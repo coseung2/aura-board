@@ -1,0 +1,60 @@
+{
+  "captured_at": "2026-04-26T16:00:00+09:00",
+  "method": "OAuth 인증 = WebSearch + 도큐 (Auth.js, Kakao Developers). UX 다자녀 패턴 = Google Image Search (phase1_researcher.md 가이드 우선순위 적용).",
+  "targets": [
+    {
+      "id": "authjs-kakao",
+      "product": "Auth.js v5 (NextAuth)",
+      "page": "Kakao provider docs",
+      "url": "https://authjs.dev/getting-started/providers/kakao",
+      "key_quotes": [
+        "Callback URL: https://example.com/api/auth/callback/kakao",
+        "Set Web app URI in Kakao Console + activate Kakao Login + configure consent items"
+      ]
+    },
+    {
+      "id": "kakao-developers-js",
+      "product": "Kakao Developers",
+      "page": "Login JavaScript SDK",
+      "url": "https://developers.kakao.com/docs/latest/en/kakaologin/js",
+      "key_observations": [
+        "OAuth 2.0 authorization code flow",
+        "user info endpoint /v2/user/me 으로 email + nickname + profile_image 획득 (consent 요청 필수)",
+        "REST API key + JavaScript key 분리 — 서버측 토큰 교환은 REST key 사용"
+      ]
+    },
+    {
+      "id": "supabase-kakao-nextjs",
+      "product": "Supabase",
+      "page": "Login with Kakao (Next.js)",
+      "url": "https://supabase.com/docs/guides/auth/social-login/auth-kakao?queryGroups=framework&framework=nextjs",
+      "key_observations": [
+        "consent items: email, profile_nickname (학부모 필수 항목), profile_image (선택)",
+        "Kakao Business 계정 미인증 시 email scope 받으려면 사업자 등록 필요 — 미인증 시 일반 신청 가능 단 검토 시간 존재"
+      ]
+    },
+    {
+      "id": "image-search-multi-child",
+      "product": "Multi-child parent app patterns (Pinterest+Mobbin Dribbble)",
+      "page": "parent app multi child selector chip dashboard",
+      "url": "https://www.google.com/search?q=parent+app+multi+child+selector+chip+dashboard&udm=2",
+      "captured_screenshot_id": "ss_2028sx9xd",
+      "key_observations": [
+        "Amazon Parent / ClassDojo 등 다수 앱이 헤더에 자녀 chip + dropdown 패턴 사용",
+        "Avatar 기반 (Netflix 프로필 선택 류) 도 흔하지만 학교 앱 컨텍스트에선 드롭다운 chip 이 보편",
+        "셀렉터는 화면 좌상단 또는 헤더 우측 — DJ 보드 헤더 actions 영역과 호환"
+      ]
+    },
+    {
+      "id": "existing-teacher-oauth",
+      "product": "Aura-board (현 프로젝트)",
+      "page": "src/lib/auth-config.ts",
+      "url": "internal://src/lib/auth-config.ts",
+      "key_observations": [
+        "NextAuth v5 + @auth/prisma-adapter + Google provider — User 모델 (교사) 전용",
+        "학부모는 Parent 모델 + 자체 ParentSession 쿠키 — NextAuth 미사용",
+        "→ 학부모 OAuth 는 NextAuth 통합 vs 커스텀 핸들러 결정 필요 (phase3 architect)"
+      ]
+    }
+  ]
+}

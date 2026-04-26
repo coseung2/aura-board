@@ -1,0 +1,44 @@
+{
+  "patterns": [
+    {
+      "pattern_id": "oauth-authcode-pkce",
+      "description": "OAuth 2.0 Authorization Code + PKCE 표준. 서버 callback (/api/parent/auth/callback/{provider}) 가 code → token 교환 후 user info fetch.",
+      "source_url": "https://authjs.dev/getting-started/providers/kakao",
+      "fits_our_use_case": "high — Kakao + Google 모두 동일 흐름",
+      "tradeoffs": "Kakao 의 email scope 는 consent 항목에 명시 + 비즈니스 검토 필요할 수 있음. 우회: 검토 통과 전엔 nickname only 로 매칭 (단 기존 매직링크 이메일 학부모 자동 link 못함 — phase2 결정)"
+    },
+    {
+      "pattern_id": "account-linking-by-email",
+      "description": "기존 학부모(매직링크 이메일) 가 OAuth 로 첫 로그인할 때 동일 이메일이면 자동으로 같은 Parent row 에 OAuth account link. 신규 row 생성 X.",
+      "source_url": "internal-decision",
+      "fits_our_use_case": "high — 기존 ParentChildLink 활성 데이터 보존 + 마이그레이션 0",
+      "tradeoffs": "이메일 일치 미보증 OAuth (Kakao email 미공개 사용자) 케이스 폴백 — phase3 에서 fallback flow 설계"
+    },
+    {
+      "pattern_id": "header-child-chip-toggle",
+      "description": "다자녀 학부모 — 헤더 좌측에 현재 선택 자녀 chip ([김민수 (3-1) ▼]). 클릭 시 dropdown 으로 다른 자녀 전환. URL 단일 (/parent/home).",
+      "source_url": "https://www.google.com/search?q=parent+app+multi+child+selector+chip+dashboard&udm=2",
+      "fits_our_use_case": "very high — 사용자 명시 (a)",
+      "tradeoffs": "딥링크 어려움 (자녀 선택 상태가 URL 에 안 박힘). URL ?child=ID 쿼리로 보강 가능."
+    },
+    {
+      "pattern_id": "single-page-portfolio-as-dashboard",
+      "description": "기존 6 탭(portfolio·plant·drawing·assignments·events·breakout) 중 portfolio 가 학생 카드 + 학급 자랑해요 통합 노출 — 별 탭 불필요. 대시보드 = portfolio 본문.",
+      "source_url": "internal — student-portfolio task v1 결과",
+      "fits_our_use_case": "high — 사용자 명시 의도 그대로",
+      "tradeoffs": "5 탭 페이지(plant/drawing/assignments/events/breakout) 의 sub-feature 가 portfolio 카드에 다 노출되는지 검증 필요. 대부분 카드 형식이라 노출 OK 추정. plant-roadmap 진행도 그래프 같은 비-카드 데이터는 별 페이지 유지 검토 (v1 비스코프)"
+    },
+    {
+      "pattern_id": "showcase-entry-button",
+      "description": "대시보드에 '🌟 우리 학급 자랑해요' 진입 버튼 — /parent/(app)/showcase 로 이동. /student/showcase 와 등가 그리드.",
+      "source_url": "internal — student-portfolio v1 패턴 재사용",
+      "fits_our_use_case": "high — 사용자 명시 요구"
+    },
+    {
+      "pattern_id": "magic-link-fallback",
+      "description": "OAuth 출시 후에도 매직링크 진입점 살려둠 (auth/* 라우트 유지). OAuth 장애·계정 분실·기업 메일 등 fallback. 주 진입점은 OAuth 버튼.",
+      "source_url": "internal-decision",
+      "fits_our_use_case": "high — phase0 rollout 결정과 일관"
+    }
+  ]
+}
