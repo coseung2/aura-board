@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { Suspense, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { OnboardingShell } from "../_shell";
 import { ParentAuthButtons } from "@/components/parent/ParentAuthButtons";
@@ -23,6 +23,14 @@ const OAUTH_ERROR_MESSAGES: Record<string, string> = {
 };
 
 export default function ParentSignupPage() {
+  return (
+    <Suspense fallback={<OnboardingShell step={1} total={4}><h1 style={titleStyle}>학부모 로그인</h1></OnboardingShell>}>
+      <ParentSignupBody />
+    </Suspense>
+  );
+}
+
+function ParentSignupBody() {
   const searchParams = useSearchParams();
   const oauthError = searchParams?.get("error") ?? null;
   const oauthErrorMsg = oauthError
