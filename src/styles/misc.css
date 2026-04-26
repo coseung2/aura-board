@@ -82,6 +82,13 @@
   box-shadow: 0 8px 30px rgba(0, 0, 0, 0.12), 0 2px 8px rgba(0, 0, 0, 0.08);
   z-index: 50;
   padding: 4px;
+}
+/* context-menu-stacking (2026-04-26): portal 변형은 document.body 직속이라
+   부모 stacking context 영향 X. 다른 카드/모달과 충돌 방지를 위해 z-index
+   상향 (모달 backdrop 90 보다 낮게 — 모달이 뜨면 그 위에 올라가지 않도록). */
+.ctx-menu-dropdown-portal {
+  z-index: 70;
+  margin-top: 0; /* fixed 위치는 이미 +4px 여백 포함 */
   animation: menuIn 120ms ease;
 }
 
