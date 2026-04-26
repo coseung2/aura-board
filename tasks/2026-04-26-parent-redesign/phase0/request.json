@@ -7,7 +7,8 @@
   "user_story": "학부모로서 OAuth 로 한 번에 로그인하고, 처음이면 학급 초대코드 → 자녀 선택만 하면 연동되며, 이후엔 로그인 후 자녀 활동 portfolio 가 곧바로 보이는 대시보드를 본다. 자녀가 더 있으면 대시보드에서 '추가 학급 코드' 진입점을 눌러 같은 흐름으로 자녀를 추가할 수 있고, 학급 자랑해요도 별도 진입점으로 본다.",
   "success_metric": "(1) 신규 가입 학부모가 OAuth 로그인 → 자녀 첫 연동까지 ≤ 30초 (현재 매직링크 ≥ 2분: 메일 도착 평균 30초 + 클릭 40초). (2) 재방문 시 OAuth 자동 로그인 → 대시보드까지 ≤ 5초. (3) 다자녀 부모의 추가 자녀 연동 진입 ≤ 3 액션. (4) 학부모 leak 0건 (자녀 외 학생 카드 절대 미노출, AC-8 student-portfolio 정책 승계).",
   "decisions_locked": {
-    "auth_method": "OAuth — 1차 Google + Kakao (한국 학부모 대부분 보유). Naver/Apple 후속.",
+    "auth_method": "OAuth — 1차 Google + Kakao 동시 출시 (한국 학부모 대부분 둘 중 하나 보유). Naver/Apple 후속.",
+    "multi_child_pattern": "헤더 자녀 chip 가로 토글 — '[김민수 (3-1) ▼]' 클릭 시 자녀 셀렉터 dropdown. URL 은 /parent/home 단일 유지(자녀 ID 는 query string 또는 internal state). DJ 보드 헤더 패턴과 일관.",
     "onboarding_first_time": [
       "1. /parent/auth — OAuth 버튼 클릭",
       "2. provider 콜백 → Parent 자동 생성/매칭 (이메일 기준 기존 계정 link)",
@@ -60,9 +61,6 @@
     "PWA / 푸시 알림",
     "비밀번호 인증 (OAuth 채택으로 불필요)"
   ],
-  "open_questions_remaining": [
-    "OAuth 1차 provider 확정 — Google + Kakao 둘 다? 아니면 1개부터?",
-    "다자녀 학부모 화면 — 헤더 자녀 셀렉터 chip(좌→우 가로 토글) vs 좌측 사이드바 vs 페이지별 자녀 ID URL?"
-  ],
+  "open_questions_remaining": [],
   "created_at": "2026-04-26T00:00:00+09:00"
 }
