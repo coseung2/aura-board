@@ -2,6 +2,7 @@
 
 import { useSession, signOut } from "next-auth/react";
 import Link from "next/link";
+import { TeacherNotificationBell } from "./TeacherNotificationBell";
 
 /**
  * Shows user info + logout button when authenticated via Google OAuth.
@@ -30,6 +31,7 @@ export function AuthHeader() {
         />
       )}
       <span className="auth-name">{session.user.name}</span>
+      <TeacherNotificationBell />
       <SettingsMenu />
       <button
         className="auth-logout-btn"
