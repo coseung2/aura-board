@@ -42,10 +42,10 @@ export function RotateConfirmModal({ open, pendingCount, onConfirm, onCancel }: 
     >
       <div style={modalStyle}>
         <h2 id="rotate-modal-title" style={{ margin: "0 0 12px 0", fontSize: 20, fontWeight: 700 }}>
-          초대 코드 회전
+          초대 코드 재발급
         </h2>
         <p style={{ margin: 0, fontSize: 15, color: "var(--color-text-muted)", lineHeight: 1.6 }}>
-          코드를 회전하면 기존 8자리 코드는 즉시 무효화되고 승인 대기 중인 {pendingCount}명은 자동으로
+          재발급하면 기존 코드는 즉시 무효화되고 승인 대기 중인 {pendingCount}명은 자동으로
           거부됩니다. 계속할까요?
         </p>
         <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 24 }}>
@@ -59,7 +59,7 @@ export function RotateConfirmModal({ open, pendingCount, onConfirm, onCancel }: 
             취소
           </button>
           <button type="button" disabled={submitting} onClick={handleConfirm} style={btnDestructive}>
-            {submitting ? "회전 중..." : "회전"}
+            {submitting ? "재발급 중..." : "재발급"}
           </button>
         </div>
       </div>

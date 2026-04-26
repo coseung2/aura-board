@@ -110,7 +110,7 @@ function InnerPage({ classroomId }: { classroomId: string }) {
       loadCode();
       loadApprovals();
     } else {
-      toast.show({ variant: "error", message: "회전에 실패했습니다" });
+      toast.show({ variant: "error", message: "재발급에 실패했습니다" });
     }
   };
 

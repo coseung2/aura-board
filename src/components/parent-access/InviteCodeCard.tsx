@@ -106,7 +106,7 @@ export function InviteCodeCard({ code, qrJoinUrl, issuedAt, usage, onRotate }: I
             cursor: "pointer",
           }}
         >
-          회전
+          재발급
         </button>
       </div>
     </div>
