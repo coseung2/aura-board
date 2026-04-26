@@ -1,14 +1,14 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import QRCode from "qrcode";
 import { formatCodeForDisplay } from "@/lib/class-invite-codes-shared";
 import { useToast } from "@/components/ui/Toast";
 
 // parent-class-invite-v2 — InviteCodeCard.
-// Renders the active code, QR placeholder, copy button, and rotate CTA.
-// QR rendering is intentionally deferred to phase8 — the server only ships
-// the code string; producing a PNG from `qrcode` npm happens at the call site
-// if/when needed. For phase7 we render a QR placeholder with the code url.
+// qr-render (2026-04-26): phase7 placeholder ("QR은 배포 후 렌더됩니다") 를
+// 실제 QR 로 교체. `qrcode` npm 이 이미 설치돼 있어 useEffect 에서 dataURL
+// 생성. qrJoinUrl 은 path-only 라 origin 결합해서 완성 URL 인코딩.
 
 export interface InviteCodeCardProps {
   code: string;
@@ -21,6 +21,22 @@ export interface InviteCodeCardProps {
 export function InviteCodeCard({ code, qrJoinUrl, issuedAt, usage, onRotate }: InviteCodeCardProps) {
   const toast = useToast();
   const [copying, setCopying] = useState(false);
+  const [qrSrc, setQrSrc] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    const fullUrl = new URL(qrJoinUrl, window.location.origin).toString();
+    QRCode.toDataURL(fullUrl, { margin: 1, width: 192, errorCorrectionLevel: "M" })
+      .then((src) => {
+        if (!cancelled) setQrSrc(src);
+      })
+      .catch(() => {
+        /* render fallback below */
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [qrJoinUrl]);
 
   const copy = async () => {
     setCopying(true);
@@ -50,23 +66,30 @@ export function InviteCodeCard({ code, qrJoinUrl, issuedAt, usage, onRotate }: I
         {formatCodeForDisplay(code)}
       </div>
       <div
-        aria-label={`학부모 가입 URL: ${qrJoinUrl}`}
+        aria-label={`학부모 가입 URL QR: ${qrJoinUrl}`}
         style={{
           margin: "0 auto 12px",
           width: 192,
           height: 192,
-          background: "var(--color-surface-alt)",
+          background: "var(--color-surface)",
           borderRadius: 8,
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
-          fontSize: 11,
-          color: "var(--color-text-muted)",
-          textAlign: "center",
-          padding: 8,
+          overflow: "hidden",
         }}
       >
-        QR은 배포 후 렌더됩니다
+        {qrSrc ? (
+          <img
+            src={qrSrc}
+            alt="학부모 가입 QR 코드"
+            width={192}
+            height={192}
+            style={{ display: "block" }}
+          />
+        ) : (
+          <span style={{ fontSize: 11, color: "var(--color-text-muted)" }}>QR 생성 중...</span>
+        )}
       </div>
       <div style={{ fontSize: 13, color: "var(--color-text-muted)", textAlign: "center" }}>
         발급: {new Date(issuedAt).toLocaleString("ko-KR")}
