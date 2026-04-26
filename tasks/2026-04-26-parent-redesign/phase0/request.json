@@ -3,24 +3,66 @@
   "slug": "parent-redesign",
   "task_id": "2026-04-26-parent-redesign",
   "change_type": "enhancement",
-  "motivation": "TBD — 현재 학부모 플로우 (parent-class-invite-v2, 2026-04-15) 의 로그인 방식 + 화면 구성 변경 필요. 사용자 디렉션 대기.",
-  "user_story": "TBD",
-  "success_metric": "TBD",
+  "motivation": "현재 학부모 플로우(parent-class-invite-v2, 2026-04-15) 매직링크 인증은 이메일 도착·클릭 단계가 매번 발생해 진입 지연이 큼. OAuth 로 단일 클릭 로그인 + 자녀 학급 코드 입력만으로 즉시 연동 가능하게 한다. 또한 자녀 페이지에 6개 탭(포트폴리오·식물·그림·숙제·행사·모둠) 이 있었는데 이번 task 의 portfolio 가 자녀 카드 + 학급 자랑해요를 모두 통합 노출하므로 별 탭이 불필요. 대시보드 = 자녀 portfolio 자체 + 자랑해요 진입점 + 추가 자녀 연동 진입점으로 단순화한다.",
+  "user_story": "학부모로서 OAuth 로 한 번에 로그인하고, 처음이면 학급 초대코드 → 자녀 선택만 하면 연동되며, 이후엔 로그인 후 자녀 활동 portfolio 가 곧바로 보이는 대시보드를 본다. 자녀가 더 있으면 대시보드에서 '추가 학급 코드' 진입점을 눌러 같은 흐름으로 자녀를 추가할 수 있고, 학급 자랑해요도 별도 진입점으로 본다.",
+  "success_metric": "(1) 신규 가입 학부모가 OAuth 로그인 → 자녀 첫 연동까지 ≤ 30초 (현재 매직링크 ≥ 2분: 메일 도착 평균 30초 + 클릭 40초). (2) 재방문 시 OAuth 자동 로그인 → 대시보드까지 ≤ 5초. (3) 다자녀 부모의 추가 자녀 연동 진입 ≤ 3 액션. (4) 학부모 leak 0건 (자녀 외 학생 카드 절대 미노출, AC-8 student-portfolio 정책 승계).",
+  "decisions_locked": {
+    "auth_method": "OAuth — 1차 Google + Kakao (한국 학부모 대부분 보유). Naver/Apple 후속.",
+    "onboarding_first_time": [
+      "1. /parent/auth — OAuth 버튼 클릭",
+      "2. provider 콜백 → Parent 자동 생성/매칭 (이메일 기준 기존 계정 link)",
+      "3. /parent/onboard/match/code — 학급 초대코드 입력",
+      "4. /parent/onboard/match/select — 자녀 선택",
+      "5. 매칭 → 교사 승인 대기(pending) — 기존 ParentChildLink 흐름 재사용",
+      "6. 승인 후 /parent/home 진입"
+    ],
+    "onboarding_returning": [
+      "1. /parent/auth — OAuth 클릭 (또는 세션 살아있으면 바로 redirect)",
+      "2. /parent/home (=대시보드)"
+    ],
+    "add_more_child_flow": "/parent/home 대시보드 상단에 '추가 자녀 연동' 진입점 → 기존 onboard/match/code 재사용 — 두번째 자녀부터 동일",
+    "screen_changes": {
+      "remove": [
+        "ChildTabs (portfolio/plant/drawing/assignments/events/breakout 6탭) — portfolio 가 모든 활동을 통합",
+        "/parent/(app)/child/[studentId]/{plant,drawing,assignments,events,breakout}/page.tsx — 별도 탭 페이지들 삭제"
+      ],
+      "keep": [
+        "/parent/(app)/child/[studentId]/portfolio — 자녀 카드 + 학급 자랑해요 통합 (이미 존재)"
+      ],
+      "redesign": [
+        "/parent/(app)/home (= 대시보드) — 풀폭 헤더 (DJ 보드 패턴) + 자녀 portfolio 본문 + 자랑해요 진입점 + 추가 자녀 연동 버튼",
+        "다자녀: 헤더에 자녀 셀렉터 (chip 토글)",
+        "/parent/(app)/child/[studentId] — 위 home 의 자녀 셀렉터 동작 등가 (deep-link 진입 가능)"
+      ],
+      "new": [
+        "/parent/(app)/showcase — 자랑해요 전용 페이지 (학생 /student/showcase 와 동등 — 학급 자랑해요 그리드)"
+      ]
+    },
+    "data_migration": "활성 ParentChildLink 유지. 기존 ParentSession 토큰은 그대로 동작 (이메일 기반). 첫 OAuth 로그인 시 Parent.email 일치 기준 OAuth account → 기존 Parent 자동 link. 재가입 강요 X.",
+    "rollout": "병행. /parent/auth 에 OAuth 버튼 + 매직링크 fallback (재가입/장애 대응). 충분히 안정화되면 별도 task 로 매직링크 deprecate.",
+    "auth_provider_storage": "NextAuth Adapter 가 이미 User 모델 사용 중 (교사 OAuth). 학부모는 별도 Parent 모델이라 신규 ParentOAuthAccount join 모델 또는 NextAuth Adapter 분기 — phase3 architect 결정"
+  },
   "affected_surfaces_current": [
-    "src/app/parent/auth/* — 매직링크 입력/콜백",
-    "src/app/parent/join/* — invite code 진입",
-    "src/app/parent/onboard/{signup,match/code,match/select,pending,rejected}",
-    "src/app/parent/(app)/{home,child/[studentId]/*,account,notifications}",
-    "src/app/parent/logged-out",
-    "src/components/parent/{ParentBottomNav,ChildTabs,SessionWatchdog}",
-    "src/lib/parent-{session,magic-link,session,rate-limit,scope,auth-only}.ts",
-    "src/lib/parent-codes.ts (학급 8자리 ClassInviteCode)"
+    "src/app/parent/auth/* — 매직링크 입력/콜백 (OAuth 추가)",
+    "src/app/parent/(app)/home/page.tsx — 대시보드 풀 재설계",
+    "src/app/parent/(app)/child/[studentId]/{plant,drawing,assignments,events,breakout}/page.tsx — 6 탭 중 5 삭제",
+    "src/app/parent/(app)/child/[studentId]/portfolio — 유지 (이미 존재)",
+    "src/app/parent/(app)/showcase/page.tsx — 신규",
+    "src/components/parent/{ChildTabs,ParentBottomNav}.tsx — 탭 제거 영향",
+    "src/lib/parent-{magic-link,session}.ts — OAuth 통합",
+    "src/lib/parent-oauth.ts — 신규",
+    "prisma/schema.prisma — ParentOAuthAccount (또는 Parent.providerId/providerAccountId 컬럼 추가)"
   ],
-  "open_questions": [
-    "로그인 방식 변경 — 현재 매직링크(이메일) → 어떤 방식으로? (예: 비밀번호, OAuth Google/Kakao, QR 매핑, 자녀 코드 직접 입력 등)",
-    "화면 구성 변경 — 어느 페이지를 어떻게? (전체 정보 구조 재편 vs 특정 페이지만? 모바일/데스크톱 비율 변경?)",
-    "기존 학부모 데이터 마이그레이션 — 활성 ParentChildLink 유지하면서 인증 방식만 swap? 또는 재가입 요구?",
-    "타임라인 — 점진적 출시(기존 + 신규 병행) vs cutover(신규 단일)?"
+  "non_goals": [
+    "Apple/Naver OAuth (1차는 Google + Kakao만)",
+    "매직링크 deprecate (병행 출시 후 별도 task)",
+    "교사 OAuth 변경 (이번 task 스코프 외, 학부모만)",
+    "PWA / 푸시 알림",
+    "비밀번호 인증 (OAuth 채택으로 불필요)"
+  ],
+  "open_questions_remaining": [
+    "OAuth 1차 provider 확정 — Google + Kakao 둘 다? 아니면 1개부터?",
+    "다자녀 학부모 화면 — 헤더 자녀 셀렉터 chip(좌→우 가로 토글) vs 좌측 사이드바 vs 페이지별 자녀 ID URL?"
   ],
   "created_at": "2026-04-26T00:00:00+09:00"
 }
