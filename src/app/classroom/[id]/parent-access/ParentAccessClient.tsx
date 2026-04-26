@@ -141,10 +141,20 @@ function InnerPage({ classroomId }: { classroomId: string }) {
     }
   };
 
-  const onRevoke = async (_linkId: string) => {
-    // Revoke endpoint out of scope in phase7 — existing flow uses /api/parent/links/[id]
-    // (soft-delete). Surface a placeholder so we don't silently no-op.
-    toast.show({ variant: "info", message: "해제 기능은 phase8에서 점검됩니다" });
+  const onRevoke = async (linkId: string) => {
+    // parent-disconnect-broken (2026-04-26): phase7 의 placeholder 가 실배포됨.
+    // 실제 endpoint (/api/parent/links/[id] DELETE) 는 이미 정상 동작 — soft-delete
+    // + 학부모 세션 전체 revoke (≤60s SLA).
+    if (!confirm("이 학부모의 연결을 해제하시겠어요? 즉시 접근이 차단됩니다.")) {
+      return;
+    }
+    const r = await fetch(`/api/parent/links/${linkId}`, { method: "DELETE" });
+    if (r.ok) {
+      setLinked((prev) => prev.filter((l) => l.linkId !== linkId));
+      toast.show({ variant: "success", message: "연결이 해제되었습니다" });
+    } else {
+      toast.show({ variant: "error", message: "해제에 실패했습니다" });
+    }
   };
 
   const filtered = useMemo(() => {
