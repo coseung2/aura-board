@@ -2,15 +2,18 @@
 
 import { useState } from "react";
 import { OnboardingShell } from "../_shell";
+import { ParentAuthButtons } from "@/components/parent/ParentAuthButtons";
 
 // parent-class-invite-v2 — P1 Signup.
-// POST /api/parent/signup → magic link dispatched (or devUrl surfaced).
+// parent-redesign (2026-04-26): OAuth(Google/Kakao) 버튼 + 매직링크 fallback.
+// 1차 진입은 OAuth, 매직링크는 보조.
 
 export default function ParentSignupPage() {
   const [email, setEmail] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [sent, setSent] = useState<{ email: string; devUrl: string | null } | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [showMagicLink, setShowMagicLink] = useState(false);
 
   const valid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
 
@@ -58,27 +61,54 @@ export default function ParentSignupPage() {
 
   return (
     <OnboardingShell step={1} total={4}>
-      <h1 style={titleStyle}>학부모 가입</h1>
-      <p style={bodyStyle}>자녀의 학급에 연결하려면 이메일을 입력해 주세요.</p>
-      <form onSubmit={onSubmit} style={{ display: "grid", gap: 12, marginTop: 16 }}>
-        <input
-          type="email"
-          placeholder="parent@example.com"
-          required
-          autoComplete="email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          aria-label="이메일"
-          style={inputStyle}
-        />
-        <button type="submit" disabled={!valid || submitting} style={primaryBtn(valid && !submitting)}>
-          {submitting ? "매직링크 발송 중..." : "매직링크 받기"}
-        </button>
-        {error && <p style={{ color: "var(--color-danger)", fontSize: 13, margin: 0 }}>{error}</p>}
-      </form>
+      <h1 style={titleStyle}>학부모 로그인</h1>
+      <p style={bodyStyle}>
+        Google 또는 Kakao 계정으로 빠르게 시작할 수 있어요.
+      </p>
+      <div style={{ marginTop: 20 }}>
+        <ParentAuthButtons />
+      </div>
+      <div style={{ marginTop: 24, textAlign: "center" }}>
+        {!showMagicLink ? (
+          <button
+            type="button"
+            onClick={() => setShowMagicLink(true)}
+            style={linkBtn}
+          >
+            이메일 매직링크로 로그인
+          </button>
+        ) : (
+          <form onSubmit={onSubmit} style={{ display: "grid", gap: 12, marginTop: 8 }}>
+            <input
+              type="email"
+              placeholder="parent@example.com"
+              required
+              autoComplete="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              aria-label="이메일"
+              style={inputStyle}
+            />
+            <button type="submit" disabled={!valid || submitting} style={primaryBtn(valid && !submitting)}>
+              {submitting ? "매직링크 발송 중..." : "매직링크 받기"}
+            </button>
+            {error && <p style={{ color: "var(--color-danger)", fontSize: 13, margin: 0 }}>{error}</p>}
+          </form>
+        )}
+      </div>
     </OnboardingShell>
   );
 }
+
+const linkBtn: React.CSSProperties = {
+  background: "transparent",
+  border: 0,
+  color: "var(--color-text-muted)",
+  fontSize: 13,
+  textDecoration: "underline",
+  cursor: "pointer",
+  padding: 4,
+};
 
 const titleStyle: React.CSSProperties = { margin: 0, fontSize: 22, fontWeight: 700 };
 const bodyStyle: React.CSSProperties = { margin: "8px 0 0", fontSize: 15, color: "var(--color-text-muted)" };

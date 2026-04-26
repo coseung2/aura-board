@@ -970,9 +970,33 @@ model Parent {
   children ParentChildLink[]
   sessions ParentSession[]
   invites  ParentInviteCode[] @relation("IssuedToEmail")
+  oauthAccounts ParentOAuthAccount[]
 
   @@index([email])
   @@index([parentDeletedAt])
+}
+
+// parent-redesign (2026-04-26): 학부모 OAuth (Google + Kakao) 1:1 매핑.
+// 한 Parent 가 여러 provider 와 link 가능 (Google 또는 Kakao 또는 둘 다).
+// (provider, providerAccountId) unique 로 같은 OAuth 계정 = 같은 Parent
+// 강제. email 매칭으로 기존 매직링크 학부모와 자동 link.
+model ParentOAuthAccount {
+  id                String   @id @default(cuid())
+  parentId          String
+  provider          String   // "google" | "kakao"
+  providerAccountId String
+  email             String?
+  emailVerified     Boolean  @default(false)
+  displayName       String?
+  profileImage      String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  parent Parent @relation(fields: [parentId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@index([parentId])
+  @@index([email])
 }
 
 // parent-class-invite-v2 — ParentLinkStatus lifecycle.

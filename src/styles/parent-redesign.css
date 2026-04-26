@@ -1,0 +1,160 @@
+/* parent-redesign (2026-04-26)
+ *
+ * 학부모 OAuth 버튼 + 자녀 셀렉터 chip dropdown + 대시보드 헤더 액션. */
+
+/* ── OAuth 버튼 ── */
+.parent-oauth-buttons {
+  display: grid;
+  gap: 12px;
+}
+.parent-oauth-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  height: 48px;
+  border-radius: var(--radius-btn, 6px);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font-size: 15px;
+  font-weight: 600;
+  text-decoration: none;
+  cursor: pointer;
+  transition:
+    background 150ms,
+    border-color 150ms;
+}
+.parent-oauth-btn:hover {
+  background: var(--color-surface-alt);
+  border-color: var(--color-border-hover);
+}
+.parent-oauth-btn:focus-visible {
+  outline: 2px solid var(--color-accent-tinted-text);
+  outline-offset: 2px;
+}
+.parent-oauth-btn-google {
+  /* white bg + Google brand icon strip — guideline 일치 */
+  background: #fff;
+  color: #1f1f1f;
+}
+.parent-oauth-btn-kakao {
+  background: var(--color-oauth-kakao);
+  color: #181600;
+  border-color: var(--color-oauth-kakao);
+}
+.parent-oauth-btn-kakao:hover {
+  /* Kakao brand 색 hover 더 진한 amber */
+  background: #fada0a;
+  border-color: #fada0a;
+}
+.parent-oauth-btn-icon {
+  display: inline-flex;
+  align-items: center;
+  line-height: 1;
+}
+
+/* ── 자녀 셀렉터 chip + dropdown ── */
+.parent-child-chip-wrap {
+  position: relative;
+  display: inline-block;
+}
+.parent-child-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  background: var(--color-surface);
+  color: var(--color-text);
+  font-size: 0.95rem;
+  font-weight: 600;
+  cursor: default;
+}
+.parent-child-chip.is-button {
+  cursor: pointer;
+  transition: background 100ms;
+}
+.parent-child-chip.is-button:hover {
+  background: var(--color-surface-alt);
+}
+.parent-child-chip.is-button:focus-visible {
+  outline: 2px solid var(--color-accent-tinted-text);
+  outline-offset: 2px;
+}
+.parent-child-chip-name {
+  font-weight: 700;
+}
+.parent-child-chip-meta {
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: var(--color-text-muted);
+}
+.parent-child-chip-caret {
+  font-size: 0.65rem;
+  color: var(--color-text-faint);
+  margin-left: 2px;
+}
+
+.parent-child-dropdown {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  z-index: 30;
+  min-width: 240px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  box-shadow: var(--shadow-card);
+  list-style: none;
+  margin: 0;
+  padding: 6px 0;
+  overflow: hidden;
+}
+.parent-child-dropdown-item {
+  display: grid;
+  grid-template-columns: 24px 1fr auto;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 8px 12px;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  text-decoration: none;
+  color: var(--color-text);
+  font-size: 0.9rem;
+  text-align: left;
+  transition: background 100ms;
+}
+.parent-child-dropdown-item:hover {
+  background: var(--color-surface-alt);
+}
+.parent-child-dropdown-item.is-selected {
+  background: var(--color-accent-tinted-bg);
+  color: var(--color-accent-tinted-text);
+}
+.parent-child-dropdown-check {
+  font-size: 0.7rem;
+}
+.parent-child-dropdown-name {
+  font-weight: 600;
+}
+.parent-child-dropdown-meta {
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+}
+.parent-child-dropdown-divider {
+  height: 1px;
+  background: var(--color-border);
+  margin: 4px 0;
+}
+.parent-child-dropdown-add {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  grid-template-columns: none;
+  color: var(--color-accent);
+  font-weight: 600;
+}

@@ -87,6 +87,11 @@ img.emoji {
      itch.io/Steam 별점 amber 와 동일 시맨틱(주목·하이라이트) 으로 alias. */
   --color-showcase: var(--color-vibe-rating);
 
+  /* parent-redesign (2026-04-26). OAuth brand 색 (Google/Kakao). brand
+     guideline 에 따라 white bg + 아래 색은 icon/strip/포커스링 한정 사용. */
+  --color-oauth-google: #4285F4;
+  --color-oauth-kakao: #FEE500;
+
   /* 페이지 컨테이너 max-width — Notion 류 가독성 컨벤션. 기본 960px,
      데스크톱(≥1280px) 에서 1240px 로 확장 (tokens-responsive.css).
      새 페이지는 var(--container-max-width) 사용해 데스크톱 분기 자동 적용. */

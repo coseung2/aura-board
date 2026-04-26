@@ -13,11 +13,19 @@ import { PortfolioCardModal } from "./PortfolioCardModal";
 type Props = {
   classroomId: string;
   classroomName: string;
+  /** ← 백 링크 destination. 학생: /student (default), 학부모: /parent/home. */
+  backHref?: string;
+  backLabel?: string;
 };
 
 const FULL_LIMIT = 200;
 
-export function ShowcaseGalleryView({ classroomId, classroomName }: Props) {
+export function ShowcaseGalleryView({
+  classroomId,
+  classroomName,
+  backHref = "/student",
+  backLabel = "학생 메인으로",
+}: Props) {
   const [entries, setEntries] = useState<ShowcaseEntryDTO[] | null>(null);
   const [loading, setLoading] = useState(true);
   const [openEntry, setOpenEntry] = useState<ShowcaseEntryDTO | null>(null);
@@ -53,9 +61,9 @@ export function ShowcaseGalleryView({ classroomId, classroomName }: Props) {
       <header className="portfolio-page-header">
         <div className="portfolio-page-header-left">
           <Link
-            href="/student"
+            href={backHref}
             className="portfolio-page-back"
-            aria-label="학생 메인으로"
+            aria-label={backLabel}
           >
             ←
           </Link>
