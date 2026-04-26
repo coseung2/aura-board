@@ -1,0 +1,16 @@
+{
+  "additions": [
+    {
+      "name": "--color-oauth-google",
+      "value": "#4285F4",
+      "purpose": "Google OAuth 버튼 brand 색 (icon strip + focus ring). brand guideline 따라 white bg + 이 색 icon."
+    },
+    {
+      "name": "--color-oauth-kakao",
+      "value": "#FEE500",
+      "purpose": "Kakao OAuth 버튼 brand 배경 + 검정 글자. brand guideline."
+    }
+  ],
+  "modifications": [],
+  "removals": []
+}
