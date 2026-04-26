@@ -105,16 +105,18 @@
   background: var(--color-accent-active);
 }
 
-/* parent-redesign (2026-04-26): 학부모 카드는 OAuth 2개 진입점이라 단일
-   CTA 대신 두 OAuth 버튼 행. 카드 자체는 button 이 아닌 div. */
-.login-role-card-parent {
+/* OAuth 카드 (교사·학부모) — button-card 대신 div 컨테이너 + 내부
+   OAuth 버튼 행. teacher-login-button-unify (2026-04-26) 에서 학부모
+   전용 클래스를 일반화 (.login-role-card-parent → .login-role-card-static,
+   .login-role-parent-actions → .login-role-oauth-actions). */
+.login-role-card-static {
   cursor: default;
 }
-.login-role-card-parent:hover {
+.login-role-card-static:hover {
   /* div 라 button hover 효과 의도 안 함 — 위 .login-role-card:hover 는 button 한정 */
   transform: none;
 }
-.login-role-parent-actions {
+.login-role-oauth-actions {
   margin-top: 10px;
   display: grid;
   gap: 6px;

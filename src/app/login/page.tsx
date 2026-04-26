@@ -5,36 +5,12 @@ import { useRouter } from "next/navigation";
 import { Logo } from "@/components/Logo";
 import { RoleIcon } from "@/components/login/RoleIcon";
 
-// parent-redesign (2026-04-26): 학부모 카드의 단일 "초대 코드 입력" 버튼 →
-// Google + Kakao OAuth 두 버튼. 학부모는 OAuth 로그인 후 자녀 코드 입력 단계.
-
-type SimpleRole = {
-  id: "teacher" | "student";
-  title: string;
-  desc: string;
-  cta: string;
-  onSelect: () => void;
-};
+// teacher-login-button-unify (2026-04-26): 교사 카드도 학부모처럼
+// Google 글리프 + 브랜드 컬러 OAuth 버튼으로 통일. 학생은 OAuth 가
+// 아니라 별도 라우팅이라 button-card 패턴 유지.
 
 export default function LoginPage() {
   const router = useRouter();
-
-  const simpleRoles: SimpleRole[] = [
-    {
-      id: "teacher",
-      title: "교사",
-      desc: "학급과 보드를 관리해요",
-      cta: "Google로 로그인",
-      onSelect: () => signIn("google", { redirectTo: "/" }),
-    },
-    {
-      id: "student",
-      title: "학생",
-      desc: "QR/코드로 학급에 참여해요",
-      cta: "학생 로그인",
-      onSelect: () => router.push("/student/login"),
-    },
-  ];
 
   return (
     <main className="login-page">
@@ -46,27 +22,51 @@ export default function LoginPage() {
         <p className="login-subtitle">어떤 역할로 들어가시나요?</p>
 
         <div className="login-hub-grid">
-          {simpleRoles.map((role) => (
-            <button
-              key={role.id}
-              type="button"
-              className="login-role-card"
-              onClick={role.onSelect}
-              aria-label={`${role.title}으로 계속`}
-            >
-              <div className="login-role-icon">
-                <RoleIcon role={role.id} />
-              </div>
-              <div className="login-role-title">{role.title}</div>
-              <div className="login-role-desc">{role.desc}</div>
-              <div className="login-role-cta">{role.cta}</div>
-            </button>
-          ))}
+          {/* 교사 카드 — Google OAuth 단일 진입점. 학부모 카드와 동일한
+              div + 내부 OAuth 버튼 패턴으로 통일. */}
+          <div
+            className="login-role-card login-role-card-static"
+            role="group"
+            aria-label="교사 로그인"
+          >
+            <div className="login-role-icon">
+              <RoleIcon role="teacher" />
+            </div>
+            <div className="login-role-title">교사</div>
+            <div className="login-role-desc">학급과 보드를 관리해요</div>
+            <div className="login-role-oauth-actions">
+              <button
+                type="button"
+                className="login-role-oauth login-role-oauth-google"
+                onClick={() => signIn("google", { redirectTo: "/" })}
+                aria-label="Google로 교사 로그인"
+              >
+                <GoogleGlyph />
+                <span>Google로 로그인</span>
+              </button>
+            </div>
+          </div>
+
+          {/* 학생 카드 — QR/코드 진입. OAuth 가 아니라 별도 라우팅이라
+              button-card 패턴 유지. */}
+          <button
+            type="button"
+            className="login-role-card"
+            onClick={() => router.push("/student/login")}
+            aria-label="학생으로 계속"
+          >
+            <div className="login-role-icon">
+              <RoleIcon role="student" />
+            </div>
+            <div className="login-role-title">학생</div>
+            <div className="login-role-desc">QR/코드로 학급에 참여해요</div>
+            <div className="login-role-cta">학생 로그인</div>
+          </button>
 
           {/* 학부모 카드 — OAuth 2 진입점 (Google + Kakao). 클릭은 카드
               자체가 아닌 내부 두 OAuth 링크. */}
           <div
-            className="login-role-card login-role-card-parent"
+            className="login-role-card login-role-card-static"
             role="group"
             aria-label="학부모 로그인"
           >
@@ -75,7 +75,7 @@ export default function LoginPage() {
             </div>
             <div className="login-role-title">학부모</div>
             <div className="login-role-desc">자녀 작품을 확인해요</div>
-            <div className="login-role-parent-actions">
+            <div className="login-role-oauth-actions">
               <a
                 href="/api/parent/auth/google"
                 className="login-role-oauth login-role-oauth-google"
