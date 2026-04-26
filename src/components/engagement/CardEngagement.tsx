@@ -264,6 +264,26 @@ function CommentsBlock({
 
   return (
     <div className="card-engagement-comments">
+      {/* comments-form-top (2026-04-26): 입력 폼이 상단, 댓글 목록은 그 아래
+          oldest → newest 순으로 쌓임. 새 댓글은 자연스럽게 list 끝에 추가. */}
+      {canInteract ? (
+        <form className="card-engagement-comment-form" onSubmit={submit}>
+          <textarea
+            value={content}
+            onChange={(e) => setContent(e.target.value)}
+            placeholder="댓글을 입력하세요"
+            maxLength={1000}
+            rows={2}
+            disabled={submitting}
+          />
+          <button type="submit" disabled={submitting || !content.trim()}>
+            {submitting ? "작성 중..." : "댓글 달기"}
+          </button>
+          {err && <span className="card-engagement-comment-err">{err}</span>}
+        </form>
+      ) : (
+        <div className="card-engagement-readonly">읽기 전용 (학부모는 댓글을 달 수 없어요)</div>
+      )}
       {items === null ? (
         <div className="card-engagement-empty">불러오는 중...</div>
       ) : items.length === 0 ? (
@@ -290,24 +310,6 @@ function CommentsBlock({
             </li>
           ))}
         </ul>
-      )}
-      {canInteract ? (
-        <form className="card-engagement-comment-form" onSubmit={submit}>
-          <textarea
-            value={content}
-            onChange={(e) => setContent(e.target.value)}
-            placeholder="댓글을 입력하세요"
-            maxLength={1000}
-            rows={2}
-            disabled={submitting}
-          />
-          <button type="submit" disabled={submitting || !content.trim()}>
-            {submitting ? "작성 중..." : "댓글 달기"}
-          </button>
-          {err && <span className="card-engagement-comment-err">{err}</span>}
-        </form>
-      ) : (
-        <div className="card-engagement-readonly">읽기 전용 (학부모는 댓글을 달 수 없어요)</div>
       )}
     </div>
   );
