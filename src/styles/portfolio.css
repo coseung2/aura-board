@@ -400,10 +400,16 @@
   display: block;
 }
 /* 카드 본문 안의 a/button 이 클릭을 가로채면 카드 자체 onClick(=모달 오픈)
-   이 안 먹음. 포트폴리오 그리드의 카드는 미리보기 용도라 인터랙션 비활성. */
+   이 안 먹음. 포트폴리오 그리드의 카드는 미리보기 용도라 인터랙션 비활성.
+   단, engagement chips (좋아요/댓글) 는 stopPropagation 을 자체 처리하므로
+   인라인에서도 클릭 가능해야 한다 — engagement-chips-clickable (2026-04-26). */
 .portfolio-card-link a,
 .portfolio-card-link button {
   pointer-events: none;
+}
+.portfolio-card-link .card-engagement-chips,
+.portfolio-card-link .card-engagement-chips button {
+  pointer-events: auto;
 }
 .portfolio-card-foot {
   display: flex;
@@ -516,11 +522,17 @@
 }
 /* CardBody 내부의 a/button (링크 미리보기·재생 버튼) 이 클릭을 가로채면
    chip 자체 onClick(=모달 오픈) 이 안 먹음. chip 안에서는 컨텐츠 미리보기
-   용도라 모든 인터랙션 비활성, 클릭은 article wrapper 만 받음. */
+   용도라 모든 인터랙션 비활성, 클릭은 article wrapper 만 받음.
+   단, engagement chips 는 stopPropagation 자체 처리 — 클릭 허용
+   (engagement-chips-clickable 2026-04-26). */
 .showcase-chip a,
 .showcase-chip button,
 .showcase-chip .card-link-preview {
   pointer-events: none;
+}
+.showcase-chip .card-engagement-chips,
+.showcase-chip .card-engagement-chips button {
+  pointer-events: auto;
 }
 .showcase-chip-skeleton {
   flex: 0 0 auto;
