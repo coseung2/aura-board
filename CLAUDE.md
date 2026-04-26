@@ -12,6 +12,7 @@
 
 - **로컬 확인 시 항상 dev 서버를 재시작한다**: `fuser -k 3000/tcp; rm -rf .next; PORT=3000 npm run dev`
 - **port 4000은 절대 건드리지 않는다** (다른 프로젝트 사용 중)
+- **worktree 진입 / dev 재시작 전 .env sync**: `cp ../../../.env .env` 먼저 실행. Next.js 는 cwd 의 `.env` 만 자동 로드하는데 worktree 와 메인 root 가 분리돼 있어 root 에 추가된 새 변수가 worktree dev 서버에 반영 안 되는 사고가 반복됨. 사용자가 root `.env` 수정한 직후엔 반드시 sync.
 
 ## Git 워크플로우
 
