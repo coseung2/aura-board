@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
-import { generateCode } from "@/lib/class-invite-codes";
+import { generateUniqueCode } from "@/lib/class-invite-codes";
 import { dispatchParentNotification } from "@/lib/parent-email";
 
 // parent-class-invite-v2 — rotate a class invite code.
@@ -31,7 +31,9 @@ export async function POST(
       return NextResponse.json({ error: "already_rotated" }, { status: 409 });
     }
 
-    const { code: newCode, codeHash: newHash } = generateCode();
+    const { code: newCode, codeHash: newHash } = await generateUniqueCode(async (hash) =>
+      Boolean(await db.classInviteCode.findUnique({ where: { codeHash: hash } }))
+    );
     const now = new Date();
 
     const { rotatedCount, affectedParents } = await db.$transaction(async (tx) => {

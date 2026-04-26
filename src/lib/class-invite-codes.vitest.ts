@@ -8,7 +8,7 @@ import {
 import { generateCode, hashCode, verifyCode } from "./class-invite-codes";
 
 describe("class-invite-codes", () => {
-  it("generateCode produces an 8-char Crockford Base32 string", () => {
+  it("generateCode produces a CODE_LENGTH Crockford Base32 string", () => {
     const { code } = generateCode();
     expect(code).toHaveLength(CODE_LENGTH);
     for (const ch of code) {
@@ -25,7 +25,8 @@ describe("class-invite-codes", () => {
     expect(normalizeCode("IOL2")).toBe("1012");
   });
 
-  it("formatCodeForDisplay inserts hyphen at 4-4", () => {
+  it("formatCodeForDisplay: 5자리는 raw, 8자리는 4-4 split (legacy), 그 외는 raw", () => {
+    expect(formatCodeForDisplay("ABCD1")).toBe("ABCD1");
     expect(formatCodeForDisplay("ABCD1234")).toBe("ABCD-1234");
     expect(formatCodeForDisplay("ABC")).toBe("ABC");
   });

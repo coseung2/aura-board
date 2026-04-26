@@ -2,13 +2,14 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { db } from "@/lib/db";
 import { withParentAuth } from "@/lib/parent-auth-only";
-import { hashCode, normalizeCode } from "@/lib/class-invite-codes";
+import { hashCode, normalizeCode, CODE_LENGTH } from "@/lib/class-invite-codes";
 import { checkMatchLimit, recordMatchAttempt } from "@/lib/rate-limit-parent";
 import { extractClientIp } from "@/lib/parent-rate-limit";
 import { issueTicket } from "@/lib/match-ticket";
 
 // parent-class-invite-v2 — POST /api/parent/match/code.
-// Validates an 8-char Crockford code, returns a short-lived match ticket + classroom name.
+// Validates a CODE_LENGTH-char Crockford code, returns a short-lived match
+// ticket + classroom name.
 
 const Schema = z.object({ code: z.string().min(1).max(32) });
 
@@ -25,7 +26,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "invalid_input" }, { status: 400 });
     }
     const normalized = normalizeCode(parsed.data.code);
-    if (normalized.length !== 8) {
+    if (normalized.length !== CODE_LENGTH) {
       return NextResponse.json({ error: "code_not_found" }, { status: 404 });
     }
 

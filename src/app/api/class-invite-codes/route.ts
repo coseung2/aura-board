@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { db } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
-import { generateCode } from "@/lib/class-invite-codes";
+import { generateUniqueCode } from "@/lib/class-invite-codes";
 
 // parent-class-invite-v2 — GET list + POST create class invite codes.
 // Auth: teacher NextAuth session + classroom ownership. api_contract.json §2.1.
@@ -77,7 +77,9 @@ export async function POST(req: Request) {
         { status: 409 }
       );
     }
-    const { code, codeHash } = generateCode();
+    const { code, codeHash } = await generateUniqueCode(async (hash) =>
+      Boolean(await db.classInviteCode.findUnique({ where: { codeHash: hash } }))
+    );
     const created = await db.classInviteCode.create({
       data: {
         classroomId,
