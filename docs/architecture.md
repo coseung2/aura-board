@@ -457,3 +457,60 @@ VibeCodingStudio · PlayModal · ReviewPanel · TeacherModerationDashboard · 8 
 ### 알려진 한계
 - Realtime publish no-op → 자랑해요 토글 즉시 다른 탭 반영 X. 진입 시 fetch 로 fallback
 - 자랑해요 한도 race 잠재 (Prisma SELECT FOR UPDATE 미지원). 클라이언트 busy state + transaction COUNT 가드. 멀티 디바이스 race 발생 시 hotfix (SERIALIZABLE 격리 또는 raw INSERT WHERE COUNT<3) 가능
+
+## Parent Redesign — OAuth + 통합 대시보드 (parent-redesign) — 2026-04-26
+
+학부모 매직링크 인증 → OAuth(Google + Kakao) 추가. 자녀 페이지 6탭
+(portfolio·plant·drawing·assignments·events·breakout) 을 portfolio 1개로
+통합한 대시보드. 학급 자랑해요 진입점 추가.
+
+### Data model
+- **`ParentOAuthAccount`** 신규: `parentId` `provider` (google/kakao) `providerAccountId` `email?` `emailVerified` `displayName?` `profileImage?` `(provider, providerAccountId)` unique. parentId+email index. 마이그레이션 `20260426_parent_oauth_account` zero-downtime.
+- 기존 `Parent` 무변경 (email 매칭으로 OAuth account link).
+
+### Auth library
+- **arctic@^3.7.0** — Lucia 기반 OAuth 클라이언트. Google + Kakao provider. NextAuth 와 별도 (학부모 = Parent 모델 + ParentSession 쿠키, 교사 = NextAuth User).
+- **State cookie**: `parent-oauth-state.ts` (pure) HMAC-SHA256 sign + 10분 TTL + timingSafeEqual 검증. 8 unit tests.
+- **Account linking** (`upsertParentFromOAuth`):
+  1. `(provider, providerAccountId)` 매칭 → 기존 link 사용
+  2. verified email 매칭 → 기존 Parent 에 신규 ParentOAuthAccount link
+  3. 신규 Parent + ParentOAuthAccount (email 없으면 placeholder `oauth-{provider}-{id}@noemail.aura.local`)
+
+### API
+| Method | Path | Role |
+|---|---|---|
+| GET | `/api/parent/auth/{provider}` | 누구나. state cookie + 302 to provider authorization |
+| GET | `/api/parent/auth/callback/{provider}` | code → token 교환 + user info + upsert + ParentSession 발급 + redirect |
+
+### Routes
+- `/parent/(app)/home` 풀 재설계: 풀폭 헤더(DJ 패턴) + 자녀 chip 셀렉터 + ParentPortfolioView 본문 + 자랑해요/자녀 추가 액션
+- `/parent/(app)/showcase` 신규: ShowcaseGalleryView 학급 자랑해요 그리드 (`/student/showcase` 등가)
+- `/parent/(app)/child/[id]/{plant,drawing,assignments,events,breakout}` 5개 → redirect /parent/home (backwards safety)
+- `/parent/(app)/child/[id]/portfolio` 유지
+- `/parent/(app)/child/[id]/page.tsx` redirect → /parent/home?child=ID
+- `/parent/onboard/signup` UI 갱신: ParentAuthButtons 우선 + "이메일 매직링크" 토글 fallback
+
+### Components
+- `<ParentDashboard />` — 풀폭 헤더 + 자녀 셀렉터 + portfolio 본문, URL ?child=ID + localStorage 복원
+- `<ParentChildSelector />` — 자녀 1명: 정적 chip / ≥2명: dropdown (listbox role + 키보드 + outside click)
+- `<ParentAuthButtons />` — Google + Kakao SVG icon 버튼
+- (재사용) `<ParentPortfolioView />` `<ShowcaseGalleryView />` `<PortfolioCardModal />`
+- `<ChildTabs />` 삭제
+
+### Design tokens (2 신규)
+| 토큰 | 값 | 용도 |
+|---|---|---|
+| `--color-oauth-google` | `#4285F4` | Google brand icon strip |
+| `--color-oauth-kakao` | `#FEE500` | Kakao brand 배경 |
+
+### Environment
+4개 env 추가 필요 (사용자 작업): `GOOGLE_PARENT_CLIENT_ID/SECRET`,
+`KAKAO_PARENT_CLIENT_ID/SECRET`, `PARENT_OAUTH_REDIRECT_BASE_URL`.
+미설정 시 OAuth 버튼 disabled + 매직링크 fallback.
+
+### 회귀 테스트
+- `parent-oauth-state.vitest.ts` 8 tests (HMAC sign/verify + 만료 + 위조 + 형식)
+
+### 알려진 한계
+- 라이브 OAuth flow 자동 검증 불가 (외부 provider 응답 필요). 코드 + 단위 테스트로 대체.
+- placeholder email 도메인 (`@noemail.aura.local`) 발송 시 bounce — 별도 task 로 발송 path skip 처리 필요

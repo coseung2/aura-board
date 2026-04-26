@@ -1,8 +1,13 @@
 import "server-only";
 import { cookies } from "next/headers";
-import { createHmac, randomBytes, timingSafeEqual } from "crypto";
+import { randomBytes } from "crypto";
 import { Google, Kakao } from "arctic";
 import { db } from "./db";
+import {
+  signStatePayload,
+  verifyStateToken,
+  type StatePayload,
+} from "./parent-oauth-state";
 
 // parent-redesign (2026-04-26): 학부모 OAuth — Google + Kakao.
 // arctic 라이브러리로 표준 OAuth 2.0 Authorization Code + PKCE 흐름.
@@ -47,45 +52,16 @@ export function isProviderEnabled(provider: ProviderId): boolean {
     : !!kakaoClient();
 }
 
-// ─── State cookie (HMAC signed JSON) ──────────────────────────────────────
-
-type StatePayload = {
-  state: string; // arctic state token
-  codeVerifier?: string; // PKCE
-  exp: number;
-  redirect?: string; // post-auth destination override (currently unused)
-};
-
-function sign(payload: StatePayload): string {
-  const json = JSON.stringify(payload);
-  const b64 = Buffer.from(json).toString("base64url");
-  const sig = createHmac("sha256", SECRET).update(b64).digest("base64url");
-  return `${b64}.${sig}`;
-}
-
-function verify(token: string): StatePayload | null {
-  const [b64, sig] = token.split(".");
-  if (!b64 || !sig) return null;
-  const expected = createHmac("sha256", SECRET).update(b64).digest("base64url");
-  const a = Buffer.from(sig);
-  const b = Buffer.from(expected);
-  if (a.length !== b.length || !timingSafeEqual(a, b)) return null;
-  try {
-    const payload = JSON.parse(
-      Buffer.from(b64, "base64url").toString()
-    ) as StatePayload;
-    if (payload.exp < Date.now()) return null;
-    return payload;
-  } catch {
-    return null;
-  }
-}
+// ─── State cookie (HMAC signed JSON via parent-oauth-state) ───────────────
 
 export async function setStateCookie(payload: Omit<StatePayload, "exp">) {
   const cookieStore = await cookies();
   cookieStore.set(
     STATE_COOKIE,
-    sign({ ...payload, exp: Date.now() + STATE_TTL_MS }),
+    signStatePayload(
+      { ...payload, exp: Date.now() + STATE_TTL_MS },
+      SECRET
+    ),
     {
       httpOnly: true,
       sameSite: "lax",
@@ -101,7 +77,7 @@ export async function popStateCookie(): Promise<StatePayload | null> {
   const v = cookieStore.get(STATE_COOKIE)?.value;
   if (!v) return null;
   cookieStore.delete(STATE_COOKIE);
-  return verify(v);
+  return verifyStateToken(v, SECRET);
 }
 
 export function makeState(): string {
