@@ -8,6 +8,7 @@ import type {
 import { PortfolioCardItem } from "./PortfolioCardItem";
 import { ShowcaseCardChip } from "./ShowcaseCardChip";
 import { PortfolioCardModal } from "./PortfolioCardModal";
+import { StarFilledIcon } from "../icons/UiIcons";
 
 type Props = {
   childId: string;
@@ -106,7 +107,10 @@ export function ParentPortfolioView({ childId, childName }: Props) {
           aria-label="우리 학급 자랑해요"
         >
           <header className="showcase-strip-head">
-            <h3>🌟 우리 학급 자랑해요 ({data.classroomShowcase.length}개)</h3>
+            <h3 className="showcase-strip-title">
+              <StarFilledIcon size={20} />
+              <span>우리 학급 자랑해요 ({data.classroomShowcase.length}개)</span>
+            </h3>
           </header>
           <div className="showcase-strip-row">
             {data.classroomShowcase.map((e) => (

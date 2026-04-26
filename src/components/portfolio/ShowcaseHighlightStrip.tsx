@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import type { ShowcaseEntryDTO } from "@/lib/portfolio-dto";
 import { ShowcaseCardChip } from "./ShowcaseCardChip";
 import { PortfolioCardModal } from "./PortfolioCardModal";
+import { StarFilledIcon } from "../icons/UiIcons";
 
 type Props = {
   classroomId: string;
@@ -48,7 +49,10 @@ export function ShowcaseHighlightStrip({ classroomId, hrefBase }: Props) {
     return (
       <section className="showcase-strip is-loading" aria-label="우리 학급 자랑해요">
         <header className="showcase-strip-head">
-          <h2>🌟 우리 학급 자랑해요</h2>
+          <h2 className="showcase-strip-title">
+            <StarFilledIcon size={22} />
+            <span>우리 학급 자랑해요</span>
+          </h2>
         </header>
         <div className="showcase-strip-row" aria-hidden>
           {[0, 1, 2].map((i) => (
@@ -67,7 +71,10 @@ export function ShowcaseHighlightStrip({ classroomId, hrefBase }: Props) {
   return (
     <section className="showcase-strip" aria-label="우리 학급 자랑해요">
       <header className="showcase-strip-head">
-        <h2>🌟 우리 학급 자랑해요</h2>
+        <h2 className="showcase-strip-title">
+          <StarFilledIcon size={22} />
+          <span>우리 학급 자랑해요</span>
+        </h2>
         <a className="showcase-strip-more" href={hrefBase}>
           더 보기 →
         </a>

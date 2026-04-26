@@ -432,18 +432,41 @@
 }
 
 /* ── Showcase highlight strip ── */
+/* showcase-strip-refine (2026-04-26): 섹션을 둥근 카드로, 헤더 typography
+   업그레이드, 별 아이콘 SVG 사용 (이전: top/bottom border + 🌟 emoji). */
 .showcase-strip {
-  margin: 16px 0;
-  padding: 12px 0;
-  background: var(--color-bg-alt);
-  border-top: 1px solid var(--color-border);
-  border-bottom: 1px solid var(--color-border);
+  margin: 20px 0;
+  padding: 18px 4px 14px;
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--color-warning, #f59e0b) 5%, var(--color-surface)) 0%,
+    var(--color-surface) 100%
+  );
+  border: 1px solid var(--color-border);
+  border-radius: 14px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.04);
 }
 .showcase-strip-head {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   justify-content: space-between;
-  padding: 0 16px 8px;
+  padding: 0 16px 12px;
+  gap: 12px;
+}
+.showcase-strip-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0;
+  font-size: 1.125rem;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  color: var(--color-text);
+  line-height: 1;
+}
+.showcase-strip-title svg {
+  flex-shrink: 0;
+  filter: drop-shadow(0 1px 1.5px rgba(245, 158, 11, 0.3));
 }
 .showcase-strip-head h2,
 .showcase-strip-head h3 {
@@ -453,8 +476,10 @@
 }
 .showcase-strip-more {
   font-size: 0.875rem;
+  font-weight: 600;
   color: var(--color-accent);
   text-decoration: none;
+  white-space: nowrap;
 }
 .showcase-strip-more:hover {
   color: var(--color-accent-active);

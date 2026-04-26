@@ -81,3 +81,30 @@ export function FullscreenExitIcon({ size = 20, className }: IconProps) {
     </svg>
   );
 }
+
+export function StarFilledIcon({ size = 20, className }: IconProps) {
+  // 24-pt star, 5점 정확 대칭. 1px 진하기 stroke 으로 그라데 hint.
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      className={className}
+      aria-hidden="true"
+    >
+      <defs>
+        <linearGradient id="starGold" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stopColor="#ffd166" />
+          <stop offset="1" stopColor="#f59e0b" />
+        </linearGradient>
+      </defs>
+      <path
+        d="M12 2.5l2.95 5.97 6.6.96-4.78 4.65 1.13 6.57L12 17.55 6.1 20.65l1.13-6.57L2.45 9.43l6.6-.96L12 2.5z"
+        fill="url(#starGold)"
+        stroke="#d97706"
+        strokeWidth="0.6"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
