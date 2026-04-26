@@ -105,6 +105,51 @@
   background: var(--color-accent-active);
 }
 
+/* parent-redesign (2026-04-26): 학부모 카드는 OAuth 2개 진입점이라 단일
+   CTA 대신 두 OAuth 버튼 행. 카드 자체는 button 이 아닌 div. */
+.login-role-card-parent {
+  cursor: default;
+}
+.login-role-card-parent:hover {
+  /* div 라 button hover 효과 의도 안 함 — 위 .login-role-card:hover 는 button 한정 */
+  transform: none;
+}
+.login-role-parent-actions {
+  margin-top: 10px;
+  display: grid;
+  gap: 6px;
+  width: 100%;
+}
+.login-role-oauth {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 36px;
+  border-radius: var(--radius-btn);
+  font-size: 12px;
+  font-weight: 600;
+  text-decoration: none;
+  border: 1px solid var(--color-border);
+  transition: background 100ms, border-color 100ms;
+}
+.login-role-oauth:hover {
+  border-color: var(--color-border-hover);
+}
+.login-role-oauth-google {
+  background: #fff;
+  color: #1f1f1f;
+}
+.login-role-oauth-kakao {
+  background: var(--color-oauth-kakao);
+  color: #181600;
+  border-color: var(--color-oauth-kakao);
+}
+.login-role-oauth-kakao:hover {
+  background: #fada0a;
+  border-color: #fada0a;
+}
+
 .login-logo {
   /* PNG lockup wrapper — inner <Logo> renders the mark. Layout-only (T2-2). */
   margin: 0 auto 20px;
