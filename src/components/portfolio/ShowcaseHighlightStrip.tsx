@@ -7,9 +7,11 @@ import { PortfolioCardModal } from "./PortfolioCardModal";
 
 type Props = {
   classroomId: string;
-  /** "더 보기" 링크 destination — 포트폴리오 페이지 진입점 */
+  /** "더 보기" 링크 destination — 자랑해요 전용 페이지 */
   hrefBase: string;
 };
+
+const STRIP_LIMIT = 10;
 
 export function ShowcaseHighlightStrip({ classroomId, hrefBase }: Props) {
   const [entries, setEntries] = useState<ShowcaseEntryDTO[] | null>(null);
@@ -19,7 +21,7 @@ export function ShowcaseHighlightStrip({ classroomId, hrefBase }: Props) {
   useEffect(() => {
     let cancelled = false;
     fetch(
-      `/api/showcase/classroom/${encodeURIComponent(classroomId)}`,
+      `/api/showcase/classroom/${encodeURIComponent(classroomId)}?limit=${STRIP_LIMIT}`,
       { cache: "no-store" }
     )
       .then(async (res) => {

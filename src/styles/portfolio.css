@@ -531,6 +531,31 @@
   animation: portfolio-skeleton-shimmer 1.6s ease-in-out infinite;
 }
 
+/* 자랑해요 전용 페이지 — strip 의 풀 버전. 가로 스크롤 X, 그리드 멀티-row. */
+.showcase-gallery {
+  padding: 24px;
+}
+.showcase-gallery-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 16px;
+  align-items: start;
+}
+.showcase-gallery-grid .showcase-chip {
+  width: auto;
+  flex: initial;
+}
+.portfolio-page-meta {
+  font-size: 0.85rem;
+  color: var(--color-text-muted);
+  font-weight: 500;
+}
+.portfolio-empty-hint {
+  margin-top: 8px;
+  font-size: 0.85rem;
+  color: var(--color-text-faint);
+}
+
 /* In-place view 모달 (포트폴리오 카드 + 자랑해요 chip 클릭 시) */
 .portfolio-card-modal-backdrop {
   position: fixed;

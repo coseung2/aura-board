@@ -67,7 +67,7 @@ export function StudentDashboard({
 
       <ShowcaseHighlightStrip
         classroomId={classroomId}
-        hrefBase="/student/portfolio"
+        hrefBase="/student/showcase"
       />
 
       <div className="student-portfolio-cta-row">
