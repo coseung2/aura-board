@@ -408,6 +408,9 @@
   align-items: center;
   gap: 8px;
   min-height: 22px;
+  /* canva-mode-badge-right (2026-04-26): "썸네일/라이브" 토글이 좌측에서
+     본문 글자랑 시각적으로 충돌해 보였음 → 우측 정렬. */
+  justify-content: flex-end;
 }
 
 .card-canva-mode-badge {
