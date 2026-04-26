@@ -22,7 +22,9 @@ export const runtime = "nodejs";
 //   5) createParentSession (cookie set)
 //   6) 302 — 활성 자녀 link 있으면 /parent/home, 없으면 onboard/match/code
 function errRedirect(req: Request, code: string) {
-  const url = new URL(`/parent/auth?error=${code}`, req.url);
+  // 학부모 OAuth 에러는 진입점(/parent/onboard/signup) 으로 되돌림.
+  // /parent/auth 는 page.tsx 가 없는 디렉토리(callback route handler 만 존재).
+  const url = new URL(`/parent/onboard/signup?error=${code}`, req.url);
   return NextResponse.redirect(url);
 }
 

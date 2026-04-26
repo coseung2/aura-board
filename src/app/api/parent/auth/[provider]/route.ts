@@ -30,7 +30,7 @@ export async function GET(
   const providerId = provider as ProviderId;
   if (!isProviderEnabled(providerId)) {
     return NextResponse.redirect(
-      new URL("/parent/auth?error=provider_disabled", _req.url)
+      new URL("/parent/onboard/signup?error=provider_disabled", _req.url)
     );
   }
 

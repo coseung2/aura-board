@@ -1,14 +1,34 @@
 "use client";
 
 import { useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { OnboardingShell } from "../_shell";
 import { ParentAuthButtons } from "@/components/parent/ParentAuthButtons";
 
 // parent-class-invite-v2 — P1 Signup.
 // parent-redesign (2026-04-26): OAuth(Google/Kakao) 버튼 + 매직링크 fallback.
-// 1차 진입은 OAuth, 매직링크는 보조.
+// 1차 진입은 OAuth, 매직링크는 보조. URL ?error=... 가 있으면 OAuth 흐름
+// 에서 돌아온 에러 — 진입점에서 사용자에게 안내.
+
+const OAUTH_ERROR_MESSAGES: Record<string, string> = {
+  provider_disabled:
+    "현재 OAuth 로그인이 비활성화돼 있어요. 관리자에게 문의하거나 매직링크로 로그인해 주세요.",
+  invalid_provider: "잘못된 OAuth provider 입니다.",
+  invalid_state: "로그인 인증이 만료됐어요. 다시 시도해 주세요.",
+  missing_params: "OAuth 응답이 누락됐어요. 다시 시도해 주세요.",
+  missing_pkce: "보안 키가 누락됐어요. 다시 시도해 주세요.",
+  token_exchange_failed: "OAuth 토큰 교환에 실패했어요. 잠시 후 다시 시도해 주세요.",
+  userinfo_failed: "OAuth 사용자 정보 조회에 실패했어요. 잠시 후 다시 시도해 주세요.",
+  upsert_failed: "계정 생성에 실패했어요. 잠시 후 다시 시도해 주세요.",
+};
 
 export default function ParentSignupPage() {
+  const searchParams = useSearchParams();
+  const oauthError = searchParams?.get("error") ?? null;
+  const oauthErrorMsg = oauthError
+    ? OAUTH_ERROR_MESSAGES[oauthError] ??
+      `로그인 중 오류가 발생했어요 (${oauthError})`
+    : null;
   const [email, setEmail] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [sent, setSent] = useState<{ email: string; devUrl: string | null } | null>(null);
@@ -65,6 +85,11 @@ export default function ParentSignupPage() {
       <p style={bodyStyle}>
         Google 또는 Kakao 계정으로 빠르게 시작할 수 있어요.
       </p>
+      {oauthErrorMsg && (
+        <div role="alert" style={errorBannerStyle}>
+          ⚠ {oauthErrorMsg}
+        </div>
+      )}
       <div style={{ marginTop: 20 }}>
         <ParentAuthButtons />
       </div>
@@ -108,6 +133,16 @@ const linkBtn: React.CSSProperties = {
   textDecoration: "underline",
   cursor: "pointer",
   padding: 4,
+};
+
+const errorBannerStyle: React.CSSProperties = {
+  marginTop: 16,
+  padding: "10px 14px",
+  background: "var(--color-status-returned-bg, #ffebee)",
+  color: "var(--color-status-returned-text, #c62828)",
+  border: "1px solid var(--color-status-returned-text, #c62828)",
+  borderRadius: 6,
+  fontSize: 13,
 };
 
 const titleStyle: React.CSSProperties = { margin: 0, fontSize: 22, fontWeight: 700 };
