@@ -1,0 +1,26 @@
+{
+  "type": "feature",
+  "slug": "parent-redesign",
+  "task_id": "2026-04-26-parent-redesign",
+  "change_type": "enhancement",
+  "motivation": "TBD — 현재 학부모 플로우 (parent-class-invite-v2, 2026-04-15) 의 로그인 방식 + 화면 구성 변경 필요. 사용자 디렉션 대기.",
+  "user_story": "TBD",
+  "success_metric": "TBD",
+  "affected_surfaces_current": [
+    "src/app/parent/auth/* — 매직링크 입력/콜백",
+    "src/app/parent/join/* — invite code 진입",
+    "src/app/parent/onboard/{signup,match/code,match/select,pending,rejected}",
+    "src/app/parent/(app)/{home,child/[studentId]/*,account,notifications}",
+    "src/app/parent/logged-out",
+    "src/components/parent/{ParentBottomNav,ChildTabs,SessionWatchdog}",
+    "src/lib/parent-{session,magic-link,session,rate-limit,scope,auth-only}.ts",
+    "src/lib/parent-codes.ts (학급 8자리 ClassInviteCode)"
+  ],
+  "open_questions": [
+    "로그인 방식 변경 — 현재 매직링크(이메일) → 어떤 방식으로? (예: 비밀번호, OAuth Google/Kakao, QR 매핑, 자녀 코드 직접 입력 등)",
+    "화면 구성 변경 — 어느 페이지를 어떻게? (전체 정보 구조 재편 vs 특정 페이지만? 모바일/데스크톱 비율 변경?)",
+    "기존 학부모 데이터 마이그레이션 — 활성 ParentChildLink 유지하면서 인증 방식만 swap? 또는 재가입 요구?",
+    "타임라인 — 점진적 출시(기존 + 신규 병행) vs cutover(신규 단일)?"
+  ],
+  "created_at": "2026-04-26T00:00:00+09:00"
+}
