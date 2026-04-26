@@ -10,6 +10,11 @@ type Props = {
   onSelect: (studentId: string) => void;
   /** 데스크톱 사이드바 토글 닫기 — undefined 면 닫기 버튼 미노출(모바일 등) */
   onClose?: () => void;
+  /** 데스크톱 드로어 모드 — true 면 fixed-position 슬라이드 (DJ 재생완료
+   *  드로어 패턴). false/undefined 면 인라인 (모바일). */
+  drawerMode?: boolean;
+  /** drawerMode 가 true 일 때만 의미. true → 화면에 슬라이드 인. */
+  drawerOpen?: boolean;
 };
 
 export function PortfolioRoster({
@@ -19,11 +24,21 @@ export function PortfolioRoster({
   selfStudentId,
   onSelect,
   onClose,
+  drawerMode,
+  drawerOpen,
 }: Props) {
+  const className = [
+    "portfolio-roster",
+    drawerMode ? "is-drawer" : "",
+    drawerMode && drawerOpen ? "is-open" : "",
+  ]
+    .filter(Boolean)
+    .join(" ");
   return (
     <aside
-      className="portfolio-roster"
+      className={className}
       aria-label={`${classroomName} 학생 명단`}
+      aria-hidden={drawerMode && !drawerOpen ? true : undefined}
     >
       <header className="portfolio-roster-head">
         <h2 className="portfolio-roster-title">{classroomName}</h2>

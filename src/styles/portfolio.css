@@ -4,39 +4,90 @@
  * 자랑해요: highlight strip (학생 dashboard 상단 가로 carousel) + 카드 코너 🌟 배지.
  * design_spec phase5 와이어프레임 일치. */
 
-.student-page-portfolio {
+/* 외곽 shell — student-page 의 max-width centering 적용 X. 페이지 자체가
+   풀폭(viewport) 으로 컨트롤. DJ 보드 패턴 일치. */
+.student-page-portfolio-shell {
+  max-width: none;
+  margin: 0;
   padding: 0;
 }
 
-.student-portfolio-header {
+/* 페이지 헤더 — DJ 보드 dj-board-header 형식: 풀 행에 제목 + 우측 액션 */
+.portfolio-page-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 16px 24px;
+  border-bottom: 1px solid var(--color-border);
+  background: var(--color-bg-alt);
+  flex-wrap: wrap;
+}
+.portfolio-page-header-left {
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 12px 16px;
-  border-bottom: 1px solid var(--color-border);
-  background: var(--color-bg-alt);
+  min-width: 0;
 }
-.student-portfolio-header h1 {
-  margin: 0;
-  font-size: 1.25rem;
-  font-weight: 600;
+.portfolio-page-header-actions {
+  display: flex;
+  gap: 8px;
 }
-.student-portfolio-back {
+.portfolio-page-back {
   text-decoration: none;
   color: var(--color-text);
   font-size: 1.25rem;
-  padding: 4px 8px;
+  padding: 4px 10px;
   border-radius: 6px;
+  line-height: 1;
 }
-.student-portfolio-back:hover {
+.portfolio-page-back:hover {
   background: var(--color-surface-alt);
+}
+.portfolio-page-title {
+  margin: 0;
+  font-size: 1.25rem;
+  font-weight: 700;
+  letter-spacing: -0.3px;
+}
+
+/* 헤더 우측 액션 버튼 (DJ dj-header-btn 동일 패턴) */
+.portfolio-header-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-btn, 4px);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition:
+    background 150ms ease,
+    border-color 150ms ease;
+}
+.portfolio-header-btn:hover {
+  background: var(--color-surface-alt);
+  border-color: var(--color-border-hover);
+}
+.portfolio-header-btn[aria-pressed="true"] {
+  background: var(--color-accent-tinted-bg);
+  color: var(--color-accent-tinted-text);
+  border-color: var(--color-accent-tinted-text);
 }
 
 .portfolio-page {
-  display: flex;
+  /* 데스크톱: 메인은 풀 폭. 드로어/백드롭은 portfolio-page 바깥에 fixed
+     렌더되어 메인 폭에 영향을 주지 않음. */
   min-height: 480px;
   background: var(--color-bg);
   position: relative;
+}
+.portfolio-page.is-mobile {
+  /* 모바일은 기존 stack — 인라인 flex */
+  display: flex;
 }
 .portfolio-page.is-empty {
   display: block;
@@ -47,64 +98,53 @@
   display: none;
 }
 
-/* ── 친구 목록 본체 (열림 상태에서만 렌더) ── */
+/* ── 친구 목록 본체 ── */
 .portfolio-roster {
-  flex: 0 0 clamp(240px, 30%, 320px);
+  /* 모바일 인라인 모드 기본 */
   display: flex;
   flex-direction: column;
   background: var(--color-surface);
-  border-right: 1px solid var(--color-border);
   padding: 12px 8px;
   overflow-y: auto;
   overflow-x: hidden;
-}
-.portfolio-page.is-mobile .portfolio-roster {
   flex: 1 1 auto;
-  border-right: 0;
 }
 
-/* 닫힘 시 화면 좌측 회색 여백에 떠있는 토글 — 페이지 박스(centered
-   max-width) 밖이라 fixed-position 사용. desktop only (모바일은
-   기존 stack 패턴). */
-.portfolio-floating-toggle {
+/* 데스크톱 드로어 모드 — DJ 재생완료 드로어와 동일 패턴 */
+.portfolio-roster.is-drawer {
   position: fixed;
-  left: 16px;
-  top: 50%;
-  transform: translateY(-50%);
-  z-index: 20;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 10px 14px;
-  border: 1px solid var(--color-border);
-  border-radius: 8px;
-  background: var(--color-surface);
-  color: var(--color-text);
-  font-size: 0.85rem;
-  font-weight: 500;
-  cursor: pointer;
-  box-shadow: var(--shadow-card);
-  transition:
-    background 100ms,
-    transform 120ms;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: clamp(280px, 28%, 360px);
+  z-index: 40;
+  border-right: 1px solid var(--color-border);
+  box-shadow: 8px 0 24px rgba(0, 0, 0, 0.08);
+  transform: translateX(-100%);
+  transition: transform 260ms cubic-bezier(0.32, 0.72, 0, 1);
 }
-.portfolio-floating-toggle:hover {
-  background: var(--color-surface-alt);
-  transform: translateY(-50%) translateX(2px);
+.portfolio-roster.is-drawer.is-open {
+  transform: translateX(0);
 }
-.portfolio-floating-toggle:focus-visible {
-  outline: 2px solid var(--color-accent-tinted-text);
-  outline-offset: 2px;
+
+/* 백드롭 — 드로어 열릴 때 메인 위에 어둡게. 클릭 시 드로어 닫힘. */
+.portfolio-roster-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.4);
+  opacity: 0;
+  pointer-events: none;
+  z-index: 39;
+  transition: opacity 220ms ease;
 }
-/* 좁은 뷰포트(태블릿/모바일)에서는 화면 박스가 화면을 꽉 채워 좌측
-   여백이 없음 — 토글이 콘텐츠 위로 올라타 시각 노이즈가 됨. 모바일은
-   stack 패턴으로 별도 처리되니 floating 자체를 숨김. 함께 닫기 버튼도
-   숨겨 닫혀서 reopen 못하는 막다른 상태 회피. */
-@media (max-width: 1279px) {
-  .portfolio-floating-toggle {
-    display: none;
-  }
-  .portfolio-roster-close {
+.portfolio-roster-backdrop.is-open {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+/* 모바일은 stack 패턴 — 드로어/백드롭 무관 */
+@media (max-width: 767px) {
+  .portfolio-roster-backdrop {
     display: none;
   }
 }

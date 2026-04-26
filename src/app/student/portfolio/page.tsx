@@ -1,5 +1,4 @@
 import { redirect } from "next/navigation";
-import Link from "next/link";
 import { db } from "@/lib/db";
 import { getCurrentStudent } from "@/lib/student-auth";
 import { PortfolioPage } from "@/components/portfolio/PortfolioPage";
@@ -73,13 +72,9 @@ export default async function StudentPortfolioPage() {
   };
 
   return (
-    <main className="student-page student-page-portfolio">
-      <header className="student-portfolio-header">
-        <Link href="/student" className="student-portfolio-back" aria-label="학생 메인으로">
-          ←
-        </Link>
-        <h1>포트폴리오</h1>
-      </header>
+    <main className="student-page-portfolio-shell">
+      {/* 헤더는 PortfolioPage 가 own — DJ 보드 패턴 일치 (제목 + action 동일
+          row, 토글 버튼이 헤더 안에 같이 들어감). */}
       <PortfolioPage
         initialRoster={initialRoster}
         selfStudentId={student.id}
