@@ -561,8 +561,8 @@
   border-radius: 50%;
   background: rgba(255, 255, 255, 0.92);
   color: #111;
-  font-size: 18px;
-  padding-left: 4px; /* optical offset for ▶ glyph */
+  /* refined-icons (2026-04-26): SVG ▶ 는 viewBox 중앙으로 그려 padding-left
+     optical hack 불필요. 시각 보정은 SVG path 자체에서 처리. */
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
 }
 .card-canva-slot-overlay-label {

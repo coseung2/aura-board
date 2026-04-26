@@ -32,6 +32,7 @@ import {
   useLastEviction,
 } from "@/hooks/useIframeBudget";
 import { useInViewport } from "@/hooks/useInViewport";
+import { PlayIcon } from "./icons/UiIcons";
 
 type Props = {
   designId: string;
@@ -283,7 +284,7 @@ export const CanvaEmbedSlot = memo(function CanvaEmbedSlot({
             onKeyDown={handleKeyDownActivate}
           >
             <span className="card-canva-slot-play-icon" aria-hidden="true">
-              ▶
+              <PlayIcon size={20} />
             </span>
             <span className="card-canva-slot-overlay-label">라이브 모드</span>
           </div>

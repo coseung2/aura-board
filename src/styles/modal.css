@@ -46,6 +46,9 @@
   overflow: hidden;
 }
 
+/* refined-icons (2026-04-26): 모든 버튼 내부에 SVG (currentColor stroke)
+   를 사용하므로 font-size/line-height 글리프 metric 의존 제거. flex
+   center 만으로 픽셀 단위 완벽 정렬. */
 .card-detail-close {
   position: absolute;
   top: 14px;
@@ -65,12 +68,11 @@
   border: 1px solid var(--color-border, #e2e2ea);
   background: var(--color-surface, white);
   color: var(--color-text, #111);
-  font-size: 20px;
-  line-height: 1;
   cursor: pointer;
-  display: flex;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
+  padding: 0;
   box-shadow: 0 6px 16px rgba(0, 0, 0, 0.1);
   transition: transform 120ms ease, box-shadow 120ms ease;
 }
@@ -93,12 +95,11 @@
   border: 1px solid var(--color-border, #e2e2ea);
   background: rgba(255, 255, 255, 0.92);
   color: var(--color-text, #111);
-  font-size: 28px;
-  line-height: 1;
   cursor: pointer;
-  display: flex;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
+  padding: 0;
   box-shadow: 0 6px 16px rgba(0, 0, 0, 0.1);
   transition: transform 120ms ease, box-shadow 120ms ease;
 }
@@ -507,11 +508,11 @@
   border: none;
   background: var(--color-surface-alt);
   border-radius: 50%;
-  font-size: 18px;
   cursor: pointer;
-  display: flex;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
+  padding: 0;
   color: var(--color-text-muted);
   transition: background 150ms ease;
 }
@@ -519,7 +520,6 @@
   .modal-close {
     width: var(--tap-min);
     height: var(--tap-min);
-    font-size: 22px;
   }
 }
 

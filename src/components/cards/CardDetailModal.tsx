@@ -5,6 +5,13 @@ import { CardAttachments } from "../CardAttachments";
 import { CardAuthorFooter } from "./CardAuthorFooter";
 import { CardImageLightbox } from "./CardImageLightbox";
 import { CardEngagement } from "../engagement/CardEngagement";
+import {
+  CloseIcon,
+  ChevronLeftIcon,
+  ChevronRightIcon,
+  FullscreenEnterIcon,
+  FullscreenExitIcon,
+} from "../icons/UiIcons";
 import type { CardData } from "../DraggableCard";
 
 type Props = {
@@ -132,7 +139,7 @@ export function CardDetailModal({
           onClick={onClose}
           aria-label="닫기"
         >
-          ×
+          <CloseIcon size={18} />
         </button>
         <button
           type="button"
@@ -141,7 +148,7 @@ export function CardDetailModal({
           aria-label={isFullscreen ? "전체화면 끄기" : "전체화면 켜기"}
           title={isFullscreen ? "전체화면 끄기" : "전체화면으로 발표"}
         >
-          {isFullscreen ? "⤫" : "⛶"}
+          {isFullscreen ? <FullscreenExitIcon size={20} /> : <FullscreenEnterIcon size={20} />}
         </button>
         {cards && cards.length > 1 && navIndex >= 0 && (
           <>
@@ -151,7 +158,7 @@ export function CardDetailModal({
               onClick={goPrev}
               aria-label="이전 카드"
             >
-              ‹
+              <ChevronLeftIcon size={24} />
             </button>
             <button
               type="button"
@@ -159,7 +166,7 @@ export function CardDetailModal({
               onClick={goNext}
               aria-label="다음 카드"
             >
-              ›
+              <ChevronRightIcon size={24} />
             </button>
           </>
         )}
