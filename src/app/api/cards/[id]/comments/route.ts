@@ -28,7 +28,8 @@ export async function GET(
 
   const rows = await db.cardComment.findMany({
     where: { cardId, deletedAt: null },
-    orderBy: { createdAt: "asc" },
+    // comments-newest-first (2026-04-26): 최근 댓글이 상단.
+    orderBy: { createdAt: "desc" },
     include: {
       authorUser: { select: { id: true, name: true } },
       authorStudent: { select: { id: true, name: true } },

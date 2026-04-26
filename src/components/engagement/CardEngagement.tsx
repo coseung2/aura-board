@@ -243,7 +243,9 @@ function CommentsBlock({
         return;
       }
       const j = (await r.json()) as { item: CommentItem };
-      setItems((prev) => [...(prev ?? []), j.item]);
+      // comments-newest-first (2026-04-26): 새 댓글을 list 맨 앞에 prepend
+      // 해서 폼 바로 아래에 노출.
+      setItems((prev) => [j.item, ...(prev ?? [])]);
       setContent("");
       onChange?.();
     } finally {
