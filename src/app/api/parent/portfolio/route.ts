@@ -59,7 +59,7 @@ export async function GET(req: Request) {
     },
     include: {
       board: {
-        select: { id: true, slug: true, title: true, layout: true },
+        select: { id: true, slug: true, title: true, layout: true, anonymousAuthor: true },
       },
       section: { select: { id: true, title: true } },
       attachments: { orderBy: { order: "asc" } },
@@ -83,7 +83,7 @@ export async function GET(req: Request) {
       card: {
         include: {
           board: {
-            select: { id: true, slug: true, title: true, layout: true },
+            select: { id: true, slug: true, title: true, layout: true, anonymousAuthor: true },
           },
           section: { select: { id: true, title: true } },
           attachments: { orderBy: { order: "asc" } },

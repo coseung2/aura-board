@@ -79,7 +79,10 @@ export function PortfolioCardItem({
         </span>
       )}
       <div className="portfolio-card-link">
-        <CardBody card={card} titleAs="h4" />
+        <CardBody
+          card={{ ...card, anonymousAuthor: card.sourceBoard.anonymousAuthor }}
+          titleAs="h4"
+        />
       </div>
       <div className="portfolio-card-foot">
         <span className="portfolio-card-source" title={sourceLabel}>

@@ -29,7 +29,7 @@ type PrismaCardLike = {
   fileSize: number | null;
   fileMimeType: string | null;
   createdAt: Date;
-  board: { id: string; slug: string; title: string; layout: string };
+  board: { id: string; slug: string; title: string; layout: string; anonymousAuthor: boolean };
   section: { id: string; title: string } | null;
   attachments: Array<{
     id: string;
@@ -81,6 +81,7 @@ export function mapPortfolioCard(
       slug: card.board.slug,
       title: card.board.title,
       layout: card.board.layout,
+      anonymousAuthor: card.board.anonymousAuthor,
     },
     sourceSection: card.section
       ? { id: card.section.id, title: card.section.title }

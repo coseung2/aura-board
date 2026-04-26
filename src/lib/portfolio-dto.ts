@@ -35,6 +35,8 @@ export type PortfolioCardDTO = {
     slug: string;
     title: string;
     layout: string;
+    /** card-comments-likes (2026-04-26): 보드 단위 작성자 익명 토글. */
+    anonymousAuthor: boolean;
   };
   sourceSection: { id: string; title: string } | null;
   /** 호출자(현재 viewer) 가 이 카드를 자랑해요 등록했는지 */

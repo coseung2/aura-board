@@ -59,7 +59,7 @@ export async function GET(
       card: {
         include: {
           board: {
-            select: { id: true, slug: true, title: true, layout: true },
+            select: { id: true, slug: true, title: true, layout: true, anonymousAuthor: true },
           },
           section: { select: { id: true, title: true } },
           attachments: { orderBy: { order: "asc" } },

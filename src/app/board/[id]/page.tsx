@@ -255,6 +255,9 @@ export default async function BoardPage({
     attachments:
       (c as { attachments?: { id: string; kind: string; url: string; fileName: string | null; fileSize: number | null; mimeType: string | null; order: number }[] }).attachments ??
       [],
+    // card-comments-likes (2026-04-26): 보드 단위 익명 토글 — 모든 카드가
+    // 동일한 보드를 공유하므로 board.anonymousAuthor 를 전 카드에 denorm.
+    anonymousAuthor: board.anonymousAuthor,
   }));
 
   const sectionProps = sections.map((s) => ({

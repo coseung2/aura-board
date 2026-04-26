@@ -59,6 +59,10 @@ export type CardData = {
     displayName: string;
     order: number;
   }>;
+  /** card-comments-likes (2026-04-26): 보드 단위 익명 토글 (Board.anonymousAuthor).
+   *  CardBody → CardAuthorFooter 가 author 라벨을 "익명" 으로 마스킹. 보드 RSC
+   *  에서 모든 카드에 동일한 board.anonymousAuthor 값을 denorm 한다. */
+  anonymousAuthor?: boolean;
 };
 
 type Props = {

@@ -40,7 +40,10 @@ export function ShowcaseCardChip({ entry, onOpen }: Props) {
         🌟
       </span>
       <div className="showcase-chip-body">
-        <CardBody card={card} titleAs="h4" />
+        <CardBody
+          card={{ ...card, anonymousAuthor: card.sourceBoard.anonymousAuthor }}
+          titleAs="h4"
+        />
       </div>
     </article>
   );
