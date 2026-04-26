@@ -253,7 +253,10 @@ function InnerPage({ classroomId }: { classroomId: string }) {
           </div>
         </section>
 
-        <section style={cardStyle} aria-labelledby="inbox-title">
+        {/* reject-dropdown-clipped (2026-04-26): cardStyle 의 overflow:hidden 이
+            PendingRow 의 거부 사유 드롭다운 (absolute, row 아래로 떨어짐) 을
+            잘라내서 클릭해도 메뉴가 안 보이는 버그. inbox 카드만 visible. */}
+        <section style={{ ...cardStyle, overflow: "visible" }} aria-labelledby="inbox-title">
           <header
             style={{
               display: "flex",
