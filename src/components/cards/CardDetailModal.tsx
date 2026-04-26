@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { CardAttachments } from "../CardAttachments";
 import { CardAuthorFooter } from "./CardAuthorFooter";
 import { CardImageLightbox } from "./CardImageLightbox";
+import { CardEngagement } from "../engagement/CardEngagement";
 import type { CardData } from "../DraggableCard";
 
 type Props = {
@@ -202,6 +203,7 @@ export function CardDetailModal({
               studentAuthorName={card.studentAuthorName}
               authorName={card.authorName}
               createdAt={card.createdAt}
+              anonymousAuthor={card.anonymousAuthor}
             />
             {onEditAuthors && (canEditAuthors ? canEditAuthors(card) : true) && (
               <button
@@ -212,6 +214,9 @@ export function CardDetailModal({
                 👥 작성자 지정
               </button>
             )}
+            {/* card-detail-modal-engagement (2026-04-26): 좋아요 + 댓글 패널.
+                작성자 지정 버튼 바로 아래 배치. */}
+            <CardEngagement cardId={card.id} mode="panel" />
           </aside>
         </div>
         {lightboxIndex !== null &&
