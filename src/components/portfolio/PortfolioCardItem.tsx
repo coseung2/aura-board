@@ -11,6 +11,8 @@ type Props = {
   canToggleShowcase: boolean;
   busy: boolean;
   onToggleShowcase: (card: PortfolioCardDTO) => void;
+  /** 카드 클릭 시 부모(StudentView) 가 모달 오픈. */
+  onOpen: (card: PortfolioCardDTO) => void;
 };
 
 export function PortfolioCardItem({
@@ -18,6 +20,7 @@ export function PortfolioCardItem({
   canToggleShowcase,
   busy,
   onToggleShowcase,
+  onOpen,
 }: Props) {
   const sourceLabel = buildSourceLabel({
     boardTitle: card.sourceBoard.title,
@@ -48,13 +51,22 @@ export function PortfolioCardItem({
     },
   });
 
+  function handleKeyDown(e: React.KeyboardEvent) {
+    if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      onOpen(card);
+    }
+  }
+
   return (
     <article
       className={`portfolio-card ${card.isShowcasedByMe ? "is-showcased-mine" : ""}`}
       style={{ backgroundColor: card.color ?? undefined }}
       tabIndex={0}
-      role="article"
-      aria-label={`${card.title} — ${sourceLabel}`}
+      role="button"
+      aria-label={`${card.title} — ${sourceLabel}, 클릭하여 자세히 보기`}
+      onClick={() => onOpen(card)}
+      onKeyDown={handleKeyDown}
     >
       {(card.isShowcasedByMe || card.hasAnyShowcase) && (
         <span
@@ -66,13 +78,9 @@ export function PortfolioCardItem({
           🌟
         </span>
       )}
-      <a
-        className="portfolio-card-link"
-        href={deepLink}
-        aria-label={`${card.title} — 원본 보드로 이동`}
-      >
+      <div className="portfolio-card-link">
         <CardBody card={card} titleAs="h4" />
-      </a>
+      </div>
       <div className="portfolio-card-foot">
         <span className="portfolio-card-source" title={sourceLabel}>
           {sourceLabel}

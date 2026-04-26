@@ -399,6 +399,12 @@
   color: var(--color-text);
   display: block;
 }
+/* 카드 본문 안의 a/button 이 클릭을 가로채면 카드 자체 onClick(=모달 오픈)
+   이 안 먹음. 포트폴리오 그리드의 카드는 미리보기 용도라 인터랙션 비활성. */
+.portfolio-card-link a,
+.portfolio-card-link button {
+  pointer-events: none;
+}
 .portfolio-card-foot {
   display: flex;
   align-items: center;
@@ -461,64 +467,160 @@
   border-radius: 3px;
 }
 
+/* 자랑해요 chip — 학급 메인 strip 의 카드. 게시자 X, 콘텐츠 풀 노출.
+   너비 280~300px 로 카드 본문 + 이미지/링크 미리보기 가독성 확보. */
 .showcase-chip {
+  position: relative;
   flex: 0 0 auto;
-  width: 160px;
-  height: 120px;
+  width: 300px;
+  max-height: 360px;
   background: var(--color-surface);
   border: 1px solid var(--color-border);
   border-radius: 8px;
-  display: grid;
-  grid-template-rows: 1fr auto;
-  text-decoration: none;
-  color: var(--color-text);
+  cursor: pointer;
   scroll-snap-align: start;
   overflow: hidden;
-  transition: transform 100ms, border-color 100ms;
+  transition:
+    transform 100ms,
+    border-color 100ms,
+    box-shadow 100ms;
 }
 .showcase-chip:hover {
   border-color: var(--color-border-hover);
   transform: translateY(-2px);
+  box-shadow: var(--shadow-card-hover);
 }
-.showcase-chip-thumb {
-  position: relative;
-  background: var(--color-surface-alt);
+.showcase-chip:focus-visible {
+  outline: 2px solid var(--color-accent-tinted-text);
+  outline-offset: 2px;
+}
+.showcase-chip-badge {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  z-index: 1;
+  width: 24px;
+  height: 24px;
   display: grid;
   place-items: center;
+  background: var(--color-showcase);
+  color: #fff;
+  border-radius: 50%;
+  font-size: 0.85rem;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.18);
+}
+.showcase-chip-body {
+  padding: 12px;
+  max-height: 360px;
   overflow: hidden;
 }
-.showcase-chip-thumb img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-.showcase-chip-thumb-fallback {
-  font-size: 1.5rem;
-  color: var(--color-text-faint);
-}
-.showcase-chip-meta {
-  padding: 6px 8px;
-  display: grid;
-  gap: 1px;
-}
-.showcase-chip-title {
-  font-size: 0.8rem;
-  font-weight: 600;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.showcase-chip-author {
-  font-size: 0.7rem;
-  color: var(--color-text-muted);
+/* CardBody 내부의 a/button (링크 미리보기·재생 버튼) 이 클릭을 가로채면
+   chip 자체 onClick(=모달 오픈) 이 안 먹음. chip 안에서는 컨텐츠 미리보기
+   용도라 모든 인터랙션 비활성, 클릭은 article wrapper 만 받음. */
+.showcase-chip a,
+.showcase-chip button,
+.showcase-chip .card-link-preview {
+  pointer-events: none;
 }
 .showcase-chip-skeleton {
   flex: 0 0 auto;
-  width: 160px;
-  height: 120px;
+  width: 300px;
+  height: 200px;
   border-radius: 8px;
   background: var(--color-surface-alt);
   animation: portfolio-skeleton-shimmer 1.6s ease-in-out infinite;
+}
+
+/* In-place view 모달 (포트폴리오 카드 + 자랑해요 chip 클릭 시) */
+.portfolio-card-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+  display: grid;
+  place-items: center;
+  z-index: 80;
+  padding: 24px;
+  animation: portfolio-modal-fade 180ms ease;
+}
+@keyframes portfolio-modal-fade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+.portfolio-card-modal {
+  position: relative;
+  width: min(560px, 100%);
+  max-height: calc(100vh - 48px);
+  background: var(--color-surface);
+  border-radius: 12px;
+  box-shadow:
+    0 24px 60px rgba(0, 0, 0, 0.18),
+    0 4px 16px rgba(0, 0, 0, 0.12);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  animation: portfolio-modal-pop 200ms cubic-bezier(0.32, 0.72, 0, 1);
+}
+@keyframes portfolio-modal-pop {
+  from {
+    transform: translateY(8px) scale(0.98);
+    opacity: 0.6;
+  }
+  to {
+    transform: translateY(0) scale(1);
+    opacity: 1;
+  }
+}
+.portfolio-card-modal-close {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  z-index: 2;
+  width: 32px;
+  height: 32px;
+  display: grid;
+  place-items: center;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 50%;
+  cursor: pointer;
+  font-size: 1.2rem;
+  line-height: 1;
+  color: var(--color-text-muted);
+  transition: background 100ms;
+}
+.portfolio-card-modal-close:hover {
+  background: var(--color-surface-alt);
+  color: var(--color-text);
+}
+.portfolio-card-modal-body {
+  padding: 24px 24px 16px;
+  overflow-y: auto;
+}
+.portfolio-card-modal-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 24px;
+  border-top: 1px solid var(--color-border);
+  background: var(--color-bg-alt);
+  font-size: 0.85rem;
+}
+.portfolio-card-modal-source {
+  color: var(--color-text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+}
+.portfolio-card-modal-deep-link {
+  color: var(--color-accent);
+  text-decoration: none;
+  font-weight: 500;
+  flex-shrink: 0;
+}
+.portfolio-card-modal-deep-link:hover {
+  color: var(--color-accent-active);
 }
 
 /* ── 한도 모달 ── */

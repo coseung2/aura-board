@@ -3,17 +3,18 @@
 import { useEffect, useState } from "react";
 import type { ShowcaseEntryDTO } from "@/lib/portfolio-dto";
 import { ShowcaseCardChip } from "./ShowcaseCardChip";
+import { PortfolioCardModal } from "./PortfolioCardModal";
 
 type Props = {
   classroomId: string;
-  /** chip 클릭 시 이동할 base 경로. 학생 dashboard 진입 시 "/student/portfolio",
-   *  학부모 진입 시 자녀 portfolio. */
+  /** "더 보기" 링크 destination — 포트폴리오 페이지 진입점 */
   hrefBase: string;
 };
 
 export function ShowcaseHighlightStrip({ classroomId, hrefBase }: Props) {
   const [entries, setEntries] = useState<ShowcaseEntryDTO[] | null>(null);
   const [loading, setLoading] = useState(true);
+  const [openEntry, setOpenEntry] = useState<ShowcaseEntryDTO | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -74,10 +75,14 @@ export function ShowcaseHighlightStrip({ classroomId, hrefBase }: Props) {
           <ShowcaseCardChip
             key={e.cardId + ":" + e.studentId}
             entry={e}
-            href={`/board/${e.card.sourceBoard.slug}`}
+            onOpen={setOpenEntry}
           />
         ))}
       </div>
+      <PortfolioCardModal
+        card={openEntry?.card ?? null}
+        onClose={() => setOpenEntry(null)}
+      />
     </section>
   );
 }

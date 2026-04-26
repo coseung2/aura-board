@@ -1,42 +1,47 @@
 "use client";
 
+import { CardBody } from "../cards/CardBody";
 import type { ShowcaseEntryDTO } from "@/lib/portfolio-dto";
+
+// student-portfolio (2026-04-26): 학급 메인 자랑해요 strip 의 카드.
+// 게시자(학생) 정보 표시하지 않고 콘텐츠 풀 노출. PortfolioCardDTO 는
+// author 필드가 없어 CardBody 의 CardAuthorFooter 가 자동으로 null
+// 반환해 게시자 라인이 사라짐 (사용자 명시 요구).
 
 type Props = {
   entry: ShowcaseEntryDTO;
-  /** chip 클릭 시 이동 — 학생: 포트폴리오 페이지의 그 학생, 학부모: 자녀
-   *  포트폴리오 페이지 (자녀가 본 친구 작품). v1 단순히 보드 deep-link */
-  href: string;
+  /** 카드 클릭 시 부모(strip) 가 in-place 모달 오픈. */
+  onOpen: (entry: ShowcaseEntryDTO) => void;
 };
 
-export function ShowcaseCardChip({ entry, href }: Props) {
+export function ShowcaseCardChip({ entry, onOpen }: Props) {
   const card = entry.card;
-  const thumbSrc = card.thumbUrl || card.imageUrl || card.linkImage;
+  function onKey(e: React.KeyboardEvent) {
+    if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      onOpen(entry);
+    }
+  }
   return (
-    <a
+    <article
       className="showcase-chip"
-      href={href}
       style={{ backgroundColor: card.color ?? undefined }}
-      aria-label={`${entry.studentName}의 자랑해요: ${card.title || "제목 없음"}`}
+      tabIndex={0}
+      role="button"
+      aria-label={`${card.title || "제목 없음"} — 자세히 보기`}
+      onClick={() => onOpen(entry)}
+      onKeyDown={onKey}
     >
-      <div className="showcase-chip-thumb" aria-hidden>
-        {thumbSrc ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={thumbSrc} alt="" loading="lazy" />
-        ) : (
-          <span className="showcase-chip-thumb-fallback">📄</span>
-        )}
+      <span
+        className="showcase-chip-badge"
+        aria-hidden
+        title="자랑해요"
+      >
+        🌟
+      </span>
+      <div className="showcase-chip-body">
+        <CardBody card={card} titleAs="h4" />
       </div>
-      <div className="showcase-chip-meta">
-        <strong className="showcase-chip-title">
-          {card.title || "제목 없음"}
-        </strong>
-        <span className="showcase-chip-author">
-          {entry.studentNumber != null
-            ? `${entry.studentNumber}. ${entry.studentName}`
-            : entry.studentName}
-        </span>
-      </div>
-    </a>
+    </article>
   );
 }

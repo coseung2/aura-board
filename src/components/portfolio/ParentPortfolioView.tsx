@@ -7,6 +7,7 @@ import type {
 } from "@/lib/portfolio-dto";
 import { PortfolioCardItem } from "./PortfolioCardItem";
 import { ShowcaseCardChip } from "./ShowcaseCardChip";
+import { PortfolioCardModal } from "./PortfolioCardModal";
 
 type Props = {
   childId: string;
@@ -23,6 +24,7 @@ export function ParentPortfolioView({ childId, childName }: Props) {
   const [data, setData] = useState<Payload | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [openCard, setOpenCard] = useState<PortfolioCardDTO | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -92,6 +94,7 @@ export function ParentPortfolioView({ childId, childName }: Props) {
               canToggleShowcase={false}
               busy={false}
               onToggleShowcase={() => {}}
+              onOpen={setOpenCard}
             />
           ))}
         </div>
@@ -110,12 +113,17 @@ export function ParentPortfolioView({ childId, childName }: Props) {
               <ShowcaseCardChip
                 key={e.cardId + ":" + e.studentId}
                 entry={e}
-                href={`/board/${e.card.sourceBoard.slug}`}
+                onOpen={(entry) => setOpenCard(entry.card)}
               />
             ))}
           </div>
         </section>
       )}
+
+      <PortfolioCardModal
+        card={openCard}
+        onClose={() => setOpenCard(null)}
+      />
     </div>
   );
 }

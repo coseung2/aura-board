@@ -6,6 +6,7 @@ import type {
   PortfolioStudentDTO,
 } from "@/lib/portfolio-dto";
 import { PortfolioCardItem } from "./PortfolioCardItem";
+import { PortfolioCardModal } from "./PortfolioCardModal";
 
 type Props = {
   studentId: string;
@@ -31,6 +32,7 @@ export function PortfolioStudentView({
   const [data, setData] = useState<PortfolioStudentDTO | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [openCard, setOpenCard] = useState<PortfolioCardDTO | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -133,19 +135,30 @@ export function PortfolioStudentView({
         </div>
       ) : (
         <div className="portfolio-grid">
-          {data.cards.map((c) => (
-            <PortfolioCardItem
-              key={c.id}
-              card={c}
-              canToggleShowcase={
-                isViewingSelf && selfStudentId !== null
-              }
-              busy={busyCardId === c.id}
-              onToggleShowcase={onToggleShowcase}
-            />
-          ))}
+          {data.cards.map((c) => {
+            // 모달에 보이는 카드 객체는 patch state 와 sync — isShowcasedByMe
+            // 변경이 모달에도 반영되도록.
+            const live = data.cards.find((x) => x.id === c.id) ?? c;
+            void live;
+            return (
+              <PortfolioCardItem
+                key={c.id}
+                card={c}
+                canToggleShowcase={
+                  isViewingSelf && selfStudentId !== null
+                }
+                busy={busyCardId === c.id}
+                onToggleShowcase={onToggleShowcase}
+                onOpen={setOpenCard}
+              />
+            );
+          })}
         </div>
       )}
+      <PortfolioCardModal
+        card={openCard ? data.cards.find((c) => c.id === openCard.id) ?? openCard : null}
+        onClose={() => setOpenCard(null)}
+      />
     </section>
   );
 }
