@@ -13,6 +13,9 @@ type Props = {
   studentAuthorName?: string | null;
   authorName?: string | null;
   createdAt?: string | Date | null;
+  // card-comments-likes (2026-04-26): board.anonymousAuthor=true 면 작성자
+  // 라벨을 "익명" 으로 마스킹.
+  anonymousAuthor?: boolean;
 };
 
 export const CardAuthorFooter = memo(function CardAuthorFooter({
@@ -21,16 +24,18 @@ export const CardAuthorFooter = memo(function CardAuthorFooter({
   studentAuthorName,
   authorName,
   createdAt,
+  anonymousAuthor,
 }: Props) {
   // formatAuthorList honours the `authors` array first (CardAuthor rows),
   // falling back to the legacy external/student/author chain when the
   // array is empty — keeps legacy cards rendering the same name pick.
-  const name = formatAuthorList(
+  const resolved = formatAuthorList(
     authors ?? null,
     externalAuthorName,
     studentAuthorName,
     authorName
   );
+  const name = anonymousAuthor && resolved ? "익명" : resolved;
   if (!name && !createdAt) return null;
 
   const iso =

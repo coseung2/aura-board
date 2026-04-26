@@ -7,6 +7,8 @@ type Props = {
   boardId: string;
   layout: string;
   sections: BoardSection[];
+  /** 보드 단위 작성자 익명 토글 초기값. */
+  anonymousAuthor: boolean;
 };
 
 /**
@@ -15,7 +17,7 @@ type Props = {
  * server component (see BoardHeader in app/board/[id]/page.tsx) so this
  * component trusts its caller and always renders when mounted.
  */
-export function BoardSettingsLauncher({ boardId, layout, sections }: Props) {
+export function BoardSettingsLauncher({ boardId, layout, sections, anonymousAuthor }: Props) {
   const [open, setOpen] = useState(false);
 
   return (
@@ -38,6 +40,7 @@ export function BoardSettingsLauncher({ boardId, layout, sections }: Props) {
           boardId={boardId}
           layout={layout}
           initialSections={sections}
+          initialAnonymousAuthor={anonymousAuthor}
         />
       )}
     </>

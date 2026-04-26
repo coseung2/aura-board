@@ -17,6 +17,8 @@ type Props = {
   backHref?: string;
   canEdit: boolean;
   settingsSections?: BoardSection[];
+  /** card-comments-likes (2026-04-26): 보드 단위 작성자 익명 토글 초기값. */
+  anonymousAuthor?: boolean;
 };
 
 export function BoardHeader({
@@ -29,6 +31,7 @@ export function BoardHeader({
   backHref,
   canEdit,
   settingsSections,
+  anonymousAuthor,
 }: Props) {
   return (
     <header className="board-header">
@@ -50,6 +53,7 @@ export function BoardHeader({
             boardId={boardId}
             layout={layout}
             sections={settingsSections ?? []}
+            anonymousAuthor={anonymousAuthor ?? false}
           />
         )}
         <span className="board-layout-badge">{layoutLabel(layout)}</span>

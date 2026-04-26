@@ -635,6 +635,7 @@ export default async function BoardPage({
         backHref={studentViewer ? "/student" : "/"}
         canEdit={effectiveRole === "owner" || effectiveRole === "editor"}
         settingsSections={settingsSections}
+        anonymousAuthor={board.anonymousAuthor}
       />
       {renderBoard()}
     </main>

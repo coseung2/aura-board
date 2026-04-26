@@ -10,16 +10,17 @@ export type BoardSection = {
   accessToken: string | null;
 };
 
-type Tab = "breakout" | "access" | "canva" | "theme";
+type Tab = "breakout" | "engagement" | "access" | "canva" | "theme";
 
 const TAB_LABELS: Record<Tab, string> = {
   breakout: "브레이크아웃",
+  engagement: "참여",
   access: "접근 권한",
   canva: "Canva 연동",
   theme: "테마",
 };
 
-const PLACEHOLDER_COPY: Record<Exclude<Tab, "breakout">, string> = {
+const PLACEHOLDER_COPY: Record<Exclude<Tab, "breakout" | "engagement">, string> = {
   access: "멤버 초대와 권한 관리",
   canva: "도메인 단위 Canva 연동 설정",
   theme: "보드 배경과 기본 레이아웃",
@@ -31,6 +32,8 @@ type Props = {
   boardId: string;
   layout: string;
   initialSections: BoardSection[];
+  /** card-comments-likes (2026-04-26): 참여 탭의 익명 토글 초기값. */
+  initialAnonymousAuthor?: boolean;
 };
 
 export function BoardSettingsPanel({
@@ -39,16 +42,21 @@ export function BoardSettingsPanel({
   boardId,
   layout,
   initialSections,
+  initialAnonymousAuthor = false,
 }: Props) {
   const router = useRouter();
   const [tab, setTab] = useState<Tab>("breakout");
   const [sections, setSections] = useState<BoardSection[]>(initialSections);
+  const [anonymousAuthor, setAnonymousAuthor] = useState(initialAnonymousAuthor);
   const tablistId = useId();
 
   // Re-sync when caller re-opens panel with fresh props.
   useEffect(() => {
-    if (open) setSections(initialSections);
-  }, [open, initialSections]);
+    if (open) {
+      setSections(initialSections);
+      setAnonymousAuthor(initialAnonymousAuthor);
+    }
+  }, [open, initialSections, initialAnonymousAuthor]);
 
   function handleSectionTokenChange(sectionId: string, nextToken: string | null) {
     setSections((list) =>
@@ -68,7 +76,7 @@ export function BoardSettingsPanel({
         style={{ margin: "-16px -20px 16px" }}
       >
         {(Object.keys(TAB_LABELS) as Tab[]).map((key) => {
-          const isPlaceholder = key !== "breakout";
+          const isPlaceholder = key !== "breakout" && key !== "engagement";
           return (
             <button
               key={key}
@@ -104,7 +112,21 @@ export function BoardSettingsPanel({
         </div>
       )}
 
-      {tab !== "breakout" && (
+      {tab === "engagement" && (
+        <div
+          role="tabpanel"
+          id={`${tablistId}-panel-engagement`}
+          aria-labelledby={`${tablistId}-tab-engagement`}
+        >
+          <EngagementTab
+            boardId={boardId}
+            anonymousAuthor={anonymousAuthor}
+            onChange={setAnonymousAuthor}
+          />
+        </div>
+      )}
+
+      {tab !== "breakout" && tab !== "engagement" && (
         <div
           role="tabpanel"
           id={`${tablistId}-panel-${tab}`}
@@ -114,12 +136,88 @@ export function BoardSettingsPanel({
             <span aria-hidden="true" style={{ fontSize: 28 }}>🚧</span>
             <p>
               준비 중이에요. 곧 이곳에서{" "}
-              <strong>{PLACEHOLDER_COPY[tab]}</strong>을 관리할 수 있어요.
+              <strong>{PLACEHOLDER_COPY[tab as keyof typeof PLACEHOLDER_COPY]}</strong>을 관리할 수 있어요.
             </p>
           </div>
         </div>
       )}
     </SidePanel>
+  );
+}
+
+/* ── Engagement tab (card-comments-likes 2026-04-26) ──── */
+
+function EngagementTab({
+  boardId,
+  anonymousAuthor,
+  onChange,
+}: {
+  boardId: string;
+  anonymousAuthor: boolean;
+  onChange: (next: boolean) => void;
+}) {
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+
+  const toggle = async () => {
+    const next = !anonymousAuthor;
+    setBusy(true);
+    setErr(null);
+    // optimistic
+    onChange(next);
+    try {
+      const r = await fetch(`/api/boards/${boardId}`, {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ anonymousAuthor: next }),
+      });
+      if (!r.ok) {
+        onChange(!next);
+        setErr("저장에 실패했어요");
+      }
+    } catch {
+      onChange(!next);
+      setErr("저장에 실패했어요");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+      <p className="section-panel-notice" style={{ marginTop: 0 }}>
+        보드 안의 카드와 댓글 작성자 표시 방식을 조절해요.
+      </p>
+      <label
+        style={{
+          display: "flex",
+          alignItems: "flex-start",
+          gap: 12,
+          padding: 14,
+          border: "1px solid var(--color-border)",
+          borderRadius: 8,
+          cursor: "pointer",
+        }}
+      >
+        <input
+          type="checkbox"
+          checked={anonymousAuthor}
+          onChange={toggle}
+          disabled={busy}
+          style={{ marginTop: 2 }}
+        />
+        <span style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+          <span style={{ fontSize: 14, fontWeight: 600 }}>작성자 익명</span>
+          <span style={{ fontSize: 13, color: "var(--color-text-muted)" }}>
+            카드 작성자와 댓글 작성자 이름을 모두 "익명" 으로 가려요.
+            좋아요 카운트는 영향을 받지 않아요.
+          </span>
+        </span>
+      </label>
+      {err && (
+        <p style={{ color: "var(--color-danger)", fontSize: 12, margin: 0 }}>{err}</p>
+      )}
+    </div>
   );
 }
 

@@ -3,9 +3,12 @@
 import { memo } from "react";
 import { CardAttachments } from "../CardAttachments";
 import { CardAuthorFooter } from "./CardAuthorFooter";
+import { CardEngagement } from "../engagement/CardEngagement";
 
 type Props = {
   card: {
+    // card-comments-likes (2026-04-26): id 가 있으면 engagement chips 렌더.
+    id?: string;
     title: string;
     content: string;
     imageUrl?: string | null;
@@ -32,14 +35,18 @@ type Props = {
     authorName?: string | null;
     authors?: Array<{ order: number; displayName: string }>;
     createdAt?: string | Date | null;
+    // 보드 단위 익명 토글 (Board.anonymousAuthor) — 호출처에서 주입.
+    anonymousAuthor?: boolean;
   };
   // Some layouts (BreakoutBoard, ColumnsBoard) nest cards inside section
   // headings, so semantic level differs. Default h3 matches DraggableCard /
   // StreamBoard / SectionBreakoutView.
   titleAs?: "h3" | "h4";
+  // engagement chips 렌더 여부. card.id 가 있을 때만 의미. 기본 true.
+  showEngagement?: boolean;
 };
 
-export const CardBody = memo(function CardBody({ card, titleAs = "h3" }: Props) {
+export const CardBody = memo(function CardBody({ card, titleAs = "h3", showEngagement = true }: Props) {
   const Title = titleAs;
   return (
     <>
@@ -65,7 +72,9 @@ export const CardBody = memo(function CardBody({ card, titleAs = "h3" }: Props) 
         studentAuthorName={card.studentAuthorName}
         authorName={card.authorName}
         createdAt={card.createdAt}
+        anonymousAuthor={card.anonymousAuthor}
       />
+      {showEngagement && card.id && <CardEngagement cardId={card.id} mode="chips" />}
     </>
   );
 });

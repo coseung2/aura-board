@@ -2,6 +2,7 @@
 
 import { useEffect } from "react";
 import { CardBody } from "../cards/CardBody";
+import { CardEngagement } from "../engagement/CardEngagement";
 import type { PortfolioCardDTO } from "@/lib/portfolio-dto";
 import { buildSourceLabel } from "./source-label";
 
@@ -62,7 +63,8 @@ export function PortfolioCardModal({ card, onClose, showSource = true }: Props) 
           ×
         </button>
         <div className="portfolio-card-modal-body">
-          <CardBody card={card} titleAs="h3" />
+          <CardBody card={card} titleAs="h3" showEngagement={false} />
+          <CardEngagement cardId={card.id} mode="panel" />
         </div>
         {showSource && (
           <div className="portfolio-card-modal-foot">

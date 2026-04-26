@@ -52,6 +52,9 @@ model User {
   oauthAuthCodesAsUser   OAuthAuthCode[]           @relation("UserOAuthAuthCodes")
   oauthAccessTokensAsUser  OAuthAccessToken[]      @relation("UserOAuthAccessTokens")
   oauthRefreshTokensAsUser OAuthRefreshToken[]     @relation("UserOAuthRefreshTokens")
+  // card-comments-likes (2026-04-26)
+  cardComments             CardComment[]            @relation("UserCardComments")
+  cardLikes                CardLike[]               @relation("UserCardLikes")
 }
 
 // ──── Audit Log (Seed 14 security, 2026-04-22) ────
@@ -266,6 +269,9 @@ model Student {
   boardResponses        BoardResponse[]           @relation("StudentBoardResponses")
   aiFeedbacks           AiFeedback[]
   showcaseEntries       ShowcaseEntry[]
+  // card-comments-likes (2026-04-26)
+  cardComments          CardComment[]             @relation("StudentCardComments")
+  cardLikes             CardLike[]                @relation("StudentCardLikes")
 
   @@unique([classroomId, number])
   @@index([classroomId])
@@ -353,6 +359,11 @@ model Board {
   // 응답을 올린다. questionVizMode 는 교사가 선택한 시각화 모드.
   questionPrompt    String?
   questionVizMode   String     @default("word-cloud")
+
+  // ── card-comments-likes (2026-04-26) ──────────────────────────────
+  // 보드 단위 토글: 카드 작성자/댓글 작성자 표기를 익명("익명") 으로 마스킹.
+  // 좋아요 카운트는 영향 없음 (누가 눌렀는지는 어차피 비공개).
+  anonymousAuthor   Boolean    @default(false)
 
   classroom          Classroom?          @relation("ClassroomBoards", fields: [classroomId], references: [id], onDelete: SetNull)
   members            BoardMember[]
@@ -484,11 +495,59 @@ model Card {
   authors          CardAuthor[]
   attachments      CardAttachment[]  @relation("CardAttachments")
   showcaseEntries  ShowcaseEntry[]
+  comments         CardComment[]
+  likes            CardLike[]
 
   @@index([boardId])
   @@index([sectionId])
   @@index([authorId])
   @@index([studentAuthorId])
+}
+
+// card-comments-likes (2026-04-26): 카드별 댓글 + 좋아요. 작성자/좋아요 누른
+// 사람은 교사(User) 또는 학생(Student) — 두 모델을 별도 nullable FK 로 보유,
+// dual @@unique 로 중복 방지 (Postgres NULL distinct 의미상 한쪽이 null 인
+// 행은 unique 검사에서 제외됨 → 교사/학생 좋아요 1회씩 enforced).
+
+enum CommentAuthorKind {
+  teacher
+  student
+}
+
+model CardComment {
+  id              String            @id @default(cuid())
+  cardId          String
+  authorKind      CommentAuthorKind
+  authorUserId    String? // teacher
+  authorStudentId String? // student
+  content         String
+  createdAt       DateTime          @default(now())
+  deletedAt       DateTime?
+
+  card          Card     @relation(fields: [cardId], references: [id], onDelete: Cascade)
+  authorUser    User?    @relation("UserCardComments", fields: [authorUserId], references: [id], onDelete: SetNull)
+  authorStudent Student? @relation("StudentCardComments", fields: [authorStudentId], references: [id], onDelete: SetNull)
+
+  @@index([cardId, createdAt])
+  @@index([authorUserId])
+  @@index([authorStudentId])
+}
+
+model CardLike {
+  id             String            @id @default(cuid())
+  cardId         String
+  likerKind      CommentAuthorKind
+  likerUserId    String? // teacher
+  likerStudentId String? // student
+  createdAt      DateTime          @default(now())
+
+  card         Card     @relation(fields: [cardId], references: [id], onDelete: Cascade)
+  likerUser    User?    @relation("UserCardLikes", fields: [likerUserId], references: [id], onDelete: Cascade)
+  likerStudent Student? @relation("StudentCardLikes", fields: [likerStudentId], references: [id], onDelete: Cascade)
+
+  @@unique([cardId, likerUserId])
+  @@unique([cardId, likerStudentId])
+  @@index([cardId])
 }
 
 // student-portfolio (2026-04-26): 학생이 자기 카드를 학급 메인화면 자랑해요
