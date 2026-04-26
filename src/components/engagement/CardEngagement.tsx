@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { formatRelativeTime } from "@/lib/card-engagement-format";
 
 // card-comments-likes (2026-04-26): 카드별 좋아요 + 댓글 UI.
@@ -145,6 +146,15 @@ function CommentsModal({
   canInteract: boolean;
   onClose: () => void;
 }) {
+  // engagement-modal-portal (2026-04-26): 모달이 카드 DOM 안에 그대로 있으면
+  // 부모 .portfolio-card-link / .showcase-chip 의 pointer-events:none 가
+  // 모달의 닫기·제출 버튼까지 막아서 안 눌림. portal 로 document.body 에 옮겨
+  // DOM 계층 탈출.
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") onClose();
@@ -153,7 +163,9 @@ function CommentsModal({
     return () => window.removeEventListener("keydown", onKey);
   }, [onClose]);
 
-  return (
+  if (!mounted) return null;
+
+  const node = (
     <div
       className="card-engagement-backdrop"
       onClick={(e) => {
@@ -181,6 +193,8 @@ function CommentsModal({
       </div>
     </div>
   );
+
+  return createPortal(node, document.body);
 }
 
 function CommentsBlock({
