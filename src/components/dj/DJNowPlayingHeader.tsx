@@ -130,7 +130,7 @@ export function DJNowPlayingHeader({ card, boardId, canControl, onNext }: Props)
             {submitter && <span> · {submitter}님 신청</span>}
           </div>
           <div className="dj-nowplaying-actions">
-            {videoId && (
+            {canControl && videoId && (
               <button
                 type="button"
                 className="dj-play-btn"
@@ -151,7 +151,7 @@ export function DJNowPlayingHeader({ card, boardId, canControl, onNext }: Props)
                 ⏭ 다음
               </button>
             )}
-            {isActive && !manualPip && (
+            {canControl && isActive && !manualPip && (
               <button
                 type="button"
                 className="dj-next-btn"
