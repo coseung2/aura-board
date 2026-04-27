@@ -44,9 +44,13 @@ type Props = {
   titleAs?: "h3" | "h4";
   // engagement chips 렌더 여부. card.id 가 있을 때만 의미. 기본 true.
   showEngagement?: boolean;
+  // 첨부 렌더 모드 — 카드 썸네일은 "thumbnail"(기본), 모달 안에서 풀 콘텐츠를
+  // 보여줄 땐 "detail" 로 넘겨 원본 비율을 유지. thumbnail 은 height: 180px +
+  // object-fit: cover 라 세로 사진을 가로 strip 으로 크롭함.
+  attachmentsVariant?: "thumbnail" | "detail";
 };
 
-export const CardBody = memo(function CardBody({ card, titleAs = "h3", showEngagement = true }: Props) {
+export const CardBody = memo(function CardBody({ card, titleAs = "h3", showEngagement = true, attachmentsVariant = "thumbnail" }: Props) {
   const Title = titleAs;
   return (
     <>
@@ -62,7 +66,7 @@ export const CardBody = memo(function CardBody({ card, titleAs = "h3", showEngag
         fileSize={card.fileSize}
         fileMimeType={card.fileMimeType}
         attachments={card.attachments}
-        variant="thumbnail"
+        variant={attachmentsVariant}
       />
       <Title className="padlet-card-title">{card.title}</Title>
       <p className="padlet-card-content">{card.content}</p>

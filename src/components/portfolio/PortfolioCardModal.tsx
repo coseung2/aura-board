@@ -67,6 +67,7 @@ export function PortfolioCardModal({ card, onClose, showSource = true }: Props) 
             card={{ ...card, anonymousAuthor: card.sourceBoard.anonymousAuthor }}
             titleAs="h3"
             showEngagement={false}
+            attachmentsVariant="detail"
           />
           <CardEngagement cardId={card.id} mode="panel" />
         </div>

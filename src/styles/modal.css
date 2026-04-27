@@ -245,8 +245,10 @@
 }
 
 /* detail 모드 이미지는 OptimizedImage(fill)가 아니라 plain <img> 로 렌더됨.
-   원본 비율 보존 + 70vh 상한. 클릭 시 라이트박스 오픈. */
-.card-detail-media .card-attach-image.is-detail {
+   원본 비율 보존 + 70vh 상한. 클릭 시 라이트박스 오픈. 컨테이너 스코프
+   없이 적용해서 카드 상세 모달뿐 아니라 포트폴리오 모달 등 다른 컨테이너
+   안에서도 동일하게 동작. */
+.card-attach-image.is-detail {
   flex: 0 0 auto;
   width: 100%;
   max-height: none;
@@ -256,7 +258,7 @@
   position: relative;
 }
 
-.card-detail-media .card-attach-image.is-detail img {
+.card-attach-image.is-detail img {
   display: block;
   width: auto;
   height: auto;
@@ -266,12 +268,12 @@
   border-radius: 8px;
 }
 
-.card-detail-media .card-attach-image.is-detail img.is-clickable {
+.card-attach-image.is-detail img.is-clickable {
   cursor: zoom-in;
   transition: transform 120ms ease-out;
 }
 
-.card-detail-media .card-attach-image.is-detail img.is-clickable:hover {
+.card-attach-image.is-detail img.is-clickable:hover {
   transform: scale(1.01);
 }
 
