@@ -21,7 +21,7 @@ type Props = {
 
 export function ContextMenu({ items }: Props) {
   const [open, setOpen] = useState(false);
-  const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
+  const [pos, setPos] = useState<{ top: number; right: number } | null>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
@@ -48,8 +48,11 @@ export function ContextMenu({ items }: Props) {
     function recompute() {
       const r = triggerRef.current?.getBoundingClientRect();
       if (!r) return;
-      // 드롭다운이 트리거 우측 정렬, 아래로 4px 여백.
-      setPos({ top: r.bottom + 4, left: r.right });
+      // 드롭다운 우측 정렬: 메뉴 right 엣지를 트리거 right 엣지에 맞춤.
+      // transform: translateX(-100%) 를 쓰면 menuIn 키프레임의 transform 이
+      // 그걸 덮어써서 애니메이션 중 좌→우 점프 플리커가 발생 — 그래서 위치를
+      // 순수 right 오프셋으로 잡는다.
+      setPos({ top: r.bottom + 4, right: window.innerWidth - r.right });
     }
     recompute();
     window.addEventListener("scroll", recompute, true);
@@ -87,8 +90,7 @@ export function ContextMenu({ items }: Props) {
             style={{
               position: "fixed",
               top: pos.top,
-              left: pos.left,
-              transform: "translateX(-100%)",
+              right: pos.right,
             }}
             onClick={(e) => e.stopPropagation()}
           >
