@@ -992,17 +992,20 @@
   border: 1px solid var(--color-border);
 }
 
-.modal-attach-list-item-image .optimized-img-wrap {
-  width: 100%;
-  max-height: 160px;
-  overflow: hidden;
+/* upload preview: plain <img> + intrinsic 비율 유지. fill 모드 wrap 은
+   부모 height 없으면 collapse 해서 strip 으로 보이는 버그가 있어 의도적으로
+   회피. blob: URI 라 어차피 next/image 최적화 이득도 없음. */
+.modal-attach-list-item-image {
+  display: flex;
+  justify-content: center;
+  background: var(--color-bg);
 }
-
-.modal-attach-list-item-image .optimized-img-wrap img {
+.modal-attach-image-preview {
   display: block;
-  width: 100%;
-  max-height: 160px;
-  object-fit: cover;
+  max-width: 100%;
+  max-height: 220px;
+  width: auto;
+  height: auto;
 }
 
 .modal-attach-list-item-video video {

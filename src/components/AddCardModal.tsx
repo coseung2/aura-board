@@ -289,14 +289,11 @@ export function AddCardModal({
                       key={a.tempId}
                       className="modal-attach-list-item modal-attach-list-item-image"
                     >
-                      <div className="optimized-img-wrap">
-                        <OptimizedImage
-                          src={a.url}
-                          alt={a.fileName ?? ""}
-                          sizes="100px"
-                          fit="cover"
-                        />
-                      </div>
+                      <img
+                        src={a.url}
+                        alt={a.fileName ?? ""}
+                        className="modal-attach-image-preview"
+                      />
                       <div className="modal-attach-reorder modal-attach-reorder-overlay">
                         <button
                           type="button"
