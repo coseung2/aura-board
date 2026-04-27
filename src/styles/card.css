@@ -333,6 +333,25 @@
   display: block;
 }
 
+/* ⋯ 토글이 있는 카드는 상단에 여유 — 28×28 트리거가 top:8 에 절대 위치라
+   기본 padding-top(14~20px) 으로는 첨부 이미지/타이틀 우상단이 토글과
+   겹친다. :has() 로 토글이 실제로 렌더된 카드에만 적용 → 읽기전용 뷰엔
+   영향 X. 터치 디바이스는 트리거가 --tap-min(≥44px) 라 더 큰 클리어런스. */
+.column-card:has(> .card-ctx-menu),
+.grid-card:has(> .card-ctx-menu),
+.stream-card:has(> .card-ctx-menu),
+.padlet-card:has(> .card-ctx-menu) {
+  padding-top: 40px;
+}
+@media (pointer: coarse) {
+  .column-card:has(> .card-ctx-menu),
+  .grid-card:has(> .card-ctx-menu),
+  .stream-card:has(> .card-ctx-menu),
+  .padlet-card:has(> .card-ctx-menu) {
+    padding-top: 56px;
+  }
+}
+
 @media (hover: hover) {
   .card-ctx-menu {
     opacity: 0;
