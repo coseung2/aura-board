@@ -2,15 +2,13 @@
 
 import { memo } from "react";
 import { extractCanvaDesignId, hasCanvaShareToken } from "@/lib/canva";
+import { extractVideoId } from "@/lib/youtube";
 import { CanvaEmbedSlot } from "./CanvaEmbedSlot";
 import { OptimizedImage } from "@/components/ui/OptimizedImage";
 import { CardFileAttachment } from "./CardFileAttachment";
 
 function getYouTubeId(url: string): string | null {
-  const m =
-    url.match(/(?:youtu\.be\/|youtube\.com\/(?:embed\/|v\/|watch\?v=|shorts\/))([a-zA-Z0-9_-]{11})/) ??
-    null;
-  return m?.[1] ?? null;
+  return extractVideoId(url);
 }
 
 type AttachmentItem = {
@@ -57,6 +55,9 @@ export const CardAttachments = memo(function CardAttachments({ imageUrl, linkUrl
   const canvaDesignId = linkUrl ? extractCanvaDesignId(linkUrl) : null;
   const hasShareToken = Boolean(linkUrl && hasCanvaShareToken(linkUrl));
   const canRenderCanvaEmbed = Boolean(canvaDesignId && (linkImage || hasShareToken));
+  const linkYouTubeId = linkUrl ? getYouTubeId(linkUrl) : null;
+  const effectiveVideoUrl = videoUrl ?? (linkYouTubeId ? linkUrl : null);
+  const shouldHideLinkPreview = Boolean(linkYouTubeId);
 
   // multi-attachment: 링크·canva·youtube는 기존 로직 그대로, 나머지
   // 이미지/동영상/파일은 attachments 배열을 우선 렌더.
@@ -175,8 +176,8 @@ export const CardAttachments = memo(function CardAttachments({ imageUrl, linkUrl
                 />
               </div>
             )}
-            {videoUrl && (() => {
-              const yt = getYouTubeId(videoUrl);
+            {effectiveVideoUrl && (() => {
+              const yt = getYouTubeId(effectiveVideoUrl);
               return yt ? (
                 <div className="card-attach-video">
                   <iframe
@@ -188,7 +189,7 @@ export const CardAttachments = memo(function CardAttachments({ imageUrl, linkUrl
                 </div>
               ) : (
                 <div className="card-attach-video">
-                  <video src={videoUrl} controls preload="metadata" />
+                  <video src={effectiveVideoUrl} controls preload="metadata" />
                 </div>
               );
             })()}
@@ -215,7 +216,7 @@ export const CardAttachments = memo(function CardAttachments({ imageUrl, linkUrl
           linkImage={linkImage ?? null}
           linkDesc={linkDesc ?? null}
         />
-      ) : linkUrl ? (
+      ) : linkUrl && !shouldHideLinkPreview ? (
         <a
           href={linkUrl}
           target="_blank"

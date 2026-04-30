@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { extractVideoId } from "@/lib/youtube";
 import { CardAttachments } from "../CardAttachments";
 import { CardAuthorFooter } from "./CardAuthorFooter";
 import { CardImageLightbox } from "./CardImageLightbox";
@@ -110,6 +111,7 @@ export function CardDetailModal({
 
   if (!card) return null;
 
+  const showOriginalLink = Boolean(card.linkUrl && !extractVideoId(card.linkUrl));
   const hasMedia =
     Boolean(card.imageUrl) ||
     Boolean(card.linkImage) ||
@@ -194,7 +196,7 @@ export function CardDetailModal({
             {card.content && (
               <p className="card-detail-content">{card.content}</p>
             )}
-            {card.linkUrl && (
+            {showOriginalLink && (
               <a
                 href={card.linkUrl}
                 target="_blank"
