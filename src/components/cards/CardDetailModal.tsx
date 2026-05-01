@@ -196,7 +196,7 @@ export function CardDetailModal({
             {card.content && (
               <p className="card-detail-content">{card.content}</p>
             )}
-            {showOriginalLink && (
+            {showOriginalLink && card.linkUrl && (
               <a
                 href={card.linkUrl}
                 target="_blank"
