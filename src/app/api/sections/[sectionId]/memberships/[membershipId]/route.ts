@@ -5,10 +5,10 @@ import { getBoardRole } from "@/lib/rbac";
 
 export async function DELETE(
   req: Request,
-  ctx: { params: Promise<{ id: string; membershipId: string }> }
+  ctx: { params: Promise<{ sectionId: string; membershipId: string }> }
 ) {
   try {
-    const { id: sectionId, membershipId } = await ctx.params;
+    const { sectionId, membershipId } = await ctx.params;
     const user = await getCurrentUser().catch(() => null);
     if (!user) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
 

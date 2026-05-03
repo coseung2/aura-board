@@ -631,10 +631,35 @@ export default async function BoardPage({
         );
       }
       case "statistics": {
+        // Student's current team (if any) for lazy team creation flow
+        const studentTeam = studentViewer
+          ? sections.find((s) =>
+              breakoutMemberships.some(
+                (m) => m.sectionId === s.id && m.studentId === studentViewer.id
+              )
+            ) ?? null
+          : null;
+        const teamMembers = studentTeam
+          ? breakoutMemberships
+              .filter((m) => m.sectionId === studentTeam.id)
+              .map((m) => ({
+                id: m.id,
+                studentId: m.studentId,
+                studentName: m.student.name,
+                studentNumber: m.student.number,
+              }))
+          : [];
         return (
           <StatisticsBoardClient
             boardId={board!.id}
             isTeacher={!studentViewer && effectiveRole === "owner"}
+            studentSectionId={studentTeam?.id ?? null}
+            teamMembers={teamMembers}
+            rosterStudents={rosterStudents.map((s) => ({
+              id: s.id,
+              name: s.name,
+              number: s.number,
+            }))}
           />
         );
       }

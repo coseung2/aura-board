@@ -5,6 +5,7 @@ import { MissionStepper } from "./MissionStepper";
 import { MissionPanel } from "./MissionPanel";
 import { TeacherDashboard } from "./TeacherDashboard";
 import { MobileTabBar } from "./MobileTabBar";
+import { StatisticsTeamInviteButton } from "./StatisticsTeamInviteButton";
 import { useMissionsSSE } from "./useMissionsSSE";
 
 export type MissionDTO = {
@@ -26,54 +27,68 @@ export type MissionDTO = {
   version: number;
 };
 
+export type TeamMemberDTO = {
+  id: string;
+  studentId: string;
+  studentName: string;
+  studentNumber: number | null;
+};
+
+export type RosterStudentDTO = {
+  id: string;
+  name: string;
+  number: number | null;
+};
+
 export type StatisticsBoardClientProps = {
   boardId: string;
   isTeacher: boolean;
+  studentSectionId: string | null;
+  teamMembers: TeamMemberDTO[];
+  rosterStudents: RosterStudentDTO[];
 };
 
 export function StatisticsBoardClient({
   boardId,
   isTeacher,
+  studentSectionId,
+  teamMembers: initialTeamMembers,
+  rosterStudents,
 }: StatisticsBoardClientProps) {
-  const [sectionId, setSectionId] = useState<string | null>(null);
+  const [sectionId, setSectionId] = useState<string | null>(studentSectionId);
   const [missions, setMissions] = useState<MissionDTO[]>([]);
   const [currentStep, setCurrentStep] = useState<number>(1);
   const [isSaving, setIsSaving] = useState(false);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(!studentSectionId);
+  const [creating, setCreating] = useState(false);
+  const [teamMembers, setTeamMembers] = useState<TeamMemberDTO[]>(initialTeamMembers);
 
   const currentMission = missions.find((m) => m.stepNumber === currentStep);
 
-  // On mount, resolve the student's section or pick the first one
+  // On mount, if student already has a section, fetch missions
   useEffect(() => {
     async function init() {
+      if (!sectionId) {
+        setLoading(false);
+        return;
+      }
       try {
-        // For teachers: list all sections and pick first
-        // For students: API returns their accessible sections
-        const sectionsRes = await fetch(`/api/boards/${boardId}/sections`);
-        if (sectionsRes.ok) {
-          const sectionsData = await sectionsRes.json();
-          const sections = sectionsData.sections as { id: string; title: string }[];
-          const sid = sections[0]?.id ?? null;
-          if (sid) {
-            setSectionId(sid);
-            const missionsRes = await fetch(`/api/sections/${sid}/missions`);
-            if (missionsRes.ok) {
-              const data = await missionsRes.json();
-              const list = data.missions as MissionDTO[];
-              setMissions(list);
-              const firstIncomplete = list.find(
-                (m) => m.status !== "approved" && m.status !== "completed"
-              );
-              setCurrentStep(firstIncomplete?.stepNumber ?? 1);
-            }
-          }
+        const missionsRes = await fetch(`/api/sections/${sectionId}/missions`);
+        if (missionsRes.ok) {
+          const data = await missionsRes.json();
+          const list = data.missions as MissionDTO[];
+          setMissions(list);
+          const firstIncomplete = list.find(
+            (m) => m.status !== "approved" && m.status !== "completed"
+          );
+          setCurrentStep(firstIncomplete?.stepNumber ?? 1);
         }
       } finally {
         setLoading(false);
       }
     }
     init();
-  }, [boardId]);
+  }, [sectionId]);
 
   async function refreshMissions() {
     if (!sectionId) return;
@@ -84,7 +99,39 @@ export function StatisticsBoardClient({
     }
   }
 
+  async function refreshMembers() {
+    if (!sectionId) return;
+    const res = await fetch(`/api/sections/${sectionId}/memberships`);
+    if (res.ok) {
+      const data = await res.json();
+      setTeamMembers(data.memberships as TeamMemberDTO[]);
+    }
+  }
+
   useMissionsSSE(boardId, refreshMissions);
+
+  async function createTeam() {
+    setCreating(true);
+    try {
+      const res = await fetch(`/api/boards/${boardId}/teams`, { method: "POST" });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        if (data.error === "already_in_team" && data.sectionId) {
+          setSectionId(data.sectionId);
+          return;
+        }
+        alert(data.error || "팀 만들기에 실패했습니다.");
+        return;
+      }
+      const data = await res.json();
+      setSectionId(data.sectionId);
+      setTeamMembers([]);
+    } catch {
+      alert("네트워크 오류가 발생했습니다.");
+    } finally {
+      setCreating(false);
+    }
+  }
 
   if (loading) {
     return <div className="statistics-loading">미션을 불러오는 중...</div>;
@@ -95,7 +142,21 @@ export function StatisticsBoardClient({
   }
 
   if (!sectionId) {
-    return <div className="statistics-empty">아직 팀이 구성되지 않았습니다.</div>;
+    return (
+      <div className="statistics-board statistics-board-empty">
+        <div className="statistics-empty-state">
+          <h2 className="statistics-empty-title">📊 통계활용대회</h2>
+          <p className="statistics-empty-text">팀을 만들어 미션을 시작하세요!</p>
+          <button
+            className="btn-primary statistics-create-team-btn"
+            onClick={createTeam}
+            disabled={creating}
+          >
+            {creating ? "팀 만드는 중..." : "팀 만들기"}
+          </button>
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -116,6 +177,22 @@ export function StatisticsBoardClient({
         />
       </div>
       <main className="statistics-main">
+        <div className="statistics-team-header">
+          <div className="statistics-team-avatars">
+            {teamMembers.map((m) => (
+              <span key={m.id} className="team-avatar" title={m.studentName}>
+                {m.studentName.charAt(0)}
+              </span>
+            ))}
+          </div>
+          <StatisticsTeamInviteButton
+            sectionId={sectionId}
+            rosterStudents={rosterStudents}
+            teamMembers={teamMembers}
+            onInvite={refreshMembers}
+          />
+        </div>
+
         {currentMission ? (
           <MissionPanel
             boardId={boardId}
