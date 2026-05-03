@@ -296,30 +296,8 @@ export async function POST(req: Request) {
           },
         });
 
-        // Create sections (teams) and missions
-        for (let g = 1; g <= groupCount; g++) {
-          const section = await tx.section.create({
-            data: {
-              boardId: createdBoard.id,
-              title: `모둠 ${g}`,
-              order: g,
-            },
-          });
-
-          // Create 11 missions per team
-          for (let step = 1; step <= 11; step++) {
-            await tx.mission.create({
-              data: {
-                sectionId: section.id,
-                stepNumber: step,
-                status: step === 1 ? "not_started" : "not_started",
-                content: {},
-                version: 0,
-              },
-            });
-          }
-        }
-
+        // Note: sections and missions are created lazily when a student
+        // clicks "팀 만들기" — POST /api/boards/[id]/teams
         return createdBoard;
       });
 

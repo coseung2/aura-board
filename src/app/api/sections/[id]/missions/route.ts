@@ -6,10 +6,10 @@ import { viewSection } from "@/lib/rbac";
 
 export async function GET(
   req: Request,
-  ctx: { params: Promise<{ sectionId: string }> }
+  ctx: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { sectionId } = await ctx.params;
+    const { id: sectionId } = await ctx.params;
     const url = new URL(req.url);
     const token = url.searchParams.get("token");
 
