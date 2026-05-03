@@ -1,6 +1,7 @@
 "use client";
 
-import { MissionDTO } from "./StatisticsBoardClient";
+import type { MissionDTO } from "./StatisticsBoardClient";
+import { MISSION_TITLES } from "./missionTitles";
 
 export function MissionStepItem({
   mission,
@@ -20,7 +21,7 @@ export function MissionStepItem({
       className={`mission-step-item ${isActive ? "active" : ""} ${isDone ? "done" : ""} ${isLocked ? "locked" : ""}`}
       role="tab"
       aria-selected={isActive}
-      aria-label={`미션 ${mission.stepNumber}, ${missionTitles[mission.stepNumber]}, 상태: ${statusLabel(mission.status)}`}
+      aria-label={`미션 ${mission.stepNumber}, ${MISSION_TITLES[mission.stepNumber]}, 상태: ${statusLabel(mission.status)}`}
       onClick={() => {
         if (isLocked) return;
         onClick();
@@ -32,27 +33,13 @@ export function MissionStepItem({
       </span>
       <span className="mission-step-text">
         <span className="mission-step-title">
-          {mission.stepNumber}. {missionTitles[mission.stepNumber]}
+          {mission.stepNumber}. {MISSION_TITLES[mission.stepNumber]}
         </span>
         <span className="mission-step-status">{statusLabel(mission.status)}</span>
       </span>
     </button>
   );
 }
-
-const missionTitles: Record<number, string> = {
-  1: "주제 카드",
-  2: "질문 사다리",
-  3: "설문 문항",
-  4: "조사 계획",
-  5: "자료 수집",
-  6: "그래프 계획",
-  7: "결과 해석",
-  8: "결론·제안",
-  9: "포스터 의뢰",
-  10: "포스터 검토",
-  11: "발표 준비",
-};
 
 function statusLabel(status: MissionDTO["status"]): string {
   switch (status) {

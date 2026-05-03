@@ -1,6 +1,7 @@
 "use client";
 
-import { MissionDTO } from "./StatisticsBoardClient";
+import type { MissionDTO } from "./StatisticsBoardClient";
+import { MISSION_TITLES } from "./missionTitles";
 
 export function MobileTabBar({
   missions,
@@ -48,24 +49,10 @@ export function MobileTabBar({
               flexShrink: 0,
             }}
           >
-            {isDone ? "✓" : mission.stepNumber}. {missionTitles[mission.stepNumber]}
+            {isDone ? "✓" : mission.stepNumber}. {MISSION_TITLES[mission.stepNumber]}
           </button>
         );
       })}
     </nav>
   );
 }
-
-const missionTitles: Record<number, string> = {
-  1: "주제 카드",
-  2: "질문 사다리",
-  3: "설문 문항",
-  4: "조사 계획",
-  5: "자료 수집",
-  6: "그래프 계획",
-  7: "결과 해석",
-  8: "결론·제안",
-  9: "포스터 의뢰",
-  10: "포스터 검토",
-  11: "발표 준비",
-};

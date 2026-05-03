@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useCallback } from "react";
-import { MissionDTO } from "./StatisticsBoardClient";
+import type { MissionDTO } from "./StatisticsBoardClient";
+import { MISSION_TITLES } from "./missionTitles";
 import { QuestionLadderAccordion } from "./QuestionLadderAccordion";
 import { MissionActionBar } from "./MissionActionBar";
 import { Mission1TopicCard } from "./missions/Mission1TopicCard";
@@ -38,12 +39,9 @@ export function MissionPanel({
   const [error, setError] = useState<string | null>(null);
 
   const canEdit =
-    !isTeacher &&
-    (mission.status === "not_started" ||
-      mission.status === "in_progress" ||
-      mission.status === "approved");
+    mission.status !== "teacher_working" && mission.status !== "completed";
 
-  const canSubmit = canEdit && mission.status !== "pending_approval";
+  const canSubmit = !isTeacher && canEdit && mission.status !== "pending_approval";
 
   const save = useCallback(async () => {
     setIsSaving(true);
@@ -103,12 +101,12 @@ export function MissionPanel({
       </div>
       <div className="mission-panel-card">
         <h3 className="mission-panel-title">
-          미션 {mission.stepNumber}. {missionTitles[mission.stepNumber]}
+          미션 {mission.stepNumber}. {MISSION_TITLES[mission.stepNumber]}
         </h3>
         <p className="mission-panel-subtitle">
           {mission.stepNumber === 2
-            ? "찬반은 마지막 보스! 지금은 단서를 모을 차례예요."
-            : "팀원들과 함께 이 미션을 완료해 보세요."}
+            ? "찬성과 반대는 마지막에 생각해요. 지금은 좋은 질문을 모을 차례예요."
+            : "팀원들과 이야기하며 빈칸을 하나씩 채워 보세요."}
         </p>
 
         {mission.stepNumber === 1 && (
@@ -165,17 +163,3 @@ export function MissionPanel({
     </div>
   );
 }
-
-const missionTitles: Record<number, string> = {
-  1: "주제 카드",
-  2: "질문 사다리",
-  3: "설문 문항",
-  4: "조사 계획",
-  5: "자료 수집",
-  6: "그래프 계획",
-  7: "결과 해석",
-  8: "결론·제안",
-  9: "포스터 의뢰",
-  10: "포스터 검토",
-  11: "발표 준비",
-};

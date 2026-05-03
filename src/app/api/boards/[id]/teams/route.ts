@@ -28,27 +28,47 @@ export async function POST(
       return NextResponse.json({ error: "board_not_found" }, { status: 404 });
     }
 
-    // If a teacher creates the team, they must own the board
-    if (user) {
-      const role = await getBoardRole(boardId, user.id);
-      if (!role) {
-        return NextResponse.json({ error: "forbidden" }, { status: 403 });
-      }
-    }
-
-    // If a student creates the team, they must belong to the board's classroom
-    // and not already be in another team on this board
     let actingStudentId: string | null = null;
+
     if (student) {
       if (!board.classroomId || student.classroomId !== board.classroomId) {
         return NextResponse.json({ error: "not_classroom_student" }, { status: 403 });
       }
       actingStudentId = student.id;
+    }
 
-      // Policy: one team per student per board
+    if (user) {
+      const role = await getBoardRole(boardId, user.id);
+      if (!role) {
+        return NextResponse.json({ error: "forbidden" }, { status: 403 });
+      }
+
+      if (!actingStudentId) {
+        const body = await req.json().catch(() => ({}));
+        const { studentId } = body;
+        if (typeof studentId === "string" && studentId) {
+          if (!board.classroomId) {
+            return NextResponse.json({ error: "board_has_no_classroom" }, { status: 400 });
+          }
+          const targetStudent = await db.student.findUnique({
+            where: { id: studentId },
+            select: { id: true, classroomId: true, name: true },
+          });
+          if (!targetStudent) {
+            return NextResponse.json({ error: "student_not_found" }, { status: 404 });
+          }
+          if (targetStudent.classroomId !== board.classroomId) {
+            return NextResponse.json({ error: "student_not_in_classroom" }, { status: 403 });
+          }
+          actingStudentId = targetStudent.id;
+        }
+      }
+    }
+
+    if (actingStudentId) {
       const existingMembership = await db.breakoutMembership.findFirst({
         where: {
-          studentId: student.id,
+          studentId: actingStudentId,
           section: { boardId },
         },
       });
@@ -60,7 +80,6 @@ export async function POST(
       }
     }
 
-    // Determine team name
     let teamName = "새 팀";
     if (actingStudentId) {
       const s = await db.student.findUnique({
@@ -70,9 +89,7 @@ export async function POST(
       if (s) teamName = `팀 ${s.name}`;
     }
 
-    // Create section + missions + membership in a transaction
     const result = await db.$transaction(async (tx) => {
-      // Count existing sections for ordering
       const existingCount = await tx.section.count({ where: { boardId } });
 
       const section = await tx.section.create({
@@ -83,7 +100,6 @@ export async function POST(
         },
       });
 
-      // Create 11 missions
       for (let step = 1; step <= 11; step++) {
         await tx.mission.create({
           data: {
@@ -96,7 +112,6 @@ export async function POST(
         });
       }
 
-      // If a student initiated, auto-join them
       if (actingStudentId) {
         await tx.breakoutMembership.create({
           data: {

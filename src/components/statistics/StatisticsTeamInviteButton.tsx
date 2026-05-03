@@ -3,6 +3,16 @@
 import { useState, useMemo, useRef, useEffect } from "react";
 import type { TeamMemberDTO, RosterStudentDTO } from "./StatisticsBoardClient";
 
+const INVITE_ERROR_MESSAGES: Record<string, string> = {
+  already_in_another_team: "이 친구는 이미 다른 팀에서 활동하고 있어요.",
+  already_assigned: "이 친구는 이미 우리 팀에 있어요.",
+  board_has_no_classroom: "이 보드에는 학급 명단이 연결되어 있지 않아요.",
+  forbidden: "우리 팀에 초대할 수 있는 권한이 없어요.",
+  student_not_found: "명단에서 이 친구를 찾을 수 없어요.",
+  student_not_in_classroom: "이 보드의 학급 친구만 초대할 수 있어요.",
+  "studentId required": "초대할 친구를 먼저 골라 주세요.",
+};
+
 export function StatisticsTeamInviteButton({
   sectionId,
   rosterStudents,
@@ -58,7 +68,8 @@ export function StatisticsTeamInviteButton({
       });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
-        alert(data.error || "초대에 실패했습니다.");
+        const errorCode = typeof data.error === "string" ? data.error : "";
+        alert(INVITE_ERROR_MESSAGES[errorCode] ?? "초대하지 못했어요. 잠시 후 다시 해 주세요.");
         return;
       }
       setSelectedId(null);

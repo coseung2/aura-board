@@ -1,6 +1,6 @@
 "use client";
 
-import { MissionDTO } from "./StatisticsBoardClient";
+import type { MissionDTO } from "./StatisticsBoardClient";
 import { StatusBadge } from "./StatusBadge";
 
 export function MissionActionBar({
@@ -25,14 +25,14 @@ export function MissionActionBar({
         onClick={onSave}
         disabled={isSaving || !canEdit}
       >
-        {isSaving ? "저장 중..." : "임시 저장"}
+        {isSaving ? "저장하고 있어요..." : "잠깐 저장"}
       </button>
       <button
         className="btn-primary"
         onClick={onSubmit}
         disabled={isSaving || !canSubmit}
       >
-        완료 — 승인 요청
+        선생님께 보내기
       </button>
       <StatusBadge status={status} />
     </div>

@@ -10,14 +10,29 @@ export async function GET(
 ) {
   try {
     const { id: sectionId } = await ctx.params;
-    const user = await getCurrentUser().catch(() => null);
-    if (!user) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+    const [user, student] = await Promise.all([
+      getCurrentUser().catch(() => null),
+      getCurrentStudent(),
+    ]);
+    if (!user && !student) {
+      return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+    }
 
     const section = await db.section.findUnique({ where: { id: sectionId }, select: { boardId: true } });
     if (!section) return NextResponse.json({ error: "not_found" }, { status: 404 });
 
-    const role = await getBoardRole(section.boardId, user.id);
-    if (!role) return NextResponse.json({ error: "forbidden" }, { status: 403 });
+    let canRead = false;
+    if (user) {
+      const role = await getBoardRole(section.boardId, user.id);
+      if (role) canRead = true;
+    }
+    if (student && !canRead) {
+      const membership = await db.breakoutMembership.findUnique({
+        where: { sectionId_studentId: { sectionId, studentId: student.id } },
+      });
+      if (membership) canRead = true;
+    }
+    if (!canRead) return NextResponse.json({ error: "forbidden" }, { status: 403 });
 
     const memberships = await db.breakoutMembership.findMany({
       where: { sectionId },
@@ -53,7 +68,7 @@ export async function POST(
 
     const section = await db.section.findUnique({
       where: { id: sectionId },
-      select: { boardId: true },
+      select: { boardId: true, board: { select: { classroomId: true } } },
     });
     if (!section) return NextResponse.json({ error: "not_found" }, { status: 404 });
 
@@ -79,6 +94,21 @@ export async function POST(
     const { studentId } = body;
     if (!studentId || typeof studentId !== "string") {
       return NextResponse.json({ error: "studentId required" }, { status: 400 });
+    }
+
+    if (!section.board.classroomId) {
+      return NextResponse.json({ error: "board_has_no_classroom" }, { status: 400 });
+    }
+
+    const targetStudent = await db.student.findUnique({
+      where: { id: studentId },
+      select: { id: true, classroomId: true },
+    });
+    if (!targetStudent) {
+      return NextResponse.json({ error: "student_not_found" }, { status: 404 });
+    }
+    if (targetStudent.classroomId !== section.board.classroomId) {
+      return NextResponse.json({ error: "student_not_in_classroom" }, { status: 403 });
     }
 
     // Check if target student is already in this section

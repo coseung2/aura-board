@@ -2,9 +2,9 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { MissionPanel } from "./MissionPanel";
-import { CardBody } from "../cards/CardBody";
 import { StatisticsTeamInviteButton } from "./StatisticsTeamInviteButton";
 import { useMissionsSSE } from "./useMissionsSSE";
+import { MISSION_TITLES } from "./missionTitles";
 
 export type MissionDTO = {
   id: string;
@@ -17,7 +17,7 @@ export type MissionDTO = {
     | "approved"
     | "teacher_working"
     | "completed";
-  content: Record<string, unknown>;
+  content: unknown;
   submittedAt: string | null;
   approvedAt: string | null;
   approvedBy: string | null;
@@ -52,25 +52,27 @@ type DashboardTeam = {
   memberCount: number;
   currentStep: number;
   missions: Array<{
+    id?: string;
+    sectionId?: string;
     stepNumber: number;
     status: MissionDTO["status"];
+    content?: unknown;
     submittedAt: string | null;
     approvedAt: string | null;
+    approvedBy?: string | null;
+    teacherFeedback?: string | null;
+    version?: number;
   }>;
 };
 
-const MISSION_TITLES: Record<number, string> = {
-  1: "주제 카드",
-  2: "질문 사다리",
-  3: "설문 문항",
-  4: "조사 계획",
-  5: "자료 수집",
-  6: "그래프 계획",
-  7: "결과 해석",
-  8: "결론·제안",
-  9: "포스터 의뢰",
-  10: "포스터 검토",
-  11: "발표 준비",
+const TEAM_CREATE_ERROR_MESSAGES: Record<string, string> = {
+  board_has_no_classroom: "이 보드에는 학급 명단이 연결되어 있지 않아요.",
+  board_not_found: "보드를 찾을 수 없어요.",
+  forbidden: "이 보드에서 팀을 만들 수 있는 권한이 없어요.",
+  not_classroom_student: "이 보드의 학급 친구만 팀을 만들 수 있어요.",
+  student_not_found: "명단에서 이 친구를 찾을 수 없어요.",
+  student_not_in_classroom: "이 보드의 학급 친구만 팀을 만들 수 있어요.",
+  unauthorized: "먼저 로그인해 주세요.",
 };
 
 function statusColor(status: MissionDTO["status"]): string | null {
@@ -112,12 +114,178 @@ function statusLabel(status: MissionDTO["status"]): string {
 type CardItem = {
   id: string;
   title: string;
-  content: string;
   color: string | null;
   sectionId: string;
   teamName: string;
   mission: MissionDTO;
+  previewRows: MissionPreviewRow[];
 };
+
+type MissionPreviewRow = {
+  label: string;
+  value: string;
+};
+
+type MissionPreviewField = {
+  path: string[];
+  label: string;
+};
+
+const MISSION_PREVIEW_FIELDS: Record<number, MissionPreviewField[]> = {
+  1: [
+    { path: ["topic", "subject"], label: "주제" },
+    { path: ["topic", "curiosity"], label: "궁금한 점" },
+    { path: ["topic", "stakeholders"], label: "도움 받는 사람" },
+    { path: ["topic", "relevance"], label: "우리와 연결" },
+  ],
+  2: [
+    { path: ["questionLadder", "experience"], label: "경험 질문" },
+    { path: ["questionLadder", "currentStatus"], label: "현황 질문" },
+    { path: ["questionLadder", "reason"], label: "이유 질문" },
+    { path: ["questionLadder", "alternative"], label: "해결 질문" },
+  ],
+  3: [{ path: ["survey", "items"], label: "설문 문항" }],
+  4: [
+    { path: ["investigationPlan", "target"], label: "조사 대상" },
+    { path: ["investigationPlan", "goalCount"], label: "목표 인원" },
+    { path: ["investigationPlan", "method"], label: "조사 방법" },
+    { path: ["investigationPlan", "period"], label: "조사 기간" },
+  ],
+  5: [
+    { path: ["dataCollection", "respondentCount"], label: "응답 수" },
+    { path: ["dataCollection", "period"], label: "조사 기간" },
+    { path: ["dataCollection", "notes"], label: "메모" },
+  ],
+  6: [{ path: ["graphPlans"], label: "그래프 계획" }],
+  7: [
+    { path: ["interpretation", "fact"], label: "알게 된 점" },
+    { path: ["interpretation", "highest"], label: "가장 많음" },
+    { path: ["interpretation", "lowest"], label: "가장 적음" },
+    { path: ["interpretation", "meaning"], label: "뜻" },
+  ],
+  8: [
+    { path: ["conclusion", "findings"], label: "중요한 발견" },
+    { path: ["conclusion", "conclusion"], label: "결론" },
+    { path: ["conclusion", "proposal"], label: "제안" },
+  ],
+  9: [
+    { path: ["posterRequest", "posterTitle"], label: "포스터 제목" },
+    { path: ["posterRequest", "topic"], label: "주제" },
+    { path: ["posterRequest", "keyData"], label: "중요한 자료" },
+    { path: ["posterRequest", "conclusion"], label: "결론" },
+  ],
+  10: [
+    { path: ["posterReview", "isAccurate"], label: "자료 확인" },
+    { path: ["posterReview", "titleCorrect"], label: "제목 확인" },
+    { path: ["posterReview", "revisionRequests"], label: "고칠 점" },
+  ],
+  11: [
+    { path: ["presentation", "structure"], label: "발표 순서" },
+    { path: ["presentation", "ready"], label: "준비" },
+  ],
+};
+
+function getValueAtPath(
+  source: unknown,
+  path: string[]
+): unknown {
+  let value: unknown = source;
+  for (const key of path) {
+    if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+    value = (value as Record<string, unknown>)[key];
+  }
+  return value;
+}
+
+function formatPreviewValue(value: unknown): string {
+  if (typeof value === "string") return value.trim();
+  if (typeof value === "number") return Number.isFinite(value) ? `${value}` : "";
+  if (typeof value === "boolean") return value ? "확인했어요" : "아직 확인 전";
+  if (Array.isArray(value)) {
+    return value
+      .map((item, index) => {
+        const text = formatPreviewListItem(item);
+        return text ? `${index + 1}. ${text}` : "";
+      })
+      .filter(Boolean)
+      .join("\n");
+  }
+  if (value && typeof value === "object") {
+    return Object.values(value as Record<string, unknown>)
+      .map(formatPreviewValue)
+      .filter(Boolean)
+      .join(" · ");
+  }
+  return "";
+}
+
+function formatPreviewListItem(item: unknown): string {
+  if (!item || typeof item !== "object" || Array.isArray(item)) {
+    return formatPreviewValue(item);
+  }
+
+  const record = item as Record<string, unknown>;
+  const primary =
+    record.question ??
+    record.content ??
+    record.insight ??
+    record.title ??
+    record.name;
+  const primaryText = formatPreviewValue(primary);
+  if (!primaryText) return formatPreviewValue(record);
+
+  const options = Array.isArray(record.options)
+    ? record.options.map(formatPreviewValue).filter(Boolean).join(", ")
+    : "";
+  const type = typeof record.type === "string" ? record.type : "";
+  const detail = options || type;
+  return detail ? `${primaryText} (${detail})` : primaryText;
+}
+
+function buildMissionPreviewRows(mission: MissionDTO): MissionPreviewRow[] {
+  const content = mission.content;
+  if (isPreviewBlank(content)) return [];
+
+  const fields = MISSION_PREVIEW_FIELDS[mission.stepNumber] ?? [];
+  const rows = fields
+    .map((field) => ({
+      label: field.label,
+      value: formatPreviewValue(getValueAtPath(content, field.path)),
+    }))
+    .filter((row) => row.value.length > 0);
+
+  if (rows.length > 0) return rows.slice(0, 4);
+
+  if (typeof content === "string" || typeof content === "number" || typeof content === "boolean") {
+    const value = formatPreviewValue(content);
+    return value ? [{ label: "내용", value }] : [];
+  }
+
+  if (Array.isArray(content)) {
+    const value = formatPreviewValue(content);
+    return value ? [{ label: "내용", value }] : [];
+  }
+
+  if (!content || typeof content !== "object") return [];
+
+  return Object.entries(content as Record<string, unknown>)
+    .map(([key, value]) => ({
+      label: key,
+      value: formatPreviewValue(value),
+    }))
+    .filter((row) => row.value.length > 0)
+    .slice(0, 4);
+}
+
+function isPreviewBlank(value: unknown): boolean {
+  if (value == null) return true;
+  if (typeof value === "string") return value.trim().length === 0;
+  if (Array.isArray(value)) return value.every(isPreviewBlank);
+  if (typeof value === "object") {
+    return Object.values(value as Record<string, unknown>).every(isPreviewBlank);
+  }
+  return false;
+}
 
 export function StatisticsBoardClient({
   boardId,
@@ -171,6 +339,7 @@ export function StatisticsBoardClient({
           );
           setCurrentStep(firstIncomplete?.stepNumber ?? 1);
         }
+        await refreshMembers();
       } finally {
         setLoading(false);
       }
@@ -206,10 +375,57 @@ export function StatisticsBoardClient({
       const dashRes = await fetch(`/api/boards/${boardId}/missions/dashboard`);
       if (!dashRes.ok) throw new Error("대시보드를 불러올 수 없습니다.");
       const dashData = await dashRes.json();
-      setTeams(dashData.teams as DashboardTeam[]);
+      const dashboardTeams = dashData.teams as DashboardTeam[];
+      setTeams(await hydrateDashboardMissionContent(dashboardTeams));
     } catch {
       // ignore
     }
+  }
+
+  async function hydrateDashboardMissionContent(
+    dashboardTeams: DashboardTeam[]
+  ): Promise<DashboardTeam[]> {
+    const detailRequests = dashboardTeams.flatMap((team) =>
+      team.missions
+        .filter((mission) => mission.status !== "not_started")
+        .map(async (mission) => {
+          try {
+            const res = await fetch(
+              `/api/sections/${team.sectionId}/missions/${mission.stepNumber}`
+            );
+            if (!res.ok) return null;
+            const data = await res.json();
+            return {
+              key: `${team.sectionId}-${mission.stepNumber}`,
+              mission: data.mission as MissionDTO,
+            };
+          } catch {
+            return null;
+          }
+        })
+    );
+
+    const detailMap = new Map<string, MissionDTO>();
+    for (const detail of await Promise.all(detailRequests)) {
+      if (detail) detailMap.set(detail.key, detail.mission);
+    }
+
+    return dashboardTeams.map((team) => ({
+      ...team,
+      missions: team.missions.map((mission) => {
+        const detail = detailMap.get(`${team.sectionId}-${mission.stepNumber}`);
+        if (!detail) return mission;
+        return {
+          ...mission,
+          id: detail.id,
+          sectionId: detail.sectionId,
+          content: detail.content,
+          approvedBy: detail.approvedBy,
+          teacherFeedback: detail.teacherFeedback,
+          version: detail.version,
+        };
+      }),
+    }));
   }
 
   useMissionsSSE(boardId, refreshData);
@@ -226,7 +442,8 @@ export function StatisticsBoardClient({
           setSectionId(data.sectionId);
           return;
         }
-        alert(data.error || "팀 만들기에 실패했습니다.");
+        const errorCode = typeof data.error === "string" ? data.error : "";
+        alert(TEAM_CREATE_ERROR_MESSAGES[errorCode] ?? "팀을 만들지 못했어요. 잠시 후 다시 해 주세요.");
         return;
       }
       const data = await res.json();
@@ -292,7 +509,7 @@ export function StatisticsBoardClient({
     setModalTeamName(teamName);
     // 교사 화면에서는 dashboard API가 content/version을 주지 않으므로
     // 모달 열기 전에 상세 미션 데이터를 불러온다.
-    if (isTeacher && !mission.content || Object.keys(mission.content).length === 0) {
+    if (isTeacher && isPreviewBlank(mission.content)) {
       try {
         const res = await fetch(`/api/sections/${sid}/missions/${mission.stepNumber}`);
         if (res.ok) {
@@ -315,7 +532,9 @@ export function StatisticsBoardClient({
 
   function getStudentTeamName(): string {
     if (teamMembers.length === 0) return "우리 팀";
-    return `팀 ${teamMembers.map((m) => m.studentName).join(" ")}`;
+    const names = teamMembers.map((m) => m.studentName);
+    if (names.length <= 2) return `팀 ${names.join(" ")}`;
+    return `팀 ${names[0]} ${names[1]} 외 ${names.length - 2}명`;
   }
 
   function getCardsForStep(step: number): CardItem[] {
@@ -325,25 +544,28 @@ export function StatisticsBoardClient({
         const m = team.missions.find((x) => x.stepNumber === step);
         if (!m) continue;
         const missionDto: MissionDTO = {
-          id: `${team.sectionId}-${step}`,
-          sectionId: team.sectionId,
+          id: m.id ?? `${team.sectionId}-${step}`,
+          sectionId: m.sectionId ?? team.sectionId,
           stepNumber: step,
           status: m.status,
-          content: {},
+          content: m.content ?? {},
           submittedAt: m.submittedAt,
           approvedAt: m.approvedAt,
-          approvedBy: null,
-          teacherFeedback: null,
-          version: 1,
+          approvedBy: m.approvedBy ?? null,
+          teacherFeedback: m.teacherFeedback ?? null,
+          version: m.version ?? 1,
         };
         cards.push({
           id: `${team.sectionId}-${step}`,
           title: team.teamName,
-          content: `${team.memberCount}명 · ${statusLabel(m.status)}`,
           color: statusColor(m.status),
           sectionId: team.sectionId,
           teamName: team.teamName,
           mission: missionDto,
+          previewRows: [
+            { label: "팀원", value: `${team.memberCount}명` },
+            ...buildMissionPreviewRows(missionDto),
+          ].slice(0, 4),
         });
       }
     } else {
@@ -352,12 +574,12 @@ export function StatisticsBoardClient({
         const name = getStudentTeamName();
         cards.push({
           id: m.id,
-          title: name,
-          content: teamMembers.map((tm) => tm.studentName).join(", "),
+          title: MISSION_TITLES[m.stepNumber],
           color: statusColor(m.status),
           sectionId: sectionId ?? m.sectionId,
           teamName: name,
           mission: m,
+          previewRows: buildMissionPreviewRows(m),
         });
       }
     }
@@ -389,7 +611,7 @@ export function StatisticsBoardClient({
   }
 
   return (
-    <div className="statistics-board columns-board" style={{ flexDirection: "column" }}>
+    <div className="statistics-board columns-board">
       {!isTeacher && sectionId && (
         <div className="statistics-toolbar">
           <div className="statistics-team-avatars">
@@ -423,7 +645,7 @@ export function StatisticsBoardClient({
                 {stepCards.map((card) => (
                   <article
                     key={card.id}
-                    className="column-card is-clickable"
+                    className="column-card statistics-mission-card is-clickable"
                     style={{ backgroundColor: card.color ?? undefined }}
                     onClick={() =>
                       openMissionModal(
@@ -446,7 +668,30 @@ export function StatisticsBoardClient({
                     role="button"
                     aria-label={`${card.title} ${MISSION_TITLES[step]}`}
                   >
-                    <CardBody card={card} titleAs="h4" showEngagement={false} />
+                    <div className="mission-card-header">
+                      <span className="mission-card-status">
+                        {statusLabel(card.mission.status)}
+                      </span>
+                      {isTeacher && (
+                        <span className="mission-card-team">
+                          {card.teamName}
+                        </span>
+                      )}
+                    </div>
+                    {card.previewRows.length > 0 ? (
+                      <dl className="mission-card-preview">
+                        {card.previewRows.map((row) => (
+                          <div key={row.label} className="mission-card-row">
+                            <dt>{row.label}</dt>
+                            <dd>{row.value}</dd>
+                          </div>
+                        ))}
+                      </dl>
+                    ) : (
+                      <p className="mission-card-empty">
+                        아직 적은 내용이 없어요. 눌러서 채워 보세요.
+                      </p>
+                    )}
                     {isTeacher &&
                       card.mission.status === "pending_approval" && (
                         <div
