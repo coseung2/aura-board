@@ -19,6 +19,11 @@ export async function GET(
       return NextResponse.json({ error: "forbidden" }, { status: 403 });
     }
 
+    const board = await db.board.findUnique({
+      where: { id: boardId },
+      select: { classroomId: true },
+    });
+
     const sections = await db.section.findMany({
       where: { boardId },
       orderBy: { order: "asc" },
@@ -46,7 +51,21 @@ export async function GET(
       };
     });
 
-    return NextResponse.json({ teams });
+    let roster: Array<{ id: string; name: string; number: number | null }> = [];
+    if (board?.classroomId) {
+      const students = await db.student.findMany({
+        where: { classroomId: board.classroomId },
+        orderBy: [{ number: "asc" }, { name: "asc" }],
+        select: { id: true, name: true, number: true },
+      });
+      roster = students;
+    }
+
+    return NextResponse.json({
+      teams,
+      sections: sections.map((s) => ({ id: s.id, title: s.title, order: s.order })),
+      roster,
+    });
   } catch (e) {
     console.error("[GET /api/boards/:id/missions/dashboard]", e);
     return NextResponse.json({ error: "internal" }, { status: 500 });

@@ -995,13 +995,13 @@ model BreakoutAssignment {
 // or teacher-assign. `@@unique([sectionId, studentId])` prevents double-membership.
 model BreakoutMembership {
   id           String   @id @default(cuid())
-  assignmentId String
+  assignmentId String?
   sectionId    String
   studentId    String
   role         String? // "expert" | "home" (Jigsaw) | null
   joinedAt     DateTime @default(now())
 
-  assignment BreakoutAssignment @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
+  assignment BreakoutAssignment? @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
   section    Section            @relation(fields: [sectionId], references: [id], onDelete: Cascade)
   student    Student            @relation(fields: [studentId], references: [id], onDelete: Cascade)
 

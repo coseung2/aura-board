@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import type { MissionDTO } from "./StatisticsBoardClient";
+import { StatisticsTeamManager } from "./StatisticsTeamManager";
 
 type DashboardTeam = {
   sectionId: string;
@@ -18,16 +19,21 @@ type DashboardTeam = {
 
 export function TeacherDashboard({ boardId }: { boardId: string }) {
   const [teams, setTeams] = useState<DashboardTeam[]>([]);
+  const [sections, setSections] = useState<Array<{ id: string; title: string; order: number }>>([]);
+  const [roster, setRoster] = useState<Array<{ id: string; name: string; number: number | null }>>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [actioning, setActioning] = useState<string | null>(null);
+  const [showTeamManager, setShowTeamManager] = useState(false);
 
   const fetchDashboard = useCallback(async () => {
     try {
-      const res = await fetch(`/api/boards/${boardId}/missions/dashboard`);
-      if (!res.ok) throw new Error("대시보드를 불러올 수 없습니다.");
-      const data = await res.json();
-      setTeams(data.teams as DashboardTeam[]);
+      const dashRes = await fetch(`/api/boards/${boardId}/missions/dashboard`);
+      if (!dashRes.ok) throw new Error("대시보드를 불러올 수 없습니다.");
+      const dashData = await dashRes.json();
+      setTeams(dashData.teams as DashboardTeam[]);
+      setSections(dashData.sections as Array<{ id: string; title: string; order: number }>);
+      setRoster(dashData.roster as Array<{ id: string; name: string; number: number | null }>);
       setError(null);
     } catch (e) {
       setError((e as Error).message);
@@ -91,6 +97,24 @@ export function TeacherDashboard({ boardId }: { boardId: string }) {
   return (
     <div className="teacher-dashboard">
       <h2 className="teacher-dashboard-title">📊 통계활용대회 교사 대시보드</h2>
+
+      {sections && roster && (
+        <div style={{ marginBottom: 16 }}>
+          <button className="btn-primary" onClick={() => setShowTeamManager(true)}>
+            팀 구성
+          </button>
+        </div>
+      )}
+
+      {showTeamManager && sections && roster && (
+        <StatisticsTeamManager
+          boardId={boardId}
+          sections={sections}
+          roster={roster}
+          onClose={() => setShowTeamManager(false)}
+          onChange={fetchDashboard}
+        />
+      )}
 
       <section className="teacher-dashboard-section">
         <h3>승인 대기 목록</h3>
