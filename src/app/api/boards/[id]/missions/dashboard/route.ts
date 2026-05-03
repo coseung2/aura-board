@@ -5,10 +5,10 @@ import { getBoardRole } from "@/lib/rbac";
 
 export async function GET(
   req: Request,
-  ctx: { params: Promise<{ boardId: string }> }
+  ctx: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { boardId } = await ctx.params;
+    const { id: boardId } = await ctx.params;
     const user = await getCurrentUser().catch(() => null);
     if (!user) {
       return NextResponse.json({ error: "unauthorized" }, { status: 401 });
