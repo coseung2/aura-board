@@ -418,6 +418,7 @@ model Section {
   board               Board                @relation(fields: [boardId], references: [id], onDelete: Cascade)
   cards               Card[]               @relation("SectionCards")
   breakoutMemberships BreakoutMembership[]
+  missions            Mission[]
 
   @@index([boardId])
 }
@@ -1731,6 +1732,38 @@ model VibeQuotaLedger {
   @@unique([classroomId, studentId, date])
   @@index([classroomId, date])
   @@index([studentId, date])
+}
+
+// ── Statistics Class Board — Mission (2026-05-03 statistics-class-board) ──
+// 브레이크아웃룸 기반 팀별 11단계 미션 상태 관리.
+enum MissionStatus {
+  not_started
+  in_progress
+  pending_approval
+  approved
+  teacher_working
+  completed
+}
+
+model Mission {
+  id              String        @id @default(cuid())
+  sectionId       String
+  stepNumber      Int
+  status          MissionStatus @default(not_started)
+  content         Json          @default("{}")
+  submittedAt     DateTime?
+  approvedAt      DateTime?
+  approvedBy      String?
+  teacherFeedback String?
+  version         Int           @default(0)
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  section Section @relation(fields: [sectionId], references: [id], onDelete: Cascade)
+
+  @@unique([sectionId, stepNumber])
+  @@index([sectionId, status])
+  @@index([sectionId, stepNumber])
 }
 
 // ── DJ Board 재생 이벤트 로그 (2026-04-22 dj-recap) ────────────────────

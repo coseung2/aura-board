@@ -31,6 +31,7 @@ const PICKER_ROWS: PickerRow[] = [
   { id: "vibe-arcade", desc: "생성형 AI를 활용한 바이브 코딩 교실" },
   { id: "vibe-gallery", desc: "승인된 코딩 결과물을 전시 · 체험" },
   { id: "question-board", desc: "교사가 주제를 던지고 학생 응답을 다양한 시각화로 표시" },
+  { id: "statistics", desc: "통계활용대회 학급보드 — 11단계 미션 기반 탐구 활동" },
 ];
 
 const LAYOUTS = PICKER_ROWS.map((r) => ({

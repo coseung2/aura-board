@@ -1,0 +1,440 @@
+/* Statistics Class Board — layout="statistics" */
+
+.statistics-board {
+  display: flex;
+  height: 100vh;
+  background: var(--color-bg);
+}
+
+.statistics-sidebar {
+  width: 280px;
+  background: var(--color-surface);
+  border-right: 1px solid var(--color-border);
+  padding: 24px;
+  overflow-y: auto;
+  flex-shrink: 0;
+}
+
+.statistics-sidebar-title {
+  font-size: 16px;
+  font-weight: 700;
+  margin-bottom: 16px;
+  color: var(--color-text);
+}
+
+.statistics-main {
+  flex: 1;
+  padding: 32px;
+  overflow-y: auto;
+  display: flex;
+  justify-content: center;
+}
+
+/* Mission Stepper */
+.mission-stepper {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.mission-step-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  text-align: left;
+  width: 100%;
+  transition: background 150ms ease;
+}
+
+.mission-step-item:hover:not(:disabled) {
+  background: var(--color-accent-tinted-bg);
+}
+
+.mission-step-item.active {
+  background: var(--color-accent-tinted-bg);
+}
+
+.mission-step-item.done .mission-step-num {
+  background: #27a35f;
+  color: #fff;
+  border-color: #27a35f;
+}
+
+.mission-step-item.locked {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.mission-step-num {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-size: 12px;
+  font-weight: 700;
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  flex-shrink: 0;
+  color: var(--color-text);
+}
+
+.mission-step-item.active .mission-step-num {
+  background: var(--color-accent);
+  color: #fff;
+  border-color: var(--color-accent);
+}
+
+.mission-step-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.mission-step-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.mission-step-status {
+  font-size: 11px;
+  color: var(--color-faint);
+}
+
+/* Mission Panel */
+.mission-panel {
+  width: 100%;
+  max-width: 720px;
+}
+
+.mission-panel-banner {
+  background: var(--color-accent-tinted-bg);
+  color: var(--color-accent);
+  padding: 12px 20px;
+  border-radius: var(--radius-card);
+  margin-bottom: 24px;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.mission-panel-card {
+  background: var(--color-surface);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-card);
+  padding: 28px;
+}
+
+.mission-panel-title {
+  font-size: 20px;
+  font-weight: 700;
+  margin-bottom: 6px;
+}
+
+.mission-panel-subtitle {
+  font-size: 14px;
+  color: var(--color-muted);
+  margin-bottom: 24px;
+}
+
+.mission-panel-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 24px;
+  align-items: center;
+}
+
+.mission-panel-error {
+  color: var(--color-danger);
+  font-size: 14px;
+  margin-top: 12px;
+  padding: 10px 12px;
+  background: var(--color-status-returned-bg);
+  border-radius: 6px;
+}
+
+/* Question Ladder */
+.question-ladder {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.question-ladder-step {
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.question-ladder-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 14px 16px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  background: transparent;
+  border: none;
+  width: 100%;
+  color: var(--color-text);
+}
+
+.question-ladder-body {
+  padding: 16px;
+  border-top: 1px solid var(--color-border);
+}
+
+.question-ladder-body textarea {
+  width: 100%;
+  min-height: 80px;
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  padding: 10px;
+  font-family: inherit;
+  font-size: 14px;
+  resize: vertical;
+}
+
+.question-ladder-hint {
+  font-size: 12px;
+  color: var(--color-faint);
+  margin-top: 6px;
+}
+
+.btn-llm {
+  margin-top: 10px;
+  padding: 8px 14px;
+  border-radius: 4px;
+  border: none;
+  background: var(--color-accent-tinted-bg);
+  color: var(--color-accent);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.llm-feedback-bubble {
+  margin-top: 12px;
+  padding: 14px;
+  background: var(--color-accent-tinted-bg);
+  border-left: 3px solid var(--color-accent);
+  border-radius: 0 8px 8px 0;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--color-text);
+}
+
+/* Status Badges */
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.status-badge.pending {
+  background: var(--color-status-pending-bg, #fff8e1);
+  color: var(--color-status-pending-text, #f57f17);
+}
+
+.status-badge.approved {
+  background: var(--color-status-reviewed-bg);
+  color: var(--color-status-reviewed-text);
+}
+
+/* Buttons */
+.btn-primary {
+  padding: 10px 18px;
+  border-radius: 4px;
+  border: none;
+  background: var(--color-accent);
+  color: #fff;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: var(--shadow-accent);
+}
+
+.btn-primary:hover:not(:disabled) {
+  background: var(--color-accent-active);
+  box-shadow: var(--shadow-accent-hover);
+}
+
+.btn-secondary {
+  padding: 10px 18px;
+  border-radius: 4px;
+  border: 1px solid var(--color-border);
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Mobile Tab Bar */
+.mobile-tab-bar-wrapper {
+  display: none;
+}
+
+.mobile-tab-bar {
+  display: flex;
+  gap: 8px;
+  padding: 10px 16px;
+  background: var(--color-surface);
+  border-bottom: 1px solid var(--color-border);
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  -webkit-overflow-scrolling: touch;
+}
+
+.mobile-tab-bar-item {
+  scroll-snap-align: start;
+}
+
+/* Responsive */
+@media (max-width: 1023px) {
+  .statistics-sidebar {
+    width: 220px;
+    padding: 16px;
+  }
+  .statistics-main {
+    padding: 24px;
+  }
+}
+
+@media (max-width: 767px) {
+  .statistics-board {
+    flex-direction: column;
+  }
+  .statistics-sidebar {
+    display: none;
+  }
+  .mobile-tab-bar-wrapper {
+    display: block;
+  }
+  .statistics-main {
+    padding: 16px;
+  }
+  .mission-panel-card {
+    padding: 20px;
+  }
+}
+
+/* Teacher Dashboard */
+.teacher-dashboard {
+  padding: 32px;
+  max-width: 960px;
+  margin: 0 auto;
+}
+
+.teacher-dashboard-title {
+  font-size: 20px;
+  font-weight: 700;
+  margin-bottom: 24px;
+}
+
+.teacher-dashboard-section {
+  margin-bottom: 32px;
+}
+
+.teacher-dashboard-section h3 {
+  font-size: 16px;
+  font-weight: 600;
+  margin-bottom: 12px;
+  color: var(--color-text);
+}
+
+.teacher-dashboard-empty {
+  color: var(--color-muted);
+  font-size: 14px;
+}
+
+.approval-queue {
+  list-style: none;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.approval-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: var(--color-surface);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-card);
+  padding: 14px 18px;
+}
+
+.approval-item-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.approval-item-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.team-progress-table-wrapper {
+  overflow-x: auto;
+}
+
+.team-progress-table {
+  width: 100%;
+  border-collapse: collapse;
+  background: var(--color-surface);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-card);
+  overflow: hidden;
+}
+
+.team-progress-table th,
+.team-progress-table td {
+  padding: 12px 16px;
+  text-align: left;
+  font-size: 14px;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.team-progress-table th {
+  background: var(--color-accent-tinted-bg);
+  font-weight: 600;
+  color: var(--color-accent);
+}
+
+.progress-bar {
+  width: 100%;
+  height: 6px;
+  background: var(--color-border);
+  border-radius: 3px;
+  margin-top: 6px;
+  overflow: hidden;
+}
+
+.progress-bar-fill {
+  height: 100%;
+  background: var(--color-accent);
+  border-radius: 3px;
+  transition: width 300ms ease;
+}

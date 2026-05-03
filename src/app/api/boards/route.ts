@@ -34,6 +34,7 @@ const CreateBoardSchema = z.object({
     "vibe-arcade",
     "vibe-gallery",
     "question-board",
+    "statistics",
   ]),
   description: z.string().max(2000).default(""),
   classroomId: z.string().optional(),
@@ -260,6 +261,69 @@ export async function POST(req: Request) {
       });
 
       return NextResponse.json({ board, slots: classroom?.students.length ?? 0 });
+    }
+
+    // ── Statistics branch (2026-05-03) ──────────────────────────────────
+    if (input.layout === "statistics") {
+      if (!input.classroomId) {
+        return NextResponse.json(
+          { error: "학급보드는 학급에 속해야 합니다" },
+          { status: 400 }
+        );
+      }
+      const classroom = await db.classroom.findUnique({
+        where: { id: input.classroomId },
+        include: { students: true },
+      });
+      if (!classroom) {
+        return NextResponse.json({ error: "classroom_not_found" }, { status: 404 });
+      }
+      if (classroom.teacherId !== user.id) {
+        return NextResponse.json({ error: "not_classroom_teacher" }, { status: 403 });
+      }
+
+      const groupCount = Math.min(Math.max(1, Math.ceil(classroom.students.length / 4)), 10);
+
+      const board = await db.$transaction(async (tx) => {
+        const createdBoard = await tx.board.create({
+          data: {
+            title: input.title || "통계활용대회 학급보드",
+            slug,
+            layout: "statistics",
+            description: input.description,
+            classroomId: input.classroomId,
+            members: { create: { userId: user.id, role: "owner" } },
+          },
+        });
+
+        // Create sections (teams) and missions
+        for (let g = 1; g <= groupCount; g++) {
+          const section = await tx.section.create({
+            data: {
+              boardId: createdBoard.id,
+              title: `모둠 ${g}`,
+              order: g,
+            },
+          });
+
+          // Create 11 missions per team
+          for (let step = 1; step <= 11; step++) {
+            await tx.mission.create({
+              data: {
+                sectionId: section.id,
+                stepNumber: step,
+                status: step === 1 ? "not_started" : "not_started",
+                content: {},
+                version: 0,
+              },
+            });
+          }
+        }
+
+        return createdBoard;
+      });
+
+      return NextResponse.json({ board });
     }
 
     // ── Non-breakout layouts (unchanged) ────────────────────────────────
