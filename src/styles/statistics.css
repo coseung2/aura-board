@@ -777,6 +777,59 @@ button:disabled {
   border-radius: 8px;
 }
 
+/* ── Columns layout (statistics board) ── */
+
+.statistics-board.columns-board {
+  flex-direction: column;
+  height: 100vh;
+  overflow: hidden;
+}
+
+.statistics-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+  padding: 12px 24px;
+  border-bottom: 1px solid var(--color-border);
+  background: var(--color-surface);
+  flex-shrink: 0;
+}
+
+/* 카드 납작 버튼 */
+.card-inline-actions {
+  display: flex;
+  gap: 8px;
+  padding: 8px 12px 12px;
+  border-top: 1px solid rgba(0, 0, 0, 0.06);
+}
+
+.btn-sm {
+  font-size: 12px;
+  padding: 6px 12px;
+  border-radius: 6px;
+}
+
+/* 미션 모달 */
+.mission-modal {
+  max-width: 720px;
+  width: 90vw;
+  max-height: 90vh;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.mission-modal-body {
+  overflow-y: auto;
+  padding: 0;
+}
+
+.mission-modal-body .mission-panel {
+  padding: 24px;
+}
+
+/* 모바일 */
 @media (max-width: 767px) {
   .statistics-team-header {
     padding: 0 16px;
