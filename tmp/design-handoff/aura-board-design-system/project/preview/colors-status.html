@@ -1,0 +1,22 @@
+<!DOCTYPE html><html><head><meta charset="utf-8">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../colors_and_type.css">
+<style>
+  body { margin: 0; padding: 20px 24px; background: var(--color-bg-alt); font-family: var(--font-body); }
+  .row { display: flex; gap: 10px; flex-wrap: wrap; }
+  .pill {
+    padding: 6px 14px; border-radius: 9999px; font-size: 12px; font-weight: 600;
+    letter-spacing: 0.125px; display: inline-flex; align-items: center; gap: 6px;
+  }
+  .dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; opacity: .7; }
+  .lbl { font-size: 11px; color: var(--color-text-muted); margin-top: 6px; font-family: var(--font-mono); }
+  .group { display: flex; flex-direction: column; gap: 2px; }
+</style></head>
+<body>
+  <div class="row">
+    <div class="group"><span class="pill" style="background:#f2f9ff;color:#1565c0"><span class="dot"></span>제출됨</span><span class="lbl">submitted</span></div>
+    <div class="group"><span class="pill" style="background:#e8f5e9;color:#2e7d32"><span class="dot"></span>검토 완료</span><span class="lbl">reviewed</span></div>
+    <div class="group"><span class="pill" style="background:#ffebee;color:#c62828"><span class="dot"></span>반려됨</span><span class="lbl">returned</span></div>
+    <div class="group"><span class="pill" style="background:#fef3c7;color:#92610a"><span class="dot"></span>D-3 경고</span><span class="lbl">warning</span></div>
+  </div>
+</body></html>

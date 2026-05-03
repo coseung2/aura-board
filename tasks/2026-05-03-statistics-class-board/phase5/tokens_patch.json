@@ -1,0 +1,26 @@
+[
+  {
+    "token": "--color-status-pending-bg",
+    "value": "#fff8e1",
+    "usage": "승인 대기/요청 중 뱃지 및 배너 배경",
+    "added_in": "statistics-class-board"
+  },
+  {
+    "token": "--color-status-pending-text",
+    "value": "#f57f17",
+    "usage": "승인 대기/요청 중 뱃지 및 배너 텍스트",
+    "added_in": "statistics-class-board"
+  },
+  {
+    "token": "--color-status-completed-bg",
+    "value": "#e3f2fd",
+    "usage": "전체 미션 완료(✅) 뱃지 배경",
+    "added_in": "statistics-class-board"
+  },
+  {
+    "token": "--color-status-completed-text",
+    "value": "#1565c0",
+    "usage": "전체 미션 완료(✅) 뱃지 텍스트",
+    "added_in": "statistics-class-board"
+  }
+]

@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>v1 — Classic Sidebar</title>
+<style>
+  :root {
+    --bg: #f6f5f4;
+    --surface: #ffffff;
+    --text: rgba(0,0,0,0.95);
+    --muted: #615d59;
+    --faint: #a39e98;
+    --accent: #0075de;
+    --accent-bg: #f2f9ff;
+    --border: rgba(0,0,0,0.1);
+    --shadow: 0 4px 18px rgba(0,0,0,0.04);
+    --radius: 12px;
+  }
+  * { box-sizing: border-box; margin: 0; }
+  body { font-family: Inter, system-ui, sans-serif; background: var(--bg); color: var(--text); }
+  .layout { display: flex; height: 100vh; }
+  .sidebar { width: 280px; background: var(--surface); border-right: 1px solid var(--border); padding: 24px; overflow-y: auto; }
+  .sidebar h2 { font-size: 16px; font-weight: 700; margin-bottom: 16px; }
+  .step { display: flex; align-items: center; gap: 12px; padding: 12px; border-radius: 8px; cursor: pointer; }
+  .step:hover { background: var(--accent-bg); }
+  .step.active { background: var(--accent-bg); }
+  .step-num { width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; font-size: 12px; font-weight: 700; background: var(--bg); border: 1px solid var(--border); }
+  .step.active .step-num { background: var(--accent); color: #fff; border-color: var(--accent); }
+  .step.done .step-num { background: #27a35f; color: #fff; border-color: #27a35f; }
+  .step.locked { opacity: 0.4; }
+  .step-title { font-size: 14px; font-weight: 600; }
+  .step-status { font-size: 11px; color: var(--faint); }
+  .main { flex: 1; padding: 32px; overflow-y: auto; }
+  .banner { background: var(--accent-bg); color: var(--accent); padding: 12px 20px; border-radius: var(--radius); margin-bottom: 24px; font-size: 14px; font-weight: 600; }
+  .panel { background: var(--surface); border-radius: var(--radius); box-shadow: var(--shadow); padding: 28px; max-width: 720px; }
+  .panel h3 { font-size: 20px; font-weight: 700; margin-bottom: 8px; }
+  .panel .subtitle { font-size: 14px; color: var(--muted); margin-bottom: 24px; }
+  .accordion { border: 1px solid var(--border); border-radius: 8px; margin-bottom: 12px; overflow: hidden; }
+  .acc-header { padding: 14px 16px; font-weight: 600; cursor: pointer; display: flex; justify-content: space-between; }
+  .acc-body { padding: 16px; border-top: 1px solid var(--border); }
+  .acc-body textarea { width: 100%; min-height: 80px; border: 1px solid var(--border); border-radius: 6px; padding: 10px; font-family: inherit; font-size: 14px; resize: vertical; }
+  .hint { font-size: 12px; color: var(--faint); margin-top: 6px; }
+  .actions { display: flex; gap: 10px; margin-top: 24px; }
+  button { padding: 10px 18px; border-radius: 4px; border: none; font-size: 14px; font-weight: 600; cursor: pointer; }
+  .btn-primary { background: var(--accent); color: #fff; }
+  .btn-secondary { background: var(--bg); color: var(--text); border: 1px solid var(--border); }
+</style>
+</head>
+<body>
+<div class="layout">
+  <aside class="sidebar">
+    <h2>📊 통계활용대회</h2>
+    <div class="step done"><div class="step-num">✓</div><div><div class="step-title">1. 주제 카드</div><div class="step-status">완료</div></div></div>
+    <div class="step active"><div class="step-num">2</div><div><div class="step-title">2. 질문 사다리</div><div class="step-status">수정 중</div></div></div>
+    <div class="step locked"><div class="step-num">3</div><div><div class="step-title">3. 설문 문항</div><div class="step-status">잠김</div></div></div>
+    <div class="step locked"><div class="step-num">4</div><div><div class="step-title">4. 조사 계획</div><div class="step-status">잠김</div></div></div>
+    <div class="step locked"><div class="step-num">5</div><div><div class="step-title">5. 자료 수집</div><div class="step-status">잠김</div></div></div>
+    <div class="step locked"><div class="step-num">6</div><div><div class="step-title">6. 그래프 계획</div><div class="step-status">잠김</div></div></div>
+    <div class="step locked"><div class="step-num">7</div><div><div class="step-title">7. 결과 해석</div><div class="step-status">잠김</div></div></div>
+    <div class="step locked"><div class="step-num">8</div><div><div class="step-title">8. 결론·제안</div><div class="step-status">잠김</div></div></div>
+    <div class="step locked"><div class="step-num">9</div><div><div class="step-title">9. 포스터 의뢰</div><div class="step-status">잠김</div></div></div>
+    <div class="step locked"><div class="step-num">10</div><div><div class="step-title">10. 포스터 검토</div><div class="step-status">잠김</div></div></div>
+    <div class="step locked"><div class="step-num">11</div><div><div class="step-title">11. 발표 준비</div><div class="step-status">잠김</div></div></div>
+  </aside>
+  <main class="main">
+    <div class="banner">지금 우리 팀은 미션 2를 하고 있어요 — 질문 사다리를 만들어 보세요!</div>
+    <div class="panel">
+      <h3>미션 2. 질문 사다리 만들기</h3>
+      <p class="subtitle">찬반은 마지막 보스! 지금은 단서를 모을 차례예요.</p>
+      <div class="accordion">
+        <div class="acc-header">1층. 경험 질문 <span>▼</span></div>
+        <div class="acc-body">
+          <textarea placeholder="노키즈존이라는 말을 들어본 적이 있나요?"></textarea>
+          <div class="hint">💡 예시: 가족과 함께 가려던 곳이 노키즈존이라 들어가지 못한 경험이 있나요?</div>
+          <button class="btn-secondary" style="margin-top:10px;">AI 조언 받기</button>
+        </div>
+      </div>
+      <div class="accordion">
+        <div class="acc-header">2층. 현황 질문 <span>▶</span></div>
+      </div>
+      <div class="accordion">
+        <div class="acc-header">3층. 이유 질문 <span>▶</span></div>
+      </div>
+      <div class="actions">
+        <button class="btn-secondary">임시 저장</button>
+        <button class="btn-primary">완료 — 승인 요청</button>
+      </div>
+    </div>
+  </main>
+</div>
+</body>
+</html>

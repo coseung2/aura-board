@@ -1,0 +1,77 @@
+{
+  "task_id": "2026-04-15-quiz-extensions",
+  "note": "live 캡처 미수행 (헤디드 Chromium 비활성). 공개 문서/UI 가이드 기반 URL 기록. phase2 이후 필요 시 재수집.",
+  "references": [
+    {
+      "id": "kahoot-reports",
+      "product": "Kahoot!",
+      "feature": "Reports / Analytics",
+      "url": "https://support.kahoot.com/hc/en-us/articles/115002256807-How-to-access-your-reports",
+      "applies_to_blocks": ["B1"]
+    },
+    {
+      "id": "kahoot-ai-generator",
+      "product": "Kahoot!",
+      "feature": "Kahoot AI (question generator)",
+      "url": "https://kahoot.com/ai/",
+      "applies_to_blocks": ["B2", "B3"]
+    },
+    {
+      "id": "kahoot-duplicate",
+      "product": "Kahoot!",
+      "feature": "Duplicate kahoot",
+      "url": "https://support.kahoot.com/hc/en-us/articles/115002408908-How-to-duplicate-a-kahoot",
+      "applies_to_blocks": ["B4"]
+    },
+    {
+      "id": "quizizz-reports",
+      "product": "Quizizz",
+      "feature": "Reports (student × question matrix)",
+      "url": "https://support.quizizz.com/hc/en-us/articles/203610072-Viewing-quiz-reports",
+      "applies_to_blocks": ["B1"]
+    },
+    {
+      "id": "quizizz-ai",
+      "product": "Quizizz",
+      "feature": "Quizizz AI generator",
+      "url": "https://quizizz.com/ai",
+      "applies_to_blocks": ["B2", "B3"]
+    },
+    {
+      "id": "quizizz-reassign",
+      "product": "Quizizz",
+      "feature": "Start new game / reassign existing quiz",
+      "url": "https://support.quizizz.com/hc/en-us/articles/203611012",
+      "applies_to_blocks": ["B4"]
+    },
+    {
+      "id": "google-forms-quiz",
+      "product": "Google Forms",
+      "feature": "Quiz responses summary + CSV export",
+      "url": "https://support.google.com/docs/answer/7032287",
+      "applies_to_blocks": ["B1"]
+    }
+  ],
+  "our_live_surfaces": [
+    {
+      "path": "src/components/QuizBoard.tsx",
+      "purpose": "퀴즈 카드 컨트롤러 (생성/풀이 entry)"
+    },
+    {
+      "path": "src/components/QuizPlay.tsx",
+      "purpose": "퀴즈 풀이 UI"
+    },
+    {
+      "path": "src/app/api/quiz/create/route.ts",
+      "purpose": "LLM 생성 + Quiz+QuizQuestion 저장 (현재 옵션 없음)"
+    },
+    {
+      "path": "src/app/api/quiz/[id]/route.ts",
+      "purpose": "GET 상세 (PATCH 미구현 — B3에서 추가)"
+    },
+    {
+      "path": "src/app/api/quiz/answer/route.ts",
+      "purpose": "답안 저장 (timeMs/correct 기록 — B1 리포트 소스)"
+    }
+  ]
+}

@@ -1,0 +1,27 @@
+<!DOCTYPE html><html><head><meta charset="utf-8">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../colors_and_type.css">
+<style>
+  body { margin: 0; padding: 20px 24px; background: var(--color-bg-alt); font-family: var(--font-body); }
+  .row { display: flex; gap: 14px; align-items: center; flex-wrap: wrap; }
+  .chip { width: 36px; height: 36px; border-radius: 50%; box-shadow: var(--shadow-lift); }
+  .g { display: flex; flex-direction: column; align-items: center; gap: 6px; }
+  .cap { font-size: 11px; color: var(--color-text-muted); font-family: var(--font-mono); }
+  .bar { height: 8px; border-radius: 4px; background: #d0cfcd; width: 220px; overflow: hidden; display: flex; margin-top: 4px; }
+  .bar span { display: block; height: 100%; }
+</style></head>
+<body>
+  <div class="row">
+    <div class="g"><div class="chip" style="background:#27a35f"></div><div class="cap">active</div></div>
+    <div class="g"><div class="chip" style="background:#b8dfc7"></div><div class="cap">visited</div></div>
+    <div class="g"><div class="chip" style="background:#d0cfcd"></div><div class="cap">upcoming</div></div>
+    <div class="g"><div class="chip" style="background:#c62828"></div><div class="cap">stalled</div></div>
+    <div class="g">
+      <div class="bar">
+        <span style="background:#27a35f;width:30%"></span>
+        <span style="background:#b8dfc7;width:25%"></span>
+      </div>
+      <div class="cap">plant progress</div>
+    </div>
+  </div>
+</body></html>

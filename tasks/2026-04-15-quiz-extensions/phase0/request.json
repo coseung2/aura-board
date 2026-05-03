@@ -1,0 +1,36 @@
+{
+  "type": "feature",
+  "slug": "quiz-extensions",
+  "task_id": "2026-04-15-quiz-extensions",
+  "change_type": "enhancement",
+  "motivation": "현재 퀴즈 카드는 LLM 즉시 생성 → 자동 저장 → 풀이만 가능. 교사가 (1) 반 성적 확인 (2) 난이도/문항 수 조절 (3) 생성 후 편집 (4) 기존 퀴즈 재사용 을 할 수 없어 수업 활용도가 떨어진다. QuizAnswer 테이블에 timeMs/correct 데이터는 이미 쌓이고 있으나 리포트 UI가 없다.",
+  "user_story": "교사로서 퀴즈를 생성할 때 난이도와 문항 수를 고르고, 생성 결과를 확인·편집한 뒤 저장하며, 풀이 후에는 학생별 정답률·소요시간 리포트를 보고 과거 퀴즈를 재사용할 수 있다.",
+  "success_metric": "B1: 리포트 모달이 학생×문항 매트릭스 + CSV export, <2s 로딩. B2: 생성 옵션 UI에서 난이도 3단계·문항 수 선택이 실제 LLM 프롬프트에 반영. B3: draft→edit→publish 3단 플로우에서 문항 추가/삭제/수정 후 저장 가능. B4: 과거 퀴즈 clone 시 questions 포함 신규 Quiz row 생성 + 현재 섹션에 노출.",
+  "affected_surfaces": [
+    "/board/[id] (QuizCard, QuizPlayModal, QuizReportModal)",
+    "/api/quiz/create",
+    "/api/quiz/draft (new)",
+    "/api/quiz/[id] (PATCH new)",
+    "/api/quiz/[id]/report (new)",
+    "/api/quiz/[id]/clone (new)",
+    "prisma/schema.prisma (Quiz.status/difficulty/parentQuizId)"
+  ],
+  "scope_blocks": {
+    "B1_report": "GET /api/quiz/[id]/report + QuizReportModal + CSV export. DB 스키마 무변경.",
+    "B2_generation_options": "난이도 (쉬움/중간/어려움) + 문항 수 모드 (기본 'AI가 정함' / 대안 '직접 지정 1~20') UI + /api/quiz/create 파라미터. 보기 수는 4지 고정. auto 모드는 LLM이 내용 길이에 맞게 생성, 서버는 20개 cap만 enforce.",
+    "B3_draft_edit": "POST /api/quiz/draft (LLM→미저장) + POST /api/quiz/create 리팩터 (draft 승격) + PATCH /api/quiz/[id] + QuizDraftEditor 컴포넌트.",
+    "B4_reuse": "POST /api/quiz/[id]/clone + QuizSessionList (과거 세션 이력 + 재사용 버튼)."
+  },
+  "dependencies": "B1 + B2 병렬 가능 (독립, 선배포 가능) → B3 → B4",
+  "schema_changes_expected": [
+    "Quiz.status 에 'draft' 값 추가 (String 컬럼이라 마이그레이션 없이 가능)",
+    "Quiz.difficulty String? (nullable)",
+    "Quiz.parentQuizId String? self-ref (재사용 원본 추적)"
+  ],
+  "out_of_scope": [
+    "QuizQuestion.options 배열화 (4지선다 유지)",
+    "퀴즈 자동 채점 외 수동 채점 UI",
+    "교사 간 퀴즈 공유 (교사 본인 재사용만)"
+  ],
+  "created_at": "2026-04-15T22:00:00+09:00"
+}

@@ -1,0 +1,37 @@
+{
+  "type": "feature",
+  "slug": "performance-assessment-autograde",
+  "task_id": "2026-04-16-performance-assessment-autograde",
+  "change_type": "new_feature",
+  "motivation": "Aura-board 수행평가 수기 채점·엑셀 성적 입력의 반복 마찰을 제거. MCQ는 서버 결정론적, SHORT는 Gemini 2.5 Flash 1차 제안 + 교사 확정 루프로 단일화하고, 화면이탈 잠금을 Supabase에 영속화하여 BYOD 부정행위를 구조적으로 차단. 교사 확정 즉시 Aura 웹앱 성적탭에 Realtime 반영되어 출제·응시·채점·공개가 한 도구에서 완결된다.",
+  "user_story": "교사로서 Aura-board에 수행평가를 배부하면 학생이 태블릿에서 응시하고 자동채점·교사 확정을 거쳐 Aura 웹앱 성적탭에 실시간 반영되는 전 과정을 단일 도구로 완결할 수 있다",
+  "success_metric": "교사 '확정·릴리스' 클릭 → Aura 웹앱 성적탭 GradebookEntry 반영 p95 < 500ms (Supabase Realtime Postgres Changes 기준). 부수 기준: 화면이탈 → isLocked=true 영속화 + 교사 대시보드 배지 푸시 p95 < 500ms, 새로고침 후 잠금 UI 복원 100%.",
+  "affected_surfaces": [
+    "/board/:id — assessment layout (학생 응시 UI, 타이머, 화면이탈 잠금, 드래프트 autosave)",
+    "/board/:id — teacher assessment composer (MCQ·SHORT 2종 드롭다운, SHORT 4필드 폼: 모범답안·키워드·부분점수·루브릭)",
+    "/teacher/assessments/:id/gradebook — 교사 매트릭스 뷰 (owner+데스크톱 전용, 학생·학부모·태블릿 차단)",
+    "/teacher/assessments/:id/proctor — 감독 대시보드 (ProctorEvent Realtime 배지, 재개 승인 버튼)",
+    "AssessmentTemplate / AssessmentQuestion / AssessmentSubmission / AssessmentAnswer / GradebookEntry / ProctorEvent REST+RPC API (Zod create gate: MCQ·SHORT만 통과)",
+    "grading worker (Supabase Edge Function) — MCQ 결정론 채점 + SHORT Gemini 2.5 Flash 호출, autoRawResponse 감사 저장",
+    "Supabase Realtime channel — assessment:{id} (채점 결과·잠금 상태·릴리스 이벤트 브로드캐스트)",
+    "PGMQ grading_retry 큐 — 2·4·8·16·32s backoff, 5회 실패 시 retry_exhausted 배지",
+    "unlock API (RPC) — teacher 또는 본인 student만 호출 가능, RLS enforcement",
+    "FeatureFlag.assessmentTierGate — false(베타)→true(런칭 Pro 게이트) 토글 진입점",
+    "Classroom.gradebookReleasePolicy=teacher_manual 설정 UI + '성적 공개' 릴리스 버튼"
+  ],
+  "cross_project_note": "Aura 웹앱 성적탭(/aura-web/gradebook) 수신은 이 request 범위에서 제외됨. aura 프로젝트 INBOX로 별도 handoff가 phase7 dispatcher에서 송출됨 — Supabase 단일 프로젝트 공유·Realtime 채널 구독·RLS 3분화 정책을 양쪽이 공유한다.",
+  "context_refs": {
+    "seed": "ideation/tasks/2026-04-16-performance-assessment-autograde/phase4/seed.yaml",
+    "plan": "ideation/plans/assessment-autograde-roadmap.md",
+    "performance_budget": "ideation/plans/tablet-performance-roadmap.md",
+    "assignment_board_plan": "ideation/plans/assignment-board-roadmap.md",
+    "parent_viewer_plan": "ideation/plans/parent-viewer-roadmap.md",
+    "decisions": "ideation/tasks/2026-04-16-performance-assessment-autograde/phase3/decisions.md",
+    "exploration": "ideation/tasks/2026-04-16-performance-assessment-autograde/phase1/exploration.md",
+    "sketch": "ideation/tasks/2026-04-16-performance-assessment-autograde/phase2/sketch.md",
+    "seeds_index": "ideation/plans/seeds-index.md",
+    "phase5_updated_docs": "ideation/tasks/2026-04-16-performance-assessment-autograde/phase5/updated_docs.md",
+    "phase5_new_docs": "ideation/tasks/2026-04-16-performance-assessment-autograde/phase5/new_docs.md"
+  },
+  "created_at": "2026-04-16T00:00:00+09:00"
+}

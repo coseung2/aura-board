@@ -1,0 +1,30 @@
+{
+  "task_id": "2026-04-15-quiz-extensions",
+  "additions": [
+    {
+      "name": "--color-quiz-difficulty-easy",
+      "value": "#27a35f",
+      "alias_of": "--color-plant-active",
+      "usage": "QuizCard 난이도 뱃지(쉬움) 배경"
+    },
+    {
+      "name": "--color-quiz-difficulty-medium",
+      "value": "#c9a227",
+      "alias_of": null,
+      "usage": "QuizCard 난이도 뱃지(중간) 배경"
+    },
+    {
+      "name": "--color-quiz-difficulty-hard",
+      "value": "#c62828",
+      "alias_of": "--color-danger",
+      "usage": "QuizCard 난이도 뱃지(어려움) 배경"
+    }
+  ],
+  "modifications": [],
+  "deletions": [],
+  "reuse_notes": [
+    "매트릭스 정답/오답/미응답 셀은 기존 status-reviewed / status-returned / slot-placeholder 재사용 — 신규 토큰 불필요",
+    "모달/카드/버튼/세그먼트/칩은 전부 기존 accent 계열 토큰 재사용",
+    "'alias_of' 가 명시된 신규 토큰은 의미 분리용 — 하드코딩 방지 + 향후 hex 분기 허용"
+  ]
+}

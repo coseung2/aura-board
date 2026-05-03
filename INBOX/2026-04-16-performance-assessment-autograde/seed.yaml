@@ -1,0 +1,214 @@
+goal: Aura-board 수행평가 자동채점 파이프라인 v1 구현 — MCQ 결정론적 채점 + SHORT 문항 Gemini 2.5 Flash LLM
+  채점, 화면이탈 잠금(Supabase 영속화), Pro 티어 게이트(런칭 플래그), teacher_manual 성적 공개 정책을 포함한 완전한
+  채점·감독 시스템 구축
+task_type: code
+brownfield_context:
+  project_type: brownfield
+  context_references:
+  - path: src/lib/grading/providers/
+    role: primary
+    summary: Gemini·OpenAI·Claude 프로바이더 추상화 레이어 — SHORT 채점 호출 진입점
+  - path: /aura-web/gradebook
+    role: reference
+    summary: 학생·학부모 성적 조회 UI 위치
+  - path: /teacher/assessments/[id]/gradebook
+    role: primary
+    summary: 교사 매트릭스 뷰 — owner+데스크톱 전용
+  existing_patterns:
+  - IndexedDB + Supabase autosave 이중화 드래프트 패턴 (300ms debounce, localDraftHash 무결성)
+  - PGMQ 큐 기반 비동기 채점 재시도 (exponential backoff)
+  - Supabase RLS 3분화 접근 제어 패턴
+  - Realtime Postgres Changes 구독 패턴 (p95 < 500ms)
+  - React state + Supabase 영속화 동기화 패턴 (isLocked ground truth = 서버)
+  existing_dependencies:
+  - Supabase (단일 프로젝트 공유, RLS + Realtime)
+  - Gemini 2.5 Flash (SHORT 채점 LLM)
+  - PGMQ (grading_retry 큐)
+  - IndexedDB (드래프트 로컬 저장)
+  - Page Visibility API (화면이탈 감지)
+  - Zod (create API 문항 유형 validation gate)
+constraints:
+- Supabase 단일 프로젝트 공유(Aura-board ↔ Aura 웹앱) + RLS 3분화(teacher/student/parent) 필수
+- v1 문항 유형은 MCQ + SHORT 2종만 (OX·NUMERIC·ESSAY는 schema-only, create API Zod gate 차단)
+- 매트릭스 뷰는 owner+데스크톱 전용(학생·학부모·태블릿 접근 차단)
+- MCQ 채점은 결정론적 서버 매칭만 (LLM 호출 없음)
+- SHORT 채점은 Gemini 2.5 Flash 전용 (프로바이더 추상화 레이어 유지)
+- isLocked 상태는 Supabase AssessmentSubmission에 영속화 (새로고침 우회 불가)
+- 잠금 중 타이머 계속 흐름 (endAt = startedAt + durationMin 고정, 정지 없음)
+- 자동 제출·자동 처벌·자동 상태전이 없음 (시간초과 cron만 예외)
+- FeatureFlag.assessmentTierGate=false 개발·베타 기간, 런칭 시 true 전환
+- 성적 공개는 Classroom.gradebookReleasePolicy=teacher_manual (별도 릴리스 버튼)
+- 드래프트 IndexedDB + Supabase autosave 이중화, 300ms debounce
+- PGMQ grading_retry 재시도 2·4·8·16·32s backoff, 5회 실패 시 retry_exhausted 배지
+- 동의서 미제출 학생은 키보드 전용 (손글씨 차단)
+- Realtime Postgres Changes p95 < 500ms
+- 태블릿 기준 갤럭시 탭 S6 Lite Chrome Android + S-Pen, S-Pen 캔버스 60fps, OCR 클라우드 오프로드
+- 타임라인 8~10주
+acceptance_criteria:
+- AssessmentTemplate 생성 UI에서 MCQ·SHORT 2종만 문항 유형 드롭다운 노출 (OX·NUMERIC·ESSAY 차단)
+- MCQ 문항 채점 시 correctChoiceIds ↔ selectedChoiceIds 서버 결정론적 매칭 동작, LLM 호출 없음
+- SHORT 문항 채점 시 Gemini 2.5 Flash 호출, payload(modelAnswers+keywords+partialCredit)+rubric
+  전체 주입, 부분점수 산출 동작
+- partialCredit=false 시 이진(전부맞음/전부틀림) 채점
+- 화면이탈(Page Visibility API/fullscreenchange) 감지 시 즉시 isLocked=true + 교사 대시보드 배지 Realtime
+  푸시
+- isLocked 상태가 AssessmentSubmission DB에 영속화되어 새로고침 후에도 잠금 UI 복원
+- 학생 "돌아왔습니다" 모달 클릭 → unlock API → isLocked=false 해제 동작
+- 교사 "재개 승인" 버튼 → unlock API + Realtime broadcast → 학생 UI 즉시 해제 동작
+- 잠금 상태에서 타이머 계속 진행, UI dim + "잠금 중 — 시간은 계속 흐릅니다" 텍스트 표시
+- ProctorEvent 전수 기록 (type, durationMs 포함)
+- FeatureFlag.assessmentTierGate=false 시 전 사용자 접근 가능, true 시 Pro만 접근
+- 교사가 릴리스 버튼 클릭 전까지 학생·학부모 GradebookEntry 비노출
+- 채점 실패 5회 시 retry_exhausted 배지 표시
+- SHORT 문항 교사 UI에 모범답안(필수)·키워드(선택)·부분점수 체크박스·루브릭 자연어(선택) 4필드 폼 렌더
+- 'RLS 정책 준수: teacher=Classroom owner, student=자기 visibleToStudent, parent=ParentChildLink
+  active + releasedAt IS NOT NULL'
+- 'unlock API RLS: teacher 또는 본인 student만 호출 가능'
+- 감사 로그 보관 Free=1학기, Pro=학년
+- 동의서 미제출 학생 손글씨 입력 비활성화
+ontology_schema:
+  name: AssessmentGradingDomain
+  description: Aura-board 수행평가 자동채점 파이프라인의 핵심 도메인 모델. 평가 템플릿·문항·제출·답안·성적·감독 이벤트 7개
+    신규 엔티티와 기존 Board·Classroom·AssignmentSlot 확장을 포함하며, MCQ 결정론적 채점과 SHORT LLM 채점,
+    화면이탈 잠금 영속화, RLS 3분화 접근 제어를 구조화한다.
+  fields:
+  - name: AssessmentTemplate.id
+    type: string
+    description: 평가 템플릿 고유 식별자
+    required: true
+  - name: AssessmentTemplate.rubricText
+    type: string
+    description: 템플릿 레벨 공통 자연어 루브릭 (Gemini 프롬프트 주입)
+    required: true
+  - name: AssessmentTemplate.durationMin
+    type: number
+    description: 시험 제한 시간(분)
+    required: true
+  - name: AssessmentQuestion.id
+    type: string
+    description: 문항 고유 식별자
+    required: true
+  - name: AssessmentQuestion.kind
+    type: string
+    description: 문항 유형 enum (MCQ/OX/NUMERIC/SHORT/ESSAY, v1 허용=MCQ·SHORT)
+    required: true
+  - name: AssessmentQuestion.payload
+    type: object
+    description: '문항 유형별 데이터 (MCQ: correctChoiceIds array, SHORT: modelAnswers·keywords·partialCredit)'
+    required: true
+  - name: AssessmentQuestion.rubric
+    type: string
+    description: 문항별 자연어 루브릭 override
+    required: true
+  - name: AssessmentSubmission.id
+    type: string
+    description: 학생 제출 고유 식별자
+    required: true
+  - name: AssessmentSubmission.startedAt
+    type: string
+    description: 시험 시작 시각 (ISO8601)
+    required: true
+  - name: AssessmentSubmission.endAt
+    type: string
+    description: 시험 종료 시각 = startedAt + durationMin 고정
+    required: true
+  - name: AssessmentSubmission.isLocked
+    type: boolean
+    description: 화면이탈 잠금 상태 (Supabase 영속화, default false)
+    required: true
+  - name: AssessmentSubmission.lockedReason
+    type: string
+    description: 잠금 사유 (visibility_hidden/fullscreen_exit/focus_lost/teacher_manual,
+      해제 시 null)
+    required: true
+  - name: AssessmentAnswer.id
+    type: string
+    description: 답안 고유 식별자
+    required: true
+  - name: AssessmentAnswer.payload
+    type: object
+    description: '답안 데이터 (MCQ: selectedChoiceIds, SHORT: textAnswer or inkImageUrl)'
+    required: true
+  - name: AssessmentAnswer.autoRawResponse
+    type: string
+    description: LLM 원본 응답 (감사용)
+    required: true
+  - name: AssessmentAnswer.autoScore
+    type: number
+    description: 자동 채점 점수
+    required: true
+  - name: GradebookEntry.id
+    type: string
+    description: 성적부 항목 식별자
+    required: true
+  - name: GradebookEntry.finalScore
+    type: number
+    description: 최종 점수 (교사 확정)
+    required: true
+  - name: GradebookEntry.releasedAt
+    type: string
+    description: 학생·학부모 공개 시각 (null이면 비공개)
+    required: true
+  - name: ProctorEvent.id
+    type: string
+    description: 감독 이벤트 식별자
+    required: true
+  - name: ProctorEvent.type
+    type: string
+    description: 이벤트 유형 (visibility_hidden/fullscreen_exit/focus_lost/teacher_resume)
+    required: true
+  - name: ProctorEvent.durationMs
+    type: number
+    description: 이벤트 지속 시간(ms)
+    required: true
+  - name: ProctorEvent.submissionId
+    type: string
+    description: 연관 제출 ID
+    required: true
+  - name: Classroom.gradebookReleasePolicy
+    type: string
+    description: 성적 공개 정책 (teacher_manual 고정)
+    required: true
+  - name: FeatureFlag.assessmentTierGate
+    type: boolean
+    description: Pro 티어 게이트 (false=전체 공개, true=Pro만)
+    required: true
+evaluation_principles:
+- name: grading_correctness
+  description: MCQ 결정론적 매칭 정확도 및 SHORT LLM 채점 점수 신뢰성
+  weight: 0.3
+- name: lock_integrity
+  description: 화면이탈 잠금의 실효성 — 새로고침·재접속 후에도 isLocked 상태 유지 여부
+  weight: 0.2
+- name: rls_enforcement
+  description: teacher/student/parent RLS 3분화 정책 준수 및 unlock API 접근 제어
+  weight: 0.2
+- name: realtime_latency
+  description: Supabase Realtime 채점 결과·잠금 상태 p95 500ms 이하 달성
+  weight: 0.15
+- name: audit_completeness
+  description: ProctorEvent·autoRawResponse·accessId 열람 이력 전수 기록 여부
+  weight: 0.1
+- name: teacher_ux
+  description: 교사 채점 기준 입력 4필드 폼 및 성적 공개 버튼 UX 완성도
+  weight: 0.05
+exit_conditions:
+- name: v1_scope_complete
+  description: MCQ+SHORT 채점·화면이탈 잠금·성적 공개·Pro 게이트 전 기능 구현 및 검증 완료
+  criteria: 모든 ACCEPTANCE_CRITERIA 통과 + ambiguity ≤ 0.2
+- name: retry_exhausted
+  description: PGMQ grading_retry 5회 소진 후 retry_exhausted 배지 표시 및 교사 수동 처리 가능 상태
+  criteria: 배지 표시 확인 + 수동 재채점 경로 존재
+- name: scope_overflow
+  description: OX·NUMERIC·ESSAY 구현 시도 감지 또는 v1.5·v2 파킹 항목 편입 시도
+  criteria: 즉시 중단 + 파킹 목록 보존
+- name: consent_block
+  description: 동의서 미제출 학생 비율이 임계치 초과해 운영 불가 판단 시
+  criteria: 교사에게 일괄 동의 재요청 플로우 활성화
+metadata:
+  seed_id: seed_0badf1e571bc
+  version: 1.0.0
+  created_at: '2026-04-15T22:55:29.392114Z'
+  ambiguity_score: 0.098
+  interview_id: interview_20260415_224854
+  parent_seed_id: null

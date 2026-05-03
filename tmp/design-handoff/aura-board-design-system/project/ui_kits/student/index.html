@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>Aura-board · 학생 UI Kit</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../shared.css">
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel" src="Components.jsx"></script>
+<script type="text/babel">
+const { useState } = React;
+
+const MOCK_BOARDS = [
+  { id: "b1", emoji: "📚", title: "4월 독서 감상", layoutLabel: "그리드", status: "warn", statusLabel: "D-3" },
+  { id: "b2", emoji: "📋", title: "수학 단원평가", layoutLabel: "과제 배부", status: "sub", statusLabel: "제출됨" },
+  { id: "b3", emoji: "🎮", title: "조선시대 인물 퀴즈", layoutLabel: "퀴즈" },
+  { id: "b4", emoji: "📊", title: "모둠 프로젝트 보드", layoutLabel: "칼럼", status: "rev", statusLabel: "검토 완료" },
+];
+
+function App() {
+  const [screen, setScreen] = useState("login"); // login | dashboard | board
+  const [board, setBoard] = useState(null);
+
+  if (screen === "login") {
+    return <LoginCard onLogin={() => setScreen("dashboard")} />;
+  }
+  if (screen === "board") {
+    return (
+      <BoardView
+        board={board}
+        onBack={() => setScreen("dashboard")}
+      />
+    );
+  }
+  return (
+    <StudentDashboard
+      name="김재민"
+      classroomName="3학년 2반"
+      boards={MOCK_BOARDS}
+      onOpen={(b) => { setBoard(b); setScreen("board"); }}
+      onLogout={() => setScreen("login")}
+    />
+  );
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+</script>
+</body>
+</html>

@@ -1,0 +1,27 @@
+<!DOCTYPE html><html><head><meta charset="utf-8">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../colors_and_type.css">
+<style>
+  body { margin: 0; padding: 20px 24px; background: var(--color-bg-alt); }
+  .row { display: flex; gap: 10px; flex-wrap: wrap; }
+  .sw {
+    width: 88px; height: 88px; border-radius: 12px;
+    border: var(--border-card); box-shadow: var(--shadow-card);
+    padding: 10px; display: flex; flex-direction: column; justify-content: flex-end;
+    font-family: var(--font-body); color: #fff;
+  }
+  .sw.small { height: 60px; padding: 8px; }
+  .sw .lbl { font-size: 11px; font-weight: 600; letter-spacing: 0.1px; opacity: .95; }
+  .sw .hex { font-family: var(--font-mono); font-size: 10px; opacity: .85; }
+  .sw.dark .lbl, .sw.dark .hex { color: var(--color-text); }
+</style></head>
+<body>
+  <div class="row">
+    <div class="sw" style="background:#0075de"><div class="lbl">accent</div><div class="hex">#0075DE</div></div>
+    <div class="sw" style="background:#005bab"><div class="lbl">accent-active</div><div class="hex">#005BAB</div></div>
+    <div class="sw dark" style="background:#f2f9ff"><div class="lbl">tinted-bg</div><div class="hex">#F2F9FF</div></div>
+    <div class="sw" style="background:#097fe8"><div class="lbl">tinted-text</div><div class="hex">#097FE8</div></div>
+  </div>
+</body></html>

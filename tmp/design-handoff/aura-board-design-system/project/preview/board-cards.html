@@ -1,0 +1,40 @@
+<!DOCTYPE html><html><head><meta charset="utf-8">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../colors_and_type.css">
+<style>
+  body { margin: 0; padding: 24px; background: var(--color-bg); font-family: var(--font-body); display: flex; gap: 16px; flex-wrap: wrap; }
+  .card {
+    width: 200px; background: #fff;
+    border: 1px solid rgba(0,0,0,0.1); border-radius: 12px;
+    box-shadow:
+      rgba(0,0,0,0.04) 0 4px 18px,
+      rgba(0,0,0,0.027) 0 2.025px 7.85px,
+      rgba(0,0,0,0.02) 0 0.8px 2.93px;
+    padding: 20px 12px; text-align: center;
+    display: flex; flex-direction: column; align-items: center; gap: 4px;
+  }
+  .emoji { font-size: 36px; line-height: 1; margin-bottom: 4px; }
+  .title { font-size: 16px; font-weight: 700; letter-spacing: -0.25px; color: rgba(0,0,0,0.95); }
+  .meta { font-size: 13px; color: #615d59; }
+  .new {
+    border-style: dashed; border-color: rgba(0,0,0,0.15); box-shadow: none;
+    background: transparent; color: #615d59; cursor: pointer;
+  }
+  .plus { font-size: 40px; font-weight: 300; color: #0075de; }
+</style></head>
+<body>
+  <div class="card">
+    <div class="emoji">🔲</div>
+    <div class="title">4월 독서 감상</div>
+    <div class="meta">그리드</div>
+  </div>
+  <div class="card">
+    <div class="emoji">📋</div>
+    <div class="title">수학 단원평가</div>
+    <div class="meta">과제 배부</div>
+  </div>
+  <div class="card new">
+    <div class="plus">+</div>
+    <div class="meta" style="margin-top:4px">새 보드 만들기</div>
+  </div>
+</body></html>

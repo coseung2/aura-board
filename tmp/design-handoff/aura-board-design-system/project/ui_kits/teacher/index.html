@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>Aura-board · 교사 UI Kit</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../shared.css">
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel" src="Components.jsx"></script>
+<script type="text/babel" src="pages/ColumnsBoardPage.jsx"></script>
+<script type="text/babel" src="pages/DJBoardPage.jsx"></script>
+<script type="text/babel" src="pages/ClassroomPages.jsx"></script>
+<script type="text/babel" src="pages/VibeAndGalleryPages.jsx"></script>
+<script type="text/babel">
+const { useState, useEffect } = React;
+
+const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
+  "playedOpen": true,
+  "playedPosition": "left",
+  "playedStyle": "drawer",
+  "showPendingBadge": true
+}/*EDITMODE-END*/;
+
+const LAYOUTS_MAP = {
+  freeform: { emoji: "🎯", label: "자유 배치" },
+  grid: { emoji: "🔲", label: "그리드" },
+  stream: { emoji: "📜", label: "스트림" },
+  columns: { emoji: "📊", label: "칼럼" },
+  assignment: { emoji: "📋", label: "과제 배부" },
+  quiz: { emoji: "🎮", label: "퀴즈" },
+  dj: { emoji: "🎧", label: "DJ 큐" },
+  vibe: { emoji: "⚡", label: "바이브 코딩" },
+  gallery: { emoji: "🖼", label: "갤러리" },
+};
+window.LAYOUTS = LAYOUTS_MAP;
+
+const INITIAL_BOARDS = [
+  { id: "b1", emoji: "🔲", title: "4월 독서 감상", layoutLabel: "그리드", layout: "grid" },
+  { id: "b2", emoji: "📋", title: "수학 단원평가", layoutLabel: "과제 배부", layout: "assignment" },
+  { id: "b3", emoji: "🎮", title: "조선시대 인물 퀴즈", layoutLabel: "퀴즈", layout: "quiz" },
+  { id: "b4", emoji: "📊", title: "모둠 프로젝트: 역사 신문", layoutLabel: "칼럼", layout: "columns" },
+  { id: "b5", emoji: "📜", title: "학급 공지", layoutLabel: "스트림", layout: "stream" },
+  { id: "b6", emoji: "🎧", title: "3학년 2반 교실 DJ", layoutLabel: "DJ 큐", layout: "dj" },
+  { id: "b7", emoji: "⚡", title: "바이브 코딩 스튜디오", layoutLabel: "바이브 코딩", layout: "vibe" },
+  { id: "b8", emoji: "🖼", title: "반 갤러리", layoutLabel: "갤러리", layout: "gallery" },
+];
+
+const INITIAL_CLASSROOMS = [
+  {
+    id: "cls1", name: "3학년 2반", code: "AURA32", grade: "3학년", studentCount: 24, boardCount: 6,
+    students: [
+      { id: "s1", name: "김재민", grade: "3학년", personalCode: "JMK412", lastSeen: "오늘 09:14", parent: "김영희 (어머니)" },
+      { id: "s2", name: "이수연", grade: "3학년", personalCode: "SYL887", lastSeen: "오늘 09:12", parent: null },
+      { id: "s3", name: "박도윤", grade: "3학년", personalCode: "DYP223", lastSeen: "어제 15:40", parent: "박정수 (아버지)" },
+      { id: "s4", name: "최하윤", grade: "3학년", personalCode: "HYC541", lastSeen: "오늘 09:15", parent: null },
+      { id: "s5", name: "정유진", grade: "3학년", personalCode: "YJJ108", lastSeen: "3일 전", parent: "정미경 (어머니)" },
+      { id: "s6", name: "한서준", grade: "3학년", personalCode: "SJH739", lastSeen: "오늘 09:03", parent: null },
+      { id: "s7", name: "윤지후", grade: "3학년", personalCode: "JHY662", lastSeen: "오늘 08:58", parent: "윤대현 (아버지)" },
+      { id: "s8", name: "강서아", grade: "3학년", personalCode: "SAK904", lastSeen: "어제 16:10", parent: null },
+    ],
+    pendingParents: [
+      { id: "p1", parent: "이정훈", student: "이수연", email: "jh.lee@email.com", daysAgo: 2 },
+      { id: "p2", parent: "최혜진", student: "최하윤", email: "hj.choi@email.com", daysAgo: 5 },
+    ],
+    boards: INITIAL_BOARDS.slice(0, 4),
+  },
+  {
+    id: "cls2", name: "과학 심화반 (방과후)", code: "AURASC", grade: "4학년", studentCount: 12, boardCount: 2,
+    students: [
+      { id: "s9", name: "오민재", grade: "4학년", personalCode: "MJO455", lastSeen: "2일 전", parent: null },
+      { id: "s10", name: "임채원", grade: "4학년", personalCode: "CWL901", lastSeen: "어제 17:00", parent: "임영규 (아버지)" },
+      { id: "s11", name: "신지우", grade: "4학년", personalCode: "JWS332", lastSeen: "오늘 14:30", parent: null },
+    ],
+    pendingParents: [],
+    boards: [INITIAL_BOARDS[1], INITIAL_BOARDS[3]],
+  },
+];
+
+function TopNav({ view, onNav }) {
+  return (
+    <div className="ab-topnav">
+      <div className="ab-topnav-left">
+        <div className="ab-logo-lockup">
+          <img src="../../assets/aura-app-icon-512.png" alt="Aura-board" className="ab-logo-img" style={{ width: 32, height: 32, borderRadius: 8 }} />
+          <span className="ab-logo-wordmark" style={{ fontFamily: "Inter" }}>Aura-board</span>
+        </div>
+        <div className="ab-topnav-links">
+          <button className={`ab-topnav-link${view === "dashboard" ? " active" : ""}`} onClick={() => onNav("dashboard")}>내 보드</button>
+          <button className={`ab-topnav-link${view === "classrooms" || view === "classroom" ? " active" : ""}`} onClick={() => onNav("classrooms")}>학급 관리</button>
+        </div>
+      </div>
+      <div className="ab-topnav-right">
+        <button className="ab-icon-btn" title="알림">🔔</button>
+        <div className="ab-avatar">선</div>
+      </div>
+    </div>
+  );
+}
+
+function TweaksPanel({ tweaks, onChange, onGoToDJ }) {
+  return (
+    <div
+      style={{
+        position: "fixed", right: 20, bottom: 20, width: 280, zIndex: 100,
+        background: "#fff", border: "1px solid var(--color-border)", borderRadius: 12,
+        boxShadow: "0 12px 34px rgba(0,0,0,0.16)", padding: 16,
+        fontSize: 13, fontFamily: "inherit",
+      }}
+    >
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
+        <strong style={{ fontSize: 13, letterSpacing: -0.1 }}>Tweaks</strong>
+        <button className="ab-link" onClick={onGoToDJ} style={{ fontSize: 12, background: "none", border: "none", cursor: "pointer" }}>
+          DJ 보드 열기 →
+        </button>
+      </div>
+
+      <label style={{ display: "flex", flexDirection: "column", gap: 4, marginBottom: 10 }}>
+        <span style={{ fontSize: 11, fontWeight: 600, color: "var(--color-text-muted)", textTransform: "uppercase", letterSpacing: 0.3 }}>재생 완료 패널 위치</span>
+        <select
+          className="ab-col-sort"
+          value={tweaks.playedPosition}
+          onChange={(e) => onChange("playedPosition", e.target.value)}
+        >
+          <option value="left">왼쪽 서랍</option>
+          <option value="right">오른쪽 서랍</option>
+        </select>
+      </label>
+
+      <label style={{ display: "flex", flexDirection: "column", gap: 4, marginBottom: 10 }}>
+        <span style={{ fontSize: 11, fontWeight: 600, color: "var(--color-text-muted)", textTransform: "uppercase", letterSpacing: 0.3 }}>표시 방식</span>
+        <select
+          className="ab-col-sort"
+          value={tweaks.playedStyle}
+          onChange={(e) => onChange("playedStyle", e.target.value)}
+        >
+          <option value="drawer">서랍 (Drawer)</option>
+          <option value="modal">중앙 모달</option>
+        </select>
+      </label>
+
+      <label style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+        <input
+          type="checkbox"
+          checked={tweaks.playedOpen}
+          onChange={(e) => onChange("playedOpen", e.target.checked)}
+        />
+        <span>재생 완료 패널 기본 열림</span>
+      </label>
+
+      <label style={{ display: "flex", alignItems: "center", gap: 8 }}>
+        <input
+          type="checkbox"
+          checked={tweaks.showPendingBadge}
+          onChange={(e) => onChange("showPendingBadge", e.target.checked)}
+        />
+        <span>대기곡 노란 배지 표시</span>
+      </label>
+
+      <p style={{ fontSize: 11, color: "var(--color-text-muted)", margin: "12px 0 0", lineHeight: 1.5 }}>
+        DJ 보드에서 대기열 안 항목을 드래그하면 순서 변경, 재생 완료 패널에서 대기열로 드래그하면 복귀됩니다.
+      </p>
+    </div>
+  );
+}
+
+function App() {
+  const [view, setView] = useState("dashboard"); // dashboard | board | classrooms | classroom
+  const [boards, setBoards] = useState(INITIAL_BOARDS);
+  const [classrooms, setClassrooms] = useState(INITIAL_CLASSROOMS);
+  const [modal, setModal] = useState(false);
+  const [openBoard, setOpenBoard] = useState(null);
+  const [openClass, setOpenClass] = useState(null);
+
+  // ── Tweaks (edit mode) ────────────────────────
+  const [tweaks, setTweaks] = useState(TWEAK_DEFAULTS);
+  const [editMode, setEditMode] = useState(false);
+
+  useEffect(() => {
+    function onMsg(e) {
+      const d = e.data;
+      if (!d || typeof d !== "object") return;
+      if (d.type === "__activate_edit_mode") setEditMode(true);
+      else if (d.type === "__deactivate_edit_mode") setEditMode(false);
+    }
+    window.addEventListener("message", onMsg);
+    window.parent.postMessage({ type: "__edit_mode_available" }, "*");
+    return () => window.removeEventListener("message", onMsg);
+  }, []);
+
+  function updateTweak(key, value) {
+    setTweaks((t) => ({ ...t, [key]: value }));
+    window.parent.postMessage({ type: "__edit_mode_set_keys", edits: { [key]: value } }, "*");
+  }
+
+  function openBoardView(b) {
+    setOpenBoard(b);
+    setView("board");
+  }
+  function backToDash() { setView("dashboard"); setOpenBoard(null); }
+  function openClassView(c) { setOpenClass(c); setView("classroom"); }
+  function backToClasses() { setView("classrooms"); setOpenClass(null); }
+
+  // shared vibe state (so submitting from Vibe → Gallery updates Gallery)
+  const [vibes, setVibes] = useState(() => (window.SEED_VIBES || []));
+  const galleryItems = vibes.filter((v) => v.status === "submitted");
+  function publishToGallery(v) {
+    setVibes((vs) => vs.map((x) => x.id === v.id ? { ...x, status: "submitted" } : x));
+  }
+
+  function renderBoard() {
+    if (!openBoard) return null;
+    if (openBoard.layout === "columns") return <ColumnsBoardPage onBack={backToDash} />;
+    if (openBoard.layout === "dj") return <DJBoardPage onBack={backToDash} tweaks={tweaks} />;
+    if (openBoard.layout === "vibe") return <VibeCodingBoardPage onBack={backToDash} vibes={vibes} setVibes={setVibes} publishToGallery={publishToGallery} />;
+    if (openBoard.layout === "gallery") return <GalleryBoardPage onBack={backToDash} items={galleryItems} />;
+    return <GridBoardView board={openBoard} onBack={backToDash} />;
+  }
+
+  function renderMain() {
+    if (view === "board") return renderBoard();
+    if (view === "classroom" && openClass) {
+      return (
+        <ClassroomDetailPage
+          classroom={openClass}
+          onBack={backToClasses}
+          onRotateCode={() => {
+            const newCode = "AURA" + Math.random().toString(36).slice(2, 4).toUpperCase();
+            setClassrooms((cs) => cs.map((c) => c.id === openClass.id ? { ...c, code: newCode } : c));
+            setOpenClass({ ...openClass, code: newCode });
+          }}
+        />
+      );
+    }
+    if (view === "classrooms") {
+      return (
+        <ClassroomListPage
+          classrooms={classrooms}
+          onOpen={openClassView}
+          onCreate={(name) => {
+            const code = "AURA" + Math.random().toString(36).slice(2, 4).toUpperCase();
+            const c = { id: "cls" + Date.now(), name, code, grade: "3학년", studentCount: 0, boardCount: 0, students: [], pendingParents: [], boards: [] };
+            setClassrooms((cs) => [c, ...cs]);
+          }}
+        />
+      );
+    }
+    return (
+      <TeacherDashboard
+        boards={boards}
+        onNew={() => setModal(true)}
+        onOpen={openBoardView}
+        onGoClassrooms={() => setView("classrooms")}
+        onDelete={(b) => { if (confirm(`"${b.title}" 을(를) 삭제하시겠습니까? 모든 카드가 함께 삭제됩니다.`)) setBoards(boards.filter((x) => x.id !== b.id)); }}
+        onDuplicate={(b) => setBoards([...boards, { ...b, id: "dup-" + Date.now(), title: b.title + " 사본" }])}
+      />
+    );
+  }
+
+  return (
+    <>
+      <TopNav view={view} onNav={(v) => { setView(v); setOpenBoard(null); setOpenClass(null); }} />
+      {renderMain()}
+      {modal && (
+        <CreateBoardModal
+          onClose={() => setModal(false)}
+          onCreate={(b) => { setBoards([b, ...boards]); setModal(false); }}
+        />
+      )}
+      {editMode && (
+        <TweaksPanel
+          tweaks={tweaks}
+          onChange={updateTweak}
+          onGoToDJ={() => {
+            const dj = boards.find((b) => b.layout === "dj");
+            if (dj) { setOpenBoard(dj); setView("board"); }
+          }}
+        />
+      )}
+    </>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+</script>
+</body>
+</html>

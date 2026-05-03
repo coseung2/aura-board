@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>v4 — Notion Scroll</title>
+<style>
+  :root {
+    --bg: #f6f5f4; --surface: #ffffff; --text: rgba(0,0,0,0.95); --muted: #615d59; --faint: #a39e98;
+    --accent: #0075de; --accent-bg: #f2f9ff; --border: rgba(0,0,0,0.1); --shadow: 0 4px 18px rgba(0,0,0,0.04); --radius: 12px;
+  }
+  * { box-sizing: border-box; margin: 0; }
+  body { font-family: Inter, system-ui, sans-serif; background: var(--bg); color: var(--text); }
+  .header { background: var(--surface); border-bottom: 1px solid var(--border); padding: 18px 32px; position: sticky; top: 0; z-index: 10; display: flex; justify-content: space-between; align-items: center; }
+  .header h1 { font-size: 18px; font-weight: 700; }
+  .header .meta { font-size: 13px; color: var(--muted); }
+  .container { max-width: 720px; margin: 0 auto; padding: 32px 24px; }
+  .mission-block { background: var(--surface); border-radius: var(--radius); box-shadow: var(--shadow); padding: 28px; margin-bottom: 24px; }
+  .mission-block.done { opacity: 0.7; }
+  .mission-block.locked { opacity: 0.45; pointer-events: none; }
+  .mission-block.current { border-left: 4px solid var(--accent); }
+  .mission-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+  .mission-header h3 { font-size: 18px; font-weight: 700; }
+  .mission-status { font-size: 12px; font-weight: 600; padding: 4px 10px; border-radius: 999px; background: var(--bg); }
+  .mission-status.done { background: #e8f5e9; color: #2e7d32; }
+  .mission-status.current { background: var(--accent-bg); color: var(--accent); }
+  .mission-status.locked { background: var(--bg); color: var(--faint); }
+  .accordion { border: 1px solid var(--border); border-radius: 8px; margin-bottom: 10px; overflow: hidden; }
+  .acc-header { padding: 12px 14px; font-weight: 600; cursor: pointer; display: flex; justify-content: space-between; font-size: 14px; }
+  .acc-body { padding: 14px; border-top: 1px solid var(--border); }
+  .acc-body textarea { width: 100%; min-height: 70px; border: 1px solid var(--border); border-radius: 6px; padding: 10px; font-family: inherit; font-size: 14px; }
+  .hint { font-size: 12px; color: var(--faint); margin-top: 6px; }
+  .actions { display: flex; gap: 10px; margin-top: 18px; }
+  button { padding: 10px 18px; border-radius: 4px; border: none; font-size: 14px; font-weight: 600; cursor: pointer; }
+  .btn-primary { background: var(--accent); color: #fff; }
+  .btn-secondary { background: var(--bg); color: var(--text); border: 1px solid var(--border); }
+  .toc { position: fixed; right: 32px; top: 80px; width: 180px; background: var(--surface); border-radius: var(--radius); box-shadow: var(--shadow); padding: 16px; }
+  .toc-item { font-size: 13px; padding: 6px 0; color: var(--muted); cursor: pointer; }
+  .toc-item:hover { color: var(--accent); }
+  .toc-item.current { color: var(--accent); font-weight: 600; }
+</style>
+</head>
+<body>
+  <div class="header">
+    <div><h1>📊 통계활용대회 — 팀 3</h1><div class="meta">초등 5학년 2반</div></div>
+    <div class="meta">현재: 미션 2 진행 중</div>
+  </div>
+  <div class="container">
+    <div class="mission-block done">
+      <div class="mission-header"><h3>미션 1. 주제 카드</h3><span class="mission-status done">✓ 완료</span></div>
+      <p style="font-size:14px;color:var(--muted);">주제: 노키즈존, 나이로 막을까 행동으로 볼까?</p>
+    </div>
+    <div class="mission-block current">
+      <div class="mission-header"><h3>미션 2. 질문 사다리</h3><span class="mission-status current">수정 중</span></div>
+      <div class="accordion">
+        <div class="acc-header">1층. 경험 질문 <span>▼</span></div>
+        <div class="acc-body">
+          <textarea placeholder="노키즈존이라는 말을 들어본 적이 있나요?"></textarea>
+          <div class="hint">💡 예시: 가족과 함께 가려던 곳이 노키즈존이라 들어가지 못한 경험이 있나요?</div>
+          <button class="btn-secondary" style="margin-top:10px;">AI 조언 받기</button>
+        </div>
+      </div>
+      <div class="actions">
+        <button class="btn-secondary">임시 저장</button>
+        <button class="btn-primary">완료 — 승인 요청</button>
+      </div>
+    </div>
+    <div class="mission-block locked">
+      <div class="mission-header"><h3>미션 3. 설문 문항</h3><span class="mission-status locked">🔒 잠김</span></div>
+      <p style="font-size:14px;color:var(--faint);">미션 2가 승인되면 열려요.</p>
+    </div>
+    <div class="mission-block locked">
+      <div class="mission-header"><h3>미션 4. 조사 계획</h3><span class="mission-status locked">🔒 잠김</span></div>
+    </div>
+    <!-- ... 생략 ... -->
+  </div>
+  <aside class="toc">
+    <div class="toc-item">1. 주제 카드</div>
+    <div class="toc-item current">2. 질문 사다리</div>
+    <div class="toc-item">3. 설문 문항</div>
+    <div class="toc-item">4. 조사 계획</div>
+    <div class="toc-item">5. 자료 수집</div>
+    <div class="toc-item">6. 그래프 계획</div>
+    <div class="toc-item">7. 결과 해석</div>
+    <div class="toc-item">8. 결론·제안</div>
+    <div class="toc-item">9. 포스터 의뢰</div>
+    <div class="toc-item">10. 포스터 검토</div>
+    <div class="toc-item">11. 발표 준비</div>
+  </aside>
+</body>
+</html>

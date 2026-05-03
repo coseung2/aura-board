@@ -1,0 +1,61 @@
+{
+  "task_id": "2026-04-15-quiz-extensions",
+  "patterns": [
+    {
+      "pattern_id": "P1-matrix-report",
+      "block": "B1",
+      "description": "학생(행) × 문항(열) 매트릭스, 셀 색으로 정답/오답/미응답 구분. 상단 요약 바(평균 정답률·평균 소요시간·제출 인원)와 결합.",
+      "source": "quizizz-reports + kahoot-reports hybrid",
+      "pros": "한 화면에서 '누가 못했나'와 '어떤 문항이 어려웠나'를 동시에 확인",
+      "cons": "반 30명+ 시 가로 스크롤 길어짐 → 우리 수업 최대 25명 가정으로 수용"
+    },
+    {
+      "pattern_id": "P2-csv-export-bom",
+      "block": "B1",
+      "description": "단일 시트 CSV (학생 × 문항 + 총점 + 평균시간). UTF-8 BOM prepend 로 한글 Excel 호환.",
+      "source": "google-forms-quiz",
+      "pros": "교사 로컬 분석 가능, 학부모 공유 쉬움",
+      "cons": "문항별 분포는 CSV 로 표현 제한"
+    },
+    {
+      "pattern_id": "P3-single-step-gen-form",
+      "block": "B2",
+      "description": "생성 옵션은 단일 모달 (주제 + 난이도 세그먼트 + 문항 수 칩). 다단계 위저드 회피.",
+      "source": "kahoot-ai-generator",
+      "pros": "교사 생성 플로우 최단거리 (기존 즉시 생성 UX 연속성)",
+      "cons": "옵션 확장 여지 줄어듦 (문제 유형 추가 시 재설계)"
+    },
+    {
+      "pattern_id": "P4-draft-preview-edit",
+      "block": "B3",
+      "description": "LLM 결과를 DB 저장 전 draft JSON 으로 받아 편집기에서 수정 후 '저장'. draft Quiz row 는 만들지 않음.",
+      "source": "kahoot-editor (변형)",
+      "pros": "orphan Quiz row 방지, draft 정리 cron 불필요",
+      "cons": "세션 중 브라우저 종료 시 draft 소실 → 사용자에 경고 필요"
+    },
+    {
+      "pattern_id": "P5-inline-question-cards",
+      "block": "B3",
+      "description": "문항별 카드 리스트 (질문 text + 4 보기 input + 정답 라디오 + 삭제 버튼) + '+ 문항 추가' 버튼.",
+      "source": "quizizz-ai-editor",
+      "pros": "WYSIWYG, 학생이 보게 될 형태 그대로 편집",
+      "cons": "문항 드래그 재정렬은 추후 — 현재는 추가/삭제만"
+    },
+    {
+      "pattern_id": "P6-clone-with-parent-ref",
+      "block": "B4",
+      "description": "퀴즈 clone 시 새 Quiz row + questions 복사, parentQuizId 로 원본 link. 현재 섹션에 Card 로 노출.",
+      "source": "kahoot-duplicate (+ parent ref custom)",
+      "pros": "Padlet 클론의 Card 단위 CRUD 모델과 정합, 원본 추적 가능",
+      "cons": "같은 퀴즈 여러 개 row → DB 용량. 솔로 프로젝트 규모 내 수용"
+    },
+    {
+      "pattern_id": "P7-past-quiz-picker",
+      "block": "B4",
+      "description": "QuizSessionList: 교사 본인이 만든 과거 퀴즈 리스트 (제목+생성일+문항수+학급). 클릭 → '이 퀴즈 재사용' 확인 → clone.",
+      "source": "자체 설계 (Kahoot library 축약 버전)",
+      "pros": "수업 준비시간 단축 (재생성 LLM 비용 회피)",
+      "cons": "필터/검색 없이 단순 리스트 — 퀴즈 누적 시 UX 저하 → 페이지네이션으로 완화"
+    }
+  ]
+}

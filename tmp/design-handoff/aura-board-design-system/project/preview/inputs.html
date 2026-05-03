@@ -1,0 +1,26 @@
+<!DOCTYPE html><html><head><meta charset="utf-8">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../colors_and_type.css">
+<style>
+  body { margin: 0; padding: 22px 24px; background: var(--color-bg); font-family: var(--font-body); }
+  .row { display: flex; gap: 14px; align-items: flex-start; flex-wrap: wrap; }
+  .field { display: flex; flex-direction: column; gap: 6px; }
+  .lbl { font-size: 13px; font-weight: 600; color: var(--color-text-muted); }
+  input {
+    font-family: inherit; font-size: 15px;
+    padding: 10px 14px; border-radius: 4px;
+    border: 1px solid rgba(0,0,0,0.1); background: #fff;
+    min-width: 180px; color: rgba(0,0,0,0.95); outline: none;
+  }
+  input:focus { border-color: #0075de; box-shadow: 0 0 0 3px rgba(0,117,222,0.15); }
+  input.err { border-color: #c62828; box-shadow: 0 0 0 3px rgba(198,40,40,0.12); }
+  .err-text { font-size: 12px; color: #c62828; margin-top: 2px; }
+  .code { letter-spacing: 3px; font-family: var(--font-mono); text-transform: uppercase; text-align: center; font-size: 18px; font-weight: 700; }
+</style></head>
+<body>
+  <div class="row">
+    <div class="field"><span class="lbl">학급 이름</span><input placeholder="3학년 2반" value="3학년 2반"></div>
+    <div class="field"><span class="lbl">학생 코드</span><input class="code" placeholder="코드 입력" value="K9PX4Z" maxlength="6"></div>
+    <div class="field"><span class="lbl">이메일</span><input class="err" value="jaemin@"><span class="err-text">로그인에 실패했습니다</span></div>
+  </div>
+</body></html>

@@ -1,0 +1,18 @@
+<!DOCTYPE html><html><head><meta charset="utf-8">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../colors_and_type.css">
+<style>
+  body { margin: 0; padding: 20px 24px; background: var(--color-bg-alt); font-family: var(--font-body); }
+  .row { display: flex; gap: 16px; align-items: flex-end; }
+  .s { display: flex; flex-direction: column; gap: 6px; align-items: center; }
+  .b { width: 80px; height: 40px; background: var(--color-accent); }
+  .r4 { border-radius: 4px; } .r12 { border-radius: 12px; } .pill { width: 90px; border-radius: 9999px; }
+  .cap { font-size: 11px; font-family: var(--font-mono); color: var(--color-text-muted); }
+</style></head>
+<body>
+  <div class="row">
+    <div class="s"><div class="b r4"></div><div class="cap">btn · 4px</div></div>
+    <div class="s"><div class="b r12"></div><div class="cap">card · 12px</div></div>
+    <div class="s"><div class="b pill"></div><div class="cap">pill · 9999px</div></div>
+  </div>
+</body></html>

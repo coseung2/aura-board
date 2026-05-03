@@ -1,0 +1,26 @@
+<!DOCTYPE html><html><head><meta charset="utf-8">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../colors_and_type.css">
+<style>
+  body { margin: 0; padding: 22px 26px; background: var(--color-bg); font-family: var(--font-body); display: flex; gap: 10px; flex-wrap: wrap; }
+  .pill { display: inline-flex; align-items: center; gap: 6px; padding: 4px 12px; border-radius: 9999px; font-size: 12px; font-weight: 600; letter-spacing: 0.125px; }
+  .new { background: #f2f9ff; color: #097fe8; }
+  .sub { background: #f2f9ff; color: #1565c0; }
+  .rev { background: #e8f5e9; color: #2e7d32; }
+  .ret { background: #ffebee; color: #c62828; }
+  .warn { background: #fef3c7; color: #92610a; }
+  .diff-e { background: rgba(39,163,95,0.12); color: #27a35f; }
+  .diff-m { background: rgba(201,162,39,0.15); color: #a27c0b; }
+  .diff-h { background: rgba(198,40,40,0.12); color: #c62828; }
+  .dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+</style></head>
+<body>
+  <span class="pill new">NEW</span>
+  <span class="pill sub"><span class="dot"></span>제출됨</span>
+  <span class="pill rev"><span class="dot"></span>검토 완료</span>
+  <span class="pill ret"><span class="dot"></span>반려됨</span>
+  <span class="pill warn"><span class="dot"></span>D-3</span>
+  <span class="pill diff-e">쉬움</span>
+  <span class="pill diff-m">보통</span>
+  <span class="pill diff-h">어려움</span>
+</body></html>

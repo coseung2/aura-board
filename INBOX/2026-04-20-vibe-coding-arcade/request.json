@@ -1,0 +1,120 @@
+{
+  "type": "feature",
+  "slug": "vibe-coding-arcade",
+  "task_id": "2026-04-20-vibe-coding-arcade",
+  "change_type": "new_feature",
+  "motivation": "Aura-board 교사 계정의 상시 잉여 Claude Sonnet API 쿼터를, 학생이 Sonnet과 대화하며 브라우저 즉시 실행 가능한 게임·퀴즈·미니앱을 바이브 코딩으로 제작하고 반 친구들이 플레이·평가하는 '학급 Steam' 공간으로 전환한다. 쿼터 낭비 해소 + AI 리터러시 실습 + 학급 내 생산자-소비자 상호작용 루프를 동시 달성한다. Board.layout=\"vibe-arcade\" 신규 레이아웃 1개 + 도메인 엔티티 6종(VibeArcadeConfig·VibeProject·VibeSession·VibeReview·VibePlaySession·VibeQuotaLedger) + Seed 12 LLM 추상화에 anthropic-sonnet.ts provider 1개 추가.",
+  "user_story": "학생으로서 Claude Sonnet과 대화하며 브라우저에서 바로 실행되는 게임·퀴즈·미니앱을 만들고 반 친구들의 작품을 플레이하고 별점·리뷰로 평가할 수 있다.",
+  "success_metric": "한 학급 기준 주당 학생 1인당 바이브 코딩 세션 >= 1회 + 타인 결과물 플레이·리뷰 >= 3회 + Sonnet 교사 계정 잉여 쿼터의 60% 이상이 학생 세션으로 소비 (학급 30명 기준 측정, VibeQuotaLedger 일별 rollup + VibeReview 카운트 집계).",
+  "affected_surfaces": [
+    "prisma/schema.prisma",
+    "src/features/vibe-arcade/ (신규 feature root)",
+    "src/features/vibe-arcade/api/sessions.ts",
+    "src/features/vibe-arcade/api/projects.ts",
+    "src/features/vibe-arcade/api/reviews.ts",
+    "src/features/vibe-arcade/api/play-sessions.ts",
+    "src/features/vibe-arcade/api/quota.ts",
+    "src/features/vibe-arcade/api/moderation.ts",
+    "src/features/vibe-arcade/components/Catalog.tsx",
+    "src/features/vibe-arcade/components/PlayModal.tsx",
+    "src/features/vibe-arcade/components/VibeCodingStudio.tsx",
+    "src/features/vibe-arcade/components/ReviewPanel.tsx",
+    "src/features/vibe-arcade/components/TeacherModerationDashboard.tsx",
+    "src/features/vibe-arcade/lib/sandbox-renderer.ts",
+    "src/features/vibe-arcade/lib/thumbnail-worker.ts",
+    "src/features/vibe-arcade/lib/quota-ledger.ts",
+    "src/features/vibe-arcade/lib/moderation-filter.ts",
+    "src/lib/llm/providers/anthropic-sonnet.ts",
+    "src/lib/board/layout-registry.ts",
+    "src/app/board/[id]/vibe-arcade/page.tsx",
+    "src/app/sandbox/vibe/[projectId]/route.ts (cross-origin serving — sandbox.aura-board.app)",
+    "src/middleware/csp-sandbox.ts",
+    "src/features/auth/feature-flags.ts (vibeArcadeGate)",
+    "cron/vibe-arcade-anonymize.ts",
+    "cron/vibe-arcade-hard-delete.ts",
+    "cron/vibe-arcade-quota-rollup.ts"
+  ],
+  "context_refs": [
+    "tasks/2026-04-20-vibe-coding-arcade/phase0/request.json",
+    "tasks/2026-04-20-vibe-coding-arcade/phase1/exploration.md",
+    "tasks/2026-04-20-vibe-coding-arcade/phase2/sketch.md",
+    "tasks/2026-04-20-vibe-coding-arcade/phase3/decisions.md",
+    "tasks/2026-04-20-vibe-coding-arcade/phase4/seed.yaml",
+    "tasks/2026-04-20-vibe-coding-arcade/phase5/updated_docs.md",
+    "tasks/2026-04-20-vibe-coding-arcade/phase5/new_docs.md",
+    "tasks/2026-04-20-vibe-coding-arcade/phase6/handoff_note.md",
+    "plans/vibe-arcade-roadmap.md",
+    "plans/seeds-index.md#seed_vibe_arcade_v1_2026_04_20",
+    "plans/phase0-requests.md",
+    "plans/tablet-performance-roadmap.md#2c-vibe-arcade-레이아웃-성능-예산-seed-13",
+    "plans/parent-viewer-roadmap.md",
+    "ideas-parking-lot.md"
+  ],
+  "performance_budget_ref": "plans/tablet-performance-roadmap.md#2c-vibe-arcade-레이아웃-성능-예산-seed-13",
+  "seed_ref": "seed_vibe_arcade_v1_2026_04_20",
+  "seed_ambiguity": 0.13,
+  "priority": "medium",
+  "dependencies": {
+    "seeds": ["Seed 2 (Tier 매트릭스)", "Seed 5 (iframe LRU 3개)", "Seed 11 (assignment-board Board.layout 확장 패턴)", "Seed 12 (LLM provider 추상화)"],
+    "blocking_on": [
+      "VA-1 Prisma 마이그레이션 (Board.layout enum + 6 엔티티 + FeatureFlag.vibeArcadeGate)",
+      "Seed 11 layout 패턴 확정",
+      "Seed 12 LLM provider 추상화 구현"
+    ]
+  },
+  "user_confirmation_needed": [
+    {
+      "id": "U-1",
+      "item": "모더레이션 정책 초기값",
+      "default": "teacher_approval_required",
+      "field": "VibeArcadeConfig.moderationPolicy",
+      "confirm_by": "padlet phase0 request.json 수용 직후 (phase1 분석 착수 전)",
+      "rationale": "R-2 극심 리스크(부적절 콘텐츠 생성) 최종 방어선. 자동 게시는 사고 리스크, 하이브리드는 v1.5 신뢰 등급 필요. 교사 부담 90건/주는 R-7 완화(자동 1차 필터 + 키보드 A/R 단축키)로 분산."
+    },
+    {
+      "id": "U-2",
+      "item": "리뷰 작성자 표시",
+      "default": "named",
+      "field": "VibeArcadeConfig.reviewAuthorDisplay",
+      "confirm_by": "UX 와이어프레임 최종화 전",
+      "rationale": "R-10 악성 리뷰 완화 — 실명 책임. Scratch Teacher Account 관례. anonymous는 악성 유인, hidden_to_peer는 설계 복잡 v1.5."
+    },
+    {
+      "id": "U-3",
+      "item": "리뷰 평가 시스템",
+      "default": "stars_1_5",
+      "field": "VibeArcadeConfig.reviewRatingSystem",
+      "confirm_by": "UX 와이어프레임 최종화 전",
+      "rationale": "itch.io/Steam/Scratch 관습. 초등 고학년~중등 이해 가능. thumbs는 정보량 축소, emoji_5는 v2 A/B 테스트."
+    },
+    {
+      "id": "U-4",
+      "item": "학급 간 공유 범위",
+      "default": false,
+      "field": "VibeArcadeConfig.crossClassroomVisible",
+      "confirm_by": "Seed 2 학교 플랜 v2 설계 전",
+      "rationale": "D-5 Classroom 스코프 격리 원칙. Pro tier 5반 혜택 확장은 교사 피드백 강도에 따라 v1.5 우선순위 상승 가능."
+    }
+  ],
+  "parking_branches": [
+    {"id": "F-1", "title": "학생 신뢰 등급 시스템 (Student.vibeTrustTier)", "park": "v1.5 or v2"},
+    {"id": "F-2", "title": "좋아요 화폐 StudentAccount 연동", "park": "별도 시드"},
+    {"id": "F-3", "title": "학부모 자녀 작품 열람", "park": "parent-viewer 후속 시드 (phase5에서 매트릭스 예고 완료)"},
+    {"id": "F-4", "title": "Remix 기능 v2 설계", "park": "v2 (allowRemix=false 기본)"},
+    {"id": "F-5", "title": "학급 Best Of + 학기말 포트폴리오 PDF", "park": "v2 (canva-assignment-pdf-merge 재활용)"},
+    {"id": "F-6", "title": "Pyodide Python 보드 분리 (vibe-arcade-python)", "park": "v2"},
+    {"id": "F-7", "title": "스쿨마스터 2026 연동", "park": "관찰만"}
+  ],
+  "constraints_summary": {
+    "device": "갤럭시 탭 S6 Lite 기준 — tablet-performance §2·§2a·§2c 교차 준수",
+    "llm_model": "Claude Sonnet 전용 (Haiku·Opus 다운그레이드·교체 금지)",
+    "environment": "Aura-board 생태계 내부 (외부 별도 앱·도메인 신설 금지)",
+    "operating_unit": "학급 (교사 1인 관찰 범위). 전교·전사 확장은 v2+",
+    "tier": "Free 접근 불가, Pro 전용 (학급 150만/일, 학생 45K/일), 학교 플랜은 v2+",
+    "artifact_format": "단일 HTML + inline JS/CSS + 외부 CDN 화이트리스트 (jsdelivr·cdnjs·unpkg, SRI 필수)",
+    "sandbox_isolation": "cross-origin 서브도메인(sandbox.aura-board.app) + <iframe sandbox=\"allow-scripts\"> (allow-same-origin 금지) + CSP sandbox 응답 헤더 + postMessage origin 화이트리스트",
+    "quota_limits": "학생 45K/일, 학급 150만/일, 자정 KST 리셋, 세션 타임아웃 활성 30분·입력 대기 5분",
+    "iframe_budget": "카탈로그 iframe 0개, 모달 iframe 1개, LRU 상한 3개 (Seed 5 승계)"
+  },
+  "created_at": "2026-04-20T00:00:00+09:00"
+}
