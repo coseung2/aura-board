@@ -26,7 +26,7 @@ export function StatisticsTeamManager({
   const fetchTeams = useCallback(async () => {
     const next: Team[] = sections.map((s) => ({ sectionId: s.id, title: s.title, order: s.order, members: [] }));
     for (const team of next) {
-      const res = await fetch(`/api/boards/${boardId}/sections/${team.sectionId}/memberships`);
+        const res = await fetch(`/api/sections/${team.sectionId}/memberships`);
       if (res.ok) {
         const data = await res.json();
         team.members = data.memberships as Member[];
@@ -43,7 +43,7 @@ export function StatisticsTeamManager({
   async function assignStudent(team: Team, student: Student) {
     setPendingStudentId(student.id);
     try {
-      const res = await fetch(`/api/boards/${boardId}/sections/${team.sectionId}/memberships`, {
+      const res = await fetch(`/api/sections/${team.sectionId}/memberships`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ studentId: student.id }),
@@ -64,7 +64,7 @@ export function StatisticsTeamManager({
     if (!window.confirm(`${member.studentName} 학생을 팀에서 제거할까요?`)) return;
     try {
       const res = await fetch(
-        `/api/boards/${boardId}/sections/${team.sectionId}/memberships/${member.id}`,
+        `/api/sections/${team.sectionId}/memberships/${member.id}`,
         { method: "DELETE" }
       );
       if (res.ok) {
