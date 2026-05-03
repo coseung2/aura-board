@@ -9,10 +9,10 @@ const APPROVAL_GATES = [2, 3, 6, 8];
 
 export async function POST(
   req: Request,
-  ctx: { params: Promise<{ sectionId: string; step: string }> }
+  ctx: { params: Promise<{ id: string; step: string }> }
 ) {
   try {
-    const { sectionId, step } = await ctx.params;
+    const { id: sectionId, step } = await ctx.params;
     const stepNumber = parseInt(step, 10);
     if (isNaN(stepNumber) || stepNumber < 1 || stepNumber > 11) {
       return NextResponse.json({ error: "invalid_step" }, { status: 400 });
