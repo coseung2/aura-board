@@ -6,10 +6,10 @@ import { getBoardRole } from "@/lib/rbac";
 
 export async function POST(
   req: Request,
-  ctx: { params: Promise<{ boardId: string }> }
+  ctx: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { boardId } = await ctx.params;
+    const { id: boardId } = await ctx.params;
 
     const [user, student] = await Promise.all([
       getCurrentUser().catch(() => null),
