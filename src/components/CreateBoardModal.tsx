@@ -102,7 +102,8 @@ export function CreateBoardModal({ classrooms, userTier = "pro", onClose }: Prop
         layoutId === "dj-queue" ||
         layoutId === "vibe-arcade" ||
         layoutId === "vibe-gallery" ||
-        layoutId === "question-board") &&
+        layoutId === "question-board" ||
+        layoutId === "statistics") &&
       classrooms.length > 0
     ) {
       setSelectedLayout(layoutId);
