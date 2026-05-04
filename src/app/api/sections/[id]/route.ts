@@ -66,7 +66,10 @@ export async function DELETE(
 
     await requirePermission(section.boardId, user.id, "edit");
 
-    await db.section.delete({ where: { id } });
+    await db.$transaction([
+      db.card.deleteMany({ where: { sectionId: id } }),
+      db.section.delete({ where: { id } }),
+    ]);
 
     await touchBoardUpdatedAt(section.boardId);
 

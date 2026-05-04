@@ -11,9 +11,6 @@ type Props = {
   section: { id: string; title: string };
   sectionCards: CardData[];
   canEdit: boolean;
-  canManageSection?: boolean;
-  canAddInColumn?: boolean;
-  canDragCards?: boolean;
   currentRole: "owner" | "editor" | "viewer";
   currentUserId: string;
   classroomId?: string | null;
@@ -57,9 +54,6 @@ export function ColumnView(props: Props) {
     section,
     sectionCards,
     canEdit,
-    canManageSection = canEdit,
-    canAddInColumn = canEdit,
-    canDragCards = canEdit,
     currentRole,
     currentUserId,
     classroomId,
@@ -98,11 +92,9 @@ export function ColumnView(props: Props) {
       (c.linkUrl.includes("canva.link") || c.linkUrl.includes("canva.com"))
   );
 
-  const sectionStudent = canManageSection
-    ? studentForSectionTitle(section.title)
-    : null;
+  const sectionStudent = canEdit ? studentForSectionTitle(section.title) : null;
 
-  const menuItems = canManageSection ? buildMenuItems() : [];
+  const menuItems = canEdit ? buildMenuItems() : [];
 
   function buildMenuItems() {
     const items: Array<{
@@ -185,12 +177,12 @@ export function ColumnView(props: Props) {
       onDrop={(e) => onDrop(e, section.id)}
     >
       <div
-        className={`column-header ${canManageSection ? "is-section-draggable" : ""} ${
+        className={`column-header ${canEdit ? "is-section-draggable" : ""} ${
           draggingSectionId === section.id ? "is-section-dragging" : ""
         }`}
-        draggable={canManageSection}
+        draggable={canEdit}
         onDragStart={(e) => {
-          if (!canManageSection) return;
+          if (!canEdit) return;
           e.dataTransfer.setData("application/section-id", section.id);
           e.dataTransfer.effectAllowed = "move";
           onSectionDragStart(section.id);
@@ -199,10 +191,10 @@ export function ColumnView(props: Props) {
       >
         <h3 className="column-title">{section.title}</h3>
         <span className="column-count">{sectionCards.length}</span>
-        {(canManageSection || menuItems.length > 0) && (
+        {(canEdit || menuItems.length > 0) && (
           <ColumnMenu
             sortMode={sortMode}
-            canSort={canManageSection}
+            canSort={canEdit}
             onSetSort={onSetSort}
             actions={menuItems}
           />
@@ -224,7 +216,7 @@ export function ColumnView(props: Props) {
               key={c.id}
               className="column-card is-clickable"
               style={{ backgroundColor: c.color ?? undefined }}
-              draggable={canDragCards}
+              draggable={canEdit}
               onDragStart={(e) => onCardDragStart(e, c.id)}
               onDragEnd={onCardDragEnd}
               onClick={() => onCardOpen(c)}
@@ -281,7 +273,7 @@ export function ColumnView(props: Props) {
           <div className="column-empty">카드를 여기로 끌어오세요</div>
         )}
       </div>
-      {canAddInColumn && (
+      {canEdit && (
         <button
           type="button"
           className="column-inline-add"

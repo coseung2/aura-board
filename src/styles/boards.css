@@ -83,14 +83,6 @@
 
 /* -------- Columns (Kanban) Board -------- */
 
-/* columns 보드 wrap — 가로 스크롤바를 항상 viewport 하단에 노출시키기
-   위해 wrap이 직접 스크롤하지 않고 columns-board 가 100% 높이로 채워
-   자체 스크롤한다. (h-scroll-vis 2026-04-24) */
-.board-page:has(.board-canvas-wrap-columns) {
-  height: 100vh;
-  overflow: hidden;
-}
-
 .board-canvas-wrap-columns {
   overflow: hidden;
   display: flex;
