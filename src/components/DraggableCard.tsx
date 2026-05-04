@@ -127,7 +127,7 @@ export function DraggableCard({
           onOpen();
         }
       }}
-      cancel=".padlet-card-delete"
+      cancel=".padlet-card-delete, .padlet-card-content-toggle"
       bounds="parent"
     >
       <article

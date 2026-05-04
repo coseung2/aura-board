@@ -1,9 +1,12 @@
 "use client";
 
-import { memo } from "react";
+import { memo, useMemo, useState } from "react";
 import { CardAttachments } from "../CardAttachments";
 import { CardAuthorFooter } from "./CardAuthorFooter";
 import { CardEngagement } from "../engagement/CardEngagement";
+
+const CONTENT_PREVIEW_CHAR_LIMIT = 150;
+const CONTENT_PREVIEW_LINE_LIMIT = 5;
 
 type Props = {
   card: {
@@ -48,10 +51,36 @@ type Props = {
   // 보여줄 땐 "detail" 로 넘겨 원본 비율을 유지. thumbnail 은 height: 180px +
   // object-fit: cover 라 세로 사진을 가로 strip 으로 크롭함.
   attachmentsVariant?: "thumbnail" | "detail";
+  // 일반 보드 카드는 긴 텍스트를 접고 카드 안에서 토글한다.
+  // 포트폴리오 그리드는 모달로 전체 내용을 보므로 "static", 상세 모달은 "full".
+  contentDisplay?: "expandable" | "static" | "full";
 };
 
-export const CardBody = memo(function CardBody({ card, titleAs = "h3", showEngagement = true, attachmentsVariant = "thumbnail" }: Props) {
+function isLongContent(content: string): boolean {
+  if (content.length > CONTENT_PREVIEW_CHAR_LIMIT) return true;
+  return content.split(/\r\n|\r|\n/).length > CONTENT_PREVIEW_LINE_LIMIT;
+}
+
+export const CardBody = memo(function CardBody({
+  card,
+  titleAs = "h3",
+  showEngagement = true,
+  attachmentsVariant = "thumbnail",
+  contentDisplay = "expandable",
+}: Props) {
   const Title = titleAs;
+  const [isExpanded, setIsExpanded] = useState(false);
+  const canToggleContent = useMemo(
+    () => contentDisplay === "expandable" && isLongContent(card.content),
+    [card.content, contentDisplay]
+  );
+  const contentClassName = [
+    "padlet-card-content",
+    canToggleContent && !isExpanded ? "is-collapsed" : "",
+  ]
+    .filter(Boolean)
+    .join(" ");
+
   return (
     <>
       <CardAttachments
@@ -69,7 +98,21 @@ export const CardBody = memo(function CardBody({ card, titleAs = "h3", showEngag
         variant={attachmentsVariant}
       />
       <Title className="padlet-card-title">{card.title}</Title>
-      <p className="padlet-card-content">{card.content}</p>
+      <p className={contentClassName}>{card.content}</p>
+      {canToggleContent && (
+        <button
+          type="button"
+          className="padlet-card-content-toggle"
+          aria-expanded={isExpanded}
+          onClick={(e) => {
+            e.stopPropagation();
+            setIsExpanded((value) => !value);
+          }}
+          onMouseDown={(e) => e.stopPropagation()}
+        >
+          {isExpanded ? "접기" : "더보기"}
+        </button>
+      )}
       <CardAuthorFooter
         authors={card.authors}
         externalAuthorName={card.externalAuthorName}

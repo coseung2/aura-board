@@ -50,6 +50,47 @@
   word-break: break-word;
 }
 
+.padlet-card-content.is-collapsed {
+  display: -webkit-box;
+  max-height: 7.5em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: var(--card-content-preview-lines, 5);
+}
+
+.padlet-card-content-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-top: 8px;
+  padding: 5px 10px;
+  min-height: 30px;
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  background: var(--color-accent-tinted-bg);
+  color: var(--color-accent-tinted-text);
+  font-family: var(--font-body);
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 150ms ease, border-color 150ms ease, transform 120ms ease;
+}
+
+.padlet-card-content-toggle:hover {
+  background: var(--color-surface);
+  border-color: var(--color-accent);
+}
+
+.padlet-card-content-toggle:active {
+  transform: translateY(1px);
+}
+
+.padlet-card-content-toggle:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
 .card-author-footer {
   display: flex;
   align-items: center;

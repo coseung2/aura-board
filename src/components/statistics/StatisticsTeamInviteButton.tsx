@@ -98,7 +98,11 @@ export function StatisticsTeamInviteButton({
         <div className="team-invite-dropdown">
           <div className="team-invite-header">
             <span className="team-invite-title">팀원 초대</span>
-            <button className="team-invite-close" onClick={() => setOpen(false)}>
+            <button
+              className="team-invite-close"
+              onClick={() => setOpen(false)}
+              aria-label="팀원 초대 닫기"
+            >
               ×
             </button>
           </div>

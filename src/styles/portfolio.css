@@ -310,6 +310,7 @@
 .portfolio-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  align-items: start;
   gap: 16px;
 }
 .portfolio-empty {
@@ -359,6 +360,7 @@
 /* ── 카드 아이템 ── */
 .portfolio-card {
   position: relative;
+  align-self: start;
   background: var(--color-surface);
   border: 1px solid var(--color-border);
   border-radius: 8px;
@@ -398,6 +400,27 @@
   text-decoration: none;
   color: var(--color-text);
   display: block;
+  min-width: 0;
+  max-height: 360px;
+  overflow: hidden;
+}
+
+.portfolio-card .padlet-card-title {
+  display: -webkit-box;
+  margin-right: 28px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.portfolio-card .padlet-card-content {
+  display: -webkit-box;
+  max-height: 15.75rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 10;
 }
 /* 카드 본문 안의 a/button 이 클릭을 가로채면 카드 자체 onClick(=모달 오픈)
    이 안 먹음. 포트폴리오 그리드의 카드는 미리보기 용도라 인터랙션 비활성.
@@ -639,29 +662,31 @@
 }
 .portfolio-card-modal-close {
   position: absolute;
-  top: 12px;
-  right: 12px;
-  z-index: 2;
-  width: 32px;
-  height: 32px;
+  top: 20px;
+  right: 20px;
+  z-index: 5;
+  width: 40px;
+  height: 40px;
   display: grid;
   place-items: center;
-  background: var(--color-surface);
+  background: rgba(255, 255, 255, 0.94);
   border: 1px solid var(--color-border);
   border-radius: 50%;
   cursor: pointer;
-  font-size: 1.2rem;
-  line-height: 1;
   color: var(--color-text-muted);
-  transition: background 100ms;
+  font-size: 0;
+  line-height: 1;
+  box-shadow: 0 6px 18px rgba(24, 74, 92, 0.12);
+  transition: background 100ms, border-color 100ms, color 100ms;
 }
 .portfolio-card-modal-close:hover {
-  background: var(--color-surface-alt);
+  border-color: var(--color-border-hover);
+  background: #fff;
   color: var(--color-text);
 }
 .portfolio-card-modal-body {
   flex: 1;
-  padding: 32px 40px 24px;
+  padding: 72px 40px 24px;
   overflow-y: auto;
 }
 .portfolio-card-modal-foot {

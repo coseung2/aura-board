@@ -68,6 +68,7 @@ export function PortfolioCardModal({ card, onClose, showSource = true }: Props) 
             titleAs="h3"
             showEngagement={false}
             attachmentsVariant="detail"
+            contentDisplay="full"
           />
           <CardEngagement cardId={card.id} mode="panel" />
         </div>

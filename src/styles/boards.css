@@ -3,12 +3,14 @@
 .grid-board {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  align-items: start;
   gap: 20px;
   padding: 0;
 }
 
 .grid-card {
   position: relative;
+  align-self: start;
   background: var(--color-surface);
   color: var(--color-text);
   border: var(--border-card);
@@ -238,8 +240,13 @@
 }
 
 .column-card .padlet-card-content {
+  --card-content-preview-lines: 4;
   font-size: 13px;
   line-height: 1.45;
+}
+
+.column-card .padlet-card-content.is-collapsed {
+  max-height: 5.8em;
 }
 
 .column-unsectioned {

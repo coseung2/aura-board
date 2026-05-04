@@ -82,6 +82,7 @@ export function PortfolioCardItem({
         <CardBody
           card={{ ...card, anonymousAuthor: card.sourceBoard.anonymousAuthor }}
           titleAs="h4"
+          contentDisplay="static"
         />
       </div>
       <div className="portfolio-card-foot">

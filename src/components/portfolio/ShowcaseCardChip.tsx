@@ -43,6 +43,7 @@ export function ShowcaseCardChip({ entry, onOpen }: Props) {
         <CardBody
           card={{ ...card, anonymousAuthor: card.sourceBoard.anonymousAuthor }}
           titleAs="h4"
+          contentDisplay="static"
         />
       </div>
     </article>

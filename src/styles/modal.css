@@ -51,9 +51,9 @@
    center 만으로 픽셀 단위 완벽 정렬. */
 .card-detail-close {
   position: absolute;
-  top: 14px;
-  right: 14px;
-  z-index: 2;
+  top: 20px;
+  right: 20px;
+  z-index: 5;
 }
 
 /* Fullscreen toggle — bottom-right for presentation mode. */
@@ -505,19 +505,45 @@
 }
 
 .modal-close {
-  width: 32px;
-  height: 32px;
-  border: none;
-  background: var(--color-surface-alt);
-  border-radius: 50%;
+  position: relative;
+  width: 36px;
+  height: 36px;
+  border: 1px solid var(--color-border);
+  background: rgba(255, 255, 255, 0.82);
+  border-radius: var(--radius-control);
   cursor: pointer;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   padding: 0;
   color: var(--color-text-muted);
-  transition: background 150ms ease;
+  font-size: 0;
+  box-shadow: 0 4px 12px rgba(24, 74, 92, 0.08);
+  transition:
+    background var(--t-normal),
+    border-color var(--t-normal),
+    box-shadow var(--t-normal),
+    color var(--t-normal);
 }
+
+.modal-close::before,
+.modal-close::after {
+  position: absolute;
+  content: "";
+  width: 15px;
+  height: 2px;
+  border-radius: 999px;
+  background: currentColor;
+}
+
+.modal-close::before {
+  transform: rotate(45deg);
+}
+
+.modal-close::after {
+  transform: rotate(-45deg);
+}
+
 @media (pointer: coarse) {
   .modal-close {
     width: var(--tap-min);
@@ -526,8 +552,10 @@
 }
 
 .modal-close:hover {
-  background: rgba(0, 0, 0, 0.1);
+  border-color: var(--color-border-hover);
+  background: #fff;
   color: var(--color-text);
+  box-shadow: var(--shadow-lift);
 }
 
 .modal-tabs {
@@ -1100,14 +1128,18 @@
 .modal-select {
   font-family: var(--font-body);
   font-size: 14px;
+  min-height: var(--tap-min);
   padding: 10px 14px;
   border: 1px solid var(--color-border);
-  border-radius: 8px;
+  border-radius: var(--radius-control);
   color: var(--color-text);
-  background: var(--color-bg);
+  background-color: #fff;
   outline: none;
   cursor: pointer;
-  transition: border-color 150ms ease;
+  transition:
+    border-color var(--t-normal),
+    box-shadow var(--t-normal),
+    background var(--t-normal);
   width: 100%;
   appearance: none;
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='none' stroke='%23615d59' stroke-width='2' stroke-linecap='round'%3E%3Cpath d='M2 4l4 4 4-4'/%3E%3C/svg%3E");
@@ -1118,4 +1150,12 @@
 
 .modal-select:focus {
   border-color: var(--color-accent);
+  box-shadow: 0 0 0 3px rgba(22, 131, 199, 0.14);
+}
+
+@media (pointer: coarse) {
+  .modal-select {
+    font-size: 16px;
+    padding: 12px 40px 12px 14px;
+  }
 }

@@ -64,12 +64,15 @@
 .side-panel-close {
   background: none;
   border: 0;
-  font-size: 22px;
-  line-height: 1;
   cursor: pointer;
-  padding: 4px 8px;
+  padding: 6px;
   color: var(--color-text-muted);
-  border-radius: 6px;
+  border-radius: 50%;
+  width: 32px;
+  height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .side-panel-close:hover {

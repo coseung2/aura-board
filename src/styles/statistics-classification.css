@@ -1,6 +1,6 @@
 .question-classification-empty {
   margin: 0;
-  color: var(--muted-foreground, #64748b);
+  color: var(--color-text-muted);
 }
 
 .question-classification-board {
@@ -16,25 +16,27 @@
 .question-classification-item {
   display: grid;
   gap: 10px;
-  padding-bottom: 14px;
-  border-bottom: 1px solid rgba(15, 23, 42, 0.1);
+  padding: 14px;
+  border: 1px solid rgba(24, 74, 92, 0.1);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.82);
 }
 
 .question-classification-item:last-child {
-  border-bottom: 0;
-  padding-bottom: 0;
+  border-bottom: 1px solid rgba(24, 74, 92, 0.1);
+  padding-bottom: 14px;
 }
 
 .question-classification-item span {
   display: inline-flex;
-  color: #475569;
+  color: var(--color-accent-tinted-text);
   font-size: 0.83rem;
   font-weight: 700;
 }
 
 .question-classification-item p {
   margin: 4px 0 0;
-  color: #0f172a;
+  color: var(--color-text);
   line-height: 1.55;
 }
 
@@ -45,10 +47,10 @@
 }
 
 .question-classification-actions button {
-  border: 1px solid rgba(15, 23, 42, 0.16);
-  border-radius: 8px;
+  border: 1px solid rgba(24, 74, 92, 0.16);
+  border-radius: var(--radius-control);
   background: #fff;
-  color: #334155;
+  color: var(--color-text);
   cursor: pointer;
   font: inherit;
   font-size: 0.88rem;
@@ -59,9 +61,9 @@
 
 .question-classification-actions button:hover:not(:disabled),
 .question-classification-actions button.is-selected {
-  border-color: #2563eb;
-  background: #eff6ff;
-  color: #1d4ed8;
+  border-color: var(--color-accent);
+  background: var(--color-accent-tinted-bg);
+  color: var(--color-accent-tinted-text);
 }
 
 .question-classification-actions button:disabled {
@@ -77,12 +79,13 @@
 
 .question-classification-lane {
   align-content: start;
-  border: 1px solid rgba(15, 23, 42, 0.1);
-  border-radius: 8px;
+  border: 1px solid rgba(24, 74, 92, 0.1);
+  border-radius: 16px;
   display: grid;
   gap: 8px;
   min-height: 128px;
   padding: 12px;
+  background: rgba(255, 255, 255, 0.7);
 }
 
 .question-classification-lane h4,
@@ -91,21 +94,21 @@
 }
 
 .question-classification-lane h4 {
-  color: #0f172a;
+  color: var(--color-text);
   font-size: 0.92rem;
 }
 
 .question-classification-lane p,
 .question-classification-placeholder {
-  color: #64748b;
+  color: var(--color-text-muted);
   font-size: 0.82rem;
   line-height: 1.45;
 }
 
 .question-classification-chip {
-  border-radius: 8px;
-  background: rgba(15, 23, 42, 0.04);
-  color: #1e293b;
+  border-radius: var(--radius-control);
+  background: rgba(233, 247, 255, 0.72);
+  color: var(--color-text);
   font-size: 0.84rem;
   line-height: 1.45;
   padding: 8px 10px;
@@ -119,11 +122,11 @@
 }
 
 .mission-reference-list li {
-  color: #1e293b;
+  color: var(--color-text);
   line-height: 1.5;
 }
 
-@media (max-width: 980px) {
+@media (max-width: 1100px) {
   .question-classification-lanes {
     grid-template-columns: 1fr;
   }

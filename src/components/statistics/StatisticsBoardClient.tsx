@@ -653,8 +653,40 @@ export function StatisticsBoardClient({
           onClick={closeModal}
           aria-label="닫기"
         >
-          ×
+          <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+            <path d="M4 4l10 10M14 4L4 14" />
+          </svg>
         </button>
+        <div className="mission-modal-topbar">
+          <div className="mission-modal-brand">
+            <span className="mission-modal-brand-icon" aria-hidden="true">탐</span>
+            <span>탐구 활동지</span>
+          </div>
+          <div className="mission-modal-stepbar" aria-label="미션 단계">
+            {Array.from({ length: STATISTICS_MISSION_COUNT }, (_, index) => {
+              const step = index + 1;
+              const isCurrent = step === modalMission.stepNumber;
+              const isPast = step < modalMission.stepNumber;
+              return (
+                <span
+                  key={step}
+                  className={`mission-modal-step ${isCurrent ? "is-current" : ""} ${isPast ? "is-past" : ""}`}
+                  aria-current={isCurrent ? "step" : undefined}
+                  title={MISSION_TITLES[step]}
+                >
+                  <span className="mission-modal-step-num">{step}</span>
+                  <span className="mission-modal-step-title">
+                    {MISSION_TITLES[step]}
+                  </span>
+                </span>
+              );
+            })}
+          </div>
+          <div className="mission-modal-team-pill">
+            <span>우리 팀</span>
+            <strong>{modalTeamName}</strong>
+          </div>
+        </div>
         <div className="mission-modal-body">
           <MissionPanel
             boardId={boardId}

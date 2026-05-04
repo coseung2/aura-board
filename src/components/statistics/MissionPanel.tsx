@@ -102,89 +102,88 @@ export function MissionPanel({
       <div className="mission-panel-banner">
         지금 우리 팀은 <strong>미션 {mission.stepNumber}</strong>를 하고 있어요
       </div>
-      <div className="mission-panel-card">
-        <h3 className="mission-panel-title">
-          미션 {mission.stepNumber}. {MISSION_TITLES[mission.stepNumber]}
-        </h3>
-        <p className="mission-panel-subtitle">
-          {mission.stepNumber === 1
-            ? "의견이 갈리거나, 불편함이 있거나, 이유가 궁금한 생활 문제를 찾아봅시다."
-            : mission.stepNumber === 2
-              ? "찬성과 반대는 마지막에 생각해요. 지금은 좋은 질문을 모을 차례예요."
-              : mission.stepNumber === 3
-                ? "만든 질문을 설문으로 물을 것과 직접 조사할 것으로 나눠 봅시다."
+
+      <h3 className="mission-panel-title">
+        미션 {mission.stepNumber}. {MISSION_TITLES[mission.stepNumber]}
+      </h3>
+      <p className="mission-panel-subtitle">
+        {mission.stepNumber === 1
+          ? "의견이 갈리거나, 불편함이 있거나, 이유가 궁금한 생활 문제를 찾아봅시다."
+          : mission.stepNumber === 2
+            ? "찬성과 반대는 마지막에 생각해요. 지금은 좋은 질문을 모을 차례예요."
+            : mission.stepNumber === 3
+              ? "만든 질문을 설문으로 물을 것과 직접 조사할 것으로 나눠 봅시다."
               : "팀원들과 이야기하며 빈칸을 하나씩 채워 보세요."}
-        </p>
+      </p>
 
-        {mission.stepNumber === 1 && (
-          <Mission1TopicCard value={draft} onChange={setDraft} disabled={!canEdit} />
-        )}
-        {mission.stepNumber === 2 && (
-          <QuestionLadderAccordion
-            value={draft}
-            onChange={setDraft}
-            disabled={!canEdit}
-            sectionId={sectionId}
-            stepNumber={mission.stepNumber}
-          />
-        )}
-        {mission.stepNumber === 3 && (
-          <Mission3QuestionSorter
-            value={draft}
-            onChange={setDraft}
-            disabled={!canEdit}
-            sourceContent={relatedMissions.find((item) => item.stepNumber === 2)?.content}
-          />
-        )}
-        {mission.stepNumber === 4 && (
-          <Mission3SurveyBuilder
-            value={draft}
-            onChange={setDraft}
-            disabled={!canEdit}
-            sourceContent={relatedMissions.find((item) => item.stepNumber === 3)?.content}
-          />
-        )}
-        {mission.stepNumber === 5 && (
-          <Mission4InvestigationPlan
-            value={draft}
-            onChange={setDraft}
-            disabled={!canEdit}
-            sourceContent={relatedMissions.find((item) => item.stepNumber === 3)?.content}
-          />
-        )}
-        {mission.stepNumber === 6 && (
-          <Mission5DataCollection value={draft} onChange={setDraft} disabled={!canEdit} />
-        )}
-        {mission.stepNumber === 7 && (
-          <Mission6GraphPlanner value={draft} onChange={setDraft} disabled={!canEdit} />
-        )}
-        {mission.stepNumber === 8 && (
-          <Mission7ResultInterpreter value={draft} onChange={setDraft} disabled={!canEdit} />
-        )}
-        {mission.stepNumber === 9 && (
-          <Mission8ConclusionWriter value={draft} onChange={setDraft} disabled={!canEdit} />
-        )}
-        {mission.stepNumber === 10 && (
-          <Mission9PosterRequest value={draft} onChange={setDraft} disabled={!canEdit} />
-        )}
-        {mission.stepNumber === 11 && (
-          <Mission10PosterReview value={draft} onChange={setDraft} disabled={!canEdit} />
-        )}
-        {mission.stepNumber === 12 && (
-          <Mission11PresentationPrep value={draft} onChange={setDraft} disabled={!canEdit} />
-        )}
-
-        {error && <div className="mission-panel-error">{error}</div>}
-
-        <MissionActionBar
-          canEdit={canEdit}
-          canSubmit={canSubmit}
-          isSaving={isSaving}
-          status={mission.status}
-          onSave={save}
-          onSubmit={submit}
+      {mission.stepNumber === 1 && (
+        <Mission1TopicCard value={draft} onChange={setDraft} disabled={!canEdit} />
+      )}
+      {mission.stepNumber === 2 && (
+        <QuestionLadderAccordion
+          value={draft}
+          onChange={setDraft}
+          disabled={!canEdit}
+          sectionId={sectionId}
+          stepNumber={mission.stepNumber}
         />
-      </div>
+      )}
+      {mission.stepNumber === 3 && (
+        <Mission3QuestionSorter
+          value={draft}
+          onChange={setDraft}
+          disabled={!canEdit}
+          sourceContent={relatedMissions.find((item) => item.stepNumber === 2)?.content}
+        />
+      )}
+      {mission.stepNumber === 4 && (
+        <Mission3SurveyBuilder
+          value={draft}
+          onChange={setDraft}
+          disabled={!canEdit}
+          sourceContent={relatedMissions.find((item) => item.stepNumber === 3)?.content}
+        />
+      )}
+      {mission.stepNumber === 5 && (
+        <Mission4InvestigationPlan
+          value={draft}
+          onChange={setDraft}
+          disabled={!canEdit}
+          sourceContent={relatedMissions.find((item) => item.stepNumber === 3)?.content}
+        />
+      )}
+      {mission.stepNumber === 6 && (
+        <Mission5DataCollection value={draft} onChange={setDraft} disabled={!canEdit} />
+      )}
+      {mission.stepNumber === 7 && (
+        <Mission6GraphPlanner value={draft} onChange={setDraft} disabled={!canEdit} />
+      )}
+      {mission.stepNumber === 8 && (
+        <Mission7ResultInterpreter value={draft} onChange={setDraft} disabled={!canEdit} />
+      )}
+      {mission.stepNumber === 9 && (
+        <Mission8ConclusionWriter value={draft} onChange={setDraft} disabled={!canEdit} />
+      )}
+      {mission.stepNumber === 10 && (
+        <Mission9PosterRequest value={draft} onChange={setDraft} disabled={!canEdit} />
+      )}
+      {mission.stepNumber === 11 && (
+        <Mission10PosterReview value={draft} onChange={setDraft} disabled={!canEdit} />
+      )}
+      {mission.stepNumber === 12 && (
+        <Mission11PresentationPrep value={draft} onChange={setDraft} disabled={!canEdit} />
+      )}
+
+      {error && <div className="mission-panel-error">{error}</div>}
+
+      <MissionActionBar
+        canEdit={canEdit}
+        canSubmit={canSubmit}
+        isSaving={isSaving}
+        status={mission.status}
+        onSave={save}
+        onSubmit={submit}
+      />
     </div>
   );
 }

@@ -28,19 +28,23 @@ img.emoji {
 
 :root {
   /* Colors — Warm neutral palette (Notion DESIGN.md) */
-  --color-bg: #f6f5f4;
+  --color-bg: #f7fbf5;
   --color-bg-alt: #ffffff;
   --color-surface: #ffffff;
-  --color-surface-alt: rgba(0, 0, 0, 0.05);
-  --color-text: rgba(0, 0, 0, 0.95);
-  --color-text-muted: #615d59;
-  --color-text-faint: #a39e98;
-  --color-accent: #0075de;
-  --color-accent-active: #005bab;
-  --color-accent-tinted-bg: #f2f9ff;
-  --color-accent-tinted-text: #097fe8;
-  --color-border: rgba(0, 0, 0, 0.1);
-  --color-border-hover: rgba(0, 0, 0, 0.15);
+  --color-surface-alt: rgba(24, 74, 92, 0.07);
+  --color-text: #18313f;
+  --color-text-muted: #5d6f76;
+  --color-text-faint: #8fa0a6;
+  --color-accent: #1683c7;
+  --color-accent-active: #0d679f;
+  --color-accent-tinted-bg: #e9f7ff;
+  --color-accent-tinted-text: #0f70ad;
+  --color-border: rgba(24, 74, 92, 0.14);
+  --color-border-hover: rgba(24, 74, 92, 0.23);
+  --color-learning-mint: #dff6e9;
+  --color-learning-sun: #fff1bd;
+  --color-learning-coral: #ffe1d6;
+  --color-learning-lavender: #ede9ff;
 
   /* Plant-roadmap (PJ-1~6) */
   --color-plant-active: #27a35f;
@@ -98,27 +102,26 @@ img.emoji {
   --container-max-width: 960px;
 
   /* Radii */
-  --radius-card: 12px;
-  --radius-btn: 4px;
+  --radius-card: 16px;
+  --radius-btn: 10px;
+  --radius-control: 12px;
   --radius-pill: 9999px;
 
   /* Typography */
-  --font-display: "Inter", -apple-system, system-ui, "Segoe UI", sans-serif;
-  --font-body: "Inter", -apple-system, system-ui, "Segoe UI", sans-serif;
-  --font-display-tracking: -0.5px;
+  --font-display: "Pretendard Variable", "SUIT", "Noto Sans KR", "Segoe UI", sans-serif;
+  --font-body: "Pretendard Variable", "SUIT", "Noto Sans KR", "Segoe UI", sans-serif;
+  --font-display-tracking: 0;
 
   /* Shadows — multi-layer soft (Notion signature) */
   --shadow-card:
-    rgba(0, 0, 0, 0.04) 0px 4px 18px,
-    rgba(0, 0, 0, 0.027) 0px 2.025px 7.85px,
-    rgba(0, 0, 0, 0.02) 0px 0.8px 2.93px,
-    rgba(0, 0, 0, 0.01) 0px 0.175px 1.04px;
+    rgba(24, 74, 92, 0.08) 0px 10px 28px,
+    rgba(24, 74, 92, 0.04) 0px 2px 8px;
   --shadow-card-hover:
-    rgba(0, 0, 0, 0.06) 0px 12px 34px,
-    rgba(0, 0, 0, 0.04) 0px 4px 14px;
-  --shadow-lift: rgba(0, 0, 0, 0.06) 0px 2px 8px;
-  --shadow-accent: 0 6px 20px rgba(0, 117, 222, 0.25);
-  --shadow-accent-hover: 0 8px 24px rgba(0, 117, 222, 0.3);
+    rgba(24, 74, 92, 0.12) 0px 16px 36px,
+    rgba(24, 74, 92, 0.06) 0px 4px 12px;
+  --shadow-lift: rgba(24, 74, 92, 0.09) 0px 3px 10px;
+  --shadow-accent: 0 8px 20px rgba(22, 131, 199, 0.22);
+  --shadow-accent-hover: 0 10px 24px rgba(22, 131, 199, 0.28);
 
   --border-card: 1px solid var(--color-border);
 
@@ -186,7 +189,10 @@ body {
   font-weight: 400;
   line-height: 1.5;
   color: var(--color-text);
-  background: var(--color-bg);
+  background:
+    radial-gradient(circle at 12% 8%, rgba(255, 241, 189, 0.65), transparent 28rem),
+    radial-gradient(circle at 88% 16%, rgba(223, 246, 233, 0.72), transparent 26rem),
+    var(--color-bg);
   -webkit-font-smoothing: antialiased;
   font-feature-settings: "kern", "liga";
 }
@@ -199,4 +205,82 @@ body {
 
 button {
   font-family: inherit;
+}
+
+button,
+input,
+textarea,
+select {
+  font: inherit;
+}
+
+button.side-panel-close.side-panel-close,
+button.quiz-modal-close.quiz-modal-close,
+button.portfolio-card-modal-close.portfolio-card-modal-close,
+button.card-engagement-modal-close.card-engagement-modal-close {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+  background: rgba(255, 255, 255, 0.82);
+  color: var(--color-text-muted);
+  font-size: 0;
+  line-height: 1;
+  cursor: pointer;
+}
+
+button.assign-modal__close.assign-modal__close {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: var(--radius-control);
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.78);
+  font-size: 0;
+  line-height: 1;
+  cursor: pointer;
+}
+
+button.side-panel-close.side-panel-close::before,
+button.side-panel-close.side-panel-close::after,
+button.quiz-modal-close.quiz-modal-close::before,
+button.quiz-modal-close.quiz-modal-close::after,
+button.portfolio-card-modal-close.portfolio-card-modal-close::before,
+button.portfolio-card-modal-close.portfolio-card-modal-close::after,
+button.card-engagement-modal-close.card-engagement-modal-close::before,
+button.card-engagement-modal-close.card-engagement-modal-close::after,
+button.assign-modal__close.assign-modal__close::before,
+button.assign-modal__close.assign-modal__close::after {
+  position: absolute;
+  content: "";
+  width: 15px;
+  height: 2px;
+  border-radius: 999px;
+  background: currentColor;
+}
+
+button.side-panel-close.side-panel-close::before,
+button.quiz-modal-close.quiz-modal-close::before,
+button.portfolio-card-modal-close.portfolio-card-modal-close::before,
+button.card-engagement-modal-close.card-engagement-modal-close::before,
+button.assign-modal__close.assign-modal__close::before {
+  transform: rotate(45deg);
+}
+
+button.side-panel-close.side-panel-close::after,
+button.quiz-modal-close.quiz-modal-close::after,
+button.portfolio-card-modal-close.portfolio-card-modal-close::after,
+button.card-engagement-modal-close.card-engagement-modal-close::after,
+button.assign-modal__close.assign-modal__close::after {
+  transform: rotate(-45deg);
 }

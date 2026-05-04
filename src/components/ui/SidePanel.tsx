@@ -157,7 +157,9 @@ export function SidePanel({
             aria-label="닫기"
             onClick={onClose}
           >
-            ×
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+              <path d="M4 4l8 8M12 4l-8 8" />
+            </svg>
           </button>
         </div>
         <div className={`side-panel-body ${className ?? ""}`.trim()}>{children}</div>
