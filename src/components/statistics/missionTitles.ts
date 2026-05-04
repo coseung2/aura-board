@@ -1,5 +1,5 @@
 export const MISSION_TITLES: Record<number, string> = {
-  1: "주제 카드",
+  1: "이슈 카드",
   2: "질문 사다리",
   3: "설문 문항",
   4: "조사 계획",

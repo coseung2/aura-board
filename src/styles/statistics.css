@@ -264,6 +264,23 @@
   accent-color: var(--color-accent);
 }
 
+.mission-stakeholder-list,
+.mission-choice-list,
+.mission-perspective-grid {
+  display: grid;
+  gap: 10px;
+}
+
+.mission-perspective-row {
+  display: grid;
+  grid-template-columns: minmax(120px, 0.4fr) minmax(0, 1fr);
+  gap: 10px;
+}
+
+.mission-choice-list {
+  margin-top: 4px;
+}
+
 .survey-item-header {
   display: flex;
   justify-content: space-between;
@@ -1091,5 +1108,9 @@ button:disabled {
 @media (max-width: 767px) {
   .statistics-team-header {
     padding: 0 16px;
+  }
+
+  .mission-perspective-row {
+    grid-template-columns: 1fr;
   }
 }

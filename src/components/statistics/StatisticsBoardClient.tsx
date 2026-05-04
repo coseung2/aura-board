@@ -134,10 +134,11 @@ type MissionPreviewField = {
 
 const MISSION_PREVIEW_FIELDS: Record<number, MissionPreviewField[]> = {
   1: [
-    { path: ["topic", "subject"], label: "주제" },
-    { path: ["topic", "curiosity"], label: "궁금한 점" },
-    { path: ["topic", "stakeholders"], label: "도움 받는 사람" },
-    { path: ["topic", "relevance"], label: "우리와 연결" },
+    { path: ["topic", "issue"], label: "우리 팀 이슈" },
+    { path: ["topic", "curiosity"], label: "궁금해진 이유" },
+    { path: ["topic", "stakeholder1"], label: "관련된 사람" },
+    { path: ["topic", "evidence"], label: "확인할 증거" },
+    { path: ["topic", "title"], label: "임시 제목" },
   ],
   2: [
     { path: ["questionLadder", "experience"], label: "경험 질문" },

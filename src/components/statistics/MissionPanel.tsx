@@ -104,9 +104,11 @@ export function MissionPanel({
           미션 {mission.stepNumber}. {MISSION_TITLES[mission.stepNumber]}
         </h3>
         <p className="mission-panel-subtitle">
-          {mission.stepNumber === 2
-            ? "찬성과 반대는 마지막에 생각해요. 지금은 좋은 질문을 모을 차례예요."
-            : "팀원들과 이야기하며 빈칸을 하나씩 채워 보세요."}
+          {mission.stepNumber === 1
+            ? "의견이 갈리거나, 불편함이 있거나, 이유가 궁금한 생활 문제를 찾아봅시다."
+            : mission.stepNumber === 2
+              ? "찬성과 반대는 마지막에 생각해요. 지금은 좋은 질문을 모을 차례예요."
+              : "팀원들과 이야기하며 빈칸을 하나씩 채워 보세요."}
         </p>
 
         {mission.stepNumber === 1 && (
