@@ -22,6 +22,7 @@ import type { CardData } from "./DraggableCard";
 type SectionData = StreamSection;
 
 type PanelTab = "rename" | "delete";
+const UNSECTIONED_SECTION_ID = "";
 
 type Props = {
   boardId: string;
@@ -237,8 +238,8 @@ export function ColumnsBoard({
   }
 
   /* ── Card drag/drop ── */
-  async function moveCard(cardId: string, targetSectionId: string) {
-    const targetCards = getCardsForSection(targetSectionId);
+  async function moveCard(cardId: string, targetSectionId: string | null) {
+    const targetCards = getCardsForSection(targetSectionId ?? UNSECTIONED_SECTION_ID);
     const newOrder = targetCards.length;
     const prevCards = [...cards];
 
@@ -296,11 +297,12 @@ export function ColumnsBoard({
     // in the column-header's onDragStart.
     const sectionId = e.dataTransfer.getData("application/section-id");
     if (sectionId) {
+      if (!targetSectionId) return;
       moveSectionTo(sectionId, targetSectionId);
       return;
     }
     const cardId = e.dataTransfer.getData("application/card-id");
-    if (cardId) moveCard(cardId, targetSectionId);
+    if (cardId) moveCard(cardId, targetSectionId || null);
   }
 
   /* ── Section reorder (drag-drop) ──
@@ -503,6 +505,7 @@ export function ColumnsBoard({
   }
 
   const sectionOptions = sections.map((s) => ({ id: s.id, title: s.title }));
+  const unsectionedCards = getCardsForSection(UNSECTIONED_SECTION_ID);
 
   return (
     <div className="board-canvas-wrap board-canvas-wrap-columns">
@@ -553,6 +556,51 @@ export function ColumnsBoard({
             onAddInColumn={() => setAddForSection(section.id)}
           />
         ))}
+
+        {unsectionedCards.length > 0 && (
+          <ColumnView
+            section={{ id: UNSECTIONED_SECTION_ID, title: "섹션 없음" }}
+            sectionCards={unsectionedCards}
+            canEdit={canEdit}
+            canManageSection={false}
+            canAddInColumn={false}
+            canDragCards={false}
+            currentRole={currentRole}
+            currentUserId={currentUserId}
+            classroomId={classroomId}
+            sortMode="manual"
+            overSectionId={overSectionId}
+            draggingSectionId={draggingSectionId}
+            organizing={organizing}
+            authorsForSection={authorsForSection}
+            studentForSectionTitle={studentForSectionTitle}
+            onSetSort={() => {}}
+            onSectionDragStart={() => {}}
+            onSectionDragEnd={() => setDraggingSectionId(null)}
+            onCardDragStart={handleDragStart}
+            onCardDragEnd={handleDragEnd}
+            onDragOver={handleDragOver}
+            onDragEnter={(id) => setOverSectionId(id)}
+            onDragLeave={(e) => {
+              if (!e.currentTarget.contains(e.relatedTarget as Node)) {
+                setOverSectionId(null);
+              }
+            }}
+            onDrop={handleDrop}
+            onRename={() => {}}
+            onDelete={() => {}}
+            onFolder={() => {}}
+            onExport={() => {}}
+            onOrganize={() => {}}
+            onFeedback={(args) => setFeedbackTarget(args)}
+            onCardOpen={(c) => setOpenCard(c)}
+            onCardEdit={(c) => setEditingCard(c)}
+            onCardEditAuthors={(c) => setAuthorEditCard(c)}
+            onCardDuplicate={handleDuplicateCard}
+            onCardDelete={handleDeleteCard}
+            onAddInColumn={() => {}}
+          />
+        )}
 
         {canEdit && (
           <div className="column-add-stack">
