@@ -1027,21 +1027,81 @@ button:disabled {
 
 /* 미션 모달 */
 .mission-modal {
-  max-width: 720px;
-  width: 90vw;
+  max-width: 860px;
+  width: min(92vw, 860px);
   max-height: 90vh;
   overflow: hidden;
   display: flex;
   flex-direction: column;
+  padding: 0;
 }
 
 .mission-modal-body {
   overflow-y: auto;
-  padding: 0;
+  padding: 32px clamp(20px, 4vw, 42px) 30px;
 }
 
 .mission-modal-body .mission-panel {
-  padding: 24px;
+  max-width: none;
+  padding: 0;
+}
+
+.mission-modal-body .mission-panel-banner {
+  display: block;
+  min-height: 0;
+  margin: 0 0 10px;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--color-text-muted);
+}
+
+.mission-modal-body .mission-panel-card {
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.mission-modal-body .mission-form {
+  gap: 20px;
+}
+
+.mission-modal-body .mission-form-card,
+.mission-modal-body .mission-form .form-group {
+  padding: 0 0 18px;
+  border: 0;
+  border-bottom: 1px solid rgba(15, 23, 42, 0.08);
+  border-radius: 0;
+  background: transparent;
+}
+
+.mission-modal-body .mission-form-card:focus-within,
+.mission-modal-body .mission-form .form-group:focus-within {
+  box-shadow: none;
+}
+
+.mission-modal-body .question-ladder-step {
+  border: 0;
+  border-bottom: 1px solid rgba(15, 23, 42, 0.08);
+  border-radius: 0;
+}
+
+.mission-modal-body .question-ladder-body {
+  padding: 0 0 16px;
+  border-top: 0;
+}
+
+.mission-modal-body .question-ladder-header {
+  padding: 14px 0;
+}
+
+.mission-modal-body .question-ladder-body textarea {
+  border-color: rgba(15, 23, 42, 0.14);
+  border-radius: 10px;
+  padding: 11px 12px;
 }
 
 /* 모바일 */
