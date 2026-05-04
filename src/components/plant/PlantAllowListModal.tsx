@@ -21,12 +21,34 @@ export function PlantAllowListModal({
   onSaved,
 }: Props) {
   const [checked, setChecked] = useState<Set<string>>(initialAllowed);
+  const [catalog, setCatalog] = useState<SpeciesDTO[]>(allSpecies);
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  const visibleSpecies = catalog.length > 0 ? catalog : allSpecies;
 
   useEffect(() => {
-    if (open) setChecked(new Set(initialAllowed));
-  }, [open, initialAllowed]);
+    if (!open) return;
+    setChecked(new Set(initialAllowed));
+    setCatalog(allSpecies);
+    setErr(null);
+    let cancelled = false;
+    async function loadCatalog() {
+      try {
+        const res = await fetch("/api/species", { cache: "no-store" });
+        if (!res.ok) throw new Error("식물 목록을 불러오지 못했어요");
+        const data = (await res.json()) as { species?: SpeciesDTO[] };
+        if (!cancelled) setCatalog(data.species ?? []);
+      } catch (e) {
+        if (!cancelled && allSpecies.length === 0) {
+          setErr((e as Error).message);
+        }
+      }
+    }
+    void loadCatalog();
+    return () => {
+      cancelled = true;
+    };
+  }, [open, initialAllowed, allSpecies]);
 
   useEffect(() => {
     if (!open) return;
@@ -46,10 +68,10 @@ export function PlantAllowListModal({
     setChecked(next);
   }
   function toggleAll() {
-    if (checked.size === allSpecies.length) {
+    if (checked.size === visibleSpecies.length) {
       setChecked(new Set());
     } else {
-      setChecked(new Set(allSpecies.map((s) => s.id)));
+      setChecked(new Set(visibleSpecies.map((s) => s.id)));
     }
   }
 
@@ -83,10 +105,10 @@ export function PlantAllowListModal({
           onClick={toggleAll}
           style={{ fontSize: 12, color: "var(--color-accent)", border: 0, background: "none", cursor: "pointer", padding: 0, marginBottom: 8 }}
         >
-          {checked.size === allSpecies.length ? "전체 해제" : "전체 선택"}
+          {checked.size === visibleSpecies.length ? "전체 해제" : "전체 선택"}
         </button>
         <div style={{ maxHeight: 360, overflowY: "auto" }}>
-          {allSpecies.map((s) => (
+          {visibleSpecies.map((s) => (
             <label key={s.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: 8, cursor: "pointer" }}>
               <input
                 type="checkbox"
@@ -102,6 +124,11 @@ export function PlantAllowListModal({
               </div>
             </label>
           ))}
+          {visibleSpecies.length === 0 && (
+            <p className="plant-empty-state" style={{ margin: 0 }}>
+              불러올 식물 목록이 없어요.
+            </p>
+          )}
         </div>
         {err && <p className="plant-error">{err}</p>}
         <div className="plant-modal-actions">
