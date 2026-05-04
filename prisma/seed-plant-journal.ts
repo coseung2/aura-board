@@ -2,10 +2,10 @@
  * Seed script — plant journal (PJ-1).
  *
  * Idempotent:
- *  - upserts 10 PlantSpecies by key
+ *  - upserts PlantSpecies by key
  *  - upserts their stages by (speciesId, order)
  *  - creates one "plant-roadmap" layout demo Board (b_plant)
- *  - allow-lists all 10 species to the demo classroom (if exists)
+ *  - allow-lists all catalog species to the demo classroom (if exists)
  *
  * Run: `npm run seed:plant` (see package.json addition)
  */
@@ -94,7 +94,7 @@ async function main() {
     });
   }
 
-  // Allow-list: all 10 species
+  // Allow-list: all catalog species
   const allSpecies = await prisma.plantSpecies.findMany();
   for (const sp of allSpecies) {
     await prisma.classroomPlantAllow.upsert({

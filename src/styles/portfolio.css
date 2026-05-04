@@ -684,6 +684,17 @@
   background: #fff;
   color: var(--color-text);
 }
+
+.portfolio-card-modal > button.portfolio-card-modal-close.portfolio-card-modal-close {
+  position: absolute;
+  top: 20px;
+  right: 20px;
+  z-index: 5;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+}
+
 .portfolio-card-modal-body {
   flex: 1;
   padding: 72px 40px 24px;
