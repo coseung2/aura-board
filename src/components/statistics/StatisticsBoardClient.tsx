@@ -141,10 +141,13 @@ const MISSION_PREVIEW_FIELDS: Record<number, MissionPreviewField[]> = {
     { path: ["topic", "title"], label: "임시 제목" },
   ],
   2: [
+    { path: ["questionLadder", "issue"], label: "우리 팀 이슈" },
     { path: ["questionLadder", "experience"], label: "경험 질문" },
     { path: ["questionLadder", "currentStatus"], label: "현황 질문" },
     { path: ["questionLadder", "reason"], label: "이유 질문" },
+    { path: ["questionLadder", "condition"], label: "조건 질문" },
     { path: ["questionLadder", "alternative"], label: "해결 질문" },
+    { path: ["questionLadder", "position"], label: "입장 질문" },
   ],
   3: [{ path: ["survey", "items"], label: "설문 문항" }],
   4: [
