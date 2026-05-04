@@ -5,6 +5,7 @@ import { getCurrentStudent } from "@/lib/student-auth";
 import { viewSection } from "@/lib/rbac";
 import { getTeacherKeyForBoard } from "@/lib/llm/teacher-key";
 import { generateFeedback } from "@/lib/ai-feedback/generate";
+import { isValidStatisticsMissionStep } from "@/lib/statistics/mission-constants";
 import { z } from "zod";
 
 const LlmFeedbackSchema = z.object({
@@ -32,7 +33,7 @@ export async function POST(
   try {
     const { id: sectionId, step } = await ctx.params;
     const stepNumber = parseInt(step, 10);
-    if (isNaN(stepNumber) || stepNumber < 1 || stepNumber > 11) {
+    if (!isValidStatisticsMissionStep(stepNumber)) {
       return NextResponse.json({ error: "invalid_step" }, { status: 400 });
     }
 

@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
 import { getBoardRole } from "@/lib/rbac";
+import { STATISTICS_MISSION_COUNT } from "@/lib/statistics/mission-constants";
+import { ensureStatisticsMissions } from "@/lib/statistics/mission-server";
 
 export async function GET(
   req: Request,
@@ -24,6 +26,17 @@ export async function GET(
       select: { classroomId: true },
     });
 
+    const sectionIds = await db.section.findMany({
+      where: { boardId },
+      select: { id: true },
+    });
+
+    await db.$transaction(async (tx) => {
+      for (const section of sectionIds) {
+        await ensureStatisticsMissions(tx, section.id);
+      }
+    });
+
     const sections = await db.section.findMany({
       where: { boardId },
       orderBy: { order: "asc" },
@@ -41,12 +54,18 @@ export async function GET(
         sectionId: section.id,
         teamName: section.title,
         memberCount: section._count.breakoutMemberships,
-        currentStep: currentMission?.stepNumber ?? 11,
+        currentStep: currentMission?.stepNumber ?? STATISTICS_MISSION_COUNT,
         missions: section.missions.map((m) => ({
+          id: m.id,
+          sectionId: m.sectionId,
           stepNumber: m.stepNumber,
           status: m.status,
+          content: m.content,
           submittedAt: m.submittedAt?.toISOString() ?? null,
           approvedAt: m.approvedAt?.toISOString() ?? null,
+          approvedBy: m.approvedBy,
+          teacherFeedback: m.teacherFeedback,
+          version: m.version,
         })),
       };
     });

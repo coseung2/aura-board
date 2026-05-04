@@ -3,9 +3,12 @@ import { db } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
 import { viewSection } from "@/lib/rbac";
 import { ApproveMissionSchema } from "@/lib/statistics/schemas";
+import {
+  isValidStatisticsMissionStep,
+  STATISTICS_APPROVAL_GATES,
+  STATISTICS_MISSION_COUNT,
+} from "@/lib/statistics/mission-constants";
 import { z } from "zod";
-
-const APPROVAL_GATES = [2, 3, 6, 8];
 
 export async function POST(
   req: Request,
@@ -14,7 +17,7 @@ export async function POST(
   try {
     const { id: sectionId, step } = await ctx.params;
     const stepNumber = parseInt(step, 10);
-    if (isNaN(stepNumber) || stepNumber < 1 || stepNumber > 11) {
+    if (!isValidStatisticsMissionStep(stepNumber)) {
       return NextResponse.json({ error: "invalid_step" }, { status: 400 });
     }
 
@@ -57,7 +60,10 @@ export async function POST(
       });
 
       // Unlock next mission if this step is an approval gate
-      if (APPROVAL_GATES.includes(stepNumber) && stepNumber < 11) {
+      if (
+        STATISTICS_APPROVAL_GATES.includes(stepNumber) &&
+        stepNumber < STATISTICS_MISSION_COUNT
+      ) {
         const nextMission = await tx.mission.findUnique({
           where: { sectionId_stepNumber: { sectionId, stepNumber: stepNumber + 1 } },
         });

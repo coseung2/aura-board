@@ -4,6 +4,7 @@ import { getCurrentUser } from "@/lib/auth";
 import { getCurrentStudent } from "@/lib/student-auth";
 import { viewSection } from "@/lib/rbac";
 import { PatchMissionSchema } from "@/lib/statistics/schemas";
+import { isValidStatisticsMissionStep } from "@/lib/statistics/mission-constants";
 import { z } from "zod";
 
 export async function GET(
@@ -13,7 +14,7 @@ export async function GET(
   try {
     const { id: sectionId, step } = await ctx.params;
     const stepNumber = parseInt(step, 10);
-    if (isNaN(stepNumber) || stepNumber < 1 || stepNumber > 11) {
+    if (!isValidStatisticsMissionStep(stepNumber)) {
       return NextResponse.json({ error: "invalid_step" }, { status: 400 });
     }
 
@@ -53,7 +54,7 @@ export async function PATCH(
   try {
     const { id: sectionId, step } = await ctx.params;
     const stepNumber = parseInt(step, 10);
-    if (isNaN(stepNumber) || stepNumber < 1 || stepNumber > 11) {
+    if (!isValidStatisticsMissionStep(stepNumber)) {
       return NextResponse.json({ error: "invalid_step" }, { status: 400 });
     }
 

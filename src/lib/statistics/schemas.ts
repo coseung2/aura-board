@@ -12,6 +12,7 @@ export const MissionStatusSchema = z.enum([
 export type MissionStatus = z.infer<typeof MissionStatusSchema>;
 
 export const QuestionLadderSchema = z.object({
+  issue: z.string().max(500).optional(),
   originalQuestion: z.string().max(500).optional(),
   weakness: z.string().max(500).optional(),
   experience: z.string().max(1000).optional(),
@@ -20,17 +21,43 @@ export const QuestionLadderSchema = z.object({
   condition: z.string().max(1000).optional(),
   alternative: z.string().max(1000).optional(),
   position: z.string().max(1000).optional(),
+  checklist: z.array(z.string().max(200)).optional(),
   llmFeedback: z.string().max(2000).optional(),
 });
 
 export const MissionContentSchema = z.object({
   topic: z.object({
+    issue: z.string().max(500).optional(),
     subject: z.string().max(200).optional(),
     curiosity: z.string().max(500).optional(),
     stakeholders: z.string().max(500).optional(),
     relevance: z.string().max(500).optional(),
+    stakeholder1: z.string().max(200).optional(),
+    stakeholder2: z.string().max(200).optional(),
+    stakeholder3: z.string().max(200).optional(),
+    stakeholder4: z.string().max(200).optional(),
+    perspectivePerson1: z.string().max(200).optional(),
+    perspectivePerson2: z.string().max(200).optional(),
+    perspectivePerson3: z.string().max(200).optional(),
+    perspectivePerson4: z.string().max(200).optional(),
+    perspectiveThought1: z.string().max(500).optional(),
+    perspectiveThought2: z.string().max(500).optional(),
+    perspectiveThought3: z.string().max(500).optional(),
+    perspectiveThought4: z.string().max(500).optional(),
+    evidence: z.string().max(1000).optional(),
+    evidenceChecks: z.array(z.string().max(200)).optional(),
+    feasibilityChecks: z.array(z.string().max(200)).optional(),
+    title: z.string().max(200).optional(),
   }).optional(),
   questionLadder: QuestionLadderSchema.optional(),
+  questionClassification: z.object({
+    items: z.array(z.object({
+      id: z.string().max(100),
+      label: z.string().max(100),
+      question: z.string().max(1000),
+      category: z.enum(["survey", "direct", "revise"]).nullable(),
+    })).optional(),
+  }).optional(),
   survey: z.object({
     items: z.array(z.object({
       question: z.string().max(500),
@@ -44,6 +71,7 @@ export const MissionContentSchema = z.object({
     method: z.string().max(500).optional(),
     period: z.string().max(200).optional(),
     linkOrMethod: z.string().max(500).optional(),
+    directQuestions: z.array(z.string().max(1000)).optional(),
     additional: z.array(z.string().max(200)).optional(),
   }).optional(),
   dataCollection: z.object({

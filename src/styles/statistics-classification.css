@@ -1,0 +1,130 @@
+.question-classification-empty {
+  margin: 0;
+  color: var(--muted-foreground, #64748b);
+}
+
+.question-classification-board {
+  display: grid;
+  gap: 18px;
+}
+
+.question-classification-source {
+  display: grid;
+  gap: 12px;
+}
+
+.question-classification-item {
+  display: grid;
+  gap: 10px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid rgba(15, 23, 42, 0.1);
+}
+
+.question-classification-item:last-child {
+  border-bottom: 0;
+  padding-bottom: 0;
+}
+
+.question-classification-item span {
+  display: inline-flex;
+  color: #475569;
+  font-size: 0.83rem;
+  font-weight: 700;
+}
+
+.question-classification-item p {
+  margin: 4px 0 0;
+  color: #0f172a;
+  line-height: 1.55;
+}
+
+.question-classification-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.question-classification-actions button {
+  border: 1px solid rgba(15, 23, 42, 0.16);
+  border-radius: 8px;
+  background: #fff;
+  color: #334155;
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.88rem;
+  font-weight: 700;
+  min-height: 36px;
+  padding: 0 12px;
+}
+
+.question-classification-actions button:hover:not(:disabled),
+.question-classification-actions button.is-selected {
+  border-color: #2563eb;
+  background: #eff6ff;
+  color: #1d4ed8;
+}
+
+.question-classification-actions button:disabled {
+  cursor: not-allowed;
+  opacity: 0.58;
+}
+
+.question-classification-lanes {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.question-classification-lane {
+  align-content: start;
+  border: 1px solid rgba(15, 23, 42, 0.1);
+  border-radius: 8px;
+  display: grid;
+  gap: 8px;
+  min-height: 128px;
+  padding: 12px;
+}
+
+.question-classification-lane h4,
+.question-classification-lane p {
+  margin: 0;
+}
+
+.question-classification-lane h4 {
+  color: #0f172a;
+  font-size: 0.92rem;
+}
+
+.question-classification-lane p,
+.question-classification-placeholder {
+  color: #64748b;
+  font-size: 0.82rem;
+  line-height: 1.45;
+}
+
+.question-classification-chip {
+  border-radius: 8px;
+  background: rgba(15, 23, 42, 0.04);
+  color: #1e293b;
+  font-size: 0.84rem;
+  line-height: 1.45;
+  padding: 8px 10px;
+}
+
+.mission-reference-list {
+  display: grid;
+  gap: 8px;
+  margin: 12px 0;
+  padding-left: 20px;
+}
+
+.mission-reference-list li {
+  color: #1e293b;
+  line-height: 1.5;
+}
+
+@media (max-width: 980px) {
+  .question-classification-lanes {
+    grid-template-columns: 1fr;
+  }
+}

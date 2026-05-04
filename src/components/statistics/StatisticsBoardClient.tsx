@@ -6,6 +6,7 @@ import { StatisticsTeacherDashboard } from "./StatisticsTeacherDashboard";
 import { StatisticsTeamInviteButton } from "./StatisticsTeamInviteButton";
 import { useMissionsSSE } from "./useMissionsSSE";
 import { MISSION_TITLES } from "./missionTitles";
+import { STATISTICS_MISSION_COUNT } from "@/lib/statistics/mission-constants";
 
 export type MissionDTO = {
   id: string;
@@ -149,42 +150,45 @@ const MISSION_PREVIEW_FIELDS: Record<number, MissionPreviewField[]> = {
     { path: ["questionLadder", "alternative"], label: "해결 질문" },
     { path: ["questionLadder", "position"], label: "입장 질문" },
   ],
-  3: [{ path: ["survey", "items"], label: "설문 문항" }],
-  4: [
+  3: [
+    { path: ["questionClassification", "items"], label: "질문 분류" },
+  ],
+  4: [{ path: ["survey", "items"], label: "설문 문항" }],
+  5: [
     { path: ["investigationPlan", "target"], label: "조사 대상" },
     { path: ["investigationPlan", "goalCount"], label: "목표 인원" },
     { path: ["investigationPlan", "method"], label: "조사 방법" },
     { path: ["investigationPlan", "period"], label: "조사 기간" },
   ],
-  5: [
+  6: [
     { path: ["dataCollection", "respondentCount"], label: "응답 수" },
     { path: ["dataCollection", "period"], label: "조사 기간" },
     { path: ["dataCollection", "notes"], label: "메모" },
   ],
-  6: [{ path: ["graphPlans"], label: "그래프 계획" }],
-  7: [
+  7: [{ path: ["graphPlans"], label: "그래프 계획" }],
+  8: [
     { path: ["interpretation", "fact"], label: "알게 된 점" },
     { path: ["interpretation", "highest"], label: "가장 많음" },
     { path: ["interpretation", "lowest"], label: "가장 적음" },
     { path: ["interpretation", "meaning"], label: "뜻" },
   ],
-  8: [
+  9: [
     { path: ["conclusion", "findings"], label: "중요한 발견" },
     { path: ["conclusion", "conclusion"], label: "결론" },
     { path: ["conclusion", "proposal"], label: "제안" },
   ],
-  9: [
+  10: [
     { path: ["posterRequest", "posterTitle"], label: "포스터 제목" },
     { path: ["posterRequest", "topic"], label: "주제" },
     { path: ["posterRequest", "keyData"], label: "중요한 자료" },
     { path: ["posterRequest", "conclusion"], label: "결론" },
   ],
-  10: [
+  11: [
     { path: ["posterReview", "isAccurate"], label: "자료 확인" },
     { path: ["posterReview", "titleCorrect"], label: "제목 확인" },
     { path: ["posterReview", "revisionRequests"], label: "고칠 점" },
   ],
-  11: [
+  12: [
     { path: ["presentation", "structure"], label: "발표 순서" },
     { path: ["presentation", "ready"], label: "준비" },
   ],
@@ -280,6 +284,24 @@ function buildMissionPreviewRows(mission: MissionDTO): MissionPreviewRow[] {
     }))
     .filter((row) => row.value.length > 0)
     .slice(0, 4);
+}
+
+function missionFromDashboard(
+  sectionId: string,
+  mission: DashboardTeam["missions"][number]
+): MissionDTO {
+  return {
+    id: mission.id ?? `${sectionId}-${mission.stepNumber}`,
+    sectionId: mission.sectionId ?? sectionId,
+    stepNumber: mission.stepNumber,
+    status: mission.status,
+    content: mission.content ?? {},
+    submittedAt: mission.submittedAt,
+    approvedAt: mission.approvedAt,
+    approvedBy: mission.approvedBy ?? null,
+    teacherFeedback: mission.teacherFeedback ?? null,
+    version: mission.version ?? 0,
+  };
 }
 
 function isPreviewBlank(value: unknown): boolean {
@@ -639,6 +661,15 @@ export function StatisticsBoardClient({
             sectionId={modalSectionId}
             mission={modalMission}
             isTeacher={isTeacher}
+            relatedMissions={
+              isTeacher
+                ? teams
+                    .find((team) => team.sectionId === modalSectionId)
+                    ?.missions.map((mission) =>
+                      missionFromDashboard(modalSectionId, mission)
+                    ) ?? []
+                : missions
+            }
             onUpdate={() => {
               refreshData();
               closeModal();
@@ -687,7 +718,7 @@ export function StatisticsBoardClient({
       )}
 
       <div className="columns-board">
-        {Array.from({ length: 11 }, (_, i) => i + 1).map((step) => {
+        {Array.from({ length: STATISTICS_MISSION_COUNT }, (_, i) => i + 1).map((step) => {
           const stepCards = getCardsForStep(step);
           return (
             <div key={step} className="column">

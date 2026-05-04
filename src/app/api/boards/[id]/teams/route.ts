@@ -3,6 +3,7 @@ import { db } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
 import { getCurrentStudent } from "@/lib/student-auth";
 import { getBoardRole } from "@/lib/rbac";
+import { STATISTICS_MISSION_COUNT } from "@/lib/statistics/mission-constants";
 
 export async function POST(
   req: Request,
@@ -100,7 +101,7 @@ export async function POST(
         },
       });
 
-      for (let step = 1; step <= 11; step++) {
+      for (let step = 1; step <= STATISTICS_MISSION_COUNT; step++) {
         await tx.mission.create({
           data: {
             sectionId: section.id,

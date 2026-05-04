@@ -3,6 +3,7 @@ import { db } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
 import { getCurrentStudent } from "@/lib/student-auth";
 import { viewSection } from "@/lib/rbac";
+import { ensureStatisticsMissions } from "@/lib/statistics/mission-server";
 
 export async function GET(
   req: Request,
@@ -24,32 +25,12 @@ export async function GET(
       token,
     });
 
+    await db.$transaction((tx) => ensureStatisticsMissions(tx, sectionId));
+
     const missions = await db.mission.findMany({
       where: { sectionId },
       orderBy: { stepNumber: "asc" },
     });
-
-    // If no missions exist yet, seed them idempotently
-    if (missions.length === 0) {
-      const created = await db.$transaction(async (tx) => {
-        const rows = [];
-        for (let step = 1; step <= 11; step++) {
-          rows.push(
-            tx.mission.create({
-              data: {
-                sectionId,
-                stepNumber: step,
-                status: "not_started",
-                content: {},
-                version: 0,
-              },
-            })
-          );
-        }
-        return Promise.all(rows);
-      });
-      return NextResponse.json({ missions: created });
-    }
 
     return NextResponse.json({ missions });
   } catch (e) {

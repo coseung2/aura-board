@@ -3,6 +3,7 @@ import { db } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
 import { viewSection } from "@/lib/rbac";
 import { RejectMissionSchema } from "@/lib/statistics/schemas";
+import { isValidStatisticsMissionStep } from "@/lib/statistics/mission-constants";
 import { z } from "zod";
 
 export async function POST(
@@ -12,7 +13,7 @@ export async function POST(
   try {
     const { id: sectionId, step } = await ctx.params;
     const stepNumber = parseInt(step, 10);
-    if (isNaN(stepNumber) || stepNumber < 1 || stepNumber > 11) {
+    if (!isValidStatisticsMissionStep(stepNumber)) {
       return NextResponse.json({ error: "invalid_step" }, { status: 400 });
     }
 

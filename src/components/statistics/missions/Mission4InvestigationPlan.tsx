@@ -1,15 +1,20 @@
 "use client";
 
+import { getClassifiedQuestionTexts } from "../QuestionClassificationBoard";
+
 export function Mission4InvestigationPlan({
   value,
   onChange,
   disabled,
+  sourceContent,
 }: {
   value: Record<string, unknown>;
   onChange: (v: Record<string, unknown>) => void;
   disabled: boolean;
+  sourceContent?: unknown;
 }) {
   const data = (value.investigationPlan as Record<string, unknown>) ?? {};
+  const directQuestions = getClassifiedQuestionTexts(sourceContent, "direct");
 
   const update = (field: string, newValue: unknown) => {
     onChange({ ...value, investigationPlan: { ...data, [field]: newValue } });
@@ -17,6 +22,29 @@ export function Mission4InvestigationPlan({
 
   return (
     <div className="mission-form">
+      {directQuestions.length > 0 && (
+        <section className="mission-form-card">
+          <label className="mission-form-label">직접 조사할 질문</label>
+          <p className="mission-form-helper">
+            미션 3에서 직접 세거나 관찰하기로 나눈 질문입니다. 이 질문을 기준으로
+            조사 대상과 방법을 정하세요.
+          </p>
+          <ul className="mission-reference-list">
+            {directQuestions.map((question) => (
+              <li key={question}>{question}</li>
+            ))}
+          </ul>
+          {!disabled && (
+            <button
+              className="btn-secondary"
+              onClick={() => update("directQuestions", directQuestions)}
+              type="button"
+            >
+              조사 계획에 반영
+            </button>
+          )}
+        </section>
+      )}
       <div className="form-group">
         <label>조사 대상</label>
         <textarea

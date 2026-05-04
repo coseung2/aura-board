@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import type { MissionDTO } from "./StatisticsBoardClient";
+import { STATISTICS_MISSION_COUNT } from "@/lib/statistics/mission-constants";
 
 type DashboardTeam = {
   sectionId: string;
@@ -152,11 +153,11 @@ export function TeacherDashboard({ boardId }: { boardId: string }) {
                     <td>{team.memberCount}명</td>
                     <td>미션 {team.currentStep}</td>
                     <td>
-                      {approvedCount}/11 완료
+                      {approvedCount}/{STATISTICS_MISSION_COUNT} 완료
                       <div className="progress-bar">
                         <div
                           className="progress-bar-fill"
-                          style={{ width: `${(approvedCount / 11) * 100}%` }}
+                          style={{ width: `${(approvedCount / STATISTICS_MISSION_COUNT) * 100}%` }}
                         />
                       </div>
                     </td>

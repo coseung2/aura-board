@@ -1,16 +1,21 @@
 "use client";
 
+import { getClassifiedQuestionTexts } from "../QuestionClassificationBoard";
+
 export function Mission3SurveyBuilder({
   value,
   onChange,
   disabled,
+  sourceContent,
 }: {
   value: Record<string, unknown>;
   onChange: (v: Record<string, unknown>) => void;
   disabled: boolean;
+  sourceContent?: unknown;
 }) {
   const survey = (value.survey as Record<string, unknown>) ?? {};
   const items = (survey.items as Array<Record<string, unknown>>) ?? [];
+  const surveyQuestions = getClassifiedQuestionTexts(sourceContent, "survey");
 
   const updateSurvey = (newItems: Array<Record<string, unknown>>) => {
     onChange({ ...value, survey: { ...survey, items: newItems } });
@@ -33,8 +38,42 @@ export function Mission3SurveyBuilder({
     updateSurvey(next);
   };
 
+  const importSurveyQuestions = () => {
+    updateSurvey([
+      ...items,
+      ...surveyQuestions.map((question) => ({
+        question,
+        options: ["", ""],
+        isKeyItem: false,
+      })),
+    ]);
+  };
+
   return (
     <div className="mission-form">
+      {surveyQuestions.length > 0 && (
+        <section className="mission-form-card">
+          <label className="mission-form-label">분류된 설문 질문</label>
+          <p className="mission-form-helper">
+            미션 3에서 설문으로 묻기로 나눈 질문입니다. 필요한 질문만 문항으로 다듬어
+            선택지를 붙이면 됩니다.
+          </p>
+          <ul className="mission-reference-list">
+            {surveyQuestions.map((question) => (
+              <li key={question}>{question}</li>
+            ))}
+          </ul>
+          {!disabled && (
+            <button
+              className="btn-secondary"
+              onClick={importSurveyQuestions}
+              type="button"
+            >
+              설문 문항으로 가져오기
+            </button>
+          )}
+        </section>
+      )}
       {items.map((item, index) => {
         const options = (item.options as string[]) ?? [];
         return (

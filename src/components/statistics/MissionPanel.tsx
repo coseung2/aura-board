@@ -6,6 +6,7 @@ import { MISSION_TITLES } from "./missionTitles";
 import { QuestionLadderAccordion } from "./QuestionLadderAccordion";
 import { MissionActionBar } from "./MissionActionBar";
 import { Mission1TopicCard } from "./missions/Mission1TopicCard";
+import { Mission3QuestionSorter } from "./missions/Mission3QuestionSorter";
 import { Mission3SurveyBuilder } from "./missions/Mission3SurveyBuilder";
 import { Mission4InvestigationPlan } from "./missions/Mission4InvestigationPlan";
 import { Mission5DataCollection } from "./missions/Mission5DataCollection";
@@ -24,6 +25,7 @@ export function MissionPanel({
   onUpdate,
   isSaving,
   setIsSaving,
+  relatedMissions = [],
 }: {
   boardId: string;
   sectionId: string;
@@ -32,6 +34,7 @@ export function MissionPanel({
   onUpdate: () => void;
   isSaving: boolean;
   setIsSaving: (v: boolean) => void;
+  relatedMissions?: MissionDTO[];
 }) {
   const [draft, setDraft] = useState<Record<string, unknown>>(
     () => (mission.content as Record<string, unknown>) ?? {}
@@ -108,6 +111,8 @@ export function MissionPanel({
             ? "의견이 갈리거나, 불편함이 있거나, 이유가 궁금한 생활 문제를 찾아봅시다."
             : mission.stepNumber === 2
               ? "찬성과 반대는 마지막에 생각해요. 지금은 좋은 질문을 모을 차례예요."
+              : mission.stepNumber === 3
+                ? "만든 질문을 설문으로 물을 것과 직접 조사할 것으로 나눠 봅시다."
               : "팀원들과 이야기하며 빈칸을 하나씩 채워 보세요."}
         </p>
 
@@ -124,30 +129,48 @@ export function MissionPanel({
           />
         )}
         {mission.stepNumber === 3 && (
-          <Mission3SurveyBuilder value={draft} onChange={setDraft} disabled={!canEdit} />
+          <Mission3QuestionSorter
+            value={draft}
+            onChange={setDraft}
+            disabled={!canEdit}
+            sourceContent={relatedMissions.find((item) => item.stepNumber === 2)?.content}
+          />
         )}
         {mission.stepNumber === 4 && (
-          <Mission4InvestigationPlan value={draft} onChange={setDraft} disabled={!canEdit} />
+          <Mission3SurveyBuilder
+            value={draft}
+            onChange={setDraft}
+            disabled={!canEdit}
+            sourceContent={relatedMissions.find((item) => item.stepNumber === 3)?.content}
+          />
         )}
         {mission.stepNumber === 5 && (
-          <Mission5DataCollection value={draft} onChange={setDraft} disabled={!canEdit} />
+          <Mission4InvestigationPlan
+            value={draft}
+            onChange={setDraft}
+            disabled={!canEdit}
+            sourceContent={relatedMissions.find((item) => item.stepNumber === 3)?.content}
+          />
         )}
         {mission.stepNumber === 6 && (
-          <Mission6GraphPlanner value={draft} onChange={setDraft} disabled={!canEdit} />
+          <Mission5DataCollection value={draft} onChange={setDraft} disabled={!canEdit} />
         )}
         {mission.stepNumber === 7 && (
-          <Mission7ResultInterpreter value={draft} onChange={setDraft} disabled={!canEdit} />
+          <Mission6GraphPlanner value={draft} onChange={setDraft} disabled={!canEdit} />
         )}
         {mission.stepNumber === 8 && (
-          <Mission8ConclusionWriter value={draft} onChange={setDraft} disabled={!canEdit} />
+          <Mission7ResultInterpreter value={draft} onChange={setDraft} disabled={!canEdit} />
         )}
         {mission.stepNumber === 9 && (
-          <Mission9PosterRequest value={draft} onChange={setDraft} disabled={!canEdit} />
+          <Mission8ConclusionWriter value={draft} onChange={setDraft} disabled={!canEdit} />
         )}
         {mission.stepNumber === 10 && (
-          <Mission10PosterReview value={draft} onChange={setDraft} disabled={!canEdit} />
+          <Mission9PosterRequest value={draft} onChange={setDraft} disabled={!canEdit} />
         )}
         {mission.stepNumber === 11 && (
+          <Mission10PosterReview value={draft} onChange={setDraft} disabled={!canEdit} />
+        )}
+        {mission.stepNumber === 12 && (
           <Mission11PresentationPrep value={draft} onChange={setDraft} disabled={!canEdit} />
         )}
 
