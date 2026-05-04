@@ -558,6 +558,13 @@
   box-shadow: var(--shadow-lift);
 }
 
+.card-detail-modal > .card-detail-close.card-detail-close {
+  position: absolute;
+  top: 20px;
+  right: 20px;
+  z-index: 5;
+}
+
 .modal-tabs {
   display: flex;
   gap: 4px;
