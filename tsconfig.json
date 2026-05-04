@@ -38,6 +38,14 @@
   ],
   "exclude": [
     "node_modules",
-    "apps/**"
+    "apps/**",
+    ".agents/**",
+    ".claude/**",
+    "browser-profile/**",
+    "memory/**",
+    "screenshots/**",
+    "skills/**",
+    "skills_ref/**",
+    "uploads/**"
   ]
 }
