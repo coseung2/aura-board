@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { MissionPanel } from "./MissionPanel";
+import { StatisticsTeacherDashboard } from "./StatisticsTeacherDashboard";
 import { StatisticsTeamInviteButton } from "./StatisticsTeamInviteButton";
 import { useMissionsSSE } from "./useMissionsSSE";
 import { MISSION_TITLES } from "./missionTitles";
@@ -46,7 +47,7 @@ export type StatisticsBoardClientProps = {
   rosterStudents: RosterStudentDTO[];
 };
 
-type DashboardTeam = {
+export type DashboardTeam = {
   sectionId: string;
   teamName: string;
   memberCount: number;
@@ -610,6 +611,57 @@ export function StatisticsBoardClient({
     );
   }
 
+  const modal = modalMission && modalSectionId && (
+    <>
+      <div className="modal-backdrop" onClick={closeModal} />
+      <div
+        className="add-card-modal mission-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-label={`${modalTeamName} ${MISSION_TITLES[modalMission.stepNumber]}`}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <button
+          type="button"
+          className="modal-close"
+          onClick={closeModal}
+          aria-label="닫기"
+        >
+          ×
+        </button>
+        <div className="mission-modal-body">
+          <MissionPanel
+            boardId={boardId}
+            sectionId={modalSectionId}
+            mission={modalMission}
+            isTeacher={isTeacher}
+            onUpdate={() => {
+              refreshData();
+              closeModal();
+            }}
+            isSaving={isSaving}
+            setIsSaving={setIsSaving}
+          />
+        </div>
+      </div>
+    </>
+  );
+
+  if (isTeacher) {
+    return (
+      <div className="statistics-board statistics-teacher-dashboard">
+        <StatisticsTeacherDashboard
+          teams={teams}
+          actioning={actioning}
+          onApprove={approve}
+          onReject={reject}
+          onOpenMission={openMissionModal}
+        />
+        {modal}
+      </div>
+    );
+  }
+
   return (
     <div className="statistics-board columns-board">
       {!isTeacher && sectionId && (
@@ -737,41 +789,7 @@ export function StatisticsBoardClient({
         })}
       </div>
 
-      {modalMission && modalSectionId && (
-        <>
-          <div className="modal-backdrop" onClick={closeModal} />
-          <div
-            className="add-card-modal mission-modal"
-            role="dialog"
-            aria-modal="true"
-            aria-label={`${modalTeamName} ${MISSION_TITLES[modalMission.stepNumber]}`}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <button
-              type="button"
-              className="modal-close"
-              onClick={closeModal}
-              aria-label="닫기"
-            >
-              ×
-            </button>
-            <div className="mission-modal-body">
-              <MissionPanel
-                boardId={boardId}
-                sectionId={modalSectionId}
-                mission={modalMission}
-                isTeacher={isTeacher}
-                onUpdate={() => {
-                  refreshData();
-                  closeModal();
-                }}
-                isSaving={isSaving}
-                setIsSaving={setIsSaving}
-              />
-            </div>
-          </div>
-        </>
-      )}
+      {modal}
     </div>
   );
 }
