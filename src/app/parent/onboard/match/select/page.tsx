@@ -60,7 +60,7 @@ function MatchSelectPage() {
       else setErr("신청에 실패했습니다");
       return;
     }
-    router.push("/parent/onboard/pending");
+    router.push("/parent/home");
   };
 
   return (

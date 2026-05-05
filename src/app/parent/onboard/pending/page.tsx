@@ -4,9 +4,9 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { OnboardingShell } from "../_shell";
 
-// parent-class-invite-v2 — P5 Pending.
-// Polls session/status every 30s; on state change (active | rejected | revoked)
-// routes to the matching page.
+// parent-class-invite-v2 — legacy P5 Pending URL.
+// Pending state now lives inside /parent/home so the bottom nav and dashboard
+// remain visible.
 
 export default function PendingPage() {
   const router = useRouter();
@@ -22,8 +22,8 @@ export default function PendingPage() {
         const j = await r.json();
         if (cancelled) return;
         setStatus(j.state);
-        if (j.state === "active") {
-          setTimeout(() => router.push("/parent/home"), 1500);
+        if (j.state === "active" || j.state === "pending") {
+          router.replace("/parent/home");
         } else if (j.state === "rejected") {
           router.push(`/parent/onboard/rejected?reason=${encodeURIComponent(j.rejectedReason ?? "other")}`);
         } else if (j.state === "anonymous" || j.state === "authed_prematch") {

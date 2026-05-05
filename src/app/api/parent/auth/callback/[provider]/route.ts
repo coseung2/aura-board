@@ -20,7 +20,7 @@ export const runtime = "nodejs";
 //   3) provider user info fetch
 //   4) upsertParentFromOAuth → parentId
 //   5) createParentSession (cookie set)
-//   6) 302 — 활성 자녀 link 있으면 /parent/home, 없으면 onboard/match/code
+//   6) 302 — 활성/대기 link 있으면 /parent/home, 없으면 onboard/match/code
 function errRedirect(req: Request, code: string) {
   // 학부모 OAuth 에러는 진입점(/parent/onboard/signup) 으로 되돌림.
   // /parent/auth 는 page.tsx 가 없는 디렉토리(callback route handler 만 존재).
@@ -107,16 +107,21 @@ export async function GET(
     ipHash: null,
   });
 
-  // redirect 분기 — 활성 자녀 link 있으면 home, 없으면 onboard
+  // redirect 분기 — 활성/대기 자녀 link 있으면 dashboard, 없으면 onboard
   const links = await db.parentChildLink.findMany({
     where: {
       parentId: result.parentId,
-      status: "active",
       deletedAt: null,
     },
-    select: { id: true },
-    take: 1,
+    select: { status: true, rejectedReason: true },
   });
-  const dest = links.length > 0 ? "/parent/home" : "/parent/onboard/match/code";
+  let dest = "/parent/onboard/match/code";
+  if (links.some((link) => link.status === "active" || link.status === "pending")) {
+    dest = "/parent/home";
+  } else if (links.some((link) => link.status === "rejected")) {
+    const rejected = links.find((link) => link.status === "rejected");
+    const reason = rejected?.rejectedReason ?? "other";
+    dest = `/parent/onboard/rejected?reason=${encodeURIComponent(reason)}`;
+  }
   return NextResponse.redirect(new URL(dest, req.url));
 }

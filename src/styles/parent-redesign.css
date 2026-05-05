@@ -158,3 +158,162 @@
   color: var(--color-accent);
   font-weight: 600;
 }
+
+/* ── 학부모 대시보드 승인 대기 패널 ── */
+.parent-pending-panel {
+  margin: 16px auto 0;
+  padding: 20px;
+  max-width: 720px;
+  border: 1px solid var(--color-border);
+  border-radius: 16px;
+  background:
+    linear-gradient(135deg, rgba(255, 247, 237, 0.92), rgba(236, 253, 245, 0.92)),
+    var(--color-surface);
+  color: var(--color-text);
+  box-shadow: 0 10px 30px rgba(15, 23, 42, 0.08);
+}
+.parent-pending-panel.is-compact {
+  margin: 12px 0 18px;
+  max-width: none;
+}
+.parent-pending-panel-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+.parent-pending-kicker {
+  margin: 0 0 4px;
+  color: var(--color-accent);
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0;
+}
+.parent-pending-panel h2 {
+  margin: 0;
+  font-size: 1.18rem;
+  line-height: 1.25;
+}
+.parent-pending-help {
+  margin: 10px 0 16px;
+  color: var(--color-text-muted);
+  font-size: 0.92rem;
+  line-height: 1.55;
+}
+.parent-pending-add {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 40px;
+  padding: 0 14px;
+  border-radius: 999px;
+  background: var(--color-accent);
+  color: #fff;
+  font-size: 0.9rem;
+  font-weight: 700;
+  text-decoration: none;
+}
+.parent-pending-add:hover {
+  background: var(--color-accent-active);
+}
+.parent-pending-list {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.parent-pending-item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px 16px;
+  align-items: center;
+  padding: 14px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.84);
+  border: 1px solid rgba(15, 23, 42, 0.08);
+}
+.parent-pending-main {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 8px;
+  min-width: 0;
+}
+.parent-pending-main strong {
+  font-size: 0.98rem;
+}
+.parent-pending-main span:last-child {
+  color: var(--color-text-muted);
+  font-size: 0.86rem;
+}
+.parent-pending-status {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  padding: 0 9px;
+  border-radius: 999px;
+  background: var(--color-warning-bg, #fff7ed);
+  color: var(--color-warning-text, #9a3412);
+  font-size: 0.76rem;
+  font-weight: 800;
+}
+.parent-pending-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  grid-column: 1 / 2;
+  color: var(--color-text-muted);
+  font-size: 0.78rem;
+}
+.parent-pending-cancel {
+  grid-column: 2 / 3;
+  grid-row: 1 / span 2;
+  min-height: 36px;
+  padding: 0 12px;
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  background: var(--color-surface);
+  color: var(--color-text);
+  font-size: 0.82rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+.parent-pending-cancel:hover:not(:disabled) {
+  border-color: var(--color-border-hover);
+  background: var(--color-surface-alt);
+}
+.parent-pending-cancel:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+.parent-pending-error {
+  margin: 12px 0 0;
+  color: var(--color-danger);
+  font-size: 0.82rem;
+}
+
+@media (max-width: 640px) {
+  .parent-pending-panel {
+    margin-top: 12px;
+    padding: 16px;
+    border-radius: 14px;
+  }
+  .parent-pending-panel-head,
+  .parent-pending-item {
+    grid-template-columns: 1fr;
+  }
+  .parent-pending-panel-head {
+    display: grid;
+  }
+  .parent-pending-add,
+  .parent-pending-cancel {
+    width: 100%;
+  }
+  .parent-pending-meta,
+  .parent-pending-cancel {
+    grid-column: auto;
+    grid-row: auto;
+  }
+}

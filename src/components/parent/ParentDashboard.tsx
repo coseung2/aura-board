@@ -4,17 +4,23 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { ParentChildSelector, type ChildRow } from "./ParentChildSelector";
 import { ParentPortfolioView } from "../portfolio/ParentPortfolioView";
+import { ParentPendingLinks, type ParentPendingLink } from "./ParentPendingLinks";
 
 type Props = {
   children: ChildRow[];
   initialSelectedId: string;
+  pendingLinks?: ParentPendingLink[];
 };
 
 // parent-redesign (2026-04-26): 풀폭 헤더 + 자녀 셀렉터 + portfolio 본문.
 // DJ 보드 헤더 패턴 일관. 자녀 선택 변경 시 URL ?child=ID 로 보존.
 const LS_KEY = "parent-dashboard-last-child";
 
-export function ParentDashboard({ children: childRows, initialSelectedId }: Props) {
+export function ParentDashboard({
+  children: childRows,
+  initialSelectedId,
+  pendingLinks = [],
+}: Props) {
   const [selectedId, setSelectedId] = useState(initialSelectedId);
 
   // localStorage 로 마지막 선택 자녀 복원 (URL 미설정 시) — 초기값에서 한 번만.
@@ -67,6 +73,8 @@ export function ParentDashboard({ children: childRows, initialSelectedId }: Prop
           </Link>
         </div>
       </header>
+
+      <ParentPendingLinks links={pendingLinks} compact />
 
       {selected ? (
         <ParentPortfolioView
