@@ -92,11 +92,9 @@ export function ParentChildSelector({
                     onSelect(c.studentId);
                   }}
                 >
-                  {isSelected && (
-                    <span className="parent-child-dropdown-check" aria-hidden>
-                      🟢
-                    </span>
-                  )}
+                  <span className="parent-child-dropdown-check" aria-hidden>
+                    {isSelected ? "●" : ""}
+                  </span>
                   <span className="parent-child-dropdown-name">
                     {c.studentName}
                   </span>

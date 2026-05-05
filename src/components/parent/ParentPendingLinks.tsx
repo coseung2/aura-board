@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
@@ -54,9 +53,6 @@ export function ParentPendingLinks({ links, compact = false }: Props) {
           <p className="parent-pending-kicker">승인 대기</p>
           <h2>선생님 승인을 기다리고 있어요</h2>
         </div>
-        <Link href="/parent/onboard/match/code" className="parent-pending-add">
-          자녀 추가
-        </Link>
       </div>
       <p className="parent-pending-help">
         승인 전에도 신청 상태를 여기서 확인할 수 있습니다. 잘못 신청했다면 취소하고 다시 연결하세요.

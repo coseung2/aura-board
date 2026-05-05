@@ -4,10 +4,7 @@
   display: flex;
   flex: 1;
   min-height: 0;
-  background:
-    radial-gradient(circle at 8% 6%, rgba(255, 241, 189, 0.9), transparent 28rem),
-    radial-gradient(circle at 92% 14%, rgba(223, 246, 233, 0.9), transparent 26rem),
-    linear-gradient(180deg, #fbfef9 0%, var(--color-bg) 58%);
+  background: #fff;
 }
 
 .statistics-sidebar {

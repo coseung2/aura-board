@@ -136,7 +136,12 @@
   color: var(--color-accent-tinted-text);
 }
 .parent-child-dropdown-check {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
   font-size: 0.7rem;
+  color: var(--color-success-text, var(--color-accent));
 }
 .parent-child-dropdown-name {
   font-weight: 600;
@@ -199,23 +204,6 @@
   color: var(--color-text-muted);
   font-size: 0.92rem;
   line-height: 1.55;
-}
-.parent-pending-add {
-  flex: 0 0 auto;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 40px;
-  padding: 0 14px;
-  border-radius: 999px;
-  background: var(--color-accent);
-  color: #fff;
-  font-size: 0.9rem;
-  font-weight: 700;
-  text-decoration: none;
-}
-.parent-pending-add:hover {
-  background: var(--color-accent-active);
 }
 .parent-pending-list {
   display: grid;
@@ -307,7 +295,6 @@
   .parent-pending-panel-head {
     display: grid;
   }
-  .parent-pending-add,
   .parent-pending-cancel {
     width: 100%;
   }
