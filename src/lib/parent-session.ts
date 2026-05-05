@@ -19,6 +19,7 @@ import { db } from "./db";
 const COOKIE_NAME = "parent_session";
 const MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
 const MAX_AGE_S = Math.floor(MAX_AGE_MS / 1000);
+const LAST_SEEN_TOUCH_MS = 5 * 60 * 1000;
 
 function generateSessionToken(): string {
   return randomBytes(32).toString("base64url");
@@ -92,11 +93,14 @@ export async function getCurrentParent() {
   if (session.expiresAt <= now) return null;
   if (session.parent.parentDeletedAt) return null;
 
-  // Best-effort lastSeenAt bump. Fire-and-forget so request latency is
-  // unaffected by the occasional DB hiccup.
-  void db.parentSession
-    .update({ where: { id: session.id }, data: { lastSeenAt: now } })
-    .catch(() => undefined);
+  // Best-effort lastSeenAt bump. Keep it sequential and throttled so a
+  // serverless Prisma pool with connection_limit=1 does not run two queries
+  // concurrently in the same request.
+  if (!session.lastSeenAt || now.getTime() - session.lastSeenAt.getTime() > LAST_SEEN_TOUCH_MS) {
+    await db.parentSession
+      .update({ where: { id: session.id }, data: { lastSeenAt: now } })
+      .catch(() => undefined);
+  }
 
   return { parent: session.parent, session };
 }
