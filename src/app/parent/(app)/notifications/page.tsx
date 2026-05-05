@@ -27,8 +27,7 @@ export default function ParentNotificationsPage() {
           lineHeight: 1.5,
         }}
       >
-        주간 활동 요약과 교사 공지가 이곳에 표시됩니다. Pro 요금제에서는 매주 월요일
-        오전 9시(KST) 이메일도 받아보실 수 있습니다.
+        주간 활동 요약과 교사 공지가 이곳에 표시됩니다.
       </div>
     </main>
   );

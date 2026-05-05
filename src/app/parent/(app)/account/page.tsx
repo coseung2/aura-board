@@ -1,8 +1,8 @@
 import Link from "next/link";
 import { getCurrentParent } from "@/lib/parent-session";
 
-// Account overview (PV-11 entry). Shows tier, email, and a deep link to the
-// withdraw confirm flow. Session guarantee comes from the (app) layout.
+// Account overview (PV-11 entry). Parent accounts are viewer-only, so this
+// page shows identity details and the withdraw confirm flow only.
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -32,7 +32,6 @@ export default async function ParentAccountPage() {
       >
         <Row label="이름" value={p.name} />
         <Row label="이메일" value={p.email} />
-        <Row label="요금제" value={p.tier === "pro" ? "Pro" : "Free"} />
       </section>
 
       <div style={{ marginTop: 24 }}>

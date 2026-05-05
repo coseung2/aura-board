@@ -14,7 +14,7 @@ interface LinkRow {
   id: string;
   createdAt: string;
   student: { id: string; name: string; number: number | null };
-  parent: { id: string; name: string; email: string; tier: string };
+  parent: { id: string; name: string; email: string };
   lastSeenAt: string | null;
 }
 
@@ -152,8 +152,7 @@ export function ParentManagementTab({ classroomId }: { classroomId: string }) {
                   marginTop: 2,
                 }}
               >
-                {row.parent.email} · {row.parent.tier === "pro" ? "Pro" : "Free"} ·{" "}
-                {formatLastSeen(row.lastSeenAt)}
+                {row.parent.email} · {formatLastSeen(row.lastSeenAt)}
               </div>
             </div>
             <button
