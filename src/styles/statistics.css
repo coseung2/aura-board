@@ -194,7 +194,7 @@
   padding: 20px 20px 20px 92px;
   border: 2px solid rgba(22, 131, 199, 0.18);
   border-radius: 22px;
-  background: #fff;
+  background: var(--color-accent-tinted-bg);
   box-shadow: 0 10px 24px rgba(24, 74, 92, 0.06);
 }
 
@@ -210,8 +210,8 @@
   display: grid;
   place-items: center;
   border-radius: 18px;
-  background: #fff;
-  color: var(--color-accent-tinted-text);
+  background: var(--color-accent);
+  color: #fff;
   font-size: 26px;
   font-weight: 900;
   line-height: 1;
@@ -221,37 +221,37 @@
 .mission-form-card:nth-child(2n),
 .mission-form .form-group:nth-child(2n) {
   border-color: rgba(76, 175, 80, 0.22);
-  background: #fff;
+  background: var(--color-learning-mint);
 }
 
 .mission-form-card:nth-child(2n)::before,
 .mission-form .form-group:nth-child(2n)::before {
-  background: #fff;
-  color: var(--color-accent-tinted-text);
+  background: var(--color-plant-active);
+  color: #fff;
 }
 
 .mission-form-card:nth-child(3n),
 .mission-form .form-group:nth-child(3n) {
   border-color: rgba(167, 102, 220, 0.22);
-  background: #fff;
+  background: var(--color-learning-lavender);
 }
 
 .mission-form-card:nth-child(3n)::before,
 .mission-form .form-group:nth-child(3n)::before {
-  background: #fff;
-  color: var(--color-accent-tinted-text);
+  background: #7a43c7;
+  color: #fff;
 }
 
 .mission-form-card:nth-child(4n),
 .mission-form .form-group:nth-child(4n) {
   border-color: rgba(244, 180, 54, 0.28);
-  background: #fff;
+  background: var(--color-learning-sun);
 }
 
 .mission-form-card:nth-child(4n)::before,
 .mission-form .form-group:nth-child(4n)::before {
-  background: #fff;
-  color: var(--color-accent-tinted-text);
+  background: var(--color-warning);
+  color: #fff;
 }
 
 .mission-form-card:focus-within,
@@ -262,8 +262,8 @@
 
 .mission-form-card:focus-within::before,
 .mission-form .form-group:focus-within::before {
-  background: #fff;
-  color: var(--color-accent-tinted-text);
+  background: var(--color-accent);
+  color: #fff;
 }
 .mission-form-label,
 .mission-form .form-group > label,
@@ -1437,8 +1437,8 @@ button:disabled {
 
 .mission-modal-step.is-current .mission-modal-step-num {
   border-color: rgba(22, 131, 199, 0.36);
-  background: #fff;
-  color: var(--color-accent-tinted-text);
+  background: var(--color-accent);
+  color: #fff;
   box-shadow: 0 8px 18px rgba(22, 131, 199, 0.24);
 }
 
