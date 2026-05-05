@@ -1,5 +1,7 @@
 import Link from "next/link";
+import { db } from "@/lib/db";
 import { getCurrentParent } from "@/lib/parent-session";
+import { ParentAccountActions, type ParentAccountLink } from "@/components/parent/ParentAccountActions";
 
 // Account overview (PV-11 entry). Parent accounts are viewer-only, so this
 // page shows identity details and the withdraw confirm flow only.
@@ -10,6 +12,34 @@ export const runtime = "nodejs";
 export default async function ParentAccountPage() {
   const current = (await getCurrentParent())!;
   const p = current.parent;
+  const links = await db.parentChildLink.findMany({
+    where: {
+      parentId: p.id,
+      status: { in: ["pending", "active"] },
+      deletedAt: null,
+    },
+    select: {
+      id: true,
+      status: true,
+      student: {
+        select: {
+          name: true,
+          number: true,
+          classroom: { select: { name: true } },
+        },
+      },
+    },
+    orderBy: [{ status: "asc" }, { requestedAt: "desc" }],
+  });
+  const accountLinks: ParentAccountLink[] = links
+    .filter((link) => link.status === "pending" || link.status === "active")
+    .map((link) => ({
+      id: link.id,
+      status: link.status === "pending" ? "pending" : "active",
+      studentName: link.student.name,
+      studentNumber: link.student.number,
+      classroomName: link.student.classroom.name,
+    }));
 
   return (
     <main
@@ -33,6 +63,8 @@ export default async function ParentAccountPage() {
         <Row label="이름" value={p.name} />
         <Row label="이메일" value={p.email} />
       </section>
+
+      <ParentAccountActions initialLinks={accountLinks} />
 
       <div style={{ marginTop: 24 }}>
         <Link

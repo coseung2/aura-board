@@ -10,7 +10,15 @@ import { ParentAuthButtons } from "@/components/parent/ParentAuthButtons";
 
 export const dynamic = "force-static";
 
-export default function ParentLoggedOutPage() {
+export default async function ParentLoggedOutPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ logout?: string; withdrawn?: string }>;
+}) {
+  const params = await searchParams;
+  const isLogout = params.logout === "1";
+  const isWithdrawn = params.withdrawn === "1";
+
   return (
     <main
       style={{
@@ -25,7 +33,9 @@ export default function ParentLoggedOutPage() {
       <div aria-hidden style={{ fontSize: 44, marginBottom: 16 }}>
         {"\u{1F512}"}
       </div>
-      <h1 style={{ fontSize: 20, margin: 0 }}>접근이 해제되었습니다</h1>
+      <h1 style={{ fontSize: 20, margin: 0 }}>
+        {isLogout ? "로그아웃되었습니다" : isWithdrawn ? "탈퇴가 완료되었습니다" : "접근이 해제되었습니다"}
+      </h1>
       <p
         style={{
           fontSize: 14,
@@ -35,7 +45,11 @@ export default function ParentLoggedOutPage() {
           lineHeight: 1.5,
         }}
       >
-        교사가 연결을 해제했거나 세션이 만료되었습니다. 다시 로그인해 주세요.
+        {isLogout
+          ? "다시 이용하려면 학부모 계정으로 로그인해 주세요."
+          : isWithdrawn
+            ? "개인정보는 정책에 따라 일정 기간 후 익명화됩니다."
+            : "교사가 연결을 해제했거나 세션이 만료되었습니다. 다시 로그인해 주세요."}
       </p>
       <ParentAuthButtons />
     </main>

@@ -152,7 +152,8 @@ export function ClassroomBoardsTab({ classroomId, linkedBoards, allBoards }: Pro
                   </span>
                   {isNew && (
                     <span className="classroom-board-new" title="마지막 방문 이후 새 활동">
-                      🟢 새 활동
+                      <span className="classroom-board-new-dot" aria-hidden />
+                      <span>새 활동</span>
                     </span>
                   )}
                 </button>
