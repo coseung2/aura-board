@@ -194,8 +194,7 @@
   padding: 20px 20px 20px 92px;
   border: 2px solid rgba(22, 131, 199, 0.18);
   border-radius: 22px;
-  background:
-    linear-gradient(135deg, rgba(233, 247, 255, 0.88), rgba(255, 255, 255, 0.96));
+  background: #fff;
   box-shadow: 0 10px 24px rgba(24, 74, 92, 0.06);
 }
 
@@ -211,8 +210,8 @@
   display: grid;
   place-items: center;
   border-radius: 18px;
-  background: linear-gradient(135deg, #36a7f5, #0d6cc2);
-  color: #fff;
+  background: #fff;
+  color: var(--color-accent-tinted-text);
   font-size: 26px;
   font-weight: 900;
   line-height: 1;
@@ -222,40 +221,37 @@
 .mission-form-card:nth-child(2n),
 .mission-form .form-group:nth-child(2n) {
   border-color: rgba(76, 175, 80, 0.22);
-  background:
-    linear-gradient(135deg, rgba(223, 246, 233, 0.9), rgba(255, 255, 255, 0.96));
+  background: #fff;
 }
 
 .mission-form-card:nth-child(2n)::before,
 .mission-form .form-group:nth-child(2n)::before {
-  background: linear-gradient(135deg, #82cf52, #2f9b3d);
-  color: #fff;
+  background: #fff;
+  color: var(--color-accent-tinted-text);
 }
 
 .mission-form-card:nth-child(3n),
 .mission-form .form-group:nth-child(3n) {
   border-color: rgba(167, 102, 220, 0.22);
-  background:
-    linear-gradient(135deg, rgba(237, 233, 255, 0.9), rgba(255, 255, 255, 0.96));
+  background: #fff;
 }
 
 .mission-form-card:nth-child(3n)::before,
 .mission-form .form-group:nth-child(3n)::before {
-  background: linear-gradient(135deg, #b578e8, #7a43c7);
-  color: #fff;
+  background: #fff;
+  color: var(--color-accent-tinted-text);
 }
 
 .mission-form-card:nth-child(4n),
 .mission-form .form-group:nth-child(4n) {
   border-color: rgba(244, 180, 54, 0.28);
-  background:
-    linear-gradient(135deg, rgba(255, 241, 189, 0.92), rgba(255, 255, 255, 0.96));
+  background: #fff;
 }
 
 .mission-form-card:nth-child(4n)::before,
 .mission-form .form-group:nth-child(4n)::before {
-  background: linear-gradient(135deg, #ffc84d, #ec8b22);
-  color: #fff;
+  background: #fff;
+  color: var(--color-accent-tinted-text);
 }
 
 .mission-form-card:focus-within,
@@ -266,8 +262,8 @@
 
 .mission-form-card:focus-within::before,
 .mission-form .form-group:focus-within::before {
-  background: linear-gradient(135deg, #36a7f5, #0d6cc2);
-  color: #fff;
+  background: #fff;
+  color: var(--color-accent-tinted-text);
 }
 .mission-form-label,
 .mission-form .form-group > label,
@@ -1188,9 +1184,7 @@ button:disabled {
   padding: 12px;
   border: 1px solid rgba(24, 74, 92, 0.1);
   border-radius: 16px;
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.68), rgba(255, 255, 255, 0.38)),
-    var(--color-surface);
+  background: #fff;
 }
 
 .statistics-mission-card:hover {
@@ -1295,9 +1289,7 @@ button:disabled {
   padding: 0;
   border: 2px solid rgba(22, 131, 199, 0.24);
   border-radius: 24px;
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(249, 253, 248, 0.98)),
-    var(--color-surface);
+  background: #fff;
   box-shadow: 0 24px 80px rgba(0, 0, 0, 0.18), 0 8px 24px rgba(0, 0, 0, 0.1);
 }
 
@@ -1445,8 +1437,8 @@ button:disabled {
 
 .mission-modal-step.is-current .mission-modal-step-num {
   border-color: rgba(22, 131, 199, 0.36);
-  background: linear-gradient(135deg, #36a7f5, #0d6cc2);
-  color: #fff;
+  background: #fff;
+  color: var(--color-accent-tinted-text);
   box-shadow: 0 8px 18px rgba(22, 131, 199, 0.24);
 }
 

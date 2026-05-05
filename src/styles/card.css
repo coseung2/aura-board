@@ -590,20 +590,12 @@
   justify-content: center;
   gap: 8px;
   cursor: pointer;
-  color: #fff;
-  background: linear-gradient(
-    180deg,
-    rgba(0, 0, 0, 0.05) 0%,
-    rgba(0, 0, 0, 0.45) 100%
-  );
+  color: var(--color-text);
+  background: #fff;
   transition: background 150ms ease;
 }
 .card-canva-slot-activate-overlay:hover {
-  background: linear-gradient(
-    180deg,
-    rgba(0, 0, 0, 0.15) 0%,
-    rgba(0, 0, 0, 0.55) 100%
-  );
+  background: #fff;
 }
 .card-canva-slot-activate-overlay:focus-visible {
   outline: 3px solid var(--color-accent, #3b82f6);
@@ -811,8 +803,8 @@
    gradient with a centred label. Replaced by the real iframe the
    moment it loads. */
 .card-canva-slot-placeholder {
-  background: linear-gradient(135deg, #00c4cc 0%, #7d2ae8 100%);
-  color: #fff;
+  background: #fff;
+  color: var(--color-text);
   display: flex;
   align-items: center;
   justify-content: center;

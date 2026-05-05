@@ -343,12 +343,7 @@
 .portfolio-card-skeleton {
   height: 200px;
   border-radius: 8px;
-  background: linear-gradient(
-    90deg,
-    var(--color-surface-alt) 25%,
-    var(--color-bg) 50%,
-    var(--color-surface-alt) 75%
-  );
+  background: #fff;
   background-size: 200% 100%;
   animation: portfolio-skeleton-shimmer 1.6s ease-in-out infinite;
 }
@@ -460,11 +455,7 @@
 .showcase-strip {
   margin: 20px 0;
   padding: 18px 4px 14px;
-  background: linear-gradient(
-    180deg,
-    color-mix(in srgb, var(--color-warning, #f59e0b) 5%, var(--color-surface)) 0%,
-    var(--color-surface) 100%
-  );
+  background: #fff;
   border: 1px solid var(--color-border);
   border-radius: 14px;
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.04);

@@ -7,10 +7,7 @@
   min-height: 0;
   overflow: hidden;
   padding: 18px 24px 24px;
-  background:
-    radial-gradient(circle at 4% 10%, rgba(255, 241, 189, 0.85), transparent 24rem),
-    radial-gradient(circle at 95% 6%, rgba(223, 246, 233, 0.9), transparent 25rem),
-    var(--color-bg);
+  background: #fff;
 }
 
 .teacher-overview {

@@ -28,7 +28,7 @@ img.emoji {
 
 :root {
   /* Colors — Warm neutral palette (Notion DESIGN.md) */
-  --color-bg: #f7fbf5;
+  --color-bg: #ffffff;
   --color-bg-alt: #ffffff;
   --color-surface: #ffffff;
   --color-surface-alt: rgba(24, 74, 92, 0.07);
@@ -189,10 +189,7 @@ body {
   font-weight: 400;
   line-height: 1.5;
   color: var(--color-text);
-  background:
-    radial-gradient(circle at 12% 8%, rgba(255, 241, 189, 0.65), transparent 28rem),
-    radial-gradient(circle at 88% 16%, rgba(223, 246, 233, 0.72), transparent 26rem),
-    var(--color-bg);
+  background: #fff;
   -webkit-font-smoothing: antialiased;
   font-feature-settings: "kern", "liga";
 }

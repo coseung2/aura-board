@@ -617,17 +617,17 @@
 
 .quiz-podium-bar-1 {
   height: 120px;
-  background: linear-gradient(180deg, #ffd700, #f0c000);
+  background: #fff;
 }
 
 .quiz-podium-bar-2 {
   height: 90px;
-  background: linear-gradient(180deg, #c0c0c0, #a8a8a8);
+  background: #fff;
 }
 
 .quiz-podium-bar-3 {
   height: 70px;
-  background: linear-gradient(180deg, #cd7f32, #b87333);
+  background: #fff;
 }
 
 .quiz-podium-name {

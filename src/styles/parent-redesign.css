@@ -171,9 +171,7 @@
   max-width: 720px;
   border: 1px solid var(--color-border);
   border-radius: 16px;
-  background:
-    linear-gradient(135deg, rgba(255, 247, 237, 0.92), rgba(236, 253, 245, 0.92)),
-    var(--color-surface);
+  background: #fff;
   color: var(--color-text);
   box-shadow: 0 10px 30px rgba(15, 23, 42, 0.08);
 }
