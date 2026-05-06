@@ -18,10 +18,8 @@ type Options = {
   setSections: React.Dispatch<React.SetStateAction<StreamSection[]>>;
 };
 
-/** Subscribes to /api/boards/:id/stream and merges snapshot payloads into
- *  local state. Card merges respect pendingCardIds — an optimistic mutation
- *  in flight keeps the local copy until it settles. Section snapshots are
- *  authoritative (section mutations go through dedicated panels). */
+const SNAPSHOT_POLL_MS = 15_000;
+
 export function useBoardStream({
   boardId,
   pendingCardIds,
@@ -29,23 +27,57 @@ export function useBoardStream({
   setSections,
 }: Options) {
   useEffect(() => {
-    const es = new EventSource(`/api/boards/${boardId}/stream`);
+    let retryTimer: ReturnType<typeof setTimeout> | null = null;
+    let stopped = false;
+    let retryCount = 0;
+    let lastHash = "";
 
-    function onSnapshot(ev: MessageEvent) {
-      try {
-        const data = JSON.parse(ev.data) as {
-          cards: CardData[];
-          sections: StreamSection[];
-        };
-        mergeCards(data.cards);
-        mergeSections(data.sections);
-      } catch (e) {
-        console.error("[board stream snapshot]", e);
-      }
+    function schedulePoll(delayMs?: number) {
+      if (stopped || retryTimer) return;
+      const backoff = Math.min(60_000, 5_000 * 2 ** retryCount);
+      retryTimer = setTimeout(() => {
+        retryTimer = null;
+        poll();
+      }, delayMs ?? backoff);
     }
 
-    function onForbidden() {
-      es.close();
+    async function poll() {
+      if (stopped) return;
+      try {
+        const qs = lastHash ? `?hash=${encodeURIComponent(lastHash)}` : "";
+        const res = await fetch(`/api/boards/${boardId}/snapshot${qs}`, {
+          cache: "no-store",
+        });
+        if (res.status === 304) {
+          retryCount = 0;
+          schedulePoll(SNAPSHOT_POLL_MS);
+          return;
+        }
+        if (res.status === 401 || res.status === 403) {
+          stopped = true;
+          return;
+        }
+        if (!res.ok) {
+          retryCount += 1;
+          schedulePoll();
+          return;
+        }
+
+        const data = (await res.json()) as {
+          cards: CardData[];
+          sections: StreamSection[];
+          hash?: string;
+        };
+        retryCount = 0;
+        lastHash = data.hash ?? "";
+        mergeCards(data.cards);
+        mergeSections(data.sections);
+        schedulePoll(SNAPSHOT_POLL_MS);
+      } catch (e) {
+        console.error("[board snapshot poll]", e);
+        retryCount += 1;
+        schedulePoll();
+      }
     }
 
     function mergeCards(serverCards: CardData[]) {
@@ -79,13 +111,11 @@ export function useBoardStream({
       );
     }
 
-    es.addEventListener("snapshot", onSnapshot as EventListener);
-    es.addEventListener("forbidden", onForbidden);
+    poll();
 
     return () => {
-      es.removeEventListener("snapshot", onSnapshot as EventListener);
-      es.removeEventListener("forbidden", onForbidden);
-      es.close();
+      stopped = true;
+      if (retryTimer) clearTimeout(retryTimer);
     };
     // boardId is the only stable dependency; merges read refs via closures.
     // eslint-disable-next-line react-hooks/exhaustive-deps

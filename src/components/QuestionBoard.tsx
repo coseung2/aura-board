@@ -33,6 +33,8 @@ type Props = {
   currentStudentId: string | null;
 };
 
+const QUESTION_POLL_MS = 15_000;
+
 const VIZ_LABELS: Record<VizMode, { emoji: string; label: string }> = {
   "word-cloud": { emoji: "☁️", label: "워드클라우드" },
   bar: { emoji: "📊", label: "막대 차트" },
@@ -75,20 +77,47 @@ export function QuestionBoard({
 
   // SSE 구독 — question_snapshot 이벤트로 prompt/vizMode/responses 갱신.
   useEffect(() => {
-    const es = new EventSource(`/api/boards/${boardId}/stream`);
-    es.addEventListener("question_snapshot", (ev) => {
+    let stopped = false;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    let lastHash = "";
+
+    async function poll() {
+      if (stopped) return;
       try {
-        const data = JSON.parse((ev as MessageEvent).data) as {
-          prompt: string | null;
-          vizMode: VizMode;
-          responses: QuestionResponse[];
-        };
-        setPrompt(data.prompt);
-        setVizMode(data.vizMode);
-        setResponses(data.responses);
+        const qs = lastHash ? `?hash=${encodeURIComponent(lastHash)}` : "";
+        const res = await fetch(`/api/boards/${boardId}/snapshot${qs}`, {
+          cache: "no-store",
+        });
+        if (res.status === 401 || res.status === 403) {
+          stopped = true;
+          return;
+        }
+        if (res.status !== 304 && res.ok) {
+          const data = (await res.json()) as {
+            hash?: string;
+            question?: {
+              prompt: string | null;
+              vizMode: VizMode;
+              responses: QuestionResponse[];
+            } | null;
+          };
+          lastHash = data.hash ?? "";
+          if (data.question) {
+            setPrompt(data.question.prompt);
+            setVizMode(data.question.vizMode);
+            setResponses(data.question.responses);
+          }
+        }
       } catch {}
-    });
-    return () => es.close();
+      if (!stopped) timer = setTimeout(poll, QUESTION_POLL_MS);
+    }
+
+    poll();
+
+    return () => {
+      stopped = true;
+      if (timer) clearTimeout(timer);
+    };
   }, [boardId]);
 
   const submitResponse = useCallback(async () => {

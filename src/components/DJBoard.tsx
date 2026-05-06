@@ -18,6 +18,8 @@ type Props = {
   currentStudentId: string | null;
 };
 
+const DJ_POLL_MS = 15_000;
+
 /**
  * DJ 보드 — 2026-04-22 핸드오프 디자인 포팅.
  *   ┌─ 헤더 (제목 + 카운트 + 재생완료 토글 + 공유) ──────────┐
@@ -66,47 +68,62 @@ export function DJBoard({
     });
   }
 
-  // Live SSE stream
+  // Poll short snapshots instead of holding a long-lived SSE function open.
   useEffect(() => {
-    const es = new EventSource(`/api/boards/${boardId}/stream`);
+    let stopped = false;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    let lastHash = "";
 
-    function onSnapshot(ev: MessageEvent) {
+    async function poll() {
+      if (stopped) return;
       try {
-        const data = JSON.parse(ev.data) as { cards: CardData[] };
-        setCards((local) => {
-          const localById = new Map(local.map((c) => [c.id, c] as const));
-          const next: CardData[] = [];
-          for (const sc of data.cards) {
-            if (pendingCardIds.current.has(sc.id)) {
-              const l = localById.get(sc.id);
-              next.push(l ?? sc);
-            } else {
-              next.push(sc);
-            }
-          }
-          for (const l of local) {
-            if (
-              pendingCardIds.current.has(l.id) &&
-              !data.cards.some((sc) => sc.id === l.id)
-            ) {
-              next.push(l);
-            }
-          }
-          return next;
+        const qs = lastHash ? `?hash=${encodeURIComponent(lastHash)}` : "";
+        const res = await fetch(`/api/boards/${boardId}/snapshot${qs}`, {
+          cache: "no-store",
         });
+        if (res.status === 401 || res.status === 403) {
+          stopped = true;
+          return;
+        }
+        if (res.status !== 304 && res.ok) {
+          const data = (await res.json()) as {
+            cards: CardData[];
+            hash?: string;
+          };
+          lastHash = data.hash ?? "";
+          setCards((local) => {
+            const localById = new Map(local.map((c) => [c.id, c] as const));
+            const next: CardData[] = [];
+            for (const sc of data.cards) {
+              if (pendingCardIds.current.has(sc.id)) {
+                const l = localById.get(sc.id);
+                next.push(l ?? sc);
+              } else {
+                next.push(sc);
+              }
+            }
+            for (const l of local) {
+              if (
+                pendingCardIds.current.has(l.id) &&
+                !data.cards.some((sc) => sc.id === l.id)
+              ) {
+                next.push(l);
+              }
+            }
+            return next;
+          });
+        }
       } catch (e) {
-        console.error("[dj stream snapshot]", e);
+        console.error("[dj snapshot poll]", e);
       }
+      if (!stopped) timer = setTimeout(poll, DJ_POLL_MS);
     }
-    function onForbidden() {
-      es.close();
-    }
-    es.addEventListener("snapshot", onSnapshot as EventListener);
-    es.addEventListener("forbidden", onForbidden);
+
+    poll();
+
     return () => {
-      es.removeEventListener("snapshot", onSnapshot as EventListener);
-      es.removeEventListener("forbidden", onForbidden);
-      es.close();
+      stopped = true;
+      if (timer) clearTimeout(timer);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [boardId]);

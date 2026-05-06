@@ -4,9 +4,12 @@ import { getCurrentUser } from "@/lib/auth";
 import { getCurrentStudent } from "@/lib/student-auth";
 import { getEffectiveBoardRole } from "@/lib/rbac";
 
-const POLL_INTERVAL_MS = 3000;
-const KEEPALIVE_INTERVAL_MS = 60_000;
+export const maxDuration = 60;
+
+const POLL_INTERVAL_MS = 10_000;
+const KEEPALIVE_INTERVAL_MS = 25_000;
 const PERMISSION_RECHECK_INTERVAL_MS = 60_000;
+const STREAM_TTL_MS = 55_000;
 
 // Wire shape mirrors what `/api/boards/:id` and `board/[id]/page.tsx` already
 // hand to ColumnsBoard, so the client can drop snapshots straight into state.
@@ -92,15 +95,29 @@ export async function GET(
   const userId = user?.id ?? null;
   const studentId = student?.id ?? null;
   let cancelled = false;
+  let timer: ReturnType<typeof setTimeout> | null = null;
 
   const stream = new ReadableStream({
     async start(controller) {
       const encoder = new TextEncoder();
+      const startedAt = Date.now();
       let lastCardsHash = "";
       let lastSectionsHash = "";
       let lastQuestionHash = "";
       let lastPermissionCheck = Date.now();
       let lastKeepalive = Date.now();
+
+      function finish() {
+        if (cancelled) return;
+        cancelled = true;
+        if (timer) {
+          clearTimeout(timer);
+          timer = null;
+        }
+        try {
+          controller.close();
+        } catch {}
+      }
 
       function send(event: string, data: unknown) {
         if (cancelled) return;
@@ -134,11 +151,16 @@ export async function GET(
             });
             if (!r) {
               send("forbidden", { reason: "permission_revoked" });
-              controller.close();
-              cancelled = true;
+              finish();
               return;
             }
             lastPermissionCheck = now;
+          }
+
+          if (now - startedAt >= STREAM_TTL_MS) {
+            send("end", { reason: "ttl", retryAfterMs: 15_000 });
+            finish();
+            return;
           }
 
           const [cardsRaw, sectionsRaw] = await Promise.all([
@@ -283,15 +305,22 @@ export async function GET(
           }
         } catch (e) {
           console.error("[SSE board poll]", e);
+          send("error", { reason: "poll_failed", retryAfterMs: 30_000 });
+          finish();
+          return;
         }
 
-        if (!cancelled) setTimeout(poll, POLL_INTERVAL_MS);
+        if (!cancelled) timer = setTimeout(poll, POLL_INTERVAL_MS);
       }
 
       poll();
     },
     cancel() {
       cancelled = true;
+      if (timer) {
+        clearTimeout(timer);
+        timer = null;
+      }
     },
   });
 
