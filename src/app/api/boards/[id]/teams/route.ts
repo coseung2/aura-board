@@ -5,6 +5,60 @@ import { getCurrentStudent } from "@/lib/student-auth";
 import { getBoardRole } from "@/lib/rbac";
 import { STATISTICS_MISSION_COUNT } from "@/lib/statistics/mission-constants";
 
+export async function GET(
+  _req: Request,
+  ctx: { params: Promise<{ id: string }> }
+) {
+  try {
+    const { id: boardId } = await ctx.params;
+    const student = await getCurrentStudent();
+    if (!student) {
+      return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+    }
+
+    const membership = await db.breakoutMembership.findFirst({
+      where: {
+        studentId: student.id,
+        section: { boardId },
+      },
+      include: {
+        section: {
+          select: {
+            id: true,
+            title: true,
+            breakoutMemberships: {
+              include: {
+                student: {
+                  select: { id: true, name: true, number: true },
+                },
+              },
+              orderBy: { joinedAt: "asc" },
+            },
+          },
+        },
+      },
+    });
+
+    if (!membership) {
+      return NextResponse.json({ sectionId: null, teamName: null, teamMembers: [] });
+    }
+
+    return NextResponse.json({
+      sectionId: membership.section.id,
+      teamName: membership.section.title,
+      teamMembers: membership.section.breakoutMemberships.map((item) => ({
+        id: item.id,
+        studentId: item.studentId,
+        studentName: item.student.name,
+        studentNumber: item.student.number,
+      })),
+    });
+  } catch (e) {
+    console.error("[GET /api/boards/:id/teams]", e);
+    return NextResponse.json({ error: "internal" }, { status: 500 });
+  }
+}
+
 export async function POST(
   req: Request,
   ctx: { params: Promise<{ id: string }> }

@@ -2,7 +2,7 @@
 
 import { useEffect } from "react";
 
-const MISSIONS_POLL_MS = 30_000;
+const MISSIONS_POLL_MS = 5_000;
 
 export function useMissionsSSE(boardId: string, onRefresh: () => void) {
   useEffect(() => {
@@ -28,7 +28,9 @@ export function useMissionsSSE(boardId: string, onRefresh: () => void) {
           return;
         }
         if (res.ok) onRefresh();
-      } catch {}
+      } catch {
+        // Ignore transient polling failures.
+      }
       schedulePoll();
     }
 

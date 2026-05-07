@@ -1233,6 +1233,54 @@
 }
 
 /* Pay tab */
+.pay-intro {
+  margin-bottom: 16px;
+  padding: 18px 20px;
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  background: var(--color-accent-tinted-bg);
+}
+.pay-intro-eyebrow {
+  margin: 0 0 6px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--color-accent);
+}
+.pay-intro-title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--color-text);
+}
+.pay-intro-copy {
+  margin: 8px 0 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--color-text-muted);
+}
+.pay-intro-actions {
+  display: flex;
+  align-items: center;
+}
+.pay-manage-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 36px;
+  padding: 0 14px;
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  background: var(--color-surface);
+  color: var(--color-text);
+  text-decoration: none;
+  font-size: 13px;
+  font-weight: 600;
+}
+.pay-manage-link:hover {
+  border-color: var(--color-accent);
+  color: var(--color-accent);
+}
 .pay-grid {
   display: grid;
   grid-template-columns: 1fr 340px;
@@ -1319,6 +1367,64 @@
 .pay-cart-qty span { min-width: 20px; text-align: center; font-weight: 600; }
 .pay-cart-sub { font-weight: 700; }
 .pay-cart-empty { color: var(--color-text-muted); font-size: 12px; }
+.pay-scanner-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.pay-scan-btn {
+  min-height: 40px;
+  border-radius: 8px;
+  border: 1px solid var(--color-accent);
+  background: var(--color-accent-tinted-bg);
+  color: var(--color-accent);
+  font-weight: 700;
+  font-size: 13px;
+  cursor: pointer;
+}
+.pay-scan-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.pay-scan-help {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--color-text-muted);
+}
+.pay-scanner-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 10px;
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  background: var(--color-surface-raised, var(--color-surface));
+}
+.pay-scanner-video {
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+  border-radius: 8px;
+  background: #000;
+}
+.pay-scanner-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 12px;
+  color: var(--color-text-muted);
+}
+.pay-scanner-stop {
+  min-height: 32px;
+  padding: 0 12px;
+  border-radius: 999px;
+  border: 1px solid var(--color-border);
+  background: transparent;
+  color: var(--color-text-muted);
+  cursor: pointer;
+}
 .pay-token-field { display: flex; flex-direction: column; gap: 4px; }
 .pay-token-field span { font-size: 12px; color: var(--color-text-muted); }
 .pay-token-field textarea {

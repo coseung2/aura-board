@@ -1,16 +1,16 @@
 "use client";
 
-import { useState, useMemo, useRef, useEffect } from "react";
-import type { TeamMemberDTO, RosterStudentDTO } from "./StatisticsBoardClient";
+import { useEffect, useMemo, useRef, useState } from "react";
+import type { RosterStudentDTO, TeamMemberDTO } from "./StatisticsBoardClient";
 
 const INVITE_ERROR_MESSAGES: Record<string, string> = {
-  already_in_another_team: "이 친구는 이미 다른 팀에서 활동하고 있어요.",
-  already_assigned: "이 친구는 이미 우리 팀에 있어요.",
+  already_in_another_team: "이 학생은 이미 다른 팀에서 작업 중이에요.",
+  already_assigned: "이 학생은 이미 우리 팀에 있어요.",
   board_has_no_classroom: "이 보드에는 학급 명단이 연결되어 있지 않아요.",
-  forbidden: "우리 팀에 초대할 수 있는 권한이 없어요.",
-  student_not_found: "명단에서 이 친구를 찾을 수 없어요.",
-  student_not_in_classroom: "이 보드의 학급 친구만 초대할 수 있어요.",
-  "studentId required": "초대할 친구를 먼저 골라 주세요.",
+  forbidden: "팀 초대 권한이 없어요.",
+  student_not_found: "학생을 찾지 못했어요.",
+  student_not_in_classroom: "같은 학급 학생만 초대할 수 있어요.",
+  "studentId required": "먼저 초대할 학생을 골라 주세요.",
 };
 
 export function StatisticsTeamInviteButton({
@@ -31,53 +31,78 @@ export function StatisticsTeamInviteButton({
   const ref = useRef<HTMLDivElement>(null);
 
   const memberIds = useMemo(
-    () => new Set(teamMembers.map((m) => m.studentId)),
+    () => new Set(teamMembers.map((member) => member.studentId)),
     [teamMembers]
   );
 
   const candidates = useMemo(() => {
-    const q = search.trim().toLowerCase();
+    const query = search.trim().toLowerCase();
     return rosterStudents
-      .filter((s) => !memberIds.has(s.id))
+      .filter((student) => !memberIds.has(student.id))
       .filter(
-        (s) =>
-          !q ||
-          s.name.toLowerCase().includes(q) ||
-          (s.number != null && String(s.number).includes(q))
+        (student) =>
+          !query ||
+          student.name.toLowerCase().includes(query) ||
+          (student.number != null && String(student.number).includes(query))
       );
   }, [rosterStudents, memberIds, search]);
 
   useEffect(() => {
-    function onClickOutside(e: MouseEvent) {
-      if (ref.current && !ref.current.contains(e.target as Node)) {
+    function onClickOutside(event: MouseEvent) {
+      if (ref.current && !ref.current.contains(event.target as Node)) {
         setOpen(false);
       }
     }
+
     if (open) document.addEventListener("mousedown", onClickOutside);
     return () => document.removeEventListener("mousedown", onClickOutside);
   }, [open]);
 
+  async function requestInvite(replaceExisting: boolean) {
+    return fetch(`/api/sections/${sectionId}/memberships`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        studentId: selectedId,
+        replaceExisting,
+      }),
+    });
+  }
+
   async function invite() {
     if (!selectedId) return;
+
     setInviting(true);
     try {
-      const res = await fetch(`/api/sections/${sectionId}/memberships`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ studentId: selectedId }),
-      });
+      let res = await requestInvite(false);
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
         const errorCode = typeof data.error === "string" ? data.error : "";
-        alert(INVITE_ERROR_MESSAGES[errorCode] ?? "초대하지 못했어요. 잠시 후 다시 해 주세요.");
-        return;
+
+        if (errorCode === "already_in_another_team") {
+          const shouldReplace = window.confirm(
+            "이 학생은 이미 다른 팀에서 작업 중이에요. 기존 팀 작업을 버리고 우리 팀으로 옮길까요?"
+          );
+          if (shouldReplace) {
+            res = await requestInvite(true);
+          }
+        }
+
+        if (!res.ok) {
+          alert(
+            INVITE_ERROR_MESSAGES[errorCode] ??
+              "초대하지 못했어요. 잠시 후 다시 시도해 주세요."
+          );
+          return;
+        }
       }
+
       setSelectedId(null);
       setSearch("");
       setOpen(false);
       onInvite?.();
     } catch {
-      alert("네트워크 오류가 발생했습니다.");
+      alert("네트워크 오류가 발생했어요.");
     } finally {
       setInviting(false);
     }
@@ -87,7 +112,7 @@ export function StatisticsTeamInviteButton({
     <div className="team-invite-container" ref={ref}>
       <button
         className="team-invite-trigger"
-        onClick={() => setOpen((v) => !v)}
+        onClick={() => setOpen((value) => !value)}
         title="팀원 초대"
         aria-label="팀원 초대"
       >
@@ -103,7 +128,7 @@ export function StatisticsTeamInviteButton({
               onClick={() => setOpen(false)}
               aria-label="팀원 초대 닫기"
             >
-              ×
+              x
             </button>
           </div>
 
@@ -112,22 +137,24 @@ export function StatisticsTeamInviteButton({
             type="text"
             placeholder="학생 이름 또는 번호 검색"
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            onChange={(event) => setSearch(event.target.value)}
           />
 
           <div className="team-invite-list">
             {candidates.length === 0 ? (
-              <p className="team-invite-empty">검색 결과가 없습니다.</p>
+              <p className="team-invite-empty">검색 결과가 없어요.</p>
             ) : (
-              candidates.map((s) => (
+              candidates.map((student) => (
                 <button
-                  key={s.id}
-                  className={`team-invite-candidate ${selectedId === s.id ? "selected" : ""}`}
-                  onClick={() => setSelectedId(s.id)}
+                  key={student.id}
+                  className={`team-invite-candidate ${
+                    selectedId === student.id ? "selected" : ""
+                  }`}
+                  onClick={() => setSelectedId(student.id)}
                 >
                   <span className="candidate-name">
-                    {s.number != null ? `${s.number}. ` : ""}
-                    {s.name}
+                    {student.number != null ? `${student.number}. ` : ""}
+                    {student.name}
                   </span>
                 </button>
               ))

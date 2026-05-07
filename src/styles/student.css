@@ -164,6 +164,134 @@
   margin-top: 8px;
 }
 
+.student-wallet-section {
+  margin-top: 20px;
+}
+
+.student-wallet-card {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 20px;
+  background: var(--color-surface);
+  border: var(--border-card);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-card);
+}
+
+.student-wallet-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.student-wallet-eyebrow {
+  margin: 0 0 6px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--color-accent);
+}
+
+.student-wallet-title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+.student-wallet-link {
+  display: inline-flex;
+  align-items: center;
+  padding: 8px 12px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-btn);
+  color: var(--color-text);
+  text-decoration: none;
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.student-wallet-link:hover {
+  border-color: var(--color-accent);
+  color: var(--color-accent);
+}
+
+.student-wallet-balance-row {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.student-wallet-balance-label {
+  font-size: 13px;
+  color: var(--color-text-muted);
+}
+
+.student-wallet-balance-value {
+  font-family: var(--font-display);
+  font-size: 28px;
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+.student-wallet-fd-strip {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px;
+}
+
+.student-wallet-fd-chip {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-height: 112px;
+  padding: 14px;
+  background: var(--color-accent-tinted-bg);
+  border: 1px solid rgba(0, 0, 0, 0.04);
+  border-radius: 8px;
+  color: var(--color-accent-tinted-text);
+}
+
+.student-wallet-fd-label {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--color-accent);
+}
+
+.student-wallet-fd-chip strong {
+  font-size: 18px;
+  color: var(--color-text);
+}
+
+.student-wallet-fd-chip span:last-child {
+  font-size: 12px;
+  color: var(--color-text-muted);
+}
+
+.student-wallet-empty {
+  padding: 16px;
+  border-radius: 8px;
+  background: var(--color-bg-alt);
+  color: var(--color-text-muted);
+  font-size: 13px;
+}
+
+@media (max-width: 760px) {
+  .student-wallet-header {
+    flex-direction: column;
+  }
+
+  .student-wallet-link {
+    width: 100%;
+    justify-content: center;
+  }
+}
+
 /* ---- Student Login ---- */
 
 .student-login-page {

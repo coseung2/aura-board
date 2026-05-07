@@ -314,6 +314,20 @@ function isPreviewBlank(value: unknown): boolean {
   return false;
 }
 
+function stableStringify(value: unknown): string {
+  if (value == null) return "null";
+  if (typeof value !== "object") return JSON.stringify(value);
+  if (Array.isArray(value)) {
+    return `[${value.map((item) => stableStringify(item)).join(",")}]`;
+  }
+  const entries = Object.entries(value as Record<string, unknown>).sort(([a], [b]) =>
+    a.localeCompare(b)
+  );
+  return `{${entries
+    .map(([key, item]) => `${JSON.stringify(key)}:${stableStringify(item)}`)
+    .join(",")}}`;
+}
+
 export function StatisticsBoardClient({
   boardId,
   isTeacher,
@@ -339,9 +353,9 @@ export function StatisticsBoardClient({
     if (isTeacher) {
       await refreshDashboard();
     } else {
-      await refreshMissions();
+      await refreshStudentWorkspace();
     }
-  }, [isTeacher, sectionId, boardId]);
+  }, [isTeacher, boardId, sectionId]);
 
   useEffect(() => {
     async function init() {
@@ -351,28 +365,14 @@ export function StatisticsBoardClient({
         setLoading(false);
         return;
       }
-      if (!sectionId) {
-        setLoading(false);
-        return;
-      }
       try {
-        const missionsRes = await fetch(`/api/sections/${sectionId}/missions`);
-        if (missionsRes.ok) {
-          const data = await missionsRes.json();
-          const list = data.missions as MissionDTO[];
-          setMissions(list);
-          const firstIncomplete = list.find(
-            (m) => m.status !== "approved" && m.status !== "completed"
-          );
-          setCurrentStep(firstIncomplete?.stepNumber ?? 1);
-        }
-        await refreshMembers();
+        await refreshStudentWorkspace();
       } finally {
         setLoading(false);
       }
     }
     init();
-  }, [isTeacher, sectionId]);
+  }, [isTeacher, sectionId, boardId]);
 
   async function refreshMissions() {
     if (!sectionId) return;
@@ -386,6 +386,38 @@ export function StatisticsBoardClient({
       );
       setCurrentStep(firstIncomplete?.stepNumber ?? 1);
     }
+  }
+
+  async function refreshStudentWorkspace() {
+    const teamRes = await fetch(`/api/boards/${boardId}/teams`, {
+      cache: "no-store",
+    });
+    if (teamRes.ok) {
+      const data = await teamRes.json();
+      const nextSectionId =
+        typeof data.sectionId === "string" ? data.sectionId : null;
+      setSectionId(nextSectionId);
+      setTeamMembers((data.teamMembers as TeamMemberDTO[]) ?? []);
+      if (!nextSectionId) {
+        setMissions([]);
+        return;
+      }
+      if (nextSectionId !== sectionId) {
+        const res = await fetch(`/api/sections/${nextSectionId}/missions`);
+        if (res.ok) {
+          const missionData = await res.json();
+          const list = missionData.missions as MissionDTO[];
+          setMissions(list);
+          const firstIncomplete = list.find(
+            (m) => m.status !== "approved" && m.status !== "completed"
+          );
+          setCurrentStep(firstIncomplete?.stepNumber ?? 1);
+        }
+        return;
+      }
+    }
+    await refreshMissions();
+    await refreshMembers();
   }
 
   async function refreshMembers() {
@@ -557,6 +589,46 @@ export function StatisticsBoardClient({
     setModalTeamName("");
   }
 
+  useEffect(() => {
+    if (!modalMission || !modalSectionId) return;
+
+    if (isTeacher) {
+      const team = teams.find((item) => item.sectionId === modalSectionId);
+      const nextMission = team?.missions.find(
+        (item) => item.stepNumber === modalMission.stepNumber
+      );
+      if (nextMission) {
+        const hydrated = missionFromDashboard(modalSectionId, nextMission);
+        if (
+          hydrated.version !== modalMission.version ||
+          stableStringify(hydrated.content) !== stableStringify(modalMission.content) ||
+          hydrated.status !== modalMission.status
+        ) {
+          setModalMission(hydrated);
+        }
+        if (team?.teamName && team.teamName !== modalTeamName) {
+          setModalTeamName(team.teamName);
+        }
+      }
+      return;
+    }
+
+    const nextMission = missions.find(
+      (item) =>
+        item.sectionId === modalSectionId &&
+        item.stepNumber === modalMission.stepNumber
+    );
+    if (nextMission) {
+      if (
+        nextMission.version !== modalMission.version ||
+        stableStringify(nextMission.content) !== stableStringify(modalMission.content) ||
+        nextMission.status !== modalMission.status
+      ) {
+        setModalMission(nextMission);
+      }
+    }
+  }, [isTeacher, missions, teams, modalMission, modalSectionId, modalTeamName]);
+
   function getStudentTeamName(): string {
     if (teamMembers.length === 0) return "우리 팀";
     const names = teamMembers.map((m) => m.studentName);
@@ -689,7 +761,6 @@ export function StatisticsBoardClient({
         </div>
         <div className="mission-modal-body">
           <MissionPanel
-            boardId={boardId}
             sectionId={modalSectionId}
             mission={modalMission}
             isTeacher={isTeacher}
@@ -704,7 +775,6 @@ export function StatisticsBoardClient({
             }
             onUpdate={() => {
               refreshData();
-              closeModal();
             }}
             isSaving={isSaving}
             setIsSaving={setIsSaving}

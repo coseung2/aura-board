@@ -92,6 +92,7 @@ export async function POST(
 
     const body = await req.json().catch(() => ({}));
     const { studentId } = body;
+    const replaceExisting = body.replaceExisting === true;
     if (!studentId || typeof studentId !== "string") {
       return NextResponse.json({ error: "studentId required" }, { status: 400 });
     }
@@ -125,14 +126,47 @@ export async function POST(
         studentId,
         section: { boardId: section.boardId },
       },
+      include: {
+        section: {
+          select: { id: true },
+        },
+      },
     });
     if (existingInBoard) {
-      return NextResponse.json({ error: "already_in_another_team" }, { status: 409 });
+      if (!replaceExisting) {
+        return NextResponse.json(
+          {
+            error: "already_in_another_team",
+            currentSectionId: existingInBoard.sectionId,
+          },
+          { status: 409 }
+        );
+      }
     }
 
-    const membership = await db.breakoutMembership.create({
-      data: { sectionId, studentId },
-      include: { student: { select: { id: true, name: true, number: true } } },
+    const membership = await db.$transaction(async (tx) => {
+      if (existingInBoard) {
+        await tx.breakoutMembership.delete({
+          where: {
+            sectionId_studentId: {
+              sectionId: existingInBoard.sectionId,
+              studentId,
+            },
+          },
+        });
+
+        const remainingCount = await tx.breakoutMembership.count({
+          where: { sectionId: existingInBoard.sectionId },
+        });
+        if (remainingCount === 0) {
+          await tx.section.delete({ where: { id: existingInBoard.sectionId } });
+        }
+      }
+
+      return tx.breakoutMembership.create({
+        data: { sectionId, studentId },
+        include: { student: { select: { id: true, name: true, number: true } } },
+      });
     });
 
     return NextResponse.json({

@@ -31,6 +31,7 @@ public/uploads/*
 !public/uploads/.gitkeep
 .vercel
 .worktrees/
+padlet-env-backup/
 
 # Session-pulled env (contains pepper, DB URL, etc.) — never commit
 .env.prod
