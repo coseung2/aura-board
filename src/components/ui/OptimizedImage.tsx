@@ -28,7 +28,7 @@ type OptimizedImageProps = {
   unoptimized?: boolean;
   /** CSS object-fit. Default: cover. */
   fit?: "cover" | "contain";
-  onError?: () => void;
+  onError?: (e: React.SyntheticEvent<HTMLImageElement>) => void;
 };
 
 const DEFAULT_SIZES = "(max-width: 768px) 100vw, 480px";
@@ -86,9 +86,9 @@ export const OptimizedImage = memo(function OptimizedImage({
     unoptimized: effectiveUnoptimized,
     className,
     style: { objectFit: fit } as React.CSSProperties,
-    onError: () => {
+    onError: (e: React.SyntheticEvent<HTMLImageElement, Event>) => {
       setFailed(true);
-      onError?.();
+      if (onError) onError(e);
     },
   };
 
