@@ -289,6 +289,8 @@
   gap: 14px;
 }
 .plant-obs-card {
+  flex-shrink: 0;
+  width: 220px;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-card);
   padding: 12px 14px;
@@ -801,11 +803,18 @@
   margin: 6px 0 4px;
 }
 .plant-stage-body-obs-grid {
-  display: grid;
+  display: flex;
   gap: 10px;
-  /* auto-fit: 관찰이 적으면 빈 열 없이 폭 전체로 늘어남 */
-  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  overflow-x: auto;
+  padding-bottom: 6px;
   width: 100%;
+}
+.plant-stage-body-obs-grid::-webkit-scrollbar {
+  height: 4px;
+}
+.plant-stage-body-obs-grid::-webkit-scrollbar-thumb {
+  background: var(--color-border);
+  border-radius: 4px;
 }
 .plant-stage-body-actions {
   margin-top: 12px;
@@ -917,7 +926,7 @@
     padding: 12px 14px;
   }
   .plant-stage-body-obs-grid {
-    grid-template-columns: 1fr;
+    flex-wrap: nowrap;
   }
   .plant-teacher-banner {
     flex-direction: column;
