@@ -27,6 +27,7 @@ export function ObservationEditor({ open, title, initial, onCancel, onSubmit }: 
   const [uploading, setUploading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
@@ -38,16 +39,21 @@ export function ObservationEditor({ open, title, initial, onCancel, onSubmit }: 
     setError(null);
     setSaving(false);
     setUploading(false);
+    setPreviewUrl(null);
   }, [open, initial]);
 
   useEffect(() => {
     if (!open) return;
     const handler = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && previewUrl) {
+        setPreviewUrl(null);
+        return;
+      }
       if (e.key === "Escape" && !saving && !uploading) onCancel();
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, [open, onCancel, saving, uploading]);
+  }, [open, onCancel, previewUrl, saving, uploading]);
 
   if (!open) return null;
 
@@ -100,6 +106,7 @@ export function ObservationEditor({ open, title, initial, onCancel, onSubmit }: 
   const full = images.length >= MAX_IMAGES;
 
   return (
+    <>
     <div className="plant-modal-backdrop" role="dialog" aria-modal="true" aria-label="관찰 기록">
       <div className="plant-modal">
         <h3>{title ?? "관찰 기록"}</h3>
@@ -126,7 +133,19 @@ export function ObservationEditor({ open, title, initial, onCancel, onSubmit }: 
           {images.length > 0 && (
             <div className="plant-thumb-grid">
               {images.map((img, i) => (
-                <div key={`${img.url}-${i}`} className="plant-thumb optimized-img-wrap">
+                <div
+                  key={`${img.url}-${i}`}
+                  className="plant-thumb optimized-img-wrap"
+                  onClick={() => setPreviewUrl(img.url)}
+                  role="button"
+                  tabIndex={0}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      setPreviewUrl(img.url);
+                    }
+                  }}
+                >
                   <OptimizedImage
                     src={img.thumbnailUrl ?? img.url}
                     alt={`사진 ${i + 1}`}
@@ -136,7 +155,11 @@ export function ObservationEditor({ open, title, initial, onCancel, onSubmit }: 
                     type="button"
                     aria-label={`사진 ${i + 1} 삭제`}
                     className="plant-thumb-x"
-                    onClick={() => removeImage(i)}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      removeImage(i);
+                    }}
+                    onKeyDown={(e) => e.stopPropagation()}
                   >
                     ×
                   </button>
@@ -144,7 +167,7 @@ export function ObservationEditor({ open, title, initial, onCancel, onSubmit }: 
               ))}
             </div>
           )}
-          {uploading && <p aria-live="polite" style={{ fontSize: 13, color: "var(--color-text-muted)" }}>업로드 중…</p>}
+          {uploading && <div className="plant-upload-progress" aria-label="업로드 중" aria-live="polite" />}
         </div>
         <div className="plant-modal-row">
           <label htmlFor="plant-memo">메모</label>
@@ -168,5 +191,25 @@ export function ObservationEditor({ open, title, initial, onCancel, onSubmit }: 
         </div>
       </div>
     </div>
+
+    {previewUrl && (
+      <div
+        className="plant-lightbox"
+        role="dialog"
+        aria-label="사진 원본"
+        onClick={() => setPreviewUrl(null)}
+      >
+        <div className="plant-lightbox-frame optimized-img-wrap">
+          <OptimizedImage
+            src={previewUrl}
+            alt="관찰 사진 원본"
+            sizes="90vw"
+            priority
+            fit="contain"
+          />
+        </div>
+      </div>
+    )}
+    </>
   );
 }
