@@ -13,8 +13,11 @@ interface Props {
   classroomId: string;
   /** Board id, used to build drill-down links /board/{boardId}/student/{studentId} (v2). */
   boardId: string;
+  boardTitle: string;
   onAllowListSaved: () => void;
 }
+
+type StudentFilter = "all" | "stalled" | "completed";
 
 function formatAgo(iso: string | null) {
   if (!iso) return "—";
@@ -25,15 +28,26 @@ function formatAgo(iso: string | null) {
   return `${days}일 전`;
 }
 
+function recencyIndicator(iso: string | null) {
+  if (!iso) return { mark: "⚪", label: "관찰 없음" };
+  const ms = Date.now() - new Date(iso).getTime();
+  const days = Math.floor(ms / (24 * 60 * 60 * 1000));
+  if (days < 1) return { mark: "🟢", label: "오늘" };
+  if (days <= 3) return { mark: "🟡", label: "3일 이내" };
+  return { mark: "🔴", label: "7일+" };
+}
+
 export function TeacherSummaryView({
   summary,
   allSpecies,
   allowedSpecies,
   classroomId,
   boardId,
+  boardTitle,
   onAllowListSaved,
 }: Props) {
   const [showAllow, setShowAllow] = useState(false);
+  const [studentFilter, setStudentFilter] = useState<StudentFilter>("all");
   const router = useRouter();
 
   const stages = Array.from({ length: 10 }, (_, i) => i + 1);
@@ -41,8 +55,20 @@ export function TeacherSummaryView({
   const studentHref = (studentId: string) =>
     `/board/${boardId}/student/${studentId}`;
 
+  const filteredStudents = summary.students.filter((s) => {
+    if (studentFilter === "stalled") return s.stalled;
+    if (studentFilter === "completed") return !s.stalled;
+    return true;
+  });
+
   return (
     <div className="plant-teacher">
+      <nav className="plant-breadcrumb" aria-label="breadcrumb">
+        <Link href={`/board/${boardId}`}>{boardTitle}</Link>
+        <span className="plant-breadcrumb-sep">&gt;</span>
+        <span>식물관찰일지</span>
+      </nav>
+
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
         <div>
           <h2 style={{ margin: 0 }}>학급 식물 관찰일지</h2>
@@ -73,11 +99,24 @@ export function TeacherSummaryView({
         ))}
       </div>
 
-      <h3 style={{ fontSize: 14, color: "var(--color-text-muted)", margin: "18px 0 8px" }}>학생</h3>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, margin: "18px 0 8px" }}>
+        <h3 style={{ fontSize: 14, color: "var(--color-text-muted)", margin: 0 }}>학생</h3>
+        <select
+          className="plant-filter-select"
+          value={studentFilter}
+          aria-label="학생 상태 필터"
+          onChange={(e) => setStudentFilter(e.target.value as StudentFilter)}
+        >
+          <option value="all">전체</option>
+          <option value="stalled">정체 학생만</option>
+          <option value="completed">완료 학생만</option>
+        </select>
+      </div>
       <table className="plant-student-table">
         <thead>
           <tr>
             <th>번호</th>
+            <th>최근 사진</th>
             <th>이름</th>
             <th>식물</th>
             <th>현재 단계</th>
@@ -86,22 +125,34 @@ export function TeacherSummaryView({
           </tr>
         </thead>
         <tbody>
-          {summary.students.map((s) => (
-            <tr
-              key={s.id}
-              className="plant-student-row-link"
-              tabIndex={0}
-              role="link"
-              aria-label={`${s.name} 관찰일지 열기`}
-              onClick={() => router.push(studentHref(s.id))}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" || e.key === " ") {
-                  e.preventDefault();
-                  router.push(studentHref(s.id));
-                }
-              }}
-            >
-              <td>{s.number ?? "—"}</td>
+          {filteredStudents.map((s) => {
+            const recency = recencyIndicator(s.lastObservedAt);
+            return (
+              <tr
+                key={s.id}
+                className="plant-student-row-link"
+                tabIndex={0}
+                role="link"
+                aria-label={`${s.name} 관찰일지 열기`}
+                onClick={() => router.push(studentHref(s.id))}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    router.push(studentHref(s.id));
+                  }
+                }}
+              >
+                <td>{s.number ?? "—"}</td>
+              <td>
+                <div
+                  className="plant-student-thumb"
+                  title={`최근 관찰: ${recency.label}`}
+                  aria-label={`최근 관찰 ${recency.label}`}
+                  style={{ display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20 }}
+                >
+                  {recency.mark}
+                </div>
+              </td>
               <td>
                 <Link
                   href={studentHref(s.id)}
@@ -120,10 +171,13 @@ export function TeacherSummaryView({
                 {s.stalled && <span className="plant-stalled-badge">정체 7일+</span>}
               </td>
             </tr>
-          ))}
-          {summary.students.length === 0 && (
+            );
+          })}
+          {filteredStudents.length === 0 && (
             <tr>
-              <td colSpan={6} className="plant-empty-state">아직 학생이 없어요.</td>
+              <td colSpan={7} className="plant-empty-state">
+                {summary.students.length === 0 ? "아직 학생이 없어요." : "조건에 맞는 학생이 없어요."}
+              </td>
             </tr>
           )}
         </tbody>

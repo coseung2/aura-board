@@ -1,5 +1,5 @@
 /**
- * Plant catalog — 11 species × up to 10 stages each.
+ * Plant catalog — 10 species × up to 10 stages each.
  * Seed source for PJ-1. Idempotent upsert by species.key + (speciesId, order).
  *
  * Shape:
@@ -86,63 +86,6 @@ export const PLANT_CATALOG: CatalogSpecies[] = [
       flower: { icon: "🌻", description: "노란 해바라기가 피었어요" },
       fruit:  { icon: "🌻", description: "가운데에 씨가 가득해요" },
       mature: { icon: "🌻", description: "씨를 받아요" },
-    }),
-  },
-  {
-    key: "morning-glory", nameKo: "나팔꽃", emoji: "🌺",
-    difficulty: "easy", season: "spring",
-    notes: "초등 관찰 활동에 잘 맞는 덩굴식물이에요. 받침대를 세워 주면 좋아요.",
-    stages: customize({
-      seed: {
-        icon: "🌰",
-        description: "단단한 씨앗을 심어요",
-        observationPoints: ["씨앗의 색깔과 모양은?", "씨앗 껍질은 단단한가요?", "심은 날짜와 깊이를 적어요."],
-      },
-      sprout: {
-        icon: "🌱",
-        description: "싹이 흙 위로 올라와요",
-        observationPoints: ["며칠 만에 싹이 나왔나요?", "줄기 색깔은 초록색인가요, 붉은빛이 있나요?", "흙의 촉촉함을 확인해요."],
-      },
-      cotyledon: {
-        icon: "🦋",
-        description: "나비 모양처럼 갈라진 떡잎이 펼쳐져요",
-        observationPoints: ["떡잎 끝이 어떻게 갈라졌나요?", "떡잎은 서로 마주 보고 있나요?", "떡잎과 씨앗 껍질이 남아 있는지 봐요."],
-      },
-      "true-leaves": {
-        icon: "💚",
-        description: "하트 모양 본잎이 나와요",
-        observationPoints: ["본잎은 떡잎과 어떤 모양이 다른가요?", "잎 가장자리는 매끈한가요?", "잎맥과 잎자루를 찾아봐요."],
-      },
-      growth: {
-        icon: "🌿",
-        description: "덩굴이 길게 뻗으며 받침대를 감아요",
-        observationPoints: ["덩굴은 어느 방향으로 감고 있나요?", "오늘 줄기 길이는 몇 cm인가요?", "새 잎은 어디에서 나오나요?"],
-      },
-      bud: {
-        icon: "💜",
-        description: "잎겨드랑이에 긴 꽃봉오리가 생겨요",
-        observationPoints: ["꽃봉오리는 어느 잎 옆에 있나요?", "끝이 말려 있거나 뾰족한가요?", "봉오리 색이 어제와 달라졌나요?"],
-      },
-      flower: {
-        icon: "🌺",
-        description: "아침에 나팔꽃이 활짝 피어요",
-        observationPoints: ["꽃의 색깔은?", "꽃은 언제 활짝 피었나요?", "나팔 모양을 자세히 그려봐요."],
-      },
-      pollination: {
-        icon: "🐝",
-        description: "꽃이 시들고 씨방이 보이기 시작해요",
-        observationPoints: ["꽃은 오후에 어떻게 변했나요?", "벌이나 나비가 찾아왔나요?", "꽃이 진 자리의 작은 씨방을 찾아봐요."],
-      },
-      fruit: {
-        icon: "🌰",
-        description: "둥근 씨방이 커지고 마르기 시작해요",
-        observationPoints: ["씨방의 크기와 색은?", "만졌을 때 단단한가요?", "마른 꽃받침이 남아 있나요?"],
-      },
-      mature: {
-        icon: "🫘",
-        description: "마른 씨방에서 씨앗을 받아요",
-        observationPoints: ["씨앗은 몇 개 들어 있나요?", "처음 심은 씨앗과 모양이 비슷한가요?", "다음에 심을 씨앗을 봉투에 보관해요."],
-      },
     }),
   },
   {

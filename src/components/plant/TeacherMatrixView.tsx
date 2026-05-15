@@ -34,14 +34,17 @@ interface Props {
   classroomId: string;
 }
 
-const DESKTOP_MIN = 1024;
+const DESKTOP_MIN = 768;
 
 // Simple column virtualization — render only visible column range + overscan.
-const COL_WIDTH = 100; // th/td width approx
+const DESKTOP_COL_WIDTH = 100; // th/td width approx
+const COMPACT_COL_WIDTH = 60;
+const STAGE_COL_WIDTH = 120;
 const OVERSCAN = 3;
 
 export function TeacherMatrixView({ classroomId }: Props) {
   const [viewportOk, setViewportOk] = useState<boolean | null>(null);
+  const [compact, setCompact] = useState(false);
   const [data, setData] = useState<{ stages: Stage[]; students: StudentRow[] } | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [lightbox, setLightbox] = useState<string | null>(null);
@@ -50,7 +53,11 @@ export function TeacherMatrixView({ classroomId }: Props) {
   const [viewportW, setViewportW] = useState(0);
 
   useEffect(() => {
-    const check = () => setViewportOk(window.innerWidth >= DESKTOP_MIN);
+    const check = () => {
+      const width = window.innerWidth;
+      setViewportOk(width >= DESKTOP_MIN);
+      setCompact(width >= DESKTOP_MIN && width < 1024);
+    };
     check();
     window.addEventListener("resize", check);
     return () => window.removeEventListener("resize", check);
@@ -87,16 +94,18 @@ export function TeacherMatrixView({ classroomId }: Props) {
     };
   }, [data]);
 
+  const colWidth = compact ? COMPACT_COL_WIDTH : DESKTOP_COL_WIDTH;
+
   const visibleRange = useMemo(() => {
     const students = data?.students ?? [];
     if (students.length === 0 || viewportW === 0) {
       return { start: 0, end: students.length };
     }
-    const start = Math.max(0, Math.floor(scrollX / COL_WIDTH) - OVERSCAN);
-    const cols = Math.ceil(viewportW / COL_WIDTH) + OVERSCAN * 2;
+    const start = Math.max(0, Math.floor(scrollX / colWidth) - OVERSCAN);
+    const cols = Math.ceil(viewportW / colWidth) + OVERSCAN * 2;
     const end = Math.min(students.length, start + cols);
     return { start, end };
-  }, [scrollX, viewportW, data]);
+  }, [scrollX, viewportW, data, colWidth]);
 
   if (viewportOk === null) {
     return <div className="plant-matrix-forbidden"><p>확인 중…</p></div>;
@@ -104,9 +113,9 @@ export function TeacherMatrixView({ classroomId }: Props) {
   if (!viewportOk) {
     return (
       <div className="plant-matrix-forbidden">
-        <h3>이 뷰는 데스크탑에서만 열 수 있어요</h3>
+        <h3>이 뷰는 태블릿 이상 화면에서 열 수 있어요</h3>
         <p style={{ color: "var(--color-text-muted)" }}>
-          태블릿·휴대폰에서는 셀이 너무 작아 보여요. 노트북이나 데스크탑에서 다시 열어주세요.
+          휴대폰에서는 셀이 너무 작아 보여요. 태블릿, 노트북 또는 데스크탑에서 다시 열어주세요.
         </p>
       </div>
     );
@@ -133,20 +142,20 @@ export function TeacherMatrixView({ classroomId }: Props) {
 
   // Virtualized visible slice
   const visibleStudents = students.slice(visibleRange.start, visibleRange.end);
-  const leftPad = visibleRange.start * COL_WIDTH;
-  const rightPad = (students.length - visibleRange.end) * COL_WIDTH;
+  const leftPad = visibleRange.start * colWidth;
+  const rightPad = (students.length - visibleRange.end) * colWidth;
 
   return (
     <div className="plant-matrix-wrap" ref={scrollRef}>
       <table
         className="plant-matrix"
-        style={{ tableLayout: "fixed", minWidth: leftPad + visibleStudents.length * COL_WIDTH + rightPad + 120 }}
+        style={{ tableLayout: "fixed", minWidth: leftPad + visibleStudents.length * colWidth + rightPad + STAGE_COL_WIDTH }}
       >
         <colgroup>
-          <col style={{ width: 120 }} />
+          <col style={{ width: STAGE_COL_WIDTH }} />
           {leftPad > 0 && <col style={{ width: leftPad }} />}
           {visibleStudents.map((s) => (
-            <col key={s.id} style={{ width: COL_WIDTH }} />
+            <col key={s.id} style={{ width: colWidth }} />
           ))}
           {rightPad > 0 && <col style={{ width: rightPad }} />}
         </colgroup>
@@ -170,8 +179,13 @@ export function TeacherMatrixView({ classroomId }: Props) {
               {leftPad > 0 && <td aria-hidden />}
               {visibleStudents.map((s) => {
                 const cell = s.cells[stIdx];
+                const freshness = cell?.thumbnail
+                  ? "recent"
+                  : cell && cell.observationCount > 0
+                    ? "stale"
+                    : "none";
                 return (
-                  <td key={s.id} className="plant-matrix-cell">
+                  <td key={s.id} className="plant-matrix-cell" data-freshness={freshness}>
                     {cell?.thumbnail ? (
                       <img
                         src={cell.thumbnail}
@@ -180,6 +194,9 @@ export function TeacherMatrixView({ classroomId }: Props) {
                       />
                     ) : (
                       <span className="plant-matrix-empty" aria-label="기록 없음">·</span>
+                    )}
+                    {cell && cell.observationCount > 0 && (
+                      <span className="plant-matrix-count-badge">{cell.observationCount}</span>
                     )}
                   </td>
                 );

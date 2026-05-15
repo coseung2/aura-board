@@ -1,7 +1,8 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import type { ObservationDTO, StageDTO, StudentPlantDTO } from "@/types/plant";
+import { STALL_THRESHOLD_DAYS } from "@/lib/plant-schemas";
 import { ObservationEditor } from "./ObservationEditor";
 import { NoPhotoReasonModal } from "./NoPhotoReasonModal";
 import { OptimizedImage } from "../ui/OptimizedImage";
@@ -29,8 +30,15 @@ export function RoadmapView({
   const [busyAdvance, setBusyAdvance] = useState(false);
   const [reasonError, setReasonError] = useState<string | null>(null);
   const [lightbox, setLightbox] = useState<string | null>(null);
-  const [nicknameDraft, setNicknameDraft] = useState<string | null>(null);
+  const [isEditingNickname, setIsEditingNickname] = useState(false);
+  const [nicknameDraft, setNicknameDraft] = useState("");
   const [savingNickname, setSavingNickname] = useState(false);
+  const [celebrate, setCelebrate] = useState(false);
+  const [compareStageId, setCompareStageId] = useState<string | null>(null);
+  const [comparePos, setComparePos] = useState(50);
+  const compareRef = useRef<HTMLDivElement | null>(null);
+  const nicknameInputRef = useRef<HTMLInputElement | null>(null);
+  const timelineRef = useRef<HTMLDivElement | null>(null);
 
   const stages = plant.species.stages;
   const currentStage = stages.find((s) => s.id === plant.currentStageId) ?? stages[0];
@@ -59,6 +67,17 @@ export function RoadmapView({
     },
     [currentOrder]
   );
+
+  /** ② 미관찰 리마인더: 마지막 관찰로부터 경과일 계산 */
+  const daysSinceLastObs = useMemo(() => {
+    const allObs = plant.observations;
+    if (allObs.length === 0) return null;
+    const last = new Date(allObs[allObs.length - 1].observedAt);
+    return Math.floor((Date.now() - last.getTime()) / (24 * 60 * 60 * 1000));
+  }, [plant.observations]);
+
+  /** ① 방금 단계 이동했는지 (축하 배지 표시용) */
+  const justAdvanced = useRef(false);
 
   async function refreshPlant() {
     const res = await fetch(`/api/student-plants/${plant.id}`);
@@ -115,6 +134,7 @@ export function RoadmapView({
     await refreshPlant();
   }
 
+  /** ①⑦ 단계 이동 + 축하 + 자동스크롤 */
   async function handleAdvanceRequest() {
     setBusyAdvance(true);
     try {
@@ -125,6 +145,13 @@ export function RoadmapView({
       });
       if (res.ok) {
         await refreshPlant();
+        justAdvanced.current = true;
+        setCelebrate(true);
+        setTimeout(() => setCelebrate(false), 3000);
+        // ⑦ 자동 스크롤
+        setTimeout(() => {
+          document.querySelector('[data-state="active"]')?.scrollIntoView({ behavior: "smooth", block: "center" });
+        }, 100);
         return;
       }
       const j = await res.json().catch(() => ({}));
@@ -160,11 +187,18 @@ export function RoadmapView({
     }
   }
 
-  async function handleNicknameSave() {
-    if (nicknameDraft == null) return;
+  /** ③ 클릭투에디트 별명 */
+  function startNicknameEdit() {
+    if (!canEdit) return;
+    setNicknameDraft(plant.nickname);
+    setIsEditingNickname(true);
+    setTimeout(() => nicknameInputRef.current?.focus(), 0);
+  }
+
+  async function saveNickname() {
     const trimmed = nicknameDraft.trim();
     if (!trimmed || trimmed === plant.nickname) {
-      setNicknameDraft(null);
+      setIsEditingNickname(false);
       return;
     }
     setSavingNickname(true);
@@ -181,10 +215,41 @@ export function RoadmapView({
       }
       const j = await res.json();
       if (j?.studentPlant) onPlantUpdated(j.studentPlant as StudentPlantDTO);
-      setNicknameDraft(null);
+      setIsEditingNickname(false);
     } finally {
       setSavingNickname(false);
     }
+  }
+
+  function cancelNicknameEdit() {
+    setIsEditingNickname(false);
+    setNicknameDraft("");
+  }
+
+  /** ⑧ 이미지 로딩 실패 fallback */
+  function handleImgError(e: React.SyntheticEvent<HTMLImageElement>) {
+    const target = e.currentTarget;
+    target.style.display = "none";
+    const fallback = target.parentElement?.querySelector?.(".plant-img-fallback") as HTMLElement | null;
+    if (fallback) fallback.style.display = "flex";
+  }
+
+  /** ⑨ 성장 비교 슬라이더 */
+  function handleCompareMouseDown(e: React.MouseEvent) {
+    e.preventDefault();
+    const wrap = compareRef.current;
+    if (!wrap) return;
+    const rect = wrap.getBoundingClientRect();
+    const onMove = (ev: MouseEvent) => {
+      const x = Math.max(0, Math.min(ev.clientX - rect.left, rect.width));
+      setComparePos((x / rect.width) * 100);
+    };
+    const onUp = () => {
+      window.removeEventListener("mousemove", onMove);
+      window.removeEventListener("mouseup", onUp);
+    };
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onUp);
   }
 
   const composerOpen = editorStageId !== null;
@@ -193,50 +258,56 @@ export function RoadmapView({
 
   return (
     <div className="plant-roadmap">
+      {/* ① 축하 배너 */}
+      {celebrate && (
+        <div className="plant-celebration-banner" role="status">
+          🎉 {currentStage.order}단계 · {currentStage.nameKo} 도달!
+        </div>
+      )}
+
       <header className="plant-head">
         <span className="plant-head-emoji" aria-hidden>{plant.species.emoji}</span>
         <div>
           <div className="plant-head-name">{plant.species.nameKo}</div>
-          {nicknameDraft != null ? (
+          {/* ③ 클릭투에디트 별명 */}
+          {isEditingNickname ? (
             <div className="plant-head-nickname-edit">
               <input
+                ref={nicknameInputRef}
                 type="text"
                 maxLength={20}
                 value={nicknameDraft}
                 onChange={(e) => setNicknameDraft(e.target.value)}
+                onBlur={saveNickname}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") saveNickname();
+                  if (e.key === "Escape") cancelNicknameEdit();
+                }}
                 aria-label="별명 편집"
                 disabled={savingNickname}
               />
-              <button type="button" onClick={handleNicknameSave} disabled={savingNickname}>
-                {savingNickname ? "저장 중…" : "저장"}
-              </button>
-              <button
-                type="button"
-                onClick={() => setNicknameDraft(null)}
-                disabled={savingNickname}
-              >
-                취소
-              </button>
             </div>
           ) : (
-            <div className="plant-head-nickname">
+            <div
+              className={`plant-head-nickname${canEdit ? " plant-head-nickname-click" : ""}`}
+              onClick={startNicknameEdit}
+              role={canEdit ? "button" : undefined}
+              tabIndex={canEdit ? 0 : undefined}
+              aria-label={canEdit ? "별명 편집하려면 클릭" : undefined}
+              onKeyDown={(e) => {
+                if (canEdit && (e.key === "Enter" || e.key === " ")) {
+                  e.preventDefault();
+                  startNicknameEdit();
+                }
+              }}
+            >
               “{plant.nickname}”
-              {canEdit && (
-                <button
-                  type="button"
-                  className="plant-head-nickname-edit-btn"
-                  onClick={() => setNicknameDraft(plant.nickname)}
-                  aria-label="별명 편집"
-                >
-                  편집
-                </button>
-              )}
             </div>
           )}
         </div>
       </header>
 
-      <div className="plant-timeline" role="list" aria-label="성장 타임라인">
+      <div className="plant-timeline" ref={timelineRef} role="list" aria-label="성장 타임라인">
         {stages.map((s, idx) => {
           const state = stageState(s.order);
           const obs = observationsByStage.get(s.id) ?? [];
@@ -245,6 +316,12 @@ export function RoadmapView({
           const isFirst = idx === 0;
           const canComposeHere =
             canEdit && (editAnyStage || isCurrent);
+
+          /** ⑨ 비교 슬라이더: 같은 단계 내 2개 이상 이미지 */
+          const allImages = obs.flatMap((o) => o.images);
+          const hasComparable = allImages.length >= 2;
+          const isComparing = compareStageId === s.id;
+
           return (
             <section
               key={s.id}
@@ -280,9 +357,38 @@ export function RoadmapView({
                     <span aria-hidden className="plant-stage-body-icon">{s.icon}</span>
                     {s.order}단계 · {s.nameKo}
                     {isCurrent && <span className="plant-stage-body-pill">현재</span>}
+                    {/* ① 축하 배지: 방금 전에 이 단계로 왔으면 */}
+                    {justAdvanced.current && isCurrent && (
+                      <span className="plant-milestone-badge">✨ 도착!</span>
+                    )}
                   </h3>
                   {s.description && <p>{s.description}</p>}
                 </header>
+
+                {/* ② 미관찰 리마인더 (현재 단계만) */}
+                {isCurrent && daysSinceLastObs !== null && (
+                  <div
+                    className="plant-stall-indicator"
+                    data-level={
+                      daysSinceLastObs === 0
+                        ? "ok"
+                        : daysSinceLastObs < STALL_THRESHOLD_DAYS
+                          ? "warn"
+                          : "danger"
+                    }
+                  >
+                    {daysSinceLastObs === 0
+                      ? "🟢 오늘 관찰했어요!"
+                      : daysSinceLastObs < STALL_THRESHOLD_DAYS
+                        ? `⏰ ${daysSinceLastObs}일째 미관찰`
+                        : `⚠️ ${daysSinceLastObs}일째 미관찰 — 정체 위험!`}
+                  </div>
+                )}
+                {isCurrent && daysSinceLastObs === null && obs.length === 0 && (
+                  <div className="plant-stall-indicator" data-level="warn">
+                    🌱 아직 첫 관찰을 기록해보세요!
+                  </div>
+                )}
 
                 {s.observationPoints.length > 0 && (
                   <div className="plant-stage-body-points">
@@ -328,7 +434,12 @@ export function RoadmapView({
                                     src={img.thumbnailUrl ?? img.url}
                                     alt="관찰 사진"
                                     sizes="(max-width: 768px) 33vw, 160px"
+                                    onError={handleImgError}
                                   />
+                                  {/* ⑧ 이미지 fallback */}
+                                  <div className="plant-img-fallback" style={{ display: "none" }}>
+                                    🌱
+                                  </div>
                                 </div>
                               ))}
                             </div>
@@ -361,6 +472,57 @@ export function RoadmapView({
                     </div>
                   )}
                 </div>
+
+                {/* ⑨ 성장 비교 슬라이더 */}
+                {hasComparable && state !== "upcoming" && (
+                  <>
+                    {isComparing ? (
+                      <div
+                        className="plant-compare-wrap"
+                        ref={compareRef}
+                        onMouseDown={handleCompareMouseDown}
+                        onTouchMove={(e) => {
+                          const rect = compareRef.current?.getBoundingClientRect();
+                          if (!rect) return;
+                          const touch = e.touches[0];
+                          const x = Math.max(0, Math.min(touch.clientX - rect.left, rect.width));
+                          setComparePos((x / rect.width) * 100);
+                        }}
+                      >
+                        <img
+                          className="plant-compare-img"
+                          src={allImages[0].thumbnailUrl ?? allImages[0].url}
+                          alt="이전 사진"
+                        />
+                        <div className="plant-compare-overlay" style={{ width: `${comparePos}%` }}>
+                          <img
+                            src={allImages[allImages.length - 1].thumbnailUrl ?? allImages[allImages.length - 1].url}
+                            alt="최신 사진"
+                          />
+                        </div>
+                        <div className="plant-compare-handle" style={{ left: `${comparePos}%` }} />
+                      </div>
+                    ) : (
+                      <button
+                        type="button"
+                        className="plant-compare-toggle"
+                        onClick={() => setCompareStageId(s.id)}
+                      >
+                        📸 이전 사진과 비교
+                      </button>
+                    )}
+                    {isComparing && (
+                      <button
+                        type="button"
+                        className="plant-compare-toggle"
+                        onClick={() => setCompareStageId(null)}
+                        style={{ marginLeft: 6 }}
+                      >
+                        비교 닫기
+                      </button>
+                    )}
+                  </>
+                )}
 
                 {canComposeHere && (
                   <div className="plant-stage-body-actions">
@@ -441,7 +603,12 @@ export function RoadmapView({
               sizes="90vw"
               priority
               fit="contain"
+              onError={handleImgError}
             />
+            {/* ⑧ 라이트박스 fallback */}
+            <div className="plant-img-fallback" style={{ display: "none", position: "absolute", inset: 0, fontSize: 64 }}>
+              🌱
+            </div>
           </div>
         </div>
       )}

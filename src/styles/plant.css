@@ -11,7 +11,7 @@
 
 /* ── Select step ─────────────────────────── */
 .plant-select {
-  max-width: var(--container-max-width);
+  max-width: 960px;
   margin: 0 auto;
   padding: 24px 20px 120px;
 }
@@ -597,6 +597,16 @@
   font-size: 13px;
   margin-top: 6px;
 }
+.plant-upload-progress {
+  height: 3px;
+  background: var(--color-plant-active);
+  animation: plant-upload-indeterminate 1.5s infinite;
+}
+@keyframes plant-upload-indeterminate {
+  0% { width: 0%; }
+  50% { width: 70%; }
+  100% { width: 100%; }
+}
 .plant-empty-state {
   text-align: center;
   color: var(--color-text-muted);
@@ -918,5 +928,465 @@
   .plant-student-row-link {
     transition: none;
   }
+}
+
+/* =====================================================
+   v3 — UI/UX 개선 (2026-05-16)
+   ===================================================== */
+
+/* ── ④ 분포 막대그래프 ─────────────────────────── */
+.plant-dist-item {
+  position: relative;
+  overflow: hidden;
+}
+.plant-dist-bar {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: linear-gradient(to top, var(--color-plant-active), color-mix(in srgb, var(--color-plant-active) 60%, transparent));
+  border-radius: 4px 4px 0 0;
+  min-height: 4px;
+  transition: height 0.3s ease;
+  opacity: 0.35;
+  z-index: 0;
+}
+.plant-dist-count,
+.plant-dist-label {
+  position: relative;
+  z-index: 1;
+}
+
+/* ── ⑤ 매트릭스 카운트 배지 ────────────────────── */
+.plant-matrix-cell {
+  position: relative;
+}
+.plant-matrix-count-badge {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  background: var(--color-plant-active);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  min-width: 18px;
+  height: 18px;
+  border-radius: 9px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+}
+
+/* ── ⑥ 매트릭스 시간 색상 코딩 ─────────────────── */
+.plant-matrix-cell[data-freshness="recent"] {
+  background: #f0fdf4;
+}
+.plant-matrix-cell[data-freshness="stale"] {
+  background: #fefce8;
+}
+.plant-matrix-cell[data-freshness="stalled"] {
+  background: #fef2f2;
+}
+.plant-matrix-cell[data-freshness="none"] {
+  background: var(--color-bg);
+}
+
+/* ── ⑪ 태블릿 매트릭스 지원 ────────────────────── */
+@media (max-width: 1023px) {
+  .plant-matrix-cell img {
+    width: 44px;
+    height: 44px;
+  }
+  .plant-matrix th,
+  .plant-matrix td {
+    width: 60px;
+    height: 60px;
+  }
+}
+
+/* ── ① 축하 배지 + confetti ──────────────────────── */
+.plant-milestone-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: linear-gradient(135deg, #ffd700, #ffaa00);
+  color: #7c5a00;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 10px;
+  border-radius: var(--radius-pill);
+  animation: plant-badge-pop 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  margin-left: 6px;
+}
+@keyframes plant-badge-pop {
+  0% { transform: scale(0); opacity: 0; }
+  60% { transform: scale(1.2); }
+  100% { transform: scale(1); opacity: 1; }
+}
+.plant-celebration-banner {
+  text-align: center;
+  padding: 12px 16px;
+  margin-bottom: 12px;
+  background: linear-gradient(135deg, #ffd70015, #ffaa0015);
+  border: 1px solid #ffd70040;
+  border-radius: var(--radius-card);
+  font-size: 14px;
+  font-weight: 700;
+  animation: plant-celebrate-fade 3s ease-out forwards;
+}
+@keyframes plant-celebrate-fade {
+  0%, 60% { opacity: 1; transform: translateY(0); }
+  100% { opacity: 0; transform: translateY(-10px); pointer-events: none; }
+}
+
+/* ── ② 미관찰 리마인더 ────────────────────────── */
+.plant-stall-indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 12px;
+  border-radius: var(--radius-pill);
+  font-size: 12px;
+  font-weight: 600;
+  margin-top: 6px;
+}
+.plant-stall-indicator[data-level="ok"] {
+  background: #f0fdf4;
+  color: #15803d;
+}
+.plant-stall-indicator[data-level="warn"] {
+  background: #fefce8;
+  color: #a16207;
+}
+.plant-stall-indicator[data-level="danger"] {
+  background: #fef2f2;
+  color: #dc2626;
+  animation: plant-pulse 2s infinite;
+}
+@keyframes plant-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
+}
+
+/* ── ③ 클릭투에디트 별명 (추가 스타일) ─────────── */
+.plant-head-nickname-click {
+  cursor: pointer;
+  padding: 2px 8px;
+  border-radius: var(--radius-btn);
+  transition: background 120ms;
+  border: 1px solid transparent;
+}
+.plant-head-nickname-click:hover {
+  background: var(--color-bg);
+  border-color: var(--color-border);
+}
+.plant-head-nickname-click::after {
+  content: "✏️";
+  font-size: 11px;
+  margin-left: 4px;
+  opacity: 0.4;
+  transition: opacity 120ms;
+}
+.plant-head-nickname-click:hover::after {
+  opacity: 1;
+}
+
+/* ── ⑧ 이미지 fallback ──────────────────────────── */
+.plant-img-fallback {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 32px;
+  background: var(--color-bg-alt);
+  border-radius: 8px;
+  color: var(--color-text-faint);
+}
+
+/* ── ⑨ 성장 비교 슬라이더 ──────────────────────── */
+.plant-compare-wrap {
+  position: relative;
+  margin-top: 10px;
+  border-radius: 8px;
+  overflow: hidden;
+  user-select: none;
+}
+.plant-compare-img {
+  display: block;
+  width: 100%;
+  height: 180px;
+  object-fit: cover;
+}
+.plant-compare-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  overflow: hidden;
+  z-index: 2;
+}
+.plant-compare-overlay img {
+  display: block;
+  width: 100%;
+  height: 180px;
+  object-fit: cover;
+}
+.plant-compare-handle {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  background: #fff;
+  z-index: 3;
+  cursor: col-resize;
+  box-shadow: 0 0 6px rgba(0,0,0,0.4);
+}
+.plant-compare-handle::after {
+  content: "↔";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: #fff;
+  border-radius: 50%;
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.3);
+}
+.plant-compare-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-btn);
+  padding: 4px 10px;
+  cursor: pointer;
+  margin-top: 6px;
+  color: var(--color-text-muted);
+  transition: all 120ms;
+}
+.plant-compare-toggle:hover {
+  border-color: var(--color-plant-active);
+  color: var(--color-plant-active);
+}
+
+/* ── ⑫ Parent 뷰 CSS 통합 ─────────────────────── */
+.plant-parent-list {
+  display: grid;
+  gap: 20px;
+}
+.plant-parent-section {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  padding: 16px;
+}
+.plant-parent-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+.plant-parent-header-emoji {
+  font-size: 22px;
+  line-height: 1;
+}
+.plant-parent-header h2 {
+  font-size: 16px;
+  margin: 0;
+}
+.plant-parent-meta {
+  flex-basis: 100%;
+  font-size: 12px;
+  color: var(--color-text-muted);
+  margin-top: 4px;
+}
+.plant-parent-timeline {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: 14px;
+}
+.plant-parent-entry {
+  padding-left: 14px;
+  border-left: 3px solid var(--color-primary-soft, #eef2ff);
+}
+.plant-parent-entry-meta {
+  font-size: 11px;
+  color: var(--color-text-muted);
+}
+.plant-parent-entry-memo {
+  margin: 4px 0 6px;
+  font-size: 14px;
+  line-height: 1.45;
+}
+.plant-parent-entry-reason {
+  margin: 4px 0 6px;
+  font-size: 12px;
+  color: var(--color-text-muted);
+  font-style: italic;
+}
+.plant-parent-entry-images {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: 6px;
+  margin-top: 4px;
+}
+.plant-parent-entry-image {
+  position: relative;
+  width: 100%;
+  height: 120px;
+  border-radius: 6px;
+  overflow: hidden;
+  background: var(--color-surface-muted, #f9fafb);
+}
+.plant-parent-empty-note {
+  font-size: 13px;
+  color: var(--color-text-muted);
+  margin: 0;
+}
+.plant-parent-empty-state {
+  padding: 20px;
+  background: var(--color-surface);
+  border: 1px dashed var(--color-border);
+  border-radius: 12px;
+  color: var(--color-text-muted);
+  font-size: 14px;
+}
+
+/* ── ⑭ 성장 요약 카드 ──────────────────────────── */
+.plant-growth-summary {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  padding: 14px 16px;
+  margin-bottom: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.plant-growth-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 13px;
+}
+.plant-growth-label {
+  color: var(--color-text-muted);
+}
+.plant-growth-value {
+  font-weight: 700;
+}
+.plant-growth-bar-track {
+  width: 100%;
+  height: 8px;
+  background: var(--color-bg-alt);
+  border-radius: 4px;
+  overflow: hidden;
+}
+.plant-growth-bar-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--color-plant-active), color-mix(in srgb, var(--color-plant-active) 70%, #ffd700));
+  border-radius: 4px;
+  transition: width 0.6s ease;
+}
+
+/* ── ⑮ 스켈레톤 로딩 ──────────────────────────── */
+.plant-skeleton {
+  background: linear-gradient(90deg, var(--color-bg-alt) 25%, var(--color-border) 50%, var(--color-bg-alt) 75%);
+  background-size: 200% 100%;
+  animation: plant-shimmer 1.5s infinite;
+  border-radius: 8px;
+}
+@keyframes plant-shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+.plant-skeleton-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+.plant-skeleton-emoji {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+}
+.plant-skeleton-title {
+  width: 120px;
+  height: 18px;
+}
+.plant-skeleton-stage {
+  height: 100px;
+  margin-bottom: 14px;
+}
+.plant-skeleton-obs {
+  height: 60px;
+  margin-bottom: 10px;
+}
+
+/* ── ⑯ breadcrumb ──────────────────────────────── */
+.plant-breadcrumb {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--color-text-muted);
+  margin-bottom: 8px;
+}
+.plant-breadcrumb a {
+  color: inherit;
+  text-decoration: none;
+  font-weight: 500;
+}
+.plant-breadcrumb a:hover {
+  text-decoration: underline;
+  color: var(--color-text);
+}
+.plant-breadcrumb-sep {
+  color: var(--color-text-faint);
+}
+
+/* ── ⑩ Teacher 썸네일 열 ────────────────────────── */
+.plant-student-thumb {
+  width: 40px;
+  height: 40px;
+  border-radius: 6px;
+  object-fit: cover;
+  background: var(--color-bg);
+}
+.plant-filter-select {
+  padding: 6px 10px;
+  border-radius: var(--radius-btn);
+  border: 1px solid var(--color-border);
+  font: inherit;
+  font-size: 13px;
+  background: var(--color-surface);
+  cursor: pointer;
+}
+.plant-filter-select:focus {
+  outline: 2px solid var(--color-plant-active);
+  outline-offset: -2px;
+}
+
+/* ── ⑬ 사진 미리보기 확대 (ObservationEditor) ──── */
+.plant-editor-thumb {
+  cursor: zoom-in;
+  transition: transform 120ms;
+}
+.plant-editor-thumb:hover {
+  transform: scale(1.05);
 }
 
