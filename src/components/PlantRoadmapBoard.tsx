@@ -11,22 +11,43 @@ interface Props {
 }
 
 export function PlantRoadmapBoard({ initial }: Props) {
-  const [state, setState] = useState<PlantJournalResponse>(initial);
+  const [state, setState] = useState<PlantJournalResponse | null>(initial);
+  const [loading, setLoading] = useState(false);
 
   const refetch = useCallback(async () => {
-    const res = await fetch(`/api/boards/${state.board.id}/plant-journal`);
-    if (!res.ok) return;
-    const j = (await res.json()) as PlantJournalResponse;
-    setState(j);
-  }, [state.board.id]);
+    if (!state) return;
+    setLoading(true);
+    try {
+      const res = await fetch(`/api/boards/${state.board.id}/plant-journal`);
+      if (!res.ok) return;
+      const j = (await res.json()) as PlantJournalResponse;
+      setState(j);
+    } finally {
+      setLoading(false);
+    }
+  }, [state]);
 
   const handleStarted = useCallback((plant: StudentPlantDTO) => {
-    setState((prev) => ({ ...prev, myPlant: plant }));
+    setState((prev) => (prev ? { ...prev, myPlant: plant } : prev));
   }, []);
 
   const handlePlantUpdated = useCallback((next: StudentPlantDTO) => {
-    setState((prev) => ({ ...prev, myPlant: next }));
+    setState((prev) => (prev ? { ...prev, myPlant: next } : prev));
   }, []);
+
+  if (loading || !state) {
+    return (
+      <div className="plant-roadmap">
+        <div className="plant-skeleton-head">
+          <div className="plant-skeleton plant-skeleton-emoji" />
+          <div className="plant-skeleton plant-skeleton-title" />
+        </div>
+        <div className="plant-skeleton plant-skeleton-stage" />
+        <div className="plant-skeleton plant-skeleton-stage" />
+        <div className="plant-skeleton plant-skeleton-stage" />
+      </div>
+    );
+  }
 
   // Teacher (board owner) path — render summary view.
   if (state.role === "owner" && state.teacherSummary) {
@@ -37,6 +58,7 @@ export function PlantRoadmapBoard({ initial }: Props) {
         allowedSpecies={state.species}
         classroomId={state.teacherSummary.classroomId}
         boardId={state.board.id}
+        boardTitle={state.board.title}
         onAllowListSaved={refetch}
       />
     );
