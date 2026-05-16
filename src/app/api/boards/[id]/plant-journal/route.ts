@@ -13,6 +13,13 @@ import { getCurrentStudent } from "@/lib/student-auth";
 import { getBoardRole } from "@/lib/rbac";
 import { parseObservationPoints, STALL_THRESHOLD_DAYS } from "@/lib/plant-schemas";
 
+export const runtime = "nodejs";
+export const maxDuration = 10;
+
+const PRIVATE_NO_STORE_HEADERS = {
+  "Cache-Control": "private, no-store, max-age=0",
+} as const;
+
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params;
@@ -21,9 +28,9 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
       getCurrentStudent(),
       db.board.findUnique({ where: { id }, select: { id: true, classroomId: true, layout: true, title: true } }),
     ]);
-    if (!board) return NextResponse.json({ error: "not found" }, { status: 404 });
+    if (!board) return NextResponse.json({ error: "not found" }, { status: 404, headers: PRIVATE_NO_STORE_HEADERS });
     if (board.layout !== "plant-roadmap") {
-      return NextResponse.json({ error: "wrong layout" }, { status: 400 });
+      return NextResponse.json({ error: "wrong layout" }, { status: 400, headers: PRIVATE_NO_STORE_HEADERS });
     }
 
     const userId = user?.id ?? null;
@@ -32,7 +39,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
       !!student && board.classroomId !== null && student.classroomId === board.classroomId;
 
     if (!role && !isStudentOfBoard) {
-      return NextResponse.json({ error: "forbidden" }, { status: 403 });
+      return NextResponse.json({ error: "forbidden" }, { status: 403, headers: PRIVATE_NO_STORE_HEADERS });
     }
 
     // Allowed species
@@ -188,19 +195,22 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
       };
     }
 
-    return NextResponse.json({
-      board: { id: board.id, title: board.title, classroomId: board.classroomId },
-      role,
-      viewer: {
-        kind: isStudentOfBoard ? "student" : role === "owner" ? "teacher_owner" : role ?? "none",
-        studentId: isStudentOfBoard && student ? student.id : null,
+    return NextResponse.json(
+      {
+        board: { id: board.id, title: board.title, classroomId: board.classroomId },
+        role,
+        viewer: {
+          kind: isStudentOfBoard ? "student" : role === "owner" ? "teacher_owner" : role ?? "none",
+          studentId: isStudentOfBoard && student ? student.id : null,
+        },
+        species: speciesOut,
+        myPlant,
+        teacherSummary,
       },
-      species: speciesOut,
-      myPlant,
-      teacherSummary,
-    });
+      { headers: PRIVATE_NO_STORE_HEADERS }
+    );
   } catch (e) {
     console.error("[GET /api/boards/:id/plant-journal]", e);
-    return NextResponse.json({ error: "internal" }, { status: 500 });
+    return NextResponse.json({ error: "internal" }, { status: 500, headers: PRIVATE_NO_STORE_HEADERS });
   }
 }

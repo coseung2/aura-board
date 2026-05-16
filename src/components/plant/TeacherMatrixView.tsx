@@ -34,7 +34,7 @@ interface Props {
   classroomId: string;
 }
 
-const DESKTOP_MIN = 768;
+const DESKTOP_MIN = 1024;
 
 // Simple column virtualization — render only visible column range + overscan.
 const DESKTOP_COL_WIDTH = 100; // th/td width approx
@@ -51,6 +51,7 @@ export function TeacherMatrixView({ classroomId }: Props) {
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const [scrollX, setScrollX] = useState(0);
   const [viewportW, setViewportW] = useState(0);
+  const [selectedStudentId, setSelectedStudentId] = useState<string | null>(null);
 
   useEffect(() => {
     const check = () => {
@@ -76,7 +77,11 @@ export function TeacherMatrixView({ classroomId }: Props) {
         }
         return r.json();
       })
-      .then((j) => setData({ stages: j.stages, students: j.students }))
+      .then((j) => {
+        const next = { stages: j.stages, students: j.students };
+        setData(next);
+        setSelectedStudentId((current) => current ?? next.students[0]?.id ?? null);
+      })
       .catch((e) => setErr((e as Error).message));
   }, [classroomId, viewportOk]);
 
@@ -144,68 +149,160 @@ export function TeacherMatrixView({ classroomId }: Props) {
   const visibleStudents = students.slice(visibleRange.start, visibleRange.end);
   const leftPad = visibleRange.start * colWidth;
   const rightPad = (students.length - visibleRange.end) * colWidth;
+  const selectedStudent = students.find((s) => s.id === selectedStudentId) ?? students[0];
+  const selectedStage = selectedStudent?.plant
+    ? stages.find((st) => st.id === selectedStudent.plant?.currentStageId) ?? null
+    : null;
+  const selectedObservationTotal = selectedStudent?.cells.reduce((acc, cell) => acc + cell.observationCount, 0) ?? 0;
+  const selectedPhotoStages = selectedStudent?.cells.filter((cell) => cell.thumbnail).length ?? 0;
+  const classPhotoCells = students.reduce(
+    (acc, student) => acc + student.cells.filter((cell) => cell.thumbnail).length,
+    0
+  );
 
   return (
-    <div className="plant-matrix-wrap" ref={scrollRef}>
-      <table
-        className="plant-matrix"
-        style={{ tableLayout: "fixed", minWidth: leftPad + visibleStudents.length * colWidth + rightPad + STAGE_COL_WIDTH }}
-      >
-        <colgroup>
-          <col style={{ width: STAGE_COL_WIDTH }} />
-          {leftPad > 0 && <col style={{ width: leftPad }} />}
-          {visibleStudents.map((s) => (
-            <col key={s.id} style={{ width: colWidth }} />
-          ))}
-          {rightPad > 0 && <col style={{ width: rightPad }} />}
-        </colgroup>
-        <thead>
-          <tr>
-            <th>단계 \ 학생</th>
-            {leftPad > 0 && <th aria-hidden />}
-            {visibleStudents.map((s) => (
-              <th key={s.id} title={s.plant?.nickname ?? s.name}>
-                <div style={{ fontSize: 14 }}>{s.plant?.speciesEmoji ?? "·"}</div>
-                <div>{s.name}</div>
-              </th>
-            ))}
-            {rightPad > 0 && <th aria-hidden />}
-          </tr>
-        </thead>
-        <tbody>
-          {stages.map((st, stIdx) => (
-            <tr key={st.id}>
-              <th>{st.order}. {st.nameKo}</th>
-              {leftPad > 0 && <td aria-hidden />}
-              {visibleStudents.map((s) => {
-                const cell = s.cells[stIdx];
-                const freshness = cell?.thumbnail
-                  ? "recent"
-                  : cell && cell.observationCount > 0
-                    ? "stale"
-                    : "none";
-                return (
-                  <td key={s.id} className="plant-matrix-cell" data-freshness={freshness}>
-                    {cell?.thumbnail ? (
-                      <img
-                        src={cell.thumbnail}
-                        alt={`${s.name} - ${st.nameKo}`}
-                        onClick={() => setLightbox(cell.thumbnail)}
-                      />
-                    ) : (
-                      <span className="plant-matrix-empty" aria-label="기록 없음">·</span>
-                    )}
-                    {cell && cell.observationCount > 0 && (
-                      <span className="plant-matrix-count-badge">{cell.observationCount}</span>
-                    )}
-                  </td>
-                );
-              })}
-              {rightPad > 0 && <td aria-hidden />}
-            </tr>
-          ))}
-        </tbody>
-      </table>
+    <div className="plant-matrix-shell">
+      <header className="plant-matrix-toolbar">
+        <div>
+          <span className="plant-hero-eyebrow">Class matrix</span>
+          <h2>학급 성장 매트릭스</h2>
+          <p>학생 × 단계별 사진/기록을 스캔하고, 오른쪽 패널에서 바로 드릴다운해요.</p>
+        </div>
+        <div className="plant-matrix-toolbar-stats" aria-label="매트릭스 요약">
+          <span><strong>{students.length}</strong>명</span>
+          <span><strong>{stages.length}</strong>단계</span>
+          <span><strong>{classPhotoCells}</strong>개 사진 셀</span>
+        </div>
+      </header>
+
+      <div className="plant-matrix-layout">
+        <div className="plant-matrix-wrap" ref={scrollRef}>
+          <table
+            className="plant-matrix"
+            style={{ tableLayout: "fixed", minWidth: leftPad + visibleStudents.length * colWidth + rightPad + STAGE_COL_WIDTH }}
+          >
+            <colgroup>
+              <col style={{ width: STAGE_COL_WIDTH }} />
+              {leftPad > 0 && <col style={{ width: leftPad }} />}
+              {visibleStudents.map((s) => (
+                <col key={s.id} style={{ width: colWidth }} />
+              ))}
+              {rightPad > 0 && <col style={{ width: rightPad }} />}
+            </colgroup>
+            <thead>
+              <tr>
+                <th>단계 \ 학생</th>
+                {leftPad > 0 && <th aria-hidden />}
+                {visibleStudents.map((s) => (
+                  <th
+                    key={s.id}
+                    title={s.plant?.nickname ?? s.name}
+                    data-selected={selectedStudent?.id === s.id ? "true" : "false"}
+                  >
+                    <button type="button" className="plant-matrix-student-head" onClick={() => setSelectedStudentId(s.id)}>
+                      <span>{s.plant?.speciesEmoji ?? "·"}</span>
+                      <strong>{s.name}</strong>
+                    </button>
+                  </th>
+                ))}
+                {rightPad > 0 && <th aria-hidden />}
+              </tr>
+            </thead>
+            <tbody>
+              {stages.map((st, stIdx) => (
+                <tr key={st.id}>
+                  <th>{st.order}. {st.nameKo}</th>
+                  {leftPad > 0 && <td aria-hidden />}
+                  {visibleStudents.map((s) => {
+                    const cell = s.cells[stIdx];
+                    const freshness = cell?.thumbnail
+                      ? "recent"
+                      : cell && cell.observationCount > 0
+                        ? "stale"
+                        : "none";
+                    const isSelected = selectedStudent?.id === s.id;
+                    const isCurrent = s.plant?.currentStageId === st.id;
+                    return (
+                      <td
+                        key={s.id}
+                        className="plant-matrix-cell"
+                        data-freshness={freshness}
+                        data-selected={isSelected ? "true" : "false"}
+                        data-current={isCurrent ? "true" : "false"}
+                        onClick={() => setSelectedStudentId(s.id)}
+                      >
+                        {cell?.thumbnail ? (
+                          <button
+                            type="button"
+                            className="plant-matrix-photo-btn"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setSelectedStudentId(s.id);
+                              setLightbox(cell.thumbnail);
+                            }}
+                          >
+                            <img
+                              src={cell.thumbnail}
+                              alt={`${s.name} - ${st.nameKo}`}
+                            />
+                          </button>
+                        ) : (
+                          <span className="plant-matrix-empty" aria-label="기록 없음">·</span>
+                        )}
+                        {isCurrent && <span className="plant-matrix-current-dot" aria-label="현재 단계" />}
+                        {cell && cell.observationCount > 0 && (
+                          <span className="plant-matrix-count-badge">{cell.observationCount}</span>
+                        )}
+                      </td>
+                    );
+                  })}
+                  {rightPad > 0 && <td aria-hidden />}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        <aside className="plant-matrix-drilldown" aria-label="선택 학생 상세">
+          {selectedStudent ? (
+            <>
+              <span className="plant-hero-eyebrow">Drilldown</span>
+              <h3>{selectedStudent.number ?? "—"}번 {selectedStudent.name}</h3>
+              <p className="plant-matrix-drilldown-plant">
+                {selectedStudent.plant
+                  ? `${selectedStudent.plant.speciesEmoji} ${selectedStudent.plant.speciesName} · “${selectedStudent.plant.nickname}”`
+                  : "아직 식물을 선택하지 않았어요."}
+              </p>
+              <div className="plant-matrix-drilldown-stats">
+                <span><strong>{selectedObservationTotal}</strong>기록</span>
+                <span><strong>{selectedPhotoStages}</strong>사진 단계</span>
+                <span><strong>{selectedStage ? `${selectedStage.order}단계` : "대기"}</strong></span>
+              </div>
+              <div className="plant-matrix-mini-strip" aria-label="학생 단계별 기록 요약">
+                {stages.map((st, index) => {
+                  const cell = selectedStudent.cells[index];
+                  return (
+                    <span
+                      key={st.id}
+                      title={`${st.order}. ${st.nameKo}: ${cell?.observationCount ?? 0}개 기록`}
+                      data-filled={cell && cell.observationCount > 0 ? "true" : "false"}
+                      data-photo={cell?.thumbnail ? "true" : "false"}
+                      data-current={selectedStudent.plant?.currentStageId === st.id ? "true" : "false"}
+                    >
+                      {st.order}
+                    </span>
+                  );
+                })}
+              </div>
+              <p className="plant-matrix-drilldown-note">
+                초록 셀은 사진 기록, 노란 셀은 글 기록만 있는 단계예요. 썸네일은 필요한 셀만 로드해 Vercel 이미지/함수 비용을 줄입니다.
+              </p>
+            </>
+          ) : (
+            <p className="plant-teacher-empty-copy">학생을 선택하면 상세가 보여요.</p>
+          )}
+        </aside>
+      </div>
 
       {lightbox && (
         <div className="plant-lightbox" onClick={() => setLightbox(null)} role="dialog" aria-label="사진 원본">

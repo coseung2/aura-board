@@ -59,6 +59,16 @@ export function RoadmapView({
     return obs.reduce((acc, o) => acc + o.images.length, 0);
   }, [observationsByStage, currentStage]);
 
+  const currentStageObservations = observationsByStage.get(currentStage?.id ?? "") ?? [];
+  const totalPhotos = useMemo(
+    () => plant.observations.reduce((acc, o) => acc + o.images.length, 0),
+    [plant.observations]
+  );
+  const progressPercent = stages.length
+    ? Math.round((currentOrder / stages.length) * 100)
+    : 0;
+  const missionPoints = currentStage?.observationPoints.slice(0, 3) ?? [];
+
   const stageState = useCallback(
     (order: number): "visited" | "active" | "upcoming" => {
       if (order < currentOrder) return "visited";
@@ -72,9 +82,15 @@ export function RoadmapView({
   const daysSinceLastObs = useMemo(() => {
     const allObs = plant.observations;
     if (allObs.length === 0) return null;
-    const last = new Date(allObs[allObs.length - 1].observedAt);
-    return Math.floor((Date.now() - last.getTime()) / (24 * 60 * 60 * 1000));
+    const latestMs = Math.max(...allObs.map((o) => new Date(o.observedAt).getTime()));
+    return Math.floor((Date.now() - latestMs) / (24 * 60 * 60 * 1000));
   }, [plant.observations]);
+
+  const lastObservedLabel = daysSinceLastObs === null
+    ? "첫 관찰 대기"
+    : daysSinceLastObs === 0
+      ? "오늘 관찰 완료"
+      : `${daysSinceLastObs}일 전 관찰`;
 
   /** ① 방금 단계 이동했는지 (축하 배지 표시용) */
   const justAdvanced = useRef(false);
@@ -265,47 +281,107 @@ export function RoadmapView({
         </div>
       )}
 
-      <header className="plant-head">
-        <span className="plant-head-emoji" aria-hidden>{plant.species.emoji}</span>
-        <div>
-          <div className="plant-head-name">{plant.species.nameKo}</div>
-          {/* ③ 클릭투에디트 별명 */}
-          {isEditingNickname ? (
-            <div className="plant-head-nickname-edit">
-              <input
-                ref={nicknameInputRef}
-                type="text"
-                maxLength={20}
-                value={nicknameDraft}
-                onChange={(e) => setNicknameDraft(e.target.value)}
-                onBlur={saveNickname}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") saveNickname();
-                  if (e.key === "Escape") cancelNicknameEdit();
-                }}
-                aria-label="별명 편집"
-                disabled={savingNickname}
-              />
+      <section className="plant-student-hero" aria-label="식물 관찰 로드맵 요약">
+        <div className="plant-hero-main-card">
+          <div className="plant-hero-eyebrow">관찰 로드맵</div>
+          <div className="plant-hero-title-row">
+            <span className="plant-head-emoji" aria-hidden>{plant.species.emoji}</span>
+            <div>
+              <div className="plant-head-name">{plant.species.nameKo}</div>
+              {/* ③ 클릭투에디트 별명 */}
+              {isEditingNickname ? (
+                <div className="plant-head-nickname-edit">
+                  <input
+                    ref={nicknameInputRef}
+                    type="text"
+                    maxLength={20}
+                    value={nicknameDraft}
+                    onChange={(e) => setNicknameDraft(e.target.value)}
+                    onBlur={saveNickname}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") saveNickname();
+                      if (e.key === "Escape") cancelNicknameEdit();
+                    }}
+                    aria-label="별명 편집"
+                    disabled={savingNickname}
+                  />
+                </div>
+              ) : (
+                <div
+                  className={`plant-head-nickname${canEdit ? " plant-head-nickname-click" : ""}`}
+                  onClick={startNicknameEdit}
+                  role={canEdit ? "button" : undefined}
+                  tabIndex={canEdit ? 0 : undefined}
+                  aria-label={canEdit ? "별명 편집하려면 클릭" : undefined}
+                  onKeyDown={(e) => {
+                    if (canEdit && (e.key === "Enter" || e.key === " ")) {
+                      e.preventDefault();
+                      startNicknameEdit();
+                    }
+                  }}
+                >
+                  “{plant.nickname}”
+                </div>
+              )}
             </div>
-          ) : (
-            <div
-              className={`plant-head-nickname${canEdit ? " plant-head-nickname-click" : ""}`}
-              onClick={startNicknameEdit}
-              role={canEdit ? "button" : undefined}
-              tabIndex={canEdit ? 0 : undefined}
-              aria-label={canEdit ? "별명 편집하려면 클릭" : undefined}
-              onKeyDown={(e) => {
-                if (canEdit && (e.key === "Enter" || e.key === " ")) {
-                  e.preventDefault();
-                  startNicknameEdit();
-                }
+          </div>
+          <div className="plant-hero-progress" aria-label={`성장 진행률 ${progressPercent}%`}>
+            <div className="plant-hero-progress-head">
+              <span>{currentStage.order}단계 · {currentStage.nameKo}</span>
+              <strong>{progressPercent}%</strong>
+            </div>
+            <div className="plant-hero-progress-track">
+              <span style={{ width: `${progressPercent}%` }} />
+            </div>
+          </div>
+          <div className="plant-hero-stat-row" aria-label="관찰 통계">
+            <span><strong>{plant.observations.length}</strong>개 기록</span>
+            <span><strong>{totalPhotos}</strong>장 사진</span>
+            <span><strong>{lastObservedLabel}</strong></span>
+          </div>
+        </div>
+
+        <div className="plant-hero-mission-card">
+          <div className="plant-hero-eyebrow">이번 주 미션</div>
+          <h2>{currentStage.icon} {currentStage.nameKo} 관찰하기</h2>
+          <ul>
+            {(missionPoints.length > 0 ? missionPoints : ["잎, 줄기, 색깔 중 달라진 점 찾기", "사진 1장 이상 남기기", "한 문장으로 변화 기록하기"]).map((point) => (
+              <li key={point}>{point}</li>
+            ))}
+          </ul>
+          {canEdit && (
+            <button
+              type="button"
+              className="plant-hero-primary-cta"
+              onClick={() => {
+                setEditingObs(null);
+                setEditorStageId(currentStage.id);
               }}
             >
-              “{plant.nickname}”
-            </div>
+              📷 사진으로 관찰 시작
+            </button>
           )}
         </div>
-      </header>
+
+        <aside className="plant-hero-camera-card" aria-label="사진 기록 요약">
+          <span className="plant-camera-icon" aria-hidden>📸</span>
+          <div>
+            <strong>현재 단계 사진 {photosOnCurrentStage}장</strong>
+            <p>{currentStageObservations.length > 0 ? "전후 비교할 기록이 쌓이고 있어요." : "첫 사진을 올리면 성장 비교가 쉬워져요."}</p>
+          </div>
+          {canEdit && (
+            <button
+              type="button"
+              onClick={() => {
+                setEditingObs(null);
+                setEditorStageId(currentStage.id);
+              }}
+            >
+              바로 올리기
+            </button>
+          )}
+        </aside>
+      </section>
 
       <div className="plant-timeline" ref={timelineRef} role="list" aria-label="성장 타임라인">
         {stages.map((s, idx) => {

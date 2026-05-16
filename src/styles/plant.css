@@ -945,6 +945,917 @@
    v3 — UI/UX 개선 (2026-05-16)
    ===================================================== */
 
+/* ── OpenUI reference implementation: 학생 히어로 + 교사용 미션 컨트롤 ── */
+.plant-student-hero {
+  max-width: 1080px;
+  margin: 0 auto 22px;
+  display: grid;
+  grid-template-columns: minmax(0, 1.25fr) minmax(260px, 0.95fr) minmax(220px, 0.7fr);
+  gap: 14px;
+  align-items: stretch;
+}
+.plant-hero-main-card,
+.plant-hero-mission-card,
+.plant-hero-camera-card,
+.plant-teacher-hero,
+.plant-teacher-panel,
+.plant-matrix-toolbar,
+.plant-matrix-drilldown {
+  border: 1px solid rgba(91, 128, 94, 0.18);
+  border-radius: 22px;
+  background: linear-gradient(145deg, #fffdf7, #f8f5ec);
+  box-shadow: 0 18px 42px rgba(61, 78, 48, 0.08);
+}
+.plant-hero-main-card {
+  padding: 22px;
+  position: relative;
+  overflow: hidden;
+}
+.plant-hero-main-card::after {
+  content: "";
+  position: absolute;
+  right: -44px;
+  top: -44px;
+  width: 150px;
+  height: 150px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(39, 163, 95, 0.16), transparent 66%);
+}
+.plant-hero-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: #66825f;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.plant-hero-title-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 12px;
+}
+.plant-hero-progress {
+  margin-top: 22px;
+}
+.plant-hero-progress-head,
+.plant-hero-stat-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  color: var(--color-text-muted);
+  font-size: 13px;
+}
+.plant-hero-progress-head strong,
+.plant-hero-stat-row strong {
+  color: var(--color-text);
+}
+.plant-hero-progress-track {
+  height: 12px;
+  margin-top: 8px;
+  border-radius: 999px;
+  overflow: hidden;
+  background: rgba(39, 163, 95, 0.12);
+}
+.plant-hero-progress-track span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #27a35f, #9bbf52);
+}
+.plant-hero-stat-row {
+  margin-top: 16px;
+  justify-content: flex-start;
+  flex-wrap: wrap;
+}
+.plant-hero-stat-row span {
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.72);
+  border: 1px solid rgba(91, 128, 94, 0.16);
+}
+.plant-hero-mission-card {
+  padding: 20px;
+  background: linear-gradient(145deg, #f2f8e9, #fffaf0);
+}
+.plant-hero-mission-card h2 {
+  margin: 10px 0 12px;
+  font-size: 20px;
+  letter-spacing: -0.3px;
+}
+.plant-hero-mission-card ul {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 16px;
+  display: grid;
+  gap: 8px;
+}
+.plant-hero-mission-card li {
+  position: relative;
+  padding-left: 20px;
+  color: var(--color-text);
+  font-size: 13px;
+  line-height: 1.45;
+}
+.plant-hero-mission-card li::before {
+  content: "✓";
+  position: absolute;
+  left: 0;
+  top: 0;
+  color: var(--color-plant-active);
+  font-weight: 900;
+}
+.plant-hero-primary-cta,
+.plant-hero-camera-card button,
+.plant-teacher-primary-link,
+.plant-teacher-outline-btn,
+.plant-teacher-chip-btn {
+  border-radius: 999px;
+  border: 1px solid transparent;
+  font: inherit;
+  font-weight: 800;
+  cursor: pointer;
+  text-decoration: none;
+}
+.plant-hero-primary-cta,
+.plant-teacher-primary-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 10px 16px;
+  color: #fff;
+  background: linear-gradient(135deg, #1f8f51, #4eaf62);
+  box-shadow: 0 10px 24px rgba(39, 163, 95, 0.24);
+}
+.plant-hero-camera-card {
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  background: linear-gradient(145deg, #fff8ed, #f4fbef);
+}
+.plant-camera-icon {
+  width: 46px;
+  height: 46px;
+  border-radius: 16px;
+  display: grid;
+  place-items: center;
+  font-size: 24px;
+  background: #ffffffa8;
+  border: 1px solid rgba(91, 128, 94, 0.16);
+}
+.plant-hero-camera-card strong {
+  display: block;
+  font-size: 15px;
+}
+.plant-hero-camera-card p {
+  margin: 5px 0 0;
+  color: var(--color-text-muted);
+  font-size: 13px;
+  line-height: 1.45;
+}
+.plant-hero-camera-card button,
+.plant-teacher-outline-btn,
+.plant-teacher-chip-btn {
+  padding: 8px 13px;
+  color: #31563c;
+  background: rgba(255, 255, 255, 0.78);
+  border-color: rgba(91, 128, 94, 0.2);
+}
+
+.plant-teacher-hero {
+  padding: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  margin-bottom: 14px;
+  background: linear-gradient(135deg, #f5f2e8, #eef7e9 58%, #fffaf1);
+}
+.plant-teacher-hero h2,
+.plant-matrix-toolbar h2,
+.plant-teacher-panel h3,
+.plant-matrix-drilldown h3 {
+  margin: 6px 0 0;
+  letter-spacing: -0.35px;
+}
+.plant-teacher-hero p,
+.plant-matrix-toolbar p {
+  margin: 7px 0 0;
+  color: var(--color-text-muted);
+  line-height: 1.5;
+}
+.plant-teacher-hero-actions,
+.plant-teacher-table-tools,
+.plant-matrix-toolbar-stats {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.plant-teacher-kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 14px;
+}
+.plant-teacher-kpi-card {
+  padding: 16px;
+  border-radius: 18px;
+  border: 1px solid rgba(91, 128, 94, 0.16);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-sm);
+}
+.plant-teacher-kpi-card span,
+.plant-teacher-kpi-card small {
+  display: block;
+  color: var(--color-text-muted);
+  font-size: 12px;
+}
+.plant-teacher-kpi-card strong {
+  display: block;
+  margin: 7px 0 3px;
+  font-size: 28px;
+  line-height: 1;
+  letter-spacing: -0.7px;
+}
+.plant-teacher-kpi-card[data-tone="green"] strong { color: #1f8f51; }
+.plant-teacher-kpi-card[data-tone="red"] strong { color: #c62828; }
+.plant-teacher-kpi-card[data-tone="amber"] strong { color: #a16207; }
+.plant-teacher-kpi-card[data-tone="blue"] strong { color: #2563eb; }
+.plant-teacher-dashboard-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.55fr) minmax(280px, 0.85fr);
+  gap: 14px;
+  margin-bottom: 14px;
+}
+.plant-teacher-panel {
+  padding: 18px;
+}
+.plant-teacher-panel-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+.plant-teacher-panel-note,
+.plant-teacher-empty-copy {
+  color: var(--color-text-muted);
+  font-size: 12px;
+}
+.plant-distribution--bars .plant-dist-item {
+  min-height: 118px;
+  justify-content: flex-end;
+}
+.plant-teacher-alert-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: 8px;
+}
+.plant-teacher-alert-list button {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  text-align: left;
+  border: 1px solid rgba(198, 40, 40, 0.14);
+  border-radius: 14px;
+  background: #fff7f2;
+  padding: 10px 12px;
+  cursor: pointer;
+  font: inherit;
+}
+.plant-teacher-alert-list span {
+  font-weight: 800;
+}
+.plant-teacher-alert-list small {
+  color: var(--color-text-muted);
+}
+.plant-teacher-table-head {
+  align-items: center;
+}
+.plant-teacher-table-tools input {
+  min-width: 220px;
+  padding: 8px 11px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-btn);
+  font: inherit;
+  background: var(--color-surface);
+}
+.plant-student-table-wrap {
+  overflow-x: auto;
+}
+.plant-student-recency-dot {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+}
+.plant-ok-badge {
+  background: #f0fdf4;
+  color: #15803d;
+  border-radius: var(--radius-pill);
+  padding: 1px 8px;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.plant-matrix-shell {
+  padding: 20px;
+}
+.plant-matrix-toolbar {
+  padding: 20px;
+  margin-bottom: 14px;
+  display: flex;
+  justify-content: space-between;
+  gap: 14px;
+  align-items: center;
+}
+.plant-matrix-toolbar-stats span {
+  padding: 8px 12px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.74);
+  border: 1px solid rgba(91, 128, 94, 0.16);
+  color: var(--color-text-muted);
+  font-size: 12px;
+}
+.plant-matrix-toolbar-stats strong {
+  color: var(--color-text);
+}
+.plant-matrix-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 300px;
+  gap: 14px;
+  align-items: start;
+}
+.plant-matrix-wrap {
+  max-width: 100%;
+  overflow: auto;
+  padding: 0;
+  border-radius: 18px;
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+}
+.plant-matrix-student-head,
+.plant-matrix-photo-btn {
+  border: 0;
+  background: transparent;
+  padding: 0;
+  font: inherit;
+  cursor: pointer;
+}
+.plant-matrix-student-head {
+  width: 100%;
+  display: grid;
+  gap: 2px;
+  color: inherit;
+}
+.plant-matrix-student-head span {
+  font-size: 14px;
+}
+.plant-matrix-student-head strong {
+  font-size: 12px;
+}
+.plant-matrix th[data-selected="true"],
+.plant-matrix-cell[data-selected="true"] {
+  box-shadow: inset 0 0 0 2px rgba(39, 163, 95, 0.28);
+}
+.plant-matrix-cell[data-current="true"] {
+  outline: 2px solid rgba(37, 99, 235, 0.4);
+  outline-offset: -3px;
+}
+.plant-matrix-current-dot {
+  position: absolute;
+  left: 4px;
+  top: 4px;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: #2563eb;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.14);
+}
+.plant-matrix-photo-btn img {
+  display: block;
+}
+.plant-matrix-drilldown {
+  position: sticky;
+  top: 16px;
+  padding: 18px;
+}
+.plant-matrix-drilldown-plant,
+.plant-matrix-drilldown-note {
+  color: var(--color-text-muted);
+  font-size: 13px;
+  line-height: 1.5;
+}
+.plant-matrix-drilldown-stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  margin: 14px 0;
+}
+.plant-matrix-drilldown-stats span {
+  padding: 10px 6px;
+  border-radius: 14px;
+  text-align: center;
+  background: #ffffffb8;
+  border: 1px solid rgba(91, 128, 94, 0.14);
+  color: var(--color-text-muted);
+  font-size: 11px;
+}
+.plant-matrix-drilldown-stats strong {
+  display: block;
+  color: var(--color-text);
+  font-size: 14px;
+}
+.plant-matrix-mini-strip {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 6px;
+}
+.plant-matrix-mini-strip span {
+  display: grid;
+  place-items: center;
+  height: 34px;
+  border-radius: 10px;
+  background: var(--color-bg-alt);
+  color: var(--color-text-muted);
+  font-size: 12px;
+  font-weight: 800;
+}
+.plant-matrix-mini-strip span[data-filled="true"] { background: #fefce8; color: #854d0e; }
+.plant-matrix-mini-strip span[data-photo="true"] { background: #dcfce7; color: #166534; }
+.plant-matrix-mini-strip span[data-current="true"] { outline: 2px solid #2563eb; }
+
+/* =====================================================
+   v4 — Variant A: Canva-style Gamified (2026-05-16)
+   ===================================================== */
+
+/* ── Gamified hero gradient ── */
+.plant-hero-game {
+  background: linear-gradient(135deg, #2d6a4f 0%, #40916c 100%);
+  border-radius: 24px;
+  padding: 32px 36px;
+  color: white;
+  margin-bottom: 28px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.plant-hero-game h1 {
+  font-size: 26px;
+  font-weight: 800;
+  letter-spacing: -0.3px;
+  margin: 0;
+}
+.plant-hero-game p {
+  font-size: 14px;
+  opacity: 0.85;
+  margin: 6px 0 0;
+}
+.plant-hero-game-actions {
+  display: flex;
+  gap: 10px;
+}
+.plant-hero-game-btn {
+  background: rgba(255, 255, 255, 0.2);
+  backdrop-filter: blur(8px);
+  border: none;
+  color: white;
+  padding: 10px 20px;
+  border-radius: 12px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-family: inherit;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.plant-hero-game-btn:hover {
+  background: rgba(255, 255, 255, 0.35);
+  transform: translateY(-2px);
+}
+.plant-hero-game-btn-primary {
+  background: #95d5b2;
+  color: #1a3a2a;
+}
+.plant-hero-game-btn-primary:hover {
+  background: #b7e4c7;
+}
+
+/* ── Game KPI cards ── */
+.plant-kpi-game-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 14px;
+  margin-bottom: 28px;
+}
+.plant-kpi-game-card {
+  background: var(--color-surface);
+  border-radius: 20px;
+  padding: 22px 24px;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.04);
+  transition: all 0.2s;
+  cursor: pointer;
+  position: relative;
+  overflow: hidden;
+  border: none;
+  border-left: 4px solid transparent;
+}
+.plant-kpi-game-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+}
+.plant-kpi-game-card .kpi-icon { font-size: 26px; margin-bottom: 6px; }
+.plant-kpi-game-card .kpi-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--color-text-muted);
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
+}
+.plant-kpi-game-card .kpi-value {
+  font-size: 34px;
+  font-weight: 800;
+  margin: 4px 0;
+  letter-spacing: -1px;
+  line-height: 1;
+}
+.plant-kpi-game-card .kpi-sub {
+  font-size: 12px;
+  color: var(--color-text-muted);
+}
+.plant-kpi-game-card .kpi-micro {
+  margin-top: 10px;
+  height: 4px;
+  background: #ece6dc;
+  border-radius: 4px;
+  overflow: hidden;
+}
+.plant-kpi-game-card .kpi-micro-fill {
+  height: 100%;
+  border-radius: 4px;
+  transition: width 0.4s;
+}
+.kpi-tone-green { border-left-color: #2d6a4f; }
+.kpi-tone-green .kpi-value { color: #2d6a4f; }
+.kpi-tone-green .kpi-micro-fill { background: #2d6a4f; }
+.kpi-tone-red { border-left-color: #d62828; }
+.kpi-tone-red .kpi-value { color: #d62828; }
+.kpi-tone-red .kpi-micro-fill { background: #d62828; }
+.kpi-tone-amber { border-left-color: #e9a820; }
+.kpi-tone-amber .kpi-value { color: #b8860b; }
+.kpi-tone-amber .kpi-micro-fill { background: #e9a820; }
+.kpi-tone-blue { border-left-color: #1d3557; }
+.kpi-tone-blue .kpi-value { color: #1d3557; }
+.kpi-tone-blue .kpi-micro-fill { background: #1d3557; }
+
+/* ── Stage distribution — vertical gradient bars (enhanced) ── */
+.plant-dist-game {
+  display: flex;
+  align-items: flex-end;
+  gap: 6px;
+  height: 180px;
+  padding: 0 4px;
+}
+.plant-dist-game-wrap {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  height: 100%;
+  justify-content: flex-end;
+}
+.plant-dist-game-bar {
+  width: 100%;
+  max-width: 44px;
+  border-radius: 8px 8px 4px 4px;
+  background: linear-gradient(180deg, #52b788 0%, #40916c 100%);
+  transition: height 0.4s;
+  min-height: 6px;
+  position: relative;
+}
+.plant-dist-game-wrap:hover .plant-dist-game-bar {
+  background: linear-gradient(180deg, #74c69d 0%, #52b788 100%);
+}
+.plant-dist-game-count {
+  font-size: 11px;
+  font-weight: 700;
+  margin-bottom: 3px;
+  color: #2d6a4f;
+}
+.plant-dist-game-label {
+  font-size: 10px;
+  color: var(--color-text-muted);
+  margin-top: 4px;
+}
+
+/* ── Alert cards (avatar style) ── */
+.plant-alert-game {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: 8px;
+}
+.plant-alert-game-card {
+  display: flex;
+  align-items: center;
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: #fef9ee;
+  transition: all 0.2s;
+  cursor: pointer;
+  border: none;
+  font: inherit;
+  text-align: left;
+  width: 100%;
+}
+.plant-alert-game-card:hover {
+  background: #fef3d9;
+  transform: translateX(4px);
+}
+.plant-alert-game-avatar {
+  width: 38px;
+  height: 38px;
+  border-radius: 12px;
+  background: #e9c46a;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  margin-right: 12px;
+  flex-shrink: 0;
+}
+.plant-alert-game-info { flex: 1; min-width: 0; }
+.plant-alert-game-name { font-weight: 600; font-size: 14px; }
+.plant-alert-game-meta { font-size: 12px; color: var(--color-text-muted); }
+.plant-alert-game-badge {
+  background: #d62828;
+  color: white;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 10px;
+  border-radius: 20px;
+  flex-shrink: 0;
+}
+
+/* ── Student card grid ── */
+.plant-student-game-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 10px;
+}
+.plant-student-game-card {
+  display: flex;
+  align-items: center;
+  padding: 14px 16px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 16px;
+  transition: all 0.2s;
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
+  color: inherit;
+  width: 100%;
+}
+.plant-student-game-card:hover {
+  border-color: #95d5b2;
+  box-shadow: 0 4px 16px rgba(45, 106, 79, 0.1);
+  transform: translateY(-2px);
+}
+.plant-student-game-avatar {
+  width: 44px;
+  height: 44px;
+  border-radius: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 24px;
+  margin-right: 14px;
+  background: #edf7ed;
+  flex-shrink: 0;
+}
+.plant-student-game-info { flex: 1; min-width: 0; }
+.plant-student-game-name { font-weight: 600; font-size: 14px; }
+.plant-student-game-plant { font-size: 12px; color: var(--color-text-muted); }
+.plant-student-game-stage {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 2px;
+}
+.plant-student-game-stage .stage-dot {
+  width: 8px; height: 8px; border-radius: 50%;
+}
+.plant-student-game-stage .stage-green { background: #52b788; }
+.plant-student-game-stage .stage-yellow { background: #e9c46a; }
+.plant-student-game-stage .stage-red { background: #d62828; }
+.plant-student-game-badge {
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 10px;
+  border-radius: 20px;
+  flex-shrink: 0;
+}
+.badge-game-stalled { background: #ffe0e0; color: #d62828; }
+.badge-game-ok { background: #e0f5e0; color: #2d6a4f; }
+.badge-game-pending { background: #f0f2f5; color: #5b6b7f; }
+
+/* ── Matrix preview mini grid ── */
+.plant-matrix-game {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 20px;
+  padding: 24px;
+  margin-top: 28px;
+}
+.plant-matrix-game-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+.plant-matrix-game-head h3 {
+  font-size: 16px;
+  font-weight: 700;
+  margin: 0;
+}
+.plant-matrix-game-stats {
+  display: flex;
+  gap: 12px;
+  font-size: 12px;
+  color: var(--color-text-muted);
+}
+.plant-matrix-game-stats strong { color: var(--color-text); }
+.plant-matrix-game-grid {
+  display: grid;
+  grid-template-columns: 100px repeat(auto-fill, minmax(56px, 1fr));
+  gap: 4px;
+}
+.plant-matrix-game-label {
+  font-size: 11px;
+  color: var(--color-text-muted);
+  display: flex;
+  align-items: center;
+  padding: 4px;
+}
+.plant-matrix-game-cell {
+  aspect-ratio: 1;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  cursor: pointer;
+  transition: all 0.12s;
+  border: none;
+  font-family: inherit;
+}
+.plant-matrix-game-cell:hover {
+  transform: scale(1.15);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+}
+.mgc-photo { background: #d8f3dc; }
+.mgc-empty { background: #f0f7f0; color: #b8d0c0; }
+.mgc-current { box-shadow: inset 0 0 0 2px #52b788; }
+.mgc-stale { background: #fef3d9; }
+.plant-matrix-game-header {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--color-text-muted);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px;
+}
+
+/* ── Board header toggles ── */
+.plant-view-toggle {
+  display: flex;
+  gap: 4px;
+  background: #f0f2f5;
+  border-radius: 12px;
+  padding: 3px;
+}
+.plant-view-toggle button {
+  border: none;
+  background: transparent;
+  padding: 6px 14px;
+  border-radius: 10px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  color: var(--color-text-muted);
+  font-family: inherit;
+  transition: all 0.15s;
+}
+.plant-view-toggle button[data-active="true"] {
+  background: white;
+  color: var(--color-text);
+  box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+}
+.plant-view-toggle button:hover:not([data-active="true"]) {
+  color: var(--color-text);
+}
+
+/* ── Dashboard layout (enhanced) ── */
+.plant-dash-game {
+  display: grid;
+  grid-template-columns: 1.6fr 1fr;
+  gap: 18px;
+  margin-bottom: 28px;
+}
+.plant-panel-game {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 20px;
+  padding: 24px;
+}
+.plant-panel-game-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+.plant-panel-game-head h3 {
+  font-size: 16px;
+  font-weight: 700;
+  margin: 0;
+}
+.plant-panel-game-eyebrow {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--color-text-muted);
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+}
+
+@media (max-width: 1100px) {
+  .plant-student-hero,
+  .plant-teacher-dashboard-grid,
+  .plant-dash-game {
+    grid-template-columns: 1fr;
+  }
+  .plant-matrix-layout {
+    grid-template-columns: 1fr;
+  }
+  .plant-matrix-drilldown {
+    position: static;
+  }
+}
+
+@media (max-width: 860px) {
+  .plant-teacher-hero,
+  .plant-matrix-toolbar,
+  .plant-teacher-panel-head,
+  .plant-teacher-table-head {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .plant-teacher-kpi-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 560px) {
+  .plant-roadmap,
+  .plant-teacher,
+  .plant-matrix-shell {
+    padding: 12px;
+  }
+  .plant-student-hero,
+  .plant-teacher-kpi-grid {
+    grid-template-columns: 1fr;
+  }
+  .plant-hero-main-card,
+  .plant-hero-mission-card,
+  .plant-hero-camera-card,
+  .plant-teacher-hero,
+  .plant-teacher-panel,
+  .plant-matrix-toolbar,
+  .plant-matrix-drilldown {
+    border-radius: 16px;
+    padding: 14px;
+  }
+  .plant-teacher-table-tools input,
+  .plant-teacher-table-tools select {
+    width: 100%;
+  }
+}
+
 /* ── ④ 분포 막대그래프 ─────────────────────────── */
 .plant-dist-item {
   position: relative;
