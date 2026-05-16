@@ -77,7 +77,7 @@ export function StudentDashboard({
     setLoggingOut(true);
     try {
       await fetch("/api/student/logout", { method: "POST" });
-      router.push("/student/login");
+      router.push("/login");
     } catch {
       setLoggingOut(false);
     }
