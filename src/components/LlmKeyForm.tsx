@@ -13,14 +13,14 @@ type Provider = "claude" | "openai" | "gemini" | "ollama" | "opencode-go";
 
 // opencode-go에서 사용할 수 있는 주요 모델 목록
 const OPENCODE_MODELS = [
-  { id: "opencode/deepseek-v4-flash-free", label: "DeepSeek Flash (무료)" },
-  { id: "opencode/kimi-k2.6", label: "Kimi K2.6" },
-  { id: "opencode/claude-sonnet-4-5", label: "Claude Sonnet 4.5" },
-  { id: "opencode/gpt-5.5-pro", label: "GPT 5.5 Pro" },
-  { id: "opencode/gemini-3-flash", label: "Gemini 3 Flash" },
-  { id: "opencode/gemini-3.1-pro", label: "Gemini 3.1 Pro" },
-  { id: "opencode/qwen3.6-plus-free", label: "Qwen 3.6 Plus (무료)" },
-  { id: "opencode/minimax-m2.5-free", label: "MiniMax M2.5 (무료)" },
+  { id: "deepseek-v4-flash", label: "DeepSeek Flash" },
+  { id: "kimi-k2.6", label: "Kimi K2.6" },
+  { id: "claude-sonnet-4-5", label: "Claude Sonnet 4.5" },
+  { id: "gpt-5.5-pro", label: "GPT 5.5 Pro" },
+  { id: "gemini-3-flash", label: "Gemini 3 Flash" },
+  { id: "gemini-3.1-pro", label: "Gemini 3.1 Pro" },
+  { id: "qwen3.6-plus", label: "Qwen 3.6 Plus" },
+  { id: "minimax-m2.5", label: "MiniMax M2.5" },
 ];
 
 type KeyStatus =
@@ -47,7 +47,7 @@ const PROVIDER_LABEL: Record<Provider, string> = {
 
 const OLLAMA_DEFAULT_URL = "http://localhost:11434/v1";
 const OLLAMA_DEFAULT_MODEL = "qwen2.5-coder:32b";
-const OPENCODE_DEFAULT_MODEL = "opencode/deepseek-v4-flash-free";
+const OPENCODE_DEFAULT_MODEL = "deepseek-v4-flash";
 
 export function LlmKeyForm() {
   const [status, setStatus] = useState<KeyStatus | null>(null);

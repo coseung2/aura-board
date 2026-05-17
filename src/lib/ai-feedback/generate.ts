@@ -9,7 +9,7 @@ const MODELS: Record<Exclude<LlmProvider, "ollama">, string> = {
   claude: process.env.CLAUDE_MODEL_ID ?? "claude-sonnet-4-5",
   openai: process.env.OPENAI_MODEL_ID ?? "gpt-4o-mini",
   gemini: process.env.GEMINI_MODEL_ID ?? "gemini-2.5-flash",
-  "opencode-go": process.env.OPENCODE_MODEL_ID ?? "opencode/deepseek-v4-flash-free",
+  "opencode-go": process.env.OPENCODE_MODEL_ID ?? "deepseek-v4-flash",
 };
 
 // 평어는 짧지만(60~100자) thinking 모델(Gemini 2.5 Flash 등)이 thinking
