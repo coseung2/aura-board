@@ -13,7 +13,7 @@ import { encryptApiKey, last4 } from "@/lib/llm/encryption";
 import { verifyApiKey, type LlmProvider } from "@/lib/llm/stream";
 import { limitLlmKeyMutation } from "@/lib/rate-limit-routes";
 
-const PROVIDERS = ["claude", "openai", "gemini", "ollama"] as const;
+const PROVIDERS = ["claude", "openai", "gemini", "ollama", "opencode-go"] as const;
 
 // ollama 는 apiKey 선택, baseUrl + modelId 필수. 다른 provider 는 apiKey 필수.
 const SaveSchema = z.object({
@@ -29,6 +29,7 @@ function keyShapeOk(provider: LlmProvider, key: string): boolean {
   if (provider === "openai") return key.startsWith("sk-");
   if (provider === "gemini") return key.startsWith("AIza") || key.length >= 30;
   if (provider === "ollama") return true; // key 없어도 OK
+  if (provider === "opencode-go") return true; // key 불필요
   return false;
 }
 
@@ -92,6 +93,13 @@ export async function POST(req: Request) {
         { status: 400, headers: { "Content-Type": "application/json" } },
       );
     }
+  } else if (provider === "opencode-go") {
+    if (!modelId) {
+      return new Response(
+        JSON.stringify({ error: "opencode_missing_fields", detail: "modelId 필수" }),
+        { status: 400, headers: { "Content-Type": "application/json" } },
+      );
+    }
   } else {
     if (apiKey.length < 8) {
       return new Response(
@@ -107,7 +115,15 @@ export async function POST(req: Request) {
     }
   }
 
-  const verifyResult = await verifyApiKey(provider, apiKey, { baseUrl, modelId });
+  let verifyResult: { ok: true } | { ok: false; error: string };
+
+  if (provider === "opencode-go") {
+    // OpenCode-go는 로컬 CLI — 검증 없이 항상 성공 처리
+    verifyResult = { ok: true };
+  } else {
+    verifyResult = await verifyApiKey(provider, apiKey, { baseUrl, modelId });
+  }
+
   const verified = verifyResult.ok;
   const lastError = verifyResult.ok ? null : verifyResult.error;
 

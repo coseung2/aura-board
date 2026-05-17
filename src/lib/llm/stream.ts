@@ -13,7 +13,7 @@
 import "server-only";
 import { incrementLedger } from "../vibe-arcade/quota-ledger";
 
-export type LlmProvider = "claude" | "openai" | "gemini" | "ollama";
+export type LlmProvider = "claude" | "openai" | "gemini" | "ollama" | "opencode-go";
 
 export type LlmStreamArgs = {
   provider: LlmProvider;
@@ -73,6 +73,16 @@ export async function streamLlm(args: LlmStreamArgs): Promise<LlmStreamResult> {
       return streamGemini(args);
     case "ollama":
       return streamOllama(args);
+    case "opencode-go":
+      // OpenCode-go 스트리밍은 Agent Service에서 처리 (stream-deepseek.ts)
+      // Vibe Arcade에서 opencode-go 사용 시 여기에 추가
+      return {
+        stopReason: "error",
+        finalContent: "",
+        tokensIn: 0,
+        tokensOut: 0,
+        errorMessage: "OpenCode-go는 Agent Service에서 사용하세요.",
+      };
     default:
       return {
         stopReason: "error",
@@ -558,6 +568,9 @@ export async function verifyApiKey(
       if (res.ok) return { ok: true };
       const text = await res.text().catch(() => "");
       return { ok: false, error: `HTTP ${res.status}: ${text.slice(0, 200)}` };
+    }
+    if (provider === "opencode-go") {
+      return { ok: true }; // 로컬 CLI — 항상 사용 가능
     }
     return { ok: false, error: `unknown provider: ${provider as string}` };
   } catch (err) {

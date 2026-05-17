@@ -1,10 +1,9 @@
 // DeepSeek Flash streaming provider for Agent Service.
 // OpenAI-compatible API via fetch + SSE parsing.
-// Phase 0: uses DEEPSEEK_API_KEY from env, or a free-tier key.
+// Phase 0: accepts apiKey as parameter (from teacher's stored LLM key).
 
 import "server-only";
 
-const DEEPSEEK_API_KEY = process.env.DEEPSEEK_API_KEY ?? "";
 const DEEPSEEK_BASE_URL =
   process.env.DEEPSEEK_BASE_URL ?? "https://api.deepseek.com";
 const DEEPSEEK_MODEL =
@@ -13,6 +12,7 @@ const DEEPSEEK_MODEL =
 export type DeepSeekStreamArgs = {
   messages: Array<{ role: "user" | "assistant" | "system"; content: string }>;
   systemPrompt: string;
+  apiKey: string;
   onDelta: (text: string) => void;
   signal?: AbortSignal;
 };
@@ -42,12 +42,11 @@ export const DEFAULT_AGENT_SYSTEM_PROMPT = `당신은 한국 초중등 학생의
 export async function streamDeepSeek(
   args: DeepSeekStreamArgs
 ): Promise<DeepSeekStreamResult> {
-  if (!DEEPSEEK_API_KEY) {
-    // Phase 0 fallback: return a helpful error message
+  if (!args.apiKey) {
     return {
       stopReason: "error",
       content:
-        "🧑‍🏫 아직 AI 선생님이 준비되지 않았어요. 선생님께 DeepSeek API Key 설정을 요청해주세요.",
+        "🧑‍🏫 아직 AI 선생님이 준비되지 않았어요. 선생님께 /teacher/settings 에서 AI 연결을 설정해달라고 요청해주세요.",
       tokensIn: 0,
       tokensOut: 0,
     };
@@ -70,7 +69,7 @@ export async function streamDeepSeek(
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${DEEPSEEK_API_KEY}`,
+        Authorization: `Bearer ${args.apiKey}`,
       },
       body: JSON.stringify({
         model: DEEPSEEK_MODEL,
@@ -147,21 +146,6 @@ export async function streamDeepSeek(
           // skip unparseable chunks
         }
       }
-    }
-    
-    // Try to read final usage from remaining buffer
-    for (const line of buffer.split("\n")) {
-      const trimmed = line.trim();
-      if (!trimmed || !trimmed.startsWith("data: ")) continue;
-      const data = trimmed.slice(6);
-      if (data === "[DONE]") break;
-      try {
-        const parsed = JSON.parse(data);
-        if (parsed.usage) {
-          tokensIn = parsed.usage.prompt_tokens ?? tokensIn;
-          tokensOut = parsed.usage.completion_tokens ?? tokensOut;
-        }
-      } catch { /* skip */ }
     }
 
     return { stopReason, content: finalContent, tokensIn, tokensOut };

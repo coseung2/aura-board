@@ -7,7 +7,19 @@
 
 import { useEffect, useState } from "react";
 
-type Provider = "claude" | "openai" | "gemini" | "ollama";
+type Provider = "claude" | "openai" | "gemini" | "ollama" | "opencode-go";
+
+// opencode-go에서 사용할 수 있는 주요 모델 목록
+const OPENCODE_MODELS = [
+  { id: "opencode/deepseek-v4-flash-free", label: "DeepSeek Flash (무료)" },
+  { id: "opencode/kimi-k2.6", label: "Kimi K2.6" },
+  { id: "opencode/claude-sonnet-4-5", label: "Claude Sonnet 4.5" },
+  { id: "opencode/gpt-5.5-pro", label: "GPT 5.5 Pro" },
+  { id: "opencode/gemini-3-flash", label: "Gemini 3 Flash" },
+  { id: "opencode/gemini-3.1-pro", label: "Gemini 3.1 Pro" },
+  { id: "opencode/qwen3.6-plus-free", label: "Qwen 3.6 Plus (무료)" },
+  { id: "opencode/minimax-m2.5-free", label: "MiniMax M2.5 (무료)" },
+];
 
 type KeyStatus =
   | { present: false }
@@ -28,6 +40,7 @@ const PROVIDER_LABEL: Record<Provider, string> = {
   openai: "ChatGPT (OpenAI)",
   gemini: "Gemini (Google)",
   ollama: "🧪 Ollama (로컬 테스트)",
+  "opencode-go": "OpenCode-go",
 };
 
 const OLLAMA_DEFAULT_URL = "http://localhost:11434/v1";
@@ -57,6 +70,9 @@ export function LlmKeyForm() {
           setBaseUrl(data.baseUrl ?? OLLAMA_DEFAULT_URL);
           setModelId(data.modelId ?? OLLAMA_DEFAULT_MODEL);
         }
+        if (data.provider === "opencode-go") {
+          setModelId(data.modelId ?? "opencode/deepseek-v4-flash-free");
+        }
       }
     } catch {
       setStatus({ present: false });
@@ -77,6 +93,9 @@ export function LlmKeyForm() {
         body.baseUrl = baseUrl.trim();
         body.modelId = modelId.trim();
       }
+      if (provider === "opencode-go") {
+        body.modelId = modelId.trim();
+      }
       const res = await fetch("/api/teacher/llm-key", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -89,7 +108,9 @@ export function LlmKeyForm() {
         setMsg(
           provider === "ollama"
             ? "저장 완료. Ollama 엔드포인트 응답 확인됐습니다."
-            : "저장 완료. 코딩 교실 보드에서 바로 사용할 수 있습니다.",
+            : provider === "opencode-go"
+              ? `저장 완료. OpenCode-go · ${modelId} 모델이 선택됐습니다.`
+              : "저장 완료. 코딩 교실 보드에서 바로 사용할 수 있습니다.",
         );
         setApiKey("");
       } else {
@@ -129,18 +150,22 @@ export function LlmKeyForm() {
 
   const keyPlaceholder =
     provider === "claude"
-      ? "sk-ant-api03-..."
+      ? "***..."
       : provider === "openai"
         ? "sk-proj-... 또는 sk-..."
         : provider === "gemini"
           ? "AIza..."
-          : "(선택) reverse-proxy 보호용 토큰";
+          : provider === "opencode-go"
+            ? "(사용 안 함)"
+            : "(선택) reverse-proxy 보호용 토큰";
 
   const submitDisabled =
     busy ||
     (provider === "ollama"
       ? baseUrl.trim().length < 7 || modelId.trim().length < 1
-      : apiKey.trim().length < 8);
+      : provider === "opencode-go"
+        ? modelId.trim().length < 1
+        : apiKey.trim().length < 8);
 
   return (
     <div className="llm-key-form">
@@ -155,7 +180,9 @@ export function LlmKeyForm() {
               {PROVIDER_LABEL[status.provider] ?? status.provider} ·{" "}
               {status.provider === "ollama"
                 ? `${status.modelId ?? "?"} @ ${status.baseUrl ?? "?"}`
-                : `...${status.last4}`}
+                : status.provider === "opencode-go"
+                  ? status.modelId ?? "?"
+                  : `...${status.last4}`}
             </span>
             <button
               type="button"
@@ -190,6 +217,7 @@ export function LlmKeyForm() {
             <option value="openai">ChatGPT (OpenAI)</option>
             <option value="gemini">Gemini (Google)</option>
             <option value="ollama">🧪 Ollama (로컬 테스트 — 개발자 전용)</option>
+            <option value="opencode-go">OpenCode-go (로컬 CLI)</option>
           </select>
         </label>
 
@@ -230,8 +258,30 @@ export function LlmKeyForm() {
           </>
         )}
 
+        {provider === "opencode-go" && (
+          <label className="llm-key-field">
+            <span>모델 선택</span>
+            <select
+              className="llm-key-select"
+              value={modelId}
+              onChange={(e) => setModelId(e.target.value)}
+              disabled={busy}
+            >
+              {OPENCODE_MODELS.map((m) => (
+                <option key={m.id} value={m.id}>
+                  {m.label}
+                </option>
+              ))}
+            </select>
+            <span className="llm-key-hint">
+              로컬에 설치된 OpenCode-go CLI로 선택한 모델을 호출합니다.
+              API Key는 OpenCode-go 설정을 따릅니다.
+            </span>
+          </label>
+        )}
+
         <label className="llm-key-field">
-          <span>API Key{provider === "ollama" && " (선택)"}</span>
+          <span>API Key{provider === "ollama" && " (선택)"}{provider === "opencode-go" && " (불필요)"}</span>
           <input
             type="password"
             className="llm-key-input"
@@ -245,7 +295,9 @@ export function LlmKeyForm() {
           <span className="llm-key-hint">
             {provider === "ollama"
               ? "로컬 Ollama는 Key가 필요 없습니다. reverse-proxy로 외부 노출 시만 입력."
-              : "Key는 서버에서 암호화 저장되며 학생 클라이언트에 노출되지 않습니다."}
+              : provider === "opencode-go"
+                ? "OpenCode-go는 자체 인증을 사용하므로 API Key가 필요하지 않습니다."
+                : "Key는 서버에서 암호화 저장되며 학생 클라이언트에 노출되지 않습니다."}
           </span>
         </label>
 

@@ -1,5 +1,6 @@
 // Agent Service — POST /api/agent/sessions/[id]/messages
 // 사용자 메시지 전송 → DeepSeek Flash SSE 스트리밍
+// 교사가 저장한 LLM Key를 DB에서 조회해 사용
 
 import { z } from "zod";
 import { db } from "@/lib/db";
@@ -9,6 +10,7 @@ import {
   DEFAULT_AGENT_SYSTEM_PROMPT,
 } from "@/lib/agent/stream-deepseek";
 import { AGENT_MODES, type AgentMode } from "@/lib/agent/types";
+import { decryptApiKey } from "@/lib/llm/encryption";
 
 const SendSchema = z.object({
   content: z.string().min(1).max(4000),
@@ -21,6 +23,26 @@ const MODE_PROMPTS: Record<AgentMode, string> = {
   code: `## 모드: 코딩 (Code)\n학생의 코딩 질문에 답변합니다. 코드 리뷰, 디버깅, 최적화를 도와주세요.\n코드 예제는 \`\`\`html 블록으로 출력하세요.`,
   lesson: `## 모드: 수업 (Lesson)\n수업 내용을 따라갈 수 있도록 안내합니다.\n선생님이 준비한 수업 자료를 바탕으로 도와주세요.`,
 };
+
+/** 세션의 classroomId → 교사 → 저장된 LLM Key 조회 */
+async function getTeacherApiKey(classroomId: string): Promise<string | null> {
+  try {
+    const classroom = await db.classroom.findUnique({
+      where: { id: classroomId },
+      select: { teacherId: true },
+    });
+    if (!classroom) return null;
+
+    const llmKey = await db.teacherLlmKey.findUnique({
+      where: { userId: classroom.teacherId },
+    });
+    if (!llmKey || !llmKey.apiKeyEnc) return null;
+
+    return decryptApiKey(llmKey.apiKeyEnc);
+  } catch {
+    return null;
+  }
+}
 
 export async function POST(
   req: Request,
@@ -74,6 +96,9 @@ export async function POST(
     },
   });
 
+  // Look up teacher's API key from DB
+  const apiKey = await getTeacherApiKey(session.classroomId);
+
   // Build message history
   const priorMessages = await db.agentMessage.findMany({
     where: { sessionId: session.id },
@@ -109,6 +134,7 @@ export async function POST(
 
       try {
         const result = await streamDeepSeek({
+          apiKey: apiKey ?? "",
           systemPrompt,
           messages: priorMessages.map((m: { role: string; content: string }) => ({
             role: m.role as "user" | "assistant",
