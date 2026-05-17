@@ -75,15 +75,7 @@ export async function streamLlm(args: LlmStreamArgs): Promise<LlmStreamResult> {
     case "ollama":
       return streamOllama(args);
     case "opencode-go":
-      // OpenCode-go 스트리밍은 Agent Service에서 처리 (stream-deepseek.ts)
-      // Vibe Arcade에서 opencode-go 사용 시 여기에 추가
-      return {
-        stopReason: "error",
-        finalContent: "",
-        tokensIn: 0,
-        tokensOut: 0,
-        errorMessage: "OpenCode-go는 Agent Service에서 사용하세요.",
-      };
+      return streamOpencodeGo(args);
     default:
       return {
         stopReason: "error",
@@ -479,6 +471,107 @@ async function streamOllama(args: LlmStreamArgs): Promise<LlmStreamResult> {
       tokensIn = Math.ceil(promptChars / 3);
       tokensOut = Math.ceil(finalContent.length / 3);
       args.onTokensUpdate(tokensIn, tokensOut);
+    }
+
+    await incrementLedger({
+      classroomId: args.classroomId,
+      studentId: args.studentId,
+      tokensIn,
+      tokensOut,
+      newSession: true,
+    });
+
+    return { stopReason, finalContent, tokensIn, tokensOut };
+  } catch (err) {
+    return {
+      stopReason: "error",
+      finalContent,
+      tokensIn,
+      tokensOut,
+      errorMessage: String((err as Error).message),
+    };
+  }
+}
+
+// ───────────────────── OpenCode-go (OpenAI 호환 API) ─────────────────────
+// OpenAI chat completions SSE와 동일한 포맷 사용. baseUrl + modelId로
+// 교사가 저장한 엔드포인트를 호출한다.
+async function streamOpencodeGo(args: LlmStreamArgs): Promise<LlmStreamResult> {
+  const baseUrl = (args.baseUrl ?? "").replace(/\/+$/, "") || process.env.OPENCODE_BASE_URL || "https://opencode.ai/zen/go/v1";
+  const model = args.modelId || MODELS["opencode-go"];
+
+  let tokensIn = 0;
+  let tokensOut = 0;
+  let finalContent = "";
+
+  try {
+    const res = await fetch(`${baseUrl}/chat/completions`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${args.apiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model,
+        stream: true,
+        stream_options: { include_usage: true },
+        max_tokens: 4096,
+        messages: [
+          { role: "system", content: args.systemPrompt },
+          ...args.messages.map((m) => ({ role: m.role, content: m.content })),
+        ],
+      }),
+    });
+
+    if (!res.ok || !res.body) {
+      const text = await res.text().catch(() => "");
+      return {
+        stopReason: "error",
+        finalContent,
+        tokensIn,
+        tokensOut,
+        errorMessage: `opencode-go http ${res.status}: ${text.slice(0, 200)}`,
+      };
+    }
+
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let buf = "";
+    let stopReason: LlmStreamResult["stopReason"] = "end_turn";
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buf += decoder.decode(value, { stream: true });
+
+      let nl;
+      while ((nl = buf.indexOf("\n")) >= 0) {
+        const line = buf.slice(0, nl).trim();
+        buf = buf.slice(nl + 1);
+        if (!line.startsWith("data:")) continue;
+        const payload = line.slice(5).trim();
+        if (payload === "[DONE]") break;
+        try {
+          const ev = JSON.parse(payload) as {
+            choices?: Array<{ delta?: { content?: string }; finish_reason?: string | null }>;
+            usage?: { prompt_tokens?: number; completion_tokens?: number };
+          };
+          const delta = ev.choices?.[0]?.delta?.content;
+          if (delta) {
+            args.onDelta(delta);
+            finalContent += delta;
+          }
+          const finish = ev.choices?.[0]?.finish_reason;
+          if (finish === "length") stopReason = "max_tokens";
+          if (ev.usage) {
+            tokensIn = ev.usage.prompt_tokens ?? tokensIn;
+            tokensOut = ev.usage.completion_tokens ?? tokensOut;
+            args.onTokensUpdate(tokensIn, tokensOut);
+          }
+        } catch {
+          // skip malformed chunk
+        }
+      }
     }
 
     await incrementLedger({
