@@ -13,6 +13,7 @@
 // (Phase 3) TeacherModerationPanel 모달. 지금은 Studio만 연결.
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { StarRating } from "./vibe-arcade/StarRating";
 import { StudentSlotCard } from "./vibe-arcade/StudentSlotCard";
@@ -77,6 +78,7 @@ export function VibeArcadeBoard(props: VibeArcadeBoardProps) {
   const [showModeration, setShowModeration] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const canPlay = props.viewerKind === "student";
+  const router = useRouter();
 
   useEffect(() => {
     let cancelled = false;
@@ -312,7 +314,7 @@ export function VibeArcadeBoard(props: VibeArcadeBoardProps) {
               <button
                 type="button"
                 className="va-card vg-card-btn"
-                onClick={canPlay ? () => setPlaying({ id: item.id, title: item.title }) : undefined}
+                onClick={canPlay ? () => router.push(`/board/${props.boardId}/project/${item.id}`) : undefined}
                 disabled={!canPlay}
                 aria-label={`${item.title}${canPlay ? " 재생" : ""}`}
               >
