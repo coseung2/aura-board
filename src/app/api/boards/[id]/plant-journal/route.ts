@@ -126,7 +126,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
     let recentObservations: unknown = null;
     if (role === "owner" && classroomId) {
       // Recent observations across all students (for feed)
-      const recentObs = await db.observation.findMany({
+      const recentObs = await db.plantObservation.findMany({
         where: {
           studentPlant: { boardId: board.id },
         },
