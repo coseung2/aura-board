@@ -51,6 +51,11 @@ export function useAgentChat({ boardId }: Args) {
     [boardId, mode]
   );
 
+  /** 기존 세션 ID로 재개 — 새 세션 생성 없이 sessionId만 설정 */
+  const resumeSession = useCallback((id: string) => {
+    setSessionId(id);
+  }, []);
+
   const sendMessage = useCallback(
     async (content: string) => {
       if (!sessionId || streaming) return;
@@ -147,6 +152,10 @@ export function useAgentChat({ boardId }: Args) {
       } finally {
         setStreaming(false);
         abortRef.current = null;
+        // Clear streaming flag on the last assistant message
+        setMessages((prev) =>
+          prev.map((msg) => (msg.streaming ? { ...msg, streaming: false } : msg))
+        );
       }
     },
     [sessionId, streaming]
@@ -173,6 +182,7 @@ export function useAgentChat({ boardId }: Args) {
     error,
     tokenCount,
     createSession,
+    resumeSession,
     sendMessage,
     stopStreaming,
     setMode,

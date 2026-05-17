@@ -69,6 +69,7 @@ export function AgentPageClient({
     error,
     tokenCount,
     createSession,
+    resumeSession,
     sendMessage,
     stopStreaming,
     setMode,
@@ -131,13 +132,13 @@ export function AgentPageClient({
             })
           )
         );
-        // Re-assign the hook's sessionId
-        await createSession(data.mode as AgentMode);
+        // Re-assign the hook's sessionId to the existing session
+        resumeSession(session.id);
       } catch {
         await handleNewSession(session.mode as AgentMode);
       }
     },
-    [createSession, handleNewSession, setMode, setMessages]
+    [createSession, handleNewSession, resumeSession, setMode, setMessages]
   );
 
   const openSaveModal = useCallback(() => {
@@ -333,6 +334,7 @@ export function AgentPageClient({
                 <div className="agent-preview-frame">
                   {previewSrcdoc ? (
                     <iframe
+                      key={previewSrcdoc.slice(0, 80)}
                       srcDoc={previewSrcdoc}
                       sandbox="allow-scripts"
                       title="게임 미리보기"
