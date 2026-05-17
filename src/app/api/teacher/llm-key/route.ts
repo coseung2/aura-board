@@ -86,6 +86,11 @@ export async function POST(req: Request) {
 
   const { provider, apiKey, baseUrl, modelId } = parsed.data;
 
+  // 기존 저장된 키 확인 (apiKey 미입력 시 유지용)
+  const existingKey = await db.teacherLlmKey.findUnique({ where: { userId: user.id } });
+  const hasExistingKey = !!(existingKey?.apiKeyEnc);
+  const isNewKey = !!apiKey;
+
   if (provider === "ollama") {
     if (!baseUrl || !modelId) {
       return new Response(
@@ -100,20 +105,20 @@ export async function POST(req: Request) {
         { status: 400, headers: { "Content-Type": "application/json" } },
       );
     }
-    if (apiKey.length < 4) {
+    if (isNewKey && apiKey.length < 4) {
       return new Response(
         JSON.stringify({ error: "api_key_required" }),
         { status: 400, headers: { "Content-Type": "application/json" } },
       );
     }
   } else {
-    if (apiKey.length < 8) {
+    if (isNewKey && apiKey.length < 8) {
       return new Response(
         JSON.stringify({ error: "api_key_required" }),
         { status: 400, headers: { "Content-Type": "application/json" } },
       );
     }
-    if (!keyShapeOk(provider, apiKey)) {
+    if (isNewKey && !keyShapeOk(provider, apiKey)) {
       return new Response(
         JSON.stringify({ error: "key_shape_mismatch", detail: `${provider} key prefix not recognized` }),
         { status: 400, headers: { "Content-Type": "application/json" } },
@@ -123,18 +128,33 @@ export async function POST(req: Request) {
 
   let verifyResult: { ok: true } | { ok: false; error: string };
 
-  if (provider === "opencode-go" && !apiKey) {
-    // Key 없으면 검증 불가
-    verifyResult = { ok: false, error: "API Key가 필요합니다." };
-  } else {
+  if (!isNewKey && hasExistingKey) {
+    // 키 변경 없음 — 기존 검증 상태 유지, 재검증 안 함
+    verifyResult = { ok: true };
+  } else if (isNewKey) {
     verifyResult = await verifyApiKey(provider, apiKey, { baseUrl, modelId });
+  } else {
+    // 새 키도 없고 기존 키도 없음
+    verifyResult = { ok: false, error: "API Key가 필요합니다." };
   }
 
   const verified = verifyResult.ok;
   const lastError = verifyResult.ok ? null : verifyResult.error;
 
-  const enc = apiKey ? encryptApiKey(apiKey) : "";
-  const tail = apiKey ? last4(apiKey) : (provider === "ollama" ? "ollama" : "");
+  let enc: string;
+  let tail: string;
+
+  if (isNewKey) {
+    enc = encryptApiKey(apiKey);
+    tail = last4(apiKey);
+  } else if (hasExistingKey) {
+    // 기존 키 유지
+    enc = existingKey!.apiKeyEnc;
+    tail = existingKey!.last4;
+  } else {
+    enc = "";
+    tail = provider === "ollama" ? "ollama" : "";
+  }
 
   const saved = await db.teacherLlmKey.upsert({
     where: { userId: user.id },

@@ -100,7 +100,11 @@ export function LlmKeyForm() {
     setBusy(true);
     setMsg(null);
     try {
-      const body: Record<string, string> = { provider, apiKey: apiKey.trim() };
+      const body: Record<string, string> = { provider };
+      // API 키가 입력된 경우에만 전송 (없으면 기존 키 유지)
+      if (apiKey.trim()) {
+        body.apiKey = apiKey.trim();
+      }
       if (provider === "ollama") {
         body.baseUrl = baseUrl.trim();
         body.modelId = modelId.trim();
@@ -176,8 +180,8 @@ export function LlmKeyForm() {
     (provider === "ollama"
       ? baseUrl.trim().length < 7 || modelId.trim().length < 1
       : provider === "opencode-go"
-        ? apiKey.trim().length < 4 || modelId.trim().length < 1
-        : apiKey.trim().length < 8);
+        ? modelId.trim().length < 1 || (apiKey.trim().length < 4 && !status?.present)
+        : apiKey.trim().length < 8 && !status?.present);
 
   return (
     <div className="llm-key-form">
