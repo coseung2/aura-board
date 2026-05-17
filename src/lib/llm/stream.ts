@@ -571,7 +571,13 @@ export async function verifyApiKey(
       return { ok: false, error: `HTTP ${res.status}: ${text.slice(0, 200)}` };
     }
     if (provider === "opencode-go") {
-      return { ok: true }; // 로컬 CLI — 항상 사용 가능
+      const baseUrl = (extra?.baseUrl ?? "").replace(/\/+$/, "") || "https://opencode.ai/zen/go/v1";
+      const res = await fetch(`${baseUrl}/models`, {
+        headers: { Authorization: `Bearer ${apiKey}` },
+      });
+      if (res.ok) return { ok: true };
+      const text = await res.text().catch(() => "");
+      return { ok: false, error: `HTTP ${res.status}: ${text.slice(0, 200)}` };
     }
     return { ok: false, error: `unknown provider: ${provider as string}` };
   } catch (err) {

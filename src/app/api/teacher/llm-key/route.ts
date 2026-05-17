@@ -100,6 +100,12 @@ export async function POST(req: Request) {
         { status: 400, headers: { "Content-Type": "application/json" } },
       );
     }
+    if (apiKey.length < 4) {
+      return new Response(
+        JSON.stringify({ error: "api_key_required" }),
+        { status: 400, headers: { "Content-Type": "application/json" } },
+      );
+    }
   } else {
     if (apiKey.length < 8) {
       return new Response(
@@ -117,9 +123,9 @@ export async function POST(req: Request) {
 
   let verifyResult: { ok: true } | { ok: false; error: string };
 
-  if (provider === "opencode-go") {
-    // OpenCode-go는 로컬 CLI — 검증 없이 항상 성공 처리
-    verifyResult = { ok: true };
+  if (provider === "opencode-go" && !apiKey) {
+    // Key 없으면 검증 불가
+    verifyResult = { ok: false, error: "API Key가 필요합니다." };
   } else {
     verifyResult = await verifyApiKey(provider, apiKey, { baseUrl, modelId });
   }
