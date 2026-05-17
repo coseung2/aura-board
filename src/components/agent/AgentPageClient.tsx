@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useMemo } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { AgentChatPanel } from "./AgentChatPanel";
@@ -11,6 +11,7 @@ import {
   AGENT_MODE_DESCRIPTIONS,
   type AgentMode,
 } from "@/lib/agent/types";
+import { buildStudioSrcDoc } from "@/lib/vibe-arcade/sandbox-renderer";
 
 interface SessionSummary {
   id: string;
@@ -31,6 +32,17 @@ interface Props {
   recentSessions: SessionSummary[];
 }
 
+/** 마지막 assistant 메시지에서 ```html 블록 추출 */
+function extractLatestHtml(messages: { role: string; content: string }[]): string | null {
+  for (let i = messages.length - 1; i >= 0; i--) {
+    const m = messages[i];
+    if (m.role !== "assistant") continue;
+    const match = m.content.match(/```html\s*\n?([\s\S]*?)```/);
+    if (match?.[1]) return match[1].trim();
+  }
+  return null;
+}
+
 export function AgentPageClient({
   boardId,
   boardTitle,
@@ -41,6 +53,7 @@ export function AgentPageClient({
   const [chatInput, setChatInput] = useState("");
   const [sessions, setSessions] = useState<SessionSummary[]>(initialSessions);
   const [showNewModal, setShowNewModal] = useState(!initialSessions.length);
+  const [previewHtml, setPreviewHtml] = useState<string | null>(null);
 
   const {
     sessionId,
@@ -56,6 +69,27 @@ export function AgentPageClient({
     setMessages,
   } = useAgentChat({ boardId });
 
+  // Extract HTML from latest assistant message for preview
+  useEffect(() => {
+    const html = extractLatestHtml(messages);
+    if (html) {
+      setPreviewHtml(html);
+    }
+  }, [messages]);
+
+  // Compute preview srcdoc when HTML changes
+  const previewSrcdoc = useMemo(() => {
+    if (!previewHtml) return "";
+    try {
+      return buildStudioSrcDoc({ htmlContent: previewHtml });
+    } catch {
+      // Fallback: wrap in basic HTML
+      return previewHtml.startsWith("<!") || previewHtml.startsWith("<html")
+        ? previewHtml
+        : `<!DOCTYPE html><html><body>${previewHtml}</body></html>`;
+    }
+  }, [previewHtml]);
+
   const handleSend = useCallback(() => {
     if (!sessionId) return;
     void sendMessage(chatInput);
@@ -67,6 +101,7 @@ export function AgentPageClient({
       setShowNewModal(false);
       setMessages([]);
       setChatInput("");
+      setPreviewHtml(null);
       await createSession(selectedMode);
     },
     [createSession, setMessages]
@@ -75,6 +110,7 @@ export function AgentPageClient({
   const handleResumeSession = useCallback(
     async (session: SessionSummary) => {
       setShowNewModal(false);
+      setPreviewHtml(null);
       try {
         const res = await fetch(`/api/agent/sessions/${session.id}`);
         if (!res.ok) return;
@@ -89,18 +125,16 @@ export function AgentPageClient({
             })
           )
         );
-        // Re-assign the hook's sessionId via createSession workaround
-        // For now just create a new session
+        // Re-assign the hook's sessionId
         await createSession(data.mode as AgentMode);
       } catch {
-        // fallback to new session
         await handleNewSession(session.mode as AgentMode);
       }
     },
     [createSession, setMode, setMessages]
   );
 
-  // Refresh session list after creating a new session
+  // Refresh session list
   useEffect(() => {
     if (sessionId) {
       fetch("/api/agent/sessions?status=active&limit=20")
@@ -141,7 +175,7 @@ export function AgentPageClient({
         </div>
       </section>
 
-      <div className="agent-layout">
+      <div className="agent-layout agent-layout-with-preview">
         {/* Sidebar: Session list */}
         <aside className="agent-sidebar">
           <div className="agent-sidebar-head">
@@ -182,54 +216,90 @@ export function AgentPageClient({
           )}
         </aside>
 
-        {/* Main: Chat */}
+        {/* Main: Chat + Preview */}
         <main className="agent-main">
           {!sessionId && !showNewModal ? (
             <div className="agent-main-empty">
               <p>대화를 선택하거나 새 대화를 시작하세요</p>
             </div>
           ) : sessionId || showNewModal ? (
-            <>
-              {/* Active session indicator */}
-              {sessionId && (
-                <div className="agent-session-info">
-                  <span className="agent-session-mode">
-                    {AGENT_MODE_LABELS[mode] ?? "대화"}
-                  </span>
-                  <span className="agent-session-tokens">
-                    ⚡ {tokenCount.in + tokenCount.out} 토큰
-                  </span>
-                </div>
-              )}
+            <div className="agent-main-split">
+              {/* Left: Chat */}
+              <div className="agent-chat-column">
+                {sessionId && (
+                  <div className="agent-session-info">
+                    <span className="agent-session-mode">
+                      {AGENT_MODE_LABELS[mode] ?? "대화"}
+                    </span>
+                    <span className="agent-session-tokens">
+                      ⚡ {tokenCount.in + tokenCount.out} 토큰
+                    </span>
+                  </div>
+                )}
 
-              <AgentChatPanel
-                messages={messages}
-                streaming={streaming}
-                error={error}
-                chatInput={chatInput}
-                onChatInputChange={setChatInput}
-                onSubmit={handleSend}
-                onStopStreaming={stopStreaming}
-              />
+                <AgentChatPanel
+                  messages={messages}
+                  streaming={streaming}
+                  error={error}
+                  chatInput={chatInput}
+                  onChatInputChange={setChatInput}
+                  onSubmit={handleSend}
+                  onStopStreaming={stopStreaming}
+                />
 
-              {/* Save to project button */}
-              {canSave && (
-                <div className="agent-save-bar">
-                  <button
-                    type="button"
-                    className="ds-btn-primary"
-                    onClick={async () => {
-                      // Phase 0: navigate to vibe-arcade studio with session
-                      router.push(
-                        `${boardHref}/vibe-arcade/studio?agentSession=${sessionId}`
-                      );
-                    }}
-                  >
-                    📦 프로젝트로 저장
-                  </button>
+                {/* Save to project button */}
+                {canSave && (
+                  <div className="agent-save-bar">
+                    <button
+                      type="button"
+                      className="ds-btn-primary"
+                      onClick={async () => {
+                        router.push(
+                          `${boardHref}/vibe-arcade/studio?agentSession=${sessionId}`
+                        );
+                      }}
+                    >
+                      📦 프로젝트로 저장
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              {/* Right: Preview */}
+              <div className="agent-preview-column">
+                <div className="agent-preview-header">
+                  <span>🎮 미리보기</span>
+                  {previewHtml && (
+                    <button
+                      type="button"
+                      className="agent-preview-refresh"
+                      onClick={() => {
+                        const html = extractLatestHtml(messages);
+                        if (html) setPreviewHtml(html);
+                      }}
+                      title="새로고침"
+                    >
+                      🔄
+                    </button>
+                  )}
                 </div>
-              )}
-            </>
+                <div className="agent-preview-frame">
+                  {previewSrcdoc ? (
+                    <iframe
+                      srcDoc={previewSrcdoc}
+                      sandbox="allow-scripts"
+                      title="게임 미리보기"
+                      className="agent-preview-iframe"
+                    />
+                  ) : (
+                    <div className="agent-preview-empty">
+                      <span>💡</span>
+                      <p>AI가 게임 코드를 생성하면<br />여기서 미리볼 수 있어요</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
           ) : null}
         </main>
       </div>

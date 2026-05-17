@@ -118,12 +118,20 @@ export function AgentChatPanel({
 }
 
 function MessageContent({ content }: { content: string }) {
-  // Render simple code blocks
+  // Render simple code blocks - hide html blocks (shown in preview)
   const parts = content.split(/(```[\s\S]*?```)/g);
   return (
     <>
       {parts.map((part, i) => {
         if (part.startsWith("```")) {
+          const isHtml = part.startsWith("```html");
+          if (isHtml) {
+            return (
+              <span key={i} className="agent-code-preview-badge">
+                🎮 게임 코드가 생성되었습니다
+              </span>
+            );
+          }
           const code = part
             .replace(/^```\w*\n?/, "")
             .replace(/```$/, "");
