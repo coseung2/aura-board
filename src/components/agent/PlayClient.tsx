@@ -31,7 +31,7 @@ export function PlayClient({ boardId, project }: Props) {
   const handleRestart = () => {
     const iframe = document.getElementById("game-iframe") as HTMLIFrameElement;
     if (iframe) {
-      iframe.srcDoc = srcdoc;
+      iframe.srcdoc = srcdoc;
     }
   };
 
