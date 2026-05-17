@@ -53,6 +53,12 @@ export function AgentPageClient({
   const [chatInput, setChatInput] = useState("");
   const [sessions, setSessions] = useState<SessionSummary[]>(initialSessions);
   const [showNewModal, setShowNewModal] = useState(!initialSessions.length);
+  const [showSaveModal, setShowSaveModal] = useState(false);
+  const [saveTitle, setSaveTitle] = useState("");
+  const [saveDescription, setSaveDescription] = useState("");
+  const [saveTags, setSaveTags] = useState("게임");
+  const [savingProject, setSavingProject] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
   const [previewHtml, setPreviewHtml] = useState<string | null>(null);
 
   const {
@@ -131,8 +137,53 @@ export function AgentPageClient({
         await handleNewSession(session.mode as AgentMode);
       }
     },
-    [createSession, setMode, setMessages]
+    [createSession, handleNewSession, setMode, setMessages]
   );
+
+  const openSaveModal = useCallback(() => {
+    const firstUserMessage = messages.find((m) => m.role === "user")?.content.trim();
+    setSaveTitle((current) => current || firstUserMessage?.slice(0, 40) || "나의 AI 게임");
+    setSaveDescription((current) => current || "AI 도우미와 함께 만든 게임입니다.");
+    setSaveError(null);
+    setShowSaveModal(true);
+  }, [messages]);
+
+  const handleSaveProject = useCallback(async () => {
+    if (!sessionId || savingProject) return;
+    const title = saveTitle.trim();
+    if (!title) {
+      setSaveError("프로젝트 제목을 입력해 주세요.");
+      return;
+    }
+
+    setSavingProject(true);
+    setSaveError(null);
+    try {
+      const res = await fetch(`/api/agent/sessions/${sessionId}/save`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          boardId,
+          title,
+          description: saveDescription.trim(),
+          tags: saveTags
+            .split(",")
+            .map((tag) => tag.trim())
+            .filter(Boolean),
+        }),
+      });
+
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(data.error === "bad_request" ? "입력값을 확인해 주세요." : "프로젝트 저장에 실패했어요.");
+      }
+      router.push(`${boardHref}/project/${data.projectId}`);
+    } catch (err) {
+      setSaveError(err instanceof Error ? err.message : "프로젝트 저장 중 오류가 발생했어요.");
+    } finally {
+      setSavingProject(false);
+    }
+  }, [boardHref, boardId, router, saveDescription, saveTags, saveTitle, savingProject, sessionId]);
 
   // Refresh session list
   useEffect(() => {
@@ -253,11 +304,7 @@ export function AgentPageClient({
                     <button
                       type="button"
                       className="ds-btn-primary"
-                      onClick={async () => {
-                        router.push(
-                          `${boardHref}/vibe-arcade/studio?agentSession=${sessionId}`
-                        );
-                      }}
+                      onClick={openSaveModal}
                     >
                       📦 프로젝트로 저장
                     </button>
@@ -339,6 +386,67 @@ export function AgentPageClient({
             >
               닫기
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* Save project modal */}
+      {showSaveModal && (
+        <div
+          className="agent-modal-overlay"
+          onClick={() => !savingProject && setShowSaveModal(false)}
+        >
+          <div className="agent-modal agent-save-modal" onClick={(e) => e.stopPropagation()}>
+            <h2>프로젝트로 저장</h2>
+            <p>갤러리에 표시될 제목과 설명을 입력하세요.</p>
+            <label className="agent-save-field">
+              <span>제목</span>
+              <input
+                value={saveTitle}
+                onChange={(event) => setSaveTitle(event.target.value)}
+                maxLength={40}
+                placeholder="예: 우주 피하기 게임"
+                disabled={savingProject}
+              />
+            </label>
+            <label className="agent-save-field">
+              <span>설명</span>
+              <textarea
+                value={saveDescription}
+                onChange={(event) => setSaveDescription(event.target.value)}
+                maxLength={500}
+                placeholder="게임 방법, 특징, 만든 의도를 적어보세요."
+                disabled={savingProject}
+              />
+            </label>
+            <label className="agent-save-field">
+              <span>태그 (쉼표로 구분)</span>
+              <input
+                value={saveTags}
+                onChange={(event) => setSaveTags(event.target.value)}
+                placeholder="게임, 아케이드, 퀴즈"
+                disabled={savingProject}
+              />
+            </label>
+            {saveError && <p className="agent-save-error">{saveError}</p>}
+            <div className="agent-save-modal-actions">
+              <button
+                type="button"
+                className="agent-modal-close"
+                onClick={() => setShowSaveModal(false)}
+                disabled={savingProject}
+              >
+                취소
+              </button>
+              <button
+                type="button"
+                className="ds-btn-primary"
+                onClick={handleSaveProject}
+                disabled={savingProject || !saveTitle.trim()}
+              >
+                {savingProject ? "저장 중..." : "저장하고 상세 페이지로 이동"}
+              </button>
+            </div>
           </div>
         </div>
       )}
