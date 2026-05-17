@@ -86,6 +86,15 @@ export function LlmKeyForm() {
     loadStatus();
   }, []);
 
+  // 프로바이더 변경 시 모델 기본값 리셋
+  useEffect(() => {
+    if (provider === "opencode-go") {
+      setModelId(OPENCODE_DEFAULT_MODEL);
+    } else if (provider === "ollama") {
+      setModelId(OLLAMA_DEFAULT_MODEL);
+    }
+  }, [provider]);
+
   async function handleSave(e: React.FormEvent) {
     e.preventDefault();
     setBusy(true);
