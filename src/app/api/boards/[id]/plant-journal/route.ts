@@ -123,7 +123,42 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
 
     // Teacher summary (only if role is owner)
     let teacherSummary: unknown = null;
+    let recentObservations: unknown = null;
     if (role === "owner" && classroomId) {
+      // Recent observations across all students (for feed)
+      const recentObs = await db.observation.findMany({
+        where: {
+          studentPlant: { boardId: board.id },
+        },
+        orderBy: { observedAt: "desc" },
+        take: 10,
+        include: {
+          images: { orderBy: { order: "asc" }, take: 1 },
+          studentPlant: {
+            include: {
+              student: { select: { id: true, name: true, number: true } },
+              species: { select: { emoji: true, nameKo: true } },
+            },
+          },
+        },
+      });
+      recentObservations = recentObs.map((o) => ({
+        id: o.id,
+        stageId: o.stageId,
+        memo: o.memo,
+        observedAt: o.observedAt.toISOString(),
+        thumbnail: o.images[0]?.url ?? null,
+        student: {
+          id: o.studentPlant.student.id,
+          name: o.studentPlant.student.name,
+          number: o.studentPlant.student.number,
+        },
+        species: {
+          emoji: o.studentPlant.species.emoji,
+          nameKo: o.studentPlant.species.nameKo,
+        },
+        plantNickname: o.studentPlant.nickname,
+      }));
       const plants = await db.studentPlant.findMany({
         where: { boardId: board.id },
         include: {
@@ -206,6 +241,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
         species: speciesOut,
         myPlant,
         teacherSummary,
+        recentObservations,
       },
       { headers: PRIVATE_NO_STORE_HEADERS }
     );

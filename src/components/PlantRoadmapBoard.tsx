@@ -54,6 +54,7 @@ export function PlantRoadmapBoard({ initial }: Props) {
     return (
       <TeacherSummaryView
         summary={state.teacherSummary}
+        recentObservations={state.recentObservations ?? []}
         allSpecies={state.species}
         allowedSpecies={state.species}
         classroomId={state.teacherSummary.classroomId}

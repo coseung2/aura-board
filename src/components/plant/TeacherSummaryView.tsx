@@ -3,11 +3,12 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
-import type { SpeciesDTO, TeacherSummaryDTO } from "@/types/plant";
+import type { SpeciesDTO, TeacherSummaryDTO, RecentObservationDTO } from "@/types/plant";
 import { PlantAllowListModal } from "./PlantAllowListModal";
 
 interface Props {
   summary: TeacherSummaryDTO;
+  recentObservations: RecentObservationDTO[];
   allSpecies: SpeciesDTO[]; // full catalog, not just allowed
   allowedSpecies: SpeciesDTO[]; // classroom allow-list
   classroomId: string;
@@ -39,6 +40,7 @@ function recencyIndicator(iso: string | null) {
 
 export function TeacherSummaryView({
   summary,
+  recentObservations,
   allSpecies,
   allowedSpecies,
   classroomId,
@@ -214,148 +216,68 @@ export function TeacherSummaryView({
         </aside>
       </div>
 
-      {/* ── Student Card Grid ── */}
-      <section className="plant-panel-game" style={{ marginBottom: 0 }}>
-        <div className="plant-panel-game-head" style={{ flexWrap: "wrap", gap: 10 }}>
+      {/* ── Recent Observations ── */}
+      <section className="plant-panel-game">
+        <div className="plant-panel-game-head">
           <div>
-            <span className="plant-panel-game-eyebrow">Student roster</span>
-            <h3 style={{ marginTop: 2, fontSize: 16, fontWeight: 700 }}>학생별 진행 상태</h3>
+            <span className="plant-panel-game-eyebrow">Recent observations</span>
+            <h3 style={{ marginTop: 2, fontSize: 16, fontWeight: 700 }}>
+              최근 관찰 기록 ({recentObservations.length}건)
+            </h3>
           </div>
-          <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-            <input
-              type="search"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              placeholder="이름·식물·단계 검색"
-              aria-label="학생 검색"
-              style={{
-                border: "1px solid var(--color-border)",
-                borderRadius: 10,
-                padding: "8px 14px",
-                fontSize: 13,
-                width: 180,
-                font: "inherit",
-                background: "var(--color-surface)",
-              }}
-            />
-            <select
-              className="plant-filter-select"
-              value={studentFilter}
-              aria-label="학생 상태 필터"
-              onChange={(e) => setStudentFilter(e.target.value as StudentFilter)}
-              style={{
-                border: "1px solid var(--color-border)",
-                borderRadius: 10,
-                padding: "8px 12px",
-                fontSize: 13,
-                background: "white",
-                font: "inherit",
-              }}
-            >
-              <option value="all">전체</option>
-              <option value="stalled">정체 학생만</option>
-              <option value="completed">정상 진행</option>
-            </select>
-          </div>
+          {recentObservations.length > 0 && (
+            <span style={{ fontSize: 12, color: "var(--color-text-muted)" }}>
+              최근 {recentObservations.length}개의 관찰
+            </span>
+          )}
         </div>
-
-        {filteredStudents.length > 0 ? (
-          <div className="plant-student-game-grid">
-            {filteredStudents.map((s) => {
-              const recency = recencyIndicator(s.lastObservedAt);
-              const stageDotClass =
-                recency.mark === "🔴" ? "stage-red"
-                : recency.mark === "🟡" ? "stage-yellow"
-                : recency.mark === "🟢" ? "stage-green"
-                : "stage-green";
-              return (
-                <button
-                  key={s.id}
-                  type="button"
-                  className="plant-student-game-card"
-                  onClick={() => router.push(studentHref(s.id))}
-                  aria-label={`${s.name} 관찰일지 열기`}
-                >
-                  <span className="plant-student-game-avatar">{s.speciesEmoji ?? "🫘"}</span>
-                  <span className="plant-student-game-info">
-                    <span className="plant-student-game-name">
-                      {s.name} · {s.number ?? "—"}번
-                      {s.speciesName && (
-                        <span style={{ fontSize: 11, color: "var(--color-text-muted)", marginLeft: 4 }}>
-                          {s.speciesEmoji} {s.speciesName}({s.nickname})
-                        </span>
-                      )}
-                    </span>
-                    <span className="plant-student-game-plant">
-                      {s.currentStageOrder ? (
-                        <span className="plant-student-game-stage">
-                          <span className={`stage-dot ${stageDotClass}`} />
-                          {s.currentStageOrder}단계 · {s.currentStageName} · {formatAgo(s.lastObservedAt)}
-                        </span>
-                      ) : (
-                        <span style={{ color: "var(--color-text-muted)" }}>식물 선택 전</span>
-                      )}
-                    </span>
+        {recentObservations.length > 0 ? (
+          <div className="plant-obs-feed">
+            {recentObservations.map((obs) => (
+              <button
+                key={obs.id}
+                type="button"
+                className="plant-obs-feed-card"
+                onClick={() => router.push(studentHref(obs.student.id))}
+                aria-label={`${obs.student.name}의 관찰 기록 열기`}
+              >
+                {obs.thumbnail ? (
+                  <img
+                    src={obs.thumbnail}
+                    alt=""
+                    className="plant-obs-feed-thumb"
+                    loading="lazy"
+                    onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
+                  />
+                ) : (
+                  <div className="plant-obs-feed-noimg">{obs.species.emoji}</div>
+                )}
+                <div className="plant-obs-feed-info">
+                  <span className="plant-obs-feed-student">
+                    {obs.student.number ?? "—"}번 {obs.student.name}
                   </span>
-                  <span className={`plant-student-game-badge ${s.stalled ? "badge-game-stalled" : s.speciesName ? "badge-game-ok" : "badge-game-pending"}`}>
-                    {s.stalled ? "정체" : s.speciesName ? "정상" : "신규"}
+                  <span className="plant-obs-feed-plant">
+                    {obs.species.emoji} {obs.species.nameKo} · “{obs.plantNickname}”
                   </span>
-                </button>
-              );
-            })}
+                  {obs.memo && (
+                    <span className="plant-obs-feed-memo">{obs.memo}</span>
+                  )}
+                  <span className="plant-obs-feed-time">
+                    {new Date(obs.observedAt).toLocaleString("ko-KR", {
+                      month: "short", day: "numeric",
+                      hour: "2-digit", minute: "2-digit",
+                    })}
+                  </span>
+                </div>
+              </button>
+            ))}
           </div>
         ) : (
-          <p className="plant-empty-state" style={{ padding: "40px 20px" }}>
-            {summary.students.length === 0 ? "아직 학생이 없어요." : "조건에 맞는 학생이 없어요."}
+          <p style={{ padding: "40px 20px", textAlign: "center", color: "var(--color-text-muted)", fontSize: 13, margin: 0 }}>
+            아직 관찰 기록이 없어요. 학생들이 첫 관찰을 시작하면 여기에 표시됩니다.
           </p>
         )}
       </section>
-
-      {/* ── Matrix Preview ── */}
-      {matrixPreviewStudents.length > 0 && (
-        <section className="plant-matrix-game">
-          <div className="plant-matrix-game-head">
-            <h3>📊 학급 성장 매트릭스</h3>
-            <div className="plant-matrix-game-stats">
-              <span><strong>{summary.plantedCount}</strong>명</span>
-              <span><strong>{stages.length}</strong>단계</span>
-              <span><strong>{summary.plantedCount * 2}</strong>개 사진</span>
-            </div>
-          </div>
-          <div className="plant-matrix-game-grid">
-            <div className="plant-matrix-game-header">단계\학생</div>
-            {matrixPreviewStudents.map((s) => (
-              <div key={s.id} className="plant-matrix-game-header">{s.number ?? "—"}번</div>
-            ))}
-            {previewStages.map((st) => (
-              <>
-                <div key={`label-${st}`} className="plant-matrix-game-label">{st}. {["발아", "성장", "분화", "개화", "결실"][st - 1] ?? `${st}단계`}</div>
-                {matrixPreviewStudents.map((s) => {
-                  const isStalled = s.stalled;
-                  const hasPlant = !!s.speciesName;
-                  const isCurrent = s.currentStageOrder === st;
-                  let cellClass = "mgc-empty";
-                  if (isStalled && hasPlant) cellClass = "mgc-stale";
-                  else if (hasPlant) cellClass = "mgc-photo";
-                  if (isCurrent) cellClass += " mgc-current";
-                  return (
-                    <button
-                      key={`${s.id}-${st}`}
-                      type="button"
-                      className={`plant-matrix-game-cell ${cellClass}`}
-                      onClick={() => router.push(studentHref(s.id))}
-                      title={`${s.name} · ${st}단계`}
-                      aria-label={`${s.name} · ${st}단계`}
-                    >
-                      {hasPlant ? (isStalled ? "⏳" : ["🌱", "🌿", "🌻", "💐", "🍎"][st - 1] ?? "🌿") : "·"}
-                    </button>
-                  );
-                })}
-              </>
-            ))}
-          </div>
-        </section>
-      )}
 
       <PlantAllowListModal
         open={showAllow}

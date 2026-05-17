@@ -71,6 +71,17 @@ export interface TeacherSummaryDTO {
   students: TeacherSummaryStudentRow[];
 }
 
+export interface RecentObservationDTO {
+  id: string;
+  stageId: string;
+  memo: string | null;
+  observedAt: string;
+  thumbnail: string | null;
+  student: { id: string; name: string; number: number | null };
+  species: { emoji: string; nameKo: string };
+  plantNickname: string;
+}
+
 export interface PlantJournalResponse {
   board: { id: string; title: string; classroomId: string | null };
   role: "owner" | "editor" | "viewer" | null;
@@ -78,4 +89,5 @@ export interface PlantJournalResponse {
   species: SpeciesDTO[];
   myPlant: StudentPlantDTO | null;
   teacherSummary: TeacherSummaryDTO | null;
+  recentObservations: RecentObservationDTO[] | null;
 }

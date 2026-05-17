@@ -2085,3 +2085,88 @@
   transform: scale(1.05);
 }
 
+/* ── Recent Observations Feed ── */
+.plant-obs-feed {
+  display: grid;
+  gap: 10px;
+}
+.plant-obs-feed-card {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+  padding: 14px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  background: var(--color-surface);
+  cursor: pointer;
+  text-align: left;
+  font: inherit;
+  color: inherit;
+  transition: box-shadow var(--t-slow), border-color var(--t-slow);
+}
+.plant-obs-feed-card:hover {
+  border-color: var(--color-border-hover);
+  box-shadow: var(--shadow-card-hover);
+}
+.plant-obs-feed-thumb {
+  width: 56px;
+  height: 56px;
+  border-radius: 12px;
+  object-fit: cover;
+  flex-shrink: 0;
+  background: var(--color-surface-alt);
+}
+.plant-obs-feed-noimg {
+  width: 56px;
+  height: 56px;
+  border-radius: 12px;
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  font-size: 24px;
+  background: var(--color-surface-alt);
+  border: 1px solid var(--color-border);
+}
+.plant-obs-feed-info {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+  flex: 1;
+}
+.plant-obs-feed-student {
+  font-weight: 700;
+  font-size: 14px;
+}
+.plant-obs-feed-plant {
+  font-size: 12px;
+  color: var(--color-text-muted);
+}
+.plant-obs-feed-memo {
+  font-size: 13px;
+  color: var(--color-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 100%;
+}
+.plant-obs-feed-time {
+  font-size: 11px;
+  color: var(--color-text-faint);
+}
+
+@media (max-width: 640px) {
+  .plant-obs-feed-card {
+    padding: 12px;
+    gap: 10px;
+  }
+  .plant-obs-feed-thumb,
+  .plant-obs-feed-noimg {
+    width: 44px;
+    height: 44px;
+  }
+  .plant-obs-feed-student {
+    font-size: 13px;
+  }
+}
+
