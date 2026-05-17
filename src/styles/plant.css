@@ -2,18 +2,9 @@
    plant-roadmap layout (PJ-1~6)
    ===================================================== */
 
-:root {
-  --color-plant-active: #27a35f;
-  --color-plant-visited: #b8dfc7;
-  --color-plant-upcoming: #d0cfcd;
-  --color-plant-stalled: #c62828;
-}
-
 /* ── Select step ─────────────────────────── */
 .plant-select {
-  max-width: 960px;
-  margin: 0 auto;
-  padding: 24px 20px 120px;
+  padding: 24px 32px 120px;
 }
 .plant-select-title {
   font-family: var(--font-display);
@@ -95,25 +86,10 @@
   border: 1px solid var(--color-border);
   font: inherit;
 }
-.plant-select-bar button {
-  padding: 10px 18px;
-  border-radius: var(--radius-btn);
-  border: none;
-  background: var(--color-accent);
-  color: #fff;
-  font-weight: 600;
-  cursor: pointer;
-}
-.plant-select-bar button:disabled {
-  background: var(--color-text-faint);
-  cursor: not-allowed;
-}
 
 /* ── Roadmap view ─────────────────────────── */
 .plant-roadmap {
-  max-width: 1200px;
-  margin: 0 auto;
-  padding: 20px;
+  padding: 24px 32px;
 }
 .plant-head {
   display: flex;
@@ -363,9 +339,7 @@
 
 /* ── Teacher summary ─────────────────────────── */
 .plant-teacher {
-  max-width: 100%;
-  margin: 0 auto;
-  padding: 20px 32px;
+  padding: 24px 32px;
 }
 .plant-distribution {
   display: flex;
@@ -1068,29 +1042,6 @@
   color: var(--color-plant-active);
   font-weight: 900;
 }
-.plant-hero-primary-cta,
-.plant-hero-camera-card button,
-.plant-teacher-primary-link,
-.plant-teacher-outline-btn,
-.plant-teacher-chip-btn {
-  border-radius: 999px;
-  border: 1px solid transparent;
-  font: inherit;
-  font-weight: 800;
-  cursor: pointer;
-  text-decoration: none;
-}
-.plant-hero-primary-cta,
-.plant-teacher-primary-link {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  padding: 10px 16px;
-  color: #fff;
-  background: linear-gradient(135deg, #1f8f51, #4eaf62);
-  box-shadow: 0 10px 24px rgba(39, 163, 95, 0.24);
-}
 .plant-hero-camera-card {
   padding: 18px;
   display: flex;
@@ -1118,158 +1069,8 @@
   font-size: 13px;
   line-height: 1.45;
 }
-.plant-hero-camera-card button,
-.plant-teacher-outline-btn,
-.plant-teacher-chip-btn {
-  padding: 8px 13px;
-  color: #31563c;
-  background: rgba(255, 255, 255, 0.78);
-  border-color: rgba(91, 128, 94, 0.2);
-}
-
-.plant-teacher-hero {
-  padding: 24px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 18px;
-  margin-bottom: 14px;
-  background: linear-gradient(135deg, #f5f2e8, #eef7e9 58%, #fffaf1);
-}
-.plant-teacher-hero h2,
-.plant-matrix-toolbar h2,
-.plant-teacher-panel h3,
-.plant-matrix-drilldown h3 {
-  margin: 6px 0 0;
-  letter-spacing: -0.35px;
-}
-.plant-teacher-hero p,
-.plant-matrix-toolbar p {
-  margin: 7px 0 0;
-  color: var(--color-text-muted);
-  line-height: 1.5;
-}
-.plant-teacher-hero-actions,
-.plant-teacher-table-tools,
-.plant-matrix-toolbar-stats {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-.plant-teacher-kpi-grid {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 12px;
-  margin-bottom: 14px;
-}
-.plant-teacher-kpi-card {
-  padding: 16px;
-  border-radius: 18px;
-  border: 1px solid rgba(91, 128, 94, 0.16);
-  background: var(--color-surface);
-  box-shadow: var(--shadow-sm);
-}
-.plant-teacher-kpi-card span,
-.plant-teacher-kpi-card small {
-  display: block;
-  color: var(--color-text-muted);
-  font-size: 12px;
-}
-.plant-teacher-kpi-card strong {
-  display: block;
-  margin: 7px 0 3px;
-  font-size: 28px;
-  line-height: 1;
-  letter-spacing: -0.7px;
-}
-.plant-teacher-kpi-card[data-tone="green"] strong { color: #1f8f51; }
-.plant-teacher-kpi-card[data-tone="red"] strong { color: #c62828; }
-.plant-teacher-kpi-card[data-tone="amber"] strong { color: #a16207; }
-.plant-teacher-kpi-card[data-tone="blue"] strong { color: #2563eb; }
-.plant-teacher-dashboard-grid {
-  display: grid;
-  grid-template-columns: minmax(0, 1.55fr) minmax(280px, 0.85fr);
-  gap: 14px;
-  margin-bottom: 14px;
-}
-.plant-teacher-panel {
-  padding: 18px;
-}
-.plant-teacher-panel-head {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 12px;
-  margin-bottom: 12px;
-}
-.plant-teacher-panel-note,
-.plant-teacher-empty-copy {
-  color: var(--color-text-muted);
-  font-size: 12px;
-}
-.plant-distribution--bars .plant-dist-item {
-  min-height: 118px;
-  justify-content: flex-end;
-}
-.plant-teacher-alert-list {
-  list-style: none;
-  padding: 0;
-  margin: 0;
-  display: grid;
-  gap: 8px;
-}
-.plant-teacher-alert-list button {
-  width: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  text-align: left;
-  border: 1px solid rgba(198, 40, 40, 0.14);
-  border-radius: 14px;
-  background: #fff7f2;
-  padding: 10px 12px;
-  cursor: pointer;
-  font: inherit;
-}
-.plant-teacher-alert-list span {
-  font-weight: 800;
-}
-.plant-teacher-alert-list small {
-  color: var(--color-text-muted);
-}
-.plant-teacher-table-head {
-  align-items: center;
-}
-.plant-teacher-table-tools input {
-  min-width: 220px;
-  padding: 8px 11px;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-btn);
-  font: inherit;
-  background: var(--color-surface);
-}
-.plant-student-table-wrap {
-  overflow-x: auto;
-}
-.plant-student-recency-dot {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 20px;
-}
-.plant-ok-badge {
-  background: #f0fdf4;
-  color: #15803d;
-  border-radius: var(--radius-pill);
-  padding: 1px 8px;
-  font-size: 11px;
-  font-weight: 700;
-}
-
 .plant-matrix-shell {
-  padding: 20px;
+  padding: 24px 32px;
 }
 .plant-matrix-toolbar {
   padding: 20px;
@@ -1424,34 +1225,6 @@
 .plant-hero-game-actions {
   display: flex;
   gap: 10px;
-}
-.plant-hero-game-btn {
-  background: rgba(255, 255, 255, 0.2);
-  backdrop-filter: blur(8px);
-  border: none;
-  color: white;
-  padding: 10px 20px;
-  border-radius: 12px;
-  font-size: 14px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.2s;
-  font-family: inherit;
-  text-decoration: none;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-}
-.plant-hero-game-btn:hover {
-  background: rgba(255, 255, 255, 0.35);
-  transform: translateY(-2px);
-}
-.plant-hero-game-btn-primary {
-  background: #95d5b2;
-  color: #1a3a2a;
-}
-.plant-hero-game-btn-primary:hover {
-  background: #b7e4c7;
 }
 
 /* ── Game KPI cards ── */

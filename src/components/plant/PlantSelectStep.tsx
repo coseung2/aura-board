@@ -107,6 +107,7 @@ export function PlantSelectStep({ boardId, species, onStart }: Props) {
         />
         <button
           type="button"
+          className="ds-btn-primary"
           onClick={start}
           disabled={!selected || !validNickname || busy}
         >

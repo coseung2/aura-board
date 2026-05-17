@@ -108,12 +108,12 @@ export function TeacherSummaryView({
           <p>오늘 챙겨야 할 학생, 단계 분포, 전체 매트릭스를 한 화면에서 확인해요</p>
         </div>
         <div className="plant-hero-game-actions">
-          <button type="button" onClick={() => setShowAllow(true)} className="plant-hero-game-btn">
+          <button type="button" onClick={() => setShowAllow(true)} className="ds-btn-secondary">
             🌿 식물 허용 목록
           </button>
           <Link
             href={`/classroom/${classroomId}/plant-matrix`}
-            className="plant-hero-game-btn plant-hero-game-btn-primary"
+            className="ds-btn-primary"
           >
             📊 매트릭스 전체 보기
           </Link>
@@ -181,8 +181,8 @@ export function TeacherSummaryView({
             </div>
             <button
               type="button"
-              className="plant-hero-game-btn"
-              style={{ background: "#f0f7f0", color: "#1a3a2a", padding: "6px 14px", fontSize: 12 }}
+              className="ds-btn-secondary"
+              style={{ padding: "6px 14px", fontSize: 12 }}
               onClick={() => setStudentFilter("stalled")}
             >
               정체만 보기

@@ -352,7 +352,7 @@ export function RoadmapView({
           {canEdit && (
             <button
               type="button"
-              className="plant-hero-primary-cta"
+              className="ds-btn-primary"
               onClick={() => {
                 setEditingObs(null);
                 setEditorStageId(currentStage.id);
@@ -372,6 +372,8 @@ export function RoadmapView({
           {canEdit && (
             <button
               type="button"
+              className="ds-btn-secondary"
+              style={{ padding: "6px 14px", fontSize: 13 }}
               onClick={() => {
                 setEditingObs(null);
                 setEditorStageId(currentStage.id);
