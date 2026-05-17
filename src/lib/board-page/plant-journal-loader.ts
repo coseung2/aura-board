@@ -17,7 +17,7 @@ export async function loadPlantJournalInitial({
   studentViewer,
 }: Args): Promise<PlantJournalResponse> {
   const classroomId = board.classroomId;
-  const [allows, myPlant, plantsForBoard, classroomStudents] = await Promise.all([
+  const [allows, myPlant, plantsForBoard, classroomStudents, recentObs] = await Promise.all([
     classroomId
       ? db.classroomPlantAllow.findMany({
           where: { classroomId },
@@ -51,6 +51,22 @@ export async function loadPlantJournalInitial({
       ? db.student.findMany({
           where: { classroomId },
           orderBy: [{ number: "asc" }, { name: "asc" }],
+        })
+      : Promise.resolve([]),
+    role === "owner" && classroomId
+      ? db.plantObservation.findMany({
+          where: { studentPlant: { boardId: board.id } },
+          orderBy: { observedAt: "desc" },
+          take: 10,
+          include: {
+            images: { orderBy: { order: "asc" }, take: 1 },
+            studentPlant: {
+              include: {
+                student: { select: { id: true, name: true, number: true } },
+                species: { select: { emoji: true, nameKo: true } },
+              },
+            },
+          },
         })
       : Promise.resolve([]),
   ]);
@@ -178,6 +194,22 @@ export async function loadPlantJournalInitial({
     species: speciesOut,
     myPlant: myPlantOut,
     teacherSummary,
-    recentObservations: null,
+    recentObservations: recentObs.map((o) => ({
+      id: o.id,
+      stageId: o.stageId,
+      memo: o.memo,
+      observedAt: o.observedAt.toISOString(),
+      thumbnail: o.images[0]?.url ?? null,
+      student: {
+        id: o.studentPlant.student.id,
+        name: o.studentPlant.student.name,
+        number: o.studentPlant.student.number,
+      },
+      species: {
+        emoji: o.studentPlant.species.emoji,
+        nameKo: o.studentPlant.species.nameKo,
+      },
+      plantNickname: o.studentPlant.nickname,
+    })),
   };
 }

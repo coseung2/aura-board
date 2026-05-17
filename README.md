@@ -2,7 +2,7 @@
 
 나만의 Aura-board 웹앱. 실시간 협업 보드 + 카드 기반 콘텐츠 + 드래그앤드롭 레이아웃. 솔로 프로젝트.
 
-> **MVP 상태**: Notion 테마 확정 (2026-04-10). 탈락한 Figma/Miro 변형은 `tasks/2026-04-09-initial-padlet-app/phase5/rejected/` 에 아카이브.
+> **MVP 상태**: Notion 테마 확정 (2026-04-10). 인증/권한 체계는 레거시(`owner/editor/viewer`)에서 3개 Identity(teacher/parent/student)로 이전 중.
 
 ---
 
@@ -26,17 +26,14 @@ npm run dev           # http://localhost:3000
 
 향후 Google Slides / Docs / Sheets, Figma, Notion, Desmos, GeoGebra 등 임베드는 `tasks/2026-04-12-embed-research/findings.md` 에 후보로 보관.
 
-### 역할 전환 (mock RBAC)
+### 인증 방식
 
-실제 인증이 없으므로 `?as=` 쿼리로 mock 사용자를 선택:
+셋 중 하나로 로그인:
+- 👩‍🏫 **교사** — Google OAuth (NextAuth)
+- 👦 **학생** — QR/코드 → HMAC 서명 쿠키
+- 👪 **학부모** — 매직 링크 → 랜덤 토큰 쿠키
 
-```
-http://localhost:3000/board/demo?as=owner     # 👑 전권 (카드 CRUD 전부)
-http://localhost:3000/board/demo?as=editor    # ✏️ 편집 (생성/수정/본인 카드 삭제)
-http://localhost:3000/board/demo?as=viewer    # 👀 읽기 전용 (카드 추가 UI 안 보임)
-```
-
-> ⚠️ **Production 금지**: `?as=` 는 dev 전용. 실제 배포 전에 `src/lib/auth.ts` + `src/proxy.ts`를 실제 인증으로 교체.
+> 한 브라우저가 여러 세션을 동시에 가질 수 있음 (교사+학부모 등). `resolveIdentities()`가 모든 신원을 취합.
 
 ---
 
@@ -67,13 +64,11 @@ padlet/
 │   │   ├── DraggableCard.tsx
 │   │   ├── AddCardButton.tsx
 │   │   └── UserSwitcher.tsx
-│   ├── lib/
-│   │   ├── db.ts               # Prisma singleton
-│   │   ├── auth.ts             # server-only mock currentUser
-│   │   ├── rbac.ts             # requirePermission + Role enum
-│   │   └── roles.ts            # isomorphic MockRoleKey 상수
-│   └── proxy.ts                # Next.js 16 request proxy (`as` 쿠키 세팅)
-├── .env                        # DATABASE_URL="file:./dev.db"
+│   ├── lib/                     # 인증/권한/prisma 유틸
+│   ├── styles/
+│   │   └── plant.css
+│   └── proxy.ts                # Next.js 16 request proxy
+├── .env                        # DATABASE_URL
 ├── next.config.ts
 ├── tsconfig.json
 └── package.json
@@ -100,17 +95,15 @@ padlet/
 
 ## RBAC 규칙
 
-`src/lib/rbac.ts` 참조.
+레거시 `BoardMember(owner/editor/viewer)`에서 **Identity 기반(`card-permissions.ts`)** 으로 이전 중. 현재는 둘 다 사용.
 
-| Action | owner | editor | viewer |
+| Action | 교사 | 학생 | 학부모 |
 |---|---|---|---|
-| 보드 보기 | ✅ | ✅ | ✅ |
-| 카드 생성 | ✅ | ✅ | ❌ |
-| 카드 수정/이동 | ✅ | ✅ | ❌ |
-| 자기 카드 삭제 | ✅ | ✅ | ❌ |
-| 남 카드 삭제 | ✅ | ❌ | ❌ |
+| 보드/카드 보기 | ✅ | ✅ | ✅ (자녀만) |
+| 카드 생성/편집 | ✅ | ✅ (자기 카드만) | ❌ |
+| 카드 삭제 | ✅ | ✅ (자기 카드만) | ❌ |
 
-서버 사이드 강제. 클라이언트는 UI 숨김만 담당 (defense in depth).
+> 자세한 권한 로직은 `src/lib/card-permissions.ts` 참조.
 
 ---
 

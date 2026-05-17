@@ -154,27 +154,72 @@ export function TeacherSummaryView({
         </article>
       </section>
 
-      {/* ── Dashboard: Distribution + Alerts ── */}
+      {/* ── Dashboard: Observations + Alerts ── */}
       <div className="plant-dash-game">
+        {/* Left: Recent Observations */}
         <div className="plant-panel-game">
           <div className="plant-panel-game-head">
             <div>
-              <span className="plant-panel-game-eyebrow">Stage distribution</span>
-              <h3>단계별 분포</h3>
+              <span className="plant-panel-game-eyebrow">Recent observations</span>
+              <h3 style={{ marginTop: 2, fontSize: 16, fontWeight: 700 }}>
+                최근 관찰 기록 ({recentObservations.length}건)
+              </h3>
             </div>
-            <span style={{ fontSize: 12, color: "var(--color-text-muted)" }}>가장 몰린 단계를 먼저 확인</span>
+            {recentObservations.length > 0 && (
+              <span style={{ fontSize: 12, color: "var(--color-text-muted)" }}>
+                최근 {recentObservations.length}개의 관찰
+              </span>
+            )}
           </div>
-          <div className="plant-dist-game">
-            {stageData.map((d) => (
-              <div className="plant-dist-game-wrap" key={d.order}>
-                <span className="plant-dist-game-count">{d.count}</span>
-                <div className="plant-dist-game-bar" style={{ height: `${Math.max(6, (d.count / maxDistCount) * 100)}%` }} />
-                <span className="plant-dist-game-label">{d.order}단계</span>
-              </div>
-            ))}
-          </div>
+          {recentObservations.length > 0 ? (
+            <div className="plant-obs-feed">
+              {recentObservations.map((obs) => (
+                <button
+                  key={obs.id}
+                  type="button"
+                  className="plant-obs-feed-card"
+                  onClick={() => router.push(studentHref(obs.student.id))}
+                  aria-label={`${obs.student.name}의 관찰 기록 열기`}
+                >
+                  {obs.thumbnail ? (
+                    <img
+                      src={obs.thumbnail}
+                      alt=""
+                      className="plant-obs-feed-thumb"
+                      loading="lazy"
+                      onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
+                    />
+                  ) : (
+                    <div className="plant-obs-feed-noimg">{obs.species.emoji}</div>
+                  )}
+                  <div className="plant-obs-feed-info">
+                    <span className="plant-obs-feed-student">
+                      {obs.student.number ?? "—"}번 {obs.student.name}
+                    </span>
+                    <span className="plant-obs-feed-plant">
+                      {obs.species.emoji} {obs.species.nameKo} · &ldquo;{obs.plantNickname}&rdquo;
+                    </span>
+                    {obs.memo && (
+                      <span className="plant-obs-feed-memo">{obs.memo}</span>
+                    )}
+                    <span className="plant-obs-feed-time">
+                      {new Date(obs.observedAt).toLocaleString("ko-KR", {
+                        month: "short", day: "numeric",
+                        hour: "2-digit", minute: "2-digit",
+                      })}
+                    </span>
+                  </div>
+                </button>
+              ))}
+            </div>
+          ) : (
+            <p style={{ padding: "40px 20px", textAlign: "center", color: "var(--color-text-muted)", fontSize: 13, margin: 0 }}>
+              아직 관찰 기록이 없어요. 학생들이 첫 관찰을 시작하면 여기에 표시됩니다.
+            </p>
+          )}
         </div>
 
+        {/* Right: Today's students */}
         <aside className="plant-panel-game" aria-label="정체 학생 빠른 확인">
           <div className="plant-panel-game-head">
             <div>
@@ -216,67 +261,24 @@ export function TeacherSummaryView({
         </aside>
       </div>
 
-      {/* ── Recent Observations ── */}
+      {/* ── Stage Distribution (full width bottom) ── */}
       <section className="plant-panel-game">
         <div className="plant-panel-game-head">
           <div>
-            <span className="plant-panel-game-eyebrow">Recent observations</span>
-            <h3 style={{ marginTop: 2, fontSize: 16, fontWeight: 700 }}>
-              최근 관찰 기록 ({recentObservations.length}건)
-            </h3>
+            <span className="plant-panel-game-eyebrow">Stage distribution</span>
+            <h3>단계별 분포표</h3>
           </div>
-          {recentObservations.length > 0 && (
-            <span style={{ fontSize: 12, color: "var(--color-text-muted)" }}>
-              최근 {recentObservations.length}개의 관찰
-            </span>
-          )}
+          <span style={{ fontSize: 12, color: "var(--color-text-muted)" }}>가장 몰린 단계를 먼저 확인</span>
         </div>
-        {recentObservations.length > 0 ? (
-          <div className="plant-obs-feed">
-            {recentObservations.map((obs) => (
-              <button
-                key={obs.id}
-                type="button"
-                className="plant-obs-feed-card"
-                onClick={() => router.push(studentHref(obs.student.id))}
-                aria-label={`${obs.student.name}의 관찰 기록 열기`}
-              >
-                {obs.thumbnail ? (
-                  <img
-                    src={obs.thumbnail}
-                    alt=""
-                    className="plant-obs-feed-thumb"
-                    loading="lazy"
-                    onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
-                  />
-                ) : (
-                  <div className="plant-obs-feed-noimg">{obs.species.emoji}</div>
-                )}
-                <div className="plant-obs-feed-info">
-                  <span className="plant-obs-feed-student">
-                    {obs.student.number ?? "—"}번 {obs.student.name}
-                  </span>
-                  <span className="plant-obs-feed-plant">
-                    {obs.species.emoji} {obs.species.nameKo} · “{obs.plantNickname}”
-                  </span>
-                  {obs.memo && (
-                    <span className="plant-obs-feed-memo">{obs.memo}</span>
-                  )}
-                  <span className="plant-obs-feed-time">
-                    {new Date(obs.observedAt).toLocaleString("ko-KR", {
-                      month: "short", day: "numeric",
-                      hour: "2-digit", minute: "2-digit",
-                    })}
-                  </span>
-                </div>
-              </button>
-            ))}
-          </div>
-        ) : (
-          <p style={{ padding: "40px 20px", textAlign: "center", color: "var(--color-text-muted)", fontSize: 13, margin: 0 }}>
-            아직 관찰 기록이 없어요. 학생들이 첫 관찰을 시작하면 여기에 표시됩니다.
-          </p>
-        )}
+        <div className="plant-dist-game">
+          {stageData.map((d) => (
+            <div className="plant-dist-game-wrap" key={d.order}>
+              <span className="plant-dist-game-count">{d.count}</span>
+              <div className="plant-dist-game-bar" style={{ height: `${Math.max(6, (d.count / maxDistCount) * 100)}%` }} />
+              <span className="plant-dist-game-label">{d.order}단계</span>
+            </div>
+          ))}
+        </div>
       </section>
 
       <PlantAllowListModal
