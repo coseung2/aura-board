@@ -178,5 +178,6 @@ export async function loadPlantJournalInitial({
     species: speciesOut,
     myPlant: myPlantOut,
     teacherSummary,
+    recentObservations: null,
   };
 }
