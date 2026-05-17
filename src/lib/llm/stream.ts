@@ -59,6 +59,7 @@ const MODELS: Record<Exclude<LlmProvider, "ollama">, string> = {
   claude: process.env.CLAUDE_MODEL_ID ?? "claude-sonnet-4-5",
   openai: process.env.OPENAI_MODEL_ID ?? "gpt-4o-mini",
   gemini: process.env.GEMINI_MODEL_ID ?? "gemini-2.5-flash",
+  "opencode-go": process.env.OPENCODE_MODEL_ID ?? "opencode/deepseek-v4-flash-free",
 };
 // ollama 는 교사가 저장 시 입력한 modelId 를 런타임에 그대로 사용 (MODELS 비적용).
 
