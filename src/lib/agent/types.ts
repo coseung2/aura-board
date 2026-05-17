@@ -57,6 +57,7 @@ export interface SendMessageRequest {
 // SSE event types for streaming
 export type AgentStreamEvent =
   | { type: "session"; id: string }
-  | { type: "delta"; text: string }
-  | { type: "done"; stopReason: string; tokensIn: number; tokensOut: number }
+  | { type: "message_delta"; text: string }
+  | { type: "code_delta"; text: string }
+  | { type: "done"; stopReason: string; message: string; code: string }
   | { type: "error"; message: string };

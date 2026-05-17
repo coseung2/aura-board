@@ -44,6 +44,92 @@ async function getTeacherApiKey(classroomId: string): Promise<string | null> {
   }
 }
 
+function findJsonStringStart(jsonText: string, key: "message" | "code") {
+  const match = new RegExp(`"${key}"\\s*:\\s*"`).exec(jsonText);
+  if (!match || match.index === undefined) return -1;
+  return match.index + match[0].length;
+}
+
+function readPartialJsonString(jsonText: string, start: number) {
+  let value = "";
+
+  for (let i = start; i < jsonText.length; i += 1) {
+    const char = jsonText[i];
+
+    if (char === '"') {
+      return value;
+    }
+
+    if (char !== "\\") {
+      value += char;
+      continue;
+    }
+
+    const escaped = jsonText[i + 1];
+    if (!escaped) break;
+
+    switch (escaped) {
+      case '"':
+      case "\\":
+      case "/":
+        value += escaped;
+        i += 1;
+        break;
+      case "b":
+        value += "\b";
+        i += 1;
+        break;
+      case "f":
+        value += "\f";
+        i += 1;
+        break;
+      case "n":
+        value += "\n";
+        i += 1;
+        break;
+      case "r":
+        value += "\r";
+        i += 1;
+        break;
+      case "t":
+        value += "\t";
+        i += 1;
+        break;
+      case "u": {
+        const hex = jsonText.slice(i + 2, i + 6);
+        if (!/^[0-9a-fA-F]{4}$/.test(hex)) return value;
+        value += String.fromCharCode(parseInt(hex, 16));
+        i += 5;
+        break;
+      }
+      default:
+        value += escaped;
+        i += 1;
+    }
+  }
+
+  return value;
+}
+
+function extractAgentJsonParts(jsonText: string) {
+  try {
+    const parsed = JSON.parse(jsonText) as { message?: unknown; code?: unknown };
+    return {
+      message: typeof parsed.message === "string" ? parsed.message : "",
+      code: typeof parsed.code === "string" ? parsed.code : "",
+    };
+  } catch {
+    const messageStart = findJsonStringStart(jsonText, "message");
+    const codeStart = findJsonStringStart(jsonText, "code");
+
+    return {
+      message:
+        messageStart >= 0 ? readPartialJsonString(jsonText, messageStart) : "",
+      code: codeStart >= 0 ? readPartialJsonString(jsonText, codeStart) : "",
+    };
+  }
+}
+
 export async function POST(
   req: Request,
   { params }: { params: Promise<{ id: string }> }
@@ -129,6 +215,8 @@ export async function POST(
       send({ type: "session", id: session.id });
 
       let fullContent = "";
+      let streamedMessage = "";
+      let streamedCode = "";
       let totalTokensIn = 0;
       let totalTokensOut = 0;
 
@@ -142,7 +230,19 @@ export async function POST(
           })),
           onDelta: (text: string) => {
             fullContent += text;
-            send({ type: "delta", text });
+            const parts = extractAgentJsonParts(fullContent);
+
+            if (parts.message.length > streamedMessage.length) {
+              const delta = parts.message.slice(streamedMessage.length);
+              streamedMessage = parts.message;
+              send({ type: "message_delta", text: delta });
+            }
+
+            if (parts.code.length > streamedCode.length) {
+              const delta = parts.code.slice(streamedCode.length);
+              streamedCode = parts.code;
+              send({ type: "code_delta", text: delta });
+            }
           },
           signal: req.signal,
         });
@@ -154,12 +254,23 @@ export async function POST(
           send({ type: "error", message: result.content });
         }
 
+        const sourceContent = fullContent || result.content;
+        const extractedParts = extractAgentJsonParts(sourceContent);
+        const finalParts =
+          !extractedParts.message && !extractedParts.code && sourceContent
+            ? { message: sourceContent, code: "" }
+            : extractedParts;
+        const assistantContent = JSON.stringify({
+          message: finalParts.message,
+          code: finalParts.code,
+        });
+
         // Save assistant message
         await db.agentMessage.create({
           data: {
             sessionId: session.id,
             role: "assistant",
-            content: fullContent || result.content,
+            content: assistantContent,
             tokenCount: totalTokensOut,
           },
         });
@@ -182,8 +293,8 @@ export async function POST(
         send({
           type: "done",
           stopReason: result.stopReason,
-          tokensIn: totalTokensIn,
-          tokensOut: totalTokensOut,
+          message: finalParts.message,
+          code: finalParts.code,
         });
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);

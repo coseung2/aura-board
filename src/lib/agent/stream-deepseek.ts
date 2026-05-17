@@ -74,6 +74,7 @@ export async function streamDeepSeek(
       body: JSON.stringify({
         model: DEEPSEEK_MODEL,
         messages: apiMessages,
+        response_format: { type: "json_object" },
         stream: true,
         max_tokens: 4096,
       }),

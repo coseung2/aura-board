@@ -32,16 +32,6 @@ interface Props {
   recentSessions: SessionSummary[];
 }
 
-/** 마지막 assistant 메시지에서 ```html 블록 추출 */
-function extractLatestHtml(messages: { role: string; content: string }[]): string | null {
-  for (let i = messages.length - 1; i >= 0; i--) {
-    const m = messages[i];
-    if (m.role !== "assistant") continue;
-    const match = m.content.match(/```html\s*\n?([\s\S]*?)```/);
-    if (match?.[1]) return match[1].trim();
-  }
-  return null;
-}
 
 export function AgentPageClient({
   boardId,
@@ -59,7 +49,6 @@ export function AgentPageClient({
   const [saveTags, setSaveTags] = useState("게임");
   const [savingProject, setSavingProject] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
-  const [previewHtml, setPreviewHtml] = useState<string | null>(null);
 
   const {
     sessionId,
@@ -67,6 +56,7 @@ export function AgentPageClient({
     messages,
     streaming,
     error,
+    generatedCode,
     tokenCount,
     createSession,
     resumeSession,
@@ -74,28 +64,32 @@ export function AgentPageClient({
     stopStreaming,
     setMode,
     setMessages,
+    setGeneratedCode,
   } = useAgentChat({ boardId });
 
-  // Extract HTML from latest assistant message for preview
-  useEffect(() => {
-    const html = extractLatestHtml(messages);
-    if (html) {
-      setPreviewHtml(html);
+  const previewHtml = useMemo(() => {
+    for (let i = messages.length - 1; i >= 0; i--) {
+      const message = messages[i];
+      if (message.role === "assistant" && message.code) {
+        return message.code;
+      }
     }
+    return null;
   }, [messages]);
 
   // Compute preview srcdoc when HTML changes
   const previewSrcdoc = useMemo(() => {
-    if (!previewHtml) return "";
+    const htmlContent = generatedCode || previewHtml;
+    if (!htmlContent) return "";
     try {
-      return buildStudioSrcDoc({ htmlContent: previewHtml });
+      return buildStudioSrcDoc({ htmlContent });
     } catch {
       // Fallback: wrap in basic HTML
-      return previewHtml.startsWith("<!") || previewHtml.startsWith("<html")
-        ? previewHtml
-        : `<!DOCTYPE html><html><body>${previewHtml}</body></html>`;
+      return htmlContent.startsWith("<!") || htmlContent.startsWith("<html")
+        ? htmlContent
+        : `<!DOCTYPE html><html><body>${htmlContent}</body></html>`;
     }
-  }, [previewHtml]);
+  }, [generatedCode, previewHtml]);
 
   const handleSend = useCallback(() => {
     if (!sessionId) return;
@@ -107,38 +101,42 @@ export function AgentPageClient({
     async (selectedMode: AgentMode) => {
       setShowNewModal(false);
       setMessages([]);
+      setGeneratedCode(null);
       setChatInput("");
-      setPreviewHtml(null);
       await createSession(selectedMode);
     },
-    [createSession, setMessages]
+    [createSession, setGeneratedCode, setMessages]
   );
 
   const handleResumeSession = useCallback(
     async (session: SessionSummary) => {
       setShowNewModal(false);
-      setPreviewHtml(null);
+      setGeneratedCode(null);
       try {
         const res = await fetch(`/api/agent/sessions/${session.id}`);
         if (!res.ok) return;
         const data = await res.json();
-        setMode(data.mode as AgentMode);
-        setMessages(
-          (data.messages ?? []).map(
-            (m: { id: string; role: string; content: string }) => ({
-              id: m.id,
-              role: m.role as "user" | "assistant",
-              content: m.content,
-            })
-          )
+        const restoredMessages = (data.messages ?? []).map(
+          (m: { id: string; role: string; content: string; code?: string | null }) => ({
+            id: m.id,
+            role: m.role as "user" | "assistant",
+            content: m.content,
+            code: m.code ?? undefined,
+          })
         );
+        setMode(data.mode as AgentMode);
+        setMessages(restoredMessages);
+        const lastAssistantCode = [...restoredMessages]
+          .reverse()
+          .find((m) => m.role === "assistant" && m.code)?.code;
+        setGeneratedCode(lastAssistantCode ?? null);
         // Re-assign the hook's sessionId to the existing session
         resumeSession(session.id);
       } catch {
         await handleNewSession(session.mode as AgentMode);
       }
     },
-    [createSession, handleNewSession, resumeSession, setMode, setMessages]
+    [handleNewSession, resumeSession, setGeneratedCode, setMode, setMessages]
   );
 
   const openSaveModal = useCallback(() => {
@@ -317,14 +315,11 @@ export function AgentPageClient({
               <div className="agent-preview-column">
                 <div className="agent-preview-header">
                   <span>🎮 미리보기</span>
-                  {previewHtml && (
+                  {(generatedCode || previewHtml) && (
                     <button
                       type="button"
                       className="agent-preview-refresh"
-                      onClick={() => {
-                        const html = extractLatestHtml(messages);
-                        if (html) setPreviewHtml(html);
-                      }}
+                      onClick={() => setGeneratedCode(previewHtml)}
                       title="새로고침"
                     >
                       🔄

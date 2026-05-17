@@ -1,14 +1,30 @@
 "use client";
 
 import { useState, useRef, useCallback } from "react";
-import type { AgentMode, AgentStreamEvent } from "@/lib/agent/types";
+import type { AgentMode } from "@/lib/agent/types";
 
 export type AgentMessage = {
   id: string;
   role: "user" | "assistant";
   content: string;
+  code?: string;
   streaming?: boolean;
 };
+
+type AgentSseEvent =
+  | { type: "session"; id: string }
+  | { type: "delta"; text: string }
+  | { type: "message_delta"; text: string }
+  | { type: "code_delta"; text: string }
+  | {
+      type: "done";
+      stopReason?: string;
+      tokensIn?: number;
+      tokensOut?: number;
+      message?: string;
+      code?: string | null;
+    }
+  | { type: "error"; message: string };
 
 type Args = {
   boardId: string;
@@ -20,6 +36,7 @@ export function useAgentChat({ boardId }: Args) {
   const [messages, setMessages] = useState<AgentMessage[]>([]);
   const [streaming, setStreaming] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [generatedCode, setGeneratedCode] = useState<string | null>(null);
   const [tokenCount, setTokenCount] = useState({ in: 0, out: 0 });
   const abortRef = useRef<AbortController | null>(null);
 
@@ -28,6 +45,7 @@ export function useAgentChat({ boardId }: Args) {
       const m = selectedMode ?? mode;
       setError(null);
       setMessages([]);
+      setGeneratedCode(null);
       setSessionId(null);
       setTokenCount({ in: 0, out: 0 });
 
@@ -71,6 +89,7 @@ export function useAgentChat({ boardId }: Args) {
         content: trimmed,
       };
       setMessages((prev) => [...prev, userMsg]);
+      setGeneratedCode(null);
 
       // Add placeholder assistant message
       setMessages((prev) => [
@@ -102,6 +121,7 @@ export function useAgentChat({ boardId }: Args) {
         const decoder = new TextDecoder();
         let buffer = "";
         let assistantText = "";
+        let codeAccumulator = "";
 
         while (true) {
           const { done, value } = await reader.read();
@@ -117,9 +137,9 @@ export function useAgentChat({ boardId }: Args) {
             if (!json) continue;
 
             try {
-              const event = JSON.parse(json) as AgentStreamEvent;
+              const event = JSON.parse(json) as AgentSseEvent;
 
-              if (event.type === "delta") {
+              if (event.type === "delta" || event.type === "message_delta") {
                 assistantText += event.text;
                 setMessages((prev) => {
                   const next = [...prev];
@@ -132,10 +152,40 @@ export function useAgentChat({ boardId }: Args) {
                   }
                   return next;
                 });
+              } else if (event.type === "code_delta") {
+                codeAccumulator += event.text;
+                setGeneratedCode(codeAccumulator);
+                setMessages((prev) => {
+                  const next = [...prev];
+                  const last = next[next.length - 1];
+                  if (last?.streaming) {
+                    next[next.length - 1] = {
+                      ...last,
+                      code: codeAccumulator,
+                    };
+                  }
+                  return next;
+                });
               } else if (event.type === "done") {
                 setTokenCount({
-                  in: event.tokensIn,
-                  out: event.tokensOut,
+                  in: event.tokensIn ?? 0,
+                  out: event.tokensOut ?? 0,
+                });
+
+                const finalMessage = event.message ?? assistantText;
+                const finalCode = event.code ?? (codeAccumulator || null);
+                setGeneratedCode(finalCode);
+                setMessages((prev) => {
+                  const next = [...prev];
+                  const last = next[next.length - 1];
+                  if (last?.streaming) {
+                    next[next.length - 1] = {
+                      ...last,
+                      content: finalMessage,
+                      code: finalCode ?? undefined,
+                    };
+                  }
+                  return next;
                 });
               } else if (event.type === "error") {
                 setError(event.message);
@@ -180,6 +230,7 @@ export function useAgentChat({ boardId }: Args) {
     messages,
     streaming,
     error,
+    generatedCode,
     tokenCount,
     createSession,
     resumeSession,
@@ -187,5 +238,6 @@ export function useAgentChat({ boardId }: Args) {
     stopStreaming,
     setMode,
     setMessages,
+    setGeneratedCode,
   };
 }
