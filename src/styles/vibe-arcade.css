@@ -1325,8 +1325,20 @@
 }
 
 .va-student-enter:hover {
-  background: var(--color-accent-active);
+  background: var(--color-primary-dark, #388e3c);
   transform: translateY(-1px);
+}
+
+/* Agent service secondary entry */
+.va-student-enter-secondary {
+  background: var(--color-surface);
+  color: var(--color-text);
+  border: 2px solid var(--color-border);
+}
+
+.va-student-enter-secondary:hover {
+  border-color: var(--color-primary);
+  background: var(--color-primary-bg, #e8f5e9);
 }
 
 .va-student-enter:active {

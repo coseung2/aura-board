@@ -210,16 +210,24 @@ export function VibeArcadeBoard(props: VibeArcadeBoardProps) {
           <p className="va-subtitle">
             Claude 와 대화하며 나만의 작품을 만들어 보세요.
           </p>
-          <Link
-            href={`/board/${props.boardId}/vibe-arcade/studio`}
-            className="va-student-enter"
-          >
-            🚀 입장하기
-          </Link>
+          <div className="va-student-actions">
+            <Link
+              href={}
+              className="va-student-enter"
+            >
+              🚀 코딩 스튜디오
+            </Link>
+            <Link
+              href={}
+              className="va-student-enter va-student-enter-secondary"
+            >
+              🤖 AI 도우미
+            </Link>
+          </div>
         </div>
       </section>
     );
-  }
+  }}
 
   return (
     <section className="va-root">

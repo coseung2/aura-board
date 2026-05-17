@@ -272,6 +272,7 @@ model Student {
   // card-comments-likes (2026-04-26)
   cardComments          CardComment[]             @relation("StudentCardComments")
   cardLikes             CardLike[]                @relation("StudentCardLikes")
+  agentSessions         AgentSession[]
 
   @@unique([classroomId, number])
   @@index([classroomId])
@@ -1650,6 +1651,7 @@ model VibeProject {
   sessions     VibeSession[]
   reviews      VibeReview[]
   playSessions VibePlaySession[]
+  agentSessions AgentSession[]
 
   @@index([boardId, moderationStatus])
   @@index([classroomId, moderationStatus, createdAt])
@@ -1790,4 +1792,44 @@ model DjPlayEvent {
   @@index([boardId, playedAt])
   @@index([classroomId, playedAt])
   @@index([videoId])
+}
+
+// ── Agent Service: 학생 전용 AI 채팅 세션 (2026-05-17) ──────────────────
+// 각 학생이 스스로 열 수 있는 채팅 세션. VibeSession(슬롯 기반)과 별개로
+// arcade(게임) / tutor(학습) / code(코딩) / lesson(수업) 모드를 지원.
+// 채팅 결과는 VibeProject로 저장 가능 (projectId nullable link).
+model AgentSession {
+  id           String   @id @default(cuid())
+  studentId    String
+  classroomId  String   // 비정규화 — classroom-scoped scan
+  // "arcade" | "tutor" | "code" | "lesson"
+  mode         String   @default("arcade")
+  title        String   @default("") // auto-generated from first exchange
+  status       String   @default("active") // "active" | "completed" | "abandoned"
+  projectId    String?  // VibeProject.id — 저장 후 링크
+  tokenCount   Int      @default(0)
+  messageCount Int      @default(0)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  student  Student       @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  project  VibeProject?  @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  messages AgentMessage[]
+
+  @@index([studentId, status])
+  @@index([studentId, createdAt])
+  @@index([classroomId, createdAt])
+}
+
+model AgentMessage {
+  id         String   @id @default(cuid())
+  sessionId  String
+  role       String   // "user" | "assistant" | "system"
+  content    String
+  tokenCount Int?     // assistant 메시지의 토큰 사용량
+  createdAt  DateTime @default(now())
+
+  session AgentSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@index([sessionId, createdAt])
 }
