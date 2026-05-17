@@ -212,13 +212,13 @@ export function VibeArcadeBoard(props: VibeArcadeBoardProps) {
           </p>
           <div className="va-student-actions">
             <Link
-              href={}
+              href={`/board/${props.boardId}/vibe-arcade/studio`}
               className="va-student-enter"
             >
               🚀 코딩 스튜디오
             </Link>
             <Link
-              href={}
+              href={`/board/${props.boardId}/agent`}
               className="va-student-enter va-student-enter-secondary"
             >
               🤖 AI 도우미
@@ -227,7 +227,7 @@ export function VibeArcadeBoard(props: VibeArcadeBoardProps) {
         </div>
       </section>
     );
-  }}
+  }
 
   return (
     <section className="va-root">
