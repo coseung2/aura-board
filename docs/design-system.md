@@ -352,6 +352,41 @@ border-radius: var(--radius-pill);
 
 ---
 
+## 9½. Design System Tooling
+
+### Component Catalog (`/design`)
+
+모든 `ds-*` utility class와 디자인 토큰을 한 화면에서 보여주는 갤러리 페이지입니다.
+
+```
+Route: /design (public, no auth)
+Source: src/app/design/page.tsx
+```
+
+### Compliance Checker (`npm run ds:check`)
+
+`src/styles/` 에서 `base.css` 외부의 하드코딩 hex color를 검사합니다.
+
+```bash
+npm run ds:check
+```
+
+검출된 hex는 `var(--color-*)` 토큰으로 교체.
+
+### 버튼 시스템
+
+표준 버튼은 `src/styles/ds-utils.css` 에 단일 정의:
+
+| 클래스 | 용도 |
+|--------|------|
+| `.ds-btn-primary` | CTA 버튼 |
+| `.ds-btn-secondary` | 보조 버튼 |
+| `:disabled` | 두 버튼 모두 opacity 0.5 + pointer-events: none |
+
+버튼 클래스는 `ds-utils.css`에만 정의되어 있어야 함. 타 CSS 파일(`drawing.css` 등)에서 중복 정의 금지.
+
+---
+
 ## 10. CSS 파일 구조
 
 ```

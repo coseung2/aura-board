@@ -63,7 +63,7 @@ export function SaveDialog({
         <div className="ds-save-actions">
           <button
             type="button"
-            className="ds-btn ds-btn-secondary"
+            className="ds-btn-secondary"
             onClick={onCancel}
             disabled={busy}
           >
@@ -71,7 +71,7 @@ export function SaveDialog({
           </button>
           <button
             type="button"
-            className="ds-btn ds-btn-primary"
+            className="ds-btn-primary"
             onClick={() => onSubmit({ title: title.trim() || "내 그림", shared })}
             disabled={busy}
           >

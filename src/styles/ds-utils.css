@@ -122,6 +122,11 @@ h5.ds-h5 {
 .ds-btn-primary:hover {
   background: var(--color-accent-active);
 }
+.ds-btn-primary:disabled {
+  opacity: 0.5;
+  cursor: default;
+  pointer-events: none;
+}
 
 .ds-btn-secondary {
   background: transparent;
@@ -138,6 +143,11 @@ h5.ds-h5 {
 .ds-btn-secondary:hover {
   background: var(--color-surface-alt);
   border-color: var(--color-border-hover);
+}
+.ds-btn-secondary:disabled {
+  opacity: 0.5;
+  cursor: default;
+  pointer-events: none;
 }
 
 /* ── Brand logo lockup (handoff shared.css Logo mark, T2-2) ──

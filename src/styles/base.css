@@ -160,12 +160,7 @@ img.emoji {
   --text-micro-weight: 600;
   --text-micro-ls: 0.1px;
 
-  /* Tap targets + modal sizing + iOS safe-area FAB (handoff ingest T1-1) */
-  --tap-min: 44px;
-  --modal-max: min(92vw, 640px);
-  --fab-bottom-safe: calc(32px + env(safe-area-inset-bottom, 0px));
-
-  /* Transition durations (handoff ingest T1-1) */
+  /* Transition durations — tap/modal/safe tokens now in tokens-responsive.css */
   --t-fast: 120ms ease;
   --t-normal: 150ms ease;
   --t-slow: 180ms ease;
@@ -185,7 +180,7 @@ body {
 
 body {
   font-family: var(--font-body);
-  font-size: 15px;
+  font-size: var(--text-body-size);
   font-weight: 400;
   line-height: 1.5;
   color: var(--color-text);
