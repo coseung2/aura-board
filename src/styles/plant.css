@@ -2187,6 +2187,7 @@
   background: rgba(0,0,0,0.7);
 }
 .plant-obs-detail-img-wrap {
+  position: relative;
   width: 100%;
   aspect-ratio: 16 / 10;
   overflow: hidden;

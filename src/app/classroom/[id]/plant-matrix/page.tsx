@@ -18,6 +18,14 @@ export default async function PlantMatrixPage({
 
   const canAccess = !!user?.id && classroom.teacherId === user.id;
 
+  // Find the classroom's plant-roadmap board for student journal links
+  const board = canAccess
+    ? await db.board.findFirst({
+        where: { classroomId: id, layout: "plant-roadmap" },
+        select: { id: true },
+      })
+    : null;
+
   return (
     <main className="board-page">
       <header className="board-header">
@@ -27,7 +35,7 @@ export default async function PlantMatrixPage({
         </div>
       </header>
       {canAccess ? (
-        <TeacherMatrixView classroomId={id} />
+        <TeacherMatrixView classroomId={id} boardId={board?.id} />
       ) : (
         <div className="plant-matrix-forbidden">
           <h3>접근 권한이 없어요</h3>

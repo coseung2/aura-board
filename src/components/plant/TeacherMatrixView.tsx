@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import Link from "next/link";
 import { OptimizedImage } from "../ui/OptimizedImage";
 
 interface Stage {
@@ -39,6 +40,7 @@ interface StudentRow {
 
 interface Props {
   classroomId: string;
+  boardId?: string; // for linking to student journal pages
 }
 
 const DESKTOP_MIN = 1024;
@@ -49,7 +51,7 @@ const COMPACT_COL_WIDTH = 60;
 const STAGE_COL_WIDTH = 120;
 const OVERSCAN = 3;
 
-export function TeacherMatrixView({ classroomId }: Props) {
+export function TeacherMatrixView({ classroomId, boardId }: Props) {
   const [viewportOk, setViewportOk] = useState<boolean | null>(null);
   const [compact, setCompact] = useState(false);
   const [data, setData] = useState<{ stages: Stage[]; students: StudentRow[] } | null>(null);
@@ -310,6 +312,15 @@ export function TeacherMatrixView({ classroomId }: Props) {
                 <span><strong>{selectedPhotoStages}</strong>사진 단계</span>
                 <span><strong>{selectedStage ? `${selectedStage.order}단계` : "대기"}</strong></span>
               </div>
+              {boardId && (
+                <Link
+                  href={`/board/${boardId}/student/${selectedStudent.id}`}
+                  className="ds-btn-secondary"
+                  style={{ padding: "8px 16px", fontSize: 13, width: "100%", textAlign: "center" }}
+                >
+                  👤 학생 화면 보기
+                </Link>
+              )}
               <div className="plant-matrix-mini-strip" aria-label="학생 단계별 기록 요약">
                 {stages.map((st, index) => {
                   const cell = selectedStudent.cells[index];
