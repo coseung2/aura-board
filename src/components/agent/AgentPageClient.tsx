@@ -4,14 +4,14 @@ import { useState, useCallback, useEffect, useMemo } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { AgentChatPanel } from "./AgentChatPanel";
-import { useAgentChat } from "./useAgentChat";
+import { useAgentChat, type AgentMessage } from "./useAgentChat";
+import MonacoEditor from "./MonacoEditor";
 import {
   AGENT_MODES,
   AGENT_MODE_LABELS,
   AGENT_MODE_DESCRIPTIONS,
   type AgentMode,
 } from "@/lib/agent/types";
-import { buildStudioSrcDoc } from "@/lib/vibe-arcade/sandbox-renderer";
 
 interface SessionSummary {
   id: string;
@@ -31,7 +31,6 @@ interface Props {
   studentName: string;
   recentSessions: SessionSummary[];
 }
-
 
 export function AgentPageClient({
   boardId,
@@ -56,40 +55,22 @@ export function AgentPageClient({
     messages,
     streaming,
     error,
-    generatedCode,
     tokenCount,
+    canvas,
+    proposedPatch,
     createSession,
     resumeSession,
     sendMessage,
     stopStreaming,
+    updateCanvas,
+    undo,
+    redo,
+    acceptPatch,
+    rejectPatch,
     setMode,
     setMessages,
-    setGeneratedCode,
+    setCanvas,
   } = useAgentChat({ boardId });
-
-  const previewHtml = useMemo(() => {
-    for (let i = messages.length - 1; i >= 0; i--) {
-      const message = messages[i];
-      if (message.role === "assistant" && message.code) {
-        return message.code;
-      }
-    }
-    return null;
-  }, [messages]);
-
-  // Compute preview srcdoc when HTML changes
-  const previewSrcdoc = useMemo(() => {
-    const htmlContent = generatedCode || previewHtml;
-    if (!htmlContent) return "";
-    try {
-      return buildStudioSrcDoc({ htmlContent });
-    } catch {
-      // Fallback: wrap in basic HTML
-      return htmlContent.startsWith("<!") || htmlContent.startsWith("<html")
-        ? htmlContent
-        : `<!DOCTYPE html><html><body>${htmlContent}</body></html>`;
-    }
-  }, [generatedCode, previewHtml]);
 
   const handleSend = useCallback(() => {
     if (!sessionId) return;
@@ -101,22 +82,20 @@ export function AgentPageClient({
     async (selectedMode: AgentMode) => {
       setShowNewModal(false);
       setMessages([]);
-      setGeneratedCode(null);
       setChatInput("");
       await createSession(selectedMode);
     },
-    [createSession, setGeneratedCode, setMessages]
+    [createSession, setMessages]
   );
 
   const handleResumeSession = useCallback(
     async (session: SessionSummary) => {
       setShowNewModal(false);
-      setGeneratedCode(null);
       try {
         const res = await fetch(`/api/agent/sessions/${session.id}`);
         if (!res.ok) return;
         const data = await res.json();
-        const restoredMessages = (data.messages ?? []).map(
+        const restoredMessages: AgentMessage[] = (data.messages ?? []).map(
           (m: { id: string; role: string; content: string; code?: string | null }) => ({
             id: m.id,
             role: m.role as "user" | "assistant",
@@ -124,19 +103,22 @@ export function AgentPageClient({
             code: m.code ?? undefined,
           })
         );
-        setMode(data.mode as AgentMode);
+        const m = session.mode as AgentMode;
+        setMode(m);
         setMessages(restoredMessages);
-        const lastAssistantCode = [...restoredMessages]
-          .reverse()
-          .find((m) => m.role === "assistant" && m.code)?.code;
-        setGeneratedCode(lastAssistantCode ?? null);
-        // Re-assign the hook's sessionId to the existing session
+
+        // Restore canvas if present
+        if (data.canvas) {
+          setCanvas(data.canvas);
+        }
+
+        // Re-assign the hook's sessionId
         resumeSession(session.id);
       } catch {
         await handleNewSession(session.mode as AgentMode);
       }
     },
-    [handleNewSession, resumeSession, setGeneratedCode, setMode, setMessages]
+    [handleNewSession, resumeSession, setMode, setMessages, setCanvas]
   );
 
   const openSaveModal = useCallback(() => {
@@ -154,7 +136,6 @@ export function AgentPageClient({
       setSaveError("프로젝트 제목을 입력해 주세요.");
       return;
     }
-
     setSavingProject(true);
     setSaveError(null);
     try {
@@ -165,13 +146,9 @@ export function AgentPageClient({
           boardId,
           title,
           description: saveDescription.trim(),
-          tags: saveTags
-            .split(",")
-            .map((tag) => tag.trim())
-            .filter(Boolean),
+          tags: saveTags.split(",").map((tag) => tag.trim()).filter(Boolean),
         }),
       });
-
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
         throw new Error(data.error === "bad_request" ? "입력값을 확인해 주세요." : "프로젝트 저장에 실패했어요.");
@@ -196,6 +173,12 @@ export function AgentPageClient({
 
   const canSave = messages.length >= 2 && !streaming && sessionId;
 
+  // Compute preview URL for the sandbox iframe
+  const previewUrl = useMemo(() => {
+    if (!sessionId || !canvas.activeFile) return null;
+    return `${boardHref}/agent/preview?session=${sessionId}&file=${encodeURIComponent(canvas.activeFile)}`;
+  }, [sessionId, canvas.activeFile, boardHref]);
+
   return (
     <div className="agent-page">
       {/* Nav */}
@@ -212,6 +195,15 @@ export function AgentPageClient({
           <p>게임, 학습, 코딩, 수업 — AI와 대화하고 결과물을 만들어보세요</p>
         </div>
         <div className="agent-hero-actions">
+          <button
+            type="button"
+            className="ds-btn-secondary"
+            onClick={undo}
+            disabled={canvas.baseVersion === 0}
+            title="실행 취소"
+          >
+            ↩ 실행 취소
+          </button>
           <Link href={boardHref} className="ds-btn-secondary">
             ← 보드로
           </Link>
@@ -248,8 +240,7 @@ export function AgentPageClient({
                   onClick={() => handleResumeSession(s)}
                 >
                   <span className="agent-sidebar-item-icon">
-                    {AGENT_MODE_LABELS[s.mode as AgentMode]?.split(" ")[0] ??
-                      "💬"}
+                    {AGENT_MODE_LABELS[s.mode as AgentMode]?.split(" ")[0] ?? "💬"}
                   </span>
                   <span className="agent-sidebar-item-info">
                     <span className="agent-sidebar-item-title">
@@ -266,7 +257,7 @@ export function AgentPageClient({
           )}
         </aside>
 
-        {/* Main: Chat + Preview */}
+        {/* Main: Canvas (left) + Chat (right) */}
         <main className="agent-main">
           {!sessionId && !showNewModal ? (
             <div className="agent-main-empty">
@@ -274,7 +265,7 @@ export function AgentPageClient({
             </div>
           ) : sessionId || showNewModal ? (
             <div className="agent-main-split">
-              {/* Left: Chat */}
+              {/* Left: Code Canvas (MonacoEditor) */}
               <div className="agent-chat-column">
                 {sessionId && (
                   <div className="agent-session-info">
@@ -284,20 +275,30 @@ export function AgentPageClient({
                     <span className="agent-session-tokens">
                       ⚡ {tokenCount.in + tokenCount.out} 토큰
                     </span>
+                    {/* Sandbox preview link */}
+                    {previewUrl && (
+                      <a
+                        href={previewUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="agent-preview-link"
+                        title="새 탭에서 미리보기"
+                      >
+                        🚀 새 탭 미리보기
+                      </a>
+                    )}
                   </div>
                 )}
 
-                <AgentChatPanel
-                  messages={messages}
-                  streaming={streaming}
-                  error={error}
-                  chatInput={chatInput}
-                  onChatInputChange={setChatInput}
-                  onSubmit={handleSend}
-                  onStopStreaming={stopStreaming}
-                />
+                <div className="agent-canvas-area">
+                  <MonacoEditor
+                    canvas={canvas}
+                    onCanvasChange={updateCanvas}
+                    readonly={false}
+                  />
+                </div>
 
-                {/* Save to project button */}
+                {/* Save to project button - below editor */}
                 {canSave && (
                   <div className="agent-save-bar">
                     <button
@@ -311,37 +312,72 @@ export function AgentPageClient({
                 )}
               </div>
 
-              {/* Right: Preview */}
+              {/* Right: Chat + Preview Column */}
               <div className="agent-preview-column">
-                <div className="agent-preview-header">
-                  <span>🎮 미리보기</span>
-                  {(generatedCode || previewHtml) && (
-                    <button
-                      type="button"
-                      className="agent-preview-refresh"
-                      onClick={() => setGeneratedCode(previewHtml)}
-                      title="새로고침"
-                    >
-                      🔄
-                    </button>
-                  )}
-                </div>
-                <div className="agent-preview-frame">
-                  {previewSrcdoc ? (
-                    <iframe
-                      key={previewSrcdoc.slice(0, 80)}
-                      srcDoc={previewSrcdoc}
-                      sandbox="allow-scripts"
-                      title="게임 미리보기"
-                      className="agent-preview-iframe"
-                    />
-                  ) : (
-                    <div className="agent-preview-empty">
-                      <span>💡</span>
-                      <p>AI가 게임 코드를 생성하면<br />여기서 미리볼 수 있어요</p>
+                {/* Patch proposal banner */}
+                {proposedPatch && (
+                  <div className="agent-patch-banner">
+                    <div className="agent-patch-banner-info">
+                      <span className="agent-patch-banner-icon">📝</span>
+                      <span className="agent-patch-banner-text">
+                        AI가 코드 변경을 제안했어요
+                      </span>
                     </div>
-                  )}
-                </div>
+                    <div className="agent-patch-banner-actions">
+                      <button
+                        type="button"
+                        className="agent-patch-btn agent-patch-btn-accept"
+                        onClick={() => acceptPatch()}
+                      >
+                        ✓ 적용
+                      </button>
+                      <button
+                        type="button"
+                        className="agent-patch-btn agent-patch-btn-reject"
+                        onClick={rejectPatch}
+                      >
+                        ✗ 무시
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                <AgentChatPanel
+                  messages={messages}
+                  streaming={streaming}
+                  error={error}
+                  chatInput={chatInput}
+                  onChatInputChange={setChatInput}
+                  onSubmit={handleSend}
+                  onStopStreaming={stopStreaming}
+                />
+
+                {/* Sandbox preview iframe for HTML output */}
+                {previewUrl && (
+                  <div className="agent-mini-preview">
+                    <div className="agent-mini-preview-header">
+                      <span>🖥️ 실행 미리보기</span>
+                      <a
+                        href={previewUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="agent-preview-refresh"
+                        title="새 창에서 열기"
+                      >
+                        ↗
+                      </a>
+                    </div>
+                    <div className="agent-mini-preview-frame">
+                      <iframe
+                        key={previewUrl}
+                        src={previewUrl}
+                        sandbox="allow-scripts"
+                        title="실행 미리보기"
+                        className="agent-preview-iframe"
+                      />
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           ) : null}

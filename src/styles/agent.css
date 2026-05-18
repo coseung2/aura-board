@@ -14,6 +14,184 @@
   flex-direction: column;
 }
 
+/* ── Monaco Code Canvas ─────────────────────────────────────────────── */
+
+.monaco-canvas {
+  display: flex;
+  min-height: 400px;
+  width: 100%;
+  overflow: hidden;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+}
+
+.monaco-canvas-empty {
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  gap: 12px;
+  color: var(--color-text-muted);
+}
+
+.monaco-canvas-empty p {
+  margin: 0;
+  font-size: 14px;
+}
+
+.monaco-canvas-empty-button,
+.monaco-canvas-icon-button,
+.monaco-canvas-tab-delete {
+  border: 1px solid var(--color-border);
+  background: var(--color-bg);
+  color: var(--color-text);
+  cursor: pointer;
+  font: inherit;
+  transition:
+    background 0.15s,
+    border-color 0.15s;
+}
+
+.monaco-canvas-empty-button:hover,
+.monaco-canvas-icon-button:hover,
+.monaco-canvas-tab-delete:hover {
+  background: var(--color-bg-hover);
+}
+
+.monaco-canvas-empty-button {
+  padding: 7px 12px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.monaco-canvas-tabs {
+  width: 200px;
+  flex: 0 0 200px;
+  display: flex;
+  flex-direction: column;
+  background: var(--color-bg);
+  border-right: 1px solid var(--color-border);
+  min-height: 400px;
+}
+
+.monaco-canvas-tabs-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 12px;
+  border-bottom: 1px solid var(--color-border);
+  color: var(--color-text-muted);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.monaco-canvas-icon-button {
+  width: 26px;
+  height: 26px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border-radius: 7px;
+  font-size: 17px;
+  line-height: 1;
+}
+
+.monaco-canvas-tab-list {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 8px;
+}
+
+.monaco-canvas-tab {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  border-radius: 9px;
+  margin-bottom: 4px;
+  background: transparent;
+}
+
+.monaco-canvas-tab:hover {
+  background: var(--color-bg-hover);
+}
+
+.monaco-canvas-tab-active {
+  background: var(--color-bg-active, rgba(120, 102, 83, 0.12));
+}
+
+.monaco-canvas-tab-button {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  padding: 9px 8px;
+  border: 0;
+  background: transparent;
+  color: var(--color-text);
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
+}
+
+.monaco-canvas-tab-name,
+.monaco-canvas-tab-language {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.monaco-canvas-tab-name {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.monaco-canvas-tab-language {
+  color: var(--color-text-muted);
+  font-size: 11px;
+}
+
+.monaco-canvas-tab-delete {
+  width: 24px;
+  height: 24px;
+  flex: 0 0 24px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-right: 6px;
+  padding: 0;
+  border-radius: 7px;
+  color: var(--color-text-muted);
+  line-height: 1;
+}
+
+.monaco-canvas-editor {
+  flex: 1;
+  min-width: 0;
+  min-height: 400px;
+  background: var(--color-surface);
+}
+
+.monaco-canvas-editor .monaco-editor,
+.monaco-canvas-editor .monaco-diff-editor {
+  --vscode-editor-background: var(--color-surface);
+}
+
+@media (max-width: 768px) {
+  .monaco-canvas-tabs {
+    width: 140px;
+    flex-basis: 140px;
+  }
+}
+
 .agent-breadcrumb {
   font-size: 13px;
   color: var(--color-text-muted);

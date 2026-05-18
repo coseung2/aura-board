@@ -24,6 +24,7 @@
   "dependencies": {
     "@anthropic-ai/sdk": "^0.90.0",
     "@auth/prisma-adapter": "^2.11.1",
+    "@monaco-editor/react": "^4.7.0",
     "@prisma/client": "^6.0.0",
     "@react-email/components": "^1.0.12",
     "@types/d3-cloud": "^1.2.9",
