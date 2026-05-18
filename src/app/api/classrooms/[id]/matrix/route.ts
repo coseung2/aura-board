@@ -111,12 +111,22 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
         const stageId = plantStage?.id ?? axisStage.id;
         const obsForStage = plant.observations.filter((o) => o.stageId === stageId);
         const firstWithImg = obsForStage.find((o) => o.images.length > 0);
+        const latestObs = obsForStage[0] ?? null;
         return {
           stageId: axisStage.id, // axis id
           thumbnail: firstWithImg?.images[0]
             ? (firstWithImg.images[0].thumbnailUrl ?? firstWithImg.images[0].url)
             : null,
           observationCount: obsForStage.length,
+          latestObs: latestObs
+            ? {
+                memo: latestObs.memo,
+                observedAt: latestObs.observedAt.toISOString(),
+                imageUrl: latestObs.images[0]?.url ?? null,
+                thumbnailUrl: latestObs.images[0]?.thumbnailUrl ?? null,
+                noPhotoReason: latestObs.noPhotoReason,
+              }
+            : null,
         };
       });
       return {

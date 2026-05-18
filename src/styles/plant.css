@@ -2155,6 +2155,128 @@
   color: var(--color-text-faint);
 }
 
+/* ── Observation Detail Modal (matrix) ── */
+.plant-obs-detail-modal {
+  position: relative;
+  background: var(--color-surface);
+  border-radius: 20px;
+  max-width: 580px;
+  width: 90vw;
+  max-height: 85vh;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+}
+.plant-obs-detail-close {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(0,0,0,0.5);
+  color: #fff;
+  font-size: 16px;
+  cursor: pointer;
+  z-index: 2;
+  display: grid;
+  place-items: center;
+}
+.plant-obs-detail-close:hover {
+  background: rgba(0,0,0,0.7);
+}
+.plant-obs-detail-img-wrap {
+  width: 100%;
+  aspect-ratio: 16 / 10;
+  overflow: hidden;
+  border-radius: 20px 20px 0 0;
+  background: var(--color-surface-alt);
+}
+.plant-obs-detail-info {
+  padding: 20px 24px 24px;
+  display: grid;
+  gap: 10px;
+}
+.plant-obs-detail-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+.plant-obs-detail-stage {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-accent);
+}
+.plant-obs-detail-student {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--color-text);
+}
+.plant-obs-detail-memo {
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--color-text);
+  margin: 0;
+  white-space: pre-wrap;
+}
+.plant-obs-detail-nophoto {
+  font-size: 13px;
+  color: var(--color-text-muted);
+  margin: 0;
+}
+.plant-obs-detail-time {
+  font-size: 12px;
+  color: var(--color-text-faint);
+}
+
+/* ── Recent Observations compact grid (4×4) ── */
+.plant-teacher .plant-obs-feed {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+}
+.plant-teacher .plant-obs-feed-card {
+  flex-direction: column;
+  padding: 10px;
+  gap: 6px;
+  border-radius: 14px;
+}
+.plant-teacher .plant-obs-feed-thumb,
+.plant-teacher .plant-obs-feed-noimg {
+  width: 100%;
+  height: auto;
+  aspect-ratio: 1;
+  border-radius: 10px;
+}
+.plant-teacher .plant-obs-feed-noimg {
+  font-size: 28px;
+}
+.plant-teacher .plant-obs-feed-info {
+  gap: 1px;
+}
+.plant-teacher .plant-obs-feed-student {
+  font-size: 12px;
+  font-weight: 600;
+}
+.plant-teacher .plant-obs-feed-plant {
+  font-size: 11px;
+}
+.plant-teacher .plant-obs-feed-memo {
+  font-size: 11px;
+  display: none;
+}
+.plant-teacher .plant-obs-feed-time {
+  font-size: 10px;
+}
+
+@media (max-width: 640px) {
+  .plant-teacher .plant-obs-feed {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
 @media (max-width: 640px) {
   .plant-obs-feed-card {
     padding: 12px;
@@ -2167,6 +2289,9 @@
   }
   .plant-obs-feed-student {
     font-size: 13px;
+  }
+  .plant-obs-feed-time {
+    font-size: 10px;
   }
 }
 

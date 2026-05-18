@@ -14,6 +14,13 @@ interface Cell {
   stageId: string;
   thumbnail: string | null;
   observationCount: number;
+  latestObs: {
+    memo: string | null;
+    observedAt: string;
+    imageUrl: string | null;
+    thumbnailUrl: string | null;
+    noPhotoReason: string | null;
+  } | null;
 }
 interface StudentRow {
   id: string;
@@ -48,6 +55,17 @@ export function TeacherMatrixView({ classroomId }: Props) {
   const [data, setData] = useState<{ stages: Stage[]; students: StudentRow[] } | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [lightbox, setLightbox] = useState<string | null>(null);
+  const [obsDetail, setObsDetail] = useState<{
+    stageName: string;
+    studentName: string;
+    studentNumber: number | null;
+    memo: string | null;
+    observedAt: string;
+    imageUrl: string | null;
+    thumbnailUrl: string | null;
+    noPhotoReason: string | null;
+    stageOrder: number;
+  } | null>(null);
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const [scrollX, setScrollX] = useState(0);
   const [viewportW, setViewportW] = useState(0);
@@ -238,7 +256,21 @@ export function TeacherMatrixView({ classroomId }: Props) {
                             onClick={(e) => {
                               e.stopPropagation();
                               setSelectedStudentId(s.id);
-                              setLightbox(cell.thumbnail);
+                              if (cell.latestObs) {
+                                setObsDetail({
+                                  stageName: st.nameKo,
+                                  studentName: s.name,
+                                  studentNumber: s.number,
+                                  memo: cell.latestObs.memo,
+                                  observedAt: cell.latestObs.observedAt,
+                                  imageUrl: cell.latestObs.imageUrl,
+                                  thumbnailUrl: cell.latestObs.thumbnailUrl,
+                                  noPhotoReason: cell.latestObs.noPhotoReason,
+                                  stageOrder: st.order,
+                                });
+                              } else {
+                                setLightbox(cell.thumbnail);
+                              }
                             }}
                           >
                             <img
@@ -303,6 +335,42 @@ export function TeacherMatrixView({ classroomId }: Props) {
           )}
         </aside>
       </div>
+
+      {obsDetail && (
+        <div className="plant-lightbox" onClick={() => setObsDetail(null)} role="dialog" aria-label="관찰 상세">
+          <div className="plant-obs-detail-modal" onClick={(e) => e.stopPropagation()}>
+            <button type="button" className="plant-obs-detail-close" onClick={() => setObsDetail(null)}>✕</button>
+            {obsDetail.imageUrl && (
+              <div className="plant-obs-detail-img-wrap">
+                <OptimizedImage
+                  src={obsDetail.imageUrl}
+                  alt={`${obsDetail.studentName} 관찰 사진`}
+                  sizes="60vw"
+                  fit="contain"
+                />
+              </div>
+            )}
+            <div className="plant-obs-detail-info">
+              <div className="plant-obs-detail-head">
+                <span className="plant-obs-detail-stage">{obsDetail.stageOrder}단계 · {obsDetail.stageName}</span>
+                <span className="plant-obs-detail-student">{obsDetail.studentNumber ?? "—"}번 {obsDetail.studentName}</span>
+              </div>
+              {obsDetail.memo && (
+                <p className="plant-obs-detail-memo">{obsDetail.memo}</p>
+              )}
+              {obsDetail.noPhotoReason && (
+                <p className="plant-obs-detail-nophoto">📝 사진 없음: {obsDetail.noPhotoReason}</p>
+              )}
+              <span className="plant-obs-detail-time">
+                {new Date(obsDetail.observedAt).toLocaleString("ko-KR", {
+                  year: "numeric", month: "long", day: "numeric",
+                  hour: "2-digit", minute: "2-digit",
+                })}
+              </span>
+            </div>
+          </div>
+        </div>
+      )}
 
       {lightbox && (
         <div className="plant-lightbox" onClick={() => setLightbox(null)} role="dialog" aria-label="사진 원본">
