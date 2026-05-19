@@ -5,11 +5,19 @@
 // 카드 진입 대신 /board/[id]/vibe-arcade/studio 로 이동해 렌더된다.
 
 import Link from "next/link";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { buildStudioSrcDoc } from "@/lib/vibe-arcade/sandbox-renderer";
+import MonacoEditor from "@/components/agent/MonacoEditor";
+import type { CodeCanvas } from "@/lib/agent/types";
 
 type ChatMessage = { role: "user" | "assistant"; content: string; streaming?: boolean };
 type VibeCategory = "game" | "quiz" | "art" | "sim";
+
+const VIBE_FILE_PATHS = {
+  html: "index.html",
+  css: "styles.css",
+  js: "script.js",
+} as const;
 
 const TAG_OPTIONS = ["게임", "퀴즈", "시뮬", "아트", "기타"] as const;
 type Tag = (typeof TAG_OPTIONS)[number];
@@ -77,6 +85,7 @@ export function StudioClient({ boardId, boardHref, studentName, existingProject 
   const [dismissedStarters, setDismissedStarters] = useState(false);
   const [category, setCategory] = useState<VibeCategory | null>(null);
   const [previewTab, setPreviewTab] = useState<"preview" | "code">("preview");
+  const [activeCodeFile, setActiveCodeFile] = useState<string>(VIBE_FILE_PATHS.html);
   const abortRef = useRef<AbortController | null>(null);
   const chatInputRef = useRef<HTMLTextAreaElement>(null);
   const logRef = useRef<HTMLDivElement>(null);
@@ -131,15 +140,34 @@ export function StudioClient({ boardId, boardHref, studentName, existingProject 
     [htmlContent, cssContent, jsContent],
   );
 
-  // 코드 뷰: 보통 AI 가 단일 HTML 문서로 돌려주지만, 드물게 css/js 블록이
-  // 분리돼 들어올 수 있어 셋 다 합친 걸 보여준다.
-  const codeView = useMemo(() => {
-    const parts: string[] = [];
-    if (htmlContent.trim()) parts.push(htmlContent);
-    if (cssContent.trim()) parts.push(`/* ---- CSS ---- */\n${cssContent}`);
-    if (jsContent.trim()) parts.push(`// ---- JS ----\n${jsContent}`);
-    return parts.join("\n\n");
-  }, [htmlContent, cssContent, jsContent]);
+  // Keep the code editor in the same html/css/js shape that VibeProject stores.
+  const codeCanvas = useMemo<CodeCanvas>(
+    () => ({
+      files: [
+        { path: VIBE_FILE_PATHS.html, language: "html", content: htmlContent },
+        { path: VIBE_FILE_PATHS.css, language: "css", content: cssContent },
+        { path: VIBE_FILE_PATHS.js, language: "javascript", content: jsContent },
+      ],
+      activeFile: activeCodeFile,
+      selection: null,
+    }),
+    [activeCodeFile, cssContent, htmlContent, jsContent],
+  );
+
+  const handleCanvasChange = useCallback((nextCanvas: CodeCanvas) => {
+    setActiveCodeFile(nextCanvas.activeFile);
+
+    const nextHtml =
+      nextCanvas.files.find((file) => file.path === VIBE_FILE_PATHS.html)?.content ?? "";
+    const nextCss =
+      nextCanvas.files.find((file) => file.path === VIBE_FILE_PATHS.css)?.content ?? "";
+    const nextJs =
+      nextCanvas.files.find((file) => file.path === VIBE_FILE_PATHS.js)?.content ?? "";
+
+    setHtmlContent((current) => (current === nextHtml ? current : nextHtml));
+    setCssContent((current) => (current === nextCss ? current : nextCss));
+    setJsContent((current) => (current === nextJs ? current : nextJs));
+  }, []);
 
   async function sendChat(
     overrideText?: string,
@@ -420,11 +448,13 @@ export function StudioClient({ boardId, boardHref, studentName, existingProject 
               srcDoc={srcDoc}
               sandbox="allow-scripts"
             />
-          ) : codeView ? (
-            <pre className="va-studio-code"><code>{codeView}</code></pre>
           ) : (
-            <div className="va-studio-code-empty">
-              아직 코드가 없어요. 챗에 요청을 보내면 여기에 생성된 코드가 보여요.
+            <div className="va-studio-code-editor">
+              <MonacoEditor
+                canvas={codeCanvas}
+                onCanvasChange={handleCanvasChange}
+                readonly={streaming}
+              />
             </div>
           )}
         </div>

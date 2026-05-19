@@ -1596,6 +1596,24 @@
   tab-size: 2;
 }
 
+.va-studio-code-editor {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+}
+
+.va-studio-code-editor .monaco-canvas {
+  flex: 1;
+  min-height: 0;
+  border: 0;
+  border-radius: 0;
+}
+
+.va-studio-code-editor .monaco-canvas-tabs,
+.va-studio-code-editor .monaco-canvas-editor {
+  min-height: 0;
+}
+
 .va-studio-code-empty {
   flex: 1;
   display: flex;

@@ -219,12 +219,6 @@ export function VibeArcadeBoard(props: VibeArcadeBoardProps) {
             >
               🚀 코딩 스튜디오
             </Link>
-            <Link
-              href={`/board/${props.boardId}/agent`}
-              className="va-student-enter va-student-enter-secondary"
-            >
-              🤖 AI 도우미
-            </Link>
           </div>
         </div>
       </section>
