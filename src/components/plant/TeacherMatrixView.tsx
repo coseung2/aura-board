@@ -55,6 +55,7 @@ export function TeacherMatrixView({ classroomId, boardId }: Props) {
   const [lightbox, setLightbox] = useState<string | null>(null);
   const [obsDetail, setObsDetail] = useState<{
     stageName: string;
+    studentId: string;
     studentName: string;
     studentNumber: number | null;
     memo: string | null;
@@ -216,6 +217,7 @@ export function TeacherMatrixView({ classroomId, boardId }: Props) {
                               if (cell.latestObs) {
                                 setObsDetail({
                                   stageName: st.nameKo,
+                                  studentId: s.id,
                                   studentName: s.name,
                                   studentNumber: s.number,
                                   memo: cell.latestObs.memo,
@@ -266,15 +268,6 @@ export function TeacherMatrixView({ classroomId, boardId }: Props) {
                 <span><strong>{selectedPhotoStages}</strong>사진 단계</span>
                 <span><strong>{selectedStage ? `${selectedStage.order}단계` : "대기"}</strong></span>
               </div>
-              {boardId && (
-                <Link
-                  href={`/board/${boardId}/student/${selectedStudent.id}`}
-                  className="ds-btn-secondary"
-                  style={{ padding: "8px 16px", fontSize: 13, width: "100%", textAlign: "center" }}
-                >
-                  👤 학생 화면 보기
-                </Link>
-              )}
               <div className="plant-matrix-mini-strip" aria-label="학생 단계별 기록 요약">
                 {stages.map((st, index) => {
                   const cell = selectedStudent.cells[index];
@@ -332,6 +325,16 @@ export function TeacherMatrixView({ classroomId, boardId }: Props) {
                   hour: "2-digit", minute: "2-digit",
                 })}
               </span>
+              {boardId && (
+                <Link
+                  href={`/board/${boardId}/student/${obsDetail.studentId}`}
+                  className="ds-btn-secondary"
+                  style={{ padding: "8px 16px", fontSize: 13, width: "100%", textAlign: "center" }}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  학생 화면 보기
+                </Link>
+              )}
             </div>
           </div>
         </div>
