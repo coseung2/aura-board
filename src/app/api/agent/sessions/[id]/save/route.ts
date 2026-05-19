@@ -12,6 +12,23 @@ const SaveSchema = z.object({
   tags: z.array(z.string()).default([]),
 });
 
+function extractHtmlFromAssistantContent(content: string): string {
+  try {
+    const parsed = JSON.parse(content) as { code?: unknown; message?: unknown };
+    if (typeof parsed.code === "string" && parsed.code.trim()) {
+      return parsed.code;
+    }
+    if (typeof parsed.message === "string") {
+      content = parsed.message;
+    }
+  } catch {
+    // Older messages used markdown code fences directly.
+  }
+
+  const codeBlocks = content.match(/```html\n?([\s\S]*?)```/);
+  return codeBlocks?.[1]?.trim() ?? "";
+}
+
 export async function POST(
   req: Request,
   { params }: { params: Promise<{ id: string }> }
@@ -68,9 +85,8 @@ export async function POST(
   let jsContent = "";
 
   if (lastMsg) {
-    const codeBlocks = lastMsg.content.match(/```html\n?([\s\S]*?)```/);
-    if (codeBlocks?.[1]) {
-      const fullHtml = codeBlocks[1];
+    const fullHtml = extractHtmlFromAssistantContent(lastMsg.content);
+    if (fullHtml) {
       // Split into html/css/js
       const styleMatch = fullHtml.match(/<style>([\s\S]*?)<\/style>/);
       const scriptMatch = fullHtml.match(/<script>([\s\S]*?)<\/script>/);

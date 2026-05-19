@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { AddCardButton } from "./AddCardButton";
 import { AddCardModal, type AddCardData } from "./AddCardModal";
 import { CardDetailModal } from "./cards/CardDetailModal";
@@ -44,6 +44,7 @@ export function ColumnsBoard({
   classroomId,
 }: Props) {
   const [cards, setCards] = useState<CardData[]>(initialCards);
+  const [scrollRailWidth, setScrollRailWidth] = useState(0);
   const [authorEditCard, setAuthorEditCard] = useState<CardData | null>(null);
   const [sections, setSections] = useState<SectionData[]>(
     [...initialSections].sort((a, b) => a.order - b.order)
@@ -79,6 +80,10 @@ export function ColumnsBoard({
   // these IDs so an in-progress optimistic update isn't stomped by a
   // server snapshot that hasn't seen the mutation commit yet.
   const pendingCardIds = useRef<Set<string>>(new Set());
+  const scrollAreaRef = useRef<HTMLDivElement | null>(null);
+  const scrollBarRef = useRef<HTMLDivElement | null>(null);
+  const columnsBoardRef = useRef<HTMLDivElement | null>(null);
+  const syncingScrollRef = useRef<"bar" | "area" | null>(null);
 
   function trackCardMutation<T>(id: string, run: () => Promise<T>): Promise<T> {
     pendingCardIds.current.add(id);
@@ -88,6 +93,48 @@ export function ColumnsBoard({
   }
 
   useBoardStream({ boardId, pendingCardIds, setCards, setSections });
+
+  useEffect(() => {
+    const boardEl = columnsBoardRef.current;
+    if (!boardEl || typeof ResizeObserver === "undefined") return;
+
+    const syncWidth = () => {
+      setScrollRailWidth(boardEl.scrollWidth);
+    };
+
+    syncWidth();
+    const observer = new ResizeObserver(syncWidth);
+    observer.observe(boardEl);
+    return () => observer.disconnect();
+  }, [cards.length, sections.length]);
+
+  useEffect(() => {
+    const area = scrollAreaRef.current;
+    const bar = scrollBarRef.current;
+    if (!area || !bar) return;
+
+    const syncFromArea = () => {
+      if (syncingScrollRef.current === "bar") return;
+      syncingScrollRef.current = "area";
+      bar.scrollLeft = area.scrollLeft;
+      syncingScrollRef.current = null;
+    };
+
+    const syncFromBar = () => {
+      if (syncingScrollRef.current === "area") return;
+      syncingScrollRef.current = "bar";
+      area.scrollLeft = bar.scrollLeft;
+      syncingScrollRef.current = null;
+    };
+
+    area.addEventListener("scroll", syncFromArea, { passive: true });
+    bar.addEventListener("scroll", syncFromBar, { passive: true });
+    syncFromArea();
+    return () => {
+      area.removeEventListener("scroll", syncFromArea);
+      bar.removeEventListener("scroll", syncFromBar);
+    };
+  }, [scrollRailWidth]);
 
   const { authorsForSection, studentForSectionTitle } = useColumnRoster({
     classroomId,
@@ -504,7 +551,8 @@ export function ColumnsBoard({
 
   return (
     <div className="board-canvas-wrap board-canvas-wrap-columns">
-      <div className="columns-board">
+      <div ref={scrollAreaRef} className="columns-scroll-area">
+        <div ref={columnsBoardRef} className="columns-board">
         {sections.map((section) => (
           <ColumnView
             key={section.id}
@@ -574,6 +622,14 @@ export function ColumnsBoard({
             )}
           </div>
         )}
+        </div>
+      </div>
+      <div
+        ref={scrollBarRef}
+        className={`columns-scrollbar ${scrollRailWidth > 0 ? "is-visible" : ""}`}
+        aria-hidden="true"
+      >
+        <div className="columns-scrollbar-rail" style={{ width: scrollRailWidth }} />
       </div>
 
       {canAddCard && <AddCardButton onAdd={handleAdd} sections={sectionOptions} />}

@@ -1,13 +1,7 @@
-// DeepSeek Flash streaming provider for Agent Service.
-// OpenAI-compatible API via fetch + SSE parsing.
-// Phase 0: accepts apiKey as parameter (from teacher's stored LLM key).
-
 import "server-only";
 
-const DEEPSEEK_BASE_URL =
-  process.env.DEEPSEEK_BASE_URL ?? "https://api.deepseek.com";
-const DEEPSEEK_MODEL =
-  process.env.DEEPSEEK_MODEL ?? "deepseek-chat";
+const DEEPSEEK_BASE_URL = process.env.DEEPSEEK_BASE_URL ?? "https://api.deepseek.com";
+const DEEPSEEK_MODEL = process.env.DEEPSEEK_MODEL ?? "deepseek-chat";
 
 export type DeepSeekStreamArgs = {
   messages: Array<{ role: "user" | "assistant" | "system"; content: string }>;
@@ -24,29 +18,21 @@ export type DeepSeekStreamResult = {
   tokensOut: number;
 };
 
-export const DEFAULT_AGENT_SYSTEM_PROMPT = `당신은 한국 초중등 학생의 AI 학습 도우미입니다.
+export const DEFAULT_AGENT_SYSTEM_PROMPT = `당신은 한국 초중등 학생을 돕는 AI 학습 도우미입니다.
 
-**응답 규칙**
-- 한국어로 친근하게 존댓말로 대답하세요.
-- 초중등 학생 수준에 맞게 쉽고 짧게 설명하세요.
-- 코드 예제가 필요하면 html/css/js 블록으로 보여주세요.
+응답 규칙:
+- 한국어로 친절하고 짧게 답하세요.
+- 초중등 학생 눈높이에 맞게 쉽고 구체적으로 설명하세요.
+- 반드시 JSON 객체 하나로만 답하세요.
+- JSON 형식은 {"message":"학생에게 보여줄 설명","code":"실행할 전체 코드 또는 빈 문자열"} 입니다.
+- code가 필요하다면 단일 HTML 문서 전체를 넣으세요. CSS와 JS는 HTML 안의 <style>, <script>에 포함하세요.
+- 폭력, 성적 내용, 개인정보, 상업용 게임 복제처럼 부적절한 요청은 거절하세요.`;
 
-**모드별 안내**
-- arcade: 게임 제작을 도와줍니다. 코드를 html 블록으로 출력하세요.
-- tutor: 학습 질문에 답하고 설명해줍니다.
-- code: 코딩 과제를 도와줍니다. 코드 리뷰와 디버깅을 포함합니다.
-- lesson: 수업 내용을 따라갈 수 있도록 안내합니다.
-
-부적절한 주제(폭력·성인·개인정보·상용 게임 복제 등)는 정중히 거절합니다.`;
-
-export async function streamDeepSeek(
-  args: DeepSeekStreamArgs
-): Promise<DeepSeekStreamResult> {
+export async function streamDeepSeek(args: DeepSeekStreamArgs): Promise<DeepSeekStreamResult> {
   if (!args.apiKey) {
     return {
       stopReason: "error",
-      content:
-        "🧑‍🏫 아직 AI 선생님이 준비되지 않았어요. 선생님께 /teacher/settings 에서 AI 연결을 설정해달라고 요청해주세요.",
+      content: "아직 AI 연결이 준비되지 않았어요. 선생님에게 AI 설정을 확인해 달라고 요청해 주세요.",
       tokensIn: 0,
       tokensOut: 0,
     };
@@ -54,9 +40,9 @@ export async function streamDeepSeek(
 
   const apiMessages = [
     { role: "system" as const, content: args.systemPrompt },
-    ...args.messages.map((m) => ({
-      role: m.role === "system" ? "user" as const : m.role as "user" | "assistant",
-      content: m.content,
+    ...args.messages.map((message) => ({
+      role: message.role === "system" ? ("user" as const) : (message.role as "user" | "assistant"),
+      content: message.content,
     })),
   ];
 
@@ -82,10 +68,10 @@ export async function streamDeepSeek(
     });
 
     if (!response.ok) {
-      const errBody = await response.text().catch(() => "");
+      const errorBody = await response.text().catch(() => "");
       return {
         stopReason: "error",
-        content: `API 오류 (${response.status}): ${errBody}`,
+        content: `API 오류 (${response.status}): ${errorBody}`,
         tokensIn: 0,
         tokensOut: 0,
       };
@@ -144,14 +130,14 @@ export async function streamDeepSeek(
             tokensOut = parsed.usage.completion_tokens ?? 0;
           }
         } catch {
-          // skip unparseable chunks
+          // Ignore malformed chunks from the provider.
         }
       }
     }
 
     return { stopReason, content: finalContent, tokensIn, tokensOut };
-  } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
     return {
       stopReason: "error",
       content: `오류가 발생했어요: ${message}`,

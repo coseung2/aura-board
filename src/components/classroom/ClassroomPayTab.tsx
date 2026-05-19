@@ -117,6 +117,37 @@ export function ClassroomPayTab({ classroomId }: Props) {
     rafRef.current = requestAnimationFrame(scanLoop);
   }, [stopScanner]);
 
+  useEffect(() => {
+    if (!scannerOpen || !videoRef.current || !streamRef.current) return;
+
+    const video = videoRef.current;
+    video.srcObject = streamRef.current;
+
+    let cancelled = false;
+
+    async function attachAndPlay() {
+      try {
+        await video.play();
+        if (!cancelled) {
+          rafRef.current = requestAnimationFrame(scanLoop);
+        }
+      } catch {
+        if (!cancelled) {
+          setScannerError(
+            "카메라 화면을 재생하지 못했어요. 권한을 확인하거나 토큰 붙여넣기를 사용해 주세요."
+          );
+          stopScanner();
+        }
+      }
+    }
+
+    void attachAndPlay();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [scanLoop, scannerOpen, stopScanner]);
+
   async function startScanner() {
     if (!scannerSupported || scannerBusy) return;
     setScannerBusy(true);
@@ -129,11 +160,6 @@ export function ClassroomPayTab({ classroomId }: Props) {
       });
       streamRef.current = stream;
       setScannerOpen(true);
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-        await videoRef.current.play();
-      }
-      rafRef.current = requestAnimationFrame(scanLoop);
     } catch {
       setScannerError(
         "카메라를 시작하지 못했어요. 권한을 확인하거나 아래 토큰 붙여넣기를 사용해 주세요."

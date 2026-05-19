@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useEffect, useMemo } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { AgentChatPanel } from "./AgentChatPanel";
@@ -8,10 +8,11 @@ import { useAgentChat, type AgentMessage } from "./useAgentChat";
 import MonacoEditor from "./MonacoEditor";
 import {
   AGENT_MODES,
-  AGENT_MODE_LABELS,
   AGENT_MODE_DESCRIPTIONS,
+  AGENT_MODE_LABELS,
   type AgentMode,
 } from "@/lib/agent/types";
+import { createEmptyCanvas } from "@/lib/agent/canvas";
 
 interface SessionSummary {
   id: string;
@@ -30,6 +31,50 @@ interface Props {
   studentId: string;
   studentName: string;
   recentSessions: SessionSummary[];
+}
+
+const MODE_ICONS: Record<AgentMode, string> = {
+  arcade: "게임",
+  tutor: "학습",
+  code: "코드",
+  lesson: "수업",
+};
+
+function normalizeMessage(raw: {
+  id: string;
+  role: string;
+  content: string;
+}): AgentMessage {
+  let content = raw.content;
+  let code: string | undefined;
+
+  if (raw.role === "assistant") {
+    try {
+      const parsed = JSON.parse(raw.content) as { message?: unknown; code?: unknown };
+      if (typeof parsed.message === "string") content = parsed.message;
+      if (typeof parsed.code === "string" && parsed.code.trim()) code = parsed.code;
+    } catch {
+      // Older messages were stored as plain text.
+    }
+  }
+
+  return {
+    id: raw.id,
+    role: raw.role as "user" | "assistant",
+    content,
+    code,
+  };
+}
+
+function canvasWithCode(mode: AgentMode, code?: string) {
+  const canvas = createEmptyCanvas(mode);
+  if (!code) return canvas;
+  return {
+    ...canvas,
+    files: canvas.files.map((file) =>
+      file.path === canvas.activeFile ? { ...file, content: code } : file,
+    ),
+  };
 }
 
 export function AgentPageClient({
@@ -57,16 +102,11 @@ export function AgentPageClient({
     error,
     tokenCount,
     canvas,
-    proposedPatch,
     createSession,
     resumeSession,
     sendMessage,
     stopStreaming,
     updateCanvas,
-    undo,
-    redo,
-    acceptPatch,
-    rejectPatch,
     setMode,
     setMessages,
     setCanvas,
@@ -76,7 +116,7 @@ export function AgentPageClient({
     if (!sessionId) return;
     void sendMessage(chatInput);
     setChatInput("");
-  }, [sessionId, sendMessage, chatInput]);
+  }, [chatInput, sendMessage, sessionId]);
 
   const handleNewSession = useCallback(
     async (selectedMode: AgentMode) => {
@@ -85,7 +125,7 @@ export function AgentPageClient({
       setChatInput("");
       await createSession(selectedMode);
     },
-    [createSession, setMessages]
+    [createSession, setMessages],
   );
 
   const handleResumeSession = useCallback(
@@ -95,36 +135,25 @@ export function AgentPageClient({
         const res = await fetch(`/api/agent/sessions/${session.id}`);
         if (!res.ok) return;
         const data = await res.json();
-        const restoredMessages: AgentMessage[] = (data.messages ?? []).map(
-          (m: { id: string; role: string; content: string; code?: string | null }) => ({
-            id: m.id,
-            role: m.role as "user" | "assistant",
-            content: m.content,
-            code: m.code ?? undefined,
-          })
-        );
-        const m = session.mode as AgentMode;
-        setMode(m);
+        const restoredMessages = (data.messages ?? []).map(normalizeMessage);
+        const restoredMode = session.mode as AgentMode;
+        const latestCode = [...restoredMessages].reverse().find((message) => message.code)?.code;
+
+        setMode(restoredMode);
         setMessages(restoredMessages);
-
-        // Restore canvas if present
-        if (data.canvas) {
-          setCanvas(data.canvas);
-        }
-
-        // Re-assign the hook's sessionId
+        setCanvas(data.canvas ?? canvasWithCode(restoredMode, latestCode));
         resumeSession(session.id);
       } catch {
         await handleNewSession(session.mode as AgentMode);
       }
     },
-    [handleNewSession, resumeSession, setMode, setMessages, setCanvas]
+    [handleNewSession, resumeSession, setCanvas, setMessages, setMode],
   );
 
   const openSaveModal = useCallback(() => {
-    const firstUserMessage = messages.find((m) => m.role === "user")?.content.trim();
+    const firstUserMessage = messages.find((message) => message.role === "user")?.content.trim();
     setSaveTitle((current) => current || firstUserMessage?.slice(0, 40) || "나의 AI 게임");
-    setSaveDescription((current) => current || "AI 도우미와 함께 만든 게임입니다.");
+    setSaveDescription((current) => current || "AI 도우미와 함께 만든 프로젝트입니다.");
     setSaveError(null);
     setShowSaveModal(true);
   }, [messages]);
@@ -136,6 +165,7 @@ export function AgentPageClient({
       setSaveError("프로젝트 제목을 입력해 주세요.");
       return;
     }
+
     setSavingProject(true);
     setSaveError(null);
     try {
@@ -146,12 +176,19 @@ export function AgentPageClient({
           boardId,
           title,
           description: saveDescription.trim(),
-          tags: saveTags.split(",").map((tag) => tag.trim()).filter(Boolean),
+          tags: saveTags
+            .split(",")
+            .map((tag) => tag.trim())
+            .filter(Boolean),
         }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        throw new Error(data.error === "bad_request" ? "입력값을 확인해 주세요." : "프로젝트 저장에 실패했어요.");
+        throw new Error(
+          data.error === "bad_request"
+            ? "입력값을 확인해 주세요."
+            : "프로젝트 저장에 실패했어요.",
+        );
       }
       router.push(`${boardHref}/project/${data.projectId}`);
     } catch (err) {
@@ -161,94 +198,72 @@ export function AgentPageClient({
     }
   }, [boardHref, boardId, router, saveDescription, saveTags, saveTitle, savingProject, sessionId]);
 
-  // Refresh session list
   useEffect(() => {
-    if (sessionId) {
-      fetch("/api/agent/sessions?status=active&limit=20")
-        .then((r) => r.json())
-        .then((data: SessionSummary[]) => setSessions(data))
-        .catch(() => {});
-    }
+    if (!sessionId) return;
+    fetch("/api/agent/sessions?status=active&limit=20")
+      .then((res) => res.json())
+      .then((data: SessionSummary[]) => setSessions(data))
+      .catch(() => {});
   }, [sessionId]);
 
-  const canSave = messages.length >= 2 && !streaming && sessionId;
-
-  // Compute preview URL for the sandbox iframe
+  const canSave = messages.length >= 2 && !streaming && !!sessionId;
   const previewUrl = useMemo(() => {
     if (!sessionId || !canvas.activeFile) return null;
     return `${boardHref}/agent/preview?session=${sessionId}&file=${encodeURIComponent(canvas.activeFile)}`;
-  }, [sessionId, canvas.activeFile, boardHref]);
+  }, [boardHref, canvas.activeFile, sessionId]);
 
   return (
     <div className="agent-page">
-      {/* Nav */}
       <nav className="agent-breadcrumb" aria-label="breadcrumb">
         <Link href={boardHref}>{boardTitle}</Link>
         <span className="agent-breadcrumb-sep">&gt;</span>
         <span>AI 도우미</span>
       </nav>
 
-      {/* Hero */}
       <section className="agent-hero">
         <div>
-          <h1>🤖 AI 도우미</h1>
-          <p>게임, 학습, 코딩, 수업 — AI와 대화하고 결과물을 만들어보세요</p>
+          <h1>AI 도우미</h1>
+          <p>게임, 학습, 코딩, 수업 아이디어를 대화로 만들고 바로 실행해보세요.</p>
         </div>
         <div className="agent-hero-actions">
-          <button
-            type="button"
-            className="ds-btn-secondary"
-            onClick={undo}
-            disabled={canvas.baseVersion === 0}
-            title="실행 취소"
-          >
-            ↩ 실행 취소
-          </button>
           <Link href={boardHref} className="ds-btn-secondary">
-            ← 보드로
+            보드로 돌아가기
           </Link>
-          <button
-            type="button"
-            className="ds-btn-primary"
-            onClick={() => setShowNewModal(true)}
-          >
-            ✨ 새 대화
+          <button type="button" className="ds-btn-primary" onClick={() => setShowNewModal(true)}>
+            새 대화
           </button>
         </div>
       </section>
 
       <div className="agent-layout agent-layout-with-preview">
-        {/* Sidebar: Session list */}
         <aside className="agent-sidebar">
           <div className="agent-sidebar-head">
-            <h3>내 대화</h3>
+            <h3>대화</h3>
             <span className="agent-sidebar-count">{sessions.length}</span>
           </div>
           {sessions.length === 0 ? (
-            <p className="agent-sidebar-empty">
-              아직 대화가 없어요. 새 대화를 시작해보세요!
-            </p>
+            <p className="agent-sidebar-empty">아직 대화가 없어요. 새 대화를 시작해보세요.</p>
           ) : (
             <div className="agent-sidebar-list">
-              {sessions.map((s) => (
+              {sessions.map((session) => (
                 <button
-                  key={s.id}
+                  key={session.id}
                   type="button"
                   className={`agent-sidebar-item ${
-                    s.id === sessionId ? "agent-sidebar-item-active" : ""
+                    session.id === sessionId ? "agent-sidebar-item-active" : ""
                   }`}
-                  onClick={() => handleResumeSession(s)}
+                  onClick={() => handleResumeSession(session)}
                 >
                   <span className="agent-sidebar-item-icon">
-                    {AGENT_MODE_LABELS[s.mode as AgentMode]?.split(" ")[0] ?? "💬"}
+                    {MODE_ICONS[session.mode as AgentMode] ?? "AI"}
                   </span>
                   <span className="agent-sidebar-item-info">
                     <span className="agent-sidebar-item-title">
-                      {s.title || "새 대화"}
+                      {session.title || "제목 없는 대화"}
                     </span>
                     <span className="agent-sidebar-item-meta">
-                      {AGENT_MODE_LABELS[s.mode as AgentMode] ?? s.mode} ·{" "}
-                      {s.messageCount}개 메시지
+                      {AGENT_MODE_LABELS[session.mode as AgentMode] ?? session.mode} ·{" "}
+                      {session.messageCount}개 메시지
                     </span>
                   </span>
                 </button>
@@ -257,91 +272,48 @@ export function AgentPageClient({
           )}
         </aside>
 
-        {/* Main: Canvas (left) + Chat (right) */}
         <main className="agent-main">
           {!sessionId && !showNewModal ? (
             <div className="agent-main-empty">
-              <p>대화를 선택하거나 새 대화를 시작하세요</p>
+              <p>대화를 선택하거나 새 대화를 시작해 주세요.</p>
             </div>
-          ) : sessionId || showNewModal ? (
+          ) : (
             <div className="agent-main-split">
-              {/* Left: Code Canvas (MonacoEditor) */}
               <div className="agent-chat-column">
                 {sessionId && (
                   <div className="agent-session-info">
-                    <span className="agent-session-mode">
-                      {AGENT_MODE_LABELS[mode] ?? "대화"}
-                    </span>
+                    <span className="agent-session-mode">{AGENT_MODE_LABELS[mode]}</span>
                     <span className="agent-session-tokens">
-                      ⚡ {tokenCount.in + tokenCount.out} 토큰
+                      {tokenCount.in + tokenCount.out} 토큰
                     </span>
-                    {/* Sandbox preview link */}
                     {previewUrl && (
                       <a
                         href={previewUrl}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="agent-preview-link"
-                        title="새 탭에서 미리보기"
+                        title="새 창에서 미리보기"
                       >
-                        🚀 새 탭 미리보기
+                        새 창 미리보기
                       </a>
                     )}
                   </div>
                 )}
 
                 <div className="agent-canvas-area">
-                  <MonacoEditor
-                    canvas={canvas}
-                    onCanvasChange={updateCanvas}
-                    readonly={false}
-                  />
+                  <MonacoEditor canvas={canvas} onCanvasChange={updateCanvas} readonly={false} />
                 </div>
 
-                {/* Save to project button - below editor */}
                 {canSave && (
                   <div className="agent-save-bar">
-                    <button
-                      type="button"
-                      className="ds-btn-primary"
-                      onClick={openSaveModal}
-                    >
-                      📦 프로젝트로 저장
+                    <button type="button" className="ds-btn-primary" onClick={openSaveModal}>
+                      프로젝트로 저장
                     </button>
                   </div>
                 )}
               </div>
 
-              {/* Right: Chat + Preview Column */}
               <div className="agent-preview-column">
-                {/* Patch proposal banner */}
-                {proposedPatch && (
-                  <div className="agent-patch-banner">
-                    <div className="agent-patch-banner-info">
-                      <span className="agent-patch-banner-icon">📝</span>
-                      <span className="agent-patch-banner-text">
-                        AI가 코드 변경을 제안했어요
-                      </span>
-                    </div>
-                    <div className="agent-patch-banner-actions">
-                      <button
-                        type="button"
-                        className="agent-patch-btn agent-patch-btn-accept"
-                        onClick={() => acceptPatch()}
-                      >
-                        ✓ 적용
-                      </button>
-                      <button
-                        type="button"
-                        className="agent-patch-btn agent-patch-btn-reject"
-                        onClick={rejectPatch}
-                      >
-                        ✗ 무시
-                      </button>
-                    </div>
-                  </div>
-                )}
-
                 <AgentChatPanel
                   messages={messages}
                   streaming={streaming}
@@ -352,11 +324,10 @@ export function AgentPageClient({
                   onStopStreaming={stopStreaming}
                 />
 
-                {/* Sandbox preview iframe for HTML output */}
                 {previewUrl && (
                   <div className="agent-mini-preview">
                     <div className="agent-mini-preview-header">
-                      <span>🖥️ 실행 미리보기</span>
+                      <span>실행 미리보기</span>
                       <a
                         href={previewUrl}
                         target="_blank"
@@ -364,7 +335,7 @@ export function AgentPageClient({
                         className="agent-preview-refresh"
                         title="새 창에서 열기"
                       >
-                        ↗
+                        열기
                       </a>
                     </div>
                     <div className="agent-mini-preview-frame">
@@ -380,65 +351,53 @@ export function AgentPageClient({
                 )}
               </div>
             </div>
-          ) : null}
+          )}
         </main>
       </div>
 
-      {/* New session modal */}
       {showNewModal && !sessionId && (
         <div className="agent-modal-overlay" onClick={() => setShowNewModal(false)}>
-          <div className="agent-modal" onClick={(e) => e.stopPropagation()}>
+          <div className="agent-modal" onClick={(event) => event.stopPropagation()}>
             <h2>새 대화 시작</h2>
-            <p>원하는 모드를 선택하세요</p>
+            <p>원하는 모드를 선택해 주세요.</p>
             <div className="agent-mode-grid">
-              {AGENT_MODES.map((m) => (
+              {AGENT_MODES.map((agentMode) => (
                 <button
-                  key={m}
+                  key={agentMode}
                   type="button"
                   className="agent-mode-card"
-                  onClick={() => handleNewSession(m)}
+                  onClick={() => handleNewSession(agentMode)}
                 >
-                  <span className="agent-mode-card-icon">
-                    {AGENT_MODE_LABELS[m].split(" ")[0]}
-                  </span>
-                  <span className="agent-mode-card-label">
-                    {AGENT_MODE_LABELS[m].slice(
-                      AGENT_MODE_LABELS[m].indexOf(" ") + 1
-                    )}
-                  </span>
+                  <span className="agent-mode-card-icon">{MODE_ICONS[agentMode]}</span>
+                  <span className="agent-mode-card-label">{AGENT_MODE_LABELS[agentMode]}</span>
                   <span className="agent-mode-card-desc">
-                    {AGENT_MODE_DESCRIPTIONS[m]}
+                    {AGENT_MODE_DESCRIPTIONS[agentMode]}
                   </span>
                 </button>
               ))}
             </div>
-            <button
-              type="button"
-              className="agent-modal-close"
-              onClick={() => setShowNewModal(false)}
-            >
+            <button type="button" className="agent-modal-close" onClick={() => setShowNewModal(false)}>
               닫기
             </button>
           </div>
         </div>
       )}
 
-      {/* Save project modal */}
       {showSaveModal && (
         <div
           className="agent-modal-overlay"
           onClick={() => !savingProject && setShowSaveModal(false)}
         >
-          <div className="agent-modal agent-save-modal" onClick={(e) => e.stopPropagation()}>
+          <div className="agent-modal agent-save-modal" onClick={(event) => event.stopPropagation()}>
             <h2>프로젝트로 저장</h2>
-            <p>갤러리에 표시될 제목과 설명을 입력하세요.</p>
+            <p>갤러리에 표시할 제목과 설명을 입력해 주세요.</p>
             <label className="agent-save-field">
               <span>제목</span>
               <input
                 value={saveTitle}
                 onChange={(event) => setSaveTitle(event.target.value)}
                 maxLength={40}
-                placeholder="예: 우주 피하기 게임"
+                placeholder="예: 우주 달리기 게임"
                 disabled={savingProject}
               />
             </label>
@@ -457,7 +416,7 @@ export function AgentPageClient({
               <input
                 value={saveTags}
                 onChange={(event) => setSaveTags(event.target.value)}
-                placeholder="게임, 아케이드, 퀴즈"
+                placeholder="게임, 어드벤처, 퀴즈"
                 disabled={savingProject}
               />
             </label>

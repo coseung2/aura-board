@@ -89,6 +89,43 @@
   overflow: hidden;
   display: flex;
   flex-direction: column;
+  min-height: 0;
+  padding-bottom: 24px;
+}
+
+.columns-scrollbar {
+  display: none;
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 40;
+  overflow-x: auto;
+  overflow-y: hidden;
+  height: 14px;
+  padding: 0;
+  background: transparent;
+  border: 0;
+}
+
+.columns-scrollbar.is-visible {
+  display: block;
+}
+
+.columns-scrollbar-rail {
+  height: 1px;
+}
+
+.columns-scroll-area {
+  overflow-x: auto;
+  overflow-y: visible;
+  min-height: 0;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+
+.columns-scroll-area::-webkit-scrollbar {
+  height: 0;
 }
 
 .columns-board {
@@ -97,13 +134,15 @@
   align-items: stretch;
   flex: 1;
   min-height: 0;
-  overflow: auto;
+  min-width: max-content;
+  width: max-content;
+  overflow: visible;
   padding-bottom: 24px;
 }
 
 .column {
   flex: 0 0 300px;
-  min-width: 0;
+  min-width: 300px;
   /* flex item은 기본 min-width:auto라 내부 콘텐츠가 본인 폭을 강제해
      300px를 벗어남. 긴 이미지/파일명/iframe이 옆 칼럼을 덮던 증상 해결.
      (card-attachment diagnosis 2026-04-20) */
@@ -1890,4 +1929,21 @@
   font-size: 11px;
   color: var(--color-text-faint);
   padding: 0 4px;
+}
+
+@media (max-width: 768px) {
+  .board-canvas-wrap-columns {
+    overflow-x: auto;
+  }
+
+  .columns-board {
+    gap: 16px;
+    min-width: max-content;
+    width: max-content;
+  }
+
+  .column {
+    flex-basis: 280px;
+    min-width: 280px;
+  }
 }

@@ -91,12 +91,6 @@
 .plant-roadmap {
   padding: 24px 32px;
 }
-.plant-head {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  margin-bottom: 16px;
-}
 .plant-head-emoji {
   font-size: 36px;
 }
@@ -107,96 +101,6 @@
 .plant-head-nickname {
   font-size: 14px;
   color: var(--color-text-muted);
-}
-
-.plant-line-scroll {
-  overflow-x: auto;
-  padding: 30px 10px 10px;
-  -webkit-overflow-scrolling: touch;
-}
-.plant-line {
-  display: flex;
-  align-items: center;
-  gap: 0;
-  min-width: max-content;
-}
-.plant-node-wrap {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  min-width: 90px;
-}
-.plant-node {
-  width: 44px;
-  height: 44px;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-weight: 700;
-  font-size: 14px;
-  border: 0;
-  cursor: pointer;
-  transition: transform 120ms, box-shadow 120ms;
-  font-family: inherit;
-  padding: 0;
-}
-.plant-node[data-state="visited"] {
-  background: var(--color-plant-visited);
-  color: var(--color-text);
-}
-.plant-node[data-state="active"] {
-  background: var(--color-plant-active);
-  color: #fff;
-  transform: scale(1.25);
-  box-shadow: 0 4px 12px rgba(39, 163, 95, 0.35);
-}
-.plant-node[data-state="upcoming"] {
-  background: var(--color-bg-alt);
-  color: var(--color-text-faint);
-  border: 2px solid var(--color-plant-upcoming);
-}
-.plant-node[data-state="upcoming"]:hover,
-.plant-node[data-state="visited"]:hover {
-  transform: scale(1.1);
-}
-.plant-node-label {
-  margin-top: 10px;
-  font-size: 11px;
-  text-align: center;
-  color: var(--color-text-muted);
-  max-width: 80px;
-}
-.plant-node-label-icon {
-  font-size: 18px;
-  line-height: 1;
-  margin-bottom: 2px;
-  display: block;
-}
-.plant-connector {
-  flex: 0 0 36px;
-  height: 4px;
-  background: var(--color-plant-visited);
-  margin-top: -24px;
-}
-.plant-connector[data-future="true"] {
-  background: transparent;
-  border-top: 2px dashed var(--color-plant-upcoming);
-  height: 0;
-}
-
-.plant-line-cta {
-  text-align: center;
-  margin-top: 16px;
-}
-.plant-line-cta button {
-  padding: 10px 20px;
-  border-radius: var(--radius-pill);
-  border: none;
-  background: var(--color-plant-active);
-  color: #fff;
-  font-weight: 700;
-  cursor: pointer;
 }
 
 /* ── Stage detail sheet ─────────────────────────── */
@@ -2295,4 +2199,3 @@
     font-size: 10px;
   }
 }
-

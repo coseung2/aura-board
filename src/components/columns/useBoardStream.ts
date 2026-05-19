@@ -18,8 +18,6 @@ type Options = {
   setSections: React.Dispatch<React.SetStateAction<StreamSection[]>>;
 };
 
-const SNAPSHOT_POLL_MS = 15_000;
-
 export function useBoardStream({
   boardId,
   pendingCardIds,
@@ -50,7 +48,6 @@ export function useBoardStream({
         });
         if (res.status === 304) {
           retryCount = 0;
-          schedulePoll(SNAPSHOT_POLL_MS);
           return;
         }
         if (res.status === 401 || res.status === 403) {
@@ -72,7 +69,6 @@ export function useBoardStream({
         lastHash = data.hash ?? "";
         mergeCards(data.cards);
         mergeSections(data.sections);
-        schedulePoll(SNAPSHOT_POLL_MS);
       } catch (e) {
         console.error("[board snapshot poll]", e);
         retryCount += 1;
@@ -111,6 +107,9 @@ export function useBoardStream({
       );
     }
 
+    // Columns boards no longer auto-refresh in the background. We keep a
+    // one-time snapshot sync on mount, plus bounded retries for transient
+    // load failures, to reduce persistent Vercel function usage.
     poll();
 
     return () => {
