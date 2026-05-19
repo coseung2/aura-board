@@ -1,14 +1,12 @@
-// Multi-provider LLM streaming for vibe-arcade (Seed 13 follow-up).
-// 교사가 /docs/ai-setup에서 저장한 API Key로 Claude / OpenAI / Gemini 중
-// 하나를 서버에서 호출한다. 단일 인터페이스 (streamLlm) — 기존 sonnet-provider.ts의
-// streamSonnet을 대체한다.
+// Multi-provider LLM streaming for vibe-arcade.
+// Teachers store one API key and this module calls the selected provider
+// behind a single streamLlm interface.
 //
-// 구현 전략:
-//   - Anthropic:  @anthropic-ai/sdk (이미 설치됨)
-//   - OpenAI:     fetch + SSE 파싱   (의존성 추가 없이)
-//   - Gemini:     fetch + NDJSON     (streamGenerateContent)
-//
-// 셋 다 공통 onDelta / onTokensUpdate / onRefusal 콜백으로 정규화.
+// Provider adapters:
+//   - Anthropic SDK for Claude
+//   - OpenAI-compatible Chat Completions SSE
+//   - Gemini streamGenerateContent NDJSON
+//   - Ollama/OpenAI-compatible local endpoints
 
 import "server-only";
 import { incrementLedger } from "../vibe-arcade/quota-ledger";
@@ -27,8 +25,7 @@ export type LlmStreamArgs = {
   onDelta: (delta: string) => void;
   onTokensUpdate: (tokensIn: number, tokensOut: number) => void;
   onRefusal: () => void;
-  // ollama 전용: OpenAI 호환 엔드포인트 주소 + 모델 식별자.
-  // 다른 provider에서는 무시된다.
+  // Ollama uses an OpenAI-compatible base URL plus a teacher-selected model.
   baseUrl?: string | null;
   modelId?: string | null;
 };
@@ -41,19 +38,19 @@ export type LlmStreamResult = {
   errorMessage?: string;
 };
 
-export const DEFAULT_SYSTEM_PROMPT = `당신은 한국 초중등 학생의 바이브 코딩 보조교사입니다.
+export const DEFAULT_SYSTEM_PROMPT = `당신은 한국 초중등 학생을 돕는 바이브 코딩 보조교사입니다.
 
-**실행 환경 (매우 중요)**
-학생 화면 오른쪽에 실시간 미리보기(iframe)가 있어서 당신이 출력한 코드는 자동으로 그 창에서 실행됩니다. 학생은 파일 저장이나 브라우저 열기를 할 필요가 전혀 없습니다. "저장해서 열어 보세요" · "파일로 만드세요" 같은 안내는 절대 하지 마세요.
+**실행 환경**
+학생 화면 오른쪽에는 실시간 미리보기 iframe이 있습니다. 당신이 출력한 HTML은 자동으로 그 창에서 실행됩니다. 파일 저장, 브라우저 열기, 다운로드 같은 안내는 하지 마세요.
 
-**출력 형식 (엄격)**
-- 코드 응답은 반드시 \`\`\`html 으로 시작하고 \`\`\` 으로 닫는 하나의 블록이어야 합니다.
-- 그 HTML 안에 <style> 과 <script> 를 모두 포함 — CSS/JS 를 별도 블록으로 쪼개지 말 것.
-- 수정 요청이 오면 전체 문서를 같은 \`\`\`html 블록으로 다시 출력.
-- 외부 CDN 은 jsdelivr / cdnjs / unpkg 만 허용.
+**출력 형식**
+- 코드 응답은 반드시 하나의 \`\`\`html 코드블록으로만 작성합니다.
+- 그 HTML 안에 <style>과 <script>를 모두 포함합니다. CSS/JS를 별도 블록으로 나누지 않습니다.
+- 수정 요청에도 전체 문서를 다시 \`\`\`html 코드블록으로 출력합니다.
+- 외부 CDN은 jsdelivr, cdnjs, unpkg만 사용합니다.
 
-부적절한 주제(폭력·성인·개인정보·상용 게임 복제 등)는 정중히 거절합니다.
-한국 초·중등 학생 대상 — 쉬운 말, 짧고 친근하게, 존댓말 유지.`;
+폭력, 성적 내용, 개인정보 침해, 악용 가능한 게임 복제처럼 부적절한 요청은 짧고 단호하게 거절합니다.
+초중등 학생에게 맞는 쉬운 말로, 친근하지만 장난스럽게 흐르지 않도록 안내하세요.`;
 
 const MODELS: Record<Exclude<LlmProvider, "ollama">, string> = {
   claude: process.env.CLAUDE_MODEL_ID ?? "claude-sonnet-4-5",
@@ -61,7 +58,7 @@ const MODELS: Record<Exclude<LlmProvider, "ollama">, string> = {
   gemini: process.env.GEMINI_MODEL_ID ?? "gemini-2.5-flash",
   "opencode-go": process.env.OPENCODE_MODEL_ID ?? "opencode/deepseek-v4-flash-free",
 };
-// ollama 는 교사가 저장 시 입력한 modelId 를 런타임에 그대로 사용 (MODELS 비적용).
+// Ollama uses the teacher-provided modelId instead of MODELS.
 
 /** Dispatch to the right provider adapter. */
 export async function streamLlm(args: LlmStreamArgs): Promise<LlmStreamResult> {
@@ -87,7 +84,7 @@ export async function streamLlm(args: LlmStreamArgs): Promise<LlmStreamResult> {
   }
 }
 
-// ───────────────────── Claude (Anthropic) ─────────────────────
+// Claude (Anthropic) adapter
 
 async function streamClaude(args: LlmStreamArgs): Promise<LlmStreamResult> {
   const { default: Anthropic } = await import("@anthropic-ai/sdk").catch(() => ({
@@ -167,7 +164,7 @@ async function streamClaude(args: LlmStreamArgs): Promise<LlmStreamResult> {
   }
 }
 
-// ───────────────────── OpenAI (Chat Completions SSE) ─────────────────────
+// OpenAI Chat Completions SSE adapter
 
 async function streamOpenAI(args: LlmStreamArgs): Promise<LlmStreamResult> {
   let tokensIn = 0;
@@ -264,15 +261,14 @@ async function streamOpenAI(args: LlmStreamArgs): Promise<LlmStreamResult> {
   }
 }
 
-// ───────────────────── Gemini (streamGenerateContent NDJSON) ─────────────────────
-
+// Gemini streamGenerateContent adapter
 async function streamGemini(args: LlmStreamArgs): Promise<LlmStreamResult> {
   let tokensIn = 0;
   let tokensOut = 0;
   let finalContent = "";
 
   try {
-    // Gemini는 system을 별도 필드로, assistant는 "model" role로 받는다.
+    // Gemini accepts the system prompt as a user/model content sequence.
     const contents = args.messages.map((m) => ({
       role: m.role === "assistant" ? "model" : "user",
       parts: [{ text: m.content }],
@@ -374,10 +370,7 @@ async function streamGemini(args: LlmStreamArgs): Promise<LlmStreamResult> {
   }
 }
 
-// ───────────────────── Ollama (로컬 테스트 — OpenAI 호환) ─────────────────────
-// 교사 PC에 Ollama가 설치돼 있다는 전제. `/v1/chat/completions` 가 OpenAI와
-// 동일한 SSE 포맷을 돌려준다. usage 필드가 없거나 다를 수 있어 문자 길이로
-// 대충 추정 (배포 환경이 아니라 본인 개발 PC에서만 쓰는 경로).
+// Ollama OpenAI-compatible adapter
 async function streamOllama(args: LlmStreamArgs): Promise<LlmStreamResult> {
   const baseUrl = (args.baseUrl ?? "").replace(/\/+$/, "");
   const model = args.modelId ?? "";
@@ -387,7 +380,7 @@ async function streamOllama(args: LlmStreamArgs): Promise<LlmStreamResult> {
       finalContent: "",
       tokensIn: 0,
       tokensOut: 0,
-      errorMessage: "ollama: baseUrl / modelId 가 설정되지 않았습니다.",
+      errorMessage: "ollama: baseUrl/modelId is not configured",
     };
   }
 
@@ -399,7 +392,7 @@ async function streamOllama(args: LlmStreamArgs): Promise<LlmStreamResult> {
     const res = await fetch(`${baseUrl}/chat/completions`, {
       method: "POST",
       headers: {
-        // Ollama는 API Key 미요구지만 reverse-proxy 보호용으로 넣을 수 있음.
+        // Ollama usually does not need an API key, but a reverse proxy might.
         ...(args.apiKey ? { Authorization: `Bearer ${args.apiKey}` } : {}),
         "Content-Type": "application/json",
       },
@@ -464,8 +457,7 @@ async function streamOllama(args: LlmStreamArgs): Promise<LlmStreamResult> {
       }
     }
 
-    // Ollama usage 미제공 시 글자 수 기반으로 근사치 제공 — quota ledger 가
-    // 0으로 내려가 쿼터 카운팅이 안 되는 것 방지.
+    // Ollama often omits usage; estimate tokens from text length for quota accounting.
     if (tokensIn === 0 && tokensOut === 0) {
       const promptChars = args.messages.reduce((n, m) => n + m.content.length, 0);
       tokensIn = Math.ceil(promptChars / 3);
@@ -493,9 +485,7 @@ async function streamOllama(args: LlmStreamArgs): Promise<LlmStreamResult> {
   }
 }
 
-// ───────────────────── OpenCode-go (OpenAI 호환 API) ─────────────────────
-// OpenAI chat completions SSE와 동일한 포맷 사용. baseUrl + modelId로
-// 교사가 저장한 엔드포인트를 호출한다.
+// OpenCode provider adapter
 async function streamOpencodeGo(args: LlmStreamArgs): Promise<LlmStreamResult> {
   const baseUrl = (args.baseUrl ?? "").replace(/\/+$/, "") || process.env.OPENCODE_BASE_URL || "https://opencode.ai/zen/go/v1";
   const model = args.modelId || MODELS["opencode-go"];
@@ -594,10 +584,7 @@ async function streamOpencodeGo(args: LlmStreamArgs): Promise<LlmStreamResult> {
   }
 }
 
-// ───────────────────── Test ping (저장 시 검증용) ─────────────────────
-// 저장된 Key가 실제로 유효한지 각 사 API에 최소 호출을 보내 확인한다.
-// 성공(true) or 실패사유(string). "verified" 표시에만 사용.
-
+// Lightweight provider key check used by the teacher settings UI.
 export async function verifyApiKey(
   provider: LlmProvider,
   apiKey: string,
@@ -608,7 +595,7 @@ export async function verifyApiKey(
       const baseUrl = (extra?.baseUrl ?? "").replace(/\/+$/, "");
       const modelId = extra?.modelId ?? "";
       if (!baseUrl || !modelId) {
-        return { ok: false, error: "baseUrl 과 modelId 가 모두 필요합니다." };
+        return { ok: false, error: "baseUrl and modelId are required" };
       }
       const res = await fetch(`${baseUrl}/models`, {
         headers: apiKey ? { Authorization: `Bearer ${apiKey}` } : {},
@@ -624,7 +611,7 @@ export async function verifyApiKey(
       if (ids.length && !ids.includes(modelId)) {
         return {
           ok: false,
-          error: `모델 '${modelId}' 을(를) 찾을 수 없습니다. 설치된 모델: ${ids.slice(0, 5).join(", ")}`,
+          error: `model '${modelId}' was not found. Installed models: ${ids.slice(0, 5).join(", ")}`,
         };
       }
       return { ok: true };

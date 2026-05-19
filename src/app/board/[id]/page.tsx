@@ -19,7 +19,6 @@ import { DJBoard } from "@/components/DJBoard";
 import { VibeArcadeBoard } from "@/components/VibeArcadeBoard";
 import { VibeGalleryBoard } from "@/components/VibeGalleryBoard";
 import { QuestionBoard } from "@/components/QuestionBoard";
-import { StatisticsBoardClient } from "@/components/statistics/StatisticsBoardClient";
 import { cloneStructure } from "@/lib/breakout";
 import type { PlantJournalResponse } from "@/types/plant";
 import type { BoardSection } from "@/components/BoardSettingsPanel";
@@ -67,17 +66,15 @@ export default async function BoardPage({
   const needsDrawingData = board.layout === "drawing";
   const needsBreakoutData = board.layout === "breakout";
   const needsQuestionData = board.layout === "question-board";
-  const needsStatisticsData = board.layout === "statistics";
   const needsCards =
     !needsAssignmentData &&
     !needsQuizData &&
     !needsPlantData &&
     !needsEventData &&
     !needsDrawingData &&
-    !needsQuestionData &&
-    !needsStatisticsData;
+    !needsQuestionData;
   // Breakout reuses cards + sections both.
-  const needsSections = board.layout === "columns" || needsBreakoutData || needsStatisticsData;
+  const needsSections = board.layout === "columns" || needsBreakoutData;
   const needsBreakoutAssignment = needsBreakoutData;
 
   const cardsPromise = needsCards
@@ -162,20 +159,13 @@ export default async function BoardPage({
       })
     : null;
   const rosterStudentsPromise =
-    (needsBreakoutAssignment || needsStatisticsData) && board.classroomId
+    needsBreakoutAssignment && board.classroomId
       ? db.student.findMany({
           where: { classroomId: board.classroomId },
           orderBy: [{ number: "asc" }, { name: "asc" }],
           select: { id: true, name: true, number: true },
         })
       : null;
-  const statisticsMissionsPromise = needsStatisticsData
-    ? db.mission.findMany({
-        where: { section: { boardId: board.id } },
-        orderBy: [{ sectionId: "asc" }, { stepNumber: "asc" }],
-      })
-    : null;
-
   const [
     cardsRaw,
     sectionsRaw,
@@ -185,7 +175,6 @@ export default async function BoardPage({
     breakoutMembershipsRaw,
     rosterStudentsRaw,
     assignmentSlotsRaw,
-    statisticsMissionsRaw,
   ] = await Promise.all([
     cardsPromise,
     sectionsPromise,
@@ -195,7 +184,6 @@ export default async function BoardPage({
     breakoutMembershipsPromise,
     rosterStudentsPromise,
     assignmentSlotsPromise,
-    statisticsMissionsPromise,
   ]);
   const breakoutMemberships = breakoutMembershipsRaw ?? [];
   const rosterStudents = rosterStudentsRaw ?? [];
@@ -630,39 +618,6 @@ export default async function BoardPage({
           />
         );
       }
-      case "statistics": {
-        // Student's current team (if any) for lazy team creation flow
-        const studentTeam = studentViewer
-          ? sections.find((s) =>
-              breakoutMemberships.some(
-                (m) => m.sectionId === s.id && m.studentId === studentViewer.id
-              )
-            ) ?? null
-          : null;
-        const teamMembers = studentTeam
-          ? breakoutMemberships
-              .filter((m) => m.sectionId === studentTeam.id)
-              .map((m) => ({
-                id: m.id,
-                studentId: m.studentId,
-                studentName: m.student.name,
-                studentNumber: m.student.number,
-              }))
-          : [];
-        return (
-          <StatisticsBoardClient
-            boardId={board!.id}
-            isTeacher={!studentViewer && effectiveRole === "owner"}
-            studentSectionId={studentTeam?.id ?? null}
-            teamMembers={teamMembers}
-            rosterStudents={rosterStudents.map((s) => ({
-              id: s.id,
-              name: s.name,
-              number: s.number,
-            }))}
-          />
-        );
-      }
       case "freeform":
       default:
         return <BoardCanvas {...common} />;
@@ -688,4 +643,3 @@ export default async function BoardPage({
     </main>
   );
 }
-

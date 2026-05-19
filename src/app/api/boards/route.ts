@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+﻿import { NextResponse } from "next/server";
 import { z } from "zod";
 import { db } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
@@ -13,7 +13,7 @@ import {
   ASSIGNMENT_GUIDE_TEXT_MAX,
 } from "@/lib/assignment-schemas";
 
-// Grid cell dims — matches Card default width/height; render uses CSS grid so
+// Grid cell dims ??matches Card default width/height; render uses CSS grid so
 // these are stored-only placeholders for future freeform fallback.
 const ASSIGN_CARD_W = 240;
 const ASSIGN_CARD_H = 160;
@@ -34,7 +34,6 @@ const CreateBoardSchema = z.object({
     "vibe-arcade",
     "vibe-gallery",
     "question-board",
-    "statistics",
   ]),
   description: z.string().max(2000).default(""),
   classroomId: z.string().optional(),
@@ -53,11 +52,15 @@ export async function POST(req: Request) {
     const input = CreateBoardSchema.parse(body);
 
     const baseSlug = input.title
-      ? input.title.toLowerCase().replace(/[^a-z0-9가-힣]/g, "-").replace(/-+/g, "-").replace(/^-|-$/g, "")
+      ? input.title
+          .toLowerCase()
+          .replace(/[^a-z0-9가-힣]/g, "-")
+          .replace(/-+/g, "-")
+          .replace(/^-|-$/g, "")
       : "board";
     const slug = `${baseSlug}-${Date.now().toString(36)}`;
 
-    // ── Breakout branch (BR-3) ──────────────────────────────────────────
+    // ?? Breakout branch (BR-3) ??????????????????????????????????????????
     if (input.layout === "breakout") {
       if (!input.breakoutConfig) {
         return NextResponse.json(
@@ -73,7 +76,7 @@ export async function POST(req: Request) {
         return NextResponse.json({ error: "template_not_found" }, { status: 404 });
       }
 
-      // Tier gating — DB subscription + env override (Seed 14 async).
+      // Tier gating ??DB subscription + env override (Seed 14 async).
       const tier = await getCurrentTierAsync(user.id);
       if (!canUseTemplate(tier, template.requiresPro)) {
         return NextResponse.json(
@@ -83,7 +86,7 @@ export async function POST(req: Request) {
       }
 
       // Deep-clone structure so template edits never retroactively affect this
-      // board (decisions Q6 — 복사 원칙).
+      // board (decisions Q6 ??蹂듭궗 ?먯튃).
       const structure = cloneStructure(template.structure);
 
       const effectiveTitle = input.title || template.name;
@@ -148,7 +151,7 @@ export async function POST(req: Request) {
           }
         }
 
-        // Shared teacher-pool section — board-level single.
+        // Shared teacher-pool section ??board-level single.
         if (structure.sharedSections) {
           for (const shared of structure.sharedSections) {
             await tx.section.create({
@@ -167,7 +170,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ board });
     }
 
-    // ── Assignment branch (AB-1) ─────────────────────────────────────────
+    // ?? Assignment branch (AB-1) ?????????????????????????????????????????
     // Board-first flow: classroomId optional at creation. When absent the
     // board is created empty (0 slots); teacher attaches a classroom later
     // from the in-board FAB, which calls `/api/boards/[id]/roster-sync` to
@@ -263,62 +266,20 @@ export async function POST(req: Request) {
       return NextResponse.json({ board, slots: classroom?.students.length ?? 0 });
     }
 
-    // ── Statistics branch (2026-05-03) ──────────────────────────────────
-    if (input.layout === "statistics") {
-      if (!input.classroomId) {
-        return NextResponse.json(
-          { error: "학급보드는 학급에 속해야 합니다" },
-          { status: 400 }
-        );
-      }
-      const classroom = await db.classroom.findUnique({
-        where: { id: input.classroomId },
-        include: { students: true },
-      });
-      if (!classroom) {
-        return NextResponse.json({ error: "classroom_not_found" }, { status: 404 });
-      }
-      if (classroom.teacherId !== user.id) {
-        return NextResponse.json({ error: "not_classroom_teacher" }, { status: 403 });
-      }
-
-      const groupCount = Math.min(Math.max(1, Math.ceil(classroom.students.length / 4)), 10);
-
-      const board = await db.$transaction(async (tx) => {
-        const createdBoard = await tx.board.create({
-          data: {
-            title: input.title || "통계활용대회 학급보드",
-            slug,
-            layout: "statistics",
-            description: input.description,
-            classroomId: input.classroomId,
-            members: { create: { userId: user.id, role: "owner" } },
-          },
-        });
-
-        // Note: sections and missions are created lazily when a student
-        // clicks "팀 만들기" — POST /api/boards/[id]/teams
-        return createdBoard;
-      });
-
-      return NextResponse.json({ board });
-    }
-
-    // ── Non-breakout layouts (unchanged) ────────────────────────────────
-    // dj-queue: classroom required — the role-grant chain keys off
+    // ?? Non-breakout layouts (unchanged) ????????????????????????????????
+    // dj-queue: classroom required ??the role-grant chain keys off
     // board.classroomId, so a classroom-less DJ board would be teacher-only
     // and defeat the purpose.
     if (input.layout === "dj-queue" && !input.classroomId) {
       return NextResponse.json(
-        { error: "DJ 큐 보드는 학급에 속해야 합니다" },
+        { error: "DJ 보드는 학급을 선택해야 합니다." },
         { status: 400 }
       );
     }
 
-    // columns + classroom: 학생 이름 자동 섹션화는 더 이상 기본이 아니다.
-    // 교사가 보드에 들어가서 "🧑 학생 이름으로 칼럼 만들기" 버튼을 명시적으로
-    // 누르면 POST /api/boards/:id/sections/seed-students 가 실행된다.
-    // (사용자 결정 2026-04-24 — 자동 생성이 강제처럼 느껴진다는 피드백)
+    // columns + classroom: ?숈깮 ?대쫫 ?먮룞 ?뱀뀡?붾뒗 ???댁긽 湲곕낯???꾨땲??
+    // 援먯궗媛 蹂대뱶???ㅼ뼱媛??"?쭛 ?숈깮 ?대쫫?쇰줈 移쇰읆 留뚮뱾湲? 踰꾪듉??紐낆떆?곸쑝濡?    // ?꾨Ⅴ硫?POST /api/boards/:id/sections/seed-students 媛 ?ㅽ뻾?쒕떎.
+    // (?ъ슜??寃곗젙 2026-04-24 ???먮룞 ?앹꽦??媛뺤젣泥섎읆 ?먭뺨吏꾨떎???쇰뱶諛?
     const board = await db.board.create({
       data: {
         title: input.title,
