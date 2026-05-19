@@ -120,6 +120,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
           observationCount: obsForStage.length,
           latestObs: latestObs
             ? {
+                id: latestObs.id,
                 memo: latestObs.memo,
                 observedAt: latestObs.observedAt.toISOString(),
                 imageUrl: latestObs.images[0]?.url ?? null,
@@ -127,6 +128,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
                 noPhotoReason: latestObs.noPhotoReason,
               }
             : null,
+          plantStageId: stageId,
         };
       });
       return {

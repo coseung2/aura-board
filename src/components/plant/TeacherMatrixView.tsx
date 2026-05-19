@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { OptimizedImage } from "../ui/OptimizedImage";
+import type { ObservationDTO } from "@/types/plant";
 
 interface Stage {
   id: string;
@@ -13,9 +14,11 @@ interface Stage {
 }
 interface Cell {
   stageId: string;
+  plantStageId?: string;
   thumbnail: string | null;
   observationCount: number;
   latestObs: {
+    id: string;
     memo: string | null;
     observedAt: string;
     imageUrl: string | null;
@@ -54,6 +57,9 @@ export function TeacherMatrixView({ classroomId, boardId }: Props) {
   const [err, setErr] = useState<string | null>(null);
   const [lightbox, setLightbox] = useState<string | null>(null);
   const [obsDetail, setObsDetail] = useState<{
+    id: string;
+    plantId: string;
+    stageId: string;
     stageName: string;
     studentId: string;
     studentName: string;
@@ -65,6 +71,10 @@ export function TeacherMatrixView({ classroomId, boardId }: Props) {
     noPhotoReason: string | null;
     stageOrder: number;
   } | null>(null);
+  const [stageObservations, setStageObservations] = useState<ObservationDTO[]>([]);
+  const [activeObservationId, setActiveObservationId] = useState<string | null>(null);
+  const [observationsLoading, setObservationsLoading] = useState(false);
+  const [observationsError, setObservationsError] = useState<string | null>(null);
   const [selectedStudentId, setSelectedStudentId] = useState<string | null>(null);
 
   useEffect(() => {
@@ -97,6 +107,50 @@ export function TeacherMatrixView({ classroomId, boardId }: Props) {
       })
       .catch((e) => setErr((e as Error).message));
   }, [classroomId, viewportOk]);
+
+  useEffect(() => {
+    if (!obsDetail) {
+      setStageObservations([]);
+      setActiveObservationId(null);
+      setObservationsLoading(false);
+      setObservationsError(null);
+      return;
+    }
+
+    let cancelled = false;
+    setObservationsLoading(true);
+    setObservationsError(null);
+    setStageObservations([]);
+    setActiveObservationId(obsDetail.id);
+    fetch(`/api/student-plants/${obsDetail.plantId}/observations`)
+      .then(async (res) => {
+        if (!res.ok) {
+          const body = await res.json().catch(() => ({}));
+          throw new Error(body?.error ?? "관찰 기록을 불러오지 못했어요.");
+        }
+        return res.json() as Promise<{ observations: ObservationDTO[] }>;
+      })
+      .then(({ observations }) => {
+        if (cancelled) return;
+        const sameStage = observations.filter((obs) => obs.stageId === obsDetail.stageId);
+        setStageObservations(sameStage);
+        setActiveObservationId((current) =>
+          current && sameStage.some((obs) => obs.id === current)
+            ? current
+            : (sameStage[0]?.id ?? obsDetail.id)
+        );
+      })
+      .catch((error) => {
+        if (!cancelled) setObservationsError((error as Error).message);
+      })
+      .finally(() => {
+        if (!cancelled) setObservationsLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [obsDetail]);
 
   if (viewportOk === null) {
     return <div className="plant-matrix-forbidden"><p>확인 중…</p></div>;
@@ -140,6 +194,38 @@ export function TeacherMatrixView({ classroomId, boardId }: Props) {
     (acc, student) => acc + student.cells.filter((cell) => cell.thumbnail).length,
     0
   );
+  const activeObservation =
+    (activeObservationId
+      ? stageObservations.find((obs) => obs.id === activeObservationId)
+      : stageObservations[0]) ?? null;
+  const detailImageUrl = activeObservation
+    ? (activeObservation.images[0]?.url ?? null)
+    : (obsDetail?.imageUrl ?? null);
+  const detailMemo = activeObservation ? activeObservation.memo : (obsDetail?.memo ?? null);
+  const detailNoPhotoReason = activeObservation
+    ? activeObservation.noPhotoReason
+    : (obsDetail?.noPhotoReason ?? null);
+  const detailObservedAt = activeObservation?.observedAt ?? obsDetail?.observedAt ?? "";
+
+  function openObservationDetail(student: StudentRow, stage: Stage, cell: Cell) {
+    setSelectedStudentId(student.id);
+    if (!student.plant || !cell.latestObs || cell.observationCount === 0) return;
+    setObsDetail({
+      id: cell.latestObs.id,
+      plantId: student.plant.id,
+      stageId: cell.plantStageId ?? stage.id,
+      stageName: stage.nameKo,
+      studentId: student.id,
+      studentName: student.name,
+      studentNumber: student.number,
+      memo: cell.latestObs.memo,
+      observedAt: cell.latestObs.observedAt,
+      imageUrl: cell.latestObs.imageUrl,
+      thumbnailUrl: cell.latestObs.thumbnailUrl,
+      noPhotoReason: cell.latestObs.noPhotoReason,
+      stageOrder: stage.order,
+    });
+  }
 
   return (
     <div className="plant-matrix-shell">
@@ -205,7 +291,7 @@ export function TeacherMatrixView({ classroomId, boardId }: Props) {
                         data-freshness={freshness}
                         data-selected={isSelected ? "true" : "false"}
                         data-current={isCurrent ? "true" : "false"}
-                        onClick={() => setSelectedStudentId(s.id)}
+                        onClick={() => openObservationDetail(s, st, cell)}
                       >
                         {cell?.thumbnail ? (
                           <button
@@ -213,23 +299,7 @@ export function TeacherMatrixView({ classroomId, boardId }: Props) {
                             className="plant-matrix-photo-btn"
                             onClick={(e) => {
                               e.stopPropagation();
-                              setSelectedStudentId(s.id);
-                              if (cell.latestObs) {
-                                setObsDetail({
-                                  stageName: st.nameKo,
-                                  studentId: s.id,
-                                  studentName: s.name,
-                                  studentNumber: s.number,
-                                  memo: cell.latestObs.memo,
-                                  observedAt: cell.latestObs.observedAt,
-                                  imageUrl: cell.latestObs.imageUrl,
-                                  thumbnailUrl: cell.latestObs.thumbnailUrl,
-                                  noPhotoReason: cell.latestObs.noPhotoReason,
-                                  stageOrder: st.order,
-                                });
-                              } else {
-                                setLightbox(cell.thumbnail);
-                              }
+                              openObservationDetail(s, st, cell);
                             }}
                           >
                             <img
@@ -298,10 +368,10 @@ export function TeacherMatrixView({ classroomId, boardId }: Props) {
         <div className="plant-lightbox" onClick={() => setObsDetail(null)} role="dialog" aria-label="관찰 상세">
           <div className="plant-obs-detail-modal" onClick={(e) => e.stopPropagation()}>
             <button type="button" className="plant-obs-detail-close" onClick={() => setObsDetail(null)}>✕</button>
-            {obsDetail.imageUrl && (
+            {detailImageUrl && (
               <div className="plant-obs-detail-img-wrap">
                 <OptimizedImage
-                  src={obsDetail.imageUrl}
+                  src={detailImageUrl}
                   alt={`${obsDetail.studentName} 관찰 사진`}
                   sizes="60vw"
                   fit="contain"
@@ -313,18 +383,53 @@ export function TeacherMatrixView({ classroomId, boardId }: Props) {
                 <span className="plant-obs-detail-stage">{obsDetail.stageOrder}단계 · {obsDetail.stageName}</span>
                 <span className="plant-obs-detail-student">{obsDetail.studentNumber ?? "—"}번 {obsDetail.studentName}</span>
               </div>
-              {obsDetail.memo && (
-                <p className="plant-obs-detail-memo">{obsDetail.memo}</p>
+              {detailMemo && (
+                <p className="plant-obs-detail-memo">{detailMemo}</p>
               )}
-              {obsDetail.noPhotoReason && (
-                <p className="plant-obs-detail-nophoto">📝 사진 없음: {obsDetail.noPhotoReason}</p>
+              {detailNoPhotoReason && (
+                <p className="plant-obs-detail-nophoto">📝 사진 없음: {detailNoPhotoReason}</p>
               )}
               <span className="plant-obs-detail-time">
-                {new Date(obsDetail.observedAt).toLocaleString("ko-KR", {
+                {new Date(detailObservedAt).toLocaleString("ko-KR", {
                   year: "numeric", month: "long", day: "numeric",
                   hour: "2-digit", minute: "2-digit",
                 })}
               </span>
+              <div className="plant-obs-detail-history" aria-label="같은 단계 관찰 기록">
+                <strong>이 단계 관찰 기록</strong>
+                {observationsLoading && <span>불러오는 중...</span>}
+                {observationsError && <span className="plant-error">{observationsError}</span>}
+                {!observationsLoading && !observationsError && stageObservations.length > 0 && (
+                  <div className="plant-obs-detail-history-list">
+                    {stageObservations.map((obs) => {
+                      const thumb = obs.images[0]?.thumbnailUrl ?? obs.images[0]?.url ?? null;
+                      return (
+                        <button
+                          key={obs.id}
+                          type="button"
+                          className="plant-obs-detail-history-item"
+                          data-active={obs.id === (activeObservation?.id ?? obsDetail.id) ? "true" : "false"}
+                          onClick={() => setActiveObservationId(obs.id)}
+                        >
+                          {thumb ? (
+                            <img src={thumb} alt="" />
+                          ) : (
+                            <span className="plant-obs-detail-history-empty">메모</span>
+                          )}
+                          <span>
+                            {new Date(obs.observedAt).toLocaleString("ko-KR", {
+                              month: "short",
+                              day: "numeric",
+                              hour: "2-digit",
+                              minute: "2-digit",
+                            })}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
               {boardId && (
                 <Link
                   href={`/board/${boardId}/student/${obsDetail.studentId}`}

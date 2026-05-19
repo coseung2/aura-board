@@ -2136,6 +2136,64 @@
   color: var(--color-text-faint);
 }
 
+.plant-obs-detail-history {
+  display: grid;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.plant-obs-detail-history > strong {
+  font-size: 13px;
+  color: var(--color-text);
+}
+
+.plant-obs-detail-history-list {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding-bottom: 2px;
+}
+
+.plant-obs-detail-history-item {
+  width: 86px;
+  min-width: 86px;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: var(--color-surface);
+  color: var(--color-text-muted);
+  cursor: pointer;
+  display: grid;
+  gap: 4px;
+  padding: 6px;
+  text-align: center;
+}
+
+.plant-obs-detail-history-item[data-active="true"] {
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.16);
+  color: var(--color-text);
+}
+
+.plant-obs-detail-history-item img,
+.plant-obs-detail-history-empty {
+  width: 100%;
+  aspect-ratio: 1;
+  border-radius: 6px;
+  object-fit: cover;
+  background: var(--color-surface-alt);
+}
+
+.plant-obs-detail-history-empty {
+  display: grid;
+  place-items: center;
+  font-size: 12px;
+}
+
+.plant-obs-detail-history-item span:last-child {
+  font-size: 11px;
+  line-height: 1.2;
+}
+
 /* ── Recent Observations compact grid (4×4) ── */
 .plant-teacher .plant-obs-feed {
   display: grid;
