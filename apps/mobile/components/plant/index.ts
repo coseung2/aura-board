@@ -1,0 +1,9 @@
+// Plant Journal 컴포넌트 barrel export.
+export { PlantHero } from "./PlantHero";
+export { StageRow } from "./StageRow";
+export { StageRail } from "./StageRail";
+export { ObservationCard } from "./ObservationCard";
+export { ImageLightbox } from "./ImageLightbox";
+export { StageCompare } from "./StageCompare";
+export { ObservationEditor } from "./ObservationEditor";
+export { NoPhotoReasonModal } from "./NoPhotoReasonModal";

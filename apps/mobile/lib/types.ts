@@ -81,6 +81,67 @@ export type Section = {
   color: string | null;
 };
 
+// ─── Plant Journal Types (웹 src/types/plant.ts 와 1:1 동기화) ───
+
+export type Difficulty = "easy" | "medium" | "hard";
+export type Season = "spring" | "summer" | "fall" | "winter" | "all";
+
+export interface StageDTO {
+  id: string;
+  order: number;
+  key: string;
+  nameKo: string;
+  description: string;
+  icon: string;
+  observationPoints: string[];
+}
+
+export interface SpeciesDTO {
+  id: string;
+  key: string;
+  nameKo: string;
+  emoji: string;
+  difficulty: Difficulty | string;
+  season: Season | string;
+  notes: string;
+  stages: StageDTO[];
+}
+
+export interface ObservationImageDTO {
+  id: string;
+  url: string;
+  thumbnailUrl: string | null;
+  order: number;
+}
+
+export interface ObservationDTO {
+  id: string;
+  stageId: string;
+  memo: string;
+  noPhotoReason: string | null;
+  observedAt: string;
+  images: ObservationImageDTO[];
+}
+
+export interface StudentPlantDTO {
+  id: string;
+  speciesId: string;
+  nickname: string;
+  currentStageId: string;
+  species: SpeciesDTO;
+  observations: ObservationDTO[];
+}
+
+export interface PlantJournalResponse {
+  board: { id: string; title: string; classroomId: string | null };
+  role: "owner" | "editor" | "viewer" | null;
+  viewer: { kind: string; studentId: string | null };
+  species: SpeciesDTO[];
+  myPlant: StudentPlantDTO | null;
+}
+
+// ─── Board Detail Response ───
+
 export type BoardDetailResponse = {
   board: BoardMeta;
   cards: BoardCard[];
@@ -147,20 +208,11 @@ export type BoardDetailResponse = {
       plants: Array<{
         id: string;
         nickname: string;
-        species: {
-          id: string;
-          nameKo: string;
-          emoji: string;
-          stages: Array<{ id: string; order: number; nameKo: string; icon: string }>;
-        };
-        currentStage: { id: string; order: number; nameKo: string; icon: string };
-        observations: Array<{
-          id: string;
-          memo: string;
-          observedAt: string;
-          stage: { nameKo: string };
-          images: Array<{ id: string; url: string }>;
-        }>;
+        speciesId: string;
+        currentStageId: string;
+        species: SpeciesDTO;
+        currentStage: StageDTO;
+        observations: ObservationDTO[];
       }>;
     };
   };
