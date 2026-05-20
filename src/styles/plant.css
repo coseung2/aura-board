@@ -1290,6 +1290,42 @@
   flex-shrink: 0;
 }
 
+.plant-attention-groups {
+  gap: 10px;
+}
+.plant-attention-group {
+  border: 1px solid var(--color-border);
+  border-radius: 14px;
+  background: var(--color-surface);
+  overflow: hidden;
+}
+.plant-attention-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 12px;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 700;
+}
+.plant-attention-summary span:last-child {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--color-text-muted);
+}
+.plant-attention-list {
+  display: grid;
+  gap: 8px;
+  padding: 0 10px 10px;
+}
+.plant-attention-empty {
+  margin: 0;
+  padding: 0 12px 12px;
+  font-size: 12px;
+  color: var(--color-text-muted);
+}
+
 /* ── Student card grid ── */
 .plant-student-game-grid {
   display: grid;
@@ -2071,6 +2107,7 @@
   overflow-y: auto;
   display: flex;
   flex-direction: column;
+  cursor: default;
 }
 .plant-obs-detail-close {
   position: absolute;
@@ -2135,6 +2172,29 @@
 .plant-obs-detail-time {
   font-size: 12px;
   color: var(--color-text-faint);
+}
+.plant-obs-detail-img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
+}
+.plant-obs-detail-empty {
+  min-height: 180px;
+  display: grid;
+  place-items: center;
+  border-radius: 20px 20px 0 0;
+  background: var(--color-surface-alt);
+  font-size: 52px;
+}
+.plant-obs-detail-title {
+  font-size: 15px;
+  color: var(--color-text);
+}
+.plant-obs-detail-link {
+  width: 100%;
+  justify-content: center;
+  margin-top: 4px;
 }
 
 .plant-obs-detail-history {
