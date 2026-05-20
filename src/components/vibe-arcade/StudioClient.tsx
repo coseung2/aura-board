@@ -150,6 +150,7 @@ export function StudioClient({ boardId, boardHref, studentName, existingProject 
       ],
       activeFile: activeCodeFile,
       selection: null,
+      baseVersion: 0,
     }),
     [activeCodeFile, cssContent, htmlContent, jsContent],
   );
