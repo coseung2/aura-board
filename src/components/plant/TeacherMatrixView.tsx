@@ -367,7 +367,14 @@ export function TeacherMatrixView({ classroomId, boardId }: Props) {
       {obsDetail && (
         <div className="plant-lightbox" onClick={() => setObsDetail(null)} role="dialog" aria-label="관찰 상세">
           <div className="plant-obs-detail-modal" onClick={(e) => e.stopPropagation()}>
-            <button type="button" className="plant-obs-detail-close" onClick={() => setObsDetail(null)}>✕</button>
+            <button
+              type="button"
+              className="modal-close plant-obs-detail-close"
+              onClick={() => setObsDetail(null)}
+              aria-label="닫기"
+            >
+              닫기
+            </button>
             {detailImageUrl && (
               <div className="plant-obs-detail-img-wrap">
                 <OptimizedImage

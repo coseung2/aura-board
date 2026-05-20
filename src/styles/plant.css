@@ -2113,20 +2113,7 @@
   position: absolute;
   top: 12px;
   right: 12px;
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
-  border: none;
-  background: rgba(0,0,0,0.5);
-  color: #fff;
-  font-size: 16px;
-  cursor: pointer;
   z-index: 2;
-  display: grid;
-  place-items: center;
-}
-.plant-obs-detail-close:hover {
-  background: rgba(0,0,0,0.7);
 }
 .plant-obs-detail-img-wrap {
   position: relative;
@@ -2255,7 +2242,7 @@
   line-height: 1.2;
 }
 
-/* ── Recent Observations compact grid (4×4) ── */
+/* ── Recent Observations compact grid (12건: 4×3) ── */
 .plant-teacher .plant-obs-feed {
   display: grid;
   grid-template-columns: repeat(4, 1fr);

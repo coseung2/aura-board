@@ -131,7 +131,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
           studentPlant: { boardId: board.id },
         },
         orderBy: { observedAt: "desc" },
-        take: 10,
+        take: 12,
         include: {
           images: { orderBy: { order: "asc" }, take: 1 },
           studentPlant: {

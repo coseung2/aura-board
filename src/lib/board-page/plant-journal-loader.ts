@@ -57,7 +57,7 @@ export async function loadPlantJournalInitial({
       ? db.plantObservation.findMany({
           where: { studentPlant: { boardId: board.id } },
           orderBy: { observedAt: "desc" },
-          take: 10,
+          take: 12,
           include: {
             images: { orderBy: { order: "asc" }, take: 1 },
             studentPlant: {

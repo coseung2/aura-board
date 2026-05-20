@@ -350,7 +350,14 @@ export function TeacherSummaryView({
       {selectedObservation && (
         <div className="plant-lightbox" onClick={() => setSelectedObservation(null)} role="dialog" aria-modal="true" aria-label="최근 관찰 기록 상세">
           <div className="plant-obs-detail-modal" onClick={(e) => e.stopPropagation()}>
-            <button type="button" className="plant-obs-detail-close" onClick={() => setSelectedObservation(null)}>✕</button>
+            <button
+              type="button"
+              className="modal-close plant-obs-detail-close"
+              onClick={() => setSelectedObservation(null)}
+              aria-label="닫기"
+            >
+              닫기
+            </button>
             {selectedObservation.thumbnail ? (
               <div className="plant-obs-detail-img-wrap">
                 <img src={selectedObservation.thumbnail} alt={`${selectedObservation.student.name} 관찰 사진`} className="plant-obs-detail-img" />
