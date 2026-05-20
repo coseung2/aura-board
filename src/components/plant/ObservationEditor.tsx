@@ -111,7 +111,7 @@ export function ObservationEditor({ open, title, initial, onCancel, onSubmit }: 
   return (
     <>
       <div className="plant-modal-backdrop" role="dialog" aria-modal="true" aria-label="관찰 기록">
-        <div className="plant-modal">
+        <div className="plant-modal plant-observation-editor">
           <h3>{title ?? "관찰 기록"}</h3>
           <div className="plant-modal-row">
             <label
@@ -183,7 +183,7 @@ export function ObservationEditor({ open, title, initial, onCancel, onSubmit }: 
               onChange={(event) => setMemo(event.target.value)}
               placeholder="어떤 모습이었나요?"
             />
-            <div style={{ fontSize: 11, color: "var(--color-text-faint)", textAlign: "right" }}>
+            <div className="plant-memo-count">
               {memo.length} / {MAX_MEMO}
             </div>
           </div>
