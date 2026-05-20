@@ -9,7 +9,7 @@ export const ReasonSchema = z.string().trim().max(200, "사유는 200자 이내"
 
 export const ImageRefSchema = z.object({
   url: z.string().min(1),
-  thumbnailUrl: z.string().optional(),
+  thumbnailUrl: z.string().nullable().optional(),
 });
 
 export const CreateStudentPlantSchema = z.object({
