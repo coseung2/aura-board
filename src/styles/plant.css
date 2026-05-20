@@ -858,13 +858,12 @@
   max-width: 1080px;
   margin: 0 auto 22px;
   display: grid;
-  grid-template-columns: minmax(0, 1.25fr) minmax(260px, 0.95fr) minmax(220px, 0.7fr);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 14px;
   align-items: stretch;
 }
 .plant-hero-main-card,
 .plant-hero-mission-card,
-.plant-hero-camera-card,
 .plant-teacher-hero,
 .plant-teacher-panel,
 .plant-matrix-toolbar,
@@ -975,33 +974,6 @@
   top: 0;
   color: var(--color-plant-active);
   font-weight: 900;
-}
-.plant-hero-camera-card {
-  padding: 18px;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  background: linear-gradient(145deg, #fff8ed, #f4fbef);
-}
-.plant-camera-icon {
-  width: 46px;
-  height: 46px;
-  border-radius: 16px;
-  display: grid;
-  place-items: center;
-  font-size: 24px;
-  background: #ffffffa8;
-  border: 1px solid rgba(91, 128, 94, 0.16);
-}
-.plant-hero-camera-card strong {
-  display: block;
-  font-size: 15px;
-}
-.plant-hero-camera-card p {
-  margin: 5px 0 0;
-  color: var(--color-text-muted);
-  font-size: 13px;
-  line-height: 1.45;
 }
 .plant-matrix-shell {
   padding: 24px 32px;
@@ -1549,7 +1521,6 @@
   }
   .plant-hero-main-card,
   .plant-hero-mission-card,
-  .plant-hero-camera-card,
   .plant-teacher-hero,
   .plant-teacher-panel,
   .plant-matrix-toolbar,

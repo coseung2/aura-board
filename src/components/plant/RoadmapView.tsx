@@ -536,11 +536,6 @@ export function RoadmapView({ plant, canEdit, editAnyStage = false, onPlantUpdat
     () => groupObservationsByStage(plant.observations),
     [plant.observations],
   );
-  const currentStageObservations = observationsByStage.get(currentStage?.id ?? "") ?? [];
-  const photosOnCurrentStage = currentStageObservations.reduce(
-    (total, observation) => total + observation.images.length,
-    0,
-  );
   const totalPhotos = plant.observations.reduce(
     (total, observation) => total + observation.images.length,
     0,
@@ -668,30 +663,6 @@ export function RoadmapView({ plant, canEdit, editAnyStage = false, onPlantUpdat
             </button>
           )}
         </div>
-
-        <aside className="plant-hero-camera-card" aria-label="사진 기록 요약">
-          <span className="plant-camera-icon" aria-hidden>
-            사진
-          </span>
-          <div>
-            <strong>현재 단계 사진 {photosOnCurrentStage}장</strong>
-            <p>
-              {currentStageObservations.length > 0
-                ? "비교할 기록이 쌓이고 있어요."
-                : "첫 사진을 올리면 성장 변화를 볼 수 있어요."}
-            </p>
-          </div>
-          {canEdit && (
-            <button
-              type="button"
-              className="ds-btn-secondary"
-              style={{ padding: "6px 14px", fontSize: 13 }}
-              onClick={() => openObservationEditor(currentStage.id)}
-            >
-              바로 올리기
-            </button>
-          )}
-        </aside>
       </section>
 
       <div className="plant-timeline" role="list" aria-label="성장 단계 타임라인">
