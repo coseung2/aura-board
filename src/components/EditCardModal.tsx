@@ -121,14 +121,29 @@ export function EditCardModal({ card, onSave, onClose }: Props) {
             <div className="modal-attach-section">
               {imageUrl ? (
                 <div className="modal-file-preview optimized-img-wrap">
-                  <OptimizedImage
-                    src={imageUrl}
-                    alt=""
-                    className="modal-preview-img"
-                    sizes="320px"
-                    fit="contain"
+                  <div className="modal-preview-img-clickable-wrap" onClick={() => imageInputRef.current?.click()}>
+                    <OptimizedImage
+                      src={imageUrl}
+                      alt=""
+                      className="modal-preview-img"
+                      sizes="320px"
+                      fit="contain"
+                    />
+                  </div>
+                  <div className="modal-file-preview-actions">
+                    <button type="button" className="modal-file-replace" onClick={() => imageInputRef.current?.click()}>교체</button>
+                    <button type="button" className="modal-file-remove" onClick={() => setImageUrl("")}>제거</button>
+                  </div>
+                  <input
+                    ref={imageInputRef}
+                    type="file"
+                    accept="image/*"
+                    hidden
+                    onChange={(e) => {
+                      const f = e.target.files?.[0];
+                      if (f) handleFileUpload(f, "image");
+                    }}
                   />
-                  <button type="button" className="modal-file-remove" onClick={() => setImageUrl("")}>제거</button>
                 </div>
               ) : (
                 <div

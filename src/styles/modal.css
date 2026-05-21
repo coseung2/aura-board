@@ -935,6 +935,40 @@
   background: rgba(0, 0, 0, 0.8);
 }
 
+.modal-preview-img-clickable-wrap {
+  cursor: pointer;
+  line-height: 0;
+}
+
+.modal-preview-img-clickable-wrap:hover {
+  filter: brightness(0.8);
+}
+
+.modal-file-preview-actions {
+  position: absolute;
+  bottom: 8px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 6px;
+}
+
+.modal-file-replace {
+  padding: 4px 12px;
+  background: rgba(0, 0, 0, 0.6);
+  color: #fff;
+  border: none;
+  border-radius: var(--radius-pill);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 150ms ease;
+}
+
+.modal-file-replace:hover {
+  background: rgba(0, 250, 0, 0.4);
+}
+
 /* -------- File attachment preview (card-file-attachment 2026-04-20) -------- */
 
 .modal-file-drop-hint {
