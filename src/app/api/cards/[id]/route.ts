@@ -137,6 +137,19 @@ export async function PATCH(
 
     const updated = await db.card.update({ where: { id }, data: patch });
 
+    // EditCardModal에서 imageUrl이 변경되면 기존 attachments(멀티 첨부)를 정리한다.
+    // 카드 표시는 imageUrl로 fallback되도록. 이 경로는 교사/학생이 수동으로
+    // 이미지를 교체할 때만 실행되고, 일반 첨부 수정 시에는 영향 없음.
+    if (input.imageUrl !== undefined) {
+      const oldAttachments = await db.cardAttachment.findMany({
+        where: { cardId: id },
+        select: { id: true },
+      });
+      if (oldAttachments.length > 0) {
+        await db.cardAttachment.deleteMany({ where: { cardId: id } });
+      }
+    }
+
     // classroom-boards-tab "🟢 새 활동" 배지 — 카드 수정으로 부모 board touch.
     await touchBoardUpdatedAt(card.boardId);
 

@@ -17,13 +17,15 @@ type Props = {
 };
 
 export function EditCardModal({ card, onSave, onClose }: Props) {
+  // 이미지 URL은 card.imageUrl(레거시) 또는 attachments의 첫 번째 이미지에서 가져온다.
+  const initialImageUrl = card.imageUrl ?? (card.attachments ?? []).find(a => a.kind === "image")?.url ?? "";
   const [title, setTitle] = useState(card.title);
   const [content, setContent] = useState(card.content);
-  const [imageUrl, setImageUrl] = useState(card.imageUrl ?? "");
+  const [imageUrl, setImageUrl] = useState(initialImageUrl);
   const [linkUrl, setLinkUrl] = useState(card.linkUrl ?? "");
   const [videoUrl, setVideoUrl] = useState(card.videoUrl ?? "");
   const [color, setColor] = useState<string | null>(card.color);
-  const [showImage, setShowImage] = useState(!!card.imageUrl);
+  const [showImage, setShowImage] = useState(!!initialImageUrl);
   const [showLink, setShowLink] = useState(!!card.linkUrl);
   const [showVideo, setShowVideo] = useState(!!card.videoUrl);
   const [busy, setBusy] = useState(false);
