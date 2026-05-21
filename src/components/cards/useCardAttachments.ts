@@ -18,12 +18,12 @@ function mintId(): string {
   return `a_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
 }
 
-export function useCardAttachments() {
-  const [attachments, setAttachments] = useState<AttachmentDraft[]>([]);
+export function useCardAttachments(initialAttachments: AttachmentDraft[] = []) {
+  const [attachments, setAttachments] = useState<AttachmentDraft[]>(initialAttachments);
   const [uploading, setUploading] = useState(false);
   // setAttachments는 async 스냅샷이라 for-loop 내부에서 최신 길이 알기 어려움.
   // 상한 체크용 ref로 현재 리스트 동기 스냅샷 유지.
-  const attachmentsRef = useRef<AttachmentDraft[]>([]);
+  const attachmentsRef = useRef<AttachmentDraft[]>(initialAttachments);
 
   function pushAttachment(draft: AttachmentDraft) {
     setAttachments((prev) => {

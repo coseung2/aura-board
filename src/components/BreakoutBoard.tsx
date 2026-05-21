@@ -17,7 +17,7 @@ import { AddCardButton } from "./AddCardButton";
 import { AddCardModal, type AddCardData } from "./AddCardModal";
 import { CardDetailModal } from "./cards/CardDetailModal";
 import { type MenuItem } from "./ContextMenu";
-import { EditCardModal } from "./EditCardModal";
+import { EditCardModal, type EditCardUpdates } from "./EditCardModal";
 import type { CardData } from "./DraggableCard";
 import { BreakoutAssignmentManager } from "./BreakoutAssignmentManager";
 import type {
@@ -275,19 +275,40 @@ export function BreakoutBoard({
     }
   }
 
-  async function handleEditCardSave(updates: Partial<CardData>) {
+  async function handleEditCardSave(updates: EditCardUpdates) {
     if (!editingCard) return;
     const prev = [...cards];
+    const cardId = editingCard.id;
+    const { attachments: updateAttachments, ...restUpdates } = updates;
+    const optimisticUpdates: Partial<CardData> = { ...restUpdates };
+    if (updateAttachments) {
+      optimisticUpdates.attachments = updateAttachments.map((a, idx) => ({
+        id: a.tempId,
+        kind: a.kind,
+        url: a.url,
+        fileName: a.fileName ?? null,
+        fileSize: a.fileSize ?? null,
+        mimeType: a.mimeType ?? null,
+        order: idx,
+      }));
+    }
     setCards((list) =>
-      list.map((c) => (c.id === editingCard.id ? { ...c, ...updates } : c))
+      list.map((c) => (c.id === cardId ? { ...c, ...optimisticUpdates } : c))
     );
     try {
-      const res = await fetch(`/api/cards/${editingCard.id}`, {
+      const res = await fetch(`/api/cards/${cardId}`, {
         method: "PATCH",
         headers: { "content-type": "application/json" },
         body: JSON.stringify(updates),
       });
-      if (!res.ok) setCards(prev);
+      if (!res.ok) {
+        setCards(prev);
+        return;
+      }
+      const data = (await res.json()) as { card?: CardData };
+      if (data.card) {
+        setCards((list) => list.map((c) => (c.id === cardId ? data.card! : c)));
+      }
     } catch {
       setCards(prev);
     }

@@ -951,8 +951,8 @@
 .modal-preview-img-clickable-wrap {
   position: relative;
   display: block;
+  height: 100%;
   cursor: pointer;
-  line-height: 0;
   outline-offset: 3px;
   transition: filter 150ms ease;
 }

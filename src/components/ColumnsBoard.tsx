@@ -5,7 +5,7 @@ import { AddCardButton } from "./AddCardButton";
 import { AddCardModal, type AddCardData } from "./AddCardModal";
 import { CardDetailModal } from "./cards/CardDetailModal";
 import { CardAuthorEditor, type SavedAuthor } from "./cards/CardAuthorEditor";
-import { EditCardModal } from "./EditCardModal";
+import { EditCardModal, type EditCardUpdates } from "./EditCardModal";
 import { ExportModal } from "./ExportModal";
 import { CanvaFolderModal } from "./CanvaFolderModal";
 import { SectionActionsPanel } from "./SectionActionsPanel";
@@ -443,12 +443,25 @@ export function ColumnsBoard({
     });
   }
 
-  async function handleEditCardSave(updates: Partial<CardData>) {
+  async function handleEditCardSave(updates: EditCardUpdates) {
     if (!editingCard) return;
     const prev = [...cards];
     const cardId = editingCard.id;
+    const { attachments: updateAttachments, ...restUpdates } = updates;
+    const optimisticUpdates: Partial<CardData> = { ...restUpdates };
+    if (updateAttachments) {
+      optimisticUpdates.attachments = updateAttachments.map((a, idx) => ({
+        id: a.tempId,
+        kind: a.kind,
+        url: a.url,
+        fileName: a.fileName ?? null,
+        fileSize: a.fileSize ?? null,
+        mimeType: a.mimeType ?? null,
+        order: idx,
+      }));
+    }
     setCards((list) =>
-      list.map((c) => (c.id === cardId ? { ...c, ...updates } : c))
+      list.map((c) => (c.id === cardId ? { ...c, ...optimisticUpdates } : c))
     );
     await trackCardMutation(cardId, async () => {
       try {
@@ -457,7 +470,14 @@ export function ColumnsBoard({
           headers: { "content-type": "application/json" },
           body: JSON.stringify(updates),
         });
-        if (!res.ok) setCards(prev);
+        if (!res.ok) {
+          setCards(prev);
+          return;
+        }
+        const data = (await res.json()) as { card?: CardData };
+        if (data.card) {
+          setCards((list) => list.map((c) => (c.id === cardId ? data.card! : c)));
+        }
       } catch {
         setCards(prev);
       }

@@ -5,7 +5,7 @@ import { ForbiddenError } from "@/lib/rbac";
 import { resolveIdentities } from "@/lib/identity";
 import { canEditCard, canDeleteCard, type BoardLike, type CardLike } from "@/lib/card-permissions";
 import { isCanvaDesignUrl, resolveCanvaEmbedUrl, expandCanvaShortLink } from "@/lib/canva";
-import { isAllowedFileUrl, isAllowedStoredMime } from "@/lib/file-attachment";
+import { isAllowedFileUrl, isAllowedStoredMime, MAX_ATTACHMENTS_PER_CARD } from "@/lib/file-attachment";
 import { touchBoardUpdatedAt } from "@/lib/board-touch";
 
 const PatchCardSchema = z.object({
@@ -23,6 +23,18 @@ const PatchCardSchema = z.object({
   fileName: z.string().max(255).nullable().optional(),
   fileSize: z.number().int().nonnegative().nullable().optional(),
   fileMimeType: z.string().max(100).nullable().optional(),
+  attachments: z
+    .array(
+      z.object({
+        kind: z.enum(["image", "video", "file"]),
+        url: z.string().url(),
+        fileName: z.string().max(255).nullable().optional(),
+        fileSize: z.number().int().nonnegative().nullable().optional(),
+        mimeType: z.string().max(100).nullable().optional(),
+      })
+    )
+    .max(MAX_ATTACHMENTS_PER_CARD)
+    .optional(),
   x: z.number().optional(),
   y: z.number().optional(),
   width: z.number().optional(),
@@ -88,6 +100,32 @@ export async function PATCH(
       );
     }
 
+    if (input.attachments) {
+      for (let i = 0; i < input.attachments.length; i += 1) {
+        const a = input.attachments[i];
+        if (!isAllowedFileUrl(a.url)) {
+          return NextResponse.json(
+            { error: `attachments[${i}].url must be from the project upload storage` },
+            { status: 400 }
+          );
+        }
+        if (a.kind === "file") {
+          if (!isAllowedStoredMime(a.mimeType ?? null)) {
+            return NextResponse.json(
+              { error: `attachments[${i}].mimeType is not in the document whitelist` },
+              { status: 400 }
+            );
+          }
+          if (!a.fileName || !a.fileSize || !a.mimeType) {
+            return NextResponse.json(
+              { error: `attachments[${i}] (kind=file) requires fileName, fileSize, mimeType` },
+              { status: 400 }
+            );
+          }
+        }
+      }
+    }
+
     // URL-change guard: re-resolve Canva oEmbed only when linkUrl actually
     // changes. Drag / resize PATCHes skip the outbound fetch.
     //
@@ -135,25 +173,52 @@ export async function PATCH(
       delete patch.linkImage;
     }
 
-    const updated = await db.card.update({ where: { id }, data: patch });
+    const { attachments: nextAttachments, ...cardPatch } = patch;
 
-    // EditCardModal에서 imageUrl이 변경되면 기존 attachments(멀티 첨부)를 정리한다.
-    // 카드 표시는 imageUrl로 fallback되도록. 이 경로는 교사/학생이 수동으로
-    // 이미지를 교체할 때만 실행되고, 일반 첨부 수정 시에는 영향 없음.
-    if (input.imageUrl !== undefined) {
-      const oldAttachments = await db.cardAttachment.findMany({
-        where: { cardId: id },
-        select: { id: true },
-      });
-      if (oldAttachments.length > 0) {
-        await db.cardAttachment.deleteMany({ where: { cardId: id } });
+    const updated = await db.$transaction(async (tx) => {
+      const updatedCard = await tx.card.update({ where: { id }, data: cardPatch });
+
+      if (nextAttachments !== undefined) {
+        await tx.cardAttachment.deleteMany({ where: { cardId: id } });
+        if (nextAttachments.length > 0) {
+          await tx.cardAttachment.createMany({
+            data: nextAttachments.map((a, idx) => ({
+              cardId: id,
+              kind: a.kind,
+              url: a.url,
+              fileName: a.fileName ?? null,
+              fileSize: a.fileSize ?? null,
+              mimeType: a.mimeType ?? null,
+              order: idx,
+            })),
+          });
+        }
+      } else if (input.imageUrl !== undefined) {
+        // 레거시 imageUrl만 PATCH된 경우에는 기존 multi-attachment를 정리한다.
+        await tx.cardAttachment.deleteMany({ where: { cardId: id } });
       }
-    }
+
+      return updatedCard;
+    });
+
+    const attachments = await db.cardAttachment.findMany({
+      where: { cardId: id },
+      orderBy: { order: "asc" },
+      select: {
+        id: true,
+        kind: true,
+        url: true,
+        fileName: true,
+        fileSize: true,
+        mimeType: true,
+        order: true,
+      },
+    });
 
     // classroom-boards-tab "🟢 새 활동" 배지 — 카드 수정으로 부모 board touch.
     await touchBoardUpdatedAt(card.boardId);
 
-    return NextResponse.json({ card: updated });
+    return NextResponse.json({ card: { ...updated, attachments } });
   } catch (e) {
     if (e instanceof ForbiddenError) {
       return NextResponse.json({ error: e.message }, { status: 403 });
