@@ -9,6 +9,10 @@ export const ALLOWED_IMAGE = [
   "image/gif",
   "image/webp",
   "image/svg+xml",
+  "image/heic",
+  "image/heif",
+  "image/bmp",
+  "image/avif",
 ] as const;
 
 export const ALLOWED_VIDEO = [

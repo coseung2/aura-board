@@ -48,6 +48,10 @@ const EXT_TO_CANONICAL_MIME: Record<string, string> = {
   hwpx: "application/vnd.hancom.hwpx",
   txt: "text/plain",
   zip: "application/zip",
+  heic: "image/heic",
+  heif: "image/heif",
+  bmp: "image/bmp",
+  avif: "image/avif",
 };
 
 /** 파일명 확장자에서 canonical MIME을 추론. 매핑 실패 시 null. */
