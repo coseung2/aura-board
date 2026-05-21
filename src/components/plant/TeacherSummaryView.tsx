@@ -259,20 +259,12 @@ export function TeacherSummaryView({
         </div>
 
         {/* Right: Today's students */}
-        <aside className="plant-panel-game" aria-label="정체 학생 빠른 확인">
+        <aside className="plant-panel-game" aria-label="학생 현황">
           <div className="plant-panel-game-head">
             <div>
-              <span className="plant-panel-game-eyebrow">Needs attention</span>
-              <h3>오늘 챙길 학생</h3>
+              <span className="plant-panel-game-eyebrow">Student status</span>
+              <h3>학생 현황</h3>
             </div>
-            <button
-              type="button"
-              className="ds-btn-secondary"
-              style={{ padding: "6px 14px", fontSize: 12 }}
-              onClick={() => setStudentFilter("stalled")}
-            >
-              정체만 보기
-            </button>
           </div>
           <div className="plant-alert-game plant-attention-groups">
             {attentionGroups.map((group) => {
@@ -281,7 +273,6 @@ export function TeacherSummaryView({
                 <details
                   key={group.key}
                   className="plant-attention-group"
-                  open={group.key === "stalled" && students.length > 0}
                 >
                   <summary className="plant-attention-summary">
                     <span>{group.label}</span>
