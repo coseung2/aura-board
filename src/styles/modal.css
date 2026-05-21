@@ -920,53 +920,127 @@
   position: absolute;
   top: 8px;
   right: 8px;
-  padding: 4px 12px;
-  background: rgba(0, 0, 0, 0.6);
+  min-height: 30px;
+  padding: 5px 12px;
+  background: rgba(24, 49, 63, 0.72);
   color: #fff;
   border: none;
   border-radius: var(--radius-pill);
+  font-family: var(--font-body);
   font-size: 12px;
-  font-weight: 500;
+  font-weight: 600;
+  line-height: 1;
   cursor: pointer;
-  transition: background 150ms ease;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.16);
+  transition: background 150ms ease, opacity 150ms ease, transform 150ms ease;
 }
 
-.modal-file-remove:hover {
-  background: rgba(0, 0, 0, 0.8);
+.modal-file-remove:hover:not(:disabled) {
+  background: var(--color-danger, #c62828);
+}
+
+.modal-file-remove:active:not(:disabled) {
+  transform: scale(0.97);
+}
+
+.modal-file-remove:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
 }
 
 .modal-preview-img-clickable-wrap {
+  position: relative;
+  display: block;
   cursor: pointer;
   line-height: 0;
+  outline-offset: 3px;
+  transition: filter 150ms ease;
 }
 
-.modal-preview-img-clickable-wrap:hover {
-  filter: brightness(0.8);
+@media (hover: hover) and (pointer: fine) {
+  .modal-preview-img-clickable-wrap:hover:not(.is-uploading) {
+    filter: brightness(0.88);
+  }
+}
+
+.modal-preview-img-clickable-wrap:focus-visible {
+  outline: 2px solid var(--color-accent);
+}
+
+.modal-preview-img-clickable-wrap:active:not(.is-uploading) {
+  filter: brightness(0.82);
+}
+
+.modal-preview-img-clickable-wrap.is-uploading {
+  cursor: wait;
+}
+
+.modal-file-uploading-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(24, 49, 63, 0.54);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  line-height: 1.2;
+  pointer-events: none;
 }
 
 .modal-file-preview-actions {
   position: absolute;
   bottom: 8px;
   left: 50%;
+  z-index: 1;
   transform: translateX(-50%);
   display: flex;
   gap: 6px;
+  align-items: center;
+  justify-content: center;
 }
 
 .modal-file-replace {
-  padding: 4px 12px;
-  background: rgba(0, 0, 0, 0.6);
+  min-height: 30px;
+  padding: 5px 13px;
+  background: var(--color-accent);
   color: #fff;
   border: none;
   border-radius: var(--radius-pill);
+  font-family: var(--font-body);
   font-size: 12px;
-  font-weight: 500;
+  font-weight: 700;
+  line-height: 1;
   cursor: pointer;
-  transition: background 150ms ease;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.16);
+  transition: background 150ms ease, opacity 150ms ease, transform 150ms ease;
 }
 
-.modal-file-replace:hover {
-  background: rgba(0, 250, 0, 0.4);
+.modal-file-replace:hover:not(:disabled) {
+  background: var(--color-accent-active);
+}
+
+.modal-file-replace:active:not(:disabled) {
+  transform: scale(0.97);
+}
+
+.modal-file-replace:disabled {
+  opacity: 0.7;
+  cursor: wait;
+}
+
+@media (pointer: coarse) {
+  .modal-file-replace,
+  .modal-file-remove {
+    min-height: var(--tap-min);
+    padding-inline: 16px;
+  }
+
+  .modal-file-preview-actions {
+    bottom: 10px;
+  }
 }
 
 /* -------- File attachment preview (card-file-attachment 2026-04-20) -------- */

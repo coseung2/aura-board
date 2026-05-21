@@ -27,12 +27,28 @@ export function EditCardModal({ card, onSave, onClose }: Props) {
   const [showLink, setShowLink] = useState(!!card.linkUrl);
   const [showVideo, setShowVideo] = useState(!!card.videoUrl);
   const [busy, setBusy] = useState(false);
-  const [uploading, setUploading] = useState(false);
+  const [uploadingType, setUploadingType] = useState<"image" | "video" | null>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
   const videoInputRef = useRef<HTMLInputElement>(null);
+  const uploadLockRef = useRef(false);
+  const isUploading = uploadingType !== null;
+  const isImageUploading = uploadingType === "image";
+  const isVideoUploading = uploadingType === "video";
+
+  function openImagePicker() {
+    if (isUploading) return;
+    imageInputRef.current?.click();
+  }
+
+  function openVideoPicker() {
+    if (isUploading) return;
+    videoInputRef.current?.click();
+  }
 
   async function handleFileUpload(file: File, type: "image" | "video") {
-    setUploading(true);
+    if (uploadLockRef.current) return;
+    uploadLockRef.current = true;
+    setUploadingType(type);
     try {
       const { url } = await uploadFile(file);
       if (type === "image") setImageUrl(url);
@@ -41,8 +57,10 @@ export function EditCardModal({ card, onSave, onClose }: Props) {
       const msg = err instanceof Error ? err.message : "업로드 실패";
       console.error(err);
       alert(`업로드 실패: ${msg}`);
+    } finally {
+      uploadLockRef.current = false;
+      setUploadingType(null);
     }
-    setUploading(false);
   }
 
   return (
@@ -58,7 +76,7 @@ export function EditCardModal({ card, onSave, onClose }: Props) {
           className="modal-body"
           onSubmit={async (e) => {
             e.preventDefault();
-            if (!title.trim()) return;
+            if (!title.trim() || isUploading) return;
             setBusy(true);
             await onSave({
               title: title.trim(),
@@ -121,7 +139,21 @@ export function EditCardModal({ card, onSave, onClose }: Props) {
             <div className="modal-attach-section">
               {imageUrl ? (
                 <div className="modal-file-preview optimized-img-wrap">
-                  <div className="modal-preview-img-clickable-wrap" onClick={() => imageInputRef.current?.click()}>
+                  <div
+                    className={`modal-preview-img-clickable-wrap ${isImageUploading ? "is-uploading" : ""}`}
+                    role="button"
+                    tabIndex={isUploading ? -1 : 0}
+                    aria-label="이미지 교체 파일 선택"
+                    aria-disabled={isUploading}
+                    aria-busy={isImageUploading}
+                    onClick={openImagePicker}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault();
+                        openImagePicker();
+                      }
+                    }}
+                  >
                     <OptimizedImage
                       src={imageUrl}
                       alt=""
@@ -129,45 +161,55 @@ export function EditCardModal({ card, onSave, onClose }: Props) {
                       sizes="320px"
                       fit="contain"
                     />
+                    {isImageUploading && <span className="modal-file-uploading-overlay">업로드 중...</span>}
                   </div>
                   <div className="modal-file-preview-actions">
-                    <button type="button" className="modal-file-replace" onClick={() => imageInputRef.current?.click()}>교체</button>
-                    <button type="button" className="modal-file-remove" onClick={() => setImageUrl("")}>제거</button>
+                    <button type="button" className="modal-file-replace" onClick={openImagePicker} disabled={isUploading}>
+                      {isImageUploading ? "업로드 중..." : "교체"}
+                    </button>
                   </div>
+                  <button type="button" className="modal-file-remove" onClick={() => setImageUrl("")} disabled={isUploading}>제거</button>
                   <input
                     ref={imageInputRef}
                     type="file"
                     accept="image/*"
                     hidden
+                    disabled={isUploading}
                     onChange={(e) => {
                       const f = e.target.files?.[0];
                       if (f) handleFileUpload(f, "image");
+                      e.currentTarget.value = "";
                     }}
                   />
                 </div>
               ) : (
                 <div
-                  className="modal-file-drop"
-                  onClick={() => imageInputRef.current?.click()}
+                  className={`modal-file-drop ${isUploading ? "is-disabled" : ""}`}
+                  aria-disabled={isUploading}
+                  aria-busy={isImageUploading}
+                  onClick={openImagePicker}
                   onDragOver={(e) => { e.preventDefault(); e.currentTarget.classList.add("drag-over"); }}
                   onDragLeave={(e) => e.currentTarget.classList.remove("drag-over")}
                   onDrop={(e) => {
                     e.preventDefault();
                     e.currentTarget.classList.remove("drag-over");
+                    if (isUploading) return;
                     const f = e.dataTransfer.files[0];
                     if (f && f.type.startsWith("image/")) handleFileUpload(f, "image");
                   }}
                 >
                   <span className="modal-file-drop-icon">🖼️</span>
-                  <span>{uploading ? "업로드 중..." : "클릭 또는 이미지를 드래그하세요"}</span>
+                  <span>{isImageUploading ? "업로드 중..." : "클릭 또는 이미지를 드래그하세요"}</span>
                   <input
                     ref={imageInputRef}
                     type="file"
                     accept="image/*"
                     hidden
+                    disabled={isUploading}
                     onChange={(e) => {
                       const f = e.target.files?.[0];
                       if (f) handleFileUpload(f, "image");
+                      e.currentTarget.value = "";
                     }}
                   />
                 </div>
@@ -196,27 +238,32 @@ export function EditCardModal({ card, onSave, onClose }: Props) {
                 </div>
               ) : (
                 <div
-                  className="modal-file-drop"
-                  onClick={() => videoInputRef.current?.click()}
+                  className={`modal-file-drop ${isUploading ? "is-disabled" : ""}`}
+                  onClick={openVideoPicker}
+                  aria-disabled={isUploading}
+                  aria-busy={isVideoUploading}
                   onDragOver={(e) => { e.preventDefault(); e.currentTarget.classList.add("drag-over"); }}
                   onDragLeave={(e) => e.currentTarget.classList.remove("drag-over")}
                   onDrop={(e) => {
                     e.preventDefault();
                     e.currentTarget.classList.remove("drag-over");
+                    if (isUploading) return;
                     const f = e.dataTransfer.files[0];
                     if (f && f.type.startsWith("video/")) handleFileUpload(f, "video");
                   }}
                 >
                   <span className="modal-file-drop-icon">🎬</span>
-                  <span>{uploading ? "업로드 중..." : "클릭 또는 동영상을 드래그하세요"}</span>
+                  <span>{isVideoUploading ? "업로드 중..." : "클릭 또는 동영상을 드래그하세요"}</span>
                   <input
                     ref={videoInputRef}
                     type="file"
                     accept="video/*"
                     hidden
+                    disabled={isUploading}
                     onChange={(e) => {
                       const f = e.target.files?.[0];
                       if (f) handleFileUpload(f, "video");
+                      e.currentTarget.value = "";
                     }}
                   />
                 </div>
@@ -244,7 +291,7 @@ export function EditCardModal({ card, onSave, onClose }: Props) {
 
           <div className="modal-actions">
             <button type="button" onClick={onClose} disabled={busy} className="modal-btn-cancel">취소</button>
-            <button type="submit" disabled={busy || !title.trim()} className="modal-btn-submit">
+            <button type="submit" disabled={busy || isUploading || !title.trim()} className="modal-btn-submit">
               {busy ? "저장 중..." : "저장"}
             </button>
           </div>
