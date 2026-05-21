@@ -59,21 +59,19 @@ export async function POST(
       );
     }
 
-    // 현재 최대 섹션 order 확인
-    const maxOrder = await db.section.aggregate({
-      where: { boardId },
-      _max: { order: true },
+    // 고정 섹션은 앞쪽에 유지하고, 새 학생 섹션은 그 다음부터 배치한다.
+    const pinnedCount = await db.section.count({
+      where: { boardId, pinned: true },
     });
-    let nextOrder = (maxOrder._max.order ?? -1) + 1;
 
     // 학생별 섹션 생성 (출석번호 이름 형식: "1. 홍길동")
     const created = await db.$transaction(
-      students.map((s) =>
+      students.map((s, studentIndex) =>
         db.section.create({
           data: {
             boardId,
             title: s.number != null ? `${s.number}. ${s.name}` : s.name,
-            order: nextOrder++,
+            order: pinnedCount + studentIndex,
           },
         })
       )

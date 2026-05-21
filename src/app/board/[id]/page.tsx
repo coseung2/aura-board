@@ -263,6 +263,7 @@ export default async function BoardPage({
     id: s.id,
     title: s.title,
     order: s.order,
+    pinned: s.pinned,
     accessToken: s.accessToken,
     sortMode: s.sortMode,
   }));

@@ -23,6 +23,13 @@ type SectionData = StreamSection;
 
 type PanelTab = "rename" | "delete";
 
+function sortSections(a: SectionData, b: SectionData): number {
+  if (a.pinned && !b.pinned) return -1;
+  if (!a.pinned && b.pinned) return 1;
+  if (a.pinned && b.pinned) return a.order - b.order;
+  return b.order - a.order;
+}
+
 type Props = {
   boardId: string;
   initialCards: CardData[];
@@ -47,7 +54,7 @@ export function ColumnsBoard({
   const [scrollRailWidth, setScrollRailWidth] = useState(0);
   const [authorEditCard, setAuthorEditCard] = useState<CardData | null>(null);
   const [sections, setSections] = useState<SectionData[]>(
-    [...initialSections].sort((a, b) => a.order - b.order)
+    [...initialSections].sort(sortSections)
   );
   const [overSectionId, setOverSectionId] = useState<string | null>(null);
   const [editingCard, setEditingCard] = useState<CardData | null>(null);
@@ -524,10 +531,46 @@ export function ColumnsBoard({
       });
       if (res.ok) {
         const { section } = await res.json();
-        setSections((prev) => [...prev, section]);
+        setSections((prev) => [...prev, section].sort(sortSections));
       }
     } catch (err) {
       console.error(err);
+    }
+  }
+
+  async function handleSectionPin(sectionId: string, pinned: boolean) {
+    if (!canEdit) return;
+    const prev = sections;
+    const current = sections.find((s) => s.id === sectionId);
+    if (!current) return;
+
+    const nextOrder = pinned
+      ? Math.max(-1, ...sections.filter((s) => s.pinned).map((s) => s.order)) + 1
+      : current.order;
+
+    setSections((list) =>
+      list
+        .map((s) =>
+          s.id === sectionId ? { ...s, pinned, order: nextOrder } : s
+        )
+        .sort(sortSections)
+    );
+
+    try {
+      const res = await fetch(`/api/sections/${sectionId}`, {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(
+          pinned ? { pinned, order: nextOrder } : { pinned }
+        ),
+      });
+      if (!res.ok) {
+        setSections(prev);
+        alert(`고정 상태 변경 실패: ${await res.text().catch(() => "")}`);
+      }
+    } catch (err) {
+      console.error(err);
+      setSections(prev);
     }
   }
 
@@ -549,7 +592,7 @@ export function ColumnsBoard({
       const { sections: created } = (await res.json()) as {
         sections: SectionData[];
       };
-      setSections((prev) => [...prev, ...created]);
+      setSections((prev) => [...prev, ...created].sort(sortSections));
     } finally {
       setSeedingStudents(false);
     }
@@ -567,16 +610,18 @@ export function ColumnsBoard({
     setPanelState(null);
   }
 
-  const sectionOptions = sections.map((s) => ({ id: s.id, title: s.title }));
+  const sortedSections = useMemo(() => [...sections].sort(sortSections), [sections]);
+  const sectionOptions = sortedSections.map((s) => ({ id: s.id, title: s.title }));
 
   return (
     <div className="board-canvas-wrap board-canvas-wrap-columns">
       <div ref={scrollAreaRef} className="columns-scroll-area">
         <div ref={columnsBoardRef} className="columns-board">
-        {sections.map((section) => (
+        {sortedSections.map((section) => (
           <ColumnView
             key={section.id}
             section={{ id: section.id, title: section.title }}
+            pinned={section.pinned}
             sectionCards={getCardsForSection(section.id)}
             canEdit={canEdit}
             currentRole={currentRole}
@@ -589,6 +634,7 @@ export function ColumnsBoard({
             authorsForSection={authorsForSection}
             studentForSectionTitle={studentForSectionTitle}
             onSetSort={(mode) => setSortFor(section.id, mode)}
+            onPin={(pinned) => handleSectionPin(section.id, pinned)}
             onSectionDragStart={(id) => setDraggingSectionId(id)}
             onSectionDragEnd={() => setDraggingSectionId(null)}
             onCardDragStart={handleDragStart}

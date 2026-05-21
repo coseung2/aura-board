@@ -17,16 +17,15 @@ export async function POST(req: Request) {
     const input = CreateSectionSchema.parse(body);
     await requirePermission(input.boardId, user.id, "edit");
 
-    const maxOrder = await db.section.aggregate({
-      where: { boardId: input.boardId },
-      _max: { order: true },
+    const pinnedCount = await db.section.count({
+      where: { boardId: input.boardId, pinned: true },
     });
 
     const section = await db.section.create({
       data: {
         boardId: input.boardId,
         title: input.title,
-        order: (maxOrder._max.order ?? -1) + 1,
+        order: pinnedCount,
       },
     });
 

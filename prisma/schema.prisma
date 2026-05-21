@@ -406,6 +406,9 @@ model Section {
   boardId     String
   title       String
   order       Int     @default(0)
+  // topic-board-pin (2026-05-21): 주제별 보드에서 주제(섹션) 고정.
+  // true면 항상 상단에 고정, false면 생성일 역순(최신순).
+  pinned      Boolean @default(false)
   // shared-column-sort (2026-04-20): 교사가 선택한 칼럼별 정렬 모드가
   // 학생 화면에도 공유되도록 서버에 저장. "manual" | "newest" | "oldest"
   // | "title". null → 클라이언트가 "manual"로 처리(기존 행 하위호환).

@@ -50,7 +50,13 @@ type CardWire = {
   createdAt: string;
 };
 
-type SectionWire = { id: string; title: string; order: number; sortMode: string | null };
+type SectionWire = {
+  id: string;
+  title: string;
+  order: number;
+  pinned: boolean;
+  sortMode: string | null;
+};
 
 export async function GET(
   req: Request,
@@ -120,10 +126,7 @@ export async function GET(
           },
         },
       }),
-      db.section.findMany({
-        where: { boardId: board.id },
-        orderBy: { order: "asc" },
-      }),
+      db.section.findMany({ where: { boardId: board.id } }),
       board.layout === "question-board"
         ? db.boardResponse.findMany({
             where: { boardId: board.id },
@@ -182,12 +185,15 @@ export async function GET(
       createdAt: c.createdAt.toISOString(),
     }));
 
-    const sections: SectionWire[] = sectionsRaw.map((s) => ({
-      id: s.id,
-      title: s.title,
-      order: s.order,
-      sortMode: s.sortMode,
-    }));
+    const sections: SectionWire[] = sectionsRaw
+      .map((s) => ({
+        id: s.id,
+        title: s.title,
+        order: s.order,
+        pinned: s.pinned,
+        sortMode: s.sortMode,
+      }))
+      .sort(sortSections);
 
     const question =
       board.layout === "question-board"
@@ -234,4 +240,11 @@ export async function GET(
 
 function hashStable(value: unknown): string {
   return createHash("sha1").update(JSON.stringify(value)).digest("hex");
+}
+
+function sortSections(a: SectionWire, b: SectionWire): number {
+  if (a.pinned && !b.pinned) return -1;
+  if (!a.pinned && b.pinned) return 1;
+  if (a.pinned && b.pinned) return a.order - b.order;
+  return b.order - a.order;
 }

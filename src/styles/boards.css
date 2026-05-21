@@ -200,6 +200,25 @@
   letter-spacing: 0.1px;
 }
 
+.column-pin-btn {
+  flex-shrink: 0;
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-text-muted);
+  border-radius: var(--radius-pill);
+  padding: 3px 8px;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.column-pin-btn:hover,
+.column-pin-btn.is-pinned {
+  color: var(--color-accent-tinted-text);
+  background: var(--color-accent-tinted-bg);
+  border-color: var(--color-accent);
+}
+
 /* column header context menu */
 .column-header .ctx-menu-wrap {
   flex-shrink: 0;

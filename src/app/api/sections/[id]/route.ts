@@ -11,6 +11,7 @@ const PatchSectionSchema = z.object({
   title: z.string().trim().min(1).max(100).optional(),
   order: z.number().int().nonnegative().optional(),
   sortMode: SortModeSchema.nullable().optional(),
+  pinned: z.boolean().optional(),
 });
 
 export async function PATCH(

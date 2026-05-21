@@ -9,6 +9,7 @@ import type { RosterEntry } from "./useColumnRoster";
 
 type Props = {
   section: { id: string; title: string };
+  pinned: boolean;
   sectionCards: CardData[];
   canEdit: boolean;
   currentRole: "owner" | "editor" | "viewer";
@@ -21,6 +22,7 @@ type Props = {
   authorsForSection: (cards: CardData[]) => RosterEntry[];
   studentForSectionTitle: (title: string) => RosterEntry | null;
   onSetSort: (mode: SortMode) => void;
+  onPin: (pinned: boolean) => void;
   onSectionDragStart: (id: string) => void;
   onSectionDragEnd: () => void;
   onCardDragStart: (e: React.DragEvent, cardId: string) => void;
@@ -52,6 +54,7 @@ type Props = {
 export function ColumnView(props: Props) {
   const {
     section,
+    pinned,
     sectionCards,
     canEdit,
     currentRole,
@@ -64,6 +67,7 @@ export function ColumnView(props: Props) {
     authorsForSection,
     studentForSectionTitle,
     onSetSort,
+    onPin,
     onSectionDragStart,
     onSectionDragEnd,
     onCardDragStart,
@@ -190,6 +194,23 @@ export function ColumnView(props: Props) {
         onDragEnd={onSectionDragEnd}
       >
         <h3 className="column-title">{section.title}</h3>
+        {canEdit && (
+          <button
+            type="button"
+            className={`column-pin-btn ${pinned ? "is-pinned" : ""}`}
+            onMouseDown={(e) => e.stopPropagation()}
+            onClick={(e) => {
+              e.stopPropagation();
+              onPin(!pinned);
+            }}
+            onDragStart={(e) => e.preventDefault()}
+            aria-pressed={pinned}
+            aria-label={pinned ? "섹션 고정 해제" : "섹션 고정"}
+            title={pinned ? "고정해제" : "고정"}
+          >
+            {pinned ? "📌 고정해제" : "📌 고정"}
+          </button>
+        )}
         <span className="column-count">{sectionCards.length}</span>
         {(canEdit || menuItems.length > 0) && (
           <ColumnMenu
