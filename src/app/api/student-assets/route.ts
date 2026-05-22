@@ -19,6 +19,8 @@ const ALLOWED_IMAGE = new Set([
   "image/png",
   "image/gif",
   "image/webp",
+  "image/heic",
+  "image/heif",
 ]);
 const MAX_SIZE = 50 * 1024 * 1024; // 50MB — parity with /api/upload
 
