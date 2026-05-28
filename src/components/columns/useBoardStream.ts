@@ -2,6 +2,7 @@
 
 import { useEffect, type MutableRefObject } from "react";
 import type { CardData } from "../DraggableCard";
+import { sortSections } from "@/lib/sort-sections";
 
 export type StreamSection = {
   id: string;
@@ -120,11 +121,4 @@ export function useBoardStream({
     // boardId is the only stable dependency; merges read refs via closures.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [boardId]);
-}
-
-function sortSections(a: StreamSection, b: StreamSection): number {
-  if (a.pinned && !b.pinned) return -1;
-  if (!a.pinned && b.pinned) return 1;
-  if (a.pinned && b.pinned) return a.order - b.order;
-  return b.order - a.order;
 }

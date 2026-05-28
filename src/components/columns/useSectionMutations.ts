@@ -1,0 +1,189 @@
+"use client";
+
+import { useMemo } from "react";
+import { sortSections } from "@/lib/sort-sections";
+
+type SectionData = {
+  id: string;
+  title: string;
+  order: number;
+  pinned: boolean;
+  sortMode?: string | null;
+};
+
+type UseSectionMutationsOptions = {
+  boardId: string;
+  canEdit: boolean;
+  classroomId?: string | null;
+  sections: SectionData[];
+  setSections: React.Dispatch<React.SetStateAction<SectionData[]>>;
+  setCards: React.Dispatch<React.SetStateAction<any[]>>;
+};
+
+type UseSectionMutationsReturn = {
+  sortedSections: SectionData[];
+  sectionOptions: { id: string; title: string }[];
+  handleAddSection: () => Promise<void>;
+  handleSectionPin: (sectionId: string, pinned: boolean) => Promise<void>;
+  handleSeedFromStudents: (seedingStudents: boolean, setSeedingStudents: React.Dispatch<React.SetStateAction<boolean>>) => Promise<void>;
+  handleSectionRenamed: (sectionId: string, newTitle: string) => void;
+  handleSectionDeleted: (sectionId: string) => void;
+  moveSectionTo: (sectionId: string, targetSectionId: string) => Promise<void>;
+};
+
+export function useSectionMutations({
+  boardId,
+  canEdit,
+  classroomId,
+  sections,
+  setSections,
+  setCards,
+}: UseSectionMutationsOptions): UseSectionMutationsReturn {
+  const sortedSections = useMemo(
+    () => [...sections].sort(sortSections),
+    [sections]
+  );
+  const sectionOptions = sortedSections.map((s) => ({
+    id: s.id,
+    title: s.title,
+  }));
+
+  async function handleAddSection() {
+    const title = window.prompt("새 섹션 이름:");
+    if (!title?.trim()) return;
+    try {
+      const res = await fetch(`/api/sections`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ boardId, title: title.trim() }),
+      });
+      if (res.ok) {
+        const { section } = await res.json();
+        setSections((prev) => [...prev, section].sort(sortSections));
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  }
+
+  async function handleSectionPin(sectionId: string, pinned: boolean) {
+    if (!canEdit) return;
+    const prev = sections;
+    const current = sections.find((s) => s.id === sectionId);
+    if (!current) return;
+
+    const nextOrder = pinned
+      ? Math.max(-1, ...sections.filter((s) => s.pinned).map((s) => s.order)) + 1
+      : current.order;
+
+    setSections((list) =>
+      list
+        .map((s) =>
+          s.id === sectionId ? { ...s, pinned, order: nextOrder } : s
+        )
+        .sort(sortSections)
+    );
+
+    try {
+      const res = await fetch(`/api/sections/${sectionId}`, {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(
+          pinned ? { pinned, order: nextOrder } : { pinned }
+        ),
+      });
+      if (!res.ok) {
+        setSections(prev);
+        alert(`고정 상태 변경 실패: ${await res.text().catch(() => "")}`);
+      }
+    } catch (err) {
+      console.error(err);
+      setSections(prev);
+    }
+  }
+
+  async function handleSeedFromStudents(
+    seedingStudents: boolean,
+    setSeedingStudents: React.Dispatch<React.SetStateAction<boolean>>
+  ) {
+    if (seedingStudents) return;
+    if (!window.confirm("학급 학생 명단으로 칼럼을 추가할까요?")) return;
+    setSeedingStudents(true);
+    try {
+      const res = await fetch(
+        `/api/boards/${boardId}/sections/seed-students`,
+        { method: "POST" }
+      );
+      if (!res.ok) {
+        const msg = (await res.json().catch(() => ({}))).error;
+        alert(typeof msg === "string" ? msg : "칼럼 추가 실패");
+        return;
+      }
+      const { sections: created } = (await res.json()) as {
+        sections: SectionData[];
+      };
+      setSections((prev) => [...prev, ...created].sort(sortSections));
+    } finally {
+      setSeedingStudents(false);
+    }
+  }
+
+  function handleSectionRenamed(sectionId: string, newTitle: string) {
+    setSections((list) =>
+      list.map((s) => (s.id === sectionId ? { ...s, title: newTitle } : s))
+    );
+  }
+
+  function handleSectionDeleted(sectionId: string) {
+    setSections((list) => list.filter((s) => s.id !== sectionId));
+    setCards((list) => list.filter((c: any) => c.sectionId !== sectionId));
+  }
+
+  async function moveSectionTo(
+    sectionId: string,
+    targetSectionId: string
+  ) {
+    if (sectionId === targetSectionId) return;
+    const fromIdx = sections.findIndex((s) => s.id === sectionId);
+    const toIdx = sections.findIndex((s) => s.id === targetSectionId);
+    if (fromIdx === -1 || toIdx === -1) return;
+
+    const prev = sections;
+    const next = [...sections];
+    const [moved] = next.splice(fromIdx, 1);
+    next.splice(toIdx, 0, moved!);
+    const normalised = next.map((s, i) => ({ ...s, order: i }));
+    setSections(normalised);
+
+    const changed = normalised.filter((s, i) => prev[i]?.id !== s.id);
+    try {
+      const responses = await Promise.all(
+        changed.map((s) =>
+          fetch(`/api/sections/${s.id}`, {
+            method: "PATCH",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({ order: s.order }),
+          })
+        )
+      );
+      if (responses.some((r) => !r.ok)) {
+        console.error("섹션 순서 변경 실패");
+        setSections(prev);
+      }
+    } catch (err) {
+      console.error(err);
+      setSections(prev);
+    }
+  }
+
+  return {
+    sortedSections,
+    sectionOptions,
+    handleAddSection,
+    handleSectionPin,
+    handleSeedFromStudents,
+    handleSectionRenamed,
+    handleSectionDeleted,
+    moveSectionTo,
+  };
+}

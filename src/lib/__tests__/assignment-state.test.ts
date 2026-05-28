@@ -1,4 +1,9 @@
 /**
+ * @deprecated Migrated to assignment-state.vitest.ts (Vitest runner).
+ * This file uses a legacy `npx tsx` harness and is NOT executed by
+ * `npm run test` (vitest only picks up *.vitest.{ts,tsx} per config).
+ * Keep only as reference; new tests go in the .vitest.ts file.
+ *
  * Plain runner (no Jest/Vitest) — `npx tsx src/lib/__tests__/assignment-state.test.ts`.
  * Pattern matches src/lib/__tests__/card-author.test.ts.
  *

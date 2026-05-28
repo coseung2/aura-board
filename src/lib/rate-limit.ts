@@ -144,5 +144,7 @@ export async function checkAll(opts: {
   return { ok: true, retryAfter: 0 };
 }
 
-// Test-only hook.
-export const __test__ = { mem };
+// Test-only hook — replaced by vi.spyOn / vi.importActual in vitest.
+// Kept as a comment for reference: the old `export const __test__ = { mem }`
+// leaked test internals into the production bundle.
+// @see src/lib/__tests__/rate-limit.vitest.ts for the replacement pattern.
