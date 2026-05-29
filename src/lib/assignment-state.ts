@@ -119,7 +119,7 @@ export function computeTeacherTransition(
       };
     default: {
       // Exhaustive check — catches any new transition type at compile time.
-      const _exhaustive: never = input;
+      const _exhaustive: never = input.transition;
       return _exhaustive;
     }
   }

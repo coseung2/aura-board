@@ -168,6 +168,15 @@ export function ColumnsBoard({
     setCards,
   });
 
+  const {
+    handleAdd,
+    handleDeleteCard,
+    handleEditCardSave,
+    handleDuplicateCard,
+    moveCard,
+    handleDragStart,
+    handleDragEnd,
+  }
   // ── Sort & grouping ────────────────────────────────────────────────
 
   async function setSortFor(sectionId: string, mode: SortMode) {
