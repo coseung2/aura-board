@@ -83,7 +83,7 @@ export function BoardSettingsPanel({
         style={{ margin: "-16px -20px 16px" }}
       >
         {(Object.keys(TAB_LABELS) as Tab[]).map((key) => {
-          const isPlaceholder = key !== "breakout" && key !== "engagement";
+          const isPlaceholder = key !== "breakout" && key !== "engagement" && key !== "share";
           return (
             <button
               key={key}
