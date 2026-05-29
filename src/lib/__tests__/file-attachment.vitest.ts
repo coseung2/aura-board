@@ -61,7 +61,7 @@ describe("file-attachment · isAllowedFileUpload", () => {
 });
 
 describe("file-attachment · fileMimeToIcon", () => {
-  it("returns distinct glyphs for the 7-type matrix", () => {
+  it("returns distinct glyphs for the 8-type matrix", () => {
     const glyphs = new Set<string>();
     glyphs.add(fileMimeToIcon("application/pdf"));
     glyphs.add(fileMimeToIcon("application/vnd.openxmlformats-officedocument.wordprocessingml.document"));
@@ -69,9 +69,10 @@ describe("file-attachment · fileMimeToIcon", () => {
     glyphs.add(fileMimeToIcon("application/vnd.openxmlformats-officedocument.presentationml.presentation"));
     glyphs.add(fileMimeToIcon("application/x-hwp"));
     glyphs.add(fileMimeToIcon("text/plain"));
+    glyphs.add(fileMimeToIcon("text/html"));
     glyphs.add(fileMimeToIcon("application/zip"));
-    // 7개 MIME이 7개 서로 다른 글리프로 매핑되어야 사용자가 유형 구분 가능.
-    expect(glyphs.size).toBe(7);
+    // 8개 MIME이 8개 서로 다른 글리프로 매핑되어야 사용자가 유형 구분 가능.
+    expect(glyphs.size).toBe(8);
   });
 
   it("falls back to generic glyph for unknown MIME", () => {
@@ -87,6 +88,7 @@ describe("file-attachment · fileMimeToLabel", () => {
     expect(fileMimeToLabel("application/vnd.openxmlformats-officedocument.presentationml.presentation")).toBe("PowerPoint");
     expect(fileMimeToLabel("application/x-hwp")).toBe("HWP");
     expect(fileMimeToLabel("text/plain")).toBe("텍스트");
+    expect(fileMimeToLabel("text/html")).toBe("HTML");
     expect(fileMimeToLabel("application/zip")).toBe("ZIP");
   });
 });
@@ -103,9 +105,9 @@ describe("file-attachment · formatBytes", () => {
 });
 
 describe("file-attachment · ALLOWED_FILE_MIMES", () => {
-  it("covers exactly the 7 types promised by scope §2", () => {
-    // 매핑 키 개수 ≥ 7 (HWP와 ZIP은 여러 MIME 변형 허용이라 키가 더 많을 수 있음)
-    expect(Object.keys(ALLOWED_FILE_MIMES).length).toBeGreaterThanOrEqual(7);
+  it("covers exactly the 8 types promised — PDF, Word, Excel, PPT, HWP, TXT, HTML, ZIP", () => {
+    // 매핑 키 개수 ≥ 8 (HWP와 ZIP은 여러 MIME 변형 허용이라 키가 더 많을 수 있음)
+    expect(Object.keys(ALLOWED_FILE_MIMES).length).toBeGreaterThanOrEqual(8);
     // 최소 한 변형이라도 존재해야 하는 핵심 유형 검증
     const keys = Object.keys(ALLOWED_FILE_MIMES);
     expect(keys).toContain("application/pdf");
@@ -114,6 +116,7 @@ describe("file-attachment · ALLOWED_FILE_MIMES", () => {
     expect(keys.some((k) => k.includes("presentationml"))).toBe(true);
     expect(keys.some((k) => k.toLowerCase().includes("hwp"))).toBe(true);
     expect(keys).toContain("text/plain");
+    expect(keys).toContain("text/html");
     expect(keys.some((k) => k.includes("zip"))).toBe(true);
   });
 });
@@ -168,8 +171,8 @@ describe("file-attachment · isAllowedStoredMime (codex security review)", () =>
     expect(isAllowedStoredMime("image/png")).toBe(false);
     expect(isAllowedStoredMime("video/mp4")).toBe(false);
   });
-  it("rejects active-content MIMEs", () => {
-    expect(isAllowedStoredMime("text/html")).toBe(false);
+  it("rejects active-content MIMEs except HTML (now allowed for card attachment)", () => {
+    expect(isAllowedStoredMime("text/html")).toBe(true);
     expect(isAllowedStoredMime("application/javascript")).toBe(false);
     expect(isAllowedStoredMime("application/x-msdownload")).toBe(false);
   });

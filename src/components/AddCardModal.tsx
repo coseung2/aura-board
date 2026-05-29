@@ -66,8 +66,8 @@ const FILE_ACCEPT =
   "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet," +
   "application/vnd.openxmlformats-officedocument.presentationml.presentation," +
   "application/x-hwp,application/haansofthwp,application/vnd.hancom.hwp,application/vnd.hancom.hwpx," +
-  "text/plain,application/zip,application/x-zip-compressed," +
-  ".pdf,.docx,.xlsx,.pptx,.hwp,.hwpx,.txt,.zip";
+  "text/plain,text/html,application/zip,application/x-zip-compressed," +
+  ".pdf,.docx,.xlsx,.pptx,.hwp,.hwpx,.txt,.html,.htm,.zip";
 
 export function AddCardModal({
   onAdd,
@@ -581,7 +581,7 @@ export function AddCardModal({
                     : "클릭 또는 파일을 드래그 (여러 개 선택 가능)"}
                 </span>
                 <span className="modal-file-drop-hint">
-                  PDF · Word · Excel · PowerPoint · HWP · TXT · ZIP (파일당 최대
+                  PDF · Word · Excel · PowerPoint · HWP · TXT · HTML · ZIP (파일당 최대
                   50MB)
                 </span>
                 <input

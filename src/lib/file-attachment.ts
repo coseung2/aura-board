@@ -24,6 +24,7 @@ export const ALLOWED_FILE_MIMES: Record<string, string[]> = {
   "application/vnd.hancom.hwp": ["hwp"],
   "application/vnd.hancom.hwpx": ["hwpx", "hwp"],
   "text/plain": ["txt"],
+  "text/html": ["html", "htm"],
   "application/zip": ["zip"],
   "application/x-zip-compressed": ["zip"],
 };
@@ -47,6 +48,8 @@ const EXT_TO_CANONICAL_MIME: Record<string, string> = {
   hwp: "application/x-hwp",
   hwpx: "application/vnd.hancom.hwpx",
   txt: "text/plain",
+  html: "text/html",
+  htm: "text/html",
   zip: "application/zip",
   heic: "image/heic",
   heif: "image/heif",
@@ -76,6 +79,7 @@ export function fileMimeToIcon(mime: string): string {
   if (mime.includes("presentationml") || mime === "application/vnd.ms-powerpoint") return "📽";
   if (mime.includes("hwp") || mime.includes("hancom")) return "📋";
   if (mime === "text/plain") return "📝";
+  if (mime === "text/html") return "🌐";
   if (mime.includes("zip")) return "🗜";
   return "📎";
 }
@@ -88,6 +92,7 @@ export function fileMimeToLabel(mime: string): string {
   if (mime.includes("presentationml")) return "PowerPoint";
   if (mime.includes("hwp") || mime.includes("hancom")) return "HWP";
   if (mime === "text/plain") return "텍스트";
+  if (mime === "text/html") return "HTML";
   if (mime.includes("zip")) return "ZIP";
   return "파일";
 }
