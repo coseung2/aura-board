@@ -117,6 +117,11 @@ export function computeTeacherTransition(
           grade: input.grade,
         },
       };
+    default: {
+      // Exhaustive check — catches any new transition type at compile time.
+      const _exhaustive: never = input;
+      return _exhaustive;
+    }
   }
 }
 

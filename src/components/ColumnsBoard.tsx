@@ -12,23 +12,15 @@ import { SectionActionsPanel } from "./SectionActionsPanel";
 import { AiFeedbackModal } from "./feedback/AiFeedbackModal";
 import { ColumnView } from "./columns/ColumnView";
 import { comparatorFor, toSortMode, type SortMode } from "./columns/sort";
-import {
-  useBoardStream,
-  type StreamSection,
-} from "./columns/useBoardStream";
+import { useBoardStream, type StreamSection } from "./columns/useBoardStream";
 import { useColumnRoster, type RosterEntry } from "./columns/useColumnRoster";
+import { useCardMutations } from "./columns/useCardMutations";
+import { useSectionMutations } from "./columns/useSectionMutations";
 import type { CardData } from "./DraggableCard";
 
 type SectionData = StreamSection;
 
 type PanelTab = "rename" | "delete";
-
-function sortSections(a: SectionData, b: SectionData): number {
-  if (a.pinned && !b.pinned) return -1;
-  if (!a.pinned && b.pinned) return 1;
-  if (a.pinned && b.pinned) return a.order - b.order;
-  return b.order - a.order;
-}
 
 type Props = {
   boardId: string;
@@ -51,11 +43,16 @@ export function ColumnsBoard({
   classroomId,
 }: Props) {
   const [cards, setCards] = useState<CardData[]>(initialCards);
+  const [sections, setSections] = useState<SectionData[]>(
+    [...initialSections].sort((a, b) => {
+      if (a.pinned && !b.pinned) return -1;
+      if (!a.pinned && b.pinned) return 1;
+      if (a.pinned && b.pinned) return a.order - b.order;
+      return b.order - a.order;
+    })
+  );
   const [scrollRailWidth, setScrollRailWidth] = useState(0);
   const [authorEditCard, setAuthorEditCard] = useState<CardData | null>(null);
-  const [sections, setSections] = useState<SectionData[]>(
-    [...initialSections].sort(sortSections)
-  );
   const [overSectionId, setOverSectionId] = useState<string | null>(null);
   const [editingCard, setEditingCard] = useState<CardData | null>(null);
   const [openCard, setOpenCard] = useState<CardData | null>(null);
@@ -78,26 +75,31 @@ export function ColumnsBoard({
   } | null>(null);
 
   const canEdit = currentRole === "owner" || currentRole === "editor";
-  // Students can add cards to their classroom's columns board. Section
-  // membership rules (sectionId must belong to this board) are enforced
-  // server-side by /api/cards + the external-cards sectionId guard.
   const canAddCard = canEdit || !!isStudentViewer;
 
-  // Cards currently mid-flight in a local mutation. SSE snapshots skip
-  // these IDs so an in-progress optimistic update isn't stomped by a
-  // server snapshot that hasn't seen the mutation commit yet.
-  const pendingCardIds = useRef<Set<string>>(new Set());
   const scrollAreaRef = useRef<HTMLDivElement | null>(null);
   const scrollBarRef = useRef<HTMLDivElement | null>(null);
   const columnsBoardRef = useRef<HTMLDivElement | null>(null);
   const syncingScrollRef = useRef<"bar" | "area" | null>(null);
 
-  function trackCardMutation<T>(id: string, run: () => Promise<T>): Promise<T> {
-    pendingCardIds.current.add(id);
-    return run().finally(() => {
-      pendingCardIds.current.delete(id);
-    });
-  }
+  // ── Hooks ──────────────────────────────────────────────────────────
+
+  const {
+    pendingCardIds,
+    handleAdd,
+    handleDeleteCard,
+    handleEditCardSave,
+    handleDuplicateCard,
+    moveCard,
+    handleDragStart,
+    handleDragEnd,
+    handleDragOver,
+  } = useCardMutations({
+    boardId,
+    canEdit,
+    sections,
+    setCards,
+  });
 
   useBoardStream({ boardId, pendingCardIds, setCards, setSections });
 
@@ -148,10 +150,26 @@ export function ColumnsBoard({
     canEdit,
   });
 
-  /* ── Per-column sort persistence (shared-column-sort 2026-04-20) ──
-     localStorage 단독이 아닌 Section.sortMode 서버 값을 단일 소스로 사용.
-     교사가 드롭다운을 바꾸면 PATCH /api/sections/:id로 저장 → SSE
-     snapshot으로 학생 화면도 동기화. 학생은 드롭다운이 disabled라 읽기만. */
+  const {
+    sortedSections,
+    sectionOptions,
+    handleAddSection,
+    handleSectionPin,
+    handleSeedFromStudents,
+    handleSectionRenamed,
+    handleSectionDeleted,
+    moveSectionTo,
+  } = useSectionMutations({
+    boardId,
+    canEdit,
+    classroomId,
+    sections,
+    setSections,
+    setCards,
+  });
+
+  // ── Sort & grouping ────────────────────────────────────────────────
+
   async function setSortFor(sectionId: string, mode: SortMode) {
     if (!canEdit) return;
     const prev = sections;
@@ -178,7 +196,9 @@ export function ColumnsBoard({
     const section = sections.find((s) => s.id === sectionId);
     if (!section) return;
 
-    const sectionCards = getCardsForSection(sectionId);
+    const sectionCards = cards.filter(
+      (c) => (c.sectionId ?? "") === sectionId
+    );
     const canvaUrls = sectionCards
       .filter(
         (c) =>
@@ -248,7 +268,8 @@ export function ColumnsBoard({
             linkImage: d.thumbnail || null,
             x: 0,
             y: 0,
-            order: getCardsForSection(sectionId).length,
+            order: cards.filter((c) => (c.sectionId ?? "") === sectionId)
+              .length,
             sectionId,
           }),
         });
@@ -263,8 +284,6 @@ export function ColumnsBoard({
     setFolderSectionId(null);
   }
 
-  // shared-column-sort: sortMode는 sections(서버) 기반. sections 변경 시
-  // 정렬 재계산 트리거되도록 의존성에 포함.
   const sortModeById = useMemo(() => {
     const map: Record<string, SortMode> = {};
     for (const s of sections) map[s.id] = toSortMode(s.sortMode);
@@ -290,64 +309,10 @@ export function ColumnsBoard({
     return cardsBySection.get(sectionId) ?? [];
   }
 
-  /* ── Card drag/drop ── */
-  async function moveCard(cardId: string, targetSectionId: string) {
-    const targetCards = getCardsForSection(targetSectionId);
-    const newOrder = targetCards.length;
-    const prevCards = [...cards];
-
-    setCards((list) =>
-      list.map((c) =>
-        c.id === cardId
-          ? { ...c, sectionId: targetSectionId, order: newOrder }
-          : c
-      )
-    );
-
-    await trackCardMutation(cardId, async () => {
-      try {
-        const res = await fetch(`/api/cards/${cardId}`, {
-          method: "PATCH",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify({ sectionId: targetSectionId, order: newOrder }),
-        });
-        if (!res.ok) {
-          console.error("이동 실패:", await res.text());
-          setCards(prevCards);
-        }
-      } catch (err) {
-        console.error(err);
-        setCards(prevCards);
-      }
-    });
-  }
-
-  function handleDragStart(e: React.DragEvent, cardId: string) {
-    e.dataTransfer.setData("application/card-id", cardId);
-    e.dataTransfer.effectAllowed = "move";
-    if (e.currentTarget instanceof HTMLElement) {
-      e.currentTarget.classList.add("is-dragging");
-    }
-  }
-
-  function handleDragEnd(e: React.DragEvent) {
-    if (e.currentTarget instanceof HTMLElement) {
-      e.currentTarget.classList.remove("is-dragging");
-    }
-    setOverSectionId(null);
-  }
-
-  function handleDragOver(e: React.DragEvent) {
-    e.preventDefault();
-    e.dataTransfer.dropEffect = "move";
-  }
-
   function handleDrop(e: React.DragEvent, targetSectionId: string) {
     e.preventDefault();
     setOverSectionId(null);
     setDraggingSectionId(null);
-    // Section drag takes priority — distinguished by the mime key set
-    // in the column-header's onDragStart.
     const sectionId = e.dataTransfer.getData("application/section-id");
     if (sectionId) {
       moveSectionTo(sectionId, targetSectionId);
@@ -357,262 +322,7 @@ export function ColumnsBoard({
     if (cardId) moveCard(cardId, targetSectionId);
   }
 
-  /* ── Section reorder (drag-drop) ──
-   *
-   * Column headers are HTML5-draggable. Dropping section A onto
-   * section B's column moves A to B's position in the list. All
-   * affected sections are re-indexed 0..N-1 locally and PATCH'd in
-   * parallel. Optimistic state; on failure we roll back.
-   *
-   * Distinguishable from card drag via the `application/section-id`
-   * mime key — card drag uses `application/card-id`. */
-  async function moveSectionTo(sectionId: string, targetSectionId: string) {
-    if (sectionId === targetSectionId) return;
-    const fromIdx = sections.findIndex((s) => s.id === sectionId);
-    const toIdx = sections.findIndex((s) => s.id === targetSectionId);
-    if (fromIdx === -1 || toIdx === -1) return;
-
-    const prev = sections;
-    const next = [...sections];
-    const [moved] = next.splice(fromIdx, 1);
-    next.splice(toIdx, 0, moved!);
-    const normalised = next.map((s, i) => ({ ...s, order: i }));
-    setSections(normalised);
-
-    const changed = normalised.filter((s, i) => prev[i]?.id !== s.id);
-    try {
-      const responses = await Promise.all(
-        changed.map((s) =>
-          fetch(`/api/sections/${s.id}`, {
-            method: "PATCH",
-            headers: { "content-type": "application/json" },
-            body: JSON.stringify({ order: s.order }),
-          })
-        )
-      );
-      if (responses.some((r) => !r.ok)) {
-        console.error("섹션 순서 변경 실패");
-        setSections(prev);
-      }
-    } catch (err) {
-      console.error(err);
-      setSections(prev);
-    }
-  }
-
-  /* ── Add card (shared by FAB and per-column buttons) ── */
-  async function handleAdd(data: AddCardData) {
-    const targetSection = data.sectionId ?? sections[0]?.id ?? null;
-    const order = targetSection ? getCardsForSection(targetSection).length : 0;
-    try {
-      const res = await fetch(`/api/cards`, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          boardId,
-          title: data.title,
-          content: data.content,
-          linkUrl: data.linkUrl || null,
-          linkTitle: data.linkTitle || null,
-          linkDesc: data.linkDesc || null,
-          linkImage: data.linkImage || null,
-          attachments: data.attachments,
-          color: data.color || null,
-          x: 0,
-          y: 0,
-          order,
-          sectionId: targetSection,
-        }),
-      });
-      if (res.ok) {
-        const { card } = await res.json();
-        setCards((prev) => [...prev, card]);
-      } else {
-        alert(`카드 추가 실패: ${await res.text()}`);
-      }
-    } catch (err) {
-      console.error(err);
-    }
-  }
-
-  /* ── Card actions ── */
-  async function handleDeleteCard(id: string) {
-    if (!window.confirm("이 카드를 삭제할까요?")) return;
-    const prev = [...cards];
-    setCards((list) => list.filter((c) => c.id !== id));
-    await trackCardMutation(id, async () => {
-      try {
-        const res = await fetch(`/api/cards/${id}`, { method: "DELETE" });
-        if (!res.ok) setCards(prev);
-      } catch {
-        setCards(prev);
-      }
-    });
-  }
-
-  async function handleEditCardSave(updates: EditCardUpdates) {
-    if (!editingCard) return;
-    const prev = [...cards];
-    const cardId = editingCard.id;
-    const { attachments: updateAttachments, ...restUpdates } = updates;
-    const optimisticUpdates: Partial<CardData> = { ...restUpdates };
-    if (updateAttachments) {
-      optimisticUpdates.attachments = updateAttachments.map((a, idx) => ({
-        id: a.tempId,
-        kind: a.kind,
-        url: a.url,
-        fileName: a.fileName ?? null,
-        fileSize: a.fileSize ?? null,
-        mimeType: a.mimeType ?? null,
-        order: idx,
-      }));
-    }
-    setCards((list) =>
-      list.map((c) => (c.id === cardId ? { ...c, ...optimisticUpdates } : c))
-    );
-    await trackCardMutation(cardId, async () => {
-      try {
-        const res = await fetch(`/api/cards/${cardId}`, {
-          method: "PATCH",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify(updates),
-        });
-        if (!res.ok) {
-          setCards(prev);
-          return;
-        }
-        const data = (await res.json()) as { card?: CardData };
-        if (data.card) {
-          setCards((list) => list.map((c) => (c.id === cardId ? data.card! : c)));
-        }
-      } catch {
-        setCards(prev);
-      }
-    });
-  }
-
-  async function handleDuplicateCard(card: CardData) {
-    try {
-      const res = await fetch(`/api/cards`, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          boardId,
-          title: `${card.title} (복사)`,
-          content: card.content,
-          imageUrl: card.imageUrl || null,
-          linkUrl: card.linkUrl || null,
-          videoUrl: card.videoUrl || null,
-          color: card.color || null,
-          x: 0,
-          y: 0,
-          order: getCardsForSection(card.sectionId ?? "").length,
-          sectionId: card.sectionId,
-        }),
-      });
-      if (res.ok) {
-        const { card: newCard } = await res.json();
-        setCards((prev) => [...prev, newCard]);
-      }
-    } catch (err) {
-      console.error(err);
-    }
-  }
-
-  /* ── Section actions ── */
-  async function handleAddSection() {
-    const title = window.prompt("새 섹션 이름:");
-    if (!title?.trim()) return;
-    try {
-      const res = await fetch(`/api/sections`, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ boardId, title: title.trim() }),
-      });
-      if (res.ok) {
-        const { section } = await res.json();
-        setSections((prev) => [...prev, section].sort(sortSections));
-      }
-    } catch (err) {
-      console.error(err);
-    }
-  }
-
-  async function handleSectionPin(sectionId: string, pinned: boolean) {
-    if (!canEdit) return;
-    const prev = sections;
-    const current = sections.find((s) => s.id === sectionId);
-    if (!current) return;
-
-    const nextOrder = pinned
-      ? Math.max(-1, ...sections.filter((s) => s.pinned).map((s) => s.order)) + 1
-      : current.order;
-
-    setSections((list) =>
-      list
-        .map((s) =>
-          s.id === sectionId ? { ...s, pinned, order: nextOrder } : s
-        )
-        .sort(sortSections)
-    );
-
-    try {
-      const res = await fetch(`/api/sections/${sectionId}`, {
-        method: "PATCH",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify(
-          pinned ? { pinned, order: nextOrder } : { pinned }
-        ),
-      });
-      if (!res.ok) {
-        setSections(prev);
-        alert(`고정 상태 변경 실패: ${await res.text().catch(() => "")}`);
-      }
-    } catch (err) {
-      console.error(err);
-      setSections(prev);
-    }
-  }
-
-  // 학생-시드: 학급 학생을 출석번호 순으로 섹션화. classroom-linked 보드에서만
-  // 노출되며 1회성 시드라 현재 섹션 뒤에 append. 명시적 확인 모달 후 호출.
-  async function handleSeedFromStudents() {
-    if (seedingStudents) return;
-    if (!window.confirm("학급 학생 명단으로 칼럼을 추가할까요?")) return;
-    setSeedingStudents(true);
-    try {
-      const res = await fetch(`/api/boards/${boardId}/sections/seed-students`, {
-        method: "POST",
-      });
-      if (!res.ok) {
-        const msg = (await res.json().catch(() => ({}))).error;
-        alert(typeof msg === "string" ? msg : "칼럼 추가 실패");
-        return;
-      }
-      const { sections: created } = (await res.json()) as {
-        sections: SectionData[];
-      };
-      setSections((prev) => [...prev, ...created].sort(sortSections));
-    } finally {
-      setSeedingStudents(false);
-    }
-  }
-
-  function handleSectionRenamed(sectionId: string, newTitle: string) {
-    setSections((list) =>
-      list.map((s) => (s.id === sectionId ? { ...s, title: newTitle } : s))
-    );
-  }
-
-  function handleSectionDeleted(sectionId: string) {
-    setSections((list) => list.filter((s) => s.id !== sectionId));
-    setCards((list) => list.filter((c) => c.sectionId !== sectionId));
-    setPanelState(null);
-  }
-
-  const sortedSections = useMemo(() => [...sections].sort(sortSections), [sections]);
-  const sectionOptions = sortedSections.map((s) => ({ id: s.id, title: s.title }));
-
+  /* ── Render ──────────────────────────────────────────────────────── */
   return (
     <div className="board-canvas-wrap board-canvas-wrap-columns">
       <div ref={scrollAreaRef} className="columns-scroll-area">
@@ -679,7 +389,12 @@ export function ColumnsBoard({
               <button
                 type="button"
                 className="column-add-btn column-add-btn-seed"
-                onClick={handleSeedFromStudents}
+                onClick={() => {
+                  handleSeedFromStudents(
+                    seedingStudents,
+                    setSeedingStudents as React.Dispatch<React.SetStateAction<boolean>>
+                  );
+                }}
                 disabled={seedingStudents}
                 title="학급 학생 명단으로 칼럼을 한 번에 추가"
               >
@@ -712,7 +427,7 @@ export function ColumnsBoard({
       {editingCard && (
         <EditCardModal
           card={editingCard}
-          onSave={handleEditCardSave}
+          onSave={(updates) => handleEditCardSave(editingCard, updates)}
           onClose={() => setEditingCard(null)}
         />
       )}
@@ -757,8 +472,6 @@ export function ColumnsBoard({
       <CardDetailModal
         card={openCard}
         onClose={() => setOpenCard(null)}
-        // 상세 모달 좌/우 네비게이션이 보드 전체 카드를 순환하지 않고 같은
-        // 섹션(칼럼) 내 카드만, 화면에 보이는 정렬 순서대로 순환하도록 필터.
         cards={
           openCard
             ? cards
