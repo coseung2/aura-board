@@ -1,7 +1,11 @@
+"use client";
+
+import { useState } from "react";
 import Link from "next/link";
 import { AuthHeader } from "./AuthHeader";
 import { EditableTitle } from "./EditableTitle";
 import { BoardSettingsLauncher } from "./BoardSettingsLauncher";
+import { QrShareModal } from "./share/QrShareModal";
 import type { BoardSection } from "./BoardSettingsPanel";
 import { layoutLabel } from "@/lib/layout-meta";
 
@@ -19,6 +23,9 @@ type Props = {
   settingsSections?: BoardSection[];
   /** card-comments-likes (2026-04-26): 보드 단위 작성자 익명 토글 초기값. */
   anonymousAuthor?: boolean;
+  /** board-share (2026-05-29): 공유 설정. */
+  shareMode?: string;
+  shareToken?: string | null;
 };
 
 export function BoardHeader({
@@ -32,7 +39,12 @@ export function BoardHeader({
   canEdit,
   settingsSections,
   anonymousAuthor,
+  shareMode,
+  shareToken,
 }: Props) {
+  const [showQr, setShowQr] = useState(false);
+  const isShared = shareMode && shareMode !== "private" && !!shareToken;
+
   return (
     <header className="board-header">
       <div className="board-header-left">
@@ -54,6 +66,8 @@ export function BoardHeader({
             layout={layout}
             sections={settingsSections ?? []}
             anonymousAuthor={anonymousAuthor ?? false}
+            shareMode={shareMode}
+            shareToken={shareToken}
           />
         )}
         <span className="board-layout-badge">{layoutLabel(layout)}</span>
@@ -67,8 +81,28 @@ export function BoardHeader({
         )}
       </div>
       <div className="board-header-right">
+        {!isStudent && boardId && isShared && (
+          <button
+            type="button"
+            className="board-share-btn"
+            aria-label="공유 보기"
+            onClick={() => setShowQr(true)}
+            title="공유"
+          >
+            <span aria-hidden="true">🔗</span>
+            <span className="board-share-badge">공유됨</span>
+          </button>
+        )}
         <AuthHeader />
       </div>
+
+      {showQr && boardId && shareToken && (
+        <QrShareModal
+          boardId={boardId}
+          shareToken={shareToken}
+          onClose={() => setShowQr(false)}
+        />
+      )}
     </header>
   );
 }

@@ -366,6 +366,12 @@ model Board {
   // 좋아요 카운트는 영향 없음 (누가 눌렀는지는 어차피 비공개).
   anonymousAuthor   Boolean    @default(false)
 
+  // ── Board Share (2026-05-29) ──────────────────────────────────────
+  // Public link sharing. "private" = no share. "view" = anyone with the
+  // shareToken in URL can view the board in read-only mode.
+  shareMode         String     @default("private") // "private" | "view"
+  shareToken        String?    @unique              // nanoid(21), null=not shared
+
   classroom          Classroom?          @relation("ClassroomBoards", fields: [classroomId], references: [id], onDelete: SetNull)
   members            BoardMember[]
   cards              Card[]
@@ -516,6 +522,7 @@ model Card {
 enum CommentAuthorKind {
   teacher
   student
+  external
 }
 
 model CardComment {
@@ -524,6 +531,7 @@ model CardComment {
   authorKind      CommentAuthorKind
   authorUserId    String? // teacher
   authorStudentId String? // student
+  externalAuthorName String? // share-link anonymous author
   content         String
   createdAt       DateTime          @default(now())
   deletedAt       DateTime?

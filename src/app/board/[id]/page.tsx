@@ -639,6 +639,8 @@ export default async function BoardPage({
         canEdit={effectiveRole === "owner" || effectiveRole === "editor"}
         settingsSections={settingsSections}
         anonymousAuthor={board.anonymousAuthor}
+        shareMode={board.shareMode}
+        shareToken={board.shareToken}
       />
       {renderBoard()}
     </main>

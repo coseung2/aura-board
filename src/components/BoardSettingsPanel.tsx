@@ -3,6 +3,7 @@
 import { useEffect, useId, useState } from "react";
 import { useRouter } from "next/navigation";
 import { SidePanel } from "./ui/SidePanel";
+import { ShareTab } from "./share/ShareTab";
 
 export type BoardSection = {
   id: string;
@@ -10,18 +11,17 @@ export type BoardSection = {
   accessToken: string | null;
 };
 
-type Tab = "breakout" | "engagement" | "access" | "canva" | "theme";
+type Tab = "breakout" | "engagement" | "share" | "canva" | "theme";
 
 const TAB_LABELS: Record<Tab, string> = {
   breakout: "브레이크아웃",
   engagement: "참여",
-  access: "접근 권한",
+  share: "공유",
   canva: "Canva 연동",
   theme: "테마",
 };
 
-const PLACEHOLDER_COPY: Record<Exclude<Tab, "breakout" | "engagement">, string> = {
-  access: "멤버 초대와 권한 관리",
+const PLACEHOLDER_COPY: Record<Exclude<Tab, "breakout" | "engagement" | "share">, string> = {
   canva: "도메인 단위 Canva 연동 설정",
   theme: "보드 배경과 기본 레이아웃",
 };
@@ -34,6 +34,9 @@ type Props = {
   initialSections: BoardSection[];
   /** card-comments-likes (2026-04-26): 참여 탭의 익명 토글 초기값. */
   initialAnonymousAuthor?: boolean;
+  /** board-share (2026-05-29): 공유 탭 초기값. */
+  initialShareMode?: string;
+  initialShareToken?: string | null;
 };
 
 export function BoardSettingsPanel({
@@ -43,11 +46,15 @@ export function BoardSettingsPanel({
   layout,
   initialSections,
   initialAnonymousAuthor = false,
+  initialShareMode = "private",
+  initialShareToken = null,
 }: Props) {
   const router = useRouter();
   const [tab, setTab] = useState<Tab>("breakout");
   const [sections, setSections] = useState<BoardSection[]>(initialSections);
   const [anonymousAuthor, setAnonymousAuthor] = useState(initialAnonymousAuthor);
+  const [shareMode, setShareMode] = useState(initialShareMode);
+  const [shareToken, setShareToken] = useState<string | null>(initialShareToken);
   const tablistId = useId();
 
   // Re-sync when caller re-opens panel with fresh props.
@@ -126,7 +133,21 @@ export function BoardSettingsPanel({
         </div>
       )}
 
-      {tab !== "breakout" && tab !== "engagement" && (
+      {tab === "share" && (
+        <div
+          role="tabpanel"
+          id={`${tablistId}-panel-share`}
+          aria-labelledby={`${tablistId}-tab-share`}
+        >
+          <ShareTab
+            boardId={boardId}
+            initialShareMode={shareMode}
+            initialShareToken={shareToken}
+          />
+        </div>
+      )}
+
+      {tab !== "breakout" && tab !== "engagement" && tab !== "share" && (
         <div
           role="tabpanel"
           id={`${tablistId}-panel-${tab}`}

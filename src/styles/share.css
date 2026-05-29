@@ -1,0 +1,249 @@
+/* ── Share UI (BoardHeader icon + QrShareModal) ─────────────────── */
+
+/* ── Header share button ── */
+.board-share-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  border: 1px solid #d0d5e2;
+  border-radius: 6px;
+  background: #fff;
+  cursor: pointer;
+  font-size: 13px;
+  color: #1e293b;
+  transition: background 0.12s;
+}
+
+.board-share-btn:hover {
+  background: #f1f5f9;
+  border-color: #94a3b8;
+}
+
+.board-share-badge {
+  font-size: 11px;
+  color: #475569;
+  font-weight: 500;
+}
+
+/* ── Modal overlay ── */
+.share-qr-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  background: rgba(0, 0, 0, 0.35);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.share-qr-modal {
+  background: #fff;
+  border-radius: 12px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.18);
+  min-width: 320px;
+  max-width: 400px;
+  width: 90vw;
+  overflow: hidden;
+}
+
+.share-qr-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px 0;
+}
+
+.share-qr-close {
+  border: none;
+  background: none;
+  font-size: 16px;
+  cursor: pointer;
+  color: #64748b;
+  padding: 4px;
+  line-height: 1;
+}
+
+.share-qr-close:hover {
+  color: #1e293b;
+}
+
+.share-qr-modal-body {
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+}
+
+.share-qr-code-wrap {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 180px;
+}
+
+.share-qr-svg {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.share-qr-svg svg {
+  width: 180px;
+  height: 180px;
+}
+
+.share-qr-loading {
+  font-size: 13px;
+  color: #94a3b8;
+}
+
+.share-link-row {
+  display: flex;
+  width: 100%;
+  gap: 6px;
+}
+
+.share-link-input {
+  flex: 1;
+  padding: 8px 10px;
+  border: 1px solid #d0d5e2;
+  border-radius: 6px;
+  font-size: 12px;
+  color: #1e293b;
+  background: #f8fafc;
+  outline: none;
+  font-family: inherit;
+}
+
+.share-link-input:focus {
+  border-color: #3b82f6;
+}
+
+.share-copy-btn {
+  padding: 8px 14px;
+  border: 1px solid #d0d5e2;
+  border-radius: 6px;
+  background: #fff;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
+  color: #1e293b;
+  white-space: nowrap;
+  transition: background 0.12s;
+}
+
+.share-copy-btn:hover {
+  background: #f1f5f9;
+}
+
+/* ── ShareTab (settings panel) ─────────────── */
+
+.share-tab {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.share-mode-row {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.share-mode-label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.share-mode-select {
+  padding: 6px 12px;
+  border: 1px solid #d0d5e2;
+  border-radius: 6px;
+  font-size: 13px;
+  background: #fff;
+  color: #1e293b;
+  cursor: pointer;
+  min-width: 140px;
+}
+
+.share-mode-select:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.share-error {
+  color: #ef4444;
+  font-size: 12px;
+  margin: 0;
+}
+
+.share-qr-area {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  padding: 16px;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  background: #fafbfc;
+}
+
+.share-qr-wrap {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 140px;
+}
+
+.share-qr-wrap .share-qr-svg svg {
+  width: 150px;
+  height: 150px;
+}
+
+.share-actions {
+  display: flex;
+  gap: 8px;
+  width: 100%;
+}
+
+.share-rotate-btn {
+  width: 100%;
+  padding: 8px 14px;
+  border: 1px solid #d0d5e2;
+  border-radius: 6px;
+  background: #fff;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
+  color: #1e293b;
+  transition: background 0.12s;
+}
+
+.share-rotate-btn:hover {
+  background: #f1f5f9;
+}
+
+.share-rotate-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.share-off-notice {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  background: #fafbfc;
+}
+
+.share-off-notice p {
+  margin: 0;
+  font-size: 13px;
+  color: #64748b;
+}
