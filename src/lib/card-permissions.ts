@@ -39,6 +39,18 @@ export type ParentIdentity = {
   childStudentIds: Set<string>;
 };
 
+/** Share token permission levels. */
+export type SharePermission = "view" | "comment" | "edit";
+
+/** An external share-link visitor (x-share-token header). */
+export type ShareIdentity = {
+  shareToken: string;
+  boardId: string;
+  permission: SharePermission;
+  /** Visitor-chosen display name (from localStorage or prompt). */
+  authorName: string;
+};
+
 /**
  * Every identity a request carries. A single browser can legitimately
  * hold all three cookies — e.g. a teacher who is also a parent of a
@@ -51,7 +63,8 @@ export type Identities = {
   teacher: TeacherIdentity | null;
   student: StudentIdentity | null;
   parent: ParentIdentity | null;
-  primary: "teacher" | "student" | "parent" | "anon";
+  share: ShareIdentity | null;
+  primary: "teacher" | "student" | "parent" | "share" | "anon";
 };
 
 /**
@@ -63,6 +76,7 @@ export type Identity =
   | ({ kind: "teacher" } & TeacherIdentity)
   | ({ kind: "student" } & StudentIdentity)
   | ({ kind: "parent" } & ParentIdentity)
+  | ({ kind: "share" } & ShareIdentity)
   | { kind: "anon" };
 
 /** Lift a legacy single Identity into the multi-identity bundle. */
@@ -73,6 +87,7 @@ export function asIdentities(id: Identity): Identities {
         teacher: { userId: id.userId, name: id.name, ownsBoardIds: id.ownsBoardIds },
         student: null,
         parent: null,
+        share: null,
         primary: "teacher",
       };
     case "student":
@@ -80,6 +95,7 @@ export function asIdentities(id: Identity): Identities {
         teacher: null,
         student: { studentId: id.studentId, name: id.name, classroomId: id.classroomId },
         parent: null,
+        share: null,
         primary: "student",
       };
     case "parent":
@@ -87,10 +103,19 @@ export function asIdentities(id: Identity): Identities {
         teacher: null,
         student: null,
         parent: { parentId: id.parentId, childStudentIds: id.childStudentIds },
+        share: null,
         primary: "parent",
       };
+    case "share":
+      return {
+        teacher: null,
+        student: null,
+        parent: null,
+        share: { shareToken: id.shareToken, boardId: id.boardId, permission: id.permission, authorName: id.authorName },
+        primary: "share",
+      };
     case "anon":
-      return { teacher: null, student: null, parent: null, primary: "anon" };
+      return { teacher: null, student: null, parent: null, share: null, primary: "anon" };
   }
 }
 
@@ -124,6 +149,10 @@ function parentHasActiveChildren(p: ParentIdentity): boolean {
   return p.childStudentIds.size > 0;
 }
 
+function shareCanReachBoard(s: ShareIdentity, b: BoardLike): boolean {
+  return s.boardId === b.id;
+}
+
 // ─── Public predicates ──────────────────────────────────────────────────────
 
 /** Base eligibility — does any identity on this request get to enumerate
@@ -135,6 +164,8 @@ export function isBoardReader(ids: Identities, b: BoardLike): boolean {
   // Board-level reader=true when they have at least one active child; the
   // caller still filters cards down to the child's authorship.
   if (ids.parent && parentHasActiveChildren(ids.parent)) return true;
+  // Share visitors can only reach their linked board.
+  if (ids.share && shareCanReachBoard(ids.share, b)) return true;
   return false;
 }
 
@@ -152,8 +183,21 @@ export function canViewCard(
     ids.parent.childStudentIds.has(c.studentAuthorId)
   )
     return true;
+  // Share visitors can view all cards on their linked board.
+  if (ids.share && shareCanReachBoard(ids.share, b)) return true;
   return false;
 }
+
+/**
+ * Share permission ranking — view < comment < edit.
+ * Check `shareCanReachBoard` first, then compare ranks.
+ */
+const PERMISSION_RANK: Record<SharePermission, number> = {
+  view: 0,
+  comment: 1,
+  edit: 2,
+};
+const MIN_EDIT_RANK = PERMISSION_RANK["edit"];
 
 export function canEditCard(
   ids: Identities,
@@ -166,6 +210,13 @@ export function canEditCard(
     ids.student &&
     studentCanReachBoard(ids.student, b) &&
     c.studentAuthorId === ids.student.studentId
+  )
+    return true;
+  // Share visitors with "edit" permission can edit any card on the board.
+  if (
+    ids.share &&
+    shareCanReachBoard(ids.share, b) &&
+    PERMISSION_RANK[ids.share.permission] >= MIN_EDIT_RANK
   )
     return true;
   // Parents never edit. Anon never edits.
@@ -185,6 +236,13 @@ export function canDeleteCard(
 export function canAddCardToBoard(ids: Identities, b: BoardLike): boolean {
   if (ids.teacher && teacherCanReachBoard(ids.teacher, b)) return true;
   if (ids.student && studentCanReachBoard(ids.student, b)) return true;
+  // Share visitors with "edit" permission can add cards.
+  if (
+    ids.share &&
+    shareCanReachBoard(ids.share, b) &&
+    PERMISSION_RANK[ids.share.permission] >= MIN_EDIT_RANK
+  )
+    return true;
   // Parents and anon can't add cards.
   return false;
 }
@@ -211,8 +269,9 @@ export function boardCaps(ids: Identities, b: BoardLike): BoardCaps {
  *  OR'd across all identities, but writes need exactly one owner. */
 export function pickWriteIdentity(
   ids: Identities
-): "teacher" | "student" | null {
+): "teacher" | "student" | "share" | null {
   if (ids.teacher) return "teacher";
   if (ids.student) return "student";
+  if (ids.share) return "share";
   return null;
 }

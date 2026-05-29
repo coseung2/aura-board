@@ -84,7 +84,7 @@ export async function resolveIdentities(): Promise<Identities> {
         ? "parent"
         : "anon";
 
-  return { teacher, student: studentId, parent, primary };
+  return { teacher, student: studentId, parent, share: null, primary };
 }
 
 /**

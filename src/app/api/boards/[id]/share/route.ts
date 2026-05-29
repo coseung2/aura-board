@@ -11,7 +11,7 @@ import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { requirePermission, ForbiddenError } from "@/lib/rbac";
 import { getCurrentUser } from "@/lib/auth";
-import { issueShareToken } from "@/lib/share/tokens";
+import { issueShareToken, issueShortCode } from "@/lib/share/tokens";
 
 export async function POST(
   req: Request,
@@ -45,14 +45,18 @@ export async function POST(
     where: { id },
     data: {
       shareMode: mode,
-      shareToken: mode === "view" ? issueShareToken() : null,
+      shareToken: mode !== "private" ? issueShareToken() : null,
+      shareShortCode: mode !== "private" ? issueShortCode() : null,
     },
-    select: { id: true, slug: true, shareMode: true, shareToken: true },
+    select: { id: true, slug: true, shareMode: true, shareToken: true, shareShortCode: true },
   });
 
   const origin = req.headers.get("origin") || "";
   const shareUrl = board.shareToken
     ? `${origin}/share/${board.shareToken}`
+    : null;
+  const shortUrl = board.shareShortCode
+    ? `${origin}/s/${board.shareShortCode}`
     : null;
 
   return NextResponse.json({
@@ -60,5 +64,7 @@ export async function POST(
     shareMode: board.shareMode,
     shareToken: board.shareToken,
     shareUrl,
+    shareShortCode: board.shareShortCode,
+    shortUrl,
   });
 }

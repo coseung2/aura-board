@@ -8,7 +8,7 @@ import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { requirePermission, ForbiddenError } from "@/lib/rbac";
 import { getCurrentUser } from "@/lib/auth";
-import { issueShareToken } from "@/lib/share/tokens";
+import { issueShareToken, issueShortCode } from "@/lib/share/tokens";
 
 export async function POST(
   req: Request,
@@ -34,7 +34,7 @@ export async function POST(
   if (!board) {
     return NextResponse.json({ error: "not_found" }, { status: 404 });
   }
-  if (board.shareMode !== "view") {
+  if (board.shareMode === "private") {
     return NextResponse.json(
       { error: "sharing_not_enabled" },
       { status: 400 }
@@ -43,17 +43,25 @@ export async function POST(
 
   const updated = await db.board.update({
     where: { id },
-    data: { shareToken: issueShareToken() },
-    select: { id: true, slug: true, shareMode: true, shareToken: true },
+    data: {
+      shareToken: issueShareToken(),
+      shareShortCode: issueShortCode(),
+    },
+    select: { id: true, slug: true, shareMode: true, shareToken: true, shareShortCode: true },
   });
 
   const origin = req.headers.get("origin") || "";
   const shareUrl = `${origin}/share/${updated.shareToken}`;
+  const shortUrl = updated.shareShortCode
+    ? `${origin}/s/${updated.shareShortCode}`
+    : null;
 
   return NextResponse.json({
     ok: true,
     shareMode: updated.shareMode,
     shareToken: updated.shareToken,
     shareUrl,
+    shareShortCode: updated.shareShortCode,
+    shortUrl,
   });
 }

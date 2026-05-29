@@ -19,7 +19,8 @@ function teacherIds(owned: string[]): Identities {
     },
     student: null,
     parent: null,
-    primary: "teacher",
+    share: null,
+  primary: "teacher",
   };
 }
 
@@ -27,6 +28,7 @@ const STUDENT_IDS: Identities = {
   teacher: null,
   student: { studentId: "s1", name: "학생", classroomId: "c1" },
   parent: null,
+  share: null,
   primary: "student",
 };
 
@@ -34,6 +36,7 @@ const ANON_IDS: Identities = {
   teacher: null,
   student: null,
   parent: null,
+  share: null,
   primary: "anon",
 };
 

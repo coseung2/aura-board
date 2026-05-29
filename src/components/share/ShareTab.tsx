@@ -14,22 +14,29 @@ type Props = {
   boardId: string;
   initialShareMode: string;
   initialShareToken: string | null;
+  initialShareShortCode?: string | null;
 };
 
-export function ShareTab({ boardId, initialShareMode, initialShareToken }: Props) {
+export function ShareTab({ boardId, initialShareMode, initialShareToken, initialShareShortCode }: Props) {
   const router = useRouter();
   const [mode, setMode] = useState(initialShareMode);
   const [shareToken, setShareToken] = useState<string | null>(initialShareToken);
+  const [shareShortCode, setShareShortCode] = useState<string | null>(initialShareShortCode ?? null);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [svg, setSvg] = useState<string | null>(null);
   const [qrLoading, setQrLoading] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [shortCopied, setShortCopied] = useState(false);
 
   const isPublic = mode !== "private";
   const shareUrl =
     isPublic && shareToken
       ? `${window.location.origin}/share/${shareToken}`
+      : null;
+  const shortUrl =
+    isPublic && shareShortCode
+      ? `${window.location.origin}/s/${shareShortCode}`
       : null;
 
   // QR 생성
@@ -81,6 +88,7 @@ export function ShareTab({ boardId, initialShareMode, initialShareToken }: Props
       const j = await res.json();
       setMode(j.shareMode);
       setShareToken(j.shareToken);
+      setShareShortCode(j.shareShortCode ?? null);
       router.refresh();
     } catch {
       setErr("저장에 실패했어요");
@@ -103,6 +111,7 @@ export function ShareTab({ boardId, initialShareMode, initialShareToken }: Props
       }
       const j = await res.json();
       setShareToken(j.shareToken);
+      setShareShortCode(j.shareShortCode ?? null);
       router.refresh();
       setSvg(null); // QR 다시 로드
     } catch {
@@ -118,6 +127,17 @@ export function ShareTab({ boardId, initialShareMode, initialShareToken }: Props
       await navigator.clipboard.writeText(shareUrl);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
+    } catch {
+      /* ignore */
+    }
+  };
+
+  const copyShortLink = async () => {
+    if (!shortUrl) return;
+    try {
+      await navigator.clipboard.writeText(shortUrl);
+      setShortCopied(true);
+      setTimeout(() => setShortCopied(false), 2000);
     } catch {
       /* ignore */
     }
@@ -165,6 +185,7 @@ export function ShareTab({ boardId, initialShareMode, initialShareToken }: Props
             )}
           </div>
 
+          {/* 긴 링크 */}
           <div className="share-link-row">
             <input
               type="text"
@@ -180,6 +201,26 @@ export function ShareTab({ boardId, initialShareMode, initialShareToken }: Props
               {copied ? "✓ 복사됨" : "복사"}
             </button>
           </div>
+
+          {/* 짧은 링크 */}
+          {shortUrl && (
+            <div className="share-link-row" style={{ marginTop: 6 }}>
+              <span className="share-link-label">짧은 링크</span>
+              <input
+                type="text"
+                className="share-link-input"
+                value={shortUrl}
+                readOnly
+              />
+              <button
+                type="button"
+                className="share-copy-btn"
+                onClick={copyShortLink}
+              >
+                {shortCopied ? "✓ 복사됨" : "복사"}
+              </button>
+            </div>
+          )}
 
           <div className="share-actions">
             <button

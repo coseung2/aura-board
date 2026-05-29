@@ -11,6 +11,12 @@ export function issueShareToken(): string {
   return randomBytes(16).toString("base64url").slice(0, 21);
 }
 
+export function issueShortCode(): string {
+  // 4 raw bytes → 6 base64url chars (no padding). /s/CODE.
+  // 64^6 ≈ 68B combinations — collision-resistant at board scale.
+  return randomBytes(4).toString("base64url").replace(/=+$/, "");
+}
+
 export function tokensEqual(
   a: string | null | undefined,
   b: string | null | undefined

@@ -37,6 +37,7 @@ type Props = {
   /** board-share (2026-05-29): 공유 탭 초기값. */
   initialShareMode?: string;
   initialShareToken?: string | null;
+  initialShareShortCode?: string | null;
 };
 
 export function BoardSettingsPanel({
@@ -48,6 +49,7 @@ export function BoardSettingsPanel({
   initialAnonymousAuthor = false,
   initialShareMode = "private",
   initialShareToken = null,
+  initialShareShortCode = null,
 }: Props) {
   const router = useRouter();
   const [tab, setTab] = useState<Tab>("breakout");
@@ -55,6 +57,7 @@ export function BoardSettingsPanel({
   const [anonymousAuthor, setAnonymousAuthor] = useState(initialAnonymousAuthor);
   const [shareMode, setShareMode] = useState(initialShareMode);
   const [shareToken, setShareToken] = useState<string | null>(initialShareToken);
+  const [shareShortCode, setShareShortCode] = useState<string | null>(initialShareShortCode);
   const tablistId = useId();
 
   // Re-sync when caller re-opens panel with fresh props.
@@ -143,6 +146,7 @@ export function BoardSettingsPanel({
             boardId={boardId}
             initialShareMode={shareMode}
             initialShareToken={shareToken}
+            initialShareShortCode={shareShortCode}
           />
         </div>
       )}

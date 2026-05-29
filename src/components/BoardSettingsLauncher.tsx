@@ -12,6 +12,7 @@ type Props = {
   /** board-share (2026-05-29): 공유 설정. */
   shareMode?: string;
   shareToken?: string | null;
+  shareShortCode?: string | null;
 };
 
 /**
@@ -20,7 +21,7 @@ type Props = {
  * server component (see BoardHeader in app/board/[id]/page.tsx) so this
  * component trusts its caller and always renders when mounted.
  */
-export function BoardSettingsLauncher({ boardId, layout, sections, anonymousAuthor, shareMode, shareToken }: Props) {
+export function BoardSettingsLauncher({ boardId, layout, sections, anonymousAuthor, shareMode, shareToken, shareShortCode }: Props) {
   const [open, setOpen] = useState(false);
 
   return (
@@ -46,6 +47,7 @@ export function BoardSettingsLauncher({ boardId, layout, sections, anonymousAuth
           initialAnonymousAuthor={anonymousAuthor}
           initialShareMode={shareMode}
           initialShareToken={shareToken}
+          initialShareShortCode={shareShortCode}
         />
       )}
     </>

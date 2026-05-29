@@ -34,20 +34,23 @@ export async function POST(req: Request) {
 
   const board = await db.board.findUnique({
     where: { id: boardId },
-    select: { shareMode: true, shareToken: true },
+    select: { shareMode: true, shareToken: true, shareShortCode: true },
   });
   if (!board)
     return NextResponse.json({ error: "not_found" }, { status: 404 });
-  if (board.shareMode !== "view" || !board.shareToken) {
+  if (board.shareMode === "private" || !board.shareToken) {
     return NextResponse.json({ error: "not_shared" }, { status: 400 });
   }
 
   const origin = req.headers.get("origin") || "";
   const url = `${origin}/share/${board.shareToken}`;
+  const shortUrl = board.shareShortCode
+    ? `${origin}/s/${board.shareShortCode}`
+    : null;
   const svg = await QRCode.toString(url, {
     type: "svg",
     margin: 1,
     width: 256,
   });
-  return NextResponse.json({ ok: true, url, svg });
+  return NextResponse.json({ ok: true, url, shortUrl, svg });
 }

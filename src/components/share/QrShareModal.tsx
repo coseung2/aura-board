@@ -9,15 +9,20 @@ import { useCallback, useEffect, useState } from "react";
 type Props = {
   boardId: string;
   shareToken: string;
+  shareShortCode?: string | null;
   onClose: () => void;
 };
 
-export function QrShareModal({ boardId, shareToken, onClose }: Props) {
+export function QrShareModal({ boardId, shareToken, shareShortCode, onClose }: Props) {
   const [svg, setSvg] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [copied, setCopied] = useState(false);
+  const [shortCopied, setShortCopied] = useState(false);
 
   const shareUrl = `${window.location.origin}/share/${shareToken}`;
+  const shortUrl = shareShortCode
+    ? `${window.location.origin}/s/${shareShortCode}`
+    : null;
 
   useEffect(() => {
     let cancelled = false;
@@ -54,6 +59,17 @@ export function QrShareModal({ boardId, shareToken, onClose }: Props) {
       /* ignore */
     }
   }, [shareUrl]);
+
+  const copyShortLink = useCallback(async () => {
+    if (!shortUrl) return;
+    try {
+      await navigator.clipboard.writeText(shortUrl);
+      setShortCopied(true);
+      setTimeout(() => setShortCopied(false), 2000);
+    } catch {
+      /* ignore */
+    }
+  }, [shortUrl]);
 
   return (
     <div className="share-qr-overlay" onClick={onClose}>
@@ -99,6 +115,25 @@ export function QrShareModal({ boardId, shareToken, onClose }: Props) {
               {copied ? "✓" : "복사"}
             </button>
           </div>
+
+          {shortUrl && (
+            <div className="share-link-row" style={{ marginTop: 6 }}>
+              <span className="share-link-label">짧은 링크</span>
+              <input
+                type="text"
+                className="share-link-input"
+                value={shortUrl}
+                readOnly
+              />
+              <button
+                type="button"
+                className="share-copy-btn"
+                onClick={copyShortLink}
+              >
+                {shortCopied ? "✓" : "복사"}
+              </button>
+            </div>
+          )}
         </div>
       </div>
     </div>

@@ -3,7 +3,8 @@ import { z } from "zod";
 import { db } from "@/lib/db";
 import { ForbiddenError } from "@/lib/rbac";
 import { resolveIdentities } from "@/lib/identity";
-import { canEditCard, canDeleteCard, type BoardLike, type CardLike } from "@/lib/card-permissions";
+import { canEditCard, canDeleteCard, type BoardLike, type CardLike, type Identities } from "@/lib/card-permissions";
+import { resolveShareIdentity, requireShareAuth } from "@/lib/share/with-share";
 import { isCanvaDesignUrl, resolveCanvaEmbedUrl, expandCanvaShortLink } from "@/lib/canva";
 import { isAllowedFileUrl, isAllowedStoredMime, MAX_ATTACHMENTS_PER_CARD } from "@/lib/file-attachment";
 import { touchBoardUpdatedAt } from "@/lib/board-touch";
@@ -67,7 +68,22 @@ export async function PATCH(
       return NextResponse.json({ error: "Board not found" }, { status: 404 });
     }
 
-    const identity = await resolveIdentities();
+    let identity = await resolveIdentities();
+
+    // Share visitor support: check x-share-token and merge ShareIdentity.
+    const shareToken = req.headers.get("x-share-token");
+    if (shareToken) {
+      const shareResult = await requireShareAuth(shareToken, "edit");
+      if (!("identity" in shareResult)) {
+        return NextResponse.json({ error: shareResult.error }, { status: shareResult.status });
+      }
+      identity = {
+        ...identity,
+        share: shareResult.identity,
+        primary: identity.primary === "anon" ? "share" : identity.primary,
+      };
+    }
+
     const boardLike: BoardLike = {
       id: board.id,
       classroomId: board.classroomId,
@@ -255,7 +271,22 @@ export async function DELETE(
       return NextResponse.json({ error: "Board not found" }, { status: 404 });
     }
 
-    const identity = await resolveIdentities();
+    let identity = await resolveIdentities();
+
+    // Share visitor support: check x-share-token and merge ShareIdentity.
+    const shareToken = _req.headers.get("x-share-token");
+    if (shareToken) {
+      const shareResult = await requireShareAuth(shareToken, "edit");
+      if (!("identity" in shareResult)) {
+        return NextResponse.json({ error: shareResult.error }, { status: shareResult.status });
+      }
+      identity = {
+        ...identity,
+        share: shareResult.identity,
+        primary: identity.primary === "anon" ? "share" : identity.primary,
+      };
+    }
+
     const boardLike: BoardLike = {
       id: board.id,
       classroomId: board.classroomId,

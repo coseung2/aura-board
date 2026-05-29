@@ -24,6 +24,7 @@ const teacherA: Identities = {
   },
   student: null,
   parent: null,
+  share: null,
   primary: "teacher",
 };
 
@@ -35,6 +36,7 @@ const teacherB: Identities = {
   },
   student: null,
   parent: null,
+  share: null,
   primary: "teacher",
 };
 
@@ -42,6 +44,7 @@ const studentIn: Identities = {
   teacher: null,
   student: { studentId: "s_in", name: "s", classroomId: "c_1" },
   parent: null,
+  share: null,
   primary: "student",
 };
 
@@ -49,6 +52,7 @@ const studentOut: Identities = {
   teacher: null,
   student: { studentId: "s_out", name: "s2", classroomId: "c_other" },
   parent: null,
+  share: null,
   primary: "student",
 };
 
@@ -56,6 +60,7 @@ const anon: Identities = {
   teacher: null,
   student: null,
   parent: null,
+  share: null,
   primary: "anon",
 };
 
