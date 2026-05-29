@@ -451,7 +451,7 @@ model Card {
   id                 String   @id @default(cuid())
   boardId            String
   sectionId          String?
-  authorId           String
+  authorId           String?
   title              String
   content            String
   color              String?
@@ -498,7 +498,7 @@ model Card {
 
   board            Board             @relation(fields: [boardId], references: [id], onDelete: Cascade)
   section          Section?          @relation("SectionCards", fields: [sectionId], references: [id], onDelete: SetNull)
-  author           User              @relation(fields: [authorId], references: [id])
+  author           User?             @relation(fields: [authorId], references: [id])
   studentAuthor    Student?          @relation("StudentCardAuthor", fields: [studentAuthorId], references: [id], onDelete: SetNull)
   assetAttachments AssetAttachment[] @relation("CardAssetAttachments")
   assignmentSlot   AssignmentSlot?   @relation("AssignmentSlotCard")

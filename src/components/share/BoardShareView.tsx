@@ -375,7 +375,7 @@ export function BoardShareView({
                   <div className="share-card-list">
                     {secCards.map((card) => (
                       <article key={card.id} className="share-card">
-                        <CardBody card={card} compact={false} showEngagement={false} />
+                        <CardBody card={card} showEngagement={false} />
                         {canComment && card.id && (
                           <CardCommentSection
                             cardId={card.id}
@@ -397,7 +397,7 @@ export function BoardShareView({
           <div className="share-grid">
             {cards.map((card) => (
               <article key={card.id} className="share-card">
-                <CardBody card={card} compact={false} showEngagement={false} />
+                <CardBody card={card} showEngagement={false} />
                 {canComment && card.id && (
                   <CardCommentSection
                     cardId={card.id}
@@ -415,7 +415,7 @@ export function BoardShareView({
           <div className="share-stream">
             {cards.map((card) => (
               <article key={card.id} className="share-card">
-                <CardBody card={card} compact={false} showEngagement={false} />
+                <CardBody card={card} showEngagement={false} />
                 {canComment && card.id && (
                   <CardCommentSection
                     cardId={card.id}
@@ -433,7 +433,7 @@ export function BoardShareView({
           <div className="share-list">
             {cards.map((card) => (
               <article key={card.id} className="share-card">
-                <CardBody card={card} compact={false} showEngagement={false} />
+                <CardBody card={card} showEngagement={false} />
                 {canComment && card.id && (
                   <CardCommentSection
                     cardId={card.id}

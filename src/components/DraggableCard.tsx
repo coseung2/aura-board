@@ -42,7 +42,7 @@ export type CardData = {
   height: number;
   order: number;
   sectionId?: string | null;
-  authorId: string;
+  authorId: string | null;
   studentAuthorId?: string | null;
   createdAt?: string;
   externalAuthorName?: string | null;

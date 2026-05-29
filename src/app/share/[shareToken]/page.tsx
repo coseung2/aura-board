@@ -94,6 +94,7 @@ export default async function ShareBoardPage({
     color: c.color,
     imageUrl: c.imageUrl,
     thumbUrl: c.thumbUrl,
+    authorId: c.authorId,
     linkUrl: c.linkUrl,
     linkTitle: c.linkTitle,
     linkDesc: c.linkDesc,

@@ -104,8 +104,8 @@ export type BoardLike = {
 export type CardLike = {
   id: string;
   boardId: string;
-  /** Always a teacher (User.id). */
-  authorId: string;
+  /** Always a teacher (User.id). Null for external/anon cards. */
+  authorId: string | null;
   /** Set when a student published the card. */
   studentAuthorId: string | null;
 };

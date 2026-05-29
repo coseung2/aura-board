@@ -1,13 +1,14 @@
 // card-comments-likes (2026-04-26): 작성자 표시 라벨 포매터.
 // shared (server + client) — server-only deps 없음.
 
-export type AuthorKind = "teacher" | "student";
+export type AuthorKind = "teacher" | "student" | "external";
 
 export function formatEngagementAuthor(opts: {
   kind: AuthorKind;
   name: string;
   anonymous: boolean;
 }): string {
+  if (opts.kind === "external") return opts.name.trim() || "익명 방문자";
   if (opts.anonymous) return "익명";
   if (opts.kind === "teacher") {
     const trimmed = opts.name.trim();

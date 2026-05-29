@@ -124,7 +124,7 @@ export default async function BreakoutArchivePage({
     g.cardCount++;
     if (!g.lastActivity || c.updatedAt > g.lastActivity) g.lastActivity = c.updatedAt;
     const set = authorsByGroup.get(gi) ?? new Set<string>();
-    set.add(c.authorId);
+    if (c.authorId) set.add(c.authorId);
     authorsByGroup.set(gi, set);
   }
   for (const [gi, set] of authorsByGroup) {
