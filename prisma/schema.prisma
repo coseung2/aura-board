@@ -367,10 +367,12 @@ model Board {
   anonymousAuthor   Boolean    @default(false)
 
   // ── Board Share (2026-05-29) ──────────────────────────────────────
-  // Public link sharing. "private" = no share. "view" = anyone with the
-  // shareToken in URL can view the board in read-only mode.
-  shareMode         String     @default("private") // "private" | "view"
+  // Public link sharing. "private" = no share. "view" / "comment" / "edit" =
+  // anyone with the shareToken in URL can access the board with that permission.
+  // shareShortCode provides a short 6-char URL (/s/CODE) for easy typing.
+  shareMode         String     @default("private") // "private" | "view" | "comment" | "edit"
   shareToken        String?    @unique              // nanoid(21), null=not shared
+  shareShortCode    String?    @unique              // 6자 짧은코드 (/s/CODE), null=not shared
 
   classroom          Classroom?          @relation("ClassroomBoards", fields: [classroomId], references: [id], onDelete: SetNull)
   members            BoardMember[]

@@ -1,29 +1,26 @@
 /**
- * /share/[shareToken] — Public board view via share link.
+ * /s/[shortCode] — Short-link public board view.
  *
- * Anyone with the shareToken can view (and optionally edit) the board
- * without authentication. Renders the same board components as the
- * authenticated board page (BoardCanvas, GridBoard, etc.), with
- * share-mode-dependent permissions.
+ * Same as /share/[shareToken] but looks up by the 6-char short code
+ * for easy typing / QR scanning.
  */
 import { notFound } from "next/navigation";
 import { db } from "@/lib/db";
-import { tokensEqual } from "@/lib/share/tokens";
 import { ShareBoardWrapper } from "@/components/share/ShareBoardWrapper";
 
 type SearchParams = Promise<Record<string, string | string[] | undefined>>;
 
-export default async function ShareBoardPage({
+export default async function ShortShareBoardPage({
   params,
 }: {
-  params: Promise<{ shareToken: string }>;
+  params: Promise<{ shortCode: string }>;
   searchParams: SearchParams;
 }) {
-  const { shareToken } = await params;
+  const { shortCode } = await params;
 
-  // Find board by shareToken
+  // Find board by shareShortCode
   const board = await db.board.findUnique({
-    where: { shareToken },
+    where: { shareShortCode: shortCode },
     select: {
       id: true,
       title: true,
@@ -37,9 +34,6 @@ export default async function ShareBoardPage({
     },
   });
   if (!board) notFound();
-  // Timing-safe comparison (defends against token enumeration)
-  if (!tokensEqual(shareToken, board.shareToken)) notFound();
-
   // Only allow view/comment/edit — private boards don't expose share pages
   if (board.shareMode !== "view" && board.shareMode !== "comment" && board.shareMode !== "edit") {
     notFound();
@@ -116,7 +110,6 @@ export default async function ShareBoardPage({
     externalAuthorName: c.externalAuthorName,
     studentAuthorName: c.studentAuthor?.name ?? null,
     authorName: c.author?.name ?? null,
-    // Display-only author info — strip internal IDs for privacy
     authors:
       (c as any).authors?.map((a: any) => ({
         id: a.id,
@@ -149,7 +142,7 @@ export default async function ShareBoardPage({
       initialCards={cardProps}
       initialSections={sectionProps}
       shareMode={board.shareMode as "view" | "comment" | "edit"}
-      shareToken={shareToken}
+      shareToken={board.shareToken!}
     />
   );
 }

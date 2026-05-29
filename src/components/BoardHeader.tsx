@@ -26,6 +26,7 @@ type Props = {
   /** board-share (2026-05-29): 공유 설정. */
   shareMode?: string;
   shareToken?: string | null;
+  shareShortCode?: string | null;
 };
 
 export function BoardHeader({
@@ -41,6 +42,7 @@ export function BoardHeader({
   anonymousAuthor,
   shareMode,
   shareToken,
+  shareShortCode,
 }: Props) {
   const [showQr, setShowQr] = useState(false);
   const isShared = shareMode && shareMode !== "private" && !!shareToken;
@@ -68,6 +70,7 @@ export function BoardHeader({
             anonymousAuthor={anonymousAuthor ?? false}
             shareMode={shareMode}
             shareToken={shareToken}
+            shareShortCode={shareShortCode}
           />
         )}
         <span className="board-layout-badge">{layoutLabel(layout)}</span>
@@ -100,6 +103,7 @@ export function BoardHeader({
         <QrShareModal
           boardId={boardId}
           shareToken={shareToken}
+          shareShortCode={shareShortCode}
           onClose={() => setShowQr(false)}
         />
       )}

@@ -641,6 +641,7 @@ export default async function BoardPage({
         anonymousAuthor={board.anonymousAuthor}
         shareMode={board.shareMode}
         shareToken={board.shareToken}
+        shareShortCode={board.shareShortCode}
       />
       {renderBoard()}
     </main>

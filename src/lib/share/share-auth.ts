@@ -5,8 +5,7 @@
  */
 import { db } from "@/lib/db";
 import { tokensEqual } from "./tokens";
-
-export type SharePermission = "view" | "comment" | "edit";
+import type { SharePermission } from "@/lib/card-permissions";
 
 export type ShareAuth = {
   ok: true;

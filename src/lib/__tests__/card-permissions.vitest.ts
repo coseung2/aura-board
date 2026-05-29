@@ -220,6 +220,7 @@ describe("card-permissions — multi-identity", () => {
       parentId: "p_sky_parent",
       childStudentIds: new Set(["s_sky"]),
     },
+    share: null,
     primary: "teacher",
   };
 
@@ -258,6 +259,7 @@ describe("card-permissions — multi-identity", () => {
       },
       student: { studentId: "s_zen", name: "Zen", classroomId: "c_other" },
       parent: null,
+      share: null,
       primary: "teacher",
     };
     expect(canEditCard(teacherWithStraleStudent, BOARD, CARD_STUDENT_A)).toBe(true);

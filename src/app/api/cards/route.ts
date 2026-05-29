@@ -7,6 +7,7 @@ import { requirePermission, ForbiddenError } from "@/lib/rbac";
 import { isCanvaDesignUrl, resolveCanvaEmbedUrl, expandCanvaShortLink } from "@/lib/canva";
 import { extractVideoId, fetchYouTubeMeta, canonicalUrl } from "@/lib/youtube";
 import { setCardAuthors } from "@/lib/card-authors-service";
+import { requireShareAuth } from "@/lib/share/with-share";
 import { isAllowedFileUrl, isAllowedStoredMime, MAX_ATTACHMENTS_PER_CARD } from "@/lib/file-attachment";
 import { touchBoardUpdatedAt } from "@/lib/board-touch";
 
@@ -129,26 +130,52 @@ export async function POST(req: Request) {
       currentUserName = teacherUser.name;
     } else {
       student = await getCurrentStudent();
-      if (!student) {
-        return NextResponse.json({ error: "unauthenticated" }, { status: 401 });
+      if (student) {
+        const board = await db.board.findUnique({
+          where: { id: input.boardId },
+          select: {
+            classroomId: true,
+            classroom: { select: { teacherId: true } },
+          },
+        });
+        if (!board || !board.classroom) {
+          return NextResponse.json({ error: "board_not_accessible" }, { status: 403 });
+        }
+        if (board.classroomId !== student.classroomId) {
+          return NextResponse.json({ error: "classroom_mismatch" }, { status: 403 });
+        }
+        authorId = board.classroom.teacherId;
+        studentAuthorId = student.id;
+        externalAuthorName = student.name;
+        currentUserName = student.name;
+      } else {
+        // Share visitor path: check x-share-token for edit permission.
+        const shareToken = req.headers.get("x-share-token");
+        if (!shareToken) {
+          return NextResponse.json({ error: "unauthenticated" }, { status: 401 });
+        }
+        const shareResult = await requireShareAuth(shareToken, "edit");
+        if (!("identity" in shareResult)) {
+          return NextResponse.json({ error: shareResult.error }, { status: shareResult.status });
+        }
+        // Verify the share token grants access to this board.
+        if (shareResult.identity.boardId !== input.boardId) {
+          return NextResponse.json({ error: "board_mismatch" }, { status: 403 });
+        }
+        const board = await db.board.findUnique({
+          where: { id: input.boardId },
+          select: {
+            classroomId: true,
+            classroom: { select: { teacherId: true } },
+          },
+        });
+        if (!board || !board.classroom) {
+          return NextResponse.json({ error: "board_not_accessible" }, { status: 403 });
+        }
+        authorId = board.classroom.teacherId;
+        externalAuthorName = shareResult.identity.authorName;
+        currentUserName = shareResult.identity.authorName;
       }
-      const board = await db.board.findUnique({
-        where: { id: input.boardId },
-        select: {
-          classroomId: true,
-          classroom: { select: { teacherId: true } },
-        },
-      });
-      if (!board || !board.classroom) {
-        return NextResponse.json({ error: "board_not_accessible" }, { status: 403 });
-      }
-      if (board.classroomId !== student.classroomId) {
-        return NextResponse.json({ error: "classroom_mismatch" }, { status: 403 });
-      }
-      authorId = board.classroom.teacherId;
-      studentAuthorId = student.id;
-      externalAuthorName = student.name;
-      currentUserName = student.name;
     }
 
     // Canva oEmbed enrichment. For a Canva design URL the SERVER owns
