@@ -9,6 +9,7 @@ type UseCardMutationsOptions = {
   boardId: string;
   canEdit: boolean;
   sections: { id: string; order: number; pinned: boolean }[];
+  cardsRef: { current: CardData[] };
   setCards: React.Dispatch<React.SetStateAction<CardData[]>>;
 };
 
@@ -22,6 +23,12 @@ type UseCardMutationsReturn = {
   ) => Promise<void>;
   handleDuplicateCard: (card: CardData) => Promise<void>;
   moveCard: (cardId: string, targetSectionId: string) => Promise<void>;
+  handleCardReorder: (
+    cardId: string,
+    targetCardId: string,
+    sectionId: string,
+    dropPosition: "before" | "after"
+  ) => Promise<void>;
   handleDragStart: (e: React.DragEvent, cardId: string) => void;
   handleDragEnd: (e: React.DragEvent) => void;
   handleDragOver: (e: React.DragEvent) => void;
@@ -63,9 +70,11 @@ export function useCardMutations({
   boardId,
   canEdit,
   sections,
+  cardsRef,
   setCards,
 }: UseCardMutationsOptions): UseCardMutationsReturn {
   const pendingCardIds = useRef<Set<string>>(new Set());
+
 
   function trackCardMutation<T>(id: string, run: () => Promise<T>): Promise<T> {
     pendingCardIds.current.add(id);
@@ -85,9 +94,9 @@ export function useCardMutations({
   async function handleAdd(data: AddCardData) {
     const targetSection = data.sectionId ?? sections[0]?.id ?? null;
     const order = targetSection
-      ? getCardsForSection(targetSection, []).length
+      ? cardsRef.current.filter((c) => (c.sectionId ?? "") === targetSection)
+          .length
       : 0;
-    // Note: order is recalculated from state inside the callback below.
     try {
       const res = await fetch(`/api/cards`, {
         method: "POST",
@@ -215,6 +224,74 @@ export function useCardMutations({
     }
   }
 
+  /* ── Intra-section card reorder ── */
+  async function handleCardReorder(
+    cardId: string,
+    targetCardId: string,
+    sectionId: string,
+    dropPosition: "before" | "after"
+  ) {
+    let prevCards: CardData[] = [];
+
+    setCards((list) => {
+      prevCards = [...list];
+
+      const sectionCards = list
+        .filter((c) => (c.sectionId ?? "") === sectionId)
+        .sort((a, b) => a.order - b.order);
+
+      const sourceIdx = sectionCards.findIndex((c) => c.id === cardId);
+      const targetIdx = sectionCards.findIndex((c) => c.id === targetCardId);
+      if (sourceIdx === -1 || targetIdx === -1) return list;
+
+      // Rebuild array without the dragged card
+      const reordered = sectionCards.filter((c) => c.id !== cardId);
+
+      // Calculate insertion point: after removing source, target's index shifts
+      let insertAt = reordered.findIndex((c) => c.id === targetCardId);
+      if (dropPosition === "after") insertAt++;
+      if (insertAt > reordered.length) insertAt = reordered.length;
+
+      // Re-insert the dragged card at the new position
+      const movedCard = list.find((c) => c.id === cardId)!;
+      reordered.splice(insertAt, 0, movedCard);
+
+      // Assign sequential orders
+      const orderMap = new Map(reordered.map((c, i) => [c.id, i] as const));
+
+      return list.map((c) => {
+        const o = orderMap.get(c.id);
+        return o !== undefined ? { ...c, order: o } : c;
+      });
+    });
+
+    // Persist to server
+    const updatedSectionCards = prevCards
+      .filter((c) => (c.sectionId ?? "") === sectionId)
+      .sort((a, b) => a.order - b.order);
+
+    const toSave = updatedSectionCards.map((c, i) => ({ id: c.id, order: i }));
+
+    await trackCardMutation(cardId, () =>
+      optimisticMutate(
+        () =>
+          Promise.all(
+            toSave.map(({ id, order }) =>
+              fetch(`/api/cards/${id}`, {
+                method: "PATCH",
+                headers: { "content-type": "application/json" },
+                body: JSON.stringify({ order }),
+              })
+            )
+          ).then((results) => {
+            const ok = results.every((r) => r.ok);
+            return ok ? Response.json({ ok: true }) : Promise.reject();
+          }),
+        () => setCards(prevCards)
+      )
+    );
+  }
+
   /* ── Card drag/drop ── */
   async function moveCard(cardId: string, targetSectionId: string) {
     let newOrder = 0;
@@ -293,6 +370,7 @@ export function useCardMutations({
     handleEditCardSave,
     handleDuplicateCard,
     moveCard,
+    handleCardReorder,
     handleDragStart,
     handleDragEnd,
     handleDragOver,

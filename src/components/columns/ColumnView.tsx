@@ -27,6 +27,12 @@ type Props = {
   onSectionDragEnd: () => void;
   onCardDragStart: (e: React.DragEvent, cardId: string) => void;
   onCardDragEnd: (e: React.DragEvent) => void;
+  onCardDropReorder: (
+    cardId: string,
+    targetCardId: string,
+    sectionId: string,
+    dropPosition: "before" | "after"
+  ) => void;
   onDragOver: (e: React.DragEvent) => void;
   onDragEnter: (id: string) => void;
   onDragLeave: (e: React.DragEvent) => void;
@@ -72,6 +78,7 @@ export function ColumnView(props: Props) {
     onSectionDragEnd,
     onCardDragStart,
     onCardDragEnd,
+    onCardDropReorder,
     onDragOver,
     onDragEnter,
     onDragLeave,
@@ -240,6 +247,29 @@ export function ColumnView(props: Props) {
               draggable={canEdit}
               onDragStart={(e) => onCardDragStart(e, c.id)}
               onDragEnd={onCardDragEnd}
+              onDragOver={(e) => {
+                if (!canEdit) return;
+                e.preventDefault();
+              }}
+              onDrop={(e) => {
+                if (!canEdit) return;
+                e.preventDefault();
+                e.stopPropagation();
+                const draggedId = e.dataTransfer.getData(
+                  "application/card-id"
+                );
+                if (!draggedId || draggedId === c.id) return;
+                const rect = e.currentTarget.getBoundingClientRect();
+                const y = e.clientY - rect.top;
+                const position =
+                  y < rect.height / 2 ? "before" : "after";
+                onCardDropReorder(
+                  draggedId,
+                  c.id,
+                  section.id,
+                  position
+                );
+              }}
               onClick={() => onCardOpen(c)}
               onKeyDown={(e) => {
                 if (e.key === "Enter" || e.key === " ") {

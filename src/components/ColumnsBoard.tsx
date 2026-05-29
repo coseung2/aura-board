@@ -43,6 +43,8 @@ export function ColumnsBoard({
   classroomId,
 }: Props) {
   const [cards, setCards] = useState<CardData[]>(initialCards);
+  const cardsRef = useRef(cards);
+  cardsRef.current = cards;
   const [sections, setSections] = useState<SectionData[]>(
     [...initialSections].sort((a, b) => {
       if (a.pinned && !b.pinned) return -1;
@@ -91,6 +93,7 @@ export function ColumnsBoard({
     handleEditCardSave,
     handleDuplicateCard,
     moveCard,
+    handleCardReorder,
     handleDragStart,
     handleDragEnd,
     handleDragOver,
@@ -98,6 +101,7 @@ export function ColumnsBoard({
     boardId,
     canEdit,
     sections,
+    cardsRef,
     setCards,
   });
 
@@ -168,15 +172,6 @@ export function ColumnsBoard({
     setCards,
   });
 
-  const {
-    handleAdd,
-    handleDeleteCard,
-    handleEditCardSave,
-    handleDuplicateCard,
-    moveCard,
-    handleDragStart,
-    handleDragEnd,
-  }
   // ── Sort & grouping ────────────────────────────────────────────────
 
   async function setSortFor(sectionId: string, mode: SortMode) {
@@ -358,6 +353,7 @@ export function ColumnsBoard({
             onSectionDragEnd={() => setDraggingSectionId(null)}
             onCardDragStart={handleDragStart}
             onCardDragEnd={handleDragEnd}
+            onCardDropReorder={handleCardReorder}
             onDragOver={handleDragOver}
             onDragEnter={(id) => setOverSectionId(id)}
             onDragLeave={(e) => {
