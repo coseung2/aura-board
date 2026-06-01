@@ -144,18 +144,30 @@ export function useSectionMutations({
     targetSectionId: string
   ) {
     if (sectionId === targetSectionId) return;
-    const fromIdx = sections.findIndex((s) => s.id === sectionId);
-    const toIdx = sections.findIndex((s) => s.id === targetSectionId);
+    const visualSections = [...sections].sort(sortSections);
+    const fromIdx = visualSections.findIndex((s) => s.id === sectionId);
+    const toIdx = visualSections.findIndex((s) => s.id === targetSectionId);
     if (fromIdx === -1 || toIdx === -1) return;
 
     const prev = sections;
-    const next = [...sections];
+    const next = [...visualSections];
     const [moved] = next.splice(fromIdx, 1);
     next.splice(toIdx, 0, moved!);
-    const normalised = next.map((s, i) => ({ ...s, order: i }));
+
+    const pinned = next.filter((s) => s.pinned);
+    const unpinned = next.filter((s) => !s.pinned);
+    const orderById = new Map<string, number>();
+    pinned.forEach((s, i) => orderById.set(s.id, i));
+    unpinned.forEach((s, i) => orderById.set(s.id, unpinned.length - 1 - i));
+
+    const normalised = next.map((s) => ({
+      ...s,
+      order: orderById.get(s.id) ?? s.order,
+    }));
     setSections(normalised);
 
-    const changed = normalised.filter((s, i) => prev[i]?.id !== s.id);
+    const prevById = new Map(prev.map((s) => [s.id, s] as const));
+    const changed = normalised.filter((s) => prevById.get(s.id)?.order !== s.order);
     try {
       const responses = await Promise.all(
         changed.map((s) =>

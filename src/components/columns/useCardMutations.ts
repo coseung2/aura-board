@@ -27,7 +27,8 @@ type UseCardMutationsReturn = {
     cardId: string,
     targetCardId: string,
     sectionId: string,
-    dropPosition: "before" | "after"
+    dropPosition: "before" | "after",
+    visibleCardIds?: string[]
   ) => Promise<void>;
   handleDragStart: (e: React.DragEvent, cardId: string) => void;
   handleDragEnd: (e: React.DragEvent) => void;
@@ -229,16 +230,21 @@ export function useCardMutations({
     cardId: string,
     targetCardId: string,
     sectionId: string,
-    dropPosition: "before" | "after"
+    dropPosition: "before" | "after",
+    visibleCardIds?: string[]
   ) {
     let prevCards: CardData[] = [];
+    let toSave: Array<{ id: string; order: number }> = [];
 
     setCards((list) => {
       prevCards = [...list];
 
       const sectionCards = list
         .filter((c) => (c.sectionId ?? "") === sectionId)
-        .sort((a, b) => a.order - b.order);
+        .sort((a, b) => {
+          if (!visibleCardIds) return a.order - b.order;
+          return visibleCardIds.indexOf(a.id) - visibleCardIds.indexOf(b.id);
+        });
 
       const sourceIdx = sectionCards.findIndex((c) => c.id === cardId);
       const targetIdx = sectionCards.findIndex((c) => c.id === targetCardId);
@@ -258,6 +264,7 @@ export function useCardMutations({
 
       // Assign sequential orders
       const orderMap = new Map(reordered.map((c, i) => [c.id, i] as const));
+      toSave = reordered.map((c, i) => ({ id: c.id, order: i }));
 
       return list.map((c) => {
         const o = orderMap.get(c.id);
@@ -265,12 +272,7 @@ export function useCardMutations({
       });
     });
 
-    // Persist to server
-    const updatedSectionCards = prevCards
-      .filter((c) => (c.sectionId ?? "") === sectionId)
-      .sort((a, b) => a.order - b.order);
-
-    const toSave = updatedSectionCards.map((c, i) => ({ id: c.id, order: i }));
+    if (toSave.length === 0) return;
 
     await trackCardMutation(cardId, () =>
       optimisticMutate(

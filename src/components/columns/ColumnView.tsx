@@ -21,7 +21,7 @@ type Props = {
   organizing: string | null;
   authorsForSection: (cards: CardData[]) => RosterEntry[];
   studentForSectionTitle: (title: string) => RosterEntry | null;
-  onSetSort: (mode: SortMode) => void;
+  onSetSort: (mode: SortMode) => void | Promise<void>;
   onPin: (pinned: boolean) => void;
   onSectionDragStart: (id: string) => void;
   onSectionDragEnd: () => void;
@@ -31,8 +31,9 @@ type Props = {
     cardId: string,
     targetCardId: string,
     sectionId: string,
-    dropPosition: "before" | "after"
-  ) => void;
+    dropPosition: "before" | "after",
+    visibleCardIds?: string[]
+  ) => void | Promise<void>;
   onDragOver: (e: React.DragEvent) => void;
   onDragEnter: (id: string) => void;
   onDragLeave: (e: React.DragEvent) => void;
@@ -251,7 +252,7 @@ export function ColumnView(props: Props) {
                 if (!canEdit) return;
                 e.preventDefault();
               }}
-              onDrop={(e) => {
+              onDrop={async (e) => {
                 if (!canEdit) return;
                 e.preventDefault();
                 e.stopPropagation();
@@ -263,11 +264,15 @@ export function ColumnView(props: Props) {
                 const y = e.clientY - rect.top;
                 const position =
                   y < rect.height / 2 ? "before" : "after";
-                onCardDropReorder(
+                if (sortMode !== "manual") {
+                  await onSetSort("manual");
+                }
+                await onCardDropReorder(
                   draggedId,
                   c.id,
                   section.id,
-                  position
+                  position,
+                  sectionCards.map((card) => card.id)
                 );
               }}
               onClick={() => onCardOpen(c)}
