@@ -273,6 +273,31 @@
   color: var(--color-text-muted);
 }
 
+.student-wallet-fd-cancel {
+  align-self: flex-start;
+  margin-top: auto;
+  padding: 5px 10px;
+  border: 1px solid var(--color-bank-negative);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--color-bank-negative);
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.student-wallet-fd-cancel:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.student-wallet-fd-error {
+  margin: 4px 0 0;
+  color: var(--color-bank-negative);
+  font-size: 12px;
+  font-weight: 600;
+}
+
 .student-wallet-empty {
   padding: 16px;
   border-radius: 8px;

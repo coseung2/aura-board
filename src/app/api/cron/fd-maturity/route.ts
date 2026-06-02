@@ -26,13 +26,15 @@ export async function GET(req: Request) {
   let processed = 0;
   for (const fd of mature) {
     try {
-      await db.$transaction(async (tx) => {
-        // Re-check status inside tx (guards against racing invocations)
-        const fresh = await tx.fixedDeposit.findUnique({
-          where: { id: fd.id },
-          select: { status: true },
+      const didProcess = await db.$transaction(async (tx) => {
+        // Atomically claim the deposit before paying out. This prevents a race
+        // with manual early-withdrawal: only the request that flips
+        // status="active" to its terminal state may touch the balance.
+        const claim = await tx.fixedDeposit.updateMany({
+          where: { id: fd.id, status: "active" },
+          data: { status: "matured", maturedAt: now },
         });
-        if (!fresh || fresh.status !== "active") return;
+        if (claim.count === 0) return false;
 
         const interest = Math.floor(fd.principal * (fd.monthlyRate / 100));
         const payout = fd.principal + interest;
@@ -41,10 +43,6 @@ export async function GET(req: Request) {
           where: { id: fd.accountId },
           data: { balance: { increment: payout } },
           select: { balance: true },
-        });
-        await tx.fixedDeposit.update({
-          where: { id: fd.id },
-          data: { status: "matured", maturedAt: now },
         });
         await tx.transaction.create({
           data: {
@@ -58,8 +56,9 @@ export async function GET(req: Request) {
             performedByKind: "system",
           },
         });
+        return true;
       });
-      processed += 1;
+      if (didProcess) processed += 1;
     } catch (e) {
       console.error("[fd-maturity]", fd.id, e);
     }

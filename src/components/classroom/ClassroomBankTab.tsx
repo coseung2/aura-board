@@ -35,6 +35,7 @@ type Overview = {
   totals: { totalBalance: number; activeFDTotal: number };
   recentTransactions: Transaction[];
   viewerKind: "teacher" | "banker";
+  canCancelFD: boolean;
 };
 
 const TYPE_LABEL: Record<string, string> = {
@@ -308,7 +309,7 @@ export function ClassroomBankTab({ classroomId }: Props) {
         </div>
       </div>
 
-      {isTeacher && data.activeFDs.length > 0 && (
+      {data.activeFDs.length > 0 && (
         <section className="bank-fd-section">
           <h3>활성 적금</h3>
           <ul className="bank-fd-list">
@@ -330,14 +331,16 @@ export function ClassroomBankTab({ classroomId }: Props) {
                   <span className="bank-fd-rate">@ {fd.monthlyRate}%</span>
                   <span className="bank-fd-due">D-{daysLeft}</span>
                   <span className="bank-fd-student">{studentName}</span>
-                  <button
-                    type="button"
-                    className="bank-fd-cancel"
-                    onClick={() => handleCancelFD(fd.id)}
-                    disabled={busy}
-                  >
-                    중도해지
-                  </button>
+                  {data.canCancelFD && (
+                    <button
+                      type="button"
+                      className="bank-fd-cancel"
+                      onClick={() => handleCancelFD(fd.id)}
+                      disabled={busy}
+                    >
+                      중도해지
+                    </button>
+                  )}
                 </li>
               );
             })}

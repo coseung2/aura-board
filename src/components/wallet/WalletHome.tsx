@@ -23,6 +23,7 @@ type Transaction = {
 
 type WalletData = {
   studentName: string;
+  classroomId: string;
   balance: number;
   currency: { unitLabel: string; monthlyInterestRate: number | null };
   card: { id: string; cardNumber: string; status: string } | null;
@@ -56,6 +57,8 @@ const TYPE_LABEL: Record<string, string> = {
 export function WalletHome({ duties }: Props) {
   const [data, setData] = useState<WalletData | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [cancellingFD, setCancellingFD] = useState<string | null>(null);
+  const [fdError, setFdError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -77,6 +80,29 @@ export function WalletHome({ duties }: Props) {
     const i = setInterval(load, 15_000); // 15초마다 백그라운드 새로고침
     return () => clearInterval(i);
   }, [load]);
+
+  async function handleCancelFD(fdId: string) {
+    if (!data) return;
+    if (!window.confirm("이 적금을 중도해지할까요? (이자 없이 원금만 반환)")) {
+      return;
+    }
+    setCancellingFD(fdId);
+    setFdError(null);
+    try {
+      const res = await fetch(
+        `/api/classrooms/${data.classroomId}/bank/fixed-deposits/${fdId}/cancel`,
+        { method: "POST" }
+      );
+      if (!res.ok) {
+        const msg = (await res.json().catch(() => ({}))).error;
+        setFdError(typeof msg === "string" ? msg : "해지에 실패했어요");
+        return;
+      }
+      await load();
+    } finally {
+      setCancellingFD(null);
+    }
+  }
 
   if (error) {
     return <p className="wallet-error">{error}</p>;
@@ -176,6 +202,7 @@ export function WalletHome({ duties }: Props) {
               );
               const projected =
                 fd.principal + Math.floor(fd.principal * (fd.monthlyRate / 100));
+              const isCancelling = cancellingFD === fd.id;
               return (
                 <li key={fd.id} className="wallet-fd-card">
                   <div className="wallet-fd-label">적금</div>
@@ -188,10 +215,23 @@ export function WalletHome({ duties }: Props) {
                   <div className="wallet-fd-projected">
                     만기 수령 예상 {projected.toLocaleString()} {unit}
                   </div>
+                  <button
+                    type="button"
+                    className="wallet-fd-cancel"
+                    onClick={() => handleCancelFD(fd.id)}
+                    disabled={isCancelling || cancellingFD !== null}
+                  >
+                    {isCancelling ? "해지 중…" : "중도해지"}
+                  </button>
                 </li>
               );
             })}
           </ul>
+          {fdError && (
+            <p className="wallet-fd-error" role="alert">
+              {fdError}
+            </p>
+          )}
         </section>
       )}
     </div>

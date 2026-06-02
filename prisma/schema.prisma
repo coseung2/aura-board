@@ -1575,7 +1575,7 @@ model Transaction {
   storeItemId     String?
   fixedDepositId  String?
   performedById   String
-  performedByKind String // "teacher" | "banker" | "store-clerk" | "system"
+  performedByKind String // "teacher" | "banker" | "store-clerk" | "system" | "owner"
   createdAt       DateTime @default(now())
 
   account      StudentAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)

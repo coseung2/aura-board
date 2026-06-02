@@ -33,6 +33,9 @@ export async function GET(
   const isBanker = !isTeacher
     ? await hasPermission(classroomId, { studentId: student?.id }, "bank.deposit")
     : false;
+  const canCancelFD = isTeacher
+    ? true
+    : await hasPermission(classroomId, { studentId: student?.id }, "bank.fd.cancel");
   if (!isTeacher && !isBanker) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
@@ -52,7 +55,10 @@ export async function GET(
     orderBy: { maturityDate: "asc" },
   });
 
-  // Recent transactions (teacher: all; banker: own)
+  // Recent transactions (teacher: all; banker: own). Note: `performedByKind:"owner"`
+  // rows (a student cancelling their own deposit) are intentionally excluded
+  // from the banker's "내가 처리한 거래" feed — those happened through the
+  // student portal, not the banker workflow. Teacher view still sees them.
   const recentTransactions = await db.transaction.findMany({
     where: {
       account: { classroomId },
@@ -102,5 +108,6 @@ export async function GET(
       createdAt: t.createdAt.toISOString(),
     })),
     viewerKind: isTeacher ? "teacher" : "banker",
+    canCancelFD,
   });
 }

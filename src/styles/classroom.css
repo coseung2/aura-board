@@ -1678,6 +1678,28 @@
 .wallet-fd-principal { font-size: 18px; font-weight: 700; }
 .wallet-fd-meta { font-size: 11px; color: var(--color-text-muted); }
 .wallet-fd-projected { font-size: 11px; color: var(--color-bank-positive); margin-top: 4px; }
+.wallet-fd-cancel {
+  align-self: flex-end;
+  margin-top: 8px;
+  padding: 5px 10px;
+  border: 1px solid var(--color-bank-negative);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--color-bank-negative);
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.wallet-fd-cancel:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+.wallet-fd-error {
+  margin: 8px 0 0;
+  color: var(--color-bank-negative);
+  font-size: 12px;
+  font-weight: 600;
+}
 .wallet-loading, .wallet-error {
   text-align: center;
   padding: 48px 16px;

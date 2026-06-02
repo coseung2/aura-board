@@ -24,6 +24,7 @@ type Duty = {
 };
 
 type WalletSummary = {
+  classroomId: string;
   balance: number;
   currency: { unitLabel: string; monthlyInterestRate: number | null };
   activeFDs: Array<{
@@ -52,6 +53,8 @@ export function StudentDashboard({
   const router = useRouter();
   const [loggingOut, setLoggingOut] = useState(false);
   const [wallet, setWallet] = useState<WalletSummary | null>(null);
+  const [cancellingFD, setCancellingFD] = useState<string | null>(null);
+  const [fdError, setFdError] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -80,6 +83,36 @@ export function StudentDashboard({
       router.push("/login");
     } catch {
       setLoggingOut(false);
+    }
+  }
+
+  async function handleCancelFD(fdId: string) {
+    if (!window.confirm("이 적금을 중도해지할까요? (이자 없이 원금만 반환)")) {
+      return;
+    }
+    setCancellingFD(fdId);
+    setFdError(null);
+    try {
+      const res = await fetch(
+        `/api/classrooms/${classroomId}/bank/fixed-deposits/${fdId}/cancel`,
+        { method: "POST" }
+      );
+      if (!res.ok) {
+        const msg = (await res.json().catch(() => ({}))).error;
+        setFdError(typeof msg === "string" ? msg : "해지에 실패했어요");
+        return;
+      }
+      // Refetch wallet summary so the chip disappears. On failure we keep
+      // the current wallet state — the cancelled FD chip will remain briefly
+      // stale, but a full router.refresh() would wipe the in-page error
+      // message above and is overkill for a transient fetch blip.
+      const fresh = await fetch("/api/my/wallet", { cache: "no-store" });
+      if (fresh.ok) {
+        const payload = (await fresh.json()) as WalletSummary;
+        setWallet(payload);
+      }
+    } finally {
+      setCancellingFD(null);
     }
   }
 
@@ -138,6 +171,7 @@ export function StudentDashboard({
                         (new Date(fd.maturityDate).getTime() - Date.now()) / 86400000
                       )
                     );
+                    const isCancelling = cancellingFD === fd.id;
                     return (
                       <div key={fd.id} className="student-wallet-fd-chip">
                         <span className="student-wallet-fd-label">적금</span>
@@ -147,6 +181,14 @@ export function StudentDashboard({
                         <span>
                           이자 {fd.monthlyRate}% · D-{daysLeft}
                         </span>
+                        <button
+                          type="button"
+                          className="student-wallet-fd-cancel"
+                          onClick={() => handleCancelFD(fd.id)}
+                          disabled={isCancelling || cancellingFD !== null}
+                        >
+                          {isCancelling ? "해지 중…" : "해지"}
+                        </button>
                       </div>
                     );
                   })
@@ -154,6 +196,11 @@ export function StudentDashboard({
                   <div className="student-wallet-empty">
                     아직 진행 중인 적금이 없어요.
                   </div>
+                )}
+                {fdError && (
+                  <p className="student-wallet-fd-error" role="alert">
+                    {fdError}
+                  </p>
                 )}
               </div>
             </>
