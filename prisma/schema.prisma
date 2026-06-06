@@ -372,10 +372,10 @@ model Board {
   boardTheme        String     @default("pastel-sky")
 
   // ── Board Share (2026-05-29) ──────────────────────────────────────
-  // Public link sharing. "private" = no share. "view" / "comment" / "edit" =
-  // anyone with the shareToken in URL can access the board with that permission.
+  // Public link sharing. "private" = no share. "student" =
+  // anyone with the shareToken in URL can access the board with student permission.
   // shareShortCode provides a short 6-char URL (/s/CODE) for easy typing.
-  shareMode         String     @default("private") // "private" | "view" | "comment" | "edit"
+  shareMode         String     @default("private") // "private" | "student"
   shareToken        String?    @unique              // nanoid(21), null=not shared
   shareShortCode    String?    @unique              // 6자 짧은코드 (/s/CODE), null=not shared
 

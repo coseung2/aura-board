@@ -3,7 +3,7 @@
 /**
  * ShareTab — 보드 공유 설정 (BoardSettingsPanel 에서 사용).
  *
- * - 비공개 / 링크로 보기 드롭다운
+ * - 비공개 / 학생 권한 공유 토글
  * - 공개 시 QR 코드 + 링크 표시
  * - 링크 갱신 / 공유 해제
  */
@@ -69,7 +69,7 @@ export function ShareTab({ boardId, initialShareMode, initialShareToken, initial
     loadQr();
   }, [loadQr]);
 
-  // 모드 변경
+  // 공유 상태 변경
   const handleModeChange = async (nextMode: string) => {
     if (nextMode === mode) return;
     setBusy(true);
@@ -146,24 +146,20 @@ export function ShareTab({ boardId, initialShareMode, initialShareToken, initial
   return (
     <div className="share-tab">
       <p className="section-panel-notice" style={{ marginTop: 0 }}>
-        이 보드를 외부에 공유할 수 있어요. QR 코드나 링크로 누구나 보드를 볼 수 있어요.
+        QR 코드나 링크를 받은 사람에게 학생 권한으로 보드를 공유해요.
       </p>
 
-      {/* 권한 드롭다운 */}
       <div className="share-mode-row">
         <label className="share-mode-label">
-          <span style={{ fontSize: 14, fontWeight: 600 }}>공유 권한</span>
-          <select
+          <span style={{ fontSize: 14, fontWeight: 600 }}>공유</span>
+          <button
+            type="button"
             className="share-mode-select"
-            value={mode}
-            onChange={(e) => handleModeChange(e.target.value)}
+            onClick={() => handleModeChange(isPublic ? "private" : "student")}
             disabled={busy}
           >
-            <option value="private">🔒 비공개</option>
-            <option value="view">👀 링크로 보기</option>
-            <option value="comment">💬 댓글 쓰기</option>
-            <option value="edit">✏️ 편집 가능</option>
-          </select>
+            {isPublic ? "학생 권한 공유 중" : "학생 권한으로 공유"}
+          </button>
         </label>
       </div>
 
@@ -230,6 +226,14 @@ export function ShareTab({ boardId, initialShareMode, initialShareToken, initial
               disabled={busy}
             >
               🔄 새 링크 발급
+            </button>
+            <button
+              type="button"
+              className="share-rotate-btn"
+              onClick={() => handleModeChange("private")}
+              disabled={busy}
+            >
+              공유 해제
             </button>
           </div>
         </div>

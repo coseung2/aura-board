@@ -34,8 +34,7 @@ export default async function ShortShareBoardPage({
     },
   });
   if (!board) notFound();
-  // Only allow view/comment/edit — private boards don't expose share pages
-  if (board.shareMode !== "view" && board.shareMode !== "comment" && board.shareMode !== "edit") {
+  if (board.shareMode !== "student" || !board.shareToken) {
     notFound();
   }
 
@@ -91,7 +90,7 @@ export default async function ShortShareBoardPage({
     color: c.color,
     imageUrl: c.imageUrl,
     thumbUrl: c.thumbUrl,
-    authorId: c.authorId,
+    authorId: c.authorId ?? (c.externalAuthorName ? board.shareToken! : null),
     linkUrl: c.linkUrl,
     linkTitle: c.linkTitle,
     linkDesc: c.linkDesc,
@@ -142,7 +141,7 @@ export default async function ShortShareBoardPage({
       }}
       initialCards={cardProps}
       initialSections={sectionProps}
-      shareMode={board.shareMode as "view" | "comment" | "edit"}
+      shareMode="student"
       shareToken={board.shareToken!}
     />
   );

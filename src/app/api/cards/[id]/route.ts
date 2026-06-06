@@ -85,7 +85,7 @@ export async function PATCH(
     // Share visitor support: check x-share-token and merge ShareIdentity.
     const shareToken = req.headers.get("x-share-token");
     if (shareToken) {
-      const shareResult = await requireShareAuth(shareToken, "edit");
+      const shareResult = await requireShareAuth(shareToken, "student");
       if (!("identity" in shareResult)) {
         return NextResponse.json({ error: shareResult.error }, { status: shareResult.status });
       }
@@ -323,7 +323,7 @@ export async function DELETE(
     // Share visitor support: check x-share-token and merge ShareIdentity.
     const shareToken = _req.headers.get("x-share-token");
     if (shareToken) {
-      const shareResult = await requireShareAuth(shareToken, "edit");
+      const shareResult = await requireShareAuth(shareToken, "student");
       if (!("identity" in shareResult)) {
         return NextResponse.json({ error: shareResult.error }, { status: shareResult.status });
       }

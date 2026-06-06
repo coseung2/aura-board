@@ -140,7 +140,7 @@ export async function POST(req: Request) {
       teacherUser = null;
     }
 
-    let authorId: string;
+    let authorId: string | null;
     let studentAuthorId: string | null = null;
     let externalAuthorName: string | null = null;
     let currentUserName: string | null = null;
@@ -171,12 +171,12 @@ export async function POST(req: Request) {
         externalAuthorName = student.name;
         currentUserName = student.name;
       } else {
-        // Share visitor path: check x-share-token for edit permission.
+        // Share visitor path: unified student permission.
         const shareToken = req.headers.get("x-share-token");
         if (!shareToken) {
           return NextResponse.json({ error: "unauthenticated" }, { status: 401 });
         }
-        const shareResult = await requireShareAuth(shareToken, "edit");
+        const shareResult = await requireShareAuth(shareToken, "student");
         if (!("identity" in shareResult)) {
           return NextResponse.json({ error: shareResult.error }, { status: shareResult.status });
         }
@@ -194,7 +194,7 @@ export async function POST(req: Request) {
         if (!board || !board.classroom) {
           return NextResponse.json({ error: "board_not_accessible" }, { status: 403 });
         }
-        authorId = board.classroom.teacherId;
+        authorId = null;
         externalAuthorName = shareResult.identity.authorName;
         currentUserName = shareResult.identity.authorName;
       }

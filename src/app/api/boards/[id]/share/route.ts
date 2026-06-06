@@ -1,6 +1,6 @@
 /**
- * POST /api/boards/[id]/share  { mode: "view" | "private" }
- *   — shareMode 를 설정. "view" 면 shareToken 자동 발급, "private" 면 shareToken 삭제.
+ * POST /api/boards/[id]/share  { mode: "student" | "private" }
+ *   — shareMode 를 설정. "student" 면 shareToken 자동 발급, "private" 면 shareToken 삭제.
  *
  * POST /api/boards/[id]/share/rotate
  *   — shareToken 만 갱신 (기존 QR/링크 무효화). shareMode 는 유지.
@@ -37,7 +37,7 @@ export async function POST(
     return NextResponse.json({ error: "bad_request" }, { status: 400 });
   }
   const mode = (raw as { mode?: unknown })?.mode;
-  if (mode !== "view" && mode !== "comment" && mode !== "edit" && mode !== "private") {
+  if (mode !== "student" && mode !== "private") {
     return NextResponse.json({ error: "invalid_mode" }, { status: 400 });
   }
 
