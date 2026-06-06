@@ -97,8 +97,10 @@ export const CardBody = memo(function CardBody({
         attachments={card.attachments}
         variant={attachmentsVariant}
       />
-      <Title className="padlet-card-title">{card.title}</Title>
-      <p className={contentClassName}>{card.content}</p>
+      {card.title.trim() && (
+        <Title className="padlet-card-title">{card.title}</Title>
+      )}
+      {card.content.trim() && <p className={contentClassName}>{card.content}</p>}
       {canToggleContent && (
         <button
           type="button"

@@ -167,7 +167,6 @@ export function AddCardModal({
           className="modal-body"
           onSubmit={async (e) => {
             e.preventDefault();
-            if (!title.trim()) return;
             // codex H3: 제출 전 authoritative 상한 검증.
             if (attachments.length > MAX_ATTACHMENTS_PER_CARD) {
               alert(
@@ -184,6 +183,12 @@ export function AddCardModal({
               fileSize: a.fileSize,
               mimeType: a.mimeType,
             })) as AttachmentDraft[];
+            const hasCardBody =
+              title.trim().length > 0 ||
+              content.trim().length > 0 ||
+              Boolean(linkUrl) ||
+              payloadAttachments.length > 0;
+            if (!hasCardBody) return;
             await onAdd({
               title: title.trim(),
               content: content.trim(),
@@ -226,7 +231,6 @@ export function AddCardModal({
             placeholder="카드 제목"
             className="modal-input"
             maxLength={200}
-            required
           />
 
           <label className="modal-field-label">내용</label>

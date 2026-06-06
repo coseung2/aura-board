@@ -128,7 +128,7 @@ export function EditCardModal({ card, onSave, onClose }: Props) {
           className="modal-body"
           onSubmit={async (e) => {
             e.preventDefault();
-            if (!title.trim() || isUploading) return;
+            if (isUploading) return;
             if (attachments.length > MAX_ATTACHMENTS_PER_CARD) {
               alert(`첨부는 카드당 최대 ${MAX_ATTACHMENTS_PER_CARD}개까지 가능합니다.`);
               return;
@@ -142,6 +142,13 @@ export function EditCardModal({ card, onSave, onClose }: Props) {
               mimeType: a.mimeType,
             })) as AttachmentDraft[];
             const firstImage = payloadAttachments.find((a) => a.kind === "image");
+            const hasCardBody =
+              title.trim().length > 0 ||
+              content.trim().length > 0 ||
+              Boolean(linkUrl) ||
+              Boolean(videoUrl) ||
+              payloadAttachments.length > 0;
+            if (!hasCardBody) return;
             await onSave({
               title: title.trim(),
               content: content.trim(),
@@ -163,7 +170,6 @@ export function EditCardModal({ card, onSave, onClose }: Props) {
             placeholder="카드 제목"
             className="modal-input"
             maxLength={200}
-            required
           />
 
           <label className="modal-field-label">내용</label>

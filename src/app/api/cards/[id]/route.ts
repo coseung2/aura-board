@@ -16,7 +16,7 @@ import { isAllowedFileUrl, isAllowedStoredMime, MAX_ATTACHMENTS_PER_CARD } from 
 import { touchBoardUpdatedAt } from "@/lib/board-touch";
 
 const PatchCardSchema = z.object({
-  title: z.string().min(1).max(200).optional(),
+  title: z.string().max(200).optional(),
   content: z.string().max(5000).optional(),
   color: z.string().nullable().optional(),
   imageUrl: z.string().url().nullable().optional(),

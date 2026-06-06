@@ -19,7 +19,7 @@ import { touchBoardUpdatedAt } from "@/lib/board-touch";
 
 const CreateCardSchema = z.object({
   boardId: z.string().min(1),
-  title: z.string().min(1).max(200),
+  title: z.string().max(200).default(""),
   content: z.string().max(5000).default(""),
   color: z.string().nullable().optional(),
   imageUrl: z.string().url().nullable().optional(),
@@ -60,6 +60,20 @@ export async function POST(req: Request) {
   try {
     const body = await req.json();
     const input = CreateCardSchema.parse(body);
+    const hasCardBody =
+      input.title.trim().length > 0 ||
+      input.content.trim().length > 0 ||
+      Boolean(input.imageUrl) ||
+      Boolean(input.linkUrl) ||
+      Boolean(input.videoUrl) ||
+      Boolean(input.fileUrl) ||
+      (input.attachments?.length ?? 0) > 0;
+    if (!hasCardBody) {
+      return NextResponse.json(
+        { error: "title, content, link, or attachment required" },
+        { status: 400 }
+      );
+    }
 
     // card-file-attachment — 파일 필드 출처/MIME 화이트리스트 검증.
     // CreateCardSchema는 형식(url·길이)만 검증하므로, 호스트·허용 MIME은
