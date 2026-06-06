@@ -23,8 +23,6 @@ type Props = {
   settingsSections?: BoardSection[];
   /** card-comments-likes (2026-04-26): 보드 단위 작성자 익명 토글 초기값. */
   anonymousAuthor?: boolean;
-  /** Board visual theme. */
-  boardTheme?: string;
   /** board-share (2026-05-29): 공유 설정. */
   shareMode?: string;
   shareToken?: string | null;
@@ -42,7 +40,6 @@ export function BoardHeader({
   canEdit,
   settingsSections,
   anonymousAuthor,
-  boardTheme,
   shareMode,
   shareToken,
   shareShortCode,
@@ -71,7 +68,6 @@ export function BoardHeader({
             layout={layout}
             sections={settingsSections ?? []}
             anonymousAuthor={anonymousAuthor ?? false}
-            boardTheme={boardTheme ?? "plain"}
             shareMode={shareMode}
             shareToken={shareToken}
             shareShortCode={shareShortCode}

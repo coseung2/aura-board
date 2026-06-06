@@ -21,8 +21,9 @@ const TAB_LABELS: Record<Tab, string> = {
   theme: "테마",
 };
 
-const PLACEHOLDER_COPY: Record<Exclude<Tab, "breakout" | "engagement" | "share" | "theme">, string> = {
+const PLACEHOLDER_COPY: Record<Exclude<Tab, "breakout" | "engagement" | "share">, string> = {
   canva: "도메인 단위 Canva 연동 설정",
+  theme: "보드 배경과 기본 레이아웃",
 };
 
 type Props = {
@@ -33,7 +34,6 @@ type Props = {
   initialSections: BoardSection[];
   /** card-comments-likes (2026-04-26): 참여 탭의 익명 토글 초기값. */
   initialAnonymousAuthor?: boolean;
-  initialBoardTheme?: string;
   /** board-share (2026-05-29): 공유 탭 초기값. */
   initialShareMode?: string;
   initialShareToken?: string | null;
@@ -47,7 +47,6 @@ export function BoardSettingsPanel({
   layout,
   initialSections,
   initialAnonymousAuthor = false,
-  initialBoardTheme = "plain",
   initialShareMode = "private",
   initialShareToken = null,
   initialShareShortCode = null,
@@ -56,7 +55,6 @@ export function BoardSettingsPanel({
   const [tab, setTab] = useState<Tab>("breakout");
   const [sections, setSections] = useState<BoardSection[]>(initialSections);
   const [anonymousAuthor, setAnonymousAuthor] = useState(initialAnonymousAuthor);
-  const [boardTheme, setBoardTheme] = useState(initialBoardTheme);
   const [shareMode, setShareMode] = useState(initialShareMode);
   const [shareToken, setShareToken] = useState<string | null>(initialShareToken);
   const [shareShortCode, setShareShortCode] = useState<string | null>(initialShareShortCode);
@@ -67,9 +65,8 @@ export function BoardSettingsPanel({
     if (open) {
       setSections(initialSections);
       setAnonymousAuthor(initialAnonymousAuthor);
-      setBoardTheme(initialBoardTheme);
     }
-  }, [open, initialSections, initialAnonymousAuthor, initialBoardTheme]);
+  }, [open, initialSections, initialAnonymousAuthor]);
 
   function handleSectionTokenChange(sectionId: string, nextToken: string | null) {
     setSections((list) =>
@@ -89,7 +86,7 @@ export function BoardSettingsPanel({
         style={{ margin: "-16px -20px 16px" }}
       >
         {(Object.keys(TAB_LABELS) as Tab[]).map((key) => {
-          const isPlaceholder = key !== "breakout" && key !== "engagement" && key !== "share" && key !== "theme";
+          const isPlaceholder = key !== "breakout" && key !== "engagement" && key !== "share";
           return (
             <button
               key={key}
@@ -154,22 +151,7 @@ export function BoardSettingsPanel({
         </div>
       )}
 
-      {tab === "theme" && (
-        <div
-          role="tabpanel"
-          id={`${tablistId}-panel-theme`}
-          aria-labelledby={`${tablistId}-tab-theme`}
-        >
-          <ThemeTab
-            boardId={boardId}
-            boardTheme={boardTheme}
-            onChange={setBoardTheme}
-            onSaved={() => router.refresh()}
-          />
-        </div>
-      )}
-
-      {tab !== "breakout" && tab !== "engagement" && tab !== "share" && tab !== "theme" && (
+      {tab !== "breakout" && tab !== "engagement" && tab !== "share" && (
         <div
           role="tabpanel"
           id={`${tablistId}-panel-${tab}`}
@@ -185,89 +167,6 @@ export function BoardSettingsPanel({
         </div>
       )}
     </SidePanel>
-  );
-}
-
-/* ── Theme tab ───────────────────────────────────────── */
-
-function ThemeTab({
-  boardId,
-  boardTheme,
-  onChange,
-  onSaved,
-}: {
-  boardId: string;
-  boardTheme: string;
-  onChange: (theme: string) => void;
-  onSaved: () => void;
-}) {
-  const [busy, setBusy] = useState(false);
-  const [err, setErr] = useState<string | null>(null);
-  const themes = [
-    {
-      id: "plain",
-      label: "기본",
-      desc: "흰 배경과 얇은 구분선",
-    },
-    {
-      id: "pastel",
-      label: "파스텔",
-      desc: "부드러운 색감의 보드 배경",
-    },
-  ];
-
-  async function selectTheme(next: string) {
-    if (next === boardTheme || busy) return;
-    const prev = boardTheme;
-    setBusy(true);
-    setErr(null);
-    onChange(next);
-    try {
-      const r = await fetch(`/api/boards/${boardId}`, {
-        method: "PATCH",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ boardTheme: next }),
-      });
-      if (!r.ok) {
-        onChange(prev);
-        setErr("테마 저장에 실패했어요");
-        return;
-      }
-      onSaved();
-    } catch {
-      onChange(prev);
-      setErr("테마 저장에 실패했어요");
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  return (
-    <div className="board-theme-panel">
-      <p className="section-panel-notice" style={{ marginTop: 0 }}>
-        보드 배경 톤을 선택해요. 게시물은 borderless 그리드에 맞춰 표시됩니다.
-      </p>
-      <div className="board-theme-options" role="radiogroup" aria-label="보드 테마">
-        {themes.map((theme) => (
-          <button
-            key={theme.id}
-            type="button"
-            className={`board-theme-option is-${theme.id}${boardTheme === theme.id ? " is-selected" : ""}`}
-            role="radio"
-            aria-checked={boardTheme === theme.id}
-            disabled={busy}
-            onClick={() => selectTheme(theme.id)}
-          >
-            <span className="board-theme-swatch" aria-hidden="true" />
-            <span className="board-theme-copy">
-              <span className="board-theme-label">{theme.label}</span>
-              <span className="board-theme-desc">{theme.desc}</span>
-            </span>
-          </button>
-        ))}
-      </div>
-      {err && <p className="board-theme-error">{err}</p>}
-    </div>
   );
 }
 

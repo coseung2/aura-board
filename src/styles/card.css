@@ -1,17 +1,15 @@
 /* -------- Card -------- */
 
 .padlet-card {
-  --post-pad-x: 18px;
-  --post-pad-y: 18px;
   background: var(--color-surface);
   color: var(--color-text);
-  border: 0;
-  border-radius: 0;
-  box-shadow: none;
-  padding: var(--post-pad-y) var(--post-pad-x);
+  border: var(--border-card);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-card);
+  padding: 16px 18px 18px;
   /* IMPORTANT: do not transition `transform` — dnd-kit updates it per frame
      during drag; transitioning causes visible lag-then-jump. */
-  transition: background 150ms ease;
+  transition: box-shadow 180ms ease, border-color 180ms ease;
   will-change: transform;
   user-select: none;
   touch-action: none;
@@ -22,12 +20,13 @@
 }
 
 .padlet-card:hover {
-  background: var(--color-surface-alt);
+  box-shadow: var(--shadow-card-hover);
+  border-color: var(--color-border-hover);
 }
 
 .padlet-card.is-dragging {
   cursor: grabbing;
-  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.14);
+  box-shadow: var(--shadow-card-hover);
   opacity: 0.96;
 }
 
@@ -98,7 +97,7 @@
   gap: 8px;
   margin-top: 10px;
   padding-top: 8px;
-  border-top: 1px solid color-mix(in srgb, var(--color-border) 60%, transparent);
+  border-top: 1px solid var(--color-border);
   font-size: 12px;
 }
 
@@ -174,13 +173,13 @@
 /* -------- Card Attachments -------- */
 
 .card-attachments {
-  margin: calc(-1 * var(--post-pad-y, 18px)) calc(-1 * var(--post-pad-x, 18px)) 12px;
+  margin-bottom: 10px;
 }
 
 .card-attach-image {
-  border-radius: 0;
+  border-radius: 8px;
   overflow: hidden;
-  margin-bottom: 1px;
+  margin-bottom: 8px;
   position: relative;
 }
 
@@ -215,9 +214,9 @@
 }
 
 .card-attach-video {
-  border-radius: 0;
+  border-radius: 8px;
   overflow: hidden;
-  margin-bottom: 1px;
+  margin-bottom: 8px;
 }
 
 .card-attach-video iframe {
@@ -235,9 +234,9 @@
   gap: 10px;
   padding: 10px 12px;
   background: var(--color-surface-alt);
-  border: 0;
-  border-radius: 0;
-  margin-bottom: 1px;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  margin-bottom: 8px;
   min-width: 0;
 }
 
@@ -277,7 +276,7 @@
   color: var(--color-accent);
   background: transparent;
   border: 1px solid var(--color-accent);
-  border-radius: 6px;
+  border-radius: 4px;
   text-decoration: none;
   white-space: nowrap;
   transition: background 120ms ease, color 120ms ease;
@@ -293,18 +292,18 @@
 .card-link-preview {
   display: flex;
   flex-direction: column;
-  border: 0;
-  border-radius: 0;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
   overflow: hidden;
   text-decoration: none;
   color: inherit;
-  margin-bottom: 1px;
-  background: var(--color-surface);
-  transition: background 150ms ease;
+  margin-bottom: 8px;
+  transition: border-color 150ms ease, box-shadow 150ms ease;
 }
 
 .card-link-preview:hover {
-  background: var(--color-surface-alt);
+  border-color: var(--color-border-hover);
+  box-shadow: var(--shadow-lift);
 }
 
 .card-link-preview-image {
@@ -361,7 +360,7 @@
   display: block;
   width: 100%;
   max-height: 180px;
-  border-radius: 0;
+  border-radius: 8px;
   background: #000;
 }
 
@@ -421,7 +420,7 @@
   padding-bottom: 56.25%;
   min-height: 90px;
   background: var(--color-bg);
-  border-radius: 0;
+  border-radius: 8px;
   overflow: hidden;
   margin-bottom: 8px;
 }
@@ -550,7 +549,7 @@
   padding-bottom: 56.25%;
   min-height: 90px;
   background: var(--color-bg, #f4f4f5);
-  border-radius: 0;
+  border-radius: 8px;
   overflow: hidden;
 }
 .card-canva-slot-thumbnail,

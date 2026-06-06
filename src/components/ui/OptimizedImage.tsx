@@ -72,7 +72,7 @@ export const OptimizedImage = memo(function OptimizedImage({
   if (failed) {
     return (
       <div className="optimized-img-error" role="img" aria-label={alt || "이미지"}>
-        이미지 없음
+        이미지를 불러올 수 없어요
       </div>
     );
   }

@@ -1,1 +1,0 @@
-ALTER TABLE "Board" ADD COLUMN "boardTheme" TEXT NOT NULL DEFAULT 'plain';

@@ -626,7 +626,7 @@ export default async function BoardPage({
   }
 
   return (
-    <main className="board-page" data-board-theme={board.boardTheme}>
+    <main className="board-page">
       <BoardVisitTracker boardId={board.id} />
       <BoardHeader
         boardId={board.id}
@@ -639,7 +639,6 @@ export default async function BoardPage({
         canEdit={effectiveRole === "owner" || effectiveRole === "editor"}
         settingsSections={settingsSections}
         anonymousAuthor={board.anonymousAuthor}
-        boardTheme={board.boardTheme}
         shareMode={board.shareMode}
         shareToken={board.shareToken}
         shareShortCode={board.shareShortCode}

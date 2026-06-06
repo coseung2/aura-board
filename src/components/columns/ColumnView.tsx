@@ -229,15 +229,6 @@ export function ColumnView(props: Props) {
           />
         )}
       </div>
-      {canEdit && (
-        <button
-          type="button"
-          className="column-add-slot"
-          onClick={onAddInColumn}
-        >
-          + 카드 추가
-        </button>
-      )}
       <div
         className={`column-cards ${
           overSectionId === section.id ? "column-cards-active" : ""
@@ -335,9 +326,18 @@ export function ColumnView(props: Props) {
           );
         })}
         {sectionCards.length === 0 && (
-          <div className="column-empty" aria-label="빈 주제" />
+          <div className="column-empty">카드를 여기로 끌어오세요</div>
         )}
       </div>
+      {canEdit && (
+        <button
+          type="button"
+          className="column-inline-add"
+          onClick={onAddInColumn}
+        >
+          + 카드 추가
+        </button>
+      )}
     </div>
   );
 }

@@ -1,16 +1,6 @@
 import { NextResponse } from "next/server";
-import { createHash } from "crypto";
-import { uploadPreviewImageBuffer } from "@/lib/blob";
-
-const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
-
-function absolutizeUrl(value: string, baseUrl: string): string | null {
-  try {
-    return new URL(value, baseUrl).toString();
-  } catch {
-    return null;
-  }
-}
+import { writeFile } from "fs/promises";
+import path from "path";
 
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
@@ -89,13 +79,7 @@ export async function GET(req: Request) {
       getMeta("twitter:image") ??
       null;
 
-    if (image) {
-      image = absolutizeUrl(image, url);
-    }
-
-    // Cache the OG image through our own storage. This keeps card previews
-    // independent from third-party hotlinking rules and next/image host
-    // allowlists for arbitrary websites.
+    // Cache the OG image locally (Canva and others block direct hotlinking)
     if (image) {
       try {
         const imgRes = await fetch(image, {
@@ -106,28 +90,16 @@ export async function GET(req: Request) {
           },
           signal: AbortSignal.timeout(8000),
         });
-        const contentType = imgRes.headers.get("content-type") ?? "";
-        const contentLength = Number(imgRes.headers.get("content-length") ?? "0");
-        if (
-          imgRes.ok &&
-          contentType.toLowerCase().startsWith("image/") &&
-          (!contentLength || contentLength <= MAX_IMAGE_BYTES)
-        ) {
+        if (imgRes.ok) {
           const buffer = Buffer.from(await imgRes.arrayBuffer());
-          if (buffer.byteLength <= MAX_IMAGE_BYTES) {
-            const hash = createHash("sha256").update(image).digest("hex").slice(0, 16);
-            image = await uploadPreviewImageBuffer(
-              buffer,
-              `link-previews/${hash}-${Date.now()}.webp`,
-            );
-          } else {
-            image = null;
-          }
-        } else {
-          image = null;
+          const ext = image.includes(".png") ? "png" : "jpg";
+          const filename = `og-${Date.now()}-${Math.random().toString(36).slice(2, 6)}.${ext}`;
+          const uploadDir = path.join(process.cwd(), "public", "uploads");
+          await writeFile(path.join(uploadDir, filename), buffer);
+          image = `/uploads/${filename}`;
         }
       } catch {
-        image = null;
+        // Keep remote URL as fallback
       }
     }
 
