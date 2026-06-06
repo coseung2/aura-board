@@ -27,11 +27,13 @@
   align-items: center;
   justify-content: center;
   width: 100%;
-  min-height: 60px;
-  background: var(--color-bg, #f5f5f5);
-  color: var(--color-text-muted, #888);
-  font-size: 0.875rem;
-  padding: 12px;
+  min-height: 34px;
+  height: 100%;
+  background: color-mix(in srgb, var(--color-bg, #f5f5f5) 80%, transparent);
+  color: var(--color-text-faint, #999);
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 6px 8px;
   text-align: center;
 }
 
@@ -40,12 +42,12 @@
 /* Card image slot: match old .card-attach-image img max-height */
 .card-attach-image.optimized-img-wrap {
   height: 180px;
-  border-radius: 8px;
+  border-radius: 0;
 }
 
 /* Card link preview image slot */
 .card-link-preview-image.optimized-img-wrap {
-  height: 140px;
+  height: 112px;
 }
 
 /* Modal file preview */

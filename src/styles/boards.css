@@ -2,28 +2,30 @@
 
 .grid-board {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
   align-items: start;
-  gap: 20px;
-  padding: 0;
+  gap: 1px;
+  padding: 1px;
+  background: color-mix(in srgb, var(--color-border) 70%, transparent);
 }
 
 .grid-card {
+  --post-pad-x: 18px;
+  --post-pad-y: 18px;
   position: relative;
   align-self: start;
   background: var(--color-surface);
   color: var(--color-text);
-  border: var(--border-card);
-  border-radius: var(--radius-card);
-  box-shadow: var(--shadow-card);
-  padding: 20px;
-  min-height: 140px;
-  transition: box-shadow 180ms ease, border-color 180ms ease;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  padding: var(--post-pad-y) var(--post-pad-x);
+  min-height: 180px;
+  transition: background 150ms ease;
 }
 
 .grid-card:hover {
-  box-shadow: var(--shadow-card-hover);
-  border-color: var(--color-border-hover);
+  background: var(--color-surface-alt);
 }
 
 .grid-card:hover .padlet-card-delete {
@@ -33,27 +35,31 @@
 /* -------- Stream Board -------- */
 
 .stream-board {
-  max-width: 640px;
-  margin: 0 auto;
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  align-items: start;
+  gap: 1px;
+  margin: 0;
+  padding: 1px;
+  background: color-mix(in srgb, var(--color-border) 70%, transparent);
 }
 
 .stream-card {
+  --post-pad-x: 20px;
+  --post-pad-y: 18px;
   position: relative;
   background: var(--color-surface);
   color: var(--color-text);
-  border: var(--border-card);
-  border-radius: var(--radius-card);
-  box-shadow: var(--shadow-card);
-  padding: 20px 24px;
-  transition: box-shadow 180ms ease, border-color 180ms ease;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  padding: var(--post-pad-y) var(--post-pad-x);
+  min-height: 190px;
+  transition: background 150ms ease;
 }
 
 .stream-card:hover {
-  box-shadow: var(--shadow-card-hover);
-  border-color: var(--color-border-hover);
+  background: var(--color-surface-alt);
 }
 
 .stream-card:hover .padlet-card-delete {
@@ -90,7 +96,7 @@
   display: flex;
   flex-direction: column;
   min-height: 0;
-  padding-bottom: 24px;
+  padding: 12px 0 24px;
 }
 
 .columns-scrollbar {
@@ -118,8 +124,9 @@
 
 .columns-scroll-area {
   overflow-x: auto;
-  overflow-y: visible;
+  overflow-y: hidden;
   min-height: 0;
+  height: 100%;
   -webkit-overflow-scrolling: touch;
   scrollbar-width: none;
 }
@@ -130,27 +137,58 @@
 
 .columns-board {
   display: flex;
-  gap: 24px;
+  gap: 12px;
   align-items: stretch;
   flex: 1;
-  min-height: 0;
+  min-height: 100%;
   min-width: max-content;
   width: max-content;
-  overflow: visible;
-  padding-bottom: 24px;
+  overflow: hidden;
+  padding: 0 12px 24px;
 }
 
 .column {
-  flex: 0 0 300px;
-  min-width: 300px;
+  flex: 0 0 312px;
+  min-width: 312px;
+  max-height: calc(100dvh - 112px);
   /* flex item은 기본 min-width:auto라 내부 콘텐츠가 본인 폭을 강제해
      300px를 벗어남. 긴 이미지/파일명/iframe이 옆 칼럼을 덮던 증상 해결.
      (card-attachment diagnosis 2026-04-20) */
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 0;
   padding: 0;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.72);
   /* full-height drop zone — just move horizontally to target a column */
+}
+
+.board-page[data-board-theme="pastel"] .columns-board {
+  background: transparent;
+}
+
+.board-page[data-board-theme="pastel"] .column {
+  background: rgba(255, 255, 255, 0.5);
+}
+
+.board-page[data-board-theme="pastel"] .column-cards,
+.board-page[data-board-theme="pastel"] .grid-board,
+.board-page[data-board-theme="pastel"] .stream-board {
+  background: rgba(255, 255, 255, 0.34);
+}
+
+.board-page[data-board-theme="pastel"] .column-card,
+.board-page[data-board-theme="pastel"] .grid-card,
+.board-page[data-board-theme="pastel"] .stream-card,
+.board-page[data-board-theme="pastel"] .padlet-card {
+  background: rgba(255, 255, 255, 0.76);
+}
+
+.board-page[data-board-theme="pastel"] .column-card:hover,
+.board-page[data-board-theme="pastel"] .grid-card:hover,
+.board-page[data-board-theme="pastel"] .stream-card:hover,
+.board-page[data-board-theme="pastel"] .padlet-card:hover {
+  background: rgba(255, 255, 255, 0.9);
 }
 
 .column-cards-active {
@@ -161,23 +199,25 @@
 }
 
 .column-empty {
-  padding: 20px;
-  text-align: center;
-  color: var(--color-text-faint);
-  font-size: 13px;
-  border: 2px dashed var(--color-border);
-  border-radius: 8px;
+  min-height: 18px;
+  background: transparent;
 }
 
 .column-header {
+  position: sticky;
+  top: 0;
+  z-index: 4;
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 10px 14px;
-  background: var(--color-surface);
-  border: var(--border-card);
-  border-radius: var(--radius-card);
-  box-shadow: var(--shadow-card);
+  padding: 12px 14px;
+  background: rgba(255, 255, 255, 0.92);
+  border-bottom: 1px solid color-mix(in srgb, var(--color-border) 70%, transparent);
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
 }
 
 .column-title {
@@ -243,23 +283,38 @@
 .column-cards {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 1px;
   flex: 1;
   min-height: 120px;
-  padding: 4px;
-  border-radius: var(--radius-card);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 1px;
+  border-radius: 0;
+  background: color-mix(in srgb, var(--color-border) 70%, transparent);
   transition: background 200ms ease;
+  scrollbar-width: thin;
+}
+
+.column-cards::-webkit-scrollbar {
+  width: 8px;
+}
+
+.column-cards::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--color-text-faint) 35%, transparent);
+  border-radius: 999px;
 }
 
 .column-card {
+  --post-pad-x: 16px;
+  --post-pad-y: 16px;
   position: relative;
   background: var(--color-surface);
-  border: var(--border-card);
-  border-radius: var(--radius-card);
-  padding: 14px 16px;
-  box-shadow: var(--shadow-card);
+  border: 0;
+  border-radius: 0;
+  padding: var(--post-pad-y) var(--post-pad-x);
+  box-shadow: none;
   cursor: grab;
-  transition: box-shadow 150ms ease, border-color 150ms ease, opacity 150ms ease;
+  transition: background 150ms ease, opacity 150ms ease;
   user-select: none;
   /* overflow:hidden 의도적으로 미설정 — card-ctx-menu 드롭다운이
      `position:absolute; top:100%`로 카드 아래로 나와야 하는데 hidden은
@@ -270,8 +325,7 @@
 }
 
 .column-card:hover {
-  box-shadow: var(--shadow-card-hover);
-  border-color: var(--color-border-hover);
+  background: var(--color-surface-alt);
 }
 
 /* column cards use context menu instead of padlet-card-delete */
@@ -309,6 +363,26 @@
 
 .column-unsectioned {
   opacity: 0.6;
+}
+
+.column-add-slot {
+  flex: 0 0 auto;
+  width: 100%;
+  min-height: 42px;
+  border: 0;
+  border-bottom: 1px solid color-mix(in srgb, var(--color-border) 70%, transparent);
+  background: rgba(255, 255, 255, 0.58);
+  color: var(--color-text-muted);
+  font-family: var(--font-body);
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 150ms ease, color 150ms ease;
+}
+
+.column-add-slot:hover {
+  background: var(--color-accent-tinted-bg);
+  color: var(--color-accent-tinted-text);
 }
 
 .column-inline-add {

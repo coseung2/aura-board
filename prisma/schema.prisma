@@ -365,6 +365,9 @@ model Board {
   // 보드 단위 토글: 카드 작성자/댓글 작성자 표기를 익명("익명") 으로 마스킹.
   // 좋아요 카운트는 영향 없음 (누가 눌렀는지는 어차피 비공개).
   anonymousAuthor   Boolean    @default(false)
+  // Board visual theme. "plain" = current white surface, "pastel" =
+  // soft pastel board background for borderless/full-bleed post grids.
+  boardTheme        String     @default("plain")
 
   // ── Board Share (2026-05-29) ──────────────────────────────────────
   // Public link sharing. "private" = no share. "view" / "comment" / "edit" =

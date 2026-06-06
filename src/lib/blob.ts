@@ -128,6 +128,40 @@ export async function resizeToWebPThumbUrl(
 }
 
 /**
+ * Normalize an arbitrary remote preview image into a small public WebP.
+ * Link previews use this so cards never depend on third-party hotlinking
+ * rules or next/image remotePatterns for every possible OG image host.
+ */
+export async function uploadPreviewImageBuffer(
+  input: Buffer,
+  pathname: string
+): Promise<string> {
+  const webp = await sharp(input)
+    .rotate()
+    .resize(1200, 630, { fit: "inside", withoutEnlargement: true })
+    .webp({ quality: 78 })
+    .toBuffer();
+
+  const blobToken = process.env.BLOB_READ_WRITE_TOKEN;
+  if (blobToken) {
+    const out = await put(pathname, webp, {
+      access: "public",
+      contentType: "image/webp",
+      token: blobToken,
+      multipart: false,
+      addRandomSuffix: false,
+    });
+    return out.url;
+  }
+
+  const safe = `${randomBytes(4).toString("hex")}-${pathname.replace(/[^a-zA-Z0-9_.-]/g, "_")}`;
+  const abs = path.join(process.cwd(), "public", "uploads", safe);
+  await mkdir(path.dirname(abs), { recursive: true });
+  await writeFile(abs, webp);
+  return `/uploads/${safe}`;
+}
+
+/**
  * Exported for the test harness only — the real sharp pipeline is not
  * mockable, so the test drives a PNG buffer through this and inspects the
  * WebP magic bytes. Route code should call `resizeToWebPThumbUrl`.
