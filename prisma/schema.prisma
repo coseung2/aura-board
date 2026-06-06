@@ -366,6 +366,11 @@ model Board {
   // 좋아요 카운트는 영향 없음 (누가 눌렀는지는 어차피 비공개).
   anonymousAuthor   Boolean    @default(false)
 
+  // ── Board theme (2026-06-06) ──────────────────────────────────────
+  // "plain" | "pastel-peach" | "pastel-mint" | "pastel-sky" |
+  // "pastel-lilac" | "pastel-lemon"
+  boardTheme        String     @default("plain")
+
   // ── Board Share (2026-05-29) ──────────────────────────────────────
   // Public link sharing. "private" = no share. "view" / "comment" / "edit" =
   // anyone with the shareToken in URL can access the board with that permission.

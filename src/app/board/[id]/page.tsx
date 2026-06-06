@@ -25,6 +25,7 @@ import type { BoardSection } from "@/components/BoardSettingsPanel";
 import { BoardVisitTracker } from "@/components/BoardVisitTracker";
 import { BoardHeader } from "@/components/BoardHeader";
 import { loadPlantJournalInitial } from "@/lib/board-page/plant-journal-loader";
+import type { BoardTheme } from "@/components/BoardSettingsPanel";
 
 // Auth + cookie reads already flag this route as dynamic.
 // Dropping the explicit flag keeps the Router Cache warm for navigations.
@@ -36,6 +37,19 @@ export default async function BoardPage({
   params: Promise<{ id: string }>;
   searchParams: Promise<{ view?: string }>;
 }) {
+  const normalizeBoardTheme = (value: string | null | undefined): BoardTheme => {
+    switch (value) {
+      case "pastel-peach":
+      case "pastel-mint":
+      case "pastel-sky":
+      case "pastel-lilac":
+      case "pastel-lemon":
+        return value;
+      default:
+        return "plain";
+    }
+  };
+
   const { id } = await params;
   const { view: viewParam } = await searchParams;
   // AC-13 matrix guard reads UA server-side. Best-effort — iPad Pro in
@@ -287,10 +301,11 @@ export default async function BoardPage({
     title: s.title,
     accessToken: s.accessToken,
   }));
+  const boardTheme = normalizeBoardTheme(board.boardTheme);
 
   if (!effectiveRole) {
     return (
-      <main className="board-page">
+      <main className="board-page" data-board-theme={boardTheme}>
         <BoardHeader title={board.title} layout={board.layout} canEdit={false} />
         <div className="forbidden-card">
           <h2>접근 불가</h2>
@@ -626,7 +641,7 @@ export default async function BoardPage({
   }
 
   return (
-    <main className="board-page">
+    <main className="board-page" data-board-theme={boardTheme}>
       <BoardVisitTracker boardId={board.id} />
       <BoardHeader
         boardId={board.id}
@@ -639,6 +654,7 @@ export default async function BoardPage({
         canEdit={effectiveRole === "owner" || effectiveRole === "editor"}
         settingsSections={settingsSections}
         anonymousAuthor={board.anonymousAuthor}
+        boardTheme={boardTheme}
         shareMode={board.shareMode}
         shareToken={board.shareToken}
         shareShortCode={board.shareShortCode}

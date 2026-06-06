@@ -105,8 +105,8 @@ export const CanvaEmbedSlot = memo(function CanvaEmbedSlot({
     return () => window.clearTimeout(t);
   }, [active, iframeLoaded, iframeFailed]);
 
-  // When THIS slot is the one evicted by LRU overflow, show a brief toast
-  // on its header. Other slots ignore the eviction event.
+  // When THIS slot is the one evicted by LRU overflow, keep the old state
+  // bookkeeping. The visible toast was removed with the live/thumbnail badge.
   useEffect(() => {
     if (!lastEviction) return;
     if (lastEviction.id !== slotId) return;
@@ -123,15 +123,6 @@ export const CanvaEmbedSlot = memo(function CanvaEmbedSlot({
     [activate, slotId],
   );
 
-  const handleToggle = useCallback(
-    (e: MouseEvent | KeyboardEvent) => {
-      e.stopPropagation();
-      if (active) deactivate(slotId);
-      else activate(slotId);
-    },
-    [active, activate, deactivate, slotId],
-  );
-
   const handleKeyDownActivate = useCallback(
     (e: KeyboardEvent<HTMLDivElement>) => {
       if (e.key === "Enter" || e.key === " ") {
@@ -140,16 +131,6 @@ export const CanvaEmbedSlot = memo(function CanvaEmbedSlot({
       }
     },
     [handleActivate],
-  );
-
-  const handleKeyDownToggle = useCallback(
-    (e: KeyboardEvent<HTMLButtonElement>) => {
-      if (e.key === "Enter" || e.key === " ") {
-        e.preventDefault();
-        handleToggle(e);
-      }
-    },
-    [handleToggle],
   );
 
   // Derive embed src from the original linkUrl so public "공개 보기" share
@@ -199,6 +180,7 @@ export const CanvaEmbedSlot = memo(function CanvaEmbedSlot({
   // eviction once IO reports genuine visibility. The LRU cap (3) still
   // prevents runaway iframe counts regardless.
   const shouldRenderIframe = active;
+  void evictedToast;
 
   return (
     <div
@@ -207,31 +189,6 @@ export const CanvaEmbedSlot = memo(function CanvaEmbedSlot({
       data-active={active ? "true" : "false"}
       data-loaded={iframeLoaded ? "true" : "false"}
     >
-      {/* Header badge: clickable / keyboard toggle between thumbnail and live. */}
-      <div className="card-canva-slot-header">
-        <button
-          type="button"
-          className="card-canva-mode-badge"
-          data-mode={active ? "live" : "thumbnail"}
-          aria-pressed={active}
-          aria-label={
-            active
-              ? "라이브 모드 끄기 (썸네일로 전환)"
-              : "라이브 모드 켜기 (Canva 에디터 로드)"
-          }
-          onClick={handleToggle}
-          onKeyDown={handleKeyDownToggle}
-        >
-          <span className="card-canva-mode-dot" aria-hidden="true" />
-          {active ? "라이브" : "썸네일"}
-        </button>
-        {evictedToast && (
-          <span className="card-canva-eviction-toast" role="status">
-            {evictedToast}
-          </span>
-        )}
-      </div>
-
       <div className="card-canva-slot-frame">
         {linkImage ? (
           // Thumbnail always painted underneath — acts as LCP image and as
@@ -271,10 +228,6 @@ export const CanvaEmbedSlot = memo(function CanvaEmbedSlot({
             className="card-canva-slot-iframe"
           />
         ) : (
-          // Thumbnail-mode play overlay. The whole overlay is itself a
-          // button-like region: tap to activate. Keyboard users get
-          // Enter/Space via the onKeyDown handler. role="button" + tabIndex
-          // surface it to AT.
           <div
             role="button"
             tabIndex={0}
@@ -286,7 +239,6 @@ export const CanvaEmbedSlot = memo(function CanvaEmbedSlot({
             <span className="card-canva-slot-play-icon" aria-hidden="true">
               <PlayIcon size={20} />
             </span>
-            <span className="card-canva-slot-overlay-label">라이브 모드</span>
           </div>
         )}
       </div>

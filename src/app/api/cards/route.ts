@@ -4,7 +4,12 @@ import { db } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
 import { getCurrentStudent } from "@/lib/student-auth";
 import { requirePermission, ForbiddenError } from "@/lib/rbac";
-import { isCanvaDesignUrl, resolveCanvaEmbedUrl, expandCanvaShortLink } from "@/lib/canva";
+import {
+  deriveCanvaThumbnailUrl,
+  expandCanvaShortLink,
+  isCanvaDesignUrl,
+  resolveCanvaEmbedUrl,
+} from "@/lib/canva";
 import { extractVideoId, fetchYouTubeMeta, canonicalUrl } from "@/lib/youtube";
 import { setCardAuthors } from "@/lib/card-authors-service";
 import { requireShareAuth } from "@/lib/share/with-share";
@@ -211,8 +216,12 @@ export async function POST(req: Request) {
         // oEmbed failed (anonymous 401 is the common path). The iframe
         // can still render when the URL carries a share token — the
         // client's canRenderCanvaEmbed gate opens in that case. We
-        // just don't have a thumbnail.
-        linkImage = null;
+        // just don't have a server-derived thumbnail. Preserve a client
+        // preview thumbnail when AddCardModal already resolved one.
+        linkImage =
+          input.linkImage === undefined
+            ? deriveCanvaThumbnailUrl(linkUrl)
+            : input.linkImage ?? deriveCanvaThumbnailUrl(linkUrl);
       }
     } else if (linkUrl) {
       // YouTube oEmbed enrichment. Matches the DJ queue submit handler so

@@ -39,13 +39,13 @@
 
 /* Card image slot: match old .card-attach-image img max-height */
 .card-attach-image.optimized-img-wrap {
-  height: 180px;
+  height: 152px;
   border-radius: 8px;
 }
 
 /* Card link preview image slot */
 .card-link-preview-image.optimized-img-wrap {
-  height: 140px;
+  height: 112px;
 }
 
 /* Modal file preview */

@@ -34,11 +34,34 @@ type Props = {
   initialSections: BoardSection[];
   /** card-comments-likes (2026-04-26): 참여 탭의 익명 토글 초기값. */
   initialAnonymousAuthor?: boolean;
+  initialBoardTheme?: BoardTheme;
   /** board-share (2026-05-29): 공유 탭 초기값. */
   initialShareMode?: string;
   initialShareToken?: string | null;
   initialShareShortCode?: string | null;
 };
+
+export type BoardTheme =
+  | "plain"
+  | "pastel-peach"
+  | "pastel-mint"
+  | "pastel-sky"
+  | "pastel-lilac"
+  | "pastel-lemon";
+
+const BOARD_THEME_OPTIONS: Array<{
+  value: BoardTheme;
+  label: string;
+  tone: string;
+  swatch: string;
+}> = [
+  { value: "plain", label: "기본", tone: "화이트", swatch: "linear-gradient(135deg, #ffffff 0%, #f4f6fb 100%)" },
+  { value: "pastel-peach", label: "복숭아", tone: "핑크 코랄", swatch: "linear-gradient(135deg, #fff4ef 0%, #ffe1dc 100%)" },
+  { value: "pastel-mint", label: "민트", tone: "민트 그린", swatch: "linear-gradient(135deg, #f2fff8 0%, #d9f6ea 100%)" },
+  { value: "pastel-sky", label: "하늘", tone: "소프트 블루", swatch: "linear-gradient(135deg, #f2f8ff 0%, #dcecff 100%)" },
+  { value: "pastel-lilac", label: "라일락", tone: "연보라", swatch: "linear-gradient(135deg, #f8f4ff 0%, #eadfff 100%)" },
+  { value: "pastel-lemon", label: "레몬", tone: "웜 옐로", swatch: "linear-gradient(135deg, #fffdf1 0%, #fff1c9 100%)" },
+];
 
 export function BoardSettingsPanel({
   open,
@@ -47,6 +70,7 @@ export function BoardSettingsPanel({
   layout,
   initialSections,
   initialAnonymousAuthor = false,
+  initialBoardTheme = "plain",
   initialShareMode = "private",
   initialShareToken = null,
   initialShareShortCode = null,
@@ -55,6 +79,7 @@ export function BoardSettingsPanel({
   const [tab, setTab] = useState<Tab>("breakout");
   const [sections, setSections] = useState<BoardSection[]>(initialSections);
   const [anonymousAuthor, setAnonymousAuthor] = useState(initialAnonymousAuthor);
+  const [boardTheme, setBoardTheme] = useState<BoardTheme>(initialBoardTheme);
   const [shareMode, setShareMode] = useState(initialShareMode);
   const [shareToken, setShareToken] = useState<string | null>(initialShareToken);
   const [shareShortCode, setShareShortCode] = useState<string | null>(initialShareShortCode);
@@ -65,8 +90,9 @@ export function BoardSettingsPanel({
     if (open) {
       setSections(initialSections);
       setAnonymousAuthor(initialAnonymousAuthor);
+      setBoardTheme(initialBoardTheme);
     }
-  }, [open, initialSections, initialAnonymousAuthor]);
+  }, [open, initialSections, initialAnonymousAuthor, initialBoardTheme]);
 
   function handleSectionTokenChange(sectionId: string, nextToken: string | null) {
     setSections((list) =>
@@ -151,7 +177,21 @@ export function BoardSettingsPanel({
         </div>
       )}
 
-      {tab !== "breakout" && tab !== "engagement" && tab !== "share" && (
+      {tab === "theme" && (
+        <div
+          role="tabpanel"
+          id={`${tablistId}-panel-theme`}
+          aria-labelledby={`${tablistId}-tab-theme`}
+        >
+          <ThemeTab
+            boardId={boardId}
+            value={boardTheme}
+            onChange={setBoardTheme}
+          />
+        </div>
+      )}
+
+      {tab !== "breakout" && tab !== "engagement" && tab !== "share" && tab !== "theme" && (
         <div
           role="tabpanel"
           id={`${tablistId}-panel-${tab}`}
@@ -242,6 +282,80 @@ function EngagementTab({
       {err && (
         <p style={{ color: "var(--color-danger)", fontSize: 12, margin: 0 }}>{err}</p>
       )}
+    </div>
+  );
+}
+
+function ThemeTab({
+  boardId,
+  value,
+  onChange,
+}: {
+  boardId: string;
+  value: BoardTheme;
+  onChange: (next: BoardTheme) => void;
+}) {
+  const router = useRouter();
+  const [busy, setBusy] = useState<BoardTheme | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  async function selectTheme(next: BoardTheme) {
+    if (next === value || busy) return;
+    const prev = value;
+    onChange(next);
+    setBusy(next);
+    setError(null);
+    try {
+      const res = await fetch(`/api/boards/${boardId}`, {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ boardTheme: next }),
+      });
+      if (!res.ok) {
+        onChange(prev);
+        setError("테마 저장에 실패했어요");
+        return;
+      }
+      router.refresh();
+    } catch {
+      onChange(prev);
+      setError("테마 저장에 실패했어요");
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+      <p className="section-panel-notice" style={{ marginTop: 0 }}>
+        보드 배경을 기본 또는 파스텔 톤 5가지 중에서 골라요.
+      </p>
+      <div className="board-theme-grid">
+        {BOARD_THEME_OPTIONS.map((option) => {
+          const selected = option.value === value;
+          return (
+            <button
+              key={option.value}
+              type="button"
+              className={`board-theme-option ${selected ? "is-selected" : ""}`}
+              onClick={() => void selectTheme(option.value)}
+              aria-pressed={selected}
+              disabled={busy !== null}
+            >
+              <span
+                className="board-theme-swatch"
+                style={{ background: option.swatch }}
+                aria-hidden="true"
+              />
+              <span className="board-theme-copy">
+                <span className="board-theme-label">{option.label}</span>
+                <span className="board-theme-tone">{option.tone}</span>
+              </span>
+            </button>
+          );
+        })}
+      </div>
+      {error && <p style={{ color: "var(--color-danger)", fontSize: 12, margin: 0 }}>{error}</p>}
     </div>
   );
 }

@@ -186,7 +186,7 @@
 .card-attach-image img {
   display: block;
   width: 100%;
-  max-height: 180px;
+  max-height: 152px;
   object-fit: cover;
 }
 
@@ -308,7 +308,7 @@
 
 .card-link-preview-image {
   width: 100%;
-  max-height: 140px;
+  max-height: 112px;
   overflow: hidden;
   background: var(--color-bg);
 }
@@ -321,7 +321,7 @@
 }
 
 .card-link-preview-body {
-  padding: 10px 12px;
+  padding: 9px 11px;
   display: flex;
   flex-direction: column;
   gap: 3px;
@@ -460,7 +460,7 @@
   margin-bottom: 8px;
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 0;
 }
 
 .card-canva-slot-header {
@@ -546,8 +546,8 @@
 .card-canva-slot-frame {
   position: relative;
   width: 100%;
-  padding-bottom: 56.25%;
-  min-height: 90px;
+  padding-bottom: 50%;
+  min-height: 76px;
   background: var(--color-bg, #f4f4f5);
   border-radius: 8px;
   overflow: hidden;

@@ -10,6 +10,16 @@ const PatchBoardSchema = z.object({
   classroomId: z.string().nullable().optional(),
   // card-comments-likes (2026-04-26)
   anonymousAuthor: z.boolean().optional(),
+  boardTheme: z
+    .enum([
+      "plain",
+      "pastel-peach",
+      "pastel-mint",
+      "pastel-sky",
+      "pastel-lilac",
+      "pastel-lemon",
+    ])
+    .optional(),
 });
 
 export async function GET(

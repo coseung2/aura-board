@@ -1,6 +1,11 @@
 import { NextResponse } from "next/server";
 import { writeFile } from "fs/promises";
 import path from "path";
+import {
+  deriveCanvaThumbnailUrl,
+  isCanvaDesignUrl,
+  resolveCanvaEmbedUrl,
+} from "@/lib/canva";
 
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
@@ -11,6 +16,25 @@ export async function GET(req: Request) {
   }
 
   try {
+    if (isCanvaDesignUrl(url)) {
+      const embed = await resolveCanvaEmbedUrl(url);
+      if (embed) {
+        return NextResponse.json({
+          title: embed.title,
+          description: embed.authorName ? `by ${embed.authorName}` : null,
+          image: embed.thumbnailUrl,
+        });
+      }
+      const derivedImage = deriveCanvaThumbnailUrl(url);
+      if (derivedImage) {
+        return NextResponse.json({
+          title: "Canva design",
+          description: null,
+          image: derivedImage,
+        });
+      }
+    }
+
     const res = await fetch(url, {
       redirect: "follow",
       headers: {
@@ -79,7 +103,7 @@ export async function GET(req: Request) {
       getMeta("twitter:image") ??
       null;
 
-    // Cache the OG image locally (Canva and others block direct hotlinking)
+    // Cache the OG image locally (some sites block direct hotlinking)
     if (image) {
       try {
         const imgRes = await fetch(image, {

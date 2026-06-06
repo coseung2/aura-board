@@ -488,6 +488,26 @@ export function hasCanvaShareToken(rawUrl: string | null | undefined): boolean {
   }
 }
 
+export function deriveCanvaThumbnailUrl(rawUrl: string | null | undefined): string | null {
+  if (!rawUrl) return null;
+  try {
+    const u = new URL(rawUrl);
+    const host = u.hostname.toLowerCase();
+    if (host !== "canva.com" && host !== "www.canva.com") return null;
+    const m = u.pathname.match(
+      /\/design\/([A-Za-z0-9_-]+)(?:\/([A-Za-z0-9_-]+))?\/(?:view|watch|edit)/
+    );
+    if (!m) return null;
+    const [, designId, shareToken] = m;
+    const pathPrefix = shareToken
+      ? `/design/${designId}/${shareToken}`
+      : `/design/${designId}`;
+    return `https://www.canva.com${pathPrefix}/screen?type=thumbnail`;
+  } catch {
+    return null;
+  }
+}
+
 // Async resolver — may do 1 short-link HEAD plus 1 oEmbed fetch.
 // Returns null on any failure so callers can fall back to the link-preview
 // path without a throw.

@@ -229,106 +229,6 @@ export function ColumnView(props: Props) {
           />
         )}
       </div>
-      <div
-        className={`column-cards ${
-          overSectionId === section.id ? "column-cards-active" : ""
-        }`}
-      >
-        {sectionCards.map((c) => {
-          const canModify =
-            currentRole === "owner" ||
-            (currentRole === "editor" && c.authorId === currentUserId) ||
-            c.studentAuthorId === currentUserId;
-
-          return (
-            <article
-              key={c.id}
-              className="column-card is-clickable"
-              style={{ backgroundColor: c.color ?? undefined }}
-              draggable={canEdit}
-              onDragStart={(e) => onCardDragStart(e, c.id)}
-              onDragEnd={onCardDragEnd}
-              onDragOver={(e) => {
-                if (!canEdit) return;
-                e.preventDefault();
-              }}
-              onDrop={async (e) => {
-                if (!canEdit) return;
-                e.preventDefault();
-                e.stopPropagation();
-                const draggedId = e.dataTransfer.getData(
-                  "application/card-id"
-                );
-                if (!draggedId || draggedId === c.id) return;
-                const rect = e.currentTarget.getBoundingClientRect();
-                const y = e.clientY - rect.top;
-                const position =
-                  y < rect.height / 2 ? "before" : "after";
-                if (sortMode !== "manual") {
-                  await onSetSort("manual");
-                }
-                await onCardDropReorder(
-                  draggedId,
-                  c.id,
-                  section.id,
-                  position,
-                  sectionCards.map((card) => card.id)
-                );
-              }}
-              onClick={() => onCardOpen(c)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" || e.key === " ") {
-                  e.preventDefault();
-                  onCardOpen(c);
-                }
-              }}
-              tabIndex={0}
-              role="button"
-            >
-              <CardBody card={c} titleAs="h4" />
-              {canModify && (
-                <div
-                  className="card-ctx-menu"
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  <ContextMenu
-                    items={[
-                      {
-                        label: "수정",
-                        icon: "✏️",
-                        onClick: () => onCardEdit(c),
-                      },
-                      ...(canEdit || c.studentAuthorId === currentUserId
-                        ? [
-                            {
-                              label: "작성자 지정",
-                              icon: "👥",
-                              onClick: () => onCardEditAuthors(c),
-                            },
-                          ]
-                        : []),
-                      {
-                        label: "복제",
-                        icon: "📋",
-                        onClick: () => onCardDuplicate(c),
-                      },
-                      {
-                        label: "삭제",
-                        icon: "🗑️",
-                        danger: true,
-                        onClick: () => onCardDelete(c.id),
-                      },
-                    ]}
-                  />
-                </div>
-              )}
-            </article>
-          );
-        })}
-        {sectionCards.length === 0 && (
-          <div className="column-empty">카드를 여기로 끌어오세요</div>
-        )}
-      </div>
       {canEdit && (
         <button
           type="button"
@@ -338,6 +238,108 @@ export function ColumnView(props: Props) {
           + 카드 추가
         </button>
       )}
+      <div className="column-cards-scroll">
+        <div
+          className={`column-cards ${
+            overSectionId === section.id ? "column-cards-active" : ""
+          }`}
+        >
+          {sectionCards.map((c) => {
+            const canModify =
+              currentRole === "owner" ||
+              (currentRole === "editor" && c.authorId === currentUserId) ||
+              c.studentAuthorId === currentUserId;
+
+            return (
+              <article
+                key={c.id}
+                className="column-card is-clickable"
+                style={{ backgroundColor: c.color ?? undefined }}
+                draggable={canEdit}
+                onDragStart={(e) => onCardDragStart(e, c.id)}
+                onDragEnd={onCardDragEnd}
+                onDragOver={(e) => {
+                  if (!canEdit) return;
+                  e.preventDefault();
+                }}
+                onDrop={async (e) => {
+                  if (!canEdit) return;
+                  e.preventDefault();
+                  e.stopPropagation();
+                  const draggedId = e.dataTransfer.getData(
+                    "application/card-id"
+                  );
+                  if (!draggedId || draggedId === c.id) return;
+                  const rect = e.currentTarget.getBoundingClientRect();
+                  const y = e.clientY - rect.top;
+                  const position =
+                    y < rect.height / 2 ? "before" : "after";
+                  if (sortMode !== "manual") {
+                    await onSetSort("manual");
+                  }
+                  await onCardDropReorder(
+                    draggedId,
+                    c.id,
+                    section.id,
+                    position,
+                    sectionCards.map((card) => card.id)
+                  );
+                }}
+                onClick={() => onCardOpen(c)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    onCardOpen(c);
+                  }
+                }}
+                tabIndex={0}
+                role="button"
+              >
+                <CardBody card={c} titleAs="h4" />
+                {canModify && (
+                  <div
+                    className="card-ctx-menu"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <ContextMenu
+                      items={[
+                        {
+                          label: "수정",
+                          icon: "✏️",
+                          onClick: () => onCardEdit(c),
+                        },
+                        ...(canEdit || c.studentAuthorId === currentUserId
+                          ? [
+                              {
+                                label: "작성자 지정",
+                                icon: "👥",
+                                onClick: () => onCardEditAuthors(c),
+                              },
+                            ]
+                          : []),
+                        {
+                          label: "복제",
+                          icon: "📋",
+                          onClick: () => onCardDuplicate(c),
+                        },
+                        {
+                          label: "삭제",
+                          icon: "🗑️",
+                          danger: true,
+                          onClick: () => onCardDelete(c.id),
+                        },
+                      ]}
+                    />
+                  </div>
+                )}
+              </article>
+            );
+          })}
+          {sectionCards.length === 0 && (
+            <div className="column-empty">카드를 여기로 끌어오세요</div>
+          )}
+        </div>
+      </div>
     </div>
   );
 }
