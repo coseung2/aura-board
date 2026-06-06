@@ -10,6 +10,7 @@ type Tab = {
 };
 
 const TABS: Tab[] = [
+  { key: "dashboard", label: "대시보드", emoji: "📊" },
   { key: "students", label: "학생 명단", emoji: "👥" },
   { key: "boards", label: "학급 보드", emoji: "🧩" },
   { key: "roles", label: "학급 역할", emoji: "🪪" },

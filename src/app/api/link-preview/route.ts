@@ -1,8 +1,10 @@
 import { NextResponse } from "next/server";
+import { createHash } from "crypto";
+import { put } from "@vercel/blob";
+import sharp from "sharp";
 import {
   deriveCanvaThumbnailUrl,
   isCanvaDesignUrl,
-  proxiedCanvaThumbnailUrl,
 } from "@/lib/canva";
 import { resolveCanvaEmbedUrlCached } from "@/lib/canva-preview-cache";
 import { getPreviewCache, setPreviewCache } from "@/lib/preview-cache";
@@ -13,22 +15,117 @@ type LinkPreviewPayload = {
   image: string | null;
 };
 
+const MAX_HTML_BYTES = 100 * 1024;
+const MAX_IMAGE_BYTES = 8 * 1024 * 1024;
+
+function decodeHtmlEntities(value: string): string {
+  return value
+    .replace(/&amp;/gi, "&")
+    .replace(/&quot;/gi, '"')
+    .replace(/&#39;|&apos;/gi, "'")
+    .replace(/&lt;/gi, "<")
+    .replace(/&gt;/gi, ">")
+    .replace(/&#x([0-9a-f]+);/gi, (_, hex: string) =>
+      String.fromCodePoint(parseInt(hex, 16))
+    )
+    .replace(/&#(\d+);/g, (_, dec: string) =>
+      String.fromCodePoint(parseInt(dec, 10))
+    );
+}
+
 function absolutizeUrl(value: string | null, baseUrl: string): string | null {
   if (!value) return null;
   try {
-    return new URL(value, baseUrl).toString();
+    return new URL(decodeHtmlEntities(value.trim()), baseUrl).toString();
   } catch {
     return null;
   }
 }
 
-function proxiedLinkPreviewImageUrl(
-  imageUrl: string | null,
-  pageUrl: string
-): string | null {
-  const absolute = absolutizeUrl(imageUrl, pageUrl);
-  if (!absolute) return null;
-  return `/api/link-preview/image?url=${encodeURIComponent(absolute)}&referer=${encodeURIComponent(pageUrl)}`;
+function cacheHash(value: string): string {
+  return createHash("sha256").update(value).digest("hex");
+}
+
+async function fetchOgImagePreview(imageUrl: string, pageUrl: string): Promise<string | null> {
+  const cacheKey = `${imageUrl}|${pageUrl}`;
+  const cached = await getPreviewCache<{ url: string }>("link-preview-image", cacheKey);
+  if (cached.hit) {
+    return cached.status === "ok" ? cached.payload.url : null;
+  }
+
+  try {
+    const upstream = await fetch(imageUrl, {
+      redirect: "follow",
+      headers: {
+        Accept: "image/avif,image/webp,image/*;q=0.9,*/*;q=0.5",
+        "User-Agent":
+          "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+        Referer: pageUrl,
+      },
+      signal: AbortSignal.timeout(10000),
+      cache: "no-store",
+    });
+
+    if (!upstream.ok) {
+      await setPreviewCache("link-preview-image", cacheKey, null, false, `HTTP ${upstream.status}`);
+      return null;
+    }
+
+    const contentType = upstream.headers.get("content-type") ?? "";
+    if (!contentType.startsWith("image/")) {
+      await setPreviewCache("link-preview-image", cacheKey, null, false, "not_image");
+      return null;
+    }
+
+    const contentLength = Number(upstream.headers.get("content-length") ?? 0);
+    if (contentLength > MAX_IMAGE_BYTES) {
+      await setPreviewCache("link-preview-image", cacheKey, null, false, "image_too_large");
+      return null;
+    }
+
+    const sourceBuffer = Buffer.from(await upstream.arrayBuffer());
+    if (sourceBuffer.byteLength > MAX_IMAGE_BYTES) {
+      await setPreviewCache("link-preview-image", cacheKey, null, false, "image_too_large");
+      return null;
+    }
+
+    const preview = await sharp(sourceBuffer)
+      .rotate()
+      .resize(640, 360, {
+        fit: "cover",
+        withoutEnlargement: true,
+      })
+      .webp({ quality: 78 })
+      .toBuffer();
+
+    const blobToken = process.env.BLOB_READ_WRITE_TOKEN;
+    if (!blobToken) {
+      await setPreviewCache("link-preview-image", cacheKey, null, false, "blob_token_missing");
+      return null;
+    }
+
+    const pathname = `link-previews/${cacheHash(imageUrl)}.webp`;
+    const blob = await put(pathname, preview, {
+      access: "public",
+      contentType: "image/webp",
+      token: blobToken,
+      multipart: false,
+      addRandomSuffix: false,
+    });
+
+    const payload = { url: blob.url };
+    await setPreviewCache("link-preview-image", cacheKey, payload, true);
+    return blob.url;
+  } catch (e) {
+    await setPreviewCache(
+      "link-preview-image",
+      cacheKey,
+      null,
+      false,
+      e instanceof Error ? e.message : "image_fetch_failed"
+    ).catch(() => undefined);
+    return null;
+  }
 }
 
 export async function GET(req: Request) {
@@ -52,20 +149,22 @@ export async function GET(req: Request) {
     if (isCanvaDesignUrl(url)) {
       const embed = await resolveCanvaEmbedUrlCached(url);
       if (embed) {
+        const image = await fetchOgImagePreview(embed.thumbnailUrl, url);
         const payload = {
           title: embed.title,
           description: embed.authorName ? `by ${embed.authorName}` : null,
-          image: proxiedCanvaThumbnailUrl(embed.thumbnailUrl, 640),
+          image,
         };
         await setPreviewCache("link-preview", url, payload, true);
         return NextResponse.json(payload);
       }
       const derivedImage = deriveCanvaThumbnailUrl(url);
       if (derivedImage) {
+        const image = await fetchOgImagePreview(derivedImage, url);
         const payload = {
           title: "Canva design",
           description: null,
-          image: derivedImage,
+          image,
         };
         await setPreviewCache("link-preview", url, payload, true);
         return NextResponse.json(payload);
@@ -98,9 +197,7 @@ export async function GET(req: Request) {
     let html = "";
     const decoder = new TextDecoder();
     let totalBytes = 0;
-    const MAX_BYTES = 100 * 1024;
-
-    while (totalBytes < MAX_BYTES) {
+    while (totalBytes < MAX_HTML_BYTES) {
       const { done, value } = await reader.read();
       if (done) break;
       html += decoder.decode(value, { stream: true });
@@ -115,7 +212,7 @@ export async function GET(req: Request) {
       ];
       for (const pat of patterns) {
         const m = html.match(pat);
-        if (m?.[1]) return m[1];
+        if (m?.[1]) return decodeHtmlEntities(m[1].trim());
       }
       return null;
     }
@@ -123,7 +220,9 @@ export async function GET(req: Request) {
     let title =
       getMeta("og:title") ??
       getMeta("twitter:title") ??
-      html.match(/<title[^>]*>([^<]+)<\/title>/i)?.[1]?.trim() ??
+      (html.match(/<title[^>]*>([^<]+)<\/title>/i)?.[1]
+        ? decodeHtmlEntities(html.match(/<title[^>]*>([^<]+)<\/title>/i)![1].trim())
+        : null) ??
       null;
 
     // Skip generic "Unsupported client" titles
@@ -137,13 +236,13 @@ export async function GET(req: Request) {
       getMeta("description") ??
       null;
 
-    const image = proxiedLinkPreviewImageUrl(
+    const rawImage =
       getMeta("og:image") ??
-        getMeta("twitter:image") ??
-        getMeta("twitter:image:src") ??
-        null,
-      url
-    );
+      getMeta("twitter:image") ??
+      getMeta("twitter:image:src") ??
+      null;
+    const absoluteImage = absolutizeUrl(rawImage, res.url || url);
+    const image = absoluteImage ? await fetchOgImagePreview(absoluteImage, res.url || url) : null;
 
     const payload = { title, description, image };
     await setPreviewCache("link-preview", url, payload, true);
