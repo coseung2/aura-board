@@ -156,15 +156,12 @@ export const CanvaEmbedSlot = memo(function CanvaEmbedSlot({
     );
   }, [linkUrl, designId]);
   const title = linkTitle || "Canva design";
-  const candidateLinkImage =
-    proxiedCanvaThumbnailUrl(linkImage, 640) ??
-    deriveCanvaThumbnailUrl(linkUrl);
-  const hasLegacyScreenThumbnail = Boolean(
-    candidateLinkImage?.includes("%2Fscreen%3F") ||
-      candidateLinkImage?.includes("/screen?")
-  );
   const effectiveLinkImage =
-    thumbnailFailed || hasLegacyScreenThumbnail ? null : candidateLinkImage;
+    thumbnailFailed
+      ? null
+      : linkImage ??
+        proxiedCanvaThumbnailUrl(linkImage, 640) ??
+        deriveCanvaThumbnailUrl(linkUrl);
 
   // Fallback branch: iframe errored. Surface the original link-preview
   // style anchor so the card is never empty.
@@ -197,8 +194,7 @@ export const CanvaEmbedSlot = memo(function CanvaEmbedSlot({
   // inView — the auto-deactivate useEffect above handles off-screen
   // eviction once IO reports genuine visibility. The LRU cap (3) still
   // prevents runaway iframe counts regardless.
-  const shouldRenderIframe =
-    active || !effectiveLinkImage || hasLegacyScreenThumbnail;
+  const shouldRenderIframe = active;
   void evictedToast;
 
   return (
@@ -208,9 +204,7 @@ export const CanvaEmbedSlot = memo(function CanvaEmbedSlot({
       data-active={active ? "true" : "false"}
       data-loaded={iframeLoaded ? "true" : "false"}
       data-preview={
-        !active && (!effectiveLinkImage || hasLegacyScreenThumbnail)
-          ? "true"
-          : "false"
+        !active && !effectiveLinkImage ? "true" : "false"
       }
     >
       <div className="card-canva-slot-frame">
@@ -222,6 +216,7 @@ export const CanvaEmbedSlot = memo(function CanvaEmbedSlot({
             src={effectiveLinkImage}
             alt={`${title} 썸네일`}
             loading="lazy"
+            decoding="async"
             onError={() => setThumbnailFailed(true)}
             className="card-canva-slot-thumbnail"
           />

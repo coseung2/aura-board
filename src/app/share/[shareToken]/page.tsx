@@ -1,10 +1,9 @@
 /**
  * /share/[shareToken] — Public board view via share link.
  *
- * Anyone with the shareToken can view (and optionally edit) the board
- * without authentication. Renders the same board components as the
- * authenticated board page (BoardCanvas, GridBoard, etc.), with
- * share-mode-dependent permissions.
+ * Anyone with the shareToken can use the board with the unified student
+ * share permission. Renders the same board components as the authenticated
+ * board page (BoardCanvas, GridBoard, etc.).
  */
 import { notFound } from "next/navigation";
 import { db } from "@/lib/db";
@@ -40,8 +39,7 @@ export default async function ShareBoardPage({
   // Timing-safe comparison (defends against token enumeration)
   if (!tokensEqual(shareToken, board.shareToken)) notFound();
 
-  // Only allow view/comment/edit — private boards don't expose share pages
-  if (board.shareMode !== "view" && board.shareMode !== "comment" && board.shareMode !== "edit") {
+  if (board.shareMode !== "student") {
     notFound();
   }
 
@@ -68,6 +66,7 @@ export default async function ShareBoardPage({
             id: true,
             kind: true,
             url: true,
+            previewUrl: true,
             fileName: true,
             fileSize: true,
             mimeType: true,
@@ -96,7 +95,7 @@ export default async function ShareBoardPage({
     color: c.color,
     imageUrl: c.imageUrl,
     thumbUrl: c.thumbUrl,
-    authorId: c.authorId,
+    authorId: c.authorId ?? (c.externalAuthorName ? shareToken : null),
     linkUrl: c.linkUrl,
     linkTitle: c.linkTitle,
     linkDesc: c.linkDesc,
@@ -148,7 +147,7 @@ export default async function ShareBoardPage({
       }}
       initialCards={cardProps}
       initialSections={sectionProps}
-      shareMode={board.shareMode as "view" | "comment" | "edit"}
+      shareMode="student"
       shareToken={shareToken}
     />
   );

@@ -39,8 +39,8 @@ export type ParentIdentity = {
   childStudentIds: Set<string>;
 };
 
-/** Share token permission levels. */
-export type SharePermission = "view" | "comment" | "edit";
+/** Share links grant the same baseline as a classroom student. */
+export type SharePermission = "student";
 
 /** An external share-link visitor (x-share-token header). */
 export type ShareIdentity = {
@@ -129,7 +129,7 @@ export type BoardLike = {
 export type CardLike = {
   id: string;
   boardId: string;
-  /** Always a teacher (User.id). Null for external/anon cards. */
+  /** Always a teacher (User.id). Null for share/external/anon cards. */
   authorId: string | null;
   /** Set when a student published the card. */
   studentAuthorId: string | null;
@@ -188,17 +188,6 @@ export function canViewCard(
   return false;
 }
 
-/**
- * Share permission ranking — view < comment < edit.
- * Check `shareCanReachBoard` first, then compare ranks.
- */
-const PERMISSION_RANK: Record<SharePermission, number> = {
-  view: 0,
-  comment: 1,
-  edit: 2,
-};
-const MIN_EDIT_RANK = PERMISSION_RANK["edit"];
-
 export function canEditCard(
   ids: Identities,
   b: BoardLike,
@@ -212,11 +201,13 @@ export function canEditCard(
     c.studentAuthorId === ids.student.studentId
   )
     return true;
-  // Share visitors with "edit" permission can edit any card on the board.
+  // Share visitors get student-like ownership: add is allowed, but editing
+  // is limited to cards created through the share link.
   if (
     ids.share &&
     shareCanReachBoard(ids.share, b) &&
-    PERMISSION_RANK[ids.share.permission] >= MIN_EDIT_RANK
+    c.authorId === null &&
+    c.studentAuthorId === null
   )
     return true;
   // Parents never edit. Anon never edits.
@@ -236,13 +227,7 @@ export function canDeleteCard(
 export function canAddCardToBoard(ids: Identities, b: BoardLike): boolean {
   if (ids.teacher && teacherCanReachBoard(ids.teacher, b)) return true;
   if (ids.student && studentCanReachBoard(ids.student, b)) return true;
-  // Share visitors with "edit" permission can add cards.
-  if (
-    ids.share &&
-    shareCanReachBoard(ids.share, b) &&
-    PERMISSION_RANK[ids.share.permission] >= MIN_EDIT_RANK
-  )
-    return true;
+  if (ids.share && shareCanReachBoard(ids.share, b)) return true;
   // Parents and anon can't add cards.
   return false;
 }

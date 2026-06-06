@@ -226,6 +226,7 @@ export function TeacherSummaryView({
                       alt=""
                       className="plant-obs-feed-thumb"
                       loading="lazy"
+                      decoding="async"
                       onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
                     />
                   ) : (
@@ -349,9 +350,15 @@ export function TeacherSummaryView({
             >
               닫기
             </button>
-            {selectedObservation.thumbnail ? (
+            {(selectedObservation.imageUrl ?? selectedObservation.thumbnail) ? (
               <div className="plant-obs-detail-img-wrap">
-                <img src={selectedObservation.thumbnail} alt={`${selectedObservation.student.name} 관찰 사진`} className="plant-obs-detail-img" />
+                <img
+                  src={selectedObservation.imageUrl ?? selectedObservation.thumbnail ?? ""}
+                  alt={`${selectedObservation.student.name} 관찰 사진`}
+                  className="plant-obs-detail-img"
+                  loading="lazy"
+                  decoding="async"
+                />
               </div>
             ) : (
               <div className="plant-obs-detail-empty">{selectedObservation.species.emoji}</div>

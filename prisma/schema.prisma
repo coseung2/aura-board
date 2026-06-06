@@ -372,10 +372,10 @@ model Board {
   boardTheme        String     @default("pastel-sky")
 
   // ── Board Share (2026-05-29) ──────────────────────────────────────
-  // Public link sharing. "private" = no share. "view" / "comment" / "edit" =
-  // anyone with the shareToken in URL can access the board with that permission.
+  // Public link sharing. "private" = no share. "student" =
+  // anyone with the shareToken in URL can access the board with student permission.
   // shareShortCode provides a short 6-char URL (/s/CODE) for easy typing.
-  shareMode         String     @default("private") // "private" | "view" | "comment" | "edit"
+  shareMode         String     @default("private") // "private" | "student"
   shareToken        String?    @unique              // nanoid(21), null=not shared
   shareShortCode    String?    @unique              // 6자 짧은코드 (/s/CODE), null=not shared
 
@@ -598,6 +598,7 @@ model CardAttachment {
   cardId     String
   kind       String   // "image" | "video" | "file"
   url        String
+  previewUrl String?
   fileName   String?
   fileSize   Int?
   mimeType   String?
@@ -607,6 +608,38 @@ model CardAttachment {
   card       Card     @relation("CardAttachments", fields: [cardId], references: [id], onDelete: Cascade)
 
   @@index([cardId])
+}
+
+model BlobDeletionQueue {
+  id           String    @id @default(cuid())
+  url          String
+  source       String
+  resourceType String?
+  resourceId   String?
+  deleteAfter  DateTime
+  attempts     Int       @default(0)
+  lastError    String?
+  deletedAt    DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  @@index([deleteAfter, deletedAt])
+  @@index([url])
+}
+
+model PreviewFetchCache {
+  key       String   @id
+  kind      String
+  url       String
+  status    String
+  payload   Json?
+  error     String?
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([kind, expiresAt])
+  @@index([url])
 }
 
 model Submission {

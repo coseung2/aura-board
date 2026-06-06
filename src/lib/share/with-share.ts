@@ -23,7 +23,7 @@ export function getShareTokenFromRequest(req: NextRequest): string | null {
  * Used by API routes that want to check share access without a separate
  * early-return path:
  *
- *   const shareId = await resolveShareIdentity(shareToken, "view");
+ *   const shareId = await resolveShareIdentity(shareToken);
  *   if (!shareId) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
  */
 export async function resolveShareIdentity(
@@ -32,7 +32,7 @@ export async function resolveShareIdentity(
 ): Promise<ShareIdentity | null> {
   if (!shareToken) return null;
 
-  const auth = await authorizeShareAccess(shareToken, "view");
+  const auth = await authorizeShareAccess(shareToken, "student");
   if (!auth.ok) return null;
 
   return {
@@ -44,17 +44,17 @@ export async function resolveShareIdentity(
 }
 
 /**
- * Auth guard that returns a ShareIdentity when the share token is valid AND
- * the board's shareMode grants at least the required permission level.
+ * Auth guard that returns a ShareIdentity when the share token is valid and
+ * board sharing is enabled.
  */
 export async function requireShareAuth(
   shareToken: string | null,
-  required: "view" | "comment" | "edit",
+  _required: "student",
   authorName?: string,
 ): Promise<{ identity: ShareIdentity } | { error: string; status: number }> {
   if (!shareToken) return { error: "missing_share_token", status: 401 };
 
-  const auth = await authorizeShareAccess(shareToken, required);
+  const auth = await authorizeShareAccess(shareToken, "student");
   if (!auth.ok) {
     const reason = auth.reason;
     const status = reason === "not_found" ? 404 : 403;

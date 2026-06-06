@@ -87,6 +87,7 @@ export function AssetInsertModal({ classroomId, onInsert, onClose }: Props) {
                       src={a.thumbnailUrl ?? a.fileUrl}
                       alt={a.title}
                       loading="lazy"
+                      decoding="async"
                     />
                   ) : (
                     <span aria-hidden>🖼️</span>

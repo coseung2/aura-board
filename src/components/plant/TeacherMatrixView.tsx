@@ -305,6 +305,8 @@ export function TeacherMatrixView({ classroomId, boardId }: Props) {
                             <img
                               src={cell.thumbnail}
                               alt={`${s.name} - ${st.nameKo}`}
+                              loading="lazy"
+                              decoding="async"
                             />
                           </button>
                         ) : (
@@ -419,7 +421,7 @@ export function TeacherMatrixView({ classroomId, boardId }: Props) {
                           onClick={() => setActiveObservationId(obs.id)}
                         >
                           {thumb ? (
-                            <img src={thumb} alt="" />
+                            <img src={thumb} alt="" loading="lazy" decoding="async" />
                           ) : (
                             <span className="plant-obs-detail-history-empty">메모</span>
                           )}

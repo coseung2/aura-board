@@ -15,6 +15,7 @@ type Props = {
     title: string;
     content: string;
     imageUrl?: string | null;
+    thumbUrl?: string | null;
     linkUrl?: string | null;
     linkTitle?: string | null;
     linkDesc?: string | null;
@@ -28,6 +29,7 @@ type Props = {
       id: string;
       kind: string;
       url: string;
+      previewUrl?: string | null;
       fileName: string | null;
       fileSize: number | null;
       mimeType: string | null;
@@ -85,6 +87,7 @@ export const CardBody = memo(function CardBody({
     <>
       <CardAttachments
         imageUrl={card.imageUrl}
+        thumbUrl={card.thumbUrl}
         linkUrl={card.linkUrl}
         linkTitle={card.linkTitle}
         linkDesc={card.linkDesc}

@@ -274,9 +274,20 @@ function StageCompare({
         onMouseDown={handleMouseDown}
         onTouchMove={(event) => updatePosition(event.touches[0].clientX)}
       >
-        <img className="plant-compare-img" src={first.thumbnailUrl ?? first.url} alt="이전 관찰 사진" />
+        <img
+          className="plant-compare-img"
+          src={first.thumbnailUrl ?? first.url}
+          alt="이전 관찰 사진"
+          loading="lazy"
+          decoding="async"
+        />
         <div className="plant-compare-overlay" style={{ width: `${position}%` }}>
-          <img src={latest.thumbnailUrl ?? latest.url} alt="최근 관찰 사진" />
+          <img
+            src={latest.thumbnailUrl ?? latest.url}
+            alt="최근 관찰 사진"
+            loading="lazy"
+            decoding="async"
+          />
         </div>
         <div className="plant-compare-handle" style={{ left: `${position}%` }} />
       </div>

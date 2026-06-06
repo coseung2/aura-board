@@ -3,6 +3,7 @@ import { z } from "zod";
 import { db } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
 import { requirePermission, ForbiddenError } from "@/lib/rbac";
+import { enqueueBlobDeletion } from "@/lib/blob-cleanup";
 
 const PatchBoardSchema = z.object({
   title: z.string().max(200).optional(),
@@ -67,6 +68,9 @@ export async function DELETE(
 
     const board = await db.board.findFirst({
       where: { OR: [{ id }, { slug: id }] },
+      include: {
+        cards: { include: { attachments: true } },
+      },
     });
     if (!board) {
       return NextResponse.json({ error: "Board not found" }, { status: 404 });
@@ -74,7 +78,20 @@ export async function DELETE(
 
     await requirePermission(board.id, user.id, "delete_any");
 
+    const blobUrls = [
+      board.eventPosterUrl,
+      ...board.cards.flatMap((card) => [
+        card.imageUrl,
+        card.thumbUrl,
+        card.linkImage,
+        card.videoUrl,
+        card.fileUrl,
+        ...card.attachments.flatMap((a) => [a.url, a.previewUrl]),
+      ]),
+    ];
+
     await db.board.delete({ where: { id: board.id } });
+    await enqueueBlobDeletion(blobUrls, "board.delete", "Board", board.id);
 
     return new NextResponse(null, { status: 204 });
   } catch (e) {

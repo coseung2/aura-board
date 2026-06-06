@@ -1,6 +1,6 @@
 /**
- * PATCH /api/share/cards/[cardId] — Update card via share link (edit mode).
- * DELETE /api/share/cards/[cardId] — Delete card via share link (edit mode).
+ * PATCH /api/share/cards/[cardId] — Update card via share link (student permission).
+ * DELETE /api/share/cards/[cardId] — Delete card via share link (student permission).
  *
  * Body (PATCH): { shareToken, title?, content?, color? }
  * Body (DELETE): { shareToken }
@@ -48,8 +48,8 @@ export async function PATCH(
     return NextResponse.json({ error: "not_found" }, { status: 404 });
   }
 
-  // Verify share access (edit required)
-  const auth = await authorizeShareAccess(parsed.shareToken, "edit");
+  // Verify share access.
+  const auth = await authorizeShareAccess(parsed.shareToken, "student");
   if (!auth.ok) {
     return NextResponse.json({ error: auth.reason }, { status: auth.reason === "not_found" ? 404 : 403 });
   }
@@ -95,7 +95,7 @@ export async function DELETE(
     return NextResponse.json({ error: "not_found" }, { status: 404 });
   }
 
-  const auth = await authorizeShareAccess(parsed.shareToken, "edit");
+  const auth = await authorizeShareAccess(parsed.shareToken, "student");
   if (!auth.ok) {
     return NextResponse.json({ error: auth.reason }, { status: auth.reason === "not_found" ? 404 : 403 });
   }

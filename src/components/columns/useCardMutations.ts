@@ -160,6 +160,7 @@ export function useCardMutations({
         id: a.tempId,
         kind: a.kind,
         url: a.url,
+        previewUrl: a.previewUrl ?? null,
         fileName: a.fileName ?? null,
         fileSize: a.fileSize ?? null,
         mimeType: a.mimeType ?? null,

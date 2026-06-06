@@ -35,6 +35,7 @@ export function GridBoard({ boardId, initialCards, currentUserId, currentRole, i
     attachments?: Array<{
       kind: "image" | "video" | "file";
       url: string;
+      previewUrl?: string | null;
       fileName?: string;
       fileSize?: number;
       mimeType?: string;
