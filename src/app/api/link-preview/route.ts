@@ -3,8 +3,15 @@ import {
   deriveCanvaThumbnailUrl,
   isCanvaDesignUrl,
   proxiedCanvaThumbnailUrl,
-  resolveCanvaEmbedUrl,
 } from "@/lib/canva";
+import { resolveCanvaEmbedUrlCached } from "@/lib/canva-preview-cache";
+import { getPreviewCache, setPreviewCache } from "@/lib/preview-cache";
+
+type LinkPreviewPayload = {
+  title: string | null;
+  description: string | null;
+  image: string | null;
+};
 
 function absolutizeUrl(value: string | null, baseUrl: string): string | null {
   if (!value) return null;
@@ -33,22 +40,35 @@ export async function GET(req: Request) {
   }
 
   try {
+    const cached = await getPreviewCache<LinkPreviewPayload>("link-preview", url);
+    if (cached.hit) {
+      return NextResponse.json(
+        cached.status === "ok"
+          ? cached.payload
+          : { title: null, description: null, image: null }
+      );
+    }
+
     if (isCanvaDesignUrl(url)) {
-      const embed = await resolveCanvaEmbedUrl(url);
+      const embed = await resolveCanvaEmbedUrlCached(url);
       if (embed) {
-        return NextResponse.json({
+        const payload = {
           title: embed.title,
           description: embed.authorName ? `by ${embed.authorName}` : null,
           image: proxiedCanvaThumbnailUrl(embed.thumbnailUrl, 640),
-        });
+        };
+        await setPreviewCache("link-preview", url, payload, true);
+        return NextResponse.json(payload);
       }
       const derivedImage = deriveCanvaThumbnailUrl(url);
       if (derivedImage) {
-        return NextResponse.json({
+        const payload = {
           title: "Canva design",
           description: null,
           image: derivedImage,
-        });
+        };
+        await setPreviewCache("link-preview", url, payload, true);
+        return NextResponse.json(payload);
       }
     }
 
@@ -64,12 +84,14 @@ export async function GET(req: Request) {
     });
 
     if (!res.ok) {
+      await setPreviewCache("link-preview", url, null, false, `HTTP ${res.status}`);
       return NextResponse.json({ title: null, description: null, image: null });
     }
 
     // Only read first 100KB to avoid downloading huge pages
     const reader = res.body?.getReader();
     if (!reader) {
+      await setPreviewCache("link-preview", url, null, false, "no_body");
       return NextResponse.json({ title: null, description: null, image: null });
     }
 
@@ -123,9 +145,18 @@ export async function GET(req: Request) {
       url
     );
 
-    return NextResponse.json({ title, description, image });
+    const payload = { title, description, image };
+    await setPreviewCache("link-preview", url, payload, true);
+    return NextResponse.json(payload);
   } catch (e) {
     console.error("[GET /api/link-preview]", e);
+    await setPreviewCache(
+      "link-preview",
+      url,
+      null,
+      false,
+      e instanceof Error ? e.message : "fetch_failed"
+    ).catch(() => undefined);
     return NextResponse.json({ title: null, description: null, image: null });
   }
 }

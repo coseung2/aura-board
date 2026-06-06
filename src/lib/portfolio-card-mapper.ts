@@ -35,6 +35,7 @@ type PrismaCardLike = {
     id: string;
     kind: string;
     url: string;
+    previewUrl: string | null;
     fileName: string | null;
     fileSize: number | null;
     mimeType: string | null;
@@ -71,6 +72,7 @@ export function mapPortfolioCard(
       id: a.id,
       kind: a.kind,
       url: a.url,
+      previewUrl: a.previewUrl,
       fileName: a.fileName,
       fileSize: a.fileSize,
       mimeType: a.mimeType,

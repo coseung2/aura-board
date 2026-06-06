@@ -98,6 +98,7 @@ function normalizeCopiedCard(
             id: string;
             kind: string;
             url: string;
+            previewUrl?: string | null;
             fileName: string | null;
             fileSize: number | null;
             mimeType: string | null;
@@ -286,6 +287,7 @@ export function BreakoutBoard({
         id: a.tempId,
         kind: a.kind,
         url: a.url,
+        previewUrl: a.previewUrl ?? null,
         fileName: a.fileName ?? null,
         fileSize: a.fileSize ?? null,
         mimeType: a.mimeType ?? null,

@@ -27,9 +27,9 @@ import { externalErrorResponse } from "@/lib/external-errors";
 import {
   extractCanvaDesignId,
   isCanvaDesignUrl,
-  resolveCanvaEmbedUrl,
   proxiedCanvaThumbnailUrl,
 } from "@/lib/canva";
+import { resolveCanvaEmbedUrlCached } from "@/lib/canva-preview-cache";
 import { touchBoardUpdatedAt } from "@/lib/board-touch";
 
 export const runtime = "nodejs";
@@ -340,7 +340,7 @@ export async function POST(req: Request) {
   let remoteThumbnailUrl: string | null = null;
   if (finalLinkUrl && !blobUrl) {
     try {
-      const embed = await resolveCanvaEmbedUrl(finalLinkUrl);
+      const embed = await resolveCanvaEmbedUrlCached(finalLinkUrl);
       if (embed?.thumbnailUrl) {
         remoteThumbnailUrl = proxiedCanvaThumbnailUrl(embed.thumbnailUrl, 640);
       }

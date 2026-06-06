@@ -31,6 +31,7 @@ export type CardData = {
     id: string;
     kind: string;
     url: string;
+    previewUrl?: string | null;
     fileName: string | null;
     fileSize: number | null;
     mimeType: string | null;

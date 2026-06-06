@@ -16,6 +16,7 @@ type AttachmentItem = {
   id: string;
   kind: string;
   url: string;
+  previewUrl?: string | null;
   fileName: string | null;
   fileSize: number | null;
   mimeType: string | null;
@@ -73,12 +74,26 @@ export const CardAttachments = memo(function CardAttachments({ imageUrl, linkUrl
   // 이미지 종류만 navigation 대상 (pdf/video 제외). CardDetailModal 이
   // onImageClick 을 넘기면 그 안에서 라이트박스 state 를 관리.
   const imageAttachments = sorted.filter((a) => a.kind === "image");
+  const renderVideoPoster = (key: string, extraBadge = true) => (
+    <div key={key} className="card-attach-video card-attach-media-poster">
+      <div className="card-attach-video-placeholder" aria-hidden="true" />
+      <span className="card-canva-slot-play-icon" aria-hidden="true">
+        ▶
+      </span>
+      {extraBadge && extraCount > 0 && (
+        <span className="card-attach-multi-badge" aria-label={`+${extraCount}개 더`}>
+          +{extraCount}
+        </span>
+      )}
+    </div>
+  );
 
   return (
     <div className="card-attachments">
       {hasAttachments
         ? sorted.map((a) => {
             if (a.kind === "image") {
+              const imageSrc = variant === "thumbnail" ? a.previewUrl ?? a.url : a.url;
               if (variant === "detail") {
                 // 모달 내 이미지는 원본 비율/해상도 보존. OptimizedImage 의
                 // fill 모드는 컨테이너 높이 문제로 크롭처럼 보여서 plain <img>
@@ -88,9 +103,10 @@ export const CardAttachments = memo(function CardAttachments({ imageUrl, linkUrl
                 return (
                   <div key={a.id} className="card-attach-image is-detail">
                     <img
-                      src={a.url}
+                      src={imageSrc}
                       alt={a.fileName ?? ""}
                       loading="lazy"
+                      decoding="async"
                       className={clickable ? "is-clickable" : undefined}
                       onClick={
                         clickable ? () => onImageClick!(imgIdx) : undefined
@@ -107,7 +123,7 @@ export const CardAttachments = memo(function CardAttachments({ imageUrl, linkUrl
               return (
                 <div key={a.id} className="card-attach-image optimized-img-wrap">
                   <OptimizedImage
-                    src={a.url}
+                    src={imageSrc}
                     alt={a.fileName ?? ""}
                     sizes="(max-width: 768px) 100vw, 480px"
                   />
@@ -120,6 +136,9 @@ export const CardAttachments = memo(function CardAttachments({ imageUrl, linkUrl
               );
             }
             if (a.kind === "video") {
+              if (variant === "thumbnail") {
+                return renderVideoPoster(a.id);
+              }
               const yt = getYouTubeId(a.url);
               if (yt) {
                 return (
@@ -178,6 +197,9 @@ export const CardAttachments = memo(function CardAttachments({ imageUrl, linkUrl
               </div>
             )}
             {effectiveVideoUrl && (() => {
+              if (variant === "thumbnail") {
+                return renderVideoPoster("single-video", false);
+              }
               const yt = getYouTubeId(effectiveVideoUrl);
               return yt ? (
                 <div className="card-attach-video">

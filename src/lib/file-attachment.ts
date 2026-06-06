@@ -8,6 +8,7 @@ export type AttachmentWire = {
   id: string;
   kind: "image" | "video" | "file";
   url: string;
+  previewUrl?: string | null;
   fileName: string | null;
   fileSize: number | null;
   mimeType: string | null;

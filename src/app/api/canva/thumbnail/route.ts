@@ -3,9 +3,10 @@ import {
   canvaGetDesign,
   extractCanvaDesignId,
   getAccessToken,
-  resolveCanvaEmbedUrl,
 } from "@/lib/canva";
+import { resolveCanvaEmbedUrlCached } from "@/lib/canva-preview-cache";
 import { getCurrentUser } from "@/lib/auth";
+import { getPreviewCache, setPreviewCache } from "@/lib/preview-cache";
 
 /**
  * Server-side proxy for Canva (and similar CDN) thumbnails. Clients
@@ -44,8 +45,20 @@ export async function GET(req: Request) {
   }
 
   if (!url && design) {
-    const embed = await resolveCanvaEmbedUrl(design);
-    url = embed?.thumbnailUrl ?? null;
+    const cached = await getPreviewCache<{ url: string | null }>("canva-thumbnail", design);
+    if (cached.hit) {
+      url = cached.status === "ok" ? cached.payload.url : null;
+    } else {
+      const embed = await resolveCanvaEmbedUrlCached(design);
+      url = embed?.thumbnailUrl ?? null;
+      await setPreviewCache(
+        "canva-thumbnail",
+        design,
+        { url },
+        Boolean(url),
+        url ? undefined : "not_found"
+      );
+    }
     if (!url) {
       const designId = extractCanvaDesignId(design);
       const user = await getCurrentUser().catch(() => null);
@@ -54,6 +67,9 @@ export async function GET(req: Request) {
         try {
           const info = await canvaGetDesign(token, designId);
           url = info.thumbnail?.url ?? null;
+          if (url) {
+            await setPreviewCache("canva-thumbnail", design, { url }, true);
+          }
         } catch {
           url = null;
         }
@@ -162,7 +178,7 @@ async function resolveDesignThumbnailFromScreenUrl(parsed: URL): Promise<string 
   const designUrl = shareToken
     ? `https://www.canva.com/design/${designId}/${shareToken}/view`
     : `https://www.canva.com/design/${designId}/view`;
-  const embed = await resolveCanvaEmbedUrl(designUrl);
+  const embed = await resolveCanvaEmbedUrlCached(designUrl);
   if (embed?.thumbnailUrl) return embed.thumbnailUrl;
 
   const user = await getCurrentUser().catch(() => null);

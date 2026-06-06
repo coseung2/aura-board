@@ -35,6 +35,7 @@ function toInitialAttachments(card: CardData): AttachmentDraft[] {
       tempId: a.id,
       kind: a.kind as AttachmentDraft["kind"],
       url: a.url,
+      previewUrl: a.previewUrl ?? null,
       fileName: a.fileName ?? undefined,
       fileSize: a.fileSize ?? undefined,
       mimeType: a.mimeType ?? undefined,
@@ -137,6 +138,7 @@ export function EditCardModal({ card, onSave, onClose }: Props) {
             const payloadAttachments = attachments.map((a) => ({
               kind: a.kind,
               url: a.url,
+              previewUrl: a.previewUrl ?? null,
               fileName: a.fileName,
               fileSize: a.fileSize,
               mimeType: a.mimeType,

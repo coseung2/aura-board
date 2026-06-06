@@ -598,6 +598,7 @@ model CardAttachment {
   cardId     String
   kind       String   // "image" | "video" | "file"
   url        String
+  previewUrl String?
   fileName   String?
   fileSize   Int?
   mimeType   String?
@@ -607,6 +608,38 @@ model CardAttachment {
   card       Card     @relation("CardAttachments", fields: [cardId], references: [id], onDelete: Cascade)
 
   @@index([cardId])
+}
+
+model BlobDeletionQueue {
+  id           String    @id @default(cuid())
+  url          String
+  source       String
+  resourceType String?
+  resourceId   String?
+  deleteAfter  DateTime
+  attempts     Int       @default(0)
+  lastError    String?
+  deletedAt    DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  @@index([deleteAfter, deletedAt])
+  @@index([url])
+}
+
+model PreviewFetchCache {
+  key       String   @id
+  kind      String
+  url       String
+  status    String
+  payload   Json?
+  error     String?
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([kind, expiresAt])
+  @@index([url])
 }
 
 model Submission {

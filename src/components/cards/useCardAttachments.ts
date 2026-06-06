@@ -9,6 +9,7 @@ export type AttachmentDraft = {
   tempId: string;
   kind: "image" | "video" | "file";
   url: string;
+  previewUrl?: string | null;
   fileName?: string;
   fileSize?: number;
   mimeType?: string;
@@ -47,6 +48,7 @@ export function useCardAttachments(initialAttachments: AttachmentDraft[] = []) {
           tempId: mintId(),
           kind,
           url: data.url,
+          previewUrl: data.previewUrl ?? null,
           fileName: data.name,
           fileSize: data.size,
           mimeType: data.mimeType,
@@ -98,7 +100,7 @@ export function useCardAttachments(initialAttachments: AttachmentDraft[] = []) {
       );
       return false;
     }
-    pushAttachment({ tempId: mintId(), kind: "image", url });
+    pushAttachment({ tempId: mintId(), kind: "image", url, previewUrl: url });
     return true;
   }
 

@@ -9,13 +9,14 @@ import {
   expandCanvaShortLink,
   isCanvaDesignUrl,
   proxiedCanvaThumbnailUrl,
-  resolveCanvaEmbedUrl,
 } from "@/lib/canva";
+import { resolveCanvaEmbedUrlCached } from "@/lib/canva-preview-cache";
 import { extractVideoId, fetchYouTubeMeta, canonicalUrl } from "@/lib/youtube";
 import { setCardAuthors } from "@/lib/card-authors-service";
 import { requireShareAuth } from "@/lib/share/with-share";
 import { isAllowedFileUrl, isAllowedStoredMime, MAX_ATTACHMENTS_PER_CARD } from "@/lib/file-attachment";
 import { touchBoardUpdatedAt } from "@/lib/board-touch";
+import { resizeRemoteImageToWebPPreviewUrl } from "@/lib/blob";
 
 const CreateCardSchema = z.object({
   boardId: z.string().min(1),
@@ -41,6 +42,7 @@ const CreateCardSchema = z.object({
       z.object({
         kind: z.enum(["image", "video", "file"]),
         url: z.string().url(),
+        previewUrl: z.string().url().nullable().optional(),
         fileName: z.string().max(255).nullable().optional(),
         fileSize: z.number().int().nonnegative().nullable().optional(),
         mimeType: z.string().max(100).nullable().optional(),
@@ -217,7 +219,7 @@ export async function POST(req: Request) {
       // expand to the canonical canva.com/{id}/{shareToken}/view form
       // before storing so the client-side hasCanvaShareToken gate works.
       linkUrl = await expandCanvaShortLink(linkUrl);
-      const embed = await resolveCanvaEmbedUrl(linkUrl);
+      const embed = await resolveCanvaEmbedUrlCached(linkUrl);
       if (embed) {
         // oEmbed resolver strips the share token from its response, so
         // we only overwrite derived fields and leave linkUrl (already
@@ -263,6 +265,19 @@ export async function POST(req: Request) {
       }
     }
 
+    const attachmentRows = input.attachments
+      ? await Promise.all(
+          input.attachments.map(async (a, idx) => ({
+            ...a,
+            previewUrl:
+              a.kind === "image"
+                ? a.previewUrl ??
+                  (await createAttachmentPreviewUrl(a.url, input.boardId, idx))
+                : null,
+          }))
+        )
+      : [];
+
     const card = await db.$transaction(async (tx) => {
       const c = await tx.card.create({
         data: {
@@ -301,12 +316,13 @@ export async function POST(req: Request) {
         ]);
       }
       // multi-attachment: 여러 첨부 일괄 저장. order는 배열 인덱스.
-      if (input.attachments && input.attachments.length > 0) {
+      if (attachmentRows.length > 0) {
         await tx.cardAttachment.createMany({
-          data: input.attachments.map((a, idx) => ({
+          data: attachmentRows.map((a, idx) => ({
             cardId: c.id,
             kind: a.kind,
             url: a.url,
+            previewUrl: a.previewUrl ?? null,
             fileName: a.fileName ?? null,
             fileSize: a.fileSize ?? null,
             mimeType: a.mimeType ?? null,
@@ -329,6 +345,7 @@ export async function POST(req: Request) {
         id: true,
         kind: true,
         url: true,
+        previewUrl: true,
         fileName: true,
         fileSize: true,
         mimeType: true,
@@ -358,5 +375,23 @@ export async function POST(req: Request) {
     }
     console.error("[POST /api/cards]", e);
     return NextResponse.json({ error: "internal" }, { status: 500 });
+  }
+}
+
+async function createAttachmentPreviewUrl(
+  sourceUrl: string,
+  boardId: string,
+  index: number
+): Promise<string | null> {
+  try {
+    return await resizeRemoteImageToWebPPreviewUrl(
+      sourceUrl,
+      `uploads/previews/cards/${boardId}/${Date.now()}-${index}.webp`,
+      640,
+      75
+    );
+  } catch (e) {
+    console.warn("[POST /api/cards] attachment preview generation failed:", e);
+    return null;
   }
 }

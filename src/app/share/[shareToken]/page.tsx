@@ -68,6 +68,7 @@ export default async function ShareBoardPage({
             id: true,
             kind: true,
             url: true,
+            previewUrl: true,
             fileName: true,
             fileSize: true,
             mimeType: true,

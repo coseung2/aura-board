@@ -8,6 +8,7 @@ import { getCurrentUser } from "@/lib/auth";
 import { getCurrentStudent } from "@/lib/student-auth";
 import { ALLOWED_FILE_MIMES, isAllowedFileUpload, normalizeUploadMime } from "@/lib/file-attachment";
 import { ALLOWED_IMAGE, ALLOWED_VIDEO, MAX_SIZE, UploadPolicyError, buildUploadPolicy } from "./upload-policy";
+import { resizeBufferToWebPPreview, uploadWebPBuffer } from "@/lib/blob";
 
 /**
  * card-file-attachment — 매직바이트 검증.
@@ -176,6 +177,7 @@ export async function POST(req: Request) {
         token: blobToken,
         multipart: true,
         addRandomSuffix: false,
+        cacheControlMaxAge: 60 * 60 * 24 * 365,
         ...(contentDisposition ? { contentDisposition } : {}),
       });
       url = res.url;
@@ -187,8 +189,21 @@ export async function POST(req: Request) {
     }
 
     const type: "image" | "video" | "file" = isImage ? "image" : isVideo ? "video" : "file";
+    let previewUrl: string | null = null;
+    if (isImage) {
+      try {
+        const preview = await resizeBufferToWebPPreview(buffer, 640, 75);
+        previewUrl = await uploadWebPBuffer(
+          preview,
+          `uploads/previews/${Date.now()}-${randomBytes(3).toString("hex")}.webp`
+        );
+      } catch (e) {
+        console.warn("[POST /api/upload] preview generation failed:", e);
+      }
+    }
     return NextResponse.json({
       url,
+      previewUrl,
       type,
       name: file.name,
       size: file.size,
