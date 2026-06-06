@@ -46,7 +46,7 @@ export default async function BoardPage({
       case "pastel-lemon":
         return value;
       default:
-        return "plain";
+        return "pastel-sky";
     }
   };
 

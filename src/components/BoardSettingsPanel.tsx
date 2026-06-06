@@ -21,9 +21,8 @@ const TAB_LABELS: Record<Tab, string> = {
   theme: "테마",
 };
 
-const PLACEHOLDER_COPY: Record<Exclude<Tab, "breakout" | "engagement" | "share">, string> = {
+const PLACEHOLDER_COPY: Record<"canva", string> = {
   canva: "도메인 단위 Canva 연동 설정",
-  theme: "보드 배경과 기본 레이아웃",
 };
 
 type Props = {
@@ -42,7 +41,6 @@ type Props = {
 };
 
 export type BoardTheme =
-  | "plain"
   | "pastel-peach"
   | "pastel-mint"
   | "pastel-sky"
@@ -55,7 +53,6 @@ const BOARD_THEME_OPTIONS: Array<{
   tone: string;
   swatch: string;
 }> = [
-  { value: "plain", label: "기본", tone: "화이트", swatch: "linear-gradient(135deg, #ffffff 0%, #f4f6fb 100%)" },
   { value: "pastel-peach", label: "복숭아", tone: "핑크 코랄", swatch: "linear-gradient(135deg, #fff4ef 0%, #ffe1dc 100%)" },
   { value: "pastel-mint", label: "민트", tone: "민트 그린", swatch: "linear-gradient(135deg, #f2fff8 0%, #d9f6ea 100%)" },
   { value: "pastel-sky", label: "하늘", tone: "소프트 블루", swatch: "linear-gradient(135deg, #f2f8ff 0%, #dcecff 100%)" },
@@ -70,7 +67,7 @@ export function BoardSettingsPanel({
   layout,
   initialSections,
   initialAnonymousAuthor = false,
-  initialBoardTheme = "plain",
+  initialBoardTheme = "pastel-sky",
   initialShareMode = "private",
   initialShareToken = null,
   initialShareShortCode = null,
@@ -112,7 +109,7 @@ export function BoardSettingsPanel({
         style={{ margin: "-16px -20px 16px" }}
       >
         {(Object.keys(TAB_LABELS) as Tab[]).map((key) => {
-          const isPlaceholder = key !== "breakout" && key !== "engagement" && key !== "share";
+          const isPlaceholder = key === "canva";
           return (
             <button
               key={key}
@@ -191,7 +188,7 @@ export function BoardSettingsPanel({
         </div>
       )}
 
-      {tab !== "breakout" && tab !== "engagement" && tab !== "share" && tab !== "theme" && (
+      {tab === "canva" && (
         <div
           role="tabpanel"
           id={`${tablistId}-panel-${tab}`}
@@ -201,7 +198,7 @@ export function BoardSettingsPanel({
             <span aria-hidden="true" style={{ fontSize: 28 }}>🚧</span>
             <p>
               준비 중이에요. 곧 이곳에서{" "}
-              <strong>{PLACEHOLDER_COPY[tab as keyof typeof PLACEHOLDER_COPY]}</strong>을 관리할 수 있어요.
+              <strong>{PLACEHOLDER_COPY[tab]}</strong>을 관리할 수 있어요.
             </p>
           </div>
         </div>
@@ -328,7 +325,7 @@ function ThemeTab({
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
       <p className="section-panel-notice" style={{ marginTop: 0 }}>
-        보드 배경을 기본 또는 파스텔 톤 5가지 중에서 골라요.
+        보드 배경을 파스텔 톤 5가지 중에서 골라요.
       </p>
       <div className="board-theme-grid">
         {BOARD_THEME_OPTIONS.map((option) => {

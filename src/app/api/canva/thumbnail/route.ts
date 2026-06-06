@@ -1,4 +1,11 @@
 import { NextResponse } from "next/server";
+import {
+  canvaGetDesign,
+  extractCanvaDesignId,
+  getAccessToken,
+  resolveCanvaEmbedUrl,
+} from "@/lib/canva";
+import { getCurrentUser } from "@/lib/auth";
 
 /**
  * Server-side proxy for Canva (and similar CDN) thumbnails. Clients
@@ -22,11 +29,12 @@ const ALLOWED_HOST_SUFFIXES = [
 
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
-  const url = searchParams.get("url");
+  const design = searchParams.get("design");
+  let url = searchParams.get("url");
   const w = searchParams.get("w");
 
-  if (!url) {
-    return NextResponse.json({ error: "Missing url" }, { status: 400 });
+  if (!url && !design) {
+    return NextResponse.json({ error: "Missing url or design" }, { status: 400 });
   }
   if (!w || !ALLOWED_WIDTHS.has(w)) {
     return NextResponse.json(
@@ -35,9 +43,30 @@ export async function GET(req: Request) {
     );
   }
 
+  if (!url && design) {
+    const embed = await resolveCanvaEmbedUrl(design);
+    url = embed?.thumbnailUrl ?? null;
+    if (!url) {
+      const designId = extractCanvaDesignId(design);
+      const user = await getCurrentUser().catch(() => null);
+      const token = user ? await getAccessToken(user.id) : null;
+      if (designId && token) {
+        try {
+          const info = await canvaGetDesign(token, designId);
+          url = info.thumbnail?.url ?? null;
+        } catch {
+          url = null;
+        }
+      }
+    }
+    if (!url) {
+      return NextResponse.json({ error: "Canva thumbnail not found" }, { status: 502 });
+    }
+  }
+
   let parsed: URL;
   try {
-    parsed = new URL(url);
+    parsed = new URL(url!);
   } catch {
     return NextResponse.json({ error: "Invalid url" }, { status: 400 });
   }
@@ -66,6 +95,30 @@ export async function GET(req: Request) {
     });
 
     if (!upstream.ok || !upstream.body) {
+      const fallbackUrl = await resolveDesignThumbnailFromScreenUrl(parsed);
+      if (fallbackUrl) {
+        const fallback = await fetch(fallbackUrl, {
+          headers: {
+            Accept: "image/avif,image/webp,image/*;q=0.8,*/*;q=0.5",
+            "User-Agent": "aura-board-thumbnail-proxy",
+          },
+          cache: "no-store",
+        });
+        if (fallback.ok && fallback.body) {
+          const fallbackType = fallback.headers.get("content-type") ?? "image/webp";
+          if (fallbackType.startsWith("image/")) {
+            return new Response(fallback.body, {
+              status: 200,
+              headers: {
+                "Content-Type": fallbackType,
+                "Cache-Control": "public, max-age=86400, s-maxage=86400, immutable",
+                "X-Thumbnail-Width": w,
+                "X-Content-Type-Options": "nosniff",
+              },
+            });
+          }
+        }
+      }
       return NextResponse.json(
         { error: `Upstream ${upstream.status}` },
         { status: 502 },
@@ -97,5 +150,28 @@ export async function GET(req: Request) {
   } catch (e) {
     console.error("[GET /api/canva/thumbnail]", e);
     return NextResponse.json({ error: "Proxy failed" }, { status: 500 });
+  }
+}
+
+async function resolveDesignThumbnailFromScreenUrl(parsed: URL): Promise<string | null> {
+  const match = parsed.pathname.match(
+    /\/design\/([A-Za-z0-9_-]+)(?:\/([A-Za-z0-9_-]+))?\/screen/
+  );
+  if (!match) return null;
+  const [, designId, shareToken] = match;
+  const designUrl = shareToken
+    ? `https://www.canva.com/design/${designId}/${shareToken}/view`
+    : `https://www.canva.com/design/${designId}/view`;
+  const embed = await resolveCanvaEmbedUrl(designUrl);
+  if (embed?.thumbnailUrl) return embed.thumbnailUrl;
+
+  const user = await getCurrentUser().catch(() => null);
+  const token = user ? await getAccessToken(user.id) : null;
+  if (!token) return null;
+  try {
+    const info = await canvaGetDesign(token, designId);
+    return info.thumbnail?.url ?? null;
+  } catch {
+    return null;
   }
 }

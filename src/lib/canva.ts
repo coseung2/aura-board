@@ -498,13 +498,29 @@ export function deriveCanvaThumbnailUrl(rawUrl: string | null | undefined): stri
       /\/design\/([A-Za-z0-9_-]+)(?:\/([A-Za-z0-9_-]+))?\/(?:view|watch|edit)/
     );
     if (!m) return null;
-    const [, designId, shareToken] = m;
-    const pathPrefix = shareToken
-      ? `/design/${designId}/${shareToken}`
-      : `/design/${designId}`;
-    return `https://www.canva.com${pathPrefix}/screen?type=thumbnail`;
+    return `/api/canva/thumbnail?design=${encodeURIComponent(u.toString())}&w=640`;
   } catch {
     return null;
+  }
+}
+
+export function proxiedCanvaThumbnailUrl(
+  rawUrl: string | null | undefined,
+  width: 160 | 320 | 640 = 640
+): string | null {
+  if (!rawUrl) return null;
+  if (rawUrl.startsWith("/api/canva/thumbnail?")) return rawUrl;
+  try {
+    const u = new URL(rawUrl);
+    const host = u.hostname.toLowerCase();
+    const isCanvaHost =
+      host === "canva.com" ||
+      host.endsWith(".canva.com") ||
+      host.endsWith(".canva-web-files.com");
+    if (!isCanvaHost) return rawUrl;
+    return `/api/canva/thumbnail?url=${encodeURIComponent(u.toString())}&w=${width}`;
+  } catch {
+    return rawUrl;
   }
 }
 

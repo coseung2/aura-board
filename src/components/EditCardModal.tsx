@@ -8,6 +8,7 @@ import {
   useCardAttachments,
   type AttachmentDraft,
 } from "./cards/useCardAttachments";
+import { detectFirstUrl, removeUrlFromText } from "@/lib/link-detection";
 
 const COLOR_PRESETS = [
   null, "#ffd8f4", "#c3faf5", "#ffe6cd", "#fde0f0",
@@ -83,6 +84,14 @@ export function EditCardModal({ card, onSave, onClose }: Props) {
 
   const isUploading = attachmentsUploading || uploadingType !== null;
   const isVideoUploading = uploadingType === "video";
+  const detectedContentUrl = linkUrl ? null : detectFirstUrl(content);
+
+  function promoteDetectedLink() {
+    if (!detectedContentUrl) return;
+    setLinkUrl(detectedContentUrl);
+    setContent((text) => removeUrlFromText(text, detectedContentUrl));
+    setShowLink(true);
+  }
 
   function openVideoPicker() {
     if (isUploading) return;
@@ -166,6 +175,15 @@ export function EditCardModal({ card, onSave, onClose }: Props) {
             className="modal-textarea"
             maxLength={5000}
           />
+          {detectedContentUrl && (
+            <button
+              type="button"
+              className="modal-link-promote"
+              onClick={promoteDetectedLink}
+            >
+              링크를 아래 링크 버튼으로 올려주세요
+            </button>
+          )}
 
           <div className="modal-attach-bar">
             <button

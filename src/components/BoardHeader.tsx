@@ -70,7 +70,7 @@ export function BoardHeader({
             layout={layout}
             sections={settingsSections ?? []}
             anonymousAuthor={anonymousAuthor ?? false}
-            boardTheme={boardTheme ?? "plain"}
+            boardTheme={boardTheme ?? "pastel-sky"}
             shareMode={shareMode}
             shareToken={shareToken}
             shareShortCode={shareShortCode}

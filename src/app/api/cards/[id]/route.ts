@@ -5,7 +5,13 @@ import { ForbiddenError } from "@/lib/rbac";
 import { resolveIdentities } from "@/lib/identity";
 import { canEditCard, canDeleteCard, type BoardLike, type CardLike, type Identities } from "@/lib/card-permissions";
 import { resolveShareIdentity, requireShareAuth } from "@/lib/share/with-share";
-import { isCanvaDesignUrl, resolveCanvaEmbedUrl, expandCanvaShortLink } from "@/lib/canva";
+import {
+  deriveCanvaThumbnailUrl,
+  isCanvaDesignUrl,
+  proxiedCanvaThumbnailUrl,
+  resolveCanvaEmbedUrl,
+  expandCanvaShortLink,
+} from "@/lib/canva";
 import { isAllowedFileUrl, isAllowedStoredMime, MAX_ATTACHMENTS_PER_CARD } from "@/lib/file-attachment";
 import { touchBoardUpdatedAt } from "@/lib/board-touch";
 
@@ -174,13 +180,13 @@ export async function PATCH(
       patch.linkUrl = await expandCanvaShortLink(patch.linkUrl as string);
       const embed = await resolveCanvaEmbedUrl(patch.linkUrl);
       if (embed) {
-        patch.linkImage = embed.thumbnailUrl;
+        patch.linkImage = proxiedCanvaThumbnailUrl(embed.thumbnailUrl, 640);
         if (patch.linkTitle === undefined) patch.linkTitle = embed.title;
         if (patch.linkDesc === undefined) {
           patch.linkDesc = embed.authorName ? `by ${embed.authorName}` : null;
         }
       } else {
-        patch.linkImage = null;
+        patch.linkImage = deriveCanvaThumbnailUrl(patch.linkUrl);
       }
     } else if (effectiveIsCanva && patch.linkImage !== undefined) {
       // linkUrl unchanged (still Canva) — client cannot seed linkImage

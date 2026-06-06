@@ -26,7 +26,11 @@ import {
   type KeyboardEvent,
   type MouseEvent,
 } from "react";
-import { buildCanvaEmbedSrc } from "@/lib/canva";
+import {
+  buildCanvaEmbedSrc,
+  deriveCanvaThumbnailUrl,
+  proxiedCanvaThumbnailUrl,
+} from "@/lib/canva";
 import {
   useIframeBudget,
   useLastEviction,
@@ -66,6 +70,7 @@ export const CanvaEmbedSlot = memo(function CanvaEmbedSlot({
 
   const [iframeLoaded, setIframeLoaded] = useState(false);
   const [iframeFailed, setIframeFailed] = useState(false);
+  const [thumbnailFailed, setThumbnailFailed] = useState(false);
   const [evictedToast, setEvictedToast] = useState<string | null>(null);
 
   // IntersectionObserver starts at `false` and only flips once it has
@@ -93,6 +98,10 @@ export const CanvaEmbedSlot = memo(function CanvaEmbedSlot({
       setIframeFailed(false);
     }
   }, [active]);
+
+  useEffect(() => {
+    setThumbnailFailed(false);
+  }, [linkImage, linkUrl]);
 
   // Fallback timeout: some Canva designs (/view share surface on certain
   // document/poster types) throw a state-deserialize error inside the
@@ -146,6 +155,16 @@ export const CanvaEmbedSlot = memo(function CanvaEmbedSlot({
       `https://www.canva.com/design/${designId}/view?embed&meta`
     );
   }, [linkUrl, designId]);
+  const title = linkTitle || "Canva design";
+  const candidateLinkImage =
+    proxiedCanvaThumbnailUrl(linkImage, 640) ??
+    deriveCanvaThumbnailUrl(linkUrl);
+  const hasLegacyScreenThumbnail = Boolean(
+    candidateLinkImage?.includes("%2Fscreen%3F") ||
+      candidateLinkImage?.includes("/screen?")
+  );
+  const effectiveLinkImage =
+    thumbnailFailed || hasLegacyScreenThumbnail ? null : candidateLinkImage;
 
   // Fallback branch: iframe errored. Surface the original link-preview
   // style anchor so the card is never empty.
@@ -155,17 +174,17 @@ export const CanvaEmbedSlot = memo(function CanvaEmbedSlot({
         href={linkUrl}
         target="_blank"
         rel="noopener noreferrer"
-        className={`card-link-preview ${linkImage ? "has-image" : ""}`}
+        className={`card-link-preview ${effectiveLinkImage ? "has-image" : ""}`}
         onClick={(e) => e.stopPropagation()}
       >
-        {linkImage && (
+        {effectiveLinkImage && (
           <div className="card-link-preview-image">
-            <img src={linkImage} alt="" loading="lazy" />
+            <img src={effectiveLinkImage} alt="" loading="lazy" />
           </div>
         )}
         <div className="card-link-preview-body">
           <span className="card-link-preview-title">
-            {linkTitle || "Canva design"}
+            {title}
           </span>
           {linkDesc && <span className="card-link-preview-desc">{linkDesc}</span>}
           <span className="card-link-preview-url">🔗 canva.com</span>
@@ -174,12 +193,12 @@ export const CanvaEmbedSlot = memo(function CanvaEmbedSlot({
     );
   }
 
-  const title = linkTitle || "Canva design";
   // Render the iframe as soon as the user activates. We no longer gate on
   // inView — the auto-deactivate useEffect above handles off-screen
   // eviction once IO reports genuine visibility. The LRU cap (3) still
   // prevents runaway iframe counts regardless.
-  const shouldRenderIframe = active;
+  const shouldRenderIframe =
+    active || !effectiveLinkImage || hasLegacyScreenThumbnail;
   void evictedToast;
 
   return (
@@ -188,16 +207,22 @@ export const CanvaEmbedSlot = memo(function CanvaEmbedSlot({
       className="card-canva-slot"
       data-active={active ? "true" : "false"}
       data-loaded={iframeLoaded ? "true" : "false"}
+      data-preview={
+        !active && (!effectiveLinkImage || hasLegacyScreenThumbnail)
+          ? "true"
+          : "false"
+      }
     >
       <div className="card-canva-slot-frame">
-        {linkImage ? (
+        {effectiveLinkImage ? (
           // Thumbnail always painted underneath — acts as LCP image and as
           // the background that shows through while iframe boots (and after
           // eviction). loading="lazy" is safe because the slot is cheap.
           <img
-            src={linkImage}
+            src={effectiveLinkImage}
             alt={`${title} 썸네일`}
             loading="lazy"
+            onError={() => setThumbnailFailed(true)}
             className="card-canva-slot-thumbnail"
           />
         ) : (
@@ -215,7 +240,7 @@ export const CanvaEmbedSlot = memo(function CanvaEmbedSlot({
           </div>
         )}
 
-        {shouldRenderIframe ? (
+        {shouldRenderIframe && (
           <iframe
             key={designId /* remount on designId change */}
             src={embedSrc}
@@ -227,7 +252,8 @@ export const CanvaEmbedSlot = memo(function CanvaEmbedSlot({
             onError={() => setIframeFailed(true)}
             className="card-canva-slot-iframe"
           />
-        ) : (
+        )}
+        {!active && (
           <div
             role="button"
             tabIndex={0}

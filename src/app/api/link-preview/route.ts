@@ -1,11 +1,28 @@
 import { NextResponse } from "next/server";
-import { writeFile } from "fs/promises";
-import path from "path";
 import {
   deriveCanvaThumbnailUrl,
   isCanvaDesignUrl,
+  proxiedCanvaThumbnailUrl,
   resolveCanvaEmbedUrl,
 } from "@/lib/canva";
+
+function absolutizeUrl(value: string | null, baseUrl: string): string | null {
+  if (!value) return null;
+  try {
+    return new URL(value, baseUrl).toString();
+  } catch {
+    return null;
+  }
+}
+
+function proxiedLinkPreviewImageUrl(
+  imageUrl: string | null,
+  pageUrl: string
+): string | null {
+  const absolute = absolutizeUrl(imageUrl, pageUrl);
+  if (!absolute) return null;
+  return `/api/link-preview/image?url=${encodeURIComponent(absolute)}&referer=${encodeURIComponent(pageUrl)}`;
+}
 
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
@@ -22,7 +39,7 @@ export async function GET(req: Request) {
         return NextResponse.json({
           title: embed.title,
           description: embed.authorName ? `by ${embed.authorName}` : null,
-          image: embed.thumbnailUrl,
+          image: proxiedCanvaThumbnailUrl(embed.thumbnailUrl, 640),
         });
       }
       const derivedImage = deriveCanvaThumbnailUrl(url);
@@ -98,34 +115,13 @@ export async function GET(req: Request) {
       getMeta("description") ??
       null;
 
-    let image =
+    const image = proxiedLinkPreviewImageUrl(
       getMeta("og:image") ??
-      getMeta("twitter:image") ??
-      null;
-
-    // Cache the OG image locally (some sites block direct hotlinking)
-    if (image) {
-      try {
-        const imgRes = await fetch(image, {
-          headers: {
-            "User-Agent":
-              "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
-            Referer: url,
-          },
-          signal: AbortSignal.timeout(8000),
-        });
-        if (imgRes.ok) {
-          const buffer = Buffer.from(await imgRes.arrayBuffer());
-          const ext = image.includes(".png") ? "png" : "jpg";
-          const filename = `og-${Date.now()}-${Math.random().toString(36).slice(2, 6)}.${ext}`;
-          const uploadDir = path.join(process.cwd(), "public", "uploads");
-          await writeFile(path.join(uploadDir, filename), buffer);
-          image = `/uploads/${filename}`;
-        }
-      } catch {
-        // Keep remote URL as fallback
-      }
-    }
+        getMeta("twitter:image") ??
+        getMeta("twitter:image:src") ??
+        null,
+      url
+    );
 
     return NextResponse.json({ title, description, image });
   } catch (e) {

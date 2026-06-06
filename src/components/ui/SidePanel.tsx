@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useId, useRef } from "react";
+import { createPortal } from "react-dom";
 
 /**
  * SidePanel — generic right-side slide-over dialog.
@@ -125,7 +126,7 @@ export function SidePanel({
 
   if (!open) return null;
 
-  return (
+  return createPortal(
     <>
       <button
         type="button"
@@ -165,6 +166,7 @@ export function SidePanel({
         <div className={`side-panel-body ${className ?? ""}`.trim()}>{children}</div>
         {footer ? <div className="side-panel-footer">{footer}</div> : null}
       </aside>
-    </>
+    </>,
+    document.body
   );
 }

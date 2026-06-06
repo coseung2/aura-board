@@ -597,6 +597,12 @@
 .card-canva-slot-activate-overlay:hover {
   background: #fff;
 }
+.card-canva-slot[data-preview="true"] .card-canva-slot-activate-overlay {
+  background: transparent;
+}
+.card-canva-slot[data-preview="true"] .card-canva-slot-activate-overlay:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
 .card-canva-slot-activate-overlay:focus-visible {
   outline: 3px solid var(--color-accent, #3b82f6);
   outline-offset: -3px;

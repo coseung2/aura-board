@@ -17,6 +17,7 @@ import {
   LibraryPickerModal,
   type LibraryAsset,
 } from "./cards/LibraryPickerModal";
+import { detectFirstUrl, removeUrlFromText } from "@/lib/link-detection";
 
 export type { AttachmentDraft } from "./cards/useCardAttachments";
 
@@ -109,6 +110,15 @@ export function AddCardModal({
     isFirstOfKind,
     isLastOfKind,
   } = useCardAttachments();
+  const detectedContentUrl = linkUrl ? null : detectFirstUrl(content);
+
+  function promoteDetectedLink() {
+    if (!detectedContentUrl) return;
+    setLinkUrl(detectedContentUrl);
+    setContent((text) => removeUrlFromText(text, detectedContentUrl));
+    setShowLink(true);
+    fetchPreview(detectedContentUrl);
+  }
 
   async function openLibrary() {
     setPickerOpen(true);
@@ -228,6 +238,15 @@ export function AddCardModal({
             className="modal-textarea"
             maxLength={5000}
           />
+          {detectedContentUrl && (
+            <button
+              type="button"
+              className="modal-link-promote"
+              onClick={promoteDetectedLink}
+            >
+              링크를 아래 링크 버튼으로 올려주세요
+            </button>
+          )}
 
           {/* ── 첨부 버튼 바 ── */}
           <div className="modal-attach-bar">

@@ -28,6 +28,7 @@ import {
   extractCanvaDesignId,
   isCanvaDesignUrl,
   resolveCanvaEmbedUrl,
+  proxiedCanvaThumbnailUrl,
 } from "@/lib/canva";
 import { touchBoardUpdatedAt } from "@/lib/board-touch";
 
@@ -340,7 +341,9 @@ export async function POST(req: Request) {
   if (finalLinkUrl && !blobUrl) {
     try {
       const embed = await resolveCanvaEmbedUrl(finalLinkUrl);
-      if (embed?.thumbnailUrl) remoteThumbnailUrl = embed.thumbnailUrl;
+      if (embed?.thumbnailUrl) {
+        remoteThumbnailUrl = proxiedCanvaThumbnailUrl(embed.thumbnailUrl, 640);
+      }
     } catch (e) {
       console.warn("[external/cards] oEmbed resolution failed", e);
     }

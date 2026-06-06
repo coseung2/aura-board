@@ -12,7 +12,6 @@ const PatchBoardSchema = z.object({
   anonymousAuthor: z.boolean().optional(),
   boardTheme: z
     .enum([
-      "plain",
       "pastel-peach",
       "pastel-mint",
       "pastel-sky",

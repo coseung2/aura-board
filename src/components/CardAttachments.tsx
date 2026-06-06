@@ -6,6 +6,7 @@ import { extractVideoId } from "@/lib/youtube";
 import { CanvaEmbedSlot } from "./CanvaEmbedSlot";
 import { OptimizedImage } from "@/components/ui/OptimizedImage";
 import { CardFileAttachment } from "./CardFileAttachment";
+import { LinkPreviewImage } from "./cards/LinkPreviewImage";
 
 function getYouTubeId(url: string): string | null {
   return extractVideoId(url);
@@ -225,13 +226,10 @@ export const CardAttachments = memo(function CardAttachments({ imageUrl, linkUrl
           onClick={(e) => e.stopPropagation()}
         >
           {linkImage && (
-            <div className="card-link-preview-image optimized-img-wrap">
-              <OptimizedImage
-                src={linkImage}
-                alt=""
-                sizes="(max-width: 768px) 40vw, 120px"
-              />
-            </div>
+            <LinkPreviewImage
+              src={linkImage}
+              sizes="(max-width: 768px) 100vw, 480px"
+            />
           )}
           <div className="card-link-preview-body">
             <span className="card-link-preview-title">

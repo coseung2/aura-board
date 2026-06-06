@@ -5,11 +5,7 @@
   display: flex;
   flex-direction: column;
   overflow: auto;
-  background: #fff;
-}
-
-.board-page[data-board-theme="plain"] {
-  background: #fff;
+  background: linear-gradient(180deg, #eef7ff 0%, #dcecff 100%);
 }
 
 .board-page[data-board-theme="pastel-peach"] {

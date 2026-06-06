@@ -8,6 +8,7 @@ import {
   deriveCanvaThumbnailUrl,
   expandCanvaShortLink,
   isCanvaDesignUrl,
+  proxiedCanvaThumbnailUrl,
   resolveCanvaEmbedUrl,
 } from "@/lib/canva";
 import { extractVideoId, fetchYouTubeMeta, canonicalUrl } from "@/lib/youtube";
@@ -207,7 +208,7 @@ export async function POST(req: Request) {
         // oEmbed resolver strips the share token from its response, so
         // we only overwrite derived fields and leave linkUrl (already
         // expanded above) untouched.
-        linkImage = embed.thumbnailUrl;
+        linkImage = proxiedCanvaThumbnailUrl(embed.thumbnailUrl, 640);
         if (input.linkTitle === undefined) linkTitle = embed.title;
         if (input.linkDesc === undefined) {
           linkDesc = embed.authorName ? `by ${embed.authorName}` : null;
