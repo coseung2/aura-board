@@ -7,6 +7,7 @@ import { z } from "zod";
 import { db } from "@/lib/db";
 import { getCurrentStudent } from "@/lib/student-auth";
 import { getCurrentUser } from "@/lib/auth";
+import { resizeBufferToWebPPreview, uploadWebPBuffer } from "@/lib/blob";
 
 // Drawpile student-asset library (partial scope). Uploads go to public/uploads/
 // same as /api/upload; this route additionally creates a StudentAsset row so the
@@ -71,6 +72,7 @@ export async function POST(req: Request) {
           token: blobToken,
           multipart: true,
           addRandomSuffix: false,
+          cacheControlMaxAge: 60 * 60 * 24 * 365,
         });
         fileUrl = res.url;
       } catch (e) {
@@ -84,13 +86,24 @@ export async function POST(req: Request) {
       fileUrl = `/uploads/${filename}`;
     }
 
+    let thumbnailUrl: string | null = null;
+    try {
+      const preview = await resizeBufferToWebPPreview(buffer, 480, 75);
+      thumbnailUrl = await uploadWebPBuffer(
+        preview,
+        `student-assets/${student.id}/thumb-${Date.now()}-${randomBytes(3).toString("hex")}.webp`
+      );
+    } catch (e) {
+      console.warn("[POST /api/student-assets] thumbnail generation failed:", e);
+    }
+
     const asset = await db.studentAsset.create({
       data: {
         studentId: student.id,
         classroomId: student.classroomId,
         title,
         fileUrl,
-        thumbnailUrl: fileUrl, // same file for now; later a resized variant
+        thumbnailUrl,
         format: file.type,
         sizeBytes: file.size,
         source,

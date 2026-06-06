@@ -23,7 +23,7 @@ import type { CardData } from "../DraggableCard";
 
 type ShareSession = {
   shareToken: string;
-  shareMode: "view" | "comment" | "edit";
+  shareMode: "student";
 };
 
 const ShareSessionContext = createContext<ShareSession | null>(null);
@@ -77,7 +77,7 @@ type Props = {
   };
   initialCards: CardData[];
   initialSections: BoardSection[];
-  shareMode: "view" | "comment" | "edit";
+  shareMode: "student";
   shareToken: string;
 };
 
@@ -90,10 +90,8 @@ export function ShareBoardWrapper({
   shareMode,
   shareToken,
 }: Props) {
-  const isEditable = shareMode === "edit";
-  // Map shareMode to the role system: "edit" → editor, otherwise viewer.
-  const role = isEditable ? "editor" : "viewer";
-  const canEdit = isEditable;
+  const role = "editor";
+  const canEdit = true;
 
   // Layout dispatch mirrors src/app/board/[id]/page.tsx
   function renderBoard() {
@@ -146,7 +144,7 @@ export function ShareBoardWrapper({
         );
 
       // Special layouts (assignment, quiz, drawing, etc.) are teacher-only
-      // or require classroom context — show a simplified card view.
+      // or require classroom context — show a simplified student-style card view.
       default:
         // Render a read-only board with the freeform canvas.
         return (
@@ -154,7 +152,7 @@ export function ShareBoardWrapper({
             boardId={board.id}
             initialCards={initialCards}
             currentUserId={shareToken}
-            currentRole="viewer"
+            currentRole={role}
             classroomId={null}
             isStudentViewer={false}
           />

@@ -1,5 +1,5 @@
 /**
- * share-auth — validate share token and check permission level for a board.
+ * share-auth — validate share token for a board.
  *
  * Used by share card/comment endpoints to authorize anonymous share users.
  */
@@ -14,22 +14,13 @@ export type ShareAuth = {
   permission: SharePermission;
 } | {
   ok: false;
-  reason: "not_found" | "token_invalid" | "insufficient_permission";
+  reason: "not_found" | "token_invalid" | "sharing_disabled";
 };
 
-const PERMISSION_RANK: Record<SharePermission, number> = {
-  view: 0,
-  comment: 1,
-  edit: 2,
-};
-
-/**
- * Validate shareToken + check that the board's shareMode grants at least
- * the `required` permission level.
- */
+/** Validate shareToken for the unified student-permission share mode. */
 export async function authorizeShareAccess(
   shareToken: string,
-  required: SharePermission
+  _required: SharePermission
 ): Promise<ShareAuth> {
   const board = await db.board.findUnique({
     where: { shareToken },
@@ -44,17 +35,13 @@ export async function authorizeShareAccess(
   if (!board.shareToken || !tokensEqual(shareToken, board.shareToken)) {
     return { ok: false, reason: "token_invalid" };
   }
-  const mode = board.shareMode as SharePermission;
-  if (!(mode in PERMISSION_RANK)) {
-    return { ok: false, reason: "insufficient_permission" };
-  }
-  if (PERMISSION_RANK[mode] < PERMISSION_RANK[required]) {
-    return { ok: false, reason: "insufficient_permission" };
+  if (board.shareMode !== "student") {
+    return { ok: false, reason: "sharing_disabled" };
   }
   return {
     ok: true,
     boardId: board.id,
     boardTitle: board.title,
-    permission: mode,
+    permission: "student",
   };
 }

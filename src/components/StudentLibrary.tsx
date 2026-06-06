@@ -96,9 +96,14 @@ export function StudentLibrary() {
         <ul className="library-list">
           {assets.map((a) => (
             <li key={a.id} className="library-item">
-              {a.thumbnailUrl ? (
+              {a.thumbnailUrl || a.fileUrl ? (
                 // eslint-disable-next-line @next/next/no-img-element
-                <img src={a.thumbnailUrl} alt={a.title || "그림"} />
+                <img
+                  src={a.thumbnailUrl ?? a.fileUrl}
+                  alt={a.title || "그림"}
+                  loading="lazy"
+                  decoding="async"
+                />
               ) : (
                 <span aria-hidden>🖼️</span>
               )}

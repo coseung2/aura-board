@@ -138,3 +138,64 @@ export async function resizeBufferToWebP(input: Buffer): Promise<Buffer> {
     .webp({ quality: 75 })
     .toBuffer();
 }
+
+export async function resizeBufferToWebPPreview(
+  input: Buffer,
+  maxDimension = 640,
+  quality = 75
+): Promise<Buffer> {
+  return sharp(input)
+    .rotate()
+    .resize(maxDimension, maxDimension, {
+      fit: "inside",
+      withoutEnlargement: true,
+    })
+    .webp({ quality })
+    .toBuffer();
+}
+
+export async function uploadWebPBuffer(
+  input: Buffer,
+  pathname: string
+): Promise<string> {
+  const blobToken = process.env.BLOB_READ_WRITE_TOKEN;
+  if (blobToken) {
+    const out = await put(pathname, input, {
+      access: "public",
+      contentType: "image/webp",
+      token: blobToken,
+      multipart: false,
+      addRandomSuffix: false,
+      cacheControlMaxAge: 60 * 60 * 24 * 365,
+    });
+    return out.url;
+  }
+
+  const safe = `${randomBytes(4).toString("hex")}-${pathname.replace(/[^a-zA-Z0-9_.-]/g, "_")}`;
+  const abs = path.join(process.cwd(), "public", "uploads", safe);
+  await mkdir(path.dirname(abs), { recursive: true });
+  await writeFile(abs, input);
+  return `/uploads/${safe}`;
+}
+
+export async function resizeRemoteImageToWebPPreviewUrl(
+  sourceUrl: string,
+  pathname: string,
+  maxDimension = 640,
+  quality = 75
+): Promise<string> {
+  const res = await fetch(sourceUrl, {
+    headers: { Accept: "image/avif,image/webp,image/*;q=0.8,*/*;q=0.5" },
+    signal: AbortSignal.timeout(10000),
+  });
+  if (!res.ok) {
+    throw new BlobUploadError(`preview source fetch failed: ${res.status}`);
+  }
+  const contentType = res.headers.get("content-type") ?? "";
+  if (!contentType.startsWith("image/")) {
+    throw new BlobUploadError(`preview source is not image: ${contentType}`);
+  }
+  const input = Buffer.from(await res.arrayBuffer());
+  const preview = await resizeBufferToWebPPreview(input, maxDimension, quality);
+  return uploadWebPBuffer(preview, pathname);
+}

@@ -6,6 +6,7 @@ import { normalizeUploadMime, mimeFromExtension } from "./file-attachment";
 
 export type UploadedFile = {
   url: string;
+  previewUrl?: string | null;
   type: "image" | "video" | "file";
   name: string;
   size: number;
@@ -53,6 +54,7 @@ export async function uploadFile(file: File): Promise<UploadedFile> {
   // 실행 위험 억제. 이미지/비디오는 기존대로 url(인라인 렌더 가능).
   return {
     url: kind === "file" ? res.downloadUrl : res.url,
+    previewUrl: null,
     type: kind,
     name: file.name, // 원본 파일명 유지 (UI 표시용)
     size: file.size,

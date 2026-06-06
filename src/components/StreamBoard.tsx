@@ -35,6 +35,7 @@ export function StreamBoard({ boardId, initialCards, currentUserId, currentRole,
     attachments?: Array<{
       kind: "image" | "video" | "file";
       url: string;
+      previewUrl?: string | null;
       fileName?: string;
       fileSize?: number;
       mimeType?: string;

@@ -4,6 +4,7 @@ import { db } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
 import { requirePermission, ForbiddenError } from "@/lib/rbac";
 import { touchBoardUpdatedAt } from "@/lib/board-touch";
+import { enqueueBlobDeletion } from "@/lib/blob-cleanup";
 
 const SortModeSchema = z.enum(["manual", "newest", "oldest", "title"]);
 
@@ -60,17 +61,30 @@ export async function DELETE(
     const { id } = await params;
     const user = await getCurrentUser();
 
-    const section = await db.section.findUnique({ where: { id } });
+    const section = await db.section.findUnique({
+      where: { id },
+      include: { cards: { include: { attachments: true } } },
+    });
     if (!section) {
       return NextResponse.json({ error: "Section not found" }, { status: 404 });
     }
 
     await requirePermission(section.boardId, user.id, "edit");
 
+    const blobUrls = section.cards.flatMap((card) => [
+      card.imageUrl,
+      card.thumbUrl,
+      card.linkImage,
+      card.videoUrl,
+      card.fileUrl,
+      ...card.attachments.flatMap((a) => [a.url, a.previewUrl]),
+    ]);
+
     await db.$transaction([
       db.card.deleteMany({ where: { sectionId: id } }),
       db.section.delete({ where: { id } }),
     ]);
+    await enqueueBlobDeletion(blobUrls, "section.delete", "Section", id);
 
     await touchBoardUpdatedAt(section.boardId);
 

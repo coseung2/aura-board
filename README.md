@@ -1,144 +1,155 @@
-# Aura-board
+# Aura Board
 
-나만의 Aura-board 웹앱. 실시간 협업 보드 + 카드 기반 콘텐츠 + 드래그앤드롭 레이아웃. 솔로 프로젝트.
+Aura Board는 교실 활동을 카드 기반 보드로 모으고, 학생·교사·학부모가 각자의 권한으로 결과물을 확인하고 공유할 수 있는 학급 운영 웹앱입니다.
 
-> **MVP 상태**: Notion 테마 확정 (2026-04-10). 인증/권한 체계는 레거시(`owner/editor/viewer`)에서 3개 Identity(teacher/parent/student)로 이전 중.
-
----
-
-## 빠르게 돌려보기
-
-```bash
-npm install           # 의존성 설치 + prisma generate
-npm run db:push       # SQLite 스키마 생성 (prisma/dev.db)
-npm run seed          # 3 users + 데모 보드 + 카드 12개
-npm run dev           # http://localhost:3000
-```
-
-첫 방문 시 `/board/demo`로 리디렉트됩니다.
-
-## 카드에 붙일 수 있는 콘텐츠
-
-- 이미지 (업로드 또는 URL)
-- 일반 링크 (OG 메타 프리뷰)
-- YouTube URL → iframe 임베드
-- **Canva 디자인 URL → 라이브 iframe 임베드** (공개 디자인. 비공개는 일반 링크 프리뷰로 폴백)
-
-향후 Google Slides / Docs / Sheets, Figma, Notion, Desmos, GeoGebra 등 임베드는 `tasks/2026-04-12-embed-research/findings.md` 에 후보로 보관.
-
-### 인증 방식
-
-셋 중 하나로 로그인:
-- 👩‍🏫 **교사** — Google OAuth (NextAuth)
-- 👦 **학생** — QR/코드 → HMAC 서명 쿠키
-- 👪 **학부모** — 매직 링크 → 랜덤 토큰 쿠키
-
-> 한 브라우저가 여러 세션을 동시에 가질 수 있음 (교사+학부모 등). `resolveIdentities()`가 모든 신원을 취합.
+단순한 협업 보드가 아니라 수업 산출물, 포트폴리오, 자랑해요, 과제, 식물 관찰일지, 퀴즈, 학급 경제, 발표/자료 카드까지 한 흐름에서 다루는 교육용 보드 플랫폼을 목표로 합니다.
 
 ---
 
-## 프로젝트 구조
+## 주요 기능
 
-```
-padlet/
-├── CLAUDE.md                   # 에이전트 하네스 루트 오케스트레이션
-├── _handoff.md                 # 기획 단계 핸드오프 노트
-├── prompts/                    # 에이전트 계약서 (feature / incident / research)
-├── tasks/                      # 작업 단위 산출물 (감사 이력)
-│   └── 2026-04-09-initial-padlet-app/   # ← 현재 task
-├── prisma/
-│   ├── schema.prisma           # User / Board / BoardMember / Card
-│   └── seed.ts                 # 멱등 시드 스크립트
-├── src/
-│   ├── app/
-│   │   ├── layout.tsx
-│   │   ├── page.tsx            # → /board/demo
-│   │   ├── globals.css         # Notion 테마 토큰 시스템
-│   │   ├── board/[id]/page.tsx # board view (server component)
-│   │   └── api/
-│   │       ├── boards/[id]/route.ts
-│   │       ├── cards/route.ts  (POST)
-│   │       └── cards/[id]/route.ts (PATCH, DELETE)
-│   ├── components/
-│   │   ├── BoardCanvas.tsx     # dnd-kit 래퍼
-│   │   ├── DraggableCard.tsx
-│   │   ├── AddCardButton.tsx
-│   │   └── UserSwitcher.tsx
-│   ├── lib/                     # 인증/권한/prisma 유틸
-│   ├── styles/
-│   │   └── plant.css
-│   └── proxy.ts                # Next.js 16 request proxy
-├── .env                        # DATABASE_URL
-├── next.config.ts
-├── tsconfig.json
-└── package.json
-```
+- **보드와 카드**
+  - 자유 배치, 그리드, 스트림, 칼럼 등 여러 보드 레이아웃
+  - 이미지, 링크, YouTube, Canva, 파일, 다중 첨부 카드
+  - 카드별 좋아요·댓글·작성자 표시
+
+- **수업 산출물 관리**
+  - 학생별 카드 작성과 자기 카드 수정
+  - 교사용 학생 drill-down
+  - 과제 슬롯과 제출 카드
+  - 포트폴리오와 학급 자랑해요 갤러리
+
+- **학급 활동**
+  - 식물 관찰일지와 교사용 관찰 매트릭스
+  - 퀴즈/평가, DJ 큐, 브레이크아웃 활동
+  - 학급 화폐, 역할, 상점, 지갑
+
+- **공유**
+  - 보드 공유는 세분화된 보기/댓글/편집 권한 대신 **학생 권한 공유**로 통일
+  - 공유 링크 방문자는 학생처럼 카드 추가 가능
+  - 공유 링크로 만든 카드는 해당 공유 방문자의 카드처럼 제한적으로 수정/삭제
+
+- **미디어 최적화**
+  - 목록과 카드 그리드에서는 원본 대신 `thumbUrl`, `previewUrl`, `thumbnailUrl` 우선 사용
+  - Canva, 영상, iframe은 클릭 전 실제 iframe/video를 mount하지 않음
+  - Canva 카드는 클릭 전에도 썸네일과 재생 버튼을 표시
+  - 업로드/생성 시점에 WebP preview를 만들고, 조회 시 반복 리사이즈나 외부 preview fetch를 피함
+  - Blob 삭제는 즉시 삭제 대신 지연 cleanup queue에서 참조 검사 후 처리
 
 ---
 
-## 기술 스택 (phase3 architect가 확정)
+## 인증과 권한
 
-| 레이어 | 선택 |
+Aura Board는 여러 신원을 동시에 고려합니다.
+
+- **교사**: Google OAuth 기반 NextAuth 세션
+- **학생**: QR/코드 기반 HMAC 서명 쿠키
+- **학부모**: 매직 링크/토큰 기반 접근
+- **공유 방문자**: share token 기반 학생 권한
+
+카드 권한은 `src/lib/card-permissions.ts`의 Identity 기반 규칙을 중심으로 처리합니다.
+
+| 동작 | 교사 | 학생 | 학부모 | 공유 방문자 |
+|---|---|---|---|---|
+| 보드/카드 보기 | 가능 | 같은 학급 가능 | 자녀/허용 범위 | 공유 보드 가능 |
+| 카드 생성 | 가능 | 가능 | 불가 | 가능 |
+| 카드 수정/삭제 | 가능 | 자기 카드만 | 불가 | 공유로 만든 카드만 |
+
+---
+
+## 기술 스택
+
+| 영역 | 사용 기술 |
 |---|---|
 | 프레임워크 | Next.js 16 App Router |
-| 런타임 | Node.js 24 |
-| DB | SQLite (Prisma) — Postgres 호환 스키마 |
-| ORM | Prisma 6 |
-| UI | 순수 CSS + CSS 변수 (Tailwind 없음) |
-| 드래그 | @dnd-kit/core |
-| 검증 | zod |
-| 디자인 | Notion-inspired (warm neutrals, whisper border, soft shadows) |
-
-**Postgres 이행**: `prisma/schema.prisma`의 `provider = "sqlite"` → `"postgresql"` + `DATABASE_URL` 교체 + `prisma db push --force-reset`. 스키마는 `@db.*` 타입 어노테이션을 쓰지 않아 호환됨.
+| UI | React 19, CSS Modules가 아닌 전역 CSS + 디자인 토큰 |
+| 인증 | NextAuth v5, 커스텀 학생/학부모 세션 |
+| DB | Prisma 6 + PostgreSQL |
+| 파일/미디어 | Vercel Blob, Sharp WebP preview |
+| 검증 | Zod, TypeScript |
+| 테스트 | Vitest |
 
 ---
 
-## RBAC 규칙
-
-레거시 `BoardMember(owner/editor/viewer)`에서 **Identity 기반(`card-permissions.ts`)** 으로 이전 중. 현재는 둘 다 사용.
-
-| Action | 교사 | 학생 | 학부모 |
-|---|---|---|---|
-| 보드/카드 보기 | ✅ | ✅ | ✅ (자녀만) |
-| 카드 생성/편집 | ✅ | ✅ (자기 카드만) | ❌ |
-| 카드 삭제 | ✅ | ✅ (자기 카드만) | ❌ |
-
-> 자세한 권한 로직은 `src/lib/card-permissions.ts` 참조.
-
----
-
-## 개발 명령
+## 빠르게 실행하기
 
 ```bash
-npm run dev         # Next.js dev server
-npm run build       # 프로덕션 빌드
-npm run start       # 프로덕션 서버
-npm run typecheck   # tsc --noEmit
-npm run db:push     # Prisma 스키마 → SQLite 반영
-npm run db:reset    # DB 초기화 (주의: 데이터 삭제)
-npm run seed        # 시드 재실행 (멱등)
+npm install
+npm run dev
+```
+
+개발 서버는 기본적으로 `http://localhost:3000`에서 실행됩니다.
+
+프로덕션 빌드:
+
+```bash
+npm run build
+```
+
+타입 체크:
+
+```bash
+npm run typecheck
+```
+
+테스트:
+
+```bash
+npm run test
 ```
 
 ---
 
-## 에이전트 하네스
+## 데이터베이스와 시드
 
-이 저장소는 Claude Code 기반 **에이전트 하네스**로 개발됩니다. 작업은 세 파이프라인 중 하나로 분기:
+Prisma 명령:
 
-- `feature` — 새 기능/화면 추가 → `prompts/feature/_index.md`
-- `incident` — 버그/사고 대응 → `prompts/incident/_index.md`
-- `research` — 기술/UX 탐색 → `prompts/research/_index.md`
+```bash
+npm run db:push
+npm run db:reset
+npm run seed
+```
 
-각 phase 파일에는 역할, 입력/출력 계약, 사용할 gstack 스킬이 명시되어 있습니다. 오케스트레이션 규약은 `CLAUDE.md` 참조.
+추가 시드:
+
+```bash
+npm run seed:plant
+npm run seed:breakout
+npm run seed:drawing-assets
+```
+
+프로덕션 빌드는 `prisma migrate deploy`를 먼저 실행합니다.
 
 ---
 
-## 다음 단계
+## 주요 디렉터리
 
-1. phase8 (code_reviewer) — staff engineer 리뷰 + 보안 체크
-2. phase9 (qa_tester) — 실제 브라우저 e2e + 수용 기준 매트릭스
-3. phase11 (doc_syncer) — docs/architecture.md 초기 작성
-4. (별도 feature task) 카드 inline 편집 UI
-5. (별도 research task) 실시간 동기화 방식 결정 (Liveblocks vs Yjs)
-6. (별도 feature task) 실제 인증 (NextAuth/Clerk) 도입
-7. (선택) Docker Desktop 활성 시 Postgres 이행
+```text
+src/app/                  Next.js App Router 페이지와 API routes
+src/components/           보드, 카드, 포트폴리오, 식물관찰 등 UI 컴포넌트
+src/lib/                  권한, 인증, Blob, preview cache, 데이터 매퍼
+src/styles/               전역 CSS와 화면별 스타일
+src/types/                공유 DTO 타입
+prisma/                   Prisma schema, migrations, seed
+docs/                     아키텍처, 현재 기능, 외부 API, 디자인 시스템 문서
+```
+
+---
+
+## 관련 문서
+
+- `docs/current-features.md`
+- `docs/architecture.md`
+- `docs/design-system.md`
+- `docs/external-api.md`
+- `CLAUDE.md`
+- `AGENTS.md`
+
+---
+
+## 운영 메모
+
+- 목록 화면에서는 원본 Blob URL보다 preview/thumbnail URL을 우선 사용합니다.
+- iframe과 video는 사용자 액션 전까지 mount하지 않는 것을 기본 원칙으로 둡니다.
+- Blob 삭제는 `BlobDeletionQueue`를 통해 지연 처리하며, cleanup 전에 동일 URL 참조 여부를 확인합니다.
+- 외부 preview fetch와 Canva thumbnail resolve는 캐시를 우선 사용합니다.

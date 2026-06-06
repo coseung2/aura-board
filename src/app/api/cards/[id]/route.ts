@@ -9,11 +9,13 @@ import {
   deriveCanvaThumbnailUrl,
   isCanvaDesignUrl,
   proxiedCanvaThumbnailUrl,
-  resolveCanvaEmbedUrl,
   expandCanvaShortLink,
 } from "@/lib/canva";
+import { resolveCanvaEmbedUrlCached } from "@/lib/canva-preview-cache";
 import { isAllowedFileUrl, isAllowedStoredMime, MAX_ATTACHMENTS_PER_CARD } from "@/lib/file-attachment";
 import { touchBoardUpdatedAt } from "@/lib/board-touch";
+import { resizeRemoteImageToWebPPreviewUrl } from "@/lib/blob";
+import { enqueueBlobDeletion } from "@/lib/blob-cleanup";
 
 const PatchCardSchema = z.object({
   title: z.string().max(200).optional(),
@@ -35,6 +37,7 @@ const PatchCardSchema = z.object({
       z.object({
         kind: z.enum(["image", "video", "file"]),
         url: z.string().url(),
+        previewUrl: z.string().url().nullable().optional(),
         fileName: z.string().max(255).nullable().optional(),
         fileSize: z.number().int().nonnegative().nullable().optional(),
         mimeType: z.string().max(100).nullable().optional(),
@@ -57,7 +60,10 @@ export async function PATCH(
   try {
     const { id } = await params;
 
-    const card = await db.card.findUnique({ where: { id } });
+    const card = await db.card.findUnique({
+      where: { id },
+      include: { attachments: true },
+    });
     if (!card) {
       return NextResponse.json({ error: "Card not found" }, { status: 404 });
     }
@@ -79,7 +85,7 @@ export async function PATCH(
     // Share visitor support: check x-share-token and merge ShareIdentity.
     const shareToken = req.headers.get("x-share-token");
     if (shareToken) {
-      const shareResult = await requireShareAuth(shareToken, "edit");
+      const shareResult = await requireShareAuth(shareToken, "student");
       if (!("identity" in shareResult)) {
         return NextResponse.json({ error: shareResult.error }, { status: shareResult.status });
       }
@@ -178,7 +184,7 @@ export async function PATCH(
       // Expand canva.link short-URL so the stored value carries the
       // share-token path segment that client predicates need.
       patch.linkUrl = await expandCanvaShortLink(patch.linkUrl as string);
-      const embed = await resolveCanvaEmbedUrl(patch.linkUrl);
+      const embed = await resolveCanvaEmbedUrlCached(patch.linkUrl);
       if (embed) {
         patch.linkImage = proxiedCanvaThumbnailUrl(embed.thumbnailUrl, 640);
         if (patch.linkTitle === undefined) patch.linkTitle = embed.title;
@@ -196,18 +202,31 @@ export async function PATCH(
     }
 
     const { attachments: nextAttachments, ...cardPatch } = patch;
+    const attachmentRows = nextAttachments
+      ? await Promise.all(
+          nextAttachments.map(async (a, idx) => ({
+            ...a,
+            previewUrl:
+              a.kind === "image"
+                ? a.previewUrl ??
+                  (await createAttachmentPreviewUrl(a.url, card.boardId, idx))
+                : null,
+          }))
+        )
+      : undefined;
 
     const updated = await db.$transaction(async (tx) => {
       const updatedCard = await tx.card.update({ where: { id }, data: cardPatch });
 
-      if (nextAttachments !== undefined) {
+      if (attachmentRows !== undefined) {
         await tx.cardAttachment.deleteMany({ where: { cardId: id } });
-        if (nextAttachments.length > 0) {
+        if (attachmentRows.length > 0) {
           await tx.cardAttachment.createMany({
-            data: nextAttachments.map((a, idx) => ({
+            data: attachmentRows.map((a, idx) => ({
               cardId: id,
               kind: a.kind,
               url: a.url,
+              previewUrl: a.previewUrl ?? null,
               fileName: a.fileName ?? null,
               fileSize: a.fileSize ?? null,
               mimeType: a.mimeType ?? null,
@@ -230,6 +249,7 @@ export async function PATCH(
         id: true,
         kind: true,
         url: true,
+        previewUrl: true,
         fileName: true,
         fileSize: true,
         mimeType: true,
@@ -253,6 +273,24 @@ export async function PATCH(
   }
 }
 
+async function createAttachmentPreviewUrl(
+  sourceUrl: string,
+  boardId: string,
+  index: number
+): Promise<string | null> {
+  try {
+    return await resizeRemoteImageToWebPPreviewUrl(
+      sourceUrl,
+      `uploads/previews/cards/${boardId}/${Date.now()}-${index}.webp`,
+      640,
+      75
+    );
+  } catch (e) {
+    console.warn("[PATCH /api/cards/:id] attachment preview generation failed:", e);
+    return null;
+  }
+}
+
 export async function DELETE(
   _req: Request,
   { params }: { params: Promise<{ id: string }> }
@@ -260,7 +298,10 @@ export async function DELETE(
   try {
     const { id } = await params;
 
-    const card = await db.card.findUnique({ where: { id } });
+    const card = await db.card.findUnique({
+      where: { id },
+      include: { attachments: true },
+    });
     if (!card) {
       return NextResponse.json({ error: "Card not found" }, { status: 404 });
     }
@@ -282,7 +323,7 @@ export async function DELETE(
     // Share visitor support: check x-share-token and merge ShareIdentity.
     const shareToken = _req.headers.get("x-share-token");
     if (shareToken) {
-      const shareResult = await requireShareAuth(shareToken, "edit");
+      const shareResult = await requireShareAuth(shareToken, "student");
       if (!("identity" in shareResult)) {
         return NextResponse.json({ error: shareResult.error }, { status: shareResult.status });
       }
@@ -309,6 +350,19 @@ export async function DELETE(
     }
 
     await db.card.delete({ where: { id } });
+    await enqueueBlobDeletion(
+      [
+        card.imageUrl,
+        card.thumbUrl,
+        card.linkImage,
+        card.videoUrl,
+        card.fileUrl,
+        ...card.attachments.flatMap((a) => [a.url, a.previewUrl]),
+      ],
+      "card.delete",
+      "Card",
+      id
+    );
 
     // classroom-boards-tab "🟢 새 활동" 배지 — 카드 삭제도 활동으로 간주.
     // Board row 자체는 카드 cascade의 부모라 여전히 존재하므로 정상 touch.

@@ -147,7 +147,8 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
         stageId: o.stageId,
         memo: o.memo,
         observedAt: o.observedAt.toISOString(),
-        thumbnail: o.images[0]?.url ?? null,
+        thumbnail: o.images[0]?.thumbnailUrl ?? o.images[0]?.url ?? null,
+        imageUrl: o.images[0]?.url ?? null,
         student: {
           id: o.studentPlant.student.id,
           name: o.studentPlant.student.name,

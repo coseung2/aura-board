@@ -177,6 +177,7 @@ export function CardDetailModal({
             <section className="card-detail-media" aria-label="첨부">
               <CardAttachments
                 imageUrl={card.imageUrl}
+                thumbUrl={card.thumbUrl}
                 linkUrl={card.linkUrl}
                 linkTitle={card.linkTitle}
                 linkDesc={card.linkDesc}

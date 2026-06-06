@@ -1,9 +1,9 @@
 /**
- * POST /api/share/cards — Create a card via share link (edit mode).
+ * POST /api/share/cards — Create a card via share link (student permission).
  *
  * Body: { shareToken, boardId, title, content?, color?, sectionId?, authorName }
  *
- * Validates shareToken + boardId + edit permission.
+ * Validates shareToken + boardId + student share permission.
  * Creates card with externalAuthorName = authorName (no user/student link).
  */
 import { NextResponse } from "next/server";
@@ -31,8 +31,8 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "invalid_input" }, { status: 400 });
   }
 
-  // Verify share access (edit required)
-  const auth = await authorizeShareAccess(parsed.shareToken, "edit");
+  // Verify share access.
+  const auth = await authorizeShareAccess(parsed.shareToken, "student");
   if (!auth.ok) {
     const status = auth.reason === "not_found" ? 404 : 403;
     return NextResponse.json({ error: auth.reason }, { status });

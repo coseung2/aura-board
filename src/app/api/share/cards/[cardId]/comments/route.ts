@@ -4,7 +4,7 @@
  * GET:  header { x-share-token } → returns comment list.
  * POST: body { shareToken, content, authorName } → creates comment.
  *
- * Requires "comment" permission level or higher ("edit" also works).
+ * Requires the unified student share permission.
  */
 import { NextResponse } from "next/server";
 import { z } from "zod";
@@ -21,8 +21,7 @@ const PostSchema = z.object({
 /** Extract share token from header (GET) or body (POST) */
 async function resolveShareAccess(
   req: Request,
-  cardId: string,
-  required: "comment" | "edit"
+  cardId: string
 ) {
   // Try header first (GET), then fall back
   const headerToken = req.headers.get("x-share-token");
@@ -34,7 +33,7 @@ async function resolveShareAccess(
   if (!card) return { error: "not_found", status: 404 } as const;
 
   if (headerToken) {
-    const auth = await authorizeShareAccess(headerToken, required);
+    const auth = await authorizeShareAccess(headerToken, "student");
     if (!auth.ok) {
       return { error: auth.reason, status: auth.reason === "not_found" ? 404 : 403 } as const;
     }
@@ -54,7 +53,7 @@ export async function GET(
 ) {
   const { cardId } = await params;
 
-  const access = await resolveShareAccess(req, cardId, "comment");
+  const access = await resolveShareAccess(req, cardId);
   if ("error" in access) {
     return NextResponse.json({ error: access.error }, { status: access.status });
   }
@@ -113,7 +112,7 @@ export async function POST(
     return NextResponse.json({ error: "not_found" }, { status: 404 });
   }
 
-  const auth = await authorizeShareAccess(parsed.shareToken, "comment");
+  const auth = await authorizeShareAccess(parsed.shareToken, "student");
   if (!auth.ok) {
     return NextResponse.json(
       { error: auth.reason },

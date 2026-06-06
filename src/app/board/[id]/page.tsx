@@ -113,6 +113,7 @@ export default async function BoardPage({
               id: true,
               kind: true,
               url: true,
+              previewUrl: true,
               fileName: true,
               fileSize: true,
               mimeType: true,
@@ -139,6 +140,7 @@ export default async function BoardPage({
               id: true,
               content: true,
               imageUrl: true,
+              thumbUrl: true,
               linkUrl: true,
               updatedAt: true,
             },
@@ -266,7 +268,7 @@ export default async function BoardPage({
     // multi-attachment (2026-04-20): 정규화 첨부 배열. singleton 필드는
     // 별개로 남겨 attachments가 비었을 때 fallback 렌더 경로가 사용.
     attachments:
-      (c as { attachments?: { id: string; kind: string; url: string; fileName: string | null; fileSize: number | null; mimeType: string | null; order: number }[] }).attachments ??
+      (c as { attachments?: { id: string; kind: string; url: string; previewUrl: string | null; fileName: string | null; fileSize: number | null; mimeType: string | null; order: number }[] }).attachments ??
       [],
     // card-comments-likes (2026-04-26): 보드 단위 익명 토글 — 모든 카드가
     // 동일한 보드를 공유하므로 board.anonymousAuthor 를 전 카드에 denorm.
@@ -474,7 +476,7 @@ export default async function BoardPage({
               id: row.card.id,
               content: row.card.content,
               imageUrl: row.card.imageUrl,
-              thumbUrl: row.card.imageUrl,
+              thumbUrl: row.card.thumbUrl ?? row.card.imageUrl,
               linkUrl: row.card.linkUrl,
               fileUrl: row.submission?.fileUrl ?? null,
               updatedAt: row.card.updatedAt.toISOString(),
