@@ -13,6 +13,7 @@ export type CardData = {
   content: string;
   color: string | null;
   imageUrl?: string | null;
+  thumbUrl?: string | null;
   linkUrl?: string | null;
   linkTitle?: string | null;
   linkDesc?: string | null;

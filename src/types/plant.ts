@@ -77,6 +77,7 @@ export interface RecentObservationDTO {
   memo: string | null;
   observedAt: string;
   thumbnail: string | null;
+  imageUrl: string | null;
   student: { id: string; name: string; number: number | null };
   species: { emoji: string; nameKo: string };
   plantNickname: string;

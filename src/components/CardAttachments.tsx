@@ -25,6 +25,7 @@ type AttachmentItem = {
 
 type Props = {
   imageUrl?: string | null;
+  thumbUrl?: string | null;
   linkUrl?: string | null;
   linkTitle?: string | null;
   linkDesc?: string | null;
@@ -48,7 +49,7 @@ type Props = {
 // All props are primitives/null, so default shallow equality is safe.
 // Memoizing avoids re-rendering attachment previews on every unrelated
 // parent state update (drag, selection, modal toggles, etc.).
-export const CardAttachments = memo(function CardAttachments({ imageUrl, linkUrl, linkTitle, linkDesc, linkImage, videoUrl, fileUrl, fileName, fileSize, fileMimeType, attachments, variant = "detail", onImageClick }: Props) {
+export const CardAttachments = memo(function CardAttachments({ imageUrl, thumbUrl, linkUrl, linkTitle, linkDesc, linkImage, videoUrl, fileUrl, fileName, fileSize, fileMimeType, attachments, variant = "detail", onImageClick }: Props) {
   const hasAttachments = (attachments?.length ?? 0) > 0;
   if (!hasAttachments && !imageUrl && !linkUrl && !videoUrl && !fileUrl) return null;
 
@@ -190,7 +191,7 @@ export const CardAttachments = memo(function CardAttachments({ imageUrl, linkUrl
             {imageUrl && (
               <div className="card-attach-image optimized-img-wrap">
                 <OptimizedImage
-                  src={imageUrl}
+                  src={variant === "thumbnail" ? thumbUrl ?? imageUrl : imageUrl}
                   alt=""
                   sizes="(max-width: 768px) 100vw, 480px"
                 />
