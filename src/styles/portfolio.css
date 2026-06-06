@@ -416,7 +416,8 @@
 .portfolio-card-link .card-attachments > .card-attach-image,
 .portfolio-card-link .card-attachments > .card-attach-video,
 .portfolio-card-link .card-attachments > .card-link-preview,
-.portfolio-card-link .card-attachments > .card-canva-slot {
+.portfolio-card-link .card-attachments > .card-canva-slot,
+.portfolio-card-link .card-attachments > .card-attach-media-poster {
   border-radius: 0;
   border: 0;
   margin: 0;
@@ -424,6 +425,7 @@
 
 .portfolio-card-link .card-attach-image,
 .portfolio-card-link .card-attach-video,
+.portfolio-card-link .card-attach-media-poster,
 .portfolio-card-link .card-canva-slot-poster,
 .portfolio-card-link .card-link-preview-image {
   height: 190px;
@@ -620,7 +622,8 @@
 .showcase-chip .card-attachments > .card-attach-image,
 .showcase-chip .card-attachments > .card-attach-video,
 .showcase-chip .card-attachments > .card-link-preview,
-.showcase-chip .card-attachments > .card-canva-slot {
+.showcase-chip .card-attachments > .card-canva-slot,
+.showcase-chip .card-attachments > .card-attach-media-poster {
   border-radius: 0;
   border: 0;
   margin: 0;
@@ -628,6 +631,7 @@
 
 .showcase-chip .card-attach-image,
 .showcase-chip .card-attach-video,
+.showcase-chip .card-attach-media-poster,
 .showcase-chip .card-canva-slot-poster,
 .showcase-chip .card-link-preview-image {
   height: 190px;
