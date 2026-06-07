@@ -199,6 +199,17 @@ export function CardDetailModal({
                 attachments={card.attachments}
                 onImageClick={(i) => setLightboxIndex(i)}
               />
+              {showOriginalLink && card.linkUrl && (
+                <a
+                  href={card.linkUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="card-detail-media-link"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  🔗 링크 열기
+                </a>
+              )}
             </section>
           )}
           <aside className="card-detail-side">
@@ -206,14 +217,14 @@ export function CardDetailModal({
             {card.content && (
               <p className="card-detail-content">{card.content}</p>
             )}
-            {showOriginalLink && card.linkUrl && (
+            {!hasMedia && showOriginalLink && card.linkUrl && (
               <a
                 href={card.linkUrl}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="card-detail-link"
               >
-                🔗 원본 열기
+                🔗 링크 열기
               </a>
             )}
             <CardAuthorFooter

@@ -48,11 +48,22 @@ export function CardEngagement({ cardId, mode }: Props) {
             },
           })
         : await fetch(`/api/cards/${cardId}/engagement`, { cache: "no-store" });
-      if (!r.ok) return;
+      if (!r.ok) {
+        if (shareSession) {
+          setState((current) =>
+            current ?? { likeCount: 0, commentCount: 0, isLiked: false, canInteract: true }
+          );
+        }
+        return;
+      }
       const j = (await r.json()) as EngagementState;
       setState(j);
     } catch {
-      /* ignore transient */
+      if (shareSession) {
+        setState((current) =>
+          current ?? { likeCount: 0, commentCount: 0, isLiked: false, canInteract: true }
+        );
+      }
     }
   }, [cardId, shareSession]);
 
