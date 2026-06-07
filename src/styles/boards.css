@@ -137,7 +137,7 @@
   min-width: max-content;
   width: max-content;
   overflow: visible;
-  padding-bottom: 24px;
+  padding: 0 32px 24px 0;
 }
 
 .column {
@@ -493,12 +493,12 @@
 /* 섹션 추가 + 학생 시드 두 버튼을 세로 스택 — 가로 폭(300px)을 유지하되
    다음 칼럼 위치를 흐리지 않도록 자기 너비만 사용. */
 .column-add-stack {
-  flex: 0 0 auto;
+  flex: 0 0 312px;
   align-self: flex-start;
   display: flex;
   flex-direction: column;
   gap: 8px;
-  min-width: 240px;
+  min-width: 312px;
 }
 
 .column-add-stack > .column-add-btn {
@@ -2094,6 +2094,11 @@
   }
 
   .column {
+    flex-basis: 288px;
+    min-width: 288px;
+  }
+
+  .column-add-stack {
     flex-basis: 288px;
     min-width: 288px;
   }

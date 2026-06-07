@@ -187,35 +187,33 @@
   align-self: stretch;
 }
 
-/* Make the image/iframe fill the media pane with contain-fit so nothing
-   is cropped. These override the tight link-preview thumb rules that
-   apply inside regular cards. */
+/* Link-only cards stay as a compact link preview in the detail modal.
+   Links are not treated like full-bleed media; the thumbnail + title/domain
+   should match the card surface. */
 .card-detail-media .card-link-preview {
-  width: 100%;
-  height: 100%;
-  margin: 0;
-  border: none;
-  background: transparent;
-  box-shadow: none;
+  width: min(520px, 100%);
+  height: auto;
+  margin: auto;
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-card);
   display: flex;
-  align-items: center;
-  justify-content: center;
+  align-items: stretch;
+  justify-content: flex-start;
 }
 .card-detail-media .card-link-preview:hover {
-  box-shadow: none;
+  box-shadow: var(--shadow-card-hover);
 }
 .card-detail-media .card-link-preview-image {
   width: 100%;
-  height: 100%;
-  max-height: none;
-  background: transparent;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  height: 220px;
+  max-height: 220px;
+  background: var(--color-bg);
 }
-.card-detail-media .card-link-preview-image img,
+.card-detail-media .card-link-preview-image img {
+  object-fit: cover;
+}
 .card-detail-media .card-attachment-image,
-.card-detail-media .card-link-preview-image .optimized-img-wrap img,
 .card-detail-media img {
   width: 100%;
   height: 100%;
@@ -365,11 +363,10 @@
 .card-detail-media .optimized-img-wrap,
 .card-detail-media .card-link-preview-image {
   width: 100%;
-  height: 100%;
   position: relative;
 }
 .card-detail-media .card-link-preview-body {
-  display: none;
+  display: flex;
 }
 /* In the detail modal, the Canva slot should fill the full media pane
    (height of modal minus header). Override the 16:9 padding-bottom

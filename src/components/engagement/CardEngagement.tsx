@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { formatRelativeTime } from "@/lib/card-engagement-format";
+import { useShareSession, type ShareSession } from "@/components/share/ShareSessionContext";
 
 // card-comments-likes (2026-04-26): 카드별 좋아요 + 댓글 UI.
 // mode="chips"  — 인라인 보드 카드 footer (좋아요 토글 + 댓글 카운트
@@ -14,7 +15,7 @@ interface CommentItem {
   id: string;
   content: string;
   createdAt: string;
-  authorKind: "teacher" | "student";
+  authorKind: "teacher" | "student" | "external";
   authorLabel: string;
   canDelete: boolean;
 }
@@ -34,17 +35,26 @@ interface Props {
 export function CardEngagement({ cardId, mode }: Props) {
   const [state, setState] = useState<EngagementState | null>(null);
   const [showModal, setShowModal] = useState(false);
+  const shareSession = useShareSession();
 
   const refresh = useCallback(async () => {
     try {
-      const r = await fetch(`/api/cards/${cardId}/engagement`, { cache: "no-store" });
+      const r = shareSession
+        ? await fetch(`/api/share/cards/${cardId}/engagement`, {
+            cache: "no-store",
+            headers: {
+              "x-share-token": shareSession.shareToken,
+              ...(shareSession.guestId ? { "x-share-guest-id": shareSession.guestId } : {}),
+            },
+          })
+        : await fetch(`/api/cards/${cardId}/engagement`, { cache: "no-store" });
       if (!r.ok) return;
       const j = (await r.json()) as EngagementState;
       setState(j);
     } catch {
       /* ignore transient */
     }
-  }, [cardId]);
+  }, [cardId, shareSession]);
 
   useEffect(() => {
     void refresh();
@@ -59,7 +69,16 @@ export function CardEngagement({ cardId, mode }: Props) {
         : s
     );
     try {
-      const r = await fetch(`/api/cards/${cardId}/like`, { method: "POST" });
+      const r = shareSession
+        ? await fetch(`/api/share/cards/${cardId}/like`, {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({
+              shareToken: shareSession.shareToken,
+              guestId: shareSession.guestId,
+            }),
+          })
+        : await fetch(`/api/cards/${cardId}/like`, { method: "POST" });
       if (!r.ok) {
         await refresh();
         return;
@@ -69,7 +88,7 @@ export function CardEngagement({ cardId, mode }: Props) {
     } catch {
       await refresh();
     }
-  }, [cardId, refresh, state?.canInteract]);
+  }, [cardId, refresh, shareSession, state?.canInteract]);
 
   if (!state) {
     return mode === "chips" ? (
@@ -106,7 +125,7 @@ export function CardEngagement({ cardId, mode }: Props) {
           </button>
         </div>
         {showModal && (
-          <CommentsModal cardId={cardId} canInteract={state.canInteract} onClose={() => {
+          <CommentsModal cardId={cardId} canInteract={state.canInteract} shareSession={shareSession} onClose={() => {
             setShowModal(false);
             void refresh();
           }} />
@@ -132,7 +151,7 @@ export function CardEngagement({ cardId, mode }: Props) {
         </button>
         <span className="card-engagement-meta">댓글 {state.commentCount}</span>
       </div>
-      <CommentsBlock cardId={cardId} canInteract={state.canInteract} onChange={refresh} />
+      <CommentsBlock cardId={cardId} canInteract={state.canInteract} shareSession={shareSession} onChange={refresh} />
     </div>
   );
 }
@@ -140,10 +159,12 @@ export function CardEngagement({ cardId, mode }: Props) {
 function CommentsModal({
   cardId,
   canInteract,
+  shareSession,
   onClose,
 }: {
   cardId: string;
   canInteract: boolean;
+  shareSession: ShareSession | null;
   onClose: () => void;
 }) {
   // engagement-modal-portal (2026-04-26): 모달이 카드 DOM 안에 그대로 있으면
@@ -188,7 +209,7 @@ function CommentsModal({
           </button>
         </div>
         <div className="card-engagement-modal-body">
-          <CommentsBlock cardId={cardId} canInteract={canInteract} />
+          <CommentsBlock cardId={cardId} canInteract={canInteract} shareSession={shareSession} />
         </div>
       </div>
     </div>
@@ -200,10 +221,12 @@ function CommentsModal({
 function CommentsBlock({
   cardId,
   canInteract,
+  shareSession,
   onChange,
 }: {
   cardId: string;
   canInteract: boolean;
+  shareSession: ShareSession | null;
   onChange?: () => void;
 }) {
   const [items, setItems] = useState<CommentItem[] | null>(null);
@@ -213,14 +236,19 @@ function CommentsBlock({
 
   const load = useCallback(async () => {
     try {
-      const r = await fetch(`/api/cards/${cardId}/comments`, { cache: "no-store" });
+      const r = shareSession
+        ? await fetch(`/api/share/cards/${cardId}/comments`, {
+            cache: "no-store",
+            headers: { "x-share-token": shareSession.shareToken },
+          })
+        : await fetch(`/api/cards/${cardId}/comments`, { cache: "no-store" });
       if (!r.ok) return;
       const j = (await r.json()) as { items: CommentItem[] };
       setItems(j.items);
     } catch {
       /* ignore */
     }
-  }, [cardId]);
+  }, [cardId, shareSession]);
 
   useEffect(() => {
     void load();
@@ -233,19 +261,34 @@ function CommentsBlock({
     setSubmitting(true);
     setErr(null);
     try {
-      const r = await fetch(`/api/cards/${cardId}/comments`, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ content: trimmed }),
-      });
+      const r = shareSession
+        ? await fetch(`/api/share/cards/${cardId}/comments`, {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({
+              shareToken: shareSession.shareToken,
+              content: trimmed,
+              authorName: shareSession.authorName,
+            }),
+          })
+        : await fetch(`/api/cards/${cardId}/comments`, {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({ content: trimmed }),
+          });
       if (!r.ok) {
         setErr("댓글 작성에 실패했어요");
         return;
       }
-      const j = (await r.json()) as { item: CommentItem };
+      const j = (await r.json()) as { item?: CommentItem; comment?: CommentItem };
+      const item = j.item ?? j.comment;
+      if (!item) {
+        setErr("댓글 작성에 실패했어요");
+        return;
+      }
       // comments-newest-first (2026-04-26): 새 댓글을 list 맨 앞에 prepend
       // 해서 폼 바로 아래에 노출.
-      setItems((prev) => [j.item, ...(prev ?? [])]);
+      setItems((prev) => [item, ...(prev ?? [])]);
       setContent("");
       onChange?.();
     } finally {
@@ -254,6 +297,7 @@ function CommentsBlock({
   };
 
   const remove = async (id: string) => {
+    if (shareSession) return;
     if (!confirm("댓글을 삭제할까요?")) return;
     const r = await fetch(`/api/cards/${cardId}/comments/${id}`, { method: "DELETE" });
     if (r.ok) {

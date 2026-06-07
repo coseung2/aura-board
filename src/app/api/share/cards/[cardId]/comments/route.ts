@@ -134,6 +134,14 @@ export async function POST(
 
   return NextResponse.json({
     ok: true,
+    item: {
+      id: comment.id,
+      content: comment.content,
+      createdAt: comment.createdAt.toISOString(),
+      authorKind: "external",
+      authorLabel: parsed.authorName,
+      canDelete: false,
+    },
     comment: {
       id: comment.id,
       content: comment.content,

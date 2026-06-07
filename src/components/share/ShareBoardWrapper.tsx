@@ -11,49 +11,14 @@
  */
 "use client";
 
-import { createContext, useContext, useCallback } from "react";
 import { BoardCanvas } from "../BoardCanvas";
 import { GridBoard } from "../GridBoard";
 import { StreamBoard } from "../StreamBoard";
 import { ColumnsBoard } from "../ColumnsBoard";
 import { BoardHeader } from "../BoardHeader";
 import type { CardData } from "../DraggableCard";
-
-// ─── Context ───────────────────────────────────────────────────────────────
-
-type ShareSession = {
-  shareToken: string;
-  shareMode: "student";
-};
-
-const ShareSessionContext = createContext<ShareSession | null>(null);
-
-export function useShareSession(): ShareSession | null {
-  return useContext(ShareSessionContext);
-}
-
-/**
- * Hook that wraps fetch calls with the share-token header.
- * Pass the same args as the standard fetch().
- *
- *   const shareFetch = useShareFetch();
- *   const res = await shareFetch("/api/cards/abc", { method: "PATCH", body: ... });
- */
-export function useShareFetch() {
-  const session = useContext(ShareSessionContext);
-  return useCallback(
-    (url: string | URL, init?: RequestInit) => {
-      return fetch(url, {
-        ...init,
-        headers: {
-          ...init?.headers,
-          ...(session ? { "x-share-token": session.shareToken } : {}),
-        },
-      });
-    },
-    [session],
-  );
-}
+import { ShareSessionProvider } from "./ShareSessionContext";
+export { useShareFetch, useShareSession } from "./ShareSessionContext";
 
 // ─── Props ─────────────────────────────────────────────────────────────────
 
@@ -161,7 +126,7 @@ export function ShareBoardWrapper({
   }
 
   return (
-    <ShareSessionContext.Provider value={{ shareToken, shareMode }}>
+    <ShareSessionProvider shareToken={shareToken} shareMode={shareMode}>
       <main className="share-board-page">
         <BoardHeader
           title={board.title}
@@ -170,6 +135,6 @@ export function ShareBoardWrapper({
         />
         <div className="share-board-content">{renderBoard()}</div>
       </main>
-    </ShareSessionContext.Provider>
+    </ShareSessionProvider>
   );
 }

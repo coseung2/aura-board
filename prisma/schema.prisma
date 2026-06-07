@@ -23,38 +23,38 @@ model User {
   emailVerified DateTime?
   createdAt     DateTime  @default(now())
 
-  memberships            BoardMember[]
-  cards                  Card[]
-  submissions            Submission[]
-  reviews                SubmissionReview[]
-  accounts               Account[]
-  sessions               Session[]
-  classrooms             Classroom[]
-  templatesOwned         BreakoutTemplate[]        @relation("TemplateOwner")
-  issuedParentInvites    ParentInviteCode[]        @relation("TeacherInvite")
-  canvaConnect           CanvaConnectAccount?
+  memberships              BoardMember[]
+  cards                    Card[]
+  submissions              Submission[]
+  reviews                  SubmissionReview[]
+  accounts                 Account[]
+  sessions                 Session[]
+  classrooms               Classroom[]
+  templatesOwned           BreakoutTemplate[]        @relation("TemplateOwner")
+  issuedParentInvites      ParentInviteCode[]        @relation("TeacherInvite")
+  canvaConnect             CanvaConnectAccount?
   // parent-class-invite-v2 — issued codes + audit FKs into ParentChildLink
-  classInvitesIssued     ClassInviteCode[]         @relation("ClassInviteIssued")
-  approvedParentLinks    ParentChildLink[]         @relation("LinkApprovedBy")
-  rejectedParentLinks    ParentChildLink[]         @relation("LinkRejectedBy")
-  revokedParentLinks     ParentChildLink[]         @relation("LinkRevokedBy")
+  classInvitesIssued       ClassInviteCode[]         @relation("ClassInviteIssued")
+  approvedParentLinks      ParentChildLink[]         @relation("LinkApprovedBy")
+  rejectedParentLinks      ParentChildLink[]         @relation("LinkRejectedBy")
+  revokedParentLinks       ParentChildLink[]         @relation("LinkRevokedBy")
   // dj-board-queue — teacher audit for role assignments
-  roleAssignmentsGranted ClassroomRoleAssignment[] @relation("ClassroomRoleAssignedBy")
+  roleAssignmentsGranted   ClassroomRoleAssignment[] @relation("ClassroomRoleAssignedBy")
   // Teacher's own LLM API key (vibe-arcade + future AI features)
-  llmKey                 TeacherLlmKey?
+  llmKey                   TeacherLlmKey?
   // Billing (Toss Payments 정기결제 — Seed 14 scaffold, 2026-04-22)
-  subscription           TeacherSubscription?
-  paymentEvents          PaymentEvent[]
-  boardResponses         BoardResponse[]           @relation("UserBoardResponses")
+  subscription             TeacherSubscription?
+  paymentEvents            PaymentEvent[]
+  boardResponses           BoardResponse[]           @relation("UserBoardResponses")
   // AI 평어 (2026-04-24) — 교사가 학생별로 생성한 평어 텍스트
-  aiFeedbacks            AiFeedback[]              @relation("TeacherAiFeedbacks")
+  aiFeedbacks              AiFeedback[]              @relation("TeacherAiFeedbacks")
   // OAuth as subject — Aura companion teacher OAuth (2026-04-24)
-  oauthAuthCodesAsUser   OAuthAuthCode[]           @relation("UserOAuthAuthCodes")
-  oauthAccessTokensAsUser  OAuthAccessToken[]      @relation("UserOAuthAccessTokens")
-  oauthRefreshTokensAsUser OAuthRefreshToken[]     @relation("UserOAuthRefreshTokens")
+  oauthAuthCodesAsUser     OAuthAuthCode[]           @relation("UserOAuthAuthCodes")
+  oauthAccessTokensAsUser  OAuthAccessToken[]        @relation("UserOAuthAccessTokens")
+  oauthRefreshTokensAsUser OAuthRefreshToken[]       @relation("UserOAuthRefreshTokens")
   // card-comments-likes (2026-04-26)
-  cardComments             CardComment[]            @relation("UserCardComments")
-  cardLikes                CardLike[]               @relation("UserCardLikes")
+  cardComments             CardComment[]             @relation("UserCardComments")
+  cardLikes                CardLike[]                @relation("UserCardLikes")
 }
 
 // ──── Audit Log (Seed 14 security, 2026-04-22) ────
@@ -126,8 +126,8 @@ model TeacherSubscription {
   createdAt          DateTime  @default(now())
   updatedAt          DateTime  @updatedAt
 
-  user     User           @relation(fields: [userId], references: [id], onDelete: Cascade)
-  events   PaymentEvent[]
+  user   User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  events PaymentEvent[]
 }
 
 // 결제·환불 이벤트 감사 로그. 웹훅·수동 호출 모두 여기에 insert.
@@ -291,11 +291,11 @@ model AiFeedback {
   teacherId   String
   classroomId String
   studentId   String
-  subject     String   // v1 'art', 향후 다과목 확장 대비 free string
+  subject     String // v1 'art', 향후 다과목 확장 대비 free string
   unit        String
   criterion   String
   comment     String   @db.Text
-  model       String   // 사용된 LLM model id (감사·디버깅용)
+  model       String // 사용된 LLM model id (감사·디버깅용)
   sentAt      DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
@@ -358,26 +358,26 @@ model Board {
   // ── Question board (QB-1, 2026-04-23) ─────────────────────────────
   // layout="question-board" 전용. 교사가 주제를 설정하고 학생들이 자유 텍스트
   // 응답을 올린다. questionVizMode 는 교사가 선택한 시각화 모드.
-  questionPrompt    String?
-  questionVizMode   String     @default("word-cloud")
+  questionPrompt  String?
+  questionVizMode String  @default("word-cloud")
 
   // ── card-comments-likes (2026-04-26) ──────────────────────────────
   // 보드 단위 토글: 카드 작성자/댓글 작성자 표기를 익명("익명") 으로 마스킹.
   // 좋아요 카운트는 영향 없음 (누가 눌렀는지는 어차피 비공개).
-  anonymousAuthor   Boolean    @default(false)
+  anonymousAuthor Boolean @default(false)
 
   // ── Board theme (2026-06-06) ──────────────────────────────────────
   // "pastel-peach" | "pastel-mint" | "pastel-sky" |
   // "pastel-lilac" | "pastel-lemon"
-  boardTheme        String     @default("pastel-sky")
+  boardTheme String @default("pastel-sky")
 
   // ── Board Share (2026-05-29) ──────────────────────────────────────
   // Public link sharing. "private" = no share. "student" =
   // anyone with the shareToken in URL can access the board with student permission.
   // shareShortCode provides a short 6-char URL (/s/CODE) for easy typing.
-  shareMode         String     @default("private") // "private" | "student"
-  shareToken        String?    @unique              // nanoid(21), null=not shared
-  shareShortCode    String?    @unique              // 6자 짧은코드 (/s/CODE), null=not shared
+  shareMode      String  @default("private") // "private" | "student"
+  shareToken     String? @unique // nanoid(21), null=not shared
+  shareShortCode String? @unique // 6자 짧은코드 (/s/CODE), null=not shared
 
   classroom          Classroom?          @relation("ClassroomBoards", fields: [classroomId], references: [id], onDelete: SetNull)
   members            BoardMember[]
@@ -533,15 +533,15 @@ enum CommentAuthorKind {
 }
 
 model CardComment {
-  id              String            @id @default(cuid())
-  cardId          String
-  authorKind      CommentAuthorKind
-  authorUserId    String? // teacher
-  authorStudentId String? // student
+  id                 String            @id @default(cuid())
+  cardId             String
+  authorKind         CommentAuthorKind
+  authorUserId       String? // teacher
+  authorStudentId    String? // student
   externalAuthorName String? // share-link anonymous author
-  content         String
-  createdAt       DateTime          @default(now())
-  deletedAt       DateTime?
+  content            String
+  createdAt          DateTime          @default(now())
+  deletedAt          DateTime?
 
   card          Card     @relation(fields: [cardId], references: [id], onDelete: Cascade)
   authorUser    User?    @relation("UserCardComments", fields: [authorUserId], references: [id], onDelete: SetNull)
@@ -553,12 +553,13 @@ model CardComment {
 }
 
 model CardLike {
-  id             String            @id @default(cuid())
-  cardId         String
-  likerKind      CommentAuthorKind
-  likerUserId    String? // teacher
-  likerStudentId String? // student
-  createdAt      DateTime          @default(now())
+  id               String            @id @default(cuid())
+  cardId           String
+  likerKind        CommentAuthorKind
+  likerUserId      String? // teacher
+  likerStudentId   String? // student
+  externalLikerKey String? // share-link anonymous visitor
+  createdAt        DateTime          @default(now())
 
   card         Card     @relation(fields: [cardId], references: [id], onDelete: Cascade)
   likerUser    User?    @relation("UserCardLikes", fields: [likerUserId], references: [id], onDelete: Cascade)
@@ -566,6 +567,7 @@ model CardLike {
 
   @@unique([cardId, likerUserId])
   @@unique([cardId, likerStudentId])
+  @@unique([cardId, externalLikerKey])
   @@index([cardId])
 }
 
@@ -596,7 +598,7 @@ model ShowcaseEntry {
 model CardAttachment {
   id         String   @id @default(cuid())
   cardId     String
-  kind       String   // "image" | "video" | "file"
+  kind       String // "image" | "video" | "file"
   url        String
   previewUrl String?
   fileName   String?
@@ -605,7 +607,7 @@ model CardAttachment {
   order      Int      @default(0)
   createdAt  DateTime @default(now())
 
-  card       Card     @relation("CardAttachments", fields: [cardId], references: [id], onDelete: Cascade)
+  card Card @relation("CardAttachments", fields: [cardId], references: [id], onDelete: Cascade)
 
   @@index([cardId])
 }
@@ -1053,8 +1055,8 @@ model BreakoutMembership {
   joinedAt     DateTime @default(now())
 
   assignment BreakoutAssignment? @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
-  section    Section            @relation(fields: [sectionId], references: [id], onDelete: Cascade)
-  student    Student            @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  section    Section             @relation(fields: [sectionId], references: [id], onDelete: Cascade)
+  student    Student             @relation(fields: [studentId], references: [id], onDelete: Cascade)
 
   @@unique([sectionId, studentId])
   @@index([assignmentId])
@@ -1078,9 +1080,9 @@ model Parent {
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
 
-  children ParentChildLink[]
-  sessions ParentSession[]
-  invites  ParentInviteCode[] @relation("IssuedToEmail")
+  children      ParentChildLink[]
+  sessions      ParentSession[]
+  invites       ParentInviteCode[]   @relation("IssuedToEmail")
   oauthAccounts ParentOAuthAccount[]
 
   @@index([email])
@@ -1094,7 +1096,7 @@ model Parent {
 model ParentOAuthAccount {
   id                String   @id @default(cuid())
   parentId          String
-  provider          String   // "google" | "kakao"
+  provider          String // "google" | "kakao"
   providerAccountId String
   email             String?
   emailVerified     Boolean  @default(false)
@@ -1668,24 +1670,24 @@ model VibeArcadeConfig {
 model VibeProject {
   id               String    @id @default(cuid())
   boardId          String
-  classroomId      String    // 비정규화 — 학급 스코프 빠른 스캔
+  classroomId      String // 비정규화 — 학급 스코프 빠른 스캔
   authorStudentId  String
   title            String
   description      String    @default("") // ≤500자
   // Vibe studio 3-tab split (2026-04-21). htmlContent는 <body> 본문만 보관하고
   // cssContent/jsContent는 각각 <style>/<script>로 합성된다. 기존 단일-HTML 레코드는
   // cssContent="", jsContent=""로 backfill 되며 렌더러가 그대로 동작 (body만 주입).
-  htmlContent      String    // <body> 본문 — CSP sandbox 헤더 부착
+  htmlContent      String // <body> 본문 — CSP sandbox 헤더 부착
   cssContent       String    @default("")
   jsContent        String    @default("")
-  thumbnailUrl     String?   // 서버 Playwright headless 160×120 WebP
+  thumbnailUrl     String? // 서버 Playwright headless 160×120 WebP
   // 고정 태그 5종 중 1개: "게임"|"퀴즈"|"시뮬"|"아트"|"기타" (JSON 배열)
   tags             String    @default("[]")
   // "draft"|"pending_review"|"approved"|"rejected"|"flagged"|"hidden"
   moderationStatus String    @default("draft")
-  moderationNote   String?   // ≤300자
+  moderationNote   String? // ≤300자
   approvedAt       DateTime?
-  approvedById     String?   // Teacher User.id
+  approvedById     String? // Teacher User.id
   rejectedAt       DateTime?
   rejectedById     String?
   playCount        Int       @default(0)
@@ -1696,11 +1698,11 @@ model VibeProject {
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @updatedAt
 
-  board        Board             @relation(fields: [boardId], references: [id], onDelete: Cascade)
-  author       Student           @relation("VibeProjectAuthor", fields: [authorStudentId], references: [id], onDelete: Restrict)
-  sessions     VibeSession[]
-  reviews      VibeReview[]
-  playSessions VibePlaySession[]
+  board         Board             @relation(fields: [boardId], references: [id], onDelete: Cascade)
+  author        Student           @relation("VibeProjectAuthor", fields: [authorStudentId], references: [id], onDelete: Restrict)
+  sessions      VibeSession[]
+  reviews       VibeReview[]
+  playSessions  VibePlaySession[]
   agentSessions AgentSession[]
 
   @@index([boardId, moderationStatus])
@@ -1710,13 +1712,13 @@ model VibeProject {
 
 model VibeSession {
   id           String    @id @default(cuid())
-  projectId    String?   // null = 아직 프로젝트 저장 전
+  projectId    String? // null = 아직 프로젝트 저장 전
   // nullable — 7일 미활성 익명화 cron이 studentId=null 로 전환 (AC-G5).
   studentId    String?
-  classroomId  String    // 비정규화 (쿼터 스캔). Student 익명화 후에도 유지.
-  messages     Json      // [{role, content, createdAt}]
+  classroomId  String // 비정규화 (쿼터 스캔). Student 익명화 후에도 유지.
+  messages     Json // [{role, content, createdAt}]
   tokensIn     Int       @default(0)
-  tokensOut   Int       @default(0)
+  tokensOut    Int       @default(0)
   // "active"|"completed"|"abandoned"|"failed"
   status       String    @default("active")
   startedAt    DateTime  @default(now())
@@ -1759,7 +1761,7 @@ model VibePlaySession {
   startedAt     DateTime  @default(now())
   endedAt       DateTime?
   completed     Boolean   @default(false) // iframe postMessage "완료" 수신
-  reportedScore Int?      // 통계·랭킹 참고용 (게임 로직 신뢰 X)
+  reportedScore Int? // 통계·랭킹 참고용 (게임 로직 신뢰 X)
 
   project VibeProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
   student Student     @relation("VibePlayer", fields: [studentId], references: [id], onDelete: Cascade)
@@ -1795,15 +1797,15 @@ model DjPlayEvent {
   id            String   @id @default(cuid())
   boardId       String
   classroomId   String
-  cardId        String?  // 카드 삭제 대응 — nullable + 수동 FK 없이 ID만 보존
+  cardId        String? // 카드 삭제 대응 — nullable + 수동 FK 없이 ID만 보존
   title         String
   linkUrl       String?
   linkImage     String?
-  videoId       String?  // youtube 11자 id — 같은 곡 집계 join key
+  videoId       String? // youtube 11자 id — 같은 곡 집계 join key
   submitterName String?
-  submitterId   String?  // Student.id 또는 User.id (교사 신청 대응)
-  submitterKind String?  // "student" | "teacher" | "anon"
-  durationSec   Int?     // YouTube oEmbed 에서 뽑힌 길이(초), 없으면 null
+  submitterId   String? // Student.id 또는 User.id (교사 신청 대응)
+  submitterKind String? // "student" | "teacher" | "anon"
+  durationSec   Int? // YouTube oEmbed 에서 뽑힌 길이(초), 없으면 null
   playedAt      DateTime @default(now())
 
   board     Board     @relation(fields: [boardId], references: [id], onDelete: Cascade)
@@ -1821,19 +1823,19 @@ model DjPlayEvent {
 model AgentSession {
   id           String   @id @default(cuid())
   studentId    String
-  classroomId  String   // 비정규화 — classroom-scoped scan
+  classroomId  String // 비정규화 — classroom-scoped scan
   // "arcade" | "tutor" | "code" | "lesson"
   mode         String   @default("arcade")
   title        String   @default("") // auto-generated from first exchange
   status       String   @default("active") // "active" | "completed" | "abandoned"
-  projectId    String?  // VibeProject.id — 저장 후 링크
+  projectId    String? // VibeProject.id — 저장 후 링크
   tokenCount   Int      @default(0)
   messageCount Int      @default(0)
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
-  student  Student       @relation(fields: [studentId], references: [id], onDelete: Cascade)
-  project  VibeProject?  @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  student  Student        @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  project  VibeProject?   @relation(fields: [projectId], references: [id], onDelete: SetNull)
   messages AgentMessage[]
 
   @@index([studentId, status])
@@ -1844,9 +1846,9 @@ model AgentSession {
 model AgentMessage {
   id         String   @id @default(cuid())
   sessionId  String
-  role       String   // "user" | "assistant" | "system"
+  role       String // "user" | "assistant" | "system"
   content    String
-  tokenCount Int?     // assistant 메시지의 토큰 사용량
+  tokenCount Int? // assistant 메시지의 토큰 사용량
   createdAt  DateTime @default(now())
 
   session AgentSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
