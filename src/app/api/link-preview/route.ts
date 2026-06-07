@@ -5,6 +5,7 @@ import sharp from "sharp";
 import {
   deriveCanvaThumbnailUrl,
   isCanvaDesignUrl,
+  proxiedCanvaThumbnailUrl,
 } from "@/lib/canva";
 import { resolveCanvaEmbedUrlCached } from "@/lib/canva-preview-cache";
 import { getPreviewCache, setPreviewCache } from "@/lib/preview-cache";
@@ -46,11 +47,27 @@ function cacheHash(value: string): string {
   return createHash("sha256").update(value).digest("hex");
 }
 
-async function fetchOgImagePreview(imageUrl: string, pageUrl: string): Promise<string | null> {
+function proxiedLinkPreviewImageUrl(
+  imageUrl: string | null,
+  pageUrl: string
+): string | null {
+  const absolute = absolutizeUrl(imageUrl, pageUrl);
+  if (!absolute) return null;
+  return `/api/link-preview/image?url=${encodeURIComponent(absolute)}&referer=${encodeURIComponent(pageUrl)}`;
+}
+
+async function fetchOgImagePreview(
+  imageUrl: string,
+  pageUrl: string,
+  fallbackUrl = proxiedLinkPreviewImageUrl(imageUrl, pageUrl)
+): Promise<string | null> {
+  const blobToken = process.env.BLOB_READ_WRITE_TOKEN;
+  if (!blobToken) return fallbackUrl;
+
   const cacheKey = `${imageUrl}|${pageUrl}`;
   const cached = await getPreviewCache<{ url: string }>("link-preview-image", cacheKey);
   if (cached.hit) {
-    return cached.status === "ok" ? cached.payload.url : null;
+    return cached.status === "ok" ? cached.payload.url : fallbackUrl;
   }
 
   try {
@@ -68,25 +85,25 @@ async function fetchOgImagePreview(imageUrl: string, pageUrl: string): Promise<s
 
     if (!upstream.ok) {
       await setPreviewCache("link-preview-image", cacheKey, null, false, `HTTP ${upstream.status}`);
-      return null;
+      return fallbackUrl;
     }
 
     const contentType = upstream.headers.get("content-type") ?? "";
     if (!contentType.startsWith("image/")) {
       await setPreviewCache("link-preview-image", cacheKey, null, false, "not_image");
-      return null;
+      return fallbackUrl;
     }
 
     const contentLength = Number(upstream.headers.get("content-length") ?? 0);
     if (contentLength > MAX_IMAGE_BYTES) {
       await setPreviewCache("link-preview-image", cacheKey, null, false, "image_too_large");
-      return null;
+      return fallbackUrl;
     }
 
     const sourceBuffer = Buffer.from(await upstream.arrayBuffer());
     if (sourceBuffer.byteLength > MAX_IMAGE_BYTES) {
       await setPreviewCache("link-preview-image", cacheKey, null, false, "image_too_large");
-      return null;
+      return fallbackUrl;
     }
 
     const preview = await sharp(sourceBuffer)
@@ -97,12 +114,6 @@ async function fetchOgImagePreview(imageUrl: string, pageUrl: string): Promise<s
       })
       .webp({ quality: 78 })
       .toBuffer();
-
-    const blobToken = process.env.BLOB_READ_WRITE_TOKEN;
-    if (!blobToken) {
-      await setPreviewCache("link-preview-image", cacheKey, null, false, "blob_token_missing");
-      return null;
-    }
 
     const pathname = `link-previews/${cacheHash(imageUrl)}.webp`;
     const blob = await put(pathname, preview, {
@@ -124,7 +135,7 @@ async function fetchOgImagePreview(imageUrl: string, pageUrl: string): Promise<s
       false,
       e instanceof Error ? e.message : "image_fetch_failed"
     ).catch(() => undefined);
-    return null;
+    return fallbackUrl;
   }
 }
 
@@ -138,7 +149,7 @@ export async function GET(req: Request) {
 
   try {
     const cached = await getPreviewCache<LinkPreviewPayload>("link-preview", url);
-    if (cached.hit) {
+    if (cached.hit && (cached.status !== "ok" || cached.payload.image)) {
       return NextResponse.json(
         cached.status === "ok"
           ? cached.payload
@@ -149,7 +160,11 @@ export async function GET(req: Request) {
     if (isCanvaDesignUrl(url)) {
       const embed = await resolveCanvaEmbedUrlCached(url);
       if (embed) {
-        const image = await fetchOgImagePreview(embed.thumbnailUrl, url);
+        const image = await fetchOgImagePreview(
+          embed.thumbnailUrl,
+          url,
+          proxiedCanvaThumbnailUrl(embed.thumbnailUrl, 640)
+        );
         const payload = {
           title: embed.title,
           description: embed.authorName ? `by ${embed.authorName}` : null,
@@ -160,11 +175,10 @@ export async function GET(req: Request) {
       }
       const derivedImage = deriveCanvaThumbnailUrl(url);
       if (derivedImage) {
-        const image = await fetchOgImagePreview(derivedImage, url);
         const payload = {
           title: "Canva design",
           description: null,
-          image,
+          image: derivedImage,
         };
         await setPreviewCache("link-preview", url, payload, true);
         return NextResponse.json(payload);

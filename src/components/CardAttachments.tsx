@@ -3,6 +3,7 @@
 import { memo } from "react";
 import { extractCanvaDesignId, hasCanvaShareToken } from "@/lib/canva";
 import { extractVideoId } from "@/lib/youtube";
+import { shouldPromoteLinkPreview } from "@/lib/card-content-policy";
 import { CanvaEmbedSlot } from "./CanvaEmbedSlot";
 import { OptimizedImage } from "@/components/ui/OptimizedImage";
 import { CardFileAttachment } from "./CardFileAttachment";
@@ -57,10 +58,19 @@ export const CardAttachments = memo(function CardAttachments({ imageUrl, thumbUr
   // 카드에서도 링크는 최대 1개(현 스키마 제약).
   const canvaDesignId = linkUrl ? extractCanvaDesignId(linkUrl) : null;
   const hasShareToken = Boolean(linkUrl && hasCanvaShareToken(linkUrl));
-  const canRenderCanvaEmbed = Boolean(canvaDesignId && (linkImage || hasShareToken));
   const linkYouTubeId = linkUrl ? getYouTubeId(linkUrl) : null;
   const effectiveVideoUrl = videoUrl ?? (linkYouTubeId ? linkUrl : null);
   const shouldHideLinkPreview = Boolean(linkYouTubeId);
+  const shouldPromoteLink = shouldPromoteLinkPreview({
+    imageUrl,
+    linkUrl,
+    videoUrl,
+    fileUrl,
+    attachments,
+  });
+  const canRenderCanvaEmbed = Boolean(
+    shouldPromoteLink && canvaDesignId && (linkImage || hasShareToken)
+  );
 
   // multi-attachment: 링크·canva·youtube는 기존 로직 그대로, 나머지
   // 이미지/동영상/파일은 attachments 배열을 우선 렌더.
@@ -240,7 +250,7 @@ export const CardAttachments = memo(function CardAttachments({ imageUrl, thumbUr
           linkImage={linkImage ?? null}
           linkDesc={linkDesc ?? null}
         />
-      ) : linkUrl && !shouldHideLinkPreview ? (
+      ) : linkUrl && shouldPromoteLink && !shouldHideLinkPreview ? (
         <a
           href={linkUrl}
           target="_blank"
@@ -261,9 +271,6 @@ export const CardAttachments = memo(function CardAttachments({ imageUrl, thumbUr
                 catch { return linkUrl; }
               })()}
             </span>
-            {linkDesc && (
-              <span className="card-link-preview-desc">{linkDesc}</span>
-            )}
             <span className="card-link-preview-url">
               🔗 {(() => {
                 try { return new URL(linkUrl).hostname.replace(/^www\./, ""); }

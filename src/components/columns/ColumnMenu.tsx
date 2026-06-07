@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import type { MenuItem } from "../ContextMenu";
 
 export type SortMode = "manual" | "newest" | "oldest" | "title";
@@ -34,24 +35,108 @@ export function ColumnMenu({
   triggerTitle,
 }: Props) {
   const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
+  const [pos, setPos] = useState<{ top: number; right: number } | null>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const dropdownRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!open) return;
     function onMouseDown(e: MouseEvent) {
-      if (ref.current && !ref.current.contains(e.target as Node)) {
-        setOpen(false);
+      const target = e.target as Node;
+      if (
+        triggerRef.current?.contains(target) ||
+        dropdownRef.current?.contains(target)
+      ) {
+        return;
       }
+      setOpen(false);
     }
     document.addEventListener("mousedown", onMouseDown);
     return () => document.removeEventListener("mousedown", onMouseDown);
   }, [open]);
 
+  useEffect(() => {
+    if (!open) return;
+    function recompute() {
+      const rect = triggerRef.current?.getBoundingClientRect();
+      if (!rect) return;
+      setPos({ top: rect.bottom + 4, right: window.innerWidth - rect.right });
+    }
+    recompute();
+    window.addEventListener("scroll", recompute, true);
+    window.addEventListener("resize", recompute);
+    return () => {
+      window.removeEventListener("scroll", recompute, true);
+      window.removeEventListener("resize", recompute);
+    };
+  }, [open]);
+
   const showSortSection = canSort;
 
+  const dropdown =
+    open && pos ? (
+      <div
+        ref={dropdownRef}
+        className="ctx-menu-dropdown ctx-menu-dropdown-portal"
+        role="menu"
+        style={{
+          position: "fixed",
+          top: pos.top,
+          right: pos.right,
+        }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        {showSortSection && (
+          <>
+            <div className="ctx-menu-label">정렬</div>
+            {SORT_OPTIONS.map((o) => {
+              const selected = sortMode === o.value;
+              return (
+                <button
+                  key={o.value}
+                  type="button"
+                  role="menuitemradio"
+                  aria-checked={selected}
+                  className={`ctx-menu-item ctx-menu-item-radio${selected ? " is-selected" : ""}`}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setOpen(false);
+                    onSetSort(o.value);
+                  }}
+                >
+                  <span className="ctx-menu-check" aria-hidden="true">
+                    {selected ? "✓" : ""}
+                  </span>
+                  {o.label}
+                </button>
+              );
+            })}
+            {actions.length > 0 && <div className="ctx-menu-sep" />}
+          </>
+        )}
+        {actions.map((a, i) => (
+          <button
+            key={i}
+            type="button"
+            role="menuitem"
+            className={`ctx-menu-item${a.danger ? " ctx-menu-item-danger" : ""}`}
+            onClick={(e) => {
+              e.stopPropagation();
+              setOpen(false);
+              a.onClick();
+            }}
+          >
+            {a.icon && <span className="ctx-menu-icon">{a.icon}</span>}
+            {a.label}
+          </button>
+        ))}
+      </div>
+    ) : null;
+
   return (
-    <div className="ctx-menu-wrap" ref={ref}>
+    <div className="ctx-menu-wrap">
       <button
+        ref={triggerRef}
         type="button"
         className="ctx-menu-trigger"
         onClick={(e) => {
@@ -65,54 +150,7 @@ export function ColumnMenu({
       >
         ⋯
       </button>
-      {open && (
-        <div className="ctx-menu-dropdown" role="menu">
-          {showSortSection && (
-            <>
-              <div className="ctx-menu-label">정렬</div>
-              {SORT_OPTIONS.map((o) => {
-                const selected = sortMode === o.value;
-                return (
-                  <button
-                    key={o.value}
-                    type="button"
-                    role="menuitemradio"
-                    aria-checked={selected}
-                    className={`ctx-menu-item ctx-menu-item-radio${selected ? " is-selected" : ""}`}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setOpen(false);
-                      onSetSort(o.value);
-                    }}
-                  >
-                    <span className="ctx-menu-check" aria-hidden="true">
-                      {selected ? "✓" : ""}
-                    </span>
-                    {o.label}
-                  </button>
-                );
-              })}
-              {actions.length > 0 && <div className="ctx-menu-sep" />}
-            </>
-          )}
-          {actions.map((a, i) => (
-            <button
-              key={i}
-              type="button"
-              role="menuitem"
-              className={`ctx-menu-item${a.danger ? " ctx-menu-item-danger" : ""}`}
-              onClick={(e) => {
-                e.stopPropagation();
-                setOpen(false);
-                a.onClick();
-              }}
-            >
-              {a.icon && <span className="ctx-menu-icon">{a.icon}</span>}
-              {a.label}
-            </button>
-          ))}
-        </div>
-      )}
+      {dropdown ? createPortal(dropdown, document.body) : null}
     </div>
   );
 }

@@ -5,6 +5,7 @@
  * BoardHeader의 공유 아이콘 버튼에서 열린다.
  */
 import { useCallback, useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 
 type Props = {
   boardId: string;
@@ -18,11 +19,16 @@ export function QrShareModal({ boardId, shareToken, shareShortCode, onClose }: P
   const [loading, setLoading] = useState(true);
   const [copied, setCopied] = useState(false);
   const [shortCopied, setShortCopied] = useState(false);
+  const [mounted, setMounted] = useState(false);
 
   const shareUrl = `${window.location.origin}/share/${shareToken}`;
   const shortUrl = shareShortCode
     ? `${window.location.origin}/s/${shareShortCode}`
     : null;
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -71,7 +77,9 @@ export function QrShareModal({ boardId, shareToken, shareShortCode, onClose }: P
     }
   }, [shortUrl]);
 
-  return (
+  if (!mounted) return null;
+
+  return createPortal(
     <div className="share-qr-overlay" onClick={onClose}>
       <div className="share-qr-modal" onClick={(e) => e.stopPropagation()}>
         <div className="share-qr-modal-header">
@@ -136,6 +144,7 @@ export function QrShareModal({ boardId, shareToken, shareShortCode, onClose }: P
           )}
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }

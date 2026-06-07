@@ -2,6 +2,11 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { extractVideoId } from "@/lib/youtube";
+import {
+  hasPrimaryNonLinkContent,
+  isYouTubeLink,
+  shouldPromoteLinkPreview,
+} from "@/lib/card-content-policy";
 import { CardAttachments } from "../CardAttachments";
 import { CardAuthorFooter } from "./CardAuthorFooter";
 import { CardImageLightbox } from "./CardImageLightbox";
@@ -112,13 +117,17 @@ export function CardDetailModal({
   if (!card) return null;
 
   const showOriginalLink = Boolean(card.linkUrl && !extractVideoId(card.linkUrl));
-  const hasMedia =
-    Boolean(card.imageUrl) ||
-    Boolean(card.linkImage) ||
-    Boolean(card.videoUrl) ||
-    Boolean(card.linkUrl) ||
-    Boolean(card.fileUrl) ||
-    (card.attachments?.length ?? 0) > 0;
+  const policyInput = {
+    imageUrl: card.imageUrl,
+    linkUrl: card.linkUrl,
+    videoUrl: card.videoUrl,
+    fileUrl: card.fileUrl,
+    attachments: card.attachments,
+  };
+  const hasNonLinkMedia = hasPrimaryNonLinkContent(policyInput);
+  const shouldShowLinkAsMedia = shouldPromoteLinkPreview(policyInput);
+  const shouldPassLinkToMedia = shouldShowLinkAsMedia || isYouTubeLink(card.linkUrl);
+  const hasMedia = hasNonLinkMedia || shouldShowLinkAsMedia;
 
   return (
     <>
@@ -178,10 +187,10 @@ export function CardDetailModal({
               <CardAttachments
                 imageUrl={card.imageUrl}
                 thumbUrl={card.thumbUrl}
-                linkUrl={card.linkUrl}
-                linkTitle={card.linkTitle}
-                linkDesc={card.linkDesc}
-                linkImage={card.linkImage}
+                linkUrl={shouldPassLinkToMedia ? card.linkUrl : null}
+                linkTitle={shouldShowLinkAsMedia ? card.linkTitle : null}
+                linkDesc={null}
+                linkImage={shouldShowLinkAsMedia ? card.linkImage : null}
                 videoUrl={card.videoUrl}
                 fileUrl={card.fileUrl}
                 fileName={card.fileName}
