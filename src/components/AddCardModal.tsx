@@ -62,13 +62,15 @@ const COLOR_PRESETS = [
 // 파일 input accept 문자열 — 모달 JSX에서 여러 번 쓰여서 상수로 분리.
 const IMAGE_ACCEPT = "image/*";
 const VIDEO_ACCEPT = "video/*";
+const AUDIO_ACCEPT = "audio/*";
 const FILE_ACCEPT =
   "application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document," +
   "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet," +
   "application/vnd.openxmlformats-officedocument.presentationml.presentation," +
   "application/x-hwp,application/haansofthwp,application/vnd.hancom.hwp,application/vnd.hancom.hwpx," +
   "text/plain,text/html,application/zip,application/x-zip-compressed," +
-  ".pdf,.docx,.xlsx,.pptx,.hwp,.hwpx,.txt,.html,.htm,.zip";
+  "audio/mpeg,audio/wav,audio/ogg,audio/mp4,audio/aac,audio/flac,audio/webm," +
+  ".pdf,.docx,.xlsx,.pptx,.hwp,.hwpx,.txt,.html,.htm,.zip,.mp3,.wav,.ogg,.m4a,.aac,.flac,.webm";
 
 export function AddCardModal({
   onAdd,
@@ -653,7 +655,7 @@ export function AddCardModal({
             </button>
             <button
               type="submit"
-              disabled={busy || uploading || !title.trim()}
+              disabled={busy || uploading}
               className="modal-btn-submit"
             >
               {busy ? "추가 중..." : "카드 추가"}

@@ -390,7 +390,7 @@ export function EditCardModal({ card, onSave, onClose }: Props) {
 
           <div className="modal-actions">
             <button type="button" onClick={onClose} disabled={busy} className="modal-btn-cancel">취소</button>
-            <button type="submit" disabled={busy || isUploading || !title.trim()} className="modal-btn-submit">
+            <button type="submit" disabled={busy || isUploading} className="modal-btn-submit">
               {busy ? "저장 중..." : "저장"}
             </button>
           </div>

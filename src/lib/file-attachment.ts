@@ -28,6 +28,14 @@ export const ALLOWED_FILE_MIMES: Record<string, string[]> = {
   "text/html": ["html", "htm"],
   "application/zip": ["zip"],
   "application/x-zip-compressed": ["zip"],
+  // Audio (2026-06-08): MP3 등 오디오 파일 허용
+  "audio/mpeg": ["mp3"],
+  "audio/wav": ["wav"],
+  "audio/ogg": ["ogg"],
+  "audio/mp4": ["m4a"],
+  "audio/aac": ["aac"],
+  "audio/flac": ["flac"],
+  "audio/webm": ["webm"],
 };
 
 /** 허용된 파일 MIME + 확장자 동시 검증 (MIME 스푸핑 방어). */
@@ -54,6 +62,14 @@ const EXT_TO_CANONICAL_MIME: Record<string, string> = {
   zip: "application/zip",
   heic: "image/heic",
   heif: "image/heif",
+  // Audio (2026-06-08)
+  mp3: "audio/mpeg",
+  wav: "audio/wav",
+  ogg: "audio/ogg",
+  m4a: "audio/mp4",
+  aac: "audio/aac",
+  flac: "audio/flac",
+  webm: "audio/webm",
 };
 
 /** 파일명 확장자에서 canonical MIME을 추론. 매핑 실패 시 null. */
@@ -82,6 +98,8 @@ export function fileMimeToIcon(mime: string): string {
   if (mime === "text/plain") return "📝";
   if (mime === "text/html") return "🌐";
   if (mime.includes("zip")) return "🗜";
+  // Audio (2026-06-08)
+  if (mime.startsWith("audio/")) return "🎵";
   return "📎";
 }
 
@@ -95,6 +113,8 @@ export function fileMimeToLabel(mime: string): string {
   if (mime === "text/plain") return "텍스트";
   if (mime === "text/html") return "HTML";
   if (mime.includes("zip")) return "ZIP";
+  // Audio (2026-06-08)
+  if (mime.startsWith("audio/")) return "오디오";
   return "파일";
 }
 
