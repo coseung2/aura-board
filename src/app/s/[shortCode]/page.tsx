@@ -31,6 +31,7 @@ export default async function ShortShareBoardPage({
       shareToken: true,
       classroomId: true,
       anonymousAuthor: true,
+      boardTheme: true,
     },
   });
   if (!board) notFound();
@@ -138,6 +139,7 @@ export default async function ShortShareBoardPage({
         description: board.description,
         slug: board.slug,
         anonymousAuthor: board.anonymousAuthor,
+        boardTheme: board.boardTheme,
       }}
       initialCards={cardProps}
       initialSections={sectionProps}

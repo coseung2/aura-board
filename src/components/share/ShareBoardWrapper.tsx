@@ -39,6 +39,7 @@ type Props = {
     description: string | null;
     slug: string | null;
     anonymousAuthor: boolean;
+    boardTheme: string | null;
   };
   initialCards: CardData[];
   initialSections: BoardSection[];
@@ -57,6 +58,21 @@ export function ShareBoardWrapper({
 }: Props) {
   const role = "editor";
   const canEdit = true;
+
+  // Normalize boardTheme same as src/app/board/[id]/page.tsx
+  const normalizeBoardTheme = (value: string | null | undefined): "pastel-peach" | "pastel-mint" | "pastel-sky" | "pastel-lilac" | "pastel-lemon" => {
+    switch (value) {
+      case "pastel-peach":
+      case "pastel-mint":
+      case "pastel-sky":
+      case "pastel-lilac":
+      case "pastel-lemon":
+        return value;
+      default:
+        return "pastel-sky";
+    }
+  };
+  const boardTheme = normalizeBoardTheme(board.boardTheme);
 
   // Layout dispatch mirrors src/app/board/[id]/page.tsx
   function renderBoard() {
@@ -127,7 +143,7 @@ export function ShareBoardWrapper({
 
   return (
     <ShareSessionProvider shareToken={shareToken} shareMode={shareMode}>
-      <main className="share-board-page">
+      <main className="board-page" data-board-theme={boardTheme}>
         <BoardHeader
           title={board.title}
           layout={board.layout}
