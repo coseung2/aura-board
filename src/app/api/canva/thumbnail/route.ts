@@ -28,7 +28,7 @@ const ALLOWED_HOST_SUFFIXES = [
   ".canva-web-files.com",
   "canva.com",
 ];
-const MAX_HTML_BYTES = 120 * 1024;
+const MAX_HTML_BYTES = 512 * 1024;
 
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
@@ -52,7 +52,7 @@ export async function GET(req: Request) {
       url = cached.status === "ok" ? cached.payload.url : null;
     } else {
       const embed = await resolveCanvaEmbedUrlCached(design);
-      url = embed?.thumbnailUrl ?? null;
+      url = normalizeResolvedThumbnailUrl(embed?.thumbnailUrl);
       await setPreviewCache(
         "canva-thumbnail",
         design,
@@ -169,7 +169,8 @@ async function resolveDesignThumbnailFromScreenUrl(parsed: URL): Promise<string 
     ? `https://www.canva.com/design/${designId}/${shareToken}/view`
     : `https://www.canva.com/design/${designId}/view`;
   const embed = await resolveCanvaEmbedUrlCached(designUrl);
-  if (embed?.thumbnailUrl) return embed.thumbnailUrl;
+  const embedThumbnail = normalizeResolvedThumbnailUrl(embed?.thumbnailUrl);
+  if (embedThumbnail) return embedThumbnail;
 
   const publicThumbnail = await resolvePublicCanvaPageThumbnail(designUrl);
   if (publicThumbnail) return publicThumbnail;
@@ -180,6 +181,20 @@ async function resolveDesignThumbnailFromScreenUrl(parsed: URL): Promise<string 
   try {
     const info = await canvaGetDesign(token, designId);
     return info.thumbnail?.url ?? null;
+  } catch {
+    return null;
+  }
+}
+
+function normalizeResolvedThumbnailUrl(url: string | null | undefined): string | null {
+  if (!url) return null;
+  try {
+    const parsed = new URL(url);
+    const host = parsed.hostname.toLowerCase();
+    if (host.endsWith("canva.com") && parsed.pathname.endsWith("/screen")) {
+      return null;
+    }
+    return parsed.toString();
   } catch {
     return null;
   }
@@ -248,21 +263,43 @@ async function resolvePublicCanvaPageThumbnail(rawDesignUrl: string): Promise<st
     }
     await reader.cancel().catch(() => undefined);
 
-    const image =
-      readMetaContent(html, "og:image") ??
-      readMetaContent(html, "twitter:image") ??
-      readMetaContent(html, "twitter:image:src");
-    if (!image) return null;
+    const candidates = [
+      ...readCanvaThumbnailUrls(html),
+      readMetaContent(html, "og:image"),
+      readMetaContent(html, "twitter:image"),
+      readMetaContent(html, "twitter:image:src"),
+    ].filter((candidate): candidate is string => Boolean(candidate));
 
-    const absolute = new URL(decodeHtmlEntities(image), res.url || pageUrl.toString());
-    const imageHost = absolute.hostname.toLowerCase();
-    const allowed =
-      imageHost === "canva.com" ||
-      ALLOWED_HOST_SUFFIXES.some((suffix) => imageHost.endsWith(suffix));
-    return allowed && absolute.protocol === "https:" ? absolute.toString() : null;
+    for (const candidate of candidates) {
+      const absolute = new URL(
+        decodeHtmlEntities(candidate),
+        res.url || pageUrl.toString(),
+      );
+      const imageHost = absolute.hostname.toLowerCase();
+      const allowed =
+        imageHost === "canva.com" ||
+        ALLOWED_HOST_SUFFIXES.some((suffix) => imageHost.endsWith(suffix));
+      const isScreenUrl =
+        imageHost.endsWith("canva.com") && absolute.pathname.endsWith("/screen");
+      if (allowed && absolute.protocol === "https:" && !isScreenUrl) {
+        return absolute.toString();
+      }
+    }
+
+    return null;
   } catch {
     return null;
   }
+}
+
+function readCanvaThumbnailUrls(html: string): string[] {
+  const urls = new Set<string>();
+  const pattern =
+    /https:\/\/document-export\.canva\.com\/[^"'\\\s<>]+?\/thumbnail\/[^"'\\\s<>]+?\.(?:png|jpe?g|webp)(?:\?[^"'\\\s<>]*)?/gi;
+  for (const match of html.matchAll(pattern)) {
+    urls.add(match[0]);
+  }
+  return [...urls];
 }
 
 function readMetaContent(html: string, property: string): string | null {

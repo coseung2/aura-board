@@ -4,6 +4,7 @@ import { db } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
 import { getCurrentStudent } from "@/lib/student-auth";
 import { getEffectiveBoardRole } from "@/lib/rbac";
+import { requireShareAuth } from "@/lib/share/with-share";
 
 type CardWire = {
   id: string;
@@ -71,9 +72,7 @@ export async function GET(
       getCurrentUser().catch(() => null),
       getCurrentStudent().catch(() => null),
     ]);
-    if (!user && !student) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const shareToken = req.headers.get("x-share-token");
 
     const board = await db.board.findFirst({
       where: { OR: [{ id: boardIdOrSlug }, { slug: boardIdOrSlug }] },
@@ -88,12 +87,25 @@ export async function GET(
       return NextResponse.json({ error: "Not found" }, { status: 404 });
     }
 
-    const role = await getEffectiveBoardRole(board.id, {
-      userId: user?.id,
-      studentId: student?.id,
-    });
-    if (!role) {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    if (!user && !student) {
+      const shareResult = await requireShareAuth(shareToken, "student");
+      if (!("identity" in shareResult)) {
+        return NextResponse.json(
+          { error: shareResult.error },
+          { status: shareResult.status },
+        );
+      }
+      if (shareResult.identity.boardId !== board.id) {
+        return NextResponse.json({ error: "board_mismatch" }, { status: 403 });
+      }
+    } else {
+      const role = await getEffectiveBoardRole(board.id, {
+        userId: user?.id,
+        studentId: student?.id,
+      });
+      if (!role) {
+        return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+      }
     }
 
     const [cardsRaw, sectionsRaw, responsesRaw] = await Promise.all([

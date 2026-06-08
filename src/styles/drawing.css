@@ -294,9 +294,8 @@
 .ds-vslider-label { font-size: 10px; color: var(--color-text-muted); }
 .ds-vslider-val { font-size: 10px; color: var(--color-text-muted); min-width: 20px; text-align: center; }
 .ds-vslider-input {
-  -webkit-appearance: slider-vertical;
-  appearance: slider-vertical;
-  writing-mode: bt-lr;
+  writing-mode: vertical-lr;
+  direction: rtl;
   width: 20px;
   height: 200px;
   padding: 0;
