@@ -21,6 +21,11 @@ import type { CardData } from "./DraggableCard";
 type SectionData = StreamSection;
 
 type PanelTab = "rename" | "delete";
+type CardDropPreview = {
+  sectionId: string;
+  cardId: string;
+  position: "before" | "after";
+} | null;
 
 type Props = {
   boardId: string;
@@ -67,6 +72,7 @@ export function ColumnsBoard({
   const [folderSectionId, setFolderSectionId] = useState<string | null>(null);
   const [organizing, setOrganizing] = useState<string | null>(null);
   const [draggingSectionId, setDraggingSectionId] = useState<string | null>(null);
+  const [cardDropPreview, setCardDropPreview] = useState<CardDropPreview>(null);
   const [seedingStudents, setSeedingStudents] = useState(false);
   const [feedbackTarget, setFeedbackTarget] = useState<{
     studentId: string | null;
@@ -317,6 +323,7 @@ export function ColumnsBoard({
     e.preventDefault();
     setOverSectionId(null);
     setDraggingSectionId(null);
+    setCardDropPreview(null);
     const sectionId = e.dataTransfer.getData("application/section-id");
     if (sectionId) {
       moveSectionTo(sectionId, targetSectionId);
@@ -344,6 +351,7 @@ export function ColumnsBoard({
             sortMode={sortModeById[section.id] ?? "manual"}
             overSectionId={overSectionId}
             draggingSectionId={draggingSectionId}
+            cardDropPreview={cardDropPreview}
             organizing={organizing}
             authorsForSection={authorsForSection}
             studentForSectionTitle={studentForSectionTitle}
@@ -352,16 +360,22 @@ export function ColumnsBoard({
             onSectionDragStart={(id) => setDraggingSectionId(id)}
             onSectionDragEnd={() => setDraggingSectionId(null)}
             onCardDragStart={handleDragStart}
-            onCardDragEnd={handleDragEnd}
+            onCardDragEnd={(e) => {
+              setCardDropPreview(null);
+              handleDragEnd(e);
+            }}
             onCardDropReorder={handleCardReorder}
             onDragOver={handleDragOver}
             onDragEnter={(id) => setOverSectionId(id)}
             onDragLeave={(e) => {
               if (!e.currentTarget.contains(e.relatedTarget as Node)) {
                 setOverSectionId(null);
+                setCardDropPreview(null);
               }
             }}
             onDrop={handleDrop}
+            onCardDropPreview={setCardDropPreview}
+            onClearCardDropPreview={() => setCardDropPreview(null)}
             onRename={() =>
               setPanelState({ sectionId: section.id, tab: "rename" })
             }

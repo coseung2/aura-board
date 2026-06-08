@@ -7,6 +7,12 @@ import { ColumnMenu } from "./ColumnMenu";
 import type { SortMode } from "./sort";
 import type { RosterEntry } from "./useColumnRoster";
 
+type CardDropPreview = {
+  sectionId: string;
+  cardId: string;
+  position: "before" | "after";
+} | null;
+
 type Props = {
   section: { id: string; title: string };
   pinned: boolean;
@@ -18,6 +24,7 @@ type Props = {
   sortMode: SortMode;
   overSectionId: string | null;
   draggingSectionId: string | null;
+  cardDropPreview: CardDropPreview;
   organizing: string | null;
   authorsForSection: (cards: CardData[]) => RosterEntry[];
   studentForSectionTitle: (title: string) => RosterEntry | null;
@@ -38,6 +45,8 @@ type Props = {
   onDragEnter: (id: string) => void;
   onDragLeave: (e: React.DragEvent) => void;
   onDrop: (e: React.DragEvent, targetId: string) => void;
+  onCardDropPreview: (preview: CardDropPreview) => void;
+  onClearCardDropPreview: () => void;
   onRename: () => void;
   onDelete: () => void;
   onFolder: () => void;
@@ -70,6 +79,7 @@ export function ColumnView(props: Props) {
     sortMode,
     overSectionId,
     draggingSectionId,
+    cardDropPreview,
     organizing,
     authorsForSection,
     studentForSectionTitle,
@@ -84,6 +94,8 @@ export function ColumnView(props: Props) {
     onDragEnter,
     onDragLeave,
     onDrop,
+    onCardDropPreview,
+    onClearCardDropPreview,
     onRename,
     onDelete,
     onFolder,
@@ -107,6 +119,7 @@ export function ColumnView(props: Props) {
   const sectionStudent = canEdit ? studentForSectionTitle(section.title) : null;
 
   const menuItems = canEdit ? buildMenuItems() : [];
+  const isDropSection = overSectionId === section.id;
 
   function buildMenuItems() {
     const items: Array<{
@@ -241,7 +254,7 @@ export function ColumnView(props: Props) {
       <div className="column-cards-scroll">
         <div
           className={`column-cards ${
-            overSectionId === section.id ? "column-cards-active" : ""
+            isDropSection ? "column-cards-active" : ""
           }`}
         >
           {sectionCards.map((c) => {
@@ -251,95 +264,137 @@ export function ColumnView(props: Props) {
               c.studentAuthorId === currentUserId;
 
             return (
-              <article
-                key={c.id}
-                className="column-card is-clickable"
-                style={{ backgroundColor: c.color ?? undefined }}
-                draggable={canEdit}
-                onDragStart={(e) => onCardDragStart(e, c.id)}
-                onDragEnd={onCardDragEnd}
-                onDragOver={(e) => {
-                  if (!canEdit) return;
-                  e.preventDefault();
-                }}
-                onDrop={async (e) => {
-                  if (!canEdit) return;
-                  e.preventDefault();
-                  e.stopPropagation();
-                  const draggedId = e.dataTransfer.getData(
-                    "application/card-id"
-                  );
-                  if (!draggedId || draggedId === c.id) return;
-                  const rect = e.currentTarget.getBoundingClientRect();
-                  const y = e.clientY - rect.top;
-                  const position =
-                    y < rect.height / 2 ? "before" : "after";
-                  if (sortMode !== "manual") {
-                    await onSetSort("manual");
-                  }
-                  await onCardDropReorder(
-                    draggedId,
-                    c.id,
-                    section.id,
-                    position,
-                    sectionCards.map((card) => card.id)
-                  );
-                }}
-                onClick={() => onCardOpen(c)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" || e.key === " ") {
+              <div key={c.id} className="column-card-drop-wrap">
+                {cardDropPreview?.sectionId === section.id &&
+                  cardDropPreview.cardId === c.id &&
+                  cardDropPreview.position === "before" && (
+                    <DropIndicator sortMode={sortMode} />
+                  )}
+                <article
+                  className={`column-card is-clickable ${
+                    cardDropPreview?.sectionId === section.id &&
+                    cardDropPreview.cardId === c.id
+                      ? `is-drop-preview is-drop-preview-${cardDropPreview.position}`
+                      : ""
+                  }`}
+                  style={{ backgroundColor: c.color ?? undefined }}
+                  draggable={canEdit}
+                  onDragStart={(e) => onCardDragStart(e, c.id)}
+                  onDragEnd={onCardDragEnd}
+                  onDragOver={(e) => {
+                    if (!canEdit) return;
                     e.preventDefault();
-                    onCardOpen(c);
-                  }
-                }}
-                tabIndex={0}
-                role="button"
-              >
-                <CardBody card={c} titleAs="h4" />
-                {canModify && (
-                  <div
-                    className="card-ctx-menu"
-                    onClick={(e) => e.stopPropagation()}
-                  >
-                    <ContextMenu
-                      items={[
-                        {
-                          label: "수정",
-                          icon: "✏️",
-                          onClick: () => onCardEdit(c),
-                        },
-                        ...(canEdit || c.studentAuthorId === currentUserId
-                          ? [
-                              {
-                                label: "작성자 지정",
-                                icon: "👥",
-                                onClick: () => onCardEditAuthors(c),
-                              },
-                            ]
-                          : []),
-                        {
-                          label: "복제",
-                          icon: "📋",
-                          onClick: () => onCardDuplicate(c),
-                        },
-                        {
-                          label: "삭제",
-                          icon: "🗑️",
-                          danger: true,
-                          onClick: () => onCardDelete(c.id),
-                        },
-                      ]}
-                    />
-                  </div>
-                )}
-              </article>
+                    const draggedId = e.dataTransfer.getData("application/card-id");
+                    if (!draggedId || draggedId === c.id) {
+                      onClearCardDropPreview();
+                      return;
+                    }
+                    const rect = e.currentTarget.getBoundingClientRect();
+                    const y = e.clientY - rect.top;
+                    onCardDropPreview({
+                      sectionId: section.id,
+                      cardId: c.id,
+                      position: y < rect.height / 2 ? "before" : "after",
+                    });
+                  }}
+                  onDrop={async (e) => {
+                    if (!canEdit) return;
+                    e.preventDefault();
+                    e.stopPropagation();
+                    const draggedId = e.dataTransfer.getData(
+                      "application/card-id"
+                    );
+                    if (!draggedId || draggedId === c.id) return;
+                    const rect = e.currentTarget.getBoundingClientRect();
+                    const y = e.clientY - rect.top;
+                    const position =
+                      y < rect.height / 2 ? "before" : "after";
+                    onClearCardDropPreview();
+                    if (sortMode !== "manual") {
+                      await onSetSort("manual");
+                    }
+                    await onCardDropReorder(
+                      draggedId,
+                      c.id,
+                      section.id,
+                      position,
+                      sectionCards.map((card) => card.id)
+                    );
+                  }}
+                  onClick={() => onCardOpen(c)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      onCardOpen(c);
+                    }
+                  }}
+                  tabIndex={0}
+                  role="button"
+                >
+                  <CardBody card={c} titleAs="h4" />
+                  {canModify && (
+                    <div
+                      className="card-ctx-menu"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <ContextMenu
+                        items={[
+                          {
+                            label: "수정",
+                            icon: "✏️",
+                            onClick: () => onCardEdit(c),
+                          },
+                          ...(canEdit || c.studentAuthorId === currentUserId
+                            ? [
+                                {
+                                  label: "작성자 지정",
+                                  icon: "👥",
+                                  onClick: () => onCardEditAuthors(c),
+                                },
+                              ]
+                            : []),
+                          {
+                            label: "복제",
+                            icon: "📋",
+                            onClick: () => onCardDuplicate(c),
+                          },
+                          {
+                            label: "삭제",
+                            icon: "🗑️",
+                            danger: true,
+                            onClick: () => onCardDelete(c.id),
+                          },
+                        ]}
+                      />
+                    </div>
+                  )}
+                </article>
+                {cardDropPreview?.sectionId === section.id &&
+                  cardDropPreview.cardId === c.id &&
+                  cardDropPreview.position === "after" && (
+                    <DropIndicator sortMode={sortMode} />
+                  )}
+              </div>
             );
           })}
           {sectionCards.length === 0 && (
-            <div className="column-empty">카드를 여기로 끌어오세요</div>
+            <div className={`column-empty ${isDropSection ? "is-drop-target" : ""}`}>
+              {isDropSection ? "여기에 놓기" : "카드를 여기로 끌어오세요"}
+            </div>
           )}
         </div>
       </div>
+    </div>
+  );
+}
+
+function DropIndicator({ sortMode }: { sortMode: SortMode }) {
+  return (
+    <div className="column-drop-indicator" aria-hidden="true">
+      <span className="column-drop-indicator-line" />
+      {sortMode !== "manual" && (
+        <span className="column-drop-indicator-label">수동 정렬로 전환</span>
+      )}
     </div>
   );
 }

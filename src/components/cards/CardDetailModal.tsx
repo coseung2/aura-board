@@ -127,7 +127,10 @@ export function CardDetailModal({
   const hasNonLinkMedia = hasPrimaryNonLinkContent(policyInput);
   const shouldShowLinkAsMedia = shouldPromoteLinkPreview(policyInput);
   const shouldPassLinkToMedia = shouldShowLinkAsMedia || isYouTubeLink(card.linkUrl);
-  const hasMedia = hasNonLinkMedia || shouldShowLinkAsMedia;
+  const hasLinkPreview = Boolean(
+    card.linkUrl && (card.linkImage || card.linkTitle || card.linkDesc)
+  );
+  const hasMedia = hasNonLinkMedia || shouldShowLinkAsMedia || hasLinkPreview;
 
   return (
     <>
@@ -187,10 +190,10 @@ export function CardDetailModal({
               <CardAttachments
                 imageUrl={card.imageUrl}
                 thumbUrl={card.thumbUrl}
-                linkUrl={shouldPassLinkToMedia ? card.linkUrl : null}
-                linkTitle={shouldShowLinkAsMedia ? card.linkTitle : null}
-                linkDesc={null}
-                linkImage={shouldShowLinkAsMedia ? card.linkImage : null}
+                linkUrl={shouldPassLinkToMedia || hasLinkPreview ? card.linkUrl : null}
+                linkTitle={card.linkTitle}
+                linkDesc={card.linkDesc}
+                linkImage={card.linkImage}
                 videoUrl={card.videoUrl}
                 fileUrl={card.fileUrl}
                 fileName={card.fileName}

@@ -83,11 +83,12 @@ export const CardAttachments = memo(function CardAttachments({ imageUrl, thumbUr
     attachments,
   });
   const canRenderCanvaEmbed = Boolean(canvaDesignId && (linkImage || hasShareToken));
+  const hasLinkPreviewContent = Boolean(canRenderCanvaEmbed || linkImage || linkTitle || linkDesc);
   const shouldRenderDetailLinkPreview = Boolean(
     variant === "detail" &&
       linkUrl &&
       !shouldHideLinkPreview &&
-      (canRenderCanvaEmbed || linkImage || linkTitle || linkDesc)
+      hasLinkPreviewContent
   );
   const shouldRenderThumbnailLinkPreview = Boolean(
     variant === "thumbnail" &&
@@ -100,10 +101,10 @@ export const CardAttachments = memo(function CardAttachments({ imageUrl, thumbUr
   const linkRendersAsMedia = Boolean(
     linkUrl &&
       !shouldHideLinkPreview &&
-      (variant === "detail" || shouldRenderThumbnailLinkPreview)
+      (variant === "detail" ? hasLinkPreviewContent : shouldRenderThumbnailLinkPreview)
   );
-  // 썸네일 모드: 첫 첨부만. 모달 모드: 전부.
-  const sorted = variant === "thumbnail" ? allSorted.slice(0, 1) : allSorted;
+  const thumbnailItem = pickThumbnailItem(allSorted);
+  const sorted = variant === "thumbnail" ? (thumbnailItem ? [thumbnailItem] : []) : allSorted;
   const extraCount =
     variant === "thumbnail"
       ? Math.max(0, allSorted.length - 1 + (linkRendersAsMedia ? 1 : 0))
@@ -113,8 +114,17 @@ export const CardAttachments = memo(function CardAttachments({ imageUrl, thumbUr
   // 이미지 종류만 navigation 대상 (pdf/video 제외). CardDetailModal 이
   // onImageClick 을 넘기면 그 안에서 라이트박스 state 를 관리.
   const imageAttachments = sorted.filter((a) => a.kind === "image");
-  const renderVideoPoster = (key: string, posterUrl?: string | null, extraBadge = true) => (
-    <div key={key} className="card-attach-video card-attach-media-poster">
+  const renderVideoPoster = (
+    key: string,
+    videoUrlForFallback: string | null,
+    posterUrl?: string | null,
+    extraBadge = true,
+    source: "youtube" | "upload" = "upload"
+  ) => (
+    <div
+      key={key}
+      className={`card-attach-video card-attach-media-poster card-attach-media-poster-${source}`}
+    >
       {posterUrl ? (
         <img
           src={posterUrl}
@@ -123,11 +133,29 @@ export const CardAttachments = memo(function CardAttachments({ imageUrl, thumbUr
           decoding="async"
           className="card-attach-video-poster-img"
         />
+      ) : videoUrlForFallback ? (
+        <video
+          src={videoUrlForFallback}
+          preload="metadata"
+          muted
+          playsInline
+          className="card-attach-video-poster-img"
+        />
       ) : (
         <div className="card-attach-video-placeholder" aria-hidden="true" />
       )}
-      <span className="card-canva-slot-play-icon" aria-hidden="true">
+      <span
+        className={
+          source === "youtube"
+            ? "card-attach-youtube-play"
+            : "card-attach-video-play"
+        }
+        aria-hidden="true"
+      >
         ▶
+      </span>
+      <span className="card-attach-video-source" aria-hidden="true">
+        {source === "youtube" ? "YouTube" : "동영상"}
       </span>
       {extraBadge && extraCount > 0 && (
         <span className="card-attach-multi-badge" aria-label={`+${extraCount}개 더`}>
@@ -189,7 +217,10 @@ export const CardAttachments = memo(function CardAttachments({ imageUrl, thumbUr
                 const yt = getYouTubeId(a.url);
                 return renderVideoPoster(
                   a.id,
-                  a.previewUrl ?? (yt ? getYouTubeThumbnailUrl(yt) : null)
+                  yt ? null : a.url,
+                  a.previewUrl ?? (yt ? getYouTubeThumbnailUrl(yt) : null),
+                  true,
+                  yt ? "youtube" : "upload"
                 );
               }
               const yt = getYouTubeId(a.url);
@@ -245,8 +276,10 @@ export const CardAttachments = memo(function CardAttachments({ imageUrl, thumbUr
               if (variant === "thumbnail") {
                 return renderVideoPoster(
                   "single-video",
+                  yt ? null : effectiveVideoUrl,
                   yt ? getYouTubeThumbnailUrl(yt) : null,
-                  false
+                  false,
+                  yt ? "youtube" : "upload"
                 );
               }
               return yt ? (
@@ -417,6 +450,18 @@ function buildMediaItems({
   }
 
   return items.sort((a, b) => a.order - b.order);
+}
+
+function pickThumbnailItem(items: AttachmentItem[]): AttachmentItem | null {
+  if (items.length === 0) return null;
+  return (
+    items.find((item) => item.kind === "image") ??
+    items.find((item) => item.kind === "video" && (item.previewUrl || getYouTubeId(item.url))) ??
+    items.find((item) => item.kind === "video") ??
+    items.find((item) => item.kind === "file") ??
+    items[0] ??
+    null
+  );
 }
 
 // NOTE: Legacy inline CanvaEmbed has been replaced by the virtualized

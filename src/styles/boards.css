@@ -182,6 +182,14 @@
   background: rgba(255, 255, 255, 0.66);
 }
 
+.column-empty.is-drop-target {
+  color: var(--color-accent);
+  border-color: var(--color-accent);
+  background: var(--color-accent-tinted-bg);
+  box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.65);
+  font-weight: 700;
+}
+
 .column-header {
   display: flex;
   align-items: center;
@@ -304,6 +312,48 @@
   transition: background 200ms ease;
 }
 
+.column-card-drop-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.column-drop-indicator {
+  position: relative;
+  display: flex;
+  align-items: center;
+  min-height: 18px;
+  margin: -11px 8px;
+  z-index: 3;
+  pointer-events: none;
+}
+
+.column-drop-indicator-line {
+  display: block;
+  width: 100%;
+  height: 4px;
+  border-radius: 999px;
+  background: var(--color-accent);
+  box-shadow:
+    0 0 0 4px var(--color-accent-tinted-bg),
+    0 6px 16px rgba(0, 117, 222, 0.22);
+}
+
+.column-drop-indicator-label {
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  padding: 3px 8px;
+  border-radius: var(--radius-pill);
+  background: var(--color-accent);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  white-space: nowrap;
+  box-shadow: 0 4px 12px rgba(0, 117, 222, 0.22);
+}
+
 .column-card {
   position: relative;
   box-sizing: border-box;
@@ -323,6 +373,13 @@
      이미지/비디오/Canva 임베드 썸네일은 각 래퍼 클래스(.card-attach-image,
      .card-attach-video, .card-canva-embed)에 개별 overflow:hidden이 이미
      걸려 있어 border-radius 클립은 유지됨. */
+}
+
+.column-card.is-drop-preview {
+  border-color: var(--color-accent);
+  box-shadow:
+    var(--shadow-card-hover),
+    0 0 0 2px var(--color-accent-tinted-bg);
 }
 
 .column-cards > .column-empty {
@@ -350,6 +407,7 @@
    avoids forcing style recalculation on every drag event. */
 .column-card.is-dragging {
   opacity: 0.5;
+  transform: scale(0.985);
 }
 
 .column-card .padlet-card-title {
