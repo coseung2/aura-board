@@ -13,6 +13,10 @@ function getYouTubeId(url: string): string | null {
   return extractVideoId(url);
 }
 
+function getYouTubeThumbnailUrl(videoId: string): string {
+  return `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`;
+}
+
 type AttachmentItem = {
   id: string;
   kind: string;
@@ -51,8 +55,18 @@ type Props = {
 // Memoizing avoids re-rendering attachment previews on every unrelated
 // parent state update (drag, selection, modal toggles, etc.).
 export const CardAttachments = memo(function CardAttachments({ imageUrl, thumbUrl, linkUrl, linkTitle, linkDesc, linkImage, videoUrl, fileUrl, fileName, fileSize, fileMimeType, attachments, variant = "detail", onImageClick }: Props) {
-  const hasAttachments = (attachments?.length ?? 0) > 0;
-  if (!hasAttachments && !imageUrl && !linkUrl && !videoUrl && !fileUrl) return null;
+  const allSorted = buildMediaItems({
+    attachments,
+    imageUrl,
+    thumbUrl,
+    videoUrl,
+    fileUrl,
+    fileName,
+    fileSize,
+    fileMimeType,
+  });
+  const hasAttachments = allSorted.length > 0;
+  if (!hasAttachments && !linkUrl) return null;
 
   // 링크는 attachments에 포함되지 않으므로 별개 렌더. multi-attachment
   // 카드에서도 링크는 최대 1개(현 스키마 제약).
@@ -68,18 +82,32 @@ export const CardAttachments = memo(function CardAttachments({ imageUrl, thumbUr
     fileUrl,
     attachments,
   });
-  const canRenderCanvaEmbed = Boolean(
-    shouldPromoteLink && canvaDesignId && (linkImage || hasShareToken)
+  const canRenderCanvaEmbed = Boolean(canvaDesignId && (linkImage || hasShareToken));
+  const shouldRenderDetailLinkPreview = Boolean(
+    variant === "detail" &&
+      linkUrl &&
+      !shouldHideLinkPreview &&
+      (canRenderCanvaEmbed || linkImage || linkTitle || linkDesc)
+  );
+  const shouldRenderThumbnailLinkPreview = Boolean(
+    variant === "thumbnail" &&
+      linkUrl &&
+      !hasAttachments &&
+      shouldPromoteLink &&
+      !shouldHideLinkPreview
   );
 
-  // multi-attachment: 링크·canva·youtube는 기존 로직 그대로, 나머지
-  // 이미지/동영상/파일은 attachments 배열을 우선 렌더.
-  const allSorted = hasAttachments
-    ? [...(attachments ?? [])].sort((a, b) => a.order - b.order)
-    : [];
+  const linkRendersAsMedia = Boolean(
+    linkUrl &&
+      !shouldHideLinkPreview &&
+      (variant === "detail" || shouldRenderThumbnailLinkPreview)
+  );
   // 썸네일 모드: 첫 첨부만. 모달 모드: 전부.
   const sorted = variant === "thumbnail" ? allSorted.slice(0, 1) : allSorted;
-  const extraCount = variant === "thumbnail" ? Math.max(0, allSorted.length - 1) : 0;
+  const extraCount =
+    variant === "thumbnail"
+      ? Math.max(0, allSorted.length - 1 + (linkRendersAsMedia ? 1 : 0))
+      : 0;
 
   // detail 모드에서 이미지 클릭 시 라이트박스를 띄울 수 있도록 인덱스 계산.
   // 이미지 종류만 navigation 대상 (pdf/video 제외). CardDetailModal 이
@@ -111,8 +139,8 @@ export const CardAttachments = memo(function CardAttachments({ imageUrl, thumbUr
 
   return (
     <div className="card-attachments">
-      {hasAttachments
-        ? sorted.map((a) => {
+      {hasAttachments ? (
+        sorted.map((a) => {
             if (a.kind === "image") {
               const imageSrc = variant === "thumbnail" ? a.previewUrl ?? a.url : a.url;
               if (variant === "detail") {
@@ -158,7 +186,11 @@ export const CardAttachments = memo(function CardAttachments({ imageUrl, thumbUr
             }
             if (a.kind === "video") {
               if (variant === "thumbnail") {
-                return renderVideoPoster(a.id, a.previewUrl);
+                const yt = getYouTubeId(a.url);
+                return renderVideoPoster(
+                  a.id,
+                  a.previewUrl ?? (yt ? getYouTubeThumbnailUrl(yt) : null)
+                );
               }
               const yt = getYouTubeId(a.url);
               if (yt) {
@@ -206,22 +238,17 @@ export const CardAttachments = memo(function CardAttachments({ imageUrl, thumbUr
               </div>
             );
           })
-        : (
-          <>
-            {imageUrl && (
-              <div className="card-attach-image optimized-img-wrap">
-                <OptimizedImage
-                  src={variant === "thumbnail" ? thumbUrl ?? imageUrl : imageUrl}
-                  alt=""
-                  sizes="(max-width: 768px) 100vw, 480px"
-                />
-              </div>
-            )}
-            {effectiveVideoUrl && (() => {
-              if (variant === "thumbnail") {
-                return renderVideoPoster("single-video", null, false);
-              }
+        )
+        : effectiveVideoUrl ? (
+          (() => {
               const yt = getYouTubeId(effectiveVideoUrl);
+              if (variant === "thumbnail") {
+                return renderVideoPoster(
+                  "single-video",
+                  yt ? getYouTubeThumbnailUrl(yt) : null,
+                  false
+                );
+              }
               return yt ? (
                 <div className="card-attach-video">
                   <iframe
@@ -236,18 +263,9 @@ export const CardAttachments = memo(function CardAttachments({ imageUrl, thumbUr
                   <video src={effectiveVideoUrl} controls preload="metadata" />
                 </div>
               );
-            })()}
-            {fileUrl && (
-              <CardFileAttachment
-                fileUrl={fileUrl}
-                fileName={fileName ?? null}
-                fileSize={fileSize ?? null}
-                fileMimeType={fileMimeType ?? null}
-              />
-            )}
-          </>
-        )}
-      {linkUrl && canRenderCanvaEmbed && canvaDesignId ? (
+            })()
+        ) : null}
+      {shouldRenderDetailLinkPreview && linkUrl && canRenderCanvaEmbed && canvaDesignId ? (
         // Delegated to CanvaEmbedSlot (T0-② virtualization): thumbnail by
         // default, iframe mounts only on activation + in viewport, with a
         // global LRU-3 budget. key={designId} forces full remount when the
@@ -260,7 +278,49 @@ export const CardAttachments = memo(function CardAttachments({ imageUrl, thumbUr
           linkImage={linkImage ?? null}
           linkDesc={linkDesc ?? null}
         />
-      ) : linkUrl && shouldPromoteLink && !shouldHideLinkPreview ? (
+      ) : shouldRenderDetailLinkPreview && linkUrl ? (
+        <a
+          href={linkUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className={`card-link-preview ${linkImage ? "has-image" : ""}`}
+          onClick={(e) => e.stopPropagation()}
+        >
+          {linkImage && (
+            <LinkPreviewImage
+              src={linkImage}
+              sizes="(max-width: 768px) 100vw, 480px"
+            />
+          )}
+          <div className="card-link-preview-body">
+            <span className="card-link-preview-title">
+              {linkTitle || (() => {
+                try { return new URL(linkUrl).hostname.replace(/^www\./, ""); }
+                catch { return linkUrl; }
+              })()}
+            </span>
+            <span className="card-link-preview-url">
+              🔗 {(() => {
+                try { return new URL(linkUrl).hostname.replace(/^www\./, ""); }
+                catch { return linkUrl; }
+              })()}
+            </span>
+          </div>
+        </a>
+      ) : shouldRenderThumbnailLinkPreview && linkUrl && canRenderCanvaEmbed && canvaDesignId ? (
+        // Delegated to CanvaEmbedSlot (T0-② virtualization): thumbnail by
+        // default, iframe mounts only on activation + in viewport, with a
+        // global LRU-3 budget. key={designId} forces full remount when the
+        // card's design changes so the slot's internal load state resets.
+        <CanvaEmbedSlot
+          key={canvaDesignId}
+          designId={canvaDesignId}
+          linkUrl={linkUrl}
+          linkTitle={linkTitle ?? null}
+          linkImage={linkImage ?? null}
+          linkDesc={linkDesc ?? null}
+        />
+      ) : shouldRenderThumbnailLinkPreview && linkUrl ? (
         <a
           href={linkUrl}
           target="_blank"
@@ -293,6 +353,71 @@ export const CardAttachments = memo(function CardAttachments({ imageUrl, thumbUr
     </div>
   );
 });
+
+function buildMediaItems({
+  attachments,
+  imageUrl,
+  thumbUrl,
+  videoUrl,
+  fileUrl,
+  fileName,
+  fileSize,
+  fileMimeType,
+}: Pick<
+  Props,
+  | "attachments"
+  | "imageUrl"
+  | "thumbUrl"
+  | "videoUrl"
+  | "fileUrl"
+  | "fileName"
+  | "fileSize"
+  | "fileMimeType"
+>): AttachmentItem[] {
+  const items = [...(attachments ?? [])].sort((a, b) => a.order - b.order);
+  let nextOrder = items.length > 0 ? Math.max(...items.map((a) => a.order)) + 1 : 0;
+  const has = (kind: string, url?: string | null) =>
+    Boolean(url && items.some((a) => a.kind === kind && a.url === url));
+
+  if (imageUrl && !has("image", imageUrl)) {
+    items.unshift({
+      id: `legacy-image-${imageUrl}`,
+      kind: "image",
+      url: imageUrl,
+      previewUrl: thumbUrl ?? null,
+      fileName: null,
+      fileSize: null,
+      mimeType: null,
+      order: -1,
+    });
+  }
+  if (videoUrl && !has("video", videoUrl)) {
+    items.push({
+      id: `legacy-video-${videoUrl}`,
+      kind: "video",
+      url: videoUrl,
+      previewUrl: null,
+      fileName: null,
+      fileSize: null,
+      mimeType: null,
+      order: nextOrder++,
+    });
+  }
+  if (fileUrl && !has("file", fileUrl)) {
+    items.push({
+      id: `legacy-file-${fileUrl}`,
+      kind: "file",
+      url: fileUrl,
+      previewUrl: null,
+      fileName: fileName ?? null,
+      fileSize: fileSize ?? null,
+      mimeType: fileMimeType ?? null,
+      order: nextOrder++,
+    });
+  }
+
+  return items.sort((a, b) => a.order - b.order);
+}
 
 // NOTE: Legacy inline CanvaEmbed has been replaced by the virtualized
 // CanvaEmbedSlot in ./CanvaEmbedSlot.tsx (T0-② tablet-crash mitigation).
