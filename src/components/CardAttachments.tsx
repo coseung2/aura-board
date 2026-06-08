@@ -97,11 +97,24 @@ export const CardAttachments = memo(function CardAttachments({ imageUrl, thumbUr
       shouldPromoteLink &&
       !shouldHideLinkPreview
   );
+  const linkedYouTubeAlreadyInMedia = Boolean(
+    linkUrl &&
+      linkYouTubeId &&
+      (videoUrl === linkUrl ||
+        allSorted.some((item) => item.kind === "video" && item.url === linkUrl))
+  );
+  const linkCountsAsAdditionalMedia = Boolean(
+    linkUrl &&
+      (linkYouTubeId ? !linkedYouTubeAlreadyInMedia : true) &&
+      (hasAttachments || variant === "detail" || shouldRenderThumbnailLinkPreview)
+  );
 
   const linkRendersAsMedia = Boolean(
     linkUrl &&
-      !shouldHideLinkPreview &&
-      (variant === "detail" ? hasLinkPreviewContent : shouldRenderThumbnailLinkPreview)
+      ((variant === "thumbnail" && linkCountsAsAdditionalMedia) ||
+        (linkYouTubeId && !linkedYouTubeAlreadyInMedia) ||
+        (!shouldHideLinkPreview &&
+          (variant === "detail" ? hasLinkPreviewContent : shouldRenderThumbnailLinkPreview)))
   );
   const thumbnailItem = pickThumbnailItem(allSorted);
   const sorted = variant === "thumbnail" ? (thumbnailItem ? [thumbnailItem] : []) : allSorted;
@@ -298,6 +311,19 @@ export const CardAttachments = memo(function CardAttachments({ imageUrl, thumbUr
               );
             })()
         ) : null}
+      {variant === "detail" &&
+        linkUrl &&
+        linkYouTubeId &&
+        !linkedYouTubeAlreadyInMedia && (
+        <div className="card-attach-video">
+          <iframe
+            src={`https://www.youtube.com/embed/${linkYouTubeId}`}
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+            allowFullScreen
+            title={linkTitle || "YouTube"}
+          />
+        </div>
+      )}
       {shouldRenderDetailLinkPreview && linkUrl && canRenderCanvaEmbed && canvaDesignId ? (
         // Delegated to CanvaEmbedSlot (T0-② virtualization): thumbnail by
         // default, iframe mounts only on activation + in viewport, with a
