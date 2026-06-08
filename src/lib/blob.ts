@@ -20,9 +20,9 @@ import * as path from "path";
 import { put } from "@vercel/blob";
 import sharp from "sharp";
 import ffmpeg from "fluent-ffmpeg";
-import ffmpegPath from "@ffmpeg-installer/ffmpeg";
+import ffmpegStatic from "ffmpeg-static";
 
-ffmpeg.setFfmpegPath(ffmpegPath.path);
+ffmpeg.setFfmpegPath(ffmpegStatic || "");
 
 export class BlobUploadError extends Error {
   code = "blob_upload_failed" as const;
