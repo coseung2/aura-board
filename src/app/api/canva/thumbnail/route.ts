@@ -120,29 +120,8 @@ export async function GET(req: Request) {
 
     if (!upstream.ok || !upstream.body) {
       const fallbackUrl = await resolveDesignThumbnailFromScreenUrl(parsed);
-      if (fallbackUrl) {
-        const fallback = await fetch(fallbackUrl, {
-          headers: {
-            Accept: "image/avif,image/webp,image/*;q=0.8,*/*;q=0.5",
-            "User-Agent": "aura-board-thumbnail-proxy",
-          },
-          cache: "no-store",
-        });
-        if (fallback.ok && fallback.body) {
-          const fallbackType = fallback.headers.get("content-type") ?? "image/webp";
-          if (fallbackType.startsWith("image/")) {
-            return new Response(fallback.body, {
-              status: 200,
-              headers: {
-                "Content-Type": fallbackType,
-                "Cache-Control": "public, max-age=86400, s-maxage=86400, immutable",
-                "X-Thumbnail-Width": w,
-                "X-Content-Type-Options": "nosniff",
-              },
-            });
-          }
-        }
-      }
+      const fallbackResponse = fallbackUrl ? await fetchThumbnailFallback(fallbackUrl, w) : null;
+      if (fallbackResponse) return fallbackResponse;
       return NextResponse.json(
         { error: `Upstream ${upstream.status}` },
         { status: 502 },
@@ -151,6 +130,9 @@ export async function GET(req: Request) {
 
     const contentType = upstream.headers.get("content-type") ?? "image/webp";
     if (!contentType.startsWith("image/")) {
+      const fallbackUrl = await resolveDesignThumbnailFromScreenUrl(parsed);
+      const fallbackResponse = fallbackUrl ? await fetchThumbnailFallback(fallbackUrl, w) : null;
+      if (fallbackResponse) return fallbackResponse;
       return NextResponse.json(
         { error: "Upstream did not return an image" },
         { status: 502 },
@@ -189,6 +171,9 @@ async function resolveDesignThumbnailFromScreenUrl(parsed: URL): Promise<string 
   const embed = await resolveCanvaEmbedUrlCached(designUrl);
   if (embed?.thumbnailUrl) return embed.thumbnailUrl;
 
+  const publicThumbnail = await resolvePublicCanvaPageThumbnail(designUrl);
+  if (publicThumbnail) return publicThumbnail;
+
   const user = await getCurrentUser().catch(() => null);
   const token = user ? await getAccessToken(user.id) : null;
   if (!token) return null;
@@ -198,6 +183,30 @@ async function resolveDesignThumbnailFromScreenUrl(parsed: URL): Promise<string 
   } catch {
     return null;
   }
+}
+
+async function fetchThumbnailFallback(url: string, width: string): Promise<Response | null> {
+  const fallback = await fetch(url, {
+    headers: {
+      Accept: "image/avif,image/webp,image/*;q=0.8,*/*;q=0.5",
+      "User-Agent": "aura-board-thumbnail-proxy",
+    },
+    cache: "no-store",
+  });
+  if (!fallback.ok || !fallback.body) return null;
+
+  const fallbackType = fallback.headers.get("content-type") ?? "image/webp";
+  if (!fallbackType.startsWith("image/")) return null;
+
+  return new Response(fallback.body, {
+    status: 200,
+    headers: {
+      "Content-Type": fallbackType,
+      "Cache-Control": "public, max-age=86400, s-maxage=86400, immutable",
+      "X-Thumbnail-Width": width,
+      "X-Content-Type-Options": "nosniff",
+    },
+  });
 }
 
 async function resolvePublicCanvaPageThumbnail(rawDesignUrl: string): Promise<string | null> {

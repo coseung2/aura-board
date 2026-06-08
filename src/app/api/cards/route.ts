@@ -173,26 +173,17 @@ export async function POST(req: Request) {
       } else {
         // Share visitor path: unified student permission.
         const shareToken = req.headers.get("x-share-token");
+        const shareAuthorName = decodeShareHeader(req.headers.get("x-share-author-name"));
         if (!shareToken) {
           return NextResponse.json({ error: "unauthenticated" }, { status: 401 });
         }
-        const shareResult = await requireShareAuth(shareToken, "student");
+        const shareResult = await requireShareAuth(shareToken, "student", shareAuthorName);
         if (!("identity" in shareResult)) {
           return NextResponse.json({ error: shareResult.error }, { status: shareResult.status });
         }
         // Verify the share token grants access to this board.
         if (shareResult.identity.boardId !== input.boardId) {
           return NextResponse.json({ error: "board_mismatch" }, { status: 403 });
-        }
-        const board = await db.board.findUnique({
-          where: { id: input.boardId },
-          select: {
-            classroomId: true,
-            classroom: { select: { teacherId: true } },
-          },
-        });
-        if (!board || !board.classroom) {
-          return NextResponse.json({ error: "board_not_accessible" }, { status: 403 });
         }
         authorId = null;
         externalAuthorName = shareResult.identity.authorName;
@@ -381,6 +372,15 @@ export async function POST(req: Request) {
     }
     console.error("[POST /api/cards]", e);
     return NextResponse.json({ error: "internal" }, { status: 500 });
+  }
+}
+
+function decodeShareHeader(value: string | null): string | undefined {
+  if (!value) return undefined;
+  try {
+    return decodeURIComponent(value);
+  } catch {
+    return value;
   }
 }
 

@@ -2,8 +2,8 @@
  * ShareBoardWrapper — Renders the real board component (BoardCanvas, GridBoard,
  * etc.) for a share-link visitor instead of the old BoardShareView.
  *
- * Props mirror what the main board page passes to each layout component,
- * but with share-token-aware role mapping instead of teacher/student auth.
+ * Props mirror what the main student board page passes to each layout
+ * component, but with share-token-aware API identity.
  *
  * The wrapper provides a React Context so child components can retrieve the
  * shareToken for API calls (PATCH /api/cards/:id, POST /api/cards, etc.)
@@ -56,8 +56,9 @@ export function ShareBoardWrapper({
   shareMode,
   shareToken,
 }: Props) {
-  const role = "editor";
-  const canEdit = true;
+  const role = "viewer" as const;
+  const canEdit = false;
+  const isStudentViewer = true;
 
   // Normalize boardTheme same as src/app/board/[id]/page.tsx
   const normalizeBoardTheme = (value: string | null | undefined): "pastel-peach" | "pastel-mint" | "pastel-sky" | "pastel-lilac" | "pastel-lemon" => {
@@ -85,7 +86,7 @@ export function ShareBoardWrapper({
             currentUserId={shareToken}
             currentRole={role}
             classroomId={null}
-            isStudentViewer={false}
+            isStudentViewer={isStudentViewer}
           />
         );
 
@@ -97,6 +98,7 @@ export function ShareBoardWrapper({
             currentUserId={shareToken}
             currentRole={role}
             classroomId={null}
+            isStudentViewer={isStudentViewer}
           />
         );
 
@@ -108,6 +110,7 @@ export function ShareBoardWrapper({
             currentUserId={shareToken}
             currentRole={role}
             classroomId={null}
+            isStudentViewer={isStudentViewer}
           />
         );
 
@@ -120,7 +123,7 @@ export function ShareBoardWrapper({
             currentUserId={shareToken}
             currentRole={role}
             classroomId={null}
-            isStudentViewer={false}
+            isStudentViewer={isStudentViewer}
           />
         );
 
@@ -135,7 +138,7 @@ export function ShareBoardWrapper({
             currentUserId={shareToken}
             currentRole={role}
             classroomId={null}
-            isStudentViewer={false}
+            isStudentViewer={isStudentViewer}
           />
         );
     }
@@ -149,7 +152,7 @@ export function ShareBoardWrapper({
           layout={board.layout}
           canEdit={canEdit}
         />
-        <div className="share-board-content">{renderBoard()}</div>
+        {renderBoard()}
       </main>
     </ShareSessionProvider>
   );

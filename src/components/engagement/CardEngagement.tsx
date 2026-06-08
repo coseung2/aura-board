@@ -120,7 +120,7 @@ export function CardEngagement({ cardId, mode }: Props) {
             disabled={!state.canInteract}
             aria-pressed={state.isLiked}
             aria-label={state.isLiked ? "좋아요 취소" : "좋아요"}
-            title={state.canInteract ? "" : "학부모는 좋아요를 누를 수 없어요"}
+            title={state.canInteract ? "" : "읽기 전용입니다"}
           >
             <span aria-hidden>{state.isLiked ? "❤️" : "🤍"}</span>
             <span>{state.likeCount}</span>
@@ -155,7 +155,7 @@ export function CardEngagement({ cardId, mode }: Props) {
           onClick={toggleLike}
           disabled={!state.canInteract}
           aria-pressed={state.isLiked}
-          title={state.canInteract ? "" : "학부모는 좋아요를 누를 수 없어요"}
+          title={state.canInteract ? "" : "읽기 전용입니다"}
         >
           <span aria-hidden>{state.isLiked ? "❤️" : "🤍"}</span>
           <span>좋아요 {state.likeCount}</span>
@@ -339,7 +339,7 @@ function CommentsBlock({
           {err && <span className="card-engagement-comment-err">{err}</span>}
         </form>
       ) : (
-        <div className="card-engagement-readonly">읽기 전용 (학부모는 댓글을 달 수 없어요)</div>
+        <div className="card-engagement-readonly">읽기 전용이라 댓글을 달 수 없어요</div>
       )}
       {items === null ? (
         <div className="card-engagement-empty">불러오는 중...</div>
