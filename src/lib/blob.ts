@@ -16,12 +16,18 @@
 import "server-only";
 import { randomBytes } from "crypto";
 import { writeFile, mkdir } from "fs/promises";
-import path from "path";
+import * as path from "path";
 import { put } from "@vercel/blob";
 import sharp from "sharp";
+import ffmpeg from "fluent-ffmpeg";
+import ffmpegPath from "@ffmpeg-installer/ffmpeg";
+
+ffmpeg.setFfmpegPath(ffmpegPath.path);
 
 export class BlobUploadError extends Error {
   code = "blob_upload_failed" as const;
+  cause?: unknown;
+
   constructor(message: string, cause?: unknown) {
     super(message);
     this.cause = cause;
@@ -198,4 +204,100 @@ export async function resizeRemoteImageToWebPPreviewUrl(
   const input = Buffer.from(await res.arrayBuffer());
   const preview = await resizeBufferToWebPPreview(input, maxDimension, quality);
   return uploadWebPBuffer(preview, pathname);
+}
+
+/**
+ * Extract a thumbnail frame from a video file (or video URL) and upload as WebP.
+ * Uses ffmpeg to seek to 10% of duration (or 1s for short videos) and extract a frame.
+ * Returns the public URL of the uploaded WebP thumbnail, or null on failure.
+ */
+export async function extractVideoThumbnail(
+  sourceUrl: string,
+  pathname: string
+): Promise<string | null> {
+  try {
+    // Fetch video metadata first to get duration
+    const metadata = await getVideoMetadata(sourceUrl);
+    if (!metadata || !metadata.duration) {
+      console.warn("[blob] video metadata unavailable, skipping thumbnail");
+      return null;
+    }
+
+    // Seek to 10% of duration, minimum 1 second, maximum 10 seconds
+    const seekTime = Math.min(Math.max(metadata.duration * 0.1, 1), 10);
+
+    const frameBuffer = await extractVideoFrame(sourceUrl, seekTime);
+    if (!frameBuffer) {
+      return null;
+    }
+
+    // Resize frame to WebP thumbnail (320x180 for 16:9)
+    const webpBuffer = await sharp(frameBuffer)
+      .resize(320, 180, {
+        fit: "inside",
+        withoutEnlargement: true,
+      })
+      .webp({ quality: 80 })
+      .toBuffer();
+
+    return uploadWebPBuffer(webpBuffer, pathname);
+  } catch (e) {
+    console.warn("[blob] video thumbnail extraction failed:", e);
+    return null;
+  }
+}
+
+interface VideoMetadata {
+  duration: number;
+  width?: number;
+  height?: number;
+}
+
+async function getVideoMetadata(sourceUrl: string): Promise<VideoMetadata | null> {
+  return new Promise((resolve) => {
+    ffmpeg.ffprobe(sourceUrl, (err: Error | null, metadata: ffmpeg.FfprobeData) => {
+      if (err || !metadata.format.duration) {
+        resolve(null);
+        return;
+      }
+      const videoStream = metadata.streams.find((s: ffmpeg.FfprobeStream) => s.codec_type === "video");
+      resolve({
+        duration: metadata.format.duration,
+        width: videoStream?.width,
+        height: videoStream?.height,
+      });
+    });
+  });
+}
+
+async function extractVideoFrame(sourceUrl: string, seekTime: number): Promise<Buffer | null> {
+  return new Promise((resolve) => {
+    const command = ffmpeg(sourceUrl)
+      .seekInput(seekTime)
+      .frames(1)
+      .format("image2")
+      .outputOptions(["-vcodec mjpeg", "-q:v 2"]);
+
+    const chunks: Buffer[] = [];
+    const stream = command.pipe();
+
+    stream.on("data", (chunk: Buffer) => {
+      chunks.push(chunk);
+    });
+
+    stream.on("end", () => {
+      const buffer = Buffer.concat(chunks);
+      resolve(buffer.length > 0 ? buffer : null);
+    });
+
+    stream.on("error", (err: Error) => {
+      console.warn("[blob] ffmpeg frame extraction error:", err);
+      resolve(null);
+    });
+
+    command.on("error", (err: Error) => {
+      console.warn("[blob] ffmpeg command error:", err);
+      resolve(null);
+    });
+  });
 }

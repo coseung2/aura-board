@@ -16,7 +16,7 @@ import { setCardAuthors } from "@/lib/card-authors-service";
 import { requireShareAuth } from "@/lib/share/with-share";
 import { isAllowedFileUrl, isAllowedStoredMime, MAX_ATTACHMENTS_PER_CARD } from "@/lib/file-attachment";
 import { touchBoardUpdatedAt } from "@/lib/board-touch";
-import { resizeRemoteImageToWebPPreviewUrl } from "@/lib/blob";
+import { resizeRemoteImageToWebPPreviewUrl, extractVideoThumbnail } from "@/lib/blob";
 
 const CreateCardSchema = z.object({
   boardId: z.string().min(1),
@@ -273,6 +273,12 @@ export async function POST(req: Request) {
               a.kind === "image"
                 ? a.previewUrl ??
                   (await createAttachmentPreviewUrl(a.url, input.boardId, idx))
+                : a.kind === "video"
+                ? a.previewUrl ??
+                  (await extractVideoThumbnail(
+                    a.url,
+                    `uploads/previews/cards/${input.boardId}/${Date.now()}-${idx}.webp`
+                  ))
                 : null,
           }))
         )

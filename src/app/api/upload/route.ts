@@ -8,7 +8,7 @@ import { getCurrentUser } from "@/lib/auth";
 import { getCurrentStudent } from "@/lib/student-auth";
 import { ALLOWED_FILE_MIMES, isAllowedFileUpload, normalizeUploadMime } from "@/lib/file-attachment";
 import { ALLOWED_IMAGE, ALLOWED_VIDEO, MAX_SIZE, UploadPolicyError, buildUploadPolicy } from "./upload-policy";
-import { resizeBufferToWebPPreview, uploadWebPBuffer } from "@/lib/blob";
+import { resizeBufferToWebPPreview, uploadWebPBuffer, extractVideoThumbnail } from "@/lib/blob";
 
 /**
  * card-file-attachment — 매직바이트 검증.
@@ -199,6 +199,16 @@ export async function POST(req: Request) {
         );
       } catch (e) {
         console.warn("[POST /api/upload] preview generation failed:", e);
+      }
+    } else if (isVideo) {
+      // Video thumbnail extraction (async, non-blocking)
+      try {
+        previewUrl = await extractVideoThumbnail(
+          url, // Use the uploaded video URL as source
+          `uploads/previews/${Date.now()}-${randomBytes(3).toString("hex")}.webp`
+        );
+      } catch (e) {
+        console.warn("[POST /api/upload] video thumbnail extraction failed:", e);
       }
     }
     return NextResponse.json({
