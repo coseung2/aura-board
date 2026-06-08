@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import {
   canvaGetDesign,
   extractCanvaDesignId,
+  expandCanvaShortLink,
   getAccessToken,
 } from "@/lib/canva";
 import { resolveCanvaEmbedUrlCached } from "@/lib/canva-preview-cache";
@@ -27,6 +28,7 @@ const ALLOWED_HOST_SUFFIXES = [
   ".canva-web-files.com",
   "canva.com",
 ];
+const MAX_HTML_BYTES = 120 * 1024;
 
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
@@ -73,6 +75,12 @@ export async function GET(req: Request) {
         } catch {
           url = null;
         }
+      }
+    }
+    if (!url) {
+      url = await resolvePublicCanvaPageThumbnail(design);
+      if (url) {
+        await setPreviewCache("canva-thumbnail", design, { url }, true);
       }
     }
     if (!url) {
@@ -190,4 +198,87 @@ async function resolveDesignThumbnailFromScreenUrl(parsed: URL): Promise<string 
   } catch {
     return null;
   }
+}
+
+async function resolvePublicCanvaPageThumbnail(rawDesignUrl: string): Promise<string | null> {
+  const expandedUrl = await expandCanvaShortLink(rawDesignUrl);
+  let pageUrl: URL;
+  try {
+    pageUrl = new URL(expandedUrl);
+  } catch {
+    return null;
+  }
+
+  const host = pageUrl.hostname.toLowerCase();
+  if (host !== "canva.com" && host !== "www.canva.com") return null;
+  if (!/\/design\/[A-Za-z0-9_-]+/.test(pageUrl.pathname)) return null;
+
+  try {
+    const res = await fetch(pageUrl.toString(), {
+      redirect: "follow",
+      headers: {
+        Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        "Accept-Language": "ko-KR,ko;q=0.9,en;q=0.8",
+        "User-Agent":
+          "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+      },
+      signal: AbortSignal.timeout(8000),
+      cache: "no-store",
+    });
+    if (!res.ok || !res.body) return null;
+
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let html = "";
+    let totalBytes = 0;
+    while (totalBytes < MAX_HTML_BYTES) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      html += decoder.decode(value, { stream: true });
+      totalBytes += value.length;
+    }
+    await reader.cancel().catch(() => undefined);
+
+    const image =
+      readMetaContent(html, "og:image") ??
+      readMetaContent(html, "twitter:image") ??
+      readMetaContent(html, "twitter:image:src");
+    if (!image) return null;
+
+    const absolute = new URL(decodeHtmlEntities(image), res.url || pageUrl.toString());
+    const imageHost = absolute.hostname.toLowerCase();
+    const allowed =
+      imageHost === "canva.com" ||
+      ALLOWED_HOST_SUFFIXES.some((suffix) => imageHost.endsWith(suffix));
+    return allowed && absolute.protocol === "https:" ? absolute.toString() : null;
+  } catch {
+    return null;
+  }
+}
+
+function readMetaContent(html: string, property: string): string | null {
+  const patterns = [
+    new RegExp(`<meta[^>]+(?:property|name)=["']${property}["'][^>]+content=["']([^"']+)["']`, "i"),
+    new RegExp(`<meta[^>]+content=["']([^"']+)["'][^>]+(?:property|name)=["']${property}["']`, "i"),
+  ];
+  for (const pattern of patterns) {
+    const match = html.match(pattern);
+    if (match?.[1]) return match[1].trim();
+  }
+  return null;
+}
+
+function decodeHtmlEntities(value: string): string {
+  return value
+    .replace(/&amp;/gi, "&")
+    .replace(/&quot;/gi, '"')
+    .replace(/&#39;|&apos;/gi, "'")
+    .replace(/&lt;/gi, "<")
+    .replace(/&gt;/gi, ">")
+    .replace(/&#x([0-9a-f]+);/gi, (_, hex: string) =>
+      String.fromCodePoint(parseInt(hex, 16))
+    )
+    .replace(/&#(\d+);/g, (_, dec: string) =>
+      String.fromCodePoint(parseInt(dec, 10))
+    );
 }

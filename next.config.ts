@@ -26,6 +26,8 @@ const nextConfig: NextConfig = {
       // YouTube thumbnails (used for video preview posters)
       { protocol: "https", hostname: "i.ytimg.com", pathname: "/**" },
       { protocol: "https", hostname: "img.youtube.com", pathname: "/**" },
+      // External generated thumbnails used by saved link previews.
+      { protocol: "https", hostname: "**.cloudfront.net", pathname: "/**" },
       // Vercel Blob — Canva publisher PNGs and other uploaded assets.
       // Each Blob store gets a unique <prefix>.public.blob.vercel-storage.com
       // host, so wildcard the subdomain.

@@ -8,7 +8,7 @@ import { getCurrentParent } from "./parent-session";
 // 식별 + 카드 가시성 검사 단일 진입점.
 //
 // 3가지 actor:
-//   - teacher: NextAuth 세션. 교사 본인이 학급 소유면 카드 접근 가능.
+//   - teacher: NextAuth 세션. 교사 본인이 학급 소유자이거나 보드 멤버면 카드 접근 가능.
 //   - student: HMAC 쿠키. 학급 소속 카드만 접근.
 //   - parent: ParentSession. 자녀(ParentChildLink active)의 학급 카드만 read.
 //             write (댓글/좋아요) 는 차단.
@@ -34,7 +34,7 @@ export async function getCurrentCardActor(): Promise<CardActor | null> {
 
 export interface CardAccessContext {
   cardId: string;
-  classroomId: string;
+  classroomId: string | null;
   anonymousAuthor: boolean;
 }
 
@@ -42,8 +42,8 @@ export interface CardAccessContext {
  * 카드 접근 권한을 검사. read 면 teacher/student/parent 모두, write 면
  * teacher/student 만 (parent 차단).
  *
- * 학급 단위 게이트 — 카드의 board.classroomId 와 actor 의 학급 매핑이 일치
- * 해야 함. 학급 없는 보드 (개인 보드) 는 댓글/좋아요 미지원.
+ * 학급 단위 게이트 + 보드 멤버 게이트. 학생/학부모는 학급 매핑이 필요하지만,
+ * 교사는 학급에 할당되지 않은 개인 보드도 BoardMember 이면 댓글/좋아요 가능.
  */
 export async function authorizeCardAccess(
   cardId: string,
@@ -54,11 +54,20 @@ export async function authorizeCardAccess(
     where: { id: cardId },
     select: {
       id: true,
-      board: { select: { classroomId: true, anonymousAuthor: true } },
+      board: {
+        select: {
+          classroomId: true,
+          anonymousAuthor: true,
+          classroom: { select: { teacherId: true } },
+          members: {
+            where: { userId: actor.kind === "teacher" ? actor.id : "" },
+            select: { userId: true },
+          },
+        },
+      },
     },
   });
   if (!card) return { ok: false, reason: "not_found" };
-  if (!card.board.classroomId) return { ok: false, reason: "no_classroom" };
   const classroomId = card.board.classroomId;
 
   if (mode === "write" && actor.kind === "parent") {
@@ -66,18 +75,18 @@ export async function authorizeCardAccess(
   }
 
   if (actor.kind === "teacher") {
-    const cls = await db.classroom.findUnique({
-      where: { id: classroomId },
-      select: { teacherId: true },
-    });
-    if (!cls || cls.teacherId !== actor.id) {
+    const isClassroomTeacher = card.board.classroom?.teacherId === actor.id;
+    const isBoardMember = card.board.members.some((m) => m.userId === actor.id);
+    if (!isClassroomTeacher && !isBoardMember) {
       return { ok: false, reason: "forbidden" };
     }
   } else if (actor.kind === "student") {
+    if (!classroomId) return { ok: false, reason: "no_classroom" };
     if (actor.classroomId !== classroomId) {
       return { ok: false, reason: "forbidden" };
     }
   } else {
+    if (!classroomId) return { ok: false, reason: "no_classroom" };
     // parent — must have an active ParentChildLink to a student in this classroom
     const link = await db.parentChildLink.findFirst({
       where: {

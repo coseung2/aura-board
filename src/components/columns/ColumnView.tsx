@@ -55,7 +55,7 @@ type Props = {
   onCardEditAuthors: (card: CardData) => void;
   onCardDuplicate: (card: CardData) => void;
   onCardDelete: (id: string) => void;
-  onAddInColumn: () => void;
+  onAddInColumn?: () => void;
 };
 
 export function ColumnView(props: Props) {
@@ -229,7 +229,7 @@ export function ColumnView(props: Props) {
           />
         )}
       </div>
-      {canEdit && (
+      {onAddInColumn && (
         <button
           type="button"
           className="column-inline-add"

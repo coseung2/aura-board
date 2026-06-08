@@ -85,9 +85,19 @@ export const CardAttachments = memo(function CardAttachments({ imageUrl, thumbUr
   // 이미지 종류만 navigation 대상 (pdf/video 제외). CardDetailModal 이
   // onImageClick 을 넘기면 그 안에서 라이트박스 state 를 관리.
   const imageAttachments = sorted.filter((a) => a.kind === "image");
-  const renderVideoPoster = (key: string, extraBadge = true) => (
+  const renderVideoPoster = (key: string, posterUrl?: string | null, extraBadge = true) => (
     <div key={key} className="card-attach-video card-attach-media-poster">
-      <div className="card-attach-video-placeholder" aria-hidden="true" />
+      {posterUrl ? (
+        <img
+          src={posterUrl}
+          alt=""
+          loading="lazy"
+          decoding="async"
+          className="card-attach-video-poster-img"
+        />
+      ) : (
+        <div className="card-attach-video-placeholder" aria-hidden="true" />
+      )}
       <span className="card-canva-slot-play-icon" aria-hidden="true">
         ▶
       </span>
@@ -148,7 +158,7 @@ export const CardAttachments = memo(function CardAttachments({ imageUrl, thumbUr
             }
             if (a.kind === "video") {
               if (variant === "thumbnail") {
-                return renderVideoPoster(a.id);
+                return renderVideoPoster(a.id, a.previewUrl);
               }
               const yt = getYouTubeId(a.url);
               if (yt) {
@@ -170,7 +180,7 @@ export const CardAttachments = memo(function CardAttachments({ imageUrl, thumbUr
               }
               return (
                 <div key={a.id} className="card-attach-video">
-                  <video src={a.url} controls preload="metadata" />
+                  <video src={a.url} controls preload="metadata" poster={a.previewUrl ?? undefined} />
                   {extraCount > 0 && (
                     <span className="card-attach-multi-badge" aria-label={`+${extraCount}개 더`}>
                       +{extraCount}
@@ -209,7 +219,7 @@ export const CardAttachments = memo(function CardAttachments({ imageUrl, thumbUr
             )}
             {effectiveVideoUrl && (() => {
               if (variant === "thumbnail") {
-                return renderVideoPoster("single-video", false);
+                return renderVideoPoster("single-video", null, false);
               }
               const yt = getYouTubeId(effectiveVideoUrl);
               return yt ? (

@@ -377,7 +377,7 @@ export function ColumnsBoard({
             onCardEditAuthors={(c) => setAuthorEditCard(c)}
             onCardDuplicate={handleDuplicateCard}
             onCardDelete={handleDeleteCard}
-            onAddInColumn={() => setAddForSection(section.id)}
+            onAddInColumn={canAddCard ? () => setAddForSection(section.id) : undefined}
           />
         ))}
 

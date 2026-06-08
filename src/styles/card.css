@@ -226,6 +226,23 @@
   border: none;
 }
 
+.card-attach-media-poster {
+  position: relative;
+  aspect-ratio: 16 / 9;
+  background: #111827;
+}
+
+.card-attach-video-poster-img,
+.card-attach-video-placeholder {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.card-attach-video-poster-img {
+  object-fit: cover;
+}
+
 /* ---- File Attachment (card-file-attachment 2026-04-20) ---- */
 
 .card-attach-file {

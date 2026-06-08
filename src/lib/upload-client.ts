@@ -1,6 +1,5 @@
 "use client";
 
-import heic2any from "heic2any";
 import { upload } from "@vercel/blob/client";
 import { normalizeUploadMime, mimeFromExtension } from "./file-attachment";
 
@@ -72,6 +71,7 @@ async function maybeConvertHeic(file: File): Promise<File> {
   if (!isHeic) return file;
 
   try {
+    const { default: heic2any } = await import("heic2any");
     const result = await heic2any({
       blob: file,
       toType: "image/jpeg",
