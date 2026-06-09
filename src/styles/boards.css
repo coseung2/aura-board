@@ -316,6 +316,17 @@
   display: flex;
   flex-direction: column;
   gap: 0;
+  transition: margin 200ms cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+/* Drag gap — existing cards slide apart to show where the dragged card
+   will land. Applied by ColumnView based on cardDropPreview position. */
+.column-card-drop-wrap.is-gap-before {
+  margin-top: 36px;
+}
+
+.column-card-drop-wrap.is-gap-after {
+  margin-bottom: 36px;
 }
 
 .column-drop-indicator {
@@ -337,6 +348,15 @@
   box-shadow:
     0 0 0 4px var(--color-accent-tinted-bg),
     0 6px 16px rgba(0, 117, 222, 0.22);
+  transition: height 200ms ease, box-shadow 200ms ease;
+}
+
+.is-gap-before .column-drop-indicator-line,
+.is-gap-after .column-drop-indicator-line {
+  height: 5px;
+  box-shadow:
+    0 0 0 6px var(--color-accent-tinted-bg),
+    0 6px 24px rgba(0, 117, 222, 0.35);
 }
 
 .column-drop-indicator-label {

@@ -264,7 +264,14 @@ export function ColumnView(props: Props) {
               c.studentAuthorId === currentUserId;
 
             return (
-              <div key={c.id} className="column-card-drop-wrap">
+              <div key={c.id} className={`column-card-drop-wrap${
+                  cardDropPreview?.sectionId === section.id &&
+                  cardDropPreview.cardId === c.id
+                    ? cardDropPreview.position === "before"
+                      ? " is-gap-before"
+                      : " is-gap-after"
+                    : ""
+                }`}>
                 {cardDropPreview?.sectionId === section.id &&
                   cardDropPreview.cardId === c.id &&
                   cardDropPreview.position === "before" && (
