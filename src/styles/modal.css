@@ -442,6 +442,22 @@
   width: 100%;
   position: relative;
 }
+
+/* LinkPreviewImage renders with both .card-link-preview-image AND
+   .optimized-img-wrap. optimized-image.css's combined selector
+   (`.card-link-preview-image.optimized-img-wrap`) hard-codes
+   height: 112px so the card thumbnail looks compact — but it lives later
+   in the import order than modal.css, so the fixed height wins inside
+   the detail modal too, shrinking the link preview to a 112px sliver
+   whenever the card also has an image. Bump specificity with the
+   modal-scoped ancestor so the modal's `flex: 1 1 auto; height: auto`
+   rule above actually applies. */
+.card-detail-media .card-link-preview-image.optimized-img-wrap {
+  flex: 1 1 auto;
+  min-height: 0;
+  height: auto;
+  max-height: none;
+}
 /* In the detail modal, the Canva slot should fill the full media pane
    (height of modal minus header). Override the 16:9 padding-bottom
    aspect ratio trick that card.css uses for the inline thumbnail. */
