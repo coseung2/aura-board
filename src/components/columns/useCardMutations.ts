@@ -77,10 +77,11 @@ export function useCardMutations({
   const pendingCardIds = useRef<Set<string>>(new Set());
 
 
-  function trackCardMutation<T>(id: string, run: () => Promise<T>): Promise<T> {
-    pendingCardIds.current.add(id);
+  function trackCardMutation<T>(ids: string | string[], run: () => Promise<T>): Promise<T> {
+    const idList = Array.isArray(ids) ? ids : [ids];
+    for (const id of idList) pendingCardIds.current.add(id);
     return run().finally(() => {
-      pendingCardIds.current.delete(id);
+      for (const id of idList) pendingCardIds.current.delete(id);
     });
   }
 
@@ -226,7 +227,7 @@ export function useCardMutations({
     }
   }
 
-  /* ── Intra-section card reorder ── */
+  /* ── Intra-section card reorder / cross-section card move ── */
   async function handleCardReorder(
     cardId: string,
     targetCardId: string,
@@ -235,10 +236,15 @@ export function useCardMutations({
     visibleCardIds?: string[]
   ) {
     let prevCards: CardData[] = [];
-    let toSave: Array<{ id: string; order: number }> = [];
+    let toSave: Array<{ id: string; order: number; sectionId?: string }> = [];
 
     setCards((list) => {
       prevCards = [...list];
+
+      const draggedCard = list.find((c) => c.id === cardId);
+      if (!draggedCard) return list;
+
+      const isCrossSection = (draggedCard.sectionId ?? "") !== sectionId;
 
       const sectionCards = list
         .filter((c) => (c.sectionId ?? "") === sectionId)
@@ -247,26 +253,71 @@ export function useCardMutations({
           return visibleCardIds.indexOf(a.id) - visibleCardIds.indexOf(b.id);
         });
 
-      const sourceIdx = sectionCards.findIndex((c) => c.id === cardId);
       const targetIdx = sectionCards.findIndex((c) => c.id === targetCardId);
-      if (sourceIdx === -1 || targetIdx === -1) return list;
+      if (targetIdx === -1) return list;
 
-      // Rebuild array without the dragged card
+      if (isCrossSection) {
+        // Cross-section: insert dragged card at the right position within
+        // the target section, updating its sectionId and all affected orders.
+        // Also reindex the source section so remaining orders have no gaps.
+        let insertAt = targetIdx;
+        if (dropPosition === "after") insertAt++;
+        if (insertAt > sectionCards.length) insertAt = sectionCards.length;
+
+        const movedCard = { ...draggedCard, sectionId, order: 0 };
+        const reordered = [...sectionCards];
+        reordered.splice(insertAt, 0, movedCard);
+
+        const targetUpdates = reordered.map((c, i) => ({
+          id: c.id,
+          order: i,
+          sectionId: c.id === cardId ? sectionId : undefined,
+        }));
+
+        // Reindex source section — remaining cards keep sequential order
+        const sourceSectionId = draggedCard.sectionId ?? "";
+        const sourceCards = list
+          .filter((c) => (c.sectionId ?? "") === sourceSectionId && c.id !== cardId)
+          .sort((a, b) => a.order - b.order);
+
+        const sourceUpdates = sourceCards.map((c, i) => ({
+          id: c.id,
+          order: i,
+          sectionId: undefined,
+        }));
+
+        toSave = [...targetUpdates, ...sourceUpdates];
+
+        const updateMap = new Map(toSave.map((s) => [s.id, s]));
+        return list.map((c) => {
+          const saved = updateMap.get(c.id);
+          if (saved) {
+            return {
+              ...c,
+              sectionId: saved.sectionId ?? c.sectionId,
+              order: saved.order,
+            };
+          }
+          return c;
+        });
+      }
+
+      // Intra-section: reorder within the same section
+      const sourceIdx = sectionCards.findIndex((c) => c.id === cardId);
+      if (sourceIdx === -1) return list;
+
       const reordered = sectionCards.filter((c) => c.id !== cardId);
 
-      // Calculate insertion point: after removing source, target's index shifts
       let insertAt = reordered.findIndex((c) => c.id === targetCardId);
       if (dropPosition === "after") insertAt++;
       if (insertAt > reordered.length) insertAt = reordered.length;
 
-      // Re-insert the dragged card at the new position
       const movedCard = list.find((c) => c.id === cardId)!;
       reordered.splice(insertAt, 0, movedCard);
 
-      // Assign sequential orders
-      const orderMap = new Map(reordered.map((c, i) => [c.id, i] as const));
       toSave = reordered.map((c, i) => ({ id: c.id, order: i }));
 
+      const orderMap = new Map(reordered.map((c, i) => [c.id, i] as const));
       return list.map((c) => {
         const o = orderMap.get(c.id);
         return o !== undefined ? { ...c, order: o } : c;
@@ -275,22 +326,38 @@ export function useCardMutations({
 
     if (toSave.length === 0) return;
 
-    await trackCardMutation(cardId, () =>
+    const affectedIds = toSave.map((s) => s.id);
+    await trackCardMutation(affectedIds, () =>
       optimisticMutate(
         () =>
           Promise.all(
-            toSave.map(({ id, order }) =>
+            toSave.map(({ id, order, sectionId: newSectionId }) =>
               fetch(`/api/cards/${id}`, {
                 method: "PATCH",
                 headers: { "content-type": "application/json" },
-                body: JSON.stringify({ order }),
+                body: JSON.stringify(
+                  newSectionId !== undefined
+                    ? { sectionId: newSectionId, order }
+                    : { order }
+                ),
               })
             )
           ).then((results) => {
             const ok = results.every((r) => r.ok);
             return ok ? Response.json({ ok: true }) : Promise.reject();
           }),
-        () => setCards(prevCards)
+        async () => {
+          setCards(prevCards);
+          // 부분실패 시 서버에 부분 반영된 상태와 클라이언트를 맞추기 위해
+          // 보드 스냅샷 재조회 → 서버 상태로 수렴
+          try {
+            const res = await fetch(`/api/boards/${boardId}/snapshot`);
+            if (res.ok) {
+              const data = await res.json();
+              if (data.cards) setCards(data.cards);
+            }
+          } catch {}
+        }
       )
     );
   }
