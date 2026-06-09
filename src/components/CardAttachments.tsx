@@ -163,11 +163,11 @@ export const CardAttachments = memo(function CardAttachments({ imageUrl, thumbUr
       ) : (
         <div className="card-attach-video-placeholder" aria-hidden="true" />
       )}
-      {!onClick && source === "youtube" ? (
+      {source === "youtube" ? (
         <span className="card-attach-youtube-play" aria-hidden="true">
           ▶
         </span>
-      ) : !onClick ? (
+      ) : (
         <>
           <span className="card-attach-video-play" aria-hidden="true">
             ▶
@@ -176,7 +176,7 @@ export const CardAttachments = memo(function CardAttachments({ imageUrl, thumbUr
             동영상
           </span>
         </>
-      ) : null}
+      )}
       {extraBadge && extraCount > 0 && (
         <span className="card-attach-multi-badge" aria-label={`+${extraCount}개 더`}>
           +{extraCount}
