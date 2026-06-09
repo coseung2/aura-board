@@ -20,7 +20,7 @@ type UseCardMutationsReturn = {
   handleDeleteCard: (id: string) => Promise<void>;
   handleEditCardSave: (
     editingCard: CardData | null,
-    updates: EditCardUpdates
+    updates: EditCardUpdates,
   ) => Promise<void>;
   handleDuplicateCard: (card: CardData) => Promise<void>;
   moveCard: (cardId: string, targetSectionId: string) => Promise<void>;
@@ -29,7 +29,7 @@ type UseCardMutationsReturn = {
     targetCardId: string,
     sectionId: string,
     dropPosition: "before" | "after",
-    visibleCardIds?: string[]
+    visibleCardIds?: string[],
   ) => Promise<void>;
   handleDragStart: (e: React.DragEvent, cardId: string) => void;
   handleDragEnd: (e: React.DragEvent) => void;
@@ -39,7 +39,7 @@ type UseCardMutationsReturn = {
     targetSectionId: string,
     setSections: React.Dispatch<React.SetStateAction<any[]>>,
     setDraggingSectionId: React.Dispatch<React.SetStateAction<string | null>>,
-    setOverSectionId: React.Dispatch<React.SetStateAction<string | null>>
+    setOverSectionId: React.Dispatch<React.SetStateAction<string | null>>,
   ) => void;
 };
 
@@ -67,7 +67,7 @@ function animateColumnCardLayout(update: () => void) {
 
   requestAnimationFrame(() => {
     const reduceMotion = window.matchMedia?.(
-      "(prefers-reduced-motion: reduce)"
+      "(prefers-reduced-motion: reduce)",
     ).matches;
     if (reduceMotion) return;
 
@@ -91,7 +91,7 @@ function animateColumnCardLayout(update: () => void) {
           {
             duration: 220,
             easing: "cubic-bezier(0.2, 0, 0, 1)",
-          }
+          },
         );
       });
   });
@@ -108,7 +108,7 @@ export async function optimisticMutate<T>(
    * After a successful fetch, `onSuccess` can apply server-confirmed state
    * (e.g. replace optimistic card with the server's copy).
    */
-  onSuccess?: () => void
+  onSuccess?: () => void,
 ): Promise<void> {
   try {
     const res = await fetchFn();
@@ -131,8 +131,10 @@ export function useCardMutations({
 }: UseCardMutationsOptions): UseCardMutationsReturn {
   const pendingCardIds = useRef<Set<string>>(new Set());
 
-
-  function trackCardMutation<T>(ids: string | string[], run: () => Promise<T>): Promise<T> {
+  function trackCardMutation<T>(
+    ids: string | string[],
+    run: () => Promise<T>,
+  ): Promise<T> {
     const idList = Array.isArray(ids) ? ids : [ids];
     for (const id of idList) pendingCardIds.current.add(id);
     return run().finally(() => {
@@ -142,7 +144,7 @@ export function useCardMutations({
 
   function getCardsForSection(
     sectionId: string,
-    cards: CardData[]
+    cards: CardData[],
   ): CardData[] {
     return cards.filter((c) => (c.sectionId ?? "") === sectionId);
   }
@@ -189,22 +191,24 @@ export function useCardMutations({
   async function handleDeleteCard(id: string) {
     if (!window.confirm("이 카드를 삭제할까요?")) return;
     const prevCards: CardData[] = [];
-    animateColumnCardLayout(() => setCards((list) => {
-      prevCards.push(...list);
-      return list.filter((c) => c.id !== id);
-    }));
+    animateColumnCardLayout(() =>
+      setCards((list) => {
+        prevCards.push(...list);
+        return list.filter((c) => c.id !== id);
+      }),
+    );
     await trackCardMutation(id, () =>
       optimisticMutate(
         () => fetch(`/api/cards/${id}`, { method: "DELETE" }),
-        () => setCards(prevCards)
-      )
+        () => setCards(prevCards),
+      ),
     );
   }
 
   /* ── Edit card ── */
   async function handleEditCardSave(
     editingCard: CardData | null,
-    updates: EditCardUpdates
+    updates: EditCardUpdates,
   ) {
     if (!editingCard) return;
     const prevCards: CardData[] = [];
@@ -226,7 +230,7 @@ export function useCardMutations({
     setCards((list) => {
       prevCards.push(...list);
       return list.map((c) =>
-        c.id === cardId ? { ...c, ...optimisticUpdates } : c
+        c.id === cardId ? { ...c, ...optimisticUpdates } : c,
       );
     });
     await trackCardMutation(cardId, () =>
@@ -244,12 +248,12 @@ export function useCardMutations({
             const data = await res.json();
             if (data.card) {
               setCards((list) =>
-                list.map((c) => (c.id === cardId ? data.card : c))
+                list.map((c) => (c.id === cardId ? data.card : c)),
               );
             }
           }
-        }
-      )
+        },
+      ),
     );
   }
 
@@ -288,96 +292,100 @@ export function useCardMutations({
     targetCardId: string,
     sectionId: string,
     dropPosition: "before" | "after",
-    visibleCardIds?: string[]
+    visibleCardIds?: string[],
   ) {
     let prevCards: CardData[] = [];
     let toSave: Array<{ id: string; order: number; sectionId?: string }> = [];
 
-    animateColumnCardLayout(() => setCards((list) => {
-      prevCards = [...list];
+    animateColumnCardLayout(() =>
+      setCards((list) => {
+        prevCards = [...list];
 
-      const draggedCard = list.find((c) => c.id === cardId);
-      if (!draggedCard) return list;
+        const draggedCard = list.find((c) => c.id === cardId);
+        if (!draggedCard) return list;
 
-      const isCrossSection = (draggedCard.sectionId ?? "") !== sectionId;
+        const isCrossSection = (draggedCard.sectionId ?? "") !== sectionId;
 
-      const sectionCards = list
-        .filter((c) => (c.sectionId ?? "") === sectionId)
-        .sort((a, b) => {
-          if (!visibleCardIds) return a.order - b.order;
-          return visibleCardIds.indexOf(a.id) - visibleCardIds.indexOf(b.id);
-        });
+        const sectionCards = list
+          .filter((c) => (c.sectionId ?? "") === sectionId)
+          .sort((a, b) => {
+            if (!visibleCardIds) return a.order - b.order;
+            return visibleCardIds.indexOf(a.id) - visibleCardIds.indexOf(b.id);
+          });
 
-      const targetIdx = sectionCards.findIndex((c) => c.id === targetCardId);
-      if (targetIdx === -1) return list;
+        const targetIdx = sectionCards.findIndex((c) => c.id === targetCardId);
+        if (targetIdx === -1) return list;
 
-      if (isCrossSection) {
-        // Cross-section: insert dragged card at the right position within
-        // the target section, updating its sectionId and all affected orders.
-        // Also reindex the source section so remaining orders have no gaps.
-        let insertAt = targetIdx;
+        if (isCrossSection) {
+          // Cross-section: insert dragged card at the right position within
+          // the target section, updating its sectionId and all affected orders.
+          // Also reindex the source section so remaining orders have no gaps.
+          let insertAt = targetIdx;
+          if (dropPosition === "after") insertAt++;
+          if (insertAt > sectionCards.length) insertAt = sectionCards.length;
+
+          const movedCard = { ...draggedCard, sectionId, order: 0 };
+          const reordered = [...sectionCards];
+          reordered.splice(insertAt, 0, movedCard);
+
+          const targetUpdates = reordered.map((c, i) => ({
+            id: c.id,
+            order: i,
+            sectionId: c.id === cardId ? sectionId : undefined,
+          }));
+
+          // Reindex source section — remaining cards keep sequential order
+          const sourceSectionId = draggedCard.sectionId ?? "";
+          const sourceCards = list
+            .filter(
+              (c) => (c.sectionId ?? "") === sourceSectionId && c.id !== cardId,
+            )
+            .sort((a, b) => a.order - b.order);
+
+          const sourceUpdates = sourceCards.map((c, i) => ({
+            id: c.id,
+            order: i,
+            sectionId: undefined,
+          }));
+
+          toSave = [...targetUpdates, ...sourceUpdates];
+
+          const updateMap = new Map(toSave.map((s) => [s.id, s]));
+          return list.map((c) => {
+            const saved = updateMap.get(c.id);
+            if (saved) {
+              return {
+                ...c,
+                sectionId: saved.sectionId ?? c.sectionId,
+                order: saved.order,
+              };
+            }
+            return c;
+          });
+        }
+
+        // Intra-section: reorder within the same section
+        const sourceIdx = sectionCards.findIndex((c) => c.id === cardId);
+        if (sourceIdx === -1) return list;
+
+        const reordered = sectionCards.filter((c) => c.id !== cardId);
+
+        let insertAt = reordered.findIndex((c) => c.id === targetCardId);
         if (dropPosition === "after") insertAt++;
-        if (insertAt > sectionCards.length) insertAt = sectionCards.length;
+        if (insertAt > reordered.length) insertAt = reordered.length;
 
-        const movedCard = { ...draggedCard, sectionId, order: 0 };
-        const reordered = [...sectionCards];
+        const movedCard = list.find((c) => c.id === cardId)!;
         reordered.splice(insertAt, 0, movedCard);
 
-        const targetUpdates = reordered.map((c, i) => ({
-          id: c.id,
-          order: i,
-          sectionId: c.id === cardId ? sectionId : undefined,
-        }));
+        toSave = reordered.map((c, i) => ({ id: c.id, order: i }));
 
-        // Reindex source section — remaining cards keep sequential order
-        const sourceSectionId = draggedCard.sectionId ?? "";
-        const sourceCards = list
-          .filter((c) => (c.sectionId ?? "") === sourceSectionId && c.id !== cardId)
-          .sort((a, b) => a.order - b.order);
-
-        const sourceUpdates = sourceCards.map((c, i) => ({
-          id: c.id,
-          order: i,
-          sectionId: undefined,
-        }));
-
-        toSave = [...targetUpdates, ...sourceUpdates];
-
-        const updateMap = new Map(toSave.map((s) => [s.id, s]));
+        const orderMap = new Map(reordered.map((c, i) => [c.id, i] as const));
         return list.map((c) => {
-          const saved = updateMap.get(c.id);
-          if (saved) {
-            return {
-              ...c,
-              sectionId: saved.sectionId ?? c.sectionId,
-              order: saved.order,
-            };
-          }
-          return c;
+          const o = orderMap.get(c.id);
+          return o !== undefined ? { ...c, order: o } : c;
         });
-      }
-
-      // Intra-section: reorder within the same section
-      const sourceIdx = sectionCards.findIndex((c) => c.id === cardId);
-      if (sourceIdx === -1) return list;
-
-      const reordered = sectionCards.filter((c) => c.id !== cardId);
-
-      let insertAt = reordered.findIndex((c) => c.id === targetCardId);
-      if (dropPosition === "after") insertAt++;
-      if (insertAt > reordered.length) insertAt = reordered.length;
-
-      const movedCard = list.find((c) => c.id === cardId)!;
-      reordered.splice(insertAt, 0, movedCard);
-
-      toSave = reordered.map((c, i) => ({ id: c.id, order: i }));
-
-      const orderMap = new Map(reordered.map((c, i) => [c.id, i] as const));
-      return list.map((c) => {
-        const o = orderMap.get(c.id);
-        return o !== undefined ? { ...c, order: o } : c;
-      });
-    }));
+      }),
+    );
 
     if (toSave.length === 0) return;
 
@@ -393,10 +401,10 @@ export function useCardMutations({
                 body: JSON.stringify(
                   newSectionId !== undefined
                     ? { sectionId: newSectionId, order }
-                    : { order }
+                    : { order },
                 ),
-              })
-            )
+              }),
+            ),
           ).then((results) => {
             const ok = results.every((r) => r.ok);
             return ok ? Response.json({ ok: true }) : Promise.reject();
@@ -412,8 +420,8 @@ export function useCardMutations({
               if (data.cards) setCards(data.cards);
             }
           } catch {}
-        }
-      )
+        },
+      ),
     );
   }
 
@@ -424,13 +432,13 @@ export function useCardMutations({
     setCards((list) => {
       prevCards.push(...list);
       const targetCards = list.filter(
-        (c) => (c.sectionId ?? "") === targetSectionId
+        (c) => (c.sectionId ?? "") === targetSectionId,
       );
       newOrder = targetCards.length;
       return list.map((c) =>
         c.id === cardId
           ? { ...c, sectionId: targetSectionId, order: newOrder }
-          : c
+          : c,
       );
     });
 
@@ -440,10 +448,13 @@ export function useCardMutations({
           fetch(`/api/cards/${cardId}`, {
             method: "PATCH",
             headers: { "content-type": "application/json" },
-            body: JSON.stringify({ sectionId: targetSectionId, order: newOrder }),
+            body: JSON.stringify({
+              sectionId: targetSectionId,
+              order: newOrder,
+            }),
           }),
-        () => setCards(prevCards)
-      )
+        () => setCards(prevCards),
+      ),
     );
   }
 
@@ -451,6 +462,11 @@ export function useCardMutations({
     e.dataTransfer.setData("application/card-id", cardId);
     e.dataTransfer.effectAllowed = "move";
     if (e.currentTarget instanceof HTMLElement) {
+      const rect = e.currentTarget.getBoundingClientRect();
+      e.dataTransfer.setData(
+        "application/card-height",
+        String(Math.ceil(rect.height)),
+      );
       e.currentTarget.classList.add("is-dragging");
     }
   }
@@ -470,10 +486,8 @@ export function useCardMutations({
     e: React.DragEvent,
     targetSectionId: string,
     setSections: React.Dispatch<React.SetStateAction<any[]>>,
-    setDraggingSectionId: React.Dispatch<
-      React.SetStateAction<string | null>
-    >,
-    setOverSectionId: React.Dispatch<React.SetStateAction<string | null>>
+    setDraggingSectionId: React.Dispatch<React.SetStateAction<string | null>>,
+    setOverSectionId: React.Dispatch<React.SetStateAction<string | null>>,
   ) {
     e.preventDefault();
     setOverSectionId(null);

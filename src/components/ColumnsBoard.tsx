@@ -25,6 +25,7 @@ type CardDropPreview = {
   sectionId: string;
   cardId: string;
   position: "before" | "after";
+  placeholderHeight: number;
 } | null;
 
 type Props = {
@@ -56,7 +57,7 @@ export function ColumnsBoard({
       if (!a.pinned && b.pinned) return 1;
       if (a.pinned && b.pinned) return a.order - b.order;
       return b.order - a.order;
-    })
+    }),
   );
   const [scrollRailWidth, setScrollRailWidth] = useState(0);
   const [authorEditCard, setAuthorEditCard] = useState<CardData | null>(null);
@@ -71,7 +72,9 @@ export function ColumnsBoard({
   const [exportSectionId, setExportSectionId] = useState<string | null>(null);
   const [folderSectionId, setFolderSectionId] = useState<string | null>(null);
   const [organizing, setOrganizing] = useState<string | null>(null);
-  const [draggingSectionId, setDraggingSectionId] = useState<string | null>(null);
+  const [draggingSectionId, setDraggingSectionId] = useState<string | null>(
+    null,
+  );
   const [cardDropPreview, setCardDropPreview] = useState<CardDropPreview>(null);
   const [seedingStudents, setSeedingStudents] = useState(false);
   const [feedbackTarget, setFeedbackTarget] = useState<{
@@ -184,7 +187,7 @@ export function ColumnsBoard({
     if (!canEdit) return;
     const prev = sections;
     setSections((list) =>
-      list.map((s) => (s.id === sectionId ? { ...s, sortMode: mode } : s))
+      list.map((s) => (s.id === sectionId ? { ...s, sortMode: mode } : s)),
     );
     try {
       const res = await fetch(`/api/sections/${sectionId}`, {
@@ -206,14 +209,12 @@ export function ColumnsBoard({
     const section = sections.find((s) => s.id === sectionId);
     if (!section) return;
 
-    const sectionCards = cards.filter(
-      (c) => (c.sectionId ?? "") === sectionId
-    );
+    const sectionCards = cards.filter((c) => (c.sectionId ?? "") === sectionId);
     const canvaUrls = sectionCards
       .filter(
         (c) =>
           c.linkUrl &&
-          (c.linkUrl.includes("canva.link") || c.linkUrl.includes("canva.com"))
+          (c.linkUrl.includes("canva.link") || c.linkUrl.includes("canva.com")),
       )
       .map((c) => c.linkUrl!);
 
@@ -224,7 +225,7 @@ export function ColumnsBoard({
 
     if (
       !window.confirm(
-        `"${section.title}" 폴더를 Canva에 생성하고\n${canvaUrls.length}개 디자인을 이동할까요?`
+        `"${section.title}" 폴더를 Canva에 생성하고\n${canvaUrls.length}개 디자인을 이동할까요?`,
       )
     )
       return;
@@ -240,7 +241,9 @@ export function ColumnsBoard({
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
         if (data.error === "canva_not_connected") {
-          if (window.confirm("Canva 계정 연결이 필요합니다. 지금 연결할까요?")) {
+          if (
+            window.confirm("Canva 계정 연결이 필요합니다. 지금 연결할까요?")
+          ) {
             window.location.href = "/api/auth/canva";
           }
         } else {
@@ -261,7 +264,7 @@ export function ColumnsBoard({
 
   async function handleImportFromCanva(
     sectionId: string,
-    designs: { id: string; title: string; thumbnail?: string }[]
+    designs: { id: string; title: string; thumbnail?: string }[],
   ) {
     for (const d of designs) {
       try {
@@ -338,90 +341,96 @@ export function ColumnsBoard({
     <div className="board-canvas-wrap board-canvas-wrap-columns">
       <div ref={scrollAreaRef} className="columns-scroll-area">
         <div ref={columnsBoardRef} className="columns-board">
-        {sortedSections.map((section) => (
-          <ColumnView
-            key={section.id}
-            section={{ id: section.id, title: section.title }}
-            pinned={section.pinned}
-            sectionCards={getCardsForSection(section.id)}
-            canEdit={canEdit}
-            currentRole={currentRole}
-            currentUserId={currentUserId}
-            classroomId={classroomId}
-            sortMode={sortModeById[section.id] ?? "manual"}
-            overSectionId={overSectionId}
-            draggingSectionId={draggingSectionId}
-            cardDropPreview={cardDropPreview}
-            organizing={organizing}
-            authorsForSection={authorsForSection}
-            studentForSectionTitle={studentForSectionTitle}
-            onSetSort={(mode) => setSortFor(section.id, mode)}
-            onPin={(pinned) => handleSectionPin(section.id, pinned)}
-            onSectionDragStart={(id) => setDraggingSectionId(id)}
-            onSectionDragEnd={() => setDraggingSectionId(null)}
-            onCardDragStart={handleDragStart}
-            onCardDragEnd={(e) => {
-              setCardDropPreview(null);
-              handleDragEnd(e);
-            }}
-            onCardDropReorder={handleCardReorder}
-            onDragOver={handleDragOver}
-            onDragEnter={(id) => setOverSectionId(id)}
-            onDragLeave={(e) => {
-              if (!e.currentTarget.contains(e.relatedTarget as Node)) {
-                setOverSectionId(null);
+          {sortedSections.map((section) => (
+            <ColumnView
+              key={section.id}
+              section={{ id: section.id, title: section.title }}
+              pinned={section.pinned}
+              sectionCards={getCardsForSection(section.id)}
+              canEdit={canEdit}
+              currentRole={currentRole}
+              currentUserId={currentUserId}
+              classroomId={classroomId}
+              sortMode={sortModeById[section.id] ?? "manual"}
+              overSectionId={overSectionId}
+              draggingSectionId={draggingSectionId}
+              cardDropPreview={cardDropPreview}
+              organizing={organizing}
+              authorsForSection={authorsForSection}
+              studentForSectionTitle={studentForSectionTitle}
+              onSetSort={(mode) => setSortFor(section.id, mode)}
+              onPin={(pinned) => handleSectionPin(section.id, pinned)}
+              onSectionDragStart={(id) => setDraggingSectionId(id)}
+              onSectionDragEnd={() => setDraggingSectionId(null)}
+              onCardDragStart={handleDragStart}
+              onCardDragEnd={(e) => {
                 setCardDropPreview(null);
+                handleDragEnd(e);
+              }}
+              onCardDropReorder={handleCardReorder}
+              onDragOver={handleDragOver}
+              onDragEnter={(id) => setOverSectionId(id)}
+              onDragLeave={(e) => {
+                if (!e.currentTarget.contains(e.relatedTarget as Node)) {
+                  setOverSectionId(null);
+                  setCardDropPreview(null);
+                }
+              }}
+              onDrop={handleDrop}
+              onCardDropPreview={setCardDropPreview}
+              onClearCardDropPreview={() => setCardDropPreview(null)}
+              onRename={() =>
+                setPanelState({ sectionId: section.id, tab: "rename" })
               }
-            }}
-            onDrop={handleDrop}
-            onCardDropPreview={setCardDropPreview}
-            onClearCardDropPreview={() => setCardDropPreview(null)}
-            onRename={() =>
-              setPanelState({ sectionId: section.id, tab: "rename" })
-            }
-            onDelete={() =>
-              setPanelState({ sectionId: section.id, tab: "delete" })
-            }
-            onFolder={() => setFolderSectionId(section.id)}
-            onExport={() => setExportSectionId(section.id)}
-            onOrganize={() => handleOrganizeToCanva(section.id)}
-            onFeedback={(args) => setFeedbackTarget(args)}
-            onCardOpen={(c) => setOpenCard(c)}
-            onCardEdit={(c) => setEditingCard(c)}
-            onCardEditAuthors={(c) => setAuthorEditCard(c)}
-            onCardDuplicate={handleDuplicateCard}
-            onCardDelete={handleDeleteCard}
-            onAddInColumn={canAddCard ? () => setAddForSection(section.id) : undefined}
-          />
-        ))}
+              onDelete={() =>
+                setPanelState({ sectionId: section.id, tab: "delete" })
+              }
+              onFolder={() => setFolderSectionId(section.id)}
+              onExport={() => setExportSectionId(section.id)}
+              onOrganize={() => handleOrganizeToCanva(section.id)}
+              onFeedback={(args) => setFeedbackTarget(args)}
+              onCardOpen={(c) => setOpenCard(c)}
+              onCardEdit={(c) => setEditingCard(c)}
+              onCardEditAuthors={(c) => setAuthorEditCard(c)}
+              onCardDuplicate={handleDuplicateCard}
+              onCardDelete={handleDeleteCard}
+              onAddInColumn={
+                canAddCard ? () => setAddForSection(section.id) : undefined
+              }
+            />
+          ))}
 
-        {canEdit && (
-          <div className="column-add-stack">
-            <button
-              type="button"
-              className="column-add-btn"
-              onClick={handleAddSection}
-            >
-              + 섹션 추가
-            </button>
-            {classroomId && (
+          {canEdit && (
+            <div className="column-add-stack">
               <button
                 type="button"
-                className="column-add-btn column-add-btn-seed"
-                onClick={() => {
-                  handleSeedFromStudents(
-                    seedingStudents,
-                    setSeedingStudents as React.Dispatch<React.SetStateAction<boolean>>
-                  );
-                }}
-                disabled={seedingStudents}
-                title="학급 학생 명단으로 칼럼을 한 번에 추가"
+                className="column-add-btn"
+                onClick={handleAddSection}
               >
-                {seedingStudents ? "추가 중…" : "🧑 학생 이름으로 칼럼 만들기"}
+                + 섹션 추가
               </button>
-            )}
-          </div>
-        )}
+              {classroomId && (
+                <button
+                  type="button"
+                  className="column-add-btn column-add-btn-seed"
+                  onClick={() => {
+                    handleSeedFromStudents(
+                      seedingStudents,
+                      setSeedingStudents as React.Dispatch<
+                        React.SetStateAction<boolean>
+                      >,
+                    );
+                  }}
+                  disabled={seedingStudents}
+                  title="학급 학생 명단으로 칼럼을 한 번에 추가"
+                >
+                  {seedingStudents
+                    ? "추가 중…"
+                    : "🧑 학생 이름으로 칼럼 만들기"}
+                </button>
+              )}
+            </div>
+          )}
         </div>
       </div>
       <div
@@ -429,10 +438,15 @@ export function ColumnsBoard({
         className={`columns-scrollbar ${scrollRailWidth > 0 ? "is-visible" : ""}`}
         aria-hidden="true"
       >
-        <div className="columns-scrollbar-rail" style={{ width: scrollRailWidth }} />
+        <div
+          className="columns-scrollbar-rail"
+          style={{ width: scrollRailWidth }}
+        />
       </div>
 
-      {canAddCard && <AddCardButton onAdd={handleAdd} sections={sectionOptions} />}
+      {canAddCard && (
+        <AddCardButton onAdd={handleAdd} sections={sectionOptions} />
+      )}
 
       {addForSection && (
         <AddCardModal
@@ -480,8 +494,8 @@ export function ColumnsBoard({
                               : "")
                           : null,
                     }
-                  : c
-              )
+                  : c,
+              ),
             );
           }}
           onClose={() => setAuthorEditCard(null)}
@@ -496,7 +510,9 @@ export function ColumnsBoard({
             ? cards
                 .filter((c) => c.sectionId === openCard.sectionId)
                 .sort(
-                  comparatorFor(sortModeById[openCard.sectionId ?? ""] ?? "manual")
+                  comparatorFor(
+                    sortModeById[openCard.sectionId ?? ""] ?? "manual",
+                  ),
                 )
             : cards
         }
@@ -527,7 +543,9 @@ export function ColumnsBoard({
           sectionTitle={
             sections.find((s) => s.id === folderSectionId)?.title ?? ""
           }
-          onImport={(designs) => handleImportFromCanva(folderSectionId, designs)}
+          onImport={(designs) =>
+            handleImportFromCanva(folderSectionId, designs)
+          }
           onClose={() => setFolderSectionId(null)}
         />
       )}

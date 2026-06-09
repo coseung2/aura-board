@@ -18,7 +18,9 @@
   box-shadow: var(--shadow-card);
   padding: 20px;
   min-height: 140px;
-  transition: box-shadow 180ms ease, border-color 180ms ease;
+  transition:
+    box-shadow 180ms ease,
+    border-color 180ms ease;
 }
 
 .grid-card:hover {
@@ -48,7 +50,9 @@
   border-radius: var(--radius-card);
   box-shadow: var(--shadow-card);
   padding: 20px 24px;
-  transition: box-shadow 180ms ease, border-color 180ms ease;
+  transition:
+    box-shadow 180ms ease,
+    border-color 180ms ease;
 }
 
 .stream-card:hover {
@@ -316,25 +320,32 @@
   display: flex;
   flex-direction: column;
   gap: 0;
-  transition: margin 200ms cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
 /* Drag gap — existing cards slide apart to show where the dragged card
    will land. Applied by ColumnView based on cardDropPreview position. */
-.column-card-drop-wrap.is-gap-before {
-  margin-top: 36px;
+.column-card-drop-placeholder {
+  position: relative;
+  flex: 0 0 auto;
+  overflow: hidden;
+  opacity: 0;
+  transition:
+    height 180ms cubic-bezier(0.2, 0, 0, 1),
+    opacity 140ms ease;
 }
 
-.column-card-drop-wrap.is-gap-after {
-  margin-bottom: 36px;
+.is-gap-before .column-card-drop-placeholder:first-child,
+.is-gap-after .column-card-drop-placeholder:last-child {
+  opacity: 1;
 }
 
 .column-drop-indicator {
   position: relative;
   display: flex;
   align-items: center;
+  height: 100%;
   min-height: 18px;
-  margin: -11px 8px;
+  margin: 0 8px;
   z-index: 3;
   pointer-events: none;
 }
@@ -348,7 +359,9 @@
   box-shadow:
     0 0 0 4px var(--color-accent-tinted-bg),
     0 6px 16px rgba(0, 117, 222, 0.22);
-  transition: height 200ms ease, box-shadow 200ms ease;
+  transition:
+    height 200ms ease,
+    box-shadow 200ms ease;
 }
 
 .is-gap-before .column-drop-indicator-line,
@@ -385,7 +398,10 @@
   padding: 13px 15px 15px;
   box-shadow: var(--shadow-card);
   cursor: grab;
-  transition: box-shadow 150ms ease, border-color 150ms ease, opacity 150ms ease;
+  transition:
+    box-shadow 150ms ease,
+    border-color 150ms ease,
+    opacity 150ms ease;
   user-select: none;
   /* overflow:hidden 의도적으로 미설정 — card-ctx-menu 드롭다운이
      `position:absolute; top:100%`로 카드 아래로 나와야 하는데 hidden은
@@ -514,7 +530,9 @@
   height: 40px;
 }
 
-.column-card:has(.card-attachments):not(:has(.padlet-card-content:not(:empty))) {
+.column-card:has(.card-attachments):not(
+    :has(.padlet-card-content:not(:empty))
+  ) {
   padding-bottom: 12px;
 }
 
@@ -540,7 +558,10 @@
   font-size: 13px;
   font-weight: 600;
   cursor: pointer;
-  transition: border-color 150ms ease, color 150ms ease, background 150ms ease;
+  transition:
+    border-color 150ms ease,
+    color 150ms ease,
+    background 150ms ease;
   text-align: center;
 }
 
@@ -563,7 +584,9 @@
   cursor: pointer;
   min-width: 200px;
   min-height: 48px;
-  transition: border-color 150ms ease, color 150ms ease;
+  transition:
+    border-color 150ms ease,
+    color 150ms ease;
 }
 
 .column-add-btn:hover {
@@ -644,7 +667,9 @@
   font-size: 13px;
   font-weight: 500;
   cursor: pointer;
-  transition: background 150ms ease, border-color 150ms ease;
+  transition:
+    background 150ms ease,
+    border-color 150ms ease;
 }
 
 .dj-header-btn:hover {
@@ -757,7 +782,9 @@
   font-weight: 500;
   font-size: 14px;
   cursor: pointer;
-  transition: background 150ms ease, border-color 150ms ease;
+  transition:
+    background 150ms ease,
+    border-color 150ms ease;
 }
 
 .dj-next-btn:hover {
@@ -940,7 +967,10 @@
   color: var(--color-text-muted);
   cursor: pointer;
   font-family: inherit;
-  transition: background 150ms ease, border-color 150ms ease, color 150ms ease;
+  transition:
+    background 150ms ease,
+    border-color 150ms ease,
+    color 150ms ease;
 }
 
 .dj-ctrl:hover {
@@ -1186,7 +1216,9 @@
   background: var(--color-surface);
   color: var(--color-text);
   cursor: pointer;
-  transition: background 120ms ease, border-color 120ms ease;
+  transition:
+    background 120ms ease,
+    border-color 120ms ease;
 }
 
 .dj-action-btn:hover {
@@ -1938,7 +1970,9 @@
 }
 
 @media (max-width: 640px) {
-  .dj-recap-spotlight { grid-template-columns: 1fr; }
+  .dj-recap-spotlight {
+    grid-template-columns: 1fr;
+  }
 }
 
 .dj-recap-spot {
@@ -2051,7 +2085,9 @@
   font-size: 13px;
 }
 
-.dj-recap-pos.top { color: #c9a227; }
+.dj-recap-pos.top {
+  color: #c9a227;
+}
 
 .dj-recap-songthumb {
   width: 56px;
@@ -2065,7 +2101,9 @@
   font-size: 14px;
 }
 
-.dj-recap-songinfo { min-width: 0; }
+.dj-recap-songinfo {
+  min-width: 0;
+}
 
 .dj-recap-songtitle {
   font-size: 14px;

@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef } from "react";
+import { useEffect, useRef } from "react";
 import type { CardData } from "../DraggableCard";
 import { CardBody } from "../cards/CardBody";
 import { ContextMenu } from "../ContextMenu";
@@ -12,6 +12,7 @@ type CardDropPreview = {
   sectionId: string;
   cardId: string;
   position: "before" | "after";
+  placeholderHeight: number;
 } | null;
 
 type Props = {
@@ -40,7 +41,7 @@ type Props = {
     targetCardId: string,
     sectionId: string,
     dropPosition: "before" | "after",
-    visibleCardIds?: string[]
+    visibleCardIds?: string[],
   ) => void | Promise<void>;
   onDragOver: (e: React.DragEvent) => void;
   onDragEnter: (id: string) => void;
@@ -114,7 +115,7 @@ export function ColumnView(props: Props) {
   const hasCanva = sectionCards.some(
     (c) =>
       c.linkUrl &&
-      (c.linkUrl.includes("canva.link") || c.linkUrl.includes("canva.com"))
+      (c.linkUrl.includes("canva.link") || c.linkUrl.includes("canva.com")),
   );
 
   const sectionStudent = canEdit ? studentForSectionTitle(section.title) : null;
@@ -126,6 +127,55 @@ export function ColumnView(props: Props) {
   // hover target actually changes, not on every onDragOver pixel-event.
   // This prevents redundant re-renders that kill the gap CSS transition.
   const lastPreviewRef = useRef<CardDropPreview>(null);
+  const autoScrollRef = useRef<{
+    el: HTMLElement | null;
+    frame: number | null;
+    pointerY: number;
+  }>({ el: null, frame: null, pointerY: 0 });
+
+  useEffect(() => stopColumnAutoScroll, []);
+
+  function getDragPlaceholderHeight(e: React.DragEvent, fallback: number) {
+    const raw = e.dataTransfer.getData("application/card-height");
+    const parsed = Number(raw);
+    return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+  }
+
+  function startColumnAutoScroll(el: HTMLElement, pointerY: number) {
+    autoScrollRef.current.el = el;
+    autoScrollRef.current.pointerY = pointerY;
+    if (autoScrollRef.current.frame !== null) return;
+
+    const tick = () => {
+      const state = autoScrollRef.current;
+      const scrollEl = state.el;
+      if (!scrollEl) {
+        state.frame = null;
+        return;
+      }
+
+      const rect = scrollEl.getBoundingClientRect();
+      const y = state.pointerY - rect.top;
+      const threshold = 72;
+      let delta = 0;
+      if (y < threshold) {
+        delta = -Math.ceil(((threshold - y) / threshold) * 18);
+      } else if (y > rect.height - threshold) {
+        delta = Math.ceil(((y - (rect.height - threshold)) / threshold) * 18);
+      }
+
+      if (delta !== 0) scrollEl.scrollTop += delta;
+      state.frame = requestAnimationFrame(tick);
+    };
+
+    autoScrollRef.current.frame = requestAnimationFrame(tick);
+  }
+
+  function stopColumnAutoScroll() {
+    const frame = autoScrollRef.current.frame;
+    if (frame !== null) cancelAnimationFrame(frame);
+    autoScrollRef.current = { el: null, frame: null, pointerY: 0 };
+  }
 
   function buildMenuItems() {
     const items: Array<{
@@ -133,18 +183,16 @@ export function ColumnView(props: Props) {
       icon: string;
       onClick: () => void;
       danger?: boolean;
-    }> = [
-      { label: "이름 변경", icon: "✏️", onClick: onRename },
-    ];
+    }> = [{ label: "이름 변경", icon: "✏️", onClick: onRename }];
 
     if (classroomId) {
       const sectionAuthors = authorsForSection(sectionCards);
       const seedRow = sectionStudent
-        ? sectionAuthors.find((s) => s.id === sectionStudent.id) ?? {
+        ? (sectionAuthors.find((s) => s.id === sectionStudent.id) ?? {
             id: sectionStudent.id,
             name: sectionStudent.name,
             number: sectionStudent.number,
-          }
+          })
         : null;
       const modalRoster = seedRow
         ? sectionAuthors.some((s) => s.id === seedRow.id)
@@ -204,8 +252,16 @@ export function ColumnView(props: Props) {
       className="column"
       onDragOver={onDragOver}
       onDragEnter={() => onDragEnter(section.id)}
-      onDragLeave={onDragLeave}
-      onDrop={(e) => onDrop(e, section.id)}
+      onDragLeave={(e) => {
+        if (!e.currentTarget.contains(e.relatedTarget as Node)) {
+          stopColumnAutoScroll();
+        }
+        onDragLeave(e);
+      }}
+      onDrop={(e) => {
+        stopColumnAutoScroll();
+        onDrop(e, section.id);
+      }}
     >
       <div
         className={`column-header ${canEdit ? "is-section-draggable" : ""} ${
@@ -257,21 +313,12 @@ export function ColumnView(props: Props) {
           + 카드 추가
         </button>
       )}
-      <div className="column-cards-scroll"
+      <div
+        className="column-cards-scroll"
         onDragOver={(e) => {
-          // Auto-scroll when dragging in gaps between cards (event doesn't
-          // hit a card element but bubbles through the scroll container).
           const draggedId = e.dataTransfer.getData("application/card-id");
           if (!draggedId) return;
-          const el = e.currentTarget;
-          const rect = el.getBoundingClientRect();
-          const y = e.clientY - rect.top;
-          const threshold = 48;
-          if (y < threshold) {
-            el.scrollTop -= Math.max(2, (threshold - y) / 4);
-          } else if (y > rect.height - threshold) {
-            el.scrollTop += Math.max(2, (y - (rect.height - threshold)) / 4);
-          }
+          startColumnAutoScroll(e.currentTarget, e.clientY);
         }}
       >
         <div
@@ -284,21 +331,37 @@ export function ColumnView(props: Props) {
               currentRole === "owner" ||
               (currentRole === "editor" && c.authorId === currentUserId) ||
               c.studentAuthorId === currentUserId;
+            const isPreviewTarget =
+              cardDropPreview?.sectionId === section.id &&
+              cardDropPreview.cardId === c.id;
+            const beforeHeight =
+              isPreviewTarget && cardDropPreview.position === "before"
+                ? cardDropPreview.placeholderHeight
+                : 0;
+            const afterHeight =
+              isPreviewTarget && cardDropPreview.position === "after"
+                ? cardDropPreview.placeholderHeight
+                : 0;
 
             return (
-              <div key={c.id} className={`column-card-drop-wrap${
+              <div
+                key={c.id}
+                className={`column-card-drop-wrap${
                   cardDropPreview?.sectionId === section.id &&
                   cardDropPreview.cardId === c.id
                     ? cardDropPreview.position === "before"
                       ? " is-gap-before"
                       : " is-gap-after"
                     : ""
-                }`}>
-                {cardDropPreview?.sectionId === section.id &&
-                  cardDropPreview.cardId === c.id &&
-                  cardDropPreview.position === "before" && (
-                    <DropIndicator sortMode={sortMode} />
-                  )}
+                }`}
+              >
+                <div
+                  className="column-card-drop-placeholder"
+                  style={{ height: beforeHeight }}
+                  aria-hidden="true"
+                >
+                  {beforeHeight > 0 && <DropIndicator sortMode={sortMode} />}
+                </div>
                 <article
                   data-column-card-id={c.id}
                   className={`column-card is-clickable ${
@@ -310,11 +373,22 @@ export function ColumnView(props: Props) {
                   style={{ backgroundColor: c.color ?? undefined }}
                   draggable={canEdit}
                   onDragStart={(e) => onCardDragStart(e, c.id)}
-                  onDragEnd={onCardDragEnd}
+                  onDragEnd={(e) => {
+                    stopColumnAutoScroll();
+                    onCardDragEnd(e);
+                  }}
                   onDragOver={(e) => {
                     if (!canEdit) return;
                     e.preventDefault();
-                    const draggedId = e.dataTransfer.getData("application/card-id");
+                    const draggedId = e.dataTransfer.getData(
+                      "application/card-id",
+                    );
+                    const scrollEl = e.currentTarget.closest(
+                      ".column-cards-scroll",
+                    ) as HTMLElement | null;
+                    if (scrollEl) {
+                      startColumnAutoScroll(scrollEl, e.clientY);
+                    }
                     if (!draggedId || draggedId === c.id) {
                       onClearCardDropPreview();
                       lastPreviewRef.current = null;
@@ -326,6 +400,10 @@ export function ColumnView(props: Props) {
                       sectionId: section.id,
                       cardId: c.id,
                       position: y < rect.height / 2 ? "before" : "after",
+                      placeholderHeight: getDragPlaceholderHeight(
+                        e,
+                        rect.height,
+                      ),
                     };
                     // Only update parent state when preview target actually
                     // changes — avoids constant re-renders during drag.
@@ -334,38 +412,25 @@ export function ColumnView(props: Props) {
                       !last ||
                       last.sectionId !== newPreview.sectionId ||
                       last.cardId !== newPreview.cardId ||
-                      last.position !== newPreview.position
+                      last.position !== newPreview.position ||
+                      last.placeholderHeight !== newPreview.placeholderHeight
                     ) {
                       lastPreviewRef.current = newPreview;
                       onCardDropPreview(newPreview);
-                    }
-                    // Auto-scroll: when dragging near the column edge,
-                    // scroll the column-cards-scroll container so the user
-                    // can reach cards hidden above/below the viewport.
-                    const scrollEl = e.currentTarget.closest('.column-cards-scroll') as HTMLElement | null;
-                    if (scrollEl) {
-                      const sRect = scrollEl.getBoundingClientRect();
-                      const sY = e.clientY - sRect.top;
-                      const threshold = 48;
-                      if (sY < threshold) {
-                        scrollEl.scrollTop -= Math.max(2, (threshold - sY) / 4);
-                      } else if (sY > sRect.height - threshold) {
-                        scrollEl.scrollTop += Math.max(2, (sY - (sRect.height - threshold)) / 4);
-                      }
                     }
                   }}
                   onDrop={async (e) => {
                     if (!canEdit) return;
                     e.preventDefault();
                     e.stopPropagation();
+                    stopColumnAutoScroll();
                     const draggedId = e.dataTransfer.getData(
-                      "application/card-id"
+                      "application/card-id",
                     );
                     if (!draggedId || draggedId === c.id) return;
                     const rect = e.currentTarget.getBoundingClientRect();
                     const y = e.clientY - rect.top;
-                    const position =
-                      y < rect.height / 2 ? "before" : "after";
+                    const position = y < rect.height / 2 ? "before" : "after";
                     onClearCardDropPreview();
                     if (sortMode !== "manual") {
                       await onSetSort("manual");
@@ -375,7 +440,7 @@ export function ColumnView(props: Props) {
                       c.id,
                       section.id,
                       position,
-                      sectionCards.map((card) => card.id)
+                      sectionCards.map((card) => card.id),
                     );
                   }}
                   onClick={() => onCardOpen(c)}
@@ -426,16 +491,20 @@ export function ColumnView(props: Props) {
                     </div>
                   )}
                 </article>
-                {cardDropPreview?.sectionId === section.id &&
-                  cardDropPreview.cardId === c.id &&
-                  cardDropPreview.position === "after" && (
-                    <DropIndicator sortMode={sortMode} />
-                  )}
+                <div
+                  className="column-card-drop-placeholder"
+                  style={{ height: afterHeight }}
+                  aria-hidden="true"
+                >
+                  {afterHeight > 0 && <DropIndicator sortMode={sortMode} />}
+                </div>
               </div>
             );
           })}
           {sectionCards.length === 0 && (
-            <div className={`column-empty ${isDropSection ? "is-drop-target" : ""}`}>
+            <div
+              className={`column-empty ${isDropSection ? "is-drop-target" : ""}`}
+            >
               {isDropSection ? "여기에 놓기" : "카드를 여기로 끌어오세요"}
             </div>
           )}
