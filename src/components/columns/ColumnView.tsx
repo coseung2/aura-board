@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, type CSSProperties } from "react";
+import { useRef } from "react";
 import type { CardData } from "../DraggableCard";
 import { CardBody } from "../cards/CardBody";
 import { ContextMenu } from "../ContextMenu";
@@ -300,18 +300,14 @@ export function ColumnView(props: Props) {
                     <DropIndicator sortMode={sortMode} />
                   )}
                 <article
+                  data-column-card-id={c.id}
                   className={`column-card is-clickable ${
                     cardDropPreview?.sectionId === section.id &&
                     cardDropPreview.cardId === c.id
                       ? `is-drop-preview is-drop-preview-${cardDropPreview.position}`
                       : ""
                   }`}
-                  style={
-                    {
-                      backgroundColor: c.color ?? undefined,
-                      viewTransitionName: `column-card-${c.id}`,
-                    } as CSSProperties
-                  }
+                  style={{ backgroundColor: c.color ?? undefined }}
                   draggable={canEdit}
                   onDragStart={(e) => onCardDragStart(e, c.id)}
                   onDragEnd={onCardDragEnd}

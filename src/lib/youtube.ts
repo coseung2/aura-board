@@ -15,6 +15,8 @@ const ALLOWED_HOSTS = new Set([
   "youtube.com",
   "www.youtube.com",
   "m.youtube.com",
+  "youtube-nocookie.com",
+  "www.youtube-nocookie.com",
   "youtu.be",
 ]);
 
@@ -42,10 +44,12 @@ export function extractVideoId(raw: string): string | null {
     return VIDEO_ID_RE.test(id) ? id : null;
   }
 
-  // /shorts/<id>
-  if (u.pathname.startsWith("/shorts/")) {
-    const id = u.pathname.slice("/shorts/".length).split("/")[0];
-    return VIDEO_ID_RE.test(id) ? id : null;
+  // /shorts/<id>, /embed/<id>, /live/<id>
+  for (const prefix of ["/shorts/", "/embed/", "/live/"]) {
+    if (u.pathname.startsWith(prefix)) {
+      const id = u.pathname.slice(prefix.length).split("/")[0];
+      return VIDEO_ID_RE.test(id) ? id : null;
+    }
   }
 
   // /watch?v=<id>

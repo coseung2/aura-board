@@ -43,19 +43,57 @@ type UseCardMutationsReturn = {
   ) => void;
 };
 
-type ViewTransitionDocument = Document & {
-  startViewTransition?: (callback: () => void) => unknown;
-};
+function getColumnCardRects() {
+  if (typeof document === "undefined") return new Map<string, DOMRect>();
 
-function applyCardLayoutTransition(update: () => void) {
-  const startViewTransition = (document as ViewTransitionDocument)
-    .startViewTransition;
-  if (!startViewTransition) {
+  const rects = new Map<string, DOMRect>();
+  document
+    .querySelectorAll<HTMLElement>("[data-column-card-id]")
+    .forEach((el) => {
+      const id = el.dataset.columnCardId;
+      if (id) rects.set(id, el.getBoundingClientRect());
+    });
+  return rects;
+}
+
+function animateColumnCardLayout(update: () => void) {
+  if (typeof document === "undefined") {
     update();
     return;
   }
-  startViewTransition(() => {
-    flushSync(update);
+
+  const before = getColumnCardRects();
+  flushSync(update);
+
+  requestAnimationFrame(() => {
+    const reduceMotion = window.matchMedia?.(
+      "(prefers-reduced-motion: reduce)"
+    ).matches;
+    if (reduceMotion) return;
+
+    document
+      .querySelectorAll<HTMLElement>("[data-column-card-id]")
+      .forEach((el) => {
+        const id = el.dataset.columnCardId;
+        const first = id ? before.get(id) : null;
+        if (!first) return;
+
+        const last = el.getBoundingClientRect();
+        const dx = first.left - last.left;
+        const dy = first.top - last.top;
+        if (Math.abs(dx) < 0.5 && Math.abs(dy) < 0.5) return;
+
+        el.animate(
+          [
+            { transform: `translate(${dx}px, ${dy}px)` },
+            { transform: "translate(0, 0)" },
+          ],
+          {
+            duration: 220,
+            easing: "cubic-bezier(0.2, 0, 0, 1)",
+          }
+        );
+      });
   });
 }
 
@@ -151,7 +189,7 @@ export function useCardMutations({
   async function handleDeleteCard(id: string) {
     if (!window.confirm("이 카드를 삭제할까요?")) return;
     const prevCards: CardData[] = [];
-    applyCardLayoutTransition(() => setCards((list) => {
+    animateColumnCardLayout(() => setCards((list) => {
       prevCards.push(...list);
       return list.filter((c) => c.id !== id);
     }));
@@ -255,7 +293,7 @@ export function useCardMutations({
     let prevCards: CardData[] = [];
     let toSave: Array<{ id: string; order: number; sectionId?: string }> = [];
 
-    applyCardLayoutTransition(() => setCards((list) => {
+    animateColumnCardLayout(() => setCards((list) => {
       prevCards = [...list];
 
       const draggedCard = list.find((c) => c.id === cardId);
