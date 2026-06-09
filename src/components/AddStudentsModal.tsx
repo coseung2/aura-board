@@ -37,14 +37,7 @@ function parseTextInput(text: string): ParsedStudent[] {
     .filter((s): s is ParsedStudent => s !== null);
 }
 
-function parseFileData(
-  XLSX: typeof import("xlsx"),
-  data: ArrayBuffer,
-): ParsedStudent[] {
-  const wb = XLSX.read(data, { type: "array" });
-  const ws = wb.Sheets[wb.SheetNames[0]];
-  const rows = XLSX.utils.sheet_to_json(ws, { header: 1 }) as unknown as unknown[][];
-
+function parseRows(rows: unknown[][]): ParsedStudent[] {
   const students: ParsedStudent[] = [];
   for (const row of rows) {
     if (!row || row.length < 2) continue;
@@ -57,6 +50,20 @@ function parseFileData(
     }
   }
   return students;
+}
+
+function parseCsvData(text: string): ParsedStudent[] {
+  return parseRows(
+    text
+      .split(/\r\n|\n|\r/)
+      .map((line) => line.split(",").map((cell) => cell.trim()))
+  );
+}
+
+async function parseXlsxData(data: ArrayBuffer): Promise<ParsedStudent[]> {
+  const { readSheet } = await import("read-excel-file/browser");
+  const rows = await readSheet(data, 1);
+  return parseRows(rows);
 }
 
 export function AddStudentsModal({ open, classroomId, onClose, onAdded }: Props) {
@@ -93,20 +100,26 @@ export function AddStudentsModal({ open, classroomId, onClose, onAdded }: Props)
     const file = e.target.files?.[0];
     if (!file) return;
     setFileName(file.name);
-    // xlsx is ~400 KB minified. Keep it out of the initial bundle and only
-    // pay the download cost when the teacher actually picks a spreadsheet.
-    const XLSX = await import("xlsx");
+    const isCsv = file.name.toLowerCase().endsWith(".csv");
+    const isXlsx = file.name.toLowerCase().endsWith(".xlsx");
+    if (!isCsv && !isXlsx) {
+      alert("지원하는 파일 형식은 .xlsx, .csv 입니다.");
+      return;
+    }
     const reader = new FileReader();
-    reader.onload = (ev) => {
-      const data = ev.target?.result as ArrayBuffer;
+    reader.onload = async (ev) => {
+      const data = ev.target?.result;
       try {
-        const students = parseFileData(XLSX, data);
+        const students = isCsv
+          ? parseCsvData(String(data ?? ""))
+          : await parseXlsxData(data as ArrayBuffer);
         setFileStudents(students);
       } catch {
         alert("파일을 읽을 수 없습니다. 엑셀 또는 CSV 파일을 확인하세요.");
       }
     };
-    reader.readAsArrayBuffer(file);
+    if (isCsv) reader.readAsText(file);
+    else reader.readAsArrayBuffer(file);
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -193,7 +206,7 @@ export function AddStudentsModal({ open, classroomId, onClose, onAdded }: Props)
               <input
                 ref={fileRef}
                 type="file"
-                accept=".xlsx,.xls,.csv"
+                accept=".xlsx,.csv"
                 onChange={handleFile}
                 style={{ display: "none" }}
               />
