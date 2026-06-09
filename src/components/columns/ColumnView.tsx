@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
+import { flushSync } from "react-dom";
 import type { CardData } from "../DraggableCard";
 import { CardBody } from "../cards/CardBody";
 import { ContextMenu } from "../ContextMenu";
@@ -10,6 +11,7 @@ import type { RosterEntry } from "./useColumnRoster";
 
 type CardDropPreview = {
   sectionId: string;
+  draggedCardId: string;
   cardId: string;
   position: "before" | "after";
   placeholderHeight: number;
@@ -135,12 +137,6 @@ export function ColumnView(props: Props) {
 
   useEffect(() => stopColumnAutoScroll, []);
 
-  function getDragPlaceholderHeight(e: React.DragEvent, fallback: number) {
-    const raw = e.dataTransfer.getData("application/card-height");
-    const parsed = Number(raw);
-    return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
-  }
-
   function startColumnAutoScroll(el: HTMLElement, pointerY: number) {
     autoScrollRef.current.el = el;
     autoScrollRef.current.pointerY = pointerY;
@@ -175,6 +171,80 @@ export function ColumnView(props: Props) {
     const frame = autoScrollRef.current.frame;
     if (frame !== null) cancelAnimationFrame(frame);
     autoScrollRef.current = { el: null, frame: null, pointerY: 0 };
+  }
+
+  function getCardRects() {
+    const rects = new Map<string, DOMRect>();
+    document
+      .querySelectorAll<HTMLElement>("[data-column-card-id]")
+      .forEach((el) => {
+        const id = el.dataset.columnCardId;
+        if (id) rects.set(id, el.getBoundingClientRect());
+      });
+    return rects;
+  }
+
+  function animatePreviewChange(preview: CardDropPreview) {
+    const before = getCardRects();
+    flushSync(() => onCardDropPreview(preview));
+
+    requestAnimationFrame(() => {
+      const reduceMotion = window.matchMedia?.(
+        "(prefers-reduced-motion: reduce)",
+      ).matches;
+      if (reduceMotion) return;
+
+      document
+        .querySelectorAll<HTMLElement>("[data-column-card-id]")
+        .forEach((el) => {
+          const id = el.dataset.columnCardId;
+          const first = id ? before.get(id) : null;
+          if (!first) return;
+
+          const last = el.getBoundingClientRect();
+          const dx = first.left - last.left;
+          const dy = first.top - last.top;
+          if (Math.abs(dx) < 0.5 && Math.abs(dy) < 0.5) return;
+
+          el.animate(
+            [
+              { transform: `translate(${dx}px, ${dy}px)` },
+              { transform: "translate(0, 0)" },
+            ],
+            {
+              duration: 180,
+              easing: "cubic-bezier(0.2, 0, 0, 1)",
+            },
+          );
+        });
+    });
+  }
+
+  function getPreviewCards() {
+    if (
+      !cardDropPreview ||
+      cardDropPreview.sectionId !== section.id ||
+      cardDropPreview.draggedCardId === cardDropPreview.cardId
+    ) {
+      return sectionCards;
+    }
+
+    const dragged = sectionCards.find(
+      (card) => card.id === cardDropPreview.draggedCardId,
+    );
+    if (!dragged) return sectionCards;
+
+    const withoutDragged = sectionCards.filter((card) => card.id !== dragged.id);
+    const targetIndex = withoutDragged.findIndex(
+      (card) => card.id === cardDropPreview.cardId,
+    );
+    if (targetIndex === -1) return sectionCards;
+
+    const insertAt =
+      cardDropPreview.position === "after" ? targetIndex + 1 : targetIndex;
+    const next = [...withoutDragged];
+    next.splice(insertAt, 0, dragged);
+    return next;
   }
 
   function buildMenuItems() {
@@ -326,7 +396,7 @@ export function ColumnView(props: Props) {
             isDropSection ? "column-cards-active" : ""
           }`}
         >
-          {sectionCards.map((c) => {
+          {getPreviewCards().map((c) => {
             const canModify =
               currentRole === "owner" ||
               (currentRole === "editor" && c.authorId === currentUserId) ||
@@ -390,20 +460,16 @@ export function ColumnView(props: Props) {
                       startColumnAutoScroll(scrollEl, e.clientY);
                     }
                     if (!draggedId || draggedId === c.id) {
-                      onClearCardDropPreview();
-                      lastPreviewRef.current = null;
                       return;
                     }
                     const rect = e.currentTarget.getBoundingClientRect();
                     const y = e.clientY - rect.top;
                     const newPreview: CardDropPreview = {
                       sectionId: section.id,
+                      draggedCardId: draggedId,
                       cardId: c.id,
                       position: y < rect.height / 2 ? "before" : "after",
-                      placeholderHeight: getDragPlaceholderHeight(
-                        e,
-                        rect.height,
-                      ),
+                      placeholderHeight: 22,
                     };
                     // Only update parent state when preview target actually
                     // changes — avoids constant re-renders during drag.
@@ -411,12 +477,13 @@ export function ColumnView(props: Props) {
                     if (
                       !last ||
                       last.sectionId !== newPreview.sectionId ||
+                      last.draggedCardId !== newPreview.draggedCardId ||
                       last.cardId !== newPreview.cardId ||
                       last.position !== newPreview.position ||
                       last.placeholderHeight !== newPreview.placeholderHeight
                     ) {
                       lastPreviewRef.current = newPreview;
-                      onCardDropPreview(newPreview);
+                      animatePreviewChange(newPreview);
                     }
                   }}
                   onDrop={async (e) => {

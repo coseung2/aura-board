@@ -23,6 +23,7 @@ type SectionData = StreamSection;
 type PanelTab = "rename" | "delete";
 type CardDropPreview = {
   sectionId: string;
+  draggedCardId: string;
   cardId: string;
   position: "before" | "after";
   placeholderHeight: number;
