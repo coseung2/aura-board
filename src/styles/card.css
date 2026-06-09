@@ -232,6 +232,16 @@
   background: #111827;
 }
 
+.card-attach-media-poster.is-clickable {
+  cursor: pointer;
+}
+
+.card-attach-media-poster.is-clickable:hover {
+  outline: 2px solid var(--color-accent);
+  outline-offset: -2px;
+  border-radius: 8px;
+}
+
 .card-attach-video-poster-img,
 .card-attach-video-placeholder {
   display: block;

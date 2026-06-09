@@ -1,5 +1,6 @@
 "use client";
 
+import { useRef } from "react";
 import type { CardData } from "../DraggableCard";
 import { CardBody } from "../cards/CardBody";
 import { ContextMenu } from "../ContextMenu";
@@ -120,6 +121,11 @@ export function ColumnView(props: Props) {
 
   const menuItems = canEdit ? buildMenuItems() : [];
   const isDropSection = overSectionId === section.id;
+
+  // Throttle drag-preview updates: only call onCardDropPreview when the
+  // hover target actually changes, not on every onDragOver pixel-event.
+  // This prevents redundant re-renders that kill the gap CSS transition.
+  const lastPreviewRef = useRef<CardDropPreview>(null);
 
   function buildMenuItems() {
     const items: Array<{
@@ -251,7 +257,23 @@ export function ColumnView(props: Props) {
           + 카드 추가
         </button>
       )}
-      <div className="column-cards-scroll">
+      <div className="column-cards-scroll"
+        onDragOver={(e) => {
+          // Auto-scroll when dragging in gaps between cards (event doesn't
+          // hit a card element but bubbles through the scroll container).
+          const draggedId = e.dataTransfer.getData("application/card-id");
+          if (!draggedId) return;
+          const el = e.currentTarget;
+          const rect = el.getBoundingClientRect();
+          const y = e.clientY - rect.top;
+          const threshold = 48;
+          if (y < threshold) {
+            el.scrollTop -= Math.max(2, (threshold - y) / 4);
+          } else if (y > rect.height - threshold) {
+            el.scrollTop += Math.max(2, (y - (rect.height - threshold)) / 4);
+          }
+        }}
+      >
         <div
           className={`column-cards ${
             isDropSection ? "column-cards-active" : ""
@@ -294,15 +316,42 @@ export function ColumnView(props: Props) {
                     const draggedId = e.dataTransfer.getData("application/card-id");
                     if (!draggedId || draggedId === c.id) {
                       onClearCardDropPreview();
+                      lastPreviewRef.current = null;
                       return;
                     }
                     const rect = e.currentTarget.getBoundingClientRect();
                     const y = e.clientY - rect.top;
-                    onCardDropPreview({
+                    const newPreview: CardDropPreview = {
                       sectionId: section.id,
                       cardId: c.id,
                       position: y < rect.height / 2 ? "before" : "after",
-                    });
+                    };
+                    // Only update parent state when preview target actually
+                    // changes — avoids constant re-renders during drag.
+                    const last = lastPreviewRef.current;
+                    if (
+                      !last ||
+                      last.sectionId !== newPreview.sectionId ||
+                      last.cardId !== newPreview.cardId ||
+                      last.position !== newPreview.position
+                    ) {
+                      lastPreviewRef.current = newPreview;
+                      onCardDropPreview(newPreview);
+                    }
+                    // Auto-scroll: when dragging near the column edge,
+                    // scroll the column-cards-scroll container so the user
+                    // can reach cards hidden above/below the viewport.
+                    const scrollEl = e.currentTarget.closest('.column-cards-scroll') as HTMLElement | null;
+                    if (scrollEl) {
+                      const sRect = scrollEl.getBoundingClientRect();
+                      const sY = e.clientY - sRect.top;
+                      const threshold = 48;
+                      if (sY < threshold) {
+                        scrollEl.scrollTop -= Math.max(2, (threshold - sY) / 4);
+                      } else if (sY > sRect.height - threshold) {
+                        scrollEl.scrollTop += Math.max(2, (sY - (sRect.height - threshold)) / 4);
+                      }
+                    }
                   }}
                   onDrop={async (e) => {
                     if (!canEdit) return;

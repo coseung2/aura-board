@@ -1,6 +1,6 @@
 "use client";
 
-import { memo } from "react";
+import { memo, useState } from "react";
 import { extractCanvaDesignId, hasCanvaShareToken } from "@/lib/canva";
 import { extractVideoId } from "@/lib/youtube";
 import { shouldPromoteLinkPreview } from "@/lib/card-content-policy";
@@ -55,6 +55,7 @@ type Props = {
 // Memoizing avoids re-rendering attachment previews on every unrelated
 // parent state update (drag, selection, modal toggles, etc.).
 export const CardAttachments = memo(function CardAttachments({ imageUrl, thumbUrl, linkUrl, linkTitle, linkDesc, linkImage, videoUrl, fileUrl, fileName, fileSize, fileMimeType, attachments, variant = "detail", onImageClick }: Props) {
+  const [playedVideoIds, setPlayedVideoIds] = useState<Set<string>>(new Set());
   const allSorted = buildMediaItems({
     attachments,
     imageUrl,
@@ -132,11 +133,16 @@ export const CardAttachments = memo(function CardAttachments({ imageUrl, thumbUr
     videoUrlForFallback: string | null,
     posterUrl?: string | null,
     extraBadge = true,
-    source: "youtube" | "upload" = "upload"
+    source: "youtube" | "upload" = "upload",
+    onClick?: () => void,
   ) => (
     <div
       key={key}
-      className={`card-attach-video card-attach-media-poster card-attach-media-poster-${source}`}
+      className={`card-attach-video card-attach-media-poster card-attach-media-poster-${source}${onClick ? " is-clickable" : ""}`}
+      onClick={onClick ? (e) => { e.stopPropagation(); onClick(); } : undefined}
+      role={onClick ? "button" : undefined}
+      tabIndex={onClick ? 0 : undefined}
+      onKeyDown={onClick ? (e) => { if (e.key === "Enter" || e.key === " ") { e.stopPropagation(); onClick(); } } : undefined}
     >
       {posterUrl ? (
         <img
@@ -157,11 +163,11 @@ export const CardAttachments = memo(function CardAttachments({ imageUrl, thumbUr
       ) : (
         <div className="card-attach-video-placeholder" aria-hidden="true" />
       )}
-      {source === "youtube" ? (
+      {!onClick && source === "youtube" ? (
         <span className="card-attach-youtube-play" aria-hidden="true">
           ▶
         </span>
-      ) : (
+      ) : !onClick ? (
         <>
           <span className="card-attach-video-play" aria-hidden="true">
             ▶
@@ -170,7 +176,7 @@ export const CardAttachments = memo(function CardAttachments({ imageUrl, thumbUr
             동영상
           </span>
         </>
-      )}
+      ) : null}
       {extraBadge && extraCount > 0 && (
         <span className="card-attach-multi-badge" aria-label={`+${extraCount}개 더`}>
           +{extraCount}
@@ -229,13 +235,27 @@ export const CardAttachments = memo(function CardAttachments({ imageUrl, thumbUr
             if (a.kind === "video") {
               if (variant === "thumbnail") {
                 const yt = getYouTubeId(a.url);
-                return renderVideoPoster(
+                if (yt && playedVideoIds.has(a.id)) {
+                  return (
+                    <div key={a.id} className="card-attach-video">
+                      <iframe
+                        src={`https://www.youtube.com/embed/${yt}?autoplay=1`}
+                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                        allowFullScreen
+                        title="YouTube"
+                      />
+                    </div>
+                  );
+                }
+                const poster = renderVideoPoster(
                   a.id,
                   yt ? null : a.url,
                   a.previewUrl ?? (yt ? getYouTubeThumbnailUrl(yt) : null),
                   true,
-                  yt ? "youtube" : "upload"
+                  yt ? "youtube" : "upload",
+                  yt ? () => setPlayedVideoIds((prev) => new Set(prev).add(a.id)) : undefined,
                 );
+                return poster;
               }
               const yt = getYouTubeId(a.url);
               if (yt) {
