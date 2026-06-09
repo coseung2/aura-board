@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useState, type MutableRefObject } from "react";
+import { flushSync } from "react-dom";
 import type { CardData } from "../DraggableCard";
 import type { AddCardData } from "../AddCardModal";
 import type { EditCardUpdates } from "../EditCardModal";
@@ -41,6 +42,22 @@ type UseCardMutationsReturn = {
     setOverSectionId: React.Dispatch<React.SetStateAction<string | null>>
   ) => void;
 };
+
+type ViewTransitionDocument = Document & {
+  startViewTransition?: (callback: () => void) => unknown;
+};
+
+function applyCardLayoutTransition(update: () => void) {
+  const startViewTransition = (document as ViewTransitionDocument)
+    .startViewTransition;
+  if (!startViewTransition) {
+    update();
+    return;
+  }
+  startViewTransition(() => {
+    flushSync(update);
+  });
+}
 
 /**
  * Shared helper: optimistic fetch with local rollback on failure.
@@ -134,10 +151,10 @@ export function useCardMutations({
   async function handleDeleteCard(id: string) {
     if (!window.confirm("이 카드를 삭제할까요?")) return;
     const prevCards: CardData[] = [];
-    setCards((list) => {
+    applyCardLayoutTransition(() => setCards((list) => {
       prevCards.push(...list);
       return list.filter((c) => c.id !== id);
-    });
+    }));
     await trackCardMutation(id, () =>
       optimisticMutate(
         () => fetch(`/api/cards/${id}`, { method: "DELETE" }),
@@ -238,7 +255,7 @@ export function useCardMutations({
     let prevCards: CardData[] = [];
     let toSave: Array<{ id: string; order: number; sectionId?: string }> = [];
 
-    setCards((list) => {
+    applyCardLayoutTransition(() => setCards((list) => {
       prevCards = [...list];
 
       const draggedCard = list.find((c) => c.id === cardId);
@@ -322,7 +339,7 @@ export function useCardMutations({
         const o = orderMap.get(c.id);
         return o !== undefined ? { ...c, order: o } : c;
       });
-    });
+    }));
 
     if (toSave.length === 0) return;
 

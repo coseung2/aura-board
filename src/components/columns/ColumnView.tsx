@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef } from "react";
+import { useRef, type CSSProperties } from "react";
 import type { CardData } from "../DraggableCard";
 import { CardBody } from "../cards/CardBody";
 import { ContextMenu } from "../ContextMenu";
@@ -306,7 +306,12 @@ export function ColumnView(props: Props) {
                       ? `is-drop-preview is-drop-preview-${cardDropPreview.position}`
                       : ""
                   }`}
-                  style={{ backgroundColor: c.color ?? undefined }}
+                  style={
+                    {
+                      backgroundColor: c.color ?? undefined,
+                      viewTransitionName: `column-card-${c.id}`,
+                    } as CSSProperties
+                  }
                   draggable={canEdit}
                   onDragStart={(e) => onCardDragStart(e, c.id)}
                   onDragEnd={onCardDragEnd}

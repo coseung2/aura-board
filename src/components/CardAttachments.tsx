@@ -17,6 +17,13 @@ function getYouTubeThumbnailUrl(videoId: string): string {
   return `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`;
 }
 
+function hasSameYouTubeId(a?: string | null, b?: string | null): boolean {
+  if (!a || !b) return false;
+  const aId = getYouTubeId(a);
+  const bId = getYouTubeId(b);
+  return Boolean(aId && bId && aId === bId);
+}
+
 type AttachmentItem = {
   id: string;
   kind: string;
@@ -101,8 +108,11 @@ export const CardAttachments = memo(function CardAttachments({ imageUrl, thumbUr
   const linkedYouTubeAlreadyInMedia = Boolean(
     linkUrl &&
       linkYouTubeId &&
-      (videoUrl === linkUrl ||
-        allSorted.some((item) => item.kind === "video" && item.url === linkUrl))
+      ((!hasAttachments && effectiveVideoUrl === linkUrl) ||
+        hasSameYouTubeId(videoUrl, linkUrl) ||
+        allSorted.some(
+          (item) => item.kind === "video" && hasSameYouTubeId(item.url, linkUrl)
+        ))
   );
   const linkCountsAsAdditionalMedia = Boolean(
     linkUrl &&
