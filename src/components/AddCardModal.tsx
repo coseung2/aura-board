@@ -68,9 +68,9 @@ const FILE_ACCEPT =
   "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet," +
   "application/vnd.openxmlformats-officedocument.presentationml.presentation," +
   "application/x-hwp,application/haansofthwp,application/vnd.hancom.hwp,application/vnd.hancom.hwpx," +
-  "text/plain,text/html,application/zip,application/x-zip-compressed," +
+  "text/plain,text/markdown,text/x-markdown,text/html,application/zip,application/x-zip-compressed," +
   "audio/mpeg,audio/wav,audio/ogg,audio/mp4,audio/aac,audio/flac,audio/webm," +
-  ".pdf,.docx,.xlsx,.pptx,.hwp,.hwpx,.txt,.html,.htm,.zip,.mp3,.wav,.ogg,.m4a,.aac,.flac,.webm";
+  ".pdf,.docx,.xlsx,.pptx,.hwp,.hwpx,.txt,.md,.markdown,.html,.htm,.zip,.mp3,.wav,.ogg,.m4a,.aac,.flac,.webm";
 
 export function AddCardModal({
   onAdd,
