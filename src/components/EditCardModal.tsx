@@ -40,12 +40,20 @@ type Props = {
   onClose: () => void;
 };
 
+// useCardMutations의 optimistic update에서 id로 그대로 흘러가지 않도록
+// legacy 형식 tempId는 안전한 임시 id로 치환. server는 createMany로 새 row를
+// 만들어 실제 id를 다시 내려보내므로 이 가짜 id는 UI 렌더 키 용도로만 쓰임.
+function safeAttachmentId(tempId: string, idx: number): string {
+  if (!tempId) return `tmp-${idx}`;
+  return tempId.startsWith("legacy-") ? `tmp-${idx}` : tempId;
+}
+
 function toInitialAttachments(card: CardData): AttachmentDraft[] {
   const normalized: AttachmentDraft[] = (card.attachments ?? [])
     .filter((a) => a.kind === "image" || a.kind === "video" || a.kind === "file")
     .sort((a, b) => a.order - b.order)
-    .map((a) => ({
-      tempId: a.id,
+    .map((a, idx) => ({
+      tempId: a.id && !a.id.startsWith("legacy-") ? a.id : `tmp-${idx}`,
       kind: a.kind as AttachmentDraft["kind"],
       url: a.url,
       previewUrl: a.previewUrl ?? null,
@@ -57,21 +65,21 @@ function toInitialAttachments(card: CardData): AttachmentDraft[] {
   // 레거시 imageUrl만 있는 카드도 다중 첨부 편집 UI에서 그대로 보이게 한다.
   if (card.imageUrl && !normalized.some((a) => a.kind === "image" && a.url === card.imageUrl)) {
     normalized.unshift({
-      tempId: `legacy-image-${card.id}`,
+      tempId: `tmp-legacy-${card.id}`,
       kind: "image",
       url: card.imageUrl,
     });
   }
   if (card.videoUrl && !normalized.some((a) => a.kind === "video" && a.url === card.videoUrl)) {
     normalized.push({
-      tempId: `legacy-video-${card.id}`,
+      tempId: `tmp-legacy-video-${card.id}`,
       kind: "video",
       url: card.videoUrl,
     });
   }
   if (card.fileUrl && !normalized.some((a) => a.kind === "file" && a.url === card.fileUrl)) {
     normalized.push({
-      tempId: `legacy-file-${card.id}`,
+      tempId: `tmp-legacy-file-${card.id}`,
       kind: "file",
       url: card.fileUrl,
       fileName: card.fileName ?? undefined,

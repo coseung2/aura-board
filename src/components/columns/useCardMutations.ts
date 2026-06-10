@@ -217,7 +217,11 @@ export function useCardMutations({
     const optimisticUpdates: Partial<CardData> = { ...restUpdates };
     if (updateAttachments) {
       optimisticUpdates.attachments = updateAttachments.map((a, idx) => ({
-        id: a.tempId,
+        // legacy-image-*/tmp-* 같은 비-Prisma id가 카드 state로 흘러가지 않도록
+        // 안전 id로 치환. server는 createMany로 실제 id를 다시 내려보냄.
+        id: a.tempId && !a.tempId.startsWith("legacy-") && !a.tempId.startsWith("tmp-")
+          ? a.tempId
+          : `opt-${idx}-${a.kind}`,
         kind: a.kind,
         url: a.url,
         previewUrl: a.previewUrl ?? null,
