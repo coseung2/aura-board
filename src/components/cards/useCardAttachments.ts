@@ -105,6 +105,7 @@ export function useCardAttachments(initialAttachments: AttachmentDraft[] = []) {
   }
 
   function removeAttachment(tempId: string) {
+    if (!tempId) return;
     setAttachments((prev) => {
       const next = prev.filter((a) => a.tempId !== tempId);
       attachmentsRef.current = next;
@@ -116,6 +117,7 @@ export function useCardAttachments(initialAttachments: AttachmentDraft[] = []) {
    *  트랜잭션이 배열 인덱스로 매긴다(AddCardModal → payloadAttachments →
    *  /api/cards에서 idx를 order로 사용). */
   function moveAttachment(tempId: string, dir: -1 | 1) {
+    if (!tempId) return;
     setAttachments((prev) => {
       const idx = prev.findIndex((a) => a.tempId === tempId);
       if (idx < 0) return prev;
