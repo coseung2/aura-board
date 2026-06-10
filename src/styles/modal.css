@@ -220,7 +220,12 @@
    the thumbnail occupy the available viewing pane. */
 .card-detail-media .card-link-preview {
   width: min(100%, 980px);
-  height: min(100%, 760px);
+  /* height는 더 이상 min(100%, 760px) 강제 안 함 — 같은 컨테이너에 영상/이미지가
+     같이 있을 때 형제(flex item)의 height 압축에 쫓겨 link-preview-image가
+     컴팩트(112px)로 줄어드는 증상 방지. flex-shrink:0 + min-height로 자연
+     높이를 보장하고 컨테이너가 모자라면 scroll. */
+  flex: 0 0 auto;
+  min-height: 280px;
   margin: auto;
   border: 1px solid var(--color-border);
   background: var(--color-surface);
@@ -237,7 +242,9 @@
 .card-detail-media .card-link-preview-image {
   width: 100%;
   flex: 1 1 auto;
-  min-height: 0;
+  /* min-height:0 → flex item이 컨텐츠보다 작게 압축 가능했던 게 컴팩트 잘림의
+     직접 원인. min-height로 자연 높이를 보장. */
+  min-height: 200px;
   height: auto;
   max-height: none;
   background: var(--color-bg);
