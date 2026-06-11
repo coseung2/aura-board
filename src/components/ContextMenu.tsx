@@ -48,16 +48,37 @@ export function ContextMenu({ items }: Props) {
     function recompute() {
       const r = triggerRef.current?.getBoundingClientRect();
       if (!r) return;
+      // Default: dropdown opens BELOW the trigger (right-aligned). When
+      // the trigger sits near the bottom of the viewport the dropdown
+      // would otherwise spill past the window edge and get clipped by
+      // any ancestor overflow:hidden (or simply by the viewport itself).
+      // Flip to above the trigger in that case.
+      //
+      // The dropdown height isn't known until it has mounted, so we
+      // measure it via dropdownRef on the first frame and again on
+      // scroll/resize. Until we have a measurement we default to the
+      // below position; the next recompute pass will flip if needed.
+      const ddHeight = dropdownRef.current?.offsetHeight ?? 0;
+      const margin = 8;
+      const below = r.bottom + 4;
+      const wouldOverflow = below + ddHeight + margin > window.innerHeight;
+      const top = wouldOverflow
+        ? Math.max(margin, r.top - 4 - ddHeight)
+        : below;
       // 드롭다운 우측 정렬: 메뉴 right 엣지를 트리거 right 엣지에 맞춤.
       // transform: translateX(-100%) 를 쓰면 menuIn 키프레임의 transform 이
       // 그걸 덮어써서 애니메이션 중 좌→우 점프 플리커가 발생 — 그래서 위치를
       // 순수 right 오프셋으로 잡는다.
-      setPos({ top: r.bottom + 4, right: window.innerWidth - r.right });
+      setPos({ top, right: window.innerWidth - r.right });
     }
     recompute();
+    // Re-measure after the dropdown has had a frame to paint, so
+    // ddHeight in recompute() is the real value rather than 0.
+    const raf = requestAnimationFrame(recompute);
     window.addEventListener("scroll", recompute, true);
     window.addEventListener("resize", recompute);
     return () => {
+      cancelAnimationFrame(raf);
       window.removeEventListener("scroll", recompute, true);
       window.removeEventListener("resize", recompute);
     };
