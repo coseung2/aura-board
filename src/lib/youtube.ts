@@ -279,26 +279,43 @@ export async function fetchYouTubeChannelMeta(
   if (!handle) return null;
 
   let res: Response;
-  try {
-    res = await fetch(handle.canonicalUrl, {
-      method: "GET",
-      redirect: "follow",
-      headers: {
-        // Desktop Chrome is the User-Agent YouTube's public HTML bundle is
-        // tuned for; mobile UAs get a different shell that hides og:.
-        "User-Agent":
-          "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
-        "Accept-Language": "ko-KR,ko;q=0.9,en;q=0.8",
-        Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-      },
-      // Public pages tolerate 24h cache just like oEmbed.
-      next: { revalidate: 86400 },
-    });
-  } catch {
-    return null;
+  // Two-step fetch with a short retry: Vercel serverless cold starts
+  // routinely push a single fetch over the 10s upstream timeout (the
+  // handler itself is warming up while the request races the deadline),
+  // and YouTube occasionally drops a request on the first try. A single
+  // transparent retry covers both without masking a real "page is down"
+  // failure, which still surfaces as null on the second miss.
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      res = await fetch(handle.canonicalUrl, {
+        method: "GET",
+        redirect: "follow",
+        headers: {
+          // Desktop Chrome is the User-Agent YouTube's public HTML bundle is
+          // tuned for; mobile UAs get a different shell that hides og:.
+          "User-Agent":
+            "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+          "Accept-Language": "ko-KR,ko;q=0.9,en;q=0.8",
+          Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        },
+        // 15s upstream budget: YouTube's HTML bundle is well under that
+        // on a warm handler, but a cold start that also has to load
+        // sharp/@vercel/blob can still need ~12s before the fetch is
+        // even fired. Past 15s we give up and let the negative cache
+        // absorb the failure (5 min TTL — see preview-cache.ts).
+        signal: AbortSignal.timeout(15000),
+        // Public pages tolerate 24h cache just like oEmbed.
+        next: { revalidate: 86400 },
+      });
+      break;
+    } catch (err) {
+      if (attempt === 1) return null;
+      // brief backoff before the retry so we don't slam YouTube on
+      // transient network blips
+      await new Promise((r) => setTimeout(r, 1500));
+    }
   }
-
-  if (!res.ok) return null;
+  if (!res!) return null;
 
   // Hard cap to keep this endpoint from being abused as an open proxy.
   const MAX_HTML_BYTES = 200 * 1024;
