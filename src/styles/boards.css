@@ -152,6 +152,20 @@
   padding: 0 32px 0 0;
 }
 
+/* Right-edge safe area for non-editor/student column boards.
+   Teacher/editor views already have .column-add-stack after the last
+   column, which naturally creates enough horizontal scroll room on the
+   right. Student/share views omit that add-column affordance, so the
+   last column can sit flush against the tablet viewport edge; the card
+   ⋯ trigger/dropdown then gets clipped or becomes hard to tap. Add a
+   synthetic flex spacer only when the add stack is absent. */
+.columns-board:not(:has(.column-add-stack))::after {
+  content: "";
+  flex: 0 0 clamp(96px, 18vw, 220px);
+  height: 1px;
+  pointer-events: none;
+}
+
 .column {
   flex: 0 0 312px;
   min-width: 312px;
