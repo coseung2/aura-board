@@ -312,13 +312,38 @@ export async function fetchYouTubeChannelMeta(
       });
       break;
     } catch (err) {
-      if (attempt === 1) return null;
+      if (attempt === 1) {
+        // Direct fetch failed twice (most likely abort/timeout from
+        // Vercel cold start or transient network). Fall back to Jina
+        // Reader — its wider residential IP pool usually succeeds
+        // where Vercel's small egress range is being rate-limited by
+        // YouTube's anti-bot.
+        const jinaHtml = await fetchYouTubeChannelMetaViaJina(
+          handle.canonicalUrl
+        );
+        if (jinaHtml) {
+          return parseYouTubeChannelHtml(jinaHtml, handle.canonicalUrl);
+        }
+        return null;
+      }
       // brief backoff before the retry so we don't slam YouTube on
       // transient network blips
       await new Promise((r) => setTimeout(r, 1500));
     }
   }
   if (!res!) return null;
+
+  if (res.status === 429 || res.status === 403) {
+    // Vercel's egress IP pool is small enough that YouTube's anti-bot
+    // sometimes 429s the cold-starting function. Fall back to Jina
+    // Reader, which has a much wider residential IP mix and a generous
+    // free tier (r.jina.ai serves raw HTML in plain text).
+    const jinaHtml = await fetchYouTubeChannelMetaViaJina(handle.canonicalUrl);
+    if (jinaHtml) {
+      return parseYouTubeChannelHtml(jinaHtml, handle.canonicalUrl);
+    }
+    return null;
+  }
 
   // Hard cap to keep this endpoint from being abused as an open proxy.
   const MAX_HTML_BYTES = 200 * 1024;
@@ -336,6 +361,16 @@ export async function fetchYouTubeChannelMeta(
   }
   reader.cancel();
 
+  return parseYouTubeChannelHtml(html, handle.canonicalUrl);
+}
+
+// Parse a YouTube channel page HTML bundle (whether fetched directly
+// or via Jina Reader fallback) into the YouTubeChannelMeta shape.
+// Exported for testability and reuse from the Jina fallback path.
+export function parseYouTubeChannelHtml(
+  html: string,
+  canonicalUrl: string
+): YouTubeChannelMeta | null {
   // <title> is the most reliable channel name source when og:title strips
   // the " - YouTube" suffix.
   const rawTitle = readMetaFromChannelHtml(html, "og:title");
@@ -370,11 +405,41 @@ export async function fetchYouTubeChannelMeta(
   // marker we conservatively treat the only image as a banner and leave
   // thumbnailUrl null so the UI knows not to crop a square avatar from it.
   return {
-    canonicalUrl: handle.canonicalUrl,
+    canonicalUrl,
     title: cleanTitle,
     thumbnailUrl: null,
     bannerUrl: banner,
     description: description ? description.slice(0, 280) : null,
     authorName: cleanTitle,
   };
+}
+
+// Jina Reader (r.jina.ai) is a free, no-auth proxy that fetches a URL
+// from its own IP pool and returns either the rendered markdown or
+// (with X-Return-Format: html) the raw HTML. We use it as a fallback
+// when YouTube's anti-bot is rate-limiting Vercel's egress IP range.
+//
+// Returns the raw HTML on success, or null on any failure (Jina is
+// best-effort; we never want its outage to break the primary path).
+async function fetchYouTubeChannelMetaViaJina(
+  canonicalUrl: string
+): Promise<string | null> {
+  try {
+    const r = await fetch(`https://r.jina.ai/${canonicalUrl}`, {
+      method: "GET",
+      redirect: "follow",
+      headers: {
+        // X-Return-Format: html keeps og: meta intact. Default is
+        // markdown which strips <meta> tags. X-Respond-With: no-markdown
+        // also works but X-Return-Format is the documented option.
+        "X-Return-Format": "html",
+        Accept: "text/html,application/xhtml+xml",
+      },
+      signal: AbortSignal.timeout(12000),
+    });
+    if (!r.ok) return null;
+    return await r.text();
+  } catch {
+    return null;
+  }
 }
