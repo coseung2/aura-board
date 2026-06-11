@@ -417,7 +417,18 @@ export function AddCardModal({
                 <div className="link-preview-card">
                   {preview.image && (
                     <div className="link-preview-card-image optimized-img-wrap">
-                      <OptimizedImage src={preview.image} alt="" sizes="160px" />
+                      {/* unoptimized: preview.image is already our
+                          /api/link-preview/image proxy URL (Google User
+                          Content blocked next/image's optimizer fetch
+                          from the Vercel edge for channel avatars).
+                          Bypassing the optimizer is safe — the proxy
+                          already enforces size + content-type limits. */}
+                      <OptimizedImage
+                        src={preview.image}
+                        alt=""
+                        sizes="160px"
+                        unoptimized
+                      />
                     </div>
                   )}
                   <div className="link-preview-card-body">

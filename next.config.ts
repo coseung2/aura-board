@@ -26,6 +26,12 @@ const nextConfig: NextConfig = {
       // YouTube thumbnails (used for video preview posters)
       { protocol: "https", hostname: "i.ytimg.com", pathname: "/**" },
       { protocol: "https", hostname: "img.youtube.com", pathname: "/**" },
+      // YouTube channel / user avatars served from Google User Content.
+      // Channels resolve their og:image to yt3.googleusercontent.com
+      // (900x900 etc.), so without this pattern every channel link
+      // preview fails next/image's optimizer fetch and falls back to
+      // the "이미지를 불러올 수 없어요" placeholder.
+      { protocol: "https", hostname: "yt3.googleusercontent.com", pathname: "/**" },
       // External generated thumbnails used by saved link previews.
       { protocol: "https", hostname: "**.cloudfront.net", pathname: "/**" },
       // Vercel Blob — Canva publisher PNGs and other uploaded assets.
