@@ -11,7 +11,7 @@ import {
   proxiedCanvaThumbnailUrl,
 } from "@/lib/canva";
 import { resolveCanvaEmbedUrlCached } from "@/lib/canva-preview-cache";
-import { extractVideoId, fetchYouTubeMeta, canonicalUrl } from "@/lib/youtube";
+import { extractVideoId, fetchYouTubeMeta, canonicalUrl, extractChannelHandle, fetchYouTubeChannelMeta } from "@/lib/youtube";
 import { setCardAuthors } from "@/lib/card-authors-service";
 import { requireShareAuth } from "@/lib/share/with-share";
 import { isAllowedFileUrl, isAllowedStoredMime, MAX_ATTACHMENTS_PER_CARD } from "@/lib/file-attachment";
@@ -252,6 +252,44 @@ export async function POST(req: Request) {
           // oEmbed failed (private / deleted / rate-limited). Keep raw URL,
           // no preview. Matches pre-enrichment behaviour.
           linkUrl = canonicalUrl(videoId);
+        }
+      } else {
+        // Not a video URL — but it might still be a YouTube channel,
+        // @handle, /c/<custom> or /user/<legacy> URL. Those don't have a
+        // public oEmbed endpoint, so we fetch the public channel page and
+        // pull og:title / og:image / og:description. The card UI renders
+        // these as a regular link preview (no inline embed) — same shape
+        // as a Canva or arbitrary web link.
+        const channel = extractChannelHandle(linkUrl);
+        if (channel) {
+          const channelMeta = await fetchYouTubeChannelMeta(channel.canonicalUrl);
+          if (channelMeta) {
+            linkUrl = channelMeta.canonicalUrl;
+            if (input.linkTitle === undefined) linkTitle = channelMeta.title;
+            if (input.linkDesc === undefined) {
+              linkDesc = channelMeta.description ?? null;
+            }
+            // Banner is exposed as linkImage so the existing card-link-
+            // preview component renders it without any new code path.
+            // We don't run it through sharp — channel banners are wide
+            // (1546x423 / 2560x1440 etc.) and 640x360 cover-fit would crop
+            // the avatar out of frame. The /api/link-preview proxy sets
+            // the same <img> src so CORS / hotlink defences are handled
+            // the same way as for any other generic link preview.
+            const banner = channelMeta.bannerUrl;
+            if (banner && input.linkImage === undefined) {
+              linkImage = `/api/link-preview/image?url=${encodeURIComponent(
+                banner
+              )}&referer=${encodeURIComponent(channelMeta.canonicalUrl)}`;
+            }
+          } else {
+            // Channel meta fetch failed (private / 404 / rate limited).
+            // Keep the user-supplied URL canonical so we don't lose the
+            // share target. Title/desc/image stay as the client sent
+            // them (which on a fresh card is empty — the user will see
+            // just the URL until they refresh the preview).
+            linkUrl = channel.canonicalUrl;
+          }
         }
       }
     }

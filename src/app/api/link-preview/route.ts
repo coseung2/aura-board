@@ -9,6 +9,10 @@ import {
 } from "@/lib/canva";
 import { resolveCanvaEmbedUrlCached } from "@/lib/canva-preview-cache";
 import { getPreviewCache, setPreviewCache } from "@/lib/preview-cache";
+import {
+  extractChannelHandle,
+  fetchYouTubeChannelMeta,
+} from "@/lib/youtube";
 
 type LinkPreviewPayload = {
   title: string | null;
@@ -180,6 +184,63 @@ export async function GET(req: Request) {
           description: null,
           image: derivedImage,
         };
+        await setPreviewCache("link-preview", url, payload, true);
+        return NextResponse.json(payload);
+      }
+    }
+
+    // YouTube channel / @handle / custom / user URL.
+    // extractVideoId() is short-circuited by extractChannelHandle() so a
+    // genuine watch URL still falls through to the video oEmbed branch
+    // inside /api/cards. Here we treat the channel page as a generic
+    // metadata scrape: og:title / og:image / og:description.
+    if (extractChannelHandle(url)) {
+      // Cache the raw channel-meta fetch separately so the "no description"
+      // outcome (genuine negative cache) doesn't poison the image cache
+      // for sites we later add to the same kind.
+      const channelCached = await getPreviewCache<{
+        title: string | null;
+        description: string | null;
+        image: string | null;
+      }>("link-preview-youtube-channel", url);
+      if (channelCached.hit) {
+        if (channelCached.status === "ok") return NextResponse.json(channelCached.payload);
+        return NextResponse.json({ title: null, description: null, image: null });
+      }
+
+      const meta = await fetchYouTubeChannelMeta(url);
+      if (!meta) {
+        await setPreviewCache(
+          "link-preview-youtube-channel",
+          url,
+          null,
+          false,
+          "channel_fetch_failed"
+        );
+        // Fall through to the generic HTML scrape below. Most YouTube
+        // channel pages do serve og: meta even when our stripped-down
+        // helper can't pick it out, so this is a strictly-better UX than
+        // returning empty.
+      } else {
+        // Channel banners are wide (2560x1440 / 1546x423 etc.) and DO NOT
+        // survive the 640x360 sharp cover-fit that we use for OG images
+        // (it would crop to a centre band and lose the avatar). Skip the
+        // sharp pipeline and let the client load the original banner
+        // through the proxy. We still cache the proxy URL (computed
+        // lazily) so future reads short-circuit before any upstream call.
+        const banner = meta.bannerUrl;
+        const image = banner
+          ? `/api/link-preview/image?url=${encodeURIComponent(
+              banner
+            )}&referer=${encodeURIComponent(meta.canonicalUrl)}`
+          : null;
+        const payload = {
+          title: meta.title,
+          description: meta.description,
+          image,
+        };
+        await setPreviewCache("link-preview-youtube-channel", url, payload, true);
+        // Also warm the generic cache so a follow-up call short-circuits.
         await setPreviewCache("link-preview", url, payload, true);
         return NextResponse.json(payload);
       }

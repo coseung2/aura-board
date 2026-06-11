@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { extractVideoId } from "@/lib/youtube";
 import {
   hasPrimaryNonLinkContent,
+  isYouTubeChannelLink,
   isYouTubeLink,
   shouldPromoteLinkPreview,
 } from "@/lib/card-content-policy";
@@ -116,7 +117,15 @@ export function CardDetailModal({
 
   if (!card) return null;
 
-  const showOriginalLink = Boolean(card.linkUrl && !extractVideoId(card.linkUrl));
+  // YouTube channel URLs render as a regular link preview (banner + name
+  // + description), not an inline iframe. Suppress the "원본 링크 열기"
+  // button on those cards the same way we do for any other link-preview
+  // card — the preview itself is the link, an extra "open" button is
+  // noise. (Canva keeps the button because its embed is an iframe and the
+  // banner alone is not clickable to the design.)
+  const isChannel = isYouTubeChannelLink(card.linkUrl);
+  const showOriginalLink =
+    Boolean(card.linkUrl && !extractVideoId(card.linkUrl) && !isChannel);
   const policyInput = {
     imageUrl: card.imageUrl,
     linkUrl: card.linkUrl,
