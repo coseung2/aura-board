@@ -345,11 +345,160 @@
   vertical-align: -0.1em;
 }
 
-/* 여러 파일/이미지가 쌓여 모달이 비대해지는 것 방지 — 첨부별 상한. */
+/* 여러 파일/이미지가 쌓여 모달이 비대해지는 것 방지 — 첨부별 상한.
+   media-attach-carousel (2026-06-12): 항목 ≥ 2 일 때 .card-attachments 안에서
+   carousel 컨테이너로 감싸 렌더되므로 column 방향은 그대로. carousel 자체는
+   미디어 영역(검은 배경)을 꽉 채움. */
 .card-detail-media .card-attachments {
   display: flex;
   flex-direction: column;
   gap: 12px;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+}
+
+/* media-attach-carousel (2026-06-12): 슬라이드 컨테이너. 검은 미디어
+   영역을 그대로 사용. arrow/dot/indicator 모두 absolute로 슬라이드 위에
+   떠 있고, 스크롤 없이 단일 화면에서 항목 1개만 표시. */
+.card-attach-carousel {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.card-attach-carousel-viewport {
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.card-attach-carousel-viewport > * {
+  max-width: 100%;
+  max-height: 100%;
+}
+
+/* carousel 내 이미지는 부모가 viewport이므로 .is-detail 의 max-height:
+   70vh 가 오히려 슬라이드를 작게 만들 수 있어 object-fit 으로 컨테인.
+   기존 detail 단일 표시(.card-detail-media .card-attach-image.is-detail)엔
+   영향 없도록 carousel 스코프 안에서만 덮어씀. */
+.card-attach-carousel-viewport .card-attach-image.is-detail {
+  max-width: 100%;
+  max-height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.card-attach-carousel-viewport .card-attach-image.is-detail img {
+  max-width: 100%;
+  max-height: 100%;
+  width: auto;
+  height: auto;
+  object-fit: contain;
+}
+
+.card-attach-carousel-viewport .card-attach-video {
+  width: 100%;
+  max-width: 100%;
+  max-height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.card-attach-carousel-viewport .card-attach-video iframe,
+.card-attach-carousel-viewport .card-attach-video video {
+  width: 100%;
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+}
+
+.card-attach-carousel-viewport .card-attach-file-wrap {
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 12px;
+  padding: 24px;
+  color: #f5f5f5;
+}
+
+.card-attach-carousel-arrow {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  background: rgba(0, 0, 0, 0.45);
+  color: #fff;
+  font-size: 22px;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  z-index: 3;
+  padding: 0;
+  transition: background 120ms ease, transform 120ms ease;
+}
+
+.card-attach-carousel-arrow:hover {
+  background: rgba(0, 0, 0, 0.7);
+}
+
+.card-attach-carousel-arrow-prev {
+  left: 12px;
+}
+
+.card-attach-carousel-arrow-next {
+  right: 12px;
+}
+
+.card-attach-carousel-indicator {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 3;
+  pointer-events: none;
+}
+
+.card-attach-carousel-dots {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.45);
+  pointer-events: auto;
+}
+
+.card-attach-carousel-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(255, 255, 255, 0.4);
+  cursor: pointer;
+  padding: 0;
+  transition: background 120ms ease, transform 120ms ease;
+}
+
+.card-attach-carousel-dot.is-active {
+  background: #fff;
+  transform: scale(1.15);
 }
 
 /* detail 모드 이미지는 OptimizedImage(fill)가 아니라 plain <img> 로 렌더됨.

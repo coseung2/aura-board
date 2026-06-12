@@ -1,6 +1,6 @@
 "use client";
 
-import { memo, useState } from "react";
+import { memo, useEffect, useState } from "react";
 import { extractCanvaDesignId, hasCanvaShareToken } from "@/lib/canva";
 import { extractVideoId } from "@/lib/youtube";
 import { shouldPromoteLinkPreview } from "@/lib/card-content-policy";
@@ -63,6 +63,9 @@ type Props = {
 // parent state update (drag, selection, modal toggles, etc.).
 export const CardAttachments = memo(function CardAttachments({ imageUrl, thumbUrl, linkUrl, linkTitle, linkDesc, linkImage, videoUrl, fileUrl, fileName, fileSize, fileMimeType, attachments, variant = "detail", onImageClick }: Props) {
   const [playedVideoIds, setPlayedVideoIds] = useState<Set<string>>(new Set());
+  // media-attach-carousel (2026-06-12): detail 모드에서 media 항목이 2개
+  // 이상이면 슬라이드 + 인디케이터로 전환. 단일 항목은 기존 표시 유지.
+  const [mediaIndex, setMediaIndex] = useState(0);
   const allSorted = buildMediaItems({
     attachments,
     imageUrl,
@@ -75,6 +78,16 @@ export const CardAttachments = memo(function CardAttachments({ imageUrl, thumbUr
   });
   const hasAttachments = allSorted.length > 0;
   if (!hasAttachments && !linkUrl) return null;
+  // media-attach-carousel (2026-06-12): 항목이 바뀌면 mediaIndex를 안전
+  // 범위로 클램프. 카드 전환 시 첨부 id 순서가 바뀌어 인덱스가 무효화될
+  // 수 있어 useEffect로 동기화.
+  useEffect(() => {
+    if (allSorted.length === 0) {
+      setMediaIndex(0);
+      return;
+    }
+    setMediaIndex((i) => (i >= allSorted.length ? 0 : i));
+  }, [allSorted.length]);
 
   // 링크는 attachments에 포함되지 않으므로 별개 렌더. multi-attachment
   // 카드에서도 링크는 최대 1개(현 스키마 제약).
@@ -129,6 +142,10 @@ export const CardAttachments = memo(function CardAttachments({ imageUrl, thumbUr
   );
   const thumbnailItem = pickThumbnailItem(allSorted);
   const sorted = variant === "thumbnail" ? (thumbnailItem ? [thumbnailItem] : []) : allSorted;
+  // media-attach-carousel (2026-06-12): detail 모드 + 항목 ≥ 2 일 때만
+  // 슬라이드 활성화. 단일 항목은 기존 풀 표시 유지.
+  const isCarousel = variant === "detail" && sorted.length > 1;
+  const currentItem = isCarousel ? sorted[Math.min(mediaIndex, sorted.length - 1)] : null;
   const extraCount =
     variant === "thumbnail"
       ? Math.max(0, allSorted.length - 1 + (linkRendersAsMedia ? 1 : 0))
@@ -195,126 +212,182 @@ export const CardAttachments = memo(function CardAttachments({ imageUrl, thumbUr
     </div>
   );
 
+  // media-attach-carousel (2026-06-12): 단일 미디어 항목 렌더 함수.
+  // carousel/stacked 분기에서 공통 사용. 기존 map() 콜백을 그대로 추출.
+  const renderMediaItem = (a: AttachmentItem) => {
+    if (a.kind === "image") {
+      const imageSrc = variant === "thumbnail" ? a.previewUrl ?? a.url : a.url;
+      if (variant === "detail") {
+        // 모달 내 이미지는 원본 비율/해상도 보존. OptimizedImage 의
+        // fill 모드는 컨테이너 높이 문제로 크롭처럼 보여서 plain <img>
+        // 로 직접 렌더. 클릭 시 라이트박스 오픈 콜백.
+        const imgIdx = imageAttachments.findIndex((it) => it.id === a.id);
+        const clickable = !!onImageClick;
+        return (
+          <div key={a.id} className="card-attach-image is-detail">
+            <img
+              src={imageSrc}
+              alt={a.fileName ?? ""}
+              loading="lazy"
+              decoding="async"
+              className={clickable ? "is-clickable" : undefined}
+              onClick={
+                clickable ? () => onImageClick!(imgIdx) : undefined
+              }
+            />
+            {extraCount > 0 && (
+              <span className="card-attach-multi-badge" aria-label={`+${extraCount}개 더`}>
+                +{extraCount}
+              </span>
+            )}
+          </div>
+        );
+      }
+      return (
+        <div key={a.id} className="card-attach-image optimized-img-wrap">
+          <OptimizedImage
+            src={imageSrc}
+            alt={a.fileName ?? ""}
+            sizes="(max-width: 768px) 100vw, 480px"
+          />
+          {extraCount > 0 && (
+            <span className="card-attach-multi-badge" aria-label={`+${extraCount}개 더`}>
+              +{extraCount}
+            </span>
+          )}
+        </div>
+      );
+    }
+    if (a.kind === "video") {
+      if (variant === "thumbnail") {
+        const yt = getYouTubeId(a.url);
+        if (yt && playedVideoIds.has(a.id)) {
+          return (
+            <div key={a.id} className="card-attach-video">
+              <iframe
+                src={`https://www.youtube.com/embed/${yt}?autoplay=1`}
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                allowFullScreen
+                title="YouTube"
+              />
+            </div>
+          );
+        }
+        const poster = renderVideoPoster(
+          a.id,
+          yt ? null : a.url,
+          a.previewUrl ?? (yt ? getYouTubeThumbnailUrl(yt) : null),
+          true,
+          yt ? "youtube" : "upload",
+          yt ? () => setPlayedVideoIds((prev) => new Set(prev).add(a.id)) : undefined,
+        );
+        return poster;
+      }
+      const yt = getYouTubeId(a.url);
+      if (yt) {
+        return (
+          <div key={a.id} className="card-attach-video">
+            <iframe
+              src={`https://www.youtube.com/embed/${yt}`}
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+              allowFullScreen
+              title="YouTube"
+            />
+            {extraCount > 0 && (
+              <span className="card-attach-multi-badge" aria-label={`+${extraCount}개 더`}>
+                +{extraCount}
+              </span>
+            )}
+          </div>
+        );
+      }
+      return (
+        <div key={a.id} className="card-attach-video">
+          <video src={a.url} controls preload="metadata" poster={a.previewUrl ?? undefined} />
+          {extraCount > 0 && (
+            <span className="card-attach-multi-badge" aria-label={`+${extraCount}개 더`}>
+              +{extraCount}
+            </span>
+          )}
+        </div>
+      );
+    }
+    // file
+    return (
+      <div key={a.id} className="card-attach-file-wrap">
+        <CardFileAttachment
+          fileUrl={a.url}
+          fileName={a.fileName}
+          fileSize={a.fileSize}
+          fileMimeType={a.mimeType}
+        />
+        {extraCount > 0 && (
+          <span className="card-attach-multi-badge is-inline" aria-label={`+${extraCount}개 더`}>
+            +{extraCount}
+          </span>
+        )}
+      </div>
+    );
+  };
+
   return (
     <div className="card-attachments">
       {hasAttachments ? (
-        sorted.map((a) => {
-            if (a.kind === "image") {
-              const imageSrc = variant === "thumbnail" ? a.previewUrl ?? a.url : a.url;
-              if (variant === "detail") {
-                // 모달 내 이미지는 원본 비율/해상도 보존. OptimizedImage 의
-                // fill 모드는 컨테이너 높이 문제로 크롭처럼 보여서 plain <img>
-                // 로 직접 렌더. 클릭 시 라이트박스 오픈 콜백.
-                const imgIdx = imageAttachments.findIndex((it) => it.id === a.id);
-                const clickable = !!onImageClick;
-                return (
-                  <div key={a.id} className="card-attach-image is-detail">
-                    <img
-                      src={imageSrc}
-                      alt={a.fileName ?? ""}
-                      loading="lazy"
-                      decoding="async"
-                      className={clickable ? "is-clickable" : undefined}
-                      onClick={
-                        clickable ? () => onImageClick!(imgIdx) : undefined
-                      }
-                    />
-                    {extraCount > 0 && (
-                      <span className="card-attach-multi-badge" aria-label={`+${extraCount}개 더`}>
-                        +{extraCount}
-                      </span>
-                    )}
-                  </div>
-                );
-              }
-              return (
-                <div key={a.id} className="card-attach-image optimized-img-wrap">
-                  <OptimizedImage
-                    src={imageSrc}
-                    alt={a.fileName ?? ""}
-                    sizes="(max-width: 768px) 100vw, 480px"
+        // media-attach-carousel (2026-06-12): 슬라이드 모드면 현재 항목
+        // 1개만, 인디케이터 + 좌우 화살표 컨트롤 함께 렌더. 그 외엔
+        // 기존처럼 모든 항목을 stacked.
+        isCarousel && currentItem ? (
+          <div className="card-attach-carousel">
+            <div className="card-attach-carousel-viewport">
+              {renderMediaItem(currentItem)}
+            </div>
+            <button
+              type="button"
+              className="card-attach-carousel-arrow card-attach-carousel-arrow-prev"
+              aria-label="이전 미디어"
+              onClick={(e) => {
+                e.stopPropagation();
+                setMediaIndex((i) => (i - 1 + sorted.length) % sorted.length);
+              }}
+            >
+              ‹
+            </button>
+            <button
+              type="button"
+              className="card-attach-carousel-arrow card-attach-carousel-arrow-next"
+              aria-label="다음 미디어"
+              onClick={(e) => {
+                e.stopPropagation();
+                setMediaIndex((i) => (i + 1) % sorted.length);
+              }}
+            >
+              ›
+            </button>
+            <div className="card-attach-carousel-indicator" role="status" aria-label={`미디어 ${mediaIndex + 1} / ${sorted.length}`}>
+              <div className="card-attach-carousel-dots">
+                {sorted.map((s, i) => (
+                  <button
+                    key={s.id}
+                    type="button"
+                    className={
+                      "card-attach-carousel-dot" +
+                      (i === mediaIndex ? " is-active" : "")
+                    }
+                    aria-label={`${i + 1}번째 미디어로 이동`}
+                    aria-current={i === mediaIndex ? "true" : undefined}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setMediaIndex(i);
+                    }}
                   />
-                  {extraCount > 0 && (
-                    <span className="card-attach-multi-badge" aria-label={`+${extraCount}개 더`}>
-                      +{extraCount}
-                    </span>
-                  )}
-                </div>
-              );
-            }
-            if (a.kind === "video") {
-              if (variant === "thumbnail") {
-                const yt = getYouTubeId(a.url);
-                if (yt && playedVideoIds.has(a.id)) {
-                  return (
-                    <div key={a.id} className="card-attach-video">
-                      <iframe
-                        src={`https://www.youtube.com/embed/${yt}?autoplay=1`}
-                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                        allowFullScreen
-                        title="YouTube"
-                      />
-                    </div>
-                  );
-                }
-                const poster = renderVideoPoster(
-                  a.id,
-                  yt ? null : a.url,
-                  a.previewUrl ?? (yt ? getYouTubeThumbnailUrl(yt) : null),
-                  true,
-                  yt ? "youtube" : "upload",
-                  yt ? () => setPlayedVideoIds((prev) => new Set(prev).add(a.id)) : undefined,
-                );
-                return poster;
-              }
-              const yt = getYouTubeId(a.url);
-              if (yt) {
-                return (
-                  <div key={a.id} className="card-attach-video">
-                    <iframe
-                      src={`https://www.youtube.com/embed/${yt}`}
-                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                      allowFullScreen
-                      title="YouTube"
-                    />
-                    {extraCount > 0 && (
-                      <span className="card-attach-multi-badge" aria-label={`+${extraCount}개 더`}>
-                        +{extraCount}
-                      </span>
-                    )}
-                  </div>
-                );
-              }
-              return (
-                <div key={a.id} className="card-attach-video">
-                  <video src={a.url} controls preload="metadata" poster={a.previewUrl ?? undefined} />
-                  {extraCount > 0 && (
-                    <span className="card-attach-multi-badge" aria-label={`+${extraCount}개 더`}>
-                      +{extraCount}
-                    </span>
-                  )}
-                </div>
-              );
-            }
-            // file
-            return (
-              <div key={a.id} className="card-attach-file-wrap">
-                <CardFileAttachment
-                  fileUrl={a.url}
-                  fileName={a.fileName}
-                  fileSize={a.fileSize}
-                  fileMimeType={a.mimeType}
-                />
-                {extraCount > 0 && (
-                  <span className="card-attach-multi-badge is-inline" aria-label={`+${extraCount}개 더`}>
-                    +{extraCount}
-                  </span>
-                )}
+                ))}
               </div>
-            );
-          })
+            </div>
+          </div>
+        ) : (
+          <>{sorted.map((a) => renderMediaItem(a))}</>
         )
-        : effectiveVideoUrl ? (
+      ) : effectiveVideoUrl ? (
           (() => {
               const yt = getYouTubeId(effectiveVideoUrl);
               if (variant === "thumbnail") {

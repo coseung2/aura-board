@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { extractVideoId } from "@/lib/youtube";
 import {
   hasPrimaryNonLinkContent,
@@ -54,43 +54,20 @@ export function CardDetailModal({
     setLightboxIndex(null);
   }, [card?.id]);
 
-  const navIndex = useMemo(() => {
-    if (!card || !cards || cards.length === 0) return -1;
-    return cards.findIndex((c) => c.id === card.id);
-  }, [card, cards]);
-
-  const goPrev = useCallback(() => {
-    if (!cards || navIndex < 0) return;
-    const next = cards[(navIndex - 1 + cards.length) % cards.length];
-    if (next) onChange?.(next);
-  }, [cards, navIndex, onChange]);
-
-  const goNext = useCallback(() => {
-    if (!cards || navIndex < 0) return;
-    const next = cards[(navIndex + 1) % cards.length];
-    if (next) onChange?.(next);
-  }, [cards, navIndex, onChange]);
-
   useEffect(() => {
     if (!card) return;
     function onKey(e: KeyboardEvent) {
       // 라이트박스 열려 있으면 카드 네비게이션 (좌우 화살표·ESC) 전부
       // 라이트박스에 위임. 여기선 무시.
       if (lightboxIndex !== null) return;
-      if (e.key === "ArrowLeft") {
-        e.preventDefault();
-        goPrev();
-      } else if (e.key === "ArrowRight") {
-        e.preventDefault();
-        goNext();
-      } else if (e.key === "Escape") {
+      if (e.key === "Escape") {
         e.preventDefault();
         onClose();
       }
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [card, goPrev, goNext, onClose, lightboxIndex]);
+  }, [card, onClose, lightboxIndex]);
 
   useEffect(() => {
     if (!card) return;
@@ -180,33 +157,6 @@ export function CardDetailModal({
         >
           {isFullscreen ? <FullscreenExitIcon size={20} /> : <FullscreenEnterIcon size={20} />}
         </button>
-        {/* 하단 인디케이터 — cards[]가 있고 1장 초과일 때만 표시.
-            dots는 클릭으로 카드 간 이동 (onChange 호출) — 모달 내 컨트롤
-            직접 조작 가능. 2026-06-12 리팩토링: 카운트(예: "3 / 7")
-            텍스트는 제거하고 dots만 중앙 정렬. */}
-        {cards && cards.length > 1 && navIndex >= 0 && (
-          <div
-            className="card-detail-indicator"
-            role="status"
-            aria-label={`현재 카드 ${navIndex + 1} / ${cards.length}`}
-          >
-            <div className="card-detail-indicator-dots">
-              {cards.map((c, i) => (
-                <button
-                  key={c.id}
-                  type="button"
-                  className={
-                    "card-detail-indicator-dot" +
-                    (i === navIndex ? " is-active" : "")
-                  }
-                  aria-label={`${i + 1}번째 카드로 이동`}
-                  aria-current={i === navIndex ? "true" : undefined}
-                  onClick={() => onChange?.(c)}
-                />
-              ))}
-            </div>
-          </div>
-        )}
         <div className="card-detail-body">
           {hasMedia && (
             <section className="card-detail-media" aria-label="첨부">
