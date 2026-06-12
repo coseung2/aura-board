@@ -84,18 +84,24 @@ async function copyToSupabase(sourceUrl: string, pathname: string): Promise<stri
   }
   const contentType = source.headers.get("content-type") ?? "application/octet-stream";
   const cacheControl = source.headers.get("cache-control") ?? "public, max-age=31536000, immutable";
+  const contentDisposition = source.headers.get("content-disposition");
   const body = Buffer.from(await source.arrayBuffer());
+
+  const headers: Record<string, string> = {
+    authorization: `Bearer ${config.serviceRoleKey}`,
+    apikey: config.serviceRoleKey,
+    "content-type": contentType,
+    "cache-control": cacheControl,
+    "x-upsert": "true",
+  };
+  if (contentDisposition) {
+    headers["content-disposition"] = contentDisposition;
+  }
 
   const target = `${config.url}/storage/v1/object/${config.bucket}/${encodeObjectPath(pathname)}`;
   const uploaded = await fetch(target, {
     method: "POST",
-    headers: {
-      authorization: `Bearer ${config.serviceRoleKey}`,
-      apikey: config.serviceRoleKey,
-      "content-type": contentType,
-      "cache-control": cacheControl,
-      "x-upsert": "true",
-    },
+    headers,
     body: body as unknown as BodyInit,
   });
   if (!uploaded.ok) {

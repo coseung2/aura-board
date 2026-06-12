@@ -74,6 +74,12 @@ export async function uploadPublicObject(
     return uploadToSupabase(supabase, normalizedPath, body, options);
   }
 
+  if (isProductionRuntime()) {
+    throw new MediaStorageError(
+      "Supabase Storage is not configured. Set NEXT_PUBLIC_SUPABASE_URL/SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY.",
+    );
+  }
+
   const blobToken = process.env.BLOB_READ_WRITE_TOKEN;
   if (blobToken) {
     try {
@@ -154,4 +160,8 @@ function normalizeObjectPath(pathname: string): string {
 
 function encodeObjectPath(pathname: string): string {
   return pathname.split("/").map(encodeURIComponent).join("/");
+}
+
+function isProductionRuntime(): boolean {
+  return process.env.NODE_ENV === "production" || process.env.VERCEL === "1";
 }
