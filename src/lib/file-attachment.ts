@@ -52,6 +52,12 @@ export function isAllowedFileUpload(mime: string, filename: string): boolean {
  *  `file.type`을 비우거나 `application/octet-stream`으로 넘기는 케이스를
  *  복구. 매핑되지 않은 확장자는 null — 업로드 거부. */
 const EXT_TO_CANONICAL_MIME: Record<string, string> = {
+  jpg: "image/jpeg",
+  jpeg: "image/jpeg",
+  png: "image/png",
+  gif: "image/gif",
+  webp: "image/webp",
+  svg: "image/svg+xml",
   pdf: "application/pdf",
   docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
   xlsx: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
@@ -138,6 +144,7 @@ export function formatBytes(n: number): string {
 /**
  * fileUrl이 이 프로젝트의 업로드 경로에서 나온 URL인지 확인.
  * - 프로덕션: `*.public.blob.vercel-storage.com` (Vercel Blob 공식 호스트)
+ * - 프로덕션: Supabase Storage public object URL (`/storage/v1/object/public/...`)
  * - 로컬/개발: 동일 오리진 `/uploads/...` 상대 경로 또는 절대 URL
  *
  * 카드 생성/수정 API가 클라이언트 공급 fileUrl을 이 화이트리스트로 통과시켜야
@@ -151,12 +158,29 @@ export function isAllowedFileUrl(url: string | null | undefined): boolean {
     const u = new URL(url);
     // Vercel Blob은 *.public.blob.vercel-storage.com 하위로만 서빙.
     if (u.hostname.endsWith(".public.blob.vercel-storage.com")) return true;
+    // Supabase Storage public bucket. NEXT_PUBLIC_SUPABASE_URL이 있으면
+    // 정확한 프로젝트 호스트만, 테스트/미설정 환경은 *.supabase.co + public object
+    // path만 허용한다.
+    if (isAllowedSupabaseStorageUrl(u)) return true;
     // 로컬 dev가 절대 URL로 /uploads/를 낼 때.
     if (u.pathname.startsWith("/uploads/")) return true;
     return false;
   } catch {
     return false;
   }
+}
+
+function isAllowedSupabaseStorageUrl(u: URL): boolean {
+  if (!u.pathname.startsWith("/storage/v1/object/public/")) return false;
+  const configured = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  if (configured) {
+    try {
+      return u.hostname === new URL(configured).hostname;
+    } catch {
+      return false;
+    }
+  }
+  return u.hostname.endsWith(".supabase.co");
 }
 
 /**

@@ -14,13 +14,10 @@
  * parsed body. For the 4MB hard guard, see the route handler (CR-4).
  */
 import "server-only";
-import { randomBytes } from "crypto";
-import { writeFile, mkdir } from "fs/promises";
-import * as path from "path";
-import { put } from "@vercel/blob";
 import sharp from "sharp";
 import ffmpeg from "fluent-ffmpeg";
 import ffmpegStatic from "ffmpeg-static";
+import { uploadPublicObject } from "@/lib/media-storage";
 
 ffmpeg.setFfmpegPath(ffmpegStatic || "");
 
@@ -64,32 +61,14 @@ export async function uploadPngFromDataUrl(
     throw new BlobUploadError("base64 decode failed", e);
   }
 
-  const blobToken = process.env.BLOB_READ_WRITE_TOKEN;
-  if (blobToken) {
-    try {
-      const res = await put(pathname, buf, {
-        access: "public",
-        contentType: "image/png",
-        token: blobToken,
-        multipart: true,
-        addRandomSuffix: false,
-      });
-      return { url: res.url, bytes: buf.byteLength, pathname };
-    } catch (e) {
-      console.warn("[blob] put() failed, falling back to fs", e);
-      // Fall through to fs fallback.
-    }
-  }
-
-  // fs fallback — public/uploads/... served by Next.js static.
-  const safe = `${randomBytes(4).toString("hex")}-${pathname.replace(/[^a-zA-Z0-9_.-]/g, "_")}`;
-  const abs = path.join(process.cwd(), "public", "uploads", safe);
   try {
-    await mkdir(path.dirname(abs), { recursive: true });
-    await writeFile(abs, buf);
-    return { url: `/uploads/${safe}`, bytes: buf.byteLength, pathname: safe };
+    const res = await uploadPublicObject(pathname, buf, {
+      contentType: "image/png",
+      multipart: true,
+    });
+    return { url: res.url, bytes: buf.byteLength, pathname: res.pathname };
   } catch (e) {
-    throw new BlobUploadError("fs fallback write failed", e);
+    throw new BlobUploadError("storage upload failed", e);
   }
 }
 
@@ -113,24 +92,11 @@ export async function resizeToWebPThumbUrl(
   const inputBuf = Buffer.from(await res.arrayBuffer());
   const webp = await resizeBufferToWebP(inputBuf);
 
-  const blobToken = process.env.BLOB_READ_WRITE_TOKEN;
-  if (blobToken) {
-    const out = await put(pathname, webp, {
-      access: "public",
-      contentType: "image/webp",
-      token: blobToken,
-      multipart: false,
-      addRandomSuffix: false,
-    });
-    return out.url;
-  }
-
-  // fs fallback mirrors uploadPngFromDataUrl for dev/self-host parity.
-  const safe = `${randomBytes(4).toString("hex")}-${pathname.replace(/[^a-zA-Z0-9_.-]/g, "_")}`;
-  const abs = path.join(process.cwd(), "public", "uploads", safe);
-  await mkdir(path.dirname(abs), { recursive: true });
-  await writeFile(abs, webp);
-  return `/uploads/${safe}`;
+  const out = await uploadPublicObject(pathname, webp, {
+    contentType: "image/webp",
+    multipart: false,
+  });
+  return out.url;
 }
 
 /**
@@ -164,24 +130,12 @@ export async function uploadWebPBuffer(
   input: Buffer,
   pathname: string
 ): Promise<string> {
-  const blobToken = process.env.BLOB_READ_WRITE_TOKEN;
-  if (blobToken) {
-    const out = await put(pathname, input, {
-      access: "public",
-      contentType: "image/webp",
-      token: blobToken,
-      multipart: false,
-      addRandomSuffix: false,
-      cacheControlMaxAge: 60 * 60 * 24 * 365,
-    });
-    return out.url;
-  }
-
-  const safe = `${randomBytes(4).toString("hex")}-${pathname.replace(/[^a-zA-Z0-9_.-]/g, "_")}`;
-  const abs = path.join(process.cwd(), "public", "uploads", safe);
-  await mkdir(path.dirname(abs), { recursive: true });
-  await writeFile(abs, input);
-  return `/uploads/${safe}`;
+  const out = await uploadPublicObject(pathname, input, {
+    contentType: "image/webp",
+    multipart: false,
+    cacheControlMaxAge: 60 * 60 * 24 * 365,
+  });
+  return out.url;
 }
 
 export async function resizeRemoteImageToWebPPreviewUrl(

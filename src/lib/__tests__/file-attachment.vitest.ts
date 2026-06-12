@@ -4,6 +4,7 @@ import {
   isAllowedFileUpload,
   isAllowedFileUrl,
   isAllowedStoredMime,
+  normalizeUploadMime,
   fileMimeToIcon,
   fileMimeToLabel,
   formatBytes,
@@ -57,6 +58,18 @@ describe("file-attachment · isAllowedFileUpload", () => {
   it("rejects unlisted MIME types regardless of extension", () => {
     expect(isAllowedFileUpload("application/x-msdownload", "a.exe")).toBe(false);
     expect(isAllowedFileUpload("image/png", "image.png")).toBe(false); // 이미지 경로는 업로드 라우트의 별도 화이트리스트가 처리
+  });
+});
+
+describe("file-attachment · normalizeUploadMime", () => {
+  it("복구: 브라우저가 사진 MIME을 비우거나 octet-stream으로 보내도 확장자로 이미지 MIME을 추론", () => {
+    expect(normalizeUploadMime("", "photo.JPG")).toBe("image/jpeg");
+    expect(normalizeUploadMime("application/octet-stream", "screen.png")).toBe("image/png");
+    expect(normalizeUploadMime("binary/octet-stream", "sticker.webp")).toBe("image/webp");
+  });
+
+  it("기존 명시 MIME은 유지한다", () => {
+    expect(normalizeUploadMime("image/png", "photo.jpg")).toBe("image/png");
   });
 });
 
@@ -133,6 +146,14 @@ describe("file-attachment · isAllowedFileUrl (codex security review)", () => {
     expect(isAllowedFileUrl("https://tenant-name.public.blob.vercel-storage.com/uploads/a.docx")).toBe(true);
   });
 
+  it("allows Supabase Storage public object URLs", () => {
+    expect(
+      isAllowedFileUrl(
+        "https://project-ref.supabase.co/storage/v1/object/public/aura-board-uploads/uploads/x.pdf",
+      ),
+    ).toBe(true);
+  });
+
   it("allows local /uploads/ paths (dev)", () => {
     expect(isAllowedFileUrl("/uploads/123.pdf")).toBe(true);
     expect(isAllowedFileUrl("http://localhost:3000/uploads/123.pdf")).toBe(true);
@@ -143,6 +164,7 @@ describe("file-attachment · isAllowedFileUrl (codex security review)", () => {
     expect(isAllowedFileUrl("https://cdn.malicious.net/payload.pdf")).toBe(false);
     // 하위 도메인 스푸핑 차단 — public.blob.vercel-storage.com.evil.com 같은 것
     expect(isAllowedFileUrl("https://fake.public.blob.vercel-storage.com.evil.com/x.pdf")).toBe(false);
+    expect(isAllowedFileUrl("https://attacker.example.com/storage/v1/object/public/aura-board-uploads/x.pdf")).toBe(false);
   });
 
   it("rejects malformed URLs", () => {

@@ -1,6 +1,5 @@
 "use client";
 
-import { upload } from "@vercel/blob/client";
 import { normalizeUploadMime, mimeFromExtension } from "./file-attachment";
 
 export type UploadedFile = {
@@ -28,19 +27,17 @@ export async function uploadFile(file: File): Promise<UploadedFile> {
     mimeFromExtension(targetFile.name) ||
     "application/octet-stream";
 
-  // 파일명 safe-ascii 버킷화 + 타임스탬프. addRandomSuffix: true 가
-  // 서버 정책으로 걸려 있어 충돌 방지는 Blob이 담당.
-  const safeName = targetFile.name.replace(/[^\w.\-]/g, "_");
-  const pathname = `uploads/${Date.now()}-${safeName}`;
+  const form = new FormData();
+  form.append("file", targetFile);
 
-  const res = await upload(pathname, targetFile, {
-    access: "public",
-    contentType: mimeType,
-    handleUploadUrl: "/api/upload",
-    multipart: true,
-    // 서버 onBeforeGenerateToken 에서 MIME/확장자 화이트리스트 검증에 사용.
-    clientPayload: JSON.stringify({ mimeType }),
+  const res = await fetch("/api/upload", {
+    method: "POST",
+    body: form,
   });
+  const json = await res.json().catch(() => null) as Partial<UploadedFile> & { error?: string } | null;
+  if (!res.ok || !json?.url) {
+    throw new Error(json?.error ?? `업로드 실패 (${res.status})`);
+  }
 
   const kind: UploadedFile["type"] = mimeType.startsWith("image/")
     ? "image"
@@ -52,12 +49,12 @@ export async function uploadFile(file: File): Promise<UploadedFile> {
   // 인라인 렌더하지 않고 강제 다운로드하도록. PDF/HWP/DOCX 등 활성 콘텐츠
   // 실행 위험 억제. 이미지/비디오는 기존대로 url(인라인 렌더 가능).
   return {
-    url: kind === "file" ? res.downloadUrl : res.url,
-    previewUrl: null,
-    type: kind,
+    url: json.url,
+    previewUrl: json.previewUrl ?? null,
+    type: json.type ?? kind,
     name: file.name, // 원본 파일명 유지 (UI 표시용)
     size: file.size,
-    mimeType,
+    mimeType: json.mimeType ?? mimeType,
   };
 }
 

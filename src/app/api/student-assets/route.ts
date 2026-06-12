@@ -1,13 +1,12 @@
 import { NextResponse } from "next/server";
-import { writeFile, mkdir } from "fs/promises";
-import path from "path";
 import { randomBytes } from "crypto";
-import { put } from "@vercel/blob";
 import { z } from "zod";
 import { db } from "@/lib/db";
 import { getCurrentStudent } from "@/lib/student-auth";
 import { getCurrentUser } from "@/lib/auth";
 import { resizeBufferToWebPPreview, uploadWebPBuffer } from "@/lib/blob";
+import { normalizeUploadMime } from "@/lib/file-attachment";
+import { uploadPublicObject } from "@/lib/media-storage";
 
 // Drawpile student-asset library (partial scope). Uploads go to public/uploads/
 // same as /api/upload; this route additionally creates a StudentAsset row so the
@@ -41,9 +40,10 @@ export async function POST(req: Request) {
     if (file.size > MAX_SIZE) {
       return NextResponse.json({ error: "File too large (max 50MB)" }, { status: 400 });
     }
-    if (!ALLOWED_IMAGE.has(file.type)) {
+    const normalizedMime = normalizeUploadMime(file.type ?? "", file.name);
+    if (!ALLOWED_IMAGE.has(normalizedMime)) {
       return NextResponse.json(
-        { error: `Unsupported file type: ${file.type}` },
+        { error: `Unsupported file type: ${normalizedMime}` },
         { status: 400 }
       );
     }
@@ -53,38 +53,21 @@ export async function POST(req: Request) {
 
     const ext = file.name.includes(".")
       ? file.name.split(".").pop()!.toLowerCase()
-      : file.type.split("/")[1] ?? "png";
+      : normalizedMime.split("/")[1] ?? "png";
     // sanitize — only alnum extension
     const safeExt = /^[a-z0-9]+$/.test(ext) ? ext : "png";
     const filename = `asset-${Date.now()}-${randomBytes(3).toString("hex")}.${safeExt}`;
     const pathname = `student-assets/${student.id}/${filename}`;
     const buffer = Buffer.from(await file.arrayBuffer());
 
-    // Prefer Vercel Blob — fs writes are ephemeral on Lambda. Fall back to
-    // public/uploads/ only for local dev without BLOB_READ_WRITE_TOKEN.
-    let fileUrl: string;
-    const blobToken = process.env.BLOB_READ_WRITE_TOKEN;
-    if (blobToken) {
-      try {
-        const res = await put(pathname, buffer, {
-          access: "public",
-          contentType: file.type,
-          token: blobToken,
-          multipart: true,
-          addRandomSuffix: false,
-          cacheControlMaxAge: 60 * 60 * 24 * 365,
-        });
-        fileUrl = res.url;
-      } catch (e) {
-        console.error("[POST /api/student-assets] blob put failed:", e);
-        return NextResponse.json({ error: "Blob upload failed" }, { status: 500 });
-      }
-    } else {
-      const uploadDir = path.join(process.cwd(), "public", "uploads");
-      await mkdir(uploadDir, { recursive: true });
-      await writeFile(path.join(uploadDir, filename), buffer);
-      fileUrl = `/uploads/${filename}`;
-    }
+    // Supabase Storage 우선. 환경변수가 없으면 기존 Vercel Blob/로컬 fs로
+    // fallback 하여 로컬 개발과 임시 롤백이 가능하게 둔다.
+    const stored = await uploadPublicObject(pathname, buffer, {
+      contentType: normalizedMime,
+      multipart: true,
+      cacheControlMaxAge: 60 * 60 * 24 * 365,
+    });
+    const fileUrl = stored.url;
 
     let thumbnailUrl: string | null = null;
     try {
@@ -104,7 +87,7 @@ export async function POST(req: Request) {
         title,
         fileUrl,
         thumbnailUrl,
-        format: file.type,
+        format: normalizedMime,
         sizeBytes: file.size,
         source,
         isSharedToClass,

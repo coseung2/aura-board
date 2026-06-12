@@ -38,6 +38,8 @@ const nextConfig: NextConfig = {
       // Each Blob store gets a unique <prefix>.public.blob.vercel-storage.com
       // host, so wildcard the subdomain.
       { protocol: "https", hostname: "**.public.blob.vercel-storage.com", pathname: "/**" },
+      // Supabase Storage — Aura-board uploaded assets after the Blob quota fix.
+      { protocol: "https", hostname: "**.supabase.co", pathname: "/storage/v1/object/public/**" },
     ],
     // Device size variants used to build the srcset for responsive images.
     // Galaxy Tab S6 Lite viewport (1500×2000 CSS, DPR 2) is covered by

@@ -1,14 +1,11 @@
 import { NextResponse } from "next/server";
-import { writeFile, mkdir } from "fs/promises";
-import path from "path";
 import { randomBytes } from "crypto";
-import { put } from "@vercel/blob";
-import { handleUpload, type HandleUploadBody } from "@vercel/blob/client";
 import { getCurrentUser } from "@/lib/auth";
 import { getCurrentStudent } from "@/lib/student-auth";
 import { ALLOWED_FILE_MIMES, isAllowedFileUpload, normalizeUploadMime } from "@/lib/file-attachment";
-import { ALLOWED_IMAGE, ALLOWED_VIDEO, MAX_SIZE, UploadPolicyError, buildUploadPolicy } from "./upload-policy";
+import { ALLOWED_IMAGE, ALLOWED_VIDEO, MAX_SIZE, UploadPolicyError } from "./upload-policy";
 import { resizeBufferToWebPPreview, uploadWebPBuffer, extractVideoThumbnail } from "@/lib/blob";
+import { uploadPublicObject } from "@/lib/media-storage";
 
 /**
  * card-file-attachment — 매직바이트 검증.
@@ -65,19 +62,12 @@ export async function POST(req: Request) {
     // 크기 상한을 토큰에 바인딩해 악용을 차단.
     const contentType = req.headers.get("content-type") ?? "";
     if (contentType.includes("application/json")) {
-      const body = (await req.json()) as HandleUploadBody;
-      const json = await handleUpload({
-        body,
-        request: req,
-        onBeforeGenerateToken: async (pathname, clientPayload) => {
-          return buildUploadPolicy(pathname, clientPayload);
-        },
-        onUploadCompleted: async () => {
-          // 카드/과제 DB 기록은 저장 시점(카드 생성/수정 API)에서 fileUrl을
-          // 받아 isAllowedFileUrl 화이트리스트로 재검증하므로 여기서는 no-op.
-        },
-      });
-      return NextResponse.json(json);
+      // 이전 Vercel Blob client-direct 프로토콜. 신규 클라이언트는 multipart로
+      // 이 라우트에 업로드하고, 서버가 Supabase Storage에 저장한다.
+      return NextResponse.json(
+        { error: "Vercel Blob direct upload is disabled; use multipart upload" },
+        { status: 410 },
+      );
     }
 
     // 레거시 multipart 경로 — BLOB_READ_WRITE_TOKEN 없는 로컬 dev·외부 호출
@@ -165,28 +155,15 @@ export async function POST(req: Request) {
     // 올바른 Content-Type 헤더가 설정되어 파일이 정상 인식됨.
     const storedContentType = normalizedMime || "application/octet-stream";
 
-    // Vercel Lambda filesystem is read-only outside /tmp — must use Blob
-    // in production. Fall back to public/uploads/ only for local dev
-    // without BLOB_READ_WRITE_TOKEN.
-    let url: string;
-    const blobToken = process.env.BLOB_READ_WRITE_TOKEN;
-    if (blobToken) {
-      const res = await put(pathname, buffer, {
-        access: "public",
-        contentType: storedContentType,
-        token: blobToken,
-        multipart: true,
-        addRandomSuffix: false,
-        cacheControlMaxAge: 60 * 60 * 24 * 365,
-        ...(contentDisposition ? { contentDisposition } : {}),
-      });
-      url = res.url;
-    } else {
-      const uploadDir = path.join(process.cwd(), "public", "uploads");
-      await mkdir(uploadDir, { recursive: true });
-      await writeFile(path.join(uploadDir, filename), buffer);
-      url = `/uploads/${filename}`;
-    }
+    // Supabase Storage 우선. 환경변수가 없으면 기존 Vercel Blob/로컬 fs로
+    // fallback 하여 로컬 개발과 임시 롤백이 가능하게 둔다.
+    const stored = await uploadPublicObject(pathname, buffer, {
+      contentType: storedContentType,
+      contentDisposition,
+      multipart: true,
+      cacheControlMaxAge: 60 * 60 * 24 * 365,
+    });
+    const url = stored.url;
 
     const type: "image" | "video" | "file" = isImage ? "image" : isVideo ? "video" : "file";
     let previewUrl: string | null = null;
