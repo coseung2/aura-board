@@ -334,53 +334,55 @@ export const CardAttachments = memo(function CardAttachments({ imageUrl, thumbUr
     <div className="card-attachments">
       {hasAttachments ? (
         // media-attach-carousel (2026-06-12): 슬라이드 모드면 현재 항목
-        // 1개만, 인디케이터 + 좌우 화살표 컨트롤 함께 렌더. 그 외엔
-        // 기존처럼 모든 항목을 stacked.
+        // 1개만, viewport 안에 콘텐츠 + arrow + indicator 모두 함께 렌더.
+        // arrow는 박스 없이 글리프만 콘텐츠 중단 좌우, indicator는 콘텐츠
+        // 정중앙 하단 — 콘텐츠가 viewport 일부만 차지해도 그 콘텐츠 자체
+        // 박스 기준 가운데에 떠 있도록 함.
         isCarousel && currentItem ? (
           <div className="card-attach-carousel">
             <div className="card-attach-carousel-viewport">
               {renderMediaItem(currentItem)}
-            </div>
-            <button
-              type="button"
-              className="card-attach-carousel-arrow card-attach-carousel-arrow-prev"
-              aria-label="이전 미디어"
-              onClick={(e) => {
-                e.stopPropagation();
-                setMediaIndex((i) => (i - 1 + sorted.length) % sorted.length);
-              }}
-            >
-              ‹
-            </button>
-            <button
-              type="button"
-              className="card-attach-carousel-arrow card-attach-carousel-arrow-next"
-              aria-label="다음 미디어"
-              onClick={(e) => {
-                e.stopPropagation();
-                setMediaIndex((i) => (i + 1) % sorted.length);
-              }}
-            >
-              ›
-            </button>
-            <div className="card-attach-carousel-indicator" role="status" aria-label={`미디어 ${mediaIndex + 1} / ${sorted.length}`}>
-              <div className="card-attach-carousel-dots">
-                {sorted.map((s, i) => (
-                  <button
-                    key={s.id}
-                    type="button"
-                    className={
-                      "card-attach-carousel-dot" +
-                      (i === mediaIndex ? " is-active" : "")
-                    }
-                    aria-label={`${i + 1}번째 미디어로 이동`}
-                    aria-current={i === mediaIndex ? "true" : undefined}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setMediaIndex(i);
-                    }}
-                  />
-                ))}
+              <button
+                type="button"
+                className="card-attach-carousel-arrow card-attach-carousel-arrow-prev"
+                aria-label="이전 미디어"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setMediaIndex((i) => (i - 1 + sorted.length) % sorted.length);
+                }}
+              >
+                ‹
+              </button>
+              <button
+                type="button"
+                className="card-attach-carousel-arrow card-attach-carousel-arrow-next"
+                aria-label="다음 미디어"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setMediaIndex((i) => (i + 1) % sorted.length);
+                }}
+              >
+                ›
+              </button>
+              <div className="card-attach-carousel-indicator" role="status" aria-label={`미디어 ${mediaIndex + 1} / ${sorted.length}`}>
+                <div className="card-attach-carousel-dots">
+                  {sorted.map((s, i) => (
+                    <button
+                      key={s.id}
+                      type="button"
+                      className={
+                        "card-attach-carousel-dot" +
+                        (i === mediaIndex ? " is-active" : "")
+                      }
+                      aria-label={`${i + 1}번째 미디어로 이동`}
+                      aria-current={i === mediaIndex ? "true" : undefined}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setMediaIndex(i);
+                      }}
+                    />
+                  ))}
+                </div>
               </div>
             </div>
           </div>

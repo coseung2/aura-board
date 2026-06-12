@@ -359,8 +359,9 @@
 }
 
 /* media-attach-carousel (2026-06-12): 슬라이드 컨테이너. 검은 미디어
-   영역을 그대로 사용. arrow/dot/indicator 모두 absolute로 슬라이드 위에
-   떠 있고, 스크롤 없이 단일 화면에서 항목 1개만 표시. */
+   영역을 그대로 사용. arrow는 콘텐츠 중단 좌우에 글리프만(박스 없음),
+   indicator는 콘텐츠 자체 정중앙 하단 — viewport를 relative 기준점으로
+   삼아 콘텐츠가 그려진 박스 기준 가운데에 떠 있도록 함. */
 .card-attach-carousel {
   position: relative;
   width: 100%;
@@ -372,6 +373,7 @@
 }
 
 .card-attach-carousel-viewport {
+  position: relative;
   width: 100%;
   height: 100%;
   min-height: 0;
@@ -434,25 +436,26 @@
   position: absolute;
   top: 50%;
   transform: translateY(-50%);
-  width: 36px;
-  height: 36px;
-  border-radius: 50%;
-  border: 1px solid rgba(255, 255, 255, 0.25);
-  background: rgba(0, 0, 0, 0.45);
   color: #fff;
-  font-size: 22px;
+  font-size: 38px;
   line-height: 1;
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
   z-index: 3;
-  padding: 0;
-  transition: background 120ms ease, transform 120ms ease;
+  padding: 8px 12px;
+  background: none;
+  border: none;
+  user-select: none;
+  opacity: 0.55;
+  transition: opacity 120ms ease, transform 120ms ease;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
 }
 
 .card-attach-carousel-arrow:hover {
-  background: rgba(0, 0, 0, 0.7);
+  opacity: 1;
+  transform: translateY(-50%) scale(1.15);
 }
 
 .card-attach-carousel-arrow-prev {
