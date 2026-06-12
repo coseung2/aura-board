@@ -14,8 +14,6 @@ import { CardImageLightbox } from "./CardImageLightbox";
 import { CardEngagement } from "../engagement/CardEngagement";
 import {
   CloseIcon,
-  ChevronLeftIcon,
-  ChevronRightIcon,
   FullscreenEnterIcon,
   FullscreenExitIcon,
 } from "../icons/UiIcons";
@@ -79,21 +77,25 @@ export function CardDetailModal({
       // 라이트박스 열려 있으면 카드 네비게이션 (좌우 화살표·ESC) 전부
       // 라이트박스에 위임. 여기선 무시.
       if (lightboxIndex !== null) return;
-      if (e.key === "Escape" && !document.fullscreenElement) onClose();
-      else if (e.key === "ArrowLeft") goPrev();
-      else if (e.key === "ArrowRight") goNext();
+      if (e.key === "ArrowLeft") {
+        e.preventDefault();
+        goPrev();
+      } else if (e.key === "ArrowRight") {
+        e.preventDefault();
+        goNext();
+      } else if (e.key === "Escape") {
+        e.preventDefault();
+        onClose();
+      }
     }
-    document.addEventListener("keydown", onKey);
-    document.body.style.overflow = "hidden";
-    return () => {
-      document.removeEventListener("keydown", onKey);
-      document.body.style.overflow = "";
-    };
-  }, [card, onClose, goPrev, goNext, lightboxIndex]);
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [card, goPrev, goNext, onClose, lightboxIndex]);
 
-  // Sync local state with the browser's fullscreen lifecycle so exiting
-  // via F11/ESC flips the button back without an extra click.
   useEffect(() => {
+    if (!card) return;
+    // F11/ESC로 fullscreen 빠져나와도 상태는 그대로. native fullscreenchange
+    // via F11/ESC flips the button back without an extra click.
     function onChange() {
       setIsFullscreen(document.fullscreenElement === rootRef.current);
     }
@@ -141,6 +143,11 @@ export function CardDetailModal({
   );
   const hasMedia = hasNonLinkMedia || shouldShowLinkAsMedia || hasLinkPreview;
 
+  // 본문 카드 안의 모든 텍스트 요소를 동일한 폰트 크기/줄높이로 통일
+  // (Variant C 스타일 슬라이드 + 본문 정돈).
+  const slideTitleSize = "clamp(20px, 2.4vw, 28px)";
+  const slideBodySize = "15px";
+
   return (
     <>
       {!isFullscreen && (
@@ -173,25 +180,32 @@ export function CardDetailModal({
         >
           {isFullscreen ? <FullscreenExitIcon size={20} /> : <FullscreenEnterIcon size={20} />}
         </button>
+        {/* 하단 인디케이터 — cards[]가 있고 1장 초과일 때만 표시.
+            dots는 클릭으로 카드 간 이동 (onChange 호출) — 모달 내 컨트롤
+            직접 조작 가능. 2026-06-12 리팩토링: 카운트(예: "3 / 7")
+            텍스트는 제거하고 dots만 중앙 정렬. */}
         {cards && cards.length > 1 && navIndex >= 0 && (
-          <>
-            <button
-              type="button"
-              className="card-detail-nav card-detail-nav-prev"
-              onClick={goPrev}
-              aria-label="이전 카드"
-            >
-              <ChevronLeftIcon size={24} />
-            </button>
-            <button
-              type="button"
-              className="card-detail-nav card-detail-nav-next"
-              onClick={goNext}
-              aria-label="다음 카드"
-            >
-              <ChevronRightIcon size={24} />
-            </button>
-          </>
+          <div
+            className="card-detail-indicator"
+            role="status"
+            aria-label={`현재 카드 ${navIndex + 1} / ${cards.length}`}
+          >
+            <div className="card-detail-indicator-dots">
+              {cards.map((c, i) => (
+                <button
+                  key={c.id}
+                  type="button"
+                  className={
+                    "card-detail-indicator-dot" +
+                    (i === navIndex ? " is-active" : "")
+                  }
+                  aria-label={`${i + 1}번째 카드로 이동`}
+                  aria-current={i === navIndex ? "true" : undefined}
+                  onClick={() => onChange?.(c)}
+                />
+              ))}
+            </div>
+          </div>
         )}
         <div className="card-detail-body">
           {hasMedia && (
@@ -225,40 +239,56 @@ export function CardDetailModal({
             </section>
           )}
           <aside className="card-detail-side">
-            <h2 className="card-detail-title">{card.title}</h2>
-            {card.content && (
-              <p className="card-detail-content">{card.content}</p>
-            )}
-            {!hasMedia && showOriginalLink && card.linkUrl && (
-              <a
-                href={card.linkUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="card-detail-link"
-              >
-                🔗 링크 열기
-              </a>
-            )}
-            <CardAuthorFooter
-              authors={card.authors}
-              externalAuthorName={card.externalAuthorName}
-              studentAuthorName={card.studentAuthorName}
-              authorName={card.authorName}
-              createdAt={card.createdAt}
-              anonymousAuthor={card.anonymousAuthor}
-            />
-            {onEditAuthors && (canEditAuthors ? canEditAuthors(card) : true) && (
-              <button
-                type="button"
-                className="card-detail-edit-authors"
-                onClick={() => onEditAuthors(card)}
-              >
-                👥 작성자 지정
-              </button>
-            )}
-            {/* card-detail-modal-engagement (2026-04-26): 좋아요 + 댓글 패널.
-                작성자 지정 버튼 바로 아래 배치. */}
-            <CardEngagement cardId={card.id} mode="panel" />
+            <div className="card-detail-side-inner">
+              {card.title.trim() && (
+                <h2
+                  className="card-detail-title"
+                  style={{ fontSize: slideTitleSize, lineHeight: 1.3 }}
+                >
+                  {card.title}
+                </h2>
+              )}
+              {card.content && (
+                <p
+                  className="card-detail-content"
+                  style={{ fontSize: slideBodySize, lineHeight: 1.7 }}
+                >
+                  {card.content}
+                </p>
+              )}
+              {!hasMedia && showOriginalLink && card.linkUrl && (
+                <a
+                  href={card.linkUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="card-detail-link"
+                >
+                  🔗 링크 열기
+                </a>
+              )}
+              <div className="card-detail-meta">
+                <CardAuthorFooter
+                  authors={card.authors}
+                  externalAuthorName={card.externalAuthorName}
+                  studentAuthorName={card.studentAuthorName}
+                  authorName={card.authorName}
+                  createdAt={card.createdAt}
+                  anonymousAuthor={card.anonymousAuthor}
+                />
+                {onEditAuthors && (canEditAuthors ? canEditAuthors(card) : true) && (
+                  <button
+                    type="button"
+                    className="card-detail-edit-authors"
+                    onClick={() => onEditAuthors(card)}
+                  >
+                    👥 작성자 지정
+                  </button>
+                )}
+              </div>
+              {/* card-detail-modal-engagement (2026-04-26): 좋아요 + 댓글 패널.
+                  작성자 지정 버튼 바로 아래 배치. */}
+              <CardEngagement cardId={card.id} mode="panel" />
+            </div>
           </aside>
         </div>
         {lightboxIndex !== null &&
