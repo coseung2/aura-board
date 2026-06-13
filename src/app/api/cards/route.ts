@@ -37,10 +37,12 @@ const CreateCardSchema = z.object({
   // multi-attachment (2026-04-20): 정규화된 첨부 배열. 이 필드가 있으면
   // 위의 imageUrl/videoUrl/fileUrl(single) 필드보다 우선. 둘 다 허용해서
   // 기존 클라이언트와 신규 클라이언트 모두 호환.
+  // multi-link-attach (2026-06-13): kind에 "link" 추가. 외부 URL 허용
+  // (서버 화이트리스트 검사 분기에서 image/video/file과 다르게 처리).
   attachments: z
     .array(
       z.object({
-        kind: z.enum(["image", "video", "file"]),
+        kind: z.enum(["image", "video", "file", "link"]),
         url: z.string().url(),
         previewUrl: z.string().url().nullable().optional(),
         fileName: z.string().max(255).nullable().optional(),
@@ -105,8 +107,12 @@ export async function POST(req: Request) {
 
     // multi-attachment (2026-04-20): attachments 배열 아이템 각각 검증.
     // file kind는 singleton 경로와 동일 규칙 강제(URL 화이트리스트 + MIME).
+    // multi-link-attach (2026-06-13): link kind는 외부 URL 허용 — 화이트리스트
+    // 검사에서 제외하고 형식 검증만. XSS 방어는 link-preview의 target="_blank"
+    // + noopener로 처리.
     if (input.attachments) {
       for (const [i, a] of input.attachments.entries()) {
+        if (a.kind === "link") continue; // 외부 링크는 화이트리스트 면제
         if (!isAllowedFileUrl(a.url)) {
           return NextResponse.json(
             { error: `attachments[${i}].url must be from the project upload storage` },

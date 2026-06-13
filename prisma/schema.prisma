@@ -592,13 +592,15 @@ model ShowcaseEntry {
 }
 
 // multi-attachment (2026-04-20): 카드 1개에 이미지·동영상·파일 여러 개를
-// 붙일 수 있는 정규화 테이블. `kind`는 "image"|"video"|"file". 레거시
+// 붙일 수 있는 정규화 테이블. `kind`는 "image"|"video"|"file"|"link".
+// link 첨부는 URL과 OG 메타를 함께 저장: url=링크, previewUrl=OG 이미지,
+// fileName=제목, mimeType=설명 (title/desc 보존). 레거시
 // Card.imageUrl/videoUrl/fileUrl 단일 필드는 별개로 계속 존재하며,
 // attachments 배열이 비어있는 카드에 한해 렌더 fallback으로 사용됨.
 model CardAttachment {
   id         String   @id @default(cuid())
   cardId     String
-  kind       String // "image" | "video" | "file"
+  kind       String // "image" | "video" | "file" | "link"
   url        String
   previewUrl String?
   fileName   String?

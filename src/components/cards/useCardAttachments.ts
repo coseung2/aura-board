@@ -7,12 +7,12 @@ import { uploadFile } from "@/lib/upload-client";
 export type AttachmentDraft = {
   /** 클라이언트 전용 식별자(DB id 아님). React key용. */
   tempId: string;
-  kind: "image" | "video" | "file";
+  kind: "image" | "video" | "file" | "link";
   url: string;
   previewUrl?: string | null;
-  fileName?: string;
-  fileSize?: number;
-  mimeType?: string;
+  fileName?: string | null;
+  fileSize?: number | null;
+  mimeType?: string | null;
 };
 
 function mintId(): string {
@@ -104,6 +104,34 @@ export function useCardAttachments(initialAttachments: AttachmentDraft[] = []) {
     return true;
   }
 
+  // multi-link-attach (2026-06-13): link 첨부 추가. fileName=제목,
+  // mimeType=설명, previewUrl=OG 이미지로 재활용. 중복 URL은 거부.
+  function addLink(input: {
+    url: string;
+    title?: string | null;
+    description?: string | null;
+    image?: string | null;
+  }): { ok: true; tempId: string } | { ok: false; reason: string } {
+    const url = input.url.trim();
+    if (!url) return { ok: false, reason: "URL이 비어있어요" };
+    if (attachmentsRef.current.some((a) => a.kind === "link" && a.url === url)) {
+      return { ok: false, reason: "이미 추가된 링크예요" };
+    }
+    if (attachmentsRef.current.length >= MAX_ATTACHMENTS_PER_CARD) {
+      return { ok: false, reason: `최대 ${MAX_ATTACHMENTS_PER_CARD}개까지 첨부 가능` };
+    }
+    const tempId = mintId();
+    pushAttachment({
+      tempId,
+      kind: "link",
+      url,
+      previewUrl: input.image ?? null,
+      fileName: input.title ?? null,
+      mimeType: input.description ?? null,
+    });
+    return { ok: true, tempId };
+  }
+
   function removeAttachment(tempId: string) {
     if (!tempId) return;
     setAttachments((prev) => {
@@ -165,6 +193,7 @@ export function useCardAttachments(initialAttachments: AttachmentDraft[] = []) {
     countByKind,
     uploadMany,
     addLibraryImage,
+    addLink,
     removeAttachment,
     moveAttachment,
     isFirstOfKind,

@@ -12,6 +12,7 @@ import { CardAttachments } from "../CardAttachments";
 import { CardAuthorFooter } from "./CardAuthorFooter";
 import { CardImageLightbox } from "./CardImageLightbox";
 import { CardEngagement } from "../engagement/CardEngagement";
+import { CardFileAttachment } from "../CardFileAttachment";
 import {
   CloseIcon,
   FullscreenEnterIcon,
@@ -190,21 +191,72 @@ export function CardDetailModal({
           )}
           <aside className="card-detail-side">
             <div className="card-detail-side-inner">
-              {card.title.trim() && (
-                <h2
-                  className="card-detail-title"
-                  style={{ fontSize: slideTitleSize, lineHeight: 1.3 }}
-                >
-                  {card.title}
-                </h2>
-              )}
-              {card.content && (
-                <p
-                  className="card-detail-content"
-                  style={{ fontSize: slideBodySize, lineHeight: 1.7 }}
-                >
-                  {card.content}
-                </p>
+              {/* meta-download-zone (2026-06-13): 본문 = 제목 + content +
+                  linkTitle/linkDesc (Notion 스타일 — 굵은 제목 / 한 줄 빈 줄 /
+                  설명). 텍스트만 본문 영역. 이미지/영상/링크 첨부는 좌측
+                  carousel, 파일 첨부는 본문 아래 메타에 다운로드 리스트. */}
+              <div className="card-detail-body-text">
+                {card.title.trim() && (
+                  <h2
+                    className="card-detail-title"
+                    style={{ fontSize: slideTitleSize, lineHeight: 1.3, margin: 0 }}
+                  >
+                    {card.title}
+                  </h2>
+                )}
+                {(card.linkTitle || card.linkDesc) && (
+                  <div
+                    className="card-detail-link-body"
+                    style={{ fontSize: slideBodySize, lineHeight: 1.7 }}
+                  >
+                    {card.linkTitle && (
+                      <strong className="card-detail-link-title">{card.linkTitle}</strong>
+                    )}
+                    {card.linkTitle && card.linkDesc && (
+                      <div className="card-detail-link-spacer" aria-hidden="true" />
+                    )}
+                    {card.linkDesc && (
+                      <span className="card-detail-link-desc">{card.linkDesc}</span>
+                    )}
+                  </div>
+                )}
+                {card.content && (
+                  <CardBodyContent
+                    content={card.content}
+                    bodyFontSize={slideBodySize}
+                  />
+                )}
+              </div>
+              {/* meta-download-zone (2026-06-13): 파일 첨부 다운로드 리스트.
+                  legacy fileUrl/fileName/fileSize/fileMimeType + attachments[].kind==="file"
+                  둘 다 커버. */}
+              {(card.fileUrl ||
+                (card.attachments ?? []).some((a) => a.kind === "file")) && (
+                <ul className="card-detail-file-list" aria-label="첨부 파일">
+                  {card.fileUrl && (
+                    <li className="card-detail-file-item">
+                      <CardFileAttachment
+                        fileUrl={card.fileUrl}
+                        fileName={card.fileName ?? null}
+                        fileSize={card.fileSize ?? null}
+                        fileMimeType={card.fileMimeType ?? null}
+                      />
+                    </li>
+                  )}
+                  {(card.attachments ?? [])
+                    .filter((a) => a.kind === "file")
+                    .sort((a, b) => a.order - b.order)
+                    .map((a) => (
+                      <li key={a.id} className="card-detail-file-item">
+                        <CardFileAttachment
+                          fileUrl={a.url}
+                          fileName={a.fileName ?? null}
+                          fileSize={a.fileSize ?? null}
+                          fileMimeType={a.mimeType ?? null}
+                        />
+                      </li>
+                    ))}
+                </ul>
               )}
               {!hasMedia && showOriginalLink && card.linkUrl && (
                 <a
@@ -258,5 +310,48 @@ export function CardDetailModal({
           })()}
       </div>
     </>
+  );
+}
+
+// meta-download-zone (2026-06-13): 본문(content)을 Notion 스타일로 렌더.
+// 첫 줄이 "**...**"로 시작/끝나면 굵은 제목으로 분리, 그 다음 빈 줄 한 줄,
+// 그 다음 본문 텍스트. 사용자가 직접 마크다운을 쓰지 않는 한 이 형식이
+// 안전. (linkTitle/linkDesc 자동 append가 항상 이 형식으로 넣음)
+function CardBodyContent({
+  content,
+  bodyFontSize,
+}: {
+  content: string;
+  bodyFontSize: string;
+}) {
+  const match = content.match(/^\s*\*\*(.+?)\*\*\s*\n\n?([\s\S]*)$/);
+  if (match) {
+    const [, title, rest] = match;
+    return (
+      <>
+        <h3
+          className="card-detail-content-title"
+          style={{ fontSize: bodyFontSize, lineHeight: 1.5, margin: 0, fontWeight: 700 }}
+        >
+          {title}
+        </h3>
+        {rest.trim() && (
+          <p
+            className="card-detail-content"
+            style={{ fontSize: bodyFontSize, lineHeight: 1.7, margin: 0 }}
+          >
+            {rest}
+          </p>
+        )}
+      </>
+    );
+  }
+  return (
+    <p
+      className="card-detail-content"
+      style={{ fontSize: bodyFontSize, lineHeight: 1.7, margin: 0 }}
+    >
+      {content}
+    </p>
   );
 }

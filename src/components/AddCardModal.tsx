@@ -72,6 +72,20 @@ const FILE_ACCEPT =
   "audio/mpeg,audio/wav,audio/ogg,audio/mp4,audio/aac,audio/flac,audio/webm," +
   ".pdf,.docx,.xlsx,.pptx,.hwp,.hwpx,.txt,.md,.markdown,.html,.htm,.zip,.mp3,.wav,.ogg,.m4a,.aac,.flac,.webm";
 
+// meta-download-zone (2026-06-13): linkTitle/linkDesc를 본문(content)에
+// Notion 스타일로 합치는 헬퍼. 굵은 제목 / 한 줄 빈 줄 / 설명.
+// 둘 다 비면 빈 문자열. 둘 중 하나만 있으면 그 줄만.
+export function buildLinkTextBlock(
+  title: string | null | undefined,
+  description: string | null | undefined
+): string {
+  const t = (title ?? "").trim();
+  const d = (description ?? "").trim();
+  if (!t && !d) return "";
+  if (t && d) return `**${t}**\n\n${d}`;
+  return t || d;
+}
+
 export function AddCardModal({
   onAdd,
   onClose,
@@ -192,9 +206,19 @@ export function AddCardModal({
               Boolean(linkUrl) ||
               payloadAttachments.length > 0;
             if (!hasCardBody) return;
+            // meta-download-zone (2026-06-13): linkTitle/linkDesc를 본문
+            // (content)에 Notion 스타일로 합쳐 저장 — 굵은 제목 / 한 줄 빈
+            // 줄 / 설명. 카드 상세 모달은 이제 이걸 그대로 본문 영역에 표시.
+            const linkTextBlock = buildLinkTextBlock(
+              preview?.title,
+              preview?.description
+            );
+            const mergedContent = linkTextBlock
+              ? linkTextBlock + (content.trim() ? "\n\n" + content.trim() : "")
+              : content.trim();
             await onAdd({
               title: title.trim(),
-              content: content.trim(),
+              content: mergedContent,
               linkUrl: linkUrl || undefined,
               linkTitle: preview?.title || undefined,
               linkDesc: preview?.description || undefined,

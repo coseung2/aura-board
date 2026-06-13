@@ -13,6 +13,7 @@ import {
   type AttachmentDraft,
 } from "./cards/useCardAttachments";
 import { detectFirstUrl, removeUrlFromText } from "@/lib/link-detection";
+import { buildLinkTextBlock } from "./AddCardModal";
 
 const COLOR_PRESETS = [
   null, "#ffd8f4", "#c3faf5", "#ffe6cd", "#fde0f0",
@@ -170,9 +171,18 @@ export function EditCardModal({ card, onSave, onClose }: Props) {
               Boolean(linkUrl) ||
               payloadAttachments.length > 0;
             if (!hasCardBody) return;
+            // meta-download-zone (2026-06-13): linkTitle/linkDesc를 본문에
+            // Notion 스타일로 합쳐 저장. AddCardModal과 동일 헬퍼 사용.
+            const linkTextBlock = buildLinkTextBlock(
+              card.linkTitle,
+              card.linkDesc
+            );
+            const mergedContent = linkTextBlock
+              ? linkTextBlock + (content.trim() ? "\n\n" + content.trim() : "")
+              : content.trim();
             await onSave({
               title: title.trim(),
-              content: content.trim(),
+              content: mergedContent,
               imageUrl: firstImage?.url ?? null,
               attachments: payloadAttachments,
               linkUrl: linkUrl || null,

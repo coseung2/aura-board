@@ -77,18 +77,6 @@ export const CardAttachments = memo(function CardAttachments({ imageUrl, thumbUr
     fileMimeType,
   });
   const hasAttachments = allSorted.length > 0;
-  if (!hasAttachments && !linkUrl) return null;
-  // media-attach-carousel (2026-06-12): 항목이 바뀌면 mediaIndex를 안전
-  // 범위로 클램프. 카드 전환 시 첨부 id 순서가 바뀌어 인덱스가 무효화될
-  // 수 있어 useEffect로 동기화.
-  useEffect(() => {
-    if (allSorted.length === 0) {
-      setMediaIndex(0);
-      return;
-    }
-    setMediaIndex((i) => (i >= allSorted.length ? 0 : i));
-  }, [allSorted.length]);
-
   // 링크는 attachments에 포함되지 않으므로 별개 렌더. multi-attachment
   // 카드에서도 링크는 최대 1개(현 스키마 제약).
   const canvaDesignId = linkUrl ? extractCanvaDesignId(linkUrl) : null;
@@ -140,27 +128,17 @@ export const CardAttachments = memo(function CardAttachments({ imageUrl, thumbUr
         (!shouldHideLinkPreview &&
           (variant === "detail" ? hasLinkPreviewContent : shouldRenderThumbnailLinkPreview)))
   );
-  // media-attach-carousel + linkUrl 통합 (2026-06-13): linkUrl의 YouTube
-  // 영상도 슬라이드에 포함. attachments/videoUrl과 별개의 legacy 링크가
-  // detail 모드에서 carousel의 일부로 동작하도록 가상 아이템으로 변환.
-  const linkYouTubeAsMediaItem: AttachmentItem | null =
-    variant === "detail" && linkUrl && linkYouTubeId && !linkedYouTubeAlreadyInMedia
-      ? {
-          id: `legacy-link-yt-${linkYouTubeId}`,
-          kind: "video",
-          url: linkUrl,
-          previewUrl: null,
-          fileName: linkTitle ?? null,
-          fileSize: null,
-          mimeType: null,
-          order: 9999,
-        }
-      : null;
-  const allSortedWithLink =
-    linkYouTubeAsMediaItem && !allSorted.some((a) => hasSameYouTubeId(a.url, linkYouTubeAsMediaItem.url))
-      ? [...allSorted, linkYouTubeAsMediaItem].sort((a, b) => a.order - b.order)
-      : allSorted;
-  const thumbnailItem = pickThumbnailItem(allSortedWithLink);
+  // multi-link-attach (2026-06-13): legacy linkUrl 단일 필드도
+  // buildMediaItems()에서 kind:"link" 첨부로 자동 변환되므로, 별도 가상
+  // 아이템 합치기 불필요. carousel은 attachments+legacy 합쳐진 allSorted로
+  // 그대로 동작.
+  // meta-download-zone (2026-06-13): file 첨부는 미디어 영역이 아니라
+  // 메타 영역(우측 사이드)에 다운로드 리스트로 옮김. mediaSorted는
+  // image/video/link만 포함하고, fileAttachments는 별도 export.
+  const fileAttachments = allSorted.filter((a) => a.kind === "file");
+  const mediaSorted = allSorted.filter((a) => a.kind !== "file");
+  const allSortedWithLink = mediaSorted;
+  const thumbnailItem = pickThumbnailItem(mediaSorted);
   const sorted = variant === "thumbnail" ? (thumbnailItem ? [thumbnailItem] : []) : allSortedWithLink;
   // media-attach-carousel (2026-06-12): detail 모드 + 항목 ≥ 2 일 때만
   // 슬라이드 활성화. 단일 항목은 기존 풀 표시 유지.
@@ -168,13 +146,27 @@ export const CardAttachments = memo(function CardAttachments({ imageUrl, thumbUr
   const currentItem = isCarousel ? sorted[Math.min(mediaIndex, sorted.length - 1)] : null;
   const extraCount =
     variant === "thumbnail"
-      ? Math.max(0, allSorted.length - 1 + (linkRendersAsMedia ? 1 : 0))
+      ? Math.max(0, mediaSorted.length - 1 + (linkRendersAsMedia ? 1 : 0))
       : 0;
 
   // detail 모드에서 이미지 클릭 시 라이트박스를 띄울 수 있도록 인덱스 계산.
   // 이미지 종류만 navigation 대상 (pdf/video 제외). CardDetailModal 이
   // onImageClick 을 넘기면 그 안에서 라이트박스 state 를 관리.
   const imageAttachments = sorted.filter((a) => a.kind === "image");
+  // meta-download-zone (2026-06-13): file-only 카드는 mediaSorted가 비어
+  // 있어 Carousel 컨테이너가 그려지지 않음. 이 컴포넌트 자체는 linkUrl
+  // 또는 media 첨부 중 하나라도 있을 때만 렌더.
+  if (!allSortedWithLink.length && !linkUrl) return null;
+  // media-attach-carousel (2026-06-12): 항목이 바뀌면 mediaIndex를 안전
+  // 범위로 클램프. 카드 전환 시 첨부 id 순서가 바뀌어 인덱스가 무효화될
+  // 수 있어 useEffect로 동기화.
+  useEffect(() => {
+    if (mediaSorted.length === 0) {
+      setMediaIndex(0);
+      return;
+    }
+    setMediaIndex((i) => (i >= mediaSorted.length ? 0 : i));
+  }, [mediaSorted.length]);
   const renderVideoPoster = (
     key: string,
     videoUrlForFallback: string | null,
@@ -332,6 +324,45 @@ export const CardAttachments = memo(function CardAttachments({ imageUrl, thumbUr
         </div>
       );
     }
+    if (a.kind === "link") {
+      // multi-link-attach (2026-06-13): link 첨부는 OG 카드(link-preview)
+      // 로 표시. YouTube URL이라도 link kind면 OG 카드로 표시 — 재생이
+      // 필요하면 video 첨부로 올리면 됨.
+      return (
+        <a
+          key={a.id}
+          href={a.url}
+          target="_blank"
+          rel="noopener noreferrer"
+          className={`card-link-preview ${a.previewUrl ? "has-image" : ""}`}
+          onClick={(e) => e.stopPropagation()}
+        >
+          {a.previewUrl && (
+            <LinkPreviewImage
+              src={a.previewUrl}
+              sizes="(max-width: 768px) 100vw, 480px"
+            />
+          )}
+          <div className="card-link-preview-body">
+            <span className="card-link-preview-title">
+              {a.fileName || (() => {
+                try { return new URL(a.url).hostname.replace(/^www\./, ""); }
+                catch { return a.url; }
+              })()}
+            </span>
+            <span className="card-link-preview-url">
+              🔗 {(() => {
+                try { return new URL(a.url).hostname.replace(/^www\./, ""); }
+                catch { return a.url; }
+              })()}
+            </span>
+            {a.mimeType && (
+              <span className="card-link-preview-desc">{a.mimeType}</span>
+            )}
+          </div>
+        </a>
+      );
+    }
     // file
     return (
       <div key={a.id} className="card-attach-file-wrap">
@@ -441,9 +472,13 @@ export const CardAttachments = memo(function CardAttachments({ imageUrl, thumbUr
         linkUrl &&
         linkYouTubeId &&
         !linkedYouTubeAlreadyInMedia &&
-        // media-attach-carousel + linkUrl 통합 (2026-06-13): carousel이
-        // linkUrl을 슬라이드로 흡수했으면 중복 iframe 렌더 차단.
-        !(isCarousel && linkYouTubeAsMediaItem) && (
+        // multi-link-attach (2026-06-13): linkUrl은 buildMediaItems()에서
+        // kind:"link" 첨부로 변환되어 carousel/stacked 어느 경로든 한 번만
+        // 렌더됨. link 첨부 렌더 자체에서 YouTube iframe 분기를 따로 두지
+        // 않으므로, link가 OG 카드로 표시될 때 legacy iframe은 어차피 안
+        // 뜨지만, attachments에 link 첨부가 없을 때(= legacy 단일 필드
+        // 만 있을 때)는 별도 iframe으로 표시.
+        !allSorted.some((a) => a.kind === "link" && a.url === linkUrl) && (
         <div className="card-attach-video">
           <iframe
             src={`https://www.youtube.com/embed/${linkYouTubeId}`}
@@ -466,7 +501,7 @@ export const CardAttachments = memo(function CardAttachments({ imageUrl, thumbUr
           linkImage={linkImage ?? null}
           linkDesc={linkDesc ?? null}
         />
-      ) : shouldRenderDetailLinkPreview && linkUrl ? (
+      ) : shouldRenderDetailLinkPreview && linkUrl && !allSorted.some((a) => a.kind === "link" && a.url === linkUrl) ? (
         <a
           href={linkUrl}
           target="_blank"
@@ -547,6 +582,10 @@ function buildMediaItems({
   imageUrl,
   thumbUrl,
   videoUrl,
+  linkUrl,
+  linkTitle,
+  linkDesc,
+  linkImage,
   fileUrl,
   fileName,
   fileSize,
@@ -557,6 +596,10 @@ function buildMediaItems({
   | "imageUrl"
   | "thumbUrl"
   | "videoUrl"
+  | "linkUrl"
+  | "linkTitle"
+  | "linkDesc"
+  | "linkImage"
   | "fileUrl"
   | "fileName"
   | "fileSize"
@@ -591,6 +634,20 @@ function buildMediaItems({
       order: nextOrder++,
     });
   }
+  // multi-link-attach (2026-06-13): legacy Card.linkUrl 단일 필드는 link
+  // 첨부로 변환. attachments에 같은 URL의 link 첨부가 이미 있으면 중복 X.
+  if (linkUrl && !has("link", linkUrl)) {
+    items.push({
+      id: `legacy-link-${linkUrl}`,
+      kind: "link",
+      url: linkUrl,
+      previewUrl: linkImage ?? null,
+      fileName: linkTitle ?? null,
+      fileSize: null,
+      mimeType: linkDesc ?? null,
+      order: nextOrder++,
+    });
+  }
   if (fileUrl && !has("file", fileUrl)) {
     items.push({
       id: `legacy-file-${fileUrl}`,
@@ -613,10 +670,15 @@ function pickThumbnailItem(items: AttachmentItem[]): AttachmentItem | null {
     items.find((item) => item.kind === "image") ??
     items.find((item) => item.kind === "video" && (item.previewUrl || getYouTubeId(item.url))) ??
     items.find((item) => item.kind === "video") ??
-    items.find((item) => item.kind === "file") ??
     items[0] ??
     null
   );
+}
+
+// meta-download-zone (2026-06-13): 첨부 리스트에서 file 첨부만 분리.
+// CardDetailModal이 메타 영역의 다운로드 리스트를 그릴 때 직접 사용.
+export function extractFileAttachments(items: AttachmentItem[]): AttachmentItem[] {
+  return items.filter((a) => a.kind === "file");
 }
 
 // NOTE: Legacy inline CanvaEmbed has been replaced by the virtualized

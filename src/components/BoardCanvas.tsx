@@ -81,12 +81,12 @@ export function BoardCanvas({
     linkDesc?: string;
     linkImage?: string;
     attachments?: Array<{
-      kind: "image" | "video" | "file";
+      kind: "image" | "video" | "file" | "link";
       url: string;
       previewUrl?: string | null;
-      fileName?: string;
-      fileSize?: number;
-      mimeType?: string;
+      fileName?: string | null;
+      fileSize?: number | null;
+      mimeType?: string | null;
     }>;
     color?: string;
     attachAssetId?: string;
