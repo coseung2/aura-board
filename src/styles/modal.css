@@ -216,7 +216,7 @@
 
 .card-detail-media {
   position: relative;
-  background: #0b0b0d;
+  background: var(--color-surface);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -395,19 +395,21 @@
    기존 detail 단일 표시(.card-detail-media .card-attach-image.is-detail)엔
    영향 없도록 carousel 스코프 안에서만 덮어씀. */
 .card-attach-carousel-viewport .card-attach-image.is-detail {
+  width: 100%;
+  height: 100%;
   max-width: 100%;
   max-height: 100%;
   display: flex;
   align-items: center;
   justify-content: center;
 }
-
 .card-attach-carousel-viewport .card-attach-image.is-detail img {
+  width: 100%;
+  height: 100%;
   max-width: 100%;
   max-height: 100%;
-  width: auto;
-  height: auto;
   object-fit: contain;
+  object-position: center;
 }
 
 .card-attach-carousel-viewport .card-attach-video {
@@ -555,21 +557,21 @@
 .card-detail-media .card-attach-video {
   flex: 0 0 auto;
   width: 100%;
-  max-height: 70vh;
+  max-height: 100%;
   display: flex;
   justify-content: center;
-  background: #000;
+  background: var(--color-surface);
 }
 
 .card-detail-media .card-attach-video > iframe,
 .card-detail-media .card-attach-video > video {
   width: 100%;
   height: auto;
-  max-height: 70vh;
+  max-height: 100%;
   aspect-ratio: auto 16 / 9;
   object-fit: contain;
   border-radius: 8px;
-  background: #000;
+  background: var(--color-surface);
 }
 
 .card-detail-media .card-attach-video > video {
@@ -712,18 +714,25 @@
   height: 100%;
   background: var(--color-surface);
 }
+/* media/content-zone 고정 (2026-06-13): media는 YouTube 16:9 비율로 고정.
+   content-zone은 남은 공간. */
+.card-detail-media {
+  flex: 0 0 auto;
+  aspect-ratio: 16 / 9;
+  width: 100%;
+  min-height: 0;
+  max-height: 70%;
+}
 .card-detail-content-zone {
-  flex-shrink: 0;
+  flex: 1 1 auto;
+  min-height: 0;
   padding: 16px 24px 20px;
   background: var(--color-surface);
   border-top: 1px solid var(--color-border);
   display: flex;
   flex-direction: column;
   gap: 12px;
-  /* 콘텐츠 영역 고정 (2026-06-13): 모달이 100dvh-48px 안에서 fit해야
-     하므로 content-zone이 모달 높이를 밀어내지 않음. 텍스트가 길면
-     모달 자체에 스크롤 생기도록 modal overflow는 위에서 처리. */
-  overflow: visible;
+  overflow-y: auto;
 }
 .card-detail-body-text {
   max-width: 70ch;
