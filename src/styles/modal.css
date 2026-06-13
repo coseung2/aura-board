@@ -180,7 +180,7 @@
 .card-detail-modal[data-fullscreen="true"] .card-detail-body {
   grid-template-columns: 1fr;
 }
-.card-detail-modal[data-fullscreen="true"] .card-detail-side {
+.card-detail-modal[data-fullscreen="true"] .card-detail-rail {
   display: none;
 }
 .card-detail-modal[data-fullscreen="true"] .card-detail-nav {
@@ -206,9 +206,9 @@
 
 .card-detail-body {
   display: grid;
-  /* Variant C 슬라이드 비율: 좌측 미디어(1.4fr) / 우측 사이드(1fr).
-     사이드는 본문이 한 화면에 fit하도록 고정. */
-  grid-template-columns: 1.4fr 1fr;
+  /* 1-column + right rail (2026-06-13): 좌측 main = media + 텍스트/다운로드,
+     우측 rail = meta + engagement. rail은 220px 고정, main은 나머지. */
+  grid-template-columns: 1fr 220px;
   height: 100%;
   min-height: 0;
   overflow: hidden;
@@ -367,6 +367,8 @@
   width: 100%;
   height: 100%;
   min-height: 0;
+  flex: 1;
+  align-self: stretch;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -422,6 +424,7 @@
   width: 100%;
   max-width: 100%;
   max-height: 100%;
+  aspect-ratio: 16 / 9;
   object-fit: contain;
 }
 
@@ -698,27 +701,37 @@
   height: 100%;
 }
 
-/* Card detail — Variant C slide layout: 사이드 패널은 단일 화면에
-   fit. 스크롤 없음. 모든 텍스트 요소는 동일 폰트 크기(15px) + 고정
-   line-height(1.7)로 통일 — 사용자가 "본문 요소 크기 들쭉날쭉"
-   문제를 호소해서 2026-06-12에 정돈. */
-.card-detail-side {
-  border-left: 1px solid var(--color-border);
-  padding: 24px 20px 20px;
-  overflow: hidden;
+/* 1-column + right rail (2026-06-13): 모달 좌측 main = carousel + 텍스트
+   + 다운로드. 우측 rail = 작성자 + 좋아요/댓글. main은 column flex로
+   위 = media, 아래 = content-zone. */
+.card-detail-main {
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  min-width: 0;
+  min-height: 0;
+  height: 100%;
+  background: var(--color-surface);
+}
+.card-detail-content-zone {
+  flex-shrink: 0;
+  padding: 16px 24px 20px;
+  background: var(--color-surface);
+  border-top: 1px solid var(--color-border);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-height: 45%;
+  overflow-y: auto;
+}
+.card-detail-rail {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 24px 16px 20px;
+  border-left: 1px solid var(--color-border);
   background: var(--color-surface);
   min-height: 0;
-}
-.card-detail-side-inner {
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-  flex: 1;
-  min-height: 0;
-  overflow: hidden;
+  overflow-y: auto;
 }
 
 .card-detail-title {
@@ -731,6 +744,19 @@
   flex-shrink: 0;
 }
 
+/* body-text (2026-06-13): content-zone(column)의 자식. 더 이상 빈 공간
+   채우기(fill) 책임은 content-zone이 가지므로 flex:1 제거. */
+.card-detail-body-text {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.card-detail-file-list {
+  flex-shrink: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
 .card-detail-content {
   white-space: pre-wrap;
   /* font-size는 인라인 15px로 고정. */
@@ -739,6 +765,11 @@
   flex: 1;
   min-height: 0;
   overflow-y: auto;
+}
+.card-detail-content-title,
+.card-detail-link-title,
+.card-detail-link-desc {
+  flex-shrink: 0;
 }
 
 /* 작성자 + 작성자 지정 버튼 묶음 — 본문과 분리, 슬라이드 하단 고정. */
@@ -767,21 +798,22 @@
 }
 
 .card-detail-modal[data-has-media="false"] .card-detail-body {
+  /* media 없으면 main이 비고, rail만 살아있음. main 영역은 숨김. */
   grid-template-columns: 1fr;
+}
+.card-detail-modal[data-has-media="false"] .card-detail-main {
+  display: none;
 }
 
 /* Stack vertically whenever the viewport is portrait-oriented (tablet
-   세로, phone) OR narrower than 1200px (narrow desktop window). Galaxy
-   Tab S6 Lite portrait is exactly 1200px wide, which max-width:1199
-   misses — orientation:portrait catches it.
-   Landscape on the same tablet (2000×1200) keeps the 2-column layout
-   because both predicates fail: not portrait AND width > 1199. */
+   세로, phone) OR narrower than 1200px (narrow desktop window). 1컬럼 +
+   rail 구조에서는 main 위, rail 아래로 쌓음. */
 @media (orientation: portrait), (max-width: 1199px) {
   .card-detail-body {
     grid-template-columns: 1fr;
-    grid-template-rows: 55dvh 1fr;
+    grid-template-rows: 55dvh auto;
   }
-  .card-detail-side {
+  .card-detail-rail {
     border-left: 0;
     border-top: 1px solid var(--color-border);
     overflow-y: auto;

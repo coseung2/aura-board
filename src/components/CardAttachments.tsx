@@ -468,26 +468,11 @@ export const CardAttachments = memo(function CardAttachments({ imageUrl, thumbUr
               );
             })()
         ) : null}
-      {variant === "detail" &&
-        linkUrl &&
-        linkYouTubeId &&
-        !linkedYouTubeAlreadyInMedia &&
-        // multi-link-attach (2026-06-13): linkUrl은 buildMediaItems()에서
-        // kind:"link" 첨부로 변환되어 carousel/stacked 어느 경로든 한 번만
-        // 렌더됨. link 첨부 렌더 자체에서 YouTube iframe 분기를 따로 두지
-        // 않으므로, link가 OG 카드로 표시될 때 legacy iframe은 어차피 안
-        // 뜨지만, attachments에 link 첨부가 없을 때(= legacy 단일 필드
-        // 만 있을 때)는 별도 iframe으로 표시.
-        !allSorted.some((a) => a.kind === "link" && a.url === linkUrl) && (
-        <div className="card-attach-video">
-          <iframe
-            src={`https://www.youtube.com/embed/${linkYouTubeId}`}
-            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-            allowFullScreen
-            title={linkTitle || "YouTube"}
-          />
-        </div>
-      )}
+      {/* REMOVED (2026-06-13): legacy linkUrl→iframe branch. buildMediaItems()
+          always pushes linkUrl as kind:"link" into allSorted, so this branch
+          was dead code — its condition !allSorted.some((a) => a.kind==="link" && a.url===linkUrl)
+          was always false. link videos render as OG cards via renderMediaItem's
+          link branch; dedicated YouTube playback needs a proper video attachment. */}
       {shouldRenderDetailLinkPreview && linkUrl && canRenderCanvaEmbed && canvaDesignId ? (
         // Delegated to CanvaEmbedSlot (T0-② virtualization): thumbnail by
         // default, iframe mounts only on activation + in viewport, with a

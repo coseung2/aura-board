@@ -43,8 +43,14 @@ const CreateCardSchema = z.object({
     .array(
       z.object({
         kind: z.enum(["image", "video", "file", "link"]),
-        url: z.string().url(),
-        previewUrl: z.string().url().nullable().optional(),
+        // attachment-url-soften (2026-06-13): url/previewUrl은 storage 절대
+        // URL 또는 link의 경우 사용자가 입력한 임의 외부 URL이 들어옴. zod
+        // .url()은 빈 문자열·상대경로·특수문자 포함 시 false negative가 잦아
+        // (예: blob:http://, student 라이브러리 상대경로, OG image 일부 누락)
+        // .min(1)로 비어있지만 않으면 통과시킴. 형식 검증은 사용 시점에
+        // downstream(storage fetch / LinkPreviewImage)이 별도 처리.
+        url: z.string().min(1),
+        previewUrl: z.string().min(1).nullable().optional(),
         fileName: z.string().max(255).nullable().optional(),
         fileSize: z.number().int().nonnegative().nullable().optional(),
         mimeType: z.string().max(100).nullable().optional(),

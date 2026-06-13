@@ -35,9 +35,10 @@ const PatchCardSchema = z.object({
   attachments: z
     .array(
       z.object({
-        kind: z.enum(["image", "video", "file"]),
-        url: z.string().url(),
-        previewUrl: z.string().url().nullable().optional(),
+        kind: z.enum(["image", "video", "file", "link"]),
+        // attachment-url-soften (2026-06-13): 동일 사유. .url() → .min(1).
+        url: z.string().min(1),
+        previewUrl: z.string().min(1).nullable().optional(),
         fileName: z.string().max(255).nullable().optional(),
         fileSize: z.number().int().nonnegative().nullable().optional(),
         mimeType: z.string().max(100).nullable().optional(),

@@ -159,42 +159,42 @@ export function CardDetailModal({
           {isFullscreen ? <FullscreenExitIcon size={20} /> : <FullscreenEnterIcon size={20} />}
         </button>
         <div className="card-detail-body">
-          {hasMedia && (
-            <section className="card-detail-media" aria-label="첨부">
-              <CardAttachments
-                imageUrl={card.imageUrl}
-                thumbUrl={card.thumbUrl}
-                linkUrl={shouldPassLinkToMedia || hasLinkPreview ? card.linkUrl : null}
-                linkTitle={card.linkTitle}
-                linkDesc={card.linkDesc}
-                linkImage={card.linkImage}
-                videoUrl={card.videoUrl}
-                fileUrl={card.fileUrl}
-                fileName={card.fileName}
-                fileSize={card.fileSize}
-                fileMimeType={card.fileMimeType}
-                attachments={card.attachments}
-                onImageClick={(i) => setLightboxIndex(i)}
-              />
-              {showOriginalLink && card.linkUrl && (
-                <a
-                  href={card.linkUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="card-detail-media-link"
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  🔗 링크 열기
-                </a>
-              )}
-            </section>
-          )}
-          <aside className="card-detail-side">
-            <div className="card-detail-side-inner">
+          <section className="card-detail-main" aria-label="콘텐츠">
+            {hasMedia && (
+              <div className="card-detail-media" aria-label="첨부">
+                <CardAttachments
+                  imageUrl={card.imageUrl}
+                  thumbUrl={card.thumbUrl}
+                  linkUrl={shouldPassLinkToMedia || hasLinkPreview ? card.linkUrl : null}
+                  linkTitle={card.linkTitle}
+                  linkDesc={card.linkDesc}
+                  linkImage={card.linkImage}
+                  videoUrl={card.videoUrl}
+                  fileUrl={card.fileUrl}
+                  fileName={card.fileName}
+                  fileSize={card.fileSize}
+                  fileMimeType={card.fileMimeType}
+                  attachments={card.attachments}
+                  onImageClick={(i) => setLightboxIndex(i)}
+                />
+                {showOriginalLink && card.linkUrl && (
+                  <a
+                    href={card.linkUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="card-detail-media-link"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    🔗 링크 열기
+                  </a>
+                )}
+              </div>
+            )}
+            <div className="card-detail-content-zone">
               {/* meta-download-zone (2026-06-13): 본문 = 제목 + content +
                   linkTitle/linkDesc (Notion 스타일 — 굵은 제목 / 한 줄 빈 줄 /
-                  설명). 텍스트만 본문 영역. 이미지/영상/링크 첨부는 좌측
-                  carousel, 파일 첨부는 본문 아래 메타에 다운로드 리스트. */}
+                  설명). 텍스트만 본문 영역. 파일 첨부는 본문 아래 다운로드
+                  리스트. */}
               <div className="card-detail-body-text">
                 {card.title.trim() && (
                   <h2
@@ -233,8 +233,15 @@ export function CardDetailModal({
               {(card.fileUrl ||
                 (card.attachments ?? []).some((a) => a.kind === "file")) && (
                 <ul className="card-detail-file-list" aria-label="첨부 파일">
+                  {/* key dedup (2026-06-13): legacy card.fileUrl과 attachments[]
+                      양쪽에 같은 url이 동기화된 경우 동일 row가 두 번 렌더되어
+                      React key 충돌 경고 발생. legacy가 있으면 그 url과 같은
+                      첨부는 제외. */}
                   {card.fileUrl && (
-                    <li className="card-detail-file-item">
+                    <li
+                      key={`legacy-file-${card.fileUrl}`}
+                      className="card-detail-file-item"
+                    >
                       <CardFileAttachment
                         fileUrl={card.fileUrl}
                         fileName={card.fileName ?? null}
@@ -244,7 +251,11 @@ export function CardDetailModal({
                     </li>
                   )}
                   {(card.attachments ?? [])
-                    .filter((a) => a.kind === "file")
+                    .filter(
+                      (a) =>
+                        a.kind === "file" &&
+                        !(card.fileUrl && a.url === card.fileUrl)
+                    )
                     .sort((a, b) => a.order - b.order)
                     .map((a) => (
                       <li key={a.id} className="card-detail-file-item">
@@ -268,29 +279,30 @@ export function CardDetailModal({
                   🔗 링크 열기
                 </a>
               )}
-              <div className="card-detail-meta">
-                <CardAuthorFooter
-                  authors={card.authors}
-                  externalAuthorName={card.externalAuthorName}
-                  studentAuthorName={card.studentAuthorName}
-                  authorName={card.authorName}
-                  createdAt={card.createdAt}
-                  anonymousAuthor={card.anonymousAuthor}
-                />
-                {onEditAuthors && (canEditAuthors ? canEditAuthors(card) : true) && (
-                  <button
-                    type="button"
-                    className="card-detail-edit-authors"
-                    onClick={() => onEditAuthors(card)}
-                  >
-                    👥 작성자 지정
-                  </button>
-                )}
-              </div>
-              {/* card-detail-modal-engagement (2026-04-26): 좋아요 + 댓글 패널.
-                  작성자 지정 버튼 바로 아래 배치. */}
-              <CardEngagement cardId={card.id} mode="panel" />
             </div>
+          </section>
+          <aside className="card-detail-rail" aria-label="메타 및 인터랙션">
+            <div className="card-detail-meta">
+              <CardAuthorFooter
+                authors={card.authors}
+                externalAuthorName={card.externalAuthorName}
+                studentAuthorName={card.studentAuthorName}
+                authorName={card.authorName}
+                createdAt={card.createdAt}
+                anonymousAuthor={card.anonymousAuthor}
+              />
+              {onEditAuthors && (canEditAuthors ? canEditAuthors(card) : true) && (
+                <button
+                  type="button"
+                  className="card-detail-edit-authors"
+                  onClick={() => onEditAuthors(card)}
+                >
+                  👥 작성자 지정
+                </button>
+              )}
+            </div>
+            {/* card-detail-modal-engagement (2026-04-26): 좋아요 + 댓글 패널. */}
+            <CardEngagement cardId={card.id} mode="panel" />
           </aside>
         </div>
         {lightboxIndex !== null &&
