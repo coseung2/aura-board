@@ -140,8 +140,28 @@ export const CardAttachments = memo(function CardAttachments({ imageUrl, thumbUr
         (!shouldHideLinkPreview &&
           (variant === "detail" ? hasLinkPreviewContent : shouldRenderThumbnailLinkPreview)))
   );
-  const thumbnailItem = pickThumbnailItem(allSorted);
-  const sorted = variant === "thumbnail" ? (thumbnailItem ? [thumbnailItem] : []) : allSorted;
+  // media-attach-carousel + linkUrl 통합 (2026-06-13): linkUrl의 YouTube
+  // 영상도 슬라이드에 포함. attachments/videoUrl과 별개의 legacy 링크가
+  // detail 모드에서 carousel의 일부로 동작하도록 가상 아이템으로 변환.
+  const linkYouTubeAsMediaItem: AttachmentItem | null =
+    variant === "detail" && linkUrl && linkYouTubeId && !linkedYouTubeAlreadyInMedia
+      ? {
+          id: `legacy-link-yt-${linkYouTubeId}`,
+          kind: "video",
+          url: linkUrl,
+          previewUrl: null,
+          fileName: linkTitle ?? null,
+          fileSize: null,
+          mimeType: null,
+          order: 9999,
+        }
+      : null;
+  const allSortedWithLink =
+    linkYouTubeAsMediaItem && !allSorted.some((a) => hasSameYouTubeId(a.url, linkYouTubeAsMediaItem.url))
+      ? [...allSorted, linkYouTubeAsMediaItem].sort((a, b) => a.order - b.order)
+      : allSorted;
+  const thumbnailItem = pickThumbnailItem(allSortedWithLink);
+  const sorted = variant === "thumbnail" ? (thumbnailItem ? [thumbnailItem] : []) : allSortedWithLink;
   // media-attach-carousel (2026-06-12): detail 모드 + 항목 ≥ 2 일 때만
   // 슬라이드 활성화. 단일 항목은 기존 풀 표시 유지.
   const isCarousel = variant === "detail" && sorted.length > 1;
@@ -420,7 +440,10 @@ export const CardAttachments = memo(function CardAttachments({ imageUrl, thumbUr
       {variant === "detail" &&
         linkUrl &&
         linkYouTubeId &&
-        !linkedYouTubeAlreadyInMedia && (
+        !linkedYouTubeAlreadyInMedia &&
+        // media-attach-carousel + linkUrl 통합 (2026-06-13): carousel이
+        // linkUrl을 슬라이드로 흡수했으면 중복 iframe 렌더 차단.
+        !(isCarousel && linkYouTubeAsMediaItem) && (
         <div className="card-attach-video">
           <iframe
             src={`https://www.youtube.com/embed/${linkYouTubeId}`}
