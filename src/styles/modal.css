@@ -46,6 +46,15 @@
   overflow: hidden;
 }
 
+/* text-only 변형 (2026-06-13): media 없으면 모달이 콘텐츠(텍스트+파일+
+   링크)만 들어가므로 더 작게. height는 콘텐츠 따라 auto, max 제한. */
+.card-detail-modal[data-has-media="false"] {
+  width: min(960px, calc(100vw - 48px));
+  height: auto;
+  max-height: calc(100dvh - 48px);
+  overflow: hidden;
+}
+
 /* refined-icons (2026-04-26): 모든 버튼 내부에 SVG (currentColor stroke)
    를 사용하므로 font-size/line-height 글리프 metric 의존 제거. flex
    center 만으로 픽셀 단위 완벽 정렬. */
@@ -809,8 +818,8 @@
 }
 
 .card-detail-modal[data-has-media="false"] .card-detail-body {
-  /* media 없으면 main이 비고, rail만 살아있음. main 영역은 숨김. */
-  grid-template-columns: 1fr;
+  /* text-only 변형 (2026-06-13): content-zone + rail 2컬럼. main은 숨김. */
+  grid-template-columns: 1fr 280px;
 }
 .card-detail-modal[data-has-media="false"] .card-detail-main {
   display: none;
