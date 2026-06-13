@@ -190,11 +190,7 @@ export function CardDetailModal({
                 )}
               </div>
             )}
-          </section>
-          {/* text-only 변형 (2026-06-13): media 없을 때 main이 비므로
-              content-zone을 main 형제로 끌어내 모달 본체 컬럼에 직접
-              배치. main이 grid에서 1fr, content-zone은 main 다음 1fr. */}
-          <div className="card-detail-content-zone">
+            <div className="card-detail-content-zone">
               {/* meta-download-zone (2026-06-13): 본문 = 제목 + content +
                   linkTitle/linkDesc (Notion 스타일 — 굵은 제목 / 한 줄 빈 줄 /
                   설명). 텍스트만 본문 영역. 파일 첨부는 본문 아래 다운로드
@@ -231,9 +227,16 @@ export function CardDetailModal({
                   />
                 )}
               </div>
+              {/* meta-download-zone (2026-06-13): 파일 첨부 다운로드 리스트.
+                  legacy fileUrl/fileName/fileSize/fileMimeType + attachments[].kind==="file"
+                  둘 다 커버. */}
               {(card.fileUrl ||
                 (card.attachments ?? []).some((a) => a.kind === "file")) && (
                 <ul className="card-detail-file-list" aria-label="첨부 파일">
+                  {/* key dedup (2026-06-13): legacy card.fileUrl과 attachments[]
+                      양쪽에 같은 url이 동기화된 경우 동일 row가 두 번 렌더되어
+                      React key 충돌 경고 발생. legacy가 있으면 그 url과 같은
+                      첨부는 제외. */}
                   {card.fileUrl && (
                     <li
                       key={`legacy-file-${card.fileUrl}`}
@@ -277,6 +280,7 @@ export function CardDetailModal({
                 </a>
               )}
             </div>
+          </section>
           <aside className="card-detail-rail" aria-label="메타 및 인터랙션">
             <div className="card-detail-meta">
               <CardAuthorFooter
