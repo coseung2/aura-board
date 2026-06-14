@@ -808,6 +808,21 @@
   border-color: var(--color-border-hover);
 }
 
+.card-detail-modal[data-has-body="false"][data-has-media="true"] .card-detail-content-zone {
+  display: none;
+}
+.card-detail-modal[data-has-body="false"][data-has-media="true"] .card-detail-main {
+  /* media only: media만 보이게 main column 너비 제한. rail은 220px 그대로. */
+  max-width: 100%;
+}
+/* media-only: portrait에서 grid 1fr (rail만) + media full width */
+@media (orientation: portrait), (max-width: 1199px) {
+  .card-detail-modal[data-has-body="false"][data-has-media="true"] .card-detail-body {
+    grid-template-columns: 1fr;
+    grid-template-rows: 1fr auto;
+  }
+}
+
 /* text-only modal variant (2026-06-13): media가 없으면 main을 hide하지
    않고 display:flex로 살려서 content-zone이 main 안에서 정상 렌더되게
    함. modal 컨테이너 크기도 줄여서 빈 공간 최소화. CSS-only 변경. */
