@@ -217,3 +217,83 @@ export type BoardDetailResponse = {
     };
   };
 };
+
+// ─── Parent DTO types ───
+
+/** GET /api/parent/children 의 children 항목. */
+export type ParentChild = {
+  id: string;
+  studentId: string;
+  number: number | null;
+  name: string;
+  classroom: { id: string; name: string } | null;
+  linkedAt: string;
+};
+
+/** GET /api/parent/children 응답. */
+export type ParentChildrenResponse = {
+  parent: { id: string };
+  children: ParentChild[];
+};
+
+/** 학부모 세션 /me placeholder (모바일 캐시용, 서버 응답과 다를 수 있음). */
+export type ParentMeResponse = {
+  parent: {
+    id: string;
+    name: string;
+    email: string | null;
+  };
+  children: ParentChild[];
+};
+
+export type ChildBoardSummary = {
+  id: string;
+  slug: string;
+  title: string;
+  layout: string;
+  cardCount: number;
+  lastActivity: string | null;
+};
+
+export type ChildDetailResponse = {
+  child: {
+    id: string;
+    name: string;
+    classroomName: string | null;
+  };
+  boards: ChildBoardSummary[];
+};
+
+// ─── Parent Child-Link DTO types ───
+
+/** POST /api/parent/match/code 요청/응답. */
+export type ParentMatchCodeRequest = { code: string };
+
+export type ParentMatchCodeResponse = {
+  ticket: string;
+  classroomName: string;
+};
+
+/** GET /api/parent/match/students 응답. */
+export type ParentMatchStudent = {
+  id: string;
+  classNo: number;
+  studentNo: number;
+  name: string;
+};
+
+export type ParentMatchStudentsResponse = {
+  classroomName: string;
+  students: ParentMatchStudent[];
+};
+
+/** POST /api/parent/match/request 요청/응답. */
+export type ParentMatchRequest = {
+  ticket: string;
+  studentId: string;
+};
+
+export type ParentMatchRequestResponse = {
+  linkId: string;
+  status: string;
+};

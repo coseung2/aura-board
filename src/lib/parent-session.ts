@@ -1,5 +1,5 @@
 import "server-only";
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { createHash, randomBytes } from "crypto";
 import { db } from "./db";
 
@@ -67,8 +67,13 @@ export async function createParentSession(params: {
 }
 
 /**
- * Retrieve the current Parent from the request cookie. Returns null on:
- *  - no cookie
+ * Retrieve the current Parent from the request. Token resolution order:
+ *   1. `Authorization: Bearer <token>` header — mobile (Expo SecureStore)
+ *   2. `parent_session` cookie — web
+ *
+ * Both paths use the same 32-byte base64url plaintext; the DB lookup is
+ * keyed on `tokenHash` (sha256) in both cases. Returns null on:
+ *  - no header / cookie
  *  - no matching session
  *  - session revoked (sessionRevokedAt != null)
  *  - session expired (expiresAt <= now)
@@ -77,8 +82,17 @@ export async function createParentSession(params: {
  * On a successful lookup, bumps lastSeenAt (best-effort; errors swallowed).
  */
 export async function getCurrentParent() {
-  const cookieStore = await cookies();
-  const token = cookieStore.get(COOKIE_NAME)?.value;
+  const headerList = await headers();
+  const authHeader =
+    headerList.get("authorization") ?? headerList.get("Authorization");
+  let token: string | null = null;
+  if (authHeader && authHeader.toLowerCase().startsWith("bearer ")) {
+    token = authHeader.slice(7).trim();
+  }
+  if (!token) {
+    const cookieStore = await cookies();
+    token = cookieStore.get(COOKIE_NAME)?.value ?? null;
+  }
   if (!token) return null;
 
   const tokenHash = hashToken(token);

@@ -6,6 +6,10 @@ import * as SecureStore from "expo-secure-store";
 const TOKEN_KEY = "aura_student_token";
 const STUDENT_KEY = "aura_student_cache";
 
+// 학부모 세션 토큰 · 프로필 캐시.
+const PARENT_TOKEN_KEY = "aura_parent_token";
+const PARENT_KEY = "aura_parent_cache";
+
 export type CachedStudent = {
   id: string;
   name: string;
@@ -35,6 +39,42 @@ export async function loadStudentCache(): Promise<CachedStudent | null> {
   if (!raw) return null;
   try {
     return JSON.parse(raw) as CachedStudent;
+  } catch {
+    return null;
+  }
+}
+
+// ─── 학부모 세션 ───
+
+export type CachedParent = {
+  id: string;
+  name: string;
+  email: string | null;
+  linkedStudentIds: string[];
+};
+
+export async function saveParentToken(token: string): Promise<void> {
+  await SecureStore.setItemAsync(PARENT_TOKEN_KEY, token);
+}
+
+export async function loadParentToken(): Promise<string | null> {
+  return (await SecureStore.getItemAsync(PARENT_TOKEN_KEY)) ?? null;
+}
+
+export async function clearParentSession(): Promise<void> {
+  await SecureStore.deleteItemAsync(PARENT_TOKEN_KEY).catch(() => undefined);
+  await SecureStore.deleteItemAsync(PARENT_KEY).catch(() => undefined);
+}
+
+export async function saveParentCache(parent: CachedParent): Promise<void> {
+  await SecureStore.setItemAsync(PARENT_KEY, JSON.stringify(parent));
+}
+
+export async function loadParentCache(): Promise<CachedParent | null> {
+  const raw = await SecureStore.getItemAsync(PARENT_KEY);
+  if (!raw) return null;
+  try {
+    return JSON.parse(raw) as CachedParent;
   } catch {
     return null;
   }

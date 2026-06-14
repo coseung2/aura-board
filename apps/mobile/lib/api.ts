@@ -4,7 +4,7 @@
 // - 쿠키를 쓰지 않으므로 CORS preflight 자체가 native fetch 에선 non-issue.
 
 import Constants from "expo-constants";
-import { loadSessionToken } from "./session";
+import { loadParentToken, loadSessionToken } from "./session";
 
 export class ApiError extends Error {
   status: number;
@@ -29,6 +29,8 @@ export function getApiBase(): string {
 type FetchOpts = RequestInit & {
   json?: unknown;
   skipAuth?: boolean;
+  /** true 이면 학생 토큰 대신 학부모 토큰을 Authorization 헤더에 사용. */
+  parentAuth?: boolean;
 };
 
 /**
@@ -42,7 +44,7 @@ export async function apiFetch<T = unknown>(
   path: string,
   opts: FetchOpts = {},
 ): Promise<T> {
-  const { json, skipAuth, headers, ...rest } = opts;
+  const { json, skipAuth, parentAuth, headers, ...rest } = opts;
   const hdrs: Record<string, string> = {
     Accept: "application/json",
     ...((headers as Record<string, string>) ?? {}),
@@ -53,7 +55,7 @@ export async function apiFetch<T = unknown>(
   }
 
   if (!skipAuth) {
-    const token = await loadSessionToken();
+    const token = await (parentAuth ? loadParentToken() : loadSessionToken());
     if (token) hdrs["Authorization"] = `Bearer ${token}`;
   }
 
@@ -80,6 +82,17 @@ export async function apiFetch<T = unknown>(
 
 export function getApiUrl(path: string): string {
   return path.startsWith("http") ? path : `${getApiBase()}${path}`;
+}
+
+/**
+ * 학부모 인증이 필요한 API 호출용 편의 헬퍼.
+ * `Authorization: Bearer <parent token>` 을 자동으로 첨부한다.
+ */
+export async function parentApiFetch<T = unknown>(
+  path: string,
+  opts: Omit<FetchOpts, "parentAuth"> = {},
+): Promise<T> {
+  return apiFetch<T>(path, { ...opts, parentAuth: true });
 }
 
 /**

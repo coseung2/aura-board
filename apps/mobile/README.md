@@ -12,10 +12,25 @@ GitHub Actions 가 자동으로 APK 를 빌드한다. 최초 1회 셋업은 [SET
 
 ## 기본 동작
 
+### 학생 (Student)
+- 랜딩 → 학생 선택 → 로그인 화면
 - 로그인: `POST /api/student/auth { token }` → `sessionToken` 을 SecureStore 에 AES 로 저장.
 - 모든 후속 요청: `Authorization: Bearer <token>` 헤더. 쿠키 X.
 - 대시보드: `GET /api/student/me` → 학급 + 보드 목록.
 - 보드 상세: `GET /api/student/board/[slug]` → layout 에 맞는 네이티브 화면 분기.
+
+### 학부모 (Parent)
+- 랜딩 → 학부모 선택 → 이메일 입력
+- 로그인: `POST /api/parent/signup { email, client: "mobile" }` → 이메일로 매직링크 발송
+- 매직링크 콜백: `auraboard://parent/auth/callback#token=<token>&expiresAt=<ISO>`
+  - 앱이 cold/foreground 상태일 때 모두 딥링크로 처리해 `parentToken` 을 SecureStore 에 저장 후 `/(parent)` 이동
+  - `#error=<code>` 는 기존 학부모 세션을 클리어하고 로그인 화면에 에러 노출
+- 개발/QA 환경에서는 API 응답의 `devMagicLinkUrl` 로 메일 없이 바로 콜백 테스트 가능
+- 모든 후속 학부모 요청: `Authorization: Bearer <parentToken>` 헤더.
+- 대시보드: `GET /api/parent/children` → active 자녀 목록.
+- 자녀 연결: `/(parent)/link-child` → `POST /api/parent/match/code` →
+  `GET /api/parent/match/students` → `POST /api/parent/match/request`
+- 자녀 상세: 자녀의 보드/활동 목록.
 
 ## API Base URL 설정
 
@@ -89,12 +104,18 @@ apps/mobile/
 ├── app.json               # orientation: landscape, tablet 지원
 ├── eas.json               # profile 별 EXPO_PUBLIC_API_BASE 주입
 ├── app/                   # expo-router file-based
-│   ├── _layout.tsx
-│   ├── index.tsx          # → /(student)/login
-│   └── (student)/
-│       ├── login.tsx      # 6자리 코드 로그인 + 기존 세션 자동 복구
-│       ├── index.tsx      # 학생 대시보드 (/api/student/me)
-│       └── board/[slug].tsx  # layout dispatcher
+│   ├── _layout.tsx        # 루트 레이아웃 (SafeAreaProvider + Stack)
+│   ├── index.tsx          # 랜딩 — 학생/학부모 역할 선택
+│   ├── (student)/         # 학생 route group
+│   │   ├── _layout.tsx
+│   │   ├── login.tsx      # 6자리 코드 로그인 + 기존 세션 자동 복구
+│   │   ├── index.tsx      # 학생 대시보드 (/api/student/me)
+│   │   └── board/[slug].tsx  # layout dispatcher
+│   └── (parent)/          # 학부모 route group
+│       ├── _layout.tsx
+│       ├── login.tsx      # 학부모 이메일 매직링크 로그인
+│       ├── index.tsx      # 학부모 대시보드 — 자녀 목록
+│       └── child/[id].tsx # 자녀 상세 — 보드 목록
 ├── components/
 │   ├── BoardShell.tsx     # 공통 헤더
 │   ├── CardView.tsx       # 카드 하나 렌더
@@ -109,8 +130,8 @@ apps/mobile/
 │       └── ReadOnlyCardsBoard.tsx
 ├── lib/
 │   ├── api.ts             # fetch 래퍼 + SSE parser
-│   ├── session.ts         # SecureStore wrapper
-│   └── types.ts           # 서버 DTO 사본
+│   ├── session.ts         # SecureStore wrapper (학생 + 학부모)
+│   └── types.ts           # 서버 DTO 사본 (학생 + 학부모)
 ├── theme/
 │   ├── tokens.ts
 │   └── layout-meta.ts
@@ -119,6 +140,7 @@ apps/mobile/
 
 ## 후속 작업
 
+- [x] 학부모 자녀 연결 플로우 네이티브화 (code → students → request)
 - [ ] expo-camera → QR 스캐너 실동작 (Dev Client 필요)
 - [ ] vibe-gallery / dj-queue / event-signup / breakout / assessment / drawing 네이티브 쓰기 모드
 - [ ] 드로잉(Canvas) — `react-native-skia` 또는 SVG
