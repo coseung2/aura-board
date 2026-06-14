@@ -819,7 +819,7 @@
 .card-detail-modal[data-has-media="false"] .card-detail-main {
   display: flex;
 }
-.card-detail-modal[data-has-media="false"] .card-detail-modal {
+.card-detail-modal[data-has-media="false"] {
   width: min(900px, calc(100vw - 48px));
   height: auto;
   max-height: calc(100dvh - 48px);
