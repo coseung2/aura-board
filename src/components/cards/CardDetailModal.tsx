@@ -171,7 +171,7 @@ export function CardDetailModal({
                 <CardAttachments
                   imageUrl={card.imageUrl}
                   thumbUrl={card.thumbUrl}
-                  linkUrl={shouldPassLinkToMedia || hasLinkPreview ? card.linkUrl : null}
+                  linkUrl={shouldPassLinkToMedia || hasLinkImage ? card.linkUrl : null}
                   linkTitle={card.linkTitle}
                   linkDesc={card.linkDesc}
                   linkImage={card.linkImage}
