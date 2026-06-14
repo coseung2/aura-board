@@ -9,6 +9,7 @@ import {
 import { colors, radii, shadows, spacing, tapMin, typography } from "../../theme/tokens";
 import { CardView } from "../CardView";
 import { CardComposer } from "../CardComposer";
+import { CardDetailModal } from "../CardDetailModal";
 import type { BoardDetailResponse, BoardCard } from "../../lib/types";
 
 // freeform / grid / stream 공용 — 2열 세로 그리드.
@@ -23,6 +24,7 @@ export function CardsBoard({
   onMutate: () => void;
 }) {
   const [composerOpen, setComposerOpen] = useState(false);
+  const [selectedCard, setSelectedCard] = useState<BoardCard | null>(null);
   const [cards, setCards] = useState<BoardCard[]>(data.cards);
 
   function handleCreated(card: BoardCard) {
@@ -39,9 +41,12 @@ export function CardsBoard({
         columnWrapperStyle={styles.row}
         contentContainerStyle={styles.content}
         renderItem={({ item }) => (
-          <View style={styles.cardWrap}>
+          <Pressable
+            style={styles.cardWrap}
+            onPress={() => setSelectedCard(item)}
+          >
             <CardView card={item} />
-          </View>
+          </Pressable>
         )}
         ListEmptyComponent={
           <View style={styles.empty}>
@@ -62,6 +67,10 @@ export function CardsBoard({
         boardId={data.board.id}
         onClose={() => setComposerOpen(false)}
         onCreated={handleCreated}
+      />
+      <CardDetailModal
+        card={selectedCard}
+        onClose={() => setSelectedCard(null)}
       />
     </View>
   );

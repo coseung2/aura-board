@@ -7,6 +7,7 @@ import {
   View,
 } from "react-native";
 import { colors, spacing, typography } from "../../theme/tokens";
+import * as ImagePicker from "expo-image-picker";
 import { PlantHero } from "../plant/PlantHero";
 import { StageRow } from "../plant/StageRow";
 import { ImageLightbox } from "../plant/ImageLightbox";
@@ -48,6 +49,27 @@ function computeDaysSinceLastObs(observations: ObservationDTO[]): number | null 
   return Math.floor(diff / (1000 * 60 * 60 * 24));
 }
 
+// API/raw 데이터를 안전하게 StudentPlantDTO 로 정규화.
+function normalizePlant(
+  raw:
+    | NonNullable<BoardDetailResponse["layoutData"]["plantRoadmap"]>["plants"][number]
+    | StudentPlantDTO,
+): StudentPlantDTO | null {
+  if (!raw || !raw.species) return null;
+  const rawWithStage = raw as Partial<{ currentStage?: StageDTO }>;
+  return {
+    id: raw.id,
+    speciesId: raw.speciesId ?? raw.species.id,
+    nickname: raw.nickname,
+    currentStageId: raw.currentStageId ?? rawWithStage.currentStage?.id ?? "",
+    species: raw.species,
+    observations: (raw.observations ?? []).map((obs) => ({
+      ...obs,
+      images: obs.images ?? [],
+    })),
+  };
+}
+
 // ─── 메인 컴포넌트 ───
 
 /**
@@ -70,18 +92,9 @@ export function PlantRoadmapBoard({
   const rawPlants = data.layoutData.plantRoadmap?.plants ?? [];
   const primaryRaw = rawPlants[0];
 
-  // 식물 상태 관리
-  const [plant, setPlant] = useState<StudentPlantDTO | null>(
-    primaryRaw
-      ? {
-          id: primaryRaw.id,
-          speciesId: primaryRaw.speciesId ?? primaryRaw.species.id,
-          nickname: primaryRaw.nickname,
-          currentStageId: primaryRaw.currentStageId ?? primaryRaw.currentStage.id,
-          species: primaryRaw.species,
-          observations: primaryRaw.observations,
-        }
-      : null,
+  // 식물 상태 관리 — 누락된 species/stages/currentStage/observations 를 기본값으로 맞춤.
+  const [plant, setPlant] = useState<StudentPlantDTO | null>(() =>
+    primaryRaw ? normalizePlant(primaryRaw) : null,
   );
 
   // UI 상태
@@ -93,61 +106,50 @@ export function PlantRoadmapBoard({
   const [reasonModalVisible, setReasonModalVisible] = useState(false);
   const [reasonBusy, setReasonBusy] = useState(false);
 
-  // ─── 식물 미배정 상태 ───
-  if (!plant) {
-    return (
-      <View style={styles.center}>
-        <Text style={styles.infoEmoji}>🌱</Text>
-        <Text style={styles.infoTitle}>아직 식물이 배정되지 않았어요</Text>
-        <Text style={styles.infoMsg}>
-          선생님이 식물을 지정하면 여기에 성장 기록이 나타나요.
-        </Text>
-      </View>
-    );
-  }
-
   // ─── 파생 데이터 ───
   const stages = useMemo(
-    () => [...plant.species.stages].sort((a, b) => a.order - b.order),
-    [plant.species.stages],
+    () => [...(plant?.species.stages ?? [])].sort((a, b) => a.order - b.order),
+    [plant?.species.stages],
   );
 
   const currentStage = useMemo(
-    () => stages.find((s) => s.id === plant.currentStageId) ?? stages[0],
-    [stages, plant.currentStageId],
+    () => stages.find((s) => s.id === plant?.currentStageId) ?? stages[0] ?? null,
+    [stages, plant?.currentStageId],
   );
 
   const observationsByStage = useMemo(
-    () => groupObservationsByStage(plant.observations),
-    [plant.observations],
+    () => groupObservationsByStage(plant?.observations ?? []),
+    [plant?.observations],
   );
 
   const totalPhotos = useMemo(
-    () => plant.observations.reduce((sum, o) => sum + o.images.length, 0),
-    [plant.observations],
+    () => (plant?.observations ?? []).reduce((sum, o) => sum + (o.images?.length ?? 0), 0),
+    [plant?.observations],
   );
 
   const daysSinceLastObs = useMemo(
-    () => computeDaysSinceLastObs(plant.observations),
-    [plant.observations],
+    () => computeDaysSinceLastObs(plant?.observations ?? []),
+    [plant?.observations],
   );
 
   const progressPercent = useMemo(() => {
     const totalStages = stages.length;
-    if (totalStages === 0) return 0;
-    return Math.round(((currentStage.order - 1) / totalStages) * 100);
+    if (totalStages === 0 || !currentStage) return 0;
+    const order = currentStage.order ?? 1;
+    return Math.round(((order - 1) / totalStages) * 100);
   }, [stages, currentStage]);
 
   // ─── 뮤테이션 핸들러 ───
 
   const refreshPlant = useCallback(async () => {
+    if (!plant) return;
     try {
       const res = await fetchStudentPlant(plant.id);
-      setPlant(res.studentPlant);
+      setPlant(res.studentPlant ? normalizePlant(res.studentPlant) : null);
     } catch {
       // silent
     }
-  }, [plant.id]);
+  }, [plant]);
 
   // 관찰 추가 모달 열기
   const handleOpenEditor = useCallback((stageId: string, obs?: ObservationDTO) => {
@@ -159,7 +161,7 @@ export function PlantRoadmapBoard({
   // 관찰 추가/수정 제출
   const handleEditorSubmit = useCallback(
     async (payload: { memo: string; images: Array<{ url: string }> }) => {
-      if (!editorStageId) return;
+      if (!plant || !editorStageId) return;
       if (editingObs) {
         await apiUpdateObservation(plant.id, editingObs.id, payload);
       } else {
@@ -171,25 +173,29 @@ export function PlantRoadmapBoard({
       await refreshPlant();
       onMutate();
     },
-    [plant.id, editorStageId, editingObs, refreshPlant, onMutate],
+    [plant, editorStageId, editingObs, refreshPlant, onMutate],
   );
 
-  // 이미지 선택 (placeholder — 실제로는 expo-image-picker 연동)
   const handlePickImage = useCallback(async (): Promise<string | null> => {
-    // TODO: expo-image-picker 연동
-    // 현재는 placeholder Alert
-    return new Promise((resolve) => {
-      Alert.alert(
-        "이미지 선택",
-        "expo-image-picker 연동이 필요합니다.\n(개발 중)",
-        [{ text: "확인", onPress: () => resolve(null) }],
-      );
+    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!permission.granted) {
+      Alert.alert("사진 권한 필요", "관찰 사진을 올리려면 사진 접근 권한이 필요해요.");
+      return null;
+    }
+
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      quality: 0.82,
+      allowsMultipleSelection: false,
     });
+    if (result.canceled || !result.assets[0]?.uri) return null;
+    return uploadImage(result.assets[0].uri);
   }, []);
 
   // 관찰 삭제
   const handleDeleteObservation = useCallback(
     (obs: ObservationDTO) => {
+      if (!plant) return;
       Alert.alert("관찰 삭제", "이 관찰 기록을 삭제할까요?", [
         { text: "취소", style: "cancel" },
         {
@@ -207,11 +213,12 @@ export function PlantRoadmapBoard({
         },
       ]);
     },
-    [plant.id, refreshPlant, onMutate],
+    [plant, refreshPlant, onMutate],
   );
 
   // 단계 진행
   const handleAdvance = useCallback(async () => {
+    if (!plant) return;
     setBusyAdvance(true);
     try {
       const result = await advanceStage(plant.id);
@@ -227,11 +234,12 @@ export function PlantRoadmapBoard({
     } finally {
       setBusyAdvance(false);
     }
-  }, [plant.id, refreshPlant, onMutate]);
+  }, [plant, refreshPlant, onMutate]);
 
   // 사진 없음 사유 제출
   const handleReasonSubmit = useCallback(
     async (reason: string) => {
+      if (!plant) return;
       setReasonBusy(true);
       try {
         await advanceStage(plant.id, reason);
@@ -246,8 +254,33 @@ export function PlantRoadmapBoard({
         setBusyAdvance(false);
       }
     },
-    [plant.id, refreshPlant, onMutate],
+    [plant, refreshPlant, onMutate],
   );
+
+  // ─── 식물 미배정 / 데이터 불완전 상태 ───
+  if (!plant) {
+    return (
+      <View style={styles.center}>
+        <Text style={styles.infoEmoji}>🌱</Text>
+        <Text style={styles.infoTitle}>아직 식물이 배정되지 않았어요</Text>
+        <Text style={styles.infoMsg}>
+          선생님이 식물을 지정하면 여기에 성장 기록이 나타나요.
+        </Text>
+      </View>
+    );
+  }
+
+  if (stages.length === 0 || !currentStage) {
+    return (
+      <View style={styles.center}>
+        <Text style={styles.infoEmoji}>🌱</Text>
+        <Text style={styles.infoTitle}>식물 성장 단계 정보가 없어요</Text>
+        <Text style={styles.infoMsg}>
+          선생님이 단계를 설정하면 관찰 기록을 시작할 수 있어요.
+        </Text>
+      </View>
+    );
+  }
 
   // ─── 렌더링 ───
 

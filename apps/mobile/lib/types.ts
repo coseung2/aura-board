@@ -264,6 +264,65 @@ export type ChildDetailResponse = {
   boards: ChildBoardSummary[];
 };
 
+export type PortfolioCardDTO = {
+  id: string;
+  title: string;
+  content: string;
+  color: string | null;
+  imageUrl: string | null;
+  thumbUrl: string | null;
+  linkUrl: string | null;
+  linkTitle: string | null;
+  linkDesc: string | null;
+  linkImage: string | null;
+  videoUrl: string | null;
+  fileUrl: string | null;
+  fileName: string | null;
+  fileSize: number | null;
+  fileMimeType: string | null;
+  attachments: Array<{
+    id: string;
+    kind: string;
+    url: string;
+    previewUrl: string | null;
+    fileName: string | null;
+    fileSize: number | null;
+    mimeType: string | null;
+    order: number;
+  }>;
+  sourceBoard: {
+    id: string;
+    slug: string;
+    title: string;
+    layout: string;
+    anonymousAuthor: boolean;
+  };
+  sourceSection: { id: string; title: string } | null;
+  isShowcasedByMe: boolean;
+  hasAnyShowcase: boolean;
+  createdAt: string;
+};
+
+export type ShowcaseEntryDTO = {
+  cardId: string;
+  studentId: string;
+  studentName: string;
+  studentNumber: number | null;
+  card: PortfolioCardDTO;
+  createdAt: string;
+};
+
+export type ParentPortfolioResponse = {
+  child: {
+    id: string;
+    name: string;
+    number: number | null;
+    classroomId: string;
+  };
+  ownCards: PortfolioCardDTO[];
+  classroomShowcase: ShowcaseEntryDTO[];
+};
+
 // ─── Parent Child-Link DTO types ───
 
 /** POST /api/parent/match/code 요청/응답. */

@@ -10,6 +10,7 @@ import {
   Text,
   TextInput,
   View,
+  useWindowDimensions,
 } from "react-native";
 import * as DocumentPicker from "expo-document-picker";
 import * as ImagePicker from "expo-image-picker";
@@ -28,12 +29,14 @@ export function AssignmentBoard({
   data: BoardDetailResponse;
   onMutate: () => void;
 }) {
+  const { width } = useWindowDimensions();
   const slots = data.layoutData.assignment?.slots ?? [];
   const mySlot = useMemo(
     () => slots.find((s) => s.studentId === data.currentStudent.id),
     [slots, data.currentStudent.id],
   );
   const [modalOpen, setModalOpen] = useState(false);
+  const peerColumns = width < 560 ? 1 : width < 840 ? 2 : width < 1120 ? 3 : 4;
 
   const counts = useMemo(() => {
     const s = { assigned: 0, submitted: 0, returned: 0, reviewed: 0 };
@@ -111,10 +114,11 @@ export function AssignmentBoard({
 
       <Text style={styles.allLabel}>반 전체 제출 현황</Text>
       <FlatList
+        key={`assignment-peers-${peerColumns}`}
         data={slots}
         keyExtractor={(s) => s.id}
-        numColumns={4}
-        columnWrapperStyle={styles.peerRow}
+        numColumns={peerColumns}
+        columnWrapperStyle={peerColumns > 1 ? styles.peerRow : undefined}
         contentContainerStyle={styles.peerList}
         renderItem={({ item }) => (
           <View

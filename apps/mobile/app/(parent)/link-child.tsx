@@ -356,7 +356,8 @@ const styles = StyleSheet.create({
     padding: spacing.xxl,
   },
   card: {
-    width: 420,
+    width: "100%",
+    maxWidth: 420,
     backgroundColor: colors.surface,
     borderRadius: radii.card,
     padding: spacing.xxl,
@@ -464,7 +465,8 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   doneCard: {
-    width: 420,
+    width: "100%",
+    maxWidth: 420,
     backgroundColor: colors.surface,
     borderRadius: radii.card,
     padding: spacing.xxl,

@@ -1,7 +1,9 @@
-import { FlatList, StyleSheet, Text, View } from "react-native";
+import { FlatList, Pressable, StyleSheet, Text, View } from "react-native";
+import { useState } from "react";
 import { colors, spacing, typography } from "../../theme/tokens";
 import { CardView } from "../CardView";
-import type { BoardDetailResponse } from "../../lib/types";
+import { CardDetailModal } from "../CardDetailModal";
+import type { BoardDetailResponse, BoardCard } from "../../lib/types";
 
 // 카드 추가를 아직 모바일에서 지원하지 않는 레이아웃의 공통 뷰어.
 // vibe-gallery / dj-queue / event-signup / breakout / assessment / drawing.
@@ -12,6 +14,8 @@ export function ReadOnlyCardsBoard({
   data: BoardDetailResponse;
   onMutate: () => void;
 }) {
+  const [selectedCard, setSelectedCard] = useState<BoardCard | null>(null);
+
   return (
     <View style={styles.root}>
       <FlatList
@@ -21,9 +25,12 @@ export function ReadOnlyCardsBoard({
         columnWrapperStyle={styles.row}
         contentContainerStyle={styles.content}
         renderItem={({ item }) => (
-          <View style={styles.cardWrap}>
+          <Pressable
+            style={styles.cardWrap}
+            onPress={() => setSelectedCard(item)}
+          >
             <CardView card={item} />
-          </View>
+          </Pressable>
         )}
         ListEmptyComponent={
           <View style={styles.empty}>
@@ -34,6 +41,10 @@ export function ReadOnlyCardsBoard({
             </Text>
           </View>
         }
+      />
+      <CardDetailModal
+        card={selectedCard}
+        onClose={() => setSelectedCard(null)}
       />
     </View>
   );

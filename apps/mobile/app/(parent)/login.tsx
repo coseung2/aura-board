@@ -19,6 +19,7 @@ import {
   typography,
 } from "../../theme/tokens";
 import { apiFetch, ApiError } from "../../lib/api";
+import { LogoLockup } from "../../components/LogoLockup";
 
 type SignupResponse = {
   ok: boolean;
@@ -96,8 +97,10 @@ export default function ParentLogin() {
     <SafeAreaView style={styles.container} edges={["top", "bottom"]}>
       <View style={styles.inner}>
         <View style={styles.brandRow}>
-          <Text style={styles.brandEmoji}>🪄</Text>
-          <Text style={styles.brandTitle}>Aura-board</Text>
+          <LogoLockup
+            size={36}
+            wordmarkStyle={styles.brandTitle}
+          />
           <Text style={styles.brandSub}>학부모 로그인</Text>
         </View>
 
@@ -201,15 +204,15 @@ const styles = StyleSheet.create({
   },
   brandRow: {
     flexDirection: "row",
-    alignItems: "baseline",
+    alignItems: "center",
     gap: spacing.md,
     marginBottom: spacing.sm,
   },
-  brandEmoji: { fontSize: 32 },
   brandTitle: { ...typography.display, color: colors.text },
   brandSub: { ...typography.subtitle, color: colors.textMuted },
   card: {
-    width: 420,
+    width: "100%",
+    maxWidth: 420,
     backgroundColor: colors.surface,
     borderRadius: radii.card,
     ...shadows.card,

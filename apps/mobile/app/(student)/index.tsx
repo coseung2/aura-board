@@ -7,6 +7,7 @@ import {
   StyleSheet,
   Text,
   View,
+  useWindowDimensions,
 } from "react-native";
 import { useFocusEffect, useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -27,10 +28,12 @@ import type { BoardMeta, MeResponse } from "../../lib/types";
 
 export default function StudentHome() {
   const router = useRouter();
+  const { width } = useWindowDimensions();
   const [me, setMe] = useState<MeResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const columnCount = width < 560 ? 1 : width < 920 ? 2 : width < 1280 ? 3 : 4;
 
   const load = useCallback(async (isRefresh = false) => {
     try {
@@ -110,10 +113,11 @@ export default function StudentHome() {
       </View>
 
       <FlatList
+        key={`boards-${columnCount}`}
         data={boards}
         keyExtractor={(b) => b.id}
-        numColumns={4}
-        columnWrapperStyle={styles.gridRow}
+        numColumns={columnCount}
+        columnWrapperStyle={columnCount > 1 ? styles.gridRow : undefined}
         contentContainerStyle={styles.gridContent}
         renderItem={({ item }) => <BoardCard board={item} />}
         refreshControl={

@@ -107,7 +107,7 @@ export default function ParentHome() {
               styles.addBtn,
               pressed && styles.addBtnPressed,
             ]}
-            onPress={() => router.push("/(parent)/link-child" as any)}
+            onPress={() => router.push("./link-child")}
           >
             <Text style={styles.addText}>+ 자녀 연결</Text>
           </Pressable>
@@ -144,7 +144,7 @@ export default function ParentHome() {
             }
           >
             <View style={styles.childAvatar}>
-              <Text style={styles.childEmoji}>👦</Text>
+              <Text style={styles.childEmoji}>🧒</Text>
             </View>
             <View style={styles.childInfo}>
               <Text style={styles.childName}>{item.name}</Text>
@@ -168,7 +168,7 @@ export default function ParentHome() {
                 styles.linkBtn,
                 pressed && styles.linkBtnPressed,
               ]}
-              onPress={() => router.push("/(parent)/link-child" as any)}
+              onPress={() => router.push("./link-child")}
             >
               <Text style={styles.linkBtnText}>자녀 연결하기</Text>
             </Pressable>

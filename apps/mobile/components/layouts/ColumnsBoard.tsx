@@ -9,6 +9,7 @@ import {
 import { colors, radii, shadows, spacing, tapMin, typography } from "../../theme/tokens";
 import { CardView } from "../CardView";
 import { CardComposer } from "../CardComposer";
+import { CardDetailModal } from "../CardDetailModal";
 import type { BoardDetailResponse, BoardCard } from "../../lib/types";
 
 // 주제별 보드(columns) — 섹션(Section) 별 세로 칼럼, 카드를 섹션에 묶어서 렌더.
@@ -22,6 +23,7 @@ export function ColumnsBoard({
   onMutate: () => void;
 }) {
   const [cards, setCards] = useState<BoardCard[]>(data.cards);
+  const [selectedCard, setSelectedCard] = useState<BoardCard | null>(null);
   const [activeSection, setActiveSection] = useState<string | null>(null);
   const [composerOpen, setComposerOpen] = useState(false);
 
@@ -78,9 +80,13 @@ export function ColumnsBoard({
               </View>
               <ScrollView contentContainerStyle={styles.colBody}>
                 {col.cards.map((c) => (
-                  <View key={c.id} style={styles.cardWrap}>
+                  <Pressable
+                    key={c.id}
+                    style={styles.cardWrap}
+                    onPress={() => setSelectedCard(c)}
+                  >
                     <CardView card={c} />
-                  </View>
+                  </Pressable>
                 ))}
                 <Pressable
                   style={({ pressed }) => [styles.addBtn, pressed && styles.addBtnPressed]}
@@ -99,6 +105,10 @@ export function ColumnsBoard({
         sectionId={activeSection}
         onClose={() => setComposerOpen(false)}
         onCreated={handleCreated}
+      />
+      <CardDetailModal
+        card={selectedCard}
+        onClose={() => setSelectedCard(null)}
       />
     </View>
   );

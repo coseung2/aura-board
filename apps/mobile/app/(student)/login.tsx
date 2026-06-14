@@ -2,10 +2,12 @@ import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
   View,
+  useWindowDimensions,
 } from "react-native";
 import { useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -23,6 +25,7 @@ import {
   saveSessionToken,
   saveStudentCache,
 } from "../../lib/session";
+import { LogoLockup } from "../../components/LogoLockup";
 
 type AuthResponse = {
   success: boolean;
@@ -39,10 +42,12 @@ type AuthResponse = {
 // QR 스캐너는 추후 phase (expo-camera + barcode scanner).
 export default function StudentLogin() {
   const router = useRouter();
+  const { width } = useWindowDimensions();
   const [code, setCode] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [booting, setBooting] = useState(true);
+  const isNarrow = width < 720;
 
   // 앱 시작 시 기존 토큰이 있으면 대시보드로 바로 이동.
   useEffect(() => {
@@ -113,14 +118,16 @@ export default function StudentLogin() {
 
   return (
     <SafeAreaView style={styles.container} edges={["top", "bottom"]}>
-      <View style={styles.inner}>
+      <ScrollView contentContainerStyle={styles.inner}>
         <View style={styles.brandRow}>
-          <Text style={styles.brandEmoji}>🪄</Text>
-          <Text style={styles.brandTitle}>Aura-board</Text>
+          <LogoLockup
+            size={36}
+            wordmarkStyle={styles.brandTitle}
+          />
           <Text style={styles.brandSub}>학생 로그인</Text>
         </View>
 
-        <View style={styles.twoPane}>
+        <View style={[styles.twoPane, isNarrow && styles.twoPaneNarrow]}>
           {/* Left — QR scanner placeholder (expo-camera 후속) */}
           <View style={styles.qrPane}>
             <View style={styles.qrFrame}>
@@ -184,7 +191,7 @@ export default function StudentLogin() {
         </View>
 
         <Text style={styles.baseUrlHint}>{getApiBase()}</Text>
-      </View>
+      </ScrollView>
     </SafeAreaView>
   );
 }
@@ -198,19 +205,21 @@ const styles = StyleSheet.create({
     gap: spacing.md,
   },
   bootingText: { ...typography.body, color: colors.textMuted },
-  inner: { flex: 1, padding: spacing.xxl, gap: spacing.xl },
+  inner: { flexGrow: 1, padding: spacing.xxl, gap: spacing.xl },
   brandRow: {
     flexDirection: "row",
-    alignItems: "baseline",
+    alignItems: "center",
     gap: spacing.md,
   },
-  brandEmoji: { fontSize: 32 },
   brandTitle: { ...typography.display, color: colors.text },
   brandSub: { ...typography.subtitle, color: colors.textMuted },
   twoPane: {
     flex: 1,
     flexDirection: "row",
     gap: spacing.xl,
+  },
+  twoPaneNarrow: {
+    flexDirection: "column",
   },
 
   qrPane: {
@@ -223,8 +232,9 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   qrFrame: {
-    width: 320,
-    height: 320,
+    width: "100%",
+    maxWidth: 320,
+    aspectRatio: 1,
     borderRadius: radii.card,
     backgroundColor: colors.surfaceAlt,
     justifyContent: "center",

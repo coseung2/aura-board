@@ -5,6 +5,7 @@ import {
   StyleSheet,
   Text,
   View,
+  useWindowDimensions,
 } from "react-native";
 import { useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -18,13 +19,16 @@ import {
 } from "../theme/tokens";
 import { loadSessionToken, loadParentToken } from "../lib/session";
 import { apiFetch } from "../lib/api";
+import { LogoLockup } from "../components/LogoLockup";
 
 // 랜딩 화면 — 학생 / 학부모 역할 선택.
 // 기존 세션이 있으면 해당 역할 대시보드로 자동 이동.
 
 export default function Landing() {
   const router = useRouter();
+  const { width } = useWindowDimensions();
   const [booting, setBooting] = useState(true);
+  const isNarrow = width < 640;
 
   useEffect(() => {
     (async () => {
@@ -71,12 +75,11 @@ export default function Landing() {
     <SafeAreaView style={styles.container} edges={["top", "bottom"]}>
       <View style={styles.inner}>
         <View style={styles.brandRow}>
-          <Text style={styles.brandEmoji}>🪄</Text>
-          <Text style={styles.brandTitle}>Aura-board</Text>
+          <LogoLockup size={40} wordmarkStyle={styles.brandTitle} />
         </View>
         <Text style={styles.brandSub}>역할을 선택해 주세요</Text>
 
-        <View style={styles.cardRow}>
+        <View style={[styles.cardRow, isNarrow && styles.cardRowNarrow]}>
           <Pressable
             style={({ pressed }) => [
               styles.roleCard,
@@ -128,16 +131,20 @@ const styles = StyleSheet.create({
   },
   brandRow: {
     flexDirection: "row",
-    alignItems: "baseline",
+    alignItems: "center",
     gap: spacing.md,
     marginBottom: spacing.sm,
   },
-  brandEmoji: { fontSize: 40 },
   brandTitle: { ...typography.display, color: colors.text },
   brandSub: { ...typography.subtitle, color: colors.textMuted, marginBottom: spacing.xl },
   cardRow: {
     flexDirection: "row",
     gap: spacing.xl,
+  },
+  cardRowNarrow: {
+    flexDirection: "column",
+    width: "100%",
+    maxWidth: 320,
   },
   roleCard: {
     width: 240,
