@@ -113,11 +113,10 @@ export function CardDetailModal({
     fileUrl: card.fileUrl,
     attachments: card.attachments,
   };
-  // text-only 모달 분기 (2026-06-14): hasMedia = 시각 미디어만.
-  // image/video/youtube-embed/OG-image-link 가 없으면 "텍스트/파일/plain
-  // link만 있는 카드"로 보고 data-has-media="false" emit. file 첨부와
-  // OG 메타 없는 plain link는 본문 영역(content-zone)에서 함께 렌더.
-  // 첨부에서 image/video kind만 추적 (file kind는 본문 컨텐츠로 분류).
+  // text-only 모달 분기 (2026-06-14): hasMedia = image/video/youtube만.
+  // linkUrl은 linkImage가 있어도 본문 영역에서 텍스트 2줄로 표시
+  // (text-only 모달에서는 CardAttachments의 큰 LinkPreview 카드 안
+  // 그리고 본문 안의 작은 link 텍스트로 처리).
   const hasUploadedImageOrVideo = Boolean(
     card.imageUrl ||
       card.videoUrl ||
@@ -126,9 +125,11 @@ export function CardDetailModal({
         (a) => a.kind === "image" || a.kind === "video"
       )
   );
-  const hasLinkImage = Boolean(card.linkUrl && card.linkImage);
-  const hasMedia = hasUploadedImageOrVideo || hasLinkImage;
-  const shouldPassLinkToMedia = hasLinkImage || isYouTubeLink(card.linkUrl);
+  const hasMedia = hasUploadedImageOrVideo;
+  // linkImage가 있는 링크는 미디어 영역(modal 상단)에 표시. plain link나
+  // OG 메타만 있는 링크는 본문 영역의 작은 link 텍스트로 표시.
+  const shouldPassLinkToMedia =
+    Boolean(card.linkImage) || isYouTubeLink(card.linkUrl);
 
   // 본문 카드 안의 모든 텍스트 요소를 동일한 폰트 크기/줄높이로 통일
   // (Variant C 스타일 슬라이드 + 본문 정돈).
@@ -174,7 +175,7 @@ export function CardDetailModal({
                 <CardAttachments
                   imageUrl={card.imageUrl}
                   thumbUrl={card.thumbUrl}
-                  linkUrl={shouldPassLinkToMedia || hasLinkImage ? card.linkUrl : null}
+                  linkUrl={shouldPassLinkToMedia ? card.linkUrl : null}
                   linkTitle={card.linkTitle}
                   linkDesc={card.linkDesc}
                   linkImage={card.linkImage}
