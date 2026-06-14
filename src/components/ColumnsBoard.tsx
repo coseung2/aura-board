@@ -446,7 +446,12 @@ export function ColumnsBoard({
       </div>
 
       {canAddCard && (
-        <AddCardButton onAdd={handleAdd} sections={sectionOptions} />
+        <AddCardButton
+          onAdd={handleAdd}
+          sections={sectionOptions}
+          canAssignAuthors={canEdit}
+          classroomId={classroomId}
+        />
       )}
 
       {addForSection && (
@@ -455,6 +460,8 @@ export function ColumnsBoard({
           onClose={() => setAddForSection(null)}
           sections={sectionOptions}
           defaultSectionId={addForSection}
+          canAssignAuthors={canEdit}
+          classroomId={classroomId}
         />
       )}
 

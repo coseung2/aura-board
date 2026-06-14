@@ -12,7 +12,12 @@ import {
 } from "@/lib/canva";
 import { resolveCanvaEmbedUrlCached } from "@/lib/canva-preview-cache";
 import { extractVideoId, fetchYouTubeMeta, canonicalUrl, extractChannelHandle, fetchYouTubeChannelMeta } from "@/lib/youtube";
-import { setCardAuthors } from "@/lib/card-authors-service";
+import {
+  setCardAuthors,
+  MAX_AUTHORS_PER_CARD,
+  MAX_DISPLAY_NAME_LEN,
+  CardAuthorError,
+} from "@/lib/card-authors-service";
 import { requireShareAuth } from "@/lib/share/with-share";
 import { isAllowedFileUrl, isAllowedStoredMime, MAX_ATTACHMENTS_PER_CARD } from "@/lib/file-attachment";
 import { touchBoardUpdatedAt } from "@/lib/board-touch";
@@ -64,6 +69,15 @@ const CreateCardSchema = z.object({
   height: z.number().optional(),
   order: z.number().optional(),
   sectionId: z.string().nullable().optional(),
+  authors: z
+    .array(
+      z.object({
+        studentId: z.string().min(1).max(40).nullable().optional(),
+        displayName: z.string().min(1).max(MAX_DISPLAY_NAME_LEN),
+      })
+    )
+    .max(MAX_AUTHORS_PER_CARD)
+    .optional(),
 });
 
 export async function POST(req: Request) {
@@ -157,11 +171,19 @@ export async function POST(req: Request) {
     let externalAuthorName: string | null = null;
     let currentUserName: string | null = null;
     let student: Awaited<ReturnType<typeof getCurrentStudent>> = null;
+    let boardClassroomId: string | null = null;
 
     if (teacherUser) {
       await requirePermission(input.boardId, teacherUser.id, "edit");
       authorId = teacherUser.id;
       currentUserName = teacherUser.name;
+      if (input.authors && input.authors.length > 0) {
+        const board = await db.board.findUnique({
+          where: { id: input.boardId },
+          select: { classroomId: true },
+        });
+        boardClassroomId = board?.classroomId ?? null;
+      }
     } else {
       student = await getCurrentStudent();
       if (student) {
@@ -178,6 +200,7 @@ export async function POST(req: Request) {
         if (board.classroomId !== student.classroomId) {
           return NextResponse.json({ error: "classroom_mismatch" }, { status: 403 });
         }
+        boardClassroomId = board.classroomId;
         authorId = board.classroom.teacherId;
         studentAuthorId = student.id;
         externalAuthorName = student.name;
@@ -357,10 +380,16 @@ export async function POST(req: Request) {
       // source of truth for authorship lives in the join table from the
       // start. Teacher-created cards (no studentAuthorId) get no initial
       // CardAuthor rows — teacher can open the editor to attribute.
-      if (studentAuthorId && externalAuthorName) {
+      if (teacherUser && input.authors && input.authors.length > 0) {
+        await setCardAuthors(tx, c.id, input.authors, {
+          classroomId: boardClassroomId,
+        });
+      } else if (studentAuthorId && externalAuthorName) {
         await setCardAuthors(tx, c.id, [
           { studentId: studentAuthorId, displayName: externalAuthorName },
-        ]);
+        ], {
+          classroomId: boardClassroomId,
+        });
       }
       // multi-attachment: 여러 첨부 일괄 저장. order는 배열 인덱스.
       if (attachmentRows.length > 0) {
@@ -377,7 +406,7 @@ export async function POST(req: Request) {
           })),
         });
       }
-      return c;
+      return (await tx.card.findUnique({ where: { id: c.id } })) ?? c;
     });
 
     // classroom-boards-tab "🟢 새 활동" 배지 — 카드 생성으로 부모 board touch.
@@ -399,6 +428,11 @@ export async function POST(req: Request) {
         order: true,
       },
     });
+    const authors = await db.cardAuthor.findMany({
+      where: { cardId: card.id },
+      orderBy: { order: "asc" },
+      select: { id: true, studentId: true, displayName: true, order: true },
+    });
 
     // Mirror the server-side cardProps mapping (board/[id]/page.tsx) so
     // the client can drop the response straight into state and keep the
@@ -411,9 +445,13 @@ export async function POST(req: Request) {
         studentAuthorName: student?.name ?? null,
         externalAuthorName: card.externalAuthorName,
         attachments,
+        authors,
       },
     });
   } catch (e) {
+    if (e instanceof CardAuthorError) {
+      return NextResponse.json({ error: e.code, detail: e.message }, { status: 400 });
+    }
     if (e instanceof ForbiddenError) {
       return NextResponse.json({ error: e.message }, { status: 403 });
     }

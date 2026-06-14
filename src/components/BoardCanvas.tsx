@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { DraggableCard, type CardData } from "./DraggableCard";
 import { AddCardButton } from "./AddCardButton";
+import type { AddCardData } from "./AddCardModal";
 import { CardDetailModal } from "./cards/CardDetailModal";
 import { CardAuthorEditor, type SavedAuthor } from "./cards/CardAuthorEditor";
 
@@ -73,24 +74,7 @@ export function BoardCanvas({
     });
   }
 
-  async function handleAdd(data: {
-    title: string;
-    content: string;
-    linkUrl?: string;
-    linkTitle?: string;
-    linkDesc?: string;
-    linkImage?: string;
-    attachments?: Array<{
-      kind: "image" | "video" | "file" | "link";
-      url: string;
-      previewUrl?: string | null;
-      fileName?: string | null;
-      fileSize?: number | null;
-      mimeType?: string | null;
-    }>;
-    color?: string;
-    attachAssetId?: string;
-  }) {
+  async function handleAdd(data: AddCardData) {
     const nextPos = {
       x: 40 + (cards.length % 3) * 280,
       y: 40 + Math.floor(cards.length / 3) * 220,
@@ -108,6 +92,7 @@ export function BoardCanvas({
           linkDesc: data.linkDesc || null,
           linkImage: data.linkImage || null,
           attachments: data.attachments,
+          authors: data.authors,
           color: data.color || null,
           ...nextPos,
         }),
@@ -182,7 +167,13 @@ export function BoardCanvas({
           />
         ))}
       </div>
-      {canAddCard && <AddCardButton onAdd={handleAdd} />}
+      {canAddCard && (
+        <AddCardButton
+          onAdd={handleAdd}
+          canAssignAuthors={canEdit}
+          classroomId={classroomId}
+        />
+      )}
       <CardDetailModal
         card={openCard}
         onClose={() => setOpenCard(null)}

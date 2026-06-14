@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { AddCardButton } from "./AddCardButton";
+import type { AddCardData } from "./AddCardModal";
 import { CardBody } from "./cards/CardBody";
 import { CardDetailModal } from "./cards/CardDetailModal";
 import { CardAuthorEditor, type SavedAuthor } from "./cards/CardAuthorEditor";
@@ -25,23 +26,7 @@ export function GridBoard({ boardId, initialCards, currentUserId, currentRole, i
   const canEdit = currentRole === "owner" || currentRole === "editor";
   const canAddCard = canEdit || !!isStudentViewer;
 
-  async function handleAdd(data: {
-    title: string;
-    content: string;
-    linkUrl?: string;
-    linkTitle?: string;
-    linkDesc?: string;
-    linkImage?: string;
-    attachments?: Array<{
-      kind: "image" | "video" | "file" | "link";
-      url: string;
-      previewUrl?: string | null;
-      fileName?: string | null;
-      fileSize?: number | null;
-      mimeType?: string | null;
-    }>;
-    color?: string;
-  }) {
+  async function handleAdd(data: AddCardData) {
     try {
       const res = await fetch(`/api/cards`, {
         method: "POST",
@@ -55,6 +40,7 @@ export function GridBoard({ boardId, initialCards, currentUserId, currentRole, i
           linkDesc: data.linkDesc || null,
           linkImage: data.linkImage || null,
           attachments: data.attachments,
+          authors: data.authors,
           color: data.color || null,
           x: 0,
           y: 0,
@@ -126,7 +112,13 @@ export function GridBoard({ boardId, initialCards, currentUserId, currentRole, i
           </article>
         ))}
       </div>
-      {canAddCard && <AddCardButton onAdd={handleAdd} />}
+      {canAddCard && (
+        <AddCardButton
+          onAdd={handleAdd}
+          canAssignAuthors={canEdit}
+          classroomId={classroomId}
+        />
+      )}
       <CardDetailModal
         card={openCard}
         onClose={() => setOpenCard(null)}

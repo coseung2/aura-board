@@ -6,9 +6,16 @@ import { AddCardModal, type AddCardData } from "./AddCardModal";
 type Props = {
   onAdd: (data: AddCardData) => Promise<void>;
   sections?: { id: string; title: string }[];
+  canAssignAuthors?: boolean;
+  classroomId?: string | null;
 };
 
-export function AddCardButton({ onAdd, sections }: Props) {
+export function AddCardButton({
+  onAdd,
+  sections,
+  canAssignAuthors,
+  classroomId,
+}: Props) {
   const [open, setOpen] = useState(false);
 
   return (
@@ -29,6 +36,8 @@ export function AddCardButton({ onAdd, sections }: Props) {
           onAdd={onAdd}
           onClose={() => setOpen(false)}
           sections={sections}
+          canAssignAuthors={canAssignAuthors}
+          classroomId={classroomId}
         />
       )}
     </>

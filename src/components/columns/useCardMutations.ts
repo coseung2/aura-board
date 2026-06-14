@@ -169,6 +169,7 @@ export function useCardMutations({
           linkDesc: data.linkDesc || null,
           linkImage: data.linkImage || null,
           attachments: data.attachments,
+          authors: data.authors,
           color: data.color || null,
           x: 0,
           y: 0,
