@@ -2,6 +2,7 @@
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
+import { handleShareApiFetch } from "@/lib/supabase/share-api";
 
 export type ShareSession = {
   shareToken: string;
@@ -107,6 +108,11 @@ function ShareFetchBridge({ session }: { session: ShareSession }) {
     const patchedFetch = (input: RequestInfo | URL, init?: RequestInit) => {
       if (!isSameOriginApiRequest(input)) {
         return originalFetch.call(window, input, init);
+      }
+
+      const handled = handleShareApiFetch(session, input, init);
+      if (handled) {
+        return handled.then((response) => response ?? originalFetch.call(window, input, init));
       }
 
       const headers = new Headers(

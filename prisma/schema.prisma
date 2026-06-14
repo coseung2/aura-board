@@ -487,6 +487,10 @@ model Card {
   // Denormalized display label (= student.name) captured at publish time so
   // the board UI can render "작성: 가온" without joining Student.
   externalAuthorName String?
+  // Stable anonymous/share visitor key. Display names are user-controlled and
+  // mutable, so RLS/client-direct share writes must key ownership off this
+  // hidden value instead of externalAuthorName.
+  externalAuthorKey  String?
   // Canva design identifier when the card was published from the Canva
   // Content Publisher app (or a pasted Canva design URL with successful
   // resolve). Enables CanvaEmbedSlot's thumbnail+live toggle UX.

@@ -34,10 +34,6 @@ const nextConfig: NextConfig = {
       { protocol: "https", hostname: "yt3.googleusercontent.com", pathname: "/**" },
       // External generated thumbnails used by saved link previews.
       { protocol: "https", hostname: "**.cloudfront.net", pathname: "/**" },
-      // Vercel Blob — Canva publisher PNGs and other uploaded assets.
-      // Each Blob store gets a unique <prefix>.public.blob.vercel-storage.com
-      // host, so wildcard the subdomain.
-      { protocol: "https", hostname: "**.public.blob.vercel-storage.com", pathname: "/**" },
       // Supabase Storage — Aura-board uploaded assets after the Blob quota fix.
       { protocol: "https", hostname: "**.supabase.co", pathname: "/storage/v1/object/public/**" },
     ],

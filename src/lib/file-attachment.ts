@@ -143,7 +143,6 @@ export function formatBytes(n: number): string {
 
 /**
  * fileUrl이 이 프로젝트의 업로드 경로에서 나온 URL인지 확인.
- * - 프로덕션: `*.public.blob.vercel-storage.com` (Vercel Blob 공식 호스트)
  * - 프로덕션: Supabase Storage public object URL (`/storage/v1/object/public/...`)
  * - 로컬/개발: 동일 오리진 `/uploads/...` 상대 경로 또는 절대 URL
  *
@@ -156,18 +155,20 @@ export function isAllowedFileUrl(url: string | null | undefined): boolean {
   if (url.startsWith("/uploads/")) return true;
   try {
     const u = new URL(url);
-    // Vercel Blob은 *.public.blob.vercel-storage.com 하위로만 서빙.
-    if (u.hostname.endsWith(".public.blob.vercel-storage.com")) return true;
     // Supabase Storage public bucket. NEXT_PUBLIC_SUPABASE_URL이 있으면
     // 정확한 프로젝트 호스트만, 테스트/미설정 환경은 *.supabase.co + public object
     // path만 허용한다.
     if (isAllowedSupabaseStorageUrl(u)) return true;
     // 로컬 dev가 절대 URL로 /uploads/를 낼 때.
-    if (u.pathname.startsWith("/uploads/")) return true;
+    if (u.pathname.startsWith("/uploads/") && isLocalUploadHost(u.hostname)) return true;
     return false;
   } catch {
     return false;
   }
+}
+
+function isLocalUploadHost(hostname: string): boolean {
+  return hostname === "localhost" || hostname === "127.0.0.1" || hostname === "::1";
 }
 
 function isAllowedSupabaseStorageUrl(u: URL): boolean {

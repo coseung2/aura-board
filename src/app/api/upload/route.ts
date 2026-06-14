@@ -55,11 +55,9 @@ export async function POST(req: Request) {
       }
     }
 
-    // upload-payload-too-large — 클라이언트는 @vercel/blob/client `upload()`로
-    // JSON 본문(generate-client-token 프로토콜)을 보낸다. handleUpload가
-    // 토큰을 발급하면 브라우저가 Blob 스토리지에 직접 PUT → Vercel Functions
-    // 요청 본문 4.5MB 한도를 우회. onBeforeGenerateToken에서 화이트리스트·
-    // 크기 상한을 토큰에 바인딩해 악용을 차단.
+    // 이전 Vercel Blob client-direct JSON 프로토콜은 제거됐다.
+    // 신규 클라이언트는 multipart로 이 라우트에 업로드하고, 서버가 MIME/
+    // 확장자/매직바이트를 검증한 뒤 Supabase Storage에 저장한다.
     const contentType = req.headers.get("content-type") ?? "";
     if (contentType.includes("application/json")) {
       // 이전 Vercel Blob client-direct 프로토콜. 신규 클라이언트는 multipart로
@@ -70,8 +68,7 @@ export async function POST(req: Request) {
       );
     }
 
-    // 레거시 multipart 경로 — BLOB_READ_WRITE_TOKEN 없는 로컬 dev·외부 호출
-    // 호환용. 프로덕션 클라이언트는 위 JSON 경로를 사용한다.
+    // multipart 경로 — 서버 검증 후 Supabase Storage canonical 저장소에 업로드.
     const formData = await req.formData();
     const file = formData.get("file") as File | null;
     if (!file) {

@@ -1,13 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { extractVideoId } from "@/lib/youtube";
-import {
-  hasPrimaryNonLinkContent,
-  isYouTubeChannelLink,
-  isYouTubeLink,
-  shouldPromoteLinkPreview,
-} from "@/lib/card-content-policy";
+import { isCanvaDesignUrl } from "@/lib/canva";
+import { isYouTubeLink } from "@/lib/card-content-policy";
 import { CardAttachments } from "../CardAttachments";
 import { CardAuthorFooter } from "./CardAuthorFooter";
 import { CardImageLightbox } from "./CardImageLightbox";
@@ -35,6 +30,8 @@ type Props = {
    *  share the same modal without leaking the editor to peers. */
   canEditAuthors?: (card: CardData) => boolean;
 };
+
+type DetailLayout = "full" | "media-meta" | "text-meta";
 
 export function CardDetailModal({
   card,
@@ -97,40 +94,36 @@ export function CardDetailModal({
 
   if (!card) return null;
 
-  // YouTube channel URLs render as a regular link preview (banner + name
-  // + description), not an inline iframe. Suppress the "원본 링크 열기"
-  // button on those cards the same way we do for any other link-preview
-  // card — the preview itself is the link, an extra "open" button is
-  // noise. (Canva keeps the button because its embed is an iframe and the
-  // banner alone is not clickable to the design.)
-  const isChannel = isYouTubeChannelLink(card.linkUrl);
-  const policyInput = {
-    imageUrl: card.imageUrl,
-    linkUrl: card.linkUrl,
-    videoUrl: card.videoUrl,
-    fileUrl: card.fileUrl,
-    attachments: card.attachments,
-  };
-  // text-only 모달 분기 (2026-06-14): hasMedia = image/video/youtube만.
-  // linkUrl은 본문 영역에서 텍스트 2줄로 표시 (media 영역으로 안 보냄).
-  // hasBodyContent: 본문/파일/링크 텍스트가 본문 영역에 있을지 여부.
-  // 없으면 media-only 모달(content-zone hide)로 분기.
-  const hasUploadedImageOrVideo = Boolean(
+  const attachments = card.attachments ?? [];
+  const mediaAttachments = attachments.filter(
+    (a) => a.kind === "image" || a.kind === "video"
+  );
+  const hasFileAttachment = Boolean(
+    card.fileUrl || attachments.some((a) => a.kind === "file")
+  );
+  const hasMediaAttachment = Boolean(
     card.imageUrl ||
       card.videoUrl ||
-      isYouTubeLink(card.linkUrl) ||
-      (card.attachments ?? []).some(
-        (a) => a.kind === "image" || a.kind === "video"
-      )
+      mediaAttachments.length > 0
   );
-  const hasMedia = hasUploadedImageOrVideo;
-  const hasBodyContent = Boolean(
+  const hasEmbeddableLink = Boolean(
+    card.linkUrl &&
+      (isYouTubeLink(card.linkUrl) || isCanvaDesignUrl(card.linkUrl))
+  );
+  const mediaLinkUrl = hasEmbeddableLink ? card.linkUrl : null;
+  const hasTextLink = Boolean(card.linkUrl && !hasEmbeddableLink);
+  const hasMedia = hasMediaAttachment || hasEmbeddableLink;
+  const hasTextContent = Boolean(
     card.title.trim() ||
       (card.content && card.content.trim()) ||
-      card.fileUrl ||
-      (card.attachments ?? []).some((a) => a.kind === "file") ||
-      card.linkUrl
+      hasFileAttachment ||
+      hasTextLink
   );
+  const detailLayout: DetailLayout = hasMedia
+    ? hasTextContent
+      ? "full"
+      : "media-meta"
+    : "text-meta";
 
   // 본문 카드 안의 모든 텍스트 요소를 동일한 폰트 크기/줄높이로 통일
   // (Variant C 스타일 슬라이드 + 본문 정돈).
@@ -148,8 +141,9 @@ export function CardDetailModal({
         role="dialog"
         aria-modal="true"
         aria-label={card.title}
+        data-detail-layout={detailLayout}
         data-has-media={hasMedia ? "true" : "false"}
-        data-has-body={hasBodyContent ? "true" : "false"}
+        data-has-body={hasTextContent ? "true" : "false"}
         data-fullscreen={isFullscreen ? "true" : "false"}
         onClick={(e) => e.stopPropagation()}
       >
@@ -177,21 +171,21 @@ export function CardDetailModal({
                 <CardAttachments
                   imageUrl={card.imageUrl}
                   thumbUrl={card.thumbUrl}
-                  linkUrl={null}
+                  linkUrl={mediaLinkUrl}
                   linkTitle={card.linkTitle}
                   linkDesc={card.linkDesc}
                   linkImage={card.linkImage}
                   videoUrl={card.videoUrl}
-                  fileUrl={card.fileUrl}
-                  fileName={card.fileName}
-                  fileSize={card.fileSize}
-                  fileMimeType={card.fileMimeType}
-                  attachments={card.attachments}
+                  fileUrl={null}
+                  fileName={null}
+                  fileSize={null}
+                  fileMimeType={null}
+                  attachments={mediaAttachments}
                   onImageClick={(i) => setLightboxIndex(i)}
                 />
               </div>
             )}
-            {hasBodyContent && (
+            {hasTextContent && (
               <div className="card-detail-content-zone">
               {/* meta-download-zone (2026-06-13): 본문 = 제목 + content +
                   linkTitle/linkDesc (Notion 스타일 — 굵은 제목 / 한 줄 빈 줄 /
@@ -206,7 +200,7 @@ export function CardDetailModal({
                     {card.title}
                   </h2>
                 )}
-                {(card.linkTitle || card.linkDesc) && (
+                {hasTextLink && (card.linkTitle || card.linkDesc) && (
                   <div
                     className="card-detail-link-body"
                     style={{ fontSize: slideBodySize, lineHeight: 1.7 }}
@@ -232,8 +226,7 @@ export function CardDetailModal({
               {/* meta-download-zone (2026-06-13): 파일 첨부 다운로드 리스트.
                   legacy fileUrl/fileName/fileSize/fileMimeType + attachments[].kind==="file"
                   둘 다 커버. */}
-              {(card.fileUrl ||
-                (card.attachments ?? []).some((a) => a.kind === "file")) && (
+              {hasFileAttachment && (
                 <ul className="card-detail-file-list" aria-label="첨부 파일">
                   {/* key dedup (2026-06-13): legacy card.fileUrl과 attachments[]
                       양쪽에 같은 url이 동기화된 경우 동일 row가 두 번 렌더되어
@@ -252,7 +245,7 @@ export function CardDetailModal({
                       />
                     </li>
                   )}
-                  {(card.attachments ?? [])
+                  {attachments
                     .filter(
                       (a) =>
                         a.kind === "file" &&
@@ -271,7 +264,7 @@ export function CardDetailModal({
                     ))}
                 </ul>
               )}
-              {!hasMedia && card.linkUrl && (
+              {hasTextLink && card.linkUrl && (
                 <a
                   href={card.linkUrl}
                   target="_blank"
@@ -310,7 +303,7 @@ export function CardDetailModal({
         </div>
         {lightboxIndex !== null &&
           (() => {
-            const imageItems = (card.attachments ?? [])
+            const imageItems = attachments
               .filter((a) => a.kind === "image")
               .sort((a, b) => a.order - b.order)
               .map((a) => ({ id: a.id, url: a.url, alt: a.fileName ?? "" }));

@@ -2,7 +2,7 @@ import "server-only";
 import { randomBytes } from "crypto";
 import { mkdir, writeFile } from "fs/promises";
 import path from "path";
-import { put } from "@vercel/blob";
+import { createClient } from "@supabase/supabase-js";
 
 export class MediaStorageError extends Error {
   code = "media_storage_failed" as const;
@@ -15,7 +15,7 @@ export class MediaStorageError extends Error {
   }
 }
 
-export type MediaStorageProvider = "supabase" | "vercel-blob" | "filesystem";
+export type MediaStorageProvider = "supabase" | "filesystem";
 
 export type UploadPublicObjectOptions = {
   contentType: string;
@@ -32,7 +32,13 @@ export type UploadPublicObjectResult = {
 
 const DEFAULT_BUCKET = "aura-board-uploads";
 
-function getSupabaseStorageConfig(): { url: string; serviceRoleKey: string; bucket: string } | null {
+export type SupabaseStorageConfig = {
+  url: string;
+  serviceRoleKey: string;
+  bucket: string;
+};
+
+export function getSupabaseStorageConfig(): SupabaseStorageConfig | null {
   const url = process.env.SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL;
   const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
   const bucket = process.env.SUPABASE_STORAGE_BUCKET ?? process.env.AURA_STORAGE_BUCKET ?? DEFAULT_BUCKET;
@@ -63,6 +69,31 @@ export function buildSupabasePublicUrl(pathname: string): string | null {
   return `${config.url}/storage/v1/object/public/${config.bucket}/${encodeObjectPath(pathname)}`;
 }
 
+export function parseSupabasePublicObjectUrl(
+  value: string | null | undefined,
+): { bucket: string; pathname: string } | null {
+  if (!value) return null;
+  const config = getSupabaseStorageConfig();
+  if (!config) return null;
+  try {
+    const url = new URL(value);
+    const base = new URL(config.url);
+    if (url.hostname !== base.hostname) return null;
+
+    const prefix = `/storage/v1/object/public/${config.bucket}/`;
+    if (!url.pathname.startsWith(prefix)) return null;
+
+    const encodedPath = url.pathname.slice(prefix.length);
+    const pathname = encodedPath
+      .split("/")
+      .map((segment) => decodeURIComponent(segment))
+      .join("/");
+    return { bucket: config.bucket, pathname };
+  } catch {
+    return null;
+  }
+}
+
 export async function uploadPublicObject(
   pathname: string,
   body: Buffer,
@@ -80,27 +111,37 @@ export async function uploadPublicObject(
     );
   }
 
-  const blobToken = process.env.BLOB_READ_WRITE_TOKEN;
-  if (blobToken) {
-    try {
-      const out = await put(normalizedPath, body, {
-        access: "public",
-        contentType: options.contentType,
-        token: blobToken,
-        multipart: options.multipart ?? true,
-        addRandomSuffix: false,
-        ...(typeof options.cacheControlMaxAge === "number"
-          ? { cacheControlMaxAge: options.cacheControlMaxAge }
-          : {}),
-        ...(options.contentDisposition ? { contentDisposition: options.contentDisposition } : {}),
-      });
-      return { url: out.url, pathname: normalizedPath, provider: "vercel-blob" };
-    } catch (e) {
-      console.warn("[media-storage] Vercel Blob put() failed, falling back to fs", e);
-    }
+  return uploadToFilesystem(normalizedPath, body);
+}
+
+export async function deletePublicObjects(
+  urls: (string | null | undefined)[],
+): Promise<{ deleted: number; skipped: number }> {
+  const config = getSupabaseStorageConfig();
+  if (!config) {
+    return { deleted: 0, skipped: urls.filter(Boolean).length };
   }
 
-  return uploadToFilesystem(normalizedPath, body);
+  const paths = [
+    ...new Set(
+      urls
+        .map((url) => parseSupabasePublicObjectUrl(url))
+        .filter((parsed): parsed is { bucket: string; pathname: string } => Boolean(parsed))
+        .map((parsed) => parsed.pathname),
+    ),
+  ];
+  if (paths.length === 0) {
+    return { deleted: 0, skipped: urls.filter(Boolean).length };
+  }
+
+  const client = createClient(config.url, config.serviceRoleKey, {
+    auth: { autoRefreshToken: false, persistSession: false },
+  });
+  const { error } = await client.storage.from(config.bucket).remove(paths);
+  if (error) {
+    throw new MediaStorageError(`Supabase Storage delete failed: ${error.message}`, error);
+  }
+  return { deleted: paths.length, skipped: urls.filter(Boolean).length - paths.length };
 }
 
 async function uploadToSupabase(

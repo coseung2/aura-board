@@ -1,9 +1,12 @@
 import { PrismaClient } from "@prisma/client";
+import { existsSync, readFileSync } from "node:fs";
 
 const db = new PrismaClient();
 
 const BLOB_HOST_SUFFIX = ".public.blob.vercel-storage.com";
 const DEFAULT_BUCKET = "aura-board-uploads";
+
+loadEnvFiles();
 
 type FieldSpec = {
   model: string;
@@ -54,6 +57,29 @@ function getStorageConfig() {
   return { url: url.replace(/\/+$/, ""), serviceRoleKey, bucket };
 }
 
+function loadEnvFiles() {
+  for (const file of [".env", ".env.local"]) {
+    if (!existsSync(file)) continue;
+    for (const line of readFileSync(file, "utf8").split(/\r?\n/)) {
+      const match = line.match(/^\s*([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*)\s*$/);
+      if (!match) continue;
+      const [, key, rawValue] = match;
+      if (process.env[key] != null) continue;
+      process.env[key] = stripEnvQuotes(rawValue.trim());
+    }
+  }
+}
+
+function stripEnvQuotes(value: string): string {
+  if (
+    (value.startsWith('"') && value.endsWith('"')) ||
+    (value.startsWith("'") && value.endsWith("'"))
+  ) {
+    return value.slice(1, -1);
+  }
+  return value;
+}
+
 function isVercelBlobUrl(value: unknown): value is string {
   if (typeof value !== "string" || !value) return false;
   try {
@@ -78,9 +104,20 @@ function encodeObjectPath(pathname: string): string {
 
 async function copyToSupabase(sourceUrl: string, pathname: string): Promise<string> {
   const config = getStorageConfig();
-  const source = await fetch(sourceUrl);
+  const sourceHeaders: HeadersInit = {};
+  if (process.env.BLOB_READ_WRITE_TOKEN) {
+    sourceHeaders.authorization = `Bearer ${process.env.BLOB_READ_WRITE_TOKEN}`;
+  }
+
+  const source = await fetch(sourceUrl, { headers: sourceHeaders });
   if (!source.ok) {
-    throw new Error(`source fetch failed ${source.status} ${source.statusText}`);
+    const hint =
+      source.status === 403
+        ? process.env.BLOB_READ_WRITE_TOKEN
+          ? " (Vercel Blob denied the object read; check whether the Blob store is suspended or quota-blocked)"
+          : " (set BLOB_READ_WRITE_TOKEN to read protected or quota-blocked Vercel Blob objects)"
+        : "";
+    throw new Error(`source fetch failed ${source.status} ${source.statusText}${hint}`);
   }
   const contentType = source.headers.get("content-type") ?? "application/octet-stream";
   const cacheControl = source.headers.get("cache-control") ?? "public, max-age=31536000, immutable";
@@ -145,6 +182,7 @@ async function main() {
         processed += 1;
         continue;
       }
+      processed += 1;
       try {
         const nextUrl = await copyToSupabase(value, pathname);
         await delegate.update({
@@ -152,7 +190,6 @@ async function main() {
           data: { [spec.field]: nextUrl },
         });
         copied += 1;
-        processed += 1;
         console.log(`[ok] ${spec.label}.${spec.field} ${row.id}: ${nextUrl}`);
       } catch (e) {
         failed += 1;

@@ -141,9 +141,9 @@ describe("file-attachment · isAllowedFileUrl (codex security review)", () => {
     expect(isAllowedFileUrl("")).toBe(true);
   });
 
-  it("allows Vercel Blob public-storage hostnames", () => {
-    expect(isAllowedFileUrl("https://abc123.public.blob.vercel-storage.com/uploads/x.pdf")).toBe(true);
-    expect(isAllowedFileUrl("https://tenant-name.public.blob.vercel-storage.com/uploads/a.docx")).toBe(true);
+  it("rejects legacy Vercel Blob public-storage hostnames", () => {
+    expect(isAllowedFileUrl("https://abc123.public.blob.vercel-storage.com/uploads/x.pdf")).toBe(false);
+    expect(isAllowedFileUrl("https://tenant-name.public.blob.vercel-storage.com/uploads/a.docx")).toBe(false);
   });
 
   it("allows Supabase Storage public object URLs", () => {

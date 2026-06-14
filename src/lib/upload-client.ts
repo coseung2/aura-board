@@ -12,9 +12,8 @@ export type UploadedFile = {
 };
 
 /**
- * upload-payload-too-large — 클라이언트 직접 업로드.
- * @vercel/blob/client `upload()`로 토큰을 받아 브라우저가 Blob 스토리지에
- * 직접 PUT. 함수 본문 4.5MB 한도(FUNCTION_PAYLOAD_TOO_LARGE)를 우회.
+ * Multipart upload helper.
+ * 서버 라우트가 MIME/확장자/매직바이트를 검증한 뒤 Supabase Storage에 저장한다.
  *
  * HEIC/HEIF 파일은 브라우저 호환성을 위해 JPEG로 자동 변환 후 업로드한다.
  * (samsung-auditorium-fix)

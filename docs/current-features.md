@@ -58,7 +58,7 @@ Live feature inventory. Update when merging feature tasks.
   - zod 검증: `boardId`, `title` 필수 / `content`, `imageDataUrl`(PNG data URL ≤5MB), `linkUrl`, `canvaDesignId` 선택
   - RBAC: board owner/editor만 허용, viewer → 403
   - Rate limit: 토큰당 60/min (in-memory fixed window)
-  - 이미지: `BLOB_READ_WRITE_TOKEN` 있으면 Vercel Blob 업로드, 없으면 `public/uploads/` fallback
+  - 이미지: Supabase Storage 업로드. 로컬 개발에서 Supabase Storage 미설정 시 `public/uploads/` fallback
   - Canva designId → 서버측 oEmbed 자동 보강(linkImage/linkTitle/linkDesc)
 - 교사 UI: `/account/tokens` — 발급 (라벨) / 리스트 (`lastUsedAt`) / 폐기
   - 평문 토큰 1회 노출 (DB 는 SHA-256 해시만 저장, 키=`NEXTAUTH_SECRET`)
@@ -117,7 +117,7 @@ Live feature inventory. Update when merging feature tasks.
 - **UI rewrite `src/components/AssignmentBoard.tsx`**: Submission+BoardMember 경로 폐기, AssignmentSlot 기반 재작성. 풀스크린 모달(prev/next + 키보드 `←/→` + inline 반려) + 학생 guide 상단 `.assign-return-banner` + 학생 submit card.
 - **Identity-based 권한**: teacher/student/parent 3tier (`project_permission_model` 메모리 정합). `BoardMember.role=editor` 학생용 행 생성 금지.
 - **Parent viewer `/parent/(app)/child/[studentId]/assignments`**: AssignmentSlot-backed rows 우선 — `returnReason` 배너 렌더, `submissionStatus` 라벨(assigned/submitted/viewed/returned/reviewed/orphaned).
-- **Realtime**: `assignmentChannelKey(boardId)` helper + 3 event types; `publish()` v1 no-op (engine 미정). 클라이언트는 `router.refresh()` + `useState` optimistic.
+- **Realtime**: `assignmentChannelKey(boardId)` helper + 3 event types. 공유 보드 학생 shell은 Supabase Realtime 구독으로 카드/섹션 변경 시 재조회한다.
 - **2026-04-15 AB-1 후속 머지**:
   - AC-12 WebP 썸네일 파이프라인 완료 — `Card.thumbUrl` + `src/lib/blob.ts#resizeToWebPThumbUrl` + 학생 제출 시 자동 생성 + `slotRowToDTO` 가 thumbUrl 우선(없으면 imageUrl fallback).
   - AC-13 Matrix 뷰 server guard 완료 — `?view=matrix` 학생/학부모 `notFound()`, 모바일 UA redirect, 교사 데스크탑은 `.assign-board--matrix` 1열 placeholder.

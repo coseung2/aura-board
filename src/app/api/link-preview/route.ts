@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
 import { createHash } from "crypto";
-import { put } from "@vercel/blob";
 import sharp from "sharp";
 import {
   deriveCanvaThumbnailUrl,
@@ -9,6 +8,7 @@ import {
 } from "@/lib/canva";
 import { resolveCanvaEmbedUrlCached } from "@/lib/canva-preview-cache";
 import { getPreviewCache, setPreviewCache } from "@/lib/preview-cache";
+import { uploadPublicObject } from "@/lib/media-storage";
 import {
   extractChannelHandle,
   fetchYouTubeChannelMeta,
@@ -65,9 +65,6 @@ async function fetchOgImagePreview(
   pageUrl: string,
   fallbackUrl = proxiedLinkPreviewImageUrl(imageUrl, pageUrl)
 ): Promise<string | null> {
-  const blobToken = process.env.BLOB_READ_WRITE_TOKEN;
-  if (!blobToken) return fallbackUrl;
-
   const cacheKey = `${imageUrl}|${pageUrl}`;
   const cached = await getPreviewCache<{ url: string }>("link-preview-image", cacheKey);
   if (cached.hit) {
@@ -120,17 +117,15 @@ async function fetchOgImagePreview(
       .toBuffer();
 
     const pathname = `link-previews/${cacheHash(imageUrl)}.webp`;
-    const blob = await put(pathname, preview, {
-      access: "public",
+    const stored = await uploadPublicObject(pathname, preview, {
       contentType: "image/webp",
-      token: blobToken,
       multipart: false,
-      addRandomSuffix: false,
+      cacheControlMaxAge: 60 * 60 * 24 * 365,
     });
 
-    const payload = { url: blob.url };
+    const payload = { url: stored.url };
     await setPreviewCache("link-preview-image", cacheKey, payload, true);
-    return blob.url;
+    return stored.url;
   } catch (e) {
     await setPreviewCache(
       "link-preview-image",

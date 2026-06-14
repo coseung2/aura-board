@@ -808,15 +808,18 @@
   border-color: var(--color-border-hover);
 }
 
+.card-detail-modal[data-detail-layout="media-meta"] .card-detail-content-zone,
 .card-detail-modal[data-has-body="false"][data-has-media="true"] .card-detail-content-zone {
   display: none;
 }
+.card-detail-modal[data-detail-layout="media-meta"] .card-detail-main,
 .card-detail-modal[data-has-body="false"][data-has-media="true"] .card-detail-main {
   /* media only: media만 보이게 main column 너비 제한. rail은 220px 그대로. */
   max-width: 100%;
 }
 /* media-only: portrait에서 grid 1fr (rail만) + media full width */
 @media (orientation: portrait), (max-width: 1199px) {
+  .card-detail-modal[data-detail-layout="media-meta"] .card-detail-body,
   .card-detail-modal[data-has-body="false"][data-has-media="true"] .card-detail-body {
     grid-template-columns: 1fr;
     grid-template-rows: 1fr auto;
@@ -826,26 +829,31 @@
 /* text-only modal variant (2026-06-13): media가 없으면 main을 hide하지
    않고 display:flex로 살려서 content-zone이 main 안에서 정상 렌더되게
    함. modal 컨테이너 크기도 줄여서 빈 공간 최소화. CSS-only 변경. */
+.card-detail-modal[data-detail-layout="text-meta"] .card-detail-body,
 .card-detail-modal[data-has-media="false"] .card-detail-body {
   /* main을 살리므로 rail만 별도 컬럼으로 두기 위해 1fr 280px 유지
      (기본 1fr 220px → 본문이 좁아보이니 text-only에선 rail 280px) */
   grid-template-columns: 1fr 280px;
 }
+.card-detail-modal[data-detail-layout="text-meta"] .card-detail-main,
 .card-detail-modal[data-has-media="false"] .card-detail-main {
   display: flex;
 }
+.card-detail-modal[data-detail-layout="text-meta"],
 .card-detail-modal[data-has-media="false"] {
   width: min(900px, calc(100vw - 48px));
   height: auto;
   max-height: calc(100dvh - 48px);
   overflow-y: auto;
 }
+.card-detail-modal[data-detail-layout="text-meta"] .card-detail-content-zone,
 .card-detail-modal[data-has-media="false"] .card-detail-content-zone {
   border-top: none;
 }
 /* portrait mode override (2026-06-13): text-only면 55dvh collapse 방지.
    portrait에서도 main이 살았으므로 grid rows auto로 두기. */
 @media (orientation: portrait), (max-width: 1199px) {
+  .card-detail-modal[data-detail-layout="text-meta"] .card-detail-body,
   .card-detail-modal[data-has-media="false"] .card-detail-body {
     grid-template-columns: 1fr;
     grid-template-rows: auto auto;

@@ -1,13 +1,13 @@
 import { randomBytes } from "crypto";
 import { spawn } from "child_process";
 import { existsSync, readFileSync } from "fs";
-import { mkdir, unlink, writeFile } from "fs/promises";
+import { unlink, writeFile } from "fs/promises";
 import { tmpdir } from "os";
 import * as path from "path";
-import { put } from "@vercel/blob";
 import ffmpegStatic from "ffmpeg-static";
 import sharp from "sharp";
 import { db } from "../src/lib/db";
+import { uploadPublicObject } from "../src/lib/media-storage";
 
 loadEnvFile(".env");
 loadEnvFile(".env.local");
@@ -69,7 +69,10 @@ async function main() {
       {
         dryRun,
         force,
-        blobUpload: Boolean(process.env.BLOB_READ_WRITE_TOKEN),
+        supabaseStorage: Boolean(
+          process.env.SUPABASE_SERVICE_ROLE_KEY &&
+            (process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL),
+        ),
         scanned: attachments.length,
         updated,
         failed,
@@ -136,24 +139,12 @@ async function materializeVideoSource(sourceUrl: string): Promise<string> {
 }
 
 async function uploadWebPBuffer(buffer: Buffer, pathname: string): Promise<string> {
-  const blobToken = process.env.BLOB_READ_WRITE_TOKEN;
-  if (blobToken) {
-    const res = await put(pathname, buffer, {
-      access: "public",
-      contentType: "image/webp",
-      token: blobToken,
-      multipart: false,
-      addRandomSuffix: false,
-      cacheControlMaxAge: 60 * 60 * 24 * 365,
-    });
-    return res.url;
-  }
-
-  const uploadDir = path.join(process.cwd(), "public", path.dirname(pathname));
-  await mkdir(uploadDir, { recursive: true });
-  const filename = path.basename(pathname);
-  await writeFile(path.join(uploadDir, filename), buffer);
-  return `/${pathname.replace(/\\/g, "/")}`;
+  const res = await uploadPublicObject(pathname, buffer, {
+    contentType: "image/webp",
+    multipart: false,
+    cacheControlMaxAge: 60 * 60 * 24 * 365,
+  });
+  return res.url;
 }
 
 async function extractVideoFrame(sourceUrl: string, seekTime: number): Promise<Buffer | null> {

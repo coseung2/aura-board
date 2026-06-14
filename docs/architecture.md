@@ -9,7 +9,14 @@
 - Prisma 6 + PostgreSQL (Supabase, region ap-northeast-2)
 - NextAuth 5 beta + Prisma Adapter
 - Student session: custom HMAC cookie (`src/lib/student-auth.ts`)
-- Realtime engine: **미정** — `src/lib/realtime.ts`는 채널 키 helper만 제공. 실제 pub/sub 엔진은 별도 research task.
+- Realtime engine: Supabase Realtime for public student share shells. `src/lib/realtime.ts`는 legacy server route용 채널 키 helper/no-op adapter로 유지한다.
+
+## Environment
+
+- Public student share shells are static (`/s/[shortCode]`, `/share/[shareToken]`) and use `@supabase/supabase-js` directly in the browser.
+- Required public client env: `NEXT_PUBLIC_SUPABASE_URL` plus `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` or legacy `NEXT_PUBLIC_SUPABASE_ANON_KEY`.
+- Server-only media writes/deletes use Supabase Storage with `SUPABASE_SERVICE_ROLE_KEY` and `SUPABASE_URL` or `NEXT_PUBLIC_SUPABASE_URL`.
+- Do not expose `SUPABASE_SERVICE_ROLE_KEY` through `NEXT_PUBLIC_*`.
 
 ## Auth & RBAC
 
@@ -27,7 +34,7 @@
 - `boardChannelKey(boardId)` → `board:{boardId}`
 - `sectionChannelKey(boardId, sectionId)` → `board:{boardId}:section:{sectionId}`
 - `assignmentChannelKey(boardId)` → `board:{boardId}:assignment` (AB-1, 2026-04-14)
-- `publish(event)` is a no-op placeholder. Consumers MUST use these helpers so a future engine swap touches only the transport layer.
+- `publish(event)` is a no-op placeholder for legacy server routes. Public student share shells subscribe directly with Supabase Realtime and refetch board data on card/section changes.
 - `AssignmentRealtimeEvent` union: `slot.updated` | `slot.returned` | `reminder.issued`.
 
 ## Data model
@@ -125,7 +132,7 @@ Status: schema + route + UI placeholder only. Drawpile 서버/포크/COOP-COEP/p
 3. COOP/COEP 헤더 (drawing-only 라우트 전략)
 4. postMessage bridge (`docs/drawpile-protocol.md`)
 5. Supabase migration 적용
-6. 프로덕션 스토리지 업그레이드 (`@vercel/blob` 등)
+6. 프로덕션 Supabase Storage bucket/policy 적용
 
 ## Breakout Room Foundation (2026-04-12, BR-1 ~ BR-4)
 

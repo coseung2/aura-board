@@ -1,13 +1,11 @@
 /**
- * Vercel Blob streaming upload helper (Seed 8 §1.5 / CR-7).
+ * Media upload helper (Seed 8 §1.5 / CR-7).
  *
- * Uses `@vercel/blob` `put()` with `multipart: true` when
- * BLOB_READ_WRITE_TOKEN is set. Otherwise falls back to writing under
- * `public/uploads/` for dev/self-host.
+ * Uses the project media-storage abstraction. Production requires Supabase
+ * Storage; local development can fall back to writing under `public/uploads/`.
  *
  * The input is a PNG data URL (`data:image/png;base64,<b64>`). We decode the
- * base64 body into a Buffer *once* and hand it to put(); the @vercel/blob SDK
- * handles the multipart streaming internally when `multipart: true`.
+ * base64 body into a Buffer *once* and hand it to storage.
  *
  * We deliberately do not accumulate more than one decoded copy — request
  * streaming is handled by Next.js framework; we only deal with the already-

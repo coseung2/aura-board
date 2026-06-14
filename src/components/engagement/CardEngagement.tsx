@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { formatRelativeTime } from "@/lib/card-engagement-format";
 import { useShareSession, type ShareSession } from "@/components/share/ShareSessionContext";
+import { createPublicSupabaseClient } from "@/lib/supabase/client";
 
 // card-comments-likes (2026-04-26): 카드별 좋아요 + 댓글 UI.
 // mode="chips"  — 인라인 보드 카드 footer (좋아요 토글 + 댓글 카운트
@@ -70,6 +71,41 @@ export function CardEngagement({ cardId, mode }: Props) {
   useEffect(() => {
     void refresh();
   }, [refresh]);
+
+  useEffect(() => {
+    if (!shareSession) return;
+    const supabase = createPublicSupabaseClient({
+      "x-share-token": shareSession.shareToken,
+      "x-share-guest-id": shareSession.guestId,
+    });
+    const channel = supabase
+      .channel(`share-card-engagement:${cardId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "CardLike",
+          filter: `cardId=eq.${cardId}`,
+        },
+        () => void refresh(),
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "CardComment",
+          filter: `cardId=eq.${cardId}`,
+        },
+        () => void refresh(),
+      )
+      .subscribe();
+
+    return () => {
+      void supabase.removeChannel(channel);
+    };
+  }, [cardId, refresh, shareSession]);
 
   const toggleLike = useCallback(async () => {
     if (!state?.canInteract) return;

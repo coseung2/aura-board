@@ -2,6 +2,7 @@
 
 import Image from "next/image";
 import { memo, useState } from "react";
+import type { CSSProperties, SyntheticEvent } from "react";
 
 type OptimizedImageProps = {
   src: string;
@@ -32,6 +33,32 @@ type OptimizedImageProps = {
 };
 
 const DEFAULT_SIZES = "(max-width: 768px) 100vw, 480px";
+
+function canUseNextImage(src: string): boolean {
+  if (!src.startsWith("http://") && !src.startsWith("https://")) return true;
+
+  try {
+    const url = new URL(src);
+    const host = url.hostname.toLowerCase();
+    if (host === "www.canva.com" || host === "canva.com") return true;
+    if (host === "document-export.canva.com") return true;
+    if (host.endsWith(".canva.com")) return true;
+    if (host.endsWith(".canva-web-files.com")) return true;
+    if (host === "i.ytimg.com" || host === "img.youtube.com") return true;
+    if (host === "yt3.googleusercontent.com") return true;
+    if (host.endsWith(".cloudfront.net")) return true;
+    if (
+      host.endsWith(".supabase.co") &&
+      url.pathname.startsWith("/storage/v1/object/public/")
+    ) {
+      return true;
+    }
+  } catch {
+    return false;
+  }
+
+  return false;
+}
 
 /**
  * Thin wrapper over next/image. Use everywhere we currently have
@@ -68,6 +95,7 @@ export const OptimizedImage = memo(function OptimizedImage({
   const isDataLike =
     src.startsWith("data:") || src.startsWith("blob:") || src.endsWith(".svg");
   const effectiveUnoptimized = unoptimized ?? isDataLike;
+  const usePlainImage = !effectiveUnoptimized && !canUseNextImage(src);
 
   if (failed) {
     return (
@@ -85,12 +113,41 @@ export const OptimizedImage = memo(function OptimizedImage({
     loading: priority ? undefined : ("lazy" as const),
     unoptimized: effectiveUnoptimized,
     className,
-    style: { objectFit: fit } as React.CSSProperties,
-    onError: (e: React.SyntheticEvent<HTMLImageElement, Event>) => {
+    style: { objectFit: fit } as CSSProperties,
+    onError: (e: SyntheticEvent<HTMLImageElement, Event>) => {
       setFailed(true);
       if (onError) onError(e);
     },
   };
+
+  if (usePlainImage) {
+    const plainStyle: CSSProperties = fill
+      ? {
+          position: "absolute",
+          inset: 0,
+          width: "100%",
+          height: "100%",
+          objectFit: fit,
+        }
+      : {
+          width,
+          height,
+          objectFit: fit,
+        };
+
+    return (
+      // eslint-disable-next-line @next/next/no-img-element
+      <img
+        src={src}
+        alt={alt}
+        loading={priority ? "eager" : "lazy"}
+        decoding="async"
+        className={className}
+        style={plainStyle}
+        onError={commonProps.onError}
+      />
+    );
+  }
 
   if (fill) {
     return <Image {...commonProps} fill />;

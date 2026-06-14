@@ -34,7 +34,7 @@ Aura Board는 교실 활동을 카드 기반 보드로 모으고, 학생·교사
   - Canva, 영상, iframe은 클릭 전 실제 iframe/video를 mount하지 않음
   - Canva 카드는 클릭 전에도 썸네일과 재생 버튼을 표시
   - 업로드/생성 시점에 WebP preview를 만들고, 조회 시 반복 리사이즈나 외부 preview fetch를 피함
-  - Blob 삭제는 즉시 삭제 대신 지연 cleanup queue에서 참조 검사 후 처리
+  - Supabase Storage 삭제는 즉시 삭제 대신 지연 cleanup queue에서 참조 검사 후 처리
 
 ---
 
@@ -65,9 +65,24 @@ Aura Board는 여러 신원을 동시에 고려합니다.
 | UI | React 19, CSS Modules가 아닌 전역 CSS + 디자인 토큰 |
 | 인증 | NextAuth v5, 커스텀 학생/학부모 세션 |
 | DB | Prisma 6 + PostgreSQL |
-| 파일/미디어 | Vercel Blob, Sharp WebP preview |
+| 파일/미디어 | Supabase Storage, Sharp WebP preview |
 | 검증 | Zod, TypeScript |
 | 테스트 | Vitest |
+
+---
+
+## 환경 변수
+
+학생 공유 페이지(`/s/[shortCode]`, `/share/[shareToken]`)는 정적 shell에서
+Supabase client로 직접 읽기/쓰기를 수행하므로 브라우저에 노출 가능한 공개
+Supabase 설정이 필요합니다.
+
+- `NEXT_PUBLIC_SUPABASE_URL`
+- `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` 또는 legacy `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+- 서버 측 Storage 업로드/삭제에는 `SUPABASE_SERVICE_ROLE_KEY`와
+  `SUPABASE_URL` 또는 `NEXT_PUBLIC_SUPABASE_URL`이 필요합니다.
+
+값 없는 템플릿은 `.env.example`을 참고하세요.
 
 ---
 
@@ -127,7 +142,7 @@ npm run seed:drawing-assets
 ```text
 src/app/                  Next.js App Router 페이지와 API routes
 src/components/           보드, 카드, 포트폴리오, 식물관찰 등 UI 컴포넌트
-src/lib/                  권한, 인증, Blob, preview cache, 데이터 매퍼
+src/lib/                  권한, 인증, Storage, preview cache, 데이터 매퍼
 src/styles/               전역 CSS와 화면별 스타일
 src/types/                공유 DTO 타입
 prisma/                   Prisma schema, migrations, seed
@@ -149,7 +164,7 @@ docs/                     아키텍처, 현재 기능, 외부 API, 디자인 시
 
 ## 운영 메모
 
-- 목록 화면에서는 원본 Blob URL보다 preview/thumbnail URL을 우선 사용합니다.
+- 목록 화면에서는 원본 업로드 URL보다 preview/thumbnail URL을 우선 사용합니다.
 - iframe과 video는 사용자 액션 전까지 mount하지 않는 것을 기본 원칙으로 둡니다.
-- Blob 삭제는 `BlobDeletionQueue`를 통해 지연 처리하며, cleanup 전에 동일 URL 참조 여부를 확인합니다.
+- Supabase Storage 삭제는 `BlobDeletionQueue`를 통해 지연 처리하며, cleanup 전에 동일 URL 참조 여부를 확인합니다.
 - 외부 preview fetch와 Canva thumbnail resolve는 캐시를 우선 사용합니다.
