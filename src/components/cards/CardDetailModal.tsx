@@ -104,8 +104,6 @@ export function CardDetailModal({
   // noise. (Canva keeps the button because its embed is an iframe and the
   // banner alone is not clickable to the design.)
   const isChannel = isYouTubeChannelLink(card.linkUrl);
-  const showOriginalLink =
-    Boolean(card.linkUrl && !extractVideoId(card.linkUrl) && !isChannel);
   const policyInput = {
     imageUrl: card.imageUrl,
     linkUrl: card.linkUrl,
@@ -114,9 +112,9 @@ export function CardDetailModal({
     attachments: card.attachments,
   };
   // text-only 모달 분기 (2026-06-14): hasMedia = image/video/youtube만.
-  // linkUrl은 linkImage가 있어도 본문 영역에서 텍스트 2줄로 표시
-  // (text-only 모달에서는 CardAttachments의 큰 LinkPreview 카드 안
-  // 그리고 본문 안의 작은 link 텍스트로 처리).
+  // linkUrl은 본문 영역에서 텍스트 2줄로 표시 (media 영역으로 안 보냄).
+  // hasBodyContent: 본문/파일/링크 텍스트가 본문 영역에 있을지 여부.
+  // 없으면 media-only 모달(content-zone hide)로 분기.
   const hasUploadedImageOrVideo = Boolean(
     card.imageUrl ||
       card.videoUrl ||
@@ -126,10 +124,13 @@ export function CardDetailModal({
       )
   );
   const hasMedia = hasUploadedImageOrVideo;
-  // linkImage가 있는 링크는 미디어 영역(modal 상단)에 표시. plain link나
-  // OG 메타만 있는 링크는 본문 영역의 작은 link 텍스트로 표시.
-  const shouldPassLinkToMedia =
-    Boolean(card.linkImage) || isYouTubeLink(card.linkUrl);
+  const hasBodyContent = Boolean(
+    card.title.trim() ||
+      (card.content && card.content.trim()) ||
+      card.fileUrl ||
+      (card.attachments ?? []).some((a) => a.kind === "file") ||
+      card.linkUrl
+  );
 
   // 본문 카드 안의 모든 텍스트 요소를 동일한 폰트 크기/줄높이로 통일
   // (Variant C 스타일 슬라이드 + 본문 정돈).
@@ -148,6 +149,7 @@ export function CardDetailModal({
         aria-modal="true"
         aria-label={card.title}
         data-has-media={hasMedia ? "true" : "false"}
+        data-has-body={hasBodyContent ? "true" : "false"}
         data-fullscreen={isFullscreen ? "true" : "false"}
         onClick={(e) => e.stopPropagation()}
       >
@@ -175,7 +177,7 @@ export function CardDetailModal({
                 <CardAttachments
                   imageUrl={card.imageUrl}
                   thumbUrl={card.thumbUrl}
-                  linkUrl={shouldPassLinkToMedia ? card.linkUrl : null}
+                  linkUrl={null}
                   linkTitle={card.linkTitle}
                   linkDesc={card.linkDesc}
                   linkImage={card.linkImage}
@@ -187,20 +189,10 @@ export function CardDetailModal({
                   attachments={card.attachments}
                   onImageClick={(i) => setLightboxIndex(i)}
                 />
-                {showOriginalLink && card.linkUrl && (
-                  <a
-                    href={card.linkUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="card-detail-media-link"
-                    onClick={(e) => e.stopPropagation()}
-                  >
-                    🔗 링크 열기
-                  </a>
-                )}
               </div>
             )}
-            <div className="card-detail-content-zone">
+            {hasBodyContent && (
+              <div className="card-detail-content-zone">
               {/* meta-download-zone (2026-06-13): 본문 = 제목 + content +
                   linkTitle/linkDesc (Notion 스타일 — 굵은 제목 / 한 줄 빈 줄 /
                   설명). 텍스트만 본문 영역. 파일 첨부는 본문 아래 다운로드
@@ -279,7 +271,7 @@ export function CardDetailModal({
                     ))}
                 </ul>
               )}
-              {!hasMedia && showOriginalLink && card.linkUrl && (
+              {!hasMedia && card.linkUrl && (
                 <a
                   href={card.linkUrl}
                   target="_blank"
@@ -290,6 +282,7 @@ export function CardDetailModal({
                 </a>
               )}
             </div>
+            )}
           </section>
           <aside className="card-detail-rail" aria-label="메타 및 인터랙션">
             <div className="card-detail-meta">
