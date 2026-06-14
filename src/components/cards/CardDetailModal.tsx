@@ -113,13 +113,19 @@ export function CardDetailModal({
     fileUrl: card.fileUrl,
     attachments: card.attachments,
   };
-  const hasNonLinkMedia = hasPrimaryNonLinkContent(policyInput);
-  const shouldShowLinkAsMedia = shouldPromoteLinkPreview(policyInput);
-  const shouldPassLinkToMedia = shouldShowLinkAsMedia || isYouTubeLink(card.linkUrl);
-  const hasLinkPreview = Boolean(
-    card.linkUrl && (card.linkImage || card.linkTitle || card.linkDesc)
-  );
-  const hasMedia = hasNonLinkMedia || shouldShowLinkAsMedia || hasLinkPreview;
+  // text-only 모달 분기 (2026-06-14): hasMedia = 시각 미디어만.
+  // image/video/youtube-embed/OG-image-link 가 없으면 "텍스트/파일/plain
+  // link만 있는 카드"로 보고 data-has-media="false" emit. file 첨부와
+  // OG 메타 없는 plain link는 본문 영역(content-zone)에서 함께 렌더.
+  const hasVisualMedia =
+    hasPrimaryNonLinkContent(policyInput) ||
+    shouldPromoteLinkPreview(policyInput);
+  const shouldPassLinkToMedia =
+    shouldPromoteLinkPreview(policyInput) || isYouTubeLink(card.linkUrl);
+  // OG 메타가 있어도 image가 비어있으면 (linkTitle/linkDesc만) 본문 영역
+  // 에서 처리 — 시각 미디어로 보지 않음.
+  const hasLinkImage = Boolean(card.linkUrl && card.linkImage);
+  const hasMedia = hasVisualMedia && (hasLinkImage || hasPrimaryNonLinkContent(policyInput));
 
   // 본문 카드 안의 모든 텍스트 요소를 동일한 폰트 크기/줄높이로 통일
   // (Variant C 스타일 슬라이드 + 본문 정돈).
