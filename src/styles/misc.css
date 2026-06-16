@@ -390,6 +390,7 @@ body {
 body > main,
 body > div {
   flex: 1 0 auto;
+  width: 100%;
 }
 
 .app-footer {
