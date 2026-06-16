@@ -111,7 +111,7 @@ export function buildCanvaEmbedUrl(raw: string): string | null {
     const host = u.hostname.toLowerCase();
     if (host !== "canva.com" && host !== "www.canva.com") return null;
     const m = u.pathname.match(
-      /\/design\/([A-Za-z0-9_-]+)(?:\/([A-Za-z0-9_-]+))?\/(?:view|watch|edit)/
+      /\/design\/([A-Za-z0-9_-]+)(?:\/([A-Za-z0-9_-]+))?\/(?:view|watch|edit|present)/
     );
     if (!m) return null;
     const [, designId, shareToken] = m;
@@ -156,6 +156,9 @@ export function classifyMediaUrl(raw: string): {
   const canvaUrl = buildCanvaEmbedUrl(raw);
   if (canvaUrl) {
     return { kind: "canva", embedUrl: canvaUrl, externalUrl: raw };
+  }
+  if (isCanvaDesignUrl(raw)) {
+    return { kind: "canva", embedUrl: raw, externalUrl: raw };
   }
   if (isDirectVideoUrl(raw)) {
     return { kind: "video", embedUrl: raw, externalUrl: raw };

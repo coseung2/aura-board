@@ -13,6 +13,7 @@ import {
 } from "react-native";
 import { colors, radii, shadows, spacing, tapMin, typography } from "../../theme/tokens";
 import { apiFetch, ApiError } from "../../lib/api";
+import { buildMediaItems } from "../../lib/media";
 import type { BoardDetailResponse, BoardCard } from "../../lib/types";
 import { DJRecapModal } from "../DJRecapModal";
 import { EmbeddedMedia } from "../EmbeddedMedia";
@@ -402,7 +403,7 @@ function NowPlayingCard({
 }) {
   const submitter =
     card.externalAuthorName ?? card.studentAuthorName ?? card.authorName ?? "";
-  const mediaUrl = card.videoUrl ?? card.linkUrl ?? null;
+  const mediaUrl = getNowPlayingMediaUrl(card);
   const hasImage = !!card.linkImage;
   return (
     <View style={styles.now}>
@@ -437,6 +438,13 @@ function NowPlayingCard({
       </View>
     </View>
   );
+}
+
+function getNowPlayingMediaUrl(card: BoardCard): string | null {
+  const mediaItem = buildMediaItems(card).find(
+    (item) => item.kind === "video" || item.kind === "link",
+  );
+  return mediaItem?.url ?? card.videoUrl ?? card.linkUrl ?? null;
 }
 
 function QueueItem({

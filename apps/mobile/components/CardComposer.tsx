@@ -2,8 +2,11 @@ import { useState } from "react";
 import {
   ActivityIndicator,
   Alert,
+  KeyboardAvoidingView,
   Modal,
+  Platform,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -37,6 +40,7 @@ type UploadResult = {
 export function CardComposer({ visible, boardId, sectionId, onClose, onCreated }: Props) {
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
+  const [linkUrl, setLinkUrl] = useState("");
   const [image, setImage] = useState<UploadResult | null>(null);
   const [file, setFile] = useState<UploadResult | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -44,6 +48,7 @@ export function CardComposer({ visible, boardId, sectionId, onClose, onCreated }
   function reset() {
     setTitle("");
     setContent("");
+    setLinkUrl("");
     setImage(null);
     setFile(null);
   }
@@ -129,8 +134,9 @@ export function CardComposer({ visible, boardId, sectionId, onClose, onCreated }
   }
 
   async function handleSubmit() {
-    if (!title.trim() && !content.trim() && !image && !file) {
-      Alert.alert("비어있어요", "제목·본문·첨부 중 하나는 있어야 해요.");
+    const normalizedLink = linkUrl.trim();
+    if (!title.trim() && !content.trim() && !normalizedLink && !image && !file) {
+      Alert.alert("비어있어요", "제목·본문·링크·첨부 중 하나는 있어야 해요.");
       return;
     }
     setSubmitting(true);
@@ -166,6 +172,7 @@ export function CardComposer({ visible, boardId, sectionId, onClose, onCreated }
         content: content.trim(),
       };
       if (sectionId) payload.sectionId = sectionId;
+      if (normalizedLink) payload.linkUrl = normalizedLink;
       if (attachments.length) payload.attachments = attachments;
       // 이미지가 있으면 호환성을 위해 imageUrl 도 채움.
       if (image) payload.imageUrl = image.url;
@@ -198,6 +205,10 @@ export function CardComposer({ visible, boardId, sectionId, onClose, onCreated }
       onRequestClose={onClose}
     >
       <View style={styles.backdrop}>
+        <KeyboardAvoidingView
+          behavior={Platform.OS === "ios" ? "padding" : undefined}
+          style={styles.keyboardWrap}
+        >
         <View style={styles.sheet}>
           <View style={styles.sheetHead}>
             <Text style={styles.sheetTitle}>새 카드</Text>
@@ -211,39 +222,91 @@ export function CardComposer({ visible, boardId, sectionId, onClose, onCreated }
               <Text style={styles.closeText}>✕</Text>
             </Pressable>
           </View>
-          <TextInput
-            style={styles.titleInput}
-            value={title}
-            onChangeText={setTitle}
-            placeholder="제목"
-            placeholderTextColor={colors.textFaint}
-            editable={!submitting}
-          />
-          <TextInput
-            style={styles.contentInput}
-            value={content}
-            onChangeText={setContent}
-            placeholder="내용을 입력하세요"
-            placeholderTextColor={colors.textFaint}
-            multiline
-            editable={!submitting}
-          />
-          <View style={styles.attachRow}>
-            <Pressable
-              style={({ pressed }) => [styles.attachBtn, pressed && styles.attachBtnPressed]}
-              onPress={handlePickImage}
-              disabled={submitting}
-            >
-              <Text style={styles.attachText}>🖼️ 이미지 {image ? "✓" : ""}</Text>
-            </Pressable>
-            <Pressable
-              style={({ pressed }) => [styles.attachBtn, pressed && styles.attachBtnPressed]}
-              onPress={handlePickFile}
-              disabled={submitting}
-            >
-              <Text style={styles.attachText}>📎 파일 {file ? "✓" : ""}</Text>
-            </Pressable>
-          </View>
+
+          <ScrollView
+            style={styles.formScroll}
+            contentContainerStyle={styles.formBody}
+            keyboardShouldPersistTaps="handled"
+          >
+            <TextInput
+              style={styles.titleInput}
+              value={title}
+              onChangeText={setTitle}
+              placeholder="제목"
+              placeholderTextColor={colors.textFaint}
+              editable={!submitting}
+            />
+            <TextInput
+              style={styles.contentInput}
+              value={content}
+              onChangeText={setContent}
+              placeholder="내용을 입력하세요"
+              placeholderTextColor={colors.textFaint}
+              multiline
+              editable={!submitting}
+            />
+            <TextInput
+              style={styles.linkInput}
+              value={linkUrl}
+              onChangeText={setLinkUrl}
+              placeholder="링크 붙여넣기"
+              placeholderTextColor={colors.textFaint}
+              autoCapitalize="none"
+              autoCorrect={false}
+              keyboardType="url"
+              editable={!submitting}
+            />
+
+            <View style={styles.sectionGroup}>
+              <Text style={styles.sectionLabel}>첨부</Text>
+              <View style={styles.attachRow}>
+                <Pressable
+                  style={({ pressed }) => [
+                    styles.attachBtn,
+                    image && styles.attachBtnSelected,
+                    pressed && styles.attachBtnPressed,
+                  ]}
+                  onPress={handlePickImage}
+                  disabled={submitting}
+                >
+                  <Text style={styles.attachText}>이미지{image ? " 선택됨" : ""}</Text>
+                </Pressable>
+                <Pressable
+                  style={({ pressed }) => [
+                    styles.attachBtn,
+                    file && styles.attachBtnSelected,
+                    pressed && styles.attachBtnPressed,
+                  ]}
+                  onPress={handlePickFile}
+                  disabled={submitting}
+                >
+                  <Text style={styles.attachText}>파일{file ? " 선택됨" : ""}</Text>
+                </Pressable>
+              </View>
+
+              {image || file ? (
+                <View style={styles.attachmentList}>
+                  {image ? (
+                    <AttachmentRow
+                      label="이미지"
+                      name={image.fileName}
+                      onRemove={() => setImage(null)}
+                      disabled={submitting}
+                    />
+                  ) : null}
+                  {file ? (
+                    <AttachmentRow
+                      label="파일"
+                      name={file.fileName}
+                      onRemove={() => setFile(null)}
+                      disabled={submitting}
+                    />
+                  ) : null}
+                </View>
+              ) : null}
+            </View>
+          </ScrollView>
+
           <Pressable
             style={({ pressed }) => [
               styles.submitBtn,
@@ -260,8 +323,42 @@ export function CardComposer({ visible, boardId, sectionId, onClose, onCreated }
             )}
           </Pressable>
         </View>
+        </KeyboardAvoidingView>
       </View>
     </Modal>
+  );
+}
+
+function AttachmentRow({
+  label,
+  name,
+  onRemove,
+  disabled,
+}: {
+  label: string;
+  name: string;
+  onRemove: () => void;
+  disabled: boolean;
+}) {
+  return (
+    <View style={styles.attachmentRow}>
+      <View style={styles.attachmentInfo}>
+        <Text style={styles.attachmentKind}>{label}</Text>
+        <Text style={styles.attachmentName} numberOfLines={1}>
+          {name}
+        </Text>
+      </View>
+      <Pressable
+        style={({ pressed }) => [
+          styles.removeAttachmentBtn,
+          pressed && styles.removeAttachmentBtnPressed,
+        ]}
+        onPress={onRemove}
+        disabled={disabled}
+      >
+        <Text style={styles.removeAttachmentText}>삭제</Text>
+      </Pressable>
+    </View>
   );
 }
 
@@ -273,19 +370,28 @@ const styles = StyleSheet.create({
     alignItems: "center",
     padding: spacing.xxl,
   },
-  sheet: {
+  keyboardWrap: {
     width: "100%",
     maxWidth: 720,
+    maxHeight: "92%",
+  },
+  sheet: {
+    width: "100%",
+    maxHeight: "100%",
     backgroundColor: colors.surface,
     borderRadius: radii.card,
-    padding: spacing.xl,
-    gap: spacing.md,
+    overflow: "hidden",
     ...shadows.cardHover,
   },
   sheetHead: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
+    paddingHorizontal: spacing.xl,
+    paddingTop: spacing.xl,
+    paddingBottom: spacing.md,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
   },
   sheetTitle: { ...typography.title, color: colors.text },
   closeBtn: {
@@ -297,6 +403,14 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surfaceAlt,
   },
   closeText: { fontSize: 18, color: colors.textMuted },
+  formScroll: {
+    flexShrink: 1,
+    maxHeight: 520,
+  },
+  formBody: {
+    padding: spacing.xl,
+    gap: spacing.md,
+  },
   titleInput: {
     borderWidth: 1,
     borderColor: colors.border,
@@ -317,6 +431,19 @@ const styles = StyleSheet.create({
     minHeight: 120,
     textAlignVertical: "top",
   },
+  linkInput: {
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radii.btn,
+    padding: spacing.md,
+    ...typography.body,
+    color: colors.text,
+    backgroundColor: colors.bg,
+  },
+  sectionGroup: {
+    gap: spacing.sm,
+  },
+  sectionLabel: { ...typography.label, color: colors.textMuted },
   attachRow: {
     flexDirection: "row",
     gap: spacing.md,
@@ -331,10 +458,44 @@ const styles = StyleSheet.create({
     minHeight: tapMin,
     justifyContent: "center",
   },
+  attachBtnSelected: {
+    borderColor: colors.accent,
+    backgroundColor: colors.accentTintedBg,
+  },
   attachBtnPressed: { backgroundColor: colors.surfaceAlt },
   attachText: { ...typography.label, color: colors.textMuted },
+  attachmentList: {
+    gap: spacing.sm,
+  },
+  attachmentRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.md,
+    padding: spacing.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radii.btn,
+    backgroundColor: colors.bg,
+  },
+  attachmentInfo: {
+    flex: 1,
+    minWidth: 0,
+  },
+  attachmentKind: { ...typography.micro, color: colors.textFaint },
+  attachmentName: { ...typography.label, color: colors.text },
+  removeAttachmentBtn: {
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderRadius: radii.btn,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
+  },
+  removeAttachmentBtnPressed: { backgroundColor: colors.surfaceAlt },
+  removeAttachmentText: { ...typography.label, color: colors.danger },
   submitBtn: {
-    marginTop: spacing.sm,
+    marginHorizontal: spacing.xl,
+    marginBottom: spacing.xl,
     paddingVertical: spacing.lg,
     backgroundColor: colors.accent,
     borderRadius: radii.card,

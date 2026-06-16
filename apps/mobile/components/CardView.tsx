@@ -62,7 +62,7 @@ export function CardView({
 
         {card.linkUrl ? (
           <Pressable
-            onPress={(event) => openUrl(event, card.linkUrl)}
+            onPress={(event) => openInlineTarget(event, card.linkUrl, onPress)}
             style={styles.linkBox}
             accessibilityRole="link"
           >
@@ -82,7 +82,7 @@ export function CardView({
 
         {card.videoUrl ? (
           <Pressable
-            onPress={(event) => openUrl(event, card.videoUrl)}
+            onPress={(event) => openInlineTarget(event, card.videoUrl, onPress)}
             style={styles.videoBox}
             accessibilityRole="link"
           >
@@ -92,7 +92,7 @@ export function CardView({
 
         {fileUrl ? (
           <Pressable
-            onPress={(event) => openUrl(event, fileUrl)}
+            onPress={(event) => openInlineTarget(event, fileUrl, onPress)}
             style={styles.fileBox}
             accessibilityRole="link"
           >
@@ -153,9 +153,28 @@ export function CardView({
   );
 }
 
-function openUrl(event: GestureResponderEvent, url: string | null | undefined) {
+function openInlineTarget(
+  event: GestureResponderEvent,
+  url: string | null | undefined,
+  onPress?: () => void,
+) {
   event.stopPropagation();
-  if (url) Linking.openURL(url);
+  if (onPress) {
+    onPress();
+    return;
+  }
+  if (url) void openExternalUrl(url);
+}
+
+async function openExternalUrl(url: string) {
+  try {
+    const canOpen = await Linking.canOpenURL(url);
+    if (canOpen) {
+      await Linking.openURL(url);
+    }
+  } catch {
+    // Ignore malformed or unsupported external targets from legacy cards.
+  }
 }
 
 function resolveAuthorName(card: BoardCard): string | null {

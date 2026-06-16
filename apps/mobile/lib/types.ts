@@ -127,6 +127,7 @@ export type BoardCard = {
   content: string;
   color: string | null;
   imageUrl: string | null;
+  thumbUrl?: string | null;
   linkUrl: string | null;
   linkTitle: string | null;
   linkDesc: string | null;
@@ -156,6 +157,7 @@ export type BoardCard = {
   authors?: CardAuthor[];
   authorName?: string | null;
   studentAuthorName?: string | null;
+  anonymousAuthor?: boolean;
 };
 
 export type Section = {

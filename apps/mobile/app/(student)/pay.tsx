@@ -24,7 +24,7 @@ import { apiFetch, ApiError } from "../../lib/api";
 import { clearSessionToken } from "../../lib/session";
 import type { StoreChargeReceipt, StoreItem } from "../../lib/types";
 
-export default function StudentPayScreen() {
+export default function StoreChargeScreen() {
   const router = useRouter();
   const params = useLocalSearchParams<{ classroomId?: string | string[] }>();
   const classroomId = firstParam(params.classroomId);
@@ -109,7 +109,7 @@ export default function StudentPayScreen() {
     if (!permission?.granted) {
       const result = await requestPermission();
       if (!result.granted) {
-        setError("카메라 권한이 필요해요. 토큰 입력은 계속 사용할 수 있어요.");
+        setError("학생 QR을 스캔하려면 카메라 권한이 필요해요.");
         return;
       }
     }
@@ -120,7 +120,7 @@ export default function StudentPayScreen() {
   async function charge() {
     if (!classroomId) return;
     if (cartList.length === 0 || !token.trim()) {
-      setError("상품과 학생 QR 토큰을 준비해 주세요.");
+      setError("상품과 학생 QR을 준비해 주세요.");
       return;
     }
     setBusy(true);
@@ -241,34 +241,45 @@ export default function StudentPayScreen() {
             )}
 
             <Pressable style={styles.scanBtn} onPress={openScanner}>
-              <Text style={styles.scanText}>QR 스캔</Text>
+              <Text style={styles.scanText}>{token ? "QR 다시 스캔" : "학생 QR 스캔"}</Text>
             </Pressable>
             {scannerOpen ? (
               <View style={styles.scannerBox}>
                 <CameraView
-                  style={styles.camera}
-                  facing="back"
-                  barcodeScannerSettings={{ barcodeTypes: ["qr"] }}
-                  onBarcodeScanned={({ data }) => {
-                    setToken(data);
-                    setScannerOpen(false);
-                  }}
-                />
+	                  style={styles.camera}
+	                  facing="back"
+	                  barcodeScannerSettings={{ barcodeTypes: ["qr"] }}
+	                  onBarcodeScanned={({ data }) => {
+	                    const scanned = parseCardQrToken(data);
+	                    if (!scanned) {
+	                      setError("학생 결제 QR이 아니에요.");
+	                      return;
+	                    }
+	                    setToken(scanned);
+	                    setError(null);
+	                    setScannerOpen(false);
+	                  }}
+	                />
                 <Pressable style={styles.scannerClose} onPress={() => setScannerOpen(false)}>
                   <Text style={styles.scannerCloseText}>닫기</Text>
                 </Pressable>
               </View>
             ) : null}
 
-            <TextInput
-              style={styles.tokenInput}
-              value={token}
-              onChangeText={setToken}
-              multiline
-              placeholder="학생 QR 토큰"
-              placeholderTextColor={colors.textFaint}
-              editable={!busy}
-            />
+            <View style={[styles.scanStatus, token && styles.scanStatusReady]}>
+              <Text style={[styles.scanStatusText, token && styles.scanStatusReadyText]}>
+                {token ? "학생 QR 스캔 완료" : "학생 QR을 스캔해 주세요."}
+              </Text>
+              {token ? (
+                <Pressable
+                  style={styles.clearScanBtn}
+                  onPress={() => setToken("")}
+                  disabled={busy}
+                >
+                  <Text style={styles.clearScanText}>해제</Text>
+                </Pressable>
+              ) : null}
+            </View>
             {error ? <Text style={styles.error}>{error}</Text> : null}
             <Pressable
               style={({ pressed }) => [
@@ -300,6 +311,27 @@ export default function StudentPayScreen() {
 
 function firstParam(value: string | string[] | undefined): string | undefined {
   return Array.isArray(value) ? value[0] : value;
+}
+
+function parseCardQrToken(value: string): string | null {
+  const raw = value.trim();
+  const token = extractTokenFromUrl(raw) ?? raw;
+  const parts = token.split(".");
+  if (parts.length !== 4 || parts.some((part) => part.length === 0)) {
+    return null;
+  }
+  return token;
+}
+
+function extractTokenFromUrl(value: string): string | null {
+  try {
+    const url = new URL(value);
+    const token = url.searchParams.get("cardQrToken") ?? url.searchParams.get("token");
+    if (token) return token.trim();
+    return null;
+  } catch {
+    return null;
+  }
 }
 
 const styles = StyleSheet.create({
@@ -439,16 +471,33 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
   },
   scannerCloseText: { ...typography.label, color: colors.text },
-  tokenInput: {
-    minHeight: 74,
+  scanStatus: {
+    minHeight: 56,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: spacing.md,
     borderRadius: radii.btn,
     borderWidth: 1,
     borderColor: colors.border,
     padding: spacing.md,
-    color: colors.text,
     backgroundColor: colors.bg,
-    textAlignVertical: "top",
   },
+  scanStatusReady: {
+    borderColor: "#16a34a",
+    backgroundColor: "#ecfdf5",
+  },
+  scanStatusText: { ...typography.label, color: colors.textMuted },
+  scanStatusReadyText: { color: "#15803d" },
+  clearScanBtn: {
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderRadius: radii.pill,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  clearScanText: { ...typography.label, color: colors.text },
   chargeBtn: {
     minHeight: 50,
     alignItems: "center",

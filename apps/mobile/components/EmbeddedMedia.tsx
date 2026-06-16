@@ -4,6 +4,7 @@ import {
   Linking,
   Pressable,
   StyleSheet,
+  type StyleProp,
   Text,
   View,
   type ViewStyle,
@@ -16,7 +17,7 @@ type Props = {
   url: string;
   title?: string;
   aspectRatio?: number;
-  style?: ViewStyle;
+  style?: StyleProp<ViewStyle>;
   hideExternal?: boolean;
 };
 
@@ -50,8 +51,11 @@ export function EmbeddedMedia({
             javaScriptEnabled
             domStorageEnabled
             allowsFullscreenVideo
+            allowsInlineMediaPlayback
             mediaPlaybackRequiresUserAction={false}
+            setSupportMultipleWindows={false}
             startInLoadingState
+            onShouldStartLoadWithRequest={() => true}
             onLoadStart={() => {
               setLoading(true);
               setError(false);
@@ -105,11 +109,22 @@ function ExternalOpenButton({ url }: { url: string }) {
         styles.externalBtn,
         pressed && styles.externalBtnPressed,
       ]}
-      onPress={() => Linking.openURL(url)}
+      onPress={() => void openExternalUrl(url)}
     >
       <Text style={styles.externalBtnText}>외부에서 열기</Text>
     </Pressable>
   );
+}
+
+async function openExternalUrl(url: string) {
+  try {
+    const canOpen = await Linking.canOpenURL(url);
+    if (canOpen) {
+      await Linking.openURL(url);
+    }
+  } catch {
+    // Ignore malformed or unsupported media links from legacy cards.
+  }
 }
 
 function buildVideoHtml(videoUrl: string, title: string): string {

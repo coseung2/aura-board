@@ -138,14 +138,9 @@ export default function StudentWalletScreen() {
               )}
             </View>
             {qr?.token ? (
-              <>
-                <Text style={styles.qrTimer}>
-                  {Math.max(0, qr.expiresAt - qrNow)}초 뒤 새 QR
-                </Text>
-                <Text selectable style={styles.qrToken} numberOfLines={3}>
-                  {qr.token}
-                </Text>
-              </>
+              <Text style={styles.qrTimer}>
+                {Math.max(0, qr.expiresAt - qrNow)}초 뒤 새 QR
+              </Text>
             ) : null}
           </View>
 
@@ -291,13 +286,6 @@ const styles = StyleSheet.create({
     color: colors.accent,
     textAlign: "center",
     fontVariant: ["tabular-nums"],
-  },
-  qrToken: {
-    ...typography.micro,
-    color: colors.textMuted,
-    padding: spacing.md,
-    borderRadius: radii.btn,
-    backgroundColor: colors.bg,
   },
   sectionTitle: { ...typography.section, color: colors.text, marginTop: spacing.md },
   stack: { gap: spacing.sm },

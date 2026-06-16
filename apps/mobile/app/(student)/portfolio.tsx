@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Image,
@@ -10,6 +10,7 @@ import {
 } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { CardDetailModal } from "../../components/CardDetailModal";
 import {
   colors,
   radii,
@@ -21,6 +22,7 @@ import { layoutLabel } from "../../theme/layout-meta";
 import { apiFetch, ApiError } from "../../lib/api";
 import { clearSessionToken } from "../../lib/session";
 import type {
+  BoardCard,
   MeResponse,
   PortfolioCardDTO,
   PortfolioRosterDTO,
@@ -34,9 +36,14 @@ export default function StudentPortfolioScreen() {
   const [roster, setRoster] = useState<PortfolioRosterDTO | null>(null);
   const [portfolio, setPortfolio] = useState<PortfolioStudentDTO | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [selectedCard, setSelectedCard] = useState<BoardCard | null>(null);
   const [loading, setLoading] = useState(true);
   const [portfolioLoading, setPortfolioLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const modalCards = useMemo(() => {
+    if (!portfolio) return [];
+    return portfolio.cards.map((card) => toBoardCard(card, portfolio.student));
+  }, [portfolio]);
 
   const handleAuthError = useCallback(
     async (e: unknown) => {
@@ -106,6 +113,7 @@ export default function StudentPortfolioScreen() {
 
   function selectStudent(studentId: string) {
     setSelectedId(studentId);
+    setSelectedCard(null);
     loadPortfolio(studentId);
   }
 
@@ -180,8 +188,13 @@ export default function StudentPortfolioScreen() {
             </View>
           ) : portfolio?.cards.length ? (
             <View style={styles.cardGrid}>
-              {portfolio.cards.map((card) => (
-                <PortfolioCard key={card.id} card={card} />
+              {portfolio.cards.map((card, index) => (
+                <PortfolioCard
+                  key={card.id}
+                  card={card}
+                  student={portfolio.student}
+                  onPress={() => setSelectedCard(modalCards[index] ?? null)}
+                />
               ))}
             </View>
           ) : (
@@ -191,14 +204,31 @@ export default function StudentPortfolioScreen() {
           )}
         </ScrollView>
       )}
+      <CardDetailModal
+        card={selectedCard}
+        onClose={() => setSelectedCard(null)}
+      />
     </SafeAreaView>
   );
 }
 
-function PortfolioCard({ card }: { card: PortfolioCardDTO }) {
+function PortfolioCard({
+  card,
+  student,
+  onPress,
+}: {
+  card: PortfolioCardDTO;
+  student: PortfolioStudentDTO["student"];
+  onPress: () => void;
+}) {
   const image = getCardPreviewImage(card);
   return (
-    <View style={styles.card}>
+    <Pressable
+      style={({ pressed }) => [styles.card, pressed && styles.cardPressed]}
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={`${student.name}의 작품 ${card.title || "제목 없음"} 열기`}
+    >
       <View style={styles.preview}>
         {image ? (
           <Image source={{ uri: image }} style={styles.previewImage} />
@@ -222,8 +252,67 @@ function PortfolioCard({ card }: { card: PortfolioCardDTO }) {
           {layoutLabel(card.sourceBoard.layout)} · {card.sourceBoard.title}
         </Text>
       </View>
-    </View>
+    </Pressable>
   );
+}
+
+function toBoardCard(
+  card: PortfolioCardDTO,
+  student: PortfolioStudentDTO["student"],
+): BoardCard {
+  const visibleAuthor = card.sourceBoard.anonymousAuthor
+    ? null
+    : student.name;
+  return {
+    id: card.id,
+    boardId: card.sourceBoard.id,
+    title: card.title,
+    content: card.content,
+    color: card.color,
+    imageUrl: card.imageUrl,
+    linkUrl: card.linkUrl,
+    linkTitle: card.linkTitle,
+    linkDesc: card.linkDesc,
+    linkImage: card.linkImage,
+    videoUrl: card.videoUrl,
+    fileUrl: card.fileUrl,
+    fileName: card.fileName,
+    fileSize: card.fileSize,
+    fileMimeType: card.fileMimeType,
+    x: 0,
+    y: 0,
+    width: null,
+    height: null,
+    order: null,
+    sectionId: card.sourceSection?.id ?? null,
+    authorId: null,
+    externalAuthorName: null,
+    studentAuthorId: student.id,
+    createdAt: card.createdAt,
+    updatedAt: card.createdAt,
+    likeCount: 0,
+    commentCount: 0,
+    attachments: card.attachments
+      .filter((attachment) =>
+        attachment.kind === "image" ||
+        attachment.kind === "video" ||
+        attachment.kind === "file"
+      )
+      .map((attachment) => ({
+        id: attachment.id,
+        kind: attachment.kind as "image" | "video" | "file",
+        url: attachment.url,
+        fileName: attachment.fileName,
+        fileSize: attachment.fileSize,
+        mimeType: attachment.mimeType,
+        order: attachment.order,
+      })),
+    authors: visibleAuthor
+      ? [{ id: student.id, displayName: visibleAuthor, studentId: student.id }]
+      : [],
+    authorName: visibleAuthor,
+    studentAuthorName: visibleAuthor,
+  };
 }
 
 function firstParam(value: string | string[] | undefined): string | undefined {
@@ -314,6 +403,10 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border,
     ...shadows.card,
+  },
+  cardPressed: {
+    borderColor: colors.borderHover,
+    ...shadows.cardHover,
   },
   preview: {
     height: 150,

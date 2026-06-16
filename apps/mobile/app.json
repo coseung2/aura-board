@@ -24,7 +24,7 @@
       },
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
-      "package": "app.auraboard.mobile"
+      "package": "com.auraboard.app"
     },
     "web": {
       "favicon": "./assets/favicon.png"
