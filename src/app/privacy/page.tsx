@@ -145,11 +145,6 @@ export default function PrivacyPage() {
           </p>
         </section>
 
-        <section className="docs-section">
-          <p className="docs-p docs-note">
-            <strong>면책 안내</strong>: 본 문서는 코드 기반으로 작성된 초안이며, 실제 법적 효력을 위해서는 변호사 등 전문가의 검토를 권장합니다.
-          </p>
-        </section>
       </article>
     </main>
   );
