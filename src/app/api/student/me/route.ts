@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getCurrentStudent } from "@/lib/student-auth";
 import { db } from "@/lib/db";
+import { getStudentDuties } from "@/lib/role-portals";
 
 export async function GET() {
   try {
@@ -9,22 +10,25 @@ export async function GET() {
       return NextResponse.json({ error: "unauthorized" }, { status: 401 });
     }
 
-    const boards = await db.board.findMany({
-      where: { classroomId: student.classroomId },
-      select: {
-        id: true,
-        slug: true,
-        title: true,
-        layout: true,
-        _count: { select: { cards: true } },
-        quizzes: {
-          select: { roomCode: true, status: true },
-          take: 1,
-          orderBy: { createdAt: "desc" },
+    const [boards, duties] = await Promise.all([
+      db.board.findMany({
+        where: { classroomId: student.classroomId },
+        select: {
+          id: true,
+          slug: true,
+          title: true,
+          layout: true,
+          _count: { select: { cards: true } },
+          quizzes: {
+            select: { roomCode: true, status: true },
+            take: 1,
+            orderBy: { createdAt: "desc" },
+          },
         },
-      },
-      orderBy: { createdAt: "desc" },
-    });
+        orderBy: { createdAt: "desc" },
+      }),
+      getStudentDuties(student.id),
+    ]);
 
     return NextResponse.json({
       student: {
@@ -33,6 +37,7 @@ export async function GET() {
         classroom: student.classroom,
       },
       boards,
+      duties,
     });
   } catch (e) {
     console.error("[GET /api/student/me]", e);
