@@ -73,10 +73,19 @@ export default function StudentPortfolioScreen() {
     (async () => {
       try {
         setLoading(true);
-        const [meRes, rosterRes] = await Promise.all([
-          apiFetch<MeResponse>("/api/student/me"),
-          apiFetch<PortfolioRosterDTO>("/api/student-portfolio/roster"),
-        ]);
+        const meRes = await apiFetch<MeResponse>("/api/student/me");
+        const classroomId = meRes.student.classroom?.id;
+        if (!classroomId) {
+          setMe(meRes);
+          setRoster(null);
+          setPortfolio(null);
+          setSelectedId(null);
+          setError("학급 정보가 없어 포트폴리오를 불러올 수 없어요.");
+          return;
+        }
+        const rosterRes = await apiFetch<PortfolioRosterDTO>(
+          `/api/student-portfolio/roster?classroomId=${encodeURIComponent(classroomId)}`,
+        );
         setMe(meRes);
         setRoster(rosterRes);
         const initialId =

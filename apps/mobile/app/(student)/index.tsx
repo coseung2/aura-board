@@ -27,6 +27,7 @@ import type {
   MeResponse,
   PortfolioCardDTO,
   ShowcaseEntryDTO,
+  StudentDuty,
   WalletSummary,
 } from "../../lib/types";
 
@@ -162,6 +163,7 @@ export default function StudentHome() {
   }
 
   const boards = me?.boards ?? [];
+  const duties = me?.duties ?? [];
   const classroomId = me?.student.classroom?.id;
   const classroomName = me?.student.classroom?.name ?? "학급 미배정";
 
@@ -232,6 +234,14 @@ export default function StudentHome() {
           wallet={wallet}
           loading={walletLoading}
           onDetail={() => router.push("/(student)/wallet" as Href)}
+        />
+
+        <DutySection
+          duties={duties}
+          onOpen={(duty) => {
+            const path = roleHref(duty);
+            if (path) router.push(path as Href);
+          }}
         />
 
         {boards.length === 0 ? (
@@ -462,6 +472,63 @@ function WalletCard({
       )}
     </View>
   );
+}
+
+function DutySection({
+  duties,
+  onOpen,
+}: {
+  duties: StudentDuty[];
+  onOpen: (duty: StudentDuty) => void;
+}) {
+  const visible = duties.filter((duty) =>
+    duty.roleKey === "banker" || duty.roleKey === "store-clerk"
+  );
+  if (visible.length === 0) return null;
+
+  return (
+    <View style={styles.dutySection}>
+      <Text style={styles.sectionSub}>내 역할</Text>
+      <View style={styles.dutyGrid}>
+        {visible.map((duty) => (
+          <Pressable
+            key={`${duty.classroomId}-${duty.roleKey}`}
+            style={({ pressed }) => [
+              styles.dutyCard,
+              pressed && styles.dutyCardPressed,
+            ]}
+            onPress={() => onOpen(duty)}
+          >
+            <Text style={styles.dutyEmoji}>{duty.emoji ?? roleEmoji(duty.roleKey)}</Text>
+            <View style={styles.dutyBody}>
+              <Text style={styles.dutyRole}>{duty.roleLabel}</Text>
+              <Text style={styles.dutyClassroom} numberOfLines={1}>
+                {duty.classroomName}
+              </Text>
+            </View>
+            <Text style={styles.dutyCta}>시작</Text>
+          </Pressable>
+        ))}
+      </View>
+    </View>
+  );
+}
+
+function roleHref(duty: StudentDuty): string | null {
+  const classroomId = encodeURIComponent(duty.classroomId);
+  if (duty.roleKey === "banker") {
+    return `/(student)/bank?classroomId=${classroomId}`;
+  }
+  if (duty.roleKey === "store-clerk") {
+    return `/(student)/pay?classroomId=${classroomId}`;
+  }
+  return null;
+}
+
+function roleEmoji(roleKey: string): string {
+  if (roleKey === "banker") return "🏦";
+  if (roleKey === "store-clerk") return "🛒";
+  return "•";
 }
 
 function getCardPreviewImage(card: PortfolioCardDTO): string | null {
@@ -755,6 +822,41 @@ const styles = StyleSheet.create({
     padding: spacing.md,
     backgroundColor: colors.bg,
     borderRadius: radii.btn,
+  },
+
+  dutySection: {
+    gap: spacing.md,
+  },
+  dutyGrid: {
+    gap: spacing.sm,
+  },
+  dutyCard: {
+    minHeight: 74,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.md,
+    padding: spacing.lg,
+    borderRadius: radii.card,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    ...shadows.card,
+  },
+  dutyCardPressed: {
+    backgroundColor: colors.surfaceAlt,
+    borderColor: colors.borderHover,
+  },
+  dutyEmoji: { fontSize: 28, width: 36, textAlign: "center" },
+  dutyBody: { flex: 1, minWidth: 0, gap: spacing.xs },
+  dutyRole: { ...typography.section, color: colors.text },
+  dutyClassroom: { ...typography.label, color: colors.textMuted },
+  dutyCta: {
+    ...typography.label,
+    color: colors.accent,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs,
+    borderRadius: radii.pill,
+    backgroundColor: colors.accentTintedBg,
   },
 
   sectionSub: {

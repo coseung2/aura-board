@@ -3,7 +3,6 @@ import {
   Alert,
   FlatList,
   Image,
-  Linking,
   Modal,
   Pressable,
   ScrollView,
@@ -16,6 +15,7 @@ import { colors, radii, shadows, spacing, tapMin, typography } from "../../theme
 import { apiFetch, ApiError } from "../../lib/api";
 import type { BoardDetailResponse, BoardCard } from "../../lib/types";
 import { DJRecapModal } from "../DJRecapModal";
+import { EmbeddedMedia } from "../EmbeddedMedia";
 
 // DJ 큐 보드 — 웹 디자인 핸드오프 DJBoardPage.jsx 를 네이티브로 이식.
 //   [헤더: 제목 + 카운트 + 재생완료 토글]
@@ -402,12 +402,17 @@ function NowPlayingCard({
 }) {
   const submitter =
     card.externalAuthorName ?? card.studentAuthorName ?? card.authorName ?? "";
+  const mediaUrl = card.videoUrl ?? card.linkUrl ?? null;
   const hasImage = !!card.linkImage;
   return (
     <View style={styles.now}>
       <Text style={styles.nowLabel}>▶ NOW PLAYING</Text>
       <View style={styles.nowBody}>
-        {hasImage ? (
+        {mediaUrl ? (
+          <View style={styles.nowPlayer}>
+            <EmbeddedMedia url={mediaUrl} title={card.title} aspectRatio={16 / 9} />
+          </View>
+        ) : hasImage ? (
           <Image source={{ uri: card.linkImage! }} style={styles.nowThumb} resizeMode="cover" />
         ) : (
           <View style={[styles.nowThumb, styles.nowThumbFallback]}>
@@ -421,14 +426,6 @@ function NowPlayingCard({
             {submitter ? `${submitter}님 신청` : ""}
           </Text>
           <View style={styles.nowActions}>
-            {card.videoUrl ? (
-              <Pressable
-                style={({ pressed }) => [styles.playBtn, pressed && styles.playBtnPressed]}
-                onPress={() => Linking.openURL(card.videoUrl!)}
-              >
-                <Text style={styles.playBtnText}>▶ YouTube 열기</Text>
-              </Pressable>
-            ) : null}
             <Pressable
               style={({ pressed }) => [styles.nextBtn, pressed && styles.nextBtnPressed]}
               onPress={onNext}
@@ -646,6 +643,12 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     gap: spacing.lg,
     alignItems: "center",
+  },
+  nowPlayer: {
+    width: 320,
+    maxWidth: "52%",
+    borderRadius: 8,
+    overflow: "hidden",
   },
   nowThumb: {
     width: 240,

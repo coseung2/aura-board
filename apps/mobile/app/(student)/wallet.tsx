@@ -9,6 +9,7 @@ import {
 } from "react-native";
 import { useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
+import QRCode from "react-native-qrcode-svg";
 import {
   colors,
   radii,
@@ -23,6 +24,9 @@ import type { WalletSummary } from "../../lib/types";
 export default function StudentWalletScreen() {
   const router = useRouter();
   const [wallet, setWallet] = useState<WalletSummary | null>(null);
+  const [qr, setQr] = useState<{ token: string; expiresAt: number } | null>(null);
+  const [qrNow, setQrNow] = useState(() => Math.floor(Date.now() / 1000));
+  const [qrError, setQrError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -38,6 +42,21 @@ export default function StudentWalletScreen() {
     [router],
   );
 
+  const loadQr = useCallback(async () => {
+    try {
+      const res = await apiFetch<{ token: string; expiresAt: number }>(
+        "/api/my/wallet/card-qr",
+      );
+      setQr(res);
+      setQrNow(Math.floor(Date.now() / 1000));
+      setQrError(null);
+    } catch (e) {
+      if (await handleAuthError(e)) return;
+      setQr(null);
+      setQrError("결제 QR을 만들 수 없어요.");
+    }
+  }, [handleAuthError]);
+
   useEffect(() => {
     (async () => {
       try {
@@ -45,6 +64,7 @@ export default function StudentWalletScreen() {
         const res = await apiFetch<WalletSummary>("/api/my/wallet");
         setWallet(res);
         setError(null);
+        await loadQr();
       } catch (e) {
         if (await handleAuthError(e)) return;
         setError("통장 정보를 불러올 수 없어요.");
@@ -52,7 +72,18 @@ export default function StudentWalletScreen() {
         setLoading(false);
       }
     })();
-  }, [handleAuthError]);
+  }, [handleAuthError, loadQr]);
+
+  useEffect(() => {
+    const handle = setInterval(() => {
+      const now = Math.floor(Date.now() / 1000);
+      setQrNow(now);
+      if (qr && qr.expiresAt - now <= 0) {
+        loadQr();
+      }
+    }, 1000);
+    return () => clearInterval(handle);
+  }, [loadQr, qr]);
 
   return (
     <SafeAreaView style={styles.container} edges={["top", "bottom"]}>
@@ -81,12 +112,41 @@ export default function StudentWalletScreen() {
                 {wallet.balance.toLocaleString()} {wallet.currency.unitLabel}
               </Text>
             </View>
-            <View style={styles.accountBox}>
-              <Text style={styles.accountLabel}>카드</Text>
-              <Text style={styles.accountValue}>
-                {wallet.card?.cardNumber ?? "발급 전"}
-              </Text>
+          </View>
+
+          <View style={styles.qrCard}>
+            <View style={styles.qrHeader}>
+              <View>
+                <Text style={styles.eyebrow}>매점 결제</Text>
+                <Text style={styles.qrTitle}>학생 QR 지갑</Text>
+              </View>
+              <Pressable
+                style={({ pressed }) => [
+                  styles.refreshBtn,
+                  pressed && styles.refreshBtnPressed,
+                ]}
+                onPress={loadQr}
+              >
+                <Text style={styles.refreshText}>새로고침</Text>
+              </Pressable>
             </View>
+            <View style={styles.qrFrame}>
+              {qr?.token ? (
+                <QRCode value={qr.token} size={220} backgroundColor="#ffffff" />
+              ) : (
+                <Text style={styles.muted}>{qrError ?? "QR 준비 중이에요."}</Text>
+              )}
+            </View>
+            {qr?.token ? (
+              <>
+                <Text style={styles.qrTimer}>
+                  {Math.max(0, qr.expiresAt - qrNow)}초 뒤 새 QR
+                </Text>
+                <Text selectable style={styles.qrToken} numberOfLines={3}>
+                  {qr.token}
+                </Text>
+              </>
+            ) : null}
           </View>
 
           <Text style={styles.sectionTitle}>진행 중인 적금</Text>
@@ -178,29 +238,67 @@ const styles = StyleSheet.create({
   },
   content: { padding: spacing.xxl, gap: spacing.lg },
   summaryCard: {
-    minHeight: 180,
+    minHeight: 132,
     borderRadius: radii.card,
     backgroundColor: colors.surface,
     borderWidth: 1,
     borderColor: colors.border,
     padding: spacing.xl,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: spacing.xl,
     ...shadows.card,
   },
   eyebrow: { ...typography.badge, color: colors.accent, marginBottom: spacing.sm },
   balance: { ...typography.display, color: colors.text },
-  accountBox: {
+  qrCard: {
+    borderRadius: radii.card,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    padding: spacing.xl,
+    gap: spacing.md,
+    ...shadows.card,
+  },
+  qrHeader: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    justifyContent: "space-between",
+    gap: spacing.md,
+  },
+  qrTitle: { ...typography.title, color: colors.text },
+  refreshBtn: {
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderRadius: radii.btn,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
+  },
+  refreshBtnPressed: { backgroundColor: colors.surfaceAlt },
+  refreshText: { ...typography.label, color: colors.text },
+  qrFrame: {
+    alignSelf: "center",
+    width: 252,
+    minHeight: 252,
+    alignItems: "center",
+    justifyContent: "center",
     padding: spacing.lg,
     borderRadius: radii.card,
-    backgroundColor: colors.bg,
-    minWidth: 180,
-    gap: spacing.xs,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: "#ffffff",
   },
-  accountLabel: { ...typography.micro, color: colors.textMuted },
-  accountValue: { ...typography.label, color: colors.text },
+  qrTimer: {
+    ...typography.label,
+    color: colors.accent,
+    textAlign: "center",
+    fontVariant: ["tabular-nums"],
+  },
+  qrToken: {
+    ...typography.micro,
+    color: colors.textMuted,
+    padding: spacing.md,
+    borderRadius: radii.btn,
+    backgroundColor: colors.bg,
+  },
   sectionTitle: { ...typography.section, color: colors.text, marginTop: spacing.md },
   stack: { gap: spacing.sm },
   listCard: {

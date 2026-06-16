@@ -19,6 +19,16 @@ export type MeResponse = {
     classroom: { id: string; name: string } | null;
   };
   boards: BoardMeta[];
+  duties?: StudentDuty[];
+};
+
+export type StudentDuty = {
+  classroomId: string;
+  classroomName: string;
+  roleKey: string;
+  roleLabel: string;
+  emoji: string | null;
+  href: string;
 };
 
 export type WalletSummary = {
@@ -45,6 +55,53 @@ export type WalletSummary = {
     note: string | null;
     createdAt: string;
   }>;
+};
+
+export type BankOverview = {
+  currency: { unitLabel: string; monthlyInterestRate: number | null };
+  students: Array<{
+    id: string;
+    number: number | null;
+    name: string;
+    balance: number;
+    accountId: string | null;
+  }>;
+  activeFDs: Array<{
+    id: string;
+    accountId: string;
+    principal: number;
+    monthlyRate: number;
+    startDate: string;
+    maturityDate: string;
+  }>;
+  totals: { totalBalance: number; activeFDTotal: number };
+  recentTransactions: Array<{
+    id: string;
+    accountId: string;
+    type: string;
+    amount: number;
+    balanceAfter: number;
+    note: string | null;
+    performedByKind: string;
+    createdAt: string;
+  }>;
+  viewerKind: "teacher" | "banker";
+  canCancelFD: boolean;
+};
+
+export type StoreItem = {
+  id: string;
+  name: string;
+  price: number;
+  stock: number | null;
+  imageUrl: string | null;
+};
+
+export type StoreChargeReceipt = {
+  total: number;
+  balance: number;
+  student: { id: string; name: string; number: number | null };
+  items: Array<{ id: string; name: string; price: number; qty: number }>;
 };
 
 export type CardAttachment = {
