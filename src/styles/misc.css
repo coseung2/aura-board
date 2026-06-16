@@ -327,6 +327,80 @@
   font-size: 14px;
 }
 
+/* -------- Global footer -------- */
+
+.app-footer {
+  border-top: 1px solid var(--color-border);
+  background: var(--color-surface);
+  padding: 24px;
+}
+
+.app-footer-inner {
+  max-width: 720px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  text-align: center;
+}
+
+@media (min-width: 640px) {
+  .app-footer-inner {
+    flex-direction: row;
+    justify-content: space-between;
+    text-align: left;
+  }
+}
+
+.app-footer-copy {
+  font-size: 13px;
+  color: var(--color-text-muted);
+  margin: 0;
+}
+
+.app-footer-links {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.app-footer-links a {
+  font-size: 13px;
+  color: var(--color-text-muted);
+  text-decoration: none;
+  transition: color 0.15s ease;
+}
+
+.app-footer-links a:hover {
+  color: var(--color-accent);
+}
+
+/* Push footer to bottom when page is short */
+html,
+body {
+  min-height: 100vh;
+}
+
+body {
+  display: flex;
+  flex-direction: column;
+}
+
+body > main,
+body > div {
+  flex: 1 0 auto;
+}
+
+.app-footer {
+  flex-shrink: 0;
+}
+
+/* Ensure docs-page accounts for footer spacing */
+.docs-page {
+  padding-bottom: 24px;
+}
+
 .docs-compare-table th,
 .docs-compare-table td {
   padding: 10px 12px;
