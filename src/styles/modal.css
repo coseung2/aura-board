@@ -735,7 +735,6 @@
   overflow-y: auto;
 }
 .card-detail-body-text {
-  max-width: 70ch;
   display: flex;
   flex-direction: column;
   gap: 12px;
@@ -756,7 +755,7 @@
   /* font-size는 CardDetailModal.tsx에서 인라인 clamp()로 슬라이드
      영역에 맞춰 가변 적용. */
   font-weight: 700;
-  margin: 0 32px 0 0; /* room for close button */
+  margin: 0;
   color: var(--color-text);
   flex-shrink: 0;
 }
