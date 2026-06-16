@@ -12,9 +12,6 @@ import { CardComposer } from "../CardComposer";
 import { CardDetailModal } from "../CardDetailModal";
 import type { BoardDetailResponse, BoardCard } from "../../lib/types";
 
-// 주제별 보드(columns) — 섹션(Section) 별 세로 칼럼, 카드를 섹션에 묶어서 렌더.
-// 섹션 없는 카드는 "기타" 칼럼에 모음.
-
 export function ColumnsBoard({
   data,
   onMutate,
@@ -29,22 +26,25 @@ export function ColumnsBoard({
 
   const columns = useMemo(() => {
     const map = new Map<string | null, { title: string; cards: BoardCard[] }>();
-    for (const s of data.sections) {
-      map.set(s.id, { title: s.title, cards: [] });
+    for (const section of data.sections) {
+      map.set(section.id, { title: section.title, cards: [] });
     }
     map.set(null, { title: "기타", cards: [] });
-    for (const c of cards) {
-      const target = map.get(c.sectionId) ?? map.get(null);
-      if (target) target.cards.push(c);
+
+    for (const card of cards) {
+      const target = map.get(card.sectionId) ?? map.get(null);
+      if (target) target.cards.push(card);
     }
-    // sections 순서 + 기타 맨 뒤.
+
     const ordered: Array<{ id: string | null; title: string; cards: BoardCard[] }> = [];
-    for (const s of data.sections) {
-      const entry = map.get(s.id);
-      if (entry) ordered.push({ id: s.id, title: entry.title, cards: entry.cards });
+    for (const section of data.sections) {
+      const entry = map.get(section.id);
+      if (entry) ordered.push({ id: section.id, title: entry.title, cards: entry.cards });
     }
     const etc = map.get(null);
-    if (etc && etc.cards.length > 0) ordered.push({ id: null, title: etc.title, cards: etc.cards });
+    if (etc && etc.cards.length > 0) {
+      ordered.push({ id: null, title: etc.title, cards: etc.cards });
+    }
     return ordered;
   }, [cards, data.sections]);
 
@@ -72,28 +72,33 @@ export function ColumnsBoard({
             <Text style={styles.emptyMsg}>선생님이 주제를 만들어야 카드를 올릴 수 있어요.</Text>
           </View>
         ) : (
-          columns.map((col) => (
-            <View key={col.id ?? "etc"} style={styles.column}>
+          columns.map((column) => (
+            <View key={column.id ?? "etc"} style={styles.column}>
               <View style={styles.colHead}>
-                <Text style={styles.colTitle}>{col.title}</Text>
-                <Text style={styles.colCount}>{col.cards.length}</Text>
+                <Text style={styles.colTitle} numberOfLines={1}>
+                  {column.title}
+                </Text>
+                <View style={styles.countPill}>
+                  <Text style={styles.colCount}>{column.cards.length}</Text>
+                </View>
               </View>
-              <ScrollView contentContainerStyle={styles.colBody}>
-                {col.cards.map((c) => (
-                  <Pressable
-                    key={c.id}
-                    style={styles.cardWrap}
-                    onPress={() => setSelectedCard(c)}
-                  >
-                    <CardView card={c} />
-                  </Pressable>
+              <Pressable
+                style={({ pressed }) => [styles.addBtn, pressed && styles.addBtnPressed]}
+                onPress={() => openComposer(column.id)}
+                accessibilityRole="button"
+              >
+                <Text style={styles.addText}>+ 카드 추가</Text>
+              </Pressable>
+              <ScrollView
+                style={styles.colBodyScroll}
+                contentContainerStyle={styles.colBodyContent}
+                showsVerticalScrollIndicator={false}
+              >
+                {column.cards.map((card) => (
+                  <View key={card.id} style={styles.cardWrap}>
+                    <CardView card={card} onPress={() => setSelectedCard(card)} />
+                  </View>
                 ))}
-                <Pressable
-                  style={({ pressed }) => [styles.addBtn, pressed && styles.addBtnPressed]}
-                  onPress={() => openComposer(col.id)}
-                >
-                  <Text style={styles.addText}>＋ 카드 추가</Text>
-                </Pressable>
               </ScrollView>
             </View>
           ))
@@ -115,49 +120,87 @@ export function ColumnsBoard({
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1 },
-  scroll: { padding: spacing.xl, gap: spacing.lg, flexDirection: "row" },
+  root: {
+    flex: 1,
+    backgroundColor: "#e9f5ff",
+  },
+  scroll: {
+    paddingTop: spacing.lg,
+    paddingLeft: spacing.lg,
+    paddingRight: spacing.xxl,
+    paddingBottom: spacing.lg,
+    gap: spacing.lg,
+    flexDirection: "row",
+    alignItems: "flex-start",
+  },
   column: {
-    width: 320,
-    backgroundColor: colors.surfaceAlt,
-    borderRadius: radii.card,
-    padding: spacing.md,
-    gap: spacing.sm,
-    maxHeight: "100%",
+    width: 312,
+    height: "100%",
+    gap: 10,
+    backgroundColor: "transparent",
   },
   colHead: {
     flexDirection: "row",
-    justifyContent: "space-between",
     alignItems: "center",
-    paddingHorizontal: spacing.sm,
-  },
-  colTitle: { ...typography.section, color: colors.text },
-  colCount: {
-    ...typography.label,
-    color: colors.textMuted,
+    gap: 10,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
     backgroundColor: colors.surface,
+    borderRadius: radii.card,
+    borderWidth: 1,
+    borderColor: colors.border,
+    ...shadows.card,
+  },
+  colTitle: {
+    fontSize: 15,
+    fontWeight: "700",
+    letterSpacing: -0.15,
+    color: colors.text,
+    flex: 1,
+  },
+  countPill: {
+    backgroundColor: colors.accentTintedBg,
     paddingHorizontal: spacing.sm,
     paddingVertical: 2,
     borderRadius: radii.pill,
     minWidth: 24,
-    textAlign: "center",
+    alignItems: "center",
   },
-  colBody: { gap: spacing.sm, paddingBottom: spacing.md },
-  cardWrap: { marginBottom: spacing.xs },
+  colCount: {
+    ...typography.badge,
+    color: colors.accentTintedText,
+  },
   addBtn: {
-    padding: spacing.md,
-    borderRadius: radii.card,
+    paddingVertical: 9,
+    paddingHorizontal: 14,
+    borderRadius: 8,
     borderWidth: 1,
     borderStyle: "dashed",
     borderColor: colors.border,
     alignItems: "center",
     minHeight: tapMin,
     justifyContent: "center",
+    backgroundColor: "transparent",
   },
-  addBtnPressed: { backgroundColor: colors.surface },
-  addText: { ...typography.label, color: colors.textFaint },
+  addBtnPressed: {
+    borderColor: colors.accent,
+    backgroundColor: colors.accentTintedBg,
+  },
+  addText: {
+    ...typography.label,
+    fontSize: 13,
+    color: colors.textFaint,
+  },
+  colBodyScroll: { flex: 1 },
+  colBodyContent: {
+    gap: spacing.md,
+    paddingTop: 8,
+    paddingBottom: spacing.xl,
+    paddingRight: 6,
+  },
+  cardWrap: { marginBottom: 0 },
   emptyColumn: {
-    width: 320,
+    width: 312,
     alignItems: "center",
     padding: spacing.xxl,
     gap: spacing.md,

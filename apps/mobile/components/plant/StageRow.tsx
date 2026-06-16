@@ -40,6 +40,10 @@ export function StageRow({
   onOpenImage,
   busyAdvance,
 }: Props) {
+  const observationPoints = Array.isArray(stage.observationPoints)
+    ? stage.observationPoints
+    : [];
+
   return (
     <View style={styles.row}>
       <StageRail
@@ -74,10 +78,10 @@ export function StageRow({
         </View>
 
         {/* 관찰 포인트 */}
-        {state !== "upcoming" && stage.observationPoints.length > 0 && (
+        {state !== "upcoming" && observationPoints.length > 0 && (
           <View style={styles.points}>
             <Text style={styles.pointsTitle}>관찰 포인트</Text>
-            {stage.observationPoints.map((point, idx) => (
+            {observationPoints.map((point, idx) => (
               <Text key={`${stage.id}-pt-${idx}`} style={styles.pointItem}>
                 • {point}
               </Text>

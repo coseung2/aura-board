@@ -21,6 +21,32 @@ export type MeResponse = {
   boards: BoardMeta[];
 };
 
+export type WalletSummary = {
+  studentName?: string;
+  classroomId?: string;
+  balance: number;
+  currency: {
+    unitLabel: string;
+    monthlyInterestRate: number | null;
+  };
+  card?: { id: string; cardNumber: string; status: string } | null;
+  activeFDs: Array<{
+    id: string;
+    principal: number;
+    monthlyRate: number;
+    startDate?: string;
+    maturityDate: string;
+  }>;
+  recentTransactions?: Array<{
+    id: string;
+    type: string;
+    amount: number;
+    balanceAfter: number;
+    note: string | null;
+    createdAt: string;
+  }>;
+};
+
 export type CardAttachment = {
   id: string;
   kind: "image" | "video" | "file";
@@ -67,6 +93,8 @@ export type BoardCard = {
   // Submission 경로 — 학생이 POST /api/boards/:id/queue 로 올린 카드
   createdAt: string;
   updatedAt: string;
+  likeCount?: number;
+  commentCount?: number;
   attachments?: CardAttachment[];
   authors?: CardAuthor[];
   authorName?: string | null;
@@ -310,6 +338,24 @@ export type ShowcaseEntryDTO = {
   studentNumber: number | null;
   card: PortfolioCardDTO;
   createdAt: string;
+};
+
+export type PortfolioRosterStudentDTO = {
+  id: string;
+  name: string;
+  number: number | null;
+  cardCount: number;
+  showcaseCount: number;
+};
+
+export type PortfolioRosterDTO = {
+  classroom: { id: string; name: string };
+  students: PortfolioRosterStudentDTO[];
+};
+
+export type PortfolioStudentDTO = {
+  student: { id: string; name: string; number: number | null };
+  cards: PortfolioCardDTO[];
 };
 
 export type ParentPortfolioResponse = {

@@ -4,7 +4,7 @@
     "slug": "aura-board-mobile",
     "scheme": "auraboard",
     "version": "0.1.0",
-    "orientation": "landscape",
+    "orientation": "default",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
     "newArchEnabled": true,
@@ -15,7 +15,7 @@
     },
     "ios": {
       "supportsTablet": true,
-      "requireFullScreen": true
+      "requireFullScreen": false
     },
     "android": {
       "adaptiveIcon": {

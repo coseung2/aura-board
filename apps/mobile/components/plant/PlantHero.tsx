@@ -29,9 +29,12 @@ export function PlantHero({
   totalPhotos,
   daysSinceLastObs,
 }: Props) {
+  const stagePoints = Array.isArray(currentStage.observationPoints)
+    ? currentStage.observationPoints
+    : [];
   const missionPoints =
-    currentStage.observationPoints.length > 0
-      ? currentStage.observationPoints
+    stagePoints.length > 0
+      ? stagePoints
       : ["줄기, 잎, 색깔 중 달라진 점 찾기", "사진 1장 이상 올리기", "한 문장으로 변화 기록하기"];
 
   return (

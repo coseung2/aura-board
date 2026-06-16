@@ -6,7 +6,7 @@ import { getCurrentStudent } from "@/lib/student-auth";
  * 학생 모바일 앱 전용 — 보드 한 개를 layout-specific 데이터와 함께 묶어서 반환.
  * 웹쪽 getBoardDetail 로직의 모바일 경량 버전. 교사 편집 권한은 내려주지 않는다.
  *
- * Card-기반 레이아웃 (freeform/grid/stream/columns/vibe-gallery/dj-queue 등)은
+ * Card-기반 레이아웃(freeform/grid/stream/columns/vibe-gallery/dj-queue 등)은
  * cards[] 만 있으면 렌더 가능. 특수 레이아웃은 layoutData 블록에 추가 fetch.
  */
 export async function GET(
@@ -31,6 +31,12 @@ export async function GET(
           include: {
             attachments: { orderBy: { order: "asc" } },
             authors: { orderBy: { displayName: "asc" } },
+            _count: {
+              select: {
+                likes: true,
+                comments: { where: { deletedAt: null } },
+              },
+            },
           },
         },
         sections: { orderBy: { order: "asc" } },
@@ -105,7 +111,6 @@ export async function GET(
     }
 
     if (board.layout === "plant-roadmap") {
-      // 본인 식물만 조회 — 타 학생 식물은 /api/student-plants/[id] 의 필터에서 이미 필터링됨.
       const plants = await db.studentPlant.findMany({
         where: {
           boardId: board.id,
@@ -133,11 +138,16 @@ export async function GET(
         description: board.description,
         classroomId: board.classroomId,
       },
-      cards: board.cards.map((c) => ({
-        ...c,
-        createdAt: c.createdAt.toISOString(),
-        updatedAt: c.updatedAt.toISOString(),
-      })),
+      cards: board.cards.map((card) => {
+        const { _count, ...rest } = card;
+        return {
+          ...rest,
+          likeCount: _count.likes,
+          commentCount: _count.comments,
+          createdAt: card.createdAt.toISOString(),
+          updatedAt: card.updatedAt.toISOString(),
+        };
+      }),
       sections: board.sections,
       currentStudent: {
         id: student.id,
