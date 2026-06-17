@@ -20,7 +20,7 @@ export type LayoutKey =
   | "question-board";
 
 export const LAYOUT_META: Record<LayoutKey, { emoji: string; label: string }> = {
-  freeform: { emoji: "🎯", label: "자유 배치" },
+  freeform: { emoji: "🗂️", label: "카드 보드" },
   grid: { emoji: "🔲", label: "그리드" },
   stream: { emoji: "📜", label: "스트림" },
   columns: { emoji: "📊", label: "주제별 보드" },

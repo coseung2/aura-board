@@ -8,6 +8,15 @@
   padding: 0;
 }
 
+.freeform-board {
+  grid-template-columns: repeat(auto-fill, minmax(238px, 238px));
+  justify-content: start;
+}
+
+.freeform-board .board-empty-inline {
+  grid-column: 1 / -1;
+}
+
 .grid-card {
   position: relative;
   align-self: start;
@@ -30,6 +39,12 @@
 
 .grid-card:hover .padlet-card-delete {
   display: flex;
+}
+
+@media (max-width: 560px) {
+  .freeform-board {
+    grid-template-columns: 1fr;
+  }
 }
 
 /* -------- Stream Board -------- */

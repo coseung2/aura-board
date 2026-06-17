@@ -31,7 +31,7 @@ const FILE_ACCEPT =
   "audio/mpeg,audio/wav,audio/ogg,audio/mp4,audio/aac,audio/flac,audio/webm," +
   ".pdf,.docx,.xlsx,.pptx,.hwp,.hwpx,.txt,.md,.markdown,.html,.htm,.zip,.mp3,.wav,.ogg,.m4a,.aac,.flac,.webm";
 
-type EditCardUpdates = Omit<Partial<CardData>, "attachments"> & {
+export type EditCardUpdates = Omit<Partial<CardData>, "attachments"> & {
   attachments?: AttachmentDraft[];
 };
 
@@ -593,4 +593,3 @@ export function EditCardModal({ card, onSave, onClose }: Props) {
     </>
   );
 }
-export type { EditCardUpdates };

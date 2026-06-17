@@ -4,10 +4,6 @@ import { useSession, signOut } from "next-auth/react";
 import Link from "next/link";
 import { TeacherNotificationBell } from "./TeacherNotificationBell";
 
-/**
- * Shows user info + logout button when authenticated via Google OAuth.
- * Mock-auth 경로는 2026-04-22 제거됨.
- */
 export function AuthHeader() {
   const { data: session, status } = useSession();
 
@@ -34,19 +30,26 @@ export function AuthHeader() {
       <TeacherNotificationBell />
       <SettingsMenu />
       <button
+        type="button"
         className="auth-logout-btn"
         onClick={() => signOut({ redirectTo: "/login" })}
+        aria-label="로그아웃"
+        title="로그아웃"
       >
-        로그아웃
+        <svg
+          className="auth-logout-icon"
+          viewBox="0 0 24 24"
+          aria-hidden="true"
+        >
+          <path d="M10 6H6.8A1.8 1.8 0 0 0 5 7.8v8.4A1.8 1.8 0 0 0 6.8 18H10" />
+          <path d="M14 8l4 4-4 4" />
+          <path d="M8.5 12H18" />
+        </svg>
       </button>
     </div>
   );
 }
 
-/**
- * Native <details>-based dropdown so teachers can jump to infrequent-but-critical
- * settings (Canva app install guide) without hunting across routes.
- */
 function SettingsMenu() {
   return (
     <details className="auth-settings">
@@ -55,7 +58,7 @@ function SettingsMenu() {
         title="설정 메뉴"
         aria-label="설정 메뉴 열기"
       >
-        ⚙
+        ⚙️
       </summary>
       <div className="auth-settings-panel" role="menu">
         <Link
@@ -63,14 +66,14 @@ function SettingsMenu() {
           className="auth-settings-item"
           role="menuitem"
         >
-          ⚙ 교사 설정
+          ⚙️ 교사 설정
         </Link>
         <Link
           href="/teacher/settings#llm"
           className="auth-settings-item auth-settings-subitem"
           role="menuitem"
         >
-          🤖 생성형 AI 연결
+          ✨ 생성형 AI 연결
         </Link>
         <Link
           href="/teacher/settings#canva"
@@ -91,9 +94,6 @@ function SettingsMenu() {
   );
 }
 
-/**
- * Login link for unauthenticated users.
- */
 export function LoginLink() {
   return (
     <Link href="/login" className="auth-login-link">

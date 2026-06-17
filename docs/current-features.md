@@ -5,7 +5,7 @@ Live feature inventory. Update when merging feature tasks.
 ## Board layouts
 | Layout | Description |
 |---|---|
-| `freeform` | 자유 배치 — react-draggable 카드 |
+| `freeform` | 카드 보드 — 칼럼 없이 카드 나열 |
 | `grid` | 그리드 정렬 |
 | `stream` | 세로 피드 |
 | `columns` | 칼럼(Kanban) — SSE 라이브 동기화 + 칼럼별 정렬(manual/newest/oldest/title, 2026-04-17) |

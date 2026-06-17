@@ -1,11 +1,14 @@
 "use client";
 
-import { useState, useTransition } from "react";
-import { DraggableCard, type CardData } from "./DraggableCard";
+import { useState } from "react";
 import { AddCardButton } from "./AddCardButton";
 import type { AddCardData } from "./AddCardModal";
+import { CardBody } from "./cards/CardBody";
 import { CardDetailModal } from "./cards/CardDetailModal";
 import { CardAuthorEditor, type SavedAuthor } from "./cards/CardAuthorEditor";
+import { ContextMenu } from "./ContextMenu";
+import { EditCardModal, type EditCardUpdates } from "./EditCardModal";
+import type { CardData } from "./DraggableCard";
 
 type Role = "owner" | "editor" | "viewer";
 
@@ -26,59 +29,16 @@ export function BoardCanvas({
   isStudentViewer,
   classroomId,
 }: Props) {
-  const [cards, setCards] = useState<CardData[]>(initialCards);
+  const [cards, setCards] = useState<CardData[]>(
+    [...initialCards].sort((a, b) => a.order - b.order),
+  );
   const [openCard, setOpenCard] = useState<CardData | null>(null);
+  const [editingCard, setEditingCard] = useState<CardData | null>(null);
   const [authorEditCard, setAuthorEditCard] = useState<CardData | null>(null);
-  const [, startTransition] = useTransition();
   const canEdit = currentRole === "owner" || currentRole === "editor";
-  // Students (role=viewer) can add cards on their own classroom's board.
-  // The POST /api/cards endpoint accepts the student_session cookie and
-  // stamps authorship via studentAuthorId + externalAuthorName.
   const canAddCard = canEdit || !!isStudentViewer;
 
-  function handlePositionChange(id: string, x: number, y: number) {
-    let prevX = 0;
-    let prevY = 0;
-    setCards((list) => {
-      const target = list.find((c) => c.id === id);
-      if (!target) return list;
-      prevX = target.x;
-      prevY = target.y;
-      return list.map((c) => (c.id === id ? { ...c, x, y } : c));
-    });
-
-    startTransition(async () => {
-      try {
-        const res = await fetch(`/api/cards/${id}`, {
-          method: "PATCH",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify({ x, y }),
-        });
-        if (!res.ok) {
-          const msg = await res.text();
-          console.error("카드 위치 저장 실패:", msg);
-          setCards((list) =>
-            list.map((c) =>
-              c.id === id ? { ...c, x: prevX, y: prevY } : c
-            )
-          );
-        }
-      } catch (err) {
-        console.error(err);
-        setCards((list) =>
-          list.map((c) =>
-            c.id === id ? { ...c, x: prevX, y: prevY } : c
-          )
-        );
-      }
-    });
-  }
-
   async function handleAdd(data: AddCardData) {
-    const nextPos = {
-      x: 40 + (cards.length % 3) * 280,
-      y: 40 + Math.floor(cards.length / 3) * 220,
-    };
     try {
       const res = await fetch(`/api/cards`, {
         method: "POST",
@@ -94,15 +54,15 @@ export function BoardCanvas({
           attachments: data.attachments,
           authors: data.authors,
           color: data.color || null,
-          ...nextPos,
+          x: 0,
+          y: 0,
+          order: cards.length,
         }),
       });
       if (res.ok) {
         const { card } = await res.json();
         setCards((prev) => [...prev, card]);
         if (data.attachAssetId) {
-          // Fire-and-forget: create AssetAttachment row. Card already has the
-          // imageUrl from the picker so failures here are cosmetic.
           void fetch(`/api/student-assets/${data.attachAssetId}/attach`, {
             method: "POST",
             headers: { "content-type": "application/json" },
@@ -111,7 +71,7 @@ export function BoardCanvas({
         }
       } else {
         const msg = await res.text();
-        console.error("카드 추가 실패:", msg);
+        console.error("Failed to add card:", msg);
         alert(`카드 추가 실패: ${msg}`);
       }
     } catch (err) {
@@ -127,8 +87,8 @@ export function BoardCanvas({
       if (!res.ok) {
         setCards(prevCards);
         const msg = await res.text();
-        console.error("삭제 실패:", msg);
-        alert(`삭제 실패: ${msg}`);
+        console.error("Failed to delete card:", msg);
+        alert(`카드 삭제 실패: ${msg}`);
       }
     } catch (err) {
       console.error(err);
@@ -136,35 +96,175 @@ export function BoardCanvas({
     }
   }
 
+  async function handleEditCardSave(
+    editingCard: CardData | null,
+    updates: EditCardUpdates,
+  ) {
+    if (!editingCard) return;
+    const prevCards = cards;
+    const cardId = editingCard.id;
+    const { attachments: updateAttachments, ...restUpdates } = updates;
+    const optimisticUpdates: Partial<CardData> = { ...restUpdates };
+
+    if (updateAttachments) {
+      optimisticUpdates.attachments = updateAttachments.map((a, idx) => ({
+        id:
+          a.tempId && !a.tempId.startsWith("legacy-") && !a.tempId.startsWith("tmp-")
+            ? a.tempId
+            : `opt-${idx}-${a.kind}`,
+        kind: a.kind,
+        url: a.url,
+        previewUrl: a.previewUrl ?? null,
+        fileName: a.fileName ?? null,
+        fileSize: a.fileSize ?? null,
+        mimeType: a.mimeType ?? null,
+        order: idx,
+      }));
+    }
+
+    setCards((list) =>
+      list.map((c) => (c.id === cardId ? { ...c, ...optimisticUpdates } : c)),
+    );
+    setOpenCard((card) =>
+      card?.id === cardId ? { ...card, ...optimisticUpdates } : card,
+    );
+
+    try {
+      const res = await fetch(`/api/cards/${cardId}`, {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(updates),
+      });
+      if (!res.ok) {
+        setCards(prevCards);
+        return;
+      }
+
+      const refreshed = await fetch(`/api/cards/${cardId}`).catch(() => null);
+      if (refreshed?.ok) {
+        const data = await refreshed.json();
+        if (data.card) {
+          setCards((list) =>
+            list.map((c) => (c.id === cardId ? data.card : c)),
+          );
+          setOpenCard((card) => (card?.id === cardId ? data.card : card));
+        }
+      }
+    } catch (err) {
+      console.error(err);
+      setCards(prevCards);
+    }
+  }
+
+  async function handleDuplicate(card: CardData) {
+    try {
+      const res = await fetch(`/api/cards`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          boardId,
+          title: `${card.title} (복사)`,
+          content: card.content,
+          imageUrl: card.imageUrl || null,
+          linkUrl: card.linkUrl || null,
+          videoUrl: card.videoUrl || null,
+          fileUrl: card.fileUrl || null,
+          fileName: card.fileName || null,
+          fileSize: card.fileSize || null,
+          fileMimeType: card.fileMimeType || null,
+          attachments: (card.attachments ?? []).map((a) => ({
+            kind: a.kind,
+            url: a.url,
+            previewUrl: a.previewUrl ?? null,
+            fileName: a.fileName,
+            fileSize: a.fileSize,
+            mimeType: a.mimeType,
+          })),
+          color: card.color || null,
+          x: 0,
+          y: 0,
+          order: cards.length,
+        }),
+      });
+      if (res.ok) {
+        const { card: newCard } = await res.json();
+        setCards((prev) => [...prev, newCard]);
+      } else {
+        alert(`카드 복제 실패: ${await res.text()}`);
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  }
+
   return (
     <div className="board-canvas-wrap">
-      <div className="board-canvas">
+      <div className="grid-board freeform-board">
         {cards.length === 0 && (
-          <div className="board-empty">
+          <div className="board-empty-inline">
             {canEdit ? (
-              <p>아직 카드가 없어요. 우하단 버튼을 눌러 첫 카드를 추가하세요.</p>
+              <p>아직 카드가 없어요. 더하기 버튼을 눌러 첫 카드를 추가하세요.</p>
             ) : (
               <p>아직 카드가 없습니다.</p>
             )}
           </div>
         )}
         {cards.map((c) => (
-          <DraggableCard
+          <article
             key={c.id}
-            card={c}
-            canEdit={canEdit}
-            canDelete={
-              currentRole === "owner" ||
+            className="grid-card is-clickable"
+            style={{ backgroundColor: c.color ?? undefined }}
+            aria-label={c.title}
+            onClick={() => setOpenCard(c)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                setOpenCard(c);
+              }
+            }}
+            tabIndex={0}
+            role="button"
+          >
+            <CardBody card={c} />
+            {(currentRole === "owner" ||
               (currentRole === "editor" && c.authorId === currentUserId) ||
-              // Student-authored card — let the student delete their own
-              // publish even though they come in as role=viewer. Matches
-              // the DELETE /api/cards/:id student-auth path.
-              c.studentAuthorId === currentUserId
-            }
-            onPositionChange={(x, y) => handlePositionChange(c.id, x, y)}
-            onDelete={() => handleDelete(c.id)}
-            onOpen={() => setOpenCard(c)}
-          />
+              c.studentAuthorId === currentUserId) && (
+              <div
+                className="card-ctx-menu"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <ContextMenu
+                  items={[
+                    {
+                      label: "수정",
+                      onClick: () => setEditingCard(c),
+                    },
+                    ...(canEdit || c.studentAuthorId === currentUserId
+                      ? [
+                          {
+                            label: "작성자 지정",
+                            onClick: () => setAuthorEditCard(c),
+                          },
+                        ]
+                      : []),
+                    {
+                      label: "복제",
+                      onClick: () => handleDuplicate(c),
+                    },
+                    {
+                      label: "삭제",
+                      danger: true,
+                      onClick: () => {
+                        if (window.confirm(`"${c.title}" 카드를 삭제할까요?`)) {
+                          handleDelete(c.id);
+                        }
+                      },
+                    },
+                  ]}
+                />
+              </div>
+            )}
+          </article>
         ))}
       </div>
       {canAddCard && (
@@ -182,6 +282,13 @@ export function BoardCanvas({
         onEditAuthors={(c) => setAuthorEditCard(c)}
         canEditAuthors={(c) => canEdit || c.studentAuthorId === currentUserId}
       />
+      {editingCard && (
+        <EditCardModal
+          card={editingCard}
+          onSave={(updates) => handleEditCardSave(editingCard, updates)}
+          onClose={() => setEditingCard(null)}
+        />
+      )}
       {authorEditCard && (
         <CardAuthorEditor
           cardId={authorEditCard.id}
@@ -195,8 +302,18 @@ export function BoardCanvas({
           onSaved={(authors: SavedAuthor[]) => {
             setCards((prev) =>
               prev.map((c) =>
-                c.id === authorEditCard.id ? { ...c, authors } : c
-              )
+                c.id === authorEditCard.id
+                  ? {
+                      ...c,
+                      authors,
+                      studentAuthorId: authors[0]?.studentId ?? null,
+                      externalAuthorName:
+                        authors.length > 0
+                          ? authors.map((a) => a.displayName).join(", ")
+                          : c.externalAuthorName,
+                    }
+                  : c,
+              ),
             );
           }}
           onClose={() => setAuthorEditCard(null)}

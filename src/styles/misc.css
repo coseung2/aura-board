@@ -75,7 +75,10 @@
   top: 100%;
   right: 0;
   margin-top: 4px;
+  box-sizing: border-box;
+  width: max-content;
   min-width: 140px;
+  max-width: min(220px, calc(100vw - 16px));
   background: var(--color-surface);
   border: var(--border-card);
   border-radius: 10px;
@@ -104,6 +107,7 @@
   align-items: center;
   gap: 8px;
   width: 100%;
+  min-width: 0;
   padding: 8px 12px;
   border: none;
   background: transparent;
@@ -115,6 +119,7 @@
   border-radius: 6px;
   transition: background 100ms ease;
   text-align: left;
+  white-space: nowrap;
 }
 
 .ctx-menu-item:hover {
