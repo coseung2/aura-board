@@ -27,10 +27,18 @@ const PICKER_ROWS: PickerRow[] = [
   { id: "question-board", desc: "학생 응답을 다양한 시각화로 표시" },
 ];
 
+const READY_LAYOUT_IDS = new Set<LayoutKey>([
+  "freeform",
+  "columns",
+  "dj-queue",
+]);
+
 const LAYOUTS = PICKER_ROWS.map((row) => ({
   id: row.id,
   emoji: LAYOUT_META[row.id].emoji,
-  label: LAYOUT_META[row.id].label,
+  label: READY_LAYOUT_IDS.has(row.id)
+    ? LAYOUT_META[row.id].label
+    : `${LAYOUT_META[row.id].label} (개발중)`,
   desc: row.desc,
   hidden: row.hidden,
 }));

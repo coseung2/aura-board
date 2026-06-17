@@ -254,18 +254,30 @@
 /* ── Board settings (gear launcher + panel rows) ─────── */
 
 .board-settings-trigger {
-  background: none;
-  border: 0;
-  font-size: 18px;
-  line-height: 1;
-  padding: 4px 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 32px;
+  padding: 6px 12px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  font-family: var(--font-body);
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.2;
   cursor: pointer;
-  color: var(--color-text-muted);
-  border-radius: 6px;
+  color: var(--color-text);
+  border-radius: var(--radius-pill);
   margin-left: 4px;
+  white-space: nowrap;
+  transition:
+    background 150ms ease,
+    border-color 150ms ease,
+    color 150ms ease;
 }
 
 .board-settings-trigger:hover {
+  border-color: var(--color-border-hover);
   background: var(--color-surface-alt);
   color: var(--color-text);
 }
@@ -280,6 +292,92 @@
   color: var(--color-text-muted);
   margin-left: 2px;
   font-size: 12px;
+}
+
+.board-settings-basic {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.board-settings-section {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding-bottom: 18px;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.board-settings-section:last-child {
+  padding-bottom: 0;
+  border-bottom: 0;
+}
+
+.board-settings-section-title {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 800;
+  color: var(--color-text);
+  letter-spacing: 0;
+}
+
+.board-settings-control-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.board-settings-check-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  cursor: pointer;
+  background: var(--color-surface);
+}
+
+.board-settings-check-row input {
+  margin-top: 2px;
+}
+
+.board-settings-check-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.board-settings-check-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+.board-settings-check-desc {
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--color-text-muted);
+}
+
+.board-settings-error {
+  margin: 0;
+  font-size: 12px;
+  color: var(--color-danger);
+}
+
+.board-settings-placeholder-mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 64px;
+  min-height: 32px;
+  padding: 6px 12px;
+  border-radius: var(--radius-pill);
+  background: var(--color-surface-alt);
+  color: var(--color-text-muted);
+  font-size: 13px;
+  font-weight: 800;
 }
 
 .board-settings-list {
@@ -347,6 +445,25 @@
 .board-settings-empty p,
 .board-settings-placeholder p {
   margin: 0;
+}
+
+.board-settings-archive-link {
+  margin-top: 16px;
+  padding-top: 12px;
+  border-top: 1px solid var(--color-border);
+}
+
+.board-settings-archive-link a {
+  display: inline-flex;
+  align-items: center;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--color-accent);
+  text-decoration: none;
+}
+
+.board-settings-archive-link a:hover {
+  text-decoration: underline;
 }
 
 .board-theme-grid {

@@ -394,6 +394,8 @@
 /* Settings dropdown (⚙ menu in header) */
 .auth-settings {
   position: relative;
+  display: inline-flex;
+  text-decoration: none;
 }
 
 .auth-settings-trigger {

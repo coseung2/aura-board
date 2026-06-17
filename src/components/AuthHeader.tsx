@@ -52,45 +52,15 @@ export function AuthHeader() {
 
 function SettingsMenu() {
   return (
-    <details className="auth-settings">
-      <summary
+    <Link href="/teacher/settings" className="auth-settings">
+      <span
         className="auth-settings-trigger"
-        title="설정 메뉴"
-        aria-label="설정 메뉴 열기"
+        title="교사 설정"
+        aria-label="교사 설정으로 이동"
       >
         ⚙️
-      </summary>
-      <div className="auth-settings-panel" role="menu">
-        <Link
-          href="/teacher/settings"
-          className="auth-settings-item"
-          role="menuitem"
-        >
-          ⚙️ 교사 설정
-        </Link>
-        <Link
-          href="/teacher/settings#llm"
-          className="auth-settings-item auth-settings-subitem"
-          role="menuitem"
-        >
-          ✨ 생성형 AI 연결
-        </Link>
-        <Link
-          href="/teacher/settings#canva"
-          className="auth-settings-item auth-settings-subitem"
-          role="menuitem"
-        >
-          🎨 Canva 연동
-        </Link>
-        <Link
-          href="/teacher/settings#billing"
-          className="auth-settings-item auth-settings-subitem"
-          role="menuitem"
-        >
-          💳 결제·구독
-        </Link>
-      </div>
-    </details>
+      </span>
+    </Link>
   );
 }
 

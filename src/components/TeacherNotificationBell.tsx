@@ -1,11 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-
-// teacher-notifications (2026-04-26) — 글로벌 TopNav 안의 알림 종.
-// 학부모 승인 요청 (ParentChildLink status=pending) 을 모든 학급에서
-// 집계해서 보여줌. 60s polling, native <details> 드롭다운.
 
 interface NotificationItem {
   linkId: string;
@@ -19,19 +15,24 @@ interface NotificationItem {
 
 export function TeacherNotificationBell() {
   const [items, setItems] = useState<NotificationItem[] | null>(null);
+  const [open, setOpen] = useState(false);
+  const detailsRef = useRef<HTMLDetailsElement | null>(null);
 
   useEffect(() => {
     let cancelled = false;
     const load = async () => {
       try {
-        const r = await fetch("/api/teacher/notifications", { cache: "no-store" });
-        if (!r.ok) return;
-        const j = await r.json();
-        if (!cancelled) setItems(j.items as NotificationItem[]);
+        const res = await fetch("/api/teacher/notifications", {
+          cache: "no-store",
+        });
+        if (!res.ok) return;
+        const data = await res.json();
+        if (!cancelled) setItems(data.items as NotificationItem[]);
       } catch {
-        /* network/transient — 다음 주기에 재시도 */
+        /* network/transient: retry on the next polling cycle */
       }
     };
+
     void load();
     const id = setInterval(load, 60_000);
     return () => {
@@ -40,10 +41,38 @@ export function TeacherNotificationBell() {
     };
   }, []);
 
+  useEffect(() => {
+    if (!open) return;
+
+    function handlePointerDown(event: MouseEvent) {
+      const target = event.target as Node;
+      if (detailsRef.current?.contains(target)) return;
+      setOpen(false);
+    }
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        setOpen(false);
+      }
+    }
+
+    document.addEventListener("mousedown", handlePointerDown);
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("mousedown", handlePointerDown);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [open]);
+
   const count = items?.length ?? 0;
 
   return (
-    <details className="auth-notify">
+    <details
+      ref={detailsRef}
+      className="auth-notify"
+      open={open}
+      onToggle={(event) => setOpen(event.currentTarget.open)}
+    >
       <summary
         className="auth-notify-trigger"
         title="알림"
@@ -61,20 +90,21 @@ export function TeacherNotificationBell() {
         {items === null ? (
           <div className="auth-notify-empty">불러오는 중...</div>
         ) : items.length === 0 ? (
-          <div className="auth-notify-empty">새 요청이 없어요</div>
+          <div className="auth-notify-empty">새 요청이 없어요.</div>
         ) : (
-          items.map((it) => (
+          items.map((item) => (
             <Link
-              key={it.linkId}
-              href={`/classroom/${it.classroomId}/parent-access`}
+              key={item.linkId}
+              href={`/classroom/${item.classroomId}/parent-access`}
               className="auth-notify-item"
               role="menuitem"
+              onClick={() => setOpen(false)}
             >
               <div className="auth-notify-item-title">
-                {it.studentName} 학부모 승인 대기
+                {item.studentName} 학부모 승인 대기
               </div>
               <div className="auth-notify-item-meta">
-                {it.classroomName} · {formatRelative(it.requestedAt)}
+                {item.classroomName} · {formatRelative(item.requestedAt)}
               </div>
             </Link>
           ))
@@ -85,12 +115,12 @@ export function TeacherNotificationBell() {
 }
 
 function formatRelative(iso: string): string {
-  const t = new Date(iso);
-  const diffMin = Math.floor((Date.now() - t.getTime()) / 60_000);
+  const time = new Date(iso);
+  const diffMin = Math.floor((Date.now() - time.getTime()) / 60_000);
   if (diffMin < 1) return "방금";
   if (diffMin < 60) return `${diffMin}분 전`;
-  const hr = Math.floor(diffMin / 60);
-  if (hr < 24) return `${hr}시간 전`;
-  const day = Math.floor(hr / 24);
+  const hour = Math.floor(diffMin / 60);
+  if (hour < 24) return `${hour}시간 전`;
+  const day = Math.floor(hour / 24);
   return `${day}일 전`;
 }

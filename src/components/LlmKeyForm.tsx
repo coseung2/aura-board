@@ -229,7 +229,7 @@ export function LlmKeyForm() {
             onChange={(e) => setProvider(e.target.value as Provider)}
             disabled={busy}
           >
-            <option value="claude">Claude (Anthropic) — 추천</option>
+            <option value="claude">Claude (Anthropic)</option>
             <option value="openai">ChatGPT (OpenAI)</option>
             <option value="gemini">Gemini (Google)</option>
             <option value="ollama">🧪 Ollama (로컬 테스트 — 개발자 전용)</option>

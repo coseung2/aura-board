@@ -2,42 +2,13 @@
 
 import { useEffect, useId, useState } from "react";
 import { useRouter } from "next/navigation";
-import { SidePanel } from "./ui/SidePanel";
 import { ShareTab } from "./share/ShareTab";
+import { SidePanel } from "./ui/SidePanel";
 
 export type BoardSection = {
   id: string;
   title: string;
   accessToken: string | null;
-};
-
-type Tab = "breakout" | "engagement" | "share" | "canva" | "theme";
-
-const TAB_LABELS: Record<Tab, string> = {
-  breakout: "브레이크아웃",
-  engagement: "참여",
-  share: "공유",
-  canva: "Canva 연동",
-  theme: "테마",
-};
-
-const PLACEHOLDER_COPY: Record<"canva", string> = {
-  canva: "도메인 단위 Canva 연동 설정",
-};
-
-type Props = {
-  open: boolean;
-  onClose: () => void;
-  boardId: string;
-  layout: string;
-  initialSections: BoardSection[];
-  /** card-comments-likes (2026-04-26): 참여 탭의 익명 토글 초기값. */
-  initialAnonymousAuthor?: boolean;
-  initialBoardTheme?: BoardTheme;
-  /** board-share (2026-05-29): 공유 탭 초기값. */
-  initialShareMode?: string;
-  initialShareToken?: string | null;
-  initialShareShortCode?: string | null;
 };
 
 export type BoardTheme =
@@ -47,17 +18,63 @@ export type BoardTheme =
   | "pastel-lilac"
   | "pastel-lemon";
 
+type Tab = "basic" | "breakout" | "canva";
+
+type Props = {
+  open: boolean;
+  onClose: () => void;
+  boardId: string;
+  layout: string;
+  initialSections: BoardSection[];
+  initialAnonymousAuthor?: boolean;
+  initialBoardTheme?: BoardTheme;
+  initialShareMode?: string;
+  initialShareToken?: string | null;
+  initialShareShortCode?: string | null;
+};
+
+const TAB_LABELS: Record<Tab, string> = {
+  basic: "기본",
+  breakout: "브레이크아웃",
+  canva: "Canva 연동",
+};
+
 const BOARD_THEME_OPTIONS: Array<{
   value: BoardTheme;
   label: string;
   tone: string;
   swatch: string;
 }> = [
-  { value: "pastel-peach", label: "복숭아", tone: "핑크 코랄", swatch: "linear-gradient(135deg, #fff4ef 0%, #ffe1dc 100%)" },
-  { value: "pastel-mint", label: "민트", tone: "민트 그린", swatch: "linear-gradient(135deg, #f2fff8 0%, #d9f6ea 100%)" },
-  { value: "pastel-sky", label: "하늘", tone: "소프트 블루", swatch: "linear-gradient(135deg, #f2f8ff 0%, #dcecff 100%)" },
-  { value: "pastel-lilac", label: "라일락", tone: "연보라", swatch: "linear-gradient(135deg, #f8f4ff 0%, #eadfff 100%)" },
-  { value: "pastel-lemon", label: "레몬", tone: "웜 옐로", swatch: "linear-gradient(135deg, #fffdf1 0%, #fff1c9 100%)" },
+  {
+    value: "pastel-peach",
+    label: "복숭아",
+    tone: "핑크 코랄",
+    swatch: "linear-gradient(135deg, #fff4ef 0%, #ffe1dc 100%)",
+  },
+  {
+    value: "pastel-mint",
+    label: "민트",
+    tone: "민트 그린",
+    swatch: "linear-gradient(135deg, #f2fff8 0%, #d9f6ea 100%)",
+  },
+  {
+    value: "pastel-sky",
+    label: "하늘",
+    tone: "소프트 블루",
+    swatch: "linear-gradient(135deg, #f2f8ff 0%, #dcecff 100%)",
+  },
+  {
+    value: "pastel-lilac",
+    label: "라일락",
+    tone: "연보라",
+    swatch: "linear-gradient(135deg, #f8f4ff 0%, #eadfff 100%)",
+  },
+  {
+    value: "pastel-lemon",
+    label: "레몬",
+    tone: "옐로",
+    swatch: "linear-gradient(135deg, #fffdf1 0%, #fff1c9 100%)",
+  },
 ];
 
 export function BoardSettingsPanel({
@@ -73,29 +90,42 @@ export function BoardSettingsPanel({
   initialShareShortCode = null,
 }: Props) {
   const router = useRouter();
-  const [tab, setTab] = useState<Tab>("breakout");
+  const [tab, setTab] = useState<Tab>("basic");
   const [sections, setSections] = useState<BoardSection[]>(initialSections);
   const [anonymousAuthor, setAnonymousAuthor] = useState(initialAnonymousAuthor);
   const [boardTheme, setBoardTheme] = useState<BoardTheme>(initialBoardTheme);
   const [shareMode, setShareMode] = useState(initialShareMode);
   const [shareToken, setShareToken] = useState<string | null>(initialShareToken);
-  const [shareShortCode, setShareShortCode] = useState<string | null>(initialShareShortCode);
+  const [shareShortCode, setShareShortCode] = useState<string | null>(
+    initialShareShortCode,
+  );
   const tablistId = useId();
 
-  // Re-sync when caller re-opens panel with fresh props.
   useEffect(() => {
-    if (open) {
-      setSections(initialSections);
-      setAnonymousAuthor(initialAnonymousAuthor);
-      setBoardTheme(initialBoardTheme);
-    }
-  }, [open, initialSections, initialAnonymousAuthor, initialBoardTheme]);
+    if (!open) return;
+    setTab("basic");
+    setSections(initialSections);
+    setAnonymousAuthor(initialAnonymousAuthor);
+    setBoardTheme(initialBoardTheme);
+    setShareMode(initialShareMode);
+    setShareToken(initialShareToken);
+    setShareShortCode(initialShareShortCode);
+  }, [
+    open,
+    initialSections,
+    initialAnonymousAuthor,
+    initialBoardTheme,
+    initialShareMode,
+    initialShareToken,
+    initialShareShortCode,
+  ]);
 
   function handleSectionTokenChange(sectionId: string, nextToken: string | null) {
     setSections((list) =>
-      list.map((s) => (s.id === sectionId ? { ...s, accessToken: nextToken } : s))
+      list.map((s) =>
+        s.id === sectionId ? { ...s, accessToken: nextToken } : s,
+      ),
     );
-    // Refresh server components so other entry points see the latest token.
     router.refresh();
   }
 
@@ -108,27 +138,43 @@ export function BoardSettingsPanel({
         id={tablistId}
         style={{ margin: "-16px -20px 16px" }}
       >
-        {(Object.keys(TAB_LABELS) as Tab[]).map((key) => {
-          const isPlaceholder = key === "canva";
-          return (
-            <button
-              key={key}
-              type="button"
-              role="tab"
-              aria-selected={tab === key}
-              aria-controls={`${tablistId}-panel-${key}`}
-              id={`${tablistId}-tab-${key}`}
-              className="side-panel-tab"
-              onClick={() => setTab(key)}
-            >
-              {TAB_LABELS[key]}
-              {isPlaceholder && (
-                <span className="board-settings-tab-meta"> (준비 중)</span>
-              )}
-            </button>
-          );
-        })}
+        {(Object.keys(TAB_LABELS) as Tab[]).map((key) => (
+          <button
+            key={key}
+            type="button"
+            role="tab"
+            aria-selected={tab === key}
+            aria-controls={`${tablistId}-panel-${key}`}
+            id={`${tablistId}-tab-${key}`}
+            className="side-panel-tab"
+            onClick={() => setTab(key)}
+          >
+            {TAB_LABELS[key]}
+            {key === "canva" && (
+              <span className="board-settings-tab-meta"> (준비 중)</span>
+            )}
+          </button>
+        ))}
       </div>
+
+      {tab === "basic" && (
+        <div
+          role="tabpanel"
+          id={`${tablistId}-panel-basic`}
+          aria-labelledby={`${tablistId}-tab-basic`}
+        >
+          <BasicTab
+            boardId={boardId}
+            anonymousAuthor={anonymousAuthor}
+            onAnonymousAuthorChange={setAnonymousAuthor}
+            initialShareMode={shareMode}
+            initialShareToken={shareToken}
+            initialShareShortCode={shareShortCode}
+            boardTheme={boardTheme}
+            onThemeChange={setBoardTheme}
+          />
+        </div>
+      )}
 
       {tab === "breakout" && (
         <div
@@ -145,60 +191,19 @@ export function BoardSettingsPanel({
         </div>
       )}
 
-      {tab === "engagement" && (
-        <div
-          role="tabpanel"
-          id={`${tablistId}-panel-engagement`}
-          aria-labelledby={`${tablistId}-tab-engagement`}
-        >
-          <EngagementTab
-            boardId={boardId}
-            anonymousAuthor={anonymousAuthor}
-            onChange={setAnonymousAuthor}
-          />
-        </div>
-      )}
-
-      {tab === "share" && (
-        <div
-          role="tabpanel"
-          id={`${tablistId}-panel-share`}
-          aria-labelledby={`${tablistId}-tab-share`}
-        >
-          <ShareTab
-            boardId={boardId}
-            initialShareMode={shareMode}
-            initialShareToken={shareToken}
-            initialShareShortCode={shareShortCode}
-          />
-        </div>
-      )}
-
-      {tab === "theme" && (
-        <div
-          role="tabpanel"
-          id={`${tablistId}-panel-theme`}
-          aria-labelledby={`${tablistId}-tab-theme`}
-        >
-          <ThemeTab
-            boardId={boardId}
-            value={boardTheme}
-            onChange={setBoardTheme}
-          />
-        </div>
-      )}
-
       {tab === "canva" && (
         <div
           role="tabpanel"
-          id={`${tablistId}-panel-${tab}`}
-          aria-labelledby={`${tablistId}-tab-${tab}`}
+          id={`${tablistId}-panel-canva`}
+          aria-labelledby={`${tablistId}-tab-canva`}
         >
           <div className="board-settings-placeholder">
-            <span aria-hidden="true" style={{ fontSize: 28 }}>🚧</span>
+            <span className="board-settings-placeholder-mark" aria-hidden="true">
+              Canva
+            </span>
             <p>
-              준비 중이에요. 곧 이곳에서{" "}
-              <strong>{PLACEHOLDER_COPY[tab]}</strong>을 관리할 수 있어요.
+              준비 중이에요. 곧 이곳에서 보드 단위 Canva 연동 설정을
+              관리할 수 있어요.
             </p>
           </div>
         </div>
@@ -207,7 +212,69 @@ export function BoardSettingsPanel({
   );
 }
 
-/* ── Engagement tab (card-comments-likes 2026-04-26) ──── */
+function BasicTab({
+  boardId,
+  anonymousAuthor,
+  onAnonymousAuthorChange,
+  initialShareMode,
+  initialShareToken,
+  initialShareShortCode,
+  boardTheme,
+  onThemeChange,
+}: {
+  boardId: string;
+  anonymousAuthor: boolean;
+  onAnonymousAuthorChange: (next: boolean) => void;
+  initialShareMode: string;
+  initialShareToken: string | null;
+  initialShareShortCode: string | null;
+  boardTheme: BoardTheme;
+  onThemeChange: (next: BoardTheme) => void;
+}) {
+  return (
+    <div className="board-settings-basic">
+      <SettingsSection title="참여">
+        <EngagementTab
+          boardId={boardId}
+          anonymousAuthor={anonymousAuthor}
+          onChange={onAnonymousAuthorChange}
+        />
+      </SettingsSection>
+      <SettingsSection title="공유">
+        <ShareTab
+          boardId={boardId}
+          initialShareMode={initialShareMode}
+          initialShareToken={initialShareToken}
+          initialShareShortCode={initialShareShortCode}
+        />
+      </SettingsSection>
+      <SettingsSection title="테마">
+        <ThemeTab
+          boardId={boardId}
+          value={boardTheme}
+          onChange={onThemeChange}
+        />
+      </SettingsSection>
+    </div>
+  );
+}
+
+function SettingsSection({
+  title,
+  children,
+}: {
+  title: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <section className="board-settings-section" aria-labelledby={`settings-${title}`}>
+      <h3 id={`settings-${title}`} className="board-settings-section-title">
+        {title}
+      </h3>
+      {children}
+    </section>
+  );
+}
 
 function EngagementTab({
   boardId,
@@ -221,64 +288,50 @@ function EngagementTab({
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
-  const toggle = async () => {
+  async function toggle() {
     const next = !anonymousAuthor;
     setBusy(true);
     setErr(null);
-    // optimistic
     onChange(next);
     try {
-      const r = await fetch(`/api/boards/${boardId}`, {
+      const res = await fetch(`/api/boards/${boardId}`, {
         method: "PATCH",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ anonymousAuthor: next }),
       });
-      if (!r.ok) {
+      if (!res.ok) {
         onChange(!next);
-        setErr("저장에 실패했어요");
+        setErr("저장에 실패했어요.");
       }
     } catch {
       onChange(!next);
-      setErr("저장에 실패했어요");
+      setErr("저장에 실패했어요.");
     } finally {
       setBusy(false);
     }
-  };
+  }
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+    <div className="board-settings-control-stack">
       <p className="section-panel-notice" style={{ marginTop: 0 }}>
         보드 안의 카드와 댓글 작성자 표시 방식을 조절해요.
       </p>
-      <label
-        style={{
-          display: "flex",
-          alignItems: "flex-start",
-          gap: 12,
-          padding: 14,
-          border: "1px solid var(--color-border)",
-          borderRadius: 8,
-          cursor: "pointer",
-        }}
-      >
+      <label className="board-settings-check-row">
         <input
           type="checkbox"
           checked={anonymousAuthor}
           onChange={toggle}
           disabled={busy}
-          style={{ marginTop: 2 }}
         />
-        <span style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-          <span style={{ fontSize: 14, fontWeight: 600 }}>작성자 익명</span>
-          <span style={{ fontSize: 13, color: "var(--color-text-muted)" }}>
-            카드 작성자와 댓글 작성자 이름을 모두 "익명" 으로 가려요.
-            좋아요 카운트는 영향을 받지 않아요.
+        <span className="board-settings-check-copy">
+          <span className="board-settings-check-title">작성자 익명 표시</span>
+          <span className="board-settings-check-desc">
+            카드 작성자와 댓글 작성자 이름을 모두 익명으로 보여줘요. 좋아요와
+            댓글 수는 그대로 유지돼요.
           </span>
         </span>
       </label>
-      {err && (
-        <p style={{ color: "var(--color-danger)", fontSize: 12, margin: 0 }}>{err}</p>
-      )}
+      {err && <p className="board-settings-error">{err}</p>}
     </div>
   );
 }
@@ -310,22 +363,22 @@ function ThemeTab({
       });
       if (!res.ok) {
         onChange(prev);
-        setError("테마 저장에 실패했어요");
+        setError("테마 저장에 실패했어요.");
         return;
       }
       router.refresh();
     } catch {
       onChange(prev);
-      setError("테마 저장에 실패했어요");
+      setError("테마 저장에 실패했어요.");
     } finally {
       setBusy(null);
     }
   }
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+    <div className="board-settings-control-stack">
       <p className="section-panel-notice" style={{ marginTop: 0 }}>
-        보드 배경을 파스텔 톤 5가지 중에서 골라요.
+        보드 배경에 어울리는 파스텔 테마를 골라요.
       </p>
       <div className="board-theme-grid">
         {BOARD_THEME_OPTIONS.map((option) => {
@@ -352,12 +405,10 @@ function ThemeTab({
           );
         })}
       </div>
-      {error && <p style={{ color: "var(--color-danger)", fontSize: 12, margin: 0 }}>{error}</p>}
+      {error && <p className="board-settings-error">{error}</p>}
     </div>
   );
 }
-
-/* ── Breakout tab ──────────────────────────────────────── */
 
 function BreakoutTab({
   boardId,
@@ -373,11 +424,10 @@ function BreakoutTab({
   if (layout !== "columns") {
     return (
       <div className="board-settings-empty">
-        <span aria-hidden="true" style={{ fontSize: 28 }}>🗂</span>
         <p>
           이 레이아웃에는 섹션이 없어요.
           <br />
-          columns 레이아웃에서만 브레이크아웃 링크를 만들 수 있어요.
+          주제별 보드에서만 브레이크아웃 링크를 만들 수 있어요.
         </p>
       </div>
     );
@@ -386,7 +436,6 @@ function BreakoutTab({
   if (sections.length === 0) {
     return (
       <div className="board-settings-empty">
-        <span aria-hidden="true" style={{ fontSize: 28 }}>📋</span>
         <p>
           섹션을 먼저 추가해 주세요.
           <br />
@@ -399,7 +448,8 @@ function BreakoutTab({
   return (
     <>
       <p className="section-panel-notice" style={{ marginTop: 0 }}>
-        각 섹션별 모둠 모드 링크를 관리해요. 링크를 공유하면 해당 섹션만 열 수 있어요.
+        각 섹션별 모둠 모드 링크를 관리해요. 링크를 공유하면 해당 섹션만 볼 수
+        있어요.
       </p>
       <div className="board-settings-list">
         {sections.map((section) => (
@@ -411,26 +461,12 @@ function BreakoutTab({
           />
         ))}
       </div>
-      <div style={{ marginTop: 16, paddingTop: 12, borderTop: "1px solid var(--color-border)" }}>
-        <a
-          href={`/board/${boardId}/archive`}
-          style={{
-            display: "inline-flex",
-            alignItems: "center",
-            gap: 6,
-            fontSize: 13,
-            color: "var(--color-accent)",
-            textDecoration: "none",
-          }}
-        >
-          🗄 지난 세션 아카이브 보기 →
-        </a>
+      <div className="board-settings-archive-link">
+        <a href={`/board/${boardId}/archive`}>지난 세션 아카이브 보기</a>
       </div>
     </>
   );
 }
-
-/* ── Single section row ───────────────────────────────── */
 
 function BreakoutSectionRow({
   boardId,
@@ -447,7 +483,9 @@ function BreakoutSectionRow({
   const inputId = useId();
 
   useEffect(() => {
-    if (typeof window !== "undefined") setOrigin(window.location.origin);
+    if (typeof window !== "undefined") {
+      setOrigin(window.location.origin);
+    }
   }, []);
 
   const token = section.accessToken;
@@ -471,7 +509,7 @@ function BreakoutSectionRow({
       const data = await res.json();
       const next = data.section?.accessToken ?? null;
       onTokenChange(section.id, next);
-      setStatus("새 링크가 생성되었어요");
+      setStatus("링크가 생성되었어요.");
     } catch {
       setStatus("생성 실패");
     } finally {
@@ -483,10 +521,10 @@ function BreakoutSectionRow({
     if (!absolute) return;
     try {
       await navigator.clipboard.writeText(absolute);
-      setStatus("복사됨 ✓");
+      setStatus("복사했어요.");
       window.setTimeout(() => setStatus(""), 1500);
     } catch {
-      setStatus("복사 실패 — 수동으로 복사해 주세요");
+      setStatus("복사에 실패했어요. 수동으로 복사해 주세요.");
     }
   }
 
@@ -528,7 +566,7 @@ function BreakoutSectionRow({
             }
             disabled={busy}
           >
-            재발급
+            새로 발급
           </button>
         </div>
       ) : (
@@ -539,7 +577,7 @@ function BreakoutSectionRow({
             onClick={() => mutate(null)}
             disabled={busy}
           >
-            {busy ? "생성 중…" : "공유 링크 생성"}
+            {busy ? "생성 중..." : "공유 링크 생성"}
           </button>
         </div>
       )}
