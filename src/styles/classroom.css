@@ -85,6 +85,10 @@
   transform: none;
 }
 
+.classroom-grid-card--menu-open {
+  z-index: 20;
+}
+
 .classroom-grid-kebab {
   position: absolute;
   top: 6px;
@@ -103,7 +107,7 @@
   cursor: pointer;
   opacity: 0.6;
   transition: background var(--t-normal), color var(--t-normal), opacity var(--t-normal);
-  z-index: 2;
+  z-index: 21;
 }
 
 .classroom-grid-kebab:hover {
@@ -122,7 +126,7 @@
   border-radius: 8px;
   box-shadow: var(--shadow-lift);
   overflow: hidden;
-  z-index: 3;
+  z-index: 22;
 }
 
 .classroom-grid-kebab-item {

@@ -143,36 +143,6 @@ export function ClassroomDetail({ classroom }: Props) {
     }
   }
 
-  // CSV export — 학생 명단 다운로드. 출석번호·이름·textCode·연결 학부모 수.
-  function handleExportCsv() {
-    const rows = [
-      ["번호", "이름", "개별코드", "연결된_학부모_수"],
-      ...students.map((s) => [
-        String(s.number ?? ""),
-        s.name,
-        s.textCode,
-        String(parentCounts[s.id] ?? 0),
-      ]),
-    ];
-    // UTF-8 BOM 추가 — Excel이 한글 CJK 정상 인식.
-    const bom = "\uFEFF";
-    const csv =
-      bom +
-      rows
-        .map((r) => r.map((c) => `"${c.replace(/"/g, '""')}"`).join(","))
-        .join("\r\n");
-    const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    const safeName = classroomName.replace(/[^\p{L}\p{N}_-]+/gu, "_");
-    a.download = `${safeName}_학생명단.csv`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-  }
-
   useEffect(() => {
     async function loadParentLinks() {
       try {
@@ -437,15 +407,6 @@ export function ClassroomDetail({ classroom }: Props) {
           </button>
         )}
         <QRPrintSheet students={students} classroomName={classroomName} />
-        <button
-          type="button"
-          className="classroom-action-btn"
-          onClick={handleExportCsv}
-          disabled={students.length === 0}
-          title="학생 명단 CSV 다운로드"
-        >
-          📄 CSV 내보내기
-        </button>
       </div>
 
       <div className="classroom-table-wrap">

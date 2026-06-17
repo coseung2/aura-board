@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { CreateClassroomModal } from "./CreateClassroomModal";
 import { ClassroomDeleteModal } from "./classroom/ClassroomDeleteModal";
@@ -21,6 +21,33 @@ export function ClassroomList({ classrooms, onRefresh }: Props) {
   const [showCreate, setShowCreate] = useState(false);
   const [menuOpen, setMenuOpen] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<ClassroomItem | null>(null);
+  const menuRootRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (!menuOpen) return;
+
+    function handlePointerDown(event: PointerEvent) {
+      const target = event.target;
+      if (
+        target instanceof Node &&
+        menuRootRef.current?.contains(target)
+      ) {
+        return;
+      }
+      setMenuOpen(null);
+    }
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") setMenuOpen(null);
+    }
+
+    document.addEventListener("pointerdown", handlePointerDown);
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("pointerdown", handlePointerDown);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [menuOpen]);
 
   async function handleDelete() {
     if (!deleteTarget) return;
@@ -60,6 +87,7 @@ export function ClassroomList({ classrooms, onRefresh }: Props) {
         {classrooms.map((c) => (
           <div
             key={c.id}
+            ref={menuOpen === c.id ? menuRootRef : null}
             className={`classroom-grid-card${menuOpen === c.id ? " classroom-grid-card--menu-open" : ""}`}
           >
             <Link href={`/classroom/${c.id}`} className="classroom-grid-card-link">
@@ -108,14 +136,6 @@ export function ClassroomList({ classrooms, onRefresh }: Props) {
           </div>
         ))}
       </div>
-
-      {/* Close menu on backdrop click */}
-      {menuOpen && (
-        <div
-          style={{ position: "fixed", inset: 0, zIndex: 1 }}
-          onClick={() => setMenuOpen(null)}
-        />
-      )}
 
       {classrooms.length === 0 && (
         <div className="classroom-empty">

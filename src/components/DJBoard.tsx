@@ -311,13 +311,28 @@ export function DJBoard({
           </div>
         </header>
 
-        {nowPlaying && (
+        {nowPlaying ? (
           <DJNowPlayingHeader
             card={nowPlaying}
             boardId={boardId}
             canControl={canControl}
             onNext={handleNextTrack}
           />
+        ) : (
+          <section className="dj-nowplaying dj-nowplaying-empty-card" aria-label="재생 중인 곡 없음">
+            <div className="dj-nowplaying-label">▶ NOW PLAYING</div>
+            <div className="dj-nowplaying-body">
+              <div className="dj-thumb-lg dj-nowplaying-placeholder" aria-hidden="true">
+                ♪
+              </div>
+              <div className="dj-nowplaying-info">
+                <div className="dj-track-title">재생 중인 곡이 없습니다</div>
+                <div className="dj-track-meta">
+                  승인된 신청곡이 생기면 이 자리에서 바로 재생할 수 있어요.
+                </div>
+              </div>
+            </div>
+          </section>
         )}
 
         <div className="dj-layout">

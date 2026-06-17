@@ -651,12 +651,14 @@
    재생 완료는 고정 드로어(.is-open 클래스로 슬라이드). 드로어→큐 드래그 복귀 가능. */
 
 .dj-board {
+  width: 100%;
   max-width: 1300px;
   margin: 0 auto;
   padding: 24px 24px 48px;
   display: flex;
   flex-direction: column;
   gap: 20px;
+  box-sizing: border-box;
 }
 
 /* 헤더: 제목 + 메타 카운트 + 오른쪽 액션 (재생 완료 토글 + 공유) */
@@ -708,6 +710,7 @@
 
 /* NOW PLAYING — 전체 폭 카드. 좌: 240x135 썸네일, 우: 제목·메타·액션 */
 .dj-nowplaying {
+  width: 100%;
   background: var(--color-surface);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-card);
@@ -716,6 +719,7 @@
   display: flex;
   flex-direction: column;
   gap: 16px;
+  box-sizing: border-box;
 }
 
 .dj-nowplaying-label {
@@ -756,6 +760,16 @@
 
 .dj-nowplaying-info {
   min-width: 0;
+}
+
+.dj-nowplaying-empty-card {
+  min-height: 216px;
+}
+
+.dj-nowplaying-placeholder {
+  background: var(--color-surface-alt);
+  color: var(--color-accent);
+  box-shadow: none;
 }
 
 .dj-track-title {
@@ -837,19 +851,23 @@
 
 /* 2열 그리드: 메인 큐 | 320px 사이드 aside */
 .dj-layout {
+  width: 100%;
   display: grid;
   grid-template-columns: minmax(0, 1fr) 320px;
   gap: 24px;
   align-items: start;
+  box-sizing: border-box;
 }
 
 /* ── 메인 대기열 카드 ── */
 .dj-queue-card {
+  min-width: 0;
   background: var(--color-surface);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-card);
   box-shadow: var(--shadow-card);
   padding: 16px;
+  box-sizing: border-box;
 }
 
 .dj-queue-title {
@@ -1036,6 +1054,7 @@
 
 /* ── 사이드 aside — 신청곡 폼 + 랭킹 ── */
 .dj-side {
+  min-width: 0;
   display: flex;
   flex-direction: column;
   gap: 16px;
