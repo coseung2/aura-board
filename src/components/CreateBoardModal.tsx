@@ -12,7 +12,7 @@ type PickerRow = {
 };
 
 const PICKER_ROWS: PickerRow[] = [
-  { id: "freeform", desc: "캔버스 위에 카드를 자유롭게 배치", hidden: true },
+  { id: "freeform", desc: "캔버스 위에 카드를 자유롭게 배치" },
   { id: "grid", desc: "격자 형태로 카드를 정렬", hidden: true },
   { id: "stream", desc: "위에서 아래로 흐르는 피드", hidden: true },
   { id: "columns", desc: "주제별로 게시물을 나눠 정리" },
