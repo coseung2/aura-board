@@ -19,9 +19,10 @@ const FILE_ACCEPT =
 
 type Props = {
   onAdd: (data: AddCardData) => Promise<void>;
+  onSubmitted?: () => void;
 };
 
-export function StreamComposer({ onAdd }: Props) {
+export function StreamComposer({ onAdd, onSubmitted }: Props) {
   const [content, setContent] = useState("");
   const [busy, setBusy] = useState(false);
   const imageInputRef = useRef<HTMLInputElement>(null);
@@ -62,6 +63,9 @@ export function StreamComposer({ onAdd }: Props) {
       setContent("");
       attachments.forEach((item) => removeAttachment(item.tempId));
       reset();
+      onSubmitted?.();
+    } catch {
+      return;
     } finally {
       setBusy(false);
     }

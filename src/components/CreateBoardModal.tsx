@@ -3,19 +3,12 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { CreateBreakoutBoardModal } from "./CreateBreakoutBoardModal";
-import { LAYOUT_META, type LayoutKey } from "@/lib/layout-meta";
+import { LAYOUT_META, layoutThumbnail, type LayoutKey } from "@/lib/layout-meta";
 
 type PickerRow = {
   id: LayoutKey;
   desc: string;
   hidden?: true;
-};
-
-const LAYOUT_THUMBNAILS: Partial<Record<LayoutKey, string>> = {
-  freeform: "/board-type-thumbnails/card-board.png",
-  columns: "/board-type-thumbnails/topic-board.png",
-  "dj-queue": "/board-type-thumbnails/dj-board.png",
-  "plant-roadmap": "/board-type-thumbnails/plant-roadmap.png",
 };
 
 const PICKER_ROWS: PickerRow[] = [
@@ -50,7 +43,7 @@ const LAYOUTS = PICKER_ROWS.map((row) => ({
     : `${LAYOUT_META[row.id].label} (개발중)`,
   desc: row.desc,
   ready: READY_LAYOUT_IDS.has(row.id),
-  thumbnail: LAYOUT_THUMBNAILS[row.id],
+  thumbnail: layoutThumbnail(row.id),
   hidden: row.hidden,
 }));
 

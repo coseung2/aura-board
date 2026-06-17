@@ -92,7 +92,7 @@
   align-items: center;
   justify-content: center;
   gap: 6px;
-  padding: 24px 12px;
+  padding: 0;
   background: var(--color-surface);
   border: var(--border-card);
   border-radius: var(--radius-card);
@@ -100,8 +100,9 @@
   text-decoration: none;
   color: var(--color-text);
   text-align: center;
-  min-height: 160px;
+  min-height: 190px;
   position: relative;
+  overflow: hidden;
   transition: box-shadow var(--t-slow), border-color var(--t-slow), transform var(--t-slow);
 }
 
@@ -119,12 +120,31 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
-  gap: 6px;
+  justify-content: flex-start;
+  gap: 8px;
   flex: 1;
   width: 100%;
+  height: 100%;
   text-decoration: none;
   color: inherit;
+}
+
+.board-grid-preview {
+  width: 100%;
+  aspect-ratio: 16 / 10;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  border-bottom: 1px solid rgba(24, 74, 92, 0.1);
+  background: linear-gradient(180deg, #f7fbff 0%, #edf6ff 100%);
+}
+
+.board-grid-preview-img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 
 .board-grid-emoji {
@@ -138,11 +158,13 @@
   letter-spacing: -0.25px;
   color: var(--color-text);
   line-height: 1.3;
+  padding: 0 12px;
 }
 
 .board-grid-meta {
   font-size: 13px;
   color: var(--color-text-muted);
+  padding: 0 12px 14px;
 }
 
 /* Kebab menu for owner actions (duplicate / delete) — handoff T4-1.
@@ -214,6 +236,8 @@
   box-shadow: none;
   cursor: pointer;
   font-family: var(--font-body);
+  padding: 24px 12px;
+  overflow: visible;
 }
 
 .board-grid-new:hover {
@@ -343,14 +367,15 @@
   align-items: center;
   justify-content: flex-start;
   text-align: center;
-  gap: 8px;
-  padding: 10px;
+  gap: 0;
+  padding: 0;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-card);
   background: var(--color-surface);
   color: var(--color-text);
   font-family: var(--font-body);
   cursor: pointer;
+  overflow: hidden;
   transition: border-color var(--t-normal), box-shadow var(--t-normal),
     background var(--t-normal);
 }
@@ -377,8 +402,7 @@
   width: 100%;
   aspect-ratio: 16 / 10;
   overflow: hidden;
-  border: 1px solid rgba(24, 74, 92, 0.1);
-  border-radius: 7px;
+  border-bottom: 1px solid rgba(24, 74, 92, 0.1);
   background: linear-gradient(180deg, #f7fbff 0%, #edf6ff 100%);
 }
 
@@ -421,12 +445,14 @@
   font-size: 13px;
   font-weight: 600;
   color: var(--color-text);
+  padding: 10px 10px 0;
 }
 
 .layout-grid-option-desc {
   font-size: 11px;
   color: var(--color-text-muted);
   line-height: 1.4;
+  padding: 5px 10px 12px;
 }
 
 @media (max-width: 540px) {
@@ -435,7 +461,7 @@
   }
 
   .layout-grid-option {
-    padding: 9px;
+    padding: 0;
   }
 
   .layout-grid-option-preview {

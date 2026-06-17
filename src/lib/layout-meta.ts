@@ -20,6 +20,13 @@ export type LayoutMeta = {
   label: string;
 };
 
+export const LAYOUT_THUMBNAILS: Partial<Record<LayoutKey, string>> = {
+  freeform: "/board-type-thumbnails/card-board.png",
+  columns: "/board-type-thumbnails/topic-board.png",
+  "dj-queue": "/board-type-thumbnails/dj-board.png",
+  "plant-roadmap": "/board-type-thumbnails/plant-roadmap.png",
+};
+
 export const LAYOUT_META: Record<LayoutKey, LayoutMeta> = {
   freeform: { emoji: "🗂️", label: "카드 보드" },
   grid: { emoji: "🔲", label: "그리드" },
@@ -44,4 +51,8 @@ export function layoutEmoji(layout: string): string {
 
 export function layoutLabel(layout: string): string {
   return (LAYOUT_META as Record<string, LayoutMeta>)[layout]?.label ?? layout;
+}
+
+export function layoutThumbnail(layout: string): string | null {
+  return (LAYOUT_THUMBNAILS as Record<string, string | undefined>)[layout] ?? null;
 }

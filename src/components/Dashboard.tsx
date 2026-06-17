@@ -4,7 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { CreateBoardModal } from "./CreateBoardModal";
-import { layoutEmoji, layoutLabel } from "@/lib/layout-meta";
+import { layoutEmoji, layoutLabel, layoutThumbnail } from "@/lib/layout-meta";
 
 type BoardItem = {
   id: string;
@@ -80,21 +80,36 @@ export function Dashboard({ boards, classrooms, userTier = "pro" }: Props) {
           <span className="board-grid-new-label">새 보드 만들기</span>
         </button>
 
-        {boards.map((b) => (
-          <div
-            key={b.id}
-            className={`board-grid-card${menuOpen === b.id ? " board-grid-card--menu-open" : ""}`}
-          >
-            <Link
-              href={`/board/${b.slug}`}
-              className="board-grid-card-link"
+        {boards.map((b) => {
+          const thumbnail = layoutThumbnail(b.layout);
+
+          return (
+            <div
+              key={b.id}
+              className={`board-grid-card${menuOpen === b.id ? " board-grid-card--menu-open" : ""}`}
             >
-              <div className="board-grid-emoji">{layoutEmoji(b.layout)}</div>
-              <div className="board-grid-title">{b.title}</div>
-              <div className="board-grid-meta">
-                {layoutLabel(b.layout)}
-              </div>
-            </Link>
+              <Link
+                href={`/board/${b.slug}`}
+                className="board-grid-card-link"
+              >
+                <div className="board-grid-preview">
+                  {thumbnail ? (
+                    <img
+                      className="board-grid-preview-img"
+                      src={thumbnail}
+                      alt={`${layoutLabel(b.layout)} 화면 미리보기`}
+                    />
+                  ) : (
+                    <span className="board-grid-emoji">
+                      {layoutEmoji(b.layout)}
+                    </span>
+                  )}
+                </div>
+                <div className="board-grid-title">{b.title}</div>
+                <div className="board-grid-meta">
+                  {layoutLabel(b.layout)}
+                </div>
+              </Link>
             {b.role === "owner" && (
               <button
                 type="button"
@@ -130,8 +145,9 @@ export function Dashboard({ boards, classrooms, userTier = "pro" }: Props) {
                 </button>
               </div>
             )}
-          </div>
-        ))}
+            </div>
+          );
+        })}
       </div>
 
       {/* Close menu on backdrop click */}
