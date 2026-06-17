@@ -175,7 +175,6 @@ export function useCardMutations({
           y: 0,
           order,
           sectionId: targetSection,
-          isAnonymous: data.isAnonymous ?? false,
         }),
       });
       if (res.ok) {

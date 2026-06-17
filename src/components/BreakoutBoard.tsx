@@ -252,7 +252,6 @@ export function BreakoutBoard({
           y: 0,
           order,
           sectionId: targetSection,
-          isAnonymous: data.isAnonymous ?? false,
         }),
       });
       if (res.ok) {

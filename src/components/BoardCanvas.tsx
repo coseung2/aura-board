@@ -95,7 +95,6 @@ export function BoardCanvas({
           authors: data.authors,
           color: data.color || null,
           ...nextPos,
-          isAnonymous: data.isAnonymous ?? false,
         }),
       });
       if (res.ok) {

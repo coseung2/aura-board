@@ -52,8 +52,6 @@ const PatchCardSchema = z.object({
   height: z.number().optional(),
   order: z.number().int().optional(),
   sectionId: z.string().nullable().optional(),
-  // card-anonymous (2026-06-17): 카드 단위 익명 게시 토글.
-  isAnonymous: z.boolean().optional(),
 });
 
 export async function PATCH(

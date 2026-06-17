@@ -69,8 +69,6 @@ const CreateCardSchema = z.object({
   height: z.number().optional(),
   order: z.number().optional(),
   sectionId: z.string().nullable().optional(),
-  // card-anonymous (2026-06-17): 카드 단위 익명 게시 토글.
-  isAnonymous: z.boolean().optional().default(false),
   authors: z
     .array(
       z.object({
@@ -376,7 +374,6 @@ export async function POST(req: Request) {
           height: input.height ?? 160,
           order: input.order ?? 0,
           sectionId: input.sectionId ?? null,
-          isAnonymous: input.isAnonymous,
         },
       });
       // Student-authored cards get a primary CardAuthor row so the

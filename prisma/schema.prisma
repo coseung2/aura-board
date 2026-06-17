@@ -503,12 +503,6 @@ model Card {
   createdAt          DateTime @default(now())
   updatedAt          DateTime @updatedAt
 
-  // card-anonymous (2026-06-17): 카드 단위 익명 게시 토글.
-  // true = 학생(viewer)에게는 "익명" 표시, 교사(owner/editor)는 실명 확인 가능.
-  // Board.anonymousAuthor(보드 단위)와는 별도로 동작하며, 서버의 cardProps
-  // 매핑 단계에서 effectiveRole 기반 마스킹을 결정한다.
-  isAnonymous        Boolean  @default(false)
-
   // DJ queue status (layout="dj-queue"만 사용). null = 비-큐 카드.
   // "pending" | "approved" | "played" | "rejected"
   queueStatus String?

@@ -65,11 +65,6 @@ export type CardData = {
    *  CardBody → CardAuthorFooter 가 author 라벨을 "익명" 으로 마스킹. 보드 RSC
    *  에서 모든 카드에 동일한 board.anonymousAuthor 값을 denorm 한다. */
   anonymousAuthor?: boolean;
-  /** card-anonymous (2026-06-17): 카드 단위 익명 게시 의도.
-   *  true = 작성자가 이 카드를 익명으로 게시함.
-   *  서버의 cardProps 매핑에서 effectiveRole과 조합해 anonymousAuthor를 최종
-   *  결정한다. */
-  isAnonymous?: boolean;
 };
 
 type Props = {
