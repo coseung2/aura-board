@@ -1,6 +1,8 @@
 // card-comments-likes (2026-04-26): 작성자 표시 라벨 포매터.
 // shared (server + client) — server-only deps 없음.
 
+import { normalizeDbTimestamp } from "./db-timestamp";
+
 export type AuthorKind = "teacher" | "student" | "external";
 
 export function formatEngagementAuthor(opts: {
@@ -18,7 +20,7 @@ export function formatEngagementAuthor(opts: {
 }
 
 export function formatRelativeTime(iso: string | Date): string {
-  const t = typeof iso === "string" ? new Date(iso) : iso;
+  const t = typeof iso === "string" ? new Date(normalizeDbTimestamp(iso)) : iso;
   const diffMin = Math.floor((Date.now() - t.getTime()) / 60_000);
   if (diffMin < 1) return "방금";
   if (diffMin < 60) return `${diffMin}분 전`;

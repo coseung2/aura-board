@@ -27,8 +27,20 @@ const TABS = [
   },
 ] as const;
 
-export function TopNav() {
+const ADMIN_TAB = {
+  id: "admin",
+  label: "관리자",
+  href: "/admin",
+  isActive: (pathname: string) => pathname.startsWith("/admin"),
+} as const;
+
+type Props = {
+  showAdmin?: boolean;
+};
+
+export function TopNav({ showAdmin = false }: Props) {
   const pathname = usePathname() ?? "";
+  const tabs = showAdmin ? [...TABS, ADMIN_TAB] : TABS;
 
   return (
     <header className="ab-topnav">
@@ -41,7 +53,7 @@ export function TopNav() {
           <Logo size={32} withWordmark />
         </Link>
         <nav className="ab-topnav-links" aria-label="주 메뉴">
-          {TABS.map((t) => {
+          {tabs.map((t) => {
             const active = t.isActive(pathname);
             return (
               <Link

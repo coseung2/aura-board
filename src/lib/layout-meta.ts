@@ -23,7 +23,7 @@ export type LayoutMeta = {
 export const LAYOUT_META: Record<LayoutKey, LayoutMeta> = {
   freeform: { emoji: "🗂️", label: "카드 보드" },
   grid: { emoji: "🔲", label: "그리드" },
-  stream: { emoji: "🧵", label: "스트림" },
+  stream: { emoji: "🧵", label: "스트림 보드" },
   columns: { emoji: "🗂️", label: "주제별 보드" },
   assignment: { emoji: "📝", label: "과제 배부" },
   quiz: { emoji: "🧩", label: "퀴즈" },

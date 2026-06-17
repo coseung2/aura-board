@@ -29,6 +29,11 @@ check("pickAuthorName — undefined skipped", pickAuthorName(undefined, "학생"
 // formatRelativeKo — fixed `now` for determinism
 const NOW = new Date("2026-04-13T12:00:00Z").getTime();
 const at = (iso: string) => formatRelativeKo(iso, NOW).rel;
+check(
+  "formatRelativeKo treats DB timestamp without timezone as UTC",
+  at("2026-04-13T09:00:00"),
+  at("2026-04-13T09:00:00Z"),
+);
 check("formatRelativeKo — 0s = 방금", at("2026-04-13T12:00:00Z"), "방금");
 check("formatRelativeKo — 29s = 방금", at("2026-04-13T11:59:31Z"), "방금");
 check("formatRelativeKo — 30s = 30초 전", at("2026-04-13T11:59:30Z"), "30초 전");

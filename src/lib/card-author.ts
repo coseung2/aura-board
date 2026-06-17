@@ -2,6 +2,8 @@
 // component free of testable logic and let both the tsx-runner legacy
 // tests and the new Vitest cases cover them.
 
+import { normalizeDbTimestamp } from "./db-timestamp";
+
 export function pickAuthorName(
   external?: string | null,
   student?: string | null,
@@ -55,7 +57,7 @@ export function formatRelativeKo(iso: string, now: number = Date.now()): {
   rel: string;
   abs: string;
 } {
-  const date = new Date(iso);
+  const date = new Date(normalizeDbTimestamp(iso));
   const ms = now - date.getTime();
   const sec = Math.floor(ms / 1000);
   const min = Math.floor(sec / 60);

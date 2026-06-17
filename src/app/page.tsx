@@ -5,6 +5,8 @@ import { Dashboard } from "@/components/Dashboard";
 import { TopNav } from "@/components/TopNav";
 import { redirect } from "next/navigation";
 
+const ADMIN_EMAIL = "mallagaenge@gmail.com";
+
 // Auth-backed page — implicitly dynamic via cookies/session reads.
 // Removing the explicit force-dynamic lets Next.js reuse the Router Cache
 // entry for back/forward navigation instead of re-executing the RSC tree.
@@ -57,7 +59,7 @@ export default async function HomePage() {
 
   return (
     <>
-      <TopNav />
+      <TopNav showAdmin={user.email.toLowerCase() === ADMIN_EMAIL} />
       <main className="home-page">
         <header className="home-header">
           <div className="home-header-top">

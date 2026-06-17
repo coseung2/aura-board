@@ -230,9 +230,8 @@ export default async function BoardPage({
   }
   const effectiveRole: Role | null = role;
 
-  // Determine the effective user id and display name
+  // Determine the effective user id.
   const effectiveUserId = studentViewer?.id ?? user?.id ?? "";
-  const effectiveUserName = studentViewer?.name ?? user?.name ?? "";
 
   const cardProps = cards.map((c) => ({
     id: c.id,
@@ -653,8 +652,6 @@ export default async function BoardPage({
         boardId={board.id}
         title={board.title}
         layout={board.layout}
-        userName={effectiveUserName}
-        userRole={effectiveRole}
         isStudent={!!studentViewer}
         backHref={studentViewer ? "/student" : "/"}
         canEdit={effectiveRole === "owner" || effectiveRole === "editor"}

@@ -7,24 +7,17 @@ import { EditableTitle } from "./EditableTitle";
 import { BoardSettingsLauncher } from "./BoardSettingsLauncher";
 import { QrShareModal } from "./share/QrShareModal";
 import type { BoardSection, BoardTheme } from "./BoardSettingsPanel";
-import { layoutLabel } from "@/lib/layout-meta";
 
 type Props = {
   boardId?: string;
   title: string;
   layout: string;
-  userName?: string;
-  userRole?: string;
-  /** Student identity 로 접근 중이면 true — 뱃지에서 leaked legacy role 숨김. */
   isStudent?: boolean;
-  /** ← 버튼 이동 경로. 기본 "/"(교사 대시보드). 학생은 "/student" 로 전달. */
   backHref?: string;
   canEdit: boolean;
   settingsSections?: BoardSection[];
-  /** card-comments-likes (2026-04-26): 보드 단위 작성자 익명 토글 초기값. */
   anonymousAuthor?: boolean;
   boardTheme?: BoardTheme;
-  /** board-share (2026-05-29): 공유 설정. */
   shareMode?: string;
   shareToken?: string | null;
   shareShortCode?: string | null;
@@ -34,8 +27,6 @@ export function BoardHeader({
   boardId,
   title,
   layout,
-  userName,
-  userRole,
   isStudent,
   backHref,
   canEdit,
@@ -75,15 +66,6 @@ export function BoardHeader({
             shareToken={shareToken}
             shareShortCode={shareShortCode}
           />
-        )}
-        <span className="board-layout-badge">{layoutLabel(layout)}</span>
-        {userName && userRole && !isStudent && (
-          <span className="board-badge">
-            {userName} · {userRole}
-          </span>
-        )}
-        {userName && isStudent && (
-          <span className="board-badge">{userName}</span>
         )}
       </div>
       <div className="board-header-right">
