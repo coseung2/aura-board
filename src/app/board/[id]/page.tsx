@@ -272,7 +272,11 @@ export default async function BoardPage({
       [],
     // card-comments-likes (2026-04-26): 보드 단위 익명 토글 — 모든 카드가
     // 동일한 보드를 공유하므로 board.anonymousAuthor 를 전 카드에 denorm.
-    anonymousAuthor: board.anonymousAuthor,
+    // (2026-06-17): 교사(owner/editor)는 실명 확인, 학생(viewer)만 익명 표시.
+    anonymousAuthor:
+      board.anonymousAuthor &&
+      effectiveRole !== "owner" &&
+      effectiveRole !== "editor",
   }));
 
   const sectionProps = sections.map((s) => ({
