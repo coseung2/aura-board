@@ -11,8 +11,15 @@ type PickerRow = {
   hidden?: true;
 };
 
+const LAYOUT_THUMBNAILS: Partial<Record<LayoutKey, string>> = {
+  freeform: "/board-type-thumbnails/card-board.png",
+  columns: "/board-type-thumbnails/topic-board.png",
+  "dj-queue": "/board-type-thumbnails/dj-board.png",
+  "plant-roadmap": "/board-type-thumbnails/plant-roadmap.png",
+};
+
 const PICKER_ROWS: PickerRow[] = [
-  { id: "freeform", desc: "칼럼 없이 카드를 차곡차곡 나열" },
+  { id: "freeform", desc: "담벼락처럼 카드를 모아 보기" },
   { id: "grid", desc: "격자 형태로 카드를 정렬", hidden: true },
   { id: "stream", desc: "SNS처럼 글과 댓글이 아래로 흐르는 피드" },
   { id: "columns", desc: "주제별로 게시물을 나눠 정리" },
@@ -22,6 +29,7 @@ const PICKER_ROWS: PickerRow[] = [
   { id: "breakout", desc: "템플릿 기반 모둠 협력 보드", hidden: true },
   { id: "assessment", desc: "교사가 입력한 문항 기반 OMR 채점" },
   { id: "dj-queue", desc: "학생 YouTube 곡 신청 및 재생 순서 관리" },
+  { id: "plant-roadmap", desc: "성장 단계별 관찰 사진과 기록 관리" },
   { id: "vibe-arcade", desc: "생성형 AI를 활용한 바이브 코딩 교실" },
   { id: "vibe-gallery", desc: "승인된 코딩 결과물 전시와 체험" },
   { id: "question-board", desc: "학생 응답을 다양한 시각화로 표시" },
@@ -29,9 +37,9 @@ const PICKER_ROWS: PickerRow[] = [
 
 const READY_LAYOUT_IDS = new Set<LayoutKey>([
   "freeform",
-  "stream",
   "columns",
   "dj-queue",
+  "plant-roadmap",
 ]);
 
 const LAYOUTS = PICKER_ROWS.map((row) => ({
@@ -41,10 +49,14 @@ const LAYOUTS = PICKER_ROWS.map((row) => ({
     ? LAYOUT_META[row.id].label
     : `${LAYOUT_META[row.id].label} (개발중)`,
   desc: row.desc,
+  ready: READY_LAYOUT_IDS.has(row.id),
+  thumbnail: LAYOUT_THUMBNAILS[row.id],
   hidden: row.hidden,
 }));
 
-const VISIBLE_LAYOUTS = LAYOUTS.filter((layout) => !layout.hidden);
+const VISIBLE_LAYOUTS = LAYOUTS.filter((layout) => !layout.hidden).sort(
+  (a, b) => Number(b.ready) - Number(a.ready)
+);
 
 type ClassroomItem = {
   id: string;
@@ -98,6 +110,10 @@ export function CreateBoardModal({
   }
 
   function handleSelect(layoutId: LayoutKey) {
+    if (!READY_LAYOUT_IDS.has(layoutId)) {
+      return;
+    }
+
     if (layoutId === "breakout") {
       setSelectedLayout(layoutId);
       setStep("breakout");
@@ -108,6 +124,7 @@ export function CreateBoardModal({
       layoutId === "columns" ||
       layoutId === "assessment" ||
       layoutId === "dj-queue" ||
+      layoutId === "plant-roadmap" ||
       layoutId === "vibe-arcade" ||
       layoutId === "vibe-gallery" ||
       layoutId === "question-board";
@@ -157,12 +174,29 @@ export function CreateBoardModal({
                   <button
                     key={layout.id}
                     type="button"
-                    className="layout-grid-option"
+                    className={`layout-grid-option${
+                      layout.ready ? "" : " layout-grid-option-dev"
+                    }`}
                     onClick={() => handleSelect(layout.id)}
-                    disabled={busy}
+                    disabled={busy || !layout.ready}
                   >
-                    <span className="layout-grid-option-emoji">
-                      {layout.emoji}
+                    <span className="layout-grid-option-preview">
+                      {layout.thumbnail ? (
+                        <img
+                          className="layout-grid-option-thumb"
+                          src={layout.thumbnail}
+                          alt={`${layout.label} 화면 미리보기`}
+                        />
+                      ) : (
+                        <span className="layout-grid-option-placeholder">
+                          <span className="layout-grid-option-emoji">
+                            {layout.emoji}
+                          </span>
+                          <span className="layout-grid-option-status">
+                            개발중
+                          </span>
+                        </span>
+                      )}
                     </span>
                     <span className="layout-grid-option-label">
                       {layout.label}

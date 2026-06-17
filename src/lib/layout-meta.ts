@@ -33,7 +33,7 @@ export const LAYOUT_META: Record<LayoutKey, LayoutMeta> = {
   "dj-queue": { emoji: "🎵", label: "DJ" },
   "vibe-arcade": { emoji: "💻", label: "코딩 교실" },
   "vibe-gallery": { emoji: "🌟", label: "코딩 갤러리" },
-  "plant-roadmap": { emoji: "🌱", label: "식물 관찰" },
+  "plant-roadmap": { emoji: "🌱", label: "식물 관찰일지" },
   "event-signup": { emoji: "🎟️", label: "행사 신청" },
   "question-board": { emoji: "💬", label: "질문 보드" },
 };
