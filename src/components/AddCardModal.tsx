@@ -40,6 +40,8 @@ export type AddCardData = {
   // When set, the caller should attach this StudentAsset to the created card
   // (POST /api/student-assets/{id}/attach) after the card row exists.
   attachAssetId?: string;
+  // card-anonymous (2026-06-17): 카드 단위 익명 게시 토글.
+  isAnonymous?: boolean;
 };
 
 type SectionOption = { id: string; title: string };
@@ -123,6 +125,7 @@ export function AddCardModal({
   const [showFile, setShowFile] = useState(false);
   const [showAuthors, setShowAuthors] = useState(false);
   const [authorRows, setAuthorRows] = useState<AuthorDraftRow[]>([]);
+  const [isAnonymous, setIsAnonymous] = useState(false);
   const { preview, loading: previewLoading, fetchPreview } = useLinkPreview();
   const [busy, setBusy] = useState(false);
   const imageInputRef = useRef<HTMLInputElement>(null);
@@ -255,6 +258,7 @@ export function AddCardModal({
               sectionId: sectionId || undefined,
               authors: authors.length > 0 ? authors : undefined,
               attachAssetId: pickedAssetId ?? undefined,
+              isAnonymous: isAnonymous || undefined,
             });
             setBusy(false);
             onClose();
@@ -723,6 +727,16 @@ export function AddCardModal({
               ))}
             </div>
           </div>
+
+          {/* card-anonymous (2026-06-17): 카드 단위 익명 게시 토글 */}
+          <label className="modal-anonymous-toggle">
+            <input
+              type="checkbox"
+              checked={isAnonymous}
+              onChange={(e) => setIsAnonymous(e.target.checked)}
+            />
+            <span>🔒 익명으로 게시</span>
+          </label>
 
           <div className="modal-actions">
             <button

@@ -45,6 +45,7 @@ export function GridBoard({ boardId, initialCards, currentUserId, currentRole, i
           x: 0,
           y: 0,
           order: cards.length,
+          isAnonymous: data.isAnonymous ?? false,
         }),
       });
       if (res.ok) {

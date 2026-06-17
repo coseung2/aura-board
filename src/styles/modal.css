@@ -1231,6 +1231,23 @@
   border-width: 2.5px;
 }
 
+/* card-anonymous (2026-06-17): 카드 단위 익명 게시 토글 */
+.modal-anonymous-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 0;
+  font-size: 14px;
+  cursor: pointer;
+  user-select: none;
+  color: #666;
+}
+.modal-anonymous-toggle input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  cursor: pointer;
+}
+
 .modal-actions {
   display: flex;
   justify-content: flex-end;

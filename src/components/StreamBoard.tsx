@@ -45,6 +45,7 @@ export function StreamBoard({ boardId, initialCards, currentUserId, currentRole,
           x: 0,
           y: 0,
           order: cards.length,
+          isAnonymous: data.isAnonymous ?? false,
         }),
       });
       if (res.ok) {
