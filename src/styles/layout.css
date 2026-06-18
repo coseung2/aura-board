@@ -71,7 +71,7 @@
   flex: 1;
   min-height: 0;
   min-width: 0;
-  padding: 32px;
+  padding: 0;
   overflow: auto;
 }
 
