@@ -1,0 +1,2 @@
+ALTER TABLE "Board"
+ADD COLUMN IF NOT EXISTS "thumbnailMode" TEXT NOT NULL DEFAULT 'default';

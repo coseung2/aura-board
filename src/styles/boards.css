@@ -9,7 +9,10 @@
 }
 
 .freeform-board {
+  --masonry-row-height: 8px;
   grid-template-columns: repeat(auto-fill, minmax(238px, 238px));
+  grid-auto-rows: var(--masonry-row-height);
+  grid-auto-flow: dense;
   justify-content: start;
 }
 
@@ -39,6 +42,10 @@
 
 .grid-card:hover .padlet-card-delete {
   display: flex;
+}
+
+.freeform-board .grid-card {
+  grid-row-end: span 24;
 }
 
 .freeform-board .grid-card:has(.card-attachments) {

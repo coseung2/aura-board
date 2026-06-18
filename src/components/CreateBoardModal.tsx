@@ -74,6 +74,9 @@ export function CreateBoardModal({
     "layout"
   );
   const [selectedLayout, setSelectedLayout] = useState<LayoutKey | null>(null);
+  const [thumbnailMode, setThumbnailMode] = useState<"default" | "none">(
+    "default"
+  );
 
   async function createBoard(layoutId: LayoutKey, classroomId?: string) {
     setBusy(true);
@@ -85,6 +88,7 @@ export function CreateBoardModal({
           title: "",
           layout: layoutId,
           classroomId,
+          thumbnailMode,
         }),
       });
 
@@ -109,26 +113,14 @@ export function CreateBoardModal({
 
     if (layoutId === "breakout") {
       setSelectedLayout(layoutId);
+      setThumbnailMode("default");
       setStep("breakout");
       return;
     }
 
-    const needsClassroom =
-      layoutId === "columns" ||
-      layoutId === "assessment" ||
-      layoutId === "dj-queue" ||
-      layoutId === "plant-roadmap" ||
-      layoutId === "vibe-arcade" ||
-      layoutId === "vibe-gallery" ||
-      layoutId === "question-board";
-
-    if (needsClassroom && classrooms.length > 0) {
-      setSelectedLayout(layoutId);
-      setStep("classroom");
-      return;
-    }
-
-    createBoard(layoutId);
+    setSelectedLayout(layoutId);
+    setThumbnailMode("default");
+    setStep("classroom");
   }
 
   if (step === "breakout") {
@@ -140,10 +132,18 @@ export function CreateBoardModal({
         onBack={() => {
           setStep("layout");
           setSelectedLayout(null);
+          setThumbnailMode("default");
         }}
       />
     );
   }
+
+  const selectedLayoutMeta = selectedLayout
+    ? LAYOUTS.find((layout) => layout.id === selectedLayout)
+    : null;
+  const selectedThumbnail =
+    thumbnailMode === "default" ? selectedLayoutMeta?.thumbnail : null;
+  const requiresClassroom = selectedLayout === "dj-queue";
 
   return (
     <>
@@ -208,16 +208,52 @@ export function CreateBoardModal({
               <p className="create-board-hint">
                 보드를 어느 학급에 연결할지 선택하세요.
               </p>
+              {selectedLayoutMeta && (
+                <div className="create-board-thumbnail-panel">
+                  <div className="create-board-thumbnail-preview">
+                    {selectedThumbnail ? (
+                      <img
+                        src={selectedThumbnail}
+                        alt={`${selectedLayoutMeta.label} 화면 미리보기`}
+                      />
+                    ) : (
+                      <span>{selectedLayoutMeta.emoji}</span>
+                    )}
+                  </div>
+                  <label className="create-board-thumbnail-toggle">
+                    <input
+                      type="checkbox"
+                      checked={thumbnailMode === "default"}
+                      onChange={(event) =>
+                        setThumbnailMode(
+                          event.target.checked ? "default" : "none"
+                        )
+                      }
+                      disabled={busy}
+                    />
+                    <span>
+                      <strong>대시보드에 보드 이미지 표시</strong>
+                      <small>
+                        기본값은 이미지 표시이며, 끄면 기본 아이콘으로 표시됩니다.
+                      </small>
+                    </span>
+                  </label>
+                </div>
+              )}
               <div className="layout-picker">
                 <button
                   type="button"
                   className="layout-option"
                   onClick={() => createBoard(selectedLayout)}
-                  disabled={busy}
+                  disabled={busy || requiresClassroom}
                 >
                   <span className="layout-option-emoji">□</span>
                   <span className="layout-option-label">학급 연결 없음</span>
-                  <span className="layout-option-desc">개인 보드로 생성</span>
+                  <span className="layout-option-desc">
+                    {requiresClassroom
+                      ? "이 보드는 학급 선택이 필요합니다"
+                      : "개인 보드로 생성"}
+                  </span>
                 </button>
 
                 {classrooms.map((classroom) => (
@@ -246,6 +282,7 @@ export function CreateBoardModal({
                   onClick={() => {
                     setStep("layout");
                     setSelectedLayout(null);
+                    setThumbnailMode("default");
                   }}
                   disabled={busy}
                 >

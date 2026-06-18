@@ -52,6 +52,7 @@ export default async function HomePage() {
     slug: m.board.slug,
     title: m.board.title || "제목 없음",
     layout: m.board.layout,
+    thumbnailMode: m.board.thumbnailMode,
     cardCount: m.board._count.cards,
     memberCount: m.board._count.members,
     role: m.role,

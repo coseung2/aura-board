@@ -11,6 +11,7 @@ type BoardItem = {
   slug: string;
   title: string;
   layout: string;
+  thumbnailMode: string | null;
   cardCount: number;
   memberCount: number;
   role: string;
@@ -81,7 +82,8 @@ export function Dashboard({ boards, classrooms, userTier = "pro" }: Props) {
         </button>
 
         {boards.map((b) => {
-          const thumbnail = layoutThumbnail(b.layout);
+          const thumbnail =
+            b.thumbnailMode === "none" ? null : layoutThumbnail(b.layout);
 
           return (
             <div

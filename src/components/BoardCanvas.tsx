@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useLayoutEffect, useRef, useState } from "react";
 import { AddCardButton } from "./AddCardButton";
 import type { AddCardData } from "./AddCardModal";
 import { CardBody } from "./cards/CardBody";
@@ -40,7 +40,55 @@ export function BoardCanvas({
   const canAddCard = canEdit || !!isStudentViewer;
 
   const deletingIds = useRef<Set<string>>(new Set());
+  const masonryGridRef = useRef<HTMLDivElement | null>(null);
+  const masonryCardRefs = useRef(new Map<string, HTMLElement>());
   useCardRealtime(boardId, setCards, deletingIds);
+
+  useLayoutEffect(() => {
+    const grid = masonryGridRef.current;
+    if (!grid || typeof ResizeObserver === "undefined") return;
+
+    let frame = 0;
+    const resizeCard = (cardEl: HTMLElement) => {
+      const gridStyle = window.getComputedStyle(grid);
+      const rowHeight =
+        parseFloat(gridStyle.getPropertyValue("--masonry-row-height")) || 8;
+      const rowGap = parseFloat(gridStyle.rowGap) || 0;
+      const cardHeight = cardEl.getBoundingClientRect().height;
+      const span = Math.ceil((cardHeight + rowGap) / (rowHeight + rowGap));
+      cardEl.style.gridRowEnd = `span ${Math.max(1, span)}`;
+    };
+    const resizeAll = () => {
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(() => {
+        for (const cardEl of masonryCardRefs.current.values()) {
+          resizeCard(cardEl);
+        }
+      });
+    };
+
+    const observer = new ResizeObserver((entries) => {
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(() => {
+        for (const entry of entries) {
+          resizeCard(entry.target as HTMLElement);
+        }
+      });
+    });
+
+    for (const cardEl of masonryCardRefs.current.values()) {
+      observer.observe(cardEl);
+      resizeCard(cardEl);
+    }
+    window.addEventListener("resize", resizeAll);
+    resizeAll();
+
+    return () => {
+      cancelAnimationFrame(frame);
+      observer.disconnect();
+      window.removeEventListener("resize", resizeAll);
+    };
+  }, [cards]);
 
   async function handleAdd(data: AddCardData) {
     try {
@@ -206,7 +254,7 @@ export function BoardCanvas({
 
   return (
     <div className="board-canvas-wrap">
-      <div className="grid-board freeform-board">
+      <div ref={masonryGridRef} className="grid-board freeform-board">
         {cards.length === 0 && (
           <div className="board-empty-inline">
             {canEdit ? (
@@ -219,6 +267,10 @@ export function BoardCanvas({
         {cards.map((c) => (
           <article
             key={c.id}
+            ref={(node) => {
+              if (node) masonryCardRefs.current.set(c.id, node);
+              else masonryCardRefs.current.delete(c.id);
+            }}
             className="grid-card is-clickable"
             style={{ backgroundColor: c.color ?? undefined }}
             aria-label={c.title}

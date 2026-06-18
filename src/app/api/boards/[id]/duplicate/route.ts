@@ -33,6 +33,7 @@ export async function POST(
         layout: board.layout,
         description: board.description,
         classroomId: board.classroomId,
+        thumbnailMode: board.thumbnailMode,
         members: {
           create: { userId: user.id, role: "owner" },
         },

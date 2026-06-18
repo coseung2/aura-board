@@ -31,12 +31,14 @@ const CreateBoardSchema = z.object({
     "breakout",
     "assessment",
     "dj-queue",
+    "plant-roadmap",
     "vibe-arcade",
     "vibe-gallery",
     "question-board",
   ]),
   description: z.string().max(2000).default(""),
   classroomId: z.string().optional(),
+  thumbnailMode: z.enum(["default", "none"]).default("default"),
   // BR-3: Breakout-specific config (only used when layout === "breakout").
   breakoutConfig: BreakoutConfigSchema.optional(),
   // AB-1: Assignment-specific fields (only used when layout === "assignment").
@@ -101,6 +103,7 @@ export async function POST(req: Request) {
             layout: "breakout",
             description: input.description,
             classroomId: input.classroomId ?? null,
+            thumbnailMode: input.thumbnailMode,
             members: {
               create: { userId: user.id, role: "owner" },
             },
@@ -215,6 +218,7 @@ export async function POST(req: Request) {
             layout: "assignment",
             description: input.description,
             classroomId: classroom?.id ?? null,
+            thumbnailMode: input.thumbnailMode,
             assignmentGuideText: input.assignmentGuideText ?? "",
             assignmentAllowLate: input.assignmentAllowLate ?? true,
             assignmentDeadline: input.assignmentDeadline ? new Date(input.assignmentDeadline) : null,
@@ -287,6 +291,7 @@ export async function POST(req: Request) {
         layout: input.layout,
         description: input.description,
         classroomId: input.classroomId ?? null,
+        thumbnailMode: input.thumbnailMode,
         members: {
           create: { userId: user.id, role: "owner" },
         },

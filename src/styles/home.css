@@ -467,6 +467,10 @@
   .layout-grid-option-preview {
     aspect-ratio: 2 / 1;
   }
+
+  .create-board-thumbnail-panel {
+    grid-template-columns: 1fr;
+  }
 }
 
 .layout-picker {
@@ -492,6 +496,16 @@
 .layout-option:hover {
   border-color: var(--color-border-hover);
   background: var(--color-bg);
+}
+
+.layout-option:disabled {
+  cursor: default;
+  opacity: 0.58;
+}
+
+.layout-option:disabled:hover {
+  border-color: var(--color-border);
+  background: var(--color-surface);
 }
 
 .layout-option-active {
@@ -523,6 +537,75 @@
   font-size: 13px;
   color: var(--color-text-muted);
   margin: 0 0 4px;
+}
+
+.create-board-thumbnail-panel {
+  display: grid;
+  grid-template-columns: 180px 1fr;
+  gap: 14px;
+  align-items: center;
+  padding: 12px;
+  margin: 8px 0 12px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  background: color-mix(in srgb, var(--color-surface-alt) 36%, #fff);
+}
+
+.create-board-thumbnail-preview {
+  aspect-ratio: 16 / 10;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(24, 74, 92, 0.1);
+  border-radius: 8px;
+  background: linear-gradient(180deg, #f7fbff 0%, #edf6ff 100%);
+  color: var(--color-text-muted);
+}
+
+.create-board-thumbnail-preview img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.create-board-thumbnail-preview span {
+  font-size: 34px;
+  line-height: 1;
+}
+
+.create-board-thumbnail-toggle {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  color: var(--color-text);
+}
+
+.create-board-thumbnail-toggle input {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--color-accent);
+  flex-shrink: 0;
+}
+
+.create-board-thumbnail-toggle span {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.create-board-thumbnail-toggle strong {
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.create-board-thumbnail-toggle small {
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--color-text-muted);
 }
 
 .create-board-selected {

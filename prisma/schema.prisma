@@ -311,18 +311,19 @@ model AiFeedback {
 // layout: "freeform" | "grid" | "stream" | "columns" | "assignment" | "quiz" | "plant-roadmap" | "event-signup" | "drawing" | "breakout" | "vibe-arcade" | "vibe-gallery"
 // (validated in app via zod)
 model Board {
-  id          String   @id @default(cuid())
-  slug        String   @unique
-  title       String
-  layout      String   @default("freeform")
-  description String   @default("")
-  classroomId String?
-  createdAt   DateTime @default(now())
+  id            String   @id @default(cuid())
+  slug          String   @unique
+  title         String
+  layout        String   @default("freeform")
+  thumbnailMode String   @default("default") // "default" | "none"
+  description   String   @default("")
+  classroomId   String?
+  createdAt     DateTime @default(now())
   // classroom-boards-tab "🟢 새 활동" 배지가 실제 활동을 반영하도록 추가.
   // @updatedAt은 Board 행 자체가 update 될 때만 자동 bump되므로, 카드/섹션
   // mutation 라우트에서 부모 board.update({updatedAt: new Date()})로 명시적
   // touch 한다 (src/app/api/cards/**, src/app/api/sections/**).
-  updatedAt   DateTime @updatedAt
+  updatedAt     DateTime @updatedAt
 
   // ── Event-signup (ES-1) ────────────────────────────────────────────
   // Public link access. "classroom" = NextAuth or classroom-scoped only.
