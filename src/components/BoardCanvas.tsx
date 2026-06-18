@@ -9,7 +9,7 @@ import { CardAuthorEditor, type SavedAuthor } from "./cards/CardAuthorEditor";
 import { ContextMenu } from "./ContextMenu";
 import { EditCardModal, type EditCardUpdates } from "./EditCardModal";
 import type { CardData } from "./DraggableCard";
-import { useCardPolling } from "@/hooks/useCardPolling";
+import { useCardRealtime } from "@/hooks/useCardRealtime";
 
 type Role = "owner" | "editor" | "viewer";
 
@@ -40,7 +40,7 @@ export function BoardCanvas({
   const canAddCard = canEdit || !!isStudentViewer;
 
   const deletingIds = useRef<Set<string>>(new Set());
-  useCardPolling(boardId, setCards, deletingIds);
+  useCardRealtime(boardId, setCards, deletingIds);
 
   async function handleAdd(data: AddCardData) {
     try {

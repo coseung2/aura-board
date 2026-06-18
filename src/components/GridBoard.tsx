@@ -7,7 +7,7 @@ import { CardBody } from "./cards/CardBody";
 import { CardDetailModal } from "./cards/CardDetailModal";
 import { CardAuthorEditor, type SavedAuthor } from "./cards/CardAuthorEditor";
 import type { CardData } from "./DraggableCard";
-import { useCardPolling } from "@/hooks/useCardPolling";
+import { useCardRealtime } from "@/hooks/useCardRealtime";
 
 type Props = {
   boardId: string;
@@ -28,7 +28,7 @@ export function GridBoard({ boardId, initialCards, currentUserId, currentRole, i
   const canAddCard = canEdit || !!isStudentViewer;
 
   const deletingIds = useRef<Set<string>>(new Set());
-  useCardPolling(boardId, setCards, deletingIds);
+  useCardRealtime(boardId, setCards, deletingIds);
 
   async function handleAdd(data: AddCardData) {
     try {

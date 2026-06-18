@@ -5,7 +5,7 @@ import type { AddCardData } from "./AddCardModal";
 import type { CardData } from "./DraggableCard";
 import { StreamComposer } from "./stream/StreamComposer";
 import { StreamPost } from "./stream/StreamPost";
-import { useCardPolling } from "@/hooks/useCardPolling";
+import { useCardRealtime } from "@/hooks/useCardRealtime";
 
 type Props = {
   boardId: string;
@@ -32,7 +32,7 @@ export function StreamBoard({
   const deletingIds = useRef<Set<string>>(new Set());
 
   // ── Realtime polling ──────────────────────────────────────────────
-  useCardPolling(boardId, setCards, deletingIds);
+  useCardRealtime(boardId, setCards, deletingIds);
 
   async function handleAdd(data: AddCardData) {
     const res = await fetch("/api/cards", {

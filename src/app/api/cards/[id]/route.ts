@@ -14,6 +14,7 @@ import {
 import { resolveCanvaEmbedUrlCached } from "@/lib/canva-preview-cache";
 import { isAllowedFileUrl, isAllowedStoredMime, MAX_ATTACHMENTS_PER_CARD } from "@/lib/file-attachment";
 import { touchBoardUpdatedAt } from "@/lib/board-touch";
+import { announceCardChange } from "@/lib/realtime-broadcast";
 import { resizeRemoteImageToWebPPreviewUrl } from "@/lib/blob";
 import { enqueueBlobDeletion } from "@/lib/blob-cleanup";
 
@@ -260,6 +261,7 @@ export async function PATCH(
 
     // classroom-boards-tab "🟢 새 활동" 배지 — 카드 수정으로 부모 board touch.
     await touchBoardUpdatedAt(card.boardId);
+    void announceCardChange(card.boardId, "update");
 
     return NextResponse.json({ card: { ...updated, attachments } });
   } catch (e) {
@@ -368,6 +370,7 @@ export async function DELETE(
     // classroom-boards-tab "🟢 새 활동" 배지 — 카드 삭제도 활동으로 간주.
     // Board row 자체는 카드 cascade의 부모라 여전히 존재하므로 정상 touch.
     await touchBoardUpdatedAt(card.boardId);
+    void announceCardChange(card.boardId, "delete");
 
     return NextResponse.json({ ok: true });
   } catch (e) {

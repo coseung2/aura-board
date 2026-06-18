@@ -21,6 +21,7 @@ import {
 import { requireShareAuth } from "@/lib/share/with-share";
 import { isAllowedFileUrl, isAllowedStoredMime, MAX_ATTACHMENTS_PER_CARD } from "@/lib/file-attachment";
 import { touchBoardUpdatedAt } from "@/lib/board-touch";
+import { announceCardChange } from "@/lib/realtime-broadcast";
 import { resizeRemoteImageToWebPPreviewUrl, extractVideoThumbnail } from "@/lib/blob";
 
 const CreateCardSchema = z.object({
@@ -172,18 +173,18 @@ export async function POST(req: Request) {
     let currentUserName: string | null = null;
     let student: Awaited<ReturnType<typeof getCurrentStudent>> = null;
     let boardClassroomId: string | null = null;
+    let boardAnonymousAuthor = false;
 
     if (teacherUser) {
       await requirePermission(input.boardId, teacherUser.id, "edit");
       authorId = teacherUser.id;
       currentUserName = teacherUser.name;
-      if (input.authors && input.authors.length > 0) {
-        const board = await db.board.findUnique({
-          where: { id: input.boardId },
-          select: { classroomId: true },
-        });
-        boardClassroomId = board?.classroomId ?? null;
-      }
+      const board = await db.board.findUnique({
+        where: { id: input.boardId },
+        select: { classroomId: true, anonymousAuthor: true },
+      });
+      boardClassroomId = board?.classroomId ?? null;
+      boardAnonymousAuthor = board?.anonymousAuthor ?? false;
     } else {
       student = await getCurrentStudent();
       if (student) {
@@ -191,6 +192,7 @@ export async function POST(req: Request) {
           where: { id: input.boardId },
           select: {
             classroomId: true,
+            anonymousAuthor: true,
             classroom: { select: { teacherId: true } },
           },
         });
@@ -201,6 +203,7 @@ export async function POST(req: Request) {
           return NextResponse.json({ error: "classroom_mismatch" }, { status: 403 });
         }
         boardClassroomId = board.classroomId;
+        boardAnonymousAuthor = board.anonymousAuthor;
         authorId = board.classroom.teacherId;
         studentAuthorId = student.id;
         externalAuthorName = student.name;
@@ -220,6 +223,11 @@ export async function POST(req: Request) {
         if (shareResult.identity.boardId !== input.boardId) {
           return NextResponse.json({ error: "board_mismatch" }, { status: 403 });
         }
+        const board = await db.board.findUnique({
+          where: { id: input.boardId },
+          select: { anonymousAuthor: true },
+        });
+        boardAnonymousAuthor = board?.anonymousAuthor ?? false;
         authorId = null;
         externalAuthorName = shareResult.identity.authorName;
         currentUserName = shareResult.identity.authorName;
@@ -412,6 +420,7 @@ export async function POST(req: Request) {
     // classroom-boards-tab "🟢 새 활동" 배지 — 카드 생성으로 부모 board touch.
     // 본 트랜잭션 바깥에서 best-effort로 실행해 실패해도 create는 성공 유지.
     await touchBoardUpdatedAt(input.boardId);
+    void announceCardChange(input.boardId, "insert");
 
     // 응답에 저장된 attachments 포함 (클라이언트 상태 즉시 반영).
     const attachments = await db.cardAttachment.findMany({
@@ -441,9 +450,11 @@ export async function POST(req: Request) {
       card: {
         ...card,
         createdAt: card.createdAt.toISOString(),
+        updatedAt: card.updatedAt.toISOString(),
         authorName: currentUserName,
         studentAuthorName: student?.name ?? null,
         externalAuthorName: card.externalAuthorName,
+        anonymousAuthor: boardAnonymousAuthor,
         attachments,
         authors,
       },
