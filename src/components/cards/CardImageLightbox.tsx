@@ -1,6 +1,12 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { createPortal } from "react-dom";
+import {
+  ChevronLeftIcon,
+  ChevronRightIcon,
+  CloseIcon,
+} from "../icons/UiIcons";
 
 type ImageItem = {
   id: string;
@@ -48,11 +54,19 @@ export function CardImageLightbox({ images, initialIndex, onClose }: Props) {
     return () => window.removeEventListener("keydown", onKey);
   }, [onClose, prev, next]);
 
+  useEffect(() => {
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
+  }, []);
+
   if (images.length === 0) return null;
   const current = images[index];
   const multi = images.length > 1;
 
-  return (
+  const lightbox = (
     <div
       className="card-image-lightbox"
       role="dialog"
@@ -68,7 +82,7 @@ export function CardImageLightbox({ images, initialIndex, onClose }: Props) {
         onClick={onClose}
         aria-label="닫기"
       >
-        ✕
+        <CloseIcon size={20} />
       </button>
 
       {multi && (
@@ -78,7 +92,7 @@ export function CardImageLightbox({ images, initialIndex, onClose }: Props) {
           onClick={prev}
           aria-label="이전 이미지"
         >
-          ◀
+          <ChevronLeftIcon size={28} />
         </button>
       )}
 
@@ -95,7 +109,7 @@ export function CardImageLightbox({ images, initialIndex, onClose }: Props) {
           onClick={next}
           aria-label="다음 이미지"
         >
-          ▶
+          <ChevronRightIcon size={28} />
         </button>
       )}
 
@@ -106,4 +120,7 @@ export function CardImageLightbox({ images, initialIndex, onClose }: Props) {
       )}
     </div>
   );
+
+  if (typeof document === "undefined") return null;
+  return createPortal(lightbox, document.body);
 }

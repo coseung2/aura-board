@@ -1042,6 +1042,11 @@
   height: 40px;
 }
 
+.column-card .card-attach-video-play {
+  width: 40px;
+  height: 40px;
+}
+
 .column-card:has(.card-attachments):not(
     :has(.padlet-card-content:not(:empty))
   ) {

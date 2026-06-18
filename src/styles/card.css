@@ -241,6 +241,7 @@
   object-fit: cover;
 }
 
+.card-attach-youtube-play,
 .card-attach-video-play {
   position: absolute;
   left: 50%;
@@ -252,16 +253,28 @@
   pointer-events: none;
 }
 
+.card-attach-youtube-play {
+  width: 58px;
+  height: 40px;
+  border-radius: 11px;
+  background: #ff0033;
+  color: #fff;
+  font-size: 19px;
+  line-height: 1;
+  padding-left: 3px;
+  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.22);
+}
+
 .card-attach-video-play {
-  width: 52px;
-  height: 52px;
+  width: 48px;
+  height: 48px;
   border-radius: 50%;
   background: rgba(255, 255, 255, 0.92);
-  color: var(--color-text);
+  color: #111;
   font-size: 20px;
   line-height: 1;
   padding-left: 3px;
-  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.2);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
 }
 
 .card-attach-video-source {
@@ -634,16 +647,10 @@
   gap: 8px;
   cursor: pointer;
   color: var(--color-text);
-  background: #fff;
+  background: transparent;
   transition: background 150ms ease;
 }
 .card-canva-slot-activate-overlay:hover {
-  background: #fff;
-}
-.card-canva-slot[data-preview="true"] .card-canva-slot-activate-overlay {
-  background: transparent;
-}
-.card-canva-slot[data-preview="true"] .card-canva-slot-activate-overlay:hover {
   background: rgba(255, 255, 255, 0.08);
 }
 .card-canva-slot-activate-overlay:focus-visible {

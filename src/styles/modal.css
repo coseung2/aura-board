@@ -611,18 +611,17 @@
   max-height: 70vh;
 }
 
-/* Image Lightbox — 카드 상세 모달 내부에서 이미지 클릭 시 띄우는 전체화면
-   뷰어. position: fixed 로 viewport 전체 덮되 카드 상세 모달의 자식이라
-   ESC/화살표 라우팅이 라이트박스 우선. */
+/* Image Lightbox — card detail images are portaled to document.body so the
+   viewer covers the whole viewport instead of being clipped by the modal. */
 .card-image-lightbox {
   position: fixed;
   inset: 0;
   background: rgba(0, 0, 0, 0.92);
-  z-index: 100;
+  z-index: 10000;
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 32px;
+  padding: clamp(16px, 3vw, 40px);
 }
 
 .card-image-lightbox-img {
@@ -638,40 +637,60 @@
 .card-image-lightbox-close,
 .card-image-lightbox-nav {
   position: absolute;
-  background: rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.12);
   color: #fff;
-  border: none;
+  border: 1px solid rgba(255, 255, 255, 0.2);
   cursor: pointer;
-  font-size: 22px;
-  width: 44px;
-  height: 44px;
+  width: 46px;
+  height: 46px;
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: background 120ms ease;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.32);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  transition:
+    background 120ms ease,
+    border-color 120ms ease,
+    transform 120ms ease;
 }
 
 .card-image-lightbox-close:hover,
 .card-image-lightbox-nav:hover {
-  background: rgba(255, 255, 255, 0.25);
+  background: rgba(255, 255, 255, 0.2);
+  border-color: rgba(255, 255, 255, 0.34);
+}
+
+.card-image-lightbox-close:focus-visible,
+.card-image-lightbox-nav:focus-visible {
+  outline: 3px solid rgba(255, 255, 255, 0.42);
+  outline-offset: 3px;
 }
 
 .card-image-lightbox-close {
-  top: 16px;
-  right: 16px;
+  top: max(16px, env(safe-area-inset-top));
+  right: max(16px, env(safe-area-inset-right));
 }
 
 .card-image-lightbox-nav.is-prev {
-  left: 16px;
+  left: max(16px, env(safe-area-inset-left));
   top: 50%;
   transform: translateY(-50%);
 }
 
 .card-image-lightbox-nav.is-next {
-  right: 16px;
+  right: max(16px, env(safe-area-inset-right));
   top: 50%;
   transform: translateY(-50%);
+}
+
+.card-image-lightbox-nav.is-prev:hover {
+  transform: translateY(-50%) translateX(-2px);
+}
+
+.card-image-lightbox-nav.is-next:hover {
+  transform: translateY(-50%) translateX(2px);
 }
 
 .card-image-lightbox-counter {

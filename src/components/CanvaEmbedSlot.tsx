@@ -70,7 +70,8 @@ export const CanvaEmbedSlot = memo(function CanvaEmbedSlot({
 
   const [iframeLoaded, setIframeLoaded] = useState(false);
   const [iframeFailed, setIframeFailed] = useState(false);
-  const [thumbnailFailed, setThumbnailFailed] = useState(false);
+  const [thumbnailAttempt, setThumbnailAttempt] = useState(0);
+  const [thumbnailLoaded, setThumbnailLoaded] = useState(false);
   const [evictedToast, setEvictedToast] = useState<string | null>(null);
 
   // IntersectionObserver starts at `false` and only flips once it has
@@ -100,7 +101,8 @@ export const CanvaEmbedSlot = memo(function CanvaEmbedSlot({
   }, [active]);
 
   useEffect(() => {
-    setThumbnailFailed(false);
+    setThumbnailAttempt(0);
+    setThumbnailLoaded(false);
   }, [linkImage, linkUrl]);
 
   // Fallback timeout: some Canva designs (/view share surface on certain
@@ -156,11 +158,31 @@ export const CanvaEmbedSlot = memo(function CanvaEmbedSlot({
     );
   }, [linkUrl, designId]);
   const title = linkTitle || "Canva design";
-  const effectiveLinkImage =
-    thumbnailFailed
-      ? null
-      : proxiedCanvaThumbnailUrl(linkImage, 640) ??
-        deriveCanvaThumbnailUrl(linkUrl);
+  const thumbnailCandidates = useMemo(() => {
+    const candidates = [
+      proxiedCanvaThumbnailUrl(linkImage, 640),
+      deriveCanvaThumbnailUrl(linkUrl),
+    ].filter((candidate): candidate is string => Boolean(candidate));
+    return [...new Set(candidates)];
+  }, [linkImage, linkUrl]);
+  const effectiveLinkImage = thumbnailCandidates[thumbnailAttempt] ?? null;
+  const handleThumbnailError = useCallback(() => {
+    setThumbnailAttempt((attempt) => attempt + 1);
+  }, []);
+  useEffect(() => {
+    setThumbnailLoaded(false);
+  }, [effectiveLinkImage]);
+  useEffect(() => {
+    if (!effectiveLinkImage || thumbnailLoaded) return;
+    const t = window.setTimeout(() => {
+      setThumbnailAttempt((attempt) =>
+        thumbnailCandidates[attempt] === effectiveLinkImage
+          ? attempt + 1
+          : attempt
+      );
+    }, 5000);
+    return () => window.clearTimeout(t);
+  }, [effectiveLinkImage, thumbnailCandidates, thumbnailLoaded]);
 
   // Fallback branch: iframe errored. Surface the original link-preview
   // style anchor so the card is never empty.
@@ -175,7 +197,13 @@ export const CanvaEmbedSlot = memo(function CanvaEmbedSlot({
       >
         {effectiveLinkImage && (
           <div className="card-link-preview-image">
-            <img src={effectiveLinkImage} alt="" loading="lazy" />
+            <img
+              src={effectiveLinkImage}
+              alt=""
+              loading="lazy"
+              onLoad={() => setThumbnailLoaded(true)}
+              onError={handleThumbnailError}
+            />
           </div>
         )}
         <div className="card-link-preview-body">
@@ -216,7 +244,8 @@ export const CanvaEmbedSlot = memo(function CanvaEmbedSlot({
             alt={`${title} 썸네일`}
             loading="lazy"
             decoding="async"
-            onError={() => setThumbnailFailed(true)}
+            onLoad={() => setThumbnailLoaded(true)}
+            onError={handleThumbnailError}
             className="card-canva-slot-thumbnail"
           />
         ) : (
