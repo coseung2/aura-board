@@ -1,12 +1,11 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import type { AddCardData } from "./AddCardModal";
 import type { CardData } from "./DraggableCard";
 import { StreamComposer } from "./stream/StreamComposer";
 import { StreamPost } from "./stream/StreamPost";
-
-const POLL_INTERVAL_MS = 5_000;
+import { useCardPolling } from "@/hooks/useCardPolling";
 
 type Props = {
   boardId: string;
@@ -33,61 +32,7 @@ export function StreamBoard({
   const deletingIds = useRef<Set<string>>(new Set());
 
   // ── Realtime polling ──────────────────────────────────────────────
-  // Fetches a hash-gated snapshot every 5 s. 304 responses are cheap
-  // (no body), so this stays light even with many concurrent viewers.
-  useEffect(() => {
-    let stopped = false;
-    let timer: ReturnType<typeof setTimeout> | null = null;
-    let lastHash = "";
-
-    async function poll() {
-      if (stopped) return;
-      try {
-        const qs = lastHash ? `?hash=${encodeURIComponent(lastHash)}` : "";
-        const res = await fetch(`/api/boards/${boardId}/snapshot${qs}`, {
-          cache: "no-store",
-        });
-        if (stopped) return;
-        if (res.status === 304) return;
-        if (res.status === 401 || res.status === 403) {
-          stopped = true;
-          return;
-        }
-        if (!res.ok) return;
-        const data = (await res.json()) as {
-          cards: CardData[];
-          hash?: string;
-        };
-        lastHash = data.hash ?? "";
-        setCards((prev) => {
-          const next = data.cards.filter(
-            (c) => !deletingIds.current.has(c.id),
-          );
-          // Preserve any locally-added cards not yet in the snapshot
-          // (shouldn't happen since handleAdd gets the real ID, but safe).
-          const serverIds = new Set(next.map((c) => c.id));
-          for (const lc of prev) {
-            if (!serverIds.has(lc.id) && !deletingIds.current.has(lc.id)) {
-              next.push(lc);
-            }
-          }
-          return sortPosts(next);
-        });
-      } catch {
-        // Network errors are transient — next interval will retry.
-      }
-    }
-
-    // Initial poll after a short delay to avoid SSR hydration race.
-    timer = setTimeout(poll, 1500);
-    const interval = setInterval(poll, POLL_INTERVAL_MS);
-
-    return () => {
-      stopped = true;
-      if (timer) clearTimeout(timer);
-      clearInterval(interval);
-    };
-  }, [boardId, setCards]);
+  useCardPolling(boardId, setCards, deletingIds);
 
   async function handleAdd(data: AddCardData) {
     const res = await fetch("/api/cards", {

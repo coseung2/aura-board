@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { AddCardButton } from "./AddCardButton";
 import type { AddCardData } from "./AddCardModal";
 import { CardBody } from "./cards/CardBody";
@@ -9,6 +9,7 @@ import { CardAuthorEditor, type SavedAuthor } from "./cards/CardAuthorEditor";
 import { ContextMenu } from "./ContextMenu";
 import { EditCardModal, type EditCardUpdates } from "./EditCardModal";
 import type { CardData } from "./DraggableCard";
+import { useCardPolling } from "@/hooks/useCardPolling";
 
 type Role = "owner" | "editor" | "viewer";
 
@@ -37,6 +38,9 @@ export function BoardCanvas({
   const [authorEditCard, setAuthorEditCard] = useState<CardData | null>(null);
   const canEdit = currentRole === "owner" || currentRole === "editor";
   const canAddCard = canEdit || !!isStudentViewer;
+
+  const deletingIds = useRef<Set<string>>(new Set());
+  useCardPolling(boardId, setCards, deletingIds);
 
   async function handleAdd(data: AddCardData) {
     try {
@@ -80,11 +84,13 @@ export function BoardCanvas({
   }
 
   async function handleDelete(id: string) {
+    deletingIds.current.add(id);
     const prevCards = cards;
     setCards((list) => list.filter((c) => c.id !== id));
     try {
       const res = await fetch(`/api/cards/${id}`, { method: "DELETE" });
       if (!res.ok) {
+        deletingIds.current.delete(id);
         setCards(prevCards);
         const msg = await res.text();
         console.error("Failed to delete card:", msg);
@@ -92,6 +98,7 @@ export function BoardCanvas({
       }
     } catch (err) {
       console.error(err);
+      deletingIds.current.delete(id);
       setCards(prevCards);
     }
   }
