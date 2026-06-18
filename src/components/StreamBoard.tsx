@@ -1,10 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { AddCardData } from "./AddCardModal";
 import type { CardData } from "./DraggableCard";
 import { StreamComposer } from "./stream/StreamComposer";
 import { StreamPost } from "./stream/StreamPost";
+
+const POLL_INTERVAL_MS = 5_000;
 
 type Props = {
   boardId: string;
@@ -26,6 +28,66 @@ export function StreamBoard({
   const [composerOpen, setComposerOpen] = useState(false);
   const canEdit = currentRole === "owner" || currentRole === "editor";
   const canAddPost = canEdit || !!isStudentViewer;
+
+  // Track in-flight deletions so polled snapshots don't resurrect them.
+  const deletingIds = useRef<Set<string>>(new Set());
+
+  // ── Realtime polling ──────────────────────────────────────────────
+  // Fetches a hash-gated snapshot every 5 s. 304 responses are cheap
+  // (no body), so this stays light even with many concurrent viewers.
+  useEffect(() => {
+    let stopped = false;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    let lastHash = "";
+
+    async function poll() {
+      if (stopped) return;
+      try {
+        const qs = lastHash ? `?hash=${encodeURIComponent(lastHash)}` : "";
+        const res = await fetch(`/api/boards/${boardId}/snapshot${qs}`, {
+          cache: "no-store",
+        });
+        if (stopped) return;
+        if (res.status === 304) return;
+        if (res.status === 401 || res.status === 403) {
+          stopped = true;
+          return;
+        }
+        if (!res.ok) return;
+        const data = (await res.json()) as {
+          cards: CardData[];
+          hash?: string;
+        };
+        lastHash = data.hash ?? "";
+        setCards((prev) => {
+          const next = data.cards.filter(
+            (c) => !deletingIds.current.has(c.id),
+          );
+          // Preserve any locally-added cards not yet in the snapshot
+          // (shouldn't happen since handleAdd gets the real ID, but safe).
+          const serverIds = new Set(next.map((c) => c.id));
+          for (const lc of prev) {
+            if (!serverIds.has(lc.id) && !deletingIds.current.has(lc.id)) {
+              next.push(lc);
+            }
+          }
+          return sortPosts(next);
+        });
+      } catch {
+        // Network errors are transient — next interval will retry.
+      }
+    }
+
+    // Initial poll after a short delay to avoid SSR hydration race.
+    timer = setTimeout(poll, 1500);
+    const interval = setInterval(poll, POLL_INTERVAL_MS);
+
+    return () => {
+      stopped = true;
+      if (timer) clearTimeout(timer);
+      clearInterval(interval);
+    };
+  }, [boardId, setCards]);
 
   async function handleAdd(data: AddCardData) {
     const res = await fetch("/api/cards", {
@@ -55,12 +117,17 @@ export function StreamBoard({
 
   async function handleDelete(card: CardData) {
     if (!window.confirm("게시글을 삭제할까요?")) return;
+    deletingIds.current.add(card.id);
     const prev = cards;
     setCards((list) => list.filter((item) => item.id !== card.id));
     try {
       const res = await fetch(`/api/cards/${card.id}`, { method: "DELETE" });
-      if (!res.ok) setCards(prev);
+      if (!res.ok) {
+        deletingIds.current.delete(card.id);
+        setCards(prev);
+      }
     } catch {
+      deletingIds.current.delete(card.id);
       setCards(prev);
     }
   }
