@@ -128,6 +128,10 @@ export function AddCardModal({
   const imageInputRef = useRef<HTMLInputElement>(null);
   const videoInputRef = useRef<HTMLInputElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const resizeState = useRef<{ startY: number; startHeight: number } | null>(
+    null
+  );
   const [pickerOpen, setPickerOpen] = useState(false);
   const [libraryAssets, setLibraryAssets] = useState<LibraryAsset[] | null>(null);
   const [libraryLoading, setLibraryLoading] = useState(false);
@@ -147,6 +151,30 @@ export function AddCardModal({
     isLastOfKind,
   } = useCardAttachments();
   const detectedContentUrl = linkUrl ? null : detectFirstUrl(content);
+
+  function startTextareaResize(e: React.PointerEvent) {
+    e.preventDefault();
+    const ta = textareaRef.current;
+    if (!ta) return;
+    resizeState.current = { startY: e.clientY, startHeight: ta.offsetHeight };
+    (e.target as HTMLElement).setPointerCapture(e.pointerId);
+  }
+
+  function moveTextareaResize(e: React.PointerEvent) {
+    if (!resizeState.current || !textareaRef.current) return;
+    const delta = e.clientY - resizeState.current.startY;
+    const next = Math.max(72, resizeState.current.startHeight + delta);
+    textareaRef.current.style.height = `${next}px`;
+  }
+
+  function endTextareaResize(e: React.PointerEvent) {
+    resizeState.current = null;
+    try {
+      (e.target as HTMLElement).releasePointerCapture(e.pointerId);
+    } catch {
+      /* noop */
+    }
+  }
 
   function promoteDetectedLink() {
     if (!detectedContentUrl) return;
@@ -288,14 +316,25 @@ export function AddCardModal({
           />
 
           <label className="modal-field-label">내용</label>
-          <textarea
-            value={content}
-            onChange={(e) => setContent(e.target.value)}
-            placeholder="내용을 입력하세요..."
-            rows={3}
-            className="modal-textarea"
-            maxLength={5000}
-          />
+          <div className="modal-textarea-wrap">
+            <textarea
+              ref={textareaRef}
+              value={content}
+              onChange={(e) => setContent(e.target.value)}
+              placeholder="내용을 입력하세요..."
+              rows={3}
+              className="modal-textarea"
+              maxLength={5000}
+            />
+            <div
+              className="modal-textarea-grip"
+              onPointerDown={startTextareaResize}
+              onPointerMove={moveTextareaResize}
+              onPointerUp={endTextareaResize}
+              onPointerCancel={endTextareaResize}
+              aria-hidden="true"
+            />
+          </div>
           {detectedContentUrl && (
             <button
               type="button"
