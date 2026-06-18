@@ -116,6 +116,7 @@ export const CardBody = memo(function CardBody({
           onMouseDown={(e) => e.stopPropagation()}
         >
           {isExpanded ? "접기" : "더보기"}
+          <span aria-hidden="true">{isExpanded ? "▴" : "▾"}</span>
         </button>
       )}
       <CardAuthorFooter

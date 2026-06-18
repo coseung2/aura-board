@@ -170,8 +170,8 @@
 .stream-composer-actions button[type="submit"],
 .stream-comment-form button {
   margin-left: auto;
-  background: var(--color-primary);
-  border-color: var(--color-primary);
+  background: var(--color-accent);
+  border-color: var(--color-accent);
   color: white;
 }
 
