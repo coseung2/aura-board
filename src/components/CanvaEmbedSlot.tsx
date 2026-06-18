@@ -159,8 +159,7 @@ export const CanvaEmbedSlot = memo(function CanvaEmbedSlot({
   const effectiveLinkImage =
     thumbnailFailed
       ? null
-      : linkImage ??
-        proxiedCanvaThumbnailUrl(linkImage, 640) ??
+      : proxiedCanvaThumbnailUrl(linkImage, 640) ??
         deriveCanvaThumbnailUrl(linkUrl);
 
   // Fallback branch: iframe errored. Surface the original link-preview

@@ -241,7 +241,6 @@
   object-fit: cover;
 }
 
-.card-attach-youtube-play,
 .card-attach-video-play {
   position: absolute;
   left: 50%;
@@ -251,18 +250,6 @@
   justify-content: center;
   transform: translate(-50%, -50%);
   pointer-events: none;
-}
-
-.card-attach-youtube-play {
-  width: 58px;
-  height: 40px;
-  border-radius: 11px;
-  background: #ff0033;
-  color: #fff;
-  font-size: 19px;
-  line-height: 1;
-  padding-left: 3px;
-  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.22);
 }
 
 .card-attach-video-play {
