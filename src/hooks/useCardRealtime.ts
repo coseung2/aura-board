@@ -15,6 +15,9 @@ import { createPublicSupabaseClient } from "@/lib/supabase/client";
  * The refetch itself hits the snapshot endpoint (NextAuth-authenticated),
  * not Supabase directly, so RLS is irrelevant.
  *
+ * If Supabase env vars are missing or the connection fails, the hook
+ * silently degrades to no realtime (page still works, just not live).
+ *
  * @param boardId     Board ID to listen on.
  * @param setCards    State setter for cards.
  * @param deletingIds Ref to a Set of card IDs being actively deleted.
@@ -44,7 +47,6 @@ export function useCardRealtime(
         const next = data.cards.filter(
           (c) => !deletingIds.current.has(c.id),
         );
-        // Preserve any locally-added cards not yet in the snapshot.
         const serverIds = new Set(next.map((c) => c.id));
         for (const lc of prev) {
           if (!serverIds.has(lc.id) && !deletingIds.current.has(lc.id)) {
@@ -59,16 +61,37 @@ export function useCardRealtime(
   }, [boardId, setCards, deletingIds]);
 
   useEffect(() => {
-    const supabase = createPublicSupabaseClient();
-    const channel = supabase
-      .channel(`board:${boardId}`)
-      .on("broadcast", { event: "card_changed" }, () => {
-        void refetch();
-      })
-      .subscribe();
+    let supabase: ReturnType<typeof createPublicSupabaseClient> | null = null;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    let channel: any = null;
+
+    try {
+      supabase = createPublicSupabaseClient();
+    } catch {
+      // Supabase env vars not configured — realtime disabled, page still works.
+      return;
+    }
+
+    try {
+      channel = supabase
+        .channel(`board:${boardId}`)
+        .on("broadcast", { event: "card_changed" }, () => {
+          void refetch();
+        })
+        .subscribe();
+    } catch {
+      // Subscription failure — non-fatal.
+      return;
+    }
 
     return () => {
-      void supabase.removeChannel(channel);
+      if (supabase && channel) {
+        try {
+          void supabase.removeChannel(channel);
+        } catch {
+          // ignore
+        }
+      }
     };
   }, [boardId, refetch]);
 }
