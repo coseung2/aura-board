@@ -8,7 +8,7 @@ import { CanvaEmbedSlot } from "./CanvaEmbedSlot";
 import { OptimizedImage } from "@/components/ui/OptimizedImage";
 import { CardFileAttachment } from "./CardFileAttachment";
 import { LinkPreviewImage } from "./cards/LinkPreviewImage";
-import { ChevronLeftIcon, ChevronRightIcon } from "./icons/UiIcons";
+import { ChevronLeftIcon, ChevronRightIcon, PlayIcon } from "./icons/UiIcons";
 
 function getYouTubeId(url: string): string | null {
   return extractVideoId(url);
@@ -208,14 +208,9 @@ export const CardAttachments = memo(function CardAttachments({ imageUrl, thumbUr
           ▶
         </span>
       ) : (
-        <>
-          <span className="card-attach-video-play" aria-hidden="true">
-            ▶
-          </span>
-          <span className="card-attach-video-source" aria-hidden="true">
-            동영상
-          </span>
-        </>
+        <span className="card-attach-video-play" aria-hidden="true">
+          <PlayIcon size={20} />
+        </span>
       )}
       {extraBadge && extraCount > 0 && (
         <span className="card-attach-multi-badge" aria-label={`+${extraCount}개 더`}>
