@@ -442,37 +442,48 @@
   top: 50%;
   transform: translateY(-50%);
   color: #fff;
-  font-size: 28px;
   line-height: 1;
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
   z-index: 3;
-  width: 40px;
-  height: 40px;
+  width: 48px;
+  height: 64px;
   padding: 0;
-  background: rgba(0, 0, 0, 0.45);
-  border: none;
-  border-radius: 50%;
+  background: rgba(7, 18, 28, 0.62);
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  border-radius: 999px;
   user-select: none;
-  opacity: 0.7;
-  transition: opacity 120ms ease, transform 120ms ease, background 120ms ease;
-  backdrop-filter: blur(4px);
+  opacity: 0.92;
+  box-shadow: 0 12px 34px rgba(0, 0, 0, 0.26);
+  transition:
+    opacity 120ms ease,
+    transform 120ms ease,
+    background 120ms ease,
+    border-color 120ms ease;
+  backdrop-filter: blur(8px);
 }
 
-.card-attach-carousel-arrow:hover {
+.card-attach-carousel-arrow:hover,
+.card-attach-carousel-arrow:focus-visible {
   opacity: 1;
-  background: rgba(0, 0, 0, 0.65);
-  transform: translateY(-50%) scale(1.1);
+  background: rgba(7, 18, 28, 0.82);
+  border-color: rgba(255, 255, 255, 0.42);
+  transform: translateY(-50%) scale(1.04);
+  outline: none;
+}
+
+.card-attach-carousel-arrow:active {
+  transform: translateY(-50%) scale(0.98);
 }
 
 .card-attach-carousel-arrow-prev {
-  left: 12px;
+  left: 18px;
 }
 
 .card-attach-carousel-arrow-next {
-  right: 12px;
+  right: 18px;
 }
 
 .card-attach-carousel-indicator {
@@ -493,8 +504,11 @@
   gap: 6px;
   padding: 6px 12px;
   border-radius: 999px;
-  background: rgba(0, 0, 0, 0.45);
+  background: rgba(7, 18, 28, 0.62);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.22);
   pointer-events: auto;
+  backdrop-filter: blur(8px);
 }
 
 .card-attach-carousel-dot {
@@ -511,6 +525,21 @@
 .card-attach-carousel-dot.is-active {
   background: #fff;
   transform: scale(1.15);
+}
+
+@media (max-width: 640px) {
+  .card-attach-carousel-arrow {
+    width: 44px;
+    height: 56px;
+  }
+
+  .card-attach-carousel-arrow-prev {
+    left: 10px;
+  }
+
+  .card-attach-carousel-arrow-next {
+    right: 10px;
+  }
 }
 
 /* detail 모드 이미지는 OptimizedImage(fill)가 아니라 plain <img> 로 렌더됨.

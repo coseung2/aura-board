@@ -8,6 +8,7 @@ import { CanvaEmbedSlot } from "./CanvaEmbedSlot";
 import { OptimizedImage } from "@/components/ui/OptimizedImage";
 import { CardFileAttachment } from "./CardFileAttachment";
 import { LinkPreviewImage } from "./cards/LinkPreviewImage";
+import { ChevronLeftIcon, ChevronRightIcon } from "./icons/UiIcons";
 
 function getYouTubeId(url: string): string | null {
   return extractVideoId(url);
@@ -153,10 +154,6 @@ export const CardAttachments = memo(function CardAttachments({ imageUrl, thumbUr
   // 이미지 종류만 navigation 대상 (pdf/video 제외). CardDetailModal 이
   // onImageClick 을 넘기면 그 안에서 라이트박스 state 를 관리.
   const imageAttachments = sorted.filter((a) => a.kind === "image");
-  // meta-download-zone (2026-06-13): file-only 카드는 mediaSorted가 비어
-  // 있어 Carousel 컨테이너가 그려지지 않음. 이 컴포넌트 자체는 linkUrl
-  // 또는 media 첨부 중 하나라도 있을 때만 렌더.
-  if (!allSortedWithLink.length && !linkUrl) return null;
   // media-attach-carousel (2026-06-12): 항목이 바뀌면 mediaIndex를 안전
   // 범위로 클램프. 카드 전환 시 첨부 id 순서가 바뀌어 인덱스가 무효화될
   // 수 있어 useEffect로 동기화.
@@ -167,6 +164,10 @@ export const CardAttachments = memo(function CardAttachments({ imageUrl, thumbUr
     }
     setMediaIndex((i) => (i >= mediaSorted.length ? 0 : i));
   }, [mediaSorted.length]);
+  // meta-download-zone (2026-06-13): file-only 카드는 mediaSorted가 비어
+  // 있어 Carousel 컨테이너가 그려지지 않음. 이 컴포넌트 자체는 linkUrl
+  // 또는 media 첨부 중 하나라도 있을 때만 렌더.
+  if (!allSortedWithLink.length && !linkUrl) return null;
   const renderVideoPoster = (
     key: string,
     videoUrlForFallback: string | null,
@@ -401,8 +402,9 @@ export const CardAttachments = memo(function CardAttachments({ imageUrl, thumbUr
                   e.stopPropagation();
                   setMediaIndex((i) => (i - 1 + sorted.length) % sorted.length);
                 }}
+                onMouseDown={(e) => e.stopPropagation()}
               >
-                ‹
+                <ChevronLeftIcon size={24} />
               </button>
               <button
                 type="button"
@@ -412,8 +414,9 @@ export const CardAttachments = memo(function CardAttachments({ imageUrl, thumbUr
                   e.stopPropagation();
                   setMediaIndex((i) => (i + 1) % sorted.length);
                 }}
+                onMouseDown={(e) => e.stopPropagation()}
               >
-                ›
+                <ChevronRightIcon size={24} />
               </button>
               <div className="card-attach-carousel-indicator" role="status" aria-label={`미디어 ${mediaIndex + 1} / ${sorted.length}`}>
                 <div className="card-attach-carousel-dots">
