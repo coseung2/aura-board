@@ -647,7 +647,7 @@
   min-width: max-content;
   width: max-content;
   overflow: visible;
-  padding: 0 32px 0 0;
+  padding: 0 32px;
 }
 
 /* Right-edge safe area for non-editor/student column boards.
