@@ -2,25 +2,23 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
-  Pressable,
   ScrollView,
   StyleSheet,
   Text,
-  TextInput,
   View,
 } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import {
+  bank,
   colors,
-  radii,
-  shadows,
   spacing,
   typography,
 } from "../../theme/tokens";
 import { apiFetch, ApiError } from "../../lib/api";
 import { clearSessionToken } from "../../lib/session";
 import type { BankOverview } from "../../lib/types";
+import { AppButton, AppHeader, SurfaceCard, SurfacePressable, TextField } from "../../components/ui";
 
 type ActionKind = "deposit" | "withdraw" | "fd_open";
 
@@ -133,12 +131,7 @@ export default function StudentBankScreen() {
 
   return (
     <SafeAreaView style={styles.container} edges={["top", "bottom"]}>
-      <View style={styles.header}>
-        <Pressable style={styles.backBtn} onPress={() => router.back()}>
-          <Text style={styles.backText}>←</Text>
-        </Pressable>
-        <Text style={styles.title}>학급 은행</Text>
-      </View>
+      <AppHeader title="학급 은행" onBack={() => router.back()} />
 
       {loading ? (
         <View style={styles.center}>
@@ -148,9 +141,7 @@ export default function StudentBankScreen() {
       ) : error && !data ? (
         <View style={styles.center}>
           <Text style={styles.error}>{error}</Text>
-          <Pressable style={styles.primaryBtn} onPress={load}>
-            <Text style={styles.primaryText}>다시 시도</Text>
-          </Pressable>
+          <AppButton onPress={load}>다시 시도</AppButton>
         </View>
       ) : data ? (
         <ScrollView contentContainerStyle={styles.content}>
@@ -164,7 +155,7 @@ export default function StudentBankScreen() {
             {data.students.map((student) => {
               const selectedRow = student.id === selectedId;
               return (
-                <Pressable
+                <SurfacePressable
                   key={student.id}
                   style={[styles.studentRow, selectedRow && styles.studentRowOn]}
                   onPress={() => setSelectedId(student.id)}
@@ -174,31 +165,29 @@ export default function StudentBankScreen() {
                   <Text style={styles.studentBalance}>
                     {student.balance.toLocaleString()} {data.currency.unitLabel}
                   </Text>
-                </Pressable>
+                </SurfacePressable>
               );
             })}
           </View>
 
           <Text style={styles.sectionTitle}>처리</Text>
-          <View style={styles.actionCard}>
+          <SurfaceCard style={styles.actionCard}>
             <Text style={styles.selectedText}>
               {selected ? `${selected.name} 학생 선택됨` : "학생을 선택하세요"}
             </Text>
-            <TextInput
+            <TextField
               style={styles.input}
               value={amount}
               onChangeText={(value) => setAmount(value.replace(/[^\d,]/g, ""))}
               keyboardType="number-pad"
               placeholder="금액"
-              placeholderTextColor={colors.textFaint}
               editable={!busy}
             />
-            <TextInput
+            <TextField
               style={styles.input}
               value={note}
               onChangeText={setNote}
               placeholder="사유 (선택)"
-              placeholderTextColor={colors.textFaint}
               editable={!busy}
             />
             {error ? <Text style={styles.error}>{error}</Text> : null}
@@ -211,7 +200,7 @@ export default function StudentBankScreen() {
                 onPress={() => runAction("fd_open")}
               />
             </View>
-          </View>
+          </SurfaceCard>
         </ScrollView>
       ) : null}
     </SafeAreaView>
@@ -220,10 +209,10 @@ export default function StudentBankScreen() {
 
 function Summary({ label, value }: { label: string; value: string }) {
   return (
-    <View style={styles.summaryCard}>
+    <SurfaceCard style={styles.summaryCard}>
       <Text style={styles.summaryLabel}>{label}</Text>
       <Text style={styles.summaryValue}>{value}</Text>
-    </View>
+    </SurfaceCard>
   );
 }
 
@@ -237,17 +226,13 @@ function ActionButton({
   onPress: () => void;
 }) {
   return (
-    <Pressable
-      style={({ pressed }) => [
-        styles.actionBtn,
-        disabled && styles.actionBtnDisabled,
-        pressed && !disabled && styles.actionBtnPressed,
-      ]}
+    <AppButton
+      style={styles.actionBtn}
       onPress={onPress}
       disabled={disabled}
     >
-      <Text style={styles.actionBtnText}>{label}</Text>
-    </Pressable>
+      {label}
+    </AppButton>
   );
 }
 
@@ -257,26 +242,6 @@ function firstParam(value: string | string[] | undefined): string | undefined {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg },
-  header: {
-    height: 72,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: spacing.md,
-    paddingHorizontal: spacing.xxl,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
-    backgroundColor: colors.surface,
-  },
-  backBtn: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: colors.surfaceAlt,
-  },
-  backText: { fontSize: 24, color: colors.text },
-  title: { ...typography.title, color: colors.text },
   center: {
     flex: 1,
     alignItems: "center",
@@ -287,72 +252,38 @@ const styles = StyleSheet.create({
   content: { padding: spacing.xxl, gap: spacing.lg },
   muted: { ...typography.body, color: colors.textMuted },
   error: { ...typography.body, color: colors.danger },
-  primaryBtn: {
-    paddingHorizontal: spacing.xl,
-    paddingVertical: spacing.md,
-    borderRadius: radii.card,
-    backgroundColor: colors.accent,
-    ...shadows.accent,
-  },
-  primaryText: { ...typography.label, color: "#fff" },
   summaryGrid: { flexDirection: "row", gap: spacing.md },
   summaryCard: {
     flex: 1,
     padding: spacing.lg,
-    borderRadius: radii.card,
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-    ...shadows.card,
   },
   summaryLabel: { ...typography.micro, color: colors.textMuted },
   summaryValue: { ...typography.section, color: colors.text, marginTop: spacing.xs },
   sectionTitle: { ...typography.section, color: colors.text },
   studentList: { gap: spacing.sm },
   studentRow: {
-    minHeight: 56,
+    minHeight: bank.studentRowMinHeight,
     flexDirection: "row",
     alignItems: "center",
     gap: spacing.md,
     padding: spacing.md,
-    borderRadius: radii.card,
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
   },
   studentRowOn: { borderColor: colors.accent, backgroundColor: colors.accentTintedBg },
-  studentNumber: { ...typography.label, color: colors.textMuted, width: 36 },
+  studentNumber: { ...typography.label, color: colors.textMuted, width: bank.studentNumberWidth },
   studentName: { ...typography.section, color: colors.text, flex: 1 },
   studentBalance: { ...typography.label, color: colors.text },
   actionCard: {
     gap: spacing.md,
     padding: spacing.lg,
-    borderRadius: radii.card,
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-    ...shadows.card,
   },
   selectedText: { ...typography.label, color: colors.accent },
   input: {
-    minHeight: 48,
-    borderRadius: radii.btn,
-    borderWidth: 1,
-    borderColor: colors.border,
-    paddingHorizontal: spacing.md,
-    color: colors.text,
+    minHeight: bank.inputMinHeight,
     backgroundColor: colors.bg,
   },
   actionRow: { flexDirection: "row", gap: spacing.sm },
   actionBtn: {
     flex: 1,
-    minHeight: 46,
-    alignItems: "center",
-    justifyContent: "center",
-    borderRadius: radii.btn,
-    backgroundColor: colors.accent,
+    minHeight: bank.actionMinHeight,
   },
-  actionBtnPressed: { backgroundColor: colors.accentActive },
-  actionBtnDisabled: { backgroundColor: colors.textFaint },
-  actionBtnText: { ...typography.label, color: "#fff" },
 });

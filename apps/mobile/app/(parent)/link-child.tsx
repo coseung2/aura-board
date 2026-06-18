@@ -2,20 +2,17 @@ import { useCallback, useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
-  Pressable,
   StyleSheet,
   Text,
-  TextInput,
   View,
 } from "react-native";
 import { useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import {
   colors,
-  radii,
-  shadows,
+  iconSizes,
+  parent,
   spacing,
-  tapMin,
   typography,
 } from "../../theme/tokens";
 import { ApiError, parentApiFetch } from "../../lib/api";
@@ -28,6 +25,14 @@ import type {
   ParentMatchStudent,
   ParentMatchStudentsResponse,
 } from "../../lib/types";
+import {
+  AppButton,
+  AppHeader,
+  EmptyState,
+  SurfaceCard,
+  SurfacePressable,
+  TextField,
+} from "../../components/ui";
 
 export default function LinkChildScreen() {
   const router = useRouter();
@@ -172,35 +177,26 @@ export default function LinkChildScreen() {
 
   return (
     <SafeAreaView style={styles.container} edges={["top", "bottom"]}>
-      <View style={styles.header}>
-        <Pressable
-          style={({ pressed }) => [styles.backBtn, pressed && styles.backBtnPressed]}
-          onPress={handleGoHome}
-        >
-          <Text style={styles.backText}>← 대시보드</Text>
-        </Pressable>
-        <Text style={styles.headerTitle}>자녀 연결</Text>
-        <View style={styles.backBtn} />
-      </View>
+      <AppHeader title="자녀 연결" onBack={handleGoHome} />
 
       {step === "code" && (
         <View style={styles.inner}>
-          <View style={styles.card}>
+          <SurfaceCard style={styles.card}>
             <Text style={styles.heading}>연결 코드 입력</Text>
             <Text style={styles.sub}>
               학급에서 안내받은 자녀 연결 코드를 입력하면 학생 명단을 확인할 수
               있어요.
             </Text>
 
-            <TextInput
+            <TextField
               style={styles.input}
               value={code}
               onChangeText={(t) => {
-                setCode(t);
+                setCode(t.toUpperCase());
                 if (error) setError(null);
               }}
-              placeholder="예: ABC123"
-              placeholderTextColor={colors.textFaint}
+              placeholder="예: AB123"
+              maxLength={parent.linkCodeLength}
               autoCapitalize="none"
               autoCorrect={false}
               editable={!loading}
@@ -209,22 +205,14 @@ export default function LinkChildScreen() {
 
             {error ? <Text style={styles.errorText}>{error}</Text> : null}
 
-            <Pressable
-              style={({ pressed }) => [
-                styles.submitBtn,
-                (!code.trim() || loading) && styles.submitBtnDisabled,
-                pressed && code.trim() && !loading && styles.submitBtnPressed,
-              ]}
+            <AppButton
               onPress={handleVerifyCode}
               disabled={!code.trim() || loading}
+              loading={loading}
             >
-              {loading ? (
-                <ActivityIndicator color="#fff" />
-              ) : (
-                <Text style={styles.submitText}>코드 확인</Text>
-              )}
-            </Pressable>
-          </View>
+              코드 확인
+            </AppButton>
+          </SurfaceCard>
         </View>
       )}
 
@@ -236,9 +224,9 @@ export default function LinkChildScreen() {
           </View>
 
           {error ? (
-            <View style={styles.errorBanner}>
+            <SurfaceCard style={styles.errorBanner}>
               <Text style={styles.errorBannerText}>{error}</Text>
-            </View>
+            </SurfaceCard>
           ) : null}
 
           <FlatList
@@ -246,11 +234,8 @@ export default function LinkChildScreen() {
             keyExtractor={(s) => s.id}
             contentContainerStyle={styles.listContent}
             renderItem={({ item }) => (
-              <Pressable
-                style={({ pressed }) => [
-                  styles.studentCard,
-                  pressed && styles.studentCardPressed,
-                ]}
+              <SurfacePressable
+                style={styles.studentCard}
                 onPress={() => handleSelectStudent(item)}
                 disabled={loading}
               >
@@ -264,16 +249,15 @@ export default function LinkChildScreen() {
                   </Text>
                 </View>
                 <Text style={styles.chevron}>›</Text>
-              </Pressable>
+              </SurfacePressable>
             )}
             ListEmptyComponent={
-              <View style={styles.emptyWrap}>
-                <Text style={styles.emptyEmoji}>📝</Text>
-                <Text style={styles.emptyTitle}>학생 명단이 비어있어요</Text>
-                <Text style={styles.emptyMsg}>
-                  코드가 올바른지 확인해 주세요.
-                </Text>
-              </View>
+              <EmptyState
+                style={styles.emptyState}
+                icon={<Text style={styles.emptyEmoji}>📝</Text>}
+                title="학생 명단이 비어있어요"
+                description="코드가 올바른지 확인해 주세요."
+              />
             }
           />
 
@@ -287,45 +271,34 @@ export default function LinkChildScreen() {
 
       {step === "done" && (
         <View style={styles.inner}>
-          <View style={styles.doneCard}>
-            <Text style={styles.doneEmoji}>
-              {result?.status === "approved" || result?.status === "linked"
-                ? "🎉"
-                : "📤"}
-            </Text>
-            <Text style={styles.heading}>
-              {result?.status === "approved" || result?.status === "linked"
-                ? "자녀 연결이 완료되었어요"
-                : "연결 요청이 전송되었어요"}
-            </Text>
-            {result ? (
-              <Text style={styles.sub}>
-                상태: {statusLabel(result.status)}
-                {"\n"}
-                담임 선생님이 승인하면 자녀 활동을 확인할 수 있어요.
+          <EmptyState
+            icon={(
+              <Text style={styles.doneEmoji}>
+                {result?.status === "approved" || result?.status === "linked"
+                  ? "🎉"
+                  : "📤"}
               </Text>
-            ) : null}
-
-            <Pressable
-              style={({ pressed }) => [
-                styles.submitBtn,
-                pressed && styles.submitBtnPressed,
-              ]}
-              onPress={handleGoHome}
-            >
-              <Text style={styles.submitText}>대시보드로 가기</Text>
-            </Pressable>
-
-            <Pressable
-              style={({ pressed }) => [
-                styles.textBtn,
-                pressed && styles.textBtnPressed,
-              ]}
-              onPress={handleLinkAnother}
-            >
-              <Text style={styles.textBtnText}>다른 자녀 연결하기</Text>
-            </Pressable>
-          </View>
+            )}
+            title={
+              result?.status === "approved" || result?.status === "linked"
+                ? "자녀 연결이 완료되었어요"
+                : "연결 요청이 전송되었어요"
+            }
+            description={
+              result
+                ? `상태: ${statusLabel(result.status)}\n담임 선생님이 승인하면 자녀 활동을 확인할 수 있어요.`
+                : undefined
+            }
+            style={styles.doneState}
+            action={(
+              <View style={styles.doneActions}>
+                <AppButton onPress={handleGoHome}>대시보드로 가기</AppButton>
+                <AppButton variant="quiet" onPress={handleLinkAnother}>
+                  다른 자녀 연결하기
+                </AppButton>
+              </View>
+            )}
+          />
         </View>
       )}
     </SafeAreaView>
@@ -334,21 +307,6 @@ export default function LinkChildScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg },
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: spacing.xxl,
-    paddingTop: spacing.xl,
-    paddingBottom: spacing.lg,
-  },
-  backBtn: {
-    minWidth: 80,
-    paddingVertical: spacing.sm,
-  },
-  backBtnPressed: { opacity: 0.6 },
-  backText: { ...typography.label, color: colors.textMuted },
-  headerTitle: { ...typography.subtitle, color: colors.text },
   inner: {
     flex: 1,
     alignItems: "center",
@@ -357,41 +315,17 @@ const styles = StyleSheet.create({
   },
   card: {
     width: "100%",
-    maxWidth: 420,
-    backgroundColor: colors.surface,
-    borderRadius: radii.card,
+    maxWidth: parent.portfolioCardMinWidth * 2 - spacing.lg,
     padding: spacing.xxl,
     gap: spacing.lg,
-    ...shadows.card,
   },
   heading: { ...typography.title, color: colors.text },
   sub: { ...typography.body, color: colors.textMuted },
   input: {
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radii.card,
     paddingVertical: spacing.lg,
     paddingHorizontal: spacing.lg,
-    fontSize: 18,
-    color: colors.text,
     backgroundColor: colors.bg,
   },
-  submitBtn: {
-    marginTop: spacing.md,
-    backgroundColor: colors.accent,
-    borderRadius: radii.card,
-    paddingVertical: spacing.lg,
-    alignItems: "center",
-    minHeight: tapMin,
-    ...shadows.accent,
-  },
-  submitBtnDisabled: {
-    backgroundColor: colors.border,
-    shadowOpacity: 0,
-    elevation: 0,
-  },
-  submitBtnPressed: { backgroundColor: colors.accentActive },
-  submitText: { ...typography.subtitle, color: "#fff" },
   errorText: {
     ...typography.body,
     color: colors.danger,
@@ -406,7 +340,6 @@ const styles = StyleSheet.create({
     marginHorizontal: spacing.xxl,
     marginBottom: spacing.lg,
     padding: spacing.lg,
-    borderRadius: radii.card,
     backgroundColor: colors.statusReturnedBg,
   },
   errorBannerText: {
@@ -422,63 +355,40 @@ const styles = StyleSheet.create({
   studentCard: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: colors.surface,
-    borderRadius: radii.card,
     padding: spacing.xl,
     gap: spacing.lg,
-    ...shadows.card,
   },
-  studentCardPressed: { backgroundColor: colors.surfaceAlt },
   studentAvatar: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
+    width: parent.childAvatarSize,
+    height: parent.childAvatarSize,
+    borderRadius: parent.childAvatarSize,
     backgroundColor: colors.accentTintedBg,
     alignItems: "center",
     justifyContent: "center",
   },
-  studentEmoji: { fontSize: 24 },
+  studentEmoji: { fontSize: iconSizes.lg },
   studentInfo: { flex: 1, gap: spacing.xs },
   studentName: { ...typography.subtitle, color: colors.text },
   studentMeta: { ...typography.body, color: colors.textMuted },
   chevron: {
-    fontSize: 28,
+    fontSize: iconSizes.lg,
     color: colors.textFaint,
     fontWeight: "300",
   },
-  emptyWrap: {
-    alignItems: "center",
+  emptyState: {
     paddingTop: spacing.xxxl,
-    gap: spacing.md,
   },
-  emptyEmoji: { fontSize: 48 },
-  emptyTitle: { ...typography.title, color: colors.text },
-  emptyMsg: {
-    ...typography.body,
-    color: colors.textMuted,
-    textAlign: "center",
-  },
+  emptyEmoji: { fontSize: parent.emptyIconSize },
   rosterOverlay: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: "rgba(246, 245, 244, 0.7)",
+    backgroundColor: colors.overlay,
     alignItems: "center",
     justifyContent: "center",
   },
-  doneCard: {
+  doneState: {
     width: "100%",
-    maxWidth: 420,
-    backgroundColor: colors.surface,
-    borderRadius: radii.card,
-    padding: spacing.xxl,
-    gap: spacing.lg,
-    alignItems: "center",
-    ...shadows.card,
+    maxWidth: parent.portfolioCardMinWidth * 2 - spacing.lg,
   },
-  doneEmoji: { fontSize: 56 },
-  textBtn: {
-    alignItems: "center",
-    paddingVertical: spacing.md,
-  },
-  textBtnPressed: { opacity: 0.6 },
-  textBtnText: { ...typography.label, color: colors.textMuted },
+  doneActions: { gap: spacing.md },
+  doneEmoji: { fontSize: parent.doneIconSize },
 });

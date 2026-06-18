@@ -1,14 +1,20 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
-  Pressable,
   StyleSheet,
   Text,
   View,
 } from "react-native";
-import { colors, radii, shadows, spacing, tapMin, typography } from "../../theme/tokens";
+import {
+  colors,
+  iconSizes,
+  quiz as quizTokens,
+  spacing,
+  typography,
+} from "../../theme/tokens";
 import { apiFetch, ApiError } from "../../lib/api";
 import type { BoardDetailResponse } from "../../lib/types";
+import { AppButton, SurfaceCard, SurfacePressable } from "../ui";
 
 // Kahoot-style quiz (student side).
 // 1) Lobby: roomCode + 이름(자동) 으로 join → playerId 받기
@@ -112,7 +118,7 @@ export function QuizBoard({
       }
     }
     tick();
-    const handle = setInterval(tick, 2000);
+    const handle = setInterval(tick, quizTokens.pollIntervalMs);
     return () => {
       cancelled = true;
       clearInterval(handle);
@@ -171,26 +177,17 @@ export function QuizBoard({
         </Text>
         <Text style={styles.infoMsg}>{data.currentStudent.name} 으로 참가합니다.</Text>
         {joinError ? <Text style={styles.errorText}>{joinError}</Text> : null}
-        <Pressable
-          style={({ pressed }) => [
-            styles.joinBtn,
-            (joining || room.status === "finished") && styles.joinBtnDisabled,
-            pressed && !joining && room.status !== "finished" && styles.joinBtnPressed,
-          ]}
+        <AppButton
+          style={styles.joinBtn}
           onPress={() => {
             void join();
             onMutate();
           }}
           disabled={joining || room.status === "finished"}
+          loading={joining}
         >
-          {joining ? (
-            <ActivityIndicator color="#fff" />
-          ) : (
-            <Text style={styles.joinText}>
-              {room.status === "finished" ? "이미 끝났어요" : "참가하기"}
-            </Text>
-          )}
-        </Pressable>
+          {room.status === "finished" ? "이미 끝났어요" : "참가하기"}
+        </AppButton>
       </View>
     );
   }
@@ -226,15 +223,15 @@ export function QuizBoard({
         <Text style={styles.infoMsg}>
           {myRank}위 · {player.score}점
         </Text>
-        <View style={styles.leaderboard}>
-          {sorted.slice(0, 5).map((p, i) => (
+        <SurfaceCard style={styles.leaderboard}>
+          {sorted.slice(0, quizTokens.leaderboardPreviewCount).map((p, i) => (
             <View key={p.id} style={styles.lbRow}>
               <Text style={styles.lbRank}>{i + 1}</Text>
               <Text style={styles.lbName}>{p.nickname}</Text>
               <Text style={styles.lbScore}>{p.score}</Text>
             </View>
           ))}
-        </View>
+        </SurfaceCard>
       </View>
     );
   }
@@ -250,10 +247,10 @@ export function QuizBoard({
 
   const myScore = quiz.players.find((p) => p.id === player.id)?.score ?? 0;
   const options: Array<{ letter: Letter; text: string; color: string }> = [
-    { letter: "A", text: q.optionA, color: "#e53935" },
-    { letter: "B", text: q.optionB, color: "#1e88e5" },
-    { letter: "C", text: q.optionC, color: "#fbc02d" },
-    { letter: "D", text: q.optionD, color: "#43a047" },
+    { letter: "A", text: q.optionA, color: colors.quizA },
+    { letter: "B", text: q.optionB, color: colors.quizB },
+    { letter: "C", text: q.optionC, color: colors.quizC },
+    { letter: "D", text: q.optionD, color: colors.quizD },
   ];
 
   return (
@@ -264,27 +261,26 @@ export function QuizBoard({
         </Text>
         <Text style={styles.topScore}>{player.nickname} · {myScore}점</Text>
       </View>
-      <View style={styles.qCard}>
+      <SurfaceCard style={styles.qCard}>
         <Text style={styles.qText}>{q.question}</Text>
-      </View>
+      </SurfaceCard>
       <View style={styles.optGrid}>
         {options.map((opt) => {
           const isSelected = selected === opt.letter;
           return (
-            <Pressable
+            <SurfacePressable
               key={opt.letter}
-              style={({ pressed }) => [
+              style={[
                 styles.opt,
                 { backgroundColor: opt.color },
                 (selected && !isSelected) && styles.optDim,
-                pressed && !selected && styles.optPressed,
               ]}
               onPress={() => answer(opt.letter)}
               disabled={selected !== null}
             >
               <Text style={styles.optLetter}>{opt.letter}</Text>
               <Text style={styles.optText} numberOfLines={3}>{opt.text}</Text>
-            </Pressable>
+            </SurfacePressable>
           );
         })}
       </View>
@@ -307,29 +303,20 @@ const styles = StyleSheet.create({
     padding: spacing.xxl,
     gap: spacing.md,
   },
-  infoEmoji: { fontSize: 72 },
+  infoEmoji: { fontSize: iconSizes.gate },
   infoTitle: { ...typography.display, color: colors.text, textAlign: "center" },
   infoMsg: { ...typography.body, color: colors.textMuted, textAlign: "center" },
   roomCode: {
     ...typography.display,
     color: colors.accent,
-    letterSpacing: 4,
+    letterSpacing: quizTokens.roomCodeLetterSpacing,
   },
   errorText: { ...typography.label, color: colors.danger },
   joinBtn: {
     marginTop: spacing.lg,
     paddingHorizontal: spacing.xxl,
     paddingVertical: spacing.lg,
-    backgroundColor: colors.accent,
-    borderRadius: radii.card,
-    minHeight: tapMin,
-    justifyContent: "center",
-    alignItems: "center",
-    ...shadows.accent,
   },
-  joinBtnDisabled: { backgroundColor: colors.border, shadowOpacity: 0, elevation: 0 },
-  joinBtnPressed: { backgroundColor: colors.accentActive },
-  joinText: { ...typography.subtitle, color: "#fff" },
 
   activeRoot: { flex: 1, padding: spacing.xl, gap: spacing.lg },
   topBar: {
@@ -340,12 +327,9 @@ const styles = StyleSheet.create({
   topLabel: { ...typography.section, color: colors.text },
   topScore: { ...typography.label, color: colors.textMuted },
   qCard: {
-    backgroundColor: colors.surface,
-    borderRadius: radii.card,
     padding: spacing.xxl,
-    minHeight: 120,
+    minHeight: quizTokens.cardMinHeight,
     justifyContent: "center",
-    ...shadows.card,
   },
   qText: {
     ...typography.title,
@@ -359,39 +343,32 @@ const styles = StyleSheet.create({
     gap: spacing.md,
   },
   opt: {
-    width: "48%",
-    flexBasis: "48%",
+    width: quizTokens.optionWidth,
+    flexBasis: quizTokens.optionWidth,
     flexGrow: 1,
-    borderRadius: radii.card,
     padding: spacing.xl,
     alignItems: "center",
     justifyContent: "center",
-    minHeight: 120,
+    minHeight: quizTokens.cardMinHeight,
     gap: spacing.sm,
-    ...shadows.card,
   },
-  optDim: { opacity: 0.4 },
-  optPressed: { opacity: 0.85 },
-  optLetter: { fontSize: 32, fontWeight: "700", color: "#fff" },
-  optText: { ...typography.section, color: "#fff", textAlign: "center" },
+  optDim: { opacity: quizTokens.optionDimOpacity },
+  optLetter: { ...typography.display, color: colors.onAccent },
+  optText: { ...typography.section, color: colors.onAccent, textAlign: "center" },
 
   feedbackBar: {
     padding: spacing.md,
     backgroundColor: colors.accentTintedBg,
-    borderRadius: radii.card,
     alignItems: "center",
   },
   feedbackText: { ...typography.label, color: colors.accentTintedText },
 
   leaderboard: {
     width: "100%",
-    maxWidth: 400,
+    maxWidth: quizTokens.leaderboardMaxWidth,
     marginTop: spacing.lg,
-    backgroundColor: colors.surface,
-    borderRadius: radii.card,
     padding: spacing.lg,
     gap: spacing.sm,
-    ...shadows.card,
   },
   lbRow: {
     flexDirection: "row",
@@ -402,7 +379,7 @@ const styles = StyleSheet.create({
   lbRank: {
     ...typography.title,
     color: colors.accent,
-    width: 28,
+    width: quizTokens.rankWidth,
   },
   lbName: { ...typography.body, color: colors.text, flex: 1 },
   lbScore: { ...typography.subtitle, color: colors.text },

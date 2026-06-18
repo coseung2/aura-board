@@ -2,7 +2,6 @@ import { useState } from "react";
 import {
   ActivityIndicator,
   Linking,
-  Pressable,
   StyleSheet,
   type StyleProp,
   Text,
@@ -11,7 +10,8 @@ import {
 } from "react-native";
 import { WebView } from "react-native-webview";
 import { classifyMediaUrl, isDirectVideoUrl, safeHost } from "../lib/media";
-import { colors, radii, spacing, typography } from "../theme/tokens";
+import { colors, media, radii, spacing, typography } from "../theme/tokens";
+import { AppButton } from "./ui";
 
 type Props = {
   url: string;
@@ -24,7 +24,7 @@ type Props = {
 export function EmbeddedMedia({
   url,
   title,
-  aspectRatio = 16 / 9,
+  aspectRatio = media.previewAspectRatio,
   style,
   hideExternal = false,
 }: Props) {
@@ -37,7 +37,7 @@ export function EmbeddedMedia({
     kind === "youtube" || kind === "canva"
       ? { uri: embedUrl! }
       : kind === "video"
-        ? { html: buildVideoHtml(embedUrl!, title ?? "영상") }
+        ? { html: buildVideoHtml(embedUrl!, title ?? "영상", colors.mediaBackdrop) }
         : { uri: externalUrl };
 
   return (
@@ -104,15 +104,14 @@ export function EmbeddedMedia({
 
 function ExternalOpenButton({ url }: { url: string }) {
   return (
-    <Pressable
-      style={({ pressed }) => [
-        styles.externalBtn,
-        pressed && styles.externalBtnPressed,
-      ]}
+    <AppButton
+      variant="secondary"
+      style={styles.externalBtn}
+      textStyle={styles.externalBtnText}
       onPress={() => void openExternalUrl(url)}
     >
-      <Text style={styles.externalBtnText}>외부에서 열기</Text>
-    </Pressable>
+      외부에서 열기
+    </AppButton>
   );
 }
 
@@ -127,14 +126,14 @@ async function openExternalUrl(url: string) {
   }
 }
 
-function buildVideoHtml(videoUrl: string, title: string): string {
+function buildVideoHtml(videoUrl: string, title: string, backgroundColor: string): string {
   return `<!DOCTYPE html>
 <html>
   <head>
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <style>
       * { margin: 0; padding: 0; box-sizing: border-box; }
-      body, html { width: 100%; height: 100%; background: #000; overflow: hidden; }
+      body, html { width: 100%; height: 100%; background: ${backgroundColor}; overflow: hidden; }
       video { width: 100%; height: 100%; object-fit: contain; }
     </style>
   </head>
@@ -203,12 +202,9 @@ const styles = StyleSheet.create({
   },
   externalBtn: {
     paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.sm + 2,
+    paddingVertical: spacing.sm,
     borderRadius: radii.pill,
     backgroundColor: colors.accentTintedBg,
-  },
-  externalBtnPressed: {
-    opacity: 0.7,
   },
   externalBtnText: {
     ...typography.label,

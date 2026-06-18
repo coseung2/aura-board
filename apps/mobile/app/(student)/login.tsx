@@ -1,42 +1,35 @@
 import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
-  Pressable,
   ScrollView,
   StyleSheet,
   Text,
-  TextInput,
   View,
   useWindowDimensions,
 } from "react-native";
 import { useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import {
+  auth,
+  brand,
   colors,
+  layout,
+  iconSizes,
   radii,
-  shadows,
+  responsive,
   spacing,
-  tapMin,
   typography,
 } from "../../theme/tokens";
 import { apiFetch, ApiError, getApiBase } from "../../lib/api";
+import { webSafeWidthStyle } from "../../lib/responsive";
 import {
   loadSessionToken,
   saveSessionToken,
   saveStudentCache,
 } from "../../lib/session";
 import { LogoLockup } from "../../components/LogoLockup";
-
-type AuthResponse = {
-  success: boolean;
-  sessionToken: string;
-  redirect: string;
-  student: {
-    id: string;
-    name: string;
-    classroomId: string;
-  };
-};
+import { AppButton, SurfaceCard, TextField } from "../../components/ui";
+import type { StudentAuthResponse } from "../../lib/types";
 
 // 학생 로그인 — 교사가 발급한 6자리 영문·숫자 코드로 로그인.
 // QR 스캐너는 추후 phase (expo-camera + barcode scanner).
@@ -47,7 +40,11 @@ export default function StudentLogin() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [booting, setBooting] = useState(true);
-  const isNarrow = width < 720;
+  const isNarrow = width < layout.authTwoPaneBreakpoint;
+  const webNarrowPaneStyle = webSafeWidthStyle(width, {
+    enabled: isNarrow,
+    inset: responsive.authWebSafeInset,
+  });
 
   // 앱 시작 시 기존 토큰이 있으면 대시보드로 바로 이동.
   useEffect(() => {
@@ -68,14 +65,14 @@ export default function StudentLogin() {
 
   async function handleSubmit() {
     const trimmed = code.trim().toUpperCase();
-    if (trimmed.length !== 6) {
+    if (trimmed.length !== auth.codeLength) {
       setError("6자리 코드를 입력해 주세요.");
       return;
     }
     setError(null);
     setLoading(true);
     try {
-      const res = await apiFetch<AuthResponse>("/api/student/auth", {
+      const res = await apiFetch<StudentAuthResponse>("/api/student/auth", {
         method: "POST",
         json: { token: trimmed },
         skipAuth: true,
@@ -121,35 +118,41 @@ export default function StudentLogin() {
       <ScrollView contentContainerStyle={styles.inner}>
         <View style={styles.brandRow}>
           <LogoLockup
-            size={36}
+            size={brand.logoSize}
             wordmarkStyle={styles.brandTitle}
           />
           <Text style={styles.brandSub}>학생 로그인</Text>
         </View>
 
-        <View style={[styles.twoPane, isNarrow && styles.twoPaneNarrow]}>
+        <View
+          style={[
+            styles.twoPane,
+            isNarrow && styles.twoPaneNarrow,
+            webNarrowPaneStyle,
+          ]}
+        >
           {/* Left — QR scanner placeholder (expo-camera 후속) */}
-          <View style={styles.qrPane}>
+          <SurfaceCard style={[styles.qrPane, isNarrow && styles.fullWidthPane]}>
             <View style={styles.qrFrame}>
-              <View style={styles.qrCornerTL} />
-              <View style={styles.qrCornerTR} />
-              <View style={styles.qrCornerBL} />
-              <View style={styles.qrCornerBR} />
+              <View style={[styles.qrCorner, styles.qrCornerTL]} />
+              <View style={[styles.qrCorner, styles.qrCornerTR]} />
+              <View style={[styles.qrCorner, styles.qrCornerBL]} />
+              <View style={[styles.qrCorner, styles.qrCornerBR]} />
               <Text style={styles.qrEmoji}>📷</Text>
               <Text style={styles.qrHint}>
                 QR 스캔은 다음 업데이트에서{"\n"}제공됩니다. 지금은 오른쪽 코드를 입력해 주세요.
               </Text>
             </View>
-          </View>
+          </SurfaceCard>
 
           {/* Right — 6-digit code */}
-          <View style={styles.codePane}>
+          <SurfaceCard style={[styles.codePane, isNarrow && styles.fullWidthPane]}>
             <Text style={styles.codeHeading}>코드로 입장</Text>
             <Text style={styles.codeSub}>
               선생님께 받은 6자리 영문·숫자 코드를 입력하세요.
             </Text>
 
-            <TextInput
+            <TextField
               style={styles.codeInput}
               value={code}
               onChangeText={(t) => {
@@ -157,10 +160,9 @@ export default function StudentLogin() {
                 if (error) setError(null);
               }}
               placeholder="ABC123"
-              placeholderTextColor={colors.textFaint}
               autoCapitalize="characters"
               autoCorrect={false}
-              maxLength={6}
+              maxLength={auth.codeLength}
               textAlign="center"
               editable={!loading}
               onSubmitEditing={handleSubmit}
@@ -168,29 +170,19 @@ export default function StudentLogin() {
 
             {error ? <Text style={styles.errorText}>{error}</Text> : null}
 
-            <Pressable
-              style={({ pressed }) => [
-                styles.submitBtn,
-                (code.trim().length !== 6 || loading) && styles.submitBtnDisabled,
-                pressed && code.trim().length === 6 && !loading && styles.submitBtnPressed,
-              ]}
+            <AppButton
               onPress={handleSubmit}
-              disabled={code.trim().length !== 6 || loading}
+              disabled={code.trim().length !== auth.codeLength}
+              loading={loading}
             >
-              {loading ? (
-                <ActivityIndicator color="#fff" />
-              ) : (
-                <Text style={styles.submitText}>들어가기 →</Text>
-              )}
-            </Pressable>
+              들어가기 →
+            </AppButton>
 
             <Text style={styles.codeHelp}>
               코드를 잃어버렸다면 선생님께 다시 요청하세요.
             </Text>
-          </View>
+          </SurfaceCard>
         </View>
-
-        <Text style={styles.baseUrlHint}>{getApiBase()}</Text>
       </ScrollView>
     </SafeAreaView>
   );
@@ -205,10 +197,16 @@ const styles = StyleSheet.create({
     gap: spacing.md,
   },
   bootingText: { ...typography.body, color: colors.textMuted },
-  inner: { flexGrow: 1, padding: spacing.xxl, gap: spacing.xl },
+  inner: {
+    flexGrow: 1,
+    padding: spacing.xxl,
+    gap: spacing.xl,
+    alignItems: "stretch",
+  },
   brandRow: {
     flexDirection: "row",
     alignItems: "center",
+    flexWrap: "wrap",
     gap: spacing.md,
   },
   brandTitle: { ...typography.display, color: colors.text },
@@ -220,20 +218,18 @@ const styles = StyleSheet.create({
   },
   twoPaneNarrow: {
     flexDirection: "column",
+    alignSelf: "stretch",
   },
 
   qrPane: {
     flex: 1,
-    backgroundColor: colors.surface,
-    borderRadius: radii.card,
-    ...shadows.card,
     padding: spacing.xl,
     alignItems: "center",
     justifyContent: "center",
   },
   qrFrame: {
     width: "100%",
-    maxWidth: 320,
+    maxWidth: auth.qrFrameMaxWidth,
     aspectRatio: 1,
     borderRadius: radii.card,
     backgroundColor: colors.surfaceAlt,
@@ -241,81 +237,66 @@ const styles = StyleSheet.create({
     alignItems: "center",
     position: "relative",
   },
-  qrEmoji: { fontSize: 56, marginBottom: spacing.md },
+  qrEmoji: { fontSize: iconSizes.hero, marginBottom: spacing.md },
   qrHint: {
     ...typography.body,
     color: colors.textMuted,
     textAlign: "center",
     paddingHorizontal: spacing.lg,
   },
-  qrCornerTL: {
+  qrCorner: {
     position: "absolute",
-    top: 0, left: 0, width: 32, height: 32,
-    borderTopWidth: 3, borderLeftWidth: 3,
+    width: auth.scanCornerSize,
+    height: auth.scanCornerSize,
     borderColor: colors.accent,
+  },
+  qrCornerTL: {
+    top: 0,
+    left: 0,
+    borderTopWidth: auth.scanCornerBorderWidth,
+    borderLeftWidth: auth.scanCornerBorderWidth,
     borderTopLeftRadius: radii.card,
   },
   qrCornerTR: {
-    position: "absolute",
-    top: 0, right: 0, width: 32, height: 32,
-    borderTopWidth: 3, borderRightWidth: 3,
-    borderColor: colors.accent,
+    top: 0,
+    right: 0,
+    borderTopWidth: auth.scanCornerBorderWidth,
+    borderRightWidth: auth.scanCornerBorderWidth,
     borderTopRightRadius: radii.card,
   },
   qrCornerBL: {
-    position: "absolute",
-    bottom: 0, left: 0, width: 32, height: 32,
-    borderBottomWidth: 3, borderLeftWidth: 3,
-    borderColor: colors.accent,
+    bottom: 0,
+    left: 0,
+    borderBottomWidth: auth.scanCornerBorderWidth,
+    borderLeftWidth: auth.scanCornerBorderWidth,
     borderBottomLeftRadius: radii.card,
   },
   qrCornerBR: {
-    position: "absolute",
-    bottom: 0, right: 0, width: 32, height: 32,
-    borderBottomWidth: 3, borderRightWidth: 3,
-    borderColor: colors.accent,
+    bottom: 0,
+    right: 0,
+    borderBottomWidth: auth.scanCornerBorderWidth,
+    borderRightWidth: auth.scanCornerBorderWidth,
     borderBottomRightRadius: radii.card,
   },
 
   codePane: {
     flex: 1,
-    backgroundColor: colors.surface,
-    borderRadius: radii.card,
-    ...shadows.card,
     padding: spacing.xxl,
     justifyContent: "center",
     gap: spacing.lg,
   },
+  fullWidthPane: {
+    alignSelf: "stretch",
+    flex: undefined,
+  },
   codeHeading: { ...typography.title, color: colors.text },
   codeSub: { ...typography.body, color: colors.textMuted },
   codeInput: {
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radii.card,
+    ...typography.code,
     paddingVertical: spacing.lg,
-    fontSize: 40,
-    fontWeight: "700",
-    letterSpacing: 8,
-    color: colors.text,
     backgroundColor: colors.bg,
     marginTop: spacing.md,
   },
-  submitBtn: {
-    marginTop: spacing.md,
-    backgroundColor: colors.accent,
-    borderRadius: radii.card,
-    paddingVertical: spacing.lg,
-    alignItems: "center",
-    minHeight: tapMin,
-    ...shadows.accent,
-  },
-  submitBtnDisabled: {
-    backgroundColor: colors.border,
-    shadowOpacity: 0,
-    elevation: 0,
-  },
-  submitBtnPressed: { backgroundColor: colors.accentActive },
-  submitText: { ...typography.subtitle, color: "#fff" },
   codeHelp: {
     ...typography.micro,
     color: colors.textFaint,
@@ -326,10 +307,5 @@ const styles = StyleSheet.create({
     ...typography.body,
     color: colors.danger,
     marginTop: spacing.sm,
-  },
-  baseUrlHint: {
-    ...typography.micro,
-    color: colors.textFaint,
-    textAlign: "center",
   },
 });

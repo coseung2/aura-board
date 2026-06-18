@@ -7,7 +7,7 @@ import {
   type TextStyle,
   type ViewStyle,
 } from "react-native";
-import { colors, spacing, typography } from "../theme/tokens";
+import { brand, colors, spacing, typography } from "../theme/tokens";
 
 type LogoLockupProps = {
   size?: number;
@@ -17,7 +17,7 @@ type LogoLockupProps = {
 };
 
 export function LogoLockup({
-  size = 32,
+  size = brand.lockupLogoSize,
   withWordmark = true,
   style,
   wordmarkStyle,
@@ -28,7 +28,7 @@ export function LogoLockup({
         source={require("../assets/icon.png")}
         style={[
           styles.icon,
-          { width: size, height: size, borderRadius: size * 0.22 },
+          { width: size, height: size, borderRadius: size * brand.logoRadiusRatio },
         ]}
         resizeMode="contain"
         accessibilityLabel="Aura-board"

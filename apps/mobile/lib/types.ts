@@ -8,8 +8,8 @@ export type BoardMeta = {
   layout: string;
   description?: string | null;
   classroomId?: string | null;
+  anonymousAuthor: boolean;
   _count?: { cards: number };
-  quizzes?: Array<{ roomCode: string | null; status: string }>;
 };
 
 export type MeResponse = {
@@ -20,6 +20,17 @@ export type MeResponse = {
   };
   boards: BoardMeta[];
   duties?: StudentDuty[];
+};
+
+export type StudentAuthResponse = {
+  success: boolean;
+  sessionToken: string;
+  redirect?: string;
+  student: {
+    id: string;
+    name: string;
+    classroomId: string;
+  };
 };
 
 export type StudentDuty = {
@@ -157,7 +168,7 @@ export type BoardCard = {
   authors?: CardAuthor[];
   authorName?: string | null;
   studentAuthorName?: string | null;
-  anonymousAuthor?: boolean;
+  anonymousAuthor: boolean;
 };
 
 export type Section = {
@@ -238,6 +249,9 @@ export type BoardDetailResponse = {
     name: string;
     classroomId: string;
   };
+  capabilities?: {
+    canControlQueue: boolean;
+  };
   layoutData: {
     quiz?: {
       room: {
@@ -288,7 +302,7 @@ export type BoardDetailResponse = {
         updatedAt: string;
         thumbnailUrl: string | null;
         moderationStatus: string;
-        authorStudentId: string;
+        authorStudentId: string | null;
       }>;
     };
     plantRoadmap?: {
@@ -317,38 +331,21 @@ export type ParentChild = {
   linkedAt: string;
 };
 
+export type ParentPendingLink = {
+  id: string;
+  studentId: string;
+  number: number | null;
+  name: string;
+  classroom: { id: string; name: string } | null;
+  requestedAt: string;
+  expiresAt: string;
+};
+
 /** GET /api/parent/children 응답. */
 export type ParentChildrenResponse = {
-  parent: { id: string };
+  parent: { id: string; name: string; email: string | null };
   children: ParentChild[];
-};
-
-/** 학부모 세션 /me placeholder (모바일 캐시용, 서버 응답과 다를 수 있음). */
-export type ParentMeResponse = {
-  parent: {
-    id: string;
-    name: string;
-    email: string | null;
-  };
-  children: ParentChild[];
-};
-
-export type ChildBoardSummary = {
-  id: string;
-  slug: string;
-  title: string;
-  layout: string;
-  cardCount: number;
-  lastActivity: string | null;
-};
-
-export type ChildDetailResponse = {
-  child: {
-    id: string;
-    name: string;
-    classroomName: string | null;
-  };
-  boards: ChildBoardSummary[];
+  pendingLinks: ParentPendingLink[];
 };
 
 export type PortfolioCardDTO = {

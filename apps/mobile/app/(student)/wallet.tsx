@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import {
   ActivityIndicator,
-  Pressable,
   ScrollView,
   StyleSheet,
   Text,
@@ -11,15 +10,17 @@ import { useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import QRCode from "react-native-qrcode-svg";
 import {
+  borders,
   colors,
   radii,
-  shadows,
   spacing,
   typography,
+  wallet as walletTokens,
 } from "../../theme/tokens";
 import { apiFetch, ApiError } from "../../lib/api";
 import { clearSessionToken } from "../../lib/session";
 import type { WalletSummary } from "../../lib/types";
+import { AppButton, AppHeader, EmptyState, SurfaceCard } from "../../components/ui";
 
 export default function StudentWalletScreen() {
   const router = useRouter();
@@ -87,12 +88,7 @@ export default function StudentWalletScreen() {
 
   return (
     <SafeAreaView style={styles.container} edges={["top", "bottom"]}>
-      <View style={styles.header}>
-        <Pressable style={styles.backBtn} onPress={() => router.back()}>
-          <Text style={styles.backText}>←</Text>
-        </Pressable>
-        <Text style={styles.title}>내 통장과 적금</Text>
-      </View>
+      <AppHeader title="내 통장과 적금" onBack={() => router.back()} />
 
       {loading ? (
         <View style={styles.center}>
@@ -105,34 +101,35 @@ export default function StudentWalletScreen() {
         </View>
       ) : (
         <ScrollView contentContainerStyle={styles.content}>
-          <View style={styles.summaryCard}>
+          <SurfaceCard style={styles.summaryCard}>
             <View>
               <Text style={styles.eyebrow}>현재 잔고</Text>
               <Text style={styles.balance}>
                 {wallet.balance.toLocaleString()} {wallet.currency.unitLabel}
               </Text>
             </View>
-          </View>
+          </SurfaceCard>
 
-          <View style={styles.qrCard}>
+          <SurfaceCard style={styles.qrCard}>
             <View style={styles.qrHeader}>
               <View>
                 <Text style={styles.eyebrow}>매점 결제</Text>
                 <Text style={styles.qrTitle}>학생 QR 지갑</Text>
               </View>
-              <Pressable
-                style={({ pressed }) => [
-                  styles.refreshBtn,
-                  pressed && styles.refreshBtnPressed,
-                ]}
+              <AppButton
+                variant="secondary"
                 onPress={loadQr}
               >
-                <Text style={styles.refreshText}>새로고침</Text>
-              </Pressable>
+                새로고침
+              </AppButton>
             </View>
             <View style={styles.qrFrame}>
               {qr?.token ? (
-                <QRCode value={qr.token} size={220} backgroundColor="#ffffff" />
+                <QRCode
+                  value={qr.token}
+                  size={walletTokens.qrCodeSize}
+                  backgroundColor={colors.surface}
+                />
               ) : (
                 <Text style={styles.muted}>{qrError ?? "QR 준비 중이에요."}</Text>
               )}
@@ -142,24 +139,22 @@ export default function StudentWalletScreen() {
                 {Math.max(0, qr.expiresAt - qrNow)}초 뒤 새 QR
               </Text>
             ) : null}
-          </View>
+          </SurfaceCard>
 
           <Text style={styles.sectionTitle}>진행 중인 적금</Text>
           {wallet.activeFDs.length === 0 ? (
-            <View style={styles.emptyBox}>
-              <Text style={styles.muted}>아직 진행 중인 적금이 없어요.</Text>
-            </View>
+            <EmptyState title="아직 진행 중인 적금이 없어요." />
           ) : (
             <View style={styles.stack}>
               {wallet.activeFDs.map((fd) => (
-                <View key={fd.id} style={styles.listCard}>
+                <SurfaceCard key={fd.id} style={styles.listCard}>
                   <Text style={styles.listTitle}>
                     {fd.principal.toLocaleString()} {wallet.currency.unitLabel}
                   </Text>
                   <Text style={styles.muted}>
                     월 {fd.monthlyRate}% · 만기 {formatShortDate(fd.maturityDate)}
                   </Text>
-                </View>
+                </SurfaceCard>
               ))}
             </View>
           )}
@@ -168,8 +163,8 @@ export default function StudentWalletScreen() {
           {wallet.recentTransactions?.length ? (
             <View style={styles.stack}>
               {wallet.recentTransactions.map((tx) => (
-                <View key={tx.id} style={styles.txRow}>
-                  <View style={{ flex: 1 }}>
+                <SurfaceCard key={tx.id} style={styles.txRow}>
+                  <View style={styles.txInfo}>
                     <Text style={styles.listTitle}>{tx.note ?? tx.type}</Text>
                     <Text style={styles.muted}>{formatShortDate(tx.createdAt)}</Text>
                   </View>
@@ -182,13 +177,11 @@ export default function StudentWalletScreen() {
                     {tx.amount > 0 ? "+" : ""}
                     {tx.amount.toLocaleString()}
                   </Text>
-                </View>
+                </SurfaceCard>
               ))}
             </View>
           ) : (
-            <View style={styles.emptyBox}>
-              <Text style={styles.muted}>최근 거래가 없어요.</Text>
-            </View>
+            <EmptyState title="최근 거래가 없어요." />
           )}
         </ScrollView>
       )}
@@ -204,26 +197,6 @@ function formatShortDate(value: string): string {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg },
-  header: {
-    height: 72,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: spacing.md,
-    paddingHorizontal: spacing.xxl,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
-    backgroundColor: colors.surface,
-  },
-  backBtn: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: colors.surfaceAlt,
-  },
-  backText: { fontSize: 24, color: colors.text },
-  title: { ...typography.title, color: colors.text },
   center: {
     flex: 1,
     alignItems: "center",
@@ -233,24 +206,14 @@ const styles = StyleSheet.create({
   },
   content: { padding: spacing.xxl, gap: spacing.lg },
   summaryCard: {
-    minHeight: 132,
-    borderRadius: radii.card,
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
+    minHeight: walletTokens.summaryMinHeight,
     padding: spacing.xl,
-    ...shadows.card,
   },
   eyebrow: { ...typography.badge, color: colors.accent, marginBottom: spacing.sm },
   balance: { ...typography.display, color: colors.text },
   qrCard: {
-    borderRadius: radii.card,
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
     padding: spacing.xl,
     gap: spacing.md,
-    ...shadows.card,
   },
   qrHeader: {
     flexDirection: "row",
@@ -259,27 +222,17 @@ const styles = StyleSheet.create({
     gap: spacing.md,
   },
   qrTitle: { ...typography.title, color: colors.text },
-  refreshBtn: {
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    borderRadius: radii.btn,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.surface,
-  },
-  refreshBtnPressed: { backgroundColor: colors.surfaceAlt },
-  refreshText: { ...typography.label, color: colors.text },
   qrFrame: {
     alignSelf: "center",
-    width: 252,
-    minHeight: 252,
+    width: walletTokens.qrFrameSize,
+    minHeight: walletTokens.qrFrameSize,
     alignItems: "center",
     justifyContent: "center",
     padding: spacing.lg,
     borderRadius: radii.card,
-    borderWidth: 1,
+    borderWidth: borders.hairline,
     borderColor: colors.border,
-    backgroundColor: "#ffffff",
+    backgroundColor: colors.surface,
   },
   qrTimer: {
     ...typography.label,
@@ -291,32 +244,18 @@ const styles = StyleSheet.create({
   stack: { gap: spacing.sm },
   listCard: {
     padding: spacing.lg,
-    borderRadius: radii.card,
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
   },
   listTitle: { ...typography.label, color: colors.text },
   txRow: {
     padding: spacing.lg,
-    borderRadius: radii.card,
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
     flexDirection: "row",
     alignItems: "center",
     gap: spacing.md,
   },
+  txInfo: { flex: 1 },
   txAmount: { ...typography.section },
   txPlus: { color: colors.bankPositive },
   txMinus: { color: colors.bankNegative },
-  emptyBox: {
-    padding: spacing.xl,
-    borderRadius: radii.card,
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
   muted: { ...typography.body, color: colors.textMuted },
   error: { ...typography.body, color: colors.danger, textAlign: "center" },
 });

@@ -8,15 +8,16 @@ import {
   ScrollView,
   StyleSheet,
   Text,
-  TextInput,
   useWindowDimensions,
   View,
 } from "react-native";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { colors, radii, shadows, spacing, typography } from "../theme/tokens";
+import { borders, cardDetail, colors, controls, layers, radii, shadows, spacing, typography } from "../theme/tokens";
 import type { BoardCard } from "../lib/types";
 import { apiFetch } from "../lib/api";
+import { maskAnonymousLabel, resolveCardAuthorName } from "../lib/card-privacy";
 import { EmbeddedMedia } from "./EmbeddedMedia";
+import { AppButton, ControlPressable, IconButton, MediaPressable, TextField } from "./ui";
 import {
   buildMediaItems,
   fileAttachments,
@@ -158,7 +159,7 @@ export function CardDetailModal({ card, onClose }: Props) {
 
   const cardId = card.id;
   const isWide = width >= 1200 && width > height;
-  const authorName = resolveAuthorName(card);
+  const authorName = resolveCardAuthorName(card);
   const allItems = buildMediaItems({
     attachments: card.attachments,
     imageUrl: card.imageUrl,
@@ -215,6 +216,9 @@ export function CardDetailModal({ card, onClose }: Props) {
     : detailLayout === "text-meta"
       ? Math.min(surfaceMaxHeight, 520)
       : surfaceMaxHeight;
+  const compactRailMaxHeight = !isWide && !expanded
+    ? Math.min(180, Math.max(118, Math.floor(surfaceMaxHeight * 0.28)))
+    : undefined;
   const mediaIndex = mediaItems.length > 0
     ? Math.min(activeMediaIndex, mediaItems.length - 1)
     : 0;
@@ -316,7 +320,7 @@ export function CardDetailModal({ card, onClose }: Props) {
       onRequestClose={onClose}
     >
       <View style={[styles.root, expanded && styles.rootExpanded]}>
-        <Pressable style={styles.backdrop} onPress={onClose} />
+        <MediaPressable style={styles.backdrop} onPress={onClose} />
         <View
           style={[
             styles.surface,
@@ -328,28 +332,23 @@ export function CardDetailModal({ card, onClose }: Props) {
             },
           ]}
         >
-          <Pressable
+          <IconButton
             onPress={onClose}
-            style={({ pressed }) => [styles.closeBtn, pressed && styles.closeBtnPressed]}
-            accessibilityRole="button"
+            style={styles.closeBtn}
             accessibilityLabel="카드 상세 닫기"
           >
             <View pointerEvents="none" style={styles.closeIcon}>
               <View style={[styles.closeStroke, styles.closeStrokeA]} />
               <View style={[styles.closeStroke, styles.closeStrokeB]} />
             </View>
-          </Pressable>
-          <Pressable
+          </IconButton>
+          <IconButton
             onPress={() => setExpanded((value) => !value)}
-            style={({ pressed }) => [
-              styles.fullscreenBtn,
-              pressed && styles.closeBtnPressed,
-            ]}
-            accessibilityRole="button"
+            style={styles.fullscreenBtn}
             accessibilityLabel={expanded ? "전체화면 끄기" : "전체화면 켜기"}
           >
             <FullscreenGlyph expanded={expanded} />
-          </Pressable>
+          </IconButton>
           <View
             style={[
               styles.body,
@@ -394,17 +393,15 @@ export function CardDetailModal({ card, onClose }: Props) {
                   ) : null}
                   {mediaItems.length > 1 ? (
                     <>
-                      <Pressable
+                      <IconButton
                         onPress={() => navigateMedia(-1)}
-                        style={({ pressed }) => [
+                        style={[
                           styles.mediaNav,
                           styles.mediaNavPrev,
                           useDarkMediaControls
                             ? styles.mediaNavOnLight
                             : styles.mediaNavOnDark,
-                          pressed && styles.mediaNavPressed,
                         ]}
-                        accessibilityRole="button"
                         accessibilityLabel="이전 첨부"
                       >
                         <Text
@@ -417,18 +414,16 @@ export function CardDetailModal({ card, onClose }: Props) {
                         >
                           ‹
                         </Text>
-                      </Pressable>
-                      <Pressable
+                      </IconButton>
+                      <IconButton
                         onPress={() => navigateMedia(1)}
-                        style={({ pressed }) => [
+                        style={[
                           styles.mediaNav,
                           styles.mediaNavNext,
                           useDarkMediaControls
                             ? styles.mediaNavOnLight
                             : styles.mediaNavOnDark,
-                          pressed && styles.mediaNavPressed,
                         ]}
-                        accessibilityRole="button"
                         accessibilityLabel="다음 첨부"
                       >
                         <Text
@@ -441,20 +436,24 @@ export function CardDetailModal({ card, onClose }: Props) {
                         >
                           ›
                         </Text>
-                      </Pressable>
+                      </IconButton>
                       <View pointerEvents="box-none" style={styles.mediaDotsWrap}>
                         <View style={styles.mediaDots}>
                           {mediaItems.map((item, index) => (
-                            <Pressable
+                            <IconButton
                               key={item.id}
                               onPress={() => setActiveMediaIndex(index)}
-                              style={[
-                                styles.mediaDot,
-                                index === mediaIndex && styles.mediaDotActive,
-                              ]}
-                              accessibilityRole="button"
+                              hitSlop={spacing.sm}
+                              style={styles.mediaDotButton}
                               accessibilityLabel={`${index + 1}번째 첨부로 이동`}
-                            />
+                            >
+                              <View
+                                style={[
+                                  styles.mediaDot,
+                                  index === mediaIndex && styles.mediaDotActive,
+                                ]}
+                              />
+                            </IconButton>
                           ))}
                         </View>
                       </View>
@@ -495,13 +494,10 @@ export function CardDetailModal({ card, onClose }: Props) {
                   {fileItems.length > 0 ? (
                     <View style={styles.fileList}>
                       {fileItems.map((item) => (
-                        <Pressable
+                        <ControlPressable
                           key={item.id}
-                          style={({ pressed }) => [
-                            styles.fileBox,
-                            pressed && styles.fileBoxPressed,
-                          ]}
-	                          onPress={() => void openExternalUrl(item.url)}
+                          style={styles.fileBox}
+		                          onPress={() => void openExternalUrl(item.url)}
                           accessibilityRole="link"
                         >
                           <Text style={styles.fileIcon}>파일</Text>
@@ -515,22 +511,19 @@ export function CardDetailModal({ card, onClose }: Props) {
                               </Text>
                             ) : null}
                           </View>
-                        </Pressable>
+                        </ControlPressable>
                       ))}
                     </View>
                   ) : null}
 
                   {hasTextLink && card.linkUrl ? (
-                    <Pressable
-                      style={({ pressed }) => [
-                        styles.externalLinkBtn,
-                        pressed && styles.externalLinkBtnPressed,
-                      ]}
-	                      onPress={() => void openExternalUrl(card.linkUrl!)}
+                    <ControlPressable
+                      style={styles.externalLinkBtn}
+		                      onPress={() => void openExternalUrl(card.linkUrl!)}
                       accessibilityRole="link"
                     >
                       <Text style={styles.externalLinkText}>링크 열기</Text>
-                    </Pressable>
+                    </ControlPressable>
                   ) : null}
                 </ScrollView>
               ) : null}
@@ -541,29 +534,24 @@ export function CardDetailModal({ card, onClose }: Props) {
                 ref={railScrollRef}
                 style={[
                   styles.rail,
-                  !isWide &&
-                    detailLayout !== "text-meta" &&
-                    styles.railStacked,
+                  !isWide && styles.railStacked,
                   !isWide &&
                     detailLayout === "media-meta" &&
                     styles.railStackedMediaOnly,
                   isWide && styles.railWide,
+                  compactRailMaxHeight ? { maxHeight: compactRailMaxHeight } : null,
                 ]}
                 keyboardShouldPersistTaps="handled"
                 keyboardDismissMode="on-drag"
                 contentContainerStyle={styles.railContent}
               >
-              <View style={styles.railSection}>
-                {authorName ? (
-                  <Text style={styles.author} numberOfLines={2}>
-                    {authorName}
-                  </Text>
-                ) : (
-                  <Text style={styles.authorMuted}>작성자 정보 없음</Text>
-                )}
-                {formatCardDate(card.createdAt) ? (
-                  <Text style={styles.date}>{formatCardDate(card.createdAt)}</Text>
-                ) : null}
+              <View style={styles.metaSection}>
+                <Text style={styles.metaLine} numberOfLines={1}>
+                  {[
+                    authorName || "작성자 정보 없음",
+                    formatCardDate(card.createdAt),
+                  ].filter(Boolean).join(" · ")}
+                </Text>
               </View>
 
               <View
@@ -579,12 +567,10 @@ export function CardDetailModal({ card, onClose }: Props) {
                   }
                 >
                   <View style={styles.engagementLikeRow}>
-                    <Pressable
-                      style={({ pressed }) => [
+                    <ControlPressable
+                      style={[
                         styles.likeButton,
                         displayedEngagement.isLiked && styles.likeButtonLiked,
-                        (!displayedEngagement.canInteract || engagementBusy) && styles.likeButtonDisabled,
-                        pressed && styles.likeButtonPressed,
                       ]}
                       disabled={!displayedEngagement.canInteract || engagementBusy}
                       onPress={toggleLike}
@@ -608,7 +594,7 @@ export function CardDetailModal({ card, onClose }: Props) {
                       >
                         좋아요 {displayedEngagement.likeCount}
                       </Text>
-                    </Pressable>
+                    </ControlPressable>
                     <Text style={styles.commentMeta}>
                       댓글 {displayedEngagement.commentCount}
                     </Text>
@@ -626,11 +612,10 @@ export function CardDetailModal({ card, onClose }: Props) {
                           updateCommentOffset("form", event.nativeEvent.layout.y)
                         }
                       >
-                        <TextInput
+                        <TextField
                           value={commentText}
                           onChangeText={setCommentText}
                           placeholder="댓글을 입력하세요"
-                          placeholderTextColor={colors.textFaint}
                           maxLength={1000}
                           multiline
                           editable={!commentSubmitting}
@@ -639,20 +624,14 @@ export function CardDetailModal({ card, onClose }: Props) {
                           }}
                           style={styles.commentInput}
                         />
-                        <Pressable
+                        <AppButton
                           onPress={submitComment}
                           disabled={commentSubmitting || !commentText.trim()}
-                          style={({ pressed }) => [
-                            styles.commentSubmit,
-                            (commentSubmitting || !commentText.trim()) && styles.commentSubmitDisabled,
-                            pressed && styles.commentSubmitPressed,
-                          ]}
-                          accessibilityRole="button"
+                          style={styles.commentSubmit}
+                          loading={commentSubmitting}
                         >
-                          <Text style={styles.commentSubmitText}>
-                            {commentSubmitting ? "작성 중..." : "댓글 달기"}
-                          </Text>
-                        </Pressable>
+                          댓글 달기
+                        </AppButton>
                       </View>
                     ) : (
                       <Text style={styles.commentReadonly}>읽기 전용이라 댓글을 달 수 없어요</Text>
@@ -667,22 +646,22 @@ export function CardDetailModal({ card, onClose }: Props) {
                         {comments.map((item) => (
                           <View key={item.id} style={styles.commentItem}>
                             <View style={styles.commentHead}>
-                              <Text style={styles.commentAuthor}>{item.authorLabel}</Text>
+                              <Text style={styles.commentAuthor}>
+                                {maskAnonymousLabel(item.authorLabel, card.anonymousAuthor)}
+                              </Text>
                               <Text style={styles.commentTime}>
                                 {formatRelativeTime(item.createdAt)}
                               </Text>
                               {item.canDelete ? (
-                                <Pressable
+                                <AppButton
+                                  variant="quiet"
                                   onPress={() => confirmDeleteComment(item.id)}
-                                  style={({ pressed }) => [
-                                    styles.commentDelete,
-                                    pressed && styles.commentDeletePressed,
-                                  ]}
-                                  accessibilityRole="button"
+                                  style={styles.commentDelete}
+                                  textStyle={styles.commentDeleteText}
                                   accessibilityLabel="댓글 삭제"
                                 >
-                                  <Text style={styles.commentDeleteText}>삭제</Text>
-                                </Pressable>
+                                  삭제
+                                </AppButton>
                               ) : null}
                             </View>
                             <Text style={styles.commentContent}>{item.content}</Text>
@@ -770,7 +749,7 @@ function MediaBlock({
 }) {
   if (item.kind === "image") {
     return (
-      <Pressable
+      <MediaPressable
         style={styles.imagePressable}
         onPress={onImagePress}
         accessibilityRole="imagebutton"
@@ -785,7 +764,7 @@ function MediaBlock({
           ]}
           resizeMode="contain"
         />
-      </Pressable>
+      </MediaPressable>
     );
   }
   if (item.kind === "video" || item.kind === "link") {
@@ -840,50 +819,42 @@ function CardImageLightbox({
   return (
     <Modal visible transparent animationType="fade" onRequestClose={onClose}>
       <View style={styles.lightboxRoot}>
-        <Pressable style={styles.lightboxBackdrop} onPress={onClose} />
+        <MediaPressable style={styles.lightboxBackdrop} onPress={onClose} />
         <Image
           source={{ uri: current.url }}
           style={styles.lightboxImage}
           resizeMode="contain"
           accessibilityLabel="이미지 원본"
         />
-        <Pressable
+        <IconButton
           onPress={onClose}
-          style={({ pressed }) => [
-            styles.lightboxClose,
-            pressed && styles.closeBtnPressed,
-          ]}
-          accessibilityRole="button"
+          style={styles.lightboxClose}
           accessibilityLabel="닫기"
         >
           <Text style={styles.lightboxCloseText}>X</Text>
-        </Pressable>
+        </IconButton>
         {multi ? (
           <>
-            <Pressable
+            <IconButton
               onPress={() => navigate(-1)}
-              style={({ pressed }) => [
+              style={[
                 styles.lightboxNav,
                 styles.lightboxNavPrev,
-                pressed && styles.mediaNavPressed,
               ]}
-              accessibilityRole="button"
               accessibilityLabel="이전 이미지"
             >
               <Text style={styles.lightboxNavText}>‹</Text>
-            </Pressable>
-            <Pressable
+            </IconButton>
+            <IconButton
               onPress={() => navigate(1)}
-              style={({ pressed }) => [
+              style={[
                 styles.lightboxNav,
                 styles.lightboxNavNext,
-                pressed && styles.mediaNavPressed,
               ]}
-              accessibilityRole="button"
               accessibilityLabel="다음 이미지"
             >
               <Text style={styles.lightboxNavText}>›</Text>
-            </Pressable>
+            </IconButton>
             <Text style={styles.lightboxCounter}>
               {index + 1} / {images.length}
             </Text>
@@ -892,19 +863,6 @@ function CardImageLightbox({
       </View>
     </Modal>
   );
-}
-
-function resolveAuthorName(card: BoardCard): string | null {
-  const anonymousAuthor = card.anonymousAuthor === true;
-  const resolved = (() => {
-  if (card.authors && card.authors.length > 0) {
-    const visible = card.authors.slice(0, 3).map((author) => author.displayName);
-    const suffix = card.authors.length > 3 ? ` 외 ${card.authors.length - 3}명` : "";
-    return visible.join(", ") + suffix;
-  }
-  return card.externalAuthorName ?? card.studentAuthorName ?? card.authorName ?? null;
-  })();
-  return anonymousAuthor && resolved ? "익명" : resolved;
 }
 
 function formatCardDate(value: string | Date | null | undefined): string {
@@ -943,11 +901,11 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "rgba(15, 23, 42, 0.48)",
+    backgroundColor: colors.modalBackdrop,
     padding: spacing.xl,
   },
   rootExpanded: {
-    padding: 0,
+    padding: spacing.none,
     backgroundColor: colors.surface,
   },
   backdrop: {
@@ -956,41 +914,40 @@ const styles = StyleSheet.create({
   surface: {
     overflow: "hidden",
     borderRadius: radii.card,
-    borderWidth: 1,
+    borderWidth: borders.hairline,
     borderColor: colors.border,
     backgroundColor: colors.surface,
-    ...shadows.cardHover,
+    ...shadows.card,
   },
   surfaceExpanded: {
-    borderRadius: 0,
-    borderWidth: 0,
+    borderRadius: radii.none,
+    borderWidth: borders.none,
   },
   closeBtn: {
-    width: 36,
-    height: 36,
+    width: controls.closeButton,
+    height: controls.closeButton,
     borderRadius: radii.btn,
     alignItems: "center",
     justifyContent: "center",
     position: "absolute",
-    top: 20,
-    right: 20,
-    zIndex: 10,
-    backgroundColor: "rgba(255, 255, 255, 0.82)",
-    borderWidth: 1,
+    top: cardDetail.closeButtonOffset,
+    right: cardDetail.closeButtonOffset,
+    zIndex: layers.overlayControl,
+    backgroundColor: colors.surfaceGlass,
+    borderWidth: borders.hairline,
     borderColor: colors.border,
     ...shadows.card,
   },
-  closeBtnPressed: { backgroundColor: colors.surfaceAlt },
   closeIcon: {
-    width: 18,
-    height: 18,
+    width: cardDetail.closeIconSize,
+    height: cardDetail.closeIconSize,
     alignItems: "center",
     justifyContent: "center",
   },
   closeStroke: {
     position: "absolute",
-    width: 15,
-    height: 2,
+    width: cardDetail.closeStrokeWidth,
+    height: cardDetail.iconStrokeHeight,
     borderRadius: radii.pill,
     backgroundColor: colors.textMuted,
   },
@@ -1000,37 +957,37 @@ const styles = StyleSheet.create({
     position: "absolute",
     right: spacing.lg,
     bottom: spacing.lg,
-    zIndex: 10,
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+    zIndex: layers.overlayControl,
+    width: cardDetail.iconButtonSize,
+    height: cardDetail.iconButtonSize,
+    borderRadius: radii.pill,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "rgba(255, 255, 255, 0.94)",
-    borderWidth: 1,
+    backgroundColor: colors.surfaceGlassStrong,
+    borderWidth: borders.hairline,
     borderColor: colors.border,
     ...shadows.card,
   },
   fullscreenGlyph: {
-    width: 20,
-    height: 20,
+    width: cardDetail.fullscreenGlyphSize,
+    height: cardDetail.fullscreenGlyphSize,
     position: "relative",
   },
   cornerStroke: {
     position: "absolute",
-    width: 8,
-    height: 8,
+    width: cardDetail.fullscreenCornerSize,
+    height: cardDetail.fullscreenCornerSize,
     borderColor: colors.text,
   },
-  cornerTop: { top: 1, borderTopWidth: 2 },
-  cornerBottom: { bottom: 1, borderBottomWidth: 2 },
-  cornerLeft: { left: 1, borderLeftWidth: 2 },
-  cornerRight: { right: 1, borderRightWidth: 2 },
+  cornerTop: { top: cardDetail.fullscreenCornerInset, borderTopWidth: cardDetail.iconStrokeWidth },
+  cornerBottom: { bottom: cardDetail.fullscreenCornerInset, borderBottomWidth: cardDetail.iconStrokeWidth },
+  cornerLeft: { left: cardDetail.fullscreenCornerInset, borderLeftWidth: cardDetail.iconStrokeWidth },
+  cornerRight: { right: cardDetail.fullscreenCornerInset, borderRightWidth: cardDetail.iconStrokeWidth },
   cornerInA: { transform: [{ rotate: "180deg" }] },
   cornerInB: { transform: [{ rotate: "180deg" }] },
   body: {
     flex: 1,
-    paddingTop: 0,
+    paddingTop: spacing.none,
   },
   bodyHorizontal: {
     flexDirection: "row",
@@ -1040,12 +997,12 @@ const styles = StyleSheet.create({
     flexDirection: "column",
   },
   bodyTextOnly: {
-    minHeight: 0,
+    minHeight: spacing.none,
   },
   main: {
     flex: 1,
     minWidth: 0,
-    minHeight: 0,
+    minHeight: spacing.none,
     backgroundColor: colors.surface,
   },
   mainWide: {
@@ -1063,15 +1020,15 @@ const styles = StyleSheet.create({
   },
   mediaZone: {
     gap: spacing.md,
-    minHeight: 260,
+    minHeight: cardDetail.mediaMinHeight,
     backgroundColor: colors.surface,
     alignItems: "stretch",
     justifyContent: "center",
     overflow: "hidden",
   },
   mediaZoneFramed: {
-    aspectRatio: 16 / 9,
-    maxHeight: "70%",
+    aspectRatio: cardDetail.mediaAspectRatio,
+    maxHeight: cardDetail.mediaMaxHeight,
   },
   mediaZoneWide: {
     minHeight: "100%",
@@ -1082,34 +1039,34 @@ const styles = StyleSheet.create({
   image: {
     width: "100%",
     height: "100%",
-    minHeight: 260,
+    minHeight: cardDetail.mediaMinHeight,
     backgroundColor: colors.surfaceAlt,
   },
   imagePressable: {
     flex: 1,
-    minHeight: 260,
+    minHeight: cardDetail.mediaMinHeight,
   },
   imageWide: {
-    minHeight: 420,
+    minHeight: cardDetail.mediaWideMinHeight,
   },
   imageMediaOnly: {
     flex: 1,
-    minHeight: 520,
+    minHeight: cardDetail.mediaOnlyMinHeight,
   },
   embed: {
-    borderRadius: 0,
+    borderRadius: radii.none,
     backgroundColor: colors.surfaceAlt,
   },
   embedWide: {
-    minHeight: 420,
+    minHeight: cardDetail.mediaWideMinHeight,
   },
   mediaNav: {
     position: "absolute",
     top: "50%",
-    zIndex: 12,
-    width: 48,
-    height: 64,
-    marginTop: -32,
+    zIndex: layers.mediaControl,
+    width: cardDetail.mediaNavWidth,
+    height: cardDetail.mediaNavHeight,
+    marginTop: cardDetail.mediaNavHalfHeight,
     alignItems: "center",
     justifyContent: "center",
     backgroundColor: "transparent",
@@ -1121,31 +1078,21 @@ const styles = StyleSheet.create({
     right: spacing.md,
   },
   mediaNavOnLight: {
-    opacity: 0.62,
+    opacity: cardDetail.mediaNavLightOpacity,
   },
   mediaNavOnDark: {
-    opacity: 0.72,
-  },
-  mediaNavPressed: {
-    opacity: 1,
-    transform: [{ scale: 1.12 }],
+    opacity: cardDetail.mediaNavDarkOpacity,
   },
   mediaNavArrow: {
-    fontSize: 38,
-    lineHeight: 44,
+    fontSize: cardDetail.mediaNavArrowFontSize,
+    lineHeight: cardDetail.mediaNavArrowLineHeight,
     fontWeight: "300",
   },
   mediaNavArrowDark: {
-    color: "rgba(20, 18, 15, 0.88)",
-    textShadowColor: "rgba(255, 255, 255, 0.62)",
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 2,
+    color: colors.mediaNavDarkText,
   },
   mediaNavArrowLight: {
-    color: "#fff",
-    textShadowColor: "rgba(0, 0, 0, 0.55)",
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 2,
+    color: colors.onAccent,
   },
   mediaDotsWrap: {
     position: "absolute",
@@ -1155,44 +1102,50 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    zIndex: 12,
+    zIndex: layers.mediaControl,
   },
   mediaDots: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    gap: 6,
+    gap: cardDetail.mediaDotsGap,
     paddingHorizontal: spacing.md,
-    paddingVertical: 6,
+    paddingVertical: cardDetail.mediaDotsPaddingVertical,
     borderRadius: radii.pill,
-    backgroundColor: "rgba(0, 0, 0, 0.45)",
+    backgroundColor: colors.mediaDotsBg,
   },
   mediaDot: {
-    width: 7,
-    height: 7,
-    borderRadius: 4,
-    backgroundColor: "rgba(255, 255, 255, 0.4)",
+    width: cardDetail.mediaDotSize,
+    height: cardDetail.mediaDotSize,
+    borderRadius: radii.pill,
+    backgroundColor: colors.mediaDotBg,
+  },
+  mediaDotButton: {
+    width: cardDetail.mediaDotHitSize,
+    height: cardDetail.mediaDotHitSize,
+    borderRadius: radii.pill,
+    backgroundColor: colors.transparent,
   },
   mediaDotActive: {
-    width: 18,
-    borderRadius: 4,
-    backgroundColor: "#fff",
+    width: cardDetail.mediaDotActiveWidth,
+    borderRadius: radii.pill,
+    backgroundColor: colors.onAccent,
   },
   contentScroll: {
     flex: 1,
-    minHeight: 0,
+    minHeight: spacing.none,
   },
   contentZone: {
     gap: spacing.md,
     paddingHorizontal: spacing.xl,
     paddingTop: spacing.lg,
     paddingBottom: spacing.xl,
-    borderTopWidth: 1,
+    borderTopWidth: borders.hairline,
     borderTopColor: colors.border,
     backgroundColor: colors.surface,
   },
   contentTextOnly: {
-    borderTopWidth: 0,
+    borderTopWidth: borders.none,
     paddingTop: spacing.xl,
   },
   bodyText: {
@@ -1201,14 +1154,13 @@ const styles = StyleSheet.create({
   title: {
     ...typography.title,
     color: colors.text,
-    lineHeight: 30,
   },
   linkBody: { gap: spacing.xs },
   linkTitle: { ...typography.subtitle, color: colors.text },
   linkDesc: { ...typography.body, color: colors.textMuted },
   contentRich: { gap: spacing.sm },
   contentTitle: { ...typography.body, color: colors.text, fontWeight: "700" },
-  content: { ...typography.body, color: colors.text, lineHeight: 24 },
+  content: { ...typography.body, color: colors.text },
   fileList: { gap: spacing.sm },
   fileBox: {
     flexDirection: "row",
@@ -1217,98 +1169,87 @@ const styles = StyleSheet.create({
     padding: spacing.md,
     borderRadius: radii.btn,
     backgroundColor: colors.surface,
-    borderWidth: 1,
+    borderWidth: borders.hairline,
     borderColor: colors.border,
   },
-  fileBoxPressed: { backgroundColor: colors.surfaceAlt },
   fileIcon: { ...typography.micro, color: colors.accent },
-  fileInfo: { flex: 1, gap: 2 },
+  fileInfo: { flex: 1, gap: spacing.xxs },
   fileName: { ...typography.label, color: colors.text },
   fileMeta: { ...typography.micro, color: colors.textFaint },
   externalLinkBtn: {
     alignSelf: "flex-start",
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
-    borderRadius: radii.btn,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.surface,
     alignItems: "center",
   },
-  externalLinkBtnPressed: { opacity: 0.7 },
   externalLinkText: { ...typography.label, color: colors.accentTintedText },
   rail: {
-    borderTopWidth: 1,
+    borderTopWidth: borders.hairline,
     borderTopColor: colors.border,
     backgroundColor: colors.surface,
   },
   railStacked: {
     flex: 0,
-    minHeight: 0,
-    maxHeight: "45%",
+    minHeight: spacing.none,
   },
   railStackedMediaOnly: {
     maxHeight: "34%",
   },
   railContent: {
-    gap: spacing.lg,
+    gap: spacing.md,
     paddingHorizontal: spacing.xl,
-    paddingVertical: spacing.lg,
+    paddingVertical: spacing.md,
   },
   railWide: {
     flex: 0,
     flexGrow: 0,
     flexShrink: 0,
-    flexBasis: 280,
-    width: 280,
-    maxWidth: 280,
-    borderTopWidth: 0,
-    borderLeftWidth: 1,
+    flexBasis: cardDetail.railWidth,
+    width: cardDetail.railWidth,
+    maxWidth: cardDetail.railWidth,
+    borderTopWidth: borders.none,
+    borderLeftWidth: borders.hairline,
     borderLeftColor: colors.border,
   },
   railSection: {
     gap: spacing.sm,
   },
-  author: { ...typography.body, color: colors.textMuted },
-  authorMuted: { ...typography.micro, color: colors.textFaint },
-  date: { ...typography.micro, color: colors.textFaint },
+  metaSection: {
+    minHeight: cardDetail.metaMinHeight,
+    justifyContent: "center",
+  },
+  metaLine: { ...typography.micro, color: colors.textMuted },
   engagementPanel: {
-    gap: spacing.md,
-    paddingTop: spacing.md,
-    borderTopWidth: 1,
+    gap: spacing.sm,
+    paddingTop: spacing.sm,
+    borderTopWidth: borders.hairline,
     borderTopColor: colors.border,
   },
   engagementLikeRow: {
-    minHeight: 38,
+    minHeight: cardDetail.engagementLikeMinHeight,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
     gap: spacing.sm,
   },
   likeButton: {
-    minHeight: 36,
+    minHeight: cardDetail.likeButtonMinHeight,
     flexDirection: "row",
     alignItems: "center",
-    gap: 6,
+    gap: cardDetail.mediaDotsGap,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.xs,
     borderRadius: radii.pill,
-    borderWidth: 1,
+    borderWidth: borders.hairline,
     borderColor: colors.border,
     backgroundColor: colors.surface,
   },
   likeButtonLiked: {
     borderColor: colors.danger,
-    backgroundColor: "rgba(198, 40, 40, 0.08)",
-  },
-  likeButtonDisabled: {
-    opacity: 0.7,
-  },
-  likeButtonPressed: {
-    backgroundColor: colors.surfaceAlt,
+    backgroundColor: colors.dangerTintedBg,
   },
   likeIcon: {
-    fontSize: 16,
+    ...typography.subtitle,
   },
   likeText: {
     ...typography.label,
@@ -1325,36 +1266,18 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
   },
   commentForm: {
-    gap: 6,
+    gap: cardDetail.mediaDotsGap,
   },
   commentInput: {
-    minHeight: 56,
+    minHeight: cardDetail.commentInputMinHeight,
     paddingHorizontal: spacing.sm,
     paddingVertical: spacing.sm,
-    borderRadius: radii.btn,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.surface,
-    color: colors.text,
-    fontSize: 14,
     textAlignVertical: "top",
   },
   commentSubmit: {
     alignSelf: "flex-end",
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
-    borderRadius: radii.btn,
-    backgroundColor: colors.accent,
-  },
-  commentSubmitPressed: {
-    backgroundColor: colors.accentActive,
-  },
-  commentSubmitDisabled: {
-    backgroundColor: colors.border,
-  },
-  commentSubmitText: {
-    ...typography.label,
-    color: "#fff",
   },
   commentReadonly: {
     ...typography.micro,
@@ -1369,19 +1292,19 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.sm,
   },
   commentList: {
-    gap: 10,
+    gap: spacing.md,
   },
   commentItem: {
-    gap: 4,
+    gap: spacing.xs,
     paddingHorizontal: spacing.sm,
     paddingVertical: spacing.sm,
-    borderRadius: 8,
+    borderRadius: radii.btn,
     backgroundColor: colors.surfaceAlt,
   },
   commentHead: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 8,
+    gap: spacing.sm,
   },
   commentAuthor: {
     ...typography.label,
@@ -1394,12 +1317,8 @@ const styles = StyleSheet.create({
   },
   commentDelete: {
     marginLeft: "auto",
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 4,
-  },
-  commentDeletePressed: {
-    backgroundColor: colors.surface,
+    paddingHorizontal: cardDetail.mediaDotsGap,
+    paddingVertical: spacing.xs,
   },
   commentDeleteText: {
     ...typography.micro,
@@ -1416,7 +1335,7 @@ const styles = StyleSheet.create({
   },
   lightboxRoot: {
     flex: 1,
-    backgroundColor: "rgba(0, 0, 0, 0.92)",
+    backgroundColor: colors.lightboxOverlay,
     alignItems: "center",
     justifyContent: "center",
   },
@@ -1424,35 +1343,35 @@ const styles = StyleSheet.create({
     ...StyleSheet.absoluteFillObject,
   },
   lightboxImage: {
-    width: "94%",
-    height: "82%",
+    width: cardDetail.lightboxImageWidth,
+    height: cardDetail.lightboxImageHeight,
   },
   lightboxClose: {
     position: "absolute",
     top: spacing.xxl,
     right: spacing.xxl,
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+    width: cardDetail.iconButtonSize,
+    height: cardDetail.iconButtonSize,
+    borderRadius: radii.pill,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "rgba(255, 255, 255, 0.16)",
+    backgroundColor: colors.lightboxControlBg,
   },
   lightboxCloseText: {
-    color: "#fff",
-    fontSize: 18,
+    color: colors.onAccent,
+    ...typography.section,
     fontWeight: "700",
   },
   lightboxNav: {
     position: "absolute",
     top: "50%",
-    width: 52,
-    height: 72,
-    marginTop: -36,
+    width: cardDetail.lightboxNavWidth,
+    height: cardDetail.lightboxNavHeight,
+    marginTop: cardDetail.lightboxNavHalfHeight,
     borderRadius: radii.btn,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "rgba(255, 255, 255, 0.14)",
+    backgroundColor: colors.lightboxControlSoftBg,
   },
   lightboxNavPrev: {
     left: spacing.xxl,
@@ -1461,15 +1380,14 @@ const styles = StyleSheet.create({
     right: spacing.xxl,
   },
   lightboxNavText: {
-    color: "#fff",
-    fontSize: 36,
-    lineHeight: 40,
+    color: colors.onAccent,
+    ...typography.display,
   },
   lightboxCounter: {
     position: "absolute",
     bottom: spacing.xxl,
     alignSelf: "center",
-    color: "#fff",
+    color: colors.onAccent,
     ...typography.label,
   },
 });

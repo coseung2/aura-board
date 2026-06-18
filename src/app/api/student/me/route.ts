@@ -18,12 +18,8 @@ export async function GET() {
           slug: true,
           title: true,
           layout: true,
+          anonymousAuthor: true,
           _count: { select: { cards: true } },
-          quizzes: {
-            select: { roomCode: true, status: true },
-            take: 1,
-            orderBy: { createdAt: "desc" },
-          },
         },
         orderBy: { createdAt: "desc" },
       }),
@@ -34,7 +30,9 @@ export async function GET() {
       student: {
         id: student.id,
         name: student.name,
-        classroom: student.classroom,
+        classroom: student.classroom
+          ? { id: student.classroom.id, name: student.classroom.name }
+          : null,
       },
       boards,
       duties,

@@ -1,23 +1,29 @@
 import { useMemo, useState } from "react";
 import {
-  ActivityIndicator,
   Alert,
   FlatList,
   Image,
-  Modal,
-  Pressable,
+  ScrollView,
   StyleSheet,
   Text,
-  TextInput,
   View,
   useWindowDimensions,
 } from "react-native";
 import * as DocumentPicker from "expo-document-picker";
 import * as ImagePicker from "expo-image-picker";
-import { colors, radii, shadows, spacing, tapMin, typography } from "../../theme/tokens";
+import {
+  assignment,
+  borders,
+  colors,
+  iconSizes,
+  radii,
+  spacing,
+  typography,
+} from "../../theme/tokens";
 import { apiFetch, getApiBase } from "../../lib/api";
 import { loadSessionToken } from "../../lib/session";
 import type { BoardDetailResponse } from "../../lib/types";
+import { AppButton, AppModal, IconButton, Pill, SurfaceCard, TextField } from "../ui";
 
 // 과제 배부(assignment) — 본인 slot 만 강조해서 보여주고, 나머지는 반 전체 진행 현황 요약.
 // 제출: content(텍스트) + 이미지 또는 파일 업로드.
@@ -36,7 +42,14 @@ export function AssignmentBoard({
     [slots, data.currentStudent.id],
   );
   const [modalOpen, setModalOpen] = useState(false);
-  const peerColumns = width < 560 ? 1 : width < 840 ? 2 : width < 1120 ? 3 : 4;
+  const peerColumns =
+    width < assignment.peerBreakpoints.one
+      ? 1
+      : width < assignment.peerBreakpoints.two
+        ? 2
+        : width < assignment.peerBreakpoints.three
+          ? 3
+          : 4;
 
   const counts = useMemo(() => {
     const s = { assigned: 0, submitted: 0, returned: 0, reviewed: 0 };
@@ -72,20 +85,18 @@ export function AssignmentBoard({
   return (
     <View style={styles.root}>
       <View style={styles.progressBar}>
-        <ProgressPill label="제출 전" count={counts.assigned} color={colors.textFaint} />
+        <ProgressPill label="제출 전" count={counts.assigned} color={colors.textMuted} />
         <ProgressPill label="제출함" count={counts.submitted} color={colors.accent} />
-        <ProgressPill label="되돌아감" count={counts.returned} color={colors.warning} />
+        <ProgressPill label="되돌아감" count={counts.returned} color={colors.statusReturnedText} />
         <ProgressPill label="평가됨" count={counts.reviewed} color={colors.plantActive} />
       </View>
 
-      <View style={styles.mySlotCard}>
+      <SurfaceCard style={styles.mySlotCard}>
         <View style={styles.slotHead}>
           <Text style={styles.slotTitle}>{mySlot.card.title}</Text>
-          <View style={[styles.statusPill, pillStyleFor(mySlot.submissionStatus)]}>
-            <Text style={[styles.statusText, pillTextFor(mySlot.submissionStatus)]}>
-              {statusLabel[mySlot.submissionStatus] ?? mySlot.submissionStatus}
-            </Text>
-          </View>
+          <Pill tone={pillToneFor(mySlot.submissionStatus)}>
+            {statusLabel[mySlot.submissionStatus] ?? mySlot.submissionStatus}
+          </Pill>
         </View>
         {mySlot.card.content ? (
           <Text style={styles.slotBody}>{mySlot.card.content}</Text>
@@ -99,18 +110,13 @@ export function AssignmentBoard({
         {mySlot.submission ? (
           <SubmissionPreview submission={mySlot.submission} />
         ) : null}
-        <Pressable
-          style={({ pressed }) => [
-            styles.submitBtn,
-            pressed && styles.submitBtnPressed,
-          ]}
+        <AppButton
+          style={styles.submitBtn}
           onPress={() => setModalOpen(true)}
         >
-          <Text style={styles.submitText}>
-            {mySlot.submission ? "다시 제출하기" : "제출하기"}
-          </Text>
-        </Pressable>
-      </View>
+          {mySlot.submission ? "다시 제출하기" : "제출하기"}
+        </AppButton>
+      </SurfaceCard>
 
       <Text style={styles.allLabel}>반 전체 제출 현황</Text>
       <FlatList
@@ -281,78 +287,74 @@ function SubmitModal({
   }
 
   return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-      <View style={styles.modalBackdrop}>
-        <View style={styles.modalSheet}>
-          <View style={styles.modalHead}>
-            <Text style={styles.modalTitle}>과제 제출</Text>
-            <Pressable onPress={onClose} style={styles.closeBtn}>
-              <Text style={styles.closeText}>✕</Text>
-            </Pressable>
-          </View>
-          <TextInput
-            style={styles.contentInput}
-            value={content}
-            onChangeText={setContent}
-            placeholder="내용을 적어주세요"
-            placeholderTextColor={colors.textFaint}
-            multiline
-            editable={!submitting}
-          />
-          <View style={styles.modalRow}>
-            <Pressable
-              style={({ pressed }) => [styles.attachBtn, pressed && styles.attachBtnPressed]}
-              onPress={pickImage}
-              disabled={submitting}
-            >
-              <Text style={styles.attachText}>🖼️ 이미지 {imageUrl ? "✓" : ""}</Text>
-            </Pressable>
-            <Pressable
-              style={({ pressed }) => [styles.attachBtn, pressed && styles.attachBtnPressed]}
-              onPress={pickFile}
-              disabled={submitting}
-            >
-              <Text style={styles.attachText}>📎 파일 {fileUrl ? "✓" : ""}</Text>
-            </Pressable>
-          </View>
-          <Pressable
-            style={({ pressed }) => [
-              styles.modalSubmit,
-              submitting && styles.modalSubmitDisabled,
-              pressed && !submitting && styles.modalSubmitPressed,
-            ]}
-            onPress={submit}
+    <AppModal
+      visible={visible}
+      onClose={onClose}
+      keyboardAvoiding
+      sheetStyle={styles.modalSheet}
+      accessibilityLabel="과제 제출"
+    >
+      <View style={styles.modalHead}>
+        <Text style={styles.modalTitle}>과제 제출</Text>
+        <IconButton onPress={onClose} style={styles.closeBtn}>
+          <Text style={styles.closeText}>✕</Text>
+        </IconButton>
+      </View>
+      <ScrollView
+        style={styles.modalBody}
+        contentContainerStyle={styles.modalBodyContent}
+        keyboardShouldPersistTaps="handled"
+      >
+        <TextField
+          style={styles.contentInput}
+          value={content}
+          onChangeText={setContent}
+          placeholder="내용을 적어주세요"
+          multiline
+          editable={!submitting}
+        />
+        <View style={styles.modalRow}>
+          <AppButton
+            variant="secondary"
+            style={styles.attachBtn}
+            textStyle={styles.attachText}
+            onPress={pickImage}
             disabled={submitting}
           >
-            {submitting ? (
-              <ActivityIndicator color="#fff" />
-            ) : (
-              <Text style={styles.modalSubmitText}>제출하기</Text>
-            )}
-          </Pressable>
+            🖼️ 이미지 {imageUrl ? "✓" : ""}
+          </AppButton>
+          <AppButton
+            variant="secondary"
+            style={styles.attachBtn}
+            textStyle={styles.attachText}
+            onPress={pickFile}
+            disabled={submitting}
+          >
+            📎 파일 {fileUrl ? "✓" : ""}
+          </AppButton>
         </View>
-      </View>
-    </Modal>
+        <AppButton
+          style={styles.modalSubmit}
+          onPress={submit}
+          loading={submitting}
+        >
+          제출하기
+        </AppButton>
+      </ScrollView>
+    </AppModal>
   );
 }
 
-function pillStyleFor(status: string) {
-  if (status === "submitted" || status === "viewed") return { backgroundColor: colors.statusSubmittedBg };
-  if (status === "returned") return { backgroundColor: colors.statusReturnedBg };
-  if (status === "reviewed") return { backgroundColor: colors.statusReviewedBg };
-  return { backgroundColor: colors.surfaceAlt };
-}
-
-function pillTextFor(status: string) {
-  if (status === "submitted" || status === "viewed") return { color: colors.statusSubmittedText };
-  if (status === "returned") return { color: colors.statusReturnedText };
-  if (status === "reviewed") return { color: colors.statusReviewedText };
-  return { color: colors.textMuted };
+function pillToneFor(status: string): "neutral" | "danger" | "submitted" | "reviewed" {
+  if (status === "submitted" || status === "viewed") return "submitted";
+  if (status === "returned") return "danger";
+  if (status === "reviewed") return "reviewed";
+  return "neutral";
 }
 
 function dotColorFor(status: string) {
   if (status === "submitted" || status === "viewed") return { backgroundColor: colors.accent };
-  if (status === "returned") return { backgroundColor: colors.warning };
+  if (status === "returned") return { backgroundColor: colors.statusReturnedText };
   if (status === "reviewed") return { backgroundColor: colors.plantActive };
   return { backgroundColor: colors.textFaint };
 }
@@ -366,7 +368,7 @@ const styles = StyleSheet.create({
     padding: spacing.xxl,
     gap: spacing.md,
   },
-  infoEmoji: { fontSize: 64 },
+  infoEmoji: { fontSize: iconSizes.empty },
   infoTitle: { ...typography.title, color: colors.text, textAlign: "center" },
   infoMsg: { ...typography.body, color: colors.textMuted, textAlign: "center" },
 
@@ -376,19 +378,16 @@ const styles = StyleSheet.create({
   },
   progressPill: {
     flex: 1,
-    borderWidth: 2,
+    borderWidth: borders.medium,
     borderRadius: radii.card,
     padding: spacing.md,
     alignItems: "center",
   },
   progressCount: { ...typography.display },
-  progressLabel: { ...typography.label, color: colors.textMuted, marginTop: 2 },
+  progressLabel: { ...typography.label, color: colors.textMuted, marginTop: spacing.xs },
 
   mySlotCard: {
-    backgroundColor: colors.surface,
-    borderRadius: radii.card,
     padding: spacing.xl,
-    ...shadows.card,
     gap: spacing.md,
   },
   slotHead: {
@@ -398,19 +397,13 @@ const styles = StyleSheet.create({
     gap: spacing.md,
   },
   slotTitle: { ...typography.title, color: colors.text, flex: 1 },
-  statusPill: {
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.xs,
-    borderRadius: radii.pill,
-  },
-  statusText: { ...typography.label },
   slotBody: { ...typography.body, color: colors.text },
 
   returnNote: {
     padding: spacing.md,
     backgroundColor: colors.statusReturnedBg,
     borderRadius: radii.btn,
-    gap: 2,
+    gap: spacing.xs,
   },
   returnLabel: { ...typography.micro, color: colors.statusReturnedText },
   returnText: { ...typography.body, color: colors.text },
@@ -425,22 +418,14 @@ const styles = StyleSheet.create({
   submissionContent: { ...typography.body, color: colors.text },
   submissionImage: {
     width: "100%",
-    aspectRatio: 16 / 9,
+    aspectRatio: assignment.previewAspectRatio,
     borderRadius: radii.btn,
   },
   submissionFile: { ...typography.label, color: colors.textMuted },
 
   submitBtn: {
     padding: spacing.lg,
-    backgroundColor: colors.accent,
-    borderRadius: radii.card,
-    alignItems: "center",
-    minHeight: tapMin,
-    justifyContent: "center",
-    ...shadows.accent,
   },
-  submitBtnPressed: { backgroundColor: colors.accentActive },
-  submitText: { ...typography.subtitle, color: "#fff" },
 
   allLabel: { ...typography.section, color: colors.text, marginTop: spacing.md },
   peerList: { gap: spacing.sm, paddingBottom: spacing.lg },
@@ -454,27 +439,19 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
     gap: spacing.xs,
-    ...shadows.card,
   },
-  peerCellMe: { borderWidth: 2, borderColor: colors.accent },
+  peerCellMe: { borderWidth: borders.medium, borderColor: colors.accent },
   peerName: { ...typography.label, color: colors.text, flex: 1 },
-  peerDot: { width: 10, height: 10, borderRadius: 5 },
-
-  modalBackdrop: {
-    flex: 1,
-    backgroundColor: "rgba(0,0,0,0.4)",
-    justifyContent: "center",
-    alignItems: "center",
-    padding: spacing.xxl,
+  peerDot: {
+    width: assignment.peerDotSize,
+    height: assignment.peerDotSize,
+    borderRadius: assignment.peerDotSize,
   },
+
   modalSheet: {
-    width: "100%",
-    maxWidth: 720,
-    backgroundColor: colors.surface,
-    borderRadius: radii.card,
+    maxWidth: assignment.modalMaxWidth,
     padding: spacing.xl,
     gap: spacing.md,
-    ...shadows.cardHover,
   },
   modalHead: {
     flexDirection: "row",
@@ -483,44 +460,27 @@ const styles = StyleSheet.create({
   },
   modalTitle: { ...typography.title, color: colors.text },
   closeBtn: {
-    width: 36, height: 36, borderRadius: 18,
-    alignItems: "center", justifyContent: "center",
     backgroundColor: colors.surfaceAlt,
   },
-  closeText: { fontSize: 18, color: colors.textMuted },
+  closeText: { ...typography.subtitle, color: colors.textMuted },
+  modalBody: {
+    flexGrow: 0,
+  },
+  modalBodyContent: {
+    gap: spacing.md,
+  },
   contentInput: {
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radii.btn,
     padding: spacing.md,
-    ...typography.body,
-    color: colors.text,
     backgroundColor: colors.bg,
-    minHeight: 120,
+    minHeight: assignment.contentInputMinHeight,
     textAlignVertical: "top",
   },
   modalRow: { flexDirection: "row", gap: spacing.md },
   attachBtn: {
     flex: 1,
-    paddingVertical: spacing.md,
-    borderRadius: radii.btn,
-    borderWidth: 1,
-    borderColor: colors.border,
-    alignItems: "center",
-    minHeight: tapMin,
-    justifyContent: "center",
   },
-  attachBtnPressed: { backgroundColor: colors.surfaceAlt },
   attachText: { ...typography.label, color: colors.textMuted },
   modalSubmit: {
     paddingVertical: spacing.lg,
-    backgroundColor: colors.accent,
-    borderRadius: radii.card,
-    alignItems: "center",
-    minHeight: tapMin,
-    ...shadows.accent,
   },
-  modalSubmitDisabled: { backgroundColor: colors.border, shadowOpacity: 0, elevation: 0 },
-  modalSubmitPressed: { backgroundColor: colors.accentActive },
-  modalSubmitText: { ...typography.subtitle, color: "#fff" },
 });

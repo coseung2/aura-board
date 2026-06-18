@@ -3,13 +3,21 @@ import type { GestureResponderEvent } from "react-native";
 import {
   Image,
   Linking,
-  Pressable,
   StyleSheet,
   Text,
   View,
 } from "react-native";
-import { colors, radii, shadows, spacing, typography } from "../theme/tokens";
+import {
+  borders,
+  colors,
+  media,
+  sizing,
+  spacing,
+  typography,
+} from "../theme/tokens";
 import type { BoardCard } from "../lib/types";
+import { resolveCardAuthorName } from "../lib/card-privacy";
+import { ControlPressable, Pill, SurfaceCard, SurfacePressable } from "./ui";
 
 export function CardView({
   card,
@@ -24,7 +32,7 @@ export function CardView({
     card.attachments?.find((attachment) => attachment.kind === "image")?.url ??
     card.linkImage ??
     null;
-  const authorName = resolveAuthorName(card);
+  const authorName = resolveCardAuthorName(card);
   const dateText = formatCardDate(card.createdAt);
   const fileUrl = card.fileUrl ?? card.attachments?.find((attachment) => attachment.kind === "file")?.url;
   const fileName = card.fileName ?? card.attachments?.find((attachment) => attachment.kind === "file")?.fileName;
@@ -61,7 +69,7 @@ export function CardView({
         ) : null}
 
         {card.linkUrl ? (
-          <Pressable
+          <ControlPressable
             onPress={(event) => openInlineTarget(event, card.linkUrl, onPress)}
             style={styles.linkBox}
             accessibilityRole="link"
@@ -77,21 +85,21 @@ export function CardView({
                 {card.linkDesc}
               </Text>
             ) : null}
-          </Pressable>
+          </ControlPressable>
         ) : null}
 
         {card.videoUrl ? (
-          <Pressable
+          <ControlPressable
             onPress={(event) => openInlineTarget(event, card.videoUrl, onPress)}
             style={styles.videoBox}
             accessibilityRole="link"
           >
             <Text style={styles.videoLabel}>▶ 영상 열기</Text>
-          </Pressable>
+          </ControlPressable>
         ) : null}
 
         {fileUrl ? (
-          <Pressable
+          <ControlPressable
             onPress={(event) => openInlineTarget(event, fileUrl, onPress)}
             style={styles.fileBox}
             accessibilityRole="link"
@@ -100,17 +108,20 @@ export function CardView({
             <Text style={styles.fileName} numberOfLines={1}>
               {fileName ?? "파일 열기"}
             </Text>
-          </Pressable>
+          </ControlPressable>
         ) : null}
 
         {(authorName || dateText) && (
           <View style={styles.authorFooter}>
             {authorName ? (
-              <View style={styles.authorChip}>
-                <Text style={styles.authorName} numberOfLines={1}>
-                  {authorName}
-                </Text>
-              </View>
+              <Pill
+                tone="accent"
+                numberOfLines={1}
+                style={styles.authorChip}
+                textStyle={styles.authorName}
+              >
+                {authorName}
+              </Pill>
             ) : null}
             {dateText ? (
               <Text style={styles.authorTime}>{dateText}</Text>
@@ -119,12 +130,8 @@ export function CardView({
         )}
 
         <View style={styles.engagement}>
-          <View style={styles.chip}>
-            <Text style={styles.chipText}>♡ {likeCount}</Text>
-          </View>
-          <View style={styles.chip}>
-            <Text style={styles.chipText}>💬 {commentCount}</Text>
-          </View>
+          <Pill textStyle={styles.chipText}>♡ {likeCount}</Pill>
+          <Pill textStyle={styles.chipText}>💬 {commentCount}</Pill>
         </View>
       </View>
     </>
@@ -132,24 +139,19 @@ export function CardView({
 
   if (onPress) {
     return (
-      <Pressable
-        style={({ pressed }) => [
-          styles.card,
-          { backgroundColor },
-          pressed && styles.cardPressed,
-        ]}
+      <SurfacePressable
+        style={[styles.card, { backgroundColor }]}
         onPress={onPress}
-        accessibilityRole="button"
       >
         {body}
-      </Pressable>
+      </SurfacePressable>
     );
   }
 
   return (
-    <View style={[styles.card, { backgroundColor }]}>
+    <SurfaceCard style={[styles.card, { backgroundColor }]}>
       {body}
-    </View>
+    </SurfaceCard>
   );
 }
 
@@ -177,15 +179,6 @@ async function openExternalUrl(url: string) {
   }
 }
 
-function resolveAuthorName(card: BoardCard): string | null {
-  if (card.authors && card.authors.length > 0) {
-    const visible = card.authors.slice(0, 3).map((author) => author.displayName);
-    const suffix = card.authors.length > 3 ? ` 외 ${card.authors.length - 3}명` : "";
-    return visible.join(", ") + suffix;
-  }
-  return card.externalAuthorName ?? card.studentAuthorName ?? card.authorName ?? null;
-}
-
 function formatCardDate(iso: string | Date | null | undefined): string | null {
   if (!iso) return null;
   const date = typeof iso === "string" ? new Date(iso) : iso;
@@ -207,24 +200,16 @@ function safeHost(url: string | null): string {
 
 const styles = StyleSheet.create({
   card: {
-    borderRadius: radii.card,
     overflow: "hidden",
-    borderWidth: 1,
-    borderColor: colors.border,
-    ...shadows.card,
-  },
-  cardPressed: {
-    borderColor: colors.borderHover,
-    ...shadows.cardHover,
   },
   image: {
     width: "100%",
-    height: 160,
+    height: media.cardImageHeight,
     backgroundColor: colors.surfaceAlt,
   },
   imageFallback: {
     width: "100%",
-    height: 160,
+    height: media.cardImageHeight,
     backgroundColor: colors.surface,
     alignItems: "center",
     justifyContent: "center",
@@ -240,23 +225,16 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
   },
   title: {
-    fontSize: 14,
-    fontWeight: "600",
-    lineHeight: 20,
+    ...typography.subtitle,
     color: colors.text,
   },
   content: {
-    fontSize: 13,
-    lineHeight: 19,
+    ...typography.micro,
     color: colors.textMuted,
   },
   linkBox: {
     padding: spacing.sm,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.surface,
-    gap: 2,
+    gap: spacing.xs,
   },
   linkHost: {
     ...typography.micro,
@@ -272,10 +250,6 @@ const styles = StyleSheet.create({
   },
   videoBox: {
     padding: spacing.sm,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.surface,
     alignItems: "center",
   },
   videoLabel: {
@@ -287,12 +261,8 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: spacing.sm,
     padding: spacing.sm,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.surface,
   },
-  fileIcon: { fontSize: 16 },
+  fileIcon: { ...typography.label },
   fileName: {
     ...typography.label,
     color: colors.text,
@@ -304,17 +274,11 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
     marginTop: spacing.sm,
     paddingTop: spacing.sm,
-    borderTopWidth: 1,
+    borderTopWidth: borders.hairline,
     borderTopColor: colors.border,
   },
   authorChip: {
-    flexDirection: "row",
-    alignItems: "center",
-    maxWidth: 120,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 2,
-    borderRadius: radii.pill,
-    backgroundColor: colors.accentTintedBg,
+    maxWidth: sizing.authorChipMaxWidth,
   },
   authorName: {
     ...typography.micro,
@@ -326,20 +290,9 @@ const styles = StyleSheet.create({
   },
   engagement: {
     flexDirection: "row",
-    gap: 6,
+    gap: spacing.sm,
     alignItems: "center",
     marginTop: spacing.sm,
-  },
-  chip: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: radii.pill,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.surface,
   },
   chipText: {
     ...typography.badge,

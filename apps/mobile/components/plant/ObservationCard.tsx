@@ -1,6 +1,7 @@
-import { FlatList, Image, Pressable, StyleSheet, Text, View } from "react-native";
-import { colors, radii, shadows, spacing, typography } from "../../theme/tokens";
+import { FlatList, Image, StyleSheet, Text, View } from "react-native";
+import { colors, plant, radii, spacing, typography } from "../../theme/tokens";
 import type { ObservationDTO } from "../../lib/types";
+import { AppButton, SurfaceCard, SurfacePressable } from "../ui";
 
 interface Props {
   observation: ObservationDTO;
@@ -22,18 +23,28 @@ export function ObservationCard({ observation, canEdit, onEdit, onDelete, onOpen
   });
 
   return (
-    <View style={styles.card}>
+    <SurfaceCard style={styles.card}>
       {/* 메타 (날짜) */}
       <View style={styles.meta}>
         <Text style={styles.date}>{dateStr}</Text>
         {canEdit && (
           <View style={styles.actionRow}>
-            <Text style={styles.actionBtn} onPress={onEdit}>
+            <AppButton
+              variant="quiet"
+              style={styles.actionBtn}
+              textStyle={styles.actionText}
+              onPress={onEdit}
+            >
               수정
-            </Text>
-            <Text style={styles.actionBtn} onPress={onDelete}>
+            </AppButton>
+            <AppButton
+              variant="quiet"
+              style={styles.actionBtn}
+              textStyle={styles.deleteText}
+              onPress={onDelete}
+            >
               삭제
-            </Text>
+            </AppButton>
           </View>
         )}
       </View>
@@ -47,14 +58,18 @@ export function ObservationCard({ observation, canEdit, onEdit, onDelete, onOpen
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={styles.imageRow}
           renderItem={({ item: img }) => (
-            <Pressable onPress={() => onOpenImage(img.url)}>
+            <SurfacePressable
+              style={styles.thumbnailButton}
+              onPress={() => onOpenImage(img.url)}
+              accessibilityLabel="관찰 사진 열기"
+            >
               <Image
                 source={{ uri: img.thumbnailUrl ?? img.url }}
                 style={styles.thumbnail}
                 resizeMode="cover"
                 accessibilityLabel="관찰 사진"
               />
-            </Pressable>
+            </SurfacePressable>
           )}
         />
       )}
@@ -72,16 +87,12 @@ export function ObservationCard({ observation, canEdit, onEdit, onDelete, onOpen
           사진 없음: {observation.noPhotoReason}
         </Text>
       ) : null}
-    </View>
+    </SurfaceCard>
   );
 }
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: colors.bgAlt,
-    borderRadius: radii.card,
-    borderWidth: 1,
-    borderColor: colors.border,
     padding: spacing.md,
     gap: spacing.sm,
   },
@@ -99,17 +110,28 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
   },
   actionBtn: {
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs,
+  },
+  actionText: {
     ...typography.micro,
     color: colors.accent,
-    fontWeight: "600",
+  },
+  deleteText: {
+    ...typography.micro,
+    color: colors.danger,
   },
   imageRow: {
     gap: spacing.sm,
   },
+  thumbnailButton: {
+    borderRadius: radii.btn,
+    overflow: "hidden",
+  },
   thumbnail: {
-    width: 80,
-    height: 60,
-    borderRadius: 8,
+    width: plant.observationThumbWidth,
+    height: plant.observationThumbHeight,
+    borderRadius: radii.btn,
     backgroundColor: colors.surfaceAlt,
   },
   memo: {

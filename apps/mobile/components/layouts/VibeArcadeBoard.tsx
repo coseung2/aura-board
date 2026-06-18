@@ -4,16 +4,23 @@ import {
   FlatList,
   Image,
   Modal,
-  Pressable,
   StyleSheet,
   Text,
-  TextInput,
+  useWindowDimensions,
   View,
 } from "react-native";
 import { WebView } from "react-native-webview";
-import { colors, radii, shadows, spacing, tapMin, typography } from "../../theme/tokens";
+import {
+  borders,
+  colors,
+  iconSizes,
+  spacing,
+  typography,
+  vibe,
+} from "../../theme/tokens";
 import { apiFetch, ApiError, getApiBase, streamSse } from "../../lib/api";
 import type { BoardDetailResponse } from "../../lib/types";
+import { AppButton, SurfaceCard, SurfacePressable, TextField } from "../ui";
 
 // 코딩 교실(vibe-arcade). 학생이 LLM 과 대화해 HTML 프로젝트 만드는 공간.
 // 3 구역 레이아웃:
@@ -35,10 +42,11 @@ export function VibeArcadeBoard({
   data,
 }: {
   data: BoardDetailResponse;
-  onMutate: () => void;
 }) {
   const cfg = data.layoutData.vibeArcade?.config;
   const projects = data.layoutData.vibeArcade?.projects ?? [];
+  const { width } = useWindowDimensions();
+  const compact = width < vibe.compactBreakpoint;
 
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
@@ -130,17 +138,18 @@ export function VibeArcadeBoard({
   }
 
   return (
-    <View style={styles.root}>
-      <View style={styles.pane}>
+    <View style={[styles.root, compact && styles.rootCompact]}>
+      <SurfaceCard style={[styles.pane, compact && styles.paneCompact]}>
         <Text style={styles.paneTitle}>📚 작품 갤러리</Text>
         <FlatList
           data={projects}
+          horizontal={compact}
           keyExtractor={(p) => p.id}
-          contentContainerStyle={styles.galleryList}
+          contentContainerStyle={[styles.galleryList, compact && styles.galleryListCompact]}
           renderItem={({ item }) => (
-            <Pressable
+            <SurfacePressable
               onPress={() => setPlayTarget({ id: item.id, title: item.title })}
-              style={({ pressed }) => [styles.galleryItem, pressed && styles.galleryItemPressed]}
+              style={[styles.galleryItem, compact && styles.galleryItemCompact]}
             >
               {item.thumbnailUrl ? (
                 <Image
@@ -157,15 +166,15 @@ export function VibeArcadeBoard({
               <Text style={styles.galleryMeta}>
                 {item.moderationStatus === "approved" ? "✓ 공개" : "개인"}
               </Text>
-            </Pressable>
+            </SurfacePressable>
           )}
           ListEmptyComponent={
             <Text style={styles.galleryEmpty}>아직 공개된 작품이 없어요.</Text>
           }
         />
-      </View>
+      </SurfaceCard>
 
-      <View style={styles.chatPane}>
+      <SurfaceCard style={styles.chatPane}>
         <Text style={styles.paneTitle}>💬 AI 와 함께 만들기</Text>
         <FlatList
           data={messages}
@@ -192,38 +201,33 @@ export function VibeArcadeBoard({
         />
         {error ? <Text style={styles.errorText}>{error}</Text> : null}
         <View style={styles.inputRow}>
-          <TextInput
+          <TextField
             style={styles.input}
             value={input}
             onChangeText={setInput}
             placeholder={streaming ? "답변을 받는 중…" : "무엇을 만들까요?"}
-            placeholderTextColor={colors.textFaint}
             editable={!streaming}
             onSubmitEditing={send}
             multiline
           />
           {streaming ? (
-            <Pressable
-              style={({ pressed }) => [styles.sendBtn, styles.cancelBtn, pressed && styles.cancelBtnPressed]}
+            <AppButton
+              variant="danger"
               onPress={cancel}
             >
-              <Text style={styles.sendText}>중지</Text>
-            </Pressable>
+              중지
+            </AppButton>
           ) : (
-            <Pressable
-              style={({ pressed }) => [
-                styles.sendBtn,
-                input.trim().length === 0 && styles.sendBtnDisabled,
-                pressed && input.trim().length > 0 && styles.sendBtnPressed,
-              ]}
+            <AppButton
+              style={styles.sendBtn}
               onPress={send}
               disabled={input.trim().length === 0}
             >
-              <Text style={styles.sendText}>보내기</Text>
-            </Pressable>
+              보내기
+            </AppButton>
           )}
         </View>
-      </View>
+      </SurfaceCard>
 
       <PlayModal
         project={playTarget}
@@ -278,18 +282,20 @@ function PlayModal({ project, onClose }: { project: PlayProject | null; onClose:
     <Modal visible={true} animationType="slide" onRequestClose={onClose}>
       <View style={styles.modalRoot}>
         <View style={styles.modalBar}>
-          <Pressable
-            style={({ pressed }) => [styles.closeBtn, pressed && styles.closeBtnPressed]}
+          <AppButton
+            variant="quiet"
+            style={styles.closeBtn}
+            textStyle={styles.closeText}
             onPress={onClose}
           >
-            <Text style={styles.closeText}>닫기</Text>
-          </Pressable>
+            닫기
+          </AppButton>
           <Text style={styles.modalTitle} numberOfLines={1}>{project.title}</Text>
-          <View style={{ width: 80 }} />
+          <View style={styles.modalSpacer} />
         </View>
         {error ? (
           <View style={styles.modalLoading}>
-            <Text style={{ ...typography.body, color: "#fff" }}>{error}</Text>
+            <Text style={styles.modalErrorText}>{error}</Text>
           </View>
         ) : !url ? (
           <View style={styles.modalLoading}>
@@ -322,19 +328,20 @@ const styles = StyleSheet.create({
     padding: spacing.lg,
     gap: spacing.lg,
   },
+  rootCompact: {
+    flexDirection: "column",
+  },
   pane: {
-    width: 280,
-    backgroundColor: colors.surface,
-    borderRadius: radii.card,
+    width: vibe.galleryPaneWidth,
     padding: spacing.md,
-    ...shadows.card,
+  },
+  paneCompact: {
+    width: "100%",
+    maxHeight: vibe.compactGalleryMaxHeight,
   },
   chatPane: {
     flex: 1,
-    backgroundColor: colors.surface,
-    borderRadius: radii.card,
     padding: spacing.md,
-    ...shadows.card,
     gap: spacing.sm,
   },
   paneTitle: {
@@ -343,22 +350,26 @@ const styles = StyleSheet.create({
     marginBottom: spacing.sm,
   },
   galleryList: { gap: spacing.md, paddingBottom: spacing.md },
+  galleryListCompact: {
+    paddingBottom: spacing.none,
+    paddingRight: spacing.md,
+  },
   galleryItem: {
     padding: spacing.sm,
-    borderRadius: radii.card,
     backgroundColor: colors.bg,
     gap: spacing.xs,
     marginBottom: spacing.sm,
   },
-  galleryItemPressed: { backgroundColor: colors.surfaceAlt },
+  galleryItemCompact: {
+    width: vibe.compactGalleryItemWidth,
+  },
   thumb: {
     width: "100%",
-    aspectRatio: 4 / 3,
-    borderRadius: radii.btn,
+    aspectRatio: vibe.thumbnailAspectRatio,
     backgroundColor: colors.surfaceAlt,
   },
   thumbFallback: { alignItems: "center", justifyContent: "center" },
-  thumbFallbackEmoji: { fontSize: 40 },
+  thumbFallbackEmoji: { fontSize: iconSizes.xl },
   galleryTitle: { ...typography.label, color: colors.text },
   galleryMeta: { ...typography.micro, color: colors.textFaint },
   galleryEmpty: {
@@ -374,11 +385,10 @@ const styles = StyleSheet.create({
     paddingTop: spacing.xl,
     gap: spacing.sm,
   },
-  chatEmptyEmoji: { fontSize: 56 },
+  chatEmptyEmoji: { fontSize: iconSizes.hero },
   chatEmptyText: { ...typography.body, color: colors.textMuted, textAlign: "center" },
   bubble: {
     padding: spacing.md,
-    borderRadius: radii.card,
     maxWidth: "90%",
     marginBottom: spacing.sm,
   },
@@ -389,7 +399,7 @@ const styles = StyleSheet.create({
   bubbleBot: {
     backgroundColor: colors.bg,
     alignSelf: "flex-start",
-    borderWidth: 1,
+    borderWidth: borders.hairline,
     borderColor: colors.border,
   },
   bubbleText: { ...typography.body, color: colors.text },
@@ -402,30 +412,14 @@ const styles = StyleSheet.create({
   },
   input: {
     flex: 1,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radii.card,
     padding: spacing.md,
-    ...typography.body,
-    color: colors.text,
     backgroundColor: colors.bg,
-    minHeight: tapMin,
-    maxHeight: 120,
+    maxHeight: vibe.inputMaxHeight,
   },
   sendBtn: {
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.md,
-    backgroundColor: colors.accent,
-    borderRadius: radii.card,
-    minHeight: tapMin,
-    justifyContent: "center",
   },
-  sendBtnDisabled: { backgroundColor: colors.border },
-  sendBtnPressed: { backgroundColor: colors.accentActive },
-  sendText: { ...typography.label, color: "#fff" },
-  cancelBtn: { backgroundColor: colors.danger },
-  cancelBtnPressed: { backgroundColor: colors.dangerActive },
-
   gateWrap: {
     flex: 1,
     alignItems: "center",
@@ -433,7 +427,7 @@ const styles = StyleSheet.create({
     padding: spacing.xxl,
     gap: spacing.md,
   },
-  gateEmoji: { fontSize: 80 },
+  gateEmoji: { fontSize: iconSizes.gate },
   gateTitle: { ...typography.title, color: colors.text },
   gateMsg: { ...typography.body, color: colors.textMuted, textAlign: "center" },
 
@@ -443,22 +437,20 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
     padding: spacing.md,
-    backgroundColor: "#000",
+    backgroundColor: colors.vibeModalBackdrop,
   },
   closeBtn: {
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    borderRadius: radii.btn,
-    backgroundColor: "rgba(255,255,255,0.15)",
+    backgroundColor: colors.vibeModalControlBg,
   },
-  closeBtnPressed: { backgroundColor: "rgba(255,255,255,0.3)" },
-  closeText: { color: "#fff", ...typography.label },
-  modalTitle: { color: "#fff", ...typography.subtitle, flex: 1, textAlign: "center" },
+  closeText: { color: colors.onAccent, ...typography.label },
+  modalTitle: { color: colors.onAccent, ...typography.subtitle, flex: 1, textAlign: "center" },
+  modalSpacer: { width: vibe.modalSpacerWidth },
+  modalErrorText: { ...typography.body, color: colors.onAccent },
   modalLoading: {
     flex: 1,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "#000",
+    backgroundColor: colors.vibeModalBackdrop,
   },
-  webview: { flex: 1, backgroundColor: "#000" },
+  webview: { flex: 1, backgroundColor: colors.vibeModalBackdrop },
 });

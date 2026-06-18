@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import {
   ActivityIndicator,
-  Pressable,
   StyleSheet,
   Text,
   View,
@@ -10,8 +9,7 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import {
   colors,
-  radii,
-  shadows,
+  iconSizes,
   spacing,
   typography,
 } from "../../../theme/tokens";
@@ -27,6 +25,7 @@ import { AssignmentBoard } from "../../../components/layouts/AssignmentBoard";
 import { PlantRoadmapBoard } from "../../../components/layouts/PlantRoadmapBoard";
 import { DJQueueBoard } from "../../../components/layouts/DJQueueBoard";
 import { ReadOnlyCardsBoard } from "../../../components/layouts/ReadOnlyCardsBoard";
+import { AppButton } from "../../../components/ui";
 
 // 학생 앱 보드 상세 dispatcher. /api/student/board/:slug 한 번 fetch 후
 // board.layout 에 따라 맞는 레이아웃 컴포넌트 렌더.
@@ -83,12 +82,11 @@ export default function BoardDetail() {
         <View style={styles.center}>
           <Text style={styles.errorEmoji}>🚫</Text>
           <Text style={styles.errorTitle}>{error ?? "알 수 없는 오류"}</Text>
-          <Pressable
-            style={({ pressed }) => [styles.retryBtn, pressed && styles.retryBtnPressed]}
+          <AppButton
             onPress={() => router.back()}
           >
-            <Text style={styles.retryText}>돌아가기</Text>
-          </Pressable>
+            돌아가기
+          </AppButton>
         </View>
       </SafeAreaView>
     );
@@ -111,7 +109,7 @@ function renderLayout(
     case "columns":
       return <ColumnsBoard data={data} onMutate={reload} />;
     case "vibe-arcade":
-      return <VibeArcadeBoard data={data} onMutate={reload} />;
+      return <VibeArcadeBoard data={data} />;
     case "quiz":
       return <QuizBoard data={data} onMutate={reload} />;
     case "assignment":
@@ -131,7 +129,7 @@ function renderLayout(
     case "assessment":
     case "drawing":
     default:
-      return <ReadOnlyCardsBoard data={data} onMutate={reload} />;
+      return <ReadOnlyCardsBoard data={data} />;
   }
 }
 
@@ -146,16 +144,6 @@ const styles = StyleSheet.create({
     padding: spacing.xxl,
   },
   loadingText: { ...typography.body, color: colors.textMuted },
-  errorEmoji: { fontSize: 64 },
+  errorEmoji: { fontSize: iconSizes.empty },
   errorTitle: { ...typography.title, color: colors.text, textAlign: "center" },
-  retryBtn: {
-    marginTop: spacing.md,
-    paddingHorizontal: spacing.xl,
-    paddingVertical: spacing.md,
-    backgroundColor: colors.accent,
-    borderRadius: radii.card,
-    ...shadows.accent,
-  },
-  retryBtnPressed: { backgroundColor: colors.accentActive },
-  retryText: { ...typography.subtitle, color: "#fff" },
 });

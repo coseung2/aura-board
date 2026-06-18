@@ -2,7 +2,6 @@ import { useCallback, useState } from "react";
 import {
   ActivityIndicator,
   Image,
-  Pressable,
   RefreshControl,
   ScrollView,
   StyleSheet,
@@ -13,7 +12,10 @@ import {
 import { useFocusEffect, useRouter, type Href } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import {
+  borders,
   colors,
+  dashboard,
+  iconSizes,
   radii,
   shadows,
   spacing,
@@ -30,12 +32,11 @@ import type {
   StudentDuty,
   WalletSummary,
 } from "../../lib/types";
+import { AppButton, Pill, SurfaceCard, SurfacePressable } from "../../components/ui";
 
 // 학생 대시보드. /api/student/me 로 본인 + 학급 보드 로딩,
 // /api/my/wallet, /api/showcase/classroom/:id 로 위젯 추가.
 // 웹 StudentDashboard 시각/구조 1:1 포팅.
-
-const SHOWCASE_LIMIT = 10;
 
 export default function StudentHome() {
   const router = useRouter();
@@ -52,14 +53,21 @@ export default function StudentHome() {
   const [refreshing, setRefreshing] = useState(false);
   const [loggingOut, setLoggingOut] = useState(false);
 
-  const columnCount = width < 560 ? 1 : width < 920 ? 2 : width < 1280 ? 3 : 4;
+  const columnCount =
+    width < dashboard.columns.one
+      ? 1
+      : width < dashboard.columns.two
+        ? 2
+        : width < dashboard.columns.three
+          ? 3
+          : 4;
   const gridGap = spacing.lg;
 
   const loadShowcase = useCallback(async (classroomId: string) => {
     setShowcaseLoading(true);
     try {
       const res = await apiFetch<{ entries: ShowcaseEntryDTO[] }>(
-        `/api/showcase/classroom/${encodeURIComponent(classroomId)}?limit=${SHOWCASE_LIMIT}`,
+        `/api/showcase/classroom/${encodeURIComponent(classroomId)}?limit=${dashboard.showcaseLimit}`,
       );
       setShowcaseEntries(res.entries);
     } catch {
@@ -145,18 +153,14 @@ export default function StudentHome() {
           <Text style={styles.errorEmoji}>😵</Text>
           <Text style={styles.errorTitle}>연결할 수 없어요</Text>
           <Text style={styles.errorMsg}>{error}</Text>
-          <Pressable
-            style={({ pressed }) => [
-              styles.retryBtn,
-              pressed && styles.retryBtnPressed,
-            ]}
+          <AppButton
             onPress={() => {
               setLoading(true);
               load();
             }}
           >
-            <Text style={styles.retryText}>다시 시도</Text>
-          </Pressable>
+            다시 시도
+          </AppButton>
         </View>
       </SafeAreaView>
     );
@@ -184,23 +188,16 @@ export default function StudentHome() {
             <Text style={styles.greeting}>
               {me?.student.name}님, 안녕하세요
             </Text>
-            <View style={styles.classroomBadge}>
-              <Text style={styles.classroomBadgeText}>{classroomName}</Text>
-            </View>
+            <Pill tone="accent">{classroomName}</Pill>
           </View>
-          <Pressable
-            style={({ pressed }) => [
-              styles.logoutBtn,
-              pressed && styles.logoutBtnPressed,
-            ]}
+          <AppButton
+            variant="secondary"
             onPress={handleLogout}
             disabled={loggingOut}
             hitSlop={8}
           >
-            <Text style={styles.logoutText}>
-              {loggingOut ? "로그아웃 중…" : "로그아웃"}
-            </Text>
-          </Pressable>
+            {loggingOut ? "로그아웃 중…" : "로그아웃"}
+          </AppButton>
         </View>
 
         <ShowcaseBand
@@ -218,17 +215,12 @@ export default function StudentHome() {
           }
         />
 
-        <Pressable
-          style={({ pressed }) => [
-            styles.portfolioCta,
-            pressed && styles.portfolioCtaPressed,
-          ]}
+        <AppButton
+          style={styles.portfolioCta}
           onPress={() => router.push("/(student)/portfolio" as Href)}
         >
-          <Text style={styles.portfolioCtaText}>
-            우리 학급 포트폴리오 보기
-          </Text>
-        </Pressable>
+          우리 학급 포트폴리오 보기
+        </AppButton>
 
         <WalletCard
           wallet={wallet}
@@ -265,7 +257,7 @@ export default function StudentHome() {
                   ]}
                 >
                   {row.map((board) => (
-                    <View key={board.id} style={{ flex: 1 }}>
+                    <View key={board.id} style={styles.gridCell}>
                       <BoardCard board={board} />
                     </View>
                   ))}
@@ -274,7 +266,7 @@ export default function StudentHome() {
                         (_, idx) => (
                           <View
                             key={`placeholder-${idx}`}
-                            style={{ flex: 1 }}
+                            style={styles.gridCell}
                             pointerEvents="none"
                           />
                         ),
@@ -342,9 +334,14 @@ function ShowcaseBand({
         <Text style={styles.showcaseTitle}>
           <Text style={styles.showcaseTitleIcon}>🌟</Text> 우리 학급 자랑해요
         </Text>
-        <Pressable onPress={onMore} hitSlop={8}>
-          <Text style={styles.showcaseMore}>더 보기 →</Text>
-        </Pressable>
+        <AppButton
+          variant="quiet"
+          textStyle={styles.showcaseMore}
+          onPress={onMore}
+          hitSlop={8}
+        >
+          더 보기 →
+        </AppButton>
       </View>
       <ScrollView
         horizontal
@@ -373,13 +370,11 @@ function ShowcaseChip({
   const card = entry.card;
   const previewImage = getCardPreviewImage(card);
   const hasVideo = hasCardVideo(card);
+  const authorLabel = card.sourceBoard.anonymousAuthor ? "익명" : entry.studentName;
 
   return (
-    <Pressable
-      style={({ pressed }) => [
-        styles.showcaseChip,
-        pressed && styles.showcaseChipPressed,
-      ]}
+    <SurfacePressable
+      style={styles.showcaseChip}
       onPress={onPress}
     >
       <View style={styles.showcaseChipBadge}>
@@ -409,13 +404,18 @@ function ShowcaseChip({
           </Text>
         ) : null}
         <View style={styles.showcaseMetaRow}>
-          <Text style={styles.showcaseAuthor} numberOfLines={1}>
-            {entry.studentName}
-          </Text>
+          <Pill
+            tone="accent"
+            numberOfLines={1}
+            style={styles.showcaseAuthor}
+            textStyle={styles.showcaseAuthorText}
+          >
+            {authorLabel}
+          </Pill>
           <Text style={styles.showcaseDate}>{formatShortDate(card.createdAt)}</Text>
         </View>
       </View>
-    </Pressable>
+    </SurfacePressable>
   );
 }
 
@@ -429,22 +429,19 @@ function WalletCard({
   onDetail: () => void;
 }) {
   return (
-    <View style={styles.walletCard}>
+    <SurfaceCard style={styles.walletCard}>
       <View style={styles.walletHeader}>
         <View>
           <Text style={styles.walletEyebrow}>개인 금융</Text>
           <Text style={styles.walletTitle}>내 통장과 적금</Text>
         </View>
-        <Pressable
-          style={({ pressed }) => [
-            styles.walletDetailBtn,
-            pressed && styles.walletDetailBtnPressed,
-          ]}
+        <AppButton
+          variant="secondary"
           onPress={onDetail}
           hitSlop={8}
         >
-          <Text style={styles.walletDetailText}>자세히 보기</Text>
-        </Pressable>
+          자세히 보기
+        </AppButton>
       </View>
 
       {loading || !wallet ? (
@@ -470,7 +467,7 @@ function WalletCard({
           )}
         </>
       )}
-    </View>
+    </SurfaceCard>
   );
 }
 
@@ -491,12 +488,9 @@ function DutySection({
       <Text style={styles.sectionSub}>내 역할</Text>
       <View style={styles.dutyGrid}>
         {visible.map((duty) => (
-          <Pressable
+          <SurfacePressable
             key={`${duty.classroomId}-${duty.roleKey}`}
-            style={({ pressed }) => [
-              styles.dutyCard,
-              pressed && styles.dutyCardPressed,
-            ]}
+            style={styles.dutyCard}
             onPress={() => onOpen(duty)}
           >
             <Text style={styles.dutyEmoji}>{duty.emoji ?? roleEmoji(duty.roleKey)}</Text>
@@ -506,8 +500,10 @@ function DutySection({
                 {duty.classroomName}
               </Text>
             </View>
-            <Text style={styles.dutyCta}>시작</Text>
-          </Pressable>
+            <Pill tone="accent" textStyle={styles.dutyCtaText}>
+              시작
+            </Pill>
+          </SurfacePressable>
         ))}
       </View>
     </View>
@@ -557,11 +553,8 @@ function formatShortDate(value: string): string {
 function BoardCard({ board }: { board: BoardMeta }) {
   const router = useRouter();
   return (
-    <Pressable
-      style={({ pressed }) => [
-        styles.boardCard,
-        pressed && styles.boardCardPressed,
-      ]}
+    <SurfacePressable
+      style={styles.boardCard}
       onPress={() =>
         router.push(`/(student)/board/${board.slug}?layout=${board.layout}`)
       }
@@ -570,7 +563,7 @@ function BoardCard({ board }: { board: BoardMeta }) {
         {board.title}
       </Text>
       <Text style={styles.boardCardMeta}>{layoutLabel(board.layout)}</Text>
-    </Pressable>
+    </SurfacePressable>
   );
 }
 
@@ -591,24 +584,13 @@ const styles = StyleSheet.create({
     gap: spacing.md,
     padding: spacing.xxl,
   },
-  errorEmoji: { fontSize: 72 },
+  errorEmoji: { fontSize: iconSizes.gate },
   errorTitle: { ...typography.title, color: colors.text },
   errorMsg: {
     ...typography.body,
     color: colors.textMuted,
     textAlign: "center",
   },
-  retryBtn: {
-    marginTop: spacing.md,
-    paddingHorizontal: spacing.xl,
-    paddingVertical: spacing.md,
-    backgroundColor: colors.accent,
-    borderRadius: radii.card,
-    ...shadows.accent,
-  },
-  retryBtnPressed: { backgroundColor: colors.accentActive },
-  retryText: { ...typography.subtitle, color: "#fff" },
-
   scrollContent: {
     paddingHorizontal: spacing.xxl,
     paddingBottom: spacing.xxl,
@@ -630,33 +612,12 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
   },
   greeting: { ...typography.display, color: colors.text },
-  classroomBadge: {
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.xs,
-    borderRadius: radii.pill,
-    backgroundColor: colors.accentTintedBg,
-  },
-  classroomBadgeText: {
-    ...typography.label,
-    color: colors.accentTintedText,
-  },
-  logoutBtn: {
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.sm,
-    borderRadius: radii.btn,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.surface,
-  },
-  logoutBtnPressed: { backgroundColor: colors.surfaceAlt },
-  logoutText: { ...typography.label, color: colors.textMuted },
-
   showcaseBand: {
     marginHorizontal: -spacing.xxl,
     paddingHorizontal: spacing.xxl,
     paddingTop: spacing.lg,
     paddingBottom: spacing.md,
-    backgroundColor: "#eaf6ff",
+    backgroundColor: colors.showcaseBand,
     gap: spacing.md,
   },
   showcaseHead: {
@@ -669,7 +630,7 @@ const styles = StyleSheet.create({
     ...typography.section,
     color: colors.text,
   },
-  showcaseTitleIcon: { fontSize: 18 },
+  showcaseTitleIcon: { fontSize: iconSizes.md },
   showcaseMore: {
     ...typography.label,
     color: colors.accent,
@@ -679,43 +640,35 @@ const styles = StyleSheet.create({
     paddingBottom: spacing.xs,
   },
   showcaseChip: {
-    width: 310,
-    minHeight: 282,
-    backgroundColor: colors.surface,
-    borderRadius: radii.card,
+    width: dashboard.showcaseCardWidth,
+    minHeight: dashboard.showcaseCardMinHeight,
     overflow: "hidden",
-    ...shadows.card,
     position: "relative",
   },
-  showcaseChipPressed: {
-    backgroundColor: colors.surfaceAlt,
-    transform: [{ scale: 0.98 }],
-  },
   showcaseChipSkeleton: {
-    width: 310,
-    height: 282,
+    width: dashboard.showcaseCardWidth,
+    height: dashboard.showcaseSkeletonHeight,
     borderRadius: radii.card,
-    backgroundColor: "rgba(0, 0, 0, 0.06)",
+    backgroundColor: colors.surfaceAlt,
   },
   showcaseChipBadge: {
     position: "absolute",
     top: spacing.md,
     right: spacing.md,
-    width: 24,
-    height: 24,
-    borderRadius: 12,
+    width: dashboard.badgeSize,
+    height: dashboard.badgeSize,
+    borderRadius: radii.pill,
     backgroundColor: colors.warning,
     alignItems: "center",
     justifyContent: "center",
-    ...shadows.card,
   },
-  showcaseChipBadgeText: { fontSize: 12 },
+  showcaseChipBadgeText: { ...typography.badge },
   showcasePreview: {
-    height: 150,
+    height: dashboard.showcasePreviewHeight,
     backgroundColor: colors.bgAlt,
     alignItems: "center",
     justifyContent: "center",
-    borderBottomWidth: 1,
+    borderBottomWidth: borders.hairline,
     borderBottomColor: colors.border,
   },
   showcasePreviewImage: {
@@ -724,9 +677,9 @@ const styles = StyleSheet.create({
   },
   showcasePlay: {
     position: "absolute",
-    width: 48,
-    height: 48,
-    borderRadius: 24,
+    width: dashboard.playSize,
+    height: dashboard.playSize,
+    borderRadius: radii.pill,
     backgroundColor: colors.surface,
     alignItems: "center",
     justifyContent: "center",
@@ -734,8 +687,8 @@ const styles = StyleSheet.create({
   },
   showcasePlayText: {
     color: colors.text,
-    fontSize: 18,
-    marginLeft: 2,
+    fontSize: iconSizes.md,
+    marginLeft: spacing.xs,
   },
   showcaseChipBody: { gap: spacing.xs, padding: spacing.lg },
   showcaseChipTitle: { ...typography.section, color: colors.text },
@@ -751,34 +704,20 @@ const styles = StyleSheet.create({
     marginTop: spacing.xs,
   },
   showcaseAuthor: {
+    maxWidth: dashboard.authorMaxWidth,
+  },
+  showcaseAuthorText: {
     ...typography.badge,
     color: colors.accent,
-    backgroundColor: colors.accentTintedBg,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: spacing.xs,
-    borderRadius: radii.pill,
-    maxWidth: 120,
   },
   showcaseDate: { ...typography.micro, color: colors.textMuted },
 
   portfolioCta: {
-    backgroundColor: colors.accent,
-    borderRadius: radii.card,
     paddingVertical: spacing.lg,
-    alignItems: "center",
-    ...shadows.accent,
   },
-  portfolioCtaPressed: { backgroundColor: colors.accentActive },
-  portfolioCtaText: { ...typography.subtitle, color: "#fff" },
-
   walletCard: {
-    backgroundColor: colors.surface,
-    borderRadius: radii.card,
     padding: spacing.xl,
     gap: spacing.lg,
-    ...shadows.card,
-    borderWidth: 1,
-    borderColor: colors.border,
   },
   walletHeader: {
     flexDirection: "row",
@@ -792,16 +731,6 @@ const styles = StyleSheet.create({
     marginBottom: spacing.xs,
   },
   walletTitle: { ...typography.title, color: colors.text },
-  walletDetailBtn: {
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    borderRadius: radii.btn,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.surface,
-  },
-  walletDetailBtnPressed: { backgroundColor: colors.surfaceAlt },
-  walletDetailText: { ...typography.label, color: colors.text },
   walletBalanceRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -831,32 +760,19 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
   },
   dutyCard: {
-    minHeight: 74,
+    minHeight: dashboard.dutyMinHeight,
     flexDirection: "row",
     alignItems: "center",
     gap: spacing.md,
     padding: spacing.lg,
-    borderRadius: radii.card,
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-    ...shadows.card,
   },
-  dutyCardPressed: {
-    backgroundColor: colors.surfaceAlt,
-    borderColor: colors.borderHover,
-  },
-  dutyEmoji: { fontSize: 28, width: 36, textAlign: "center" },
+  dutyEmoji: { fontSize: iconSizes.lg, width: dashboard.dutyIconWidth, textAlign: "center" },
   dutyBody: { flex: 1, minWidth: 0, gap: spacing.xs },
   dutyRole: { ...typography.section, color: colors.text },
   dutyClassroom: { ...typography.label, color: colors.textMuted },
-  dutyCta: {
+  dutyCtaText: {
     ...typography.label,
     color: colors.accent,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.xs,
-    borderRadius: radii.pill,
-    backgroundColor: colors.accentTintedBg,
   },
 
   sectionSub: {
@@ -867,20 +783,12 @@ const styles = StyleSheet.create({
   },
   boardGrid: { marginTop: spacing.xs },
   gridRow: { flexDirection: "row" },
+  gridCell: { flex: 1 },
   boardCard: {
     flex: 1,
-    minHeight: 88,
-    backgroundColor: colors.surface,
-    borderRadius: radii.card,
+    minHeight: dashboard.boardMinHeight,
     padding: spacing.md,
     gap: spacing.sm,
-    ...shadows.card,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  boardCardPressed: {
-    backgroundColor: colors.surfaceAlt,
-    borderColor: colors.borderHover,
   },
   boardCardTitle: { ...typography.section, color: colors.text },
   boardCardMeta: { ...typography.label, color: colors.textMuted, marginTop: "auto" },
@@ -890,7 +798,7 @@ const styles = StyleSheet.create({
     paddingTop: spacing.xxxl,
     gap: spacing.md,
   },
-  emptyEmoji: { fontSize: 64 },
+  emptyEmoji: { fontSize: iconSizes.empty },
   emptyTitle: { ...typography.title, color: colors.text },
   emptyMsg: {
     ...typography.body,

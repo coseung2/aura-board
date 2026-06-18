@@ -5,6 +5,7 @@ import { getCurrentUser } from "@/lib/auth";
 import { getCurrentStudent } from "@/lib/student-auth";
 import { getEffectiveBoardRole } from "@/lib/rbac";
 import { touchBoardUpdatedAt } from "@/lib/board-touch";
+import { resolveCardAuthorLabels } from "@/lib/card-author-labels";
 
 const PatchBody = z.object({
   status: z.enum(["approved", "rejected", "played"]),
@@ -13,7 +14,7 @@ const PatchBody = z.object({
 async function resolveBoard(idOrSlug: string) {
   return db.board.findFirst({
     where: { OR: [{ id: idOrSlug }, { slug: idOrSlug }] },
-    select: { id: true, layout: true, classroomId: true },
+    select: { id: true, layout: true, classroomId: true, anonymousAuthor: true },
   });
 }
 
@@ -133,8 +134,17 @@ export async function PATCH(
 
   // classroom-boards-tab "🟢 새 활동" 배지 — 큐 상태 변경도 활동 신호.
   await touchBoardUpdatedAt(board.id);
+  const authorLabels = await resolveCardAuthorLabels(updated);
 
-  return NextResponse.json({ card: updated });
+  return NextResponse.json({
+    card: {
+      ...updated,
+      ...authorLabels,
+      createdAt: updated.createdAt.toISOString(),
+      updatedAt: updated.updatedAt.toISOString(),
+      anonymousAuthor: board.anonymousAuthor,
+    },
+  });
 }
 
 async function resolveSubmitterName(

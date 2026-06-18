@@ -1,6 +1,7 @@
 import { StyleSheet, Text, View } from "react-native";
-import { colors, radii, shadows, spacing, typography } from "../../theme/tokens";
+import { colors, plant, radii, spacing, typography } from "../../theme/tokens";
 import type { StudentPlantDTO, StageDTO } from "../../lib/types";
+import { SurfaceCard } from "../ui";
 
 interface Props {
   plant: StudentPlantDTO;
@@ -40,7 +41,7 @@ export function PlantHero({
   return (
     <View style={styles.hero}>
       {/* 메인 카드 */}
-      <View style={styles.mainCard}>
+      <SurfaceCard style={styles.mainCard}>
         <Text style={styles.eyebrow}>관찰 로드맵</Text>
         <View style={styles.titleRow}>
           <Text style={styles.emoji}>{plant.species.emoji}</Text>
@@ -75,10 +76,10 @@ export function PlantHero({
             <Text style={styles.statBold}>{formatLastObserved(daysSinceLastObs)}</Text>
           </Text>
         </View>
-      </View>
+      </SurfaceCard>
 
       {/* 미션 카드 */}
-      <View style={styles.missionCard}>
+      <SurfaceCard style={styles.missionCard}>
         <Text style={styles.eyebrow}>이번 주 미션</Text>
         <Text style={styles.missionTitle}>
           {currentStage.icon} {currentStage.nameKo} 관찰하기
@@ -88,7 +89,7 @@ export function PlantHero({
             • {point}
           </Text>
         ))}
-      </View>
+      </SurfaceCard>
     </View>
   );
 }
@@ -99,17 +100,13 @@ const styles = StyleSheet.create({
     marginBottom: spacing.lg,
   },
   mainCard: {
-    backgroundColor: colors.surface,
-    borderRadius: radii.card,
     padding: spacing.xl,
     gap: spacing.md,
-    ...shadows.card,
   },
   eyebrow: {
     ...typography.badge,
     color: colors.textMuted,
     textTransform: "uppercase",
-    letterSpacing: 0.5,
   },
   titleRow: {
     flexDirection: "row",
@@ -117,11 +114,11 @@ const styles = StyleSheet.create({
     gap: spacing.md,
   },
   emoji: {
-    fontSize: 48,
+    fontSize: plant.heroEmojiSize,
   },
   titleText: {
     flex: 1,
-    gap: 2,
+    gap: spacing.xxs,
   },
   speciesName: {
     ...typography.title,
@@ -149,15 +146,15 @@ const styles = StyleSheet.create({
     fontWeight: "700",
   },
   progressTrack: {
-    height: 8,
+    height: plant.progressHeight,
     backgroundColor: colors.surfaceAlt,
-    borderRadius: 4,
+    borderRadius: radii.pill,
     overflow: "hidden",
   },
   progressFill: {
     height: "100%",
     backgroundColor: colors.plantActive,
-    borderRadius: 4,
+    borderRadius: radii.pill,
   },
   statRow: {
     flexDirection: "row",
@@ -174,7 +171,6 @@ const styles = StyleSheet.create({
   },
   missionCard: {
     backgroundColor: colors.accentTintedBg,
-    borderRadius: radii.card,
     padding: spacing.lg,
     gap: spacing.xs,
   },

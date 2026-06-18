@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
-  Pressable,
   StyleSheet,
   Text,
   View,
@@ -10,16 +9,25 @@ import {
 import { useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import {
+  brand,
   colors,
-  radii,
-  shadows,
+  iconSizes,
+  layout,
+  responsive,
   spacing,
-  tapMin,
   typography,
 } from "../theme/tokens";
-import { loadSessionToken, loadParentToken } from "../lib/session";
+import {
+  clearParentSession,
+  loadSessionToken,
+  loadParentToken,
+  saveParentCache,
+} from "../lib/session";
 import { apiFetch } from "../lib/api";
+import { webSafeWidthStyle } from "../lib/responsive";
 import { LogoLockup } from "../components/LogoLockup";
+import { SurfacePressable } from "../components/ui";
+import type { ParentChildrenResponse } from "../lib/types";
 
 // 랜딩 화면 — 학생 / 학부모 역할 선택.
 // 기존 세션이 있으면 해당 역할 대시보드로 자동 이동.
@@ -28,7 +36,12 @@ export default function Landing() {
   const router = useRouter();
   const { width } = useWindowDimensions();
   const [booting, setBooting] = useState(true);
-  const isNarrow = width < 640;
+  const isNarrow = width < layout.mobileBreakpoint;
+  const webNarrowContentStyle = webSafeWidthStyle(width, {
+    enabled: isNarrow,
+    inset: responsive.roleWebSafeInset,
+    maxWidth: layout.roleCardNarrowMaxWidth,
+  });
 
   useEffect(() => {
     (async () => {
@@ -45,15 +58,23 @@ export default function Landing() {
       }
 
       try {
-        // 기존 학부모 세션 확인
         const parentToken = await loadParentToken();
         if (parentToken) {
-          // 학부모 API는 아직 mock이므로 세션 존재만으로 이동
+          const res = await apiFetch<ParentChildrenResponse>(
+            "/api/parent/children",
+            { parentAuth: true },
+          );
+          void saveParentCache({
+            id: res.parent.id,
+            name: res.parent.name || "학부모",
+            email: res.parent.email,
+            linkedStudentIds: res.children.map((child) => child.studentId),
+          });
           router.replace("/(parent)");
           return;
         }
       } catch {
-        // 학부모 세션 무효
+        await clearParentSession();
       }
 
       setBooting(false);
@@ -75,16 +96,19 @@ export default function Landing() {
     <SafeAreaView style={styles.container} edges={["top", "bottom"]}>
       <View style={styles.inner}>
         <View style={styles.brandRow}>
-          <LogoLockup size={40} wordmarkStyle={styles.brandTitle} />
+          <LogoLockup size={brand.logoSize} wordmarkStyle={styles.brandTitle} />
         </View>
         <Text style={styles.brandSub}>역할을 선택해 주세요</Text>
 
-        <View style={[styles.cardRow, isNarrow && styles.cardRowNarrow]}>
-          <Pressable
-            style={({ pressed }) => [
-              styles.roleCard,
-              pressed && styles.roleCardPressed,
-            ]}
+        <View
+          style={[
+            styles.cardRow,
+            isNarrow && styles.cardRowNarrow,
+            webNarrowContentStyle,
+          ]}
+        >
+          <SurfacePressable
+            style={[styles.roleCard, isNarrow && styles.roleCardNarrow]}
             onPress={() => router.push("/(student)/login")}
           >
             <Text style={styles.roleEmoji}>🎒</Text>
@@ -92,13 +116,10 @@ export default function Landing() {
             <Text style={styles.roleDesc}>
               선생님께 받은{"\n"}6자리 코드로 입장
             </Text>
-          </Pressable>
+          </SurfacePressable>
 
-          <Pressable
-            style={({ pressed }) => [
-              styles.roleCard,
-              pressed && styles.roleCardPressed,
-            ]}
+          <SurfacePressable
+            style={[styles.roleCard, isNarrow && styles.roleCardNarrow]}
             onPress={() => router.push("/(parent)/login")}
           >
             <Text style={styles.roleEmoji}>👨‍👩‍👧</Text>
@@ -106,7 +127,7 @@ export default function Landing() {
             <Text style={styles.roleDesc}>
               자녀의 학급 활동을{"\n"}확인하세요
             </Text>
-          </Pressable>
+          </SurfacePressable>
         </View>
       </View>
     </SafeAreaView>
@@ -144,28 +165,22 @@ const styles = StyleSheet.create({
   cardRowNarrow: {
     flexDirection: "column",
     width: "100%",
-    maxWidth: 320,
+    maxWidth: layout.roleCardNarrowMaxWidth,
   },
   roleCard: {
-    width: 240,
-    backgroundColor: colors.surface,
-    borderRadius: radii.card,
+    width: layout.roleCardWidth,
     padding: spacing.xxl,
     alignItems: "center",
     gap: spacing.md,
-    minHeight: tapMin,
-    ...shadows.card,
   },
-  roleCardPressed: {
-    backgroundColor: colors.surfaceAlt,
-    transform: [{ scale: 0.97 }],
+  roleCardNarrow: {
+    width: "100%",
   },
-  roleEmoji: { fontSize: 56 },
+  roleEmoji: { fontSize: iconSizes.hero },
   roleTitle: { ...typography.title, color: colors.text },
   roleDesc: {
     ...typography.body,
     color: colors.textMuted,
     textAlign: "center",
-    lineHeight: 22,
   },
 });

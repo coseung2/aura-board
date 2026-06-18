@@ -3,26 +3,27 @@ import {
   ActivityIndicator,
   Alert,
   Image,
-  Pressable,
   ScrollView,
   StyleSheet,
   Text,
-  TextInput,
   View,
 } from "react-native";
 import { CameraView, useCameraPermissions } from "expo-camera";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import {
+  borders,
   colors,
   radii,
-  shadows,
   spacing,
+  states,
+  store,
   typography,
 } from "../../theme/tokens";
 import { apiFetch, ApiError } from "../../lib/api";
 import { clearSessionToken } from "../../lib/session";
 import type { StoreChargeReceipt, StoreItem } from "../../lib/types";
+import { AppButton, AppHeader, EmptyState, IconButton, SurfaceCard, SurfacePressable } from "../../components/ui";
 
 export default function StoreChargeScreen() {
   const router = useRouter();
@@ -159,12 +160,7 @@ export default function StoreChargeScreen() {
 
   return (
     <SafeAreaView style={styles.container} edges={["top", "bottom"]}>
-      <View style={styles.header}>
-        <Pressable style={styles.backBtn} onPress={() => router.back()}>
-          <Text style={styles.backText}>←</Text>
-        </Pressable>
-        <Text style={styles.title}>매점 결제</Text>
-      </View>
+      <AppHeader title="매점 결제" onBack={() => router.back()} />
 
       {loading ? (
         <View style={styles.center}>
@@ -174,27 +170,19 @@ export default function StoreChargeScreen() {
       ) : error && items.length === 0 ? (
         <View style={styles.center}>
           <Text style={styles.error}>{error}</Text>
-          <Pressable style={styles.primaryBtn} onPress={load}>
-            <Text style={styles.primaryText}>다시 시도</Text>
-          </Pressable>
+          <AppButton onPress={load}>다시 시도</AppButton>
         </View>
       ) : (
         <ScrollView contentContainerStyle={styles.content}>
           <Text style={styles.sectionTitle}>상품</Text>
           {items.length === 0 ? (
-            <View style={styles.emptyBox}>
-              <Text style={styles.muted}>등록된 상품이 없어요.</Text>
-            </View>
+            <EmptyState title="등록된 상품이 없어요." />
           ) : (
             <View style={styles.itemGrid}>
               {items.map((item) => (
-                <Pressable
+                <SurfacePressable
                   key={item.id}
-                  style={({ pressed }) => [
-                    styles.itemCard,
-                    item.stock === 0 && styles.itemDisabled,
-                    pressed && item.stock !== 0 && styles.itemPressed,
-                  ]}
+                  style={[styles.itemCard, item.stock === 0 && styles.itemDisabled]}
                   onPress={() => addToCart(item)}
                   disabled={item.stock === 0}
                 >
@@ -208,12 +196,12 @@ export default function StoreChargeScreen() {
                   <Text style={styles.itemStock}>
                     {item.stock === null ? "재고 무제한" : `재고 ${item.stock}`}
                   </Text>
-                </Pressable>
+                </SurfacePressable>
               ))}
             </View>
           )}
 
-          <View style={styles.cartCard}>
+          <SurfaceCard style={styles.cartCard}>
             <View style={styles.cartHeader}>
               <Text style={styles.sectionTitle}>결제 바구니</Text>
               <Text style={styles.total}>{total.toLocaleString()}원</Text>
@@ -227,22 +215,22 @@ export default function StoreChargeScreen() {
                     {item.name}
                   </Text>
                   <View style={styles.qtyRow}>
-                    <Pressable style={styles.qtyBtn} onPress={() => changeQty(item.id, -1)}>
+                    <IconButton style={styles.qtyBtn} onPress={() => changeQty(item.id, -1)}>
                       <Text style={styles.qtyText}>-</Text>
-                    </Pressable>
+                    </IconButton>
                     <Text style={styles.qtyValue}>{item.qty}</Text>
-                    <Pressable style={styles.qtyBtn} onPress={() => changeQty(item.id, 1)}>
+                    <IconButton style={styles.qtyBtn} onPress={() => changeQty(item.id, 1)}>
                       <Text style={styles.qtyText}>+</Text>
-                    </Pressable>
+                    </IconButton>
                   </View>
                   <Text style={styles.cartSub}>{(item.price * item.qty).toLocaleString()}원</Text>
                 </View>
               ))
             )}
 
-            <Pressable style={styles.scanBtn} onPress={openScanner}>
-              <Text style={styles.scanText}>{token ? "QR 다시 스캔" : "학생 QR 스캔"}</Text>
-            </Pressable>
+            <AppButton onPress={openScanner}>
+              {token ? "QR 다시 스캔" : "학생 QR 스캔"}
+            </AppButton>
             {scannerOpen ? (
               <View style={styles.scannerBox}>
                 <CameraView
@@ -260,9 +248,13 @@ export default function StoreChargeScreen() {
 	                    setScannerOpen(false);
 	                  }}
 	                />
-                <Pressable style={styles.scannerClose} onPress={() => setScannerOpen(false)}>
-                  <Text style={styles.scannerCloseText}>닫기</Text>
-                </Pressable>
+                <AppButton
+                  variant="secondary"
+                  style={styles.scannerClose}
+                  onPress={() => setScannerOpen(false)}
+                >
+                  닫기
+                </AppButton>
               </View>
             ) : null}
 
@@ -271,37 +263,33 @@ export default function StoreChargeScreen() {
                 {token ? "학생 QR 스캔 완료" : "학생 QR을 스캔해 주세요."}
               </Text>
               {token ? (
-                <Pressable
-                  style={styles.clearScanBtn}
+                <AppButton
+                  variant="secondary"
                   onPress={() => setToken("")}
                   disabled={busy}
                 >
-                  <Text style={styles.clearScanText}>해제</Text>
-                </Pressable>
+                  해제
+                </AppButton>
               ) : null}
             </View>
             {error ? <Text style={styles.error}>{error}</Text> : null}
-            <Pressable
-              style={({ pressed }) => [
-                styles.chargeBtn,
-                (busy || cartList.length === 0 || !token.trim()) && styles.chargeBtnDisabled,
-                pressed && styles.chargeBtnPressed,
-              ]}
+            <AppButton
               disabled={busy || cartList.length === 0 || !token.trim()}
+              loading={busy}
               onPress={charge}
             >
-              <Text style={styles.chargeText}>{busy ? "결제 중..." : "결제하기"}</Text>
-            </Pressable>
-          </View>
+              결제하기
+            </AppButton>
+          </SurfaceCard>
 
           {receipt ? (
-            <View style={styles.receipt}>
+            <SurfaceCard style={styles.receipt}>
               <Text style={styles.receiptTitle}>최근 결제</Text>
               <Text style={styles.muted}>
                 {receipt.student.name} · {receipt.total.toLocaleString()}원 · 잔액{" "}
                 {receipt.balance.toLocaleString()}원
               </Text>
-            </View>
+            </SurfaceCard>
           ) : null}
         </ScrollView>
       )}
@@ -336,26 +324,6 @@ function extractTokenFromUrl(value: string): string | null {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg },
-  header: {
-    height: 72,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: spacing.md,
-    paddingHorizontal: spacing.xxl,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
-    backgroundColor: colors.surface,
-  },
-  backBtn: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: colors.surfaceAlt,
-  },
-  backText: { fontSize: 24, color: colors.text },
-  title: { ...typography.title, color: colors.text },
   center: {
     flex: 1,
     alignItems: "center",
@@ -366,39 +334,18 @@ const styles = StyleSheet.create({
   content: { padding: spacing.xxl, gap: spacing.lg },
   muted: { ...typography.body, color: colors.textMuted },
   error: { ...typography.body, color: colors.danger },
-  primaryBtn: {
-    paddingHorizontal: spacing.xl,
-    paddingVertical: spacing.md,
-    borderRadius: radii.card,
-    backgroundColor: colors.accent,
-    ...shadows.accent,
-  },
-  primaryText: { ...typography.label, color: "#fff" },
   sectionTitle: { ...typography.section, color: colors.text },
-  emptyBox: {
-    padding: spacing.xl,
-    borderRadius: radii.card,
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
   itemGrid: { flexDirection: "row", flexWrap: "wrap", gap: spacing.md },
   itemCard: {
-    width: 160,
-    minHeight: 154,
+    width: store.itemCardWidth,
+    minHeight: store.itemCardMinHeight,
     padding: spacing.md,
     gap: spacing.xs,
-    borderRadius: radii.card,
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-    ...shadows.card,
   },
-  itemPressed: { backgroundColor: colors.surfaceAlt },
-  itemDisabled: { opacity: 0.45 },
+  itemDisabled: { opacity: states.disabledOpacity },
   itemImage: {
     width: "100%",
-    height: 72,
+    height: store.itemImageHeight,
     borderRadius: radii.btn,
     backgroundColor: colors.bg,
   },
@@ -408,11 +355,6 @@ const styles = StyleSheet.create({
   cartCard: {
     gap: spacing.md,
     padding: spacing.lg,
-    borderRadius: radii.card,
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-    ...shadows.card,
   },
   cartHeader: {
     flexDirection: "row",
@@ -426,92 +368,55 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: spacing.sm,
     paddingVertical: spacing.sm,
-    borderBottomWidth: 1,
+    borderBottomWidth: borders.hairline,
     borderBottomColor: colors.border,
   },
   cartName: { ...typography.label, color: colors.text, flex: 1 },
   qtyRow: { flexDirection: "row", alignItems: "center", gap: spacing.xs },
   qtyBtn: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
-    alignItems: "center",
-    justifyContent: "center",
     backgroundColor: colors.bg,
-    borderWidth: 1,
+    borderWidth: borders.hairline,
     borderColor: colors.border,
   },
   qtyText: { ...typography.section, color: colors.text },
-  qtyValue: { ...typography.label, color: colors.text, width: 24, textAlign: "center" },
+  qtyValue: { ...typography.label, color: colors.text, width: store.qtyValueWidth, textAlign: "center" },
   cartSub: { ...typography.label, color: colors.text },
-  scanBtn: {
-    minHeight: 46,
-    alignItems: "center",
-    justifyContent: "center",
-    borderRadius: radii.btn,
-    backgroundColor: colors.accent,
-  },
-  scanText: { ...typography.label, color: "#fff" },
   scannerBox: {
-    height: 280,
+    height: store.scannerHeight,
     overflow: "hidden",
     borderRadius: radii.card,
-    borderWidth: 1,
+    borderWidth: borders.hairline,
     borderColor: colors.border,
-    backgroundColor: "#000",
+    backgroundColor: colors.mediaBackdrop,
   },
   camera: { flex: 1 },
   scannerClose: {
     position: "absolute",
     right: spacing.md,
     top: spacing.md,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
     borderRadius: radii.pill,
-    backgroundColor: colors.surface,
   },
-  scannerCloseText: { ...typography.label, color: colors.text },
   scanStatus: {
-    minHeight: 56,
+    minHeight: store.scanStatusMinHeight,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
     gap: spacing.md,
     borderRadius: radii.btn,
-    borderWidth: 1,
+    borderWidth: borders.hairline,
     borderColor: colors.border,
     padding: spacing.md,
     backgroundColor: colors.bg,
   },
   scanStatusReady: {
-    borderColor: "#16a34a",
-    backgroundColor: "#ecfdf5",
+    borderColor: colors.bankPositive,
+    backgroundColor: colors.statusReviewedBg,
   },
   scanStatusText: { ...typography.label, color: colors.textMuted },
-  scanStatusReadyText: { color: "#15803d" },
-  clearScanBtn: {
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    borderRadius: radii.pill,
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  clearScanText: { ...typography.label, color: colors.text },
-  chargeBtn: {
-    minHeight: 50,
-    alignItems: "center",
-    justifyContent: "center",
-    borderRadius: radii.btn,
-    backgroundColor: colors.accent,
-  },
-  chargeBtnPressed: { backgroundColor: colors.accentActive },
-  chargeBtnDisabled: { backgroundColor: colors.textFaint },
-  chargeText: { ...typography.subtitle, color: "#fff" },
+  scanStatusReadyText: { color: colors.statusReviewedText },
   receipt: {
     gap: spacing.xs,
     padding: spacing.lg,
-    borderRadius: radii.card,
     backgroundColor: colors.accentTintedBg,
   },
   receiptTitle: { ...typography.section, color: colors.accentTintedText },

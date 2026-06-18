@@ -3,26 +3,34 @@ import {
   Alert,
   FlatList,
   Image,
-  Modal,
-  Pressable,
   ScrollView,
   StyleSheet,
   Text,
-  TextInput,
+  useWindowDimensions,
   View,
 } from "react-native";
-import { colors, radii, shadows, spacing, tapMin, typography } from "../../theme/tokens";
+import {
+  borders,
+  colors,
+  dj,
+  iconSizes,
+  radii,
+  spacing,
+  typography,
+} from "../../theme/tokens";
 import { apiFetch, ApiError } from "../../lib/api";
 import { buildMediaItems } from "../../lib/media";
 import type { BoardDetailResponse, BoardCard } from "../../lib/types";
+import { withBoardAnonymousAuthor, withBoardAnonymousAuthors } from "../../lib/card-privacy";
 import { DJRecapModal } from "../DJRecapModal";
 import { EmbeddedMedia } from "../EmbeddedMedia";
+import { AppButton, AppModal, IconButton, Pill, SurfaceCard, TextField } from "../ui";
 
 // DJ 큐 보드 — 웹 디자인 핸드오프 DJBoardPage.jsx 를 네이티브로 이식.
 //   [헤더: 제목 + 카운트 + 재생완료 토글]
 //   [NOW PLAYING 카드 (전체 폭)]
 //   [2열] 대기열 카드 | 사이드 (신청폼 + 랭킹)
-//   + 재생완료 드로어 = 네이티브 Modal (슬라이드 왼쪽)
+//   + 재생완료 드로어 = AppModal side panel
 //
 // Drag-drop 재정렬은 RN 에서 무겁기에 ↑↓ 버튼으로 대체.
 // SSE 폴링은 vibe-arcade 처럼 2초 polling (간단성).
@@ -36,7 +44,9 @@ export function DJQueueBoard({
   data: BoardDetailResponse;
   onMutate: () => void;
 }) {
-  const [cards, setCards] = useState<BoardCard[]>(data.cards);
+  const [cards, setCards] = useState<BoardCard[]>(() =>
+    withBoardAnonymousAuthors(data.cards, data.board),
+  );
   const [submitUrl, setSubmitUrl] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
@@ -44,6 +54,8 @@ export function DJQueueBoard({
   const [recapOpen, setRecapOpen] = useState(false);
   const pendingIds = useRef<Set<string>>(new Set());
   const boardId = data.board.id;
+  const { width } = useWindowDimensions();
+  const compact = width < dj.compactBreakpoint;
 
   // 2초 폴링으로 교사의 승인/재생 완료 반영.
   useEffect(() => {
@@ -55,7 +67,8 @@ export function DJQueueBoard({
         setCards((prev) => {
           const prevById = new Map(prev.map((c) => [c.id, c] as const));
           const next: BoardCard[] = [];
-          for (const sc of res.cards) {
+          for (const rawCard of res.cards) {
+            const sc = withBoardAnonymousAuthor(rawCard, res.board);
             if (pendingIds.current.has(sc.id)) {
               const l = prevById.get(sc.id);
               next.push(l ?? sc);
@@ -76,7 +89,7 @@ export function DJQueueBoard({
       } catch {
         // swallow — next tick.
       }
-    }, 2000);
+    }, dj.pollIntervalMs);
     return () => clearInterval(handle);
   }, [data.board.slug]);
 
@@ -106,14 +119,14 @@ export function DJQueueBoard({
   const ranking = useMemo(() => {
     const counts = new Map<string, number>();
     for (const c of cards) {
-      const name = c.externalAuthorName ?? c.studentAuthorName ?? c.authorName;
+      const name = resolveQueueAuthorName(c);
       if (!name) continue;
       counts.set(name, (counts.get(name) ?? 0) + 1);
     }
     return [...counts.entries()]
       .map(([name, count]) => ({ name, count }))
       .sort((a, b) => b.count - a.count)
-      .slice(0, 8);
+      .slice(0, dj.rankingLimit);
   }, [cards]);
 
   async function trackMutation<T>(id: string, run: () => Promise<T>): Promise<T> {
@@ -135,8 +148,9 @@ export function DJQueueBoard({
         `/api/boards/${encodeURIComponent(boardId)}/queue`,
         { method: "POST", json: { youtubeUrl: url } },
       );
-      setCards((prev) => [...prev, card]);
+      setCards((prev) => [...prev, withBoardAnonymousAuthor(card, data.board)]);
       setSubmitUrl("");
+      onMutate();
     } catch (e) {
       if (e instanceof ApiError) {
         const body = e.body as { error?: string } | string;
@@ -150,6 +164,7 @@ export function DJQueueBoard({
   }
 
   async function handleStatus(cardId: string, status: QueueStatus) {
+    if (!canControl) return;
     const prev = cards;
     setCards((list) =>
       list.map((c) => (c.id === cardId ? { ...c, queueStatus: status } : c)),
@@ -161,13 +176,18 @@ export function DJQueueBoard({
           json: { status },
         });
         onMutate();
-      } catch {
+      } catch (e) {
         setCards(prev);
+        Alert.alert(
+          "변경 실패",
+          e instanceof Error ? e.message : "대기열 상태를 바꾸지 못했어요.",
+        );
       }
     });
   }
 
   async function handleDelete(cardId: string) {
+    if (!canControl) return;
     Alert.alert("곡 삭제", "이 곡을 삭제할까요?", [
       { text: "취소", style: "cancel" },
       {
@@ -182,8 +202,12 @@ export function DJQueueBoard({
                 method: "DELETE",
               });
               onMutate();
-            } catch {
+            } catch (e) {
               setCards(prev);
+              Alert.alert(
+                "삭제 실패",
+                e instanceof Error ? e.message : "곡을 삭제하지 못했어요.",
+              );
             }
           });
         },
@@ -192,6 +216,7 @@ export function DJQueueBoard({
   }
 
   async function handleMove(cardId: string, direction: -1 | 1) {
+    if (!canControl) return;
     const idx = activeQueue.findIndex((c) => c.id === cardId);
     if (idx < 0) return;
     const swapIdx = idx + direction;
@@ -211,13 +236,18 @@ export function DJQueueBoard({
           { method: "PATCH", json: { order: targetOrder } },
         );
         onMutate();
-      } catch {
+      } catch (e) {
         setCards(prev);
+        Alert.alert(
+          "순서 변경 실패",
+          e instanceof Error ? e.message : "대기열 순서를 바꾸지 못했어요.",
+        );
       }
     });
   }
 
   async function handleRestore(cardId: string) {
+    if (!canControl) return;
     const maxOrder = activeQueue.reduce((m, c) => Math.max(m, c.order ?? 0), 0);
     const targetOrder = maxOrder + 1;
     const prev = cards;
@@ -241,46 +271,56 @@ export function DJQueueBoard({
           ),
         ]);
         onMutate();
-      } catch {
+      } catch (e) {
         setCards(prev);
+        Alert.alert(
+          "복귀 실패",
+          e instanceof Error ? e.message : "곡을 대기열로 복귀하지 못했어요.",
+        );
       }
     });
   }
 
-  // 교사인지 학생인지 구분 — mobile은 학생 전용이라 항상 학생. 승인/거부/재생은
-  // 서버에서 ClassroomRoleAssignment(DJ 역할) 기준으로 판단하므로 UI는 시도만
-  // 노출하고 서버가 403 을 반환하면 그 때 경고. 단순성을 위해 모든 컨트롤 노출.
-  const canControl = true;
+  const canControl = data.capabilities?.canControlQueue === true;
 
   return (
     <View style={styles.root}>
-      <View style={styles.header}>
-        <View style={{ flex: 1 }}>
+      <View style={[styles.header, compact && styles.headerCompact]}>
+        <View style={styles.headerCopy}>
           <Text style={styles.title}>🎧 {data.board.title}</Text>
           <Text style={styles.subtitle}>
             DJ 큐 · 대기 {pendingCount} · 승인 {approvedCount} · 재생 완료 {playedCards.length}
           </Text>
         </View>
-        <View style={{ flexDirection: "row", gap: spacing.sm }}>
-          <Pressable
-            style={({ pressed }) => [styles.headerBtn, pressed && styles.headerBtnPressed]}
+        <View style={[styles.headerActions, compact && styles.headerActionsCompact]}>
+          <AppButton
+            variant="secondary"
+            style={styles.headerBtn}
             onPress={() => setRecapOpen(true)}
           >
-            <Text style={styles.headerBtnText}>📊 이달의 리캡</Text>
-          </Pressable>
-          <Pressable
-            style={({ pressed }) => [styles.headerBtn, pressed && styles.headerBtnPressed]}
+            📊 이달의 리캡
+          </AppButton>
+          <AppButton
+            variant="secondary"
+            style={styles.headerBtn}
             onPress={() => setPlayedOpen(true)}
           >
-            <Text style={styles.headerBtnText}>🕘 재생 완료 ({playedCards.length})</Text>
-          </Pressable>
+            🕘 재생 완료 ({playedCards.length})
+          </AppButton>
         </View>
       </View>
 
-      {nowPlaying ? <NowPlayingCard card={nowPlaying} onNext={() => handleStatus(nowPlaying.id, "played")} /> : null}
+      {nowPlaying ? (
+        <NowPlayingCard
+          card={nowPlaying}
+          compact={compact}
+          canControl={canControl}
+          onNext={() => handleStatus(nowPlaying.id, "played")}
+        />
+      ) : null}
 
-      <View style={styles.layout}>
-        <View style={styles.queueCard}>
+      <View style={[styles.layout, compact && styles.layoutCompact]}>
+        <SurfaceCard style={styles.queueCard}>
           <View style={styles.queueTitleRow}>
             <Text style={styles.queueTitle}>대기열</Text>
             <Text style={styles.queueHint}>
@@ -308,20 +348,20 @@ export function DJQueueBoard({
                   onMoveDown={() => handleMove(item.id, 1)}
                   canMoveUp={index > 0 || !!nowPlaying}
                   canMoveDown={index < upNext.length - 1}
+                  canControl={canControl}
                 />
               )}
               ItemSeparatorComponent={() => <View style={styles.separator} />}
             />
           )}
-        </View>
+        </SurfaceCard>
 
-        <View style={styles.side}>
-          <View style={styles.submitCard}>
+        <View style={[styles.side, compact && styles.sideCompact]}>
+          <SurfaceCard style={styles.submitCard}>
             <Text style={styles.sideTitle}>신청곡 추가</Text>
-            <TextInput
+            <TextField
               style={styles.submitInput}
               placeholder="YouTube 링크 또는 곡 제목"
-              placeholderTextColor={colors.textFaint}
               value={submitUrl}
               onChangeText={(t) => {
                 setSubmitUrl(t);
@@ -332,17 +372,14 @@ export function DJQueueBoard({
               autoCapitalize="none"
               autoCorrect={false}
             />
-            <Pressable
-              style={({ pressed }) => [
-                styles.submitBtn,
-                (!submitUrl.trim() || submitting) && styles.submitBtnDisabled,
-                pressed && !!submitUrl.trim() && !submitting && styles.submitBtnPressed,
-              ]}
+            <AppButton
+              style={styles.submitBtn}
               onPress={handleSubmit}
               disabled={!submitUrl.trim() || submitting}
+              loading={submitting}
             >
-              <Text style={styles.submitBtnText}>{submitting ? "신청 중…" : "신청하기"}</Text>
-            </Pressable>
+              신청하기
+            </AppButton>
             {submitError ? (
               <Text style={styles.submitError}>{submitError}</Text>
             ) : (
@@ -350,9 +387,9 @@ export function DJQueueBoard({
                 학생 신청은 대기 상태로 등록되고, 선생님 승인 후 재생 목록에 올라갑니다.
               </Text>
             )}
-          </View>
+          </SurfaceCard>
 
-          <View style={styles.rankingCard}>
+          <SurfaceCard style={styles.rankingCard}>
             <Text style={styles.sideTitle}>신청 TOP</Text>
             {ranking.length === 0 ? (
               <Text style={styles.submitNote}>아직 신청 기록이 없어요.</Text>
@@ -363,7 +400,7 @@ export function DJQueueBoard({
                     {i + 1}
                   </Text>
                   <View style={[styles.rankingAvatar, i === 0 && styles.rankingAvatarTop]}>
-                    <Text style={[styles.rankingAvatarText, i === 0 && { color: "#fff" }]}>
+                    <Text style={[styles.rankingAvatarText, i === 0 && styles.rankingAvatarTextTop]}>
                       {r.name[0]}
                     </Text>
                   </View>
@@ -372,13 +409,14 @@ export function DJQueueBoard({
                 </View>
               ))
             )}
-          </View>
+          </SurfaceCard>
         </View>
       </View>
 
       <PlayedDrawer
         open={playedOpen}
         played={playedCards}
+        canControl={canControl}
         onClose={() => setPlayedOpen(false)}
         onRestore={handleRestore}
         onDelete={handleDelete}
@@ -396,22 +434,25 @@ export function DJQueueBoard({
 
 function NowPlayingCard({
   card,
+  compact,
+  canControl,
   onNext,
 }: {
   card: BoardCard;
+  compact: boolean;
+  canControl: boolean;
   onNext: () => void;
 }) {
-  const submitter =
-    card.externalAuthorName ?? card.studentAuthorName ?? card.authorName ?? "";
+  const submitter = resolveQueueAuthorName(card);
   const mediaUrl = getNowPlayingMediaUrl(card);
   const hasImage = !!card.linkImage;
   return (
-    <View style={styles.now}>
+    <SurfaceCard style={styles.now}>
       <Text style={styles.nowLabel}>▶ NOW PLAYING</Text>
-      <View style={styles.nowBody}>
+      <View style={[styles.nowBody, compact && styles.nowBodyCompact]}>
         {mediaUrl ? (
-          <View style={styles.nowPlayer}>
-            <EmbeddedMedia url={mediaUrl} title={card.title} aspectRatio={16 / 9} />
+          <View style={[styles.nowPlayer, compact && styles.nowPlayerCompact]}>
+            <EmbeddedMedia url={mediaUrl} title={card.title} aspectRatio={dj.mediaAspectRatio} />
           </View>
         ) : hasImage ? (
           <Image source={{ uri: card.linkImage! }} style={styles.nowThumb} resizeMode="cover" />
@@ -426,17 +467,19 @@ function NowPlayingCard({
             {card.linkDesc ? `${card.linkDesc} · ` : ""}
             {submitter ? `${submitter}님 신청` : ""}
           </Text>
-          <View style={styles.nowActions}>
-            <Pressable
-              style={({ pressed }) => [styles.nextBtn, pressed && styles.nextBtnPressed]}
-              onPress={onNext}
-            >
-              <Text style={styles.nextBtnText}>⏭ 다음 곡</Text>
-            </Pressable>
-          </View>
+          {canControl ? (
+            <View style={styles.nowActions}>
+              <AppButton
+                variant="secondary"
+                onPress={onNext}
+              >
+                ⏭ 다음 곡
+              </AppButton>
+            </View>
+          ) : null}
         </View>
       </View>
-    </View>
+    </SurfaceCard>
   );
 }
 
@@ -445,6 +488,11 @@ function getNowPlayingMediaUrl(card: BoardCard): string | null {
     (item) => item.kind === "video" || item.kind === "link",
   );
   return mediaItem?.url ?? card.videoUrl ?? card.linkUrl ?? null;
+}
+
+function resolveQueueAuthorName(card: BoardCard): string {
+  const resolved = card.externalAuthorName ?? card.studentAuthorName ?? card.authorName ?? "";
+  return card.anonymousAuthor && resolved ? "익명" : resolved;
 }
 
 function QueueItem({
@@ -458,6 +506,7 @@ function QueueItem({
   onMoveDown,
   canMoveUp,
   canMoveDown,
+  canControl,
 }: {
   card: BoardCard;
   rank: number;
@@ -469,9 +518,9 @@ function QueueItem({
   onMoveDown: () => void;
   canMoveUp: boolean;
   canMoveDown: boolean;
+  canControl: boolean;
 }) {
-  const submitter =
-    card.externalAuthorName ?? card.studentAuthorName ?? card.authorName ?? "";
+  const submitter = resolveQueueAuthorName(card);
   const status = card.queueStatus ?? "pending";
   const isPending = status === "pending";
 
@@ -497,49 +546,56 @@ function QueueItem({
             </Text>
           ) : null}
           {isPending ? (
-            <View style={styles.pendingPill}>
-              <View style={styles.pendingDot} />
-              <Text style={styles.pendingText}>대기</Text>
-            </View>
+            <Pill tone="warning" style={styles.pendingPill} textStyle={styles.pendingText}>
+              대기
+            </Pill>
           ) : null}
         </View>
       </View>
-      <View style={styles.queueCtrls}>
-        <Pressable
-          style={({ pressed }) => [styles.iconBtn, (!canMoveUp || pressed) && styles.iconBtnDim]}
-          onPress={onMoveUp}
-          disabled={!canMoveUp}
-        >
-          <Text style={styles.iconBtnText}>↑</Text>
-        </Pressable>
-        <Pressable
-          style={({ pressed }) => [styles.iconBtn, (!canMoveDown || pressed) && styles.iconBtnDim]}
-          onPress={onMoveDown}
-          disabled={!canMoveDown}
-        >
-          <Text style={styles.iconBtnText}>↓</Text>
-        </Pressable>
-        {isPending ? (
-          <Pressable
-            style={({ pressed }) => [styles.ctrlBtn, styles.ctrlApprove, pressed && styles.ctrlPressed]}
-            onPress={onApprove}
+      {canControl ? (
+        <View style={styles.queueCtrls}>
+          <IconButton
+            style={styles.iconBtn}
+            onPress={onMoveUp}
+            disabled={!canMoveUp}
           >
-            <Text style={styles.ctrlText}>승인</Text>
-          </Pressable>
-        ) : null}
-        <Pressable
-          style={({ pressed }) => [styles.ctrlBtn, pressed && styles.ctrlPressed]}
-          onPress={onMarkPlayed}
-        >
-          <Text style={styles.ctrlText}>✓</Text>
-        </Pressable>
-        <Pressable
-          style={({ pressed }) => [styles.ctrlBtn, styles.ctrlReject, pressed && styles.ctrlPressed]}
-          onPress={isPending ? onReject : onDelete}
-        >
-          <Text style={styles.ctrlText}>{isPending ? "거부" : "제거"}</Text>
-        </Pressable>
-      </View>
+            <Text style={styles.iconBtnText}>↑</Text>
+          </IconButton>
+          <IconButton
+            style={styles.iconBtn}
+            onPress={onMoveDown}
+            disabled={!canMoveDown}
+          >
+            <Text style={styles.iconBtnText}>↓</Text>
+          </IconButton>
+          {isPending ? (
+            <AppButton
+              variant="secondary"
+              style={[styles.ctrlBtn, styles.ctrlApprove]}
+              textStyle={styles.ctrlText}
+              onPress={onApprove}
+            >
+              승인
+            </AppButton>
+          ) : null}
+          <AppButton
+            variant="quiet"
+            style={styles.ctrlBtn}
+            textStyle={styles.ctrlText}
+            onPress={onMarkPlayed}
+          >
+            ✓
+          </AppButton>
+          <AppButton
+            variant="quiet"
+            style={styles.ctrlBtn}
+            textStyle={styles.ctrlText}
+            onPress={isPending ? onReject : onDelete}
+          >
+            {isPending ? "거부" : "제거"}
+          </AppButton>
+        </View>
+      ) : null}
     </View>
   );
 }
@@ -547,71 +603,81 @@ function QueueItem({
 function PlayedDrawer({
   open,
   played,
+  canControl,
   onClose,
   onRestore,
   onDelete,
 }: {
   open: boolean;
   played: BoardCard[];
+  canControl: boolean;
   onClose: () => void;
   onRestore: (cardId: string) => void;
   onDelete: (cardId: string) => void;
 }) {
   return (
-    <Modal visible={open} animationType="slide" transparent onRequestClose={onClose}>
-      <Pressable style={styles.drawerBackdrop} onPress={onClose}>
-        <Pressable style={styles.drawer} onPress={() => undefined}>
-          <View style={styles.drawerHead}>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.drawerTitle}>재생 완료</Text>
-              <Text style={styles.drawerSubtitle}>대기열로 복귀시킬 수 있습니다</Text>
-            </View>
-            <Pressable style={styles.drawerClose} onPress={onClose}>
-              <Text style={styles.drawerCloseText}>×</Text>
-            </Pressable>
-          </View>
-          <ScrollView contentContainerStyle={styles.drawerList}>
-            {played.length === 0 ? (
-              <Text style={styles.empty}>재생 완료된 곡이 없습니다.</Text>
-            ) : (
-              played.map((p) => (
-                <View key={p.id} style={styles.drawerItem}>
-                  {p.linkImage ? (
-                    <Image source={{ uri: p.linkImage }} style={styles.drawerThumb} resizeMode="cover" />
-                  ) : (
-                    <View style={[styles.drawerThumb, styles.drawerThumbFallback]}>
-                      <Text style={styles.drawerThumbEmoji}>♪</Text>
-                    </View>
-                  )}
-                  <View style={styles.drawerInfo}>
-                    <Text style={styles.drawerItemTitle} numberOfLines={1}>{p.title}</Text>
-                    <Text style={styles.drawerItemSub} numberOfLines={1}>
-                      {p.linkDesc ? `${p.linkDesc} · ` : ""}
-                      {p.externalAuthorName ?? p.studentAuthorName ?? p.authorName ?? ""}
-                    </Text>
-                  </View>
-                  <Pressable
-                    style={({ pressed }) => [styles.drawerBtn, pressed && styles.ctrlPressed]}
+    <AppModal
+      visible={open}
+      animationType="slide"
+      onClose={onClose}
+      align="right"
+      closeOnBackdropPress
+      sheetStyle={styles.drawer}
+      accessibilityLabel="재생 완료 목록"
+    >
+      <View style={styles.drawerHead}>
+        <View style={styles.drawerCopy}>
+          <Text style={styles.drawerTitle}>재생 완료</Text>
+          <Text style={styles.drawerSubtitle}>대기열로 복귀시킬 수 있습니다</Text>
+        </View>
+        <IconButton style={styles.drawerClose} onPress={onClose}>
+          <Text style={styles.drawerCloseText}>×</Text>
+        </IconButton>
+      </View>
+      <ScrollView contentContainerStyle={styles.drawerList}>
+        {played.length === 0 ? (
+          <Text style={styles.empty}>재생 완료된 곡이 없습니다.</Text>
+        ) : (
+          played.map((p) => (
+            <View key={p.id} style={styles.drawerItem}>
+              {p.linkImage ? (
+                <Image source={{ uri: p.linkImage }} style={styles.drawerThumb} resizeMode="cover" />
+              ) : (
+                <View style={[styles.drawerThumb, styles.drawerThumbFallback]}>
+                  <Text style={styles.drawerThumbEmoji}>♪</Text>
+                </View>
+              )}
+              <View style={styles.drawerInfo}>
+                <Text style={styles.drawerItemTitle} numberOfLines={1}>{p.title}</Text>
+                <Text style={styles.drawerItemSub} numberOfLines={1}>
+                  {p.linkDesc ? `${p.linkDesc} · ` : ""}
+                  {resolveQueueAuthorName(p)}
+                </Text>
+              </View>
+              {canControl ? (
+                <>
+                  <IconButton
+                    style={styles.drawerBtn}
                     onPress={() => onRestore(p.id)}
                   >
                     <Text style={styles.drawerBtnText}>↺</Text>
-                  </Pressable>
-                  <Pressable
-                    style={({ pressed }) => [styles.drawerBtn, styles.drawerBtnDanger, pressed && styles.ctrlPressed]}
+                  </IconButton>
+                  <IconButton
+                    style={styles.drawerBtn}
                     onPress={() => onDelete(p.id)}
                   >
-                    <Text style={[styles.drawerBtnText, { color: colors.danger }]}>×</Text>
-                  </Pressable>
-                </View>
-              ))
-            )}
-          </ScrollView>
-          <View style={styles.drawerFoot}>
-            <Text style={styles.drawerFootText}>총 {played.length}곡 재생됨</Text>
-          </View>
-        </Pressable>
-      </Pressable>
-    </Modal>
+                    <Text style={styles.drawerBtnDangerText}>×</Text>
+                  </IconButton>
+                </>
+              ) : null}
+            </View>
+          ))
+        )}
+      </ScrollView>
+      <View style={styles.drawerFoot}>
+        <Text style={styles.drawerFootText}>총 {played.length}곡 재생됨</Text>
+      </View>
+    </AppModal>
   );
 }
 
@@ -623,26 +689,22 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     gap: spacing.md,
   },
-  title: { ...typography.title, color: colors.text },
-  subtitle: { ...typography.body, color: colors.textMuted, marginTop: 2 },
-  headerBtn: {
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
-    borderRadius: radii.btn,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.surface,
+  headerCompact: {
+    flexDirection: "column",
   },
-  headerBtnPressed: { backgroundColor: colors.surfaceAlt },
-  headerBtnText: { ...typography.label, color: colors.text },
+  headerCopy: { flex: 1 },
+  headerActions: { flexDirection: "row", gap: spacing.sm },
+  headerActionsCompact: {
+    flexWrap: "wrap",
+  },
+  title: { ...typography.title, color: colors.text },
+  subtitle: { ...typography.body, color: colors.textMuted, marginTop: spacing.xs },
+  headerBtn: {
+    flexShrink: 0,
+  },
 
   // NOW PLAYING
   now: {
-    backgroundColor: colors.surface,
-    borderRadius: radii.card,
-    borderWidth: 1,
-    borderColor: colors.border,
-    ...shadows.card,
     padding: spacing.xl,
     gap: spacing.md,
   },
@@ -652,61 +714,43 @@ const styles = StyleSheet.create({
     gap: spacing.lg,
     alignItems: "center",
   },
+  nowBodyCompact: {
+    flexDirection: "column",
+    alignItems: "stretch",
+  },
   nowPlayer: {
-    width: 320,
-    maxWidth: "52%",
-    borderRadius: 8,
+    width: dj.nowPlayerWidth,
+    maxWidth: dj.nowPlayerMaxWidth,
+    borderRadius: radii.control,
     overflow: "hidden",
   },
+  nowPlayerCompact: {
+    width: dj.nowPlayerCompactWidth,
+    maxWidth: dj.nowPlayerCompactMaxWidth,
+  },
   nowThumb: {
-    width: 240,
-    height: 135,
-    borderRadius: 8,
-    backgroundColor: "#b79bff",
+    width: dj.nowThumbWidth,
+    height: dj.nowThumbHeight,
+    borderRadius: radii.control,
+    backgroundColor: colors.mediaLilacDark,
   },
   nowThumbFallback: { alignItems: "center", justifyContent: "center" },
-  nowThumbEmoji: { fontSize: 40, color: "#fff" },
+  nowThumbEmoji: { fontSize: iconSizes.xl, color: colors.onAccent },
   nowInfo: { flex: 1, minWidth: 0 },
   nowTitle: { ...typography.title, color: colors.text, marginBottom: spacing.xs },
   nowMeta: { ...typography.body, color: colors.textMuted },
   nowActions: { flexDirection: "row", gap: spacing.sm, marginTop: spacing.md, flexWrap: "wrap" },
-  playBtn: {
-    backgroundColor: colors.accent,
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.sm + 2,
-    borderRadius: radii.pill,
-    minHeight: tapMin,
-    justifyContent: "center",
-    ...shadows.accent,
-  },
-  playBtnPressed: { backgroundColor: colors.accentActive },
-  playBtnText: { color: "#fff", ...typography.label, fontWeight: "600" },
-  nextBtn: {
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.sm + 2,
-    borderRadius: radii.pill,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: "transparent",
-    minHeight: tapMin,
-    justifyContent: "center",
-  },
-  nextBtnPressed: { backgroundColor: colors.surfaceAlt },
-  nextBtnText: { ...typography.label, color: colors.text },
-
   // Layout
   layout: {
     flex: 1,
     flexDirection: "row",
     gap: spacing.lg,
   },
+  layoutCompact: {
+    flexDirection: "column",
+  },
   queueCard: {
     flex: 1,
-    backgroundColor: colors.surface,
-    borderRadius: radii.card,
-    borderWidth: 1,
-    borderColor: colors.border,
-    ...shadows.card,
     padding: spacing.md,
   },
   queueTitleRow: {
@@ -719,7 +763,7 @@ const styles = StyleSheet.create({
   },
   queueTitle: { ...typography.section, color: colors.text },
   queueHint: { ...typography.micro, color: colors.textMuted },
-  separator: { height: 4 },
+  separator: { height: spacing.xs },
   empty: {
     ...typography.body,
     color: colors.textMuted,
@@ -732,147 +776,102 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: spacing.md,
-    padding: spacing.sm + 2,
-    borderRadius: 8,
-    backgroundColor: "transparent",
+    padding: spacing.md,
+    borderRadius: radii.btn,
+    backgroundColor: colors.transparent,
   },
-  queueItemPending: { backgroundColor: "rgba(245, 158, 11, 0.06)" },
+  queueItemPending: { backgroundColor: colors.warningTintedBg },
   queueRank: {
-    width: 24,
+    width: dj.queueRankWidth,
     textAlign: "center",
-    fontSize: 13,
-    fontWeight: "600",
+    ...typography.label,
     color: colors.textMuted,
     fontFamily: "monospace",
   },
   queueThumb: {
-    width: 56,
-    height: 42,
-    borderRadius: 4,
-    backgroundColor: "#c7b8ff",
+    width: dj.queueThumbWidth,
+    height: dj.queueThumbHeight,
+    borderRadius: radii.btn,
+    backgroundColor: colors.mediaLilac,
   },
   queueThumbFallback: { alignItems: "center", justifyContent: "center" },
-  queueThumbEmoji: { fontSize: 16, color: "#fff" },
+  queueThumbEmoji: { fontSize: iconSizes.sm, color: colors.onAccent },
   queueInfo: { flex: 1, minWidth: 0 },
-  queueTrack: { ...typography.label, color: colors.text, fontSize: 14, fontWeight: "600" },
-  queueSubRow: { flexDirection: "row", alignItems: "center", flexWrap: "wrap", gap: 2, marginTop: 2 },
+  queueTrack: { ...typography.label, color: colors.text },
+  queueSubRow: { flexDirection: "row", alignItems: "center", flexWrap: "wrap", gap: spacing.xs, marginTop: spacing.xs },
   queueSub: { ...typography.micro, color: colors.textMuted },
   pendingPill: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-    marginLeft: 6,
-    paddingHorizontal: 8,
-    paddingVertical: 1,
-    borderRadius: radii.pill,
-    backgroundColor: "#fef3c7",
+    marginLeft: spacing.sm,
   },
-  pendingDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: "#92610a" },
-  pendingText: { fontSize: 11, fontWeight: "600", color: "#92610a" },
-  queueCtrls: { flexDirection: "row", gap: 2 },
+  pendingText: { ...typography.badge, color: colors.warningTintedText },
+  queueCtrls: { flexDirection: "row", gap: spacing.xs },
   iconBtn: {
-    width: 30,
-    height: 30,
-    borderRadius: 4,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "transparent",
+    width: dj.compactIconButton,
+    height: dj.compactIconButton,
+    backgroundColor: colors.transparent,
   },
-  iconBtnDim: { opacity: 0.3 },
-  iconBtnText: { fontSize: 14, color: colors.textMuted, fontWeight: "700" },
+  iconBtnText: { ...typography.label, color: colors.textMuted },
   ctrlBtn: {
-    paddingHorizontal: spacing.sm + 2,
-    paddingVertical: 4,
-    borderRadius: 4,
-    borderWidth: 1,
-    borderColor: "transparent",
+    minHeight: dj.compactIconButton,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs,
   },
-  ctrlPressed: { opacity: 0.6 },
-  ctrlApprove: { borderColor: "rgba(39,163,95,0.3)", backgroundColor: "rgba(39,163,95,0.08)" },
-  ctrlReject: { },
-  ctrlText: { fontSize: 12, fontWeight: "500", color: colors.textMuted },
+  ctrlApprove: { borderColor: colors.plantActive, backgroundColor: colors.statusReviewedBg },
+  ctrlText: { ...typography.badge, color: colors.textMuted },
 
   // Side
-  side: { width: 300, gap: spacing.md },
+  side: { width: dj.sideWidth, gap: spacing.md },
+  sideCompact: { width: "100%" },
   submitCard: {
-    backgroundColor: colors.surface,
-    borderRadius: radii.card,
-    borderWidth: 1,
-    borderColor: colors.border,
-    ...shadows.card,
     padding: spacing.lg,
   },
-  sideTitle: { ...typography.label, fontSize: 14, color: colors.text, marginBottom: spacing.sm + 2 },
+  sideTitle: { ...typography.label, color: colors.text, marginBottom: spacing.md },
   submitInput: {
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: 6,
-    padding: spacing.sm + 2,
-    ...typography.body,
-    color: colors.text,
     backgroundColor: colors.bg,
   },
   submitBtn: {
     marginTop: spacing.sm,
-    paddingVertical: spacing.sm + 2,
-    backgroundColor: colors.accent,
-    borderRadius: radii.btn,
-    alignItems: "center",
-    minHeight: tapMin,
-    justifyContent: "center",
   },
-  submitBtnPressed: { backgroundColor: colors.accentActive },
-  submitBtnDisabled: { backgroundColor: colors.border },
-  submitBtnText: { color: "#fff", ...typography.label, fontSize: 14, fontWeight: "600" },
-  submitNote: { ...typography.micro, color: colors.textMuted, marginTop: spacing.sm, lineHeight: 16 },
+  submitNote: { ...typography.micro, color: colors.textMuted, marginTop: spacing.sm },
   submitError: { ...typography.micro, color: colors.danger, marginTop: spacing.sm },
 
   rankingCard: {
-    backgroundColor: colors.surface,
-    borderRadius: radii.card,
-    borderWidth: 1,
-    borderColor: colors.border,
-    ...shadows.card,
     padding: spacing.lg,
   },
   rankingRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: spacing.sm + 2,
-    paddingVertical: 6,
+    gap: spacing.md,
+    paddingVertical: spacing.sm,
   },
   rankingPos: {
-    width: 22,
+    width: dj.rankingPositionWidth,
     textAlign: "center",
     fontFamily: "monospace",
-    fontWeight: "700",
-    fontSize: 13,
+    ...typography.label,
     color: colors.textMuted,
   },
-  rankingPosTop: { color: "#c9a227" },
+  rankingPosTop: { color: colors.rankingGold },
   rankingAvatar: {
-    width: 22,
-    height: 22,
-    borderRadius: 11,
-    backgroundColor: "rgba(0,0,0,0.08)",
+    width: dj.rankingAvatarSize,
+    height: dj.rankingAvatarSize,
+    borderRadius: radii.pill,
+    backgroundColor: colors.surfaceAlt,
     alignItems: "center",
     justifyContent: "center",
   },
-  rankingAvatarTop: { backgroundColor: "#c9a227" },
-  rankingAvatarText: { fontSize: 10, fontWeight: "600", color: colors.text },
-  rankingName: { flex: 1, ...typography.body, fontSize: 13, color: colors.text },
-  rankingCount: { ...typography.body, fontSize: 13, color: colors.textMuted, fontVariant: ["tabular-nums"] },
+  rankingAvatarTop: { backgroundColor: colors.rankingGold },
+  rankingAvatarText: { ...typography.micro, color: colors.text },
+  rankingAvatarTextTop: { color: colors.onAccent },
+  rankingName: { flex: 1, ...typography.body, color: colors.text },
+  rankingCount: { ...typography.body, color: colors.textMuted, fontVariant: ["tabular-nums"] },
 
   // Drawer
-  drawerBackdrop: {
-    flex: 1,
-    backgroundColor: "rgba(0,0,0,0.4)",
-  },
   drawer: {
-    width: 360,
+    width: dj.drawerWidth,
     height: "100%",
-    backgroundColor: colors.surface,
-    ...shadows.cardHover,
+    maxHeight: "100%",
+    borderRadius: radii.none,
   },
   drawerHead: {
     flexDirection: "row",
@@ -880,53 +879,45 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     gap: spacing.md,
     padding: spacing.lg,
-    borderBottomWidth: 1,
+    borderBottomWidth: borders.hairline,
     borderBottomColor: colors.border,
   },
-  drawerTitle: { ...typography.section, color: colors.text, fontSize: 14, fontWeight: "700" },
-  drawerSubtitle: { ...typography.micro, color: colors.textMuted, marginTop: 2 },
+  drawerCopy: { flex: 1 },
+  drawerTitle: { ...typography.section, color: colors.text },
+  drawerSubtitle: { ...typography.micro, color: colors.textMuted, marginTop: spacing.xs },
   drawerClose: {
-    width: 32,
-    height: 32,
-    borderRadius: radii.btn,
-    borderWidth: 1,
+    borderWidth: borders.hairline,
     borderColor: colors.border,
-    alignItems: "center",
-    justifyContent: "center",
   },
-  drawerCloseText: { fontSize: 16, color: colors.textMuted },
-  drawerList: { padding: spacing.sm, gap: 4 },
+  drawerCloseText: { ...typography.subtitle, color: colors.textMuted },
+  drawerList: { padding: spacing.sm, gap: spacing.xs },
   drawerItem: {
     flexDirection: "row",
     alignItems: "center",
-    gap: spacing.sm + 2,
-    paddingHorizontal: spacing.sm + 2,
+    gap: spacing.md,
+    paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
-    borderRadius: 8,
+    borderRadius: radii.btn,
   },
   drawerThumb: {
-    width: 44,
-    height: 34,
-    borderRadius: 4,
-    backgroundColor: "#b5b5b5",
+    width: dj.drawerThumbWidth,
+    height: dj.drawerThumbHeight,
+    borderRadius: radii.btn,
+    backgroundColor: colors.mediaNeutral,
   },
   drawerThumbFallback: { alignItems: "center", justifyContent: "center" },
-  drawerThumbEmoji: { fontSize: 14, color: "#fff" },
+  drawerThumbEmoji: { fontSize: iconSizes.sm, color: colors.onAccent },
   drawerInfo: { flex: 1, minWidth: 0 },
-  drawerItemTitle: { ...typography.label, fontSize: 13, color: colors.text },
-  drawerItemSub: { ...typography.micro, fontSize: 11, color: colors.textMuted, marginTop: 2 },
+  drawerItemTitle: { ...typography.label, color: colors.text },
+  drawerItemSub: { ...typography.micro, color: colors.textMuted, marginTop: spacing.xs },
   drawerBtn: {
-    width: 32,
-    height: 32,
-    borderRadius: 4,
-    alignItems: "center",
-    justifyContent: "center",
+    borderRadius: radii.btn,
   },
-  drawerBtnDanger: { },
-  drawerBtnText: { fontSize: 14, color: colors.textMuted },
+  drawerBtnText: { ...typography.label, color: colors.textMuted },
+  drawerBtnDangerText: { ...typography.label, color: colors.danger },
   drawerFoot: {
-    padding: spacing.sm + 2,
-    borderTopWidth: 1,
+    padding: spacing.md,
+    borderTopWidth: borders.hairline,
     borderTopColor: colors.border,
     alignItems: "center",
   },

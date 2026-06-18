@@ -1,6 +1,6 @@
 // DJ 큐 다음 곡 조회 — provider 레벨 auto-advance 용 (PiP 상태).
 // GET /api/boards/:id/queue/next
-// 응답: { card: { id, title, videoUrl, linkUrl, linkImage } | null }
+// 응답: { card: DJ queue card | null } — PiP 클라이언트는 일부 필드만 사용한다.
 //
 // 권한: 교사 or 학생 (자기 학급). DJ 보드가 DJBoard 컴포넌트로 마운트되어
 // 있으면 SSE snapshot 으로 이미 클라이언트에 cards 가 있으므로 이 엔드포인트
@@ -11,6 +11,7 @@ import { db } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
 import { getCurrentStudent } from "@/lib/student-auth";
 import { getEffectiveBoardRole } from "@/lib/rbac";
+import { resolveCardAuthorLabels } from "@/lib/card-author-labels";
 
 export async function GET(
   _req: Request,
@@ -28,7 +29,7 @@ export async function GET(
 
   const board = await db.board.findFirst({
     where: { OR: [{ id: boardIdOrSlug }, { slug: boardIdOrSlug }] },
-    select: { id: true, classroomId: true },
+    select: { id: true, classroomId: true, anonymousAuthor: true },
   });
   if (!board) {
     return NextResponse.json({ error: "not_found" }, { status: 404 });
@@ -51,12 +52,29 @@ export async function GET(
     orderBy: { order: "asc" },
     select: {
       id: true,
+      boardId: true,
+      authorId: true,
+      studentAuthorId: true,
+      externalAuthorName: true,
       title: true,
       videoUrl: true,
       linkUrl: true,
       linkImage: true,
+      queueStatus: true,
     },
   });
 
-  return NextResponse.json({ card });
+  if (!card) {
+    return NextResponse.json({ card: null });
+  }
+
+  const authorLabels = await resolveCardAuthorLabels(card);
+
+  return NextResponse.json({
+    card: {
+      ...card,
+      ...authorLabels,
+      anonymousAuthor: board.anonymousAuthor,
+    },
+  });
 }

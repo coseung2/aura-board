@@ -1,36 +1,33 @@
-import { FlatList, Pressable, StyleSheet, Text, View } from "react-native";
+import { FlatList, StyleSheet, Text, useWindowDimensions, View } from "react-native";
 import { useState } from "react";
-import { colors, spacing, typography } from "../../theme/tokens";
+import { colors, iconSizes, layout, spacing, typography } from "../../theme/tokens";
 import { CardView } from "../CardView";
 import { CardDetailModal } from "../CardDetailModal";
 import type { BoardDetailResponse, BoardCard } from "../../lib/types";
+import { withBoardAnonymousAuthors } from "../../lib/card-privacy";
 
 // 카드 추가를 아직 모바일에서 지원하지 않는 레이아웃의 공통 뷰어.
 // vibe-gallery / dj-queue / event-signup / breakout / assessment / drawing.
 
-export function ReadOnlyCardsBoard({
-  data,
-}: {
-  data: BoardDetailResponse;
-  onMutate: () => void;
-}) {
+export function ReadOnlyCardsBoard({ data }: { data: BoardDetailResponse }) {
   const [selectedCard, setSelectedCard] = useState<BoardCard | null>(null);
+  const { width } = useWindowDimensions();
+  const columnCount = width < layout.mobileBreakpoint ? 1 : 2;
+  const cards = withBoardAnonymousAuthors(data.cards, data.board);
 
   return (
     <View style={styles.root}>
       <FlatList
-        data={data.cards}
+        data={cards}
+        key={`readonly-cards-${columnCount}`}
         keyExtractor={(c) => c.id}
-        numColumns={2}
-        columnWrapperStyle={styles.row}
+        numColumns={columnCount}
+        columnWrapperStyle={columnCount > 1 ? styles.row : undefined}
         contentContainerStyle={styles.content}
         renderItem={({ item }) => (
-          <Pressable
-            style={styles.cardWrap}
-            onPress={() => setSelectedCard(item)}
-          >
-            <CardView card={item} />
-          </Pressable>
+          <View style={styles.cardWrap}>
+            <CardView card={item} onPress={() => setSelectedCard(item)} />
+          </View>
         )}
         ListEmptyComponent={
           <View style={styles.empty}>
@@ -60,7 +57,7 @@ const styles = StyleSheet.create({
     paddingTop: spacing.xxxl,
     gap: spacing.md,
   },
-  emptyEmoji: { fontSize: 72 },
+  emptyEmoji: { fontSize: iconSizes.gate },
   emptyTitle: { ...typography.title, color: colors.text },
   emptyMsg: {
     ...typography.body,

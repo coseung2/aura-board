@@ -13,10 +13,10 @@ https://expo.dev/signup 또는 `npx expo login` 으로 로그인
 cd apps/mobile
 npm install -g eas-cli
 eas login                      # expo 계정 자격 입력
-eas init                       # 대화형으로 projectId 발급 + app.json 자동 갱신
+eas init                       # 대화형으로 projectId 발급 + app.config.ts 자동 갱신
 ```
 
-- `eas init` 이 `app.json` 의 `extra.eas.projectId` 와 `updates.url` 의
+- `eas init` 이 `app.config.ts` 의 `extra.eas.projectId` 와 `updates.url` 의
   `REPLACE_WITH_EAS_PROJECT_ID` 두 곳을 자동 교체
 - 이 변경을 commit + push (workflow 가 이 값을 읽음)
 

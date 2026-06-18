@@ -2,15 +2,23 @@ import { useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Image,
-  Modal,
-  Pressable,
   ScrollView,
   StyleSheet,
   Text,
   View,
 } from "react-native";
-import { colors, radii, shadows, spacing, tapMin, typography } from "../theme/tokens";
+import {
+  borders,
+  colors,
+  iconSizes,
+  radii,
+  recap,
+  spacing,
+  states,
+  typography,
+} from "../theme/tokens";
 import { apiFetch, ApiError } from "../lib/api";
+import { AppButton, AppModal, IconButton, Pill, SurfaceCard } from "./ui";
 
 // DJ 월말 리캡 모달 (mobile). 웹 src/components/dj/DJRecapModal.tsx 의 네이티브 포팅.
 
@@ -91,41 +99,45 @@ export function DJRecapModal({
   }, [data]);
 
   return (
-    <Modal visible={open} animationType="slide" transparent onRequestClose={onClose}>
-      <View style={styles.backdrop}>
-        <View style={styles.modal}>
-          <View style={styles.head}>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.eyebrow}>📊 이달의 리캡</Text>
-              <Text style={styles.title}>{boardTitle}</Text>
-            </View>
-            <Pressable style={styles.closeBtn} onPress={onClose}>
-              <Text style={styles.closeText}>×</Text>
-            </Pressable>
-          </View>
+    <AppModal
+      visible={open}
+      onClose={onClose}
+      backdropStyle={styles.backdrop}
+      sheetStyle={styles.modal}
+      accessibilityLabel="DJ 보드 이달의 리캡"
+    >
+      <View style={styles.head}>
+        <View style={styles.headCopy}>
+          <Text style={styles.eyebrow}>📊 이달의 리캡</Text>
+          <Text style={styles.title}>{boardTitle}</Text>
+        </View>
+        <IconButton style={styles.closeBtn} onPress={onClose}>
+          <Text style={styles.closeText}>×</Text>
+        </IconButton>
+      </View>
 
-          <View style={styles.monthbar}>
-            <Pressable
-              style={({ pressed }) => [styles.monthBtn, pressed && styles.monthBtnPressed]}
-              onPress={() => setMonth(shiftMonth(month, -1))}
-            >
-              <Text style={styles.monthBtnText}>← {monthLabel(shiftMonth(month, -1))}</Text>
-            </Pressable>
-            <View style={styles.monthPill}>
-              <Text style={styles.monthPillText}>{monthLabel(month)}</Text>
-            </View>
-            <Pressable
-              style={({ pressed }) => [
-                styles.monthBtn,
-                (month >= currentMonth()) && styles.monthBtnDisabled,
-                pressed && month < currentMonth() && styles.monthBtnPressed,
-              ]}
-              onPress={() => setMonth(shiftMonth(month, 1))}
-              disabled={month >= currentMonth()}
-            >
-              <Text style={styles.monthBtnText}>{monthLabel(shiftMonth(month, 1))} →</Text>
-            </Pressable>
-          </View>
+      <View style={styles.monthbar}>
+        <AppButton
+          variant="secondary"
+          style={styles.monthBtn}
+          textStyle={styles.monthBtnText}
+          onPress={() => setMonth(shiftMonth(month, -1))}
+        >
+          ← {monthLabel(shiftMonth(month, -1))}
+        </AppButton>
+        <Pill tone="accent" textStyle={styles.monthPillText}>
+          {monthLabel(month)}
+        </Pill>
+        <AppButton
+          variant="secondary"
+          style={styles.monthBtn}
+          textStyle={styles.monthBtnText}
+          onPress={() => setMonth(shiftMonth(month, 1))}
+          disabled={month >= currentMonth()}
+        >
+          {monthLabel(shiftMonth(month, 1))} →
+        </AppButton>
+      </View>
 
           {loading ? (
             <View style={styles.emptyBox}>
@@ -143,7 +155,10 @@ export function DJRecapModal({
               <Text style={styles.emptyText}>이 달에는 아직 재생된 곡이 없어요.</Text>
             </View>
           ) : (
-            <ScrollView contentContainerStyle={styles.body}>
+            <ScrollView
+              style={styles.bodyScroll}
+              contentContainerStyle={styles.body}
+            >
               {/* 탑스탯 */}
               <View style={styles.stats}>
                 <Stat label="총 재생" value={`${data.totals.plays}`} unit="곡" />
@@ -158,7 +173,7 @@ export function DJRecapModal({
               {data.spotlight.topSong || data.spotlight.topSubmitter ? (
                 <View style={styles.spotlight}>
                   {data.spotlight.topSong ? (
-                    <View style={[styles.spot, styles.spotSong]}>
+                    <SurfaceCard style={[styles.spot, styles.spotSong]}>
                       <Text style={styles.spotLabel}>🎵 가장 많이 들은 곡</Text>
                       {data.spotlight.topSong.linkImage ? (
                         <Image
@@ -175,10 +190,10 @@ export function DJRecapModal({
                         {data.spotlight.topSong.title}
                       </Text>
                       <Text style={styles.spotMeta}>{data.spotlight.topSong.plays}회 재생</Text>
-                    </View>
+                    </SurfaceCard>
                   ) : null}
                   {data.spotlight.topSubmitter ? (
-                    <View style={[styles.spot, styles.spotDJ]}>
+                    <SurfaceCard style={[styles.spot, styles.spotDJ]}>
                       <Text style={styles.spotLabel}>🏆 이달의 DJ</Text>
                       <View style={styles.spotAvatar}>
                         <Text style={styles.spotAvatarText}>
@@ -189,7 +204,7 @@ export function DJRecapModal({
                       <Text style={styles.spotMeta}>
                         {data.spotlight.topSubmitter.plays}회 · {data.spotlight.topSubmitter.uniqueSongs}곡
                       </Text>
-                    </View>
+                    </SurfaceCard>
                   ) : null}
                 </View>
               ) : null}
@@ -207,7 +222,7 @@ export function DJRecapModal({
                         <Text style={styles.spotThumbEmoji}>♪</Text>
                       </View>
                     )}
-                    <View style={{ flex: 1, minWidth: 0 }}>
+                    <View style={styles.songInfo}>
                       <Text style={styles.songTitle} numberOfLines={1}>{song.title}</Text>
                       {song.firstSubmitter ? (
                         <Text style={styles.songSub}>첫 신청 {song.firstSubmitter}</Text>
@@ -225,7 +240,7 @@ export function DJRecapModal({
                   <View key={`${s.id ?? s.name}`} style={styles.rankRow}>
                     <Text style={[styles.pos, i < 3 && styles.posTop]}>{i + 1}</Text>
                     <View style={[styles.rankAvatar, i === 0 && styles.rankAvatarTop]}>
-                      <Text style={[styles.rankAvatarText, i === 0 && { color: "#fff" }]}>
+                      <Text style={[styles.rankAvatarText, i === 0 && styles.rankAvatarTextTop]}>
                         {s.name[0]}
                       </Text>
                     </View>
@@ -240,13 +255,13 @@ export function DJRecapModal({
                 <Text style={styles.sectionTitle}>일별 재생</Text>
                 <View style={styles.bars}>
                   {data.byDay.map((d) => {
-                    const h = (d.plays / maxByDay) * 100;
+                    const h = (d.plays / maxByDay) * recap.barFullPercent;
                     return (
                       <View key={d.date} style={styles.barCol}>
                         <View
                           style={[
                             styles.barFill,
-                            { height: `${Math.max(3, h)}%` },
+                            { height: `${Math.max(recap.barMinPercent, h)}%` },
                           ]}
                         />
                       </View>
@@ -262,21 +277,19 @@ export function DJRecapModal({
               </View>
             </ScrollView>
           )}
-        </View>
-      </View>
-    </Modal>
+    </AppModal>
   );
 }
 
 function Stat({ label, value, unit }: { label: string; value: string; unit: string }) {
   return (
-    <View style={styles.stat}>
+    <SurfaceCard style={styles.stat}>
       <Text style={styles.statValue}>
         {value}
         <Text style={styles.statUnit}> {unit}</Text>
       </Text>
       <Text style={styles.statLabel}>{label}</Text>
-    </View>
+    </SurfaceCard>
   );
 }
 
@@ -298,20 +311,11 @@ function monthLabel(month: string): string {
 
 const styles = StyleSheet.create({
   backdrop: {
-    flex: 1,
-    backgroundColor: "rgba(0,0,0,0.5)",
-    justifyContent: "center",
-    alignItems: "center",
     padding: spacing.xl,
   },
   modal: {
-    width: "100%",
-    maxWidth: 720,
-    maxHeight: "92%",
-    backgroundColor: colors.surface,
-    borderRadius: radii.card,
-    ...shadows.cardHover,
-    overflow: "hidden",
+    maxWidth: recap.modalMaxWidth,
+    maxHeight: recap.modalMaxHeight,
   },
   head: {
     flexDirection: "row",
@@ -319,22 +323,18 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     padding: spacing.xl,
     paddingBottom: spacing.md,
-    borderBottomWidth: 1,
+    borderBottomWidth: borders.hairline,
     borderBottomColor: colors.border,
     gap: spacing.md,
   },
-  eyebrow: { ...typography.badge, color: colors.accent, marginBottom: 4 },
+  headCopy: { flex: 1 },
+  eyebrow: { ...typography.badge, color: colors.accent, marginBottom: spacing.xs },
   title: { ...typography.title, color: colors.text },
   closeBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: radii.btn,
-    borderWidth: 1,
+    borderWidth: borders.hairline,
     borderColor: colors.border,
-    alignItems: "center",
-    justifyContent: "center",
   },
-  closeText: { fontSize: 18, color: colors.textMuted },
+  closeText: { ...typography.subtitle, color: colors.textMuted },
 
   monthbar: {
     flexDirection: "row",
@@ -342,27 +342,18 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     gap: spacing.md,
     padding: spacing.md,
-    borderBottomWidth: 1,
+    borderBottomWidth: borders.hairline,
     borderBottomColor: colors.border,
   },
   monthBtn: {
-    paddingHorizontal: spacing.md,
-    paddingVertical: 6,
-    borderRadius: radii.btn,
-    borderWidth: 1,
-    borderColor: colors.border,
+    flexShrink: 1,
   },
-  monthBtnPressed: { backgroundColor: colors.surfaceAlt },
-  monthBtnDisabled: { opacity: 0.3 },
   monthBtnText: { ...typography.micro, color: colors.textMuted },
-  monthPill: {
-    paddingHorizontal: spacing.lg,
-    paddingVertical: 4,
-    backgroundColor: colors.accentTintedBg,
-    borderRadius: radii.pill,
-  },
-  monthPillText: { ...typography.label, color: colors.accentTintedText, fontSize: 14, fontWeight: "700" },
+  monthPillText: { ...typography.label, color: colors.accentTintedText },
 
+  bodyScroll: {
+    flexShrink: 1,
+  },
   body: { padding: spacing.xl, gap: spacing.xl },
   emptyBox: {
     padding: spacing.xxxl,
@@ -370,119 +361,113 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     gap: spacing.md,
   },
-  emptyEmoji: { fontSize: 48 },
+  emptyEmoji: { fontSize: iconSizes.gate },
   emptyText: { ...typography.body, color: colors.textMuted, textAlign: "center" },
 
   stats: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm },
   stat: {
     flex: 1,
-    minWidth: 120,
-    backgroundColor: colors.bg,
-    borderRadius: radii.card,
-    borderWidth: 1,
-    borderColor: colors.border,
+    minWidth: recap.statMinWidth,
     padding: spacing.md,
     alignItems: "center",
   },
-  statValue: { fontSize: 28, fontWeight: "700", color: colors.text, letterSpacing: -0.5 },
-  statUnit: { fontSize: 13, color: colors.textMuted, fontWeight: "500" },
-  statLabel: { ...typography.micro, color: colors.textMuted, marginTop: 2 },
+  statValue: { ...typography.display, color: colors.text },
+  statUnit: { ...typography.label, color: colors.textMuted },
+  statLabel: { ...typography.micro, color: colors.textMuted, marginTop: spacing.xs },
 
   spotlight: { flexDirection: "row", gap: spacing.md, flexWrap: "wrap" },
   spot: {
     flex: 1,
-    minWidth: 200,
-    borderRadius: radii.card,
+    minWidth: recap.spotMinWidth,
     padding: spacing.lg,
     alignItems: "center",
-    gap: spacing.xs + 2,
-    borderWidth: 1,
+    gap: spacing.sm,
   },
-  spotSong: { backgroundColor: "#fff7e6", borderColor: "rgba(201,162,39,0.3)" },
-  spotDJ: { backgroundColor: "#e8f3ff", borderColor: "rgba(0,117,222,0.3)" },
-  spotLabel: { ...typography.badge, fontSize: 11, color: colors.textMuted },
+  spotSong: { backgroundColor: colors.recapSongBg, borderColor: colors.recapSongBorder },
+  spotDJ: { backgroundColor: colors.recapDjBg, borderColor: colors.recapDjBorder },
+  spotLabel: { ...typography.badge, color: colors.textMuted },
   spotThumb: {
-    width: 120,
-    height: 68,
-    borderRadius: 8,
+    width: recap.spotThumbWidth,
+    height: recap.spotThumbHeight,
+    borderRadius: radii.control,
     backgroundColor: colors.surfaceAlt,
   },
   spotThumbFallback: {
-    backgroundColor: "#d6b8ff",
+    backgroundColor: colors.mediaLavender,
     alignItems: "center",
     justifyContent: "center",
   },
-  spotThumbEmoji: { fontSize: 20, color: "#fff" },
+  spotThumbEmoji: { fontSize: iconSizes.md, color: colors.onAccent },
   spotAvatar: {
-    width: 72,
-    height: 72,
-    borderRadius: 36,
-    backgroundColor: "#c9a227",
+    width: recap.spotAvatarSize,
+    height: recap.spotAvatarSize,
+    borderRadius: radii.pill,
+    backgroundColor: colors.rankingGold,
     alignItems: "center",
     justifyContent: "center",
   },
-  spotAvatarText: { fontSize: 28, fontWeight: "700", color: "#fff" },
+  spotAvatarText: { ...typography.display, color: colors.onAccent },
   spotTitle: { ...typography.section, color: colors.text, textAlign: "center" },
   spotMeta: { ...typography.micro, color: colors.textMuted },
 
   section: { gap: spacing.sm },
-  sectionTitle: { ...typography.label, fontSize: 14, fontWeight: "700", color: colors.text },
+  sectionTitle: { ...typography.label, color: colors.text },
 
   songRow: {
     flexDirection: "row",
     alignItems: "center",
     gap: spacing.md,
-    padding: spacing.sm + 2,
+    padding: spacing.md,
     backgroundColor: colors.bg,
-    borderRadius: 8,
-    minHeight: tapMin,
+    borderRadius: radii.btn,
   },
   pos: {
-    width: 28,
+    width: recap.positionWidth,
     textAlign: "center",
     fontFamily: "monospace",
-    fontWeight: "700",
-    fontSize: 13,
+    ...typography.label,
     color: colors.textMuted,
   },
-  posTop: { color: "#c9a227" },
+  posTop: { color: colors.rankingGold },
   songThumb: {
-    width: 56,
-    height: 32,
-    borderRadius: 4,
+    width: recap.songThumbWidth,
+    height: recap.songThumbHeight,
+    borderRadius: radii.btn,
     backgroundColor: colors.surfaceAlt,
   },
-  songTitle: { ...typography.label, fontSize: 14, color: colors.text, fontWeight: "600" },
-  songSub: { ...typography.micro, fontSize: 11, color: colors.textMuted, marginTop: 2 },
-  songPlays: { ...typography.label, fontSize: 13, color: colors.accent, fontVariant: ["tabular-nums"] },
+  songInfo: { flex: 1, minWidth: 0 },
+  songTitle: { ...typography.label, color: colors.text },
+  songSub: { ...typography.micro, color: colors.textMuted, marginTop: spacing.xs },
+  songPlays: { ...typography.label, color: colors.accent, fontVariant: ["tabular-nums"] },
 
   rankRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: spacing.sm + 2,
-    paddingVertical: 6,
+    gap: spacing.md,
+    paddingVertical: spacing.sm,
   },
   rankAvatar: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: "rgba(0,0,0,0.08)",
+    width: recap.rankAvatarSize,
+    height: recap.rankAvatarSize,
+    borderRadius: radii.pill,
+    backgroundColor: colors.surfaceAlt,
     alignItems: "center",
     justifyContent: "center",
   },
-  rankAvatarTop: { backgroundColor: "#c9a227" },
-  rankAvatarText: { fontSize: 12, fontWeight: "600", color: colors.text },
-  rankName: { flex: 1, ...typography.body, fontSize: 13, color: colors.text },
+  rankAvatarTop: { backgroundColor: colors.rankingGold },
+  rankAvatarText: { ...typography.badge, color: colors.text },
+  rankAvatarTextTop: { color: colors.onAccent },
+  rankName: { flex: 1, ...typography.body, color: colors.text },
   rankCount: { ...typography.micro, color: colors.textMuted, fontVariant: ["tabular-nums"] },
 
   bars: {
     flexDirection: "row",
     alignItems: "flex-end",
-    height: 80,
+    height: recap.barsHeight,
     backgroundColor: colors.bg,
-    borderRadius: 8,
-    padding: spacing.sm + 4,
-    gap: 2,
+    borderRadius: radii.btn,
+    padding: spacing.md,
+    gap: spacing.xs,
   },
   barCol: {
     flex: 1,
@@ -491,14 +476,14 @@ const styles = StyleSheet.create({
   },
   barFill: {
     backgroundColor: colors.accent,
-    borderRadius: 2,
-    opacity: 0.8,
-    minHeight: 2,
+    borderRadius: radii.btn,
+    opacity: states.pressedOpacity,
+    minHeight: spacing.xs,
   },
   barsXaxis: {
     flexDirection: "row",
     justifyContent: "space-between",
     paddingHorizontal: spacing.xs,
   },
-  barsXtext: { ...typography.micro, fontSize: 11, color: colors.textFaint },
+  barsXtext: { ...typography.micro, color: colors.textFaint },
 });

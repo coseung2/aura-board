@@ -6,7 +6,7 @@ import {
   Text,
   View,
 } from "react-native";
-import { colors, spacing, typography } from "../../theme/tokens";
+import { colors, iconSizes, spacing, typography } from "../../theme/tokens";
 import * as ImagePicker from "expo-image-picker";
 import { PlantHero } from "../plant/PlantHero";
 import { StageRow } from "../plant/StageRow";
@@ -389,7 +389,7 @@ const styles = StyleSheet.create({
     padding: spacing.xxl,
     gap: spacing.md,
   },
-  infoEmoji: { fontSize: 72 },
+  infoEmoji: { fontSize: iconSizes.gate },
   infoTitle: { ...typography.title, color: colors.text, textAlign: "center" },
   infoMsg: { ...typography.body, color: colors.textMuted, textAlign: "center" },
   sectionTitle: {

@@ -1,7 +1,8 @@
 import { useState } from "react";
-import { Image, Pressable, StyleSheet, Text, View } from "react-native";
-import { colors, radii, spacing, typography } from "../../theme/tokens";
+import { Image, StyleSheet, Text, View } from "react-native";
+import { colors, iconSizes, plant, radii, spacing, typography } from "../../theme/tokens";
 import type { ObservationImageDTO } from "../../lib/types";
+import { AppButton, SurfaceCard } from "../ui";
 
 interface Props {
   images: ObservationImageDTO[];
@@ -22,19 +23,29 @@ export function StageCompare({ images }: Props) {
 
   if (!expanded) {
     return (
-      <Pressable style={styles.toggleBtn} onPress={() => setExpanded(true)}>
-        <Text style={styles.toggleText}>📷 성장 비교 보기</Text>
-      </Pressable>
+      <AppButton
+        variant="quiet"
+        style={styles.toggleBtn}
+        textStyle={styles.toggleText}
+        onPress={() => setExpanded(true)}
+      >
+        📷 성장 비교 보기
+      </AppButton>
     );
   }
 
   return (
-    <View style={styles.container}>
+    <SurfaceCard style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.headerText}>📷 성장 비교</Text>
-        <Pressable onPress={() => setExpanded(false)}>
-          <Text style={styles.closeText}>접기</Text>
-        </Pressable>
+        <AppButton
+          variant="quiet"
+          style={styles.closeBtn}
+          textStyle={styles.closeText}
+          onPress={() => setExpanded(false)}
+        >
+          접기
+        </AppButton>
       </View>
       <View style={styles.compareRow}>
         <View style={styles.compareItem}>
@@ -55,15 +66,15 @@ export function StageCompare({ images }: Props) {
           <Text style={styles.compareLabel}>최근</Text>
         </View>
       </View>
-    </View>
+    </SurfaceCard>
   );
 }
 
 const styles = StyleSheet.create({
   toggleBtn: {
     alignSelf: "flex-start",
-    paddingVertical: spacing.xs,
     paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs,
   },
   toggleText: {
     ...typography.label,
@@ -71,7 +82,6 @@ const styles = StyleSheet.create({
   },
   container: {
     backgroundColor: colors.surfaceAlt,
-    borderRadius: radii.card,
     padding: spacing.md,
     gap: spacing.sm,
   },
@@ -88,6 +98,10 @@ const styles = StyleSheet.create({
     ...typography.label,
     color: colors.accent,
   },
+  closeBtn: {
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs,
+  },
   compareRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -96,13 +110,13 @@ const styles = StyleSheet.create({
   },
   compareItem: {
     alignItems: "center",
-    gap: 4,
+    gap: spacing.xs,
     flex: 1,
   },
   compareImage: {
     width: "100%",
-    aspectRatio: 4 / 3,
-    borderRadius: 8,
+    aspectRatio: plant.compareAspectRatio,
+    borderRadius: radii.btn,
     backgroundColor: colors.surfaceAlt,
   },
   compareLabel: {
@@ -110,7 +124,7 @@ const styles = StyleSheet.create({
     color: colors.textMuted,
   },
   arrow: {
-    fontSize: 20,
+    fontSize: iconSizes.md,
     color: colors.textMuted,
   },
 });

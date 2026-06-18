@@ -2,6 +2,13 @@
 
 Updated: 2026-06-15
 
+Canonical implementation rules now live in:
+
+- `docs/mobile-ui-parity.md`
+- `docs/mobile-component-mapping.md`
+- `apps/mobile/theme/tokens.ts`
+- `apps/mobile/components/ui.tsx`
+
 ## Goal
 
 Make the Expo mobile app feel functionally and visually equivalent to the web app for student and parent users, then upload a verified Expo build.
@@ -25,11 +32,16 @@ Parity means the same user should be able to complete the same core task with th
 
 ## Current Findings
 
-- Student board detail was missing a card-detail modal for card-based layouts. A first pass now adds a native detail modal for freeform/grid/stream, columns, and read-only card layouts.
-- Student plant journal could crash when plant roadmap data omitted `species`, `currentStage`, stages, or observations. A first pass now normalizes missing fields and shows a graceful empty state.
-- Mobile board shell did not show the same Aura-board logo lockup as the web `Logo` component. A first pass now adds the app icon and wordmark.
-- Parent child detail still uses mock board data and has a TODO instead of opening a board. This is the largest parent parity gap.
-- Student and parent login screens still use an emoji brand mark instead of the app icon, so brand parity is incomplete beyond board detail.
+- Student board detail now has a native card-detail modal for freeform/grid/stream, columns, and read-only card layouts.
+- Student plant journal normalizes missing plant/stage/observation fields and shows graceful empty states.
+- Mobile board shell, login, and home flows use the shared Aura-board logo lockup instead of route-local emoji branding.
+- Parent child detail now uses `/api/parent/portfolio` production data and opens portfolio cards in the shared card detail modal.
+- Parent home now exposes a dedicated showcase entry point, and the mobile
+  parent showcase screen uses the same classroom showcase API plus shared card
+  detail modal.
+- Mobile UI parity is now governed by `docs/mobile-ui-parity.md`, `docs/mobile-component-mapping.md`, `apps/mobile/theme/tokens.ts`, `apps/mobile/components/ui.tsx`, and `apps/mobile/scripts/check-design-system.mjs`.
+- Remaining proof gaps are rendered viewport evidence on emulator/tablet sizes,
+  plus focused audits for media/embed states and web accessibility equivalents.
 
 ## Implementation Plan
 
@@ -44,9 +56,9 @@ Parity means the same user should be able to complete the same core task with th
    - Keep dimensions close to web logo usage: 28-32px in headers, larger only on login.
 
 3. Fix parent data parity.
-   - Replace `MOCK_BOARDS` in `apps/mobile/app/(parent)/child/[id].tsx` with a real parent-auth API call.
-   - If an endpoint already exists, consume it. If not, implement a narrow API route returning child identity and board summaries.
-   - Wire parent board taps to a real parent-safe board viewer or shared read-only board detail flow.
+   - Done: `apps/mobile/app/(parent)/child/[id].tsx` consumes `/api/parent/portfolio`.
+   - Done: parent card taps open a real shared card detail flow.
+   - Continue validating parent auth/session expiry and empty states against device runtime evidence.
 
 4. Audit student board layouts.
    - Compare mobile layout behavior against web for columns, read-only card boards, plant journal, DJ queue, quiz, assignment, and vibe arcade.
@@ -76,7 +88,7 @@ Parity means the same user should be able to complete the same core task with th
 - Student card attachments open from the modal.
 - Plant journal opens without crashing with missing or empty stage data.
 - Parent login/link-child flow still typechecks and preserves session behavior.
-- Parent child detail uses real data and board taps are not dead.
+- Parent child detail uses real data and card taps open detail content.
 - No env or secret files are read or modified.
 - Expo build is uploaded and build URL/status is reported.
 

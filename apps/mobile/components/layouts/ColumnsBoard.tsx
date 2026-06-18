@@ -1,16 +1,24 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
-  Pressable,
   ScrollView,
   StyleSheet,
   Text,
   View,
 } from "react-native";
-import { colors, radii, shadows, spacing, tapMin, typography } from "../../theme/tokens";
+import {
+  borders,
+  colors,
+  columns as columnTokens,
+  iconSizes,
+  spacing,
+  typography,
+} from "../../theme/tokens";
 import { CardView } from "../CardView";
 import { CardComposer } from "../CardComposer";
 import { CardDetailModal } from "../CardDetailModal";
 import type { BoardDetailResponse, BoardCard } from "../../lib/types";
+import { withBoardAnonymousAuthor, withBoardAnonymousAuthors } from "../../lib/card-privacy";
+import { AppButton, Pill, SurfaceCard } from "../ui";
 
 export function ColumnsBoard({
   data,
@@ -19,10 +27,16 @@ export function ColumnsBoard({
   data: BoardDetailResponse;
   onMutate: () => void;
 }) {
-  const [cards, setCards] = useState<BoardCard[]>(data.cards);
+  const [cards, setCards] = useState<BoardCard[]>(() =>
+    withBoardAnonymousAuthors(data.cards, data.board),
+  );
   const [selectedCard, setSelectedCard] = useState<BoardCard | null>(null);
   const [activeSection, setActiveSection] = useState<string | null>(null);
   const [composerOpen, setComposerOpen] = useState(false);
+
+  useEffect(() => {
+    setCards(withBoardAnonymousAuthors(data.cards, data.board));
+  }, [data.cards, data.board]);
 
   const columns = useMemo(() => {
     const map = new Map<string | null, { title: string; cards: BoardCard[] }>();
@@ -49,7 +63,7 @@ export function ColumnsBoard({
   }, [cards, data.sections]);
 
   function handleCreated(card: BoardCard) {
-    setCards((prev) => [...prev, card]);
+    setCards((prev) => [...prev, withBoardAnonymousAuthor(card, data.board)]);
     onMutate();
   }
 
@@ -66,36 +80,37 @@ export function ColumnsBoard({
         showsHorizontalScrollIndicator
       >
         {columns.length === 0 ? (
-          <View style={styles.emptyColumn}>
+          <SurfaceCard style={styles.emptyColumn}>
             <Text style={styles.emptyEmoji}>📊</Text>
             <Text style={styles.emptyTitle}>주제가 아직 없어요</Text>
             <Text style={styles.emptyMsg}>선생님이 주제를 만들어야 카드를 올릴 수 있어요.</Text>
-          </View>
+          </SurfaceCard>
         ) : (
           columns.map((column) => (
             <View key={column.id ?? "etc"} style={styles.column}>
-              <View style={styles.colHead}>
+              <SurfaceCard style={styles.colHead}>
                 <Text style={styles.colTitle} numberOfLines={1}>
                   {column.title}
                 </Text>
-                <View style={styles.countPill}>
-                  <Text style={styles.colCount}>{column.cards.length}</Text>
-                </View>
-              </View>
-              <Pressable
-                style={({ pressed }) => [styles.addBtn, pressed && styles.addBtnPressed]}
+                <Pill tone="accent" style={styles.countPill}>
+                  {column.cards.length}
+                </Pill>
+              </SurfaceCard>
+              <AppButton
+                variant="secondary"
+                style={styles.addBtn}
+                textStyle={styles.addText}
                 onPress={() => openComposer(column.id)}
-                accessibilityRole="button"
               >
-                <Text style={styles.addText}>+ 카드 추가</Text>
-              </Pressable>
+                + 카드 추가
+              </AppButton>
               <ScrollView
                 style={styles.colBodyScroll}
                 contentContainerStyle={styles.colBodyContent}
                 showsVerticalScrollIndicator={false}
               >
                 {column.cards.map((card) => (
-                  <View key={card.id} style={styles.cardWrap}>
+                  <View key={card.id}>
                     <CardView card={card} onPress={() => setSelectedCard(card)} />
                   </View>
                 ))}
@@ -122,7 +137,7 @@ export function ColumnsBoard({
 const styles = StyleSheet.create({
   root: {
     flex: 1,
-    backgroundColor: "#e9f5ff",
+    backgroundColor: colors.bg,
   },
   scroll: {
     paddingTop: spacing.lg,
@@ -134,81 +149,51 @@ const styles = StyleSheet.create({
     alignItems: "flex-start",
   },
   column: {
-    width: 312,
+    width: columnTokens.columnWidth,
     height: "100%",
-    gap: 10,
-    backgroundColor: "transparent",
+    gap: spacing.md,
+    backgroundColor: colors.transparent,
   },
   colHead: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 10,
-    paddingVertical: 10,
-    paddingHorizontal: 14,
-    backgroundColor: colors.surface,
-    borderRadius: radii.card,
-    borderWidth: 1,
-    borderColor: colors.border,
-    ...shadows.card,
+    gap: spacing.md,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.lg,
   },
   colTitle: {
-    fontSize: 15,
-    fontWeight: "700",
-    letterSpacing: -0.15,
+    ...typography.section,
     color: colors.text,
     flex: 1,
   },
   countPill: {
-    backgroundColor: colors.accentTintedBg,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 2,
-    borderRadius: radii.pill,
-    minWidth: 24,
+    minWidth: columnTokens.countPillMinWidth,
     alignItems: "center",
-  },
-  colCount: {
-    ...typography.badge,
-    color: colors.accentTintedText,
   },
   addBtn: {
-    paddingVertical: 9,
-    paddingHorizontal: 14,
-    borderRadius: 8,
-    borderWidth: 1,
+    borderWidth: borders.hairline,
     borderStyle: "dashed",
     borderColor: colors.border,
-    alignItems: "center",
-    minHeight: tapMin,
-    justifyContent: "center",
-    backgroundColor: "transparent",
-  },
-  addBtnPressed: {
-    borderColor: colors.accent,
-    backgroundColor: colors.accentTintedBg,
+    backgroundColor: colors.transparent,
   },
   addText: {
     ...typography.label,
-    fontSize: 13,
     color: colors.textFaint,
   },
   colBodyScroll: { flex: 1 },
   colBodyContent: {
     gap: spacing.md,
-    paddingTop: 8,
+    paddingTop: spacing.sm,
     paddingBottom: spacing.xl,
-    paddingRight: 6,
+    paddingRight: spacing.sm,
   },
-  cardWrap: { marginBottom: 0 },
   emptyColumn: {
-    width: 312,
+    width: columnTokens.columnWidth,
     alignItems: "center",
     padding: spacing.xxl,
     gap: spacing.md,
-    ...shadows.card,
-    backgroundColor: colors.surface,
-    borderRadius: radii.card,
   },
-  emptyEmoji: { fontSize: 48 },
+  emptyEmoji: { fontSize: iconSizes.empty },
   emptyTitle: { ...typography.title, color: colors.text },
   emptyMsg: { ...typography.body, color: colors.textMuted, textAlign: "center" },
 });

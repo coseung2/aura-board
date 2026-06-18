@@ -93,15 +93,15 @@ npx eas build --profile development --platform android
 
 ## 디자인 토큰
 
-`theme/tokens.ts` 에 웹 `src/styles/base.css` 의 CSS 변수 1:1 포팅.
-`colors.accent = #0075de`, `radii.card = 12` 등 시각적 동일성 유지.
+`theme/tokens.ts` 에 웹 `src/styles/base.css` 의 CSS 변수를 포팅합니다.
+색, 반경, 그림자, 고정 크기는 화면 파일에 직접 쓰지 않고 토큰 또는 공통 UI 컴포넌트를 통해 사용합니다.
 양쪽 동기화는 추후 `packages/shared/` 추출 대상.
 
 ## 폴더 구조
 
 ```
 apps/mobile/
-├── app.json               # orientation: landscape, tablet 지원
+├── app.config.ts          # Expo 설정, theme/tokens.ts 기준값 참조
 ├── eas.json               # profile 별 EXPO_PUBLIC_API_BASE 주입
 ├── app/                   # expo-router file-based
 │   ├── _layout.tsx        # 루트 레이아웃 (SafeAreaProvider + Stack)

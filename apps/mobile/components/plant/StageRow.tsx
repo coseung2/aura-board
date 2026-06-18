@@ -1,9 +1,16 @@
 import { StyleSheet, Text, View } from "react-native";
-import { colors, radii, shadows, spacing, typography } from "../../theme/tokens";
+import {
+  colors,
+  iconSizes,
+  spacing,
+  states,
+  typography,
+} from "../../theme/tokens";
 import { StageRail, type StageState } from "./StageRail";
 import { ObservationCard } from "./ObservationCard";
 import { StageCompare } from "./StageCompare";
 import type { StageDTO, ObservationDTO } from "../../lib/types";
+import { AppButton, Pill, SurfaceCard } from "../ui";
 
 interface Props {
   stage: StageDTO;
@@ -52,7 +59,7 @@ export function StageRow({
         isFirst={isFirst}
         isLast={isLast}
       />
-      <View
+      <SurfaceCard
         style={[
           styles.body,
           state === "active" && styles.bodyActive,
@@ -67,9 +74,9 @@ export function StageRow({
               {stage.order}단계 · {stage.nameKo}
             </Text>
             {isCurrent && (
-              <View style={styles.currentBadge}>
-                <Text style={styles.currentBadgeText}>현재</Text>
-              </View>
+              <Pill tone="accent" textStyle={styles.currentBadgeText}>
+                현재
+              </Pill>
             )}
           </View>
           {stage.description ? (
@@ -119,25 +126,26 @@ export function StageRow({
         {/* 액션 버튼 */}
         {canEdit && state !== "upcoming" && (
           <View style={styles.actions}>
-            <Text
-              style={styles.actionPrimary}
+            <AppButton
+              variant="success"
               onPress={onAddObservation}
-              accessibilityRole="button"
             >
               + 관찰 추가
-            </Text>
+            </AppButton>
             {isCurrent && (
-              <Text
-                style={[styles.actionSecondary, busyAdvance && styles.actionDisabled]}
+              <AppButton
+                variant="secondary"
+                textStyle={styles.actionSecondaryText}
+                style={styles.actionSecondary}
                 onPress={busyAdvance ? undefined : onAdvance}
-                accessibilityRole="button"
+                disabled={busyAdvance}
               >
                 다음 단계로 →
-              </Text>
+              </AppButton>
             )}
           </View>
         )}
-      </View>
+      </SurfaceCard>
     </View>
   );
 }
@@ -149,27 +157,19 @@ const styles = StyleSheet.create({
   },
   body: {
     flex: 1,
-    backgroundColor: colors.surface,
-    borderRadius: radii.card,
-    borderWidth: 1,
-    borderColor: colors.border,
     padding: spacing.lg,
     marginBottom: spacing.md,
     gap: spacing.sm,
-    ...shadows.card,
   },
   bodyActive: {
     borderColor: colors.plantActive,
-    shadowColor: colors.plantActive,
-    shadowOpacity: 0.15,
-    shadowRadius: 12,
   },
   bodyUpcoming: {
-    opacity: 0.55,
+    opacity: states.disabledOpacity,
     borderStyle: "dashed" as never, // RN doesn't support dashed natively; fallback to solid
   },
   header: {
-    gap: 4,
+    gap: spacing.xs,
   },
   headerTitle: {
     flexDirection: "row",
@@ -178,28 +178,22 @@ const styles = StyleSheet.create({
     flexWrap: "wrap",
   },
   icon: {
-    fontSize: 20,
+    fontSize: iconSizes.md,
   },
   title: {
     ...typography.section,
     color: colors.text,
   },
-  currentBadge: {
-    backgroundColor: colors.plantActive,
-    borderRadius: 9999,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 2,
-  },
   currentBadgeText: {
     ...typography.badge,
-    color: "#ffffff",
+    color: colors.accentTintedText,
   },
   description: {
     ...typography.body,
     color: colors.textMuted,
   },
   points: {
-    gap: 4,
+    gap: spacing.xs,
     paddingTop: spacing.xs,
   },
   pointsTitle: {
@@ -226,28 +220,14 @@ const styles = StyleSheet.create({
     paddingTop: spacing.sm,
     flexWrap: "wrap",
   },
-  actionPrimary: {
-    ...typography.label,
-    color: "#ffffff",
-    backgroundColor: colors.plantActive,
-    borderRadius: radii.btn,
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.sm,
-    overflow: "hidden",
-    textAlign: "center",
-  },
   actionSecondary: {
+    borderColor: colors.plantActive,
+  },
+  actionSecondaryText: {
     ...typography.label,
     color: colors.plantActive,
-    borderWidth: 1,
-    borderColor: colors.plantActive,
-    borderRadius: radii.btn,
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.sm,
-    overflow: "hidden",
-    textAlign: "center",
   },
   actionDisabled: {
-    opacity: 0.5,
+    opacity: states.disabledOpacity,
   },
 });

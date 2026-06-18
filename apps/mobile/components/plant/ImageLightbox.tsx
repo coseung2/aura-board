@@ -1,12 +1,11 @@
-import { Dimensions, Image, Modal, Pressable, StyleSheet, Text, View } from "react-native";
-import { colors, spacing } from "../../theme/tokens";
+import { Image, Modal, StyleSheet, Text, useWindowDimensions, View } from "react-native";
+import { colors, plant, radii, spacing, typography } from "../../theme/tokens";
+import { AppButton, MediaPressable } from "../ui";
 
 interface Props {
   url: string | null;
   onClose: () => void;
 }
-
-const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
 
 /**
  * 풀스크린 이미지 라이트박스.
@@ -14,23 +13,35 @@ const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
  * 향후 react-native-reanimated 기반 pinch-to-zoom 추가 예정.
  */
 export function ImageLightbox({ url, onClose }: Props) {
+  const { width, height } = useWindowDimensions();
   if (!url) return null;
 
   return (
     <Modal visible transparent animationType="fade" onRequestClose={onClose}>
-      <Pressable style={styles.backdrop} onPress={onClose}>
-        <View style={styles.container}>
-          <Image
-            source={{ uri: url }}
-            style={styles.image}
+      <MediaPressable style={styles.backdrop} onPress={onClose}>
+          <View style={[styles.container, { width, height: height * plant.lightboxHeightRatio }]}>
+            <Image
+              source={{ uri: url }}
+              style={[
+                styles.image,
+                {
+                  width: width * plant.lightboxImageWidthRatio,
+                  height: height * plant.lightboxImageHeightRatio,
+                },
+              ]}
             resizeMode="contain"
             accessibilityLabel="관찰 사진 원본"
           />
         </View>
-        <Pressable style={styles.closeBtn} onPress={onClose}>
-          <Text style={styles.closeText}>✕ 닫기</Text>
-        </Pressable>
-      </Pressable>
+        <AppButton
+          variant="quiet"
+          style={styles.closeBtn}
+          textStyle={styles.closeText}
+          onPress={onClose}
+        >
+          ✕ 닫기
+        </AppButton>
+      </MediaPressable>
     </Modal>
   );
 }
@@ -38,32 +49,27 @@ export function ImageLightbox({ url, onClose }: Props) {
 const styles = StyleSheet.create({
   backdrop: {
     flex: 1,
-    backgroundColor: "rgba(0, 0, 0, 0.92)",
+    backgroundColor: colors.lightboxOverlay,
     alignItems: "center",
     justifyContent: "center",
   },
   container: {
-    width: SCREEN_WIDTH,
-    height: SCREEN_HEIGHT * 0.75,
     alignItems: "center",
     justifyContent: "center",
   },
-  image: {
-    width: SCREEN_WIDTH * 0.92,
-    height: SCREEN_HEIGHT * 0.7,
-  },
+  image: {},
   closeBtn: {
     position: "absolute",
-    bottom: 60,
+    bottom: plant.lightboxCloseBottom,
     alignSelf: "center",
     paddingHorizontal: spacing.xl,
     paddingVertical: spacing.md,
-    backgroundColor: "rgba(255,255,255,0.15)",
-    borderRadius: 20,
+    backgroundColor: colors.lightboxControlBg,
+    borderRadius: radii.pill,
+    borderColor: colors.transparent,
   },
   closeText: {
-    color: "#ffffff",
-    fontSize: 16,
-    fontWeight: "600",
+    ...typography.label,
+    color: colors.onAccent,
   },
 });

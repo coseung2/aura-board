@@ -1,18 +1,15 @@
 import { useCallback, useState } from "react";
 import {
-  ActivityIndicator,
   Alert,
   Image,
-  Modal,
-  Pressable,
   ScrollView,
   StyleSheet,
   Text,
-  TextInput,
   View,
 } from "react-native";
-import { colors, radii, shadows, spacing, typography } from "../../theme/tokens";
+import { borders, colors, plant, radii, spacing, typography } from "../../theme/tokens";
 import type { ObservationDTO } from "../../lib/types";
+import { AppButton, AppModal, IconButton, SurfacePressable, TextField } from "../ui";
 
 interface Props {
   visible: boolean;
@@ -22,8 +19,6 @@ interface Props {
   onSubmit: (payload: { memo: string; images: Array<{ url: string }> }) => Promise<void>;
   onPickImage: () => Promise<string | null>;
 }
-
-const MAX_IMAGES = 10;
 
 /**
  * 관찰 기록 작성/수정 모달.
@@ -45,6 +40,9 @@ export function ObservationEditor({
     initial?.images.map((img) => ({ url: img.url })) ?? [],
   );
   const [busy, setBusy] = useState(false);
+  const handleRequestClose = useCallback(() => {
+    if (!busy) onCancel();
+  }, [busy, onCancel]);
 
   // 모달이 열릴 때 initial 값으로 리셋
   const handleShow = useCallback(() => {
@@ -54,8 +52,8 @@ export function ObservationEditor({
   }, [initial]);
 
   const handleAddImage = useCallback(async () => {
-    if (images.length >= MAX_IMAGES) {
-      Alert.alert("최대 10장", "사진은 최대 10장까지 추가할 수 있어요.");
+    if (images.length >= plant.editorImageLimit) {
+      Alert.alert(`최대 ${plant.editorImageLimit}장`, `사진은 최대 ${plant.editorImageLimit}장까지 추가할 수 있어요.`);
       return;
     }
     try {
@@ -88,80 +86,90 @@ export function ObservationEditor({
   }, [memo, images, onSubmit]);
 
   return (
-    <Modal
+    <AppModal
       visible={visible}
       animationType="slide"
-      presentationStyle="pageSheet"
-      onRequestClose={onCancel}
+      onClose={handleRequestClose}
       onShow={handleShow}
+      keyboardAvoiding
+      sheetStyle={styles.container}
+      accessibilityLabel={title}
     >
-      <View style={styles.container}>
-        {/* 헤더 */}
-        <View style={styles.header}>
-          <Pressable onPress={onCancel} disabled={busy}>
-            <Text style={styles.cancelBtn}>취소</Text>
-          </Pressable>
-          <Text style={styles.title}>{title}</Text>
-          <Pressable onPress={handleSubmit} disabled={busy}>
-            {busy ? (
-              <ActivityIndicator size="small" color={colors.plantActive} />
-            ) : (
-              <Text style={styles.submitBtn}>저장</Text>
-            )}
-          </Pressable>
-        </View>
-
-        <ScrollView
-          contentContainerStyle={styles.body}
-          keyboardShouldPersistTaps="handled"
+      <View style={styles.header}>
+        <AppButton
+          variant="quiet"
+          textStyle={styles.cancelBtn}
+          onPress={handleRequestClose}
+          disabled={busy}
         >
-          {/* 메모 입력 */}
-          <TextInput
-            style={styles.memoInput}
-            placeholder="관찰한 내용을 적어 주세요..."
-            placeholderTextColor={colors.textFaint}
-            value={memo}
-            onChangeText={setMemo}
-            multiline
-            textAlignVertical="top"
-            maxLength={1000}
-            editable={!busy}
-          />
-          <Text style={styles.charCount}>{memo.length}/1000</Text>
-
-          {/* 이미지 그리드 */}
-          <View style={styles.imageGrid}>
-            {images.map((img, idx) => (
-              <View key={`img-${idx}`} style={styles.imageWrap}>
-                <Image source={{ uri: img.url }} style={styles.imageThumb} resizeMode="cover" />
-                <Pressable
-                  style={styles.imageRemove}
-                  onPress={() => handleRemoveImage(idx)}
-                  disabled={busy}
-                >
-                  <Text style={styles.imageRemoveText}>✕</Text>
-                </Pressable>
-              </View>
-            ))}
-            {images.length < MAX_IMAGES && (
-              <Pressable style={styles.addImageBtn} onPress={handleAddImage} disabled={busy}>
-                <Text style={styles.addImageIcon}>📷</Text>
-                <Text style={styles.addImageText}>추가</Text>
-              </Pressable>
-            )}
-          </View>
-          {images.length >= MAX_IMAGES && (
-            <Text style={styles.maxNotice}>최대 10장까지 추가할 수 있어요.</Text>
-          )}
-        </ScrollView>
+          취소
+        </AppButton>
+        <Text style={styles.title}>{title}</Text>
+        <AppButton
+          variant="quiet"
+          textStyle={styles.submitBtn}
+          onPress={handleSubmit}
+          disabled={busy}
+          loading={busy}
+        >
+          저장
+        </AppButton>
       </View>
-    </Modal>
+
+      <ScrollView
+        style={styles.bodyScroll}
+        contentContainerStyle={styles.body}
+        keyboardShouldPersistTaps="handled"
+      >
+        <TextField
+          style={styles.memoInput}
+          placeholder="관찰한 내용을 적어 주세요..."
+          value={memo}
+          onChangeText={setMemo}
+          multiline
+          textAlignVertical="top"
+          maxLength={1000}
+          editable={!busy}
+        />
+        <Text style={styles.charCount}>{memo.length}/1000</Text>
+
+        <View style={styles.imageGrid}>
+          {images.map((img, idx) => (
+            <View key={`img-${idx}`} style={styles.imageWrap}>
+              <Image source={{ uri: img.url }} style={styles.imageThumb} resizeMode="cover" />
+              <IconButton
+                style={styles.imageRemove}
+                hitSlop={spacing.md}
+                onPress={() => handleRemoveImage(idx)}
+                disabled={busy}
+              >
+                <Text style={styles.imageRemoveText}>✕</Text>
+              </IconButton>
+            </View>
+          ))}
+          {images.length < plant.editorImageLimit && (
+            <SurfacePressable
+              style={styles.addImageBtn}
+              onPress={handleAddImage}
+              disabled={busy}
+            >
+              <Text style={styles.addImageIcon}>📷</Text>
+              <Text style={styles.addImageText}>추가</Text>
+            </SurfacePressable>
+          )}
+        </View>
+        {images.length >= plant.editorImageLimit && (
+          <Text style={styles.maxNotice}>최대 {plant.editorImageLimit}장까지 추가할 수 있어요.</Text>
+        )}
+      </ScrollView>
+    </AppModal>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
-    flex: 1,
+    maxWidth: plant.editorModalMaxWidth,
+    maxHeight: plant.editorModalMaxHeight,
     backgroundColor: colors.bg,
   },
   header: {
@@ -170,7 +178,7 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.md,
-    borderBottomWidth: 1,
+    borderBottomWidth: borders.hairline,
     borderBottomColor: colors.border,
     backgroundColor: colors.surface,
   },
@@ -185,21 +193,18 @@ const styles = StyleSheet.create({
   submitBtn: {
     ...typography.label,
     color: colors.plantActive,
-    fontSize: 16,
+  },
+  bodyScroll: {
+    flexShrink: 1,
   },
   body: {
     padding: spacing.lg,
     gap: spacing.md,
   },
   memoInput: {
-    backgroundColor: colors.surface,
-    borderRadius: radii.card,
-    borderWidth: 1,
-    borderColor: colors.border,
     padding: spacing.lg,
-    minHeight: 120,
-    ...typography.body,
-    color: colors.text,
+    minHeight: plant.editorMemoMinHeight,
+    backgroundColor: colors.surface,
   },
   charCount: {
     ...typography.micro,
@@ -213,9 +218,9 @@ const styles = StyleSheet.create({
   },
   imageWrap: {
     position: "relative",
-    width: 80,
-    height: 80,
-    borderRadius: 8,
+    width: plant.editorImageSize,
+    height: plant.editorImageSize,
+    borderRadius: radii.btn,
     overflow: "hidden",
   },
   imageThumb: {
@@ -225,34 +230,30 @@ const styles = StyleSheet.create({
   },
   imageRemove: {
     position: "absolute",
-    top: 4,
-    right: 4,
-    width: 22,
-    height: 22,
-    borderRadius: 11,
-    backgroundColor: "rgba(0,0,0,0.6)",
-    alignItems: "center",
-    justifyContent: "center",
+    top: spacing.xs,
+    right: spacing.xs,
+    width: plant.editorRemoveSize,
+    height: plant.editorRemoveSize,
+    minHeight: plant.editorRemoveSize,
+    backgroundColor: colors.overlay,
   },
   imageRemoveText: {
-    color: "#ffffff",
-    fontSize: 12,
+    color: colors.onAccent,
+    ...typography.badge,
     fontWeight: "700",
   },
   addImageBtn: {
-    width: 80,
-    height: 80,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: colors.border,
+    width: plant.editorImageSize,
+    height: plant.editorImageSize,
+    borderRadius: radii.btn,
     borderStyle: "dashed" as never,
     alignItems: "center",
     justifyContent: "center",
-    gap: 4,
+    gap: spacing.xs,
     backgroundColor: colors.surface,
   },
   addImageIcon: {
-    fontSize: 24,
+    ...typography.title,
   },
   addImageText: {
     ...typography.micro,

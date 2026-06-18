@@ -1,16 +1,25 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   FlatList,
-  Pressable,
   StyleSheet,
   Text,
+  useWindowDimensions,
   View,
 } from "react-native";
-import { colors, radii, shadows, spacing, tapMin, typography } from "../../theme/tokens";
+import {
+  colors,
+  controls,
+  iconSizes,
+  layout,
+  spacing,
+  typography,
+} from "../../theme/tokens";
 import { CardView } from "../CardView";
 import { CardComposer } from "../CardComposer";
 import { CardDetailModal } from "../CardDetailModal";
 import type { BoardDetailResponse, BoardCard } from "../../lib/types";
+import { withBoardAnonymousAuthor, withBoardAnonymousAuthors } from "../../lib/card-privacy";
+import { Fab } from "../ui";
 
 // freeform / grid / stream 공용 — 2열 세로 그리드.
 // freeform 의 x/y 좌표는 모바일에선 무시하고 작성순 스트림으로 보여준다
@@ -25,10 +34,18 @@ export function CardsBoard({
 }) {
   const [composerOpen, setComposerOpen] = useState(false);
   const [selectedCard, setSelectedCard] = useState<BoardCard | null>(null);
-  const [cards, setCards] = useState<BoardCard[]>(data.cards);
+  const [cards, setCards] = useState<BoardCard[]>(() =>
+    withBoardAnonymousAuthors(data.cards, data.board),
+  );
+  const { width } = useWindowDimensions();
+  const columnCount = width < layout.mobileBreakpoint ? 1 : 2;
+
+  useEffect(() => {
+    setCards(withBoardAnonymousAuthors(data.cards, data.board));
+  }, [data.cards, data.board]);
 
   function handleCreated(card: BoardCard) {
-    setCards((prev) => [...prev, card]);
+    setCards((prev) => [...prev, withBoardAnonymousAuthor(card, data.board)]);
     onMutate();
   }
 
@@ -36,17 +53,15 @@ export function CardsBoard({
     <View style={styles.root}>
       <FlatList
         data={cards}
+        key={`cards-${columnCount}`}
         keyExtractor={(c) => c.id}
-        numColumns={2}
-        columnWrapperStyle={styles.row}
+        numColumns={columnCount}
+        columnWrapperStyle={columnCount > 1 ? styles.row : undefined}
         contentContainerStyle={styles.content}
         renderItem={({ item }) => (
-          <Pressable
-            style={styles.cardWrap}
-            onPress={() => setSelectedCard(item)}
-          >
-            <CardView card={item} />
-          </Pressable>
+          <View style={styles.cardWrap}>
+            <CardView card={item} onPress={() => setSelectedCard(item)} />
+          </View>
         )}
         ListEmptyComponent={
           <View style={styles.empty}>
@@ -56,12 +71,12 @@ export function CardsBoard({
           </View>
         }
       />
-      <Pressable
-        style={({ pressed }) => [styles.fab, pressed && styles.fabPressed]}
+      <Fab
+        style={styles.fab}
         onPress={() => setComposerOpen(true)}
       >
         <Text style={styles.fabPlus}>＋</Text>
-      </Pressable>
+      </Fab>
       <CardComposer
         visible={composerOpen}
         boardId={data.board.id}
@@ -78,7 +93,7 @@ export function CardsBoard({
 
 const styles = StyleSheet.create({
   root: { flex: 1 },
-  content: { padding: spacing.xl, gap: spacing.md, paddingBottom: spacing.xxxl + 80 },
+  content: { padding: spacing.xl, gap: spacing.md, paddingBottom: spacing.xxxl + controls.fab },
   row: { gap: spacing.md },
   cardWrap: { flex: 1, marginBottom: spacing.md },
   empty: {
@@ -86,23 +101,12 @@ const styles = StyleSheet.create({
     paddingTop: spacing.xxxl,
     gap: spacing.md,
   },
-  emptyEmoji: { fontSize: 72 },
+  emptyEmoji: { fontSize: iconSizes.gate },
   emptyTitle: { ...typography.title, color: colors.text },
   emptyMsg: { ...typography.body, color: colors.textMuted },
   fab: {
-    position: "absolute",
     right: spacing.xxl,
     bottom: spacing.xxl,
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    backgroundColor: colors.accent,
-    alignItems: "center",
-    justifyContent: "center",
-    ...shadows.accent,
-    minWidth: tapMin,
-    minHeight: tapMin,
   },
-  fabPressed: { backgroundColor: colors.accentActive },
-  fabPlus: { fontSize: 36, color: "#fff", fontWeight: "300", marginTop: -4 },
+  fabPlus: { fontSize: iconSizes.xl, color: colors.onAccent, fontWeight: "300", marginTop: -spacing.xs },
 });

@@ -1,14 +1,11 @@
 import { useCallback, useState } from "react";
 import {
-  ActivityIndicator,
-  Modal,
-  Pressable,
   StyleSheet,
   Text,
-  TextInput,
   View,
 } from "react-native";
-import { colors, radii, spacing, typography } from "../../theme/tokens";
+import { borders, colors, controls, plant, radii, spacing, typography } from "../../theme/tokens";
+import { AppButton, AppModal, ControlPressable, TextField } from "../ui";
 
 interface Props {
   visible: boolean;
@@ -47,82 +44,75 @@ export function NoPhotoReasonModal({ visible, onCancel, onSubmit, busy }: Props)
   }, []);
 
   return (
-    <Modal
+    <AppModal
       visible={visible}
-      transparent
       animationType="fade"
-      onRequestClose={onCancel}
+      onClose={onCancel}
       onShow={handleShow}
+      sheetStyle={styles.modal}
+      backdropStyle={styles.backdrop}
+      accessibilityLabel="사진 없이 넘어가기 사유 선택"
     >
-      <View style={styles.backdrop}>
-        <View style={styles.modal}>
-          <Text style={styles.title}>사진 없이 넘어갈까요?</Text>
-          <Text style={styles.subtitle}>
-            현재 단계에 사진이 없어요. 사유를 선택해 주세요.
-          </Text>
+      <Text style={styles.title}>사진 없이 넘어갈까요?</Text>
+      <Text style={styles.subtitle}>
+        현재 단계에 사진이 없어요. 사유를 선택해 주세요.
+      </Text>
 
-          {/* 프리셋 라디오 */}
-          {PRESETS.map((preset, idx) => (
-            <Pressable
-              key={`preset-${idx}`}
-              style={[styles.option, selected === idx && styles.optionSelected]}
-              onPress={() => setSelected(idx)}
-            >
-              <View style={[styles.radio, selected === idx && styles.radioActive]} />
-              <Text style={styles.optionText}>{preset}</Text>
-            </Pressable>
-          ))}
+      {PRESETS.map((preset, idx) => (
+        <ControlPressable
+          key={`preset-${idx}`}
+          accessibilityRole="radio"
+          accessibilityState={{ checked: selected === idx }}
+          style={[styles.option, selected === idx && styles.optionSelected]}
+          onPress={() => setSelected(idx)}
+        >
+          <View style={[styles.radio, selected === idx && styles.radioActive]} />
+          <Text style={styles.optionText}>{preset}</Text>
+        </ControlPressable>
+      ))}
 
-          {/* 기타 입력 */}
-          {isCustom && (
-            <TextInput
-              style={styles.customInput}
-              placeholder="사유를 적어 주세요..."
-              placeholderTextColor={colors.textFaint}
-              value={customReason}
-              onChangeText={setCustomReason}
-              maxLength={200}
-              editable={!busy}
-            />
-          )}
+      {isCustom && (
+        <TextField
+          style={styles.customInput}
+          placeholder="사유를 적어 주세요..."
+          value={customReason}
+          onChangeText={setCustomReason}
+          maxLength={200}
+          editable={!busy}
+        />
+      )}
 
-          {/* 버튼 */}
-          <View style={styles.btnRow}>
-            <Pressable style={styles.cancelBtn} onPress={onCancel} disabled={busy}>
-              <Text style={styles.cancelText}>취소</Text>
-            </Pressable>
-            <Pressable
-              style={[styles.submitBtn, !canSubmit && styles.submitDisabled]}
-              onPress={handleSubmit}
-              disabled={!canSubmit}
-            >
-              {busy ? (
-                <ActivityIndicator size="small" color="#ffffff" />
-              ) : (
-                <Text style={styles.submitText}>계속</Text>
-              )}
-            </Pressable>
-          </View>
-        </View>
+      <View style={styles.btnRow}>
+        <AppButton
+          variant="secondary"
+          style={styles.actionBtn}
+          textStyle={styles.cancelText}
+          onPress={onCancel}
+          disabled={busy}
+        >
+          취소
+        </AppButton>
+        <AppButton
+          variant="success"
+          style={styles.actionBtn}
+          onPress={handleSubmit}
+          disabled={!canSubmit}
+          loading={busy}
+        >
+          계속
+        </AppButton>
       </View>
-    </Modal>
+    </AppModal>
   );
 }
 
 const styles = StyleSheet.create({
   backdrop: {
-    flex: 1,
-    backgroundColor: "rgba(0,0,0,0.5)",
-    alignItems: "center",
-    justifyContent: "center",
     padding: spacing.lg,
   },
   modal: {
-    backgroundColor: colors.surface,
-    borderRadius: radii.card,
     padding: spacing.xl,
-    width: "100%",
-    maxWidth: 400,
+    maxWidth: plant.noPhotoReasonMaxWidth,
     gap: spacing.md,
   },
   title: {
@@ -140,18 +130,18 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.sm,
     paddingHorizontal: spacing.md,
     borderRadius: radii.btn,
-    borderWidth: 1,
+    borderWidth: borders.hairline,
     borderColor: colors.border,
   },
   optionSelected: {
     borderColor: colors.plantActive,
-    backgroundColor: "rgba(39, 163, 95, 0.05)",
+    backgroundColor: colors.plantActiveTintedBg,
   },
   radio: {
-    width: 18,
-    height: 18,
-    borderRadius: 9,
-    borderWidth: 2,
+    width: controls.radioSize,
+    height: controls.radioSize,
+    borderRadius: radii.pill,
+    borderWidth: borders.medium,
     borderColor: colors.border,
   },
   radioActive: {
@@ -164,42 +154,16 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   customInput: {
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radii.btn,
     padding: spacing.md,
-    ...typography.body,
-    color: colors.text,
   },
   btnRow: {
     flexDirection: "row",
     gap: spacing.md,
     marginTop: spacing.sm,
   },
-  cancelBtn: {
-    flex: 1,
-    alignItems: "center",
-    paddingVertical: spacing.md,
-    borderRadius: radii.btn,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
+  actionBtn: { flex: 1 },
   cancelText: {
     ...typography.label,
     color: colors.textMuted,
-  },
-  submitBtn: {
-    flex: 1,
-    alignItems: "center",
-    paddingVertical: spacing.md,
-    borderRadius: radii.btn,
-    backgroundColor: colors.plantActive,
-  },
-  submitDisabled: {
-    opacity: 0.5,
-  },
-  submitText: {
-    ...typography.label,
-    color: "#ffffff",
   },
 });

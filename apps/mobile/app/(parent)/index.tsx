@@ -2,19 +2,17 @@ import { useCallback, useEffect, useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
-  Pressable,
   StyleSheet,
   Text,
   View,
 } from "react-native";
-import { useRouter } from "expo-router";
+import { useRouter, type Href } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import {
   colors,
-  radii,
-  shadows,
+  iconSizes,
+  parent,
   spacing,
-  tapMin,
   typography,
 } from "../../theme/tokens";
 import { ApiError, apiFetch } from "../../lib/api";
@@ -22,13 +20,25 @@ import {
   clearParentSession,
   loadParentCache,
   loadParentToken,
+  saveParentCache,
 } from "../../lib/session";
-import type { ParentChild, ParentChildrenResponse } from "../../lib/types";
+import type {
+  ParentChild,
+  ParentChildrenResponse,
+  ParentPendingLink,
+} from "../../lib/types";
+import {
+  AppButton,
+  EmptyState,
+  SurfaceCard,
+  SurfacePressable,
+} from "../../components/ui";
 
 export default function ParentHome() {
   const router = useRouter();
   const [parentName, setParentName] = useState("학부모");
   const [children, setChildren] = useState<ParentChild[]>([]);
+  const [pendingLinks, setPendingLinks] = useState<ParentPendingLink[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -52,7 +62,16 @@ export default function ParentHome() {
           { parentAuth: true },
         );
         if (mounted) {
+          const nextParentName = res.parent.name || "학부모";
+          void saveParentCache({
+            id: res.parent.id,
+            name: nextParentName,
+            email: res.parent.email,
+            linkedStudentIds: res.children.map((child) => child.studentId),
+          });
+          setParentName(nextParentName);
           setChildren(res.children);
+          setPendingLinks(res.pendingLinks);
           setError(null);
         }
       } catch (e) {
@@ -66,6 +85,7 @@ export default function ParentHome() {
           }
           setError("자녀 목록을 불러오지 못했어요.");
           setChildren([]);
+          setPendingLinks([]);
         }
       } finally {
         if (mounted) setLoading(false);
@@ -81,6 +101,8 @@ export default function ParentHome() {
     router.replace("/");
   }, [router]);
 
+  const firstClassroomId = children.find((child) => child.classroom?.id)?.classroom?.id;
+
   if (loading) {
     return (
       <SafeAreaView style={styles.container} edges={["top", "bottom"]}>
@@ -95,38 +117,45 @@ export default function ParentHome() {
   return (
     <SafeAreaView style={styles.container} edges={["top", "bottom"]}>
       <View style={styles.header}>
-        <View style={{ flex: 1 }}>
+        <View style={styles.headerCopy}>
           <Text style={styles.greeting}>{parentName}님, 안녕하세요!</Text>
           <Text style={styles.subText}>
             자녀 {children.length}명 · 활동을 확인하세요
+            {pendingLinks.length > 0 ? ` · 승인 대기 ${pendingLinks.length}건` : ""}
           </Text>
         </View>
         <View style={styles.actions}>
-          <Pressable
-            style={({ pressed }) => [
-              styles.addBtn,
-              pressed && styles.addBtnPressed,
-            ]}
+          {firstClassroomId ? (
+            <AppButton
+              variant="secondary"
+              onPress={() =>
+                router.push({
+                  pathname: "/(parent)/showcase",
+                  params: { classroomId: firstClassroomId },
+                } as unknown as Href)
+              }
+            >
+              자랑해요
+            </AppButton>
+          ) : null}
+          <AppButton
             onPress={() => router.push("./link-child")}
           >
-            <Text style={styles.addText}>+ 자녀 연결</Text>
-          </Pressable>
-          <Pressable
-            style={({ pressed }) => [
-              styles.logoutBtn,
-              pressed && styles.logoutBtnPressed,
-            ]}
+            + 자녀 연결
+          </AppButton>
+          <AppButton
+            variant="secondary"
             onPress={handleLogout}
           >
-            <Text style={styles.logoutText}>로그아웃</Text>
-          </Pressable>
+            로그아웃
+          </AppButton>
         </View>
       </View>
 
       {error ? (
-        <View style={styles.errorBanner}>
+        <SurfaceCard style={styles.errorBanner}>
           <Text style={styles.errorBannerText}>{error}</Text>
-        </View>
+        </SurfaceCard>
       ) : null}
 
       <FlatList
@@ -134,11 +163,8 @@ export default function ParentHome() {
         keyExtractor={(c) => c.id}
         contentContainerStyle={styles.listContent}
         renderItem={({ item }) => (
-          <Pressable
-            style={({ pressed }) => [
-              styles.childCard,
-              pressed && styles.childCardPressed,
-            ]}
+          <SurfacePressable
+            style={styles.childCard}
             onPress={() =>
               router.push(`/(parent)/child/${item.studentId}`)
             }
@@ -154,29 +180,62 @@ export default function ParentHome() {
               </Text>
             </View>
             <Text style={styles.chevron}>›</Text>
-          </Pressable>
+          </SurfacePressable>
         )}
+        ListHeaderComponent={
+          pendingLinks.length > 0 ? (
+            <View style={styles.pendingSection}>
+              <Text style={styles.pendingTitle}>승인 대기 중</Text>
+              {pendingLinks.map((item) => (
+                <PendingLinkCard key={item.id} item={item} />
+              ))}
+            </View>
+          ) : null
+        }
         ListEmptyComponent={
-          <View style={styles.emptyWrap}>
-            <Text style={styles.emptyEmoji}>👨‍👩‍👧</Text>
-            <Text style={styles.emptyTitle}>연결된 자녀가 없어요</Text>
-            <Text style={styles.emptyMsg}>
-              학교에서 자녀 연결을 설정하면 여기에 나타나요.
-            </Text>
-            <Pressable
-              style={({ pressed }) => [
-                styles.linkBtn,
-                pressed && styles.linkBtnPressed,
-              ]}
-              onPress={() => router.push("./link-child")}
-            >
-              <Text style={styles.linkBtnText}>자녀 연결하기</Text>
-            </Pressable>
-          </View>
+          <EmptyState
+            style={styles.emptyState}
+            icon={<Text style={styles.emptyEmoji}>👨‍👩‍👧</Text>}
+            title="연결된 자녀가 없어요"
+            description="학교에서 자녀 연결을 설정하면 여기에 나타나요."
+            action={(
+              <AppButton onPress={() => router.push("./link-child")}>
+                자녀 연결하기
+              </AppButton>
+            )}
+          />
         }
       />
     </SafeAreaView>
   );
+}
+
+function PendingLinkCard({ item }: { item: ParentPendingLink }) {
+  return (
+    <SurfaceCard style={styles.pendingCard}>
+      <View style={styles.childAvatar}>
+        <Text style={styles.childEmoji}>🕒</Text>
+      </View>
+      <View style={styles.childInfo}>
+        <Text style={styles.childName}>{item.name}</Text>
+        <Text style={styles.childClass}>
+          {item.classroom?.name ?? "학급 미배정"}
+          {item.number != null ? ` · ${item.number}번` : ""}
+        </Text>
+        <Text style={styles.pendingMeta}>
+          선생님 승인 대기 · {formatPendingExpiry(item.expiresAt)}
+        </Text>
+      </View>
+    </SurfaceCard>
+  );
+}
+
+function formatPendingExpiry(value: string): string {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "만료일 확인 중";
+  const days = Math.ceil((date.getTime() - Date.now()) / 86_400_000);
+  if (days <= 0) return "오늘 만료";
+  return `${days}일 후 만료`;
 }
 
 const styles = StyleSheet.create({
@@ -205,31 +264,14 @@ const styles = StyleSheet.create({
   actions: {
     flexDirection: "row",
     alignItems: "center",
+    flexWrap: "wrap",
     gap: spacing.md,
   },
-  addBtn: {
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
-    borderRadius: radii.card,
-    backgroundColor: colors.accent,
-  },
-  addBtnPressed: { backgroundColor: colors.accentActive },
-  addText: { ...typography.label, color: "#fff" },
-  logoutBtn: {
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
-    borderRadius: radii.card,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.surface,
-  },
-  logoutBtnPressed: { backgroundColor: colors.surfaceAlt },
-  logoutText: { ...typography.label, color: colors.textMuted },
+  headerCopy: { flex: 1 },
   errorBanner: {
     marginHorizontal: spacing.xxl,
     marginBottom: spacing.lg,
     padding: spacing.lg,
-    borderRadius: radii.card,
     backgroundColor: colors.statusReturnedBg,
   },
   errorBannerText: {
@@ -242,57 +284,43 @@ const styles = StyleSheet.create({
     paddingBottom: spacing.xxl,
     gap: spacing.lg,
   },
-  linkBtn: {
-    marginTop: spacing.lg,
-    backgroundColor: colors.accent,
-    borderRadius: radii.card,
-    paddingVertical: spacing.lg,
-    paddingHorizontal: spacing.xl,
-    alignItems: "center",
-    minHeight: tapMin,
-    ...shadows.accent,
+  pendingSection: {
+    gap: spacing.md,
   },
-  linkBtnPressed: { backgroundColor: colors.accentActive },
-  linkBtnText: { ...typography.subtitle, color: "#fff" },
+  pendingTitle: { ...typography.title, color: colors.text },
+  pendingCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    padding: spacing.xl,
+    gap: spacing.lg,
+    backgroundColor: colors.statusSubmittedBg,
+  },
+  pendingMeta: { ...typography.micro, color: colors.statusSubmittedText },
   childCard: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: colors.surface,
-    borderRadius: radii.card,
     padding: spacing.xl,
     gap: spacing.lg,
-    ...shadows.card,
-  },
-  childCardPressed: {
-    backgroundColor: colors.surfaceAlt,
   },
   childAvatar: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
+    width: parent.childDetailAvatarSize,
+    height: parent.childDetailAvatarSize,
+    borderRadius: parent.childDetailAvatarSize,
     backgroundColor: colors.accentTintedBg,
     alignItems: "center",
     justifyContent: "center",
   },
-  childEmoji: { fontSize: 28 },
+  childEmoji: { fontSize: iconSizes.lg },
   childInfo: { flex: 1, gap: spacing.xs },
   childName: { ...typography.subtitle, color: colors.text },
   childClass: { ...typography.body, color: colors.textMuted },
   chevron: {
-    fontSize: 28,
+    fontSize: iconSizes.lg,
     color: colors.textFaint,
     fontWeight: "300",
   },
-  emptyWrap: {
-    alignItems: "center",
+  emptyState: {
     paddingTop: spacing.xxxl,
-    gap: spacing.md,
   },
-  emptyEmoji: { fontSize: 64 },
-  emptyTitle: { ...typography.title, color: colors.text },
-  emptyMsg: {
-    ...typography.body,
-    color: colors.textMuted,
-    textAlign: "center",
-  },
+  emptyEmoji: { fontSize: iconSizes.empty },
 });

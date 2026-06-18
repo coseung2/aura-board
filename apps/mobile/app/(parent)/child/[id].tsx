@@ -2,7 +2,6 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Image,
-  Pressable,
   ScrollView,
   StyleSheet,
   Text,
@@ -11,9 +10,10 @@ import {
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import {
+  borders,
   colors,
-  radii,
-  shadows,
+  iconSizes,
+  parent,
   spacing,
   typography,
 } from "../../../theme/tokens";
@@ -27,6 +27,13 @@ import type {
   ShowcaseEntryDTO,
 } from "../../../lib/types";
 import { CardDetailModal } from "../../../components/CardDetailModal";
+import {
+  AppButton,
+  AppHeader,
+  EmptyState,
+  Pill,
+  SurfacePressable,
+} from "../../../components/ui";
 
 type OpenCard = {
   card: PortfolioCardDTO;
@@ -102,21 +109,19 @@ export default function ChildDetail() {
     return (
       <SafeAreaView style={styles.container} edges={["top", "bottom"]}>
         <View style={styles.errorCenter}>
-          <Text style={styles.errorEmoji}>🔒</Text>
-          <Text style={styles.errorTitle}>확인할 수 없어요</Text>
-          <Text style={styles.errorMsg}>{error ?? "잠시 후 다시 시도해 주세요."}</Text>
-          <Pressable
-            style={({ pressed }) => [styles.primaryBtn, pressed && styles.primaryBtnPressed]}
-            onPress={load}
-          >
-            <Text style={styles.primaryBtnText}>다시 시도</Text>
-          </Pressable>
-          <Pressable
-            style={({ pressed }) => [styles.secondaryBtn, pressed && styles.secondaryBtnPressed]}
-            onPress={handleBack}
-          >
-            <Text style={styles.secondaryBtnText}>돌아가기</Text>
-          </Pressable>
+          <EmptyState
+            icon={<Text style={styles.errorEmoji}>🔒</Text>}
+            title="확인할 수 없어요"
+            description={error ?? "잠시 후 다시 시도해 주세요."}
+            action={(
+              <View style={styles.emptyActions}>
+                <AppButton onPress={load}>다시 시도</AppButton>
+                <AppButton variant="secondary" onPress={handleBack}>
+                  돌아가기
+                </AppButton>
+              </View>
+            )}
+          />
         </View>
       </SafeAreaView>
     );
@@ -127,26 +132,19 @@ export default function ChildDetail() {
 
   return (
     <SafeAreaView style={styles.container} edges={["top", "bottom"]}>
+      <AppHeader title="자녀 작품" onBack={handleBack} />
       <ScrollView contentContainerStyle={styles.scrollContent}>
-        <View style={styles.header}>
-          <Pressable
-            style={({ pressed }) => [styles.backBtn, pressed && styles.backBtnPressed]}
-            onPress={handleBack}
-          >
-            <Text style={styles.backText}>← 돌아가기</Text>
-          </Pressable>
-          <View style={styles.headerInfo}>
-            <View style={styles.avatar}>
-              <Text style={styles.avatarText}>
-                {data.child.name.slice(0, 1)}
-              </Text>
-            </View>
-            <View style={styles.headerCopy}>
-              <Text style={styles.childName}>{data.child.name}의 작품</Text>
-              <Text style={styles.childSub}>
-                작품 {ownCards.length}개 · 우리 학급 자랑해요 {showcase.length}개
-              </Text>
-            </View>
+        <View style={styles.headerInfo}>
+          <View style={styles.avatar}>
+            <Text style={styles.avatarText}>
+              {data.child.name.slice(0, 1)}
+            </Text>
+          </View>
+          <View style={styles.headerCopy}>
+            <Text style={styles.childName}>{data.child.name}의 작품</Text>
+            <Text style={styles.childSub}>
+              작품 {ownCards.length}개 · 우리 학급 자랑해요 {showcase.length}개
+            </Text>
           </View>
         </View>
 
@@ -200,10 +198,11 @@ function PortfolioSection({
         <Text style={styles.sectionTitle}>{title}</Text>
       </View>
       {cards.length === 0 ? (
-        <View style={styles.emptyWrap}>
-          <Text style={styles.emptyEmoji}>📭</Text>
-          <Text style={styles.emptyTitle}>{emptyTitle}</Text>
-        </View>
+        <EmptyState
+          style={styles.emptyWrap}
+          icon={<Text style={styles.emptyEmoji}>📭</Text>}
+          title={emptyTitle}
+        />
       ) : (
         <View style={styles.cardGrid}>
           {cards.map(({ key, card, authorName, showcase }) => (
@@ -239,10 +238,15 @@ function PortfolioCard({
     card.attachments.find((a) => a.kind === "image")?.url ??
     card.linkImage;
   const sourceLabel = buildSourceLabel(card);
+  const authorLabel = card.sourceBoard.anonymousAuthor
+    ? "익명"
+    : showcase
+      ? showcase.studentName
+      : authorName;
 
   return (
-    <Pressable
-      style={({ pressed }) => [styles.card, pressed && styles.cardPressed]}
+    <SurfacePressable
+      style={styles.card}
       onPress={onPress}
     >
       {imageUrl ? (
@@ -260,13 +264,20 @@ function PortfolioCard({
           {sourceLabel}
         </Text>
         <View style={styles.cardMetaRow}>
-          <Text style={styles.cardLayout}>{layoutLabel(card.sourceBoard.layout)}</Text>
-          <Text style={styles.cardAuthor} numberOfLines={1}>
-            {showcase ? showcase.studentName : authorName}
-          </Text>
+          <Pill numberOfLines={1} textStyle={styles.cardLayout}>
+            {layoutLabel(card.sourceBoard.layout)}
+          </Pill>
+          <Pill
+            tone="accent"
+            numberOfLines={1}
+            style={styles.cardAuthorPill}
+            textStyle={styles.cardAuthor}
+          >
+            {authorLabel}
+          </Pill>
         </View>
       </View>
-    </Pressable>
+    </SurfacePressable>
   );
 }
 
@@ -316,6 +327,9 @@ function toBoardCard(card: PortfolioCardDTO, authorName: string): BoardCard {
         mimeType: a.mimeType,
         order: a.order,
       })),
+    authorName,
+    studentAuthorName: authorName,
+    anonymousAuthor: card.sourceBoard.anonymousAuthor,
   };
 }
 
@@ -332,65 +346,34 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: "center",
     justifyContent: "center",
-    gap: spacing.md,
     padding: spacing.xxl,
   },
-  errorEmoji: { fontSize: 56 },
-  errorTitle: { ...typography.title, color: colors.text },
-  errorMsg: { ...typography.body, color: colors.textMuted, textAlign: "center" },
-  primaryBtn: {
-    marginTop: spacing.md,
-    paddingHorizontal: spacing.xl,
-    paddingVertical: spacing.md,
-    borderRadius: radii.card,
-    backgroundColor: colors.accent,
-    ...shadows.accent,
+  errorEmoji: { fontSize: parent.doneIconSize },
+  emptyActions: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    justifyContent: "center",
+    gap: spacing.md,
   },
-  primaryBtnPressed: { backgroundColor: colors.accentActive },
-  primaryBtnText: { ...typography.label, color: "#fff" },
-  secondaryBtn: {
-    paddingHorizontal: spacing.xl,
-    paddingVertical: spacing.md,
-    borderRadius: radii.card,
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  secondaryBtnPressed: { backgroundColor: colors.surfaceAlt },
-  secondaryBtnText: { ...typography.label, color: colors.textMuted },
   scrollContent: {
     paddingHorizontal: spacing.xxl,
     paddingTop: spacing.xl,
     paddingBottom: spacing.xxxl,
     gap: spacing.xl,
   },
-  header: {
-    gap: spacing.lg,
-  },
-  backBtn: {
-    alignSelf: "flex-start",
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.sm,
-    borderRadius: radii.btn,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.surface,
-  },
-  backBtnPressed: { backgroundColor: colors.surfaceAlt },
-  backText: { ...typography.label, color: colors.textMuted },
   headerInfo: {
     flexDirection: "row",
     alignItems: "center",
     gap: spacing.lg,
   },
   avatar: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
+    width: parent.childDetailAvatarSize,
+    height: parent.childDetailAvatarSize,
+    borderRadius: parent.childDetailAvatarSize,
     alignItems: "center",
     justifyContent: "center",
     backgroundColor: colors.accentTintedBg,
-    borderWidth: 1,
+    borderWidth: borders.hairline,
     borderColor: colors.border,
   },
   avatarText: { ...typography.title, color: colors.accentTintedText },
@@ -414,29 +397,22 @@ const styles = StyleSheet.create({
     gap: spacing.lg,
   },
   card: {
-    width: "31.8%",
-    minWidth: 220,
-    backgroundColor: colors.surface,
-    borderRadius: radii.card,
+    width: parent.portfolioCardWidth,
+    minWidth: parent.portfolioCardMinWidth,
     overflow: "hidden",
-    ...shadows.card,
-  },
-  cardPressed: {
-    backgroundColor: colors.surfaceAlt,
-    transform: [{ scale: 0.99 }],
   },
   cardImage: {
     width: "100%",
-    height: 132,
+    height: parent.portfolioImageHeight,
     backgroundColor: colors.surfaceAlt,
   },
   cardFallback: {
-    height: 132,
+    height: parent.portfolioImageHeight,
     alignItems: "center",
     justifyContent: "center",
     backgroundColor: colors.accentTintedBg,
   },
-  cardEmoji: { fontSize: 48 },
+  cardEmoji: { fontSize: parent.emptyIconSize },
   cardBody: {
     padding: spacing.md,
     gap: spacing.xs,
@@ -446,22 +422,16 @@ const styles = StyleSheet.create({
   cardMetaRow: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
     gap: spacing.sm,
     marginTop: spacing.xs,
   },
   cardLayout: { ...typography.micro, color: colors.textFaint },
-  cardAuthor: { ...typography.micro, color: colors.textMuted, flex: 1, textAlign: "right" },
+  cardAuthorPill: { flex: 1 },
+  cardAuthor: { ...typography.micro, color: colors.accentTintedText },
   emptyWrap: {
     alignItems: "center",
     justifyContent: "center",
-    minHeight: 180,
-    gap: spacing.md,
-    borderRadius: radii.card,
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
+    minHeight: parent.portfolioEmptyMinHeight,
   },
-  emptyEmoji: { fontSize: 48 },
-  emptyTitle: { ...typography.section, color: colors.textMuted },
+  emptyEmoji: { fontSize: parent.emptyIconSize },
 });

@@ -1,6 +1,10 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { getCurrentStudent } from "@/lib/student-auth";
+import { getEffectiveBoardRole } from "@/lib/rbac";
+import { resolveCardAuthorLabels } from "@/lib/card-author-labels";
+
+const ANONYMOUS_AUTHOR_LABEL = "익명";
 
 /**
  * 학생 모바일 앱 전용 — 보드 한 개를 layout-specific 데이터와 함께 묶어서 반환.
@@ -67,12 +71,43 @@ export async function GET(
         where: { boardId: board.id },
         orderBy: { slotNumber: "asc" },
         include: {
-          submission: true,
-          card: true,
+          submission: {
+            select: {
+              id: true,
+              content: true,
+              fileUrl: true,
+              linkUrl: true,
+              createdAt: true,
+            },
+          },
+          card: {
+            select: {
+              id: true,
+              title: true,
+              content: true,
+              imageUrl: true,
+              linkUrl: true,
+              fileUrl: true,
+            },
+          },
           student: { select: { id: true, name: true, number: true } },
         },
       });
-      layoutData.assignment = { slots };
+      layoutData.assignment = {
+        slots: slots.map((slot) => ({
+          ...slot,
+          submission: slot.submission
+            ? {
+                id: slot.submission.id,
+                content: slot.submission.content,
+                imageUrl: null,
+                fileUrl: slot.submission.fileUrl,
+                linkUrl: slot.submission.linkUrl,
+                submittedAt: slot.submission.createdAt.toISOString(),
+              }
+            : null,
+        })),
+      };
     }
 
     if (board.layout === "vibe-arcade") {
@@ -106,7 +141,9 @@ export async function GET(
               classroomDailyTokenPool: config.classroomDailyTokenPool,
             }
           : null,
-        projects,
+        projects: board.anonymousAuthor
+          ? projects.map((project) => ({ ...project, authorStudentId: null }))
+          : projects,
       };
     }
 
@@ -129,6 +166,42 @@ export async function GET(
       layoutData.plantRoadmap = { plants };
     }
 
+    const role = await getEffectiveBoardRole(board.id, { studentId: student.id });
+    const canControlQueue = role === "owner" || role === "editor";
+    const cards = await Promise.all(
+      board.cards.map(async (card) => {
+        const { _count, ...rest } = card;
+        const hasAuthor =
+          rest.authors.length > 0 ||
+          Boolean(rest.externalAuthorName || rest.authorId || rest.studentAuthorId);
+        const visibleAuthorLabels = board.anonymousAuthor
+          ? hasAuthor
+            ? {
+              authorName: ANONYMOUS_AUTHOR_LABEL,
+              studentAuthorName: null,
+            }
+            : { authorName: null, studentAuthorName: null }
+          : await resolveCardAuthorLabels(card);
+        return {
+          ...rest,
+          ...visibleAuthorLabels,
+          authorId: board.anonymousAuthor ? null : rest.authorId,
+          studentAuthorId: board.anonymousAuthor ? null : rest.studentAuthorId,
+          externalAuthorKey: board.anonymousAuthor ? null : rest.externalAuthorKey,
+          externalAuthorName:
+            board.anonymousAuthor && hasAuthor
+              ? ANONYMOUS_AUTHOR_LABEL
+              : rest.externalAuthorName,
+          authors: board.anonymousAuthor ? [] : rest.authors,
+          anonymousAuthor: board.anonymousAuthor,
+          likeCount: _count.likes,
+          commentCount: _count.comments,
+          createdAt: card.createdAt.toISOString(),
+          updatedAt: card.updatedAt.toISOString(),
+        };
+      }),
+    );
+
     return NextResponse.json({
       board: {
         id: board.id,
@@ -137,22 +210,18 @@ export async function GET(
         layout: board.layout,
         description: board.description,
         classroomId: board.classroomId,
+        anonymousAuthor: board.anonymousAuthor,
+        _count: { cards: board.cards.length },
       },
-      cards: board.cards.map((card) => {
-        const { _count, ...rest } = card;
-        return {
-          ...rest,
-          likeCount: _count.likes,
-          commentCount: _count.comments,
-          createdAt: card.createdAt.toISOString(),
-          updatedAt: card.updatedAt.toISOString(),
-        };
-      }),
+      cards,
       sections: board.sections,
       currentStudent: {
         id: student.id,
         name: student.name,
         classroomId: student.classroomId,
+      },
+      capabilities: {
+        canControlQueue,
       },
       layoutData,
     });

@@ -2,7 +2,6 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Image,
-  Pressable,
   ScrollView,
   StyleSheet,
   Text,
@@ -12,7 +11,11 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { CardDetailModal } from "../../components/CardDetailModal";
 import {
+  borders,
   colors,
+  dashboard,
+  media,
+  portfolio,
   radii,
   shadows,
   spacing,
@@ -21,6 +24,7 @@ import {
 import { layoutLabel } from "../../theme/layout-meta";
 import { apiFetch, ApiError } from "../../lib/api";
 import { clearSessionToken } from "../../lib/session";
+import { AppHeader, SurfaceCard, SurfacePressable } from "../../components/ui";
 import type {
   BoardCard,
   MeResponse,
@@ -119,12 +123,7 @@ export default function StudentPortfolioScreen() {
 
   return (
     <SafeAreaView style={styles.container} edges={["top", "bottom"]}>
-      <View style={styles.header}>
-        <Pressable style={styles.backBtn} onPress={() => router.back()}>
-          <Text style={styles.backText}>←</Text>
-        </Pressable>
-        <Text style={styles.title}>우리 학급 포트폴리오</Text>
-      </View>
+      <AppHeader title="우리 학급 포트폴리오" onBack={() => router.back()} />
 
       {loading ? (
         <View style={styles.center}>
@@ -147,7 +146,7 @@ export default function StudentPortfolioScreen() {
               const selected = student.id === selectedId;
               const self = student.id === me?.student.id;
               return (
-                <Pressable
+                <SurfacePressable
                   key={student.id}
                   style={[styles.studentChip, selected && styles.studentChipOn]}
                   onPress={() => selectStudent(student.id)}
@@ -171,7 +170,7 @@ export default function StudentPortfolioScreen() {
                   >
                     작품 {student.cardCount}개 · 자랑 {student.showcaseCount}개
                   </Text>
-                </Pressable>
+                </SurfacePressable>
               );
             })}
           </ScrollView>
@@ -198,9 +197,9 @@ export default function StudentPortfolioScreen() {
               ))}
             </View>
           ) : (
-            <View style={styles.emptyBox}>
+            <SurfaceCard style={styles.emptyBox}>
               <Text style={styles.muted}>아직 포트폴리오 작품이 없어요.</Text>
-            </View>
+            </SurfaceCard>
           )}
         </ScrollView>
       )}
@@ -222,12 +221,12 @@ function PortfolioCard({
   onPress: () => void;
 }) {
   const image = getCardPreviewImage(card);
+  const authorLabel = card.sourceBoard.anonymousAuthor ? "익명" : student.name;
   return (
-    <Pressable
-      style={({ pressed }) => [styles.card, pressed && styles.cardPressed]}
+    <SurfacePressable
+      style={styles.card}
       onPress={onPress}
-      accessibilityRole="button"
-      accessibilityLabel={`${student.name}의 작품 ${card.title || "제목 없음"} 열기`}
+      accessibilityLabel={`${authorLabel}의 작품 ${card.title || "제목 없음"} 열기`}
     >
       <View style={styles.preview}>
         {image ? (
@@ -252,7 +251,7 @@ function PortfolioCard({
           {layoutLabel(card.sourceBoard.layout)} · {card.sourceBoard.title}
         </Text>
       </View>
-    </Pressable>
+    </SurfacePressable>
   );
 }
 
@@ -260,9 +259,7 @@ function toBoardCard(
   card: PortfolioCardDTO,
   student: PortfolioStudentDTO["student"],
 ): BoardCard {
-  const visibleAuthor = card.sourceBoard.anonymousAuthor
-    ? null
-    : student.name;
+  const authorName = student.name;
   return {
     id: card.id,
     boardId: card.sourceBoard.id,
@@ -307,11 +304,10 @@ function toBoardCard(
         mimeType: attachment.mimeType,
         order: attachment.order,
       })),
-    authors: visibleAuthor
-      ? [{ id: student.id, displayName: visibleAuthor, studentId: student.id }]
-      : [],
-    authorName: visibleAuthor,
-    studentAuthorName: visibleAuthor,
+    authors: [{ id: student.id, displayName: authorName, studentId: student.id }],
+    authorName,
+    studentAuthorName: authorName,
+    anonymousAuthor: card.sourceBoard.anonymousAuthor,
   };
 }
 
@@ -331,26 +327,6 @@ function getCardPreviewImage(card: PortfolioCardDTO): string | null {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg },
-  header: {
-    height: 72,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: spacing.md,
-    paddingHorizontal: spacing.xxl,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
-    backgroundColor: colors.surface,
-  },
-  backBtn: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: colors.surfaceAlt,
-  },
-  backText: { fontSize: 24, color: colors.text },
-  title: { ...typography.title, color: colors.text },
   center: {
     flex: 1,
     alignItems: "center",
@@ -365,13 +341,9 @@ const styles = StyleSheet.create({
   classroom: { ...typography.section, color: colors.text },
   rosterRow: { gap: spacing.sm, paddingBottom: spacing.xs },
   studentChip: {
-    width: 176,
-    minHeight: 74,
+    width: portfolio.rosterChipWidth,
+    minHeight: portfolio.rosterChipMinHeight,
     padding: spacing.md,
-    borderRadius: radii.card,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.surface,
     gap: spacing.xs,
   },
   studentChipOn: {
@@ -395,49 +367,36 @@ const styles = StyleSheet.create({
     gap: spacing.lg,
   },
   card: {
-    width: 300,
-    minHeight: 300,
-    borderRadius: radii.card,
+    width: portfolio.cardWidth,
+    minHeight: portfolio.cardMinHeight,
     overflow: "hidden",
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-    ...shadows.card,
-  },
-  cardPressed: {
-    borderColor: colors.borderHover,
-    ...shadows.cardHover,
   },
   preview: {
-    height: 150,
+    height: dashboard.showcasePreviewHeight,
     backgroundColor: colors.bgAlt,
     alignItems: "center",
     justifyContent: "center",
-    borderBottomWidth: 1,
+    borderBottomWidth: borders.hairline,
     borderBottomColor: colors.border,
   },
   previewImage: { width: "100%", height: "100%" },
   play: {
     position: "absolute",
-    width: 48,
-    height: 48,
-    borderRadius: 24,
+    width: dashboard.playSize,
+    height: dashboard.playSize,
+    borderRadius: radii.pill,
     backgroundColor: colors.surface,
     alignItems: "center",
     justifyContent: "center",
     ...shadows.card,
   },
-  playText: { color: colors.text, fontSize: 18, marginLeft: 2 },
+  playText: { ...typography.section, color: colors.text, marginLeft: media.playOffset },
   cardBody: { padding: spacing.lg, gap: spacing.sm },
   cardTitle: { ...typography.section, color: colors.text },
   cardContent: { ...typography.body, color: colors.textMuted },
   cardMeta: { ...typography.micro, color: colors.textMuted, marginTop: "auto" },
   emptyBox: {
     padding: spacing.xl,
-    borderRadius: radii.card,
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
   },
   muted: { ...typography.body, color: colors.textMuted },
   error: { ...typography.body, color: colors.danger, textAlign: "center" },

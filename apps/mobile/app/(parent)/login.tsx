@@ -1,25 +1,26 @@
 import { useEffect, useState } from "react";
 import {
-  ActivityIndicator,
-  Pressable,
   StyleSheet,
   Text,
-  TextInput,
   View,
+  useWindowDimensions,
 } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import * as Linking from "expo-linking";
 import {
+  auth,
+  brand,
   colors,
-  radii,
-  shadows,
+  layout,
+  responsive,
   spacing,
-  tapMin,
   typography,
 } from "../../theme/tokens";
 import { apiFetch, ApiError } from "../../lib/api";
+import { webSafeWidthStyle } from "../../lib/responsive";
 import { LogoLockup } from "../../components/LogoLockup";
+import { AppButton, SurfaceCard, TextField } from "../../components/ui";
 
 type SignupResponse = {
   ok: boolean;
@@ -30,6 +31,11 @@ type SignupResponse = {
 export default function ParentLogin() {
   const router = useRouter();
   const { error: routeError } = useLocalSearchParams<{ error?: string }>();
+  const { width } = useWindowDimensions();
+  const isNarrow = width < layout.mobileBreakpoint;
+  const webSafeAuthStyle = webSafeWidthStyle(width, {
+    inset: responsive.authCardWebSafeInset,
+  });
 
   const [email, setEmail] = useState("");
   const [loading, setLoading] = useState(false);
@@ -96,15 +102,15 @@ export default function ParentLogin() {
   return (
     <SafeAreaView style={styles.container} edges={["top", "bottom"]}>
       <View style={styles.inner}>
-        <View style={styles.brandRow}>
+        <View style={[styles.brandRow, isNarrow && styles.brandRowNarrow, webSafeAuthStyle]}>
           <LogoLockup
-            size={36}
+            size={brand.logoSize}
             wordmarkStyle={styles.brandTitle}
           />
           <Text style={styles.brandSub}>학부모 로그인</Text>
         </View>
 
-        <View style={styles.card}>
+        <SurfaceCard style={[styles.card, webSafeAuthStyle]}>
           {!sent ? (
             <>
               <Text style={styles.heading}>이메일로 로그인</Text>
@@ -112,7 +118,7 @@ export default function ParentLogin() {
                 자녀의 학급에서 등록한 이메일을 입력하면 로그인 링크를 보내드려요.
               </Text>
 
-              <TextInput
+              <TextField
                 style={styles.input}
                 value={email}
                 onChangeText={(t) => {
@@ -120,7 +126,6 @@ export default function ParentLogin() {
                   if (error) setError(null);
                 }}
                 placeholder="parent@example.com"
-                placeholderTextColor={colors.textFaint}
                 autoCapitalize="none"
                 autoCorrect={false}
                 keyboardType="email-address"
@@ -130,21 +135,13 @@ export default function ParentLogin() {
 
               {error ? <Text style={styles.errorText}>{error}</Text> : null}
 
-              <Pressable
-                style={({ pressed }) => [
-                  styles.submitBtn,
-                  (!email.trim() || loading) && styles.submitBtnDisabled,
-                  pressed && email.trim() && !loading && styles.submitBtnPressed,
-                ]}
+              <AppButton
                 onPress={handleSubmit}
                 disabled={!email.trim() || loading}
+                loading={loading}
               >
-                {loading ? (
-                  <ActivityIndicator color="#fff" />
-                ) : (
-                  <Text style={styles.submitText}>로그인 링크 보내기</Text>
-                )}
-              </Pressable>
+                로그인 링크 보내기
+              </AppButton>
             </>
           ) : (
             <>
@@ -155,35 +152,30 @@ export default function ParentLogin() {
               </Text>
 
               {devLink ? (
-                <Pressable
-                  style={({ pressed }) => [
-                    styles.devLinkBtn,
-                    pressed && styles.devLinkBtnPressed,
-                  ]}
+                <AppButton
+                  variant="secondary"
                   onPress={handleOpenDevLink}
                 >
-                  <Text style={styles.devLinkText}>
-                    🔧 개발용: 메일 대신 링크 열기
-                  </Text>
-                </Pressable>
+                  🔧 개발용: 메일 대신 링크 열기
+                </AppButton>
               ) : null}
 
-              <Pressable
-                style={({ pressed }) => [styles.backBtn, pressed && styles.backBtnPressed]}
+              <AppButton
+                variant="quiet"
                 onPress={handleReset}
               >
-                <Text style={styles.backText}>다른 이메일로 다시 보내기</Text>
-              </Pressable>
+                다른 이메일로 다시 보내기
+              </AppButton>
             </>
           )}
 
-          <Pressable
-            style={({ pressed }) => [styles.textBtn, pressed && styles.textBtnPressed]}
+          <AppButton
+            variant="quiet"
             onPress={() => router.replace("/")}
           >
-            <Text style={styles.textBtnText}>← 역할 선택으로 돌아가기</Text>
-          </Pressable>
-        </View>
+            ← 역할 선택으로 돌아가기
+          </AppButton>
+        </SurfaceCard>
 
         <Text style={styles.hint}>
           메일이 안 온 경우 스팸함을 확인해 주세요.
@@ -205,69 +197,27 @@ const styles = StyleSheet.create({
   brandRow: {
     flexDirection: "row",
     alignItems: "center",
+    justifyContent: "center",
+    flexWrap: "wrap",
     gap: spacing.md,
     marginBottom: spacing.sm,
+  },
+  brandRowNarrow: {
+    flexDirection: "column",
   },
   brandTitle: { ...typography.display, color: colors.text },
   brandSub: { ...typography.subtitle, color: colors.textMuted },
   card: {
     width: "100%",
-    maxWidth: 420,
-    backgroundColor: colors.surface,
-    borderRadius: radii.card,
-    ...shadows.card,
+    maxWidth: auth.cardMaxWidth,
     padding: spacing.xxl,
     gap: spacing.lg,
   },
   heading: { ...typography.title, color: colors.text },
   sub: { ...typography.body, color: colors.textMuted },
   input: {
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radii.card,
-    paddingVertical: spacing.lg,
-    paddingHorizontal: spacing.lg,
-    fontSize: 18,
-    color: colors.text,
     backgroundColor: colors.bg,
   },
-  submitBtn: {
-    marginTop: spacing.md,
-    backgroundColor: colors.accent,
-    borderRadius: radii.card,
-    paddingVertical: spacing.lg,
-    alignItems: "center",
-    minHeight: tapMin,
-    ...shadows.accent,
-  },
-  submitBtnDisabled: {
-    backgroundColor: colors.border,
-    shadowOpacity: 0,
-    elevation: 0,
-  },
-  submitBtnPressed: { backgroundColor: colors.accentActive },
-  submitText: { ...typography.subtitle, color: "#fff" },
-  devLinkBtn: {
-    backgroundColor: colors.accentTintedBg,
-    borderRadius: radii.card,
-    paddingVertical: spacing.lg,
-    alignItems: "center",
-    minHeight: tapMin,
-  },
-  devLinkBtnPressed: { backgroundColor: "#dbeafe" },
-  devLinkText: { ...typography.label, color: colors.accentTintedText },
-  backBtn: {
-    alignItems: "center",
-    paddingVertical: spacing.md,
-  },
-  backBtnPressed: { opacity: 0.6 },
-  backText: { ...typography.label, color: colors.textMuted },
-  textBtn: {
-    alignItems: "center",
-    paddingVertical: spacing.md,
-  },
-  textBtnPressed: { opacity: 0.6 },
-  textBtnText: { ...typography.label, color: colors.textMuted },
   errorText: {
     ...typography.body,
     color: colors.danger,
@@ -276,6 +226,5 @@ const styles = StyleSheet.create({
     ...typography.micro,
     color: colors.textFaint,
     textAlign: "center",
-    lineHeight: 18,
   },
 });

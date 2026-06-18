@@ -6,6 +6,7 @@ import { getCurrentStudent } from "@/lib/student-auth";
 import { getEffectiveBoardRole } from "@/lib/rbac";
 import { extractVideoId, fetchYouTubeMeta, canonicalUrl } from "@/lib/youtube";
 import { touchBoardUpdatedAt } from "@/lib/board-touch";
+import { resolveCardAuthorLabels } from "@/lib/card-author-labels";
 import {
   DJ_REQUEST_LIMIT_ERROR,
   DJ_REQUEST_LIMIT_PER_HOUR,
@@ -59,6 +60,7 @@ export async function POST(
       id: true,
       layout: true,
       classroomId: true,
+      anonymousAuthor: true,
       classroom: { select: { teacherId: true } },
     },
   });
@@ -180,6 +182,19 @@ export async function POST(
 
   // classroom-boards-tab "🟢 새 활동" 배지 — DJ 큐 신청도 카드 생성 → board touch.
   await touchBoardUpdatedAt(board.id);
+  const authorLabels = await resolveCardAuthorLabels(result.card);
 
-  return NextResponse.json({ card: result.card });
+  return NextResponse.json({
+    card: {
+      ...result.card,
+      ...authorLabels,
+      createdAt: result.card.createdAt.toISOString(),
+      updatedAt: result.card.updatedAt.toISOString(),
+      anonymousAuthor: board.anonymousAuthor,
+      likeCount: 0,
+      commentCount: 0,
+      attachments: [],
+      authors: [],
+    },
+  });
 }
