@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState, useRef } from "react";
+import { createPortal } from "react-dom";
 import { useLinkPreview } from "./useLinkPreview";
 import { OptimizedImage } from "@/components/ui/OptimizedImage";
 import {
@@ -136,6 +137,7 @@ export function AddCardModal({
   const [libraryAssets, setLibraryAssets] = useState<LibraryAsset[] | null>(null);
   const [libraryLoading, setLibraryLoading] = useState(false);
   const [pickedAssetId, setPickedAssetId] = useState<string | null>(null);
+  const [mounted, setMounted] = useState(false);
 
   const {
     attachments,
@@ -151,6 +153,10 @@ export function AddCardModal({
     isLastOfKind,
   } = useCardAttachments();
   const detectedContentUrl = linkUrl ? null : detectFirstUrl(content);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   function startTextareaResize(e: React.PointerEvent) {
     e.preventDefault();
@@ -216,7 +222,9 @@ export function AddCardModal({
     setPickerOpen(false);
   }
 
-  return (
+  if (!mounted) return null;
+
+  return createPortal(
     <>
       <div className="modal-backdrop" onClick={onClose} />
       <div className="add-card-modal">
@@ -794,7 +802,8 @@ export function AddCardModal({
           onConfirm={confirmLibraryPick}
         />
       )}
-    </>
+    </>,
+    document.body
   );
 }
 
