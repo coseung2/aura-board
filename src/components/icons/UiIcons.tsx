@@ -60,6 +60,16 @@ export function PlayIcon({ size = 20, className }: IconProps) {
   );
 }
 
+export function DownloadIcon({ size = 20, className }: IconProps) {
+  return (
+    <svg {...base(size)} className={className} aria-hidden="true">
+      <path d="M12 4v10" />
+      <polyline points="7 10 12 15 17 10" />
+      <path d="M5 20h14" />
+    </svg>
+  );
+}
+
 export function FullscreenEnterIcon({ size = 20, className }: IconProps) {
   return (
     <svg {...base(size)} className={className} aria-hidden="true">

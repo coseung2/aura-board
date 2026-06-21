@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { formatRelativeTime } from "@/lib/card-engagement-format";
 import { isYouTubeLink } from "@/lib/card-content-policy";
@@ -35,14 +35,26 @@ export function StreamSlideshowOverlay({
   onClose,
 }: Props) {
   const [mounted, setMounted] = useState(false);
+  const [mediaIndex, setMediaIndex] = useState(0);
+  const [controlsVisible, setControlsVisible] = useState(false);
+  const controlsTimerRef = useRef<number | null>(null);
 
   useEffect(() => {
     setMounted(true);
   }, []);
 
+  useEffect(() => {
+    return () => {
+      if (controlsTimerRef.current !== null) {
+        window.clearTimeout(controlsTimerRef.current);
+      }
+    };
+  }, []);
+
   const total = slides.length;
   const safeIndex = Math.min(index, total - 1);
   const slide = slides[safeIndex];
+  const mediaItems = slide ? buildSlideshowMedia(slide.card) : [];
 
   const go = useCallback(
     (next: number) => {
@@ -73,12 +85,21 @@ export function StreamSlideshowOverlay({
     return () => window.removeEventListener("keydown", onKey);
   }, [go, safeIndex, onClose, slide]);
 
+  useEffect(() => {
+    if (!slide) return;
+    setMediaIndex(0);
+  }, [slide?.id]);
+
+  useEffect(() => {
+    if (mediaIndex >= mediaItems.length) setMediaIndex(0);
+  }, [mediaIndex, mediaItems.length]);
+
   if (!mounted || !slide) return null;
 
   const card = slide.card;
   const author = getStreamAuthor(card);
-  const mediaItems = buildSlideshowMedia(card);
-  const primaryMediaItem = mediaItems[0];
+  const activeMediaIndex = Math.min(mediaIndex, Math.max(0, mediaItems.length - 1));
+  const activeMediaItem = mediaItems[activeMediaIndex];
   const fileAttachments = (card.attachments ?? []).filter(
     (item) => item.kind === "file",
   );
@@ -87,12 +108,33 @@ export function StreamSlideshowOverlay({
   const hasFiles = Boolean(card.fileUrl) || fileAttachments.length > 0;
   const displayTitle = resolveSlideshowTitle(card);
 
+  function goMedia(next: number) {
+    if (mediaItems.length <= 1) return;
+    setMediaIndex((next + mediaItems.length) % mediaItems.length);
+  }
+
+  function revealControls() {
+    setControlsVisible(true);
+    if (controlsTimerRef.current !== null) {
+      window.clearTimeout(controlsTimerRef.current);
+    }
+    controlsTimerRef.current = window.setTimeout(() => {
+      setControlsVisible(false);
+      controlsTimerRef.current = null;
+    }, 900);
+  }
+
   return createPortal(
     <div
-      className="slideshow-overlay"
+      className={`slideshow-overlay ${
+        controlsVisible ? "is-controls-visible" : ""
+      }`}
       role="dialog"
       aria-modal="true"
       aria-label="슬라이드쇼"
+      onPointerMove={revealControls}
+      onPointerDown={revealControls}
+      onFocusCapture={revealControls}
     >
       <div className="slideshow-topbar">
         <div className="slideshow-meta">
@@ -174,26 +216,61 @@ export function StreamSlideshowOverlay({
         </div>
 
         <div className="slideshow-media">
-          {primaryMediaItem ? (
+          {activeMediaItem ? (
             <div className="slideshow-media-strip">
               <figure className="slideshow-media-slide">
-                {primaryMediaItem.kind === "image" ? (
+                {activeMediaItem.kind === "image" ? (
                   <img
-                    src={primaryMediaItem.url}
-                    alt={primaryMediaItem.alt}
+                    src={activeMediaItem.url}
+                    alt={activeMediaItem.alt}
                     loading="lazy"
                     decoding="async"
                   />
                 ) : (
                   <video
-                    src={primaryMediaItem.url}
-                    poster={primaryMediaItem.previewUrl ?? undefined}
+                    src={activeMediaItem.url}
+                    poster={activeMediaItem.previewUrl ?? undefined}
                     controls
                     preload="metadata"
                     playsInline
                   />
                 )}
               </figure>
+              {mediaItems.length > 1 && (
+                <>
+                  <button
+                    type="button"
+                    className="slideshow-media-nav slideshow-media-prev"
+                    onClick={() => goMedia(activeMediaIndex - 1)}
+                    aria-label="이전 미디어"
+                  >
+                    <ChevronLeftIcon size={20} />
+                  </button>
+                  <button
+                    type="button"
+                    className="slideshow-media-nav slideshow-media-next"
+                    onClick={() => goMedia(activeMediaIndex + 1)}
+                    aria-label="다음 미디어"
+                  >
+                    <ChevronRightIcon size={20} />
+                  </button>
+                  <div
+                    className="slideshow-media-indicators"
+                    aria-label={`미디어 ${activeMediaIndex + 1} / ${mediaItems.length}`}
+                  >
+                    {mediaItems.map((item, i) => (
+                      <button
+                        key={item.id}
+                        type="button"
+                        className={i === activeMediaIndex ? "is-active" : ""}
+                        aria-label={`${i + 1}번째 미디어 보기`}
+                        aria-current={i === activeMediaIndex ? "true" : undefined}
+                        onClick={() => setMediaIndex(i)}
+                      />
+                    ))}
+                  </div>
+                </>
+              )}
             </div>
           ) : (
             <div className="slideshow-media-empty">
@@ -213,6 +290,18 @@ export function StreamSlideshowOverlay({
         >
           <ChevronLeftIcon size={24} />
         </button>
+        <div className="slideshow-slide-indicators" aria-label={`슬라이드 ${safeIndex + 1} / ${total}`}>
+          {slides.map((item, i) => (
+            <button
+              key={item.id}
+              type="button"
+              className={i === safeIndex ? "is-active" : ""}
+              aria-label={`${i + 1}번째 슬라이드 보기`}
+              aria-current={i === safeIndex ? "true" : undefined}
+              onClick={() => onIndexChange(i)}
+            />
+          ))}
+        </div>
         <button
           type="button"
           className="slideshow-nav slideshow-next"

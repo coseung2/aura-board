@@ -114,13 +114,6 @@ export function BoardCanvas({
       if (res.ok) {
         const { card } = await res.json();
         setCards((prev) => [...prev, card]);
-        if (data.attachAssetId) {
-          void fetch(`/api/student-assets/${data.attachAssetId}/attach`, {
-            method: "POST",
-            headers: { "content-type": "application/json" },
-            body: JSON.stringify({ cardId: card.id }),
-          }).catch(() => {});
-        }
       } else {
         const msg = await res.text();
         console.error("Failed to add card:", msg);

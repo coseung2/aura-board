@@ -700,6 +700,11 @@ function SubmissionStatusModal({
               </span>
             )}
           </div>
+          {!hasRoster && (
+            <p className="column-submission-note">
+              학급이 연결되지 않은 보드예요. 학생별 제출자/미제출자 현황 대신 이 칼럼의 카드 수를 표시합니다.
+            </p>
+          )}
 
           <SubmissionList title="제출자" people={submitted} empty="제출자 없음" />
           {hasRoster && (

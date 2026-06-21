@@ -120,40 +120,6 @@
 .library-item img { width: 48px; height: 48px; border-radius: 6px; object-fit: cover; }
 .library-item-title { font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
-.library-picker-overlay {
-  position: fixed;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.5);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 60;
-}
-.library-picker {
-  background: var(--color-surface, #fff);
-  border-radius: 12px;
-  padding: 16px;
-  width: min(640px, 90vw);
-  max-height: 80vh;
-  overflow: auto;
-}
-.library-picker-grid {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 12px;
-}
-.library-picker-item {
-  aspect-ratio: 1;
-  border: 2px solid transparent;
-  border-radius: 8px;
-  overflow: hidden;
-  cursor: pointer;
-  padding: 0;
-  background: var(--color-bg, #fafafa);
-}
-.library-picker-item.selected { border-color: var(--color-text, #111); }
-.library-picker-item img { width: 100%; height: 100%; object-fit: cover; }
-
 @media (max-width: 768px) {
   .drawing-board { flex-direction: column; }
   .drawing-sidebar { flex: 0 0 auto; max-height: 240px; }

@@ -108,7 +108,6 @@ Status: schema + route + UI placeholder only. Drawpile 서버/포크/COOP-COEP/p
 ### Routes
 - `POST /api/student-assets` — 학생 세션 필수. multipart/form-data `file` (image/*, ≤50MB). `public/uploads/` 저장 (기존 `/api/upload` 와 동일 FS 패턴 — 영속성 업그레이드는 BLOCKERS.md #6).
 - `GET /api/student-assets?scope=mine|shared[&classroomId=…]` — `mine`: 로그인 학생 본인. `shared`: 교사 owner or 해당 교실 학생.
-- `POST /api/student-assets/[id]/attach` — body `{ cardId?, observationId? }`. 자산 owner 또는 board owner 에게만 허용. `cardId` 지정 + `Card.imageUrl === null` 일 때만 imageUrl 채움 (기존 업로드 이미지 보호).
 
 ### Layout wiring
 - `Board.layout` app-level zod enum 에 `"drawing"` 추가 (`src/app/api/boards/route.ts`).
@@ -118,10 +117,9 @@ Status: schema + route + UI placeholder only. Drawpile 서버/포크/COOP-COEP/p
 ### Components
 - `src/components/DrawingBoard.tsx` — 작업실/갤러리 탭 토글. `NEXT_PUBLIC_DRAWPILE_URL` 있음 → `<iframe sandbox="allow-scripts allow-same-origin allow-forms allow-modals">`. 미설정 → placeholder card (`BLOCKERS.md` 가이드). 갤러리 탭: GET shared + `gallery-empty` 빈 상태.
 - `src/components/StudentLibrary.tsx` — 학생 로그인 시에만 사이드바. GET mine + 업로드 버튼 + 썸네일 list.
-- `AddCardModal` — `🎨 내 라이브러리` 버튼 + picker overlay. 선택 시 `imageUrl` set + `attachAssetId` 를 `AddCardData` 로 반출. `BoardCanvas.handleAdd` 가 카드 생성 후 fire-and-forget attach 호출.
 
 ### Styles
-- `src/styles/drawing.css` (globals.css import) — `.drawing-board`, `.drawing-tabs`, `.drawing-panel`, `.drawing-iframe`, `.drawing-placeholder`, `.drawing-gallery`, `.gallery-thumb`, `.drawing-sidebar`, `.library-list`, `.library-picker*`. 768px breakpoint 에서 세로 스택.
+- `src/styles/drawing.css` (globals.css import) — `.drawing-board`, `.drawing-tabs`, `.drawing-panel`, `.drawing-iframe`, `.drawing-placeholder`, `.drawing-gallery`, `.gallery-thumb`, `.drawing-sidebar`, `.library-list`. 768px breakpoint 에서 세로 스택.
 
 ### Migrations
 - `prisma/migrations/20260413_add_drawpile_student_assets/migration.sql` (non-destructive). Supabase 수동 적용 필요 (`BLOCKERS.md` #5).

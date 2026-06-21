@@ -93,17 +93,6 @@ export function useCardAttachments(initialAttachments: AttachmentDraft[] = []) {
     }
   }
 
-  function addLibraryImage(url: string) {
-    if (attachmentsRef.current.length >= MAX_ATTACHMENTS_PER_CARD) {
-      alert(
-        `첨부는 카드당 최대 ${MAX_ATTACHMENTS_PER_CARD}개까지 가능합니다.`
-      );
-      return false;
-    }
-    pushAttachment({ tempId: mintId(), kind: "image", url, previewUrl: url });
-    return true;
-  }
-
   // multi-link-attach (2026-06-13): link 첨부 추가. fileName=제목,
   // mimeType=설명, previewUrl=OG 이미지로 재활용. 중복 URL은 거부.
   function addLink(input: {
@@ -192,7 +181,6 @@ export function useCardAttachments(initialAttachments: AttachmentDraft[] = []) {
     canAddMore,
     countByKind,
     uploadMany,
-    addLibraryImage,
     addLink,
     removeAttachment,
     moveAttachment,

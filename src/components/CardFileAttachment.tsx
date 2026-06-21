@@ -6,6 +6,7 @@ import {
   fileMimeToLabel,
   formatBytes,
 } from "@/lib/file-attachment";
+import { DownloadIcon } from "./icons/UiIcons";
 
 type Props = {
   fileUrl: string;
@@ -56,8 +57,9 @@ export const CardFileAttachment = memo(function CardFileAttachment({
         className="card-attach-file-download"
         onClick={(e) => e.stopPropagation()}
         aria-label={`${displayName} 다운로드`}
+        title={`${displayName} 다운로드`}
       >
-        📥 다운로드
+        <DownloadIcon size={17} />
       </a>
     </div>
   );

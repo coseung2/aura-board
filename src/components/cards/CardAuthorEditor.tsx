@@ -159,7 +159,7 @@ export function CardAuthorEditor({
 
   return (
     <>
-      <div className="modal-backdrop" onClick={onClose} />
+      <div className="modal-backdrop card-author-editor-backdrop" onClick={onClose} />
       <div
         className="add-card-modal card-author-editor"
         role="dialog"
@@ -173,9 +173,9 @@ export function CardAuthorEditor({
             ×
           </button>
         </div>
-        <div className="modal-body card-author-editor-body">
-          {classroomId && (
-            <section className="card-author-roster">
+	        <div className="modal-body card-author-editor-body">
+	          {classroomId && (
+	            <section className="card-author-roster">
               <h3 className="card-author-section-title">학급 학생</h3>
               {!students && !fetchError && (
                 <p className="card-author-loading">불러오는 중...</p>

@@ -19,10 +19,6 @@ import {
   type AttachmentDraft,
 } from "./cards/useCardAttachments";
 import {
-  LibraryPickerModal,
-  type LibraryAsset,
-} from "./cards/LibraryPickerModal";
-import {
   AttachmentDownloadLink,
   getAttachmentDisplayName,
 } from "./cards/AttachmentDownloadLink";
@@ -42,9 +38,6 @@ export type AddCardData = {
   color?: string;
   sectionId?: string;
   authors?: CardAuthorDraft[];
-  // When set, the caller should attach this StudentAsset to the created card
-  // (POST /api/student-assets/{id}/attach) after the card row exists.
-  attachAssetId?: string;
 };
 
 type SectionOption = { id: string; title: string };
@@ -137,10 +130,6 @@ export function AddCardModal({
   const resizeState = useRef<{ startY: number; startHeight: number } | null>(
     null
   );
-  const [pickerOpen, setPickerOpen] = useState(false);
-  const [libraryAssets, setLibraryAssets] = useState<LibraryAsset[] | null>(null);
-  const [libraryLoading, setLibraryLoading] = useState(false);
-  const [pickedAssetId, setPickedAssetId] = useState<string | null>(null);
   const [mounted, setMounted] = useState(false);
 
   const {
@@ -150,7 +139,6 @@ export function AddCardModal({
     canAddMore,
     countByKind,
     uploadMany,
-    addLibraryImage,
     removeAttachment,
     moveAttachment,
     isFirstOfKind,
@@ -192,38 +180,6 @@ export function AddCardModal({
     setContent((text) => removeUrlFromText(text, detectedContentUrl));
     setShowLink(true);
     fetchPreview(detectedContentUrl);
-  }
-
-  async function openLibrary() {
-    setPickerOpen(true);
-    if (libraryAssets === null) {
-      setLibraryLoading(true);
-      try {
-        const res = await fetch("/api/student-assets?scope=mine");
-        if (res.ok) {
-          const data = (await res.json()) as { assets: LibraryAsset[] };
-          setLibraryAssets(data.assets ?? []);
-        } else {
-          setLibraryAssets([]);
-        }
-      } catch {
-        setLibraryAssets([]);
-      } finally {
-        setLibraryLoading(false);
-      }
-    }
-  }
-
-  function confirmLibraryPick() {
-    if (!pickedAssetId || !libraryAssets) return;
-    const picked = libraryAssets.find((a) => a.id === pickedAssetId);
-    if (picked) {
-      const url = picked.thumbnailUrl ?? picked.fileUrl;
-      // 라이브러리 픽은 "이미지" attachment로 추가. attachAssetId는 별도
-      // StudentAsset 조인용으로 유지.
-      if (addLibraryImage(url)) setShowImage(true);
-    }
-    setPickerOpen(false);
   }
 
   if (!mounted) return null;
@@ -294,7 +250,6 @@ export function AddCardModal({
               color: color || undefined,
               sectionId: sectionId || undefined,
               authors: authors.length > 0 ? authors : undefined,
-              attachAssetId: pickedAssetId ?? undefined,
             });
             setBusy(false);
             onClose();
@@ -389,14 +344,6 @@ export function AddCardModal({
               aria-label="파일 첨부"
             >
               📎 파일{countByKind("file") > 0 && ` · ${countByKind("file")}`}
-            </button>
-            <button
-              type="button"
-              className="modal-attach-btn"
-              onClick={openLibrary}
-              title="내 그림 라이브러리에서 선택"
-            >
-              🎨 내 라이브러리
             </button>
             {canAssignAuthors && (
               <button
@@ -823,17 +770,6 @@ export function AddCardModal({
         </form>
       </div>
 
-      {pickerOpen && (
-        <LibraryPickerModal
-          loading={libraryLoading}
-          assets={libraryAssets}
-          pickedId={pickedAssetId}
-          canConfirm={!!pickedAssetId && canAddMore}
-          onPick={setPickedAssetId}
-          onClose={() => setPickerOpen(false)}
-          onConfirm={confirmLibraryPick}
-        />
-      )}
     </>,
     document.body
   );

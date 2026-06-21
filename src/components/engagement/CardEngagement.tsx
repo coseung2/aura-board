@@ -182,6 +182,7 @@ export function CardEngagement({ cardId, mode }: Props) {
   }
 
   // panel mode — 인라인 풀 패널
+  const commentInputId = `card-comments-input-${cardId}`;
   return (
     <div className="card-engagement-panel">
       <div className="card-engagement-panel-likeRow">
@@ -194,11 +195,25 @@ export function CardEngagement({ cardId, mode }: Props) {
           title={state.canInteract ? "" : "읽기 전용입니다"}
         >
           <span aria-hidden>{state.isLiked ? "❤️" : "🤍"}</span>
-          <span>좋아요 {state.likeCount}</span>
+          <span>{state.likeCount}</span>
         </button>
-        <span className="card-engagement-meta">댓글 {state.commentCount}</span>
+        <button
+          type="button"
+          className="card-engagement-comment-btn"
+          onClick={() => document.getElementById(commentInputId)?.focus()}
+          aria-label={`댓글 ${state.commentCount}개`}
+        >
+          <span aria-hidden>💬</span>
+          <span>{state.commentCount}</span>
+        </button>
       </div>
-      <CommentsBlock cardId={cardId} canInteract={state.canInteract} shareSession={shareSession} onChange={refresh} />
+      <CommentsBlock
+        cardId={cardId}
+        canInteract={state.canInteract}
+        shareSession={shareSession}
+        onChange={refresh}
+        inputId={commentInputId}
+      />
     </div>
   );
 }
@@ -270,11 +285,13 @@ function CommentsBlock({
   canInteract,
   shareSession,
   onChange,
+  inputId,
 }: {
   cardId: string;
   canInteract: boolean;
   shareSession: ShareSession | null;
   onChange?: () => void;
+  inputId?: string;
 }) {
   const [items, setItems] = useState<CommentItem[] | null>(null);
   const [content, setContent] = useState("");
@@ -362,6 +379,7 @@ function CommentsBlock({
       {canInteract ? (
         <form className="card-engagement-comment-form" onSubmit={submit}>
           <textarea
+            id={inputId}
             value={content}
             onChange={(e) => setContent(e.target.value)}
             placeholder="댓글을 입력하세요"

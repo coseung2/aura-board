@@ -4,6 +4,7 @@ import { memo, useEffect, useState } from "react";
 import { extractCanvaDesignId, hasCanvaShareToken } from "@/lib/canva";
 import { extractVideoId } from "@/lib/youtube";
 import { shouldPromoteLinkPreview } from "@/lib/card-content-policy";
+import { fileMimeToIcon, fileMimeToLabel, formatBytes } from "@/lib/file-attachment";
 import { CanvaEmbedSlot } from "./CanvaEmbedSlot";
 import { OptimizedImage } from "@/components/ui/OptimizedImage";
 import { CardFileAttachment } from "./CardFileAttachment";
@@ -140,14 +141,29 @@ export const CardAttachments = memo(function CardAttachments({ imageUrl, thumbUr
   const mediaSorted = allSorted.filter((a) => a.kind !== "file");
   const allSortedWithLink = mediaSorted;
   const thumbnailItem = pickThumbnailItem(mediaSorted);
-  const sorted = variant === "thumbnail" ? (thumbnailItem ? [thumbnailItem] : []) : allSortedWithLink;
+  const thumbnailFileItem =
+    variant === "thumbnail" && !thumbnailItem ? fileAttachments[0] ?? null : null;
+  const sorted =
+    variant === "thumbnail"
+      ? thumbnailItem
+        ? [thumbnailItem]
+        : thumbnailFileItem
+          ? [thumbnailFileItem]
+          : []
+      : allSortedWithLink;
   // media-attach-carousel (2026-06-12): detail 모드 + 항목 ≥ 2 일 때만
   // 슬라이드 활성화. 단일 항목은 기존 풀 표시 유지.
   const isCarousel = variant === "detail" && sorted.length > 1;
   const currentItem = isCarousel ? sorted[Math.min(mediaIndex, sorted.length - 1)] : null;
   const extraCount =
     variant === "thumbnail"
-      ? Math.max(0, mediaSorted.length - 1 + (linkRendersAsMedia ? 1 : 0))
+      ? Math.max(
+          0,
+          mediaSorted.length +
+            fileAttachments.length -
+            (thumbnailItem || thumbnailFileItem ? 1 : 0) +
+            (linkRendersAsMedia ? 1 : 0)
+        )
       : 0;
 
   // detail 모드에서 이미지 클릭 시 라이트박스를 띄울 수 있도록 인덱스 계산.
@@ -164,10 +180,10 @@ export const CardAttachments = memo(function CardAttachments({ imageUrl, thumbUr
     }
     setMediaIndex((i) => (i >= mediaSorted.length ? 0 : i));
   }, [mediaSorted.length]);
-  // meta-download-zone (2026-06-13): file-only 카드는 mediaSorted가 비어
-  // 있어 Carousel 컨테이너가 그려지지 않음. 이 컴포넌트 자체는 linkUrl
-  // 또는 media 첨부 중 하나라도 있을 때만 렌더.
-  if (!allSortedWithLink.length && !linkUrl) return null;
+  // meta-download-zone (2026-06-13): detail 모드에서 file 첨부는 미디어
+  // 영역이 아니라 메타 영역 다운로드 리스트로 옮김. thumbnail 모드에서는
+  // file-only 카드도 카드 목록에서 첨부 신호가 보이도록 파일 타일을 렌더.
+  if (!allSortedWithLink.length && !linkUrl && !thumbnailFileItem) return null;
   const renderVideoPoster = (
     key: string,
     videoUrlForFallback: string | null,
@@ -203,11 +219,15 @@ export const CardAttachments = memo(function CardAttachments({ imageUrl, thumbUr
       ) : (
         <div className="card-attach-video-placeholder" aria-hidden="true" />
       )}
-      {source !== "youtube" && (
+      {source === "youtube" && onClick ? (
+        <span className="card-attach-youtube-play" aria-hidden="true">
+          <PlayIcon size={18} />
+        </span>
+      ) : source !== "youtube" ? (
         <span className="card-attach-video-play" aria-hidden="true">
           <PlayIcon size={20} />
         </span>
-      )}
+      ) : null}
       {extraBadge && extraCount > 0 && (
         <span className="card-attach-multi-badge" aria-label={`+${extraCount}개 더`}>
           +{extraCount}
@@ -356,6 +376,30 @@ export const CardAttachments = memo(function CardAttachments({ imageUrl, thumbUr
       );
     }
     // file
+    if (variant === "thumbnail") {
+      const icon = fileMimeToIcon(a.mimeType ?? "");
+      const label = fileMimeToLabel(a.mimeType ?? "");
+      return (
+        <div key={a.id} className="card-attach-file-thumbnail">
+          <div className="card-attach-file-thumbnail-icon" aria-hidden>
+            {icon}
+          </div>
+          <div className="card-attach-file-thumbnail-body">
+            <span className="card-attach-file-thumbnail-name" title={a.fileName ?? "파일"}>
+              {a.fileName ?? "파일"}
+            </span>
+            <span className="card-attach-file-thumbnail-meta">
+              {a.fileSize ? formatBytes(a.fileSize) : "—"} · {label}
+            </span>
+          </div>
+          {extraCount > 0 && (
+            <span className="card-attach-multi-badge" aria-label={`+${extraCount}개 더`}>
+              +{extraCount}
+            </span>
+          )}
+        </div>
+      );
+    }
     return (
       <div key={a.id} className="card-attach-file-wrap">
         <CardFileAttachment
@@ -438,12 +482,30 @@ export const CardAttachments = memo(function CardAttachments({ imageUrl, thumbUr
           (() => {
               const yt = getYouTubeId(effectiveVideoUrl);
               if (variant === "thumbnail") {
+                if (yt && playedVideoIds.has("single-video")) {
+                  return (
+                    <div className="card-attach-video">
+                      <iframe
+                        src={`https://www.youtube.com/embed/${yt}?autoplay=1`}
+                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                        allowFullScreen
+                        title="YouTube"
+                      />
+                    </div>
+                  );
+                }
                 return renderVideoPoster(
                   "single-video",
                   yt ? null : effectiveVideoUrl,
                   yt ? getYouTubeThumbnailUrl(yt) : null,
                   false,
-                  yt ? "youtube" : "upload"
+                  yt ? "youtube" : "upload",
+                  yt
+                    ? () =>
+                        setPlayedVideoIds((prev) =>
+                          new Set(prev).add("single-video"),
+                        )
+                    : undefined,
                 );
               }
               return yt ? (
