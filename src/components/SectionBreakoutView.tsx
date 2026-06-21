@@ -116,7 +116,7 @@ export function SectionBreakoutView({
                 }
               }}
             >
-              <CardBody card={c} titleAs="h4" />
+              <CardBody card={c} titleAs="h4" boardId={boardId} />
             </article>
           ))}
         </div>
@@ -125,6 +125,7 @@ export function SectionBreakoutView({
       <CardDetailModal
         card={openCard ? (openCard as unknown as CardData) : null}
         onClose={() => setOpenCard(null)}
+        boardId={boardId}
       />
     </main>
   );

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { db } from "@/lib/db";
 import { authorizeShareAccess } from "@/lib/share/share-auth";
+import { announceEngagementChange } from "@/lib/realtime-broadcast";
 
 const LikeSchema = z.object({
   shareToken: z.string().min(1),
@@ -52,7 +53,11 @@ export async function POST(
   const existing = await db.cardLike.findUnique({ where });
   if (existing) {
     await db.cardLike.delete({ where: { id: existing.id } });
-    const count = await db.cardLike.count({ where: { cardId } });
+    const [count, commentCount] = await Promise.all([
+      db.cardLike.count({ where: { cardId } }),
+      db.cardComment.count({ where: { cardId, deletedAt: null } }),
+    ]);
+    await announceEngagementChange(card.boardId, cardId, count, commentCount);
     return NextResponse.json({ liked: false, count });
   }
 
@@ -63,6 +68,10 @@ export async function POST(
       externalLikerKey: parsed.guestId,
     },
   });
-  const count = await db.cardLike.count({ where: { cardId } });
+  const [count, commentCount] = await Promise.all([
+    db.cardLike.count({ where: { cardId } }),
+    db.cardComment.count({ where: { cardId, deletedAt: null } }),
+  ]);
+  await announceEngagementChange(card.boardId, cardId, count, commentCount);
   return NextResponse.json({ liked: true, count });
 }

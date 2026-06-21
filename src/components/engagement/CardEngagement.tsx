@@ -5,6 +5,7 @@ import { createPortal } from "react-dom";
 import { formatRelativeTime } from "@/lib/card-engagement-format";
 import { useShareSession, type ShareSession } from "@/components/share/ShareSessionContext";
 import { createPublicSupabaseClient } from "@/lib/supabase/client";
+import { useBoardEngagement } from "@/hooks/useBoardEngagementRealtime";
 
 // card-comments-likes (2026-04-26): 카드별 좋아요 + 댓글 UI.
 // mode="chips"  — 인라인 보드 카드 footer (좋아요 토글 + 댓글 카운트
@@ -31,9 +32,10 @@ interface EngagementState {
 interface Props {
   cardId: string;
   mode: "chips" | "panel";
+  boardId?: string;
 }
 
-export function CardEngagement({ cardId, mode }: Props) {
+export function CardEngagement({ cardId, mode, boardId }: Props) {
   const [state, setState] = useState<EngagementState | null>(null);
   const [showModal, setShowModal] = useState(false);
   const shareSession = useShareSession();
@@ -72,8 +74,21 @@ export function CardEngagement({ cardId, mode }: Props) {
     void refresh();
   }, [refresh]);
 
+  // Live-update counts from board-level engagement broadcasts. Only counts
+  // move; isLiked is the current user's own state (handled in toggleLike).
+  useBoardEngagement(boardId, cardId, (event) => {
+    setState((current) =>
+      current
+        ? { ...current, likeCount: event.likeCount, commentCount: event.commentCount }
+        : current,
+    );
+  });
+
   useEffect(() => {
-    if (!shareSession) return;
+    // When a boardId is wired, board-level broadcasts drive updates and we
+    // skip the per-card postgres_changes channel. Share sessions without a
+    // boardId keep the per-card subscription.
+    if (!shareSession || boardId) return;
     const supabase = createPublicSupabaseClient({
       "x-share-token": shareSession.shareToken,
       "x-share-guest-id": shareSession.guestId,
@@ -105,7 +120,7 @@ export function CardEngagement({ cardId, mode }: Props) {
     return () => {
       void supabase.removeChannel(channel);
     };
-  }, [cardId, refresh, shareSession]);
+  }, [cardId, refresh, shareSession, boardId]);
 
   const toggleLike = useCallback(async () => {
     if (!state?.canInteract) return;

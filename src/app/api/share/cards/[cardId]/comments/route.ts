@@ -11,6 +11,7 @@ import { z } from "zod";
 import { db } from "@/lib/db";
 import { authorizeShareAccess } from "@/lib/share/share-auth";
 import { formatEngagementAuthor } from "@/lib/card-engagement-format";
+import { announceEngagementChange } from "@/lib/realtime-broadcast";
 
 const PostSchema = z.object({
   shareToken: z.string().min(1),
@@ -131,6 +132,16 @@ export async function POST(
       content: parsed.content,
     },
   });
+
+  try {
+    const [likeCount, commentCount] = await Promise.all([
+      db.cardLike.count({ where: { cardId } }),
+      db.cardComment.count({ where: { cardId, deletedAt: null } }),
+    ]);
+    await announceEngagementChange(card.boardId, cardId, likeCount, commentCount);
+  } catch {
+    // Broadcast side-effects are non-fatal.
+  }
 
   return NextResponse.json({
     ok: true,

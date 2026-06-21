@@ -250,6 +250,7 @@ export function StreamBoard({
           <StreamGroupedFeed
             sections={sortedSections}
             grouped={grouped}
+            boardId={boardId}
             canEdit={canEdit}
             currentUserId={currentUserId}
             currentRole={currentRole}
@@ -274,6 +275,7 @@ export function StreamBoard({
               card={card}
               canDelete={canDeleteCard(card, currentUserId, currentRole)}
               onDelete={() => handleDelete(card)}
+              boardId={boardId}
             />
           ))
         )}
@@ -365,6 +367,7 @@ export function StreamBoard({
 type StreamGroupedFeedProps = {
   sections: StreamSection[];
   grouped: { bySection: Map<string, CardData[]>; unsectioned: CardData[] };
+  boardId: string;
   canEdit: boolean;
   currentUserId: string;
   currentRole: "owner" | "editor" | "viewer";
@@ -384,6 +387,7 @@ type StreamGroupedFeedProps = {
 function StreamGroupedFeed({
   sections,
   grouped,
+  boardId,
   canEdit,
   currentUserId,
   currentRole,
@@ -480,6 +484,7 @@ function StreamGroupedFeed({
                   card={card}
                   canDelete={canDeleteCard(card, currentUserId, currentRole)}
                   onDelete={() => onDeleteCard(card)}
+                  boardId={boardId}
                 />
               ))
             )}
@@ -498,6 +503,7 @@ function StreamGroupedFeed({
               card={card}
               canDelete={canDeleteCard(card, currentUserId, currentRole)}
               onDelete={() => onDeleteCard(card)}
+              boardId={boardId}
             />
           ))}
         </section>

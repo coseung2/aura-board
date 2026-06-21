@@ -13,9 +13,10 @@ type Props = {
   card: CardData;
   canDelete: boolean;
   onDelete: () => void;
+  boardId?: string;
 };
 
-export function StreamPost({ card, canDelete, onDelete }: Props) {
+export function StreamPost({ card, canDelete, onDelete, boardId }: Props) {
   const [menuOpen, setMenuOpen] = useState(false);
   const author = getStreamAuthor(card);
   const fileAttachments = (card.attachments ?? []).filter((item) => item.kind === "file");
@@ -93,7 +94,7 @@ export function StreamPost({ card, canDelete, onDelete }: Props) {
         )}
       </div>
 
-      <StreamEngagement cardId={card.id} />
+      <StreamEngagement cardId={card.id} boardId={boardId} />
     </article>
   );
 }

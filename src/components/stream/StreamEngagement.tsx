@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { formatRelativeTime } from "@/lib/card-engagement-format";
 import { useShareSession, type ShareSession } from "@/components/share/ShareSessionContext";
+import { useBoardEngagement } from "@/hooks/useBoardEngagementRealtime";
 
 type CommentItem = {
   id: string;
@@ -22,9 +23,10 @@ type EngagementState = {
 
 type Props = {
   cardId: string;
+  boardId?: string;
 };
 
-export function StreamEngagement({ cardId }: Props) {
+export function StreamEngagement({ cardId, boardId }: Props) {
   const [state, setState] = useState<EngagementState | null>(null);
   const [expanded, setExpanded] = useState(false);
   const shareSession = useShareSession();
@@ -42,6 +44,17 @@ export function StreamEngagement({ cardId }: Props) {
   useEffect(() => {
     void refresh();
   }, [refresh]);
+
+  // Live-update counts from board-level engagement broadcasts. Only the
+  // counts move here — isLiked is the current user's own state and is
+  // already handled optimistically by toggleLike.
+  useBoardEngagement(boardId, cardId, (event) => {
+    setState((current) =>
+      current
+        ? { ...current, likeCount: event.likeCount, commentCount: event.commentCount }
+        : current,
+    );
+  });
 
   const toggleLike = useCallback(async () => {
     if (!state?.canInteract) return;

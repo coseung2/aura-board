@@ -56,6 +56,7 @@ type Props = {
   // 일반 보드 카드는 긴 텍스트를 접고 카드 안에서 토글한다.
   // 포트폴리오 그리드는 모달로 전체 내용을 보므로 "static", 상세 모달은 "full".
   contentDisplay?: "expandable" | "static" | "full";
+  boardId?: string;
 };
 
 function isLongContent(content: string): boolean {
@@ -69,6 +70,7 @@ export const CardBody = memo(function CardBody({
   showEngagement = true,
   attachmentsVariant = "thumbnail",
   contentDisplay = "expandable",
+  boardId,
 }: Props) {
   const Title = titleAs;
   const [isExpanded, setIsExpanded] = useState(false);
@@ -127,7 +129,9 @@ export const CardBody = memo(function CardBody({
         createdAt={card.createdAt}
         anonymousAuthor={card.anonymousAuthor}
       />
-      {showEngagement && card.id && <CardEngagement cardId={card.id} mode="chips" />}
+      {showEngagement && card.id && (
+        <CardEngagement cardId={card.id} mode="chips" boardId={boardId} />
+      )}
     </>
   );
 });

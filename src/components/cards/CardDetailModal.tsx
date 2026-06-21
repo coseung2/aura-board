@@ -26,6 +26,7 @@ type Props = {
    *  return `true`. Lets teachers (all cards) and students (own cards)
    *  share the same modal without leaking the editor to peers. */
   canEditAuthors?: (card: CardData) => boolean;
+  boardId?: string;
 };
 
 type DetailLayout = "full" | "media-meta" | "text-meta";
@@ -35,6 +36,7 @@ export function CardDetailModal({
   onClose,
   onEditAuthors,
   canEditAuthors,
+  boardId,
 }: Props) {
   const rootRef = useRef<HTMLDivElement>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -304,7 +306,7 @@ export function CardDetailModal({
               )}
             </div>
             {/* card-detail-modal-engagement (2026-04-26): 좋아요 + 댓글 패널. */}
-            <CardEngagement cardId={card.id} mode="panel" />
+            <CardEngagement cardId={card.id} mode="panel" boardId={boardId} />
           </aside>
         </div>
         {lightboxIndex !== null &&

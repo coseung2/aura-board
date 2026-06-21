@@ -21,6 +21,7 @@ type Props = {
   section: { id: string; title: string };
   pinned: boolean;
   sectionCards: CardData[];
+  boardId?: string;
   canEdit: boolean;
   currentRole: "owner" | "editor" | "viewer";
   currentUserId: string;
@@ -77,6 +78,7 @@ export function ColumnView(props: Props) {
     section,
     pinned,
     sectionCards,
+    boardId,
     canEdit,
     currentRole,
     currentUserId,
@@ -553,7 +555,7 @@ export function ColumnView(props: Props) {
                   tabIndex={0}
                   role="button"
                 >
-                  <CardBody card={c} titleAs="h4" />
+                  <CardBody card={c} titleAs="h4" boardId={boardId} />
                   {canModify && (
                     <div
                       className="card-ctx-menu"

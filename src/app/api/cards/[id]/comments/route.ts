@@ -3,6 +3,7 @@ import { z } from "zod";
 import { db } from "@/lib/db";
 import { authorizeCardAccess, getCurrentCardActor } from "@/lib/card-engagement-actor";
 import { formatEngagementAuthor } from "@/lib/card-engagement-format";
+import { announceEngagementChange } from "@/lib/realtime-broadcast";
 
 // card-comments-likes (2026-04-26): GET list / POST create.
 
@@ -99,6 +100,19 @@ export async function POST(
       authorStudent: { select: { id: true, name: true } },
     },
   });
+
+  try {
+    const [likeCount, commentCount, card] = await Promise.all([
+      db.cardLike.count({ where: { cardId } }),
+      db.cardComment.count({ where: { cardId, deletedAt: null } }),
+      db.card.findUnique({ where: { id: cardId }, select: { boardId: true } }),
+    ]);
+    if (card) {
+      await announceEngagementChange(card.boardId, cardId, likeCount, commentCount);
+    }
+  } catch {
+    // Broadcast side-effects are non-fatal.
+  }
 
   const rawName = isTeacher ? created.authorUser?.name ?? "" : created.authorStudent?.name ?? "";
   return NextResponse.json({

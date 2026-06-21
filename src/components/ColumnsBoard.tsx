@@ -348,6 +348,7 @@ export function ColumnsBoard({
               section={{ id: section.id, title: section.title }}
               pinned={section.pinned}
               sectionCards={getCardsForSection(section.id)}
+              boardId={boardId}
               canEdit={canEdit}
               currentRole={currentRole}
               currentUserId={currentUserId}
@@ -516,6 +517,7 @@ export function ColumnsBoard({
         onClose={() => setOpenCard(null)}
         onEditAuthors={(c) => setAuthorEditCard(c)}
         canEditAuthors={(c) => canEdit || c.studentAuthorId === currentUserId}
+        boardId={boardId}
       />
 
       {panelState &&

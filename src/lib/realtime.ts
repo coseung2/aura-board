@@ -46,6 +46,22 @@ export type ShowcaseRealtimeEvent =
   | { type: "showcase_added"; cardId: string; studentId: string; classroomId: string; createdAt: string }
   | { type: "showcase_removed"; cardId: string; studentId: string; classroomId: string };
 
+/**
+ * Board-level realtime event union.
+ *
+ * Broadcast on the `board:{boardId}` channel under the event name
+ * `board_changed` (see `realtime-broadcast.ts`).
+ */
+export type BoardRealtimeEvent =
+  | {
+      type: "engagement_changed";
+      boardId: string;
+      cardId: string;
+      likeCount: number;
+      commentCount: number;
+      updatedAt: string;
+    };
+
 export type AssignmentRealtimeEvent =
   | {
       type: "slot.updated";

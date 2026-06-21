@@ -102,7 +102,7 @@ export function GridBoard({ boardId, initialCards, currentUserId, currentRole, i
             tabIndex={0}
             role="button"
           >
-            <CardBody card={c} />
+            <CardBody card={c} boardId={boardId} />
             {(currentRole === "owner" ||
               (currentRole === "editor" && c.authorId === currentUserId) ||
               c.studentAuthorId === currentUserId) && (
@@ -133,6 +133,7 @@ export function GridBoard({ boardId, initialCards, currentUserId, currentRole, i
         onClose={() => setOpenCard(null)}
         onEditAuthors={(c) => setAuthorEditCard(c)}
         canEditAuthors={(c) => canEdit || c.studentAuthorId === currentUserId}
+        boardId={boardId}
       />
       {authorEditCard && (
         <CardAuthorEditor
