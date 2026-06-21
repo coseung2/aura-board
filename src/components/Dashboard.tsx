@@ -5,7 +5,9 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { CreateBoardModal } from "./CreateBoardModal";
 import { EditBoardModal } from "./EditBoardModal";
-import { layoutEmoji, layoutLabel, layoutThumbnail } from "@/lib/layout-meta";
+import { layoutLabel, layoutThumbnail } from "@/lib/layout-meta";
+
+const FALLBACK_THUMBNAIL = "/board-type-thumbnails/card-board.png";
 
 type BoardItem = {
   id: string;
@@ -89,9 +91,7 @@ export function Dashboard({ boards, classrooms, userTier = "pro" }: Props) {
           const thumbnail =
             b.thumbnailMode === "custom" && b.thumbnailUrl
               ? b.thumbnailUrl
-              : b.thumbnailMode === "none"
-                ? null
-                : layoutThumbnail(b.layout);
+              : layoutThumbnail(b.layout) ?? FALLBACK_THUMBNAIL;
 
           return (
             <div
@@ -103,17 +103,11 @@ export function Dashboard({ boards, classrooms, userTier = "pro" }: Props) {
                 className="board-grid-card-link"
               >
                 <div className="board-grid-preview">
-                  {thumbnail ? (
-                    <img
-                      className="board-grid-preview-img"
-                      src={thumbnail}
-                      alt={`${layoutLabel(b.layout)} 화면 미리보기`}
-                    />
-                  ) : (
-                    <span className="board-grid-emoji">
-                      {layoutEmoji(b.layout)}
-                    </span>
-                  )}
+                  <img
+                    className="board-grid-preview-img"
+                    src={thumbnail}
+                    alt={`${layoutLabel(b.layout)} 화면 미리보기`}
+                  />
                 </div>
                 <div className="board-grid-title">{b.title}</div>
                 <div className="board-grid-meta">

@@ -89,7 +89,13 @@ export default async function BoardPage({
     !needsDrawingData &&
     !needsQuestionData;
   // Breakout reuses cards + sections both.
-  const needsSections = board.layout === "columns" || needsBreakoutData;
+  const needsSections =
+    board.layout === "columns" ||
+    needsBreakoutData ||
+    // Stream board sections: opt-in per-board. When disabled we skip the
+    // section fetch entirely so the stream layout remains the lightweight
+    // twitter-style flow it was before.
+    (board.layout === "stream" && board.streamSectionsEnabled);
   const needsBreakoutAssignment = needsBreakoutData;
 
   const cardsPromise = needsCards
@@ -388,6 +394,8 @@ export default async function BoardPage({
         return (
           <StreamBoard
             {...common}
+            initialSections={sectionProps}
+            streamSectionsEnabled={board!.streamSectionsEnabled}
             streamTitlePrompt={board!.streamTitlePrompt ?? ""}
             streamContentPrompt={board!.streamContentPrompt ?? ""}
           />
@@ -693,6 +701,7 @@ export default async function BoardPage({
           shareShortCode={board.shareShortCode}
           streamTitlePrompt={board.streamTitlePrompt ?? ""}
           streamContentPrompt={board.streamContentPrompt ?? ""}
+          streamSectionsEnabled={board.streamSectionsEnabled}
         />
         {renderBoard()}
       </main>

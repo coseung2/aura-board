@@ -1,7 +1,7 @@
 # Aura Board Agent Guide
 
-This repository uses Codex as the supervising agent and opencode workers for
-bounded specialist tasks. The project source of truth is the current code,
+This repository uses Codex as the supervising agent and Codex/opencode workers
+for bounded specialist tasks. The project source of truth is the current code,
 `README.md`, `docs/`, and `CLAUDE.md`.
 
 ## Working Rules
@@ -26,7 +26,13 @@ dev server before browser checks when practical.
 
 ## Opencode Workers
 
-Use opencode workers only for narrow, bounded tasks.
+Codex may proactively delegate to subagents/workers when a task is multi-layer,
+multi-file, long-running, or benefits from parallel frontend/backend work. The
+user does not need to explicitly request delegation every time.
+
+Prefer Codex subagents when the tool is available. Use opencode workers for
+narrow, bounded tasks when subagents are unavailable or when the global
+orchestration skill specifically calls for opencode.
 
 - `frontend`: UI, CSS, React components, responsive layout, visual QA, and
   user-facing flows. Use `opencode-go/glm-5.2`.

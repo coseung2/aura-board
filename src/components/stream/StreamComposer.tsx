@@ -26,6 +26,7 @@ type Props = {
   onSubmitted?: () => void;
   streamTitlePrompt?: string;
   streamContentPrompt?: string;
+  sections?: Array<{ id: string; title: string }>;
 };
 
 export function StreamComposer({
@@ -33,12 +34,14 @@ export function StreamComposer({
   onSubmitted,
   streamTitlePrompt,
   streamContentPrompt,
+  sections,
 }: Props) {
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
   const [showLink, setShowLink] = useState(false);
   const [linkUrl, setLinkUrl] = useState("");
   const [busy, setBusy] = useState(false);
+  const [sectionId, setSectionId] = useState(sections?.[0]?.id ?? "");
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
   const videoInputRef = useRef<HTMLInputElement>(null);
@@ -65,6 +68,18 @@ export function StreamComposer({
     else reset();
   }, [effectiveLinkUrl, fetchPreview, reset]);
 
+  useEffect(() => {
+    if (!sections || sections.length === 0) {
+      setSectionId("");
+      return;
+    }
+    setSectionId((current) =>
+      sections.some((section) => section.id === current)
+        ? current
+        : sections[0]?.id ?? "",
+    );
+  }, [sections]);
+
   async function submit(event: React.FormEvent) {
     event.preventDefault();
     const trimmedTitle = title.trim();
@@ -84,11 +99,13 @@ export function StreamComposer({
         linkDesc: preview?.description ?? undefined,
         linkImage: preview?.image ?? undefined,
         attachments: attachments.length > 0 ? attachments : undefined,
+        sectionId: sectionId || undefined,
       });
       setTitle("");
       setContent("");
       setLinkUrl("");
       setShowLink(false);
+      setSectionId(sections?.[0]?.id ?? "");
       attachments.forEach((item) => removeAttachment(item.tempId));
       reset();
       onSubmitted?.();
@@ -306,6 +323,23 @@ export function StreamComposer({
         >
           파일
         </button>
+        {sections && sections.length > 0 && (
+          <label className="stream-composer-section-field">
+            <span className="stream-composer-section-label">섹션</span>
+            <select
+              className="stream-composer-section-select"
+              value={sectionId}
+              onChange={(event) => setSectionId(event.target.value)}
+              disabled={busy}
+            >
+              {sections.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.title}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
         <button
           type="submit"
           disabled={busy || uploading || !canSubmit}

@@ -64,9 +64,7 @@ export function EditBoardModal({ board, classrooms, onClose }: Props) {
           thumbnailMode:
             thumbnailMode === "custom" && thumbnailUrl
               ? "custom"
-              : thumbnailMode === "none"
-                ? "none"
-                : "default",
+              : "default",
           thumbnailUrl:
             thumbnailMode === "custom" && thumbnailUrl ? thumbnailUrl : null,
         }),
@@ -194,6 +192,6 @@ export function EditBoardModal({ board, classrooms, onClose }: Props) {
 }
 
 function normalizeMode(value: string | null): ThumbnailMode {
-  if (value === "none" || value === "custom") return value;
+  if (value === "custom") return value;
   return "default";
 }

@@ -46,6 +46,7 @@ type Props = {
   initialShareShortCode?: string | null;
   initialStreamTitlePrompt?: string;
   initialStreamContentPrompt?: string;
+  initialStreamSectionsEnabled?: boolean;
 };
 
 const TAB_LABELS: Record<Tab, string> = {
@@ -104,6 +105,7 @@ export function BoardSettingsPanel({
   initialShareShortCode = null,
   initialStreamTitlePrompt = "",
   initialStreamContentPrompt = "",
+  initialStreamSectionsEnabled = false,
 }: Props) {
   const router = useRouter();
   const [tab, setTab] = useState<Tab>("basic");
@@ -130,6 +132,9 @@ export function BoardSettingsPanel({
   const [streamContentPrompt, setStreamContentPrompt] = useState(
     initialStreamContentPrompt,
   );
+  const [streamSectionsEnabled, setStreamSectionsEnabled] = useState(
+    initialStreamSectionsEnabled,
+  );
   const tablistId = useId();
 
   useEffect(() => {
@@ -146,6 +151,7 @@ export function BoardSettingsPanel({
     setThumbnailUrl(initialThumbnailUrl);
     setStreamTitlePrompt(initialStreamTitlePrompt);
     setStreamContentPrompt(initialStreamContentPrompt);
+    setStreamSectionsEnabled(initialStreamSectionsEnabled);
   }, [
     open,
     initialSections,
@@ -159,6 +165,7 @@ export function BoardSettingsPanel({
     initialThumbnailUrl,
     initialStreamTitlePrompt,
     initialStreamContentPrompt,
+    initialStreamSectionsEnabled,
   ]);
 
   function handleSectionTokenChange(sectionId: string, nextToken: string | null) {
@@ -228,6 +235,8 @@ export function BoardSettingsPanel({
             streamContentPrompt={streamContentPrompt}
             onStreamTitlePromptChange={setStreamTitlePrompt}
             onStreamContentPromptChange={setStreamContentPrompt}
+            streamSectionsEnabled={streamSectionsEnabled}
+            onStreamSectionsEnabledChange={setStreamSectionsEnabled}
           />
         </div>
       )}
@@ -240,8 +249,14 @@ export function BoardSettingsPanel({
         >
           <BreakoutTab
             boardId={boardId}
+            title={title}
             layout={layout}
+            classrooms={classrooms}
+            classroomId={classroomId}
             sections={sections}
+            streamSectionsEnabled={streamSectionsEnabled}
+            streamTitlePrompt={streamTitlePrompt}
+            streamContentPrompt={streamContentPrompt}
             onTokenChange={handleSectionTokenChange}
           />
         </div>
@@ -289,6 +304,8 @@ function BasicTab({
   streamContentPrompt,
   onStreamTitlePromptChange,
   onStreamContentPromptChange,
+  streamSectionsEnabled,
+  onStreamSectionsEnabledChange,
 }: {
   boardId: string;
   layout: string;
@@ -310,6 +327,8 @@ function BasicTab({
   streamContentPrompt: string;
   onStreamTitlePromptChange: (next: string) => void;
   onStreamContentPromptChange: (next: string) => void;
+  streamSectionsEnabled: boolean;
+  onStreamSectionsEnabledChange: (next: boolean) => void;
 }) {
   return (
     <div className="board-settings-basic">
@@ -341,6 +360,15 @@ function BasicTab({
             contentPrompt={streamContentPrompt}
             onTitlePromptChange={onStreamTitlePromptChange}
             onContentPromptChange={onStreamContentPromptChange}
+          />
+        </SettingsSection>
+      )}
+      {layout === "stream" && (
+        <SettingsSection title="섹션">
+          <StreamSectionsToggle
+            boardId={boardId}
+            enabled={streamSectionsEnabled}
+            onChange={onStreamSectionsEnabledChange}
           />
         </SettingsSection>
       )}
@@ -446,9 +474,7 @@ function BasicInfoTab({
           thumbnailMode:
             thumbnailDraft.mode === "custom" && thumbnailDraft.url
               ? "custom"
-              : thumbnailDraft.mode === "none"
-                ? "none"
-                : "default",
+              : "default",
           thumbnailUrl:
             thumbnailDraft.mode === "custom" && thumbnailDraft.url
               ? thumbnailDraft.url
@@ -727,6 +753,68 @@ function StreamGuidanceTab({
   );
 }
 
+function StreamSectionsToggle({
+  boardId,
+  enabled,
+  onChange,
+}: {
+  boardId: string;
+  enabled: boolean;
+  onChange: (next: boolean) => void;
+}) {
+  const router = useRouter();
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+
+  async function toggle() {
+    const next = !enabled;
+    setBusy(true);
+    setErr(null);
+    onChange(next);
+    try {
+      const res = await fetch(`/api/boards/${boardId}`, {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ streamSectionsEnabled: next }),
+      });
+      if (!res.ok) {
+        onChange(!next);
+        setErr("저장에 실패했어요.");
+        return;
+      }
+      router.refresh();
+    } catch {
+      onChange(!next);
+      setErr("저장에 실패했어요.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="board-settings-control-stack">
+      <button
+        type="button"
+        className="board-settings-check-row board-settings-check-row-compact board-settings-switch-row"
+        role="switch"
+        aria-checked={enabled}
+        onClick={() => {
+          if (!busy) void toggle();
+        }}
+        disabled={busy}
+      >
+        <span className="board-settings-switch-track" aria-hidden="true">
+          <span className="board-settings-switch-thumb" />
+        </span>
+        <span className="board-settings-check-copy">
+          <span className="board-settings-check-title">섹션별로 게시물 그룹화</span>
+        </span>
+      </button>
+      {err && <p className="board-settings-error">{err}</p>}
+    </div>
+  );
+}
+
 function ThemeTab({
   boardId,
   value,
@@ -799,15 +887,42 @@ function ThemeTab({
 
 function BreakoutTab({
   boardId,
+  title,
   layout,
+  classrooms,
+  classroomId,
   sections,
+  streamSectionsEnabled,
+  streamTitlePrompt,
+  streamContentPrompt,
   onTokenChange,
 }: {
   boardId: string;
+  title: string;
   layout: string;
+  classrooms: Array<{ id: string; name: string; studentCount: number }>;
+  classroomId: string | null;
   sections: BoardSection[];
+  streamSectionsEnabled: boolean;
+  streamTitlePrompt: string;
+  streamContentPrompt: string;
   onTokenChange: (sectionId: string, token: string | null) => void;
 }) {
+  if (layout === "stream") {
+    return (
+      <StreamBreakoutCreator
+        boardId={boardId}
+        title={title}
+        classrooms={classrooms}
+        classroomId={classroomId}
+        sections={sections}
+        streamSectionsEnabled={streamSectionsEnabled}
+        streamTitlePrompt={streamTitlePrompt}
+        streamContentPrompt={streamContentPrompt}
+      />
+    );
+  }
+
   if (layout !== "columns") {
     return (
       <div className="board-settings-empty">
@@ -971,7 +1086,175 @@ function BreakoutSectionRow({
   );
 }
 
+function StreamBreakoutCreator({
+  boardId,
+  title,
+  classrooms,
+  classroomId,
+  sections,
+  streamSectionsEnabled,
+  streamTitlePrompt,
+  streamContentPrompt,
+}: {
+  boardId: string;
+  title: string;
+  classrooms: Array<{ id: string; name: string; studentCount: number }>;
+  classroomId: string | null;
+  sections: BoardSection[];
+  streamSectionsEnabled: boolean;
+  streamTitlePrompt: string;
+  streamContentPrompt: string;
+}) {
+  const router = useRouter();
+  const [groupCount, setGroupCount] = useState(4);
+  const [groupCapacity, setGroupCapacity] = useState(6);
+  const [visibility, setVisibility] = useState<"own-only" | "peek-others">(
+    "own-only",
+  );
+  const [targetClassroomId, setTargetClassroomId] = useState(classroomId ?? "");
+  const [busy, setBusy] = useState(false);
+  const [status, setStatus] = useState("");
+  const sectionCount = streamSectionsEnabled && sections.length > 0 ? sections.length : 1;
+  const hasPrompt = Boolean(streamTitlePrompt.trim() || streamContentPrompt.trim());
+
+  async function createBreakout() {
+    setBusy(true);
+    setStatus("");
+    try {
+      const res = await fetch(`/api/boards/${boardId}/breakout`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          groupCount,
+          groupCapacity,
+          visibilityOverride: visibility,
+          classroomId: targetClassroomId || null,
+        }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        setStatus(`생성 실패: ${data.error ?? res.status}`);
+        return;
+      }
+      const data = (await res.json()) as { board?: { slug?: string; id?: string } };
+      const next = data.board?.slug ?? data.board?.id;
+      if (next) router.push(`/board/${next}`);
+    } catch {
+      setStatus("생성 실패");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="board-settings-control-stack">
+      <div className="board-settings-row">
+        <div className="board-settings-row-title">
+          <span className="board-settings-row-name">
+            {title || "제목 없음"} 브레이크아웃
+          </span>
+          <span className="board-settings-row-badge on">
+            {groupCount}모둠
+          </span>
+        </div>
+        <p className="board-settings-row-note">
+          현재 스트림 양식의 섹션 {sectionCount}개와 글쓰기 안내
+          {hasPrompt ? "" : " 없이"}를 모둠별로 복제합니다.
+        </p>
+      </div>
+
+      <label className="modal-field-label" htmlFor={`breakout-group-count-${boardId}`}>
+        모둠 수
+      </label>
+      <input
+        id={`breakout-group-count-${boardId}`}
+        type="number"
+        min={1}
+        max={10}
+        className="modal-input"
+        value={groupCount}
+        onChange={(event) => {
+          const value = Number(event.target.value);
+          if (Number.isFinite(value)) setGroupCount(Math.max(1, Math.min(10, value)));
+        }}
+        disabled={busy}
+      />
+
+      <label className="modal-field-label" htmlFor={`breakout-capacity-${boardId}`}>
+        모둠 정원
+      </label>
+      <input
+        id={`breakout-capacity-${boardId}`}
+        type="number"
+        min={1}
+        max={6}
+        className="modal-input"
+        value={groupCapacity}
+        onChange={(event) => {
+          const value = Number(event.target.value);
+          if (Number.isFinite(value)) setGroupCapacity(Math.max(1, Math.min(6, value)));
+        }}
+        disabled={busy}
+      />
+
+      <label className="modal-field-label" htmlFor={`breakout-visibility-${boardId}`}>
+        열람 방식
+      </label>
+      <select
+        id={`breakout-visibility-${boardId}`}
+        className="modal-select"
+        value={visibility}
+        onChange={(event) =>
+          setVisibility(event.target.value as "own-only" | "peek-others")
+        }
+        disabled={busy}
+      >
+        <option value="own-only">자기 모둠만</option>
+        <option value="peek-others">다른 모둠도 보기</option>
+      </select>
+
+      {classrooms.length > 0 && (
+        <>
+          <label className="modal-field-label" htmlFor={`breakout-classroom-${boardId}`}>
+            학급 연결
+          </label>
+          <select
+            id={`breakout-classroom-${boardId}`}
+            className="modal-select"
+            value={targetClassroomId}
+            onChange={(event) => setTargetClassroomId(event.target.value)}
+            disabled={busy}
+          >
+            <option value="">학급 연결 없음</option>
+            {classrooms.map((classroom) => (
+              <option key={classroom.id} value={classroom.id}>
+                {classroom.name} (학생 {classroom.studentCount}명)
+              </option>
+            ))}
+          </select>
+        </>
+      )}
+
+      <div className="stream-guidance-actions">
+        <button
+          type="button"
+          className="stream-guidance-save"
+          onClick={() => void createBreakout()}
+          disabled={busy}
+        >
+          {busy ? "만드는 중..." : "브레이크아웃 만들기"}
+        </button>
+        {status && (
+          <span className="stream-guidance-error" aria-live="polite">
+            {status}
+          </span>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function normalizeThumbnailMode(value: string | null | undefined): ThumbnailMode {
-  if (value === "none" || value === "custom") return value;
+  if (value === "custom") return value;
   return "default";
 }

@@ -1,16 +1,25 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { createPortal } from "react-dom";
 import type { AddCardData } from "./AddCardModal";
 import type { CardData } from "./DraggableCard";
+import { SectionActionsPanel } from "./SectionActionsPanel";
 import { StreamComposer } from "./stream/StreamComposer";
 import { StreamPost } from "./stream/StreamPost";
 import { useCardRealtime } from "@/hooks/useCardRealtime";
+import { sortSections } from "@/lib/sort-sections";
 import {
   useBoardSlideshow,
   type SlideshowSlide,
 } from "./slideshow/BoardSlideshowProvider";
+
+export type StreamSection = {
+  id: string;
+  title: string;
+  order: number;
+  pinned: boolean;
+};
 
 type Props = {
   boardId: string;
@@ -21,6 +30,8 @@ type Props = {
   classroomId?: string | null;
   streamTitlePrompt?: string;
   streamContentPrompt?: string;
+  initialSections?: StreamSection[];
+  streamSectionsEnabled?: boolean;
 };
 
 export function StreamBoard({
@@ -31,10 +42,23 @@ export function StreamBoard({
   isStudentViewer,
   streamTitlePrompt,
   streamContentPrompt,
+  initialSections = [],
+  streamSectionsEnabled = false,
 }: Props) {
   const [cards, setCards] = useState<CardData[]>(() => sortPosts(initialCards));
+  const [sections, setSections] = useState<StreamSection[]>(() =>
+    [...initialSections].sort(sortSections),
+  );
   const [composerOpen, setComposerOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
+  const [panelState, setPanelState] = useState<{
+    sectionId: string;
+    tab: "rename" | "delete";
+  } | null>(null);
+  const [isAddingSection, setIsAddingSection] = useState(false);
+  const [newSectionTitle, setNewSectionTitle] = useState("");
+  const [sectionAddBusy, setSectionAddBusy] = useState(false);
+  const [sectionAddError, setSectionAddError] = useState<string | null>(null);
   const canEdit = currentRole === "owner" || currentRole === "editor";
   const canAddPost = canEdit || !!isStudentViewer;
 
@@ -48,20 +72,71 @@ export function StreamBoard({
     setMounted(true);
   }, []);
 
+  const sortedSections = useMemo(
+    () => [...sections].sort(sortSections),
+    [sections],
+  );
+
+  // Group cards by section. Unsectioned cards (null/unknown sectionId)
+  // land in the "" bucket, rendered last as "섹션 없음".
+  const grouped = useMemo(() => {
+    const bySection = new Map<string, CardData[]>();
+    const unsectioned: CardData[] = [];
+    const knownIds = new Set(sortedSections.map((s) => s.id));
+    for (const card of cards) {
+      const sid = card.sectionId ?? null;
+      if (sid && knownIds.has(sid)) {
+        const bucket = bySection.get(sid);
+        if (bucket) bucket.push(card);
+        else bySection.set(sid, [card]);
+      } else {
+        unsectioned.push(card);
+      }
+    }
+    return { bySection, unsectioned };
+  }, [cards, sortedSections]);
+
+  const sectionOptions = useMemo(
+    () => sortedSections.map((s) => ({ id: s.id, title: s.title })),
+    [sortedSections],
+  );
+
   // Register the sorted feed as slideshow slides so the board header
-  // button can open a presentation overlay. Reactive to realtime polling,
-  // local add, and delete because `cards` is the sorted state.
+  // button can open a presentation overlay. When sections are enabled,
+  // insert a section-title slide before each section group.
   const { registerSlides, unregisterSlides } = useBoardSlideshow();
   useEffect(() => {
-    const slides: SlideshowSlide[] = cards.map((card) => ({
-      id: card.id,
-      card,
-    }));
+    const slides: SlideshowSlide[] = [];
+    if (streamSectionsEnabled) {
+      for (const section of sortedSections) {
+        const bucket = grouped.bySection.get(section.id) ?? [];
+        slides.push({
+          id: `section:${section.id}`,
+          kind: "section",
+          sectionId: section.id,
+          sectionTitle: section.title,
+        });
+        for (const card of bucket) slides.push({ id: card.id, kind: "card", card });
+      }
+      if (grouped.unsectioned.length > 0) {
+        slides.push({
+          id: "section:none",
+          kind: "section",
+          sectionId: null,
+          sectionTitle: "섹션 없음",
+        });
+        for (const card of grouped.unsectioned) {
+          slides.push({ id: card.id, kind: "card", card });
+        }
+      }
+    } else {
+      for (const card of cards) slides.push({ id: card.id, kind: "card", card });
+    }
     registerSlides("stream", slides);
     return () => {
       unregisterSlides("stream");
     };
-  }, [cards, registerSlides, unregisterSlides]);
+  }, [cards, sortedSections, grouped, streamSectionsEnabled, registerSlides, unregisterSlides]);
 
   async function handleAdd(data: AddCardData) {
     const res = await fetch("/api/cards", {
@@ -79,6 +154,7 @@ export function StreamBoard({
         x: 0,
         y: 0,
         order: cards.length,
+        sectionId: data.sectionId ?? null,
       }),
     });
     if (!res.ok) {
@@ -106,13 +182,91 @@ export function StreamBoard({
     }
   }
 
+  function startAddSection() {
+    setIsAddingSection(true);
+    setSectionAddError(null);
+  }
+
+  function cancelAddSection() {
+    if (sectionAddBusy) return;
+    setIsAddingSection(false);
+    setNewSectionTitle("");
+    setSectionAddError(null);
+  }
+
+  async function handleAddSection(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const title = newSectionTitle.trim();
+    if (!title) {
+      setSectionAddError("섹션 이름을 입력하세요.");
+      return;
+    }
+
+    setSectionAddBusy(true);
+    setSectionAddError(null);
+    try {
+      const res = await fetch("/api/sections", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ boardId, title }),
+      });
+      if (!res.ok) {
+        setSectionAddError("섹션 추가에 실패했어요.");
+        return;
+      }
+      const { section } = (await res.json()) as { section: StreamSection };
+      setSections((prev) => [...prev, section].sort(sortSections));
+      setNewSectionTitle("");
+      setIsAddingSection(false);
+    } catch {
+      setSectionAddError("섹션 추가에 실패했어요.");
+    } finally {
+      setSectionAddBusy(false);
+    }
+  }
+
+  function handleSectionRenamed(sectionId: string, newTitle: string) {
+    setSections((list) =>
+      list.map((s) => (s.id === sectionId ? { ...s, title: newTitle } : s)),
+    );
+  }
+
+  function handleSectionDeleted(sectionId: string) {
+    setSections((list) => list.filter((s) => s.id !== sectionId));
+    setCards((list) => list.filter((c) => c.sectionId !== sectionId));
+  }
+
+  const showComposerSections =
+    streamSectionsEnabled && sectionOptions.length > 0;
+
   return (
     <div className="board-canvas-wrap stream-board-wrap">
       <div className="stream-feed">
-        {cards.length === 0 ? (
+        {cards.length === 0 && !streamSectionsEnabled ? (
           <div className="stream-empty">
             {canAddPost ? "첫 게시글을 남겨보세요." : "아직 게시글이 없어요."}
           </div>
+        ) : streamSectionsEnabled ? (
+          <StreamGroupedFeed
+            sections={sortedSections}
+            grouped={grouped}
+            canEdit={canEdit}
+            currentUserId={currentUserId}
+            currentRole={currentRole}
+            canAddPost={canAddPost}
+            isAddingSection={isAddingSection}
+            newSectionTitle={newSectionTitle}
+            sectionAddBusy={sectionAddBusy}
+            sectionAddError={sectionAddError}
+            onStartAddSection={startAddSection}
+            onCancelAddSection={cancelAddSection}
+            onSectionTitleChange={setNewSectionTitle}
+            onSubmitSection={handleAddSection}
+            onOpenSectionPanel={(sectionId, tab) =>
+              setPanelState({ sectionId, tab })
+            }
+            onDeleteCard={handleDelete}
+          />
         ) : (
           cards.map((card) => (
             <StreamPost
@@ -178,6 +332,7 @@ export function StreamBoard({
                       onSubmitted={() => setComposerOpen(false)}
                       streamTitlePrompt={streamTitlePrompt}
                       streamContentPrompt={streamContentPrompt}
+                      sections={showComposerSections ? sectionOptions : undefined}
                     />
                   </div>
                 </div>
@@ -186,7 +341,175 @@ export function StreamBoard({
             )}
         </>
       )}
+
+      {panelState &&
+        (() => {
+          const section = sections.find((s) => s.id === panelState.sectionId);
+          if (!section) return null;
+          return (
+            <SectionActionsPanel
+              open={true}
+              onClose={() => setPanelState(null)}
+              section={{ id: section.id, title: section.title }}
+              currentRole={currentRole}
+              defaultTab={panelState.tab}
+              onRenamed={(t) => handleSectionRenamed(section.id, t)}
+              onDeleted={() => handleSectionDeleted(section.id)}
+            />
+          );
+        })()}
     </div>
+  );
+}
+
+type StreamGroupedFeedProps = {
+  sections: StreamSection[];
+  grouped: { bySection: Map<string, CardData[]>; unsectioned: CardData[] };
+  canEdit: boolean;
+  currentUserId: string;
+  currentRole: "owner" | "editor" | "viewer";
+  canAddPost: boolean;
+  isAddingSection: boolean;
+  newSectionTitle: string;
+  sectionAddBusy: boolean;
+  sectionAddError: string | null;
+  onStartAddSection: () => void;
+  onCancelAddSection: () => void;
+  onSectionTitleChange: (title: string) => void;
+  onSubmitSection: (event: FormEvent<HTMLFormElement>) => void;
+  onOpenSectionPanel: (sectionId: string, tab: "rename" | "delete") => void;
+  onDeleteCard: (card: CardData) => void;
+};
+
+function StreamGroupedFeed({
+  sections,
+  grouped,
+  canEdit,
+  currentUserId,
+  currentRole,
+  canAddPost,
+  isAddingSection,
+  newSectionTitle,
+  sectionAddBusy,
+  sectionAddError,
+  onStartAddSection,
+  onCancelAddSection,
+  onSectionTitleChange,
+  onSubmitSection,
+  onOpenSectionPanel,
+  onDeleteCard,
+}: StreamGroupedFeedProps) {
+  const hasAnyCard =
+    grouped.unsectioned.length > 0 ||
+    sections.some((s) => (grouped.bySection.get(s.id) ?? []).length > 0);
+
+  return (
+    <>
+      {canEdit && (
+        <div className="stream-section-add-row">
+          {isAddingSection ? (
+            <form className="stream-section-add-form" onSubmit={onSubmitSection}>
+              <input
+                type="text"
+                value={newSectionTitle}
+                onChange={(event) => onSectionTitleChange(event.target.value)}
+                placeholder="섹션 이름"
+                className="stream-section-add-input"
+                maxLength={80}
+                autoFocus
+                disabled={sectionAddBusy}
+              />
+              <button
+                type="submit"
+                className="stream-section-add-submit"
+                disabled={sectionAddBusy}
+              >
+                추가
+              </button>
+              <button
+                type="button"
+                className="stream-section-add-cancel"
+                onClick={onCancelAddSection}
+                disabled={sectionAddBusy}
+              >
+                취소
+              </button>
+              {sectionAddError && (
+                <span className="stream-section-add-error" role="alert">
+                  {sectionAddError}
+                </span>
+              )}
+            </form>
+          ) : (
+            <button
+              type="button"
+              className="column-add-btn stream-section-add-btn"
+              onClick={onStartAddSection}
+            >
+              + 섹션 추가
+            </button>
+          )}
+        </div>
+      )}
+
+      {sections.map((section) => {
+        const bucket = grouped.bySection.get(section.id) ?? [];
+        return (
+          <section key={section.id} className="stream-section-group">
+            <header className="stream-section-header">
+              <h2 className="stream-section-title">{section.title}</h2>
+              {canEdit && (
+                <div className="stream-section-menu">
+                  <button
+                    type="button"
+                    className="stream-section-menu-toggle"
+                    aria-label="섹션 옵션"
+                    onClick={() => onOpenSectionPanel(section.id, "rename")}
+                  >
+                    ⋯
+                  </button>
+                </div>
+              )}
+            </header>
+            {bucket.length === 0 ? (
+              <div className="stream-section-empty">아직 게시글이 없어요.</div>
+            ) : (
+              bucket.map((card) => (
+                <StreamPost
+                  key={card.id}
+                  card={card}
+                  canDelete={canDeleteCard(card, currentUserId, currentRole)}
+                  onDelete={() => onDeleteCard(card)}
+                />
+              ))
+            )}
+          </section>
+        );
+      })}
+
+      {grouped.unsectioned.length > 0 && (
+        <section className="stream-section-group stream-section-group-unsectioned">
+          <header className="stream-section-header">
+            <h2 className="stream-section-title">섹션 없음</h2>
+          </header>
+          {grouped.unsectioned.map((card) => (
+            <StreamPost
+              key={card.id}
+              card={card}
+              canDelete={canDeleteCard(card, currentUserId, currentRole)}
+              onDelete={() => onDeleteCard(card)}
+            />
+          ))}
+        </section>
+      )}
+
+      {!hasAnyCard && !canEdit && (
+        <div className="stream-empty">아직 게시글이 없어요.</div>
+      )}
+      {!hasAnyCard && canEdit && canAddPost && (
+        <div className="stream-empty">첫 게시글을 남겨보세요.</div>
+      )}
+    </>
   );
 }
 

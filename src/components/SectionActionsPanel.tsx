@@ -213,8 +213,7 @@ function SectionDeleteForm({
   return (
     <div className="section-delete-confirm">
       <p id={descId}>
-        이 섹션을 삭제합니다. 섹션에 있던 카드는{" "}
-        <strong>&quot;섹션 없음&quot;</strong> 상태로 이동합니다.
+        이 섹션을 삭제합니다. 섹션에 있던 카드도 함께 삭제됩니다.
       </p>
       <label className="checkbox-row">
         <input

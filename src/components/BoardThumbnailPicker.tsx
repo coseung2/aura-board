@@ -1,11 +1,12 @@
 "use client";
 
 import { useState, useRef } from "react";
-import { layoutEmoji, layoutThumbnail } from "@/lib/layout-meta";
+import { layoutThumbnail } from "@/lib/layout-meta";
 import { uploadFile } from "@/lib/upload-client";
-import { SegmentedControl } from "./ui/SegmentedControl";
 
-export type ThumbnailMode = "default" | "none" | "custom";
+export type ThumbnailMode = "default" | "custom";
+
+const FALLBACK_THUMBNAIL = "/board-type-thumbnails/card-board.png";
 
 type Props = {
   layout: string;
@@ -15,15 +16,8 @@ type Props = {
   disabled?: boolean;
 };
 
-const MODE_OPTIONS: { value: ThumbnailMode; label: string }[] = [
-  { value: "default", label: "기본 이미지" },
-  { value: "custom", label: "직접 업로드" },
-  { value: "none", label: "아이콘" },
-];
-
 export function BoardThumbnailPicker({
   layout,
-  mode,
   url,
   onChange,
   disabled,
@@ -32,9 +26,8 @@ export function BoardThumbnailPicker({
   const [error, setError] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const previewSrc =
-    mode === "custom" && url ? url : mode === "none" ? null : layoutThumbnail(layout);
-  const previewEmoji = layoutEmoji(layout);
+  const previewSrc = url ?? layoutThumbnail(layout) ?? FALLBACK_THUMBNAIL;
+  const busy = disabled || uploadBusy;
 
   async function handleFile(file: File) {
     setUploadBusy(true);
@@ -51,60 +44,34 @@ export function BoardThumbnailPicker({
 
   return (
     <div className="board-thumbnail-picker">
-      <div className="board-thumbnail-preview">
-        {previewSrc ? (
-          <img src={previewSrc} alt="보드 썸네일 미리보기" />
-        ) : (
-          <span aria-hidden="true">{previewEmoji}</span>
-        )}
-      </div>
-
-      <SegmentedControl
-        value={mode}
-        onChange={(next) => onChange({ mode: next, url })}
-        options={MODE_OPTIONS}
-        ariaLabel="썸네일 표시 방식"
-        disabled={disabled || uploadBusy}
-      />
-
-      {mode === "custom" && (
-        <div className="board-thumbnail-upload">
-          {url ? (
-            <div className="board-thumbnail-uploaded">
-              <img src={url} alt="업로드된 썸네일" />
-              <button
-                type="button"
-                className="board-thumbnail-remove"
-                onClick={() => onChange({ mode: "custom", url: null })}
-                disabled={disabled || uploadBusy}
-              >
-                제거
-              </button>
-            </div>
-          ) : (
-            <label className={`modal-file-drop${uploadBusy ? " is-disabled" : ""}`}>
-              <input
-                ref={inputRef}
-                type="file"
-                accept="image/*"
-                onChange={(e) => {
-                  const file = e.target.files?.[0];
-                  if (file) void handleFile(file);
-                  if (inputRef.current) inputRef.current.value = "";
-                }}
-                disabled={disabled || uploadBusy}
-                hidden
-              />
-              <span className="modal-file-drop-icon" aria-hidden="true">
-                {uploadBusy ? "⏳" : "📎"}
-              </span>
-              <span>
-                {uploadBusy ? "업로드 중..." : "이미지를 선택하세요"}
-              </span>
-            </label>
-          )}
+      <div className="board-thumbnail-preview board-thumbnail-preview--upload">
+        <img src={previewSrc} alt="보드 썸네일 미리보기" />
+        <div className="board-thumbnail-overlay">
+          <p className="board-thumbnail-help">
+            이미지를 올리지 않으면 기본 이미지로 적용됩니다.
+          </p>
+          <button
+            type="button"
+            className="board-thumbnail-upload-btn"
+            onClick={() => inputRef.current?.click()}
+            disabled={busy}
+          >
+            <span>{uploadBusy ? "업로드 중..." : "이미지 업로드"}</span>
+          </button>
         </div>
-      )}
+        <input
+          ref={inputRef}
+          type="file"
+          accept="image/*"
+          onChange={(e) => {
+            const file = e.target.files?.[0];
+            if (file) void handleFile(file);
+            if (inputRef.current) inputRef.current.value = "";
+          }}
+          disabled={busy}
+          hidden
+        />
+      </div>
 
       {error && <p className="board-settings-error">{error}</p>}
     </div>

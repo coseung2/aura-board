@@ -143,7 +143,7 @@
 .stream-composer-resize-handle {
   position: absolute;
   right: 2px;
-  bottom: 5px;
+  bottom: -2px;
   width: 18px;
   height: 18px;
   padding: 0;
@@ -159,7 +159,7 @@
   content: "";
   position: absolute;
   right: 3px;
-  bottom: 3px;
+  bottom: 1px;
   width: 11px;
   height: 11px;
   background:
@@ -286,6 +286,8 @@
 .stream-composer-actions button,
 .stream-comment-form button,
 .stream-post-menu-popover button {
+  box-sizing: border-box;
+  height: 40px;
   border: 1px solid var(--color-border);
   background: var(--color-surface);
   color: var(--color-text);
@@ -451,15 +453,27 @@
   position: absolute;
   top: 50%;
   transform: translateY(-50%);
-  width: 36px;
-  height: 36px;
+  width: 44px;
+  height: 44px;
   border: 0;
-  border-radius: 50%;
-  background: rgb(15 23 42 / 0.62);
-  color: white;
-  font-size: 28px;
+  border-radius: 0;
+  background: transparent;
+  color: #fff;
+  font-size: 34px;
   line-height: 1;
   cursor: pointer;
+  mix-blend-mode: difference;
+  text-shadow: none;
+  transition: transform 150ms ease, opacity 150ms ease;
+}
+
+.stream-media-nav:hover {
+  transform: translateY(-50%) scale(1.08);
+}
+
+.stream-media-nav:focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: 4px;
 }
 
 .stream-media-prev {
@@ -3292,29 +3306,28 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 42px;
-  height: 42px;
+  width: 44px;
+  height: 44px;
   border: 0;
-  border-radius: 50%;
-  background: rgba(255, 255, 255, 0.92);
-  color: var(--color-text);
-  box-shadow: 0 4px 16px rgba(15, 23, 42, 0.16);
+  border-radius: 0;
+  background: transparent;
+  color: #fff;
+  box-shadow: none;
+  mix-blend-mode: difference;
   transform: translateY(-50%);
   opacity: 0;
   pointer-events: none;
   cursor: pointer;
-  transition:
-    opacity 160ms ease,
-    background 150ms ease;
+  transition: opacity 160ms ease, transform 150ms ease;
 }
 
 .slideshow-media-nav:hover {
-  background: #fff;
+  transform: translateY(-50%) scale(1.08);
 }
 
 .slideshow-media-nav:focus-visible {
-  outline: 2px solid var(--color-accent);
-  outline-offset: 2px;
+  outline: 2px solid currentColor;
+  outline-offset: 4px;
 }
 
 .slideshow-media-prev {
@@ -3419,38 +3432,35 @@
 }
 
 .slideshow-nav {
-  width: 48px;
-  height: 48px;
+  width: 44px;
+  height: 44px;
   border: 0;
-  border-radius: 50%;
-  background: var(--color-surface);
-  color: var(--color-text);
+  border-radius: 0;
+  background: transparent;
+  color: #fff;
   font-size: 24px;
   line-height: 1;
   cursor: pointer;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 2px 12px rgba(15, 23, 42, 0.1);
-  transition:
-    background 150ms ease,
-    box-shadow 150ms ease;
+  box-shadow: none;
+  mix-blend-mode: difference;
+  transition: opacity 150ms ease, transform 150ms ease;
 }
 
 .slideshow-nav:hover:not(:disabled) {
-  background: var(--color-surface-alt);
-  box-shadow: 0 4px 18px rgba(15, 23, 42, 0.16);
+  transform: scale(1.08);
 }
 
 .slideshow-nav:focus-visible {
-  outline: 2px solid var(--color-accent);
-  outline-offset: 2px;
+  outline: 2px solid currentColor;
+  outline-offset: 4px;
 }
 
 .slideshow-nav:disabled {
   opacity: 0.35;
   cursor: not-allowed;
-  box-shadow: none;
 }
 
 /* Tablet: stacked layout — media on top, text below. */
@@ -3530,11 +3540,6 @@
     padding: 12px;
   }
 
-  .slideshow-media-nav {
-    width: 36px;
-    height: 36px;
-  }
-
   .slideshow-media-prev {
     left: 8px;
   }
@@ -3547,10 +3552,10 @@
     max-width: calc(100vw - 128px);
   }
 
-  .slideshow-nav {
-    width: 42px;
-    height: 42px;
-    font-size: 22px;
+  .slideshow-nav,
+  .slideshow-media-nav {
+    width: 40px;
+    height: 40px;
   }
 }
 
@@ -3710,4 +3715,230 @@
 .stream-guidance-error {
   font-size: 12px;
   color: var(--color-danger);
+}
+
+/* ── Stream section grouping (streamSectionsEnabled) ─────────────── */
+
+.stream-section-add-row {
+  display: flex;
+  justify-content: flex-end;
+  padding: 4px 0 12px;
+}
+
+.stream-section-add-btn {
+  font-size: 13px;
+}
+
+.stream-section-add-form {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 8px;
+  width: min(100%, 520px);
+}
+
+.stream-section-add-input {
+  flex: 1 1 180px;
+  min-width: 0;
+  height: 36px;
+  padding: 0 11px;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: var(--color-surface);
+  color: var(--color-text);
+  font-size: 14px;
+}
+
+.stream-section-add-input:focus {
+  outline: 2px solid var(--color-accent-tinted-text);
+  outline-offset: 1px;
+}
+
+.stream-section-add-submit,
+.stream-section-add-cancel {
+  height: 36px;
+  padding: 0 12px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.stream-section-add-submit {
+  border: 1px solid var(--color-accent);
+  background: var(--color-accent);
+  color: #fff;
+}
+
+.stream-section-add-cancel {
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-text-muted);
+}
+
+.stream-section-add-submit:disabled,
+.stream-section-add-cancel:disabled,
+.stream-section-add-input:disabled {
+  cursor: wait;
+  opacity: 0.65;
+}
+
+.stream-section-add-error {
+  flex: 1 0 100%;
+  color: var(--color-danger);
+  font-size: 12px;
+  text-align: right;
+}
+
+.stream-section-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  margin-bottom: 28px;
+}
+
+.stream-section-group:last-child {
+  margin-bottom: 0;
+}
+
+.stream-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 6px 4px 14px;
+}
+
+.stream-section-title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 20px;
+  font-weight: 800;
+  letter-spacing: 0;
+  color: var(--color-accent);
+  word-break: break-word;
+}
+
+.stream-section-menu-toggle {
+  width: 30px;
+  height: 30px;
+  border: 1px solid var(--color-border);
+  border-radius: 50%;
+  background: var(--color-surface);
+  color: var(--color-text-muted);
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 150ms ease, border-color 150ms ease;
+}
+
+.stream-section-menu-toggle:hover,
+.stream-section-menu-toggle:focus-visible {
+  background: var(--color-surface-alt);
+  border-color: var(--color-border-hover);
+  color: var(--color-text);
+  outline: none;
+}
+
+.stream-section-empty {
+  padding: 18px;
+  border: 1px dashed var(--color-border);
+  border-radius: 8px;
+  color: var(--color-text-faint);
+  font-size: 13px;
+  text-align: center;
+}
+
+/* ── Stream composer section dropdown ────────────────────────────── */
+
+.stream-composer-section-field {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1 1 220px;
+  margin-left: 4px;
+  min-width: 0;
+}
+
+.stream-composer-section-label {
+  font-size: 15px;
+  font-weight: 800;
+  color: var(--color-text);
+  white-space: nowrap;
+}
+
+.stream-composer-section-select {
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 180px;
+  height: 40px;
+  padding: 8px 34px 8px 10px;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: var(--color-surface);
+  background-image:
+    linear-gradient(45deg, transparent 50%, #6f7569 50%),
+    linear-gradient(135deg, #6f7569 50%, transparent 50%);
+  background-position:
+    calc(100% - 16px) 50%,
+    calc(100% - 11px) 50%;
+  background-size:
+    5px 5px,
+    5px 5px;
+  background-repeat: no-repeat;
+  color: var(--color-text);
+  font-size: 14px;
+  cursor: pointer;
+  appearance: none;
+}
+
+.stream-composer-section-select:focus {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 1px;
+}
+
+.stream-composer-section-select:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* ── Slideshow section-title slide ───────────────────────────────── */
+
+.slideshow-overlay-section {
+  background: #ffffff;
+}
+
+.slideshow-section-stage {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 48px 64px;
+  text-align: center;
+  min-height: 0;
+}
+
+.slideshow-section-title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 64px;
+  font-weight: 800;
+  line-height: 1.15;
+  letter-spacing: 0;
+  color: var(--color-accent);
+  word-break: break-word;
+}
+
+@media (max-width: 640px) {
+  .slideshow-section-stage {
+    padding: 36px 24px;
+  }
+
+  .slideshow-section-title {
+    font-size: 38px;
+  }
 }

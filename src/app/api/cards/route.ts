@@ -337,6 +337,23 @@ export async function POST(req: Request) {
       }
     }
 
+    // stream board sections: reject sectionId values that do not belong to
+    // the target board. Returns 422 (Unprocessable Entity) so the client
+    // can distinguish this from a generic 400/404 and surface a clear
+    // "section does not belong to this board" error.
+    if (input.sectionId) {
+      const section = await db.section.findUnique({
+        where: { id: input.sectionId },
+        select: { boardId: true },
+      });
+      if (!section || section.boardId !== input.boardId) {
+        return NextResponse.json(
+          { error: "sectionId does not belong to boardId" },
+          { status: 422 },
+        );
+      }
+    }
+
     const attachmentRows = input.attachments
       ? await Promise.all(
           input.attachments.map(async (a, idx) => ({

@@ -15,7 +15,10 @@ import { StreamSlideshowOverlay } from "./StreamSlideshowOverlay";
 
 export type SlideshowSlide = {
   id: string;
-  card: CardData;
+  kind?: "card" | "section";
+  card?: CardData;
+  sectionId?: string | null;
+  sectionTitle?: string;
 };
 
 type SlideshowContextValue = {

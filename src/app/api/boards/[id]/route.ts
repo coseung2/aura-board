@@ -11,6 +11,7 @@ const PatchBoardSchema = z.object({
   classroomId: z.string().nullable().optional(),
   streamTitlePrompt: z.string().max(200).optional(),
   streamContentPrompt: z.string().max(1000).optional(),
+  streamSectionsEnabled: z.boolean().optional(),
   thumbnailMode: z.enum(["default", "none", "custom"]).optional(),
   // Public image URL for board thumbnail. Used when thumbnailMode="custom";
   // empty/null is normalized to null. custom+null is accepted so the client

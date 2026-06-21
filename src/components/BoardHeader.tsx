@@ -32,6 +32,7 @@ type Props = {
   shareShortCode?: string | null;
   streamTitlePrompt?: string;
   streamContentPrompt?: string;
+  streamSectionsEnabled?: boolean;
 };
 
 export function BoardHeader({
@@ -53,6 +54,7 @@ export function BoardHeader({
   shareShortCode,
   streamTitlePrompt,
   streamContentPrompt,
+  streamSectionsEnabled,
 }: Props) {
   const [showQr, setShowQr] = useState(false);
   const isShared = shareMode && shareMode !== "private" && !!shareToken;
@@ -90,6 +92,7 @@ export function BoardHeader({
             shareShortCode={shareShortCode}
             streamTitlePrompt={streamTitlePrompt ?? ""}
             streamContentPrompt={streamContentPrompt ?? ""}
+            streamSectionsEnabled={streamSectionsEnabled}
           />
         )}
         {canOpen && (

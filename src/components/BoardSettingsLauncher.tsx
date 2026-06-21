@@ -27,6 +27,7 @@ type Props = {
   shareShortCode?: string | null;
   streamTitlePrompt?: string;
   streamContentPrompt?: string;
+  streamSectionsEnabled?: boolean;
 };
 
 export function BoardSettingsLauncher({
@@ -45,6 +46,7 @@ export function BoardSettingsLauncher({
   shareShortCode,
   streamTitlePrompt,
   streamContentPrompt,
+  streamSectionsEnabled,
 }: Props) {
   const [open, setOpen] = useState(false);
 
@@ -79,6 +81,7 @@ export function BoardSettingsLauncher({
           initialShareShortCode={shareShortCode}
           initialStreamTitlePrompt={streamTitlePrompt ?? ""}
           initialStreamContentPrompt={streamContentPrompt ?? ""}
+          initialStreamSectionsEnabled={streamSectionsEnabled ?? false}
         />
       )}
     </>

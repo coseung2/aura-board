@@ -91,9 +91,7 @@ export function CreateBoardModal({
           thumbnailMode:
             thumbnailMode === "custom" && thumbnailUrl
               ? "custom"
-              : thumbnailMode === "none"
-                ? "none"
-                : "default",
+              : "default",
           thumbnailUrl:
             thumbnailMode === "custom" && thumbnailUrl ? thumbnailUrl : null,
         }),

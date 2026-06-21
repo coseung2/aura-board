@@ -54,7 +54,9 @@ export function StreamSlideshowOverlay({
   const total = slides.length;
   const safeIndex = Math.min(index, total - 1);
   const slide = slides[safeIndex];
-  const mediaItems = slide ? buildSlideshowMedia(slide.card) : [];
+  const isSectionSlide = slide?.kind === "section";
+  const mediaItems =
+    slide && slide.card ? buildSlideshowMedia(slide.card) : [];
 
   const go = useCallback(
     (next: number) => {
@@ -97,6 +99,87 @@ export function StreamSlideshowOverlay({
   if (!mounted || !slide) return null;
 
   const card = slide.card;
+  // Section-title slides render a large centered title and skip media/author.
+  if (isSectionSlide) {
+    return createPortal(
+      <div
+        className={`slideshow-overlay slideshow-overlay-section ${
+          controlsVisible ? "is-controls-visible" : ""
+        }`}
+        role="dialog"
+        aria-modal="true"
+        aria-label="섹션 제목 슬라이드"
+        onPointerMove={revealControls}
+        onPointerDown={revealControls}
+        onFocusCapture={revealControls}
+      >
+        <div className="slideshow-topbar">
+          <div className="slideshow-meta">
+            <span className="slideshow-meta-app">Aura Board</span>
+            <span className="slideshow-meta-sep" aria-hidden="true">·</span>
+            <span className="slideshow-meta-author">섹션</span>
+          </div>
+          <div className="slideshow-topbar-right">
+            <span className="slideshow-position" aria-live="polite">
+              {safeIndex + 1} / {total}
+            </span>
+            <button
+              type="button"
+              className="slideshow-close"
+              onClick={onClose}
+              aria-label="슬라이드쇼 닫기"
+            >
+              <CloseIcon size={18} />
+            </button>
+          </div>
+        </div>
+        <div className="slideshow-section-stage">
+          <h2 className="slideshow-section-title">
+            {slide.sectionTitle ?? "섹션"}
+          </h2>
+        </div>
+        <div className="slideshow-controls">
+          <button
+            type="button"
+            className="slideshow-nav slideshow-prev"
+            onClick={() => go(safeIndex - 1)}
+            disabled={total <= 1}
+            aria-label="이전 슬라이드"
+          >
+            <ChevronLeftIcon size={24} />
+          </button>
+          <div
+            className="slideshow-slide-indicators"
+            aria-label={`슬라이드 ${safeIndex + 1} / ${total}`}
+          >
+            {slides.map((item, i) => (
+              <button
+                key={item.id}
+                type="button"
+                className={i === safeIndex ? "is-active" : ""}
+                aria-label={`${i + 1}번째 슬라이드 보기`}
+                aria-current={i === safeIndex ? "true" : undefined}
+                onClick={() => onIndexChange(i)}
+              />
+            ))}
+          </div>
+          <button
+            type="button"
+            className="slideshow-nav slideshow-next"
+            onClick={() => go(safeIndex + 1)}
+            disabled={total <= 1}
+            aria-label="다음 슬라이드"
+          >
+            <ChevronRightIcon size={24} />
+          </button>
+        </div>
+      </div>,
+      document.body,
+    );
+  }
+
+  if (!card) return null;
+
   const author = getStreamAuthor(card);
   const activeMediaIndex = Math.min(mediaIndex, Math.max(0, mediaItems.length - 1));
   const activeMediaItem = mediaItems[activeMediaIndex];
