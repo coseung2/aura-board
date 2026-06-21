@@ -315,7 +315,8 @@ model Board {
   slug          String   @unique
   title         String
   layout        String   @default("freeform")
-  thumbnailMode String   @default("default") // "default" | "none"
+  thumbnailMode String   @default("default") // "default" | "none" | "custom"
+  thumbnailUrl  String? // public image URL used when thumbnailMode="custom"
   description   String   @default("")
   classroomId   String?
   createdAt     DateTime @default(now())

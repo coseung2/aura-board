@@ -123,6 +123,16 @@ export function CardDetailModal({
   // (Variant C 스타일 슬라이드 + 본문 정돈).
   const slideTitleSize = "clamp(20px, 2.4vw, 28px)";
   const slideBodySize = "15px";
+  const contentText = (card.content ?? "").trim();
+  const shouldShowLinkBody = Boolean(
+    hasTextLink &&
+      (card.linkTitle || card.linkDesc) &&
+      !contentStartsWithLinkPreview(
+        contentText,
+        card.linkTitle,
+        card.linkDesc
+      )
+  );
 
   return (
     <>
@@ -141,14 +151,16 @@ export function CardDetailModal({
         data-fullscreen={isFullscreen ? "true" : "false"}
         onClick={(e) => e.stopPropagation()}
       >
-        <button
-          type="button"
-          className="modal-close card-detail-close"
-          onClick={onClose}
-          aria-label="닫기"
-        >
-          <CloseIcon size={18} />
-        </button>
+        <div className="card-detail-topbar">
+          <button
+            type="button"
+            className="modal-close card-detail-close"
+            onClick={onClose}
+            aria-label="닫기"
+          >
+            <CloseIcon size={18} />
+          </button>
+        </div>
         <button
           type="button"
           className="card-detail-fullscreen"
@@ -194,7 +206,7 @@ export function CardDetailModal({
                     {card.title}
                   </h2>
                 )}
-                {hasTextLink && (card.linkTitle || card.linkDesc) && (
+                {shouldShowLinkBody && (
                   <div
                     className="card-detail-link-body"
                     style={{ fontSize: slideBodySize, lineHeight: 1.7 }}
@@ -313,6 +325,25 @@ export function CardDetailModal({
       </div>
     </>
   );
+}
+
+function contentStartsWithLinkPreview(
+  content: string,
+  title: string | null | undefined,
+  description: string | null | undefined
+): boolean {
+  const contentText = normalizePreviewText(content);
+  const titleText = normalizePreviewText(title ?? "");
+  const descText = normalizePreviewText(description ?? "");
+  const previewText = [titleText, descText].filter(Boolean).join(" ");
+  return Boolean(previewText && contentText.startsWith(previewText));
+}
+
+function normalizePreviewText(value: string): string {
+  return value
+    .replace(/\*\*(.*?)\*\*/g, "$1")
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
 // meta-download-zone (2026-06-13): 본문(content)을 Notion 스타일로 렌더.

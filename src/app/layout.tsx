@@ -8,7 +8,7 @@ import "./globals.css";
 export const metadata: Metadata = {
   title: "Aura-board",
   description: "Classroom workspace",
-  metadataBase: new URL("https://aura-teacher.com"),
+  metadataBase: new URL("https://aura-board.com"),
   icons: {
     icon: "/aura-app-icon-512.png",
     apple: "/aura-app-icon-512.png",
@@ -16,7 +16,7 @@ export const metadata: Metadata = {
   openGraph: {
     title: "Aura-board",
     description: "Classroom workspace",
-    url: "https://aura-teacher.com",
+    url: "https://aura-board.com",
     siteName: "Aura-board",
     images: [
       {

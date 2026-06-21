@@ -15,6 +15,7 @@ export interface SegmentedControlProps<T extends string> {
   onChange: (next: T) => void;
   options: readonly SegmentedOption<T>[];
   ariaLabel: string;
+  disabled?: boolean;
 }
 
 export function SegmentedControl<T extends string>({
@@ -22,6 +23,7 @@ export function SegmentedControl<T extends string>({
   onChange,
   options,
   ariaLabel,
+  disabled = false,
 }: SegmentedControlProps<T>) {
   const groupId = useId();
   return (
@@ -40,6 +42,7 @@ export function SegmentedControl<T extends string>({
             type="button"
             role="radio"
             aria-checked={checked}
+            disabled={disabled}
             className={`segmented-control-item${checked ? " is-active" : ""}`}
             onClick={() => onChange(opt.value)}
           >

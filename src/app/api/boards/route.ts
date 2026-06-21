@@ -38,7 +38,15 @@ const CreateBoardSchema = z.object({
   ]),
   description: z.string().max(2000).default(""),
   classroomId: z.string().optional(),
-  thumbnailMode: z.enum(["default", "none"]).default("default"),
+  thumbnailMode: z.enum(["default", "none", "custom"]).default("default"),
+  // Public image URL for board thumbnail. Used when thumbnailMode="custom";
+  // empty/null is normalized to null. Max 2000 chars to bound storage.
+  thumbnailUrl: z
+    .string()
+    .max(2000)
+    .nullable()
+    .optional()
+    .transform((v) => (v == null || v === "" ? null : v)),
   // BR-3: Breakout-specific config (only used when layout === "breakout").
   breakoutConfig: BreakoutConfigSchema.optional(),
   // AB-1: Assignment-specific fields (only used when layout === "assignment").
@@ -104,6 +112,7 @@ export async function POST(req: Request) {
             description: input.description,
             classroomId: input.classroomId ?? null,
             thumbnailMode: input.thumbnailMode,
+            thumbnailUrl: input.thumbnailUrl,
             members: {
               create: { userId: user.id, role: "owner" },
             },
@@ -219,6 +228,7 @@ export async function POST(req: Request) {
             description: input.description,
             classroomId: classroom?.id ?? null,
             thumbnailMode: input.thumbnailMode,
+            thumbnailUrl: input.thumbnailUrl,
             assignmentGuideText: input.assignmentGuideText ?? "",
             assignmentAllowLate: input.assignmentAllowLate ?? true,
             assignmentDeadline: input.assignmentDeadline ? new Date(input.assignmentDeadline) : null,
@@ -284,19 +294,20 @@ export async function POST(req: Request) {
     // columns + classroom: ?숈깮 ?대쫫 ?먮룞 ?뱀뀡?붾뒗 ???댁긽 湲곕낯???꾨땲??
     // 援먯궗媛 蹂대뱶???ㅼ뼱媛??"?쭛 ?숈깮 ?대쫫?쇰줈 移쇰읆 留뚮뱾湲? 踰꾪듉??紐낆떆?곸쑝濡?    // ?꾨Ⅴ硫?POST /api/boards/:id/sections/seed-students 媛 ?ㅽ뻾?쒕떎.
     // (?ъ슜??寃곗젙 2026-04-24 ???먮룞 ?앹꽦??媛뺤젣泥섎읆 ?먭뺨吏꾨떎???쇰뱶諛?
-    const board = await db.board.create({
-      data: {
-        title: input.title,
-        slug,
-        layout: input.layout,
-        description: input.description,
-        classroomId: input.classroomId ?? null,
-        thumbnailMode: input.thumbnailMode,
-        members: {
-          create: { userId: user.id, role: "owner" },
-        },
+  const board = await db.board.create({
+    data: {
+      title: input.title,
+      slug,
+      layout: input.layout,
+      description: input.description,
+      classroomId: input.classroomId ?? null,
+      thumbnailMode: input.thumbnailMode,
+      thumbnailUrl: input.thumbnailUrl,
+      members: {
+        create: { userId: user.id, role: "owner" },
       },
-    });
+    },
+  });
 
     return NextResponse.json({ board });
   } catch (e) {

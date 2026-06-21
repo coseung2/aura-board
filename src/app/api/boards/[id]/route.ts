@@ -11,6 +11,16 @@ const PatchBoardSchema = z.object({
   classroomId: z.string().nullable().optional(),
   streamTitlePrompt: z.string().max(200).optional(),
   streamContentPrompt: z.string().max(1000).optional(),
+  thumbnailMode: z.enum(["default", "none", "custom"]).optional(),
+  // Public image URL for board thumbnail. Used when thumbnailMode="custom";
+  // empty/null is normalized to null. custom+null is accepted so the client
+  // can fall back to the layout default.
+  thumbnailUrl: z
+    .string()
+    .max(2000)
+    .nullable()
+    .optional()
+    .transform((v) => (v == null || v === "" ? null : v)),
   // card-comments-likes (2026-04-26)
   anonymousAuthor: z.boolean().optional(),
   boardTheme: z
@@ -82,6 +92,7 @@ export async function DELETE(
 
     const blobUrls = [
       board.eventPosterUrl,
+      board.thumbnailUrl,
       ...board.cards.flatMap((card) => [
         card.imageUrl,
         card.thumbUrl,
@@ -124,7 +135,45 @@ export async function PATCH(
 
     const body = await req.json();
     const input = PatchBoardSchema.parse(body);
+    if (Object.prototype.hasOwnProperty.call(input, "classroomId")) {
+      if (board.layout === "dj-queue" && input.classroomId == null) {
+        return NextResponse.json(
+          { error: "DJ 보드는 학급 연결이 필요합니다." },
+          { status: 400 }
+        );
+      }
+      if (input.classroomId) {
+        const classroom = await db.classroom.findUnique({
+          where: { id: input.classroomId },
+          select: { teacherId: true },
+        });
+        if (!classroom) {
+          return NextResponse.json(
+            { error: "classroom_not_found" },
+            { status: 404 }
+          );
+        }
+        if (classroom.teacherId !== user.id) {
+          return NextResponse.json(
+            { error: "not_classroom_teacher" },
+            { status: 403 }
+          );
+        }
+      }
+    }
     const updated = await db.board.update({ where: { id: board.id }, data: input });
+    if (
+      Object.prototype.hasOwnProperty.call(input, "thumbnailUrl") &&
+      board.thumbnailUrl &&
+      board.thumbnailUrl !== input.thumbnailUrl
+    ) {
+      await enqueueBlobDeletion(
+        [board.thumbnailUrl],
+        "board.thumbnail.update",
+        "Board",
+        board.id
+      );
+    }
 
     return NextResponse.json({ board: updated });
   } catch (e) {

@@ -53,6 +53,8 @@ export default async function HomePage() {
     title: m.board.title || "제목 없음",
     layout: m.board.layout,
     thumbnailMode: m.board.thumbnailMode,
+    thumbnailUrl: (m.board as { thumbnailUrl?: string | null }).thumbnailUrl ?? null,
+    classroomId: m.board.classroomId,
     cardCount: m.board._count.cards,
     memberCount: m.board._count.members,
     role: m.role,

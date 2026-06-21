@@ -10,6 +10,15 @@ import {
 type Props = {
   boardId: string;
   layout: string;
+  title?: string;
+  classrooms?: Array<{
+    id: string;
+    name: string;
+    studentCount: number;
+  }>;
+  classroomId?: string | null;
+  thumbnailMode?: string | null;
+  thumbnailUrl?: string | null;
   sections: BoardSection[];
   anonymousAuthor: boolean;
   boardTheme: BoardTheme;
@@ -23,6 +32,11 @@ type Props = {
 export function BoardSettingsLauncher({
   boardId,
   layout,
+  title,
+  classrooms,
+  classroomId,
+  thumbnailMode,
+  thumbnailUrl,
   sections,
   anonymousAuthor,
   boardTheme,
@@ -50,6 +64,11 @@ export function BoardSettingsLauncher({
         <BoardSettingsPanel
           open={open}
           onClose={() => setOpen(false)}
+          title={title}
+          classrooms={classrooms}
+          initialClassroomId={classroomId}
+          initialThumbnailMode={thumbnailMode}
+          initialThumbnailUrl={thumbnailUrl}
           boardId={boardId}
           layout={layout}
           initialSections={sections}

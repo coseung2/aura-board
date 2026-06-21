@@ -4,6 +4,10 @@ import { useEffect, useId, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ShareTab } from "./share/ShareTab";
 import { SidePanel } from "./ui/SidePanel";
+import {
+  BoardThumbnailPicker,
+  type ThumbnailMode,
+} from "./BoardThumbnailPicker";
 
 export type BoardSection = {
   id: string;
@@ -23,6 +27,15 @@ type Tab = "basic" | "breakout" | "canva";
 type Props = {
   open: boolean;
   onClose: () => void;
+  title?: string;
+  classrooms?: Array<{
+    id: string;
+    name: string;
+    studentCount: number;
+  }>;
+  initialClassroomId?: string | null;
+  initialThumbnailMode?: string | null;
+  initialThumbnailUrl?: string | null;
   boardId: string;
   layout: string;
   initialSections: BoardSection[];
@@ -76,6 +89,11 @@ const BOARD_THEME_OPTIONS: Array<{
 export function BoardSettingsPanel({
   open,
   onClose,
+  title = "",
+  classrooms = [],
+  initialClassroomId = null,
+  initialThumbnailMode = "default",
+  initialThumbnailUrl = null,
   boardId,
   layout,
   initialSections,
@@ -97,6 +115,15 @@ export function BoardSettingsPanel({
   const [shareShortCode, setShareShortCode] = useState<string | null>(
     initialShareShortCode,
   );
+  const [classroomId, setClassroomId] = useState<string | null>(
+    initialClassroomId,
+  );
+  const [thumbnailMode, setThumbnailMode] = useState<ThumbnailMode>(
+    normalizeThumbnailMode(initialThumbnailMode),
+  );
+  const [thumbnailUrl, setThumbnailUrl] = useState<string | null>(
+    initialThumbnailUrl,
+  );
   const [streamTitlePrompt, setStreamTitlePrompt] = useState(
     initialStreamTitlePrompt,
   );
@@ -114,6 +141,9 @@ export function BoardSettingsPanel({
     setShareMode(initialShareMode);
     setShareToken(initialShareToken);
     setShareShortCode(initialShareShortCode);
+    setClassroomId(initialClassroomId);
+    setThumbnailMode(normalizeThumbnailMode(initialThumbnailMode));
+    setThumbnailUrl(initialThumbnailUrl);
     setStreamTitlePrompt(initialStreamTitlePrompt);
     setStreamContentPrompt(initialStreamContentPrompt);
   }, [
@@ -124,6 +154,9 @@ export function BoardSettingsPanel({
     initialShareMode,
     initialShareToken,
     initialShareShortCode,
+    initialClassroomId,
+    initialThumbnailMode,
+    initialThumbnailUrl,
     initialStreamTitlePrompt,
     initialStreamContentPrompt,
   ]);
@@ -174,6 +207,16 @@ export function BoardSettingsPanel({
           <BasicTab
             boardId={boardId}
             layout={layout}
+            title={title}
+            classrooms={classrooms}
+            classroomId={classroomId}
+            onClassroomIdChange={setClassroomId}
+            thumbnailMode={thumbnailMode}
+            thumbnailUrl={thumbnailUrl}
+            onThumbnailChange={({ mode, url }) => {
+              setThumbnailMode(mode);
+              setThumbnailUrl(url);
+            }}
             anonymousAuthor={anonymousAuthor}
             onAnonymousAuthorChange={setAnonymousAuthor}
             initialShareMode={shareMode}
@@ -228,6 +271,13 @@ export function BoardSettingsPanel({
 function BasicTab({
   boardId,
   layout,
+  title,
+  classrooms,
+  classroomId,
+  onClassroomIdChange,
+  thumbnailMode,
+  thumbnailUrl,
+  onThumbnailChange,
   anonymousAuthor,
   onAnonymousAuthorChange,
   initialShareMode,
@@ -242,6 +292,13 @@ function BasicTab({
 }: {
   boardId: string;
   layout: string;
+  title: string;
+  classrooms: Array<{ id: string; name: string; studentCount: number }>;
+  classroomId: string | null;
+  onClassroomIdChange: (next: string | null) => void;
+  thumbnailMode: ThumbnailMode;
+  thumbnailUrl: string | null;
+  onThumbnailChange: (next: { mode: ThumbnailMode; url: string | null }) => void;
   anonymousAuthor: boolean;
   onAnonymousAuthorChange: (next: boolean) => void;
   initialShareMode: string;
@@ -256,6 +313,19 @@ function BasicTab({
 }) {
   return (
     <div className="board-settings-basic">
+      <SettingsSection title="기본 정보">
+        <BasicInfoTab
+          boardId={boardId}
+          layout={layout}
+          title={title}
+          classrooms={classrooms}
+          classroomId={classroomId}
+          onClassroomIdChange={onClassroomIdChange}
+          thumbnailMode={thumbnailMode}
+          thumbnailUrl={thumbnailUrl}
+          onThumbnailChange={onThumbnailChange}
+        />
+      </SettingsSection>
       <SettingsSection title="참여">
         <EngagementTab
           boardId={boardId}
@@ -307,6 +377,173 @@ function SettingsSection({
       </h3>
       {children}
     </section>
+  );
+}
+
+function BasicInfoTab({
+  boardId,
+  layout,
+  title,
+  classrooms,
+  classroomId,
+  onClassroomIdChange,
+  thumbnailMode,
+  thumbnailUrl,
+  onThumbnailChange,
+}: {
+  boardId: string;
+  layout: string;
+  title: string;
+  classrooms: Array<{ id: string; name: string; studentCount: number }>;
+  classroomId: string | null;
+  onClassroomIdChange: (next: string | null) => void;
+  thumbnailMode: ThumbnailMode;
+  thumbnailUrl: string | null;
+  onThumbnailChange: (next: { mode: ThumbnailMode; url: string | null }) => void;
+}) {
+  const router = useRouter();
+  const [titleDraft, setTitleDraft] = useState(title);
+  const [classroomDraft, setClassroomDraft] = useState<string | null>(classroomId);
+  const [thumbnailDraft, setThumbnailDraft] = useState<{
+    mode: ThumbnailMode;
+    url: string | null;
+  }>({ mode: thumbnailMode, url: thumbnailUrl });
+  const [saveState, setSaveState] = useState<
+    | { status: "idle" }
+    | { status: "saving" }
+    | { status: "saved"; at: number }
+    | { status: "error"; message: string }
+  >({ status: "idle" });
+
+  useEffect(() => {
+    setTitleDraft(title);
+    setClassroomDraft(classroomId);
+    setThumbnailDraft({ mode: thumbnailMode, url: thumbnailUrl });
+    setSaveState({ status: "idle" });
+  }, [title, classroomId, thumbnailMode, thumbnailUrl]);
+
+  const titleDirty = titleDraft.trim() !== title;
+  const classroomDirty = classroomDraft !== classroomId;
+  const thumbnailDirty =
+    thumbnailDraft.mode !== thumbnailMode ||
+    thumbnailDraft.url !== thumbnailUrl;
+  const canSave = titleDirty || classroomDirty || thumbnailDirty;
+  const canEditClassroom =
+    layout !== "assignment" || classroomId == null;
+  const shouldSyncAssignmentClassroom =
+    layout === "assignment" && classroomId == null && Boolean(classroomDraft);
+
+  async function save() {
+    if (!canSave) return;
+    setSaveState({ status: "saving" });
+    try {
+      const res = await fetch(`/api/boards/${boardId}`, {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          title: titleDraft.trim() || "제목 없음",
+          ...(layout === "assignment" ? {} : { classroomId: classroomDraft }),
+          thumbnailMode:
+            thumbnailDraft.mode === "custom" && thumbnailDraft.url
+              ? "custom"
+              : thumbnailDraft.mode === "none"
+                ? "none"
+                : "default",
+          thumbnailUrl:
+            thumbnailDraft.mode === "custom" && thumbnailDraft.url
+              ? thumbnailDraft.url
+              : null,
+        }),
+      });
+      if (!res.ok) {
+        setSaveState({ status: "error", message: "저장에 실패했어요." });
+        return;
+      }
+      if (shouldSyncAssignmentClassroom) {
+        const syncRes = await fetch(`/api/boards/${boardId}/roster-sync`, {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ classroomId: classroomDraft }),
+        });
+        if (!syncRes.ok) {
+          setSaveState({ status: "error", message: "학급 연결에 실패했어요." });
+          return;
+        }
+      }
+      onClassroomIdChange(classroomDraft);
+      onThumbnailChange(thumbnailDraft);
+      router.refresh();
+      setSaveState({ status: "saved", at: Date.now() });
+    } catch {
+      setSaveState({ status: "error", message: "저장에 실패했어요." });
+    }
+  }
+
+  return (
+    <div className="board-settings-control-stack">
+      <label className="modal-field-label" htmlFor={`basic-title-${boardId}`}>
+        보드 이름
+      </label>
+      <input
+        id={`basic-title-${boardId}`}
+        type="text"
+        className="modal-input"
+        value={titleDraft}
+        onChange={(e) => setTitleDraft(e.target.value.slice(0, 200))}
+        maxLength={200}
+        disabled={saveState.status === "saving"}
+      />
+
+      <label className="modal-field-label" htmlFor={`basic-classroom-${boardId}`}>
+        학급 연결
+      </label>
+      <select
+        id={`basic-classroom-${boardId}`}
+        className="modal-select"
+        value={classroomDraft ?? ""}
+        onChange={(e) => setClassroomDraft(e.target.value || null)}
+        disabled={saveState.status === "saving" || !canEditClassroom}
+      >
+        <option value="" disabled={layout === "dj-queue"}>
+          학급 연결 없음
+        </option>
+        {classrooms.map((c) => (
+          <option key={c.id} value={c.id}>
+            {c.name} (학생 {c.studentCount}명)
+          </option>
+        ))}
+      </select>
+
+      <label className="modal-field-label">대시보드 썸네일</label>
+      <BoardThumbnailPicker
+        layout={layout}
+        mode={thumbnailDraft.mode}
+        url={thumbnailDraft.url}
+        onChange={setThumbnailDraft}
+        disabled={saveState.status === "saving"}
+      />
+
+      <div className="stream-guidance-actions">
+        <button
+          type="button"
+          className="stream-guidance-save"
+          onClick={() => void save()}
+          disabled={!canSave || saveState.status === "saving"}
+        >
+          {saveState.status === "saving" ? "저장 중..." : "저장"}
+        </button>
+        {saveState.status === "saved" && (
+          <span className="stream-guidance-status" aria-live="polite">
+            저장했어요.
+          </span>
+        )}
+        {saveState.status === "error" && (
+          <span className="stream-guidance-error" aria-live="polite">
+            {saveState.message}
+          </span>
+        )}
+      </div>
+    </div>
   );
 }
 
@@ -732,4 +969,9 @@ function BreakoutSectionRow({
       </p>
     </article>
   );
+}
+
+function normalizeThumbnailMode(value: string | null | undefined): ThumbnailMode {
+  if (value === "none" || value === "custom") return value;
+  return "default";
 }

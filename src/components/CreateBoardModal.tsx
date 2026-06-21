@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { CreateBreakoutBoardModal } from "./CreateBreakoutBoardModal";
+import { BoardThumbnailPicker, type ThumbnailMode } from "./BoardThumbnailPicker";
 import { LAYOUT_META, layoutThumbnail, type LayoutKey } from "@/lib/layout-meta";
 
 type PickerRow = {
@@ -74,9 +75,8 @@ export function CreateBoardModal({
     "layout"
   );
   const [selectedLayout, setSelectedLayout] = useState<LayoutKey | null>(null);
-  const [thumbnailMode, setThumbnailMode] = useState<"default" | "none">(
-    "default"
-  );
+  const [thumbnailMode, setThumbnailMode] = useState<ThumbnailMode>("default");
+  const [thumbnailUrl, setThumbnailUrl] = useState<string | null>(null);
 
   async function createBoard(layoutId: LayoutKey, classroomId?: string) {
     setBusy(true);
@@ -88,7 +88,14 @@ export function CreateBoardModal({
           title: "",
           layout: layoutId,
           classroomId,
-          thumbnailMode,
+          thumbnailMode:
+            thumbnailMode === "custom" && thumbnailUrl
+              ? "custom"
+              : thumbnailMode === "none"
+                ? "none"
+                : "default",
+          thumbnailUrl:
+            thumbnailMode === "custom" && thumbnailUrl ? thumbnailUrl : null,
         }),
       });
 
@@ -114,12 +121,14 @@ export function CreateBoardModal({
     if (layoutId === "breakout") {
       setSelectedLayout(layoutId);
       setThumbnailMode("default");
+      setThumbnailUrl(null);
       setStep("breakout");
       return;
     }
 
     setSelectedLayout(layoutId);
     setThumbnailMode("default");
+    setThumbnailUrl(null);
     setStep("classroom");
   }
 
@@ -141,8 +150,6 @@ export function CreateBoardModal({
   const selectedLayoutMeta = selectedLayout
     ? LAYOUTS.find((layout) => layout.id === selectedLayout)
     : null;
-  const selectedThumbnail =
-    thumbnailMode === "default" ? selectedLayoutMeta?.thumbnail : null;
   const requiresClassroom = selectedLayout === "dj-queue";
 
   return (
@@ -205,41 +212,24 @@ export function CreateBoardModal({
 
           {step === "classroom" && selectedLayout && (
             <>
+              {selectedLayoutMeta && (
+                <div className="create-board-thumbnail-panel create-board-thumbnail-panel--vertical">
+                  <p className="create-board-hint">대시보드 썸네일</p>
+                  <BoardThumbnailPicker
+                    layout={selectedLayout}
+                    mode={thumbnailMode}
+                    url={thumbnailUrl}
+                    onChange={({ mode, url }) => {
+                      setThumbnailMode(mode);
+                      setThumbnailUrl(url);
+                    }}
+                    disabled={busy}
+                  />
+                </div>
+              )}
               <p className="create-board-hint">
                 보드를 어느 학급에 연결할지 선택하세요.
               </p>
-              {selectedLayoutMeta && (
-                <div className="create-board-thumbnail-panel">
-                  <div className="create-board-thumbnail-preview">
-                    {selectedThumbnail ? (
-                      <img
-                        src={selectedThumbnail}
-                        alt={`${selectedLayoutMeta.label} 화면 미리보기`}
-                      />
-                    ) : (
-                      <span>{selectedLayoutMeta.emoji}</span>
-                    )}
-                  </div>
-                  <label className="create-board-thumbnail-toggle">
-                    <input
-                      type="checkbox"
-                      checked={thumbnailMode === "default"}
-                      onChange={(event) =>
-                        setThumbnailMode(
-                          event.target.checked ? "default" : "none"
-                        )
-                      }
-                      disabled={busy}
-                    />
-                    <span>
-                      <strong>대시보드에 보드 이미지 표시</strong>
-                      <small>
-                        기본값은 이미지 표시이며, 끄면 기본 아이콘으로 표시됩니다.
-                      </small>
-                    </span>
-                  </label>
-                </div>
-              )}
               <div className="layout-picker">
                 <button
                   type="button"
@@ -283,6 +273,7 @@ export function CreateBoardModal({
                     setStep("layout");
                     setSelectedLayout(null);
                     setThumbnailMode("default");
+                    setThumbnailUrl(null);
                   }}
                   disabled={busy}
                 >

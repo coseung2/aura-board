@@ -16,6 +16,14 @@ type Props = {
   isStudent?: boolean;
   backHref?: string;
   canEdit: boolean;
+  classrooms?: Array<{
+    id: string;
+    name: string;
+    studentCount: number;
+  }>;
+  classroomId?: string | null;
+  thumbnailMode?: string | null;
+  thumbnailUrl?: string | null;
   settingsSections?: BoardSection[];
   anonymousAuthor?: boolean;
   boardTheme?: BoardTheme;
@@ -33,6 +41,10 @@ export function BoardHeader({
   isStudent,
   backHref,
   canEdit,
+  classrooms,
+  classroomId,
+  thumbnailMode,
+  thumbnailUrl,
   settingsSections,
   anonymousAuthor,
   boardTheme,
@@ -65,6 +77,11 @@ export function BoardHeader({
           <BoardSettingsLauncher
             boardId={boardId}
             layout={layout}
+            title={title}
+            classrooms={classrooms}
+            classroomId={classroomId}
+            thumbnailMode={thumbnailMode}
+            thumbnailUrl={thumbnailUrl}
             sections={settingsSections ?? []}
             anonymousAuthor={anonymousAuthor ?? false}
             boardTheme={boardTheme ?? "pastel-sky"}

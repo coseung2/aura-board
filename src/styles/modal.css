@@ -44,16 +44,29 @@
   max-height: calc(100dvh - 48px);
   padding: 0;
   overflow: hidden;
+  display: flex;
+  flex-direction: column;
 }
 
 /* refined-icons (2026-04-26): 모든 버튼 내부에 SVG (currentColor stroke)
    를 사용하므로 font-size/line-height 글리프 metric 의존 제거. flex
    center 만으로 픽셀 단위 완벽 정렬. */
 .card-detail-close {
-  position: absolute;
-  top: 20px;
-  right: 20px;
-  z-index: 5;
+  flex: 0 0 auto;
+}
+
+.card-detail-topbar {
+  flex: 0 0 auto;
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  min-height: 56px;
+  padding: 16px 20px 4px;
+  pointer-events: none;
+}
+
+.card-detail-topbar > .card-detail-close {
+  pointer-events: auto;
 }
 
 /* Fullscreen toggle — bottom-right for presentation mode. */
@@ -97,7 +110,16 @@
   border-radius: 0 !important;
   border: none !important;
 }
+.card-detail-modal[data-fullscreen="true"] .card-detail-topbar {
+  position: absolute;
+  top: 0;
+  right: 0;
+  left: 0;
+  z-index: 5;
+  background: transparent;
+}
 .card-detail-modal[data-fullscreen="true"] .card-detail-body {
+  flex: 1 1 auto;
   grid-template-columns: 1fr;
 }
 .card-detail-modal[data-fullscreen="true"] .card-detail-rail {
@@ -121,7 +143,8 @@
   /* 1-column + right rail (2026-06-13): 좌측 main = media + 텍스트/다운로드,
      우측 rail = meta + engagement. rail은 220px 고정, main은 나머지. */
   grid-template-columns: 1fr 280px;
-  height: 100%;
+  flex: 1 1 auto;
+  height: auto;
   min-height: 0;
   overflow: hidden;
 }
@@ -976,13 +999,6 @@
   background: #fff;
   color: var(--color-text);
   box-shadow: var(--shadow-lift);
-}
-
-.card-detail-modal > .card-detail-close.card-detail-close {
-  position: absolute;
-  top: 20px;
-  right: 20px;
-  z-index: 5;
 }
 
 .modal-tabs {

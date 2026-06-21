@@ -60,6 +60,13 @@ function proxiedLinkPreviewImageUrl(
   return `/api/link-preview/image?url=${encodeURIComponent(absolute)}&referer=${encodeURIComponent(pageUrl)}`;
 }
 
+function hasStaleAuraBoardOgImage(payload: LinkPreviewPayload): boolean {
+  return Boolean(
+    payload.image?.includes("aura-teacher.com") &&
+      payload.image.includes("aura-board-og.png")
+  );
+}
+
 async function fetchOgImagePreview(
   imageUrl: string,
   pageUrl: string,
@@ -148,7 +155,11 @@ export async function GET(req: Request) {
 
   try {
     const cached = await getPreviewCache<LinkPreviewPayload>("link-preview", url);
-    if (cached.hit && (cached.status !== "ok" || cached.payload.image)) {
+    if (
+      cached.hit &&
+      (cached.status !== "ok" ||
+        (cached.payload.image && !hasStaleAuraBoardOgImage(cached.payload)))
+    ) {
       return NextResponse.json(
         cached.status === "ok"
           ? cached.payload

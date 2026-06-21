@@ -347,6 +347,24 @@ export default async function BoardPage({
       ? assignTeacherClassrooms.find((c) => c.id === board.classroomId) ?? null
       : null;
 
+  // Settings panel needs the teacher's classroom list for board connection edits.
+  const settingsClassrooms =
+    !studentViewer && user
+      ? (await db.classroom.findMany({
+          where: { teacherId: user.id },
+          orderBy: { createdAt: "desc" },
+          select: {
+            id: true,
+            name: true,
+            _count: { select: { students: true } },
+          },
+        })).map((c) => ({
+          id: c.id,
+          name: c.name,
+          studentCount: c._count.students,
+        }))
+      : undefined;
+
   function renderBoard() {
     const common = {
       boardId: board!.id,
@@ -663,6 +681,10 @@ export default async function BoardPage({
           isStudent={!!studentViewer}
           backHref={studentViewer ? "/student" : "/"}
           canEdit={effectiveRole === "owner" || effectiveRole === "editor"}
+          classrooms={settingsClassrooms}
+          classroomId={board.classroomId}
+          thumbnailMode={board.thumbnailMode}
+          thumbnailUrl={(board as { thumbnailUrl?: string | null }).thumbnailUrl ?? null}
           settingsSections={settingsSections}
           anonymousAuthor={board.anonymousAuthor}
           boardTheme={boardTheme}

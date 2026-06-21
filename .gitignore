@@ -48,6 +48,7 @@ dev.log
 # Local mobile signing credentials and one-off build outputs
 .codex/tmp/
 .codex/builds/
+supabase/.temp/
 apps/mobile/credentials.json
 apps/mobile/credentials/
 apps/mobile/android/keystores/

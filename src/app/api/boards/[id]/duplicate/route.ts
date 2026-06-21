@@ -34,6 +34,7 @@ export async function POST(
         description: board.description,
         classroomId: board.classroomId,
         thumbnailMode: board.thumbnailMode,
+        thumbnailUrl: board.thumbnailUrl,
         members: {
           create: { userId: user.id, role: "owner" },
         },

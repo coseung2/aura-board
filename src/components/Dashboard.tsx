@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { CreateBoardModal } from "./CreateBoardModal";
+import { EditBoardModal } from "./EditBoardModal";
 import { layoutEmoji, layoutLabel, layoutThumbnail } from "@/lib/layout-meta";
 
 type BoardItem = {
@@ -12,6 +13,8 @@ type BoardItem = {
   title: string;
   layout: string;
   thumbnailMode: string | null;
+  thumbnailUrl: string | null;
+  classroomId: string | null;
   cardCount: number;
   memberCount: number;
   role: string;
@@ -32,6 +35,7 @@ type Props = {
 export function Dashboard({ boards, classrooms, userTier = "pro" }: Props) {
   const router = useRouter();
   const [showCreate, setShowCreate] = useState(false);
+  const [editingBoard, setEditingBoard] = useState<BoardItem | null>(null);
   const [menuOpen, setMenuOpen] = useState<string | null>(null);
 
   async function handleDelete(boardId: string) {
@@ -83,7 +87,11 @@ export function Dashboard({ boards, classrooms, userTier = "pro" }: Props) {
 
         {boards.map((b) => {
           const thumbnail =
-            b.thumbnailMode === "none" ? null : layoutThumbnail(b.layout);
+            b.thumbnailMode === "custom" && b.thumbnailUrl
+              ? b.thumbnailUrl
+              : b.thumbnailMode === "none"
+                ? null
+                : layoutThumbnail(b.layout);
 
           return (
             <div
@@ -133,6 +141,17 @@ export function Dashboard({ boards, classrooms, userTier = "pro" }: Props) {
                   type="button"
                   className="board-grid-kebab-item"
                   role="menuitem"
+                  onClick={() => {
+                    setEditingBoard(b);
+                    setMenuOpen(null);
+                  }}
+                >
+                  수정
+                </button>
+                <button
+                  type="button"
+                  className="board-grid-kebab-item"
+                  role="menuitem"
                   onClick={() => handleDuplicate(b.id)}
                 >
                   복제
@@ -165,6 +184,13 @@ export function Dashboard({ boards, classrooms, userTier = "pro" }: Props) {
           classrooms={classrooms}
           userTier={userTier}
           onClose={() => setShowCreate(false)}
+        />
+      )}
+      {editingBoard && (
+        <EditBoardModal
+          board={editingBoard}
+          classrooms={classrooms}
+          onClose={() => setEditingBoard(null)}
         />
       )}
     </>
