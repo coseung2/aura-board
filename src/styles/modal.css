@@ -46,54 +46,25 @@
   overflow: hidden;
   display: flex;
   flex-direction: column;
-  --card-detail-topbar-height: 60px;
+  --card-detail-corner-inset: 14px;
 }
 
 /* refined-icons (2026-04-26): 모든 버튼 내부에 SVG (currentColor stroke)
    를 사용하므로 font-size/line-height 글리프 metric 의존 제거. flex
    center 만으로 픽셀 단위 완벽 정렬. */
 .card-detail-close {
-  flex: 0 0 auto;
-}
-
-.card-detail-topbar {
-  flex: 0 0 auto;
-  display: flex;
-  justify-content: flex-end;
-  align-items: center;
-  min-height: var(--card-detail-topbar-height);
-  padding: 14px 20px 8px;
-  pointer-events: none;
-  border-bottom: 1px solid transparent;
-}
-
-.card-detail-topbar > .card-detail-close {
-  pointer-events: auto;
+  top: var(--card-detail-corner-inset);
+  right: var(--card-detail-corner-inset);
 }
 
 /* Fullscreen toggle — bottom-right for presentation mode. */
 .card-detail-fullscreen {
-  position: absolute;
-  bottom: 16px;
-  right: 16px;
-  z-index: 3;
-  width: 44px;
-  height: 44px;
-  border-radius: 50%;
-  border: 1px solid var(--color-border, #e2e2ea);
-  background: var(--color-surface, white);
-  color: var(--color-text, #111);
-  cursor: pointer;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0;
-  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.1);
-  transition: transform 120ms ease, box-shadow 120ms ease;
+  right: var(--card-detail-corner-inset);
+  bottom: var(--card-detail-corner-inset);
+  color: var(--color-text);
 }
 .card-detail-fullscreen:hover {
-  transform: scale(1.05);
-  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.15);
+  transform: scale(1.06);
 }
 
 /* When entering the browser fullscreen, the modal becomes the root
@@ -111,14 +82,6 @@
   transform: none !important;
   border-radius: 0 !important;
   border: none !important;
-}
-.card-detail-modal[data-fullscreen="true"] .card-detail-topbar {
-  position: absolute;
-  top: 0;
-  right: 0;
-  left: 0;
-  z-index: 5;
-  background: transparent;
 }
 .card-detail-modal[data-fullscreen="true"] .card-detail-body {
   flex: 1 1 auto;
@@ -149,7 +112,6 @@
   height: auto;
   min-height: 0;
   overflow: hidden;
-  border-top: 1px solid var(--color-border);
 }
 
 .card-detail-media {
@@ -395,7 +357,7 @@
   user-select: none;
   opacity: 1;
   box-shadow: none;
-  mix-blend-mode: difference;
+  text-shadow: 0 1px 3px rgba(15, 23, 42, 0.55);
   transition:
     opacity 120ms ease,
     transform 120ms ease;
@@ -571,39 +533,30 @@
 .card-image-lightbox-close,
 .card-image-lightbox-nav {
   position: absolute;
-  background: rgba(255, 255, 255, 0.12);
   color: #fff;
-  border: 1px solid rgba(255, 255, 255, 0.2);
   cursor: pointer;
   width: 46px;
   height: 46px;
-  border-radius: 50%;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.32);
-  backdrop-filter: blur(14px);
-  -webkit-backdrop-filter: blur(14px);
+  box-shadow: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
   transition:
-    background 120ms ease,
-    border-color 120ms ease,
     transform 120ms ease;
 }
 
 .card-image-lightbox-close:hover,
 .card-image-lightbox-nav:hover {
-  background: rgba(255, 255, 255, 0.2);
-  border-color: rgba(255, 255, 255, 0.34);
+  color: #fff;
 }
 
 .card-image-lightbox-nav {
-  background: transparent;
-  border: 0;
-  border-radius: 0;
-  box-shadow: none;
-  backdrop-filter: none;
-  -webkit-backdrop-filter: none;
-  mix-blend-mode: difference;
+  filter: drop-shadow(0 1px 3px rgba(15, 23, 42, 0.55));
 }
 
 .card-image-lightbox-nav:hover {
@@ -620,6 +573,7 @@
 .card-image-lightbox-close {
   top: max(16px, env(safe-area-inset-top));
   right: max(16px, env(safe-area-inset-right));
+  filter: drop-shadow(0 1px 3px rgba(15, 23, 42, 0.55));
 }
 
 .card-image-lightbox-nav.is-prev {
@@ -743,7 +697,7 @@
   display: flex;
   flex-direction: column;
   gap: 16px;
-  padding: 20px 16px 20px;
+  padding: 58px 16px 64px;
   border-left: 1px solid var(--color-border);
   background: var(--color-surface);
   min-height: 0;
@@ -970,9 +924,9 @@
   position: relative;
   width: 36px;
   height: 36px;
-  border: 1px solid var(--color-border);
-  background: rgba(255, 255, 255, 0.82);
-  border-radius: var(--radius-control);
+  border: 0;
+  background: transparent;
+  border-radius: 0;
   cursor: pointer;
   display: inline-flex;
   align-items: center;
@@ -980,12 +934,10 @@
   padding: 0;
   color: var(--color-text-muted);
   font-size: 0;
-  box-shadow: 0 4px 12px rgba(24, 74, 92, 0.08);
+  box-shadow: none;
   transition:
-    background var(--t-normal),
-    border-color var(--t-normal),
-    box-shadow var(--t-normal),
-    color var(--t-normal);
+    color var(--t-normal),
+    transform var(--t-normal);
 }
 
 .modal-close::before,
@@ -1014,10 +966,8 @@
 }
 
 .modal-close:hover {
-  border-color: var(--color-border-hover);
-  background: #fff;
   color: var(--color-text);
-  box-shadow: var(--shadow-lift);
+  transform: scale(1.06);
 }
 
 .modal-tabs {

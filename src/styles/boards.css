@@ -462,8 +462,7 @@
   font-size: 34px;
   line-height: 1;
   cursor: pointer;
-  mix-blend-mode: difference;
-  text-shadow: none;
+  text-shadow: 0 1px 3px rgba(15, 23, 42, 0.55);
   transition: transform 150ms ease, opacity 150ms ease;
 }
 
@@ -3106,8 +3105,8 @@
   width: 36px;
   height: 36px;
   border: 0;
-  border-radius: 50%;
-  background: var(--color-surface-alt);
+  border-radius: 0;
+  background: transparent;
   color: var(--color-text-muted);
   font-size: 16px;
   line-height: 1;
@@ -3115,12 +3114,12 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  transition: background 150ms ease;
+  transition: color 150ms ease, transform 150ms ease;
 }
 
 .slideshow-close:hover {
-  background: var(--color-border);
   color: var(--color-text);
+  transform: scale(1.06);
 }
 
 .slideshow-close:focus-visible {
@@ -3313,7 +3312,7 @@
   background: transparent;
   color: #fff;
   box-shadow: none;
-  mix-blend-mode: difference;
+  filter: drop-shadow(0 1px 3px rgba(15, 23, 42, 0.55));
   transform: translateY(-50%);
   opacity: 0;
   pointer-events: none;
@@ -3437,7 +3436,7 @@
   border: 0;
   border-radius: 0;
   background: transparent;
-  color: #fff;
+  color: rgba(15, 23, 42, 0.82);
   font-size: 24px;
   line-height: 1;
   cursor: pointer;
@@ -3445,7 +3444,6 @@
   align-items: center;
   justify-content: center;
   box-shadow: none;
-  mix-blend-mode: difference;
   transition: opacity 150ms ease, transform 150ms ease;
 }
 

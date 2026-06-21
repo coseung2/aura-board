@@ -1137,8 +1137,8 @@ function StreamBreakoutCreator({
         return;
       }
       const data = (await res.json()) as { board?: { slug?: string; id?: string } };
-      const next = data.board?.slug ?? data.board?.id;
-      if (next) router.push(`/board/${next}`);
+      const next = data.board?.id ?? data.board?.slug;
+      if (next) router.push(`/board/${encodeURIComponent(next)}`);
     } catch {
       setStatus("생성 실패");
     } finally {

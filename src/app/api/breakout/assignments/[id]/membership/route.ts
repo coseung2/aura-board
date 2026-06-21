@@ -79,17 +79,16 @@ export async function POST(
       if (!board?.classroomId || !student || student.classroomId !== board.classroomId) {
         throw new ForbiddenError("classroom mismatch");
       }
-      // Student mode: v1 — initial 1회 only for self-select.
-      if (assignment.deployMode === "self-select") {
-        const existing = await db.breakoutMembership.findFirst({
-          where: { assignmentId, studentId: targetStudentId },
-        });
-        if (existing) {
-          return NextResponse.json(
-            { error: "already_selected", membership: existing },
-            { status: 409 }
-          );
-        }
+      // Student self-pick path: one membership per breakout assignment.
+      // Link-fixed auto-join uses maybeAutoJoinLinkFixed, not this endpoint.
+      const existing = await db.breakoutMembership.findFirst({
+        where: { assignmentId, studentId: targetStudentId },
+      });
+      if (existing) {
+        return NextResponse.json(
+          { error: "already_selected", membership: existing },
+          { status: 409 }
+        );
       }
     }
 

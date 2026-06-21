@@ -12,6 +12,23 @@ type BoardItem = {
   title: string;
   layout: string;
   quizzes?: { roomCode: string; status: string }[];
+  breakout?: StudentBreakout | null;
+};
+
+type BreakoutGroup = {
+  groupIndex: number;
+  entrySectionId: string;
+  totalCount: number;
+  sections: Array<{ id: string; title: string; count: number }>;
+};
+
+type StudentBreakout = {
+  assignmentId: string;
+  boardSlug: string;
+  boardTitle: string;
+  groupCapacity: number;
+  selectedSectionId: string | null;
+  groups: BreakoutGroup[];
 };
 
 type Duty = {
@@ -55,6 +72,10 @@ export function StudentDashboard({
   const [wallet, setWallet] = useState<WalletSummary | null>(null);
   const [cancellingFD, setCancellingFD] = useState<string | null>(null);
   const [fdError, setFdError] = useState<string | null>(null);
+  const [breakoutModal, setBreakoutModal] = useState<{
+    sourceTitle: string;
+    breakout: StudentBreakout;
+  } | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -243,6 +264,30 @@ export function StudentDashboard({
               const quizCode =
                 board.layout === "quiz" && board.quizzes?.[0]?.roomCode;
               const href = quizCode ? `/quiz/${quizCode}` : `/board/${board.slug}`;
+              const breakout = board.breakout;
+              if (breakout) {
+                return (
+                  <button
+                    key={board.id}
+                    type="button"
+                    className="student-board-card"
+                    onClick={() => {
+                      if (breakout.selectedSectionId) {
+                        router.push(
+                          `/board/${breakout.boardSlug}/s/${breakout.selectedSectionId}`,
+                        );
+                        return;
+                      }
+                      setBreakoutModal({ sourceTitle: board.title, breakout });
+                    }}
+                  >
+                    <span className="student-board-card-title">{board.title}</span>
+                    <span className="student-board-card-meta">
+                      모둠 선택 · {breakout.boardTitle}
+                    </span>
+                  </button>
+                );
+              }
               return (
                 <Link
                   key={board.id}
@@ -260,6 +305,120 @@ export function StudentDashboard({
           </div>
         </>
       )}
+
+      {breakoutModal && (
+        <StudentBreakoutModal
+          sourceTitle={breakoutModal.sourceTitle}
+          breakout={breakoutModal.breakout}
+          onClose={() => setBreakoutModal(null)}
+        />
+      )}
+    </>
+  );
+}
+
+function StudentBreakoutModal({
+  sourceTitle,
+  breakout,
+  onClose,
+}: {
+  sourceTitle: string;
+  breakout: StudentBreakout;
+  onClose: () => void;
+}) {
+  const router = useRouter();
+  const [pending, setPending] = useState<number | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  async function pick(group: BreakoutGroup) {
+    if (pending !== null || !group.entrySectionId) return;
+    setPending(group.groupIndex);
+    setError(null);
+    try {
+      const res = await fetch(
+        `/api/breakout/assignments/${breakout.assignmentId}/membership`,
+        {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ sectionId: group.entrySectionId }),
+        },
+      );
+      if (res.ok) {
+        router.push(`/board/${breakout.boardSlug}/s/${group.entrySectionId}`);
+        return;
+      }
+      const data = await res.json().catch(() => ({}));
+      if (res.status === 409 && data.membership?.sectionId) {
+        router.push(`/board/${breakout.boardSlug}/s/${data.membership.sectionId}`);
+        return;
+      }
+      if (data.error === "capacity_reached") {
+        setError(`모둠 ${group.groupIndex}은 이미 정원이 찼어요.`);
+      } else if (data.error === "already_selected") {
+        setError("이미 모둠을 선택했어요.");
+      } else {
+        setError("모둠 선택에 실패했어요.");
+      }
+    } catch {
+      setError("네트워크 오류로 선택하지 못했어요.");
+    } finally {
+      setPending(null);
+    }
+  }
+
+  return (
+    <>
+      <div className="modal-backdrop" onClick={pending === null ? onClose : undefined} />
+      <div
+        className="student-breakout-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="student-breakout-title"
+      >
+        <div className="student-breakout-modal-header">
+          <div>
+            <p className="student-breakout-kicker">{sourceTitle}</p>
+            <h2 id="student-breakout-title">모둠 선택</h2>
+          </div>
+          <button
+            type="button"
+            className="modal-close"
+            onClick={onClose}
+            disabled={pending !== null}
+            aria-label="닫기"
+          >
+            ×
+          </button>
+        </div>
+
+        {error && (
+          <p className="student-breakout-error" role="alert">
+            {error}
+          </p>
+        )}
+
+        <div className="student-breakout-grid">
+          {breakout.groups.map((group) => {
+            const isFull = group.totalCount >= breakout.groupCapacity;
+            return (
+              <button
+                key={group.groupIndex}
+                type="button"
+                className="student-breakout-group"
+                disabled={isFull || pending !== null}
+                onClick={() => void pick(group)}
+              >
+                <strong>모둠 {group.groupIndex}</strong>
+                <span>
+                  {group.totalCount} / {breakout.groupCapacity}명
+                </span>
+                {pending === group.groupIndex && <small>선택 중...</small>}
+                {isFull && <small>정원 마감</small>}
+              </button>
+            );
+          })}
+        </div>
+      </div>
     </>
   );
 }

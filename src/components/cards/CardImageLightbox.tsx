@@ -78,7 +78,7 @@ export function CardImageLightbox({ images, initialIndex, onClose }: Props) {
     >
       <button
         type="button"
-        className="card-image-lightbox-close"
+        className="ui-icon-action card-image-lightbox-close"
         onClick={onClose}
         aria-label="닫기"
       >

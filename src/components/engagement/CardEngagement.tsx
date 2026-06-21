@@ -278,7 +278,7 @@ function CommentsModal({
           <h3>댓글</h3>
           <button
             type="button"
-            className="card-engagement-modal-close"
+            className="ui-icon-action card-engagement-modal-close"
             onClick={onClose}
             aria-label="닫기"
           >

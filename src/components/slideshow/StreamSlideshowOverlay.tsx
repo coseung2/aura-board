@@ -125,7 +125,7 @@ export function StreamSlideshowOverlay({
             </span>
             <button
               type="button"
-              className="slideshow-close"
+              className="ui-icon-action slideshow-close"
               onClick={onClose}
               aria-label="슬라이드쇼 닫기"
             >
@@ -236,7 +236,7 @@ export function StreamSlideshowOverlay({
           </span>
           <button
             type="button"
-            className="slideshow-close"
+            className="ui-icon-action slideshow-close"
             onClick={onClose}
             aria-label="슬라이드쇼 닫기"
           >

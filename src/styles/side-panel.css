@@ -67,7 +67,7 @@
   cursor: pointer;
   padding: 6px;
   color: var(--color-text-muted);
-  border-radius: 50%;
+  border-radius: 0;
   width: 32px;
   height: 32px;
   display: inline-flex;
@@ -76,7 +76,6 @@
 }
 
 .side-panel-close:hover {
-  background: var(--color-surface-alt);
   color: var(--color-text);
 }
 

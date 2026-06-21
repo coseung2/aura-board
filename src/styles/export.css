@@ -128,7 +128,54 @@
 .export-summary {
   font-size: 14px;
   color: var(--color-text-muted);
-  margin: 0 0 16px;
+  margin: 0 0 12px;
+}
+
+.export-layout-options {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.export-layout-option {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  color: var(--color-text);
+  cursor: pointer;
+  transition: background 150ms ease, border-color 150ms ease;
+}
+
+.export-layout-option.active {
+  background: var(--color-accent-tinted-bg);
+  border-color: var(--color-accent);
+}
+
+.export-layout-option input {
+  flex-shrink: 0;
+  width: 16px;
+  height: 16px;
+  margin-top: 2px;
+  accent-color: var(--color-accent);
+}
+
+.export-layout-option span {
+  display: grid;
+  gap: 2px;
+}
+
+.export-layout-option strong {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.export-layout-option small {
+  font-size: 11px;
+  line-height: 1.35;
+  color: var(--color-text-faint);
 }
 
 .export-design-list {

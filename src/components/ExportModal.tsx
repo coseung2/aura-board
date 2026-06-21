@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { CardData } from "./DraggableCard";
 import { OptimizedImage } from "./ui/OptimizedImage";
 
@@ -10,54 +10,74 @@ type Props = {
   onClose: () => void;
 };
 
-type DesignInfo = {
+type ExportLayout = "a4-auto" | "a4-fit" | "original";
+
+type ExportItem = {
+  id: string;
+  type: "canva" | "image";
   cardId: string;
-  linkUrl: string;
+  url: string;
   title: string;
   pageCount: number | null;
   thumbnail: string | null;
   status: "loading" | "ready" | "error";
 };
 
+const EXPORT_LAYOUTS: Array<{
+  value: ExportLayout;
+  label: string;
+  description: string;
+}> = [
+  {
+    value: "a4-auto",
+    label: "A4 자동 배치",
+    description: "선택한 Canva 페이지와 이미지를 A4에 알맞게 묶어서 배치",
+  },
+  {
+    value: "a4-fit",
+    label: "A4 한 장씩",
+    description: "각 페이지와 이미지를 A4 한 장에 크게 맞춤",
+  },
+  {
+    value: "original",
+    label: "원본 크기",
+    description: "Canva PDF와 이미지 원본 크기를 그대로 유지",
+  },
+];
+
 export function ExportModal({ sectionTitle, cards, onClose }: Props) {
-  const canvaCards = cards.filter(
-    (c) => c.linkUrl && (c.linkUrl.includes("canva.link") || c.linkUrl.includes("canva.com"))
+  const exportItems = useMemo(() => buildExportItems(cards), [cards]);
+  const [items, setItems] = useState<ExportItem[]>(exportItems);
+  const [selected, setSelected] = useState<Set<string>>(
+    new Set(exportItems.map((item) => item.id)),
   );
-  const [designs, setDesigns] = useState<DesignInfo[]>(
-    canvaCards.map((c) => ({
-      cardId: c.id,
-      linkUrl: c.linkUrl!,
-      title: c.linkTitle || c.title,
-      pageCount: null,
-      thumbnail: c.linkImage || null,
-      status: "loading" as const,
-    }))
-  );
-  const [selected, setSelected] = useState<Set<string>>(new Set(canvaCards.map((c) => c.id)));
+  const [layout, setLayout] = useState<ExportLayout>("a4-auto");
   const [exporting, setExporting] = useState(false);
   const [progress, setProgress] = useState("");
 
-  // Fetch accurate design info from Canva API on mount
   useEffect(() => {
+    setItems(exportItems);
+    setSelected(new Set(exportItems.map((item) => item.id)));
+  }, [exportItems]);
+
+  useEffect(() => {
+    const canvaItems = exportItems.filter((item) => item.type === "canva");
     async function fetchDesignInfo() {
-      for (let i = 0; i < canvaCards.length; i++) {
-        const card = canvaCards[i];
+      for (const item of canvaItems) {
         try {
-          // Resolve shortlink first
           const resolveRes = await fetch(
-            `/api/export/resolve-canva?url=${encodeURIComponent(card.linkUrl!)}`
+            `/api/export/resolve-canva?url=${encodeURIComponent(item.url)}`,
           );
           if (!resolveRes.ok) throw new Error("resolve failed");
           const { designId } = await resolveRes.json();
           if (!designId) throw new Error("no design ID");
 
-          // Get design info via Canva API
           const infoRes = await fetch(`/api/canva/design/${designId}`);
           if (infoRes.ok) {
             const { design } = await infoRes.json();
-            setDesigns((prev) =>
+            setItems((prev) =>
               prev.map((d) =>
-                d.cardId === card.id
+                d.id === item.id
                   ? {
                       ...d,
                       title: design.title,
@@ -65,28 +85,27 @@ export function ExportModal({ sectionTitle, cards, onClose }: Props) {
                       thumbnail: design.thumbnail?.url || d.thumbnail,
                       status: "ready" as const,
                     }
-                  : d
-              )
+                  : d,
+              ),
             );
           } else {
-            // Canva not connected — use OG data
-            setDesigns((prev) =>
+            setItems((prev) =>
               prev.map((d) =>
-                d.cardId === card.id ? { ...d, status: "ready" as const } : d
-              )
+                d.id === item.id ? { ...d, status: "ready" as const } : d,
+              ),
             );
           }
         } catch {
-          setDesigns((prev) =>
+          setItems((prev) =>
             prev.map((d) =>
-              d.cardId === card.id ? { ...d, status: "error" as const } : d
-            )
+              d.id === item.id ? { ...d, status: "error" as const } : d,
+            ),
           );
         }
       }
     }
-    fetchDesignInfo();
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+    void fetchDesignInfo();
+  }, [exportItems]);
 
   function toggle(id: string) {
     setSelected((prev) => {
@@ -97,23 +116,30 @@ export function ExportModal({ sectionTitle, cards, onClose }: Props) {
     });
   }
 
-  const totalPages = designs
-    .filter((d) => selected.has(d.cardId) && d.pageCount)
-    .reduce((sum, d) => sum + (d.pageCount ?? 0), 0);
+  const selectedItems = items.filter((item) => selected.has(item.id));
+  const totalSourcePages = selectedItems.reduce(
+    (sum, item) => sum + (item.pageCount ?? 1),
+    0,
+  );
 
   async function handleExport() {
-    const selectedCards = canvaCards.filter((c) => selected.has(c.id));
-    if (selectedCards.length === 0) return;
+    if (selectedItems.length === 0) return;
 
     setExporting(true);
-    setProgress(`${selectedCards.length}개 디자인 PDF 내보내는 중...`);
+    setProgress(`${selectedItems.length}개 항목 PDF 내보내는 중...`);
 
     try {
-      const urls = selectedCards.map((c) => c.linkUrl!);
       const res = await fetch("/api/export/canva-pdf", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ urls }),
+        body: JSON.stringify({
+          layout,
+          items: selectedItems.map((item) => ({
+            type: item.type,
+            url: item.url,
+            title: item.title,
+          })),
+        }),
       });
 
       if (!res.ok) {
@@ -158,30 +184,59 @@ export function ExportModal({ sectionTitle, cards, onClose }: Props) {
       <div className="modal-backdrop" onClick={exporting ? undefined : onClose} />
       <div className="add-card-modal export-modal">
         <div className="modal-header">
-          <h2 className="modal-title">{sectionTitle} — PDF 내보내기</h2>
-          <button type="button" className="modal-close" onClick={onClose} disabled={exporting}>×</button>
+          <h2 className="modal-title">{sectionTitle} - PDF 내보내기</h2>
+          <button
+            type="button"
+            className="modal-close"
+            onClick={onClose}
+            disabled={exporting}
+            aria-label="닫기"
+          >
+            ×
+          </button>
         </div>
 
         <div className="modal-body">
-          {canvaCards.length === 0 ? (
-            <p className="export-hint">이 섹션에 Canva 링크가 있는 카드가 없습니다.</p>
+          {items.length === 0 ? (
+            <p className="export-hint">이 섹션에 내보낼 Canva 링크나 이미지가 없습니다.</p>
           ) : (
             <>
               <p className="export-summary">
-                Canva 디자인 {selected.size}개 선택
-                {totalPages > 0 && ` · 총 ${totalPages}페이지`}
+                항목 {selected.size}개 선택 · 원본 {totalSourcePages}페이지
               </p>
 
-              <div className="export-design-list">
-                {designs.map((d) => (
+              <div className="export-layout-options" aria-label="PDF 배치 방식">
+                {EXPORT_LAYOUTS.map((option) => (
                   <label
-                    key={d.cardId}
-                    className={`export-design-item ${selected.has(d.cardId) ? "ready" : ""}`}
+                    key={option.value}
+                    className={`export-layout-option ${layout === option.value ? "active" : ""}`}
+                  >
+                    <input
+                      type="radio"
+                      name="export-layout"
+                      value={option.value}
+                      checked={layout === option.value}
+                      disabled={exporting}
+                      onChange={() => setLayout(option.value)}
+                    />
+                    <span>
+                      <strong>{option.label}</strong>
+                      <small>{option.description}</small>
+                    </span>
+                  </label>
+                ))}
+              </div>
+
+              <div className="export-design-list">
+                {items.map((d) => (
+                  <label
+                    key={d.id}
+                    className={`export-design-item ${selected.has(d.id) ? "ready" : ""}`}
                   >
                     <input
                       type="checkbox"
-                      checked={selected.has(d.cardId)}
-                      onChange={() => toggle(d.cardId)}
+                      checked={selected.has(d.id)}
+                      onChange={() => toggle(d.id)}
                       disabled={exporting}
                       className="export-item-check"
                     />
@@ -194,7 +249,12 @@ export function ExportModal({ sectionTitle, cards, onClose }: Props) {
                       <div className="export-design-title">{d.title}</div>
                       <div className="export-design-meta">
                         {d.status === "loading" && "디자인 정보 가져오는 중..."}
-                        {d.status === "ready" && (d.pageCount ? `${d.pageCount}페이지` : "준비됨")}
+                        {d.status === "ready" &&
+                          (d.type === "image"
+                            ? "이미지 · 1페이지"
+                            : d.pageCount
+                              ? `${d.pageCount}페이지`
+                              : "준비됨")}
                         {d.status === "error" && "정보 가져오기 실패"}
                       </div>
                     </div>
@@ -205,7 +265,12 @@ export function ExportModal({ sectionTitle, cards, onClose }: Props) {
               {progress && <div className="export-ready-msg">{progress}</div>}
 
               <div className="modal-actions">
-                <button type="button" onClick={onClose} disabled={exporting} className="modal-btn-cancel">
+                <button
+                  type="button"
+                  onClick={onClose}
+                  disabled={exporting}
+                  className="modal-btn-cancel"
+                >
                   취소
                 </button>
                 <button
@@ -223,4 +288,75 @@ export function ExportModal({ sectionTitle, cards, onClose }: Props) {
       </div>
     </>
   );
+}
+
+function buildExportItems(cards: CardData[]): ExportItem[] {
+  const items: ExportItem[] = [];
+  for (const card of cards) {
+    if (card.linkUrl && isCanvaUrl(card.linkUrl)) {
+      items.push({
+        id: `${card.id}:canva`,
+        type: "canva",
+        cardId: card.id,
+        url: card.linkUrl,
+        title: card.linkTitle || card.title || "Canva 디자인",
+        pageCount: null,
+        thumbnail: card.linkImage || null,
+        status: "loading",
+      });
+    }
+
+    const seenImageUrls = new Set<string>();
+    for (const image of getCardImages(card)) {
+      if (seenImageUrls.has(image.url)) continue;
+      seenImageUrls.add(image.url);
+      items.push({
+        id: `${card.id}:image:${image.id}`,
+        type: "image",
+        cardId: card.id,
+        url: image.url,
+        title: image.title,
+        pageCount: 1,
+        thumbnail: image.previewUrl || image.url,
+        status: "ready",
+      });
+    }
+  }
+  return items;
+}
+
+function getCardImages(card: CardData): Array<{
+  id: string;
+  url: string;
+  previewUrl: string | null;
+  title: string;
+}> {
+  const images = (card.attachments ?? [])
+    .filter((attachment) => attachment.kind === "image")
+    .map((attachment, index) => ({
+      id: attachment.id || `attachment-${index}`,
+      url: attachment.url,
+      previewUrl: attachment.previewUrl ?? null,
+      title: attachment.fileName || card.title || `이미지 ${index + 1}`,
+    }));
+
+  if (images.length === 0 && card.imageUrl) {
+    images.push({
+      id: "legacy",
+      url: card.imageUrl,
+      previewUrl: card.thumbUrl ?? null,
+      title: card.title || "이미지",
+    });
+  }
+
+  return images;
+}
+
+function isCanvaUrl(url: string): boolean {
+  try {
+    const host = new URL(url).hostname.toLowerCase();
+    return host === "canva.link" || host === "canva.com" || host.endsWith(".canva.com");
+  } catch {
+    return url.includes("canva.link") || url.includes("canva.com");
+  }
 }

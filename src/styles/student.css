@@ -135,11 +135,14 @@
   display: flex;
   flex-direction: column;
   gap: 8px;
+  width: 100%;
   padding: 20px;
   background: var(--color-surface);
   border: var(--border-card);
   border-radius: var(--radius-card);
   box-shadow: var(--shadow-card);
+  font-family: var(--font-body);
+  text-align: left;
   text-decoration: none;
   color: var(--color-text);
   cursor: pointer;
@@ -162,6 +165,99 @@
   font-size: 13px;
   color: var(--color-text-muted);
   margin-top: 8px;
+}
+
+.student-breakout-modal {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  z-index: var(--z-modal);
+  width: min(560px, calc(100vw - 32px));
+  max-height: min(680px, calc(100vh - 48px));
+  overflow: auto;
+  transform: translate(-50%, -50%);
+  padding: 22px;
+  background: var(--color-surface);
+  border: var(--border-card);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-modal);
+}
+
+.student-breakout-modal-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.student-breakout-modal-header h2 {
+  margin: 2px 0 0;
+  font-family: var(--font-display);
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+.student-breakout-kicker {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--color-text-muted);
+}
+
+.student-breakout-error {
+  margin: 0 0 12px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: rgba(220, 53, 69, 0.08);
+  color: var(--color-danger);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.student-breakout-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 10px;
+}
+
+.student-breakout-group {
+  display: grid;
+  gap: 6px;
+  min-height: 108px;
+  padding: 14px;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: var(--color-bg-alt);
+  color: var(--color-text);
+  font-family: var(--font-body);
+  text-align: left;
+  cursor: pointer;
+  transition: background 150ms ease, border-color 150ms ease, box-shadow 150ms ease;
+}
+
+.student-breakout-group:hover:not(:disabled) {
+  background: var(--color-accent-tinted-bg);
+  border-color: var(--color-accent);
+  box-shadow: var(--shadow-card-hover);
+}
+
+.student-breakout-group:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.student-breakout-group strong {
+  font-family: var(--font-display);
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.student-breakout-group span,
+.student-breakout-group small {
+  font-size: 12px;
+  color: var(--color-text-muted);
 }
 
 .student-wallet-section {

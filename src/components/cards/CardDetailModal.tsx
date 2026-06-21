@@ -153,19 +153,17 @@ export function CardDetailModal({
         data-fullscreen={isFullscreen ? "true" : "false"}
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="card-detail-topbar">
-          <button
-            type="button"
-            className="modal-close card-detail-close"
-            onClick={onClose}
-            aria-label="닫기"
-          >
-            <CloseIcon size={18} />
-          </button>
-        </div>
         <button
           type="button"
-          className="card-detail-fullscreen"
+          className="ui-icon-action ui-corner-action card-detail-close"
+          onClick={onClose}
+          aria-label="닫기"
+        >
+          <CloseIcon size={20} />
+        </button>
+        <button
+          type="button"
+          className="ui-icon-action ui-corner-action card-detail-fullscreen"
           onClick={toggleFullscreen}
           aria-label={isFullscreen ? "전체화면 끄기" : "전체화면 켜기"}
           title={isFullscreen ? "전체화면 끄기" : "전체화면으로 발표"}

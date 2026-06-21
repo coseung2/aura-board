@@ -108,7 +108,7 @@ export async function POST(
         data: {
           boardId: createdBoard.id,
           templateId: template.id,
-          deployMode: "link-fixed",
+          deployMode: "self-select",
           groupCount: input.groupCount,
           groupCapacity: input.groupCapacity,
           visibilityOverride: input.visibilityOverride ?? null,
