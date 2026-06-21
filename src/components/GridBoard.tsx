@@ -131,8 +131,6 @@ export function GridBoard({ boardId, initialCards, currentUserId, currentRole, i
       <CardDetailModal
         card={openCard}
         onClose={() => setOpenCard(null)}
-        cards={cards}
-        onChange={setOpenCard}
         onEditAuthors={(c) => setAuthorEditCard(c)}
         canEditAuthors={(c) => canEdit || c.studentAuthorId === currentUserId}
       />

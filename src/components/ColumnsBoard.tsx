@@ -514,18 +514,6 @@ export function ColumnsBoard({
       <CardDetailModal
         card={openCard}
         onClose={() => setOpenCard(null)}
-        cards={
-          openCard
-            ? cards
-                .filter((c) => c.sectionId === openCard.sectionId)
-                .sort(
-                  comparatorFor(
-                    sortModeById[openCard.sectionId ?? ""] ?? "manual",
-                  ),
-                )
-            : cards
-        }
-        onChange={setOpenCard}
         onEditAuthors={(c) => setAuthorEditCard(c)}
         canEditAuthors={(c) => canEdit || c.studentAuthorId === currentUserId}
       />

@@ -509,8 +509,6 @@ export function BreakoutBoard({
       <CardDetailModal
         card={openCard}
         onClose={() => setOpenCard(null)}
-        cards={cards}
-        onChange={setOpenCard}
       />
     </div>
   );

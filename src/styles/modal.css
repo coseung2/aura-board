@@ -81,90 +81,10 @@
   box-shadow: 0 8px 20px rgba(0, 0, 0, 0.15);
 }
 
-/* Prev / next card navigation arrows. Positioned at middle-left and
-   middle-right so the student can swipe through a section's cards
-   without exiting the modal.
-   ⚠ card-detail-indicator (2026-06-12): 좌/우 화살표 버튼은 인디케이터
-   dots + 키보드 ← → 로 대체되어 더 이상 JSX에 렌더되지 않음.
-   CSS는 fullscreen 모드 display:none 룰과 외부 후크 호환 위해 유지. */
-.card-detail-nav {
-  position: absolute;
-  top: 50%;
-  transform: translateY(-50%);
-  z-index: 3;
-  width: 44px;
-  height: 64px;
-  border-radius: 8px;
-  border: 1px solid var(--color-border, #e2e2ea);
-  background: rgba(255, 255, 255, 0.92);
-  color: var(--color-text, #111);
-  cursor: pointer;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0;
-  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.1);
-  transition: transform 120ms ease, box-shadow 120ms ease;
-}
-.card-detail-nav:hover {
-  transform: translateY(-50%) scale(1.05);
-}
-.card-detail-nav-prev {
-  left: 12px;
-}
-.card-detail-nav-next {
-  right: 12px;
-}
-
-/* card-detail-indicator (2026-06-12): 모달 하단 중앙에 카드 위치 표시.
-   좌/우 화살표 대신 인디케이터 dots + 키보드 ← → 로 카드 간 이동.
-   dots는 클릭으로 직접 점프 가능 (onChange 호출).
-   2026-06-12 리팩토링: 카운트 텍스트 제거, dots만 중앙 정렬. */
-.card-detail-indicator {
-  position: absolute;
-  bottom: 14px;
-  left: 50%;
-  transform: translateX(-50%);
-  z-index: 4;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 8px 14px;
-  background: rgba(20, 18, 15, 0.78);
-  border-radius: 999px;
-  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.18);
-  backdrop-filter: blur(8px);
-  pointer-events: auto;
-}
-.card-detail-indicator-dots {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-}
-.card-detail-indicator-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: rgba(255, 255, 255, 0.35);
-  border: none;
-  padding: 0;
-  cursor: pointer;
-  transition: background 120ms ease, transform 120ms ease, width 160ms ease;
-}
-.card-detail-indicator-dot:hover {
-  background: rgba(255, 255, 255, 0.6);
-}
-.card-detail-indicator-dot.is-active {
-  background: #ffffff;
-  width: 18px;
-  border-radius: 4px;
-}
-
 /* When entering the browser fullscreen, the modal becomes the root
    element — strip all width/height caps + fixed-position offsets so it
-   genuinely fills the screen. Hide the side panel + navigation so the
-   presenter sees only the media. Close + fullscreen-toggle buttons fade
+   genuinely fills the screen. Hide the side panel so the presenter sees
+   only the media. Close + fullscreen-toggle buttons fade
    in on hover so they don't distract during presentation. */
 .card-detail-modal[data-fullscreen="true"] {
   width: 100vw !important;
@@ -181,14 +101,6 @@
   grid-template-columns: 1fr;
 }
 .card-detail-modal[data-fullscreen="true"] .card-detail-rail {
-  display: none;
-}
-.card-detail-modal[data-fullscreen="true"] .card-detail-nav {
-  display: none;
-}
-/* card-detail-indicator (2026-06-12): 풀스크린 발표 모드에서는 인디케이터 숨김.
-   발표는 한 카드씩 보는데 슬라이드 위치 노출이 노이즈가 됨. */
-.card-detail-modal[data-fullscreen="true"] .card-detail-indicator {
   display: none;
 }
 .card-detail-modal[data-fullscreen="true"] .card-detail-media .card-canva-slot-frame {
@@ -451,25 +363,21 @@
   width: 48px;
   height: 64px;
   padding: 0;
-  background: rgba(7, 18, 28, 0.62);
-  border: 1px solid rgba(255, 255, 255, 0.22);
-  border-radius: 999px;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
   user-select: none;
-  opacity: 0.92;
-  box-shadow: 0 12px 34px rgba(0, 0, 0, 0.26);
+  opacity: 1;
+  box-shadow: none;
+  mix-blend-mode: difference;
   transition:
     opacity 120ms ease,
-    transform 120ms ease,
-    background 120ms ease,
-    border-color 120ms ease;
-  backdrop-filter: blur(8px);
+    transform 120ms ease;
 }
 
 .card-attach-carousel-arrow:hover,
 .card-attach-carousel-arrow:focus-visible {
-  opacity: 1;
-  background: rgba(7, 18, 28, 0.82);
-  border-color: rgba(255, 255, 255, 0.42);
+  opacity: 0.78;
   transform: translateY(-50%) scale(1.04);
   outline: none;
 }

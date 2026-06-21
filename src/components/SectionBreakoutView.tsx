@@ -125,8 +125,6 @@ export function SectionBreakoutView({
       <CardDetailModal
         card={openCard ? (openCard as unknown as CardData) : null}
         onClose={() => setOpenCard(null)}
-        cards={cards as unknown as CardData[]}
-        onChange={(c) => setOpenCard(c as unknown as CardLike)}
       />
     </main>
   );

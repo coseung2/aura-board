@@ -18,9 +18,6 @@ import type { CardData } from "../DraggableCard";
 type Props = {
   card: CardData | null;
   onClose: () => void;
-  /** Optional: cards list + setter for prev/next navigation. */
-  cards?: CardData[];
-  onChange?: (card: CardData) => void;
   /** Opens CardAuthorEditor from inside the modal. When undefined the
    *  button is hidden. When defined, visibility is further gated by
    *  `canEditAuthors` (per-card predicate) if provided. */
@@ -36,8 +33,6 @@ type DetailLayout = "full" | "media-meta" | "text-meta";
 export function CardDetailModal({
   card,
   onClose,
-  cards,
-  onChange,
   onEditAuthors,
   canEditAuthors,
 }: Props) {
@@ -47,7 +42,7 @@ export function CardDetailModal({
   // kind==="image" 만 걸러낸 배열 내 인덱스.
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
 
-  // 카드가 바뀌면 라이트박스 자동 닫기 (카드 간 이동은 라이트박스의 scope 밖).
+  // 카드가 바뀌면 라이트박스 자동 닫기.
   useEffect(() => {
     setLightboxIndex(null);
   }, [card?.id]);
@@ -55,8 +50,7 @@ export function CardDetailModal({
   useEffect(() => {
     if (!card) return;
     function onKey(e: KeyboardEvent) {
-      // 라이트박스 열려 있으면 카드 네비게이션 (좌우 화살표·ESC) 전부
-      // 라이트박스에 위임. 여기선 무시.
+      // 라이트박스 열려 있으면 ESC 처리는 라이트박스에 위임.
       if (lightboxIndex !== null) return;
       if (e.key === "Escape") {
         e.preventDefault();

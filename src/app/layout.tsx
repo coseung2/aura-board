@@ -7,10 +7,32 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: "Aura-board",
-  description: "나만의 Aura-board — Notion inspired MVP",
+  description: "Classroom workspace",
+  metadataBase: new URL("https://aura-teacher.com"),
   icons: {
     icon: "/aura-app-icon-512.png",
     apple: "/aura-app-icon-512.png",
+  },
+  openGraph: {
+    title: "Aura-board",
+    description: "Classroom workspace",
+    url: "https://aura-teacher.com",
+    siteName: "Aura-board",
+    images: [
+      {
+        url: "/aura-board-og.png",
+        width: 1200,
+        height: 630,
+        alt: "Aura-board Classroom workspace",
+      },
+    ],
+    type: "website",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Aura-board",
+    description: "Classroom workspace",
+    images: ["/aura-board-og.png"],
   },
 };
 
