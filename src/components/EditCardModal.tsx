@@ -12,6 +12,10 @@ import {
   useCardAttachments,
   type AttachmentDraft,
 } from "./cards/useCardAttachments";
+import {
+  AttachmentDownloadLink,
+  getAttachmentDisplayName,
+} from "./cards/AttachmentDownloadLink";
 import { detectFirstUrl, removeUrlFromText } from "@/lib/link-detection";
 import { buildLinkTextBlock } from "./AddCardModal";
 
@@ -280,6 +284,18 @@ export function EditCardModal({ card, onSave, onClose }: Props) {
                         alt={a.fileName ?? ""}
                         className="modal-attach-image-preview"
                       />
+                      <div className="modal-attach-filebar">
+                        <span
+                          className="modal-attach-filebar-name"
+                          title={getAttachmentDisplayName(a)}
+                        >
+                          {getAttachmentDisplayName(a)}
+                        </span>
+                        <AttachmentDownloadLink
+                          attachment={a}
+                          className="modal-attach-download"
+                        />
+                      </div>
                       <div className="modal-attach-reorder modal-attach-reorder-overlay">
                         <button
                           type="button"
@@ -386,6 +402,18 @@ export function EditCardModal({ card, onSave, onClose }: Props) {
                         preload="metadata"
                         controls
                       />
+                      <div className="modal-attach-filebar">
+                        <span
+                          className="modal-attach-filebar-name"
+                          title={getAttachmentDisplayName(a)}
+                        >
+                          {getAttachmentDisplayName(a)}
+                        </span>
+                        <AttachmentDownloadLink
+                          attachment={a}
+                          className="modal-attach-download"
+                        />
+                      </div>
                       <div className="modal-attach-reorder modal-attach-reorder-overlay">
                         <button
                           type="button"
@@ -505,6 +533,10 @@ export function EditCardModal({ card, onSave, onClose }: Props) {
                           ↓
                         </button>
                       </div>
+                      <AttachmentDownloadLink
+                        attachment={a}
+                        className="modal-file-download"
+                      />
                       <button
                         type="button"
                         className="modal-file-remove"

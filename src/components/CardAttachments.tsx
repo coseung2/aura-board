@@ -203,11 +203,7 @@ export const CardAttachments = memo(function CardAttachments({ imageUrl, thumbUr
       ) : (
         <div className="card-attach-video-placeholder" aria-hidden="true" />
       )}
-      {source === "youtube" ? (
-        <span className="card-attach-youtube-play" aria-hidden="true">
-          ▶
-        </span>
-      ) : (
+      {source !== "youtube" && (
         <span className="card-attach-video-play" aria-hidden="true">
           <PlayIcon size={20} />
         </span>

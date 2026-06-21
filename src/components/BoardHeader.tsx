@@ -6,6 +6,7 @@ import { AuthHeader } from "./AuthHeader";
 import { EditableTitle } from "./EditableTitle";
 import { BoardSettingsLauncher } from "./BoardSettingsLauncher";
 import { QrShareModal } from "./share/QrShareModal";
+import { useBoardSlideshow } from "./slideshow/BoardSlideshowProvider";
 import type { BoardSection, BoardTheme } from "./BoardSettingsPanel";
 
 type Props = {
@@ -21,6 +22,8 @@ type Props = {
   shareMode?: string;
   shareToken?: string | null;
   shareShortCode?: string | null;
+  streamTitlePrompt?: string;
+  streamContentPrompt?: string;
 };
 
 export function BoardHeader({
@@ -36,9 +39,12 @@ export function BoardHeader({
   shareMode,
   shareToken,
   shareShortCode,
+  streamTitlePrompt,
+  streamContentPrompt,
 }: Props) {
   const [showQr, setShowQr] = useState(false);
   const isShared = shareMode && shareMode !== "private" && !!shareToken;
+  const { canOpen, openSlideshow } = useBoardSlideshow();
 
   return (
     <header className="board-header">
@@ -65,7 +71,19 @@ export function BoardHeader({
             shareMode={shareMode}
             shareToken={shareToken}
             shareShortCode={shareShortCode}
+            streamTitlePrompt={streamTitlePrompt ?? ""}
+            streamContentPrompt={streamContentPrompt ?? ""}
           />
+        )}
+        {canOpen && (
+          <button
+            type="button"
+            className="board-slideshow-trigger"
+            onClick={() => openSlideshow()}
+            aria-label="슬라이드쇼 시작"
+          >
+            슬라이드쇼
+          </button>
         )}
       </div>
       <div className="board-header-right">

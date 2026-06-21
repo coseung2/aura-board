@@ -1,11 +1,16 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import type { AddCardData } from "./AddCardModal";
 import type { CardData } from "./DraggableCard";
 import { StreamComposer } from "./stream/StreamComposer";
 import { StreamPost } from "./stream/StreamPost";
 import { useCardRealtime } from "@/hooks/useCardRealtime";
+import {
+  useBoardSlideshow,
+  type SlideshowSlide,
+} from "./slideshow/BoardSlideshowProvider";
 
 type Props = {
   boardId: string;
@@ -14,6 +19,8 @@ type Props = {
   currentRole: "owner" | "editor" | "viewer";
   isStudentViewer?: boolean;
   classroomId?: string | null;
+  streamTitlePrompt?: string;
+  streamContentPrompt?: string;
 };
 
 export function StreamBoard({
@@ -22,9 +29,12 @@ export function StreamBoard({
   currentUserId,
   currentRole,
   isStudentViewer,
+  streamTitlePrompt,
+  streamContentPrompt,
 }: Props) {
   const [cards, setCards] = useState<CardData[]>(() => sortPosts(initialCards));
   const [composerOpen, setComposerOpen] = useState(false);
+  const [mounted, setMounted] = useState(false);
   const canEdit = currentRole === "owner" || currentRole === "editor";
   const canAddPost = canEdit || !!isStudentViewer;
 
@@ -33,6 +43,25 @@ export function StreamBoard({
 
   // ── Realtime polling ──────────────────────────────────────────────
   useCardRealtime(boardId, setCards, deletingIds);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  // Register the sorted feed as slideshow slides so the board header
+  // button can open a presentation overlay. Reactive to realtime polling,
+  // local add, and delete because `cards` is the sorted state.
+  const { registerSlides, unregisterSlides } = useBoardSlideshow();
+  useEffect(() => {
+    const slides: SlideshowSlide[] = cards.map((card) => ({
+      id: card.id,
+      card,
+    }));
+    registerSlides("stream", slides);
+    return () => {
+      unregisterSlides("stream");
+    };
+  }, [cards, registerSlides, unregisterSlides]);
 
   async function handleAdd(data: AddCardData) {
     const res = await fetch("/api/cards", {
@@ -116,32 +145,45 @@ export function StreamBoard({
               <line x1="5" y1="12" x2="19" y2="12" />
             </svg>
           </button>
-          {composerOpen && (
-            <>
-              <div
-                className="modal-backdrop"
-                onClick={() => setComposerOpen(false)}
-              />
-              <div className="add-card-modal stream-composer-modal">
-                <div className="modal-header">
-                  <h2 className="modal-title">게시글 작성</h2>
-                  <button
-                    type="button"
-                    className="modal-close"
-                    onClick={() => setComposerOpen(false)}
-                  >
-                    닫기
-                  </button>
+          {mounted &&
+            composerOpen &&
+            createPortal(
+              <>
+                <div
+                  className="modal-backdrop"
+                  onClick={() => setComposerOpen(false)}
+                />
+                <div
+                  className="add-card-modal stream-composer-modal"
+                  role="dialog"
+                  aria-modal="true"
+                  aria-labelledby="stream-composer-modal-title"
+                >
+                  <div className="modal-header">
+                    <h2 className="modal-title" id="stream-composer-modal-title">
+                      게시글 작성
+                    </h2>
+                    <button
+                      type="button"
+                      className="modal-close"
+                      onClick={() => setComposerOpen(false)}
+                      aria-label="닫기"
+                    >
+                      ×
+                    </button>
+                  </div>
+                  <div className="modal-body">
+                    <StreamComposer
+                      onAdd={handleAdd}
+                      onSubmitted={() => setComposerOpen(false)}
+                      streamTitlePrompt={streamTitlePrompt}
+                      streamContentPrompt={streamContentPrompt}
+                    />
+                  </div>
                 </div>
-                <div className="modal-body">
-                  <StreamComposer
-                    onAdd={handleAdd}
-                    onSubmitted={() => setComposerOpen(false)}
-                  />
-                </div>
-              </div>
-            </>
-          )}
+              </>,
+              document.body,
+            )}
         </>
       )}
     </div>

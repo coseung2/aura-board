@@ -1,0 +1,315 @@
+"use client";
+
+import { useCallback, useEffect, useState } from "react";
+import { createPortal } from "react-dom";
+import { formatRelativeTime } from "@/lib/card-engagement-format";
+import { isYouTubeLink } from "@/lib/card-content-policy";
+import type { CardData } from "../DraggableCard";
+import {
+  ChevronLeftIcon,
+  ChevronRightIcon,
+  CloseIcon,
+} from "../icons/UiIcons";
+import { getStreamAuthor } from "../stream/stream-author";
+import type { SlideshowSlide } from "./BoardSlideshowProvider";
+
+type Props = {
+  slides: SlideshowSlide[];
+  index: number;
+  onIndexChange: (index: number) => void;
+  onClose: () => void;
+};
+
+type MediaItem = {
+  id: string;
+  kind: "image" | "video";
+  url: string;
+  previewUrl?: string | null;
+  alt: string;
+};
+
+export function StreamSlideshowOverlay({
+  slides,
+  index,
+  onIndexChange,
+  onClose,
+}: Props) {
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  const total = slides.length;
+  const safeIndex = Math.min(index, total - 1);
+  const slide = slides[safeIndex];
+
+  const go = useCallback(
+    (next: number) => {
+      if (total <= 1) return;
+      const bounded = (next + total) % total;
+      onIndexChange(bounded);
+    },
+    [total, onIndexChange],
+  );
+
+  // Keyboard: ArrowRight/PageDown goes next, ArrowLeft/PageUp goes previous,
+  // Escape closes the overlay.
+  useEffect(() => {
+    if (!slide) return;
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "ArrowRight" || e.key === "PageDown") {
+        e.preventDefault();
+        go(safeIndex + 1);
+      } else if (e.key === "ArrowLeft" || e.key === "PageUp") {
+        e.preventDefault();
+        go(safeIndex - 1);
+      } else if (e.key === "Escape") {
+        e.preventDefault();
+        onClose();
+      }
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [go, safeIndex, onClose, slide]);
+
+  if (!mounted || !slide) return null;
+
+  const card = slide.card;
+  const author = getStreamAuthor(card);
+  const mediaItems = buildSlideshowMedia(card);
+  const primaryMediaItem = mediaItems[0];
+  const fileAttachments = (card.attachments ?? []).filter(
+    (item) => item.kind === "file",
+  );
+  const hasContent = card.content.trim().length > 0;
+  const linkUrl = card.linkUrl;
+  const hasFiles = Boolean(card.fileUrl) || fileAttachments.length > 0;
+  const displayTitle = resolveSlideshowTitle(card);
+
+  return createPortal(
+    <div
+      className="slideshow-overlay"
+      role="dialog"
+      aria-modal="true"
+      aria-label="슬라이드쇼"
+    >
+      <div className="slideshow-topbar">
+        <div className="slideshow-meta">
+          <span className="slideshow-meta-app">Aura Board</span>
+          <span className="slideshow-meta-sep" aria-hidden="true">·</span>
+          <span className="slideshow-meta-author">{author.displayName}</span>
+          <time className="slideshow-meta-time">
+            {formatRelativeTime(
+              card.createdAt ?? new Date().toISOString(),
+            )}
+          </time>
+        </div>
+        <div className="slideshow-topbar-right">
+          <span className="slideshow-position" aria-live="polite">
+            {safeIndex + 1} / {total}
+          </span>
+          <button
+            type="button"
+            className="slideshow-close"
+            onClick={onClose}
+            aria-label="슬라이드쇼 닫기"
+          >
+            <CloseIcon size={18} />
+          </button>
+        </div>
+      </div>
+
+      <div className="slideshow-stage">
+        <div className="slideshow-text">
+          <h2 className="slideshow-title">{displayTitle}</h2>
+          {hasContent && <p className="slideshow-content">{card.content}</p>}
+
+          {linkUrl && (
+            <a
+              className="slideshow-link"
+              href={linkUrl}
+              target="_blank"
+              rel="noreferrer"
+            >
+              <span className="slideshow-link-host">
+                {getHost(linkUrl)}
+              </span>
+              <strong>{card.linkTitle || linkUrl}</strong>
+              {card.linkDesc && <span>{card.linkDesc}</span>}
+            </a>
+          )}
+
+          {hasFiles && (
+            <div className="slideshow-files">
+              {card.fileUrl && (
+                <div
+                  className="slideshow-file"
+                  title={card.fileName ?? undefined}
+                >
+                  <span className="slideshow-file-icon" aria-hidden="true">
+                    파일
+                  </span>
+                  <span className="slideshow-file-name">
+                    {card.fileName ?? "파일"}
+                  </span>
+                </div>
+              )}
+              {fileAttachments.map((file) => (
+                <div
+                  className="slideshow-file"
+                  key={file.id}
+                  title={file.fileName ?? undefined}
+                >
+                  <span className="slideshow-file-icon" aria-hidden="true">
+                    파일
+                  </span>
+                  <span className="slideshow-file-name">
+                    {file.fileName ?? "파일"}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <div className="slideshow-media">
+          {primaryMediaItem ? (
+            <div className="slideshow-media-strip">
+              <figure className="slideshow-media-slide">
+                {primaryMediaItem.kind === "image" ? (
+                  <img
+                    src={primaryMediaItem.url}
+                    alt={primaryMediaItem.alt}
+                    loading="lazy"
+                    decoding="async"
+                  />
+                ) : (
+                  <video
+                    src={primaryMediaItem.url}
+                    poster={primaryMediaItem.previewUrl ?? undefined}
+                    controls
+                    preload="metadata"
+                    playsInline
+                  />
+                )}
+              </figure>
+            </div>
+          ) : (
+            <div className="slideshow-media-empty">
+              <span>미디어가 없어요</span>
+            </div>
+          )}
+        </div>
+      </div>
+
+      <div className="slideshow-controls">
+        <button
+          type="button"
+          className="slideshow-nav slideshow-prev"
+          onClick={() => go(safeIndex - 1)}
+          disabled={total <= 1}
+          aria-label="이전 슬라이드"
+        >
+          <ChevronLeftIcon size={24} />
+        </button>
+        <button
+          type="button"
+          className="slideshow-nav slideshow-next"
+          onClick={() => go(safeIndex + 1)}
+          disabled={total <= 1}
+          aria-label="다음 슬라이드"
+        >
+          <ChevronRightIcon size={24} />
+        </button>
+      </div>
+    </div>,
+    document.body,
+  );
+}
+
+/**
+ * Resolve a display title for the slideshow. Falls back to the first
+ * non-empty content line, then to "제목 없음" when both are empty.
+ */
+function resolveSlideshowTitle(card: CardData): string {
+  const trimmedTitle = card.title.trim();
+  if (trimmedTitle) return trimmedTitle;
+  const firstLine = card.content
+    .split("\n")
+    .map((line) => line.trim())
+    .find((line) => line.length > 0);
+  return firstLine ?? "제목 없음";
+}
+
+/**
+ * Build media items for a slide. Mirrors StreamMediaCarousel's
+ * buildMediaItems logic (attachments, then legacy imageUrl/videoUrl) and
+ * adds a link-preview-image fallback so a link-only post still has a
+ * visual on the right panel.
+ */
+function buildSlideshowMedia(card: CardData): MediaItem[] {
+  const fromAttachments = (card.attachments ?? [])
+    .filter((item) => item.kind === "image" || item.kind === "video")
+    .map((item) => ({
+      id: item.id,
+      kind: item.kind as "image" | "video",
+      url: item.url,
+      previewUrl: item.previewUrl,
+      alt: item.fileName ?? card.title,
+    }));
+
+  if (fromAttachments.length > 0) return fromAttachments;
+
+  const legacy: MediaItem[] = [];
+  if (card.imageUrl) {
+    legacy.push({
+      id: `${card.id}-image`,
+      kind: "image",
+      url: card.imageUrl,
+      previewUrl: card.thumbUrl,
+      alt: card.title,
+    });
+  }
+  // Skip video when it's just a YouTube link URL (shown as link preview).
+  if (
+    card.videoUrl &&
+    !(
+      card.linkUrl &&
+      card.videoUrl === card.linkUrl &&
+      isYouTubeLink(card.linkUrl)
+    )
+  ) {
+    legacy.push({
+      id: `${card.id}-video`,
+      kind: "video",
+      url: card.videoUrl,
+      previewUrl: card.thumbUrl,
+      alt: card.title,
+    });
+  }
+  if (legacy.length > 0) return legacy;
+
+  // Fallback: link preview image as the visual media.
+  if (card.linkImage) {
+    return [
+      {
+        id: `${card.id}-link-image`,
+        kind: "image",
+        url: card.linkImage,
+        previewUrl: null,
+        alt: card.linkTitle ?? card.title,
+      },
+    ];
+  }
+
+  return [];
+}
+
+function getHost(rawUrl: string): string {
+  try {
+    return new URL(rawUrl).hostname.replace(/^www\./, "");
+  } catch {
+    return rawUrl;
+  }
+}

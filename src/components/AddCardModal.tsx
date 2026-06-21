@@ -22,6 +22,10 @@ import {
   LibraryPickerModal,
   type LibraryAsset,
 } from "./cards/LibraryPickerModal";
+import {
+  AttachmentDownloadLink,
+  getAttachmentDisplayName,
+} from "./cards/AttachmentDownloadLink";
 import { detectFirstUrl, removeUrlFromText } from "@/lib/link-detection";
 
 export type { AttachmentDraft } from "./cards/useCardAttachments";
@@ -428,6 +432,18 @@ export function AddCardModal({
                         alt={a.fileName ?? ""}
                         className="modal-attach-image-preview"
                       />
+                      <div className="modal-attach-filebar">
+                        <span
+                          className="modal-attach-filebar-name"
+                          title={getAttachmentDisplayName(a)}
+                        >
+                          {getAttachmentDisplayName(a)}
+                        </span>
+                        <AttachmentDownloadLink
+                          attachment={a}
+                          className="modal-attach-download"
+                        />
+                      </div>
                       <div className="modal-attach-reorder modal-attach-reorder-overlay">
                         <button
                           type="button"
@@ -572,6 +588,18 @@ export function AddCardModal({
                         className="modal-preview-video-file"
                         preload="metadata"
                       />
+                      <div className="modal-attach-filebar">
+                        <span
+                          className="modal-attach-filebar-name"
+                          title={getAttachmentDisplayName(a)}
+                        >
+                          {getAttachmentDisplayName(a)}
+                        </span>
+                        <AttachmentDownloadLink
+                          attachment={a}
+                          className="modal-attach-download"
+                        />
+                      </div>
                       <div className="modal-attach-reorder modal-attach-reorder-overlay">
                         <button
                           type="button"
@@ -690,6 +718,10 @@ export function AddCardModal({
                           ↓
                         </button>
                       </div>
+                      <AttachmentDownloadLink
+                        attachment={a}
+                        className="modal-file-download"
+                      />
                       <button
                         type="button"
                         className="modal-file-remove"

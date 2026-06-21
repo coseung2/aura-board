@@ -1,0 +1,2 @@
+ALTER TABLE "Board" ADD COLUMN "streamTitlePrompt" TEXT NOT NULL DEFAULT '';
+ALTER TABLE "Board" ADD COLUMN "streamContentPrompt" TEXT NOT NULL DEFAULT '';

@@ -29,8 +29,9 @@ dev server before browser checks when practical.
 Use opencode workers only for narrow, bounded tasks.
 
 - `frontend`: UI, CSS, React components, responsive layout, visual QA, and
-  user-facing flows.
+  user-facing flows. Use `opencode-go/glm-5.2`.
 - `backend`: API routes, Prisma, auth, permissions, cron, and reliability.
+  Use `opencode-go/minimax-m3`.
 - `docs`: README, API docs, and project documentation.
 - `frontend-audit` and `backend-audit`: read-only review agents.
 
@@ -40,7 +41,7 @@ whole-UI audit prompts.
 Reliable command shape:
 
 ```powershell
-opencode run "prompt first" --agent frontend --model opencode-go/mimo-v2.5-pro --file "src/path/file.tsx"
+opencode run "prompt first" --agent frontend --model opencode-go/glm-5.2 --file "src/path/file.tsx"
 ```
 
 Do not put the prompt after `--file`; this opencode version can interpret it as

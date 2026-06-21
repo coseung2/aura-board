@@ -24,6 +24,7 @@ import type { PlantJournalResponse } from "@/types/plant";
 import type { BoardSection } from "@/components/BoardSettingsPanel";
 import { BoardVisitTracker } from "@/components/BoardVisitTracker";
 import { BoardHeader } from "@/components/BoardHeader";
+import { BoardSlideshowProvider } from "@/components/slideshow/BoardSlideshowProvider";
 import { loadPlantJournalInitial } from "@/lib/board-page/plant-journal-loader";
 import type { BoardTheme } from "@/components/BoardSettingsPanel";
 
@@ -366,7 +367,13 @@ export default async function BoardPage({
       case "grid":
         return <GridBoard {...common} />;
       case "stream":
-        return <StreamBoard {...common} />;
+        return (
+          <StreamBoard
+            {...common}
+            streamTitlePrompt={board!.streamTitlePrompt ?? ""}
+            streamContentPrompt={board!.streamContentPrompt ?? ""}
+          />
+        );
       case "columns":
         return <ColumnsBoard {...common} initialSections={sectionProps} />;
       case "dj-queue":
@@ -646,23 +653,27 @@ export default async function BoardPage({
   }
 
   return (
-    <main className="board-page" data-board-theme={boardTheme}>
-      <BoardVisitTracker boardId={board.id} />
-      <BoardHeader
-        boardId={board.id}
-        title={board.title}
-        layout={board.layout}
-        isStudent={!!studentViewer}
-        backHref={studentViewer ? "/student" : "/"}
-        canEdit={effectiveRole === "owner" || effectiveRole === "editor"}
-        settingsSections={settingsSections}
-        anonymousAuthor={board.anonymousAuthor}
-        boardTheme={boardTheme}
-        shareMode={board.shareMode}
-        shareToken={board.shareToken}
-        shareShortCode={board.shareShortCode}
-      />
-      {renderBoard()}
-    </main>
+    <BoardSlideshowProvider>
+      <main className="board-page" data-board-theme={boardTheme}>
+        <BoardVisitTracker boardId={board.id} />
+        <BoardHeader
+          boardId={board.id}
+          title={board.title}
+          layout={board.layout}
+          isStudent={!!studentViewer}
+          backHref={studentViewer ? "/student" : "/"}
+          canEdit={effectiveRole === "owner" || effectiveRole === "editor"}
+          settingsSections={settingsSections}
+          anonymousAuthor={board.anonymousAuthor}
+          boardTheme={boardTheme}
+          shareMode={board.shareMode}
+          shareToken={board.shareToken}
+          shareShortCode={board.shareShortCode}
+          streamTitlePrompt={board.streamTitlePrompt ?? ""}
+          streamContentPrompt={board.streamContentPrompt ?? ""}
+        />
+        {renderBoard()}
+      </main>
+    </BoardSlideshowProvider>
   );
 }

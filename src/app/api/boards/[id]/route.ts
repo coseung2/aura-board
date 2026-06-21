@@ -9,6 +9,8 @@ const PatchBoardSchema = z.object({
   title: z.string().max(200).optional(),
   description: z.string().max(2000).optional(),
   classroomId: z.string().nullable().optional(),
+  streamTitlePrompt: z.string().max(200).optional(),
+  streamContentPrompt: z.string().max(1000).optional(),
   // card-comments-likes (2026-04-26)
   anonymousAuthor: z.boolean().optional(),
   boardTheme: z

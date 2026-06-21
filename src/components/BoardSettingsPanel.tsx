@@ -31,6 +31,8 @@ type Props = {
   initialShareMode?: string;
   initialShareToken?: string | null;
   initialShareShortCode?: string | null;
+  initialStreamTitlePrompt?: string;
+  initialStreamContentPrompt?: string;
 };
 
 const TAB_LABELS: Record<Tab, string> = {
@@ -42,37 +44,31 @@ const TAB_LABELS: Record<Tab, string> = {
 const BOARD_THEME_OPTIONS: Array<{
   value: BoardTheme;
   label: string;
-  tone: string;
   swatch: string;
 }> = [
   {
     value: "pastel-peach",
     label: "복숭아",
-    tone: "핑크 코랄",
     swatch: "linear-gradient(135deg, #fff4ef 0%, #ffe1dc 100%)",
   },
   {
     value: "pastel-mint",
     label: "민트",
-    tone: "민트 그린",
     swatch: "linear-gradient(135deg, #f2fff8 0%, #d9f6ea 100%)",
   },
   {
     value: "pastel-sky",
     label: "하늘",
-    tone: "소프트 블루",
     swatch: "linear-gradient(135deg, #f2f8ff 0%, #dcecff 100%)",
   },
   {
     value: "pastel-lilac",
     label: "라일락",
-    tone: "연보라",
     swatch: "linear-gradient(135deg, #f8f4ff 0%, #eadfff 100%)",
   },
   {
     value: "pastel-lemon",
     label: "레몬",
-    tone: "옐로",
     swatch: "linear-gradient(135deg, #fffdf1 0%, #fff1c9 100%)",
   },
 ];
@@ -88,6 +84,8 @@ export function BoardSettingsPanel({
   initialShareMode = "private",
   initialShareToken = null,
   initialShareShortCode = null,
+  initialStreamTitlePrompt = "",
+  initialStreamContentPrompt = "",
 }: Props) {
   const router = useRouter();
   const [tab, setTab] = useState<Tab>("basic");
@@ -98,6 +96,12 @@ export function BoardSettingsPanel({
   const [shareToken, setShareToken] = useState<string | null>(initialShareToken);
   const [shareShortCode, setShareShortCode] = useState<string | null>(
     initialShareShortCode,
+  );
+  const [streamTitlePrompt, setStreamTitlePrompt] = useState(
+    initialStreamTitlePrompt,
+  );
+  const [streamContentPrompt, setStreamContentPrompt] = useState(
+    initialStreamContentPrompt,
   );
   const tablistId = useId();
 
@@ -110,6 +114,8 @@ export function BoardSettingsPanel({
     setShareMode(initialShareMode);
     setShareToken(initialShareToken);
     setShareShortCode(initialShareShortCode);
+    setStreamTitlePrompt(initialStreamTitlePrompt);
+    setStreamContentPrompt(initialStreamContentPrompt);
   }, [
     open,
     initialSections,
@@ -118,6 +124,8 @@ export function BoardSettingsPanel({
     initialShareMode,
     initialShareToken,
     initialShareShortCode,
+    initialStreamTitlePrompt,
+    initialStreamContentPrompt,
   ]);
 
   function handleSectionTokenChange(sectionId: string, nextToken: string | null) {
@@ -165,6 +173,7 @@ export function BoardSettingsPanel({
         >
           <BasicTab
             boardId={boardId}
+            layout={layout}
             anonymousAuthor={anonymousAuthor}
             onAnonymousAuthorChange={setAnonymousAuthor}
             initialShareMode={shareMode}
@@ -172,6 +181,10 @@ export function BoardSettingsPanel({
             initialShareShortCode={shareShortCode}
             boardTheme={boardTheme}
             onThemeChange={setBoardTheme}
+            streamTitlePrompt={streamTitlePrompt}
+            streamContentPrompt={streamContentPrompt}
+            onStreamTitlePromptChange={setStreamTitlePrompt}
+            onStreamContentPromptChange={setStreamContentPrompt}
           />
         </div>
       )}
@@ -214,6 +227,7 @@ export function BoardSettingsPanel({
 
 function BasicTab({
   boardId,
+  layout,
   anonymousAuthor,
   onAnonymousAuthorChange,
   initialShareMode,
@@ -221,8 +235,13 @@ function BasicTab({
   initialShareShortCode,
   boardTheme,
   onThemeChange,
+  streamTitlePrompt,
+  streamContentPrompt,
+  onStreamTitlePromptChange,
+  onStreamContentPromptChange,
 }: {
   boardId: string;
+  layout: string;
   anonymousAuthor: boolean;
   onAnonymousAuthorChange: (next: boolean) => void;
   initialShareMode: string;
@@ -230,6 +249,10 @@ function BasicTab({
   initialShareShortCode: string | null;
   boardTheme: BoardTheme;
   onThemeChange: (next: BoardTheme) => void;
+  streamTitlePrompt: string;
+  streamContentPrompt: string;
+  onStreamTitlePromptChange: (next: string) => void;
+  onStreamContentPromptChange: (next: string) => void;
 }) {
   return (
     <div className="board-settings-basic">
@@ -240,6 +263,17 @@ function BasicTab({
           onChange={onAnonymousAuthorChange}
         />
       </SettingsSection>
+      {layout === "stream" && (
+        <SettingsSection title="글쓰기 안내">
+          <StreamGuidanceTab
+            boardId={boardId}
+            titlePrompt={streamTitlePrompt}
+            contentPrompt={streamContentPrompt}
+            onTitlePromptChange={onStreamTitlePromptChange}
+            onContentPromptChange={onStreamContentPromptChange}
+          />
+        </SettingsSection>
+      )}
       <SettingsSection title="공유">
         <ShareTab
           boardId={boardId}
@@ -313,9 +347,6 @@ function EngagementTab({
 
   return (
     <div className="board-settings-control-stack">
-      <p className="section-panel-notice" style={{ marginTop: 0 }}>
-        보드 안의 카드와 댓글 작성자 표시 방식을 조절해요.
-      </p>
       <label className="board-settings-check-row">
         <input
           type="checkbox"
@@ -332,6 +363,129 @@ function EngagementTab({
         </span>
       </label>
       {err && <p className="board-settings-error">{err}</p>}
+    </div>
+  );
+}
+
+function StreamGuidanceTab({
+  boardId,
+  titlePrompt,
+  contentPrompt,
+  onTitlePromptChange,
+  onContentPromptChange,
+}: {
+  boardId: string;
+  titlePrompt: string;
+  contentPrompt: string;
+  onTitlePromptChange: (next: string) => void;
+  onContentPromptChange: (next: string) => void;
+}) {
+  const router = useRouter();
+  const [titleDraft, setTitleDraft] = useState(titlePrompt);
+  const [contentDraft, setContentDraft] = useState(contentPrompt);
+  const [saveState, setSaveState] = useState<
+    | { status: "idle" }
+    | { status: "saving" }
+    | { status: "saved"; at: number }
+    | { status: "error"; message: string }
+  >({ status: "idle" });
+
+  // Sync drafts when the panel reopens or the upstream state changes.
+  useEffect(() => {
+    setTitleDraft(titlePrompt);
+    setContentDraft(contentPrompt);
+  }, [titlePrompt, contentPrompt]);
+
+  const titleDirty = titleDraft !== titlePrompt;
+  const contentDirty = contentDraft !== contentPrompt;
+  const canSave = titleDirty || contentDirty;
+
+  async function save() {
+    if (!canSave) return;
+    setSaveState({ status: "saving" });
+    try {
+      const res = await fetch(`/api/boards/${boardId}`, {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          streamTitlePrompt: titleDraft.slice(0, 200),
+          streamContentPrompt: contentDraft.slice(0, 1000),
+        }),
+      });
+      if (!res.ok) {
+        setSaveState({ status: "error", message: "저장에 실패했어요." });
+        return;
+      }
+      onTitlePromptChange(titleDraft.slice(0, 200));
+      onContentPromptChange(contentDraft.slice(0, 1000));
+      router.refresh();
+      setSaveState({ status: "saved", at: Date.now() });
+    } catch {
+      setSaveState({ status: "error", message: "저장에 실패했어요." });
+    }
+  }
+
+  return (
+    <div className="board-settings-control-stack">
+      <div className="stream-guidance-field">
+        <label className="stream-guidance-label" htmlFor={`sg-title-${boardId}`}>
+          제목 안내
+        </label>
+        <input
+          id={`sg-title-${boardId}`}
+          type="text"
+          className="stream-guidance-input"
+          value={titleDraft}
+          onChange={(e) => setTitleDraft(e.target.value.slice(0, 200))}
+          placeholder="예: 0번 자기 이름: 제목 쓰기"
+          maxLength={200}
+          disabled={saveState.status === "saving"}
+        />
+        <span className="stream-guidance-counter">
+          {titleDraft.length}/200
+        </span>
+      </div>
+      <div className="stream-guidance-field">
+        <label
+          className="stream-guidance-label"
+          htmlFor={`sg-content-${boardId}`}
+        >
+          본문 안내
+        </label>
+        <textarea
+          id={`sg-content-${boardId}`}
+          className="stream-guidance-textarea"
+          value={contentDraft}
+          onChange={(e) => setContentDraft(e.target.value.slice(0, 1000))}
+          placeholder="예: 자료를 조사하고 설명하는 글의 구조에 맞게 설명하는 글쓰기"
+          maxLength={1000}
+          rows={4}
+          disabled={saveState.status === "saving"}
+        />
+        <span className="stream-guidance-counter">
+          {contentDraft.length}/1000
+        </span>
+      </div>
+      <div className="stream-guidance-actions">
+        <button
+          type="button"
+          className="stream-guidance-save"
+          onClick={() => void save()}
+          disabled={!canSave || saveState.status === "saving"}
+        >
+          {saveState.status === "saving" ? "저장 중..." : "저장"}
+        </button>
+        {saveState.status === "saved" && (
+          <span className="stream-guidance-status" aria-live="polite">
+            저장했어요.
+          </span>
+        )}
+        {saveState.status === "error" && (
+          <span className="stream-guidance-error" aria-live="polite">
+            {saveState.message}
+          </span>
+        )}
+      </div>
     </div>
   );
 }
@@ -377,9 +531,6 @@ function ThemeTab({
 
   return (
     <div className="board-settings-control-stack">
-      <p className="section-panel-notice" style={{ marginTop: 0 }}>
-        보드 배경에 어울리는 파스텔 테마를 골라요.
-      </p>
       <div className="board-theme-grid">
         {BOARD_THEME_OPTIONS.map((option) => {
           const selected = option.value === value;
@@ -399,7 +550,6 @@ function ThemeTab({
               />
               <span className="board-theme-copy">
                 <span className="board-theme-label">{option.label}</span>
-                <span className="board-theme-tone">{option.tone}</span>
               </span>
             </button>
           );
@@ -447,10 +597,6 @@ function BreakoutTab({
 
   return (
     <>
-      <p className="section-panel-notice" style={{ marginTop: 0 }}>
-        각 섹션별 모둠 모드 링크를 관리해요. 링크를 공유하면 해당 섹션만 볼 수
-        있어요.
-      </p>
       <div className="board-settings-list">
         {sections.map((section) => (
           <BreakoutSectionRow

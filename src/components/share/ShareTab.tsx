@@ -145,10 +145,6 @@ export function ShareTab({ boardId, initialShareMode, initialShareToken, initial
 
   return (
     <div className="share-tab">
-      <p className="section-panel-notice" style={{ marginTop: 0 }}>
-        QR 코드나 링크를 받은 사람에게 학생 권한으로 보드를 공유해요.
-      </p>
-
       <div className="share-mode-row">
         <label className="share-mode-label">
           <span style={{ fontSize: 14, fontWeight: 600 }}>공유</span>

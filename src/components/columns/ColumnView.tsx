@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useRef } from "react";
-import { flushSync } from "react-dom";
+import { useEffect, useRef, useState } from "react";
+import { createPortal, flushSync } from "react-dom";
 import type { CardData } from "../DraggableCard";
 import { CardBody } from "../cards/CardBody";
 import { ContextMenu } from "../ContextMenu";
@@ -30,6 +30,7 @@ type Props = {
   draggingSectionId: string | null;
   cardDropPreview: CardDropPreview;
   organizing: string | null;
+  roster: RosterEntry[];
   authorsForSection: (cards: CardData[]) => RosterEntry[];
   studentForSectionTitle: (title: string) => RosterEntry | null;
   onSetSort: (mode: SortMode) => void | Promise<void>;
@@ -85,6 +86,7 @@ export function ColumnView(props: Props) {
     draggingSectionId,
     cardDropPreview,
     organizing,
+    roster,
     authorsForSection,
     studentForSectionTitle,
     onSetSort,
@@ -124,6 +126,14 @@ export function ColumnView(props: Props) {
 
   const menuItems = canEdit ? buildMenuItems() : [];
   const isDropSection = overSectionId === section.id;
+  const [submissionModalOpen, setSubmissionModalOpen] = useState(false);
+  const submittedStudents = authorsForSection(sectionCards);
+  const submittedIds = new Set(submittedStudents.map((student) => student.id));
+  const missingStudents = roster
+    .filter((student) => !submittedIds.has(student.id))
+    .sort(compareRosterEntries);
+  const submissionCount =
+    roster.length > 0 ? submittedStudents.length : sectionCards.length;
 
   // Throttle drag-preview updates: only call onCardDropPreview when the
   // hover target actually changes, not on every onDragOver pixel-event.
@@ -136,6 +146,15 @@ export function ColumnView(props: Props) {
   }>({ el: null, frame: null, pointerY: 0 });
 
   useEffect(() => stopColumnAutoScroll, []);
+
+  useEffect(() => {
+    if (!submissionModalOpen) return;
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setSubmissionModalOpen(false);
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [submissionModalOpen]);
 
   function startColumnAutoScroll(el: HTMLElement, pointerY: number) {
     autoScrollRef.current.el = el;
@@ -318,21 +337,22 @@ export function ColumnView(props: Props) {
   }
 
   return (
-    <div
-      className="column"
-      onDragOver={onDragOver}
-      onDragEnter={() => onDragEnter(section.id)}
-      onDragLeave={(e) => {
-        if (!e.currentTarget.contains(e.relatedTarget as Node)) {
+    <>
+      <div
+        className="column"
+        onDragOver={onDragOver}
+        onDragEnter={() => onDragEnter(section.id)}
+        onDragLeave={(e) => {
+          if (!e.currentTarget.contains(e.relatedTarget as Node)) {
+            stopColumnAutoScroll();
+          }
+          onDragLeave(e);
+        }}
+        onDrop={(e) => {
           stopColumnAutoScroll();
-        }
-        onDragLeave(e);
-      }}
-      onDrop={(e) => {
-        stopColumnAutoScroll();
-        onDrop(e, section.id);
-      }}
-    >
+          onDrop(e, section.id);
+        }}
+      >
       <div
         className={`column-header ${canEdit ? "is-section-draggable" : ""} ${
           draggingSectionId === section.id ? "is-section-dragging" : ""
@@ -361,10 +381,23 @@ export function ColumnView(props: Props) {
             aria-label={pinned ? "섹션 고정 해제" : "섹션 고정"}
             title={pinned ? "고정해제" : "고정"}
           >
-            {pinned ? "📌 고정해제" : "📌 고정"}
+            📌
           </button>
         )}
-        <span className="column-count">{sectionCards.length}</span>
+        <button
+          type="button"
+          className="column-count column-count-button"
+          onMouseDown={(e) => e.stopPropagation()}
+          onClick={(e) => {
+            e.stopPropagation();
+            setSubmissionModalOpen(true);
+          }}
+          onDragStart={(e) => e.preventDefault()}
+          aria-label={`${section.title} 제출 현황 보기`}
+          title="제출 현황"
+        >
+          {submissionCount}
+        </button>
         {(canEdit || menuItems.length > 0) && (
           <ColumnMenu
             sortMode={sortMode}
@@ -577,7 +610,135 @@ export function ColumnView(props: Props) {
           )}
         </div>
       </div>
+      </div>
+      {submissionModalOpen &&
+        createPortal(
+          <SubmissionStatusModal
+            sectionTitle={section.title}
+            submitted={submittedStudents}
+            missing={missingStudents}
+            rosterCount={roster.length}
+            fallbackCount={sectionCards.length}
+            onClose={() => setSubmissionModalOpen(false)}
+          />,
+          document.body,
+        )}
+    </>
+  );
+}
+
+function compareRosterEntries(a: RosterEntry, b: RosterEntry) {
+  if (a.number == null && b.number == null) {
+    return a.name.localeCompare(b.name, "ko");
+  }
+  if (a.number == null) return 1;
+  if (b.number == null) return -1;
+  return a.number - b.number;
+}
+
+function formatRosterName(student: RosterEntry) {
+  return student.number == null
+    ? student.name
+    : `${student.number}번 ${student.name}`;
+}
+
+function SubmissionStatusModal({
+  sectionTitle,
+  submitted,
+  missing,
+  rosterCount,
+  fallbackCount,
+  onClose,
+}: {
+  sectionTitle: string;
+  submitted: RosterEntry[];
+  missing: RosterEntry[];
+  rosterCount: number;
+  fallbackCount: number;
+  onClose: () => void;
+}) {
+  const hasRoster = rosterCount > 0;
+
+  return (
+    <div className="modal-backdrop" onMouseDown={onClose}>
+      <section
+        className="column-submission-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-label={`${sectionTitle} 제출 현황`}
+        onMouseDown={(event) => event.stopPropagation()}
+      >
+        <div className="modal-header">
+          <div>
+            <p className="column-submission-eyebrow">{sectionTitle}</p>
+            <h2 className="modal-title">제출 현황</h2>
+          </div>
+          <button
+            type="button"
+            className="modal-close"
+            onClick={onClose}
+            aria-label="닫기"
+          />
+        </div>
+        <div className="column-submission-modal-body">
+          <div className="column-submission-summary">
+            <span className="column-submission-summary-chip">
+              제출 {submitted.length}
+            </span>
+            {hasRoster ? (
+              <>
+                <span className="column-submission-summary-chip">
+                  미제출 {missing.length}
+                </span>
+                <span className="column-submission-summary-chip">
+                  전체 {rosterCount}
+                </span>
+              </>
+            ) : (
+              <span className="column-submission-summary-chip">
+                카드 {fallbackCount}
+              </span>
+            )}
+          </div>
+
+          <SubmissionList title="제출자" people={submitted} empty="제출자 없음" />
+          {hasRoster && (
+            <SubmissionList
+              title="미제출자"
+              people={missing}
+              empty="미제출자 없음"
+            />
+          )}
+        </div>
+      </section>
     </div>
+  );
+}
+
+function SubmissionList({
+  title,
+  people,
+  empty,
+}: {
+  title: string;
+  people: RosterEntry[];
+  empty: string;
+}) {
+  return (
+    <section className="column-submission-group">
+      <h3 className="column-submission-group-title">{title}</h3>
+      {people.length > 0 ? (
+        <div className="column-submission-list">
+          {people.map((person) => (
+            <div className="column-submission-person" key={person.id}>
+              {formatRosterName(person)}
+            </div>
+          ))}
+        </div>
+      ) : (
+        <p className="column-submission-empty">{empty}</p>
+      )}
+    </section>
   );
 }
 

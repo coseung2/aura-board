@@ -365,7 +365,9 @@ model Board {
   // ── card-comments-likes (2026-04-26) ──────────────────────────────
   // 보드 단위 토글: 카드 작성자/댓글 작성자 표기를 익명("익명") 으로 마스킹.
   // 좋아요 카운트는 영향 없음 (누가 눌렀는지는 어차피 비공개).
-  anonymousAuthor Boolean @default(false)
+  anonymousAuthor      Boolean @default(false)
+  streamTitlePrompt   String  @default("")
+  streamContentPrompt String  @default("")
 
   // ── Board theme (2026-06-06) ──────────────────────────────────────
   // "pastel-peach" | "pastel-mint" | "pastel-sky" |

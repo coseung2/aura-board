@@ -159,7 +159,7 @@ export function ColumnsBoard({
     };
   }, [scrollRailWidth]);
 
-  const { authorsForSection, studentForSectionTitle } = useColumnRoster({
+  const { roster, authorsForSection, studentForSectionTitle } = useColumnRoster({
     classroomId,
     canEdit,
   });
@@ -357,6 +357,7 @@ export function ColumnsBoard({
               draggingSectionId={draggingSectionId}
               cardDropPreview={cardDropPreview}
               organizing={organizing}
+              roster={roster}
               authorsForSection={authorsForSection}
               studentForSectionTitle={studentForSectionTitle}
               onSetSort={(mode) => setSortFor(section.id, mode)}
