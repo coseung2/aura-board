@@ -211,7 +211,14 @@ export async function GET(req: Request) {
       }>("link-preview-youtube-channel", url);
       if (channelCached.hit) {
         if (channelCached.status === "ok") return NextResponse.json(channelCached.payload);
-        return NextResponse.json({ title: null, description: null, image: null });
+        const shouldRetryAfterEmptyGenericCache =
+          cached.hit && cached.status === "ok" && !cached.payload.image;
+        if (!shouldRetryAfterEmptyGenericCache) {
+          return NextResponse.json({ title: null, description: null, image: null });
+        }
+        // A previous low-byte channel scrape may have warmed the generic
+        // cache with an empty payload. Retry the YouTube-specific path so
+        // URLs like /@jocoding recover immediately after parser fixes.
       }
 
       const meta = await fetchYouTubeChannelMeta(url);

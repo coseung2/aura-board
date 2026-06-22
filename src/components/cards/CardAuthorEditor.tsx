@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { createPortal } from "react-dom";
 import {
   MAX_AUTHORS_PER_CARD,
   MAX_DISPLAY_NAME_LEN,
@@ -62,6 +63,11 @@ export function CardAuthorEditor({
   );
   const [busy, setBusy] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   useEffect(() => {
     if (!classroomId) {
@@ -157,7 +163,9 @@ export function CardAuthorEditor({
     }
   }
 
-  return (
+  if (!mounted) return null;
+
+  return createPortal(
     <>
       <div className="modal-backdrop card-author-editor-backdrop" onClick={onClose} />
       <div
@@ -309,7 +317,7 @@ export function CardAuthorEditor({
             </button>
             <button
               type="button"
-              className="modal-btn-primary"
+              className="modal-btn-submit"
               onClick={handleSave}
               disabled={busy}
             >
@@ -318,6 +326,7 @@ export function CardAuthorEditor({
           </div>
         </div>
       </div>
-    </>
+    </>,
+    document.body
   );
 }

@@ -750,10 +750,10 @@
 /* ═══════════ CardAuthorEditor (card-author-multi, 2026-04-15) ═══════════ */
 .card-author-editor {
   max-width: 720px;
-  z-index: 121;
+  z-index: 10020;
 }
 .card-author-editor-backdrop {
-  z-index: 120;
+  z-index: 10019;
 }
 .card-author-editor-body {
   display: grid;

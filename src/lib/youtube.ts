@@ -55,6 +55,8 @@ export type YouTubeChannelMeta = {
   authorName: string;
 };
 
+export const YOUTUBE_CHANNEL_HTML_MAX_BYTES = 1024 * 1024;
+
 export function extractVideoId(raw: string): string | null {
   let u: URL;
   try {
@@ -346,14 +348,15 @@ export async function fetchYouTubeChannelMeta(
   }
 
   // Hard cap to keep this endpoint from being abused as an open proxy.
-  const MAX_HTML_BYTES = 200 * 1024;
+  // YouTube channel pages often place og:title/og:image after the first
+  // 600KB of the app shell, so the old 200KB cap missed valid previews.
   const reader = res.body?.getReader();
   if (!reader) return null;
 
   let html = "";
   const decoder = new TextDecoder();
   let totalBytes = 0;
-  while (totalBytes < MAX_HTML_BYTES) {
+  while (totalBytes < YOUTUBE_CHANNEL_HTML_MAX_BYTES) {
     const { done, value } = await reader.read();
     if (done) break;
     html += decoder.decode(value, { stream: true });

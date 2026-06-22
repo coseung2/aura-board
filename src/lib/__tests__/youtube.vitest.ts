@@ -5,6 +5,8 @@ import {
   extractChannelHandle,
   extractVideoId,
   isYouTubeChannelUrl,
+  parseYouTubeChannelHtml,
+  YOUTUBE_CHANNEL_HTML_MAX_BYTES,
 } from "../youtube";
 
 const VIDEO_ID = "abcDEF123_4";
@@ -46,6 +48,15 @@ describe("youtube url parsing", () => {
 });
 
 describe("youtube channel handle parsing", () => {
+  it("parses @jocoding urls", () => {
+    const result = extractChannelHandle("https://www.youtube.com/@jocoding");
+    expect(result).toEqual({
+      kind: "handle",
+      handle: "jocoding",
+      canonicalUrl: "https://www.youtube.com/@jocoding",
+    });
+  });
+
   it("parses @handle urls and canonicalises to www.youtube.com", () => {
     const result = extractChannelHandle("https://www.youtube.com/@jayychoii");
     expect(result).toEqual({
@@ -137,5 +148,38 @@ describe("youtube channel handle parsing", () => {
     );
     expect(isYouTubeChannelUrl("https://example.com/foo")).toBe(false);
     expect(isYouTubeChannelUrl(null)).toBe(false);
+  });
+});
+
+describe("youtube channel metadata parsing", () => {
+  it("keeps enough channel HTML to reach delayed YouTube OG tags", () => {
+    const metaOffsetSeenOnChannelPages = 650 * 1024;
+
+    expect(YOUTUBE_CHANNEL_HTML_MAX_BYTES).toBeGreaterThan(
+      metaOffsetSeenOnChannelPages
+    );
+  });
+
+  it("parses channel OG metadata after a large app shell", () => {
+    const html =
+      "x".repeat(650 * 1024) +
+      [
+        '<title>조코딩 JoCoding - YouTube</title>',
+        '<meta property="og:title" content="조코딩 JoCoding">',
+        '<meta property="og:description" content="누구나 배울 수 있는 쉬운 코딩 채널">',
+        '<meta property="og:image" content="https://yt3.googleusercontent.com/avatar=s900-c-k-c0x00ffffff-no-rj">',
+      ].join("");
+
+    expect(
+      parseYouTubeChannelHtml(html, "https://www.youtube.com/@jocoding")
+    ).toEqual({
+      canonicalUrl: "https://www.youtube.com/@jocoding",
+      title: "조코딩 JoCoding",
+      thumbnailUrl: null,
+      bannerUrl:
+        "https://yt3.googleusercontent.com/avatar=s900-c-k-c0x00ffffff-no-rj",
+      description: "누구나 배울 수 있는 쉬운 코딩 채널",
+      authorName: "조코딩 JoCoding",
+    });
   });
 });
