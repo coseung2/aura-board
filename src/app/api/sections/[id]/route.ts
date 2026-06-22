@@ -5,14 +5,17 @@ import { getCurrentUser } from "@/lib/auth";
 import { requirePermission, ForbiddenError } from "@/lib/rbac";
 import { touchBoardUpdatedAt } from "@/lib/board-touch";
 import { enqueueBlobDeletion } from "@/lib/blob-cleanup";
+import { STREAM_ACTIVITY_TEMPLATES } from "@/lib/stream-activity-templates";
 
 const SortModeSchema = z.enum(["manual", "newest", "oldest", "title"]);
+const ActivityTemplateSchema = z.enum(STREAM_ACTIVITY_TEMPLATES);
 
 const PatchSectionSchema = z.object({
   title: z.string().trim().min(1).max(100).optional(),
   order: z.number().int().nonnegative().optional(),
   sortMode: SortModeSchema.nullable().optional(),
   pinned: z.boolean().optional(),
+  activityTemplate: ActivityTemplateSchema.nullable().optional(),
 });
 
 export async function PATCH(

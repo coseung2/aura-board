@@ -3,6 +3,7 @@ import { AuthProvider } from "@/components/AuthProvider";
 import { DJPlayerProvider } from "@/components/dj/DJPlayerProvider";
 import { Footer } from "@/components/Footer";
 import { TwemojiRoot } from "@/components/TwemojiRoot";
+import "maplibre-gl/dist/maplibre-gl.css";
 import "./globals.css";
 
 export const metadata: Metadata = {

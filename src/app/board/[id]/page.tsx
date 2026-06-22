@@ -26,6 +26,7 @@ import { BoardVisitTracker } from "@/components/BoardVisitTracker";
 import { BoardHeader } from "@/components/BoardHeader";
 import { BoardSlideshowProvider } from "@/components/slideshow/BoardSlideshowProvider";
 import { loadPlantJournalInitial } from "@/lib/board-page/plant-journal-loader";
+import { isStreamActivityTemplate } from "@/lib/stream-activity-templates";
 import type { BoardTheme } from "@/components/BoardSettingsPanel";
 
 // Auth + cookie reads already flag this route as dynamic.
@@ -292,6 +293,9 @@ export default async function BoardPage({
     pinned: s.pinned,
     accessToken: s.accessToken,
     sortMode: s.sortMode,
+    activityTemplate: isStreamActivityTemplate(s.activityTemplate)
+      ? s.activityTemplate
+      : null,
   }));
 
   // Assemble the plant-journal initial payload when rendering that layout.

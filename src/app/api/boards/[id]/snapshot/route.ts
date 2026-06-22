@@ -57,6 +57,7 @@ type SectionWire = {
   order: number;
   pinned: boolean;
   sortMode: string | null;
+  activityTemplate: string | null;
 };
 
 export async function GET(
@@ -204,6 +205,7 @@ export async function GET(
         order: s.order,
         pinned: s.pinned,
         sortMode: s.sortMode,
+        activityTemplate: s.activityTemplate,
       }))
       .sort(sortSections);
 

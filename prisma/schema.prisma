@@ -366,9 +366,9 @@ model Board {
   // ── card-comments-likes (2026-04-26) ──────────────────────────────
   // 보드 단위 토글: 카드 작성자/댓글 작성자 표기를 익명("익명") 으로 마스킹.
   // 좋아요 카운트는 영향 없음 (누가 눌렀는지는 어차피 비공개).
-  anonymousAuthor      Boolean @default(false)
-  streamTitlePrompt   String  @default("")
-  streamContentPrompt String  @default("")
+  anonymousAuthor       Boolean @default(false)
+  streamTitlePrompt     String  @default("")
+  streamContentPrompt   String  @default("")
   streamSectionsEnabled Boolean @default(false)
 
   // ── Board theme (2026-06-06) ──────────────────────────────────────
@@ -420,28 +420,65 @@ model BoardResponse {
 
 // Columns/Kanban용 섹션 (grid/stream에선 사용 안 함)
 model Section {
-  id          String  @id @default(cuid())
-  boardId     String
-  title       String
-  order       Int     @default(0)
+  id               String  @id @default(cuid())
+  boardId          String
+  title            String
+  order            Int     @default(0)
   // topic-board-pin (2026-05-21): 주제별 보드에서 주제(섹션) 고정.
   // true면 항상 상단에 고정, false면 생성일 역순(최신순).
-  pinned      Boolean @default(false)
+  pinned           Boolean @default(false)
   // shared-column-sort (2026-04-20): 교사가 선택한 칼럼별 정렬 모드가
   // 학생 화면에도 공유되도록 서버에 저장. "manual" | "newest" | "oldest"
   // | "title". null → 클라이언트가 "manual"로 처리(기존 행 하위호환).
-  sortMode    String?
+  sortMode         String?
+  activityTemplate String?
   // Breakout view (T0-①): teacher-rotatable access token.
   // null = no public share link. When set, anyone with the token can view the
   // section-isolated Breakout route. Rotating replaces the value, invalidating
   // previously distributed links. See src/lib/rbac.ts#viewSection.
-  accessToken String? @unique
+  accessToken      String? @unique
 
   board               Board                @relation(fields: [boardId], references: [id], onDelete: Cascade)
   cards               Card[]               @relation("SectionCards")
   breakoutMemberships BreakoutMembership[]
+  mapPlaces           SectionMapPlace[]
+  mapRoute            SectionMapRoute?
 
   @@index([boardId])
+}
+
+model SectionMapPlace {
+  id                 String   @id @default(cuid())
+  sectionId          String
+  title              String
+  note               String?
+  address            String?
+  providerPlaceId    String?
+  lat                Float
+  lng                Float
+  color              String?
+  order              Int      @default(0)
+  createdByUserId    String?
+  createdByStudentId String?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  section Section @relation(fields: [sectionId], references: [id], onDelete: Cascade)
+
+  @@index([sectionId])
+  @@index([createdByStudentId])
+}
+
+model SectionMapRoute {
+  id              String   @id @default(cuid())
+  sectionId       String   @unique
+  orderedPlaceIds Json
+  travelMode      String   @default("walking")
+  lineColor       String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  section Section @relation(fields: [sectionId], references: [id], onDelete: Cascade)
 }
 
 // RBAC core: one row per (board, user).

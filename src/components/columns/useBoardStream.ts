@@ -11,6 +11,7 @@ export type StreamSection = {
   pinned: boolean;
   accessToken?: string | null;
   sortMode?: string | null;
+  activityTemplate?: string | null;
 };
 
 type Options = {

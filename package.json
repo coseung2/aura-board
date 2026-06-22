@@ -38,6 +38,7 @@
     "fluent-ffmpeg": "^2.1.3",
     "heic2any": "^0.0.4",
     "jspdf": "^4.2.1",
+    "maplibre-gl": "^5.24.0",
     "next": "^16.2.7",
     "next-auth": "^5.0.0-beta.30",
     "pdf-lib": "^1.17.1",

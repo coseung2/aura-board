@@ -6,9 +6,15 @@ import type { AddCardData } from "./AddCardModal";
 import type { CardData } from "./DraggableCard";
 import { SectionActionsPanel } from "./SectionActionsPanel";
 import { StreamComposer } from "./stream/StreamComposer";
+import { StreamActivityTemplatePanel } from "./stream/StreamActivityTemplatePanel";
 import { StreamPost } from "./stream/StreamPost";
 import { useCardRealtime } from "@/hooks/useCardRealtime";
 import { sortSections } from "@/lib/sort-sections";
+import {
+  STREAM_ACTIVITY_TEMPLATE_LABELS,
+  STREAM_ACTIVITY_TEMPLATES,
+  type StreamActivityTemplate,
+} from "@/lib/stream-activity-templates";
 import {
   useBoardSlideshow,
   type SlideshowSlide,
@@ -19,6 +25,7 @@ export type StreamSection = {
   title: string;
   order: number;
   pinned: boolean;
+  activityTemplate?: StreamActivityTemplate | null;
 };
 
 type Props = {
@@ -59,6 +66,7 @@ export function StreamBoard({
   const [newSectionTitle, setNewSectionTitle] = useState("");
   const [sectionAddBusy, setSectionAddBusy] = useState(false);
   const [sectionAddError, setSectionAddError] = useState<string | null>(null);
+  const [templateBusySectionId, setTemplateBusySectionId] = useState<string | null>(null);
   const canEdit = currentRole === "owner" || currentRole === "editor";
   const canAddPost = canEdit || !!isStudentViewer;
 
@@ -236,6 +244,42 @@ export function StreamBoard({
     setCards((list) => list.filter((c) => c.sectionId !== sectionId));
   }
 
+  async function handleSectionTemplateChange(
+    sectionId: string,
+    activityTemplate: StreamActivityTemplate | null,
+  ) {
+    setTemplateBusySectionId(sectionId);
+    const prev = sections;
+    setSections((list) =>
+      list.map((s) => (s.id === sectionId ? { ...s, activityTemplate } : s)),
+    );
+    try {
+      const res = await fetch(`/api/sections/${sectionId}`, {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ activityTemplate }),
+      });
+      if (!res.ok) {
+        setSections(prev);
+        alert("활동 템플릿 저장에 실패했어요.");
+        return;
+      }
+      const { section } = (await res.json()) as { section: StreamSection };
+      setSections((list) =>
+        list.map((s) =>
+          s.id === section.id
+            ? { ...s, activityTemplate: section.activityTemplate ?? null }
+            : s,
+        ),
+      );
+    } catch {
+      setSections(prev);
+      alert("활동 템플릿 저장에 실패했어요.");
+    } finally {
+      setTemplateBusySectionId(null);
+    }
+  }
+
   const showComposerSections =
     streamSectionsEnabled && sectionOptions.length > 0;
 
@@ -266,6 +310,8 @@ export function StreamBoard({
             onOpenSectionPanel={(sectionId, tab) =>
               setPanelState({ sectionId, tab })
             }
+            onSectionTemplateChange={handleSectionTemplateChange}
+            templateBusySectionId={templateBusySectionId}
             onDeleteCard={handleDelete}
           />
         ) : (
@@ -381,6 +427,11 @@ type StreamGroupedFeedProps = {
   onSectionTitleChange: (title: string) => void;
   onSubmitSection: (event: FormEvent<HTMLFormElement>) => void;
   onOpenSectionPanel: (sectionId: string, tab: "rename" | "delete") => void;
+  onSectionTemplateChange: (
+    sectionId: string,
+    activityTemplate: StreamActivityTemplate | null,
+  ) => void;
+  templateBusySectionId: string | null;
   onDeleteCard: (card: CardData) => void;
 };
 
@@ -401,6 +452,8 @@ function StreamGroupedFeed({
   onSectionTitleChange,
   onSubmitSection,
   onOpenSectionPanel,
+  onSectionTemplateChange,
+  templateBusySectionId,
   onDeleteCard,
 }: StreamGroupedFeedProps) {
   const hasAnyCard =
@@ -461,9 +514,37 @@ function StreamGroupedFeed({
         return (
           <section key={section.id} className="stream-section-group">
             <header className="stream-section-header">
-              <h2 className="stream-section-title">{section.title}</h2>
+              <div className="stream-section-heading">
+                <h2 className="stream-section-title">{section.title}</h2>
+                {section.activityTemplate && (
+                  <span className="stream-section-template-badge">
+                    {STREAM_ACTIVITY_TEMPLATE_LABELS[section.activityTemplate]}
+                  </span>
+                )}
+              </div>
               {canEdit && (
                 <div className="stream-section-menu">
+                  <select
+                    className="stream-section-template-select"
+                    value={section.activityTemplate ?? ""}
+                    onChange={(event) =>
+                      onSectionTemplateChange(
+                        section.id,
+                        event.target.value
+                          ? (event.target.value as StreamActivityTemplate)
+                          : null,
+                      )
+                    }
+                    disabled={templateBusySectionId === section.id}
+                    aria-label={`${section.title} 활동 템플릿`}
+                  >
+                    <option value="">일반 섹션</option>
+                    {STREAM_ACTIVITY_TEMPLATES.map((template) => (
+                      <option key={template} value={template}>
+                        {STREAM_ACTIVITY_TEMPLATE_LABELS[template]}
+                      </option>
+                    ))}
+                  </select>
                   <button
                     type="button"
                     className="stream-section-menu-toggle"
@@ -475,6 +556,14 @@ function StreamGroupedFeed({
                 </div>
               )}
             </header>
+            {section.activityTemplate && (
+              <StreamActivityTemplatePanel
+                template={section.activityTemplate}
+                sectionId={section.id}
+                cards={bucket}
+                canEdit={canAddPost}
+              />
+            )}
             {bucket.length === 0 ? (
               <div className="stream-section-empty">아직 게시글이 없어요.</div>
             ) : (

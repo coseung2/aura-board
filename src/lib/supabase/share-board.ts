@@ -1,5 +1,6 @@
 import type { CardData } from "@/components/DraggableCard";
 import type { BoardSection } from "@/components/share/ShareBoardWrapper";
+import { isStreamActivityTemplate } from "@/lib/stream-activity-templates";
 import { createPublicSupabaseClient } from "./client";
 
 export type ShareBoardPayload = {
@@ -11,6 +12,7 @@ export type ShareBoardPayload = {
     slug: string | null;
     anonymousAuthor: boolean;
     boardTheme: string | null;
+    streamSectionsEnabled: boolean;
   };
   initialCards: CardData[];
   initialSections: BoardSection[];
@@ -29,10 +31,11 @@ type BoardRow = {
   layout: string;
   description: string | null;
   shareMode: string;
-  shareToken: string | null;
-  anonymousAuthor: boolean;
-  boardTheme: string | null;
-};
+    shareToken: string | null;
+    anonymousAuthor: boolean;
+    boardTheme: string | null;
+    streamSectionsEnabled: boolean;
+  };
 
 type CardRow = {
   id: string;
@@ -67,6 +70,7 @@ type SectionRow = {
   order: number;
   pinned: boolean;
   sortMode: string | null;
+  activityTemplate: string | null;
 };
 
 type AttachmentRow = {
@@ -102,7 +106,7 @@ export async function fetchShareBoard(
 
   const { data: board, error: boardError } = await supabase
     .from("Board")
-    .select("id,title,slug,layout,description,shareMode,shareToken,anonymousAuthor,boardTheme")
+        .select("id,title,slug,layout,description,shareMode,shareToken,anonymousAuthor,boardTheme,streamSectionsEnabled")
     .eq(boardFilter.column, boardFilter.value)
     .eq("shareMode", "student")
     .maybeSingle<BoardRow>();
@@ -122,7 +126,7 @@ export async function fetchShareBoard(
         .returns<CardRow[]>(),
       supabase
         .from("Section")
-        .select("id,title,order,pinned,sortMode")
+        .select("id,title,order,pinned,sortMode,activityTemplate")
         .eq("boardId", board.id)
         .order("order", { ascending: true })
         .returns<SectionRow[]>(),
@@ -168,6 +172,7 @@ export async function fetchShareBoard(
       slug: board.slug,
       anonymousAuthor: board.anonymousAuthor,
       boardTheme: board.boardTheme,
+      streamSectionsEnabled: board.streamSectionsEnabled,
     },
     initialCards: (cards ?? []).map((card) => ({
       id: card.id,
@@ -211,6 +216,9 @@ export async function fetchShareBoard(
       order: section.order,
       pinned: section.pinned,
       sortMode: section.sortMode,
+      activityTemplate: isStreamActivityTemplate(section.activityTemplate)
+        ? section.activityTemplate
+        : null,
       accessToken: null,
     })),
     shareMode: "student",
