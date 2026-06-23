@@ -1360,6 +1360,8 @@ function AuraTab({
               message:
                 data.error === "aura_oauth_token_issue_failed"
                   ? "Aura Board OAuth 연결을 확인해 주세요."
+                  : data.error === "aura_oauth_verify_failed"
+                    ? "Aura에서 Board 토큰을 확인하지 못했어요."
                   : "Aura 평가계획을 불러오지 못했어요.",
             });
           }

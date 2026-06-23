@@ -121,8 +121,19 @@ export async function GET(_req: Request, { params }: RouteContext) {
   }
 
   if (!response.ok) {
+    const detail = (await response.json().catch(() => null)) as {
+      error?: string;
+    } | null;
     return NextResponse.json(
-      { plans: [], error: "aura_assessment_plans_fetch_failed" },
+      {
+        plans: [],
+        error:
+          response.status === 401
+            ? "aura_oauth_verify_failed"
+            : "aura_assessment_plans_fetch_failed",
+        upstreamStatus: response.status,
+        upstreamError: detail?.error ?? null,
+      },
       { status: 502 },
     );
   }
