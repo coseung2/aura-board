@@ -3,6 +3,7 @@
 import { useEffect, type MutableRefObject } from "react";
 import type { CardData } from "../DraggableCard";
 import { sortSections } from "@/lib/sort-sections";
+import type { StreamActivityTemplateState } from "@/lib/stream-activity-templates";
 
 export type StreamSection = {
   id: string;
@@ -12,6 +13,7 @@ export type StreamSection = {
   accessToken?: string | null;
   sortMode?: string | null;
   activityTemplate?: string | null;
+  activityTemplateState?: StreamActivityTemplateState | null;
 };
 
 type Options = {

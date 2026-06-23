@@ -11,7 +11,10 @@ import {
   type ReactNode,
 } from "react";
 import type { CardData } from "../DraggableCard";
-import type { StreamActivityTemplate } from "@/lib/stream-activity-templates";
+import type {
+  StreamActivityTemplate,
+  StreamActivityTemplateState,
+} from "@/lib/stream-activity-templates";
 import { StreamSlideshowOverlay } from "./StreamSlideshowOverlay";
 
 export type SlideshowSlide = {
@@ -22,6 +25,7 @@ export type SlideshowSlide = {
   sectionId?: string | null;
   sectionTitle?: string;
   activityTemplate?: StreamActivityTemplate;
+  activityTemplateState?: StreamActivityTemplateState | null;
 };
 
 type SlideshowContextValue = {

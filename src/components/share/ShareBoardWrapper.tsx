@@ -18,7 +18,10 @@ import { ColumnsBoard } from "../ColumnsBoard";
 import { BoardHeader } from "../BoardHeader";
 import type { CardData } from "../DraggableCard";
 import { ShareSessionProvider } from "./ShareSessionContext";
-import type { StreamActivityTemplate } from "@/lib/stream-activity-templates";
+import type {
+  StreamActivityTemplate,
+  StreamActivityTemplateState,
+} from "@/lib/stream-activity-templates";
 export { useShareFetch, useShareSession } from "./ShareSessionContext";
 
 // ─── Props ─────────────────────────────────────────────────────────────────
@@ -30,6 +33,7 @@ export type BoardSection = {
   pinned: boolean;
   sortMode: string | null;
   activityTemplate?: StreamActivityTemplate | null;
+  activityTemplateState?: StreamActivityTemplateState | null;
   accessToken: string | null;
 };
 

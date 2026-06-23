@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useCallback } from "react";
 import type { CardData } from "@/components/DraggableCard";
+import { sortSections } from "@/lib/sort-sections";
 
 /**
  * Subscribes to Supabase Realtime broadcast channel `board:{boardId}`.
@@ -17,10 +18,16 @@ import type { CardData } from "@/components/DraggableCard";
  * @param setCards    State setter for cards.
  * @param deletingIds Ref to a Set of card IDs being actively deleted.
  */
-export function useCardRealtime(
+export function useCardRealtime<
+  TSection extends { order: number; pinned: boolean } = {
+    order: number;
+    pinned: boolean;
+  },
+>(
   boardId: string,
   setCards: React.Dispatch<React.SetStateAction<CardData[]>>,
   deletingIds: React.RefObject<Set<string>>,
+  setSections?: React.Dispatch<React.SetStateAction<TSection[]>>,
 ) {
   const lastHashRef = useRef("");
 
@@ -35,6 +42,7 @@ export function useCardRealtime(
       if (!res.ok) return;
       const data = (await res.json()) as {
         cards: CardData[];
+        sections?: TSection[];
         hash?: string;
       };
       lastHashRef.current = data.hash ?? "";
@@ -50,10 +58,13 @@ export function useCardRealtime(
         }
         return next;
       });
+      if (data.sections && setSections) {
+        setSections([...data.sections].sort(sortSections));
+      }
     } catch {
       // Transient — next broadcast will retry.
     }
-  }, [boardId, setCards, deletingIds]);
+  }, [boardId, setCards, deletingIds, setSections]);
 
   useEffect(() => {
     // Dynamic import: Supabase 클라이언트를 브라우저에서만 지연 로드.

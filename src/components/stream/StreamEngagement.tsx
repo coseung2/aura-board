@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { createPortal } from "react-dom";
 import { formatRelativeTime } from "@/lib/card-engagement-format";
 import { useShareSession, type ShareSession } from "@/components/share/ShareSessionContext";
 import { useBoardEngagement } from "@/hooks/useBoardEngagementRealtime";
@@ -28,7 +29,8 @@ type Props = {
 
 export function StreamEngagement({ cardId, boardId }: Props) {
   const [state, setState] = useState<EngagementState | null>(null);
-  const [expanded, setExpanded] = useState(false);
+  const [commentsOpen, setCommentsOpen] = useState(false);
+  const [mounted, setMounted] = useState(false);
   const shareSession = useShareSession();
 
   const refresh = useCallback(async () => {
@@ -44,6 +46,10 @@ export function StreamEngagement({ cardId, boardId }: Props) {
   useEffect(() => {
     void refresh();
   }, [refresh]);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   // Live-update counts from board-level engagement broadcasts. Only the
   // counts move here — isLiked is the current user's own state and is
@@ -109,36 +115,92 @@ export function StreamEngagement({ cardId, boardId }: Props) {
         <button
           type="button"
           className="stream-action"
-          onClick={() => setExpanded((value) => !value)}
-          aria-expanded={expanded}
+          onClick={() => setCommentsOpen(true)}
+          aria-haspopup="dialog"
         >
           <span aria-hidden>💬</span>
           <span>{commentCount}</span>
         </button>
       </div>
-      <StreamComments
-        cardId={cardId}
-        expanded={expanded}
-        canInteract={state?.canInteract ?? false}
-        shareSession={shareSession}
-        onChanged={() => {
-          setExpanded(true);
-          void refresh();
-        }}
-      />
+      {mounted &&
+        commentsOpen &&
+        createPortal(
+          <StreamCommentsModal
+            cardId={cardId}
+            canInteract={state?.canInteract ?? false}
+            shareSession={shareSession}
+            onClose={() => setCommentsOpen(false)}
+            onChanged={() => {
+              void refresh();
+            }}
+          />,
+          document.body,
+        )}
     </section>
+  );
+}
+
+function StreamCommentsModal({
+  cardId,
+  canInteract,
+  shareSession,
+  onClose,
+  onChanged,
+}: {
+  cardId: string;
+  canInteract: boolean;
+  shareSession: ShareSession | null;
+  onClose: () => void;
+  onChanged: () => void;
+}) {
+  useEffect(() => {
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") onClose();
+    }
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [onClose]);
+
+  return (
+    <>
+      <div className="stream-comments-backdrop" onClick={onClose} aria-hidden="true" />
+      <div
+        className="stream-comments-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="stream-comments-modal-title"
+      >
+        <header className="stream-comments-modal-head">
+          <h3 id="stream-comments-modal-title">댓글</h3>
+          <button
+            type="button"
+            className="stream-comments-modal-close"
+            onClick={onClose}
+            aria-label="닫기"
+          >
+            ×
+          </button>
+        </header>
+        <div className="stream-comments-modal-body">
+          <StreamComments
+            cardId={cardId}
+            canInteract={canInteract}
+            shareSession={shareSession}
+            onChanged={onChanged}
+          />
+        </div>
+      </div>
+    </>
   );
 }
 
 function StreamComments({
   cardId,
-  expanded,
   canInteract,
   shareSession,
   onChanged,
 }: {
   cardId: string;
-  expanded: boolean;
   canInteract: boolean;
   shareSession: ShareSession | null;
   onChanged: () => void;
@@ -173,8 +235,6 @@ function StreamComments({
       (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
     );
   }, [items]);
-  const visibleItems = expanded ? orderedItems : orderedItems.slice(-2);
-  const hiddenCount = Math.max(0, orderedItems.length - visibleItems.length);
 
   async function submit(event: React.FormEvent) {
     event.preventDefault();
@@ -230,14 +290,9 @@ function StreamComments({
 
   return (
     <div className="stream-comments">
-      {hiddenCount > 0 && (
-        <button type="button" className="stream-comments-more" onClick={() => onChanged()}>
-          댓글 {orderedItems.length}개 모두 보기
-        </button>
-      )}
-      {visibleItems.length > 0 && (
+      {orderedItems.length > 0 ? (
         <ul className="stream-comment-list">
-          {visibleItems.map((comment) => (
+          {orderedItems.map((comment) => (
             <li key={comment.id} className="stream-comment">
               <div className="stream-comment-copy">
                 <span className="stream-comment-author">{comment.authorLabel}</span>
@@ -254,6 +309,8 @@ function StreamComments({
             </li>
           ))}
         </ul>
+      ) : (
+        <div className="stream-comments-empty">아직 댓글이 없어요.</div>
       )}
       {canInteract ? (
         <form className="stream-comment-form" onSubmit={submit}>

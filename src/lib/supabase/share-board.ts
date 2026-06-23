@@ -1,6 +1,9 @@
 import type { CardData } from "@/components/DraggableCard";
 import type { BoardSection } from "@/components/share/ShareBoardWrapper";
-import { isStreamActivityTemplate } from "@/lib/stream-activity-templates";
+import {
+  isStreamActivityTemplate,
+  normalizeStreamActivityTemplateState,
+} from "@/lib/stream-activity-templates";
 import { createPublicSupabaseClient } from "./client";
 
 export type ShareBoardPayload = {
@@ -71,6 +74,7 @@ type SectionRow = {
   pinned: boolean;
   sortMode: string | null;
   activityTemplate: string | null;
+  activityTemplateState: unknown;
 };
 
 type AttachmentRow = {
@@ -126,7 +130,7 @@ export async function fetchShareBoard(
         .returns<CardRow[]>(),
       supabase
         .from("Section")
-        .select("id,title,order,pinned,sortMode,activityTemplate")
+        .select("id,title,order,pinned,sortMode,activityTemplate,activityTemplateState")
         .eq("boardId", board.id)
         .order("order", { ascending: true })
         .returns<SectionRow[]>(),
@@ -219,6 +223,9 @@ export async function fetchShareBoard(
       activityTemplate: isStreamActivityTemplate(section.activityTemplate)
         ? section.activityTemplate
         : null,
+      activityTemplateState: normalizeStreamActivityTemplateState(
+        section.activityTemplateState,
+      ),
       accessToken: null,
     })),
     shareMode: "student",

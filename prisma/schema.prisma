@@ -485,6 +485,7 @@ model Section {
   // | "title". null → 클라이언트가 "manual"로 처리(기존 행 하위호환).
   sortMode         String?
   activityTemplate String?
+  activityTemplateState Json?
   // Breakout view (T0-①): teacher-rotatable access token.
   // null = no public share link. When set, anyone with the token can view the
   // section-isolated Breakout route. Rotating replaces the value, invalidating

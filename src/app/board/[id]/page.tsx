@@ -26,7 +26,10 @@ import { BoardVisitTracker } from "@/components/BoardVisitTracker";
 import { BoardHeader } from "@/components/BoardHeader";
 import { BoardSlideshowProvider } from "@/components/slideshow/BoardSlideshowProvider";
 import { loadPlantJournalInitial } from "@/lib/board-page/plant-journal-loader";
-import { isStreamActivityTemplate } from "@/lib/stream-activity-templates";
+import {
+  isStreamActivityTemplate,
+  normalizeStreamActivityTemplateState,
+} from "@/lib/stream-activity-templates";
 import type { BoardTheme } from "@/components/BoardSettingsPanel";
 import type {
   AuraBoardSettings,
@@ -376,6 +379,9 @@ export default async function BoardPage({
     activityTemplate: isStreamActivityTemplate(s.activityTemplate)
       ? s.activityTemplate
       : null,
+    activityTemplateState: normalizeStreamActivityTemplateState(
+      s.activityTemplateState,
+    ),
     // stream-board section breakout (2026-06-23): per-section breakout
     // summary. null when the section is not in breakout mode. The
     // group roster is denormalized here so the front-end can render

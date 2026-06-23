@@ -4,6 +4,10 @@ import { getCurrentUser } from "@/lib/auth";
 import { getCurrentStudent } from "@/lib/student-auth";
 import { getEffectiveBoardRole } from "@/lib/rbac";
 import type { SectionBreakoutConfigWire, SectionBreakoutGroupWire } from "@/lib/section-breakout";
+import {
+  normalizeStreamActivityTemplateState,
+  type StreamActivityTemplateState,
+} from "@/lib/stream-activity-templates";
 
 export const maxDuration = 60;
 
@@ -70,6 +74,7 @@ type SectionWire = {
   order: number;
   sortMode: string | null;
   activityTemplate: string | null;
+  activityTemplateState: StreamActivityTemplateState;
   // stream-board section breakout (2026-06-23): the section's breakout
   // config + group roster snapshot. null when the section is not in
   // breakout mode. The full membership list is intentionally omitted
@@ -297,6 +302,9 @@ export async function GET(
             order: s.order,
             sortMode: s.sortMode,
             activityTemplate: s.activityTemplate,
+            activityTemplateState: normalizeStreamActivityTemplateState(
+              s.activityTemplateState,
+            ),
             // stream-board section breakout (2026-06-23): the section-level
             // breakout summary. `null` when the section is not in breakout
             // mode — keeps the wire shape additive (no new field on the

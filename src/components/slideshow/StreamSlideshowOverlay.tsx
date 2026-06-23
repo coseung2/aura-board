@@ -226,6 +226,8 @@ export function StreamSlideshowOverlay({
             sectionId={slide.sectionId ?? ""}
             cards={slide.cards ?? []}
             canEdit={false}
+            isTeacherView={false}
+            state={slide.activityTemplateState ?? null}
             onCreateCard={async () => {}}
           />
         </div>

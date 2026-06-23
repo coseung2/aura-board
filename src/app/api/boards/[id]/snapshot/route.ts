@@ -6,6 +6,10 @@ import { getCurrentStudent } from "@/lib/student-auth";
 import { getEffectiveBoardRole } from "@/lib/rbac";
 import { requireShareAuth } from "@/lib/share/with-share";
 import type { SectionBreakoutGroupWire } from "@/lib/section-breakout";
+import {
+  normalizeStreamActivityTemplateState,
+  type StreamActivityTemplateState,
+} from "@/lib/stream-activity-templates";
 
 type CardWire = {
   id: string;
@@ -60,6 +64,7 @@ type SectionWire = {
   pinned: boolean;
   sortMode: string | null;
   activityTemplate: string | null;
+  activityTemplateState: StreamActivityTemplateState;
   breakout: {
     groupCount: number;
     groupCapacity: number | null;
@@ -242,6 +247,9 @@ export async function GET(
         pinned: s.pinned,
         sortMode: s.sortMode,
         activityTemplate: s.activityTemplate,
+        activityTemplateState: normalizeStreamActivityTemplateState(
+          s.activityTemplateState,
+        ),
         breakout: buildSectionBreakoutSnapshot(
           s.id,
           breakoutConfigBySection,

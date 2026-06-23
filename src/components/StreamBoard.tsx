@@ -4,7 +4,14 @@ import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { createPortal } from "react-dom";
 import type { AddCardData } from "./AddCardModal";
 import type { CardData } from "./DraggableCard";
-import { GroupIcon, PencilIcon, TemplateIcon, TrashIcon } from "./icons/UiIcons";
+import {
+  ChevronDownIcon,
+  ChevronUpIcon,
+  GroupIcon,
+  PencilIcon,
+  TemplateIcon,
+  TrashIcon,
+} from "./icons/UiIcons";
 import { SectionActionsPanel } from "./SectionActionsPanel";
 import { StreamComposer } from "./stream/StreamComposer";
 import { StreamActivityTemplatePanel } from "./stream/StreamActivityTemplatePanel";
@@ -14,7 +21,9 @@ import { sortSections } from "@/lib/sort-sections";
 import {
   STREAM_ACTIVITY_TEMPLATE_LABELS,
   STREAM_ACTIVITY_TEMPLATES,
+  normalizeStreamActivityTemplateState,
   type StreamActivityTemplate,
+  type StreamActivityTemplateState,
 } from "@/lib/stream-activity-templates";
 import {
   useBoardSlideshow,
@@ -27,6 +36,7 @@ export type StreamSection = {
   order: number;
   pinned: boolean;
   activityTemplate?: StreamActivityTemplate | null;
+  activityTemplateState?: StreamActivityTemplateState | null;
   breakout?: {
     groupCount: number;
     groupCapacity: number | null;
@@ -98,6 +108,7 @@ export function StreamBoard({
   const [sectionAddError, setSectionAddError] = useState<string | null>(null);
   const [templateBusySectionId, setTemplateBusySectionId] = useState<string | null>(null);
   const [templateModalSectionId, setTemplateModalSectionId] = useState<string | null>(null);
+  const [sectionOrderBusyId, setSectionOrderBusyId] = useState<string | null>(null);
   const canEdit = currentRole === "owner" || currentRole === "editor";
   const canAddPost = canEdit || !!isStudentViewer;
   const [breakoutBySection, setBreakoutBySection] = useState<Record<string, BreakoutState>>(() =>
@@ -114,7 +125,7 @@ export function StreamBoard({
   const deletingIds = useRef<Set<string>>(new Set());
 
   // ── Realtime polling ──────────────────────────────────────────────
-  useCardRealtime(boardId, setCards, deletingIds);
+  useCardRealtime(boardId, setCards, deletingIds, setSections);
 
   useEffect(() => {
     setMounted(true);
@@ -231,6 +242,7 @@ export function StreamBoard({
             sectionId: section.id,
             sectionTitle: section.title,
             activityTemplate: section.activityTemplate,
+            activityTemplateState: section.activityTemplateState ?? null,
             cards: bucket,
           });
         } else {
@@ -356,20 +368,78 @@ export function StreamBoard({
     setCards((list) => list.filter((c) => c.sectionId !== sectionId));
   }
 
+  async function handleMoveSection(
+    sectionId: string,
+    direction: "up" | "down",
+  ): Promise<void> {
+    const visualSections = [...sections].sort(sortSections);
+    const fromIdx = visualSections.findIndex((s) => s.id === sectionId);
+    const toIdx = direction === "up" ? fromIdx - 1 : fromIdx + 1;
+    if (fromIdx < 0 || toIdx < 0 || toIdx >= visualSections.length) return;
+
+    const prev = sections;
+    const next = [...visualSections];
+    const [moved] = next.splice(fromIdx, 1);
+    if (!moved) return;
+    next.splice(toIdx, 0, moved);
+
+    const pinned = next.filter((s) => s.pinned);
+    const unpinned = next.filter((s) => !s.pinned);
+    const orderById = new Map<string, number>();
+    pinned.forEach((s, i) => orderById.set(s.id, i));
+    unpinned.forEach((s, i) => orderById.set(s.id, unpinned.length - 1 - i));
+
+    const normalised = next.map((s) => ({
+      ...s,
+      order: orderById.get(s.id) ?? s.order,
+    }));
+    setSections(normalised);
+    setSectionOrderBusyId(sectionId);
+
+    const prevById = new Map(prev.map((s) => [s.id, s] as const));
+    const changed = normalised.filter((s) => prevById.get(s.id)?.order !== s.order);
+    try {
+      const responses = await Promise.all(
+        changed.map((s) =>
+          fetch(`/api/sections/${s.id}`, {
+            method: "PATCH",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({ order: s.order }),
+          }),
+        ),
+      );
+      if (responses.some((res) => !res.ok)) {
+        setSections(prev);
+        alert("섹션 순서 변경에 실패했어요.");
+      }
+    } catch {
+      setSections(prev);
+      alert("섹션 순서 변경에 실패했어요.");
+    } finally {
+      setSectionOrderBusyId(null);
+    }
+  }
+
   async function handleSectionTemplateChange(
     sectionId: string,
     activityTemplate: StreamActivityTemplate | null,
   ): Promise<boolean> {
     setTemplateBusySectionId(sectionId);
     const prev = sections;
+    const activityTemplateState =
+      activityTemplate === "word_cloud" ? { wordCloudPublished: false } : null;
     setSections((list) =>
-      list.map((s) => (s.id === sectionId ? { ...s, activityTemplate } : s)),
+      list.map((s) =>
+        s.id === sectionId
+          ? { ...s, activityTemplate, activityTemplateState }
+          : s,
+      ),
     );
     try {
       const res = await fetch(`/api/sections/${sectionId}`, {
         method: "PATCH",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ activityTemplate }),
+        body: JSON.stringify({ activityTemplate, activityTemplateState }),
       });
       if (!res.ok) {
         setSections(prev);
@@ -380,7 +450,13 @@ export function StreamBoard({
       setSections((list) =>
         list.map((s) =>
           s.id === section.id
-            ? { ...s, activityTemplate: section.activityTemplate ?? null }
+            ? {
+                ...s,
+                activityTemplate: section.activityTemplate ?? null,
+                activityTemplateState: normalizeStreamActivityTemplateState(
+                  section.activityTemplateState,
+                ),
+              }
             : s,
         ),
       );
@@ -391,6 +467,48 @@ export function StreamBoard({
       return false;
     } finally {
       setTemplateBusySectionId(null);
+    }
+  }
+
+  async function handleSectionActivityStateChange(
+    sectionId: string,
+    activityTemplateState: StreamActivityTemplateState | null,
+  ): Promise<boolean> {
+    const prev = sections;
+    setSections((list) =>
+      list.map((s) =>
+        s.id === sectionId ? { ...s, activityTemplateState } : s,
+      ),
+    );
+    try {
+      const res = await fetch(`/api/sections/${sectionId}`, {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ activityTemplateState }),
+      });
+      if (!res.ok) {
+        setSections(prev);
+        alert("활동 상태 저장에 실패했어요.");
+        return false;
+      }
+      const { section } = (await res.json()) as { section: StreamSection };
+      setSections((list) =>
+        list.map((s) =>
+          s.id === section.id
+            ? {
+                ...s,
+                activityTemplateState: normalizeStreamActivityTemplateState(
+                  section.activityTemplateState,
+                ),
+              }
+            : s,
+        ),
+      );
+      return true;
+    } catch {
+      setSections(prev);
+      alert("활동 상태 저장에 실패했어요.");
+      return false;
     }
   }
 
@@ -501,34 +619,37 @@ export function StreamBoard({
             canEdit={canEdit}
             currentUserId={currentUserId}
             currentRole={currentRole}
-           canAddPost={canAddPost}
-           isStudentViewer={isStudentViewer}
-           isAddingSection={isAddingSection}
-           newSectionTitle={newSectionTitle}
-           sectionAddBusy={sectionAddBusy}
-           sectionAddError={sectionAddError}
-           onStartAddSection={startAddSection}
-           onCancelAddSection={cancelAddSection}
-           onSectionTitleChange={setNewSectionTitle}
-           onSubmitSection={handleAddSection}
-           onOpenSectionPanel={(sectionId, tab) =>
-             setPanelState({ sectionId, tab })
-           }
-           onOpenTemplateModal={setTemplateModalSectionId}
-           onOpenBreakoutModal={setBreakoutModalSectionId}
-           onCreateSectionCard={(sectionId, data, groupId) =>
-             handleAdd({ ...data, sectionId }, groupId)
-           }
-           templateBusySectionId={templateBusySectionId}
-           breakoutBySection={breakoutBySection}
-           activeGroupBySection={activeGroupBySection}
-           breakoutBusyId={breakoutBusyId}
-           onSetActiveGroup={(sectionId, group) =>
-             setActiveGroupBySection((prev) => ({ ...prev, [sectionId]: group }))
-           }
-           onJoinBreakout={handleJoinBreakout}
-           onDeleteCard={handleDelete}
-         />
+            canAddPost={canAddPost}
+            isStudentViewer={isStudentViewer}
+            isAddingSection={isAddingSection}
+            newSectionTitle={newSectionTitle}
+            sectionAddBusy={sectionAddBusy}
+            sectionAddError={sectionAddError}
+            onStartAddSection={startAddSection}
+            onCancelAddSection={cancelAddSection}
+            onSectionTitleChange={setNewSectionTitle}
+            onSubmitSection={handleAddSection}
+            onOpenSectionPanel={(sectionId, tab) =>
+              setPanelState({ sectionId, tab })
+            }
+            onMoveSection={handleMoveSection}
+            onOpenTemplateModal={setTemplateModalSectionId}
+            onOpenBreakoutModal={setBreakoutModalSectionId}
+            onSectionActivityStateChange={handleSectionActivityStateChange}
+            onCreateSectionCard={(sectionId, data, groupId) =>
+              handleAdd({ ...data, sectionId }, groupId)
+            }
+            templateBusySectionId={templateBusySectionId}
+            sectionOrderBusyId={sectionOrderBusyId}
+            breakoutBySection={breakoutBySection}
+            activeGroupBySection={activeGroupBySection}
+            breakoutBusyId={breakoutBusyId}
+            onSetActiveGroup={(sectionId, group) =>
+              setActiveGroupBySection((prev) => ({ ...prev, [sectionId]: group }))
+            }
+            onJoinBreakout={handleJoinBreakout}
+            onDeleteCard={handleDelete}
+          />
         ) : (
           cards.map((card) => (
             <StreamPost
@@ -688,14 +809,20 @@ type StreamGroupedFeedProps = {
   onSectionTitleChange: (title: string) => void;
   onSubmitSection: (event: FormEvent<HTMLFormElement>) => void;
   onOpenSectionPanel: (sectionId: string, tab: "rename" | "delete") => void;
+  onMoveSection: (sectionId: string, direction: "up" | "down") => Promise<void>;
   onOpenTemplateModal: (sectionId: string) => void;
   onOpenBreakoutModal: (sectionId: string) => void;
+  onSectionActivityStateChange: (
+    sectionId: string,
+    activityTemplateState: StreamActivityTemplateState | null,
+  ) => Promise<boolean>;
   onCreateSectionCard: (
     sectionId: string,
     data: { title: string; content: string },
     groupId?: string | null,
   ) => Promise<void>;
   templateBusySectionId: string | null;
+  sectionOrderBusyId: string | null;
   breakoutBySection: Record<string, BreakoutState>;
   activeGroupBySection: Record<string, string>;
   breakoutBusyId: string | null;
@@ -722,10 +849,13 @@ function StreamGroupedFeed({
   onSectionTitleChange,
   onSubmitSection,
   onOpenSectionPanel,
+  onMoveSection,
   onOpenTemplateModal,
   onOpenBreakoutModal,
+  onSectionActivityStateChange,
   onCreateSectionCard,
   templateBusySectionId,
+  sectionOrderBusyId,
   breakoutBySection,
   activeGroupBySection,
   breakoutBusyId,
@@ -733,10 +863,6 @@ function StreamGroupedFeed({
   onJoinBreakout,
   onDeleteCard,
 }: StreamGroupedFeedProps) {
-  const hasAnyCard =
-    grouped.unsectioned.length > 0 ||
-    sections.some((s) => (grouped.bySection.get(s.id) ?? []).length > 0);
-
   return (
     <>
       {canEdit && (
@@ -786,10 +912,13 @@ function StreamGroupedFeed({
         </div>
       )}
 
-      {sections.map((section) => {
+      {sections.map((section, sectionIndex) => {
         const bucket = grouped.bySection.get(section.id) ?? [];
         const breakout = breakoutBySection[section.id];
         const hasBreakout = !!breakout?.config;
+        const orderBusy = sectionOrderBusyId !== null;
+        const canMoveUp = sectionIndex > 0;
+        const canMoveDown = sectionIndex < sections.length - 1;
         return (
           <section
             key={section.id}
@@ -810,6 +939,26 @@ function StreamGroupedFeed({
                       onClick={() => onOpenSectionPanel(section.id, "rename")}
                     >
                       <PencilIcon size={16} />
+                    </button>
+                    <button
+                      type="button"
+                      className="ui-icon-action ui-icon-action-soft stream-section-icon-btn"
+                      aria-label={`${section.title} 위로 이동`}
+                      title="위로 이동"
+                      onClick={() => void onMoveSection(section.id, "up")}
+                      disabled={orderBusy || !canMoveUp}
+                    >
+                      <ChevronUpIcon size={16} />
+                    </button>
+                    <button
+                      type="button"
+                      className="ui-icon-action ui-icon-action-soft stream-section-icon-btn"
+                      aria-label={`${section.title} 아래로 이동`}
+                      title="아래로 이동"
+                      onClick={() => void onMoveSection(section.id, "down")}
+                      disabled={orderBusy || !canMoveDown}
+                    >
+                      <ChevronDownIcon size={16} />
                     </button>
                     <button
                       type="button"
@@ -873,6 +1022,7 @@ function StreamGroupedFeed({
                onCreateCard={(data, groupId) =>
                  onCreateSectionCard(section.id, data, groupId)
                }
+               onSectionActivityStateChange={onSectionActivityStateChange}
                onDeleteCard={onDeleteCard}
              />
            ) : (
@@ -883,6 +1033,11 @@ function StreamGroupedFeed({
                    sectionId={section.id}
                    cards={bucket}
                    canEdit={canAddPost}
+                   isTeacherView={canEdit}
+                   state={section.activityTemplateState ?? null}
+                   onStateChange={(nextState) =>
+                     onSectionActivityStateChange(section.id, nextState)
+                   }
                    onCreateCard={(data) => onCreateSectionCard(section.id, data)}
                  />
                )}
@@ -923,12 +1078,6 @@ function StreamGroupedFeed({
         </section>
       )}
 
-      {!hasAnyCard && !canEdit && (
-        <div className="stream-empty">아직 게시글이 없어요.</div>
-      )}
-      {!hasAnyCard && canEdit && canAddPost && (
-        <div className="stream-empty">첫 게시글을 남겨보세요.</div>
-      )}
     </>
   );
 }
@@ -1145,6 +1294,10 @@ type StreamBreakoutBodyProps = {
     data: { title: string; content: string },
     groupId: string | null,
   ) => Promise<void>;
+  onSectionActivityStateChange?: (
+    sectionId: string,
+    activityTemplateState: StreamActivityTemplateState | null,
+  ) => Promise<boolean>;
   onDeleteCard: (card: CardData) => void;
 };
 
@@ -1161,6 +1314,7 @@ function StreamBreakoutBody({
   onSetActiveGroup,
   onJoin,
   onCreateCard,
+  onSectionActivityStateChange,
   onDeleteCard,
 }: StreamBreakoutBodyProps) {
   const groups = [...state.groups].sort((a, b) => a.order - b.order);
@@ -1189,6 +1343,12 @@ function StreamBreakoutBody({
             sectionId={section.id}
             cards={cards}
             canEdit={state.canManage || canAddPost}
+            isTeacherView={state.canManage}
+            state={section.activityTemplateState ?? null}
+            onStateChange={(nextState) =>
+              onSectionActivityStateChange?.(section.id, nextState) ??
+              Promise.resolve(false)
+            }
             onCreateCard={(data) => onCreateCard(data, groupId)}
           />
         )}
@@ -1223,6 +1383,8 @@ function StreamBreakoutBody({
                 sectionId={section.id}
                 cards={[]}
                 canEdit={false}
+                isTeacherView={false}
+                state={section.activityTemplateState ?? null}
                 onCreateCard={() => Promise.resolve()}
               />
             )}
@@ -1268,6 +1430,8 @@ function StreamBreakoutBody({
             sectionId={section.id}
             cards={cards}
             canEdit={canAddPost}
+            isTeacherView={false}
+            state={section.activityTemplateState ?? null}
             onCreateCard={(data) => onCreateCard(data, myGroupId)}
           />
         )}

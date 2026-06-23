@@ -44,6 +44,22 @@ export function ChevronRightIcon({ size = 24, className }: IconProps) {
   );
 }
 
+export function ChevronUpIcon({ size = 24, className }: IconProps) {
+  return (
+    <svg {...base(size)} className={className} aria-hidden="true">
+      <polyline points="18 15 12 9 6 15" />
+    </svg>
+  );
+}
+
+export function ChevronDownIcon({ size = 24, className }: IconProps) {
+  return (
+    <svg {...base(size)} className={className} aria-hidden="true">
+      <polyline points="6 9 12 15 18 9" />
+    </svg>
+  );
+}
+
 export function PlayIcon({ size = 20, className }: IconProps) {
   // 시각적 중앙 보정 위해 X 6 부터 시작 — 삼각형 무게중심이 도형 좌측에 있음.
   return (

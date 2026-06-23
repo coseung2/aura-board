@@ -1,9 +1,11 @@
 import { NextResponse } from "next/server";
+import { Prisma } from "@prisma/client";
 import { z } from "zod";
 import { db } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
 import { requirePermission, ForbiddenError } from "@/lib/rbac";
 import { touchBoardUpdatedAt } from "@/lib/board-touch";
+import { announceCardChange } from "@/lib/realtime-broadcast";
 import { enqueueBlobDeletion } from "@/lib/blob-cleanup";
 import { STREAM_ACTIVITY_TEMPLATES } from "@/lib/stream-activity-templates";
 
@@ -16,6 +18,10 @@ const PatchSectionSchema = z.object({
   sortMode: SortModeSchema.nullable().optional(),
   pinned: z.boolean().optional(),
   activityTemplate: ActivityTemplateSchema.nullable().optional(),
+  activityTemplateState: z
+    .object({ wordCloudPublished: z.boolean().optional() })
+    .nullable()
+    .optional(),
 });
 
 export async function PATCH(
@@ -36,12 +42,21 @@ export async function PATCH(
     const body = await req.json();
     const input = PatchSectionSchema.parse(body);
 
+    const data = {
+      ...input,
+      activityTemplateState:
+        input.activityTemplate === null || input.activityTemplateState === null
+          ? Prisma.DbNull
+          : input.activityTemplateState,
+    };
+
     const updated = await db.section.update({
       where: { id },
-      data: input,
+      data,
     });
 
     await touchBoardUpdatedAt(section.boardId);
+    await announceCardChange(section.boardId, "update");
 
     return NextResponse.json({ section: updated });
   } catch (e) {

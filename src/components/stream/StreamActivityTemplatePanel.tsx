@@ -3,13 +3,20 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import type { Map as MapLibreMap, Marker as MapLibreMarker } from "maplibre-gl";
 import type { CardData } from "../DraggableCard";
-import type { StreamActivityTemplate } from "@/lib/stream-activity-templates";
+import {
+  normalizeStreamActivityTemplateState,
+  type StreamActivityTemplate,
+  type StreamActivityTemplateState,
+} from "@/lib/stream-activity-templates";
 
 type Props = {
   template: StreamActivityTemplate;
   sectionId: string;
   cards: CardData[];
   canEdit: boolean;
+  isTeacherView?: boolean;
+  state?: StreamActivityTemplateState | null;
+  onStateChange?: (state: StreamActivityTemplateState | null) => Promise<boolean>;
   onCreateCard: (data: { title: string; content: string }) => Promise<void>;
 };
 
@@ -36,6 +43,9 @@ export function StreamActivityTemplatePanel({
   sectionId,
   cards,
   canEdit,
+  isTeacherView = false,
+  state,
+  onStateChange,
   onCreateCard,
 }: Props) {
   if (template === "window_opening") {
@@ -52,6 +62,9 @@ export function StreamActivityTemplatePanel({
       <WordCloudPanel
         cards={cards}
         canEdit={canEdit}
+        isTeacherView={isTeacherView}
+        state={state}
+        onStateChange={onStateChange}
         onCreateCard={onCreateCard}
       />
     );
@@ -127,17 +140,58 @@ function WindowOpeningPanel({
 function WordCloudPanel({
   cards,
   canEdit,
+  isTeacherView,
+  state,
+  onStateChange,
   onCreateCard,
 }: {
   cards: CardData[];
   canEdit: boolean;
+  isTeacherView: boolean;
+  state?: StreamActivityTemplateState | null;
+  onStateChange?: (state: StreamActivityTemplateState | null) => Promise<boolean>;
   onCreateCard: (data: { title: string; content: string }) => Promise<void>;
 }) {
   const words = useMemo(() => buildWordCloud(cards), [cards]);
+  const normalizedState = normalizeStreamActivityTemplateState(state);
+  const published = normalizedState.wordCloudPublished === true;
+  const canSeeCloud = published || isTeacherView;
+  const [publishing, setPublishing] = useState(false);
+
+  async function publish() {
+    if (!onStateChange || publishing) return;
+    setPublishing(true);
+    try {
+      await onStateChange({ ...normalizedState, wordCloudPublished: true });
+    } finally {
+      setPublishing(false);
+    }
+  }
+
   return (
     <div className="stream-activity-panel stream-word-panel">
+      {isTeacherView && (
+        <div className="stream-word-toolbar">
+          <span>
+            {published
+              ? "공개됨"
+              : `비공개 수집 중 · ${cards.length}개 입력`}
+          </span>
+          <button
+            type="button"
+            onClick={publish}
+            disabled={published || publishing || !onStateChange}
+          >
+            {published ? "공개됨" : "공개"}
+          </button>
+        </div>
+      )}
       <div className="stream-word-stage">
-        {words.length === 0 ? (
+        {!canSeeCloud ? (
+          <p className="stream-activity-muted">
+            교사가 공개하면 워드클라우드가 표시됩니다.
+          </p>
+        ) : words.length === 0 ? (
           <p className="stream-activity-muted">게시글 없음</p>
         ) : (
           <div className="stream-word-cloud" aria-label="워드클라우드">
@@ -735,38 +789,28 @@ function normalizeRouteIds(route: MapRoute, places: MapPlace[]): string[] {
 }
 
 function buildWordCloud(cards: CardData[]) {
-  const stop = new Set([
-    "그리고",
-    "하지만",
-    "그래서",
-    "나는",
-    "우리",
-    "있는",
-    "없는",
-    "것은",
-    "것이",
-    "the",
-    "and",
-    "for",
-    "with",
-  ]);
-  const counts = new Map<string, number>();
+  const counts = new Map<string, { text: string; count: number }>();
   for (const card of cards) {
-    const text = `${card.title} ${card.content}`.toLowerCase();
-    for (const raw of text.match(/[가-힣a-zA-Z0-9]{2,}/g) ?? []) {
-      if (stop.has(raw)) continue;
-      counts.set(raw, (counts.get(raw) ?? 0) + 1);
-    }
+    const text = normalizeWordCloudEntry(card.content || card.title);
+    if (!text) continue;
+    const key = text.toLocaleLowerCase("ko-KR");
+    const existing = counts.get(key);
+    if (existing) existing.count += 1;
+    else counts.set(key, { text, count: 1 });
   }
-  const max = Math.max(1, ...counts.values());
-  return [...counts.entries()]
-    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+  const max = Math.max(1, ...[...counts.values()].map((item) => item.count));
+  return [...counts.values()]
+    .sort((a, b) => b.count - a.count || a.text.localeCompare(b.text))
     .slice(0, 32)
-    .map(([text, count]) => ({
-      text,
-      count,
-      weight: Math.max(1, Math.round((count / max) * 5)),
+    .map((item) => ({
+      text: item.text,
+      count: item.count,
+      weight: max === 1 ? 2 : 1 + Math.round(((item.count - 1) / (max - 1)) * 5),
     }));
+}
+
+function normalizeWordCloudEntry(value: string | null | undefined): string {
+  return (value ?? "").trim().replace(/\s+/g, " ");
 }
 
 function buildTimeline(cards: CardData[]) {
