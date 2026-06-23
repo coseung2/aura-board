@@ -209,8 +209,7 @@
   border-color: var(--color-accent);
 }
 
-.stream-composer-attachment,
-.stream-composer-link {
+.stream-composer-attachment {
   display: flex;
   align-items: center;
   gap: 12px;
@@ -221,13 +220,29 @@
   background: var(--color-surface-alt);
 }
 
+.stream-composer-link {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+  border: 0;
+  padding: 0;
+  background: transparent;
+}
+
 .stream-composer-attachment img,
-.stream-composer-attachment video,
-.stream-composer-link img {
+.stream-composer-attachment video {
   width: 64px;
   height: 64px;
   object-fit: cover;
   border-radius: 6px;
+  background: var(--color-border);
+}
+
+.stream-composer-link img {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  object-fit: cover;
+  border-radius: 8px;
   background: var(--color-border);
 }
 
@@ -440,16 +455,19 @@
   flex: 0 0 100%;
   scroll-snap-align: center;
   margin: 0;
-  aspect-ratio: 4 / 3;
+  aspect-ratio: 16 / 9;
   display: grid;
   place-items: center;
   background: #0f172a;
 }
 
 .stream-media-slide img,
-.stream-media-slide video {
+.stream-media-slide video,
+.stream-media-slide iframe {
   width: 100%;
   height: 100%;
+  border: 0;
+  display: block;
   object-fit: contain;
 }
 
@@ -3120,6 +3138,132 @@
   }
 }
 
+.presentation-prompt-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 220;
+  background: rgba(15, 23, 42, 0.46);
+}
+
+.presentation-prompt {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  z-index: 221;
+  display: flex;
+  flex-direction: column;
+  width: min(520px, calc(100vw - 32px));
+  max-height: min(680px, calc(100vh - 32px));
+  transform: translate(-50%, -50%);
+  overflow: hidden;
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  background: var(--color-surface);
+  box-shadow: 0 24px 64px rgba(15, 23, 42, 0.22);
+}
+
+.presentation-prompt-head {
+  display: grid;
+  gap: 6px;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.presentation-prompt-head h2 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 18px;
+  font-weight: 800;
+  color: var(--color-text);
+}
+
+.presentation-prompt-head p {
+  margin: 0;
+  font-size: 13px;
+  color: var(--color-text-muted);
+  line-height: 1.5;
+}
+
+.presentation-prompt-list {
+  display: grid;
+  gap: 14px;
+  padding: 16px 20px;
+  overflow-y: auto;
+}
+
+.presentation-prompt-section {
+  display: grid;
+  gap: 8px;
+}
+
+.presentation-prompt-section-title {
+  font-family: var(--font-display);
+  font-size: 14px;
+  font-weight: 800;
+  color: var(--color-text);
+}
+
+.presentation-prompt-groups {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.presentation-prompt-group {
+  min-height: 32px;
+  padding: 4px 12px;
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  background: var(--color-surface);
+  color: var(--color-text-muted);
+  font-family: var(--font-body);
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 120ms ease, border-color 120ms ease, color 120ms ease;
+}
+
+.presentation-prompt-group:hover,
+.presentation-prompt-group:focus-visible {
+  border-color: var(--color-border-hover);
+  background: var(--color-surface-alt);
+  color: var(--color-text);
+  outline: none;
+}
+
+.presentation-prompt-group.is-active {
+  border-color: var(--color-accent);
+  background: var(--color-accent-tinted-bg);
+  color: var(--color-accent-tinted-text);
+}
+
+.presentation-prompt-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 14px 20px;
+  border-top: 1px solid var(--color-border);
+}
+
+.presentation-prompt-actions .ui-icon-action {
+  min-height: 36px;
+  padding: 0 16px;
+  border-radius: 8px;
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font-family: var(--font-body);
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.presentation-prompt-actions .ui-icon-action.is-accent {
+  border-color: var(--color-accent);
+  background: var(--color-accent);
+  color: #fff;
+}
+
 /* -------- Board Slideshow (stream presentation overlay) -------- */
 
 .slideshow-overlay {
@@ -3374,6 +3518,11 @@
   overflow: hidden;
 }
 
+.slideshow-media-slide--youtube {
+  align-content: center;
+  gap: 14px;
+}
+
 .slideshow-media-slide img,
 .slideshow-media-slide video {
   width: auto;
@@ -3390,6 +3539,29 @@
 .slideshow-media-slide video {
   width: 100%;
   height: 100%;
+}
+
+.slideshow-media-slide iframe {
+  width: min(100%, 960px);
+  aspect-ratio: 16 / 9;
+  max-height: 100%;
+  border: 0;
+  border-radius: 12px;
+  display: block;
+  box-shadow: 0 8px 32px rgba(15, 23, 42, 0.12);
+}
+
+.slideshow-media-caption {
+  width: min(100%, 960px);
+  margin: 0;
+  color: var(--color-text);
+  font-family: var(--font-display);
+  font-size: 20px;
+  font-weight: 800;
+  line-height: 1.35;
+  text-align: center;
+  word-break: keep-all;
+  overflow-wrap: anywhere;
 }
 
 .slideshow-media-nav {

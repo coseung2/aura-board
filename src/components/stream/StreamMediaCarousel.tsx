@@ -2,11 +2,12 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { isYouTubeLink } from "@/lib/card-content-policy";
+import { extractVideoId } from "@/lib/youtube";
 import type { CardData } from "../DraggableCard";
 
 type MediaItem = {
   id: string;
-  kind: "image" | "video";
+  kind: "image" | "video" | "youtube";
   url: string;
   previewUrl?: string | null;
   alt: string;
@@ -41,6 +42,14 @@ export function StreamMediaCarousel({ card }: Props) {
           <figure className="stream-media-slide" key={item.id}>
             {item.kind === "image" ? (
               <img src={item.url} alt={item.alt} loading="lazy" decoding="async" />
+            ) : item.kind === "youtube" ? (
+              <iframe
+                src={item.url}
+                title={item.alt}
+                loading="lazy"
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                allowFullScreen
+              />
             ) : (
               <video
                 src={item.url}
@@ -99,6 +108,19 @@ export function StreamMediaCarousel({ card }: Props) {
 }
 
 function buildMediaItems(card: CardData): MediaItem[] {
+  const linkedYouTubeId = card.linkUrl ? extractVideoId(card.linkUrl) : null;
+  if (linkedYouTubeId) {
+    return [
+      {
+        id: `${card.id}-youtube`,
+        kind: "youtube",
+        url: `https://www.youtube.com/embed/${linkedYouTubeId}`,
+        previewUrl: card.linkImage,
+        alt: card.linkTitle ?? card.title ?? "YouTube",
+      },
+    ];
+  }
+
   const fromAttachments = (card.attachments ?? [])
     .filter((item) => item.kind === "image" || item.kind === "video")
     .map((item) => ({

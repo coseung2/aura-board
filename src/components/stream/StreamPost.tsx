@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { formatRelativeTime } from "@/lib/card-engagement-format";
+import { extractVideoId } from "@/lib/youtube";
 import { CardFileAttachment } from "../CardFileAttachment";
 import type { CardData } from "../DraggableCard";
 import { getStreamAuthor } from "./stream-author";
@@ -20,6 +21,36 @@ export function StreamPost({ card, canDelete, onDelete, boardId }: Props) {
   const [menuOpen, setMenuOpen] = useState(false);
   const author = getStreamAuthor(card);
   const fileAttachments = (card.attachments ?? []).filter((item) => item.kind === "file");
+  const isYouTubeVideo = Boolean(card.linkUrl && extractVideoId(card.linkUrl));
+  const [resolvedYouTubeTitle, setResolvedYouTubeTitle] = useState<string | null>(null);
+  const displayTitle =
+    isYouTubeVideo && card.linkTitle?.trim()
+      ? card.linkTitle.trim()
+      : isYouTubeVideo && resolvedYouTubeTitle
+        ? resolvedYouTubeTitle
+      : card.title.trim();
+
+  useEffect(() => {
+    if (!isYouTubeVideo || card.linkTitle?.trim() || !card.linkUrl) {
+      setResolvedYouTubeTitle(null);
+      return;
+    }
+    let alive = true;
+    fetch(`/api/link-preview?url=${encodeURIComponent(card.linkUrl)}`, {
+      cache: "no-store",
+    })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data: { title?: string | null } | null) => {
+        if (!alive) return;
+        setResolvedYouTubeTitle(data?.title?.trim() || null);
+      })
+      .catch(() => {
+        if (alive) setResolvedYouTubeTitle(null);
+      });
+    return () => {
+      alive = false;
+    };
+  }, [card.linkTitle, card.linkUrl, isYouTubeVideo]);
 
   return (
     <article className="stream-post">
@@ -66,9 +97,9 @@ export function StreamPost({ card, canDelete, onDelete, boardId }: Props) {
       <StreamMediaCarousel card={card} />
 
       <div className="stream-post-body">
-        {card.title.trim() && <h2>{card.title}</h2>}
+        {displayTitle && <h2>{displayTitle}</h2>}
         {card.content.trim() && <p>{card.content}</p>}
-        <StreamLinkPreview card={card} />
+        {!isYouTubeVideo && <StreamLinkPreview card={card} />}
         {card.fileUrl && (
           <div className="stream-file-list">
             <CardFileAttachment

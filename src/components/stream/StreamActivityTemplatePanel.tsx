@@ -155,7 +155,7 @@ function WordCloudPanel({
   const words = useMemo(() => buildWordCloud(cards), [cards]);
   const normalizedState = normalizeStreamActivityTemplateState(state);
   const published = normalizedState.wordCloudPublished === true;
-  const canSeeCloud = published || isTeacherView;
+  const canSeeCloud = published;
   const [publishing, setPublishing] = useState(false);
 
   async function publish() {
@@ -198,7 +198,10 @@ function WordCloudPanel({
             {words.map((word) => (
               <span
                 key={word.text}
-                style={{ fontSize: `${14 + word.weight * 4}px` }}
+                style={{
+                  color: word.color,
+                  fontSize: `${14 + word.weight * 10}px`,
+                }}
                 title={`${word.count}회`}
               >
                 {word.text}
@@ -804,6 +807,7 @@ function buildWordCloud(cards: CardData[]) {
     .slice(0, 32)
     .map((item) => ({
       text: item.text,
+      color: wordCloudColor(item.text),
       count: item.count,
       weight: max === 1 ? 2 : 1 + Math.round(((item.count - 1) / (max - 1)) * 5),
     }));
@@ -811,6 +815,27 @@ function buildWordCloud(cards: CardData[]) {
 
 function normalizeWordCloudEntry(value: string | null | undefined): string {
   return (value ?? "").trim().replace(/\s+/g, " ");
+}
+
+const WORD_CLOUD_COLORS = [
+  "#0f82c9",
+  "#d92d7b",
+  "#2f9e44",
+  "#8a5cf6",
+  "#e67700",
+  "#0ca678",
+  "#c2255c",
+  "#4263eb",
+  "#5c940d",
+  "#ae3ec9",
+];
+
+function wordCloudColor(text: string): string {
+  let hash = 0;
+  for (let i = 0; i < text.length; i += 1) {
+    hash = (hash * 31 + text.charCodeAt(i)) >>> 0;
+  }
+  return WORD_CLOUD_COLORS[hash % WORD_CLOUD_COLORS.length] ?? WORD_CLOUD_COLORS[0];
 }
 
 function buildTimeline(cards: CardData[]) {

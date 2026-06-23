@@ -11,7 +11,9 @@ import { getPreviewCache, setPreviewCache } from "@/lib/preview-cache";
 import { uploadPublicObject } from "@/lib/media-storage";
 import {
   extractChannelHandle,
+  extractVideoId,
   fetchYouTubeChannelMeta,
+  fetchYouTubeMeta,
 } from "@/lib/youtube";
 
 type LinkPreviewPayload = {
@@ -154,6 +156,29 @@ export async function GET(req: Request) {
   }
 
   try {
+    const youtubeVideoId = extractVideoId(url);
+    if (youtubeVideoId) {
+      const videoCached = await getPreviewCache<LinkPreviewPayload>(
+        "link-preview-youtube-video",
+        url
+      );
+      if (videoCached.hit && videoCached.status === "ok") {
+        return NextResponse.json(videoCached.payload);
+      }
+
+      const meta = await fetchYouTubeMeta(youtubeVideoId);
+      if (meta) {
+        const payload = {
+          title: meta.title,
+          description: meta.authorName ? `YouTube · ${meta.authorName}` : "YouTube",
+          image: meta.thumbnailUrl,
+        };
+        await setPreviewCache("link-preview-youtube-video", url, payload, true);
+        await setPreviewCache("link-preview", url, payload, true);
+        return NextResponse.json(payload);
+      }
+    }
+
     const cached = await getPreviewCache<LinkPreviewPayload>("link-preview", url);
     if (
       cached.hit &&

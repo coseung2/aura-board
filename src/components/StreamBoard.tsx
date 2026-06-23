@@ -27,6 +27,7 @@ import {
 } from "@/lib/stream-activity-templates";
 import {
   useBoardSlideshow,
+  type SlideshowSectionOption,
   type SlideshowSlide,
 } from "./slideshow/BoardSlideshowProvider";
 
@@ -223,7 +224,8 @@ export function StreamBoard({
   // Register the sorted feed as slideshow slides so the board header
   // button can open a presentation overlay. When sections are enabled,
   // insert a section-title slide before each section group.
-  const { registerSlides, unregisterSlides } = useBoardSlideshow();
+  const { registerSlides, unregisterSlides, setSectionOptions } =
+    useBoardSlideshow();
   useEffect(() => {
     const slides: SlideshowSlide[] = [];
     if (streamSectionsEnabled) {
@@ -268,6 +270,30 @@ export function StreamBoard({
       unregisterSlides("stream");
     };
   }, [cards, sortedSections, visibleBySection, streamSectionsEnabled, registerSlides, unregisterSlides]);
+
+  useEffect(() => {
+    if (!streamSectionsEnabled) {
+      setSectionOptions("stream", []);
+      return;
+    }
+    const options: SlideshowSectionOption[] = sortedSections
+      .map((section) => {
+        const state = breakoutBySection[section.id];
+        const groups = state?.config
+          ? [...state.groups]
+              .sort((a, b) => a.order - b.order)
+              .map((group) => ({ groupId: group.id, name: group.name }))
+          : [];
+        return { sectionId: section.id, title: section.title, groups };
+      })
+      .filter((option) => option.groups.length > 0);
+    setSectionOptions("stream", options);
+  }, [
+    sortedSections,
+    breakoutBySection,
+    streamSectionsEnabled,
+    setSectionOptions,
+  ]);
 
   async function handleAdd(data: AddCardData, groupId?: string | null) {
     const res = await fetch("/api/cards", {

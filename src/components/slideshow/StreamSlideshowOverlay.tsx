@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { formatRelativeTime } from "@/lib/card-engagement-format";
 import { isYouTubeLink } from "@/lib/card-content-policy";
+import { extractVideoId } from "@/lib/youtube";
 import type { CardData } from "../DraggableCard";
 import {
   ChevronLeftIcon,
@@ -24,7 +25,7 @@ type Props = {
 
 type MediaItem = {
   id: string;
-  kind: "image" | "video";
+  kind: "image" | "video" | "youtube";
   url: string;
   previewUrl?: string | null;
   alt: string;
@@ -60,6 +61,9 @@ export function StreamSlideshowOverlay({
   const isActivitySlide = slide?.kind === "activity";
   const mediaItems =
     slide && slide.card ? buildSlideshowMedia(slide.card) : [];
+  const cardLinkUrl = slide?.card?.linkUrl ?? null;
+  const cardLinkTitle = slide?.card?.linkTitle ?? null;
+  const [resolvedYouTubeTitle, setResolvedYouTubeTitle] = useState<string | null>(null);
 
   const go = useCallback(
     (next: number) => {
@@ -98,6 +102,28 @@ export function StreamSlideshowOverlay({
   useEffect(() => {
     if (mediaIndex >= mediaItems.length) setMediaIndex(0);
   }, [mediaIndex, mediaItems.length]);
+
+  useEffect(() => {
+    if (!cardLinkUrl || !extractVideoId(cardLinkUrl) || cardLinkTitle?.trim()) {
+      setResolvedYouTubeTitle(null);
+      return;
+    }
+    let alive = true;
+    fetch(`/api/link-preview?url=${encodeURIComponent(cardLinkUrl)}`, {
+      cache: "no-store",
+    })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data: { title?: string | null } | null) => {
+        if (!alive) return;
+        setResolvedYouTubeTitle(data?.title?.trim() || null);
+      })
+      .catch(() => {
+        if (alive) setResolvedYouTubeTitle(null);
+      });
+    return () => {
+      alive = false;
+    };
+  }, [cardLinkTitle, cardLinkUrl]);
 
   if (!mounted || !slide) return null;
 
@@ -281,8 +307,9 @@ export function StreamSlideshowOverlay({
   );
   const hasContent = card.content.trim().length > 0;
   const linkUrl = card.linkUrl;
+  const isYouTubeVideo = Boolean(linkUrl && extractVideoId(linkUrl));
   const hasFiles = Boolean(card.fileUrl) || fileAttachments.length > 0;
-  const displayTitle = resolveSlideshowTitle(card);
+  const displayTitle = resolveSlideshowTitle(card, resolvedYouTubeTitle);
 
   function goMedia(next: number) {
     if (mediaItems.length <= 1) return;
@@ -338,12 +365,12 @@ export function StreamSlideshowOverlay({
         </div>
       </div>
 
-      <div className="slideshow-stage">
+      <div className={`slideshow-stage${isYouTubeVideo ? " slideshow-stage--youtube" : ""}`}>
         <div className="slideshow-text">
-          <h2 className="slideshow-title">{displayTitle}</h2>
+          {!isYouTubeVideo && <h2 className="slideshow-title">{displayTitle}</h2>}
           {hasContent && <p className="slideshow-content">{card.content}</p>}
 
-          {linkUrl && (
+          {linkUrl && !isYouTubeVideo && (
             <a
               className="slideshow-link"
               href={linkUrl}
@@ -394,13 +421,27 @@ export function StreamSlideshowOverlay({
         <div className="slideshow-media">
           {activeMediaItem ? (
             <div className="slideshow-media-strip">
-              <figure className="slideshow-media-slide">
+              <figure
+                className={`slideshow-media-slide${
+                  activeMediaItem.kind === "youtube"
+                    ? " slideshow-media-slide--youtube"
+                    : ""
+                }`}
+              >
                 {activeMediaItem.kind === "image" ? (
                   <img
                     src={activeMediaItem.url}
                     alt={activeMediaItem.alt}
                     loading="lazy"
                     decoding="async"
+                  />
+                ) : activeMediaItem.kind === "youtube" ? (
+                  <iframe
+                    src={activeMediaItem.url}
+                    title={activeMediaItem.alt}
+                    loading="lazy"
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                    allowFullScreen
                   />
                 ) : (
                   <video
@@ -410,6 +451,11 @@ export function StreamSlideshowOverlay({
                     preload="metadata"
                     playsInline
                   />
+                )}
+                {activeMediaItem.kind === "youtube" && (
+                  <figcaption className="slideshow-media-caption">
+                    {displayTitle}
+                  </figcaption>
                 )}
               </figure>
               {mediaItems.length > 1 && (
@@ -497,7 +543,16 @@ export function StreamSlideshowOverlay({
  * Resolve a display title for the slideshow. Falls back to the first
  * non-empty content line, then to "제목 없음" when both are empty.
  */
-function resolveSlideshowTitle(card: CardData): string {
+function resolveSlideshowTitle(
+  card: CardData,
+  resolvedYouTubeTitle?: string | null,
+): string {
+  if (card.linkUrl && extractVideoId(card.linkUrl) && card.linkTitle?.trim()) {
+    return card.linkTitle.trim();
+  }
+  if (card.linkUrl && extractVideoId(card.linkUrl) && resolvedYouTubeTitle) {
+    return resolvedYouTubeTitle;
+  }
   const trimmedTitle = card.title.trim();
   if (trimmedTitle) return trimmedTitle;
   const firstLine = card.content
@@ -514,6 +569,19 @@ function resolveSlideshowTitle(card: CardData): string {
  * visual on the right panel.
  */
 function buildSlideshowMedia(card: CardData): MediaItem[] {
+  const linkedYouTubeId = card.linkUrl ? extractVideoId(card.linkUrl) : null;
+  if (linkedYouTubeId) {
+    return [
+      {
+        id: `${card.id}-youtube`,
+        kind: "youtube",
+        url: `https://www.youtube.com/embed/${linkedYouTubeId}`,
+        previewUrl: card.linkImage,
+        alt: card.linkTitle ?? card.title ?? "YouTube",
+      },
+    ];
+  }
+
   const fromAttachments = (card.attachments ?? [])
     .filter((item) => item.kind === "image" || item.kind === "video")
     .map((item) => ({
