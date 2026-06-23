@@ -6,6 +6,7 @@ import {
   type BoardSection,
   type BoardTheme,
 } from "./BoardSettingsPanel";
+import type { AuraBoardSettings } from "./AuraEvaluationControl";
 
 type Props = {
   boardId: string;
@@ -28,6 +29,7 @@ type Props = {
   streamTitlePrompt?: string;
   streamContentPrompt?: string;
   streamSectionsEnabled?: boolean;
+  auraSettings?: AuraBoardSettings;
 };
 
 export function BoardSettingsLauncher({
@@ -47,6 +49,7 @@ export function BoardSettingsLauncher({
   streamTitlePrompt,
   streamContentPrompt,
   streamSectionsEnabled,
+  auraSettings,
 }: Props) {
   const [open, setOpen] = useState(false);
 
@@ -82,6 +85,7 @@ export function BoardSettingsLauncher({
           initialStreamTitlePrompt={streamTitlePrompt ?? ""}
           initialStreamContentPrompt={streamContentPrompt ?? ""}
           initialStreamSectionsEnabled={streamSectionsEnabled ?? false}
+          initialAuraSettings={auraSettings}
         />
       )}
     </>

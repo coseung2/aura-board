@@ -48,6 +48,8 @@ model User {
   boardResponses           BoardResponse[]           @relation("UserBoardResponses")
   // AI 평어 (2026-04-24) — 교사가 학생별로 생성한 평어 텍스트
   aiFeedbacks              AiFeedback[]              @relation("TeacherAiFeedbacks")
+  // Aura 평가 모드 (2026-06-23) — 교사가 카드의 학생 글에 남긴 상/중/하 등급
+  cardEvaluations          CardEvaluation[]          @relation("TeacherCardEvaluations")
   // OAuth as subject — Aura companion teacher OAuth (2026-04-24)
   oauthAuthCodesAsUser     OAuthAuthCode[]           @relation("UserOAuthAuthCodes")
   oauthAccessTokensAsUser  OAuthAccessToken[]        @relation("UserOAuthAccessTokens")
@@ -245,35 +247,36 @@ model Student {
   sessionVersion Int      @default(1)
   createdAt      DateTime @default(now())
 
-  classroom             Classroom                 @relation(fields: [classroomId], references: [id], onDelete: Cascade)
-  quizPlayers           QuizPlayer[]
-  studentPlants         StudentPlant[]
-  assets                StudentAsset[]
-  breakoutMemberships   BreakoutMembership[]
+  classroom              Classroom                   @relation(fields: [classroomId], references: [id], onDelete: Cascade)
+  quizPlayers            QuizPlayer[]
+  studentPlants          StudentPlant[]
+  assets                 StudentAsset[]
+  breakoutMemberships    BreakoutMembership[]
   sectionBreakoutMembers SectionBreakoutMembership[]
-  parents               ParentChildLink[]
-  parentInvites         ParentInviteCode[]
-  cardsAuthored         Card[]                    @relation("StudentCardAuthor")
-  oauthAuthCodes        OAuthAuthCode[]
-  oauthAccessTokens     OAuthAccessToken[]
-  oauthRefreshTokens    OAuthRefreshToken[]
-  canvaAppLink          CanvaAppLink?
-  assignmentSlots       AssignmentSlot[]          @relation("StudentAssignmentSlots")
-  cardAuthors           CardAuthor[]              @relation("StudentCardAuthors")
-  assessmentSubmissions AssessmentSubmission[]
-  roleAssignments       ClassroomRoleAssignment[]
-  account               StudentAccount?
-  vibeProjectsAuthored  VibeProject[]             @relation("VibeProjectAuthor")
-  vibeSessions          VibeSession[]             @relation("VibeSessionAuthor")
-  vibeReviews           VibeReview[]              @relation("VibeReviewer")
-  vibePlaySessions      VibePlaySession[]         @relation("VibePlayer")
-  boardResponses        BoardResponse[]           @relation("StudentBoardResponses")
-  aiFeedbacks           AiFeedback[]
-  showcaseEntries       ShowcaseEntry[]
+  parents                ParentChildLink[]
+  parentInvites          ParentInviteCode[]
+  cardsAuthored          Card[]                      @relation("StudentCardAuthor")
+  oauthAuthCodes         OAuthAuthCode[]
+  oauthAccessTokens      OAuthAccessToken[]
+  oauthRefreshTokens     OAuthRefreshToken[]
+  canvaAppLink           CanvaAppLink?
+  assignmentSlots        AssignmentSlot[]            @relation("StudentAssignmentSlots")
+  cardAuthors            CardAuthor[]                @relation("StudentCardAuthors")
+  assessmentSubmissions  AssessmentSubmission[]
+  roleAssignments        ClassroomRoleAssignment[]
+  account                StudentAccount?
+  vibeProjectsAuthored   VibeProject[]               @relation("VibeProjectAuthor")
+  vibeSessions           VibeSession[]               @relation("VibeSessionAuthor")
+  vibeReviews            VibeReview[]                @relation("VibeReviewer")
+  vibePlaySessions       VibePlaySession[]           @relation("VibePlayer")
+  boardResponses         BoardResponse[]             @relation("StudentBoardResponses")
+  aiFeedbacks            AiFeedback[]
+  showcaseEntries        ShowcaseEntry[]
+  cardEvaluations        CardEvaluation[]            @relation("StudentCardEvaluations")
   // card-comments-likes (2026-04-26)
-  cardComments          CardComment[]             @relation("StudentCardComments")
-  cardLikes             CardLike[]                @relation("StudentCardLikes")
-  agentSessions         AgentSession[]
+  cardComments           CardComment[]               @relation("StudentCardComments")
+  cardLikes              CardLike[]                  @relation("StudentCardLikes")
+  agentSessions          AgentSession[]
 
   @@unique([classroomId, number])
   @@index([classroomId])
@@ -307,6 +310,43 @@ model AiFeedback {
   @@unique([studentId, subject, unit, criterion])
   @@index([classroomId, updatedAt])
   @@index([teacherId, updatedAt])
+}
+
+// Aura 평가 모드 (2026-06-23): 일반 카드/그리드 보드에서 교사가 카드에
+// 상/중/하 등급만 남기면, 같은 (학생, 과목, 단원, 평가항목) 조합으로
+// AiFeedback row 가 deterministic fixed text 로 upsert 된다. AiFeedback 의
+// unique 키 (studentId, subject, unit, criterion) 가 그대로 종합 진실
+// 소스이므로 Aura 측은 기존 /api/external/feedbacks 로 끌어간다 — 별도
+// export 시스템은 만들지 않는다.
+//
+// CardEvaluation 은 카드 × 학생 단위의 최신 등급만 보존한다. 한 학생이
+// 같은 카드에 다시 등급을 매기면 upsert. aiFeedbackId 는 어떤 AiFeedback
+// row 와 매칭되는지 빠른 lookup 용 (nullable: 모드 비활성/마이그레이션
+// 이전 row 호환).
+model CardEvaluation {
+  id           String   @id @default(cuid())
+  boardId      String
+  cardId       String
+  studentId    String
+  teacherId    String
+  // "high" | "mid" | "low" — API 경계. v1 은 영문 라벨만 받는다.
+  level        String
+  // 결정된 fixed text (level 기반) — CardEvaluation 자체는 참고용 캐시이며
+  // 진실은 AiFeedback.comment. 마이그레이션/감사용으로 보존.
+  comment      String?
+  aiFeedbackId String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  board   Board   @relation(fields: [boardId], references: [id], onDelete: Cascade)
+  card    Card    @relation("CardEvaluations", fields: [cardId], references: [id], onDelete: Cascade)
+  student Student @relation("StudentCardEvaluations", fields: [studentId], references: [id], onDelete: Cascade)
+  teacher User    @relation("TeacherCardEvaluations", fields: [teacherId], references: [id], onDelete: Cascade)
+
+  @@unique([cardId])
+  @@index([boardId, studentId])
+  @@index([boardId, teacherId])
+  @@index([studentId, updatedAt])
 }
 
 // layout: "freeform" | "grid" | "stream" | "columns" | "assignment" | "quiz" | "plant-roadmap" | "event-signup" | "drawing" | "breakout" | "vibe-arcade" | "vibe-gallery"
@@ -385,6 +425,17 @@ model Board {
   shareToken     String? @unique // nanoid(21), null=not shared
   shareShortCode String? @unique // 6자 짧은코드 (/s/CODE), null=not shared
 
+  // ── Aura evaluation mode (2026-06-23) ────────────────────────────
+  // 일반 카드/그리드 보드에서 교사가 카드의 학생 글에 대해 상/중/하 평가만
+  // 남기면, 같은 (학생, 과목, 단원, 평가항목) 조합으로 AiFeedback row 가
+  // deterministic 문장(상/중/하 fixed text) 으로 upsert 된다. Aura 측은 기존
+  // GET /api/external/feedbacks 로 그대로 끌어간다. enabled 가 true 이고
+  // subject/unit/criterion 이 모두 채워져 있어야 카드 단위 평가가 가능.
+  auraEvaluationEnabled Boolean @default(false)
+  auraSubject           String?
+  auraUnit              String?
+  auraCriterion         String?
+
   classroom          Classroom?          @relation("ClassroomBoards", fields: [classroomId], references: [id], onDelete: SetNull)
   members            BoardMember[]
   cards              Card[]
@@ -398,6 +449,7 @@ model Board {
   vibeProjects       VibeProject[]
   djPlayEvents       DjPlayEvent[]
   responses          BoardResponse[]
+  cardEvaluations    CardEvaluation[]
 }
 
 // Question Board 응답 (QB-1, 2026-04-23).
@@ -439,17 +491,17 @@ model Section {
   // previously distributed links. See src/lib/rbac.ts#viewSection.
   accessToken      String? @unique
 
-  board               Board                @relation(fields: [boardId], references: [id], onDelete: Cascade)
-  cards               Card[]               @relation("SectionCards")
+  board               Board                       @relation(fields: [boardId], references: [id], onDelete: Cascade)
+  cards               Card[]                      @relation("SectionCards")
   breakoutMemberships BreakoutMembership[]
   // stream-board section breakout (2026-06-23): per-section breakout config
   // and small-group roster. Distinct from BreakoutAssignment which is the
   // board-level BreakoutTemplate deployment. Here the teacher enables
   // breakout on a single Section (stream board) and students self-select
   // into one of N groups. Card.groupId tags which group a card belongs to.
-  breakoutConfig     SectionBreakoutConfig?
-  breakoutGroups     SectionBreakoutGroup[]
-  breakoutMembers    SectionBreakoutMembership[]
+  breakoutConfig      SectionBreakoutConfig?
+  breakoutGroups      SectionBreakoutGroup[]
+  breakoutMembers     SectionBreakoutMembership[]
   mapPlaces           SectionMapPlace[]
   mapRoute            SectionMapRoute?
 
@@ -465,7 +517,7 @@ model SectionBreakoutConfig {
   id            String   @id @default(cuid())
   sectionId     String   @unique
   groupCount    Int      @default(4)
-  groupCapacity Int?     // null = unlimited
+  groupCapacity Int? // null = unlimited
   joinMode      String   @default("student_select")
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
@@ -485,9 +537,9 @@ model SectionBreakoutGroup {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  section    Section                   @relation(fields: [sectionId], references: [id], onDelete: Cascade)
-  members    SectionBreakoutMembership[]
-  cards      Card[]                    @relation("SectionBreakoutGroupCards")
+  section Section                     @relation(fields: [sectionId], references: [id], onDelete: Cascade)
+  members SectionBreakoutMembership[]
+  cards   Card[]                      @relation("SectionBreakoutGroupCards")
 
   @@unique([sectionId, order])
   @@index([sectionId])
@@ -503,9 +555,9 @@ model SectionBreakoutMembership {
   studentId String
   joinedAt  DateTime @default(now())
 
-  section Section             @relation(fields: [sectionId], references: [id], onDelete: Cascade)
+  section Section              @relation(fields: [sectionId], references: [id], onDelete: Cascade)
   group   SectionBreakoutGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
-  student Student             @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  student Student              @relation(fields: [studentId], references: [id], onDelete: Cascade)
 
   @@unique([sectionId, studentId])
   @@index([groupId])
@@ -614,23 +666,24 @@ model Card {
   // "pending" | "approved" | "played" | "rejected"
   queueStatus String?
 
-  board            Board             @relation(fields: [boardId], references: [id], onDelete: Cascade)
-  section          Section?          @relation("SectionCards", fields: [sectionId], references: [id], onDelete: SetNull)
-  author           User?             @relation(fields: [authorId], references: [id])
-  studentAuthor    Student?          @relation("StudentCardAuthor", fields: [studentAuthorId], references: [id], onDelete: SetNull)
+  board            Board                 @relation(fields: [boardId], references: [id], onDelete: Cascade)
+  section          Section?              @relation("SectionCards", fields: [sectionId], references: [id], onDelete: SetNull)
+  author           User?                 @relation(fields: [authorId], references: [id])
+  studentAuthor    Student?              @relation("StudentCardAuthor", fields: [studentAuthorId], references: [id], onDelete: SetNull)
   // stream-board section breakout (2026-06-23): null = whole-section card,
   // non-null = a group-scoped card. Server validates that the group belongs
   // to the same section as the card, and that student authors have a
   // SectionBreakoutMembership matching the group.
   groupId          String?
   group            SectionBreakoutGroup? @relation("SectionBreakoutGroupCards", fields: [groupId], references: [id], onDelete: SetNull)
-  assetAttachments AssetAttachment[] @relation("CardAssetAttachments")
-  assignmentSlot   AssignmentSlot?   @relation("AssignmentSlotCard")
+  assetAttachments AssetAttachment[]     @relation("CardAssetAttachments")
+  assignmentSlot   AssignmentSlot?       @relation("AssignmentSlotCard")
   authors          CardAuthor[]
-  attachments      CardAttachment[]  @relation("CardAttachments")
+  attachments      CardAttachment[]      @relation("CardAttachments")
   showcaseEntries  ShowcaseEntry[]
   comments         CardComment[]
   likes            CardLike[]
+  evaluations      CardEvaluation[]      @relation("CardEvaluations")
 
   @@index([boardId])
   @@index([sectionId])

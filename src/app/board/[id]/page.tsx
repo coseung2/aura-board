@@ -28,6 +28,10 @@ import { BoardSlideshowProvider } from "@/components/slideshow/BoardSlideshowPro
 import { loadPlantJournalInitial } from "@/lib/board-page/plant-journal-loader";
 import { isStreamActivityTemplate } from "@/lib/stream-activity-templates";
 import type { BoardTheme } from "@/components/BoardSettingsPanel";
+import type {
+  AuraBoardSettings,
+  AuraEvaluationLevel,
+} from "@/components/AuraEvaluationControl";
 
 // Auth + cookie reads already flag this route as dynamic.
 // Dropping the explicit flag keeps the Router Cache warm for navigations.
@@ -403,6 +407,12 @@ export default async function BoardPage({
     accessToken: s.accessToken,
   }));
   const boardTheme = normalizeBoardTheme(board.boardTheme);
+  const auraSettings: AuraBoardSettings = {
+    evaluationEnabled: board.auraEvaluationEnabled,
+    subject: board.auraSubject,
+    unit: board.auraUnit,
+    criterion: board.auraCriterion,
+  };
 
   if (!effectiveRole) {
     return (
@@ -460,6 +470,22 @@ export default async function BoardPage({
         }))
       : undefined;
 
+  // 아우라 평가모드: grid/freeform 에서 교사가 카드별 상/중/하를 매길 때
+  // 초기 선택 상태를 한 번에 내려주기 위한 cardId -> level 맵. 평가모드가
+  // 켜져 있고 기준이 모두 있을 때만 (또는 켜려는 직후까지) 조회한다.
+  const needsAuraEvaluations =
+    (board.layout === "grid" || board.layout === "freeform") &&
+    (effectiveRole === "owner" || effectiveRole === "editor") &&
+    board.auraEvaluationEnabled;
+  const auraEvaluations: Record<string, AuraEvaluationLevel> = needsAuraEvaluations
+    ? Object.fromEntries(
+        (await db.cardEvaluation.findMany({
+          where: { boardId: board.id },
+          select: { cardId: true, level: true },
+        })).map((row) => [row.cardId, row.level as AuraEvaluationLevel]),
+      )
+    : {};
+
   function renderBoard() {
     const common = {
       boardId: board!.id,
@@ -478,7 +504,13 @@ export default async function BoardPage({
 
     switch (board!.layout) {
       case "grid":
-        return <GridBoard {...common} />;
+        return (
+          <GridBoard
+            {...common}
+            auraSettings={auraSettings}
+            auraEvaluations={auraEvaluations}
+          />
+        );
       case "stream":
         return (
           <StreamBoard
@@ -763,7 +795,13 @@ export default async function BoardPage({
       }
       case "freeform":
       default:
-        return <BoardCanvas {...common} />;
+        return (
+          <BoardCanvas
+            {...common}
+            auraSettings={auraSettings}
+            auraEvaluations={auraEvaluations}
+          />
+        );
     }
   }
 
@@ -791,6 +829,7 @@ export default async function BoardPage({
           streamTitlePrompt={board.streamTitlePrompt ?? ""}
           streamContentPrompt={board.streamContentPrompt ?? ""}
           streamSectionsEnabled={board.streamSectionsEnabled}
+          auraSettings={auraSettings}
         />
         {renderBoard()}
       </main>

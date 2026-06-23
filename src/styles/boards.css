@@ -4866,3 +4866,53 @@
   font-size: 12px;
   color: var(--color-text-faint);
 }
+
+/* -------- Aura card evaluation segmented control -------- */
+
+.aura-eval-control {
+  margin-top: 12px;
+}
+
+.aura-eval-segmented {
+  display: inline-flex;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-pill);
+  overflow: hidden;
+  background: var(--color-surface-alt);
+}
+
+.aura-eval-btn {
+  min-width: 36px;
+  padding: 4px 12px;
+  border: 0;
+  background: transparent;
+  color: var(--color-text-muted);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.6;
+  cursor: pointer;
+  transition: background 120ms ease, color 120ms ease;
+}
+
+.aura-eval-btn:not(:disabled):hover {
+  background: var(--color-surface);
+  color: var(--color-text);
+}
+
+.aura-eval-btn.is-selected {
+  background: var(--color-accent);
+  color: white;
+}
+
+.aura-eval-btn:disabled {
+  cursor: wait;
+  opacity: 0.7;
+}
+
+.aura-eval-error {
+  margin: 6px 0 0;
+  font-size: 12px;
+  color: var(--color-danger);
+  line-height: 1.45;
+}

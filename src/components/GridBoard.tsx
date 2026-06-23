@@ -10,6 +10,11 @@ import { ContextMenu } from "./ContextMenu";
 import { EditCardModal, type EditCardUpdates } from "./EditCardModal";
 import type { CardData } from "./DraggableCard";
 import { useCardRealtime } from "@/hooks/useCardRealtime";
+import {
+  AuraEvaluationControl,
+  type AuraBoardSettings,
+  type AuraEvaluationLevel,
+} from "./AuraEvaluationControl";
 
 type Props = {
   boardId: string;
@@ -18,6 +23,8 @@ type Props = {
   currentRole: "owner" | "editor" | "viewer";
   isStudentViewer?: boolean;
   classroomId?: string | null;
+  auraSettings?: AuraBoardSettings;
+  auraEvaluations?: Record<string, AuraEvaluationLevel>;
 };
 
 export function GridBoard({
@@ -27,6 +34,8 @@ export function GridBoard({
   currentRole,
   isStudentViewer,
   classroomId,
+  auraSettings,
+  auraEvaluations,
 }: Props) {
   const [cards, setCards] = useState<CardData[]>(
     [...initialCards].sort((a, b) => a.order - b.order),
@@ -36,6 +45,15 @@ export function GridBoard({
   const [authorEditCard, setAuthorEditCard] = useState<CardData | null>(null);
   const canEdit = currentRole === "owner" || currentRole === "editor";
   const canAddCard = canEdit || !!isStudentViewer;
+  const showAuraControl =
+    canEdit &&
+    !!auraSettings?.evaluationEnabled &&
+    !!auraSettings.subject &&
+    !!auraSettings.unit &&
+    !!auraSettings.criterion;
+  const [auraLevels, setAuraLevels] = useState<
+    Record<string, AuraEvaluationLevel>
+  >(auraEvaluations ?? {});
 
   const deletingIds = useRef<Set<string>>(new Set());
   useCardRealtime(boardId, setCards, deletingIds);
@@ -226,6 +244,15 @@ export function GridBoard({
               role="button"
             >
               <CardBody card={c} boardId={boardId} />
+              {showAuraControl && (
+                <AuraEvaluationControl
+                  cardId={c.id}
+                  initialLevel={auraLevels[c.id] ?? null}
+                  onSaved={(level) =>
+                    setAuraLevels((map) => ({ ...map, [c.id]: level }))
+                  }
+                />
+              )}
               {canModify && (
                 <div
                   className="card-ctx-menu"

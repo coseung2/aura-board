@@ -8,6 +8,7 @@ import { BoardSettingsLauncher } from "./BoardSettingsLauncher";
 import { QrShareModal } from "./share/QrShareModal";
 import { useBoardSlideshow } from "./slideshow/BoardSlideshowProvider";
 import type { BoardSection, BoardTheme } from "./BoardSettingsPanel";
+import type { AuraBoardSettings } from "./AuraEvaluationControl";
 
 type Props = {
   boardId?: string;
@@ -33,6 +34,7 @@ type Props = {
   streamTitlePrompt?: string;
   streamContentPrompt?: string;
   streamSectionsEnabled?: boolean;
+  auraSettings?: AuraBoardSettings;
 };
 
 export function BoardHeader({
@@ -55,6 +57,7 @@ export function BoardHeader({
   streamTitlePrompt,
   streamContentPrompt,
   streamSectionsEnabled,
+  auraSettings,
 }: Props) {
   const [showQr, setShowQr] = useState(false);
   const isShared = shareMode && shareMode !== "private" && !!shareToken;
@@ -93,6 +96,7 @@ export function BoardHeader({
             streamTitlePrompt={streamTitlePrompt ?? ""}
             streamContentPrompt={streamContentPrompt ?? ""}
             streamSectionsEnabled={streamSectionsEnabled}
+            auraSettings={auraSettings}
           />
         )}
         {canOpen && (

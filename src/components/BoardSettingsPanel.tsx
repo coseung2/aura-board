@@ -4,6 +4,7 @@ import { useEffect, useId, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ShareTab } from "./share/ShareTab";
 import { SidePanel } from "./ui/SidePanel";
+import type { AuraBoardSettings } from "./AuraEvaluationControl";
 import {
   BoardThumbnailPicker,
   type ThumbnailMode,
@@ -22,7 +23,7 @@ export type BoardTheme =
   | "pastel-lilac"
   | "pastel-lemon";
 
-type Tab = "basic" | "breakout" | "canva";
+type Tab = "basic" | "breakout" | "canva" | "aura";
 
 type Props = {
   open: boolean;
@@ -47,12 +48,14 @@ type Props = {
   initialStreamTitlePrompt?: string;
   initialStreamContentPrompt?: string;
   initialStreamSectionsEnabled?: boolean;
+  initialAuraSettings?: AuraBoardSettings;
 };
 
 const TAB_LABELS: Record<Tab, string> = {
   basic: "기본",
   breakout: "브레이크아웃",
   canva: "Canva 연동",
+  aura: "아우라 연동",
 };
 
 const BOARD_THEME_OPTIONS: Array<{
@@ -106,6 +109,12 @@ export function BoardSettingsPanel({
   initialStreamTitlePrompt = "",
   initialStreamContentPrompt = "",
   initialStreamSectionsEnabled = false,
+  initialAuraSettings = {
+    evaluationEnabled: false,
+    subject: null,
+    unit: null,
+    criterion: null,
+  },
 }: Props) {
   const router = useRouter();
   const [tab, setTab] = useState<Tab>("basic");
@@ -135,6 +144,8 @@ export function BoardSettingsPanel({
   const [streamSectionsEnabled, setStreamSectionsEnabled] = useState(
     initialStreamSectionsEnabled,
   );
+  const [auraSettings, setAuraSettings] =
+    useState<AuraBoardSettings>(initialAuraSettings);
   const tablistId = useId();
 
   useEffect(() => {
@@ -152,6 +163,7 @@ export function BoardSettingsPanel({
     setStreamTitlePrompt(initialStreamTitlePrompt);
     setStreamContentPrompt(initialStreamContentPrompt);
     setStreamSectionsEnabled(initialStreamSectionsEnabled);
+    setAuraSettings(initialAuraSettings);
   }, [
     open,
     initialSections,
@@ -166,6 +178,7 @@ export function BoardSettingsPanel({
     initialStreamTitlePrompt,
     initialStreamContentPrompt,
     initialStreamSectionsEnabled,
+    initialAuraSettings,
   ]);
 
   function handleSectionTokenChange(sectionId: string, nextToken: string | null) {
@@ -277,6 +290,20 @@ export function BoardSettingsPanel({
               관리할 수 있어요.
             </p>
           </div>
+        </div>
+      )}
+
+      {tab === "aura" && (
+        <div
+          role="tabpanel"
+          id={`${tablistId}-panel-aura`}
+          aria-labelledby={`${tablistId}-tab-aura`}
+        >
+          <AuraTab
+            boardId={boardId}
+            value={auraSettings}
+            onChange={setAuraSettings}
+          />
         </div>
       )}
     </SidePanel>
@@ -1257,4 +1284,191 @@ function StreamBreakoutCreator({
 function normalizeThumbnailMode(value: string | null | undefined): ThumbnailMode {
   if (value === "custom") return value;
   return "default";
+}
+
+function AuraTab({
+  boardId,
+  value,
+  onChange,
+}: {
+  boardId: string;
+  value: AuraBoardSettings;
+  onChange: (next: AuraBoardSettings) => void;
+}) {
+  const router = useRouter();
+  const [subjectDraft, setSubjectDraft] = useState(value.subject ?? "");
+  const [unitDraft, setUnitDraft] = useState(value.unit ?? "");
+  const [criterionDraft, setCriterionDraft] = useState(value.criterion ?? "");
+  const [toggleBusy, setToggleBusy] = useState(false);
+  const [toggleErr, setToggleErr] = useState<string | null>(null);
+  const [saveState, setSaveState] = useState<
+    | { status: "idle" }
+    | { status: "saving" }
+    | { status: "saved"; at: number }
+    | { status: "error"; message: string }
+  >({ status: "idle" });
+
+  useEffect(() => {
+    setSubjectDraft(value.subject ?? "");
+    setUnitDraft(value.unit ?? "");
+    setCriterionDraft(value.criterion ?? "");
+    setSaveState({ status: "idle" });
+  }, [value.subject, value.unit, value.criterion]);
+
+  const fieldsDirty =
+    subjectDraft.trim() !== (value.subject ?? "") ||
+    unitDraft.trim() !== (value.unit ?? "") ||
+    criterionDraft.trim() !== (value.criterion ?? "");
+
+  async function toggleMode() {
+    const next = !value.evaluationEnabled;
+    setToggleBusy(true);
+    setToggleErr(null);
+    onChange({ ...value, evaluationEnabled: next });
+    try {
+      const res = await fetch(`/api/boards/${boardId}/aura`, {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ evaluationEnabled: next }),
+      });
+      if (!res.ok) {
+        onChange({ ...value, evaluationEnabled: !next });
+        setToggleErr("저장에 실패했어요.");
+        return;
+      }
+      const data = (await res.json()) as AuraBoardSettings;
+      onChange(data);
+      router.refresh();
+    } catch {
+      onChange({ ...value, evaluationEnabled: !next });
+      setToggleErr("저장에 실패했어요.");
+    } finally {
+      setToggleBusy(false);
+    }
+  }
+
+  async function saveFields() {
+    if (!fieldsDirty) return;
+    setSaveState({ status: "saving" });
+    try {
+      const res = await fetch(`/api/boards/${boardId}/aura`, {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          subject: subjectDraft,
+          unit: unitDraft,
+          criterion: criterionDraft,
+        }),
+      });
+      if (!res.ok) {
+        setSaveState({ status: "error", message: "저장에 실패했어요." });
+        return;
+      }
+      const data = (await res.json()) as AuraBoardSettings;
+      onChange(data);
+      setSubjectDraft(data.subject ?? "");
+      setUnitDraft(data.unit ?? "");
+      setCriterionDraft(data.criterion ?? "");
+      router.refresh();
+      setSaveState({ status: "saved", at: Date.now() });
+    } catch {
+      setSaveState({ status: "error", message: "저장에 실패했어요." });
+    }
+  }
+
+  return (
+    <div className="board-settings-control-stack">
+      <button
+        type="button"
+        className="board-settings-check-row board-settings-check-row-compact board-settings-switch-row"
+        role="switch"
+        aria-checked={value.evaluationEnabled}
+        onClick={() => {
+          if (!toggleBusy) void toggleMode();
+        }}
+        disabled={toggleBusy}
+      >
+        <span className="board-settings-switch-track" aria-hidden="true">
+          <span className="board-settings-switch-thumb" />
+        </span>
+        <span className="board-settings-check-copy">
+          <span className="board-settings-check-title">평가모드</span>
+          <span className="board-settings-check-desc">
+            카드에 상/중/하 평가를 표시하고 AiFeedback 으로 연동해요.
+          </span>
+        </span>
+      </button>
+      {toggleErr && <p className="board-settings-error">{toggleErr}</p>}
+
+      <SettingsSection title="평가 기준">
+        <div className="board-settings-control-stack">
+          <div className="stream-guidance-field">
+            <label className="stream-guidance-label" htmlFor={`aura-subject-${boardId}`}>
+              과목
+            </label>
+            <input
+              id={`aura-subject-${boardId}`}
+              type="text"
+              className="stream-guidance-input"
+              value={subjectDraft}
+              onChange={(e) => setSubjectDraft(e.target.value.slice(0, 120))}
+              placeholder="국어"
+              maxLength={120}
+              disabled={saveState.status === "saving"}
+            />
+          </div>
+          <div className="stream-guidance-field">
+            <label className="stream-guidance-label" htmlFor={`aura-unit-${boardId}`}>
+              단원
+            </label>
+            <input
+              id={`aura-unit-${boardId}`}
+              type="text"
+              className="stream-guidance-input"
+              value={unitDraft}
+              onChange={(e) => setUnitDraft(e.target.value.slice(0, 120))}
+              placeholder="4. 대상을 설명해요"
+              maxLength={120}
+              disabled={saveState.status === "saving"}
+            />
+          </div>
+          <div className="stream-guidance-field">
+            <label className="stream-guidance-label" htmlFor={`aura-criterion-${boardId}`}>
+              평가항목
+            </label>
+            <textarea
+              id={`aura-criterion-${boardId}`}
+              className="stream-guidance-textarea"
+              value={criterionDraft}
+              onChange={(e) => setCriterionDraft(e.target.value.slice(0, 120))}
+              placeholder="설명하고 싶은 내용을 선정하고, 글의 구조에 따라 쓸 내용을 정리하여 설명하는 글 쓰기"
+              maxLength={120}
+              rows={3}
+              disabled={saveState.status === "saving"}
+            />
+          </div>
+          <div className="stream-guidance-actions">
+            <button
+              type="button"
+              className="stream-guidance-save"
+              onClick={() => void saveFields()}
+              disabled={!fieldsDirty || saveState.status === "saving"}
+            >
+              {saveState.status === "saving" ? "저장 중..." : "저장"}
+            </button>
+            {saveState.status === "saved" && (
+              <span className="stream-guidance-status" aria-live="polite">
+                저장했어요.
+              </span>
+            )}
+            {saveState.status === "error" && (
+              <span className="stream-guidance-error" aria-live="polite">
+                {saveState.message}
+              </span>
+            )}
+          </div>
+        </div>
+      </SettingsSection>
+    </div>
+  );
 }
