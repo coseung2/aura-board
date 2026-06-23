@@ -338,9 +338,7 @@ function PresentationGroupPrompt({
     return () => window.removeEventListener("keydown", onKey);
   }, [onCancel]);
 
-  const titleText = "\ubc1c\ud45c \ubaa8\ub4e0 \uc120\ud0dd";
-  const descriptionText =
-    "\ubaa8\ub4e0\ud65c\ub3d9 \uc139\uc158\uc740 \uc120\ud0dd\ud55c \ubaa8\ub4e0\uc73c\ub85c \ud45c\uc2dc\ub429\ub2c8\ub2e4. \ubc1c\ud45c\ud560 \ubaa8\ub4e0\uc744 \uace8\ub77c \uc11c\ub974\uac8c \ud45c\uc2dc\ud560 \uac83\uc785\ub2c8\uae4c?";
+  const titleText = "\ubc1c\ud45c \ubaa8\ub461 \uc120\ud0dd";
   const cancelText = "\ucde8\uc18c";
   const confirmText = "\uc2e4\ud589";
 
@@ -359,7 +357,6 @@ function PresentationGroupPrompt({
       >
         <header className="presentation-prompt-head">
           <h2 id="presentation-prompt-title">{titleText}</h2>
-          <p>{descriptionText}</p>
         </header>
         <div className="presentation-prompt-list">
           {sections.map((section) => {

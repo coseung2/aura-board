@@ -71,7 +71,6 @@ export async function GET(_req: Request, { params }: RouteContext) {
     where: { OR: [{ id: boardIdOrSlug }, { slug: boardIdOrSlug }] },
     select: {
       id: true,
-      classroom: { select: { code: true } },
     },
   });
   if (!board) return NextResponse.json({ error: "not_found" }, { status: 404 });
@@ -127,9 +126,6 @@ export async function GET(_req: Request, { params }: RouteContext) {
   try {
     const url = new URL("/api/external/aura-board/assessment-plans", baseUrl);
     url.searchParams.set("auraboardTeacherId", user.id);
-    if (board.classroom?.code) {
-      url.searchParams.set("classroomCode", board.classroom.code);
-    }
     response = await fetch(url, {
       method: "GET",
       headers: {

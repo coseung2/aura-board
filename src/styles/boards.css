@@ -3164,8 +3164,7 @@
 
 .presentation-prompt-head {
   display: grid;
-  gap: 6px;
-  padding: 16px 20px;
+  padding: 18px 20px;
   border-bottom: 1px solid var(--color-border);
 }
 
@@ -3210,10 +3209,10 @@
 }
 
 .presentation-prompt-group {
-  min-height: 32px;
-  padding: 4px 12px;
+  min-height: 34px;
+  padding: 0 14px;
   border: 1px solid var(--color-border);
-  border-radius: 999px;
+  border-radius: 10px;
   background: var(--color-surface);
   color: var(--color-text-muted);
   font-family: var(--font-body);
@@ -3246,8 +3245,9 @@
 }
 
 .presentation-prompt-actions .ui-icon-action {
-  min-height: 36px;
-  padding: 0 16px;
+  min-width: 72px;
+  min-height: 40px;
+  padding: 0 18px;
   border-radius: 8px;
   border: 1px solid var(--color-border);
   background: var(--color-surface);
@@ -3255,6 +3255,8 @@
   font-family: var(--font-body);
   font-size: 13px;
   font-weight: 700;
+  line-height: 1;
+  white-space: nowrap;
   cursor: pointer;
 }
 
@@ -4387,20 +4389,23 @@
 }
 
 .stream-word-cloud {
-  display: flex;
+  position: relative;
+  width: 100%;
   min-height: 320px;
-  align-items: center;
-  justify-content: center;
-  flex-wrap: wrap;
-  gap: 14px 24px;
-  text-align: center;
+  aspect-ratio: 4 / 3;
+  overflow: hidden;
 }
 
 .stream-word-cloud span {
-  max-width: 100%;
+  position: absolute;
+  left: 0;
+  top: 0;
+  transform: translate(-50%, -50%);
+  max-width: clamp(90px, 20%, 170px);
   color: var(--color-accent);
   font-weight: 900;
   line-height: 1.1;
+  text-align: center;
   overflow-wrap: anywhere;
 }
 
@@ -4952,7 +4957,11 @@
   min-height: 0;
 }
 
-.slideshow-activity-stage .stream-word-cloud,
+.slideshow-activity-stage .stream-word-cloud {
+  aspect-ratio: auto;
+  min-height: 0;
+  height: 100%;
+}
 .slideshow-activity-stage .stream-activity-muted {
   min-height: 0;
 }
@@ -5101,6 +5110,12 @@
 .stream-breakout-compare .stream-word-input,
 .stream-breakout-compare .stream-timeline-input {
   gap: 6px;
+}
+
+.stream-breakout-compare .stream-word-cloud {
+  aspect-ratio: auto;
+  min-height: 0;
+  height: 100%;
 }
 
 .stream-breakout-compare .stream-word-input input,

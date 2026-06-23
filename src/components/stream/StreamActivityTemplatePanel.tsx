@@ -153,6 +153,7 @@ function WordCloudPanel({
   onCreateCard: (data: { title: string; content: string }) => Promise<void>;
 }) {
   const words = useMemo(() => buildWordCloud(cards), [cards]);
+  const layout = useMemo(() => wordCloudLayout(words.length), [words.length]);
   const normalizedState = normalizeStreamActivityTemplateState(state);
   const published = normalizedState.wordCloudPublished === true;
   const canSeeCloud = published;
@@ -195,18 +196,23 @@ function WordCloudPanel({
           <p className="stream-activity-muted">게시글 없음</p>
         ) : (
           <div className="stream-word-cloud" aria-label="워드클라우드">
-            {words.map((word) => (
-              <span
-                key={word.text}
-                style={{
-                  color: word.color,
-                  fontSize: `${14 + word.weight * 10}px`,
-                }}
-                title={`${word.count}회`}
-              >
-                {word.text}
-              </span>
-            ))}
+            {words.map((word, index) => {
+              const pos = layout[index] ?? { x: 50, y: 50 };
+              return (
+                <span
+                  key={word.text}
+                  style={{
+                    left: `${pos.x}%`,
+                    top: `${pos.y}%`,
+                    color: word.color,
+                    fontSize: `${14 + word.weight * 10}px`,
+                  }}
+                  title={`${word.count}회`}
+                >
+                  {word.text}
+                </span>
+              );
+            })}
           </div>
         )}
       </div>
@@ -811,6 +817,22 @@ function buildWordCloud(cards: CardData[]) {
       count: item.count,
       weight: max === 1 ? 2 : 1 + Math.round(((item.count - 1) / (max - 1)) * 5),
     }));
+}
+
+function wordCloudLayout(count: number): { x: number; y: number }[] {
+  // Fermat spiral (phyllotaxis). Same count always yields the same positions,
+  // so the layout is stable for a given set of words. Words are sorted by
+  // count desc in buildWordCloud, so the heaviest (largest) entries end up
+  // near the center and rarer entries spiral outward into an oval cloud.
+  const goldenAngle = Math.PI * (3 - Math.sqrt(5));
+  const spread = 5.5;
+  const out: { x: number; y: number }[] = [];
+  for (let i = 0; i < count; i += 1) {
+    const r = spread * Math.sqrt(i);
+    const a = i * goldenAngle;
+    out.push({ x: 50 + r * Math.cos(a), y: 50 + r * Math.sin(a) });
+  }
+  return out;
 }
 
 function normalizeWordCloudEntry(value: string | null | undefined): string {
