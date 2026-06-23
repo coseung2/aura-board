@@ -1,5 +1,6 @@
 // GET  /api/sections/[id]/breakout
-// POST /api/sections/[id]/breakout  (teacher owner/editor)
+// POST   /api/sections/[id]/breakout  (teacher owner/editor)
+// DELETE /api/sections/[id]/breakout  (teacher owner/editor)
 //
 // Reads/upserts a single section's breakout config + groups + the caller's
 // membership. The response shape is shared by both verbs and by the
@@ -154,6 +155,53 @@ export async function POST(
       return NextResponse.json({ error: e.message }, { status: 403 });
     }
     console.error("[POST section breakout]", e);
+    return NextResponse.json({ error: "internal" }, { status: 500 });
+  }
+}
+
+export async function DELETE(
+  _req: Request,
+  ctx: { params: Promise<{ id: string }> }
+) {
+  try {
+    const { id: sectionId } = await ctx.params;
+    const user = await getCurrentUser();
+
+    const section = await db.section.findUnique({
+      where: { id: sectionId },
+      select: { id: true, boardId: true },
+    });
+    if (!section) {
+      return NextResponse.json({ error: "not_found" }, { status: 404 });
+    }
+
+    try {
+      await requirePermission(section.boardId, user.id, "edit");
+    } catch (e) {
+      if (e instanceof ForbiddenError) {
+        return NextResponse.json({ error: e.message }, { status: 403 });
+      }
+      throw e;
+    }
+
+    await db.$transaction([
+      db.sectionBreakoutMembership.deleteMany({ where: { sectionId } }),
+      db.sectionBreakoutGroup.deleteMany({ where: { sectionId } }),
+      db.sectionBreakoutConfig.deleteMany({ where: { sectionId } }),
+    ]);
+
+    await touchBoardUpdatedAt(section.boardId);
+
+    const snapshot = await loadSnapshot(sectionId, {
+      callerRole: "owner",
+      studentId: null,
+    });
+    return NextResponse.json(snapshot);
+  } catch (e) {
+    if (e instanceof ForbiddenError) {
+      return NextResponse.json({ error: e.message }, { status: 403 });
+    }
+    console.error("[DELETE section breakout]", e);
     return NextResponse.json({ error: "internal" }, { status: 500 });
   }
 }

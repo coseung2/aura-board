@@ -233,8 +233,9 @@ export function StreamBoard({
             activityTemplate: section.activityTemplate,
             cards: bucket,
           });
+        } else {
+          for (const card of bucket) slides.push({ id: card.id, kind: "card", card });
         }
-        for (const card of bucket) slides.push({ id: card.id, kind: "card", card });
       }
       if (grouped.unsectioned.length > 0) {
         slides.push({
@@ -419,6 +420,39 @@ export function StreamBoard({
       return true;
     } catch {
       alert("모둠 활동 설정에 실패했어요.");
+      return false;
+    } finally {
+      setBreakoutBusyId(null);
+    }
+  }
+
+  async function handleDisableBreakout(sectionId: string): Promise<boolean> {
+    setBreakoutBusyId(sectionId);
+    try {
+      const res = await fetch(`/api/sections/${sectionId}/breakout`, {
+        method: "DELETE",
+      });
+      if (!res.ok) {
+        alert("모둠 활동 해제에 실패했어요.");
+        return false;
+      }
+      const data = (await res.json()) as BreakoutState;
+      setBreakoutBySection((prev) => ({ ...prev, [sectionId]: data }));
+      setActiveGroupBySection((prev) => {
+        const next = { ...prev };
+        delete next[sectionId];
+        return next;
+      });
+      setCards((prev) =>
+        prev.map((card) =>
+          card.sectionId === sectionId && card.groupId
+            ? { ...card, groupId: null }
+            : card,
+        ),
+      );
+      return true;
+    } catch {
+      alert("모둠 활동 해제에 실패했어요.");
       return false;
     } finally {
       setBreakoutBusyId(null);
@@ -618,11 +652,16 @@ export function StreamBoard({
               state={state}
               busy={breakoutBusyId === section.id}
               onClose={() => setBreakoutModalSectionId(null)}
-             onSave={async (groupCount, groupCapacity) => {
-               const ok = await handleSaveBreakout(section.id, groupCount, groupCapacity);
-               if (ok) setBreakoutModalSectionId(null);
-               return ok;
-             }}
+              onSave={async (groupCount, groupCapacity) => {
+                const ok = await handleSaveBreakout(section.id, groupCount, groupCapacity);
+                if (ok) setBreakoutModalSectionId(null);
+                return ok;
+              }}
+              onDisable={async () => {
+                const ok = await handleDisableBreakout(section.id);
+                if (ok) setBreakoutModalSectionId(null);
+                return ok;
+              }}
             />,
             document.body,
           );
@@ -847,19 +886,20 @@ function StreamGroupedFeed({
                    onCreateCard={(data) => onCreateSectionCard(section.id, data)}
                  />
                )}
-               {bucket.length === 0 ? (
-                 <div className="stream-section-empty">아직 게시글이 없어요.</div>
-               ) : (
-                 bucket.map((card) => (
-                   <StreamPost
-                     key={card.id}
-                     card={card}
-                     canDelete={canDeleteCard(card, currentUserId, currentRole)}
-                     onDelete={() => onDeleteCard(card)}
-                     boardId={boardId}
-                   />
-                 ))
-               )}
+              {!section.activityTemplate &&
+                (bucket.length === 0 ? (
+                  <div className="stream-section-empty">아직 게시글이 없어요.</div>
+                ) : (
+                  bucket.map((card) => (
+                    <StreamPost
+                      key={card.id}
+                      card={card}
+                      canDelete={canDeleteCard(card, currentUserId, currentRole)}
+                      onDelete={() => onDeleteCard(card)}
+                      boardId={boardId}
+                    />
+                  ))
+                ))}
              </>
            )}
           </section>
@@ -1148,23 +1188,24 @@ function StreamBreakoutBody({
             template={section.activityTemplate}
             sectionId={section.id}
             cards={cards}
-            canEdit={canAddPost}
+            canEdit={state.canManage || canAddPost}
             onCreateCard={(data) => onCreateCard(data, groupId)}
           />
         )}
-        {cards.length === 0 ? (
-          <div className="stream-section-empty">아직 게시글이 없어요.</div>
-        ) : (
-          cards.map((card) => (
-            <StreamPost
-              key={card.id}
-              card={card}
-              canDelete={canDeleteCard(card, currentUserId, currentRole)}
-              onDelete={() => onDeleteCard(card)}
-              boardId={boardId}
-            />
-          ))
-        )}
+        {!section.activityTemplate &&
+          (cards.length === 0 ? (
+            <div className="stream-section-empty">아직 게시글이 없어요.</div>
+          ) : (
+            cards.map((card) => (
+              <StreamPost
+                key={card.id}
+                card={card}
+                canDelete={canDeleteCard(card, currentUserId, currentRole)}
+                onDelete={() => onDeleteCard(card)}
+                boardId={boardId}
+              />
+            ))
+          ))}
       </div>
     );
   }
@@ -1230,19 +1271,20 @@ function StreamBreakoutBody({
             onCreateCard={(data) => onCreateCard(data, myGroupId)}
           />
         )}
-        {cards.length === 0 ? (
-          <div className="stream-section-empty">아직 게시글이 없어요.</div>
-        ) : (
-          cards.map((card) => (
-            <StreamPost
-              key={card.id}
-              card={card}
-              canDelete={canDeleteCard(card, currentUserId, currentRole)}
-              onDelete={() => onDeleteCard(card)}
-              boardId={boardId}
-            />
-          ))
-        )}
+        {!section.activityTemplate &&
+          (cards.length === 0 ? (
+            <div className="stream-section-empty">아직 게시글이 없어요.</div>
+          ) : (
+            cards.map((card) => (
+              <StreamPost
+                key={card.id}
+                card={card}
+                canDelete={canDeleteCard(card, currentUserId, currentRole)}
+                onDelete={() => onDeleteCard(card)}
+                boardId={boardId}
+              />
+            ))
+          ))}
       </div>
     );
   }
@@ -1297,12 +1339,14 @@ function BreakoutConfigModal({
   busy,
   onClose,
   onSave,
+  onDisable,
 }: {
   section: StreamSection;
   state: BreakoutState | undefined;
   busy: boolean;
   onClose: () => void;
   onSave: (groupCount: number, groupCapacity: number) => Promise<boolean>;
+  onDisable: () => Promise<boolean>;
 }) {
   const [groupCount, setGroupCount] = useState(state?.config?.groupCount ?? 4);
   const [groupCapacity, setGroupCapacity] = useState(
@@ -1325,6 +1369,16 @@ function BreakoutConfigModal({
   }
 
   const disabled = busy || submitting;
+
+  async function disableBreakout() {
+    if (!state?.config || disabled) return;
+    setSubmitting(true);
+    try {
+      await onDisable();
+    } finally {
+      setSubmitting(false);
+    }
+  }
 
   return (
     <>
@@ -1382,6 +1436,16 @@ function BreakoutConfigModal({
                : "저장하면 학생이 섹션에서 모둠을 선택할 수 있어요."}
             </p>
             <div className="stream-template-modal-actions">
+              {state?.config && (
+                <button
+                  type="button"
+                  className="modal-btn-cancel"
+                  onClick={disableBreakout}
+                  disabled={disabled}
+                >
+                  모둠활동 해제
+                </button>
+              )}
               <button type="submit" className="modal-btn-submit" disabled={disabled}>
                 저장
               </button>

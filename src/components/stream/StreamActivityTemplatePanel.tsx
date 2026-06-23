@@ -182,12 +182,25 @@ function TimelinePanel({
           <p className="stream-activity-muted">게시글 없음</p>
         ) : (
           <ol className="stream-timeline-list">
-            {items.map((item) => (
-              <li key={`${item.card.id}:${item.dateText}`}>
-                <time>{item.dateText}</time>
-                <span>{item.card.title || item.card.content.slice(0, 48)}</span>
-              </li>
-            ))}
+            {items.map((item, index) => {
+              const eventText =
+                item.card.title ||
+                item.card.content.replace(item.dateText, "").trim() ||
+                item.card.content.slice(0, 48);
+              return (
+                <li
+                  key={`${item.card.id}:${item.dateText}`}
+                  className={index % 2 === 0 ? "is-above" : "is-below"}
+                >
+                  <span className="stream-timeline-stem" aria-hidden="true" />
+                  <span className="stream-timeline-node" aria-hidden="true" />
+                  <article className="stream-timeline-event">
+                    <time>{item.dateText}</time>
+                    <span>{eventText}</span>
+                  </article>
+                </li>
+              );
+            })}
           </ol>
         )}
       </div>

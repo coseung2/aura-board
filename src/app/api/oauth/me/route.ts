@@ -7,9 +7,15 @@ import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { verifyTeacherAccessToken } from "@/lib/oauth-teacher";
 
+function safeTokenPrefix(token: string): string {
+  const match = token.match(/^auratea_([0-9A-Za-z]{8})_/);
+  return match?.[1] ?? "unknown";
+}
+
 export async function GET(req: Request) {
   const auth = req.headers.get("authorization");
   if (!auth?.startsWith("Bearer ")) {
+    console.warn("[oauth/me] missing bearer");
     return NextResponse.json(
       { error: "missing_bearer" },
       {
@@ -23,6 +29,10 @@ export async function GET(req: Request) {
   const token = auth.slice(7).trim();
   const result = await verifyTeacherAccessToken(token);
   if (!result.ok) {
+    console.warn("[oauth/me] token verification failed", {
+      reason: result.code,
+      tokenPrefix: safeTokenPrefix(token),
+    });
     return NextResponse.json(
       { error: "invalid_token", reason: result.code },
       {

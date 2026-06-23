@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
 import { ForbiddenError, requirePermission } from "@/lib/rbac";
-import { issueTeacherAccessToken } from "@/lib/oauth-teacher";
+import { issueTeacherAccessToken, verifyTeacherAccessToken } from "@/lib/oauth-teacher";
 
 type RouteContext = { params: Promise<{ id: string }> };
 
@@ -52,6 +52,11 @@ function parsePlans(payload: unknown): AuraAssessmentPlan[] {
   return plans;
 }
 
+function safeTokenPrefix(token: string): string {
+  const match = token.match(/^auratea_([0-9A-Za-z]{8})_/);
+  return match?.[1] ?? "unknown";
+}
+
 export async function GET(_req: Request, { params }: RouteContext) {
   const { id: boardIdOrSlug } = await params;
 
@@ -91,9 +96,29 @@ export async function GET(_req: Request, { params }: RouteContext) {
       scope: "external:read",
     });
     accessToken = issued.accessToken;
-  } catch {
+  } catch (error) {
+    console.error("[boards/aura/plans] teacher token issue failed", error);
     return NextResponse.json(
       { plans: [], error: "aura_oauth_token_issue_failed" },
+      { status: 502 },
+    );
+  }
+
+  const tokenPrefix = safeTokenPrefix(accessToken);
+  const localVerification = await verifyTeacherAccessToken(accessToken);
+  if (!localVerification.ok) {
+    console.error("[boards/aura/plans] issued token failed local verification", {
+      boardId: board.id,
+      userId: user.id,
+      tokenPrefix,
+      reason: localVerification.code,
+    });
+    return NextResponse.json(
+      {
+        plans: [],
+        error: "aura_oauth_local_verify_failed",
+        reason: localVerification.code,
+      },
       { status: 502 },
     );
   }
@@ -113,7 +138,13 @@ export async function GET(_req: Request, { params }: RouteContext) {
       },
       cache: "no-store",
     });
-  } catch {
+  } catch (error) {
+    console.error("[boards/aura/plans] assessment plans fetch failed", {
+      boardId: board.id,
+      userId: user.id,
+      tokenPrefix,
+      error,
+    });
     return NextResponse.json(
       { plans: [], error: "aura_assessment_plans_fetch_failed" },
       { status: 502 },
@@ -121,9 +152,22 @@ export async function GET(_req: Request, { params }: RouteContext) {
   }
 
   if (!response.ok) {
-    const detail = (await response.json().catch(() => null)) as {
-      error?: string;
-    } | null;
+    const detailText = await response.text().catch(() => "");
+    let detail: { error?: string; reason?: string } | null = null;
+    try {
+      detail = detailText ? (JSON.parse(detailText) as { error?: string; reason?: string }) : null;
+    } catch {
+      detail = null;
+    }
+    console.warn("[boards/aura/plans] upstream assessment plans rejected", {
+      boardId: board.id,
+      userId: user.id,
+      tokenPrefix,
+      upstreamStatus: response.status,
+      upstreamError: detail?.error ?? null,
+      upstreamReason: detail?.reason ?? null,
+      upstreamBody: detail ? undefined : detailText.slice(0, 200),
+    });
     return NextResponse.json(
       {
         plans: [],
@@ -133,6 +177,7 @@ export async function GET(_req: Request, { params }: RouteContext) {
             : "aura_assessment_plans_fetch_failed",
         upstreamStatus: response.status,
         upstreamError: detail?.error ?? null,
+        upstreamReason: detail?.reason ?? null,
       },
       { status: 502 },
     );

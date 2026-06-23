@@ -4157,37 +4157,114 @@
 }
 
 .stream-timeline-stage {
+  display: flex;
+  align-items: stretch;
   min-height: 0;
-  overflow: auto;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding: 18px 18px 24px;
 }
 
 .stream-timeline-list {
-  display: grid;
+  position: relative;
+  display: flex;
+  align-items: stretch;
   gap: 0;
+  min-width: max(100%, 720px);
+  min-height: 340px;
   margin: 0;
-  padding: 0;
+  padding: 0 32px;
   list-style: none;
 }
 
+.stream-timeline-list::before {
+  content: "";
+  position: absolute;
+  left: 32px;
+  right: 32px;
+  top: 50%;
+  height: 3px;
+  border-radius: 999px;
+  background: linear-gradient(
+    90deg,
+    rgb(31 138 112 / 0.2),
+    rgb(31 138 112 / 0.7),
+    rgb(31 138 112 / 0.2)
+  );
+}
+
 .stream-timeline-list li {
-  display: grid;
-  grid-template-columns: 116px 1fr;
-  gap: 12px;
-  padding: 11px 16px;
-  border-bottom: 1px solid var(--color-border);
+  position: relative;
+  flex: 1 0 180px;
+  min-width: 180px;
+  min-height: 340px;
 }
 
 .stream-timeline-list li:last-child {
   border-bottom: 0;
 }
 
+.stream-timeline-node {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 15px;
+  height: 15px;
+  border: 3px solid var(--color-accent);
+  border-radius: 999px;
+  background: var(--color-surface);
+  transform: translate(-50%, -50%);
+  z-index: 2;
+  box-shadow: 0 0 0 4px rgb(31 138 112 / 0.14);
+}
+
+.stream-timeline-stem {
+  position: absolute;
+  left: 50%;
+  width: 2px;
+  height: 58px;
+  background: rgb(31 138 112 / 0.4);
+  transform: translateX(-50%);
+}
+
+.stream-timeline-list li.is-above .stream-timeline-stem {
+  bottom: 50%;
+}
+
+.stream-timeline-list li.is-below .stream-timeline-stem {
+  top: 50%;
+}
+
+.stream-timeline-event {
+  position: absolute;
+  left: 50%;
+  display: grid;
+  gap: 6px;
+  width: min(168px, calc(100% - 16px));
+  padding: 12px;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: var(--color-surface);
+  box-shadow: 0 10px 24px rgb(15 23 42 / 0.08);
+  transform: translateX(-50%);
+}
+
+.stream-timeline-list li.is-above .stream-timeline-event {
+  bottom: calc(50% + 58px);
+}
+
+.stream-timeline-list li.is-below .stream-timeline-event {
+  top: calc(50% + 58px);
+}
+
 .stream-timeline-list time {
   color: var(--color-accent);
   font-size: 13px;
   font-weight: 900;
+  line-height: 1.25;
 }
 
-.stream-timeline-list span {
+.stream-timeline-event span {
   min-width: 0;
   color: var(--color-text);
   font-size: 14px;
@@ -4673,7 +4750,7 @@
 
 .stream-breakout-compare {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
   gap: 14px;
   align-items: start;
 }
@@ -4689,8 +4766,79 @@
 .stream-breakout-group-area {
   padding: 12px;
   border: 1px solid var(--color-border);
-  border-radius: 10px;
+  border-radius: 8px;
   background: var(--color-surface);
+}
+
+.stream-breakout-compare .stream-activity-panel {
+  min-height: 0;
+  box-shadow: none;
+}
+
+.stream-breakout-compare .stream-window-panel,
+.stream-breakout-compare .stream-word-panel,
+.stream-breakout-compare .stream-timeline-panel {
+  aspect-ratio: 4 / 3;
+  height: auto;
+  max-height: none;
+}
+
+.stream-breakout-compare .stream-window-panel {
+  padding: 8px;
+}
+
+.stream-breakout-compare .stream-window-board {
+  height: 100%;
+  min-height: 0;
+  grid-template-rows: repeat(3, minmax(0, 1fr));
+}
+
+.stream-breakout-compare .stream-window-board > div {
+  gap: 5px;
+  padding: 7px;
+}
+
+.stream-breakout-compare .stream-window-cell-label,
+.stream-breakout-compare .stream-window-note strong,
+.stream-breakout-compare .stream-window-note p {
+  font-size: 10px;
+}
+
+.stream-breakout-compare .stream-window-note {
+  padding: 6px;
+}
+
+.stream-breakout-compare .stream-word-panel,
+.stream-breakout-compare .stream-timeline-panel {
+  padding: 10px;
+}
+
+.stream-breakout-compare .stream-window-cell-input {
+  gap: 4px;
+}
+
+.stream-breakout-compare .stream-window-cell-input input,
+.stream-breakout-compare .stream-window-cell-input button {
+  height: 24px;
+  font-size: 10px;
+}
+
+.stream-breakout-compare .stream-word-input,
+.stream-breakout-compare .stream-timeline-input {
+  gap: 6px;
+}
+
+.stream-breakout-compare .stream-word-input input,
+.stream-breakout-compare .stream-word-input button,
+.stream-breakout-compare .stream-timeline-input input,
+.stream-breakout-compare .stream-timeline-input button {
+  height: 30px;
+  font-size: 11px;
+}
+
+.stream-breakout-compare .stream-timeline-input {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr) auto;
+  padding: 8px;
 }
 
 .stream-breakout-group-area-head {
