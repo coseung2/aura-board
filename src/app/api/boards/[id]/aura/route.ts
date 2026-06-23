@@ -18,7 +18,7 @@ import { db } from "@/lib/db";
 import { requirePermission, ForbiddenError } from "@/lib/rbac";
 import { getCurrentUser } from "@/lib/auth";
 
-const MAX_LEN = 120;
+const MAX_LEN = 300;
 
 const PatchBody = z.object({
   evaluationEnabled: z.boolean().optional(),

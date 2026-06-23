@@ -1286,6 +1286,19 @@ function normalizeThumbnailMode(value: string | null | undefined): ThumbnailMode
   return "default";
 }
 
+type AuraAssessmentPlan = {
+  id?: string;
+  subject: string;
+  unit: string;
+  criterion: string;
+  title?: string | null;
+  date?: string | null;
+};
+
+function auraPlanKey(plan: Pick<AuraAssessmentPlan, "subject" | "unit" | "criterion">) {
+  return `${plan.subject}\u001f${plan.unit}\u001f${plan.criterion}`;
+}
+
 function AuraTab({
   boardId,
   value,
@@ -1296,9 +1309,14 @@ function AuraTab({
   onChange: (next: AuraBoardSettings) => void;
 }) {
   const router = useRouter();
-  const [subjectDraft, setSubjectDraft] = useState(value.subject ?? "");
-  const [unitDraft, setUnitDraft] = useState(value.unit ?? "");
-  const [criterionDraft, setCriterionDraft] = useState(value.criterion ?? "");
+  const [plans, setPlans] = useState<AuraAssessmentPlan[]>([]);
+  const [plansStatus, setPlansStatus] = useState<
+    | { status: "loading" }
+    | { status: "ready" }
+    | { status: "empty" }
+    | { status: "error"; message: string }
+  >({ status: "loading" });
+  const [selectedKey, setSelectedKey] = useState("");
   const [toggleBusy, setToggleBusy] = useState(false);
   const [toggleErr, setToggleErr] = useState<string | null>(null);
   const [saveState, setSaveState] = useState<
@@ -1309,16 +1327,76 @@ function AuraTab({
   >({ status: "idle" });
 
   useEffect(() => {
-    setSubjectDraft(value.subject ?? "");
-    setUnitDraft(value.unit ?? "");
-    setCriterionDraft(value.criterion ?? "");
+    const savedKey =
+      value.subject && value.criterion
+        ? auraPlanKey({
+            subject: value.subject,
+            unit: value.unit ?? "",
+            criterion: value.criterion,
+          })
+        : "";
+    setSelectedKey(savedKey);
     setSaveState({ status: "idle" });
   }, [value.subject, value.unit, value.criterion]);
 
-  const fieldsDirty =
-    subjectDraft.trim() !== (value.subject ?? "") ||
-    unitDraft.trim() !== (value.unit ?? "") ||
-    criterionDraft.trim() !== (value.criterion ?? "");
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadPlans() {
+      setPlansStatus({ status: "loading" });
+      try {
+        const res = await fetch(`/api/boards/${boardId}/aura/plans`, {
+          cache: "no-store",
+        });
+        const data = (await res.json().catch(() => ({}))) as {
+          plans?: AuraAssessmentPlan[];
+          error?: string;
+        };
+        if (!res.ok) {
+          if (!cancelled) {
+            setPlans([]);
+            setPlansStatus({
+              status: "error",
+              message:
+                data.error === "aura_oauth_token_issue_failed"
+                  ? "Aura Board OAuth 연결을 확인해 주세요."
+                  : "Aura 평가계획을 불러오지 못했어요.",
+            });
+          }
+          return;
+        }
+        const nextPlans = Array.isArray(data.plans) ? data.plans : [];
+        if (!cancelled) {
+          setPlans(nextPlans);
+          setPlansStatus({ status: nextPlans.length > 0 ? "ready" : "empty" });
+        }
+      } catch {
+        if (!cancelled) {
+          setPlans([]);
+          setPlansStatus({
+            status: "error",
+            message: "Aura 평가계획을 불러오지 못했어요.",
+          });
+        }
+      }
+    }
+
+    void loadPlans();
+    return () => {
+      cancelled = true;
+    };
+  }, [boardId]);
+
+  const selectedPlan = plans.find((plan) => auraPlanKey(plan) === selectedKey);
+  const savedKey =
+    value.subject && value.criterion
+      ? auraPlanKey({
+          subject: value.subject,
+          unit: value.unit ?? "",
+          criterion: value.criterion,
+        })
+      : "";
+  const fieldsDirty = Boolean(selectedPlan) && selectedKey !== savedKey;
 
   async function toggleMode() {
     const next = !value.evaluationEnabled;
@@ -1348,16 +1426,16 @@ function AuraTab({
   }
 
   async function saveFields() {
-    if (!fieldsDirty) return;
+    if (!selectedPlan || !fieldsDirty) return;
     setSaveState({ status: "saving" });
     try {
       const res = await fetch(`/api/boards/${boardId}/aura`, {
         method: "PATCH",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
-          subject: subjectDraft,
-          unit: unitDraft,
-          criterion: criterionDraft,
+          subject: selectedPlan.subject,
+          unit: selectedPlan.unit,
+          criterion: selectedPlan.criterion,
         }),
       });
       if (!res.ok) {
@@ -1366,9 +1444,6 @@ function AuraTab({
       }
       const data = (await res.json()) as AuraBoardSettings;
       onChange(data);
-      setSubjectDraft(data.subject ?? "");
-      setUnitDraft(data.unit ?? "");
-      setCriterionDraft(data.criterion ?? "");
       router.refresh();
       setSaveState({ status: "saved", at: Date.now() });
     } catch {
@@ -1403,56 +1478,62 @@ function AuraTab({
       <SettingsSection title="평가 기준">
         <div className="board-settings-control-stack">
           <div className="stream-guidance-field">
-            <label className="stream-guidance-label" htmlFor={`aura-subject-${boardId}`}>
-              과목
+            <label className="stream-guidance-label" htmlFor={`aura-plan-${boardId}`}>
+              Aura 평가계획
             </label>
-            <input
-              id={`aura-subject-${boardId}`}
-              type="text"
-              className="stream-guidance-input"
-              value={subjectDraft}
-              onChange={(e) => setSubjectDraft(e.target.value.slice(0, 120))}
-              placeholder="국어"
-              maxLength={120}
-              disabled={saveState.status === "saving"}
-            />
+            <select
+              id={`aura-plan-${boardId}`}
+              className="modal-select"
+              value={selectedKey}
+              onChange={(e) => setSelectedKey(e.target.value)}
+              disabled={
+                saveState.status === "saving" ||
+                plansStatus.status === "loading" ||
+                plans.length === 0
+              }
+            >
+              <option value="">
+                {plansStatus.status === "loading"
+                  ? "불러오는 중..."
+                  : "평가계획을 선택하세요"}
+              </option>
+              {plans.map((plan) => (
+                <option key={auraPlanKey(plan)} value={auraPlanKey(plan)}>
+                  {[plan.subject, plan.unit, plan.criterion]
+                    .filter((part) => part.trim().length > 0)
+                    .join(" · ")}
+                </option>
+              ))}
+            </select>
           </div>
-          <div className="stream-guidance-field">
-            <label className="stream-guidance-label" htmlFor={`aura-unit-${boardId}`}>
-              단원
-            </label>
-            <input
-              id={`aura-unit-${boardId}`}
-              type="text"
-              className="stream-guidance-input"
-              value={unitDraft}
-              onChange={(e) => setUnitDraft(e.target.value.slice(0, 120))}
-              placeholder="4. 대상을 설명해요"
-              maxLength={120}
-              disabled={saveState.status === "saving"}
-            />
-          </div>
-          <div className="stream-guidance-field">
-            <label className="stream-guidance-label" htmlFor={`aura-criterion-${boardId}`}>
-              평가항목
-            </label>
-            <textarea
-              id={`aura-criterion-${boardId}`}
-              className="stream-guidance-textarea"
-              value={criterionDraft}
-              onChange={(e) => setCriterionDraft(e.target.value.slice(0, 120))}
-              placeholder="설명하고 싶은 내용을 선정하고, 글의 구조에 따라 쓸 내용을 정리하여 설명하는 글 쓰기"
-              maxLength={120}
-              rows={3}
-              disabled={saveState.status === "saving"}
-            />
-          </div>
+          {plansStatus.status === "empty" && (
+            <p className="board-settings-error">
+              Aura에 등록된 평가계획이 없습니다.
+            </p>
+          )}
+          {plansStatus.status === "error" && (
+            <p className="board-settings-error">{plansStatus.message}</p>
+          )}
+          {selectedPlan && (
+            <article className="board-settings-row">
+              <div className="board-settings-row-title">
+                <span className="board-settings-row-name">
+                  {selectedPlan.criterion}
+                </span>
+              </div>
+              <p className="board-settings-row-note">
+                {[selectedPlan.subject, selectedPlan.unit]
+                  .filter((part) => part.trim().length > 0)
+                  .join(" · ")}
+              </p>
+            </article>
+          )}
           <div className="stream-guidance-actions">
             <button
               type="button"
               className="stream-guidance-save"
               onClick={() => void saveFields()}
-              disabled={!fieldsDirty || saveState.status === "saving"}
+              disabled={!fieldsDirty || saveState.status === "saving" || !selectedPlan}
             >
               {saveState.status === "saving" ? "저장 중..." : "저장"}
             </button>

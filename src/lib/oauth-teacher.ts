@@ -173,6 +173,32 @@ export async function issueTeacherTokenPair(params: {
   };
 }
 
+export async function issueTeacherAccessToken(params: {
+  userId: string;
+  clientId: string;
+  scope: string;
+}): Promise<{ accessToken: string; expiresIn: number; scope: string; tokenType: "Bearer" }> {
+  const access = makePair();
+
+  await db.oAuthAccessToken.create({
+    data: {
+      tokenHash: hashSecret(access.secret),
+      tokenPrefix: access.prefix,
+      userId: params.userId,
+      clientId: params.clientId,
+      scope: params.scope,
+      expiresAt: new Date(Date.now() + ACCESS_TOKEN_TTL_MS),
+    },
+  });
+
+  return {
+    accessToken: `${TEACHER_ACCESS_PREFIX}${access.prefix}_${access.secret}`,
+    expiresIn: Math.floor(ACCESS_TOKEN_TTL_MS / 1000),
+    scope: params.scope,
+    tokenType: "Bearer",
+  };
+}
+
 // ─── Refresh grant (rotate-on-use) ───────────────────────────────────────
 
 export async function rotateTeacherRefresh(params: {
