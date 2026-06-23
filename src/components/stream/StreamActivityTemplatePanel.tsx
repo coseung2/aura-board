@@ -153,7 +153,7 @@ function WordCloudPanel({
   onCreateCard: (data: { title: string; content: string }) => Promise<void>;
 }) {
   const words = useMemo(() => buildWordCloud(cards), [cards]);
-  const layout = useMemo(() => wordCloudLayout(words.length), [words.length]);
+  const layout = useMemo(() => wordCloudLayout(words), [words]);
   const normalizedState = normalizeStreamActivityTemplateState(state);
   const published = normalizedState.wordCloudPublished === true;
   const canSeeCloud = published;
@@ -819,20 +819,65 @@ function buildWordCloud(cards: CardData[]) {
     }));
 }
 
-function wordCloudLayout(count: number): { x: number; y: number }[] {
-  // Fermat spiral (phyllotaxis). Same count always yields the same positions,
-  // so the layout is stable for a given set of words. Words are sorted by
-  // count desc in buildWordCloud, so the heaviest (largest) entries end up
-  // near the center and rarer entries spiral outward into an oval cloud.
+function wordCloudLayout(
+  words: Array<{ text: string; weight: number }>,
+): { x: number; y: number }[] {
+  // Deterministic spiral placement with conservative collision checks. The
+  // browser owns the exact glyph metrics, so we overestimate each label box to
+  // keep large Korean words and short phrases from stacking on top of each other.
   const goldenAngle = Math.PI * (3 - Math.sqrt(5));
-  const spread = 5.5;
+  const placed: Array<{ x: number; y: number; w: number; h: number }> = [];
   const out: { x: number; y: number }[] = [];
-  for (let i = 0; i < count; i += 1) {
-    const r = spread * Math.sqrt(i);
-    const a = i * goldenAngle;
-    out.push({ x: 50 + r * Math.cos(a), y: 50 + r * Math.sin(a) });
+
+  for (let i = 0; i < words.length; i += 1) {
+    const word = words[i];
+    const box = estimateWordBox(word.text, word.weight);
+    let chosen = { x: 50, y: 50 };
+
+    for (let step = 0; step < 260; step += 1) {
+      const r = 2.7 * Math.sqrt(step + i * 10);
+      const a = (step + i * 7) * goldenAngle;
+      const x = Math.max(8 + box.w / 2, Math.min(92 - box.w / 2, 50 + r * Math.cos(a)));
+      const y = Math.max(10 + box.h / 2, Math.min(90 - box.h / 2, 50 + r * Math.sin(a)));
+      const candidate = { x, y, w: box.w, h: box.h };
+      if (!placed.some((other) => boxesOverlap(candidate, other))) {
+        chosen = { x, y };
+        placed.push(candidate);
+        break;
+      }
+      if (step === 259) {
+        chosen = { x, y };
+        placed.push(candidate);
+      }
+    }
+    out.push(chosen);
   }
   return out;
+}
+
+function estimateWordBox(text: string, weight: number): { w: number; h: number } {
+  const fontSize = 14 + weight * 10;
+  let units = 0;
+  for (const ch of text) {
+    if (/\s/.test(ch)) units += 0.38;
+    else if (/[\u0000-\u00ff]/.test(ch)) units += 0.58;
+    else units += 1;
+  }
+  const widthPx = Math.max(fontSize * 1.6, fontSize * units * 1.08);
+  return {
+    w: Math.min(58, Math.max(8, (widthPx / 900) * 100 + 3)),
+    h: Math.max(7, ((fontSize * 1.35) / 675) * 100 + 2),
+  };
+}
+
+function boxesOverlap(
+  a: { x: number; y: number; w: number; h: number },
+  b: { x: number; y: number; w: number; h: number },
+): boolean {
+  return (
+    Math.abs(a.x - b.x) < (a.w + b.w) / 2 &&
+    Math.abs(a.y - b.y) < (a.h + b.h) / 2
+  );
 }
 
 function normalizeWordCloudEntry(value: string | null | undefined): string {

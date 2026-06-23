@@ -303,8 +303,7 @@
 }
 
 .stream-composer-actions button,
-.stream-comment-form button,
-.stream-post-menu-popover button {
+.stream-comment-form button {
   box-sizing: border-box;
   height: 40px;
   border: 1px solid var(--color-border);
@@ -419,20 +418,30 @@
 
 .stream-post-menu-popover {
   position: absolute;
-  right: 0;
-  top: calc(100% + 6px);
+  right: 2px;
+  top: calc(100% + 4px);
   z-index: 5;
-  min-width: 104px;
-  padding: 6px;
-  border: 1px solid var(--color-border);
-  border-radius: 8px;
-  background: var(--color-surface);
-  box-shadow: var(--shadow-dropdown);
+  padding: 0;
 }
 
 .stream-post-menu-popover button {
-  width: 100%;
+  min-height: 34px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
   color: #b42318;
+  font-weight: 800;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.stream-post-menu-popover button:hover,
+.stream-post-menu-popover button:focus-visible {
+  color: #8f1d14;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  outline: none;
 }
 
 .stream-media {
@@ -4401,12 +4410,14 @@
   left: 0;
   top: 0;
   transform: translate(-50%, -50%);
-  max-width: clamp(90px, 20%, 170px);
+  display: inline-block;
   color: var(--color-accent);
   font-weight: 900;
   line-height: 1.1;
   text-align: center;
-  overflow-wrap: anywhere;
+  white-space: nowrap;
+  word-break: keep-all;
+  overflow-wrap: normal;
 }
 
 .stream-word-input {
