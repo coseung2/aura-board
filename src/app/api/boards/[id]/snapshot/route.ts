@@ -5,6 +5,7 @@ import { getCurrentUser } from "@/lib/auth";
 import { getCurrentStudent } from "@/lib/student-auth";
 import { getEffectiveBoardRole } from "@/lib/rbac";
 import { requireShareAuth } from "@/lib/share/with-share";
+import type { SectionBreakoutGroupWire } from "@/lib/section-breakout";
 
 type CardWire = {
   id: string;
@@ -27,6 +28,7 @@ type CardWire = {
   height: number;
   order: number;
   sectionId: string | null;
+  groupId: string | null;
   authorId: string | null;
   studentAuthorId: string | null;
   externalAuthorName: string | null;
@@ -58,6 +60,12 @@ type SectionWire = {
   pinned: boolean;
   sortMode: string | null;
   activityTemplate: string | null;
+  breakout: {
+    groupCount: number;
+    groupCapacity: number | null;
+    joinMode: string;
+    groups: SectionBreakoutGroupWire[];
+  } | null;
 };
 
 export async function GET(
@@ -109,7 +117,13 @@ export async function GET(
       }
     }
 
-    const [cardsRaw, sectionsRaw, responsesRaw] = await Promise.all([
+    const [
+      cardsRaw,
+      sectionsRaw,
+      breakoutConfigsRaw,
+      breakoutGroupsRaw,
+      responsesRaw,
+    ] = await Promise.all([
       db.card.findMany({
         where: { boardId: board.id },
         orderBy: { order: "asc" },
@@ -140,6 +154,14 @@ export async function GET(
         },
       }),
       db.section.findMany({ where: { boardId: board.id } }),
+      db.sectionBreakoutConfig.findMany({
+        where: { section: { boardId: board.id } },
+      }),
+      db.sectionBreakoutGroup.findMany({
+        where: { section: { boardId: board.id } },
+        orderBy: { order: "asc" },
+        include: { _count: { select: { members: true } } },
+      }),
       board.layout === "question-board"
         ? db.boardResponse.findMany({
             where: { boardId: board.id },
@@ -152,6 +174,19 @@ export async function GET(
           })
         : Promise.resolve([]),
     ]);
+
+    const breakoutConfigBySection = new Map(
+      breakoutConfigsRaw.map((row) => [row.sectionId, row]),
+    );
+    const breakoutGroupsBySection = new Map<
+      string,
+      (typeof breakoutGroupsRaw)[number][]
+    >();
+    for (const group of breakoutGroupsRaw) {
+      const list = breakoutGroupsBySection.get(group.sectionId) ?? [];
+      list.push(group);
+      breakoutGroupsBySection.set(group.sectionId, list);
+    }
 
     const cards: CardWire[] = cardsRaw.map((c) => ({
       id: c.id,
@@ -174,6 +209,7 @@ export async function GET(
       height: c.height,
       order: c.order,
       sectionId: c.sectionId,
+      groupId: c.groupId ?? null,
       authorId: c.authorId,
       studentAuthorId: c.studentAuthorId,
       externalAuthorName: c.externalAuthorName,
@@ -206,6 +242,11 @@ export async function GET(
         pinned: s.pinned,
         sortMode: s.sortMode,
         activityTemplate: s.activityTemplate,
+        breakout: buildSectionBreakoutSnapshot(
+          s.id,
+          breakoutConfigBySection,
+          breakoutGroupsBySection,
+        ),
       }))
       .sort(sortSections);
 
@@ -254,6 +295,42 @@ export async function GET(
 
 function hashStable(value: unknown): string {
   return createHash("sha1").update(JSON.stringify(value)).digest("hex");
+}
+
+type SectionBreakoutConfigRow = {
+  sectionId: string;
+  groupCount: number;
+  groupCapacity: number | null;
+  joinMode: string;
+};
+
+type SectionBreakoutGroupRow = {
+  id: string;
+  sectionId: string;
+  name: string;
+  order: number;
+  _count: { members: number };
+};
+
+function buildSectionBreakoutSnapshot(
+  sectionId: string,
+  configBySection: Map<string, SectionBreakoutConfigRow>,
+  groupsBySection: Map<string, SectionBreakoutGroupRow[]>,
+): SectionWire["breakout"] {
+  const config = configBySection.get(sectionId);
+  if (!config) return null;
+  return {
+    groupCount: config.groupCount,
+    groupCapacity: config.groupCapacity,
+    joinMode: config.joinMode,
+    groups: (groupsBySection.get(sectionId) ?? []).map((group) => ({
+      id: group.id,
+      sectionId: group.sectionId,
+      name: group.name,
+      order: group.order,
+      memberCount: group._count.members,
+    })),
+  };
 }
 
 function sortSections(a: SectionWire, b: SectionWire): number {

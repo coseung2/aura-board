@@ -44,6 +44,7 @@ export type CardData = {
   height: number;
   order: number;
   sectionId?: string | null;
+  groupId?: string | null;
   authorId: string | null;
   studentAuthorId?: string | null;
   createdAt?: string;

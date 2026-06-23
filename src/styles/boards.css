@@ -4617,6 +4617,252 @@
   }
 
   .slideshow-section-title {
-    font-size: 38px;
+   font-size: 38px;
   }
+}
+
+/* ---- Stream Breakout (모둠 활동) ---- */
+
+.stream-section-breakout-open.is-active {
+  border-color: var(--color-accent);
+  background: var(--color-accent-tinted-bg);
+  color: var(--color-accent-tinted-text);
+}
+
+.stream-breakout-teacher {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.stream-breakout-segments {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 4px 0;
+}
+
+.stream-breakout-segments button {
+  min-height: 30px;
+  padding: 4px 12px;
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  background: var(--color-surface);
+  color: var(--color-text-muted);
+  font-family: var(--font-body);
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0;
+  cursor: pointer;
+  transition: background 120ms ease, border-color 120ms ease, color 120ms ease;
+}
+
+.stream-breakout-segments button:hover,
+.stream-breakout-segments button:focus-visible {
+  border-color: var(--color-border-hover);
+  background: var(--color-surface-alt);
+  color: var(--color-text);
+  outline: none;
+}
+
+.stream-breakout-segments button.is-active {
+  border-color: var(--color-accent);
+  background: var(--color-accent-tinted-bg);
+  color: var(--color-accent-tinted-text);
+}
+
+.stream-breakout-compare {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 14px;
+  align-items: start;
+}
+
+.stream-breakout-group-area,
+.stream-breakout-group-view {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+}
+
+.stream-breakout-group-area {
+  padding: 12px;
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  background: var(--color-surface);
+}
+
+.stream-breakout-group-area-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.stream-breakout-group-area-name {
+  font-family: var(--font-display);
+  font-size: 15px;
+  font-weight: 800;
+  color: var(--color-accent);
+}
+
+.stream-breakout-group-area-count,
+.stream-breakout-my-group span:last-child {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--color-text-muted);
+}
+
+.stream-breakout-my-group {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 6px 12px;
+  border: 1px solid var(--color-accent);
+  border-radius: 999px;
+  background: var(--color-accent-tinted-bg);
+  align-self: flex-start;
+}
+
+.stream-breakout-my-group span:first-child {
+  font-weight: 800;
+  color: var(--color-accent-tinted-text);
+}
+
+/* Student pre-join: dim the section content, overlay the group picker. */
+.stream-breakout-locked {
+  position: relative;
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  background: var(--color-surface);
+  overflow: hidden;
+}
+
+.stream-breakout-locked-content {
+  opacity: 0.35;
+  pointer-events: none;
+  filter: grayscale(0.4);
+}
+
+.stream-breakout-join-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: 14px;
+  padding: 20px;
+  background: linear-gradient(
+    to bottom,
+    rgba(255, 255, 255, 0.72),
+    rgba(255, 255, 255, 0.92)
+  );
+}
+
+.stream-breakout-join-title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 16px;
+  font-weight: 800;
+  color: var(--color-text);
+}
+
+.stream-breakout-join-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 10px;
+  width: 100%;
+  max-width: 520px;
+}
+
+.stream-breakout-join-card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  padding: 12px 14px;
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  background: var(--color-surface);
+  color: var(--color-text);
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 120ms ease, background 120ms ease,
+    transform 120ms ease;
+}
+
+.stream-breakout-join-card:hover:not(:disabled),
+.stream-breakout-join-card:focus-visible:not(:disabled) {
+  border-color: var(--color-accent);
+  background: var(--color-accent-tinted-bg);
+  outline: none;
+}
+
+.stream-breakout-join-card:active:not(:disabled) {
+  transform: translateY(1px);
+}
+
+.stream-breakout-join-card:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.stream-breakout-join-name {
+  font-family: var(--font-display);
+  font-size: 15px;
+  font-weight: 800;
+}
+
+.stream-breakout-join-count {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--color-text-muted);
+}
+
+.stream-breakout-modal {
+  width: min(92vw, 460px);
+}
+
+.stream-breakout-form {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.stream-breakout-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.stream-breakout-field span {
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--color-text-muted);
+}
+
+.stream-breakout-field input {
+  width: 100%;
+  padding: 9px 11px;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: var(--color-surface);
+  color: var(--color-text);
+  font-family: var(--font-body);
+  font-size: 15px;
+}
+
+.stream-breakout-field input:focus-visible {
+  border-color: var(--color-accent);
+  outline: none;
+}
+
+.stream-breakout-modal-hint {
+  margin: 12px 0 0;
+  font-size: 12px;
+  color: var(--color-text-faint);
 }

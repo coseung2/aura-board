@@ -101,6 +101,17 @@ export function TemplateIcon({ size = 20, className }: IconProps) {
   );
 }
 
+export function GroupIcon({ size = 20, className }: IconProps) {
+  return (
+    <svg {...base(size)} className={className} aria-hidden="true">
+      <circle cx="9" cy="8" r="3" />
+      <path d="M3.5 19a5.5 5.5 0 0 1 11 0" />
+      <circle cx="17" cy="9" r="2.4" />
+      <path d="M15 19a4.6 4.6 0 0 1 6 0" />
+    </svg>
+  );
+}
+
 export function FullscreenEnterIcon({ size = 20, className }: IconProps) {
   return (
     <svg {...base(size)} className={className} aria-hidden="true">

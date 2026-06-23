@@ -3,6 +3,7 @@ import { db } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
 import { getCurrentStudent } from "@/lib/student-auth";
 import { getEffectiveBoardRole } from "@/lib/rbac";
+import type { SectionBreakoutConfigWire, SectionBreakoutGroupWire } from "@/lib/section-breakout";
 
 export const maxDuration = 60;
 
@@ -40,6 +41,11 @@ type CardWire = {
   studentAuthorName: string | null;
   authorName: string | null;
   queueStatus: string | null;
+  // stream-board section breakout (2026-06-23): optional group tag. null
+  // for whole-section cards. Server always emits the field so the
+  // front-end can branch on `card.groupId !== null` without guarding
+  // for `undefined`.
+  groupId: string | null;
   authors: Array<{
     id: string;
     studentId: string | null;
@@ -64,6 +70,18 @@ type SectionWire = {
   order: number;
   sortMode: string | null;
   activityTemplate: string | null;
+  // stream-board section breakout (2026-06-23): the section's breakout
+  // config + group roster snapshot. null when the section is not in
+  // breakout mode. The full membership list is intentionally omitted
+  // from the public SSE — the caller can fetch it via
+  // GET /api/sections/[id]/breakout. group member counts are included
+  // so the front-end can show a roster badge per group.
+  breakout: {
+    groupCount: number;
+    groupCapacity: number | null;
+    joinMode: string;
+    groups: SectionBreakoutGroupWire[];
+  } | null;
 };
 
 export async function GET(
@@ -169,7 +187,7 @@ export async function GET(
             return;
           }
 
-          const [cardsRaw, sectionsRaw] = await Promise.all([
+          const [cardsRaw, sectionsRaw, configRows, groupRows] = await Promise.all([
             db.card.findMany({
               where: { boardId },
               orderBy: { order: "asc" },
@@ -203,8 +221,30 @@ export async function GET(
               where: { boardId },
               orderBy: { order: "asc" },
             }),
+            // stream-board section breakout (2026-06-23): for every section
+            // on the board, pull the breakout config (1:1) and the group
+            // rows + member counts. Sections without breakout config get
+            // `null` in the snapshot.
+            db.sectionBreakoutConfig.findMany({
+              where: { section: { boardId } },
+            }),
+            db.sectionBreakoutGroup.findMany({
+              where: { section: { boardId } },
+              orderBy: { order: "asc" },
+              include: { _count: { select: { members: true } } },
+            }),
           ]);
 
+          // Index the section-level breakout data by sectionId so the
+          // SectionWire build is O(1) per section.
+          const configBySection = new Map<string, typeof configRows[number]>();
+          for (const c of configRows) configBySection.set(c.sectionId, c);
+          const groupsBySection = new Map<string, typeof groupRows[number][]>();
+          for (const g of groupRows) {
+            const list = groupsBySection.get(g.sectionId) ?? [];
+            list.push(g);
+            groupsBySection.set(g.sectionId, list);
+          }
           const cards: CardWire[] = cardsRaw.map((c) => ({
             id: c.id,
             title: c.title,
@@ -232,6 +272,7 @@ export async function GET(
             studentAuthorName: c.studentAuthor?.name ?? null,
             authorName: c.author?.name ?? null,
             queueStatus: c.queueStatus,
+            groupId: c.groupId ?? null,
             authors: c.authors.map((a) => ({
               id: a.id,
               studentId: a.studentId,
@@ -256,6 +297,15 @@ export async function GET(
             order: s.order,
             sortMode: s.sortMode,
             activityTemplate: s.activityTemplate,
+            // stream-board section breakout (2026-06-23): the section-level
+            // breakout summary. `null` when the section is not in breakout
+            // mode — keeps the wire shape additive (no new field on the
+            // Section row, just an optional nested key).
+            breakout: buildSectionBreakoutSnapshot(
+              s.id,
+              configBySection,
+              groupsBySection,
+            ),
           }));
 
           const cardsHash = hashStable(cards);
@@ -343,4 +393,49 @@ export async function GET(
 
 function hashStable(value: unknown): string {
   return createHash("sha1").update(JSON.stringify(value)).digest("hex");
+}
+
+// stream-board section breakout (2026-06-23): build a per-section breakout
+// summary for the SSE snapshot. Returns null when the section has no
+// breakout config so the wire is additive (no breakout on a section → no
+// extra keys for the front-end to guard).
+type SectionBreakoutConfigRow = {
+  sectionId: string;
+  groupCount: number;
+  groupCapacity: number | null;
+  joinMode: string;
+};
+type SectionBreakoutGroupRow = {
+  id: string;
+  sectionId: string;
+  name: string;
+  order: number;
+  _count: { members: number };
+};
+
+function buildSectionBreakoutSnapshot(
+  sectionId: string,
+  configBySection: Map<string, SectionBreakoutConfigRow>,
+  groupsBySection: Map<string, SectionBreakoutGroupRow[]>,
+): {
+  groupCount: number;
+  groupCapacity: number | null;
+  joinMode: string;
+  groups: SectionBreakoutGroupWire[];
+} | null {
+  const cfg = configBySection.get(sectionId);
+  if (!cfg) return null;
+  const groups = (groupsBySection.get(sectionId) ?? []).map((g) => ({
+    id: g.id,
+    sectionId: g.sectionId,
+    name: g.name,
+    order: g.order,
+    memberCount: g._count.members,
+  }));
+  return {
+    groupCount: cfg.groupCount,
+    groupCapacity: cfg.groupCapacity,
+    joinMode: cfg.joinMode,
+    groups,
+  };
 }

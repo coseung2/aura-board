@@ -250,6 +250,7 @@ model Student {
   studentPlants         StudentPlant[]
   assets                StudentAsset[]
   breakoutMemberships   BreakoutMembership[]
+  sectionBreakoutMembers SectionBreakoutMembership[]
   parents               ParentChildLink[]
   parentInvites         ParentInviteCode[]
   cardsAuthored         Card[]                    @relation("StudentCardAuthor")
@@ -441,10 +442,74 @@ model Section {
   board               Board                @relation(fields: [boardId], references: [id], onDelete: Cascade)
   cards               Card[]               @relation("SectionCards")
   breakoutMemberships BreakoutMembership[]
+  // stream-board section breakout (2026-06-23): per-section breakout config
+  // and small-group roster. Distinct from BreakoutAssignment which is the
+  // board-level BreakoutTemplate deployment. Here the teacher enables
+  // breakout on a single Section (stream board) and students self-select
+  // into one of N groups. Card.groupId tags which group a card belongs to.
+  breakoutConfig     SectionBreakoutConfig?
+  breakoutGroups     SectionBreakoutGroup[]
+  breakoutMembers    SectionBreakoutMembership[]
   mapPlaces           SectionMapPlace[]
   mapRoute            SectionMapRoute?
 
   @@index([boardId])
+}
+
+// SectionBreakoutConfig — one row per Section that has breakout mode enabled.
+// sectionId is unique so re-enabling/re-configuring is a single upsert.
+// joinMode is currently fixed to "student_select" (server only accepts that
+// value) — stored as a string so future modes ("teacher_assign") don't need
+// a migration.
+model SectionBreakoutConfig {
+  id            String   @id @default(cuid())
+  sectionId     String   @unique
+  groupCount    Int      @default(4)
+  groupCapacity Int?     // null = unlimited
+  joinMode      String   @default("student_select")
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  section Section @relation(fields: [sectionId], references: [id], onDelete: Cascade)
+}
+
+// SectionBreakoutGroup — a single group within a section's breakout. order
+// is the display slot (1-based in API responses, 0-based in the DB to match
+// Section.order). @@unique([sectionId, order]) prevents the teacher from
+// accidentally creating two groups at the same slot via the API.
+model SectionBreakoutGroup {
+  id        String   @id @default(cuid())
+  sectionId String
+  name      String
+  order     Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  section    Section                   @relation(fields: [sectionId], references: [id], onDelete: Cascade)
+  members    SectionBreakoutMembership[]
+  cards      Card[]                    @relation("SectionBreakoutGroupCards")
+
+  @@unique([sectionId, order])
+  @@index([sectionId])
+}
+
+// SectionBreakoutMembership — a Student's pick within a section breakout.
+// @@unique([sectionId, studentId]) enforces "one group per student per
+// section" so a re-pick is a single upsert.
+model SectionBreakoutMembership {
+  id        String   @id @default(cuid())
+  sectionId String
+  groupId   String
+  studentId String
+  joinedAt  DateTime @default(now())
+
+  section Section             @relation(fields: [sectionId], references: [id], onDelete: Cascade)
+  group   SectionBreakoutGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  student Student             @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@unique([sectionId, studentId])
+  @@index([groupId])
+  @@index([studentId])
 }
 
 model SectionMapPlace {
@@ -553,6 +618,12 @@ model Card {
   section          Section?          @relation("SectionCards", fields: [sectionId], references: [id], onDelete: SetNull)
   author           User?             @relation(fields: [authorId], references: [id])
   studentAuthor    Student?          @relation("StudentCardAuthor", fields: [studentAuthorId], references: [id], onDelete: SetNull)
+  // stream-board section breakout (2026-06-23): null = whole-section card,
+  // non-null = a group-scoped card. Server validates that the group belongs
+  // to the same section as the card, and that student authors have a
+  // SectionBreakoutMembership matching the group.
+  groupId          String?
+  group            SectionBreakoutGroup? @relation("SectionBreakoutGroupCards", fields: [groupId], references: [id], onDelete: SetNull)
   assetAttachments AssetAttachment[] @relation("CardAssetAttachments")
   assignmentSlot   AssignmentSlot?   @relation("AssignmentSlotCard")
   authors          CardAuthor[]
@@ -565,6 +636,7 @@ model Card {
   @@index([sectionId])
   @@index([authorId])
   @@index([studentAuthorId])
+  @@index([groupId])
 }
 
 // card-comments-likes (2026-04-26): 카드별 댓글 + 좋아요. 작성자/좋아요 누른

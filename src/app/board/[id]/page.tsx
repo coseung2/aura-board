@@ -32,6 +32,45 @@ import type { BoardTheme } from "@/components/BoardSettingsPanel";
 // Auth + cookie reads already flag this route as dynamic.
 // Dropping the explicit flag keeps the Router Cache warm for navigations.
 
+// stream-board section breakout (2026-06-23): mirror of the SSE
+// buildSectionBreakoutSnapshot for the initial server-rendered page
+// payload. Inline (not a shared import) so the section-breakout wire
+// type is also free of client-side import friction.
+type SectionBreakoutConfigRow = {
+  sectionId: string;
+  groupCount: number;
+  groupCapacity: number | null;
+  joinMode: string;
+};
+type SectionBreakoutGroupRow = {
+  id: string;
+  sectionId: string;
+  name: string;
+  order: number;
+  _count: { members: number };
+};
+
+function buildSectionBreakoutForPage(
+  sectionId: string,
+  configBySection: Map<string, SectionBreakoutConfigRow>,
+  groupsBySection: Map<string, SectionBreakoutGroupRow[]>,
+) {
+  const cfg = configBySection.get(sectionId);
+  if (!cfg) return null;
+  const groups = (groupsBySection.get(sectionId) ?? []).map((g) => ({
+    id: g.id,
+    sectionId: g.sectionId,
+    name: g.name,
+    order: g.order,
+    memberCount: g._count.members,
+  }));
+  return {
+    groupCount: cfg.groupCount,
+    groupCapacity: cfg.groupCapacity,
+    joinMode: cfg.joinMode,
+    groups,
+  };
+}
 export default async function BoardPage({
   params,
   searchParams,
@@ -137,6 +176,21 @@ export default async function BoardPage({
         orderBy: { order: "asc" },
       })
     : null;
+  // stream-board section breakout (2026-06-23): fetch the per-section
+  // breakout config + group roster alongside sections. We only query when
+  // sections are already being loaded (board.layout has them enabled).
+  const sectionBreakoutConfigPromise = needsSections
+    ? db.sectionBreakoutConfig.findMany({
+        where: { section: { boardId: board.id } },
+      })
+    : null;
+  const sectionBreakoutGroupPromise = needsSections
+    ? db.sectionBreakoutGroup.findMany({
+        where: { section: { boardId: board.id } },
+        orderBy: { order: "asc" },
+        include: { _count: { select: { members: true } } },
+      })
+    : null;
   const assignmentSlotsPromise = needsAssignmentData
     ? db.assignmentSlot.findMany({
         where: { boardId: board.id },
@@ -199,6 +253,8 @@ export default async function BoardPage({
     breakoutMembershipsRaw,
     rosterStudentsRaw,
     assignmentSlotsRaw,
+    sectionBreakoutConfigRaw,
+    sectionBreakoutGroupRaw,
   ] = await Promise.all([
     cardsPromise,
     sectionsPromise,
@@ -208,9 +264,24 @@ export default async function BoardPage({
     breakoutMembershipsPromise,
     rosterStudentsPromise,
     assignmentSlotsPromise,
+    sectionBreakoutConfigPromise,
+    sectionBreakoutGroupPromise,
   ]);
   const breakoutMemberships = breakoutMembershipsRaw ?? [];
   const rosterStudents = rosterStudentsRaw ?? [];
+  const sectionBreakoutConfigRows = sectionBreakoutConfigRaw ?? [];
+  const sectionBreakoutGroupRows = sectionBreakoutGroupRaw ?? [];
+  // stream-board section breakout (2026-06-23): index rows by sectionId
+  // for O(1) lookup in the wire build below.
+  const sectionBreakoutConfigBySection = new Map(
+    sectionBreakoutConfigRows.map((row) => [row.sectionId, row]),
+  );
+  const sectionBreakoutGroupBySection = new Map();
+  for (const g of sectionBreakoutGroupRows) {
+    const list = sectionBreakoutGroupBySection.get(g.sectionId) ?? [];
+    list.push(g);
+    sectionBreakoutGroupBySection.set(g.sectionId, list);
+  }
 
   const cards = cardsRaw ?? [];
   const sections = sectionsRaw ?? [];
@@ -262,6 +333,11 @@ export default async function BoardPage({
     height: c.height,
     order: c.order,
     sectionId: c.sectionId,
+    // stream-board section breakout (2026-06-23): group tag.
+    // null for whole-section cards. Server always emits the field so the
+    // front-end can branch on `card.groupId !== null` without guarding
+    // for `undefined`.
+    groupId: c.groupId ?? null,
     authorId: c.authorId,
     studentAuthorId: c.studentAuthorId,
     createdAt: c.createdAt.toISOString(),
@@ -296,6 +372,15 @@ export default async function BoardPage({
     activityTemplate: isStreamActivityTemplate(s.activityTemplate)
       ? s.activityTemplate
       : null,
+    // stream-board section breakout (2026-06-23): per-section breakout
+    // summary. null when the section is not in breakout mode. The
+    // group roster is denormalized here so the front-end can render
+    // group lanes + member badges without a follow-up fetch.
+    breakout: buildSectionBreakoutForPage(
+      s.id,
+      sectionBreakoutConfigBySection,
+      sectionBreakoutGroupBySection,
+    ),
   }));
 
   // Assemble the plant-journal initial payload when rendering that layout.

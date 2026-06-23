@@ -70,6 +70,11 @@ const CreateCardSchema = z.object({
   height: z.number().optional(),
   order: z.number().optional(),
   sectionId: z.string().nullable().optional(),
+  // stream-board section breakout (2026-06-23): optional group tag. Server
+  // validates that the group belongs to the same sectionId and that the
+  // student author's SectionBreakoutMembership matches. null = whole-section
+  // card (the default).
+  groupId: z.string().nullable().optional(),
   authors: z
     .array(
       z.object({
@@ -354,6 +359,74 @@ export async function POST(req: Request) {
       }
     }
 
+    // stream-board section breakout (2026-06-23): groupId must be consistent
+    // with sectionId + the caller's identity. The shape of the check is:
+    //   - If a section breakout config exists for the section:
+    //       * groupId present → must belong to the section (422 if not).
+// * student authors must have a SectionBreakoutMembership pointing at
+// the same group; missing/wrong → 403. (Teachers are exempt.)
+// * groupId absent → card is whole-section (allowed).
+    //   - If no section breakout config exists:
+    //       * groupId present → 422 ("section has no breakout").
+    let resolvedGroupId: string | null = null;
+    if (input.sectionId) {
+      const breakoutConfig = await db.sectionBreakoutConfig.findUnique({
+        where: { sectionId: input.sectionId },
+        select: { id: true },
+      });
+      if (breakoutConfig) {
+        if (input.groupId) {
+          const group = await db.sectionBreakoutGroup.findUnique({
+            where: { id: input.groupId },
+            select: { id: true, sectionId: true },
+          });
+          if (!group || group.sectionId !== input.sectionId) {
+            return NextResponse.json(
+              { error: "groupId does not belong to sectionId" },
+              { status: 422 },
+            );
+          }
+          // Student author must already be a member of this group. We do not
+          // auto-pick here — that's a separate /breakout/membership call so
+          // the student can see the capacity gate + see their pick reflected
+          // in the breakout snapshot.
+          if (studentAuthorId && !teacherUser) {
+            const membership = await db.sectionBreakoutMembership.findUnique(
+              {
+                where: {
+                  sectionId_studentId: {
+                    sectionId: input.sectionId,
+                    studentId: studentAuthorId,
+                  },
+                },
+                select: { groupId: true },
+              },
+            );
+            if (!membership || membership.groupId !== group.id) {
+              return NextResponse.json(
+                { error: "not_a_member_of_group" },
+                { status: 403 },
+              );
+            }
+          }
+          resolvedGroupId = group.id;
+        }
+        // groupId absent + breakout config present = whole-section card.
+        // Allowed by design: teachers may post a prompt visible to all
+        // groups, and the front-end will tag its group-scoped cards itself.
+      } else if (input.groupId) {
+        return NextResponse.json(
+          { error: "section has no breakout config" },
+          { status: 422 },
+        );
+      }
+    } else if (input.groupId) {
+      return NextResponse.json(
+        { error: "groupId requires sectionId" },
+        { status: 422 },
+      );
+    }
+
     const attachmentRows = input.attachments
       ? await Promise.all(
           input.attachments.map(async (a, idx) => ({
@@ -399,6 +472,7 @@ export async function POST(req: Request) {
           height: input.height ?? 160,
           order: input.order ?? 0,
           sectionId: input.sectionId ?? null,
+          groupId: resolvedGroupId,
         },
       });
       // Student-authored cards get a primary CardAuthor row so the
@@ -472,6 +546,10 @@ export async function POST(req: Request) {
         studentAuthorName: student?.name ?? null,
         externalAuthorName: card.externalAuthorName,
         anonymousAuthor: boardAnonymousAuthor,
+        // stream-board section breakout (2026-06-23): include groupId so
+        // the front-end can place the card in the right group lane without
+        // a follow-up refetch.
+        groupId: card.groupId ?? null,
         attachments,
         authors,
       },
