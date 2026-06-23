@@ -167,11 +167,19 @@
   margin-top: 8px;
 }
 
+.student-breakout-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: calc(var(--z-modal, 101) - 1);
+  background: rgba(15, 23, 42, 0.46);
+  animation: fadeIn 150ms ease;
+}
+
 .student-breakout-modal {
   position: fixed;
   top: 50%;
   left: 50%;
-  z-index: var(--z-modal);
+  z-index: var(--z-modal, 101);
   width: min(560px, calc(100vw - 32px));
   max-height: min(680px, calc(100vh - 48px));
   overflow: auto;
@@ -204,6 +212,18 @@
   font-size: 12px;
   font-weight: 700;
   color: var(--color-text-muted);
+}
+
+.student-breakout-capacity {
+  flex: 0 0 auto;
+  padding: 6px 10px;
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  background: var(--color-bg-alt);
+  color: var(--color-text-muted);
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1;
 }
 
 .student-breakout-error {

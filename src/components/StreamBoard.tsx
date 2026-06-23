@@ -126,6 +126,16 @@ export function StreamBoard({
           sectionId: section.id,
           sectionTitle: section.title,
         });
+        if (section.activityTemplate) {
+          slides.push({
+            id: `activity:${section.id}:${section.activityTemplate}`,
+            kind: "activity",
+            sectionId: section.id,
+            sectionTitle: section.title,
+            activityTemplate: section.activityTemplate,
+            cards: bucket,
+          });
+        }
         for (const card of bucket) slides.push({ id: card.id, kind: "card", card });
       }
       if (grouped.unsectioned.length > 0) {
@@ -315,6 +325,9 @@ export function StreamBoard({
               setPanelState({ sectionId, tab })
             }
             onOpenTemplateModal={setTemplateModalSectionId}
+            onCreateSectionCard={(sectionId, data) =>
+              handleAdd({ ...data, sectionId })
+            }
             templateBusySectionId={templateBusySectionId}
             onDeleteCard={handleDelete}
           />
@@ -451,6 +464,10 @@ type StreamGroupedFeedProps = {
   onSubmitSection: (event: FormEvent<HTMLFormElement>) => void;
   onOpenSectionPanel: (sectionId: string, tab: "rename" | "delete") => void;
   onOpenTemplateModal: (sectionId: string) => void;
+  onCreateSectionCard: (
+    sectionId: string,
+    data: { title: string; content: string },
+  ) => Promise<void>;
   templateBusySectionId: string | null;
   onDeleteCard: (card: CardData) => void;
 };
@@ -473,6 +490,7 @@ function StreamGroupedFeed({
   onSubmitSection,
   onOpenSectionPanel,
   onOpenTemplateModal,
+  onCreateSectionCard,
   templateBusySectionId,
   onDeleteCard,
 }: StreamGroupedFeedProps) {
@@ -590,6 +608,7 @@ function StreamGroupedFeed({
                 sectionId={section.id}
                 cards={bucket}
                 canEdit={canAddPost}
+                onCreateCard={(data) => onCreateSectionCard(section.id, data)}
               />
             )}
             {bucket.length === 0 ? (
@@ -684,6 +703,7 @@ function ActivityTemplateModal({
                   disabled={busy}
                   aria-pressed={selected}
                 >
+                  <StreamTemplatePreviewSvg template={template} />
                   <span className="stream-template-card-title">
                     {STREAM_ACTIVITY_TEMPLATE_LABELS[template]}
                   </span>
@@ -704,6 +724,91 @@ function ActivityTemplateModal({
         </div>
       </div>
     </>
+  );
+}
+
+function StreamTemplatePreviewSvg({
+  template,
+}: {
+  template: StreamActivityTemplate;
+}) {
+  if (template === "window_opening") {
+    return (
+      <svg
+        className="stream-template-card-preview"
+        viewBox="0 0 160 96"
+        role="img"
+        aria-label="창문 열기 예시"
+      >
+        <rect className="stream-template-preview-bg" x="1" y="1" width="158" height="94" rx="8" />
+        <g className="stream-template-preview-line">
+          <rect x="18" y="16" width="124" height="64" rx="4" />
+          <path d="M18 37.33h124M18 58.67h124M59.33 16v64M100.67 16v64" />
+        </g>
+        <rect className="stream-template-preview-accent-fill" x="59.33" y="37.33" width="41.34" height="21.34" />
+      </svg>
+    );
+  }
+
+  if (template === "word_cloud") {
+    return (
+      <svg
+        className="stream-template-card-preview"
+        viewBox="0 0 160 96"
+        role="img"
+        aria-label="워드클라우드 예시"
+      >
+        <rect className="stream-template-preview-bg" x="1" y="1" width="158" height="94" rx="8" />
+        <g className="stream-template-preview-word">
+          <text x="48" y="44">생각</text>
+          <text x="83" y="61">질문</text>
+          <text x="25" y="64">근거</text>
+          <text x="93" y="33">탐구</text>
+          <text x="61" y="76">정리</text>
+        </g>
+        <circle className="stream-template-preview-dot" cx="40" cy="28" r="4" />
+        <circle className="stream-template-preview-dot" cx="120" cy="70" r="3" />
+      </svg>
+    );
+  }
+
+  if (template === "map") {
+    return (
+      <svg
+        className="stream-template-card-preview"
+        viewBox="0 0 160 96"
+        role="img"
+        aria-label="지도 예시"
+      >
+        <rect className="stream-template-preview-bg" x="1" y="1" width="158" height="94" rx="8" />
+        <path className="stream-template-preview-map-land" d="M18 70 45 18l34 18 29-15 34 50Z" />
+        <path className="stream-template-preview-line" d="M43 62c24-28 42-29 74-8" />
+        <g className="stream-template-preview-pin">
+          <path d="M42 48c0 10-10 20-10 20s-10-10-10-20a10 10 0 1 1 20 0Z" />
+          <circle cx="32" cy="48" r="3" />
+          <path d="M128 42c0 10-10 20-10 20s-10-10-10-20a10 10 0 1 1 20 0Z" />
+          <circle cx="118" cy="42" r="3" />
+        </g>
+      </svg>
+    );
+  }
+
+  return (
+    <svg
+      className="stream-template-card-preview"
+      viewBox="0 0 160 96"
+      role="img"
+      aria-label="연표 예시"
+    >
+      <rect className="stream-template-preview-bg" x="1" y="1" width="158" height="94" rx="8" />
+      <path className="stream-template-preview-line" d="M32 50h96" />
+      <g className="stream-template-preview-timeline">
+        <circle cx="40" cy="50" r="6" />
+        <circle cx="80" cy="50" r="6" />
+        <circle cx="120" cy="50" r="6" />
+        <path d="M32 26h32M71 70h34M112 26h30" />
+      </g>
+    </svg>
   );
 }
 

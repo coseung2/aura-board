@@ -11,14 +11,17 @@ import {
   type ReactNode,
 } from "react";
 import type { CardData } from "../DraggableCard";
+import type { StreamActivityTemplate } from "@/lib/stream-activity-templates";
 import { StreamSlideshowOverlay } from "./StreamSlideshowOverlay";
 
 export type SlideshowSlide = {
   id: string;
-  kind?: "card" | "section";
+  kind?: "card" | "section" | "activity";
   card?: CardData;
+  cards?: CardData[];
   sectionId?: string | null;
   sectionTitle?: string;
+  activityTemplate?: StreamActivityTemplate;
 };
 
 type SlideshowContextValue = {

@@ -67,58 +67,49 @@ export function BreakoutSelectClient({
   }
 
   return (
-    <section style={{ padding: "16px" }}>
-      <p style={{ marginBottom: 12, color: "var(--color-muted,#555)" }}>
-        {studentName} 님, 참여할 모둠을 한 번만 고를 수 있어요. (정원 {groupCapacity}명)
-      </p>
-      {error && (
-        <div role="alert" style={{ color: "var(--color-danger,#c00)", marginBottom: 12 }}>
-          {error}
-        </div>
-      )}
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))",
-          gap: 12,
-        }}
+    <>
+      <div className="student-breakout-backdrop" aria-hidden="true" />
+      <section
+        className="student-breakout-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="student-breakout-title"
       >
-        {groups.map((g) => {
-          const isFull = g.totalCount >= groupCapacity * g.sections.length;
-          return (
-            <button
-              key={g.groupIndex}
-              type="button"
-              disabled={isFull || pending !== null}
-              onClick={() => pick(g)}
-              className="column-card"
-              style={{
-                padding: 16,
-                minHeight: 120,
-                cursor: isFull ? "not-allowed" : "pointer",
-                textAlign: "left",
-                border: "2px solid var(--color-border,#ddd)",
-                borderRadius: 8,
-                opacity: isFull ? 0.5 : 1,
-              }}
-              aria-label={`모둠 ${g.groupIndex} 선택`}
-            >
-              <h3 style={{ fontSize: "1.1rem", marginBottom: 8 }}>모둠 {g.groupIndex}</h3>
-              <p style={{ fontSize: "0.9rem", margin: 0 }}>
-                현재 {g.totalCount} / {groupCapacity * g.sections.length}명
-              </p>
-              {isFull && (
-                <p style={{ color: "var(--color-muted,#888)", fontSize: "0.85rem", marginTop: 4 }}>
-                  정원 초과
-                </p>
-              )}
-              {pending === g.groupIndex && (
-                <p style={{ fontSize: "0.85rem", marginTop: 4 }}>선택 중…</p>
-              )}
-            </button>
-          );
-        })}
-      </div>
-    </section>
+        <div className="student-breakout-modal-header">
+          <div>
+            <p className="student-breakout-kicker">{studentName}</p>
+            <h2 id="student-breakout-title">모둠 선택</h2>
+          </div>
+          <span className="student-breakout-capacity">정원 {groupCapacity}명</span>
+        </div>
+        {error && (
+          <div role="alert" className="student-breakout-error">
+            {error}
+          </div>
+        )}
+        <div className="student-breakout-grid">
+          {groups.map((g) => {
+            const isFull = g.totalCount >= groupCapacity * g.sections.length;
+            return (
+              <button
+                key={g.groupIndex}
+                type="button"
+                disabled={isFull || pending !== null}
+                onClick={() => pick(g)}
+                className="student-breakout-group"
+                aria-label={`모둠 ${g.groupIndex} 선택`}
+              >
+                <strong>모둠 {g.groupIndex}</strong>
+                <span>
+                  현재 {g.totalCount} / {groupCapacity * g.sections.length}명
+                </span>
+                {isFull && <small>정원 초과</small>}
+                {pending === g.groupIndex && <small>선택 중…</small>}
+              </button>
+            );
+          })}
+        </div>
+      </section>
+    </>
   );
 }

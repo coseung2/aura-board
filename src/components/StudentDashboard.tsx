@@ -368,7 +368,11 @@ function StudentBreakoutModal({
 
   return (
     <>
-      <div className="modal-backdrop" onClick={pending === null ? onClose : undefined} />
+      <div
+        className="student-breakout-backdrop"
+        onClick={pending === null ? onClose : undefined}
+        aria-hidden="true"
+      />
       <div
         className="student-breakout-modal"
         role="dialog"

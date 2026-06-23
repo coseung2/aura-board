@@ -11,6 +11,8 @@ import {
   CloseIcon,
 } from "../icons/UiIcons";
 import { getStreamAuthor } from "../stream/stream-author";
+import { StreamActivityTemplatePanel } from "../stream/StreamActivityTemplatePanel";
+import { STREAM_ACTIVITY_TEMPLATE_LABELS } from "@/lib/stream-activity-templates";
 import type { SlideshowSlide } from "./BoardSlideshowProvider";
 
 type Props = {
@@ -55,6 +57,7 @@ export function StreamSlideshowOverlay({
   const safeIndex = Math.min(index, total - 1);
   const slide = slides[safeIndex];
   const isSectionSlide = slide?.kind === "section";
+  const isActivitySlide = slide?.kind === "activity";
   const mediaItems =
     slide && slide.card ? buildSlideshowMedia(slide.card) : [];
 
@@ -137,6 +140,94 @@ export function StreamSlideshowOverlay({
           <h2 className="slideshow-section-title">
             {slide.sectionTitle ?? "섹션"}
           </h2>
+        </div>
+        <div className="slideshow-controls">
+          <button
+            type="button"
+            className="slideshow-nav slideshow-prev"
+            onClick={() => go(safeIndex - 1)}
+            disabled={total <= 1}
+            aria-label="이전 슬라이드"
+          >
+            <ChevronLeftIcon size={24} />
+          </button>
+          <div
+            className="slideshow-slide-indicators"
+            aria-label={`슬라이드 ${safeIndex + 1} / ${total}`}
+          >
+            {slides.map((item, i) => (
+              <button
+                key={item.id}
+                type="button"
+                className={i === safeIndex ? "is-active" : ""}
+                aria-label={`${i + 1}번째 슬라이드 보기`}
+                aria-current={i === safeIndex ? "true" : undefined}
+                onClick={() => onIndexChange(i)}
+              />
+            ))}
+          </div>
+          <button
+            type="button"
+            className="slideshow-nav slideshow-next"
+            onClick={() => go(safeIndex + 1)}
+            disabled={total <= 1}
+            aria-label="다음 슬라이드"
+          >
+            <ChevronRightIcon size={24} />
+          </button>
+        </div>
+      </div>,
+      document.body,
+    );
+  }
+
+  if (isActivitySlide && slide.activityTemplate) {
+    return createPortal(
+      <div
+        className={`slideshow-overlay slideshow-overlay-section slideshow-overlay-activity ${
+          controlsVisible ? "is-controls-visible" : ""
+        }`}
+        role="dialog"
+        aria-modal="true"
+        aria-label="활동 템플릿 슬라이드"
+        onPointerMove={revealControls}
+        onPointerDown={revealControls}
+        onFocusCapture={revealControls}
+      >
+        <div className="slideshow-topbar">
+          <div className="slideshow-meta">
+            <span className="slideshow-meta-app">Aura Board</span>
+            <span className="slideshow-meta-sep" aria-hidden="true">·</span>
+            <span className="slideshow-meta-author">
+              {slide.sectionTitle ?? "섹션"}
+            </span>
+            <span className="slideshow-meta-sep" aria-hidden="true">·</span>
+            <span className="slideshow-meta-author">
+              {STREAM_ACTIVITY_TEMPLATE_LABELS[slide.activityTemplate]}
+            </span>
+          </div>
+          <div className="slideshow-topbar-right">
+            <span className="slideshow-position" aria-live="polite">
+              {safeIndex + 1} / {total}
+            </span>
+            <button
+              type="button"
+              className="ui-icon-action slideshow-close"
+              onClick={onClose}
+              aria-label="슬라이드쇼 닫기"
+            >
+              <CloseIcon size={18} />
+            </button>
+          </div>
+        </div>
+        <div className="slideshow-activity-stage">
+          <StreamActivityTemplatePanel
+            template={slide.activityTemplate}
+            sectionId={slide.sectionId ?? ""}
+            cards={slide.cards ?? []}
+            canEdit={false}
+            onCreateCard={async () => {}}
+          />
         </div>
         <div className="slideshow-controls">
           <button

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import type { Map as MapLibreMap, Marker as MapLibreMarker } from "maplibre-gl";
 import type { CardData } from "../DraggableCard";
 import type { StreamActivityTemplate } from "@/lib/stream-activity-templates";
@@ -10,6 +10,7 @@ type Props = {
   sectionId: string;
   cards: CardData[];
   canEdit: boolean;
+  onCreateCard: (data: { title: string; content: string }) => Promise<void>;
 };
 
 type MapPlace = {
@@ -35,10 +36,35 @@ export function StreamActivityTemplatePanel({
   sectionId,
   cards,
   canEdit,
+  onCreateCard,
 }: Props) {
-  if (template === "window_opening") return <WindowOpeningPanel cards={cards} />;
-  if (template === "word_cloud") return <WordCloudPanel cards={cards} />;
-  if (template === "timeline") return <TimelinePanel cards={cards} />;
+  if (template === "window_opening") {
+    return (
+      <WindowOpeningPanel
+        cards={cards}
+        canEdit={canEdit}
+        onCreateCard={onCreateCard}
+      />
+    );
+  }
+  if (template === "word_cloud") {
+    return (
+      <WordCloudPanel
+        cards={cards}
+        canEdit={canEdit}
+        onCreateCard={onCreateCard}
+      />
+    );
+  }
+  if (template === "timeline") {
+    return (
+      <TimelinePanel
+        cards={cards}
+        canEdit={canEdit}
+        onCreateCard={onCreateCard}
+      />
+    );
+  }
   return <MapActivityPanel sectionId={sectionId} canEdit={canEdit} />;
 }
 
@@ -54,7 +80,15 @@ const WINDOW_OPENING_CELLS = [
   "추가 의견",
 ] as const;
 
-function WindowOpeningPanel({ cards }: { cards: CardData[] }) {
+function WindowOpeningPanel({
+  cards,
+  canEdit,
+  onCreateCard,
+}: {
+  cards: CardData[];
+  canEdit: boolean;
+  onCreateCard: (data: { title: string; content: string }) => Promise<void>;
+}) {
   const groupedCards = useMemo(() => groupWindowOpeningCards(cards), [cards]);
 
   return (
@@ -71,11 +105,17 @@ function WindowOpeningPanel({ cards }: { cards: CardData[] }) {
               <div className="stream-window-note-stack">
                 {cellCards.map((card) => (
                   <article key={card.id} className="stream-window-note">
-                    {card.title && <strong>{card.title}</strong>}
+                    {card.title && card.title !== label && <strong>{card.title}</strong>}
                     <p>{card.content}</p>
                   </article>
                 ))}
               </div>
+              {canEdit && (
+                <WindowCellComposer
+                  label={label}
+                  onCreateCard={onCreateCard}
+                />
+              )}
             </div>
           );
         })}
@@ -84,46 +124,183 @@ function WindowOpeningPanel({ cards }: { cards: CardData[] }) {
   );
 }
 
-function WordCloudPanel({ cards }: { cards: CardData[] }) {
+function WordCloudPanel({
+  cards,
+  canEdit,
+  onCreateCard,
+}: {
+  cards: CardData[];
+  canEdit: boolean;
+  onCreateCard: (data: { title: string; content: string }) => Promise<void>;
+}) {
   const words = useMemo(() => buildWordCloud(cards), [cards]);
   return (
     <div className="stream-activity-panel stream-word-panel">
-      {words.length === 0 ? (
-        <p className="stream-activity-muted">게시글 없음</p>
-      ) : (
-        <div className="stream-word-cloud" aria-label="워드클라우드">
-          {words.map((word) => (
-            <span
-              key={word.text}
-              style={{ fontSize: `${14 + word.weight * 4}px` }}
-              title={`${word.count}회`}
-            >
-              {word.text}
-            </span>
-          ))}
-        </div>
+      <div className="stream-word-stage">
+        {words.length === 0 ? (
+          <p className="stream-activity-muted">게시글 없음</p>
+        ) : (
+          <div className="stream-word-cloud" aria-label="워드클라우드">
+            {words.map((word) => (
+              <span
+                key={word.text}
+                style={{ fontSize: `${14 + word.weight * 4}px` }}
+                title={`${word.count}회`}
+              >
+                {word.text}
+              </span>
+            ))}
+          </div>
+        )}
+      </div>
+      {canEdit && (
+        <QuickTextForm
+          className="stream-word-input"
+          placeholder="단어 또는 문장"
+          submitLabel="추가"
+          onSubmit={(content) => onCreateCard({ title: "", content })}
+        />
       )}
     </div>
   );
 }
 
-function TimelinePanel({ cards }: { cards: CardData[] }) {
+function TimelinePanel({
+  cards,
+  canEdit,
+  onCreateCard,
+}: {
+  cards: CardData[];
+  canEdit: boolean;
+  onCreateCard: (data: { title: string; content: string }) => Promise<void>;
+}) {
   const items = useMemo(() => buildTimeline(cards), [cards]);
   return (
     <div className="stream-activity-panel stream-timeline-panel">
-      {items.length === 0 ? (
-        <p className="stream-activity-muted">게시글 없음</p>
-      ) : (
-        <ol className="stream-timeline-list">
-          {items.map((item) => (
-            <li key={`${item.card.id}:${item.dateText}`}>
-              <time>{item.dateText}</time>
-              <span>{item.card.title || item.card.content.slice(0, 48)}</span>
-            </li>
-          ))}
-        </ol>
+      <div className="stream-timeline-stage">
+        {items.length === 0 ? (
+          <p className="stream-activity-muted">게시글 없음</p>
+        ) : (
+          <ol className="stream-timeline-list">
+            {items.map((item) => (
+              <li key={`${item.card.id}:${item.dateText}`}>
+                <time>{item.dateText}</time>
+                <span>{item.card.title || item.card.content.slice(0, 48)}</span>
+              </li>
+            ))}
+          </ol>
+        )}
+      </div>
+      {canEdit && (
+        <TimelineEntryForm onCreateCard={onCreateCard} />
       )}
     </div>
+  );
+}
+
+function WindowCellComposer({
+  label,
+  onCreateCard,
+}: {
+  label: (typeof WINDOW_OPENING_CELLS)[number];
+  onCreateCard: (data: { title: string; content: string }) => Promise<void>;
+}) {
+  return (
+    <QuickTextForm
+      className="stream-window-cell-input"
+      placeholder="입력"
+      submitLabel="등록"
+      onSubmit={(content) => onCreateCard({ title: label, content })}
+    />
+  );
+}
+
+function TimelineEntryForm({
+  onCreateCard,
+}: {
+  onCreateCard: (data: { title: string; content: string }) => Promise<void>;
+}) {
+  const [date, setDate] = useState("");
+  const [content, setContent] = useState("");
+  const [busy, setBusy] = useState(false);
+  const trimmed = content.trim();
+
+  async function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!date || !trimmed || busy) return;
+    setBusy(true);
+    try {
+      await onCreateCard({ title: trimmed, content: date });
+      setContent("");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <form className="stream-timeline-input" onSubmit={submit}>
+      <input
+        type="date"
+        value={date}
+        onChange={(event) => setDate(event.target.value)}
+        disabled={busy}
+        aria-label="날짜"
+      />
+      <input
+        type="text"
+        value={content}
+        onChange={(event) => setContent(event.target.value)}
+        placeholder="내용"
+        disabled={busy}
+        aria-label="연표 내용"
+      />
+      <button type="submit" disabled={!date || !trimmed || busy}>
+        추가
+      </button>
+    </form>
+  );
+}
+
+function QuickTextForm({
+  className,
+  placeholder,
+  submitLabel,
+  onSubmit,
+}: {
+  className: string;
+  placeholder: string;
+  submitLabel: string;
+  onSubmit: (content: string) => Promise<void>;
+}) {
+  const [content, setContent] = useState("");
+  const [busy, setBusy] = useState(false);
+  const trimmed = content.trim();
+
+  async function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!trimmed || busy) return;
+    setBusy(true);
+    try {
+      await onSubmit(trimmed);
+      setContent("");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <form className={className} onSubmit={submit}>
+      <input
+        type="text"
+        value={content}
+        onChange={(event) => setContent(event.target.value)}
+        placeholder={placeholder}
+        disabled={busy}
+      />
+      <button type="submit" disabled={!trimmed || busy}>
+        {submitLabel}
+      </button>
+    </form>
   );
 }
 
