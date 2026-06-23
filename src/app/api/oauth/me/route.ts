@@ -13,7 +13,9 @@ function safeTokenPrefix(token: string): string {
 }
 
 export async function GET(req: Request) {
-  const auth = req.headers.get("authorization");
+  const auth =
+    req.headers.get("authorization") ??
+    req.headers.get("x-aura-board-authorization");
   if (!auth?.startsWith("Bearer ")) {
     console.warn("[oauth/me] missing bearer");
     return NextResponse.json(
@@ -51,6 +53,7 @@ export async function GET(req: Request) {
     return NextResponse.json({ error: "user_not_found" }, { status: 404 });
   }
   return NextResponse.json({
+    auraboardTeacherId: user.id,
     teacherId: user.id,
     email: user.email,
     name: user.name,
