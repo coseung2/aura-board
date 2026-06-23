@@ -36,30 +36,49 @@ export function StreamActivityTemplatePanel({
   cards,
   canEdit,
 }: Props) {
-  if (template === "window_opening") return <WindowOpeningPanel />;
+  if (template === "window_opening") return <WindowOpeningPanel cards={cards} />;
   if (template === "word_cloud") return <WordCloudPanel cards={cards} />;
   if (template === "timeline") return <TimelinePanel cards={cards} />;
   return <MapActivityPanel sectionId={sectionId} canEdit={canEdit} />;
 }
 
-function WindowOpeningPanel() {
+const WINDOW_OPENING_CELLS = [
+  "내 생각",
+  "친구 생각",
+  "질문",
+  "근거",
+  "모둠 합의",
+  "새 관점",
+  "해결책",
+  "정리",
+  "추가 의견",
+] as const;
+
+function WindowOpeningPanel({ cards }: { cards: CardData[] }) {
+  const groupedCards = useMemo(() => groupWindowOpeningCards(cards), [cards]);
+
   return (
     <div className="stream-activity-panel stream-window-panel">
-      <div className="stream-window-board" aria-hidden="true">
-        <div>내 생각</div>
-        <div>친구 생각</div>
-        <div>질문</div>
-        <div className="stream-window-center">모둠 합의</div>
-        <div>근거</div>
-        <div>새 관점</div>
-        <div>해결책</div>
-        <div>정리</div>
-      </div>
-      <div className="stream-activity-copy">
-        <strong>창문 열기</strong>
-        <span>
-          각자 바깥 칸에 생각을 남기고, 가운데에는 모둠이 합의한 의견을 정리하세요.
-        </span>
+      <div className="stream-window-board">
+        {WINDOW_OPENING_CELLS.map((label) => {
+          const cellCards = groupedCards[label] ?? [];
+          return (
+            <div
+              key={label}
+              className={label === "모둠 합의" ? "stream-window-center" : undefined}
+            >
+              <span className="stream-window-cell-label">{label}</span>
+              <div className="stream-window-note-stack">
+                {cellCards.map((card) => (
+                  <article key={card.id} className="stream-window-note">
+                    {card.title && <strong>{card.title}</strong>}
+                    <p>{card.content}</p>
+                  </article>
+                ))}
+              </div>
+            </div>
+          );
+        })}
       </div>
     </div>
   );
@@ -70,7 +89,7 @@ function WordCloudPanel({ cards }: { cards: CardData[] }) {
   return (
     <div className="stream-activity-panel stream-word-panel">
       {words.length === 0 ? (
-        <p className="stream-activity-muted">게시글이 쌓이면 핵심 단어가 여기에 모입니다.</p>
+        <p className="stream-activity-muted">게시글 없음</p>
       ) : (
         <div className="stream-word-cloud" aria-label="워드클라우드">
           {words.map((word) => (
@@ -93,9 +112,7 @@ function TimelinePanel({ cards }: { cards: CardData[] }) {
   return (
     <div className="stream-activity-panel stream-timeline-panel">
       {items.length === 0 ? (
-        <p className="stream-activity-muted">
-          카드에 날짜를 적으면 연표 순서로 모아 보여줍니다. 예: 2026-06-23, 6월 23일
-        </p>
+        <p className="stream-activity-muted">게시글 없음</p>
       ) : (
         <ol className="stream-timeline-list">
           {items.map((item) => (
@@ -386,15 +403,30 @@ function MapActivityPanel({ sectionId, canEdit }: { sectionId: string; canEdit: 
           />
         )}
         {places.length === 0 && (
-          <p className="stream-activity-muted">
-            {canEdit
-              ? "지도 위를 눌러 여행 장소를 추가하세요."
-              : "아직 추가된 여행 장소가 없어요."}
-          </p>
+          <p className="stream-activity-muted">핀 없음</p>
         )}
       </div>
     </div>
   );
+}
+
+function groupWindowOpeningCards(cards: CardData[]) {
+  const groups: Partial<Record<(typeof WINDOW_OPENING_CELLS)[number], CardData[]>> = {};
+  const outerCells = WINDOW_OPENING_CELLS.filter((label) => label !== "모둠 합의");
+  let outerIndex = 0;
+
+  for (const card of cards) {
+    const text = `${card.title} ${card.content}`;
+    const label = WINDOW_OPENING_CELLS.find((cell) => text.includes(cell));
+    const target =
+      label ??
+      (/(합의|결론|공통|모둠)/.test(text)
+        ? "모둠 합의"
+        : outerCells[outerIndex++ % outerCells.length]);
+    groups[target] = [...(groups[target] ?? []), card];
+  }
+
+  return groups;
 }
 
 function MapPlaceEditor({

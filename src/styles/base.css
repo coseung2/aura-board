@@ -226,6 +226,37 @@ button {
   color: var(--color-text);
 }
 
+.ui-icon-action-soft {
+  --ui-icon-action-size: 32px;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: var(--color-surface);
+  color: var(--color-text-muted);
+  transition:
+    background 120ms ease,
+    border-color 120ms ease,
+    color 120ms ease,
+    opacity 120ms ease,
+    transform 120ms ease;
+}
+
+.ui-icon-action-soft:hover,
+.ui-icon-action-soft:focus-visible {
+  border-color: var(--color-border-hover);
+  background: var(--color-surface-alt);
+  color: var(--color-text);
+}
+
+.ui-icon-action-accent {
+  color: var(--color-accent);
+}
+
+.ui-icon-action-danger:hover,
+.ui-icon-action-danger:focus-visible {
+  border-color: var(--color-danger);
+  color: var(--color-danger);
+}
+
 .ui-icon-action:focus-visible {
   outline: 2px solid currentColor;
   outline-offset: 3px;

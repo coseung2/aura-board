@@ -36,6 +36,8 @@ const READY_LAYOUT_IDS = new Set<LayoutKey>([
   "plant-roadmap",
 ]);
 
+const UNLOCKED_DEV_LAYOUT_IDS = new Set<LayoutKey>(["stream"]);
+
 const LAYOUTS = PICKER_ROWS.map((row) => ({
   id: row.id,
   emoji: LAYOUT_META[row.id].emoji,
@@ -44,12 +46,13 @@ const LAYOUTS = PICKER_ROWS.map((row) => ({
     : `${LAYOUT_META[row.id].label} (개발중)`,
   desc: row.desc,
   ready: READY_LAYOUT_IDS.has(row.id),
+  selectable: READY_LAYOUT_IDS.has(row.id) || UNLOCKED_DEV_LAYOUT_IDS.has(row.id),
   thumbnail: layoutThumbnail(row.id),
   hidden: row.hidden,
 }));
 
 const VISIBLE_LAYOUTS = LAYOUTS.filter((layout) => !layout.hidden).sort(
-  (a, b) => Number(b.ready) - Number(a.ready)
+  (a, b) => Number(b.selectable) - Number(a.selectable)
 );
 
 type ClassroomItem = {
@@ -112,7 +115,10 @@ export function CreateBoardModal({
   }
 
   function handleSelect(layoutId: LayoutKey) {
-    if (!READY_LAYOUT_IDS.has(layoutId)) {
+    if (
+      !READY_LAYOUT_IDS.has(layoutId) &&
+      !UNLOCKED_DEV_LAYOUT_IDS.has(layoutId)
+    ) {
       return;
     }
 
@@ -176,7 +182,7 @@ export function CreateBoardModal({
                       layout.ready ? "" : " layout-grid-option-dev"
                     }`}
                     onClick={() => handleSelect(layout.id)}
-                    disabled={busy || !layout.ready}
+                    disabled={busy || !layout.selectable}
                   >
                     <span className="layout-grid-option-preview">
                       {layout.thumbnail ? (

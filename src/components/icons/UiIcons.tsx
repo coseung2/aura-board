@@ -70,6 +70,37 @@ export function DownloadIcon({ size = 20, className }: IconProps) {
   );
 }
 
+export function PencilIcon({ size = 20, className }: IconProps) {
+  return (
+    <svg {...base(size)} className={className} aria-hidden="true">
+      <path d="M12 20h9" />
+      <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z" />
+    </svg>
+  );
+}
+
+export function TrashIcon({ size = 20, className }: IconProps) {
+  return (
+    <svg {...base(size)} className={className} aria-hidden="true">
+      <path d="M3 6h18" />
+      <path d="M8 6V4h8v2" />
+      <path d="M19 6l-1 14H6L5 6" />
+      <path d="M10 11v5" />
+      <path d="M14 11v5" />
+    </svg>
+  );
+}
+
+export function TemplateIcon({ size = 20, className }: IconProps) {
+  return (
+    <svg {...base(size)} className={className} aria-hidden="true">
+      <rect x="4" y="4" width="16" height="16" rx="2" />
+      <path d="M4 10h16" />
+      <path d="M10 10v10" />
+    </svg>
+  );
+}
+
 export function FullscreenEnterIcon({ size = 20, className }: IconProps) {
   return (
     <svg {...base(size)} className={className} aria-hidden="true">
