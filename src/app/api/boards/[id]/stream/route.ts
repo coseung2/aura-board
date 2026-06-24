@@ -236,7 +236,18 @@ export async function GET(
             db.sectionBreakoutGroup.findMany({
               where: { section: { boardId } },
               orderBy: { order: "asc" },
-              include: { _count: { select: { members: true } } },
+              include: {
+                _count: { select: { members: true } },
+                members: {
+                  orderBy: [
+                    { student: { number: "asc" } },
+                    { student: { name: "asc" } },
+                  ],
+                  include: {
+                    student: { select: { id: true, name: true, number: true } },
+                  },
+                },
+              },
             }),
           ]);
 
@@ -419,6 +430,11 @@ type SectionBreakoutGroupRow = {
   name: string;
   order: number;
   _count: { members: number };
+  members: {
+    id: string;
+    studentId: string;
+    student: { id: string; name: string; number: number | null };
+  }[];
 };
 
 function buildSectionBreakoutSnapshot(
@@ -439,6 +455,12 @@ function buildSectionBreakoutSnapshot(
     name: g.name,
     order: g.order,
     memberCount: g._count.members,
+    members: g.members.map((member) => ({
+      id: member.id,
+      studentId: member.studentId,
+      studentName: member.student.name,
+      studentNumber: member.student.number,
+    })),
   }));
   return {
     groupCount: cfg.groupCount,

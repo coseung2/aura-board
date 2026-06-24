@@ -261,7 +261,18 @@ export async function loadSnapshot(
     db.sectionBreakoutGroup.findMany({
       where: { sectionId },
       orderBy: { order: "asc" },
-      include: { _count: { select: { members: true } } },
+      include: {
+        _count: { select: { members: true } },
+        members: {
+          orderBy: [
+            { student: { number: "asc" } },
+            { student: { name: "asc" } },
+          ],
+          include: {
+            student: { select: { id: true, name: true, number: true } },
+          },
+        },
+      },
     }),
     opts.studentId
       ? db.sectionBreakoutMembership.findUnique({
@@ -277,6 +288,12 @@ export async function loadSnapshot(
     name: g.name,
     order: g.order,
     memberCount: g._count.members,
+    members: g.members.map((member) => ({
+      id: member.id,
+      studentId: member.studentId,
+      studentName: member.student.name,
+      studentNumber: member.student.number,
+    })),
   }));
 
   const configWire: SectionBreakoutConfigWire | null = config

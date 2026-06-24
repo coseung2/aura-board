@@ -5265,6 +5265,14 @@
   border-bottom: 0;
 }
 
+.stream-breakout-group-title-row {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
 .stream-breakout-group-area-name {
   font-family: var(--font-display);
   font-size: 15px;
@@ -5277,6 +5285,53 @@
   font-size: 12px;
   font-weight: 700;
   color: var(--color-text-muted);
+}
+
+.stream-breakout-member-list {
+  display: inline-flex;
+  min-width: 0;
+  align-items: center;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.stream-breakout-member-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 24px;
+  padding: 3px 6px 3px 8px;
+  border-radius: var(--radius-pill);
+  background: var(--color-surface-alt);
+  color: var(--color-text-muted);
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1.2;
+}
+
+.stream-breakout-member-chip button {
+  display: inline-grid;
+  width: 18px;
+  height: 18px;
+  place-items: center;
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--color-text-muted);
+  font: inherit;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.stream-breakout-member-chip button:hover:not(:disabled),
+.stream-breakout-member-chip button:focus-visible {
+  background: color-mix(in srgb, var(--color-danger) 10%, transparent);
+  color: var(--color-danger);
+}
+
+.stream-breakout-member-chip button:disabled {
+  cursor: wait;
+  opacity: 0.45;
 }
 
 .stream-breakout-my-group {

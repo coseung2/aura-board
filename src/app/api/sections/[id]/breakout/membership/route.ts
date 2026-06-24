@@ -10,8 +10,14 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { db } from "@/lib/db";
+import { getCurrentUser } from "@/lib/auth";
 import { getCurrentStudent } from "@/lib/student-auth";
-import { getEffectiveBoardRole, ForbiddenError } from "@/lib/rbac";
+import {
+  getEffectiveBoardRole,
+  requirePermission,
+  ForbiddenError,
+} from "@/lib/rbac";
+import { touchBoardUpdatedAt } from "@/lib/board-touch";
 import { loadSnapshot } from "../route";
 
 const Body = z.object({
@@ -125,6 +131,77 @@ export async function POST(
       return NextResponse.json({ error: e.message }, { status: 403 });
     }
     console.error("[POST section breakout membership]", e);
+    return NextResponse.json({ error: "internal" }, { status: 500 });
+  }
+}
+
+export async function DELETE(
+  req: Request,
+  ctx: { params: Promise<{ id: string }> }
+) {
+  try {
+    const { id: sectionId } = await ctx.params;
+    const user = await getCurrentUser().catch(() => null);
+    if (!user) {
+      return NextResponse.json({ error: "teacher_only" }, { status: 403 });
+    }
+
+    const section = await db.section.findUnique({
+      where: { id: sectionId },
+      select: { id: true, boardId: true },
+    });
+    if (!section) {
+      return NextResponse.json({ error: "not_found" }, { status: 404 });
+    }
+
+    try {
+      await requirePermission(section.boardId, user.id, "edit");
+    } catch (e) {
+      if (e instanceof ForbiddenError) {
+        return NextResponse.json({ error: e.message }, { status: 403 });
+      }
+      throw e;
+    }
+
+    const body = await req.json().catch(() => ({}));
+    const membershipId =
+      typeof body.membershipId === "string" ? body.membershipId : null;
+    if (!membershipId) {
+      return NextResponse.json({ error: "membershipId_required" }, { status: 400 });
+    }
+
+    const membership = await db.sectionBreakoutMembership.findUnique({
+      where: { id: membershipId },
+      select: { id: true, sectionId: true, groupId: true, studentId: true },
+    });
+    if (!membership || membership.sectionId !== sectionId) {
+      return NextResponse.json({ error: "membership_not_found" }, { status: 404 });
+    }
+
+    await db.$transaction(async (tx) => {
+      await tx.sectionBreakoutMembership.delete({ where: { id: membership.id } });
+      await tx.card.updateMany({
+        where: {
+          sectionId,
+          studentAuthorId: membership.studentId,
+          groupId: membership.groupId,
+        },
+        data: { groupId: null },
+      });
+    });
+
+    await touchBoardUpdatedAt(section.boardId);
+
+    const snapshot = await loadSnapshot(sectionId, {
+      callerRole: "owner",
+      studentId: null,
+    });
+    return NextResponse.json(snapshot);
+  } catch (e) {
+    if (e instanceof ForbiddenError) {
+      return NextResponse.json({ error: e.message }, { status: 403 });
+    }
+    console.error("[DELETE section breakout membership]", e);
     return NextResponse.json({ error: "internal" }, { status: 500 });
   }
 }

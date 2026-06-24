@@ -51,6 +51,14 @@ export type BreakoutGroup = {
   name: string;
   order: number;
   memberCount: number;
+  members?: BreakoutGroupMember[];
+};
+
+export type BreakoutGroupMember = {
+  id: string;
+  studentId: string;
+  studentName: string;
+  studentNumber: number | null;
 };
 
 export type BreakoutConfig = {
@@ -758,6 +766,56 @@ export function StreamBoard({
     setComposerOpen(true);
   }
 
+  async function handleRemoveBreakoutMember(
+    sectionId: string,
+    membershipId: string,
+  ): Promise<boolean> {
+    const prevState = breakoutBySection[sectionId];
+    if (!prevState) return false;
+    setBreakoutBusyId(sectionId);
+    try {
+      const res = await fetch(`/api/sections/${sectionId}/breakout/membership`, {
+        method: "DELETE",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ membershipId }),
+      });
+      if (!res.ok) {
+        alert("모둠원 내보내기에 실패했어요.");
+        return false;
+      }
+      const data = normalizeBreakoutStateForViewer(
+        (await res.json()) as BreakoutState,
+        !!isStudentViewer,
+      );
+      const removedMember = prevState.groups
+        .flatMap((group) =>
+          (group.members ?? []).map((member) => ({
+            ...member,
+            groupId: group.id,
+          })),
+        )
+        .find((member) => member.id === membershipId);
+      setBreakoutBySection((prev) => ({ ...prev, [sectionId]: data }));
+      if (removedMember) {
+        setCards((prev) =>
+          prev.map((card) =>
+            card.sectionId === sectionId &&
+            card.studentAuthorId === removedMember.studentId &&
+            card.groupId === removedMember.groupId
+              ? { ...card, groupId: null }
+              : card,
+          ),
+        );
+      }
+      return true;
+    } catch {
+      alert("모둠원 내보내기에 실패했어요.");
+      return false;
+    } finally {
+      setBreakoutBusyId(null);
+    }
+  }
+
   function closeComposer() {
     setComposerOpen(false);
     setComposerSectionId(null);
@@ -810,6 +868,7 @@ export function StreamBoard({
               setActiveGroupBySection((prev) => ({ ...prev, [sectionId]: group }))
             }
             onJoinBreakout={handleJoinBreakout}
+            onRemoveBreakoutMember={handleRemoveBreakoutMember}
             onDeleteCard={handleDelete}
           />
         ) : (
@@ -999,6 +1058,10 @@ type StreamGroupedFeedProps = {
   breakoutBusyId: string | null;
   onSetActiveGroup: (sectionId: string, group: string) => void;
   onJoinBreakout: (sectionId: string, groupId: string) => Promise<boolean>;
+  onRemoveBreakoutMember: (
+    sectionId: string,
+    membershipId: string,
+  ) => Promise<boolean>;
   onDeleteCard: (card: CardData) => void;
 };
 
@@ -1035,6 +1098,7 @@ function StreamGroupedFeed({
   breakoutBusyId,
   onSetActiveGroup,
   onJoinBreakout,
+  onRemoveBreakoutMember,
   onDeleteCard,
 }: StreamGroupedFeedProps) {
   return (
@@ -1194,29 +1258,32 @@ function StreamGroupedFeed({
                 </button>
               </div>
             )}
-           {hasBreakout && breakout ? (
-             <StreamBreakoutBody
-               section={section}
-               bucket={bucket}
-               state={breakout}
-               activeGroup={activeGroupBySection[section.id] ?? "all"}
-               busy={breakoutBusyId === section.id}
-               boardId={boardId}
-               canAddPost={canAddPost}
-               currentUserId={currentUserId}
-              currentRole={currentRole}
-              onSetActiveGroup={(group) => onSetActiveGroup(section.id, group)}
-               onJoin={(groupId) => onJoinBreakout(section.id, groupId)}
-               onCreateCard={(data, groupId) =>
-                 onCreateSectionCard(section.id, data, groupId)
-               }
-               onSectionActivityStateChange={onSectionActivityStateChange}
-               onDeleteCard={onDeleteCard}
-             />
-           ) : contentItems.length === 0 ? (
-             <div className="stream-section-empty">아직 게시글이 없어요.</div>
-           ) : (
-             contentItems.map((item, itemIndex) => (
+            {hasBreakout && breakout ? (
+              <StreamBreakoutBody
+                section={section}
+                bucket={bucket}
+                state={breakout}
+                activeGroup={activeGroupBySection[section.id] ?? "all"}
+                busy={breakoutBusyId === section.id}
+                boardId={boardId}
+                canAddPost={canAddPost}
+                currentUserId={currentUserId}
+                currentRole={currentRole}
+                onSetActiveGroup={(group) => onSetActiveGroup(section.id, group)}
+                onJoin={(groupId) => onJoinBreakout(section.id, groupId)}
+                onRemoveMember={(membershipId) =>
+                  onRemoveBreakoutMember(section.id, membershipId)
+                }
+                onCreateCard={(data, groupId) =>
+                  onCreateSectionCard(section.id, data, groupId)
+                }
+                onSectionActivityStateChange={onSectionActivityStateChange}
+                onDeleteCard={onDeleteCard}
+              />
+            ) : contentItems.length === 0 ? (
+              <div className="stream-section-empty">아직 게시글이 없어요.</div>
+            ) : (
+              contentItems.map((item, itemIndex) => (
                <StreamSectionContentItem
                  key={item.id}
                  item={item}
@@ -1609,6 +1676,12 @@ function canDeleteCard(
   return card.studentAuthorId === currentUserId;
 }
 
+function formatBreakoutMemberName(member: BreakoutGroupMember): string {
+  return member.studentNumber != null
+    ? `${member.studentNumber}번 ${member.studentName}`
+    : member.studentName;
+}
+
 type StreamBreakoutBodyProps = {
   section: StreamSection;
   bucket: CardData[];
@@ -1621,6 +1694,7 @@ type StreamBreakoutBodyProps = {
   currentRole: "owner" | "editor" | "viewer";
   onSetActiveGroup: (group: string) => void;
   onJoin: (groupId: string) => Promise<boolean>;
+  onRemoveMember: (membershipId: string) => Promise<boolean>;
   onCreateCard: (
     data: { title: string; content: string },
     groupId: string | null,
@@ -1644,6 +1718,7 @@ function StreamBreakoutBody({
   currentRole,
   onSetActiveGroup,
   onJoin,
+  onRemoveMember,
   onCreateCard,
   onSectionActivityStateChange,
   onDeleteCard,
@@ -1659,14 +1734,35 @@ function StreamBreakoutBody({
     return (
       <div className="stream-breakout-group-area" key={group?.id ?? "__unassigned"}>
         <div className="stream-breakout-group-area-head">
-          <span className="stream-breakout-group-area-name">
-            {group?.name ?? "미지정"}
-          </span>
-          {group && (
-            <span className="stream-breakout-group-area-count">
-              {group.memberCount}명
+          <div className="stream-breakout-group-title-row">
+            <span className="stream-breakout-group-area-name">
+              {group?.name ?? "미지정"}
             </span>
-          )}
+            {group && (
+              <span className="stream-breakout-group-area-count">
+                {group.memberCount}명
+              </span>
+            )}
+            {group && group.members && group.members.length > 0 && (
+              <div className="stream-breakout-member-list" aria-label={`${group.name} 학생`}>
+                {group.members.map((member) => (
+                  <span className="stream-breakout-member-chip" key={member.id}>
+                    <span>{formatBreakoutMemberName(member)}</span>
+                    {state.canManage && (
+                      <button
+                        type="button"
+                        aria-label={`${member.studentName} 모둠에서 내보내기`}
+                        onClick={() => void onRemoveMember(member.id)}
+                        disabled={busy}
+                      >
+                        ×
+                      </button>
+                    )}
+                  </span>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
         {section.activityTemplate && (
           <StreamActivityTemplatePanel
@@ -1827,7 +1923,7 @@ function StreamBreakoutBody({
             className={activeGroup === group.id ? "is-active" : ""}
             onClick={() => onSetActiveGroup(group.id)}
           >
-            {group.name} · {group.memberCount}
+            {group.name}
           </button>
         ))}
       </div>

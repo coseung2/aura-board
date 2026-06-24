@@ -165,7 +165,18 @@ export async function GET(
       db.sectionBreakoutGroup.findMany({
         where: { section: { boardId: board.id } },
         orderBy: { order: "asc" },
-        include: { _count: { select: { members: true } } },
+        include: {
+          _count: { select: { members: true } },
+          members: {
+            orderBy: [
+              { student: { number: "asc" } },
+              { student: { name: "asc" } },
+            ],
+            include: {
+              student: { select: { id: true, name: true, number: true } },
+            },
+          },
+        },
       }),
       board.layout === "question-board"
         ? db.boardResponse.findMany({
@@ -318,6 +329,11 @@ type SectionBreakoutGroupRow = {
   name: string;
   order: number;
   _count: { members: number };
+  members: {
+    id: string;
+    studentId: string;
+    student: { id: string; name: string; number: number | null };
+  }[];
 };
 
 function buildSectionBreakoutSnapshot(
@@ -337,6 +353,12 @@ function buildSectionBreakoutSnapshot(
       name: group.name,
       order: group.order,
       memberCount: group._count.members,
+      members: group.members.map((member) => ({
+        id: member.id,
+        studentId: member.studentId,
+        studentName: member.student.name,
+        studentNumber: member.student.number,
+      })),
     })),
   };
 }

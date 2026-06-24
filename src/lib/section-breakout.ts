@@ -31,6 +31,14 @@ export type SectionBreakoutGroupWire = {
   name: string;
   order: number;
   memberCount: number;
+  members: SectionBreakoutGroupMemberWire[];
+};
+
+export type SectionBreakoutGroupMemberWire = {
+  id: string;
+  studentId: string;
+  studentName: string;
+  studentNumber: number | null;
 };
 
 export type SectionBreakoutMembershipWire = {
