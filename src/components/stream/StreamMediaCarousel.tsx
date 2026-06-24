@@ -2,12 +2,13 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { isYouTubeLink } from "@/lib/card-content-policy";
+import { buildCanvaEmbedSrc } from "@/lib/canva";
 import { extractVideoId } from "@/lib/youtube";
 import type { CardData } from "../DraggableCard";
 
 type MediaItem = {
   id: string;
-  kind: "image" | "video" | "youtube";
+  kind: "image" | "video" | "youtube" | "canva";
   url: string;
   previewUrl?: string | null;
   alt: string;
@@ -42,7 +43,7 @@ export function StreamMediaCarousel({ card }: Props) {
           <figure className="stream-media-slide" key={item.id}>
             {item.kind === "image" ? (
               <img src={item.url} alt={item.alt} loading="lazy" decoding="async" />
-            ) : item.kind === "youtube" ? (
+            ) : item.kind === "youtube" || item.kind === "canva" ? (
               <iframe
                 src={item.url}
                 title={item.alt}
@@ -128,6 +129,19 @@ function buildMediaItems(card: CardData): MediaItem[] {
         url: `https://www.youtube.com/embed/${linkedYouTubeId}`,
         previewUrl: card.linkImage,
         alt: card.linkTitle ?? card.title ?? "YouTube",
+      },
+    ];
+  }
+
+  const linkedCanvaEmbedSrc = card.linkUrl ? buildCanvaEmbedSrc(card.linkUrl) : null;
+  if (linkedCanvaEmbedSrc) {
+    return [
+      {
+        id: `${card.id}-canva`,
+        kind: "canva",
+        url: linkedCanvaEmbedSrc,
+        previewUrl: card.linkImage,
+        alt: card.linkTitle ?? card.title ?? "Canva",
       },
     ];
   }

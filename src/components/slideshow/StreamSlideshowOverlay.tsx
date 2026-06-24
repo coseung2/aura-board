@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { formatRelativeTime } from "@/lib/card-engagement-format";
 import { isYouTubeLink } from "@/lib/card-content-policy";
+import { buildCanvaEmbedSrc } from "@/lib/canva";
 import { extractVideoId } from "@/lib/youtube";
 import type { CardData } from "../DraggableCard";
 import {
@@ -25,7 +26,7 @@ type Props = {
 
 type MediaItem = {
   id: string;
-  kind: "image" | "video" | "youtube";
+  kind: "image" | "video" | "youtube" | "canva";
   url: string;
   previewUrl?: string | null;
   alt: string;
@@ -308,6 +309,7 @@ export function StreamSlideshowOverlay({
   const hasContent = card.content.trim().length > 0;
   const linkUrl = card.linkUrl;
   const isYouTubeVideo = Boolean(linkUrl && extractVideoId(linkUrl));
+  const isCanvaMedia = activeMediaItem?.kind === "canva";
   const hasFiles = Boolean(card.fileUrl) || fileAttachments.length > 0;
   const displayTitle = resolveSlideshowTitle(card, resolvedYouTubeTitle);
 
@@ -365,7 +367,11 @@ export function StreamSlideshowOverlay({
         </div>
       </div>
 
-      <div className={`slideshow-stage${isYouTubeVideo ? " slideshow-stage--youtube" : ""}`}>
+      <div
+        className={`slideshow-stage${isYouTubeVideo ? " slideshow-stage--youtube" : ""}${
+          isCanvaMedia ? " slideshow-stage--canva" : ""
+        }`}
+      >
         <div className="slideshow-text">
           {!isYouTubeVideo && <h2 className="slideshow-title">{displayTitle}</h2>}
           {hasContent && <p className="slideshow-content">{card.content}</p>}
@@ -425,6 +431,8 @@ export function StreamSlideshowOverlay({
                 className={`slideshow-media-slide${
                   activeMediaItem.kind === "youtube"
                     ? " slideshow-media-slide--youtube"
+                    : activeMediaItem.kind === "canva"
+                      ? " slideshow-media-slide--canva"
                     : ""
                 }`}
               >
@@ -435,7 +443,7 @@ export function StreamSlideshowOverlay({
                     loading="lazy"
                     decoding="async"
                   />
-                ) : activeMediaItem.kind === "youtube" ? (
+                ) : activeMediaItem.kind === "youtube" || activeMediaItem.kind === "canva" ? (
                   <iframe
                     src={activeMediaItem.url}
                     title={activeMediaItem.alt}
@@ -578,6 +586,19 @@ function buildSlideshowMedia(card: CardData): MediaItem[] {
         url: `https://www.youtube.com/embed/${linkedYouTubeId}`,
         previewUrl: card.linkImage,
         alt: card.linkTitle ?? card.title ?? "YouTube",
+      },
+    ];
+  }
+
+  const linkedCanvaEmbedSrc = card.linkUrl ? buildCanvaEmbedSrc(card.linkUrl) : null;
+  if (linkedCanvaEmbedSrc) {
+    return [
+      {
+        id: `${card.id}-canva`,
+        kind: "canva",
+        url: linkedCanvaEmbedSrc,
+        previewUrl: card.linkImage,
+        alt: card.linkTitle ?? card.title ?? "Canva",
       },
     ];
   }

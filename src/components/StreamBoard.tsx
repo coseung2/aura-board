@@ -122,6 +122,7 @@ export function StreamBoard({
   );
   const [composerOpen, setComposerOpen] = useState(false);
   const [composerSectionId, setComposerSectionId] = useState<string | null>(null);
+  const [composerGroupId, setComposerGroupId] = useState<string | null>(null);
   const [mounted, setMounted] = useState(false);
   const [panelState, setPanelState] = useState<{
     sectionId: string;
@@ -356,11 +357,12 @@ export function StreamBoard({
 
   async function handleAdd(data: AddCardData, groupId?: string | null) {
     const sectionId = data.sectionId ?? null;
+    const effectiveGroupId = groupId === undefined ? composerGroupId : groupId;
     const siblingOrders = cards
       .filter(
         (card) =>
           (card.sectionId ?? null) === sectionId &&
-          (card.groupId ?? null) === (groupId ?? null),
+          (card.groupId ?? null) === (effectiveGroupId ?? null),
       )
       .map((card) => card.order);
     const nextOrder =
@@ -381,7 +383,7 @@ export function StreamBoard({
         y: 0,
         order: nextOrder,
         sectionId,
-        groupId: groupId ?? null,
+        groupId: effectiveGroupId ?? null,
       }),
     });
     if (!res.ok) {
@@ -1050,8 +1052,9 @@ export function StreamBoard({
   const showComposerSections =
     streamSectionsEnabled && sectionOptions.length > 0;
 
-  function openComposer(sectionId?: string | null) {
+  function openComposer(sectionId?: string | null, groupId?: string | null) {
     setComposerSectionId(sectionId ?? null);
+    setComposerGroupId(groupId ?? null);
     setComposerOpen(true);
   }
 
@@ -1108,6 +1111,7 @@ export function StreamBoard({
   function closeComposer() {
     setComposerOpen(false);
     setComposerSectionId(null);
+    setComposerGroupId(null);
   }
 
   return (
@@ -1379,7 +1383,7 @@ type StreamGroupedFeedProps = {
   onMoveSection: (sectionId: string, direction: "up" | "down") => Promise<void>;
   onOpenTemplateModal: (sectionId: string) => void;
   onOpenBreakoutModal: (sectionId: string) => void;
-  onOpenComposerForSection: (sectionId: string) => void;
+  onOpenComposerForSection: (sectionId: string, groupId?: string | null) => void;
   onSectionActivityStateChange: (
     sectionId: string,
     activityTemplateState: StreamActivityTemplateState | null,
@@ -1642,7 +1646,14 @@ function StreamGroupedFeed({
                 <button
                   type="button"
                   className="stream-section-post-btn"
-                  onClick={() => onOpenComposerForSection(section.id)}
+                  onClick={() =>
+                    onOpenComposerForSection(
+                      section.id,
+                      breakout?.config && !breakout.canManage
+                        ? breakout.membership?.groupId ?? null
+                        : null,
+                    )
+                  }
                 >
                   + 게시글 추가
                 </button>

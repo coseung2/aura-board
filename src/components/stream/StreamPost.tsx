@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { formatRelativeTime } from "@/lib/card-engagement-format";
+import { buildCanvaEmbedSrc } from "@/lib/canva";
 import { extractVideoId } from "@/lib/youtube";
 import { CardFileAttachment } from "../CardFileAttachment";
 import type { CardData } from "../DraggableCard";
@@ -39,7 +40,8 @@ export function StreamPost({
   const author = getStreamAuthor(card);
   const fileAttachments = (card.attachments ?? []).filter((item) => item.kind === "file");
   const isYouTubeVideo = Boolean(card.linkUrl && extractVideoId(card.linkUrl));
-  const isArticleLink = Boolean(card.linkUrl && !isYouTubeVideo);
+  const isCanvaDesign = Boolean(card.linkUrl && buildCanvaEmbedSrc(card.linkUrl));
+  const isArticleLink = Boolean(card.linkUrl && !isYouTubeVideo && !isCanvaDesign);
   const [resolvedYouTubeTitle, setResolvedYouTubeTitle] = useState<string | null>(null);
   const displayTitle =
     isYouTubeVideo && card.linkTitle?.trim()

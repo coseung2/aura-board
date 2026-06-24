@@ -6,7 +6,7 @@
  * so it can be executed with `npx tsx src/lib/__tests__/canva-embed.test.ts`.
  * When a test framework is adopted, the cases below should port cleanly.
  */
-import { isCanvaDesignUrl, extractCanvaDesignId } from "../canva";
+import { buildCanvaEmbedSrc, isCanvaDesignUrl, extractCanvaDesignId } from "../canva";
 
 type Row<TFn extends (arg: string) => unknown> = {
   name: string;
@@ -38,6 +38,24 @@ const extractCases: Row<typeof extractCanvaDesignId>[] = [
   { name: "canva design without id → null", input: "https://www.canva.com/design//view", expected: null },
 ];
 
+const embedCases: Row<typeof buildCanvaEmbedSrc>[] = [
+  {
+    name: "public /view without share token",
+    input: "https://www.canva.com/design/DAFxyz_ABCDE/view?utm_content=DAFxyz_ABCDE",
+    expected: "https://www.canva.com/design/DAFxyz_ABCDE/view?embed&meta",
+  },
+  {
+    name: "public presentation /present with share token",
+    input: "https://www.canva.com/design/DAFxyz_ABCDE/shareToken123/present",
+    expected: "https://www.canva.com/design/DAFxyz_ABCDE/shareToken123/view?embed&meta",
+  },
+  {
+    name: "non-canva URL -> null",
+    input: "https://example.com/design/DAFxyz_ABCDE/view",
+    expected: null,
+  },
+];
+
 let passed = 0;
 let failed = 0;
 const fails: string[] = [];
@@ -56,6 +74,9 @@ for (const row of isCanvaCases) {
 }
 for (const row of extractCases) {
   check(`extractCanvaDesignId — ${row.name}`, extractCanvaDesignId(row.input), row.expected);
+}
+for (const row of embedCases) {
+  check(`buildCanvaEmbedSrc — ${row.name}`, buildCanvaEmbedSrc(row.input), row.expected);
 }
 
 console.log(`canva-embed sync specs: ${passed} passed, ${failed} failed`);

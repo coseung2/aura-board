@@ -444,12 +444,12 @@ export function buildCanvaEmbedSrc(rawUrl: string): string | null {
     const host = u.hostname.toLowerCase();
     if (host !== "canva.com" && host !== "www.canva.com") return null;
 
-    // Accept /design/{id}/(view|watch|edit), or the full share form
-    // /design/{id}/{shareToken}/(view|watch|edit). Canva's "링크 공유"
+    // Accept /design/{id}/(view|watch|edit|present), or the full share form
+    // /design/{id}/{shareToken}/(view|watch|edit|present). Canva's "링크 공유"
     // button gives an /edit URL; we always rewrite it to /view for the
     // iframe (embedding the editor surface is blocked by X-Frame).
     const m = u.pathname.match(
-      /\/design\/([A-Za-z0-9_-]+)(?:\/([A-Za-z0-9_-]+))?\/(?:view|watch|edit)/
+      /\/design\/([A-Za-z0-9_-]+)(?:\/([A-Za-z0-9_-]+))?\/(?:view|watch|edit|present)/
     );
     if (!m) return null;
     const [, designId, shareToken] = m;
@@ -476,11 +476,11 @@ export function hasCanvaShareToken(rawUrl: string | null | undefined): boolean {
     const u = new URL(rawUrl);
     const host = u.hostname.toLowerCase();
     if (host !== "canva.com" && host !== "www.canva.com") return false;
-    // Accept view / watch / edit — Canva hands out /edit URLs for the
+    // Accept view / watch / edit / present — Canva hands out /edit URLs for the
     // "링크 공유" (anyone-with-link) share flow; buildCanvaEmbedSrc
     // rewrites to /view for the iframe.
     const m = u.pathname.match(
-      /\/design\/[A-Za-z0-9_-]+\/([A-Za-z0-9_-]+)\/(?:view|watch|edit)/
+      /\/design\/[A-Za-z0-9_-]+\/([A-Za-z0-9_-]+)\/(?:view|watch|edit|present)/
     );
     return !!m?.[1];
   } catch {
@@ -535,7 +535,7 @@ export async function resolveCanvaEmbedUrl(
   // 1. Expand canva.link so share-token path segment becomes visible.
   const expandedUrl = await expandCanvaShortLink(rawUrl);
   const match = expandedUrl.match(
-    /\/design\/([A-Za-z0-9_-]+)(?:\/([A-Za-z0-9_-]+))?\/(?:view|watch|edit)/
+    /\/design\/([A-Za-z0-9_-]+)(?:\/([A-Za-z0-9_-]+))?\/(?:view|watch|edit|present)/
   );
   if (!match) return null;
   const designId = match[1];
