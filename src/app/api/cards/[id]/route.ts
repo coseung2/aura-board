@@ -103,18 +103,26 @@ export async function PATCH(
       classroomId: board.classroomId,
       ownerUserId: board.classroom?.teacherId ?? null,
     };
+    const body = await req.json();
+    const input = PatchCardSchema.parse(body);
+    const patchKeys = Object.keys(input);
+    const isOrderOnlyPatch =
+      patchKeys.length === 1 && typeof input.order === "number";
+    const studentCanReorder =
+      isOrderOnlyPatch &&
+      !!identity.student &&
+      !!board.classroomId &&
+      board.classroomId === identity.student.classroomId;
+
     const cardLike: CardLike = {
       id: card.id,
       boardId: card.boardId,
       authorId: card.authorId,
       studentAuthorId: card.studentAuthorId,
     };
-    if (!canEditCard(identity, boardLike, cardLike)) {
+    if (!canEditCard(identity, boardLike, cardLike) && !studentCanReorder) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
-
-    const body = await req.json();
-    const input = PatchCardSchema.parse(body);
 
     // card-file-attachment — 파일 필드 출처/MIME 검증. POST와 동일 규칙.
     if (input.fileUrl !== undefined && !isAllowedFileUrl(input.fileUrl)) {

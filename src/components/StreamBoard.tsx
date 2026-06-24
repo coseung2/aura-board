@@ -82,6 +82,10 @@ type Props = {
   streamSectionsEnabled?: boolean;
 };
 
+type StreamContentItem =
+  | { kind: "template"; id: string; order: number }
+  | { kind: "card"; id: string; card: CardData; order: number };
+
 export function StreamBoard({
   boardId,
   initialCards,
@@ -98,6 +102,7 @@ export function StreamBoard({
     [...initialSections].sort(sortSections),
   );
   const [composerOpen, setComposerOpen] = useState(false);
+  const [composerSectionId, setComposerSectionId] = useState<string | null>(null);
   const [mounted, setMounted] = useState(false);
   const [panelState, setPanelState] = useState<{
     sectionId: string;
@@ -110,6 +115,7 @@ export function StreamBoard({
   const [templateBusySectionId, setTemplateBusySectionId] = useState<string | null>(null);
   const [templateModalSectionId, setTemplateModalSectionId] = useState<string | null>(null);
   const [sectionOrderBusyId, setSectionOrderBusyId] = useState<string | null>(null);
+  const [contentOrderBusyId, setContentOrderBusyId] = useState<string | null>(null);
   const canEdit = currentRole === "owner" || currentRole === "editor";
   const canManageSections = canEdit && !isStudentViewer;
   const canAddPost = canEdit || !!isStudentViewer;
@@ -300,6 +306,16 @@ export function StreamBoard({
   ]);
 
   async function handleAdd(data: AddCardData, groupId?: string | null) {
+    const sectionId = data.sectionId ?? null;
+    const siblingOrders = cards
+      .filter(
+        (card) =>
+          (card.sectionId ?? null) === sectionId &&
+          (card.groupId ?? null) === (groupId ?? null),
+      )
+      .map((card) => card.order);
+    const nextOrder =
+      siblingOrders.length > 0 ? Math.max(...siblingOrders) + 1 : 0;
     const res = await fetch("/api/cards", {
       method: "POST",
       headers: { "content-type": "application/json" },
@@ -314,8 +330,8 @@ export function StreamBoard({
         attachments: data.attachments,
         x: 0,
         y: 0,
-        order: cards.length,
-        sectionId: data.sectionId ?? null,
+        order: nextOrder,
+        sectionId,
         groupId: groupId ?? null,
       }),
     });
@@ -542,6 +558,90 @@ export function StreamBoard({
     }
   }
 
+  async function handleMoveSectionContent(
+    section: StreamSection,
+    items: StreamContentItem[],
+    itemId: string,
+    direction: "up" | "down",
+  ): Promise<void> {
+    const fromIdx = items.findIndex((item) => item.id === itemId);
+    const toIdx = direction === "up" ? fromIdx - 1 : fromIdx + 1;
+    if (fromIdx < 0 || toIdx < 0 || toIdx >= items.length) return;
+
+    const prevCards = cards;
+    const prevSections = sections;
+    const nextItems = [...items];
+    const [moved] = nextItems.splice(fromIdx, 1);
+    if (!moved) return;
+    nextItems.splice(toIdx, 0, moved);
+
+    const cardOrder = new Map<string, number>();
+    let templateOrder: number | null = null;
+    nextItems.forEach((item, index) => {
+      if (item.kind === "card") cardOrder.set(item.card.id, index);
+      else templateOrder = index;
+    });
+
+    const nextTemplateState =
+      templateOrder === null
+        ? null
+        : {
+            ...normalizeStreamActivityTemplateState(section.activityTemplateState),
+            activityTemplateOrder: templateOrder,
+          };
+
+    setContentOrderBusyId(itemId);
+    setCards((list) =>
+      sortPosts(
+        list.map((card) => {
+          const order = cardOrder.get(card.id);
+          return order === undefined ? card : { ...card, order };
+        }),
+      ),
+    );
+    if (nextTemplateState) {
+      setSections((list) =>
+        list.map((candidate) =>
+          candidate.id === section.id
+            ? { ...candidate, activityTemplateState: nextTemplateState }
+            : candidate,
+        ),
+      );
+    }
+
+    try {
+      const responses = await Promise.all([
+        ...Array.from(cardOrder.entries()).map(([id, order]) =>
+          fetch(`/api/cards/${id}`, {
+            method: "PATCH",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({ order }),
+          }),
+        ),
+        ...(nextTemplateState
+          ? [
+              fetch(`/api/sections/${section.id}`, {
+                method: "PATCH",
+                headers: { "content-type": "application/json" },
+                body: JSON.stringify({ activityTemplateState: nextTemplateState }),
+              }),
+            ]
+          : []),
+      ]);
+      if (responses.some((res) => !res.ok)) {
+        setCards(prevCards);
+        setSections(prevSections);
+        alert("콘텐츠 순서 변경에 실패했어요.");
+      }
+    } catch {
+      setCards(prevCards);
+      setSections(prevSections);
+      alert("콘텐츠 순서 변경에 실패했어요.");
+    } finally {
+      setContentOrderBusyId(null);
+    }
+  }
+
   async function handleSaveBreakout(
     sectionId: string,
     groupCount: number,
@@ -653,6 +753,16 @@ export function StreamBoard({
   const showComposerSections =
     streamSectionsEnabled && sectionOptions.length > 0;
 
+  function openComposer(sectionId?: string | null) {
+    setComposerSectionId(sectionId ?? null);
+    setComposerOpen(true);
+  }
+
+  function closeComposer() {
+    setComposerOpen(false);
+    setComposerSectionId(null);
+  }
+
   return (
     <div className="board-canvas-wrap stream-board-wrap">
       <div className="stream-feed">
@@ -684,12 +794,15 @@ export function StreamBoard({
             onMoveSection={handleMoveSection}
             onOpenTemplateModal={setTemplateModalSectionId}
             onOpenBreakoutModal={setBreakoutModalSectionId}
+            onOpenComposerForSection={openComposer}
             onSectionActivityStateChange={handleSectionActivityStateChange}
             onCreateSectionCard={(sectionId, data, groupId) =>
               handleAdd({ ...data, sectionId }, groupId)
             }
+            onMoveSectionContent={handleMoveSectionContent}
             templateBusySectionId={templateBusySectionId}
             sectionOrderBusyId={sectionOrderBusyId}
+            contentOrderBusyId={contentOrderBusyId}
             breakoutBySection={breakoutBySection}
             activeGroupBySection={activeGroupBySection}
             breakoutBusyId={breakoutBusyId}
@@ -716,7 +829,7 @@ export function StreamBoard({
           <button
             type="button"
             className="add-card-fab"
-            onClick={() => setComposerOpen(true)}
+            onClick={() => openComposer(null)}
             aria-label="게시글 작성"
           >
             <svg
@@ -738,7 +851,7 @@ export function StreamBoard({
               <>
                 <div
                   className="modal-backdrop"
-                  onClick={() => setComposerOpen(false)}
+                  onClick={closeComposer}
                 />
                 <div
                   className="add-card-modal stream-composer-modal"
@@ -753,7 +866,7 @@ export function StreamBoard({
                     <button
                       type="button"
                       className="modal-close"
-                      onClick={() => setComposerOpen(false)}
+                      onClick={closeComposer}
                       aria-label="닫기"
                     >
                       ×
@@ -762,10 +875,11 @@ export function StreamBoard({
                   <div className="modal-body">
                     <StreamComposer
                       onAdd={handleAdd}
-                      onSubmitted={() => setComposerOpen(false)}
+                      onSubmitted={closeComposer}
                       streamTitlePrompt={streamTitlePrompt}
                       streamContentPrompt={streamContentPrompt}
                       sections={showComposerSections ? sectionOptions : undefined}
+                      initialSectionId={composerSectionId ?? undefined}
                     />
                   </div>
                 </div>
@@ -861,6 +975,7 @@ type StreamGroupedFeedProps = {
   onMoveSection: (sectionId: string, direction: "up" | "down") => Promise<void>;
   onOpenTemplateModal: (sectionId: string) => void;
   onOpenBreakoutModal: (sectionId: string) => void;
+  onOpenComposerForSection: (sectionId: string) => void;
   onSectionActivityStateChange: (
     sectionId: string,
     activityTemplateState: StreamActivityTemplateState | null,
@@ -870,8 +985,15 @@ type StreamGroupedFeedProps = {
     data: { title: string; content: string },
     groupId?: string | null,
   ) => Promise<void>;
+  onMoveSectionContent: (
+    section: StreamSection,
+    items: StreamContentItem[],
+    itemId: string,
+    direction: "up" | "down",
+  ) => Promise<void>;
   templateBusySectionId: string | null;
   sectionOrderBusyId: string | null;
+  contentOrderBusyId: string | null;
   breakoutBySection: Record<string, BreakoutState>;
   activeGroupBySection: Record<string, string>;
   breakoutBusyId: string | null;
@@ -901,10 +1023,13 @@ function StreamGroupedFeed({
   onMoveSection,
   onOpenTemplateModal,
   onOpenBreakoutModal,
+  onOpenComposerForSection,
   onSectionActivityStateChange,
   onCreateSectionCard,
+  onMoveSectionContent,
   templateBusySectionId,
   sectionOrderBusyId,
+  contentOrderBusyId,
   breakoutBySection,
   activeGroupBySection,
   breakoutBusyId,
@@ -967,6 +1092,7 @@ function StreamGroupedFeed({
           breakoutBySection[section.id] ??
           buildBreakoutStateFromSection(section, canEdit);
         const hasBreakout = !!breakout?.config;
+        const contentItems = buildSectionContentItems(section, bucket);
         const orderBusy = sectionOrderBusyId !== null;
         const canMoveUp = sectionIndex > 0;
         const canMoveDown = sectionIndex < sections.length - 1;
@@ -1057,6 +1183,17 @@ function StreamGroupedFeed({
                </div>
              )}
             </header>
+            {canAddPost && (
+              <div className="stream-section-post-row">
+                <button
+                  type="button"
+                  className="stream-section-post-btn"
+                  onClick={() => onOpenComposerForSection(section.id)}
+                >
+                  + 게시글 추가
+                </button>
+              </div>
+            )}
            {hasBreakout && breakout ? (
              <StreamBreakoutBody
                section={section}
@@ -1076,37 +1213,32 @@ function StreamGroupedFeed({
                onSectionActivityStateChange={onSectionActivityStateChange}
                onDeleteCard={onDeleteCard}
              />
+           ) : contentItems.length === 0 ? (
+             <div className="stream-section-empty">아직 게시글이 없어요.</div>
            ) : (
-             <>
-               {section.activityTemplate && (
-                 <StreamActivityTemplatePanel
-                   template={section.activityTemplate}
-                   sectionId={section.id}
-                   cards={bucket}
-                   canEdit={canAddPost}
-                   isTeacherView={canEdit}
-                   state={section.activityTemplateState ?? null}
-                   onStateChange={(nextState) =>
-                     onSectionActivityStateChange(section.id, nextState)
-                   }
-                   onCreateCard={(data) => onCreateSectionCard(section.id, data)}
-                 />
-               )}
-              {!section.activityTemplate &&
-                (bucket.length === 0 ? (
-                  <div className="stream-section-empty">아직 게시글이 없어요.</div>
-                ) : (
-                  bucket.map((card) => (
-                    <StreamPost
-                      key={card.id}
-                      card={card}
-                      canDelete={canDeleteCard(card, currentUserId, currentRole)}
-                      onDelete={() => onDeleteCard(card)}
-                      boardId={boardId}
-                    />
-                  ))
-                ))}
-             </>
+             contentItems.map((item, itemIndex) => (
+               <StreamSectionContentItem
+                 key={item.id}
+                 item={item}
+                 itemIndex={itemIndex}
+                 itemCount={contentItems.length}
+                 section={section}
+                 cards={bucket}
+                 canReorder={canAddPost}
+                 canEditTemplate={canAddPost}
+                 isTeacherView={canEdit}
+                 orderBusyId={contentOrderBusyId}
+                 boardId={boardId}
+                 currentUserId={currentUserId}
+                 currentRole={currentRole}
+                 onMove={(id, direction) =>
+                   onMoveSectionContent(section, contentItems, id, direction)
+                 }
+                 onDeleteCard={onDeleteCard}
+                 onSectionActivityStateChange={onSectionActivityStateChange}
+                 onCreateSectionCard={onCreateSectionCard}
+               />
+             ))
            )}
           </section>
         );
@@ -1130,6 +1262,101 @@ function StreamGroupedFeed({
       )}
 
     </>
+  );
+}
+
+function StreamSectionContentItem({
+  item,
+  itemIndex,
+  itemCount,
+  section,
+  cards,
+  canReorder,
+  canEditTemplate,
+  isTeacherView,
+  orderBusyId,
+  boardId,
+  currentUserId,
+  currentRole,
+  onMove,
+  onDeleteCard,
+  onSectionActivityStateChange,
+  onCreateSectionCard,
+}: {
+  item: StreamContentItem;
+  itemIndex: number;
+  itemCount: number;
+  section: StreamSection;
+  cards: CardData[];
+  canReorder: boolean;
+  canEditTemplate: boolean;
+  isTeacherView: boolean;
+  orderBusyId: string | null;
+  boardId: string;
+  currentUserId: string;
+  currentRole: "owner" | "editor" | "viewer";
+  onMove: (itemId: string, direction: "up" | "down") => Promise<void>;
+  onDeleteCard: (card: CardData) => void;
+  onSectionActivityStateChange: (
+    sectionId: string,
+    activityTemplateState: StreamActivityTemplateState | null,
+  ) => Promise<boolean>;
+  onCreateSectionCard: (
+    sectionId: string,
+    data: { title: string; content: string },
+    groupId?: string | null,
+  ) => Promise<void>;
+}) {
+  const moving = orderBusyId === item.id;
+  const label = item.kind === "template" ? "템플릿" : "게시글";
+  return (
+    <div className="stream-section-content-item">
+      {canReorder && itemCount > 1 && (
+        <div className="stream-section-content-order">
+          <button
+            type="button"
+            className="ui-icon-action ui-icon-action-soft stream-section-icon-btn"
+            aria-label={`${label} 위로 이동`}
+            title="위로 이동"
+            onClick={() => void onMove(item.id, "up")}
+            disabled={moving || itemIndex === 0}
+          >
+            <ChevronUpIcon size={16} />
+          </button>
+          <button
+            type="button"
+            className="ui-icon-action ui-icon-action-soft stream-section-icon-btn"
+            aria-label={`${label} 아래로 이동`}
+            title="아래로 이동"
+            onClick={() => void onMove(item.id, "down")}
+            disabled={moving || itemIndex === itemCount - 1}
+          >
+            <ChevronDownIcon size={16} />
+          </button>
+        </div>
+      )}
+      {item.kind === "template" ? (
+        <StreamActivityTemplatePanel
+          template={section.activityTemplate!}
+          sectionId={section.id}
+          cards={cards}
+          canEdit={canEditTemplate}
+          isTeacherView={isTeacherView}
+          state={section.activityTemplateState ?? null}
+          onStateChange={(nextState) =>
+            onSectionActivityStateChange(section.id, nextState)
+          }
+          onCreateCard={(data) => onCreateSectionCard(section.id, data)}
+        />
+      ) : (
+        <StreamPost
+          card={item.card}
+          canDelete={canDeleteCard(item.card, currentUserId, currentRole)}
+          onDelete={() => onDeleteCard(item.card)}
+          boardId={boardId}
+        />
+      )}
+    </div>
   );
 }
 
@@ -1290,12 +1517,49 @@ function StreamTemplatePreviewSvg({
   );
 }
 
-function sortPosts(cards: CardData[]): CardData[] {
-  return [...cards].sort((a, b) => {
-    const byCreatedAt =
-      new Date(b.createdAt ?? 0).getTime() - new Date(a.createdAt ?? 0).getTime();
-    return byCreatedAt || b.order - a.order;
+function buildSectionContentItems(
+  section: StreamSection,
+  cards: CardData[],
+): StreamContentItem[] {
+  const items: StreamContentItem[] = [];
+  const hasTemplate = Boolean(section.activityTemplate);
+  const templateOrder =
+    normalizeStreamActivityTemplateState(section.activityTemplateState)
+      .activityTemplateOrder ?? 0;
+  if (hasTemplate) {
+    items.push({ kind: "template", id: `template:${section.id}`, order: templateOrder });
+  }
+  const cardItems = [...cards]
+    .sort(compareStreamCards)
+    .map((card) => ({
+      kind: "card" as const,
+      id: card.id,
+      card,
+      order: hasTemplate && card.order <= templateOrder ? card.order + 1 : card.order,
+    }));
+  items.push(...cardItems);
+  return items.sort((a, b) => {
+    const order = a.order - b.order;
+    if (order !== 0) return order;
+    if (a.kind !== b.kind) return a.kind === "template" ? -1 : 1;
+    if (a.kind === "card" && b.kind === "card") {
+      return compareStreamCards(a.card, b.card);
+    }
+    return 0;
   });
+}
+
+function sortPosts(cards: CardData[]): CardData[] {
+  return [...cards].sort(compareStreamCards);
+}
+
+function compareStreamCards(a: CardData, b: CardData): number {
+  const byOrder = a.order - b.order;
+  if (byOrder !== 0) return byOrder;
+  return (
+    new Date(a.createdAt ?? 0).getTime() -
+    new Date(b.createdAt ?? 0).getTime()
+  );
 }
 
 function buildInitialBreakoutState(

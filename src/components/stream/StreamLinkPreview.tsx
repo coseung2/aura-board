@@ -4,9 +4,10 @@ import type { CardData } from "../DraggableCard";
 
 type Props = {
   card: Pick<CardData, "linkUrl" | "linkTitle" | "linkDesc" | "linkImage">;
+  variant?: "inline" | "hero";
 };
 
-export function StreamLinkPreview({ card }: Props) {
+export function StreamLinkPreview({ card, variant = "inline" }: Props) {
   if (!card.linkUrl) return null;
 
   const host = getHost(card.linkUrl);
@@ -14,7 +15,9 @@ export function StreamLinkPreview({ card }: Props) {
 
   return (
     <a
-      className={`stream-link-preview${hasPreview ? "" : " is-plain"}`}
+      className={`stream-link-preview stream-link-preview--${variant}${
+        hasPreview ? "" : " is-plain"
+      }`}
       href={card.linkUrl}
       target="_blank"
       rel="noreferrer"

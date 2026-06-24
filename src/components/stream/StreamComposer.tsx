@@ -7,6 +7,7 @@ import {
   AttachmentDownloadLink,
   getAttachmentDisplayName,
 } from "../cards/AttachmentDownloadLink";
+import { DownloadIcon, TrashIcon } from "../icons/UiIcons";
 import { useLinkPreview } from "../useLinkPreview";
 import { detectFirstUrl, removeUrlFromText } from "@/lib/link-detection";
 import { formatBytes } from "@/lib/file-attachment";
@@ -27,6 +28,7 @@ type Props = {
   streamTitlePrompt?: string;
   streamContentPrompt?: string;
   sections?: Array<{ id: string; title: string }>;
+  initialSectionId?: string;
 };
 
 export function StreamComposer({
@@ -35,13 +37,16 @@ export function StreamComposer({
   streamTitlePrompt,
   streamContentPrompt,
   sections,
+  initialSectionId,
 }: Props) {
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
   const [showLink, setShowLink] = useState(false);
   const [linkUrl, setLinkUrl] = useState("");
   const [busy, setBusy] = useState(false);
-  const [sectionId, setSectionId] = useState(sections?.[0]?.id ?? "");
+  const [sectionId, setSectionId] = useState(
+    initialSectionId ?? sections?.[0]?.id ?? "",
+  );
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
   const videoInputRef = useRef<HTMLInputElement>(null);
@@ -73,12 +78,16 @@ export function StreamComposer({
       setSectionId("");
       return;
     }
+    if (initialSectionId && sections.some((section) => section.id === initialSectionId)) {
+      setSectionId(initialSectionId);
+      return;
+    }
     setSectionId((current) =>
       sections.some((section) => section.id === current)
         ? current
         : sections[0]?.id ?? "",
     );
-  }, [sections]);
+  }, [initialSectionId, sections]);
 
   async function submit(event: React.FormEvent) {
     event.preventDefault();
@@ -105,7 +114,7 @@ export function StreamComposer({
       setContent("");
       setLinkUrl("");
       setShowLink(false);
-      setSectionId(sections?.[0]?.id ?? "");
+      setSectionId(initialSectionId ?? sections?.[0]?.id ?? "");
       attachments.forEach((item) => removeAttachment(item.tempId));
       reset();
       onSubmitted?.();
@@ -230,10 +239,18 @@ export function StreamComposer({
               </span>
               <AttachmentDownloadLink
                 attachment={item}
-                className="stream-composer-download"
-              />
-              <button type="button" onClick={() => removeAttachment(item.tempId)}>
-                제거
+                className="ui-icon-action stream-composer-download"
+              >
+                <DownloadIcon size={16} />
+                <span className="sr-only">다운로드</span>
+              </AttachmentDownloadLink>
+              <button
+                type="button"
+                className="ui-icon-action stream-composer-remove"
+                onClick={() => removeAttachment(item.tempId)}
+                aria-label="첨부 제거"
+              >
+                <TrashIcon size={16} />
               </button>
             </div>
           ))}

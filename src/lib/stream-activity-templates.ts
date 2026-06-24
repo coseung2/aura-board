@@ -9,6 +9,7 @@ export type StreamActivityTemplate = (typeof STREAM_ACTIVITY_TEMPLATES)[number];
 
 export type StreamActivityTemplateState = {
   wordCloudPublished?: boolean;
+  activityTemplateOrder?: number;
 };
 
 export const STREAM_ACTIVITY_TEMPLATE_LABELS: Record<StreamActivityTemplate, string> = {
@@ -33,6 +34,11 @@ export function normalizeStreamActivityTemplateState(
     wordCloudPublished:
       typeof row.wordCloudPublished === "boolean"
         ? row.wordCloudPublished
+        : undefined,
+    activityTemplateOrder:
+      typeof row.activityTemplateOrder === "number" &&
+      Number.isFinite(row.activityTemplateOrder)
+        ? row.activityTemplateOrder
         : undefined,
   };
 }

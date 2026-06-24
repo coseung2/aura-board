@@ -22,12 +22,15 @@ export function StreamPost({ card, canDelete, onDelete, boardId }: Props) {
   const author = getStreamAuthor(card);
   const fileAttachments = (card.attachments ?? []).filter((item) => item.kind === "file");
   const isYouTubeVideo = Boolean(card.linkUrl && extractVideoId(card.linkUrl));
+  const isArticleLink = Boolean(card.linkUrl && !isYouTubeVideo);
   const [resolvedYouTubeTitle, setResolvedYouTubeTitle] = useState<string | null>(null);
   const displayTitle =
     isYouTubeVideo && card.linkTitle?.trim()
       ? card.linkTitle.trim()
       : isYouTubeVideo && resolvedYouTubeTitle
         ? resolvedYouTubeTitle
+      : isArticleLink && card.linkTitle?.trim()
+        ? card.linkTitle.trim()
       : card.title.trim();
 
   useEffect(() => {
@@ -96,11 +99,12 @@ export function StreamPost({ card, canDelete, onDelete, boardId }: Props) {
       </header>
 
       <StreamMediaCarousel card={card} />
+      {isArticleLink && <StreamLinkPreview card={card} variant="hero" />}
 
       <div className="stream-post-body">
         {displayTitle && <h2>{displayTitle}</h2>}
         {card.content.trim() && <p>{card.content}</p>}
-        {!isYouTubeVideo && <StreamLinkPreview card={card} />}
+        {!isYouTubeVideo && !isArticleLink && <StreamLinkPreview card={card} />}
         {card.fileUrl && (
           <div className="stream-file-list">
             <CardFileAttachment

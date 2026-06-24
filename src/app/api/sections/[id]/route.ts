@@ -4,6 +4,7 @@ import { z } from "zod";
 import { db } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
 import { requirePermission, ForbiddenError } from "@/lib/rbac";
+import { resolveIdentities } from "@/lib/identity";
 import { touchBoardUpdatedAt } from "@/lib/board-touch";
 import { announceCardChange } from "@/lib/realtime-broadcast";
 import { enqueueBlobDeletion } from "@/lib/blob-cleanup";
@@ -19,7 +20,10 @@ const PatchSectionSchema = z.object({
   pinned: z.boolean().optional(),
   activityTemplate: ActivityTemplateSchema.nullable().optional(),
   activityTemplateState: z
-    .object({ wordCloudPublished: z.boolean().optional() })
+    .object({
+      wordCloudPublished: z.boolean().optional(),
+      activityTemplateOrder: z.number().int().nonnegative().optional(),
+    })
     .nullable()
     .optional(),
 });
@@ -30,21 +34,53 @@ export async function PATCH(
 ) {
   try {
     const { id } = await params;
-    const user = await getCurrentUser();
 
-    const section = await db.section.findUnique({ where: { id } });
+    const section = await db.section.findUnique({
+      where: { id },
+      include: { board: { select: { classroomId: true } } },
+    });
     if (!section) {
       return NextResponse.json({ error: "Section not found" }, { status: 404 });
     }
 
-    await requirePermission(section.boardId, user.id, "edit");
-
     const body = await req.json();
     const input = PatchSectionSchema.parse(body);
+    const identities = await resolveIdentities();
+    const inputKeys = Object.keys(input);
+    const isStudentTemplateOrderPatch =
+      inputKeys.length === 1 &&
+      input.activityTemplateState !== undefined &&
+      input.activityTemplateState !== null &&
+      typeof input.activityTemplateState.activityTemplateOrder === "number";
+    const studentCanReorder =
+      isStudentTemplateOrderPatch &&
+      !!identities.student &&
+      !!section.board.classroomId &&
+      section.board.classroomId === identities.student.classroomId;
+
+    if (!studentCanReorder) {
+      if (!identities.teacher) {
+        return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+      }
+      await requirePermission(section.boardId, identities.teacher.userId, "edit");
+    }
+
+    const existingActivityTemplateState =
+      section.activityTemplateState &&
+      typeof section.activityTemplateState === "object" &&
+      !Array.isArray(section.activityTemplateState)
+        ? (section.activityTemplateState as Record<string, unknown>)
+        : {};
 
     const data = {
       ...input,
       activityTemplateState:
+        studentCanReorder && input.activityTemplateState
+          ? {
+              ...existingActivityTemplateState,
+              activityTemplateOrder: input.activityTemplateState.activityTemplateOrder,
+            }
+          :
         input.activityTemplate === null || input.activityTemplateState === null
           ? Prisma.DbNull
           : input.activityTemplateState,
