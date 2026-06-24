@@ -2532,47 +2532,44 @@ function StreamBreakoutBody({
     );
   }
 
-  // Student flow: pick a group before seeing anything group-specific.
+  // Student flow: students now enter after teacher assignment. If membership
+  // has not arrived yet, show the available section surface without a lock.
   if (!state.canManage) {
     if (!state.membership) {
-      const teacherAssigned = state.config?.joinMode === "teacher_assign";
-      const capacity = state.config?.groupCapacity ?? 0;
       const previewCards = groupCards(null);
       const previewMemberCount =
-        capacity > 0
-          ? capacity
-          : Math.max(0, ...groups.map((group) => group.memberCount));
+        Math.max(0, ...groups.map((group) => group.memberCount)) || undefined;
       return (
-        <div className="stream-breakout-locked">
-          <div className="stream-breakout-locked-content" aria-hidden="true" inert>
-            <StreamGuideList
-              cards={guideCards}
-              boardId={boardId}
-              currentUserId={currentUserId}
-              currentRole={currentRole}
-              canToggleGuide={false}
-              guideBusyId={guideBusyId}
-              onEditCard={onEditCard}
-              onOpenCard={onOpenCard}
-              onDeleteCard={onDeleteCard}
-              onToggleGuide={onToggleGuide}
+        <div className="stream-breakout-group-view">
+          <StreamGuideList
+            cards={guideCards}
+            boardId={boardId}
+            currentUserId={currentUserId}
+            currentRole={currentRole}
+            canToggleGuide={false}
+            guideBusyId={guideBusyId}
+            onEditCard={onEditCard}
+            onOpenCard={onOpenCard}
+            onDeleteCard={onDeleteCard}
+            onToggleGuide={onToggleGuide}
+          />
+          {section.activityTemplate ? (
+            <StreamActivityTemplatePanel
+              template={section.activityTemplate}
+              sectionId={section.id}
+              cards={previewCards}
+              canEdit={canAddPost}
+              isTeacherView={false}
+              windowMemberCount={previewMemberCount}
+              windowCurrentMemberName={currentStudentName}
+              state={section.activityTemplateState ?? null}
+              onCreateCard={(data) => onCreateCard(data, null)}
             />
-            {section.activityTemplate ? (
-              <StreamActivityTemplatePanel
-                template={section.activityTemplate}
-                sectionId={section.id}
-                cards={previewCards}
-                canEdit={canAddPost}
-                isTeacherView={false}
-                windowMemberCount={previewMemberCount || undefined}
-                windowCurrentMemberName={currentStudentName}
-                state={section.activityTemplateState ?? null}
-                onCreateCard={() => Promise.resolve()}
-              />
-            ) : previewCards.length === 0 ? (
-              <div className="stream-section-empty">아직 게시글이 없어요.</div>
-            ) : (
-              previewCards.map((card) => (
+          ) : previewCards.length === 0 ? (
+            <div className="stream-section-empty">아직 게시글이 없어요.</div>
+          ) : (
+            <div className="stream-post-grid">
+              {previewCards.map((card) => (
                 <StreamPost
                   key={card.id}
                   card={card}
@@ -2583,35 +2580,9 @@ function StreamBreakoutBody({
                   onDelete={() => onDeleteCard(card)}
                   boardId={boardId}
                 />
-              ))
-            )}
-          </div>
-          <div className="stream-breakout-join-overlay">
-            <p className="stream-breakout-join-title">
-              {teacherAssigned
-                ? "아직 모둠이 지정되지 않았어요."
-                : "참여할 모둠을 선택하세요."}
-            </p>
-            <div className="stream-breakout-join-grid">
-              {(teacherAssigned ? [] : groups).map((group) => {
-                const full = capacity > 0 && group.memberCount >= capacity;
-                return (
-                  <button
-                    key={group.id}
-                    type="button"
-                    className="stream-breakout-join-card"
-                    disabled={busy || full}
-                    onClick={() => void onJoin(group.id)}
-                  >
-                    <span className="stream-breakout-join-name">{group.name}</span>
-                    <span className="stream-breakout-join-count">
-                      {group.memberCount}명{full ? " · 정원 초과" : ""}
-                    </span>
-                  </button>
-                );
-              })}
+              ))}
             </div>
-          </div>
+          )}
         </div>
       );
     }
