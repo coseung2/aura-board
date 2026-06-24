@@ -24,6 +24,8 @@ const PatchSectionSchema = z.object({
 	      wordCloudPublished: z.boolean().optional(),
 	      activityTemplateOrder: z.number().int().nonnegative().optional(),
 	      slideshowEnabled: z.boolean().optional(),
+	      streamTitlePrompt: z.string().trim().max(120).optional(),
+	      streamContentPrompt: z.string().trim().max(300).optional(),
 	    })
     .nullable()
     .optional(),

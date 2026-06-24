@@ -13,6 +13,7 @@ import {
   SlideshowIcon,
   TemplateIcon,
   TrashIcon,
+  WritingGuideIcon,
 } from "./icons/UiIcons";
 import { SectionActionsPanel } from "./SectionActionsPanel";
 import { StreamComposer } from "./stream/StreamComposer";
@@ -132,6 +133,8 @@ export function StreamBoard({
   const [templateBusySectionId, setTemplateBusySectionId] = useState<string | null>(null);
   const [templateModalSectionId, setTemplateModalSectionId] = useState<string | null>(null);
   const [sectionSlideshowBusyId, setSectionSlideshowBusyId] = useState<string | null>(null);
+  const [sectionPromptBusyId, setSectionPromptBusyId] = useState<string | null>(null);
+  const [sectionPromptModalId, setSectionPromptModalId] = useState<string | null>(null);
   const [sectionOrderBusyId, setSectionOrderBusyId] = useState<string | null>(null);
   const [contentOrderBusyId, setContentOrderBusyId] = useState<string | null>(null);
   const [guideBusyId, setGuideBusyId] = useState<string | null>(null);
@@ -249,7 +252,16 @@ export function StreamBoard({
   }, [sortedSections, grouped, breakoutBySection, activeGroupBySection]);
 
   const sectionOptions = useMemo(
-    () => sortedSections.map((s) => ({ id: s.id, title: s.title })),
+    () =>
+      sortedSections.map((section) => {
+        const guidance = getSectionWritingGuidance(section);
+        return {
+          id: section.id,
+          title: section.title,
+          streamTitlePrompt: guidance.titlePrompt,
+          streamContentPrompt: guidance.contentPrompt,
+        };
+      }),
     [sortedSections],
   );
 
@@ -560,10 +572,17 @@ export function StreamBoard({
     const currentState = normalizeStreamActivityTemplateState(
       currentSection?.activityTemplateState,
     );
-    const baseState =
-      currentState.slideshowEnabled === undefined
+    const baseState: StreamActivityTemplateState = {
+      ...(currentState.slideshowEnabled === undefined
         ? {}
-        : { slideshowEnabled: currentState.slideshowEnabled };
+        : { slideshowEnabled: currentState.slideshowEnabled }),
+      ...(currentState.streamTitlePrompt
+        ? { streamTitlePrompt: currentState.streamTitlePrompt }
+        : {}),
+      ...(currentState.streamContentPrompt
+        ? { streamContentPrompt: currentState.streamContentPrompt }
+        : {}),
+    };
     const activityTemplateState =
       activityTemplate === "word_cloud"
         ? { ...baseState, wordCloudPublished: false }
@@ -660,21 +679,87 @@ export function StreamBoard({
     }
   }
 
+  async function handleSectionWritingGuidanceSave(
+    section: StreamSection,
+    prompts: { titlePrompt: string; contentPrompt: string },
+  ): Promise<boolean> {
+    if (sectionPromptBusyId) return false;
+    const prev = sections;
+    const currentState = normalizeStreamActivityTemplateState(section.activityTemplateState);
+    const nextState: StreamActivityTemplateState = {
+      ...currentState,
+      streamTitlePrompt: prompts.titlePrompt.trim() || undefined,
+      streamContentPrompt: prompts.contentPrompt.trim() || undefined,
+    };
+    setSectionPromptBusyId(section.id);
+    setSections((list) =>
+      list.map((candidate) =>
+        candidate.id === section.id
+          ? { ...candidate, activityTemplateState: nextState }
+          : candidate,
+      ),
+    );
+    try {
+      const res = await fetch(`/api/sections/${section.id}`, {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ activityTemplateState: nextState }),
+      });
+      if (!res.ok) {
+        setSections(prev);
+        alert("글쓰기 안내 저장에 실패했어요.");
+        return false;
+      }
+      const { section: saved } = (await res.json()) as { section: StreamSection };
+      setSections((list) =>
+        list.map((candidate) =>
+          candidate.id === saved.id
+            ? {
+                ...candidate,
+                activityTemplateState: normalizeStreamActivityTemplateState(
+                  saved.activityTemplateState,
+                ),
+              }
+            : candidate,
+        ),
+      );
+      return true;
+    } catch {
+      setSections(prev);
+      alert("글쓰기 안내 저장에 실패했어요.");
+      return false;
+    } finally {
+      setSectionPromptBusyId(null);
+    }
+  }
+
   async function handleSectionActivityStateChange(
     sectionId: string,
     activityTemplateState: StreamActivityTemplateState | null,
   ): Promise<boolean> {
     const prev = sections;
+    const currentSection = sections.find((section) => section.id === sectionId);
+    const nextActivityTemplateState =
+      activityTemplateState === null
+        ? null
+        : {
+            ...normalizeStreamActivityTemplateState(
+              currentSection?.activityTemplateState,
+            ),
+            ...activityTemplateState,
+          };
     setSections((list) =>
       list.map((s) =>
-        s.id === sectionId ? { ...s, activityTemplateState } : s,
+        s.id === sectionId
+          ? { ...s, activityTemplateState: nextActivityTemplateState }
+          : s,
       ),
     );
     try {
       const res = await fetch(`/api/sections/${sectionId}`, {
         method: "PATCH",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ activityTemplateState }),
+        body: JSON.stringify({ activityTemplateState: nextActivityTemplateState }),
       });
       if (!res.ok) {
         setSections(prev);
@@ -1036,6 +1121,7 @@ export function StreamBoard({
               setPanelState({ sectionId, tab })
             }
             onToggleSectionSlideshow={handleSectionSlideshowToggle}
+            onOpenSectionPromptModal={setSectionPromptModalId}
             onMoveSection={handleMoveSection}
             onOpenTemplateModal={setTemplateModalSectionId}
             onOpenBreakoutModal={setBreakoutModalSectionId}
@@ -1047,6 +1133,7 @@ export function StreamBoard({
             onMoveSectionContent={handleMoveSectionContent}
             templateBusySectionId={templateBusySectionId}
             sectionSlideshowBusyId={sectionSlideshowBusyId}
+            sectionPromptBusyId={sectionPromptBusyId}
             sectionOrderBusyId={sectionOrderBusyId}
             contentOrderBusyId={contentOrderBusyId}
             guideBusyId={guideBusyId}
@@ -1163,11 +1250,11 @@ export function StreamBoard({
           );
         })()}
 
-      {mounted &&
-        templateModalSectionId &&
-        (() => {
-          const section = sections.find((s) => s.id === templateModalSectionId);
-          if (!section) return null;
+	      {mounted &&
+	        templateModalSectionId &&
+	        (() => {
+	          const section = sections.find((s) => s.id === templateModalSectionId);
+	          if (!section) return null;
           return createPortal(
             <ActivityTemplateModal
               section={section}
@@ -1178,11 +1265,32 @@ export function StreamBoard({
                 if (ok) setTemplateModalSectionId(null);
               }}
             />,
-            document.body,
-          );
-        })()}
-      {mounted &&
-        breakoutModalSectionId &&
+	            document.body,
+	          );
+	        })()}
+	      {mounted &&
+	        sectionPromptModalId &&
+	        (() => {
+	          const section = sections.find((s) => s.id === sectionPromptModalId);
+	          if (!section) return null;
+	          const guidance = getSectionWritingGuidance(section);
+	          return createPortal(
+	            <SectionWritingPromptModal
+	              section={section}
+	              initialTitlePrompt={guidance.titlePrompt}
+	              initialContentPrompt={guidance.contentPrompt}
+	              busy={sectionPromptBusyId === section.id}
+	              onClose={() => setSectionPromptModalId(null)}
+	              onSave={async (prompts) => {
+	                const ok = await handleSectionWritingGuidanceSave(section, prompts);
+	                if (ok) setSectionPromptModalId(null);
+	              }}
+	            />,
+	            document.body,
+	          );
+	        })()}
+	      {mounted &&
+	        breakoutModalSectionId &&
         (() => {
           const section = sections.find((s) => s.id === breakoutModalSectionId);
           if (!section) return null;
@@ -1241,6 +1349,7 @@ type StreamGroupedFeedProps = {
   onSubmitSection: (event: FormEvent<HTMLFormElement>) => void;
   onOpenSectionPanel: (sectionId: string, tab: "rename" | "delete") => void;
   onToggleSectionSlideshow: (section: StreamSection) => Promise<void>;
+  onOpenSectionPromptModal: (sectionId: string) => void;
   onMoveSection: (sectionId: string, direction: "up" | "down") => Promise<void>;
   onOpenTemplateModal: (sectionId: string) => void;
   onOpenBreakoutModal: (sectionId: string) => void;
@@ -1262,6 +1371,7 @@ type StreamGroupedFeedProps = {
   ) => Promise<void>;
   templateBusySectionId: string | null;
   sectionSlideshowBusyId: string | null;
+  sectionPromptBusyId: string | null;
   sectionOrderBusyId: string | null;
   contentOrderBusyId: string | null;
   guideBusyId: string | null;
@@ -1299,6 +1409,7 @@ function StreamGroupedFeed({
   onSubmitSection,
   onOpenSectionPanel,
   onToggleSectionSlideshow,
+  onOpenSectionPromptModal,
   onMoveSection,
   onOpenTemplateModal,
   onOpenBreakoutModal,
@@ -1308,6 +1419,7 @@ function StreamGroupedFeed({
   onMoveSectionContent,
   templateBusySectionId,
   sectionSlideshowBusyId,
+  sectionPromptBusyId,
   sectionOrderBusyId,
   contentOrderBusyId,
   guideBusyId,
@@ -1411,6 +1523,16 @@ function StreamGroupedFeed({
 	                      disabled={sectionSlideshowBusyId === section.id}
 	                    >
 	                      <SlideshowIcon size={16} />
+	                    </button>
+	                    <button
+	                      type="button"
+	                      className="ui-icon-action ui-icon-action-soft stream-section-icon-btn"
+	                      aria-label={`${section.title} 글쓰기 안내 설정`}
+	                      title="글쓰기 안내"
+	                      onClick={() => onOpenSectionPromptModal(section.id)}
+	                      disabled={sectionPromptBusyId === section.id}
+	                    >
+	                      <WritingGuideIcon size={16} />
 	                    </button>
 	                    <button
 	                      type="button"
@@ -1653,20 +1775,22 @@ function StreamGuideList({
   return (
     <div className="stream-section-guide-list" aria-label="섹션 가이드">
       <div className="stream-section-guide-label">가이드</div>
-      {cards.map((card) => (
-        <StreamPost
-          key={card.id}
-          card={card}
-          canEdit={canDeleteCard(card, currentUserId, currentRole)}
-          onEdit={() => onEditCard(card)}
-          canDelete={canDeleteCard(card, currentUserId, currentRole)}
-          onDelete={() => onDeleteCard(card)}
-          canToggleGuide={canToggleGuideCard(card, canToggleGuide)}
-          guideBusy={guideBusyId === card.id}
-          onToggleGuide={(guidePinned) => onToggleGuide(card, guidePinned)}
-          boardId={boardId}
-        />
-      ))}
+      <div className="stream-post-grid stream-section-guide-grid">
+        {cards.map((card) => (
+          <StreamPost
+            key={card.id}
+            card={card}
+            canEdit={canDeleteCard(card, currentUserId, currentRole)}
+            onEdit={() => onEditCard(card)}
+            canDelete={canDeleteCard(card, currentUserId, currentRole)}
+            onDelete={() => onDeleteCard(card)}
+            canToggleGuide={canToggleGuideCard(card, canToggleGuide)}
+            guideBusy={guideBusyId === card.id}
+            onToggleGuide={(guidePinned) => onToggleGuide(card, guidePinned)}
+            boardId={boardId}
+          />
+        ))}
+      </div>
     </div>
   );
 }
@@ -1849,6 +1973,100 @@ function ActivityTemplateModal({
             </button>
           </div>
         </div>
+      </div>
+    </>
+  );
+}
+
+function SectionWritingPromptModal({
+  section,
+  initialTitlePrompt,
+  initialContentPrompt,
+  busy,
+  onClose,
+  onSave,
+}: {
+  section: StreamSection;
+  initialTitlePrompt: string;
+  initialContentPrompt: string;
+  busy: boolean;
+  onClose: () => void;
+  onSave: (prompts: { titlePrompt: string; contentPrompt: string }) => Promise<void>;
+}) {
+  const [titlePrompt, setTitlePrompt] = useState(initialTitlePrompt);
+  const [contentPrompt, setContentPrompt] = useState(initialContentPrompt);
+
+  useEffect(() => {
+    setTitlePrompt(initialTitlePrompt);
+    setContentPrompt(initialContentPrompt);
+  }, [initialTitlePrompt, initialContentPrompt, section.id]);
+
+  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    void onSave({ titlePrompt, contentPrompt });
+  }
+
+  return (
+    <>
+      <div className="modal-backdrop" onClick={busy ? undefined : onClose} />
+      <div
+        className="add-card-modal stream-template-modal stream-section-prompt-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="stream-section-prompt-modal-title"
+      >
+        <div className="modal-header">
+          <h2 className="modal-title" id="stream-section-prompt-modal-title">
+            글쓰기 안내
+          </h2>
+          <button
+            type="button"
+            className="modal-close"
+            onClick={onClose}
+            disabled={busy}
+            aria-label="닫기"
+          >
+            ×
+          </button>
+        </div>
+        <form className="modal-body stream-section-prompt-form" onSubmit={handleSubmit}>
+          <p className="stream-template-modal-section">{section.title}</p>
+          <label className="stream-section-prompt-field">
+            <span>제목 안내</span>
+            <input
+              type="text"
+              value={titlePrompt}
+              onChange={(event) => setTitlePrompt(event.target.value)}
+              placeholder="제목 입력칸에 보여줄 문구"
+              maxLength={120}
+              disabled={busy}
+            />
+          </label>
+          <label className="stream-section-prompt-field">
+            <span>본문 안내</span>
+            <textarea
+              value={contentPrompt}
+              onChange={(event) => setContentPrompt(event.target.value)}
+              placeholder="본문 입력칸에 보여줄 문구"
+              maxLength={300}
+              rows={4}
+              disabled={busy}
+            />
+          </label>
+          <div className="stream-template-modal-actions">
+            <button
+              type="button"
+              className="modal-btn-cancel"
+              onClick={onClose}
+              disabled={busy}
+            >
+              취소
+            </button>
+            <button type="submit" className="modal-btn-submit" disabled={busy}>
+              저장
+            </button>
+          </div>
+        </form>
       </div>
     </>
   );
@@ -2041,6 +2259,17 @@ function isSectionSlideshowEnabled(section: StreamSection): boolean {
   );
 }
 
+function getSectionWritingGuidance(section: StreamSection): {
+  titlePrompt: string;
+  contentPrompt: string;
+} {
+  const state = normalizeStreamActivityTemplateState(section.activityTemplateState);
+  return {
+    titlePrompt: state.streamTitlePrompt?.trim() ?? "",
+    contentPrompt: state.streamContentPrompt?.trim() ?? "",
+  };
+}
+
 function isGuideCard(card: CardData): boolean {
   return !!card.guidePinned && isTeacherAuthoredCard(card);
 }
@@ -2179,6 +2408,21 @@ function StreamBreakoutBody({
                 {group.memberCount}명
               </span>
             )}
+            {canCollapsePosts && (
+              <button
+                type="button"
+                className="stream-breakout-group-post-toggle"
+                aria-expanded={expanded}
+                onClick={() =>
+                  setExpandedGroupKeys((prev) => ({
+                    ...prev,
+                    [groupKey]: !expanded,
+                  }))
+                }
+              >
+                {expanded ? "접기" : `게시글 ${cards.length}개 펼치기`}
+              </button>
+            )}
             {group && group.members && group.members.length > 0 && (
               <div className="stream-breakout-member-list" aria-label={`${group.name} 학생`}>
                 {group.members.map((member) => (
@@ -2199,21 +2443,6 @@ function StreamBreakoutBody({
               </div>
             )}
           </div>
-          {canCollapsePosts && (
-            <button
-              type="button"
-              className="stream-breakout-group-post-toggle"
-              aria-expanded={expanded}
-              onClick={() =>
-                setExpandedGroupKeys((prev) => ({
-                  ...prev,
-                  [groupKey]: !expanded,
-                }))
-              }
-            >
-              {expanded ? "접기" : `게시글 ${cards.length}개 펼치기`}
-            </button>
-          )}
         </div>
         {section.activityTemplate && (
           <StreamActivityTemplatePanel
@@ -2239,7 +2468,9 @@ function StreamBreakoutBody({
           (cards.length === 0 ? (
             <div className="stream-section-empty">아직 게시글이 없어요.</div>
           ) : (
-            <div className="stream-post-grid">
+            <div
+              className={`stream-post-grid${expanded ? " stream-post-masonry" : ""}`}
+            >
               {visibleCards.map((card) => (
                 <StreamPost
                   key={card.id}
@@ -2404,7 +2635,11 @@ function StreamBreakoutBody({
           (cards.length === 0 ? (
             <div className="stream-section-empty">아직 게시글이 없어요.</div>
           ) : (
-            <div className="stream-post-grid">
+            <div
+              className={`stream-post-grid${
+                myGroupExpanded ? " stream-post-masonry" : ""
+              }`}
+            >
               {visibleMyGroupCards.map((card) => (
                 <StreamPost
                   key={card.id}

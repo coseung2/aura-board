@@ -387,7 +387,24 @@
 
 .stream-post-grid .stream-post {
   min-width: 0;
+  border-top: 1px solid var(--color-border);
   border-radius: 8px;
+}
+
+.stream-post-grid.stream-post-masonry {
+  display: block;
+  columns: 238px 3;
+  column-gap: 12px;
+}
+
+.stream-post-grid.stream-post-masonry > * {
+  display: block;
+  break-inside: avoid;
+  margin-bottom: 12px;
+}
+
+.stream-post-grid.stream-post-masonry > :last-child {
+  margin-bottom: 0;
 }
 
 .stream-post-grid .stream-post-head {
@@ -4298,15 +4315,19 @@
 
 .stream-section-guide-list {
   display: grid;
-  gap: 0;
+  gap: 8px;
   margin: 0 0 12px;
 }
 
 .stream-section-guide-label {
-  padding: 0 4px 8px;
+  padding: 0 4px;
   color: var(--color-accent);
   font-size: 12px;
   font-weight: 900;
+}
+
+.stream-section-guide-grid {
+  width: 100%;
 }
 
 .stream-section-guide-list .stream-post:first-of-type {
@@ -5120,6 +5141,55 @@
   font-weight: 800;
 }
 
+.stream-section-prompt-modal {
+  width: min(92vw, 560px);
+}
+
+.stream-section-prompt-form {
+  display: grid;
+  gap: 12px;
+}
+
+.stream-section-prompt-field {
+  display: grid;
+  gap: 6px;
+}
+
+.stream-section-prompt-field span {
+  color: var(--color-text);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.stream-section-prompt-field input,
+.stream-section-prompt-field textarea {
+  width: 100%;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: var(--color-surface);
+  color: var(--color-text);
+  font-family: var(--font-body);
+  font-size: 14px;
+}
+
+.stream-section-prompt-field input {
+  height: 40px;
+  padding: 0 11px;
+}
+
+.stream-section-prompt-field textarea {
+  min-height: 104px;
+  padding: 10px 11px;
+  line-height: 1.5;
+  resize: vertical;
+}
+
+.stream-section-prompt-field input:focus-visible,
+.stream-section-prompt-field textarea:focus-visible {
+  border-color: var(--color-accent);
+  outline: none;
+}
+
 .stream-template-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -5415,7 +5485,7 @@
   align-items: start;
 }
 
-.stream-breakout-compare .stream-post-grid {
+.stream-breakout-compare .stream-post-grid:not(.stream-post-masonry) {
   grid-template-columns: minmax(0, 1fr);
 }
 
@@ -5514,7 +5584,7 @@
 .stream-breakout-group-area-head {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-start;
   gap: 8px;
   min-height: 24px;
   padding: 0;
@@ -5567,6 +5637,7 @@
 
 .stream-breakout-member-list {
   display: inline-flex;
+  flex: 1 0 100%;
   min-width: 0;
   align-items: center;
   gap: 4px;

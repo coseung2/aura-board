@@ -27,7 +27,12 @@ type Props = {
   onSubmitted?: () => void;
   streamTitlePrompt?: string;
   streamContentPrompt?: string;
-  sections?: Array<{ id: string; title: string }>;
+  sections?: Array<{
+    id: string;
+    title: string;
+    streamTitlePrompt?: string;
+    streamContentPrompt?: string;
+  }>;
   initialSectionId?: string;
 };
 
@@ -65,6 +70,11 @@ export function StreamComposer({
   const hasLinkPreview = Boolean(
     preview?.title || preview?.description || preview?.image,
   );
+  const activeSection = sections?.find((section) => section.id === sectionId);
+  const effectiveTitlePrompt =
+    activeSection?.streamTitlePrompt?.trim() || streamTitlePrompt?.trim() || "";
+  const effectiveContentPrompt =
+    activeSection?.streamContentPrompt?.trim() || streamContentPrompt?.trim() || "";
   const canSubmit =
     title.trim().length > 0 ||
     content.trim().length > 0 ||
@@ -173,9 +183,7 @@ export function StreamComposer({
         value={title}
         onChange={(event) => setTitle(event.target.value)}
         placeholder={
-          streamTitlePrompt?.trim()
-            ? streamTitlePrompt.trim()
-            : "제목을 입력하세요"
+          effectiveTitlePrompt || "제목을 입력하세요"
         }
         maxLength={200}
         disabled={busy}
@@ -187,9 +195,7 @@ export function StreamComposer({
           value={content}
           onChange={(event) => setContent(event.target.value)}
           placeholder={
-            streamContentPrompt?.trim()
-              ? streamContentPrompt.trim()
-              : "무슨 이야기를 나눌까요?"
+            effectiveContentPrompt || "무슨 이야기를 나눌까요?"
           }
           maxLength={5000}
           rows={3}

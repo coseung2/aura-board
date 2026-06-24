@@ -11,6 +11,8 @@ export type StreamActivityTemplateState = {
   wordCloudPublished?: boolean;
   activityTemplateOrder?: number;
   slideshowEnabled?: boolean;
+  streamTitlePrompt?: string;
+  streamContentPrompt?: string;
 };
 
 export const STREAM_ACTIVITY_TEMPLATE_LABELS: Record<StreamActivityTemplate, string> = {
@@ -44,6 +46,14 @@ export function normalizeStreamActivityTemplateState(
     slideshowEnabled:
       typeof row.slideshowEnabled === "boolean"
         ? row.slideshowEnabled
+        : undefined,
+    streamTitlePrompt:
+      typeof row.streamTitlePrompt === "string"
+        ? row.streamTitlePrompt
+        : undefined,
+    streamContentPrompt:
+      typeof row.streamContentPrompt === "string"
+        ? row.streamContentPrompt
         : undefined,
   };
 }

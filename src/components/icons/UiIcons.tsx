@@ -139,6 +139,17 @@ export function SlideshowIcon({ size = 20, className }: IconProps) {
   );
 }
 
+export function WritingGuideIcon({ size = 20, className }: IconProps) {
+  return (
+    <svg {...base(size)} className={className} aria-hidden="true">
+      <path d="M5 5h9" />
+      <path d="M5 9h7" />
+      <path d="M5 13h5" />
+      <path d="M14.5 19.5 20 14l-2.5-2.5-5.5 5.5-.5 3Z" />
+    </svg>
+  );
+}
+
 export function FullscreenEnterIcon({ size = 20, className }: IconProps) {
   return (
     <svg {...base(size)} className={className} aria-hidden="true">
