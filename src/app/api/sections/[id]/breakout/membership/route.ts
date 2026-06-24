@@ -66,16 +66,17 @@ export async function POST(
       return NextResponse.json({ error: "group_mismatch" }, { status: 422 });
     }
 
+    const existing = await db.sectionBreakoutMembership.findUnique({
+      where: { sectionId_studentId: { sectionId, studentId: student.id } },
+      select: { groupId: true },
+    });
+
     // Capacity check. groupCapacity is nullable (null = unlimited).
     const config = await db.sectionBreakoutConfig.findUnique({
       where: { sectionId },
       select: { groupCapacity: true },
     });
     if (config && config.groupCapacity != null) {
-      const existing = await db.sectionBreakoutMembership.findUnique({
-        where: { sectionId_studentId: { sectionId, studentId: student.id } },
-        select: { groupId: true },
-      });
       // No-op self-pick (already in this group) is allowed even at full
       // capacity; any new occupant, including a first-time pick, is gated.
       if (!existing || existing.groupId !== group.id) {
@@ -91,10 +92,24 @@ export async function POST(
     // upsert keyed on (sectionId, studentId). Prisma's compound unique
     // sectionId_studentId makes this the canonical "one group per
     // student per section" enforcement.
-    await db.sectionBreakoutMembership.upsert({
-      where: { sectionId_studentId: { sectionId, studentId: student.id } },
-      create: { sectionId, groupId: group.id, studentId: student.id },
-      update: { groupId: group.id },
+    await db.$transaction(async (tx) => {
+      await tx.sectionBreakoutMembership.upsert({
+        where: { sectionId_studentId: { sectionId, studentId: student.id } },
+        create: { sectionId, groupId: group.id, studentId: student.id },
+        update: { groupId: group.id },
+      });
+
+      await tx.card.updateMany({
+        where: {
+          sectionId,
+          studentAuthorId: student.id,
+          OR: [
+            { groupId: null },
+            ...(existing?.groupId ? [{ groupId: existing.groupId }] : []),
+          ],
+        },
+        data: { groupId: group.id },
+      });
     });
 
     const snapshot = await loadSnapshot(sectionId, {

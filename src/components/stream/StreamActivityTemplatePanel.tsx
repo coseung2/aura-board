@@ -154,6 +154,16 @@ function WordCloudPanel({
 }) {
   const words = useMemo(() => buildWordCloud(cards), [cards]);
   const layout = useMemo(() => wordCloudLayout(words), [words]);
+  const visibleWords = useMemo(
+    () =>
+      words
+        .map((word, index) => ({ word, pos: layout[index] }))
+        .filter(
+          (item): item is { word: (typeof words)[number]; pos: { x: number; y: number } } =>
+            item.pos != null,
+        ),
+    [layout, words],
+  );
   const normalizedState = normalizeStreamActivityTemplateState(state);
   const published = normalizedState.wordCloudPublished === true;
   const canSeeCloud = published;
@@ -194,10 +204,11 @@ function WordCloudPanel({
           </p>
         ) : words.length === 0 ? (
           <p className="stream-activity-muted">게시글 없음</p>
+        ) : visibleWords.length === 0 ? (
+          <p className="stream-activity-muted">표시할 공간이 부족해요.</p>
         ) : (
           <div className="stream-word-cloud" aria-label="워드클라우드">
-            {words.map((word, index) => {
-              const pos = layout[index] ?? { x: 50, y: 50 };
+            {visibleWords.map(({ word, pos }) => {
               return (
                 <span
                   key={word.text}
@@ -219,8 +230,11 @@ function WordCloudPanel({
       {canEdit && (
         <QuickTextForm
           className="stream-word-input"
-          placeholder="단어 또는 문장"
+          placeholder="단어 또는 두 어절"
           submitLabel="추가"
+          normalizeInput={limitWordCloudInput}
+          successMessage="반영됐어요."
+          errorMessage="반영에 실패했어요."
           onSubmit={(content) => onCreateCard({ title: "", content })}
         />
       )}
@@ -341,24 +355,36 @@ function QuickTextForm({
   className,
   placeholder,
   submitLabel,
+  normalizeInput,
+  successMessage,
+  errorMessage,
   onSubmit,
 }: {
   className: string;
   placeholder: string;
   submitLabel: string;
+  normalizeInput?: (value: string) => string;
+  successMessage?: string;
+  errorMessage?: string;
   onSubmit: (content: string) => Promise<void>;
 }) {
   const [content, setContent] = useState("");
   const [busy, setBusy] = useState(false);
+  const [status, setStatus] = useState<"idle" | "success" | "error">("idle");
   const trimmed = content.trim();
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!trimmed || busy) return;
     setBusy(true);
+    setStatus("idle");
     try {
-      await onSubmit(trimmed);
+      await onSubmit(normalizeInput ? normalizeInput(trimmed).trim() : trimmed);
       setContent("");
+      setStatus("success");
+      window.setTimeout(() => setStatus("idle"), 1800);
+    } catch {
+      setStatus("error");
     } finally {
       setBusy(false);
     }
@@ -366,16 +392,30 @@ function QuickTextForm({
 
   return (
     <form className={className} onSubmit={submit}>
-      <input
-        type="text"
-        value={content}
-        onChange={(event) => setContent(event.target.value)}
-        placeholder={placeholder}
-        disabled={busy}
-      />
-      <button type="submit" disabled={!trimmed || busy}>
-        {submitLabel}
-      </button>
+      <div className="quick-text-form-row">
+        <input
+          type="text"
+          value={content}
+          onChange={(event) => {
+            setStatus("idle");
+            setContent(normalizeInput ? normalizeInput(event.target.value) : event.target.value);
+          }}
+          placeholder={placeholder}
+          disabled={busy}
+        />
+        <button type="submit" disabled={!trimmed || busy}>
+          {submitLabel}
+        </button>
+      </div>
+      {(successMessage || errorMessage) && (
+        <p className={`quick-text-form-status is-${status}`} aria-live="polite">
+          {status === "success"
+            ? successMessage
+            : status === "error"
+              ? errorMessage
+              : "\u00a0"}
+        </p>
+      )}
     </form>
   );
 }
@@ -821,18 +861,18 @@ function buildWordCloud(cards: CardData[]) {
 
 function wordCloudLayout(
   words: Array<{ text: string; weight: number }>,
-): { x: number; y: number }[] {
+): Array<{ x: number; y: number } | null> {
   // Deterministic spiral placement with conservative collision checks. The
   // browser owns the exact glyph metrics, so we overestimate each label box to
   // keep large Korean words and short phrases from stacking on top of each other.
   const goldenAngle = Math.PI * (3 - Math.sqrt(5));
   const placed: Array<{ x: number; y: number; w: number; h: number }> = [];
-  const out: { x: number; y: number }[] = [];
+  const out: Array<{ x: number; y: number } | null> = [];
 
   for (let i = 0; i < words.length; i += 1) {
     const word = words[i];
     const box = estimateWordBox(word.text, word.weight);
-    let chosen = { x: 50, y: 50 };
+    let chosen: { x: number; y: number } | null = null;
 
     for (let step = 0; step < 260; step += 1) {
       const r = 2.7 * Math.sqrt(step + i * 10);
@@ -844,10 +884,6 @@ function wordCloudLayout(
         chosen = { x, y };
         placed.push(candidate);
         break;
-      }
-      if (step === 259) {
-        chosen = { x, y };
-        placed.push(candidate);
       }
     }
     out.push(chosen);
@@ -881,7 +917,19 @@ function boxesOverlap(
 }
 
 function normalizeWordCloudEntry(value: string | null | undefined): string {
-  return (value ?? "").trim().replace(/\s+/g, " ");
+  return limitWordCloudInput(value ?? "").trim();
+}
+
+function limitWordCloudInput(value: string): string {
+  const singleSpaced = value.replace(/\s+/g, " ");
+  const hasTrailingSpace = /\s$/.test(singleSpaced);
+  const words = singleSpaced.trim().split(" ").filter(Boolean);
+  if (words.length <= 2) {
+    return `${words.join(" ")}${
+      hasTrailingSpace && words.length > 0 && words.length < 2 ? " " : ""
+    }`;
+  }
+  return words.slice(0, 2).join(" ");
 }
 
 const WORD_CLOUD_COLORS = [

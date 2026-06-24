@@ -402,45 +402,53 @@
 .stream-post-menu-toggle {
   width: 34px;
   height: 34px;
-  border: 0;
+  border: 1px solid var(--color-border);
   border-radius: 50%;
-  background: transparent;
+  background: var(--color-surface);
   color: var(--color-text-muted);
   font-size: 22px;
   line-height: 1;
   cursor: pointer;
+  box-shadow: var(--shadow-lift);
 }
 
 .stream-post-menu-toggle:hover,
 .stream-post-menu-toggle:focus-visible {
-  background: var(--color-surface-alt);
+  border-color: var(--color-accent);
+  background: var(--color-accent-tinted-bg);
+  color: var(--color-accent-tinted-text);
+  outline: none;
 }
 
 .stream-post-menu-popover {
   position: absolute;
   right: 2px;
-  top: calc(100% + 4px);
+  top: calc(100% + 8px);
   z-index: 5;
-  padding: 0;
+  padding: 6px;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: var(--color-surface);
+  box-shadow: var(--shadow-card);
 }
 
-.stream-post-menu-popover button {
-  min-height: 34px;
-  padding: 0 10px;
-  border: 0;
-  border-radius: 0;
-  background: transparent;
+.stream-post-menu-delete {
+  min-height: 36px;
+  padding: 0 14px;
+  border: 1px solid #f0b8b1;
+  border-radius: 8px;
+  background: #fff5f3;
   color: #b42318;
   font-weight: 800;
   white-space: nowrap;
   cursor: pointer;
 }
 
-.stream-post-menu-popover button:hover,
-.stream-post-menu-popover button:focus-visible {
+.stream-post-menu-delete:hover,
+.stream-post-menu-delete:focus-visible {
+  border-color: #e08a80;
+  background: #ffe7e2;
   color: #8f1d14;
-  text-decoration: underline;
-  text-underline-offset: 3px;
   outline: none;
 }
 
@@ -4298,9 +4306,15 @@
 }
 
 .stream-window-cell-input {
-  display: flex;
+  display: grid;
   gap: 6px;
   margin-top: auto;
+}
+
+.quick-text-form-row {
+  display: flex;
+  gap: inherit;
+  min-width: 0;
 }
 
 .stream-window-cell-input input,
@@ -4421,7 +4435,7 @@
 }
 
 .stream-word-input {
-  display: flex;
+  display: grid;
   gap: 8px;
   width: min(560px, 100%);
   justify-self: center;
@@ -4436,6 +4450,23 @@
 .stream-word-input button {
   height: 40px;
   padding: 0 16px;
+}
+
+.quick-text-form-status {
+  min-height: 18px;
+  margin: 2px 0 0;
+  color: var(--color-text-faint);
+  font-size: 12px;
+  font-weight: 800;
+  text-align: center;
+}
+
+.quick-text-form-status.is-success {
+  color: var(--color-accent-tinted-text);
+}
+
+.quick-text-form-status.is-error {
+  color: #b42318;
 }
 
 .stream-timeline-panel {
@@ -4864,6 +4895,8 @@
 .stream-template-modal-actions {
   display: flex;
   justify-content: flex-end;
+  gap: 10px;
+  flex-wrap: wrap;
   margin-top: 14px;
 }
 
@@ -5192,9 +5225,9 @@
 }
 
 .stream-breakout-locked-content {
-  opacity: 0.35;
+  opacity: 0.48;
   pointer-events: none;
-  filter: grayscale(0.4);
+  filter: grayscale(0.25);
 }
 
 .stream-breakout-join-overlay {
@@ -5208,8 +5241,8 @@
   padding: 20px;
   background: linear-gradient(
     to bottom,
-    rgba(255, 255, 255, 0.72),
-    rgba(255, 255, 255, 0.92)
+    rgba(255, 255, 255, 0.5),
+    rgba(255, 255, 255, 0.78)
   );
 }
 

@@ -81,6 +81,7 @@ export function StreamPost({ card, canDelete, onDelete, boardId }: Props) {
               <div className="stream-post-menu-popover">
                 <button
                   type="button"
+                  className="stream-post-menu-delete"
                   onClick={() => {
                     setMenuOpen(false);
                     onDelete();

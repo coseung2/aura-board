@@ -614,6 +614,7 @@ export function StreamBoard({
   }
 
   async function handleJoinBreakout(sectionId: string, groupId: string): Promise<boolean> {
+    const previousGroupId = breakoutBySection[sectionId]?.membership?.groupId ?? null;
     setBreakoutBusyId(sectionId);
     try {
       const res = await fetch(`/api/sections/${sectionId}/breakout/membership`, {
@@ -631,6 +632,15 @@ export function StreamBoard({
       );
       setBreakoutBySection((prev) => ({ ...prev, [sectionId]: data }));
       setActiveGroupBySection((prev) => ({ ...prev, [sectionId]: groupId }));
+      setCards((prev) =>
+        prev.map((card) =>
+          card.sectionId === sectionId &&
+          card.studentAuthorId === currentUserId &&
+          (card.groupId == null || card.groupId === previousGroupId)
+            ? { ...card, groupId }
+            : card,
+        ),
+      );
       return true;
     } catch {
       alert("모둠 선택에 실패했어요.");
@@ -1434,13 +1444,13 @@ function StreamBreakoutBody({
       const previewCards = groupCards(null);
       return (
         <div className="stream-breakout-locked">
-          <div className="stream-breakout-locked-content" aria-hidden="true">
+          <div className="stream-breakout-locked-content" aria-hidden="true" inert>
             {section.activityTemplate ? (
               <StreamActivityTemplatePanel
                 template={section.activityTemplate}
                 sectionId={section.id}
-                cards={[]}
-                canEdit={false}
+                cards={previewCards}
+                canEdit={canAddPost}
                 isTeacherView={false}
                 state={section.activityTemplateState ?? null}
                 onCreateCard={() => Promise.resolve()}
@@ -1669,7 +1679,7 @@ function BreakoutConfigModal({
                 ? `현재 ${state.config.groupCount}모둠 · 정원 ${state.config.groupCapacity ?? "-"}명 · 학생이 직접 모둠을 선택합니다.`
                : "저장하면 학생이 섹션에서 모둠을 선택할 수 있어요."}
             </p>
-            <div className="stream-template-modal-actions">
+            <div className="stream-template-modal-actions stream-breakout-modal-actions">
               {state?.config && (
                 <button
                   type="button"
