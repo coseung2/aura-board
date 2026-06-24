@@ -64,7 +64,7 @@ export async function GET(
 
     const snapshot = await loadSnapshot(sectionId, {
       callerRole: role,
-      studentId: student?.id ?? null,
+      studentId: user ? null : (student?.id ?? null),
     });
     return NextResponse.json(snapshot);
   } catch (e) {
@@ -305,6 +305,8 @@ export async function loadSnapshot(
     config: configWire,
     groups: groupsWire,
     membership: membershipWire,
-    canManage: opts.callerRole === "owner" || opts.callerRole === "editor",
+    canManage:
+      !opts.studentId &&
+      (opts.callerRole === "owner" || opts.callerRole === "editor"),
   };
 }

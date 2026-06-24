@@ -111,9 +111,10 @@ export function StreamBoard({
   const [templateModalSectionId, setTemplateModalSectionId] = useState<string | null>(null);
   const [sectionOrderBusyId, setSectionOrderBusyId] = useState<string | null>(null);
   const canEdit = currentRole === "owner" || currentRole === "editor";
+  const canManageSections = canEdit && !isStudentViewer;
   const canAddPost = canEdit || !!isStudentViewer;
   const [breakoutBySection, setBreakoutBySection] = useState<Record<string, BreakoutState>>(() =>
-    buildInitialBreakoutState(initialSections, canEdit),
+    buildInitialBreakoutState(initialSections, canManageSections),
   );
   const [breakoutBusyId, setBreakoutBusyId] = useState<string | null>(null);
   const [breakoutModalSectionId, setBreakoutModalSectionId] = useState<string | null>(null);
@@ -169,7 +170,10 @@ export function StreamBoard({
         .then((res) => (res.ok ? res.json() : null))
         .then((data) => {
           if (!alive || !data) return;
-          const state = data as BreakoutState;
+          const state = normalizeBreakoutStateForViewer(
+            data as BreakoutState,
+            !!isStudentViewer,
+          );
           setBreakoutBySection((prev) => ({ ...prev, [section.id]: state }));
           setActiveGroupBySection((prev) =>
             prev[section.id] !== undefined
@@ -189,7 +193,7 @@ export function StreamBoard({
     return () => {
       alive = false;
     };
-  }, [sortedSections, streamSectionsEnabled]);
+  }, [sortedSections, streamSectionsEnabled, isStudentViewer]);
 
   function visibleCardsForSection(sectionId: string, bucket: CardData[]): CardData[] {
     const bs = breakoutBySection[sectionId];
@@ -558,7 +562,10 @@ export function StreamBoard({
         alert("모둠 활동 설정에 실패했어요.");
         return false;
       }
-      const data = (await res.json()) as BreakoutState;
+      const data = normalizeBreakoutStateForViewer(
+        (await res.json()) as BreakoutState,
+        !!isStudentViewer,
+      );
       setBreakoutBySection((prev) => ({ ...prev, [sectionId]: data }));
       setActiveGroupBySection((prev) => ({ ...prev, [sectionId]: "all" }));
       return true;
@@ -580,7 +587,10 @@ export function StreamBoard({
         alert("모둠 활동 해제에 실패했어요.");
         return false;
       }
-      const data = (await res.json()) as BreakoutState;
+      const data = normalizeBreakoutStateForViewer(
+        (await res.json()) as BreakoutState,
+        !!isStudentViewer,
+      );
       setBreakoutBySection((prev) => ({ ...prev, [sectionId]: data }));
       setActiveGroupBySection((prev) => {
         const next = { ...prev };
@@ -615,7 +625,10 @@ export function StreamBoard({
         alert("모둠 선택에 실패했어요.");
         return false;
       }
-      const data = (await res.json()) as BreakoutState;
+      const data = normalizeBreakoutStateForViewer(
+        (await res.json()) as BreakoutState,
+        !!isStudentViewer,
+      );
       setBreakoutBySection((prev) => ({ ...prev, [sectionId]: data }));
       setActiveGroupBySection((prev) => ({ ...prev, [sectionId]: groupId }));
       return true;
@@ -642,7 +655,7 @@ export function StreamBoard({
             sections={sortedSections}
             grouped={grouped}
             boardId={boardId}
-            canEdit={canEdit}
+            canEdit={canManageSections}
             currentUserId={currentUserId}
             currentRole={currentRole}
             canAddPost={canAddPost}
@@ -940,7 +953,9 @@ function StreamGroupedFeed({
 
       {sections.map((section, sectionIndex) => {
         const bucket = grouped.bySection.get(section.id) ?? [];
-        const breakout = breakoutBySection[section.id];
+        const breakout =
+          breakoutBySection[section.id] ??
+          buildBreakoutStateFromSection(section, canEdit);
         const hasBreakout = !!breakout?.config;
         const orderBusy = sectionOrderBusyId !== null;
         const canMoveUp = sectionIndex > 0;
@@ -1279,19 +1294,35 @@ function buildInitialBreakoutState(
 ): Record<string, BreakoutState> {
   const result: Record<string, BreakoutState> = {};
   for (const section of sections) {
-    if (!section.breakout) continue;
-    result[section.id] = {
-      config: {
-        groupCount: section.breakout.groupCount,
-        groupCapacity: section.breakout.groupCapacity,
-        joinMode: "student_select",
-      },
-      groups: section.breakout.groups,
-      membership: null,
-      canManage,
-    };
+    const state = buildBreakoutStateFromSection(section, canManage);
+    if (state) result[section.id] = state;
   }
   return result;
+}
+
+function buildBreakoutStateFromSection(
+  section: StreamSection,
+  canManage: boolean,
+): BreakoutState | null {
+  if (!section.breakout) return null;
+  return {
+    config: {
+      groupCount: section.breakout.groupCount,
+      groupCapacity: section.breakout.groupCapacity,
+      joinMode: "student_select",
+    },
+    groups: section.breakout.groups,
+    membership: null,
+    canManage,
+  };
+}
+
+function normalizeBreakoutStateForViewer(
+  state: BreakoutState,
+  isStudentViewer: boolean,
+): BreakoutState {
+  if (!isStudentViewer || !state.canManage) return state;
+  return { ...state, canManage: false };
 }
 
 function canDeleteCard(
@@ -1400,10 +1431,11 @@ function StreamBreakoutBody({
   if (!state.canManage) {
     if (!state.membership) {
       const capacity = state.config?.groupCapacity ?? 0;
+      const previewCards = groupCards(null);
       return (
         <div className="stream-breakout-locked">
           <div className="stream-breakout-locked-content" aria-hidden="true">
-            {section.activityTemplate && (
+            {section.activityTemplate ? (
               <StreamActivityTemplatePanel
                 template={section.activityTemplate}
                 sectionId={section.id}
@@ -1413,6 +1445,18 @@ function StreamBreakoutBody({
                 state={section.activityTemplateState ?? null}
                 onCreateCard={() => Promise.resolve()}
               />
+            ) : previewCards.length === 0 ? (
+              <div className="stream-section-empty">아직 게시글이 없어요.</div>
+            ) : (
+              previewCards.map((card) => (
+                <StreamPost
+                  key={card.id}
+                  card={card}
+                  canDelete={false}
+                  onDelete={() => onDeleteCard(card)}
+                  boardId={boardId}
+                />
+              ))
             )}
           </div>
           <div className="stream-breakout-join-overlay">
