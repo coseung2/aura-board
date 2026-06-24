@@ -257,10 +257,10 @@ function WordCloudPanel({
       {canEdit && (
         <QuickTextForm
           className="stream-word-input"
-          placeholder="단어 또는 두 어절"
+          placeholder="떠오르는 단어를 입력해주세요."
           submitLabel="추가"
           normalizeInput={limitWordCloudInput}
-          successMessage="반영됐어요."
+          successMessage="친구들의 응답을 기다려볼까요? 또 입력하셔도 좋아요!"
           errorMessage="반영에 실패했어요."
           onSubmit={(content) => onCreateCard({ title: "", content })}
         />

@@ -456,39 +456,45 @@
   right: 2px;
   top: calc(100% + 8px);
   z-index: 5;
-  padding: 0;
+  min-width: 132px;
+  padding: 6px;
   display: grid;
-  gap: 6px;
-  justify-items: end;
+  gap: 2px;
+  justify-items: stretch;
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  background: var(--color-surface);
+  box-shadow: var(--shadow-card);
 }
 
-.stream-post-menu-action,
-.stream-post-menu-delete {
+.stream-post-menu-item {
+  width: 100%;
   min-height: 36px;
-  padding: 0 14px;
+  padding: 0 10px;
   border: 0;
-  border-radius: var(--radius-pill);
-  background: var(--color-surface-alt);
+  border-radius: 7px;
+  background: transparent;
   color: var(--color-text-muted);
   font-weight: 800;
+  text-align: left;
   white-space: nowrap;
   cursor: pointer;
 }
 
-.stream-post-menu-action:disabled {
+.stream-post-menu-item:disabled {
   cursor: wait;
   opacity: 0.6;
 }
 
-.stream-post-menu-action:hover,
-.stream-post-menu-action:focus-visible {
+.stream-post-menu-item:hover,
+.stream-post-menu-item:focus-visible {
   background: var(--color-accent-tinted-bg);
   color: var(--color-accent-tinted-text);
   outline: none;
 }
 
-.stream-post-menu-delete:hover,
-.stream-post-menu-delete:focus-visible {
+.stream-post-menu-item.is-danger:hover,
+.stream-post-menu-item.is-danger:focus-visible {
   background: var(--color-status-returned-bg);
   color: var(--color-danger);
   outline: none;
@@ -3300,6 +3306,26 @@
   gap: 6px;
 }
 
+.presentation-prompt-toggle {
+  justify-self: start;
+  min-height: 30px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--color-accent);
+  font-family: var(--font-body);
+  font-size: 13px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.presentation-prompt-toggle:hover,
+.presentation-prompt-toggle:focus-visible {
+  color: var(--color-accent-active);
+  text-decoration: underline;
+  outline: none;
+}
+
 .presentation-prompt-group {
   min-height: 34px;
   padding: 0 14px;
@@ -4937,8 +4963,8 @@
 .stream-template-card {
   display: grid;
   min-height: 156px;
-  padding: 12px;
-  gap: 10px;
+  padding: 14px 12px 12px;
+  gap: 8px;
   border: 1px solid var(--color-border);
   border-radius: 8px;
   background: var(--color-surface);
@@ -4958,7 +4984,6 @@
 .stream-template-card.is-selected {
   border-color: var(--color-accent);
   background: var(--color-accent-tinted-bg);
-  box-shadow: 0 0 0 1px var(--color-accent);
 }
 
 .stream-template-card:disabled {
@@ -4971,12 +4996,11 @@
   aspect-ratio: 5 / 3;
   display: block;
   overflow: hidden;
-  border-radius: 7px;
 }
 
 .stream-template-preview-bg {
-  fill: var(--color-bg-alt);
-  stroke: var(--color-border);
+  fill: transparent;
+  stroke: transparent;
 }
 
 .stream-template-preview-line {
@@ -5538,14 +5562,47 @@
 }
 
 .stream-breakout-modal .group-roster-name-field {
-  grid-template-columns: auto 118px auto;
-  gap: 5px;
+  grid-template-columns: auto minmax(78px, 118px) auto;
+  gap: 6px;
 }
 
 .stream-breakout-modal .group-roster-name-field input,
 .stream-breakout-modal .group-roster-table select {
   min-height: 30px;
   font-size: 12px;
+}
+
+.stream-breakout-modal .group-roster-name-field input {
+  min-height: 28px;
+  padding: 0 4px;
+  border: 0;
+  border-bottom: 1px solid var(--color-border);
+  border-radius: 0;
+  background: transparent;
+}
+
+.stream-breakout-modal .group-roster-name-field input:hover:not(:disabled),
+.stream-breakout-modal .group-roster-name-field input:focus {
+  border-bottom-color: var(--color-accent);
+  outline: none;
+}
+
+.stream-breakout-modal .group-roster-name-field button {
+  min-height: 28px;
+  padding: 0 2px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--color-danger);
+  font-weight: 800;
+}
+
+.stream-breakout-modal .group-roster-name-field button:hover:not(:disabled),
+.stream-breakout-modal .group-roster-name-field button:focus-visible {
+  background: transparent;
+  color: var(--color-danger);
+  text-decoration: underline;
+  outline: none;
 }
 
 .stream-breakout-modal .group-roster-table-wrap {

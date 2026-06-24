@@ -69,6 +69,24 @@ function hasStaleAuraBoardOgImage(payload: LinkPreviewPayload): boolean {
   );
 }
 
+function canvaFallbackPreview(rawUrl: string): LinkPreviewPayload | null {
+  try {
+    const url = new URL(rawUrl);
+    const host = url.hostname.toLowerCase();
+    if (host !== "canva.com" && host !== "www.canva.com") return null;
+    if (url.pathname.startsWith("/assignment/access")) {
+      return {
+        title: "Canva 활동",
+        description: "canva.com",
+        image: null,
+      };
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
 async function fetchOgImagePreview(
   imageUrl: string,
   pageUrl: string,
@@ -218,6 +236,12 @@ export async function GET(req: Request) {
         await setPreviewCache("link-preview", url, payload, true);
         return NextResponse.json(payload);
       }
+    }
+
+    const canvaFallback = canvaFallbackPreview(url);
+    if (canvaFallback) {
+      await setPreviewCache("link-preview", url, canvaFallback, true);
+      return NextResponse.json(canvaFallback);
     }
 
     // YouTube channel / @handle / custom / user URL.

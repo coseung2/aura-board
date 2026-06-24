@@ -101,7 +101,7 @@ export function StreamPost({
                 {canToggleGuide && (
                   <button
                     type="button"
-                    className="stream-post-menu-action"
+                    className="stream-post-menu-item"
                     disabled={guideBusy}
                     onClick={() => {
                       setMenuOpen(false);
@@ -112,16 +112,16 @@ export function StreamPost({
                   </button>
                 )}
                 {canDelete && (
-                <button
-                  type="button"
-                  className="stream-post-menu-delete"
-                  onClick={() => {
-                    setMenuOpen(false);
-                    onDelete();
-                  }}
-                >
-                  삭제
-                </button>
+                  <button
+                    type="button"
+                    className="stream-post-menu-item is-danger"
+                    onClick={() => {
+                      setMenuOpen(false);
+                      onDelete();
+                    }}
+                  >
+                    삭제
+                  </button>
                 )}
               </div>
             )}

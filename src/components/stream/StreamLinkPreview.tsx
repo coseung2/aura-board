@@ -12,6 +12,7 @@ export function StreamLinkPreview({ card, variant = "inline" }: Props) {
 
   const host = getHost(card.linkUrl);
   const hasPreview = Boolean(card.linkTitle || card.linkDesc || card.linkImage);
+  const fallbackTitle = getFallbackTitle(card.linkUrl);
 
   return (
     <a
@@ -32,7 +33,7 @@ export function StreamLinkPreview({ card, variant = "inline" }: Props) {
         <span className="stream-link-host">{host}</span>
         {card.linkTitle && <strong>{card.linkTitle}</strong>}
         {card.linkDesc && <span>{card.linkDesc}</span>}
-        {!card.linkTitle && !card.linkDesc && <strong>{card.linkUrl}</strong>}
+        {!card.linkTitle && !card.linkDesc && <strong>{fallbackTitle}</strong>}
       </span>
     </a>
   );
@@ -43,5 +44,21 @@ function getHost(rawUrl: string): string {
     return new URL(rawUrl).hostname.replace(/^www\./, "");
   } catch {
     return rawUrl;
+  }
+}
+
+function getFallbackTitle(rawUrl: string): string {
+  try {
+    const url = new URL(rawUrl);
+    const host = url.hostname.replace(/^www\./, "");
+    if (host === "canva.com" && url.pathname.startsWith("/assignment/access")) {
+      return "Canva 활동";
+    }
+    if (host === "canva.com" || host === "canva.link") {
+      return "Canva에서 열기";
+    }
+    return "링크 열기";
+  } catch {
+    return "링크 열기";
   }
 }

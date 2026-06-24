@@ -29,6 +29,7 @@ export function useLinkPreview() {
       return;
     }
 
+    setPreview(null);
     setLoading(true);
 
     timerRef.current = setTimeout(async () => {
@@ -44,6 +45,8 @@ export function useLinkPreview() {
         if (res.ok && !controller.signal.aborted) {
           const data = await res.json();
           setPreview(data);
+        } else if (!controller.signal.aborted) {
+          setPreview(null);
         }
       } catch {
         if (!controller.signal.aborted) {

@@ -150,14 +150,8 @@ export function BoardSlideshowProvider({ children }: { children: ReactNode }) {
     setOpen(true);
   }, []);
 
-  const chooseGroupForSection = useCallback(
-    (sectionId: string, groupId: string) => {
-      setPresentationGroupBySection((prev) => ({ ...prev, [sectionId]: groupId }));
-    },
-    [],
-  );
-
-  const confirmPrompt = useCallback(() => {
+  const confirmPrompt = useCallback((groupBySection: Record<string, string>) => {
+    setPresentationGroupBySection(groupBySection);
     setPendingPrompt(null);
     setIndex(0);
     setOpen(true);
@@ -241,7 +235,6 @@ export function BoardSlideshowProvider({ children }: { children: ReactNode }) {
           <PresentationGroupPrompt
             sections={pendingPrompt.sections}
             presentationGroupBySection={presentationGroupBySection}
-            onChoose={chooseGroupForSection}
             onConfirm={confirmPrompt}
             onCancel={cancelPrompt}
           />,
@@ -320,16 +313,35 @@ function applyPresentationFilter(
 function PresentationGroupPrompt({
   sections,
   presentationGroupBySection,
-  onChoose,
   onConfirm,
   onCancel,
 }: {
   sections: SlideshowSectionOption[];
   presentationGroupBySection: Record<string, string>;
-  onChoose: (sectionId: string, groupId: string) => void;
-  onConfirm: () => void;
+  onConfirm: (groupBySection: Record<string, string>) => void;
   onCancel: () => void;
 }) {
+  const firstGroups = sections[0]?.groups ?? [];
+  const initialBaseGroupId =
+    presentationGroupBySection[sections[0]?.sectionId ?? ""] ??
+    firstGroups[0]?.groupId ??
+    "";
+  const [baseGroupId, setBaseGroupId] = useState(initialBaseGroupId);
+  const [useSectionChoices, setUseSectionChoices] = useState(false);
+  const baseGroupIndex = Math.max(
+    0,
+    firstGroups.findIndex((group) => group.groupId === baseGroupId),
+  );
+  const [sectionGroupBySection, setSectionGroupBySection] = useState<
+    Record<string, string>
+  >(() =>
+    buildPresentationGroupSelection(
+      sections,
+      baseGroupIndex,
+      presentationGroupBySection,
+    ),
+  );
+
   useEffect(() => {
     function onKey(event: KeyboardEvent) {
       if (event.key === "Escape") onCancel();
@@ -338,9 +350,32 @@ function PresentationGroupPrompt({
     return () => window.removeEventListener("keydown", onKey);
   }, [onCancel]);
 
-  const titleText = "\ubc1c\ud45c \ubaa8\ub461 \uc120\ud0dd";
-  const cancelText = "\ucde8\uc18c";
-  const confirmText = "\uc2e4\ud589";
+  const titleText = "발표 모둠 선택";
+  const cancelText = "취소";
+  const confirmText = "실행";
+
+  function submit() {
+    const groupBySection = useSectionChoices
+      ? buildPresentationGroupSelection(
+          sections,
+          baseGroupIndex,
+          sectionGroupBySection,
+        )
+      : buildPresentationGroupSelection(sections, baseGroupIndex);
+    onConfirm(groupBySection);
+  }
+
+  function toggleSectionChoices() {
+    setUseSectionChoices((current) => {
+      const next = !current;
+      if (next) {
+        setSectionGroupBySection(
+          buildPresentationGroupSelection(sections, baseGroupIndex),
+        );
+      }
+      return next;
+    });
+  }
 
   return (
     <>
@@ -359,40 +394,76 @@ function PresentationGroupPrompt({
           <h2 id="presentation-prompt-title">{titleText}</h2>
         </header>
         <div className="presentation-prompt-list">
-          {sections.map((section) => {
-            const chosen =
-              presentationGroupBySection[section.sectionId] ??
-              section.groups[0]?.groupId;
-            return (
-              <div
-                className="presentation-prompt-section"
-                key={section.sectionId}
-              >
-                <span className="presentation-prompt-section-title">
-                  {section.title}
-                </span>
-                <div
-                  className="presentation-prompt-groups"
-                  role="radiogroup"
+          <div className="presentation-prompt-section">
+            <span className="presentation-prompt-section-title">
+              발표할 모둠
+            </span>
+            <div className="presentation-prompt-groups" role="radiogroup">
+              {firstGroups.map((group) => (
+                <button
+                  key={group.groupId}
+                  type="button"
+                  role="radio"
+                  aria-checked={baseGroupId === group.groupId}
+                  className={`presentation-prompt-group${
+                    baseGroupId === group.groupId ? " is-active" : ""
+                  }`}
+                  onClick={() => setBaseGroupId(group.groupId)}
                 >
-                  {section.groups.map((group) => (
-                    <button
-                      key={group.groupId}
-                      type="button"
-                      role="radio"
-                      aria-checked={chosen === group.groupId}
-                      className={`presentation-prompt-group${
-                        chosen === group.groupId ? " is-active" : ""
-                      }`}
-                      onClick={() => onChoose(section.sectionId, group.groupId)}
-                    >
-                      {group.name}
-                    </button>
-                  ))}
+                  {group.name}
+                </button>
+              ))}
+            </div>
+          </div>
+          <button
+            type="button"
+            className="presentation-prompt-toggle"
+            aria-expanded={useSectionChoices}
+            onClick={toggleSectionChoices}
+          >
+            {useSectionChoices ? "섹션별 선택 접기" : "섹션별로 다르게 선택"}
+          </button>
+          {useSectionChoices &&
+            sections.map((section) => {
+              const chosen =
+                sectionGroupBySection[section.sectionId] ??
+                section.groups[baseGroupIndex]?.groupId ??
+                section.groups[0]?.groupId;
+              return (
+                <div
+                  className="presentation-prompt-section"
+                  key={section.sectionId}
+                >
+                  <span className="presentation-prompt-section-title">
+                    {section.title}
+                  </span>
+                  <div
+                    className="presentation-prompt-groups"
+                    role="radiogroup"
+                  >
+                    {section.groups.map((group) => (
+                      <button
+                        key={group.groupId}
+                        type="button"
+                        role="radio"
+                        aria-checked={chosen === group.groupId}
+                        className={`presentation-prompt-group${
+                          chosen === group.groupId ? " is-active" : ""
+                        }`}
+                        onClick={() =>
+                          setSectionGroupBySection((current) => ({
+                            ...current,
+                            [section.sectionId]: group.groupId,
+                          }))
+                        }
+                      >
+                        {group.name}
+                      </button>
+                    ))}
+                  </div>
                 </div>
-              </div>
-            );
-          })}
+              );
+            })}
         </div>
         <footer className="presentation-prompt-actions">
           <button type="button" className="ui-icon-action" onClick={onCancel}>
@@ -401,7 +472,7 @@ function PresentationGroupPrompt({
           <button
             type="button"
             className="ui-icon-action is-accent"
-            onClick={onConfirm}
+            onClick={submit}
           >
             {confirmText}
           </button>
@@ -409,4 +480,20 @@ function PresentationGroupPrompt({
       </div>
     </>
   );
+}
+
+function buildPresentationGroupSelection(
+  sections: SlideshowSectionOption[],
+  baseGroupIndex: number,
+  overrides: Record<string, string> = {},
+): Record<string, string> {
+  const selection: Record<string, string> = {};
+  for (const section of sections) {
+    selection[section.sectionId] =
+      overrides[section.sectionId] ??
+      section.groups[baseGroupIndex]?.groupId ??
+      section.groups[0]?.groupId ??
+      "";
+  }
+  return selection;
 }

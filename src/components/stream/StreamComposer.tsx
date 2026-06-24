@@ -62,6 +62,9 @@ export function StreamComposer({
   const detectedUrl = useMemo(() => detectFirstUrl(content), [content]);
   const explicitLinkUrl = linkUrl.trim();
   const effectiveLinkUrl = explicitLinkUrl || detectedUrl || undefined;
+  const hasLinkPreview = Boolean(
+    preview?.title || preview?.description || preview?.image,
+  );
   const canSubmit =
     title.trim().length > 0 ||
     content.trim().length > 0 ||
@@ -222,7 +225,7 @@ export function StreamComposer({
         </div>
       )}
 
-      {(attachments.length > 0 || effectiveLinkUrl) && (
+      {(attachments.length > 0 || loading || hasLinkPreview) && (
         <div className="stream-composer-preview">
           {attachments.map((item) => (
             <div className="stream-composer-attachment" key={item.tempId}>
@@ -254,17 +257,19 @@ export function StreamComposer({
               </button>
             </div>
           ))}
-          {effectiveLinkUrl && (
+          {effectiveLinkUrl && (loading || hasLinkPreview) && (
             <div className="stream-composer-link">
               {loading ? (
                 <span>링크 미리보기 불러오는 중...</span>
               ) : (
                 <>
                   {preview?.image && <img src={preview.image} alt="" />}
-                  <span>
-                    <strong>{preview?.title ?? effectiveLinkUrl}</strong>
-                    {preview?.description && <small>{preview.description}</small>}
-                  </span>
+                  {(preview?.title || preview?.description) && (
+                    <span>
+                      {preview?.title && <strong>{preview.title}</strong>}
+                      {preview?.description && <small>{preview.description}</small>}
+                    </span>
+                  )}
                 </>
               )}
             </div>
