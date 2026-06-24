@@ -4,11 +4,13 @@ import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { createPortal } from "react-dom";
 import type { AddCardData } from "./AddCardModal";
 import type { CardData } from "./DraggableCard";
+import { EditCardModal, type EditCardUpdates } from "./EditCardModal";
 import {
   ChevronDownIcon,
   ChevronUpIcon,
   GroupIcon,
   PencilIcon,
+  SlideshowIcon,
   TemplateIcon,
   TrashIcon,
 } from "./icons/UiIcons";
@@ -88,6 +90,7 @@ type Props = {
   currentUserId: string;
   currentRole: "owner" | "editor" | "viewer";
   isStudentViewer?: boolean;
+  currentStudentName?: string | null;
   classroomId?: string | null;
   streamTitlePrompt?: string;
   streamContentPrompt?: string;
@@ -105,6 +108,7 @@ export function StreamBoard({
   currentUserId,
   currentRole,
   isStudentViewer,
+  currentStudentName,
   streamTitlePrompt,
   streamContentPrompt,
   initialSections = [],
@@ -127,9 +131,11 @@ export function StreamBoard({
   const [sectionAddError, setSectionAddError] = useState<string | null>(null);
   const [templateBusySectionId, setTemplateBusySectionId] = useState<string | null>(null);
   const [templateModalSectionId, setTemplateModalSectionId] = useState<string | null>(null);
+  const [sectionSlideshowBusyId, setSectionSlideshowBusyId] = useState<string | null>(null);
   const [sectionOrderBusyId, setSectionOrderBusyId] = useState<string | null>(null);
   const [contentOrderBusyId, setContentOrderBusyId] = useState<string | null>(null);
   const [guideBusyId, setGuideBusyId] = useState<string | null>(null);
+  const [editingCard, setEditingCard] = useState<CardData | null>(null);
   const canEdit = currentRole === "owner" || currentRole === "editor";
   const canManageSections = canEdit && !isStudentViewer;
   const canAddPost = canEdit || !!isStudentViewer;
@@ -253,12 +259,13 @@ export function StreamBoard({
   const { registerSlides, unregisterSlides, setSectionOptions } =
     useBoardSlideshow();
   useEffect(() => {
-    const slides: SlideshowSlide[] = [];
-    if (streamSectionsEnabled) {
-      for (const section of sortedSections) {
-        const bucket = visibleBySection.get(section.id) ?? [];
-        slides.push({
-          id: `section:${section.id}`,
+	    const slides: SlideshowSlide[] = [];
+	    if (streamSectionsEnabled) {
+	      for (const section of sortedSections) {
+	        if (!isSectionSlideshowEnabled(section)) continue;
+	        const bucket = visibleBySection.get(section.id) ?? [];
+	        slides.push({
+	          id: `section:${section.id}`,
           kind: "section",
           sectionId: section.id,
           sectionTitle: section.title,
@@ -302,13 +309,18 @@ export function StreamBoard({
       setSectionOptions("stream", []);
       return;
     }
-    const options: SlideshowSectionOption[] = sortedSections
-      .map((section) => {
+	    const options: SlideshowSectionOption[] = sortedSections
+	      .filter(isSectionSlideshowEnabled)
+	      .map((section) => {
         const state = breakoutBySection[section.id];
         const groups = state?.config
           ? [...state.groups]
               .sort((a, b) => a.order - b.order)
-              .map((group) => ({ groupId: group.id, name: group.name }))
+              .map((group) => ({
+                groupId: group.id,
+                name: group.name,
+                memberStudentIds: (group.members ?? []).map((member) => member.studentId),
+              }))
           : [];
         return { sectionId: section.id, title: section.title, groups };
       })
@@ -373,6 +385,62 @@ export function StreamBoard({
     } catch {
       deletingIds.current.delete(card.id);
       setCards(prev);
+    }
+  }
+
+  async function handleEditCardSave(updates: EditCardUpdates) {
+    if (!editingCard) return;
+    const prev = cards;
+    const cardId = editingCard.id;
+    const { attachments: updateAttachments, ...restUpdates } = updates;
+    const optimisticUpdates: Partial<CardData> = { ...restUpdates };
+    if (updateAttachments) {
+      optimisticUpdates.attachments = updateAttachments.map((attachment, index) => ({
+        id:
+          attachment.tempId &&
+          !attachment.tempId.startsWith("legacy-") &&
+          !attachment.tempId.startsWith("tmp-")
+            ? attachment.tempId
+            : `opt-${index}-${attachment.kind}`,
+        kind: attachment.kind,
+        url: attachment.url,
+        previewUrl: attachment.previewUrl ?? null,
+        fileName: attachment.fileName ?? null,
+        fileSize: attachment.fileSize ?? null,
+        mimeType: attachment.mimeType ?? null,
+        order: index,
+      }));
+    }
+    setCards((list) =>
+      sortPosts(
+        list.map((card) =>
+          card.id === cardId ? { ...card, ...optimisticUpdates } : card,
+        ),
+      ),
+    );
+    try {
+      const res = await fetch(`/api/cards/${cardId}`, {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(updates),
+      });
+      if (!res.ok) {
+        setCards(prev);
+        alert("게시글 수정에 실패했어요.");
+        return;
+      }
+      const refreshed = await fetch(`/api/cards/${cardId}`).catch(() => null);
+      if (refreshed?.ok) {
+        const data = (await refreshed.json()) as { card?: CardData };
+        if (data.card) {
+          setCards((list) =>
+            sortPosts(list.map((card) => (card.id === cardId ? data.card! : card))),
+          );
+        }
+      }
+    } catch {
+      setCards(prev);
+      alert("게시글 수정에 실패했어요.");
     }
   }
 
@@ -488,8 +556,20 @@ export function StreamBoard({
   ): Promise<boolean> {
     setTemplateBusySectionId(sectionId);
     const prev = sections;
+    const currentSection = sections.find((s) => s.id === sectionId);
+    const currentState = normalizeStreamActivityTemplateState(
+      currentSection?.activityTemplateState,
+    );
+    const baseState =
+      currentState.slideshowEnabled === undefined
+        ? {}
+        : { slideshowEnabled: currentState.slideshowEnabled };
     const activityTemplateState =
-      activityTemplate === "word_cloud" ? { wordCloudPublished: false } : null;
+      activityTemplate === "word_cloud"
+        ? { ...baseState, wordCloudPublished: false }
+        : Object.keys(baseState).length > 0
+          ? baseState
+          : null;
     setSections((list) =>
       list.map((s) =>
         s.id === sectionId
@@ -529,6 +609,54 @@ export function StreamBoard({
       return false;
     } finally {
       setTemplateBusySectionId(null);
+    }
+  }
+
+  async function handleSectionSlideshowToggle(section: StreamSection): Promise<void> {
+    if (sectionSlideshowBusyId) return;
+    const prev = sections;
+    const currentState = normalizeStreamActivityTemplateState(section.activityTemplateState);
+    const nextState: StreamActivityTemplateState = {
+      ...currentState,
+      slideshowEnabled: !isSectionSlideshowEnabled(section),
+    };
+    setSectionSlideshowBusyId(section.id);
+    setSections((list) =>
+      list.map((candidate) =>
+        candidate.id === section.id
+          ? { ...candidate, activityTemplateState: nextState }
+          : candidate,
+      ),
+    );
+    try {
+      const res = await fetch(`/api/sections/${section.id}`, {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ activityTemplateState: nextState }),
+      });
+      if (!res.ok) {
+        setSections(prev);
+        alert("슬라이드쇼 설정 저장에 실패했어요.");
+        return;
+      }
+      const { section: saved } = (await res.json()) as { section: StreamSection };
+      setSections((list) =>
+        list.map((candidate) =>
+          candidate.id === saved.id
+            ? {
+                ...candidate,
+                activityTemplateState: normalizeStreamActivityTemplateState(
+                  saved.activityTemplateState,
+                ),
+              }
+            : candidate,
+        ),
+      );
+    } catch {
+      setSections(prev);
+      alert("슬라이드쇼 설정 저장에 실패했어요.");
+    } finally {
+      setSectionSlideshowBusyId(null);
     }
   }
 
@@ -895,6 +1023,7 @@ export function StreamBoard({
             currentRole={currentRole}
             canAddPost={canAddPost}
             isStudentViewer={isStudentViewer}
+            currentStudentName={currentStudentName}
             isAddingSection={isAddingSection}
             newSectionTitle={newSectionTitle}
             sectionAddBusy={sectionAddBusy}
@@ -906,6 +1035,7 @@ export function StreamBoard({
             onOpenSectionPanel={(sectionId, tab) =>
               setPanelState({ sectionId, tab })
             }
+            onToggleSectionSlideshow={handleSectionSlideshowToggle}
             onMoveSection={handleMoveSection}
             onOpenTemplateModal={setTemplateModalSectionId}
             onOpenBreakoutModal={setBreakoutModalSectionId}
@@ -916,6 +1046,7 @@ export function StreamBoard({
             }
             onMoveSectionContent={handleMoveSectionContent}
             templateBusySectionId={templateBusySectionId}
+            sectionSlideshowBusyId={sectionSlideshowBusyId}
             sectionOrderBusyId={sectionOrderBusyId}
             contentOrderBusyId={contentOrderBusyId}
             guideBusyId={guideBusyId}
@@ -927,22 +1058,27 @@ export function StreamBoard({
             }
             onJoinBreakout={handleJoinBreakout}
             onRemoveBreakoutMember={handleRemoveBreakoutMember}
+            onEditCard={setEditingCard}
             onDeleteCard={handleDelete}
             onToggleGuide={handleToggleGuide}
           />
         ) : (
-          cards.map((card) => (
-            <StreamPost
-              key={card.id}
-              card={card}
-              canDelete={canDeleteCard(card, currentUserId, currentRole)}
-              onDelete={() => handleDelete(card)}
-              canToggleGuide={canToggleGuideCard(card, canManageSections)}
-              guideBusy={guideBusyId === card.id}
-              onToggleGuide={(guidePinned) => handleToggleGuide(card, guidePinned)}
-              boardId={boardId}
-            />
-          ))
+          <div className="stream-post-grid">
+            {cards.map((card) => (
+              <StreamPost
+                key={card.id}
+                card={card}
+                canEdit={canDeleteCard(card, currentUserId, currentRole)}
+                onEdit={() => setEditingCard(card)}
+                canDelete={canDeleteCard(card, currentUserId, currentRole)}
+                onDelete={() => handleDelete(card)}
+                canToggleGuide={canToggleGuideCard(card, canManageSections)}
+                guideBusy={guideBusyId === card.id}
+                onToggleGuide={(guidePinned) => handleToggleGuide(card, guidePinned)}
+                boardId={boardId}
+              />
+            ))}
+          </div>
         )}
       </div>
       {canAddPost && (
@@ -1072,6 +1208,15 @@ export function StreamBoard({
             document.body,
           );
         })()}
+      {editingCard &&
+        createPortal(
+          <EditCardModal
+            card={editingCard}
+            onSave={handleEditCardSave}
+            onClose={() => setEditingCard(null)}
+          />,
+          document.body,
+        )}
     </div>
   );
 }
@@ -1085,6 +1230,7 @@ type StreamGroupedFeedProps = {
   currentRole: "owner" | "editor" | "viewer";
   canAddPost: boolean;
   isStudentViewer?: boolean;
+  currentStudentName?: string | null;
   isAddingSection: boolean;
   newSectionTitle: string;
   sectionAddBusy: boolean;
@@ -1094,6 +1240,7 @@ type StreamGroupedFeedProps = {
   onSectionTitleChange: (title: string) => void;
   onSubmitSection: (event: FormEvent<HTMLFormElement>) => void;
   onOpenSectionPanel: (sectionId: string, tab: "rename" | "delete") => void;
+  onToggleSectionSlideshow: (section: StreamSection) => Promise<void>;
   onMoveSection: (sectionId: string, direction: "up" | "down") => Promise<void>;
   onOpenTemplateModal: (sectionId: string) => void;
   onOpenBreakoutModal: (sectionId: string) => void;
@@ -1114,6 +1261,7 @@ type StreamGroupedFeedProps = {
     direction: "up" | "down",
   ) => Promise<void>;
   templateBusySectionId: string | null;
+  sectionSlideshowBusyId: string | null;
   sectionOrderBusyId: string | null;
   contentOrderBusyId: string | null;
   guideBusyId: string | null;
@@ -1126,6 +1274,7 @@ type StreamGroupedFeedProps = {
     sectionId: string,
     membershipId: string,
   ) => Promise<boolean>;
+  onEditCard: (card: CardData) => void;
   onDeleteCard: (card: CardData) => void;
   onToggleGuide: (card: CardData, guidePinned: boolean) => void;
 };
@@ -1139,6 +1288,7 @@ function StreamGroupedFeed({
   currentRole,
   canAddPost,
   isStudentViewer,
+  currentStudentName,
   isAddingSection,
   newSectionTitle,
   sectionAddBusy,
@@ -1148,6 +1298,7 @@ function StreamGroupedFeed({
   onSectionTitleChange,
   onSubmitSection,
   onOpenSectionPanel,
+  onToggleSectionSlideshow,
   onMoveSection,
   onOpenTemplateModal,
   onOpenBreakoutModal,
@@ -1156,6 +1307,7 @@ function StreamGroupedFeed({
   onCreateSectionCard,
   onMoveSectionContent,
   templateBusySectionId,
+  sectionSlideshowBusyId,
   sectionOrderBusyId,
   contentOrderBusyId,
   guideBusyId,
@@ -1165,6 +1317,7 @@ function StreamGroupedFeed({
   onSetActiveGroup,
   onJoinBreakout,
   onRemoveBreakoutMember,
+  onEditCard,
   onDeleteCard,
   onToggleGuide,
 }: StreamGroupedFeedProps) {
@@ -1225,10 +1378,11 @@ function StreamGroupedFeed({
         const hasBreakout = !!breakout?.config;
         const guideCards = bucket.filter(isGuideCard);
         const sectionCards = bucket.filter((card) => !isGuideCard(card));
-        const contentItems = buildSectionContentItems(section, sectionCards);
-        const orderBusy = sectionOrderBusyId !== null;
-        const canMoveUp = sectionIndex > 0;
-        const canMoveDown = sectionIndex < sections.length - 1;
+	        const contentItems = buildSectionContentItems(section, sectionCards);
+	        const orderBusy = sectionOrderBusyId !== null;
+	        const slideshowEnabled = isSectionSlideshowEnabled(section);
+	        const canMoveUp = sectionIndex > 0;
+	        const canMoveDown = sectionIndex < sections.length - 1;
         return (
           <section
             key={section.id}
@@ -1240,10 +1394,27 @@ function StreamGroupedFeed({
               <div className="stream-section-heading">
                 <h2 className="stream-section-title">{section.title}</h2>
                 {canEdit && (
-                  <div className="stream-section-inline-actions">
-                    <button
-                      type="button"
-                      className="ui-icon-action ui-icon-action-soft stream-section-icon-btn"
+	                  <div className="stream-section-inline-actions">
+	                    <button
+	                      type="button"
+	                      className={`ui-icon-action ui-icon-action-soft stream-section-icon-btn stream-section-slideshow-btn${
+	                        slideshowEnabled ? " is-active" : ""
+	                      }`}
+	                      aria-label={
+	                        slideshowEnabled
+	                          ? `${section.title} 슬라이드쇼에서 제외`
+	                          : `${section.title} 슬라이드쇼에 포함`
+	                      }
+	                      aria-pressed={slideshowEnabled}
+	                      title={slideshowEnabled ? "슬라이드쇼 포함" : "슬라이드쇼 제외"}
+	                      onClick={() => void onToggleSectionSlideshow(section)}
+	                      disabled={sectionSlideshowBusyId === section.id}
+	                    >
+	                      <SlideshowIcon size={16} />
+	                    </button>
+	                    <button
+	                      type="button"
+	                      className="ui-icon-action ui-icon-action-soft stream-section-icon-btn"
                       aria-label={`${section.title} 이름 변경`}
                       title="이름 변경"
                       onClick={() => onOpenSectionPanel(section.id, "rename")}
@@ -1335,6 +1506,7 @@ function StreamGroupedFeed({
                 currentRole={currentRole}
                 canToggleGuide={canEdit}
                 guideBusyId={guideBusyId}
+                onEditCard={onEditCard}
                 onDeleteCard={onDeleteCard}
                 onToggleGuide={onToggleGuide}
               />
@@ -1351,6 +1523,7 @@ function StreamGroupedFeed({
                 canAddPost={canAddPost}
                 currentUserId={currentUserId}
                 currentRole={currentRole}
+                currentStudentName={currentStudentName}
                 onSetActiveGroup={(group) => onSetActiveGroup(section.id, group)}
                 onJoin={(groupId) => onJoinBreakout(section.id, groupId)}
                 onRemoveMember={(membershipId) =>
@@ -1360,38 +1533,71 @@ function StreamGroupedFeed({
                   onCreateSectionCard(section.id, data, groupId)
                 }
                 onSectionActivityStateChange={onSectionActivityStateChange}
+                onEditCard={onEditCard}
                 onDeleteCard={onDeleteCard}
                 onToggleGuide={onToggleGuide}
                 guideBusyId={guideBusyId}
               />
             ) : contentItems.length === 0 && guideCards.length === 0 ? (
               <div className="stream-section-empty">아직 게시글이 없어요.</div>
-            ) : (
+            ) : section.activityTemplate ? (
               contentItems.map((item, itemIndex) => (
-               <StreamSectionContentItem
-                 key={item.id}
-                 item={item}
-                 itemIndex={itemIndex}
-                 itemCount={contentItems.length}
-                 section={section}
-                 cards={sectionCards}
-                 canReorder={canAddPost}
-                 canEditTemplate={canAddPost}
-                 isTeacherView={canEdit}
-                 orderBusyId={contentOrderBusyId}
-                 guideBusyId={guideBusyId}
-                 boardId={boardId}
-                 currentUserId={currentUserId}
-                 currentRole={currentRole}
-                 onMove={(id, direction) =>
-                   onMoveSectionContent(section, contentItems, id, direction)
-                 }
-                 onDeleteCard={onDeleteCard}
-                 onToggleGuide={onToggleGuide}
-                 onSectionActivityStateChange={onSectionActivityStateChange}
-                 onCreateSectionCard={onCreateSectionCard}
-               />
-             ))
+                <StreamSectionContentItem
+                  key={item.id}
+                  item={item}
+                  itemIndex={itemIndex}
+                  itemCount={contentItems.length}
+                  section={section}
+                  cards={sectionCards}
+                  canReorder={canAddPost}
+                  canEditTemplate={canAddPost}
+                  isTeacherView={canEdit}
+                  orderBusyId={contentOrderBusyId}
+                  guideBusyId={guideBusyId}
+                  boardId={boardId}
+                  currentUserId={currentUserId}
+                  currentRole={currentRole}
+                  currentStudentName={currentStudentName}
+                  onMove={(id, direction) =>
+                    onMoveSectionContent(section, contentItems, id, direction)
+                  }
+                  onEditCard={onEditCard}
+                  onDeleteCard={onDeleteCard}
+                  onToggleGuide={onToggleGuide}
+                  onSectionActivityStateChange={onSectionActivityStateChange}
+                  onCreateSectionCard={onCreateSectionCard}
+                />
+              ))
+            ) : (
+              <div className="stream-post-grid">
+                {contentItems.map((item, itemIndex) => (
+                  <StreamSectionContentItem
+                    key={item.id}
+                    item={item}
+                    itemIndex={itemIndex}
+                    itemCount={contentItems.length}
+                    section={section}
+                    cards={sectionCards}
+                    canReorder={canAddPost}
+                    canEditTemplate={canAddPost}
+                    isTeacherView={canEdit}
+                    orderBusyId={contentOrderBusyId}
+                    guideBusyId={guideBusyId}
+                    boardId={boardId}
+                    currentUserId={currentUserId}
+                    currentRole={currentRole}
+                    currentStudentName={currentStudentName}
+                    onMove={(id, direction) =>
+                      onMoveSectionContent(section, contentItems, id, direction)
+                    }
+                    onEditCard={onEditCard}
+                    onDeleteCard={onDeleteCard}
+                    onToggleGuide={onToggleGuide}
+                    onSectionActivityStateChange={onSectionActivityStateChange}
+                    onCreateSectionCard={onCreateSectionCard}
+                  />
+                ))}
+              </div>
            )}
           </section>
         );
@@ -1402,15 +1608,19 @@ function StreamGroupedFeed({
           <header className="stream-section-header">
             <h2 className="stream-section-title">섹션 없음</h2>
           </header>
-          {grouped.unsectioned.map((card) => (
-            <StreamPost
-              key={card.id}
-              card={card}
-              canDelete={canDeleteCard(card, currentUserId, currentRole)}
-              onDelete={() => onDeleteCard(card)}
-              boardId={boardId}
-            />
-          ))}
+          <div className="stream-post-grid">
+            {grouped.unsectioned.map((card) => (
+              <StreamPost
+                key={card.id}
+                card={card}
+                canEdit={canDeleteCard(card, currentUserId, currentRole)}
+                onEdit={() => onEditCard(card)}
+                canDelete={canDeleteCard(card, currentUserId, currentRole)}
+                onDelete={() => onDeleteCard(card)}
+                boardId={boardId}
+              />
+            ))}
+          </div>
         </section>
       )}
 
@@ -1425,6 +1635,7 @@ function StreamGuideList({
   currentRole,
   canToggleGuide,
   guideBusyId,
+  onEditCard,
   onDeleteCard,
   onToggleGuide,
 }: {
@@ -1434,6 +1645,7 @@ function StreamGuideList({
   currentRole: "owner" | "editor" | "viewer";
   canToggleGuide: boolean;
   guideBusyId: string | null;
+  onEditCard: (card: CardData) => void;
   onDeleteCard: (card: CardData) => void;
   onToggleGuide: (card: CardData, guidePinned: boolean) => void;
 }) {
@@ -1445,6 +1657,8 @@ function StreamGuideList({
         <StreamPost
           key={card.id}
           card={card}
+          canEdit={canDeleteCard(card, currentUserId, currentRole)}
+          onEdit={() => onEditCard(card)}
           canDelete={canDeleteCard(card, currentUserId, currentRole)}
           onDelete={() => onDeleteCard(card)}
           canToggleGuide={canToggleGuideCard(card, canToggleGuide)}
@@ -1471,7 +1685,9 @@ function StreamSectionContentItem({
   boardId,
   currentUserId,
   currentRole,
+  currentStudentName,
   onMove,
+  onEditCard,
   onDeleteCard,
   onToggleGuide,
   onSectionActivityStateChange,
@@ -1490,7 +1706,9 @@ function StreamSectionContentItem({
   boardId: string;
   currentUserId: string;
   currentRole: "owner" | "editor" | "viewer";
+  currentStudentName?: string | null;
   onMove: (itemId: string, direction: "up" | "down") => Promise<void>;
+  onEditCard: (card: CardData) => void;
   onDeleteCard: (card: CardData) => void;
   onToggleGuide: (card: CardData, guidePinned: boolean) => void;
   onSectionActivityStateChange: (
@@ -1538,7 +1756,10 @@ function StreamSectionContentItem({
           cards={cards}
           canEdit={canEditTemplate}
           isTeacherView={isTeacherView}
+          windowCurrentMemberName={currentStudentName}
           state={section.activityTemplateState ?? null}
+          canEditCard={(card) => canDeleteCard(card, currentUserId, currentRole)}
+          onEditCard={onEditCard}
           onStateChange={(nextState) =>
             onSectionActivityStateChange(section.id, nextState)
           }
@@ -1547,6 +1768,8 @@ function StreamSectionContentItem({
       ) : (
         <StreamPost
           card={item.card}
+          canEdit={canDeleteCard(item.card, currentUserId, currentRole)}
+          onEdit={() => onEditCard(item.card)}
           canDelete={canDeleteCard(item.card, currentUserId, currentRole)}
           onDelete={() => onDeleteCard(item.card)}
           canToggleGuide={canToggleGuideCard(item.card, isTeacherView)}
@@ -1811,6 +2034,13 @@ function canDeleteCard(
   return card.studentAuthorId === currentUserId;
 }
 
+function isSectionSlideshowEnabled(section: StreamSection): boolean {
+  return (
+    normalizeStreamActivityTemplateState(section.activityTemplateState)
+      .slideshowEnabled !== false
+  );
+}
+
 function isGuideCard(card: CardData): boolean {
   return !!card.guidePinned && isTeacherAuthoredCard(card);
 }
@@ -1884,6 +2114,7 @@ type StreamBreakoutBodyProps = {
   canAddPost: boolean;
   currentUserId: string;
   currentRole: "owner" | "editor" | "viewer";
+  currentStudentName?: string | null;
   onSetActiveGroup: (group: string) => void;
   onJoin: (groupId: string) => Promise<boolean>;
   onRemoveMember: (membershipId: string) => Promise<boolean>;
@@ -1895,6 +2126,7 @@ type StreamBreakoutBodyProps = {
     sectionId: string,
     activityTemplateState: StreamActivityTemplateState | null,
   ) => Promise<boolean>;
+  onEditCard: (card: CardData) => void;
   onDeleteCard: (card: CardData) => void;
   onToggleGuide: (card: CardData, guidePinned: boolean) => void;
   guideBusyId: string | null;
@@ -1911,16 +2143,19 @@ function StreamBreakoutBody({
   canAddPost,
   currentUserId,
   currentRole,
+  currentStudentName,
   onSetActiveGroup,
   onJoin,
   onRemoveMember,
   onCreateCard,
   onSectionActivityStateChange,
+  onEditCard,
   onDeleteCard,
   onToggleGuide,
   guideBusyId,
 }: StreamBreakoutBodyProps) {
   const groups = [...state.groups].sort((a, b) => a.order - b.order);
+  const [expandedGroupKeys, setExpandedGroupKeys] = useState<Record<string, boolean>>({});
 
   function groupCards(groupId: string | null): CardData[] {
     return bucket.filter((c) => resolveCardBreakoutGroupId(c, groups) === groupId);
@@ -1928,8 +2163,12 @@ function StreamBreakoutBody({
 
   function renderGroupArea(group: BreakoutGroup | null, cards: CardData[]) {
     const groupId = group?.id ?? null;
+    const groupKey = group?.id ?? "__unassigned";
+    const canCollapsePosts = !section.activityTemplate && cards.length > 1;
+    const expanded = expandedGroupKeys[groupKey] === true;
+    const visibleCards = canCollapsePosts && !expanded ? cards.slice(0, 1) : cards;
     return (
-      <div className="stream-breakout-group-area" key={group?.id ?? "__unassigned"}>
+      <div className="stream-breakout-group-area" key={groupKey}>
         <div className="stream-breakout-group-area-head">
           <div className="stream-breakout-group-title-row">
             <span className="stream-breakout-group-area-name">
@@ -1960,6 +2199,21 @@ function StreamBreakoutBody({
               </div>
             )}
           </div>
+          {canCollapsePosts && (
+            <button
+              type="button"
+              className="stream-breakout-group-post-toggle"
+              aria-expanded={expanded}
+              onClick={() =>
+                setExpandedGroupKeys((prev) => ({
+                  ...prev,
+                  [groupKey]: !expanded,
+                }))
+              }
+            >
+              {expanded ? "접기" : `게시글 ${cards.length}개 펼치기`}
+            </button>
+          )}
         </div>
         {section.activityTemplate && (
           <StreamActivityTemplatePanel
@@ -1970,7 +2224,10 @@ function StreamBreakoutBody({
             isTeacherView={state.canManage}
             windowMemberCount={group?.memberCount}
             windowMemberNames={group?.members?.map((member) => member.studentName)}
+            windowCurrentMemberName={state.canManage ? null : currentStudentName}
             state={section.activityTemplateState ?? null}
+            canEditCard={(card) => canDeleteCard(card, currentUserId, currentRole)}
+            onEditCard={onEditCard}
             onStateChange={(nextState) =>
               onSectionActivityStateChange?.(section.id, nextState) ??
               Promise.resolve(false)
@@ -1982,18 +2239,22 @@ function StreamBreakoutBody({
           (cards.length === 0 ? (
             <div className="stream-section-empty">아직 게시글이 없어요.</div>
           ) : (
-            cards.map((card) => (
-              <StreamPost
-                key={card.id}
-                card={card}
-                canDelete={canDeleteCard(card, currentUserId, currentRole)}
-                onDelete={() => onDeleteCard(card)}
-                canToggleGuide={canToggleGuideCard(card, state.canManage)}
-                guideBusy={guideBusyId === card.id}
-                onToggleGuide={(guidePinned) => onToggleGuide(card, guidePinned)}
-                boardId={boardId}
-              />
-            ))
+            <div className="stream-post-grid">
+              {visibleCards.map((card) => (
+                <StreamPost
+                  key={card.id}
+                  card={card}
+                  canEdit={canDeleteCard(card, currentUserId, currentRole)}
+                  onEdit={() => onEditCard(card)}
+                  canDelete={canDeleteCard(card, currentUserId, currentRole)}
+                  onDelete={() => onDeleteCard(card)}
+                  canToggleGuide={canToggleGuideCard(card, state.canManage)}
+                  guideBusy={guideBusyId === card.id}
+                  onToggleGuide={(guidePinned) => onToggleGuide(card, guidePinned)}
+                  boardId={boardId}
+                />
+              ))}
+            </div>
           ))}
       </div>
     );
@@ -2019,6 +2280,7 @@ function StreamBreakoutBody({
               currentRole={currentRole}
               canToggleGuide={false}
               guideBusyId={guideBusyId}
+              onEditCard={onEditCard}
               onDeleteCard={onDeleteCard}
               onToggleGuide={onToggleGuide}
             />
@@ -2030,6 +2292,7 @@ function StreamBreakoutBody({
                 canEdit={canAddPost}
                 isTeacherView={false}
                 windowMemberCount={previewMemberCount || undefined}
+                windowCurrentMemberName={currentStudentName}
                 state={section.activityTemplateState ?? null}
                 onCreateCard={() => Promise.resolve()}
               />
@@ -2040,6 +2303,8 @@ function StreamBreakoutBody({
                 <StreamPost
                   key={card.id}
                   card={card}
+                  canEdit={false}
+                  onEdit={() => undefined}
                   canDelete={false}
                   onDelete={() => onDeleteCard(card)}
                   boardId={boardId}
@@ -2080,6 +2345,10 @@ function StreamBreakoutBody({
     const myGroupId = state.membership.groupId;
     const myGroup = groups.find((g) => g.id === myGroupId) ?? null;
     const cards = groupCards(myGroupId);
+    const myGroupExpanded = expandedGroupKeys[myGroupId] === true;
+    const canCollapseMyGroupPosts = !section.activityTemplate && cards.length > 1;
+    const visibleMyGroupCards =
+      canCollapseMyGroupPosts && !myGroupExpanded ? cards.slice(0, 1) : cards;
     const myGroupGuideList = (
       <StreamGuideList
         cards={guideCards}
@@ -2088,6 +2357,7 @@ function StreamBreakoutBody({
         currentRole={currentRole}
         canToggleGuide={false}
         guideBusyId={guideBusyId}
+        onEditCard={onEditCard}
         onDeleteCard={onDeleteCard}
         onToggleGuide={onToggleGuide}
       />
@@ -2098,6 +2368,21 @@ function StreamBreakoutBody({
         <div className="stream-breakout-my-group">
           <span>{myGroup?.name ?? "내 모둠"}</span>
           {myGroup && <span>{myGroup.memberCount}명</span>}
+          {canCollapseMyGroupPosts && (
+            <button
+              type="button"
+              className="stream-breakout-group-post-toggle"
+              aria-expanded={myGroupExpanded}
+              onClick={() =>
+                setExpandedGroupKeys((prev) => ({
+                  ...prev,
+                  [myGroupId]: !myGroupExpanded,
+                }))
+              }
+            >
+              {myGroupExpanded ? "접기" : `게시글 ${cards.length}개 펼치기`}
+            </button>
+          )}
         </div>
         {section.activityTemplate && (
           <StreamActivityTemplatePanel
@@ -2108,7 +2393,10 @@ function StreamBreakoutBody({
             isTeacherView={false}
             windowMemberCount={myGroup?.memberCount}
             windowMemberNames={myGroup?.members?.map((member) => member.studentName)}
+            windowCurrentMemberName={currentStudentName}
             state={section.activityTemplateState ?? null}
+            canEditCard={(card) => canDeleteCard(card, currentUserId, currentRole)}
+            onEditCard={onEditCard}
             onCreateCard={(data) => onCreateCard(data, myGroupId)}
           />
         )}
@@ -2116,15 +2404,19 @@ function StreamBreakoutBody({
           (cards.length === 0 ? (
             <div className="stream-section-empty">아직 게시글이 없어요.</div>
           ) : (
-            cards.map((card) => (
-              <StreamPost
-                key={card.id}
-                card={card}
-                canDelete={canDeleteCard(card, currentUserId, currentRole)}
-                onDelete={() => onDeleteCard(card)}
-                boardId={boardId}
-              />
-            ))
+            <div className="stream-post-grid">
+              {visibleMyGroupCards.map((card) => (
+                <StreamPost
+                  key={card.id}
+                  card={card}
+                  canEdit={canDeleteCard(card, currentUserId, currentRole)}
+                  onEdit={() => onEditCard(card)}
+                  canDelete={canDeleteCard(card, currentUserId, currentRole)}
+                  onDelete={() => onDeleteCard(card)}
+                  boardId={boardId}
+                />
+              ))}
+            </div>
           ))}
       </div>
     );
@@ -2140,6 +2432,7 @@ function StreamBreakoutBody({
       currentRole={currentRole}
       canToggleGuide={state.canManage}
       guideBusyId={guideBusyId}
+      onEditCard={onEditCard}
       onDeleteCard={onDeleteCard}
       onToggleGuide={onToggleGuide}
     />

@@ -32,6 +32,7 @@ export type SlideshowSlide = {
 export type SlideshowGroupOption = {
   groupId: string;
   name: string;
+  memberStudentIds?: string[];
 };
 
 export type SlideshowSectionOption = {
@@ -267,47 +268,35 @@ function applyPresentationFilter(
     }
     if (slide.kind === "activity") {
       const filtered = (slide.cards ?? []).filter(
-        (card) => (card.groupId ?? null) === chosen,
+        (card) => cardBelongsToPresentationGroup(card, chosen, option),
       );
       if (filtered.length === 0) continue;
       result.push({ ...slide, cards: filtered });
       continue;
     }
     if (slide.kind === "card" && slide.card) {
-      if ((slide.card.groupId ?? null) !== chosen) continue;
+      if (!cardBelongsToPresentationGroup(slide.card, chosen, option)) continue;
       result.push(slide);
       continue;
     }
     result.push(slide);
   }
-  const seenNoticeFor = new Set<string>();
-  for (let i = 0; i < result.length; i += 1) {
-    const slide = result[i];
-    if (slide.kind !== "section" || !slide.sectionId) continue;
-    const option = optionsById.get(slide.sectionId);
-    if (!option || option.groups.length === 0) continue;
-    const chosen = groupBySection[option.sectionId];
-    if (!chosen || seenNoticeFor.has(option.sectionId)) continue;
-    const hasContent = result.some(
-      (s, idx) =>
-        idx > i &&
-        s.sectionId === option.sectionId &&
-        (s.kind === "card" || s.kind === "activity"),
-    );
-    if (!hasContent) {
-      seenNoticeFor.add(option.sectionId);
-      const groupName =
-        option.groups.find((g) => g.groupId === chosen)?.name ??
-        "selected group";
-      result.splice(i + 1, 0, {
-        id: `notice:${option.sectionId}:${chosen}`,
-        kind: "section",
-        sectionId: option.sectionId,
-        sectionTitle: `${option.title} - ${groupName} (no posts)`,
-      });
-    }
-  }
   return result;
+}
+
+function cardBelongsToPresentationGroup(
+  card: CardData,
+  groupId: string,
+  option: SlideshowSectionOption,
+): boolean {
+  if ((card.groupId ?? null) === groupId) return true;
+  const group = option.groups.find((item) => item.groupId === groupId);
+  const memberIds = new Set(group?.memberStudentIds ?? []);
+  if (memberIds.size === 0) return false;
+  if (card.studentAuthorId && memberIds.has(card.studentAuthorId)) return true;
+  return (card.authors ?? []).some(
+    (author) => author.studentId && memberIds.has(author.studentId),
+  );
 }
 
 function PresentationGroupPrompt({

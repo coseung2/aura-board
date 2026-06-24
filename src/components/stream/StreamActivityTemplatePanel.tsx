@@ -17,7 +17,10 @@ type Props = {
   isTeacherView?: boolean;
   windowMemberCount?: number;
   windowMemberNames?: string[];
+  windowCurrentMemberName?: string | null;
   state?: StreamActivityTemplateState | null;
+  canEditCard?: (card: CardData) => boolean;
+  onEditCard?: (card: CardData) => void;
   onStateChange?: (state: StreamActivityTemplateState | null) => Promise<boolean>;
   onCreateCard: (data: { title: string; content: string }) => Promise<void>;
 };
@@ -48,7 +51,10 @@ export function StreamActivityTemplatePanel({
   isTeacherView = false,
   windowMemberCount,
   windowMemberNames,
+  windowCurrentMemberName,
   state,
+  canEditCard,
+  onEditCard,
   onStateChange,
   onCreateCard,
 }: Props) {
@@ -57,8 +63,12 @@ export function StreamActivityTemplatePanel({
       <WindowOpeningPanel
         cards={cards}
         canEdit={canEdit}
+        isTeacherView={isTeacherView}
         memberCount={windowMemberCount}
         memberNames={windowMemberNames}
+        currentMemberName={windowCurrentMemberName}
+        canEditCard={canEditCard}
+        onEditCard={onEditCard}
         onCreateCard={onCreateCard}
       />
     );
@@ -70,6 +80,8 @@ export function StreamActivityTemplatePanel({
         canEdit={canEdit}
         isTeacherView={isTeacherView}
         state={state}
+        canEditCard={canEditCard}
+        onEditCard={onEditCard}
         onStateChange={onStateChange}
         onCreateCard={onCreateCard}
       />
@@ -80,6 +92,8 @@ export function StreamActivityTemplatePanel({
       <TimelinePanel
         cards={cards}
         canEdit={canEdit}
+        canEditCard={canEditCard}
+        onEditCard={onEditCard}
         onCreateCard={onCreateCard}
       />
     );
@@ -111,14 +125,22 @@ type WindowOpeningCell = {
 function WindowOpeningPanel({
   cards,
   canEdit,
+  isTeacherView,
   memberCount,
   memberNames,
+  currentMemberName,
+  canEditCard,
+  onEditCard,
   onCreateCard,
 }: {
   cards: CardData[];
   canEdit: boolean;
+  isTeacherView: boolean;
   memberCount?: number;
   memberNames?: string[];
+  currentMemberName?: string | null;
+  canEditCard?: (card: CardData) => boolean;
+  onEditCard?: (card: CardData) => void;
   onCreateCard: (data: { title: string; content: string }) => Promise<void>;
 }) {
   const cells = useMemo(
@@ -135,6 +157,14 @@ function WindowOpeningPanel({
       <div className="stream-window-board">
         {cells.map((cell) => {
           const cellCards = groupedCards[cell.id] ?? [];
+          const canWriteCell =
+            canEdit &&
+            canWriteWindowOpeningCell({
+              cell,
+              isTeacherView,
+              memberNames,
+              currentMemberName,
+            });
           return (
             <div
               key={cell.id}
@@ -143,14 +173,26 @@ function WindowOpeningPanel({
             >
               <span className="stream-window-cell-label">{cell.label}</span>
               <div className="stream-window-note-stack">
-                {cellCards.map((card) => (
-                  <article key={card.id} className="stream-window-note">
-                    {card.title && card.title !== cell.label && <strong>{card.title}</strong>}
-                    <p>{card.content}</p>
-                  </article>
-                ))}
+                {cellCards.map((card) => {
+                  const editable = canWriteCell && (canEditCard?.(card) ?? false);
+                  return (
+                    <article key={card.id} className="stream-window-note">
+                      {card.title && card.title !== cell.label && <strong>{card.title}</strong>}
+                      <p>{card.content}</p>
+                      {editable && onEditCard && (
+                        <button
+                          type="button"
+                          className="stream-template-inline-edit"
+                          onClick={() => onEditCard(card)}
+                        >
+                          수정
+                        </button>
+                      )}
+                    </article>
+                  );
+                })}
               </div>
-              {canEdit && (
+              {canWriteCell && (
                 <WindowCellComposer
                   label={cell.label}
                   onCreateCard={onCreateCard}
@@ -164,11 +206,34 @@ function WindowOpeningPanel({
   );
 }
 
+function canWriteWindowOpeningCell({
+  cell,
+  isTeacherView,
+  memberNames,
+  currentMemberName,
+}: {
+  cell: WindowOpeningCell;
+  isTeacherView: boolean;
+  memberNames?: string[];
+  currentMemberName?: string | null;
+}): boolean {
+  if (isTeacherView) return true;
+  if (cell.kind === "agreement") return true;
+  if (!currentMemberName || !memberNames || memberNames.length === 0) return true;
+  return normalizeWindowMemberName(cell.label) === normalizeWindowMemberName(currentMemberName);
+}
+
+function normalizeWindowMemberName(value: string): string {
+  return value.replace(/\s+/g, "").trim();
+}
+
 function WordCloudPanel({
   cards,
   canEdit,
   isTeacherView,
   state,
+  canEditCard,
+  onEditCard,
   onStateChange,
   onCreateCard,
 }: {
@@ -176,10 +241,16 @@ function WordCloudPanel({
   canEdit: boolean;
   isTeacherView: boolean;
   state?: StreamActivityTemplateState | null;
+  canEditCard?: (card: CardData) => boolean;
+  onEditCard?: (card: CardData) => void;
   onStateChange?: (state: StreamActivityTemplateState | null) => Promise<boolean>;
   onCreateCard: (data: { title: string; content: string }) => Promise<void>;
 }) {
   const words = useMemo(() => buildWordCloud(cards), [cards]);
+  const editableResponses = useMemo(
+    () => cards.filter((card) => canEditCard?.(card) ?? false),
+    [canEditCard, cards],
+  );
   const layout = useMemo(() => wordCloudLayout(words), [words]);
   const visibleWords = useMemo(
     () =>
@@ -255,15 +326,32 @@ function WordCloudPanel({
         )}
       </div>
       {canEdit && (
-        <QuickTextForm
-          className="stream-word-input"
-          placeholder="떠오르는 단어를 입력해주세요."
-          submitLabel="추가"
-          normalizeInput={limitWordCloudInput}
-          successMessage="친구들의 응답을 기다려볼까요? 또 입력하셔도 좋아요!"
-          errorMessage="반영에 실패했어요."
-          onSubmit={(content) => onCreateCard({ title: "", content })}
-        />
+        <div className="stream-word-input-block">
+          <QuickTextForm
+            className="stream-word-input"
+            placeholder="떠오르는 단어를 입력해주세요."
+            submitLabel="추가"
+            normalizeInput={limitWordCloudInput}
+            successMessage="친구들의 응답을 기다려볼까요? 또 입력하셔도 좋아요!"
+            errorMessage="반영에 실패했어요."
+            onSubmit={(content) => onCreateCard({ title: "", content })}
+          />
+          {!isTeacherView && editableResponses.length > 0 && onEditCard && (
+            <div className="stream-word-response-list" aria-label="내 응답">
+              {editableResponses.map((card) => (
+                <button
+                  key={card.id}
+                  type="button"
+                  className="stream-word-response-item"
+                  onClick={() => onEditCard(card)}
+                >
+                  <span>{card.content}</span>
+                  <strong>수정</strong>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
       )}
     </div>
   );
@@ -272,10 +360,14 @@ function WordCloudPanel({
 function TimelinePanel({
   cards,
   canEdit,
+  canEditCard,
+  onEditCard,
   onCreateCard,
 }: {
   cards: CardData[];
   canEdit: boolean;
+  canEditCard?: (card: CardData) => boolean;
+  onEditCard?: (card: CardData) => void;
   onCreateCard: (data: { title: string; content: string }) => Promise<void>;
 }) {
   const items = useMemo(() => buildTimeline(cards), [cards]);
@@ -301,6 +393,15 @@ function TimelinePanel({
                   <article className="stream-timeline-event">
                     <time>{item.dateText}</time>
                     <span>{eventText}</span>
+                    {(canEditCard?.(item.card) ?? false) && onEditCard && (
+                      <button
+                        type="button"
+                        className="stream-template-inline-edit"
+                        onClick={() => onEditCard(item.card)}
+                      >
+                        수정
+                      </button>
+                    )}
                   </article>
                 </li>
               );

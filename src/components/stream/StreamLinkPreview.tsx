@@ -5,19 +5,22 @@ import type { CardData } from "../DraggableCard";
 type Props = {
   card: Pick<CardData, "linkUrl" | "linkTitle" | "linkDesc" | "linkImage">;
   variant?: "inline" | "hero";
+  mediaOnly?: boolean;
 };
 
-export function StreamLinkPreview({ card, variant = "inline" }: Props) {
+export function StreamLinkPreview({ card, variant = "inline", mediaOnly = false }: Props) {
   if (!card.linkUrl) return null;
 
   const host = getHost(card.linkUrl);
   const hasPreview = Boolean(card.linkTitle || card.linkDesc || card.linkImage);
   const fallbackTitle = getFallbackTitle(card.linkUrl);
+  const showCopy = !mediaOnly || !card.linkImage;
 
   return (
     <a
       className={`stream-link-preview stream-link-preview--${variant}${
         hasPreview ? "" : " is-plain"
+      }${mediaOnly && card.linkImage ? " is-media-only" : ""
       }`}
       href={card.linkUrl}
       target="_blank"
@@ -29,12 +32,20 @@ export function StreamLinkPreview({ card, variant = "inline" }: Props) {
           <img src={card.linkImage} alt="" loading="lazy" decoding="async" />
         </span>
       )}
-      <span className="stream-link-copy">
-        <span className="stream-link-host">{host}</span>
-        {card.linkTitle && <strong>{card.linkTitle}</strong>}
-        {card.linkDesc && <span>{card.linkDesc}</span>}
-        {!card.linkTitle && !card.linkDesc && <strong>{fallbackTitle}</strong>}
-      </span>
+      {showCopy && (
+        <span className="stream-link-copy">
+          <span className="stream-link-host">{host}</span>
+          {mediaOnly ? (
+            <strong>{fallbackTitle}</strong>
+          ) : (
+            <>
+              {card.linkTitle && <strong>{card.linkTitle}</strong>}
+              {card.linkDesc && <span>{card.linkDesc}</span>}
+              {!card.linkTitle && !card.linkDesc && <strong>{fallbackTitle}</strong>}
+            </>
+          )}
+        </span>
+      )}
     </a>
   );
 }

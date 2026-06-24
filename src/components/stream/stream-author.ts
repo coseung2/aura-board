@@ -21,10 +21,11 @@ export function getStreamAuthor(card: CardData) {
     card.authorName?.trim() ||
     "익명";
   const rawName = card.anonymousAuthor ? "익명" : names[0] || fallback;
+  const formattedName = formatDisplayName(rawName);
   const displayName = card.anonymousAuthor
     ? "익명"
-    : `${formatDisplayName(rawName)}${names.length > 1 ? ` 외 ${names.length - 1}명` : ""}`;
-  const avatarText = displayName.trim().charAt(0) || "익";
+    : `${formattedName}${names.length > 1 ? ` 외 ${names.length - 1}명` : ""}`;
+  const avatarText = formatAvatarText(formattedName);
   const colorKey = card.studentAuthorId || card.authorId || rawName;
 
   return {
@@ -39,6 +40,13 @@ function formatDisplayName(name: string): string {
   if (!trimmed || trimmed === "익명") return trimmed || "익명";
   if (/^[가-힣]{3,}$/.test(trimmed)) return trimmed.slice(1);
   return trimmed;
+}
+
+function formatAvatarText(name: string): string {
+  const trimmed = name.trim();
+  if (!trimmed || trimmed === "익명") return trimmed || "익";
+  if (/^[가-힣]+$/.test(trimmed)) return trimmed.slice(0, 2);
+  return trimmed.slice(0, 3).toUpperCase();
 }
 
 function hashString(value: string | null | undefined): number {

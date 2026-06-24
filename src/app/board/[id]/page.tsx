@@ -526,6 +526,7 @@ export default async function BoardPage({
       // /api/cards endpoint also accepts student_session when a student
       // posts to a board in their own classroom.
       isStudentViewer: !!studentViewer,
+      currentStudentName: studentViewer?.name ?? null,
       // Board's classroom id — CardAuthorEditor uses it to fetch the
       // roster for multi-student author assignment.
       classroomId: board!.classroomId,

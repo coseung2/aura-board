@@ -12,6 +12,8 @@ import { StreamMediaCarousel } from "./StreamMediaCarousel";
 
 type Props = {
   card: CardData;
+  canEdit: boolean;
+  onEdit: () => void;
   canDelete: boolean;
   onDelete: () => void;
   canToggleGuide?: boolean;
@@ -22,6 +24,8 @@ type Props = {
 
 export function StreamPost({
   card,
+  canEdit,
+  onEdit,
   canDelete,
   onDelete,
   canToggleGuide = false,
@@ -85,7 +89,7 @@ export function StreamPost({
           </strong>
           <time>{formatRelativeTime(card.createdAt ?? new Date().toISOString())}</time>
         </div>
-        {(canDelete || canToggleGuide) && (
+        {(canEdit || canDelete || canToggleGuide) && (
           <div className="stream-post-menu">
             <button
               type="button"
@@ -98,6 +102,18 @@ export function StreamPost({
             </button>
             {menuOpen && (
               <div className="stream-post-menu-popover">
+                {canEdit && (
+                  <button
+                    type="button"
+                    className="stream-post-menu-item"
+                    onClick={() => {
+                      setMenuOpen(false);
+                      onEdit();
+                    }}
+                  >
+                    수정
+                  </button>
+                )}
                 {canToggleGuide && (
                   <button
                     type="button"
@@ -130,7 +146,7 @@ export function StreamPost({
       </header>
 
       <StreamMediaCarousel card={card} />
-      {isArticleLink && <StreamLinkPreview card={card} variant="hero" />}
+      {isArticleLink && <StreamLinkPreview card={card} variant="hero" mediaOnly />}
 
       <div className="stream-post-body">
         {displayTitle && <h2>{displayTitle}</h2>}

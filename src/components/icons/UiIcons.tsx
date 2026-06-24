@@ -128,6 +128,17 @@ export function GroupIcon({ size = 20, className }: IconProps) {
   );
 }
 
+export function SlideshowIcon({ size = 20, className }: IconProps) {
+  return (
+    <svg {...base(size)} className={className} aria-hidden="true">
+      <rect x="4" y="5" width="16" height="11" rx="2" />
+      <path d="M12 16v3" />
+      <path d="M8 21h8" />
+      <path d="M10 8.5v4l4-2Z" />
+    </svg>
+  );
+}
+
 export function FullscreenEnterIcon({ size = 20, className }: IconProps) {
   return (
     <svg {...base(size)} className={className} aria-hidden="true">

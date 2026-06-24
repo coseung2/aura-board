@@ -20,10 +20,11 @@ const PatchSectionSchema = z.object({
   pinned: z.boolean().optional(),
   activityTemplate: ActivityTemplateSchema.nullable().optional(),
   activityTemplateState: z
-    .object({
-      wordCloudPublished: z.boolean().optional(),
-      activityTemplateOrder: z.number().int().nonnegative().optional(),
-    })
+	    .object({
+	      wordCloudPublished: z.boolean().optional(),
+	      activityTemplateOrder: z.number().int().nonnegative().optional(),
+	      slideshowEnabled: z.boolean().optional(),
+	    })
     .nullable()
     .optional(),
 });
@@ -81,10 +82,11 @@ export async function PATCH(
               activityTemplateOrder: input.activityTemplateState.activityTemplateOrder,
             }
           :
-        input.activityTemplate === null || input.activityTemplateState === null
-          ? Prisma.DbNull
-          : input.activityTemplateState,
-    };
+	        input.activityTemplateState === null ||
+	        (input.activityTemplate === null && input.activityTemplateState === undefined)
+	          ? Prisma.DbNull
+	          : input.activityTemplateState,
+	    };
 
     const updated = await db.section.update({
       where: { id },
