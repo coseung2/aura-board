@@ -5304,10 +5304,19 @@
   overflow: hidden;
 }
 
+.stream-breakout-locked:has(.stream-activity-panel) {
+  min-height: clamp(520px, 68vh, 760px);
+}
+
 .stream-breakout-locked-content {
+  min-height: inherit;
   opacity: 0.48;
   pointer-events: none;
   filter: grayscale(0.25);
+}
+
+.stream-breakout-locked-content > .stream-activity-panel {
+  min-height: inherit;
 }
 
 .stream-breakout-join-overlay {

@@ -1675,6 +1675,7 @@ function StreamBreakoutBody({
             cards={cards}
             canEdit={state.canManage || canAddPost}
             isTeacherView={state.canManage}
+            windowMemberCount={group?.memberCount}
             state={section.activityTemplateState ?? null}
             onStateChange={(nextState) =>
               onSectionActivityStateChange?.(section.id, nextState) ??
@@ -1706,6 +1707,10 @@ function StreamBreakoutBody({
     if (!state.membership) {
       const capacity = state.config?.groupCapacity ?? 0;
       const previewCards = groupCards(null);
+      const previewMemberCount =
+        capacity > 0
+          ? capacity
+          : Math.max(0, ...groups.map((group) => group.memberCount));
       return (
         <div className="stream-breakout-locked">
           <div className="stream-breakout-locked-content" aria-hidden="true" inert>
@@ -1716,6 +1721,7 @@ function StreamBreakoutBody({
                 cards={previewCards}
                 canEdit={canAddPost}
                 isTeacherView={false}
+                windowMemberCount={previewMemberCount || undefined}
                 state={section.activityTemplateState ?? null}
                 onCreateCard={() => Promise.resolve()}
               />
@@ -1775,6 +1781,7 @@ function StreamBreakoutBody({
             cards={cards}
             canEdit={canAddPost}
             isTeacherView={false}
+            windowMemberCount={myGroup?.memberCount}
             state={section.activityTemplateState ?? null}
             onCreateCard={(data) => onCreateCard(data, myGroupId)}
           />

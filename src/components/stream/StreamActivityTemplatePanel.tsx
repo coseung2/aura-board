@@ -15,6 +15,7 @@ type Props = {
   cards: CardData[];
   canEdit: boolean;
   isTeacherView?: boolean;
+  windowMemberCount?: number;
   state?: StreamActivityTemplateState | null;
   onStateChange?: (state: StreamActivityTemplateState | null) => Promise<boolean>;
   onCreateCard: (data: { title: string; content: string }) => Promise<void>;
@@ -44,6 +45,7 @@ export function StreamActivityTemplatePanel({
   cards,
   canEdit,
   isTeacherView = false,
+  windowMemberCount,
   state,
   onStateChange,
   onCreateCard,
@@ -53,6 +55,7 @@ export function StreamActivityTemplatePanel({
       <WindowOpeningPanel
         cards={cards}
         canEdit={canEdit}
+        memberCount={windowMemberCount}
         onCreateCard={onCreateCard}
       />
     );
@@ -81,51 +84,67 @@ export function StreamActivityTemplatePanel({
   return <MapActivityPanel sectionId={sectionId} canEdit={canEdit} />;
 }
 
-const WINDOW_OPENING_CELLS = [
-  "내 생각",
-  "친구 생각",
-  "질문",
-  "근거",
-  "모둠 합의",
-  "새 관점",
-  "해결책",
-  "정리",
-  "추가 의견",
+const WINDOW_AGREEMENT_LABEL = "합의";
+const DEFAULT_WINDOW_MEMBER_COUNT = 4;
+const WINDOW_MEMBER_SLOTS = [
+  { row: 1, column: 1 },
+  { row: 1, column: 3 },
+  { row: 3, column: 1 },
+  { row: 3, column: 3 },
+  { row: 1, column: 2 },
+  { row: 2, column: 1 },
+  { row: 2, column: 3 },
+  { row: 3, column: 2 },
 ] as const;
+
+type WindowOpeningCell = {
+  id: string;
+  label: string;
+  kind: "member" | "agreement";
+  row: number;
+  column: number;
+};
 
 function WindowOpeningPanel({
   cards,
   canEdit,
+  memberCount,
   onCreateCard,
 }: {
   cards: CardData[];
   canEdit: boolean;
+  memberCount?: number;
   onCreateCard: (data: { title: string; content: string }) => Promise<void>;
 }) {
-  const groupedCards = useMemo(() => groupWindowOpeningCards(cards), [cards]);
+  const cells = useMemo(() => buildWindowOpeningCells(memberCount), [memberCount]);
+  const groupedCards = useMemo(
+    () => groupWindowOpeningCards(cards, cells),
+    [cards, cells],
+  );
 
   return (
     <div className="stream-activity-panel stream-window-panel">
       <div className="stream-window-board">
-        {WINDOW_OPENING_CELLS.map((label) => {
-          const cellCards = groupedCards[label] ?? [];
+        {cells.map((cell) => {
+          const cellCards = groupedCards[cell.id] ?? [];
           return (
             <div
-              key={label}
-              className={label === "모둠 합의" ? "stream-window-center" : undefined}
+              key={cell.id}
+              className={cell.kind === "agreement" ? "stream-window-center" : undefined}
+              style={{ gridColumn: cell.column, gridRow: cell.row }}
             >
-              <span className="stream-window-cell-label">{label}</span>
+              <span className="stream-window-cell-label">{cell.label}</span>
               <div className="stream-window-note-stack">
                 {cellCards.map((card) => (
                   <article key={card.id} className="stream-window-note">
-                    {card.title && card.title !== label && <strong>{card.title}</strong>}
+                    {card.title && card.title !== cell.label && <strong>{card.title}</strong>}
                     <p>{card.content}</p>
                   </article>
                 ))}
               </div>
               {canEdit && (
                 <WindowCellComposer
-                  label={label}
+                  label={cell.label}
                   onCreateCard={onCreateCard}
                 />
               )}
@@ -292,7 +311,7 @@ function WindowCellComposer({
   label,
   onCreateCard,
 }: {
-  label: (typeof WINDOW_OPENING_CELLS)[number];
+  label: string;
   onCreateCard: (data: { title: string; content: string }) => Promise<void>;
 }) {
   return (
@@ -703,19 +722,45 @@ function MapActivityPanel({ sectionId, canEdit }: { sectionId: string; canEdit: 
   );
 }
 
-function groupWindowOpeningCards(cards: CardData[]) {
-  const groups: Partial<Record<(typeof WINDOW_OPENING_CELLS)[number], CardData[]>> = {};
-  const outerCells = WINDOW_OPENING_CELLS.filter((label) => label !== "모둠 합의");
+function buildWindowOpeningCells(memberCount: number | undefined): WindowOpeningCell[] {
+  const count =
+    typeof memberCount === "number"
+      ? Math.max(0, Math.min(WINDOW_MEMBER_SLOTS.length, Math.floor(memberCount)))
+      : DEFAULT_WINDOW_MEMBER_COUNT;
+  const memberCells = WINDOW_MEMBER_SLOTS.slice(0, count).map((slot, index) => ({
+    id: `member-${index + 1}`,
+    label: `모둠원 ${index + 1}`,
+    kind: "member" as const,
+    row: slot.row,
+    column: slot.column,
+  }));
+  return [
+    ...memberCells,
+    {
+      id: "agreement",
+      label: WINDOW_AGREEMENT_LABEL,
+      kind: "agreement" as const,
+      row: 2,
+      column: 2,
+    },
+  ];
+}
+
+function groupWindowOpeningCards(cards: CardData[], cells: WindowOpeningCell[]) {
+  const groups: Record<string, CardData[]> = {};
+  const memberCells = cells.filter((cell) => cell.kind === "member");
   let outerIndex = 0;
 
   for (const card of cards) {
     const text = `${card.title} ${card.content}`;
-    const label = WINDOW_OPENING_CELLS.find((cell) => text.includes(cell));
+    const matchingCell = cells.find((cell) => text.includes(cell.label));
     const target =
-      label ??
-      (/(합의|결론|공통|모둠)/.test(text)
-        ? "모둠 합의"
-        : outerCells[outerIndex++ % outerCells.length]);
+      matchingCell?.id ??
+      (/(합의|결론|공통|모둠 합의)/.test(text)
+        ? "agreement"
+        : memberCells.length > 0
+          ? memberCells[outerIndex++ % memberCells.length]?.id ?? "agreement"
+          : "agreement");
     groups[target] = [...(groups[target] ?? []), card];
   }
 
