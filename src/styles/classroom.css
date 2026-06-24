@@ -2205,6 +2205,14 @@
   gap: 10px;
 }
 
+.classroom-setting-heading-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
 .classroom-setting-input {
   max-width: 380px;
   width: 100%;
@@ -2355,7 +2363,7 @@
 .classroom-settings-modal {
   background: var(--color-surface);
   border-radius: var(--radius-card);
-  max-width: 560px;
+  max-width: 760px;
   width: calc(100vw - 32px);
   max-height: calc(100vh - 80px);
   overflow: auto;
@@ -2383,6 +2391,115 @@
   display: flex;
   flex-direction: column;
   gap: 16px;
+}
+
+.group-roster-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.group-roster-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.group-roster-toolbar button,
+.group-roster-name-field button {
+  min-height: 32px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-btn);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.group-roster-toolbar button {
+  padding: 0 12px;
+}
+
+.group-roster-toolbar button:hover:not(:disabled),
+.group-roster-name-field button:hover:not(:disabled) {
+  background: var(--color-surface-alt);
+  border-color: var(--color-border-hover);
+}
+
+.group-roster-name-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 8px;
+}
+
+.group-roster-name-field {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 6px;
+}
+
+.group-roster-name-field span {
+  font-size: 12px;
+  font-weight: 800;
+  color: var(--color-text-muted);
+}
+
+.group-roster-name-field input,
+.group-roster-table select {
+  width: 100%;
+  min-height: 32px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-btn);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font: inherit;
+  font-size: 13px;
+}
+
+.group-roster-name-field input {
+  padding: 0 10px;
+}
+
+.group-roster-name-field button {
+  padding: 0 8px;
+  color: var(--color-danger);
+}
+
+.group-roster-table-wrap {
+  overflow: auto;
+  border-top: 1px solid var(--color-border);
+}
+
+.group-roster-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.group-roster-table th,
+.group-roster-table td {
+  padding: 8px 4px;
+  border-bottom: 1px solid var(--color-border);
+  text-align: left;
+}
+
+.group-roster-table th {
+  color: var(--color-text-muted);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.group-roster-table select {
+  padding: 0 8px;
+}
+
+.group-roster-empty {
+  margin: 10px 0 0;
+  color: var(--color-text-muted);
+  font-size: 13px;
 }
 
 /* ═══ Student row: name + role stacked (2026-04-21) ══════════════════ */

@@ -16,6 +16,7 @@ type Props = {
   canEdit: boolean;
   isTeacherView?: boolean;
   windowMemberCount?: number;
+  windowMemberNames?: string[];
   state?: StreamActivityTemplateState | null;
   onStateChange?: (state: StreamActivityTemplateState | null) => Promise<boolean>;
   onCreateCard: (data: { title: string; content: string }) => Promise<void>;
@@ -46,6 +47,7 @@ export function StreamActivityTemplatePanel({
   canEdit,
   isTeacherView = false,
   windowMemberCount,
+  windowMemberNames,
   state,
   onStateChange,
   onCreateCard,
@@ -56,6 +58,7 @@ export function StreamActivityTemplatePanel({
         cards={cards}
         canEdit={canEdit}
         memberCount={windowMemberCount}
+        memberNames={windowMemberNames}
         onCreateCard={onCreateCard}
       />
     );
@@ -109,14 +112,19 @@ function WindowOpeningPanel({
   cards,
   canEdit,
   memberCount,
+  memberNames,
   onCreateCard,
 }: {
   cards: CardData[];
   canEdit: boolean;
   memberCount?: number;
+  memberNames?: string[];
   onCreateCard: (data: { title: string; content: string }) => Promise<void>;
 }) {
-  const cells = useMemo(() => buildWindowOpeningCells(memberCount), [memberCount]);
+  const cells = useMemo(
+    () => buildWindowOpeningCells(memberCount, memberNames),
+    [memberCount, memberNames],
+  );
   const groupedCards = useMemo(
     () => groupWindowOpeningCards(cards, cells),
     [cards, cells],
@@ -722,14 +730,19 @@ function MapActivityPanel({ sectionId, canEdit }: { sectionId: string; canEdit: 
   );
 }
 
-function buildWindowOpeningCells(memberCount: number | undefined): WindowOpeningCell[] {
+function buildWindowOpeningCells(
+  memberCount: number | undefined,
+  memberNames?: string[],
+): WindowOpeningCell[] {
   const count =
     typeof memberCount === "number"
       ? Math.max(0, Math.min(WINDOW_MEMBER_SLOTS.length, Math.floor(memberCount)))
-      : DEFAULT_WINDOW_MEMBER_COUNT;
+      : memberNames?.length
+        ? Math.min(WINDOW_MEMBER_SLOTS.length, memberNames.length)
+        : DEFAULT_WINDOW_MEMBER_COUNT;
   const memberCells = WINDOW_MEMBER_SLOTS.slice(0, count).map((slot, index) => ({
     id: `member-${index + 1}`,
-    label: `모둠원 ${index + 1}`,
+    label: memberNames?.[index] ?? `모둠원 ${index + 1}`,
     kind: "member" as const,
     row: slot.row,
     column: slot.column,

@@ -13,6 +13,13 @@ import { getCurrentStudent } from "@/lib/student-auth";
 import { getEffectiveBoardRole, requirePermission, ForbiddenError } from "@/lib/rbac";
 import { touchBoardUpdatedAt } from "@/lib/board-touch";
 import {
+  loadBoardDefaultGroups,
+  loadClassroomDefaultGroups,
+  normalizeGroupDrafts,
+  saveSectionBreakoutGroups,
+  type DefaultGroupDraft,
+} from "@/lib/default-groups";
+import {
   DEFAULT_GROUP_CAPACITY,
   MAX_GROUP_CAPACITY,
   MAX_GROUP_COUNT,
@@ -73,8 +80,13 @@ export async function GET(
   }
 }
 
+const GroupDraftBody = z.object({
+  name: z.string().min(1).max(80),
+  studentIds: z.array(z.string().min(1)),
+});
+
 const PostBody = z.object({
-  groupCount: z.number().int().min(MIN_GROUP_COUNT).max(MAX_GROUP_COUNT),
+  groupCount: z.number().int().min(MIN_GROUP_COUNT).max(MAX_GROUP_COUNT).optional(),
   groupCapacity: z
     .number()
     .int()
@@ -83,6 +95,7 @@ const PostBody = z.object({
     .nullable()
     .optional(),
   joinMode: z.enum(SECTION_BREAKOUT_JOIN_MODES).optional(),
+  groups: z.array(GroupDraftBody).optional(),
 });
 
 export async function POST(
@@ -95,7 +108,11 @@ export async function POST(
 
     const section = await db.section.findUnique({
       where: { id: sectionId },
-      select: { id: true, boardId: true },
+      select: {
+        id: true,
+        boardId: true,
+        board: { select: { classroomId: true } },
+      },
     });
     if (!section) {
       return NextResponse.json({ error: "not_found" }, { status: 404 });
@@ -115,8 +132,69 @@ export async function POST(
     const body = await req.json().catch(() => ({}));
     const input = PostBody.parse(body);
 
-    const groupCapacity = input.groupCapacity ?? DEFAULT_GROUP_CAPACITY;
-    const joinMode = input.joinMode ?? "student_select";
+    const requestedJoinMode = input.joinMode ?? "teacher_assign";
+    const groupCapacity =
+      requestedJoinMode === "teacher_assign"
+        ? null
+        : (input.groupCapacity ?? DEFAULT_GROUP_CAPACITY);
+    let groupDrafts: DefaultGroupDraft[] | null = input.groups
+      ? normalizeGroupDrafts(input.groups)
+      : null;
+
+    if (requestedJoinMode === "teacher_assign" && !groupDrafts) {
+      const boardGroups = await loadBoardDefaultGroups(db, section.boardId);
+      groupDrafts =
+        boardGroups.length > 0
+          ? boardGroups
+          : section.board.classroomId
+            ? await loadClassroomDefaultGroups(db, section.board.classroomId)
+            : [];
+    }
+    if (
+      requestedJoinMode === "teacher_assign" &&
+      groupDrafts &&
+      groupDrafts.length === 0
+    ) {
+      const count = input.groupCount ?? 4;
+      groupDrafts = Array.from({ length: count }, (_, index) => ({
+        name: defaultGroupName(index),
+        studentIds: [],
+      }));
+    }
+
+    if (requestedJoinMode === "teacher_assign" && groupDrafts) {
+      const studentIds = groupDrafts.flatMap((group) => group.studentIds);
+      if (studentIds.length > 0) {
+        if (!section.board.classroomId) {
+          return NextResponse.json(
+            { error: "classroom_required_for_group_members" },
+            { status: 422 },
+          );
+        }
+        const validStudentIds = new Set(
+          (
+            await db.student.findMany({
+              where: { classroomId: section.board.classroomId },
+              select: { id: true },
+            })
+          ).map((student) => student.id),
+        );
+        const invalidStudentId = studentIds.find(
+          (studentId) => !validStudentIds.has(studentId),
+        );
+        if (invalidStudentId) {
+          return NextResponse.json(
+            { error: "student_not_in_classroom", studentId: invalidStudentId },
+            { status: 422 },
+          );
+        }
+      }
+    }
+
+    const groupCount =
+      requestedJoinMode === "teacher_assign" && groupDrafts
+        ? groupDrafts.length
+        : (input.groupCount ?? 4);
 
     // Upsert config + reconcile group rows. One transaction so a partial
     // sync can't leave the section with config but no groups (or vice
@@ -126,18 +204,22 @@ export async function POST(
         where: { sectionId },
         create: {
           sectionId,
-          groupCount: input.groupCount,
+          groupCount,
           groupCapacity,
-          joinMode,
+          joinMode: requestedJoinMode,
         },
         update: {
-          groupCount: input.groupCount,
+          groupCount,
           groupCapacity,
-          joinMode,
+          joinMode: requestedJoinMode,
         },
       });
 
-      await reconcileGroups(tx, sectionId, input.groupCount);
+      if (requestedJoinMode === "teacher_assign" && groupDrafts) {
+        await saveSectionBreakoutGroups(tx, sectionId, groupDrafts);
+      } else {
+        await reconcileGroups(tx, sectionId, groupCount);
+      }
     });
 
     await touchBoardUpdatedAt(section.boardId);

@@ -219,19 +219,21 @@ model Classroom {
   teacherId String
   createdAt DateTime @default(now())
 
-  teacher         User                      @relation(fields: [teacherId], references: [id])
-  students        Student[]
-  boards          Board[]                   @relation("ClassroomBoards")
-  plantAllows     ClassroomPlantAllow[]
-  inviteCodes     ClassInviteCode[]
-  assessments     AssessmentTemplate[]
-  roleAssignments ClassroomRoleAssignment[]
-  currency        ClassroomCurrency?
-  studentAccounts StudentAccount[]
-  storeItems      StoreItem[]
-  rolePermissions ClassroomRolePermission[]
-  djPlayEvents    DjPlayEvent[]
-  aiFeedbacks     AiFeedback[]
+  teacher             User                          @relation(fields: [teacherId], references: [id])
+  students            Student[]
+  defaultGroups       ClassroomDefaultGroup[]
+  defaultGroupMembers ClassroomDefaultGroupMember[]
+  boards              Board[]                       @relation("ClassroomBoards")
+  plantAllows         ClassroomPlantAllow[]
+  inviteCodes         ClassInviteCode[]
+  assessments         AssessmentTemplate[]
+  roleAssignments     ClassroomRoleAssignment[]
+  currency            ClassroomCurrency?
+  studentAccounts     StudentAccount[]
+  storeItems          StoreItem[]
+  rolePermissions     ClassroomRolePermission[]
+  djPlayEvents        DjPlayEvent[]
+  aiFeedbacks         AiFeedback[]
 
   @@index([teacherId])
   @@index([code])
@@ -247,35 +249,37 @@ model Student {
   sessionVersion Int      @default(1)
   createdAt      DateTime @default(now())
 
-  classroom              Classroom                   @relation(fields: [classroomId], references: [id], onDelete: Cascade)
+  classroom              Classroom                     @relation(fields: [classroomId], references: [id], onDelete: Cascade)
   quizPlayers            QuizPlayer[]
   studentPlants          StudentPlant[]
   assets                 StudentAsset[]
   breakoutMemberships    BreakoutMembership[]
   sectionBreakoutMembers SectionBreakoutMembership[]
+  classroomDefaultGroups ClassroomDefaultGroupMember[]
+  boardDefaultGroups     BoardDefaultGroupMember[]
   parents                ParentChildLink[]
   parentInvites          ParentInviteCode[]
-  cardsAuthored          Card[]                      @relation("StudentCardAuthor")
+  cardsAuthored          Card[]                        @relation("StudentCardAuthor")
   oauthAuthCodes         OAuthAuthCode[]
   oauthAccessTokens      OAuthAccessToken[]
   oauthRefreshTokens     OAuthRefreshToken[]
   canvaAppLink           CanvaAppLink?
-  assignmentSlots        AssignmentSlot[]            @relation("StudentAssignmentSlots")
-  cardAuthors            CardAuthor[]                @relation("StudentCardAuthors")
+  assignmentSlots        AssignmentSlot[]              @relation("StudentAssignmentSlots")
+  cardAuthors            CardAuthor[]                  @relation("StudentCardAuthors")
   assessmentSubmissions  AssessmentSubmission[]
   roleAssignments        ClassroomRoleAssignment[]
   account                StudentAccount?
-  vibeProjectsAuthored   VibeProject[]               @relation("VibeProjectAuthor")
-  vibeSessions           VibeSession[]               @relation("VibeSessionAuthor")
-  vibeReviews            VibeReview[]                @relation("VibeReviewer")
-  vibePlaySessions       VibePlaySession[]           @relation("VibePlayer")
-  boardResponses         BoardResponse[]             @relation("StudentBoardResponses")
+  vibeProjectsAuthored   VibeProject[]                 @relation("VibeProjectAuthor")
+  vibeSessions           VibeSession[]                 @relation("VibeSessionAuthor")
+  vibeReviews            VibeReview[]                  @relation("VibeReviewer")
+  vibePlaySessions       VibePlaySession[]             @relation("VibePlayer")
+  boardResponses         BoardResponse[]               @relation("StudentBoardResponses")
   aiFeedbacks            AiFeedback[]
   showcaseEntries        ShowcaseEntry[]
-  cardEvaluations        CardEvaluation[]            @relation("StudentCardEvaluations")
+  cardEvaluations        CardEvaluation[]              @relation("StudentCardEvaluations")
   // card-comments-likes (2026-04-26)
-  cardComments           CardComment[]               @relation("StudentCardComments")
-  cardLikes              CardLike[]                  @relation("StudentCardLikes")
+  cardComments           CardComment[]                 @relation("StudentCardComments")
+  cardLikes              CardLike[]                    @relation("StudentCardLikes")
   agentSessions          AgentSession[]
 
   @@unique([classroomId, number])
@@ -290,6 +294,38 @@ model Student {
 // 같은 (학생, 과목, 단원, 평가항목) 조합 재생성 시 동일 row UPSERT (덮어쓰기).
 // 외부 컴패니언 앱 Aura 가 GET /api/external/feedbacks 로 풀해 종합.
 // 학생/학부모 노출 X — 교사 전용.
+model ClassroomDefaultGroup {
+  id          String   @id @default(cuid())
+  classroomId String
+  name        String
+  order       Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  classroom Classroom                     @relation(fields: [classroomId], references: [id], onDelete: Cascade)
+  members   ClassroomDefaultGroupMember[]
+
+  @@unique([classroomId, order])
+  @@index([classroomId])
+}
+
+model ClassroomDefaultGroupMember {
+  id          String   @id @default(cuid())
+  classroomId String
+  groupId     String
+  studentId   String
+  order       Int      @default(0)
+  createdAt   DateTime @default(now())
+
+  classroom Classroom             @relation(fields: [classroomId], references: [id], onDelete: Cascade)
+  group     ClassroomDefaultGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  student   Student               @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@unique([classroomId, studentId])
+  @@index([groupId])
+  @@index([studentId])
+}
+
 model AiFeedback {
   id          String   @id @default(cuid())
   teacherId   String
@@ -436,25 +472,59 @@ model Board {
   auraUnit              String?
   auraCriterion         String?
 
-  classroom          Classroom?          @relation("ClassroomBoards", fields: [classroomId], references: [id], onDelete: SetNull)
-  members            BoardMember[]
-  cards              Card[]
-  sections           Section[]
-  submissions        Submission[]
-  quizzes            Quiz[]
-  studentPlants      StudentPlant[]
-  breakoutAssignment BreakoutAssignment?
-  assignmentSlots    AssignmentSlot[]
-  vibeArcadeConfig   VibeArcadeConfig?
-  vibeProjects       VibeProject[]
-  djPlayEvents       DjPlayEvent[]
-  responses          BoardResponse[]
-  cardEvaluations    CardEvaluation[]
+  classroom           Classroom?                @relation("ClassroomBoards", fields: [classroomId], references: [id], onDelete: SetNull)
+  members             BoardMember[]
+  cards               Card[]
+  sections            Section[]
+  defaultGroups       BoardDefaultGroup[]
+  defaultGroupMembers BoardDefaultGroupMember[]
+  submissions         Submission[]
+  quizzes             Quiz[]
+  studentPlants       StudentPlant[]
+  breakoutAssignment  BreakoutAssignment?
+  assignmentSlots     AssignmentSlot[]
+  vibeArcadeConfig    VibeArcadeConfig?
+  vibeProjects        VibeProject[]
+  djPlayEvents        DjPlayEvent[]
+  responses           BoardResponse[]
+  cardEvaluations     CardEvaluation[]
 }
 
 // Question Board 응답 (QB-1, 2026-04-23).
 // 하나의 Board(layout=question-board) 에 N 개 응답. 학생 또는 교사가 작성.
 // Board 삭제 시 cascade, Student/User 삭제 시 응답은 남지만 authorship 해지.
+model BoardDefaultGroup {
+  id        String   @id @default(cuid())
+  boardId   String
+  name      String
+  order     Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  board   Board                     @relation(fields: [boardId], references: [id], onDelete: Cascade)
+  members BoardDefaultGroupMember[]
+
+  @@unique([boardId, order])
+  @@index([boardId])
+}
+
+model BoardDefaultGroupMember {
+  id        String   @id @default(cuid())
+  boardId   String
+  groupId   String
+  studentId String
+  order     Int      @default(0)
+  createdAt DateTime @default(now())
+
+  board   Board             @relation(fields: [boardId], references: [id], onDelete: Cascade)
+  group   BoardDefaultGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  student Student           @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@unique([boardId, studentId])
+  @@index([groupId])
+  @@index([studentId])
+}
+
 model BoardResponse {
   id        String   @id @default(cuid())
   boardId   String
@@ -473,24 +543,24 @@ model BoardResponse {
 
 // Columns/Kanban용 섹션 (grid/stream에선 사용 안 함)
 model Section {
-  id               String  @id @default(cuid())
-  boardId          String
-  title            String
-  order            Int     @default(0)
+  id                    String  @id @default(cuid())
+  boardId               String
+  title                 String
+  order                 Int     @default(0)
   // topic-board-pin (2026-05-21): 주제별 보드에서 주제(섹션) 고정.
   // true면 항상 상단에 고정, false면 생성일 역순(최신순).
-  pinned           Boolean @default(false)
+  pinned                Boolean @default(false)
   // shared-column-sort (2026-04-20): 교사가 선택한 칼럼별 정렬 모드가
   // 학생 화면에도 공유되도록 서버에 저장. "manual" | "newest" | "oldest"
   // | "title". null → 클라이언트가 "manual"로 처리(기존 행 하위호환).
-  sortMode         String?
-  activityTemplate String?
+  sortMode              String?
+  activityTemplate      String?
   activityTemplateState Json?
   // Breakout view (T0-①): teacher-rotatable access token.
   // null = no public share link. When set, anyone with the token can view the
   // section-isolated Breakout route. Rotating replaces the value, invalidating
   // previously distributed links. See src/lib/rbac.ts#viewSection.
-  accessToken      String? @unique
+  accessToken           String? @unique
 
   board               Board                       @relation(fields: [boardId], references: [id], onDelete: Cascade)
   cards               Card[]                      @relation("SectionCards")

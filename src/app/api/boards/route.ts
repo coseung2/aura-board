@@ -12,6 +12,7 @@ import {
   ASSIGNMENT_MAX_SLOTS,
   ASSIGNMENT_GUIDE_TEXT_MAX,
 } from "@/lib/assignment-schemas";
+import { snapshotClassroomGroupsToBoard } from "@/lib/default-groups";
 
 // Grid cell dims ??matches Card default width/height; render uses CSS grid so
 // these are stored-only placeholders for future freeform fallback.
@@ -118,6 +119,13 @@ export async function POST(req: Request) {
             },
           },
         });
+        if (input.classroomId) {
+          await snapshotClassroomGroupsToBoard(
+            tx,
+            input.classroomId,
+            createdBoard.id,
+          );
+        }
 
         const assignment = await tx.breakoutAssignment.create({
           data: {
@@ -236,6 +244,9 @@ export async function POST(req: Request) {
           },
         });
         if (classroom) {
+          await snapshotClassroomGroupsToBoard(tx, classroom.id, createdBoard.id);
+        }
+        if (classroom) {
           for (const s of classroom.students) {
             const n = s.number as number;
             const col = (n - 1) % 5;
@@ -294,19 +305,29 @@ export async function POST(req: Request) {
     // columns + classroom: ?숈깮 ?대쫫 ?먮룞 ?뱀뀡?붾뒗 ???댁긽 湲곕낯???꾨땲??
     // 援먯궗媛 蹂대뱶???ㅼ뼱媛??"?쭛 ?숈깮 ?대쫫?쇰줈 移쇰읆 留뚮뱾湲? 踰꾪듉??紐낆떆?곸쑝濡?    // ?꾨Ⅴ硫?POST /api/boards/:id/sections/seed-students 媛 ?ㅽ뻾?쒕떎.
     // (?ъ슜??寃곗젙 2026-04-24 ???먮룞 ?앹꽦??媛뺤젣泥섎읆 ?먭뺨吏꾨떎???쇰뱶諛?
-  const board = await db.board.create({
-    data: {
-      title: input.title,
-      slug,
-      layout: input.layout,
-      description: input.description,
-      classroomId: input.classroomId ?? null,
-      thumbnailMode: input.thumbnailMode,
-      thumbnailUrl: input.thumbnailUrl,
-      members: {
-        create: { userId: user.id, role: "owner" },
+  const board = await db.$transaction(async (tx) => {
+    const createdBoard = await tx.board.create({
+      data: {
+        title: input.title,
+        slug,
+        layout: input.layout,
+        description: input.description,
+        classroomId: input.classroomId ?? null,
+        thumbnailMode: input.thumbnailMode,
+        thumbnailUrl: input.thumbnailUrl,
+        members: {
+          create: { userId: user.id, role: "owner" },
+        },
       },
-    },
+    });
+    if (input.classroomId) {
+      await snapshotClassroomGroupsToBoard(
+        tx,
+        input.classroomId,
+        createdBoard.id,
+      );
+    }
+    return createdBoard;
   });
 
     return NextResponse.json({ board });

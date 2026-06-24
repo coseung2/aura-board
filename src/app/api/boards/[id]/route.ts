@@ -4,6 +4,7 @@ import { db } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
 import { requirePermission, ForbiddenError } from "@/lib/rbac";
 import { enqueueBlobDeletion } from "@/lib/blob-cleanup";
+import { snapshotClassroomGroupsToBoard } from "@/lib/default-groups";
 
 const PatchBoardSchema = z.object({
   title: z.string().max(200).optional(),
@@ -162,7 +163,20 @@ export async function PATCH(
         }
       }
     }
-    const updated = await db.board.update({ where: { id: board.id }, data: input });
+    const updated = await db.$transaction(async (tx) => {
+      const next = await tx.board.update({ where: { id: board.id }, data: input });
+      if (
+        Object.prototype.hasOwnProperty.call(input, "classroomId") &&
+        input.classroomId !== board.classroomId
+      ) {
+        await tx.boardDefaultGroupMember.deleteMany({ where: { boardId: board.id } });
+        await tx.boardDefaultGroup.deleteMany({ where: { boardId: board.id } });
+        if (input.classroomId) {
+          await snapshotClassroomGroupsToBoard(tx, input.classroomId, board.id);
+        }
+      }
+      return next;
+    });
     if (
       Object.prototype.hasOwnProperty.call(input, "thumbnailUrl") &&
       board.thumbnailUrl &&

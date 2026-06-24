@@ -16,6 +16,11 @@ import { SectionActionsPanel } from "./SectionActionsPanel";
 import { StreamComposer } from "./stream/StreamComposer";
 import { StreamActivityTemplatePanel } from "./stream/StreamActivityTemplatePanel";
 import { StreamPost } from "./stream/StreamPost";
+import {
+  GroupRosterEditor,
+  type GroupEditorDraft,
+  type GroupEditorStudent,
+} from "./classroom/GroupRosterEditor";
 import { useCardRealtime } from "@/hooks/useCardRealtime";
 import { sortSections } from "@/lib/sort-sections";
 import {
@@ -64,7 +69,7 @@ export type BreakoutGroupMember = {
 export type BreakoutConfig = {
   groupCount: number;
   groupCapacity: number | null;
-  joinMode: "student_select";
+  joinMode: "student_select" | "teacher_assign";
 };
 
 /** Per-section breakout state, fetched from
@@ -652,8 +657,7 @@ export function StreamBoard({
 
   async function handleSaveBreakout(
     sectionId: string,
-    groupCount: number,
-    groupCapacity: number,
+    groups: GroupEditorDraft[],
   ): Promise<boolean> {
     setBreakoutBusyId(sectionId);
     try {
@@ -661,9 +665,10 @@ export function StreamBoard({
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
-          groupCount,
-          groupCapacity,
-          joinMode: "student_select",
+          groupCount: Math.max(1, groups.length),
+          groupCapacity: null,
+          joinMode: "teacher_assign",
+          groups,
         }),
       });
       if (!res.ok) {
@@ -991,12 +996,13 @@ export function StreamBoard({
           const state = breakoutBySection[section.id];
           return createPortal(
             <BreakoutConfigModal
+              boardId={boardId}
               section={section}
               state={state}
               busy={breakoutBusyId === section.id}
               onClose={() => setBreakoutModalSectionId(null)}
-              onSave={async (groupCount, groupCapacity) => {
-                const ok = await handleSaveBreakout(section.id, groupCount, groupCapacity);
+              onSave={async (groups) => {
+                const ok = await handleSaveBreakout(section.id, groups);
                 if (ok) setBreakoutModalSectionId(null);
                 return ok;
               }}
@@ -1650,7 +1656,10 @@ function buildBreakoutStateFromSection(
     config: {
       groupCount: section.breakout.groupCount,
       groupCapacity: section.breakout.groupCapacity,
-      joinMode: "student_select",
+      joinMode:
+        section.breakout.joinMode === "teacher_assign"
+          ? "teacher_assign"
+          : "student_select",
     },
     groups: section.breakout.groups,
     membership: null,
@@ -1772,6 +1781,7 @@ function StreamBreakoutBody({
             canEdit={state.canManage || canAddPost}
             isTeacherView={state.canManage}
             windowMemberCount={group?.memberCount}
+            windowMemberNames={group?.members?.map((member) => member.studentName)}
             state={section.activityTemplateState ?? null}
             onStateChange={(nextState) =>
               onSectionActivityStateChange?.(section.id, nextState) ??
@@ -1801,6 +1811,7 @@ function StreamBreakoutBody({
   // Student flow: pick a group before seeing anything group-specific.
   if (!state.canManage) {
     if (!state.membership) {
+      const teacherAssigned = state.config?.joinMode === "teacher_assign";
       const capacity = state.config?.groupCapacity ?? 0;
       const previewCards = groupCards(null);
       const previewMemberCount =
@@ -1836,9 +1847,13 @@ function StreamBreakoutBody({
             )}
           </div>
           <div className="stream-breakout-join-overlay">
-            <p className="stream-breakout-join-title">참여할 모둠을 선택하세요</p>
+            <p className="stream-breakout-join-title">
+              {teacherAssigned
+                ? "아직 모둠이 지정되지 않았어요."
+                : "참여할 모둠을 선택하세요."}
+            </p>
             <div className="stream-breakout-join-grid">
-              {groups.map((group) => {
+              {(teacherAssigned ? [] : groups).map((group) => {
                 const full = capacity > 0 && group.memberCount >= capacity;
                 return (
                   <button
@@ -1878,6 +1893,7 @@ function StreamBreakoutBody({
             canEdit={canAddPost}
             isTeacherView={false}
             windowMemberCount={myGroup?.memberCount}
+            windowMemberNames={myGroup?.members?.map((member) => member.studentName)}
             state={section.activityTemplateState ?? null}
             onCreateCard={(data) => onCreateCard(data, myGroupId)}
           />
@@ -1944,7 +1960,55 @@ function StreamBreakoutBody({
   );
 }
 
+function groupsFromBreakoutState(
+  state: BreakoutState | undefined,
+): GroupEditorDraft[] {
+  if (!state?.groups.length) return defaultBreakoutGroups([]);
+  return [...state.groups]
+    .sort((a, b) => a.order - b.order)
+    .map((group) => ({
+      name: group.name,
+      studentIds: (group.members ?? []).map((member) => member.studentId),
+    }));
+}
+
+function studentsFromBreakoutState(
+  state: BreakoutState | undefined,
+): GroupEditorStudent[] {
+  const byId = new Map<string, GroupEditorStudent>();
+  for (const group of state?.groups ?? []) {
+    for (const member of group.members ?? []) {
+      byId.set(member.studentId, {
+        id: member.studentId,
+        name: member.studentName,
+        number: member.studentNumber,
+      });
+    }
+  }
+  return [...byId.values()].sort((a, b) => {
+    if (a.number == null && b.number == null) return a.name.localeCompare(b.name);
+    if (a.number == null) return 1;
+    if (b.number == null) return -1;
+    return a.number - b.number;
+  });
+}
+
+function defaultBreakoutGroups(
+  students: GroupEditorStudent[],
+): GroupEditorDraft[] {
+  const count = Math.max(1, Math.min(4, students.length || 1));
+  const groups = Array.from({ length: count }, (_, index) => ({
+    name: `${index + 1}모둠`,
+    studentIds: [] as string[],
+  }));
+  students.forEach((student, index) => {
+    groups[index % count].studentIds.push(student.id);
+  });
+  return groups;
+}
+
 function BreakoutConfigModal({
+  boardId,
   section,
   state,
   busy,
@@ -1952,34 +2016,74 @@ function BreakoutConfigModal({
   onSave,
   onDisable,
 }: {
+  boardId: string;
   section: StreamSection;
   state: BreakoutState | undefined;
   busy: boolean;
   onClose: () => void;
-  onSave: (groupCount: number, groupCapacity: number) => Promise<boolean>;
+  onSave: (groups: GroupEditorDraft[]) => Promise<boolean>;
   onDisable: () => Promise<boolean>;
 }) {
-  const [groupCount, setGroupCount] = useState(state?.config?.groupCount ?? 4);
-  const [groupCapacity, setGroupCapacity] = useState(
-    state?.config?.groupCapacity ?? 4,
+  const [students, setStudents] = useState<GroupEditorStudent[]>([]);
+  const [groups, setGroups] = useState<GroupEditorDraft[]>(() =>
+    groupsFromBreakoutState(state),
   );
+  const [loading, setLoading] = useState(!state?.config);
   const [submitting, setSubmitting] = useState(false);
+  const [status, setStatus] = useState("");
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const gc = Math.min(12, Math.max(1, Math.round(Number(groupCount) || 1)));
-    const gcap = Math.min(50, Math.max(1, Math.round(Number(groupCapacity) || 1)));
-    setGroupCount(gc);
-    setGroupCapacity(gcap);
     setSubmitting(true);
+    setStatus("");
     try {
-      await onSave(gc, gcap);
+      await onSave(groups);
     } finally {
       setSubmitting(false);
     }
   }
 
-  const disabled = busy || submitting;
+  useEffect(() => {
+    let cancelled = false;
+    async function loadDefaults() {
+      setLoading(true);
+      setStatus("");
+      try {
+        const res = await fetch(`/api/boards/${boardId}/default-groups`, {
+          cache: "no-store",
+        });
+        if (!res.ok) throw new Error(await res.text());
+        const data = (await res.json()) as {
+          students: GroupEditorStudent[];
+          groups: GroupEditorDraft[];
+        };
+        if (!cancelled) {
+          setStudents(data.students ?? []);
+          setGroups(
+            state?.config
+              ? groupsFromBreakoutState(state)
+              : data.groups.length > 0
+              ? data.groups
+              : defaultBreakoutGroups(data.students ?? []),
+          );
+        }
+      } catch {
+        if (!cancelled) {
+          setStudents(studentsFromBreakoutState(state));
+          setGroups(groupsFromBreakoutState(state));
+          setStatus("기본 모둠을 불러오지 못했어요. 여기서 직접 설정할 수 있어요.");
+        }
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    }
+    void loadDefaults();
+    return () => {
+      cancelled = true;
+    };
+  }, [boardId, state]);
+
+  const disabled = busy || submitting || loading;
 
   async function disableBreakout() {
     if (!state?.config || disabled) return;
@@ -2003,7 +2107,7 @@ function BreakoutConfigModal({
         <form onSubmit={submit}>
           <div className="modal-header">
             <h2 className="modal-title" id="stream-breakout-modal-title">
-              모둠 활동 설정
+              모둠활동 설정
             </h2>
             <button
               type="button"
@@ -2017,35 +2121,22 @@ function BreakoutConfigModal({
           </div>
           <div className="modal-body">
             <p className="stream-template-modal-section">{section.title}</p>
-            <div className="stream-breakout-form">
-              <label className="stream-breakout-field">
-               <span>모둠 수</span>
-               <input
-                 type="number"
-                 min={1}
-                 max={12}
-                 value={groupCount}
-                 onChange={(e) => setGroupCount(Number(e.target.value))}
-                 disabled={disabled}
-               />
-             </label>
-             <label className="stream-breakout-field">
-                <span>모둠 정원</span>
-               <input
-                 type="number"
-                 min={1}
-                 max={50}
-                 value={groupCapacity}
-                  onChange={(e) => setGroupCapacity(Number(e.target.value))}
-                  disabled={disabled}
-                />
-              </label>
-            </div>
+            {loading ? (
+              <p className="stream-breakout-modal-hint">기본 모둠을 불러오는 중...</p>
+            ) : (
+              <GroupRosterEditor
+                students={students}
+                groups={groups}
+                onChange={setGroups}
+                disabled={disabled}
+              />
+            )}
             <p className="stream-breakout-modal-hint">
-             {state?.config
-                ? `현재 ${state.config.groupCount}모둠 · 정원 ${state.config.groupCapacity ?? "-"}명 · 학생이 직접 모둠을 선택합니다.`
-               : "저장하면 학생이 섹션에서 모둠을 선택할 수 있어요."}
+              {state?.config
+                ? "이 변경은 이 섹션의 모둠활동에만 적용됩니다."
+                : "학급 기본 모둠을 가져왔어요. 여기서 바꿔도 이 섹션에만 적용됩니다."}
             </p>
+            {status && <p className="stream-breakout-modal-hint">{status}</p>}
             <div className="stream-template-modal-actions stream-breakout-modal-actions">
               {state?.config && (
                 <button

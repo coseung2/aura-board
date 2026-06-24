@@ -15,7 +15,10 @@ export const MIN_GROUP_CAPACITY = 1;
 export const MAX_GROUP_CAPACITY = 50;
 export const DEFAULT_GROUP_CAPACITY = 6;
 
-export const SECTION_BREAKOUT_JOIN_MODES = ["student_select"] as const;
+export const SECTION_BREAKOUT_JOIN_MODES = [
+  "student_select",
+  "teacher_assign",
+] as const;
 export type SectionBreakoutJoinMode =
   (typeof SECTION_BREAKOUT_JOIN_MODES)[number];
 
@@ -39,6 +42,11 @@ export type SectionBreakoutGroupMemberWire = {
   studentId: string;
   studentName: string;
   studentNumber: number | null;
+};
+
+export type SectionBreakoutGroupDraftWire = {
+  name: string;
+  studentIds: string[];
 };
 
 export type SectionBreakoutMembershipWire = {

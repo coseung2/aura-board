@@ -80,8 +80,11 @@ export async function POST(
     // Capacity check. groupCapacity is nullable (null = unlimited).
     const config = await db.sectionBreakoutConfig.findUnique({
       where: { sectionId },
-      select: { groupCapacity: true },
+      select: { groupCapacity: true, joinMode: true },
     });
+    if (config?.joinMode === "teacher_assign") {
+      return NextResponse.json({ error: "teacher_assigned" }, { status: 403 });
+    }
     if (config && config.groupCapacity != null) {
       // No-op self-pick (already in this group) is allowed even at full
       // capacity; any new occupant, including a first-time pick, is gated.
