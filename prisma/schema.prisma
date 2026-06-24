@@ -730,6 +730,7 @@ model Card {
   width              Float    @default(240)
   height             Float    @default(160)
   order              Int      @default(0)
+  guidePinned        Boolean  @default(false)
   createdAt          DateTime @default(now())
   updatedAt          DateTime @updatedAt
 
@@ -758,6 +759,7 @@ model Card {
 
   @@index([boardId])
   @@index([sectionId])
+  @@index([sectionId, guidePinned])
   @@index([authorId])
   @@index([studentAuthorId])
   @@index([groupId])

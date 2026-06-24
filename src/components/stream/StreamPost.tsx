@@ -14,10 +14,21 @@ type Props = {
   card: CardData;
   canDelete: boolean;
   onDelete: () => void;
+  canToggleGuide?: boolean;
+  guideBusy?: boolean;
+  onToggleGuide?: (pinned: boolean) => void;
   boardId?: string;
 };
 
-export function StreamPost({ card, canDelete, onDelete, boardId }: Props) {
+export function StreamPost({
+  card,
+  canDelete,
+  onDelete,
+  canToggleGuide = false,
+  guideBusy = false,
+  onToggleGuide,
+  boardId,
+}: Props) {
   const [menuOpen, setMenuOpen] = useState(false);
   const author = getStreamAuthor(card);
   const fileAttachments = (card.attachments ?? []).filter((item) => item.kind === "file");
@@ -56,7 +67,7 @@ export function StreamPost({ card, canDelete, onDelete, boardId }: Props) {
   }, [card.linkTitle, card.linkUrl, isYouTubeVideo]);
 
   return (
-    <article className="stream-post">
+    <article className={`stream-post${card.guidePinned ? " is-guide" : ""}`}>
       <header className="stream-post-head">
         <div
           className="stream-avatar"
@@ -66,10 +77,15 @@ export function StreamPost({ card, canDelete, onDelete, boardId }: Props) {
           {author.avatarText}
         </div>
         <div className="stream-author-copy">
-          <strong>{author.displayName}</strong>
+          <strong>
+            {author.displayName}
+            {card.guidePinned && (
+              <span className="stream-post-guide-chip">가이드</span>
+            )}
+          </strong>
           <time>{formatRelativeTime(card.createdAt ?? new Date().toISOString())}</time>
         </div>
-        {canDelete && (
+        {(canDelete || canToggleGuide) && (
           <div className="stream-post-menu">
             <button
               type="button"
@@ -82,6 +98,20 @@ export function StreamPost({ card, canDelete, onDelete, boardId }: Props) {
             </button>
             {menuOpen && (
               <div className="stream-post-menu-popover">
+                {canToggleGuide && (
+                  <button
+                    type="button"
+                    className="stream-post-menu-action"
+                    disabled={guideBusy}
+                    onClick={() => {
+                      setMenuOpen(false);
+                      onToggleGuide?.(!card.guidePinned);
+                    }}
+                  >
+                    {card.guidePinned ? "가이드 해제" : "가이드 고정"}
+                  </button>
+                )}
+                {canDelete && (
                 <button
                   type="button"
                   className="stream-post-menu-delete"
@@ -92,6 +122,7 @@ export function StreamPost({ card, canDelete, onDelete, boardId }: Props) {
                 >
                   삭제
                 </button>
+                )}
               </div>
             )}
           </div>

@@ -38,6 +38,7 @@ type CardWire = {
   width: number;
   height: number;
   order: number;
+  guidePinned: boolean;
   sectionId: string | null;
   authorId: string | null;
   studentAuthorId: string | null;
@@ -281,6 +282,7 @@ export async function GET(
             width: c.width,
             height: c.height,
             order: c.order,
+            guidePinned: c.guidePinned,
             sectionId: c.sectionId,
             authorId: c.authorId,
             studentAuthorId: c.studentAuthorId,

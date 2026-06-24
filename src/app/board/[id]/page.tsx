@@ -361,6 +361,7 @@ export default async function BoardPage({
     width: c.width,
     height: c.height,
     order: c.order,
+    guidePinned: c.guidePinned,
     sectionId: c.sectionId,
     // stream-board section breakout (2026-06-23): group tag.
     // null for whole-section cards. Server always emits the field so the

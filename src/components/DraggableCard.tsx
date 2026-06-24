@@ -43,6 +43,7 @@ export type CardData = {
   width: number;
   height: number;
   order: number;
+  guidePinned?: boolean;
   sectionId?: string | null;
   groupId?: string | null;
   authorId: string | null;

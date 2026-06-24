@@ -111,10 +111,20 @@ export async function POST(
       await tx.card.updateMany({
         where: {
           sectionId,
-          studentAuthorId: student.id,
-          OR: [
-            { groupId: null },
-            ...(existing?.groupId ? [{ groupId: existing.groupId }] : []),
+          guidePinned: false,
+          AND: [
+            {
+              OR: [
+                { studentAuthorId: student.id },
+                { authors: { some: { studentId: student.id } } },
+              ],
+            },
+            {
+              OR: [
+                { groupId: null },
+                ...(existing?.groupId ? [{ groupId: existing.groupId }] : []),
+              ],
+            },
           ],
         },
         data: { groupId: group.id },
@@ -186,8 +196,11 @@ export async function DELETE(
       await tx.card.updateMany({
         where: {
           sectionId,
-          studentAuthorId: membership.studentId,
           groupId: membership.groupId,
+          OR: [
+            { studentAuthorId: membership.studentId },
+            { authors: { some: { studentId: membership.studentId } } },
+          ],
         },
         data: { groupId: null },
       });

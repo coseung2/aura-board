@@ -52,6 +52,7 @@ const PatchCardSchema = z.object({
   width: z.number().optional(),
   height: z.number().optional(),
   order: z.number().int().optional(),
+  guidePinned: z.boolean().optional(),
   sectionId: z.string().nullable().optional(),
 });
 
@@ -122,6 +123,25 @@ export async function PATCH(
     };
     if (!canEditCard(identity, boardLike, cardLike) && !studentCanReorder) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+
+    if (input.guidePinned !== undefined) {
+      const effectiveSectionId =
+        input.sectionId === undefined ? card.sectionId : input.sectionId;
+      const canToggleGuide =
+        !!identity.teacher &&
+        !!card.authorId &&
+        card.studentAuthorId === null &&
+        canEditCard(identity, boardLike, cardLike);
+      if (!canToggleGuide) {
+        return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+      }
+      if (input.guidePinned && !effectiveSectionId) {
+        return NextResponse.json(
+          { error: "guidePinned requires sectionId" },
+          { status: 422 },
+        );
+      }
     }
 
     // card-file-attachment — 파일 필드 출처/MIME 검증. POST와 동일 규칙.

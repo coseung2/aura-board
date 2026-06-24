@@ -471,9 +471,7 @@ export function ClassroomDetail({ classroom }: Props) {
           classroom name. Content kept 1:1 with the old 설정 탭. */}
       {showSettings && (
         <ClassroomSettingsModal
-          classroomId={classroom.id}
           classroomName={classroomName}
-          students={students}
           renaming={renaming}
           renameErr={renameErr}
           onRename={(next) => void handleRenameClassroom(next)}

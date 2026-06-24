@@ -150,6 +150,17 @@ export async function saveSectionBreakoutGroups(
   const normalized = normalizeGroupDrafts(groups);
   await tx.sectionBreakoutMembership.deleteMany({ where: { sectionId } });
   await tx.sectionBreakoutGroup.deleteMany({ where: { sectionId } });
+  await tx.card.updateMany({
+    where: {
+      sectionId,
+      guidePinned: false,
+      OR: [
+        { studentAuthorId: { not: null } },
+        { authors: { some: { studentId: { not: null } } } },
+      ],
+    },
+    data: { groupId: null },
+  });
 
   for (const [groupIndex, group] of normalized.entries()) {
     const created = await tx.sectionBreakoutGroup.create({
@@ -166,6 +177,19 @@ export async function saveSectionBreakoutGroups(
           groupId: created.id,
           studentId,
         },
+      });
+    }
+    if (group.studentIds.length > 0) {
+      await tx.card.updateMany({
+        where: {
+          sectionId,
+          guidePinned: false,
+          OR: [
+            { studentAuthorId: { in: group.studentIds } },
+            { authors: { some: { studentId: { in: group.studentIds } } } },
+          ],
+        },
+        data: { groupId: created.id },
       });
     }
   }

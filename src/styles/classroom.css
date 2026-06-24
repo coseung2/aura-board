@@ -608,7 +608,13 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
   margin-bottom: 16px;
+}
+
+.classroom-boards-header .classroom-setting-hint {
+  max-width: none;
 }
 
 .classroom-boards-heading {
@@ -2363,7 +2369,7 @@
 .classroom-settings-modal {
   background: var(--color-surface);
   border-radius: var(--radius-card);
-  max-width: 760px;
+  max-width: 560px;
   width: calc(100vw - 32px);
   max-height: calc(100vh - 80px);
   overflow: auto;

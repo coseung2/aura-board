@@ -129,6 +129,7 @@ export function StreamBoard({
   const [templateModalSectionId, setTemplateModalSectionId] = useState<string | null>(null);
   const [sectionOrderBusyId, setSectionOrderBusyId] = useState<string | null>(null);
   const [contentOrderBusyId, setContentOrderBusyId] = useState<string | null>(null);
+  const [guideBusyId, setGuideBusyId] = useState<string | null>(null);
   const canEdit = currentRole === "owner" || currentRole === "editor";
   const canManageSections = canEdit && !isStudentViewer;
   const canAddPost = canEdit || !!isStudentViewer;
@@ -220,11 +221,13 @@ export function StreamBoard({
     if (!bs.canManage) {
       // Students only see their own group; before joining, nothing.
       if (!bs.membership) return [];
-      return bucket.filter((c) => (c.groupId ?? null) === bs.membership!.groupId);
+      return bucket.filter(
+        (c) => resolveCardBreakoutGroupId(c, bs.groups) === bs.membership!.groupId,
+      );
     }
     const active = activeGroupBySection[sectionId] ?? "all";
     if (active === "all") return bucket;
-    return bucket.filter((c) => (c.groupId ?? null) === active);
+    return bucket.filter((c) => resolveCardBreakoutGroupId(c, bs.groups) === active);
   }
 
   // Cards each viewer is allowed to see per section — drives both the
@@ -571,6 +574,34 @@ export function StreamBoard({
     }
   }
 
+  async function handleToggleGuide(card: CardData, guidePinned: boolean) {
+    const prev = cards;
+    setGuideBusyId(card.id);
+    setCards((list) =>
+      sortPosts(
+        list.map((item) =>
+          item.id === card.id ? { ...item, guidePinned } : item,
+        ),
+      ),
+    );
+    try {
+      const res = await fetch(`/api/cards/${card.id}`, {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ guidePinned }),
+      });
+      if (!res.ok) {
+        setCards(prev);
+        alert("가이드 고정 설정에 실패했어요.");
+      }
+    } catch {
+      setCards(prev);
+      alert("가이드 고정 설정에 실패했어요.");
+    } finally {
+      setGuideBusyId(null);
+    }
+  }
+
   async function handleMoveSectionContent(
     section: StreamSection,
     items: StreamContentItem[],
@@ -679,8 +710,29 @@ export function StreamBoard({
         (await res.json()) as BreakoutState,
         !!isStudentViewer,
       );
+      const groupIdByStudentId = new Map<string, string>();
+      for (const group of data.groups) {
+        for (const member of group.members ?? []) {
+          groupIdByStudentId.set(member.studentId, group.id);
+        }
+      }
       setBreakoutBySection((prev) => ({ ...prev, [sectionId]: data }));
       setActiveGroupBySection((prev) => ({ ...prev, [sectionId]: "all" }));
+      setCards((prev) =>
+        prev.map((card) => {
+          if (
+            card.sectionId !== sectionId ||
+            card.guidePinned ||
+            !cardHasAnyStudentAuthor(card)
+          ) {
+            return card;
+          }
+          return {
+            ...card,
+            groupId: getGroupIdForCardAuthors(card, groupIdByStudentId),
+          };
+        }),
+      );
       return true;
     } catch {
       alert("모둠 활동 설정에 실패했어요.");
@@ -748,7 +800,7 @@ export function StreamBoard({
       setCards((prev) =>
         prev.map((card) =>
           card.sectionId === sectionId &&
-          card.studentAuthorId === currentUserId &&
+          cardHasStudentAuthor(card, currentUserId) &&
           (card.groupId == null || card.groupId === previousGroupId)
             ? { ...card, groupId }
             : card,
@@ -805,7 +857,7 @@ export function StreamBoard({
         setCards((prev) =>
           prev.map((card) =>
             card.sectionId === sectionId &&
-            card.studentAuthorId === removedMember.studentId &&
+            cardHasStudentAuthor(card, removedMember.studentId) &&
             card.groupId === removedMember.groupId
               ? { ...card, groupId: null }
               : card,
@@ -866,6 +918,7 @@ export function StreamBoard({
             templateBusySectionId={templateBusySectionId}
             sectionOrderBusyId={sectionOrderBusyId}
             contentOrderBusyId={contentOrderBusyId}
+            guideBusyId={guideBusyId}
             breakoutBySection={breakoutBySection}
             activeGroupBySection={activeGroupBySection}
             breakoutBusyId={breakoutBusyId}
@@ -875,6 +928,7 @@ export function StreamBoard({
             onJoinBreakout={handleJoinBreakout}
             onRemoveBreakoutMember={handleRemoveBreakoutMember}
             onDeleteCard={handleDelete}
+            onToggleGuide={handleToggleGuide}
           />
         ) : (
           cards.map((card) => (
@@ -883,6 +937,9 @@ export function StreamBoard({
               card={card}
               canDelete={canDeleteCard(card, currentUserId, currentRole)}
               onDelete={() => handleDelete(card)}
+              canToggleGuide={canToggleGuideCard(card, canManageSections)}
+              guideBusy={guideBusyId === card.id}
+              onToggleGuide={(guidePinned) => handleToggleGuide(card, guidePinned)}
               boardId={boardId}
             />
           ))
@@ -1059,6 +1116,7 @@ type StreamGroupedFeedProps = {
   templateBusySectionId: string | null;
   sectionOrderBusyId: string | null;
   contentOrderBusyId: string | null;
+  guideBusyId: string | null;
   breakoutBySection: Record<string, BreakoutState>;
   activeGroupBySection: Record<string, string>;
   breakoutBusyId: string | null;
@@ -1069,6 +1127,7 @@ type StreamGroupedFeedProps = {
     membershipId: string,
   ) => Promise<boolean>;
   onDeleteCard: (card: CardData) => void;
+  onToggleGuide: (card: CardData, guidePinned: boolean) => void;
 };
 
 function StreamGroupedFeed({
@@ -1099,6 +1158,7 @@ function StreamGroupedFeed({
   templateBusySectionId,
   sectionOrderBusyId,
   contentOrderBusyId,
+  guideBusyId,
   breakoutBySection,
   activeGroupBySection,
   breakoutBusyId,
@@ -1106,6 +1166,7 @@ function StreamGroupedFeed({
   onJoinBreakout,
   onRemoveBreakoutMember,
   onDeleteCard,
+  onToggleGuide,
 }: StreamGroupedFeedProps) {
   return (
     <>
@@ -1162,7 +1223,9 @@ function StreamGroupedFeed({
           breakoutBySection[section.id] ??
           buildBreakoutStateFromSection(section, canEdit);
         const hasBreakout = !!breakout?.config;
-        const contentItems = buildSectionContentItems(section, bucket);
+        const guideCards = bucket.filter(isGuideCard);
+        const sectionCards = bucket.filter((card) => !isGuideCard(card));
+        const contentItems = buildSectionContentItems(section, sectionCards);
         const orderBusy = sectionOrderBusyId !== null;
         const canMoveUp = sectionIndex > 0;
         const canMoveDown = sectionIndex < sections.length - 1;
@@ -1264,10 +1327,23 @@ function StreamGroupedFeed({
                 </button>
               </div>
             )}
+            {!hasBreakout && (
+              <StreamGuideList
+                cards={guideCards}
+                boardId={boardId}
+                currentUserId={currentUserId}
+                currentRole={currentRole}
+                canToggleGuide={canEdit}
+                guideBusyId={guideBusyId}
+                onDeleteCard={onDeleteCard}
+                onToggleGuide={onToggleGuide}
+              />
+            )}
             {hasBreakout && breakout ? (
               <StreamBreakoutBody
                 section={section}
-                bucket={bucket}
+                bucket={sectionCards}
+                guideCards={guideCards}
                 state={breakout}
                 activeGroup={activeGroupBySection[section.id] ?? "all"}
                 busy={breakoutBusyId === section.id}
@@ -1285,8 +1361,10 @@ function StreamGroupedFeed({
                 }
                 onSectionActivityStateChange={onSectionActivityStateChange}
                 onDeleteCard={onDeleteCard}
+                onToggleGuide={onToggleGuide}
+                guideBusyId={guideBusyId}
               />
-            ) : contentItems.length === 0 ? (
+            ) : contentItems.length === 0 && guideCards.length === 0 ? (
               <div className="stream-section-empty">아직 게시글이 없어요.</div>
             ) : (
               contentItems.map((item, itemIndex) => (
@@ -1296,11 +1374,12 @@ function StreamGroupedFeed({
                  itemIndex={itemIndex}
                  itemCount={contentItems.length}
                  section={section}
-                 cards={bucket}
+                 cards={sectionCards}
                  canReorder={canAddPost}
                  canEditTemplate={canAddPost}
                  isTeacherView={canEdit}
                  orderBusyId={contentOrderBusyId}
+                 guideBusyId={guideBusyId}
                  boardId={boardId}
                  currentUserId={currentUserId}
                  currentRole={currentRole}
@@ -1308,6 +1387,7 @@ function StreamGroupedFeed({
                    onMoveSectionContent(section, contentItems, id, direction)
                  }
                  onDeleteCard={onDeleteCard}
+                 onToggleGuide={onToggleGuide}
                  onSectionActivityStateChange={onSectionActivityStateChange}
                  onCreateSectionCard={onCreateSectionCard}
                />
@@ -1338,6 +1418,45 @@ function StreamGroupedFeed({
   );
 }
 
+function StreamGuideList({
+  cards,
+  boardId,
+  currentUserId,
+  currentRole,
+  canToggleGuide,
+  guideBusyId,
+  onDeleteCard,
+  onToggleGuide,
+}: {
+  cards: CardData[];
+  boardId: string;
+  currentUserId: string;
+  currentRole: "owner" | "editor" | "viewer";
+  canToggleGuide: boolean;
+  guideBusyId: string | null;
+  onDeleteCard: (card: CardData) => void;
+  onToggleGuide: (card: CardData, guidePinned: boolean) => void;
+}) {
+  if (cards.length === 0) return null;
+  return (
+    <div className="stream-section-guide-list" aria-label="섹션 가이드">
+      <div className="stream-section-guide-label">가이드</div>
+      {cards.map((card) => (
+        <StreamPost
+          key={card.id}
+          card={card}
+          canDelete={canDeleteCard(card, currentUserId, currentRole)}
+          onDelete={() => onDeleteCard(card)}
+          canToggleGuide={canToggleGuideCard(card, canToggleGuide)}
+          guideBusy={guideBusyId === card.id}
+          onToggleGuide={(guidePinned) => onToggleGuide(card, guidePinned)}
+          boardId={boardId}
+        />
+      ))}
+    </div>
+  );
+}
+
 function StreamSectionContentItem({
   item,
   itemIndex,
@@ -1348,11 +1467,13 @@ function StreamSectionContentItem({
   canEditTemplate,
   isTeacherView,
   orderBusyId,
+  guideBusyId,
   boardId,
   currentUserId,
   currentRole,
   onMove,
   onDeleteCard,
+  onToggleGuide,
   onSectionActivityStateChange,
   onCreateSectionCard,
 }: {
@@ -1365,11 +1486,13 @@ function StreamSectionContentItem({
   canEditTemplate: boolean;
   isTeacherView: boolean;
   orderBusyId: string | null;
+  guideBusyId: string | null;
   boardId: string;
   currentUserId: string;
   currentRole: "owner" | "editor" | "viewer";
   onMove: (itemId: string, direction: "up" | "down") => Promise<void>;
   onDeleteCard: (card: CardData) => void;
+  onToggleGuide: (card: CardData, guidePinned: boolean) => void;
   onSectionActivityStateChange: (
     sectionId: string,
     activityTemplateState: StreamActivityTemplateState | null,
@@ -1426,6 +1549,9 @@ function StreamSectionContentItem({
           card={item.card}
           canDelete={canDeleteCard(item.card, currentUserId, currentRole)}
           onDelete={() => onDeleteCard(item.card)}
+          canToggleGuide={canToggleGuideCard(item.card, isTeacherView)}
+          guideBusy={guideBusyId === item.card.id}
+          onToggleGuide={(guidePinned) => onToggleGuide(item.card, guidePinned)}
           boardId={boardId}
         />
       )}
@@ -1685,6 +1811,62 @@ function canDeleteCard(
   return card.studentAuthorId === currentUserId;
 }
 
+function isGuideCard(card: CardData): boolean {
+  return !!card.guidePinned && isTeacherAuthoredCard(card);
+}
+
+function isTeacherAuthoredCard(card: CardData): boolean {
+  return !!card.authorId && !card.studentAuthorId;
+}
+
+function canToggleGuideCard(card: CardData, canManageBoard: boolean): boolean {
+  return canManageBoard && !!card.sectionId && isTeacherAuthoredCard(card);
+}
+
+function cardStudentIds(card: CardData): string[] {
+  const ids: string[] = [];
+  if (card.studentAuthorId) ids.push(card.studentAuthorId);
+  for (const author of card.authors ?? []) {
+    if (author.studentId && !ids.includes(author.studentId)) {
+      ids.push(author.studentId);
+    }
+  }
+  return ids;
+}
+
+function cardHasAnyStudentAuthor(card: CardData): boolean {
+  return cardStudentIds(card).length > 0;
+}
+
+function cardHasStudentAuthor(card: CardData, studentId: string): boolean {
+  return cardStudentIds(card).includes(studentId);
+}
+
+function getGroupIdForCardAuthors(
+  card: CardData,
+  groupIdByStudentId: Map<string, string>,
+): string | null {
+  for (const studentId of cardStudentIds(card)) {
+    const groupId = groupIdByStudentId.get(studentId);
+    if (groupId) return groupId;
+  }
+  return null;
+}
+
+function resolveCardBreakoutGroupId(
+  card: CardData,
+  groups: BreakoutGroup[],
+): string | null {
+  if (card.groupId) return card.groupId;
+  const groupIdByStudentId = new Map<string, string>();
+  for (const group of groups) {
+    for (const member of group.members ?? []) {
+      groupIdByStudentId.set(member.studentId, group.id);
+    }
+  }
+  return getGroupIdForCardAuthors(card, groupIdByStudentId);
+}
+
 function formatBreakoutMemberName(member: BreakoutGroupMember): string {
   return member.studentNumber != null
     ? `${member.studentNumber}번 ${member.studentName}`
@@ -1694,6 +1876,7 @@ function formatBreakoutMemberName(member: BreakoutGroupMember): string {
 type StreamBreakoutBodyProps = {
   section: StreamSection;
   bucket: CardData[];
+  guideCards: CardData[];
   state: BreakoutState;
   activeGroup: string;
   busy: boolean;
@@ -1713,11 +1896,14 @@ type StreamBreakoutBodyProps = {
     activityTemplateState: StreamActivityTemplateState | null,
   ) => Promise<boolean>;
   onDeleteCard: (card: CardData) => void;
+  onToggleGuide: (card: CardData, guidePinned: boolean) => void;
+  guideBusyId: string | null;
 };
 
 function StreamBreakoutBody({
   section,
   bucket,
+  guideCards,
   state,
   activeGroup,
   busy,
@@ -1731,11 +1917,13 @@ function StreamBreakoutBody({
   onCreateCard,
   onSectionActivityStateChange,
   onDeleteCard,
+  onToggleGuide,
+  guideBusyId,
 }: StreamBreakoutBodyProps) {
   const groups = [...state.groups].sort((a, b) => a.order - b.order);
 
   function groupCards(groupId: string | null): CardData[] {
-    return bucket.filter((c) => (c.groupId ?? null) === groupId);
+    return bucket.filter((c) => resolveCardBreakoutGroupId(c, groups) === groupId);
   }
 
   function renderGroupArea(group: BreakoutGroup | null, cards: CardData[]) {
@@ -1800,6 +1988,9 @@ function StreamBreakoutBody({
                 card={card}
                 canDelete={canDeleteCard(card, currentUserId, currentRole)}
                 onDelete={() => onDeleteCard(card)}
+                canToggleGuide={canToggleGuideCard(card, state.canManage)}
+                guideBusy={guideBusyId === card.id}
+                onToggleGuide={(guidePinned) => onToggleGuide(card, guidePinned)}
                 boardId={boardId}
               />
             ))
@@ -1821,6 +2012,16 @@ function StreamBreakoutBody({
       return (
         <div className="stream-breakout-locked">
           <div className="stream-breakout-locked-content" aria-hidden="true" inert>
+            <StreamGuideList
+              cards={guideCards}
+              boardId={boardId}
+              currentUserId={currentUserId}
+              currentRole={currentRole}
+              canToggleGuide={false}
+              guideBusyId={guideBusyId}
+              onDeleteCard={onDeleteCard}
+              onToggleGuide={onToggleGuide}
+            />
             {section.activityTemplate ? (
               <StreamActivityTemplatePanel
                 template={section.activityTemplate}
@@ -1879,8 +2080,21 @@ function StreamBreakoutBody({
     const myGroupId = state.membership.groupId;
     const myGroup = groups.find((g) => g.id === myGroupId) ?? null;
     const cards = groupCards(myGroupId);
+    const myGroupGuideList = (
+      <StreamGuideList
+        cards={guideCards}
+        boardId={boardId}
+        currentUserId={currentUserId}
+        currentRole={currentRole}
+        canToggleGuide={false}
+        guideBusyId={guideBusyId}
+        onDeleteCard={onDeleteCard}
+        onToggleGuide={onToggleGuide}
+      />
+    );
     return (
       <div className="stream-breakout-group-view">
+        {myGroupGuideList}
         <div className="stream-breakout-my-group">
           <span>{myGroup?.name ?? "내 모둠"}</span>
           {myGroup && <span>{myGroup.memberCount}명</span>}
@@ -1918,6 +2132,18 @@ function StreamBreakoutBody({
 
   // Teacher flow: segment bar + compare or single-group view.
   const unassigned = groupCards(null);
+  const teacherGuideList = (
+    <StreamGuideList
+      cards={guideCards}
+      boardId={boardId}
+      currentUserId={currentUserId}
+      currentRole={currentRole}
+      canToggleGuide={state.canManage}
+      guideBusyId={guideBusyId}
+      onDeleteCard={onDeleteCard}
+      onToggleGuide={onToggleGuide}
+    />
+  );
   return (
     <div className="stream-breakout-teacher">
       <div className="stream-breakout-segments" role="tablist">
@@ -1943,6 +2169,7 @@ function StreamBreakoutBody({
           </button>
         ))}
       </div>
+      {teacherGuideList}
       {activeGroup === "all" ? (
         <div className="stream-breakout-compare">
           {groups.map((group) => renderGroupArea(group, groupCards(group.id)))}

@@ -546,6 +546,7 @@ export async function POST(req: Request) {
         studentAuthorName: student?.name ?? null,
         externalAuthorName: card.externalAuthorName,
         anonymousAuthor: boardAnonymousAuthor,
+        guidePinned: card.guidePinned,
         // stream-board section breakout (2026-06-23): include groupId so
         // the front-end can place the card in the right group lane without
         // a follow-up refetch.
