@@ -16,6 +16,7 @@ type Props = {
   onEdit: () => void;
   canDelete: boolean;
   onDelete: () => void;
+  onOpen?: () => void;
   canToggleGuide?: boolean;
   guideBusy?: boolean;
   onToggleGuide?: (pinned: boolean) => void;
@@ -28,6 +29,7 @@ export function StreamPost({
   onEdit,
   canDelete,
   onDelete,
+  onOpen,
   canToggleGuide = false,
   guideBusy = false,
   onToggleGuide,
@@ -71,7 +73,21 @@ export function StreamPost({
   }, [card.linkTitle, card.linkUrl, isYouTubeVideo]);
 
   return (
-    <article className={`stream-post${card.guidePinned ? " is-guide" : ""}`}>
+    <article
+      className={`stream-post${card.guidePinned ? " is-guide" : ""}${
+        onOpen ? " is-clickable" : ""
+      }`}
+      role={onOpen ? "button" : undefined}
+      tabIndex={onOpen ? 0 : undefined}
+      onClick={onOpen}
+      onKeyDown={(event) => {
+        if (!onOpen) return;
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          onOpen();
+        }
+      }}
+    >
       <header className="stream-post-head">
         <div
           className="stream-avatar"
@@ -90,7 +106,10 @@ export function StreamPost({
           <time>{formatRelativeTime(card.createdAt ?? new Date().toISOString())}</time>
         </div>
         {(canEdit || canDelete || canToggleGuide) && (
-          <div className="stream-post-menu">
+          <div
+            className="stream-post-menu"
+            onClick={(event) => event.stopPropagation()}
+          >
             <button
               type="button"
               className="stream-post-menu-toggle"
@@ -177,7 +196,9 @@ export function StreamPost({
         )}
       </div>
 
-      <StreamEngagement cardId={card.id} boardId={boardId} />
+      <div onClick={(event) => event.stopPropagation()}>
+        <StreamEngagement cardId={card.id} boardId={boardId} />
+      </div>
     </article>
   );
 }

@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { createPortal } from "react-dom";
 import type { AddCardData } from "./AddCardModal";
+import { CardDetailModal } from "./cards/CardDetailModal";
 import type { CardData } from "./DraggableCard";
 import { EditCardModal, type EditCardUpdates } from "./EditCardModal";
 import {
@@ -138,6 +139,7 @@ export function StreamBoard({
   const [sectionOrderBusyId, setSectionOrderBusyId] = useState<string | null>(null);
   const [contentOrderBusyId, setContentOrderBusyId] = useState<string | null>(null);
   const [guideBusyId, setGuideBusyId] = useState<string | null>(null);
+  const [openCard, setOpenCard] = useState<CardData | null>(null);
   const [editingCard, setEditingCard] = useState<CardData | null>(null);
   const canEdit = currentRole === "owner" || currentRole === "editor";
   const canManageSections = canEdit && !isStudentViewer;
@@ -250,6 +252,13 @@ export function StreamBoard({
     return map;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sortedSections, grouped, breakoutBySection, activeGroupBySection]);
+
+  useEffect(() => {
+    setOpenCard((current) => {
+      if (!current) return current;
+      return cards.find((card) => card.id === current.id) ?? null;
+    });
+  }, [cards]);
 
   const sectionOptions = useMemo(
     () =>
@@ -387,16 +396,20 @@ export function StreamBoard({
     if (!window.confirm("게시글을 삭제할까요?")) return;
     deletingIds.current.add(card.id);
     const prev = cards;
+    const wasOpen = openCard?.id === card.id ? openCard : null;
     setCards((list) => list.filter((item) => item.id !== card.id));
+    setOpenCard((current) => (current?.id === card.id ? null : current));
     try {
       const res = await fetch(`/api/cards/${card.id}`, { method: "DELETE" });
       if (!res.ok) {
         deletingIds.current.delete(card.id);
         setCards(prev);
+        if (wasOpen) setOpenCard(wasOpen);
       }
     } catch {
       deletingIds.current.delete(card.id);
       setCards(prev);
+      if (wasOpen) setOpenCard(wasOpen);
     }
   }
 
@@ -430,6 +443,9 @@ export function StreamBoard({
         ),
       ),
     );
+    setOpenCard((card) =>
+      card?.id === cardId ? { ...card, ...optimisticUpdates } : card,
+    );
     try {
       const res = await fetch(`/api/cards/${cardId}`, {
         method: "PATCH",
@@ -438,6 +454,7 @@ export function StreamBoard({
       });
       if (!res.ok) {
         setCards(prev);
+        setOpenCard((card) => (card?.id === cardId ? editingCard : card));
         alert("게시글 수정에 실패했어요.");
         return;
       }
@@ -448,10 +465,12 @@ export function StreamBoard({
           setCards((list) =>
             sortPosts(list.map((card) => (card.id === cardId ? data.card! : card))),
           );
+          setOpenCard((card) => (card?.id === cardId ? data.card! : card));
         }
       }
     } catch {
       setCards(prev);
+      setOpenCard((card) => (card?.id === cardId ? editingCard : card));
       alert("게시글 수정에 실패했어요.");
     }
   }
@@ -1146,6 +1165,7 @@ export function StreamBoard({
             onJoinBreakout={handleJoinBreakout}
             onRemoveBreakoutMember={handleRemoveBreakoutMember}
             onEditCard={setEditingCard}
+            onOpenCard={setOpenCard}
             onDeleteCard={handleDelete}
             onToggleGuide={handleToggleGuide}
           />
@@ -1162,6 +1182,7 @@ export function StreamBoard({
                 canToggleGuide={canToggleGuideCard(card, canManageSections)}
                 guideBusy={guideBusyId === card.id}
                 onToggleGuide={(guidePinned) => handleToggleGuide(card, guidePinned)}
+                onOpen={() => setOpenCard(card)}
                 boardId={boardId}
               />
             ))}
@@ -1325,6 +1346,11 @@ export function StreamBoard({
           />,
           document.body,
         )}
+      <CardDetailModal
+        card={openCard}
+        onClose={() => setOpenCard(null)}
+        boardId={boardId}
+      />
     </div>
   );
 }
@@ -1385,6 +1411,7 @@ type StreamGroupedFeedProps = {
     membershipId: string,
   ) => Promise<boolean>;
   onEditCard: (card: CardData) => void;
+  onOpenCard: (card: CardData) => void;
   onDeleteCard: (card: CardData) => void;
   onToggleGuide: (card: CardData, guidePinned: boolean) => void;
 };
@@ -1430,6 +1457,7 @@ function StreamGroupedFeed({
   onJoinBreakout,
   onRemoveBreakoutMember,
   onEditCard,
+  onOpenCard,
   onDeleteCard,
   onToggleGuide,
 }: StreamGroupedFeedProps) {
@@ -1629,6 +1657,7 @@ function StreamGroupedFeed({
                 canToggleGuide={canEdit}
                 guideBusyId={guideBusyId}
                 onEditCard={onEditCard}
+                onOpenCard={onOpenCard}
                 onDeleteCard={onDeleteCard}
                 onToggleGuide={onToggleGuide}
               />
@@ -1656,6 +1685,7 @@ function StreamGroupedFeed({
                 }
                 onSectionActivityStateChange={onSectionActivityStateChange}
                 onEditCard={onEditCard}
+                onOpenCard={onOpenCard}
                 onDeleteCard={onDeleteCard}
                 onToggleGuide={onToggleGuide}
                 guideBusyId={guideBusyId}
@@ -1684,6 +1714,7 @@ function StreamGroupedFeed({
                     onMoveSectionContent(section, contentItems, id, direction)
                   }
                   onEditCard={onEditCard}
+                  onOpenCard={onOpenCard}
                   onDeleteCard={onDeleteCard}
                   onToggleGuide={onToggleGuide}
                   onSectionActivityStateChange={onSectionActivityStateChange}
@@ -1713,6 +1744,7 @@ function StreamGroupedFeed({
                       onMoveSectionContent(section, contentItems, id, direction)
                     }
                     onEditCard={onEditCard}
+                    onOpenCard={onOpenCard}
                     onDeleteCard={onDeleteCard}
                     onToggleGuide={onToggleGuide}
                     onSectionActivityStateChange={onSectionActivityStateChange}
@@ -1737,6 +1769,7 @@ function StreamGroupedFeed({
                 card={card}
                 canEdit={canDeleteCard(card, currentUserId, currentRole)}
                 onEdit={() => onEditCard(card)}
+                onOpen={() => onOpenCard(card)}
                 canDelete={canDeleteCard(card, currentUserId, currentRole)}
                 onDelete={() => onDeleteCard(card)}
                 boardId={boardId}
@@ -1758,6 +1791,7 @@ function StreamGuideList({
   canToggleGuide,
   guideBusyId,
   onEditCard,
+  onOpenCard,
   onDeleteCard,
   onToggleGuide,
 }: {
@@ -1768,6 +1802,7 @@ function StreamGuideList({
   canToggleGuide: boolean;
   guideBusyId: string | null;
   onEditCard: (card: CardData) => void;
+  onOpenCard: (card: CardData) => void;
   onDeleteCard: (card: CardData) => void;
   onToggleGuide: (card: CardData, guidePinned: boolean) => void;
 }) {
@@ -1782,6 +1817,7 @@ function StreamGuideList({
             card={card}
             canEdit={canDeleteCard(card, currentUserId, currentRole)}
             onEdit={() => onEditCard(card)}
+            onOpen={() => onOpenCard(card)}
             canDelete={canDeleteCard(card, currentUserId, currentRole)}
             onDelete={() => onDeleteCard(card)}
             canToggleGuide={canToggleGuideCard(card, canToggleGuide)}
@@ -1812,6 +1848,7 @@ function StreamSectionContentItem({
   currentStudentName,
   onMove,
   onEditCard,
+  onOpenCard,
   onDeleteCard,
   onToggleGuide,
   onSectionActivityStateChange,
@@ -1833,6 +1870,7 @@ function StreamSectionContentItem({
   currentStudentName?: string | null;
   onMove: (itemId: string, direction: "up" | "down") => Promise<void>;
   onEditCard: (card: CardData) => void;
+  onOpenCard: (card: CardData) => void;
   onDeleteCard: (card: CardData) => void;
   onToggleGuide: (card: CardData, guidePinned: boolean) => void;
   onSectionActivityStateChange: (
@@ -1894,6 +1932,7 @@ function StreamSectionContentItem({
           card={item.card}
           canEdit={canDeleteCard(item.card, currentUserId, currentRole)}
           onEdit={() => onEditCard(item.card)}
+          onOpen={() => onOpenCard(item.card)}
           canDelete={canDeleteCard(item.card, currentUserId, currentRole)}
           onDelete={() => onDeleteCard(item.card)}
           canToggleGuide={canToggleGuideCard(item.card, isTeacherView)}
@@ -2356,6 +2395,7 @@ type StreamBreakoutBodyProps = {
     activityTemplateState: StreamActivityTemplateState | null,
   ) => Promise<boolean>;
   onEditCard: (card: CardData) => void;
+  onOpenCard: (card: CardData) => void;
   onDeleteCard: (card: CardData) => void;
   onToggleGuide: (card: CardData, guidePinned: boolean) => void;
   guideBusyId: string | null;
@@ -2379,6 +2419,7 @@ function StreamBreakoutBody({
   onCreateCard,
   onSectionActivityStateChange,
   onEditCard,
+  onOpenCard,
   onDeleteCard,
   onToggleGuide,
   guideBusyId,
@@ -2512,6 +2553,7 @@ function StreamBreakoutBody({
               canToggleGuide={false}
               guideBusyId={guideBusyId}
               onEditCard={onEditCard}
+              onOpenCard={onOpenCard}
               onDeleteCard={onDeleteCard}
               onToggleGuide={onToggleGuide}
             />
@@ -2536,6 +2578,7 @@ function StreamBreakoutBody({
                   card={card}
                   canEdit={false}
                   onEdit={() => undefined}
+                  onOpen={() => onOpenCard(card)}
                   canDelete={false}
                   onDelete={() => onDeleteCard(card)}
                   boardId={boardId}
@@ -2589,6 +2632,7 @@ function StreamBreakoutBody({
         canToggleGuide={false}
         guideBusyId={guideBusyId}
         onEditCard={onEditCard}
+        onOpenCard={onOpenCard}
         onDeleteCard={onDeleteCard}
         onToggleGuide={onToggleGuide}
       />
@@ -2646,6 +2690,7 @@ function StreamBreakoutBody({
                   card={card}
                   canEdit={canDeleteCard(card, currentUserId, currentRole)}
                   onEdit={() => onEditCard(card)}
+                  onOpen={() => onOpenCard(card)}
                   canDelete={canDeleteCard(card, currentUserId, currentRole)}
                   onDelete={() => onDeleteCard(card)}
                   boardId={boardId}
@@ -2668,6 +2713,7 @@ function StreamBreakoutBody({
       canToggleGuide={state.canManage}
       guideBusyId={guideBusyId}
       onEditCard={onEditCard}
+      onOpenCard={onOpenCard}
       onDeleteCard={onDeleteCard}
       onToggleGuide={onToggleGuide}
     />

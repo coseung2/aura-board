@@ -47,6 +47,7 @@ export function StreamMediaCarousel({ card }: Props) {
                 src={item.url}
                 title={item.alt}
                 loading="lazy"
+                onClick={(event) => event.stopPropagation()}
                 allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
                 allowFullScreen
               />
@@ -57,6 +58,7 @@ export function StreamMediaCarousel({ card }: Props) {
                 controls
                 preload="metadata"
                 playsInline
+                onClick={(event) => event.stopPropagation()}
               />
             )}
           </figure>
@@ -67,7 +69,10 @@ export function StreamMediaCarousel({ card }: Props) {
           <button
             type="button"
             className="stream-media-nav stream-media-prev"
-            onClick={() => go(index - 1)}
+            onClick={(event) => {
+              event.stopPropagation();
+              go(index - 1);
+            }}
             aria-label="이전 미디어"
           >
             ‹
@@ -75,7 +80,10 @@ export function StreamMediaCarousel({ card }: Props) {
           <button
             type="button"
             className="stream-media-nav stream-media-next"
-            onClick={() => go(index + 1)}
+            onClick={(event) => {
+              event.stopPropagation();
+              go(index + 1);
+            }}
             aria-label="다음 미디어"
           >
             ›
@@ -87,7 +95,10 @@ export function StreamMediaCarousel({ card }: Props) {
                 type="button"
                 className={i === index ? "is-active" : ""}
                 aria-label={`${i + 1}번째 미디어 보기`}
-                onClick={() => go(i)}
+                onClick={(event) => {
+                  event.stopPropagation();
+                  go(i);
+                }}
               />
             ))}
           </div>
