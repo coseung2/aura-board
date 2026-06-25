@@ -216,7 +216,7 @@ export function StreamBoard({
           );
           setBreakoutBySection((prev) => ({ ...prev, [section.id]: state }));
           setActiveGroupBySection((prev) =>
-            prev[section.id] !== undefined
+            state.canManage && prev[section.id] !== undefined
               ? prev
               : {
                   ...prev,
@@ -417,7 +417,17 @@ export function StreamBoard({
 
   async function handleAdd(data: AddCardData, groupId?: string | null) {
     const sectionId = data.sectionId ?? null;
-    const effectiveGroupId = groupId === undefined ? composerGroupId : groupId;
+    const requestedGroupId = groupId === undefined ? composerGroupId : groupId;
+    const breakout = sectionId ? breakoutBySection[sectionId] : undefined;
+    const effectiveGroupId =
+      sectionId && breakout?.config
+        ? !breakout.canManage
+          ? breakout.membership?.groupId ?? null
+          : requestedGroupId &&
+              breakout.groups.some((group) => group.id === requestedGroupId)
+            ? requestedGroupId
+            : null
+        : null;
     const siblingOrders = cards
       .filter(
         (card) =>
@@ -429,7 +439,10 @@ export function StreamBoard({
       siblingOrders.length > 0 ? Math.max(...siblingOrders) + 1 : 0;
     const res = await fetch("/api/cards", {
       method: "POST",
-      headers: { "content-type": "application/json" },
+      headers: {
+        "content-type": "application/json",
+        ...(isStudentViewer ? { "x-aura-student-viewer": "1" } : {}),
+      },
       body: JSON.stringify({
         boardId,
         title: data.title,
@@ -451,7 +464,9 @@ export function StreamBoard({
       throw new Error("Failed to create stream post");
     }
     const { card } = (await res.json()) as { card: CardData };
-    setCards((prev) => sortPosts([card, ...prev]));
+    const visibleCard =
+      effectiveGroupId && !card.groupId ? { ...card, groupId: effectiveGroupId } : card;
+    setCards((prev) => sortPosts([visibleCard, ...prev]));
   }
 
   async function handleDelete(card: CardData) {
@@ -1999,6 +2014,7 @@ function StreamSectionContentItem({
           state={section.activityTemplateState ?? null}
           canEditCard={(card) => canDeleteCard(card, currentUserId, currentRole)}
           onEditCard={onEditCard}
+          onDeleteCard={onDeleteCard}
           onStateChange={(nextState) =>
             onSectionActivityStateChange(section.id, nextState)
           }
@@ -2575,6 +2591,7 @@ function StreamBreakoutBody({
             state={section.activityTemplateState ?? null}
             canEditCard={(card) => canDeleteCard(card, currentUserId, currentRole)}
             onEditCard={onEditCard}
+            onDeleteCard={onDeleteCard}
             onStateChange={(nextState) =>
               onSectionActivityStateChange?.(section.id, nextState) ??
               Promise.resolve(false)
@@ -2721,6 +2738,7 @@ function StreamBreakoutBody({
             state={section.activityTemplateState ?? null}
             canEditCard={(card) => canDeleteCard(card, currentUserId, currentRole)}
             onEditCard={onEditCard}
+            onDeleteCard={onDeleteCard}
             onCreateCard={(data) => onCreateCard(data, myGroupId)}
           />
         )}

@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { db } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
-import { getCurrentStudent } from "@/lib/student-auth";
+import { getCurrentStudent, getCurrentStudentRaw } from "@/lib/student-auth";
 import { requirePermission, ForbiddenError } from "@/lib/rbac";
 import {
   deriveCanvaThumbnailUrl,
@@ -165,9 +165,11 @@ export async function POST(req: Request) {
     // Auth precedence: teacher (NextAuth) → student (HMAC cookie). Same
     // order as resolveIdentity / PATCH / DELETE. A leftover student_session
     // cookie from prior testing must NOT hijack a teacher-initiated POST.
+    const preferStudentSession =
+      req.headers.get("x-aura-student-viewer") === "1";
     let teacherUser: Awaited<ReturnType<typeof getCurrentUser>> | null = null;
     try {
-      teacherUser = await getCurrentUser();
+      teacherUser = preferStudentSession ? null : await getCurrentUser();
     } catch {
       teacherUser = null;
     }
@@ -191,7 +193,9 @@ export async function POST(req: Request) {
       boardClassroomId = board?.classroomId ?? null;
       boardAnonymousAuthor = board?.anonymousAuthor ?? false;
     } else {
-      student = await getCurrentStudent();
+      student = preferStudentSession
+        ? await getCurrentStudentRaw()
+        : await getCurrentStudent();
       if (student) {
         const board = await db.board.findUnique({
           where: { id: input.boardId },

@@ -21,6 +21,7 @@ type Props = {
   state?: StreamActivityTemplateState | null;
   canEditCard?: (card: CardData) => boolean;
   onEditCard?: (card: CardData) => void;
+  onDeleteCard?: (card: CardData) => void;
   onStateChange?: (state: StreamActivityTemplateState | null) => Promise<boolean>;
   onCreateCard: (data: { title: string; content: string }) => Promise<void>;
 };
@@ -55,6 +56,7 @@ export function StreamActivityTemplatePanel({
   state,
   canEditCard,
   onEditCard,
+  onDeleteCard,
   onStateChange,
   onCreateCard,
 }: Props) {
@@ -69,6 +71,7 @@ export function StreamActivityTemplatePanel({
         currentMemberName={windowCurrentMemberName}
         canEditCard={canEditCard}
         onEditCard={onEditCard}
+        onDeleteCard={onDeleteCard}
         onCreateCard={onCreateCard}
       />
     );
@@ -131,6 +134,7 @@ function WindowOpeningPanel({
   currentMemberName,
   canEditCard,
   onEditCard,
+  onDeleteCard,
   onCreateCard,
 }: {
   cards: CardData[];
@@ -141,6 +145,7 @@ function WindowOpeningPanel({
   currentMemberName?: string | null;
   canEditCard?: (card: CardData) => boolean;
   onEditCard?: (card: CardData) => void;
+  onDeleteCard?: (card: CardData) => void;
   onCreateCard: (data: { title: string; content: string }) => Promise<void>;
 }) {
   const cells = useMemo(
@@ -179,14 +184,27 @@ function WindowOpeningPanel({
                     <article key={card.id} className="stream-window-note">
                       {card.title && card.title !== cell.label && <strong>{card.title}</strong>}
                       <p>{card.content}</p>
-                      {editable && onEditCard && (
-                        <button
-                          type="button"
-                          className="stream-template-inline-edit"
-                          onClick={() => onEditCard(card)}
-                        >
-                          수정
-                        </button>
+                      {editable && (onEditCard || onDeleteCard) && (
+                        <div className="stream-template-inline-actions">
+                          {onEditCard && (
+                            <button
+                              type="button"
+                              className="stream-template-inline-edit"
+                              onClick={() => onEditCard(card)}
+                            >
+                              수정
+                            </button>
+                          )}
+                          {onDeleteCard && (
+                            <button
+                              type="button"
+                              className="stream-template-inline-edit stream-template-inline-delete"
+                              onClick={() => onDeleteCard(card)}
+                            >
+                              삭제
+                            </button>
+                          )}
+                        </div>
                       )}
                     </article>
                   );
