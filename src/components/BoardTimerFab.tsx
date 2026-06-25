@@ -1,12 +1,23 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type CSSProperties,
+  type PointerEvent as ReactPointerEvent,
+} from "react";
 import { createPortal } from "react-dom";
 import { ClockIcon, CloseIcon } from "./icons/UiIcons";
 
 const PRESET_MINUTES = [1, 3, 5, 10, 15];
 const MIN_MINUTES = 1;
 const MAX_MINUTES = 180;
+const PANEL_MARGIN = 12;
+const MIN_PANEL_WIDTH = 280;
+const MIN_PANEL_HEIGHT = 320;
+const DEFAULT_PANEL_SIZE = { width: 320, height: 360 };
 
 function clampMinutes(value: number) {
   if (!Number.isFinite(value)) return 5;
@@ -44,6 +55,32 @@ function playTimerChime() {
   }
 }
 
+function clampPanelGeometry(
+  left: number,
+  top: number,
+  width: number,
+  height: number,
+) {
+  const viewportWidth = window.innerWidth;
+  const viewportHeight = window.innerHeight;
+  const maxWidth = Math.max(MIN_PANEL_WIDTH, viewportWidth - PANEL_MARGIN * 2);
+  const maxHeight = Math.max(MIN_PANEL_HEIGHT, viewportHeight - PANEL_MARGIN * 2);
+  const nextWidth = Math.min(maxWidth, Math.max(MIN_PANEL_WIDTH, width));
+  const nextHeight = Math.min(maxHeight, Math.max(MIN_PANEL_HEIGHT, height));
+  return {
+    left: Math.min(
+      viewportWidth - PANEL_MARGIN - nextWidth,
+      Math.max(PANEL_MARGIN, left),
+    ),
+    top: Math.min(
+      viewportHeight - PANEL_MARGIN - nextHeight,
+      Math.max(PANEL_MARGIN, top),
+    ),
+    width: nextWidth,
+    height: nextHeight,
+  };
+}
+
 declare global {
   interface Window {
     webkitAudioContext?: typeof AudioContext;
@@ -57,7 +94,10 @@ export function BoardTimerFab() {
   const [remainingSeconds, setRemainingSeconds] = useState(5 * 60);
   const [running, setRunning] = useState(false);
   const [finished, setFinished] = useState(false);
+  const [panelPosition, setPanelPosition] = useState<{ left: number; top: number } | null>(null);
+  const [panelSize, setPanelSize] = useState(DEFAULT_PANEL_SIZE);
   const endAtRef = useRef<number | null>(null);
+  const panelRef = useRef<HTMLElement | null>(null);
 
   const durationSeconds = useMemo(() => minutes * 60, [minutes]);
   const timerLabel = finished ? "종료" : running ? "진행 중" : "대기";
@@ -84,6 +124,25 @@ export function BoardTimerFab() {
 
     return () => window.clearInterval(intervalId);
   }, [running]);
+
+  useEffect(() => {
+    function keepPanelInViewport() {
+      setPanelPosition((current) => {
+        if (!current) return current;
+        const next = clampPanelGeometry(
+          current.left,
+          current.top,
+          panelSize.width,
+          panelSize.height,
+        );
+        setPanelSize({ width: next.width, height: next.height });
+        return { left: next.left, top: next.top };
+      });
+    }
+
+    window.addEventListener("resize", keepPanelInViewport);
+    return () => window.removeEventListener("resize", keepPanelInViewport);
+  }, [panelSize.height, panelSize.width]);
 
   const setDuration = (nextMinutes: number) => {
     const safeMinutes = clampMinutes(nextMinutes);
@@ -117,17 +176,111 @@ export function BoardTimerFab() {
     setFinished(false);
   };
 
+  const beginPanelDrag = (event: ReactPointerEvent<HTMLElement>) => {
+    if (event.button !== 0 || !panelRef.current) return;
+    event.preventDefault();
+    const rect = panelRef.current.getBoundingClientRect();
+    const startX = event.clientX;
+    const startY = event.clientY;
+    const startLeft = rect.left;
+    const startTop = rect.top;
+    const previousUserSelect = document.body.style.userSelect;
+    document.body.style.userSelect = "none";
+
+    const move = (moveEvent: PointerEvent) => {
+      const next = clampPanelGeometry(
+        startLeft + moveEvent.clientX - startX,
+        startTop + moveEvent.clientY - startY,
+        rect.width,
+        rect.height,
+      );
+      setPanelPosition({ left: next.left, top: next.top });
+      setPanelSize({ width: next.width, height: next.height });
+    };
+
+    const stop = () => {
+      document.body.style.userSelect = previousUserSelect;
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", stop);
+      window.removeEventListener("pointercancel", stop);
+    };
+
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", stop);
+    window.addEventListener("pointercancel", stop);
+  };
+
+  const beginPanelResize = (event: ReactPointerEvent<HTMLButtonElement>) => {
+    if (event.button !== 0 || !panelRef.current) return;
+    event.preventDefault();
+    event.stopPropagation();
+    const rect = panelRef.current.getBoundingClientRect();
+    const startX = event.clientX;
+    const startY = event.clientY;
+    const previousUserSelect = document.body.style.userSelect;
+    document.body.style.userSelect = "none";
+
+    const move = (moveEvent: PointerEvent) => {
+      const next = clampPanelGeometry(
+        rect.left,
+        rect.top,
+        rect.width + moveEvent.clientX - startX,
+        rect.height + moveEvent.clientY - startY,
+      );
+      setPanelPosition({ left: next.left, top: next.top });
+      setPanelSize({ width: next.width, height: next.height });
+    };
+
+    const stop = () => {
+      document.body.style.userSelect = previousUserSelect;
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", stop);
+      window.removeEventListener("pointercancel", stop);
+    };
+
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", stop);
+    window.addEventListener("pointercancel", stop);
+  };
+
+  const panelStyle: CSSProperties = {
+    width: panelPosition
+      ? panelSize.width
+      : `min(${panelSize.width}px, calc(100vw - 32px))`,
+    height: panelPosition
+      ? panelSize.height
+      : `min(${panelSize.height}px, calc(100vh - 96px))`,
+    ...(panelPosition
+      ? {
+          left: panelPosition.left,
+          top: panelPosition.top,
+          right: "auto",
+          bottom: "auto",
+        }
+      : null),
+  };
+
   const panel = (
     <section
+      ref={(element) => {
+        panelRef.current = element;
+      }}
       className={`board-timer-panel${finished ? " is-finished" : ""}`}
       role="dialog"
       aria-label="타이머"
+      style={panelStyle}
     >
       <div className="board-timer-header">
-        <div>
+        <button
+          type="button"
+          className="board-timer-drag-handle"
+          onPointerDown={beginPanelDrag}
+          aria-label="타이머 이동"
+          title="타이머 이동"
+        >
           <p className="board-timer-kicker">타이머</p>
           <strong className="board-timer-status">{timerLabel}</strong>
-        </div>
+        </button>
         <button
           type="button"
           className="board-timer-close"
@@ -138,49 +291,58 @@ export function BoardTimerFab() {
         </button>
       </div>
 
-      <output className="board-timer-display" aria-live="polite">
-        {formatTimer(remainingSeconds)}
-      </output>
+      <div className="board-timer-content">
+        <output className="board-timer-display" aria-live="polite">
+          {formatTimer(remainingSeconds)}
+        </output>
 
-      <div className="board-timer-presets" aria-label="타이머 빠른 설정">
-        {PRESET_MINUTES.map((preset) => (
-          <button
-            key={preset}
-            type="button"
-            className={preset === minutes ? "is-selected" : ""}
-            onClick={() => setDuration(preset)}
-          >
-            {preset}분
+        <div className="board-timer-presets" aria-label="타이머 빠른 설정">
+          {PRESET_MINUTES.map((preset) => (
+            <button
+              key={preset}
+              type="button"
+              className={preset === minutes ? "is-selected" : ""}
+              onClick={() => setDuration(preset)}
+            >
+              {preset}분
+            </button>
+          ))}
+        </div>
+
+        <label className="board-timer-input">
+          <span>시간</span>
+          <input
+            type="number"
+            min={MIN_MINUTES}
+            max={MAX_MINUTES}
+            value={minutes}
+            onChange={(event) => setDuration(Number(event.target.value))}
+          />
+          <span>분</span>
+        </label>
+
+        <div className="board-timer-actions">
+          {running ? (
+            <button type="button" className="board-timer-primary" onClick={pauseTimer}>
+              일시정지
+            </button>
+          ) : (
+            <button type="button" className="board-timer-primary" onClick={startTimer}>
+              시작
+            </button>
+          )}
+          <button type="button" className="board-timer-secondary" onClick={resetTimer}>
+            초기화
           </button>
-        ))}
+        </div>
       </div>
-
-      <label className="board-timer-input">
-        <span>시간</span>
-        <input
-          type="number"
-          min={MIN_MINUTES}
-          max={MAX_MINUTES}
-          value={minutes}
-          onChange={(event) => setDuration(Number(event.target.value))}
-        />
-        <span>분</span>
-      </label>
-
-      <div className="board-timer-actions">
-        {running ? (
-          <button type="button" className="board-timer-primary" onClick={pauseTimer}>
-            일시정지
-          </button>
-        ) : (
-          <button type="button" className="board-timer-primary" onClick={startTimer}>
-            시작
-          </button>
-        )}
-        <button type="button" className="board-timer-secondary" onClick={resetTimer}>
-          초기화
-        </button>
-      </div>
+      <button
+        type="button"
+        className="board-timer-resize-handle"
+        onPointerDown={beginPanelResize}
+        aria-label="타이머 크기 조절"
+        title="타이머 크기 조절"
+      />
     </section>
   );
 
