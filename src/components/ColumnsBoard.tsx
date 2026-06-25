@@ -323,6 +323,19 @@ export function ColumnsBoard({
     return cardsBySection.get(sectionId) ?? [];
   }
 
+  const detailCards = openCard
+    ? cardsBySection.get(openCard.sectionId ?? "") ?? []
+    : [];
+  const openCardIndex = openCard
+    ? detailCards.findIndex((card) => card.id === openCard.id)
+    : -1;
+  const previousOpenCard =
+    openCardIndex > 0 ? detailCards[openCardIndex - 1] : null;
+  const nextOpenCard =
+    openCardIndex >= 0 && openCardIndex < detailCards.length - 1
+      ? detailCards[openCardIndex + 1]
+      : null;
+
   function handleDrop(e: React.DragEvent, targetSectionId: string) {
     e.preventDefault();
     setOverSectionId(null);
@@ -515,6 +528,12 @@ export function ColumnsBoard({
       <CardDetailModal
         card={openCard}
         onClose={() => setOpenCard(null)}
+        hasPrevious={!!previousOpenCard}
+        hasNext={!!nextOpenCard}
+        onPrevious={
+          previousOpenCard ? () => setOpenCard(previousOpenCard) : undefined
+        }
+        onNext={nextOpenCard ? () => setOpenCard(nextOpenCard) : undefined}
         onEditAuthors={(c) => setAuthorEditCard(c)}
         canEditAuthors={(c) => canEdit || c.studentAuthorId === currentUserId}
         boardId={boardId}

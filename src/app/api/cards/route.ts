@@ -360,12 +360,15 @@ export async function POST(req: Request) {
     }
 
     // stream-board section breakout (2026-06-23): groupId must be consistent
-    // with sectionId + the caller's identity. The shape of the check is:
+    // with sectionId + the caller's identity. For student-authored cards,
+    // the server-side membership is authoritative so a stale client groupId
+    // cannot block posting after a teacher reassigns groups.
+    // The shape of the check is:
     //   - If a section breakout config exists for the section:
+    //       * student author + membership → use membership.groupId.
     //       * groupId present → must belong to the section (422 if not).
-// * student authors must have a SectionBreakoutMembership pointing at
-// the same group; missing/wrong → 403. (Teachers are exempt.)
-// * groupId absent → card is whole-section (allowed).
+    //       * student authors with a requested group but no membership → 403.
+    //       * groupId absent → card is whole-section (allowed).
     //   - If no section breakout config exists:
     //       * groupId present → 422 ("section has no breakout").
     let resolvedGroupId: string | null = null;
@@ -375,7 +378,25 @@ export async function POST(req: Request) {
         select: { id: true },
       });
       if (breakoutConfig) {
-        if (input.groupId) {
+        if (studentAuthorId && !teacherUser) {
+          const membership = await db.sectionBreakoutMembership.findUnique({
+            where: {
+              sectionId_studentId: {
+                sectionId: input.sectionId,
+                studentId: studentAuthorId,
+              },
+            },
+            select: { groupId: true },
+          });
+          if (membership) {
+            resolvedGroupId = membership.groupId;
+          } else if (input.groupId) {
+            return NextResponse.json(
+              { error: "not_a_member_of_group" },
+              { status: 403 },
+            );
+          }
+        } else if (input.groupId) {
           const group = await db.sectionBreakoutGroup.findUnique({
             where: { id: input.groupId },
             select: { id: true, sectionId: true },
@@ -385,29 +406,6 @@ export async function POST(req: Request) {
               { error: "groupId does not belong to sectionId" },
               { status: 422 },
             );
-          }
-          // Student author must already be a member of this group. We do not
-          // auto-pick here — that's a separate /breakout/membership call so
-          // the student can see the capacity gate + see their pick reflected
-          // in the breakout snapshot.
-          if (studentAuthorId && !teacherUser) {
-            const membership = await db.sectionBreakoutMembership.findUnique(
-              {
-                where: {
-                  sectionId_studentId: {
-                    sectionId: input.sectionId,
-                    studentId: studentAuthorId,
-                  },
-                },
-                select: { groupId: true },
-              },
-            );
-            if (!membership || membership.groupId !== group.id) {
-              return NextResponse.json(
-                { error: "not_a_member_of_group" },
-                { status: 403 },
-              );
-            }
           }
           resolvedGroupId = group.id;
         }

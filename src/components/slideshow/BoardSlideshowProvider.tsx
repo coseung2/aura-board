@@ -39,6 +39,7 @@ export type SlideshowSectionOption = {
   sectionId: string;
   title: string;
   groups: SlideshowGroupOption[];
+  defaultGroupId?: string | null;
 };
 
 type SlideshowContextValue = {
@@ -140,6 +141,14 @@ export function BoardSlideshowProvider({ children }: { children: ReactNode }) {
     if (!slides || slides.length === 0) return;
     const sectionOptions = sectionOptionsRef.current.get(targetId) ?? [];
     if (sectionOptions.length > 0) {
+      const defaultSelection = buildDefaultPresentationGroupSelection(sectionOptions);
+      if (defaultSelection) {
+        setActiveSourceId(targetId);
+        setPresentationGroupBySection(defaultSelection);
+        setIndex(0);
+        setOpen(true);
+        return;
+      }
       setActiveSourceId(targetId);
       setIndex(0);
       setPendingPrompt({ sourceId: targetId, sections: sectionOptions });
@@ -313,6 +322,7 @@ function PresentationGroupPrompt({
   const firstGroups = sections[0]?.groups ?? [];
   const initialBaseGroupId =
     presentationGroupBySection[sections[0]?.sectionId ?? ""] ??
+    sections[0]?.defaultGroupId ??
     firstGroups[0]?.groupId ??
     "";
   const [baseGroupId, setBaseGroupId] = useState(initialBaseGroupId);
@@ -483,6 +493,23 @@ function buildPresentationGroupSelection(
       section.groups[baseGroupIndex]?.groupId ??
       section.groups[0]?.groupId ??
       "";
+  }
+  return selection;
+}
+
+function buildDefaultPresentationGroupSelection(
+  sections: SlideshowSectionOption[],
+): Record<string, string> | null {
+  const selection: Record<string, string> = {};
+  for (const section of sections) {
+    const defaultGroupId = section.defaultGroupId;
+    if (
+      !defaultGroupId ||
+      !section.groups.some((group) => group.groupId === defaultGroupId)
+    ) {
+      return null;
+    }
+    selection[section.sectionId] = defaultGroupId;
   }
   return selection;
 }

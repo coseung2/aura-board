@@ -67,6 +67,42 @@
   transform: scale(1.06);
 }
 
+.card-detail-nav {
+  position: absolute;
+  top: 50%;
+  z-index: 8;
+  --ui-icon-action-size: 52px;
+  color: var(--color-text);
+  background: rgba(255, 255, 255, 0.94);
+  border: 1px solid rgba(204, 220, 232, 0.95);
+  box-shadow: 0 14px 34px rgba(15, 23, 42, 0.18);
+}
+.card-detail-nav:hover:not(:disabled),
+.card-detail-nav:focus-visible:not(:disabled) {
+  background: var(--color-surface);
+  transform: translateY(-50%) scale(1.04);
+}
+.card-detail-nav:disabled {
+  opacity: 0.32;
+  cursor: default;
+}
+.card-detail-nav-prev {
+  left: 0;
+  transform: translate(-50%, -50%);
+}
+.card-detail-nav-prev:hover:not(:disabled),
+.card-detail-nav-prev:focus-visible:not(:disabled) {
+  transform: translate(-50%, -50%) scale(1.04);
+}
+.card-detail-nav-next {
+  right: 0;
+  transform: translate(50%, -50%);
+}
+.card-detail-nav-next:hover:not(:disabled),
+.card-detail-nav-next:focus-visible:not(:disabled) {
+  transform: translate(50%, -50%) scale(1.04);
+}
+
 /* When entering the browser fullscreen, the modal becomes the root
    element — strip all width/height caps + fixed-position offsets so it
    genuinely fills the screen. Hide the side panel so the presenter sees
@@ -94,13 +130,23 @@
   min-height: 100vh;
 }
 .card-detail-modal[data-fullscreen="true"] .card-detail-close,
-.card-detail-modal[data-fullscreen="true"] .card-detail-fullscreen {
+.card-detail-modal[data-fullscreen="true"] .card-detail-fullscreen,
+.card-detail-modal[data-fullscreen="true"] .card-detail-nav {
   opacity: 0;
   transition: opacity 0.2s ease;
 }
 .card-detail-modal[data-fullscreen="true"]:hover .card-detail-close,
-.card-detail-modal[data-fullscreen="true"]:hover .card-detail-fullscreen {
+.card-detail-modal[data-fullscreen="true"]:hover .card-detail-fullscreen,
+.card-detail-modal[data-fullscreen="true"]:hover .card-detail-nav {
   opacity: 1;
+}
+.card-detail-modal[data-fullscreen="true"] .card-detail-nav-prev {
+  left: 24px;
+  transform: translateY(-50%);
+}
+.card-detail-modal[data-fullscreen="true"] .card-detail-nav-next {
+  right: 24px;
+  transform: translateY(-50%);
 }
 
 .card-detail-body {
@@ -878,6 +924,23 @@
 @media (orientation: portrait) and (max-width: 640px) {
   .card-detail-body {
     grid-template-rows: 45dvh 1fr;
+  }
+  .card-detail-nav {
+    --ui-icon-action-size: 44px;
+  }
+  .card-detail-nav-prev {
+    left: 12px;
+    transform: translateY(-50%);
+  }
+  .card-detail-nav-next {
+    right: 12px;
+    transform: translateY(-50%);
+  }
+  .card-detail-nav-prev:hover:not(:disabled),
+  .card-detail-nav-prev:focus-visible:not(:disabled),
+  .card-detail-nav-next:hover:not(:disabled),
+  .card-detail-nav-next:focus-visible:not(:disabled) {
+    transform: translateY(-50%) scale(1.04);
   }
 }
 

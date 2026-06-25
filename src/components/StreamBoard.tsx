@@ -151,6 +151,7 @@ export function StreamBoard({
   const [breakoutBusyId, setBreakoutBusyId] = useState<string | null>(null);
   const [breakoutModalSectionId, setBreakoutModalSectionId] = useState<string | null>(null);
   const [activeGroupBySection, setActiveGroupBySection] = useState<Record<string, string>>({});
+  const breakoutViewerKey = `${isStudentViewer ? "student" : "user"}:${currentUserId}`;
   // Track which sections we've already fetched breakout for so a poll or
   // re-render does not re-trigger the GET.
   const breakoutLoadedRef = useRef<Set<string>>(new Set());
@@ -189,6 +190,13 @@ export function StreamBoard({
     return { bySection, unsectioned };
   }, [cards, sortedSections]);
 
+  useEffect(() => {
+    if (!streamSectionsEnabled) return;
+    breakoutLoadedRef.current.clear();
+    setBreakoutBySection(buildInitialBreakoutState(sortedSections, canManageSections));
+    setActiveGroupBySection({});
+  }, [breakoutViewerKey, streamSectionsEnabled, sortedSections, canManageSections]);
+
   // Load breakout state for each section from the dedicated endpoint. The
   // page server component stays unaware of breakout; this client fetch is
   // the source of truth for config, groups, membership and canManage.
@@ -225,7 +233,7 @@ export function StreamBoard({
     return () => {
       alive = false;
     };
-  }, [sortedSections, streamSectionsEnabled, isStudentViewer]);
+  }, [sortedSections, streamSectionsEnabled, isStudentViewer, breakoutViewerKey]);
 
   function visibleCardsForSection(sectionId: string, bucket: CardData[]): CardData[] {
     const bs = breakoutBySection[sectionId];
@@ -253,6 +261,50 @@ export function StreamBoard({
     return map;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sortedSections, grouped, breakoutBySection, activeGroupBySection]);
+
+  function getStreamDetailCards(card: CardData): CardData[] {
+    if (!streamSectionsEnabled) return cards;
+
+    const sectionId = card.sectionId ?? null;
+    if (!sectionId) return grouped.unsectioned;
+
+    const bucket = grouped.bySection.get(sectionId) ?? [];
+    if (isGuideCard(card)) {
+      return bucket.filter(isGuideCard);
+    }
+
+    const postBucket = bucket.filter((candidate) => !isGuideCard(candidate));
+    const breakout = breakoutBySection[sectionId];
+    if (!breakout?.config) return postBucket;
+
+    const cardGroupId = resolveCardBreakoutGroupId(card, breakout.groups);
+    if (!breakout.canManage) {
+      const groupId = breakout.membership?.groupId ?? cardGroupId;
+      return postBucket.filter(
+        (candidate) =>
+          resolveCardBreakoutGroupId(candidate, breakout.groups) === groupId,
+      );
+    }
+
+    const activeGroup = activeGroupBySection[sectionId] ?? "all";
+    if (activeGroup === "all") return postBucket;
+    const groupId = activeGroup || cardGroupId;
+    return postBucket.filter(
+      (candidate) =>
+        resolveCardBreakoutGroupId(candidate, breakout.groups) === groupId,
+    );
+  }
+
+  const detailCards = openCard ? getStreamDetailCards(openCard) : [];
+  const openCardIndex = openCard
+    ? detailCards.findIndex((card) => card.id === openCard.id)
+    : -1;
+  const previousOpenCard =
+    openCardIndex > 0 ? detailCards[openCardIndex - 1] : null;
+  const nextOpenCard =
+    openCardIndex >= 0 && openCardIndex < detailCards.length - 1
+      ? detailCards[openCardIndex + 1]
+      : null;
 
   useEffect(() => {
     setOpenCard((current) => {
@@ -344,7 +396,15 @@ export function StreamBoard({
                 memberStudentIds: (group.members ?? []).map((member) => member.studentId),
               }))
           : [];
-        return { sectionId: section.id, title: section.title, groups };
+        return {
+          sectionId: section.id,
+          title: section.title,
+          groups,
+          defaultGroupId:
+            state?.config && !state.canManage
+              ? state.membership?.groupId ?? null
+              : null,
+        };
       })
       .filter((option) => option.groups.length > 0);
     setSectionOptions("stream", options);
@@ -1353,6 +1413,12 @@ export function StreamBoard({
       <CardDetailModal
         card={openCard}
         onClose={() => setOpenCard(null)}
+        hasPrevious={!!previousOpenCard}
+        hasNext={!!nextOpenCard}
+        onPrevious={
+          previousOpenCard ? () => setOpenCard(previousOpenCard) : undefined
+        }
+        onNext={nextOpenCard ? () => setOpenCard(nextOpenCard) : undefined}
         boardId={boardId}
       />
     </div>
@@ -2529,6 +2595,7 @@ function StreamBreakoutBody({
                   card={card}
                   canEdit={canDeleteCard(card, currentUserId, currentRole)}
                   onEdit={() => onEditCard(card)}
+                  onOpen={() => onOpenCard(card)}
                   canDelete={canDeleteCard(card, currentUserId, currentRole)}
                   onDelete={() => onDeleteCard(card)}
                   canToggleGuide={canToggleGuideCard(card, state.canManage)}

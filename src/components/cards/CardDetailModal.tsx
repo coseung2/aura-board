@@ -9,6 +9,8 @@ import { CardImageLightbox } from "./CardImageLightbox";
 import { CardEngagement } from "../engagement/CardEngagement";
 import { CardFileAttachment } from "../CardFileAttachment";
 import {
+  ChevronLeftIcon,
+  ChevronRightIcon,
   CloseIcon,
   FullscreenEnterIcon,
   FullscreenExitIcon,
@@ -26,6 +28,10 @@ type Props = {
    *  return `true`. Lets teachers (all cards) and students (own cards)
    *  share the same modal without leaking the editor to peers. */
   canEditAuthors?: (card: CardData) => boolean;
+  hasPrevious?: boolean;
+  hasNext?: boolean;
+  onPrevious?: () => void;
+  onNext?: () => void;
   boardId?: string;
 };
 
@@ -36,6 +42,10 @@ export function CardDetailModal({
   onClose,
   onEditAuthors,
   canEditAuthors,
+  hasPrevious,
+  hasNext,
+  onPrevious,
+  onNext,
   boardId,
 }: Props) {
   const rootRef = useRef<HTMLDivElement>(null);
@@ -43,6 +53,8 @@ export function CardDetailModal({
   // 카드 내부 이미지 라이트박스. null 이면 닫힘. 값은 card.attachments 중
   // kind==="image" 만 걸러낸 배열 내 인덱스.
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
+  const canGoPrevious = Boolean(hasPrevious && onPrevious);
+  const canGoNext = Boolean(hasNext && onNext);
 
   // 카드가 바뀌면 라이트박스 자동 닫기.
   useEffect(() => {
@@ -57,11 +69,17 @@ export function CardDetailModal({
       if (e.key === "Escape") {
         e.preventDefault();
         onClose();
+      } else if (e.key === "ArrowLeft" && canGoPrevious && !isEditableTarget(e.target)) {
+        e.preventDefault();
+        onPrevious?.();
+      } else if (e.key === "ArrowRight" && canGoNext && !isEditableTarget(e.target)) {
+        e.preventDefault();
+        onNext?.();
       }
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [card, onClose, lightboxIndex]);
+  }, [card, onClose, lightboxIndex, canGoPrevious, canGoNext, onPrevious, onNext]);
 
   useEffect(() => {
     if (!card) return;
@@ -170,6 +188,30 @@ export function CardDetailModal({
         >
           {isFullscreen ? <FullscreenExitIcon size={20} /> : <FullscreenEnterIcon size={20} />}
         </button>
+        {(onPrevious || onNext) && (
+          <>
+            <button
+              type="button"
+              className="ui-icon-action card-detail-nav card-detail-nav-prev"
+              onClick={onPrevious}
+              disabled={!canGoPrevious}
+              aria-label="이전 게시글"
+              title="이전 게시글"
+            >
+              <ChevronLeftIcon size={28} />
+            </button>
+            <button
+              type="button"
+              className="ui-icon-action card-detail-nav card-detail-nav-next"
+              onClick={onNext}
+              disabled={!canGoNext}
+              aria-label="다음 게시글"
+              title="다음 게시글"
+            >
+              <ChevronRightIcon size={28} />
+            </button>
+          </>
+        )}
         <div className="card-detail-body">
           <section className="card-detail-main" aria-label="콘텐츠">
             {hasMedia && (
@@ -344,6 +386,12 @@ function normalizePreviewText(value: string): string {
     .replace(/\*\*(.*?)\*\*/g, "$1")
     .replace(/\s+/g, " ")
     .trim();
+}
+
+function isEditableTarget(target: EventTarget | null): boolean {
+  if (!(target instanceof HTMLElement)) return false;
+  if (target.isContentEditable) return true;
+  return ["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName);
 }
 
 // meta-download-zone (2026-06-13): 본문(content)을 Notion 스타일로 렌더.

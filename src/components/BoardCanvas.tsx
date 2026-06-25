@@ -263,6 +263,16 @@ export function BoardCanvas({
     }
   }
 
+  const openCardIndex = openCard
+    ? cards.findIndex((card) => card.id === openCard.id)
+    : -1;
+  const previousOpenCard =
+    openCardIndex > 0 ? cards[openCardIndex - 1] : null;
+  const nextOpenCard =
+    openCardIndex >= 0 && openCardIndex < cards.length - 1
+      ? cards[openCardIndex + 1]
+      : null;
+
   return (
     <div className="board-canvas-wrap">
       <div ref={masonryGridRef} className="grid-board freeform-board">
@@ -356,6 +366,12 @@ export function BoardCanvas({
       <CardDetailModal
         card={openCard}
         onClose={() => setOpenCard(null)}
+        hasPrevious={!!previousOpenCard}
+        hasNext={!!nextOpenCard}
+        onPrevious={
+          previousOpenCard ? () => setOpenCard(previousOpenCard) : undefined
+        }
+        onNext={nextOpenCard ? () => setOpenCard(nextOpenCard) : undefined}
         onEditAuthors={(c) => setAuthorEditCard(c)}
         canEditAuthors={(c) => canEdit || c.studentAuthorId === currentUserId}
         boardId={boardId}
