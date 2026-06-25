@@ -86,6 +86,15 @@ export function DownloadIcon({ size = 20, className }: IconProps) {
   );
 }
 
+export function ClockIcon({ size = 20, className }: IconProps) {
+  return (
+    <svg {...base(size)} className={className} aria-hidden="true">
+      <circle cx="12" cy="12" r="8" />
+      <path d="M12 8v4l3 2" />
+    </svg>
+  );
+}
+
 export function PencilIcon({ size = 20, className }: IconProps) {
   return (
     <svg {...base(size)} className={className} aria-hidden="true">

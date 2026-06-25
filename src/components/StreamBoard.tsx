@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { createPortal } from "react-dom";
 import type { AddCardData } from "./AddCardModal";
+import { BoardTimerFab } from "./BoardTimerFab";
 import { CardDetailModal } from "./cards/CardDetailModal";
 import type { CardData } from "./DraggableCard";
 import { EditCardModal, type EditCardUpdates } from "./EditCardModal";
@@ -335,27 +336,32 @@ export function StreamBoard({
   useEffect(() => {
 	    const slides: SlideshowSlide[] = [];
 	    if (streamSectionsEnabled) {
-	      for (const section of sortedSections) {
-	        if (!isSectionSlideshowEnabled(section)) continue;
-	        const bucket = visibleBySection.get(section.id) ?? [];
-	        slides.push({
-	          id: `section:${section.id}`,
+      for (const section of sortedSections) {
+        if (!isSectionSlideshowEnabled(section)) continue;
+        const bucket = visibleBySection.get(section.id) ?? [];
+        const contentItems = buildSectionContentItems(section, bucket);
+        slides.push({
+          id: `section:${section.id}`,
           kind: "section",
           sectionId: section.id,
           sectionTitle: section.title,
         });
-        if (section.activityTemplate) {
-          slides.push({
-            id: `activity:${section.id}:${section.activityTemplate}`,
-            kind: "activity",
-            sectionId: section.id,
-            sectionTitle: section.title,
-            activityTemplate: section.activityTemplate,
-            activityTemplateState: section.activityTemplateState ?? null,
-            cards: bucket,
-          });
-        } else {
-          for (const card of bucket) slides.push({ id: card.id, kind: "card", card });
+        for (const item of contentItems) {
+          if (item.kind === "template" && section.activityTemplate) {
+            slides.push({
+              id: `activity:${section.id}:${section.activityTemplate}`,
+              kind: "activity",
+              sectionId: section.id,
+              sectionTitle: section.title,
+              activityTemplate: section.activityTemplate,
+              activityTemplateState: section.activityTemplateState ?? null,
+              cards: bucket,
+            });
+            continue;
+          }
+          if (item.kind === "card") {
+            slides.push({ id: item.card.id, kind: "card", card: item.card });
+          }
         }
       }
       if (grouped.unsectioned.length > 0) {
@@ -1270,6 +1276,7 @@ export function StreamBoard({
       </div>
       {canAddPost && (
         <>
+          <BoardTimerFab />
           <button
             type="button"
             className="add-card-fab"
