@@ -22,6 +22,7 @@ type Props = {
   guideBusy?: boolean;
   onToggleGuide?: (pinned: boolean) => void;
   boardId?: string;
+  isStudentViewer?: boolean;
 };
 
 export function StreamPost({
@@ -35,6 +36,7 @@ export function StreamPost({
   guideBusy = false,
   onToggleGuide,
   boardId,
+  isStudentViewer = false,
 }: Props) {
   const [menuOpen, setMenuOpen] = useState(false);
   const author = getStreamAuthor(card);
@@ -199,7 +201,11 @@ export function StreamPost({
       </div>
 
       <div onClick={(event) => event.stopPropagation()}>
-        <StreamEngagement cardId={card.id} boardId={boardId} />
+        <StreamEngagement
+          cardId={card.id}
+          boardId={boardId}
+          isStudentViewer={isStudentViewer}
+        />
       </div>
     </article>
   );

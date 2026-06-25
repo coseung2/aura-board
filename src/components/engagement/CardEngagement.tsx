@@ -33,9 +33,10 @@ interface Props {
   cardId: string;
   mode: "chips" | "panel";
   boardId?: string;
+  isStudentViewer?: boolean;
 }
 
-export function CardEngagement({ cardId, mode, boardId }: Props) {
+export function CardEngagement({ cardId, mode, boardId, isStudentViewer }: Props) {
   const [state, setState] = useState<EngagementState | null>(null);
   const [showModal, setShowModal] = useState(false);
   const shareSession = useShareSession();
@@ -50,7 +51,10 @@ export function CardEngagement({ cardId, mode, boardId }: Props) {
               ...(shareSession.guestId ? { "x-share-guest-id": shareSession.guestId } : {}),
             },
           })
-        : await fetch(`/api/cards/${cardId}/engagement`, { cache: "no-store" });
+        : await fetch(`/api/cards/${cardId}/engagement`, {
+            cache: "no-store",
+            headers: studentViewerHeaders(!!isStudentViewer),
+          });
       if (!r.ok) {
         if (shareSession) {
           setState((current) =>
@@ -68,7 +72,7 @@ export function CardEngagement({ cardId, mode, boardId }: Props) {
         );
       }
     }
-  }, [cardId, shareSession]);
+  }, [cardId, shareSession, isStudentViewer]);
 
   useEffect(() => {
     void refresh();
@@ -140,7 +144,10 @@ export function CardEngagement({ cardId, mode, boardId }: Props) {
               guestId: shareSession.guestId,
             }),
           })
-        : await fetch(`/api/cards/${cardId}/like`, { method: "POST" });
+        : await fetch(`/api/cards/${cardId}/like`, {
+            method: "POST",
+            headers: studentViewerHeaders(!!isStudentViewer),
+          });
       if (!r.ok) {
         await refresh();
         return;
@@ -187,7 +194,7 @@ export function CardEngagement({ cardId, mode, boardId }: Props) {
           </button>
         </div>
         {showModal && (
-          <CommentsModal cardId={cardId} canInteract={state.canInteract} shareSession={shareSession} onClose={() => {
+          <CommentsModal cardId={cardId} canInteract={state.canInteract} shareSession={shareSession} isStudentViewer={!!isStudentViewer} onClose={() => {
             setShowModal(false);
             void refresh();
           }} />
@@ -226,6 +233,7 @@ export function CardEngagement({ cardId, mode, boardId }: Props) {
         cardId={cardId}
         canInteract={state.canInteract}
         shareSession={shareSession}
+        isStudentViewer={!!isStudentViewer}
         onChange={refresh}
         inputId={commentInputId}
       />
@@ -233,15 +241,21 @@ export function CardEngagement({ cardId, mode, boardId }: Props) {
   );
 }
 
+function studentViewerHeaders(isStudentViewer: boolean): Record<string, string> {
+  return isStudentViewer ? { "x-aura-student-viewer": "1" } : {};
+}
+
 function CommentsModal({
   cardId,
   canInteract,
   shareSession,
+  isStudentViewer,
   onClose,
 }: {
   cardId: string;
   canInteract: boolean;
   shareSession: ShareSession | null;
+  isStudentViewer: boolean;
   onClose: () => void;
 }) {
   // engagement-modal-portal (2026-04-26): 모달이 카드 DOM 안에 그대로 있으면
@@ -286,7 +300,12 @@ function CommentsModal({
           </button>
         </div>
         <div className="card-engagement-modal-body">
-          <CommentsBlock cardId={cardId} canInteract={canInteract} shareSession={shareSession} />
+          <CommentsBlock
+            cardId={cardId}
+            canInteract={canInteract}
+            shareSession={shareSession}
+            isStudentViewer={isStudentViewer}
+          />
         </div>
       </div>
     </div>
@@ -299,12 +318,14 @@ function CommentsBlock({
   cardId,
   canInteract,
   shareSession,
+  isStudentViewer,
   onChange,
   inputId,
 }: {
   cardId: string;
   canInteract: boolean;
   shareSession: ShareSession | null;
+  isStudentViewer: boolean;
   onChange?: () => void;
   inputId?: string;
 }) {
@@ -320,14 +341,17 @@ function CommentsBlock({
             cache: "no-store",
             headers: { "x-share-token": shareSession.shareToken },
           })
-        : await fetch(`/api/cards/${cardId}/comments`, { cache: "no-store" });
+        : await fetch(`/api/cards/${cardId}/comments`, {
+            cache: "no-store",
+            headers: studentViewerHeaders(isStudentViewer),
+          });
       if (!r.ok) return;
       const j = (await r.json()) as { items: CommentItem[] };
       setItems(j.items);
     } catch {
       /* ignore */
     }
-  }, [cardId, shareSession]);
+  }, [cardId, shareSession, isStudentViewer]);
 
   useEffect(() => {
     void load();
@@ -352,7 +376,10 @@ function CommentsBlock({
           })
         : await fetch(`/api/cards/${cardId}/comments`, {
             method: "POST",
-            headers: { "content-type": "application/json" },
+            headers: {
+              "content-type": "application/json",
+              ...studentViewerHeaders(isStudentViewer),
+            },
             body: JSON.stringify({ content: trimmed }),
           });
       if (!r.ok) {
@@ -378,7 +405,10 @@ function CommentsBlock({
   const remove = async (id: string) => {
     if (shareSession) return;
     if (!confirm("댓글을 삭제할까요?")) return;
-    const r = await fetch(`/api/cards/${cardId}/comments/${id}`, { method: "DELETE" });
+    const r = await fetch(`/api/cards/${cardId}/comments/${id}`, {
+      method: "DELETE",
+      headers: studentViewerHeaders(isStudentViewer),
+    });
     if (r.ok) {
       setItems((prev) => prev?.filter((c) => c.id !== id) ?? null);
       onChange?.();

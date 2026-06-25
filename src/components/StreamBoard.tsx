@@ -338,7 +338,7 @@ export function StreamBoard({
 	    if (streamSectionsEnabled) {
       for (const section of sortedSections) {
         if (!isSectionSlideshowEnabled(section)) continue;
-        const bucket = visibleBySection.get(section.id) ?? [];
+        const bucket = getSlideshowCards(visibleBySection.get(section.id) ?? []);
         const contentItems = buildSectionContentItems(section, bucket);
         slides.push({
           id: `section:${section.id}`,
@@ -364,19 +364,22 @@ export function StreamBoard({
           }
         }
       }
-      if (grouped.unsectioned.length > 0) {
+      const unsectionedSlides = getSlideshowCards(grouped.unsectioned);
+      if (unsectionedSlides.length > 0) {
         slides.push({
           id: "section:none",
           kind: "section",
           sectionId: null,
           sectionTitle: "섹션 없음",
         });
-        for (const card of grouped.unsectioned) {
+        for (const card of unsectionedSlides) {
           slides.push({ id: card.id, kind: "card", card });
         }
       }
     } else {
-      for (const card of cards) slides.push({ id: card.id, kind: "card", card });
+      for (const card of getSlideshowCards(cards)) {
+        slides.push({ id: card.id, kind: "card", card });
+      }
     }
     registerSlides("stream", slides);
     return () => {
@@ -1269,6 +1272,7 @@ export function StreamBoard({
                 onToggleGuide={(guidePinned) => handleToggleGuide(card, guidePinned)}
                 onOpen={() => setOpenCard(card)}
                 boardId={boardId}
+                isStudentViewer={!!isStudentViewer}
               />
             ))}
           </div>
@@ -1442,6 +1446,7 @@ export function StreamBoard({
         }
         onNext={nextOpenCard ? () => setOpenCard(nextOpenCard) : undefined}
         boardId={boardId}
+        isStudentViewer={!!isStudentViewer}
       />
     </div>
   );
@@ -1754,6 +1759,7 @@ function StreamGroupedFeed({
                 currentUserId={currentUserId}
                 currentRole={currentRole}
                 canToggleGuide={canEdit}
+                isStudentViewer={!!isStudentViewer}
                 guideBusyId={guideBusyId}
                 onEditCard={onEditCard}
                 onOpenCard={onOpenCard}
@@ -1774,6 +1780,7 @@ function StreamGroupedFeed({
                 currentUserId={currentUserId}
                 currentRole={currentRole}
                 currentStudentName={currentStudentName}
+                isStudentViewer={!!isStudentViewer}
                 onSetActiveGroup={(group) => onSetActiveGroup(section.id, group)}
                 onJoin={(groupId) => onJoinBreakout(section.id, groupId)}
                 onRemoveMember={(membershipId) =>
@@ -1809,6 +1816,7 @@ function StreamGroupedFeed({
                   currentUserId={currentUserId}
                   currentRole={currentRole}
                   currentStudentName={currentStudentName}
+                  isStudentViewer={!!isStudentViewer}
                   onMove={(id, direction) =>
                     onMoveSectionContent(section, contentItems, id, direction)
                   }
@@ -1839,6 +1847,7 @@ function StreamGroupedFeed({
                     currentUserId={currentUserId}
                     currentRole={currentRole}
                     currentStudentName={currentStudentName}
+                    isStudentViewer={!!isStudentViewer}
                     onMove={(id, direction) =>
                       onMoveSectionContent(section, contentItems, id, direction)
                     }
@@ -1872,6 +1881,7 @@ function StreamGroupedFeed({
                 canDelete={canDeleteCard(card, currentUserId, currentRole)}
                 onDelete={() => onDeleteCard(card)}
                 boardId={boardId}
+                isStudentViewer={!!isStudentViewer}
               />
             ))}
           </div>
@@ -1888,6 +1898,7 @@ function StreamGuideList({
   currentUserId,
   currentRole,
   canToggleGuide,
+  isStudentViewer,
   guideBusyId,
   onEditCard,
   onOpenCard,
@@ -1899,6 +1910,7 @@ function StreamGuideList({
   currentUserId: string;
   currentRole: "owner" | "editor" | "viewer";
   canToggleGuide: boolean;
+  isStudentViewer: boolean;
   guideBusyId: string | null;
   onEditCard: (card: CardData) => void;
   onOpenCard: (card: CardData) => void;
@@ -1923,6 +1935,7 @@ function StreamGuideList({
             guideBusy={guideBusyId === card.id}
             onToggleGuide={(guidePinned) => onToggleGuide(card, guidePinned)}
             boardId={boardId}
+            isStudentViewer={isStudentViewer}
           />
         ))}
       </div>
@@ -1945,6 +1958,7 @@ function StreamSectionContentItem({
   currentUserId,
   currentRole,
   currentStudentName,
+  isStudentViewer,
   onMove,
   onEditCard,
   onOpenCard,
@@ -1967,6 +1981,7 @@ function StreamSectionContentItem({
   currentUserId: string;
   currentRole: "owner" | "editor" | "viewer";
   currentStudentName?: string | null;
+  isStudentViewer: boolean;
   onMove: (itemId: string, direction: "up" | "down") => Promise<void>;
   onEditCard: (card: CardData) => void;
   onOpenCard: (card: CardData) => void;
@@ -2039,6 +2054,7 @@ function StreamSectionContentItem({
           guideBusy={guideBusyId === item.card.id}
           onToggleGuide={(guidePinned) => onToggleGuide(item.card, guidePinned)}
           boardId={boardId}
+          isStudentViewer={isStudentViewer}
         />
       )}
     </div>
@@ -2413,6 +2429,10 @@ function isGuideCard(card: CardData): boolean {
   return !!card.guidePinned && isTeacherAuthoredCard(card);
 }
 
+function getSlideshowCards(cards: CardData[]): CardData[] {
+  return cards.filter((card) => !isGuideCard(card));
+}
+
 function isTeacherAuthoredCard(card: CardData): boolean {
   return !!card.authorId && !card.studentAuthorId;
 }
@@ -2483,6 +2503,7 @@ type StreamBreakoutBodyProps = {
   currentUserId: string;
   currentRole: "owner" | "editor" | "viewer";
   currentStudentName?: string | null;
+  isStudentViewer: boolean;
   onSetActiveGroup: (group: string) => void;
   onJoin: (groupId: string) => Promise<boolean>;
   onRemoveMember: (membershipId: string) => Promise<boolean>;
@@ -2513,6 +2534,7 @@ function StreamBreakoutBody({
   currentUserId,
   currentRole,
   currentStudentName,
+  isStudentViewer,
   onSetActiveGroup,
   onJoin,
   onRemoveMember,
@@ -2626,6 +2648,7 @@ function StreamBreakoutBody({
                   guideBusy={guideBusyId === card.id}
                   onToggleGuide={(guidePinned) => onToggleGuide(card, guidePinned)}
                   boardId={boardId}
+                  isStudentViewer={isStudentViewer}
                 />
               ))}
             </div>
@@ -2649,6 +2672,7 @@ function StreamBreakoutBody({
             currentUserId={currentUserId}
             currentRole={currentRole}
             canToggleGuide={false}
+            isStudentViewer={isStudentViewer}
             guideBusyId={guideBusyId}
             onEditCard={onEditCard}
             onOpenCard={onOpenCard}
@@ -2681,6 +2705,7 @@ function StreamBreakoutBody({
                   canDelete={false}
                   onDelete={() => onDeleteCard(card)}
                   boardId={boardId}
+                  isStudentViewer={isStudentViewer}
                 />
               ))}
             </div>
@@ -2703,6 +2728,7 @@ function StreamBreakoutBody({
         currentUserId={currentUserId}
         currentRole={currentRole}
         canToggleGuide={false}
+        isStudentViewer={isStudentViewer}
         guideBusyId={guideBusyId}
         onEditCard={onEditCard}
         onOpenCard={onOpenCard}
@@ -2768,6 +2794,7 @@ function StreamBreakoutBody({
                   canDelete={canDeleteCard(card, currentUserId, currentRole)}
                   onDelete={() => onDeleteCard(card)}
                   boardId={boardId}
+                  isStudentViewer={isStudentViewer}
                 />
               ))}
             </div>
@@ -2785,6 +2812,7 @@ function StreamBreakoutBody({
       currentUserId={currentUserId}
       currentRole={currentRole}
       canToggleGuide={state.canManage}
+      isStudentViewer={isStudentViewer}
       guideBusyId={guideBusyId}
       onEditCard={onEditCard}
       onOpenCard={onOpenCard}

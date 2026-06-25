@@ -25,23 +25,24 @@ type EngagementState = {
 type Props = {
   cardId: string;
   boardId?: string;
+  isStudentViewer?: boolean;
 };
 
-export function StreamEngagement({ cardId, boardId }: Props) {
+export function StreamEngagement({ cardId, boardId, isStudentViewer }: Props) {
   const [state, setState] = useState<EngagementState | null>(null);
   const [commentsOpen, setCommentsOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
   const shareSession = useShareSession();
 
   const refresh = useCallback(async () => {
-    const next = await fetchEngagement(cardId, shareSession);
+    const next = await fetchEngagement(cardId, shareSession, !!isStudentViewer);
     if (next) setState(next);
     else if (shareSession) {
       setState((current) =>
         current ?? { likeCount: 0, commentCount: 0, isLiked: false, canInteract: true },
       );
     }
-  }, [cardId, shareSession]);
+  }, [cardId, shareSession, isStudentViewer]);
 
   useEffect(() => {
     void refresh();
@@ -83,7 +84,10 @@ export function StreamEngagement({ cardId, boardId }: Props) {
               guestId: shareSession.guestId,
             }),
           })
-        : await fetch(`/api/cards/${cardId}/like`, { method: "POST" });
+        : await fetch(`/api/cards/${cardId}/like`, {
+            method: "POST",
+            headers: studentViewerHeaders(!!isStudentViewer),
+          });
       if (!res.ok) {
         await refresh();
         return;
@@ -129,6 +133,7 @@ export function StreamEngagement({ cardId, boardId }: Props) {
             cardId={cardId}
             canInteract={state?.canInteract ?? false}
             shareSession={shareSession}
+            isStudentViewer={!!isStudentViewer}
             onClose={() => setCommentsOpen(false)}
             onChanged={() => {
               void refresh();
@@ -144,12 +149,14 @@ function StreamCommentsModal({
   cardId,
   canInteract,
   shareSession,
+  isStudentViewer,
   onClose,
   onChanged,
 }: {
   cardId: string;
   canInteract: boolean;
   shareSession: ShareSession | null;
+  isStudentViewer: boolean;
   onClose: () => void;
   onChanged: () => void;
 }) {
@@ -186,6 +193,7 @@ function StreamCommentsModal({
             cardId={cardId}
             canInteract={canInteract}
             shareSession={shareSession}
+            isStudentViewer={isStudentViewer}
             onChanged={onChanged}
           />
         </div>
@@ -198,11 +206,13 @@ function StreamComments({
   cardId,
   canInteract,
   shareSession,
+  isStudentViewer,
   onChanged,
 }: {
   cardId: string;
   canInteract: boolean;
   shareSession: ShareSession | null;
+  isStudentViewer: boolean;
   onChanged: () => void;
 }) {
   const [items, setItems] = useState<CommentItem[] | null>(null);
@@ -217,7 +227,10 @@ function StreamComments({
             cache: "no-store",
             headers: { "x-share-token": shareSession.shareToken },
           })
-        : await fetch(`/api/cards/${cardId}/comments`, { cache: "no-store" });
+        : await fetch(`/api/cards/${cardId}/comments`, {
+            cache: "no-store",
+            headers: studentViewerHeaders(isStudentViewer),
+          });
       if (!res.ok) return;
       const body = (await res.json()) as { items: CommentItem[] };
       setItems(body.items);
@@ -255,7 +268,10 @@ function StreamComments({
           })
         : await fetch(`/api/cards/${cardId}/comments`, {
             method: "POST",
-            headers: { "content-type": "application/json" },
+            headers: {
+              "content-type": "application/json",
+              ...studentViewerHeaders(isStudentViewer),
+            },
             body: JSON.stringify({ content: trimmed }),
           });
       if (!res.ok) {
@@ -279,7 +295,10 @@ function StreamComments({
   async function removeComment(id: string) {
     if (shareSession) return;
     if (!window.confirm("댓글을 삭제할까요?")) return;
-    const res = await fetch(`/api/cards/${cardId}/comments/${id}`, { method: "DELETE" });
+    const res = await fetch(`/api/cards/${cardId}/comments/${id}`, {
+      method: "DELETE",
+      headers: studentViewerHeaders(isStudentViewer),
+    });
     if (!res.ok) {
       setError("댓글 삭제에 실패했어요.");
       return;
@@ -333,7 +352,15 @@ function StreamComments({
   );
 }
 
-async function fetchEngagement(cardId: string, shareSession: ShareSession | null) {
+function studentViewerHeaders(isStudentViewer: boolean): Record<string, string> {
+  return isStudentViewer ? { "x-aura-student-viewer": "1" } : {};
+}
+
+async function fetchEngagement(
+  cardId: string,
+  shareSession: ShareSession | null,
+  isStudentViewer: boolean,
+) {
   try {
     const res = shareSession
       ? await fetch(`/api/share/cards/${cardId}/engagement`, {
@@ -343,7 +370,10 @@ async function fetchEngagement(cardId: string, shareSession: ShareSession | null
             "x-share-guest-id": shareSession.guestId,
           },
         })
-      : await fetch(`/api/cards/${cardId}/engagement`, { cache: "no-store" });
+      : await fetch(`/api/cards/${cardId}/engagement`, {
+          cache: "no-store",
+          headers: studentViewerHeaders(isStudentViewer),
+        });
     if (!res.ok) return null;
     return (await res.json()) as EngagementState;
   } catch {

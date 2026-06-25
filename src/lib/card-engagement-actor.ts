@@ -1,7 +1,8 @@
 import "server-only";
+import { headers } from "next/headers";
 import { db } from "./db";
 import { getCurrentUser } from "./auth";
-import { getCurrentStudent } from "./student-auth";
+import { getCurrentStudent, getCurrentStudentRaw } from "./student-auth";
 import { getCurrentParent } from "./parent-session";
 
 // card-comments-likes (2026-04-26): 카드 engagement (댓글/좋아요) 의 actor
@@ -19,6 +20,14 @@ export type CardActor =
   | { kind: "parent"; id: string };
 
 export async function getCurrentCardActor(): Promise<CardActor | null> {
+  const headerList = await headers();
+  const preferStudent =
+    headerList.get("x-aura-student-viewer") === "1";
+  if (preferStudent) {
+    const s = await getCurrentStudentRaw().catch(() => null);
+    if (s) return { kind: "student", id: s.id, name: s.name, classroomId: s.classroomId };
+  }
+
   try {
     const u = await getCurrentUser();
     if (u) return { kind: "teacher", id: u.id, name: u.name ?? "선생님" };

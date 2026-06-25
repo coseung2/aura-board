@@ -33,6 +33,7 @@ type Props = {
   onPrevious?: () => void;
   onNext?: () => void;
   boardId?: string;
+  isStudentViewer?: boolean;
 };
 
 type DetailLayout = "full" | "media-meta" | "text-meta";
@@ -47,6 +48,7 @@ export function CardDetailModal({
   onPrevious,
   onNext,
   boardId,
+  isStudentViewer = false,
 }: Props) {
   const rootRef = useRef<HTMLDivElement>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -346,7 +348,12 @@ export function CardDetailModal({
               )}
             </div>
             {/* card-detail-modal-engagement (2026-04-26): 좋아요 + 댓글 패널. */}
-            <CardEngagement cardId={card.id} mode="panel" boardId={boardId} />
+            <CardEngagement
+              cardId={card.id}
+              mode="panel"
+              boardId={boardId}
+              isStudentViewer={isStudentViewer}
+            />
           </aside>
         </div>
         {lightboxIndex !== null &&
