@@ -48,12 +48,12 @@ dev.log
 # Local tooling artifacts
 tmp/
 tasks/
-oracle-bundle*.zip
-oracle-context.zip
-oracle-prompt*.txt
-oracle-run*.cmd
-oracle-phase2*.cmd
-oracle-followup*.cmd
+oracle-*.zip
+oracle-*.md
+oracle-*.txt
+oracle-*.cmd
+
+
 .codex-dev-server.*.log
 padlet-env-backup/
 output/

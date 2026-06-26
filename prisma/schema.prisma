@@ -453,6 +453,8 @@ model Student {
   vibeReviews VibeReview[] @relation("VibeReviewer")
 
   vibePlaySessions VibePlaySession[] @relation("VibePlayer")
+  // BC-2: back-relation for Kordle attempts without a play session.
+  kordleAttempts   KordleAttempt[]
 
   boardResponses BoardResponse[] @relation("StudentBoardResponses")
 
@@ -786,6 +788,8 @@ model Board {
   vibeArcadeConfig VibeArcadeConfig?
 
   vibeProjects VibeProject[]
+  // BC-2: optional Kordle engine attached to this board (1:1).
+  kordleGame   KordleGame?
 
   djPlayEvents DjPlayEvent[]
 
@@ -3153,7 +3157,9 @@ model VibePlaySession {
 
   completed Boolean @default(false) // iframe postMessage "??ш끽維?? ??筌뚯슜堉?  reportedScore Int? // ????嚥????雅?癲ル슔?蹂앸듋???(?濡ろ뜐????棺??짆?먰맪????ル굔?X)
 
-  project VibeProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  project        VibeProject     @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  // BC-2: back-relation for Kordle attempts keyed by this play session.
+  kordleAttempts KordleAttempt[]
 
   student Student @relation("VibePlayer", fields: [studentId], references: [id], onDelete: Cascade)
 
@@ -3285,4 +3291,139 @@ model AgentMessage {
   session AgentSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
 
   @@index([sessionId, createdAt])
+}
+
+// Kordle (BC-2): built-in Wordle engine, scoped to a Board.
+// Models live next to other gameplay (Vibe*) and reuse `Board` + `VibePlaySession`
+// for the classroom/board shell. New tables are Kordle-specific so guessing
+// state, validation feedback, and dictionary don't pollute Quiz/VibeProject.
+
+enum KordleGameMode {
+  CLASSIC
+  DAILY
+  TEACHER_CUSTOM
+  LIVE_CLASS
+}
+
+enum KordlePuzzleStatus {
+  DRAFT
+  SCHEDULED
+  LIVE
+  CLOSED
+  ARCHIVED
+}
+
+enum KordleAttemptStatus {
+  IN_PROGRESS
+  WON
+  LOST
+  ABANDONED
+}
+
+model KordleGame {
+  id         String         @id @default(cuid())
+  // One Kordle engine per Board. When a teacher picks "놀이" with the
+  // Kordle layout, we create the row here in the same transaction.
+  boardId    String         @unique
+  board      Board          @relation(fields: [boardId], references: [id], onDelete: Cascade)
+  title      String?
+  // 5 is the classic Wordle length; 6/7 reserved for future.
+  wordLength Int            @default(5)
+  maxGuesses Int            @default(6)
+  mode       KordleGameMode @default(CLASSIC)
+  // Locale-tagged: ko-KR / en-US. Affects dictionary + jamo rules.
+  locale     String         @default("ko-KR")
+  puzzles    KordlePuzzle[]
+  createdAt  DateTime       @default(now())
+  updatedAt  DateTime       @updatedAt
+}
+
+model KordlePuzzle {
+  id             String             @id @default(cuid())
+  gameId         String
+  game           KordleGame         @relation(fields: [gameId], references: [id], onDelete: Cascade)
+  // The solution word. KordleWord.locale must match KordleGame.locale.
+  solutionWordId String
+  solutionWord   KordleWord         @relation(fields: [solutionWordId], references: [id])
+  status         KordlePuzzleStatus @default(DRAFT)
+  // When the puzzle goes live (DAILY mode uses startsAt; LIVE_CLASS uses live
+  // toggles). Null until scheduled.
+  startsAt       DateTime?
+  endsAt         DateTime?
+  // Optional deterministic seed so two classrooms get the same word for the
+  // same date without sharing a row.
+  seed           String?
+  attempts       KordleAttempt[]
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
+
+  @@index([gameId, startsAt])
+  @@index([status, startsAt])
+}
+
+model KordleAttempt {
+  id                String              @id @default(cuid())
+  puzzleId          String
+  puzzle            KordlePuzzle        @relation(fields: [puzzleId], references: [id], onDelete: Cascade)
+  // Nullable so a teacher can demo without owning a VibePlaySession.
+  // Normal students get one VibePlaySession per play (per existing
+  // VibeProject lifecycle); Kordle keys off that.
+  vibePlaySessionId String?
+  vibePlaySession   VibePlaySession?    @relation(fields: [vibePlaySessionId], references: [id], onDelete: SetNull)
+  // Direct student FK for cases without a VibePlaySession (e.g. anonymous
+  // share-link play). Either studentId or vibePlaySessionId must be set
+  // — enforced in the server action.
+  studentId         String?
+  student           Student?            @relation(fields: [studentId], references: [id], onDelete: SetNull)
+  status            KordleAttemptStatus @default(IN_PROGRESS)
+  // Which guess (1-indexed) won; null until status=WON.
+  solvedAtGuess     Int?
+  startedAt         DateTime            @default(now())
+  completedAt       DateTime?
+  guesses           KordleGuess[]
+
+  @@index([puzzleId, status])
+  @@index([studentId, startedAt])
+}
+
+model KordleGuess {
+  id         String        @id @default(cuid())
+  attemptId  String
+  attempt    KordleAttempt @relation(fields: [attemptId], references: [id], onDelete: Cascade)
+  // 1-indexed guess order within the attempt.
+  guessIndex Int
+  // Raw text the student entered (normalized server-side before compare).
+  guess      String
+  // Per-letter feedback: [{char, state: 'correct'|'present'|'absent'}]
+  // Serialized as JSON to keep the schema portable and to avoid a
+  // join table for 5-7 char rows.
+  feedback   Json
+  isCorrect  Boolean       @default(false)
+  createdAt  DateTime      @default(now())
+
+  @@unique([attemptId, guessIndex])
+}
+
+model KordleWord {
+  id         String         @id @default(cuid())
+  // Surface form (e.g. "학교" or "apple").
+  text       String
+  // Normalized form used for validation: lowercased + jamo-decomposed for
+  // Korean. The engine compares normalized-to-normalized.
+  normalized String
+  length     Int
+  locale     String         @default("ko-KR")
+  // Optional CEFR/grade bucket for unit-scoping.
+  difficulty Int?
+  // Whether this word can be used as a *solution*. The dictionary table
+  // can also hold isAllowed-only words (valid guesses, not solutions).
+  isSolution Boolean        @default(true)
+  isAllowed  Boolean        @default(true)
+  // Optional curriculum unit tag (free-form for now; future: a Unit table).
+  unitTag    String?
+  puzzles    KordlePuzzle[]
+
+  @@unique([locale, normalized])
+  @@index([locale, length, isSolution])
+  @@index([locale, unitTag])
 }

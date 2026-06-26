@@ -292,7 +292,13 @@ function StudentBoardSections({ boards, onOpenBreakout }: StudentBoardSectionsPr
   const renderCard = (board: BoardItem) => {
     const quizCode =
       board.layout === "quiz" && board.quizzes?.[0]?.roomCode;
-    const href = quizCode ? `/quiz/${quizCode}` : `/board/${board.slug}`;
+    // BC-2: play-category boards link to the Kordle play surface by default.
+    // The play page itself validates the KordleGame attachment.
+    const href = quizCode
+      ? `/quiz/${quizCode}`
+      : board.category === "PLAY"
+        ? `/board/${board.slug}/play/kordle`
+        : `/board/${board.slug}`;
     const breakout = board.breakout;
     if (breakout) {
       return (
