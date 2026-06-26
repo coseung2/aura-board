@@ -19,6 +19,7 @@ import {
   typography,
 } from "../../theme/tokens";
 import { apiFetch, ApiError } from "../../lib/api";
+import { useBoardRealtime } from "../../lib/use-board-realtime";
 import { buildMediaItems } from "../../lib/media";
 import type { BoardDetailResponse, BoardCard } from "../../lib/types";
 import { withBoardAnonymousAuthor, withBoardAnonymousAuthors } from "../../lib/card-privacy";
@@ -56,6 +57,10 @@ export function DJQueueBoard({
   const boardId = data.board.id;
   const { width } = useWindowDimensions();
   const compact = width < dj.compactBreakpoint;
+  const canControl = data.capabilities?.canControlQueue === true;
+  // 실시간: queue_changed/card_changed broadcast 가 오면 부모 refetch.
+  // 서버 channel key 가 board.id 기준이므로 id 로 구독해야 한다.
+  useBoardRealtime({ slug: data.board.id, onReload: onMutate });
 
   // 2초 폴링으로 교사의 승인/재생 완료 반영.
   useEffect(() => {
@@ -96,9 +101,15 @@ export function DJQueueBoard({
   const activeQueue = useMemo(
     () =>
       [...cards]
-        .filter((c) => c.queueStatus && c.queueStatus !== "played")
+        // rejected 항목은 교사/DJ 만 본다. 일반 학생은 안 보이게.
+        .filter((c) => {
+          if (!c.queueStatus || c.queueStatus === "played") return false;
+          if (c.queueStatus === "rejected" && !canControl) return false;
+          return true;
+        })
         .sort((a, b) => (a.order ?? 0) - (b.order ?? 0)),
-    [cards],
+    // 일반 학생에게 rejected 항목이 보이지 않도록 canControl 일 때만 통과.
+    [cards, canControl],
   );
   const playedCards = useMemo(
     () =>
@@ -187,7 +198,10 @@ export function DJQueueBoard({
   }
 
   async function handleDelete(cardId: string) {
-    if (!canControl) return;
+    // 교사/DJ 는 항상 삭제 가능. 학생은 본인 pending 신청일 때만 삭제 가능.
+    const target = cards.find((c) => c.id === cardId);
+    const isOwnPending = target?.isOwnPendingQueue === true;
+    if (!canControl && !isOwnPending) return;
     Alert.alert("곡 삭제", "이 곡을 삭제할까요?", [
       { text: "취소", style: "cancel" },
       {
@@ -224,7 +238,11 @@ export function DJQueueBoard({
     const self = activeQueue[idx];
     const other = activeQueue[swapIdx];
     if (!self || !other) return;
-    const targetOrder = other.order ?? 0;
+    // 백엔드 move 는 "insert at N" 의미: order >= N 인 카드를 +1 후 자신을 N 으로
+    // 세팅한다. swap 의 down 방향이면 N = other.order + 1 이면 자신(other 보다 한 칸 뒤)
+    // 에 안착한다. up 방향이면 N = other.order 로 두면 other 가 +1 되어 자신 앞으로
+    // 밀려난다.
+    const targetOrder = (other.order ?? 0) + (direction > 0 ? 1 : 0);
     const prev = cards;
     setCards((list) =>
       list.map((c) => (c.id === self.id ? { ...c, order: targetOrder } : c)),
@@ -280,8 +298,6 @@ export function DJQueueBoard({
       }
     });
   }
-
-  const canControl = data.capabilities?.canControlQueue === true;
 
   return (
     <View style={styles.root}>
@@ -593,6 +609,18 @@ function QueueItem({
             onPress={isPending ? onReject : onDelete}
           >
             {isPending ? "거부" : "제거"}
+          </AppButton>
+        </View>
+      ) : isPending && card.isOwnPendingQueue ? (
+        // 일반 학생도 본인 pending 신청은 취소할 수 있다.
+        <View style={styles.queueCtrls}>
+          <AppButton
+            variant="quiet"
+            style={styles.ctrlBtn}
+            textStyle={styles.ctrlText}
+            onPress={onDelete}
+          >
+            신청 취소
           </AppButton>
         </View>
       ) : null}

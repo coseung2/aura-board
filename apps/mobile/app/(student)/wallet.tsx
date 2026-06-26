@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import {
   ActivityIndicator,
+  Alert,
   ScrollView,
   StyleSheet,
   Text,
@@ -57,6 +58,30 @@ export default function StudentWalletScreen() {
       setQrError("결제 QR을 만들 수 없어요.");
     }
   }, [handleAuthError]);
+
+  const cancelFd = useCallback(
+    async (fdId: string) => {
+      if (!wallet?.classroomId) {
+        Alert.alert("오류", "학급 정보를 찾을 수 없어요.");
+        return;
+      }
+      try {
+        await apiFetch(
+          `/api/classrooms/${encodeURIComponent(wallet.classroomId)}/bank/fixed-deposits/${encodeURIComponent(fdId)}/cancel`,
+          { method: "POST" },
+        );
+        // 통장/FD 다시 로드.
+        const res = await apiFetch<WalletSummary>("/api/my/wallet");
+        setWallet(res);
+      } catch (e) {
+        Alert.alert(
+          "해지 실패",
+          e instanceof Error ? e.message : "적금을 해지하지 못했어요.",
+        );
+      }
+    },
+    [wallet?.classroomId],
+  );
 
   useEffect(() => {
     (async () => {
@@ -154,6 +179,22 @@ export default function StudentWalletScreen() {
                   <Text style={styles.muted}>
                     월 {fd.monthlyRate}% · 만기 {formatShortDate(fd.maturityDate)}
                   </Text>
+                  <AppButton
+                    variant="secondary"
+                    style={styles.fdCancelBtn}
+                    onPress={() =>
+                      Alert.alert(
+                        "적금 해지",
+                        "원금만 반환돼요. 해지할까요?",
+                        [
+                          { text: "취소", style: "cancel" },
+                          { text: "해지", style: "destructive", onPress: () => void cancelFd(fd.id) },
+                        ],
+                      )
+                    }
+                  >
+                    해지
+                  </AppButton>
                 </SurfaceCard>
               ))}
             </View>
@@ -244,6 +285,10 @@ const styles = StyleSheet.create({
   stack: { gap: spacing.sm },
   listCard: {
     padding: spacing.lg,
+  },
+  fdCancelBtn: {
+    alignSelf: "flex-start",
+    marginTop: spacing.sm,
   },
   listTitle: { ...typography.label, color: colors.text },
   txRow: {

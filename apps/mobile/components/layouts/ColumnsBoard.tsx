@@ -19,6 +19,7 @@ import { CardDetailModal } from "../CardDetailModal";
 import type { BoardDetailResponse, BoardCard } from "../../lib/types";
 import { withBoardAnonymousAuthor, withBoardAnonymousAuthors } from "../../lib/card-privacy";
 import { AppButton, Pill, SurfaceCard } from "../ui";
+import { useBoardRealtime } from "../../lib/use-board-realtime";
 
 export function ColumnsBoard({
   data,
@@ -35,7 +36,18 @@ export function ColumnsBoard({
   const [composerOpen, setComposerOpen] = useState(false);
 
   useEffect(() => {
-    setCards(withBoardAnonymousAuthors(data.cards, data.board));
+    // server 정렬이 order asc 라도 mobile 에서 안정화 한 번 더.
+    setCards(
+      withBoardAnonymousAuthors(
+        [...data.cards].sort((a, b) => {
+          const ao = a.order ?? 0;
+          const bo = b.order ?? 0;
+          if (ao !== bo) return ao - bo;
+          return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+        }),
+        data.board,
+      ),
+    );
   }, [data.cards, data.board]);
 
   const columns = useMemo(() => {
@@ -71,6 +83,10 @@ export function ColumnsBoard({
     setActiveSection(sectionId);
     setComposerOpen(true);
   }
+
+  // 실시간: broadcast 가 오면 부모 refetch → 카드/섹션 다시 머지.
+  // 서버 broadcast channel key 가 board.id 기준이므로 id 로 구독한다.
+  useBoardRealtime({ slug: data.board.id, onReload: onMutate });
 
   return (
     <View style={styles.root}>
@@ -129,6 +145,16 @@ export function ColumnsBoard({
       <CardDetailModal
         card={selectedCard}
         onClose={() => setSelectedCard(null)}
+        onUpdated={(c) => {
+          const next = withBoardAnonymousAuthor(c, data.board);
+          setCards((prev) =>
+            prev.map((existing) => (existing.id === next.id ? next : existing)),
+          );
+          setSelectedCard((current) => (current?.id === next.id ? next : current));
+        }}
+        onDeleted={(id) => {
+          setCards((prev) => prev.filter((c) => c.id !== id));
+        }}
       />
     </View>
   );

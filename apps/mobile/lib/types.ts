@@ -117,8 +117,9 @@ export type StoreChargeReceipt = {
 
 export type CardAttachment = {
   id: string;
-  kind: "image" | "video" | "file";
+  kind: "image" | "video" | "file" | "link";
   url: string;
+  previewUrl: string | null;
   fileName: string | null;
   fileSize: number | null;
   mimeType: string | null;
@@ -169,6 +170,12 @@ export type BoardCard = {
   authorName?: string | null;
   studentAuthorName?: string | null;
   anonymousAuthor: boolean;
+  // 서버에서 같이 내려주는 카드 단위 권한 플래그. 모바일 UI는 이 값을 보고
+  // 본인 카드 수정/삭제 메뉴 / DJ pending 삭제 버튼 노출 여부를 결정한다.
+  isMine?: boolean;
+  canEdit?: boolean;
+  canDelete?: boolean;
+  isOwnPendingQueue?: boolean;
 };
 
 export type Section = {
@@ -251,6 +258,9 @@ export type BoardDetailResponse = {
   };
   capabilities?: {
     canControlQueue: boolean;
+    canAddCard?: boolean;
+    canEditOwnCard?: boolean;
+    canDeleteOwnCard?: boolean;
   };
   layoutData: {
     quiz?: {

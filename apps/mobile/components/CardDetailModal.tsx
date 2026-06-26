@@ -12,12 +12,12 @@ import {
   View,
 } from "react-native";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { AppButton, ControlPressable, IconButton, MediaPressable, TextField } from "./ui";
 import { borders, cardDetail, colors, controls, layers, radii, shadows, spacing, typography } from "../theme/tokens";
 import type { BoardCard } from "../lib/types";
 import { apiFetch } from "../lib/api";
 import { maskAnonymousLabel, resolveCardAuthorName } from "../lib/card-privacy";
 import { EmbeddedMedia } from "./EmbeddedMedia";
-import { AppButton, ControlPressable, IconButton, MediaPressable, TextField } from "./ui";
 import {
   buildMediaItems,
   fileAttachments,
@@ -49,9 +49,17 @@ interface CommentItem {
 interface Props {
   card: BoardCard | null;
   onClose: () => void;
+  // 서버 저장 후 부모 board 리스트를 정확히 갱신하기 위한 콜백.
+  onUpdated?: (card: BoardCard) => void;
+  onDeleted?: (cardId: string) => void;
 }
 
-export function CardDetailModal({ card, onClose }: Props) {
+export function CardDetailModal({
+  card,
+  onClose,
+  onUpdated,
+  onDeleted,
+}: Props) {
   const { width, height } = useWindowDimensions();
   const [expanded, setExpanded] = useState(false);
   const [activeMediaIndex, setActiveMediaIndex] = useState(0);
@@ -62,6 +70,11 @@ export function CardDetailModal({ card, onClose }: Props) {
   const [engagementBusy, setEngagementBusy] = useState(false);
   const [commentSubmitting, setCommentSubmitting] = useState(false);
   const [engagementError, setEngagementError] = useState<string | null>(null);
+  const [editing, setEditing] = useState(false);
+  const [editTitle, setEditTitle] = useState("");
+  const [editContent, setEditContent] = useState("");
+  const [editBusy, setEditBusy] = useState(false);
+  const [editError, setEditError] = useState<string | null>(null);
   const [keyboardInset, setKeyboardInset] = useState(0);
   const [commentOffsets, setCommentOffsets] = useState({
     section: 0,
@@ -136,6 +149,10 @@ export function CardDetailModal({ card, onClose }: Props) {
     setEngagement(null);
     setComments(null);
     setEngagementError(null);
+    setEditing(false);
+    setEditError(null);
+    setEditTitle(card?.title ?? "");
+    setEditContent(card?.content ?? "");
     if (!card) return;
     void loadEngagement();
     void loadComments();
@@ -311,6 +328,45 @@ export function CardDetailModal({ card, onClose }: Props) {
     ]);
   }
 
+  async function deleteCard() {
+    try {
+      await apiFetch(`/api/cards/${encodeURIComponent(cardId)}`, { method: "DELETE" });
+      onDeleted?.(cardId);
+      onClose();
+    } catch (e) {
+      Alert.alert("삭제 실패", e instanceof Error ? e.message : "카드를 삭제하지 못했어요.");
+    }
+  }
+
+  function confirmDeleteCard() {
+    Alert.alert("카드 삭제", "이 카드를 삭제할까요?", [
+      { text: "취소", style: "cancel" },
+      { text: "삭제", style: "destructive", onPress: () => void deleteCard() },
+    ]);
+  }
+
+  async function saveEdit() {
+    if (editBusy) return;
+    setEditBusy(true);
+    setEditError(null);
+    try {
+      const res = await apiFetch<{ card: BoardCard }>(
+        `/api/cards/${encodeURIComponent(cardId)}`,
+        { method: "PATCH", json: { title: editTitle.trim(), content: editContent.trim() } },
+      );
+      // 인라인 편집: 부모에 새 카드 DTO 를 알려 로컬 리스트도 즉시 갱신.
+      onUpdated?.(res.card);
+      setEditing(false);
+    } catch (e) {
+      setEditError(e instanceof Error ? e.message : "수정에 실패했어요.");
+    } finally {
+      setEditBusy(false);
+    }
+  }
+
+  const canEditCard = card.canEdit === true;
+  const canDeleteCard = card.canDelete === true;
+
   return (
     <Modal
       visible
@@ -473,7 +529,17 @@ export function CardDetailModal({ card, onClose }: Props) {
                   ]}
                 >
                   <View style={styles.bodyText}>
-                    {title ? <Text style={styles.title}>{title}</Text> : null}
+                    {editing && canEditCard ? (
+                      <TextField
+                        style={styles.editTitleInput}
+                        value={editTitle}
+                        onChangeText={setEditTitle}
+                        placeholder="제목"
+                        editable={!editBusy}
+                      />
+                    ) : title ? (
+                      <Text style={styles.title}>{title}</Text>
+                    ) : null}
 
                     {hasTextLink && (card.linkTitle || card.linkDesc) ? (
                       <View style={styles.linkBody}>
@@ -486,8 +552,41 @@ export function CardDetailModal({ card, onClose }: Props) {
                       </View>
                     ) : null}
 
-                    {content ? (
-		                      <CardBodyContent content={content} />
+                    {editing && canEditCard ? (
+                      <>
+                        <TextField
+                          style={styles.editContentInput}
+                          value={editContent}
+                          onChangeText={setEditContent}
+                          placeholder="내용"
+                          multiline
+                          editable={!editBusy}
+                        />
+                        {editError ? (
+                          <Text style={styles.editError}>{editError}</Text>
+                        ) : null}
+                        <View style={styles.editActionRow}>
+                          <AppButton
+                            variant="secondary"
+                            textStyle={styles.editActionText}
+                            onPress={() => {
+                              setEditing(false);
+                              setEditError(null);
+                            }}
+                            disabled={editBusy}
+                          >
+                            취소
+                          </AppButton>
+                          <AppButton
+                            onPress={saveEdit}
+                            loading={editBusy}
+                          >
+                            저장
+                          </AppButton>
+                        </View>
+                      </>
+                    ) : content ? (
+                      <CardBodyContent content={content} />
                     ) : null}
                   </View>
 
@@ -552,6 +651,28 @@ export function CardDetailModal({ card, onClose }: Props) {
                     formatCardDate(card.createdAt),
                   ].filter(Boolean).join(" · ")}
                 </Text>
+                {canEditCard || canDeleteCard ? (
+                  <View style={styles.ownerActions}>
+                    {canEditCard ? (
+                      <AppButton
+                        variant="quiet"
+                        textStyle={styles.ownerActionText}
+                        onPress={() => setEditing((v) => !v)}
+                      >
+                        {editing ? "편집 닫기" : "수정"}
+                      </AppButton>
+                    ) : null}
+                    {canDeleteCard ? (
+                      <AppButton
+                        variant="quiet"
+                        textStyle={styles.ownerActionText}
+                        onPress={confirmDeleteCard}
+                      >
+                        삭제
+                      </AppButton>
+                    ) : null}
+                  </View>
+                ) : null}
               </View>
 
               <View
@@ -1219,6 +1340,38 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   metaLine: { ...typography.micro, color: colors.textMuted },
+  ownerActions: {
+    flexDirection: "row",
+    gap: spacing.sm,
+    marginTop: spacing.xs,
+  },
+  ownerActionText: {
+    ...typography.micro,
+    color: colors.accent,
+  },
+  editTitleInput: {
+    ...typography.subtitle,
+    backgroundColor: colors.bg,
+  },
+  editContentInput: {
+    ...typography.body,
+    backgroundColor: colors.bg,
+    minHeight: cardDetail.commentInputMinHeight,
+    textAlignVertical: "top",
+  },
+  editActionRow: {
+    flexDirection: "row",
+    justifyContent: "flex-end",
+    gap: spacing.sm,
+  },
+  editActionText: {
+    ...typography.label,
+    color: colors.textMuted,
+  },
+  editError: {
+    ...typography.micro,
+    color: colors.danger,
+  },
   engagementPanel: {
     gap: spacing.sm,
     paddingTop: spacing.sm,

@@ -478,9 +478,10 @@ function DutySection({
   duties: StudentDuty[];
   onOpen: (duty: StudentDuty) => void;
 }) {
-  const visible = duties.filter((duty) =>
-    duty.roleKey === "banker" || duty.roleKey === "store-clerk"
-  );
+  // 권한은 서버( getStudentDuties ) 가 이미 권한 해석 후 내려준 duty 만 노출되므로
+  // 클라이언트는 roleKey 가 아니라 href 그대로 라우팅만 한다. 커스텀 역할에
+  // bank.store 권한이 부여돼도 같은 duty 카드가 노출된다.
+  const visible = duties.filter((duty) => Boolean(duty.href));
   if (visible.length === 0) return null;
 
   return (
@@ -511,11 +512,13 @@ function DutySection({
 }
 
 function roleHref(duty: StudentDuty): string | null {
+  // 서버가 부여한 href 가 모바일 라우터 경로와 다를 수 있어 매핑한다.
+  // (서버는 /classroom/:id/{bank,pay} 웹 경로를, 모바일은 /(student)/{bank,pay}?classroomId=... 를 쓴다.)
   const classroomId = encodeURIComponent(duty.classroomId);
-  if (duty.roleKey === "banker") {
+  if (duty.href.endsWith("/bank")) {
     return `/(student)/bank?classroomId=${classroomId}`;
   }
-  if (duty.roleKey === "store-clerk") {
+  if (duty.href.endsWith("/pay")) {
     return `/(student)/pay?classroomId=${classroomId}`;
   }
   return null;
