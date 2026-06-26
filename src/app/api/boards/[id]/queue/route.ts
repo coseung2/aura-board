@@ -7,6 +7,7 @@ import { getEffectiveBoardRole } from "@/lib/rbac";
 import { extractVideoId, fetchYouTubeMeta, canonicalUrl } from "@/lib/youtube";
 import { touchBoardUpdatedAt } from "@/lib/board-touch";
 import { resolveCardAuthorLabels } from "@/lib/card-author-labels";
+import { announceQueueChange } from "@/lib/realtime-broadcast";
 import {
   DJ_REQUEST_LIMIT_ERROR,
   DJ_REQUEST_LIMIT_PER_HOUR,
@@ -182,6 +183,7 @@ export async function POST(
 
   // classroom-boards-tab "🟢 새 활동" 배지 — DJ 큐 신청도 카드 생성 → board touch.
   await touchBoardUpdatedAt(board.id);
+  void announceQueueChange(board.id, result.card.id, "submit");
   const authorLabels = await resolveCardAuthorLabels(result.card);
 
   return NextResponse.json({

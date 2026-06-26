@@ -31,7 +31,8 @@ export async function GET(
       },
       include: {
         cards: {
-          orderBy: { createdAt: "asc" },
+          // web 의 order 기반 정렬과 동일하게 유지하되 createdAt 으로 안정 정렬.
+          orderBy: [{ order: "asc" }, { createdAt: "asc" }],
           include: {
             attachments: { orderBy: { order: "asc" } },
             authors: { orderBy: { displayName: "asc" } },
@@ -174,6 +175,14 @@ export async function GET(
         const hasAuthor =
           rest.authors.length > 0 ||
           Boolean(rest.externalAuthorName || rest.authorId || rest.studentAuthorId);
+        // mobile parity: 카드 단위 권한을 서버에서 같이 내려주면 클라이언트가
+        // 권한 분기를 로컬로 추정하지 않아도 된다. isMine / canEdit / canDelete
+        // 는 본인 카드 수정/삭제 메뉴 노출에 직접 사용됨.
+        const isMine = !!rest.studentAuthorId && rest.studentAuthorId === student.id;
+        const isOwnPendingQueue =
+          rest.queueStatus === "pending" && isMine;
+        const canEdit = isMine;
+        const canDelete = isMine;
         const visibleAuthorLabels = board.anonymousAuthor
           ? hasAuthor
             ? {
@@ -196,6 +205,10 @@ export async function GET(
           anonymousAuthor: board.anonymousAuthor,
           likeCount: _count.likes,
           commentCount: _count.comments,
+          isMine,
+          canEdit,
+          canDelete,
+          isOwnPendingQueue,
           createdAt: card.createdAt.toISOString(),
           updatedAt: card.updatedAt.toISOString(),
         };
@@ -222,6 +235,9 @@ export async function GET(
       },
       capabilities: {
         canControlQueue,
+        canAddCard: true,
+        canEditOwnCard: true,
+        canDeleteOwnCard: true,
       },
       layoutData,
     });

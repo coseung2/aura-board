@@ -56,8 +56,14 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
 
     if (photoCount === 0 && (!input.noPhotoReason || input.noPhotoReason.length === 0)) {
       return NextResponse.json(
-        { error: "require_reason", message: "현재 단계에 사진이 없어요. 다음 단계로 가려면 사유를 적어주세요." },
-        { status: 400 }
+        // 모바일/웹 모두 422 + needsReason 컨트랙트로 통일 (앱이 reason modal 을
+        // 띄울 수 있게). 기존 400 require_reason 응답에 의존하던 클라는 없음.
+        {
+          needsReason: true,
+          error: "require_reason",
+          message: "현재 단계에 사진이 없어요. 다음 단계로 가려면 사유를 적어주세요.",
+        },
+        { status: 422 }
       );
     }
 

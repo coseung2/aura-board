@@ -60,6 +60,20 @@ export type BoardRealtimeEvent =
       likeCount: number;
       commentCount: number;
       updatedAt: string;
+    }
+  | {
+      type: "card_changed";
+      boardId: string;
+      cardId: string;
+      changeType: "insert" | "update" | "delete";
+      updatedAt: string;
+    }
+  | {
+      type: "queue_changed";
+      boardId: string;
+      changeType: "submit" | "status" | "move" | "delete";
+      cardId: string;
+      updatedAt: string;
     };
 
 export type AssignmentRealtimeEvent =

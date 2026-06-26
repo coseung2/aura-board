@@ -86,3 +86,34 @@ export async function announceEngagementChange(
     // Broadcast failures are non-fatal — clients fall back to no realtime.
   }
 }
+
+/**
+ * Broadcast a DJ queue mutation so listening mobile/web clients can
+ * refetch their queue snapshot. Keep the payload minimal — clients merge
+ * on the existing list and just patch the affected card.
+ */
+export async function announceQueueChange(
+  boardId: string,
+  cardId: string,
+  changeType: "submit" | "status" | "move" | "delete",
+): Promise<void> {
+  if (!boardId || !cardId) return;
+  const client = getServerClient();
+  if (!client) return;
+  const event: BoardRealtimeEvent = {
+    type: "queue_changed",
+    boardId,
+    cardId,
+    changeType,
+    updatedAt: new Date().toISOString(),
+  };
+  try {
+    await client.channel(boardChannelKey(boardId)).send({
+      type: "broadcast",
+      event: "queue_changed",
+      payload: event,
+    });
+  } catch {
+    // ignore — clients fall back to next poll.
+  }
+}

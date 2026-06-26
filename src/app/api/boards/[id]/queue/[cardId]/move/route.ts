@@ -6,6 +6,7 @@ import { getCurrentStudent } from "@/lib/student-auth";
 import { getEffectiveBoardRole } from "@/lib/rbac";
 import { touchBoardUpdatedAt } from "@/lib/board-touch";
 import { resolveCardAuthorLabels } from "@/lib/card-author-labels";
+import { announceQueueChange } from "@/lib/realtime-broadcast";
 
 const MoveBody = z.object({
   order: z.number().int().min(0),
@@ -78,6 +79,7 @@ export async function PATCH(
 
   // classroom-boards-tab "🟢 새 활동" 배지 — 큐 순서 변경도 활동 신호.
   await touchBoardUpdatedAt(board.id);
+  void announceQueueChange(board.id, cardId, "move");
   const authorLabels = await resolveCardAuthorLabels(updated);
 
   return NextResponse.json({

@@ -6,6 +6,7 @@ import { getCurrentStudent } from "@/lib/student-auth";
 import { getEffectiveBoardRole } from "@/lib/rbac";
 import { touchBoardUpdatedAt } from "@/lib/board-touch";
 import { resolveCardAuthorLabels } from "@/lib/card-author-labels";
+import { announceQueueChange } from "@/lib/realtime-broadcast";
 
 const PatchBody = z.object({
   status: z.enum(["approved", "rejected", "played"]),
@@ -134,6 +135,7 @@ export async function PATCH(
 
   // classroom-boards-tab "🟢 새 활동" 배지 — 큐 상태 변경도 활동 신호.
   await touchBoardUpdatedAt(board.id);
+  void announceQueueChange(board.id, cardId, "status");
   const authorLabels = await resolveCardAuthorLabels(updated);
 
   return NextResponse.json({
@@ -208,6 +210,7 @@ export async function DELETE(
 
   // classroom-boards-tab "🟢 새 활동" 배지 — 큐 카드 삭제도 활동 신호.
   await touchBoardUpdatedAt(board.id);
+  void announceQueueChange(board.id, cardId, "delete");
 
   return NextResponse.json({ ok: true });
 }

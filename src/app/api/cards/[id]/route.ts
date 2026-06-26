@@ -161,6 +161,9 @@ export async function PATCH(
     if (input.attachments) {
       for (let i = 0; i < input.attachments.length; i += 1) {
         const a = input.attachments[i];
+        // multi-link-attach (2026-06-13): POST 와 동일하게 link 첨부는 storage
+        // whitelist 검사에서 제외. PATCH 가 link 만 보냈을 때 400 이 나지 않게.
+        if (a.kind === "link") continue;
         if (!isAllowedFileUrl(a.url)) {
           return NextResponse.json(
             { error: `attachments[${i}].url must be from the project upload storage` },
