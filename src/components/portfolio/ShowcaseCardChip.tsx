@@ -28,7 +28,7 @@ export function ShowcaseCardChip({ entry, onOpen }: Props) {
       style={{ backgroundColor: card.color ?? undefined }}
       tabIndex={0}
       role="button"
-      aria-label={`${card.title || "제목 없음"} — 자세히 보기`}
+      aria-label={`${card.title || "제목 없음"} - 자세히 보기`}
       onClick={() => onOpen(entry)}
       onKeyDown={onKey}
     >

@@ -36,7 +36,7 @@ const attentionGroups: Array<{
 ];
 
 function formatAgo(iso: string | null) {
-  if (!iso) return "—";
+  if (!iso) return "-";
   const ms = Date.now() - new Date(iso).getTime();
   const days = Math.floor(ms / (24 * 60 * 60 * 1000));
   if (days < 1) return "오늘";
@@ -165,14 +165,8 @@ export function TeacherSummaryView({
         <span>식물관찰일지</span>
       </nav>
 
-      {/* ── Hero ── */}
-      <section className="plant-hero" aria-label="교사용 요약 헤더">
-        <div>
-          <h1>식물 관찰일지</h1>
-          <p>
-            오늘 챙겨야 할 학생, 단계 분포, 전체 매트릭스를 한 화면에서 확인해요
-          </p>
-        </div>
+      {/* ── Quick actions ── */}
+      <div className="plant-summary-actions" aria-label="교사용 빠른 작업">
         <div className="plant-hero-actions">
           <button
             type="button"
@@ -188,7 +182,7 @@ export function TeacherSummaryView({
             매트릭스 전체 보기
           </Link>
         </div>
-      </section>
+      </div>
 
       {/* ── KPI Cards ── */}
       <section className="plant-kpi-grid" aria-label="학급 관찰 요약">
@@ -289,7 +283,7 @@ export function TeacherSummaryView({
                   )}
                   <div className="plant-obs-feed-info">
                     <span className="plant-obs-feed-student">
-                      {obs.student.number ?? "—"}번 {obs.student.name}
+                      {obs.student.number ?? "-"}번 {obs.student.name}
                     </span>
                     <span className="plant-obs-feed-plant">
                       {obs.species.nameKo} · &ldquo;{obs.plantNickname}&rdquo;
@@ -361,7 +355,7 @@ export function TeacherSummaryView({
                           </span>
                           <span className="plant-attention-info">
                             <span className="plant-attention-name">
-                              {s.name} · {s.number ?? "—"}번
+                              {s.name} · {s.number ?? "-"}번
                             </span>
                             <span className="plant-attention-meta">
                               {s.currentStageOrder
@@ -482,7 +476,7 @@ export function TeacherSummaryView({
                   {selectedObservation.species.nameKo}
                 </span>
                 <span className="plant-obs-detail-student">
-                  {selectedObservation.student.number ?? "—"}번{" "}
+                  {selectedObservation.student.number ?? "-"}번{" "}
                   {selectedObservation.student.name}
                 </span>
               </div>

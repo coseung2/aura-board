@@ -64,7 +64,7 @@ export function PortfolioCardItem({
       style={{ backgroundColor: card.color ?? undefined }}
       tabIndex={0}
       role="button"
-      aria-label={`${card.title} — ${sourceLabel}, 클릭하여 자세히 보기`}
+      aria-label={`${card.title} - ${sourceLabel}, 클릭하여 자세히 보기`}
       onClick={() => onOpen(card)}
       onKeyDown={handleKeyDown}
     >

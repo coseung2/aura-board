@@ -84,12 +84,12 @@ export default function PrivacyPage() {
           <h2 className="docs-h2">6. 개인정보 처리 위탁</h2>
           <p className="docs-p">서비스 제공을 위해 다음과 같이 개인정보 처리를 위탁합니다.</p>
           <ul className="docs-list">
-            <li><strong>Supabase, Inc.</strong> — 데이터베이스, 인증, 파일 스토리지, 실시간 동기화</li>
-            <li><strong>Vercel, Inc.</strong> — 웹/모바일 앱 호스팅, 서버리스 함수 실행</li>
-            <li><strong>Resend, Inc.</strong> — 이메일 발송</li>
-            <li><strong>Google, Kakao</strong> — OAuth 소셜 로그인</li>
-            <li><strong>YouTube(Google)</strong> — 영상 임베드 콘텐츠 제공</li>
-            <li><strong>Upstash</strong> — 서비스 부하 제어 및 캐싱</li>
+            <li><strong>Supabase, Inc.</strong> - 데이터베이스, 인증, 파일 스토리지, 실시간 동기화</li>
+            <li><strong>Vercel, Inc.</strong> - 웹/모바일 앱 호스팅, 서버리스 함수 실행</li>
+            <li><strong>Resend, Inc.</strong> - 이메일 발송</li>
+            <li><strong>Google, Kakao</strong> - OAuth 소셜 로그인</li>
+            <li><strong>YouTube(Google)</strong> - 영상 임베드 콘텐츠 제공</li>
+            <li><strong>Upstash</strong> - 서비스 부하 제어 및 캐싱</li>
           </ul>
           <p className="docs-p">각 수탁업체는 개별 개인정보처리방침에 따라 정보를 처리합니다.</p>
         </section>

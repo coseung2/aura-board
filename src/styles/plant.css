@@ -32,7 +32,9 @@
   display: flex;
   flex-direction: column;
   gap: 6px;
-  transition: border-color 120ms, box-shadow 120ms;
+  transition:
+    border-color 120ms,
+    box-shadow 120ms;
   font: inherit;
   color: inherit;
 }
@@ -513,9 +515,15 @@
   animation: plant-upload-indeterminate 1.5s infinite;
 }
 @keyframes plant-upload-indeterminate {
-  0% { width: 0%; }
-  50% { width: 70%; }
-  100% { width: 100%; }
+  0% {
+    width: 0%;
+  }
+  50% {
+    width: 70%;
+  }
+  100% {
+    width: 100%;
+  }
 }
 .plant-empty-state {
   text-align: center;
@@ -657,7 +665,9 @@
 }
 .plant-stage-row[data-state="active"] .plant-stage-body {
   border-color: var(--color-plant-active);
-  box-shadow: 0 0 0 2px rgba(39, 163, 95, 0.18), var(--shadow-sm);
+  box-shadow:
+    0 0 0 2px rgba(39, 163, 95, 0.18),
+    var(--shadow-sm);
 }
 
 .plant-stage-body-head h3 {
@@ -866,7 +876,6 @@
 .plant-hero-mission-card,
 .plant-teacher-hero,
 .plant-teacher-panel,
-.plant-matrix-toolbar,
 .plant-matrix-drilldown {
   border: 1px solid rgba(91, 128, 94, 0.18);
   border-radius: 22px;
@@ -979,12 +988,18 @@
   padding: 24px 32px;
 }
 .plant-matrix-toolbar {
-  padding: 20px;
-  margin-bottom: 14px;
+  padding: 10px 0;
+  margin-bottom: 10px;
   display: flex;
   justify-content: space-between;
   gap: 14px;
   align-items: center;
+}
+.plant-matrix-toolbar h2 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--color-text);
 }
 .plant-matrix-toolbar-stats span {
   padding: 8px 12px;
@@ -1098,14 +1113,21 @@
   font-size: 12px;
   font-weight: 800;
 }
-.plant-matrix-mini-strip span[data-filled="true"] { background: #fefce8; color: #854d0e; }
-.plant-matrix-mini-strip span[data-photo="true"] { background: #dcfce7; color: #166534; }
-.plant-matrix-mini-strip span[data-current="true"] { outline: 2px solid #2563eb; }
+.plant-matrix-mini-strip span[data-filled="true"] {
+  background: #fefce8;
+  color: #854d0e;
+}
+.plant-matrix-mini-strip span[data-photo="true"] {
+  background: #dcfce7;
+  color: #166534;
+}
+.plant-matrix-mini-strip span[data-current="true"] {
+  outline: 2px solid #2563eb;
+}
 
 /* =====================================================
    Teacher plant dashboard — design-system aligned summary
    ===================================================== */
-
 
 /* ── Teacher summary hero ── */
 .plant-hero {
@@ -1155,6 +1177,27 @@
   }
 }
 
+.plant-summary-actions {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+@media (max-width: 640px) {
+  .plant-summary-actions {
+    width: 100%;
+  }
+
+  .plant-summary-actions .ds-btn-primary,
+  .plant-summary-actions .ds-btn-secondary {
+    flex: 1;
+    text-align: center;
+    justify-content: center;
+  }
+}
+
 /* ── KPI cards ── */
 .plant-kpi-grid {
   display: grid;
@@ -1168,7 +1211,9 @@
   border-radius: var(--radius-card);
   padding: 18px 20px;
   box-shadow: var(--shadow-card);
-  transition: box-shadow var(--t-slow), border-color var(--t-slow);
+  transition:
+    box-shadow var(--t-slow),
+    border-color var(--t-slow);
   position: relative;
   overflow: hidden;
   border-left: 3px solid transparent;
@@ -1207,23 +1252,51 @@
   border-radius: 4px;
   transition: width 0.4s;
 }
-.kpi-tone-plant { border-left-color: var(--color-plant-active); }
-.kpi-tone-plant .kpi-value { color: var(--color-plant-active); }
-.kpi-tone-plant .kpi-micro-fill { background: var(--color-plant-active); }
-.kpi-tone-danger { border-left-color: var(--color-danger); }
-.kpi-tone-danger .kpi-value { color: var(--color-danger); }
-.kpi-tone-danger .kpi-micro-fill { background: var(--color-danger); }
-.kpi-tone-warn { border-left-color: var(--color-warning); }
-.kpi-tone-warn .kpi-value { color: #b45309; }
-.kpi-tone-warn .kpi-micro-fill { background: var(--color-warning); }
-.kpi-tone-info { border-left-color: var(--color-accent); }
-.kpi-tone-info .kpi-value { color: var(--color-accent); }
-.kpi-tone-info .kpi-micro-fill { background: var(--color-accent); }
+.kpi-tone-plant {
+  border-left-color: var(--color-plant-active);
+}
+.kpi-tone-plant .kpi-value {
+  color: var(--color-plant-active);
+}
+.kpi-tone-plant .kpi-micro-fill {
+  background: var(--color-plant-active);
+}
+.kpi-tone-danger {
+  border-left-color: var(--color-danger);
+}
+.kpi-tone-danger .kpi-value {
+  color: var(--color-danger);
+}
+.kpi-tone-danger .kpi-micro-fill {
+  background: var(--color-danger);
+}
+.kpi-tone-warn {
+  border-left-color: var(--color-warning);
+}
+.kpi-tone-warn .kpi-value {
+  color: #b45309;
+}
+.kpi-tone-warn .kpi-micro-fill {
+  background: var(--color-warning);
+}
+.kpi-tone-info {
+  border-left-color: var(--color-accent);
+}
+.kpi-tone-info .kpi-value {
+  color: var(--color-accent);
+}
+.kpi-tone-info .kpi-micro-fill {
+  background: var(--color-accent);
+}
 @media (max-width: 860px) {
-  .plant-kpi-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .plant-kpi-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 @media (max-width: 560px) {
-  .plant-kpi-grid { grid-template-columns: 1fr; }
+  .plant-kpi-grid {
+    grid-template-columns: 1fr;
+  }
 }
 
 /* ── Stage distribution bars ── */
@@ -1249,7 +1322,9 @@
   border-radius: 6px 6px 3px 3px;
   background: var(--color-plant-active);
   opacity: 0.3;
-  transition: height 0.4s, opacity 0.15s;
+  transition:
+    height 0.4s,
+    opacity 0.15s;
   min-height: 4px;
   position: relative;
 }
@@ -1277,7 +1352,9 @@
   border-radius: var(--radius-btn);
   background: var(--color-surface);
   border: var(--border-card);
-  transition: background var(--t-fast), border-color var(--t-fast);
+  transition:
+    background var(--t-fast),
+    border-color var(--t-fast);
   cursor: pointer;
   font: inherit;
   text-align: left;
@@ -1300,9 +1377,21 @@
   color: var(--color-text-muted);
   flex-shrink: 0;
 }
-.plant-attention-info { flex: 1; min-width: 0; display: grid; gap: 2px; }
-.plant-attention-name { font-weight: 600; font-size: 14px; color: var(--color-text); }
-.plant-attention-meta { font-size: 12px; color: var(--color-text-muted); }
+.plant-attention-info {
+  flex: 1;
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+.plant-attention-name {
+  font-weight: 600;
+  font-size: 14px;
+  color: var(--color-text);
+}
+.plant-attention-meta {
+  font-size: 12px;
+  color: var(--color-text-muted);
+}
 .plant-attention-badge {
   display: inline-block;
   font-size: var(--text-badge-size);
@@ -1400,9 +1489,18 @@
   background: #edf7ed;
   flex-shrink: 0;
 }
-.plant-student-game-info { flex: 1; min-width: 0; }
-.plant-student-game-name { font-weight: 600; font-size: 14px; }
-.plant-student-game-plant { font-size: 12px; color: var(--color-text-muted); }
+.plant-student-game-info {
+  flex: 1;
+  min-width: 0;
+}
+.plant-student-game-name {
+  font-weight: 600;
+  font-size: 14px;
+}
+.plant-student-game-plant {
+  font-size: 12px;
+  color: var(--color-text-muted);
+}
 .plant-student-game-stage {
   display: flex;
   align-items: center;
@@ -1410,11 +1508,19 @@
   margin-top: 2px;
 }
 .plant-student-game-stage .stage-dot {
-  width: 8px; height: 8px; border-radius: 50%;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
 }
-.plant-student-game-stage .stage-green { background: #52b788; }
-.plant-student-game-stage .stage-yellow { background: #e9c46a; }
-.plant-student-game-stage .stage-red { background: #d62828; }
+.plant-student-game-stage .stage-green {
+  background: #52b788;
+}
+.plant-student-game-stage .stage-yellow {
+  background: #e9c46a;
+}
+.plant-student-game-stage .stage-red {
+  background: #d62828;
+}
 .plant-student-game-badge {
   font-size: 10px;
   font-weight: 700;
@@ -1422,9 +1528,18 @@
   border-radius: 20px;
   flex-shrink: 0;
 }
-.badge-game-stalled { background: #ffe0e0; color: #d62828; }
-.badge-game-ok { background: #e0f5e0; color: #2d6a4f; }
-.badge-game-pending { background: #f0f2f5; color: #5b6b7f; }
+.badge-game-stalled {
+  background: #ffe0e0;
+  color: #d62828;
+}
+.badge-game-ok {
+  background: #e0f5e0;
+  color: #2d6a4f;
+}
+.badge-game-pending {
+  background: #f0f2f5;
+  color: #5b6b7f;
+}
 
 /* ── Matrix preview mini grid ── */
 .plant-matrix-game {
@@ -1451,7 +1566,9 @@
   font-size: 12px;
   color: var(--color-text-muted);
 }
-.plant-matrix-game-stats strong { color: var(--color-text); }
+.plant-matrix-game-stats strong {
+  color: var(--color-text);
+}
 .plant-matrix-game-grid {
   display: grid;
   grid-template-columns: 100px repeat(auto-fill, minmax(56px, 1fr));
@@ -1480,10 +1597,19 @@
   transform: scale(1.15);
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
 }
-.mgc-photo { background: #d8f3dc; }
-.mgc-empty { background: #f0f7f0; color: #b8d0c0; }
-.mgc-current { box-shadow: inset 0 0 0 2px #52b788; }
-.mgc-stale { background: #fef3d9; }
+.mgc-photo {
+  background: #d8f3dc;
+}
+.mgc-empty {
+  background: #f0f7f0;
+  color: #b8d0c0;
+}
+.mgc-current {
+  box-shadow: inset 0 0 0 2px #52b788;
+}
+.mgc-stale {
+  background: #fef3d9;
+}
 .plant-matrix-game-header {
   font-size: 11px;
   font-weight: 600;
@@ -1517,7 +1643,7 @@
 .plant-view-toggle button[data-active="true"] {
   background: white;
   color: var(--color-text);
-  box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
 }
 .plant-view-toggle button:hover:not([data-active="true"]) {
   color: var(--color-text);
@@ -1598,7 +1724,6 @@
   .plant-hero-mission-card,
   .plant-teacher-hero,
   .plant-teacher-panel,
-  .plant-matrix-toolbar,
   .plant-matrix-drilldown {
     border-radius: 16px;
     padding: 14px;
@@ -1614,12 +1739,16 @@
   position: relative;
   overflow: hidden;
 }
-.plant-dist-bar {
+.plant-dist-item .plant-dist-bar {
   position: absolute;
   bottom: 0;
   left: 0;
   right: 0;
-  background: linear-gradient(to top, var(--color-plant-active), color-mix(in srgb, var(--color-plant-active) 60%, transparent));
+  background: linear-gradient(
+    to top,
+    var(--color-plant-active),
+    color-mix(in srgb, var(--color-plant-active) 60%, transparent)
+  );
   border-radius: 4px 4px 0 0;
   min-height: 4px;
   transition: height 0.3s ease;
@@ -1651,7 +1780,7 @@
   align-items: center;
   justify-content: center;
   line-height: 1;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
 }
 
 /* ── ⑥ 매트릭스 시간 색상 코딩 ─────────────────── */
@@ -1696,9 +1825,17 @@
   margin-left: 6px;
 }
 @keyframes plant-badge-pop {
-  0% { transform: scale(0); opacity: 0; }
-  60% { transform: scale(1.2); }
-  100% { transform: scale(1); opacity: 1; }
+  0% {
+    transform: scale(0);
+    opacity: 0;
+  }
+  60% {
+    transform: scale(1.2);
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
 }
 .plant-celebration-banner {
   text-align: center;
@@ -1712,8 +1849,16 @@
   animation: plant-celebrate-fade 3s ease-out forwards;
 }
 @keyframes plant-celebrate-fade {
-  0%, 60% { opacity: 1; transform: translateY(0); }
-  100% { opacity: 0; transform: translateY(-10px); pointer-events: none; }
+  0%,
+  60% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-10px);
+    pointer-events: none;
+  }
 }
 
 /* ── ② 미관찰 리마인더 ────────────────────────── */
@@ -1741,8 +1886,13 @@
   animation: plant-pulse 2s infinite;
 }
 @keyframes plant-pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.6; }
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.6;
+  }
 }
 
 /* ── ③ 클릭투에디트 별명 (추가 스타일) ─────────── */
@@ -1817,7 +1967,7 @@
   background: #fff;
   z-index: 3;
   cursor: col-resize;
-  box-shadow: 0 0 6px rgba(0,0,0,0.4);
+  box-shadow: 0 0 6px rgba(0, 0, 0, 0.4);
 }
 .plant-compare-handle::after {
   content: "↔";
@@ -1833,7 +1983,7 @@
   align-items: center;
   justify-content: center;
   font-size: 14px;
-  box-shadow: 0 1px 4px rgba(0,0,0,0.3);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
 }
 .plant-compare-toggle {
   display: inline-flex;
@@ -1972,21 +2122,34 @@
 }
 .plant-growth-bar-fill {
   height: 100%;
-  background: linear-gradient(90deg, var(--color-plant-active), color-mix(in srgb, var(--color-plant-active) 70%, #ffd700));
+  background: linear-gradient(
+    90deg,
+    var(--color-plant-active),
+    color-mix(in srgb, var(--color-plant-active) 70%, #ffd700)
+  );
   border-radius: 4px;
   transition: width 0.6s ease;
 }
 
 /* ── ⑮ 스켈레톤 로딩 ──────────────────────────── */
 .plant-skeleton {
-  background: linear-gradient(90deg, var(--color-bg-alt) 25%, var(--color-border) 50%, var(--color-bg-alt) 75%);
+  background: linear-gradient(
+    90deg,
+    var(--color-bg-alt) 25%,
+    var(--color-border) 50%,
+    var(--color-bg-alt) 75%
+  );
   background-size: 200% 100%;
   animation: plant-shimmer 1.5s infinite;
   border-radius: 8px;
 }
 @keyframes plant-shimmer {
-  0% { background-position: 200% 0; }
-  100% { background-position: -200% 0; }
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
 }
 .plant-skeleton-head {
   display: flex;
@@ -2115,7 +2278,11 @@
   place-items: center;
   font-size: 36px;
   background:
-    radial-gradient(circle at 28% 22%, rgba(255, 255, 255, 0.34), transparent 30%),
+    radial-gradient(
+      circle at 28% 22%,
+      rgba(255, 255, 255, 0.34),
+      transparent 30%
+    ),
     linear-gradient(135deg, #16a34a, #0f766e 56%, #164e63);
   border: 0;
 }
@@ -2336,7 +2503,10 @@
   overflow: hidden;
   aspect-ratio: 1 / 1;
   box-shadow: var(--shadow-card);
-  transition: box-shadow var(--t-slow), border-color var(--t-slow), transform var(--t-slow);
+  transition:
+    box-shadow var(--t-slow),
+    border-color var(--t-slow),
+    transform var(--t-slow);
 }
 .plant-teacher .plant-obs-feed-card:hover {
   border-color: var(--color-border-hover);

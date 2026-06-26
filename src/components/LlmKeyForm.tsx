@@ -3,7 +3,7 @@
 // Teacher LLM API Key 입력 폼 (/teacher/settings#llm 마운트).
 // 붙여넣기 → 저장 → 서버가 즉시 각 사 API에 테스트 호출로 검증.
 // 성공 시 "연결됨 ✓ sk-...xxxx" 배지, 실패 시 에러 메시지.
-// Ollama 는 로컬 테스트용 — baseUrl + modelId 필드가 추가로 필요하다.
+// Ollama 는 로컬 테스트용 - baseUrl + modelId 필드가 추가로 필요하다.
 // OpenCode-go는 OpenAI 호환 API 키 + 모델 선택.
 // 2026-05-17: opencode-go 추가 (로컬 CLI 아님, API 키 방식)
 
@@ -232,7 +232,7 @@ export function LlmKeyForm() {
             <option value="claude">Claude (Anthropic)</option>
             <option value="openai">ChatGPT (OpenAI)</option>
             <option value="gemini">Gemini (Google)</option>
-            <option value="ollama">🧪 Ollama (로컬 테스트 — 개발자 전용)</option>
+            <option value="ollama">🧪 Ollama (로컬 테스트 - 개발자 전용)</option>
             <option value="opencode-go">OpenCode-go</option>
           </select>
         </label>

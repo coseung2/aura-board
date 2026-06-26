@@ -55,6 +55,91 @@
 .dashboard-classroom-row .dashboard-classroom-link {
   margin-left: auto;
 }
+
+.board-section-tabs {
+  max-width: var(--container-max-width);
+  margin: 0 auto 16px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.board-section-tabs-list {
+  display: inline-flex;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-btn);
+  overflow: hidden;
+  background: var(--color-surface);
+}
+
+.board-section-tab {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  width: 88px;
+  box-sizing: border-box;
+  border: none;
+  border-right: 1px solid var(--color-border);
+  background: var(--color-surface);
+  padding: 8px 16px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  transition:
+    background 120ms ease,
+    color 120ms ease;
+}
+
+.board-section-tab:last-child {
+  border-right: none;
+}
+
+.board-section-tab:hover {
+  background: var(--color-surface-alt);
+  color: var(--color-text);
+}
+
+.board-section-tab.is-active {
+  background: var(--color-accent);
+  color: #fff;
+}
+
+.board-section-tab-count {
+  display: inline-flex;
+  justify-content: flex-end;
+  min-width: 2ch;
+  font-size: 12px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  opacity: 0.9;
+}
+
+.board-section-tabs-link {
+  margin-left: auto;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--color-accent);
+  text-decoration: none;
+}
+
+.board-section-tabs-link:hover {
+  color: var(--color-accent-active);
+}
+
+@media (max-width: 640px) {
+  .board-section-tabs {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .board-section-tabs-link {
+    margin-left: 0;
+  }
+}
+
 /* -------- Home / Board List -------- */
 
 .home-page {
@@ -130,7 +215,10 @@
   min-height: 190px;
   position: relative;
   overflow: hidden;
-  transition: box-shadow var(--t-slow), border-color var(--t-slow), transform var(--t-slow);
+  transition:
+    box-shadow var(--t-slow),
+    border-color var(--t-slow),
+    transform var(--t-slow);
 }
 
 .board-grid-card:hover {
@@ -213,7 +301,10 @@
   line-height: 1;
   cursor: pointer;
   opacity: 0.6;
-  transition: background var(--t-normal), color var(--t-normal), opacity var(--t-normal);
+  transition:
+    background var(--t-normal),
+    color var(--t-normal),
+    opacity var(--t-normal);
 }
 
 .board-grid-kebab:hover {
@@ -284,7 +375,9 @@
   justify-content: center;
   font-size: 28px;
   color: var(--color-text-faint);
-  transition: background 150ms ease, color 150ms ease;
+  transition:
+    background 150ms ease,
+    color 150ms ease;
 }
 
 .board-grid-new:hover .board-grid-new-icon {
@@ -309,7 +402,10 @@
   box-shadow: var(--shadow-card);
   text-decoration: none;
   color: var(--color-text);
-  transition: box-shadow 180ms ease, border-color 180ms ease, transform 180ms ease;
+  transition:
+    box-shadow 180ms ease,
+    border-color 180ms ease,
+    transform 180ms ease;
 }
 
 .board-list-card:hover {
@@ -403,7 +499,9 @@
   font-family: var(--font-body);
   cursor: pointer;
   overflow: hidden;
-  transition: border-color var(--t-normal), box-shadow var(--t-normal),
+  transition:
+    border-color var(--t-normal),
+    box-shadow var(--t-normal),
     background var(--t-normal);
 }
 
@@ -517,7 +615,9 @@
   cursor: pointer;
   text-align: left;
   font-family: var(--font-body);
-  transition: border-color 150ms ease, background 150ms ease;
+  transition:
+    border-color 150ms ease,
+    background 150ms ease;
 }
 
 .layout-option:hover {
@@ -559,7 +659,6 @@
   color: var(--color-text-muted);
   flex: 1;
 }
-
 
 /* -------- BC-1: lesson vs play radios in create-board modal -------- */
 
@@ -692,7 +791,9 @@
   color: var(--color-text-muted);
   padding: 4px 8px;
   border-radius: var(--radius-btn);
-  transition: color 150ms ease, background 150ms ease;
+  transition:
+    color 150ms ease,
+    background 150ms ease;
 }
 
 .board-back-link:hover {
@@ -755,8 +856,11 @@
   content: "";
   position: absolute;
   inset: 0;
-  background:
-    linear-gradient(180deg, rgba(7, 20, 31, 0.08), rgba(7, 20, 31, 0.38));
+  background: linear-gradient(
+    180deg,
+    rgba(7, 20, 31, 0.08),
+    rgba(7, 20, 31, 0.38)
+  );
   pointer-events: none;
 }
 
@@ -792,7 +896,10 @@
   font-weight: 700;
   cursor: pointer;
   box-shadow: 0 8px 18px rgba(0, 0, 0, 0.16);
-  transition: background 150ms ease, transform 150ms ease, opacity 150ms ease;
+  transition:
+    background 150ms ease,
+    transform 150ms ease,
+    opacity 150ms ease;
 }
 
 .board-thumbnail-upload-btn:hover:not(:disabled) {

@@ -5,10 +5,10 @@ import { useSearchParams } from "next/navigation";
 import { OnboardingShell } from "../_shell";
 import { ParentAuthButtons } from "@/components/parent/ParentAuthButtons";
 
-// parent-class-invite-v2 — P1 Signup.
+// parent-class-invite-v2 - P1 Signup.
 // parent-redesign (2026-04-26): OAuth(Google/Kakao) 버튼 + 매직링크 fallback.
 // 1차 진입은 OAuth, 매직링크는 보조. URL ?error=... 가 있으면 OAuth 흐름
-// 에서 돌아온 에러 — 진입점에서 사용자에게 안내.
+// 에서 돌아온 에러 - 진입점에서 사용자에게 안내.
 
 const OAUTH_ERROR_MESSAGES: Record<string, string> = {
   provider_disabled:
@@ -77,7 +77,7 @@ function ParentSignupBody() {
         </p>
         {sent.devUrl && (
           <div style={devStyle}>
-            [DEV] 이메일 인프라 미연결 — 다음 링크로 바로 인증하세요:
+            [DEV] 이메일 인프라 미연결 - 다음 링크로 바로 인증하세요:
             <div style={{ marginTop: 6, wordBreak: "break-all" }}>
               <a href={sent.devUrl}>{sent.devUrl}</a>
             </div>

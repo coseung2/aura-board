@@ -52,7 +52,7 @@ type Props = {
   /** multi-attachment (2026-04-20): 정규화 첨부 배열. 있으면 이 배열이
    *  우선 렌더되고, 비어있을 때만 위의 single-field fallback이 동작. */
   attachments?: AttachmentItem[];
-  /** 썸네일 모드 — 첫 첨부만 렌더 + 2개 이상이면 "+N" 배지. 기본은 detail
+  /** 썸네일 모드 - 첫 첨부만 렌더 + 2개 이상이면 "+N" 배지. 기본은 detail
    *  (모달용, 전부 렌더). 카드 본문에서는 "thumbnail" 로 지정. */
   variant?: "thumbnail" | "detail";
   /** detail 모드에서 이미지 클릭 시 라이트박스 오픈. index 는 이미지
@@ -338,7 +338,7 @@ export const CardAttachments = memo(function CardAttachments({ imageUrl, thumbUr
     }
     if (a.kind === "link") {
       // multi-link-attach (2026-06-13): link 첨부는 OG 카드(link-preview)
-      // 로 표시. YouTube URL이라도 link kind면 OG 카드로 표시 — 재생이
+      // 로 표시. YouTube URL이라도 link kind면 OG 카드로 표시 - 재생이
       // 필요하면 video 첨부로 올리면 됨.
       return (
         <a
@@ -389,7 +389,7 @@ export const CardAttachments = memo(function CardAttachments({ imageUrl, thumbUr
               {a.fileName ?? "파일"}
             </span>
             <span className="card-attach-file-thumbnail-meta">
-              {a.fileSize ? formatBytes(a.fileSize) : "—"} · {label}
+              {a.fileSize ? formatBytes(a.fileSize) : "-"} · {label}
             </span>
           </div>
           {extraCount > 0 && (
@@ -423,7 +423,7 @@ export const CardAttachments = memo(function CardAttachments({ imageUrl, thumbUr
         // media-attach-carousel (2026-06-12): 슬라이드 모드면 현재 항목
         // 1개만, viewport 안에 콘텐츠 + arrow + indicator 모두 함께 렌더.
         // arrow는 박스 없이 글리프만 콘텐츠 중단 좌우, indicator는 콘텐츠
-        // 정중앙 하단 — 콘텐츠가 viewport 일부만 차지해도 그 콘텐츠 자체
+        // 정중앙 하단 - 콘텐츠가 viewport 일부만 차지해도 그 콘텐츠 자체
         // 박스 기준 가운데에 떠 있도록 함.
         isCarousel && currentItem ? (
           <div className="card-attach-carousel">
@@ -526,7 +526,7 @@ export const CardAttachments = memo(function CardAttachments({ imageUrl, thumbUr
         ) : null}
       {/* REMOVED (2026-06-13): legacy linkUrl→iframe branch. buildMediaItems()
           always pushes linkUrl as kind:"link" into allSorted, so this branch
-          was dead code — its condition !allSorted.some((a) => a.kind==="link" && a.url===linkUrl)
+          was dead code - its condition !allSorted.some((a) => a.kind==="link" && a.url===linkUrl)
           was always false. link videos render as OG cards via renderMediaItem's
           link branch; dedicated YouTube playback needs a proper video attachment. */}
       {shouldRenderDetailLinkPreview && linkUrl && canRenderCanvaEmbed && canvaDesignId ? (

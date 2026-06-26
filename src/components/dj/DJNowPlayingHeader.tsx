@@ -27,7 +27,7 @@ function extractVideoId(url: string | null | undefined): string | null {
  * - `hostRef` 가 달린 썸네일 자리를 provider 에 host 로 등록 → 재생 중이면
  *   iframe 이 그 rect 위에 올라앉음 (프로바이더는 iframe 을 re-parent 하지
  *   않고 fixed position 으로 덮음). 페이지 이탈 시 등록 해제 → PiP 로 전환.
- * - 썸네일 `<img>` 는 iframe 이 덮는 영역과 동일 — iframe 이 불투명해서
+ * - 썸네일 `<img>` 는 iframe 이 덮는 영역과 동일 - iframe 이 불투명해서
  *   시각적으로 숨겨지고, 재생 중이 아닐 땐 썸네일이 자연스럽게 보임.
  */
 export function DJNowPlayingHeader({ card, boardId, canControl, onNext }: Props) {
@@ -59,7 +59,7 @@ export function DJNowPlayingHeader({ card, boardId, canControl, onNext }: Props)
     };
   }, [registerHost]);
 
-  // 다음 곡 advance 핸들러 provider 에 위임 — 자동 advance + PiP next 버튼.
+  // 다음 곡 advance 핸들러 provider 에 위임 - 자동 advance + PiP next 버튼.
   useEffect(() => {
     setAdvanceHandler(() => onNext());
     return () => {
@@ -105,7 +105,7 @@ export function DJNowPlayingHeader({ card, boardId, canControl, onNext }: Props)
     >
       <div className="dj-nowplaying-label">▶ NOW PLAYING</div>
       <div className="dj-nowplaying-body">
-        {/* host 자리 — iframe 이 fixed position 으로 이 rect 위에 덮임.
+        {/* host 자리 - iframe 이 fixed position 으로 이 rect 위에 덮임.
             재생 중이 아닐 때는 썸네일 이미지가 그대로 보이고, 재생 시작
             하면 iframe 이 같은 위치에 올라앉음. */}
         <div ref={hostRef} className="dj-thumb-lg dj-nowplaying-host">
@@ -157,7 +157,7 @@ export function DJNowPlayingHeader({ card, boardId, canControl, onNext }: Props)
                 className="dj-next-btn"
                 onClick={() => setManualPip(true)}
                 aria-label="PiP 모드로 전환"
-                title="우하단 플로팅 창으로 전환 — 드래그·리사이즈 가능"
+                title="우하단 플로팅 창으로 전환 - 드래그·리사이즈 가능"
               >
                 📺 PiP
               </button>

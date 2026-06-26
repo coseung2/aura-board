@@ -8,9 +8,9 @@ type Props = {
   selectedStudentId: string | null;
   selfStudentId: string | null;
   onSelect: (studentId: string) => void;
-  /** 데스크톱 사이드바 토글 닫기 — undefined 면 닫기 버튼 미노출(모바일 등) */
+  /** 데스크톱 사이드바 토글 닫기 - undefined 면 닫기 버튼 미노출(모바일 등) */
   onClose?: () => void;
-  /** 데스크톱 드로어 모드 — true 면 fixed-position 슬라이드 (DJ 재생완료
+  /** 데스크톱 드로어 모드 - true 면 fixed-position 슬라이드 (DJ 재생완료
    *  드로어 패턴). false/undefined 면 인라인 (모바일). */
   drawerMode?: boolean;
   /** drawerMode 가 true 일 때만 의미. true → 화면에 슬라이드 인. */
@@ -84,7 +84,7 @@ export function PortfolioRoster({
                   onClick={() => onSelect(s.id)}
                 >
                   <span className="portfolio-roster-num">
-                    {s.number ?? "—"}
+                    {s.number ?? "-"}
                   </span>
                   <span className="portfolio-roster-name">
                     {isSelf && (

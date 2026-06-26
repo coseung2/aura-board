@@ -106,7 +106,7 @@ export function StudentRow({
       </td>
       <td className="classroom-td classroom-td-qr">
         {qrSrc ? (
-          // QR is a data: URL generated client-side — next/image can't optimize it
+          // QR is a data: URL generated client-side - next/image can't optimize it
           // and the origin is our own page, so a raw <img> is intentional here.
           // eslint-disable-next-line @next/next/no-img-element
           <img src={qrSrc} alt="QR" className="classroom-qr-thumb" loading="lazy" />
@@ -125,7 +125,7 @@ export function StudentRow({
             parentCount === 0 ? "연결된 학부모 없음" : `학부모 ${parentCount}명`
           }
         >
-          {parentCount === 0 ? "–" : `${parentCount}명`}
+          {parentCount === 0 ? "-" : `${parentCount}명`}
         </a>
       </td>
       <td className="classroom-td classroom-td-actions">

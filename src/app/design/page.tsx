@@ -1,10 +1,10 @@
 "use client";
 
 /* ───────────────────────────────────────────────────
-   Aura-board Design System — Component Catalog
+   Aura-board Design System - Component Catalog
    Route: /design
    Every ds-* utility class rendered as a visual gallery.
-   No data fetching — purely self-contained display.
+   No data fetching - purely self-contained display.
    ─────────────────────────────────────────────────── */
 
 import { useState } from "react";
@@ -16,36 +16,36 @@ export default function DesignPage() {
         Aura-board Design System
       </h1>
       <p className="ds-body" style={{ color: "var(--color-text-muted)", marginBottom: 40 }}>
-        CSS token & component catalog — version 2.0 (Notion-inspired)
+        CSS token & component catalog - version 2.0 (Notion-inspired)
       </p>
 
       <Section title="Typography">
         <div className="ds-card" style={{ padding: 24 }}>
           <div style={{ display: "grid", gap: 8 }}>
-            <div><span className="h1">h1 — Display (32px)</span></div>
-            <div><span className="h2">h2 — Display (26px)</span></div>
-            <div><span className="h3">h3 — Title (20px)</span></div>
-            <div><span className="h4">h4 — Subtitle (16px)</span></div>
-            <div><span className="h5">h5 — Section (15px)</span></div>
-            <div><span className="ds-body">.ds-body — Body (15px)</span></div>
-            <div><span className="ds-label">.ds-label — Label (13px)</span></div>
-            <div><span className="ds-badge">.ds-badge — Badge (12px)</span></div>
-            <div><span className="ds-micro">.ds-micro — Micro (11px)</span></div>
-            <div><span className="ds-code">.ds-code — Inline code</span></div>
+            <div><span className="h1">h1 - Display (32px)</span></div>
+            <div><span className="h2">h2 - Display (26px)</span></div>
+            <div><span className="h3">h3 - Title (20px)</span></div>
+            <div><span className="h4">h4 - Subtitle (16px)</span></div>
+            <div><span className="h5">h5 - Section (15px)</span></div>
+            <div><span className="ds-body">.ds-body - Body (15px)</span></div>
+            <div><span className="ds-label">.ds-label - Label (13px)</span></div>
+            <div><span className="ds-badge">.ds-badge - Badge (12px)</span></div>
+            <div><span className="ds-micro">.ds-micro - Micro (11px)</span></div>
+            <div><span className="ds-code">.ds-code - Inline code</span></div>
           </div>
         </div>
       </Section>
 
       <Section title="Cards">
         <div className="ds-card" style={{ padding: 24 }}>
-          <p className="ds-label" style={{ marginBottom: 8 }}>.ds-card — default</p>
+          <p className="ds-label" style={{ marginBottom: 8 }}>.ds-card - default</p>
           <div className="ds-card" style={{ padding: 16 }}>
             Content inside a card
           </div>
         </div>
         <div style={{ height: 12 }} />
         <div className="ds-card" style={{ padding: 24 }}>
-          <p className="ds-label" style={{ marginBottom: 8 }}>.ds-card — hover me</p>
+          <p className="ds-label" style={{ marginBottom: 8 }}>.ds-card - hover me</p>
           <div className="ds-card" style={{ padding: 16, cursor: "pointer" }}
             onMouseEnter={e => { (e.target as HTMLElement).style.boxShadow = "var(--shadow-card-hover)"; (e.target as HTMLElement).style.borderColor = "var(--color-border-hover)" }}
             onMouseLeave={e => { (e.target as HTMLElement).style.boxShadow = "var(--shadow-card)"; (e.target as HTMLElement).style.borderColor = "var(--color-border)" }}>

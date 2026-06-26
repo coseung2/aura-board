@@ -16,7 +16,7 @@ type Props = {
 };
 
 /**
- * card-file-attachment — 통일된 파일 카드 렌더.
+ * card-file-attachment - 통일된 파일 카드 렌더.
  *
  * 아이콘 + 원본 파일명 + 크기/유형 라벨 + 다운로드 버튼 4요소로 구성.
  * PDF도 동일 렌더. 초기 버전의 iframe 인라인 뷰어는 Vercel Blob
@@ -46,7 +46,7 @@ export const CardFileAttachment = memo(function CardFileAttachment({
           {displayName}
         </span>
         <span className="card-attach-file-meta">
-          {fileSize ? formatBytes(fileSize) : "—"} · {label}
+          {fileSize ? formatBytes(fileSize) : "-"} · {label}
         </span>
       </div>
       <a

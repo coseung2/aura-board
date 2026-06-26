@@ -43,7 +43,8 @@ function parseRows(rows: unknown[][]): ParsedStudent[] {
     if (!row || row.length < 2) continue;
     const numVal = row[0];
     const nameVal = row[1];
-    const num = typeof numVal === "number" ? numVal : parseInt(String(numVal), 10);
+    const num =
+      typeof numVal === "number" ? numVal : parseInt(String(numVal), 10);
     const name = String(nameVal).trim();
     if (!isNaN(num) && num > 0 && name) {
       students.push({ number: num, name });
@@ -56,7 +57,7 @@ function parseCsvData(text: string): ParsedStudent[] {
   return parseRows(
     text
       .split(/\r\n|\n|\r/)
-      .map((line) => line.split(",").map((cell) => cell.trim()))
+      .map((line) => line.split(",").map((cell) => cell.trim())),
   );
 }
 
@@ -66,7 +67,12 @@ async function parseXlsxData(data: ArrayBuffer): Promise<ParsedStudent[]> {
   return parseRows(rows);
 }
 
-export function AddStudentsModal({ open, classroomId, onClose, onAdded }: Props) {
+export function AddStudentsModal({
+  open,
+  classroomId,
+  onClose,
+  onAdded,
+}: Props) {
   const [mode, setMode] = useState<"text" | "file">("file");
   const [text, setText] = useState("");
   const [fileStudents, setFileStudents] = useState<ParsedStudent[]>([]);
@@ -81,7 +87,7 @@ export function AddStudentsModal({ open, classroomId, onClose, onAdded }: Props)
     mode === "text" &&
     text.split("\n").filter((l) => l.trim()).length !== parsed.length;
 
-  // 학생별 이름 유효성 검증 — 행 단위 에러 표시 + 1건이라도 오류면 submit 차단.
+  // 학생별 이름 유효성 검증 - 행 단위 에러 표시 + 1건이라도 오류면 submit 차단.
   const validated = useMemo(
     () =>
       parsed.map((s) => {
@@ -92,7 +98,7 @@ export function AddStudentsModal({ open, classroomId, onClose, onAdded }: Props)
           error: result.ok ? null : result.error,
         };
       }),
-    [parsed]
+    [parsed],
   );
   const invalidCount = validated.filter((v) => v.error).length;
 
@@ -125,7 +131,7 @@ export function AddStudentsModal({ open, classroomId, onClose, onAdded }: Props)
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (parsed.length === 0) return;
-    // 이름 검증 실패한 행이 있으면 submit 차단 — early return.
+    // 이름 검증 실패한 행이 있으면 submit 차단 - early return.
     if (invalidCount > 0) return;
 
     setBusy(true);
@@ -172,7 +178,10 @@ export function AddStudentsModal({ open, classroomId, onClose, onAdded }: Props)
                 padding: "8px 0",
                 borderRadius: 6,
                 border: "1px solid var(--color-border, #e2e8f0)",
-                background: mode === "file" ? "var(--color-primary, #3b82f6)" : "transparent",
+                background:
+                  mode === "file"
+                    ? "var(--color-primary, #3b82f6)"
+                    : "transparent",
                 color: mode === "file" ? "#fff" : "inherit",
                 cursor: "pointer",
                 fontWeight: 500,
@@ -188,7 +197,10 @@ export function AddStudentsModal({ open, classroomId, onClose, onAdded }: Props)
                 padding: "8px 0",
                 borderRadius: 6,
                 border: "1px solid var(--color-border, #e2e8f0)",
-                background: mode === "text" ? "var(--color-primary, #3b82f6)" : "transparent",
+                background:
+                  mode === "text"
+                    ? "var(--color-primary, #3b82f6)"
+                    : "transparent",
                 color: mode === "text" ? "#fff" : "inherit",
                 cursor: "pointer",
                 fontWeight: 500,
@@ -285,7 +297,9 @@ export function AddStudentsModal({ open, classroomId, onClose, onAdded }: Props)
                 ? "파일을 업로드하세요"
                 : "번호와 이름을 입력하세요"}
             {hasInvalidLines && (
-              <span style={{ color: "var(--color-danger, #e53e3e)", marginLeft: 8 }}>
+              <span
+                style={{ color: "var(--color-danger, #e53e3e)", marginLeft: 8 }}
+              >
                 형식 오류가 있는 줄이 있습니다
               </span>
             )}
@@ -297,7 +311,7 @@ export function AddStudentsModal({ open, classroomId, onClose, onAdded }: Props)
                   marginLeft: 8,
                 }}
               >
-                이름 오류 {invalidCount}건 — 수정 후 다시 시도해 주세요
+                이름 오류 {invalidCount}건 - 수정 후 다시 시도해 주세요
               </span>
             )}
           </p>
@@ -318,7 +332,7 @@ export function AddStudentsModal({ open, classroomId, onClose, onAdded }: Props)
                 .filter((v) => v.error)
                 .map((v, i) => (
                   <li key={i}>
-                    {v.number}번 “{v.name}” — {v.error}
+                    {v.number}번 “{v.name}” - {v.error}
                   </li>
                 ))}
             </ul>

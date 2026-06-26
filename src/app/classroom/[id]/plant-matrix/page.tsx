@@ -30,8 +30,14 @@ export default async function PlantMatrixPage({
     <main className="board-page">
       <header className="board-header">
         <div className="board-header-left">
-          <Link href={`/classroom/${id}`} className="board-back-link" aria-label="학급으로">←</Link>
-          <h1 className="board-title">매트릭스 뷰 — {classroom.name}</h1>
+          <Link
+            href={`/classroom/${id}`}
+            className="board-back-link"
+            aria-label="학급으로"
+          >
+            ←
+          </Link>
+          <h1 className="board-title">매트릭스 뷰 - {classroom.name}</h1>
         </div>
       </header>
       {canAccess ? (
@@ -39,7 +45,9 @@ export default async function PlantMatrixPage({
       ) : (
         <div className="plant-matrix-forbidden">
           <h3>접근 권한이 없어요</h3>
-          <p style={{ color: "var(--color-text-muted)" }}>이 학급의 담임 계정으로 로그인해 주세요.</p>
+          <p style={{ color: "var(--color-text-muted)" }}>
+            이 학급의 담임 계정으로 로그인해 주세요.
+          </p>
         </div>
       )}
     </main>

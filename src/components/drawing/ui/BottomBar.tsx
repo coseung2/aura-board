@@ -84,7 +84,7 @@ export function BottomBar({
           className="ds-color-current"
           style={{ background: color }}
           onClick={onColorClick}
-          aria-label={`현재 색 ${color} — 피커 열기`}
+          aria-label={`현재 색 ${color} - 피커 열기`}
           title="색상 선택"
         />
         <div className="ds-colorbar-divider" aria-hidden="true" />

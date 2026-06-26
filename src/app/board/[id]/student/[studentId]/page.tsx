@@ -20,7 +20,9 @@ export default async function TeacherStudentPlantPage({
   const { id: boardParam, studentId } = await params;
 
   const [board, user] = await Promise.all([
-    db.board.findFirst({ where: { OR: [{ id: boardParam }, { slug: boardParam }] } }),
+    db.board.findFirst({
+      where: { OR: [{ id: boardParam }, { slug: boardParam }] },
+    }),
     getCurrentUser().catch(() => null),
   ]);
   if (!board) notFound();
@@ -81,14 +83,19 @@ export default async function TeacherStudentPlantPage({
       <main className="board-page">
         <div className="plant-teacher-banner" role="status">
           <span aria-hidden>👩‍🏫</span>
-          교사 모드 — <b>{student.name}</b>
-          <Link href={`/board/${board.id}`} className="plant-teacher-banner-back">
+          교사 모드 - <b>{student.name}</b>
+          <Link
+            href={`/board/${board.id}`}
+            className="plant-teacher-banner-back"
+          >
             ← 요약으로 돌아가기
           </Link>
         </div>
         <div className="plant-empty-state">
           <h2>아직 식물을 고르지 않았어요</h2>
-          <p>{student.name} 학생이 먼저 식물을 선택해야 관찰일지를 볼 수 있어요.</p>
+          <p>
+            {student.name} 학생이 먼저 식물을 선택해야 관찰일지를 볼 수 있어요.
+          </p>
         </div>
       </main>
     );

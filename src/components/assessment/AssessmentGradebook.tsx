@@ -115,7 +115,7 @@ export function AssessmentGradebook({ templateId }: AssessmentGradebookProps) {
   return (
     <div className="assessment-gradebook">
       <div className="assessment-gradebook-head">
-        <h2 className="assessment-gradebook-title">{data.template.title} — 성적부</h2>
+        <h2 className="assessment-gradebook-title">{data.template.title} - 성적부</h2>
         <div className="assessment-gradebook-meta">
           제출 {submitted}/{data.rows.length}명 · 확정 {withEntries.length}명 · 공개 {releasedCount}명
         </div>

@@ -509,7 +509,7 @@ export function EditCardModal({ card, onSave, onClose }: Props) {
                           {a.fileName ?? "파일"}
                         </span>
                         <span className="modal-file-preview-meta">
-                          {a.fileSize ? formatBytes(a.fileSize) : "—"} ·{" "}
+                          {a.fileSize ? formatBytes(a.fileSize) : "-"} ·{" "}
                           {fileMimeToLabel(a.mimeType ?? "")}
                         </span>
                       </div>

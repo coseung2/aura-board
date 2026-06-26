@@ -1,5 +1,5 @@
 /**
- * /oauth/authorize — RFC 6749 Authorization Endpoint.
+ * /oauth/authorize - RFC 6749 Authorization Endpoint.
  *
  * Canva registers this URL in the app Developer Portal as "Authorization
  * server URL". Canva opens it in a popup with the standard OAuth query
@@ -62,19 +62,21 @@ export default async function AuthorizePage({
   if (q.response_type !== "code") {
     return renderError(
       "response_type가 올바르지 않아요.",
-      `response_type=${q.response_type ?? "(없음)"} — 'code'만 지원합니다.`
+      `response_type=${q.response_type ?? "(없음)"} - 'code'만 지원합니다.`,
     );
   }
 
   if (!q.client_id || !q.redirect_uri) {
     return renderError(
       "필수 파라미터가 누락됐어요.",
-      `client_id=${q.client_id ?? "(없음)"}\nredirect_uri=${q.redirect_uri ?? "(없음)"}`
+      `client_id=${q.client_id ?? "(없음)"}\nredirect_uri=${q.redirect_uri ?? "(없음)"}`,
     );
   }
 
   // [2] Client lookup.
-  const client = await db.oAuthClient.findUnique({ where: { id: q.client_id } });
+  const client = await db.oAuthClient.findUnique({
+    where: { id: q.client_id },
+  });
   if (!client) {
     return renderError("등록되지 않은 앱이에요.", `client_id=${q.client_id}`);
   }
@@ -83,7 +85,7 @@ export default async function AuthorizePage({
   if (!allowedRedirects.includes(q.redirect_uri)) {
     return renderError(
       "redirect_uri가 등록되지 않았어요.",
-      `redirect_uri=${q.redirect_uri}\n허용된 값:\n${allowedRedirects.join("\n")}`
+      `redirect_uri=${q.redirect_uri}\n허용된 값:\n${allowedRedirects.join("\n")}`,
     );
   }
 
@@ -97,7 +99,7 @@ export default async function AuthorizePage({
   if (unknown.length > 0) {
     return renderError(
       "허용되지 않은 scope가 포함됐어요.",
-      `허용: ${allowedScopes.join(", ")}\n요청: ${requestedList.join(", ")}`
+      `허용: ${allowedScopes.join(", ")}\n요청: ${requestedList.join(", ")}`,
     );
   }
 
@@ -106,13 +108,13 @@ export default async function AuthorizePage({
     if (!q.code_challenge || q.code_challenge_method !== "S256") {
       return renderError(
         "PKCE(code_challenge_method=S256)가 필요해요.",
-        `code_challenge=${q.code_challenge ?? "(없음)"}\nmethod=${q.code_challenge_method ?? "(없음)"}`
+        `code_challenge=${q.code_challenge ?? "(없음)"}\nmethod=${q.code_challenge_method ?? "(없음)"}`,
       );
     }
   }
 
   const authorizeUrl = `/oauth/authorize?${new URLSearchParams(
-    Object.entries(q).filter(([, v]) => v != null) as [string, string][]
+    Object.entries(q).filter(([, v]) => v != null) as [string, string][],
   ).toString()}`;
 
   // [4] Subject session lookup. Teacher (user) clients use NextAuth Google
@@ -124,7 +126,11 @@ export default async function AuthorizePage({
     }
     const session = await nextAuth();
     const teacherUser = session?.user
-      ? { id: session.user.id ?? "", name: session.user.name ?? "", email: session.user.email ?? "" }
+      ? {
+          id: session.user.id ?? "",
+          name: session.user.name ?? "",
+          email: session.user.email ?? "",
+        }
       : null;
     if (!teacherUser?.id) {
       redirect(`/login?callbackUrl=${encodeURIComponent(authorizeUrl)}`);
@@ -137,7 +143,11 @@ export default async function AuthorizePage({
           <input type="hidden" name="redirect_uri" value={q.redirect_uri} />
           <input type="hidden" name="scope" value={requested} />
           <input type="hidden" name="state" value={q.state ?? ""} />
-          <input type="hidden" name="code_challenge" value={q.code_challenge ?? ""} />
+          <input
+            type="hidden"
+            name="code_challenge"
+            value={q.code_challenge ?? ""}
+          />
           <input
             type="hidden"
             name="code_challenge_method"
@@ -145,8 +155,12 @@ export default async function AuthorizePage({
           />
 
           <div className="oauth-header">
-            <div className="oauth-app-icon" aria-hidden="true">✨</div>
-            <h1 className="oauth-title">{client.name}이 Aura-board 에 연결하려고 해요</h1>
+            <div className="oauth-app-icon" aria-hidden="true">
+              ✨
+            </div>
+            <h1 className="oauth-title">
+              {client.name}이 Aura-board 에 연결하려고 해요
+            </h1>
           </div>
 
           <div className="oauth-identity">
@@ -154,7 +168,10 @@ export default async function AuthorizePage({
             <div className="oauth-identity-value">
               👤 {teacherUser?.name ?? ""}
               {teacherUser?.email && (
-                <span className="oauth-identity-email"> · {teacherUser.email}</span>
+                <span className="oauth-identity-email">
+                  {" "}
+                  · {teacherUser.email}
+                </span>
               )}
             </div>
           </div>
@@ -163,12 +180,14 @@ export default async function AuthorizePage({
             <p className="oauth-scopes-head">앱이 할 수 있게 되는 것:</p>
             <ul className="oauth-scopes-list">
               {requestedList.includes("external:read") && (
-                <li>📖 회원님의 Aura-board 학급 평어·채점 결과를 읽기 (읽기 전용)</li>
+                <li>
+                  📖 회원님의 Aura-board 학급 평어·채점 결과를 읽기 (읽기 전용)
+                </li>
               )}
             </ul>
             <p className="oauth-scopes-note">
-              앱은 회원님의 비밀번호를 절대 볼 수 없고, 데이터를 수정·삭제하지 못합니다.
-              교사 설정 페이지에서 언제든 연결을 끊을 수 있어요.
+              앱은 회원님의 비밀번호를 절대 볼 수 없고, 데이터를 수정·삭제하지
+              못합니다. 교사 설정 페이지에서 언제든 연결을 끊을 수 있어요.
             </p>
           </div>
 
@@ -195,7 +214,7 @@ export default async function AuthorizePage({
     );
   }
 
-  // Student subject branch (Canva pairing — unchanged).
+  // Student subject branch (Canva pairing - unchanged).
   const student = await getCurrentStudent();
   if (!student) {
     redirect(`/student/login?return=${encodeURIComponent(authorizeUrl)}`);
@@ -211,7 +230,11 @@ export default async function AuthorizePage({
         <input type="hidden" name="redirect_uri" value={q.redirect_uri} />
         <input type="hidden" name="scope" value={requested} />
         <input type="hidden" name="state" value={q.state ?? ""} />
-        <input type="hidden" name="code_challenge" value={q.code_challenge ?? ""} />
+        <input
+          type="hidden"
+          name="code_challenge"
+          value={q.code_challenge ?? ""}
+        />
         <input
           type="hidden"
           name="code_challenge_method"
@@ -222,8 +245,12 @@ export default async function AuthorizePage({
         )}
 
         <div className="oauth-header">
-          <div className="oauth-app-icon" aria-hidden="true">🎨</div>
-          <h1 className="oauth-title">{client.name}이 Aura에 연결하려고 해요</h1>
+          <div className="oauth-app-icon" aria-hidden="true">
+            🎨
+          </div>
+          <h1 className="oauth-title">
+            {client.name}이 Aura에 연결하려고 해요
+          </h1>
         </div>
 
         <div className="oauth-identity">

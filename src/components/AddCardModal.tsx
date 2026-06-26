@@ -73,7 +73,7 @@ const COLOR_PRESETS = [
   "#fff3e0",
 ];
 
-// 파일 input accept 문자열 — 모달 JSX에서 여러 번 쓰여서 상수로 분리.
+// 파일 input accept 문자열 - 모달 JSX에서 여러 번 쓰여서 상수로 분리.
 const IMAGE_ACCEPT = "image/*";
 const VIDEO_ACCEPT = "video/*";
 const AUDIO_ACCEPT = "audio/*";
@@ -91,7 +91,7 @@ const FILE_ACCEPT =
 // 둘 다 비면 빈 문자열. 둘 중 하나만 있으면 그 줄만.
 export function buildLinkTextBlock(
   title: string | null | undefined,
-  description: string | null | undefined
+  description: string | null | undefined,
 ): string {
   const t = (title ?? "").trim();
   const d = (description ?? "").trim();
@@ -113,7 +113,7 @@ export function AddCardModal({
   const [linkUrl, setLinkUrl] = useState("");
   const [color, setColor] = useState<string | null>(null);
   const [sectionId, setSectionId] = useState(
-    defaultSectionId ?? sections?.[0]?.id ?? ""
+    defaultSectionId ?? sections?.[0]?.id ?? "",
   );
   const [showImage, setShowImage] = useState(false);
   const [showLink, setShowLink] = useState(false);
@@ -128,7 +128,7 @@ export function AddCardModal({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const resizeState = useRef<{ startY: number; startHeight: number } | null>(
-    null
+    null,
   );
   const [mounted, setMounted] = useState(false);
 
@@ -202,7 +202,7 @@ export function AddCardModal({
             // codex H3: 제출 전 authoritative 상한 검증.
             if (attachments.length > MAX_ATTACHMENTS_PER_CARD) {
               alert(
-                `첨부는 카드당 최대 ${MAX_ATTACHMENTS_PER_CARD}개까지 가능합니다.`
+                `첨부는 카드당 최대 ${MAX_ATTACHMENTS_PER_CARD}개까지 가능합니다.`,
               );
               return;
             }
@@ -223,11 +223,11 @@ export function AddCardModal({
               payloadAttachments.length > 0;
             if (!hasCardBody) return;
             // meta-download-zone (2026-06-13): linkTitle/linkDesc를 본문
-            // (content)에 Notion 스타일로 합쳐 저장 — 굵은 제목 / 한 줄 빈
+            // (content)에 Notion 스타일로 합쳐 저장 - 굵은 제목 / 한 줄 빈
             // 줄 / 설명. 카드 상세 모달은 이제 이걸 그대로 본문 영역에 표시.
             const linkTextBlock = buildLinkTextBlock(
               preview?.title,
-              preview?.description
+              preview?.description,
             );
             const mergedContent = linkTextBlock
               ? linkTextBlock + (content.trim() ? "\n\n" + content.trim() : "")
@@ -438,7 +438,7 @@ export function AddCardModal({
                   e.currentTarget.classList.remove("drag-over");
                   if (!canAddMore) return;
                   const fs = Array.from(e.dataTransfer.files).filter((f) =>
-                    f.type.startsWith("image/")
+                    f.type.startsWith("image/"),
                   );
                   if (fs.length > 0) void uploadMany(fs, "image");
                 }}
@@ -492,7 +492,7 @@ export function AddCardModal({
                           /api/link-preview/image proxy URL (Google User
                           Content blocked next/image's optimizer fetch
                           from the Vercel edge for channel avatars).
-                          Bypassing the optimizer is safe — the proxy
+                          Bypassing the optimizer is safe - the proxy
                           already enforces size + content-type limits. */}
                       <OptimizedImage
                         src={preview.image}
@@ -594,7 +594,7 @@ export function AddCardModal({
                   e.currentTarget.classList.remove("drag-over");
                   if (!canAddMore) return;
                   const fs = Array.from(e.dataTransfer.files).filter((f) =>
-                    f.type.startsWith("video/")
+                    f.type.startsWith("video/"),
                   );
                   if (fs.length > 0) void uploadMany(fs, "video");
                 }}
@@ -641,7 +641,7 @@ export function AddCardModal({
                           {a.fileName ?? "파일"}
                         </span>
                         <span className="modal-file-preview-meta">
-                          {a.fileSize ? formatBytes(a.fileSize) : "—"} ·{" "}
+                          {a.fileSize ? formatBytes(a.fileSize) : "-"} ·{" "}
                           {fileMimeToLabel(a.mimeType ?? "")}
                         </span>
                       </div>
@@ -705,8 +705,8 @@ export function AddCardModal({
                     : "클릭 또는 파일을 드래그 (여러 개 선택 가능)"}
                 </span>
                 <span className="modal-file-drop-hint">
-                  PDF · Word · Excel · PowerPoint · HWP · TXT · HTML · ZIP (파일당 최대
-                  50MB)
+                  PDF · Word · Excel · PowerPoint · HWP · TXT · HTML · ZIP
+                  (파일당 최대 50MB)
                 </span>
                 <input
                   ref={fileInputRef}
@@ -769,9 +769,8 @@ export function AddCardModal({
           </div>
         </form>
       </div>
-
     </>,
-    document.body
+    document.body,
   );
 }
 
@@ -785,7 +784,7 @@ function AddCardAuthorPicker({
   onChange: (rows: AuthorDraftRow[]) => void;
 }) {
   const [students, setStudents] = useState<StudentOption[] | null>(
-    classroomId ? null : []
+    classroomId ? null : [],
   );
   const [fetchError, setFetchError] = useState<string | null>(null);
 
@@ -848,7 +847,7 @@ function AddCardAuthorPicker({
 
   function updateRow(key: string, displayName: string) {
     onChange(
-      rows.map((row) => (row.key === key ? { ...row, displayName } : row))
+      rows.map((row) => (row.key === key ? { ...row, displayName } : row)),
     );
   }
 

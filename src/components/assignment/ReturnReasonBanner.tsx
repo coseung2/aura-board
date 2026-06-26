@@ -11,7 +11,7 @@ export function ReturnReasonBanner({ reason }: Props) {
         !
       </span>
       <div className="assign-return-banner__body">
-        <div className="assign-return-banner__title">반려됨 — 재제출 필요</div>
+        <div className="assign-return-banner__title">반려됨 - 재제출 필요</div>
         <div className="assign-return-banner__reason">{reason}</div>
       </div>
     </div>

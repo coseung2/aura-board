@@ -1,7 +1,7 @@
 "use client";
 
 // Teacher-only modal for grading MANUAL questions. Loaded with the
-// per-question queue from /api/.../manual-queue — shows one MANUAL
+// per-question queue from /api/.../manual-queue - shows one MANUAL
 // question at a time with every submitted student's answer. Teacher
 // taps [오답]/[정답] per row. PATCHes /api/assessment/submissions/
 // [sid]/manual with { questionId, correct }. After all items in the
@@ -163,7 +163,7 @@ export function AssessmentManualGradeModal({
       >
         <div className="quiz-modal-header">
           <h2 className="quiz-modal-title">
-            수동채점 — {active.questionOrder + 1}번
+            수동채점 - {active.questionOrder + 1}번
           </h2>
           <button
             type="button"

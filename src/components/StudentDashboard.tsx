@@ -11,7 +11,7 @@ type BoardItem = {
   slug: string;
   title: string;
   layout: string;
-  // BC-1: "LESSON" or "PLAY" — drives the lesson/play section split below.
+  // BC-1: "LESSON" or "PLAY" - drives the lesson/play section split below.
   category: "LESSON" | "PLAY";
   quizzes?: { roomCode: string; status: string }[];
   breakout?: StudentBreakout | null;
@@ -121,7 +121,7 @@ export function StudentDashboard({
     try {
       const res = await fetch(
         `/api/classrooms/${classroomId}/bank/fixed-deposits/${fdId}/cancel`,
-        { method: "POST" }
+        { method: "POST" },
       );
       if (!res.ok) {
         const msg = (await res.json().catch(() => ({}))).error;
@@ -129,7 +129,7 @@ export function StudentDashboard({
         return;
       }
       // Refetch wallet summary so the chip disappears. On failure we keep
-      // the current wallet state — the cancelled FD chip will remain briefly
+      // the current wallet state - the cancelled FD chip will remain briefly
       // stale, but a full router.refresh() would wipe the in-page error
       // message above and is overkill for a transient fetch blip.
       const fresh = await fetch("/api/my/wallet", { cache: "no-store" });
@@ -194,15 +194,17 @@ export function StudentDashboard({
                     const daysLeft = Math.max(
                       0,
                       Math.ceil(
-                        (new Date(fd.maturityDate).getTime() - Date.now()) / 86400000
-                      )
+                        (new Date(fd.maturityDate).getTime() - Date.now()) /
+                          86400000,
+                      ),
                     );
                     const isCancelling = cancellingFD === fd.id;
                     return (
                       <div key={fd.id} className="student-wallet-fd-chip">
                         <span className="student-wallet-fd-label">적금</span>
                         <strong>
-                          {fd.principal.toLocaleString()} {wallet.currency.unitLabel}
+                          {fd.principal.toLocaleString()}{" "}
+                          {wallet.currency.unitLabel}
                         </strong>
                         <span>
                           이자 {fd.monthlyRate}% · D-{daysLeft}
@@ -231,7 +233,9 @@ export function StudentDashboard({
               </div>
             </>
           ) : (
-            <div className="student-wallet-empty">통장 정보를 불러오는 중이에요.</div>
+            <div className="student-wallet-empty">
+              통장 정보를 불러오는 중이에요.
+            </div>
           )}
         </div>
       </section>
@@ -262,7 +266,10 @@ export function StudentDashboard({
           <p>아직 보드가 없어요.</p>
         </div>
       ) : (
-        <StudentBoardSections boards={boards} onOpenBreakout={setBreakoutModal} />
+        <StudentBoardSections
+          boards={boards}
+          onOpenBreakout={setBreakoutModal}
+        />
       )}
 
       {breakoutModal && (
@@ -281,19 +288,25 @@ export function StudentDashboard({
 // threaded in via props.
 type StudentBoardSectionsProps = {
   boards: BoardItem[];
-  onOpenBreakout: (modal: { sourceTitle: string; breakout: StudentBreakout } | null) => void;
+  onOpenBreakout: (
+    modal: { sourceTitle: string; breakout: StudentBreakout } | null,
+  ) => void;
 };
 
-function StudentBoardSections({ boards, onOpenBreakout }: StudentBoardSectionsProps) {
+function StudentBoardSections({
+  boards,
+  onOpenBreakout,
+}: StudentBoardSectionsProps) {
   const router = useRouter();
+  const [activeCategory, setActiveCategory] = useState<"LESSON" | "PLAY">(() =>
+    boards.some((b) => b.category === "LESSON") ? "LESSON" : "PLAY",
+  );
   const lessonBoards = boards.filter((b) => b.category === "LESSON");
   const playBoards = boards.filter((b) => b.category === "PLAY");
+  const activeBoards = activeCategory === "LESSON" ? lessonBoards : playBoards;
 
   const renderCard = (board: BoardItem) => {
-    const quizCode =
-      board.layout === "quiz" && board.quizzes?.[0]?.roomCode;
-    // BC-2: play-category boards link to the Kordle play surface by default.
-    // The play page itself validates the KordleGame attachment.
+    const quizCode = board.layout === "quiz" && board.quizzes?.[0]?.roomCode;
     const href = quizCode
       ? `/quiz/${quizCode}`
       : board.category === "PLAY"
@@ -334,28 +347,37 @@ function StudentBoardSections({ boards, onOpenBreakout }: StudentBoardSectionsPr
     );
   };
 
-  const renderGrid = (sectionBoards: BoardItem[]) => (
-    <div className="student-board-grid">
-      {sectionBoards.map((board) => renderCard(board))}
-    </div>
-  );
-
   return (
     <>
-      <section className="student-section" aria-label="수업 보드">
-        <h3 className="student-section-title">
-          수업 보드 <span className="student-section-count">{lessonBoards.length}개</span>
-        </h3>
-        {renderGrid(lessonBoards)}
-      </section>
-      {playBoards.length > 0 && (
-        <section className="student-section" aria-label="놀이 보드">
-          <h3 className="student-section-title">
-            놀이 보드 <span className="student-section-count">{playBoards.length}개</span>
-          </h3>
-          {renderGrid(playBoards)}
-        </section>
-      )}
+      <div className="board-section-tabs" role="tablist" aria-label="보드 구분">
+        <div className="board-section-tabs-list">
+          <button
+            type="button"
+            role="tab"
+            aria-selected={activeCategory === "LESSON"}
+            className={`board-section-tab ${activeCategory === "LESSON" ? "is-active" : ""}`}
+            onClick={() => setActiveCategory("LESSON")}
+          >
+            수업
+            <span className="board-section-tab-count">
+              {lessonBoards.length}
+            </span>
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={activeCategory === "PLAY"}
+            className={`board-section-tab ${activeCategory === "PLAY" ? "is-active" : ""}`}
+            onClick={() => setActiveCategory("PLAY")}
+          >
+            놀이
+            <span className="board-section-tab-count">{playBoards.length}</span>
+          </button>
+        </div>
+      </div>
+      <div className="student-board-grid">
+        {activeBoards.map((board) => renderCard(board))}
+      </div>
     </>
   );
 }
@@ -392,7 +414,9 @@ function StudentBreakoutModal({
       }
       const data = await res.json().catch(() => ({}));
       if (res.status === 409 && data.membership?.sectionId) {
-        router.push(`/board/${breakout.boardSlug}/s/${data.membership.sectionId}`);
+        router.push(
+          `/board/${breakout.boardSlug}/s/${data.membership.sectionId}`,
+        );
         return;
       }
       if (data.error === "capacity_reached") {

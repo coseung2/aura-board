@@ -21,7 +21,7 @@ interface Props {
 }
 
 /**
- * StageDetailSheet — now wraps the generic SidePanel primitive so the
+ * StageDetailSheet - now wraps the generic SidePanel primitive so the
  * sheet/dialog behavior (ESC, scroll lock, focus trap) is shared with
  * SectionActionsPanel. Content markup (plant-obs-*, plant-sheet-points)
  * is preserved for CSS continuity.
@@ -159,7 +159,7 @@ export function StageDetailSheet({
               title={
                 hasPhotosOnCurrent
                   ? "다음 단계로"
-                  : "사진이 없어요 — 사유를 적게 됩니다"
+                  : "사진이 없어요 - 사유를 적게 됩니다"
               }
             >
               다음 단계로 →

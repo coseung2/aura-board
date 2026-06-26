@@ -36,6 +36,11 @@ export function GroupRosterEditor({
     return map;
   }, [groups]);
 
+  const unassignedStudents = useMemo(
+    () => students.filter((s) => !assignmentByStudent.has(s.id)),
+    [students, assignmentByStudent],
+  );
+
   function updateGroupName(groupIndex: number, name: string) {
     onChange(
       groups.map((group, index) =>
@@ -62,10 +67,7 @@ export function GroupRosterEditor({
   }
 
   function addGroup() {
-    onChange([
-      ...groups,
-      { name: `${groups.length + 1}모둠`, studentIds: [] },
-    ]);
+    onChange([...groups, { name: `${groups.length + 1}모둠`, studentIds: [] }]);
   }
 
   function removeGroup(groupIndex: number) {
@@ -73,7 +75,10 @@ export function GroupRosterEditor({
   }
 
   function autoDistribute() {
-    const count = Math.max(1, groups.length || Math.min(4, students.length || 1));
+    const count = Math.max(
+      1,
+      groups.length || Math.min(4, students.length || 1),
+    );
     const next = Array.from({ length: count }, (_, index) => ({
       name: groups[index]?.name?.trim() || `${index + 1}모둠`,
       studentIds: [] as string[],
@@ -119,49 +124,94 @@ export function GroupRosterEditor({
         ))}
       </div>
 
-      <div className="group-roster-table-wrap">
-        <table className="group-roster-table">
-          <thead>
-            <tr>
-              <th>학생</th>
-              <th>모둠</th>
-            </tr>
-          </thead>
-          <tbody>
-            {students.map((student) => {
-              const assigned = assignmentByStudent.get(student.id);
-              return (
-                <tr key={student.id}>
-                  <td>
-                    {student.number != null
-                      ? `${student.number}번 ${student.name}`
-                      : student.name}
-                  </td>
-                  <td>
-                    <select
-                      value={assigned == null ? UNASSIGNED : String(assigned)}
-                      onChange={(event) =>
-                        assignStudent(student.id, event.target.value)
-                      }
-                      disabled={disabled || groups.length === 0}
-                    >
-                      <option value={UNASSIGNED}>미배정</option>
-                      {groups.map((group, groupIndex) => (
-                        <option value={groupIndex} key={groupIndex}>
-                          {group.name || `${groupIndex + 1}모둠`}
-                        </option>
-                      ))}
-                    </select>
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-        {students.length === 0 && (
-          <p className="group-roster-empty">학생을 먼저 추가하세요.</p>
-        )}
-      </div>
+      {students.length > 0 && (
+        <div className="group-roster-grid">
+          {groups.map((group, groupIndex) => {
+            const members = students.filter(
+              (s) => assignmentByStudent.get(s.id) === groupIndex,
+            );
+            return (
+              <div className="group-roster-card" key={groupIndex}>
+                <div className="group-roster-card-head">
+                  <span className="group-roster-card-index">
+                    {groupIndex + 1}
+                  </span>
+                  <strong>{group.name || `${groupIndex + 1}모둠`}</strong>
+                  <span className="group-roster-card-count">
+                    {members.length}명
+                  </span>
+                </div>
+                <div className="group-roster-card-body">
+                  {members.length === 0 ? (
+                    <span className="group-roster-card-empty">학생 없음</span>
+                  ) : (
+                    members.map((student) => (
+                      <div className="group-roster-member" key={student.id}>
+                        <span>
+                          {student.number != null
+                            ? `${student.number}번 ${student.name}`
+                            : student.name}
+                        </span>
+                        <select
+                          value={groupIndex}
+                          onChange={(event) =>
+                            assignStudent(student.id, event.target.value)
+                          }
+                          disabled={disabled || groups.length === 0}
+                          aria-label="모둠 변경"
+                        >
+                          {groups.map((g, i) => (
+                            <option value={i} key={i}>
+                              {g.name || `${i + 1}모둠`}
+                            </option>
+                          ))}
+                          <option value={UNASSIGNED}>미배정</option>
+                        </select>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {unassignedStudents.length > 0 && (
+        <div className="group-roster-unassigned">
+          <strong>미배정 ({unassignedStudents.length}명)</strong>
+          <div className="group-roster-member-list">
+            {unassignedStudents.map((student) => (
+              <div className="group-roster-member" key={student.id}>
+                <span>
+                  {student.number != null
+                    ? `${student.number}번 ${student.name}`
+                    : student.name}
+                </span>
+                <select
+                  value={UNASSIGNED}
+                  onChange={(event) =>
+                    assignStudent(student.id, event.target.value)
+                  }
+                  disabled={disabled || groups.length === 0}
+                  aria-label="모둠 배정"
+                >
+                  <option value={UNASSIGNED}>배정</option>
+                  {groups.map((g, i) => (
+                    <option value={i} key={i}>
+                      {g.name || `${i + 1}모둠`}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {students.length === 0 && (
+        <p className="group-roster-empty">학생을 먼저 추가하세요.</p>
+      )}
     </div>
   );
 }

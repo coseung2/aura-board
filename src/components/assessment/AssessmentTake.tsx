@@ -2,7 +2,7 @@
 
 // OMR-style student take view. Shows a bubble grid (question × choice)
 // with a sticky timer. Answers auto-save with 300ms debounce. The exam
-// text is on the printed paper — only the answer grid is digital.
+// text is on the printed paper - only the answer grid is digital.
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { AssessmentTemplateStudentDTO } from "@/types/assessment";
@@ -94,7 +94,7 @@ export function AssessmentTake({ templateId, onSubmitted }: AssessmentTakeProps)
   const timers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
   const selectAnswer = useCallback(
     (questionId: string, choiceId: string) => {
-      // 복수 정답 허용 — 같은 버블 재클릭 시 해제, 아니면 set 에 추가.
+      // 복수 정답 허용 - 같은 버블 재클릭 시 해제, 아니면 set 에 추가.
       const current = answers[questionId] ?? [];
       const nextSelected = current.includes(choiceId)
         ? current.filter((id) => id !== choiceId)
@@ -132,7 +132,7 @@ export function AssessmentTake({ templateId, onSubmitted }: AssessmentTakeProps)
 
   const saveManual = useCallback(
     (questionId: string, raw: string) => {
-      // 수동채점은 자유 텍스트 — 공백/줄바꿈 유지. 500자 제한.
+      // 수동채점은 자유 텍스트 - 공백/줄바꿈 유지. 500자 제한.
       const text = raw.slice(0, 500);
       setShortAnswers((prev) => ({ ...prev, [questionId]: text }));
       if (state.kind !== "ready") return;
@@ -254,7 +254,7 @@ export function AssessmentTake({ templateId, onSubmitted }: AssessmentTakeProps)
         <span className="assessment-take-timer-icon">⏱</span>
         <span className="assessment-take-timer-value">{mm}:{ss}</span>
         <span className="assessment-take-timer-label">
-          {expired ? "시간 종료 — 제출해주세요" : "남은 시간"}
+          {expired ? "시간 종료 - 제출해주세요" : "남은 시간"}
         </span>
         <span className="assessment-take-save">
           {saveState === "saving" ? "저장 중" : saveState === "saved" ? "저장됨" : ""}

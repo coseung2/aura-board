@@ -59,7 +59,7 @@ export function SectionShareClient({ boardId, sectionId, initialToken }: Props) 
       setStatus("복사됨 ✓");
       window.setTimeout(() => setStatus(""), 1500);
     } catch {
-      setStatus("복사 실패 — 수동으로 복사해 주세요");
+      setStatus("복사 실패 - 수동으로 복사해 주세요");
     }
   }
 

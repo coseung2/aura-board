@@ -258,7 +258,7 @@ export function EventSignupForm({
               onChange={(e) => setAns(q.id, e.target.value)}
               required={q.required}
             >
-              <option value="">— 선택 —</option>
+              <option value="">- 선택 -</option>
               {(q.options ?? []).map((o) => (
                 <option key={o} value={o}>
                   {o}

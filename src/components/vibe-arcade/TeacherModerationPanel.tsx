@@ -64,7 +64,10 @@ export function TeacherModerationPanel({ boardId, onClose, onChange }: Props) {
         { cache: "no-store" },
       );
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const data = (await res.json()) as { items: ModerationItem[]; counts: CountsByStatus };
+      const data = (await res.json()) as {
+        items: ModerationItem[];
+        counts: CountsByStatus;
+      };
       setItems(data.items);
       setCounts(data.counts);
     } catch (e) {
@@ -81,7 +84,8 @@ export function TeacherModerationPanel({ boardId, onClose, onChange }: Props) {
   async function act(projectId: string, action: "approve" | "reject") {
     let note: string | undefined;
     if (action === "reject") {
-      note = window.prompt("거부 사유를 입력하세요 (학생에게 공개)") ?? undefined;
+      note =
+        window.prompt("거부 사유를 입력하세요 (학생에게 공개)") ?? undefined;
       if (!note) return; // 빈 사유 취소
     }
     setBusyId(projectId);
@@ -108,8 +112,13 @@ export function TeacherModerationPanel({ boardId, onClose, onChange }: Props) {
       <div className="modal-backdrop" onClick={onClose} />
       <div className="va-mod-modal">
         <div className="va-mod-modal-header">
-          <h2 className="va-mod-modal-title">📝 코딩 교실 — 모더레이션</h2>
-          <button type="button" className="modal-close" onClick={onClose} aria-label="닫기">
+          <h2 className="va-mod-modal-title">📝 코딩 교실 - 모더레이션</h2>
+          <button
+            type="button"
+            className="modal-close"
+            onClick={onClose}
+            aria-label="닫기"
+          >
             ×
           </button>
         </div>
@@ -139,7 +148,9 @@ export function TeacherModerationPanel({ boardId, onClose, onChange }: Props) {
           {err ? (
             <div className="va-mod-error" role="alert">
               불러오기 실패: {err}
-              <button type="button" onClick={load}>재시도</button>
+              <button type="button" onClick={load}>
+                재시도
+              </button>
             </div>
           ) : loading ? (
             <div className="va-mod-loading">불러오는 중…</div>

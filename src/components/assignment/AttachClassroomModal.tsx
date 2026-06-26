@@ -65,7 +65,9 @@ export function AttachClassroomModal({
           <h2 className="modal-title">
             {mode === "attach" ? "학급 배당하기" : "새 학생 동기화"}
           </h2>
-          <button type="button" className="modal-close" onClick={onClose}>×</button>
+          <button type="button" className="modal-close" onClick={onClose}>
+            ×
+          </button>
         </div>
         <div className="modal-body">
           {mode === "attach" && (
@@ -74,9 +76,7 @@ export function AttachClassroomModal({
                 학급을 선택하면 학생 수만큼 과제 slot이 자동 생성됩니다.
               </p>
               {classrooms.length === 0 ? (
-                <p className="create-board-hint">
-                  먼저 학급을 만들어 주세요.
-                </p>
+                <p className="create-board-hint">먼저 학급을 만들어 주세요.</p>
               ) : (
                 <div className="layout-picker">
                   {classrooms.map((c) => {
@@ -98,9 +98,9 @@ export function AttachClassroomModal({
                         <span className="layout-option-label">{c.name}</span>
                         <span className="layout-option-desc">
                           {over
-                            ? `학생 ${c.studentCount}명 — 최대 ${ASSIGNMENT_MAX_SLOTS}명까지만 가능`
+                            ? `학생 ${c.studentCount}명 - 최대 ${ASSIGNMENT_MAX_SLOTS}명까지만 가능`
                             : empty
-                              ? "학생 0명 — 먼저 학생을 추가하세요"
+                              ? "학생 0명 - 먼저 학생을 추가하세요"
                               : `학생 ${c.studentCount}명 → slot ${c.studentCount}개 생성`}
                         </span>
                       </button>
@@ -114,8 +114,13 @@ export function AttachClassroomModal({
           {mode === "sync" && (
             <>
               <p className="create-board-hint">
-                {boundClassroomName ? <strong>{boundClassroomName}</strong> : "연결된 학급"} 에서 새 학생{" "}
-                <strong>{newStudentCount ?? 0}명</strong>을 slot으로 추가합니다.
+                {boundClassroomName ? (
+                  <strong>{boundClassroomName}</strong>
+                ) : (
+                  "연결된 학급"
+                )}{" "}
+                에서 새 학생 <strong>{newStudentCount ?? 0}명</strong>을
+                slot으로 추가합니다.
               </p>
               <div className="modal-actions" style={{ marginTop: 16 }}>
                 <button

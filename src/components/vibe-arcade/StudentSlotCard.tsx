@@ -18,19 +18,19 @@ type Props = {
 };
 
 const STATUS_LABEL: Record<VibeSlotStatus, string> = {
-  "empty": "아직 없음",
+  empty: "아직 없음",
   "in-progress": "작업 중",
   "needs-review": "선생님 확인 중",
-  "submitted": "완성",
-  "returned": "수정 요청",
+  submitted: "완성",
+  returned: "수정 요청",
 };
 
 const STATUS_PILL_CLASS: Record<VibeSlotStatus, string> = {
-  "empty": "vs-pill vs-pill-empty",
+  empty: "vs-pill vs-pill-empty",
   "in-progress": "vs-pill vs-pill-draft",
   "needs-review": "vs-pill vs-pill-review",
-  "submitted": "vs-pill vs-pill-submitted",
-  "returned": "vs-pill vs-pill-returned",
+  submitted: "vs-pill vs-pill-submitted",
+  returned: "vs-pill vs-pill-returned",
 };
 
 export function StudentSlotCard({ slot, isSelf, isTeacher, onOpen }: Props) {
@@ -40,11 +40,11 @@ export function StudentSlotCard({ slot, isSelf, isTeacher, onOpen }: Props) {
 
   const cta = (() => {
     if (!isSelf && !isTeacher) return null;
-    if (isSelf && isEmpty)         return "+ 만들기";
+    if (isSelf && isEmpty) return "+ 만들기";
     if (isSelf && status === "in-progress") return "이어하기 →";
-    if (isSelf && status === "returned")    return "다시 쓰기 →";
+    if (isSelf && status === "returned") return "다시 쓰기 →";
     if (isTeacher && status === "needs-review") return "검토하기 →";
-    if (isTeacher && status === "submitted")    return "보기 →";
+    if (isTeacher && status === "submitted") return "보기 →";
     return null;
   })();
 
@@ -54,7 +54,7 @@ export function StudentSlotCard({ slot, isSelf, isTeacher, onOpen }: Props) {
       className={`vs-slot${isSelf ? " is-self" : ""}${isEmpty ? " is-empty" : ""}`}
       onClick={canInteract && onOpen ? () => onOpen(slot) : undefined}
       disabled={!canInteract || !cta}
-      aria-label={`${slot.studentName} — ${STATUS_LABEL[status]}`}
+      aria-label={`${slot.studentName} - ${STATUS_LABEL[status]}`}
     >
       <header className="vs-slot-header">
         <span className="vs-slot-name">
@@ -64,7 +64,9 @@ export function StudentSlotCard({ slot, isSelf, isTeacher, onOpen }: Props) {
           {slot.studentName}
           {isSelf && <span className="vs-self-badge">나</span>}
         </span>
-        <span className={STATUS_PILL_CLASS[status]}>{STATUS_LABEL[status]}</span>
+        <span className={STATUS_PILL_CLASS[status]}>
+          {STATUS_LABEL[status]}
+        </span>
       </header>
 
       {slot.project ? (
@@ -86,7 +88,9 @@ export function StudentSlotCard({ slot, isSelf, isTeacher, onOpen }: Props) {
         </div>
       ) : (
         <div className="vs-slot-body vs-slot-body-empty">
-          <span className="vs-slot-empty-icon" aria-hidden>✨</span>
+          <span className="vs-slot-empty-icon" aria-hidden>
+            ✨
+          </span>
           <p className="vs-slot-empty-hint">
             {isSelf ? "아직 시작하지 않았어요." : "아직 없어요."}
           </p>

@@ -7,7 +7,7 @@ import { cloneStructure } from "@/lib/breakout";
 import { CardAttachments } from "@/components/CardAttachments";
 
 /**
- * /board/[id]/archive — Teacher read-only archive for a breakout session (BR-9).
+ * /board/[id]/archive - Teacher read-only archive for a breakout session (BR-9).
  * Aggregates per-group card counts, active-student counts, last activity time.
  */
 export default async function BreakoutArchivePage({
@@ -177,12 +177,12 @@ export default async function BreakoutArchivePage({
               <tr key={g.groupIndex} style={{ borderBottom: "1px solid var(--color-border,#eee)" }}>
                 <td style={{ padding: 6 }}>모둠 {g.groupIndex}</td>
                 <td style={{ padding: 6 }}>
-                  {g.memberNames.length > 0 ? g.memberNames.join(", ") : "—"}
+                  {g.memberNames.length > 0 ? g.memberNames.join(", ") : "-"}
                 </td>
                 <td style={{ padding: 6, textAlign: "right" }}>{g.cardCount}</td>
                 <td style={{ padding: 6, textAlign: "right" }}>{g.activeStudents}</td>
                 <td style={{ padding: 6, textAlign: "right" }}>
-                  {g.lastActivity ? g.lastActivity.toLocaleString("ko-KR") : "—"}
+                  {g.lastActivity ? g.lastActivity.toLocaleString("ko-KR") : "-"}
                 </td>
               </tr>
             ))}

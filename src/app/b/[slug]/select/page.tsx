@@ -6,7 +6,7 @@ import { cloneStructure } from "@/lib/breakout";
 import { BreakoutSelectClient } from "@/components/BreakoutSelectClient";
 
 /**
- * /b/[slug]/select — Student self-select landing page (BR-5).
+ * /b/[slug]/select - Student self-select landing page (BR-5).
  *
  * Resolves a breakout board by slug, verifies the calling student belongs to
  * the board's classroom, and renders the group grid with current occupancy.
@@ -20,7 +20,13 @@ export default async function BreakoutSelectPage({
   const { slug } = await params;
   const board = await db.board.findFirst({
     where: { OR: [{ slug }, { id: slug }] },
-    select: { id: true, slug: true, title: true, classroomId: true, layout: true },
+    select: {
+      id: true,
+      slug: true,
+      title: true,
+      classroomId: true,
+      layout: true,
+    },
   });
   if (!board || board.layout !== "breakout") notFound();
 
@@ -51,7 +57,10 @@ export default async function BreakoutSelectPage({
       <main className="board-page">
         <div className="forbidden-card">
           <h2>자율 선택 모드가 아니에요</h2>
-          <p>이 수업은 다른 배포 방식으로 운영 중이에요. 교사 안내를 확인해 주세요.</p>
+          <p>
+            이 수업은 다른 배포 방식으로 운영 중이에요. 교사 안내를 확인해
+            주세요.
+          </p>
           <p>
             <Link href={`/board/${board.slug}`}>보드로 이동</Link>
           </p>
@@ -70,7 +79,9 @@ export default async function BreakoutSelectPage({
 
   // Parse structure to identify group sections (exclude teacher-pool).
   const structure = cloneStructure(assignment.template.structure);
-  const sharedTitles = new Set((structure.sharedSections ?? []).map((s) => s.title));
+  const sharedTitles = new Set(
+    (structure.sharedSections ?? []).map((s) => s.title),
+  );
 
   const allSections = await db.section.findMany({
     where: { boardId: board.id },
@@ -85,10 +96,15 @@ export default async function BreakoutSelectPage({
     where: { assignmentId: assignment.id },
     _count: { _all: true },
   });
-  const countBySection = new Map(counts.map((c) => [c.sectionId, c._count._all]));
+  const countBySection = new Map(
+    counts.map((c) => [c.sectionId, c._count._all]),
+  );
 
   // Regroup "모둠 N · Section" titles so we show 1 row per group index.
-  const groupedBy: Record<number, { id: string; title: string; count: number }[]> = {};
+  const groupedBy: Record<
+    number,
+    { id: string; title: string; count: number }[]
+  > = {};
   for (const s of groupSections) {
     const m = /^모둠\s+(\d+)\s+·\s+(.+)$/.exec(s.title);
     const gi = m ? Number(m[1]) : 0;
@@ -111,10 +127,14 @@ export default async function BreakoutSelectPage({
   return (
     <main className="board-page">
       <header className="board-header">
-        <Link href={`/board/${board.slug}`} className="board-back-link" aria-label="보드로">
+        <Link
+          href={`/board/${board.slug}`}
+          className="board-back-link"
+          aria-label="보드로"
+        >
           ←
         </Link>
-        <h1 className="board-title">{board.title} — 모둠 선택</h1>
+        <h1 className="board-title">{board.title} - 모둠 선택</h1>
       </header>
       <BreakoutSelectClient
         assignmentId={assignment.id}

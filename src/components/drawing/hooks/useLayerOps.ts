@@ -92,12 +92,12 @@ export function useLayerOps({
 
   // Stamps an external image (from /api/student-assets shared scope, or a
   // seeded design asset) onto a fresh layer. Scaled to fit the canvas
-  // while preserving aspect ratio — user can resize with new layer tools
+  // while preserving aspect ratio - user can resize with new layer tools
   // in a future iteration.
   const insertAsset = useCallback(
     async (asset: InsertableAsset) => {
       if (layers.length >= MAX_LAYERS) {
-        return; // silent — panel already shows the cap
+        return; // silent - panel already shows the cap
       }
       const img = new Image();
       img.crossOrigin = "anonymous";
@@ -110,7 +110,7 @@ export function useLayerOps({
       } catch {
         return;
       }
-      const name = asset.title ? `에셋 — ${asset.title}` : "에셋";
+      const name = asset.title ? `에셋 - ${asset.title}` : "에셋";
       const layer = createLayer({ name, size: canvasSize });
       const ctx = layer.canvas.getContext("2d");
       if (!ctx) return;

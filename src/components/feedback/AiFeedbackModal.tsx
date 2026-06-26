@@ -13,7 +13,7 @@ type Props = {
   roster?: RosterStudent[];
   /** 'art' v1 고정. */
   subject?: string;
-  /** 칼럼에서 진입했을 때 해당 sectionId — 서버가 그 칼럼 안 학생 카드 이미지를
+  /** 칼럼에서 진입했을 때 해당 sectionId - 서버가 그 칼럼 안 학생 카드 이미지를
    *  Gemini Vision 으로 함께 보낸다. assignment 채점 등 다른 진입점은 omit. */
   sectionId?: string | null;
   onClose: () => void;
@@ -37,7 +37,7 @@ function visionBadge(v: VisionStatus): { icon: string; title: string } {
     case "no_image_url":
       return { icon: "📝", title: "텍스트 전용 (학생 카드에 이미지 첨부가 없음)" };
     case "fetch_failed":
-      return { icon: "📝", title: "텍스트 전용 (이미지 fetch 실패 — 5초 timeout)" };
+      return { icon: "📝", title: "텍스트 전용 (이미지 fetch 실패 - 5초 timeout)" };
   }
 }
 
@@ -46,9 +46,9 @@ function visionBadge(v: VisionStatus): { icon: string; title: string } {
  *
  * 흐름:
  *   1. 학생 다중 선택 (전체 선택 토글 포함). preset 학생이 있으면 자동 체크.
- *   2. 단원 / 평가항목 입력 — 둘 다 선택. 비어있으면 "학기 전반" 톤으로 생성.
+ *   2. 단원 / 평가항목 입력 - 둘 다 선택. 비어있으면 "학기 전반" 톤으로 생성.
  *   3. "✨ N명 평어 생성·전송" 한 번 → 서버에서 동시 4 cap 으로 LLM 호출 + UPSERT.
- *   4. 결과 카드 — 학생별 평어 본문 + 실패 사유.
+ *   4. 결과 카드 - 학생별 평어 본문 + 실패 사유.
  */
 export function AiFeedbackModal({
   studentId: presetStudentId,
@@ -284,11 +284,11 @@ export function AiFeedbackModal({
             </p>
           </section>
 
-          {/* 3. 결과 — 생성 후에만 노출 */}
+          {/* 3. 결과 - 생성 후에만 노출 */}
           {results && (
             <section className="ai-feedback-modal__results">
               <header className="ai-feedback-modal__results-head">
-                생성 결과 — 성공 {successCount}명
+                생성 결과 - 성공 {successCount}명
                 {failureCount > 0 && ` · 실패 ${failureCount}명`}
                 <span className="ai-feedback-modal__results-saved">
                   (저장 완료, Aura 풀 즉시 반영{visionUsed && sectionId ? " · 비전 사용" : ""})
