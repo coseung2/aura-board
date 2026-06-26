@@ -1103,194 +1103,229 @@
 .plant-matrix-mini-strip span[data-current="true"] { outline: 2px solid #2563eb; }
 
 /* =====================================================
-   v4 — Variant A: Canva-style Gamified (2026-05-16)
+   Teacher plant dashboard — design-system aligned summary
    ===================================================== */
 
-/* ── Gamified hero gradient ── */
-.plant-hero-game {
-  background: linear-gradient(135deg, #2d6a4f 0%, #40916c 100%);
-  border-radius: 24px;
-  padding: 32px 36px;
-  color: white;
-  margin-bottom: 28px;
+
+/* ── Teacher summary hero ── */
+.plant-hero {
+  background: var(--color-surface);
+  border: var(--border-card);
+  border-radius: var(--radius-card);
+  padding: 24px;
+  color: var(--color-text);
+  margin-bottom: 24px;
   display: flex;
   justify-content: space-between;
   align-items: center;
+  gap: 16px;
+  box-shadow: var(--shadow-card);
 }
-.plant-hero-game h1 {
-  font-size: 26px;
-  font-weight: 800;
-  letter-spacing: -0.3px;
+.plant-hero h1 {
+  font-size: var(--text-display-size);
+  font-weight: var(--text-display-weight);
+  letter-spacing: var(--text-display-ls);
+  line-height: 1.2;
   margin: 0;
 }
-.plant-hero-game p {
+.plant-hero p {
   font-size: 14px;
-  opacity: 0.85;
+  color: var(--color-text-muted);
   margin: 6px 0 0;
 }
-.plant-hero-game-actions {
+.plant-hero-actions {
   display: flex;
   gap: 10px;
+  flex-shrink: 0;
+}
+@media (max-width: 640px) {
+  .plant-hero {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 14px;
+  }
+  .plant-hero-actions {
+    width: 100%;
+  }
+  .plant-hero-actions .ds-btn-primary,
+  .plant-hero-actions .ds-btn-secondary {
+    flex: 1;
+    text-align: center;
+    justify-content: center;
+  }
 }
 
-/* ── Game KPI cards ── */
-.plant-kpi-game-grid {
+/* ── KPI cards ── */
+.plant-kpi-grid {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 14px;
-  margin-bottom: 28px;
+  margin-bottom: 24px;
 }
-.plant-kpi-game-card {
+.plant-kpi-card {
   background: var(--color-surface);
-  border-radius: 20px;
-  padding: 22px 24px;
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.04);
-  transition: all 0.2s;
-  cursor: pointer;
+  border: var(--border-card);
+  border-radius: var(--radius-card);
+  padding: 18px 20px;
+  box-shadow: var(--shadow-card);
+  transition: box-shadow var(--t-slow), border-color var(--t-slow);
   position: relative;
   overflow: hidden;
-  border: none;
-  border-left: 4px solid transparent;
+  border-left: 3px solid transparent;
 }
-.plant-kpi-game-card:hover {
-  transform: translateY(-4px);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+.plant-kpi-card:hover {
+  border-color: var(--color-border-hover);
+  box-shadow: var(--shadow-card-hover);
 }
-.plant-kpi-game-card .kpi-icon { font-size: 26px; margin-bottom: 6px; }
-.plant-kpi-game-card .kpi-label {
+.plant-kpi-card .kpi-label {
   font-size: 11px;
   font-weight: 600;
   color: var(--color-text-muted);
   letter-spacing: 0.3px;
   text-transform: uppercase;
 }
-.plant-kpi-game-card .kpi-value {
-  font-size: 34px;
-  font-weight: 800;
-  margin: 4px 0;
-  letter-spacing: -1px;
+.plant-kpi-card .kpi-value {
+  font-size: 28px;
+  font-weight: 700;
+  margin: 8px 0 4px;
+  letter-spacing: -0.5px;
   line-height: 1;
 }
-.plant-kpi-game-card .kpi-sub {
+.plant-kpi-card .kpi-sub {
   font-size: 12px;
   color: var(--color-text-muted);
 }
-.plant-kpi-game-card .kpi-micro {
+.plant-kpi-card .kpi-micro {
   margin-top: 10px;
   height: 4px;
-  background: #ece6dc;
+  background: var(--color-surface-alt);
   border-radius: 4px;
   overflow: hidden;
 }
-.plant-kpi-game-card .kpi-micro-fill {
+.plant-kpi-card .kpi-micro-fill {
   height: 100%;
   border-radius: 4px;
   transition: width 0.4s;
 }
-.kpi-tone-green { border-left-color: #2d6a4f; }
-.kpi-tone-green .kpi-value { color: #2d6a4f; }
-.kpi-tone-green .kpi-micro-fill { background: #2d6a4f; }
-.kpi-tone-red { border-left-color: #d62828; }
-.kpi-tone-red .kpi-value { color: #d62828; }
-.kpi-tone-red .kpi-micro-fill { background: #d62828; }
-.kpi-tone-amber { border-left-color: #e9a820; }
-.kpi-tone-amber .kpi-value { color: #b8860b; }
-.kpi-tone-amber .kpi-micro-fill { background: #e9a820; }
-.kpi-tone-blue { border-left-color: #1d3557; }
-.kpi-tone-blue .kpi-value { color: #1d3557; }
-.kpi-tone-blue .kpi-micro-fill { background: #1d3557; }
+.kpi-tone-plant { border-left-color: var(--color-plant-active); }
+.kpi-tone-plant .kpi-value { color: var(--color-plant-active); }
+.kpi-tone-plant .kpi-micro-fill { background: var(--color-plant-active); }
+.kpi-tone-danger { border-left-color: var(--color-danger); }
+.kpi-tone-danger .kpi-value { color: var(--color-danger); }
+.kpi-tone-danger .kpi-micro-fill { background: var(--color-danger); }
+.kpi-tone-warn { border-left-color: var(--color-warning); }
+.kpi-tone-warn .kpi-value { color: #b45309; }
+.kpi-tone-warn .kpi-micro-fill { background: var(--color-warning); }
+.kpi-tone-info { border-left-color: var(--color-accent); }
+.kpi-tone-info .kpi-value { color: var(--color-accent); }
+.kpi-tone-info .kpi-micro-fill { background: var(--color-accent); }
+@media (max-width: 860px) {
+  .plant-kpi-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 560px) {
+  .plant-kpi-grid { grid-template-columns: 1fr; }
+}
 
-/* ── Stage distribution — vertical gradient bars (enhanced) ── */
-.plant-dist-game {
+/* ── Stage distribution bars ── */
+.plant-dist-chart {
   display: flex;
   align-items: flex-end;
-  gap: 6px;
-  height: 180px;
+  gap: 8px;
+  height: 160px;
   padding: 0 4px;
 }
-.plant-dist-game-wrap {
+.plant-dist-bar-wrap {
   flex: 1;
+  min-width: 24px;
   display: flex;
   flex-direction: column;
   align-items: center;
   height: 100%;
   justify-content: flex-end;
 }
-.plant-dist-game-bar {
+.plant-dist-bar {
   width: 100%;
-  max-width: 44px;
-  border-radius: 8px 8px 4px 4px;
-  background: linear-gradient(180deg, #52b788 0%, #40916c 100%);
-  transition: height 0.4s;
-  min-height: 6px;
+  max-width: 36px;
+  border-radius: 6px 6px 3px 3px;
+  background: var(--color-plant-active);
+  opacity: 0.3;
+  transition: height 0.4s, opacity 0.15s;
+  min-height: 4px;
   position: relative;
 }
-.plant-dist-game-wrap:hover .plant-dist-game-bar {
-  background: linear-gradient(180deg, #74c69d 0%, #52b788 100%);
+.plant-dist-bar-wrap:hover .plant-dist-bar {
+  opacity: 0.45;
 }
-.plant-dist-game-count {
+.plant-dist-count {
   font-size: 11px;
   font-weight: 700;
-  margin-bottom: 3px;
-  color: #2d6a4f;
+  margin-bottom: 4px;
+  color: var(--color-text);
 }
-.plant-dist-game-label {
+.plant-dist-label {
   font-size: 10px;
   color: var(--color-text-muted);
   margin-top: 4px;
 }
 
-/* ── Alert cards (avatar style) ── */
-.plant-alert-game {
-  list-style: none;
-  padding: 0;
-  margin: 0;
-  display: grid;
-  gap: 8px;
-}
-.plant-alert-game-card {
+/* ── Attention cards ── */
+.plant-attention-card {
   display: flex;
   align-items: center;
-  padding: 12px 14px;
-  border-radius: 14px;
-  background: #fef9ee;
-  transition: all 0.2s;
+  gap: 12px;
+  padding: 10px 12px;
+  border-radius: var(--radius-btn);
+  background: var(--color-surface);
+  border: var(--border-card);
+  transition: background var(--t-fast), border-color var(--t-fast);
   cursor: pointer;
-  border: none;
   font: inherit;
   text-align: left;
   width: 100%;
 }
-.plant-alert-game-card:hover {
-  background: #fef3d9;
-  transform: translateX(4px);
+.plant-attention-card:hover {
+  background: var(--color-surface-alt);
+  border-color: var(--color-border-hover);
 }
-.plant-alert-game-avatar {
-  width: 38px;
-  height: 38px;
-  border-radius: 12px;
-  background: #e9c46a;
+.plant-attention-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--color-surface-alt);
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 18px;
-  margin-right: 12px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--color-text-muted);
   flex-shrink: 0;
 }
-.plant-alert-game-info { flex: 1; min-width: 0; }
-.plant-alert-game-name { font-weight: 600; font-size: 14px; }
-.plant-alert-game-meta { font-size: 12px; color: var(--color-text-muted); }
-.plant-alert-game-badge {
-  background: #d62828;
-  color: white;
-  font-size: 10px;
-  font-weight: 700;
-  padding: 2px 10px;
-  border-radius: 20px;
+.plant-attention-info { flex: 1; min-width: 0; display: grid; gap: 2px; }
+.plant-attention-name { font-weight: 600; font-size: 14px; color: var(--color-text); }
+.plant-attention-meta { font-size: 12px; color: var(--color-text-muted); }
+.plant-attention-badge {
+  display: inline-block;
+  font-size: var(--text-badge-size);
+  font-weight: var(--text-badge-weight);
+  padding: 2px 8px;
+  border-radius: var(--radius-pill);
   flex-shrink: 0;
+}
+.plant-attention-badge.stalled {
+  background: var(--color-status-returned-bg);
+  color: var(--color-status-returned-text);
+}
+.plant-attention-badge.active {
+  background: var(--color-status-reviewed-bg);
+  color: var(--color-status-reviewed-text);
+}
+.plant-attention-badge.normal {
+  background: var(--color-accent-tinted-bg);
+  color: var(--color-accent-tinted-text);
 }
 
 .plant-attention-groups {
+  display: grid;
   gap: 10px;
   max-height: 400px;
   overflow-y: auto;
@@ -1488,34 +1523,35 @@
   color: var(--color-text);
 }
 
-/* ── Dashboard layout (enhanced) ── */
-.plant-dash-game {
+/* ── Dashboard layout ── */
+.plant-dash {
   display: grid;
   grid-template-columns: 1.6fr 1fr;
   gap: 18px;
-  margin-bottom: 28px;
+  margin-bottom: 24px;
 }
-.plant-panel-game {
-  background: #fff;
-  border: 1px solid rgba(15, 23, 42, 0.08);
-  border-radius: 20px;
-  padding: 24px;
-  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.05);
+.plant-panel {
+  background: var(--color-surface);
+  border: var(--border-card);
+  border-radius: var(--radius-card);
+  padding: 20px;
+  box-shadow: var(--shadow-card);
 }
-.plant-panel-game-head {
+.plant-panel-head {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  gap: 12px;
   margin-bottom: 16px;
 }
-.plant-panel-game-head h3 {
-  font-size: 16px;
-  font-weight: 700;
+.plant-panel-head h3 {
+  font-size: var(--text-section-size);
+  font-weight: var(--text-section-weight);
   margin: 0;
 }
-.plant-panel-game-eyebrow {
-  font-size: 11px;
-  font-weight: 600;
+.plant-panel-eyebrow {
+  font-size: var(--text-micro-size);
+  font-weight: var(--text-micro-weight);
   color: var(--color-text-muted);
   letter-spacing: 0.5px;
   text-transform: uppercase;
@@ -1524,7 +1560,7 @@
 @media (max-width: 1100px) {
   .plant-student-hero,
   .plant-teacher-dashboard-grid,
-  .plant-dash-game {
+  .plant-dash {
     grid-template-columns: 1fr;
   }
   .plant-matrix-layout {
@@ -2205,7 +2241,9 @@
   place-items: center;
   border-radius: 20px 20px 0 0;
   background: var(--color-surface-alt);
-  font-size: 52px;
+  font-size: 32px;
+  font-weight: 700;
+  color: var(--color-text-faint);
 }
 .plant-obs-detail-title {
   font-size: 15px;
@@ -2275,42 +2313,85 @@
   line-height: 1.2;
 }
 
-/* ── Recent Observations compact grid (12건: 4×3) ── */
+/* ── Recent Observations compact grid ── */
 .plant-teacher .plant-obs-feed {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 10px;
+  gap: 12px;
 }
 .plant-teacher .plant-obs-feed-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  width: 100%;
   padding: 0;
-  border-radius: 14px;
+  border: var(--border-card);
+  border-radius: var(--radius-card);
+  background: var(--color-surface);
+  cursor: pointer;
+  text-align: left;
+  font: inherit;
+  color: var(--color-text);
+  overflow: hidden;
+  aspect-ratio: 1 / 1;
+  box-shadow: var(--shadow-card);
+  transition: box-shadow var(--t-slow), border-color var(--t-slow), transform var(--t-slow);
 }
-.plant-teacher .plant-obs-feed-thumb,
+.plant-teacher .plant-obs-feed-card:hover {
+  border-color: var(--color-border-hover);
+  box-shadow: var(--shadow-card-hover);
+  transform: translateY(-2px);
+}
+.plant-teacher .plant-obs-feed-thumb {
+  width: 100%;
+  height: 70%;
+  border-radius: var(--radius-card) var(--radius-card) 0 0;
+  object-fit: cover;
+  background: var(--color-surface-alt);
+  display: block;
+}
 .plant-teacher .plant-obs-feed-noimg {
   width: 100%;
-  height: 100%;
-  border-radius: 0;
-}
-.plant-teacher .plant-obs-feed-noimg {
-  font-size: 36px;
+  height: 70%;
+  border-radius: var(--radius-card) var(--radius-card) 0 0;
+  display: grid;
+  place-items: center;
+  font-size: 28px;
+  font-weight: 700;
+  color: var(--color-text-faint);
+  background: var(--color-surface-alt);
 }
 .plant-teacher .plant-obs-feed-info {
-  gap: 3px;
-  padding: 34px 12px 11px;
+  position: static;
+  inset: auto;
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+  padding: 10px 12px 12px;
+  color: var(--color-text);
+  background: transparent;
+  text-shadow: none;
 }
 .plant-teacher .plant-obs-feed-student {
+  font-weight: 700;
   font-size: 13px;
-  font-weight: 800;
+  line-height: 1.3;
+  color: var(--color-text);
 }
 .plant-teacher .plant-obs-feed-plant {
-  font-size: 11px;
+  font-size: 12px;
+  color: var(--color-text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .plant-teacher .plant-obs-feed-memo {
-  font-size: 11px;
   display: none;
 }
 .plant-teacher .plant-obs-feed-time {
   font-size: 11px;
+  color: var(--color-text-faint);
 }
 
 @media (max-width: 1180px) {
