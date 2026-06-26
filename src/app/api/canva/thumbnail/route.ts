@@ -84,7 +84,13 @@ export async function GET(req: Request) {
       }
     }
     if (!url) {
-      return NextResponse.json({ error: "Canva thumbnail not found" }, { status: 502 });
+      // Expected "this design has no public thumbnail" outcome, not a
+      // proxy failure — return 404 so the consumer renders its placeholder
+      // and Vercel monitors do not page on an expected 5xx.
+      return NextResponse.json(
+        { error: "thumbnail_unavailable" },
+        { status: 404 }
+      );
     }
   }
 
@@ -122,9 +128,21 @@ export async function GET(req: Request) {
       const fallbackUrl = await resolveDesignThumbnailFromScreenUrl(parsed);
       const fallbackResponse = fallbackUrl ? await fetchThumbnailFallback(fallbackUrl, w) : null;
       if (fallbackResponse) return fallbackResponse;
+      // Upstream 4xx (404/410/etc) is a normal "thumbnail is gone" outcome
+      // for the consumer; only 5xx is a real proxy failure that we want to
+      // keep visible in Vercel logs.
+      if (upstream.status >= 500) {
+        console.warn(
+          `[GET /api/canva/thumbnail] upstream ${upstream.status} for ${parsed.hostname}${parsed.pathname}`,
+        );
+        return NextResponse.json(
+          { error: `Upstream ${upstream.status}` },
+          { status: 502 },
+        );
+      }
       return NextResponse.json(
-        { error: `Upstream ${upstream.status}` },
-        { status: 502 },
+        { error: "thumbnail_unavailable" },
+        { status: 404 },
       );
     }
 
@@ -133,9 +151,12 @@ export async function GET(req: Request) {
       const fallbackUrl = await resolveDesignThumbnailFromScreenUrl(parsed);
       const fallbackResponse = fallbackUrl ? await fetchThumbnailFallback(fallbackUrl, w) : null;
       if (fallbackResponse) return fallbackResponse;
+      // 200 with a non-image body means the URL is alive but is not a
+      // thumbnail (e.g. a login page or a redirect HTML). Treat as a
+      // missing resource for the consumer.
       return NextResponse.json(
-        { error: "Upstream did not return an image" },
-        { status: 502 },
+        { error: "thumbnail_unavailable" },
+        { status: 404 },
       );
     }
 
@@ -154,7 +175,12 @@ export async function GET(req: Request) {
       },
     });
   } catch (e) {
-    console.error("[GET /api/canva/thumbnail]", e);
+    // Real proxy failure (network error, TLS, abort, etc). Keep the 5xx so
+    // it shows up in Vercel alerts and we can investigate upstream.
+    console.warn(
+      `[GET /api/canva/thumbnail] fetch failed for ${parsed.toString()}`,
+      e,
+    );
     return NextResponse.json({ error: "Proxy failed" }, { status: 500 });
   }
 }

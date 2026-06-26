@@ -7,9 +7,10 @@
 // membership endpoint so the client can drop it into state straight away.
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import { Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
-import { getCurrentStudent } from "@/lib/student-auth";
+import { getCurrentStudentRaw } from "@/lib/student-auth";
 import { getEffectiveBoardRole, requirePermission, ForbiddenError } from "@/lib/rbac";
 import { touchBoardUpdatedAt } from "@/lib/board-touch";
 import {
@@ -45,10 +46,12 @@ export async function GET(
 ) {
   try {
     const { id: sectionId } = await ctx.params;
-    const [user, student] = await Promise.all([
-      getCurrentUser().catch(() => null),
-      getCurrentStudent(),
-    ]);
+    // Sequential under connection_limit=1: getCurrentStudent internally
+    // re-calls getCurrentUser, so the original Promise.all fired two
+    // concurrent user.findUnique calls. Resolve the user first and only
+    // consult the student cookie if no teacher session is active.
+    const user = await getCurrentUser().catch(() => null);
+    const student = user ? null : await getCurrentStudentRaw();
     if (!user && !student) {
       return NextResponse.json({ error: "unauthorized" }, { status: 401 });
     }
@@ -75,6 +78,13 @@ export async function GET(
     });
     return NextResponse.json(snapshot);
   } catch (e) {
+    if (isPoolTimeout(e)) {
+      console.warn("[GET section breakout] pool timeout", e);
+      return NextResponse.json(
+        { error: "busy" },
+        { status: 503, headers: { "Retry-After": "2" } }
+      );
+    }
     console.error("[GET section breakout]", e);
     return NextResponse.json({ error: "internal" }, { status: 500 });
   }
@@ -236,6 +246,13 @@ export async function POST(
     if (e instanceof ForbiddenError) {
       return NextResponse.json({ error: e.message }, { status: 403 });
     }
+    if (isPoolTimeout(e)) {
+      console.warn("[POST section breakout] pool timeout", e);
+      return NextResponse.json(
+        { error: "busy" },
+        { status: 503, headers: { "Retry-After": "2" } }
+      );
+    }
     console.error("[POST section breakout]", e);
     return NextResponse.json({ error: "internal" }, { status: 500 });
   }
@@ -282,6 +299,13 @@ export async function DELETE(
   } catch (e) {
     if (e instanceof ForbiddenError) {
       return NextResponse.json({ error: e.message }, { status: 403 });
+    }
+    if (isPoolTimeout(e)) {
+      console.warn("[DELETE section breakout] pool timeout", e);
+      return NextResponse.json(
+        { error: "busy" },
+        { status: 503, headers: { "Retry-After": "2" } }
+      );
     }
     console.error("[DELETE section breakout]", e);
     return NextResponse.json({ error: "internal" }, { status: 500 });
@@ -338,31 +362,47 @@ export async function loadSnapshot(
   sectionId: string,
   opts: { callerRole: string; studentId: string | null },
 ): Promise<SectionBreakoutSnapshot> {
-  const [config, groups, membership] = await Promise.all([
-    db.sectionBreakoutConfig.findUnique({ where: { sectionId } }),
-    db.sectionBreakoutGroup.findMany({
-      where: { sectionId },
-      orderBy: { order: "asc" },
-      include: {
-        _count: { select: { members: true } },
-        members: {
-          orderBy: [
-            { student: { number: "asc" } },
-            { student: { name: "asc" } },
-          ],
-          include: {
-            student: { select: { id: true, name: true, number: true } },
-          },
+  // Sequential under serverless Prisma with connection_limit=1. The previous
+  // Promise.all fan-out (3 concurrent reads per call) collided with
+  // sectionBreakoutConfig/Group/Membership lookups happening on every section
+  // of every board page load and surfaced as P2024 in Vercel logs.
+  const config = await db.sectionBreakoutConfig.findUnique({
+    where: { sectionId },
+  });
+
+  if (!config) {
+    return {
+      config: null,
+      groups: [],
+      membership: null,
+      canManage:
+        !opts.studentId &&
+        (opts.callerRole === "owner" || opts.callerRole === "editor"),
+    };
+  }
+
+  const groups = await db.sectionBreakoutGroup.findMany({
+    where: { sectionId },
+    orderBy: { order: "asc" },
+    include: {
+      _count: { select: { members: true } },
+      members: {
+        orderBy: [
+          { student: { number: "asc" } },
+          { student: { name: "asc" } },
+        ],
+        include: {
+          student: { select: { id: true, name: true, number: true } },
         },
       },
-    }),
-    opts.studentId
-      ? db.sectionBreakoutMembership.findUnique({
-          where: { sectionId_studentId: { sectionId, studentId: opts.studentId } },
-          include: { group: { select: { name: true, order: true } } },
-        })
-      : Promise.resolve(null),
-  ]);
+    },
+  });
+  const membership = opts.studentId
+    ? await db.sectionBreakoutMembership.findUnique({
+        where: { sectionId_studentId: { sectionId, studentId: opts.studentId } },
+        include: { group: { select: { name: true, order: true } } },
+      })
+    : null;
 
   const groupsWire: SectionBreakoutGroupWire[] = groups.map((g) => ({
     id: g.id,
@@ -408,4 +448,17 @@ export async function loadSnapshot(
       !opts.studentId &&
       (opts.callerRole === "owner" || opts.callerRole === "editor"),
   };
+}
+
+// Map Prisma's "Timed out fetching a new connection from the connection
+// pool" (P2024) to a 503 with Retry-After so Vercel monitors and the
+// StreamBoard client both treat it as transient pressure, not a hard 500.
+function isPoolTimeout(e: unknown): boolean {
+  if (e instanceof Prisma.PrismaClientKnownRequestError) {
+    return e.code === "P2024";
+  }
+  if (e instanceof Prisma.PrismaClientInitializationError) {
+    return /timeout|timed out|pool/i.test(e.message);
+  }
+  return false;
 }
