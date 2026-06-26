@@ -3,9 +3,10 @@ import { db } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
 import { requirePermission, ForbiddenError } from "@/lib/rbac";
 import {
-  loadBoardDefaultGroups,
-  saveBoardDefaultGroups,
-} from "@/lib/default-groups";
+  cloneTeacherBoard,
+  SUPPORTED_CLONE_LAYOUTS,
+  type BoardCloneSource,
+} from "@/lib/boards/clone";
 
 export async function POST(
   _req: Request,
@@ -19,6 +20,10 @@ export async function POST(
       where: { OR: [{ id }, { slug: id }] },
       include: {
         sections: { orderBy: { order: "asc" } },
+        cards: {
+          orderBy: { order: "asc" },
+          include: { authors: true },
+        },
       },
     });
     if (!board) {
@@ -27,34 +32,20 @@ export async function POST(
 
     await requirePermission(board.id, user.id, "view");
 
-    const slug = `${board.slug}-copy-${Date.now().toString(36)}`;
+    if (!SUPPORTED_CLONE_LAYOUTS.has(board.layout)) {
+      return NextResponse.json(
+        { error: "unsupported_layout" },
+        { status: 400 },
+      );
+    }
+
+    // The source row carries every scalar we need. The Prisma `select` for
+    // board-by-id-or-slug already returned sections and cards-with-authors,
+    // which is the exact surface cloneTeacherBoard expects.
+    const source: BoardCloneSource = board;
 
     const newBoard = await db.$transaction(async (tx) => {
-      const created = await tx.board.create({
-        data: {
-          title: board.title ? `${board.title} (복사본)` : "(복사본)",
-          slug,
-          layout: board.layout,
-          description: board.description,
-          classroomId: board.classroomId,
-          thumbnailMode: board.thumbnailMode,
-          thumbnailUrl: board.thumbnailUrl,
-          members: {
-            create: { userId: user.id, role: "owner" },
-          },
-          sections: {
-            create: board.sections.map((s) => ({
-              title: s.title,
-              order: s.order,
-            })),
-          },
-        },
-      });
-      const groups = await loadBoardDefaultGroups(tx, board.id);
-      if (groups.length > 0) {
-        await saveBoardDefaultGroups(tx, created.id, groups);
-      }
-      return created;
+      return cloneTeacherBoard(tx, source, user.id);
     });
 
     return NextResponse.json({ board: newBoard });

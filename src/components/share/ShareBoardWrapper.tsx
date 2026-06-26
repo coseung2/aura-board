@@ -19,6 +19,7 @@ import { ColumnsBoard } from "../ColumnsBoard";
 import { BoardHeader } from "../BoardHeader";
 import type { CardData } from "../DraggableCard";
 import { ShareSessionProvider } from "./ShareSessionContext";
+import { useShareSession } from "./ShareSessionContext";
 import type {
   StreamActivityTemplate,
   StreamActivityTemplateState,
@@ -64,7 +65,28 @@ export function ShareBoardWrapper({
   shareMode,
   shareToken,
 }: Props) {
+  return (
+    <ShareSessionProvider shareToken={shareToken} shareMode={shareMode}>
+      <ShareBoardContent
+        board={board}
+        initialCards={initialCards}
+        initialSections={initialSections}
+        shareToken={shareToken}
+      />
+    </ShareSessionProvider>
+  );
+}
+
+function ShareBoardContent({
+  board,
+  initialCards,
+  initialSections,
+  shareToken,
+}: Omit<Props, "shareMode">) {
   const router = useRouter();
+  const shareSession = useShareSession();
+  const guestId = shareSession?.guestId ?? shareToken;
+
   const [cloneStatus, setCloneStatus] = useState<
     "idle" | "loading" | "loginRequired" | "error"
   >("idle");
@@ -147,7 +169,7 @@ export function ShareBoardWrapper({
           <BoardCanvas
             boardId={board.id}
             initialCards={initialCards}
-            currentUserId={shareToken}
+            currentUserId={guestId}
             currentRole={role}
             classroomId={null}
             isStudentViewer={isStudentViewer}
@@ -159,7 +181,7 @@ export function ShareBoardWrapper({
           <GridBoard
             boardId={board.id}
             initialCards={initialCards}
-            currentUserId={shareToken}
+            currentUserId={guestId}
             currentRole={role}
             classroomId={null}
             isStudentViewer={isStudentViewer}
@@ -171,7 +193,7 @@ export function ShareBoardWrapper({
           <StreamBoard
             boardId={board.id}
             initialCards={initialCards}
-            currentUserId={shareToken}
+            currentUserId={guestId}
             currentRole={role}
             classroomId={null}
             isStudentViewer={isStudentViewer}
@@ -186,7 +208,7 @@ export function ShareBoardWrapper({
             boardId={board.id}
             initialCards={initialCards}
             initialSections={initialSections}
-            currentUserId={shareToken}
+            currentUserId={guestId}
             currentRole={role}
             classroomId={null}
             isStudentViewer={isStudentViewer}
@@ -201,7 +223,7 @@ export function ShareBoardWrapper({
           <BoardCanvas
             boardId={board.id}
             initialCards={initialCards}
-            currentUserId={shareToken}
+            currentUserId={guestId}
             currentRole={role}
             classroomId={null}
             isStudentViewer={isStudentViewer}
@@ -211,35 +233,33 @@ export function ShareBoardWrapper({
   }
 
   return (
-    <ShareSessionProvider shareToken={shareToken} shareMode={shareMode}>
-      <main className="board-page" data-board-theme={boardTheme}>
-        <div className="share-clone-bar" role="region" aria-label="공유 보드 액션">
-          {cloneStatus === "loginRequired" ? (
-            <p className="share-clone-message">
-              복제하려면 <a href="/login">로그인</a>이 필요해요.
-            </p>
-          ) : cloneStatus === "error" && cloneError ? (
-            <p className="share-clone-message share-clone-message-error" role="alert">
-              {cloneError}
-            </p>
-          ) : null}
-          <button
-            type="button"
-            className="ds-btn-primary share-clone-btn"
-            onClick={handleClone}
-            disabled={cloneStatus === "loading"}
-            aria-busy={cloneStatus === "loading"}
-          >
-            {cloneStatus === "loading" ? "복제하는 중..." : "내 보드로 복제"}
-          </button>
-        </div>
-        <BoardHeader
-          title={board.title}
-          layout={board.layout}
-          canEdit={canEdit}
-        />
-        {renderBoard()}
-      </main>
-    </ShareSessionProvider>
+    <main className="board-page" data-board-theme={boardTheme}>
+      <div className="share-clone-bar" role="region" aria-label="공유 보드 액션">
+        {cloneStatus === "loginRequired" ? (
+          <p className="share-clone-message">
+            복제하려면 <a href="/login">로그인</a>이 필요해요.
+          </p>
+        ) : cloneStatus === "error" && cloneError ? (
+          <p className="share-clone-message share-clone-message-error" role="alert">
+            {cloneError}
+          </p>
+        ) : null}
+        <button
+          type="button"
+          className="ds-btn-primary share-clone-btn"
+          onClick={handleClone}
+          disabled={cloneStatus === "loading"}
+          aria-busy={cloneStatus === "loading"}
+        >
+          {cloneStatus === "loading" ? "복제하는 중..." : "내 보드로 복제"}
+        </button>
+      </div>
+      <BoardHeader
+        title={board.title}
+        layout={board.layout}
+        canEdit={canEdit}
+      />
+      {renderBoard()}
+    </main>
   );
 }

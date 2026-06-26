@@ -13,6 +13,30 @@ export type ShareSession = {
 
 const SHARE_GUEST_ID_KEY = "aura-share-guest-id";
 const SHARE_AUTHOR_NAME_KEY = "aura-share-author-name";
+const NICKNAME_ADJECTIVES = [
+  "맑은",
+  "푸른",
+  "초록",
+  "은빛",
+  "따뜻한",
+  "반짝",
+  "고요한",
+  "싱그러운",
+  "환한",
+  "단단한",
+];
+const NICKNAME_NOUNS = [
+  "새싹",
+  "연필",
+  "구름",
+  "열쇠",
+  "노트",
+  "햇살",
+  "종이",
+  "물결",
+  "별빛",
+  "나무",
+];
 
 const ShareSessionContext = createContext<ShareSession | null>(null);
 
@@ -21,6 +45,21 @@ function createGuestId(): string {
     return crypto.randomUUID();
   }
   return `guest-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+}
+
+function randomIndex(length: number): number {
+  if (typeof crypto !== "undefined" && "getRandomValues" in crypto) {
+    const values = new Uint32Array(1);
+    crypto.getRandomValues(values);
+    return values[0] % length;
+  }
+  return Math.floor(Math.random() * length);
+}
+
+function createAuthorName(): string {
+  const adjective = NICKNAME_ADJECTIVES[randomIndex(NICKNAME_ADJECTIVES.length)];
+  const noun = NICKNAME_NOUNS[randomIndex(NICKNAME_NOUNS.length)];
+  return `${adjective} ${noun}`;
 }
 
 export function ShareSessionProvider({
@@ -33,11 +72,11 @@ export function ShareSessionProvider({
   children: ReactNode;
 }) {
   const [guestId, setGuestId] = useState(() => getOrCreateStoredGuestId());
-  const [authorName, setAuthorName] = useState(() => getStoredAuthorName());
+  const [authorName, setAuthorName] = useState(() => getOrCreateStoredAuthorName());
 
   useEffect(() => {
     setGuestId(getOrCreateStoredGuestId());
-    setAuthorName(getStoredAuthorName());
+    setAuthorName(getOrCreateStoredAuthorName());
   }, []);
 
   const value = useMemo(
@@ -74,9 +113,13 @@ export function useShareFetch() {
   );
 }
 
-function getStoredAuthorName(): string {
+function getOrCreateStoredAuthorName(): string {
   if (typeof window === "undefined") return "방문자";
-  return window.localStorage.getItem(SHARE_AUTHOR_NAME_KEY) || "방문자";
+  const stored = window.localStorage.getItem(SHARE_AUTHOR_NAME_KEY);
+  if (stored && stored !== "방문자") return stored;
+  const name = createAuthorName();
+  window.localStorage.setItem(SHARE_AUTHOR_NAME_KEY, name);
+  return name;
 }
 
 function getOrCreateStoredGuestId(): string {
