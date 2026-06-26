@@ -133,6 +133,7 @@ export default async function StudentPage() {
         slug: b.slug,
         title: b.title || "제목 없음",
         layout: b.layout,
+        category: b.category,
         quizzes: b.quizzes,
         breakout: linkedBreakout
           ? buildDashboardBreakout({
@@ -222,3 +223,4 @@ function buildDashboardBreakout({
       })),
   };
 }
+

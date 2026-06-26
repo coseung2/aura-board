@@ -124,6 +124,29 @@
   font-weight: 600;
 }
 
+
+/* -------- BC-1: lesson vs play section title (student dashboard) -------- */
+
+.student-section {
+  max-width: var(--container-max-width, 1100px);
+  margin: 0 auto 24px;
+}
+
+.student-section-title {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 8px;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--color-text-strong);
+  margin: 0 0 12px;
+}
+
+.student-section-count {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--color-text-muted);
+}
 .student-board-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));

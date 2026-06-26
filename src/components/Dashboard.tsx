@@ -17,6 +17,8 @@ type BoardItem = {
   thumbnailMode: string | null;
   thumbnailUrl: string | null;
   classroomId: string | null;
+  // BC-1: "LESSON" or "PLAY". Drives the section split in the grid below.
+  category: "LESSON" | "PLAY";
   cardCount: number;
   memberCount: number;
   role: string;
@@ -73,21 +75,24 @@ export function Dashboard({ boards, classrooms, userTier = "pro" }: Props) {
 
   return (
     <>
-      <div className="dashboard-classroom-row">
-        <a href="/classroom" className="dashboard-classroom-link">학급 관리 →</a>
-      </div>
-      <div className="board-grid">
-        {/* New board card — first position */}
-        <button
-          type="button"
-          className="board-grid-card board-grid-new"
-          onClick={() => setShowCreate(true)}
-        >
-          <div className="board-grid-new-icon">+</div>
-          <span className="board-grid-new-label">새 보드 만들기</span>
-        </button>
 
-        {boards.map((b) => {
+      {/* BC-1: split boards into lesson vs play; render two grids with their own headers. */}
+      {(() => {
+        const lessonBoards = boards.filter((b) => b.category === "LESSON");
+        const playBoards = boards.filter((b) => b.category === "PLAY");
+        const renderGrid = (sectionBoards: BoardItem[], showCreateCard: boolean) => (
+          <div className="board-grid">
+            {showCreateCard && (
+              <button
+                type="button"
+                className="board-grid-card board-grid-new"
+                onClick={() => setShowCreate(true)}
+              >
+                <div className="board-grid-new-icon">+</div>
+                <span className="board-grid-new-label">새 보드 만들기</span>
+              </button>
+            )}
+            {sectionBoards.map((b) => {
           const thumbnail =
             b.thumbnailMode === "custom" && b.thumbnailUrl
               ? b.thumbnailUrl
@@ -163,7 +168,26 @@ export function Dashboard({ boards, classrooms, userTier = "pro" }: Props) {
             </div>
           );
         })}
-      </div>
+          </div>
+        );
+        return (
+          <>
+            <section className="dashboard-classroom-row" aria-label="수업 보드">
+              <h2 className="dashboard-section-title">
+                수업 보드 <span className="dashboard-section-count">{lessonBoards.length}개</span>
+              </h2>
+              <a href="/classroom" className="dashboard-classroom-link">학급 관리 →</a>
+            </section>
+            {renderGrid(lessonBoards, true)}
+            <section className="dashboard-classroom-row" aria-label="놀이 보드">
+              <h2 className="dashboard-section-title">
+                놀이 보드 <span className="dashboard-section-count">{playBoards.length}개</span>
+              </h2>
+            </section>
+            {renderGrid(playBoards, false)}
+          </>
+        );
+      })()}
 
       {/* Close menu on backdrop click */}
       {menuOpen && (

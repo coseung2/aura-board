@@ -34,6 +34,8 @@ const PatchBoardSchema = z.object({
       "pastel-lemon",
     ])
     .optional(),
+  // BC-1: reclassify a board as lesson vs play.
+  category: z.enum(["LESSON", "PLAY"]).optional(),
 });
 
 export async function GET(

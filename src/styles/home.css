@@ -14,6 +14,12 @@
 .dashboard-classroom-row {
   max-width: var(--container-max-width);
   margin: 0 auto 16px;
+  /* BC-1 fix: flex row so the h2 (lesson/play title) sits on the left and
+     the .dashboard-classroom-link (학급 관리) pushes to the right via
+     margin-left: auto. Without this the link collapses next to the title. */
+  display: flex;
+  align-items: center;
+  gap: 12px;
 }
 
 .dashboard-classroom-link {
@@ -28,6 +34,27 @@
   color: var(--color-accent-active);
 }
 
+/* -------- BC-1: lesson vs play section title -------- */
+
+.dashboard-section-title {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 8px;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--color-text-strong);
+  margin: 0;
+}
+
+.dashboard-section-count {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--color-text-muted);
+}
+
+.dashboard-classroom-row .dashboard-classroom-link {
+  margin-left: auto;
+}
 /* -------- Home / Board List -------- */
 
 .home-page {
@@ -533,6 +560,40 @@
   flex: 1;
 }
 
+
+/* -------- BC-1: lesson vs play radios in create-board modal -------- */
+
+.create-board-category {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  border: none;
+  padding: 0;
+  margin: 0 0 12px;
+}
+
+.create-board-category legend {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-text-strong);
+  margin: 0 8px 0 0;
+  padding: 0;
+}
+
+.create-board-category-option {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 14px;
+  color: var(--color-text-strong);
+  cursor: pointer;
+}
+
+.create-board-category-option input[type="radio"] {
+  accent-color: var(--color-accent);
+  width: 16px;
+  height: 16px;
+}
 .create-board-hint {
   font-size: 13px;
   color: var(--color-text-muted);
