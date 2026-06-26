@@ -1,4 +1,4 @@
-﻿import { NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import { z } from "zod";
 import { db } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
@@ -38,6 +38,8 @@ const CreateBoardSchema = z.object({
     "question-board",
   ]),
   description: z.string().max(2000).default(""),
+  // BC-1: lesson vs play grouping. Defaults to LESSON to keep legacy clients working.
+  category: z.enum(["LESSON", "PLAY"]).default("LESSON"),
   classroomId: z.string().optional(),
   thumbnailMode: z.enum(["default", "none", "custom"]).default("default"),
   // Public image URL for board thumbnail. Used when thumbnailMode="custom";
@@ -61,6 +63,25 @@ export async function POST(req: Request) {
     const user = await getCurrentUser();
     const body = await req.json();
     const input = CreateBoardSchema.parse(body);
+
+    // BC-1 fix: validate classroom ownership up-front so every layout branch
+    // (breakout, assignment, generic) inherits the same guard. Without this,
+    // a client could post any classroomId and snapshot groups into a class they
+    // do not own. Resolves to null when classroomId is omitted (e.g. teacher-only boards).
+    let ownedClassroom: { id: string } | null = null;
+    if (input.classroomId) {
+      const classroom = await db.classroom.findUnique({
+        where: { id: input.classroomId },
+        select: { id: true, teacherId: true },
+      });
+      if (!classroom) {
+        return NextResponse.json({ error: "classroom_not_found" }, { status: 404 });
+      }
+      if (classroom.teacherId !== user.id) {
+        return NextResponse.json({ error: "not_classroom_teacher" }, { status: 403 });
+      }
+      ownedClassroom = { id: classroom.id };
+    }
 
     const baseSlug = input.title
       ? input.title
@@ -111,7 +132,8 @@ export async function POST(req: Request) {
             slug,
             layout: "breakout",
             description: input.description,
-            classroomId: input.classroomId ?? null,
+            category: input.category,
+            classroomId: ownedClassroom?.id ?? null,
             thumbnailMode: input.thumbnailMode,
             thumbnailUrl: input.thumbnailUrl,
             members: {
@@ -234,6 +256,7 @@ export async function POST(req: Request) {
             slug,
             layout: "assignment",
             description: input.description,
+            category: input.category,
             classroomId: classroom?.id ?? null,
             thumbnailMode: input.thumbnailMode,
             thumbnailUrl: input.thumbnailUrl,
@@ -312,7 +335,8 @@ export async function POST(req: Request) {
         slug,
         layout: input.layout,
         description: input.description,
-        classroomId: input.classroomId ?? null,
+        category: input.category,
+        classroomId: ownedClassroom?.id ?? null,
         thumbnailMode: input.thumbnailMode,
         thumbnailUrl: input.thumbnailUrl,
         members: {
@@ -339,3 +363,4 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "internal" }, { status: 500 });
   }
 }
+

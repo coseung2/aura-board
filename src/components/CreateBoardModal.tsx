@@ -80,6 +80,9 @@ export function CreateBoardModal({
   const [selectedLayout, setSelectedLayout] = useState<LayoutKey | null>(null);
   const [thumbnailMode, setThumbnailMode] = useState<ThumbnailMode>("default");
   const [thumbnailUrl, setThumbnailUrl] = useState<string | null>(null);
+  // BC-1: lesson vs play grouping. Defaults to lesson; teacher can pick "play"
+  // for casual/exploratory boards like the Kordle word game.
+  const [category, setCategory] = useState<"LESSON" | "PLAY">("LESSON");
 
   async function createBoard(layoutId: LayoutKey, classroomId?: string) {
     setBusy(true);
@@ -90,6 +93,7 @@ export function CreateBoardModal({
         body: JSON.stringify({
           title: "",
           layout: layoutId,
+          category,
           classroomId,
           thumbnailMode:
             thumbnailMode === "custom" && thumbnailUrl
@@ -172,6 +176,30 @@ export function CreateBoardModal({
         <div className="modal-body">
           {step === "layout" && (
             <>
+              {/* BC-1: pick lesson vs play up-front. Persists across layout choice. */}
+              <fieldset className="create-board-category">
+                <legend>보드 분류</legend>
+                <label className="create-board-category-option">
+                  <input
+                    type="radio"
+                    name="board-category"
+                    value="LESSON"
+                    checked={category === "LESSON"}
+                    onChange={() => setCategory("LESSON")}
+                  />
+                  <span>수업</span>
+                </label>
+                <label className="create-board-category-option">
+                  <input
+                    type="radio"
+                    name="board-category"
+                    value="PLAY"
+                    checked={category === "PLAY"}
+                    onChange={() => setCategory("PLAY")}
+                  />
+                  <span>놀이</span>
+                </label>
+              </fieldset>
               <p className="create-board-hint">보드 유형을 선택하세요.</p>
               <div className="layout-grid-picker">
                 {VISIBLE_LAYOUTS.map((layout) => (

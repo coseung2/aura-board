@@ -11,6 +11,8 @@ type BoardItem = {
   slug: string;
   title: string;
   layout: string;
+  // BC-1: "LESSON" or "PLAY" — drives the lesson/play section split below.
+  category: "LESSON" | "PLAY";
   quizzes?: { roomCode: string; status: string }[];
   breakout?: StudentBreakout | null;
 };
@@ -101,7 +103,10 @@ export function StudentDashboard({
     setLoggingOut(true);
     try {
       await fetch("/api/student/logout", { method: "POST" });
-      router.push("/login");
+      // BC-1 fix: send the student back to the student login page, not the
+      // teacher login. Every other student-facing page uses /student/login
+      // as the unauth redirect target.
+      router.push("/student/login");
     } catch {
       setLoggingOut(false);
     }
@@ -257,53 +262,7 @@ export function StudentDashboard({
           <p>아직 보드가 없어요.</p>
         </div>
       ) : (
-        <>
-          <p className="student-sub">오늘의 보드</p>
-          <div className="student-board-grid">
-            {boards.map((board) => {
-              const quizCode =
-                board.layout === "quiz" && board.quizzes?.[0]?.roomCode;
-              const href = quizCode ? `/quiz/${quizCode}` : `/board/${board.slug}`;
-              const breakout = board.breakout;
-              if (breakout) {
-                return (
-                  <button
-                    key={board.id}
-                    type="button"
-                    className="student-board-card"
-                    onClick={() => {
-                      if (breakout.selectedSectionId) {
-                        router.push(
-                          `/board/${breakout.boardSlug}/s/${breakout.selectedSectionId}`,
-                        );
-                        return;
-                      }
-                      setBreakoutModal({ sourceTitle: board.title, breakout });
-                    }}
-                  >
-                    <span className="student-board-card-title">{board.title}</span>
-                    <span className="student-board-card-meta">
-                      모둠 선택 · {breakout.boardTitle}
-                    </span>
-                  </button>
-                );
-              }
-              return (
-                <Link
-                  key={board.id}
-                  href={href}
-                  className="student-board-card"
-                >
-                  <span className="student-board-card-title">{board.title}</span>
-                  <span className="student-board-card-meta">
-                    {layoutLabel(board.layout)}
-                    {quizCode && " · 참여하기"}
-                  </span>
-                </Link>
-              );
-            })}
-          </div>
-        </>
+        <StudentBoardSections boards={boards} onOpenBreakout={setBreakoutModal} />
       )}
 
       {breakoutModal && (
@@ -312,6 +271,84 @@ export function StudentDashboard({
           breakout={breakoutModal.breakout}
           onClose={() => setBreakoutModal(null)}
         />
+      )}
+    </>
+  );
+}
+
+// BC-1: render the student's boards split into lesson vs play sections.
+// The breakout modal state lives on the parent so we still need setBreakoutModal
+// threaded in via props.
+type StudentBoardSectionsProps = {
+  boards: BoardItem[];
+  onOpenBreakout: (modal: { sourceTitle: string; breakout: StudentBreakout } | null) => void;
+};
+
+function StudentBoardSections({ boards, onOpenBreakout }: StudentBoardSectionsProps) {
+  const router = useRouter();
+  const lessonBoards = boards.filter((b) => b.category === "LESSON");
+  const playBoards = boards.filter((b) => b.category === "PLAY");
+
+  const renderCard = (board: BoardItem) => {
+    const quizCode =
+      board.layout === "quiz" && board.quizzes?.[0]?.roomCode;
+    const href = quizCode ? `/quiz/${quizCode}` : `/board/${board.slug}`;
+    const breakout = board.breakout;
+    if (breakout) {
+      return (
+        <button
+          key={board.id}
+          type="button"
+          className="student-board-card"
+          onClick={() => {
+            if (breakout.selectedSectionId) {
+              router.push(
+                `/board/${breakout.boardSlug}/s/${breakout.selectedSectionId}`,
+              );
+              return;
+            }
+            onOpenBreakout({ sourceTitle: board.title, breakout });
+          }}
+        >
+          <span className="student-board-card-title">{board.title}</span>
+          <span className="student-board-card-meta">
+            모둠 선택 · {breakout.boardTitle}
+          </span>
+        </button>
+      );
+    }
+    return (
+      <Link key={board.id} href={href} className="student-board-card">
+        <span className="student-board-card-title">{board.title}</span>
+        <span className="student-board-card-meta">
+          {layoutLabel(board.layout)}
+          {quizCode && " · 참여하기"}
+        </span>
+      </Link>
+    );
+  };
+
+  const renderGrid = (sectionBoards: BoardItem[]) => (
+    <div className="student-board-grid">
+      {sectionBoards.map((board) => renderCard(board))}
+    </div>
+  );
+
+  return (
+    <>
+      <section className="student-section" aria-label="수업 보드">
+        <h3 className="student-section-title">
+          수업 보드 <span className="student-section-count">{lessonBoards.length}개</span>
+        </h3>
+        {renderGrid(lessonBoards)}
+      </section>
+      {playBoards.length > 0 && (
+        <section className="student-section" aria-label="놀이 보드">
+          <h3 className="student-section-title">
+            놀이 보드 <span className="student-section-count">{playBoards.length}개</span>
+          </h3>
+          {renderGrid(playBoards)}
+        </section>
       )}
     </>
   );

@@ -20,6 +20,56 @@ type Props = {
 
 const DJ_POLL_MS = 15_000;
 
+type DJQueueStatus = "pending" | "approved" | "rejected" | "played";
+
+function getQueueStatusLabel(
+  status: string | null | undefined,
+  isNowPlaying: boolean,
+) {
+  if (isNowPlaying) return "지금 재생 중";
+  switch (status) {
+    case "pending":
+      return "승인 대기";
+    case "approved":
+      return "재생 목록";
+    case "played":
+      return "재생 완료";
+    case "rejected":
+      return "반려";
+    default:
+      return "확인 중";
+  }
+}
+
+function getQueueStatusHelp(
+  status: string | null | undefined,
+  isNowPlaying: boolean,
+) {
+  if (isNowPlaying)
+    return "대기열에서 빠진 게 아니라 위쪽 NOW PLAYING으로 이동했어요.";
+  switch (status) {
+    case "pending":
+      return "선생님 승인 전이라 대기 상태예요.";
+    case "approved":
+      return "승인되어 다음 재생 목록에 올라갔어요.";
+    case "played":
+      return "재생 완료 목록으로 이동했어요.";
+    case "rejected":
+      return "선생님이 목록에서 제외했어요.";
+    default:
+      return "잠시 후 상태가 다시 갱신돼요.";
+  }
+}
+
+function queueStatusClass(status: string | null | undefined) {
+  return status === "pending" ||
+    status === "approved" ||
+    status === "played" ||
+    status === "rejected"
+    ? status
+    : "pending";
+}
+
 /**
  * DJ 보드 — 2026-04-22 핸드오프 디자인 포팅.
  *   ┌─ 헤더 (제목 + 카운트 + 재생완료 토글 + 공유) ──────────┐
@@ -154,6 +204,18 @@ export function DJBoard({
 
   const pendingCount = activeQueue.filter((c) => c.queueStatus === "pending").length;
   const approvedCount = activeQueue.filter((c) => c.queueStatus === "approved").length;
+  const studentRequests = useMemo(() => {
+    if (!currentStudentId || canControl) return [];
+    return cards
+      .filter((c) => c.queueStatus && c.studentAuthorId === currentStudentId)
+      .sort((a, b) => {
+        const aTime = a.createdAt ? Date.parse(a.createdAt) : 0;
+        const bTime = b.createdAt ? Date.parse(b.createdAt) : 0;
+        if (aTime !== bTime) return bTime - aTime;
+        return b.order - a.order;
+      })
+      .slice(0, 3);
+  }, [cards, canControl, currentStudentId]);
 
   async function handleSubmit(youtubeUrl: string) {
     setError(null);
@@ -163,12 +225,16 @@ export function DJBoard({
       body: JSON.stringify({ youtubeUrl }),
     });
     if (!res.ok) {
-      const msg = (await res.json().catch(() => ({ error: "제출 실패" }))).error;
+      const msg = (await res.json().catch(() => ({ error: "제출 실패" })))
+        .error;
       setError(typeof msg === "string" ? msg : "제출 실패");
-      return;
+      return false;
     }
     const { card } = (await res.json()) as { card: CardData };
-    setCards((prev) => [...prev, card]);
+    setCards((prev) =>
+      prev.some((existing) => existing.id === card.id) ? prev : [...prev, card],
+    );
+    return true;
   }
 
   async function handleStatus(
@@ -269,8 +335,14 @@ export function DJBoard({
     await handleQueueDrop(cardId, maxOrder + 1);
   }
 
-  const isEmpty = activeQueue.length === 0;
   const rankingKey = cards.length + playedCards.length;
+  const queueEmptyMessage = nowPlaying
+    ? canControl
+      ? "지금 재생 중인 곡만 있고 다음 곡은 없습니다."
+      : "지금 재생 중인 곡은 위에 표시돼요. 다음 곡은 아직 없습니다."
+    : canControl
+      ? "신청곡이 없습니다. 학생들에게 신청을 받아보세요."
+      : "아직 신청된 곡이 없어요. 오른쪽에서 신청해 보세요.";
 
   return (
     <>
@@ -343,17 +415,14 @@ export function DJBoard({
                 {canControl ? "드래그해서 순서 변경 · 재생 완료에서도 복귀 가능" : "선생님이 승인하면 재생 목록에 올라갑니다"}
               </span>
             </h3>
-            {isEmpty ? (
-              <div className="dj-empty">
-                {canControl
-                  ? "신청곡이 없습니다. 학생들에게 신청을 받아보세요."
-                  : "아직 신청된 곡이 없어요. 오른쪽에서 신청해 보세요."}
-              </div>
+            {upNext.length === 0 ? (
+              <div className="dj-empty">{queueEmptyMessage}</div>
             ) : (
               <DJQueueList
                 cards={upNext}
                 canControl={canControl}
                 currentStudentId={currentStudentId}
+                startRank={nowPlaying ? 2 : 1}
                 onStatus={handleStatus}
                 onDelete={handleDelete}
                 onReorder={handleQueueDrop}
@@ -363,6 +432,35 @@ export function DJBoard({
 
           <aside className="dj-side">
             <DJSubmitForm error={error} onSubmit={handleSubmit} />
+            {studentRequests.length > 0 ? (
+              <section className="dj-my-requests" aria-live="polite">
+                <h3 className="dj-my-requests-title">내 신청 현황</h3>
+                <ul className="dj-my-requests-list">
+                  {studentRequests.map((card) => {
+                    const status = card.queueStatus as
+                      | DJQueueStatus
+                      | null
+                      | undefined;
+                    const isNowPlaying = nowPlaying?.id === card.id;
+                    return (
+                      <li key={card.id} className="dj-my-request">
+                        <div className="dj-my-request-main">
+                          <span className="dj-my-request-title">
+                            {card.title}
+                          </span>
+                          <span
+                            className={`dj-status-pill dj-status-pill-${queueStatusClass(status)}`}
+                          >
+                            {getQueueStatusLabel(status, isNowPlaying)}
+                          </span>
+                        </div>
+                        <p>{getQueueStatusHelp(status, isNowPlaying)}</p>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </section>
+            ) : null}
             <DJRanking boardId={boardId} refreshKey={rankingKey} />
           </aside>
         </div>

@@ -8,6 +8,7 @@ type Props = {
   cards: CardData[];
   canControl: boolean;
   currentStudentId: string | null;
+  startRank?: number;
   onStatus: (
     cardId: string,
     status: "approved" | "rejected" | "played"
@@ -20,6 +21,7 @@ export function DJQueueList({
   cards,
   canControl,
   currentStudentId,
+  startRank = 1,
   onStatus,
   onDelete,
   onReorder,
@@ -74,7 +76,7 @@ export function DJQueueList({
           <DJQueueItem
             key={card.id}
             card={card}
-            rank={idx + 1}
+            rank={startRank + idx}
             canControl={canControl}
             isOwnPending={isOwnPending}
             isDragging={draggingId === card.id}

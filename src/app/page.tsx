@@ -24,9 +24,28 @@ export default async function HomePage() {
     // Only show boards where the current user is a member
     db.boardMember.findMany({
       where: { userId: user.id },
-      include: {
+      // BC-1 fix: Prisma does not allow mixing `include` and `select` at the
+      // same nesting level, so we move the board payload into a single
+      // `select` that also pulls `_count` for cards and members.
+      select: {
+        role: true,
         board: {
-          include: { _count: { select: { cards: true, members: true } } },
+          select: {
+            id: true,
+            slug: true,
+            title: true,
+            layout: true,
+            thumbnailMode: true,
+            thumbnailUrl: true,
+            classroomId: true,
+            category: true,
+            _count: {
+              select: {
+                cards: true,
+                members: true,
+              },
+            },
+          },
         },
       },
       orderBy: { board: { createdAt: "desc" } },
@@ -55,6 +74,7 @@ export default async function HomePage() {
     thumbnailMode: m.board.thumbnailMode,
     thumbnailUrl: (m.board as { thumbnailUrl?: string | null }).thumbnailUrl ?? null,
     classroomId: m.board.classroomId,
+    category: m.board.category,
     cardCount: m.board._count.cards,
     memberCount: m.board._count.members,
     role: m.role,
