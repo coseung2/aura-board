@@ -6,11 +6,12 @@
  * component, but with share-token-aware API identity.
  *
  * The wrapper provides a React Context so child components can retrieve the
- * shareToken for API calls (PATCH /api/cards/:id, POST /api/cards, etc.)
- * by adding the x-share-token header.
+ * shareToken for API calls by adding the x-share-token header.
  */
 "use client";
 
+import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { BoardCanvas } from "../BoardCanvas";
 import { GridBoard } from "../GridBoard";
 import { StreamBoard } from "../StreamBoard";
@@ -63,6 +64,62 @@ export function ShareBoardWrapper({
   shareMode,
   shareToken,
 }: Props) {
+  const router = useRouter();
+  const [cloneStatus, setCloneStatus] = useState<
+    "idle" | "loading" | "loginRequired" | "error"
+  >("idle");
+  const [cloneError, setCloneError] = useState<string | null>(null);
+
+  async function handleClone() {
+    if (cloneStatus === "loading") return;
+    setCloneStatus("loading");
+    setCloneError(null);
+
+    try {
+      const res = await fetch(
+        `/api/share/boards/${encodeURIComponent(shareToken)}/clone`,
+        {
+          method: "POST",
+          headers: { accept: "application/json" },
+        },
+      );
+
+      if (res.status === 401) {
+        setCloneStatus("loginRequired");
+        return;
+      }
+
+      if (res.status === 404) {
+        setCloneStatus("error");
+        setCloneError("공유 보드를 찾을 수 없어요.");
+        return;
+      }
+
+      if (res.status === 400) {
+        setCloneStatus("error");
+        setCloneError("이 보드 형식은 아직 복제를 지원하지 않아요.");
+        return;
+      }
+
+      if (!res.ok) {
+        setCloneStatus("error");
+        setCloneError("보드 복제에 실패했어요. 잠시 후 다시 시도해 주세요.");
+        return;
+      }
+
+      const data = (await res.json()) as { boardUrl?: string };
+      if (data.boardUrl) {
+        router.push(data.boardUrl);
+      } else {
+        setCloneStatus("error");
+        setCloneError("복제된 보드로 이동할 수 없어요.");
+      }
+    } catch {
+      setCloneStatus("error");
+      setCloneError("보드 복제 중 오류가 발생했어요.");
+    }
+  }
+
   const role = "viewer" as const;
   const canEdit = false;
   const isStudentViewer = true;
@@ -156,6 +213,26 @@ export function ShareBoardWrapper({
   return (
     <ShareSessionProvider shareToken={shareToken} shareMode={shareMode}>
       <main className="board-page" data-board-theme={boardTheme}>
+        <div className="share-clone-bar" role="region" aria-label="공유 보드 액션">
+          {cloneStatus === "loginRequired" ? (
+            <p className="share-clone-message">
+              복제하려면 <a href="/login">로그인</a>이 필요해요.
+            </p>
+          ) : cloneStatus === "error" && cloneError ? (
+            <p className="share-clone-message share-clone-message-error" role="alert">
+              {cloneError}
+            </p>
+          ) : null}
+          <button
+            type="button"
+            className="ds-btn-primary share-clone-btn"
+            onClick={handleClone}
+            disabled={cloneStatus === "loading"}
+            aria-busy={cloneStatus === "loading"}
+          >
+            {cloneStatus === "loading" ? "복제하는 중..." : "내 보드로 복제"}
+          </button>
+        </div>
         <BoardHeader
           title={board.title}
           layout={board.layout}
