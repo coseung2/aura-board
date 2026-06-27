@@ -10,6 +10,35 @@ GitHub Actions 가 자동으로 APK 를 빌드한다. 최초 1회 셋업은 [SET
 - 또는 GitHub > Actions > **Mobile APK Build (EAS Preview)** > Run workflow
 - 10-20분 뒤 expo.dev 에서 APK 다운로드 → 태블릿에 설치 → 교사가 발급한 6자리 코드로 로그인
 
+## 로컬 Android 빌드 (APK/AAB)
+
+로컬 릴리스 빌드는 repo 안의 `android/`를 직접 빌드 기준으로 삼지 않고,
+전용 ASCII 빌드 디렉터리에서 Expo prebuild를 재생성하는 파이프라인을 사용한다.
+상세 규칙은 `../../docs/mobile-android-build.md` 참고.
+
+APK:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File "..\..\.codex\scripts\build-android.ps1" `
+  -AppSource "." `
+  -BuildDir "C:\build-aura-board-android" `
+  -ForcePrebuild `
+  -Output Apk
+```
+
+APK + AAB:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File "..\..\.codex\scripts\build-android.ps1" `
+  -AppSource "." `
+  -BuildDir "C:\build-aura-board-android" `
+  -ForcePrebuild `
+  -Output Both
+```
+
+Play Store용 AAB는 빌드 전에 `app.config.ts`의 `android.versionCode`를
+증가시킨다.
+
 ## 기본 동작
 
 ### 학생 (Student)

@@ -71,6 +71,17 @@ Aura Board는 여러 신원을 동시에 고려합니다.
 
 ---
 
+## 모바일 Android 빌드
+
+Aura Board 모바일 앱은 Expo 소스를 `C:\build-aura-board-android` 같은 전용
+ASCII 빌드 디렉터리로 미러링한 뒤 APK/AAB를 만든다. Windows 사용자 경로에
+한글이 있어도 `USERPROFILE`, `HOME`, `TEMP`, `TMP`, Gradle/Java 홈을 빌드
+디렉터리 내부 ASCII 경로로 고정해 Expo prebuild와 Gradle을 실행한다.
+
+로컬 APK/AAB 표준 절차는 `docs/mobile-android-build.md`를 따른다.
+
+---
+
 ## 환경 변수
 
 학생 공유 페이지(`/s/[shortCode]`, `/share/[shareToken]`)는 정적 shell에서
@@ -156,6 +167,7 @@ docs/                     아키텍처, 현재 기능, 외부 API, 디자인 시
 - `docs/current-features.md`
 - `docs/architecture.md`
 - `docs/design-system.md`
+- `docs/mobile-android-build.md`
 - `docs/external-api.md`
 - `CLAUDE.md`
 - `AGENTS.md`

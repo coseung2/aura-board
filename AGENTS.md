@@ -20,6 +20,8 @@ for bounded specialist tasks. The project source of truth is the current code,
 - Type check: `npm run typecheck`
 - Tests: `npm run test`
 - Production build: `npm run build`
+- Mobile Android APK/AAB: follow `docs/mobile-android-build.md` and use
+  `.codex\scripts\build-android.ps1` with a dedicated ASCII build directory.
 
 For frontend verification after design changes, clear `.next` and restart the
 dev server before browser checks when practical.
