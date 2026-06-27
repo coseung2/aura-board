@@ -137,7 +137,12 @@ export function ClassroomStoreTab({ classroomId, canManage }: Props) {
       ) : (
         <ul className="classroom-store-grid">
           {items.map((it) => (
-            <li key={it.id} className="store-item-card">
+            <li
+              key={it.id}
+              className={`store-item-card ${
+                it.imageUrl ? "has-image" : "is-text-only"
+              }`}
+            >
               {it.imageUrl && (
                 <img
                   className="store-item-image"
