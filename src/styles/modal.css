@@ -45,23 +45,10 @@
   max-width: calc(100vw - 48px);
   max-height: calc(100dvh - 48px);
   padding: 0;
-  overflow: visible;
+  overflow: hidden;
   display: flex;
   flex-direction: column;
   --card-detail-corner-inset: 14px;
-}
-
-/* The visual card surface. Navigation arrows live outside this frame so
-   they are not clipped by the modal border-radius / overflow. */
-.card-detail-frame {
-  position: relative;
-  flex: 1 1 auto;
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
-  background: var(--color-surface);
-  border-radius: var(--radius-card);
-  overflow: hidden;
 }
 
 /* refined-icons (2026-04-26): 모든 버튼 내부에 SVG (currentColor stroke)
@@ -83,9 +70,9 @@
 }
 
 .card-detail-nav {
-  position: absolute;
+  position: fixed;
   top: 50%;
-  z-index: 8;
+  z-index: 102;
   --ui-icon-action-size: 52px;
   color: var(--color-text);
   background: rgba(255, 255, 255, 0.94);
@@ -98,11 +85,11 @@
 }
 
 .card-detail-nav-prev {
-  left: 0;
+  left: max(26px, calc(50vw - 700px));
   transform: translate(-50%, -50%);
 }
 .card-detail-nav-next {
-  right: 0;
+  right: max(26px, calc(50vw - 700px));
   transform: translate(50%, -50%);
 }
 .card-detail-nav-prev:hover:not(:disabled),
@@ -119,11 +106,11 @@
 /* Extra-wide desktop: float arrows fully outside the modal surface. */
 @media (min-width: 1536px) {
   .card-detail-nav-prev {
-    left: 0;
+    left: calc(50vw - 700px);
     transform: translate(calc(-100% - 16px), -50%);
   }
   .card-detail-nav-next {
-    right: 0;
+    right: calc(50vw - 700px);
     transform: translate(calc(100% + 16px), -50%);
   }
   .card-detail-nav-prev:hover:not(:disabled),
@@ -151,9 +138,6 @@
   transform: none !important;
   border-radius: 0 !important;
   border: none !important;
-}
-.card-detail-modal[data-fullscreen="true"] .card-detail-frame {
-  border-radius: 0;
 }
 .card-detail-modal[data-fullscreen="true"] .card-detail-body {
   flex: 1 1 auto;
@@ -782,7 +766,7 @@
   display: flex;
   flex-direction: column;
   gap: 16px;
-  padding: 14px 16px 64px;
+  padding: 58px 16px 64px;
   border-left: 1px solid var(--color-border);
   background: var(--color-surface);
   min-height: 0;
@@ -829,10 +813,9 @@
   flex-wrap: wrap;
   gap: 8px;
   flex-shrink: 0;
-  min-height: 36px;
   font-size: 15px;
   line-height: 1.5;
-  padding-right: 50px;
+  padding-right: 4px;
 }
 
 .card-detail-meta .card-author-footer {

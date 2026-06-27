@@ -181,29 +181,28 @@ export function CardDetailModal({
         data-fullscreen={isFullscreen ? "true" : "false"}
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="card-detail-frame">
-          <button
-            type="button"
-            className="ui-icon-action ui-corner-action card-detail-close"
-            onClick={onClose}
-            aria-label="닫기"
-          >
-            <CloseIcon size={20} />
-          </button>
-          <button
-            type="button"
-            className="ui-icon-action ui-corner-action card-detail-fullscreen"
-            onClick={toggleFullscreen}
-            aria-label={isFullscreen ? "전체화면 끄기" : "전체화면 켜기"}
-            title={isFullscreen ? "전체화면 끄기" : "전체화면으로 발표"}
-          >
-            {isFullscreen ? (
-              <FullscreenExitIcon size={20} />
-            ) : (
-              <FullscreenEnterIcon size={20} />
-            )}
-          </button>
-          <div className="card-detail-body">
+        <button
+          type="button"
+          className="ui-icon-action ui-corner-action card-detail-close"
+          onClick={onClose}
+          aria-label="닫기"
+        >
+          <CloseIcon size={20} />
+        </button>
+        <button
+          type="button"
+          className="ui-icon-action ui-corner-action card-detail-fullscreen"
+          onClick={toggleFullscreen}
+          aria-label={isFullscreen ? "전체화면 끄기" : "전체화면 켜기"}
+          title={isFullscreen ? "전체화면 끄기" : "전체화면으로 발표"}
+        >
+          {isFullscreen ? (
+            <FullscreenExitIcon size={20} />
+          ) : (
+            <FullscreenEnterIcon size={20} />
+          )}
+        </button>
+        <div className="card-detail-body">
             <section className="card-detail-main" aria-label="콘텐츠">
               {hasMedia && (
                 <div className="card-detail-media" aria-label="첨부">
@@ -359,32 +358,7 @@ export function CardDetailModal({
                 isStudentViewer={isStudentViewer}
               />
             </aside>
-          </div>
         </div>
-        {(onPrevious || onNext) && (
-          <>
-            <button
-              type="button"
-              className="ui-icon-action card-detail-nav card-detail-nav-prev"
-              onClick={onPrevious}
-              disabled={!canGoPrevious}
-              aria-label="이전 게시글"
-              title="이전 게시글"
-            >
-              <ChevronLeftIcon size={28} />
-            </button>
-            <button
-              type="button"
-              className="ui-icon-action card-detail-nav card-detail-nav-next"
-              onClick={onNext}
-              disabled={!canGoNext}
-              aria-label="다음 게시글"
-              title="다음 게시글"
-            >
-              <ChevronRightIcon size={28} />
-            </button>
-          </>
-        )}
         {lightboxIndex !== null &&
           (() => {
             const imageItems = attachments
@@ -401,6 +375,30 @@ export function CardDetailModal({
             );
           })()}
       </div>
+      {!isFullscreen && (onPrevious || onNext) && (
+        <>
+          <button
+            type="button"
+            className="ui-icon-action card-detail-nav card-detail-nav-prev"
+            onClick={onPrevious}
+            disabled={!canGoPrevious}
+            aria-label="이전 게시글"
+            title="이전 게시글"
+          >
+            <ChevronLeftIcon size={28} />
+          </button>
+          <button
+            type="button"
+            className="ui-icon-action card-detail-nav card-detail-nav-next"
+            onClick={onNext}
+            disabled={!canGoNext}
+            aria-label="다음 게시글"
+            title="다음 게시글"
+          >
+            <ChevronRightIcon size={28} />
+          </button>
+        </>
+      )}
     </>
   );
 }
