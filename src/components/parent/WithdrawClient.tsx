@@ -7,7 +7,7 @@ import { useRouter } from "next/navigation";
 //
 // Uses a native confirm() dialog (no extra modal library) since the flow is
 // terminal + irreversible + mobile-first. On success we hard-navigate to
-// /parent/logged-out so the bottom nav + session watchdog unmount cleanly.
+// /parent/logged-out so authenticated parent UI + watchdog unmount cleanly.
 
 export function WithdrawClient() {
   const router = useRouter();

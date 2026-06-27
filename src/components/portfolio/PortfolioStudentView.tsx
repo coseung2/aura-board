@@ -5,8 +5,9 @@ import type {
   PortfolioCardDTO,
   PortfolioStudentDTO,
 } from "@/lib/portfolio-dto";
+import { CardDetailModal } from "../cards/CardDetailModal";
 import { PortfolioCardItem } from "./PortfolioCardItem";
-import { PortfolioCardModal } from "./PortfolioCardModal";
+import { portfolioCardToCardData } from "./portfolio-card-adapter";
 
 type Props = {
   studentId: string;
@@ -118,6 +119,9 @@ export function PortfolioStudentView({
 
   const headTitle = `${data.student.name}의 작품 ${data.cards.length}개`;
   const isViewingSelf = data.student.id === selfStudentId;
+  const selectedCard = openCard
+    ? data.cards.find((c) => c.id === openCard.id) ?? openCard
+    : null;
 
   return (
     <section className="portfolio-student-view">
@@ -155,9 +159,11 @@ export function PortfolioStudentView({
           })}
         </div>
       )}
-      <PortfolioCardModal
-        card={openCard ? data.cards.find((c) => c.id === openCard.id) ?? openCard : null}
+      <CardDetailModal
+        card={selectedCard ? portfolioCardToCardData(selectedCard) : null}
         onClose={() => setOpenCard(null)}
+        boardId={selectedCard?.sourceBoard.id}
+        isStudentViewer={selfStudentId !== null}
       />
     </section>
   );

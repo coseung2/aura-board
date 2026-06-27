@@ -2,8 +2,9 @@
 
 import { useEffect, useState } from "react";
 import type { ShowcaseEntryDTO } from "@/lib/portfolio-dto";
+import { CardDetailModal } from "../cards/CardDetailModal";
 import { ShowcaseCardChip } from "./ShowcaseCardChip";
-import { PortfolioCardModal } from "./PortfolioCardModal";
+import { portfolioCardToCardData } from "./portfolio-card-adapter";
 import { StarFilledIcon } from "../icons/UiIcons";
 
 type Props = {
@@ -68,6 +69,8 @@ export function ShowcaseHighlightStrip({ classroomId, hrefBase }: Props) {
     return null;
   }
 
+  const selectedCard = openEntry?.card ?? null;
+
   return (
     <section className="showcase-strip" aria-label="우리 학급 자랑해요">
       <header className="showcase-strip-head">
@@ -88,9 +91,11 @@ export function ShowcaseHighlightStrip({ classroomId, hrefBase }: Props) {
           />
         ))}
       </div>
-      <PortfolioCardModal
-        card={openEntry?.card ?? null}
+      <CardDetailModal
+        card={selectedCard ? portfolioCardToCardData(selectedCard) : null}
         onClose={() => setOpenEntry(null)}
+        boardId={selectedCard?.sourceBoard.id}
+        isStudentViewer={hrefBase.startsWith("/student")}
       />
     </section>
   );

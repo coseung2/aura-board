@@ -3,15 +3,15 @@
 import { CardBody } from "../cards/CardBody";
 import { ContextMenu, type MenuItem } from "../ContextMenu";
 import type { PortfolioCardDTO } from "@/lib/portfolio-dto";
+import { portfolioCardToCardData } from "./portfolio-card-adapter";
 import { buildSourceLabel } from "./source-label";
 
 type Props = {
   card: PortfolioCardDTO;
-  /** 본인이 작성/공동작성한 카드면 true — 자랑해요 토글 메뉴 노출 */
   canToggleShowcase: boolean;
+  readOnly?: boolean;
   busy: boolean;
   onToggleShowcase: (card: PortfolioCardDTO) => void;
-  /** 카드 클릭 시 부모(StudentView) 가 모달 오픈. */
   onOpen: (card: PortfolioCardDTO) => void;
 };
 
@@ -27,29 +27,22 @@ export function PortfolioCardItem({
     boardLayout: card.sourceBoard.layout,
     sectionTitle: card.sourceSection?.title ?? null,
   });
-  const deepLink = `/board/${card.sourceBoard.slug}`;
+  const cardData = portfolioCardToCardData(card);
 
   const menuItems: MenuItem[] = [];
   if (canToggleShowcase) {
     menuItems.push({
       label: card.isShowcasedByMe
         ? busy
-          ? "처리 중…"
-          : "🌟 자랑해요 내리기"
+          ? "처리 중..."
+          : "자랑해요 내리기"
         : busy
-          ? "처리 중…"
-          : "🌟 자랑해요에 올리기",
+          ? "처리 중..."
+          : "자랑해요에 올리기",
       icon: "🌟",
       onClick: () => onToggleShowcase(card),
     });
   }
-  menuItems.push({
-    label: "원본 보드로 이동",
-    icon: "↗️",
-    onClick: () => {
-      window.location.href = deepLink;
-    },
-  });
 
   function handleKeyDown(e: React.KeyboardEvent) {
     if (e.key === "Enter" || e.key === " ") {
@@ -60,11 +53,17 @@ export function PortfolioCardItem({
 
   return (
     <article
-      className={`portfolio-card ${card.isShowcasedByMe ? "is-showcased-mine" : ""}`}
-      style={{ backgroundColor: card.color ?? undefined }}
+      className={`padlet-card is-static is-clickable portfolio-card ${
+        card.isShowcasedByMe ? "is-showcased-mine" : ""
+      }`}
+      style={{
+        width: cardData.width,
+        minHeight: cardData.height,
+        backgroundColor: cardData.color ?? undefined,
+      }}
       tabIndex={0}
       role="button"
-      aria-label={`${card.title} - ${sourceLabel}, 클릭하여 자세히 보기`}
+      aria-label={`${card.title || "제목 없음"} - ${sourceLabel}, 자세히 보기`}
       onClick={() => onOpen(card)}
       onKeyDown={handleKeyDown}
     >
@@ -78,26 +77,15 @@ export function PortfolioCardItem({
           🌟
         </span>
       )}
-      <div className="portfolio-card-link">
-        <CardBody
-          card={{ ...card, anonymousAuthor: card.sourceBoard.anonymousAuthor }}
-          titleAs="h4"
-          contentDisplay="static"
-        />
-      </div>
-      <div className="portfolio-card-foot">
-        <span className="portfolio-card-source" title={sourceLabel}>
-          {sourceLabel}
-        </span>
-        {menuItems.length > 0 && (
-          <div
-            className="portfolio-card-menu"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <ContextMenu items={menuItems} />
-          </div>
-        )}
-      </div>
+      {menuItems.length > 0 && (
+        <div
+          className="card-ctx-menu portfolio-card-menu"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <ContextMenu items={menuItems} />
+        </div>
+      )}
+      <CardBody card={cardData} boardId={card.sourceBoard.id} />
     </article>
   );
 }

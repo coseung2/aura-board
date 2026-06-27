@@ -5,9 +5,10 @@ import type {
   PortfolioCardDTO,
   ShowcaseEntryDTO,
 } from "@/lib/portfolio-dto";
+import { CardDetailModal } from "../cards/CardDetailModal";
 import { PortfolioCardItem } from "./PortfolioCardItem";
 import { ShowcaseCardChip } from "./ShowcaseCardChip";
-import { PortfolioCardModal } from "./PortfolioCardModal";
+import { portfolioCardToCardData } from "./portfolio-card-adapter";
 import { StarFilledIcon } from "../icons/UiIcons";
 
 type Props = {
@@ -77,6 +78,12 @@ export function ParentPortfolioView({ childId, childName }: Props) {
     );
   }
 
+  const selectedCard = openCard
+    ? data.ownCards.find((c) => c.id === openCard.id) ??
+      data.classroomShowcase.find((e) => e.card.id === openCard.id)?.card ??
+      openCard
+    : null;
+
   return (
     <div className="parent-portfolio">
       <header className="parent-portfolio-head">
@@ -93,6 +100,7 @@ export function ParentPortfolioView({ childId, childName }: Props) {
               key={c.id}
               card={c}
               canToggleShowcase={false}
+              readOnly
               busy={false}
               onToggleShowcase={() => {}}
               onOpen={setOpenCard}
@@ -124,9 +132,10 @@ export function ParentPortfolioView({ childId, childName }: Props) {
         </section>
       )}
 
-      <PortfolioCardModal
-        card={openCard}
+      <CardDetailModal
+        card={selectedCard ? portfolioCardToCardData(selectedCard) : null}
         onClose={() => setOpenCard(null)}
+        boardId={selectedCard?.sourceBoard.id}
       />
     </div>
   );

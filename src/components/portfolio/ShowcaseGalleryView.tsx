@@ -3,12 +3,13 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import type { ShowcaseEntryDTO } from "@/lib/portfolio-dto";
+import { CardDetailModal } from "../cards/CardDetailModal";
 import { ShowcaseCardChip } from "./ShowcaseCardChip";
-import { PortfolioCardModal } from "./PortfolioCardModal";
+import { portfolioCardToCardData } from "./portfolio-card-adapter";
 
 // student-portfolio (2026-04-26): 자랑해요 전용 페이지의 client view.
 // 학급 메인 strip(최신 10개 가로 스크롤) 의 풀버전 — 모든 자랑해요를
-// 그리드로 렌더. 클릭 시 PortfolioCardModal in-place view.
+// 그리드로 렌더. 클릭 시 보드 카드 상세모달을 그대로 연다.
 
 type Props = {
   classroomId: string;
@@ -56,6 +57,8 @@ export function ShowcaseGalleryView({
     };
   }, [classroomId]);
 
+  const selectedCard = openEntry?.card ?? null;
+
   return (
     <>
       <header className="portfolio-page-header">
@@ -101,9 +104,11 @@ export function ShowcaseGalleryView({
         )}
       </main>
 
-      <PortfolioCardModal
-        card={openEntry?.card ?? null}
+      <CardDetailModal
+        card={selectedCard ? portfolioCardToCardData(selectedCard) : null}
         onClose={() => setOpenEntry(null)}
+        boardId={selectedCard?.sourceBoard.id}
+        isStudentViewer={backHref.startsWith("/student")}
       />
     </>
   );

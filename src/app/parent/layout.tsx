@@ -3,8 +3,8 @@ import type { ReactNode } from "react";
 
 // Parent PWA shell layout (PV-6).
 //
-// - Injects mobile-first viewport with `maximum-scale=1` to block pinch-zoom
-//   jitter on iOS Safari when tapping fixed bottom nav.
+// - Injects mobile-first viewport with `maximum-scale=1` to keep the parent
+//   app shell stable in standalone/mobile Safari.
 // - Registers `parent-manifest.json` scoped to `/parent/` so the home screen
 //   install prompt only fires inside the parent flow (doesn't affect teacher UX).
 // - Adds theme-color meta for standalone mode (matches manifest primary).
@@ -12,8 +12,7 @@ import type { ReactNode } from "react";
 //   a scope helper explicitly so we can differentiate 401 vs missing-cookie
 //   redirects per route.
 //
-// Bottom nav is NOT mounted here (cannot reliably read pathname in a root
-// server layout). Each authenticated segment layout (/parent/(app)) mounts it.
+// Authenticated parent navigation is mounted by /parent/(app)/layout.tsx.
 
 export const metadata: Metadata = {
   title: "Aura-board 학부모",

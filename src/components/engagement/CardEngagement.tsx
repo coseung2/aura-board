@@ -10,7 +10,7 @@ import { useBoardEngagement } from "@/hooks/useBoardEngagementRealtime";
 // card-comments-likes (2026-04-26): 카드별 좋아요 + 댓글 UI.
 // mode="chips"  — 인라인 보드 카드 footer (좋아요 토글 + 댓글 카운트
 //                  → 클릭 시 내부 모달 열어 댓글 패널 노출).
-// mode="panel"  — PortfolioCardModal/showcase 등 이미 모달 안인 컨텍스트.
+// mode="panel"  — CardDetailModal/showcase 등 이미 모달 안인 컨텍스트.
 //                  댓글 패널을 통째로 인라인 렌더.
 
 interface CommentItem {
@@ -259,7 +259,7 @@ function CommentsModal({
   onClose: () => void;
 }) {
   // engagement-modal-portal (2026-04-26): 모달이 카드 DOM 안에 그대로 있으면
-  // 부모 .portfolio-card-link / .showcase-chip 의 pointer-events:none 가
+  // 부모 .portfolio-card / .showcase-chip 의 pointer-events:none 가
   // 모달의 닫기·제출 버튼까지 막아서 안 눌림. portal 로 document.body 에 옮겨
   // DOM 계층 탈출.
   const [mounted, setMounted] = useState(false);

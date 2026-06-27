@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import { redirect } from "next/navigation";
 import { getCurrentParent } from "@/lib/parent-session";
-import { ParentBottomNav } from "@/components/parent/ParentBottomNav";
+import { ParentTopNav } from "@/components/parent/ParentTopNav";
 import { SessionWatchdog } from "@/components/parent/SessionWatchdog";
 
 // Authenticated parent segment layout (PV-6).
@@ -11,7 +11,7 @@ import { SessionWatchdog } from "@/components/parent/SessionWatchdog";
 // boilerplate. `getCurrentParent()` already returns null for revoked /
 // expired / soft-deleted — all of those funnel into /parent/logged-out.
 //
-// The bottom nav is mounted here (NOT in the parent root layout) because it
+// The top nav is mounted here (NOT in the parent root layout) because it
 // only belongs on authenticated pages, not /join or /auth.
 
 export const dynamic = "force-dynamic";
@@ -22,16 +22,12 @@ export default async function ParentAppLayout({ children }: { children: ReactNod
   if (!current) {
     redirect("/parent/join?error=session_required");
   }
+  const parent = current.parent;
   return (
-    <div
-      style={{
-        minHeight: "100dvh",
-        paddingBottom: "calc(56px + env(safe-area-inset-bottom, 0px))",
-      }}
-    >
+    <>
+      <ParentTopNav parent={{ name: parent.name, email: parent.email }} />
       {children}
-      <ParentBottomNav />
       <SessionWatchdog />
-    </div>
+    </>
   );
 }

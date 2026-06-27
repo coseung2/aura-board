@@ -5,8 +5,8 @@ import { useRouter } from "next/navigation";
 import { OnboardingShell } from "../_shell";
 
 // parent-class-invite-v2 — legacy P5 Pending URL.
-// Pending state now lives inside /parent/home so the bottom nav and dashboard
-// remain visible.
+// Pending state now lives inside /parent/home so the authenticated dashboard
+// remains visible.
 
 export default function PendingPage() {
   const router = useRouter();

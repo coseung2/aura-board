@@ -4,6 +4,8 @@ import { ClassroomListPage } from "@/components/ClassroomListPage";
 import { TopNav } from "@/components/TopNav";
 import { redirect } from "next/navigation";
 
+const ADMIN_EMAIL = "mallagaenge@gmail.com";
+
 export default async function ClassroomPage() {
   let user;
   try {
@@ -22,7 +24,7 @@ export default async function ClassroomPage() {
 
   return (
     <>
-      <TopNav />
+      <TopNav showAdmin={user.email.toLowerCase() === ADMIN_EMAIL} />
       <main className="classroom-page">
         <div className="classroom-header">
           <h1>학급 관리</h1>

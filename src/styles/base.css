@@ -281,7 +281,6 @@ select {
 
 button.side-panel-close.side-panel-close,
 button.quiz-modal-close.quiz-modal-close,
-button.portfolio-card-modal-close.portfolio-card-modal-close,
 button.card-engagement-modal-close.card-engagement-modal-close {
   position: relative;
   display: inline-flex;
@@ -321,8 +320,6 @@ button.side-panel-close.side-panel-close::before,
 button.side-panel-close.side-panel-close::after,
 button.quiz-modal-close.quiz-modal-close::before,
 button.quiz-modal-close.quiz-modal-close::after,
-button.portfolio-card-modal-close.portfolio-card-modal-close::before,
-button.portfolio-card-modal-close.portfolio-card-modal-close::after,
 button.card-engagement-modal-close.card-engagement-modal-close::before,
 button.card-engagement-modal-close.card-engagement-modal-close::after,
 button.assign-modal__close.assign-modal__close::before,
@@ -337,7 +334,6 @@ button.assign-modal__close.assign-modal__close::after {
 
 button.side-panel-close.side-panel-close::before,
 button.quiz-modal-close.quiz-modal-close::before,
-button.portfolio-card-modal-close.portfolio-card-modal-close::before,
 button.card-engagement-modal-close.card-engagement-modal-close::before,
 button.assign-modal__close.assign-modal__close::before {
   transform: rotate(45deg);
@@ -345,7 +341,6 @@ button.assign-modal__close.assign-modal__close::before {
 
 button.side-panel-close.side-panel-close::after,
 button.quiz-modal-close.quiz-modal-close::after,
-button.portfolio-card-modal-close.portfolio-card-modal-close::after,
 button.card-engagement-modal-close.card-engagement-modal-close::after,
 button.assign-modal__close.assign-modal__close::after {
   transform: rotate(-45deg);

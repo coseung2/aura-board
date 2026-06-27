@@ -13,7 +13,7 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 // parent-redesign (2026-04-26): 학부모 대시보드.
 // 풀폭 헤더 + 자녀 chip 셀렉터 + 자녀 portfolio 본문(자녀 카드 + 학급
 // 자랑해요). DJ 보드 헤더 패턴 일관. /parent/(app)/layout.tsx 가 이미
-// 세션 가드 + ParentBottomNav 마운트. 본 페이지는 데이터 fetch + 렌더.
+// 세션 가드 + ParentTopNav 마운트. 본 페이지는 데이터 fetch + 렌더.
 export default async function ParentHomePage({
   searchParams,
 }: {

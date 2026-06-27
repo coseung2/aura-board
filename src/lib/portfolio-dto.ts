@@ -10,6 +10,8 @@ export type PortfolioCardDTO = {
   title: string;
   content: string;
   color: string | null;
+  width: number;
+  height: number;
   imageUrl: string | null;
   thumbUrl: string | null;
   linkUrl: string | null;

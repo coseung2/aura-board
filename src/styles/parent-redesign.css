@@ -302,3 +302,168 @@
     grid-row: auto;
   }
 }
+
+/* ── 학부모 상단 네비게이션 ── */
+.parent-topnav {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 32px;
+  background: rgba(246, 245, 244, 0.96);
+  border-bottom: 1px solid var(--color-border);
+  backdrop-filter: saturate(150%) blur(8px);
+  -webkit-backdrop-filter: saturate(150%) blur(8px);
+}
+
+.parent-topnav-left {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  min-width: 0;
+}
+
+.parent-topnav-logo {
+  display: inline-flex;
+  align-items: center;
+  color: inherit;
+  text-decoration: none;
+  flex: 0 0 auto;
+}
+
+.parent-topnav-links {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  min-width: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.parent-topnav-links::-webkit-scrollbar {
+  display: none;
+}
+
+.parent-topnav-link {
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 12px;
+  border-radius: 6px;
+  color: var(--color-text-muted);
+  text-decoration: none;
+  font-size: 14px;
+  font-weight: 500;
+  white-space: nowrap;
+  transition:
+    background var(--t-normal),
+    color var(--t-normal);
+}
+
+.parent-topnav-link:hover {
+  background: var(--color-surface-alt);
+  color: var(--color-text);
+}
+
+.parent-topnav-link.active {
+  background: var(--color-surface-alt);
+  color: var(--color-text);
+  font-weight: 600;
+}
+
+.parent-topnav-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 0 0 auto;
+  min-width: 0;
+}
+
+.parent-topnav-user {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 1px;
+  line-height: 1.15;
+  min-width: 0;
+}
+
+.parent-topnav-name {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--color-text);
+  white-space: nowrap;
+}
+
+.parent-topnav-email {
+  max-width: 180px;
+  overflow: hidden;
+  color: var(--color-text-muted);
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.parent-topnav-logout {
+  flex: 0 0 auto;
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  font: inherit;
+  font-size: 13px;
+  padding: 6px 10px;
+  white-space: nowrap;
+  transition:
+    border-color var(--t-normal),
+    color var(--t-normal),
+    background var(--t-normal);
+}
+
+.parent-topnav-logout:hover:not(:disabled) {
+  border-color: var(--color-accent);
+  background: var(--color-surface-alt);
+  color: var(--color-accent);
+}
+
+.parent-topnav-logout:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+@media (max-width: 760px) {
+  .parent-topnav {
+    align-items: flex-start;
+    flex-direction: column;
+    padding: 10px 16px;
+  }
+
+  .parent-topnav-left {
+    width: 100%;
+    gap: 12px;
+  }
+
+  .parent-topnav-logo .ab-logo-wordmark {
+    display: none;
+  }
+
+  .parent-topnav-links {
+    flex: 1;
+  }
+
+  .parent-topnav-right {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .parent-topnav-user {
+    align-items: flex-start;
+  }
+
+  .parent-topnav-email {
+    max-width: 140px;
+  }
+}
