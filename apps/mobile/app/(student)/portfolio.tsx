@@ -122,7 +122,7 @@ export default function StudentPortfolioScreen() {
   }
 
   return (
-    <SafeAreaView style={styles.container} edges={["top", "bottom"]}>
+    <SafeAreaView style={styles.container} edges={["top"]}>
       <AppHeader title="우리 학급 포트폴리오" onBack={() => router.back()} />
 
       {loading ? (

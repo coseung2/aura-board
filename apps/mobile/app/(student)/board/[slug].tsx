@@ -64,7 +64,7 @@ export default function BoardDetail() {
 
   if (loading) {
     return (
-      <SafeAreaView style={styles.container} edges={["top", "bottom"]}>
+      <SafeAreaView style={styles.container} edges={["top"]}>
         <View style={styles.center}>
           <ActivityIndicator size="large" color={colors.accent} />
           <Text style={styles.loadingText}>보드 열기…</Text>
@@ -75,7 +75,7 @@ export default function BoardDetail() {
 
   if (error || !data) {
     return (
-      <SafeAreaView style={styles.container} edges={["top", "bottom"]}>
+      <SafeAreaView style={styles.container} edges={["top"]}>
         <View style={styles.center}>
           <Text style={styles.errorEmoji}>🚫</Text>
           <Text style={styles.errorTitle}>{error ?? "알 수 없는 오류"}</Text>
@@ -90,7 +90,7 @@ export default function BoardDetail() {
   return (
     <SafeAreaView
       style={[styles.container, { backgroundColor: boardTheme.background }]}
-      edges={["top", "bottom"]}
+      edges={["top"]}
     >
       <BoardHeader title={board.title} layout={board.layout} />
       <View style={styles.body}>{renderLayout(data, load)}</View>

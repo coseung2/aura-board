@@ -66,7 +66,7 @@ export default function StudentShowcaseScreen() {
   }, [handleAuthError]);
 
   return (
-    <SafeAreaView style={styles.container} edges={["top", "bottom"]}>
+    <SafeAreaView style={styles.container} edges={["top"]}>
       <AppHeader title="우리 학급 자랑해요" onBack={() => router.back()} />
 
       {loading ? (

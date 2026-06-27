@@ -159,7 +159,7 @@ export default function StoreChargeScreen() {
   }
 
   return (
-    <SafeAreaView style={styles.container} edges={["top", "bottom"]}>
+    <SafeAreaView style={styles.container} edges={["top"]}>
       <AppHeader title="매점 결제" onBack={() => router.back()} />
 
       {loading ? (

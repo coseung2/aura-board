@@ -269,6 +269,7 @@ export const layers = {
   badge: 2,
   overlayControl: 10,
   mediaControl: 12,
+  bottomNav: 20,
 } as const;
 
 export const media = {
@@ -410,6 +411,12 @@ export const navigation = {
   headerHeight: 72,
 } as const;
 
+export const studentNav = {
+  tabMinWidth: 72,
+  dutyTabMaxWidth: 128,
+  logoutMinWidth: 76,
+} as const;
+
 export const store = {
   headerHeight: 72,
   itemCardWidth: 160,
@@ -426,6 +433,14 @@ export const bank = {
   studentNumberWidth: 36,
   inputMinHeight: 48,
   actionMinHeight: 46,
+} as const;
+
+export const check = {
+  taskCardWidth: 236,
+  taskCardMinHeight: 118,
+  rosterNumberWidth: 36,
+  markSize: 28,
+  progressHeight: 8,
 } as const;
 
 export const wallet = {

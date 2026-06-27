@@ -112,7 +112,7 @@ export default function StudentWalletScreen() {
   }, [loadQr, qr]);
 
   return (
-    <SafeAreaView style={styles.container} edges={["top", "bottom"]}>
+    <SafeAreaView style={styles.container} edges={["top"]}>
       <AppHeader title="내 통장과 적금" onBack={() => router.back()} />
 
       {loading ? (

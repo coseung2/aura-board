@@ -122,6 +122,44 @@ export type StoreChargeReceipt = {
   items: Array<{ id: string; name: string; price: number; qty: number }>;
 };
 
+export type CheckTask = {
+  id: string;
+  title: string;
+  description: string | null;
+  dueDate: string | null;
+  isActive: boolean;
+  submittedCount: number;
+  totalStudents: number;
+  createdAt: string;
+};
+
+export type CheckTaskListResponse = {
+  tasks: CheckTask[];
+};
+
+export type CheckRosterEntry = {
+  student: { id: string; name: string; number: number | null };
+  submission: {
+    id: string;
+    submitted: boolean;
+    checkedAt: string | null;
+    checkedById: string | null;
+  } | null;
+};
+
+export type CheckTaskDetailResponse = {
+  task: {
+    id: string;
+    title: string;
+    description: string | null;
+    dueDate: string | null;
+    isActive: boolean;
+    createdAt: string;
+    updatedAt: string;
+  };
+  roster: CheckRosterEntry[];
+};
+
 export type CardAttachment = {
   id: string;
   kind: "image" | "video" | "file" | "link";

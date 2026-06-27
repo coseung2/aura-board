@@ -24,6 +24,7 @@ import {
 import { layoutLabel, layoutThumbnail } from "../../theme/layout-meta";
 import { apiFetch, ApiError, getApiUrl } from "../../lib/api";
 import { clearSessionToken } from "../../lib/session";
+import { roleEmoji, studentDutyTarget } from "../../lib/student-navigation";
 import type {
   BoardMeta,
   MeResponse,
@@ -58,7 +59,6 @@ export default function StudentHome() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [loggingOut, setLoggingOut] = useState(false);
 
   const columnCount =
     width < dashboard.columns.one
@@ -133,18 +133,9 @@ export default function StudentHome() {
     }, [load]),
   );
 
-  async function handleLogout() {
-    if (loggingOut) return;
-    setLoggingOut(true);
-    await clearSessionToken();
-    // Web-side POST /api/student/logout — best-effort. 실패해도 로컬 삭제가 우선.
-    apiFetch("/api/student/logout", { method: "POST" }).catch(() => undefined);
-    router.replace("/(student)/login");
-  }
-
   if (loading && !me) {
     return (
-      <SafeAreaView style={styles.container} edges={["top", "bottom"]}>
+      <SafeAreaView style={styles.container} edges={["top"]}>
         <View style={styles.loadingCenter}>
           <ActivityIndicator size="large" color={colors.accent} />
           <Text style={styles.loadingText}>보드를 불러오는 중…</Text>
@@ -155,7 +146,7 @@ export default function StudentHome() {
 
   if (error && !me) {
     return (
-      <SafeAreaView style={styles.container} edges={["top", "bottom"]}>
+      <SafeAreaView style={styles.container} edges={["top"]}>
         <View style={styles.errorCenter}>
           <Text style={styles.errorEmoji}>😵</Text>
           <Text style={styles.errorTitle}>연결할 수 없어요</Text>
@@ -179,7 +170,7 @@ export default function StudentHome() {
   const classroomName = me?.student.classroom?.name ?? "학급 미배정";
 
   return (
-    <SafeAreaView style={styles.container} edges={["top", "bottom"]}>
+    <SafeAreaView style={styles.container} edges={["top"]}>
       <ScrollView
         contentContainerStyle={styles.scrollContent}
         refreshControl={
@@ -197,14 +188,6 @@ export default function StudentHome() {
             </Text>
             <Pill tone="accent">{classroomName}</Pill>
           </View>
-          <AppButton
-            variant="secondary"
-            onPress={handleLogout}
-            disabled={loggingOut}
-            hitSlop={8}
-          >
-            {loggingOut ? "로그아웃 중…" : "로그아웃"}
-          </AppButton>
         </View>
 
         <ShowcaseBand
@@ -477,22 +460,22 @@ function DutySectionCompact({
   onOpen,
 }: {
   duties: StudentDuty[];
-  onOpen: (path: string) => void;
+  onOpen: (path: Href) => void;
 }) {
   const visible = duties
-    .map((duty) => ({ duty, path: roleHref(duty) }))
-    .filter((item): item is { duty: StudentDuty; path: string } =>
-      Boolean(item.path),
+    .map((duty) => ({ duty, target: studentDutyTarget(duty) }))
+    .filter((item): item is { duty: StudentDuty; target: NonNullable<ReturnType<typeof studentDutyTarget>> } =>
+      item.target !== null,
     );
   if (visible.length === 0) return null;
 
   return (
     <View style={styles.dutyStrip}>
-      {visible.map(({ duty, path }) => (
+      {visible.map(({ duty, target }) => (
         <SurfacePressable
           key={`${duty.classroomId}-${duty.roleKey}`}
           style={styles.dutyChip}
-          onPress={() => onOpen(path)}
+          onPress={() => onOpen(target.href)}
         >
           <Text style={styles.dutyChipEmoji}>
             {duty.emoji ?? roleEmoji(duty.roleKey)}
@@ -503,25 +486,6 @@ function DutySectionCompact({
       ))}
     </View>
   );
-}
-
-function roleHref(duty: StudentDuty): string | null {
-  // 서버가 부여한 href 가 모바일 라우터 경로와 다를 수 있어 매핑한다.
-  // (서버는 /classroom/:id/{bank,pay} 웹 경로를, 모바일은 /(student)/{bank,pay}?classroomId=... 를 쓴다.)
-  const classroomId = encodeURIComponent(duty.classroomId);
-  if (duty.href.endsWith("/bank")) {
-    return `/(student)/bank?classroomId=${classroomId}`;
-  }
-  if (duty.href.endsWith("/pay")) {
-    return `/(student)/pay?classroomId=${classroomId}`;
-  }
-  return null;
-}
-
-function roleEmoji(roleKey: string): string {
-  if (roleKey === "banker") return "🏦";
-  if (roleKey === "store-clerk") return "🛒";
-  return "•";
 }
 
 function getCardPreviewImage(card: PortfolioCardDTO): string | null {
