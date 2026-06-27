@@ -13,17 +13,27 @@ type Props = { params: Promise<{ id: string }> };
 // works in both contexts.
 export default async function KordlePlayPage({ params }: Props) {
   const { id } = await params;
-  const boardId = id;
+  const boardIdOrSlug = id;
+
+  // StudentDashboard links to /board/${board.slug}/play/kordle, so the
+  // dynamic segment can be either a board id or a slug. Resolve to the
+  // canonical board row first; the Kordle game is keyed by boardId.
+  const board = await db.board.findFirst({
+    where: { OR: [{ id: boardIdOrSlug }, { slug: boardIdOrSlug }] },
+    select: {
+      id: true,
+      slug: true,
+      classroomId: true,
+      classroom: { select: { teacherId: true } },
+    },
+  });
+  if (!board) notFound();
+  const boardId = board.id;
 
   const game = await db.kordleGame.findUnique({
     where: { boardId },
-    include: {
-      board: {
-        select: {
-          classroomId: true,
-          classroom: { select: { teacherId: true } },
-        },
-      },
+    select: {
+      locale: true,
       puzzles: {
         where: { status: { in: ["LIVE", "SCHEDULED"] } },
         orderBy: { startsAt: "desc" },
@@ -37,8 +47,8 @@ export default async function KordlePlayPage({ params }: Props) {
   if (!puzzle) {
     return (
       <main className="kordle-board">
-        <h1>??? ??? ?? ???? ????</h1>
-        <p>???? ??? ???? ??? ? ? ???.</p>
+        <h1>아직 플레이할 퍼즐이 없어요</h1>
+        <p>선생님이 퍼즐을 열면 여기에서 바로 시작할 수 있어요.</p>
       </main>
     );
   }
@@ -47,12 +57,12 @@ export default async function KordlePlayPage({ params }: Props) {
   if (!student) {
     // Teacher fallback: same link, no student session.
     const user = await getCurrentUser();
-    if (user && game.board.classroom?.teacherId === user.id) {
-      redirect(`/board/${boardId}`);
+    if (user && board.classroom?.teacherId === user.id) {
+      redirect(`/board/${board.slug ?? boardId}`);
     }
     notFound();
   }
-  if (game.board.classroomId !== student.classroomId) {
+  if (board.classroomId !== student.classroomId) {
     notFound();
   }
 

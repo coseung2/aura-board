@@ -1,8 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import type { GuessFeedback, KordlePublicState, LetterState } from "../engine";
-import { recomposeHangul } from "../engine";
+import type { KordlePublicState, LetterState } from "../engine";
 import { KordleGrid } from "./KordleGrid";
 import { KordleKeyboard } from "./KordleKeyboard";
 import { KordleResultModal } from "./KordleResultModal";
@@ -16,14 +15,16 @@ type Props = {
 
 type Status = KordlePublicState["status"];
 
-// Korean on-screen typing is jamo-based. The user taps a leading jamo
-// (e.g. ?), then a medial (e.g. ?), then optionally a trail. The
-// `currentBuffer` holds the in-progress syllable. When a complete syllable
-// is reached we commit it to `pendingSlots`. On submit we recompose each
-// slot to a Hangul syllable and join.
-const KO_LEADS = new Set([0x1100, 0x1101, 0x1102, 0x1103, 0x1104, 0x1105, 0x1106, 0x1107, 0x1108, 0x1109, 0x110a, 0x110b, 0x110c, 0x110d, 0x110e, 0x110f, 0x1110, 0x1111, 0x1112]);
-const KO_MEDIALS = new Set([0x1161, 0x1162, 0x1163, 0x1164, 0x1165, 0x1166, 0x1167, 0x1168, 0x1169, 0x116a, 0x116b, 0x116c, 0x116d, 0x116e, 0x116f, 0x1170, 0x1171, 0x1172, 0x1173, 0x1174, 0x1175]);
-const KO_TRAILS = new Set([0x11a8, 0x11a9, 0x11aa, 0x11ab, 0x11ac, 0x11ad, 0x11ae, 0x11af, 0x11b0, 0x11b1, 0x11b2, 0x11b3, 0x11b4, 0x11b5, 0x11b6, 0x11b7, 0x11b8, 0x11b9, 0x11ba, 0x11bb, 0x11bc, 0x11bd, 0x11be, 0x11bf, 0x11c0, 0x11c1, 0x11c2]);
+// Korean on-screen typing is jamo-based. The engine normalizes Korean into a
+// flat jamo stream (lead U+1100..U+1112, medial U+1161..U+1175,
+// trail U+11A8..U+11C2) and `state.wordLength` is that jamo code-point length,
+// NOT a syllable count. So pending input is modeled as a flat array of single
+// jamo characters, one per grid cell - matching the per-jamo feedback the
+// server returns. `buffer` holds the in-progress syllable (1-3 jamos) until it
+// is complete; on submit the whole jamo stream is sent as-is.
+const KO_LEADS = new Set(Array.from({ length: 19 }, (_, i) => 0x1100 + i));
+const KO_MEDIALS = new Set(Array.from({ length: 21 }, (_, i) => 0x1161 + i));
+const KO_TRAILS = new Set(Array.from({ length: 27 }, (_, i) => 0x11a8 + i));
 
 function classifyHangul(cp: number): "lead" | "medial" | "trail" | "none" {
   if (KO_LEADS.has(cp)) return "lead";
@@ -49,10 +50,10 @@ function isCompleteSyllable(buffer: string): boolean {
 
 export function KordleBoard({ boardId, initialState, attemptId, locale }: Props) {
   const [state, setState] = useState<KordlePublicState>(initialState);
-  // For Korean, `pendingSlots` holds committed syllable strings (each 2-3
-  // jamos long). `buffer` holds the in-progress syllable.
-  // For English, `pendingSlots` holds single letters and `buffer` is unused.
-  const [pendingSlots, setPendingSlots] = useState<string[]>([]);
+  // `pending` holds committed single-character cells: one letter per slot for
+  // English, one jamo per slot for Korean. `buffer` is the Korean in-progress
+  // syllable (a jamo string of 1-3 code points); empty for English.
+  const [pending, setPending] = useState<string[]>([]);
   const [buffer, setBuffer] = useState<string>("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -76,14 +77,11 @@ export function KordleBoard({ boardId, initialState, attemptId, locale }: Props)
 
   const submit = useCallback(async () => {
     if (submitting || isComplete) return;
-    // Compose final guess.
-    const finalSlots = [...pendingSlots];
-    if (buffer.length > 0) {
-      finalSlots.push(recomposeHangul(buffer));
-    }
-    const guess = isKorean ? finalSlots.map((s) => s).join("") : finalSlots.join("");
+    // Full guess = committed cells + any in-progress Korean syllable jamos.
+    // For English `buffer` is always "" so this is just the joined letters.
+    const guess = pending.join("") + buffer;
     if ([...guess].length !== state.wordLength) {
-      setError(`??? ${state.wordLength}???? ??`);
+      setError(`${state.wordLength}개의 자모를 입력하세요`);
       return;
     }
     setSubmitting(true);
@@ -101,28 +99,21 @@ export function KordleBoard({ boardId, initialState, attemptId, locale }: Props)
       }
       const data = (await res.json()) as { state: KordlePublicState };
       setState(data.state);
-      setPendingSlots([]);
+      setPending([]);
       setBuffer("");
     } finally {
       setSubmitting(false);
     }
-  }, [attemptId, buffer, isComplete, isKorean, pendingSlots, state.wordLength, submitting]);
+  }, [attemptId, buffer, isComplete, pending, state.wordLength, submitting]);
 
   const onKey = useCallback(
     (key: string) => {
       if (isComplete || submitting) return;
       if (key === "ENTER") {
-        // For Korean, ENTER commits the current buffer to a slot if it is
-        // a complete syllable, then submits.
-        if (isKorean && buffer.length > 0) {
-          if (isCompleteSyllable(buffer)) {
-            const slot = recomposeHangul(buffer);
-            setPendingSlots((p) => (p.length >= state.wordLength ? p : [...p, slot]));
-            setBuffer("");
-          } else {
-            setError("??? ???? ????");
-            return;
-          }
+        // Refuse to submit a half-formed Korean syllable.
+        if (isKorean && buffer.length > 0 && !isCompleteSyllable(buffer)) {
+          setError("음절이 완성되지 않았습니다");
+          return;
         }
         void submit();
         return;
@@ -131,7 +122,7 @@ export function KordleBoard({ boardId, initialState, attemptId, locale }: Props)
         if (isKorean && buffer.length > 0) {
           setBuffer((b) => b.slice(0, -1));
         } else {
-          setPendingSlots((p) => p.slice(0, -1));
+          setPending((p) => p.slice(0, -1));
         }
         return;
       }
@@ -139,42 +130,50 @@ export function KordleBoard({ boardId, initialState, attemptId, locale }: Props)
         const cp = key.codePointAt(0) ?? 0;
         const klass = classifyHangul(cp);
         if (klass === "none") return; // ignore non-jamo keys for Korean
-        const nextBuffer = buffer + key;
-        if (buffer.length === 0 && klass !== "lead") {
-          setError("???? ??? ???");
-          return;
-        }
-        if (buffer.length === 1 && klass !== "medial" && klass !== "lead") {
-          setError("?? ?? ?? ??? ??? ???");
-          return;
-        }
-        if (buffer.length === 2 && klass !== "trail") {
-          // Buffer is full (lead+medial); commit then start new syllable.
-          const slot = recomposeHangul(buffer);
-          setPendingSlots((p) => (p.length >= state.wordLength ? p : [...p, slot]));
-          if (klass === "lead") {
-            setBuffer(key);
-          } else {
-            // Stray medial/trail with no lead: ignore.
-            setError("??? ??????");
+        if (pending.length + buffer.length >= state.wordLength) return; // grid full
+        if (buffer.length === 0) {
+          if (klass !== "lead") {
+            setError("초성부터 입력하세요");
             return;
           }
+          setBuffer(key);
           return;
         }
-        setBuffer(nextBuffer);
-        // Auto-commit when complete (3 jamos).
-        if (isCompleteSyllable(nextBuffer)) {
-          const slot = recomposeHangul(nextBuffer);
-          setPendingSlots((p) => (p.length >= state.wordLength ? p : [...p, slot]));
-          setBuffer("");
+        if (buffer.length === 1) {
+          // buffer holds a lone lead.
+          if (klass === "medial") {
+            setBuffer(buffer + key);
+            return;
+          }
+          if (klass === "lead") {
+            // No medial chosen: commit the lone lead and start a new syllable.
+            setPending((p) => [...p, ...buffer]);
+            setBuffer(key);
+            return;
+          }
+          setError("중성을 먼저 입력하세요");
+          return;
         }
+        // buffer.length === 2: lead + medial (a complete 2-jamo syllable).
+        if (klass === "trail") {
+          const completed = buffer + key;
+          setPending((p) => [...p, ...completed]);
+          setBuffer("");
+          return;
+        }
+        if (klass === "lead") {
+          setPending((p) => [...p, ...buffer]);
+          setBuffer(key);
+          return;
+        }
+        setError("종성 또는 새 초성을 입력하세요");
         return;
       }
       // English: one letter per slot.
-      if (pendingSlots.length >= state.wordLength) return;
-      setPendingSlots((p) => [...p, key]);
+      if (pending.length >= state.wordLength) return;
+      setPending((p) => [...p, key]);
     },
-    [buffer, isComplete, isKorean, pendingSlots.length, state.wordLength, submit, submitting],
+    [buffer, isComplete, isKorean, pending.length, state.wordLength, submit, submitting],
   );
 
   useEffect(() => {
@@ -195,17 +194,9 @@ export function KordleBoard({ boardId, initialState, attemptId, locale }: Props)
     return () => window.removeEventListener("keydown", handler);
   }, [isKorean, onKey]);
 
-  // For display, the grid wants an array of slot strings (each
-  // representing one cell). For Korean, slots = pendingSlots + (buffer
-  // precomposed as the next cell if non-empty). For English, slots are
-  // already the raw letters.
-  const displaySlots: string[] = isKorean
-    ? (() => {
-        const slots = [...pendingSlots];
-        if (buffer.length > 0) slots.push(recomposeHangul(buffer));
-        return slots;
-      })()
-    : pendingSlots;
+  // Grid cells = committed cells + in-progress Korean jamos. For English
+  // `buffer` is "" so this is just `pending`. Each entry is one cell.
+  const displaySlots: string[] = [...pending, ...buffer];
 
   return (
     <div className="kordle-board" data-locale={locale} aria-label="Kordle game">

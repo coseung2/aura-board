@@ -31,9 +31,11 @@ export function KordleGrid({ wordLength, maxGuesses, pastGuesses, pending, isKor
     >
       {rows.map((row, rowIdx) => (
         <div className="kordle-row" role="row" key={rowIdx}>
-          {Array.from({ length: wordLength }).map((_, colIdx) => {
-            const cell = row[colIdx];
-            if (typeof cell === "string") {
+         {Array.from({ length: wordLength }).map((_, colIdx) => {
+           const cell = row[colIdx];
+            // Pending rows are shorter than `wordLength` while typing, so
+            // out-of-range cells are `undefined`; render them as empty.
+            if (cell === undefined || typeof cell === "string") {
               return (
                 <div
                   className="kordle-cell kordle-cell--empty"
@@ -41,7 +43,7 @@ export function KordleGrid({ wordLength, maxGuesses, pastGuesses, pending, isKor
                   role="gridcell"
                   aria-label={cell || "empty"}
                 >
-                  {cell}
+                  {cell ?? ""}
                 </div>
               );
             }
