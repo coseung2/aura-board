@@ -35,7 +35,11 @@ export default async function StudentPage() {
   const streamBreakouts = boards
     .map((board) => {
       const assignment = board.breakoutAssignment;
-      if (!assignment || board.layout !== "breakout" || assignment.status !== "active") {
+      if (
+        !assignment ||
+        board.layout !== "breakout" ||
+        assignment.status !== "active"
+      ) {
         return null;
       }
       const sourceBoardId = getStreamBreakoutSourceId(assignment.template.key);
@@ -44,7 +48,9 @@ export default async function StudentPage() {
     })
     .filter((item): item is NonNullable<typeof item> => item !== null);
 
-  const streamBreakoutBoardIds = new Set(streamBreakouts.map((item) => item.board.id));
+  const streamBreakoutBoardIds = new Set(
+    streamBreakouts.map((item) => item.board.id),
+  );
   const streamBreakoutBySource = new Map<
     string,
     (typeof streamBreakouts)[number]
@@ -72,25 +78,27 @@ export default async function StudentPage() {
   const myMemberships: Array<{ assignmentId: string; sectionId: string }> = [];
 
   if (breakoutBoardIds.length > 0) {
-    const [sectionsResult, countsResult, membershipsResult] = await Promise.all([
-      db.section.findMany({
-        where: { boardId: { in: breakoutBoardIds } },
-        orderBy: { order: "asc" },
-        select: { id: true, boardId: true, title: true, order: true },
-      }),
-      db.breakoutMembership.groupBy({
-        by: ["assignmentId", "sectionId"],
-        where: { assignmentId: { in: assignmentIds } },
-        _count: { _all: true },
-      }),
-      db.breakoutMembership.findMany({
-        where: {
-          assignmentId: { in: assignmentIds },
-          studentId: student.id,
-        },
-        select: { assignmentId: true, sectionId: true },
-      }),
-    ]);
+    const [sectionsResult, countsResult, membershipsResult] = await Promise.all(
+      [
+        db.section.findMany({
+          where: { boardId: { in: breakoutBoardIds } },
+          orderBy: { order: "asc" },
+          select: { id: true, boardId: true, title: true, order: true },
+        }),
+        db.breakoutMembership.groupBy({
+          by: ["assignmentId", "sectionId"],
+          where: { assignmentId: { in: assignmentIds } },
+          _count: { _all: true },
+        }),
+        db.breakoutMembership.findMany({
+          where: {
+            assignmentId: { in: assignmentIds },
+            studentId: student.id,
+          },
+          select: { assignmentId: true, sectionId: true },
+        }),
+      ],
+    );
     breakoutSections.push(...sectionsResult);
     membershipCounts.push(
       ...countsResult
@@ -121,7 +129,10 @@ export default async function StudentPage() {
     membershipCounts.map((count) => [count.sectionId, count._count._all]),
   );
   const mySectionByAssignmentId = new Map(
-    myMemberships.map((membership) => [membership.assignmentId, membership.sectionId]),
+    myMemberships.map((membership) => [
+      membership.assignmentId,
+      membership.sectionId,
+    ]),
   );
 
   const boardItems = boards
@@ -134,6 +145,8 @@ export default async function StudentPage() {
         title: b.title || "제목 없음",
         layout: b.layout,
         category: b.category,
+        thumbnailMode: b.thumbnailMode,
+        thumbnailUrl: b.thumbnailUrl,
         quizzes: b.quizzes,
         breakout: linkedBreakout
           ? buildDashboardBreakout({
@@ -142,7 +155,8 @@ export default async function StudentPage() {
               sections: sectionsByBoardId.get(linkedBreakout.board.id) ?? [],
               countBySectionId,
               selectedSectionId:
-                mySectionByAssignmentId.get(linkedBreakout.assignment.id) ?? null,
+                mySectionByAssignmentId.get(linkedBreakout.assignment.id) ??
+                null,
             })
           : null,
       };
@@ -188,7 +202,9 @@ function buildDashboardBreakout({
   selectedSectionId: string | null;
 }) {
   const structure = cloneStructure(assignment.template.structure);
-  const sharedTitles = new Set((structure.sharedSections ?? []).map((s) => s.title));
+  const sharedTitles = new Set(
+    (structure.sharedSections ?? []).map((s) => s.title),
+  );
   const grouped = new Map<
     number,
     Array<{ id: string; title: string; count: number }>
@@ -218,9 +234,11 @@ function buildDashboardBreakout({
       .map(([groupIndex, groupSections]) => ({
         groupIndex,
         entrySectionId: groupSections[0]?.id ?? "",
-        totalCount: groupSections.reduce((sum, section) => sum + section.count, 0),
+        totalCount: groupSections.reduce(
+          (sum, section) => sum + section.count,
+          0,
+        ),
         sections: groupSections,
       })),
   };
 }
-

@@ -1,31 +1,68 @@
-import { FlatList, StyleSheet, Text, useWindowDimensions, View } from "react-native";
-import { useState } from "react";
-import { colors, iconSizes, layout, spacing, typography } from "../../theme/tokens";
+import {
+  FlatList,
+  StyleSheet,
+  Text,
+  useWindowDimensions,
+  View,
+} from "react-native";
+import { useEffect, useState } from "react";
+import {
+  boardThemes,
+  colors,
+  iconSizes,
+  layout,
+  normalizeBoardTheme,
+  spacing,
+  typography,
+} from "../../theme/tokens";
 import { CardView } from "../CardView";
 import { CardDetailModal } from "../CardDetailModal";
 import type { BoardDetailResponse, BoardCard } from "../../lib/types";
-import { withBoardAnonymousAuthors } from "../../lib/card-privacy";
+import {
+  withBoardAnonymousAuthor,
+  withBoardAnonymousAuthors,
+} from "../../lib/card-privacy";
 
 // 카드 추가를 아직 모바일에서 지원하지 않는 레이아웃의 공통 뷰어.
 // vibe-gallery / dj-queue / event-signup / breakout / assessment / drawing.
 
+function useBoardGridMetrics(width: number) {
+  const padding = layout.boardGridPadding * 2;
+  const gap = layout.boardGridGap;
+  const available = Math.max(0, width - padding);
+  const columns = Math.max(
+    1,
+    Math.floor((available + gap) / (layout.boardGridMinCardWidth + gap)),
+  );
+  const cardWidth =
+    columns === 1 ? available : (available - (columns - 1) * gap) / columns;
+  return { columns, cardWidth };
+}
+
 export function ReadOnlyCardsBoard({ data }: { data: BoardDetailResponse }) {
   const [selectedCard, setSelectedCard] = useState<BoardCard | null>(null);
+  const [cards, setCards] = useState<BoardCard[]>(() =>
+    withBoardAnonymousAuthors(data.cards, data.board),
+  );
   const { width } = useWindowDimensions();
-  const columnCount = width < layout.mobileBreakpoint ? 1 : 2;
-  const cards = withBoardAnonymousAuthors(data.cards, data.board);
+  const { columns, cardWidth } = useBoardGridMetrics(width);
+  const boardTheme = boardThemes[normalizeBoardTheme(data.board.boardTheme)];
+
+  useEffect(() => {
+    setCards(withBoardAnonymousAuthors(data.cards, data.board));
+  }, [data.cards, data.board]);
 
   return (
-    <View style={styles.root}>
+    <View style={[styles.root, { backgroundColor: boardTheme.background }]}>
       <FlatList
         data={cards}
-        key={`readonly-cards-${columnCount}`}
+        key={`readonly-cards-${columns}`}
         keyExtractor={(c) => c.id}
-        numColumns={columnCount}
-        columnWrapperStyle={columnCount > 1 ? styles.row : undefined}
+        numColumns={columns}
+        columnWrapperStyle={columns > 1 ? styles.row : undefined}
         contentContainerStyle={styles.content}
         renderItem={({ item }) => (
-          <View style={styles.cardWrap}>
+          <View style={[styles.cardWrap, { width: cardWidth }]}>
             <CardView card={item} onPress={() => setSelectedCard(item)} />
           </View>
         )}
@@ -42,16 +79,56 @@ export function ReadOnlyCardsBoard({ data }: { data: BoardDetailResponse }) {
       <CardDetailModal
         card={selectedCard}
         onClose={() => setSelectedCard(null)}
+        onUpdated={(c) => {
+          const selectedNext =
+            selectedCard?.id === c.id
+              ? mergeUpdatedCard(selectedCard, c, data.board)
+              : null;
+          setCards((prev) =>
+            prev.map((existing) =>
+              existing.id === c.id
+                ? mergeUpdatedCard(existing, c, data.board)
+                : existing,
+            ),
+          );
+          setSelectedCard((current) =>
+            current?.id === c.id
+              ? (selectedNext ?? mergeUpdatedCard(current, c, data.board))
+              : current,
+          );
+        }}
+        onDeleted={(id) => {
+          setCards((prev) => prev.filter((c) => c.id !== id));
+          setSelectedCard((current) => (current?.id === id ? null : current));
+        }}
       />
     </View>
   );
 }
 
+function mergeUpdatedCard(
+  existing: BoardCard,
+  updated: BoardCard,
+  board: BoardDetailResponse["board"],
+): BoardCard {
+  return withBoardAnonymousAuthor(
+    {
+      ...existing,
+      ...updated,
+      isMine: existing.isMine,
+      canEdit: existing.canEdit,
+      canDelete: existing.canDelete,
+      isOwnPendingQueue: existing.isOwnPendingQueue,
+    },
+    board,
+  );
+}
+
 const styles = StyleSheet.create({
   root: { flex: 1 },
-  content: { padding: spacing.xl, gap: spacing.md },
-  row: { gap: spacing.md },
-  cardWrap: { flex: 1, marginBottom: spacing.md },
+  content: { padding: layout.boardGridPadding, gap: layout.boardGridGap },
+  row: { gap: layout.boardGridGap },
+  cardWrap: { marginBottom: spacing.md },
   empty: {
     alignItems: "center",
     paddingTop: spacing.xxxl,

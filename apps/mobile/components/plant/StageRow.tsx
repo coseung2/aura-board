@@ -2,6 +2,7 @@ import { StyleSheet, Text, View } from "react-native";
 import {
   colors,
   iconSizes,
+  plant,
   spacing,
   states,
   typography,
@@ -104,32 +105,28 @@ export function StageRow({
         ) : (
           <View style={styles.obsGrid}>
             {observations.map((obs) => (
-              <ObservationCard
-                key={obs.id}
-                observation={obs}
-                canEdit={canEdit}
-                onEdit={() => onEditObservation(obs)}
-                onDelete={() => onDeleteObservation(obs)}
-                onOpenImage={onOpenImage}
-              />
+              <View key={obs.id} style={styles.obsGridItem}>
+                <ObservationCard
+                  observation={obs}
+                  canEdit={canEdit}
+                  onEdit={() => onEditObservation(obs)}
+                  onDelete={() => onDeleteObservation(obs)}
+                  onOpenImage={onOpenImage}
+                />
+              </View>
             ))}
           </View>
         )}
 
         {/* 사진 비교 */}
         {state !== "upcoming" && observations.length > 0 && (
-          <StageCompare
-            images={observations.flatMap((o) => o.images)}
-          />
+          <StageCompare images={observations.flatMap((o) => o.images)} />
         )}
 
         {/* 액션 버튼 */}
         {canEdit && state !== "upcoming" && (
           <View style={styles.actions}>
-            <AppButton
-              variant="success"
-              onPress={onAddObservation}
-            >
+            <AppButton variant="success" onPress={onAddObservation}>
               + 관찰 추가
             </AppButton>
             {isCurrent && (
@@ -212,7 +209,13 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.md,
   },
   obsGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
     gap: spacing.sm,
+    alignItems: "flex-start",
+  },
+  obsGridItem: {
+    width: plant.observationCardWidth,
   },
   actions: {
     flexDirection: "row",

@@ -21,8 +21,8 @@ import {
   spacing,
   typography,
 } from "../../theme/tokens";
-import { layoutLabel } from "../../theme/layout-meta";
-import { apiFetch, ApiError } from "../../lib/api";
+import { layoutLabel, layoutThumbnail } from "../../theme/layout-meta";
+import { apiFetch, ApiError, getApiUrl } from "../../lib/api";
 import { clearSessionToken } from "../../lib/session";
 import type {
   BoardMeta,
@@ -32,11 +32,18 @@ import type {
   StudentDuty,
   WalletSummary,
 } from "../../lib/types";
-import { AppButton, Pill, SurfaceCard, SurfacePressable } from "../../components/ui";
+import {
+  AppButton,
+  Pill,
+  SurfaceCard,
+  SurfacePressable,
+} from "../../components/ui";
 
 // 학생 대시보드. /api/student/me 로 본인 + 학급 보드 로딩,
 // /api/my/wallet, /api/showcase/classroom/:id 로 위젯 추가.
 // 웹 StudentDashboard 시각/구조 1:1 포팅.
+
+const FALLBACK_THUMBNAIL = "/board-type-thumbnails/card-board.png";
 
 export default function StudentHome() {
   const router = useRouter();
@@ -206,34 +213,30 @@ export default function StudentHome() {
           loading={showcaseLoading}
           onMore={() => router.push("/(student)/showcase" as Href)}
           onCardPress={(entry) =>
-            router.push(
-              {
-                pathname: "/(student)/portfolio",
-                params: { studentId: entry.studentId },
-              } as unknown as Href,
-            )
+            router.push({
+              pathname: "/(student)/portfolio",
+              params: { studentId: entry.studentId },
+            } as unknown as Href)
           }
         />
 
         <AppButton
-          style={styles.portfolioCta}
+          variant="secondary"
+          style={styles.portfolioCtaCompact}
           onPress={() => router.push("/(student)/portfolio" as Href)}
         >
-          우리 학급 포트폴리오 보기
+          🗂️ 우리 학급 포트폴리오 보기
         </AppButton>
 
-        <WalletCard
+        <WalletCardCompact
           wallet={wallet}
           loading={walletLoading}
           onDetail={() => router.push("/(student)/wallet" as Href)}
         />
 
-        <DutySection
+        <DutySectionCompact
           duties={duties}
-          onOpen={(duty) => {
-            const path = roleHref(duty);
-            if (path) router.push(path as Href);
-          }}
+          onOpen={(path) => router.push(path as Href)}
         />
 
         {boards.length === 0 ? (
@@ -370,13 +373,12 @@ function ShowcaseChip({
   const card = entry.card;
   const previewImage = getCardPreviewImage(card);
   const hasVideo = hasCardVideo(card);
-  const authorLabel = card.sourceBoard.anonymousAuthor ? "익명" : entry.studentName;
+  const authorLabel = card.sourceBoard.anonymousAuthor
+    ? "익명"
+    : entry.studentName;
 
   return (
-    <SurfacePressable
-      style={styles.showcaseChip}
-      onPress={onPress}
-    >
+    <SurfacePressable style={styles.showcaseChip} onPress={onPress}>
       <View style={styles.showcaseChipBadge}>
         <Text style={styles.showcaseChipBadgeText}>🌟</Text>
       </View>
@@ -412,14 +414,16 @@ function ShowcaseChip({
           >
             {authorLabel}
           </Pill>
-          <Text style={styles.showcaseDate}>{formatShortDate(card.createdAt)}</Text>
+          <Text style={styles.showcaseDate}>
+            {formatShortDate(card.createdAt)}
+          </Text>
         </View>
       </View>
     </SurfacePressable>
   );
 }
 
-function WalletCard({
+function WalletCardCompact({
   wallet,
   loading,
   onDetail,
@@ -429,41 +433,38 @@ function WalletCard({
   onDetail: () => void;
 }) {
   return (
-    <SurfaceCard style={styles.walletCard}>
-      <View style={styles.walletHeader}>
+    <SurfaceCard style={styles.walletCardCompact}>
+      <View style={styles.walletHeaderCompact}>
         <View>
-          <Text style={styles.walletEyebrow}>개인 금융</Text>
-          <Text style={styles.walletTitle}>내 통장과 적금</Text>
+          <Text style={styles.walletEyebrowCompact}>개인 금융</Text>
+          <Text style={styles.walletTitleCompact}>내 통장과 적금</Text>
         </View>
         <AppButton
           variant="secondary"
           onPress={onDetail}
           hitSlop={8}
+          textStyle={styles.walletDetailBtnText}
         >
-          자세히 보기
+          자세히
         </AppButton>
       </View>
 
       {loading || !wallet ? (
-        <Text style={styles.walletEmpty}>
+        <Text style={styles.walletEmptyCompact}>
           통장 정보를 불러오는 중이에요.
         </Text>
       ) : (
         <>
-          <View style={styles.walletBalanceRow}>
-            <Text style={styles.walletBalanceLabel}>현재 잔고</Text>
-            <Text style={styles.walletBalanceValue}>
+          <View style={styles.walletBalanceRowCompact}>
+            <Text style={styles.walletBalanceLabelCompact}>현재 잔고</Text>
+            <Text style={styles.walletBalanceValueCompact}>
               {wallet.balance.toLocaleString()} {wallet.currency.unitLabel}
             </Text>
           </View>
-          {wallet.activeFDs.length === 0 ? (
-            <Text style={styles.walletEmpty}>
-              아직 진행 중인 적금이 없어요.
-            </Text>
-          ) : (
-            <Text style={styles.walletEmpty}>
-              진행 중인 적금 {wallet.activeFDs.length}개
-            </Text>
+          {wallet.activeFDs.length > 0 && (
+            <Pill tone="accent" textStyle={styles.walletFdPillText}>
+              적금 {wallet.activeFDs.length}개
+            </Pill>
           )}
         </>
       )}
@@ -471,42 +472,35 @@ function WalletCard({
   );
 }
 
-function DutySection({
+function DutySectionCompact({
   duties,
   onOpen,
 }: {
   duties: StudentDuty[];
-  onOpen: (duty: StudentDuty) => void;
+  onOpen: (path: string) => void;
 }) {
-  // 권한은 서버( getStudentDuties ) 가 이미 권한 해석 후 내려준 duty 만 노출되므로
-  // 클라이언트는 roleKey 가 아니라 href 그대로 라우팅만 한다. 커스텀 역할에
-  // bank.store 권한이 부여돼도 같은 duty 카드가 노출된다.
-  const visible = duties.filter((duty) => Boolean(duty.href));
+  const visible = duties
+    .map((duty) => ({ duty, path: roleHref(duty) }))
+    .filter((item): item is { duty: StudentDuty; path: string } =>
+      Boolean(item.path),
+    );
   if (visible.length === 0) return null;
 
   return (
-    <View style={styles.dutySection}>
-      <Text style={styles.sectionSub}>내 역할</Text>
-      <View style={styles.dutyGrid}>
-        {visible.map((duty) => (
-          <SurfacePressable
-            key={`${duty.classroomId}-${duty.roleKey}`}
-            style={styles.dutyCard}
-            onPress={() => onOpen(duty)}
-          >
-            <Text style={styles.dutyEmoji}>{duty.emoji ?? roleEmoji(duty.roleKey)}</Text>
-            <View style={styles.dutyBody}>
-              <Text style={styles.dutyRole}>{duty.roleLabel}</Text>
-              <Text style={styles.dutyClassroom} numberOfLines={1}>
-                {duty.classroomName}
-              </Text>
-            </View>
-            <Pill tone="accent" textStyle={styles.dutyCtaText}>
-              시작
-            </Pill>
-          </SurfacePressable>
-        ))}
-      </View>
+    <View style={styles.dutyStrip}>
+      {visible.map(({ duty, path }) => (
+        <SurfacePressable
+          key={`${duty.classroomId}-${duty.roleKey}`}
+          style={styles.dutyChip}
+          onPress={() => onOpen(path)}
+        >
+          <Text style={styles.dutyChipEmoji}>
+            {duty.emoji ?? roleEmoji(duty.roleKey)}
+          </Text>
+          <Text style={styles.dutyChipRole}>{duty.roleLabel}</Text>
+          <Text style={styles.dutyChipCta}>시작</Text>
+        </SurfacePressable>
+      ))}
     </View>
   );
 }
@@ -541,10 +535,7 @@ function getCardPreviewImage(card: PortfolioCardDTO): string | null {
 }
 
 function hasCardVideo(card: PortfolioCardDTO): boolean {
-  return !!(
-    card.videoUrl ||
-    card.attachments?.some((a) => a.kind === "video")
-  );
+  return !!(card.videoUrl || card.attachments?.some((a) => a.kind === "video"));
 }
 
 function formatShortDate(value: string): string {
@@ -562,12 +553,29 @@ function BoardCard({ board }: { board: BoardMeta }) {
         router.push(`/(student)/board/${board.slug}?layout=${board.layout}`)
       }
     >
-      <Text style={styles.boardCardTitle} numberOfLines={2}>
-        {board.title}
-      </Text>
-      <Text style={styles.boardCardMeta}>{layoutLabel(board.layout)}</Text>
+      <View style={styles.boardThumb}>
+        <Image
+          source={{ uri: boardThumbUri(board) }}
+          style={styles.boardThumbImage}
+          resizeMode="cover"
+        />
+      </View>
+      <View style={styles.boardCardBody}>
+        <Text style={styles.boardCardTitle} numberOfLines={2}>
+          {board.title}
+        </Text>
+        <Text style={styles.boardCardMeta}>{layoutLabel(board.layout)}</Text>
+      </View>
     </SurfacePressable>
   );
+}
+
+function boardThumbUri(board: BoardMeta): string {
+  const thumb =
+    board.thumbnailMode === "custom" && board.thumbnailUrl
+      ? board.thumbnailUrl
+      : (layoutThumbnail(board.layout) ?? FALLBACK_THUMBNAIL);
+  return thumb.startsWith("http") ? thumb : getApiUrl(thumb);
 }
 
 const styles = StyleSheet.create({
@@ -715,40 +723,46 @@ const styles = StyleSheet.create({
   },
   showcaseDate: { ...typography.micro, color: colors.textMuted },
 
-  portfolioCta: {
-    paddingVertical: spacing.lg,
+  portfolioCtaCompact: {
+    paddingVertical: spacing.md,
   },
-  walletCard: {
-    padding: spacing.xl,
-    gap: spacing.lg,
-  },
-  walletHeader: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-    justifyContent: "space-between",
+  walletCardCompact: {
+    padding: spacing.lg,
     gap: spacing.md,
   },
-  walletEyebrow: {
-    ...typography.badge,
-    color: colors.accent,
-    marginBottom: spacing.xs,
-  },
-  walletTitle: { ...typography.title, color: colors.text },
-  walletBalanceRow: {
+  walletHeaderCompact: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
     gap: spacing.md,
   },
-  walletBalanceLabel: {
+  walletEyebrowCompact: {
+    ...typography.badge,
+    color: colors.accent,
+    marginBottom: spacing.xs,
+  },
+  walletTitleCompact: { ...typography.subtitle, color: colors.text },
+  walletDetailBtnText: { ...typography.label },
+  walletBalanceRowCompact: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: spacing.md,
+    flexWrap: "wrap",
+  },
+  walletBalanceLabelCompact: {
     ...typography.body,
     color: colors.textMuted,
   },
-  walletBalanceValue: {
-    ...typography.display,
+  walletBalanceValueCompact: {
+    ...typography.title,
     color: colors.text,
   },
-  walletEmpty: {
+  walletFdPillText: {
+    ...typography.badge,
+    color: colors.accent,
+  },
+  walletEmptyCompact: {
     ...typography.body,
     color: colors.textMuted,
     padding: spacing.md,
@@ -756,26 +770,26 @@ const styles = StyleSheet.create({
     borderRadius: radii.btn,
   },
 
-  dutySection: {
-    gap: spacing.md,
-  },
-  dutyGrid: {
+  dutyStrip: {
+    flexDirection: "row",
+    flexWrap: "wrap",
     gap: spacing.sm,
   },
-  dutyCard: {
-    minHeight: dashboard.dutyMinHeight,
+  dutyChip: {
     flexDirection: "row",
     alignItems: "center",
-    gap: spacing.md,
-    padding: spacing.lg,
+    gap: spacing.sm,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
+    backgroundColor: colors.accentTintedBg,
+    borderRadius: radii.pill,
   },
-  dutyEmoji: { fontSize: iconSizes.lg, width: dashboard.dutyIconWidth, textAlign: "center" },
-  dutyBody: { flex: 1, minWidth: 0, gap: spacing.xs },
-  dutyRole: { ...typography.section, color: colors.text },
-  dutyClassroom: { ...typography.label, color: colors.textMuted },
-  dutyCtaText: {
-    ...typography.label,
-    color: colors.accent,
+  dutyChipEmoji: { fontSize: iconSizes.md },
+  dutyChipRole: { ...typography.label, color: colors.accentTintedText },
+  dutyChipCta: {
+    ...typography.badge,
+    color: colors.accentTintedText,
+    opacity: dashboard.dutyCtaOpacity,
   },
 
   sectionSub: {
@@ -790,11 +804,30 @@ const styles = StyleSheet.create({
   boardCard: {
     flex: 1,
     minHeight: dashboard.boardMinHeight,
+    padding: 0,
+    overflow: "hidden",
+  },
+  boardThumb: {
+    aspectRatio: dashboard.boardThumbAspectRatio,
+    backgroundColor: colors.bgAlt,
+    borderBottomWidth: borders.hairline,
+    borderBottomColor: colors.border,
+  },
+  boardThumbImage: {
+    width: "100%",
+    height: "100%",
+  },
+  boardCardBody: {
     padding: spacing.md,
-    gap: spacing.sm,
+    gap: spacing.xs,
+    flex: 1,
   },
   boardCardTitle: { ...typography.section, color: colors.text },
-  boardCardMeta: { ...typography.label, color: colors.textMuted, marginTop: "auto" },
+  boardCardMeta: {
+    ...typography.label,
+    color: colors.textMuted,
+    marginTop: "auto",
+  },
 
   emptyWrap: {
     alignItems: "center",

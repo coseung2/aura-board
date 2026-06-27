@@ -1,12 +1,6 @@
 import { useState } from "react";
 import type { GestureResponderEvent } from "react-native";
-import {
-  Image,
-  Linking,
-  StyleSheet,
-  Text,
-  View,
-} from "react-native";
+import { Image, Linking, StyleSheet, Text, View } from "react-native";
 import {
   borders,
   colors,
@@ -17,6 +11,10 @@ import {
 } from "../theme/tokens";
 import type { BoardCard } from "../lib/types";
 import { resolveCardAuthorName } from "../lib/card-privacy";
+import {
+  getYouTubeThumbnailUrlFromLink,
+  isYouTubeVideoUrl,
+} from "../lib/media";
 import { ControlPressable, Pill, SurfaceCard, SurfacePressable } from "./ui";
 
 export function CardView({
@@ -27,15 +25,24 @@ export function CardView({
   onPress?: () => void;
 }) {
   const [imageFailed, setImageFailed] = useState(false);
+  const youTubeThumb = getYouTubeThumbnailUrlFromLink(
+    card.linkUrl ?? card.videoUrl,
+  );
   const firstImage =
     card.imageUrl ??
     card.attachments?.find((attachment) => attachment.kind === "image")?.url ??
     card.linkImage ??
+    youTubeThumb ??
     null;
   const authorName = resolveCardAuthorName(card);
   const dateText = formatCardDate(card.createdAt);
-  const fileUrl = card.fileUrl ?? card.attachments?.find((attachment) => attachment.kind === "file")?.url;
-  const fileName = card.fileName ?? card.attachments?.find((attachment) => attachment.kind === "file")?.fileName;
+  const fileUrl =
+    card.fileUrl ??
+    card.attachments?.find((attachment) => attachment.kind === "file")?.url;
+  const fileName =
+    card.fileName ??
+    card.attachments?.find((attachment) => attachment.kind === "file")
+      ?.fileName;
   const hasImageFallback = Boolean(firstImage && imageFailed);
   const backgroundColor = card.color ?? colors.surface;
   const likeCount = card.likeCount ?? 0;
@@ -52,7 +59,9 @@ export function CardView({
         />
       ) : hasImageFallback ? (
         <View style={styles.imageFallback}>
-          <Text style={styles.imageFallbackText}>이미지를 불러올 수 없어요</Text>
+          <Text style={styles.imageFallbackText}>
+            이미지를 불러올 수 없어요
+          </Text>
         </View>
       ) : null}
 
@@ -78,7 +87,10 @@ export function CardView({
               {safeHost(card.linkUrl)}
             </Text>
             <Text style={styles.linkTitle} numberOfLines={2}>
-              {card.linkTitle ?? card.linkUrl}
+              {card.linkTitle ??
+                (isYouTubeVideoUrl(card.linkUrl)
+                  ? "YouTube 영상"
+                  : card.linkUrl)}
             </Text>
             {card.linkDesc ? (
               <Text style={styles.linkDesc} numberOfLines={2}>
@@ -129,9 +141,15 @@ export function CardView({
           </View>
         )}
 
-        <View style={styles.engagement}>
-          <Pill textStyle={styles.chipText}>♡ {likeCount}</Pill>
-          <Pill textStyle={styles.chipText}>💬 {commentCount}</Pill>
+        <View style={styles.engagement} accessible accessibilityRole="text">
+          <View style={styles.engageItem}>
+            <Text style={styles.engageIcon}>♡</Text>
+            <Text style={styles.engageCount}>{likeCount}</Text>
+          </View>
+          <View style={styles.engageItem}>
+            <Text style={styles.engageIcon}>💬</Text>
+            <Text style={styles.engageCount}>{commentCount}</Text>
+          </View>
         </View>
       </View>
     </>
@@ -149,9 +167,7 @@ export function CardView({
   }
 
   return (
-    <SurfaceCard style={[styles.card, { backgroundColor }]}>
-      {body}
-    </SurfaceCard>
+    <SurfaceCard style={[styles.card, { backgroundColor }]}>{body}</SurfaceCard>
   );
 }
 
@@ -294,8 +310,18 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginTop: spacing.sm,
   },
-  chipText: {
+  engageItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.xs,
+  },
+  engageIcon: {
     ...typography.badge,
     color: colors.textMuted,
+  },
+  engageCount: {
+    ...typography.badge,
+    color: colors.textMuted,
+    minWidth: 14,
   },
 });

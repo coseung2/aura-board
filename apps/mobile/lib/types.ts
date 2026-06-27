@@ -9,6 +9,13 @@ export type BoardMeta = {
   description?: string | null;
   classroomId?: string | null;
   anonymousAuthor: boolean;
+  // 2026-06-27 모바일 student DTO 확장: 교사 보드 설정의 썸네일/테마/스트림
+  // 섹션 토글 값. 폴백 처리는 프론트에서 결정하므로 옵셔널 + nullable 로 받는다.
+  // enum 소스가 모바일에 로컬 타입으로 공유되어 있지 않아 string|null 로 둠.
+  thumbnailMode?: string | null;
+  thumbnailUrl?: string | null;
+  boardTheme?: string | null;
+  streamSectionsEnabled?: boolean;
   _count?: { cards: number };
 };
 

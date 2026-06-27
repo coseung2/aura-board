@@ -1,15 +1,12 @@
 import { useCallback, useEffect, useState } from "react";
-import {
-  ActivityIndicator,
-  StyleSheet,
-  Text,
-  View,
-} from "react-native";
+import { ActivityIndicator, StyleSheet, Text, View } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import {
+  boardThemes,
   colors,
   iconSizes,
+  normalizeBoardTheme,
   spacing,
   typography,
 } from "../../../theme/tokens";
@@ -82,29 +79,26 @@ export default function BoardDetail() {
         <View style={styles.center}>
           <Text style={styles.errorEmoji}>🚫</Text>
           <Text style={styles.errorTitle}>{error ?? "알 수 없는 오류"}</Text>
-          <AppButton
-            onPress={() => router.back()}
-          >
-            돌아가기
-          </AppButton>
+          <AppButton onPress={() => router.back()}>돌아가기</AppButton>
         </View>
       </SafeAreaView>
     );
   }
 
   const { board } = data;
+  const boardTheme = boardThemes[normalizeBoardTheme(board.boardTheme)];
   return (
-    <SafeAreaView style={styles.container} edges={["top", "bottom"]}>
+    <SafeAreaView
+      style={[styles.container, { backgroundColor: boardTheme.background }]}
+      edges={["top", "bottom"]}
+    >
       <BoardHeader title={board.title} layout={board.layout} />
       <View style={styles.body}>{renderLayout(data, load)}</View>
     </SafeAreaView>
   );
 }
 
-function renderLayout(
-  data: BoardDetailResponse,
-  reload: () => void,
-) {
+function renderLayout(data: BoardDetailResponse, reload: () => void) {
   switch (data.board.layout) {
     case "columns":
       return <ColumnsBoard data={data} onMutate={reload} />;

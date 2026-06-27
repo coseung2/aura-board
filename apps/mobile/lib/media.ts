@@ -67,6 +67,14 @@ export function getYouTubeThumbnailUrl(videoId: string): string {
   return `https://img.youtube.com/vi/${encodeURIComponent(videoId)}/hqdefault.jpg`;
 }
 
+/** Deterministic YouTube thumbnail from any URL, or null if not a YouTube link. */
+export function getYouTubeThumbnailUrlFromLink(
+  raw: string | null | undefined,
+): string | null {
+  const videoId = extractYouTubeVideoId(raw ?? "");
+  return videoId ? getYouTubeThumbnailUrl(videoId) : null;
+}
+
 /** True for public canva.com / canva.link design URLs. */
 export function isCanvaDesignUrl(raw: string): boolean {
   if (!raw) return false;
@@ -111,7 +119,7 @@ export function buildCanvaEmbedUrl(raw: string): string | null {
     const host = u.hostname.toLowerCase();
     if (host !== "canva.com" && host !== "www.canva.com") return null;
     const m = u.pathname.match(
-      /\/design\/([A-Za-z0-9_-]+)(?:\/([A-Za-z0-9_-]+))?\/(?:view|watch|edit|present)/
+      /\/design\/([A-Za-z0-9_-]+)(?:\/([A-Za-z0-9_-]+))?\/(?:view|watch|edit|present)/,
     );
     if (!m) return null;
     const [, designId, shareToken] = m;
@@ -200,7 +208,7 @@ export function buildMediaItems({
       id: a.id,
       kind: a.kind,
       url: a.url,
-      previewUrl: null,
+      previewUrl: a.previewUrl,
       fileName: a.fileName,
       fileSize: a.fileSize,
       mimeType: a.mimeType,
@@ -241,7 +249,7 @@ export function buildMediaItems({
       id: `legacy-link-${linkUrl}`,
       kind: "link",
       url: linkUrl,
-      previewUrl: linkImage ?? null,
+      previewUrl: linkImage ?? getYouTubeThumbnailUrlFromLink(linkUrl),
       fileName: linkTitle ?? null,
       fileSize: null,
       mimeType: linkDesc ?? null,

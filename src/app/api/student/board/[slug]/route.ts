@@ -167,28 +167,45 @@ export async function GET(
       layoutData.plantRoadmap = { plants };
     }
 
-    const role = await getEffectiveBoardRole(board.id, { studentId: student.id });
+    const role = await getEffectiveBoardRole(board.id, {
+      studentId: student.id,
+    });
     const canControlQueue = role === "owner" || role === "editor";
+    const visibleCards =
+      board.layout === "dj-queue"
+        ? board.cards.filter((card) => {
+            if (!card.queueStatus) return false;
+            if (canControlQueue) return true;
+            return (
+              card.queueStatus === "approved" ||
+              card.queueStatus === "played" ||
+              (card.queueStatus === "pending" &&
+                card.studentAuthorId === student.id)
+            );
+          })
+        : board.cards;
     const cards = await Promise.all(
-      board.cards.map(async (card) => {
+      visibleCards.map(async (card) => {
         const { _count, ...rest } = card;
         const hasAuthor =
           rest.authors.length > 0 ||
-          Boolean(rest.externalAuthorName || rest.authorId || rest.studentAuthorId);
+          Boolean(
+            rest.externalAuthorName || rest.authorId || rest.studentAuthorId,
+          );
         // mobile parity: 카드 단위 권한을 서버에서 같이 내려주면 클라이언트가
         // 권한 분기를 로컬로 추정하지 않아도 된다. isMine / canEdit / canDelete
         // 는 본인 카드 수정/삭제 메뉴 노출에 직접 사용됨.
-        const isMine = !!rest.studentAuthorId && rest.studentAuthorId === student.id;
-        const isOwnPendingQueue =
-          rest.queueStatus === "pending" && isMine;
+        const isMine =
+          !!rest.studentAuthorId && rest.studentAuthorId === student.id;
+        const isOwnPendingQueue = rest.queueStatus === "pending" && isMine;
         const canEdit = isMine;
         const canDelete = isMine;
         const visibleAuthorLabels = board.anonymousAuthor
           ? hasAuthor
             ? {
-              authorName: ANONYMOUS_AUTHOR_LABEL,
-              studentAuthorName: null,
-            }
+                authorName: ANONYMOUS_AUTHOR_LABEL,
+                studentAuthorName: null,
+              }
             : { authorName: null, studentAuthorName: null }
           : await resolveCardAuthorLabels(card);
         return {
@@ -196,7 +213,9 @@ export async function GET(
           ...visibleAuthorLabels,
           authorId: board.anonymousAuthor ? null : rest.authorId,
           studentAuthorId: board.anonymousAuthor ? null : rest.studentAuthorId,
-          externalAuthorKey: board.anonymousAuthor ? null : rest.externalAuthorKey,
+          externalAuthorKey: board.anonymousAuthor
+            ? null
+            : rest.externalAuthorKey,
           externalAuthorName:
             board.anonymousAuthor && hasAuthor
               ? ANONYMOUS_AUTHOR_LABEL
@@ -224,7 +243,13 @@ export async function GET(
         description: board.description,
         classroomId: board.classroomId,
         anonymousAuthor: board.anonymousAuthor,
-        _count: { cards: board.cards.length },
+        // 보드 썸네일/테마/스트림 섹션 토글 (2026-06-27 모바일 student DTO 확장).
+        // 교사 보드 설정에서 저장된 값을 그대로 내려주며, 폴백 처리는 프론트에서 한다.
+        thumbnailMode: board.thumbnailMode,
+        thumbnailUrl: board.thumbnailUrl,
+        boardTheme: board.boardTheme,
+        streamSectionsEnabled: board.streamSectionsEnabled,
+        _count: { cards: visibleCards.length },
       },
       cards,
       sections: board.sections,

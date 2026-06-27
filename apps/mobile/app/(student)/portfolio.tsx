@@ -299,6 +299,7 @@ function toBoardCard(
         id: attachment.id,
         kind: attachment.kind as "image" | "video" | "file",
         url: attachment.url,
+        previewUrl: null,
         fileName: attachment.fileName,
         fileSize: attachment.fileSize,
         mimeType: attachment.mimeType,

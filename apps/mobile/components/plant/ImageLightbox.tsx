@@ -1,6 +1,21 @@
-import { Image, Modal, StyleSheet, Text, useWindowDimensions, View } from "react-native";
-import { colors, plant, radii, spacing, typography } from "../../theme/tokens";
-import { AppButton, MediaPressable } from "../ui";
+import {
+  Image,
+  Modal,
+  StyleSheet,
+  Text,
+  useWindowDimensions,
+  View,
+} from "react-native";
+import {
+  cardDetail,
+  colors,
+  controls,
+  plant,
+  radii,
+  spacing,
+  typography,
+} from "../../theme/tokens";
+import { IconButton, MediaPressable } from "../ui";
 
 interface Props {
   url: string | null;
@@ -19,28 +34,35 @@ export function ImageLightbox({ url, onClose }: Props) {
   return (
     <Modal visible transparent animationType="fade" onRequestClose={onClose}>
       <MediaPressable style={styles.backdrop} onPress={onClose}>
-          <View style={[styles.container, { width, height: height * plant.lightboxHeightRatio }]}>
-            <Image
-              source={{ uri: url }}
-              style={[
-                styles.image,
-                {
-                  width: width * plant.lightboxImageWidthRatio,
-                  height: height * plant.lightboxImageHeightRatio,
-                },
-              ]}
+        <View
+          style={[
+            styles.container,
+            { width, height: height * plant.lightboxHeightRatio },
+          ]}
+        >
+          <Image
+            source={{ uri: url }}
+            style={[
+              styles.image,
+              {
+                width: width * plant.lightboxImageWidthRatio,
+                height: height * plant.lightboxImageHeightRatio,
+              },
+            ]}
             resizeMode="contain"
             accessibilityLabel="관찰 사진 원본"
           />
         </View>
-        <AppButton
-          variant="quiet"
-          style={styles.closeBtn}
-          textStyle={styles.closeText}
+        <IconButton
           onPress={onClose}
+          style={styles.closeBtn}
+          accessibilityLabel="관찰 사진 닫기"
         >
-          ✕ 닫기
-        </AppButton>
+          <View pointerEvents="none" style={styles.closeIcon}>
+            <View style={[styles.closeStroke, styles.closeStrokeA]} />
+            <View style={[styles.closeStroke, styles.closeStrokeB]} />
+          </View>
+        </IconButton>
       </MediaPressable>
     </Modal>
   );
@@ -62,14 +84,27 @@ const styles = StyleSheet.create({
     position: "absolute",
     bottom: plant.lightboxCloseBottom,
     alignSelf: "center",
-    paddingHorizontal: spacing.xl,
-    paddingVertical: spacing.md,
+    width: controls.iconButton,
+    height: controls.iconButton,
     backgroundColor: colors.lightboxControlBg,
     borderRadius: radii.pill,
     borderColor: colors.transparent,
+    alignItems: "center",
+    justifyContent: "center",
   },
-  closeText: {
-    ...typography.label,
-    color: colors.onAccent,
+  closeIcon: {
+    width: cardDetail.closeIconSize,
+    height: cardDetail.closeIconSize,
+    alignItems: "center",
+    justifyContent: "center",
   },
+  closeStroke: {
+    position: "absolute",
+    width: cardDetail.closeStrokeWidth,
+    height: cardDetail.iconStrokeHeight,
+    borderRadius: radii.pill,
+    backgroundColor: colors.onAccent,
+  },
+  closeStrokeA: { transform: [{ rotate: "45deg" }] },
+  closeStrokeB: { transform: [{ rotate: "-45deg" }] },
 });

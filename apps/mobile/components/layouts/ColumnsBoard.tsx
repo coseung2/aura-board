@@ -1,15 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
-import {
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
-} from "react-native";
+import { ScrollView, StyleSheet, Text, View } from "react-native";
 import {
   borders,
+  boardThemes,
   colors,
   columns as columnTokens,
   iconSizes,
+  normalizeBoardTheme,
   spacing,
   typography,
 } from "../../theme/tokens";
@@ -17,7 +14,10 @@ import { CardView } from "../CardView";
 import { CardComposer } from "../CardComposer";
 import { CardDetailModal } from "../CardDetailModal";
 import type { BoardDetailResponse, BoardCard } from "../../lib/types";
-import { withBoardAnonymousAuthor, withBoardAnonymousAuthors } from "../../lib/card-privacy";
+import {
+  withBoardAnonymousAuthor,
+  withBoardAnonymousAuthors,
+} from "../../lib/card-privacy";
 import { AppButton, Pill, SurfaceCard } from "../ui";
 import { useBoardRealtime } from "../../lib/use-board-realtime";
 
@@ -34,6 +34,7 @@ export function ColumnsBoard({
   const [selectedCard, setSelectedCard] = useState<BoardCard | null>(null);
   const [activeSection, setActiveSection] = useState<string | null>(null);
   const [composerOpen, setComposerOpen] = useState(false);
+  const boardTheme = boardThemes[normalizeBoardTheme(data.board.boardTheme)];
 
   useEffect(() => {
     // server 정렬이 order asc 라도 mobile 에서 안정화 한 번 더.
@@ -43,7 +44,9 @@ export function ColumnsBoard({
           const ao = a.order ?? 0;
           const bo = b.order ?? 0;
           if (ao !== bo) return ao - bo;
-          return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+          return (
+            new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+          );
         }),
         data.board,
       ),
@@ -62,10 +65,19 @@ export function ColumnsBoard({
       if (target) target.cards.push(card);
     }
 
-    const ordered: Array<{ id: string | null; title: string; cards: BoardCard[] }> = [];
+    const ordered: Array<{
+      id: string | null;
+      title: string;
+      cards: BoardCard[];
+    }> = [];
     for (const section of data.sections) {
       const entry = map.get(section.id);
-      if (entry) ordered.push({ id: section.id, title: entry.title, cards: entry.cards });
+      if (entry)
+        ordered.push({
+          id: section.id,
+          title: entry.title,
+          cards: entry.cards,
+        });
     }
     const etc = map.get(null);
     if (etc && etc.cards.length > 0) {
@@ -89,7 +101,7 @@ export function ColumnsBoard({
   useBoardRealtime({ slug: data.board.id, onReload: onMutate });
 
   return (
-    <View style={styles.root}>
+    <View style={[styles.root, { backgroundColor: boardTheme.background }]}>
       <ScrollView
         horizontal
         contentContainerStyle={styles.scroll}
@@ -99,7 +111,9 @@ export function ColumnsBoard({
           <SurfaceCard style={styles.emptyColumn}>
             <Text style={styles.emptyEmoji}>📊</Text>
             <Text style={styles.emptyTitle}>주제가 아직 없어요</Text>
-            <Text style={styles.emptyMsg}>선생님이 주제를 만들어야 카드를 올릴 수 있어요.</Text>
+            <Text style={styles.emptyMsg}>
+              선생님이 주제를 만들어야 카드를 올릴 수 있어요.
+            </Text>
           </SurfaceCard>
         ) : (
           columns.map((column) => (
@@ -127,7 +141,10 @@ export function ColumnsBoard({
               >
                 {column.cards.map((card) => (
                   <View key={card.id}>
-                    <CardView card={card} onPress={() => setSelectedCard(card)} />
+                    <CardView
+                      card={card}
+                      onPress={() => setSelectedCard(card)}
+                    />
                   </View>
                 ))}
               </ScrollView>
@@ -146,11 +163,22 @@ export function ColumnsBoard({
         card={selectedCard}
         onClose={() => setSelectedCard(null)}
         onUpdated={(c) => {
-          const next = withBoardAnonymousAuthor(c, data.board);
+          const selectedNext =
+            selectedCard?.id === c.id
+              ? mergeUpdatedCard(selectedCard, c, data.board)
+              : null;
           setCards((prev) =>
-            prev.map((existing) => (existing.id === next.id ? next : existing)),
+            prev.map((existing) =>
+              existing.id === c.id
+                ? mergeUpdatedCard(existing, c, data.board)
+                : existing,
+            ),
           );
-          setSelectedCard((current) => (current?.id === next.id ? next : current));
+          setSelectedCard((current) =>
+            current?.id === c.id
+              ? (selectedNext ?? mergeUpdatedCard(current, c, data.board))
+              : current,
+          );
         }}
         onDeleted={(id) => {
           setCards((prev) => prev.filter((c) => c.id !== id));
@@ -160,10 +188,27 @@ export function ColumnsBoard({
   );
 }
 
+function mergeUpdatedCard(
+  existing: BoardCard,
+  updated: BoardCard,
+  board: BoardDetailResponse["board"],
+): BoardCard {
+  return withBoardAnonymousAuthor(
+    {
+      ...existing,
+      ...updated,
+      isMine: existing.isMine,
+      canEdit: existing.canEdit,
+      canDelete: existing.canDelete,
+      isOwnPendingQueue: existing.isOwnPendingQueue,
+    },
+    board,
+  );
+}
+
 const styles = StyleSheet.create({
   root: {
     flex: 1,
-    backgroundColor: colors.bg,
   },
   scroll: {
     paddingTop: spacing.lg,
@@ -221,5 +266,9 @@ const styles = StyleSheet.create({
   },
   emptyEmoji: { fontSize: iconSizes.empty },
   emptyTitle: { ...typography.title, color: colors.text },
-  emptyMsg: { ...typography.body, color: colors.textMuted, textAlign: "center" },
+  emptyMsg: {
+    ...typography.body,
+    color: colors.textMuted,
+    textAlign: "center",
+  },
 });

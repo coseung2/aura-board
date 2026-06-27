@@ -12,8 +12,25 @@ import {
   View,
 } from "react-native";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { AppButton, ControlPressable, IconButton, MediaPressable, TextField } from "./ui";
-import { borders, cardDetail, colors, controls, layers, radii, shadows, spacing, typography } from "../theme/tokens";
+import {
+  AppButton,
+  ControlPressable,
+  IconButton,
+  MediaPressable,
+  TextField,
+} from "./ui";
+import {
+  borders,
+  cardDetail,
+  colors,
+  controls,
+  layers,
+  radii,
+  shadows,
+  spacing,
+  tapMin,
+  typography,
+} from "../theme/tokens";
 import type { BoardCard } from "../lib/types";
 import { apiFetch } from "../lib/api";
 import { maskAnonymousLabel, resolveCardAuthorName } from "../lib/card-privacy";
@@ -194,7 +211,7 @@ export function CardDetailModal({
   const fileItems = fileAttachments(allItems);
   const hasEmbeddableLink = Boolean(
     card.linkUrl &&
-      (isYouTubeVideoUrl(card.linkUrl) || isCanvaDesignUrl(card.linkUrl)),
+    (isYouTubeVideoUrl(card.linkUrl) || isCanvaDesignUrl(card.linkUrl)),
   );
   const mediaItems = dedupeMediaItems(
     mediaAttachments(allItems).filter((item) => {
@@ -224,31 +241,37 @@ export function CardDetailModal({
   const modalMargin = expanded ? 0 : 24;
   const maxModalWidth = detailLayout === "text-meta" ? 900 : 1400;
   const surfaceWidth = Math.min(width - modalMargin * 2, maxModalWidth);
-  const keyboardHeight = keyboardInset > 0
-    ? Math.min(keyboardInset, Math.floor(height * 0.45))
-    : 0;
-  const surfaceMaxHeight = Math.max(320, height - modalMargin * 2 - keyboardHeight);
+  const keyboardHeight =
+    keyboardInset > 0 ? Math.min(keyboardInset, Math.floor(height * 0.45)) : 0;
+  const surfaceMaxHeight = Math.max(
+    320,
+    height - modalMargin * 2 - keyboardHeight,
+  );
   const surfaceHeight = expanded
     ? surfaceMaxHeight
     : detailLayout === "text-meta"
       ? Math.min(surfaceMaxHeight, 520)
       : surfaceMaxHeight;
-  const compactRailMaxHeight = !isWide && !expanded
-    ? Math.min(180, Math.max(118, Math.floor(surfaceMaxHeight * 0.28)))
-    : undefined;
-  const mediaIndex = mediaItems.length > 0
-    ? Math.min(activeMediaIndex, mediaItems.length - 1)
-    : 0;
+  const compactRailMaxHeight =
+    !isWide && !expanded
+      ? Math.min(180, Math.max(118, Math.floor(surfaceMaxHeight * 0.28)))
+      : undefined;
+  const mediaIndex =
+    mediaItems.length > 0
+      ? Math.min(activeMediaIndex, mediaItems.length - 1)
+      : 0;
   const activeMediaItem = mediaItems[mediaIndex] ?? null;
   const imageItems = mediaItems.filter((item) => item.kind === "image");
   const useDarkMediaControls = Boolean(
     activeMediaItem &&
-      (activeMediaItem.kind === "image" || isCanvaDesignUrl(activeMediaItem.url)),
+    (activeMediaItem.kind === "image" || isCanvaDesignUrl(activeMediaItem.url)),
   );
 
   function navigateMedia(delta: -1 | 1) {
     if (mediaItems.length <= 1) return;
-    setActiveMediaIndex((index) => (index + delta + mediaItems.length) % mediaItems.length);
+    setActiveMediaIndex(
+      (index) => (index + delta + mediaItems.length) % mediaItems.length,
+    );
   }
 
   async function toggleLike() {
@@ -282,7 +305,8 @@ export function CardDetailModal({
 
   async function submitComment() {
     const trimmed = commentText.trim();
-    if (!trimmed || !displayedEngagement.canInteract || commentSubmitting) return;
+    if (!trimmed || !displayedEngagement.canInteract || commentSubmitting)
+      return;
     setCommentSubmitting(true);
     try {
       const res = await apiFetch<{ item?: CommentItem; comment?: CommentItem }>(
@@ -307,13 +331,21 @@ export function CardDetailModal({
 
   async function deleteComment(commentId: string) {
     try {
-      await apiFetch(`/api/cards/${encodeURIComponent(cardId)}/comments/${encodeURIComponent(commentId)}`, {
-        method: "DELETE",
-      });
-      setComments((prev) => prev?.filter((item) => item.id !== commentId) ?? []);
+      await apiFetch(
+        `/api/cards/${encodeURIComponent(cardId)}/comments/${encodeURIComponent(commentId)}`,
+        {
+          method: "DELETE",
+        },
+      );
+      setComments(
+        (prev) => prev?.filter((item) => item.id !== commentId) ?? [],
+      );
       setEngagement((current) => ({
         ...(current ?? displayedEngagement),
-        commentCount: Math.max(0, (current ?? displayedEngagement).commentCount - 1),
+        commentCount: Math.max(
+          0,
+          (current ?? displayedEngagement).commentCount - 1,
+        ),
       }));
       setEngagementError(null);
     } catch {
@@ -324,17 +356,26 @@ export function CardDetailModal({
   function confirmDeleteComment(commentId: string) {
     Alert.alert("댓글 삭제", "댓글을 삭제할까요?", [
       { text: "취소", style: "cancel" },
-      { text: "삭제", style: "destructive", onPress: () => void deleteComment(commentId) },
+      {
+        text: "삭제",
+        style: "destructive",
+        onPress: () => void deleteComment(commentId),
+      },
     ]);
   }
 
   async function deleteCard() {
     try {
-      await apiFetch(`/api/cards/${encodeURIComponent(cardId)}`, { method: "DELETE" });
+      await apiFetch(`/api/cards/${encodeURIComponent(cardId)}`, {
+        method: "DELETE",
+      });
       onDeleted?.(cardId);
       onClose();
     } catch (e) {
-      Alert.alert("삭제 실패", e instanceof Error ? e.message : "카드를 삭제하지 못했어요.");
+      Alert.alert(
+        "삭제 실패",
+        e instanceof Error ? e.message : "카드를 삭제하지 못했어요.",
+      );
     }
   }
 
@@ -352,7 +393,10 @@ export function CardDetailModal({
     try {
       const res = await apiFetch<{ card: BoardCard }>(
         `/api/cards/${encodeURIComponent(cardId)}`,
-        { method: "PATCH", json: { title: editTitle.trim(), content: editContent.trim() } },
+        {
+          method: "PATCH",
+          json: { title: editTitle.trim(), content: editContent.trim() },
+        },
       );
       // 인라인 편집: 부모에 새 카드 DTO 를 알려 로컬 리스트도 즉시 갱신.
       onUpdated?.(res.card);
@@ -430,22 +474,24 @@ export function CardDetailModal({
                   style={[
                     styles.mediaZone,
                     detailLayout !== "media-meta" && styles.mediaZoneFramed,
-                    isWide && detailLayout === "media-meta" && styles.mediaZoneWide,
+                    isWide &&
+                      detailLayout === "media-meta" &&
+                      styles.mediaZoneWide,
                     detailLayout === "media-meta" && styles.mediaOnlyZone,
                   ]}
                 >
                   {activeMediaItem ? (
-	                    <MediaBlock
-	                      item={activeMediaItem}
+                    <MediaBlock
+                      item={activeMediaItem}
                       isWide={isWide}
-	                      isMediaOnly={!hasTextContent}
-	                      onImagePress={() => {
-	                        const index = imageItems.findIndex(
-	                          (item) => item.url === activeMediaItem.url,
-	                        );
-	                        if (index >= 0) setLightboxIndex(index);
-	                      }}
-	                    />
+                      isMediaOnly={!hasTextContent}
+                      onImagePress={() => {
+                        const index = imageItems.findIndex(
+                          (item) => item.url === activeMediaItem.url,
+                        );
+                        if (index >= 0) setLightboxIndex(index);
+                      }}
+                    />
                   ) : null}
                   {mediaItems.length > 1 ? (
                     <>
@@ -493,7 +539,10 @@ export function CardDetailModal({
                           ›
                         </Text>
                       </IconButton>
-                      <View pointerEvents="box-none" style={styles.mediaDotsWrap}>
+                      <View
+                        pointerEvents="box-none"
+                        style={styles.mediaDotsWrap}
+                      >
                         <View style={styles.mediaDots}>
                           {mediaItems.map((item, index) => (
                             <IconButton
@@ -577,10 +626,7 @@ export function CardDetailModal({
                           >
                             취소
                           </AppButton>
-                          <AppButton
-                            onPress={saveEdit}
-                            loading={editBusy}
-                          >
+                          <AppButton onPress={saveEdit} loading={editBusy}>
                             저장
                           </AppButton>
                         </View>
@@ -596,7 +642,7 @@ export function CardDetailModal({
                         <ControlPressable
                           key={item.id}
                           style={styles.fileBox}
-		                          onPress={() => void openExternalUrl(item.url)}
+                          onPress={() => void openExternalUrl(item.url)}
                           accessibilityRole="link"
                         >
                           <Text style={styles.fileIcon}>파일</Text>
@@ -618,7 +664,7 @@ export function CardDetailModal({
                   {hasTextLink && card.linkUrl ? (
                     <ControlPressable
                       style={styles.externalLinkBtn}
-		                      onPress={() => void openExternalUrl(card.linkUrl!)}
+                      onPress={() => void openExternalUrl(card.linkUrl!)}
                       accessibilityRole="link"
                     >
                       <Text style={styles.externalLinkText}>링크 열기</Text>
@@ -638,164 +684,196 @@ export function CardDetailModal({
                     detailLayout === "media-meta" &&
                     styles.railStackedMediaOnly,
                   isWide && styles.railWide,
-                  compactRailMaxHeight ? { maxHeight: compactRailMaxHeight } : null,
+                  compactRailMaxHeight
+                    ? { maxHeight: compactRailMaxHeight }
+                    : null,
                 ]}
                 keyboardShouldPersistTaps="handled"
                 keyboardDismissMode="on-drag"
                 contentContainerStyle={styles.railContent}
               >
-              <View style={styles.metaSection}>
-                <Text style={styles.metaLine} numberOfLines={1}>
-                  {[
-                    authorName || "작성자 정보 없음",
-                    formatCardDate(card.createdAt),
-                  ].filter(Boolean).join(" · ")}
-                </Text>
-                {canEditCard || canDeleteCard ? (
-                  <View style={styles.ownerActions}>
-                    {canEditCard ? (
-                      <AppButton
-                        variant="quiet"
-                        textStyle={styles.ownerActionText}
-                        onPress={() => setEditing((v) => !v)}
-                      >
-                        {editing ? "편집 닫기" : "수정"}
-                      </AppButton>
-                    ) : null}
-                    {canDeleteCard ? (
-                      <AppButton
-                        variant="quiet"
-                        textStyle={styles.ownerActionText}
-                        onPress={confirmDeleteCard}
-                      >
-                        삭제
-                      </AppButton>
-                    ) : null}
-                  </View>
-                ) : null}
-              </View>
+                <View style={styles.metaSection}>
+                  <Text style={styles.metaLine} numberOfLines={1}>
+                    {[
+                      authorName || "작성자 정보 없음",
+                      formatCardDate(card.createdAt),
+                    ]
+                      .filter(Boolean)
+                      .join(" · ")}
+                  </Text>
+                  {canEditCard || canDeleteCard ? (
+                    <View style={styles.ownerActions}>
+                      {canEditCard ? (
+                        <AppButton
+                          variant="quiet"
+                          textStyle={styles.ownerActionText}
+                          onPress={() => setEditing((v) => !v)}
+                        >
+                          {editing ? "편집 닫기" : "수정"}
+                        </AppButton>
+                      ) : null}
+                      {canDeleteCard ? (
+                        <AppButton
+                          variant="quiet"
+                          textStyle={styles.ownerActionText}
+                          onPress={confirmDeleteCard}
+                        >
+                          삭제
+                        </AppButton>
+                      ) : null}
+                    </View>
+                  ) : null}
+                </View>
 
-              <View
-                style={styles.railSection}
-                onLayout={(event) =>
-                  updateCommentOffset("section", event.nativeEvent.layout.y)
-                }
-              >
                 <View
-                  style={styles.engagementPanel}
+                  style={styles.railSection}
                   onLayout={(event) =>
-                    updateCommentOffset("panel", event.nativeEvent.layout.y)
+                    updateCommentOffset("section", event.nativeEvent.layout.y)
                   }
                 >
-                  <View style={styles.engagementLikeRow}>
-                    <ControlPressable
-                      style={[
-                        styles.likeButton,
-                        displayedEngagement.isLiked && styles.likeButtonLiked,
-                      ]}
-                      disabled={!displayedEngagement.canInteract || engagementBusy}
-                      onPress={toggleLike}
-                      accessibilityRole="button"
-                      accessibilityState={{
-                        disabled: !displayedEngagement.canInteract || engagementBusy,
-                        selected: displayedEngagement.isLiked,
-                      }}
-                      accessibilityLabel={
-                        displayedEngagement.isLiked ? "좋아요 취소" : "좋아요"
-                      }
-                    >
-                      <Text style={styles.likeIcon}>
-                        {displayedEngagement.isLiked ? "❤️" : "🤍"}
-                      </Text>
-                      <Text
-                        style={[
-                          styles.likeText,
-                          displayedEngagement.isLiked && styles.likeTextLiked,
-                        ]}
-                      >
-                        좋아요 {displayedEngagement.likeCount}
-                      </Text>
-                    </ControlPressable>
-                    <Text style={styles.commentMeta}>
-                      댓글 {displayedEngagement.commentCount}
-                    </Text>
-                  </View>
                   <View
-                    style={styles.commentsBlock}
+                    style={styles.engagementPanel}
                     onLayout={(event) =>
-                      updateCommentOffset("block", event.nativeEvent.layout.y)
+                      updateCommentOffset("panel", event.nativeEvent.layout.y)
                     }
                   >
-                    {displayedEngagement.canInteract ? (
-                      <View
-                        style={styles.commentForm}
-                        onLayout={(event) =>
-                          updateCommentOffset("form", event.nativeEvent.layout.y)
+                    <View style={styles.engagementLikeRow}>
+                      <ControlPressable
+                        style={[
+                          styles.likeButton,
+                          displayedEngagement.isLiked && styles.likeButtonLiked,
+                        ]}
+                        disabled={
+                          !displayedEngagement.canInteract || engagementBusy
+                        }
+                        onPress={toggleLike}
+                        accessibilityRole="button"
+                        accessibilityState={{
+                          disabled:
+                            !displayedEngagement.canInteract || engagementBusy,
+                          selected: displayedEngagement.isLiked,
+                        }}
+                        accessibilityLabel={
+                          displayedEngagement.isLiked
+                            ? `좋아요 ${displayedEngagement.likeCount}, 취소`
+                            : `좋아요 ${displayedEngagement.likeCount}`
                         }
                       >
-                        <TextField
-                          value={commentText}
-                          onChangeText={setCommentText}
-                          placeholder="댓글을 입력하세요"
-                          maxLength={1000}
-                          multiline
-                          editable={!commentSubmitting}
-                          onFocus={() => {
-                            setTimeout(scrollCommentInputIntoView, 80);
-                          }}
-                          style={styles.commentInput}
-                        />
-                        <AppButton
-                          onPress={submitComment}
-                          disabled={commentSubmitting || !commentText.trim()}
-                          style={styles.commentSubmit}
-                          loading={commentSubmitting}
+                        <Text style={styles.likeIcon}>
+                          {displayedEngagement.isLiked ? "❤️" : "🤍"}
+                        </Text>
+                        <Text
+                          style={[
+                            styles.likeText,
+                            displayedEngagement.isLiked && styles.likeTextLiked,
+                          ]}
                         >
-                          댓글 달기
-                        </AppButton>
+                          {displayedEngagement.likeCount}
+                        </Text>
+                      </ControlPressable>
+                      <View
+                        style={styles.commentMeta}
+                        accessible
+                        accessibilityRole="text"
+                      >
+                        <Text style={styles.commentMetaIcon}>💬</Text>
+                        <Text style={styles.commentMetaCount}>
+                          {displayedEngagement.commentCount}
+                        </Text>
                       </View>
-                    ) : (
-                      <Text style={styles.commentReadonly}>읽기 전용이라 댓글을 달 수 없어요</Text>
-                    )}
+                    </View>
+                    <View
+                      style={styles.commentsBlock}
+                      onLayout={(event) =>
+                        updateCommentOffset("block", event.nativeEvent.layout.y)
+                      }
+                    >
+                      {displayedEngagement.canInteract ? (
+                        <View
+                          style={styles.commentForm}
+                          onLayout={(event) =>
+                            updateCommentOffset(
+                              "form",
+                              event.nativeEvent.layout.y,
+                            )
+                          }
+                        >
+                          <TextField
+                            value={commentText}
+                            onChangeText={setCommentText}
+                            placeholder="댓글을 입력하세요"
+                            maxLength={1000}
+                            multiline
+                            editable={!commentSubmitting}
+                            onFocus={() => {
+                              setTimeout(scrollCommentInputIntoView, 80);
+                            }}
+                            style={styles.commentInput}
+                          />
+                          <AppButton
+                            onPress={submitComment}
+                            disabled={commentSubmitting || !commentText.trim()}
+                            style={styles.commentSubmit}
+                            loading={commentSubmitting}
+                          >
+                            댓글 달기
+                          </AppButton>
+                        </View>
+                      ) : (
+                        <Text style={styles.commentReadonly}>
+                          읽기 전용이라 댓글을 달 수 없어요
+                        </Text>
+                      )}
 
-                    {comments === null ? (
-                      <Text style={styles.commentEmpty}>불러오는 중...</Text>
-                    ) : comments.length === 0 ? (
-                      <Text style={styles.commentEmpty}>아직 댓글이 없어요</Text>
-                    ) : (
-                      <View style={styles.commentList}>
-                        {comments.map((item) => (
-                          <View key={item.id} style={styles.commentItem}>
-                            <View style={styles.commentHead}>
-                              <Text style={styles.commentAuthor}>
-                                {maskAnonymousLabel(item.authorLabel, card.anonymousAuthor)}
+                      {comments === null ? (
+                        <Text style={styles.commentEmpty}>불러오는 중...</Text>
+                      ) : comments.length === 0 ? (
+                        <Text style={styles.commentEmpty}>
+                          아직 댓글이 없어요
+                        </Text>
+                      ) : (
+                        <View style={styles.commentList}>
+                          {comments.map((item) => (
+                            <View key={item.id} style={styles.commentItem}>
+                              <View style={styles.commentHead}>
+                                <Text style={styles.commentAuthor}>
+                                  {maskAnonymousLabel(
+                                    item.authorLabel,
+                                    card.anonymousAuthor,
+                                  )}
+                                </Text>
+                                <Text style={styles.commentTime}>
+                                  {formatRelativeTime(item.createdAt)}
+                                </Text>
+                                {item.canDelete ? (
+                                  <AppButton
+                                    variant="quiet"
+                                    onPress={() =>
+                                      confirmDeleteComment(item.id)
+                                    }
+                                    style={styles.commentDelete}
+                                    textStyle={styles.commentDeleteText}
+                                    accessibilityLabel="댓글 삭제"
+                                  >
+                                    삭제
+                                  </AppButton>
+                                ) : null}
+                              </View>
+                              <Text style={styles.commentContent}>
+                                {item.content}
                               </Text>
-                              <Text style={styles.commentTime}>
-                                {formatRelativeTime(item.createdAt)}
-                              </Text>
-                              {item.canDelete ? (
-                                <AppButton
-                                  variant="quiet"
-                                  onPress={() => confirmDeleteComment(item.id)}
-                                  style={styles.commentDelete}
-                                  textStyle={styles.commentDeleteText}
-                                  accessibilityLabel="댓글 삭제"
-                                >
-                                  삭제
-                                </AppButton>
-                              ) : null}
                             </View>
-                            <Text style={styles.commentContent}>{item.content}</Text>
-                          </View>
-                        ))}
-                      </View>
-                    )}
-                    {engagementError ? (
-                      <Text style={styles.commentError}>{engagementError}</Text>
-                    ) : null}
+                          ))}
+                        </View>
+                      )}
+                      {engagementError ? (
+                        <Text style={styles.commentError}>
+                          {engagementError}
+                        </Text>
+                      ) : null}
+                    </View>
                   </View>
                 </View>
-              </View>
               </ScrollView>
             ) : null}
           </View>
@@ -840,17 +918,61 @@ function FullscreenGlyph({ expanded }: { expanded: boolean }) {
     <View style={styles.fullscreenGlyph}>
       {expanded ? (
         <>
-          <View style={[styles.cornerStroke, styles.cornerTop, styles.cornerLeft, styles.cornerInA]} />
-          <View style={[styles.cornerStroke, styles.cornerTop, styles.cornerRight, styles.cornerInB]} />
-          <View style={[styles.cornerStroke, styles.cornerBottom, styles.cornerLeft, styles.cornerInB]} />
-          <View style={[styles.cornerStroke, styles.cornerBottom, styles.cornerRight, styles.cornerInA]} />
+          <View
+            style={[
+              styles.cornerStroke,
+              styles.cornerTop,
+              styles.cornerLeft,
+              styles.cornerInA,
+            ]}
+          />
+          <View
+            style={[
+              styles.cornerStroke,
+              styles.cornerTop,
+              styles.cornerRight,
+              styles.cornerInB,
+            ]}
+          />
+          <View
+            style={[
+              styles.cornerStroke,
+              styles.cornerBottom,
+              styles.cornerLeft,
+              styles.cornerInB,
+            ]}
+          />
+          <View
+            style={[
+              styles.cornerStroke,
+              styles.cornerBottom,
+              styles.cornerRight,
+              styles.cornerInA,
+            ]}
+          />
         </>
       ) : (
         <>
-          <View style={[styles.cornerStroke, styles.cornerTop, styles.cornerLeft]} />
-          <View style={[styles.cornerStroke, styles.cornerTop, styles.cornerRight]} />
-          <View style={[styles.cornerStroke, styles.cornerBottom, styles.cornerLeft]} />
-          <View style={[styles.cornerStroke, styles.cornerBottom, styles.cornerRight]} />
+          <View
+            style={[styles.cornerStroke, styles.cornerTop, styles.cornerLeft]}
+          />
+          <View
+            style={[styles.cornerStroke, styles.cornerTop, styles.cornerRight]}
+          />
+          <View
+            style={[
+              styles.cornerStroke,
+              styles.cornerBottom,
+              styles.cornerLeft,
+            ]}
+          />
+          <View
+            style={[
+              styles.cornerStroke,
+              styles.cornerBottom,
+              styles.cornerRight,
+            ]}
+          />
         </>
       )}
     </View>
@@ -950,28 +1072,25 @@ function CardImageLightbox({
         <IconButton
           onPress={onClose}
           style={styles.lightboxClose}
-          accessibilityLabel="닫기"
+          accessibilityLabel="이미지 라이트박스 닫기"
         >
-          <Text style={styles.lightboxCloseText}>X</Text>
+          <View pointerEvents="none" style={styles.lightboxCloseIcon}>
+            <View style={[styles.lightboxCloseStroke, styles.closeStrokeA]} />
+            <View style={[styles.lightboxCloseStroke, styles.closeStrokeB]} />
+          </View>
         </IconButton>
         {multi ? (
           <>
             <IconButton
               onPress={() => navigate(-1)}
-              style={[
-                styles.lightboxNav,
-                styles.lightboxNavPrev,
-              ]}
+              style={[styles.lightboxNav, styles.lightboxNavPrev]}
               accessibilityLabel="이전 이미지"
             >
               <Text style={styles.lightboxNavText}>‹</Text>
             </IconButton>
             <IconButton
               onPress={() => navigate(1)}
-              style={[
-                styles.lightboxNav,
-                styles.lightboxNavNext,
-              ]}
+              style={[styles.lightboxNav, styles.lightboxNavNext]}
               accessibilityLabel="다음 이미지"
             >
               <Text style={styles.lightboxNavText}>›</Text>
@@ -1072,6 +1191,19 @@ const styles = StyleSheet.create({
     borderRadius: radii.pill,
     backgroundColor: colors.textMuted,
   },
+  lightboxCloseIcon: {
+    width: cardDetail.closeIconSize,
+    height: cardDetail.closeIconSize,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  lightboxCloseStroke: {
+    position: "absolute",
+    width: cardDetail.closeStrokeWidth,
+    height: cardDetail.iconStrokeHeight,
+    borderRadius: radii.pill,
+    backgroundColor: colors.onAccent,
+  },
   closeStrokeA: { transform: [{ rotate: "45deg" }] },
   closeStrokeB: { transform: [{ rotate: "-45deg" }] },
   fullscreenBtn: {
@@ -1100,10 +1232,22 @@ const styles = StyleSheet.create({
     height: cardDetail.fullscreenCornerSize,
     borderColor: colors.text,
   },
-  cornerTop: { top: cardDetail.fullscreenCornerInset, borderTopWidth: cardDetail.iconStrokeWidth },
-  cornerBottom: { bottom: cardDetail.fullscreenCornerInset, borderBottomWidth: cardDetail.iconStrokeWidth },
-  cornerLeft: { left: cardDetail.fullscreenCornerInset, borderLeftWidth: cardDetail.iconStrokeWidth },
-  cornerRight: { right: cardDetail.fullscreenCornerInset, borderRightWidth: cardDetail.iconStrokeWidth },
+  cornerTop: {
+    top: cardDetail.fullscreenCornerInset,
+    borderTopWidth: cardDetail.iconStrokeWidth,
+  },
+  cornerBottom: {
+    bottom: cardDetail.fullscreenCornerInset,
+    borderBottomWidth: cardDetail.iconStrokeWidth,
+  },
+  cornerLeft: {
+    left: cardDetail.fullscreenCornerInset,
+    borderLeftWidth: cardDetail.iconStrokeWidth,
+  },
+  cornerRight: {
+    right: cardDetail.fullscreenCornerInset,
+    borderRightWidth: cardDetail.iconStrokeWidth,
+  },
   cornerInA: { transform: [{ rotate: "180deg" }] },
   cornerInB: { transform: [{ rotate: "180deg" }] },
   body: {
@@ -1386,7 +1530,7 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
   },
   likeButton: {
-    minHeight: cardDetail.likeButtonMinHeight,
+    minHeight: tapMin,
     flexDirection: "row",
     alignItems: "center",
     gap: cardDetail.mediaDotsGap,
@@ -1412,8 +1556,18 @@ const styles = StyleSheet.create({
     color: colors.danger,
   },
   commentMeta: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.xs,
+  },
+  commentMetaIcon: {
     ...typography.micro,
     color: colors.textMuted,
+  },
+  commentMetaCount: {
+    ...typography.micro,
+    color: colors.textMuted,
+    minWidth: 14,
   },
   commentsBlock: {
     gap: spacing.sm,
@@ -1509,11 +1663,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     backgroundColor: colors.lightboxControlBg,
-  },
-  lightboxCloseText: {
-    color: colors.onAccent,
-    ...typography.section,
-    fontWeight: "700",
   },
   lightboxNav: {
     position: "absolute",

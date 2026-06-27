@@ -71,26 +71,42 @@ export function CardDetailModal({
       if (e.key === "Escape") {
         e.preventDefault();
         onClose();
-      } else if (e.key === "ArrowLeft" && canGoPrevious && !isEditableTarget(e.target)) {
+      } else if (
+        e.key === "ArrowLeft" &&
+        canGoPrevious &&
+        !isEditableTarget(e.target)
+      ) {
         e.preventDefault();
         onPrevious?.();
-      } else if (e.key === "ArrowRight" && canGoNext && !isEditableTarget(e.target)) {
+      } else if (
+        e.key === "ArrowRight" &&
+        canGoNext &&
+        !isEditableTarget(e.target)
+      ) {
         e.preventDefault();
         onNext?.();
       }
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [card, onClose, lightboxIndex, canGoPrevious, canGoNext, onPrevious, onNext]);
+  }, [
+    card,
+    onClose,
+    lightboxIndex,
+    canGoPrevious,
+    canGoNext,
+    onPrevious,
+    onNext,
+  ]);
 
   useEffect(() => {
-    if (!card) return;
     // F11/ESC로 fullscreen 빠져나와도 상태는 그대로. native fullscreenchange
     // via F11/ESC flips the button back without an extra click.
     function onChange() {
       setIsFullscreen(document.fullscreenElement === rootRef.current);
     }
     document.addEventListener("fullscreenchange", onChange);
+    onChange();
     return () => document.removeEventListener("fullscreenchange", onChange);
   }, []);
 
@@ -112,28 +128,26 @@ export function CardDetailModal({
 
   const attachments = card.attachments ?? [];
   const mediaAttachments = attachments.filter(
-    (a) => a.kind === "image" || a.kind === "video"
+    (a) => a.kind === "image" || a.kind === "video",
   );
   const hasFileAttachment = Boolean(
-    card.fileUrl || attachments.some((a) => a.kind === "file")
+    card.fileUrl || attachments.some((a) => a.kind === "file"),
   );
   const hasMediaAttachment = Boolean(
-    card.imageUrl ||
-      card.videoUrl ||
-      mediaAttachments.length > 0
+    card.imageUrl || card.videoUrl || mediaAttachments.length > 0,
   );
   const hasEmbeddableLink = Boolean(
     card.linkUrl &&
-      (isYouTubeLink(card.linkUrl) || isCanvaDesignUrl(card.linkUrl))
+    (isYouTubeLink(card.linkUrl) || isCanvaDesignUrl(card.linkUrl)),
   );
   const mediaLinkUrl = hasEmbeddableLink ? card.linkUrl : null;
   const hasTextLink = Boolean(card.linkUrl && !hasEmbeddableLink);
   const hasMedia = hasMediaAttachment || hasEmbeddableLink;
   const hasTextContent = Boolean(
     card.title.trim() ||
-      (card.content && card.content.trim()) ||
-      hasFileAttachment ||
-      hasTextLink
+    (card.content && card.content.trim()) ||
+    hasFileAttachment ||
+    hasTextLink,
   );
   const detailLayout: DetailLayout = hasMedia
     ? hasTextContent
@@ -148,19 +162,13 @@ export function CardDetailModal({
   const contentText = (card.content ?? "").trim();
   const shouldShowLinkBody = Boolean(
     hasTextLink &&
-      (card.linkTitle || card.linkDesc) &&
-      !contentStartsWithLinkPreview(
-        contentText,
-        card.linkTitle,
-        card.linkDesc
-      )
+    (card.linkTitle || card.linkDesc) &&
+    !contentStartsWithLinkPreview(contentText, card.linkTitle, card.linkDesc),
   );
 
   return (
     <>
-      {!isFullscreen && (
-        <div className="modal-backdrop" onClick={onClose} />
-      )}
+      {!isFullscreen && <div className="modal-backdrop" onClick={onClose} />}
       <div
         ref={rootRef}
         className="add-card-modal card-detail-modal"
@@ -173,23 +181,186 @@ export function CardDetailModal({
         data-fullscreen={isFullscreen ? "true" : "false"}
         onClick={(e) => e.stopPropagation()}
       >
-        <button
-          type="button"
-          className="ui-icon-action ui-corner-action card-detail-close"
-          onClick={onClose}
-          aria-label="닫기"
-        >
-          <CloseIcon size={20} />
-        </button>
-        <button
-          type="button"
-          className="ui-icon-action ui-corner-action card-detail-fullscreen"
-          onClick={toggleFullscreen}
-          aria-label={isFullscreen ? "전체화면 끄기" : "전체화면 켜기"}
-          title={isFullscreen ? "전체화면 끄기" : "전체화면으로 발표"}
-        >
-          {isFullscreen ? <FullscreenExitIcon size={20} /> : <FullscreenEnterIcon size={20} />}
-        </button>
+        <div className="card-detail-frame">
+          <button
+            type="button"
+            className="ui-icon-action ui-corner-action card-detail-close"
+            onClick={onClose}
+            aria-label="닫기"
+          >
+            <CloseIcon size={20} />
+          </button>
+          <button
+            type="button"
+            className="ui-icon-action ui-corner-action card-detail-fullscreen"
+            onClick={toggleFullscreen}
+            aria-label={isFullscreen ? "전체화면 끄기" : "전체화면 켜기"}
+            title={isFullscreen ? "전체화면 끄기" : "전체화면으로 발표"}
+          >
+            {isFullscreen ? (
+              <FullscreenExitIcon size={20} />
+            ) : (
+              <FullscreenEnterIcon size={20} />
+            )}
+          </button>
+          <div className="card-detail-body">
+            <section className="card-detail-main" aria-label="콘텐츠">
+              {hasMedia && (
+                <div className="card-detail-media" aria-label="첨부">
+                  <CardAttachments
+                    imageUrl={card.imageUrl}
+                    thumbUrl={card.thumbUrl}
+                    linkUrl={mediaLinkUrl}
+                    linkTitle={card.linkTitle}
+                    linkDesc={card.linkDesc}
+                    linkImage={card.linkImage}
+                    videoUrl={card.videoUrl}
+                    fileUrl={null}
+                    fileName={null}
+                    fileSize={null}
+                    fileMimeType={null}
+                    attachments={mediaAttachments}
+                    onImageClick={(i) => setLightboxIndex(i)}
+                  />
+                </div>
+              )}
+              {hasTextContent && (
+                <div className="card-detail-content-zone">
+                  {/* meta-download-zone (2026-06-13): 본문 = 제목 + content +
+                  linkTitle/linkDesc (Notion 스타일 — 굵은 제목 / 한 줄 빈 줄 /
+                  설명). 텍스트만 본문 영역. 파일 첨부는 본문 아래 다운로드
+                  리스트. */}
+                  <div className="card-detail-body-text">
+                    {card.title.trim() && (
+                      <h2
+                        className="card-detail-title"
+                        style={{
+                          fontSize: slideTitleSize,
+                          lineHeight: 1.3,
+                          margin: 0,
+                        }}
+                      >
+                        {card.title}
+                      </h2>
+                    )}
+                    {shouldShowLinkBody && (
+                      <div
+                        className="card-detail-link-body"
+                        style={{ fontSize: slideBodySize, lineHeight: 1.7 }}
+                      >
+                        {card.linkTitle && (
+                          <strong className="card-detail-link-title">
+                            {card.linkTitle}
+                          </strong>
+                        )}
+                        {card.linkTitle && card.linkDesc && (
+                          <div
+                            className="card-detail-link-spacer"
+                            aria-hidden="true"
+                          />
+                        )}
+                        {card.linkDesc && (
+                          <span className="card-detail-link-desc">
+                            {card.linkDesc}
+                          </span>
+                        )}
+                      </div>
+                    )}
+                    {card.content && (
+                      <CardBodyContent
+                        content={card.content}
+                        bodyFontSize={slideBodySize}
+                      />
+                    )}
+                  </div>
+                  {/* meta-download-zone (2026-06-13): 파일 첨부 다운로드 리스트.
+                  legacy fileUrl/fileName/fileSize/fileMimeType + attachments[].kind==="file"
+                  둘 다 커버. */}
+                  {hasFileAttachment && (
+                    <ul
+                      className="card-detail-file-list"
+                      aria-label="첨부 파일"
+                    >
+                      {/* key dedup (2026-06-13): legacy card.fileUrl과 attachments[]
+                      양쪽에 같은 url이 동기화된 경우 동일 row가 두 번 렌더되어
+                      React key 충돌 경고 발생. legacy가 있으면 그 url과 같은
+                      첨부는 제외. */}
+                      {card.fileUrl && (
+                        <li
+                          key={`legacy-file-${card.fileUrl}`}
+                          className="card-detail-file-item"
+                        >
+                          <CardFileAttachment
+                            fileUrl={card.fileUrl}
+                            fileName={card.fileName ?? null}
+                            fileSize={card.fileSize ?? null}
+                            fileMimeType={card.fileMimeType ?? null}
+                          />
+                        </li>
+                      )}
+                      {attachments
+                        .filter(
+                          (a) =>
+                            a.kind === "file" &&
+                            !(card.fileUrl && a.url === card.fileUrl),
+                        )
+                        .sort((a, b) => a.order - b.order)
+                        .map((a) => (
+                          <li key={a.id} className="card-detail-file-item">
+                            <CardFileAttachment
+                              fileUrl={a.url}
+                              fileName={a.fileName ?? null}
+                              fileSize={a.fileSize ?? null}
+                              fileMimeType={a.mimeType ?? null}
+                            />
+                          </li>
+                        ))}
+                    </ul>
+                  )}
+                  {hasTextLink && card.linkUrl && (
+                    <a
+                      href={card.linkUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="card-detail-link"
+                    >
+                      🔗 링크 열기
+                    </a>
+                  )}
+                </div>
+              )}
+            </section>
+            <aside className="card-detail-rail" aria-label="메타 및 인터랙션">
+              <div className="card-detail-meta">
+                <CardAuthorFooter
+                  authors={card.authors}
+                  externalAuthorName={card.externalAuthorName}
+                  studentAuthorName={card.studentAuthorName}
+                  authorName={card.authorName}
+                  createdAt={card.createdAt}
+                  anonymousAuthor={card.anonymousAuthor}
+                />
+                {onEditAuthors &&
+                  (canEditAuthors ? canEditAuthors(card) : true) && (
+                    <button
+                      type="button"
+                      className="card-detail-edit-authors"
+                      onClick={() => onEditAuthors(card)}
+                    >
+                      👥 작성자 지정
+                    </button>
+                  )}
+              </div>
+              {/* card-detail-modal-engagement (2026-04-26): 좋아요 + 댓글 패널. */}
+              <CardEngagement
+                cardId={card.id}
+                mode="panel"
+                boardId={boardId}
+                isStudentViewer={isStudentViewer}
+              />
+            </aside>
+          </div>
+        </div>
         {(onPrevious || onNext) && (
           <>
             <button
@@ -214,148 +385,6 @@ export function CardDetailModal({
             </button>
           </>
         )}
-        <div className="card-detail-body">
-          <section className="card-detail-main" aria-label="콘텐츠">
-            {hasMedia && (
-              <div className="card-detail-media" aria-label="첨부">
-                <CardAttachments
-                  imageUrl={card.imageUrl}
-                  thumbUrl={card.thumbUrl}
-                  linkUrl={mediaLinkUrl}
-                  linkTitle={card.linkTitle}
-                  linkDesc={card.linkDesc}
-                  linkImage={card.linkImage}
-                  videoUrl={card.videoUrl}
-                  fileUrl={null}
-                  fileName={null}
-                  fileSize={null}
-                  fileMimeType={null}
-                  attachments={mediaAttachments}
-                  onImageClick={(i) => setLightboxIndex(i)}
-                />
-              </div>
-            )}
-            {hasTextContent && (
-              <div className="card-detail-content-zone">
-              {/* meta-download-zone (2026-06-13): 본문 = 제목 + content +
-                  linkTitle/linkDesc (Notion 스타일 — 굵은 제목 / 한 줄 빈 줄 /
-                  설명). 텍스트만 본문 영역. 파일 첨부는 본문 아래 다운로드
-                  리스트. */}
-              <div className="card-detail-body-text">
-                {card.title.trim() && (
-                  <h2
-                    className="card-detail-title"
-                    style={{ fontSize: slideTitleSize, lineHeight: 1.3, margin: 0 }}
-                  >
-                    {card.title}
-                  </h2>
-                )}
-                {shouldShowLinkBody && (
-                  <div
-                    className="card-detail-link-body"
-                    style={{ fontSize: slideBodySize, lineHeight: 1.7 }}
-                  >
-                    {card.linkTitle && (
-                      <strong className="card-detail-link-title">{card.linkTitle}</strong>
-                    )}
-                    {card.linkTitle && card.linkDesc && (
-                      <div className="card-detail-link-spacer" aria-hidden="true" />
-                    )}
-                    {card.linkDesc && (
-                      <span className="card-detail-link-desc">{card.linkDesc}</span>
-                    )}
-                  </div>
-                )}
-                {card.content && (
-                  <CardBodyContent
-                    content={card.content}
-                    bodyFontSize={slideBodySize}
-                  />
-                )}
-              </div>
-              {/* meta-download-zone (2026-06-13): 파일 첨부 다운로드 리스트.
-                  legacy fileUrl/fileName/fileSize/fileMimeType + attachments[].kind==="file"
-                  둘 다 커버. */}
-              {hasFileAttachment && (
-                <ul className="card-detail-file-list" aria-label="첨부 파일">
-                  {/* key dedup (2026-06-13): legacy card.fileUrl과 attachments[]
-                      양쪽에 같은 url이 동기화된 경우 동일 row가 두 번 렌더되어
-                      React key 충돌 경고 발생. legacy가 있으면 그 url과 같은
-                      첨부는 제외. */}
-                  {card.fileUrl && (
-                    <li
-                      key={`legacy-file-${card.fileUrl}`}
-                      className="card-detail-file-item"
-                    >
-                      <CardFileAttachment
-                        fileUrl={card.fileUrl}
-                        fileName={card.fileName ?? null}
-                        fileSize={card.fileSize ?? null}
-                        fileMimeType={card.fileMimeType ?? null}
-                      />
-                    </li>
-                  )}
-                  {attachments
-                    .filter(
-                      (a) =>
-                        a.kind === "file" &&
-                        !(card.fileUrl && a.url === card.fileUrl)
-                    )
-                    .sort((a, b) => a.order - b.order)
-                    .map((a) => (
-                      <li key={a.id} className="card-detail-file-item">
-                        <CardFileAttachment
-                          fileUrl={a.url}
-                          fileName={a.fileName ?? null}
-                          fileSize={a.fileSize ?? null}
-                          fileMimeType={a.mimeType ?? null}
-                        />
-                      </li>
-                    ))}
-                </ul>
-              )}
-              {hasTextLink && card.linkUrl && (
-                <a
-                  href={card.linkUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="card-detail-link"
-                >
-                  🔗 링크 열기
-                </a>
-              )}
-            </div>
-            )}
-          </section>
-          <aside className="card-detail-rail" aria-label="메타 및 인터랙션">
-            <div className="card-detail-meta">
-              <CardAuthorFooter
-                authors={card.authors}
-                externalAuthorName={card.externalAuthorName}
-                studentAuthorName={card.studentAuthorName}
-                authorName={card.authorName}
-                createdAt={card.createdAt}
-                anonymousAuthor={card.anonymousAuthor}
-              />
-              {onEditAuthors && (canEditAuthors ? canEditAuthors(card) : true) && (
-                <button
-                  type="button"
-                  className="card-detail-edit-authors"
-                  onClick={() => onEditAuthors(card)}
-                >
-                  👥 작성자 지정
-                </button>
-              )}
-            </div>
-            {/* card-detail-modal-engagement (2026-04-26): 좋아요 + 댓글 패널. */}
-            <CardEngagement
-              cardId={card.id}
-              mode="panel"
-              boardId={boardId}
-              isStudentViewer={isStudentViewer}
-            />
-          </aside>
-        </div>
         {lightboxIndex !== null &&
           (() => {
             const imageItems = attachments
@@ -379,7 +408,7 @@ export function CardDetailModal({
 function contentStartsWithLinkPreview(
   content: string,
   title: string | null | undefined,
-  description: string | null | undefined
+  description: string | null | undefined,
 ): boolean {
   const contentText = normalizePreviewText(content);
   const titleText = normalizePreviewText(title ?? "");
@@ -419,7 +448,12 @@ function CardBodyContent({
       <>
         <h3
           className="card-detail-content-title"
-          style={{ fontSize: bodyFontSize, lineHeight: 1.5, margin: 0, fontWeight: 700 }}
+          style={{
+            fontSize: bodyFontSize,
+            lineHeight: 1.5,
+            margin: 0,
+            fontWeight: 700,
+          }}
         >
           {title}
         </h3>

@@ -116,15 +116,55 @@ export const shadows = {
 
 /** 8-role type scale. 웹 design-system.md §2 와 동일한 semantic 이름. */
 export const typography = {
-  display: { fontSize: 26, fontWeight: "700", letterSpacing: 0, lineHeight: 32 } as const,
-  title: { fontSize: 20, fontWeight: "700", letterSpacing: 0, lineHeight: 26 } as const,
-  subtitle: { fontSize: 16, fontWeight: "700", letterSpacing: 0, lineHeight: 22 } as const,
-  section: { fontSize: 15, fontWeight: "700", letterSpacing: 0, lineHeight: 21 } as const,
+  display: {
+    fontSize: 26,
+    fontWeight: "700",
+    letterSpacing: 0,
+    lineHeight: 32,
+  } as const,
+  title: {
+    fontSize: 20,
+    fontWeight: "700",
+    letterSpacing: 0,
+    lineHeight: 26,
+  } as const,
+  subtitle: {
+    fontSize: 16,
+    fontWeight: "700",
+    letterSpacing: 0,
+    lineHeight: 22,
+  } as const,
+  section: {
+    fontSize: 15,
+    fontWeight: "700",
+    letterSpacing: 0,
+    lineHeight: 21,
+  } as const,
   body: { fontSize: 15, fontWeight: "400", lineHeight: 22 } as const,
-  label: { fontSize: 13, fontWeight: "600", letterSpacing: 0, lineHeight: 18 } as const,
-  badge: { fontSize: 12, fontWeight: "600", letterSpacing: 0, lineHeight: 16 } as const,
-  micro: { fontSize: 11, fontWeight: "600", letterSpacing: 0, lineHeight: 15 } as const,
-  code: { fontSize: 40, fontWeight: "700", letterSpacing: 0, lineHeight: 48 } as const,
+  label: {
+    fontSize: 13,
+    fontWeight: "600",
+    letterSpacing: 0,
+    lineHeight: 18,
+  } as const,
+  badge: {
+    fontSize: 12,
+    fontWeight: "600",
+    letterSpacing: 0,
+    lineHeight: 16,
+  } as const,
+  micro: {
+    fontSize: 11,
+    fontWeight: "600",
+    letterSpacing: 0,
+    lineHeight: 15,
+  } as const,
+  code: {
+    fontSize: 40,
+    fontWeight: "700",
+    letterSpacing: 0,
+    lineHeight: 48,
+  } as const,
 };
 
 /** Tap target — handoff ingest T1-1. 학생 태블릿 기준. */
@@ -159,7 +199,43 @@ export const layout = {
   roleCardNarrowMaxWidth: 320,
   mobileBreakpoint: 640,
   authTwoPaneBreakpoint: 720,
+  boardGridPadding: spacing.xl,
+  boardGridGap: spacing.md,
+  boardGridMinCardWidth: 260,
 } as const;
+
+export type BoardThemeKey =
+  | "pastel-peach"
+  | "pastel-mint"
+  | "pastel-sky"
+  | "pastel-lilac"
+  | "pastel-lemon";
+
+export const boardThemes: Record<
+  BoardThemeKey,
+  { background: string; surface: string }
+> = {
+  "pastel-peach": { background: "#fff4ef", surface: "#fff9f6" },
+  "pastel-mint": { background: "#f1fff8", surface: "#f8fffb" },
+  "pastel-sky": { background: "#eef7ff", surface: "#f8fbff" },
+  "pastel-lilac": { background: "#f8f2ff", surface: "#fcf8ff" },
+  "pastel-lemon": { background: "#fffcee", surface: "#fffdf5" },
+};
+
+export function normalizeBoardTheme(
+  value: string | null | undefined,
+): BoardThemeKey {
+  if (
+    value === "pastel-peach" ||
+    value === "pastel-mint" ||
+    value === "pastel-sky" ||
+    value === "pastel-lilac" ||
+    value === "pastel-lemon"
+  ) {
+    return value;
+  }
+  return "pastel-sky";
+}
 
 export const responsive = {
   minSafeWidth: spacing.none,
@@ -325,7 +401,9 @@ export const dashboard = {
   authorMaxWidth: 120,
   dutyMinHeight: 74,
   dutyIconWidth: 36,
+  dutyCtaOpacity: 0.8,
   boardMinHeight: 88,
+  boardThumbAspectRatio: 16 / 10,
 } as const;
 
 export const navigation = {
@@ -435,4 +513,5 @@ export const plant = {
   lightboxImageWidthRatio: 0.92,
   lightboxImageHeightRatio: 0.7,
   lightboxCloseBottom: 60,
+  observationCardWidth: 220,
 } as const;

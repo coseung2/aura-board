@@ -4,7 +4,9 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { ShowcaseHighlightStrip } from "@/components/portfolio/ShowcaseHighlightStrip";
-import { layoutLabel } from "@/lib/layout-meta";
+import { layoutLabel, layoutThumbnail } from "@/lib/layout-meta";
+
+const FALLBACK_THUMBNAIL = "/board-type-thumbnails/card-board.png";
 
 type BoardItem = {
   id: string;
@@ -13,6 +15,9 @@ type BoardItem = {
   layout: string;
   // BC-1: "LESSON" or "PLAY" - drives the lesson/play section split below.
   category: "LESSON" | "PLAY";
+  // Thumbnail/fallback matches the teacher Dashboard board cards.
+  thumbnailMode?: string | null;
+  thumbnailUrl?: string | null;
   quizzes?: { roomCode: string; status: string }[];
   breakout?: StudentBreakout | null;
 };
@@ -161,13 +166,12 @@ export function StudentDashboard({
         hrefBase="/student/showcase"
       />
 
-      <div className="student-portfolio-cta-row">
+      <section className="student-utilities" aria-label="바로가기">
         <Link href="/student/portfolio" className="student-portfolio-cta">
-          우리 학급 포트폴리오 보기
+          <span className="student-portfolio-cta-icon">🗂️</span>
+          <span className="student-portfolio-cta-label">포트폴리오 보기</span>
         </Link>
-      </div>
 
-      <section className="student-wallet-section">
         <div className="student-wallet-card">
           <div className="student-wallet-header">
             <div>
@@ -175,7 +179,7 @@ export function StudentDashboard({
               <h2 className="student-wallet-title">내 통장과 적금</h2>
             </div>
             <Link href="/my/wallet" className="student-wallet-link">
-              자세히 보기
+              자세히
             </Link>
           </div>
 
@@ -206,9 +210,7 @@ export function StudentDashboard({
                           {fd.principal.toLocaleString()}{" "}
                           {wallet.currency.unitLabel}
                         </strong>
-                        <span>
-                          이자 {fd.monthlyRate}% · D-{daysLeft}
-                        </span>
+                        <span>D-{daysLeft}</span>
                         <button
                           type="button"
                           className="student-wallet-fd-cancel"
@@ -238,28 +240,25 @@ export function StudentDashboard({
             </div>
           )}
         </div>
-      </section>
 
-      {duties.length > 0 && (
-        <section className="student-duty-section">
-          <h2 className="student-duty-title">내 역할</h2>
-          <div className="student-duty-grid">
+        {duties.length > 0 && (
+          <div className="student-duty-strip">
             {duties.map((duty) => (
               <Link
                 key={`${duty.classroomId}-${duty.roleKey}`}
                 href={duty.href}
-                className="student-duty-card"
+                className="student-duty-chip"
               >
                 <span className="student-duty-emoji" aria-hidden="true">
                   {duty.emoji ?? "•"}
                 </span>
                 <span className="student-duty-role">{duty.roleLabel}</span>
-                <span className="student-duty-cta">역할 시작</span>
+                <span className="student-duty-cta">시작</span>
               </Link>
             ))}
           </div>
-        </section>
-      )}
+        )}
+      </section>
 
       {boards.length === 0 ? (
         <div className="student-empty">
@@ -305,7 +304,15 @@ function StudentBoardSections({
   const playBoards = boards.filter((b) => b.category === "PLAY");
   const activeBoards = activeCategory === "LESSON" ? lessonBoards : playBoards;
 
+  const boardThumbnail = (board: BoardItem) => {
+    if (board.thumbnailMode === "custom" && board.thumbnailUrl) {
+      return board.thumbnailUrl;
+    }
+    return layoutThumbnail(board.layout) ?? FALLBACK_THUMBNAIL;
+  };
+
   const renderCard = (board: BoardItem) => {
+    const thumbnail = boardThumbnail(board);
     const quizCode = board.layout === "quiz" && board.quizzes?.[0]?.roomCode;
     const href = quizCode
       ? `/quiz/${quizCode}`
@@ -329,20 +336,38 @@ function StudentBoardSections({
             onOpenBreakout({ sourceTitle: board.title, breakout });
           }}
         >
-          <span className="student-board-card-title">{board.title}</span>
-          <span className="student-board-card-meta">
-            모둠 선택 · {breakout.boardTitle}
-          </span>
+          <div className="student-board-preview">
+            <img
+              className="student-board-preview-img"
+              src={thumbnail}
+              alt={`${layoutLabel(board.layout)} 화면 미리보기`}
+            />
+          </div>
+          <div className="student-board-card-body">
+            <span className="student-board-card-title">{board.title}</span>
+            <span className="student-board-card-meta">
+              모둠 선택 · {breakout.boardTitle}
+            </span>
+          </div>
         </button>
       );
     }
     return (
       <Link key={board.id} href={href} className="student-board-card">
-        <span className="student-board-card-title">{board.title}</span>
-        <span className="student-board-card-meta">
-          {layoutLabel(board.layout)}
-          {quizCode && " · 참여하기"}
-        </span>
+        <div className="student-board-preview">
+          <img
+            className="student-board-preview-img"
+            src={thumbnail}
+            alt={`${layoutLabel(board.layout)} 화면 미리보기`}
+          />
+        </div>
+        <div className="student-board-card-body">
+          <span className="student-board-card-title">{board.title}</span>
+          <span className="student-board-card-meta">
+            {layoutLabel(board.layout)}
+            {quizCode && " · 참여하기"}
+          </span>
+        </div>
       </Link>
     );
   };

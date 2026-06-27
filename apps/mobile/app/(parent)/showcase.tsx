@@ -170,6 +170,7 @@ function toBoardCard(card: PortfolioCardDTO, authorName: string): BoardCard {
         id: a.id,
         kind: a.kind as "image" | "video" | "file",
         url: a.url,
+        previewUrl: null,
         fileName: a.fileName,
         fileSize: a.fileSize,
         mimeType: a.mimeType,

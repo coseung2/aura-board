@@ -12,15 +12,24 @@ import {
 import { WebView } from "react-native-webview";
 import {
   borders,
+  cardDetail,
   colors,
+  controls,
   iconSizes,
+  radii,
   spacing,
   typography,
   vibe,
 } from "../../theme/tokens";
 import { apiFetch, ApiError, getApiBase, streamSse } from "../../lib/api";
 import type { BoardDetailResponse } from "../../lib/types";
-import { AppButton, SurfaceCard, SurfacePressable, TextField } from "../ui";
+import {
+  AppButton,
+  IconButton,
+  SurfaceCard,
+  SurfacePressable,
+  TextField,
+} from "../ui";
 
 // 코딩 교실(vibe-arcade). 학생이 LLM 과 대화해 HTML 프로젝트 만드는 공간.
 // 3 구역 레이아웃:
@@ -38,11 +47,7 @@ type PlayProject = {
   title: string;
 };
 
-export function VibeArcadeBoard({
-  data,
-}: {
-  data: BoardDetailResponse;
-}) {
+export function VibeArcadeBoard({ data }: { data: BoardDetailResponse }) {
   const cfg = data.layoutData.vibeArcade?.config;
   const projects = data.layoutData.vibeArcade?.projects ?? [];
   const { width } = useWindowDimensions();
@@ -61,7 +66,11 @@ export function VibeArcadeBoard({
     if (!msg || streaming) return;
     setInput("");
     setError(null);
-    setMessages((prev) => [...prev, { role: "user", content: msg }, { role: "assistant", content: "" }]);
+    setMessages((prev) => [
+      ...prev,
+      { role: "user", content: msg },
+      { role: "assistant", content: "" },
+    ]);
     setStreaming(true);
     const ctrl = new AbortController();
     abortRef.current = ctrl;
@@ -99,16 +108,21 @@ export function VibeArcadeBoard({
             setError(evt.message);
           }
           if (evt.type === "refusal") {
-            setError("요청이 거절되었어요. 학습 목적의 질문으로 다시 시도해주세요.");
+            setError(
+              "요청이 거절되었어요. 학습 목적의 질문으로 다시 시도해주세요.",
+            );
           }
         },
       });
     } catch (e) {
       if (e instanceof ApiError) {
         if (e.status === 401) setError("로그인이 만료되었어요.");
-        else if (e.status === 403) setError("선생님이 코딩 교실을 아직 열지 않았어요.");
-        else if (e.status === 429) setError("토큰 사용량을 모두 썼거나 연속 요청을 초과했어요.");
-        else if (e.status === 503) setError("선생님이 AI Key 를 아직 등록하지 않았어요.");
+        else if (e.status === 403)
+          setError("선생님이 코딩 교실을 아직 열지 않았어요.");
+        else if (e.status === 429)
+          setError("토큰 사용량을 모두 썼거나 연속 요청을 초과했어요.");
+        else if (e.status === 503)
+          setError("선생님이 AI Key 를 아직 등록하지 않았어요.");
         else setError(`오류 (${e.status})`);
       } else {
         setError(e instanceof Error ? e.message : "오류");
@@ -145,7 +159,10 @@ export function VibeArcadeBoard({
           data={projects}
           horizontal={compact}
           keyExtractor={(p) => p.id}
-          contentContainerStyle={[styles.galleryList, compact && styles.galleryListCompact]}
+          contentContainerStyle={[
+            styles.galleryList,
+            compact && styles.galleryListCompact,
+          ]}
           renderItem={({ item }) => (
             <SurfacePressable
               onPress={() => setPlayTarget({ id: item.id, title: item.title })}
@@ -162,7 +179,9 @@ export function VibeArcadeBoard({
                   <Text style={styles.thumbFallbackEmoji}>💻</Text>
                 </View>
               )}
-              <Text style={styles.galleryTitle} numberOfLines={2}>{item.title}</Text>
+              <Text style={styles.galleryTitle} numberOfLines={2}>
+                {item.title}
+              </Text>
               <Text style={styles.galleryMeta}>
                 {item.moderationStatus === "approved" ? "✓ 공개" : "개인"}
               </Text>
@@ -211,10 +230,7 @@ export function VibeArcadeBoard({
             multiline
           />
           {streaming ? (
-            <AppButton
-              variant="danger"
-              onPress={cancel}
-            >
+            <AppButton variant="danger" onPress={cancel}>
               중지
             </AppButton>
           ) : (
@@ -229,15 +245,18 @@ export function VibeArcadeBoard({
         </View>
       </SurfaceCard>
 
-      <PlayModal
-        project={playTarget}
-        onClose={() => setPlayTarget(null)}
-      />
+      <PlayModal project={playTarget} onClose={() => setPlayTarget(null)} />
     </View>
   );
 }
 
-function PlayModal({ project, onClose }: { project: PlayProject | null; onClose: () => void }) {
+function PlayModal({
+  project,
+  onClose,
+}: {
+  project: PlayProject | null;
+  onClose: () => void;
+}) {
   const [playToken, setPlayToken] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -282,15 +301,19 @@ function PlayModal({ project, onClose }: { project: PlayProject | null; onClose:
     <Modal visible={true} animationType="slide" onRequestClose={onClose}>
       <View style={styles.modalRoot}>
         <View style={styles.modalBar}>
-          <AppButton
-            variant="quiet"
-            style={styles.closeBtn}
-            textStyle={styles.closeText}
+          <IconButton
             onPress={onClose}
+            style={styles.closeBtn}
+            accessibilityLabel="프로젝트 미리보기 닫기"
           >
-            닫기
-          </AppButton>
-          <Text style={styles.modalTitle} numberOfLines={1}>{project.title}</Text>
+            <View pointerEvents="none" style={styles.closeIcon}>
+              <View style={[styles.closeStroke, styles.closeStrokeA]} />
+              <View style={[styles.closeStroke, styles.closeStrokeB]} />
+            </View>
+          </IconButton>
+          <Text style={styles.modalTitle} numberOfLines={1}>
+            {project.title}
+          </Text>
           <View style={styles.modalSpacer} />
         </View>
         {error ? (
@@ -386,7 +409,11 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
   },
   chatEmptyEmoji: { fontSize: iconSizes.hero },
-  chatEmptyText: { ...typography.body, color: colors.textMuted, textAlign: "center" },
+  chatEmptyText: {
+    ...typography.body,
+    color: colors.textMuted,
+    textAlign: "center",
+  },
   bubble: {
     padding: spacing.md,
     maxWidth: "90%",
@@ -440,11 +467,35 @@ const styles = StyleSheet.create({
     backgroundColor: colors.vibeModalBackdrop,
   },
   closeBtn: {
+    width: controls.iconButton,
+    height: controls.iconButton,
+    borderRadius: radii.pill,
     backgroundColor: colors.vibeModalControlBg,
+    alignItems: "center",
+    justifyContent: "center",
   },
-  closeText: { color: colors.onAccent, ...typography.label },
-  modalTitle: { color: colors.onAccent, ...typography.subtitle, flex: 1, textAlign: "center" },
-  modalSpacer: { width: vibe.modalSpacerWidth },
+  closeIcon: {
+    width: cardDetail.closeIconSize,
+    height: cardDetail.closeIconSize,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  closeStroke: {
+    position: "absolute",
+    width: cardDetail.closeStrokeWidth,
+    height: cardDetail.iconStrokeHeight,
+    borderRadius: radii.pill,
+    backgroundColor: colors.onAccent,
+  },
+  closeStrokeA: { transform: [{ rotate: "45deg" }] },
+  closeStrokeB: { transform: [{ rotate: "-45deg" }] },
+  modalTitle: {
+    color: colors.onAccent,
+    ...typography.subtitle,
+    flex: 1,
+    textAlign: "center",
+  },
+  modalSpacer: { width: controls.iconButton },
   modalErrorText: { ...typography.body, color: colors.onAccent },
   modalLoading: {
     flex: 1,
