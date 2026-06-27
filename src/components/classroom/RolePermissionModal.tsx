@@ -2,6 +2,12 @@
 
 import { useMemo, useState } from "react";
 
+const CATEGORY_LABEL: Record<string, string> = {
+  bank: "📂 은행 업무",
+  store: "📂 매점 운영",
+  checks: "📂 제출 체크",
+};
+
 type CatalogEntry = {
   key: string;
   label: string;
@@ -98,7 +104,7 @@ export function RolePermissionModal({
           {Object.entries(grouped).map(([cat, entries]) => (
             <section key={cat} className="role-perm-group">
               <h4 className="role-perm-group-title">
-                {cat === "bank" ? "📂 은행 업무" : "📂 매점 운영"}
+                {CATEGORY_LABEL[cat] ?? cat}
               </h4>
               <ul className="role-perm-list">
                 {entries.map((entry) => {

@@ -2,6 +2,7 @@ import { getCurrentStudent } from "@/lib/student-auth";
 import { db } from "@/lib/db";
 import { getStudentDuties } from "@/lib/role-portals";
 import { StudentDashboard } from "@/components/StudentDashboard";
+import { StudentTopNav } from "@/components/StudentTopNav";
 import { cloneStructure } from "@/lib/breakout";
 import { redirect } from "next/navigation";
 
@@ -163,15 +164,22 @@ export default async function StudentPage() {
     });
 
   return (
-    <main className="student-page">
-      <StudentDashboard
+    <>
+      <StudentTopNav
         studentName={student.name}
         classroomName={student.classroom.name}
-        classroomId={student.classroomId}
-        boards={boardItems}
         duties={duties}
       />
-    </main>
+      <main className="student-page">
+        <StudentDashboard
+          studentName={student.name}
+          classroomName={student.classroom.name}
+          classroomId={student.classroomId}
+          boards={boardItems}
+          duties={duties}
+        />
+      </main>
+    </>
   );
 }
 

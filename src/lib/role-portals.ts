@@ -15,7 +15,7 @@ export type Duty = {
 // 권한 해석 결과를 따른다. 교사가 커스텀 역할에 bank/store 권한을 부여해도
 // 모바일/웹 학생 홈에서 해당 업무 카드가 보여야 한다.
 const PORTALS: Array<{
-  roleKey: "banker" | "store-clerk";
+  roleKey: "banker" | "store-clerk" | "checker";
   segment: string;
   permission: PermissionKey;
   fallbackLabel: string;
@@ -34,6 +34,13 @@ const PORTALS: Array<{
     permission: "store.charge",
     fallbackLabel: "매점 결제",
     fallbackEmoji: "🛒",
+  },
+  {
+    roleKey: "checker",
+    segment: "check",
+    permission: "checks.manage",
+    fallbackLabel: "제출 체크",
+    fallbackEmoji: "✅",
   },
 ];
 

@@ -18,6 +18,7 @@ const TABS: Tab[] = [
   { key: "bank", label: "은행", emoji: "🏦" },
   { key: "store", label: "매점", emoji: "🏪" },
   { key: "pay", label: "결제", emoji: "QR" },
+  { key: "check", label: "제출 체크", emoji: "✅" },
 ];
 
 type Props = {

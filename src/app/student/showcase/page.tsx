@@ -1,7 +1,9 @@
 import { redirect } from "next/navigation";
 import { db } from "@/lib/db";
 import { getCurrentStudent } from "@/lib/student-auth";
+import { getStudentDuties } from "@/lib/role-portals";
 import { ShowcaseGalleryView } from "@/components/portfolio/ShowcaseGalleryView";
+import { StudentTopNav } from "@/components/StudentTopNav";
 
 export const dynamic = "force-dynamic";
 
@@ -13,19 +15,29 @@ export default async function StudentShowcasePage() {
   if (!student) {
     redirect("/student/login");
   }
-  const classroom = await db.classroom.findUnique({
-    where: { id: student.classroomId },
-    select: { id: true, name: true },
-  });
+  const [classroom, duties] = await Promise.all([
+    db.classroom.findUnique({
+      where: { id: student.classroomId },
+      select: { id: true, name: true },
+    }),
+    getStudentDuties(student.id),
+  ]);
   if (!classroom) {
     redirect("/student/login");
   }
   return (
-    <main className="student-page-portfolio-shell">
-      <ShowcaseGalleryView
-        classroomId={classroom.id}
+    <>
+      <StudentTopNav
+        studentName={student.name}
         classroomName={classroom.name}
+        duties={duties}
       />
-    </main>
+      <main className="student-page-portfolio-shell">
+        <ShowcaseGalleryView
+          classroomId={classroom.id}
+          classroomName={classroom.name}
+        />
+      </main>
+    </>
   );
 }

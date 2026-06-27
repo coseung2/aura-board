@@ -48,6 +48,12 @@ export const PERMISSION_CATALOG = {
     category: "store",
     defaultRoles: ["store-clerk"],
   },
+  "checks.manage": {
+    label: "제출 체크",
+    description: "숙제·가정통신문 등 제출 여부 기록",
+    category: "checks",
+    defaultRoles: ["checker"],
+  },
 } as const;
 
 export type PermissionKey = keyof typeof PERMISSION_CATALOG;

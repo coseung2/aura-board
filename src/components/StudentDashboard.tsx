@@ -72,10 +72,7 @@ export function StudentDashboard({
   classroomName,
   classroomId,
   boards,
-  duties,
 }: Props) {
-  const router = useRouter();
-  const [loggingOut, setLoggingOut] = useState(false);
   const [wallet, setWallet] = useState<WalletSummary | null>(null);
   const [cancellingFD, setCancellingFD] = useState<string | null>(null);
   const [fdError, setFdError] = useState<string | null>(null);
@@ -103,19 +100,6 @@ export function StudentDashboard({
       cancelled = true;
     };
   }, []);
-
-  async function handleLogout() {
-    setLoggingOut(true);
-    try {
-      await fetch("/api/student/logout", { method: "POST" });
-      // BC-1 fix: send the student back to the student login page, not the
-      // teacher login. Every other student-facing page uses /student/login
-      // as the unauth redirect target.
-      router.push("/student/login");
-    } catch {
-      setLoggingOut(false);
-    }
-  }
 
   async function handleCancelFD(fdId: string) {
     if (!window.confirm("이 적금을 중도해지할까요? (이자 없이 원금만 반환)")) {
@@ -152,13 +136,6 @@ export function StudentDashboard({
       <div className="student-greeting-row">
         <h1 className="student-greeting">{studentName}님, 안녕하세요</h1>
         <span className="student-classroom-badge">{classroomName}</span>
-        <button
-          className="student-logout-btn"
-          onClick={handleLogout}
-          disabled={loggingOut}
-        >
-          {loggingOut ? "로그아웃 중..." : "로그아웃"}
-        </button>
       </div>
 
       <ShowcaseHighlightStrip
@@ -167,11 +144,6 @@ export function StudentDashboard({
       />
 
       <section className="student-utilities" aria-label="바로가기">
-        <Link href="/student/portfolio" className="student-portfolio-cta">
-          <span className="student-portfolio-cta-icon">🗂️</span>
-          <span className="student-portfolio-cta-label">포트폴리오 보기</span>
-        </Link>
-
         <div className="student-wallet-card">
           <div className="student-wallet-header">
             <div>
@@ -240,24 +212,6 @@ export function StudentDashboard({
             </div>
           )}
         </div>
-
-        {duties.length > 0 && (
-          <div className="student-duty-strip">
-            {duties.map((duty) => (
-              <Link
-                key={`${duty.classroomId}-${duty.roleKey}`}
-                href={duty.href}
-                className="student-duty-chip"
-              >
-                <span className="student-duty-emoji" aria-hidden="true">
-                  {duty.emoji ?? "•"}
-                </span>
-                <span className="student-duty-role">{duty.roleLabel}</span>
-                <span className="student-duty-cta">시작</span>
-              </Link>
-            ))}
-          </div>
-        )}
       </section>
 
       {boards.length === 0 ? (

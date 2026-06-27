@@ -1,7 +1,9 @@
 import { redirect } from "next/navigation";
 import { db } from "@/lib/db";
 import { getCurrentStudent } from "@/lib/student-auth";
+import { getStudentDuties } from "@/lib/role-portals";
 import { PortfolioPage } from "@/components/portfolio/PortfolioPage";
+import { StudentTopNav } from "@/components/StudentTopNav";
 import type { PortfolioRosterDTO } from "@/lib/portfolio-dto";
 
 export const dynamic = "force-dynamic";
@@ -18,10 +20,13 @@ export default async function StudentPortfolioPage() {
   }
 
   const classroomId = student.classroomId;
-  const classroom = await db.classroom.findUnique({
-    where: { id: classroomId },
-    select: { id: true, name: true },
-  });
+  const [classroom, duties] = await Promise.all([
+    db.classroom.findUnique({
+      where: { id: classroomId },
+      select: { id: true, name: true },
+    }),
+    getStudentDuties(student.id),
+  ]);
   if (!classroom) {
     // 학생 세션은 있는데 학급이 사라진 케이스 — 데이터 정합성 깨짐, login 으로
     redirect("/student/login");
@@ -72,14 +77,21 @@ export default async function StudentPortfolioPage() {
   };
 
   return (
-    <main className="student-page-portfolio-shell">
-      {/* 헤더는 PortfolioPage 가 own — DJ 보드 패턴 일치 (제목 + action 동일
-          row, 토글 버튼이 헤더 안에 같이 들어감). */}
-      <PortfolioPage
-        initialRoster={initialRoster}
-        selfStudentId={student.id}
-        defaultStudentId={student.id}
+    <>
+      <StudentTopNav
+        studentName={student.name}
+        classroomName={classroom.name}
+        duties={duties}
       />
-    </main>
+      <main className="student-page-portfolio-shell">
+        {/* 헤더는 PortfolioPage 가 own — DJ 보드 패턴 일치 (제목 + action 동일
+            row, 토글 버튼이 헤더 안에 같이 들어감). */}
+        <PortfolioPage
+          initialRoster={initialRoster}
+          selfStudentId={student.id}
+          defaultStudentId={student.id}
+        />
+      </main>
+    </>
   );
 }

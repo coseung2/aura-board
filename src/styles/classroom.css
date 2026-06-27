@@ -3007,3 +3007,463 @@
   min-width: 0;
   max-width: 140px;
 }
+
+/* ═══ Check tab (체크원 · 제출 체크) ═════════════════════════════════ */
+
+.classroom-check {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.check-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.check-header h2 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.check-header-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.check-add {
+  padding: 7px 12px;
+  border: 1px solid var(--color-accent);
+  border-radius: var(--radius-btn);
+  background: var(--color-accent);
+  color: #fff;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.check-add:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.check-loading,
+.check-empty {
+  width: min(100%, 640px);
+  color: var(--color-text-muted);
+  font-size: 14px;
+  margin: 0;
+}
+
+.check-error {
+  width: min(100%, 640px);
+  color: var(--color-bank-negative);
+  font-size: 13px;
+  margin: 0;
+}
+
+.check-toast {
+  width: min(100%, 640px);
+  color: var(--color-bank-positive);
+  font-size: 13px;
+  margin: 0;
+}
+
+.check-task-list {
+  width: min(100%, 640px);
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.check-task-row {
+  display: grid;
+  grid-template-columns: minmax(220px, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  transition: border-color 150ms ease;
+}
+
+.check-task-row.is-selected {
+  border-color: var(--color-accent);
+}
+
+.check-task-row.is-inactive {
+  opacity: 0.65;
+}
+
+.check-task-main {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  background: none;
+  border: none;
+  text-align: left;
+  cursor: pointer;
+  font: inherit;
+  color: inherit;
+  min-width: 0;
+}
+
+.check-task-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.check-task-desc {
+  font-size: 12px;
+  color: var(--color-text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.check-task-meta {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  font-size: 12px;
+  color: var(--color-text-muted);
+}
+
+.check-task-count {
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.check-task-due {
+  color: var(--color-accent);
+}
+
+.check-task-status {
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: var(--color-surface-alt);
+  color: var(--color-text-muted);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.check-task-actions {
+  display: flex;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.check-task-actions button {
+  padding: 5px 8px;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-btn);
+  background: var(--color-surface);
+  color: var(--color-text);
+ cursor: pointer;
+}
+
+.check-task-actions button:hover:not(:disabled) {
+  background: var(--color-surface-alt);
+}
+
+.check-task-delete {
+  color: var(--color-bank-negative) !important;
+  border-color: var(--color-border) !important;
+}
+
+.check-task-delete:hover:not(:disabled) {
+  background: rgba(198, 40, 40, 0.08) !important;
+}
+
+.check-task-actions button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+@media (max-width: 640px) {
+  .check-task-row {
+    grid-template-columns: 1fr;
+  }
+  .check-task-actions {
+    flex-wrap: wrap;
+  }
+}
+
+/* ---- Check task editor modal ---- */
+
+.check-editor {
+  background: var(--color-surface);
+  border-radius: var(--radius-card);
+  max-width: 480px;
+  width: calc(100vw - 32px);
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 20px;
+  box-shadow: var(--shadow-card);
+}
+
+.check-editor-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.check-editor-header h3 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.check-editor-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--color-text-muted);
+}
+
+.check-editor-field input,
+.check-editor-field textarea {
+  padding: 8px 10px;
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  font: inherit;
+  font-size: 14px;
+  background: var(--color-surface);
+  color: var(--color-text);
+  resize: vertical;
+}
+
+.check-editor-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.check-editor-footer button {
+  padding: 8px 16px;
+  border-radius: 6px;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.check-editor-footer button[type="button"] {
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-text);
+}
+
+.check-editor-footer button[type="submit"] {
+  border: 1px solid var(--color-accent);
+  background: var(--color-accent);
+  color: #fff;
+}
+
+.check-editor-footer button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* ---- Check roster modal ---- */
+
+.check-roster {
+  background: var(--color-surface);
+  border-radius: var(--radius-card);
+  max-width: 560px;
+  width: calc(100vw - 32px);
+  max-height: calc(100vh - 80px);
+  display: flex;
+  flex-direction: column;
+  box-shadow: var(--shadow-card);
+  overflow: hidden;
+}
+
+.check-roster-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.check-roster-header h3 {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 700;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.check-roster-loading,
+.check-roster-empty {
+  padding: 24px 20px;
+  color: var(--color-text-muted);
+  font-size: 14px;
+  margin: 0;
+}
+
+.check-roster-error {
+  padding: 16px 20px;
+  color: var(--color-bank-negative);
+  font-size: 13px;
+  margin: 0;
+}
+
+.check-roster-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 20px;
+  border-bottom: 1px solid var(--color-border);
+  flex-wrap: wrap;
+}
+
+.check-roster-count {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+.check-roster-bulk {
+  display: flex;
+  gap: 6px;
+}
+
+.check-roster-bulk button {
+  padding: 5px 10px;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-btn);
+  background: var(--color-surface);
+  color: var(--color-text);
+  cursor: pointer;
+}
+
+.check-roster-bulk button:hover:not(:disabled) {
+  background: var(--color-surface-alt);
+}
+
+.check-roster-bulk button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.check-roster-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  flex: 1;
+}
+
+.check-roster-row {
+  border-bottom: 1px solid var(--color-border);
+}
+
+.check-roster-toggle {
+  width: 100%;
+  display: grid;
+  grid-template-columns: 32px 1fr auto;
+  gap: 10px;
+  align-items: center;
+  padding: 10px 20px;
+  background: none;
+  border: none;
+  text-align: left;
+  cursor: pointer;
+  font: inherit;
+  color: inherit;
+}
+
+.check-roster-toggle:hover {
+  background: var(--color-surface-alt);
+}
+
+.check-roster-toggle:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.check-roster-row.is-submitted .check-roster-toggle {
+  background: var(--color-accent-tinted-bg);
+}
+
+.check-roster-num {
+  color: var(--color-text-faint);
+  font-size: 12px;
+}
+
+.check-roster-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.check-roster-mark {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--color-text-muted);
+}
+
+.check-roster-row.is-submitted .check-roster-mark {
+  color: var(--color-bank-positive);
+}
+
+.check-roster-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 20px;
+  border-top: 1px solid var(--color-border);
+}
+
+.check-roster-toast {
+  font-size: 12px;
+  color: var(--color-bank-positive);
+  font-weight: 600;
+}
+
+.check-roster-save {
+  margin-left: auto;
+  padding: 8px 18px;
+  border: 1px solid var(--color-accent);
+  border-radius: 6px;
+  background: var(--color-accent);
+  color: #fff;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.check-roster-save:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
