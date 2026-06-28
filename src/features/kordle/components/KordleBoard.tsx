@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { GameWinnerInfo } from "@/features/games/components/GameWinnerInfo";
 import type { KordlePublicState, LetterState } from "../engine";
 import { KordleGrid } from "./KordleGrid";
 import { KordleKeyboard } from "./KordleKeyboard";
@@ -14,39 +15,6 @@ type Props = {
 };
 
 type Status = KordlePublicState["status"];
-
-function KordleWinnerInfo({ stats }: { stats: KordlePublicState["winnerStats"] }) {
-  const latestRound = stats.rounds[0] ?? null;
-  return (
-    <aside className="kordle-winner-info" aria-label="꼬들 우승 기록">
-      <div className="kordle-winner-section">
-        <p className="kordle-winner-label">우승 기록</p>
-        {stats.leaderboard.length > 0 ? (
-          <ol className="kordle-winner-list">
-            {stats.leaderboard.map((winner) => (
-              <li key={winner.studentId}>
-                <span>{winner.name}</span>
-                <strong>{winner.wins}승</strong>
-              </li>
-            ))}
-          </ol>
-        ) : (
-          <p className="kordle-winner-empty">아직 우승자가 없습니다</p>
-        )}
-      </div>
-      {latestRound && (
-        <div className="kordle-winner-section">
-          <p className="kordle-winner-label">최근 회차</p>
-          <p className="kordle-round-winner">
-            <span>{latestRound.roundNumber}회차</span>
-            <strong>{latestRound.winners.map((winner) => winner.name).join(", ")}</strong>
-            <small>{latestRound.solvedAtGuess}줄 만에 성공</small>
-          </p>
-        </div>
-      )}
-    </aside>
-  );
-}
 
 // Korean on-screen typing is jamo-based. The engine normalizes Korean into a
 // flat jamo stream (lead U+1100..U+1112, medial U+1161..U+1175,
@@ -519,10 +487,32 @@ export function KordleBoard({ boardId, initialState, attemptId, locale }: Props)
   // Grid cells = committed cells + in-progress Korean jamos. For English
   // `buffer` is "" so this is just `pending`. Each entry is one cell.
   const displaySlots: string[] = [...pending, ...buffer];
+  const latestRound = state.winnerStats.rounds[0] ?? null;
 
   return (
     <div className="kordle-play-layout">
-      <KordleWinnerInfo stats={state.winnerStats} />
+      <GameWinnerInfo
+        ariaLabel="꼬들 우승 기록"
+        className="kordle-winner-info"
+        leaderboard={state.winnerStats.leaderboard.map((winner) => ({
+          id: winner.studentId,
+          name: winner.name,
+          wins: winner.wins,
+        }))}
+        latestRound={
+          latestRound
+            ? {
+                id: latestRound.puzzleId,
+                roundNumber: latestRound.roundNumber,
+                winners: latestRound.winners.map((winner) => ({
+                  id: winner.studentId,
+                  name: winner.name,
+                })),
+                resultLabel: `${latestRound.solvedAtGuess}줄 만에 성공`,
+              }
+            : null
+        }
+      />
       <div className="kordle-board" data-locale={activeLocale} aria-label="Kordle game">
         <KordleGrid
           wordLength={state.wordLength}

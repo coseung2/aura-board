@@ -1,4 +1,5 @@
 import { db } from "@/lib/db";
+import { GameParticipantsList } from "@/features/games/components/GameParticipantsList";
 import { KordleBoard } from "./KordleBoard";
 import { KordleLiveToasts } from "./KordleLiveToasts";
 import { KordleTeacherControls } from "./KordleTeacherControls";
@@ -187,17 +188,20 @@ export async function KordleTeacherBoard({ boardId, teacherUserId }: Props) {
               </div>
             </dl>
 
-            {puzzle && puzzle.attempts.length > 0 && (
-              <div className="kordle-participant-list">
-                <span>입장한 학생</span>
-                <div>
-                  {puzzle.attempts.map((attempt) =>
-                    attempt.student ? (
-                      <strong key={attempt.student.id}>{attempt.student.name}</strong>
-                    ) : null,
-                  )}
-                </div>
-              </div>
+            {puzzle && (
+              <GameParticipantsList
+                className="kordle-participant-list"
+                participants={puzzle.attempts
+                  .map((attempt) =>
+                    attempt.student
+                      ? {
+                          id: attempt.student.id,
+                          name: attempt.student.name,
+                        }
+                      : null,
+                  )
+                  .filter((participant): participant is { id: string; name: string } => Boolean(participant))}
+              />
             )}
 
             {puzzle ? (

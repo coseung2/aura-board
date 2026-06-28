@@ -20,6 +20,7 @@
   padding: 0 16px;
 }
 
+.game-winner-info,
 .kordle-winner-info {
   display: flex;
   flex-direction: column;
@@ -31,12 +32,14 @@
   box-shadow: 0 8px 24px rgba(15, 23, 42, 0.06);
 }
 
+.game-winner-section,
 .kordle-winner-section {
   display: flex;
   flex-direction: column;
   gap: 8px;
 }
 
+.game-winner-label,
 .kordle-winner-label {
   margin: 0;
   color: var(--color-text-muted, #64748b);
@@ -44,6 +47,7 @@
   font-weight: 850;
 }
 
+.game-winner-list,
 .kordle-winner-list {
   display: flex;
   flex-direction: column;
@@ -53,7 +57,9 @@
   list-style: none;
 }
 
+.game-winner-list li,
 .kordle-winner-list li,
+.game-round-winner,
 .kordle-round-winner {
   display: flex;
   align-items: center;
@@ -64,18 +70,21 @@
   font-weight: 750;
 }
 
+.game-winner-list strong,
 .kordle-winner-list strong {
   color: var(--color-text-muted, #64748b);
   font-size: 12px;
   white-space: nowrap;
 }
 
+.game-winner-empty,
 .kordle-winner-empty {
   margin: 0;
   color: var(--color-text-muted, #64748b);
   font-size: 13px;
 }
 
+.game-round-winner,
 .kordle-round-winner {
   align-items: flex-start;
   flex-direction: column;
@@ -83,12 +92,15 @@
   gap: 2px;
 }
 
+.game-round-winner span,
+.game-round-winner small,
 .kordle-round-winner span,
 .kordle-round-winner small {
   color: var(--color-text-muted, #64748b);
   font-size: 12px;
 }
 
+.game-round-winner strong,
 .kordle-round-winner strong {
   font-size: 14px;
 }
@@ -117,6 +129,7 @@
   margin: -4px 0 12px;
 }
 
+.game-kicker,
 .kordle-kicker {
   margin: 0 0 4px;
   color: var(--color-text-muted, #64748b);
@@ -317,6 +330,7 @@
   margin: 0;
 }
 
+.game-participant-list,
 .kordle-participant-list {
   display: flex;
   flex-direction: column;
@@ -326,14 +340,18 @@
   font-weight: 750;
 }
 
+.game-participant-list div,
 .kordle-participant-list div,
+.game-waiting-participants div,
 .kordle-waiting-participants div {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
 }
 
+.game-participant-list strong,
 .kordle-participant-list strong,
+.game-waiting-participants strong,
 .kordle-waiting-participants strong {
   color: var(--color-text, #0f172a);
   font-size: 13px;
@@ -516,6 +534,7 @@
   font-weight: 850;
 }
 
+.game-waiting,
 .kordle-waiting {
   width: min(100%, 420px);
   margin: 0 auto;
@@ -523,18 +542,21 @@
   text-align: center;
 }
 
+.game-waiting h1,
 .kordle-waiting h1 {
   margin: 0;
   color: var(--color-text, #0f172a);
   font-size: 22px;
 }
 
+.game-waiting > p:last-child,
 .kordle-waiting p:last-child {
   margin: 8px 0 0;
   color: var(--color-text-muted, #64748b);
   font-size: 14px;
 }
 
+.game-waiting-participants,
 .kordle-waiting-participants {
   display: flex;
   flex-direction: column;
@@ -545,6 +567,7 @@
   font-weight: 750;
 }
 
+.game-waiting-participants div,
 .kordle-waiting-participants div {
   justify-content: center;
 }
