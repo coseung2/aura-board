@@ -2,10 +2,33 @@
 
 import { useSession, signOut } from "next-auth/react";
 import Link from "next/link";
+import { useEffect, useState } from "react";
 import { TeacherNotificationBell } from "./TeacherNotificationBell";
 
 export function AuthHeader() {
   const { data: session, status } = useSession();
+  const [hasParentSession, setHasParentSession] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    async function loadParentSession() {
+      try {
+        const res = await fetch("/api/parent/session/status", {
+          cache: "no-store",
+          credentials: "same-origin",
+        });
+        if (!res.ok) return;
+        const data = (await res.json()) as { state?: string };
+        if (!cancelled) setHasParentSession(data.state !== "anonymous");
+      } catch {
+        /* parent session is optional */
+      }
+    }
+    void loadParentSession();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   if (status === "loading") {
     return null;
@@ -28,6 +51,17 @@ export function AuthHeader() {
       )}
       <span className="auth-name">{session.user.name}</span>
       <TeacherNotificationBell />
+      {hasParentSession && (
+        <Link
+          href="/parent/home"
+          className="auth-mode-switch"
+          title="학부모 화면으로 전환"
+          aria-label="학부모 화면으로 전환"
+        >
+          <span aria-hidden>👪</span>
+          <span>학부모</span>
+        </Link>
+      )}
       <SettingsMenu />
       <button
         type="button"

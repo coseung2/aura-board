@@ -14,6 +14,7 @@ type Props = {
   children: ChildRow[];
   selectedId: string;
   onSelect: (studentId: string) => void;
+  showAddChildLink?: boolean;
 };
 
 // parent-redesign (2026-04-26): 다자녀 셀렉터 chip + dropdown.
@@ -22,6 +23,7 @@ export function ParentChildSelector({
   children: childRows,
   selectedId,
   onSelect,
+  showAddChildLink = true,
 }: Props) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -105,16 +107,20 @@ export function ParentChildSelector({
               </li>
             );
           })}
-          <li className="parent-child-dropdown-divider" role="presentation" />
-          <li role="presentation">
-            <Link
-              href="/parent/onboard/match/code"
-              className="parent-child-dropdown-item parent-child-dropdown-add"
-            >
-              <span aria-hidden>＋</span>
-              <span>자녀 추가</span>
-            </Link>
-          </li>
+          {showAddChildLink && (
+            <>
+              <li className="parent-child-dropdown-divider" role="presentation" />
+              <li role="presentation">
+                <Link
+                  href="/parent/onboard/match/code"
+                  className="parent-child-dropdown-item parent-child-dropdown-add"
+                >
+                  <span aria-hidden>＋</span>
+                  <span>자녀 추가</span>
+                </Link>
+              </li>
+            </>
+          )}
         </ul>
       )}
     </div>

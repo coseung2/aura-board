@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useState } from "react";
 import { Logo } from "./Logo";
+import { StudentNotificationBell } from "./StudentNotificationBell";
 
 type Duty = {
   classroomId: string;
@@ -104,18 +105,28 @@ export function StudentTopNav({
         </nav>
       </div>
 
-      <div className="student-topnav-right">
-        <div className="student-topnav-user" aria-label="로그인 정보">
-          <span className="student-topnav-name">{studentName}</span>
-          <span className="student-topnav-class">{classroomName}</span>
-        </div>
+      <div className="student-topnav-right auth-header">
+        <span className="auth-name" title={classroomName}>
+          {studentName}
+        </span>
+        <StudentNotificationBell />
         <button
           type="button"
-          className="student-topnav-logout"
+          className="auth-logout-btn"
           onClick={handleLogout}
           disabled={loggingOut}
+          aria-label="로그아웃"
+          title={loggingOut ? "로그아웃 중..." : "로그아웃"}
         >
-          {loggingOut ? "로그아웃 중..." : "로그아웃"}
+          <svg
+            className="auth-logout-icon"
+            viewBox="0 0 24 24"
+            aria-hidden="true"
+          >
+            <path d="M10 6H6.8A1.8 1.8 0 0 0 5 7.8v8.4A1.8 1.8 0 0 0 6.8 18H10" />
+            <path d="M14 8l4 4-4 4" />
+            <path d="M8.5 12H18" />
+          </svg>
         </button>
       </div>
     </header>

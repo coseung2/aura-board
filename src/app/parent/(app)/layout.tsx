@@ -1,8 +1,11 @@
 import type { ReactNode } from "react";
 import { redirect } from "next/navigation";
+import { db } from "@/lib/db";
+import { getCurrentUser } from "@/lib/auth";
 import { getCurrentParent } from "@/lib/parent-session";
 import { ParentTopNav } from "@/components/parent/ParentTopNav";
 import { SessionWatchdog } from "@/components/parent/SessionWatchdog";
+import type { ChildRow } from "@/components/parent/ParentChildSelector";
 
 // Authenticated parent segment layout (PV-6).
 //
@@ -23,9 +26,49 @@ export default async function ParentAppLayout({ children }: { children: ReactNod
     redirect("/parent/join?error=session_required");
   }
   const parent = current.parent;
+  const [activeLinks, pendingCount, teacherUser] = await Promise.all([
+    db.parentChildLink.findMany({
+      where: {
+        parentId: parent.id,
+        status: "active",
+        deletedAt: null,
+      },
+      select: {
+        studentId: true,
+        student: {
+          select: {
+            name: true,
+            number: true,
+            classroom: { select: { name: true } },
+          },
+        },
+      },
+      orderBy: { requestedAt: "asc" },
+    }),
+    db.parentChildLink.count({
+      where: {
+        parentId: parent.id,
+        status: "pending",
+        deletedAt: null,
+      },
+    }),
+    getCurrentUser().catch(() => null),
+  ]);
+  const childRows: ChildRow[] = activeLinks.map((link) => ({
+    studentId: link.studentId,
+    studentName: link.student.name,
+    studentNumber: link.student.number,
+    classroomName: link.student.classroom.name,
+  }));
+
   return (
     <>
-      <ParentTopNav parent={{ name: parent.name, email: parent.email }} />
+      <ParentTopNav
+        parent={{ name: parent.name, email: parent.email }}
+        childRows={childRows}
+        pendingNotificationCount={pendingCount}
+        canSwitchToTeacher={Boolean(teacherUser)}
+      />
       {children}
       <SessionWatchdog />
     </>

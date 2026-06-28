@@ -89,6 +89,10 @@
   flex: 0 0 auto;
 }
 
+.student-topnav-right.auth-header {
+  gap: 8px;
+}
+
 .student-topnav-user {
   display: flex;
   flex-direction: column;
@@ -709,6 +713,10 @@
   .student-topnav-right {
     width: 100%;
     justify-content: space-between;
+  }
+
+  .student-topnav-right.auth-header {
+    justify-content: flex-end;
   }
 
   .student-topnav-user {

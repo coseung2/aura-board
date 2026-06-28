@@ -54,12 +54,6 @@ export default async function ParentHomePage({
           <div className="portfolio-page-header-left">
             <h1 className="portfolio-page-title">환영합니다</h1>
           </div>
-          <div className="portfolio-page-header-actions">
-            <a href="/parent/onboard/match/code" className="portfolio-header-btn">
-              <span aria-hidden>＋</span>
-              <span>자녀 추가</span>
-            </a>
-          </div>
         </header>
         {pendingLinks.length > 0 ? (
           <ParentPendingLinks links={pendingLinks} />
