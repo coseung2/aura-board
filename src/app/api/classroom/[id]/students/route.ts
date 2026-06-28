@@ -59,7 +59,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
     const students = await db.student.findMany({
       where: { classroomId: id },
       orderBy: [{ number: "asc" }, { name: "asc" }],
-      select: { id: true, name: true, number: true },
+      select: { id: true, name: true, number: true, gender: true },
     });
 
     return NextResponse.json({ students });

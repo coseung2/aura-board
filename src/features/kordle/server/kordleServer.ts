@@ -28,18 +28,19 @@ export async function loadGameConfig(boardId: string): Promise<{
 
 export interface EnsureAttemptInput {
   puzzleId: string;
-  // Exactly one of these must be set. The CHECK constraint enforces it
-  // at the DB level too; the client call here is a friendly check.
   studentId: string | null;
   vibePlaySessionId: string | null;
+  teacherUserId?: string | null;
 }
 
 export async function ensureAttempt(opts: EnsureAttemptInput): Promise<string> {
-  if (!opts.studentId && !opts.vibePlaySessionId) {
-    throw new Error("ensureAttempt: must provide studentId or vibePlaySessionId");
-  }
-  if (opts.studentId && opts.vibePlaySessionId) {
-    throw new Error("ensureAttempt: only one of studentId / vibePlaySessionId");
+  const actorCount = [
+    opts.studentId,
+    opts.vibePlaySessionId,
+    opts.teacherUserId,
+  ].filter(Boolean).length;
+  if (actorCount !== 1) {
+    throw new Error("ensureAttempt: must provide exactly one actor");
   }
   // The partial unique index on (puzzleId, studentId) / (puzzleId, vibePlaySessionId)
   // guarantees idempotency, but we still try-then-create so the read path
@@ -47,7 +48,11 @@ export async function ensureAttempt(opts: EnsureAttemptInput): Promise<string> {
   const existing = await db.kordleAttempt.findFirst({
     where: {
       puzzleId: opts.puzzleId,
-      ...(opts.studentId ? { studentId: opts.studentId } : { vibePlaySessionId: opts.vibePlaySessionId }),
+      ...(opts.studentId
+        ? { studentId: opts.studentId }
+        : opts.vibePlaySessionId
+          ? { vibePlaySessionId: opts.vibePlaySessionId }
+          : { teacherUserId: opts.teacherUserId }),
     },
     select: { id: true },
   });
@@ -56,8 +61,9 @@ export async function ensureAttempt(opts: EnsureAttemptInput): Promise<string> {
     const created = await db.kordleAttempt.create({
       data: {
         puzzleId: opts.puzzleId,
-        studentId: opts.studentId,
-        vibePlaySessionId: opts.vibePlaySessionId,
+        studentId: opts.studentId ?? null,
+        vibePlaySessionId: opts.vibePlaySessionId ?? null,
+        teacherUserId: opts.teacherUserId ?? null,
       },
       select: { id: true },
     });
@@ -71,7 +77,9 @@ export async function ensureAttempt(opts: EnsureAttemptInput): Promise<string> {
           puzzleId: opts.puzzleId,
           ...(opts.studentId
             ? { studentId: opts.studentId }
-            : { vibePlaySessionId: opts.vibePlaySessionId }),
+            : opts.vibePlaySessionId
+              ? { vibePlaySessionId: opts.vibePlaySessionId }
+              : { teacherUserId: opts.teacherUserId }),
         },
         select: { id: true },
       });
@@ -84,18 +92,18 @@ export async function ensureAttempt(opts: EnsureAttemptInput): Promise<string> {
 export interface SubmitGuessInput {
   attemptId: string;
   rawGuess: string;
-  // One of these MUST be set so we can authorize.
   studentId: string | null;
   vibePlaySessionId: string | null;
+  teacherUserId?: string | null;
 }
 
 export async function submitGuess(
   opts: SubmitGuessInput,
 ): Promise<{ ok: true; state: KordlePublicState } | { ok: false; reason: string }> {
-  if (!opts.studentId && !opts.vibePlaySessionId) {
+  if (!opts.studentId && !opts.vibePlaySessionId && !opts.teacherUserId) {
     return { ok: false, reason: "unauthenticated" };
   }
-  if (opts.studentId && opts.vibePlaySessionId) {
+  if ([opts.studentId, opts.vibePlaySessionId, opts.teacherUserId].filter(Boolean).length > 1) {
     return { ok: false, reason: "ambiguous_actor" };
   }
   return await db.$transaction(async (tx) => {
@@ -118,9 +126,8 @@ export async function submitGuess(
     });
     if (!attempt) return { ok: false as const, reason: "attempt_not_found" };
 
-    // Ownership check. Either studentId or vibePlaySessionId on the attempt
-    // must match the caller. If both are null (impossible due to CHECK but
-    // defended in depth) or neither matches, we reject.
+    // Ownership check. Students, Vibe sessions, and teachers each have their
+    // own attempt rows so every actor solves the same puzzle independently.
     if (opts.studentId) {
       if (attempt.studentId !== opts.studentId) {
         return { ok: false as const, reason: "forbidden" };
@@ -129,6 +136,23 @@ export async function submitGuess(
       if (attempt.vibePlaySessionId !== opts.vibePlaySessionId) {
         return { ok: false as const, reason: "forbidden" };
       }
+    } else if (opts.teacherUserId) {
+      if (attempt.teacherUserId !== opts.teacherUserId) {
+        return { ok: false as const, reason: "forbidden" };
+      }
+      const board = await tx.board.findFirst({
+        where: {
+          id: attempt.puzzle.game.boardId,
+          members: {
+            some: {
+              userId: opts.teacherUserId,
+              role: { in: ["owner", "editor"] },
+            },
+          },
+        },
+        select: { id: true },
+      });
+      if (!board) return { ok: false as const, reason: "forbidden" };
     } else {
       return { ok: false as const, reason: "forbidden" };
     }
@@ -161,13 +185,7 @@ export async function submitGuess(
     };
 
     const validation = await validateGuess(opts.rawGuess, config, {
-      isAllowed: async (normalized) => {
-        const found = await tx.kordleWord.findFirst({
-          where: { locale: config.locale, normalized, isAllowed: true },
-          select: { id: true },
-        });
-        return Boolean(found);
-      },
+      isAllowed: async () => true,
     });
     if (!validation.ok) {
       return { ok: false as const, reason: validation.reason };
@@ -236,6 +254,7 @@ export async function getPublicState(opts: {
   attemptId: string;
   studentId: string | null;
   vibePlaySessionId?: string | null;
+  teacherUserId?: string | null;
 }): Promise<KordlePublicState | null> {
   const attempt = await db.kordleAttempt.findUnique({
     where: { id: opts.attemptId },
@@ -250,8 +269,22 @@ export async function getPublicState(opts: {
   if (opts.vibePlaySessionId && attempt.vibePlaySessionId !== opts.vibePlaySessionId) {
     return null;
   }
-  if (!opts.studentId && !opts.vibePlaySessionId) {
-    // Neither id provided: refuse to leak. Require at least one.
+  if (opts.teacherUserId) {
+    if (attempt.teacherUserId !== opts.teacherUserId) return null;
+    const board = await db.board.findFirst({
+      where: {
+        id: attempt.puzzle.game.boardId,
+        members: {
+          some: {
+            userId: opts.teacherUserId,
+            role: { in: ["owner", "editor"] },
+          },
+        },
+      },
+      select: { id: true },
+    });
+    if (!board) return null;
+  } else if (!opts.studentId && !opts.vibePlaySessionId) {
     return null;
   }
   const config: KordleEngineConfig = {

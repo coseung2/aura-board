@@ -11,6 +11,7 @@ export type LayoutKey =
   | "dj-queue"
   | "vibe-arcade"
   | "vibe-gallery"
+  | "kordle"
   | "plant-roadmap"
   | "event-signup"
   | "question-board";
@@ -40,6 +41,7 @@ export const LAYOUT_META: Record<LayoutKey, LayoutMeta> = {
   "dj-queue": { emoji: "🎵", label: "DJ" },
   "vibe-arcade": { emoji: "💻", label: "코딩 교실" },
   "vibe-gallery": { emoji: "🌟", label: "코딩 갤러리" },
+  kordle: { emoji: "🟩", label: "꼬들" },
   "plant-roadmap": { emoji: "🌱", label: "식물 관찰일지" },
   "event-signup": { emoji: "🎟️", label: "행사 신청" },
   "question-board": { emoji: "💬", label: "질문 보드" },

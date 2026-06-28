@@ -3,7 +3,6 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { createPortal } from "react-dom";
 import type { AddCardData } from "./AddCardModal";
-import { BoardTimerFab } from "./BoardTimerFab";
 import { CardDetailModal } from "./cards/CardDetailModal";
 import type { CardData } from "./DraggableCard";
 import { EditCardModal, type EditCardUpdates } from "./EditCardModal";
@@ -112,6 +111,7 @@ export function StreamBoard({
   currentRole,
   isStudentViewer,
   currentStudentName,
+  classroomId,
   streamTitlePrompt,
   streamContentPrompt,
   initialSections = [],
@@ -1282,7 +1282,6 @@ export function StreamBoard({
       </div>
       {canAddPost && (
         <>
-          <BoardTimerFab />
           <button
             type="button"
             className="add-card-fab"

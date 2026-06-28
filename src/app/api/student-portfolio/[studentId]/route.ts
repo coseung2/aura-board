@@ -42,9 +42,14 @@ export async function GET(
     viewer.kind === "student" ? viewer.id : null;
   const cards = await db.card.findMany({
     where: {
-      OR: [
-        { studentAuthorId: studentId },
-        { authors: { some: { studentId } } },
+      AND: [
+        {
+          OR: [
+            { studentAuthorId: studentId },
+            { authors: { some: { studentId } } },
+          ],
+        },
+        { OR: [{ queueStatus: null }, { queueStatus: { not: "played" } }] },
       ],
       // dj-queue 음악 신청 카드는 결과물 아니므로 포트폴리오에서 제외
       board: { layout: { notIn: [...EXCLUDED_BOARD_LAYOUTS] } },

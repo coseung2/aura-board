@@ -70,6 +70,7 @@ type Props = {
   onCardEditAuthors: (card: CardData) => void;
   onCardDuplicate: (card: CardData) => void;
   onCardDelete: (id: string) => void;
+  onCardToggleGuide: (card: CardData, guidePinned: boolean) => void;
   onAddInColumn?: () => void;
 };
 
@@ -115,6 +116,7 @@ export function ColumnView(props: Props) {
     onCardEditAuthors,
     onCardDuplicate,
     onCardDelete,
+    onCardToggleGuide,
     onAddInColumn,
   } = props;
 
@@ -577,12 +579,12 @@ export function ColumnView(props: Props) {
                             icon: "✏️",
                             onClick: () => onCardEdit(c),
                           },
-                          ...(canEdit || c.studentAuthorId === currentUserId
+                          ...(canEdit && !!c.authorId && !c.studentAuthorId
                             ? [
                                 {
-                                  label: "작성자 지정",
-                                  icon: "👥",
-                                  onClick: () => onCardEditAuthors(c),
+                                  label: c.guidePinned ? "가이드 해제" : "가이드 고정",
+                                  icon: "📌",
+                                  onClick: () => onCardToggleGuide(c, !c.guidePinned),
                                 },
                               ]
                             : []),

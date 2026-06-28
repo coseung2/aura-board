@@ -373,6 +373,27 @@ export function BreakoutBoard({
     }
   }
 
+  async function handleToggleGuide(card: CardData, guidePinned: boolean) {
+    const prev = [...cards];
+    setCards((list) =>
+      list.map((c) => (c.id === card.id ? { ...c, guidePinned } : c)),
+    );
+    try {
+      const res = await fetch(`/api/cards/${card.id}`, {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ guidePinned }),
+      });
+      if (!res.ok) {
+        setCards(prev);
+        alert("가이드 설정에 실패했어요.");
+      }
+    } catch {
+      setCards(prev);
+      alert("가이드 설정에 실패했어요.");
+    }
+  }
+
   function cardMenuItems(card: CardData, isPoolCard: boolean): MenuItem[] {
     const canModify =
       currentRole === "owner" ||
@@ -383,6 +404,13 @@ export function BreakoutBoard({
         label: "수정",
         icon: "✏️",
         onClick: () => setEditingCard(card),
+      });
+    }
+    if (canEdit && !!card.authorId && !card.studentAuthorId) {
+      items.push({
+        label: card.guidePinned ? "가이드 해제" : "가이드 고정",
+        icon: "📌",
+        onClick: () => handleToggleGuide(card, !card.guidePinned),
       });
     }
     if (canBulkCopy && !isPoolCard) {

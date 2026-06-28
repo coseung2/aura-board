@@ -1,8 +1,27 @@
 import { NextResponse } from "next/server";
+import { z } from "zod";
 import { db } from "@/lib/db";
+import { getCurrentUser } from "@/lib/auth";
 import { getCurrentStudent } from "@/lib/student-auth";
+import { normalizeWord } from "@/features/kordle/engine";
 
 type Params = { params: Promise<{ boardId: string }> };
+
+const WORD_LENGTH = 6;
+const DEFAULT_WORDS: Record<"en-US" | "ko-KR", string[]> = {
+  "en-US": ["planet", "school", "friend", "garden", "window", "silver"],
+  "ko-KR": ["연필", "책상", "운동", "음악", "한글"],
+};
+
+const CreatePuzzleSchema = z.object({
+  locale: z.enum(["en-US", "ko-KR"]),
+  solution: z.string().trim().max(30).optional(),
+});
+
+const StartPuzzleSchema = z.object({
+  action: z.literal("start"),
+  puzzleId: z.string().min(1),
+});
 
 export async function GET(_req: Request, { params }: Params) {
   // StudentDashboard links to /board/${board.slug}/play/kordle and the
@@ -52,4 +71,201 @@ export async function GET(_req: Request, { params }: Params) {
     locale: game.locale,
     puzzle,
   });
+}
+
+export async function POST(req: Request, { params }: Params) {
+  const { boardId: boardIdOrSlug } = await params;
+  const user = await getCurrentUser().catch(() => null);
+  if (!user) {
+    return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+  }
+
+  const body = await req.json().catch(() => null);
+  const parsed = CreatePuzzleSchema.safeParse(body);
+  if (!parsed.success) {
+    return NextResponse.json(
+      { error: "bad_request", issues: parsed.error.issues },
+      { status: 400 },
+    );
+  }
+
+  const board = await db.board.findFirst({
+    where: {
+      OR: [{ id: boardIdOrSlug }, { slug: boardIdOrSlug }],
+      members: {
+        some: {
+          userId: user.id,
+          role: { in: ["owner", "editor"] },
+        },
+      },
+    },
+    select: { id: true, title: true },
+  });
+  if (!board) {
+    return NextResponse.json({ error: "forbidden" }, { status: 403 });
+  }
+
+  const locale = parsed.data.locale;
+  const defaults = DEFAULT_WORDS[locale];
+  const rawWord =
+    parsed.data.solution && parsed.data.solution.length > 0
+      ? parsed.data.solution
+      : defaults[Math.floor(Math.random() * defaults.length)];
+  const normalized = normalizeWord(rawWord, locale);
+  if (normalized.length !== WORD_LENGTH) {
+    return NextResponse.json(
+      {
+        error: "wrong_length",
+        wordLength: WORD_LENGTH,
+        normalizedLength: normalized.length,
+      },
+      { status: 400 },
+    );
+  }
+
+  const result = await db.$transaction(async (tx) => {
+    const game = await tx.kordleGame.upsert({
+      where: { boardId: board.id },
+      update: {
+        title: board.title || "꼬들",
+        locale,
+        wordLength: WORD_LENGTH,
+        maxGuesses: 6,
+      },
+      create: {
+        boardId: board.id,
+        title: board.title || "꼬들",
+        locale,
+        wordLength: WORD_LENGTH,
+        maxGuesses: 6,
+        mode: "CLASSIC",
+      },
+    });
+
+    await tx.kordlePuzzle.updateMany({
+      where: {
+        gameId: game.id,
+        status: { in: ["DRAFT", "LIVE", "SCHEDULED"] },
+      },
+      data: {
+        status: "CLOSED",
+        endsAt: new Date(),
+      },
+    });
+
+    const word = await tx.kordleWord.upsert({
+      where: {
+        locale_normalized: {
+          locale,
+          normalized,
+        },
+      },
+      update: {
+        text: rawWord,
+        length: WORD_LENGTH,
+        isAllowed: true,
+        isSolution: true,
+      },
+      create: {
+        text: rawWord,
+        normalized,
+        length: WORD_LENGTH,
+        locale,
+        isAllowed: true,
+        isSolution: true,
+      },
+    });
+
+    const puzzle = await tx.kordlePuzzle.create({
+      data: {
+        gameId: game.id,
+        solutionWordId: word.id,
+        status: "DRAFT",
+        startsAt: null,
+      },
+      select: { id: true, status: true, startsAt: true },
+    });
+
+    return { game, puzzle };
+  });
+
+  return NextResponse.json({
+    gameId: result.game.id,
+    locale: result.game.locale,
+    wordLength: result.game.wordLength,
+    maxGuesses: result.game.maxGuesses,
+    puzzle: result.puzzle,
+  });
+}
+
+export async function PATCH(req: Request, { params }: Params) {
+  const { boardId: boardIdOrSlug } = await params;
+  const user = await getCurrentUser().catch(() => null);
+  if (!user) {
+    return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+  }
+
+  const body = await req.json().catch(() => null);
+  const parsed = StartPuzzleSchema.safeParse(body);
+  if (!parsed.success) {
+    return NextResponse.json(
+      { error: "bad_request", issues: parsed.error.issues },
+      { status: 400 },
+    );
+  }
+
+  const board = await db.board.findFirst({
+    where: {
+      OR: [{ id: boardIdOrSlug }, { slug: boardIdOrSlug }],
+      members: {
+        some: {
+          userId: user.id,
+          role: { in: ["owner", "editor"] },
+        },
+      },
+    },
+    select: { id: true },
+  });
+  if (!board) {
+    return NextResponse.json({ error: "forbidden" }, { status: 403 });
+  }
+
+  const result = await db.$transaction(async (tx) => {
+    const puzzle = await tx.kordlePuzzle.findFirst({
+      where: {
+        id: parsed.data.puzzleId,
+        game: { boardId: board.id },
+      },
+      select: { id: true, gameId: true },
+    });
+    if (!puzzle) return null;
+
+    await tx.kordlePuzzle.updateMany({
+      where: {
+        gameId: puzzle.gameId,
+        id: { not: puzzle.id },
+        status: { in: ["LIVE", "SCHEDULED"] },
+      },
+      data: {
+        status: "CLOSED",
+        endsAt: new Date(),
+      },
+    });
+
+    return await tx.kordlePuzzle.update({
+      where: { id: puzzle.id },
+      data: {
+        status: "LIVE",
+        startsAt: new Date(),
+        endsAt: null,
+      },
+      select: { id: true, status: true, startsAt: true },
+    });
+  });
+
+  if (!result) {
+    return NextResponse.json({ error: "puzzle_not_found" }, { status: 404 });
+  }
+
+  return NextResponse.json({ puzzle: result });
 }

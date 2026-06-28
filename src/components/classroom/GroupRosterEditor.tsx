@@ -6,6 +6,7 @@ export type GroupEditorStudent = {
   id: string;
   name: string;
   number: number | null;
+  gender?: string | null;
 };
 
 export type GroupEditorDraft = {

@@ -19,6 +19,7 @@ import { DJBoard } from "@/components/DJBoard";
 import { VibeArcadeBoard } from "@/components/VibeArcadeBoard";
 import { VibeGalleryBoard } from "@/components/VibeGalleryBoard";
 import { QuestionBoard } from "@/components/QuestionBoard";
+import { KordleTeacherBoard } from "@/features/kordle/components/KordleTeacherBoard";
 import { cloneStructure } from "@/lib/breakout";
 import type { PlantJournalResponse } from "@/types/plant";
 import type { BoardSection } from "@/components/BoardSettingsPanel";
@@ -35,6 +36,7 @@ import type {
   AuraBoardSettings,
   AuraEvaluationLevel,
 } from "@/components/AuraEvaluationControl";
+import "@/features/kordle/components/kordle.css";
 
 // Auth + cookie reads already flag this route as dynamic.
 // Dropping the explicit flag keeps the Router Cache warm for navigations.
@@ -829,6 +831,12 @@ export default async function BoardPage({
             currentStudentId={studentViewer?.id ?? null}
           />
         );
+      }
+      case "kordle": {
+        if (studentViewer) {
+          redirect(`/board/${board!.slug ?? board!.id}/play/kordle`);
+        }
+        return <KordleTeacherBoard boardId={board!.id} teacherUserId={user!.id} />;
       }
       case "freeform":
       default:

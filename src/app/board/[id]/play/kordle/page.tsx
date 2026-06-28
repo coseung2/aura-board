@@ -3,6 +3,8 @@ import { db } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
 import { getCurrentStudent } from "@/lib/student-auth";
 import { KordleBoard } from "@/features/kordle/components/KordleBoard";
+import { KordleLiveToasts } from "@/features/kordle/components/KordleLiveToasts";
+import { KordleWaitingRoom } from "@/features/kordle/components/KordleWaitingRoom";
 import { ensureAttempt, getPublicState } from "@/features/kordle/server/kordleServer";
 import "@/features/kordle/components/kordle.css";
 
@@ -35,7 +37,7 @@ export default async function KordlePlayPage({ params }: Props) {
     select: {
       locale: true,
       puzzles: {
-        where: { status: { in: ["LIVE", "SCHEDULED"] } },
+        where: { status: "LIVE" },
         orderBy: { startsAt: "desc" },
         take: 1,
         select: { id: true },
@@ -45,12 +47,7 @@ export default async function KordlePlayPage({ params }: Props) {
   if (!game) notFound();
   const puzzle = game.puzzles[0];
   if (!puzzle) {
-    return (
-      <main className="kordle-board">
-        <h1>아직 플레이할 퍼즐이 없어요</h1>
-        <p>선생님이 퍼즐을 열면 여기에서 바로 시작할 수 있어요.</p>
-      </main>
-    );
+    return <KordleWaitingRoom boardId={boardId} />;
   }
 
   const student = await getCurrentStudent();
@@ -70,6 +67,7 @@ export default async function KordlePlayPage({ params }: Props) {
     puzzleId: puzzle.id,
     studentId: student.id,
     vibePlaySessionId: null,
+    teacherUserId: null,
   });
   const state = await getPublicState({ attemptId, studentId: student.id });
   if (!state) notFound();
@@ -82,6 +80,7 @@ export default async function KordlePlayPage({ params }: Props) {
         initialState={state}
         locale={game.locale}
       />
+      <KordleLiveToasts boardId={boardId} />
     </main>
   );
 }

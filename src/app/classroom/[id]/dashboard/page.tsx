@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { db } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
 import { ClassroomNav } from "@/components/classroom/ClassroomNav";
+import { EXCLUDED_BOARD_LAYOUTS } from "@/lib/portfolio-acl-pure";
 
 type Props = {
   params: Promise<{ id: string }>;
@@ -52,6 +53,9 @@ export default async function ClassroomDashboardPage({ params }: Props) {
             orderBy: { assignedAt: "desc" },
           },
           cardsAuthored: {
+            where: {
+              OR: [{ queueStatus: null }, { queueStatus: { not: "played" } }],
+            },
             select: { id: true },
           },
           assets: {
@@ -69,7 +73,13 @@ export default async function ClassroomDashboardPage({ params }: Props) {
 
   const [showcaseEntries, authoredCardCounts] = await Promise.all([
     db.showcaseEntry.findMany({
-      where: { classroomId: id },
+      where: {
+        classroomId: id,
+        card: {
+          board: { layout: { notIn: [...EXCLUDED_BOARD_LAYOUTS] } },
+          OR: [{ queueStatus: null }, { queueStatus: { not: "played" } }],
+        },
+      },
       orderBy: { createdAt: "desc" },
       take: 6,
       include: {
@@ -87,6 +97,7 @@ export default async function ClassroomDashboardPage({ params }: Props) {
       where: {
         studentAuthorId: { not: null },
         studentAuthor: { classroomId: id },
+        OR: [{ queueStatus: null }, { queueStatus: { not: "played" } }],
       },
       _count: { _all: true },
     }),
@@ -137,19 +148,6 @@ export default async function ClassroomDashboardPage({ params }: Props) {
       </a>
       <h1 className="classroom-page-title">{classroom.name}</h1>
       <ClassroomNav classroomId={classroom.id} />
-
-      <section className="classroom-dashboard-hero">
-        <div>
-          <span className="classroom-dashboard-eyebrow">Class dashboard</span>
-          <h2>학급 대시보드</h2>
-          <p>자랑해요, 포트폴리오, 적금, 저축, 1인1역 현황을 한 화면에서 확인합니다.</p>
-        </div>
-        <div className="classroom-dashboard-hero-stats" aria-label="학급 핵심 지표">
-          <span>{students.length}명</span>
-          <span>{showcaseEntries.length}개 자랑</span>
-          <span>{studentsWithRole}명 역할</span>
-        </div>
-      </section>
 
       <section className="classroom-dashboard-kpis" aria-label="학급 요약">
         <article className="classroom-dashboard-kpi">

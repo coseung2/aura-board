@@ -49,6 +49,7 @@ export default async function StudentPortfolioPage() {
       (c."studentAuthorId" = s.id
        OR c.id IN (SELECT "cardId" FROM "CardAuthor" WHERE "studentId" = s.id))
       AND c."boardId" IN (SELECT id FROM "Board" WHERE layout != 'dj-queue')
+      AND (c."queueStatus" IS NULL OR c."queueStatus" != 'played')
     )
     WHERE s."classroomId" = ${classroomId}
     GROUP BY s.id

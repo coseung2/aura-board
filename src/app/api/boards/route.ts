@@ -18,6 +18,14 @@ import { snapshotClassroomGroupsToBoard } from "@/lib/default-groups";
 // these are stored-only placeholders for future freeform fallback.
 const ASSIGN_CARD_W = 240;
 const ASSIGN_CARD_H = 160;
+const KORDLE_DEFAULT_WORDS = [
+  "planet",
+  "school",
+  "friend",
+  "garden",
+  "window",
+  "silver",
+];
 
 const CreateBoardSchema = z.object({
   title: z.string().max(200).default(""),
@@ -35,6 +43,7 @@ const CreateBoardSchema = z.object({
     "plant-roadmap",
     "vibe-arcade",
     "vibe-gallery",
+    "kordle",
     "question-board",
   ]),
   description: z.string().max(2000).default(""),
@@ -314,6 +323,84 @@ export async function POST(req: Request) {
       return NextResponse.json({ board, slots: classroom?.students.length ?? 0 });
     }
 
+    if (input.layout === "kordle") {
+      if (!ownedClassroom) {
+        return NextResponse.json(
+          { error: "꼬들은 학급을 선택해야 합니다." },
+          { status: 400 },
+        );
+      }
+
+      const board = await db.$transaction(async (tx) => {
+        const createdBoard = await tx.board.create({
+          data: {
+            title: input.title || "꼬들",
+            slug,
+            layout: "kordle",
+            description: input.description,
+            category: "PLAY",
+            classroomId: ownedClassroom.id,
+            thumbnailMode: input.thumbnailMode,
+            thumbnailUrl: input.thumbnailUrl,
+            members: {
+              create: { userId: user.id, role: "owner" },
+            },
+          },
+        });
+        const game = await tx.kordleGame.create({
+          data: {
+            boardId: createdBoard.id,
+            title: createdBoard.title,
+            mode: "CLASSIC",
+            locale: "en-US",
+            wordLength: 6,
+            maxGuesses: 6,
+          },
+        });
+        const words = await Promise.all(
+          KORDLE_DEFAULT_WORDS.map((word) =>
+            tx.kordleWord.upsert({
+              where: {
+                locale_normalized: {
+                  locale: "en-US",
+                  normalized: word,
+                },
+              },
+              update: {
+                isAllowed: true,
+                isSolution: true,
+                length: 6,
+              },
+              create: {
+                text: word,
+                normalized: word,
+                length: 6,
+                locale: "en-US",
+                isAllowed: true,
+                isSolution: true,
+              },
+            }),
+          ),
+        );
+        await tx.kordlePuzzle.create({
+          data: {
+            gameId: game.id,
+            solutionWordId: words[0].id,
+            status: "LIVE",
+            startsAt: new Date(),
+          },
+        });
+        await snapshotClassroomGroupsToBoard(
+          tx,
+          ownedClassroom.id,
+          createdBoard.id,
+        );
+        return createdBoard;
+      });
+
+      return NextResponse.json({ board });
+    }
+
     // ?? Non-breakout layouts (unchanged) ????????????????????????????????
     // dj-queue: classroom required ??the role-grant chain keys off
     // board.classroomId, so a classroom-less DJ board would be teacher-only
@@ -363,4 +450,3 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "internal" }, { status: 500 });
   }
 }
-

@@ -60,7 +60,12 @@ export async function GET(
     const role = await requirePermission(board.id, user.id, "view");
 
     return NextResponse.json({
-      board: { id: board.id, slug: board.slug, title: board.title },
+      board: {
+        id: board.id,
+        slug: board.slug,
+        title: board.title,
+        classroomId: board.classroomId,
+      },
       cards: board.cards,
       members: board.members,
       currentUser: { id: user.id, name: user.name, role },

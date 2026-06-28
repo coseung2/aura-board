@@ -1,7 +1,10 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { resolvePortfolioViewer, canToggleShowcase } from "@/lib/portfolio-acl";
-import { isPortfolioEligibleLayout } from "@/lib/portfolio-acl-pure";
+import {
+  EXCLUDED_BOARD_LAYOUTS,
+  isPortfolioEligibleLayout,
+} from "@/lib/portfolio-acl-pure";
 import { mapPortfolioCard } from "@/lib/portfolio-card-mapper";
 import { classroomShowcaseChannelKey, publish } from "@/lib/realtime";
 import type { PortfolioCardDTO } from "@/lib/portfolio-dto";
@@ -65,6 +68,12 @@ export async function POST(req: Request) {
       { status: 400 }
     );
   }
+  if (card.queueStatus === "played") {
+    return NextResponse.json(
+      { error: "card_not_portfolio_eligible" },
+      { status: 400 }
+    );
+  }
 
   const classroomId = card.board.classroomId;
 
@@ -81,12 +90,24 @@ export async function POST(req: Request) {
         return { kind: "already" as const, entry: existing };
       }
       const count = await tx.showcaseEntry.count({
-        where: { studentId: viewer.id },
+        where: {
+          studentId: viewer.id,
+          card: {
+            board: { layout: { notIn: [...EXCLUDED_BOARD_LAYOUTS] } },
+            OR: [{ queueStatus: null }, { queueStatus: { not: "played" } }],
+          },
+        },
       });
       if (count >= SHOWCASE_LIMIT_PER_STUDENT) {
         // 현재 자랑해요 카드 목록을 함께 반환해 클라이언트 모달 채움
         const current = await tx.showcaseEntry.findMany({
-          where: { studentId: viewer.id },
+          where: {
+            studentId: viewer.id,
+            card: {
+              board: { layout: { notIn: [...EXCLUDED_BOARD_LAYOUTS] } },
+              OR: [{ queueStatus: null }, { queueStatus: { not: "played" } }],
+            },
+          },
           include: {
             card: {
               include: {

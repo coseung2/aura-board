@@ -25,6 +25,7 @@ export type Student = {
   id: string;
   number: number | null;
   name: string;
+  gender?: string | null;
   qrToken: string;
   textCode: string;
   createdAt: string;
@@ -37,6 +38,7 @@ type Props = {
   roleKey: string;
   roleDefs: { key: string; labelKo: string; emoji: string | null }[];
   onRoleChange: (roleKey: string) => void;
+  onGenderChange: (gender: string) => void;
   checked: boolean;
   onToggle: () => void;
   onReissue: () => void;
@@ -50,6 +52,7 @@ export function StudentRow({
   roleKey,
   roleDefs,
   onRoleChange,
+  onGenderChange,
   checked,
   onToggle,
   onReissue,
@@ -88,6 +91,16 @@ export function StudentRow({
       <td className="classroom-td classroom-td-name">
         <div className="classroom-name-stack">
           <span className="classroom-name-text">{student.name}</span>
+          <select
+            className="classroom-role-select classroom-role-select-inline"
+            value={student.gender ?? ""}
+            onChange={(e) => onGenderChange(e.target.value)}
+            aria-label={`${student.name} 성별`}
+          >
+            <option value="">미정</option>
+            <option value="female">여</option>
+            <option value="male">남</option>
+          </select>
           <select
             className="classroom-role-select classroom-role-select-inline"
             value={roleKey}

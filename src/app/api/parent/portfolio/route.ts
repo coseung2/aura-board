@@ -51,9 +51,14 @@ export async function GET(req: Request) {
   // 자녀 본인 카드 (작성/공동작성). dj-queue 등 결과물 아닌 카드 제외.
   const ownCards = await db.card.findMany({
     where: {
-      OR: [
-        { studentAuthorId: childId },
-        { authors: { some: { studentId: childId } } },
+      AND: [
+        {
+          OR: [
+            { studentAuthorId: childId },
+            { authors: { some: { studentId: childId } } },
+          ],
+        },
+        { OR: [{ queueStatus: null }, { queueStatus: { not: "played" } }] },
       ],
       board: { layout: { notIn: [...EXCLUDED_BOARD_LAYOUTS] } },
     },
@@ -86,7 +91,10 @@ export async function GET(req: Request) {
   const showcase = await db.showcaseEntry.findMany({
     where: {
       classroomId: child.classroomId,
-      card: { board: { layout: { notIn: [...EXCLUDED_BOARD_LAYOUTS] } } },
+      card: {
+        board: { layout: { notIn: [...EXCLUDED_BOARD_LAYOUTS] } },
+        OR: [{ queueStatus: null }, { queueStatus: { not: "played" } }],
+      },
     },
     orderBy: { createdAt: "desc" },
     take: 30,

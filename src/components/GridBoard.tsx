@@ -212,6 +212,34 @@ export function GridBoard({
     }
   }
 
+  async function handleToggleGuide(card: CardData, guidePinned: boolean) {
+    const prevCards = cards;
+    const prevOpenCard = openCard;
+    setCards((list) =>
+      list.map((c) => (c.id === card.id ? { ...c, guidePinned } : c)),
+    );
+    setOpenCard((c) =>
+      c?.id === card.id ? { ...c, guidePinned } : c,
+    );
+    try {
+      const res = await fetch(`/api/cards/${card.id}`, {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ guidePinned }),
+      });
+      if (!res.ok) {
+        setCards(prevCards);
+        setOpenCard(prevOpenCard);
+        alert("가이드 설정에 실패했어요.");
+      }
+    } catch (err) {
+      console.error(err);
+      setCards(prevCards);
+      setOpenCard(prevOpenCard);
+      alert("가이드 설정에 실패했어요.");
+    }
+  }
+
   const openCardIndex = openCard
     ? cards.findIndex((card) => card.id === openCard.id)
     : -1;
@@ -285,11 +313,11 @@ export function GridBoard({
                         label: "수정",
                         onClick: () => setEditingCard(c),
                       },
-                      ...(canEdit || c.studentAuthorId === currentUserId
+                      ...(canEdit && !!c.authorId && !c.studentAuthorId
                         ? [
                             {
-                              label: "작성자 지정",
-                              onClick: () => setAuthorEditCard(c),
+                              label: c.guidePinned ? "가이드 해제" : "가이드 고정",
+                              onClick: () => handleToggleGuide(c, !c.guidePinned),
                             },
                           ]
                         : []),

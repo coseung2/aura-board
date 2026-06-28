@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import { AddCardModal, type AddCardData } from "./AddCardModal";
-import { BoardTimerFab } from "./BoardTimerFab";
 
 type Props = {
   onAdd: (data: AddCardData) => Promise<void>;
@@ -23,7 +22,6 @@ export function AddCardButton({
 
   return (
     <>
-      <BoardTimerFab />
       <button
         type="button"
         className="add-card-fab"

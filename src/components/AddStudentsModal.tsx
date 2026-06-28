@@ -7,6 +7,7 @@ export type CreatedStudent = {
   id: string;
   number: number | null;
   name: string;
+  gender?: string | null;
   qrToken: string;
   textCode: string;
   createdAt: string;

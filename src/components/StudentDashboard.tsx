@@ -270,7 +270,7 @@ function StudentBoardSections({
     const quizCode = board.layout === "quiz" && board.quizzes?.[0]?.roomCode;
     const href = quizCode
       ? `/quiz/${quizCode}`
-      : board.category === "PLAY"
+      : board.layout === "kordle"
         ? `/board/${board.slug}/play/kordle`
         : `/board/${board.slug}`;
     const breakout = board.breakout;

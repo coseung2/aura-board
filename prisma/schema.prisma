@@ -79,6 +79,8 @@ model User {
 
   boardResponses BoardResponse[] @relation("UserBoardResponses")
 
+  kordleAttempts KordleAttempt[] @relation("TeacherKordleAttempts")
+
   // AI back-relation for AiFeedback (2026-04-24)
 
   aiFeedbacks AiFeedback[] @relation("TeacherAiFeedbacks")
@@ -403,6 +405,8 @@ model Student {
   number Int? // ??⑥レ툔?臾먯뵦????얩돭
 
   name String
+
+  gender String?
 
   qrToken String @unique // UUID ??encoded in QR
 
@@ -3465,6 +3469,8 @@ model KordleAttempt {
   // — enforced in the server action.
   studentId         String?
   student           Student?            @relation(fields: [studentId], references: [id], onDelete: SetNull)
+  teacherUserId     String?
+  teacherUser       User?               @relation("TeacherKordleAttempts", fields: [teacherUserId], references: [id], onDelete: SetNull)
   status            KordleAttemptStatus @default(IN_PROGRESS)
   // Which guess (1-indexed) won; null until status=WON.
   solvedAtGuess     Int?
@@ -3474,6 +3480,7 @@ model KordleAttempt {
 
   @@index([puzzleId, status])
   @@index([studentId, startedAt])
+  @@index([teacherUserId, startedAt])
 }
 
 model KordleGuess {

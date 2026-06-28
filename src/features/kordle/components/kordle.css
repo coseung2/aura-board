@@ -3,22 +3,233 @@
 .kordle-board {
   display: flex;
   flex-direction: column;
-  gap: 16px;
-  max-width: 480px;
+  gap: 14px;
+  max-width: 420px;
+  margin: 0 auto;
+  padding: 0;
+}
+
+.kordle-shell {
+  width: min(100%, 760px);
   margin: 0 auto;
   padding: 16px;
+}
+
+.kordle-teacher-card {
+  padding: 0;
+}
+
+.kordle-teacher-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 22px;
+}
+
+.kordle-kicker {
+  margin: 0 0 4px;
+  color: var(--color-text-muted, #64748b);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.kordle-teacher-header h2 {
+  margin: 0;
+  color: var(--color-text, #0f172a);
+  font-size: 24px;
+}
+
+.kordle-teacher-controls {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: -8px auto 16px;
+}
+
+.kordle-locale-toggle {
+  display: inline-flex;
+  gap: 2px;
+  padding: 2px;
+  border: 1px solid var(--color-border, #cbd5e1);
+  border-radius: 7px;
+  background: var(--color-surface, #fff);
+}
+
+.kordle-locale-toggle button,
+.kordle-create-btn,
+.kordle-random-btn {
+  min-height: 34px;
+  border: 0;
+  border-radius: 5px;
+  padding: 0 12px;
+  font-size: 13px;
+  font-weight: 750;
+  cursor: pointer;
+}
+
+.kordle-locale-toggle button {
+  color: var(--color-text-muted, #64748b);
+  background: transparent;
+}
+
+.kordle-locale-toggle button.is-active {
+  color: var(--color-text, #0f172a);
+  background: var(--color-surface-alt, #f1f5f9);
+}
+
+.kordle-word-input {
+  width: min(180px, 100%);
+  min-height: 36px;
+  border: 1px solid var(--color-border, #cbd5e1);
+  border-radius: 6px;
+  padding: 0 10px;
+  color: var(--color-text, #0f172a);
+  font-size: 14px;
+  font-weight: 700;
+  outline: none;
+}
+
+.kordle-word-input:focus {
+  border-color: var(--color-primary, #2563eb);
+}
+
+.kordle-word-input::placeholder {
+  color: #b8c2d0;
+  font-weight: 600;
+}
+
+.kordle-create-btn {
+  color: #fff;
+  background: var(--color-primary, #2563eb);
+}
+
+.kordle-random-btn {
+  color: var(--color-text, #0f172a);
+  background: var(--color-surface-alt, #e2e8f0);
+}
+
+.kordle-start-btn {
+  min-height: 34px;
+  border: 0;
+  border-radius: 5px;
+  padding: 0 14px;
+  color: #fff;
+  background: #16a34a;
+  font-size: 13px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.kordle-create-btn:disabled,
+.kordle-random-btn:disabled,
+.kordle-start-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.kordle-word-count,
+.kordle-control-error {
+  font-size: 12px;
+  font-weight: 750;
+}
+
+.kordle-word-count {
+  color: var(--color-text-muted, #64748b);
+}
+
+.kordle-word-count.is-invalid,
+.kordle-control-error {
+  color: #b91c1c;
+}
+
+.kordle-status-pill {
+  border: 1px solid var(--color-border, #cbd5e1);
+  border-radius: 999px;
+  padding: 6px 10px;
+  color: var(--color-text-muted, #64748b);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.kordle-teacher-layout {
+  display: grid;
+  grid-template-columns: minmax(260px, 420px) minmax(220px, 1fr);
+  gap: 24px;
+  align-items: start;
+}
+
+.kordle-teacher-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.kordle-teacher-panel dl {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin: 0;
+}
+
+.kordle-teacher-panel dl div {
+  border: 1px solid var(--color-border, #cbd5e1);
+  border-radius: 8px;
+  padding: 10px;
+  background: var(--color-surface-alt, #f8fafc);
+}
+
+.kordle-teacher-panel dt {
+  color: var(--color-text-muted, #64748b);
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.kordle-teacher-panel dd {
+  margin: 4px 0 0;
+  color: var(--color-text, #0f172a);
+  font-size: 17px;
+  font-weight: 850;
+}
+
+.kordle-puzzle-summary {
+  border: 1px solid var(--color-border, #cbd5e1);
+  border-radius: 8px;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.kordle-puzzle-summary span,
+.kordle-puzzle-summary small,
+.kordle-teacher-empty {
+  color: var(--color-text-muted, #64748b);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.kordle-puzzle-summary strong {
+  color: var(--color-text, #0f172a);
+  font-size: 22px;
+}
+
+.kordle-teacher-empty {
+  margin: 0;
 }
 
 .kordle-grid {
   display: grid;
   grid-template-rows: repeat(var(--kordle-rows, 6), 1fr);
-  gap: 6px;
+  gap: 5px;
 }
 
 .kordle-row {
   display: grid;
   grid-template-columns: repeat(var(--kordle-cols, 5), 1fr);
-  gap: 6px;
+  gap: 5px;
 }
 
 .kordle-cell {
@@ -27,7 +238,8 @@
   align-items: center;
   justify-content: center;
   font-weight: 600;
-  font-size: 1.6rem;
+  font-size: 1.25rem;
+  line-height: 1;
   border: 2px solid var(--kordle-border, #cbd5e1);
   border-radius: 6px;
   background: var(--kordle-bg, #f8fafc);
@@ -56,20 +268,26 @@
 .kordle-kbd {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 5px;
   align-items: center;
 }
 .kordle-kbd-row {
   display: flex;
   gap: 4px;
   justify-content: center;
+  align-items: center;
   flex-wrap: wrap;
 }
+
+.kordle-kbd[data-locale="ko"] .kordle-kbd-row {
+  width: 100%;
+}
+
 .kordle-kbd-key {
-  min-width: 32px;
-  min-height: 40px;
-  padding: 0 8px;
-  font-size: 14px;
+  min-width: 30px;
+  min-height: 36px;
+  padding: 0 7px;
+  font-size: 13px;
   font-weight: 600;
   border-radius: 4px;
   border: 1px solid #cbd5e1;
@@ -77,24 +295,29 @@
   cursor: pointer;
 }
 .kordle-kbd-key:disabled {
-  opacity: 0.4;
   cursor: not-allowed;
 }
+.kordle-kbd-key:disabled:not(.kordle-kbd-key--correct):not(.kordle-kbd-key--present):not(.kordle-kbd-key--absent) {
+  opacity: 0.45;
+}
 .kordle-kbd-key--action {
-  min-width: 56px;
+  min-width: 52px;
   background: #e2e8f0;
 }
 .kordle-kbd-key--correct {
   background: #16a34a;
   color: #fff;
+  border-color: #15803d;
 }
 .kordle-kbd-key--present {
   background: #f59e0b;
   color: #fff;
+  border-color: #b45309;
 }
 .kordle-kbd-key--absent {
-  background: #475569;
+  background: #64748b;
   color: #fff;
+  border-color: #475569;
 }
 .kordle-kbd-key--blank {
   visibility: hidden;
@@ -133,4 +356,64 @@
   border: none;
   font-weight: 600;
   cursor: pointer;
+}
+
+.kordle-live-toasts {
+  position: fixed;
+  right: 18px;
+  bottom: 18px;
+  z-index: 60;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8px;
+  pointer-events: none;
+}
+
+.kordle-live-toast {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 40px;
+  max-width: min(320px, calc(100vw - 36px));
+  border: 1px solid rgba(148, 163, 184, 0.45);
+  border-radius: 8px;
+  padding: 9px 12px;
+  background: rgba(255, 255, 255, 0.96);
+  color: var(--color-text, #0f172a);
+  box-shadow: 0 12px 28px rgba(15, 23, 42, 0.16);
+  font-size: 13px;
+}
+
+.kordle-live-toast strong {
+  font-weight: 850;
+}
+
+.kordle-waiting {
+  width: min(100%, 420px);
+  margin: 0 auto;
+  padding: 48px 16px;
+  text-align: center;
+}
+
+.kordle-waiting h1 {
+  margin: 0;
+  color: var(--color-text, #0f172a);
+  font-size: 22px;
+}
+
+.kordle-waiting p:last-child {
+  margin: 8px 0 0;
+  color: var(--color-text-muted, #64748b);
+  font-size: 14px;
+}
+
+@media (max-width: 760px) {
+  .kordle-shell {
+    padding: 16px;
+  }
+
+  .kordle-teacher-layout {
+    grid-template-columns: 1fr;
+  }
 }

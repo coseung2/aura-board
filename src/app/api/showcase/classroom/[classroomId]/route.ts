@@ -50,7 +50,10 @@ export async function GET(
       // 방어적 — POST /api/showcase 가 EXCLUDED layout 차단하지만 과거
       // 데이터에 잔존할 가능성 대비. 학생 결과물 컨텍스트 아닌 카드는 학급
       // dashboard highlight 영역에서도 노출 X.
-      card: { board: { layout: { notIn: [...EXCLUDED_BOARD_LAYOUTS] } } },
+      card: {
+        board: { layout: { notIn: [...EXCLUDED_BOARD_LAYOUTS] } },
+        OR: [{ queueStatus: null }, { queueStatus: { not: "played" } }],
+      },
     },
     orderBy: { createdAt: "desc" },
     take,

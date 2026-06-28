@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import { getCurrentUser } from "@/lib/auth";
 import { getCurrentStudent } from "@/lib/student-auth";
 import { submitGuess } from "@/features/kordle/server/kordleServer";
 
@@ -12,7 +13,8 @@ type Params = { params: Promise<{ attemptId: string }> };
 export async function POST(req: Request, { params }: Params) {
   const { attemptId } = await params;
   const student = await getCurrentStudent();
-  if (!student) {
+  const user = student ? null : await getCurrentUser().catch(() => null);
+  if (!student && !user) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
   let body: unknown;
@@ -32,8 +34,9 @@ export async function POST(req: Request, { params }: Params) {
   const result = await submitGuess({
     attemptId,
     rawGuess: parsed.data.guess,
-    studentId: student.id,
+    studentId: student?.id ?? null,
     vibePlaySessionId: null,
+    teacherUserId: user?.id ?? null,
   });
   if (!result.ok) {
     const status =

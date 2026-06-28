@@ -1,5 +1,7 @@
 "use client";
 
+import { useState } from "react";
+
 type Props = {
   status: "WON" | "LOST" | "ABANDONED" | "IN_PROGRESS";
   solvedAtGuess: number | null;
@@ -7,7 +9,9 @@ type Props = {
 };
 
 export function KordleResultModal({ status, solvedAtGuess, totalGuesses }: Props) {
+  const [open, setOpen] = useState(true);
   if (status === "IN_PROGRESS") return null;
+  if (!open) return null;
   const won = status === "WON";
   return (
     <div className="kordle-result" role="dialog" aria-modal="true" aria-label="게임 결과">
@@ -21,9 +25,9 @@ export function KordleResultModal({ status, solvedAtGuess, totalGuesses }: Props
         <button
           type="button"
           className="kordle-result-close"
-          onClick={() => window.location.reload()}
+          onClick={() => setOpen(false)}
         >
-          다시 시작
+          닫기
         </button>
       </div>
     </div>

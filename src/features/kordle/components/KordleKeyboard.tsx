@@ -9,10 +9,9 @@ type Props = {
   disabled?: boolean;
 };
 
-// Minimal two-row QWERTY layout for English. Korean mode shows a focused
-// jamo picker (consonant + vowel rows) so the student taps a leading
-// jamo, then a medial, then an optional trail to fill one slot.
-// Composition happens client-side in KordleBoard.
+// Minimal QWERTY layout for English. Korean mode uses the familiar 2-beolsik
+// QWERTY shape and emits compatibility jamo labels; KordleBoard converts those
+// labels into canonical lead/medial/trail jamo for the engine.
 
 const EN_ROWS: string[][] = [
   ["Q", "W", "E", "R", "T", "Y", "U", "I", "O", "P"],
@@ -20,20 +19,85 @@ const EN_ROWS: string[][] = [
   ["ENTER", "Z", "X", "C", "V", "B", "N", "M", "BACK"],
 ];
 
-// Canonical Hangul jamo ranges, generated with String.fromCodePoint so the
-// file stays ASCII-only and the keys are the exact code points the engine
-// produces after normalizeKorean: lead U+1100..U+1112, medial U+1161..U+1175,
-// trail U+11A8..U+11C2. KordleBoard ignores any key outside these ranges, so
-// the previous literal "?" (U+003F) placeholders silently dropped every key.
-const JAMO = {
-  LEAD: Array.from({ length: 19 }, (_, i) => String.fromCodePoint(0x1100 + i)),
-  MEDIAL: Array.from({ length: 21 }, (_, i) => String.fromCodePoint(0x1161 + i)),
-  // First entry is a blank "no trail" slot so the trail row aligns with the
-  // medial row; it is hidden and disabled.
-  TRAIL: [
-    "",
-    ...Array.from({ length: 27 }, (_, i) => String.fromCodePoint(0x11a8 + i)),
+const KO_ROWS: string[][] = [
+  ["ㅂ", "ㅈ", "ㄷ", "ㄱ", "ㅅ", "ㅛ", "ㅕ", "ㅑ", "ㅐ", "ㅔ"],
+  ["ㅁ", "ㄴ", "ㅇ", "ㄹ", "ㅎ", "ㅗ", "ㅓ", "ㅏ", "ㅣ"],
+  ["ENTER", "ㅋ", "ㅌ", "ㅊ", "ㅍ", "ㅠ", "ㅜ", "ㅡ", "BACK"],
+];
+
+const KO_TO_CANONICAL: Record<string, string[]> = {
+  ㄱ: [
+    String.fromCodePoint(0x1100),
+    String.fromCodePoint(0x1101),
+    String.fromCodePoint(0x11a8),
+    String.fromCodePoint(0x11a9),
+    String.fromCodePoint(0x11aa),
+    String.fromCodePoint(0x11b0),
   ],
+  ㄴ: [
+    String.fromCodePoint(0x1102),
+    String.fromCodePoint(0x11ab),
+    String.fromCodePoint(0x11ac),
+    String.fromCodePoint(0x11ad),
+  ],
+  ㄷ: [String.fromCodePoint(0x1103), String.fromCodePoint(0x1104), String.fromCodePoint(0x11ae)],
+  ㄹ: [
+    String.fromCodePoint(0x1105),
+    String.fromCodePoint(0x11af),
+    String.fromCodePoint(0x11b0),
+    String.fromCodePoint(0x11b1),
+    String.fromCodePoint(0x11b2),
+    String.fromCodePoint(0x11b3),
+    String.fromCodePoint(0x11b4),
+    String.fromCodePoint(0x11b5),
+    String.fromCodePoint(0x11b6),
+  ],
+  ㅁ: [String.fromCodePoint(0x1106), String.fromCodePoint(0x11b7), String.fromCodePoint(0x11b1)],
+  ㅂ: [
+    String.fromCodePoint(0x1107),
+    String.fromCodePoint(0x1108),
+    String.fromCodePoint(0x11b8),
+    String.fromCodePoint(0x11b2),
+    String.fromCodePoint(0x11b9),
+  ],
+  ㅅ: [
+    String.fromCodePoint(0x1109),
+    String.fromCodePoint(0x110a),
+    String.fromCodePoint(0x11ba),
+    String.fromCodePoint(0x11aa),
+    String.fromCodePoint(0x11b3),
+    String.fromCodePoint(0x11b9),
+    String.fromCodePoint(0x11bb),
+  ],
+  ㅇ: [String.fromCodePoint(0x110b), String.fromCodePoint(0x11bc)],
+  ㅈ: [
+    String.fromCodePoint(0x110c),
+    String.fromCodePoint(0x110d),
+    String.fromCodePoint(0x11bd),
+    String.fromCodePoint(0x11ac),
+  ],
+  ㅊ: [String.fromCodePoint(0x110e), String.fromCodePoint(0x11be)],
+  ㅋ: [String.fromCodePoint(0x110f), String.fromCodePoint(0x11bf)],
+  ㅌ: [String.fromCodePoint(0x1110), String.fromCodePoint(0x11c0), String.fromCodePoint(0x11b4)],
+  ㅍ: [String.fromCodePoint(0x1111), String.fromCodePoint(0x11c1), String.fromCodePoint(0x11b5)],
+  ㅎ: [
+    String.fromCodePoint(0x1112),
+    String.fromCodePoint(0x11c2),
+    String.fromCodePoint(0x11ad),
+    String.fromCodePoint(0x11b6),
+  ],
+  ㅏ: [String.fromCodePoint(0x1161)],
+  ㅐ: [String.fromCodePoint(0x1162)],
+  ㅑ: [String.fromCodePoint(0x1163)],
+  ㅔ: [String.fromCodePoint(0x1166)],
+  ㅓ: [String.fromCodePoint(0x1165)],
+  ㅕ: [String.fromCodePoint(0x1167)],
+  ㅗ: [String.fromCodePoint(0x1169)],
+  ㅛ: [String.fromCodePoint(0x116d)],
+  ㅜ: [String.fromCodePoint(0x116e)],
+  ㅠ: [String.fromCodePoint(0x1172)],
+  ㅡ: [String.fromCodePoint(0x1173)],
+  ㅣ: [String.fromCodePoint(0x1175)],
 };
 
 function isSpecialKey(label: string): boolean {
@@ -41,67 +105,44 @@ function isSpecialKey(label: string): boolean {
 }
 
 export function KordleKeyboard({ locale, letterStates, onKey, disabled }: Props) {
+  function getKoreanKeyState(label: string): LetterState | undefined {
+    const canonical = KO_TO_CANONICAL[label] ?? [];
+    let best: LetterState | undefined;
+    for (const char of canonical) {
+      const state = letterStates.get(char);
+      if (state === "correct") return state;
+      if (state === "present") best = state;
+      else if (state === "absent" && !best) best = state;
+    }
+    return best;
+  }
+
   if (locale.toLowerCase().startsWith("ko")) {
     return (
       <div className="kordle-kbd" data-locale="ko" aria-label="한글 키보드">
-        <div className="kordle-kbd-row">
-          {JAMO.LEAD.map((c) => (
-            <button
-              key={`lead-${c}`}
-              type="button"
-              className={`kordle-kbd-key kordle-kbd-key--lead ${letterStates.has(c) ? `kordle-kbd-key--${letterStates.get(c)}` : ""}`}
-              onClick={() => onKey(c)}
-              disabled={disabled}
-              aria-label={`초성 ${c}`}
-            >
-              {c}
-            </button>
-          ))}
-        </div>
-        <div className="kordle-kbd-row">
-          {JAMO.MEDIAL.map((c) => (
-            <button
-              key={`med-${c}`}
-              type="button"
-              className="kordle-kbd-key kordle-kbd-key--med"
-              onClick={() => onKey(c)}
-              disabled={disabled}
-              aria-label={`중성 ${c}`}
-            >
-              {c}
-            </button>
-          ))}
-        </div>
-        <div className="kordle-kbd-row">
-          {JAMO.TRAIL.map((c, i) => (
-            <button
-              key={`trail-${i}`}
-              type="button"
-              className={`kordle-kbd-key kordle-kbd-key--trail ${i === 0 ? "kordle-kbd-key--blank" : ""}`}
-              onClick={() => onKey(c)}
-              disabled={disabled || c === ""}
-              aria-label={c ? `종성 ${c}` : "종성 없음"}
-            >
-              {c}
-            </button>
-          ))}
-          <button
-            type="button"
-            className="kordle-kbd-key kordle-kbd-key--action"
-            onClick={() => onKey("ENTER")}
-            disabled={disabled}
-          >
-            확인
-          </button>
-          <button
-            type="button"
-            className="kordle-kbd-key kordle-kbd-key--action"
-            onClick={() => onKey("BACK")}
-            disabled={disabled}
-          >
-            지움
-          </button>
-        </div>
+        {KO_ROWS.map((row, i) => (
+          <div className="kordle-kbd-row" key={i}>
+            {row.map((label) => {
+              const state = !isSpecialKey(label) ? getKoreanKeyState(label) : undefined;
+              return (
+                <button
+                  key={label}
+                  type="button"
+                  className={[
+                    "kordle-kbd-key",
+                    isSpecialKey(label) ? "kordle-kbd-key--action" : "",
+                    state ? `kordle-kbd-key--${state}` : "",
+                  ].filter(Boolean).join(" ")}
+                  onClick={() => onKey(label)}
+                  disabled={disabled}
+                  aria-label={label === "ENTER" ? "확인" : label === "BACK" ? "지움" : label}
+                >
+                  {label === "ENTER" ? "확인" : label === "BACK" ? "지움" : label}
+                </button>
+              );
+            })}
+          </div>
+        ))}
       </div>
     );
   }

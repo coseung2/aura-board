@@ -21,7 +21,7 @@ export default async function ClassroomGroupsPage({ params }: Props) {
       teacherId: true,
       students: {
         orderBy: [{ number: "asc" }, { createdAt: "asc" }],
-        select: { id: true, name: true, number: true },
+        select: { id: true, name: true, number: true, gender: true },
       },
     },
   });

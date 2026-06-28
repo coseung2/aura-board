@@ -180,6 +180,7 @@ export function ClassroomDetail({ classroom }: Props) {
         id: s.id,
         number: s.number,
         name: s.name,
+        gender: s.gender ?? null,
         qrToken: s.qrToken,
         textCode: s.textCode,
         createdAt: s.createdAt,
@@ -334,6 +335,31 @@ export function ClassroomDetail({ classroom }: Props) {
     }
   }
 
+  async function handleGenderChange(studentId: string, gender: string) {
+    const normalized = gender === "" ? null : gender;
+    const prev = students.find((student) => student.id === studentId)?.gender ?? null;
+    setStudents((current) =>
+      current.map((student) =>
+        student.id === studentId ? { ...student, gender: normalized } : student,
+      ),
+    );
+    const res = await fetch(
+      `/api/classroom/${classroom.id}/students/${studentId}`,
+      {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ gender: normalized }),
+      },
+    );
+    if (!res.ok) {
+      setStudents((current) =>
+        current.map((student) =>
+          student.id === studentId ? { ...student, gender: prev } : student,
+        ),
+      );
+    }
+  }
+
   return (
     <div className="classroom-detail">
       {/* Header — classroom.code used to be displayed here as a 6-char
@@ -439,7 +465,7 @@ export function ClassroomDetail({ classroom }: Props) {
                   style={{ width: 44 }}
                   aria-label="아바타"
                 />
-                <th className="classroom-th">이름 / 역할</th>
+                <th className="classroom-th">이름 / 성별 / 역할</th>
                 <th className="classroom-th">QR</th>
                 <th className="classroom-th">코드</th>
                 <th className="classroom-th">학부모</th>
@@ -456,6 +482,7 @@ export function ClassroomDetail({ classroom }: Props) {
                   roleKey={studentRoleKey[s.id] ?? ""}
                   roleDefs={roleDefs}
                   onRoleChange={(k) => handleRoleChange(s.id, k)}
+                  onGenderChange={(gender) => void handleGenderChange(s.id, gender)}
                   checked={selected.has(s.id)}
                   onToggle={() => toggleSelect(s.id)}
                   onReissue={() => handleReissue(s.id)}

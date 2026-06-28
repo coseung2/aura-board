@@ -118,6 +118,34 @@ export function ColumnsBoard({
 
   useBoardStream({ boardId, pendingCardIds, setCards, setSections });
 
+  async function handleToggleGuide(card: CardData, guidePinned: boolean) {
+    const prevCards = cards;
+    const prevOpenCard = openCard;
+    setCards((list) =>
+      list.map((c) => (c.id === card.id ? { ...c, guidePinned } : c)),
+    );
+    setOpenCard((c) =>
+      c?.id === card.id ? { ...c, guidePinned } : c,
+    );
+    try {
+      const res = await fetch(`/api/cards/${card.id}`, {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ guidePinned }),
+      });
+      if (!res.ok) {
+        setCards(prevCards);
+        setOpenCard(prevOpenCard);
+        alert("가이드 설정에 실패했어요.");
+      }
+    } catch (err) {
+      console.error(err);
+      setCards(prevCards);
+      setOpenCard(prevOpenCard);
+      alert("가이드 설정에 실패했어요.");
+    }
+  }
+
   useEffect(() => {
     const boardEl = columnsBoardRef.current;
     if (!boardEl || typeof ResizeObserver === "undefined") return;
@@ -411,6 +439,7 @@ export function ColumnsBoard({
               onCardEditAuthors={(c) => setAuthorEditCard(c)}
               onCardDuplicate={handleDuplicateCard}
               onCardDelete={handleDeleteCard}
+              onCardToggleGuide={handleToggleGuide}
               onAddInColumn={
                 canAddCard ? () => setAddForSection(section.id) : undefined
               }

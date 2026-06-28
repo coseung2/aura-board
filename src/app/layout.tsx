@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { AuthProvider } from "@/components/AuthProvider";
 import { DJPlayerProvider } from "@/components/dj/DJPlayerProvider";
 import { Footer } from "@/components/Footer";
+import { GlobalToolkitFab } from "@/components/GlobalToolkitFab";
 import { TwemojiRoot } from "@/components/TwemojiRoot";
 import "maplibre-gl/dist/maplibre-gl.css";
 import "./globals.css";
@@ -47,7 +48,10 @@ export default function RootLayout({
       <body>
         <TwemojiRoot />
         <AuthProvider>
-          <DJPlayerProvider>{children}</DJPlayerProvider>
+          <DJPlayerProvider>
+            {children}
+            <GlobalToolkitFab />
+          </DJPlayerProvider>
         </AuthProvider>
         <Footer />
       </body>

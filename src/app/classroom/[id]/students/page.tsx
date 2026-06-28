@@ -32,6 +32,7 @@ export default async function ClassroomStudentsPage({ params }: Props) {
       id: s.id,
       number: s.number,
       name: s.name,
+      gender: s.gender,
       qrToken: s.qrToken,
       textCode: s.textCode,
       createdAt: s.createdAt.toISOString(),
