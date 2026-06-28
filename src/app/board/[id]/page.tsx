@@ -377,6 +377,10 @@ export default async function BoardPage({
     authorName: c.author?.name ?? null,
     likeCount: c._count.likes,
     commentCount: c._count.comments,
+    commentVoteOptionCount: c.commentVoteOptionCount ?? null,
+    commentVoteOptionLabels: Array.isArray(c.commentVoteOptionLabels)
+      ? c.commentVoteOptionLabels.filter((label): label is string => typeof label === "string")
+      : null,
     queueStatus: c.queueStatus ?? null,
     authors:
       (c as { authors?: { id: string; studentId: string | null; displayName: string; order: number }[] }).authors ??

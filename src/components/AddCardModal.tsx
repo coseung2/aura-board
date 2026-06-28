@@ -38,6 +38,9 @@ export type AddCardData = {
   color?: string;
   sectionId?: string;
   authors?: CardAuthorDraft[];
+  /** comment-area poll (2026-06-28): null disables, 2..6 enables. */
+  commentVoteOptionCount?: number | null;
+  commentVoteOptionLabels?: string[] | null;
 };
 
 type SectionOption = { id: string; title: string };
@@ -57,6 +60,7 @@ type Props = {
   sections?: SectionOption[];
   defaultSectionId?: string;
   canAssignAuthors?: boolean;
+  canConfigurePoll?: boolean;
   classroomId?: string | null;
 };
 
@@ -106,6 +110,7 @@ export function AddCardModal({
   sections,
   defaultSectionId,
   canAssignAuthors = false,
+  canConfigurePoll = canAssignAuthors,
   classroomId,
 }: Props) {
   const [title, setTitle] = useState("");
@@ -121,6 +126,11 @@ export function AddCardModal({
   const [showFile, setShowFile] = useState(false);
   const [showAuthors, setShowAuthors] = useState(false);
   const [authorRows, setAuthorRows] = useState<AuthorDraftRow[]>([]);
+  const [pollEnabled, setPollEnabled] = useState(false);
+  const [pollOptionCount, setPollOptionCount] = useState<number>(2);
+  const [pollOptionLabels, setPollOptionLabels] = useState<string[]>(
+    Array.from({ length: 6 }, (_, idx) => `${idx + 1}번`),
+  );
   const { preview, loading: previewLoading, fetchPreview } = useLinkPreview();
   const [busy, setBusy] = useState(false);
   const imageInputRef = useRef<HTMLInputElement>(null);
@@ -250,6 +260,14 @@ export function AddCardModal({
               color: color || undefined,
               sectionId: sectionId || undefined,
               authors: authors.length > 0 ? authors : undefined,
+              ...(canConfigurePoll
+                ? {
+                    commentVoteOptionCount: pollEnabled ? pollOptionCount : null,
+                    commentVoteOptionLabels: pollEnabled
+                      ? pollOptionLabels.slice(0, pollOptionCount)
+                      : null,
+                  }
+                : {}),
             });
             setBusy(false);
             onClose();
@@ -730,6 +748,58 @@ export function AddCardModal({
               rows={authorRows}
               onChange={setAuthorRows}
             />
+          )}
+
+          {canConfigurePoll && (
+            <div className="modal-poll-section">
+              <span className="modal-field-label">댓글 투표</span>
+              <label className="modal-poll-enable">
+                <input
+                  type="checkbox"
+                  checked={pollEnabled}
+                  onChange={(e) => {
+                    setPollEnabled(e.target.checked);
+                    if (e.target.checked) setPollOptionCount(2);
+                  }}
+                />
+                댓글창에서 투표 받기
+              </label>
+              {pollEnabled && (
+                <select
+                  value={pollOptionCount}
+                  onChange={(e) => setPollOptionCount(Number(e.target.value))}
+                  className="modal-select"
+                >
+                  {[2, 3, 4, 5, 6].map((n) => (
+                    <option key={n} value={n}>
+                      {n}개 선택지
+                    </option>
+                  ))}
+                </select>
+              )}
+              {pollEnabled && (
+                <div className="modal-poll-label-grid">
+                  {Array.from({ length: pollOptionCount }, (_, idx) => (
+                    <label key={idx} className="modal-poll-label-field">
+                      <span>{idx + 1}</span>
+                      <input
+                        value={pollOptionLabels[idx] ?? `${idx + 1}번`}
+                        onChange={(event) => {
+                          const value = event.target.value;
+                          setPollOptionLabels((current) => {
+                            const next = [...current];
+                            next[idx] = value;
+                            return next;
+                          });
+                        }}
+                        maxLength={40}
+                        placeholder={`${idx + 1}번`}
+                      />
+                    </label>
+                  ))}
+                </div>
+              )}
+            </div>
           )}
 
           <div className="modal-color-section">

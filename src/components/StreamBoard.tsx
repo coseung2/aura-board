@@ -461,6 +461,8 @@ export function StreamBoard({
         linkDesc: data.linkDesc || null,
         linkImage: data.linkImage || null,
         attachments: data.attachments,
+        commentVoteOptionCount: data.commentVoteOptionCount ?? null,
+        commentVoteOptionLabels: data.commentVoteOptionLabels ?? null,
         x: 0,
         y: 0,
         order: nextOrder,
@@ -1335,6 +1337,7 @@ export function StreamBoard({
                       streamContentPrompt={streamContentPrompt}
                       sections={showComposerSections ? sectionOptions : undefined}
                       initialSectionId={composerSectionId ?? undefined}
+                      canConfigurePoll={canEdit || !!isStudentViewer}
                     />
                   </div>
                 </div>
@@ -1433,6 +1436,7 @@ export function StreamBoard({
             card={editingCard}
             onSave={handleEditCardSave}
             onClose={() => setEditingCard(null)}
+            canConfigurePoll={canDeleteCard(editingCard, currentUserId, currentRole)}
           />,
           document.body,
         )}

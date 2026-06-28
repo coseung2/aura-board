@@ -476,6 +476,9 @@ model Student {
 
   cardLikes CardLike[] @relation("StudentCardLikes")
 
+  // comment-area poll (2026-06-28): 학생이 누른 카드별 투표.
+  cardPollVotes CardPollVote[] @relation("StudentCardPollVotes")
+
   agentSessions AgentSession[]
 
   // Classroom check submissions (1인1역할: 체크원, 2026-06-28)
@@ -1207,6 +1210,14 @@ model Card {
 
   guidePinned Boolean @default(false)
 
+  // comment-area poll (2026-06-28): 교사가 발행 시 선택지 개수(2~6) 설정.
+  // null/0/1 = 비활성, 2..6 = 활성화된 선택지 수. 카드 응답 DTO 에 그대로
+  // 노출되며 카드별 댓글창 투표 UI 가 본 필드로 분기한다.
+  commentVoteOptionCount Int?
+  // comment-area poll labels (2026-06-28): 선택지 표시명 배열.
+  // null이면 "1번", "2번" 기본 라벨로 렌더한다.
+  commentVoteOptionLabels Json?
+
   createdAt DateTime @default(now())
 
   updatedAt DateTime @updatedAt
@@ -1250,6 +1261,10 @@ model Card {
   comments CardComment[]
 
   likes CardLike[]
+
+  // comment-area poll (2026-06-28): 카드별 학생 투표 row. student 가
+  // 1 카드에 1 표 (@@unique on cardPollVote 아래 참조).
+  pollVotes CardPollVote[]
 
   evaluations CardEvaluation[] @relation("CardEvaluations")
 
@@ -1334,6 +1349,24 @@ model CardLike {
   @@unique([cardId, likerStudentId])
   @@unique([cardId, externalLikerKey])
   @@index([cardId])
+}
+
+// comment-area poll (2026-06-28): 학생이 카드별 댓글창에서 누른 선택지.
+// 1 학생 = 1 카드에 대해 1 표 (upsert). 다른 선택지로 바꾸면 update.
+model CardPollVote {
+  id             String   @id @default(cuid())
+  cardId         String
+  optionIndex    Int
+  voterStudentId String
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  card  Card    @relation(fields: [cardId], references: [id], onDelete: Cascade)
+  voter Student @relation("StudentCardPollVotes", fields: [voterStudentId], references: [id], onDelete: Cascade)
+
+  @@unique([cardId, voterStudentId])
+  @@index([cardId])
+  @@index([voterStudentId])
 }
 
 // student-portfolio (2026-04-26): ????뽓????????怨멸텭????ｏ쭗????猿딅빑 癲ル슢?????釉먮뻤?????????⑤챶萸?// ???ㅼ굡?????ш끽維??ъ땡?堉온 ???獄?????. ??????뽓????怨멸텭???1????@@unique). ????뽓??// ???????⑤챶萸???筌먲퐣????ш끽維??N=3)??application-level COUNT ?嶺뚮ㅎ????????⑥??enforce.

@@ -105,6 +105,10 @@ function normalizeCopiedCard(
             order: number;
           }>
         | undefined) ?? [],
+    commentVoteOptionCount: (c.commentVoteOptionCount as number | null) ?? null,
+    commentVoteOptionLabels: Array.isArray(c.commentVoteOptionLabels)
+      ? c.commentVoteOptionLabels.filter((label): label is string => typeof label === "string")
+      : null,
     x: Number(c.x ?? 0),
     y: Number(c.y ?? 0),
     width: Number(c.width ?? 240),
@@ -248,6 +252,8 @@ export function BreakoutBoard({
           attachments: data.attachments,
           authors: data.authors,
           color: data.color || null,
+          commentVoteOptionCount: data.commentVoteOptionCount ?? null,
+          commentVoteOptionLabels: data.commentVoteOptionLabels ?? null,
           x: 0,
           y: 0,
           order,
@@ -486,7 +492,11 @@ export function BreakoutBoard({
       )}
 
       {canEdit && localStatus === "active" && (
-        <AddCardButton onAdd={handleAdd} sections={sectionOptions} />
+        <AddCardButton
+          onAdd={handleAdd}
+          sections={sectionOptions}
+          canConfigurePoll={canEdit}
+        />
       )}
 
       {addForSection && (
@@ -495,6 +505,7 @@ export function BreakoutBoard({
           onClose={() => setAddForSection(null)}
           sections={sectionOptions}
           defaultSectionId={addForSection}
+          canConfigurePoll={canEdit}
         />
       )}
 
@@ -503,12 +514,14 @@ export function BreakoutBoard({
           card={editingCard}
           onSave={handleEditCardSave}
           onClose={() => setEditingCard(null)}
+          canConfigurePoll={canEdit}
         />
       )}
 
       <CardDetailModal
         card={openCard}
         onClose={() => setOpenCard(null)}
+        boardId={boardId}
       />
     </div>
   );

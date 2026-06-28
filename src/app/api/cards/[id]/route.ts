@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import { Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
 import { ForbiddenError } from "@/lib/rbac";
 import { resolveIdentities } from "@/lib/identity";
@@ -14,9 +15,13 @@ import {
 import { resolveCanvaEmbedUrlCached } from "@/lib/canva-preview-cache";
 import { isAllowedFileUrl, isAllowedStoredMime, MAX_ATTACHMENTS_PER_CARD } from "@/lib/file-attachment";
 import { touchBoardUpdatedAt } from "@/lib/board-touch";
-import { announceCardChange } from "@/lib/realtime-broadcast";
+import { announceCardChange, announcePollChange } from "@/lib/realtime-broadcast";
 import { resizeRemoteImageToWebPPreviewUrl } from "@/lib/blob";
 import { enqueueBlobDeletion } from "@/lib/blob-cleanup";
+import {
+  normalizeCommentVoteOptionCount,
+  normalizeCommentVoteOptionLabels,
+} from "../poll-shared";
 
 const PatchCardSchema = z.object({
   title: z.string().max(200).optional(),
@@ -54,6 +59,11 @@ const PatchCardSchema = z.object({
   order: z.number().int().optional(),
   guidePinned: z.boolean().optional(),
   sectionId: z.string().nullable().optional(),
+  // comment-area poll (2026-06-28): null/0/1 = 비활성, 2..6 = 선택지 수.
+  // 정규화는 route 안에서 normalizeCommentVoteOptionCount() 로 처리해
+  // 응답에 항상 null | 2..6 만 들어가도록 한다.
+  commentVoteOptionCount: z.number().int().nullable().optional(),
+  commentVoteOptionLabels: z.array(z.string().max(40)).max(6).nullable().optional(),
 });
 
 export async function PATCH(
@@ -158,6 +168,53 @@ export async function PATCH(
       );
     }
 
+    // comment-area poll (2026-06-28): 옵션 수/라벨 정규화. 0/1 은 null 로
+    // 흡수하고, 라벨은 활성 옵션 수와 같은 길이로 맞춘다.
+    const pollConfigTouched =
+      input.commentVoteOptionCount !== undefined ||
+      input.commentVoteOptionLabels !== undefined;
+    if (pollConfigTouched) {
+      const canConfigurePoll =
+        !!identity.teacher ||
+        (!!identity.student &&
+          card.studentAuthorId === identity.student.studentId);
+      if (!canConfigurePoll) {
+        return NextResponse.json({ error: "poll_config_forbidden" }, { status: 403 });
+      }
+      if (input.commentVoteOptionCount !== undefined) {
+        const normalized = normalizeCommentVoteOptionCount(input.commentVoteOptionCount);
+        if (!normalized.ok) {
+          return NextResponse.json({ error: normalized.error }, { status: 400 });
+        }
+        input.commentVoteOptionCount = normalized.value;
+      }
+      const effectivePollCount =
+        input.commentVoteOptionCount !== undefined
+          ? input.commentVoteOptionCount
+          : card.commentVoteOptionCount ?? null;
+      const normalizedLabels = normalizeCommentVoteOptionLabels(
+        input.commentVoteOptionLabels,
+        effectivePollCount,
+      );
+      if (!normalizedLabels.ok) {
+        return NextResponse.json({ error: normalizedLabels.error }, { status: 400 });
+      }
+      input.commentVoteOptionLabels = normalizedLabels.value;
+    }
+    const nextPollCount =
+      input.commentVoteOptionCount !== undefined
+        ? input.commentVoteOptionCount
+        : card.commentVoteOptionCount ?? null;
+    const nextPollLabels =
+      input.commentVoteOptionLabels !== undefined
+        ? input.commentVoteOptionLabels
+        : card.commentVoteOptionLabels ?? null;
+    const pollConfigChanged =
+      pollConfigTouched &&
+      (nextPollCount !== (card.commentVoteOptionCount ?? null) ||
+        JSON.stringify(nextPollLabels) !==
+          JSON.stringify(card.commentVoteOptionLabels ?? null));
+
     if (input.attachments) {
       for (let i = 0; i < input.attachments.length; i += 1) {
         const a = input.attachments[i];
@@ -234,7 +291,20 @@ export async function PATCH(
       delete patch.linkImage;
     }
 
-    const { attachments: nextAttachments, ...cardPatch } = patch;
+    const {
+      attachments: nextAttachments,
+      commentVoteOptionLabels: _commentVoteOptionLabels,
+      ...cardPatch
+    } = patch;
+    const cardPatchData: Prisma.CardUncheckedUpdateInput = {
+      ...cardPatch,
+    };
+    if (input.commentVoteOptionLabels !== undefined) {
+      cardPatchData.commentVoteOptionLabels =
+        input.commentVoteOptionLabels === null
+          ? Prisma.DbNull
+          : input.commentVoteOptionLabels;
+    }
     const attachmentRows = nextAttachments
       ? await Promise.all(
           nextAttachments.map(async (a, idx) => ({
@@ -249,7 +319,20 @@ export async function PATCH(
       : undefined;
 
     const updated = await db.$transaction(async (tx) => {
-      const updatedCard = await tx.card.update({ where: { id }, data: cardPatch });
+      const updatedCard = await tx.card.update({ where: { id }, data: cardPatchData });
+
+      if (input.commentVoteOptionCount !== undefined) {
+        if (input.commentVoteOptionCount === null) {
+          await tx.cardPollVote.deleteMany({ where: { cardId: id } });
+        } else {
+          await tx.cardPollVote.deleteMany({
+            where: {
+              cardId: id,
+              optionIndex: { gte: input.commentVoteOptionCount },
+            },
+          });
+        }
+      }
 
       if (attachmentRows !== undefined) {
         await tx.cardAttachment.deleteMany({ where: { cardId: id } });
@@ -293,6 +376,9 @@ export async function PATCH(
     // classroom-boards-tab "🟢 새 활동" 배지 — 카드 수정으로 부모 board touch.
     await touchBoardUpdatedAt(card.boardId);
     void announceCardChange(card.boardId, "update");
+    if (pollConfigChanged) {
+      await announcePollChange(card.boardId, id);
+    }
 
     return NextResponse.json({ card: { ...updated, attachments } });
   } catch (e) {

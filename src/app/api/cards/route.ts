@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import { Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
 import { getCurrentStudent, getCurrentStudentRaw } from "@/lib/student-auth";
@@ -23,6 +24,10 @@ import { isAllowedFileUrl, isAllowedStoredMime, MAX_ATTACHMENTS_PER_CARD } from 
 import { touchBoardUpdatedAt } from "@/lib/board-touch";
 import { announceCardChange } from "@/lib/realtime-broadcast";
 import { resizeRemoteImageToWebPPreviewUrl, extractVideoThumbnail } from "@/lib/blob";
+import {
+  normalizeCommentVoteOptionCount,
+  normalizeCommentVoteOptionLabels,
+} from "./poll-shared";
 
 const CreateCardSchema = z.object({
   boardId: z.string().min(1),
@@ -75,6 +80,11 @@ const CreateCardSchema = z.object({
   // student author's SectionBreakoutMembership matches. null = whole-section
   // card (the default).
   groupId: z.string().nullable().optional(),
+  // comment-area poll (2026-06-28): 선택지 개수. POST 단계에서 정규화
+  // (null/0/1 -> null, 2..6 -> 그대로, 그 외 -> 400). 교사와 학생
+  // 세션의 카드 발행에서만 설정할 수 있고, 공유 방문자는 설정할 수 없다.
+  commentVoteOptionCount: z.number().int().nullable().optional(),
+  commentVoteOptionLabels: z.array(z.string().max(40)).max(6).nullable().optional(),
   authors: z
     .array(
       z.object({
@@ -162,6 +172,25 @@ export async function POST(req: Request) {
       }
     }
 
+    // comment-area poll (2026-06-28): 옵션 수 정규화. 0/1 은 null 로
+    // 흡수, 2..6 외의 값은 400. 카드 생성 시점에 본 필드만 보내는 경우도
+    // 있어서 zod 단계가 아닌 여기서 한 번 더 정규화한다.
+    if (input.commentVoteOptionCount !== undefined) {
+      const normalized = normalizeCommentVoteOptionCount(input.commentVoteOptionCount);
+      if (!normalized.ok) {
+        return NextResponse.json({ error: normalized.error }, { status: 400 });
+      }
+      input.commentVoteOptionCount = normalized.value;
+    }
+    const normalizedPollLabels = normalizeCommentVoteOptionLabels(
+      input.commentVoteOptionLabels,
+      input.commentVoteOptionCount ?? null,
+    );
+    if (!normalizedPollLabels.ok) {
+      return NextResponse.json({ error: normalizedPollLabels.error }, { status: 400 });
+    }
+    input.commentVoteOptionLabels = normalizedPollLabels.value;
+
     // Auth precedence: teacher (NextAuth) → student (HMAC cookie). Same
     // order as resolveIdentity / PATCH / DELETE. A leftover student_session
     // cookie from prior testing must NOT hijack a teacher-initiated POST.
@@ -241,6 +270,22 @@ export async function POST(req: Request) {
         externalAuthorName = shareResult.identity.authorName;
         currentUserName = shareResult.identity.authorName;
       }
+    }
+
+    if (
+      !teacherUser &&
+      !student &&
+      (input.commentVoteOptionCount !== undefined ||
+        input.commentVoteOptionLabels !== undefined)
+    ) {
+      if (
+        input.commentVoteOptionCount !== null ||
+        input.commentVoteOptionLabels !== null
+      ) {
+        return NextResponse.json({ error: "poll_config_forbidden" }, { status: 403 });
+      }
+      input.commentVoteOptionCount = null;
+      input.commentVoteOptionLabels = null;
     }
 
     // Canva oEmbed enrichment. For a Canva design URL the SERVER owns
@@ -475,6 +520,11 @@ export async function POST(req: Request) {
           order: input.order ?? 0,
           sectionId: input.sectionId ?? null,
           groupId: resolvedGroupId,
+          // comment-area poll (2026-06-28): 정규화된 null | 2..6 만
+          // 들어온다. 미지정 시 null (비활성).
+          commentVoteOptionCount: input.commentVoteOptionCount ?? null,
+          commentVoteOptionLabels:
+            input.commentVoteOptionLabels ?? Prisma.DbNull,
         },
       });
       // Student-authored cards get a primary CardAuthor row so the

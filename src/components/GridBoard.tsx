@@ -75,6 +75,8 @@ export function GridBoard({
           attachments: data.attachments,
           authors: data.authors,
           color: data.color || null,
+          commentVoteOptionCount: data.commentVoteOptionCount ?? null,
+          commentVoteOptionLabels: data.commentVoteOptionLabels ?? null,
           x: 0,
           y: 0,
           order: cards.length,
@@ -316,6 +318,7 @@ export function GridBoard({
         <AddCardButton
           onAdd={handleAdd}
           canAssignAuthors={canEdit}
+          canConfigurePoll={canEdit || !!isStudentViewer}
           classroomId={classroomId}
         />
       )}
@@ -337,6 +340,7 @@ export function GridBoard({
           card={editingCard}
           onSave={(updates) => handleEditCardSave(editingCard, updates)}
           onClose={() => setEditingCard(null)}
+          canConfigurePoll={canEdit || editingCard.studentAuthorId === currentUserId}
         />
       )}
       {authorEditCard && (

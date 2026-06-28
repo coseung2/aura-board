@@ -8,6 +8,7 @@ type Props = {
   onAdd: (data: AddCardData) => Promise<void>;
   sections?: { id: string; title: string }[];
   canAssignAuthors?: boolean;
+  canConfigurePoll?: boolean;
   classroomId?: string | null;
 };
 
@@ -15,6 +16,7 @@ export function AddCardButton({
   onAdd,
   sections,
   canAssignAuthors,
+  canConfigurePoll,
   classroomId,
 }: Props) {
   const [open, setOpen] = useState(false);
@@ -39,6 +41,7 @@ export function AddCardButton({
           onClose={() => setOpen(false)}
           sections={sections}
           canAssignAuthors={canAssignAuthors}
+          canConfigurePoll={canConfigurePoll}
           classroomId={classroomId}
         />
       )}

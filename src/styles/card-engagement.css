@@ -236,3 +236,95 @@
   text-align: center;
   padding: 8px;
 }
+
+/* comment-area poll (2026-06-28) */
+.card-engagement-poll {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.card-engagement-poll-options {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(64px, 1fr));
+  gap: 8px;
+}
+
+.card-engagement-poll-option {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 8px 6px;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: var(--color-surface);
+  color: var(--color-text);
+  cursor: pointer;
+  transition:
+    border-color 120ms ease,
+    background 120ms ease;
+  min-width: 0;
+}
+
+.card-engagement-poll-option:hover:not(:disabled) {
+  border-color: var(--color-accent);
+}
+
+.card-engagement-poll-option.is-selected {
+  border-color: var(--color-accent);
+  background: var(--color-accent-tinted-bg);
+}
+
+.card-engagement-poll-option.is-expanded {
+  box-shadow: 0 0 0 1px var(--color-accent);
+}
+
+.card-engagement-poll-option:disabled {
+  cursor: default;
+  opacity: 0.7;
+}
+
+.card-engagement-poll-option-label {
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.2;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+
+.card-engagement-poll-option-count {
+  font-size: 12px;
+  color: var(--color-text-muted);
+  line-height: 1.2;
+}
+
+.card-engagement-poll-total {
+  font-size: 12px;
+  color: var(--color-text-muted);
+  text-align: center;
+}
+
+.card-engagement-poll-voters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 6px;
+  font-size: 12px;
+  line-height: 1.35;
+  color: var(--color-text-muted);
+}
+
+.card-engagement-poll-voters-title {
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+.card-engagement-poll-voters-list {
+  overflow-wrap: anywhere;
+}
+
+.card-engagement-poll-voters-empty {
+  color: var(--color-text-muted);
+}

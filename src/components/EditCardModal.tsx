@@ -43,6 +43,7 @@ type Props = {
   card: CardData;
   onSave: (updates: EditCardUpdates) => Promise<void>;
   onClose: () => void;
+  canConfigurePoll?: boolean;
 };
 
 // useCardMutations의 optimistic update에서 id로 그대로 흘러가지 않도록
@@ -96,7 +97,12 @@ function toInitialAttachments(card: CardData): AttachmentDraft[] {
   return normalized;
 }
 
-export function EditCardModal({ card, onSave, onClose }: Props) {
+export function EditCardModal({
+  card,
+  onSave,
+  onClose,
+  canConfigurePoll = false,
+}: Props) {
   const [title, setTitle] = useState(card.title);
   const [content, setContent] = useState(card.content);
   const [linkUrl, setLinkUrl] = useState(card.linkUrl ?? "");
@@ -110,6 +116,17 @@ export function EditCardModal({ card, onSave, onClose }: Props) {
   );
   const [showFile, setShowFile] = useState(
     Boolean(card.fileUrl) || (card.attachments ?? []).some((a) => a.kind === "file")
+  );
+  const initialPollCount = card.commentVoteOptionCount;
+  const [pollEnabled, setPollEnabled] = useState(
+    initialPollCount !== null && initialPollCount !== undefined && initialPollCount >= 2,
+  );
+  const [pollOptionCount, setPollOptionCount] = useState<number>(initialPollCount ?? 2);
+  const [pollOptionLabels, setPollOptionLabels] = useState<string[]>(() =>
+    Array.from({ length: 6 }, (_, idx) => {
+      const label = card.commentVoteOptionLabels?.[idx];
+      return typeof label === "string" && label.trim() ? label : `${idx + 1}번`;
+    }),
   );
   const [busy, setBusy] = useState(false);
   const imageInputRef = useRef<HTMLInputElement>(null);
@@ -196,6 +213,14 @@ export function EditCardModal({ card, onSave, onClose }: Props) {
               fileSize: firstFile?.fileSize ?? null,
               fileMimeType: firstFile?.mimeType ?? null,
               color,
+              ...(canConfigurePoll
+                ? {
+                    commentVoteOptionCount: pollEnabled ? pollOptionCount : null,
+                    commentVoteOptionLabels: pollEnabled
+                      ? pollOptionLabels.slice(0, pollOptionCount)
+                      : null,
+                  }
+                : {}),
             });
             setBusy(false);
             onClose();
@@ -591,6 +616,58 @@ export function EditCardModal({ card, onSave, onClose }: Props) {
                       e.currentTarget.value = "";
                     }}
                   />
+                </div>
+              )}
+            </div>
+          )}
+
+          {canConfigurePoll && (
+            <div className="modal-poll-section">
+              <span className="modal-field-label">댓글 투표</span>
+              <label className="modal-poll-enable">
+                <input
+                  type="checkbox"
+                  checked={pollEnabled}
+                  onChange={(e) => {
+                    setPollEnabled(e.target.checked);
+                    if (e.target.checked && pollOptionCount < 2) setPollOptionCount(2);
+                  }}
+                />
+                댓글창에서 투표 받기
+              </label>
+              {pollEnabled && (
+                <select
+                  value={pollOptionCount}
+                  onChange={(e) => setPollOptionCount(Number(e.target.value))}
+                  className="modal-select"
+                >
+                  {[2, 3, 4, 5, 6].map((n) => (
+                    <option key={n} value={n}>
+                      {n}개 선택지
+                    </option>
+                  ))}
+                </select>
+              )}
+              {pollEnabled && (
+                <div className="modal-poll-label-grid">
+                  {Array.from({ length: pollOptionCount }, (_, idx) => (
+                    <label key={idx} className="modal-poll-label-field">
+                      <span>{idx + 1}</span>
+                      <input
+                        value={pollOptionLabels[idx] ?? `${idx + 1}번`}
+                        onChange={(event) => {
+                          const value = event.target.value;
+                          setPollOptionLabels((current) => {
+                            const next = [...current];
+                            next[idx] = value;
+                            return next;
+                          });
+                        }}
+                        maxLength={40}
+                        placeholder={`${idx + 1}번`}
+                      />
+                    </label>
+                  ))}
                 </div>
               )}
             </div>

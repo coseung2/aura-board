@@ -65,6 +65,11 @@ export type CardData = {
     displayName: string;
     order: number;
   }>;
+  /** comment-area poll (2026-06-28): number of poll options shown above
+   *  the comment input. null/0/1 disables the poll. */
+  commentVoteOptionCount?: number | null;
+  /** comment-area poll labels. null falls back to "1번", "2번"... */
+  commentVoteOptionLabels?: string[] | null;
   /** card-comments-likes (2026-04-26): 보드 단위 익명 토글 (Board.anonymousAuthor).
    *  CardBody → CardAuthorFooter 가 author 라벨을 "익명" 으로 마스킹. 보드 RSC
    *  에서 모든 카드에 동일한 board.anonymousAuthor 값을 denorm 한다. */

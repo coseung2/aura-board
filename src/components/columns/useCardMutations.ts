@@ -171,6 +171,8 @@ export function useCardMutations({
           attachments: data.attachments,
           authors: data.authors,
           color: data.color || null,
+          commentVoteOptionCount: data.commentVoteOptionCount ?? null,
+          commentVoteOptionLabels: data.commentVoteOptionLabels ?? null,
           x: 0,
           y: 0,
           order,

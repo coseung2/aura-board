@@ -5,7 +5,7 @@ import { createPortal } from "react-dom";
 import { formatRelativeTime } from "@/lib/card-engagement-format";
 import { useShareSession, type ShareSession } from "@/components/share/ShareSessionContext";
 import { createPublicSupabaseClient } from "@/lib/supabase/client";
-import { useBoardEngagement } from "@/hooks/useBoardEngagementRealtime";
+import { useBoardEngagement, useBoardPollChange } from "@/hooks/useBoardEngagementRealtime";
 
 // card-comments-likes (2026-04-26): 카드별 좋아요 + 댓글 UI.
 // mode="chips"  — 인라인 보드 카드 footer (좋아요 토글 + 댓글 카운트
@@ -166,6 +166,7 @@ export function CardEngagement({
   // Live-update counts from board-level engagement broadcasts. Only counts
   // move; isLiked is the current user's own state (handled in toggleLike).
   useBoardEngagement(boardId, cardId, (event) => {
+    if (event.type !== "engagement_changed") return;
     setState((current) => {
       if (!current) return current;
       const next = {
@@ -296,7 +297,7 @@ export function CardEngagement({
           {chipsActionsEnd}
         </div>
         {showModal && (
-          <CommentsModal cardId={cardId} canInteract={state.canInteract} shareSession={shareSession} isStudentViewer={!!isStudentViewer} onClose={() => {
+          <CommentsModal cardId={cardId} canInteract={state.canInteract} shareSession={shareSession} isStudentViewer={!!isStudentViewer} boardId={boardId} onClose={() => {
             setShowModal(false);
             void refresh();
           }} />
@@ -341,6 +342,7 @@ export function CardEngagement({
           canInteract={state.canInteract}
           shareSession={shareSession}
           isStudentViewer={!!isStudentViewer}
+          boardId={boardId}
           onChange={refresh}
           inputId={commentInputId}
         />
@@ -358,12 +360,14 @@ function CommentsModal({
   canInteract,
   shareSession,
   isStudentViewer,
+  boardId,
   onClose,
 }: {
   cardId: string;
   canInteract: boolean;
   shareSession: ShareSession | null;
   isStudentViewer: boolean;
+  boardId?: string;
   onClose: () => void;
 }) {
   // engagement-modal-portal (2026-04-26): 모달이 카드 DOM 안에 그대로 있으면
@@ -413,6 +417,7 @@ function CommentsModal({
             canInteract={canInteract}
             shareSession={shareSession}
             isStudentViewer={isStudentViewer}
+            boardId={boardId}
           />
         </div>
       </div>
@@ -427,6 +432,7 @@ function CommentsBlock({
   canInteract,
   shareSession,
   isStudentViewer,
+  boardId,
   onChange,
   inputId,
 }: {
@@ -434,6 +440,7 @@ function CommentsBlock({
   canInteract: boolean;
   shareSession: ShareSession | null;
   isStudentViewer: boolean;
+  boardId?: string;
   onChange?: () => void;
   inputId?: string;
 }) {
@@ -528,6 +535,13 @@ function CommentsBlock({
 
   return (
     <div className="card-engagement-comments">
+      {/* comment-area poll (2026-06-28): 댓글 입력/목록 위에 투표 UI. */}
+      <CommentsPoll
+        cardId={cardId}
+        shareSession={shareSession}
+        isStudentViewer={isStudentViewer}
+        boardId={boardId}
+      />
       {/* comments-form-top (2026-04-26): 입력 폼이 상단, 댓글 목록은 그 아래
           oldest → newest 순으로 쌓임. 새 댓글은 자연스럽게 list 끝에 추가. */}
       {canInteract ? (
@@ -580,6 +594,163 @@ function CommentsBlock({
           ))}
         </ul>
       )}
+    </div>
+  );
+}
+
+// comment-area poll (2026-06-28): 카드 댓글 영역 투표 UI.
+type PollState = {
+  enabled: boolean;
+  optionCount: number;
+  counts: number[];
+  labels: string[];
+  voters: Array<Array<{ id: string; name: string }>>;
+  total: number;
+  selectedOption: number | null;
+  canVote: boolean;
+};
+
+function CommentsPoll({
+  cardId,
+  shareSession,
+  isStudentViewer,
+  boardId,
+}: {
+  cardId: string;
+  shareSession: ShareSession | null;
+  isStudentViewer: boolean;
+  boardId?: string;
+}) {
+  const [poll, setPoll] = useState<PollState | null>(null);
+  const [voting, setVoting] = useState(false);
+  const [openOption, setOpenOption] = useState<number | null>(null);
+
+  const load = useCallback(async () => {
+    if (shareSession) {
+      setPoll(null);
+      return;
+    }
+    try {
+      const r = await fetch(`/api/cards/${cardId}/poll`, {
+        cache: "no-store",
+        headers: studentViewerHeaders(isStudentViewer),
+      });
+      if (!r.ok) return;
+      const j = (await r.json()) as PollState;
+      setPoll(j);
+    } catch {
+      /* ignore */
+    }
+  }, [cardId, shareSession, isStudentViewer]);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  useBoardPollChange(boardId, cardId, () => {
+    void load();
+  });
+
+  const vote = async (optionIndex: number) => {
+    if (shareSession || voting || !poll?.canVote || poll.selectedOption === optionIndex) return;
+    setVoting(true);
+    setOpenOption(optionIndex);
+    setPoll((current) => {
+      if (!current) return current;
+      const old = current.selectedOption;
+      const nextCounts = [...current.counts];
+      if (old !== null && old >= 0 && old < nextCounts.length) {
+        nextCounts[old] = Math.max(0, nextCounts[old] - 1);
+      }
+      if (optionIndex >= 0 && optionIndex < nextCounts.length) {
+        nextCounts[optionIndex]++;
+      }
+      return {
+        ...current,
+        selectedOption: optionIndex,
+        counts: nextCounts,
+        total: old === null ? current.total + 1 : current.total,
+      };
+    });
+    try {
+      const r = await fetch(`/api/cards/${cardId}/poll`, {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          ...studentViewerHeaders(isStudentViewer),
+        },
+        body: JSON.stringify({ optionIndex }),
+      });
+      if (!r.ok) {
+        await load();
+        return;
+      }
+      const j = (await r.json()) as PollState;
+      setPoll(j);
+    } catch {
+      await load();
+    } finally {
+      setVoting(false);
+    }
+  };
+
+  if (!poll?.enabled) return null;
+
+  const toggleOption = (optionIndex: number) => {
+    if (poll.canVote && poll.selectedOption !== optionIndex) {
+      void vote(optionIndex);
+      return;
+    }
+    setOpenOption((current) => (current === optionIndex ? null : optionIndex));
+  };
+  const openVoters =
+    openOption !== null ? (poll.voters[openOption] ?? []) : [];
+  const openLabel =
+    openOption !== null
+      ? poll.labels[openOption] ?? `${openOption + 1}번`
+      : "";
+
+  return (
+    <div className="card-engagement-poll" role="group" aria-label="투표">
+      <div className="card-engagement-poll-options">
+        {poll.counts.map((count, idx) => {
+          const selected = poll.selectedOption === idx;
+          const expanded = openOption === idx;
+          const label = poll.labels[idx] ?? `${idx + 1}번`;
+          return (
+            <button
+              key={idx}
+              type="button"
+              className={`card-engagement-poll-option${selected ? " is-selected" : ""}${expanded ? " is-expanded" : ""}`}
+              onClick={() => toggleOption(idx)}
+              disabled={voting}
+              aria-pressed={selected}
+              aria-expanded={expanded}
+              aria-label={`${label} (${count}표), 투표자 보기`}
+            >
+              <span className="card-engagement-poll-option-label">{label}</span>
+              <span className="card-engagement-poll-option-count">{count}표</span>
+            </button>
+          );
+        })}
+      </div>
+      {openOption !== null && (
+        <div className="card-engagement-poll-voters">
+          <span className="card-engagement-poll-voters-title">
+            {openLabel} 투표자
+          </span>
+          {openVoters.length > 0 ? (
+            <span className="card-engagement-poll-voters-list">
+              {openVoters.map((voter) => voter.name).join(", ")}
+            </span>
+          ) : (
+            <span className="card-engagement-poll-voters-empty">
+              아직 없어요
+            </span>
+          )}
+        </div>
+      )}
+      <div className="card-engagement-poll-total">총 {poll.total}명 참여</div>
     </div>
   );
 }

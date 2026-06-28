@@ -71,7 +71,16 @@ export type BoardRealtimeEvent =
   | {
       type: "queue_changed";
       boardId: string;
-      changeType: "submit" | "status" | "move" | "delete";
+     changeType: "submit" | "status" | "move" | "delete";
+     cardId: string;
+     updatedAt: string;
+   }
+  | {
+      // comment-area poll (2026-06-28): 학생이 카드별 댓글창에서 투표를
+      // 누르면 방송. 클라이언트는 옵션 수·현재 카운트 등을 본 이벤트로
+      // 갱신하지 않고 /api/cards/:id/poll 을 refetch 한다.
+      type: "poll_changed";
+      boardId: string;
       cardId: string;
       updatedAt: string;
     };

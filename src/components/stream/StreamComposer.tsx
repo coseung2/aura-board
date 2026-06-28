@@ -34,6 +34,7 @@ type Props = {
     streamContentPrompt?: string;
   }>;
   initialSectionId?: string;
+  canConfigurePoll?: boolean;
 };
 
 export function StreamComposer({
@@ -43,12 +44,18 @@ export function StreamComposer({
   streamContentPrompt,
   sections,
   initialSectionId,
+  canConfigurePoll = false,
 }: Props) {
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
   const [showLink, setShowLink] = useState(false);
   const [linkUrl, setLinkUrl] = useState("");
   const [busy, setBusy] = useState(false);
+  const [pollEnabled, setPollEnabled] = useState(false);
+  const [pollOptionCount, setPollOptionCount] = useState<number>(2);
+  const [pollOptionLabels, setPollOptionLabels] = useState<string[]>(
+    Array.from({ length: 6 }, (_, idx) => `${idx + 1}번`),
+  );
   const [sectionId, setSectionId] = useState(
     initialSectionId ?? sections?.[0]?.id ?? "",
   );
@@ -122,11 +129,22 @@ export function StreamComposer({
         linkImage: preview?.image ?? undefined,
         attachments: attachments.length > 0 ? attachments : undefined,
         sectionId: sectionId || undefined,
+        ...(canConfigurePoll
+          ? {
+              commentVoteOptionCount: pollEnabled ? pollOptionCount : null,
+              commentVoteOptionLabels: pollEnabled
+                ? pollOptionLabels.slice(0, pollOptionCount)
+                : null,
+            }
+          : {}),
       });
       setTitle("");
       setContent("");
       setLinkUrl("");
       setShowLink(false);
+      setPollEnabled(false);
+      setPollOptionCount(2);
+      setPollOptionLabels(Array.from({ length: 6 }, (_, idx) => `${idx + 1}번`));
       setSectionId(initialSectionId ?? sections?.[0]?.id ?? "");
       attachments.forEach((item) => removeAttachment(item.tempId));
       reset();
@@ -351,6 +369,56 @@ export function StreamComposer({
         >
           파일
         </button>
+        {canConfigurePoll && (
+          <>
+            <button
+              type="button"
+              className={pollEnabled ? "modal-attach-btn-active" : ""}
+              onClick={() => setPollEnabled((value) => !value)}
+              disabled={busy || uploading}
+            >
+              투표
+            </button>
+            {pollEnabled && (
+              <label className="stream-composer-poll-field">
+                <span className="stream-composer-section-label">선택지</span>
+                <select
+                  className="stream-composer-section-select"
+                  value={pollOptionCount}
+                  onChange={(event) => setPollOptionCount(Number(event.target.value))}
+                  disabled={busy}
+                >
+                  {[2, 3, 4, 5, 6].map((n) => (
+                    <option key={n} value={n}>
+                      {n}개
+                    </option>
+                  ))}
+                </select>
+              </label>
+            )}
+            {pollEnabled && (
+              <div className="stream-composer-poll-labels">
+                {Array.from({ length: pollOptionCount }, (_, idx) => (
+                  <input
+                    key={idx}
+                    value={pollOptionLabels[idx] ?? `${idx + 1}번`}
+                    onChange={(event) => {
+                      const value = event.target.value;
+                      setPollOptionLabels((current) => {
+                        const next = [...current];
+                        next[idx] = value;
+                        return next;
+                      });
+                    }}
+                    maxLength={40}
+                    placeholder={`${idx + 1}번`}
+                    aria-label={`투표 선택지 ${idx + 1} 이름`}
+                  />
+                ))}
+              </div>
+            )}
+          </>
+        )}
         {sections && sections.length > 0 && (
           <label className="stream-composer-section-field">
             <span className="stream-composer-section-label">섹션</span>

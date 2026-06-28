@@ -45,6 +45,8 @@ type CardWire = {
   externalAuthorName: string | null;
   studentAuthorName: string | null;
   authorName: string | null;
+  commentVoteOptionCount: number | null;
+  commentVoteOptionLabels: string[] | null;
   queueStatus: string | null;
   // stream-board section breakout (2026-06-23): optional group tag. null
   // for whole-section cards. Server always emits the field so the
@@ -289,6 +291,12 @@ export async function GET(
             externalAuthorName: c.externalAuthorName,
             studentAuthorName: c.studentAuthor?.name ?? null,
             authorName: c.author?.name ?? null,
+            commentVoteOptionCount: c.commentVoteOptionCount ?? null,
+            commentVoteOptionLabels: Array.isArray(c.commentVoteOptionLabels)
+              ? c.commentVoteOptionLabels.filter(
+                  (label): label is string => typeof label === "string",
+                )
+              : null,
             queueStatus: c.queueStatus,
             groupId: c.groupId ?? null,
             authors: c.authors.map((a) => ({

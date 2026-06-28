@@ -117,3 +117,36 @@ export async function announceQueueChange(
     // ignore — clients fall back to next poll.
   }
 }
+
+/**
+ * comment-area poll (2026-06-28): 학생이 카드별 댓글창에서 투표를 누르면
+ * 같은 board 채널에 `board_changed` broadcast 로 신호. 클라이언트는 본
+ * 이벤트를 받으면 /api/cards/:id/poll 을 refetch 해서 분포/본인 선택을
+ * 갱신한다. payload 가 아니라 board_changed 이벤트 이름으로 보내는 이유는
+ * useBoardEngagement 등 기존 board-레벨 리스너가 단일 이벤트로
+ * 라우팅하도록 통일하기 위함. announceEngagementChange 와 동일하게 실패는
+ * non-fatal.
+ */
+export async function announcePollChange(
+  boardId: string,
+  cardId: string,
+): Promise<void> {
+  if (!boardId || !cardId) return;
+  const client = getServerClient();
+  if (!client) return;
+  const event: BoardRealtimeEvent = {
+    type: "poll_changed",
+    boardId,
+    cardId,
+    updatedAt: new Date().toISOString(),
+  };
+  try {
+    await client.channel(boardChannelKey(boardId)).send({
+      type: "broadcast",
+      event: "board_changed",
+      payload: event,
+    });
+  } catch {
+    // ignore — clients fall back to next poll.
+  }
+}

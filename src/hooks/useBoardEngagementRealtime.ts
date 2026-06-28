@@ -13,10 +13,22 @@ export type BoardEngagementEvent = {
   updatedAt: string;
 };
 
-type Listener = (event: BoardEngagementEvent) => void;
+// comment-area poll (2026-06-28): board-level poll change broadcast.
+export type BoardPollEvent = {
+  type: "poll_changed";
+  boardId: string;
+  cardId: string;
+  updatedAt: string;
+};
+
+export type BoardRealtimeEvent = BoardEngagementEvent | BoardPollEvent;
+
+type EngagementListener = (event: BoardEngagementEvent) => void;
+type PollListener = (event: BoardPollEvent) => void;
 
 type BoardEntry = {
-  listeners: Map<string, Set<Listener>>;
+  engagementListeners: Map<string, Set<EngagementListener>>;
+  pollListeners: Map<string, Set<PollListener>>;
   started: boolean;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   channel: any;
@@ -39,16 +51,28 @@ function getSupabase() {
   return supabasePromise;
 }
 
-function dispatch(boardId: string, event: BoardEngagementEvent) {
+function dispatch(boardId: string, event: BoardRealtimeEvent) {
   const entry = boards.get(boardId);
   if (!entry) return;
-  const set = entry.listeners.get(event.cardId);
-  if (!set) return;
-  for (const fn of set) {
-    try {
-      fn(event);
-    } catch {
-      // listener errors are non-fatal
+  if (event.type === "engagement_changed") {
+    const set = entry.engagementListeners.get(event.cardId);
+    if (!set) return;
+    for (const fn of set) {
+      try {
+        fn(event);
+      } catch {
+        // listener errors are non-fatal
+      }
+    }
+  } else if (event.type === "poll_changed") {
+    const set = entry.pollListeners.get(event.cardId);
+    if (!set) return;
+    for (const fn of set) {
+      try {
+        fn(event);
+      } catch {
+        // listener errors are non-fatal
+      }
     }
   }
 }
@@ -67,8 +91,8 @@ async function startBoard(boardId: string, entry: BoardEntry) {
         "broadcast",
         { event: "board_changed" },
         (msg: { payload?: unknown }) => {
-          const payload = msg?.payload as BoardEngagementEvent | undefined;
-          if (payload?.type !== "engagement_changed") return;
+          const payload = msg?.payload as BoardRealtimeEvent | undefined;
+          if (!payload) return;
           if (payload.boardId !== boardId) return;
           dispatch(boardId, payload);
         },
@@ -87,15 +111,16 @@ async function startBoard(boardId: string, entry: BoardEntry) {
   }
 }
 
-function subscribe(
+function subscribeEngagement(
   boardId: string,
   cardId: string,
-  listener: Listener,
+  listener: EngagementListener,
 ): () => void {
   let entry = boards.get(boardId);
   if (!entry) {
     entry = {
-      listeners: new Map(),
+      engagementListeners: new Map(),
+      pollListeners: new Map(),
       started: false,
       channel: null,
       remove: () => {},
@@ -103,20 +128,57 @@ function subscribe(
     boards.set(boardId, entry);
     void startBoard(boardId, entry);
   }
-  let set = entry.listeners.get(cardId);
+  let set = entry.engagementListeners.get(cardId);
   if (!set) {
     set = new Set();
-    entry.listeners.set(cardId, set);
+    entry.engagementListeners.set(cardId, set);
   }
   set.add(listener);
   return () => {
     const e = boards.get(boardId);
     if (!e) return;
-    const s = e.listeners.get(cardId);
+    const s = e.engagementListeners.get(cardId);
     if (!s) return;
     s.delete(listener);
-    if (s.size === 0) e.listeners.delete(cardId);
-    if (e.listeners.size === 0) {
+    if (s.size === 0) e.engagementListeners.delete(cardId);
+    if (e.engagementListeners.size === 0 && e.pollListeners.size === 0) {
+      e.remove();
+      boards.delete(boardId);
+    }
+  };
+}
+
+function subscribePoll(
+  boardId: string,
+  cardId: string,
+  listener: PollListener,
+): () => void {
+  let entry = boards.get(boardId);
+  if (!entry) {
+    entry = {
+      engagementListeners: new Map(),
+      pollListeners: new Map(),
+      started: false,
+      channel: null,
+      remove: () => {},
+    };
+    boards.set(boardId, entry);
+    void startBoard(boardId, entry);
+  }
+  let set = entry.pollListeners.get(cardId);
+  if (!set) {
+    set = new Set();
+    entry.pollListeners.set(cardId, set);
+  }
+  set.add(listener);
+  return () => {
+    const e = boards.get(boardId);
+    if (!e) return;
+    const s = e.pollListeners.get(cardId);
+    if (!s) return;
+    s.delete(listener);
+    if (s.size === 0) e.pollListeners.delete(cardId);
+    if (e.engagementListeners.size === 0 && e.pollListeners.size === 0) {
       e.remove();
       boards.delete(boardId);
     }
@@ -132,13 +194,33 @@ function subscribe(
 export function useBoardEngagement(
   boardId: string | null | undefined,
   cardId: string | null | undefined,
-  onEvent: Listener,
+  onEvent: EngagementListener,
 ) {
-  const ref = useRef<Listener>(onEvent);
+  const ref = useRef<EngagementListener>(onEvent);
   ref.current = onEvent;
   useEffect(() => {
     if (!boardId || !cardId) return;
-    const listener: Listener = (e) => ref.current(e);
-    return subscribe(boardId, cardId, listener);
+    const listener: EngagementListener = (e) => ref.current(e);
+    return subscribeEngagement(boardId, cardId, listener);
+  }, [boardId, cardId]);
+}
+
+/**
+ * Subscribes a single card to board-level poll broadcasts on
+ * `board:${boardId}`. Calls `onEvent` for each `poll_changed` event
+ * targeting `cardId`. No-op (and non-fatal) when boardId/cardId are missing
+ * or Supabase is not configured.
+ */
+export function useBoardPollChange(
+  boardId: string | null | undefined,
+  cardId: string | null | undefined,
+  onEvent: PollListener,
+) {
+  const ref = useRef<PollListener>(onEvent);
+  ref.current = onEvent;
+  useEffect(() => {
+    if (!boardId || !cardId) return;
+    const listener: PollListener = (e) => ref.current(e);
+    return subscribePoll(boardId, cardId, listener);
   }, [boardId, cardId]);
 }

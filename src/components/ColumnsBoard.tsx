@@ -466,6 +466,7 @@ export function ColumnsBoard({
           onAdd={handleAdd}
           sections={sectionOptions}
           canAssignAuthors={canEdit}
+          canConfigurePoll={canEdit || !!isStudentViewer}
           classroomId={classroomId}
         />
       )}
@@ -477,6 +478,7 @@ export function ColumnsBoard({
           sections={sectionOptions}
           defaultSectionId={addForSection}
           canAssignAuthors={canEdit}
+          canConfigurePoll={canEdit || !!isStudentViewer}
           classroomId={classroomId}
         />
       )}
@@ -486,6 +488,7 @@ export function ColumnsBoard({
           card={editingCard}
           onSave={(updates) => handleEditCardSave(editingCard, updates)}
           onClose={() => setEditingCard(null)}
+          canConfigurePoll={canEdit || editingCard.studentAuthorId === currentUserId}
         />
       )}
 
