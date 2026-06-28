@@ -18,8 +18,8 @@ const CreatePuzzleSchema = z.object({
   solution: z.string().trim().max(30).optional(),
 });
 
-const StartPuzzleSchema = z.object({
-  action: z.literal("start"),
+const PuzzleActionSchema = z.object({
+  action: z.enum(["start", "stop"]),
   puzzleId: z.string().min(1),
 });
 
@@ -206,7 +206,7 @@ export async function PATCH(req: Request, { params }: Params) {
   }
 
   const body = await req.json().catch(() => null);
-  const parsed = StartPuzzleSchema.safeParse(body);
+  const parsed = PuzzleActionSchema.safeParse(body);
   if (!parsed.success) {
     return NextResponse.json(
       { error: "bad_request", issues: parsed.error.issues },
@@ -224,7 +224,9 @@ export async function PATCH(req: Request, { params }: Params) {
         },
       },
     },
-    select: { id: true },
+    select: {
+      id: true,
+    },
   });
   if (!board) {
     return NextResponse.json({ error: "forbidden" }, { status: 403 });
@@ -236,9 +238,23 @@ export async function PATCH(req: Request, { params }: Params) {
         id: parsed.data.puzzleId,
         game: { boardId: board.id },
       },
-      select: { id: true, gameId: true },
+      select: { id: true, gameId: true, status: true },
     });
     if (!puzzle) return null;
+
+    if (parsed.data.action === "stop") {
+      return await tx.kordlePuzzle.update({
+        where: { id: puzzle.id },
+        data: {
+          status: "CLOSED",
+          endsAt: new Date(),
+        },
+        select: { id: true, status: true, startsAt: true },
+      });
+    }
+    if (puzzle.status !== "DRAFT") {
+      return "not_startable" as const;
+    }
 
     await tx.kordlePuzzle.updateMany({
       where: {
@@ -252,7 +268,7 @@ export async function PATCH(req: Request, { params }: Params) {
       },
     });
 
-    return await tx.kordlePuzzle.update({
+    const livePuzzle = await tx.kordlePuzzle.update({
       where: { id: puzzle.id },
       data: {
         status: "LIVE",
@@ -261,10 +277,15 @@ export async function PATCH(req: Request, { params }: Params) {
       },
       select: { id: true, status: true, startsAt: true },
     });
+
+    return livePuzzle;
   });
 
   if (!result) {
     return NextResponse.json({ error: "puzzle_not_found" }, { status: 404 });
+  }
+  if (result === "not_startable") {
+    return NextResponse.json({ error: "puzzle_not_startable" }, { status: 409 });
   }
 
   return NextResponse.json({ puzzle: result });

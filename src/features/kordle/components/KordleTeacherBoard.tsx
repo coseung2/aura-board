@@ -13,6 +13,23 @@ function localeLabel(locale: string) {
   return locale === "ko-KR" ? "한글" : "영어";
 }
 
+function statusLabel(status: string | null | undefined) {
+  switch (status) {
+    case "DRAFT":
+      return "시작 대기";
+    case "LIVE":
+      return "진행 중";
+    case "SCHEDULED":
+      return "예약됨";
+    case "CLOSED":
+      return "종료";
+    case "ARCHIVED":
+      return "보관됨";
+    default:
+      return "퍼즐 없음";
+  }
+}
+
 function EmptyGrid({ wordLength, maxGuesses }: { wordLength: number; maxGuesses: number }) {
   return (
     <div
@@ -70,7 +87,6 @@ export async function KordleTeacherBoard({ boardId, teacherUserId }: Props) {
     return (
       <section className="kordle-shell">
         <div className="kordle-teacher-card">
-          <p className="kordle-kicker">꼬들</p>
           <h2>게임 설정이 필요합니다</h2>
           <p>이 보드에 연결된 꼬들 게임 정보를 찾지 못했어요.</p>
         </div>
@@ -97,12 +113,8 @@ export async function KordleTeacherBoard({ boardId, teacherUserId }: Props) {
     if (state) {
       return (
         <section className="kordle-shell">
-          <div className="kordle-teacher-header">
-            <div>
-              <p className="kordle-kicker">꼬들</p>
-              <h2>{game.title || "꼬들 보드"}</h2>
-            </div>
-            <span className="kordle-status-pill">{puzzle.status}</span>
+          <div className="kordle-teacher-statusbar">
+            <span className="kordle-status-pill">{statusLabel(puzzle.status)}</span>
           </div>
           <KordleTeacherControls
             boardId={boardId}
@@ -125,14 +137,8 @@ export async function KordleTeacherBoard({ boardId, teacherUserId }: Props) {
   return (
     <section className="kordle-shell">
       <div className="kordle-teacher-card">
-        <div className="kordle-teacher-header">
-          <div>
-            <p className="kordle-kicker">꼬들</p>
-            <h2>{game.title || "꼬들 보드"}</h2>
-          </div>
-          <span className="kordle-status-pill">
-            {puzzle ? puzzle.status : "퍼즐 없음"}
-          </span>
+        <div className="kordle-teacher-statusbar">
+          <span className="kordle-status-pill">{statusLabel(puzzle?.status)}</span>
         </div>
         <KordleTeacherControls
           boardId={boardId}

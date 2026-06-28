@@ -3,9 +3,15 @@
 
 import "server-only";
 
+import type { Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
 import { evaluateGuess, validateGuess } from "../engine";
-import type { KordleEngineConfig, KordlePublicState, GuessFeedback } from "../engine";
+import type {
+  GuessFeedback,
+  KordleEngineConfig,
+  KordlePublicState,
+  KordleWinnerStats,
+} from "../engine";
 
 export async function loadGameConfig(boardId: string): Promise<{
   gameId: string;
@@ -95,6 +101,199 @@ export interface SubmitGuessInput {
   studentId: string | null;
   vibePlaySessionId: string | null;
   teacherUserId?: string | null;
+}
+
+type KordleTurnState = KordlePublicState["turn"];
+
+function materializeGuessRows(
+  guesses: Array<{ guessIndex: number; feedback: unknown }>,
+): GuessFeedback[] {
+  const rows: GuessFeedback[] = [];
+  for (const guess of guesses) {
+    while (rows.length < guess.guessIndex - 1) {
+      rows.push([]);
+    }
+    rows[guess.guessIndex - 1] = guess.feedback as unknown as GuessFeedback;
+  }
+  return rows;
+}
+
+async function loadWinnerStats(
+  client: Prisma.TransactionClient | typeof db,
+  boardId: string,
+): Promise<KordleWinnerStats> {
+  const puzzles = await client.kordlePuzzle.findMany({
+    where: {
+      game: { boardId },
+      attempts: {
+        some: {
+          studentId: { not: null },
+          status: "WON",
+          solvedAtGuess: { not: null },
+        },
+      },
+    },
+    orderBy: { createdAt: "asc" },
+    select: {
+      id: true,
+      attempts: {
+        where: {
+          studentId: { not: null },
+          status: "WON",
+          solvedAtGuess: { not: null },
+        },
+        select: {
+          studentId: true,
+          solvedAtGuess: true,
+          student: { select: { name: true } },
+        },
+      },
+    },
+  });
+
+  const wins = new Map<string, { studentId: string; name: string; wins: number }>();
+  const rounds: KordleWinnerStats["rounds"] = [];
+
+  puzzles.forEach((puzzle, index) => {
+    const solved = puzzle.attempts.filter(
+      (attempt) => attempt.studentId && attempt.solvedAtGuess !== null,
+    );
+    if (solved.length === 0) return;
+    const bestGuess = Math.min(...solved.map((attempt) => attempt.solvedAtGuess ?? Infinity));
+    if (!Number.isFinite(bestGuess)) return;
+    const winners = solved.filter((attempt) => attempt.solvedAtGuess === bestGuess);
+    const roundWinners = winners.map((attempt) => ({
+      studentId: attempt.studentId!,
+      name: attempt.student?.name ?? "이름 없음",
+    }));
+
+    for (const winner of roundWinners) {
+      const current = wins.get(winner.studentId);
+      if (current) {
+        current.wins += 1;
+      } else {
+        wins.set(winner.studentId, { ...winner, wins: 1 });
+      }
+    }
+
+    rounds.push({
+      puzzleId: puzzle.id,
+      roundNumber: index + 1,
+      winners: roundWinners,
+      solvedAtGuess: bestGuess,
+    });
+  });
+
+  return {
+    leaderboard: Array.from(wins.values()).sort(
+      (a, b) => b.wins - a.wins || a.name.localeCompare(b.name, "ko-KR"),
+    ),
+    rounds: rounds.slice(-6).reverse(),
+  };
+}
+
+async function getTurnState(
+  client: Prisma.TransactionClient | typeof db,
+  puzzleId: string,
+  maxGuesses: number,
+  actorGuessCount: number,
+  actorStatus: "IN_PROGRESS" | "WON" | "LOST" | "ABANDONED",
+  actorStartedAt: Date,
+  isStudentActor: boolean,
+): Promise<KordleTurnState> {
+  const studentAttempts = await client.kordleAttempt.findMany({
+    where: {
+      puzzleId,
+      studentId: { not: null },
+    },
+    select: {
+      startedAt: true,
+      status: true,
+      _count: { select: { guesses: true } },
+    },
+  });
+
+  const firstGuess = await client.kordleGuess.findFirst({
+    where: {
+      guessIndex: 1,
+      attempt: {
+        puzzleId,
+        studentId: { not: null },
+      },
+    },
+    orderBy: { createdAt: "asc" },
+    select: { createdAt: true },
+  });
+  const joinedAttempts = firstGuess
+    ? studentAttempts.filter(
+        (attempt) =>
+          attempt._count.guesses > 0 || attempt.startedAt <= firstGuess.createdAt,
+      )
+    : studentAttempts;
+  const latestGuessBeforeJoin = isStudentActor
+    ? await client.kordleGuess.findFirst({
+        where: {
+          createdAt: { lte: actorStartedAt },
+          attempt: {
+            puzzleId,
+            studentId: { not: null },
+          },
+        },
+        orderBy: { createdAt: "desc" },
+        select: { guessIndex: true },
+      })
+    : null;
+  const lateJoinTargetGuessIndex =
+    isStudentActor && actorGuessCount === 0 && latestGuessBeforeJoin
+      ? Math.min(latestGuessBeforeJoin.guessIndex + 1, maxGuesses)
+      : null;
+  const activeAttempts = joinedAttempts.filter((attempt) => attempt.status === "IN_PROGRESS");
+  if (activeAttempts.length === 0) {
+    const currentGuessIndex =
+      actorStatus === "IN_PROGRESS" && actorGuessCount < maxGuesses
+        ? actorGuessCount + 1
+        : null;
+    return {
+      currentGuessIndex,
+      nextGuessIndex: currentGuessIndex,
+      submittedCount: joinedAttempts.length,
+      totalCount: joinedAttempts.length,
+      isWaiting: false,
+      isPendingJoin: false,
+    };
+  }
+
+  const currentGuessIndex = Math.min(
+    Math.min(...activeAttempts.map((attempt) => attempt._count.guesses)) + 1,
+    maxGuesses,
+  );
+  const submittedCount = activeAttempts.filter(
+    (attempt) => attempt._count.guesses >= currentGuessIndex,
+  ).length;
+  const pendingJoin =
+    actorStatus === "IN_PROGRESS" &&
+    lateJoinTargetGuessIndex !== null &&
+    currentGuessIndex < lateJoinTargetGuessIndex;
+  const actorNextGuessIndex =
+    actorStatus === "IN_PROGRESS"
+      ? pendingJoin
+        ? lateJoinTargetGuessIndex
+        : actorGuessCount >= currentGuessIndex
+          ? Math.min(actorGuessCount + 1, maxGuesses)
+          : (lateJoinTargetGuessIndex ?? currentGuessIndex)
+      : null;
+
+  return {
+    currentGuessIndex,
+    nextGuessIndex: actorNextGuessIndex,
+    submittedCount,
+    totalCount: activeAttempts.length,
+    isWaiting:
+      actorStatus === "IN_PROGRESS" &&
+      (pendingJoin || actorGuessCount >= currentGuessIndex) &&
+      submittedCount < activeAttempts.length,
+    isPendingJoin: pendingJoin,
+  };
 }
 
 export async function submitGuess(
@@ -191,9 +390,24 @@ export async function submitGuess(
       return { ok: false as const, reason: validation.reason };
     }
 
-    const guessIndex = attempt.guesses.length + 1;
-    if (guessIndex > config.maxGuesses) {
+    const turnBeforeGuess = await getTurnState(
+      tx,
+      attempt.puzzleId,
+      config.maxGuesses,
+      attempt.guesses.length,
+      attempt.status,
+      attempt.startedAt,
+      !!attempt.studentId,
+    );
+    const guessIndex = turnBeforeGuess.nextGuessIndex;
+    if (guessIndex === null || guessIndex > config.maxGuesses) {
       return { ok: false as const, reason: "no_attempts_left" };
+    }
+    if (
+      turnBeforeGuess.currentGuessIndex !== null &&
+      guessIndex !== turnBeforeGuess.currentGuessIndex
+    ) {
+      return { ok: false as const, reason: "waiting_for_turn" };
     }
 
     const result = evaluateGuess(attempt.puzzle.solutionWord.text, opts.rawGuess, config);
@@ -221,10 +435,13 @@ export async function submitGuess(
       },
     });
 
-    const allGuesses: GuessFeedback[] = [
-      ...attempt.guesses.map((g) => g.feedback as unknown as GuessFeedback),
-      result.feedback,
-    ];
+    const allGuesses = materializeGuessRows([
+      ...attempt.guesses.map((g) => ({
+        guessIndex: g.guessIndex,
+        feedback: g.feedback,
+      })),
+      { guessIndex, feedback: result.feedback },
+    ]);
     const absentLetters: string[] = [];
     for (const fb of allGuesses) {
       for (const lf of fb) {
@@ -233,6 +450,16 @@ export async function submitGuess(
         }
       }
     }
+    const turn = await getTurnState(
+      tx,
+      attempt.puzzleId,
+      config.maxGuesses,
+      allGuesses.length,
+      updated.status,
+      attempt.startedAt,
+      !!attempt.studentId,
+    );
+    const winnerStats = await loadWinnerStats(tx, attempt.puzzle.game.boardId);
 
     return {
       ok: true as const,
@@ -242,9 +469,11 @@ export async function submitGuess(
         wordLength: config.wordLength,
         maxGuesses: config.maxGuesses,
         guesses: allGuesses,
-        nextGuessIndex: updated.status === "IN_PROGRESS" ? guessIndex + 1 : null,
+        nextGuessIndex: turn.nextGuessIndex,
         absentLetters,
         solvedAtGuess: updated.solvedAtGuess,
+        turn,
+        winnerStats,
       },
     };
   });
@@ -292,9 +521,7 @@ export async function getPublicState(opts: {
     maxGuesses: attempt.puzzle.game.maxGuesses,
     locale: attempt.puzzle.game.locale,
   };
-  const allGuesses: GuessFeedback[] = attempt.guesses.map(
-    (g) => g.feedback as unknown as GuessFeedback,
-  );
+  const allGuesses = materializeGuessRows(attempt.guesses);
   const absentLetters: string[] = [];
   for (const fb of allGuesses) {
     for (const lf of fb) {
@@ -303,15 +530,26 @@ export async function getPublicState(opts: {
       }
     }
   }
+  const turn = await getTurnState(
+    db,
+    attempt.puzzleId,
+    config.maxGuesses,
+    attempt.guesses.length,
+    attempt.status,
+    attempt.startedAt,
+    !!attempt.studentId,
+  );
+  const winnerStats = await loadWinnerStats(db, attempt.puzzle.game.boardId);
   return {
     puzzleId: attempt.puzzleId,
     status: attempt.status,
     wordLength: config.wordLength,
     maxGuesses: config.maxGuesses,
     guesses: allGuesses,
-    nextGuessIndex:
-      attempt.status === "IN_PROGRESS" ? attempt.guesses.length + 1 : null,
+    nextGuessIndex: turn.nextGuessIndex,
     absentLetters,
     solvedAtGuess: attempt.solvedAtGuess,
+    turn,
+    winnerStats,
   };
 }

@@ -8,6 +8,7 @@ type Props = {
   pastGuesses: GuessFeedback[];
   pending: string[];
   isKorean: boolean;
+  activeGuessIndex?: number | null;
 };
 
 const LEAD_TO_COMPAT = [
@@ -100,16 +101,25 @@ function displayChar(char: string | undefined, isKorean: boolean): string {
   return char;
 }
 
-export function KordleGrid({ wordLength, maxGuesses, pastGuesses, pending, isKorean }: Props) {
+export function KordleGrid({
+  wordLength,
+  maxGuesses,
+  pastGuesses,
+  pending,
+  isKorean,
+  activeGuessIndex,
+}: Props) {
   const rows: Array<GuessFeedback | string[]> = [];
-  for (let i = 0; i < pastGuesses.length; i++) {
-    rows.push(pastGuesses[i]);
-  }
-  if (rows.length < maxGuesses) {
-    rows.push(pending);
-  }
-  while (rows.length < maxGuesses) {
-    rows.push(new Array<string>(wordLength).fill(""));
+  const activeRow = activeGuessIndex ?? pastGuesses.length + 1;
+  for (let rowIndex = 1; rowIndex <= maxGuesses; rowIndex += 1) {
+    const past = pastGuesses[rowIndex - 1];
+    if (past) {
+      rows.push(past);
+    } else if (rowIndex === activeRow) {
+      rows.push(pending);
+    } else {
+      rows.push(new Array<string>(wordLength).fill(""));
+    }
   }
   return (
     <div

@@ -109,6 +109,26 @@ export function KordleTeacherControls({
     }
   }
 
+  async function stopPuzzle() {
+    if (busy || !puzzleId) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/kordle/boards/${boardId}/puzzle`, {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ action: "stop", puzzleId }),
+      });
+      if (!res.ok) {
+        setError("중단하지 못했습니다");
+        return;
+      }
+      startTransition(() => router.refresh());
+    } finally {
+      setBusy(false);
+    }
+  }
+
   return (
     <div className="kordle-teacher-controls">
       <div className="kordle-locale-toggle" aria-label="꼬들 언어">
@@ -161,6 +181,16 @@ export function KordleTeacherControls({
           disabled={busy || isPending || !puzzleId}
         >
           시작
+        </button>
+      )}
+      {(puzzleStatus === "DRAFT" || puzzleStatus === "LIVE") && (
+        <button
+          type="button"
+          className="kordle-stop-btn"
+          onClick={() => stopPuzzle()}
+          disabled={busy || isPending || !puzzleId}
+        >
+          중단
         </button>
       )}
       {hasCustomWord && (

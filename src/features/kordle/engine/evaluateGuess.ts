@@ -13,6 +13,96 @@
 import { normalizeWord } from "./normalizeWord";
 import type { GuessFeedback, KordleEngineConfig, LetterFeedback, LetterState } from "./types";
 
+const LEAD_TO_COMPAT = [
+  "ㄱ",
+  "ㄲ",
+  "ㄴ",
+  "ㄷ",
+  "ㄸ",
+  "ㄹ",
+  "ㅁ",
+  "ㅂ",
+  "ㅃ",
+  "ㅅ",
+  "ㅆ",
+  "ㅇ",
+  "ㅈ",
+  "ㅉ",
+  "ㅊ",
+  "ㅋ",
+  "ㅌ",
+  "ㅍ",
+  "ㅎ",
+];
+const MEDIAL_TO_COMPAT = [
+  "ㅏ",
+  "ㅐ",
+  "ㅑ",
+  "ㅒ",
+  "ㅓ",
+  "ㅔ",
+  "ㅕ",
+  "ㅖ",
+  "ㅗ",
+  "ㅘ",
+  "ㅙ",
+  "ㅚ",
+  "ㅛ",
+  "ㅜ",
+  "ㅝ",
+  "ㅞ",
+  "ㅟ",
+  "ㅠ",
+  "ㅡ",
+  "ㅢ",
+  "ㅣ",
+];
+const TRAIL_TO_COMPAT = [
+  "ㄱ",
+  "ㄲ",
+  "ㄳ",
+  "ㄴ",
+  "ㄵ",
+  "ㄶ",
+  "ㄷ",
+  "ㄹ",
+  "ㄺ",
+  "ㄻ",
+  "ㄼ",
+  "ㄽ",
+  "ㄾ",
+  "ㄿ",
+  "ㅀ",
+  "ㅁ",
+  "ㅂ",
+  "ㅄ",
+  "ㅅ",
+  "ㅆ",
+  "ㅇ",
+  "ㅈ",
+  "ㅊ",
+  "ㅋ",
+  "ㅌ",
+  "ㅍ",
+  "ㅎ",
+];
+
+function compareChar(char: string, locale: string): string {
+  if (!locale.toLowerCase().startsWith("ko")) return char;
+  const cp = char.codePointAt(0);
+  if (cp === undefined) return char;
+  if (cp >= 0x1100 && cp <= 0x1112) {
+    return LEAD_TO_COMPAT[cp - 0x1100] ?? char;
+  }
+  if (cp >= 0x1161 && cp <= 0x1175) {
+    return MEDIAL_TO_COMPAT[cp - 0x1161] ?? char;
+  }
+  if (cp >= 0x11a8 && cp <= 0x11c2) {
+    return TRAIL_TO_COMPAT[cp - 0x11a8] ?? char;
+  }
+  return char;
+}
+
 export function evaluateGuess(
   solution: string,
   rawGuess: string,
@@ -32,13 +122,17 @@ export function evaluateGuess(
     );
   }
 
+  const solutionChars = [...normalizedSolution];
+  const guessChars = [...normalizedGuess];
+  const solutionKeys = solutionChars.map((char) => compareChar(char, config.locale));
+  const guessKeys = guessChars.map((char) => compareChar(char, config.locale));
   const states: LetterState[] = new Array(config.wordLength).fill("absent");
-  const remaining: Map<number, number> = new Map();
+  const remaining: Map<string, number> = new Map();
 
   // Pass 1: correct (right char + right position).
   for (let i = 0; i < config.wordLength; i++) {
-    const g = normalizedGuess.codePointAt(i) ?? 0;
-    const s = normalizedSolution.codePointAt(i) ?? 0;
+    const g = guessKeys[i];
+    const s = solutionKeys[i];
     if (g === s) {
       states[i] = "correct";
     } else {
@@ -49,7 +143,7 @@ export function evaluateGuess(
   // Pass 2: present (right char, wrong position) / absent.
   for (let i = 0; i < config.wordLength; i++) {
     if (states[i] === "correct") continue;
-    const g = normalizedGuess.codePointAt(i) ?? 0;
+    const g = guessKeys[i];
     const count = remaining.get(g) ?? 0;
     if (count > 0) {
       states[i] = "present";
@@ -63,7 +157,7 @@ export function evaluateGuess(
   // per syllable). The UI is responsible for composing them back to a
   // syllable for display using `recomposeHangul` from normalizeWord.
   const feedback: GuessFeedback = states.map((state, i) => ({
-    char: String.fromCodePoint(normalizedGuess.codePointAt(i) ?? 0),
+    char: guessChars[i] ?? "",
     state,
   }));
 

@@ -27,6 +27,16 @@ export default async function StudentPage() {
             template: true,
           },
         },
+        kordleGame: {
+          select: {
+            puzzles: {
+              where: { status: { in: ["DRAFT", "LIVE"] } },
+              orderBy: { createdAt: "desc" },
+              take: 1,
+              select: { status: true },
+            },
+          },
+        },
       },
       orderBy: { createdAt: "desc" },
     }),
@@ -149,6 +159,10 @@ export default async function StudentPage() {
         thumbnailMode: b.thumbnailMode,
         thumbnailUrl: b.thumbnailUrl,
         quizzes: b.quizzes,
+        kordleStatus:
+          b.layout === "kordle"
+            ? b.kordleGame?.puzzles[0]?.status ?? null
+            : null,
         breakout: linkedBreakout
           ? buildDashboardBreakout({
               board: linkedBreakout.board,

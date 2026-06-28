@@ -19,6 +19,23 @@ export interface KordleEngineConfig {
   locale: string;
 }
 
+export interface KordleWinnerStats {
+  leaderboard: Array<{
+    studentId: string;
+    name: string;
+    wins: number;
+  }>;
+  rounds: Array<{
+    puzzleId: string;
+    roundNumber: number;
+    winners: Array<{
+      studentId: string;
+      name: string;
+    }>;
+    solvedAtGuess: number;
+  }>;
+}
+
 export interface KordleGuessInput {
   guess: string;
   guessIndex: number; // 1-based
@@ -47,4 +64,13 @@ export interface KordlePublicState {
   absentLetters: string[];
   // If WON/LOST, the winning guess index or the last guess respectively.
   solvedAtGuess: number | null;
+  turn: {
+    currentGuessIndex: number | null;
+    nextGuessIndex: number | null;
+    submittedCount: number;
+    totalCount: number;
+    isWaiting: boolean;
+    isPendingJoin: boolean;
+  };
+  winnerStats: KordleWinnerStats;
 }

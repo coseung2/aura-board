@@ -2,13 +2,28 @@ import { notFound, redirect } from "next/navigation";
 import { db } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
 import { getCurrentStudent } from "@/lib/student-auth";
+import { BoardHeader } from "@/components/BoardHeader";
 import { KordleBoard } from "@/features/kordle/components/KordleBoard";
 import { KordleLiveToasts } from "@/features/kordle/components/KordleLiveToasts";
 import { KordleWaitingRoom } from "@/features/kordle/components/KordleWaitingRoom";
 import { ensureAttempt, getPublicState } from "@/features/kordle/server/kordleServer";
+import type { BoardTheme } from "@/components/BoardSettingsPanel";
 import "@/features/kordle/components/kordle.css";
 
 type Props = { params: Promise<{ id: string }> };
+
+function normalizeBoardTheme(value: string | null | undefined): BoardTheme {
+  switch (value) {
+    case "pastel-peach":
+    case "pastel-mint":
+    case "pastel-sky":
+    case "pastel-lilac":
+    case "pastel-lemon":
+      return value;
+    default:
+      return "pastel-sky";
+  }
+}
 
 // BC-2: a Kordle play page. Student-facing daily play surface. If a
 // teacher hits this URL we redirect to the board page so the same link
@@ -25,12 +40,29 @@ export default async function KordlePlayPage({ params }: Props) {
     select: {
       id: true,
       slug: true,
+      title: true,
+      layout: true,
+      boardTheme: true,
       classroomId: true,
       classroom: { select: { teacherId: true } },
     },
   });
   if (!board) notFound();
   const boardId = board.id;
+  const boardTheme = normalizeBoardTheme(board.boardTheme);
+
+  const student = await getCurrentStudent();
+  if (!student) {
+    // Teacher fallback: same link, no student session.
+    const user = await getCurrentUser();
+    if (user && board.classroom?.teacherId === user.id) {
+      redirect(`/board/${board.slug ?? boardId}`);
+    }
+    notFound();
+  }
+  if (board.classroomId !== student.classroomId) {
+    notFound();
+  }
 
   const game = await db.kordleGame.findUnique({
     where: { boardId },
@@ -47,20 +79,19 @@ export default async function KordlePlayPage({ params }: Props) {
   if (!game) notFound();
   const puzzle = game.puzzles[0];
   if (!puzzle) {
-    return <KordleWaitingRoom boardId={boardId} />;
-  }
-
-  const student = await getCurrentStudent();
-  if (!student) {
-    // Teacher fallback: same link, no student session.
-    const user = await getCurrentUser();
-    if (user && board.classroom?.teacherId === user.id) {
-      redirect(`/board/${board.slug ?? boardId}`);
-    }
-    notFound();
-  }
-  if (board.classroomId !== student.classroomId) {
-    notFound();
+    return (
+      <main className="board-page" data-board-theme={boardTheme}>
+        <BoardHeader
+          boardId={boardId}
+          title={board.title}
+          layout={board.layout}
+          isStudent
+          backHref="/student"
+          canEdit={false}
+        />
+        <KordleWaitingRoom boardId={boardId} />
+      </main>
+    );
   }
 
   const attemptId = await ensureAttempt({
@@ -73,7 +104,15 @@ export default async function KordlePlayPage({ params }: Props) {
   if (!state) notFound();
 
   return (
-    <main>
+    <main className="board-page" data-board-theme={boardTheme}>
+      <BoardHeader
+        boardId={boardId}
+        title={board.title}
+        layout={board.layout}
+        isStudent
+        backHref="/student"
+        canEdit={false}
+      />
       <KordleBoard
         boardId={boardId}
         attemptId={attemptId}

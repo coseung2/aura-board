@@ -15,6 +15,39 @@ type Props = {
 
 type Status = KordlePublicState["status"];
 
+function KordleWinnerInfo({ stats }: { stats: KordlePublicState["winnerStats"] }) {
+  const latestRound = stats.rounds[0] ?? null;
+  return (
+    <aside className="kordle-winner-info" aria-label="꼬들 우승 기록">
+      <div className="kordle-winner-section">
+        <p className="kordle-winner-label">우승 기록</p>
+        {stats.leaderboard.length > 0 ? (
+          <ol className="kordle-winner-list">
+            {stats.leaderboard.map((winner) => (
+              <li key={winner.studentId}>
+                <span>{winner.name}</span>
+                <strong>{winner.wins}승</strong>
+              </li>
+            ))}
+          </ol>
+        ) : (
+          <p className="kordle-winner-empty">아직 우승자가 없습니다</p>
+        )}
+      </div>
+      {latestRound && (
+        <div className="kordle-winner-section">
+          <p className="kordle-winner-label">최근 회차</p>
+          <p className="kordle-round-winner">
+            <span>{latestRound.roundNumber}회차</span>
+            <strong>{latestRound.winners.map((winner) => winner.name).join(", ")}</strong>
+            <small>{latestRound.solvedAtGuess}줄 만에 성공</small>
+          </p>
+        </div>
+      )}
+    </aside>
+  );
+}
+
 // Korean on-screen typing is jamo-based. The engine normalizes Korean into a
 // flat jamo stream (lead U+1100..U+1112, medial U+1161..U+1175,
 // trail U+11A8..U+11C2) and `state.wordLength` is that jamo code-point length,
@@ -217,6 +250,8 @@ function guessErrorMessage(reason: string, wordLength: number): string {
       return "아직 시작되지 않았거나 종료된 문제예요";
     case "no_attempts_left":
       return "더 이상 시도할 수 없어요";
+    case "waiting_for_turn":
+      return "다른 친구들이 제출하면 다음 줄로 넘어갑니다";
     case "forbidden":
     case "unauthenticated":
       return "참여 권한을 확인해 주세요";
@@ -273,6 +308,49 @@ export function KordleBoard({ boardId, initialState, attemptId, locale }: Props)
   }, [state.guesses]);
 
   const isComplete = state.status === "WON" || state.status === "LOST";
+  const isWaitingForTurn =
+    !isComplete && state.turn.currentGuessIndex !== null && state.turn.isWaiting;
+  const canType =
+    !isComplete &&
+    !submitting &&
+    state.turn.currentGuessIndex !== null &&
+    state.nextGuessIndex === state.turn.currentGuessIndex;
+
+  useEffect(() => {
+    if (!isWaitingForTurn) return;
+    let cancelled = false;
+    let timer: number | null = null;
+
+    async function poll() {
+      try {
+        const res = await fetch(`/api/kordle/attempts/${attemptId}`, {
+          cache: "no-store",
+        });
+        if (res.ok) {
+          const data = (await res.json().catch(() => null)) as {
+            state?: KordlePublicState;
+          } | null;
+          if (!cancelled && data?.state) {
+            setState(data.state);
+            if (!data.state.turn.isWaiting) {
+              setError(null);
+              return;
+            }
+          }
+        }
+      } finally {
+        if (!cancelled) {
+          timer = window.setTimeout(poll, 1200);
+        }
+      }
+    }
+
+    timer = window.setTimeout(poll, 900);
+    return () => {
+      cancelled = true;
+      if (timer !== null) window.clearTimeout(timer);
+    };
+  }, [attemptId, isWaitingForTurn]);
 
   const submit = useCallback(async () => {
     if (submitting || isComplete) return;
@@ -311,7 +389,7 @@ export function KordleBoard({ boardId, initialState, attemptId, locale }: Props)
 
   const onKey = useCallback(
     (key: string) => {
-      if (isComplete || submitting) return;
+      if (!canType) return;
       if (key === "ENTER") {
         // Refuse to submit a half-formed Korean syllable.
         if (isKorean && buffer.length > 0 && !isCompleteSyllable(buffer)) {
@@ -417,7 +495,7 @@ export function KordleBoard({ boardId, initialState, attemptId, locale }: Props)
       if (pending.length >= state.wordLength) return;
       setPending((p) => [...p, key]);
     },
-    [buffer, isComplete, isKorean, pending.length, state.wordLength, submit, submitting],
+    [buffer, canType, isKorean, pending.length, state.wordLength, submit],
   );
 
   useEffect(() => {
@@ -443,32 +521,43 @@ export function KordleBoard({ boardId, initialState, attemptId, locale }: Props)
   const displaySlots: string[] = [...pending, ...buffer];
 
   return (
-    <div className="kordle-board" data-locale={activeLocale} aria-label="Kordle game">
-      <KordleGrid
-        wordLength={state.wordLength}
-        maxGuesses={state.maxGuesses}
-        pastGuesses={state.guesses}
-        pending={displaySlots}
-        isKorean={isKorean}
-      />
-      {error && (
-        <p className="kordle-error" role="alert">
-          {error}
-        </p>
-      )}
-      <KordleKeyboard
-        locale={activeLocale}
-        letterStates={letterStates}
-        onKey={onKey}
-        disabled={submitting || isComplete}
-      />
-      {isComplete && (
-        <KordleResultModal
-          status={state.status as Status}
-          solvedAtGuess={state.solvedAtGuess}
-          totalGuesses={state.guesses.length}
+    <div className="kordle-play-layout">
+      <KordleWinnerInfo stats={state.winnerStats} />
+      <div className="kordle-board" data-locale={activeLocale} aria-label="Kordle game">
+        <KordleGrid
+          wordLength={state.wordLength}
+          maxGuesses={state.maxGuesses}
+          pastGuesses={state.guesses}
+          pending={displaySlots}
+          isKorean={isKorean}
+          activeGuessIndex={state.nextGuessIndex}
         />
-      )}
+        {error && (
+          <p className="kordle-error" role="alert">
+            {error}
+          </p>
+        )}
+        {isWaitingForTurn && (
+          <p className="kordle-turn-wait" role="status">
+            {state.turn.isPendingJoin
+              ? "다음 턴이 시작되면 입장합니다"
+              : `${state.turn.submittedCount}/${state.turn.totalCount}명 제출 완료`}
+          </p>
+        )}
+        <KordleKeyboard
+          locale={activeLocale}
+          letterStates={letterStates}
+          onKey={onKey}
+          disabled={!canType}
+        />
+        {isComplete && (
+          <KordleResultModal
+            status={state.status as Status}
+            solvedAtGuess={state.solvedAtGuess}
+            totalGuesses={state.guesses.length}
+          />
+        )}
+      </div>
     </div>
   );
 }

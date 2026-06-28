@@ -19,6 +19,7 @@ type BoardItem = {
   thumbnailMode?: string | null;
   thumbnailUrl?: string | null;
   quizzes?: { roomCode: string; status: string }[];
+  kordleStatus?: string | null;
   breakout?: StudentBreakout | null;
 };
 
@@ -268,6 +269,14 @@ function StudentBoardSections({
   const renderCard = (board: BoardItem) => {
     const thumbnail = boardThumbnail(board);
     const quizCode = board.layout === "quiz" && board.quizzes?.[0]?.roomCode;
+    const kordleMeta =
+      board.layout === "kordle"
+        ? board.kordleStatus === "LIVE"
+          ? "꼬들 · 게임 진행 중"
+          : board.kordleStatus === "DRAFT"
+            ? "꼬들 · 시작 대기"
+            : "꼬들 · 게임 없음"
+        : null;
     const href = quizCode
       ? `/quiz/${quizCode}`
       : board.layout === "kordle"
@@ -318,7 +327,7 @@ function StudentBoardSections({
         <div className="student-board-card-body">
           <span className="student-board-card-title">{board.title}</span>
           <span className="student-board-card-meta">
-            {layoutLabel(board.layout)}
+            {kordleMeta ?? layoutLabel(board.layout)}
             {quizCode && " · 참여하기"}
           </span>
         </div>

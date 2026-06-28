@@ -70,6 +70,18 @@ describe("evaluateGuess — Korean", () => {
     const r = evaluateGuess("사강", "사강", { ...koConfig, wordLength: 5 });
     expect(r.isCorrect).toBe(true);
   });
+
+  it("compares Korean jamo by visible letter, not lead/trail code point", () => {
+    const r = evaluateGuess("책상", "막말", { ...koConfig, wordLength: 6 });
+    expect(r.feedback.map((f) => f.state)).toEqual([
+      "absent",
+      "absent",
+      "correct",
+      "absent",
+      "correct",
+      "absent",
+    ]);
+  });
 });
 
 describe("isAllHangulJamos", () => {
