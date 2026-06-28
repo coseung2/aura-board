@@ -50,10 +50,24 @@ export async function GET(_req: Request, { params }: Params) {
       locale: true,
       board: { select: { classroomId: true } },
       puzzles: {
-        where: { status: { in: ["LIVE", "SCHEDULED"] } },
-        orderBy: { startsAt: "desc" },
+        where: { status: { in: ["DRAFT", "LIVE", "SCHEDULED"] } },
+        orderBy: { createdAt: "desc" },
         take: 1,
-        select: { id: true, status: true, startsAt: true, endsAt: true },
+        select: {
+          id: true,
+          status: true,
+          startsAt: true,
+          endsAt: true,
+          attempts: {
+            where: { studentId: { not: null } },
+            orderBy: { startedAt: "asc" },
+            select: {
+              id: true,
+              startedAt: true,
+              student: { select: { id: true, name: true } },
+            },
+          },
+        },
       },
     },
   });
@@ -69,7 +83,21 @@ export async function GET(_req: Request, { params }: Params) {
     wordLength: game.wordLength,
     maxGuesses: game.maxGuesses,
     locale: game.locale,
-    puzzle,
+    puzzle: puzzle
+      ? {
+          id: puzzle.id,
+          status: puzzle.status,
+          startsAt: puzzle.startsAt,
+          endsAt: puzzle.endsAt,
+          participants: puzzle.attempts
+            .filter((attempt) => attempt.student)
+            .map((attempt) => ({
+              id: attempt.student!.id,
+              name: attempt.student!.name,
+              joinedAt: attempt.startedAt.toISOString(),
+            })),
+        }
+      : null,
   });
 }
 

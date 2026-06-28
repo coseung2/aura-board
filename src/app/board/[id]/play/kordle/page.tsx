@@ -69,8 +69,8 @@ export default async function KordlePlayPage({ params }: Props) {
     select: {
       locale: true,
       puzzles: {
-        where: { status: "LIVE" },
-        orderBy: { startsAt: "desc" },
+        where: { status: { in: ["DRAFT", "LIVE"] } },
+        orderBy: { createdAt: "desc" },
         take: 1,
         select: { id: true },
       },
@@ -100,6 +100,27 @@ export default async function KordlePlayPage({ params }: Props) {
     vibePlaySessionId: null,
     teacherUserId: null,
   });
+
+  const livePuzzle = await db.kordlePuzzle.findUnique({
+    where: { id: puzzle.id },
+    select: { status: true },
+  });
+  if (livePuzzle?.status !== "LIVE") {
+    return (
+      <main className="board-page" data-board-theme={boardTheme}>
+        <BoardHeader
+          boardId={boardId}
+          title={board.title}
+          layout={board.layout}
+          isStudent
+          backHref="/student"
+          canEdit={false}
+        />
+        <KordleWaitingRoom boardId={boardId} />
+      </main>
+    );
+  }
+
   const state = await getPublicState({ attemptId, studentId: student.id });
   if (!state) notFound();
 

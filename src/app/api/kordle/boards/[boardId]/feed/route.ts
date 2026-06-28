@@ -53,8 +53,8 @@ export async function GET(req: Request, { params }: Params) {
     where: { boardId: board.id },
     select: {
       puzzles: {
-        where: { status: "LIVE" },
-        orderBy: { startsAt: "desc" },
+        where: { status: { in: ["DRAFT", "LIVE", "CLOSED"] } },
+        orderBy: { createdAt: "desc" },
         take: 1,
         select: { id: true },
       },

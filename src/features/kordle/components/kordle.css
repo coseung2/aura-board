@@ -317,6 +317,28 @@
   margin: 0;
 }
 
+.kordle-participant-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  color: var(--color-text-muted, #64748b);
+  font-size: 13px;
+  font-weight: 750;
+}
+
+.kordle-participant-list div,
+.kordle-waiting-participants div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.kordle-participant-list strong,
+.kordle-waiting-participants strong {
+  color: var(--color-text, #0f172a);
+  font-size: 13px;
+}
+
 .kordle-grid {
   display: grid;
   grid-template-rows: repeat(var(--kordle-rows, 6), 1fr);
@@ -511,6 +533,20 @@
   margin: 8px 0 0;
   color: var(--color-text-muted, #64748b);
   font-size: 14px;
+}
+
+.kordle-waiting-participants {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 18px;
+  color: var(--color-text-muted, #64748b);
+  font-size: 13px;
+  font-weight: 750;
+}
+
+.kordle-waiting-participants div {
+  justify-content: center;
 }
 
 @media (max-width: 760px) {

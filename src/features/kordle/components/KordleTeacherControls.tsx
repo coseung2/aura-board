@@ -37,6 +37,7 @@ export function KordleTeacherControls({
 
   const hasCustomWord = solution.trim().length > 0;
   const customWordInvalid = hasCustomWord && normalizedLength !== WORD_LENGTH;
+  const roundEnded = puzzleStatus === "CLOSED";
 
   function applyLocale(nextLocale: KordleLocale) {
     setLocale(nextLocale);
@@ -163,7 +164,7 @@ export function KordleTeacherControls({
         onClick={() => createPuzzle(false)}
         disabled={busy || isPending || customWordInvalid || !hasCustomWord}
       >
-        생성
+        {roundEnded ? "다음 라운드" : "생성"}
       </button>
       <button
         type="button"
@@ -171,7 +172,7 @@ export function KordleTeacherControls({
         onClick={() => createPuzzle(true)}
         disabled={busy || isPending}
       >
-        랜덤
+        {roundEnded ? "랜덤 다음 라운드" : "랜덤"}
       </button>
       {puzzleStatus === "DRAFT" && (
         <button

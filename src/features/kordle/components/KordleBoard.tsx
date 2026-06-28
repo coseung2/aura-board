@@ -317,7 +317,7 @@ export function KordleBoard({ boardId, initialState, attemptId, locale }: Props)
     state.nextGuessIndex === state.turn.currentGuessIndex;
 
   useEffect(() => {
-    if (!isWaitingForTurn) return;
+    if (isComplete) return;
     let cancelled = false;
     let timer: number | null = null;
 
@@ -345,12 +345,12 @@ export function KordleBoard({ boardId, initialState, attemptId, locale }: Props)
       }
     }
 
-    timer = window.setTimeout(poll, 900);
+    timer = window.setTimeout(poll, isWaitingForTurn ? 900 : 2500);
     return () => {
       cancelled = true;
       if (timer !== null) window.clearTimeout(timer);
     };
-  }, [attemptId, isWaitingForTurn]);
+  }, [attemptId, isComplete, isWaitingForTurn]);
 
   const submit = useCallback(async () => {
     if (submitting || isComplete) return;

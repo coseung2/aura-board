@@ -540,9 +540,13 @@ export async function getPublicState(opts: {
     !!attempt.studentId,
   );
   const winnerStats = await loadWinnerStats(db, attempt.puzzle.game.boardId);
+  const status =
+    attempt.status === "IN_PROGRESS" && attempt.puzzle.status === "CLOSED"
+      ? "LOST"
+      : attempt.status;
   return {
     puzzleId: attempt.puzzleId,
-    status: attempt.status,
+    status,
     wordLength: config.wordLength,
     maxGuesses: config.maxGuesses,
     guesses: allGuesses,

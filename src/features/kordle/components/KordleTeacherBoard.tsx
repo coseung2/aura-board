@@ -77,6 +77,14 @@ export async function KordleTeacherBoard({ boardId, teacherUserId }: Props) {
           startsAt: true,
           endsAt: true,
           solutionWord: { select: { text: true } },
+          attempts: {
+            where: { studentId: { not: null } },
+            orderBy: { startedAt: "asc" },
+            select: {
+              id: true,
+              student: { select: { id: true, name: true } },
+            },
+          },
           _count: { select: { attempts: true } },
         },
       },
@@ -96,6 +104,14 @@ export async function KordleTeacherBoard({ boardId, teacherUserId }: Props) {
 
   const puzzle = game.puzzles[0] ?? null;
   const attemptCount = puzzle?._count.attempts ?? 0;
+  const puzzleSummaryText =
+    puzzle?.status === "DRAFT"
+      ? "시작 대기 중"
+      : puzzle?.status === "CLOSED"
+        ? "라운드 종료"
+        : puzzle?.startsAt
+          ? `시작 ${puzzle.startsAt.toLocaleString("ko-KR")}`
+          : "바로 플레이 가능";
 
   if (puzzle?.status === "LIVE") {
     const attemptId = await ensureAttempt({
@@ -171,16 +187,25 @@ export async function KordleTeacherBoard({ boardId, teacherUserId }: Props) {
               </div>
             </dl>
 
+            {puzzle && puzzle.attempts.length > 0 && (
+              <div className="kordle-participant-list">
+                <span>입장한 학생</span>
+                <div>
+                  {puzzle.attempts.map((attempt) =>
+                    attempt.student ? (
+                      <strong key={attempt.student.id}>{attempt.student.name}</strong>
+                    ) : null,
+                  )}
+                </div>
+              </div>
+            )}
+
             {puzzle ? (
               <div className="kordle-puzzle-summary">
                 <span>현재 퍼즐</span>
                 <strong>{puzzle.solutionWord.text}</strong>
                 <small>
-                  {puzzle.status === "DRAFT"
-                    ? "시작 대기 중"
-                    : puzzle.startsAt
-                    ? `시작 ${puzzle.startsAt.toLocaleString("ko-KR")}`
-                    : "바로 플레이 가능"}
+                  {puzzleSummaryText}
                 </small>
               </div>
             ) : (
