@@ -1,9 +1,8 @@
 "use client";
 
-import { CardBody } from "../cards/CardBody";
 import { ContextMenu, type MenuItem } from "../ContextMenu";
 import type { PortfolioCardDTO } from "@/lib/portfolio-dto";
-import { portfolioCardToCardData } from "./portfolio-card-adapter";
+import { PortfolioCardSurface } from "./PortfolioCardSurface";
 import { buildSourceLabel } from "./source-label";
 
 type Props = {
@@ -27,7 +26,6 @@ export function PortfolioCardItem({
     boardLayout: card.sourceBoard.layout,
     sectionTitle: card.sourceSection?.title ?? null,
   });
-  const cardData = portfolioCardToCardData(card);
 
   const menuItems: MenuItem[] = [];
   if (canToggleShowcase) {
@@ -44,28 +42,12 @@ export function PortfolioCardItem({
     });
   }
 
-  function handleKeyDown(e: React.KeyboardEvent) {
-    if (e.key === "Enter" || e.key === " ") {
-      e.preventDefault();
-      onOpen(card);
-    }
-  }
-
   return (
-    <article
-      className={`padlet-card is-static is-clickable portfolio-card ${
-        card.isShowcasedByMe ? "is-showcased-mine" : ""
-      }`}
-      style={{
-        width: cardData.width,
-        minHeight: cardData.height,
-        backgroundColor: cardData.color ?? undefined,
-      }}
-      tabIndex={0}
-      role="button"
-      aria-label={`${card.title || "제목 없음"} - ${sourceLabel}, 자세히 보기`}
-      onClick={() => onOpen(card)}
-      onKeyDown={handleKeyDown}
+    <PortfolioCardSurface
+      card={card}
+      className={`portfolio-card ${card.isShowcasedByMe ? "is-showcased-mine" : ""}`}
+      ariaLabel={`${card.title || "제목 없음"} - ${sourceLabel}, 자세히 보기`}
+      onOpen={() => onOpen(card)}
     >
       {(card.isShowcasedByMe || card.hasAnyShowcase) && (
         <span
@@ -85,7 +67,6 @@ export function PortfolioCardItem({
           <ContextMenu items={menuItems} />
         </div>
       )}
-      <CardBody card={cardData} boardId={card.sourceBoard.id} />
-    </article>
+    </PortfolioCardSurface>
   );
 }

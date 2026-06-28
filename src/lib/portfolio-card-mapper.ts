@@ -30,9 +30,18 @@ type PrismaCardLike = {
   fileName: string | null;
   fileSize: number | null;
   fileMimeType: string | null;
+  externalAuthorName: string | null;
   createdAt: Date;
+  author: { name: string } | null;
+  studentAuthor: { name: string } | null;
   board: { id: string; slug: string; title: string; layout: string; anonymousAuthor: boolean };
   section: { id: string; title: string } | null;
+  authors: Array<{
+    id: string;
+    studentId: string | null;
+    displayName: string;
+    order: number;
+  }>;
   attachments: Array<{
     id: string;
     kind: string;
@@ -44,6 +53,7 @@ type PrismaCardLike = {
     order: number;
   }>;
   showcaseEntries: Array<{ studentId: string }>;
+  _count: { likes: number; comments: number };
 };
 
 export function mapPortfolioCard(
@@ -72,6 +82,17 @@ export function mapPortfolioCard(
     fileName: card.fileName,
     fileSize: card.fileSize,
     fileMimeType: card.fileMimeType,
+    externalAuthorName: card.externalAuthorName,
+    studentAuthorName: card.studentAuthor?.name ?? null,
+    authorName: card.author?.name ?? null,
+    likeCount: card._count.likes,
+    commentCount: card._count.comments,
+    authors: card.authors.map((a) => ({
+      id: a.id,
+      studentId: a.studentId,
+      displayName: a.displayName,
+      order: a.order,
+    })),
     attachments: card.attachments.map((a) => ({
       id: a.id,
       kind: a.kind,

@@ -359,6 +359,47 @@
   position: relative;
   cursor: pointer;
 }
+.portfolio-card:has(.card-attachments),
+.showcase-chip:has(.card-attachments) {
+  padding-top: 0;
+  overflow: hidden;
+}
+.portfolio-card:has(> .card-ctx-menu):has(.card-attachments),
+.showcase-chip:has(> .card-ctx-menu):has(.card-attachments) {
+  padding-top: 0;
+}
+.portfolio-card:has(.card-attachments) .card-attachments,
+.showcase-chip:has(.card-attachments) .card-attachments {
+  margin: 0 -18px 14px;
+}
+.portfolio-card .card-attachments > :first-child,
+.portfolio-card .card-attach-image,
+.portfolio-card .card-attach-video,
+.portfolio-card .card-link-preview,
+.portfolio-card .card-canva-slot-frame,
+.showcase-chip .card-attachments > :first-child,
+.showcase-chip .card-attach-image,
+.showcase-chip .card-attach-video,
+.showcase-chip .card-link-preview,
+.showcase-chip .card-canva-slot-frame {
+  border-radius: var(--radius-card) var(--radius-card) 0 0 !important;
+  overflow: hidden !important;
+}
+.portfolio-card .card-attach-image.optimized-img-wrap,
+.portfolio-card .card-link-preview-image.optimized-img-wrap,
+.showcase-chip .card-attach-image.optimized-img-wrap,
+.showcase-chip .card-link-preview-image.optimized-img-wrap {
+  border-radius: var(--radius-card) var(--radius-card) 0 0 !important;
+  overflow: hidden !important;
+}
+.portfolio-card .card-attach-image.optimized-img-wrap img,
+.portfolio-card .card-link-preview-image.optimized-img-wrap img,
+.portfolio-card .card-canva-slot-thumbnail,
+.showcase-chip .card-attach-image.optimized-img-wrap img,
+.showcase-chip .card-link-preview-image.optimized-img-wrap img,
+.showcase-chip .card-canva-slot-thumbnail {
+  border-radius: inherit;
+}
 .portfolio-card:focus-visible {
   outline: 2px solid var(--color-accent-tinted-text);
   outline-offset: 2px;

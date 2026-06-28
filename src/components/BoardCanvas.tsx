@@ -10,6 +10,7 @@ import { ContextMenu } from "./ContextMenu";
 import { EditCardModal, type EditCardUpdates } from "./EditCardModal";
 import type { CardData } from "./DraggableCard";
 import { useCardRealtime } from "@/hooks/useCardRealtime";
+import { formatAuthorList } from "@/lib/card-author";
 import {
   AuraEvaluationControl,
   type AuraBoardSettings,
@@ -305,7 +306,15 @@ export function BoardCanvas({
             tabIndex={0}
             role="button"
           >
-            <CardBody card={c} boardId={boardId} />
+            <CardBody
+              card={c}
+              boardId={boardId}
+              onEditAuthors={
+                canEdit || c.studentAuthorId === currentUserId
+                  ? () => setAuthorEditCard(c)
+                  : undefined
+              }
+            />
             {showAuraControl && (
               <AuraEvaluationControl
                 cardId={c.id}
@@ -394,20 +403,30 @@ export function BoardCanvas({
             order: a.order,
           }))}
           onSaved={(authors: SavedAuthor[]) => {
+            const authorPatch: Partial<CardData> = {
+              authors,
+              studentAuthorId: authors[0]?.studentId ?? null,
+              externalAuthorName:
+                authors.length > 0
+                  ? formatAuthorList(authors, null, null, null)
+                  : null,
+            };
             setCards((prev) =>
               prev.map((c) =>
                 c.id === authorEditCard.id
-                  ? {
-                      ...c,
-                      authors,
-                      studentAuthorId: authors[0]?.studentId ?? null,
-                      externalAuthorName:
-                        authors.length > 0
-                          ? authors.map((a) => a.displayName).join(", ")
-                          : c.externalAuthorName,
-                    }
+                  ? { ...c, ...authorPatch }
                   : c,
               ),
+            );
+            setOpenCard((current) =>
+              current?.id === authorEditCard.id
+                ? { ...current, ...authorPatch }
+                : current,
+            );
+            setAuthorEditCard((current) =>
+              current?.id === authorEditCard.id
+                ? { ...current, ...authorPatch }
+                : current,
             );
           }}
           onClose={() => setAuthorEditCard(null)}

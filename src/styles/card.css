@@ -6,7 +6,7 @@
   border: var(--border-card);
   border-radius: var(--radius-card);
   box-shadow: var(--shadow-card);
-  padding: 16px 18px 18px;
+  padding: 12px 18px 18px;
   /* IMPORTANT: do not transition `transform` — dnd-kit updates it per frame
      during drag; transitioning causes visible lag-then-jump. */
   transition: box-shadow 180ms ease, border-color 180ms ease;
@@ -98,11 +98,14 @@
 .card-author-chip {
   display: inline-flex;
   align-items: center;
-  background: var(--color-accent-tinted-bg);
-  color: var(--color-accent-tinted-text);
-  border-radius: var(--radius-pill);
-  padding: 2px 8px;
-  max-width: 120px;
+  padding: 0;
+  background: transparent;
+  border-radius: 0;
+  color: var(--color-text);
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1;
+  max-width: 160px;
   pointer-events: none;
 }
 
@@ -502,14 +505,14 @@
 .grid-card:has(> .card-ctx-menu),
 .stream-card:has(> .card-ctx-menu),
 .padlet-card:has(> .card-ctx-menu) {
-  padding-top: 40px;
+  padding-top: 12px;
 }
 @media (pointer: coarse) {
   .column-card:has(> .card-ctx-menu),
   .grid-card:has(> .card-ctx-menu),
   .stream-card:has(> .card-ctx-menu),
   .padlet-card:has(> .card-ctx-menu) {
-    padding-top: 56px;
+    padding-top: 12px;
   }
 }
 
@@ -822,10 +825,10 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 6px 10px;
-  background: var(--color-bg);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-btn);
+  padding: 0;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
 }
 .card-author-primary-badge {
   width: 24px;
@@ -906,32 +909,34 @@
   border-radius: var(--radius-btn);
   padding: 8px 12px;
 }
-.card-detail-edit-authors {
-  align-self: flex-start;
+.card-detail-edit-authors,
+.card-author-edit-action {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: var(--control-inline-gap);
   margin-top: 0;
   width: auto;
-  min-height: 22px;
-  padding: 2px 8px;
-  font-size: 12px;
-  line-height: 1.4;
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-pill);
+  min-height: 24px;
+  padding: 0;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
   color: var(--color-text-muted);
   cursor: pointer;
   font-family: inherit;
+  transition: color 120ms ease;
 }
-.card-detail-edit-authors img.emoji {
+.card-detail-edit-authors img.emoji,
+.card-author-edit-action img.emoji {
   margin: 0;
 }
-.card-detail-edit-authors:hover {
+.card-detail-edit-authors:hover,
+.card-author-edit-action:hover {
   color: var(--color-text);
-  border-color: var(--color-border-hover);
-  background: var(--color-surface-alt);
 }
 
 /* Placeholder shown in CanvaEmbedSlot when we don't have an oEmbed

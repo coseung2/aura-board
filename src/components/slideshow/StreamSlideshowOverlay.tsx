@@ -571,10 +571,8 @@ function resolveSlideshowTitle(
 }
 
 /**
- * Build media items for a slide. Mirrors StreamMediaCarousel's
- * buildMediaItems logic (attachments, then legacy imageUrl/videoUrl) and
- * adds a link-preview-image fallback so a link-only post still has a
- * visual on the right panel.
+ * Build media items for a slide from the same card fields used by CardBody:
+ * attachments first, then legacy imageUrl/videoUrl and link-preview fallback.
  */
 function buildSlideshowMedia(card: CardData): MediaItem[] {
   const linkedYouTubeId = card.linkUrl ? extractVideoId(card.linkUrl) : null;

@@ -23,6 +23,17 @@ export type PortfolioCardDTO = {
   fileName: string | null;
   fileSize: number | null;
   fileMimeType: string | null;
+  externalAuthorName: string | null;
+  studentAuthorName: string | null;
+  authorName: string | null;
+  likeCount: number;
+  commentCount: number;
+  authors: Array<{
+    id: string;
+    studentId: string | null;
+    displayName: string;
+    order: number;
+  }>;
   attachments: Array<{
     id: string;
     kind: string;

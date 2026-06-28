@@ -1,15 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { formatRelativeTime } from "@/lib/card-engagement-format";
-import { buildCanvaEmbedSrc } from "@/lib/canva";
-import { extractVideoId } from "@/lib/youtube";
-import { CardFileAttachment } from "../CardFileAttachment";
+import { CardBody } from "../cards/CardBody";
+import { CardEngagement } from "../engagement/CardEngagement";
 import type { CardData } from "../DraggableCard";
 import { getStreamAuthor } from "./stream-author";
-import { StreamEngagement } from "./StreamEngagement";
-import { StreamLinkPreview } from "./StreamLinkPreview";
-import { StreamMediaCarousel } from "./StreamMediaCarousel";
 
 type Props = {
   card: CardData;
@@ -40,41 +36,6 @@ export function StreamPost({
 }: Props) {
   const [menuOpen, setMenuOpen] = useState(false);
   const author = getStreamAuthor(card);
-  const fileAttachments = (card.attachments ?? []).filter((item) => item.kind === "file");
-  const isYouTubeVideo = Boolean(card.linkUrl && extractVideoId(card.linkUrl));
-  const isCanvaDesign = Boolean(card.linkUrl && buildCanvaEmbedSrc(card.linkUrl));
-  const isArticleLink = Boolean(card.linkUrl && !isYouTubeVideo && !isCanvaDesign);
-  const [resolvedYouTubeTitle, setResolvedYouTubeTitle] = useState<string | null>(null);
-  const displayTitle =
-    isYouTubeVideo && card.linkTitle?.trim()
-      ? card.linkTitle.trim()
-      : isYouTubeVideo && resolvedYouTubeTitle
-        ? resolvedYouTubeTitle
-      : isArticleLink && card.linkTitle?.trim()
-        ? card.linkTitle.trim()
-      : card.title.trim();
-
-  useEffect(() => {
-    if (!isYouTubeVideo || card.linkTitle?.trim() || !card.linkUrl) {
-      setResolvedYouTubeTitle(null);
-      return;
-    }
-    let alive = true;
-    fetch(`/api/link-preview?url=${encodeURIComponent(card.linkUrl)}`, {
-      cache: "no-store",
-    })
-      .then((res) => (res.ok ? res.json() : null))
-      .then((data: { title?: string | null } | null) => {
-        if (!alive) return;
-        setResolvedYouTubeTitle(data?.title?.trim() || null);
-      })
-      .catch(() => {
-        if (alive) setResolvedYouTubeTitle(null);
-      });
-    return () => {
-      alive = false;
-    };
-  }, [card.linkTitle, card.linkUrl, isYouTubeVideo]);
 
   return (
     <article
@@ -168,43 +129,27 @@ export function StreamPost({
         )}
       </header>
 
-      <StreamMediaCarousel card={card} />
-      {isArticleLink && <StreamLinkPreview card={card} variant="hero" mediaOnly />}
-
       <div className="stream-post-body">
-        {displayTitle && <h2>{displayTitle}</h2>}
-        {card.content.trim() && <p>{card.content}</p>}
-        {!isYouTubeVideo && !isArticleLink && <StreamLinkPreview card={card} />}
-        {card.fileUrl && (
-          <div className="stream-file-list">
-            <CardFileAttachment
-              fileUrl={card.fileUrl}
-              fileName={card.fileName ?? null}
-              fileSize={card.fileSize ?? null}
-              fileMimeType={card.fileMimeType ?? null}
-            />
-          </div>
-        )}
-        {fileAttachments.length > 0 && (
-          <div className="stream-file-list">
-            {fileAttachments.map((file) => (
-              <CardFileAttachment
-                key={file.id}
-                fileUrl={file.url}
-                fileName={file.fileName ?? null}
-                fileSize={file.fileSize ?? null}
-                fileMimeType={file.mimeType ?? null}
-              />
-            ))}
-          </div>
-        )}
+        <CardBody
+          card={card}
+          titleAs="h2"
+          showAuthorFooter={false}
+          showEngagement={false}
+          contentDisplay="full"
+          boardId={boardId}
+        />
       </div>
 
-      <div onClick={(event) => event.stopPropagation()}>
-        <StreamEngagement
+      <div className="stream-post-engagement" onClick={(event) => event.stopPropagation()}>
+        <CardEngagement
           cardId={card.id}
+          mode="chips"
           boardId={boardId}
           isStudentViewer={isStudentViewer}
+          initialCounts={{
+            likeCount: card.likeCount ?? 0,
+            commentCount: card.commentCount ?? 0,
+          }}
         />
       </div>
     </article>

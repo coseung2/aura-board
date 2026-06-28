@@ -17,6 +17,7 @@ import { useColumnRoster, type RosterEntry } from "./columns/useColumnRoster";
 import { useCardMutations } from "./columns/useCardMutations";
 import { useSectionMutations } from "./columns/useSectionMutations";
 import type { CardData } from "./DraggableCard";
+import { formatAuthorList } from "@/lib/card-author";
 
 type SectionData = StreamSection;
 
@@ -499,26 +500,30 @@ export function ColumnsBoard({
             order: a.order,
           }))}
           onSaved={(authors: SavedAuthor[]) => {
+            const authorPatch: Partial<CardData> = {
+              authors,
+              studentAuthorId: authors[0]?.studentId ?? null,
+              externalAuthorName:
+                authors.length > 0
+                  ? formatAuthorList(authors, null, null, null)
+                  : null,
+            };
             setCards((prev) =>
               prev.map((c) =>
                 c.id === authorEditCard.id
-                  ? {
-                      ...c,
-                      authors,
-                      studentAuthorId: authors[0]?.studentId ?? null,
-                      externalAuthorName:
-                        authors.length > 0
-                          ? authors
-                              .slice(0, 3)
-                              .map((a) => a.displayName)
-                              .join(", ") +
-                            (authors.length > 3
-                              ? ` 외 ${authors.length - 1}명`
-                              : "")
-                          : null,
-                    }
+                  ? { ...c, ...authorPatch }
                   : c,
               ),
+            );
+            setOpenCard((current) =>
+              current?.id === authorEditCard.id
+                ? { ...current, ...authorPatch }
+                : current,
+            );
+            setAuthorEditCard((current) =>
+              current?.id === authorEditCard.id
+                ? { ...current, ...authorPatch }
+                : current,
             );
           }}
           onClose={() => setAuthorEditCard(null)}

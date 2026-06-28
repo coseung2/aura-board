@@ -185,6 +185,7 @@ export default async function BoardPage({
               order: true,
             },
           },
+          _count: { select: { likes: true, comments: true } },
         },
       })
     : null;
@@ -374,6 +375,8 @@ export default async function BoardPage({
     externalAuthorName: c.externalAuthorName,
     studentAuthorName: c.studentAuthor?.name ?? null,
     authorName: c.author?.name ?? null,
+    likeCount: c._count.likes,
+    commentCount: c._count.comments,
     queueStatus: c.queueStatus ?? null,
     authors:
       (c as { authors?: { id: string; studentId: string | null; displayName: string; order: number }[] }).authors ??

@@ -555,7 +555,16 @@ export function ColumnView(props: Props) {
                   tabIndex={0}
                   role="button"
                 >
-                  <CardBody card={c} titleAs="h4" boardId={boardId} />
+                  <CardBody
+                    card={c}
+                    titleAs="h4"
+                    boardId={boardId}
+                    onEditAuthors={
+                      canEdit || c.studentAuthorId === currentUserId
+                        ? () => onCardEditAuthors(c)
+                        : undefined
+                    }
+                  />
                   {canModify && (
                     <div
                       className="card-ctx-menu"

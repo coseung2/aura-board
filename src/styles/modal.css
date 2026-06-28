@@ -45,10 +45,23 @@
   max-width: calc(100vw - 48px);
   max-height: calc(100dvh - 48px);
   padding: 0;
-  overflow: hidden;
+  overflow: visible;
   display: flex;
   flex-direction: column;
   --card-detail-corner-inset: 14px;
+}
+
+/* The visual card surface. Navigation arrows live outside this frame so
+   they are not clipped by the modal border-radius / overflow. */
+.card-detail-frame {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--color-surface);
+  border-radius: var(--radius-card);
+  overflow: hidden;
 }
 
 /* refined-icons (2026-04-26): 모든 버튼 내부에 SVG (currentColor stroke)
@@ -73,11 +86,28 @@
   position: fixed;
   top: 50%;
   z-index: 102;
-  --ui-icon-action-size: 52px;
+  --ui-icon-action-size: 48px;
+  --card-detail-nav-half: 24px;
+  --card-detail-nav-gap: 16px;
+  --card-detail-nav-min-center: calc(var(--card-detail-nav-half) + 8px);
+  --card-detail-nav-modal-half: 700px;
+  --card-detail-nav-edge: max(24px, calc(50vw - var(--card-detail-nav-modal-half)));
+  --card-detail-nav-center: max(
+    var(--card-detail-nav-min-center),
+    calc(
+      var(--card-detail-nav-edge) - var(--card-detail-nav-gap) -
+        var(--card-detail-nav-half)
+    )
+  );
   color: var(--color-text);
-  background: rgba(255, 255, 255, 0.94);
-  border: 1px solid rgba(204, 220, 232, 0.95);
-  box-shadow: 0 14px 34px rgba(15, 23, 42, 0.18);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--color-surface) 82%, transparent);
+  border: 1px solid color-mix(in srgb, var(--color-border) 70%, transparent);
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.12);
+  backdrop-filter: blur(10px);
+}
+.card-detail-nav[data-detail-layout="text-meta"] {
+  --card-detail-nav-modal-half: 450px;
 }
 .card-detail-nav:disabled {
   opacity: 0.32;
@@ -85,42 +115,24 @@
 }
 
 .card-detail-nav-prev {
-  left: max(26px, calc(50vw - 700px));
+  left: var(--card-detail-nav-center);
   transform: translate(-50%, -50%);
 }
 .card-detail-nav-next {
-  right: max(26px, calc(50vw - 700px));
+  right: var(--card-detail-nav-center);
   transform: translate(50%, -50%);
 }
 .card-detail-nav-prev:hover:not(:disabled),
 .card-detail-nav-prev:focus-visible:not(:disabled) {
   background: var(--color-surface);
+  border-color: var(--color-border);
   transform: translate(-50%, -50%) scale(1.04);
 }
 .card-detail-nav-next:hover:not(:disabled),
 .card-detail-nav-next:focus-visible:not(:disabled) {
   background: var(--color-surface);
+  border-color: var(--color-border);
   transform: translate(50%, -50%) scale(1.04);
-}
-
-/* Extra-wide desktop: float arrows fully outside the modal surface. */
-@media (min-width: 1536px) {
-  .card-detail-nav-prev {
-    left: calc(50vw - 700px);
-    transform: translate(calc(-100% - 16px), -50%);
-  }
-  .card-detail-nav-next {
-    right: calc(50vw - 700px);
-    transform: translate(calc(100% + 16px), -50%);
-  }
-  .card-detail-nav-prev:hover:not(:disabled),
-  .card-detail-nav-prev:focus-visible:not(:disabled) {
-    transform: translate(calc(-100% - 16px), -50%) scale(1.04);
-  }
-  .card-detail-nav-next:hover:not(:disabled),
-  .card-detail-nav-next:focus-visible:not(:disabled) {
-    transform: translate(calc(100% + 16px), -50%) scale(1.04);
-  }
 }
 
 /* When entering the browser fullscreen, the modal becomes the root
@@ -139,6 +151,9 @@
   border-radius: 0 !important;
   border: none !important;
 }
+.card-detail-modal[data-fullscreen="true"] .card-detail-frame {
+  border-radius: 0;
+}
 .card-detail-modal[data-fullscreen="true"] .card-detail-body {
   flex: 1 1 auto;
   grid-template-columns: 1fr;
@@ -152,23 +167,13 @@
   min-height: 100vh;
 }
 .card-detail-modal[data-fullscreen="true"] .card-detail-close,
-.card-detail-modal[data-fullscreen="true"] .card-detail-fullscreen,
-.card-detail-modal[data-fullscreen="true"] .card-detail-nav {
+.card-detail-modal[data-fullscreen="true"] .card-detail-fullscreen {
   opacity: 0;
   transition: opacity 0.2s ease;
 }
 .card-detail-modal[data-fullscreen="true"]:hover .card-detail-close,
-.card-detail-modal[data-fullscreen="true"]:hover .card-detail-fullscreen,
-.card-detail-modal[data-fullscreen="true"]:hover .card-detail-nav {
+.card-detail-modal[data-fullscreen="true"]:hover .card-detail-fullscreen {
   opacity: 1;
-}
-.card-detail-modal[data-fullscreen="true"] .card-detail-nav-prev {
-  left: 24px;
-  transform: translateY(-50%);
-}
-.card-detail-modal[data-fullscreen="true"] .card-detail-nav-next {
-  right: 24px;
-  transform: translateY(-50%);
 }
 
 .card-detail-body {
@@ -415,7 +420,7 @@
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  z-index: 3;
+  z-index: 6;
   width: 48px;
   height: 64px;
   padding: 0;
@@ -450,6 +455,18 @@
   right: 18px;
 }
 
+.card-detail-media .card-attach-carousel-arrow {
+  background: transparent;
+  color: #fff;
+  mix-blend-mode: difference;
+  text-shadow: none;
+}
+
+.card-detail-media .card-attach-carousel-arrow:hover,
+.card-detail-media .card-attach-carousel-arrow:focus-visible {
+  background: transparent;
+}
+
 .card-attach-carousel-indicator {
   position: absolute;
   left: 0;
@@ -458,7 +475,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 3;
+  z-index: 6;
   pointer-events: none;
 }
 
@@ -765,8 +782,8 @@
 .card-detail-rail {
   display: flex;
   flex-direction: column;
-  gap: 16px;
-  padding: 58px 16px 64px;
+  gap: 6px;
+  padding: 14px 16px 64px;
   border-left: 1px solid var(--color-border);
   background: var(--color-surface);
   min-height: 0;
@@ -811,22 +828,44 @@
   flex-direction: row;
   align-items: center;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: 6px;
   flex-shrink: 0;
+  min-height: 24px;
   font-size: 15px;
   line-height: 1.5;
-  padding-right: 4px;
+  padding-right: 50px;
 }
 
 .card-detail-meta .card-author-footer {
+  display: inline-flex;
+  align-items: center;
   min-width: 0;
+  min-height: 24px;
   margin-top: 0;
   padding-top: 0;
   border-top: 0;
+  line-height: 1;
 }
 
 .card-detail-meta .card-author-chip {
+  padding: 0;
+  background: transparent;
+  border-radius: 0;
+  color: var(--color-text);
+  font-size: 13px;
+  font-weight: 600;
+  min-height: 24px;
   max-width: 180px;
+  line-height: 1;
+}
+
+.card-detail-meta .card-author-time {
+  display: inline-flex;
+  align-items: center;
+  font-size: 13px;
+  font-weight: 500;
+  min-height: 24px;
+  line-height: 1;
 }
 
 .add-card-author-picker {
@@ -888,6 +927,13 @@
   .card-detail-main {
   /* media only: media만 보이게 main column 너비 제한. rail은 220px 그대로. */
   max-width: 100%;
+}
+.card-detail-modal[data-detail-layout="media-meta"] .card-detail-media,
+.card-detail-modal[data-has-body="false"][data-has-media="true"]
+  .card-detail-media {
+  flex: 1 1 auto;
+  aspect-ratio: auto;
+  max-height: none;
 }
 /* media-only: portrait에서 grid 1fr (rail만) + media full width */
 @media (orientation: portrait), (max-width: 1199px) {
@@ -956,20 +1002,24 @@
   }
   .card-detail-nav {
     --ui-icon-action-size: 44px;
+    --card-detail-nav-half: 22px;
+    --card-detail-nav-edge: max(24px, calc(50vw - var(--card-detail-nav-modal-half)));
   }
   .card-detail-nav-prev {
-    left: 12px;
-    transform: translateY(-50%);
+    left: var(--card-detail-nav-center);
+    transform: translate(-50%, -50%);
   }
   .card-detail-nav-next {
-    right: 12px;
-    transform: translateY(-50%);
+    right: var(--card-detail-nav-center);
+    transform: translate(50%, -50%);
   }
   .card-detail-nav-prev:hover:not(:disabled),
-  .card-detail-nav-prev:focus-visible:not(:disabled),
+  .card-detail-nav-prev:focus-visible:not(:disabled) {
+    transform: translate(-50%, -50%) scale(1.04);
+  }
   .card-detail-nav-next:hover:not(:disabled),
   .card-detail-nav-next:focus-visible:not(:disabled) {
-    transform: translateY(-50%) scale(1.04);
+    transform: translate(50%, -50%) scale(1.04);
   }
 }
 

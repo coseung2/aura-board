@@ -58,12 +58,24 @@ export async function GET(req: Request) {
       board: { layout: { notIn: [...EXCLUDED_BOARD_LAYOUTS] } },
     },
     include: {
+      author: { select: { name: true } },
+      studentAuthor: { select: { name: true } },
       board: {
         select: { id: true, slug: true, title: true, layout: true, anonymousAuthor: true },
       },
       section: { select: { id: true, title: true } },
+      authors: {
+        orderBy: { order: "asc" },
+        select: {
+          id: true,
+          studentId: true,
+          displayName: true,
+          order: true,
+        },
+      },
       attachments: { orderBy: { order: "asc" } },
       showcaseEntries: { select: { studentId: true } },
+      _count: { select: { likes: true, comments: true } },
     },
     orderBy: { createdAt: "desc" },
   });
@@ -82,12 +94,24 @@ export async function GET(req: Request) {
       student: { select: { id: true, name: true, number: true } },
       card: {
         include: {
+          author: { select: { name: true } },
+          studentAuthor: { select: { name: true } },
           board: {
             select: { id: true, slug: true, title: true, layout: true, anonymousAuthor: true },
           },
           section: { select: { id: true, title: true } },
+          authors: {
+            orderBy: { order: "asc" },
+            select: {
+              id: true,
+              studentId: true,
+              displayName: true,
+              order: true,
+            },
+          },
           attachments: { orderBy: { order: "asc" } },
           showcaseEntries: { select: { studentId: true } },
+          _count: { select: { likes: true, comments: true } },
         },
       },
     },

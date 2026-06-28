@@ -40,15 +40,21 @@ type Props = {
     authorName?: string | null;
     authors?: Array<{ order: number; displayName: string }>;
     createdAt?: string | Date | null;
+    likeCount?: number;
+    commentCount?: number;
     // 보드 단위 익명 토글 (Board.anonymousAuthor) — 호출처에서 주입.
     anonymousAuthor?: boolean;
   };
   // Some layouts (BreakoutBoard, ColumnsBoard) nest cards inside section
   // headings, so semantic level differs. Default h3 matches DraggableCard /
   // StreamBoard / SectionBreakoutView.
-  titleAs?: "h3" | "h4";
+  titleAs?: "h2" | "h3" | "h4";
+  // Some surfaces (stream posts) already render author metadata in their own
+  // header, but should still reuse CardBody for attachments/content.
+  showAuthorFooter?: boolean;
   // engagement chips 렌더 여부. card.id 가 있을 때만 의미. 기본 true.
   showEngagement?: boolean;
+  onEditAuthors?: () => void;
   // 첨부 렌더 모드 — 카드 썸네일은 "thumbnail"(기본), 모달 안에서 풀 콘텐츠를
   // 보여줄 땐 "detail" 로 넘겨 원본 비율을 유지. thumbnail 은 height: 180px +
   // object-fit: cover 라 세로 사진을 가로 strip 으로 크롭함.
@@ -67,7 +73,9 @@ function isLongContent(content: string): boolean {
 export const CardBody = memo(function CardBody({
   card,
   titleAs = "h3",
+  showAuthorFooter = true,
   showEngagement = true,
+  onEditAuthors,
   attachmentsVariant = "thumbnail",
   contentDisplay = "expandable",
   boardId,
@@ -84,6 +92,26 @@ export const CardBody = memo(function CardBody({
   ]
     .filter(Boolean)
     .join(" ");
+  const editAuthorsAction = onEditAuthors ? (
+    <button
+      type="button"
+      className="card-author-edit-action"
+      onClick={(e) => {
+        e.stopPropagation();
+        onEditAuthors();
+      }}
+      onMouseDown={(e) => e.stopPropagation()}
+    >
+      👥 작성자 지정
+    </button>
+  ) : null;
+  const initialCounts =
+    card.likeCount !== undefined || card.commentCount !== undefined
+      ? {
+          likeCount: card.likeCount ?? 0,
+          commentCount: card.commentCount ?? 0,
+        }
+      : undefined;
 
   return (
     <>
@@ -121,17 +149,27 @@ export const CardBody = memo(function CardBody({
           <span aria-hidden="true">{isExpanded ? "▴" : "▾"}</span>
         </button>
       )}
-      <CardAuthorFooter
-        authors={card.authors}
-        externalAuthorName={card.externalAuthorName}
-        studentAuthorName={card.studentAuthorName}
-        authorName={card.authorName}
-        createdAt={card.createdAt}
-        anonymousAuthor={card.anonymousAuthor}
-      />
-      {showEngagement && card.id && (
-        <CardEngagement cardId={card.id} mode="chips" boardId={boardId} />
+      {showAuthorFooter && (
+        <CardAuthorFooter
+          authors={card.authors}
+          externalAuthorName={card.externalAuthorName}
+          studentAuthorName={card.studentAuthorName}
+          authorName={card.authorName}
+          createdAt={card.createdAt}
+          anonymousAuthor={card.anonymousAuthor}
+        />
       )}
+      {showEngagement && card.id ? (
+        <CardEngagement
+          cardId={card.id}
+          mode="chips"
+          boardId={boardId}
+          initialCounts={initialCounts}
+          chipsActionsEnd={editAuthorsAction}
+        />
+      ) : editAuthorsAction ? (
+        <div className="card-engagement-chips">{editAuthorsAction}</div>
+      ) : null}
     </>
   );
 });

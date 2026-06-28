@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { formatRelativeTime } from "@/lib/card-engagement-format";
 import { useShareSession, type ShareSession } from "@/components/share/ShareSessionContext";
@@ -34,12 +34,73 @@ interface Props {
   mode: "chips" | "panel";
   boardId?: string;
   isStudentViewer?: boolean;
+  initialCounts?: {
+    likeCount: number;
+    commentCount: number;
+  };
+  chipsActionsEnd?: ReactNode;
+  panelActionsEnd?: ReactNode;
 }
 
-export function CardEngagement({ cardId, mode, boardId, isStudentViewer }: Props) {
-  const [state, setState] = useState<EngagementState | null>(null);
-  const [showModal, setShowModal] = useState(false);
+function initialEngagementState(
+  likeCount: number | undefined,
+  commentCount: number | undefined,
+): EngagementState | null {
+  return likeCount !== undefined || commentCount !== undefined
+    ? {
+        likeCount: likeCount ?? 0,
+        commentCount: commentCount ?? 0,
+        isLiked: false,
+        canInteract: false,
+      }
+    : null;
+}
+
+const engagementStateCache = new Map<string, EngagementState>();
+
+function getEngagementCacheKey({
+  cardId,
+  boardId,
+  isStudentViewer,
+  shareSession,
+}: {
+  cardId: string;
+  boardId?: string;
+  isStudentViewer?: boolean;
+  shareSession: ShareSession | null;
+}) {
+  if (shareSession) {
+    return `share:${shareSession.shareToken}:${shareSession.guestId}:${cardId}`;
+  }
+  return `board:${boardId ?? ""}:${isStudentViewer ? "student" : "user"}:${cardId}`;
+}
+
+export function CardEngagement({
+  cardId,
+  mode,
+  boardId,
+  isStudentViewer,
+  initialCounts,
+  chipsActionsEnd,
+  panelActionsEnd,
+}: Props) {
+  const initialLikeCount = initialCounts?.likeCount;
+  const initialCommentCount = initialCounts?.commentCount;
   const shareSession = useShareSession();
+  const cacheKey = getEngagementCacheKey({
+    cardId,
+    boardId,
+    isStudentViewer,
+    shareSession,
+  });
+  const cachedState = engagementStateCache.get(cacheKey);
+  const [state, setState] = useState<EngagementState | null>(() =>
+    cachedState ?? initialEngagementState(initialLikeCount, initialCommentCount),
+  );
+  const [engagementReady, setEngagementReady] = useState(
+    Boolean(cachedState) || !initialCounts,
+  );
+  const [showModal, setShowModal] = useState(false);
 
   const refresh = useCallback(async () => {
     try {
@@ -57,35 +118,64 @@ export function CardEngagement({ cardId, mode, boardId, isStudentViewer }: Props
           });
       if (!r.ok) {
         if (shareSession) {
-          setState((current) =>
-            current ?? { likeCount: 0, commentCount: 0, isLiked: false, canInteract: true }
-          );
+          setState((current) => {
+            if (current) return current;
+            const fallback = {
+              likeCount: 0,
+              commentCount: 0,
+              isLiked: false,
+              canInteract: true,
+            };
+            engagementStateCache.set(cacheKey, fallback);
+            return fallback;
+          });
         }
         return;
       }
       const j = (await r.json()) as EngagementState;
+      engagementStateCache.set(cacheKey, j);
       setState(j);
     } catch {
       if (shareSession) {
-        setState((current) =>
-          current ?? { likeCount: 0, commentCount: 0, isLiked: false, canInteract: true }
-        );
+        setState((current) => {
+          if (current) return current;
+          const fallback = {
+            likeCount: 0,
+            commentCount: 0,
+            isLiked: false,
+            canInteract: true,
+          };
+          engagementStateCache.set(cacheKey, fallback);
+          return fallback;
+        });
       }
+    } finally {
+      setEngagementReady(true);
     }
-  }, [cardId, shareSession, isStudentViewer]);
+  }, [cacheKey, cardId, shareSession, isStudentViewer]);
 
   useEffect(() => {
+    const cached = engagementStateCache.get(cacheKey);
+    setEngagementReady(Boolean(cached));
+    setState(
+      cached ?? initialEngagementState(initialLikeCount, initialCommentCount),
+    );
     void refresh();
-  }, [refresh]);
+  }, [cacheKey, refresh, initialLikeCount, initialCommentCount]);
 
   // Live-update counts from board-level engagement broadcasts. Only counts
   // move; isLiked is the current user's own state (handled in toggleLike).
   useBoardEngagement(boardId, cardId, (event) => {
-    setState((current) =>
-      current
-        ? { ...current, likeCount: event.likeCount, commentCount: event.commentCount }
-        : current,
-    );
+    setState((current) => {
+      if (!current) return current;
+      const next = {
+        ...current,
+        likeCount: event.likeCount,
+        commentCount: event.commentCount,
+      };
+      engagementStateCache.set(cacheKey, next);
+      return next;
+    });
   });
 
   useEffect(() => {
@@ -129,11 +219,16 @@ export function CardEngagement({ cardId, mode, boardId, isStudentViewer }: Props
   const toggleLike = useCallback(async () => {
     if (!state?.canInteract) return;
     // optimistic
-    setState((s) =>
-      s
-        ? { ...s, isLiked: !s.isLiked, likeCount: s.likeCount + (s.isLiked ? -1 : 1) }
-        : s
-    );
+    setState((s) => {
+      if (!s) return s;
+      const next = {
+        ...s,
+        isLiked: !s.isLiked,
+        likeCount: s.likeCount + (s.isLiked ? -1 : 1),
+      };
+      engagementStateCache.set(cacheKey, next);
+      return next;
+    });
     try {
       const r = shareSession
         ? await fetch(`/api/share/cards/${cardId}/like`, {
@@ -153,16 +248,22 @@ export function CardEngagement({ cardId, mode, boardId, isStudentViewer }: Props
         return;
       }
       const j = (await r.json()) as { liked: boolean; count: number };
-      setState((s) => (s ? { ...s, isLiked: j.liked, likeCount: j.count } : s));
+      setState((s) => {
+        if (!s) return s;
+        const next = { ...s, isLiked: j.liked, likeCount: j.count };
+        engagementStateCache.set(cacheKey, next);
+        return next;
+      });
     } catch {
       await refresh();
     }
-  }, [cardId, refresh, shareSession, state?.canInteract]);
+  }, [cacheKey, cardId, refresh, shareSession, state?.canInteract]);
 
   if (!state) {
     return mode === "chips" ? (
       <div className="card-engagement-chips" aria-hidden>
         <span className="card-engagement-chip card-engagement-chip-loading">…</span>
+        {chipsActionsEnd}
       </div>
     ) : null;
   }
@@ -192,6 +293,7 @@ export function CardEngagement({ cardId, mode, boardId, isStudentViewer }: Props
             <span aria-hidden>💬</span>
             <span>{state.commentCount}</span>
           </button>
+          {chipsActionsEnd}
         </div>
         {showModal && (
           <CommentsModal cardId={cardId} canInteract={state.canInteract} shareSession={shareSession} isStudentViewer={!!isStudentViewer} onClose={() => {
@@ -214,7 +316,9 @@ export function CardEngagement({ cardId, mode, boardId, isStudentViewer }: Props
           onClick={toggleLike}
           disabled={!state.canInteract}
           aria-pressed={state.isLiked}
-          title={state.canInteract ? "" : "읽기 전용입니다"}
+          title={
+            engagementReady ? (state.canInteract ? "" : "읽기 전용입니다") : ""
+          }
         >
           <span aria-hidden>{state.isLiked ? "❤️" : "🤍"}</span>
           <span>{state.likeCount}</span>
@@ -222,21 +326,25 @@ export function CardEngagement({ cardId, mode, boardId, isStudentViewer }: Props
         <button
           type="button"
           className="card-engagement-comment-btn"
+          disabled={!engagementReady}
           onClick={() => document.getElementById(commentInputId)?.focus()}
           aria-label={`댓글 ${state.commentCount}개`}
         >
           <span aria-hidden>💬</span>
           <span>{state.commentCount}</span>
         </button>
+        {panelActionsEnd}
       </div>
-      <CommentsBlock
-        cardId={cardId}
-        canInteract={state.canInteract}
-        shareSession={shareSession}
-        isStudentViewer={!!isStudentViewer}
-        onChange={refresh}
-        inputId={commentInputId}
-      />
+      {engagementReady && (
+        <CommentsBlock
+          cardId={cardId}
+          canInteract={state.canInteract}
+          shareSession={shareSession}
+          isStudentViewer={!!isStudentViewer}
+          onChange={refresh}
+          inputId={commentInputId}
+        />
+      )}
     </div>
   );
 }
@@ -359,6 +467,7 @@ function CommentsBlock({
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (submitting) return;
     const trimmed = content.trim();
     if (!trimmed) return;
     setSubmitting(true);
@@ -427,14 +536,18 @@ function CommentsBlock({
             id={inputId}
             value={content}
             onChange={(e) => setContent(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key !== "Enter" || e.shiftKey || e.nativeEvent.isComposing) {
+                return;
+              }
+              e.preventDefault();
+              e.currentTarget.form?.requestSubmit();
+            }}
             placeholder="댓글을 입력하세요"
             maxLength={1000}
             rows={2}
             disabled={submitting}
           />
-          <button type="submit" disabled={submitting || !content.trim()}>
-            {submitting ? "작성 중..." : "댓글 달기"}
-          </button>
           {err && <span className="card-engagement-comment-err">{err}</span>}
         </form>
       ) : (

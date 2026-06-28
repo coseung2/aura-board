@@ -26,9 +26,8 @@ export type AuthorLike = {
  * Card footer display — 0/1/2/3/4+ cases:
  *   0    → pickAuthorName fallback (legacy)
  *   1    → "김철수"
- *   2    → "김철수, 이영희"
- *   3    → "김철수, 이영희, 박민수"
- *   4+   → "김철수 외 N명"
+ *   2    → "김철수님과 이영희"
+ *   3+   → "김철수님과 N명"
  *
  * Entries are sorted by .order ascending so callers can pass unsorted
  * Prisma rows without extra work.
@@ -46,11 +45,14 @@ export function formatAuthorList(
     return pickAuthorName(externalFallback, studentFallback, authorFallback);
   }
   if (list.length === 1) return list[0].displayName;
-  if (list.length === 2) return `${list[0].displayName}, ${list[1].displayName}`;
-  if (list.length === 3) {
-    return `${list[0].displayName}, ${list[1].displayName}, ${list[2].displayName}`;
+  if (list.length === 2) {
+    return `${withNim(list[0].displayName)}과 ${withNim(list[1].displayName)}`;
   }
-  return `${list[0].displayName} 외 ${list.length - 1}명`;
+  return `${withNim(list[0].displayName)}과 ${list.length - 1}명`;
+}
+
+function withNim(name: string): string {
+  return name.endsWith("님") ? name : `${name}님`;
 }
 
 export function formatRelativeKo(iso: string, now: number = Date.now()): {

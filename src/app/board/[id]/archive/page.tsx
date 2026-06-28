@@ -4,7 +4,7 @@ import { db } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
 import { getBoardRole } from "@/lib/rbac";
 import { cloneStructure } from "@/lib/breakout";
-import { CardAttachments } from "@/components/CardAttachments";
+import { CardBody } from "@/components/cards/CardBody";
 
 /**
  * /board/[id]/archive - Teacher read-only archive for a breakout session (BR-9).
@@ -69,6 +69,7 @@ export default async function BreakoutArchivePage({
             id: true,
             kind: true,
             url: true,
+            previewUrl: true,
             fileName: true,
             fileSize: true,
             mimeType: true,
@@ -227,21 +228,12 @@ export default async function BreakoutArchivePage({
                           className="column-card"
                           style={{ backgroundColor: c.color ?? undefined }}
                         >
-                          <CardAttachments
-                            imageUrl={c.imageUrl}
-                            linkUrl={c.linkUrl}
-                            linkTitle={c.linkTitle}
-                            linkDesc={c.linkDesc}
-                            linkImage={c.linkImage}
-                            videoUrl={c.videoUrl}
-                            fileUrl={c.fileUrl}
-                            fileName={c.fileName}
-                            fileSize={c.fileSize}
-                            fileMimeType={c.fileMimeType}
-                            attachments={c.attachments}
+                          <CardBody
+                            card={c}
+                            titleAs="h4"
+                            showAuthorFooter={false}
+                            showEngagement={false}
                           />
-                          <h4 className="padlet-card-title">{c.title}</h4>
-                          <p className="padlet-card-content">{c.content}</p>
                         </article>
                       ))}
                     </div>

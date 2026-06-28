@@ -58,9 +58,22 @@ export function CardDetailModal({
   const canGoPrevious = Boolean(hasPrevious && onPrevious);
   const canGoNext = Boolean(hasNext && onNext);
 
+  const closeDetail = useCallback(() => {
+    if (document.fullscreenElement === rootRef.current) {
+      void document.exitFullscreen().catch(() => {
+        // Browser may reject if fullscreen was already dismissed.
+      });
+    }
+    setIsFullscreen(false);
+    onClose();
+  }, [onClose]);
+
   // 카드가 바뀌면 라이트박스 자동 닫기.
   useEffect(() => {
     setLightboxIndex(null);
+    if (!card || !document.fullscreenElement) {
+      setIsFullscreen(false);
+    }
   }, [card?.id]);
 
   useEffect(() => {
@@ -70,7 +83,7 @@ export function CardDetailModal({
       if (lightboxIndex !== null) return;
       if (e.key === "Escape") {
         e.preventDefault();
-        onClose();
+        closeDetail();
       } else if (
         e.key === "ArrowLeft" &&
         canGoPrevious &&
@@ -91,7 +104,7 @@ export function CardDetailModal({
     return () => window.removeEventListener("keydown", onKey);
   }, [
     card,
-    onClose,
+    closeDetail,
     lightboxIndex,
     canGoPrevious,
     canGoNext,
@@ -103,7 +116,11 @@ export function CardDetailModal({
     // F11/ESC로 fullscreen 빠져나와도 상태는 그대로. native fullscreenchange
     // via F11/ESC flips the button back without an extra click.
     function onChange() {
-      setIsFullscreen(document.fullscreenElement === rootRef.current);
+      setIsFullscreen(
+        Boolean(
+          rootRef.current && document.fullscreenElement === rootRef.current,
+        ),
+      );
     }
     document.addEventListener("fullscreenchange", onChange);
     onChange();
@@ -168,7 +185,9 @@ export function CardDetailModal({
 
   return (
     <>
-      {!isFullscreen && <div className="modal-backdrop" onClick={onClose} />}
+      {!isFullscreen && (
+        <div className="modal-backdrop" onClick={closeDetail} />
+      )}
       <div
         ref={rootRef}
         className="add-card-modal card-detail-modal"
@@ -181,28 +200,29 @@ export function CardDetailModal({
         data-fullscreen={isFullscreen ? "true" : "false"}
         onClick={(e) => e.stopPropagation()}
       >
-        <button
-          type="button"
-          className="ui-icon-action ui-corner-action card-detail-close"
-          onClick={onClose}
-          aria-label="닫기"
-        >
-          <CloseIcon size={20} />
-        </button>
-        <button
-          type="button"
-          className="ui-icon-action ui-corner-action card-detail-fullscreen"
-          onClick={toggleFullscreen}
-          aria-label={isFullscreen ? "전체화면 끄기" : "전체화면 켜기"}
-          title={isFullscreen ? "전체화면 끄기" : "전체화면으로 발표"}
-        >
-          {isFullscreen ? (
-            <FullscreenExitIcon size={20} />
-          ) : (
-            <FullscreenEnterIcon size={20} />
-          )}
-        </button>
-        <div className="card-detail-body">
+        <div className="card-detail-frame">
+          <button
+            type="button"
+            className="ui-icon-action ui-corner-action card-detail-close"
+            onClick={closeDetail}
+            aria-label="닫기"
+          >
+            <CloseIcon size={20} />
+          </button>
+          <button
+            type="button"
+            className="ui-icon-action ui-corner-action card-detail-fullscreen"
+            onClick={toggleFullscreen}
+            aria-label={isFullscreen ? "전체화면 끄기" : "전체화면 켜기"}
+            title={isFullscreen ? "전체화면 끄기" : "전체화면으로 발표"}
+          >
+            {isFullscreen ? (
+              <FullscreenExitIcon size={20} />
+            ) : (
+              <FullscreenEnterIcon size={20} />
+            )}
+          </button>
+          <div className="card-detail-body">
             <section className="card-detail-main" aria-label="콘텐츠">
               {hasMedia && (
                 <div className="card-detail-media" aria-label="첨부">
@@ -339,16 +359,6 @@ export function CardDetailModal({
                   createdAt={card.createdAt}
                   anonymousAuthor={card.anonymousAuthor}
                 />
-                {onEditAuthors &&
-                  (canEditAuthors ? canEditAuthors(card) : true) && (
-                    <button
-                      type="button"
-                      className="card-detail-edit-authors"
-                      onClick={() => onEditAuthors(card)}
-                    >
-                      👥 작성자 지정
-                    </button>
-                  )}
               </div>
               {/* card-detail-modal-engagement (2026-04-26): 좋아요 + 댓글 패널. */}
               <CardEngagement
@@ -356,8 +366,25 @@ export function CardDetailModal({
                 mode="panel"
                 boardId={boardId}
                 isStudentViewer={isStudentViewer}
+                initialCounts={{
+                  likeCount: card.likeCount ?? 0,
+                  commentCount: card.commentCount ?? 0,
+                }}
+                panelActionsEnd={
+                  onEditAuthors &&
+                  (canEditAuthors ? canEditAuthors(card) : true) ? (
+                    <button
+                      type="button"
+                      className="card-detail-edit-authors"
+                      onClick={() => onEditAuthors(card)}
+                    >
+                      👥 작성자 지정
+                    </button>
+                  ) : null
+                }
               />
             </aside>
+          </div>
         </div>
         {lightboxIndex !== null &&
           (() => {
@@ -380,6 +407,7 @@ export function CardDetailModal({
           <button
             type="button"
             className="ui-icon-action card-detail-nav card-detail-nav-prev"
+            data-detail-layout={detailLayout}
             onClick={onPrevious}
             disabled={!canGoPrevious}
             aria-label="이전 게시글"
@@ -390,6 +418,7 @@ export function CardDetailModal({
           <button
             type="button"
             className="ui-icon-action card-detail-nav card-detail-nav-next"
+            data-detail-layout={detailLayout}
             onClick={onNext}
             disabled={!canGoNext}
             aria-label="다음 게시글"
