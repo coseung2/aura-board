@@ -22,12 +22,10 @@ import { apiFetch, ApiError } from "../../lib/api";
 import { clearSessionToken } from "../../lib/session";
 import type { WalletSummary } from "../../lib/types";
 import { AppButton, AppHeader, EmptyState, SurfaceCard } from "../../components/ui";
-
 export default function StudentWalletScreen() {
   const router = useRouter();
   const [wallet, setWallet] = useState<WalletSummary | null>(null);
-  const [qr, setQr] = useState<{ token: string; expiresAt: number } | null>(null);
-  const [qrNow, setQrNow] = useState(() => Math.floor(Date.now() / 1000));
+  const [qr, setQr] = useState<{ token: string; expiresAt: null } | null>(null);
   const [qrError, setQrError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -46,11 +44,10 @@ export default function StudentWalletScreen() {
 
   const loadQr = useCallback(async () => {
     try {
-      const res = await apiFetch<{ token: string; expiresAt: number }>(
+      const res = await apiFetch<{ token: string; expiresAt: null }>(
         "/api/my/wallet/card-qr",
       );
       setQr(res);
-      setQrNow(Math.floor(Date.now() / 1000));
       setQrError(null);
     } catch (e) {
       if (await handleAuthError(e)) return;
@@ -100,17 +97,6 @@ export default function StudentWalletScreen() {
     })();
   }, [handleAuthError, loadQr]);
 
-  useEffect(() => {
-    const handle = setInterval(() => {
-      const now = Math.floor(Date.now() / 1000);
-      setQrNow(now);
-      if (qr && qr.expiresAt - now <= 0) {
-        loadQr();
-      }
-    }, 1000);
-    return () => clearInterval(handle);
-  }, [loadQr, qr]);
-
   return (
     <SafeAreaView style={styles.container} edges={["top"]}>
       <AppHeader title="내 통장과 적금" onBack={() => router.back()} />
@@ -141,12 +127,6 @@ export default function StudentWalletScreen() {
                 <Text style={styles.eyebrow}>매점 결제</Text>
                 <Text style={styles.qrTitle}>학생 QR 지갑</Text>
               </View>
-              <AppButton
-                variant="secondary"
-                onPress={loadQr}
-              >
-                새로고침
-              </AppButton>
             </View>
             <View style={styles.qrFrame}>
               {qr?.token ? (
@@ -161,7 +141,7 @@ export default function StudentWalletScreen() {
             </View>
             {qr?.token ? (
               <Text style={styles.qrTimer}>
-                {Math.max(0, qr.expiresAt - qrNow)}초 뒤 새 QR
+                고정 QR
               </Text>
             ) : null}
           </SurfaceCard>

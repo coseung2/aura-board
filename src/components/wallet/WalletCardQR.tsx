@@ -9,9 +9,9 @@ type Props = {
 export function WalletCardQR({ card }: Props) {
   const [token, setToken] = useState<string | null>(null);
   const [qrDataUrl, setQrDataUrl] = useState<string | null>(null);
-  const [expiresAt, setExpiresAt] = useState<number>(0);
-  const [progress, setProgress] = useState(0);
   const [copied, setCopied] = useState(false);
+  const [designing, setDesigning] = useState(false);
+  const [designError, setDesignError] = useState<string | null>(null);
   const fetchRef = useRef(false);
 
   const fetchToken = useCallback(async () => {
@@ -20,9 +20,8 @@ export function WalletCardQR({ card }: Props) {
     try {
       const res = await fetch("/api/my/wallet/card-qr", { cache: "no-store" });
       if (!res.ok) return;
-      const data = (await res.json()) as { token: string; expiresAt: number };
+      const data = (await res.json()) as { token: string; expiresAt: null };
       setToken(data.token);
-      setExpiresAt(data.expiresAt);
       // Generate QR image
       const { default: QRCode } = await import("qrcode");
       const url = await QRCode.toDataURL(data.token, { width: 220, margin: 1 });
@@ -36,31 +35,6 @@ export function WalletCardQR({ card }: Props) {
     fetchToken();
   }, [fetchToken]);
 
-  // Tick progress every 200ms, refetch on expiry
-  useEffect(() => {
-    if (!expiresAt) return;
-    const t = setInterval(() => {
-      const remaining = expiresAt - Math.floor(Date.now() / 1000);
-      if (remaining <= 0) {
-        fetchToken();
-      } else {
-        setProgress((60 - remaining) / 60);
-      }
-    }, 200);
-    return () => clearInterval(t);
-  }, [expiresAt, fetchToken]);
-
-  // Pause on hidden tab, resume on visible
-  useEffect(() => {
-    function onVis() {
-      if (document.visibilityState === "visible") {
-        fetchToken();
-      }
-    }
-    document.addEventListener("visibilitychange", onVis);
-    return () => document.removeEventListener("visibilitychange", onVis);
-  }, [fetchToken]);
-
   async function handleCopy() {
     if (!token) return;
     try {
@@ -69,6 +43,48 @@ export function WalletCardQR({ card }: Props) {
       setTimeout(() => setCopied(false), 1200);
     } catch {
       // clipboard denied — surface token as fallback
+    }
+  }
+
+  async function handleCanvaDesign() {
+    if (designing) return;
+    setDesigning(true);
+    setDesignError(null);
+    const popup = window.open("about:blank", "_blank");
+    try {
+      const res = await fetch("/api/my/wallet/canva-card", {
+        method: "POST",
+        cache: "no-store",
+      });
+      const data = (await res.json().catch(() => ({}))) as {
+        editUrl?: string;
+        connectUrl?: string;
+        error?: string;
+      };
+
+      if (res.status === 401 && data.connectUrl) {
+        if (popup) {
+          popup.location.href = data.connectUrl;
+        } else {
+          window.location.href = data.connectUrl;
+        }
+        return;
+      }
+
+      if (!res.ok || !data.editUrl) {
+        throw new Error(data.error ?? "canva_design_failed");
+      }
+
+      if (popup) {
+        popup.location.href = data.editUrl;
+      } else {
+        window.location.href = data.editUrl;
+      }
+    } catch {
+      popup?.close();
+      setDesignError("Canva 디자인을 만들 수 없어요.");
+    } finally {
+      setDesigning(false);
     }
   }
 
@@ -82,7 +98,7 @@ export function WalletCardQR({ card }: Props) {
       <div
         className="wallet-qr-frame"
         role="img"
-        aria-label={`카드 QR 코드. ${Math.max(0, expiresAt - Math.floor(Date.now() / 1000))}초 후 갱신됩니다.`}
+        aria-label="고정 카드 QR 코드"
       >
         {qrDataUrl ? (
           // eslint-disable-next-line @next/next/no-img-element
@@ -92,27 +108,29 @@ export function WalletCardQR({ card }: Props) {
         )}
       </div>
 
-      <div className="wallet-qr-timer">
-        <div
-          className="wallet-qr-timer-bar"
-          style={{ width: `${progress * 100}%` }}
-        />
-        <div className="wallet-qr-timer-label">
-          {Math.max(0, expiresAt - Math.floor(Date.now() / 1000))}초 뒤 새 QR
-        </div>
+      <div className="wallet-qr-actions">
+        <button
+          type="button"
+          className="wallet-qr-copy"
+          onClick={handleCopy}
+          disabled={!token}
+        >
+          {copied ? "복사됨!" : "토큰 복사"}
+        </button>
+        <button
+          type="button"
+          className="wallet-qr-canva"
+          onClick={handleCanvaDesign}
+          disabled={!token || designing}
+        >
+          {designing ? "준비 중…" : "Canva에서 카드 디자인"}
+        </button>
       </div>
-
-      <button
-        type="button"
-        className="wallet-qr-copy"
-        onClick={handleCopy}
-        disabled={!token}
-      >
-        {copied ? "복사됨!" : "토큰 복사"}
-      </button>
-      <p className="wallet-qr-help">
-        매점원이 QR을 스캔하거나 토큰을 붙여넣어 결제합니다.
-      </p>
+      {designError && (
+        <p className="wallet-qr-design-error" role="alert">
+          {designError}
+        </p>
+      )}
     </div>
   );
 }

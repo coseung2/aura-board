@@ -12,6 +12,15 @@ import { db } from "./db";
 const CANVA_API = "https://api.canva.com/rest/v1";
 const CANVA_AUTH = "https://www.canva.com/api/oauth/authorize";
 const CANVA_TOKEN = `${CANVA_API}/oauth/token`;
+const CANVA_DEFAULT_SCOPES = "design:meta:read design:content:read folder:read folder:write";
+const CANVA_STUDENT_CARD_SCOPES =
+  "design:meta:read design:content:write asset:read asset:write";
+
+type CanvaAuthState = {
+  kind: "student";
+  id: string;
+  returnTo: string | null;
+};
 
 export function getCanvaClientId() {
   return process.env.CANVA_CLIENT_ID ?? "";
@@ -23,6 +32,24 @@ function getCanvaClientSecret() {
 
 function getRedirectUri() {
   return process.env.CANVA_REDIRECT_URI ?? "http://localhost:3000/api/auth/canva/callback";
+}
+
+function encodeStudentAuthState(state: CanvaAuthState): string {
+  return Buffer.from(JSON.stringify(state)).toString("base64url");
+}
+
+export function decodeStudentAuthState(raw: string): CanvaAuthState | null {
+  try {
+    const parsed = JSON.parse(Buffer.from(raw, "base64url").toString("utf8")) as unknown;
+    if (!parsed || typeof parsed !== "object") return null;
+    const row = parsed as Record<string, unknown>;
+    if (row.kind !== "student") return null;
+    if (typeof row.id !== "string" || !row.id) return null;
+    const returnTo = typeof row.returnTo === "string" ? row.returnTo : null;
+    return { kind: "student", id: row.id, returnTo };
+  } catch {
+    return null;
+  }
 }
 
 /* ── PKCE helpers ── */
@@ -60,8 +87,34 @@ export async function buildAuthorizationUrl(userId: string): Promise<string> {
     redirect_uri: getRedirectUri(),
     code_challenge: challenge,
     code_challenge_method: "s256",
-    scope: "design:meta:read design:content:read folder:read folder:write",
+    scope: CANVA_DEFAULT_SCOPES,
     state: userId,
+  });
+
+  return `${CANVA_AUTH}?${params}`;
+}
+
+export async function buildStudentCardDesignAuthorizationUrl(
+  studentId: string,
+  returnTo: string | null = "/my/wallet"
+): Promise<string> {
+  const verifier = generateCodeVerifier();
+  const challenge = await generateCodeChallenge(verifier);
+
+  await db.canvaStudentConnectAccount.upsert({
+    where: { studentId },
+    create: { studentId, pkceVerifier: verifier },
+    update: { pkceVerifier: verifier },
+  });
+
+  const params = new URLSearchParams({
+    response_type: "code",
+    client_id: getCanvaClientId(),
+    redirect_uri: getRedirectUri(),
+    code_challenge: challenge,
+    code_challenge_method: "s256",
+    scope: CANVA_STUDENT_CARD_SCOPES,
+    state: encodeStudentAuthState({ kind: "student", id: studentId, returnTo }),
   });
 
   return `${CANVA_AUTH}?${params}`;
@@ -96,6 +149,45 @@ export async function exchangeCode(userId: string, code: string): Promise<boolea
   const data = await res.json();
   await db.canvaConnectAccount.update({
     where: { userId },
+    data: {
+      accessToken: data.access_token,
+      refreshToken: data.refresh_token,
+      expiresAt: new Date(Date.now() + data.expires_in * 1000),
+      pkceVerifier: null,
+    },
+  });
+  return true;
+}
+
+export async function exchangeStudentCode(studentId: string, code: string): Promise<boolean> {
+  const row = await db.canvaStudentConnectAccount.findUnique({ where: { studentId } });
+  const verifier = row?.pkceVerifier;
+  if (!verifier) return false;
+
+  const basic = Buffer.from(`${getCanvaClientId()}:${getCanvaClientSecret()}`).toString("base64");
+
+  const res = await fetch(CANVA_TOKEN, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/x-www-form-urlencoded",
+      Authorization: `Basic ${basic}`,
+    },
+    body: new URLSearchParams({
+      grant_type: "authorization_code",
+      code,
+      code_verifier: verifier,
+      redirect_uri: getRedirectUri(),
+    }),
+  });
+
+  if (!res.ok) {
+    console.error("[Canva] Student token exchange failed:", await res.text());
+    return false;
+  }
+
+  const data = await res.json();
+  await db.canvaStudentConnectAccount.update({
+    where: { studentId },
     data: {
       accessToken: data.access_token,
       refreshToken: data.refresh_token,
@@ -146,6 +238,44 @@ async function refreshAccessToken(userId: string): Promise<string | null> {
   return data.access_token;
 }
 
+async function refreshStudentAccessToken(studentId: string): Promise<string | null> {
+  const row = await db.canvaStudentConnectAccount.findUnique({ where: { studentId } });
+  if (!row?.refreshToken) return null;
+
+  const basic = Buffer.from(`${getCanvaClientId()}:${getCanvaClientSecret()}`).toString("base64");
+
+  const res = await fetch(CANVA_TOKEN, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/x-www-form-urlencoded",
+      Authorization: `Basic ${basic}`,
+    },
+    body: new URLSearchParams({
+      grant_type: "refresh_token",
+      refresh_token: row.refreshToken,
+    }),
+  });
+
+  if (!res.ok) {
+    await db.canvaStudentConnectAccount.update({
+      where: { studentId },
+      data: { accessToken: null, refreshToken: null, expiresAt: null },
+    });
+    return null;
+  }
+
+  const data = await res.json();
+  await db.canvaStudentConnectAccount.update({
+    where: { studentId },
+    data: {
+      accessToken: data.access_token,
+      refreshToken: data.refresh_token,
+      expiresAt: new Date(Date.now() + data.expires_in * 1000),
+    },
+  });
+  return data.access_token;
+}
+
 export async function getAccessToken(userId: string): Promise<string | null> {
   const row = await db.canvaConnectAccount.findUnique({ where: { userId } });
   if (!row?.accessToken || !row.expiresAt) return null;
@@ -153,6 +283,16 @@ export async function getAccessToken(userId: string): Promise<string | null> {
   // Refresh if expiring within 5 minutes.
   if (row.expiresAt.getTime() - Date.now() < 5 * 60 * 1000) {
     return refreshAccessToken(userId);
+  }
+  return row.accessToken;
+}
+
+export async function getStudentCanvaAccessToken(studentId: string): Promise<string | null> {
+  const row = await db.canvaStudentConnectAccount.findUnique({ where: { studentId } });
+  if (!row?.accessToken || !row.expiresAt) return null;
+
+  if (row.expiresAt.getTime() - Date.now() < 5 * 60 * 1000) {
+    return refreshStudentAccessToken(studentId);
   }
   return row.accessToken;
 }
@@ -166,6 +306,120 @@ export async function isCanvaConnected(userId: string): Promise<boolean> {
 }
 
 /* ── API calls ── */
+type CanvaAssetUploadJob = {
+  id: string;
+  status: "in_progress" | "success" | "failed";
+  asset?: { id: string };
+  error?: { code?: string; message?: string };
+};
+
+export type CanvaCreatedDesign = {
+  id: string;
+  editUrl: string | null;
+  viewUrl: string | null;
+};
+
+function assetUploadMetadataHeader(name: string, mimeType: string): string {
+  const metadata = {
+    name_base64: Buffer.from(name).toString("base64"),
+    mime_type: mimeType,
+  };
+  return Buffer.from(JSON.stringify(metadata)).toString("base64");
+}
+
+async function canvaGetAssetUploadJob(
+  token: string,
+  jobId: string
+): Promise<CanvaAssetUploadJob> {
+  const res = await fetch(`${CANVA_API}/asset-uploads/${jobId}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+
+  if (!res.ok) {
+    const err = await res.text();
+    throw new Error(`Get asset upload job failed: ${err}`);
+  }
+
+  const { job } = await res.json();
+  return job as CanvaAssetUploadJob;
+}
+
+export async function canvaUploadImageAsset(
+  token: string,
+  name: string,
+  png: Buffer
+): Promise<string> {
+  const res = await fetch(`${CANVA_API}/asset-uploads`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/octet-stream",
+      "Asset-Upload-Metadata": assetUploadMetadataHeader(name, "image/png"),
+    },
+    body: new Uint8Array(png),
+  });
+
+  if (!res.ok) {
+    const err = await res.text();
+    throw new Error(`Create asset upload job failed: ${err}`);
+  }
+
+  const { job } = (await res.json()) as { job: CanvaAssetUploadJob };
+  for (let attempt = 0; attempt < 12; attempt++) {
+    const current = attempt === 0 ? job : await canvaGetAssetUploadJob(token, job.id);
+    if (current.status === "success" && current.asset?.id) {
+      return current.asset.id;
+    }
+    if (current.status === "failed") {
+      const code = current.error?.code ?? "unknown";
+      const message = current.error?.message ?? "Asset upload failed";
+      throw new Error(`Asset upload failed: ${code} ${message}`);
+    }
+    await new Promise((resolve) => setTimeout(resolve, 500));
+  }
+
+  throw new Error("Asset upload did not finish in time");
+}
+
+export async function canvaCreateCardDesign(
+  token: string,
+  input: {
+    title: string;
+    assetId: string;
+    width: number;
+    height: number;
+  }
+): Promise<CanvaCreatedDesign> {
+  const res = await fetch(`${CANVA_API}/designs`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      design_type: {
+        type: "custom",
+        width: input.width,
+        height: input.height,
+      },
+      title: input.title,
+      asset_id: input.assetId,
+    }),
+  });
+
+  if (!res.ok) {
+    const err = await res.text();
+    throw new Error(`Create design failed: ${err}`);
+  }
+
+  const { design } = await res.json();
+  return {
+    id: design.id,
+    editUrl: design.urls?.edit_url ?? null,
+    viewUrl: design.urls?.view_url ?? null,
+  };
+}
+
 export async function canvaExportDesign(
   token: string,
   designId: string,

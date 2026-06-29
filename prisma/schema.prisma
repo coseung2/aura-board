@@ -302,6 +302,24 @@ model CanvaConnectAccount {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
+model CanvaStudentConnectAccount {
+  studentId String @id
+
+  accessToken String?
+
+  refreshToken String?
+
+  expiresAt DateTime?
+
+  pkceVerifier String?
+
+  updatedAt DateTime @updatedAt
+
+  createdAt DateTime @default(now())
+
+  student Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+}
+
 model Account {
   id String @id @default(cuid())
 
@@ -445,6 +463,7 @@ model Student {
   oauthRefreshTokens OAuthRefreshToken[]
 
   canvaAppLink CanvaAppLink?
+  canvaConnect CanvaStudentConnectAccount?
 
   assignmentSlots AssignmentSlot[] @relation("StudentAssignmentSlots")
 

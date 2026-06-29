@@ -5,7 +5,7 @@ import { ensureAccountFor } from "@/lib/bank";
 import { issueCardToken } from "@/lib/qr-token";
 
 // GET /api/my/wallet/card-qr
-// Issues a fresh 60s card token for the logged-in student's card.
+// Returns the fixed payment card token for the logged-in student's card.
 export async function GET() {
   const student = await getCurrentStudent().catch(() => null);
   if (!student) {

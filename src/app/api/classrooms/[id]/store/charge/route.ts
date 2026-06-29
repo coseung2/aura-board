@@ -4,11 +4,7 @@ import { db } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
 import { getCurrentStudent } from "@/lib/student-auth";
 import { hasPermission } from "@/lib/bank-permissions";
-import {
-  verifyCardToken,
-  isNonceConsumed,
-  markNonceConsumed,
-} from "@/lib/qr-token";
+import { getCardIdFromToken, verifyCardToken } from "@/lib/qr-token";
 
 const Body = z.object({
   cardQrToken: z.string().min(1),
@@ -62,14 +58,13 @@ export async function POST(
   }
 
   // 1) Verify card token
-  const parts = parsed.data.cardQrToken.split(".");
-  if (parts.length !== 4) {
+  const cardId = getCardIdFromToken(parsed.data.cardQrToken);
+  if (!cardId) {
     return NextResponse.json(
       { error: "유효하지 않은 카드 QR" },
       { status: 400 }
     );
   }
-  const [cardId] = parts;
   const card = await db.studentCard.findUnique({
     where: { id: cardId },
     include: {
@@ -97,12 +92,6 @@ export async function POST(
   if (!verified) {
     return NextResponse.json(
       { error: "만료되었거나 위조된 QR 토큰입니다" },
-      { status: 400 }
-    );
-  }
-  if (isNonceConsumed(verified.nonce)) {
-    return NextResponse.json(
-      { error: "이미 사용된 QR 토큰입니다" },
       { status: 400 }
     );
   }
@@ -198,9 +187,6 @@ export async function POST(
         })),
       };
     });
-
-    // 4) Mark nonce consumed on success
-    markNonceConsumed(verified.nonce);
 
     return NextResponse.json({ ok: true, ...result });
   } catch (err: unknown) {

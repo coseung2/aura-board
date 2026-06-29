@@ -2,31 +2,34 @@ import "server-only";
 import { createHmac, randomBytes, timingSafeEqual } from "crypto";
 
 /**
- * Card QR token — HMAC-signed payload with short expiry + single-use nonce.
+ * Card QR token — fixed HMAC-signed payload.
  *
- * Format: `${cardId}.${nonce}.${expiresAt}.${signature}`
+ * Format: `card.${cardId}.${signature}`
  *  - cardId: the StudentCard row we're authenticating to
- *  - nonce: random 12 bytes base64url, single-use (consumed on successful charge)
- *  - expiresAt: unix seconds; verified ≤ now
- *  - signature: HMAC(cardSecret + AUTH_SECRET, `${cardId}.${nonce}.${expiresAt}`)
+ *  - signature: HMAC(cardSecret + AUTH_SECRET, `card.fixed.${cardId}`)
  *
- * Nonce consumption uses a Prisma table `QRConsumedNonce` — we avoid an
- * in-memory cache because Vercel functions don't share memory across cold
- * starts. Actually for MVP simplicity we use an ephemeral Map with a TTL —
- * in a serverless the same instance often handles back-to-back scans in
- * short windows. If collision (same nonce re-used cross-instance) happens
- * the second consumer simply fails the signature/expiry check because we
- * bind nonce into the signature — every new token has a fresh nonce.
+ * The QR functions like a physical card credential. Charge requests remain
+ * atomic on the account/store transaction path; rotating/revoking the card's
+ * qrSecret or status is the server-side way to invalidate the printed QR.
  *
- * Reality: the strongest guarantee is the 60s expiry. Nonce consumption
- * is a belt-and-braces check for fast double-spend attempts from the same
- * instance.
+ * The verifier still accepts the previous daily token format for a short
+ * migration window so already-open wallet screens do not break mid-session.
  */
 
 const AUTH_SECRET = process.env.AUTH_SECRET ?? "dev-secret-never-in-prod";
-const TOKEN_TTL_SECONDS = 60;
 
-function signInput(cardId: string, nonce: string, expiresAt: number, cardSecret: string): string {
+function signFixedInput(cardId: string, cardSecret: string): string {
+  return createHmac("sha256", `${AUTH_SECRET}:${cardSecret}`)
+    .update(`card.fixed.${cardId}`)
+    .digest("base64url");
+}
+
+function signLegacyDailyInput(
+  cardId: string,
+  nonce: string,
+  expiresAt: number,
+  cardSecret: string
+): string {
   return createHmac("sha256", `${AUTH_SECRET}:${cardSecret}`)
     .update(`${cardId}.${nonce}.${expiresAt}`)
     .digest("base64url");
@@ -34,37 +37,49 @@ function signInput(cardId: string, nonce: string, expiresAt: number, cardSecret:
 
 export function issueCardToken(cardId: string, cardSecret: string): {
   token: string;
-  expiresAt: number;
+  expiresAt: null;
 } {
-  const nonce = randomBytes(12).toString("base64url");
-  const expiresAt = Math.floor(Date.now() / 1000) + TOKEN_TTL_SECONDS;
-  const sig = signInput(cardId, nonce, expiresAt, cardSecret);
-  const token = `${cardId}.${nonce}.${expiresAt}.${sig}`;
-  return { token, expiresAt };
+  const sig = signFixedInput(cardId, cardSecret);
+  const token = `card.${cardId}.${sig}`;
+  return { token, expiresAt: null };
 }
 
 export type VerifiedCardToken = {
   cardId: string;
-  nonce: string;
-  expiresAt: number;
+  kind: "fixed" | "legacy-daily";
+  nonce: string | null;
+  expiresAt: number | null;
 };
 
 export function parseCardToken(token: string): VerifiedCardToken | null {
   const parts = token.split(".");
+  if (parts.length === 3 && parts[0] === "card") {
+    const [, cardId] = parts;
+    if (!cardId) return null;
+    return { cardId, kind: "fixed", nonce: null, expiresAt: null };
+  }
+
   if (parts.length !== 4) return null;
   const [cardId, nonce, expiresAtRaw] = parts;
   const expiresAt = Number(expiresAtRaw);
   if (!Number.isFinite(expiresAt)) return null;
   if (!cardId || !nonce) return null;
-  return { cardId, nonce, expiresAt };
+  return { cardId, kind: "legacy-daily", nonce, expiresAt };
+}
+
+export function getCardIdFromToken(token: string): string | null {
+  return parseCardToken(token)?.cardId ?? null;
 }
 
 export function verifyCardToken(token: string, cardSecret: string): VerifiedCardToken | null {
   const parsed = parseCardToken(token);
   if (!parsed) return null;
   const parts = token.split(".");
-  const sig = parts[3];
-  const expected = signInput(parsed.cardId, parsed.nonce, parsed.expiresAt, cardSecret);
+  const sig = parsed.kind === "fixed" ? parts[2] : parts[3];
+  const expected =
+    parsed.kind === "fixed"
+      ? signFixedInput(parsed.cardId, cardSecret)
+      : signLegacyDailyInput(parsed.cardId, parsed.nonce ?? "", parsed.expiresAt ?? 0, cardSecret);
   try {
     const a = Buffer.from(sig);
     const b = Buffer.from(expected);
@@ -73,35 +88,10 @@ export function verifyCardToken(token: string, cardSecret: string): VerifiedCard
   } catch {
     return null;
   }
-  if (parsed.expiresAt < Math.floor(Date.now() / 1000)) return null;
-  return parsed;
-}
-
-// ─── Nonce consumption (in-memory, best-effort) ─────────────────────
-// Keys are nonces, values are expiry timestamps. Simple map with periodic
-// cleanup — bounded by the number of active tokens in the 15-minute window.
-// Serverless cold starts will re-create, so this is primarily a defense
-// against double-scan within the same warm instance during a POS session.
-
-type NonceRecord = { expiresAt: number };
-const consumedNonces = new Map<string, NonceRecord>();
-const NONCE_TTL_MS = 15 * 60 * 1000;
-
-function cleanupNonces() {
-  const now = Date.now();
-  for (const [nonce, rec] of consumedNonces) {
-    if (rec.expiresAt < now) consumedNonces.delete(nonce);
+  if (parsed.expiresAt !== null && parsed.expiresAt < Math.floor(Date.now() / 1000)) {
+    return null;
   }
-}
-
-export function markNonceConsumed(nonce: string) {
-  cleanupNonces();
-  consumedNonces.set(nonce, { expiresAt: Date.now() + NONCE_TTL_MS });
-}
-
-export function isNonceConsumed(nonce: string): boolean {
-  cleanupNonces();
-  return consumedNonces.has(nonce);
+  return parsed;
 }
 
 /** 4-digit blocks like "5501-1234". Server-side cardNumber generator. */
