@@ -23,6 +23,8 @@
 .grid-card {
   position: relative;
   align-self: start;
+  display: flex;
+  flex-direction: column;
   background: var(--color-surface);
   color: var(--color-text);
   border: var(--border-card);
@@ -5675,29 +5677,41 @@
 /* -------- Aura card evaluation segmented control -------- */
 
 .aura-eval-control {
-  margin-top: 12px;
+  margin: 14px -20px -20px;
+  border-top: 1px solid var(--color-border);
+  background: color-mix(in srgb, var(--color-surface-alt) 72%, transparent);
+  overflow: hidden;
+  border-radius: 0 0 var(--radius-card) var(--radius-card);
 }
 
 .aura-eval-segmented {
-  display: inline-flex;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-pill);
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  width: 100%;
+  border: 0;
+  border-radius: 0;
   overflow: hidden;
-  background: var(--color-surface-alt);
+  background: transparent;
 }
 
 .aura-eval-btn {
-  min-width: 36px;
-  padding: 4px 12px;
+  min-width: 0;
+  min-height: 34px;
+  padding: 7px 8px;
   border: 0;
+  border-right: 1px solid var(--color-border);
   background: transparent;
   color: var(--color-text-muted);
   font: inherit;
   font-size: 13px;
   font-weight: 700;
-  line-height: 1.6;
+  line-height: 1.35;
   cursor: pointer;
   transition: background 120ms ease, color 120ms ease;
+}
+
+.aura-eval-btn:last-child {
+  border-right: 0;
 }
 
 .aura-eval-btn:not(:disabled):hover {
@@ -5706,8 +5720,8 @@
 }
 
 .aura-eval-btn.is-selected {
-  background: var(--color-accent);
-  color: white;
+  background: var(--color-accent-tinted-bg);
+  color: var(--color-accent);
 }
 
 .aura-eval-btn:disabled {
@@ -5716,8 +5730,17 @@
 }
 
 .aura-eval-error {
-  margin: 6px 0 0;
+  margin: 0;
+  padding: 6px 10px 8px;
+  border-top: 1px solid var(--color-border);
   font-size: 12px;
   color: var(--color-danger);
   line-height: 1.45;
+  background: var(--color-surface);
+}
+
+.card-detail-aura-eval .aura-eval-control {
+  margin: 2px 0 8px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
 }

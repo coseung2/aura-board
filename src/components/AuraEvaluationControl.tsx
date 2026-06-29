@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 // Aura 평가 모드 (2026-06-23): 카드 단위 상/중/하 등급 컨트롤.
 // 보드 설정에서 평가모드가 켜지고 과목/단원/평가항목이 모두 있을 때만
@@ -31,10 +31,21 @@ type Props = {
   onSaved: (level: AuraEvaluationLevel) => void;
 };
 
-export function AuraEvaluationControl({ cardId, initialLevel, onSaved }: Props) {
-  const [current, setCurrent] = useState<AuraEvaluationLevel | null>(initialLevel);
+export function AuraEvaluationControl({
+  cardId,
+  initialLevel,
+  onSaved,
+}: Props) {
+  const [current, setCurrent] = useState<AuraEvaluationLevel | null>(
+    initialLevel,
+  );
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    setCurrent(initialLevel);
+    setError(null);
+  }, [cardId, initialLevel]);
 
   async function select(next: AuraEvaluationLevel) {
     if (busy || next === current) return;
@@ -73,6 +84,7 @@ export function AuraEvaluationControl({ cardId, initialLevel, onSaved }: Props) 
     <div
       className="aura-eval-control"
       onClick={(e) => e.stopPropagation()}
+      onMouseDown={(e) => e.stopPropagation()}
       role="group"
       aria-label="아우라 평가"
     >
@@ -84,13 +96,21 @@ export function AuraEvaluationControl({ cardId, initialLevel, onSaved }: Props) 
             className={`aura-eval-btn ${current === lvl ? "is-selected" : ""}`}
             aria-pressed={current === lvl}
             disabled={busy}
-            onClick={() => void select(lvl)}
+            onClick={(event) => {
+              event.stopPropagation();
+              void select(lvl);
+            }}
+            onMouseDown={(event) => event.stopPropagation()}
           >
             {LEVEL_LABELS[lvl]}
           </button>
         ))}
       </div>
-      {error && <p className="aura-eval-error" role="alert">{error}</p>}
+      {error && (
+        <p className="aura-eval-error" role="alert">
+          {error}
+        </p>
+      )}
     </div>
   );
 }

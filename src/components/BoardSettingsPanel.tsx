@@ -1295,8 +1295,23 @@ type AuraAssessmentPlan = {
   date?: string | null;
 };
 
-function auraPlanKey(plan: Pick<AuraAssessmentPlan, "subject" | "unit" | "criterion">) {
+type AuraPlansCacheEntry = {
+  plans: AuraAssessmentPlan[];
+  status: "ready" | "empty";
+};
+
+const auraPlansCache = new Map<string, AuraPlansCacheEntry>();
+
+function auraPlanKey(
+  plan: Pick<AuraAssessmentPlan, "subject" | "unit" | "criterion">,
+) {
   return `${plan.subject}\u001f${plan.unit}\u001f${plan.criterion}`;
+}
+
+function auraPlanLabel(plan: Pick<AuraAssessmentPlan, "subject" | "unit">) {
+  return [plan.subject, plan.unit]
+    .filter((part) => part.trim().length > 0)
+    .join(" · ");
 }
 
 function AuraTab({
@@ -1343,6 +1358,12 @@ function AuraTab({
     let cancelled = false;
 
     async function loadPlans() {
+      const cached = auraPlansCache.get(boardId);
+      if (cached) {
+        setPlans(cached.plans);
+        setPlansStatus({ status: cached.status });
+        return;
+      }
       setPlansStatus({ status: "loading" });
       try {
         const res = await fetch(`/api/boards/${boardId}/aura/plans`, {
@@ -1370,7 +1391,12 @@ function AuraTab({
         const nextPlans = Array.isArray(data.plans) ? data.plans : [];
         if (!cancelled) {
           setPlans(nextPlans);
-          setPlansStatus({ status: nextPlans.length > 0 ? "ready" : "empty" });
+          const nextStatus = nextPlans.length > 0 ? "ready" : "empty";
+          auraPlansCache.set(boardId, {
+            plans: nextPlans,
+            status: nextStatus,
+          });
+          setPlansStatus({ status: nextStatus });
         }
       } catch {
         if (!cancelled) {
@@ -1501,9 +1527,7 @@ function AuraTab({
               </option>
               {plans.map((plan) => (
                 <option key={auraPlanKey(plan)} value={auraPlanKey(plan)}>
-                  {[plan.subject, plan.unit, plan.criterion]
-                    .filter((part) => part.trim().length > 0)
-                    .join(" · ")}
+                  {auraPlanLabel(plan)}
                 </option>
               ))}
             </select>
@@ -1520,13 +1544,11 @@ function AuraTab({
             <article className="board-settings-row">
               <div className="board-settings-row-title">
                 <span className="board-settings-row-name">
-                  {selectedPlan.criterion}
+                  {auraPlanLabel(selectedPlan)}
                 </span>
               </div>
               <p className="board-settings-row-note">
-                {[selectedPlan.subject, selectedPlan.unit]
-                  .filter((part) => part.trim().length > 0)
-                  .join(" · ")}
+                {selectedPlan.criterion}
               </p>
             </article>
           )}

@@ -16,6 +16,10 @@ import {
   FullscreenExitIcon,
 } from "../icons/UiIcons";
 import type { CardData } from "../DraggableCard";
+import {
+  AuraEvaluationControl,
+  type AuraEvaluationLevel,
+} from "../AuraEvaluationControl";
 
 type Props = {
   card: CardData | null;
@@ -34,6 +38,11 @@ type Props = {
   onNext?: () => void;
   boardId?: string;
   isStudentViewer?: boolean;
+  auraEvaluation?: {
+    enabled: boolean;
+    level: AuraEvaluationLevel | null;
+    onSaved: (cardId: string, level: AuraEvaluationLevel) => void;
+  };
 };
 
 type DetailLayout = "full" | "media-meta" | "text-meta";
@@ -49,6 +58,7 @@ export function CardDetailModal({
   onNext,
   boardId,
   isStudentViewer = false,
+  auraEvaluation,
 }: Props) {
   const rootRef = useRef<HTMLDivElement>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -360,6 +370,15 @@ export function CardDetailModal({
                   anonymousAuthor={card.anonymousAuthor}
                 />
               </div>
+              {auraEvaluation?.enabled && (
+                <div className="card-detail-aura-eval">
+                  <AuraEvaluationControl
+                    cardId={card.id}
+                    initialLevel={auraEvaluation.level}
+                    onSaved={(level) => auraEvaluation.onSaved(card.id, level)}
+                  />
+                </div>
+              )}
               {/* card-detail-modal-engagement (2026-04-26): 좋아요 + 댓글 패널. */}
               <CardEngagement
                 cardId={card.id}

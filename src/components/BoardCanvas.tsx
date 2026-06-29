@@ -58,6 +58,10 @@ export function BoardCanvas({
     Record<string, AuraEvaluationLevel>
   >(auraEvaluations ?? {});
 
+  function handleAuraSaved(cardId: string, level: AuraEvaluationLevel) {
+    setAuraLevels((map) => ({ ...map, [cardId]: level }));
+  }
+
   const deletingIds = useRef<Set<string>>(new Set());
   const masonryGridRef = useRef<HTMLDivElement | null>(null);
   const masonryCardRefs = useRef(new Map<string, HTMLElement>());
@@ -349,9 +353,7 @@ export function BoardCanvas({
               <AuraEvaluationControl
                 cardId={c.id}
                 initialLevel={auraLevels[c.id] ?? null}
-                onSaved={(level) =>
-                  setAuraLevels((map) => ({ ...map, [c.id]: level }))
-                }
+                onSaved={(level) => handleAuraSaved(c.id, level)}
               />
             )}
             {(currentRole === "owner" ||
@@ -415,6 +417,15 @@ export function BoardCanvas({
         onEditAuthors={(c) => setAuthorEditCard(c)}
         canEditAuthors={(c) => canEdit || c.studentAuthorId === currentUserId}
         boardId={boardId}
+        auraEvaluation={
+          showAuraControl && openCard
+            ? {
+                enabled: true,
+                level: auraLevels[openCard.id] ?? null,
+                onSaved: handleAuraSaved,
+              }
+            : undefined
+        }
       />
       {editingCard && (
         <EditCardModal
