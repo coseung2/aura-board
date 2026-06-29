@@ -3,9 +3,9 @@
 import { useEffect, useState } from "react";
 
 // Aura 평가 모드 (2026-06-23): 카드 단위 상/중/하 등급 컨트롤.
-// 보드 설정에서 평가모드가 켜지고 과목/단원/평가항목이 모두 있을 때만
-// grid/freeform 카드에 렌더된다. 진실은 AiFeedback 이고, 이 컨트롤은
-// PUT /api/cards/[id]/aura-evaluation 만 호출한다.
+// 보드 설정에서 평가모드가 켜지면 grid/freeform 카드에 렌더된다.
+// 이 컨트롤은 CardEvaluation 초안 저장만 담당하고, AiFeedback 전송은
+// 보드 설정의 "결과 보내기" 단계에서 처리한다.
 
 export type AuraEvaluationLevel = "high" | "mid" | "low";
 
@@ -65,7 +65,7 @@ export function AuraEvaluationControl({
         if (data.error === "student_author_required") {
           setError("카드에 학생 작성자를 먼저 지정해 주세요.");
         } else if (data.error === "evaluation_not_configured") {
-          setError("보드 아우라 평가 설정이 필요해요.");
+          setError("보드 평가모드를 먼저 켜 주세요.");
         } else {
           setError("평가 저장에 실패했어요.");
         }

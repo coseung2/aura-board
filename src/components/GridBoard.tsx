@@ -46,12 +46,7 @@ export function GridBoard({
   const [authorEditCard, setAuthorEditCard] = useState<CardData | null>(null);
   const canEdit = currentRole === "owner" || currentRole === "editor";
   const canAddCard = canEdit || !!isStudentViewer;
-  const showAuraControl =
-    canEdit &&
-    !!auraSettings?.evaluationEnabled &&
-    !!auraSettings.subject &&
-    !!auraSettings.unit &&
-    !!auraSettings.criterion;
+  const showAuraControl = canEdit && !!auraSettings?.evaluationEnabled;
   const [auraLevels, setAuraLevels] = useState<
     Record<string, AuraEvaluationLevel>
   >(auraEvaluations ?? {});

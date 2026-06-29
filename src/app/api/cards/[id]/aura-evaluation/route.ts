@@ -1,22 +1,20 @@
 /**
  * /api/cards/[id]/aura-evaluation
  *
- * Aura 평가 모드 (2026-06-23) — 카드 단위 상/중/하 등급 upsert.
+ * Aura 평가 모드 (2026-06-23) — 카드 단위 상/중/하 등급 초안 upsert.
  *
  *   PUT — teacher owner/editor 만. body = { level: "high" | "mid" | "low" }.
  *
- *   1) board.auraEvaluationEnabled === true 이고
- *      board.auraSubject / auraUnit / auraCriterion 이 모두 non-empty
- *      이어야 한다. 아니면 400.
+ *   1) board.auraEvaluationEnabled === true 이어야 한다. 과목/단원/평가요소
+ *      매핑은 "결과 보내기" 시점에 /api/boards/[id]/aura/evaluations POST 로
+ *      받는다.
  *   2) 학생 식별: card.authors (order ASC) 의 첫 행.studentId 를 우선,
  *      없으면 card.studentAuthorId. 둘 다 없으면 400
  *      { error: "student_author_required" }.
  *   3) CardEvaluation upsert (cardId unique). 같은 카드에 다시 등급을
  *      매기면 덮어쓴다.
- *   4) AiFeedback upsert (studentId, subject, unit, criterion unique). 교사
- *      LLM Key 가 필요 없고, model 은 "aura-board:evaluation-mode:v1"
- *      고정 — deterministic 등급 문장이라 LLM 호출 없음.
- *   5) response = { cardId, studentId, level, comment, aiFeedbackId, updatedAt }.
+ *   4) response = { cardId, studentId, level, comment, aiFeedbackId, updatedAt }.
+ *      aiFeedbackId 는 아직 보내지 않은 초안이면 null 이다.
  */
 import { NextResponse } from "next/server";
 import { z } from "zod";
@@ -24,7 +22,6 @@ import { db } from "@/lib/db";
 import { requirePermission, ForbiddenError } from "@/lib/rbac";
 import { getCurrentUser } from "@/lib/auth";
 import {
-  AURA_EVALUATION_MODEL,
   commentForLevel,
   isAuraEvaluationLevel,
 } from "@/lib/aura-evaluation";
@@ -75,9 +72,6 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
     select: {
       id: true,
       auraEvaluationEnabled: true,
-      auraSubject: true,
-      auraUnit: true,
-      auraCriterion: true,
     },
   });
   if (!board) return NextResponse.json({ error: "not_found" }, { status: 404 });
@@ -91,12 +85,7 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
     throw e;
   }
 
-  if (
-    !board.auraEvaluationEnabled ||
-    !board.auraSubject ||
-    !board.auraUnit ||
-    !board.auraCriterion
-  ) {
+  if (!board.auraEvaluationEnabled) {
     return NextResponse.json({ error: "evaluation_not_configured" }, { status: 400 });
   }
 
@@ -115,9 +104,6 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
   }
 
   const comment = commentForLevel(level);
-  const subject = board.auraSubject;
-  const unit = board.auraUnit;
-  const criterion = board.auraCriterion;
 
   const evaluation = await db.cardEvaluation.upsert({
     where: { cardId: card.id },
@@ -134,51 +120,16 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
       comment,
       teacherId: user.id,
       studentId: student.id,
+      aiFeedbackId: null,
     },
   });
-
-  const feedback = await db.aiFeedback.upsert({
-    where: {
-      studentId_subject_unit_criterion: {
-        studentId: student.id,
-        subject,
-        unit,
-        criterion,
-      },
-    },
-    create: {
-      teacherId: user.id,
-      classroomId: student.classroomId,
-      studentId: student.id,
-      subject,
-      unit,
-      criterion,
-      comment,
-      model: AURA_EVALUATION_MODEL,
-    },
-    update: {
-      comment,
-      model: AURA_EVALUATION_MODEL,
-      teacherId: user.id,
-      classroomId: student.classroomId,
-    },
-    select: { id: true, updatedAt: true },
-  });
-
-  // aiFeedbackId 를 CardEvaluation 에 backlink (옵션, 진단용).
-  if (evaluation.aiFeedbackId !== feedback.id) {
-    await db.cardEvaluation.update({
-      where: { cardId: card.id },
-      data: { aiFeedbackId: feedback.id },
-    });
-  }
 
   return NextResponse.json({
     cardId: card.id,
     studentId: student.id,
     level,
     comment,
-    aiFeedbackId: feedback.id,
-    updatedAt: feedback.updatedAt.toISOString(),
+    aiFeedbackId: evaluation.aiFeedbackId,
+    updatedAt: evaluation.updatedAt.toISOString(),
   });
 }

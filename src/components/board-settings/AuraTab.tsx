@@ -56,9 +56,10 @@ export function AuraTab({
   const [saveState, setSaveState] = useState<
     | { status: "idle" }
     | { status: "saving" }
-    | { status: "saved"; at: number }
+    | { status: "sent"; count: number; at: number }
     | { status: "error"; message: string }
   >({ status: "idle" });
+  const [evaluationCount, setEvaluationCount] = useState<number | null>(null);
 
   useEffect(() => {
     const savedKey =
@@ -70,7 +71,6 @@ export function AuraTab({
           })
         : "";
     setSelectedKey(savedKey);
-    setSaveState({ status: "idle" });
   }, [value.subject, value.unit, value.criterion]);
 
   useEffect(() => {
@@ -134,16 +134,36 @@ export function AuraTab({
     };
   }, [boardId]);
 
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadEvaluations() {
+      if (!value.evaluationEnabled) {
+        setEvaluationCount(null);
+        return;
+      }
+      try {
+        const res = await fetch(`/api/boards/${boardId}/aura/evaluations`, {
+          cache: "no-store",
+        });
+        const data = (await res.json().catch(() => ({}))) as {
+          evaluations?: unknown[];
+        };
+        if (!cancelled) {
+          setEvaluationCount(Array.isArray(data.evaluations) ? data.evaluations.length : 0);
+        }
+      } catch {
+        if (!cancelled) setEvaluationCount(null);
+      }
+    }
+
+    void loadEvaluations();
+    return () => {
+      cancelled = true;
+    };
+  }, [boardId, value.evaluationEnabled]);
+
   const selectedPlan = plans.find((plan) => auraPlanKey(plan) === selectedKey);
-  const savedKey =
-    value.subject && value.criterion
-      ? auraPlanKey({
-          subject: value.subject,
-          unit: value.unit ?? "",
-          criterion: value.criterion,
-        })
-      : "";
-  const fieldsDirty = Boolean(selectedPlan) && selectedKey !== savedKey;
 
   async function toggleMode() {
     const next = !value.evaluationEnabled;
@@ -172,12 +192,12 @@ export function AuraTab({
     }
   }
 
-  async function saveFields() {
-    if (!selectedPlan || !fieldsDirty) return;
+  async function sendResults() {
+    if (!selectedPlan) return;
     setSaveState({ status: "saving" });
     try {
-      const res = await fetch(`/api/boards/${boardId}/aura`, {
-        method: "PATCH",
+      const res = await fetch(`/api/boards/${boardId}/aura/evaluations`, {
+        method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
           subject: selectedPlan.subject,
@@ -186,15 +206,32 @@ export function AuraTab({
         }),
       });
       if (!res.ok) {
-        setSaveState({ status: "error", message: "저장에 실패했어요." });
+        const data = (await res.json().catch(() => ({}))) as { error?: string };
+        setSaveState({
+          status: "error",
+          message:
+            data.error === "no_evaluations" ||
+            data.error === "no_valid_evaluations"
+              ? "먼저 카드 평가를 저장해 주세요."
+              : "결과 보내기에 실패했어요.",
+        });
         return;
       }
-      const data = (await res.json()) as AuraBoardSettings;
-      onChange(data);
+      const data = (await res.json()) as { sentCount?: number };
+      onChange({
+        ...value,
+        subject: selectedPlan.subject,
+        unit: selectedPlan.unit,
+        criterion: selectedPlan.criterion,
+      });
       router.refresh();
-      setSaveState({ status: "saved", at: Date.now() });
+      setSaveState({
+        status: "sent",
+        count: data.sentCount ?? 0,
+        at: Date.now(),
+      });
     } catch {
-      setSaveState({ status: "error", message: "저장에 실패했어요." });
+      setSaveState({ status: "error", message: "결과 보내기에 실패했어요." });
     }
   }
 
@@ -216,23 +253,26 @@ export function AuraTab({
         <span className="board-settings-check-copy">
           <span className="board-settings-check-title">평가모드</span>
           <span className="board-settings-check-desc">
-            카드에 상/중/하 평가를 표시하고 AiFeedback 으로 연동해요.
+            카드에 상/중/하 평가를 먼저 저장하고, 완료 후 결과를 보냅니다.
           </span>
         </span>
       </button>
       {toggleErr && <p className="board-settings-error">{toggleErr}</p>}
 
-      <SettingsSection title="평가 기준">
+      <SettingsSection title="결과 보내기">
         <div className="board-settings-control-stack">
           <div className="stream-guidance-field">
             <label className="stream-guidance-label" htmlFor={`aura-plan-${boardId}`}>
-              Aura 평가계획
+              보낼 평가계획
             </label>
             <select
               id={`aura-plan-${boardId}`}
               className="modal-select"
               value={selectedKey}
-              onChange={(e) => setSelectedKey(e.target.value)}
+              onChange={(e) => {
+                setSelectedKey(e.target.value);
+                setSaveState({ status: "idle" });
+              }}
               disabled={
                 saveState.status === "saving" ||
                 plansStatus.status === "loading" ||
@@ -271,18 +311,28 @@ export function AuraTab({
               </p>
             </article>
           )}
+          {evaluationCount !== null && (
+            <p className="board-settings-row-note">
+              현재 저장된 카드 평가 {evaluationCount}개를 선택한 평가계획에 매핑해 보냅니다.
+            </p>
+          )}
           <div className="stream-guidance-actions">
             <button
               type="button"
               className="stream-guidance-save"
-              onClick={() => void saveFields()}
-              disabled={!fieldsDirty || saveState.status === "saving" || !selectedPlan}
+              onClick={() => void sendResults()}
+              disabled={
+                !value.evaluationEnabled ||
+                saveState.status === "saving" ||
+                !selectedPlan ||
+                evaluationCount === 0
+              }
             >
-              {saveState.status === "saving" ? "저장 중..." : "저장"}
+              {saveState.status === "saving" ? "보내는 중..." : "결과 보내기"}
             </button>
-            {saveState.status === "saved" && (
+            {saveState.status === "sent" && (
               <span className="stream-guidance-status" aria-live="polite">
-                저장했어요.
+                {saveState.count}명 결과를 보냈어요.
               </span>
             )}
             {saveState.status === "error" && (
