@@ -27,7 +27,9 @@ function fixedPairId(a: string, b: string): string {
   return [a, b].sort().join("__");
 }
 
-function genderOf(student: GroupEditorStudent | undefined): StudentGender | null {
+function genderOf(
+  student: GroupEditorStudent | undefined,
+): StudentGender | null {
   return student?.gender === "male" || student?.gender === "female"
     ? student.gender
     : null;
@@ -95,7 +97,8 @@ function scaledGenderTargets(
   maleTarget: number,
 ) {
   const quotaTotal = femaleTarget + maleTarget;
-  if (size <= 0 || quotaTotal <= 0) return { female: 0, male: 0, scaled: false };
+  if (size <= 0 || quotaTotal <= 0)
+    return { female: 0, male: 0, scaled: false };
   if (quotaTotal <= size) {
     return { female: femaleTarget, male: maleTarget, scaled: false };
   }
@@ -132,7 +135,9 @@ export function ClassroomSeatingEditor({
   const [maleTarget, setMaleTarget] = useState(2);
   const [femaleTarget, setFemaleTarget] = useState(2);
   const [randomStatus, setRandomStatus] = useState("");
-  const [draggingStudentId, setDraggingStudentId] = useState<string | null>(null);
+  const [draggingStudentId, setDraggingStudentId] = useState<string | null>(
+    null,
+  );
   const [placementRunId, setPlacementRunId] = useState(0);
   const [fixedPairs, setFixedPairs] = useState<FixedPair[]>([]);
   const [pairFirstId, setPairFirstId] = useState("");
@@ -148,10 +153,7 @@ export function ClassroomSeatingEditor({
   }, [students]);
 
   const seatMap = useMemo(() => {
-    const map = new Map<
-      string,
-      { groupIndex: number; seatIndex: number }
-    >();
+    const map = new Map<string, { groupIndex: number; seatIndex: number }>();
     groups.forEach((group, groupIndex) => {
       group.studentIds.forEach((studentId, seatIndex) => {
         map.set(studentId, { groupIndex, seatIndex });
@@ -159,22 +161,36 @@ export function ClassroomSeatingEditor({
     });
     return map;
   }, [groups]);
+  const arrangedStudentIds = useMemo(() => {
+    const ids = new Set<string>();
+    groups.forEach((group) => {
+      group.studentIds.forEach((studentId) => {
+        if (studentMap.has(studentId)) ids.add(studentId);
+      });
+    });
+    return ids;
+  }, [groups, studentMap]);
+  const arrangeableStudents = useMemo(
+    () => students.filter((student) => arrangedStudentIds.has(student.id)),
+    [students, arrangedStudentIds],
+  );
 
   const unassigned = useMemo(
     () => students.filter((student) => !seatMap.has(student.id)),
     [students, seatMap],
   );
-  const unknownGenderCount = useMemo(
-    () => students.filter((student) => !genderOf(student)).length,
-    [students],
+  const arrangeableUnknownGenderCount = useMemo(
+    () => arrangeableStudents.filter((student) => !genderOf(student)).length,
+    [arrangeableStudents],
   );
   const validFixedPairs = useMemo(
     () =>
       fixedPairs.filter(
         (pair) =>
-          studentMap.has(pair.studentIds[0]) && studentMap.has(pair.studentIds[1]),
+          arrangedStudentIds.has(pair.studentIds[0]) &&
+          arrangedStudentIds.has(pair.studentIds[1]),
       ),
-    [fixedPairs, studentMap],
+    [arrangedStudentIds, fixedPairs],
   );
   const fixedPairStudentIds = useMemo(() => {
     const ids = new Set<string>();
@@ -185,8 +201,11 @@ export function ClassroomSeatingEditor({
     return ids;
   }, [validFixedPairs]);
   const pairableStudents = useMemo(
-    () => students.filter((student) => !fixedPairStudentIds.has(student.id)),
-    [students, fixedPairStudentIds],
+    () =>
+      arrangeableStudents.filter(
+        (student) => !fixedPairStudentIds.has(student.id),
+      ),
+    [arrangeableStudents, fixedPairStudentIds],
   );
 
   useEffect(() => {
@@ -198,7 +217,10 @@ export function ClassroomSeatingEditor({
     return () => window.removeEventListener("dragend", handleWindowDragEnd);
   }, [draggingStudentId]);
 
-  function withoutStudent(studentId: string, sourceGroups = groups): GroupEditorDraft[] {
+  function withoutStudent(
+    studentId: string,
+    sourceGroups = groups,
+  ): GroupEditorDraft[] {
     return sourceGroups.map((group) => ({
       ...group,
       studentIds: group.studentIds.filter((id) => id !== studentId),
@@ -207,7 +229,9 @@ export function ClassroomSeatingEditor({
 
   function changeGroups(nextGroups: GroupEditorDraft[]) {
     const doc = document as Document & {
-      startViewTransition?: (callback: () => void) => { finished: Promise<void> };
+      startViewTransition?: (callback: () => void) => {
+        finished: Promise<void>;
+      };
     };
     const prefersReducedMotion = window.matchMedia(
       "(prefers-reduced-motion: reduce)",
@@ -292,7 +316,7 @@ export function ClassroomSeatingEditor({
     const targetStudentId =
       targetSeatIndex == null
         ? null
-        : groups[targetGroupIndex].studentIds[targetSeatIndex] ?? null;
+        : (groups[targetGroupIndex].studentIds[targetSeatIndex] ?? null);
     if (targetStudentId === studentId) return;
 
     const source = seatMap.get(studentId);
@@ -341,10 +365,7 @@ export function ClassroomSeatingEditor({
     setFixedPairs((current) =>
       current.some((pair) => pair.id === id)
         ? current
-        : [
-            ...current,
-            { id, studentIds: [pairFirstId, pairSecondId] },
-          ],
+        : [...current, { id, studentIds: [pairFirstId, pairSecondId] }],
     );
     setPairFirstId("");
     setPairSecondId("");
@@ -355,9 +376,18 @@ export function ClassroomSeatingEditor({
   }
 
   function randomArrange() {
-    const columnCount = Math.max(1, Math.ceil(students.length / GROUP_SIZE));
-    const baseSize = Math.floor(students.length / columnCount);
-    const remainder = students.length % columnCount;
+    if (arrangeableStudents.length === 0) {
+      setRandomStatus(
+        "배치할 학생이 없어요. 미배정 학생은 랜덤 배치에서 제외돼요.",
+      );
+      return;
+    }
+    const columnCount = Math.max(
+      1,
+      Math.ceil(arrangeableStudents.length / GROUP_SIZE),
+    );
+    const baseSize = Math.floor(arrangeableStudents.length / columnCount);
+    const remainder = arrangeableStudents.length % columnCount;
     const sizes = Array.from(
       { length: columnCount },
       (_, index) => baseSize + (index < remainder ? 1 : 0),
@@ -378,8 +408,12 @@ export function ClassroomSeatingEditor({
           partial = true;
           return;
         }
-        const maxSpace = Math.max(...candidates.map((candidate) => candidate.space));
-        const best = candidates.filter((candidate) => candidate.space === maxSpace);
+        const maxSpace = Math.max(
+          ...candidates.map((candidate) => candidate.space),
+        );
+        const best = candidates.filter(
+          (candidate) => candidate.space === maxSpace,
+        );
         const target = shuffle(best)[0];
         next[target.groupIndex].studentIds.push(...ids);
         remaining[target.groupIndex] -= ids.length;
@@ -389,7 +423,9 @@ export function ClassroomSeatingEditor({
         placeUnit(shuffle([...pair.studentIds]));
       });
       shuffle(
-        students.filter((student) => !fixedPairStudentIds.has(student.id)),
+        arrangeableStudents.filter(
+          (student) => !fixedPairStudentIds.has(student.id),
+        ),
       ).forEach((student) => {
         placeUnit([student.id]);
       });
@@ -400,10 +436,17 @@ export function ClassroomSeatingEditor({
           : `지정짝 ${validFixedPairs.length}쌍을 함께 랜덤 배치했어요.`,
       ];
       if (useGenderQuota || pairMode !== "any") {
-        notes.push("고정짝이 있는 동안 성비/짝 조건은 보조 조건으로만 적용돼요.");
+        notes.push(
+          "고정짝이 있는 동안 성비/짝 조건은 보조 조건으로만 적용돼요.",
+        );
       }
-      if (unknownGenderCount > 0) {
-        notes.push(`성별 미지정 ${unknownGenderCount}명은 성비 조건에서 제외됐어요.`);
+      if (arrangeableUnknownGenderCount > 0) {
+        notes.push(
+          `성별 미지정 ${arrangeableUnknownGenderCount}명은 성비 조건에서 제외됐어요.`,
+        );
+      }
+      if (unassigned.length > 0) {
+        notes.push(`미배정 ${unassigned.length}명은 그대로 제외했어요.`);
       }
       setRandomStatus(notes.join(" "));
       setPlacementRunId((current) => current + 1);
@@ -411,12 +454,14 @@ export function ClassroomSeatingEditor({
       return;
     }
     const malePool = shuffle(
-      students.filter((student) => genderOf(student) === "male"),
+      arrangeableStudents.filter((student) => genderOf(student) === "male"),
     );
     const femalePool = shuffle(
-      students.filter((student) => genderOf(student) === "female"),
+      arrangeableStudents.filter((student) => genderOf(student) === "female"),
     );
-    const unknownPool = shuffle(students.filter((student) => !genderOf(student)));
+    const unknownPool = shuffle(
+      arrangeableStudents.filter((student) => !genderOf(student)),
+    );
     let partial = false;
 
     function takeFrom(pool: GroupEditorStudent[]) {
@@ -471,7 +516,13 @@ export function ClassroomSeatingEditor({
           const rightId = rightIds[row];
           if (!leftId || !rightId) continue;
           pairCount += 1;
-          if (pairMatches(studentMap.get(leftId), studentMap.get(rightId), pairMode)) {
+          if (
+            pairMatches(
+              studentMap.get(leftId),
+              studentMap.get(rightId),
+              pairMode,
+            )
+          ) {
             matchedCount += 1;
             continue;
           }
@@ -502,8 +553,13 @@ export function ClassroomSeatingEditor({
         ? "조건을 완전히 맞추긴 어려워 가능한 범위에서 랜덤 배치했어요."
         : `${pairModeLabel(pairMode)} 조건으로 랜덤 배치했어요.`,
     ];
-    if (unknownGenderCount > 0) {
-      notes.push(`성별 미지정 ${unknownGenderCount}명은 성비 조건에서 제외됐어요.`);
+    if (arrangeableUnknownGenderCount > 0) {
+      notes.push(
+        `성별 미지정 ${arrangeableUnknownGenderCount}명은 성비 조건에서 제외됐어요.`,
+      );
+    }
+    if (unassigned.length > 0) {
+      notes.push(`미배정 ${unassigned.length}명은 그대로 제외했어요.`);
     }
     setRandomStatus(notes.join(" "));
     setPlacementRunId((current) => current + 1);
@@ -660,8 +716,7 @@ export function ClassroomSeatingEditor({
               onDrop={(event) => {
                 event.preventDefault();
                 const studentId =
-                  draggingStudentId ||
-                  event.dataTransfer.getData("text/plain");
+                  draggingStudentId || event.dataTransfer.getData("text/plain");
                 if (studentId) {
                   if (previewTargetRef.current) {
                     commitDrag();
@@ -685,7 +740,10 @@ export function ClassroomSeatingEditor({
                         key={`empty-${groupIndex}-${seatIndex}`}
                         onDragOver={(event) => {
                           if (!disabled) event.preventDefault();
-                          if (previewTargetRef.current && dragSnapshotRef.current) {
+                          if (
+                            previewTargetRef.current &&
+                            dragSnapshotRef.current
+                          ) {
                             previewTargetRef.current = null;
                             onChange(dragSnapshotRef.current);
                           }
@@ -697,7 +755,11 @@ export function ClassroomSeatingEditor({
                             draggingStudentId ||
                             event.dataTransfer.getData("text/plain");
                           if (droppedId) {
-                            moveDraggedStudent(droppedId, groupIndex, seatIndex);
+                            moveDraggedStudent(
+                              droppedId,
+                              groupIndex,
+                              seatIndex,
+                            );
                             commitDrag();
                           }
                         }}
@@ -707,7 +769,9 @@ export function ClassroomSeatingEditor({
                   return (
                     <div
                       className={`seating-desk ${
-                        draggingStudentId === student.id ? "is-dragging-card" : ""
+                        draggingStudentId === student.id
+                          ? "is-dragging-card"
+                          : ""
                       } ${placementRunId > 0 ? "is-placing" : ""}`}
                       key={`${student.id}-${placementRunId}`}
                       style={{
@@ -740,7 +804,11 @@ export function ClassroomSeatingEditor({
                           if (previewTargetRef.current) {
                             commitDrag();
                           } else {
-                            moveDraggedStudent(droppedId, groupIndex, seatIndex);
+                            moveDraggedStudent(
+                              droppedId,
+                              groupIndex,
+                              seatIndex,
+                            );
                             commitDrag();
                           }
                         }
@@ -768,54 +836,54 @@ export function ClassroomSeatingEditor({
       </div>
 
       <div
-          className={`seating-unassigned ${draggingStudentId ? "is-drop-target" : ""}`}
-          onDragOver={(event) => {
-            if (!disabled) event.preventDefault();
-          }}
-          onDrop={(event) => {
-            event.preventDefault();
-            const studentId =
-              draggingStudentId || event.dataTransfer.getData("text/plain");
-            if (studentId) {
-              if (previewTargetRef.current && dragSnapshotRef.current) {
-                changeGroups(withoutStudent(studentId, dragSnapshotRef.current));
-              } else {
-                moveToUnassigned(studentId);
-              }
-              commitDrag();
+        className={`seating-unassigned ${draggingStudentId ? "is-drop-target" : ""}`}
+        onDragOver={(event) => {
+          if (!disabled) event.preventDefault();
+        }}
+        onDrop={(event) => {
+          event.preventDefault();
+          const studentId =
+            draggingStudentId || event.dataTransfer.getData("text/plain");
+          if (studentId) {
+            if (previewTargetRef.current && dragSnapshotRef.current) {
+              changeGroups(withoutStudent(studentId, dragSnapshotRef.current));
+            } else {
+              moveToUnassigned(studentId);
             }
-          }}
-        >
-          <strong>미배정 ({unassigned.length}명)</strong>
-          {unassigned.length === 0 && (
-            <p className="seating-unassigned-empty">미배정 학생이 없어요.</p>
-          )}
-          <div className="seating-unassigned-list">
-            {unassigned.map((student) => (
-              <div
-                className="seating-desk is-unassigned"
-                key={student.id}
-                style={{ viewTransitionName: seatingTransitionName(student.id) }}
-                draggable={!disabled}
-                onDragStart={(event) => {
-                  startStudentDrag(student.id);
-                  event.dataTransfer.effectAllowed = "move";
-                  event.dataTransfer.setData("text/plain", student.id);
-                }}
-                onDragEnd={cancelDragPreview}
+            commitDrag();
+          }
+        }}
+      >
+        <strong>미배정 ({unassigned.length}명)</strong>
+        {unassigned.length === 0 && (
+          <p className="seating-unassigned-empty">미배정 학생이 없어요.</p>
+        )}
+        <div className="seating-unassigned-list">
+          {unassigned.map((student) => (
+            <div
+              className="seating-desk is-unassigned"
+              key={student.id}
+              style={{ viewTransitionName: seatingTransitionName(student.id) }}
+              draggable={!disabled}
+              onDragStart={(event) => {
+                startStudentDrag(student.id);
+                event.dataTransfer.effectAllowed = "move";
+                event.dataTransfer.setData("text/plain", student.id);
+              }}
+              onDragEnd={cancelDragPreview}
+            >
+              <span className="seating-desk-num">
+                {student.number != null ? `${student.number}번` : "-"}
+              </span>
+              <span className="seating-desk-name">{student.name}</span>
+              <span
+                className={`seating-gender is-${student.gender ?? "unknown"}`}
               >
-                <span className="seating-desk-num">
-                  {student.number != null ? `${student.number}번` : "-"}
-                </span>
-                <span className="seating-desk-name">{student.name}</span>
-                <span
-                  className={`seating-gender is-${student.gender ?? "unknown"}`}
-                >
-                  {genderLabel(student.gender)}
-                </span>
-              </div>
-            ))}
-          </div>
+                {genderLabel(student.gender)}
+              </span>
+            </div>
+          ))}
+        </div>
       </div>
     </div>
   );

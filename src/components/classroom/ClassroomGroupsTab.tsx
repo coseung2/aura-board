@@ -24,13 +24,9 @@ function defaultGroups(students: GroupEditorStudent[]): GroupEditorDraft[] {
 function chunkIntoSeatGroups(
   orderedIds: string[],
   students: GroupEditorStudent[],
+  options: { includeMissingStudents?: boolean } = {},
 ): GroupEditorDraft[] {
-  const count = Math.max(1, Math.ceil((students.length || 1) / 4));
-  const groups = Array.from({ length: count }, (_, index) => ({
-    name: `${index + 1}분단`,
-    studentIds: [] as string[],
-  }));
-
+  const includeMissingStudents = options.includeMissingStudents ?? true;
   const validIds = new Set(students.map((student) => student.id));
   const seen = new Set<string>();
   const normalizedIds = orderedIds.filter((studentId) => {
@@ -38,9 +34,17 @@ function chunkIntoSeatGroups(
     seen.add(studentId);
     return true;
   });
-  for (const student of students) {
-    if (!seen.has(student.id)) normalizedIds.push(student.id);
+  if (includeMissingStudents) {
+    for (const student of students) {
+      if (!seen.has(student.id)) normalizedIds.push(student.id);
+    }
   }
+
+  const count = Math.max(1, Math.ceil((normalizedIds.length || 1) / 4));
+  const groups = Array.from({ length: count }, (_, index) => ({
+    name: `${index + 1}분단`,
+    studentIds: [] as string[],
+  }));
 
   normalizedIds.forEach((studentId, index) => {
     groups[Math.floor(index / 4)].studentIds.push(studentId);
@@ -77,6 +81,7 @@ export function ClassroomGroupsTab({
       ? chunkIntoSeatGroups(
           initialGroups.flatMap((group) => group.studentIds),
           seatingStudents,
+          { includeMissingStudents: false },
         )
       : defaultGroups(seatingStudents),
   );
@@ -137,16 +142,16 @@ export function ClassroomGroupsTab({
         message: `${duplicateName} 학생이 두 좌석에 중복 배정되어 있어요.`,
       };
     }
-    if (unassigned.length > 0) {
-      return {
-        canSave: false,
-        message: `미배정 학생 ${unassigned.length}명을 좌석에 배정해 주세요.`,
-      };
-    }
     if (emptyGroup) {
       return {
         canSave: false,
         message: "빈 분단은 삭제하거나 학생을 배정해 주세요.",
+      };
+    }
+    if (unassigned.length > 0) {
+      return {
+        canSave: true,
+        message: `미배정 학생 ${unassigned.length}명은 자리 배치에서 제외돼요.`,
       };
     }
     return { canSave: true, message: "" };
@@ -176,9 +181,7 @@ export function ClassroomGroupsTab({
       setStatus("자리 배치를 저장했어요.");
     } catch (error) {
       setStatus(
-        error instanceof Error
-          ? error.message
-          : "자리 배치 저장에 실패했어요.",
+        error instanceof Error ? error.message : "자리 배치 저장에 실패했어요.",
       );
     } finally {
       setSaving(false);
@@ -216,7 +219,11 @@ export function ClassroomGroupsTab({
         disabled={saving}
       />
       {validation.message && (
-        <p className="classroom-setting-warning" role="status" aria-live="polite">
+        <p
+          className="classroom-setting-warning"
+          role="status"
+          aria-live="polite"
+        >
           {validation.message}
         </p>
       )}

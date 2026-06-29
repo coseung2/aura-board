@@ -109,16 +109,6 @@ export async function PUT(
         { status: 422 },
       );
     }
-    const missingStudentId = seatingStudents
-      .map((student) => student.id)
-      .find((studentId) => !assignedIds.includes(studentId));
-    if (missingStudentId) {
-      return NextResponse.json(
-        { error: "student_unassigned", studentId: missingStudentId },
-        { status: 422 },
-      );
-    }
-
     let affectedBoardIds: string[] = [];
     await db.$transaction(async (tx) => {
       await saveClassroomDefaultGroups(tx, id, input.groups);
