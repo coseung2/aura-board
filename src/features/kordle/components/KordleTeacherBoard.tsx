@@ -141,7 +141,7 @@ export async function KordleTeacherBoard({ boardId, teacherUserId }: Props) {
     });
     if (state) {
       return (
-        <section className="kordle-shell">
+        <section className="kordle-shell kordle-shell--teacher-live">
           <div className="kordle-teacher-statusbar">
             <span className="kordle-status-pill">{statusLabel(puzzle.status)}</span>
           </div>
@@ -151,12 +151,22 @@ export async function KordleTeacherBoard({ boardId, teacherUserId }: Props) {
             puzzleId={puzzle.id}
             puzzleStatus={puzzle.status}
           />
-          <KordleBoard
-            boardId={boardId}
-            attemptId={attemptId}
-            initialState={state}
-            locale={game.locale}
-          />
+          <div className="kordle-teacher-live-layout">
+            <KordleBoard
+              boardId={boardId}
+              attemptId={attemptId}
+              initialState={state}
+              locale={game.locale}
+            />
+            <aside className="kordle-teacher-live-panel" aria-label="라운드별 제출 현황">
+              <KordleTeacherParticipants
+                boardId={boardId}
+                puzzleId={puzzle.id}
+                initialStatus={puzzle.status}
+                initialParticipants={participants}
+              />
+            </aside>
+          </div>
           <KordleLiveToasts boardId={boardId} />
         </section>
       );

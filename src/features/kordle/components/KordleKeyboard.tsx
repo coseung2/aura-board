@@ -167,7 +167,7 @@ export function KordleKeyboard({ locale, letterStates, onKey, disabled }: Props)
                 disabled={disabled}
                 aria-label={isSpecialKey(label) ? (label === "ENTER" ? "Enter" : "Backspace") : label}
               >
-                {label}
+                {label === "ENTER" ? "Enter" : label === "BACK" ? "Back" : label}
               </button>
             );
           })}

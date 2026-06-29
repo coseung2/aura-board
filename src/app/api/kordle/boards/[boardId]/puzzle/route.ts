@@ -4,14 +4,15 @@ import { db } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
 import { getCurrentStudent } from "@/lib/student-auth";
 import { normalizeWord } from "@/features/kordle/engine";
+import {
+  KORDLE_WORD_LENGTH,
+  resolveRandomKordleSolution,
+  type KordleLocale,
+} from "@/features/kordle/server/kordleWords";
 
 type Params = { params: Promise<{ boardId: string }> };
 
-const WORD_LENGTH = 6;
-const DEFAULT_WORDS: Record<"en-US" | "ko-KR", string[]> = {
-  "en-US": ["planet", "school", "friend", "garden", "window", "silver"],
-  "ko-KR": ["연필", "책상", "운동", "음악", "한글"],
-};
+const WORD_LENGTH = KORDLE_WORD_LENGTH;
 
 const CreatePuzzleSchema = z.object({
   locale: z.enum(["en-US", "ko-KR"]),
@@ -133,13 +134,20 @@ export async function POST(req: Request, { params }: Params) {
     return NextResponse.json({ error: "forbidden" }, { status: 403 });
   }
 
-  const locale = parsed.data.locale;
-  const defaults = DEFAULT_WORDS[locale];
-  const rawWord =
+  const locale = parsed.data.locale as KordleLocale;
+  const selectedWord =
     parsed.data.solution && parsed.data.solution.length > 0
-      ? parsed.data.solution
-      : defaults[Math.floor(Math.random() * defaults.length)];
-  const normalized = normalizeWord(rawWord, locale);
+      ? {
+          text: parsed.data.solution,
+          normalized: normalizeWord(parsed.data.solution, locale),
+        }
+      : await resolveRandomKordleSolution({
+          boardId: board.id,
+          locale,
+          wordLength: WORD_LENGTH,
+        });
+  const rawWord = selectedWord.text;
+  const normalized = selectedWord.normalized;
   if (normalized.length !== WORD_LENGTH) {
     return NextResponse.json(
       {

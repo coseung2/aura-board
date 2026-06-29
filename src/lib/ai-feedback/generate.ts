@@ -51,6 +51,8 @@ export async function generateFeedback(
       return callGemini(args);
     case "ollama":
       return callOllama(args);
+    case "opencode-go":
+      return callOpencodeGo(args);
     default:
       return { ok: false, error: `unknown provider: ${args.provider as string}` };
   }
@@ -195,6 +197,43 @@ async function callOllama(args: GenerateFeedbackArgs): Promise<GenerateFeedbackR
     if (!res.ok) {
       const t = await res.text().catch(() => "");
       return { ok: false, error: `ollama http ${res.status}: ${t.slice(0, 200)}` };
+    }
+    const data = (await res.json()) as {
+      choices?: Array<{ message?: { content?: string } }>;
+    };
+    const text = (data.choices?.[0]?.message?.content ?? "").trim();
+    return { ok: true, text, model };
+  } catch (err) {
+    return { ok: false, error: String((err as Error).message) };
+  }
+}
+
+async function callOpencodeGo(args: GenerateFeedbackArgs): Promise<GenerateFeedbackResult> {
+  const baseUrl =
+    (args.baseUrl ?? "").replace(/\/+$/, "") ||
+    process.env.OPENCODE_BASE_URL ||
+    "https://opencode.ai/zen/go/v1";
+  const model = args.modelId ?? MODELS["opencode-go"];
+
+  try {
+    const res = await fetch(`${baseUrl}/chat/completions`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${args.apiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model,
+        max_tokens: MAX_OUTPUT_TOKENS,
+        messages: [
+          { role: "system", content: args.systemPrompt },
+          { role: "user", content: args.userPrompt },
+        ],
+      }),
+    });
+    if (!res.ok) {
+      const t = await res.text().catch(() => "");
+      return { ok: false, error: `opencode-go http ${res.status}: ${t.slice(0, 200)}` };
     }
     const data = (await res.json()) as {
       choices?: Array<{ message?: { content?: string } }>;

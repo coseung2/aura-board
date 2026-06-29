@@ -40,7 +40,7 @@ export function KordleLiveToasts({ boardId }: Props) {
           const fresh = data.events.filter((event) => !seenIds.current.has(event.id));
           for (const event of fresh) seenIds.current.add(event.id);
           if (!cancelled && fresh.length > 0) {
-            setEvents((current) => [[...fresh].reverse(), current].flat().slice(0, 12));
+            setEvents((current) => [[...fresh].reverse(), current].flat().slice(0, 18));
           }
         }
       } finally {
@@ -60,16 +60,17 @@ export function KordleLiveToasts({ boardId }: Props) {
   if (events.length === 0) return null;
 
   return (
-    <aside className="kordle-live-toasts" aria-live="polite" aria-label="꼬들 라이브 피드">
-      <div className="kordle-live-feed-head">실시간 제출</div>
-      {events.map((event) => (
-        <div className="kordle-live-toast" key={event.id}>
-          <strong>{event.name}님</strong>
-          <span>
-            {event.guessIndex}줄에서 {event.correctCount}글자 맞춤
-          </span>
-        </div>
-      ))}
+    <aside className="kordle-live-toasts" aria-label="꼬들 라이브 채팅">
+      <div className="kordle-live-chat-list" role="log" aria-live="polite">
+        {[...events].reverse().map((event) => (
+          <div className="kordle-live-toast" key={event.id}>
+            <strong>{event.name}님</strong>
+            <span>
+              {event.guessIndex}줄 · {event.correctCount}글자
+            </span>
+          </div>
+        ))}
+      </div>
     </aside>
   );
 }
