@@ -410,7 +410,15 @@ src/styles/
 ├── layout.css        # 페이지 구조, 헤더, 캔버스
 ├── card.css          # 카드 공통, 첨부파일, 링크 프리뷰
 ├── modal.css         # 모달, 폼, 파일 업로드
-├── boards.css        # Grid, Stream, Columns 레이아웃
+├── boards.css        # 보드 스타일 manifest
+├── boards-grid.css   # Grid 보드
+├── boards-stream.css # Stream 보드 피드
+├── boards-columns.css # Columns/Kanban 보드
+├── boards-dj.css     # DJ 보드, 플레이어, 리캡
+├── boards-slideshow.css       # Stream 슬라이드쇼 오버레이
+├── boards-stream-settings.css # Stream 작성/섹션 설정
+├── boards-stream-breakout.css # Stream 브레이크아웃 UI
+├── boards-aura-evaluation.css # Aura 평가 컨트롤
 ├── assignment.css    # 과제 보드
 ├── home.css          # 대시보드, 보드 리스트
 ├── user-switcher.css # RBAC 스위처

@@ -1,0 +1,1849 @@
+/* ── DJ Board (dj-board-queue) ── design-handoff 2026-04-22 port ───────── */
+
+/* 레이아웃: 전체 컨테이너 + 헤더 + NOW PLAYING 카드 + 2열(메인 큐 / 사이드 aside)
+   재생 완료는 고정 드로어(.is-open 클래스로 슬라이드). 드로어→큐 드래그 복귀 가능. */
+
+.dj-board {
+  width: 100%;
+  max-width: 1300px;
+  margin: 0 auto;
+  padding: 24px 24px 48px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  box-sizing: border-box;
+}
+
+/* 헤더: 제목 + 메타 카운트 + 오른쪽 액션 (재생 완료 토글 + 공유) */
+.dj-board-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.dj-board-header h1 {
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: -0.3px;
+  color: var(--color-text);
+  margin: 0;
+}
+
+.dj-board-subtitle {
+  font-size: 13px;
+  color: var(--color-text-muted);
+  margin: 4px 0 0;
+}
+
+.dj-header-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.dj-header-btn {
+  background: var(--color-surface);
+  color: var(--color-text);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-btn);
+  padding: 8px 14px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition:
+    background 150ms ease,
+    border-color 150ms ease;
+}
+
+.dj-header-btn:hover {
+  background: var(--color-surface-alt);
+  border-color: var(--color-border-hover);
+}
+
+/* NOW PLAYING — 전체 폭 카드. 좌: 240x135 썸네일, 우: 제목·메타·액션 */
+.dj-nowplaying {
+  width: 100%;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-card);
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  box-sizing: border-box;
+}
+
+.dj-nowplaying-label {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  color: var(--color-accent);
+}
+
+.dj-nowplaying-body {
+  display: grid;
+  grid-template-columns: 240px 1fr;
+  gap: 20px;
+  align-items: center;
+}
+
+.dj-thumb {
+  width: 96px;
+  height: 54px;
+  object-fit: cover;
+  border-radius: 6px;
+  background: var(--color-surface-alt);
+  flex: 0 0 auto;
+}
+
+.dj-thumb-lg {
+  width: 240px;
+  height: 135px;
+  border-radius: 8px;
+  background: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-size: 40px;
+  box-shadow: 0 4px 14px rgba(139, 121, 255, 0.35);
+}
+
+.dj-nowplaying-info {
+  min-width: 0;
+}
+
+.dj-nowplaying-empty-card {
+  min-height: 216px;
+}
+
+.dj-nowplaying-placeholder {
+  background: var(--color-surface-alt);
+  color: var(--color-accent);
+  box-shadow: none;
+}
+
+.dj-track-title {
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: -0.3px;
+  margin: 0 0 6px;
+  color: var(--color-text);
+}
+
+.dj-track-meta {
+  font-size: 13px;
+  color: var(--color-text-muted);
+  margin: 0;
+  word-break: break-word;
+}
+
+.dj-nowplaying-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 14px;
+  flex-wrap: wrap;
+}
+
+.dj-play-btn {
+  background: var(--color-accent);
+  color: #fff;
+  border: none;
+  border-radius: var(--radius-pill);
+  padding: 10px 20px;
+  font-weight: 600;
+  font-size: 14px;
+  cursor: pointer;
+  transition: background 150ms ease;
+}
+
+.dj-play-btn:hover {
+  background: var(--color-accent-active);
+}
+
+.dj-play-btn[aria-pressed="true"] {
+  background: transparent;
+  color: var(--color-accent);
+  outline: 1px solid var(--color-accent);
+}
+
+.dj-next-btn {
+  background: transparent;
+  color: var(--color-text);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-pill);
+  padding: 10px 16px;
+  font-weight: 500;
+  font-size: 14px;
+  cursor: pointer;
+  transition:
+    background 150ms ease,
+    border-color 150ms ease;
+}
+
+.dj-next-btn:hover {
+  background: var(--color-surface-alt);
+  border-color: var(--color-border-hover);
+}
+
+.dj-player-wrap {
+  width: 240px;
+  aspect-ratio: 16 / 9;
+  border-radius: 8px;
+  overflow: hidden;
+  background: black;
+}
+
+.dj-player-iframe {
+  width: 100%;
+  height: 100%;
+  border: 0;
+}
+
+/* 2열 그리드: 메인 큐 | 320px 사이드 aside */
+.dj-layout {
+  width: 100%;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 320px;
+  gap: 24px;
+  align-items: start;
+  box-sizing: border-box;
+}
+
+/* ── 메인 대기열 카드 ── */
+.dj-queue-card {
+  min-width: 0;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-card);
+  padding: 16px;
+  box-sizing: border-box;
+}
+
+.dj-queue-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: -0.15px;
+  margin: 0 0 12px;
+  color: var(--color-text);
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.dj-queue-hint {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--color-text-muted);
+}
+
+.dj-queue-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+/* 큐 아이템 — 24 rank / 56 thumb / 1fr info / auto controls */
+.dj-queue-item {
+  display: grid;
+  grid-template-columns: 24px 56px 1fr auto;
+  gap: 12px;
+  padding: 10px;
+  border-radius: 8px;
+  align-items: center;
+  cursor: grab;
+  transition: background 150ms ease;
+}
+
+.dj-queue-item:hover {
+  background: var(--color-surface-alt);
+}
+
+.dj-queue-item.is-pending {
+  background: rgba(245, 158, 11, 0.06);
+}
+
+.dj-queue-item.is-dragging {
+  opacity: 0.4;
+}
+
+.dj-queue-item.is-drag-over {
+  outline: 2px dashed var(--color-accent);
+  outline-offset: -2px;
+}
+
+.dj-queue-item.dj-status-played {
+  opacity: 0.55;
+}
+
+.dj-rank {
+  font-family: "SF Mono", ui-monospace, monospace;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-text-muted);
+  text-align: center;
+}
+
+.dj-tinythumb {
+  width: 56px;
+  height: 42px;
+  object-fit: cover;
+  border-radius: 4px;
+  background: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-size: 16px;
+}
+
+.dj-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.dj-item-info {
+  flex: 1 1 180px;
+  min-width: 0;
+}
+
+.dj-track {
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: -0.1px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--color-text);
+}
+
+.dj-sub {
+  font-size: 12px;
+  color: var(--color-text-muted);
+}
+
+.dj-pending-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: 6px;
+  padding: 1px 8px;
+  border-radius: var(--radius-pill);
+  background: #fef3c7;
+  color: #92610a;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.dj-pending-pill .dj-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.dj-controls {
+  display: flex;
+  gap: 4px;
+}
+
+.dj-ctrl {
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  padding: 4px 10px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  font-family: inherit;
+  transition:
+    background 150ms ease,
+    border-color 150ms ease,
+    color 150ms ease;
+}
+
+.dj-ctrl:hover {
+  background: var(--color-surface-alt);
+  color: var(--color-text);
+  border-color: var(--color-border);
+}
+
+.dj-ctrl.approve:hover {
+  color: #27a35f;
+  border-color: rgba(39, 163, 95, 0.3);
+  background: rgba(39, 163, 95, 0.08);
+}
+
+.dj-ctrl.reject:hover {
+  color: var(--color-danger);
+  border-color: rgba(198, 40, 40, 0.3);
+  background: rgba(198, 40, 40, 0.08);
+}
+
+.dj-ctrl.restore:hover {
+  color: var(--color-accent);
+  border-color: var(--color-accent-tinted-bg);
+  background: var(--color-accent-tinted-bg);
+}
+
+/* 빈 상태 — 큐 비었을 때 인라인 메시지 */
+.dj-empty {
+  padding: 32px 16px;
+  text-align: center;
+  color: var(--color-text-muted);
+  font-size: 13px;
+}
+
+/* ── 사이드 aside — 신청곡 폼 + 랭킹 ── */
+.dj-side {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.dj-submit-card {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-card);
+  padding: 20px;
+}
+
+.dj-submit-title {
+  font-size: 14px;
+  font-weight: 700;
+  margin: 0 0 12px;
+  color: var(--color-text);
+}
+
+.dj-submit-input {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  font-size: 14px;
+  font-family: inherit;
+  background: var(--color-surface);
+  color: var(--color-text);
+  box-sizing: border-box;
+}
+
+.dj-submit-input:focus-visible {
+  outline: 2px solid var(--color-accent-tinted-text);
+  outline-offset: 1px;
+}
+
+.dj-submit-btn {
+  width: 100%;
+  margin-top: 10px;
+  padding: 10px 16px;
+  background: var(--color-accent);
+  color: white;
+  border: none;
+  border-radius: var(--radius-btn);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 120ms ease;
+}
+
+.dj-submit-btn:hover {
+  background: var(--color-accent-active);
+}
+
+.dj-submit-btn:disabled {
+  background: var(--color-text-faint);
+  cursor: not-allowed;
+}
+
+.dj-submit-note {
+  font-size: 11px;
+  color: var(--color-text-muted);
+  margin: 10px 0 0;
+  line-height: 1.5;
+}
+
+.dj-submit-error {
+  font-size: 12px;
+  color: var(--color-status-returned-text);
+  margin: 10px 0 0;
+}
+
+.dj-submit-success {
+  font-size: 12px;
+  color: var(--color-status-reviewed-text);
+  margin: 10px 0 0;
+  line-height: 1.5;
+}
+
+.dj-my-requests {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-card);
+  padding: 16px;
+}
+
+.dj-my-requests-title {
+  font-size: 14px;
+  font-weight: 700;
+  margin: 0 0 10px;
+  color: var(--color-text);
+}
+
+.dj-my-requests-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.dj-my-request {
+  border-top: 1px solid var(--color-border);
+  padding-top: 10px;
+}
+
+.dj-my-request:first-child {
+  border-top: 0;
+  padding-top: 0;
+}
+
+.dj-my-request-main {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.dj-my-request-title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.dj-my-request p {
+  margin: 4px 0 0;
+  color: var(--color-text-muted);
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+/* 랭킹 */
+.dj-ranking {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-card);
+  padding: 20px;
+}
+
+.dj-ranking-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.dj-ranking-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 0;
+  font-size: 13px;
+}
+
+.dj-ranking-pos {
+  width: 22px;
+  font-family: "SF Mono", ui-monospace, monospace;
+  font-weight: 700;
+  color: var(--color-text-muted);
+  text-align: center;
+}
+
+.dj-ranking-pos.top {
+  color: #c9a227;
+}
+
+.dj-ranking-avatar {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.08);
+  color: var(--color-text);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  font-weight: 600;
+}
+
+.dj-ranking-avatar.top {
+  background: #c9a227;
+  color: #fff;
+}
+
+.dj-ranking-name {
+  flex: 1;
+  color: var(--color-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+.dj-ranking-count {
+  font-variant-numeric: tabular-nums;
+  color: var(--color-text-muted);
+  font-weight: 500;
+}
+
+.dj-ranking-meta {
+  font-size: 11px;
+  color: var(--color-text-faint);
+  margin: 0 0 8px;
+}
+
+.dj-ranking-loading,
+.dj-ranking-empty {
+  font-size: 12px;
+  color: var(--color-text-faint);
+  margin: 8px 0 0;
+}
+
+.dj-ranking-thumb {
+  width: 48px;
+  height: 27px;
+  object-fit: cover;
+  border-radius: 3px;
+  background: var(--color-surface-alt);
+}
+
+.dj-ranking-thumb-blank {
+  display: inline-block;
+}
+
+.dj-ranking-section {
+  margin-bottom: 16px;
+}
+
+.dj-ranking-title {
+  font-size: 14px;
+  font-weight: 700;
+  margin: 0 0 6px;
+  color: var(--color-text);
+}
+
+.dj-ranking-rank {
+  font-weight: 700;
+  color: var(--color-text-faint);
+  text-align: right;
+}
+
+.dj-ranking-tag {
+  display: inline-block;
+  margin-left: 4px;
+  padding: 1px 6px;
+  border-radius: var(--radius-pill);
+  background: var(--color-accent-tinted-bg);
+  color: var(--color-accent-tinted-text);
+  font-size: 10px;
+  font-weight: 600;
+}
+
+/* 큐 아이템 레거시 action-btn 재사용 (썸네일 없을 때 fallback) */
+.dj-item-actions {
+  display: flex;
+  gap: 4px;
+  flex: 0 0 auto;
+}
+
+.dj-action-btn {
+  padding: 4px 10px;
+  font-size: 12px;
+  border-radius: 4px;
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-text);
+  cursor: pointer;
+  transition:
+    background 120ms ease,
+    border-color 120ms ease;
+}
+
+.dj-action-btn:hover {
+  border-color: var(--color-border-hover);
+}
+
+.dj-action-reject,
+.dj-action-delete {
+  color: var(--color-danger);
+}
+
+.dj-action-cancel-own {
+  padding: 4px 10px;
+  font-size: 12px;
+  border-radius: 4px;
+  border: 1px solid var(--color-border);
+  background: transparent;
+  color: var(--color-text-muted);
+  cursor: pointer;
+}
+
+.dj-drag-handle {
+  flex: 0 0 auto;
+  cursor: grab;
+  color: var(--color-text-faint);
+  font-size: 16px;
+  padding: 4px;
+  user-select: none;
+}
+
+.dj-status-pill {
+  flex: 0 0 auto;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.dj-status-pill-pending {
+  background: rgba(0, 0, 0, 0.05);
+  color: var(--color-text-muted);
+}
+
+.dj-status-pill-approved {
+  background: var(--color-status-reviewed-bg);
+  color: var(--color-status-reviewed-text);
+}
+
+.dj-status-pill-played {
+  background: transparent;
+  color: var(--color-text-faint);
+}
+
+.dj-status-pill-rejected {
+  background: var(--color-status-returned-bg);
+  color: var(--color-status-returned-text);
+}
+
+.classroom-dj-panel {
+  margin-top: 24px;
+  padding: 16px;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: var(--color-surface);
+}
+.classroom-dj-panel h3 {
+  margin: 0 0 8px;
+  font-size: 15px;
+  font-weight: 700;
+}
+.dj-panel-desc {
+  margin: 0 0 12px;
+  font-size: 12px;
+  color: var(--color-text-muted);
+}
+.dj-panel-current {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+  padding: 8px 0;
+  margin-bottom: 8px;
+}
+.dj-panel-label {
+  font-size: 12px;
+  color: var(--color-text-muted);
+}
+.dj-panel-chip {
+  padding: 3px 10px;
+  background: var(--color-accent-tinted-bg);
+  color: var(--color-accent-tinted-text);
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+}
+.dj-panel-error {
+  font-size: 12px;
+  color: var(--color-status-returned-text);
+  margin: 8px 0;
+}
+.dj-panel-loading {
+  font-size: 12px;
+  color: var(--color-text-faint);
+  margin: 0;
+}
+.dj-panel-students {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.dj-panel-student-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 6px 0;
+  border-top: 1px solid var(--color-border);
+  font-size: 13px;
+}
+.dj-panel-toggle {
+  padding: 4px 10px;
+  font-size: 12px;
+  border-radius: 4px;
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-text);
+  cursor: pointer;
+}
+.dj-panel-toggle.is-on {
+  background: var(--color-accent);
+  color: white;
+  border-color: var(--color-accent);
+}
+
+/* ── 재생 완료 드로어 (design-handoff DJ) ───────────────────────────── */
+/* 3-column 고정 컬럼에서 fixed-position 슬라이딩 드로어로 전환.
+   헤더의 "재생 완료" 버튼으로 open/close 토글, 드로어→큐 드래그로 복귀. */
+
+.dj-played-stack {
+  position: fixed;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 320px;
+  z-index: 40;
+  background: var(--color-surface);
+  border-right: 1px solid var(--color-border);
+  box-shadow: 8px 0 24px rgba(0, 0, 0, 0.08);
+  display: flex;
+  flex-direction: column;
+  transform: translateX(-100%);
+  transition: transform 260ms cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+.dj-played-stack.is-open {
+  transform: translateX(0);
+}
+
+.dj-played-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.dj-played-title {
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: -0.15px;
+  color: var(--color-text);
+  margin: 0;
+}
+
+.dj-played-subtitle {
+  font-size: 11px;
+  color: var(--color-text-muted);
+  margin-top: 2px;
+}
+
+.dj-played-close {
+  background: transparent;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-btn);
+  width: 32px;
+  height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  font-size: 16px;
+}
+
+.dj-played-close:hover {
+  background: var(--color-surface-alt);
+  color: var(--color-text);
+}
+
+.dj-played-list {
+  list-style: none;
+  margin: 0;
+  padding: 8px;
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.dj-played-item {
+  display: grid;
+  grid-template-columns: 44px 1fr auto;
+  gap: 10px;
+  align-items: center;
+  padding: 8px 10px;
+  border-radius: 8px;
+  cursor: grab;
+  transition: background 150ms ease;
+  animation: dj-played-slide-in 300ms ease;
+  user-select: none;
+}
+
+.dj-played-item:hover {
+  background: var(--color-surface-alt);
+}
+
+.dj-played-item.is-dragging {
+  opacity: 0.4;
+}
+
+.dj-played-item .dj-track {
+  font-size: 13px;
+}
+
+.dj-played-item .dj-sub {
+  font-size: 11px;
+}
+
+.dj-played-thumb {
+  width: 44px;
+  height: 34px;
+  object-fit: cover;
+  border-radius: 4px;
+  background: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-size: 14px;
+}
+
+.dj-played-item-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.dj-played-delete {
+  width: 28px;
+  height: 28px;
+  border-radius: 4px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--color-text-muted);
+  font-size: 14px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.dj-played-delete:hover {
+  background: rgba(198, 40, 40, 0.08);
+  color: var(--color-danger);
+  border-color: rgba(198, 40, 40, 0.3);
+}
+
+.dj-played-foot {
+  padding: 10px 20px;
+  border-top: 1px solid var(--color-border);
+  font-size: 11px;
+  color: var(--color-text-muted);
+  text-align: center;
+}
+
+/* 드로어 열린 상태에서 본문 상단에 안전 영역 */
+.dj-played-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.12);
+  z-index: 39;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 200ms ease;
+}
+
+.dj-played-backdrop.is-open {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+@keyframes dj-played-slide-in {
+  from {
+    opacity: 0;
+    transform: translateX(-16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dj-played-stack,
+  .dj-played-item,
+  .dj-queue-item,
+  .dj-next-btn,
+  .dj-play-btn,
+  .dj-submit-btn,
+  .dj-ctrl,
+  .dj-action-btn {
+    transition: none !important;
+    animation: none !important;
+  }
+}
+
+/* 반응형: 사이드 aside를 하단으로 떨어뜨림 */
+@media (max-width: 959px) {
+  .dj-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .dj-side {
+    order: 2;
+  }
+  .dj-nowplaying-body {
+    grid-template-columns: 1fr;
+  }
+  .dj-thumb-lg {
+    width: 100%;
+    max-width: 360px;
+    height: auto;
+    aspect-ratio: 16 / 9;
+  }
+  .dj-played-stack {
+    width: min(320px, 85vw);
+  }
+}
+
+@media (max-width: 640px) {
+  .dj-board {
+    padding: 16px 12px 32px;
+  }
+  .dj-mini-player.is-expanded {
+    width: 280px;
+    bottom: 12px;
+    right: 12px;
+  }
+}
+
+/* Global mini player (DJPlayerProvider) — 2026-04-22 docked+PiP.
+   - is-docked : host 엘리먼트 위에 덮어씌운 상태 (DJ 보드 NOW PLAYING 자리).
+                 left/top/width/height 은 inline style 로 host rect 기준.
+                 header / 리사이즈 핸들 숨김. iframe 만 가득 채움.
+   - is-pip    : 자유 이동·리사이즈 플로팅. header + 우하단 resize handle. */
+.dj-mini-player {
+  z-index: 2000;
+  background: var(--color-surface);
+  display: flex;
+  flex-direction: column;
+}
+
+.dj-mini-player.is-hidden {
+  display: none;
+}
+
+.dj-mini-player.is-docked {
+  /* host rect 에 맞춰 inline style 이 left/top/width/height 를 덮어씀.
+     시각적으로 NOW PLAYING 썸네일 자리에 iframe 이 앉은 것처럼 보이게
+     border/padding 제거 + 둥근 모서리만 유지. */
+  border: 0;
+  border-radius: 8px;
+  padding: 0;
+  box-shadow: none;
+  overflow: hidden;
+}
+
+.dj-mini-player.is-pip {
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.18);
+  padding: 8px;
+  gap: 6px;
+  resize: none; /* 우리가 직접 핸들 그림 */
+  user-select: none;
+}
+
+.dj-mini-body {
+  width: 100%;
+  flex: 1 1 auto;
+  min-height: 0;
+  border-radius: 6px;
+  overflow: hidden;
+  background: black;
+}
+
+.dj-mini-player.is-docked .dj-mini-body {
+  border-radius: 8px;
+  height: 100%;
+}
+
+.dj-mini-player.is-pip .dj-mini-body {
+  aspect-ratio: 16 / 9;
+}
+
+.dj-mini-iframe {
+  width: 100%;
+  height: 100%;
+}
+
+.dj-mini-iframe iframe {
+  width: 100%;
+  height: 100%;
+  border: 0;
+}
+
+.dj-mini-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: grab;
+  touch-action: none;
+  padding: 2px 4px;
+}
+
+.dj-mini-header:active {
+  cursor: grabbing;
+}
+
+.dj-mini-drag-hint {
+  font-size: 12px;
+  color: var(--color-text-faint);
+  letter-spacing: -2px;
+  padding: 0 2px;
+  flex: 0 0 auto;
+}
+
+.dj-mini-title {
+  flex: 1 1 auto;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+.dj-mini-actions {
+  display: flex;
+  gap: 4px;
+  flex: 0 0 auto;
+}
+
+.dj-mini-btn {
+  background: transparent;
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+  padding: 3px 8px;
+  font-size: 11px;
+  cursor: pointer;
+  color: var(--color-text);
+  touch-action: manipulation;
+}
+
+.dj-mini-btn:hover {
+  background: var(--color-surface-alt);
+}
+
+.dj-mini-close {
+  color: var(--color-danger);
+}
+
+/* 리사이즈 핸들 — 3면(우/하/우하단). iframe 위에 z-index 로 올려서 포인터
+   이벤트가 iframe 에 먹히지 않게 방지. 얇은 strip (6px) 이라 iframe 영역
+   대부분은 그대로 클릭 가능. */
+.dj-mini-resize {
+  position: absolute;
+  z-index: 3;
+  touch-action: none;
+  background: transparent;
+}
+
+.dj-mini-resize-e {
+  right: 0;
+  top: 8px;
+  bottom: 22px;
+  width: 6px;
+  cursor: ew-resize;
+}
+
+.dj-mini-resize-s {
+  left: 8px;
+  right: 22px;
+  bottom: 0;
+  height: 6px;
+  cursor: ns-resize;
+}
+
+.dj-mini-resize-se {
+  right: 0;
+  bottom: 0;
+  width: 18px;
+  height: 18px;
+  cursor: nwse-resize;
+  background: #fff;
+  opacity: 0.7;
+  border-radius: 0 0 8px 0;
+}
+
+.dj-mini-resize-e:hover,
+.dj-mini-resize-s:hover {
+  background: var(--color-accent-tinted-bg);
+  opacity: 0.6;
+}
+
+.dj-mini-resize-se:hover {
+  opacity: 1;
+}
+
+/* 외부 창 PiP 가 열린 동안 메인 컨테이너가 비어 보이지 않도록 플레이스홀더. */
+.dj-mini-external-placeholder {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 16px;
+  background: var(--color-surface-alt);
+  color: var(--color-text-muted);
+  text-align: center;
+}
+
+.dj-mini-external-emoji {
+  font-size: 40px;
+  opacity: 0.7;
+}
+
+.dj-mini-external-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.dj-mini-player.is-pip {
+  position: fixed;
+}
+
+/* host (NOW PLAYING 썸네일) — iframe 이 덮을 영역. 썸네일 이미지는
+   아래에 깔려있다가 iframe 이 덮으면 자동으로 가려짐. */
+.dj-nowplaying-host {
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.dj-nowplaying-host-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 8px;
+  display: block;
+}
+
+.dj-nowplaying-host-fallback {
+  font-size: 48px;
+  color: #fff;
+}
+
+/* DJ 월말 리캡 모달 (2026-04-22 dj-recap) */
+.dj-recap-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 24px;
+}
+
+.dj-recap-modal {
+  background: var(--color-surface);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-card-hover);
+  width: 100%;
+  max-width: 860px;
+  max-height: 92vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.dj-recap-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 24px 28px 16px;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.dj-recap-eyebrow {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  color: var(--color-accent);
+  margin-bottom: 4px;
+}
+
+.dj-recap-title {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--color-text);
+  margin: 0;
+}
+
+.dj-recap-close {
+  background: transparent;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-btn);
+  width: 36px;
+  height: 36px;
+  font-size: 18px;
+  color: var(--color-text-muted);
+  cursor: pointer;
+}
+
+.dj-recap-close:hover {
+  background: var(--color-surface-alt);
+  color: var(--color-text);
+}
+
+.dj-recap-monthbar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  padding: 12px 28px;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.dj-recap-monthbtn {
+  background: transparent;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-btn);
+  padding: 6px 12px;
+  font-size: 12px;
+  color: var(--color-text-muted);
+  cursor: pointer;
+}
+
+.dj-recap-monthbtn:hover {
+  background: var(--color-surface-alt);
+  color: var(--color-text);
+}
+
+.dj-recap-monthbtn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.dj-recap-monthpill {
+  font-size: 15px;
+  font-weight: 700;
+  padding: 4px 16px;
+  background: var(--color-accent-tinted-bg);
+  color: var(--color-accent-tinted-text);
+  border-radius: var(--radius-pill);
+}
+
+.dj-recap-body {
+  padding: 24px 28px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.dj-recap-empty {
+  padding: 64px 20px;
+  text-align: center;
+  color: var(--color-text-muted);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+
+.dj-recap-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 12px;
+}
+
+.dj-recap-stat {
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  padding: 16px;
+  text-align: center;
+}
+
+.dj-recap-stat-value {
+  font-size: 32px;
+  font-weight: 700;
+  letter-spacing: -0.5px;
+  color: var(--color-text);
+}
+
+.dj-recap-stat-unit {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--color-text-muted);
+  margin-left: 4px;
+}
+
+.dj-recap-stat-label {
+  font-size: 12px;
+  color: var(--color-text-muted);
+  margin-top: 4px;
+}
+
+.dj-recap-spotlight {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+@media (max-width: 640px) {
+  .dj-recap-spotlight {
+    grid-template-columns: 1fr;
+  }
+}
+
+.dj-recap-spot {
+  background: #fff;
+  border: 1px solid rgba(201, 162, 39, 0.3);
+  border-radius: var(--radius-card);
+  padding: 20px;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+.dj-recap-spot-dj {
+  background: #fff;
+  border-color: rgba(0, 117, 222, 0.3);
+}
+
+.dj-recap-spot-label {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  color: var(--color-text-muted);
+}
+
+.dj-recap-spot-thumb {
+  width: 120px;
+  height: 68px;
+  border-radius: 8px;
+  object-fit: cover;
+  background: var(--color-surface-alt);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-text-faint);
+  font-size: 24px;
+}
+
+.dj-recap-spot-thumb-fallback {
+  background: #fff;
+  color: #fff;
+}
+
+.dj-recap-spot-avatar {
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  background: #c9a227;
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 28px;
+  font-weight: 700;
+}
+
+.dj-recap-spot-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--color-text);
+  max-width: 100%;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.dj-recap-spot-meta {
+  font-size: 13px;
+  color: var(--color-text-muted);
+}
+
+.dj-recap-section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.dj-recap-sectiontitle {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--color-text);
+  margin: 0;
+}
+
+.dj-recap-songlist {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.dj-recap-songrow {
+  display: grid;
+  grid-template-columns: 28px 56px 1fr auto;
+  gap: 12px;
+  align-items: center;
+  padding: 8px 12px;
+  background: var(--color-bg);
+  border-radius: 8px;
+}
+
+.dj-recap-pos {
+  font-family: "SF Mono", ui-monospace, monospace;
+  font-weight: 700;
+  color: var(--color-text-muted);
+  text-align: center;
+  font-size: 13px;
+}
+
+.dj-recap-pos.top {
+  color: #c9a227;
+}
+
+.dj-recap-songthumb {
+  width: 56px;
+  height: 32px;
+  border-radius: 4px;
+  object-fit: cover;
+  background: var(--color-surface-alt);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+}
+
+.dj-recap-songinfo {
+  min-width: 0;
+}
+
+.dj-recap-songtitle {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.dj-recap-songsub {
+  font-size: 11px;
+  color: var(--color-text-muted);
+}
+
+.dj-recap-songplays {
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  color: var(--color-accent);
+  font-size: 13px;
+}
+
+.dj-recap-ranking {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.dj-recap-rankrow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 0;
+}
+
+.dj-recap-avatar {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.08);
+  color: var(--color-text);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.dj-recap-avatar.top {
+  background: #c9a227;
+  color: #fff;
+}
+
+.dj-recap-rankname {
+  flex: 1;
+  font-size: 13px;
+  color: var(--color-text);
+}
+
+.dj-recap-rankcount {
+  font-size: 12px;
+  color: var(--color-text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.dj-recap-bars {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(4px, 1fr);
+  gap: 2px;
+  align-items: end;
+  height: 80px;
+  background: var(--color-bg);
+  border-radius: 8px;
+  padding: 12px;
+}
+
+.dj-recap-bar {
+  background: transparent;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  height: 100%;
+}
+
+.dj-recap-bar-fill {
+  background: var(--color-accent);
+  border-radius: 2px;
+  opacity: 0.8;
+}
+
+.dj-recap-bar:hover .dj-recap-bar-fill {
+  opacity: 1;
+}
+
+.dj-recap-bars-xaxis {
+  display: flex;
+  justify-content: space-between;
+  font-size: 11px;
+  color: var(--color-text-faint);
+  padding: 0 4px;
+}
+
+@media (max-width: 768px) {
+  .board-canvas-wrap-columns {
+    overflow-x: auto;
+  }
+
+  .columns-board {
+    gap: 16px;
+    min-width: max-content;
+    width: max-content;
+  }
+
+  .column {
+    flex-basis: 288px;
+    min-width: 288px;
+  }
+
+  .column-add-stack {
+    flex-basis: 288px;
+    min-width: 288px;
+  }
+
+  .column-cards-scroll {
+    min-height: 56px;
+  }
+}
+
+.presentation-prompt-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 220;
+  background: rgba(15, 23, 42, 0.46);
+}
+
+.presentation-prompt {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  z-index: 221;
+  display: flex;
+  flex-direction: column;
+  width: min(520px, calc(100vw - 32px));
+  max-height: min(680px, calc(100vh - 32px));
+  transform: translate(-50%, -50%);
+  overflow: hidden;
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  background: var(--color-surface);
+  box-shadow: 0 24px 64px rgba(15, 23, 42, 0.22);
+}
+
+.presentation-prompt-head {
+  display: grid;
+  padding: 18px 20px;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.presentation-prompt-head h2 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 18px;
+  font-weight: 800;
+  color: var(--color-text);
+}
+
+.presentation-prompt-head p {
+  margin: 0;
+  font-size: 13px;
+  color: var(--color-text-muted);
+  line-height: 1.5;
+}
+
+.presentation-prompt-list {
+  display: grid;
+  gap: 14px;
+  padding: 16px 20px;
+  overflow-y: auto;
+}
+
+.presentation-prompt-section {
+  display: grid;
+  gap: 8px;
+}
+
+.presentation-prompt-section-title {
+  font-family: var(--font-display);
+  font-size: 14px;
+  font-weight: 800;
+  color: var(--color-text);
+}
+
+.presentation-prompt-groups {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.presentation-prompt-toggle {
+  justify-self: start;
+  min-height: 30px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--color-accent);
+  font-family: var(--font-body);
+  font-size: 13px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.presentation-prompt-toggle:hover,
+.presentation-prompt-toggle:focus-visible {
+  color: var(--color-accent-active);
+  text-decoration: underline;
+  outline: none;
+}
+
+.presentation-prompt-group {
+  min-height: 34px;
+  padding: 0 14px;
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  background: var(--color-surface);
+  color: var(--color-text-muted);
+  font-family: var(--font-body);
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 120ms ease, border-color 120ms ease, color 120ms ease;
+}
+
+.presentation-prompt-group:hover,
+.presentation-prompt-group:focus-visible {
+  border-color: var(--color-border-hover);
+  background: var(--color-surface-alt);
+  color: var(--color-text);
+  outline: none;
+}
+
+.presentation-prompt-group.is-active {
+  border-color: var(--color-accent);
+  background: var(--color-accent-tinted-bg);
+  color: var(--color-accent-tinted-text);
+}
+
+.presentation-prompt-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 14px 20px;
+  border-top: 1px solid var(--color-border);
+}
+
+.presentation-prompt-actions .ui-icon-action {
+  min-width: 72px;
+  min-height: 40px;
+  padding: 0 18px;
+  border-radius: 8px;
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font-family: var(--font-body);
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.presentation-prompt-actions .ui-icon-action.is-accent {
+  border-color: var(--color-accent);
+  background: var(--color-accent);
+  color: #fff;
+}
+

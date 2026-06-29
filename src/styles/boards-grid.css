@@ -1,0 +1,86 @@
+/* -------- Grid Board -------- */
+
+.grid-board {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  align-items: start;
+  gap: 20px;
+  padding: 24px 16px;
+}
+
+.freeform-board {
+  --masonry-row-height: 8px;
+  grid-template-columns: repeat(auto-fill, minmax(238px, 238px));
+  grid-auto-rows: var(--masonry-row-height);
+  grid-auto-flow: dense;
+  justify-content: start;
+}
+
+.freeform-board .board-empty-inline {
+  grid-column: 1 / -1;
+}
+
+.grid-card {
+  position: relative;
+  align-self: start;
+  display: flex;
+  flex-direction: column;
+  background: var(--color-surface);
+  color: var(--color-text);
+  border: var(--border-card);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-card);
+  padding: 20px;
+  min-height: 140px;
+  transition:
+    box-shadow 180ms ease,
+    border-color 180ms ease;
+}
+
+.grid-card:hover {
+  box-shadow: var(--shadow-card-hover);
+  border-color: var(--color-border-hover);
+}
+
+.grid-card:hover .padlet-card-delete {
+  display: flex;
+}
+
+.freeform-board .grid-card {
+  grid-row-end: span 24;
+}
+
+.freeform-board .grid-card:has(.card-attachments) {
+  padding-top: 0;
+  overflow: hidden;
+}
+
+.freeform-board .grid-card:has(.card-attachments) .card-attachments {
+  margin: 0 -20px 14px;
+}
+
+.freeform-board .grid-card:has(> .card-ctx-menu):has(.card-attachments) {
+  padding-top: 0;
+}
+
+.freeform-board .grid-card .card-attachments > :first-child,
+.freeform-board .grid-card .card-attach-image,
+.freeform-board .grid-card .card-attach-video,
+.freeform-board .grid-card .card-link-preview,
+.freeform-board .grid-card .card-canva-slot-frame {
+  border-radius: var(--radius-card) var(--radius-card) 0 0 !important;
+  overflow: hidden !important;
+}
+
+.freeform-board .grid-card .card-attach-image.optimized-img-wrap,
+.freeform-board .grid-card .card-link-preview-image.optimized-img-wrap {
+  border-radius: var(--radius-card) var(--radius-card) 0 0 !important;
+  overflow: hidden !important;
+}
+
+@media (max-width: 560px) {
+  .freeform-board {
+    grid-template-columns: 1fr;
+  }
+}
+

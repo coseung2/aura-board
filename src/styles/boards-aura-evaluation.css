@@ -1,0 +1,70 @@
+/* -------- Aura card evaluation segmented control -------- */
+
+.aura-eval-control {
+  margin: 14px -20px -20px;
+  border-top: 1px solid var(--color-border);
+  background: color-mix(in srgb, var(--color-surface-alt) 72%, transparent);
+  overflow: hidden;
+  border-radius: 0 0 var(--radius-card) var(--radius-card);
+}
+
+.aura-eval-segmented {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  width: 100%;
+  border: 0;
+  border-radius: 0;
+  overflow: hidden;
+  background: transparent;
+}
+
+.aura-eval-btn {
+  min-width: 0;
+  min-height: 34px;
+  padding: 7px 8px;
+  border: 0;
+  border-right: 1px solid var(--color-border);
+  background: transparent;
+  color: var(--color-text-muted);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.35;
+  cursor: pointer;
+  transition: background 120ms ease, color 120ms ease;
+}
+
+.aura-eval-btn:last-child {
+  border-right: 0;
+}
+
+.aura-eval-btn:not(:disabled):hover {
+  background: var(--color-surface);
+  color: var(--color-text);
+}
+
+.aura-eval-btn.is-selected {
+  background: var(--color-accent-tinted-bg);
+  color: var(--color-accent);
+}
+
+.aura-eval-btn:disabled {
+  cursor: wait;
+  opacity: 0.7;
+}
+
+.aura-eval-error {
+  margin: 0;
+  padding: 6px 10px 8px;
+  border-top: 1px solid var(--color-border);
+  font-size: 12px;
+  color: var(--color-danger);
+  line-height: 1.45;
+  background: var(--color-surface);
+}
+
+.card-detail-aura-eval .aura-eval-control {
+  margin: 2px 0 8px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+}
