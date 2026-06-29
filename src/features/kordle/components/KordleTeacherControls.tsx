@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { normalizeWord } from "../engine";
 
 type KordleLocale = "en-US" | "ko-KR";
@@ -25,6 +25,7 @@ export function KordleTeacherControls({
   const [locale, setLocale] = useState<KordleLocale>(
     initialLocale === "ko-KR" ? "ko-KR" : "en-US",
   );
+  const localeRef = useRef<KordleLocale>(initialLocale === "ko-KR" ? "ko-KR" : "en-US");
   const [solution, setSolution] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -39,7 +40,14 @@ export function KordleTeacherControls({
   const customWordInvalid = hasCustomWord && normalizedLength !== WORD_LENGTH;
   const roundEnded = puzzleStatus === "CLOSED";
 
+  useEffect(() => {
+    const nextLocale = initialLocale === "ko-KR" ? "ko-KR" : "en-US";
+    setLocale(nextLocale);
+    localeRef.current = nextLocale;
+  }, [initialLocale]);
+
   function applyLocale(nextLocale: KordleLocale) {
+    localeRef.current = nextLocale;
     setLocale(nextLocale);
     setSolution("");
     setError(null);
@@ -58,12 +66,13 @@ export function KordleTeacherControls({
     }
     setError(null);
     setBusy(true);
+    const selectedLocale = localeRef.current;
     try {
       const res = await fetch(`/api/kordle/boards/${boardId}/puzzle`, {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
-          locale,
+          locale: selectedLocale,
           solution: useRandom ? undefined : solution,
         }),
       });
@@ -77,6 +86,7 @@ export function KordleTeacherControls({
         return;
       }
       const nextLocale = data?.locale === "ko-KR" ? "ko-KR" : "en-US";
+      localeRef.current = nextLocale;
       setLocale(nextLocale);
       setSolution("");
       window.dispatchEvent(
@@ -164,7 +174,7 @@ export function KordleTeacherControls({
         onClick={() => createPuzzle(false)}
         disabled={busy || isPending || customWordInvalid || !hasCustomWord}
       >
-        {roundEnded ? "다음 라운드" : "생성"}
+        {roundEnded ? "새 문제" : "생성"}
       </button>
       <button
         type="button"
@@ -172,7 +182,7 @@ export function KordleTeacherControls({
         onClick={() => createPuzzle(true)}
         disabled={busy || isPending}
       >
-        {roundEnded ? "랜덤 다음 라운드" : "랜덤"}
+        {roundEnded ? "랜덤 새 문제" : "랜덤"}
       </button>
       {puzzleStatus === "DRAFT" && (
         <button

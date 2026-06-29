@@ -71,6 +71,10 @@ export interface KordlePublicState {
     totalCount: number;
     isWaiting: boolean;
     isPendingJoin: boolean;
+    roundDurationMs: number;
+    roundStartedAt: string | null;
+    roundEndsAt: string | null;
+    remainingMs: number;
   };
   winnerStats: KordleWinnerStats;
 }

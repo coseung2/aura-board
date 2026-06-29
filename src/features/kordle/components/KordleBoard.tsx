@@ -220,6 +220,8 @@ function guessErrorMessage(reason: string, wordLength: number): string {
       return "더 이상 시도할 수 없어요";
     case "waiting_for_turn":
       return "다른 친구들이 제출하면 다음 줄로 넘어갑니다";
+    case "round_time_expired":
+      return "시간이 지나 다음 줄로 넘어갑니다";
     case "forbidden":
     case "unauthenticated":
       return "참여 권한을 확인해 주세요";
@@ -238,6 +240,7 @@ export function KordleBoard({ boardId, initialState, attemptId, locale }: Props)
   const [buffer, setBuffer] = useState<string>("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [nowMs, setNowMs] = useState(() => Date.now());
   const isKorean = activeLocale.toLowerCase().startsWith("ko");
   void boardId;
 
@@ -276,13 +279,26 @@ export function KordleBoard({ boardId, initialState, attemptId, locale }: Props)
   }, [state.guesses]);
 
   const isComplete = state.status === "WON" || state.status === "LOST";
+  const roundEndsAtMs = state.turn.roundEndsAt ? Date.parse(state.turn.roundEndsAt) : NaN;
+  const roundRemainingMs = Number.isFinite(roundEndsAtMs)
+    ? Math.max(0, roundEndsAtMs - nowMs)
+    : state.turn.remainingMs;
+  const roundExpired = state.turn.currentGuessIndex !== null && roundRemainingMs <= 0;
   const isWaitingForTurn =
     !isComplete && state.turn.currentGuessIndex !== null && state.turn.isWaiting;
   const canType =
     !isComplete &&
     !submitting &&
+    !roundExpired &&
     state.turn.currentGuessIndex !== null &&
     state.nextGuessIndex === state.turn.currentGuessIndex;
+
+  useEffect(() => {
+    if (isComplete || !state.turn.roundEndsAt) return;
+    setNowMs(Date.now());
+    const timer = window.setInterval(() => setNowMs(Date.now()), 500);
+    return () => window.clearInterval(timer);
+  }, [isComplete, state.turn.roundEndsAt]);
 
   useEffect(() => {
     if (isComplete) return;
@@ -322,6 +338,10 @@ export function KordleBoard({ boardId, initialState, attemptId, locale }: Props)
 
   const submit = useCallback(async () => {
     if (submitting || isComplete) return;
+    if (roundExpired) {
+      setError("시간이 지나 다음 줄로 넘어갑니다");
+      return;
+    }
     // Full guess = committed cells + any in-progress Korean syllable jamos.
     // For English `buffer` is always "" so this is just the joined letters.
     const guess = pending.join("") + buffer;
@@ -335,7 +355,7 @@ export function KordleBoard({ boardId, initialState, attemptId, locale }: Props)
       const res = await fetch(`/api/kordle/attempts/${attemptId}/guess`, {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ guess }),
+        body: JSON.stringify({ guess, guessIndex: state.turn.currentGuessIndex ?? undefined }),
       });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
@@ -353,7 +373,16 @@ export function KordleBoard({ boardId, initialState, attemptId, locale }: Props)
     } finally {
       setSubmitting(false);
     }
-  }, [attemptId, buffer, isComplete, pending, state.wordLength, submitting]);
+  }, [
+    attemptId,
+    buffer,
+    isComplete,
+    pending,
+    roundExpired,
+    state.turn.currentGuessIndex,
+    state.wordLength,
+    submitting,
+  ]);
 
   const onKey = useCallback(
     (key: string) => {
@@ -484,6 +513,24 @@ export function KordleBoard({ boardId, initialState, attemptId, locale }: Props)
     return () => window.removeEventListener("keydown", handler);
   }, [isKorean, onKey]);
 
+  useEffect(() => {
+    if (isComplete || !roundExpired) return;
+    setPending([]);
+    setBuffer("");
+    setError(null);
+    let cancelled = false;
+    const timer = window.setTimeout(async () => {
+      const res = await fetch(`/api/kordle/attempts/${attemptId}`, { cache: "no-store" });
+      if (!res.ok || cancelled) return;
+      const data = (await res.json().catch(() => null)) as { state?: KordlePublicState } | null;
+      if (data?.state) setState(data.state);
+    }, 350);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, [attemptId, isComplete, roundExpired, state.turn.currentGuessIndex]);
+
   // Grid cells = committed cells + in-progress Korean jamos. For English
   // `buffer` is "" so this is just `pending`. Each entry is one cell.
   const displaySlots: string[] = [...pending, ...buffer];
@@ -525,6 +572,11 @@ export function KordleBoard({ boardId, initialState, attemptId, locale }: Props)
         {error && (
           <p className="kordle-error" role="alert">
             {error}
+          </p>
+        )}
+        {!isComplete && state.turn.currentGuessIndex !== null && (
+          <p className="kordle-round-timer" role="timer">
+            {state.turn.currentGuessIndex}줄 · {Math.ceil(roundRemainingMs / 1000)}초
           </p>
         )}
         {isWaitingForTurn && (

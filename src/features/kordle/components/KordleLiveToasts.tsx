@@ -9,6 +9,7 @@ type Props = {
 type LiveEvent = {
   id: string;
   name: string;
+  guessIndex: number;
   correctCount: number;
   createdAt: string;
 };
@@ -19,7 +20,7 @@ type FeedResponse = {
 };
 
 export function KordleLiveToasts({ boardId }: Props) {
-  const [toasts, setToasts] = useState<LiveEvent[]>([]);
+  const [events, setEvents] = useState<LiveEvent[]>([]);
   const seenIds = useRef(new Set<string>());
   const sinceRef = useRef(new Date().toISOString());
 
@@ -39,12 +40,7 @@ export function KordleLiveToasts({ boardId }: Props) {
           const fresh = data.events.filter((event) => !seenIds.current.has(event.id));
           for (const event of fresh) seenIds.current.add(event.id);
           if (!cancelled && fresh.length > 0) {
-            setToasts((current) => [...fresh, ...current].slice(0, 4));
-            window.setTimeout(() => {
-              setToasts((current) =>
-                current.filter((toast) => !fresh.some((event) => event.id === toast.id)),
-              );
-            }, 4200);
+            setEvents((current) => [[...fresh].reverse(), current].flat().slice(0, 12));
           }
         }
       } finally {
@@ -61,16 +57,19 @@ export function KordleLiveToasts({ boardId }: Props) {
     };
   }, [boardId]);
 
-  if (toasts.length === 0) return null;
+  if (events.length === 0) return null;
 
   return (
-    <div className="kordle-live-toasts" aria-live="polite" aria-label="꼬들 라이브 알림">
-      {toasts.map((toast) => (
-        <div className="kordle-live-toast" key={toast.id}>
-          <strong>{toast.name}님</strong>
-          <span>{toast.correctCount}글자 맞추셨습니다.</span>
+    <aside className="kordle-live-toasts" aria-live="polite" aria-label="꼬들 라이브 피드">
+      <div className="kordle-live-feed-head">실시간 제출</div>
+      {events.map((event) => (
+        <div className="kordle-live-toast" key={event.id}>
+          <strong>{event.name}님</strong>
+          <span>
+            {event.guessIndex}줄에서 {event.correctCount}글자 맞춤
+          </span>
         </div>
       ))}
-    </div>
+    </aside>
   );
 }

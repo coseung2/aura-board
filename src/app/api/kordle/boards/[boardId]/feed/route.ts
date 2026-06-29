@@ -74,6 +74,7 @@ export async function GET(req: Request, { params }: Params) {
     take: 12,
     select: {
       id: true,
+      guessIndex: true,
       feedback: true,
       createdAt: true,
       attempt: {
@@ -91,6 +92,7 @@ export async function GET(req: Request, { params }: Params) {
       return {
         id: guess.id,
         name: guess.attempt.student?.name ?? guess.attempt.teacherUser?.name ?? "누군가",
+        guessIndex: guess.guessIndex,
         correctCount: count,
         createdAt: guess.createdAt.toISOString(),
       };

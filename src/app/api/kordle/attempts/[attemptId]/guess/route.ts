@@ -6,6 +6,7 @@ import { submitGuess } from "@/features/kordle/server/kordleServer";
 
 const BodySchema = z.object({
   guess: z.string().min(1).max(50),
+  guessIndex: z.number().int().min(1).max(20).optional(),
 });
 
 type Params = { params: Promise<{ attemptId: string }> };
@@ -34,6 +35,7 @@ export async function POST(req: Request, { params }: Params) {
   const result = await submitGuess({
     attemptId,
     rawGuess: parsed.data.guess,
+    expectedGuessIndex: parsed.data.guessIndex,
     studentId: student?.id ?? null,
     vibePlaySessionId: null,
     teacherUserId: user?.id ?? null,
@@ -42,7 +44,7 @@ export async function POST(req: Request, { params }: Params) {
     const status =
       result.reason === "forbidden" ? 403 :
       result.reason === "attempt_not_found" ? 404 :
-      result.reason === "puzzle_closed" ? 409 :
+      result.reason === "puzzle_closed" || result.reason === "round_time_expired" ? 409 :
       400;
     return NextResponse.json({ error: result.reason }, { status });
   }

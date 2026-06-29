@@ -1,8 +1,8 @@
 import { db } from "@/lib/db";
-import { GameParticipantsList } from "@/features/games/components/GameParticipantsList";
 import { KordleBoard } from "./KordleBoard";
 import { KordleLiveToasts } from "./KordleLiveToasts";
 import { KordleTeacherControls } from "./KordleTeacherControls";
+import { KordleTeacherParticipants } from "./KordleTeacherParticipants";
 import { ensureAttempt, getPublicState } from "../server/kordleServer";
 
 type Props = {
@@ -105,6 +105,18 @@ export async function KordleTeacherBoard({ boardId, teacherUserId }: Props) {
 
   const puzzle = game.puzzles[0] ?? null;
   const attemptCount = puzzle?._count.attempts ?? 0;
+  const participants = puzzle
+    ? puzzle.attempts
+        .map((attempt) =>
+          attempt.student
+            ? {
+                id: attempt.student.id,
+                name: attempt.student.name,
+              }
+            : null,
+        )
+        .filter((participant): participant is { id: string; name: string } => Boolean(participant))
+    : [];
   const puzzleSummaryText =
     puzzle?.status === "DRAFT"
       ? "시작 대기 중"
@@ -189,18 +201,11 @@ export async function KordleTeacherBoard({ boardId, teacherUserId }: Props) {
             </dl>
 
             {puzzle && (
-              <GameParticipantsList
-                className="kordle-participant-list"
-                participants={puzzle.attempts
-                  .map((attempt) =>
-                    attempt.student
-                      ? {
-                          id: attempt.student.id,
-                          name: attempt.student.name,
-                        }
-                      : null,
-                  )
-                  .filter((participant): participant is { id: string; name: string } => Boolean(participant))}
+              <KordleTeacherParticipants
+                boardId={boardId}
+                puzzleId={puzzle.id}
+                initialStatus={puzzle.status}
+                initialParticipants={participants}
               />
             )}
 

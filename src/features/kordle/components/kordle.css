@@ -330,6 +330,61 @@
   margin: 0;
 }
 
+.kordle-teacher-participants {
+  border: 1px solid var(--color-border, #cbd5e1);
+  border-radius: 8px;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  background: var(--color-surface, #fff);
+}
+
+.kordle-teacher-participants-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  color: var(--color-text-muted, #64748b);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.kordle-teacher-participants-header strong {
+  color: var(--color-text, #0f172a);
+  font-size: 18px;
+}
+
+.kordle-teacher-participants p,
+.kordle-teacher-participants small {
+  margin: 0;
+  color: var(--color-text-muted, #64748b);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.kordle-round-progress {
+  border-top: 1px solid var(--color-border, #cbd5e1);
+  padding-top: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.kordle-round-progress-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  color: var(--color-text, #0f172a);
+  font-size: 13px;
+  font-weight: 850;
+}
+
+.kordle-round-progress-header strong {
+  font-variant-numeric: tabular-nums;
+}
+
 .game-participant-list,
 .kordle-participant-list {
   display: flex;
@@ -403,17 +458,19 @@
 }
 
 .kordle-kbd {
+  width: min(100%, 560px);
   display: flex;
   flex-direction: column;
-  gap: 5px;
+  gap: 8px;
   align-items: center;
 }
 .kordle-kbd-row {
+  width: 100%;
   display: flex;
-  gap: 4px;
+  gap: 6px;
   justify-content: center;
   align-items: center;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
 }
 
 .kordle-kbd[data-locale="ko"] .kordle-kbd-row {
@@ -421,12 +478,13 @@
 }
 
 .kordle-kbd-key {
-  min-width: 30px;
-  min-height: 36px;
-  padding: 0 7px;
-  font-size: 13px;
+  flex: 1 1 0;
+  min-width: 45px;
+  min-height: 54px;
+  padding: 0 11px;
+  font-size: 20px;
   font-weight: 600;
-  border-radius: 4px;
+  border-radius: 6px;
   border: 1px solid #cbd5e1;
   background: #fff;
   cursor: pointer;
@@ -438,7 +496,8 @@
   opacity: 0.45;
 }
 .kordle-kbd-key--action {
-  min-width: 52px;
+  flex-grow: 1.7;
+  min-width: 78px;
   background: #e2e8f0;
 }
 .kordle-kbd-key--correct {
@@ -464,6 +523,15 @@
 .kordle-error {
   color: #b91c1c;
   font-size: 14px;
+  text-align: center;
+}
+
+.kordle-round-timer {
+  margin: 0;
+  color: var(--color-text, #0f172a);
+  font-size: 13px;
+  font-weight: 850;
+  font-variant-numeric: tabular-nums;
   text-align: center;
 }
 
@@ -510,28 +578,45 @@
   z-index: 60;
   display: flex;
   flex-direction: column;
-  align-items: flex-end;
+  align-items: stretch;
   gap: 8px;
   pointer-events: none;
+  width: min(340px, calc(100vw - 36px));
+  max-height: min(480px, calc(100vh - 36px));
+  overflow: hidden;
+  border: 1px solid rgba(148, 163, 184, 0.45);
+  border-radius: 10px;
+  padding: 10px;
+  background: rgba(255, 255, 255, 0.96);
+  box-shadow: 0 16px 36px rgba(15, 23, 42, 0.18);
+}
+
+.kordle-live-feed-head {
+  color: var(--color-text-muted, #64748b);
+  font-size: 12px;
+  font-weight: 850;
 }
 
 .kordle-live-toast {
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: 6px;
-  min-height: 40px;
-  max-width: min(320px, calc(100vw - 36px));
-  border: 1px solid rgba(148, 163, 184, 0.45);
-  border-radius: 8px;
-  padding: 9px 12px;
-  background: rgba(255, 255, 255, 0.96);
+  min-height: 34px;
+  border-top: 1px solid rgba(148, 163, 184, 0.22);
+  padding: 8px 0 0;
   color: var(--color-text, #0f172a);
-  box-shadow: 0 12px 28px rgba(15, 23, 42, 0.16);
   font-size: 13px;
 }
 
 .kordle-live-toast strong {
   font-weight: 850;
+}
+
+.kordle-live-toast span {
+  color: var(--color-text-muted, #64748b);
+  font-size: 12px;
+  text-align: right;
 }
 
 .game-waiting,
@@ -590,5 +675,16 @@
 
   .kordle-teacher-layout {
     grid-template-columns: 1fr;
+  }
+
+  .kordle-kbd-key {
+    min-width: 0;
+    min-height: 50px;
+    padding: 0 6px;
+    font-size: 17px;
+  }
+
+  .kordle-kbd-key--action {
+    min-width: 0;
   }
 }
