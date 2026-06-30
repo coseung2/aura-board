@@ -2,8 +2,8 @@
  * Server-side Supabase Realtime broadcast helper.
  *
  * Uses the service-role key to send broadcast events on public channels.
- * Clients subscribe to the same channel and refetch on signal — no RLS
- * needed because broadcast channels bypass row-level security entirely.
+ * Clients subscribe to the same channel and refetch on signal. Broadcast
+ * failures are non-fatal because the API mutation already succeeded.
  */
 
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
@@ -29,35 +29,28 @@ function getServerClient(): SupabaseClient | null {
 /**
  * Broadcast a card-change event on the board's realtime channel.
  * Clients listening on `board:{boardId}` will refetch a snapshot.
- *
- * Call this after any mutation that changes the board's card set:
- * POST /api/cards, PATCH /api/cards/:id, DELETE /api/cards/:id.
  */
 export async function announceCardChange(
   boardId: string,
   changeType: "insert" | "update" | "delete" = "insert",
 ): Promise<void> {
   const client = getServerClient();
-  if (!client) return; // Supabase not configured — silent no-op.
+  if (!client) return;
   try {
-    await client.channel(`board:${boardId}`).send({
+    await client.channel(boardChannelKey(boardId)).send({
       type: "broadcast",
       event: "card_changed",
       payload: { boardId, changeType, ts: Date.now() },
     });
   } catch {
-    // Broadcast failures are non-fatal — clients fall back to no realtime.
+    // ignore
   }
 }
 
 /**
- * Broadcast a board-level engagement change (like/comment counts) on the
- * board's realtime channel. Listeners on `board:{boardId}` receive the
- * `board_changed` broadcast event and can patch counts without refetching
- * the whole snapshot.
- *
- * Failures are non-fatal — clients will simply re-sync on their next
- * polling/snapshot fetch.
+ * Broadcast a board-level engagement change. Listeners on `board:{boardId}`
+ * receive the aggregate `board_changed` event and can patch counts without
+ * refetching the whole snapshot.
  */
 export async function announceEngagementChange(
   boardId: string,
@@ -67,7 +60,7 @@ export async function announceEngagementChange(
 ): Promise<void> {
   if (!boardId || !cardId) return;
   const client = getServerClient();
-  if (!client) return; // Supabase not configured — silent no-op.
+  if (!client) return;
   const event: BoardRealtimeEvent = {
     type: "engagement_changed",
     boardId,
@@ -83,14 +76,13 @@ export async function announceEngagementChange(
       payload: event,
     });
   } catch {
-    // Broadcast failures are non-fatal — clients fall back to no realtime.
+    // ignore
   }
 }
 
 /**
- * Broadcast a DJ queue mutation so listening mobile/web clients can
- * refetch their queue snapshot. Keep the payload minimal — clients merge
- * on the existing list and just patch the affected card.
+ * Broadcast a DJ queue mutation so listening clients can refetch the queue
+ * snapshot without falling back to interval polling.
  */
 export async function announceQueueChange(
   boardId: string,
@@ -114,18 +106,13 @@ export async function announceQueueChange(
       payload: event,
     });
   } catch {
-    // ignore — clients fall back to next poll.
+    // ignore
   }
 }
 
 /**
- * comment-area poll (2026-06-28): 학생이 카드별 댓글창에서 투표를 누르면
- * 같은 board 채널에 `board_changed` broadcast 로 신호. 클라이언트는 본
- * 이벤트를 받으면 /api/cards/:id/poll 을 refetch 해서 분포/본인 선택을
- * 갱신한다. payload 가 아니라 board_changed 이벤트 이름으로 보내는 이유는
- * useBoardEngagement 등 기존 board-레벨 리스너가 단일 이벤트로
- * 라우팅하도록 통일하기 위함. announceEngagementChange 와 동일하게 실패는
- * non-fatal.
+ * Broadcast card comment poll changes. Clients refetch /api/cards/:id/poll
+ * instead of trusting the event payload for counts.
  */
 export async function announcePollChange(
   boardId: string,
@@ -147,6 +134,37 @@ export async function announcePollChange(
       payload: event,
     });
   } catch {
-    // ignore — clients fall back to next poll.
+    // ignore
+  }
+}
+
+/**
+ * Broadcast question-board response/config changes. Clients listen for the
+ * type-specific `question_changed` event and refetch the board snapshot.
+ */
+export async function announceQuestionChange(
+  boardId: string,
+  changeType: "response_insert" | "response_delete" | "config",
+  responseId?: string,
+): Promise<void> {
+  if (!boardId) return;
+  if (changeType !== "config" && !responseId) return;
+  const client = getServerClient();
+  if (!client) return;
+  const event: BoardRealtimeEvent = {
+    type: "question_changed",
+    boardId,
+    changeType,
+    ...(responseId ? { responseId } : {}),
+    updatedAt: new Date().toISOString(),
+  };
+  try {
+    await client.channel(boardChannelKey(boardId)).send({
+      type: "broadcast",
+      event: "question_changed",
+      payload: event,
+    });
+  } catch {
+    // ignore
   }
 }

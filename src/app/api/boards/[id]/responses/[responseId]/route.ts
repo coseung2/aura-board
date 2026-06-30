@@ -4,6 +4,7 @@ import { getCurrentUser } from "@/lib/auth";
 import { getCurrentStudent } from "@/lib/student-auth";
 import { getEffectiveBoardRole } from "@/lib/rbac";
 import { touchBoardUpdatedAt } from "@/lib/board-touch";
+import { announceQuestionChange } from "@/lib/realtime-broadcast";
 
 // DELETE: 응답 삭제. 교사(owner/editor) 만 가능. 학생은 자기 것도 삭제 불가 (MVP).
 export async function DELETE(
@@ -43,6 +44,7 @@ export async function DELETE(
 
   await db.boardResponse.delete({ where: { id: responseId } });
   await touchBoardUpdatedAt(board.id);
+  void announceQuestionChange(board.id, "response_delete", responseId);
 
   return NextResponse.json({ ok: true });
 }

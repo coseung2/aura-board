@@ -1,20 +1,12 @@
 /**
  * Realtime channel key helpers.
  *
- * NOTE (Breakout T0-①): This module only defines *channel key strings* that
- * the UI and server routes can agree on. The actual pub/sub engine (Supabase
- * Realtime, PartyKit, Pusher, …) has not been chosen yet — that decision is
- * deferred to a separate research task (`research/realtime-engine`).
+ * This module only defines channel key strings that the UI and server routes
+ * agree on. Keeping channel naming centralized makes future transport swaps
+ * local to the transport layer.
  *
- * By keeping the channel naming convention here, any future engine swap only
- * needs to rewire the transport layer; call sites that use these helpers
- * remain stable.
- *
- *   board  → `board:{boardId}`                (all events for the whole board)
- *   section→ `board:{boardId}:section:{sectionId}`  (breakout-scoped events)
- *
- * Consumers MUST NOT construct channel names by hand. Use these helpers so
- * the format stays canonical and greppable.
+ *   board   -> `board:{boardId}`
+ *   section -> `board:{boardId}:section:{sectionId}`
  */
 
 export function boardChannelKey(boardId: string): string {
@@ -34,8 +26,7 @@ export function assignmentChannelKey(boardId: string): string {
   return `board:${boardId}:assignment`;
 }
 
-/** Classroom 자랑해요 highlight 영역 (student-portfolio 2026-04-26).
- *  학급 dashboard 가 구독해 자랑해요 추가/제거 시 즉시 반영. */
+/** Classroom showcase highlight channel. */
 export function classroomShowcaseChannelKey(classroomId: string): string {
   if (!classroomId)
     throw new Error("classroomShowcaseChannelKey: classroomId required");
@@ -43,14 +34,24 @@ export function classroomShowcaseChannelKey(classroomId: string): string {
 }
 
 export type ShowcaseRealtimeEvent =
-  | { type: "showcase_added"; cardId: string; studentId: string; classroomId: string; createdAt: string }
-  | { type: "showcase_removed"; cardId: string; studentId: string; classroomId: string };
+  | {
+      type: "showcase_added";
+      cardId: string;
+      studentId: string;
+      classroomId: string;
+      createdAt: string;
+    }
+  | {
+      type: "showcase_removed";
+      cardId: string;
+      studentId: string;
+      classroomId: string;
+    };
 
 /**
- * Board-level realtime event union.
- *
- * Broadcast on the `board:{boardId}` channel under the event name
- * `board_changed` (see `realtime-broadcast.ts`).
+ * Board-level realtime event union. Broadcast event names may be either
+ * type-specific (`card_changed`, `queue_changed`, `question_changed`) or the
+ * aggregate `board_changed` event for engagement/poll listeners.
  */
 export type BoardRealtimeEvent =
   | {
@@ -71,17 +72,21 @@ export type BoardRealtimeEvent =
   | {
       type: "queue_changed";
       boardId: string;
-     changeType: "submit" | "status" | "move" | "delete";
-     cardId: string;
-     updatedAt: string;
-   }
+      changeType: "submit" | "status" | "move" | "delete";
+      cardId: string;
+      updatedAt: string;
+    }
   | {
-      // comment-area poll (2026-06-28): 학생이 카드별 댓글창에서 투표를
-      // 누르면 방송. 클라이언트는 옵션 수·현재 카운트 등을 본 이벤트로
-      // 갱신하지 않고 /api/cards/:id/poll 을 refetch 한다.
       type: "poll_changed";
       boardId: string;
       cardId: string;
+      updatedAt: string;
+    }
+  | {
+      type: "question_changed";
+      boardId: string;
+      changeType: "response_insert" | "response_delete" | "config";
+      responseId?: string;
       updatedAt: string;
     };
 
@@ -109,7 +114,7 @@ export type AssignmentRealtimeEvent =
 /**
  * Placeholder publish/subscribe. Intentionally a no-op.
  * When the realtime engine is chosen, replace the body of this module while
- * keeping the signatures so callers (if added) won't need updates.
+ * keeping the signatures so callers do not need updates.
  */
 export type RealtimeEvent = {
   channel: string;

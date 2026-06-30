@@ -6,6 +6,7 @@ import { BarChartViz } from "./question/viz/BarChartViz";
 import { PieChartViz } from "./question/viz/PieChartViz";
 import { TimelineViz } from "./question/viz/TimelineViz";
 import { ResponseListViz } from "./question/viz/ResponseListViz";
+import { useBoardSnapshotRealtime } from "@/hooks/useBoardSnapshotRealtime";
 
 // d3-cloud 는 브라우저 전용 canvas 측정 사용 → SSR 에서 import 안 됨.
 const WordCloudViz = dynamic(
@@ -32,8 +33,6 @@ type Props = {
   viewerKind: "teacher" | "student" | "none";
   currentStudentId: string | null;
 };
-
-const QUESTION_POLL_MS = 15_000;
 
 const VIZ_LABELS: Record<VizMode, { emoji: string; label: string }> = {
   "word-cloud": { emoji: "☁️", label: "워드클라우드" },
@@ -75,50 +74,32 @@ export function QuestionBoard({
     };
   }, [boardId]);
 
-  // SSE 구독 — question_snapshot 이벤트로 prompt/vizMode/responses 갱신.
-  useEffect(() => {
-    let stopped = false;
-    let timer: ReturnType<typeof setTimeout> | null = null;
-    let lastHash = "";
-
-    async function poll() {
-      if (stopped) return;
-      try {
-        const qs = lastHash ? `?hash=${encodeURIComponent(lastHash)}` : "";
-        const res = await fetch(`/api/boards/${boardId}/snapshot${qs}`, {
-          cache: "no-store",
-        });
-        if (res.status === 401 || res.status === 403) {
-          stopped = true;
-          return;
+  // Realtime: refetch /snapshot on mount and whenever the backend broadcasts
+  // `question_changed` on channel `board:{boardId}`. Replaces the old 15s poll.
+  const applyQuestionSnapshot = useCallback(
+    (data: { [key: string]: unknown }) => {
+      const q = (
+        data as {
+          question?: {
+            prompt: string | null;
+            vizMode: VizMode;
+            responses: QuestionResponse[];
+          } | null;
         }
-        if (res.status !== 304 && res.ok) {
-          const data = (await res.json()) as {
-            hash?: string;
-            question?: {
-              prompt: string | null;
-              vizMode: VizMode;
-              responses: QuestionResponse[];
-            } | null;
-          };
-          lastHash = data.hash ?? "";
-          if (data.question) {
-            setPrompt(data.question.prompt);
-            setVizMode(data.question.vizMode);
-            setResponses(data.question.responses);
-          }
-        }
-      } catch {}
-      if (!stopped) timer = setTimeout(poll, QUESTION_POLL_MS);
-    }
+      ).question;
+      if (!q) return;
+      setPrompt(q.prompt);
+      setVizMode(q.vizMode);
+      setResponses(q.responses);
+    },
+    [],
+  );
 
-    poll();
-
-    return () => {
-      stopped = true;
-      if (timer) clearTimeout(timer);
-    };
-  }, [boardId]);
+  useBoardSnapshotRealtime(
+    boardId,
+    ["question_changed"],
+    applyQuestionSnapshot,
+  );
 
   const submitResponse = useCallback(async () => {
     const text = draft.trim();

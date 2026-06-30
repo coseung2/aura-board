@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { CardData } from "./DraggableCard";
 import { DJNowPlayingHeader } from "./dj/DJNowPlayingHeader";
 import { DJQueueList } from "./dj/DJQueueList";
@@ -8,6 +8,7 @@ import { DJSubmitForm } from "./dj/DJSubmitForm";
 import { DJRanking } from "./dj/DJRanking";
 import { DJPlayedStack } from "./dj/DJPlayedStack";
 import { DJRecapModal } from "./dj/DJRecapModal";
+import { useBoardSnapshotRealtime } from "@/hooks/useBoardSnapshotRealtime";
 
 type Props = {
   boardId: string;
@@ -17,8 +18,6 @@ type Props = {
   currentUserId: string | null;
   currentStudentId: string | null;
 };
-
-const DJ_POLL_MS = 15_000;
 
 type DJQueueStatus = "pending" | "approved" | "rejected" | "played";
 
@@ -118,65 +117,37 @@ export function DJBoard({
     });
   }
 
-  // Poll short snapshots instead of holding a long-lived SSE function open.
-  useEffect(() => {
-    let stopped = false;
-    let timer: ReturnType<typeof setTimeout> | null = null;
-    let lastHash = "";
-
-    async function poll() {
-      if (stopped) return;
-      try {
-        const qs = lastHash ? `?hash=${encodeURIComponent(lastHash)}` : "";
-        const res = await fetch(`/api/boards/${boardId}/snapshot${qs}`, {
-          cache: "no-store",
-        });
-        if (res.status === 401 || res.status === 403) {
-          stopped = true;
-          return;
+  // Realtime: refetch /snapshot on mount and whenever the backend broadcasts
+  // `queue_changed` on channel `board:{boardId}`. Replaces the old 15s poll.
+  // Optimistic pending mutations are preserved: cards in pendingCardIds keep
+  // their local shape and are never dropped by an in-flight server snapshot.
+  const applyQueueSnapshot = useCallback((data: { [key: string]: unknown }) => {
+    const snapshot = data as { cards: CardData[] };
+    if (!Array.isArray(snapshot.cards)) return;
+    setCards((local) => {
+      const localById = new Map(local.map((c) => [c.id, c] as const));
+      const next: CardData[] = [];
+      for (const sc of snapshot.cards) {
+        if (pendingCardIds.current.has(sc.id)) {
+          const l = localById.get(sc.id);
+          next.push(l ?? sc);
+        } else {
+          next.push(sc);
         }
-        if (res.status !== 304 && res.ok) {
-          const data = (await res.json()) as {
-            cards: CardData[];
-            hash?: string;
-          };
-          lastHash = data.hash ?? "";
-          setCards((local) => {
-            const localById = new Map(local.map((c) => [c.id, c] as const));
-            const next: CardData[] = [];
-            for (const sc of data.cards) {
-              if (pendingCardIds.current.has(sc.id)) {
-                const l = localById.get(sc.id);
-                next.push(l ?? sc);
-              } else {
-                next.push(sc);
-              }
-            }
-            for (const l of local) {
-              if (
-                pendingCardIds.current.has(l.id) &&
-                !data.cards.some((sc) => sc.id === l.id)
-              ) {
-                next.push(l);
-              }
-            }
-            return next;
-          });
-        }
-      } catch (e) {
-        console.error("[dj snapshot poll]", e);
       }
-      if (!stopped) timer = setTimeout(poll, DJ_POLL_MS);
-    }
+      for (const l of local) {
+        if (
+          pendingCardIds.current.has(l.id) &&
+          !snapshot.cards.some((sc) => sc.id === l.id)
+        ) {
+          next.push(l);
+        }
+      }
+      return next;
+    });
+  }, []);
 
-    poll();
-
-    return () => {
-      stopped = true;
-      if (timer) clearTimeout(timer);
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [boardId]);
+  useBoardSnapshotRealtime(boardId, ["queue_changed"], applyQueueSnapshot);
 
   // Active queue = pending + approved (non-played). Played cards go into the
   // left drawer so they can be dragged back.

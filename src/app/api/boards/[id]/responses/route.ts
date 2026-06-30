@@ -5,6 +5,7 @@ import { getCurrentUser } from "@/lib/auth";
 import { getCurrentStudent } from "@/lib/student-auth";
 import { getEffectiveBoardRole } from "@/lib/rbac";
 import { touchBoardUpdatedAt } from "@/lib/board-touch";
+import { announceQuestionChange } from "@/lib/realtime-broadcast";
 
 const CreateBody = z.object({
   text: z.string().min(1).max(500),
@@ -72,6 +73,7 @@ export async function POST(
 
   // stream route 의 poll 이 board.updatedAt 변화를 감지해 snapshot 재전송.
   await touchBoardUpdatedAt(board.id);
+  void announceQuestionChange(board.id, "response_insert", response.id);
 
   return NextResponse.json({ response });
 }

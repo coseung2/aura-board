@@ -5,6 +5,7 @@ import { getCurrentUser } from "@/lib/auth";
 import { getCurrentStudent } from "@/lib/student-auth";
 import { getEffectiveBoardRole } from "@/lib/rbac";
 import { touchBoardUpdatedAt } from "@/lib/board-touch";
+import { announceQuestionChange } from "@/lib/realtime-broadcast";
 
 const VIZ_MODES = ["word-cloud", "bar", "pie", "timeline", "list"] as const;
 
@@ -77,6 +78,7 @@ export async function PATCH(
   });
 
   await touchBoardUpdatedAt(board.id);
+  void announceQuestionChange(board.id, "config");
 
   return NextResponse.json({ board: updated });
 }

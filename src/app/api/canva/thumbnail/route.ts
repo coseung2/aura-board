@@ -30,6 +30,20 @@ const ALLOWED_HOST_SUFFIXES = [
 ];
 const MAX_HTML_BYTES = 512 * 1024;
 
+// Single point of truth for writes to the shared `canva-thumbnail` cache.
+// Only non-null URLs are stored, and callers are responsible for ensuring
+// the URL is publicly resolvable (e.g. came from resolveCanvaEmbedUrlCached
+// or resolvePublicCanvaPageThumbnail). User-token-derived thumbnails must
+// NEVER be passed here; they are kept off the shared cache and served with
+// `Cache-Control: private, no-store` via the `privateThumbnail` flag below.
+async function cacheSharedCanvaThumbnail(
+  design: string,
+  url: string | null,
+): Promise<void> {
+  if (!url) return;
+  await setPreviewCache("canva-thumbnail", design, { url }, true);
+}
+
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
   const design = searchParams.get("design");
@@ -54,13 +68,15 @@ export async function GET(req: Request) {
     } else {
       const embed = await resolveCanvaEmbedUrlCached(design);
       url = normalizeResolvedThumbnailUrl(embed?.thumbnailUrl);
-      await setPreviewCache(
-        "canva-thumbnail",
-        design,
-        { url },
-        Boolean(url),
-        url ? undefined : "not_found"
-      );
+      // Invariant: the shared `canva-thumbnail` key may only store
+      // publicly resolvable URLs. Negative outcomes are intentionally
+      // NOT cached here; otherwise a logged-in user with a Canva token
+      // (whose private thumbnail lookup would succeed) is short-circuited
+      // to a 404. The oembed layer caches its own `canva-oembed`
+      // negatives, so we do not lose upstream protection.
+      if (url) {
+        await cacheSharedCanvaThumbnail(design, url);
+      }
     }
     if (!url) {
       const designId = extractCanvaDesignId(design);
@@ -79,7 +95,10 @@ export async function GET(req: Request) {
     if (!url) {
       url = await resolvePublicCanvaPageThumbnail(design);
       if (url) {
-        await setPreviewCache("canva-thumbnail", design, { url }, true);
+        // Public HTML scrape produces a CDN URL on the canva.com
+        // allowlist, so it is safe to share. User-token thumbnails are
+        // never routed through this path.
+        await cacheSharedCanvaThumbnail(design, url);
       }
     }
     if (!url) {
