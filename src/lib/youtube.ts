@@ -193,8 +193,7 @@ export async function fetchYouTubeMeta(
     res = await fetch(oembedUrl, {
       method: "GET",
       headers: { accept: "application/json" },
-      // Next.js fetch cache — 24h is plenty for public oEmbed.
-      next: { revalidate: 86400 },
+      cache: "no-store",
     });
   } catch {
     return null;
@@ -309,8 +308,7 @@ export async function fetchYouTubeChannelMeta(
         // bundle (usually <2s on a warm handler) lands inside the
         // budget on the first try with headroom for warmup.
         signal: AbortSignal.timeout(12000),
-        // Public pages tolerate 24h cache just like oEmbed.
-        next: { revalidate: 86400 },
+        cache: "no-store",
       });
       break;
     } catch (err) {
@@ -439,6 +437,7 @@ async function fetchYouTubeChannelMetaViaJina(
         Accept: "text/html,application/xhtml+xml",
       },
       signal: AbortSignal.timeout(12000),
+      cache: "no-store",
     });
     if (!r.ok) return null;
     return await r.text();

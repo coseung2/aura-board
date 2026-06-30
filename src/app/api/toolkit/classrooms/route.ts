@@ -1,7 +1,7 @@
-import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
 import { getCurrentStudent } from "@/lib/student-auth";
+import { jsonPrivateNoStore } from "@/lib/http-cache";
 
 export async function GET() {
   try {
@@ -16,7 +16,7 @@ export async function GET() {
           _count: { select: { students: true } },
         },
       });
-      return NextResponse.json({
+      return jsonPrivateNoStore({
         classrooms: classrooms.map((classroom) => ({
           id: classroom.id,
           name: classroom.name,
@@ -27,7 +27,7 @@ export async function GET() {
 
     const student = await getCurrentStudent();
     if (student) {
-      return NextResponse.json({
+      return jsonPrivateNoStore({
         classrooms: [
           {
             id: student.classroomId,
@@ -38,9 +38,9 @@ export async function GET() {
       });
     }
 
-    return NextResponse.json({ classrooms: [] }, { status: 401 });
+    return jsonPrivateNoStore({ classrooms: [] }, { status: 401 });
   } catch (error) {
     console.error("[GET /api/toolkit/classrooms]", error);
-    return NextResponse.json({ error: "internal" }, { status: 500 });
+    return jsonPrivateNoStore({ error: "internal" }, { status: 500 });
   }
 }

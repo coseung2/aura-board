@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import { fetchBreakoutTemplates } from "@/lib/client-lookup-cache";
 
 type Template = {
   id: string;
@@ -60,11 +61,10 @@ export function CreateBreakoutBoardModal({
 
   useEffect(() => {
     let cancelled = false;
-    fetch("/api/breakout/templates")
-      .then((r) => r.json())
-      .then((d) => {
+    fetchBreakoutTemplates()
+      .then((nextTemplates) => {
         if (!cancelled) {
-          setTemplates(d.templates ?? []);
+          setTemplates(nextTemplates);
           setLoading(false);
         }
       })

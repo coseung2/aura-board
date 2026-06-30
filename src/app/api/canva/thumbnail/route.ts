@@ -35,6 +35,7 @@ export async function GET(req: Request) {
   const design = searchParams.get("design");
   let url = searchParams.get("url");
   const w = searchParams.get("w");
+  let privateThumbnail = false;
 
   if (!url && !design) {
     return NextResponse.json({ error: "Missing url or design" }, { status: 400 });
@@ -69,9 +70,7 @@ export async function GET(req: Request) {
         try {
           const info = await canvaGetDesign(token, designId);
           url = info.thumbnail?.url ?? null;
-          if (url) {
-            await setPreviewCache("canva-thumbnail", design, { url }, true);
-          }
+          privateThumbnail = Boolean(url);
         } catch {
           url = null;
         }
@@ -126,7 +125,9 @@ export async function GET(req: Request) {
 
     if (!upstream.ok || !upstream.body) {
       const fallbackUrl = await resolveDesignThumbnailFromScreenUrl(parsed);
-      const fallbackResponse = fallbackUrl ? await fetchThumbnailFallback(fallbackUrl, w) : null;
+      const fallbackResponse = fallbackUrl
+        ? await fetchThumbnailFallback(fallbackUrl.url, w, fallbackUrl.private)
+        : null;
       if (fallbackResponse) return fallbackResponse;
       // Upstream 4xx (404/410/etc) is a normal "thumbnail is gone" outcome
       // for the consumer; only 5xx is a real proxy failure that we want to
@@ -149,7 +150,9 @@ export async function GET(req: Request) {
     const contentType = upstream.headers.get("content-type") ?? "image/webp";
     if (!contentType.startsWith("image/")) {
       const fallbackUrl = await resolveDesignThumbnailFromScreenUrl(parsed);
-      const fallbackResponse = fallbackUrl ? await fetchThumbnailFallback(fallbackUrl, w) : null;
+      const fallbackResponse = fallbackUrl
+        ? await fetchThumbnailFallback(fallbackUrl.url, w, fallbackUrl.private)
+        : null;
       if (fallbackResponse) return fallbackResponse;
       // 200 with a non-image body means the URL is alive but is not a
       // thumbnail (e.g. a login page or a redirect HTML). Treat as a
@@ -169,7 +172,10 @@ export async function GET(req: Request) {
       status: 200,
       headers: {
         "Content-Type": contentType,
-        "Cache-Control": "public, max-age=86400, s-maxage=86400, immutable",
+        "Cache-Control": privateThumbnail
+          ? "private, no-store, max-age=0"
+          : "public, max-age=86400, s-maxage=86400, immutable",
+        Vary: privateThumbnail ? "Cookie, Authorization" : "Accept",
         "X-Thumbnail-Width": w,
         "X-Content-Type-Options": "nosniff",
       },
@@ -185,7 +191,9 @@ export async function GET(req: Request) {
   }
 }
 
-async function resolveDesignThumbnailFromScreenUrl(parsed: URL): Promise<string | null> {
+async function resolveDesignThumbnailFromScreenUrl(
+  parsed: URL,
+): Promise<{ url: string; private: boolean } | null> {
   const match = parsed.pathname.match(
     /\/design\/([A-Za-z0-9_-]+)(?:\/([A-Za-z0-9_-]+))?\/screen/
   );
@@ -196,17 +204,19 @@ async function resolveDesignThumbnailFromScreenUrl(parsed: URL): Promise<string 
     : `https://www.canva.com/design/${designId}/view`;
   const embed = await resolveCanvaEmbedUrlCached(designUrl);
   const embedThumbnail = normalizeResolvedThumbnailUrl(embed?.thumbnailUrl);
-  if (embedThumbnail) return embedThumbnail;
+  if (embedThumbnail) return { url: embedThumbnail, private: false };
 
   const publicThumbnail = await resolvePublicCanvaPageThumbnail(designUrl);
-  if (publicThumbnail) return publicThumbnail;
+  if (publicThumbnail) return { url: publicThumbnail, private: false };
 
   const user = await getCurrentUser().catch(() => null);
   const token = user ? await getAccessToken(user.id) : null;
   if (!token) return null;
   try {
     const info = await canvaGetDesign(token, designId);
-    return info.thumbnail?.url ?? null;
+    return info.thumbnail?.url
+      ? { url: info.thumbnail.url, private: true }
+      : null;
   } catch {
     return null;
   }
@@ -226,7 +236,11 @@ function normalizeResolvedThumbnailUrl(url: string | null | undefined): string |
   }
 }
 
-async function fetchThumbnailFallback(url: string, width: string): Promise<Response | null> {
+async function fetchThumbnailFallback(
+  url: string,
+  width: string,
+  privateThumbnail = false,
+): Promise<Response | null> {
   const fallback = await fetch(url, {
     headers: {
       Accept: "image/avif,image/webp,image/*;q=0.8,*/*;q=0.5",
@@ -243,7 +257,10 @@ async function fetchThumbnailFallback(url: string, width: string): Promise<Respo
     status: 200,
     headers: {
       "Content-Type": fallbackType,
-      "Cache-Control": "public, max-age=86400, s-maxage=86400, immutable",
+      "Cache-Control": privateThumbnail
+        ? "private, no-store, max-age=0"
+        : "public, max-age=86400, s-maxage=86400, immutable",
+      Vary: privateThumbnail ? "Cookie, Authorization" : "Accept",
       "X-Thumbnail-Width": width,
       "X-Content-Type-Options": "nosniff",
     },

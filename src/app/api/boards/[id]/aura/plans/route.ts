@@ -1,8 +1,8 @@
-import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
 import { ForbiddenError, requirePermission } from "@/lib/rbac";
 import { issueTeacherAccessToken, verifyTeacherAccessToken } from "@/lib/oauth-teacher";
+import { jsonPrivateNoStore } from "@/lib/http-cache";
 
 type RouteContext = { params: Promise<{ id: string }> };
 
@@ -64,7 +64,7 @@ export async function GET(_req: Request, { params }: RouteContext) {
   try {
     user = await getCurrentUser();
   } catch {
-    return NextResponse.json({ error: "unauthenticated" }, { status: 401 });
+    return jsonPrivateNoStore({ error: "unauthenticated" }, { status: 401 });
   }
 
   const board = await db.board.findFirst({
@@ -73,13 +73,13 @@ export async function GET(_req: Request, { params }: RouteContext) {
       id: true,
     },
   });
-  if (!board) return NextResponse.json({ error: "not_found" }, { status: 404 });
+  if (!board) return jsonPrivateNoStore({ error: "not_found" }, { status: 404 });
 
   try {
     await requirePermission(board.id, user.id, "edit");
   } catch (e) {
     if (e instanceof ForbiddenError) {
-      return NextResponse.json({ error: "forbidden" }, { status: 403 });
+      return jsonPrivateNoStore({ error: "forbidden" }, { status: 403 });
     }
     throw e;
   }
@@ -97,7 +97,7 @@ export async function GET(_req: Request, { params }: RouteContext) {
     accessToken = issued.accessToken;
   } catch (error) {
     console.error("[boards/aura/plans] teacher token issue failed", error);
-    return NextResponse.json(
+    return jsonPrivateNoStore(
       { plans: [], error: "aura_oauth_token_issue_failed" },
       { status: 502 },
     );
@@ -112,7 +112,7 @@ export async function GET(_req: Request, { params }: RouteContext) {
       tokenPrefix,
       reason: localVerification.code,
     });
-    return NextResponse.json(
+    return jsonPrivateNoStore(
       {
         plans: [],
         error: "aura_oauth_local_verify_failed",
@@ -141,7 +141,7 @@ export async function GET(_req: Request, { params }: RouteContext) {
       tokenPrefix,
       error,
     });
-    return NextResponse.json(
+    return jsonPrivateNoStore(
       { plans: [], error: "aura_assessment_plans_fetch_failed" },
       { status: 502 },
     );
@@ -164,7 +164,7 @@ export async function GET(_req: Request, { params }: RouteContext) {
       upstreamReason: detail?.reason ?? null,
       upstreamBody: detail ? undefined : detailText.slice(0, 200),
     });
-    return NextResponse.json(
+    return jsonPrivateNoStore(
       {
         plans: [],
         error:
@@ -180,5 +180,5 @@ export async function GET(_req: Request, { params }: RouteContext) {
   }
 
   const payload = (await response.json().catch(() => null)) as unknown;
-  return NextResponse.json({ plans: parsePlans(payload) });
+  return jsonPrivateNoStore({ plans: parsePlans(payload) });
 }

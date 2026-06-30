@@ -3,6 +3,7 @@ import { z } from "zod";
 import { db } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
 import { getCurrentStudent } from "@/lib/student-auth";
+import { jsonPrivateNoStore } from "@/lib/http-cache";
 import { normalizeWord } from "@/features/kordle/engine";
 import {
   KORDLE_WORD_LENGTH,
@@ -32,14 +33,14 @@ export async function GET(_req: Request, { params }: Params) {
   const { boardId: boardIdOrSlug } = await params;
   const student = await getCurrentStudent();
   if (!student) {
-    return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+    return jsonPrivateNoStore({ error: "unauthorized" }, { status: 401 });
   }
   const board = await db.board.findFirst({
     where: { OR: [{ id: boardIdOrSlug }, { slug: boardIdOrSlug }] },
     select: { id: true },
   });
   if (!board) {
-    return NextResponse.json({ error: "game_not_found" }, { status: 404 });
+    return jsonPrivateNoStore({ error: "game_not_found" }, { status: 404 });
   }
   const boardId = board.id;
   const game = await db.kordleGame.findUnique({
@@ -73,13 +74,13 @@ export async function GET(_req: Request, { params }: Params) {
     },
   });
   if (!game) {
-    return NextResponse.json({ error: "game_not_found" }, { status: 404 });
+    return jsonPrivateNoStore({ error: "game_not_found" }, { status: 404 });
   }
   if (game.board.classroomId !== student.classroomId) {
-    return NextResponse.json({ error: "forbidden" }, { status: 403 });
+    return jsonPrivateNoStore({ error: "forbidden" }, { status: 403 });
   }
   const puzzle = game.puzzles[0] ?? null;
-  return NextResponse.json({
+  return jsonPrivateNoStore({
     gameId: game.id,
     wordLength: game.wordLength,
     maxGuesses: game.maxGuesses,

@@ -2,6 +2,10 @@
 
 import { useEffect, useState } from "react";
 import type { CardData } from "../DraggableCard";
+import {
+  fetchClassroomStudents,
+  onRosterChanged,
+} from "@/lib/client-lookup-cache";
 
 export type RosterEntry = {
   id: string;
@@ -20,20 +24,22 @@ export function useColumnRoster({ classroomId, canEdit }: Options) {
   useEffect(() => {
     if (!canEdit || !classroomId) return;
     let cancelled = false;
-    (async () => {
+    const load = async (force = false) => {
       try {
-        const res = await fetch(`/api/classroom/${classroomId}/students`, {
-          cache: "no-store",
-        });
-        if (!res.ok) return;
-        const data = (await res.json()) as { students: RosterEntry[] };
-        if (!cancelled) setRoster(data.students ?? []);
+        const nextRoster = await fetchClassroomStudents<RosterEntry>(
+          classroomId,
+          { force },
+        );
+        if (!cancelled) setRoster(nextRoster);
       } catch {
         /* roster fetch best-effort */
       }
-    })();
+    };
+    void load();
+    const unsubscribe = onRosterChanged(classroomId, () => void load(true));
     return () => {
       cancelled = true;
+      unsubscribe();
     };
   }, [canEdit, classroomId]);
 

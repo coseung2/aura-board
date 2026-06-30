@@ -19,6 +19,10 @@ import {
   type AttachmentDraft,
 } from "./cards/useCardAttachments";
 import {
+  fetchClassroomStudents,
+  onRosterChanged,
+} from "@/lib/client-lookup-cache";
+import {
   AttachmentDownloadLink,
   getAttachmentDisplayName,
 } from "./cards/AttachmentDownloadLink";
@@ -866,21 +870,25 @@ function AddCardAuthorPicker({
     let cancelled = false;
     setStudents(null);
     setFetchError(null);
-    (async () => {
+    const load = async (force = false) => {
       try {
-        const res = await fetch(`/api/classroom/${classroomId}/students`);
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const data = (await res.json()) as { students: StudentOption[] };
-        if (!cancelled) setStudents(data.students ?? []);
+        const nextStudents = await fetchClassroomStudents<StudentOption>(
+          classroomId,
+          { force },
+        );
+        if (!cancelled) setStudents(nextStudents);
       } catch (e) {
         if (!cancelled) {
           setFetchError(e instanceof Error ? e.message : "load_failed");
           setStudents([]);
         }
       }
-    })();
+    };
+    void load();
+    const unsubscribe = onRosterChanged(classroomId, () => void load(true));
     return () => {
       cancelled = true;
+      unsubscribe();
     };
   }, [classroomId]);
 

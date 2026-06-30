@@ -10,6 +10,12 @@ import {
 } from "react";
 import { createPortal } from "react-dom";
 import { CloseIcon } from "./icons/UiIcons";
+import {
+  fetchClassroomStudents,
+  fetchToolkitClassrooms,
+  onClassroomListChanged,
+  onRosterChanged,
+} from "@/lib/client-lookup-cache";
 
 const PRESET_MINUTES = [1, 3, 5, 10, 15];
 const MIN_MINUTES = 1;
@@ -143,17 +149,31 @@ export function BoardToolkitFab(_props: BoardToolkitFabProps) {
   }, []);
 
   useEffect(() => {
+    return onClassroomListChanged(() => {
+      setClassrooms([]);
+      setClassroomsLoaded(false);
+      setClassroomsError("");
+    });
+  }, []);
+
+  useEffect(() => {
+    return onRosterChanged(activeClassroomId, () => {
+      setStudents([]);
+      setStudentsLoaded(false);
+      setStudentsClassroomId(null);
+      setStudentsError("");
+      setPickedStudents([]);
+      setHighlightedStudentId(null);
+    });
+  }, [activeClassroomId]);
+
+  useEffect(() => {
     if (!pickerOpen || classroomsLoaded || classroomsError) return;
     let cancelled = false;
     setClassroomsError("");
-    fetch("/api/toolkit/classrooms", { cache: "no-store" })
-      .then(async (res) => {
-        if (!res.ok) throw new Error("학급 목록을 불러오지 못했어요.");
-        return (await res.json()) as { classrooms?: ToolkitClassroom[] };
-      })
-      .then((data) => {
+    fetchToolkitClassrooms()
+      .then((nextClassrooms: ToolkitClassroom[]) => {
         if (cancelled) return;
-        const nextClassrooms = data.classrooms ?? [];
         setClassrooms(nextClassrooms);
         setClassroomsLoaded(true);
       })
@@ -181,14 +201,10 @@ export function BoardToolkitFab(_props: BoardToolkitFabProps) {
     }
     let cancelled = false;
     setStudentsError("");
-    fetch(`/api/classroom/${activeClassroomId}/students`, { cache: "no-store" })
-      .then(async (res) => {
-        if (!res.ok) throw new Error("학생 명단을 불러오지 못했어요.");
-        return (await res.json()) as { students?: ToolkitStudent[] };
-      })
-      .then((data) => {
+    fetchClassroomStudents<ToolkitStudent>(activeClassroomId)
+      .then((nextStudents) => {
         if (cancelled) return;
-        setStudents(data.students ?? []);
+        setStudents(nextStudents);
         setStudentsLoaded(true);
         setStudentsClassroomId(activeClassroomId);
       })

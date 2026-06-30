@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { notifyClassroomListChanged } from "@/lib/client-lookup-cache";
 
 type Props = {
   open: boolean;
@@ -26,6 +27,7 @@ export function CreateClassroomModal({ open, onClose, onCreated }: Props) {
         body: JSON.stringify({ name: name.trim() }),
       });
       if (res.ok) {
+        notifyClassroomListChanged();
         onCreated();
       } else {
         alert(`학급 생성 실패: ${await res.text()}`);

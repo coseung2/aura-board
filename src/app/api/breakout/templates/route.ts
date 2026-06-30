@@ -4,9 +4,9 @@
  * Lists system templates (scope="system") + teacher-owned templates for the
  * current user. BR-3 uses this to populate the template picker grid.
  */
-import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
+import { jsonPrivateNoStore } from "@/lib/http-cache";
 
 export async function GET() {
   try {
@@ -34,9 +34,9 @@ export async function GET() {
       },
     });
 
-    return NextResponse.json({ templates });
+    return jsonPrivateNoStore({ templates });
   } catch (e) {
     console.error("[GET /api/breakout/templates]", e);
-    return NextResponse.json({ error: "internal" }, { status: 500 });
+    return jsonPrivateNoStore({ error: "internal" }, { status: 500 });
   }
 }

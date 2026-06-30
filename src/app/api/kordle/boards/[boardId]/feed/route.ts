@@ -1,7 +1,7 @@
-import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
 import { getCurrentStudent } from "@/lib/student-auth";
+import { jsonPrivateNoStore } from "@/lib/http-cache";
 import type { GuessFeedback } from "@/features/kordle/engine";
 
 type Params = { params: Promise<{ boardId: string }> };
@@ -20,7 +20,7 @@ export async function GET(req: Request, { params }: Params) {
   const student = await getCurrentStudent();
   const user = student ? null : await getCurrentUser().catch(() => null);
   if (!student && !user) {
-    return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+    return jsonPrivateNoStore({ error: "unauthorized" }, { status: 401 });
   }
 
   const board = await db.board.findFirst({
@@ -40,13 +40,13 @@ export async function GET(req: Request, { params }: Params) {
     },
   });
   if (!board) {
-    return NextResponse.json({ error: "board_not_found" }, { status: 404 });
+    return jsonPrivateNoStore({ error: "board_not_found" }, { status: 404 });
   }
   if (student && board.classroomId !== student.classroomId) {
-    return NextResponse.json({ error: "forbidden" }, { status: 403 });
+    return jsonPrivateNoStore({ error: "forbidden" }, { status: 403 });
   }
   if (user && board.members.length === 0) {
-    return NextResponse.json({ error: "forbidden" }, { status: 403 });
+    return jsonPrivateNoStore({ error: "forbidden" }, { status: 403 });
   }
 
   const game = await db.kordleGame.findUnique({
@@ -62,7 +62,7 @@ export async function GET(req: Request, { params }: Params) {
   });
   const puzzle = game?.puzzles[0] ?? null;
   if (!puzzle) {
-    return NextResponse.json({ events: [], serverTime: new Date().toISOString() });
+    return jsonPrivateNoStore({ events: [], serverTime: new Date().toISOString() });
   }
 
   const guesses = await db.kordleGuess.findMany({
@@ -99,5 +99,5 @@ export async function GET(req: Request, { params }: Params) {
     })
     .filter((event) => event.correctCount > 0);
 
-  return NextResponse.json({ events, serverTime: new Date().toISOString() });
+  return jsonPrivateNoStore({ events, serverTime: new Date().toISOString() });
 }

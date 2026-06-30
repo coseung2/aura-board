@@ -4,6 +4,7 @@ import { db } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
 import { getCurrentStudent } from "@/lib/student-auth";
 import { generateQrToken, generateTextCode } from "@/lib/classroom-utils";
+import { jsonPrivateNoStore } from "@/lib/http-cache";
 
 const StudentEntry = z.object({
   number: z.number().int().min(1),
@@ -33,7 +34,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
       select: { id: true, teacherId: true },
     });
     if (!classroom) {
-      return NextResponse.json({ error: "not_found" }, { status: 404 });
+      return jsonPrivateNoStore({ error: "not_found" }, { status: 404 });
     }
 
     // Teacher path — owner of this classroom.
@@ -53,7 +54,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
     }
 
     if (!teacherOk && !studentOk) {
-      return NextResponse.json({ error: "forbidden" }, { status: 403 });
+      return jsonPrivateNoStore({ error: "forbidden" }, { status: 403 });
     }
 
     const students = await db.student.findMany({
@@ -62,10 +63,10 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
       select: { id: true, name: true, number: true, gender: true },
     });
 
-    return NextResponse.json({ students });
+    return jsonPrivateNoStore({ students });
   } catch (e) {
     console.error("[GET /api/classroom/:id/students]", e);
-    return NextResponse.json({ error: "internal" }, { status: 500 });
+    return jsonPrivateNoStore({ error: "internal" }, { status: 500 });
   }
 }
 

@@ -1,6 +1,6 @@
-import { NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth";
 import { getAccessToken, isCanvaConnected, canvaGetDesign, resolveCanvaDesignId } from "@/lib/canva";
+import { jsonPrivateNoStore } from "@/lib/http-cache";
 
 export async function GET(
   req: Request,
@@ -11,12 +11,12 @@ export async function GET(
     const user = await getCurrentUser();
 
     if (!(await isCanvaConnected(user.id))) {
-      return NextResponse.json({ error: "canva_not_connected" }, { status: 401 });
+      return jsonPrivateNoStore({ error: "canva_not_connected" }, { status: 401 });
     }
 
     const token = await getAccessToken(user.id);
     if (!token) {
-      return NextResponse.json({ error: "canva_token_expired" }, { status: 401 });
+      return jsonPrivateNoStore({ error: "canva_token_expired" }, { status: 401 });
     }
 
     // id can be a design ID or a URL
@@ -26,9 +26,9 @@ export async function GET(
     }
 
     const design = await canvaGetDesign(token, designId);
-    return NextResponse.json({ design });
+    return jsonPrivateNoStore({ design });
   } catch (e) {
     console.error("[GET /api/canva/design/:id]", e);
-    return NextResponse.json({ error: "Failed to get design" }, { status: 500 });
+    return jsonPrivateNoStore({ error: "Failed to get design" }, { status: 500 });
   }
 }

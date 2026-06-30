@@ -6,6 +6,10 @@ import {
   MAX_AUTHORS_PER_CARD,
   MAX_DISPLAY_NAME_LEN,
 } from "@/lib/card-authors-constants";
+import {
+  fetchClassroomStudents,
+  onRosterChanged,
+} from "@/lib/client-lookup-cache";
 
 type Student = { id: string; name: string; number: number | null };
 
@@ -75,18 +79,21 @@ export function CardAuthorEditor({
       return;
     }
     let cancelled = false;
-    (async () => {
+    const load = async (force = false) => {
       try {
-        const res = await fetch(`/api/classroom/${classroomId}/students`);
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const data = (await res.json()) as { students: Student[] };
-        if (!cancelled) setStudents(data.students ?? []);
+        const nextStudents = await fetchClassroomStudents<Student>(classroomId, {
+          force,
+        });
+        if (!cancelled) setStudents(nextStudents);
       } catch (e) {
         if (!cancelled) setFetchError(e instanceof Error ? e.message : "load_failed");
       }
-    })();
+    };
+    void load();
+    const unsubscribe = onRosterChanged(classroomId, () => void load(true));
     return () => {
       cancelled = true;
+      unsubscribe();
     };
   }, [classroomId]);
 

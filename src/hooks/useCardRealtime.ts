@@ -30,9 +30,13 @@ export function useCardRealtime<
   setSections?: React.Dispatch<React.SetStateAction<TSection[]>>,
 ) {
   const lastHashRef = useRef("");
+  const inflightRef = useRef<Promise<void> | null>(null);
 
-  const refetch = useCallback(async () => {
-    try {
+  const refetch = useCallback(() => {
+    if (inflightRef.current) return inflightRef.current;
+
+    const request = (async () => {
+      try {
       const qs = lastHashRef.current
         ? `?hash=${encodeURIComponent(lastHashRef.current)}`
         : "";
@@ -61,9 +65,15 @@ export function useCardRealtime<
       if (data.sections && setSections) {
         setSections([...data.sections].sort(sortSections));
       }
-    } catch {
-      // Transient — next broadcast will retry.
-    }
+      } catch {
+        // Transient — next broadcast will retry.
+      }
+    })().finally(() => {
+      if (inflightRef.current === request) inflightRef.current = null;
+    });
+
+    inflightRef.current = request;
+    return request;
   }, [boardId, setCards, deletingIds, setSections]);
 
   useEffect(() => {

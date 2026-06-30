@@ -4,9 +4,9 @@ import type { Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
 
 const POSITIVE_TTL_MS = 30 * 24 * 60 * 60 * 1000;
-// Default negative cache TTL — 24h matches the original behaviour so
-// unreachable sites don't keep hammering upstream on every read.
-const NEGATIVE_TTL_MS = 24 * 60 * 60 * 1000;
+// Default negative cache TTL. Keep it short enough that transient upstream
+// failures don't leave a pasted link blank for the rest of the school day.
+const NEGATIVE_TTL_MS = 60 * 60 * 1000;
 // Per-kind overrides. Use sparingly — short negatives only exist to
 // recover from cold-start failures / transient upstream blips, not to
 // mask real "page genuinely has no metadata" outcomes.

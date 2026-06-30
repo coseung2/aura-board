@@ -2,6 +2,10 @@
 
 import { useState, useRef, useMemo } from "react";
 import { validateStudentName } from "@/lib/student-name";
+import {
+  notifyClassroomListChanged,
+  notifyRosterChanged,
+} from "@/lib/client-lookup-cache";
 
 export type CreatedStudent = {
   id: string;
@@ -146,6 +150,8 @@ export function AddStudentsModal({
       });
       if (res.ok) {
         const body = (await res.json()) as { students: CreatedStudent[] };
+        notifyRosterChanged(classroomId);
+        notifyClassroomListChanged();
         onAdded(body.students);
       } else {
         const errBody = await res.json().catch(() => null);

@@ -7,6 +7,10 @@ import { QRPrintSheet } from "./QRPrintSheet";
 import { ClassroomDeleteModal } from "./classroom/ClassroomDeleteModal";
 import { ClassroomSettingsModal } from "./classroom/ClassroomSettingsModal";
 import { StudentRow, type Student } from "./classroom/StudentRow";
+import {
+  notifyClassroomListChanged,
+  notifyRosterChanged,
+} from "@/lib/client-lookup-cache";
 // parent-class-invite-v2 — per-student ParentInviteButton removed.
 // Codes are now classroom-scoped (see /classroom/[id]/parent-access).
 // The separate ParentManagementTab widget was pulled too — connected
@@ -232,6 +236,8 @@ export function ClassroomDetail({ classroom }: Props) {
       if (res.ok) {
         setStudents((prev) => prev.filter((s) => !selected.has(s.id)));
         setSelected(new Set());
+        notifyRosterChanged(classroom.id);
+        notifyClassroomListChanged();
       } else {
         alert(`삭제 실패: ${await res.text()}`);
       }
@@ -254,6 +260,7 @@ export function ClassroomDetail({ classroom }: Props) {
       });
       if (res.ok) {
         setClassroomName(trimmed);
+        notifyClassroomListChanged();
       } else {
         const body = (await res.json().catch(() => ({}))) as { error?: string };
         setRenameErr(body.error ?? `rename ${res.status}`);
@@ -274,6 +281,7 @@ export function ClassroomDetail({ classroom }: Props) {
         body: JSON.stringify({ confirmName: classroom.name }),
       });
       if (res.ok) {
+        notifyClassroomListChanged();
         router.push("/classroom");
       } else {
         const errText = await res.text();
@@ -327,6 +335,8 @@ export function ClassroomDetail({ classroom }: Props) {
           next.delete(studentId);
           return next;
         });
+        notifyRosterChanged(classroom.id);
+        notifyClassroomListChanged();
       } else {
         alert(`삭제 실패: ${await res.text()}`);
       }
@@ -357,6 +367,8 @@ export function ClassroomDetail({ classroom }: Props) {
           student.id === studentId ? { ...student, gender: prev } : student,
         ),
       );
+    } else {
+      notifyRosterChanged(classroom.id);
     }
   }
 

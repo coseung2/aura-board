@@ -1,6 +1,6 @@
-import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
+import { jsonPrivateNoStore } from "@/lib/http-cache";
 import { KORDLE_ROUND_DURATION_MS } from "@/features/kordle/server/kordleServer";
 
 type Params = { params: Promise<{ boardId: string }> };
@@ -106,7 +106,7 @@ export async function GET(req: Request, { params }: Params) {
   const { boardId: boardIdOrSlug } = await params;
   const user = await getCurrentUser().catch(() => null);
   if (!user) {
-    return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+    return jsonPrivateNoStore({ error: "unauthorized" }, { status: 401 });
   }
 
   const board = await db.board.findFirst({
@@ -122,7 +122,7 @@ export async function GET(req: Request, { params }: Params) {
     select: { id: true },
   });
   if (!board) {
-    return NextResponse.json({ error: "forbidden" }, { status: 403 });
+    return jsonPrivateNoStore({ error: "forbidden" }, { status: 403 });
   }
 
   const url = new URL(req.url);
@@ -164,7 +164,7 @@ export async function GET(req: Request, { params }: Params) {
   const round = puzzle
     ? getRoundSnapshot(puzzle.attempts, puzzle.game.maxGuesses, puzzle.startsAt)
     : null;
-  return NextResponse.json({
+  return jsonPrivateNoStore({
     puzzle: puzzle
       ? {
           id: puzzle.id,

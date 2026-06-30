@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { CreateClassroomModal } from "./CreateClassroomModal";
 import { ClassroomDeleteModal } from "./classroom/ClassroomDeleteModal";
+import { notifyClassroomListChanged } from "@/lib/client-lookup-cache";
 
 type ClassroomItem = {
   id: string;
@@ -58,6 +59,7 @@ export function ClassroomList({ classrooms, onRefresh }: Props) {
         body: JSON.stringify({ confirmName: deleteTarget.name }),
       });
       if (res.ok) {
+        notifyClassroomListChanged();
         setDeleteTarget(null);
         setMenuOpen(null);
         onRefresh();
