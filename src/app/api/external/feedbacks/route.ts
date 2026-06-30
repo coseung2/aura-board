@@ -16,6 +16,34 @@ import {
   deniedResponse,
   bridgeDeprecationHeaders,
 } from "@/lib/aura-bridge-auth";
+import {
+  isAuraEvaluationLevel,
+  type AuraEvaluationLevel,
+} from "@/lib/aura-evaluation";
+
+async function getEvaluationLevelsByFeedbackId(
+  feedbackIds: string[],
+): Promise<Map<string, AuraEvaluationLevel>> {
+  if (feedbackIds.length === 0) return new Map();
+
+  const rows = await db.cardEvaluation.findMany({
+    where: { aiFeedbackId: { in: feedbackIds } },
+    orderBy: { updatedAt: "desc" },
+    select: {
+      aiFeedbackId: true,
+      level: true,
+    },
+  });
+
+  const levels = new Map<string, AuraEvaluationLevel>();
+  for (const row of rows) {
+    if (!row.aiFeedbackId || levels.has(row.aiFeedbackId)) continue;
+    if (isAuraEvaluationLevel(row.level)) {
+      levels.set(row.aiFeedbackId, row.level);
+    }
+  }
+  return levels;
+}
 
 export async function GET(req: Request) {
   const auth = await resolveAuraBridgeAuth(req);
@@ -45,6 +73,7 @@ export async function GET(req: Request) {
         classroom: { select: { code: true } },
       },
     });
+    const levels = await getEvaluationLevelsByFeedbackId(rows.map((r) => r.id));
     return NextResponse.json({
       feedbacks: rows.map((r) => ({
         id: r.id,
@@ -55,6 +84,7 @@ export async function GET(req: Request) {
         unit: r.unit,
         criterion: r.criterion,
         comment: r.comment,
+        level: levels.get(r.id) ?? null,
         model: r.model,
         sentAt: r.updatedAt.toISOString(),
       })),
@@ -77,6 +107,7 @@ export async function GET(req: Request) {
     orderBy: { updatedAt: "desc" },
     include: { student: { select: { number: true, name: true } } },
   });
+  const levels = await getEvaluationLevelsByFeedbackId(rows.map((r) => r.id));
   return NextResponse.json(
     {
       feedbacks: rows.map((r) => ({
@@ -88,6 +119,7 @@ export async function GET(req: Request) {
         unit: r.unit,
         criterion: r.criterion,
         comment: r.comment,
+        level: levels.get(r.id) ?? null,
         model: r.model,
         sentAt: r.updatedAt.toISOString(),
       })),
