@@ -35,7 +35,7 @@ type Props = {
   };
 };
 
-// Tab navigation moved to the top <ClassroomNav />. 학부모 연결/공유된 보드
+// Tab navigation moved into the shared teacher <TopNav />. 학부모 연결/공유된 보드
 // = 각자 페이지로 이동. 설정 = 학급명 옆 톱니바퀴 → 모달. (2026-04-21)
 
 export function ClassroomDetail({ classroom }: Props) {
@@ -416,7 +416,7 @@ export function ClassroomDetail({ classroom }: Props) {
         </a>
       </div>
 
-      {/* Tab navigation owned by the top <ClassroomNav />:
+      {/* Tab navigation owned by the shared teacher <TopNav />:
           학생 명단 = this page, 학부모 연결 = /parent-access,
           공유된 보드 = /boards, 설정 = 학급명 옆 톱니바퀴 → 설정 모달.
           2026-04-21. */}

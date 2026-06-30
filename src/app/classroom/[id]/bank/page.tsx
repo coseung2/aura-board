@@ -3,7 +3,6 @@ import { getCurrentUser } from "@/lib/auth";
 import { getCurrentStudent } from "@/lib/student-auth";
 import { hasPermission } from "@/lib/bank-permissions";
 import { notFound } from "next/navigation";
-import { ClassroomNav } from "@/components/classroom/ClassroomNav";
 import { ClassroomBankTab } from "@/components/classroom/ClassroomBankTab";
 
 type Props = { params: Promise<{ id: string }> };
@@ -33,7 +32,6 @@ export default async function ClassroomBankPage({ params }: Props) {
         &larr; 학급 목록
       </a>
       <h1 className="classroom-page-title">{classroom.name}</h1>
-      <ClassroomNav classroomId={classroom.id} />
       <ClassroomBankTab classroomId={classroom.id} />
     </main>
   );

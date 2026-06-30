@@ -2,7 +2,6 @@ import { notFound } from "next/navigation";
 import { db } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
 import { loadClassroomDefaultGroups } from "@/lib/default-groups";
-import { ClassroomNav } from "@/components/classroom/ClassroomNav";
 import { ClassroomGroupsTab } from "@/components/classroom/ClassroomGroupsTab";
 
 type Props = {
@@ -37,7 +36,6 @@ export default async function ClassroomGroupsPage({ params }: Props) {
         &larr; 학급 목록
       </a>
       <h1 className="classroom-page-title">{classroom.name}</h1>
-      <ClassroomNav classroomId={classroom.id} />
       <ClassroomGroupsTab
         classroomId={classroom.id}
         students={classroom.students}

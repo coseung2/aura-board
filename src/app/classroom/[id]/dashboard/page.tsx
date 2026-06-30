@@ -2,7 +2,6 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { db } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
-import { ClassroomNav } from "@/components/classroom/ClassroomNav";
 import { EXCLUDED_BOARD_LAYOUTS } from "@/lib/portfolio-acl-pure";
 
 type Props = {
@@ -147,7 +146,6 @@ export default async function ClassroomDashboardPage({ params }: Props) {
         &larr; 학급 목록
       </a>
       <h1 className="classroom-page-title">{classroom.name}</h1>
-      <ClassroomNav classroomId={classroom.id} />
 
       <section className="classroom-dashboard-kpis" aria-label="학급 요약">
         <article className="classroom-dashboard-kpi">

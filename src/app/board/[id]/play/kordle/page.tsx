@@ -88,6 +88,7 @@ export default async function KordlePlayPage({ params }: Props) {
           isStudent
           backHref="/student"
           canEdit={false}
+          showAuth={false}
         />
         <KordleWaitingRoom boardId={boardId} />
       </main>
@@ -115,6 +116,7 @@ export default async function KordlePlayPage({ params }: Props) {
           isStudent
           backHref="/student"
           canEdit={false}
+          showAuth={false}
         />
         <KordleWaitingRoom boardId={boardId} />
       </main>
@@ -125,7 +127,7 @@ export default async function KordlePlayPage({ params }: Props) {
   if (!state) notFound();
 
   return (
-    <main className="board-page" data-board-theme={boardTheme}>
+    <main className="board-page kordle-play-page" data-board-theme={boardTheme}>
       <BoardHeader
         boardId={boardId}
         title={board.title}
@@ -133,6 +135,7 @@ export default async function KordlePlayPage({ params }: Props) {
         isStudent
         backHref="/student"
         canEdit={false}
+        showAuth={false}
       />
       <KordleBoard
         boardId={boardId}

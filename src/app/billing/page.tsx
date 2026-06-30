@@ -1,13 +1,21 @@
 import Link from "next/link";
+import { TopNav } from "@/components/TopNav";
+import { getCurrentUser } from "@/lib/auth";
 import { BillingClient } from "./BillingClient";
+
+const ADMIN_EMAIL = "mallagaenge@gmail.com";
 
 export const metadata = {
   title: "결제·구독 · Aura-board",
 };
 
-export default function BillingPage() {
+export default async function BillingPage() {
+  const user = await getCurrentUser().catch(() => null);
+
   return (
-    <main className="docs-page">
+    <>
+      {user && <TopNav showAdmin={user.email.toLowerCase() === ADMIN_EMAIL} />}
+      <main className="docs-page">
       <article className="docs-article">
         <Link href="/" className="docs-back">← 대시보드로</Link>
         <h1 className="docs-title">결제·구독</h1>
@@ -33,6 +41,7 @@ export default function BillingPage() {
           </ul>
         </section>
       </article>
-    </main>
+      </main>
+    </>
   );
 }

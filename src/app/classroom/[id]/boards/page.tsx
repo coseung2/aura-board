@@ -1,7 +1,6 @@
 import { db } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
 import { notFound } from "next/navigation";
-import { ClassroomNav } from "@/components/classroom/ClassroomNav";
 import { ClassroomBoardsTab } from "@/components/classroom/ClassroomBoardsTab";
 
 type Props = { params: Promise<{ id: string }> };
@@ -56,7 +55,6 @@ export default async function ClassroomBoardsPage({ params }: Props) {
         &larr; 학급 목록
       </a>
       <h1 className="classroom-page-title">{classroom.name}</h1>
-      <ClassroomNav classroomId={classroom.id} />
       <ClassroomBoardsTab
         classroomId={classroom.id}
         linkedBoards={linkedBoards}

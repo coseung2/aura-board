@@ -455,7 +455,12 @@ export default async function BoardPage({
   if (!effectiveRole) {
     return (
       <main className="board-page" data-board-theme={boardTheme}>
-        <BoardHeader title={board.title} layout={board.layout} canEdit={false} />
+        <BoardHeader
+          title={board.title}
+          layout={board.layout}
+          canEdit={false}
+          showAuth={false}
+        />
         <div className="forbidden-card">
           <h2>접근 불가</h2>
           <p>이 보드에 접근할 권한이 없습니다.</p>
@@ -875,6 +880,7 @@ export default async function BoardPage({
           streamContentPrompt={board.streamContentPrompt ?? ""}
           streamSectionsEnabled={board.streamSectionsEnabled}
           auraSettings={auraSettings}
+          showAuth={false}
         />
         {renderBoard()}
       </main>

@@ -11,6 +11,7 @@ type LiveEvent = {
   name: string;
   guessIndex: number;
   correctCount: number;
+  isCorrect: boolean;
   createdAt: string;
 };
 
@@ -63,10 +64,17 @@ export function KordleLiveToasts({ boardId }: Props) {
     <aside className="kordle-live-toasts" aria-label="꼬들 라이브 채팅">
       <div className="kordle-live-chat-list" role="log" aria-live="polite">
         {[...events].reverse().map((event) => (
-          <div className="kordle-live-toast" key={event.id}>
+          <div
+            className={
+              event.isCorrect
+                ? "kordle-live-toast kordle-live-toast--winner"
+                : "kordle-live-toast"
+            }
+            key={event.id}
+          >
             <strong>{event.name}님</strong>
             <span>
-              {event.guessIndex}줄 · {event.correctCount}글자
+              {event.isCorrect ? "정답을 맞췄습니다" : `${event.guessIndex}줄 · ${event.correctCount}글자`}
             </span>
           </div>
         ))}

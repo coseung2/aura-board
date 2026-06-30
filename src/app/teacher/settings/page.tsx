@@ -2,6 +2,9 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
 import { LlmKeyForm } from "@/components/LlmKeyForm";
+import { TopNav } from "@/components/TopNav";
+
+const ADMIN_EMAIL = "mallagaenge@gmail.com";
 
 export const metadata = {
   title: "교사 설정 · Aura-board",
@@ -12,7 +15,9 @@ export default async function TeacherSettingsPage() {
   if (!user) redirect("/login");
 
   return (
-    <main className="docs-page">
+    <>
+      <TopNav showAdmin={user.email.toLowerCase() === ADMIN_EMAIL} />
+      <main className="docs-page">
       <article className="docs-article">
         <Link href="/" className="docs-back">
           ← 대시보드로
@@ -35,6 +40,7 @@ export default async function TeacherSettingsPage() {
           <LlmKeyForm />
         </section>
       </article>
-    </main>
+      </main>
+    </>
   );
 }

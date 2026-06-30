@@ -35,6 +35,7 @@ type Props = {
   streamContentPrompt?: string;
   streamSectionsEnabled?: boolean;
   auraSettings?: AuraBoardSettings;
+  showAuth?: boolean;
 };
 
 export function BoardHeader({
@@ -58,6 +59,7 @@ export function BoardHeader({
   streamContentPrompt,
   streamSectionsEnabled,
   auraSettings,
+  showAuth = true,
 }: Props) {
   const [showQr, setShowQr] = useState(false);
   const isShared = shareMode && shareMode !== "private" && !!shareToken;
@@ -123,7 +125,7 @@ export function BoardHeader({
             <span className="board-share-badge">공유됨</span>
           </button>
         )}
-        <AuthHeader />
+        {showAuth && <AuthHeader />}
       </div>
 
       {showQr && boardId && shareToken && (

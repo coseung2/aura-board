@@ -1,7 +1,6 @@
 import { db } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
 import { ClassroomDetail } from "@/components/ClassroomDetail";
-import { ClassroomNav } from "@/components/classroom/ClassroomNav";
 import { notFound } from "next/navigation";
 
 type Props = {
@@ -50,7 +49,6 @@ export default async function ClassroomStudentsPage({ params }: Props) {
       <a href="/classroom" className="classroom-back-link">
         &larr; 학급 목록
       </a>
-      <ClassroomNav classroomId={classroom.id} />
       <ClassroomDetail classroom={serialized} />
     </main>
   );

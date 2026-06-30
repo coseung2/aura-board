@@ -76,6 +76,7 @@ export async function GET(req: Request, { params }: Params) {
       id: true,
       guessIndex: true,
       feedback: true,
+      isCorrect: true,
       createdAt: true,
       attempt: {
         select: {
@@ -94,10 +95,11 @@ export async function GET(req: Request, { params }: Params) {
         name: guess.attempt.student?.name ?? guess.attempt.teacherUser?.name ?? "누군가",
         guessIndex: guess.guessIndex,
         correctCount: count,
+        isCorrect: guess.isCorrect,
         createdAt: guess.createdAt.toISOString(),
       };
     })
-    .filter((event) => event.correctCount > 0);
+    .filter((event) => event.isCorrect || event.correctCount > 0);
 
   return jsonPrivateNoStore({ events, serverTime: new Date().toISOString() });
 }

@@ -15,6 +15,8 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { randomBytes } from "crypto";
 import { getCurrentStudent } from "@/lib/student-auth";
+import { getStudentDuties } from "@/lib/role-portals";
+import { StudentTopNav } from "@/components/StudentTopNav";
 import { db } from "@/lib/db";
 import { CopyButton } from "./CopyButton";
 
@@ -68,35 +70,44 @@ export default async function CanvaPairPage() {
     redirect("/student/login?from=/student/canva-pair");
   }
 
-  const code = await issuePairCode(student.id);
+  const [code, duties] = await Promise.all([
+    issuePairCode(student.id),
+    getStudentDuties(student.id),
+  ]);
   // Split into two groups of 4 for easier reading on a tablet ("A3K7-BN9X").
   const pretty = `${code.slice(0, 4)}-${code.slice(4)}`;
 
   return (
-    <main
-      style={{
-        minHeight: "100vh",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        padding: 24,
-        fontFamily: "system-ui, sans-serif",
-        background: "var(--color-surface-alt, #f4f4f6)",
-      }}
-    >
-      <div
+    <>
+      <StudentTopNav
+        studentName={student.name}
+        classroomName={student.classroom.name}
+        duties={duties}
+      />
+      <main
         style={{
-          maxWidth: 480,
-          width: "100%",
-          background: "var(--color-surface, white)",
-          border: "1px solid var(--color-border, #e2e2ea)",
-          borderRadius: 16,
-          padding: 28,
-          textAlign: "center",
-          boxShadow: "0 10px 40px rgba(0,0,0,0.06)",
+          minHeight: "calc(100vh - 64px)",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          padding: 24,
+          fontFamily: "system-ui, sans-serif",
+          background: "var(--color-surface-alt, #f4f4f6)",
         }}
       >
-        <p style={{ color: "#666", margin: 0, fontSize: 14 }}>
+        <div
+          style={{
+            maxWidth: 480,
+            width: "100%",
+            background: "var(--color-surface, white)",
+            border: "1px solid var(--color-border, #e2e2ea)",
+            borderRadius: 16,
+            padding: 28,
+            textAlign: "center",
+            boxShadow: "0 10px 40px rgba(0,0,0,0.06)",
+          }}
+        >
+          <p style={{ color: "#666", margin: 0, fontSize: 14 }}>
           {student.name} · 5분간 유효 · 한 번만 사용
         </p>
         <h1 style={{ fontSize: 20, fontWeight: 700, margin: "14px 0 18px" }}>
@@ -140,7 +151,8 @@ export default async function CanvaPairPage() {
             다른 학생으로 로그아웃
           </Link>
         </p>
-      </div>
-    </main>
+        </div>
+      </main>
+    </>
   );
 }
