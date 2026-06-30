@@ -111,6 +111,22 @@
   padding: 34px 16px 16px;
 }
 
+.board-page.kordle-waiting-page {
+  position: relative;
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.18) 0 2px, transparent 2px 18px),
+    repeating-linear-gradient(90deg, transparent 0 34px, rgba(255, 255, 255, 0.12) 34px 36px),
+    repeating-linear-gradient(0deg, transparent 0 34px, rgba(255, 255, 255, 0.1) 34px 36px),
+    linear-gradient(155deg, #304ffe 0%, #00a6d6 28%, #13b86a 55%, #ffb000 78%, #ff5f7e 100%);
+  color: #ffffff;
+}
+
+.board-page.kordle-waiting-page .board-header {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.26);
+  background: rgba(255, 255, 255, 0.18);
+  backdrop-filter: blur(12px);
+}
+
 .kordle-shell--teacher-live {
   width: min(100%, 1080px);
 }
@@ -724,41 +740,25 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  width: min(100%, 920px);
-  min-height: clamp(620px, 72vh, 760px);
-  margin-top: 26px;
-  padding: 72px 40px 48px;
+  flex: 1;
+  width: 100%;
+  min-height: calc(100dvh - 76px);
+  margin: 0;
+  padding: 72px 40px 56px;
   overflow: hidden;
-  border: 1px solid rgba(255, 255, 255, 0.48);
-  border-radius: 8px;
-  background:
-    linear-gradient(135deg, rgba(255, 255, 255, 0.18) 0 2px, transparent 2px 18px),
-    linear-gradient(155deg, #304ffe 0%, #00a6d6 28%, #13b86a 55%, #ffb000 78%, #ff5f7e 100%);
-  box-shadow: 0 24px 70px rgba(15, 23, 42, 0.2);
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
   color: #ffffff;
 }
 
 .kordle-waiting::before {
-  position: absolute;
-  inset: 0;
-  z-index: -2;
-  content: "";
-  background:
-    repeating-linear-gradient(90deg, transparent 0 34px, rgba(255, 255, 255, 0.12) 34px 36px),
-    repeating-linear-gradient(0deg, transparent 0 34px, rgba(255, 255, 255, 0.1) 34px 36px);
-  opacity: 0.58;
+  content: none;
 }
 
 .kordle-waiting::after {
-  position: absolute;
-  inset: 14px;
-  z-index: -1;
-  content: "";
-  border: 1px solid rgba(255, 255, 255, 0.18);
-  background:
-    linear-gradient(90deg, rgba(255, 255, 255, 0.14) 0 10px, transparent 10px 34px),
-    linear-gradient(0deg, rgba(255, 255, 255, 0.1) 0 10px, transparent 10px 34px);
-  mask-image: linear-gradient(to bottom, transparent 0%, black 24%, black 74%, transparent 100%);
+  content: none;
 }
 
 .kordle-waiting h1 {
@@ -879,8 +879,8 @@
   }
 
   .kordle-waiting {
-    min-height: 560px;
-    margin-top: 18px;
+    min-height: calc(100dvh - 74px);
+    margin-top: 0;
     padding: 56px 18px 34px;
   }
 

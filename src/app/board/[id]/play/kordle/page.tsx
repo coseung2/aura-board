@@ -80,7 +80,7 @@ export default async function KordlePlayPage({ params }: Props) {
   const puzzle = game.puzzles[0];
   if (!puzzle) {
     return (
-      <main className="board-page" data-board-theme={boardTheme}>
+      <main className="board-page kordle-waiting-page" data-board-theme={boardTheme}>
         <BoardHeader
           boardId={boardId}
           title={board.title}
@@ -107,7 +107,7 @@ export default async function KordlePlayPage({ params }: Props) {
   });
   if (livePuzzle?.status !== "LIVE") {
     return (
-      <main className="board-page" data-board-theme={boardTheme}>
+      <main className="board-page kordle-waiting-page" data-board-theme={boardTheme}>
         <BoardHeader
           boardId={boardId}
           title={board.title}
