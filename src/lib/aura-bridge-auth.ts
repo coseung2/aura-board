@@ -23,7 +23,9 @@ export type AuraBridgeAuth =
   | { mode: "denied"; reason: "missing_bearer" | "invalid_token" | "no_bridge_configured" };
 
 export async function resolveAuraBridgeAuth(req: Request): Promise<AuraBridgeAuth> {
-  const auth = req.headers.get("authorization");
+  const auth =
+    req.headers.get("authorization") ??
+    req.headers.get("x-aura-board-authorization");
   if (!auth?.startsWith("Bearer ")) {
     return { mode: "denied", reason: "missing_bearer" };
   }
