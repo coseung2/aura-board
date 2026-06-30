@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { type ReactNode, useEffect, useState } from "react";
 import { GameParticipantsList, type GameParticipant } from "./GameParticipantsList";
 
 export type GameWaitingSnapshot = {
@@ -17,6 +17,7 @@ type Props = {
   isReadyStatus?: (status: string | null | undefined) => boolean;
   pollDelayMs?: number;
   className?: string;
+  children?: ReactNode;
 };
 
 function defaultIsReadyStatus(status: string | null | undefined) {
@@ -32,6 +33,7 @@ export function GameWaitingRoom({
   isReadyStatus = defaultIsReadyStatus,
   pollDelayMs = 1800,
   className,
+  children,
 }: Props) {
   const [participants, setParticipants] = useState<GameParticipant[]>([]);
 
@@ -68,6 +70,7 @@ export function GameWaitingRoom({
       <p className="game-kicker">{gameLabel}</p>
       <h1>{title}</h1>
       <p>{message}</p>
+      {children}
       <div className="game-waiting-participants" aria-label="입장한 학생">
         <span>입장 {participants.length}명</span>
         <GameParticipantsList participants={participants} label="" />
