@@ -19,6 +19,13 @@ import { normalizeThumbnailMode } from "./board-settings/utils";
 
 export type { BoardSection, BoardTheme } from "./board-settings/types";
 
+const TAB_LABEL_LINES: Record<BoardSettingsTab, string[]> = {
+  basic: ["기본"],
+  breakout: ["브레이크", "아웃"],
+  canva: ["Canva 연동", "(준비 중)"],
+  aura: ["아우라", "연동"],
+};
+
 export function BoardSettingsPanel({
   open,
   onClose,
@@ -135,14 +142,25 @@ export function BoardSettingsPanel({
             role="tab"
             aria-selected={tab === key}
             aria-controls={`${tablistId}-panel-${key}`}
+            aria-label={key === "canva" ? "Canva 연동 준비 중" : TAB_LABELS[key]}
             id={`${tablistId}-tab-${key}`}
             className="side-panel-tab"
             onClick={() => setTab(key)}
           >
-            {TAB_LABELS[key]}
-            {key === "canva" && (
-              <span className="board-settings-tab-meta"> (준비 중)</span>
-            )}
+            <span className="board-settings-tab-label" aria-hidden="true">
+              {TAB_LABEL_LINES[key].map((line, index) => (
+                <span
+                  key={`${key}-${index}`}
+                  className={
+                    key === "canva" && index === 1
+                      ? "board-settings-tab-meta"
+                      : undefined
+                  }
+                >
+                  {line}
+                </span>
+              ))}
+            </span>
           </button>
         ))}
       </div>

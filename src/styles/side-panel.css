@@ -103,15 +103,18 @@
 }
 
 .side-panel-tab {
+  flex: 1 1 0;
+  min-width: 0;
   background: none;
   border: 0;
-  padding: 10px 12px;
+  padding: 10px 6px;
   font-size: 14px;
   font-weight: 600;
   color: var(--color-text-muted);
   cursor: pointer;
   border-bottom: 2px solid transparent;
   margin-bottom: -1px;
+  line-height: 1.25;
 }
 
 .side-panel-tab:hover {
@@ -286,10 +289,20 @@
   outline-offset: 2px;
 }
 
+.board-settings-tab-label {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+}
+
+.board-settings-tab-label > span {
+  white-space: nowrap;
+}
+
 .board-settings-tab-meta {
   font-weight: 400;
   color: var(--color-text-muted);
-  margin-left: 2px;
   font-size: 12px;
 }
 

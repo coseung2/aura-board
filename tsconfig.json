@@ -46,6 +46,7 @@
     "screenshots/**",
     "skills/**",
     "skills_ref/**",
+    "tmp/**",
     "uploads/**"
   ]
 }
