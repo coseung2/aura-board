@@ -67,12 +67,12 @@ export function GameWaitingRoom({
 
   return (
     <main className={["game-waiting", className].filter(Boolean).join(" ")}>
-      <p className="game-kicker">{gameLabel}</p>
+      {gameLabel ? <p className="game-kicker">{gameLabel}</p> : null}
       <h1>{title}</h1>
-      <p>{message}</p>
+      {message ? <p>{message}</p> : null}
       {children}
       <div className="game-waiting-participants" aria-label="입장한 학생">
-        <span>입장 {participants.length}명</span>
+        <span>입장한 사람 {participants.length}명</span>
         <GameParticipantsList participants={participants} label="" />
       </div>
     </main>
