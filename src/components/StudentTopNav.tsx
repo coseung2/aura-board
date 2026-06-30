@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useState } from "react";
 import { Logo } from "./Logo";
+import { MegaNav } from "./MegaNav";
 import { StudentNotificationBell } from "./StudentNotificationBell";
 
 type Duty = {
@@ -30,31 +31,134 @@ export function StudentTopNav({
   const router = useRouter();
   const [loggingOut, setLoggingOut] = useState(false);
 
-  const tabs = [
+  const dutyLinks = duties.map((duty) => ({
+    href: duty.href,
+    label: duty.roleLabel,
+    active: pathname.startsWith(duty.href),
+    emoji: duty.emoji,
+  }));
+
+  const navItems = [
     {
       id: "boards",
       label: "보드",
       href: "/student",
       active: pathname === "/student",
+      groups: [
+        {
+          title: "학습",
+          links: [
+            { href: "/student", label: "보드", active: pathname === "/student" },
+            {
+              href: "/student/portfolio",
+              label: "포트폴리오",
+              active: pathname.startsWith("/student/portfolio"),
+            },
+            {
+              href: "/student/showcase",
+              label: "자랑해요",
+              active: pathname.startsWith("/student/showcase"),
+            },
+          ],
+        },
+        {
+          title: "활동",
+          links: [
+            {
+              href: "/student/canva-pair",
+              label: "캔바 연결",
+              active: pathname.startsWith("/student/canva-pair"),
+            },
+          ],
+        },
+        ...(dutyLinks.length > 0
+          ? [{ title: "내 역할", links: dutyLinks }]
+          : []),
+      ],
     },
     {
       id: "portfolio",
       label: "포트폴리오",
       href: "/student/portfolio",
       active: pathname.startsWith("/student/portfolio"),
+      groups: [
+        {
+          title: "작품",
+          links: [
+            {
+              href: "/student/portfolio",
+              label: "포트폴리오",
+              active: pathname.startsWith("/student/portfolio"),
+            },
+            {
+              href: "/student/showcase",
+              label: "자랑해요",
+              active: pathname.startsWith("/student/showcase"),
+            },
+          ],
+        },
+      ],
     },
     {
       id: "showcase",
       label: "자랑해요",
       href: "/student/showcase",
       active: pathname.startsWith("/student/showcase"),
+      groups: [
+        {
+          title: "전시",
+          links: [
+            {
+              href: "/student/showcase",
+              label: "자랑해요",
+              active: pathname.startsWith("/student/showcase"),
+            },
+            {
+              href: "/student/portfolio",
+              label: "포트폴리오",
+              active: pathname.startsWith("/student/portfolio"),
+            },
+          ],
+        },
+      ],
     },
     {
       id: "wallet",
       label: "통장",
       href: "/my/wallet",
       active: pathname.startsWith("/my/wallet"),
+      groups: [
+        {
+          title: "내 것",
+          links: [
+            {
+              href: "/my/wallet",
+              label: "통장",
+              active: pathname.startsWith("/my/wallet"),
+            },
+          ],
+        },
+      ],
     },
+    ...duties.map((duty) => ({
+      id: `duty-${duty.classroomId}-${duty.roleKey}`,
+      label: duty.roleLabel,
+      href: duty.href,
+      active: pathname.startsWith(duty.href),
+      groups: [
+        {
+          title: duty.classroomName,
+          links: [
+            {
+              href: duty.href,
+              label: duty.roleLabel,
+              active: pathname.startsWith(duty.href),
+              emoji: duty.emoji,
+            },
+          ],
+        },
+      ],
+    })),
   ];
 
   async function handleLogout() {
@@ -74,35 +178,7 @@ export function StudentTopNav({
           <Logo size={32} withWordmark />
         </Link>
 
-        <nav className="student-topnav-links" aria-label="학생 메뉴">
-          {tabs.map((tab) => (
-            <Link
-              key={tab.id}
-              href={tab.href}
-              className={`student-topnav-link${tab.active ? " active" : ""}`}
-              aria-current={tab.active ? "page" : undefined}
-            >
-              {tab.label}
-            </Link>
-          ))}
-
-          {duties.map((duty) => {
-            const active = pathname.startsWith(duty.href);
-            return (
-              <Link
-                key={`${duty.classroomId}-${duty.roleKey}`}
-                href={duty.href}
-                className={`student-topnav-link student-topnav-duty${
-                  active ? " active" : ""
-                }`}
-                aria-current={active ? "page" : undefined}
-              >
-                <span aria-hidden="true">{duty.emoji ?? "•"}</span>
-                {duty.roleLabel}
-              </Link>
-            );
-          })}
-        </nav>
+        <MegaNav items={navItems} ariaLabel="학생 메뉴" />
       </div>
 
       <div className="student-topnav-right auth-header">

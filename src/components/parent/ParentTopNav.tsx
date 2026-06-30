@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
 import { Logo } from "@/components/Logo";
+import { MegaNav } from "@/components/MegaNav";
 import {
   ParentChildSelector,
   type ChildRow,
@@ -35,20 +36,111 @@ export function ParentTopNav({
   const router = useRouter();
   const [loggingOut, setLoggingOut] = useState(false);
 
-  const tabs = [
+  const routeChildId = pathname.match(/^\/parent\/child\/([^/]+)/)?.[1] ?? null;
+  const requestedChildId = searchParams.get("child") ?? routeChildId;
+  const selectedChildId =
+    childRows.find((child) => child.studentId === requestedChildId)?.studentId ??
+    childRows[0]?.studentId ??
+    "";
+
+  const selectedChildLinks = selectedChildId
+    ? [
+        {
+          href: `/parent/child/${selectedChildId}`,
+          label: "홈",
+          active: pathname === `/parent/child/${selectedChildId}`,
+        },
+        {
+          href: `/parent/child/${selectedChildId}/portfolio`,
+          label: "포트폴리오",
+          active: pathname.startsWith(
+            `/parent/child/${selectedChildId}/portfolio`
+          ),
+        },
+        {
+          href: `/parent/child/${selectedChildId}/assignments`,
+          label: "과제",
+          active: pathname.startsWith(
+            `/parent/child/${selectedChildId}/assignments`
+          ),
+        },
+        {
+          href: `/parent/child/${selectedChildId}/drawing`,
+          label: "그림",
+          active: pathname.startsWith(
+            `/parent/child/${selectedChildId}/drawing`
+          ),
+        },
+        {
+          href: `/parent/child/${selectedChildId}/plant`,
+          label: "식물 관찰",
+          active: pathname.startsWith(`/parent/child/${selectedChildId}/plant`),
+        },
+        {
+          href: `/parent/child/${selectedChildId}/events`,
+          label: "행사",
+          active: pathname.startsWith(`/parent/child/${selectedChildId}/events`),
+        },
+        {
+          href: `/parent/child/${selectedChildId}/breakout`,
+          label: "모둠",
+          active: pathname.startsWith(
+            `/parent/child/${selectedChildId}/breakout`
+          ),
+        },
+      ]
+    : [];
+
+  const navItems = [
     {
       id: "home",
       label: "홈",
       href: "/parent/home",
       active: pathname === "/parent/home" || pathname.startsWith("/parent/home"),
+      groups: [
+        {
+          title: "자녀",
+          links: [
+            {
+              href: "/parent/home",
+              label: "홈",
+              active:
+                pathname === "/parent/home" ||
+                pathname.startsWith("/parent/home"),
+            },
+            {
+              href: "/parent/showcase",
+              label: "자랑해요",
+              active: pathname.startsWith("/parent/showcase"),
+            },
+          ],
+        },
+        ...(selectedChildLinks.length > 0
+          ? [{ title: "선택한 자녀", links: selectedChildLinks }]
+          : []),
+        {
+          title: "계정",
+          links: [
+            {
+              href: "/parent/notifications",
+              label: "알림",
+              active: pathname.startsWith("/parent/notifications"),
+            },
+            {
+              href: "/parent/account",
+              label: "계정",
+              active: pathname.startsWith("/parent/account"),
+            },
+            {
+              href: "/parent/onboard/match/code",
+              label: "자녀 추가",
+              active: pathname.startsWith("/parent/onboard/match/code"),
+            },
+          ],
+        },
+      ],
     },
   ];
-  const routeChildId = pathname.match(/^\/parent\/child\/([^/]+)/)?.[1] ?? null;
-  const selectedChildId =
-    searchParams.get("child") ??
-    routeChildId ??
-    childRows[0]?.studentId ??
-    "";
 
   function handleChildSelect(studentId: string) {
     if (typeof window !== "undefined") {
@@ -82,18 +174,7 @@ export function ParentTopNav({
           <Logo size={32} withWordmark />
         </Link>
 
-        <nav className="parent-topnav-links" aria-label="학부모 메뉴">
-          {tabs.map((tab) => (
-            <Link
-              key={tab.id}
-              href={tab.href}
-              className={`parent-topnav-link${tab.active ? " active" : ""}`}
-              aria-current={tab.active ? "page" : undefined}
-            >
-              {tab.label}
-            </Link>
-          ))}
-        </nav>
+        <MegaNav items={navItems} ariaLabel="학부모 메뉴" />
       </div>
 
       <div className="parent-topnav-tools">
@@ -167,4 +248,3 @@ export function ParentTopNav({
     </header>
   );
 }
-
