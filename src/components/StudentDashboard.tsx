@@ -48,6 +48,20 @@ type Duty = {
   href: string;
 };
 
+type StudentAssignmentTodo = {
+  id: string;
+  sectionId: string;
+  boardId: string;
+  boardSlug: string;
+  boardTitle: string;
+  sectionTitle: string;
+  href: string;
+  assignedAt: string;
+  reminderSentAt?: string | null;
+  submitted: boolean;
+  submittedAt?: string | null;
+};
+
 type WalletSummary = {
   classroomId: string;
   balance: number;
@@ -66,6 +80,7 @@ type Props = {
   classroomId: string;
   boards: BoardItem[];
   duties: Duty[];
+  assignments?: StudentAssignmentTodo[];
 };
 
 export function StudentDashboard({
@@ -73,6 +88,7 @@ export function StudentDashboard({
   classroomName,
   classroomId,
   boards,
+  assignments = [],
 }: Props) {
   const [wallet, setWallet] = useState<WalletSummary | null>(null);
   const [cancellingFD, setCancellingFD] = useState<string | null>(null);
@@ -215,6 +231,8 @@ export function StudentDashboard({
         </div>
       </section>
 
+      <StudentAssignmentTodos assignments={assignments} />
+
       {boards.length === 0 ? (
         <div className="student-empty">
           <p>아직 보드가 없어요.</p>
@@ -235,6 +253,98 @@ export function StudentDashboard({
       )}
     </>
   );
+}
+
+function StudentAssignmentTodos({
+  assignments,
+}: {
+  assignments: StudentAssignmentTodo[];
+}) {
+  if (assignments.length === 0) return null;
+
+  const ordered = [...assignments].sort((a, b) => {
+    if (a.submitted !== b.submitted) return a.submitted ? 1 : -1;
+    return b.assignedAt.localeCompare(a.assignedAt);
+  });
+  const missingCount = assignments.filter(
+    (item) => !item.submitted,
+  ).length;
+  const completedCount = assignments.length - missingCount;
+
+  return (
+    <section className="student-assignment-panel" aria-label="과제 목록">
+      <div className="student-assignment-header">
+        <div>
+          <p className="student-assignment-eyebrow">과제 목록</p>
+          <h2 className="student-assignment-title">해야 할 과제</h2>
+        </div>
+        <div className="student-assignment-summary" aria-label="과제 제출 현황">
+          <span className="student-assignment-summary-chip is-missing">
+            미제출 {missingCount}
+          </span>
+          <span className="student-assignment-summary-chip">
+            완료 {completedCount}
+          </span>
+        </div>
+      </div>
+
+      <div className="student-assignment-list">
+        {ordered.map((item) => {
+          const submitted = item.submitted;
+          const href = item.href;
+          const reminded =
+            !submitted &&
+            item.reminderSentAt !== null &&
+            item.reminderSentAt !== undefined &&
+            item.reminderSentAt !== item.assignedAt;
+          return (
+            <Link
+              key={item.id}
+              href={href}
+              className={`student-assignment-item ${
+                submitted ? "is-submitted" : "is-missing"
+              }`}
+            >
+              <span className="student-assignment-check" aria-hidden="true">
+                {submitted ? "✓" : ""}
+              </span>
+              <span className="student-assignment-main">
+                <strong>{item.sectionTitle}</strong>
+                <span>{item.boardTitle}</span>
+              </span>
+              <span className="student-assignment-meta">
+                <span
+                  className={`student-assignment-status ${
+                    submitted ? "is-submitted" : "is-missing"
+                  }`}
+                >
+                  {submitted ? "제출 완료" : "미제출"}
+                </span>
+                <small>
+                  {submitted && item.submittedAt
+                    ? `제출 ${formatAssignmentDate(item.submittedAt)}`
+                    : submitted
+                      ? "제출 완료"
+                      : reminded
+                      ? `알림 ${formatAssignmentDate(item.reminderSentAt)}`
+                      : item.assignedAt
+                        ? `배부 ${formatAssignmentDate(item.assignedAt)}`
+                        : "과제 배부됨"}
+                </small>
+              </span>
+            </Link>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
+
+function formatAssignmentDate(value: string | null | undefined) {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  return `${date.getMonth() + 1}/${date.getDate()}`;
 }
 
 // BC-1: render the student's boards split into lesson vs play sections.

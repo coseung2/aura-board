@@ -12,6 +12,8 @@ export type StreamSection = {
   pinned: boolean;
   accessToken?: string | null;
   sortMode?: string | null;
+  assignmentPublishedAt?: string | null;
+  assignmentReminderSentAt?: string | null;
   activityTemplate?: string | null;
   activityTemplateState?: StreamActivityTemplateState | null;
 };

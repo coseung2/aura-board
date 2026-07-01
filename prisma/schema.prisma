@@ -940,6 +940,10 @@ model Section {
 
   activityTemplateState Json?
 
+  assignmentPublishedAt DateTime?
+
+  assignmentReminderSentAt DateTime?
+
   // Breakout view (T0-??: teacher-rotatable access token.
 
   // null = no public share link. When set, anyone with the token can view the
@@ -977,6 +981,7 @@ model Section {
   mapRoute SectionMapRoute?
 
   @@index([boardId])
+  @@index([boardId, assignmentPublishedAt])
 }
 
 // SectionBreakoutConfig ??one row per Section that has breakout mode enabled.
@@ -1293,6 +1298,7 @@ model Card {
 
   @@index([boardId])
   @@index([sectionId])
+  @@index([sectionId, studentAuthorId])
   @@index([sectionId, guidePinned])
   @@index([authorId])
   @@index([studentAuthorId])

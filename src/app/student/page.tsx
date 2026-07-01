@@ -13,7 +13,7 @@ export default async function StudentPage() {
     redirect("/student/login");
   }
 
-  const [boards, duties] = await Promise.all([
+  const [boards, duties, assignmentSections] = await Promise.all([
     db.board.findMany({
       where: { classroomId: student.classroomId },
       include: {
@@ -41,6 +41,31 @@ export default async function StudentPage() {
       orderBy: { createdAt: "desc" },
     }),
     getStudentDuties(student.id),
+    db.section.findMany({
+      where: {
+        assignmentPublishedAt: { not: null },
+        board: { classroomId: student.classroomId, layout: "columns" },
+      },
+      orderBy: [{ assignmentPublishedAt: "desc" }, { order: "asc" }],
+      select: {
+        id: true,
+        title: true,
+        assignmentPublishedAt: true,
+        assignmentReminderSentAt: true,
+        board: { select: { id: true, slug: true, title: true } },
+        cards: {
+          where: {
+            OR: [
+              { studentAuthorId: student.id },
+              { authors: { some: { studentId: student.id } } },
+            ],
+          },
+          orderBy: { createdAt: "desc" },
+          take: 1,
+          select: { id: true, createdAt: true },
+        },
+      },
+    }),
   ]);
 
   const streamBreakouts = boards
@@ -177,6 +202,26 @@ export default async function StudentPage() {
       };
     });
 
+  const assignmentTodos = assignmentSections.flatMap((section) => {
+    if (!section.assignmentPublishedAt) return [];
+    const submittedCard = section.cards[0] ?? null;
+    return [
+      {
+        id: section.id,
+        sectionId: section.id,
+        boardId: section.board.id,
+        boardSlug: section.board.slug,
+        boardTitle: section.board.title || "제목 없음",
+        sectionTitle: section.title,
+        href: `/board/${section.board.slug}`,
+        assignedAt: section.assignmentPublishedAt.toISOString(),
+        reminderSentAt: section.assignmentReminderSentAt?.toISOString() ?? null,
+        submitted: !!submittedCard,
+        submittedAt: submittedCard?.createdAt.toISOString() ?? null,
+      },
+    ];
+  });
+
   return (
     <>
       <StudentTopNav
@@ -191,6 +236,7 @@ export default async function StudentPage() {
           classroomId={student.classroomId}
           boards={boardItems}
           duties={duties}
+          assignments={assignmentTodos}
         />
       </main>
     </>

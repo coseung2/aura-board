@@ -18,6 +18,8 @@ const PatchSectionSchema = z.object({
   order: z.number().int().nonnegative().optional(),
   sortMode: SortModeSchema.nullable().optional(),
   pinned: z.boolean().optional(),
+  assignmentPublishedAt: z.coerce.date().nullable().optional(),
+  assignmentReminderSentAt: z.coerce.date().nullable().optional(),
   activityTemplate: ActivityTemplateSchema.nullable().optional(),
   activityTemplateState: z
 	    .object({

@@ -9,6 +9,15 @@ import { ColumnMenu } from "./ColumnMenu";
 import type { SortMode } from "./sort";
 import type { RosterEntry } from "./useColumnRoster";
 
+export type ColumnAssignmentAction = "distribute" | "remind";
+
+export type ColumnAssignmentState = {
+  distributed: boolean;
+  distributedAt: string | null;
+  reminderSentAt: string | null;
+  pending: boolean;
+};
+
 type CardDropPreview = {
   sectionId: string;
   draggedCardId: string;
@@ -18,7 +27,10 @@ type CardDropPreview = {
 } | null;
 
 type Props = {
-  section: { id: string; title: string };
+  section: {
+    id: string;
+    title: string;
+  };
   pinned: boolean;
   sectionCards: CardData[];
   boardId?: string;
@@ -31,6 +43,7 @@ type Props = {
   draggingSectionId: string | null;
   cardDropPreview: CardDropPreview;
   organizing: string | null;
+  assignmentState?: ColumnAssignmentState;
   roster: RosterEntry[];
   authorsForSection: (cards: CardData[]) => RosterEntry[];
   studentForSectionTitle: (title: string) => RosterEntry | null;
@@ -58,6 +71,7 @@ type Props = {
   onFolder: () => void;
   onExport: () => void;
   onOrganize: () => void;
+  onAssignmentAction?: (action: ColumnAssignmentAction) => void | Promise<void>;
   onFeedback: (args: {
     studentId: string | null;
     name: string | null;
@@ -89,10 +103,12 @@ export function ColumnView(props: Props) {
     draggingSectionId,
     cardDropPreview,
     organizing,
+    assignmentState,
     roster,
     authorsForSection,
     studentForSectionTitle,
     onSetSort,
+    onAssignmentAction,
     onPin,
     onSectionDragStart,
     onSectionDragEnd,
@@ -130,6 +146,11 @@ export function ColumnView(props: Props) {
 
   const menuItems = canEdit ? buildMenuItems() : [];
   const isDropSection = overSectionId === section.id;
+  const assignmentDistributed = assignmentState?.distributed ?? false;
+  const assignmentAction: ColumnAssignmentAction = assignmentDistributed
+    ? "remind"
+    : "distribute";
+  const assignmentBadgeTitle = formatAssignmentBadgeTitle(assignmentState);
   const [submissionModalOpen, setSubmissionModalOpen] = useState(false);
   const submittedStudents = authorsForSection(sectionCards);
   const submittedIds = new Set(submittedStudents.map((student) => student.id));
@@ -279,6 +300,21 @@ export function ColumnView(props: Props) {
     }> = [{ label: "이름 변경", icon: "✏️", onClick: onRename }];
 
     if (classroomId) {
+      if (onAssignmentAction) {
+        items.push({
+          label: assignmentState?.pending
+            ? "처리 중..."
+            : assignmentDistributed
+              ? "제출 알림"
+              : "과제 배부",
+          icon: assignmentDistributed ? "🔔" : "📣",
+          onClick: () => {
+            if (assignmentState?.pending) return;
+            void onAssignmentAction(assignmentAction);
+          },
+        });
+      }
+
       const sectionAuthors = authorsForSection(sectionCards);
       const seedRow = sectionStudent
         ? (sectionAuthors.find((s) => s.id === sectionStudent.id) ?? {
@@ -371,6 +407,11 @@ export function ColumnView(props: Props) {
         onDragEnd={onSectionDragEnd}
       >
         <h3 className="column-title">{section.title}</h3>
+        {assignmentDistributed && (
+          <span className="column-assignment-badge" title={assignmentBadgeTitle}>
+            과제 배부됨
+          </span>
+        )}
         {canEdit && (
           <button
             type="button"
@@ -653,6 +694,27 @@ function formatRosterName(student: RosterEntry) {
   return student.number == null
     ? student.name
     : `${student.number}번 ${student.name}`;
+}
+
+function formatAssignmentBadgeTitle(state?: ColumnAssignmentState) {
+  if (!state?.distributed) return "아직 배부되지 않은 과제";
+  const distributedAt = formatAssignmentDate(state.distributedAt);
+  const reminderSentAt = formatAssignmentDate(state.reminderSentAt);
+  if (reminderSentAt) return `과제 배부됨 · 최근 알림 ${reminderSentAt}`;
+  if (distributedAt) return `과제 배부됨 · ${distributedAt}`;
+  return "과제 배부됨";
+}
+
+function formatAssignmentDate(value: string | null | undefined) {
+  if (!value) return null;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return null;
+  return date.toLocaleString("ko-KR", {
+    month: "numeric",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
 }
 
 function SubmissionStatusModal({

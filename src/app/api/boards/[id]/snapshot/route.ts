@@ -64,6 +64,8 @@ type SectionWire = {
   order: number;
   pinned: boolean;
   sortMode: string | null;
+  assignmentPublishedAt: string | null;
+  assignmentReminderSentAt: string | null;
   activityTemplate: string | null;
   activityTemplateState: StreamActivityTemplateState;
   breakout: {
@@ -259,6 +261,9 @@ export async function GET(
         order: s.order,
         pinned: s.pinned,
         sortMode: s.sortMode,
+        assignmentPublishedAt: s.assignmentPublishedAt?.toISOString() ?? null,
+        assignmentReminderSentAt:
+          s.assignmentReminderSentAt?.toISOString() ?? null,
         activityTemplate: s.activityTemplate,
         activityTemplateState: normalizeStreamActivityTemplateState(
           s.activityTemplateState,

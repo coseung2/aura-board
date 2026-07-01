@@ -10,7 +10,11 @@ import { ExportModal } from "./ExportModal";
 import { CanvaFolderModal } from "./CanvaFolderModal";
 import { SectionActionsPanel } from "./SectionActionsPanel";
 import { AiFeedbackModal } from "./feedback/AiFeedbackModal";
-import { ColumnView } from "./columns/ColumnView";
+import {
+  ColumnView,
+  type ColumnAssignmentAction,
+  type ColumnAssignmentState,
+} from "./columns/ColumnView";
 import { comparatorFor, toSortMode, type SortMode } from "./columns/sort";
 import { useBoardStream, type StreamSection } from "./columns/useBoardStream";
 import { useColumnRoster, type RosterEntry } from "./columns/useColumnRoster";
@@ -79,6 +83,9 @@ export function ColumnsBoard({
   );
   const [cardDropPreview, setCardDropPreview] = useState<CardDropPreview>(null);
   const [seedingStudents, setSeedingStudents] = useState(false);
+  const [assignmentBusySectionId, setAssignmentBusySectionId] = useState<
+    string | null
+  >(null);
   const [feedbackTarget, setFeedbackTarget] = useState<{
     studentId: string | null;
     name: string | null;
@@ -235,6 +242,81 @@ export function ColumnsBoard({
     }
   }
 
+  async function handleSectionAssignment(
+    sectionId: string,
+    action: ColumnAssignmentAction,
+  ) {
+    if (!canEdit || !classroomId || assignmentBusySectionId) return;
+    const section = sections.find((s) => s.id === sectionId);
+    if (!section) return;
+
+    const previousState = getSectionAssignmentState(section);
+    const now = new Date().toISOString();
+    const nextState =
+      action === "distribute"
+        ? {
+            distributed: true,
+            distributedAt: previousState.distributedAt ?? now,
+            reminderSentAt: previousState.reminderSentAt,
+          }
+        : {
+            distributed: true,
+            distributedAt: previousState.distributedAt ?? now,
+            reminderSentAt: now,
+          };
+
+    setAssignmentBusySectionId(sectionId);
+    setSections((list) =>
+      list.map((s) =>
+        s.id === sectionId ? applySectionAssignmentState(s, nextState) : s,
+      ),
+    );
+
+    try {
+      const res = await fetch(`/api/sections/${sectionId}`, {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(toSectionAssignmentPatch(nextState)),
+      });
+      if (!res.ok) {
+        setSections((list) =>
+          list.map((s) =>
+            s.id === sectionId ? applySectionAssignmentState(s, previousState) : s,
+          ),
+        );
+        alert(`과제 상태 저장 실패: ${await res.text().catch(() => "")}`);
+        return;
+      }
+
+      const payload = (await res.json().catch(() => null)) as {
+        section?: SectionData;
+      } | null;
+      const persistedState = payload?.section
+        ? getSectionAssignmentState({ ...section, ...payload.section })
+        : nextState;
+      setSections((list) =>
+        list.map((s) =>
+          s.id === sectionId ? applySectionAssignmentState(s, persistedState) : s,
+        ),
+      );
+      alert(
+        action === "distribute"
+          ? "과제를 배부했어요."
+          : "제출 알림을 보냈어요.",
+      );
+    } catch (e) {
+      setSections((list) =>
+        list.map((s) =>
+          s.id === sectionId ? applySectionAssignmentState(s, previousState) : s,
+        ),
+      );
+      console.error("[handleSectionAssignment]", e);
+      alert("과제 상태 저장 중 오류가 발생했어요.");
+    } finally {
+      setAssignmentBusySectionId(null);
+    }
+  }
+
   async function handleOrganizeToCanva(sectionId: string) {
     const section = sections.find((s) => s.id === sectionId);
     if (!section) return;
@@ -387,7 +469,10 @@ export function ColumnsBoard({
           {sortedSections.map((section) => (
             <ColumnView
               key={section.id}
-              section={{ id: section.id, title: section.title }}
+              section={{
+                id: section.id,
+                title: section.title,
+              }}
               pinned={section.pinned}
               sectionCards={getCardsForSection(section.id)}
               boardId={boardId}
@@ -400,10 +485,17 @@ export function ColumnsBoard({
               draggingSectionId={draggingSectionId}
               cardDropPreview={cardDropPreview}
               organizing={organizing}
+              assignmentState={getSectionAssignmentState(
+                section,
+                assignmentBusySectionId === section.id,
+              )}
               roster={roster}
               authorsForSection={authorsForSection}
               studentForSectionTitle={studentForSectionTitle}
               onSetSort={(mode) => setSortFor(section.id, mode)}
+              onAssignmentAction={(action) =>
+                handleSectionAssignment(section.id, action)
+              }
               onPin={(pinned) => handleSectionPin(section.id, pinned)}
               onSectionDragStart={(id) => setDraggingSectionId(id)}
               onSectionDragEnd={() => setDraggingSectionId(null)}
@@ -627,4 +719,39 @@ export function ColumnsBoard({
       )}
     </div>
   );
+}
+
+type PersistedAssignmentState = Omit<ColumnAssignmentState, "pending">;
+
+function getSectionAssignmentState(
+  section: SectionData,
+  pending = false,
+): ColumnAssignmentState {
+  const distributedAt = section.assignmentPublishedAt ?? null;
+  const reminderSentAt = section.assignmentReminderSentAt ?? null;
+
+  return {
+    distributed: Boolean(distributedAt),
+    distributedAt,
+    reminderSentAt,
+    pending,
+  };
+}
+
+function applySectionAssignmentState(
+  section: SectionData,
+  state: PersistedAssignmentState | ColumnAssignmentState,
+): SectionData {
+  return {
+    ...section,
+    assignmentPublishedAt: state.distributed ? state.distributedAt : null,
+    assignmentReminderSentAt: state.reminderSentAt,
+  };
+}
+
+function toSectionAssignmentPatch(state: PersistedAssignmentState) {
+  return {
+    assignmentPublishedAt: state.distributed ? state.distributedAt : null,
+    assignmentReminderSentAt: state.reminderSentAt,
+  };
 }

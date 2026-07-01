@@ -9,6 +9,8 @@ type SectionData = {
   order: number;
   pinned: boolean;
   sortMode?: string | null;
+  assignmentPublishedAt?: string | null;
+  assignmentReminderSentAt?: string | null;
 };
 
 type UseSectionMutationsOptions = {

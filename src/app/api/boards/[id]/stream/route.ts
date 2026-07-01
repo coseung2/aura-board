@@ -76,6 +76,8 @@ type SectionWire = {
   title: string;
   order: number;
   sortMode: string | null;
+  assignmentPublishedAt: string | null;
+  assignmentReminderSentAt: string | null;
   activityTemplate: string | null;
   activityTemplateState: StreamActivityTemplateState;
   // stream-board section breakout (2026-06-23): the section's breakout
@@ -322,6 +324,9 @@ export async function GET(
             title: s.title,
             order: s.order,
             sortMode: s.sortMode,
+            assignmentPublishedAt: s.assignmentPublishedAt?.toISOString() ?? null,
+            assignmentReminderSentAt:
+              s.assignmentReminderSentAt?.toISOString() ?? null,
             activityTemplate: s.activityTemplate,
             activityTemplateState: normalizeStreamActivityTemplateState(
               s.activityTemplateState,

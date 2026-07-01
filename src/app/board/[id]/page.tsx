@@ -408,6 +408,9 @@ export default async function BoardPage({
     pinned: s.pinned,
     accessToken: s.accessToken,
     sortMode: s.sortMode,
+    assignmentPublishedAt: s.assignmentPublishedAt?.toISOString() ?? null,
+    assignmentReminderSentAt:
+      s.assignmentReminderSentAt?.toISOString() ?? null,
     activityTemplate: isStreamActivityTemplate(s.activityTemplate)
       ? s.activityTemplate
       : null,
