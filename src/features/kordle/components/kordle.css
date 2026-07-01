@@ -113,6 +113,7 @@
 
 .board-page.kordle-waiting-page,
 .board-page.kordle-play-page,
+.board-page:has(.kordle-shell--teacher-setup),
 .board-page:has(.kordle-shell--teacher-live) {
   position: relative;
   background:
@@ -128,6 +129,7 @@
 
 .board-page.kordle-waiting-page .board-header,
 .board-page.kordle-play-page .board-header,
+.board-page:has(.kordle-shell--teacher-setup) .board-header,
 .board-page:has(.kordle-shell--teacher-live) .board-header {
   border-bottom: 1px solid rgba(255, 255, 255, 0.26);
   background: rgba(255, 255, 255, 0.18);
@@ -161,6 +163,22 @@
   padding: 0;
 }
 
+.kordle-teacher-card--setup {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  padding: 24px;
+  border: 1px solid rgba(255, 255, 255, 0.24);
+  border-radius: 28px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.2), rgba(255, 255, 255, 0.1));
+  backdrop-filter: blur(18px);
+  box-shadow: 0 28px 60px rgba(15, 23, 42, 0.16);
+}
+
+.kordle-shell--teacher-setup {
+  width: min(100%, 1100px);
+}
+
 .kordle-teacher-header {
   display: flex;
   align-items: flex-start;
@@ -173,6 +191,10 @@
   display: flex;
   justify-content: flex-end;
   margin: -4px 0 12px;
+}
+
+.kordle-teacher-card--setup .kordle-teacher-statusbar {
+  margin: 0;
 }
 
 .game-kicker,
@@ -189,6 +211,37 @@
   font-size: 24px;
 }
 
+.kordle-teacher-hero {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  text-align: center;
+}
+
+.kordle-teacher-hero .kordle-kicker {
+  margin: 0;
+  color: rgba(255, 255, 255, 0.82);
+}
+
+.kordle-teacher-hero h2 {
+  margin: 0;
+  color: #ffffff;
+  font-family: "Jua", "Gamja Flower", "Arial Rounded MT Bold", "Segoe UI Rounded", "Noto Sans KR", sans-serif;
+  font-size: clamp(32px, 5vw, 48px);
+  line-height: 1.02;
+  text-shadow: 0 4px 0 rgba(15, 23, 42, 0.18);
+}
+
+.kordle-teacher-hero p {
+  width: min(100%, 720px);
+  margin: 0;
+  color: rgba(255, 255, 255, 0.92);
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 1.55;
+}
+
 .kordle-teacher-controls {
   display: flex;
   align-items: center;
@@ -202,9 +255,9 @@
   display: inline-flex;
   gap: 2px;
   padding: 2px;
-  border: 1px solid var(--color-border, #cbd5e1);
+  border: 1px solid rgba(255, 255, 255, 0.3);
   border-radius: 7px;
-  background: var(--color-surface, #fff);
+  background: rgba(255, 255, 255, 0.9);
 }
 
 .kordle-locale-toggle button,
@@ -233,12 +286,13 @@
 .kordle-word-input {
   width: min(180px, 100%);
   min-height: 36px;
-  border: 1px solid var(--color-border, #cbd5e1);
+  border: 1px solid rgba(255, 255, 255, 0.34);
   border-radius: 6px;
   padding: 0 10px;
   color: var(--color-text, #0f172a);
   font-size: 14px;
   font-weight: 700;
+  background: rgba(255, 255, 255, 0.92);
   outline: none;
 }
 
@@ -317,6 +371,14 @@
   align-items: start;
 }
 
+.kordle-teacher-preview {
+  padding: 20px;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  border-radius: 24px;
+  background: rgba(255, 255, 255, 0.14);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.14);
+}
+
 .kordle-teacher-panel {
   display: flex;
   flex-direction: column;
@@ -331,59 +393,67 @@
 }
 
 .kordle-teacher-panel dl div {
-  border: 1px solid var(--color-border, #cbd5e1);
-  border-radius: 8px;
-  padding: 10px;
-  background: var(--color-surface-alt, #f8fafc);
+  border: 1px solid rgba(255, 255, 255, 0.24);
+  border-radius: 18px;
+  padding: 14px;
+  background: rgba(255, 255, 255, 0.16);
+  backdrop-filter: blur(10px);
 }
 
 .kordle-teacher-panel dt {
-  color: var(--color-text-muted, #64748b);
+  color: rgba(255, 255, 255, 0.74);
   font-size: 11px;
   font-weight: 800;
 }
 
 .kordle-teacher-panel dd {
   margin: 4px 0 0;
-  color: var(--color-text, #0f172a);
+  color: #ffffff;
   font-size: 17px;
   font-weight: 850;
 }
 
 .kordle-puzzle-summary {
-  border: 1px solid var(--color-border, #cbd5e1);
-  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.24);
+  border-radius: 18px;
   padding: 14px;
   display: flex;
   flex-direction: column;
   gap: 4px;
+  background: rgba(255, 255, 255, 0.16);
+  backdrop-filter: blur(10px);
 }
 
 .kordle-puzzle-summary span,
 .kordle-puzzle-summary small,
 .kordle-teacher-empty {
-  color: var(--color-text-muted, #64748b);
+  color: rgba(255, 255, 255, 0.78);
   font-size: 13px;
   line-height: 1.5;
 }
 
 .kordle-puzzle-summary strong {
-  color: var(--color-text, #0f172a);
+  color: #ffffff;
   font-size: 22px;
 }
 
 .kordle-teacher-empty {
   margin: 0;
+  padding: 18px;
+  border: 1px dashed rgba(255, 255, 255, 0.28);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.1);
 }
 
 .kordle-teacher-participants {
-  border: 1px solid var(--color-border, #cbd5e1);
-  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.24);
+  border-radius: 18px;
   padding: 14px;
   display: flex;
   flex-direction: column;
   gap: 10px;
-  background: var(--color-surface, #fff);
+  background: rgba(255, 255, 255, 0.92);
+  backdrop-filter: blur(10px);
 }
 
 .kordle-teacher-participants-header {

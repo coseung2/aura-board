@@ -125,6 +125,16 @@ export async function KordleTeacherBoard({ boardId, teacherUserId }: Props) {
         : puzzle?.startsAt
           ? `시작 ${puzzle.startsAt.toLocaleString("ko-KR")}`
           : "바로 플레이 가능";
+  const setupTitle = puzzle
+    ? puzzle.status === "CLOSED"
+      ? "다음 라운드를 준비하세요"
+      : "문제를 출제하고 시작하세요"
+    : "첫 문제를 출제하세요";
+  const setupMessage = puzzle
+    ? puzzle.status === "CLOSED"
+      ? "방금 끝난 퍼즐에서 이어서 새 문제를 열 수 있어요."
+      : "단어를 직접 입력하거나 랜덤 문제를 만든 뒤, 준비가 되면 바로 시작해 보세요."
+    : "언어를 고르고 문제를 만들면 학생들이 같은 게임 화면으로 바로 들어올 수 있어요.";
 
   if (puzzle?.status === "LIVE") {
     const attemptId = await ensureAttempt({
@@ -174,10 +184,15 @@ export async function KordleTeacherBoard({ boardId, teacherUserId }: Props) {
   }
 
   return (
-    <section className="kordle-shell">
-      <div className="kordle-teacher-card">
+    <section className="kordle-shell kordle-shell--teacher-setup">
+      <div className="kordle-teacher-card kordle-teacher-card--setup">
         <div className="kordle-teacher-statusbar">
           <span className="kordle-status-pill">{statusLabel(puzzle?.status)}</span>
+        </div>
+        <div className="kordle-teacher-hero">
+          <p className="kordle-kicker">꼬들 라운드 준비</p>
+          <h2>{setupTitle}</h2>
+          <p>{setupMessage}</p>
         </div>
         <KordleTeacherControls
           boardId={boardId}
@@ -187,7 +202,7 @@ export async function KordleTeacherBoard({ boardId, teacherUserId }: Props) {
         />
 
         <div className="kordle-teacher-layout">
-          <div>
+          <div className="kordle-teacher-preview">
             <EmptyGrid wordLength={game.wordLength} maxGuesses={game.maxGuesses} />
           </div>
           <div className="kordle-teacher-panel">
