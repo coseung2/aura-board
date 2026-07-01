@@ -144,13 +144,13 @@ export function ColumnView(props: Props) {
 
   const sectionStudent = canEdit ? studentForSectionTitle(section.title) : null;
 
-  const menuItems = canEdit ? buildMenuItems() : [];
   const isDropSection = overSectionId === section.id;
   const assignmentDistributed = assignmentState?.distributed ?? false;
   const assignmentAction: ColumnAssignmentAction = assignmentDistributed
     ? "remind"
     : "distribute";
   const assignmentBadgeTitle = formatAssignmentBadgeTitle(assignmentState);
+  const menuItems = canEdit ? buildMenuItems() : [];
   const [submissionModalOpen, setSubmissionModalOpen] = useState(false);
   const submittedStudents = authorsForSection(sectionCards);
   const submittedIds = new Set(submittedStudents.map((student) => student.id));

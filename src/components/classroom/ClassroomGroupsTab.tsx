@@ -52,6 +52,29 @@ function chunkIntoSeatGroups(
   return groups;
 }
 
+function restoreSavedGroups(
+  savedGroups: GroupEditorDraft[],
+  students: GroupEditorStudent[],
+): GroupEditorDraft[] {
+  const validIds = new Set(students.map((student) => student.id));
+  const seen = new Set<string>();
+  const groups = savedGroups
+    .map((group, index) => {
+      const studentIds = group.studentIds.filter((studentId) => {
+        if (!validIds.has(studentId) || seen.has(studentId)) return false;
+        seen.add(studentId);
+        return true;
+      });
+      return {
+        name: group.name.trim() || `${index + 1}분단`,
+        studentIds,
+      };
+    })
+    .filter((group) => group.studentIds.length > 0);
+
+  return groups.length > 0 ? groups : defaultGroups(students);
+}
+
 function serverErrorMessage(error: string | undefined): string {
   switch (error) {
     case "student_unassigned":
@@ -78,11 +101,7 @@ export function ClassroomGroupsTab({
   );
   const [groups, setGroups] = useState<GroupEditorDraft[]>(
     initialGroups.length > 0
-      ? chunkIntoSeatGroups(
-          initialGroups.flatMap((group) => group.studentIds),
-          seatingStudents,
-          { includeMissingStudents: false },
-        )
+      ? restoreSavedGroups(initialGroups, seatingStudents)
       : defaultGroups(seatingStudents),
   );
   const [saving, setSaving] = useState(false);
