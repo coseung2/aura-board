@@ -67,7 +67,7 @@ async function issuePairCode(studentId: string): Promise<string> {
 export default async function CanvaPairPage() {
   const student = await getCurrentStudent();
   if (!student) {
-    redirect("/student/login?from=/student/canva-pair");
+    redirect("/login?from=/student/canva-pair");
   }
 
   const [code, duties] = await Promise.all([

@@ -15,7 +15,7 @@ export default function QRInvalidPage() {
           유효하지 않거나 만료된 QR 코드예요. 선생님께 새 QR 코드를
           요청하거나 텍스트 코드로 로그인하세요.
         </p>
-        <a href="/student/login" className="student-login-btn">
+        <a href="/login" className="student-login-btn">
           코드로 로그인
         </a>
       </div>

@@ -2,7 +2,7 @@
 
 // parent-redesign (2026-04-26): OAuth 진입 버튼 (Google + Kakao).
 // 클릭 시 /api/parent/auth/{provider} 로 redirect. 환경변수 미설정 시
-// 버튼 disabled + 안내. 매직링크는 별도 fallback 토글로 보조.
+// 버튼 disabled + 안내.
 
 export function ParentAuthButtons() {
   return (

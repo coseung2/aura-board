@@ -5,46 +5,31 @@ import {
   StyleSheet,
   Text,
   View,
-  useWindowDimensions,
 } from "react-native";
 import { useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import {
   auth,
-  brand,
   colors,
-  layout,
-  iconSizes,
-  radii,
-  responsive,
   spacing,
   typography,
 } from "../../theme/tokens";
 import { apiFetch, ApiError, getApiBase } from "../../lib/api";
-import { webSafeWidthStyle } from "../../lib/responsive";
 import {
   loadSessionToken,
   saveSessionToken,
   saveStudentCache,
 } from "../../lib/session";
-import { LogoLockup } from "../../components/LogoLockup";
 import { AppButton, SurfaceCard, TextField } from "../../components/ui";
 import type { StudentAuthResponse } from "../../lib/types";
 
 // 학생 로그인 — 교사가 발급한 6자리 영문·숫자 코드로 로그인.
-// QR 스캐너는 추후 phase (expo-camera + barcode scanner).
 export default function StudentLogin() {
   const router = useRouter();
-  const { width } = useWindowDimensions();
   const [code, setCode] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [booting, setBooting] = useState(true);
-  const isNarrow = width < layout.authTwoPaneBreakpoint;
-  const webNarrowPaneStyle = webSafeWidthStyle(width, {
-    enabled: isNarrow,
-    inset: responsive.authWebSafeInset,
-  });
 
   // 앱 시작 시 기존 토큰이 있으면 대시보드로 바로 이동.
   useEffect(() => {
@@ -115,74 +100,39 @@ export default function StudentLogin() {
 
   return (
     <SafeAreaView style={styles.container} edges={["top", "bottom"]}>
-      <ScrollView contentContainerStyle={styles.inner}>
-        <View style={styles.brandRow}>
-          <LogoLockup
-            size={brand.logoSize}
-            wordmarkStyle={styles.brandTitle}
+      <ScrollView
+        contentContainerStyle={styles.inner}
+        keyboardShouldPersistTaps="handled"
+      >
+        <SurfaceCard style={styles.loginCard}>
+          <Text style={styles.loginTitle}>학생 로그인</Text>
+
+          <TextField
+            style={styles.codeInput}
+            value={code}
+            onChangeText={(t) => {
+              setCode(t.toUpperCase());
+              if (error) setError(null);
+            }}
+            placeholder="코드 입력"
+            autoCapitalize="characters"
+            autoCorrect={false}
+            maxLength={auth.codeLength}
+            textAlign="center"
+            editable={!loading}
+            onSubmitEditing={handleSubmit}
           />
-          <Text style={styles.brandSub}>학생 로그인</Text>
-        </View>
 
-        <View
-          style={[
-            styles.twoPane,
-            isNarrow && styles.twoPaneNarrow,
-            webNarrowPaneStyle,
-          ]}
-        >
-          {/* Left — QR scanner placeholder (expo-camera 후속) */}
-          <SurfaceCard style={[styles.qrPane, isNarrow && styles.fullWidthPane]}>
-            <View style={styles.qrFrame}>
-              <View style={[styles.qrCorner, styles.qrCornerTL]} />
-              <View style={[styles.qrCorner, styles.qrCornerTR]} />
-              <View style={[styles.qrCorner, styles.qrCornerBL]} />
-              <View style={[styles.qrCorner, styles.qrCornerBR]} />
-              <Text style={styles.qrEmoji}>📷</Text>
-              <Text style={styles.qrHint}>
-                QR 스캔은 다음 업데이트에서{"\n"}제공됩니다. 지금은 오른쪽 코드를 입력해 주세요.
-              </Text>
-            </View>
-          </SurfaceCard>
+          {error ? <Text style={styles.errorText}>{error}</Text> : null}
 
-          {/* Right — 6-digit code */}
-          <SurfaceCard style={[styles.codePane, isNarrow && styles.fullWidthPane]}>
-            <Text style={styles.codeHeading}>코드로 입장</Text>
-            <Text style={styles.codeSub}>
-              선생님께 받은 6자리 영문·숫자 코드를 입력하세요.
-            </Text>
-
-            <TextField
-              style={styles.codeInput}
-              value={code}
-              onChangeText={(t) => {
-                setCode(t);
-                if (error) setError(null);
-              }}
-              placeholder="ABC123"
-              autoCapitalize="characters"
-              autoCorrect={false}
-              maxLength={auth.codeLength}
-              textAlign="center"
-              editable={!loading}
-              onSubmitEditing={handleSubmit}
-            />
-
-            {error ? <Text style={styles.errorText}>{error}</Text> : null}
-
-            <AppButton
-              onPress={handleSubmit}
-              disabled={code.trim().length !== auth.codeLength}
-              loading={loading}
-            >
-              들어가기 →
-            </AppButton>
-
-            <Text style={styles.codeHelp}>
-              코드를 잃어버렸다면 선생님께 다시 요청하세요.
-            </Text>
-          </SurfaceCard>
-        </View>
+          <AppButton
+            onPress={handleSubmit}
+            disabled={loading || code.trim().length === 0}
+            loading={loading}
+          >
+            로그인
+          </AppButton>
+        </SurfaceCard>
       </ScrollView>
     </SafeAreaView>
   );
@@ -199,113 +149,33 @@ const styles = StyleSheet.create({
   bootingText: { ...typography.body, color: colors.textMuted },
   inner: {
     flexGrow: 1,
-    padding: spacing.xxl,
-    gap: spacing.xl,
-    alignItems: "stretch",
-  },
-  brandRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    flexWrap: "wrap",
-    gap: spacing.md,
-  },
-  brandTitle: { ...typography.display, color: colors.text },
-  brandSub: { ...typography.subtitle, color: colors.textMuted },
-  twoPane: {
-    flex: 1,
-    flexDirection: "row",
-    gap: spacing.xl,
-  },
-  twoPaneNarrow: {
-    flexDirection: "column",
-    alignSelf: "stretch",
-  },
-
-  qrPane: {
-    flex: 1,
-    padding: spacing.xl,
     alignItems: "center",
     justifyContent: "center",
+    padding: spacing.xxl,
   },
-  qrFrame: {
+  loginCard: {
     width: "100%",
-    maxWidth: auth.qrFrameMaxWidth,
-    aspectRatio: 1,
-    borderRadius: radii.card,
-    backgroundColor: colors.surfaceAlt,
-    justifyContent: "center",
-    alignItems: "center",
-    position: "relative",
-  },
-  qrEmoji: { fontSize: iconSizes.hero, marginBottom: spacing.md },
-  qrHint: {
-    ...typography.body,
-    color: colors.textMuted,
-    textAlign: "center",
-    paddingHorizontal: spacing.lg,
-  },
-  qrCorner: {
-    position: "absolute",
-    width: auth.scanCornerSize,
-    height: auth.scanCornerSize,
-    borderColor: colors.accent,
-  },
-  qrCornerTL: {
-    top: 0,
-    left: 0,
-    borderTopWidth: auth.scanCornerBorderWidth,
-    borderLeftWidth: auth.scanCornerBorderWidth,
-    borderTopLeftRadius: radii.card,
-  },
-  qrCornerTR: {
-    top: 0,
-    right: 0,
-    borderTopWidth: auth.scanCornerBorderWidth,
-    borderRightWidth: auth.scanCornerBorderWidth,
-    borderTopRightRadius: radii.card,
-  },
-  qrCornerBL: {
-    bottom: 0,
-    left: 0,
-    borderBottomWidth: auth.scanCornerBorderWidth,
-    borderLeftWidth: auth.scanCornerBorderWidth,
-    borderBottomLeftRadius: radii.card,
-  },
-  qrCornerBR: {
-    bottom: 0,
-    right: 0,
-    borderBottomWidth: auth.scanCornerBorderWidth,
-    borderRightWidth: auth.scanCornerBorderWidth,
-    borderBottomRightRadius: radii.card,
-  },
-
-  codePane: {
-    flex: 1,
-    padding: spacing.xxl,
-    justifyContent: "center",
+    maxWidth: auth.cardMaxWidth,
+    paddingVertical: spacing.xxxl,
+    paddingHorizontal: spacing.xxl,
     gap: spacing.lg,
   },
-  fullWidthPane: {
-    alignSelf: "stretch",
-    flex: undefined,
-  },
-  codeHeading: { ...typography.title, color: colors.text },
-  codeSub: { ...typography.body, color: colors.textMuted },
-  codeInput: {
-    ...typography.code,
-    paddingVertical: spacing.lg,
-    backgroundColor: colors.bg,
-    marginTop: spacing.md,
-  },
-  codeHelp: {
-    ...typography.micro,
-    color: colors.textFaint,
+  loginTitle: {
+    ...typography.display,
+    color: colors.text,
     textAlign: "center",
-    marginTop: spacing.md,
+    marginBottom: spacing.sm,
+  },
+  codeInput: {
+    ...typography.title,
+    color: colors.text,
+    backgroundColor: colors.bgAlt,
+    paddingVertical: spacing.lg,
+    textAlign: "center",
   },
   errorText: {
     ...typography.body,
     color: colors.danger,
-    marginTop: spacing.sm,
+    textAlign: "center",
   },
 });

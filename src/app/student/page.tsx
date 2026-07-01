@@ -10,10 +10,10 @@ export default async function StudentPage() {
   const student = await getCurrentStudent();
 
   if (!student) {
-    redirect("/student/login");
+    redirect("/login");
   }
 
-  const [boards, duties, assignmentSections] = await Promise.all([
+  const [boards, duties, assignmentSections, checkTasks] = await Promise.all([
     db.board.findMany({
       where: { classroomId: student.classroomId },
       include: {
@@ -63,6 +63,32 @@ export default async function StudentPage() {
           orderBy: { createdAt: "desc" },
           take: 1,
           select: { id: true, createdAt: true },
+        },
+      },
+    }),
+    db.classroomCheckTask.findMany({
+      where: {
+        classroomId: student.classroomId,
+        isActive: true,
+      },
+      orderBy: [
+        { dueDate: "asc" },
+        { createdAt: "desc" },
+      ],
+      select: {
+        id: true,
+        title: true,
+        description: true,
+        dueDate: true,
+        createdAt: true,
+        submissions: {
+          where: { studentId: student.id },
+          take: 1,
+          select: {
+            submitted: true,
+            checkedAt: true,
+            updatedAt: true,
+          },
         },
       },
     }),
@@ -221,6 +247,26 @@ export default async function StudentPage() {
       },
     ];
   });
+  const checkHref = `/classroom/${student.classroomId}/check`;
+  const canOpenChecks = duties.some((duty) => duty.href === checkHref);
+  const checkTodos = checkTasks.map((task) => {
+    const submission = task.submissions[0] ?? null;
+    const checkedAt = submission?.checkedAt ?? submission?.updatedAt ?? null;
+    return {
+      id: `check-${task.id}`,
+      sectionId: task.id,
+      boardId: `check-${student.classroomId}`,
+      boardSlug: student.classroomId,
+      boardTitle: task.description || "제출 체크",
+      sectionTitle: task.title,
+      href: canOpenChecks ? checkHref : null,
+      assignedAt: (task.dueDate ?? task.createdAt).toISOString(),
+      reminderSentAt: task.dueDate?.toISOString() ?? null,
+      submitted: submission?.submitted === true,
+      submittedAt: checkedAt?.toISOString() ?? null,
+    };
+  });
+  const allAssignmentTodos = [...assignmentTodos, ...checkTodos];
 
   return (
     <>
@@ -236,7 +282,7 @@ export default async function StudentPage() {
           classroomId={student.classroomId}
           boards={boardItems}
           duties={duties}
-          assignments={assignmentTodos}
+          assignments={allAssignmentTodos}
         />
       </main>
     </>

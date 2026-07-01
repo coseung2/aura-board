@@ -5,7 +5,7 @@
  * server URL". Canva opens it in a popup with the standard OAuth query
  * params. We validate the client + redirect_uri + PKCE challenge, then:
  *
- *   - not logged in as a student → bounce to /student/login with a return
+ *   - not logged in as a student → bounce to /login with a return
  *     URL that brings the user back here after auth,
  *   - logged in → render an on-device consent screen (this page) that the
  *     student submits to /api/oauth/consent, which issues a code and
@@ -217,7 +217,7 @@ export default async function AuthorizePage({
   // Student subject branch (Canva pairing - unchanged).
   const student = await getCurrentStudent();
   if (!student) {
-    redirect(`/student/login?return=${encodeURIComponent(authorizeUrl)}`);
+    redirect(`/login?return=${encodeURIComponent(authorizeUrl)}`);
   }
 
   // [5] Render consent UI. The student submits the form which POSTs to

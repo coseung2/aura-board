@@ -7,6 +7,7 @@ import { ShowcaseHighlightStrip } from "@/components/portfolio/ShowcaseHighlight
 import { layoutLabel, layoutThumbnail } from "@/lib/layout-meta";
 
 const FALLBACK_THUMBNAIL = "/board-type-thumbnails/card-board.png";
+const STUDENT_ASSIGNMENT_VISIBLE_LIMIT = 4;
 
 type BoardItem = {
   id: string;
@@ -55,7 +56,7 @@ type StudentAssignmentTodo = {
   boardSlug: string;
   boardTitle: string;
   sectionTitle: string;
-  href: string;
+  href?: string | null;
   assignedAt: string;
   reminderSentAt?: string | null;
   submitted: boolean;
@@ -160,78 +161,80 @@ export function StudentDashboard({
         hrefBase="/student/showcase"
       />
 
-      <section className="student-utilities" aria-label="바로가기">
-        <div className="student-wallet-card">
-          <div className="student-wallet-header">
-            <div>
-              <p className="student-wallet-eyebrow">개인 금융</p>
-              <h2 className="student-wallet-title">내 통장과 적금</h2>
+      <div className="student-overview-row">
+        <section className="student-utilities" aria-label="바로가기">
+          <div className="student-wallet-card">
+            <div className="student-wallet-header">
+              <div>
+                <p className="student-wallet-eyebrow">개인 금융</p>
+                <h2 className="student-wallet-title">내 통장과 적금</h2>
+              </div>
+              <Link href="/my/wallet" className="student-wallet-link">
+                자세히
+              </Link>
             </div>
-            <Link href="/my/wallet" className="student-wallet-link">
-              자세히
-            </Link>
+
+            {wallet ? (
+              <>
+                <div className="student-wallet-balance-row">
+                  <span className="student-wallet-balance-label">현재 잔고</span>
+                  <strong className="student-wallet-balance-value">
+                    {wallet.balance.toLocaleString()} {wallet.currency.unitLabel}
+                  </strong>
+                </div>
+
+                <div className="student-wallet-fd-strip">
+                  {wallet.activeFDs.length > 0 ? (
+                    wallet.activeFDs.slice(0, 3).map((fd) => {
+                      const daysLeft = Math.max(
+                        0,
+                        Math.ceil(
+                          (new Date(fd.maturityDate).getTime() - Date.now()) /
+                            86400000,
+                        ),
+                      );
+                      const isCancelling = cancellingFD === fd.id;
+                      return (
+                        <div key={fd.id} className="student-wallet-fd-chip">
+                          <span className="student-wallet-fd-label">적금</span>
+                          <strong>
+                            {fd.principal.toLocaleString()}{" "}
+                            {wallet.currency.unitLabel}
+                          </strong>
+                          <span>D-{daysLeft}</span>
+                          <button
+                            type="button"
+                            className="student-wallet-fd-cancel"
+                            onClick={() => handleCancelFD(fd.id)}
+                            disabled={isCancelling || cancellingFD !== null}
+                          >
+                            {isCancelling ? "해지 중…" : "해지"}
+                          </button>
+                        </div>
+                      );
+                    })
+                  ) : (
+                    <div className="student-wallet-empty">
+                      아직 진행 중인 적금이 없어요.
+                    </div>
+                  )}
+                  {fdError && (
+                    <p className="student-wallet-fd-error" role="alert">
+                      {fdError}
+                    </p>
+                  )}
+                </div>
+              </>
+            ) : (
+              <div className="student-wallet-empty">
+                통장 정보를 불러오는 중이에요.
+              </div>
+            )}
           </div>
+        </section>
 
-          {wallet ? (
-            <>
-              <div className="student-wallet-balance-row">
-                <span className="student-wallet-balance-label">현재 잔고</span>
-                <strong className="student-wallet-balance-value">
-                  {wallet.balance.toLocaleString()} {wallet.currency.unitLabel}
-                </strong>
-              </div>
-
-              <div className="student-wallet-fd-strip">
-                {wallet.activeFDs.length > 0 ? (
-                  wallet.activeFDs.slice(0, 3).map((fd) => {
-                    const daysLeft = Math.max(
-                      0,
-                      Math.ceil(
-                        (new Date(fd.maturityDate).getTime() - Date.now()) /
-                          86400000,
-                      ),
-                    );
-                    const isCancelling = cancellingFD === fd.id;
-                    return (
-                      <div key={fd.id} className="student-wallet-fd-chip">
-                        <span className="student-wallet-fd-label">적금</span>
-                        <strong>
-                          {fd.principal.toLocaleString()}{" "}
-                          {wallet.currency.unitLabel}
-                        </strong>
-                        <span>D-{daysLeft}</span>
-                        <button
-                          type="button"
-                          className="student-wallet-fd-cancel"
-                          onClick={() => handleCancelFD(fd.id)}
-                          disabled={isCancelling || cancellingFD !== null}
-                        >
-                          {isCancelling ? "해지 중…" : "해지"}
-                        </button>
-                      </div>
-                    );
-                  })
-                ) : (
-                  <div className="student-wallet-empty">
-                    아직 진행 중인 적금이 없어요.
-                  </div>
-                )}
-                {fdError && (
-                  <p className="student-wallet-fd-error" role="alert">
-                    {fdError}
-                  </p>
-                )}
-              </div>
-            </>
-          ) : (
-            <div className="student-wallet-empty">
-              통장 정보를 불러오는 중이에요.
-            </div>
-          )}
-        </div>
-      </section>
-
-      <StudentAssignmentTodos assignments={assignments} />
+        <StudentAssignmentTodos assignments={assignments} />
+      </div>
 
       {boards.length === 0 ? (
         <div className="student-empty">
@@ -260,51 +263,75 @@ function StudentAssignmentTodos({
 }: {
   assignments: StudentAssignmentTodo[];
 }) {
+  const missingCount = assignments.filter((item) => !item.submitted).length;
+  const completedCount = assignments.length - missingCount;
+  const [filter, setFilter] = useState<"missing" | "completed">(
+    missingCount > 0 ? "missing" : "completed",
+  );
   if (assignments.length === 0) return null;
 
   const ordered = [...assignments].sort((a, b) => {
     if (a.submitted !== b.submitted) return a.submitted ? 1 : -1;
     return b.assignedAt.localeCompare(a.assignedAt);
   });
-  const missingCount = assignments.filter(
-    (item) => !item.submitted,
-  ).length;
-  const completedCount = assignments.length - missingCount;
+  const filtered = ordered.filter((item) =>
+    filter === "missing" ? !item.submitted : item.submitted,
+  );
+  const visibleItems = filtered.slice(0, STUDENT_ASSIGNMENT_VISIBLE_LIMIT);
+  const emptyMessage =
+    filter === "missing"
+      ? "미제출 과제가 없어요."
+      : "완료한 과제가 없어요.";
 
   return (
     <section className="student-assignment-panel" aria-label="과제 목록">
       <div className="student-assignment-header">
         <div>
           <p className="student-assignment-eyebrow">과제 목록</p>
-          <h2 className="student-assignment-title">해야 할 과제</h2>
+          <h2 className="student-assignment-title">
+            {filter === "missing" ? "해야 할 과제" : "완료한 과제"}
+          </h2>
         </div>
         <div className="student-assignment-summary" aria-label="과제 제출 현황">
-          <span className="student-assignment-summary-chip is-missing">
+          <button
+            type="button"
+            className={`student-assignment-summary-chip is-missing ${
+              filter === "missing" ? "is-active" : ""
+            }`}
+            onClick={() => setFilter("missing")}
+            aria-pressed={filter === "missing"}
+          >
             미제출 {missingCount}
-          </span>
-          <span className="student-assignment-summary-chip">
+          </button>
+          <button
+            type="button"
+            className={`student-assignment-summary-chip ${
+              filter === "completed" ? "is-active" : ""
+            }`}
+            onClick={() => setFilter("completed")}
+            aria-pressed={filter === "completed"}
+          >
             완료 {completedCount}
-          </span>
+          </button>
         </div>
       </div>
 
       <div className="student-assignment-list">
-        {ordered.map((item) => {
+        {filtered.length === 0 ? (
+          <p className="student-assignment-empty">{emptyMessage}</p>
+        ) : visibleItems.map((item) => {
           const submitted = item.submitted;
           const href = item.href;
+          const className = `student-assignment-item ${
+            submitted ? "is-submitted" : "is-missing"
+          }`;
           const reminded =
             !submitted &&
             item.reminderSentAt !== null &&
             item.reminderSentAt !== undefined &&
             item.reminderSentAt !== item.assignedAt;
-          return (
-            <Link
-              key={item.id}
-              href={href}
-              className={`student-assignment-item ${
-                submitted ? "is-submitted" : "is-missing"
-              }`}
-            >
+          const content = (
+            <>
               <span className="student-assignment-check" aria-hidden="true">
                 {submitted ? "✓" : ""}
               </span>
@@ -322,17 +349,26 @@ function StudentAssignmentTodos({
                 </span>
                 <small>
                   {submitted && item.submittedAt
-                    ? `제출 ${formatAssignmentDate(item.submittedAt)}`
-                    : submitted
-                      ? "제출 완료"
-                      : reminded
-                      ? `알림 ${formatAssignmentDate(item.reminderSentAt)}`
-                      : item.assignedAt
-                        ? `배부 ${formatAssignmentDate(item.assignedAt)}`
-                        : "과제 배부됨"}
+                  ? `제출 ${formatAssignmentDate(item.submittedAt)}`
+                  : submitted
+                    ? "제출 완료"
+                    : reminded
+                    ? `알림 ${formatAssignmentDate(item.reminderSentAt)}`
+                    : item.assignedAt
+                      ? `배부 ${formatAssignmentDate(item.assignedAt)}`
+                      : "과제 배부됨"}
                 </small>
               </span>
+            </>
+          );
+          return href ? (
+            <Link key={item.id} href={href} className={className}>
+              {content}
             </Link>
+          ) : (
+            <div key={item.id} className={`${className} is-static`}>
+              {content}
+            </div>
           );
         })}
       </div>

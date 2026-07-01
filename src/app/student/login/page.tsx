@@ -1,17 +1,16 @@
-import { Suspense } from "react";
-import { StudentLoginForm } from "@/components/StudentLoginForm";
+import { redirect } from "next/navigation";
 
-// StudentLoginForm uses useSearchParams() to read ?from=..., which
-// forces the page out of static prerender. Mark it dynamic + wrap in
-// Suspense per Next.js app-router requirements.
 export const dynamic = "force-dynamic";
 
-export default function StudentLoginPage() {
-  return (
-    <div className="student-login-page">
-      <Suspense fallback={null}>
-        <StudentLoginForm />
-      </Suspense>
-    </div>
-  );
+export default async function StudentLoginPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ from?: string; return?: string }>;
+}) {
+  const params = await searchParams;
+  const next = new URLSearchParams();
+  if (params.from) next.set("from", params.from);
+  if (params.return) next.set("return", params.return);
+  const query = next.toString();
+  redirect(query ? `/login?${query}` : "/login");
 }

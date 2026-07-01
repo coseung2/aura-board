@@ -1,6 +1,6 @@
 /**
  * /student/canva-return — 로그인 후 자동으로 닫히는 완료 페이지.
- * Canva 앱의 "Log in" 버튼이 /student/login?from=/student/canva-return 를
+ * Canva 앱의 "Log in" 버튼이 /login?from=/student/canva-return 를
  * 열고, 로그인 폼이 이 경로로 이동하면 여기서 세션 쿠키가 top-level 에
  * 정상으로 설정되어 있는지만 보여주고 0.8s 뒤 자동 종료. Canva 앱은
  * visibilitychange 이벤트로 복귀를 감지해 whoami 를 재조회한다.

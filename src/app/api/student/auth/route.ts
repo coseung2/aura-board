@@ -10,7 +10,7 @@ const AuthSchema = z.object({
 
 // 학생 코드 로그인은 명시적 신원 전환이므로 NextAuth(교사) 세션 쿠키를 같이
 // 정리한다. 그러지 않으면 getCurrentStudent() 의 교사 게이트가 학생 쿠키를
-// 무시해 /student → /student/login 루프가 발생.
+// 무시해 /student → /login 루프가 발생.
 const AUTHJS_COOKIES = [
   "authjs.session-token",
   "__Secure-authjs.session-token",

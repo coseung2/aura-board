@@ -13,7 +13,7 @@ export const dynamic = "force-dynamic";
 export default async function StudentShowcasePage() {
   const student = await getCurrentStudent();
   if (!student) {
-    redirect("/student/login");
+    redirect("/login?from=/student/showcase");
   }
   const [classroom, duties] = await Promise.all([
     db.classroom.findUnique({
@@ -23,7 +23,7 @@ export default async function StudentShowcasePage() {
     getStudentDuties(student.id),
   ]);
   if (!classroom) {
-    redirect("/student/login");
+    redirect("/login?from=/student/showcase");
   }
   return (
     <>

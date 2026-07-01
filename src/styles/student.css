@@ -201,10 +201,19 @@
   cursor: not-allowed;
 }
 
+.student-overview-row {
+  display: grid;
+  grid-template-columns: minmax(300px, 520px) minmax(0, 1fr);
+  align-items: start;
+  gap: 24px;
+  margin: 16px 0 32px;
+}
+
 .student-utilities {
   display: block;
-  max-width: 520px;
-  margin: 16px 0 32px;
+  min-width: 0;
+  max-width: none;
+  margin: 0;
 }
 
 .student-utilities .student-portfolio-cta {
@@ -295,8 +304,9 @@
 .student-assignment-panel {
   display: grid;
   gap: 14px;
-  max-width: 760px;
-  margin: 0 0 32px;
+  min-width: 0;
+  max-width: none;
+  margin: 0;
   padding: 18px;
   border: var(--border-card);
   border-radius: var(--radius-card);
@@ -336,14 +346,23 @@
 .student-assignment-summary-chip {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
+  min-width: 72px;
   min-height: 28px;
   padding: 0 10px;
+  border: 1px solid transparent;
   border-radius: var(--radius-pill);
   background: var(--color-bg-alt);
   color: var(--color-text-muted);
+  cursor: pointer;
+  font: inherit;
   font-size: 12px;
   font-weight: 800;
   white-space: nowrap;
+  transition:
+    background var(--t-normal),
+    border-color var(--t-normal),
+    color var(--t-normal);
 }
 
 .student-assignment-summary-chip.is-missing {
@@ -351,9 +370,32 @@
   color: var(--color-bank-negative);
 }
 
+.student-assignment-summary-chip:hover,
+.student-assignment-summary-chip.is-active {
+  border-color: var(--color-border-hover);
+  background: var(--color-surface-alt);
+  color: var(--color-text);
+}
+
+.student-assignment-summary-chip.is-missing.is-active {
+  border-color: rgba(220, 38, 38, 0.18);
+  background: rgba(220, 38, 38, 0.12);
+  color: var(--color-bank-negative);
+}
+
 .student-assignment-list {
   display: grid;
-  gap: 8px;
+  gap: 0;
+  overflow: hidden;
+  border: 0;
+  border-radius: 0;
+}
+
+.student-assignment-empty {
+  margin: 0;
+  padding: 18px 12px;
+  color: var(--color-text-muted);
+  font-size: 13px;
 }
 
 .student-assignment-item {
@@ -362,27 +404,40 @@
   align-items: center;
   gap: 12px;
   min-height: 58px;
-  padding: 10px 12px;
-  border: 1px solid var(--color-border);
-  border-radius: 8px;
-  background: var(--color-bg-alt);
+  padding: 11px 12px;
+  border: 0;
+  border-bottom: 1px solid var(--color-border);
+  border-radius: 0;
+  background: transparent;
   color: var(--color-text);
   text-decoration: none;
   transition:
-    border-color var(--t-normal),
     background var(--t-normal),
-    transform var(--t-normal);
+    color var(--t-normal);
+}
+
+.student-assignment-item:first-child {
+  border-top: 1px solid var(--color-border);
+}
+
+.student-assignment-item:last-child {
+  border-bottom: 0;
 }
 
 .student-assignment-item:hover {
-  border-color: var(--color-border-hover);
   background: var(--color-surface-alt);
-  transform: translateY(-1px);
+}
+
+.student-assignment-item.is-static {
+  cursor: default;
+}
+
+.student-assignment-item.is-static:hover {
+  background: transparent;
 }
 
 .student-assignment-item.is-missing {
-  border-color: rgba(220, 38, 38, 0.28);
-  background: rgba(220, 38, 38, 0.035);
+  background: transparent;
 }
 
 .student-assignment-check {
@@ -902,8 +957,9 @@
     align-items: flex-start;
   }
 
-  .student-utilities {
-    max-width: none;
+  .student-overview-row {
+    grid-template-columns: 1fr;
+    gap: 16px;
   }
 
   .student-utilities .student-wallet-header {
@@ -913,62 +969,6 @@
   .student-utilities .student-wallet-link {
     width: auto;
   }
-}
-
-/* ---- Student Login ---- */
-
-.student-login-page {
-  min-height: 100vh;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: var(--color-bg);
-}
-
-.student-login-card {
-  background: var(--color-surface);
-  border: var(--border-card);
-  border-radius: var(--radius-card);
-  padding: 48px 40px;
-  max-width: 400px;
-  width: 100%;
-  box-shadow: var(--shadow-card);
-  text-align: center;
-}
-
-.student-login-title {
-  font-family: var(--font-display);
-  font-size: 24px;
-  font-weight: 700;
-  letter-spacing: -0.3px;
-  text-align: center;
-  margin: 0 0 24px;
-  color: var(--color-text);
-}
-
-.student-login-input {
-  width: 100%;
-  padding: 14px 16px;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-btn);
-  background: var(--color-bg-alt);
-  font-family: var(--font-mono);
-  font-size: 22px;
-  font-weight: 700;
-  letter-spacing: 6px;
-  text-align: center;
-  text-transform: uppercase;
-  color: var(--color-text);
-  outline: none;
-  box-sizing: border-box;
-  transition:
-    border-color var(--t-normal),
-    box-shadow var(--t-normal);
-}
-
-.student-login-input:focus {
-  border-color: var(--color-accent);
-  box-shadow: 0 0 0 3px rgba(0, 117, 222, 0.15);
 }
 
 .student-login-btn {
@@ -996,13 +996,6 @@
 .student-login-btn:disabled {
   opacity: 0.45;
   cursor: not-allowed;
-}
-
-.student-login-error {
-  color: var(--color-danger);
-  font-size: 13px;
-  text-align: center;
-  margin: 8px 0 0;
 }
 
 /* ---- Empty state ---- */

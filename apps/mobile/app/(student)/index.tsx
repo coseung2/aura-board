@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react";
+import { useCallback, useState, type ReactNode } from "react";
 import {
   ActivityIndicator,
   Image,
@@ -30,11 +30,13 @@ import type {
   MeResponse,
   PortfolioCardDTO,
   ShowcaseEntryDTO,
+  StudentAssignmentTodo,
   StudentDuty,
   WalletSummary,
 } from "../../lib/types";
 import {
   AppButton,
+  ControlPressable,
   Pill,
   SurfaceCard,
   SurfacePressable,
@@ -166,6 +168,7 @@ export default function StudentHome() {
 
   const boards = me?.boards ?? [];
   const duties = me?.duties ?? [];
+  const assignments = me?.assignments ?? [];
   const classroomId = me?.student.classroom?.id;
   const classroomName = me?.student.classroom?.name ?? "학급 미배정";
 
@@ -222,6 +225,8 @@ export default function StudentHome() {
           onOpen={(path) => router.push(path as Href)}
         />
 
+        <AssignmentPanel assignments={assignments} />
+
         {boards.length === 0 ? (
           <View style={styles.emptyWrap}>
             <Text style={styles.emptyEmoji}>📭</Text>
@@ -274,6 +279,212 @@ function chunk<T>(arr: T[], size: number): T[][] {
     out.push(arr.slice(i, i + size));
   }
   return out;
+}
+
+const ASSIGNMENT_VISIBLE_LIMIT = 4;
+
+function assignmentTarget(item: StudentAssignmentTodo): string | null {
+  if (!item.href) return null;
+  if (item.href.includes("/check") || item.href.startsWith("/classroom/")) {
+    return `/(student)/check?classroomId=${encodeURIComponent(item.boardSlug)}`;
+  }
+  return `/(student)/board/${encodeURIComponent(item.boardSlug)}`;
+}
+
+function formatAssignmentDate(value: string | null | undefined): string {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  return `${date.getMonth() + 1}/${date.getDate()}`;
+}
+
+function AssignmentPanel({
+  assignments,
+}: {
+  assignments: StudentAssignmentTodo[];
+}) {
+  const router = useRouter();
+  const missingCount = assignments.filter((item) => !item.submitted).length;
+  const completedCount = assignments.length - missingCount;
+  const [filter, setFilter] = useState<"missing" | "completed">(
+    missingCount > 0 ? "missing" : "completed",
+  );
+
+  if (assignments.length === 0) return null;
+
+  const ordered = [...assignments].sort((a, b) => {
+    if (a.submitted !== b.submitted) return a.submitted ? 1 : -1;
+    return b.assignedAt.localeCompare(a.assignedAt);
+  });
+  const filtered = ordered.filter((item) =>
+    filter === "missing" ? !item.submitted : item.submitted,
+  );
+  const visibleItems = filtered.slice(0, ASSIGNMENT_VISIBLE_LIMIT);
+
+  const emptyMessage =
+    filter === "missing"
+      ? "미제출 과제가 없어요"
+      : "완료한 과제가 없어요";
+
+  return (
+    <SurfaceCard style={styles.assignmentPanel}>
+      <View style={styles.assignmentHeader}>
+        <View>
+          <Text style={styles.assignmentEyebrow}>과제 목록</Text>
+          <Text style={styles.assignmentTitle}>해야 할 과제</Text>
+        </View>
+        <View style={styles.assignmentFilter}>
+          <FilterChip
+            active={filter === "missing"}
+            onPress={() => setFilter("missing")}
+            tone="danger"
+          >
+            미제출 {missingCount}
+          </FilterChip>
+          <FilterChip
+            active={filter === "completed"}
+            onPress={() => setFilter("completed")}
+            tone="neutral"
+          >
+            완료 {completedCount}
+          </FilterChip>
+        </View>
+      </View>
+
+      <View style={styles.assignmentList}>
+        {filtered.length === 0 ? (
+          <Text style={styles.assignmentEmpty}>{emptyMessage}</Text>
+        ) : (
+          visibleItems.map((item, index) => {
+            const target = assignmentTarget(item);
+            return (
+              <AssignmentRow
+                key={item.id}
+                item={item}
+                isLast={index === visibleItems.length - 1}
+                onPress={target ? () => router.push(target as Href) : undefined}
+              />
+            );
+          })
+        )}
+      </View>
+    </SurfaceCard>
+  );
+}
+
+function FilterChip({
+  active,
+  tone,
+  onPress,
+  children,
+}: {
+  active: boolean;
+  tone: "danger" | "neutral";
+  onPress: () => void;
+  children: ReactNode;
+}) {
+  return (
+    <ControlPressable
+      onPress={onPress}
+      style={[
+        styles.filterChip,
+        active && styles.filterChipActive,
+        tone === "danger" && active && styles.filterChipDangerActive,
+      ]}
+      accessibilityRole="button"
+      accessibilityState={{ selected: active }}
+    >
+      <Text
+        style={[
+          styles.filterChipText,
+          active && styles.filterChipTextActive,
+          tone === "danger" && active && styles.filterChipTextDangerActive,
+        ]}
+        numberOfLines={1}
+      >
+        {children}
+      </Text>
+    </ControlPressable>
+  );
+}
+
+function AssignmentRow({
+  item,
+  isLast,
+  onPress,
+}: {
+  item: StudentAssignmentTodo;
+  isLast: boolean;
+  onPress?: () => void;
+}) {
+  const submitted = item.submitted;
+  const reminded =
+    !submitted &&
+    item.reminderSentAt !== null &&
+    item.reminderSentAt !== undefined &&
+    item.reminderSentAt !== item.assignedAt;
+
+  const dateText = submitted
+    ? item.submittedAt
+      ? `제출 ${formatAssignmentDate(item.submittedAt)}`
+      : "제출 완료"
+    : reminded
+      ? `알림 ${formatAssignmentDate(item.reminderSentAt)}`
+      : item.assignedAt
+        ? `배부 ${formatAssignmentDate(item.assignedAt)}`
+        : "과제 배부됨";
+
+  const content = (
+    <View style={styles.assignmentRowInner}>
+      <View style={styles.assignmentMain}>
+        <Text style={styles.assignmentTitleText} numberOfLines={1}>
+          {item.sectionTitle}
+        </Text>
+        <Text style={styles.assignmentSubtitleText} numberOfLines={1}>
+          {item.boardTitle}
+        </Text>
+      </View>
+      <View style={styles.assignmentMeta}>
+        <Text
+          style={[
+            styles.assignmentStatus,
+            submitted
+              ? styles.assignmentStatusSubmitted
+              : styles.assignmentStatusMissing,
+          ]}
+          numberOfLines={1}
+        >
+          {submitted ? "제출 완료" : "미제출"}
+        </Text>
+        <Text style={styles.assignmentDate} numberOfLines={1}>
+          {dateText}
+        </Text>
+      </View>
+    </View>
+  );
+
+  if (onPress) {
+    return (
+      <ControlPressable
+        style={[styles.assignmentRow, isLast && styles.assignmentRowLast]}
+        onPress={onPress}
+      >
+        {content}
+      </ControlPressable>
+    );
+  }
+
+  return (
+    <View
+      style={[
+        styles.assignmentRow,
+        styles.assignmentRowStatic,
+        isLast && styles.assignmentRowLast,
+      ]}
+    >
+      {content}
+    </View>
+  );
 }
 
 function ShowcaseBand({
@@ -804,5 +1015,115 @@ const styles = StyleSheet.create({
     ...typography.body,
     color: colors.textMuted,
     textAlign: "center",
+  },
+  assignmentPanel: {
+    padding: spacing.lg,
+    gap: spacing.md,
+  },
+  assignmentHeader: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    justifyContent: "space-between",
+    gap: spacing.md,
+  },
+  assignmentEyebrow: {
+    ...typography.badge,
+    color: colors.accent,
+    marginBottom: spacing.xs,
+  },
+  assignmentTitle: {
+    ...typography.subtitle,
+    color: colors.text,
+  },
+  assignmentFilter: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    justifyContent: "flex-end",
+    gap: spacing.sm,
+  },
+  filterChip: {
+    borderRadius: radii.pill,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs,
+    backgroundColor: colors.surfaceAlt,
+    borderColor: colors.transparent,
+  },
+  filterChipActive: {
+    backgroundColor: colors.surfaceAlt,
+    borderColor: colors.borderHover,
+  },
+  filterChipDangerActive: {
+    backgroundColor: colors.statusReturnedBg,
+    borderColor: colors.borderHover,
+  },
+  filterChipText: {
+    ...typography.badge,
+    color: colors.textMuted,
+  },
+  filterChipTextActive: {
+    color: colors.text,
+  },
+  filterChipTextDangerActive: {
+    color: colors.statusReturnedText,
+  },
+  assignmentList: {
+    overflow: "hidden",
+  },
+  assignmentEmpty: {
+    ...typography.body,
+    color: colors.textMuted,
+    padding: spacing.lg,
+    textAlign: "center",
+  },
+  assignmentRow: {
+    minHeight: dashboard.dutyMinHeight,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
+    borderWidth: borders.none,
+    borderRadius: radii.none,
+    borderBottomWidth: borders.hairline,
+    borderBottomColor: colors.border,
+    backgroundColor: colors.transparent,
+  },
+  assignmentRowLast: {
+    borderBottomWidth: borders.none,
+  },
+  assignmentRowStatic: {
+    backgroundColor: colors.transparent,
+  },
+  assignmentRowInner: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.md,
+  },
+  assignmentMain: {
+    flex: 1,
+    minWidth: 0,
+    gap: spacing.xxs,
+  },
+  assignmentTitleText: {
+    ...typography.label,
+    color: colors.text,
+  },
+  assignmentSubtitleText: {
+    ...typography.badge,
+    color: colors.textMuted,
+  },
+  assignmentMeta: {
+    alignItems: "flex-end",
+    gap: spacing.xxs,
+  },
+  assignmentStatus: {
+    ...typography.badge,
+  },
+  assignmentStatusMissing: {
+    color: colors.danger,
+  },
+  assignmentStatusSubmitted: {
+    color: colors.accent,
+  },
+  assignmentDate: {
+    ...typography.micro,
+    color: colors.textMuted,
   },
 });

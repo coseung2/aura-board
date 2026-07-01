@@ -16,7 +16,7 @@ export const dynamic = "force-dynamic";
 export default async function StudentPortfolioPage() {
   const student = await getCurrentStudent();
   if (!student) {
-    redirect("/student/login");
+    redirect("/login?from=/student/portfolio");
   }
 
   const classroomId = student.classroomId;
@@ -29,7 +29,7 @@ export default async function StudentPortfolioPage() {
   ]);
   if (!classroom) {
     // 학생 세션은 있는데 학급이 사라진 케이스 — 데이터 정합성 깨짐, login 으로
-    redirect("/student/login");
+    redirect("/login?from=/student/portfolio");
   }
 
   const students = await db.student.findMany({

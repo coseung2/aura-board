@@ -69,7 +69,7 @@ const DEFAULT_MESSAGE: Record<ExternalErrorCode, string> = {
   payload_too_large: "Request body exceeds 4.0MB hard limit",
   rate_limited: "Rate limit exceeded — retry after the Retry-After window",
   student_session_required:
-    "Aura 학생 로그인이 필요해요. /student/login 에서 로그인한 뒤 다시 시도하세요.",
+    "Aura 학생 로그인이 필요해요. /login 에서 로그인한 뒤 다시 시도하세요.",
   blob_upload_failed: "Image upload to storage failed",
   internal: "Internal server error",
 };

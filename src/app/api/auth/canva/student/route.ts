@@ -20,7 +20,7 @@ export async function GET(req: Request) {
 
   const student = await getCurrentStudent();
   if (!student) {
-    return NextResponse.redirect(new URL("/student/login?from=/my/wallet", req.url));
+    return NextResponse.redirect(new URL("/login?from=/my/wallet", req.url));
   }
 
   const { searchParams } = new URL(req.url);

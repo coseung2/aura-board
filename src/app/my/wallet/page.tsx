@@ -6,7 +6,7 @@ import { StudentTopNav } from "@/components/StudentTopNav";
 
 export default async function MyWalletPage() {
   const student = await getCurrentStudent();
-  if (!student) redirect("/student/login");
+  if (!student) redirect("/login?from=/my/wallet");
   const duties = await getStudentDuties(student.id);
   return (
     <>

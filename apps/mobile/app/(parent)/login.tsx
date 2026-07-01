@@ -8,24 +8,42 @@ import {
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import * as Linking from "expo-linking";
+import Svg, { Path } from "react-native-svg";
 import {
   auth,
+  borders,
   brand,
   colors,
+  iconSizes,
   layout,
+  radii,
   responsive,
   spacing,
+  states,
+  tapMin,
   typography,
 } from "../../theme/tokens";
-import { apiFetch, ApiError } from "../../lib/api";
+import { getApiBase } from "../../lib/api";
 import { webSafeWidthStyle } from "../../lib/responsive";
 import { LogoLockup } from "../../components/LogoLockup";
-import { AppButton, SurfaceCard, TextField } from "../../components/ui";
+import {
+  AppButton,
+  ControlPressable,
+  SurfaceCard,
+} from "../../components/ui";
 
-type SignupResponse = {
-  ok: boolean;
-  message: string;
-  devMagicLinkUrl?: string | null;
+type OAuthProvider = "google" | "kakao";
+
+const OAUTH_ERROR_MESSAGES: Record<string, string> = {
+  provider_disabled:
+    "현재 OAuth 로그인이 비활성화되어 있어요. 관리자에게 문의해 주세요.",
+  invalid_provider: "지원하지 않는 로그인 방식이에요.",
+  invalid_state: "로그인 인증이 만료되었어요. 다시 시도해 주세요.",
+  missing_params: "로그인 응답이 올바르지 않아요. 다시 시도해 주세요.",
+  missing_pkce: "보안 정보가 누락되었어요. 다시 시도해 주세요.",
+  token_exchange_failed: "로그인 토큰 교환에 실패했어요. 잠시 후 다시 시도해 주세요.",
+  userinfo_failed: "사용자 정보 조회에 실패했어요. 잠시 후 다시 시도해 주세요.",
+  upsert_failed: "계정 생성에 실패했어요. 잠시 후 다시 시도해 주세요.",
 };
 
 export default function ParentLogin() {
@@ -37,66 +55,41 @@ export default function ParentLogin() {
     inset: responsive.authCardWebSafeInset,
   });
 
-  const [email, setEmail] = useState("");
-  const [loading, setLoading] = useState(false);
+  const [openingProvider, setOpeningProvider] = useState<OAuthProvider | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [sent, setSent] = useState(false);
-  const [sentTo, setSentTo] = useState("");
-  const [message, setMessage] = useState<string | null>(null);
-  const [devLink, setDevLink] = useState<string | null>(null);
 
   useEffect(() => {
     const initial = Array.isArray(routeError) ? routeError[0] : routeError;
-    if (initial) setError(initial);
+    if (initial) {
+      setError(
+        OAUTH_ERROR_MESSAGES[initial] ??
+          `로그인 중 오류가 발생했어요. (${initial})`,
+      );
+    }
   }, [routeError]);
 
-  async function handleSubmit() {
-    const trimmed = email.trim();
-    if (!trimmed || !trimmed.includes("@")) {
-      setError("올바른 이메일을 입력해 주세요.");
-      return;
-    }
+  async function handleOAuth(provider: OAuthProvider) {
+    const providerLabel = provider === "google" ? "Google" : "Kakao";
+    const url = `${getApiBase()}/api/parent/auth/${provider}`;
     setError(null);
-    setLoading(true);
-
+    setOpeningProvider(provider);
     try {
-      const res = await apiFetch<SignupResponse>("/api/parent/signup", {
-        method: "POST",
-        json: { email: trimmed, client: "mobile" },
-        skipAuth: true,
-      });
-
-      setSent(true);
-      setSentTo(trimmed);
-      setMessage(res.message ?? "이메일로 로그인 링크를 보냈어요.");
-      setDevLink(res.devMagicLinkUrl ?? null);
-    } catch (e) {
-      let msg = "로그인 링크를 보내지 못했어요.";
-      if (e instanceof ApiError) {
-        const body = e.body as Record<string, unknown> | string | null;
-        if (body && typeof body === "object" && typeof body.message === "string") {
-          msg = body.message;
-        } else if (typeof body === "string" && body) {
-          msg = body;
-        }
+      if (
+        typeof window !== "undefined" &&
+        typeof window.location?.assign === "function"
+      ) {
+        window.location.assign(url);
+        return;
       }
-      setError(msg);
+      await Linking.openURL(url);
+    } catch {
+      setError(`${providerLabel} 로그인을 시작하지 못했어요.`);
+      setOpeningProvider(null);
     } finally {
-      setLoading(false);
+      if (typeof window === "undefined") {
+        setOpeningProvider(null);
+      }
     }
-  }
-
-  function handleReset() {
-    setSent(false);
-    setSentTo("");
-    setMessage(null);
-    setDevLink(null);
-    setEmail("");
-    setError(null);
-  }
-
-  async function handleOpenDevLink() {
-    if (devLink) await Linking.openURL(devLink);
   }
 
   return (
@@ -111,63 +104,45 @@ export default function ParentLogin() {
         </View>
 
         <SurfaceCard style={[styles.card, webSafeAuthStyle]}>
-          {!sent ? (
-            <>
-              <Text style={styles.heading}>이메일로 로그인</Text>
-              <Text style={styles.sub}>
-                자녀의 학급에서 등록한 이메일을 입력하면 로그인 링크를 보내드려요.
+          <Text style={styles.heading}>학부모 로그인</Text>
+          <Text style={styles.sub}>
+            Google 또는 Kakao 계정으로 빠르게 시작할 수 있어요.
+          </Text>
+
+          {error ? <Text style={styles.errorText}>{error}</Text> : null}
+
+          <View style={styles.oauthActions}>
+            <ControlPressable
+              style={[
+                styles.oauthButton,
+                styles.oauthGoogle,
+                openingProvider && styles.oauthDisabled,
+              ]}
+              onPress={() => handleOAuth("google")}
+              disabled={openingProvider !== null}
+              accessibilityLabel="Google로 로그인"
+            >
+              <GoogleGlyph />
+              <Text style={styles.oauthGoogleText}>
+                {openingProvider === "google" ? "Google 로그인 중..." : "Google로 로그인"}
               </Text>
-
-              <TextField
-                style={styles.input}
-                value={email}
-                onChangeText={(t) => {
-                  setEmail(t);
-                  if (error) setError(null);
-                }}
-                placeholder="parent@example.com"
-                autoCapitalize="none"
-                autoCorrect={false}
-                keyboardType="email-address"
-                editable={!loading}
-                onSubmitEditing={handleSubmit}
-              />
-
-              {error ? <Text style={styles.errorText}>{error}</Text> : null}
-
-              <AppButton
-                onPress={handleSubmit}
-                disabled={!email.trim() || loading}
-                loading={loading}
-              >
-                로그인 링크 보내기
-              </AppButton>
-            </>
-          ) : (
-            <>
-              <Text style={styles.heading}>📧 링크를 보냈어요</Text>
-              <Text style={styles.sub}>
-                {sentTo} {"\n"}
-                {message}
+            </ControlPressable>
+            <ControlPressable
+              style={[
+                styles.oauthButton,
+                styles.oauthKakao,
+                openingProvider && styles.oauthDisabled,
+              ]}
+              onPress={() => handleOAuth("kakao")}
+              disabled={openingProvider !== null}
+              accessibilityLabel="Kakao로 로그인"
+            >
+              <KakaoGlyph />
+              <Text style={styles.oauthKakaoText}>
+                {openingProvider === "kakao" ? "Kakao 로그인 중..." : "Kakao로 로그인"}
               </Text>
-
-              {devLink ? (
-                <AppButton
-                  variant="secondary"
-                  onPress={handleOpenDevLink}
-                >
-                  🔧 개발용: 메일 대신 링크 열기
-                </AppButton>
-              ) : null}
-
-              <AppButton
-                variant="quiet"
-                onPress={handleReset}
-              >
-                다른 이메일로 다시 보내기
-              </AppButton>
-            </>
-          )}
+            </ControlPressable>
+          </View>
 
           <AppButton
             variant="quiet"
@@ -176,12 +151,52 @@ export default function ParentLogin() {
             ← 역할 선택으로 돌아가기
           </AppButton>
         </SurfaceCard>
-
-        <Text style={styles.hint}>
-          메일이 안 온 경우 스팸함을 확인해 주세요.
-        </Text>
       </View>
     </SafeAreaView>
+  );
+}
+
+function GoogleGlyph() {
+  return (
+    <Svg
+      width={iconSizes.md}
+      height={iconSizes.md}
+      viewBox="0 0 24 24"
+      accessibilityLabel="Google"
+    >
+      <Path
+        fill={colors.oauthGoogle}
+        d="M21.6 12.227c0-.708-.064-1.39-.182-2.045H12v3.868h5.385a4.604 4.604 0 0 1-1.997 3.022v2.51h3.231c1.891-1.741 2.981-4.307 2.981-7.355z"
+      />
+      <Path
+        fill={colors.plantActive}
+        d="M12 22c2.7 0 4.964-.895 6.619-2.418l-3.231-2.51c-.895.6-2.04.954-3.388.954-2.605 0-4.81-1.76-5.598-4.123H3.064v2.59A9.996 9.996 0 0 0 12 22z"
+      />
+      <Path
+        fill={colors.warning}
+        d="M6.402 13.903a6.005 6.005 0 0 1 0-3.806v-2.59H3.064a9.998 9.998 0 0 0 0 8.987l3.338-2.59z"
+      />
+      <Path
+        fill={colors.danger}
+        d="M12 5.977c1.469 0 2.786.505 3.823 1.495l2.866-2.866C16.96 2.99 14.696 2 12 2A9.998 9.998 0 0 0 3.064 7.508l3.338 2.59C7.19 7.736 9.395 5.977 12 5.977z"
+      />
+    </Svg>
+  );
+}
+
+function KakaoGlyph() {
+  return (
+    <Svg
+      width={iconSizes.md}
+      height={iconSizes.md}
+      viewBox="0 0 24 24"
+      accessibilityLabel="Kakao"
+    >
+      <Path
+        fill={colors.text}
+        d="M12 4C7.03 4 3 7.21 3 11.16c0 2.6 1.74 4.87 4.34 6.13l-.83 3.06c-.07.27.22.49.46.34l3.62-2.4c.46.05.93.07 1.41.07 4.97 0 9-3.21 9-7.2C21 7.21 16.97 4 12 4z"
+      />
+    </Svg>
   );
 }
 
@@ -215,16 +230,41 @@ const styles = StyleSheet.create({
   },
   heading: { ...typography.title, color: colors.text },
   sub: { ...typography.body, color: colors.textMuted },
-  input: {
-    backgroundColor: colors.bg,
+  oauthActions: {
+    width: "100%",
+    gap: spacing.sm,
+  },
+  oauthButton: {
+    width: "100%",
+    height: tapMin,
+    borderRadius: radii.btn,
+    borderWidth: borders.hairline,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: spacing.sm,
+  },
+  oauthGoogle: {
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
+  },
+  oauthKakao: {
+    borderColor: colors.oauthKakao,
+    backgroundColor: colors.oauthKakao,
+  },
+  oauthDisabled: {
+    opacity: states.disabledOpacity,
+  },
+  oauthGoogleText: {
+    ...typography.label,
+    color: colors.text,
+  },
+  oauthKakaoText: {
+    ...typography.label,
+    color: colors.text,
   },
   errorText: {
     ...typography.body,
     color: colors.danger,
-  },
-  hint: {
-    ...typography.micro,
-    color: colors.textFaint,
-    textAlign: "center",
   },
 });

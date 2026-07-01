@@ -19,6 +19,20 @@ export type BoardMeta = {
   _count?: { cards: number };
 };
 
+export type StudentAssignmentTodo = {
+  id: string;
+  sectionId: string;
+  boardId: string;
+  boardSlug: string;
+  boardTitle: string;
+  sectionTitle: string;
+  href?: string | null;
+  assignedAt: string;
+  reminderSentAt?: string | null;
+  submitted: boolean;
+  submittedAt?: string | null;
+};
+
 export type MeResponse = {
   student: {
     id: string;
@@ -27,6 +41,7 @@ export type MeResponse = {
   };
   boards: BoardMeta[];
   duties?: StudentDuty[];
+  assignments?: StudentAssignmentTodo[];
 };
 
 export type StudentAuthResponse = {

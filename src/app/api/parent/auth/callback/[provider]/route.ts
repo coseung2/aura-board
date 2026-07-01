@@ -28,6 +28,10 @@ function errRedirect(req: Request, code: string) {
   return NextResponse.redirect(url);
 }
 
+function restartAuth(req: Request, provider: ProviderId) {
+  return NextResponse.redirect(new URL(`/api/parent/auth/${provider}`, req.url));
+}
+
 export async function GET(
   req: Request,
   { params }: { params: Promise<{ provider: string }> }
@@ -46,12 +50,12 @@ export async function GET(
     return errRedirect(req, `provider_${oauthError}`);
   }
   if (!code || !incomingState) {
-    return errRedirect(req, "missing_params");
+    return restartAuth(req, providerId);
   }
 
   const stateRecord = await popStateCookie();
   if (!stateRecord || stateRecord.state !== incomingState) {
-    return errRedirect(req, "invalid_state");
+    return restartAuth(req, providerId);
   }
 
   // 토큰 교환
@@ -61,7 +65,7 @@ export async function GET(
       const client = googleClient();
       if (!client) return errRedirect(req, "provider_disabled");
       if (!stateRecord.codeVerifier) {
-        return errRedirect(req, "missing_pkce");
+        return restartAuth(req, providerId);
       }
       const tokens = await client.validateAuthorizationCode(
         code,
