@@ -66,7 +66,7 @@ export default function LoginPage() {
         <h1 className="login-title">Aura-board</h1>
 
         <div className="login-hub-grid">
-          {/* 교사 카드 — Google OAuth 단일 진입점. 학부모 카드와 동일한
+          {/* 교사 카드 — OAuth 진입점. 학부모 카드와 동일한
               div + 내부 OAuth 버튼 패턴으로 통일. */}
           <div
             className="login-role-card login-role-card-static"
@@ -87,6 +87,15 @@ export default function LoginPage() {
               >
                 <GoogleGlyph />
                 <span>Google로 로그인</span>
+              </button>
+              <button
+                type="button"
+                className="login-role-oauth login-role-oauth-kakao"
+                onClick={() => signIn("kakao", { redirectTo: "/" })}
+                aria-label="Kakao로 교사 로그인"
+              >
+                <KakaoGlyph />
+                <span>Kakao로 로그인</span>
               </button>
             </div>
           </div>
@@ -149,7 +158,7 @@ export default function LoginPage() {
                 aria-label="Google로 학부모 로그인"
               >
                 <GoogleGlyph />
-                <span>Google</span>
+                <span>Google로 로그인</span>
               </a>
               <a
                 href="/api/parent/auth/kakao"
@@ -157,7 +166,7 @@ export default function LoginPage() {
                 aria-label="Kakao로 학부모 로그인"
               >
                 <KakaoGlyph />
-                <span>Kakao</span>
+                <span>Kakao로 로그인</span>
               </a>
             </div>
           </div>

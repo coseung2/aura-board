@@ -241,7 +241,7 @@ export default function Landing() {
                 accessibilityLabel="Google로 로그인"
               >
                 <GoogleGlyph />
-                <Text style={styles.oauthGoogleText}>Google</Text>
+                <Text style={styles.oauthGoogleText}>Google로 로그인</Text>
               </ControlPressable>
               <ControlPressable
                 style={styles.oauthKakao}
@@ -249,7 +249,7 @@ export default function Landing() {
                 accessibilityLabel="Kakao로 로그인"
               >
                 <KakaoGlyph />
-                <Text style={styles.oauthKakaoText}>Kakao</Text>
+                <Text style={styles.oauthKakaoText}>Kakao로 로그인</Text>
               </ControlPressable>
             </View>
           </SurfaceCard>
