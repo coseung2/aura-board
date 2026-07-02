@@ -14,8 +14,12 @@ type Props = {
 
 const SPRITE_COLUMNS = 8;
 const SPRITE_ROWS = 2;
-const DEFAULT_VISIBLE_FLOORS = 7;
-const STUDENTS_PER_FLOOR = 4;
+const STUDENTS_PER_FLOOR = 6;
+const DEFAULT_VISIBLE_FLOORS = 5;
+
+const SPAWN_X = [17.1, 30.9, 44.6, 58.2, 71.9, 85.6];
+const SPAWN_Y = [19.2, 36.1, 53.6, 71.4, 88.4];
+const FRAME_BY_SLOT = [0, 1, 5, 0, 1, 7];
 
 function spriteStyle(row: number, frame: number): ExhibitionStyle {
   return {
@@ -24,12 +28,27 @@ function spriteStyle(row: number, frame: number): ExhibitionStyle {
   };
 }
 
+function residentStyle(floorIndex: number, slotIndex: number): ExhibitionStyle {
+  const fallbackY =
+    SPAWN_Y[SPAWN_Y.length - 1] + (floorIndex - SPAWN_Y.length + 1) * 14;
+  return {
+    "--spawn-x": `${SPAWN_X[slotIndex] ?? 50}%`,
+    "--spawn-y": `${SPAWN_Y[floorIndex] ?? fallbackY}%`,
+  };
+}
+
+function spriteRowFor(student: AvatarGalleryStudent): number {
+  if (student.gender === "female") return 1;
+  if (student.gender === "male") return 0;
+  return (student.number ?? 1) % 2 === 0 ? 1 : 0;
+}
+
 function chunkStudents(students: AvatarGalleryStudent[]) {
-  const rows: AvatarGalleryStudent[][] = [];
+  const floors: AvatarGalleryStudent[][] = [];
   for (let i = 0; i < students.length; i += STUDENTS_PER_FLOOR) {
-    rows.push(students.slice(i, i + STUDENTS_PER_FLOOR));
+    floors.push(students.slice(i, i + STUDENTS_PER_FLOOR));
   }
-  return rows;
+  return floors;
 }
 
 function ExhibitionFloor({
@@ -42,38 +61,27 @@ function ExhibitionFloor({
   badgesByStudentId: Record<string, string>;
 }) {
   return (
-    <div
-      className="character-town-floor"
-      style={{ "--floor-index": floorIndex } as ExhibitionStyle}
-    >
+    <div className="character-town-floor" role="presentation">
       {students.map((student, index) => {
-        const visible = student.galleryVisible;
         const number = student.number ?? floorIndex * STUDENTS_PER_FLOOR + index + 1;
-        const spriteRow = number % 2 === 0 ? 1 : 0;
-        const spriteFrame =
-          index === 3 ? 7 : index === 2 ? 5 : index === 1 ? 1 : 0;
+        const spriteRow = spriteRowFor(student);
+        const spriteFrame = FRAME_BY_SLOT[index] ?? 0;
         const badge = badgesByStudentId[student.id];
 
         return (
           <div
             key={student.id}
-            className={`character-town-resident${visible ? "" : " is-hidden"}`}
-            style={{ "--resident-slot": index } as ExhibitionStyle}
+            className="character-town-resident"
+            style={residentStyle(floorIndex, index)}
             role="listitem"
           >
             <div className="character-town-avatar-wrap">
-              {visible ? (
-                <span
-                  className="character-town-sprite"
-                  style={spriteStyle(spriteRow, spriteFrame)}
-                  role="img"
-                  aria-label={`${student.name} 아바타`}
-                />
-              ) : (
-                <div className="character-town-hidden" aria-label="비공개 캐릭터">
-                  <span>?</span>
-                </div>
-              )}
+              <span
+                className="character-town-sprite"
+                style={spriteStyle(spriteRow, spriteFrame)}
+                role="img"
+                aria-label={`${student.name} 아바타`}
+              />
             </div>
             {badge && <span className="character-town-badge">{badge}</span>}
             <span className="character-town-name">
@@ -93,9 +101,12 @@ export function ReadingChampionExhibition({
   minFloors = DEFAULT_VISIBLE_FLOORS,
   ariaLabel = "우리 반 독서왕 전시공간",
 }: Props) {
-  const rows = chunkStudents(students);
-  const floorCount = Math.max(rows.length, minFloors);
-  const floors = Array.from({ length: floorCount }, (_, index) => rows[index] ?? []);
+  const studentFloors = chunkStudents(students);
+  const floorCount = Math.max(studentFloors.length, minFloors);
+  const floors = Array.from(
+    { length: floorCount },
+    (_, index) => studentFloors[index] ?? [],
+  );
 
   return (
     <div className="character-town-map" aria-label={ariaLabel}>

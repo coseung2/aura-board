@@ -382,13 +382,10 @@
 
 .character-town-ground {
   position: relative;
-  display: flex;
-  flex-direction: column;
   width: 1024px;
   max-width: none;
-  min-height: max(1536px, calc(var(--floor-count, 7) * 220px));
+  min-height: 1365px;
   margin: 0 auto;
-  padding: 6.2% 8.4% 5.8%;
   background-image: url("/avatar/reading-champion-map.png");
   background-position: center;
   background-repeat: no-repeat;
@@ -397,19 +394,14 @@
 }
 
 .character-town-floor {
-  position: relative;
-  z-index: 1;
-  display: grid;
-  grid-template-columns: repeat(4, minmax(120px, 1fr));
-  align-items: end;
-  justify-items: center;
-  flex: 1 1 0;
-  min-height: 176px;
-  padding: 0 2.4% 0;
-  pointer-events: none;
+  display: contents;
 }
 
 .character-town-resident {
+  position: absolute;
+  left: var(--spawn-x, 50%);
+  top: var(--spawn-y, 50%);
+  z-index: 1;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -417,7 +409,7 @@
   width: 112px;
   min-height: 150px;
   pointer-events: auto;
-  transform: translateY(20px);
+  transform: translate(-50%, -100%) translateY(28px);
 }
 
 .character-town-resident.is-hidden {
@@ -533,13 +525,12 @@
 
   .character-town-ground {
     width: 1024px;
-    min-height: max(1536px, calc(var(--floor-count, 7) * 220px));
-    padding-inline: 8%;
+    min-height: 1365px;
   }
 
   .character-town-resident {
     width: 104px;
-    transform: translateY(18px);
+    transform: translate(-50%, -100%) translateY(26px);
   }
 
   .character-town-sprite {

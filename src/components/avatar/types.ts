@@ -22,6 +22,7 @@ export type AvatarStudent = {
   name: string;
   number: number | null;
   classroomId: string;
+  gender?: string | null;
 };
 
 export type AvatarCurrency = {
@@ -49,6 +50,7 @@ export type AvatarGalleryStudent = {
   id: string;
   name: string;
   number: number | null;
+  gender?: string | null;
   equipped: Record<string, string | null>;
   galleryVisible: boolean;
 };

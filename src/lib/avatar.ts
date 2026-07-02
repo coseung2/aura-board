@@ -638,6 +638,7 @@ export type GalleryPeer = {
   studentId: string;
   name: string;
   number: number | null;
+  gender: string | null;
   equipped: Record<string, string | null>;
   galleryVisible: boolean;
 };
@@ -646,7 +647,7 @@ export async function getClassroomGallery(classroomId: string): Promise<GalleryP
   await ensureDefaultAvatarItems();
   const students = await db.student.findMany({
     where: { classroomId },
-    select: { id: true, name: true, number: true },
+    select: { id: true, name: true, number: true, gender: true },
     orderBy: [{ number: "asc" }, { name: "asc" }],
   });
   if (students.length === 0) return [];
@@ -674,6 +675,7 @@ export async function getClassroomGallery(classroomId: string): Promise<GalleryP
       studentId: s.id,
       name: s.name,
       number: s.number,
+      gender: s.gender,
       equipped,
       galleryVisible: visibleSet.has(s.id),
     };
