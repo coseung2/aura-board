@@ -13,6 +13,9 @@ export function ClassroomMorningDashboard({ classroomId }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [autoRefresh, setAutoRefresh] = useState(true);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+  const [selectedCleaning, setSelectedCleaning] = useState<
+    MorningSummary["cleaningFindings"][number] | null
+  >(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const refresh = useCallback(async () => {
@@ -47,6 +50,31 @@ export function ClassroomMorningDashboard({ classroomId }: Props) {
   }, [autoRefresh, refresh]);
 
   const kpis = summary?.kpis;
+  const assignmentSections = summary
+    ? summary.missingAssignments.reduce<
+        Array<{
+          id: string;
+          title: string;
+          dueDate: string | null;
+          students: MorningSummary["missingAssignments"][number]["student"][];
+        }>
+      >((sections, item) => {
+        for (const task of item.tasks) {
+          let section = sections.find((s) => s.id === task.id);
+          if (!section) {
+            section = {
+              id: task.id,
+              title: task.title,
+              dueDate: task.dueDate,
+              students: [],
+            };
+            sections.push(section);
+          }
+          section.students.push(item.student);
+        }
+        return sections;
+      }, [])
+    : [];
 
   return (
     <section className="morning-dashboard">
@@ -116,45 +144,44 @@ export function ClassroomMorningDashboard({ classroomId }: Props) {
             <section className="classroom-dashboard-panel morning-panel">
               <div className="classroom-dashboard-panel-head">
                 <div>
-                  <span>Assignments</span>
                   <h3>미제출 과제</h3>
                 </div>
               </div>
-              {summary.missingAssignments.length === 0 ? (
+              {assignmentSections.length === 0 ? (
                 <p className="classroom-dashboard-empty">
                   모두 제출했습니다 🎉
                 </p>
               ) : (
-                <ul className="morning-list">
-                  {summary.missingAssignments.map((item) => (
-                    <li key={item.student.id} className="morning-list-row">
-                      <div className="morning-list-head">
-                        <span className="morning-list-num">
-                          {item.student.number ?? "-"}
-                        </span>
-                        <span className="morning-list-name">
-                          {item.student.name}
-                        </span>
-                      </div>
-                      <div className="morning-list-tasks">
-                        {item.tasks.map((t) => (
-                          <span key={t.id} className="morning-task-chip">
-                            {t.title}
-                            {t.dueDate &&
-                              ` · ${new Date(t.dueDate).toLocaleDateString("ko-KR")}`}
+                <div className="morning-section-list">
+                  {assignmentSections.map((section) => (
+                    <section key={section.id} className="morning-name-section">
+                      <h4>
+                        {section.title}
+                        {section.dueDate && (
+                          <span>
+                            {new Date(section.dueDate).toLocaleDateString("ko-KR")}
                           </span>
+                        )}
+                      </h4>
+                      <ul className="morning-name-list">
+                        {section.students.map((student) => (
+                          <li key={student.id} className="morning-name-item">
+                            {student.number && (
+                              <span className="morning-list-num">{student.number}</span>
+                            )}
+                            <span>{student.name}</span>
+                          </li>
                         ))}
-                      </div>
-                    </li>
+                      </ul>
+                    </section>
                   ))}
-                </ul>
+                </div>
               )}
             </section>
 
             <section className="classroom-dashboard-panel morning-panel">
               <div className="classroom-dashboard-panel-head">
                 <div>
-                  <span>Cleaning</span>
                   <h3>청소 검사 결과</h3>
                 </div>
               </div>
@@ -163,38 +190,24 @@ export function ClassroomMorningDashboard({ classroomId }: Props) {
                   청소 지적이 없습니다 🎉
                 </p>
               ) : (
-                <ul className="morning-list">
+                <ul className="morning-name-list morning-cleaning-name-list">
                   {summary.cleaningFindings.map((item) => (
-                    <li
-                      key={item.student.id}
-                      className="morning-list-row morning-cleaning-row"
-                    >
-                      <div className="morning-list-head">
-                        <span className="morning-list-num">
-                          {item.student.number ?? "-"}
-                        </span>
-                        <span className="morning-list-name">
-                          {item.student.name}
-                        </span>
-                        {item.seatLabel && (
-                          <span className="cleaning-roster-seat">
-                            자리 {item.seatLabel}
+                    <li key={item.student.id}>
+                      <button
+                        type="button"
+                        className="morning-name-item morning-name-button"
+                        onClick={() => setSelectedCleaning(item)}
+                      >
+                        {item.student.number && (
+                          <span className="morning-list-num">
+                            {item.student.number}
                           </span>
                         )}
-                      </div>
-                      {item.photoUrl && (
-                        <a
-                          href={item.photoUrl}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="morning-cleaning-photo"
-                        >
-                          <img src={item.photoUrl} alt={`${item.student.name} 자리`} />
-                        </a>
-                      )}
-                      {item.note && (
-                        <p className="morning-cleaning-note">{item.note}</p>
-                      )}
+                        <span>{item.student.name}</span>
+                        {item.seatLabel && (
+                          <span className="morning-name-meta">{item.seatLabel}</span>
+                        )}
+                      </button>
                     </li>
                   ))}
                 </ul>
@@ -204,7 +217,6 @@ export function ClassroomMorningDashboard({ classroomId }: Props) {
             <section className="classroom-dashboard-panel morning-panel">
               <div className="classroom-dashboard-panel-head">
                 <div>
-                  <span>Shoes</span>
                   <h3>실내화 정리 결과</h3>
                 </div>
               </div>
@@ -213,12 +225,14 @@ export function ClassroomMorningDashboard({ classroomId }: Props) {
                   실내화 미정리 학생이 없습니다 🎉
                 </p>
               ) : (
-                <ul className="morning-chips-list">
+                <ul className="morning-name-list">
                   {summary.shoeFindings.map((item) => (
-                    <li key={item.student.id} className="morning-chip">
-                      <span className="morning-list-num">
-                        {item.student.number ?? "-"}
-                      </span>
+                    <li key={item.student.id} className="morning-name-item">
+                      {item.student.number && (
+                        <span className="morning-list-num">
+                          {item.student.number}
+                        </span>
+                      )}
                       <span>{item.student.name}</span>
                     </li>
                   ))}
@@ -233,6 +247,51 @@ export function ClassroomMorningDashboard({ classroomId }: Props) {
             </p>
           )}
         </>
+      )}
+
+      {selectedCleaning && (
+        <div className="morning-modal-layer" role="presentation">
+          <button
+            type="button"
+            className="morning-modal-backdrop"
+            aria-label="청소 사진 닫기"
+            onClick={() => setSelectedCleaning(null)}
+          />
+          <section
+            className="morning-cleaning-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-label={`${selectedCleaning.student.name} 청소 검사 사진`}
+          >
+            <header>
+              <div>
+                <h3>{selectedCleaning.student.name}</h3>
+                {selectedCleaning.seatLabel && (
+                  <p>자리 {selectedCleaning.seatLabel}</p>
+                )}
+              </div>
+              <button
+                type="button"
+                className="morning-modal-close"
+                onClick={() => setSelectedCleaning(null)}
+                aria-label="닫기"
+              >
+                ×
+              </button>
+            </header>
+            {selectedCleaning.photoUrl ? (
+              <img
+                src={selectedCleaning.photoUrl}
+                alt={`${selectedCleaning.student.name} 자리 사진`}
+              />
+            ) : (
+              <p className="morning-modal-empty">등록된 사진이 없습니다.</p>
+            )}
+            {selectedCleaning.note && (
+              <p className="morning-cleaning-note">{selectedCleaning.note}</p>
+            )}
+          </section>
+        </div>
       )}
     </section>
   );

@@ -4053,12 +4053,12 @@
 }
 
 .cleaning-roster-list {
-  width: min(100%, 720px);
+  width: min(100%, 1120px);
   list-style: none;
   margin: 12px 0 0;
   padding: 0;
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 8px;
 }
 
@@ -4202,12 +4202,18 @@
 }
 
 .cleaning-inspector-footer {
-  width: min(100%, 720px);
+  width: min(100%, 1120px);
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
   margin-top: 14px;
+}
+
+@media (max-width: 900px) {
+  .cleaning-roster-list {
+    grid-template-columns: 1fr;
+  }
 }
 
 @media (max-width: 640px) {
@@ -4362,6 +4368,93 @@
   overflow-y: auto;
 }
 
+.morning-section-list {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  max-height: 46vh;
+  overflow-y: auto;
+  padding-right: 2px;
+}
+
+.morning-name-section {
+  padding: 12px;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: var(--color-surface);
+}
+
+.morning-name-section h4 {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  margin: 0 0 10px;
+  font-size: 14px;
+  font-weight: 800;
+  letter-spacing: 0;
+  color: var(--color-text);
+}
+
+.morning-name-section h4 span {
+  flex: 0 0 auto;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--color-text-muted);
+}
+
+.morning-name-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  max-height: 46vh;
+  overflow-y: auto;
+}
+
+.morning-name-section .morning-name-list {
+  max-height: none;
+  overflow: visible;
+}
+
+.morning-name-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 32px;
+  padding: 6px 10px;
+  border: 1px solid rgba(120, 144, 156, 0.22);
+  border-radius: 8px;
+  background: var(--color-surface-alt);
+  color: var(--color-text);
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 0;
+}
+
+.morning-name-button {
+  font: inherit;
+  cursor: pointer;
+}
+
+.morning-name-button:hover {
+  border-color: var(--color-accent);
+  background: var(--color-accent-tinted-bg);
+  color: var(--color-accent);
+}
+
+.morning-name-meta {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--color-text-muted);
+}
+
+.morning-cleaning-name-list {
+  align-content: flex-start;
+}
+
 .morning-list-row {
   display: flex;
   flex-direction: column;
@@ -4425,6 +4518,88 @@
 .morning-cleaning-note {
   margin: 0;
   font-size: 13px;
+  color: var(--color-text-muted);
+}
+
+.morning-modal-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+
+.morning-modal-backdrop {
+  position: absolute;
+  inset: 0;
+  border: 0;
+  background: rgba(12, 18, 22, 0.52);
+  cursor: pointer;
+}
+
+.morning-cleaning-modal {
+  position: relative;
+  z-index: 1;
+  width: min(92vw, 560px);
+  max-height: min(86vh, 720px);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px;
+  border-radius: 12px;
+  background: var(--color-surface);
+  box-shadow: var(--shadow-lg);
+  overflow: auto;
+}
+
+.morning-cleaning-modal header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.morning-cleaning-modal h3 {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 800;
+}
+
+.morning-cleaning-modal header p {
+  margin: 4px 0 0;
+  font-size: 13px;
+  color: var(--color-text-muted);
+}
+
+.morning-cleaning-modal img {
+  width: 100%;
+  max-height: 58vh;
+  object-fit: contain;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: var(--color-surface-alt);
+}
+
+.morning-modal-close {
+  width: 34px;
+  height: 34px;
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  background: var(--color-surface);
+  color: var(--color-text);
+  font-size: 22px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.morning-modal-empty {
+  margin: 0;
+  padding: 28px;
+  border: 1px dashed var(--color-border);
+  border-radius: 8px;
+  text-align: center;
   color: var(--color-text-muted);
 }
 

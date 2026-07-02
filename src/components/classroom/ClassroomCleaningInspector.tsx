@@ -133,17 +133,6 @@ export function ClassroomCleaningInspector({ classroomId }: Props) {
     }));
   }
 
-  function markAllClean() {
-    setDrafts((prev) => {
-      const next: Record<string, Draft> = {};
-      for (const [id, d] of Object.entries(prev)) {
-        next[id] = { ...d, dirty: false };
-      }
-      return next;
-    });
-    setToast(null);
-  }
-
   async function handleSave() {
     const findings = roster.map((entry) => {
       const d = drafts[entry.student.id] ?? emptyDraft();
@@ -180,16 +169,6 @@ export function ClassroomCleaningInspector({ classroomId }: Props) {
               {new Date(date).toLocaleDateString("ko-KR")} 기준
             </p>
           )}
-        </div>
-        <div className="check-header-actions">
-          <button
-            type="button"
-            className="check-task-toggle"
-            onClick={markAllClean}
-            disabled={saving || anyUploading}
-          >
-            전체 청소
-          </button>
         </div>
       </header>
 
