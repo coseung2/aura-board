@@ -1,12 +1,16 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   fetchMorningSummary,
   saveShoeFindings,
+  type ReadingChampion,
   type MorningSummary,
 } from "@/lib/inspections-client";
 import { AppBackgroundButton } from "@/components/AppBackground";
+import { fetchAvatarGallery } from "@/components/avatar/gallery-client";
+import { CharacterAvatar } from "@/components/avatar/CharacterAvatar";
+import type { AvatarGalleryStudent } from "@/components/avatar/types";
 
 type Props = { classroomId: string };
 
@@ -316,7 +320,10 @@ export function ClassroomMorningDashboard({ classroomId }: Props) {
             </section>
           </div>
 
-          <ReadingChampionsSection champions={summary.readingChampions} />
+          <ReadingChampionsSection
+            classroomId={classroomId}
+            champions={summary.readingChampions}
+          />
 
           {lastUpdated && (
             <p className="morning-updated">
@@ -432,62 +439,142 @@ export function ClassroomMorningDashboard({ classroomId }: Props) {
   );
 }
 
-type ReadingChampionsSectionProps = {
-  champions?: import("@/lib/inspections-client").ReadingChampion[];
-};
+function ReadingChampionsSection({
+  classroomId,
+  champions,
+}: {
+  classroomId: string;
+  champions?: ReadingChampion[];
+}) {
+  const [students, setStudents] = useState<AvatarGalleryStudent[] | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [fetchError, setFetchError] = useState<string | null>(null);
 
-function ReadingChampionsSection({ champions }: ReadingChampionsSectionProps) {
-  const list = champions ?? [];
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    setFetchError(null);
+    fetchAvatarGallery(classroomId)
+      .then((data) => {
+        if (!cancelled) setStudents(data.students);
+      })
+      .catch((e) => {
+        if (!cancelled) {
+          setFetchError(
+            e instanceof Error ? e.message : "전시 공간을 불러오지 못했습니다.",
+          );
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [classroomId]);
+
+  const championMap = useMemo(() => {
+    const map = new Map<string, ReadingChampion>();
+    for (const c of champions ?? []) map.set(c.student.id, c);
+    return map;
+  }, [champions]);
+
+  const header = (
+    <div className="classroom-dashboard-panel-head">
+      <div>
+        <h3>독서왕 전시공간</h3>
+        <span className="classroom-dashboard-eyebrow">
+          번호 순서대로 나열된 우리 반 아바타
+        </span>
+      </div>
+    </div>
+  );
+
+  if (loading) {
+    return (
+      <section className="classroom-dashboard-panel morning-panel morning-reading-panel">
+        {header}
+        <p className="classroom-dashboard-empty">친구들을 불러오는 중…</p>
+      </section>
+    );
+  }
+
+  if (fetchError) {
+    return (
+      <section className="classroom-dashboard-panel morning-panel morning-reading-panel">
+        {header}
+        <p className="check-error">{fetchError}</p>
+      </section>
+    );
+  }
+
+  if (!students || students.length === 0) {
+    return (
+      <section className="classroom-dashboard-panel morning-panel morning-reading-panel">
+        {header}
+        <p className="classroom-dashboard-empty">아직 전시할 친구가 없어요.</p>
+      </section>
+    );
+  }
+
   return (
     <section className="classroom-dashboard-panel morning-panel morning-reading-panel">
       <div className="classroom-dashboard-panel-head">
         <div>
-          <h3>
-            독서왕
-            <span className="morning-title-count">{list.length}명</span>
-          </h3>
+          <h3>독서왕 전시공간</h3>
+          <span className="classroom-dashboard-eyebrow">
+            번호 순서대로 나열된 우리 반 아바타
+          </span>
         </div>
+        <span className="morning-title-count">{students.length}명</span>
       </div>
-      {list.length === 0 ? (
-        <p className="classroom-dashboard-empty">아직 독서 기록이 없어요.</p>
-      ) : (
-        <ol className="morning-reading-list">
-          {list.map((champ, index) => (
-            <li key={champ.student.id} className="morning-reading-item">
-              <span className="morning-reading-rank" aria-hidden="true">
-                {index + 1}
-              </span>
-              <div className="morning-reading-info">
-                <div className="morning-reading-name-row">
-                  {champ.student.number && (
-                    <span className="morning-list-num">{champ.student.number}</span>
-                  )}
-                  <span className="morning-reading-name">{champ.student.name}</span>
-                </div>
-                {champ.latestTitle && (
-                  <p className="morning-reading-latest">
-                    {champ.latestBookType === "comic"
-                      ? "만화책"
-                      : champ.latestBookType === "story"
-                        ? "이야기책"
-                        : ""}
-                    {champ.latestBookType ? " · " : ""}
-                    {champ.latestTitle}
-                  </p>
+      <div className="avatar-exhibition">
+        {students.map((student) => {
+          const champ = championMap.get(student.id);
+          return (
+            <div key={student.id} className="avatar-exhibit-card">
+              <div className="avatar-exhibit-stage">
+                <div className="avatar-exhibit-platform" aria-hidden="true" />
+                {student.galleryVisible ? (
+                  <CharacterAvatar
+                    items={[]}
+                    equipped={student.equipped}
+                    size={84}
+                    ariaLabel={`${student.name} 아바타`}
+                  />
+                ) : (
+                  <svg
+                    className="avatar-silhouette"
+                    width={84}
+                    height={84}
+                    viewBox="0 0 96 96"
+                    aria-hidden="true"
+                  >
+                    <ellipse cx="48" cy="88" rx="22" ry="5" fill="rgba(24,74,92,0.12)" />
+                    <rect x="34" y="56" width="12" height="24" rx="2" fill="#9ca3af" />
+                    <rect x="50" y="56" width="12" height="24" rx="2" fill="#9ca3af" />
+                    <rect x="32" y="78" width="16" height="7" rx="2" fill="#6b7280" />
+                    <rect x="48" y="78" width="16" height="7" rx="2" fill="#6b7280" />
+                    <rect x="30" y="36" width="36" height="28" rx="6" fill="#9ca3af" />
+                    <rect x="34" y="16" width="28" height="26" rx="10" fill="#9ca3af" />
+                  </svg>
+                )}
+                {champ && (
+                  <span className="avatar-exhibit-badge">
+                    독서왕 {champ.totalScore}점
+                  </span>
                 )}
               </div>
-              <div className="morning-reading-stats">
-                <span className="morning-reading-score">
-                  {champ.totalScore}점
+              <div className="avatar-exhibit-label">
+                <span className="avatar-exhibit-number">
+                  {student.number ?? "?"}번
                 </span>
-                <span className="morning-reading-count">
-                  {champ.entryCount}회
-                </span>
+                <span className="avatar-exhibit-name">{student.name}</span>
               </div>
-            </li>
-          ))}
-        </ol>
-      )}
+            </div>
+          );
+        })}
+      </div>
     </section>
   );
 }

@@ -58,13 +58,20 @@ export default function LoginPage() {
 
   function safeStudentReturnTarget(fallback?: string): string {
     const params = new URLSearchParams(window.location.search);
-    const raw = params.get("from") ?? params.get("return") ?? fallback;
+    const raw =
+      params.get("from") ??
+      params.get("return") ??
+      params.get("callbackUrl") ??
+      fallback;
     return safeReturnTarget(raw, "/student");
   }
 
   function safeTeacherReturnTarget(): string {
     const params = new URLSearchParams(window.location.search);
-    return safeReturnTarget(params.get("from") ?? params.get("return"), "/");
+    return safeReturnTarget(
+      params.get("from") ?? params.get("return") ?? params.get("callbackUrl"),
+      "/",
+    );
   }
 
   return (

@@ -4872,94 +4872,120 @@
   }
 }
 
-/* ---- 독서왕 (reading champions) section on the morning dashboard ------- */
+/* ---- 독서왕 전시공간 (avatar exhibition) ------- */
 .morning-reading-panel {
   grid-column: 1 / -1;
+  position: relative;
 }
 
-.morning-reading-list {
-  list-style: none;
-  margin: 0;
-  padding: 0;
+.avatar-exhibition {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.avatar-exhibit-card {
+  position: relative;
   display: flex;
   flex-direction: column;
-  gap: 10px;
-}
-
-.morning-reading-item {
-  display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 10px 12px;
-  border: 1px solid var(--color-border);
-  border-radius: 10px;
+  gap: 10px;
+  padding: 16px 12px 14px;
+  border-radius: var(--radius-card);
   background: var(--color-surface-alt);
+  border: 1px solid var(--color-border);
 }
 
-.morning-reading-rank {
-  flex: 0 0 auto;
-  min-width: 26px;
-  height: 26px;
-  padding: 0 6px;
-  border-radius: 8px;
-  background: var(--color-accent);
-  color: #fff;
-  font-size: 13px;
+.avatar-exhibit-stage {
+  position: relative;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  width: 100%;
+  min-height: 110px;
+}
+
+.avatar-exhibit-platform {
+  position: absolute;
+  bottom: 6px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 80%;
+  height: 18px;
+  border-radius: 999px;
+  background: linear-gradient(180deg, #86efac 0%, #4ade80 55%, #22c55e 100%);
+  box-shadow: inset 0 -3px 0 rgba(0, 0, 0, 0.08);
+}
+
+.avatar-exhibit-stage > svg {
+  position: relative;
+  z-index: 1;
+  margin-bottom: 10px;
+}
+
+.avatar-silhouette {
+  opacity: 0.65;
+}
+
+.avatar-exhibit-badge {
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  padding: 3px 7px;
+  border-radius: 999px;
+  background: #fef3c7;
+  color: #b45309;
+  border: 1px solid #fde68a;
+  font-size: 11px;
   font-weight: 800;
-  display: inline-flex;
+  white-space: nowrap;
+  z-index: 2;
+}
+
+.avatar-exhibit-label {
+  display: flex;
   align-items: center;
   justify-content: center;
-}
-
-.morning-reading-info {
-  flex: 1 1 auto;
-  min-width: 0;
-}
-
-.morning-reading-name-row {
-  display: flex;
-  align-items: baseline;
   gap: 6px;
+  width: 100%;
 }
 
-.morning-reading-name {
-  font-size: 15px;
-  font-weight: 800;
-  color: var(--color-text);
-}
-
-.morning-reading-latest {
-  margin: 2px 0 0;
+.avatar-exhibit-number {
   font-size: 12px;
+  font-weight: 800;
+  color: var(--color-text-faint);
+}
+
+.avatar-exhibit-name {
+  font-size: 14px;
   font-weight: 700;
-  color: var(--color-text-muted);
+  color: var(--color-text);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.morning-reading-stats {
-  flex: 0 0 auto;
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 2px;
+@media (max-width: 900px) {
+  .avatar-exhibition {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
 }
 
-.morning-reading-score {
-  font-size: 16px;
-  font-weight: 800;
-  color: var(--color-text);
-}
+@media (max-width: 480px) {
+  .avatar-exhibition {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+  }
 
-.morning-reading-count {
-  font-size: 11px;
-  font-weight: 700;
-  color: var(--color-text-muted);
-}
+  .avatar-exhibit-card {
+    padding: 12px 8px 10px;
+  }
 
-@media (max-width: 640px) {
-  .morning-reading-latest {
-    white-space: normal;
+  .avatar-exhibit-stage {
+    min-height: 92px;
+  }
+
+  .avatar-exhibit-name {
+    font-size: 13px;
   }
 }
