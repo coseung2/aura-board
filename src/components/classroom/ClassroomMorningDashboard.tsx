@@ -9,7 +9,7 @@ import {
 } from "@/lib/inspections-client";
 import { AppBackgroundButton } from "@/components/AppBackground";
 import { fetchAvatarGallery } from "@/components/avatar/gallery-client";
-import { CharacterAvatar } from "@/components/avatar/CharacterAvatar";
+import { ReadingChampionExhibition } from "@/components/avatar/ReadingChampionExhibition";
 import type { AvatarGalleryStudent } from "@/components/avatar/types";
 
 type Props = { classroomId: string };
@@ -474,8 +474,10 @@ function ReadingChampionsSection({
   }, [classroomId]);
 
   const championMap = useMemo(() => {
-    const map = new Map<string, ReadingChampion>();
-    for (const c of champions ?? []) map.set(c.student.id, c);
+    const map: Record<string, string> = {};
+    for (const c of champions ?? []) {
+      map[c.student.id] = `독서왕 ${c.totalScore}점`;
+    }
     return map;
   }, [champions]);
 
@@ -528,53 +530,10 @@ function ReadingChampionsSection({
         </div>
         <span className="morning-title-count">{students.length}명</span>
       </div>
-      <div className="avatar-exhibition">
-        {students.map((student) => {
-          const champ = championMap.get(student.id);
-          return (
-            <div key={student.id} className="avatar-exhibit-card">
-              <div className="avatar-exhibit-stage">
-                <div className="avatar-exhibit-platform" aria-hidden="true" />
-                {student.galleryVisible ? (
-                  <CharacterAvatar
-                    items={[]}
-                    equipped={student.equipped}
-                    size={84}
-                    ariaLabel={`${student.name} 아바타`}
-                  />
-                ) : (
-                  <svg
-                    className="avatar-silhouette"
-                    width={84}
-                    height={84}
-                    viewBox="0 0 96 96"
-                    aria-hidden="true"
-                  >
-                    <ellipse cx="48" cy="88" rx="22" ry="5" fill="rgba(24,74,92,0.12)" />
-                    <rect x="34" y="56" width="12" height="24" rx="2" fill="#9ca3af" />
-                    <rect x="50" y="56" width="12" height="24" rx="2" fill="#9ca3af" />
-                    <rect x="32" y="78" width="16" height="7" rx="2" fill="#6b7280" />
-                    <rect x="48" y="78" width="16" height="7" rx="2" fill="#6b7280" />
-                    <rect x="30" y="36" width="36" height="28" rx="6" fill="#9ca3af" />
-                    <rect x="34" y="16" width="28" height="26" rx="10" fill="#9ca3af" />
-                  </svg>
-                )}
-                {champ && (
-                  <span className="avatar-exhibit-badge">
-                    독서왕 {champ.totalScore}점
-                  </span>
-                )}
-              </div>
-              <div className="avatar-exhibit-label">
-                <span className="avatar-exhibit-number">
-                  {student.number ?? "?"}번
-                </span>
-                <span className="avatar-exhibit-name">{student.name}</span>
-              </div>
-            </div>
-          );
-        })}
-      </div>
+      <ReadingChampionExhibition
+        students={students}
+        badgesByStudentId={championMap}
+      />
     </section>
   );
 }
