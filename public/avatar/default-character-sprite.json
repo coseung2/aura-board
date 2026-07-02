@@ -1,0 +1,79 @@
+{
+  "image": "/avatar/default-character-sprite.png",
+  "rawImage": "/avatar/default-character-sprite-raw.png",
+  "frameWidth": 222,
+  "frameHeight": 444,
+  "columns": 8,
+  "rows": 2,
+  "sourcePrompt": "Original chibi pixel art student avatar bases inspired by classic 2D side-scrolling MMORPG sprite proportions. No hats, no accessories, simple modular clothes.",
+  "animations": {
+    "boyIdle": {
+      "frames": ["boy-idle-0", "boy-idle-1"],
+      "fps": 2,
+      "loop": true
+    },
+    "boyBlink": {
+      "frames": ["boy-idle-0", "boy-blink", "boy-idle-0"],
+      "fps": 6,
+      "loop": false
+    },
+    "boyWave": {
+      "frames": ["boy-wave-0", "boy-wave-1"],
+      "fps": 4,
+      "loop": true
+    },
+    "boyWalk": {
+      "frames": ["boy-walk-0", "boy-walk-1"],
+      "fps": 6,
+      "loop": true
+    },
+    "boyCheer": {
+      "frames": ["boy-cheer"],
+      "fps": 1,
+      "loop": false
+    },
+    "girlIdle": {
+      "frames": ["girl-idle-0", "girl-idle-1"],
+      "fps": 2,
+      "loop": true
+    },
+    "girlBlink": {
+      "frames": ["girl-idle-0", "girl-blink", "girl-idle-0"],
+      "fps": 6,
+      "loop": false
+    },
+    "girlWave": {
+      "frames": ["girl-wave-0", "girl-wave-1"],
+      "fps": 4,
+      "loop": true
+    },
+    "girlWalk": {
+      "frames": ["girl-walk-0", "girl-walk-1"],
+      "fps": 6,
+      "loop": true
+    },
+    "girlCheer": {
+      "frames": ["girl-cheer"],
+      "fps": 1,
+      "loop": false
+    }
+  },
+  "frames": {
+    "boy-idle-0": { "x": 0, "y": 0, "w": 222, "h": 444 },
+    "boy-idle-1": { "x": 222, "y": 0, "w": 222, "h": 444 },
+    "boy-blink": { "x": 444, "y": 0, "w": 222, "h": 444 },
+    "boy-wave-0": { "x": 666, "y": 0, "w": 222, "h": 444 },
+    "boy-wave-1": { "x": 888, "y": 0, "w": 222, "h": 444 },
+    "boy-walk-0": { "x": 1110, "y": 0, "w": 222, "h": 444 },
+    "boy-walk-1": { "x": 1332, "y": 0, "w": 222, "h": 444 },
+    "boy-cheer": { "x": 1554, "y": 0, "w": 222, "h": 444 },
+    "girl-idle-0": { "x": 0, "y": 444, "w": 222, "h": 444 },
+    "girl-idle-1": { "x": 222, "y": 444, "w": 222, "h": 444 },
+    "girl-blink": { "x": 444, "y": 444, "w": 222, "h": 444 },
+    "girl-wave-0": { "x": 666, "y": 444, "w": 222, "h": 444 },
+    "girl-wave-1": { "x": 888, "y": 444, "w": 222, "h": 444 },
+    "girl-walk-0": { "x": 1110, "y": 444, "w": 222, "h": 444 },
+    "girl-walk-1": { "x": 1332, "y": 444, "w": 222, "h": 444 },
+    "girl-cheer": { "x": 1554, "y": 444, "w": 222, "h": 444 }
+  }
+}

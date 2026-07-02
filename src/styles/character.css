@@ -364,73 +364,118 @@
 }
 
 /* -------- Character Town -------- */
-.character-town-ground {
-  display: flex;
-  flex-direction: column;
-  gap: 24px;
-  padding: 24px;
-  border-radius: var(--radius-card);
-  background: linear-gradient(180deg, #e9f7ff 0%, #dff6e9 100%);
+.character-town-page {
+  max-width: 1440px;
 }
 
-.character-town-row {
+.character-town-map {
+  width: 100%;
+}
+
+.character-town-map-scroll {
+  overflow-x: auto;
+  overflow-y: visible;
+  border-radius: 8px;
+  background: #6eb7e8;
+  box-shadow: 0 18px 40px rgba(15, 23, 42, 0.18);
+}
+
+.character-town-ground {
+  position: relative;
   display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: 20px;
+  flex-direction: column;
+  width: 1024px;
+  max-width: none;
+  min-height: max(1536px, calc(var(--floor-count, 7) * 220px));
+  margin: 0 auto;
+  padding: 6.2% 8.4% 5.8%;
+  background-image: url("/avatar/reading-champion-map.png");
+  background-position: center;
+  background-repeat: no-repeat;
+  background-size: 100% 100%;
+  isolation: isolate;
+}
+
+.character-town-floor {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(120px, 1fr));
+  align-items: end;
+  justify-items: center;
+  flex: 1 1 0;
+  min-height: 176px;
+  padding: 0 2.4% 0;
+  pointer-events: none;
 }
 
 .character-town-resident {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 6px;
-  width: 110px;
-  padding: 14px 10px;
-  border-radius: var(--radius-card);
-  background: var(--color-surface);
-  box-shadow: var(--shadow-card);
+  justify-content: flex-end;
+  width: 112px;
+  min-height: 150px;
+  pointer-events: auto;
+  transform: translateY(20px);
 }
 
 .character-town-resident.is-hidden {
-  opacity: 0.55;
+  opacity: 0.62;
 }
 
 .character-town-avatar-wrap {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 96px;
-  height: 96px;
-  border-radius: 12px;
-  background: var(--color-bg-alt);
+  width: 92px;
+  height: 130px;
 }
 
 .character-town-hidden {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 80px;
-  height: 80px;
-  border-radius: 50%;
-  background: var(--color-surface-alt);
-  color: var(--color-text-muted);
-  font-size: 32px;
+  width: 66px;
+  height: 104px;
+  border-radius: 36px 36px 18px 18px;
+  background: rgba(59, 76, 91, 0.45);
+  color: rgba(255, 255, 255, 0.82);
+  font-size: 26px;
   font-weight: 800;
+  box-shadow: inset 0 -8px 0 rgba(15, 23, 42, 0.16);
+}
+
+.character-town-sprite {
+  display: block;
+  width: 84px;
+  height: 168px;
+  background-image: url("/avatar/default-character-sprite.png");
+  background-position: var(--avatar-sprite-position-x, 0%) var(--avatar-sprite-position-y, 0%);
+  background-repeat: no-repeat;
+  background-size: 800% 200%;
+  image-rendering: pixelated;
+  transform: translateY(10px);
 }
 
 .character-town-name {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  max-width: 124px;
+  min-height: 26px;
+  margin-top: -4px;
+  padding: 3px 8px;
+  border: 1px solid rgba(74, 56, 36, 0.32);
+  border-radius: 999px;
+  background: rgba(255, 248, 221, 0.92);
+  box-shadow: 0 3px 0 rgba(69, 43, 23, 0.18);
+  color: #3f2d1c;
   font-size: 14px;
   font-weight: 800;
-  color: var(--color-text);
   text-align: center;
   word-break: keep-all;
-}
-
-.character-town-number {
-  font-size: 12px;
-  color: var(--color-text-muted);
-  font-weight: 700;
+  line-height: 1.15;
 }
 
 /* -------- Avatar renderer -------- */
@@ -462,12 +507,29 @@
     grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
   }
 
-  .character-town-row {
-    gap: 12px;
+  .character-town-map-scroll {
+    margin: 0 -16px;
+    border-radius: 0;
+  }
+
+  .character-town-ground {
+    width: 1024px;
+    min-height: max(1536px, calc(var(--floor-count, 7) * 220px));
+    padding-inline: 8%;
   }
 
   .character-town-resident {
-    width: 96px;
-    padding: 12px 8px;
+    width: 104px;
+    transform: translateY(18px);
+  }
+
+  .character-town-sprite {
+    width: 78px;
+    height: 156px;
+  }
+
+  .character-town-name {
+    max-width: 112px;
+    font-size: 13px;
   }
 }

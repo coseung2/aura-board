@@ -1,17 +1,22 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import Link from "next/link";
-import { CharacterAvatar } from "@/components/avatar/CharacterAvatar";
 import { ErrorState } from "@/components/avatar/ErrorState";
 import { LoadingState } from "@/components/avatar/LoadingState";
 import { useAvatarMe } from "@/components/avatar/useAvatarMe";
-import type { AvatarGalleryResponse, AvatarItem } from "@/components/avatar/types";
+import type { AvatarGalleryResponse } from "@/components/avatar/types";
 
 type GalleryState =
   | { status: "loading"; data: null; error: null }
   | { status: "ok"; data: AvatarGalleryResponse; error: null }
   | { status: "error"; data: null; error: string };
+
+type TownStyle = CSSProperties & Record<string, string | number>;
+
+const SPRITE_COLUMNS = 8;
+const SPRITE_ROWS = 2;
+const DEFAULT_VISIBLE_FLOORS = 7;
 
 function useAvatarGallery(classroomId: string | null) {
   const [state, setState] = useState<GalleryState>({
@@ -67,29 +72,46 @@ function useAvatarGallery(classroomId: string | null) {
   return state;
 }
 
-function ExhibitionRow({
+function spriteStyle(row: number, frame: number): TownStyle {
+  return {
+    "--avatar-sprite-position-x": `${(frame / (SPRITE_COLUMNS - 1)) * 100}%`,
+    "--avatar-sprite-position-y": `${(row / (SPRITE_ROWS - 1)) * 100}%`,
+  };
+}
+
+function ExhibitionFloor({
   students,
-  items,
+  floorIndex,
 }: {
   students: AvatarGalleryResponse["students"];
-  items: AvatarItem[];
+  floorIndex: number;
 }) {
   return (
-    <div className="character-town-row">
-      {students.map((student) => {
+    <div
+      className="character-town-floor"
+      style={{ "--floor-index": floorIndex } as TownStyle}
+    >
+      {students.map((student, index) => {
         const visible = student.galleryVisible;
+        const number = student.number ?? floorIndex * 4 + index + 1;
+        const spriteRow = number % 2 === 0 ? 1 : 0;
+        const spriteFrame =
+          index === 3 ? 7 : index === 2 ? 5 : index === 1 ? 1 : 0;
+
         return (
           <div
             key={student.id}
             className={`character-town-resident${visible ? "" : " is-hidden"}`}
+            style={{ "--resident-slot": index } as TownStyle}
+            role="listitem"
           >
             <div className="character-town-avatar-wrap">
               {visible ? (
-                <CharacterAvatar
-                  items={items}
-                  equipped={student.equipped}
-                  size={80}
-                  ariaLabel={`${student.name} 아바타`}
+                <span
+                  className="character-town-sprite"
+                  style={spriteStyle(spriteRow, spriteFrame)}
+                  role="img"
+                  aria-label={`${student.name} 아바타`}
                 />
               ) : (
                 <div className="character-town-hidden" aria-label="비공개 캐릭터">
@@ -97,10 +119,10 @@ function ExhibitionRow({
                 </div>
               )}
             </div>
-            <span className="character-town-name">{student.name}</span>
-            {student.number !== null && (
-              <span className="character-town-number">{student.number}번</span>
-            )}
+            <span className="character-town-name">
+              {student.number !== null ? `${student.number}번 ` : ""}
+              {student.name}
+            </span>
           </div>
         );
       })}
@@ -115,13 +137,18 @@ export function CharacterTownClient() {
   const rows = useMemo(() => {
     if (gallery.status !== "ok" || !gallery.data) return [];
     const students = gallery.data.students;
-    const perRow = 6;
+    const perFloor = 4;
     const result: AvatarGalleryResponse["students"][] = [];
-    for (let i = 0; i < students.length; i += perRow) {
-      result.push(students.slice(i, i + perRow));
+    for (let i = 0; i < students.length; i += perFloor) {
+      result.push(students.slice(i, i + perFloor));
     }
     return result;
   }, [gallery]);
+
+  const floors = useMemo(() => {
+    const floorCount = Math.max(rows.length, DEFAULT_VISIBLE_FLOORS);
+    return Array.from({ length: floorCount }, (_, index) => rows[index] ?? []);
+  }, [rows]);
 
   if (me.status === "loading") {
     return <LoadingState message="캐릭터 정보를 불러오는 중..." />;
@@ -165,14 +192,23 @@ export function CharacterTownClient() {
           {rows.length === 0 ? (
             <div className="avatar-empty">아직 전시할 친구가 없어요.</div>
           ) : (
-            <div
-              className="character-town-ground"
-              role="list"
-              aria-label="우리 반 독서왕 전시공간"
-            >
-              {rows.map((row, index) => (
-                <ExhibitionRow key={index} students={row} items={me.data?.items ?? []} />
-              ))}
+            <div className="character-town-map" aria-label="우리 반 독서왕 전시공간">
+              <div className="character-town-map-scroll">
+                <div
+                  className="character-town-ground"
+                  role="list"
+                  aria-label="우리 반 독서왕 전시공간"
+                  style={{ "--floor-count": floors.length } as TownStyle}
+                >
+                  {floors.map((floorStudents, index) => (
+                    <ExhibitionFloor
+                      key={index}
+                      students={floorStudents}
+                      floorIndex={index}
+                    />
+                  ))}
+                </div>
+              </div>
             </div>
           )}
         </>
