@@ -6,7 +6,7 @@ import {
   saveShoeFindings,
   type MorningSummary,
 } from "@/lib/inspections-client";
-import { uploadFile } from "@/lib/upload-client";
+import { AppBackgroundButton } from "@/components/AppBackground";
 
 type Props = { classroomId: string };
 
@@ -18,8 +18,6 @@ export function ClassroomMorningDashboard({ classroomId }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const [activeAssignmentIndex, setActiveAssignmentIndex] = useState(0);
-  const [backgroundUrl, setBackgroundUrl] = useState<string | null>(null);
-  const [backgroundBusy, setBackgroundBusy] = useState(false);
   const [selectedCleaning, setSelectedCleaning] = useState<
     MorningSummary["cleaningFindings"][number] | null
   >(null);
@@ -28,7 +26,6 @@ export function ClassroomMorningDashboard({ classroomId }: Props) {
   >(null);
   const [shoeSaving, setShoeSaving] = useState(false);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const backgroundStorageKey = `aura:classroom:${classroomId}:morning-background`;
 
   const refresh = useCallback(async () => {
     setError(null);
@@ -47,14 +44,6 @@ export function ClassroomMorningDashboard({ classroomId }: Props) {
     setLoaded(false);
     refresh();
   }, [refresh]);
-
-  useEffect(() => {
-    try {
-      setBackgroundUrl(localStorage.getItem(backgroundStorageKey));
-    } catch {
-      setBackgroundUrl(null);
-    }
-  }, [backgroundStorageKey]);
 
   useEffect(() => {
     if (timerRef.current) {
@@ -105,19 +94,6 @@ export function ClassroomMorningDashboard({ classroomId }: Props) {
       )
     : [];
 
-  async function handleBackgroundFile(file: File | null) {
-    if (!file || backgroundBusy) return;
-    setBackgroundBusy(true);
-    try {
-      const uploaded = await uploadFile(file);
-      const nextUrl = uploaded.previewUrl ?? uploaded.url;
-      setBackgroundUrl(nextUrl);
-      localStorage.setItem(backgroundStorageKey, nextUrl);
-    } finally {
-      setBackgroundBusy(false);
-    }
-  }
-
   async function completeShoeFinding() {
     if (!selectedShoe || shoeSaving) return;
     const shoe = selectedShoe;
@@ -158,28 +134,10 @@ export function ClassroomMorningDashboard({ classroomId }: Props) {
   }
 
   return (
-    <section className={`morning-dashboard ${backgroundUrl ? "has-background" : ""}`}>
-      {backgroundUrl && (
-        <div
-          className="morning-background"
-          style={{ backgroundImage: `url("${backgroundUrl.replace(/"/g, "%22")}")` }}
-          aria-hidden="true"
-        />
-      )}
+    <section className="morning-dashboard">
       <header className="morning-board-header">
         <h1>학급게시판</h1>
-        <label className="morning-background-button">
-          <input
-            type="file"
-            accept="image/*"
-            onChange={(e) => {
-              void handleBackgroundFile(e.target.files?.[0] ?? null);
-              e.currentTarget.value = "";
-            }}
-            disabled={backgroundBusy}
-          />
-          <span>{backgroundBusy ? "설정 중..." : "배경 설정"}</span>
-        </label>
+        <AppBackgroundButton />
       </header>
 
       {!loaded ? (
@@ -369,7 +327,7 @@ export function ClassroomMorningDashboard({ classroomId }: Props) {
       )}
 
       {selectedCleaning && (
-        <div className="morning-modal-layer" role="presentation">
+        <div className="morning-modal-layer morning-photo-modal-layer" role="presentation">
           <button
             type="button"
             className="morning-modal-backdrop"
@@ -377,7 +335,7 @@ export function ClassroomMorningDashboard({ classroomId }: Props) {
             onClick={() => setSelectedCleaning(null)}
           />
           <section
-            className="morning-cleaning-modal"
+            className="morning-cleaning-modal morning-cleaning-photo-modal"
             role="dialog"
             aria-modal="true"
             aria-label={`${selectedCleaning.student.name} 청소 검사 사진`}
@@ -391,7 +349,7 @@ export function ClassroomMorningDashboard({ classroomId }: Props) {
               </div>
               <button
                 type="button"
-                className="morning-modal-close"
+                className="modal-close morning-modal-close morning-photo-modal-close"
                 onClick={() => setSelectedCleaning(null)}
                 aria-label="닫기"
               >
@@ -438,7 +396,7 @@ export function ClassroomMorningDashboard({ classroomId }: Props) {
               </div>
               <button
                 type="button"
-                className="morning-modal-close"
+                className="modal-close morning-modal-close"
                 onClick={() => setSelectedShoe(null)}
                 disabled={shoeSaving}
                 aria-label="닫기"

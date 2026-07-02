@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { AppBackgroundLayer } from "@/components/AppBackground";
 import { AuthProvider } from "@/components/AuthProvider";
 import { DJPlayerProvider } from "@/components/dj/DJPlayerProvider";
 import { Footer } from "@/components/Footer";
@@ -46,6 +47,7 @@ export default function RootLayout({
   return (
     <html lang="ko">
       <body>
+        <AppBackgroundLayer />
         <TwemojiRoot />
         <AuthProvider>
           <DJPlayerProvider>

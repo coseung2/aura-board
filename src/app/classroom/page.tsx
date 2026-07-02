@@ -2,6 +2,7 @@ import { db } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
 import { ClassroomListPage } from "@/components/ClassroomListPage";
 import { TopNav } from "@/components/TopNav";
+import { AppBackgroundButton } from "@/components/AppBackground";
 import { redirect } from "next/navigation";
 
 const ADMIN_EMAIL = "mallagaenge@gmail.com";
@@ -28,6 +29,7 @@ export default async function ClassroomPage() {
       <main className="classroom-page">
         <div className="classroom-header">
           <h1>학급 관리</h1>
+          <AppBackgroundButton />
         </div>
         <ClassroomListPage initialClassrooms={classrooms} />
       </main>

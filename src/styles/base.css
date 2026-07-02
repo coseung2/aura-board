@@ -190,6 +190,71 @@ body {
   font-feature-settings: "kern", "liga";
 }
 
+body.app-background-active {
+  background: transparent;
+}
+
+body.app-background-active > :not(.app-background-layer) {
+  position: relative;
+  z-index: 1;
+}
+
+.app-background-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  background-position: center;
+  background-size: cover;
+  background-repeat: no-repeat;
+  pointer-events: none;
+}
+
+.app-background-layer::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: rgba(255, 255, 255, 0.18);
+}
+
+body.app-background-active .home-page,
+body.app-background-active .classroom-page {
+  background: transparent;
+}
+
+.app-background-button {
+  display: inline-flex;
+  align-items: center;
+  min-height: 34px;
+  padding: 7px 12px;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: var(--color-surface);
+  color: var(--color-text);
+  font-size: 13px;
+  font-weight: 800;
+  cursor: pointer;
+  box-shadow: var(--shadow-lift);
+  transition:
+    background var(--t-normal),
+    border-color var(--t-normal),
+    transform var(--t-normal);
+}
+
+.app-background-button:hover {
+  background: var(--color-surface-alt);
+  border-color: var(--color-border-hover);
+}
+
+.app-background-button:has(input:disabled) {
+  cursor: default;
+  opacity: 0.62;
+  transform: none;
+}
+
+.app-background-button input {
+  display: none;
+}
+
 :focus-visible {
   outline: 2px solid var(--color-accent-tinted-text);
   outline-offset: 2px;
