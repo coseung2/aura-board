@@ -7,6 +7,7 @@ import { getCurrentUser } from "./auth";
 const SECRET = process.env.AUTH_SECRET ?? "dev-secret";
 const COOKIE_NAME = "student_session";
 const MAX_AGE = 30 * 24 * 60 * 60; // 30 days
+const USE_SECURE_STUDENT_COOKIE = process.env.NODE_ENV === "production";
 
 interface StudentPayload {
   studentId: string;
@@ -56,13 +57,13 @@ export async function createStudentSession(
   };
   const token = sign(payload);
   const cookieStore = await cookies();
-  // SameSite=None + Secure: Canva Content Publisher 앱(canva-apps.com) 교차 사이트
-  // fetch 가 /api/external/* 에 쿠키를 포함할 수 있게 하기 위함. 모바일은 쿠키가
-  // 아니라 Bearer 로 인증하므로 SameSite 무관.
+  // Production needs SameSite=None + Secure so Canva's cross-site app surface
+  // can include this cookie. Local HTTP cannot store Secure cookies, so dev
+  // uses Lax to keep QR/text-code login functional.
   cookieStore.set(COOKIE_NAME, token, {
     httpOnly: true,
-    secure: true,
-    sameSite: "none",
+    secure: USE_SECURE_STUDENT_COOKIE,
+    sameSite: USE_SECURE_STUDENT_COOKIE ? "none" : "lax",
     path: "/",
     maxAge: MAX_AGE,
   });

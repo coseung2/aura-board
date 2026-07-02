@@ -2,7 +2,6 @@
 
 import { useState, type FormEvent } from "react";
 import { signIn } from "next-auth/react";
-import { useRouter } from "next/navigation";
 import { Logo } from "@/components/Logo";
 import { RoleIcon } from "@/components/login/RoleIcon";
 
@@ -11,7 +10,6 @@ import { RoleIcon } from "@/components/login/RoleIcon";
 // 아니라 별도 라우팅이라 button-card 패턴 유지.
 
 export default function LoginPage() {
-  const router = useRouter();
   const [studentCode, setStudentCode] = useState("");
   const [studentError, setStudentError] = useState("");
   const [studentBusy, setStudentBusy] = useState(false);
@@ -35,7 +33,10 @@ export default function LoginPage() {
       });
 
       if (res.ok) {
-        router.push(safeStudentReturnTarget());
+        const data = (await res.json().catch(() => null)) as {
+          redirect?: string;
+        } | null;
+        window.location.assign(safeStudentReturnTarget(data?.redirect));
         return;
       }
 
@@ -50,9 +51,9 @@ export default function LoginPage() {
     }
   }
 
-  function safeStudentReturnTarget(): string {
+  function safeStudentReturnTarget(fallback?: string): string {
     const params = new URLSearchParams(window.location.search);
-    const raw = params.get("from") ?? params.get("return");
+    const raw = params.get("from") ?? params.get("return") ?? fallback;
     if (raw && raw.startsWith("/") && !raw.startsWith("//")) return raw;
     return "/student";
   }

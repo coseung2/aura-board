@@ -11,6 +11,9 @@ function safeReturnTo(value: string | null): string {
 }
 
 export async function GET(req: Request) {
+  const { searchParams } = new URL(req.url);
+  const returnTo = safeReturnTo(searchParams.get("returnTo"));
+
   if (!getCanvaClientId()) {
     return NextResponse.json(
       { error: "Canva API not configured. Set CANVA_CLIENT_ID in .env" },
@@ -20,11 +23,12 @@ export async function GET(req: Request) {
 
   const student = await getCurrentStudent();
   if (!student) {
-    return NextResponse.redirect(new URL("/login?from=/my/wallet", req.url));
+    const startPath = `/api/auth/canva/student?returnTo=${encodeURIComponent(returnTo)}`;
+    return NextResponse.redirect(
+      new URL(`/student/login?from=${encodeURIComponent(startPath)}`, req.url)
+    );
   }
 
-  const { searchParams } = new URL(req.url);
-  const returnTo = safeReturnTo(searchParams.get("returnTo"));
   const url = await buildStudentCardDesignAuthorizationUrl(student.id, returnTo);
   return NextResponse.redirect(url);
 }

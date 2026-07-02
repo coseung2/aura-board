@@ -8,10 +8,10 @@ const AuthSchema = z.object({
   token: z.string().min(1),
 });
 
-// 학생 코드 로그인은 명시적 신원 전환이므로 NextAuth(교사) 세션 쿠키를 같이
-// 정리한다. 그러지 않으면 getCurrentStudent() 의 교사 게이트가 학생 쿠키를
-// 무시해 /student → /login 루프가 발생.
-const AUTHJS_COOKIES = [
+// Student code login is an explicit identity switch. Clear Auth.js teacher
+// cookies too, otherwise getCurrentStudent() will ignore the new student cookie
+// and /student will bounce back to /login.
+const AUTHJS_COOKIE_PREFIXES = [
   "authjs.session-token",
   "__Secure-authjs.session-token",
   "authjs.csrf-token",
@@ -19,6 +19,16 @@ const AUTHJS_COOKIES = [
   "authjs.callback-url",
   "__Secure-authjs.callback-url",
 ];
+
+function isAuthJsCookie(name: string) {
+  return AUTHJS_COOKIE_PREFIXES.some(
+    (prefix) => name === prefix || name.startsWith(`${prefix}.`),
+  );
+}
+
+function authCookieNeedsSecureDelete(name: string) {
+  return name.startsWith("__Secure-") || name.startsWith("__Host-");
+}
 
 export async function POST(req: Request) {
   try {
@@ -35,18 +45,17 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "invalid_token" }, { status: 404 });
     }
 
-    // Cookie는 웹 세션용, sessionToken은 모바일 앱이 SecureStore에 보관해
-    // 이후 요청에 `Authorization: Bearer <token>` 으로 재사용.
+    // The cookie is for web sessions; mobile stores sessionToken and reuses it
+    // with Authorization: Bearer <token>.
     const sessionToken = await createStudentSession(student.id, student.classroomId);
 
     const cookieStore = await cookies();
-    for (const name of AUTHJS_COOKIES) {
-      if (cookieStore.has(name)) {
-        cookieStore.delete({ name, path: "/" });
-      }
+    const authCookieNames = new Set(AUTHJS_COOKIE_PREFIXES);
+    for (const cookie of cookieStore.getAll()) {
+      if (isAuthJsCookie(cookie.name)) authCookieNames.add(cookie.name);
     }
 
-    return NextResponse.json({
+    const response = NextResponse.json({
       success: true,
       redirect: "/student",
       sessionToken,
@@ -56,6 +65,16 @@ export async function POST(req: Request) {
         classroomId: student.classroomId,
       },
     });
+    for (const name of authCookieNames) {
+      response.cookies.set(name, "", {
+        path: "/",
+        maxAge: 0,
+        expires: new Date(0),
+        secure: authCookieNeedsSecureDelete(name),
+        sameSite: "lax",
+      });
+    }
+    return response;
   } catch (e) {
     if (e instanceof z.ZodError) {
       return NextResponse.json({ error: e.message }, { status: 400 });
