@@ -411,6 +411,10 @@ model Classroom {
   // Classroom check tasks in this classroom (1인1역할: 체크원, 2026-06-28)
   checkTasks ClassroomCheckTask[]
 
+  // Inspector findings (2026-07-02)
+  cleaningFindings CleaningFinding[]
+  shoeFindings     ShoeFinding[]
+
   @@index([teacherId])
   @@index([code])
 }
@@ -507,6 +511,12 @@ model Student {
   // Classroom check submissions (1인1역할: 체크원, 2026-06-28)
   checkSubmissions        ClassroomCheckSubmission[] @relation("ClassroomCheckSubmissionStudent")
   checkSubmissionsChecked ClassroomCheckSubmission[] @relation("ClassroomCheckSubmissionCheckedBy")
+
+  // Inspector findings (2026-07-02)
+  cleaningFindingsReported CleaningFinding[] @relation("CleaningFindingReporter")
+  cleaningFindingsMarked   CleaningFinding[] @relation("CleaningFindingMarked")
+  shoeFindingsReported     ShoeFinding[]     @relation("ShoeFindingReporter")
+  shoeFindingsMarked       ShoeFinding[]     @relation("ShoeFindingMarked")
 
   @@unique([classroomId, number])
   @@index([classroomId])
@@ -3081,6 +3091,49 @@ model ClassroomCheckSubmission {
 
   @@unique([taskId, studentId])
   @@index([studentId])
+}
+
+// Inspector findings (2026-07-02): cleaning-inspector and shoe-inspector roles.
+// All additive. Photo is optional on cleaning findings; shoe findings are text-only.
+model CleaningFinding {
+  id              String   @id @default(cuid())
+  classroomId     String
+  reporterId      String
+  markedStudentId String
+  dirty           Boolean  @default(false)
+  note            String?
+  photoUrl        String?
+  findingDate     DateTime
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  classroom     Classroom @relation(fields: [classroomId], references: [id], onDelete: Cascade)
+  reporter      Student   @relation("CleaningFindingReporter", fields: [reporterId], references: [id], onDelete: Cascade)
+  markedStudent Student   @relation("CleaningFindingMarked", fields: [markedStudentId], references: [id], onDelete: Cascade)
+
+  @@unique([classroomId, markedStudentId, findingDate])
+  @@index([classroomId, findingDate])
+  @@index([reporterId])
+}
+
+model ShoeFinding {
+  id              String   @id @default(cuid())
+  classroomId     String
+  reporterId      String
+  markedStudentId String
+  notArranged     Boolean  @default(true)
+  note            String?
+  findingDate     DateTime
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  classroom     Classroom @relation(fields: [classroomId], references: [id], onDelete: Cascade)
+  reporter      Student   @relation("ShoeFindingReporter", fields: [reporterId], references: [id], onDelete: Cascade)
+  markedStudent Student   @relation("ShoeFindingMarked", fields: [markedStudentId], references: [id], onDelete: Cascade)
+
+  @@unique([classroomId, markedStudentId, findingDate])
+  @@index([classroomId, findingDate])
+  @@index([reporterId])
 }
 
 // ????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????

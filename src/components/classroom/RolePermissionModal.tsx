@@ -6,6 +6,7 @@ const CATEGORY_LABEL: Record<string, string> = {
   bank: "📂 은행 업무",
   store: "📂 매점 운영",
   checks: "📂 제출 체크",
+  inspections: "📂 아침 검사",
 };
 
 type CatalogEntry = {

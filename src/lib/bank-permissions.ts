@@ -54,6 +54,18 @@ export const PERMISSION_CATALOG = {
     category: "checks",
     defaultRoles: ["checker"],
   },
+  "inspections.cleaning": {
+    label: "청소 검사",
+    description: "교실 좌석·책상 청소 상태 기록 (사진 첨부 가능)",
+    category: "inspections",
+    defaultRoles: ["cleaning-inspector"],
+  },
+  "inspections.shoes": {
+    label: "신발 검사",
+    description: "아침마다 신발 정돈 상태가 어긋난 학생 기록",
+    category: "inspections",
+    defaultRoles: ["shoe-inspector"],
+  },
 } as const;
 
 export type PermissionKey = keyof typeof PERMISSION_CATALOG;
