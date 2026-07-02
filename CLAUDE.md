@@ -13,6 +13,10 @@ below for worker tasks.
 - Mobile Android APK/AAB: follow `docs/mobile-android-build.md` and use
   `.codex\scripts\build-android.ps1` with a dedicated ASCII build directory.
 
+Use `docs/verification-checklist.md` as the single verification source of
+truth, especially for save/publish flows, optimistic UI, production issues,
+and test fixture notes.
+
 When a frontend change needs visual verification, clear `.next` and restart
 the dev server before checking the browser.
 

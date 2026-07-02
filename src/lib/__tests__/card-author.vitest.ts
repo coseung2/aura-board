@@ -29,12 +29,12 @@ describe("formatAuthorList", () => {
   it("1 author — just the name", () => {
     expect(formatAuthorList([A(0, "김철수")], null, null, null)).toBe("김철수");
   });
-  it("2 authors — comma join", () => {
+  it("2 authors — polite pair label", () => {
     expect(formatAuthorList([A(0, "김철수"), A(1, "이영희")], null, null, null)).toBe(
-      "김철수, 이영희"
+      "김철수님과 이영희님"
     );
   });
-  it("3 authors — full comma join", () => {
+  it("3 authors — first author plus remaining count", () => {
     expect(
       formatAuthorList(
         [A(0, "김철수"), A(1, "이영희"), A(2, "박민수")],
@@ -42,9 +42,9 @@ describe("formatAuthorList", () => {
         null,
         null
       )
-    ).toBe("김철수, 이영희, 박민수");
+    ).toBe("김철수님과 2명");
   });
-  it("4+ authors — 'name 외 N명'", () => {
+  it("4+ authors — first author plus remaining count", () => {
     expect(
       formatAuthorList(
         [A(0, "김"), A(1, "이"), A(2, "박"), A(3, "최")],
@@ -52,7 +52,7 @@ describe("formatAuthorList", () => {
         null,
         null
       )
-    ).toBe("김 외 3명");
+    ).toBe("김님과 3명");
     expect(
       formatAuthorList(
         [A(0, "a"), A(1, "b"), A(2, "c"), A(3, "d"), A(4, "e"), A(5, "f")],
@@ -60,17 +60,17 @@ describe("formatAuthorList", () => {
         null,
         null
       )
-    ).toBe("a 외 5명");
+    ).toBe("a님과 5명");
   });
   it("respects order — primary is smallest order", () => {
     expect(
       formatAuthorList([A(1, "이영희"), A(0, "김철수")], null, null, null)
-    ).toBe("김철수, 이영희");
+    ).toBe("김철수님과 이영희님");
   });
   it("filters empty displayName", () => {
     expect(
       formatAuthorList([A(0, "김"), A(1, "   "), A(2, "박")], null, null, null)
-    ).toBe("김, 박");
+    ).toBe("김님과 박님");
   });
   it("all empty strings → fallback", () => {
     expect(formatAuthorList([A(0, ""), A(1, "   ")], "ex", null, null)).toBe("ex");

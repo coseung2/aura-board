@@ -161,6 +161,20 @@ export type MorningSummary = {
   missingAssignments: MorningMissingAssignment[];
   cleaningFindings: MorningCleaningItem[];
   shoeFindings: MorningShoeItem[];
+  // 독서왕 leaderboard. Optional because the backend adds this in parallel;
+  // the dashboard renders defensively when it is absent.
+  readingChampions?: ReadingChampion[];
+};
+
+// ---- Reading champions (독서왕) --------------------------------------
+// Surfaced on the teacher morning dashboard. Scoring formula is TBD on the
+// backend; the UI only presents the score, it does not encode policy.
+export type ReadingChampion = {
+  student: StudentRef;
+  totalScore: number;
+  entryCount: number;
+  latestTitle: string | null;
+  latestBookType: "comic" | "story" | null;
 };
 
 // GET /api/classrooms/:id/morning-summary

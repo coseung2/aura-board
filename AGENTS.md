@@ -13,6 +13,9 @@ for bounded specialist tasks. The project source of truth is the current code,
 - Do not run git commit, push, branch, reset, or clean unless the user
   explicitly asks in the same turn.
 - Report changed files, verification commands, and remaining risk.
+- Use `docs/verification-checklist.md` as the single verification source of
+  truth, especially for save/publish flows, optimistic UI, production issues,
+  and test fixture notes.
 
 ## Local Commands
 

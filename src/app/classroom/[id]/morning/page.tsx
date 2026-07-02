@@ -18,9 +18,6 @@ export default async function ClassroomMorningPage({ params }: Props) {
 
   return (
     <main className="classroom-page classroom-page-detail classroom-morning">
-      <a href={`/classroom/${id}/dashboard`} className="classroom-back-link">
-        &larr; 대시보드
-      </a>
       <ClassroomMorningDashboard classroomId={id} />
     </main>
   );

@@ -77,20 +77,37 @@ export async function PATCH(
         ? (section.activityTemplateState as Record<string, unknown>)
         : {};
 
-    const data = {
-      ...input,
-      activityTemplateState:
+    const data: Prisma.SectionUpdateInput = {};
+    if (input.title !== undefined) data.title = input.title;
+    if (input.order !== undefined) data.order = input.order;
+    if (input.sortMode !== undefined) data.sortMode = input.sortMode;
+    if (input.pinned !== undefined) data.pinned = input.pinned;
+    if (input.assignmentPublishedAt !== undefined) {
+      data.assignmentPublishedAt = input.assignmentPublishedAt;
+    }
+    if (input.assignmentReminderSentAt !== undefined) {
+      data.assignmentReminderSentAt = input.assignmentReminderSentAt;
+    }
+    if (input.activityTemplate !== undefined) {
+      data.activityTemplate = input.activityTemplate;
+    }
+    if (
+      input.activityTemplateState !== undefined ||
+      input.activityTemplate === null
+    ) {
+      data.activityTemplateState =
         studentCanReorder && input.activityTemplateState
           ? {
               ...existingActivityTemplateState,
-              activityTemplateOrder: input.activityTemplateState.activityTemplateOrder,
+              activityTemplateOrder:
+                input.activityTemplateState.activityTemplateOrder,
             }
-          :
-	        input.activityTemplateState === null ||
-	        (input.activityTemplate === null && input.activityTemplateState === undefined)
-	          ? Prisma.DbNull
-	          : input.activityTemplateState,
-	    };
+          : input.activityTemplateState === null ||
+              (input.activityTemplate === null &&
+                input.activityTemplateState === undefined)
+            ? Prisma.DbNull
+            : input.activityTemplateState;
+    }
 
     const updated = await db.section.update({
       where: { id },

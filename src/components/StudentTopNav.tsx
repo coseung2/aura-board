@@ -59,6 +59,11 @@ export function StudentTopNav({
               label: "자랑해요",
               active: pathname.startsWith("/student/showcase"),
             },
+            {
+              href: "/student/reading",
+              label: "독서",
+              active: pathname.startsWith("/student/reading"),
+            },
           ],
         },
         {
@@ -135,6 +140,24 @@ export function StudentTopNav({
               href: "/my/wallet",
               label: "통장",
               active: pathname.startsWith("/my/wallet"),
+            },
+          ],
+        },
+      ],
+    },
+    {
+      id: "reading",
+      label: "독서",
+      href: "/student/reading",
+      active: pathname.startsWith("/student/reading"),
+      groups: [
+        {
+          title: "학습",
+          links: [
+            {
+              href: "/student/reading",
+              label: "독서",
+              active: pathname.startsWith("/student/reading"),
             },
           ],
         },

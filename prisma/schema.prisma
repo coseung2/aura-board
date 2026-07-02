@@ -415,6 +415,9 @@ model Classroom {
   cleaningFindings CleaningFinding[]
   shoeFindings     ShoeFinding[]
 
+  // Reading log / reading champion (2026-07-02)
+  readingLogs ReadingLog[]
+
   @@index([teacherId])
   @@index([code])
 }
@@ -517,6 +520,9 @@ model Student {
   cleaningFindingsMarked   CleaningFinding[] @relation("CleaningFindingMarked")
   shoeFindingsReported     ShoeFinding[]     @relation("ShoeFindingReporter")
   shoeFindingsMarked       ShoeFinding[]     @relation("ShoeFindingMarked")
+
+  // Reading log (2026-07-02)
+  readingLogs ReadingLog[]
 
   @@unique([classroomId, number])
   @@index([classroomId])
@@ -3114,6 +3120,35 @@ model CleaningFinding {
   @@unique([classroomId, markedStudentId, findingDate])
   @@index([classroomId, findingDate])
   @@index([reporterId])
+}
+
+// Reading log / reading champion (2026-07-02)
+// 학생이 아침 읽기 활동으로 제출한 한 줄 독후감/메타. bookType 은 'comic' | 'story'
+// 문자열만 받는다. enum 확장은 프론트 입력 옵션이 안정된 뒤 별도 PR 로 다룬다.
+// aiScore / aiFeedback / evaluatedAt 은 LLM 또는 결정적 placeholder 채점기 결과.
+// 채점기는 src/lib/reading-evaluator.ts 에 격리되어 있어 추후 실제 LLM 으로 교체
+// 가능. morning-summary 의 readingChampions 집계는 aiScore 의 단순 합 (v1).
+model ReadingLog {
+  id          String   @id @default(cuid())
+  classroomId String
+  studentId   String
+  // "comic" | "story" — 추후 enum 승격 가능
+  bookType    String
+  title       String
+  author      String
+  reflection  String   @db.Text
+  aiScore     Int?
+  aiFeedback  String?  @db.Text
+  evaluatedAt DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  classroom Classroom @relation(fields: [classroomId], references: [id], onDelete: Cascade)
+  student   Student   @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@index([classroomId, createdAt])
+  @@index([classroomId, studentId, createdAt])
+  @@index([studentId, createdAt])
 }
 
 model ShoeFinding {

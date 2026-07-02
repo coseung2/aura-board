@@ -26,7 +26,7 @@ export type AuthorLike = {
  * Card footer display — 0/1/2/3/4+ cases:
  *   0    → pickAuthorName fallback (legacy)
  *   1    → "김철수"
- *   2    → "김철수님과 이영희"
+ *   2    → "김철수님과 이영희님"
  *   3+   → "김철수님과 N명"
  *
  * Entries are sorted by .order ascending so callers can pass unsorted

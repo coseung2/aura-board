@@ -144,13 +144,13 @@ describe("setCardAuthors — write path", () => {
       { studentId: "sC", displayName: "Carol" },
     ]);
     expect(res.primaryStudentId).toBe("sA");
-    expect(res.externalAuthorName).toBe("Alice, Bob, Carol");
+    expect(res.externalAuthorName).toBe("Alice님과 2명");
 
     const updCall = m.calls.find((c) => c.op === "card.update");
     expect(updCall).toMatchObject({
       args: {
         where: { id: "card1" },
-        data: { studentAuthorId: "sA", externalAuthorName: "Alice, Bob, Carol" },
+        data: { studentAuthorId: "sA", externalAuthorName: "Alice님과 2명" },
       },
     });
   });
@@ -165,7 +165,7 @@ describe("setCardAuthors — write path", () => {
     expect(m.calls.some((c) => c.op === "createMany")).toBe(false);
   });
 
-  it("4+ authors yield '외 N명' mirror format", async () => {
+  it("4+ authors yield polite remaining-count mirror format", async () => {
     const m = makeMockTx();
     const res = await setCardAuthors(m.tx as never, "card1", [
       { studentId: "s1", displayName: "가" },
@@ -173,7 +173,7 @@ describe("setCardAuthors — write path", () => {
       { studentId: "s3", displayName: "다" },
       { studentId: "s4", displayName: "라" },
     ]);
-    expect(res.externalAuthorName).toBe("가 외 3명");
+    expect(res.externalAuthorName).toBe("가님과 3명");
   });
 
   it("trims whitespace in displayName", async () => {

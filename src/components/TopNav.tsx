@@ -48,7 +48,7 @@ const CLASSROOM_TABS = [
   { key: "store", label: "매점" },
   { key: "pay", label: "QR결제" },
   { key: "check", label: "제출 체크" },
-  { key: "morning", label: "아침 조회" },
+  { key: "morning", label: "학급게시판" },
 ] as const;
 
 function boardHref(board: TeacherNavBoard) {

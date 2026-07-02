@@ -51,11 +51,20 @@ export default function LoginPage() {
     }
   }
 
+  function safeReturnTarget(raw: string | null | undefined, fallback: string): string {
+    if (raw && raw.startsWith("/") && !raw.startsWith("//")) return raw;
+    return fallback;
+  }
+
   function safeStudentReturnTarget(fallback?: string): string {
     const params = new URLSearchParams(window.location.search);
     const raw = params.get("from") ?? params.get("return") ?? fallback;
-    if (raw && raw.startsWith("/") && !raw.startsWith("//")) return raw;
-    return "/student";
+    return safeReturnTarget(raw, "/student");
+  }
+
+  function safeTeacherReturnTarget(): string {
+    const params = new URLSearchParams(window.location.search);
+    return safeReturnTarget(params.get("from") ?? params.get("return"), "/");
   }
 
   return (
@@ -83,7 +92,7 @@ export default function LoginPage() {
               <button
                 type="button"
                 className="login-role-oauth login-role-oauth-google"
-                onClick={() => signIn("google", { redirectTo: "/" })}
+                onClick={() => signIn("google", { redirectTo: safeTeacherReturnTarget() })}
                 aria-label="Google로 교사 로그인"
               >
                 <GoogleGlyph />
@@ -92,7 +101,7 @@ export default function LoginPage() {
               <button
                 type="button"
                 className="login-role-oauth login-role-oauth-kakao"
-                onClick={() => signIn("kakao", { redirectTo: "/" })}
+                onClick={() => signIn("kakao", { redirectTo: safeTeacherReturnTarget() })}
                 aria-label="Kakao로 교사 로그인"
               >
                 <KakaoGlyph />

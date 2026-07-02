@@ -87,10 +87,15 @@ function ShareBoardContent({
   const shareSession = useShareSession();
   const guestId = shareSession?.guestId ?? shareToken;
 
-  const [cloneStatus, setCloneStatus] = useState<
-    "idle" | "loading" | "loginRequired" | "error"
-  >("idle");
+  const [cloneStatus, setCloneStatus] = useState<"idle" | "loading" | "error">(
+    "idle",
+  );
   const [cloneError, setCloneError] = useState<string | null>(null);
+
+  function redirectToLogin() {
+    const from = `${window.location.pathname}${window.location.search}${window.location.hash}`;
+    window.location.assign(`/login?from=${encodeURIComponent(from)}`);
+  }
 
   async function handleClone() {
     if (cloneStatus === "loading") return;
@@ -107,7 +112,7 @@ function ShareBoardContent({
       );
 
       if (res.status === 401) {
-        setCloneStatus("loginRequired");
+        redirectToLogin();
         return;
       }
 
@@ -235,11 +240,7 @@ function ShareBoardContent({
   return (
     <main className="board-page" data-board-theme={boardTheme}>
       <div className="share-clone-bar" role="region" aria-label="공유 보드 액션">
-        {cloneStatus === "loginRequired" ? (
-          <p className="share-clone-message">
-            복제하려면 <a href="/login">로그인</a>이 필요해요.
-          </p>
-        ) : cloneStatus === "error" && cloneError ? (
+        {cloneStatus === "error" && cloneError ? (
           <p className="share-clone-message share-clone-message-error" role="alert">
             {cloneError}
           </p>
