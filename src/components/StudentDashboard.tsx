@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { ShowcaseHighlightStrip } from "@/components/portfolio/ShowcaseHighlightStrip";
 import { layoutLabel, layoutThumbnail } from "@/lib/layout-meta";
+import { CharacterAvatar } from "@/components/avatar/CharacterAvatar";
+import type { AvatarMeResponse } from "@/components/avatar/types";
 
 const FALLBACK_THUMBNAIL = "/board-type-thumbnails/card-board.png";
 const STUDENT_ASSIGNMENT_VISIBLE_LIMIT = 4;
@@ -92,6 +94,7 @@ export function StudentDashboard({
   assignments = [],
 }: Props) {
   const [wallet, setWallet] = useState<WalletSummary | null>(null);
+  const [avatar, setAvatar] = useState<AvatarMeResponse | null>(null);
   const [cancellingFD, setCancellingFD] = useState<string | null>(null);
   const [fdError, setFdError] = useState<string | null>(null);
   const [breakoutModal, setBreakoutModal] = useState<{
@@ -113,7 +116,19 @@ export function StudentDashboard({
       }
     }
 
+    async function loadAvatar() {
+      try {
+        const res = await fetch("/api/avatar/me", { cache: "no-store" });
+        if (!res.ok) return;
+        const payload = (await res.json()) as AvatarMeResponse;
+        if (!cancelled) setAvatar(payload);
+      } catch {
+        // Ignore avatar load failures on the dashboard.
+      }
+    }
+
     loadWallet();
+    loadAvatar();
     return () => {
       cancelled = true;
     };
@@ -231,6 +246,39 @@ export function StudentDashboard({
               </div>
             )}
           </div>
+
+          {avatar && (
+            <div className="student-avatar-card">
+              <div className="student-avatar-header">
+                <div>
+                  <p className="student-avatar-eyebrow">나만의 캐릭터</p>
+                  <h2 className="student-avatar-title">내 캐릭터</h2>
+                </div>
+                <div className="student-avatar-links">
+                  <Link href="/student/character-room" className="student-wallet-link">
+                    피팅룸
+                  </Link>
+                  <Link href="/student/character-shop" className="student-wallet-link">
+                    상점
+                  </Link>
+                </div>
+              </div>
+              <div className="student-avatar-body">
+                <CharacterAvatar
+                  items={avatar.items}
+                  equipped={avatar.equipped}
+                  size={88}
+                  ariaLabel="내 캐릭터 미리보기"
+                />
+                <div className="student-avatar-balance">
+                  <span className="student-avatar-balance-label">보유 화폐</span>
+                  <strong className="student-avatar-balance-value">
+                    {avatar.balance.toLocaleString()} {avatar.currency.unitLabel}
+                  </strong>
+                </div>
+              </div>
+            </div>
+          )}
         </section>
 
         <StudentAssignmentTodos assignments={assignments} />

@@ -38,6 +38,11 @@ export function StudentTopNav({
     emoji: duty.emoji,
   }));
 
+  const characterActive =
+    pathname === "/student/character-room" ||
+    pathname === "/student/character-shop" ||
+    pathname === "/student/character-town";
+
   const navItems = [
     {
       id: "boards",
@@ -122,6 +127,34 @@ export function StudentTopNav({
               href: "/student/portfolio",
               label: "포트폴리오",
               active: pathname.startsWith("/student/portfolio"),
+            },
+          ],
+        },
+      ],
+    },
+    {
+      id: "character",
+      label: "캐릭터",
+      href: "/student/character-town",
+      active: characterActive,
+      groups: [
+        {
+          title: "캐릭터",
+          links: [
+            {
+              href: "/student/character-town",
+              label: "마을",
+              active: pathname === "/student/character-town",
+            },
+            {
+              href: "/student/character-room",
+              label: "피팅룸",
+              active: pathname === "/student/character-room",
+            },
+            {
+              href: "/student/character-shop",
+              label: "상점",
+              active: pathname === "/student/character-shop",
             },
           ],
         },

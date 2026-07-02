@@ -416,7 +416,11 @@ model Classroom {
   shoeFindings     ShoeFinding[]
 
   // Reading log / reading champion (2026-07-02)
-  readingLogs ReadingLog[]
+  readingLogs          ReadingLog[]
+  // Avatar customization MVP (2026-07-02)
+  avatarItems          AvatarItem[]
+  avatarRewardConfigs  AvatarRewardConfig[]
+  avatarGalleryEntries AvatarGalleryEntry[]
 
   @@index([teacherId])
   @@index([code])
@@ -522,7 +526,12 @@ model Student {
   shoeFindingsMarked       ShoeFinding[]     @relation("ShoeFindingMarked")
 
   // Reading log (2026-07-02)
-  readingLogs ReadingLog[]
+  readingLogs          ReadingLog[]
+  // Avatar customization MVP (2026-07-02)
+  avatarInventory      AvatarInventoryItem[]
+  avatarLoadout        AvatarLoadout?
+  avatarPurchases      AvatarPurchase[]
+  avatarGalleryEntries AvatarGalleryEntry[]
 
   @@unique([classroomId, number])
   @@index([classroomId])
@@ -1257,7 +1266,7 @@ model Card {
   // comment-area poll (2026-06-28): 교사가 발행 시 선택지 개수(2~6) 설정.
   // null/0/1 = 비활성, 2..6 = 활성화된 선택지 수. 카드 응답 DTO 에 그대로
   // 노출되며 카드별 댓글창 투표 UI 가 본 필드로 분기한다.
-  commentVoteOptionCount Int?
+  commentVoteOptionCount  Int?
   // comment-area poll labels (2026-06-28): 선택지 표시명 배열.
   // null이면 "1번", "2번" 기본 라벨로 렌더한다.
   commentVoteOptionLabels Json?
@@ -3032,7 +3041,9 @@ model Transaction {
 
   createdAt DateTime @default(now())
 
-  account StudentAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  account        StudentAccount  @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  // Avatar customization MVP (2026-07-02)
+  avatarPurchase AvatarPurchase?
 
   storeItem StoreItem? @relation(fields: [storeItemId], references: [id], onDelete: SetNull)
 
@@ -3129,19 +3140,19 @@ model CleaningFinding {
 // 채점기는 src/lib/reading-evaluator.ts 에 격리되어 있어 추후 실제 LLM 으로 교체
 // 가능. morning-summary 의 readingChampions 집계는 aiScore 의 단순 합 (v1).
 model ReadingLog {
-  id          String   @id @default(cuid())
+  id          String    @id @default(cuid())
   classroomId String
   studentId   String
   // "comic" | "story" — 추후 enum 승격 가능
   bookType    String
   title       String
   author      String
-  reflection  String   @db.Text
+  reflection  String    @db.Text
   aiScore     Int?
-  aiFeedback  String?  @db.Text
+  aiFeedback  String?   @db.Text
   evaluatedAt DateTime?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
 
   classroom Classroom @relation(fields: [classroomId], references: [id], onDelete: Cascade)
   student   Student   @relation(fields: [studentId], references: [id], onDelete: Cascade)
@@ -3636,4 +3647,138 @@ model KordleWord {
   @@unique([locale, normalized])
   @@index([locale, length, isSolution])
   @@index([locale, unitTag])
+}
+
+// ===== Avatar customization MVP (2026-07-02) =====
+//
+// Self-contained character layer. The wallet source of truth stays
+// StudentAccount.balance + Transaction; avatar purchases reuse the same
+// Transaction table with `type = "avatar_purchase"`. Art is intentionally
+// nullable: items can be code-seeded with `imageUrl: null` and a metadata
+// JSON describing fallback colors/shapes, then upgraded later.
+
+model AvatarItem {
+  id           String   @id @default(cuid())
+  // null = system/default catalog item available to every classroom.
+  // Non-null = classroom-scoped item added by the teacher.
+  classroomId  String?
+  // Stable code within a (classroomId) scope. System items use a global
+  // key (e.g. "default-skin-01"); classroom items prefix with classroomId.
+  key          String
+  name         String
+  description  String?
+  // "skin" | "background" | "hair" | "outfit" | "accessory" | "pet"
+  category     String
+  // Equipment slot key (e.g. "skin", "background"). Null = not wearable.
+  slot         String?
+  // "common" | "rare" | "epic" | "legendary"
+  rarity       String   @default("common")
+  price        Int      @default(0)
+  imageUrl     String?
+  thumbnailUrl String?
+  metadata     Json?
+  archived     Boolean  @default(false)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  classroom    Classroom?            @relation(fields: [classroomId], references: [id], onDelete: Cascade)
+  inventory    AvatarInventoryItem[]
+  loadoutSlots AvatarLoadoutItem[]
+  purchases    AvatarPurchase[]
+
+  // System items (classroomId IS NULL) share the (classroomId, key) pair
+  // where classroomId is NULL — distinct per row in both SQLite and
+  // Postgres, so app-level uniqueness gates duplicates.
+  @@unique([classroomId, key])
+  @@index([classroomId, archived])
+  @@index([category, archived])
+}
+
+model AvatarInventoryItem {
+  id          String   @id @default(cuid())
+  studentId   String
+  itemId      String
+  // "purchase" | "reward" | "grant"
+  acquiredVia String   @default("purchase")
+  // Free-form reference (transaction id, reading log id, ...). Nullable
+  // for manual grants.
+  sourceRef   String?
+  acquiredAt  DateTime @default(now())
+
+  student Student    @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  item    AvatarItem @relation(fields: [itemId], references: [id], onDelete: Cascade)
+
+  @@unique([studentId, itemId])
+  @@index([studentId])
+}
+
+model AvatarLoadout {
+  id        String   @id @default(cuid())
+  studentId String   @unique
+  updatedAt DateTime @updatedAt
+  createdAt DateTime @default(now())
+
+  student Student             @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  items   AvatarLoadoutItem[]
+}
+
+model AvatarLoadoutItem {
+  id        String  @id @default(cuid())
+  loadoutId String
+  // Slot key (e.g. "skin", "background"). Unique per loadout.
+  slot      String
+  // Nullable so an unequip can clear the row in one update.
+  itemId    String?
+
+  loadout AvatarLoadout @relation(fields: [loadoutId], references: [id], onDelete: Cascade)
+  item    AvatarItem?   @relation(fields: [itemId], references: [id], onDelete: SetNull)
+
+  @@unique([loadoutId, slot])
+  @@index([loadoutId])
+}
+
+model AvatarPurchase {
+  id            String   @id @default(cuid())
+  studentId     String
+  itemId        String
+  unitPrice     Int
+  // "succeeded" | "failed"
+  status        String   @default("succeeded")
+  // @unique: each Transaction is linked to at most one AvatarPurchase (1:1).
+  transactionId String?  @unique
+  failureReason String?
+  createdAt     DateTime @default(now())
+
+  student     Student      @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  item        AvatarItem   @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  transaction Transaction? @relation(fields: [transactionId], references: [id], onDelete: SetNull)
+
+  @@index([studentId, createdAt])
+  @@index([itemId])
+}
+
+model AvatarRewardConfig {
+  classroomId              String @id
+  // Wallet reward per reading score point (e.g. 10 won per point).
+  readingRewardPerPoint    Int    @default(10)
+  // Minimum aiScore required to trigger a payout (0..10 evaluator range).
+  readingMinScoreForPayout Int    @default(5)
+
+  classroom Classroom @relation(fields: [classroomId], references: [id], onDelete: Cascade)
+}
+
+model AvatarGalleryEntry {
+  id          String    @id @default(cuid())
+  classroomId String
+  studentId   String
+  // When the student opted in to appear in the town gallery.
+  visibleFrom DateTime  @default(now())
+  // Soft-revoke timestamp; null = currently visible.
+  revokedAt   DateTime?
+
+  classroom Classroom @relation(fields: [classroomId], references: [id], onDelete: Cascade)
+  student   Student   @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@unique([classroomId, studentId])
+  @@index([classroomId, revokedAt])
 }

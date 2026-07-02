@@ -924,6 +924,72 @@
   font-size: 13px;
 }
 
+/* -------- Character dashboard widget -------- */
+.student-avatar-card {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 16px;
+  margin-top: 16px;
+  background: var(--color-surface);
+  border: var(--border-card);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-card);
+}
+
+.student-avatar-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.student-avatar-eyebrow {
+  margin: 0 0 5px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--color-accent);
+}
+
+.student-avatar-title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+.student-avatar-links {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.student-avatar-body {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.student-avatar-balance {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.student-avatar-balance-label {
+  font-size: 12px;
+  color: var(--color-text-muted);
+}
+
+.student-avatar-balance-value {
+  font-family: var(--font-display);
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--color-text);
+}
+
 @media (max-width: 760px) {
   .student-topnav {
     align-items: flex-start;

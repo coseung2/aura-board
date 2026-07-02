@@ -5,6 +5,7 @@ import {
   evaluateReadingLog,
   type ReadingBookType,
 } from "@/lib/reading-evaluator";
+import { awardReadingReward } from "@/lib/avatar-rewards";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -192,5 +193,19 @@ export async function POST(req: Request) {
     );
   }
 
-  return NextResponse.json({ entry: serialize(created) }, { status: 201 });
+  // Award avatar/wallet reward if the reading log qualifies. The helper
+  // is intentionally fire-and-forget: a reward failure must not roll back
+  // the log entry the student just submitted.
+  let reward: { amount: number; unitLabel: string } | null = null;
+  try {
+    reward = await awardReadingReward({
+      student,
+      score: created.aiScore,
+      readingLogId: created.id,
+    });
+  } catch (e) {
+    console.error("[reading] reward hook failed", e);
+  }
+
+  return NextResponse.json({ entry: serialize(created), reward }, { status: 201 });
 }

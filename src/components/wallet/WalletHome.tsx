@@ -38,6 +38,7 @@ const TYPE_LABEL: Record<string, string> = {
   fd_open: "적금 가입",
   fd_matured: "적금 만기",
   fd_cancelled: "적금 해지",
+  avatar_purchase: "캐릭터 상점 구매",
 };
 
 export function WalletHome() {
