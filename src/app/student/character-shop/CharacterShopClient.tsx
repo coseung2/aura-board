@@ -63,8 +63,8 @@ export function CharacterShopClient() {
           <Link href="/student/character-room" className="avatar-btn avatar-btn-secondary">
             피팅룸 가기
           </Link>
-          <Link href="/student/character-town" className="avatar-btn avatar-btn-ghost">
-            마을 가기
+          <Link href="/student/reading-champions" className="avatar-btn avatar-btn-ghost">
+            전시공간
           </Link>
         </div>
       </div>

@@ -16,7 +16,7 @@ import { db } from "@/lib/db";
 import { getCurrentStudent } from "@/lib/student-auth";
 import { isAuthenticated } from "@/lib/auth";
 import { auth as nextAuth } from "@/lib/auth-config";
-import { subjectKindForClient } from "@/lib/oauth-subject";
+import { pkceRequiredForClient, subjectKindForClient } from "@/lib/oauth-subject";
 
 type SearchParams = Promise<{
   client_id?: string;
@@ -35,13 +35,36 @@ type SearchParams = Promise<{
 
 export const metadata = { title: "Aura-board 앱 권한 요청" };
 
-function renderError(title: string, detail: string) {
+type ErrorAction = {
+  href: string;
+  label: string;
+  variant: "primary" | "secondary";
+};
+
+function renderError(
+  title: string,
+  detail: string,
+  actions: ErrorAction[] = [],
+) {
   return (
     <main className="oauth-page">
       <div className="oauth-card">
         <h1 className="oauth-title">⚠ 요청을 처리할 수 없어요</h1>
         <p className="oauth-subtitle">{title}</p>
         <pre className="oauth-error-detail">{detail}</pre>
+        {actions.length > 0 && (
+          <div className="oauth-actions">
+            {actions.map((action) => (
+              <a
+                key={action.href}
+                href={action.href}
+                className={`oauth-btn oauth-btn-${action.variant}`}
+              >
+                {action.label}
+              </a>
+            ))}
+          </div>
+        )}
       </div>
     </main>
   );
@@ -57,6 +80,10 @@ export default async function AuthorizePage({
     hasLinkNonce: Boolean(q.link_nonce),
     linkNonceLen: q.link_nonce?.length ?? 0,
   });
+
+  const authorizeUrl = `/oauth/authorize?${new URLSearchParams(
+    Object.entries(q).filter(([, v]) => v != null) as [string, string][],
+  ).toString()}`;
 
   // [1] Response type must be "code".
   if (q.response_type !== "code") {
@@ -78,7 +105,18 @@ export default async function AuthorizePage({
     where: { id: q.client_id },
   });
   if (!client) {
-    return renderError("등록되지 않은 앱이에요.", `client_id=${q.client_id}`);
+    return renderError("등록되지 않은 앱이에요.", `client_id=${q.client_id}`, [
+      {
+        href: `/login?return=${encodeURIComponent("/my/wallet")}`,
+        label: "다시 로그인",
+        variant: "secondary",
+      },
+      {
+        href: "/my/wallet",
+        label: "카드 화면으로 돌아가기",
+        variant: "primary",
+      },
+    ]);
   }
 
   const allowedRedirects = JSON.parse(client.redirectUris) as string[];
@@ -104,18 +142,21 @@ export default async function AuthorizePage({
   }
 
   // [3] PKCE enforcement.
-  if (client.pkceRequired) {
+  const pkceRequired = pkceRequiredForClient(client.id, client.pkceRequired);
+
+  if (pkceRequired) {
     if (!q.code_challenge || q.code_challenge_method !== "S256") {
       return renderError(
         "PKCE(code_challenge_method=S256)가 필요해요.",
         `code_challenge=${q.code_challenge ?? "(없음)"}\nmethod=${q.code_challenge_method ?? "(없음)"}`,
       );
     }
+  } else if (q.code_challenge && q.code_challenge_method !== "S256") {
+    return renderError(
+      "PKCE(code_challenge_method=S256)가 필요해요.",
+      `code_challenge=${q.code_challenge}\nmethod=${q.code_challenge_method ?? "(없음)"}`,
+    );
   }
-
-  const authorizeUrl = `/oauth/authorize?${new URLSearchParams(
-    Object.entries(q).filter(([, v]) => v != null) as [string, string][],
-  ).toString()}`;
 
   // [4] Subject session lookup. Teacher (user) clients use NextAuth Google
   // session; student clients use student cookie session. Mismatch = bounce

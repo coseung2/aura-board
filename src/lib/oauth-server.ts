@@ -177,7 +177,7 @@ export async function consumeAuthCode(params: {
   code: string;
   clientId: string;
   redirectUri: string;
-  codeVerifier: string;
+  codeVerifier?: string;
 }): Promise<
   | { ok: true; studentId: string; scope: string }
   | { ok: false; error: "invalid_grant" }
@@ -197,9 +197,12 @@ export async function consumeAuthCode(params: {
   // 으로 잘못 보낸 경우 → invalid_grant.
   if (!row.studentId) return { ok: false, error: "invalid_grant" };
 
-  // PKCE S256: code_challenge === BASE64URL(SHA256(code_verifier))
-  const challenge = createHash("sha256").update(params.codeVerifier).digest("base64url");
-  if (challenge !== row.codeChallenge) return { ok: false, error: "invalid_grant" };
+  if (row.codeChallengeMethod !== "none") {
+    if (!params.codeVerifier) return { ok: false, error: "invalid_grant" };
+    // PKCE S256: code_challenge === BASE64URL(SHA256(code_verifier))
+    const challenge = createHash("sha256").update(params.codeVerifier).digest("base64url");
+    if (challenge !== row.codeChallenge) return { ok: false, error: "invalid_grant" };
+  }
 
   await db.oAuthAuthCode.update({
     where: { code: params.code },

@@ -16,7 +16,7 @@ import { getCurrentStudent } from "@/lib/student-auth";
 import { getCurrentUser } from "@/lib/auth";
 import { issueAuthCode } from "@/lib/oauth-server";
 import { issueTeacherAuthCode } from "@/lib/oauth-teacher";
-import { subjectKindForClient } from "@/lib/oauth-subject";
+import { pkceRequiredForClient, subjectKindForClient } from "@/lib/oauth-subject";
 import { verifyLinkNonce } from "@/lib/canva-link-nonce";
 
 export const runtime = "nodejs";
@@ -51,9 +51,15 @@ export async function POST(req: Request) {
   if (!redirects.includes(redirectUri)) {
     return NextResponse.json({ error: "invalid_redirect_uri" }, { status: 400 });
   }
-  if (client.pkceRequired && (!codeChallenge || codeChallengeMethod !== "S256")) {
+  const pkceRequired = pkceRequiredForClient(clientId, client.pkceRequired);
+  if (pkceRequired && (!codeChallenge || codeChallengeMethod !== "S256")) {
     return NextResponse.json({ error: "invalid_request" }, { status: 400 });
   }
+  if (!pkceRequired && codeChallenge && codeChallengeMethod !== "S256") {
+    return NextResponse.json({ error: "invalid_request" }, { status: 400 });
+  }
+  const storedCodeChallenge = codeChallenge || "none";
+  const storedCodeChallengeMethod = codeChallenge ? "S256" : "none";
 
   const subject = subjectKindForClient(clientId);
 
@@ -79,8 +85,8 @@ export async function POST(req: Request) {
       clientId,
       redirectUri,
       scope,
-      codeChallenge,
-      codeChallengeMethod,
+      codeChallenge: storedCodeChallenge,
+      codeChallengeMethod: storedCodeChallengeMethod,
       state: state || null,
     });
     return safeRedirect(redirectUri, {
@@ -153,8 +159,8 @@ export async function POST(req: Request) {
     clientId,
     redirectUri,
     scope,
-    codeChallenge,
-    codeChallengeMethod,
+    codeChallenge: storedCodeChallenge,
+    codeChallengeMethod: storedCodeChallengeMethod,
     state: state || null,
   });
 

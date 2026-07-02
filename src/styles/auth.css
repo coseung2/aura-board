@@ -681,6 +681,9 @@
 }
 
 .oauth-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   padding: 10px 20px;
   border-radius: var(--radius-btn);
   font-size: 14px;
@@ -688,6 +691,7 @@
   cursor: pointer;
   font-family: var(--font-body);
   border: 1px solid transparent;
+  text-decoration: none;
   transition: background 150ms ease, border-color 150ms ease;
 }
 

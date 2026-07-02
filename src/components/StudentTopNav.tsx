@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useState } from "react";
 import { Logo } from "./Logo";
-import { MegaNav } from "./MegaNav";
+import { MegaNav, type MegaNavItem } from "./MegaNav";
 import { StudentNotificationBell } from "./StudentNotificationBell";
 
 type Duty = {
@@ -39,11 +39,17 @@ export function StudentTopNav({
   }));
 
   const characterActive =
+    pathname === "/student/reading-champions" ||
+    pathname === "/student/character-town" ||
     pathname === "/student/character-room" ||
-    pathname === "/student/character-shop" ||
-    pathname === "/student/character-town";
+    pathname === "/student/character-shop";
+  const readingRecordActive =
+    pathname === "/student/reading" || pathname.startsWith("/student/reading/");
+  const readingChampionsActive = pathname.startsWith("/student/reading-champions");
+  const readingActive =
+    readingRecordActive || readingChampionsActive;
 
-  const navItems = [
+  const navItems: MegaNavItem[] = [
     {
       id: "boards",
       label: "보드",
@@ -66,8 +72,13 @@ export function StudentTopNav({
             },
             {
               href: "/student/reading",
-              label: "독서",
-              active: pathname.startsWith("/student/reading"),
+              label: "독서 기록",
+              active: readingRecordActive,
+            },
+            {
+              href: "/student/reading-champions",
+              label: "독서왕 전시",
+              active: readingChampionsActive,
             },
           ],
         },
@@ -134,17 +145,19 @@ export function StudentTopNav({
     },
     {
       id: "character",
-      label: "캐릭터",
-      href: "/student/character-town",
+      label: "독서왕",
+      href: "/student/reading-champions",
       active: characterActive,
       groups: [
         {
           title: "캐릭터",
           links: [
             {
-              href: "/student/character-town",
-              label: "마을",
-              active: pathname === "/student/character-town",
+              href: "/student/reading-champions",
+              label: "독서왕 전시",
+              active:
+                readingChampionsActive ||
+                pathname === "/student/character-town",
             },
             {
               href: "/student/character-room",
@@ -182,15 +195,20 @@ export function StudentTopNav({
       id: "reading",
       label: "독서",
       href: "/student/reading",
-      active: pathname.startsWith("/student/reading"),
+      active: readingActive,
       groups: [
         {
           title: "학습",
           links: [
             {
-              href: "/student/reading",
-              label: "독서",
-              active: pathname.startsWith("/student/reading"),
+                href: "/student/reading",
+                label: "독서 기록",
+                active: readingRecordActive,
+              },
+            {
+              href: "/student/reading-champions",
+              label: "독서왕 전시",
+              active: readingChampionsActive,
             },
           ],
         },

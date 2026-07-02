@@ -27,16 +27,20 @@ function useAvatarGallery(classroomId: string | null) {
     async function load() {
       if (!classroomId) return;
       try {
-        const res = await fetch(`/api/avatar/gallery?classroomId=${encodeURIComponent(classroomId)}`, {
-          cache: "no-store",
-        });
+        const res = await fetch(
+          `/api/avatar/gallery?classroomId=${encodeURIComponent(classroomId)}`,
+          { cache: "no-store" },
+        );
         if (!res.ok) {
           const body = await res.json().catch(() => ({}));
           if (!cancelled) {
             setState({
               status: "error",
               data: null,
-              error: typeof body.error === "string" ? body.error : "마을 정보를 불러올 수 없어요",
+              error:
+                typeof body.error === "string"
+                  ? body.error
+                  : "전시공간 정보를 불러올 수 없어요.",
             });
           }
           return;
@@ -48,7 +52,7 @@ function useAvatarGallery(classroomId: string | null) {
           setState({
             status: "error",
             data: null,
-            error: "네트워크 오류가 발생했어요",
+            error: "네트워크 오류가 발생했어요.",
           });
         }
       }
@@ -63,7 +67,13 @@ function useAvatarGallery(classroomId: string | null) {
   return state;
 }
 
-function TownRow({ students, items }: { students: AvatarGalleryResponse["students"]; items: AvatarItem[] }) {
+function ExhibitionRow({
+  students,
+  items,
+}: {
+  students: AvatarGalleryResponse["students"];
+  items: AvatarItem[];
+}) {
   return (
     <div className="character-town-row">
       {students.map((student) => {
@@ -79,7 +89,7 @@ function TownRow({ students, items }: { students: AvatarGalleryResponse["student
                   items={items}
                   equipped={student.equipped}
                   size={80}
-                  ariaLabel={`${student.name} 캐릭터`}
+                  ariaLabel={`${student.name} 아바타`}
                 />
               ) : (
                 <div className="character-town-hidden" aria-label="비공개 캐릭터">
@@ -113,40 +123,55 @@ export function CharacterTownClient() {
     return result;
   }, [gallery]);
 
-  if (me.status === "loading") return <LoadingState message="내 정보를 불러오는 중…" />;
-  if (me.status === "error" || !me.data) return <ErrorState message={me.error ?? "불러오지 못했어요"} onRetry={me.reload} />;
+  if (me.status === "loading") {
+    return <LoadingState message="캐릭터 정보를 불러오는 중..." />;
+  }
+  if (me.status === "error" || !me.data) {
+    return (
+      <ErrorState
+        message={me.error ?? "캐릭터 정보를 불러오지 못했어요."}
+        onRetry={me.reload}
+      />
+    );
+  }
 
   return (
     <main className="character-page character-town-page">
       <div className="character-page-header">
         <div>
-          <h1 className="character-page-title">마을</h1>
-          <p className="character-page-subtitle">우리 반 친구들의 캐릭터를 구경해요</p>
+          <h1 className="character-page-title">독서왕 전시공간</h1>
+          <p className="character-page-subtitle">
+            우리 반 친구들의 캐릭터를 번호 순서대로 구경해요.
+          </p>
         </div>
         <div className="character-page-actions">
           <Link href="/student/character-room" className="avatar-btn avatar-btn-secondary">
-            피팅룸 가기
+            피팅룸
           </Link>
           <Link href="/student/character-shop" className="avatar-btn avatar-btn-secondary">
-            상점 가기
+            상점
           </Link>
         </div>
       </div>
 
-      {gallery.status === "error" && (
-        <ErrorState message={gallery.error} />
-      )}
+      {gallery.status === "error" && <ErrorState message={gallery.error} />}
 
-      {gallery.status === "loading" && <LoadingState message="마을 정보를 불러오는 중…" />}
+      {gallery.status === "loading" && (
+        <LoadingState message="전시공간 정보를 불러오는 중..." />
+      )}
 
       {gallery.status === "ok" && (
         <>
           {rows.length === 0 ? (
-            <div className="avatar-empty">아직 마을에 친구들이 없어요.</div>
+            <div className="avatar-empty">아직 전시할 친구가 없어요.</div>
           ) : (
-            <div className="character-town-ground" role="list" aria-label="우리 반 캐릭터 목록">
+            <div
+              className="character-town-ground"
+              role="list"
+              aria-label="우리 반 독서왕 전시공간"
+            >
               {rows.map((row, index) => (
-                <TownRow key={index} students={row} items={me.data?.items ?? []} />
+                <ExhibitionRow key={index} students={row} items={me.data?.items ?? []} />
               ))}
             </div>
           )}

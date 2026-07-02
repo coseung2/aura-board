@@ -101,7 +101,7 @@
   position: absolute;
   top: calc(100% + 6px);
   left: 0;
-  z-index: 30;
+  z-index: var(--z-nav-popover, 3002);
   min-width: 240px;
   background: var(--color-surface);
   border: 1px solid var(--color-border);
@@ -307,7 +307,7 @@
 .parent-topnav {
   position: sticky;
   top: 0;
-  z-index: 50;
+  z-index: var(--z-topnav, 3000);
   display: flex;
   align-items: center;
   justify-content: space-between;

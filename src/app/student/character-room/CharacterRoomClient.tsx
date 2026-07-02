@@ -103,8 +103,8 @@ export function CharacterRoomClient() {
           <Link href="/student/character-shop" className="avatar-btn avatar-btn-secondary">
             상점 가기
           </Link>
-          <Link href="/student/character-town" className="avatar-btn avatar-btn-ghost">
-            마을 가기
+          <Link href="/student/reading-champions" className="avatar-btn avatar-btn-ghost">
+            전시공간
           </Link>
         </div>
       </div>
@@ -130,7 +130,7 @@ export function CharacterRoomClient() {
               disabled={saving}
               aria-pressed={data.galleryVisible}
             >
-              {data.galleryVisible ? "마을에 보이기 중" : "마을에 숨기기"}
+              {data.galleryVisible ? "전시공간에 보이는 중" : "전시공간에서 숨김"}
             </button>
           </div>
           {saveError && <p className="character-form-error" role="alert">{saveError}</p>}

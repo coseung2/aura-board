@@ -19,7 +19,7 @@ import {
   issueTeacherTokenPair,
   rotateTeacherRefresh,
 } from "@/lib/oauth-teacher";
-import { subjectKindForClient } from "@/lib/oauth-subject";
+import { pkceRequiredForClient, subjectKindForClient } from "@/lib/oauth-subject";
 
 export const runtime = "nodejs";
 export const maxDuration = 15;
@@ -65,7 +65,7 @@ export async function POST(req: Request) {
     if (!code || !redirectUri) {
       return errorResponse("invalid_request", "code and redirect_uri required");
     }
-    if (client.pkceRequired && !codeVerifier) {
+    if (pkceRequiredForClient(client.id, client.pkceRequired) && !codeVerifier) {
       return errorResponse("invalid_request", "code_verifier required");
     }
 
