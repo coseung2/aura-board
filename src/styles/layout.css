@@ -179,7 +179,7 @@
 .ab-topnav {
   position: sticky;
   top: 0;
-  z-index: var(--z-topnav, 3000);
+  z-index: var(--z-topnav, 2147483000);
   display: flex;
   align-items: center;
   justify-content: space-between;

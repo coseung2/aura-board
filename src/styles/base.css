@@ -199,6 +199,16 @@ body.app-background-active > :not(.app-background-layer) {
   z-index: 1;
 }
 
+body.app-background-active .ab-topnav,
+body.app-background-active .student-topnav,
+body.app-background-active .parent-topnav {
+  z-index: var(--z-topnav, 2147483000);
+}
+
+body.app-background-active .mega-nav-panel {
+  z-index: var(--z-mega-nav-panel, 2147483001);
+}
+
 .app-background-layer {
   position: fixed;
   inset: 0;
