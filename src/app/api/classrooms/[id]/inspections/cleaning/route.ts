@@ -33,11 +33,13 @@ async function authorize(classroomId: string) {
   if (!classroom) return { status: 404 as const };
 
   const isTeacher = user?.id === classroom.teacherId;
-  const inspectorAllowed = !isTeacher
-    ? await hasPermission(classroomId, { studentId: student?.id }, "inspections.cleaning")
-    : false;
-  if (!isTeacher && !inspectorAllowed) return { status: 403 as const };
-  return { status: 200 as const, student, isTeacher };
+  const inspectorAllowed = await hasPermission(
+    classroomId,
+    { userId: user?.id, studentId: student?.id },
+    "inspections.cleaning",
+  );
+  if (!inspectorAllowed) return { status: 403 as const };
+  return { status: 200 as const, user, student, isTeacher };
 }
 
 async function loadSeatLabels(classroomId: string): Promise<Map<string, string>> {
@@ -96,6 +98,7 @@ export async function GET(
       orderBy: { createdAt: "desc" },
       include: {
         reporter: { select: { id: true, name: true } },
+        reporterUser: { select: { id: true, name: true } },
       },
     }),
   ]);
@@ -121,7 +124,7 @@ export async function GET(
               photoUrl: finding.photoUrl,
               note: finding.note,
               recordedAt: finding.createdAt.toISOString(),
-              recordedByName: finding.reporter.name,
+              recordedByName: finding.reporter?.name ?? finding.reporterUser?.name ?? null,
             }
           : null,
       };
@@ -136,7 +139,7 @@ export async function POST(
   const { id: classroomId } = await params;
   const auth = await authorize(classroomId);
   if (auth.status !== 200) return errorForStatus(auth.status);
-  if (auth.isTeacher || !auth.student) {
+  if (!auth.isTeacher && !auth.student) {
     return NextResponse.json(
       { error: "Only the student inspector can save results." },
       { status: 403 },
@@ -174,7 +177,8 @@ export async function POST(
       await tx.cleaningFinding.createMany({
         data: dirtyFindings.map((finding) => ({
           classroomId,
-          reporterId: auth.student!.id,
+          reporterId: auth.student?.id ?? null,
+          reporterUserId: auth.isTeacher ? auth.user?.id ?? null : null,
           markedStudentId: finding.studentId,
           dirty: true,
           note: finding.note?.trim() || null,

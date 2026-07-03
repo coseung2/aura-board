@@ -105,6 +105,9 @@ model User {
 
   // Classroom check tasks created by this teacher (checker role, 2026-06-28)
   classroomCheckTasks ClassroomCheckTask[] @relation("ClassroomCheckTaskCreatedBy")
+
+  cleaningFindingsReported CleaningFinding[] @relation("CleaningFindingReporterUser")
+  shoeFindingsReported     ShoeFinding[]     @relation("ShoeFindingReporterUser")
 }
 
 // ???????? Audit Log (Seed 14 security, 2026-04-22) ????????
@@ -3115,7 +3118,8 @@ model ClassroomCheckSubmission {
 model CleaningFinding {
   id              String   @id @default(cuid())
   classroomId     String
-  reporterId      String
+  reporterId      String?
+  reporterUserId  String?
   markedStudentId String
   dirty           Boolean  @default(false)
   note            String?
@@ -3125,12 +3129,14 @@ model CleaningFinding {
   updatedAt       DateTime @updatedAt
 
   classroom     Classroom @relation(fields: [classroomId], references: [id], onDelete: Cascade)
-  reporter      Student   @relation("CleaningFindingReporter", fields: [reporterId], references: [id], onDelete: Cascade)
+  reporter      Student?  @relation("CleaningFindingReporter", fields: [reporterId], references: [id], onDelete: Cascade)
+  reporterUser  User?     @relation("CleaningFindingReporterUser", fields: [reporterUserId], references: [id], onDelete: Cascade)
   markedStudent Student   @relation("CleaningFindingMarked", fields: [markedStudentId], references: [id], onDelete: Cascade)
 
   @@unique([classroomId, markedStudentId, findingDate])
   @@index([classroomId, findingDate])
   @@index([reporterId])
+  @@index([reporterUserId])
 }
 
 // Reading log / reading champion (2026-07-02)
@@ -3165,7 +3171,8 @@ model ReadingLog {
 model ShoeFinding {
   id              String   @id @default(cuid())
   classroomId     String
-  reporterId      String
+  reporterId      String?
+  reporterUserId  String?
   markedStudentId String
   notArranged     Boolean  @default(true)
   note            String?
@@ -3174,12 +3181,14 @@ model ShoeFinding {
   updatedAt       DateTime @updatedAt
 
   classroom     Classroom @relation(fields: [classroomId], references: [id], onDelete: Cascade)
-  reporter      Student   @relation("ShoeFindingReporter", fields: [reporterId], references: [id], onDelete: Cascade)
+  reporter      Student?  @relation("ShoeFindingReporter", fields: [reporterId], references: [id], onDelete: Cascade)
+  reporterUser  User?     @relation("ShoeFindingReporterUser", fields: [reporterUserId], references: [id], onDelete: Cascade)
   markedStudent Student   @relation("ShoeFindingMarked", fields: [markedStudentId], references: [id], onDelete: Cascade)
 
   @@unique([classroomId, markedStudentId, findingDate])
   @@index([classroomId, findingDate])
   @@index([reporterId])
+  @@index([reporterUserId])
 }
 
 // ????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????

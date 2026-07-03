@@ -4649,17 +4649,18 @@
 
 .morning-cleaning-photo-modal .morning-cleaning-note {
   position: absolute;
-  left: 50%;
-  bottom: max(18px, env(safe-area-inset-bottom));
+  inset: auto max(18px, env(safe-area-inset-right))
+    max(18px, env(safe-area-inset-bottom))
+    max(18px, env(safe-area-inset-left));
   z-index: 2;
-  width: min(720px, calc(100vw - 36px));
+  max-width: min(680px, calc(100vw - 36px));
   padding: 10px 12px;
   border: 1px solid rgba(255, 255, 255, 0.16);
   border-radius: 8px;
   background: rgba(0, 0, 0, 0.58);
   color: rgba(255, 255, 255, 0.92);
   font-size: 14px;
-  transform: translateX(-50%);
+  transform: none;
 }
 
 .morning-modal-layer {
@@ -4762,12 +4763,29 @@
 }
 
 .morning-cleaning-photo-modal img {
+  position: absolute;
+  inset: 0;
   height: 100%;
+  width: 100%;
   max-height: none;
-  object-fit: contain;
+  object-fit: cover;
   border: 0;
   border-radius: 0;
   background: transparent;
+}
+
+.morning-cleaning-photo-modal::after {
+  content: "";
+  position: absolute;
+  inset: auto 0 0;
+  z-index: 1;
+  height: 34vh;
+  pointer-events: none;
+  background: linear-gradient(
+    to top,
+    rgba(0, 0, 0, 0.58),
+    rgba(0, 0, 0, 0)
+  );
 }
 
 .morning-modal-close {

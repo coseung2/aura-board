@@ -33,6 +33,10 @@ async function loadSeatLabels(classroomId: string): Promise<Map<string, string>>
 async function loadReadingChampionLogs(
   classroomId: string,
 ): Promise<ReadingLogRow[]> {
+  if (!db.readingLog) {
+    console.warn("[morning-summary] ReadingLog delegate is not available yet.");
+    return [];
+  }
   try {
     return await db.readingLog.findMany({
       where: { classroomId, aiScore: { not: null } },
@@ -59,7 +63,10 @@ function isMissingReadingLogTable(e: unknown): boolean {
     const code = (e as { code?: unknown }).code;
     if (code === "P2021") return true;
   }
-  return e instanceof Error && e.message.includes("ReadingLog");
+  return (
+    e instanceof Error &&
+    (e.message.includes("ReadingLog") || e.message.includes("readingLog"))
+  );
 }
 
 export async function GET(
@@ -121,6 +128,7 @@ export async function GET(
       orderBy: { createdAt: "desc" },
       include: {
         reporter: { select: { id: true, name: true, number: true } },
+        reporterUser: { select: { id: true, name: true } },
         markedStudent: { select: { id: true, name: true, number: true } },
       },
     }),
@@ -129,6 +137,7 @@ export async function GET(
       orderBy: { createdAt: "desc" },
       include: {
         reporter: { select: { id: true, name: true, number: true } },
+        reporterUser: { select: { id: true, name: true } },
         markedStudent: { select: { id: true, name: true, number: true } },
       },
     }),
@@ -154,12 +163,12 @@ export async function GET(
     seatLabel: seatLabels.get(row.markedStudentId) ?? null,
     photoUrl: row.photoUrl,
     note: row.note,
-    recordedByName: row.reporter.name,
+    recordedByName: row.reporter?.name ?? row.reporterUser?.name ?? null,
   }));
 
   const shoeFindings = shoes.map((row) => ({
     student: row.markedStudent,
-    recordedByName: row.reporter.name,
+    recordedByName: row.reporter?.name ?? row.reporterUser?.name ?? null,
   }));
 
   // Reading champions: 점수 합계 상위 5명. 동점이면 최근 등록 log 가 있는

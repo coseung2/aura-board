@@ -73,13 +73,20 @@ function isMissingReadingLogTable(e: unknown): boolean {
     const code = (e as { code?: unknown }).code;
     if (code === "P2021") return true;
   }
-  return e instanceof Error && e.message.includes("ReadingLog");
+  return (
+    e instanceof Error &&
+    (e.message.includes("ReadingLog") || e.message.includes("readingLog"))
+  );
 }
 
 export async function GET() {
   const student = await getCurrentStudent();
   if (!student) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+  }
+
+  if (!db.readingLog) {
+    return NextResponse.json({ entries: [], count: 0 });
   }
 
   let rows: Awaited<ReturnType<typeof db.readingLog.findMany>>;
