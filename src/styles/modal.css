@@ -1,5 +1,10 @@
 /* -------- Modal -------- */
 
+:root {
+  --modal-safe-top: calc(env(safe-area-inset-top, 0px) + 76px);
+  --modal-safe-bottom: calc(env(safe-area-inset-bottom, 0px) + 24px);
+}
+
 .modal-backdrop {
   position: fixed;
   inset: 0;
@@ -11,7 +16,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 32px 16px;
+  padding: var(--modal-safe-top) 16px var(--modal-safe-bottom);
   overflow-y: auto;
 }
 
@@ -41,9 +46,9 @@
   width: min(1400px, calc(100vw - 48px));
   /* dvh (dynamic viewport) so Chrome Android's address-bar resize
      doesn't leave the modal taller than the visible viewport. */
-  height: calc(100dvh - 48px);
+  height: calc(100dvh - var(--modal-safe-top) - var(--modal-safe-bottom));
   max-width: calc(100vw - 48px);
-  max-height: calc(100dvh - 48px);
+  max-height: calc(100dvh - var(--modal-safe-top) - var(--modal-safe-bottom));
   padding: 0;
   overflow: visible;
   display: flex;
@@ -962,7 +967,7 @@
 .card-detail-modal[data-has-media="false"] {
   width: min(900px, calc(100vw - 48px));
   height: auto;
-  max-height: calc(100dvh - 48px);
+  max-height: calc(100dvh - var(--modal-safe-top) - var(--modal-safe-bottom));
   overflow-y: auto;
 }
 .card-detail-modal[data-detail-layout="text-meta"] .card-detail-content-zone,
@@ -983,6 +988,11 @@
    세로, phone) OR narrower than 1200px (narrow desktop window). 1컬럼 +
    rail 구조에서는 main 위, rail 아래로 쌓음. */
 @media (orientation: portrait), (max-width: 1199px) {
+  :root {
+    --modal-safe-top: calc(env(safe-area-inset-top, 0px) + 112px);
+    --modal-safe-bottom: calc(env(safe-area-inset-bottom, 0px) + 18px);
+  }
+
   .card-detail-body {
     grid-template-columns: 1fr;
     grid-template-rows: 55dvh auto;
@@ -997,6 +1007,10 @@
 /* Tighter portrait split for skinny portrait viewports (phone portrait).
    Drop media to 45dvh so text + actions aren't hidden below the fold. */
 @media (orientation: portrait) and (max-width: 640px) {
+  :root {
+    --modal-safe-top: calc(env(safe-area-inset-top, 0px) + 144px);
+  }
+
   .card-detail-body {
     grid-template-rows: 45dvh 1fr;
   }
