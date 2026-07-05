@@ -17,6 +17,7 @@ type CardWire = {
   content: string;
   color: string | null;
   imageUrl: string | null;
+  thumbUrl: string | null;
   linkUrl: string | null;
   linkTitle: string | null;
   linkDesc: string | null;
@@ -41,6 +42,10 @@ type CardWire = {
   authorName: string | null;
   queueStatus: string | null;
   anonymousAuthor: boolean;
+  likeCount: number;
+  commentCount: number;
+  commentVoteOptionCount: number | null;
+  commentVoteOptionLabels: string[] | null;
   authors: Array<{
     id: string;
     studentId: string | null;
@@ -51,6 +56,7 @@ type CardWire = {
     id: string;
     kind: string;
     url: string;
+    previewUrl: string | null;
     fileName: string | null;
     fileSize: number | null;
     mimeType: string | null;
@@ -155,12 +161,14 @@ export async function GET(
               id: true,
               kind: true,
               url: true,
+              previewUrl: true,
               fileName: true,
               fileSize: true,
               mimeType: true,
               order: true,
             },
           },
+          _count: { select: { likes: true, comments: true } },
         },
       }),
       db.section.findMany({ where: { boardId: board.id } }),
@@ -215,6 +223,7 @@ export async function GET(
       content: c.content,
       color: c.color,
       imageUrl: c.imageUrl,
+      thumbUrl: c.thumbUrl,
       linkUrl: c.linkUrl,
       linkTitle: c.linkTitle,
       linkDesc: c.linkDesc,
@@ -239,6 +248,14 @@ export async function GET(
       authorName: c.author?.name ?? null,
       queueStatus: c.queueStatus,
       anonymousAuthor: board.anonymousAuthor,
+      likeCount: c._count.likes,
+      commentCount: c._count.comments,
+      commentVoteOptionCount: c.commentVoteOptionCount ?? null,
+      commentVoteOptionLabels: Array.isArray(c.commentVoteOptionLabels)
+        ? c.commentVoteOptionLabels.filter(
+            (label): label is string => typeof label === "string",
+          )
+        : null,
       authors: c.authors.map((a) => ({
         id: a.id,
         studentId: a.studentId,
@@ -249,6 +266,7 @@ export async function GET(
         id: a.id,
         kind: a.kind,
         url: a.url,
+        previewUrl: a.previewUrl,
         fileName: a.fileName,
         fileSize: a.fileSize,
         mimeType: a.mimeType,

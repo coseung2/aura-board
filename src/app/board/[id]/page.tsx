@@ -864,7 +864,7 @@ export default async function BoardPage({
           title={board.title}
           layout={board.layout}
           isStudent={!!studentViewer}
-          backHref={studentViewer ? "/student" : "/"}
+          backHref={studentViewer ? "/student" : "/dashboard"}
           canEdit={effectiveRole === "owner" || effectiveRole === "editor"}
           classrooms={settingsClassrooms}
           classroomId={board.classroomId}
