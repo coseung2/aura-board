@@ -8,7 +8,7 @@ export default function PrivacyPage() {
   return (
     <main className="docs-page">
       <article className="docs-article">
-        <Link href="/landing" className="docs-back">← 홈으로</Link>
+        <Link href="/dashboard" className="docs-back">← 홈으로</Link>
         <h1 className="docs-title">개인정보처리방침</h1>
         <p className="docs-subtitle">최종 수정일: 2026년 6월 16일 | 시행일: 2026년 6월 16일</p>
 
