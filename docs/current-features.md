@@ -16,6 +16,7 @@ Live feature inventory. Update when merging feature tasks.
 | `breakout` | 모둠 학습 보드 (2026-04-12, foundation BR-1~BR-4) — 8종 템플릿(Free 3 + Pro 5), N모둠 × S섹션 자동 복사, teacher-pool 공용 섹션, "모든 모둠에 복제" 일괄 액션 |
 | `dj-queue` | DJ 큐 (2026-04-18) — YouTube 곡 대기열, classroom-role 학생 DJ가 교사와 동등한 순서·승인 권한. Now-Playing pinned + 단일 세로 큐 + status pill (pending/approved/played/rejected) |
 | `vibe-arcade` | 학급 Steam (2026-04-20, Seed 13 v1) — 학생이 Claude Sonnet과 대화해 브라우저 실행 HTML 게임·퀴즈를 만들고 반 친구들이 cross-origin 샌드박스에서 플레이·리뷰. 현재 스코프: **backend + 카탈로그/게이트오프 UI 뼈대**. Studio/PlayModal/ReviewPanel/TeacherModerationDashboard UI는 phase7 후속 세션. `VibeArcadeConfig.enabled` gate 기본 false. |
+| `speed-game` | 모둠별 실시간 단어 설명·맞추기 게임 (2026-07-06) — 교사가 라운드/단어/채점방식/점수를 구성, 학생은 모둠 내 역할(설명자/추리자)로 실시간 참여. SSE 기반 상태 동기화. |
 
 ## Classroom & Student
 - 교사 `Classroom` 생성/수정 + 6-char classroom code

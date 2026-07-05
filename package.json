@@ -19,6 +19,7 @@
     "seed:plant": "tsx prisma/seed-plant-journal.ts",
     "seed:breakout": "tsx prisma/seed-breakout-templates.ts",
     "seed:drawing-assets": "tsx prisma/seed-drawing-assets.ts",
+    "seed:speed-game": "tsx prisma/seed-speed-game-word-sets.ts",
     "postinstall": "prisma generate"
   },
   "dependencies": {

@@ -19,8 +19,10 @@ import { DJBoard } from "@/components/DJBoard";
 import { VibeArcadeBoard } from "@/components/VibeArcadeBoard";
 import { VibeGalleryBoard } from "@/components/VibeGalleryBoard";
 import { QuestionBoard } from "@/components/QuestionBoard";
+import { SpeedGameBoard } from "@/components/speed-game/SpeedGameBoard";
 import { KordleTeacherBoard } from "@/features/kordle/components/KordleTeacherBoard";
 import { cloneStructure } from "@/lib/breakout";
+import { loadGameSnapshot } from "@/lib/speed-game/runtime";
 import type { PlantJournalResponse } from "@/types/plant";
 import type { BoardSection } from "@/components/BoardSettingsPanel";
 import { BoardVisitTracker } from "@/components/BoardVisitTracker";
@@ -141,13 +143,15 @@ export default async function BoardPage({
   const needsDrawingData = board.layout === "drawing";
   const needsBreakoutData = board.layout === "breakout";
   const needsQuestionData = board.layout === "question-board";
+  const needsSpeedGameData = board.layout === "speed-game";
   const needsCards =
     !needsAssignmentData &&
     !needsQuizData &&
     !needsPlantData &&
     !needsEventData &&
     !needsDrawingData &&
-    !needsQuestionData;
+    !needsQuestionData &&
+    !needsSpeedGameData;
   // Breakout reuses cards + sections both.
   const needsSections =
     board.layout === "columns" ||
@@ -250,6 +254,14 @@ export default async function BoardPage({
         orderBy: { createdAt: "desc" },
       })
     : null;
+  const speedGamePromise = needsSpeedGameData
+    ? db.speedGame
+        .findUnique({
+          where: { boardId: board.id },
+          select: { id: true },
+        })
+        .then((game) => (game ? loadGameSnapshot(game.id) : null))
+    : null;
   // Effective role = teacher via BoardMember OR classroom-role-granted student
   // OR classroom-student baseline (viewer) OR null.
   const rolePromise: Promise<Role | null> = getEffectiveBoardRole(board.id, {
@@ -287,6 +299,7 @@ export default async function BoardPage({
     assignmentSlotsRaw,
     sectionBreakoutConfigRaw,
     sectionBreakoutGroupRaw,
+    speedGameRaw,
   ] = await Promise.all([
     cardsPromise,
     sectionsPromise,
@@ -298,6 +311,7 @@ export default async function BoardPage({
     assignmentSlotsPromise,
     sectionBreakoutConfigPromise,
     sectionBreakoutGroupPromise,
+    speedGamePromise,
   ]);
   const breakoutMemberships = breakoutMembershipsRaw ?? [];
   const rosterStudents = rosterStudentsRaw ?? [];
@@ -318,6 +332,7 @@ export default async function BoardPage({
   const cards = cardsRaw ?? [];
   const sections = sectionsRaw ?? [];
   const quizzes = quizzesRaw ?? [];
+  const speedGameInitial = speedGameRaw ?? null;
 
   // Role resolution moved into getEffectiveBoardRole (teacher + student DJ +
   // classroom-student baseline). studentViewer is the identity signal for
@@ -834,6 +849,23 @@ export default async function BoardPage({
             }
             viewerKind={viewerKind}
             currentStudentId={studentViewer?.id ?? null}
+          />
+        );
+      }
+      case "speed-game": {
+        const viewerKind: "teacher" | "student" | "none" = studentViewer
+          ? "student"
+          : effectiveRole === "owner" || effectiveRole === "editor"
+            ? "teacher"
+            : "none";
+        return (
+          <SpeedGameBoard
+            boardId={board!.id}
+            boardSlug={board!.slug ?? board!.id}
+            classroomId={board!.classroomId ?? ""}
+            viewerKind={viewerKind}
+            currentStudentId={studentViewer?.id ?? null}
+            initialGame={speedGameInitial}
           />
         );
       }

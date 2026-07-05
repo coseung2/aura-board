@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import { getCurrentStudent } from "@/lib/student-auth";
 import { getStudentDuties } from "@/lib/role-portals";
 import { StudentTopNav } from "@/components/StudentTopNav";
-import { CharacterRoomClient } from "./CharacterRoomClient";
+import { StudentFeatureComingSoon } from "@/components/student/StudentFeatureComingSoon";
 
 export const dynamic = "force-dynamic";
 
@@ -18,7 +18,10 @@ export default async function CharacterRoomPage() {
         classroomName={student.classroom.name}
         duties={duties}
       />
-      <CharacterRoomClient />
+      <StudentFeatureComingSoon
+        title="내 캐릭터"
+        description="학생별 캐릭터 꾸미기 기능은 아직 개발 중이에요. 보유 아이템과 장착 기능을 안정화한 뒤 열어둘게요."
+      />
     </>
   );
 }

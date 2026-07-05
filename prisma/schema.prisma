@@ -110,6 +110,11 @@ model User {
 
   cleaningFindingsReported CleaningFinding[] @relation("CleaningFindingReporterUser")
   shoeFindingsReported     ShoeFinding[]     @relation("ShoeFindingReporterUser")
+
+  // ===== Speed Game (스피드게임, 2026-07-06) =====
+  // Teacher-owned word sets. System sets live with userId = NULL; user sets
+  // scope to a single teacher (no classroom-level sharing in v1).
+  speedGameWordSets SpeedGameWordSet[]
 }
 
 // ???????? Audit Log (Seed 14 security, 2026-04-22) ????????
@@ -538,6 +543,11 @@ model Student {
   avatarPurchases      AvatarPurchase[]
   avatarGalleryEntries AvatarGalleryEntry[]
 
+  // ===== Speed Game (스피드게임, 2026-07-06) =====
+  // 학생이 한 보드의 여러 라운드에 답을 제출. groupId는 String(FK 아님,
+  // 모둠 ID는 board default groups에서 join해 런타임에 매칭한다).
+  speedGameAnswers SpeedGameAnswer[]
+
   @@unique([classroomId, number])
   @@index([classroomId])
   @@index([qrToken])
@@ -856,6 +866,8 @@ model Board {
   vibeProjects VibeProject[]
   // BC-2: optional Kordle engine attached to this board (1:1).
   kordleGame   KordleGame?
+  // 스피드게임 (2026-07-06) — 보드 1개당 게임 1개 (1:1).
+  speedGame    SpeedGame?
 
   djPlayEvents DjPlayEvent[]
 
@@ -3792,4 +3804,125 @@ model AvatarGalleryEntry {
 
   @@unique([classroomId, studentId])
   @@index([classroomId, revokedAt])
+}
+
+// ===== Speed Game (스피드게임, 2026-07-06) =====
+//
+// Board(layout="speed-game") 보드 1개당 SpeedGame 1개. 라운드별 키워드 +
+// guesser 슬롯 + 학생 답/점수. 모둠은 기존 board default groups를 그대로
+// 재사용(별도 team 테이블 없음). status/answerMode 같은 enum은 String으로
+// 둬서 추후 케이스 추가 시 마이그레이션 비용을 0으로 유지.
+//
+// Keyword/answer normalization은 src/lib/speed-game/score.ts의 헬퍼를
+// 단일 출처로 사용한다(공백 제거 + lowercase, trim된 exact compare).
+
+model SpeedGameWordSet {
+  id        String   @id @default(cuid())
+  // null = 시스템 기본 세트(전 교사 노출, 편집/삭제 불가).
+  // null이 아니면 해당 teacher 소유.
+  userId    String?
+  // UI/검색용 stable key. 시스템은 "system-<topic>" 컨벤션.
+  key       String
+  name      String
+  // "ko" | "en" — 표기/정규화에 영향. UI 필터링에도 사용.
+  locale    String   @default("ko")
+  // 콤마로 join된 키워드. 사용 시 split/normalize.
+  // 저장 시 trim/dedupe 1..80자 1..100개 (서버 검증).
+  keywords  String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User? @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // 시스템(userId NULL) 세트는 key 충돌 불가, 사용자 세트는 (userId, key) 충돌 불가.
+  // NULL은 NULL 끼리는 unique 비교에서 distinct로 취급되므로 시스템/사용자
+  // 세트가 같은 key를 가져도 OK.
+  @@unique([userId, key])
+  @@index([userId])
+}
+
+model SpeedGame {
+  id              String    @id @default(cuid())
+  boardId         String    @unique
+  board           Board     @relation(fields: [boardId], references: [id], onDelete: Cascade)
+  // "lobby" | "running" | "finished"
+  status          String    @default("lobby")
+  // 현재 활성 라운드 index. -1이면 아직 시작 전.
+  roundIndex      Int       @default(-1)
+  // "exact" | "teacher-approval"
+  // - exact: 서버에서 trim/normalize로 즉시 정답 판정
+  // - normalize-space: 모든 공백을 제거하고 비교
+  // - teacher-approval: 교사가 PATCH로 accept/reject
+  answerMode      String    @default("exact")
+  // 점수 계산 기본값. 생성 모달에서 보드별로 조정 가능.
+  baseScore       Int       @default(1000)
+  minScore        Int       @default(0)
+  // 보너스 점수 랭크 컷오프(1~3등). 0 = 보너스 없음. 항상 정확히 3개 값.
+  bonusRanks      String    @default("300,200,100")
+  // 라운드 시작 시의 ms 단위 시간 한도(힌트/타이머용). 0 = 무제한.
+  timeLimitMs     Int       @default(0)
+  // 활성 라운드의 startedAt. SSE가 흘려보내는 clock anchor.
+  activeStartedAt DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  rounds  SpeedGameRound[]
+  answers SpeedGameAnswer[]
+
+  @@index([status])
+}
+
+model SpeedGameRound {
+  id                String    @id @default(cuid())
+  gameId            String
+  game              SpeedGame @relation(fields: [gameId], references: [id], onDelete: Cascade)
+  // 0-indexed 라운드 순서. 같은 게임 내에서 unique.
+  order             Int
+  // 표시 키워드(원문). 화면에 그대로 노출.
+  keyword           String
+  // 정규화된 키워드(공백 제거 + lowercase). exact 판정/검증용.
+  keywordNormalized String
+  // 1..4 슬롯. (order % 4) + 1로 자동 계산, 오버라이드 허용.
+  guesserSlot       Int       @default(1)
+  // 라운드 시작 시각. null이면 아직 시작 안 함.
+  startedAt         DateTime?
+  // 라운드 종료(다음 라운드 시작 또는 게임 종료) 시각.
+  endedAt           DateTime?
+  createdAt         DateTime  @default(now())
+
+  answers SpeedGameAnswer[]
+
+  @@unique([gameId, order])
+  @@index([gameId])
+}
+
+model SpeedGameAnswer {
+  id          String         @id @default(cuid())
+  roundId     String
+  round       SpeedGameRound @relation(fields: [roundId], references: [id], onDelete: Cascade)
+  // 보드 default group ID (String, FK 없음). 런타임 검증은 join으로.
+  groupId     String
+  studentId   String
+  student     Student        @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  // 정답/오답. teacher-approval 모드에서 교사가 false로 확정 가능.
+  correct     Boolean        @default(false)
+  // 0 = 오답, 그 외 = 점수(보너스 포함 가능).
+  score       Int            @default(0)
+  // "pending" | "accepted" | "rejected" (teacher-approval 모드에서만 사용)
+  // exact 모드에서는 accept 즉시 "accepted"로 박힌다.
+  approval    String         @default("pending")
+  // 학생이 입력한 원문(공백 유지). UI 디버그/감사용.
+  rawText     String
+  // 라운드 시작 후 답을 제출한 시점까지의 경과 ms. 0 = 시작 전 입력.
+  elapsedMs   Int            @default(0)
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+  speedGame   SpeedGame?     @relation(fields: [speedGameId], references: [id])
+  speedGameId String?
+
+  // 한 라운드에서 한 모둠당 1개의 답만 허용. 후속 시도는 update.
+  @@unique([roundId, groupId])
+  @@index([roundId])
+  @@index([studentId])
+  @@index([groupId])
 }

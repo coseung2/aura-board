@@ -13,6 +13,11 @@ import {
   ASSIGNMENT_GUIDE_TEXT_MAX,
 } from "@/lib/assignment-schemas";
 import { snapshotClassroomGroupsToBoard } from "@/lib/default-groups";
+import {
+  deriveGuesserSlot,
+  normalizeKeyword,
+  parseKeywords,
+} from "@/lib/speed-game/score";
 
 // Grid cell dims ??matches Card default width/height; render uses CSS grid so
 // these are stored-only placeholders for future freeform fallback.
@@ -45,6 +50,7 @@ const CreateBoardSchema = z.object({
     "vibe-gallery",
     "kordle",
     "question-board",
+    "speed-game",
   ]),
   description: z.string().max(2000).default(""),
   // BC-1: lesson vs play grouping. Defaults to LESSON to keep legacy clients working.
@@ -65,6 +71,31 @@ const CreateBoardSchema = z.object({
   assignmentGuideText: z.string().max(ASSIGNMENT_GUIDE_TEXT_MAX).optional(),
   assignmentAllowLate: z.boolean().optional(),
   assignmentDeadline: z.string().datetime().optional(),
+  // 스피드게임 (2026-07-06) 설정. layout === 'speed-game' 일 때만 사용.
+  // keywords: 라운드별 키워드. 1..100개, 각 1..80자.
+  // answerMode: 'exact' | 'normalize-space' | 'teacher-approval'.
+  // bonusRanks: '300,200,100' 형식 CSV.
+  // timeLimitMs: 라운드당 시간 한도 (0 = 무제한).
+  speedGameConfig: z
+    .object({
+      title: z.string().max(100).optional(),
+      sourceWordSetId: z.string().nullable().optional(),
+      keywords: z.array(z.string().min(1).max(80)).min(1).max(200),
+      answerMode: z
+        .enum(['exact', 'normalize-space', 'teacher-approval'])
+        .default('normalize-space'),
+      baseScore: z.number().int().min(0).max(100000).default(1000),
+      minScore: z.number().int().min(0).max(100000).default(0),
+      rankBonusFirst: z.number().int().min(0).max(100000).default(300),
+      rankBonusSecond: z.number().int().min(0).max(100000).default(200),
+      rankBonusThird: z.number().int().min(0).max(100000).default(100),
+      bonusRanks: z
+        .string()
+        .regex(/^(\d+)(,\d+){0,2}$/)
+        .optional(),
+      timeLimitMs: z.number().int().min(0).max(600000).default(0),
+    })
+    .optional(),
 });
 
 export async function POST(req: Request) {
@@ -323,7 +354,96 @@ export async function POST(req: Request) {
       return NextResponse.json({ board, slots: classroom?.students.length ?? 0 });
     }
 
-    if (input.layout === "kordle") {
+    // 스피드게임 (2026-07-06) — classroom 필수(빠른 게임은 학급 단위).
+    // Board + SpeedGame + SpeedGameRound(N) + snapshotClassroomGroupsToBoard
+    // 를 한 트랜잭션에서 만든다.
+    if (input.layout === 'speed-game') {
+      if (!ownedClassroom) {
+        return NextResponse.json(
+          { error: '스피드게임 보드는 학급을 선택해야 합니다.' },
+          { status: 400 },
+        );
+      }
+      if (!input.speedGameConfig) {
+        return NextResponse.json(
+          { error: 'speedGameConfig required for layout=speed-game' },
+          { status: 400 },
+        );
+      }
+      const cfg = input.speedGameConfig;
+      // 키워드 1..100개, 각 1..80자, trim/dedupe 정규화.
+      const keywords = parseKeywords(cfg.keywords);
+      if (keywords.length < 1) {
+        return NextResponse.json(
+          { error: 'keywords_empty_after_normalize' },
+          { status: 400 },
+        );
+      }
+      if (keywords.length > 100) {
+        return NextResponse.json(
+          { error: 'too_many_keywords', max: 100 },
+          { status: 400 },
+        );
+      }
+      const title = input.title || cfg.title || '스피드게임';
+      const bonusRanks =
+        cfg.bonusRanks ??
+        [cfg.rankBonusFirst, cfg.rankBonusSecond, cfg.rankBonusThird].join(',');
+
+      const board = await db.$transaction(async (tx) => {
+        const createdBoard = await tx.board.create({
+          data: {
+            title,
+            slug,
+            layout: 'speed-game',
+            description: input.description,
+            // 스피드게임은 항상 PLAY 카테고리로 강제.
+            category: 'PLAY',
+            classroomId: ownedClassroom.id,
+            thumbnailMode: input.thumbnailMode,
+            thumbnailUrl: input.thumbnailUrl,
+            members: {
+              create: { userId: user.id, role: 'owner' },
+            },
+          },
+        });
+        const game = await tx.speedGame.create({
+          data: {
+            boardId: createdBoard.id,
+            status: 'lobby',
+            roundIndex: -1,
+            answerMode: cfg.answerMode,
+            baseScore: cfg.baseScore,
+            minScore: cfg.minScore,
+            bonusRanks,
+            timeLimitMs: cfg.timeLimitMs,
+          },
+        });
+        // 라운드 1..N (order 0-indexed, guesserSlot 자동 회전).
+        for (let i = 0; i < keywords.length; i++) {
+          const kw = keywords[i];
+          await tx.speedGameRound.create({
+            data: {
+              gameId: game.id,
+              order: i,
+              keyword: kw,
+              keywordNormalized: normalizeKeyword(kw),
+              guesserSlot: deriveGuesserSlot(i),
+            },
+          });
+        }
+        await snapshotClassroomGroupsToBoard(
+          tx,
+          ownedClassroom.id,
+          createdBoard.id,
+        );
+        return createdBoard;
+      });
+
+      return NextResponse.json({ board });
+    }
+
+    if (input.layout === 'kordle') {
       if (!ownedClassroom) {
         return NextResponse.json(
           { error: "꼬들은 학급을 선택해야 합니다." },

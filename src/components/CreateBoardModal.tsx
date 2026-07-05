@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { CreateBreakoutBoardModal } from "./CreateBreakoutBoardModal";
+import { CreateSpeedGameBoardModal } from "./CreateSpeedGameBoardModal";
 import { BoardThumbnailPicker, type ThumbnailMode } from "./BoardThumbnailPicker";
 import { LAYOUT_META, layoutThumbnail, type LayoutKey } from "@/lib/layout-meta";
 
@@ -27,6 +28,7 @@ const PICKER_ROWS: PickerRow[] = [
   { id: "vibe-arcade", desc: "생성형 AI를 활용한 바이브 코딩 교실" },
   { id: "vibe-gallery", desc: "승인된 코딩 결과물 전시와 체험" },
   { id: "kordle", desc: "학생들이 매일 푸는 단어 추리 게임" },
+  { id: "speed-game", desc: "모둠별 실시간 단어 설명 맞추기 게임" },
   { id: "question-board", desc: "학생 응답을 다양한 시각화로 표시" },
 ];
 
@@ -36,6 +38,7 @@ const READY_LAYOUT_IDS = new Set<LayoutKey>([
   "dj-queue",
   "plant-roadmap",
   "kordle",
+  "speed-game",
 ]);
 
 const UNLOCKED_DEV_LAYOUT_IDS = new Set<LayoutKey>(["stream"]);
@@ -56,7 +59,7 @@ const LAYOUTS = PICKER_ROWS.map((row) => ({
 const VISIBLE_LAYOUTS = LAYOUTS.filter((layout) => !layout.hidden).sort(
   (a, b) => Number(b.selectable) - Number(a.selectable)
 );
-const PLAY_LAYOUT_IDS = new Set<LayoutKey>(["kordle"]);
+const PLAY_LAYOUT_IDS = new Set<LayoutKey>(["kordle", "speed-game"]);
 
 type ClassroomItem = {
   id: string;
@@ -77,8 +80,8 @@ export function CreateBoardModal({
 }: Props) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
-  const [step, setStep] = useState<"layout" | "classroom" | "breakout">(
-    "layout"
+  const [step, setStep] = useState<"layout" | "classroom" | "breakout" | "speed-game">(
+    "layout",
   );
   const [selectedLayout, setSelectedLayout] = useState<LayoutKey | null>(null);
   const [thumbnailMode, setThumbnailMode] = useState<ThumbnailMode>("default");
@@ -135,6 +138,14 @@ export function CreateBoardModal({
       return;
     }
 
+    if (layoutId === "speed-game") {
+      setSelectedLayout(layoutId);
+      setThumbnailMode("default");
+      setThumbnailUrl(null);
+      setStep("speed-game");
+      return;
+    }
+
     setCategory(PLAY_LAYOUT_IDS.has(layoutId) ? "PLAY" : "LESSON");
     setSelectedLayout(layoutId);
     setThumbnailMode("default");
@@ -152,6 +163,22 @@ export function CreateBoardModal({
           setStep("layout");
           setSelectedLayout(null);
           setThumbnailMode("default");
+        }}
+      />
+    );
+  }
+
+  if (step === "speed-game") {
+    return (
+      <CreateSpeedGameBoardModal
+        classrooms={classrooms}
+        userTier={userTier}
+        onClose={onClose}
+        onBack={() => {
+          setStep("layout");
+          setSelectedLayout(null);
+          setThumbnailMode("default");
+          setThumbnailUrl(null);
         }}
       />
     );
