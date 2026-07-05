@@ -9,6 +9,246 @@
   letter-spacing: 0.125px;
 }
 
+/* -------- Public Homepage (Google OAuth branding verification) -------- */
+
+.public-home {
+  min-height: 100vh;
+  background: #f8fafc;
+  color: #102533;
+}
+
+.public-hero {
+  position: relative;
+  min-height: 86vh;
+  overflow: hidden;
+  isolation: isolate;
+  display: flex;
+  flex-direction: column;
+}
+
+.public-hero-bg {
+  position: absolute;
+  inset: 0;
+  z-index: -2;
+  background-image:
+    linear-gradient(90deg, rgba(8, 31, 45, 0.78), rgba(8, 31, 45, 0.46) 52%, rgba(8, 31, 45, 0.08)),
+    url("/aura-public-hero-bg.png");
+  background-size: cover;
+  background-position: center;
+}
+
+.public-hero::after {
+  content: "";
+  position: absolute;
+  inset: auto 0 0;
+  height: 120px;
+  z-index: -1;
+  background: linear-gradient(180deg, rgba(248, 250, 252, 0), #f8fafc 90%);
+}
+
+.public-nav {
+  width: min(1120px, calc(100% - 40px));
+  margin: 0 auto;
+  padding: 22px 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+}
+
+.public-brand {
+  color: #fff;
+  text-decoration: none;
+}
+
+.public-brand .ab-logo-wordmark {
+  color: #fff;
+}
+
+.public-nav-links {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.public-nav-links a {
+  color: rgba(255, 255, 255, 0.9);
+  text-decoration: none;
+}
+
+.public-nav-links a:hover {
+  color: #fff;
+}
+
+.public-nav-login {
+  min-height: 38px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 16px;
+  border-radius: var(--radius-btn);
+  background: #fff;
+  color: #0f5f86 !important;
+}
+
+.public-hero-copy {
+  width: min(1120px, calc(100% - 40px));
+  margin: auto auto 110px;
+  padding: 42px 0 0;
+  color: #fff;
+}
+
+.public-kicker {
+  margin: 0 0 12px;
+  font-size: 13px;
+  font-weight: 800;
+  text-transform: uppercase;
+  color: #8be0ff;
+}
+
+.public-hero-copy h1 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: clamp(48px, 8vw, 92px);
+  line-height: 0.98;
+  font-weight: 800;
+  color: #fff;
+}
+
+.public-hero-lead {
+  width: min(820px, 100%);
+  margin: 24px 0 0;
+  font-size: 20px;
+  line-height: 1.7;
+  color: rgba(255, 255, 255, 0.92);
+  word-break: keep-all;
+  overflow-wrap: normal;
+}
+
+.public-hero-actions {
+  margin-top: 32px;
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.public-primary-action,
+.public-secondary-action {
+  min-height: 46px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 20px;
+  border-radius: var(--radius-btn);
+  font-weight: 800;
+  text-decoration: none;
+}
+
+.public-primary-action {
+  background: #fff;
+  color: #0f5f86;
+}
+
+.public-secondary-action {
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  color: #fff;
+}
+
+.public-purpose,
+.public-features {
+  background: #f8fafc;
+}
+
+.public-section-inner {
+  width: min(1120px, calc(100% - 40px));
+  margin: 0 auto;
+  padding: 54px 0;
+}
+
+.public-section-head h2 {
+  max-width: 900px;
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 30px;
+  line-height: 1.25;
+  color: #102533;
+  word-break: keep-all;
+  overflow-wrap: normal;
+}
+
+.public-purpose-text {
+  max-width: 980px;
+  margin: 20px 0 0;
+  font-size: 16px;
+  line-height: 1.8;
+  color: #425466;
+  word-break: keep-all;
+  overflow-wrap: normal;
+}
+
+.public-feature-grid {
+  padding-top: 8px;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 18px;
+}
+
+.public-feature {
+  min-height: 148px;
+  padding: 22px;
+  border: 1px solid rgba(16, 37, 51, 0.12);
+  border-radius: var(--radius-card);
+  background: #fff;
+  box-shadow: 0 12px 28px rgba(16, 37, 51, 0.08);
+}
+
+.public-feature h3 {
+  margin: 0;
+  font-size: 18px;
+  color: #102533;
+  word-break: keep-all;
+}
+
+.public-feature p {
+  margin: 12px 0 0;
+  font-size: 15px;
+  line-height: 1.7;
+  color: #526779;
+  word-break: keep-all;
+  overflow-wrap: normal;
+}
+
+@media (max-width: 760px) {
+  .public-hero {
+    min-height: 88vh;
+  }
+
+  .public-nav {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .public-nav-links {
+    width: 100%;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+
+  .public-hero-copy {
+    margin-bottom: 70px;
+  }
+
+  .public-hero-lead {
+    font-size: 17px;
+  }
+
+  .public-feature-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
 /* -------- Dashboard classroom link -------- */
 
 .dashboard-classroom-row {

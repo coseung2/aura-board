@@ -70,7 +70,7 @@ export default function LoginPage() {
     const params = new URLSearchParams(window.location.search);
     return safeReturnTarget(
       params.get("from") ?? params.get("return") ?? params.get("callbackUrl"),
-      "/",
+      "/dashboard",
     );
   }
 

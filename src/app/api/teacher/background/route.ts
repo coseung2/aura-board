@@ -13,7 +13,7 @@ const SaveSchema = z.object({
 export async function GET() {
   const user = await getCurrentUser().catch(() => null);
   if (!user) {
-    return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+    return NextResponse.json({ url: null });
   }
   return NextResponse.json({ url: user.appBackgroundUrl ?? null });
 }

@@ -1,107 +1,83 @@
-import { db } from "@/lib/db";
-import { getCurrentUser } from "@/lib/auth";
-import { getCurrentTierAsync } from "@/lib/tier";
-import { Dashboard } from "@/components/Dashboard";
-import { TopNav } from "@/components/TopNav";
-import { AppBackgroundButton } from "@/components/AppBackground";
-import { redirect } from "next/navigation";
+import Link from "next/link";
+import { Logo } from "@/components/Logo";
 
-const ADMIN_EMAIL = "mallagaenge@gmail.com";
+const features = [
+  {
+    title: "학급 보드",
+    body: "교사가 보드를 만들고 섹션, 활동, 자료, 학생 제출물을 한곳에서 정리합니다.",
+  },
+  {
+    title: "학생 참여",
+    body: "학생은 QR 코드나 참여 코드로 접속해 글, 이미지, 파일, Canva 링크를 제출합니다.",
+  },
+  {
+    title: "학부모 공유",
+    body: "승인된 학부모는 자녀의 작품과 활동 기록을 안전하게 확인할 수 있습니다.",
+  },
+];
 
-// Auth-backed page — implicitly dynamic via cookies/session reads.
-// Removing the explicit force-dynamic lets Next.js reuse the Router Cache
-// entry for back/forward navigation instead of re-executing the RSC tree.
-
-export default async function HomePage() {
-  let user;
-  try {
-    user = await getCurrentUser();
-  } catch {
-    redirect("/login");
-  }
-
-  // Independent queries → run in parallel.
-  const [memberships, classrooms, tier] = await Promise.all([
-    // Only show boards where the current user is a member
-    db.boardMember.findMany({
-      where: { userId: user.id },
-      // BC-1 fix: Prisma does not allow mixing `include` and `select` at the
-      // same nesting level, so we move the board payload into a single
-      // `select` that also pulls `_count` for cards and members.
-      select: {
-        role: true,
-        board: {
-          select: {
-            id: true,
-            slug: true,
-            title: true,
-            layout: true,
-            thumbnailMode: true,
-            thumbnailUrl: true,
-            classroomId: true,
-            category: true,
-            _count: {
-              select: {
-                cards: true,
-                members: true,
-              },
-            },
-          },
-        },
-      },
-      orderBy: { board: { createdAt: "desc" } },
-    }),
-    // Fetch classrooms for board creation modal
-    db.classroom.findMany({
-      where: { teacherId: user.id },
-      include: { _count: { select: { students: true } } },
-      orderBy: { createdAt: "desc" },
-    }),
-    // DB subscription + env override → CreateBoardModal Pro gating 입력
-    getCurrentTierAsync(user.id),
-  ]);
-
-  const classroomItems = classrooms.map((c) => ({
-    id: c.id,
-    name: c.name,
-    studentCount: c._count.students,
-  }));
-
-  const boardItems = memberships.map((m) => ({
-    id: m.board.id,
-    slug: m.board.slug,
-    title: m.board.title || "제목 없음",
-    layout: m.board.layout,
-    thumbnailMode: m.board.thumbnailMode,
-    thumbnailUrl: (m.board as { thumbnailUrl?: string | null }).thumbnailUrl ?? null,
-    classroomId: m.board.classroomId,
-    category: m.board.category,
-    cardCount: m.board._count.cards,
-    memberCount: m.board._count.members,
-    role: m.role,
-  }));
-
+export default function PublicHomePage() {
   return (
-    <>
-      <TopNav showAdmin={user.email.toLowerCase() === ADMIN_EMAIL} />
-      <main className="home-page">
-        <header className="home-header">
-          <div className="home-header-top">
-            <div>
-              <h1 className="home-title">내 보드</h1>
-              <p className="home-subtitle">{user.name}님의 보드</p>
-            </div>
-            <div className="home-header-actions">
-              <AppBackgroundButton />
-            </div>
+    <main className="public-home">
+      <section className="public-hero" aria-labelledby="public-home-title">
+        <div className="public-hero-bg" aria-hidden="true" />
+        <nav className="public-nav" aria-label="홈페이지">
+          <Link href="/" className="public-brand" aria-label="Aura-board 홈">
+            <Logo size={34} withWordmark />
+          </Link>
+          <div className="public-nav-links">
+            <Link href="/privacy">개인정보처리방침</Link>
+            <Link href="/terms">이용약관</Link>
+            <Link href="/support">지원</Link>
+            <Link href="/login" className="public-nav-login">
+              로그인
+            </Link>
           </div>
-        </header>
-        <Dashboard
-          boards={boardItems}
-          classrooms={classroomItems}
-          userTier={tier}
-        />
-      </main>
-    </>
+        </nav>
+
+        <div className="public-hero-copy">
+          <p className="public-kicker">Classroom workspace</p>
+          <h1 id="public-home-title">Aura-board</h1>
+          <p className="public-hero-lead">
+            Aura-board는 교사가 학급 보드를 만들고, 학생 제출물과 Canva 링크,
+            이미지, 파일, 피드백을 한곳에서 관리하는 온라인 학급 활동 플랫폼입니다.
+          </p>
+          <div className="public-hero-actions">
+            <Link href="/login" className="public-primary-action">
+              Google로 시작하기
+            </Link>
+            <Link href="/support" className="public-secondary-action">
+              문의하기
+            </Link>
+          </div>
+        </div>
+      </section>
+
+      <section className="public-purpose" aria-labelledby="public-purpose-title">
+        <div className="public-section-inner">
+          <div className="public-section-head">
+            <p className="public-kicker">Purpose</p>
+            <h2 id="public-purpose-title">수업 자료와 학생 활동을 안전하게 모으기 위한 도구</h2>
+          </div>
+          <p className="public-purpose-text">
+            교사는 Google 계정으로 로그인해 학급과 보드를 관리합니다. 학생은 교사가
+            제공한 코드로 참여하고, 학부모는 승인된 연결을 통해 자녀의 활동을
+            확인합니다. 서비스는 학급 운영, 과제 제출, 포트폴리오 확인, 알림 제공을
+            위해 필요한 계정 및 활동 정보를 처리합니다.
+          </p>
+        </div>
+      </section>
+
+      <section className="public-features" aria-label="주요 기능">
+        <div className="public-section-inner public-feature-grid">
+          {features.map((feature) => (
+            <article key={feature.title} className="public-feature">
+              <h3>{feature.title}</h3>
+              <p>{feature.body}</p>
+            </article>
+          ))}
+        </div>
+      </section>
+    </main>
   );
 }
