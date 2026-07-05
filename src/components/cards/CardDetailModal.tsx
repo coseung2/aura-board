@@ -251,6 +251,16 @@ export function CardDetailModal({
                     attachments={mediaAttachments}
                     onImageClick={(i) => setLightboxIndex(i)}
                   />
+                  {hasEmbeddableLink && card.linkUrl && (
+                    <a
+                      href={card.linkUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="card-detail-media-link"
+                    >
+                      🔗 링크 열기
+                    </a>
+                  )}
                 </div>
               )}
               {hasTextContent && (

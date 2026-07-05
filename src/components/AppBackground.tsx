@@ -6,31 +6,44 @@ import { uploadFile } from "@/lib/upload-client";
 
 const APP_BACKGROUND_KEY = "aura:app:background";
 const APP_BACKGROUND_EVENT = "aura:app-background-change";
+const APP_BACKGROUND_API = "/api/teacher/background";
 
 type BackgroundChangeEvent = CustomEvent<{ url: string | null }>;
 
-function readBackgroundUrl() {
+function readCachedBackgroundUrl() {
   try {
-    const direct = localStorage.getItem(APP_BACKGROUND_KEY);
-    if (direct) return direct;
-
-    for (let index = 0; index < localStorage.length; index += 1) {
-      const key = localStorage.key(index);
-      if (
-        key?.startsWith("aura:classroom:") &&
-        key.endsWith(":morning-background")
-      ) {
-        const legacy = localStorage.getItem(key);
-        if (legacy) {
-          localStorage.setItem(APP_BACKGROUND_KEY, legacy);
-          return legacy;
-        }
-      }
-    }
-    return null;
+    return localStorage.getItem(APP_BACKGROUND_KEY);
   } catch {
     return null;
   }
+}
+
+function cacheBackgroundUrl(url: string | null) {
+  try {
+    if (url) localStorage.setItem(APP_BACKGROUND_KEY, url);
+    else localStorage.removeItem(APP_BACKGROUND_KEY);
+  } catch {
+    // ignore
+  }
+}
+
+async function fetchAccountBackgroundUrl(): Promise<string | null | undefined> {
+  const res = await fetch(APP_BACKGROUND_API, { cache: "no-store" });
+  if (res.status === 401 || res.status === 403) return undefined;
+  if (!res.ok) throw new Error(`background_get_failed:${res.status}`);
+  const body = (await res.json()) as { url?: string | null };
+  return body.url ?? null;
+}
+
+async function saveAccountBackgroundUrl(url: string | null): Promise<string | null> {
+  const res = await fetch(APP_BACKGROUND_API, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ url }),
+  });
+  if (!res.ok) throw new Error(`background_save_failed:${res.status}`);
+  const body = (await res.json()) as { url?: string | null };
+  return body.url ?? null;
 }
 
 function isBoardInterior(pathname: string | null) {
@@ -43,11 +56,24 @@ export function AppBackgroundLayer() {
   const active = Boolean(backgroundUrl) && !isBoardInterior(pathname);
 
   useEffect(() => {
-    setBackgroundUrl(readBackgroundUrl());
+    let cancelled = false;
+
+    fetchAccountBackgroundUrl()
+      .then((serverUrl) => {
+        if (cancelled || serverUrl === undefined) return;
+        cacheBackgroundUrl(serverUrl);
+        setBackgroundUrl(serverUrl);
+        window.dispatchEvent(
+          new CustomEvent(APP_BACKGROUND_EVENT, { detail: { url: serverUrl } }),
+        );
+      })
+      .catch(() => {
+        // Keep the current value when the network/API is temporarily unavailable.
+      });
 
     function handleChange(event: Event) {
       const nextUrl = (event as BackgroundChangeEvent).detail?.url;
-      setBackgroundUrl(nextUrl ?? readBackgroundUrl());
+      setBackgroundUrl(nextUrl ?? readCachedBackgroundUrl());
     }
 
     function handleStorage(event: StorageEvent) {
@@ -57,6 +83,7 @@ export function AppBackgroundLayer() {
     window.addEventListener(APP_BACKGROUND_EVENT, handleChange);
     window.addEventListener("storage", handleStorage);
     return () => {
+      cancelled = true;
       window.removeEventListener(APP_BACKGROUND_EVENT, handleChange);
       window.removeEventListener("storage", handleStorage);
     };
@@ -95,9 +122,10 @@ export function AppBackgroundButton({
     try {
       const uploaded = await uploadFile(file);
       const nextUrl = uploaded.previewUrl ?? uploaded.url;
-      localStorage.setItem(APP_BACKGROUND_KEY, nextUrl);
+      const savedUrl = await saveAccountBackgroundUrl(nextUrl);
+      cacheBackgroundUrl(savedUrl);
       window.dispatchEvent(
-        new CustomEvent(APP_BACKGROUND_EVENT, { detail: { url: nextUrl } }),
+        new CustomEvent(APP_BACKGROUND_EVENT, { detail: { url: savedUrl } }),
       );
     } finally {
       setBusy(false);
