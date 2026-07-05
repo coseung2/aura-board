@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AddCardButton } from "./AddCardButton";
 import { AddCardModal, type AddCardData } from "./AddCardModal";
 import { CardDetailModal } from "./cards/CardDetailModal";
@@ -17,6 +17,7 @@ import {
 } from "./columns/ColumnView";
 import { comparatorFor, toSortMode, type SortMode } from "./columns/sort";
 import { useBoardStream, type StreamSection } from "./columns/useBoardStream";
+import { useBoardAnonymityChange } from "@/hooks/useBoardAnonymityChange";
 import { useColumnRoster, type RosterEntry } from "./columns/useColumnRoster";
 import { useCardMutations } from "./columns/useCardMutations";
 import { useSectionMutations } from "./columns/useSectionMutations";
@@ -105,12 +106,18 @@ export function ColumnsBoard({
   const canEdit = currentRole === "owner" || currentRole === "editor";
   const canAddCard = canEdit || !!isStudentViewer;
 
+  const applyAnonymousAuthor = useCallback((next: boolean) => {
+    setCards((list) => withBoardAnonymousAuthors(list, next));
+    setOpenCard((card) => withBoardAnonymousAuthor(card, next));
+    setEditingCard((card) => withBoardAnonymousAuthor(card, next));
+    setAuthorEditCard((card) => withBoardAnonymousAuthor(card, next));
+  }, []);
+
   useEffect(() => {
-    setCards((list) => withBoardAnonymousAuthors(list, anonymousAuthor));
-    setOpenCard((card) => withBoardAnonymousAuthor(card, anonymousAuthor));
-    setEditingCard((card) => withBoardAnonymousAuthor(card, anonymousAuthor));
-    setAuthorEditCard((card) => withBoardAnonymousAuthor(card, anonymousAuthor));
-  }, [anonymousAuthor]);
+    applyAnonymousAuthor(anonymousAuthor);
+  }, [anonymousAuthor, applyAnonymousAuthor]);
+
+  useBoardAnonymityChange(boardId, applyAnonymousAuthor);
 
   const scrollAreaRef = useRef<HTMLDivElement | null>(null);
   const scrollBarRef = useRef<HTMLDivElement | null>(null);

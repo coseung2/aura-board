@@ -39,4 +39,5 @@ export type BoardSettingsPanelProps = {
   initialStreamContentPrompt?: string;
   initialStreamSectionsEnabled?: boolean;
   initialAuraSettings?: AuraBoardSettings;
+  onAnonymousAuthorChange?: (next: boolean) => void;
 };

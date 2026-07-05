@@ -4,6 +4,10 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ShareTab } from "../share/ShareTab";
 import {
+  BOARD_ANONYMITY_EVENT,
+  type BoardAnonymityChangeDetail,
+} from "@/lib/card-anonymity";
+import {
   BoardThumbnailPicker,
   type ThumbnailMode,
 } from "../BoardThumbnailPicker";
@@ -313,6 +317,19 @@ function EngagementTab({
         setErr("저장에 실패했어요.");
         return;
       }
+      const data = (await res.json().catch(() => null)) as {
+        board?: { anonymousAuthor?: boolean };
+      } | null;
+      const persisted =
+        typeof data?.board?.anonymousAuthor === "boolean"
+          ? data.board.anonymousAuthor
+          : next;
+      onChange(persisted);
+      window.dispatchEvent(
+        new CustomEvent<BoardAnonymityChangeDetail>(BOARD_ANONYMITY_EVENT, {
+          detail: { boardId, anonymousAuthor: persisted },
+        }),
+      );
       router.refresh();
     } catch {
       onChange(!next);

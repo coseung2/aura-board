@@ -51,6 +51,7 @@ export function BoardSettingsPanel({
     unit: null,
     criterion: null,
   },
+  onAnonymousAuthorChange,
 }: BoardSettingsPanelProps) {
   const router = useRouter();
   const [tab, setTab] = useState<BoardSettingsTab>("basic");
@@ -185,7 +186,10 @@ export function BoardSettingsPanel({
               setThumbnailUrl(url);
             }}
             anonymousAuthor={anonymousAuthor}
-            onAnonymousAuthorChange={setAnonymousAuthor}
+            onAnonymousAuthorChange={(next) => {
+              setAnonymousAuthor(next);
+              onAnonymousAuthorChange?.(next);
+            }}
             initialShareMode={shareMode}
             initialShareToken={shareToken}
             initialShareShortCode={shareShortCode}

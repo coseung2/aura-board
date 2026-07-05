@@ -1,5 +1,12 @@
 import type { CardData } from "@/components/DraggableCard";
 
+export const BOARD_ANONYMITY_EVENT = "aura:board-anonymity-change";
+
+export type BoardAnonymityChangeDetail = {
+  boardId: string;
+  anonymousAuthor: boolean;
+};
+
 export function withBoardAnonymousAuthors<T extends CardData>(
   cards: T[],
   anonymousAuthor: boolean,

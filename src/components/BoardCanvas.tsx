@@ -1,6 +1,12 @@
 "use client";
 
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from "react";
 import { AddCardButton } from "./AddCardButton";
 import type { AddCardData } from "./AddCardModal";
 import { CardBody } from "./cards/CardBody";
@@ -9,6 +15,7 @@ import { CardAuthorEditor, type SavedAuthor } from "./cards/CardAuthorEditor";
 import { ContextMenu } from "./ContextMenu";
 import { EditCardModal, type EditCardUpdates } from "./EditCardModal";
 import type { CardData } from "./DraggableCard";
+import { useBoardAnonymityChange } from "@/hooks/useBoardAnonymityChange";
 import { useCardRealtime } from "@/hooks/useCardRealtime";
 import { formatAuthorList } from "@/lib/card-author";
 import {
@@ -71,12 +78,18 @@ export function BoardCanvas({
   const masonryCardRefs = useRef(new Map<string, HTMLElement>());
   useCardRealtime(boardId, setCards, deletingIds);
 
+  const applyAnonymousAuthor = useCallback((next: boolean) => {
+    setCards((list) => withBoardAnonymousAuthors(list, next));
+    setOpenCard((card) => withBoardAnonymousAuthor(card, next));
+    setEditingCard((card) => withBoardAnonymousAuthor(card, next));
+    setAuthorEditCard((card) => withBoardAnonymousAuthor(card, next));
+  }, []);
+
   useEffect(() => {
-    setCards((list) => withBoardAnonymousAuthors(list, anonymousAuthor));
-    setOpenCard((card) => withBoardAnonymousAuthor(card, anonymousAuthor));
-    setEditingCard((card) => withBoardAnonymousAuthor(card, anonymousAuthor));
-    setAuthorEditCard((card) => withBoardAnonymousAuthor(card, anonymousAuthor));
-  }, [anonymousAuthor]);
+    applyAnonymousAuthor(anonymousAuthor);
+  }, [anonymousAuthor, applyAnonymousAuthor]);
+
+  useBoardAnonymityChange(boardId, applyAnonymousAuthor);
 
   useLayoutEffect(() => {
     const grid = masonryGridRef.current;

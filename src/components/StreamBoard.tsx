@@ -1,6 +1,13 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type FormEvent,
+} from "react";
 import { createPortal } from "react-dom";
 import type { AddCardData } from "./AddCardModal";
 import { CardDetailModal } from "./cards/CardDetailModal";
@@ -26,6 +33,7 @@ import {
 } from "./stream/StreamSectionModals";
 import { BreakoutConfigModal } from "./stream/StreamBreakoutConfigModal";
 import type { GroupEditorDraft } from "./classroom/GroupRosterEditor";
+import { useBoardAnonymityChange } from "@/hooks/useBoardAnonymityChange";
 import { useCardRealtime } from "@/hooks/useCardRealtime";
 import {
   withBoardAnonymousAuthor,
@@ -152,11 +160,17 @@ export function StreamBoard({
   // ── Realtime polling ──────────────────────────────────────────────
   useCardRealtime(boardId, setCards, deletingIds, setSections);
 
+  const applyAnonymousAuthor = useCallback((next: boolean) => {
+    setCards((list) => withBoardAnonymousAuthors(list, next));
+    setOpenCard((card) => withBoardAnonymousAuthor(card, next));
+    setEditingCard((card) => withBoardAnonymousAuthor(card, next));
+  }, []);
+
   useEffect(() => {
-    setCards((list) => withBoardAnonymousAuthors(list, anonymousAuthor));
-    setOpenCard((card) => withBoardAnonymousAuthor(card, anonymousAuthor));
-    setEditingCard((card) => withBoardAnonymousAuthor(card, anonymousAuthor));
-  }, [anonymousAuthor]);
+    applyAnonymousAuthor(anonymousAuthor);
+  }, [anonymousAuthor, applyAnonymousAuthor]);
+
+  useBoardAnonymityChange(boardId, applyAnonymousAuthor);
 
   useEffect(() => {
     setMounted(true);

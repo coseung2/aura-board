@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   BoardSettingsPanel,
   type BoardSection,
@@ -52,6 +52,12 @@ export function BoardSettingsLauncher({
   auraSettings,
 }: Props) {
   const [open, setOpen] = useState(false);
+  const [anonymousAuthorState, setAnonymousAuthorState] =
+    useState(anonymousAuthor);
+
+  useEffect(() => {
+    setAnonymousAuthorState(anonymousAuthor);
+  }, [anonymousAuthor]);
 
   return (
     <>
@@ -77,7 +83,7 @@ export function BoardSettingsLauncher({
           boardId={boardId}
           layout={layout}
           initialSections={sections}
-          initialAnonymousAuthor={anonymousAuthor}
+          initialAnonymousAuthor={anonymousAuthorState}
           initialBoardTheme={boardTheme}
           initialShareMode={shareMode}
           initialShareToken={shareToken}
@@ -86,6 +92,7 @@ export function BoardSettingsLauncher({
           initialStreamContentPrompt={streamContentPrompt ?? ""}
           initialStreamSectionsEnabled={streamSectionsEnabled ?? false}
           initialAuraSettings={auraSettings}
+          onAnonymousAuthorChange={setAnonymousAuthorState}
         />
       )}
     </>
