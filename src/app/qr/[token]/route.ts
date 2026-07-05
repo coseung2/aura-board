@@ -15,11 +15,35 @@ import { createStudentSession } from "@/lib/student-auth";
 
 export const runtime = "nodejs";
 
+const DEFAULT_NEXT = "/student";
+const FORBIDDEN_NEXT_PREFIXES = ["/api", "/landing", "/login", "/student/login"];
+
+// Accept only same-origin internal paths; reject empty, external, and any
+// auth-surface targets so the QR flow cannot bounce a fresh student session
+// into the login page or a callback chain.
+function resolveSafeNext(raw: string | null | undefined): string | null {
+  if (!raw) return null;
+  if (!raw.startsWith("/")) return null;
+  if (raw.startsWith("//")) return null;
+  if (raw === "/") return null;
+  if (
+    FORBIDDEN_NEXT_PREFIXES.some(
+      (p) => raw === p || raw.startsWith(`${p}/`) || raw.startsWith(`${p}?`),
+    )
+  ) {
+    return null;
+  }
+  return raw;
+}
+
 export async function GET(
   _req: Request,
   { params }: { params: Promise<{ token: string }> }
 ) {
   const { token } = await params;
+
+  const requestUrl = new URL(_req.url);
+  const next = resolveSafeNext(requestUrl.searchParams.get("next"));
 
   const student = await db.student.findUnique({
     where: { qrToken: token },
@@ -34,7 +58,7 @@ export async function GET(
   }
 
   await createStudentSession(student.id, student.classroomId);
-  return NextResponse.redirect(new URL("/student", _req.url), {
+  return NextResponse.redirect(new URL(next ?? DEFAULT_NEXT, _req.url), {
     status: 302,
   });
 }

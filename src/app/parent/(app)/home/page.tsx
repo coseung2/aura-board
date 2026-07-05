@@ -17,7 +17,10 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 export default async function ParentHomePage({
   searchParams,
 }: {
-  searchParams: Promise<{ child?: string }>;
+  // child=<studentId>   - 다자녀 셀렉터 초기 선택
+  // error=forbidden_student - child layout 이 권한 미보유 시 forward
+  //                           (기존엔 무시되던 query 를 작은 notice 로 노출)
+  searchParams: Promise<{ child?: string; error?: string }>;
 }) {
   const current = await getCurrentParent();
   if (!current) redirect("/parent/join?error=session_required");
@@ -77,13 +80,27 @@ export default async function ParentHomePage({
     classroomName: l.student.classroom.name,
   }));
 
-  const { child } = await searchParams;
+  const { child, error } = await searchParams;
   const initialSelectedId =
     (child && childRows.find((c) => c.studentId === child)?.studentId) ??
     childRows[0].studentId;
 
+  // child layout 의 requireParentScopeForStudent 실패 → /parent/home?error=forbidden_student
+  // 로 forward 됐을 때만 노출. 다른 error 값은 무시 (오타/남용 방지).
+  const showForbiddenNotice = error === "forbidden_student";
+
   return (
     <main className="student-page-portfolio-shell">
+      {showForbiddenNotice ? (
+        <div
+          className="section-panel-notice"
+          role="status"
+          aria-live="polite"
+          style={{ margin: "16px auto", maxWidth: 640 }}
+        >
+          해당 자녀에 접근할 권한이 없어요. 연결된 자녀 목록에서 다시 선택해 주세요.
+        </div>
+      ) : null}
       <ParentDashboard
         children={childRows}
         initialSelectedId={initialSelectedId}

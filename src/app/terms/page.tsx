@@ -8,7 +8,7 @@ export default function TermsPage() {
   return (
     <main className="docs-page">
       <article className="docs-article">
-        <Link href="/" className="docs-back">← 홈으로</Link>
+        <Link href="/landing" className="docs-back">← 홈으로</Link>
         <h1 className="docs-title">이용약관</h1>
         <p className="docs-subtitle">최종 업데이트: 2026-04-14</p>
 

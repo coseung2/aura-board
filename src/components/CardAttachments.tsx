@@ -1,7 +1,7 @@
 "use client";
 
 import { memo, useEffect, useState } from "react";
-import { extractCanvaDesignId, hasCanvaShareToken } from "@/lib/canva";
+import { extractCanvaDesignId } from "@/lib/canva";
 import { extractVideoId } from "@/lib/youtube";
 import { shouldPromoteLinkPreview } from "@/lib/card-content-policy";
 import { fileMimeToIcon, fileMimeToLabel, formatBytes } from "@/lib/file-attachment";
@@ -82,7 +82,6 @@ export const CardAttachments = memo(function CardAttachments({ imageUrl, thumbUr
   // 링크는 attachments에 포함되지 않으므로 별개 렌더. multi-attachment
   // 카드에서도 링크는 최대 1개(현 스키마 제약).
   const canvaDesignId = linkUrl ? extractCanvaDesignId(linkUrl) : null;
-  const hasShareToken = Boolean(linkUrl && hasCanvaShareToken(linkUrl));
   const linkYouTubeId = linkUrl ? getYouTubeId(linkUrl) : null;
   const effectiveVideoUrl = videoUrl ?? (linkYouTubeId ? linkUrl : null);
   const shouldHideLinkPreview = Boolean(linkYouTubeId);
@@ -93,7 +92,7 @@ export const CardAttachments = memo(function CardAttachments({ imageUrl, thumbUr
     fileUrl,
     attachments,
   });
-  const canRenderCanvaEmbed = Boolean(canvaDesignId && (linkImage || hasShareToken));
+  const canRenderCanvaEmbed = Boolean(canvaDesignId);
   const hasLinkPreviewContent = Boolean(canRenderCanvaEmbed || linkImage || linkTitle || linkDesc);
   const shouldRenderDetailLinkPreview = Boolean(
     variant === "detail" &&
@@ -337,6 +336,19 @@ export const CardAttachments = memo(function CardAttachments({ imageUrl, thumbUr
       );
     }
     if (a.kind === "link") {
+      const canvaAttachmentDesignId = extractCanvaDesignId(a.url);
+      if (canvaAttachmentDesignId) {
+        return (
+          <CanvaEmbedSlot
+            key={a.id}
+            designId={canvaAttachmentDesignId}
+            linkUrl={a.url}
+            linkTitle={a.fileName ?? null}
+            linkImage={a.previewUrl ?? null}
+            linkDesc={a.mimeType ?? null}
+          />
+        );
+      }
       // multi-link-attach (2026-06-13): link 첨부는 OG 카드(link-preview)
       // 로 표시. YouTube URL이라도 link kind면 OG 카드로 표시 - 재생이
       // 필요하면 video 첨부로 올리면 됨.

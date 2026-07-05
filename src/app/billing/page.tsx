@@ -17,7 +17,7 @@ export default async function BillingPage() {
       {user && <TopNav showAdmin={user.email.toLowerCase() === ADMIN_EMAIL} />}
       <main className="docs-page">
       <article className="docs-article">
-        <Link href="/" className="docs-back">← 대시보드로</Link>
+        <Link href="/dashboard" className="docs-back">← 대시보드로</Link>
         <h1 className="docs-title">결제·구독</h1>
         <p className="docs-subtitle">
           Aura-board Pro는 모둠 학습·코딩 교실 등 부가 기능을 풀 해제합니다.

@@ -10,7 +10,7 @@ export default async function StudentPage() {
   const student = await getCurrentStudent();
 
   if (!student) {
-    redirect("/login");
+    redirect("/login?from=/student");
   }
 
   const [boards, duties, assignmentSections, checkTasks] = await Promise.all([

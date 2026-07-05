@@ -8,7 +8,7 @@ export default function CanvaSetupPage() {
   return (
     <main className="docs-page">
       <article className="docs-article">
-        <Link href="/" className="docs-back">
+        <Link href="/dashboard" className="docs-back">
           ← 대시보드로
         </Link>
         <h1 className="docs-title">Canva 앱 연결 안내</h1>

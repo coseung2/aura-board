@@ -41,7 +41,7 @@ export default async function AdminPage() {
             <p className="admin-eyebrow">관리자</p>
             <h1>접근 권한이 없습니다</h1>
             <p>이 페이지는 지정된 관리자 계정만 볼 수 있습니다.</p>
-            <Link href="/" className="admin-link-btn">
+            <Link href="/dashboard" className="admin-link-btn">
               대시보드로 이동
             </Link>
           </section>
@@ -156,7 +156,7 @@ export default async function AdminPage() {
             <h1>Aura-board 운영 현황</h1>
             <p>가입자별 사용량과 최근 가입 추이를 확인합니다.</p>
           </div>
-          <Link href="/" className="admin-link-btn">
+          <Link href="/dashboard" className="admin-link-btn">
             대시보드
           </Link>
         </header>

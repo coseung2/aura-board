@@ -12,7 +12,7 @@ export default async function ClassroomPage() {
   try {
     user = await getCurrentUser();
   } catch {
-    redirect("/login");
+    redirect("/login?callbackUrl=/classroom");
   }
 
   const classrooms = await db.classroom.findMany({

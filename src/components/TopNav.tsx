@@ -408,7 +408,7 @@ export function TopNav({ showAdmin = false }: Props) {
   return (
     <header className="ab-topnav">
       <div className="ab-topnav-left">
-        <Link href="/" className="ab-topnav-logo" aria-label="Aura-board 홈">
+        <Link href="/dashboard" className="ab-topnav-logo" aria-label="Aura-board 홈">
           <Logo size={32} withWordmark />
         </Link>
         <MegaNav items={navItems} ariaLabel="주 메뉴" />

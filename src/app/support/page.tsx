@@ -8,7 +8,7 @@ export default function SupportPage() {
   return (
     <main className="docs-page">
       <article className="docs-article">
-        <Link href="/" className="docs-back">← 홈으로</Link>
+        <Link href="/landing" className="docs-back">← 홈으로</Link>
         <h1 className="docs-title">지원 안내</h1>
         <p className="docs-subtitle">
           Aura-board 사용 중 문제가 생기거나 기능 제안이 있으시면 아래

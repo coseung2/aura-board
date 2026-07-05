@@ -71,7 +71,7 @@ export const CanvaEmbedSlot = memo(function CanvaEmbedSlot({
   const [iframeLoaded, setIframeLoaded] = useState(false);
   const [iframeFailed, setIframeFailed] = useState(false);
   const [thumbnailAttempt, setThumbnailAttempt] = useState(0);
-  const [thumbnailLoaded, setThumbnailLoaded] = useState(false);
+  const [lastGoodThumbnail, setLastGoodThumbnail] = useState<string | null>(null);
   const [evictedToast, setEvictedToast] = useState<string | null>(null);
 
   // IntersectionObserver starts at `false` and only flips once it has
@@ -102,19 +102,7 @@ export const CanvaEmbedSlot = memo(function CanvaEmbedSlot({
 
   useEffect(() => {
     setThumbnailAttempt(0);
-    setThumbnailLoaded(false);
   }, [linkImage, linkUrl]);
-
-  // Fallback timeout: some Canva designs (/view share surface on certain
-  // document/poster types) throw a state-deserialize error inside the
-  // iframe and never fire onLoad/onError on the parent. If we don't hear
-  // back within 8 seconds, treat it as a silent failure and surface the
-  // link-preview so the card is never blank.
-  useEffect(() => {
-    if (!active || iframeLoaded || iframeFailed) return;
-    const t = window.setTimeout(() => setIframeFailed(true), 8000);
-    return () => window.clearTimeout(t);
-  }, [active, iframeLoaded, iframeFailed]);
 
   // When THIS slot is the one evicted by LRU overflow, keep the old state
   // bookkeeping. The visible toast was removed with the live/thumbnail badge.
@@ -129,6 +117,8 @@ export const CanvaEmbedSlot = memo(function CanvaEmbedSlot({
   const handleActivate = useCallback(
     (e: MouseEvent | KeyboardEvent) => {
       e.stopPropagation();
+      setIframeLoaded(false);
+      setIframeFailed(false);
       activate(slotId);
     },
     [activate, slotId],
@@ -148,9 +138,8 @@ export const CanvaEmbedSlot = memo(function CanvaEmbedSlot({
   // tokens (path segment between designId and /view) are preserved. Falls
   // back to the bare designId form for legacy rows / private designs.
   //
-  // MUST run before the iframeFailed early return — React's rules-of-hooks
-  // fires #300 ("rendered fewer hooks") when iframeFailed flips true and
-  // we skip this useMemo after having called it on the previous render.
+  // Keep this stable across iframe retries so a failed attempt remounts the
+  // same public Canva player URL instead of falling back to a plain link.
   const embedSrc = useMemo(() => {
     return (
       buildCanvaEmbedSrc(linkUrl) ??
@@ -158,6 +147,7 @@ export const CanvaEmbedSlot = memo(function CanvaEmbedSlot({
     );
   }, [linkUrl, designId]);
   const title = linkTitle || "Canva design";
+  void linkDesc;
   const thumbnailCandidates = useMemo(() => {
     const candidates = [
       proxiedCanvaThumbnailUrl(linkImage, 640),
@@ -165,73 +155,35 @@ export const CanvaEmbedSlot = memo(function CanvaEmbedSlot({
     ].filter((candidate): candidate is string => Boolean(candidate));
     return [...new Set(candidates)];
   }, [linkImage, linkUrl]);
-  const effectiveLinkImage = thumbnailCandidates[thumbnailAttempt] ?? null;
+  const candidateThumbnail = thumbnailCandidates[thumbnailAttempt] ?? null;
+  const effectiveLinkImage = candidateThumbnail ?? lastGoodThumbnail;
+  const handleThumbnailLoad = useCallback(() => {
+    if (candidateThumbnail) {
+      setLastGoodThumbnail(candidateThumbnail);
+    }
+  }, [candidateThumbnail]);
   const handleThumbnailError = useCallback(() => {
-    setThumbnailAttempt((attempt) => attempt + 1);
-  }, []);
-  useEffect(() => {
-    setThumbnailLoaded(false);
-  }, [effectiveLinkImage]);
-  useEffect(() => {
-    if (!effectiveLinkImage || thumbnailLoaded) return;
-    const t = window.setTimeout(() => {
-      setThumbnailAttempt((attempt) =>
-        thumbnailCandidates[attempt] === effectiveLinkImage
-          ? attempt + 1
-          : attempt
-      );
-    }, 5000);
-    return () => window.clearTimeout(t);
-  }, [effectiveLinkImage, thumbnailCandidates, thumbnailLoaded]);
-
-  // Fallback branch: iframe errored. Surface the original link-preview
-  // style anchor so the card is never empty.
-  if (iframeFailed) {
-    return (
-      <a
-        href={linkUrl}
-        target="_blank"
-        rel="noopener noreferrer"
-        className={`card-link-preview ${effectiveLinkImage ? "has-image" : ""}`}
-        onClick={(e) => e.stopPropagation()}
-      >
-        {effectiveLinkImage && (
-          <div className="card-link-preview-image">
-            <img
-              src={effectiveLinkImage}
-              alt=""
-              loading="lazy"
-              onLoad={() => setThumbnailLoaded(true)}
-              onError={handleThumbnailError}
-            />
-          </div>
-        )}
-        <div className="card-link-preview-body">
-          <span className="card-link-preview-title">
-            {title}
-          </span>
-          {linkDesc && <span className="card-link-preview-desc">{linkDesc}</span>}
-          <span className="card-link-preview-url">🔗 canva.com</span>
-        </div>
-      </a>
+    if (!candidateThumbnail) return;
+    setThumbnailAttempt((attempt) =>
+      attempt < thumbnailCandidates.length - 1 ? attempt + 1 : attempt
     );
-  }
+  }, [candidateThumbnail, thumbnailCandidates.length]);
 
   // Render the iframe as soon as the user activates. We no longer gate on
   // inView — the auto-deactivate useEffect above handles off-screen
   // eviction once IO reports genuine visibility. The LRU cap (3) still
   // prevents runaway iframe counts regardless.
-  const shouldRenderIframe = active;
+  const shouldRenderIframe = active && !iframeFailed;
   void evictedToast;
 
   return (
     <div
       ref={containerRef}
       className="card-canva-slot"
-      data-active={active ? "true" : "false"}
-      data-loaded={iframeLoaded ? "true" : "false"}
+      data-active={shouldRenderIframe ? "true" : "false"}
+      data-loaded={shouldRenderIframe && iframeLoaded ? "true" : "false"}
       data-preview={
-        !active && !effectiveLinkImage ? "true" : "false"
+        !shouldRenderIframe && !effectiveLinkImage ? "true" : "false"
       }
     >
       <div className="card-canva-slot-frame">
@@ -244,7 +196,7 @@ export const CanvaEmbedSlot = memo(function CanvaEmbedSlot({
             alt={`${title} 썸네일`}
             loading="lazy"
             decoding="async"
-            onLoad={() => setThumbnailLoaded(true)}
+            onLoad={handleThumbnailLoad}
             onError={handleThumbnailError}
             className="card-canva-slot-thumbnail"
           />
@@ -276,7 +228,7 @@ export const CanvaEmbedSlot = memo(function CanvaEmbedSlot({
             className="card-canva-slot-iframe"
           />
         )}
-        {!active && (
+        {!shouldRenderIframe && (
           <div
             role="button"
             tabIndex={0}

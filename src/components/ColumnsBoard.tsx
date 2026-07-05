@@ -27,6 +27,7 @@ import {
   withBoardAnonymousAuthor,
   withBoardAnonymousAuthors,
 } from "@/lib/card-anonymity";
+import { buildCanvaConnectUrl } from "@/lib/canva-connect-return";
 
 type SectionData = StreamSection;
 
@@ -378,7 +379,7 @@ export function ColumnsBoard({
           if (
             window.confirm("Canva 계정 연결이 필요합니다. 지금 연결할까요?")
           ) {
-            window.location.href = "/api/auth/canva";
+            window.location.href = buildCanvaConnectUrl();
           }
         } else {
           alert(`정리 실패: ${data.error}`);

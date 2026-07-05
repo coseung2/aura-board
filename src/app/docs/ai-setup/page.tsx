@@ -13,7 +13,7 @@ export default function AiSetupPage() {
   return (
     <main className="docs-page">
       <article className="docs-article">
-        <Link href="/" className="docs-back">
+        <Link href="/dashboard" className="docs-back">
           ← 대시보드로
         </Link>
         <h1 className="docs-title">생성형 AI 연결하기</h1>

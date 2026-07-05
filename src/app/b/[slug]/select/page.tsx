@@ -32,8 +32,8 @@ export default async function BreakoutSelectPage({
 
   const student = await getCurrentStudent();
   if (!student) {
-    // Route the student to the QR/code login, then return here.
-    redirect(`/qr?next=${encodeURIComponent(`/b/${board.slug}/select`)}`);
+    // Route the student through the universal login page with a return target.
+    redirect(`/login?from=${encodeURIComponent(`/b/${board.slug}/select`)}`);
   }
   if (board.classroomId !== student.classroomId) {
     return (

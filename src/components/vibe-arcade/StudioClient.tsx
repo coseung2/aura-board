@@ -5,6 +5,7 @@
 // 카드 진입 대신 /board/[id]/vibe-arcade/studio 로 이동해 렌더된다.
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { buildStudioSrcDoc } from "@/lib/vibe-arcade/sandbox-renderer";
 import MonacoEditor from "@/components/agent/MonacoEditor";
@@ -70,6 +71,7 @@ type Props = {
 };
 
 export function StudioClient({ boardId, boardHref, studentName, existingProject }: Props) {
+  const router = useRouter();
   const [title, setTitle] = useState(existingProject?.title ?? "");
   const [htmlContent, setHtmlContent] = useState("");
   const [cssContent, setCssContent] = useState("");
@@ -287,7 +289,7 @@ export function StudioClient({ boardId, boardHref, studentName, existingProject 
         throw new Error(body.error ?? `save ${res.status}`);
       }
       // 저장 성공 → 보드로 복귀
-      window.location.href = boardHref;
+      router.push(boardHref);
     } catch (e) {
       setSaveError((e as Error).message);
     } finally {

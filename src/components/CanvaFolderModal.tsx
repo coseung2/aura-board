@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { OptimizedImage } from "./ui/OptimizedImage";
+import { buildCanvaConnectUrl } from "@/lib/canva-connect-return";
 
 type FolderItem = {
   type: "design" | "folder";
@@ -42,7 +43,7 @@ export function CanvaFolderModal({ sectionTitle, onImport, onClose }: Props) {
         const data = await res.json().catch(() => ({}));
         if (data.error === "canva_not_connected") {
           if (window.confirm("Canva 계정 연결이 필요합니다. 지금 연결할까요?")) {
-            window.location.href = "/api/auth/canva";
+            window.location.href = buildCanvaConnectUrl();
           }
           onClose();
           return;

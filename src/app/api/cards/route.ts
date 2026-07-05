@@ -305,7 +305,7 @@ export async function POST(req: Request) {
     if (linkUrl && isCanvaDesignUrl(linkUrl)) {
       // Canva's "링크 공유" button hands out canva.link short URLs —
       // expand to the canonical canva.com/{id}/{shareToken}/view form
-      // before storing so the client-side hasCanvaShareToken gate works.
+      // before storing so the client can render the embedded Canva slot.
       linkUrl = await expandCanvaShortLink(linkUrl);
       const embed = await resolveCanvaEmbedUrlCached(linkUrl);
       if (embed) {
@@ -476,20 +476,49 @@ export async function POST(req: Request) {
 
     const attachmentRows = input.attachments
       ? await Promise.all(
-          input.attachments.map(async (a, idx) => ({
-            ...a,
-            previewUrl:
-              a.kind === "image"
-                ? a.previewUrl ??
-                  (await createAttachmentPreviewUrl(a.url, input.boardId, idx))
-                : a.kind === "video"
-                ? a.previewUrl ??
+          input.attachments.map(async (a, idx) => {
+            if (a.kind === "image") {
+              return {
+                ...a,
+                previewUrl:
+                  a.previewUrl ??
+                  (await createAttachmentPreviewUrl(a.url, input.boardId, idx)),
+              };
+            }
+            if (a.kind === "video") {
+              return {
+                ...a,
+                previewUrl:
+                  a.previewUrl ??
                   (await extractVideoThumbnail(
                     a.url,
                     `uploads/previews/cards/${input.boardId}/${Date.now()}-${idx}.webp`
-                  ))
-                : null,
-          }))
+                  )),
+              };
+            }
+            if (a.kind === "link") {
+              let attachmentUrl = a.url;
+              let previewUrl = a.previewUrl ?? null;
+              if (isCanvaDesignUrl(attachmentUrl)) {
+                attachmentUrl = await expandCanvaShortLink(attachmentUrl);
+                if (!previewUrl) {
+                  const embed = await resolveCanvaEmbedUrlCached(attachmentUrl);
+                  previewUrl = embed
+                    ? proxiedCanvaThumbnailUrl(embed.thumbnailUrl, 640)
+                    : deriveCanvaThumbnailUrl(attachmentUrl);
+                }
+              }
+              return {
+                ...a,
+                url: attachmentUrl,
+                previewUrl,
+              };
+            }
+            return {
+              ...a,
+              previewUrl: null,
+            };
+          })
         )
       : [];
 

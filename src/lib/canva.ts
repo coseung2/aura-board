@@ -16,11 +16,17 @@ const CANVA_DEFAULT_SCOPES = "design:meta:read design:content:read folder:read f
 const CANVA_STUDENT_CARD_SCOPES =
   "design:meta:read design:content:write asset:read asset:write";
 
-type CanvaAuthState = {
-  kind: "student";
-  id: string;
-  returnTo: string | null;
-};
+export type CanvaAuthState =
+  | {
+      kind: "teacher";
+      id: string;
+      returnTo: string | null;
+    }
+  | {
+      kind: "student";
+      id: string;
+      returnTo: string | null;
+    };
 
 export function getCanvaClientId() {
   return process.env.CANVA_CLIENT_ID ?? "";
@@ -34,22 +40,27 @@ function getRedirectUri() {
   return process.env.CANVA_REDIRECT_URI ?? "http://localhost:3000/api/auth/canva/callback";
 }
 
-function encodeStudentAuthState(state: CanvaAuthState): string {
+function encodeAuthState(state: CanvaAuthState): string {
   return Buffer.from(JSON.stringify(state)).toString("base64url");
 }
 
-export function decodeStudentAuthState(raw: string): CanvaAuthState | null {
+export function decodeCanvaAuthState(raw: string): CanvaAuthState | null {
   try {
     const parsed = JSON.parse(Buffer.from(raw, "base64url").toString("utf8")) as unknown;
     if (!parsed || typeof parsed !== "object") return null;
     const row = parsed as Record<string, unknown>;
-    if (row.kind !== "student") return null;
+    if (row.kind !== "teacher" && row.kind !== "student") return null;
     if (typeof row.id !== "string" || !row.id) return null;
     const returnTo = typeof row.returnTo === "string" ? row.returnTo : null;
-    return { kind: "student", id: row.id, returnTo };
+    return { kind: row.kind, id: row.id, returnTo };
   } catch {
     return null;
   }
+}
+
+export function decodeStudentAuthState(raw: string): CanvaAuthState | null {
+  const state = decodeCanvaAuthState(raw);
+  return state?.kind === "student" ? state : null;
 }
 
 /* ── PKCE helpers ── */
@@ -67,7 +78,10 @@ async function generateCodeChallenge(verifier: string): Promise<string> {
 }
 
 /* ── OAuth flow ── */
-export async function buildAuthorizationUrl(userId: string): Promise<string> {
+export async function buildAuthorizationUrl(
+  userId: string,
+  returnTo: string | null = "/dashboard"
+): Promise<string> {
   const verifier = generateCodeVerifier();
   const challenge = await generateCodeChallenge(verifier);
 
@@ -88,7 +102,7 @@ export async function buildAuthorizationUrl(userId: string): Promise<string> {
     code_challenge: challenge,
     code_challenge_method: "s256",
     scope: CANVA_DEFAULT_SCOPES,
-    state: userId,
+    state: encodeAuthState({ kind: "teacher", id: userId, returnTo }),
   });
 
   return `${CANVA_AUTH}?${params}`;
@@ -114,7 +128,7 @@ export async function buildStudentCardDesignAuthorizationUrl(
     code_challenge: challenge,
     code_challenge_method: "s256",
     scope: CANVA_STUDENT_CARD_SCOPES,
-    state: encodeStudentAuthState({ kind: "student", id: studentId, returnTo }),
+    state: encodeAuthState({ kind: "student", id: studentId, returnTo }),
   });
 
   return `${CANVA_AUTH}?${params}`;

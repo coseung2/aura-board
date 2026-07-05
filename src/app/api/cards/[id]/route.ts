@@ -300,14 +300,38 @@ export async function PATCH(
     }
     const attachmentRows = nextAttachments
       ? await Promise.all(
-          nextAttachments.map(async (a, idx) => ({
-            ...a,
-            previewUrl:
-              a.kind === "image"
-                ? a.previewUrl ??
-                  (await createAttachmentPreviewUrl(a.url, card.boardId, idx))
-                : null,
-          }))
+          nextAttachments.map(async (a, idx) => {
+            if (a.kind === "image") {
+              return {
+                ...a,
+                previewUrl:
+                  a.previewUrl ??
+                  (await createAttachmentPreviewUrl(a.url, card.boardId, idx)),
+              };
+            }
+            if (a.kind === "link") {
+              let attachmentUrl = a.url;
+              let previewUrl = a.previewUrl ?? null;
+              if (isCanvaDesignUrl(attachmentUrl)) {
+                attachmentUrl = await expandCanvaShortLink(attachmentUrl);
+                if (!previewUrl) {
+                  const embed = await resolveCanvaEmbedUrlCached(attachmentUrl);
+                  previewUrl = embed
+                    ? proxiedCanvaThumbnailUrl(embed.thumbnailUrl, 640)
+                    : deriveCanvaThumbnailUrl(attachmentUrl);
+                }
+              }
+              return {
+                ...a,
+                url: attachmentUrl,
+                previewUrl,
+              };
+            }
+            return {
+              ...a,
+              previewUrl: null,
+            };
+          })
         )
       : undefined;
 

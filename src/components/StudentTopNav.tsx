@@ -239,7 +239,7 @@ export function StudentTopNav({
     setLoggingOut(true);
     try {
       await fetch("/api/student/logout", { method: "POST" });
-      router.push("/login");
+      router.replace("/login");
     } catch {
       setLoggingOut(false);
     }

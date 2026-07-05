@@ -146,6 +146,15 @@ export function ParentTopNav({
     if (typeof window !== "undefined") {
       localStorage.setItem(LS_KEY, studentId);
     }
+    if (pathname.startsWith("/parent/child/")) {
+      const suffix = pathname.replace(/^\/parent\/child\/[^/]+/, "");
+      const params = new URLSearchParams(searchParams.toString());
+      params.delete("child");
+      const query = params.toString();
+      const newPath = `/parent/child/${studentId}${suffix}${query ? `?${query}` : ""}`;
+      router.replace(newPath, { scroll: false });
+      return;
+    }
     const params = new URLSearchParams(searchParams.toString());
     params.set("child", studentId);
     router.replace(`/parent/home?${params.toString()}`, { scroll: false });
@@ -203,7 +212,7 @@ export function ParentTopNav({
         <ParentNotificationBell pendingCount={pendingNotificationCount} />
         {canSwitchToTeacher && (
           <Link
-            href="/"
+            href="/dashboard"
             className="auth-mode-switch"
             title="교사 화면으로 전환"
             aria-label="교사 화면으로 전환"

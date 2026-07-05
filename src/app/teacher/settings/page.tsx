@@ -12,14 +12,14 @@ export const metadata = {
 
 export default async function TeacherSettingsPage() {
   const user = await getCurrentUser();
-  if (!user) redirect("/login");
+  if (!user) redirect("/login?from=/teacher/settings");
 
   return (
     <>
       <TopNav showAdmin={user.email.toLowerCase() === ADMIN_EMAIL} />
       <main className="docs-page">
       <article className="docs-article">
-        <Link href="/" className="docs-back">
+        <Link href="/dashboard" className="docs-back">
           ← 대시보드로
         </Link>
         <h1 className="docs-title">교사 설정</h1>

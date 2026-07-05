@@ -13,6 +13,7 @@
  * /board/[id]/s/[sectionId] route (T0-①).
  */
 import { useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import { AddCardButton } from "./AddCardButton";
 import { AddCardModal, type AddCardData } from "./AddCardModal";
 import { CardDetailModal } from "./cards/CardDetailModal";
@@ -131,6 +132,7 @@ export function BreakoutBoard({
   currentUserId,
   currentRole,
 }: Props) {
+  const router = useRouter();
   const [cards, setCards] = useState<CardData[]>(initialCards);
   const [sections, setSections] = useState<SectionData[]>(
     [...initialSections].sort((a, b) => a.order - b.order)
@@ -179,7 +181,7 @@ export function BreakoutBoard({
       });
       if (res.ok) {
         setLocalStatus("archived");
-        window.location.href = `/board/${boardSlug}/archive`;
+        router.replace(`/board/${boardSlug}/archive`);
       } else {
         alert("세션 종료 실패");
       }

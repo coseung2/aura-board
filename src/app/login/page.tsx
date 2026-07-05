@@ -52,7 +52,21 @@ export default function LoginPage() {
   }
 
   function safeReturnTarget(raw: string | null | undefined, fallback: string): string {
-    if (raw && raw.startsWith("/") && !raw.startsWith("//")) return raw;
+    const blockedTargets = ["/api", "/landing", "/login", "/student/login"];
+    if (
+      raw &&
+      raw.startsWith("/") &&
+      !raw.startsWith("//") &&
+      raw !== "/" &&
+      !blockedTargets.some(
+        (target) =>
+          raw === target ||
+          raw.startsWith(`${target}?`) ||
+          raw.startsWith(`${target}/`),
+      )
+    ) {
+      return raw;
+    }
     return fallback;
   }
 

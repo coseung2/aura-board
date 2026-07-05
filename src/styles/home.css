@@ -19,7 +19,7 @@
 
 .public-hero {
   position: relative;
-  min-height: 86vh;
+  min-height: clamp(500px, 66vh, 620px);
   overflow: hidden;
   isolation: isolate;
   display: flex;
@@ -34,7 +34,7 @@
     linear-gradient(90deg, rgba(8, 31, 45, 0.78), rgba(8, 31, 45, 0.46) 52%, rgba(8, 31, 45, 0.08)),
     url("/aura-public-hero-bg.png");
   background-size: cover;
-  background-position: center;
+  background-position: center 46%;
 }
 
 .public-hero::after {
@@ -95,8 +95,8 @@
 
 .public-hero-copy {
   width: min(1120px, calc(100% - 40px));
-  margin: auto auto 110px;
-  padding: 42px 0 0;
+  margin: clamp(88px, 14vh, 128px) auto 58px;
+  padding: 16px 0 0;
   color: #fff;
 }
 
@@ -222,7 +222,7 @@
 
 @media (max-width: 760px) {
   .public-hero {
-    min-height: 88vh;
+    min-height: clamp(540px, 74vh, 640px);
   }
 
   .public-nav {
@@ -237,7 +237,8 @@
   }
 
   .public-hero-copy {
-    margin-bottom: 70px;
+    margin-top: clamp(70px, 10vh, 96px);
+    margin-bottom: 48px;
   }
 
   .public-hero-lead {

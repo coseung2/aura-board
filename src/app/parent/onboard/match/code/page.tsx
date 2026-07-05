@@ -1,19 +1,38 @@
 "use client";
 
-import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { Suspense, useEffect, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { CodeInputCells } from "@/components/parent/CodeInputCells";
-import { CODE_LENGTH } from "@/lib/class-invite-codes-shared";
+import { CODE_LENGTH, normalizeCode } from "@/lib/class-invite-codes-shared";
 import { OnboardingShell } from "../../_shell";
 
 // parent-class-invite-v2 — P3 Code Input.
 // invite-code-5-digit (2026-04-26): 길이 8 → 5, 컴포넌트 generic 화.
-
+// Next.js requires `useSearchParams` consumers to be wrapped in Suspense so
+// the surrounding static boundary can be prerendered. We export a tiny
+// wrapper rather than the inner component directly.
 export default function MatchCodePage() {
+  return (
+    <Suspense fallback={null}>
+      <MatchCodeInner />
+    </Suspense>
+  );
+}
+
+function MatchCodeInner() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [code, setCode] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+
+  useEffect(() => {
+    const raw = searchParams.get("code");
+    if (!raw) return;
+    const normalized = normalizeCode(raw);
+    if (!normalized) return;
+    setCode(normalized.slice(0, CODE_LENGTH));
+  }, [searchParams]);
 
   const submit = async (codeStr: string) => {
     setSubmitting(true);
@@ -51,7 +70,13 @@ export default function MatchCodePage() {
       <p style={{ margin: "8px 0 24px", fontSize: 15, color: "var(--color-text-muted)" }}>
         선생님께 받은 {CODE_LENGTH}자리 코드를 입력하세요.
       </p>
-      <CodeInputCells value={code} onChange={setCode} onComplete={submit} disabled={submitting} autoFocus />
+      <CodeInputCells
+        value={code}
+        onChange={setCode}
+        onComplete={submit}
+        disabled={submitting}
+        autoFocus
+      />
       {err && (
         <p style={{ textAlign: "center", marginTop: 12, color: "var(--color-danger)", fontSize: 13 }}>
           {err}

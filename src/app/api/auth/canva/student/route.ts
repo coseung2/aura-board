@@ -7,6 +7,7 @@ import {
 
 function safeReturnTo(value: string | null): string {
   if (!value || !value.startsWith("/") || value.startsWith("//")) return "/my/wallet";
+  if (value === "/" || value === "/landing") return "/my/wallet";
   return value;
 }
 

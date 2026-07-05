@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import type { CardData } from "./DraggableCard";
 import { OptimizedImage } from "./ui/OptimizedImage";
+import { buildCanvaConnectUrl } from "@/lib/canva-connect-return";
 
 type Props = {
   sectionTitle: string;
@@ -146,7 +147,7 @@ export function ExportModal({ sectionTitle, cards, onClose }: Props) {
         const data = await res.json().catch(() => ({ error: "unknown" }));
         if (data.error === "canva_not_connected" || data.error === "canva_token_expired") {
           if (window.confirm("Canva 계정 연결이 필요합니다. 지금 연결할까요?")) {
-            window.location.href = "/api/auth/canva";
+            window.location.href = buildCanvaConnectUrl();
           }
           setExporting(false);
           setProgress("");
