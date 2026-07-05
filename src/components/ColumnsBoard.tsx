@@ -22,6 +22,10 @@ import { useCardMutations } from "./columns/useCardMutations";
 import { useSectionMutations } from "./columns/useSectionMutations";
 import type { CardData } from "./DraggableCard";
 import { formatAuthorList } from "@/lib/card-author";
+import {
+  withBoardAnonymousAuthor,
+  withBoardAnonymousAuthors,
+} from "@/lib/card-anonymity";
 
 type SectionData = StreamSection;
 
@@ -43,6 +47,7 @@ type Props = {
   isStudentViewer?: boolean;
   /** Board's classroomId — enables the CardAuthorEditor roster picker. */
   classroomId?: string | null;
+  anonymousAuthor?: boolean;
 };
 
 export function ColumnsBoard({
@@ -53,8 +58,11 @@ export function ColumnsBoard({
   currentRole,
   isStudentViewer,
   classroomId,
+  anonymousAuthor = false,
 }: Props) {
-  const [cards, setCards] = useState<CardData[]>(initialCards);
+  const [cards, setCards] = useState<CardData[]>(
+    withBoardAnonymousAuthors(initialCards, anonymousAuthor),
+  );
   const cardsRef = useRef(cards);
   cardsRef.current = cards;
   const [sections, setSections] = useState<SectionData[]>(
@@ -96,6 +104,13 @@ export function ColumnsBoard({
 
   const canEdit = currentRole === "owner" || currentRole === "editor";
   const canAddCard = canEdit || !!isStudentViewer;
+
+  useEffect(() => {
+    setCards((list) => withBoardAnonymousAuthors(list, anonymousAuthor));
+    setOpenCard((card) => withBoardAnonymousAuthor(card, anonymousAuthor));
+    setEditingCard((card) => withBoardAnonymousAuthor(card, anonymousAuthor));
+    setAuthorEditCard((card) => withBoardAnonymousAuthor(card, anonymousAuthor));
+  }, [anonymousAuthor]);
 
   const scrollAreaRef = useRef<HTMLDivElement | null>(null);
   const scrollBarRef = useRef<HTMLDivElement | null>(null);

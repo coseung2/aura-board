@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { AddCardButton } from "./AddCardButton";
 import type { AddCardData } from "./AddCardModal";
 import { CardBody } from "./cards/CardBody";
@@ -11,6 +11,10 @@ import { EditCardModal, type EditCardUpdates } from "./EditCardModal";
 import type { CardData } from "./DraggableCard";
 import { useCardRealtime } from "@/hooks/useCardRealtime";
 import { formatAuthorList } from "@/lib/card-author";
+import {
+  withBoardAnonymousAuthor,
+  withBoardAnonymousAuthors,
+} from "@/lib/card-anonymity";
 import {
   AuraEvaluationControl,
   type AuraBoardSettings,
@@ -24,6 +28,7 @@ type Props = {
   currentRole: "owner" | "editor" | "viewer";
   isStudentViewer?: boolean;
   classroomId?: string | null;
+  anonymousAuthor?: boolean;
   auraSettings?: AuraBoardSettings;
   auraEvaluations?: Record<string, AuraEvaluationLevel>;
 };
@@ -35,11 +40,15 @@ export function GridBoard({
   currentRole,
   isStudentViewer,
   classroomId,
+  anonymousAuthor = false,
   auraSettings,
   auraEvaluations,
 }: Props) {
   const [cards, setCards] = useState<CardData[]>(
-    [...initialCards].sort((a, b) => a.order - b.order),
+    withBoardAnonymousAuthors(
+      [...initialCards].sort((a, b) => a.order - b.order),
+      anonymousAuthor,
+    ),
   );
   const [openCard, setOpenCard] = useState<CardData | null>(null);
   const [editingCard, setEditingCard] = useState<CardData | null>(null);
@@ -57,6 +66,13 @@ export function GridBoard({
 
   const deletingIds = useRef<Set<string>>(new Set());
   useCardRealtime(boardId, setCards, deletingIds);
+
+  useEffect(() => {
+    setCards((list) => withBoardAnonymousAuthors(list, anonymousAuthor));
+    setOpenCard((card) => withBoardAnonymousAuthor(card, anonymousAuthor));
+    setEditingCard((card) => withBoardAnonymousAuthor(card, anonymousAuthor));
+    setAuthorEditCard((card) => withBoardAnonymousAuthor(card, anonymousAuthor));
+  }, [anonymousAuthor]);
 
   async function handleAdd(data: AddCardData) {
     try {

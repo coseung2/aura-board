@@ -1,6 +1,6 @@
 "use client";
 
-import { useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { AddCardButton } from "./AddCardButton";
 import type { AddCardData } from "./AddCardModal";
 import { CardBody } from "./cards/CardBody";
@@ -11,6 +11,10 @@ import { EditCardModal, type EditCardUpdates } from "./EditCardModal";
 import type { CardData } from "./DraggableCard";
 import { useCardRealtime } from "@/hooks/useCardRealtime";
 import { formatAuthorList } from "@/lib/card-author";
+import {
+  withBoardAnonymousAuthor,
+  withBoardAnonymousAuthors,
+} from "@/lib/card-anonymity";
 import {
   AuraEvaluationControl,
   type AuraBoardSettings,
@@ -26,6 +30,7 @@ type Props = {
   currentRole: Role;
   isStudentViewer?: boolean;
   classroomId?: string | null;
+  anonymousAuthor?: boolean;
   auraSettings?: AuraBoardSettings;
   auraEvaluations?: Record<string, AuraEvaluationLevel>;
 };
@@ -37,11 +42,15 @@ export function BoardCanvas({
   currentRole,
   isStudentViewer,
   classroomId,
+  anonymousAuthor = false,
   auraSettings,
   auraEvaluations,
 }: Props) {
   const [cards, setCards] = useState<CardData[]>(
-    [...initialCards].sort((a, b) => a.order - b.order),
+    withBoardAnonymousAuthors(
+      [...initialCards].sort((a, b) => a.order - b.order),
+      anonymousAuthor,
+    ),
   );
   const [openCard, setOpenCard] = useState<CardData | null>(null);
   const [editingCard, setEditingCard] = useState<CardData | null>(null);
@@ -61,6 +70,13 @@ export function BoardCanvas({
   const masonryGridRef = useRef<HTMLDivElement | null>(null);
   const masonryCardRefs = useRef(new Map<string, HTMLElement>());
   useCardRealtime(boardId, setCards, deletingIds);
+
+  useEffect(() => {
+    setCards((list) => withBoardAnonymousAuthors(list, anonymousAuthor));
+    setOpenCard((card) => withBoardAnonymousAuthor(card, anonymousAuthor));
+    setEditingCard((card) => withBoardAnonymousAuthor(card, anonymousAuthor));
+    setAuthorEditCard((card) => withBoardAnonymousAuthor(card, anonymousAuthor));
+  }, [anonymousAuthor]);
 
   useLayoutEffect(() => {
     const grid = masonryGridRef.current;

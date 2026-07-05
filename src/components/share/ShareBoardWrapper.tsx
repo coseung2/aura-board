@@ -178,6 +178,7 @@ function ShareBoardContent({
             currentRole={role}
             classroomId={null}
             isStudentViewer={isStudentViewer}
+            anonymousAuthor={board.anonymousAuthor}
           />
         );
 
@@ -190,6 +191,7 @@ function ShareBoardContent({
             currentRole={role}
             classroomId={null}
             isStudentViewer={isStudentViewer}
+            anonymousAuthor={board.anonymousAuthor}
           />
         );
 
@@ -204,6 +206,7 @@ function ShareBoardContent({
             isStudentViewer={isStudentViewer}
             initialSections={initialSections}
             streamSectionsEnabled={!!board.streamSectionsEnabled}
+            anonymousAuthor={board.anonymousAuthor}
           />
         );
 
@@ -217,6 +220,7 @@ function ShareBoardContent({
             currentRole={role}
             classroomId={null}
             isStudentViewer={isStudentViewer}
+            anonymousAuthor={board.anonymousAuthor}
           />
         );
 
@@ -232,6 +236,7 @@ function ShareBoardContent({
             currentRole={role}
             classroomId={null}
             isStudentViewer={isStudentViewer}
+            anonymousAuthor={board.anonymousAuthor}
           />
         );
     }

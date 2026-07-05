@@ -27,6 +27,10 @@ import {
 import { BreakoutConfigModal } from "./stream/StreamBreakoutConfigModal";
 import type { GroupEditorDraft } from "./classroom/GroupRosterEditor";
 import { useCardRealtime } from "@/hooks/useCardRealtime";
+import {
+  withBoardAnonymousAuthor,
+  withBoardAnonymousAuthors,
+} from "@/lib/card-anonymity";
 import { sortSections } from "@/lib/sort-sections";
 import {
   STREAM_ACTIVITY_TEMPLATE_LABELS,
@@ -83,6 +87,7 @@ type Props = {
   streamContentPrompt?: string;
   initialSections?: StreamSection[];
   streamSectionsEnabled?: boolean;
+  anonymousAuthor?: boolean;
 };
 
 export function StreamBoard({
@@ -97,8 +102,11 @@ export function StreamBoard({
   streamContentPrompt,
   initialSections = [],
   streamSectionsEnabled = false,
+  anonymousAuthor = false,
 }: Props) {
-  const [cards, setCards] = useState<CardData[]>(() => sortPosts(initialCards));
+  const [cards, setCards] = useState<CardData[]>(() =>
+    withBoardAnonymousAuthors(sortPosts(initialCards), anonymousAuthor),
+  );
   const [sections, setSections] = useState<StreamSection[]>(() =>
     [...initialSections].sort(sortSections),
   );
@@ -143,6 +151,12 @@ export function StreamBoard({
 
   // ── Realtime polling ──────────────────────────────────────────────
   useCardRealtime(boardId, setCards, deletingIds, setSections);
+
+  useEffect(() => {
+    setCards((list) => withBoardAnonymousAuthors(list, anonymousAuthor));
+    setOpenCard((card) => withBoardAnonymousAuthor(card, anonymousAuthor));
+    setEditingCard((card) => withBoardAnonymousAuthor(card, anonymousAuthor));
+  }, [anonymousAuthor]);
 
   useEffect(() => {
     setMounted(true);

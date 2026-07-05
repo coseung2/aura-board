@@ -40,6 +40,7 @@ type CardWire = {
   studentAuthorName: string | null;
   authorName: string | null;
   queueStatus: string | null;
+  anonymousAuthor: boolean;
   authors: Array<{
     id: string;
     studentId: string | null;
@@ -96,6 +97,7 @@ export async function GET(
       select: {
         id: true,
         layout: true,
+        anonymousAuthor: true,
         questionPrompt: true,
         questionVizMode: true,
       },
@@ -236,6 +238,7 @@ export async function GET(
       studentAuthorName: c.studentAuthor?.name ?? null,
       authorName: c.author?.name ?? null,
       queueStatus: c.queueStatus,
+      anonymousAuthor: board.anonymousAuthor,
       authors: c.authors.map((a) => ({
         id: a.id,
         studentId: a.studentId,

@@ -86,6 +86,7 @@ export async function PATCH(
       select: {
         id: true,
         classroomId: true,
+        anonymousAuthor: true,
         classroom: { select: { teacherId: true } },
       },
     });
@@ -372,7 +373,9 @@ export async function PATCH(
       await announcePollChange(card.boardId, id);
     }
 
-    return NextResponse.json({ card: { ...updated, attachments } });
+    return NextResponse.json({
+      card: { ...updated, attachments, anonymousAuthor: board.anonymousAuthor },
+    });
   } catch (e) {
     if (e instanceof ForbiddenError) {
       return NextResponse.json({ error: e.message }, { status: 403 });

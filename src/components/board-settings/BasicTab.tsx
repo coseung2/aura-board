@@ -293,6 +293,7 @@ function EngagementTab({
   anonymousAuthor: boolean;
   onChange: (next: boolean) => void;
 }) {
+  const router = useRouter();
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
@@ -310,7 +311,9 @@ function EngagementTab({
       if (!res.ok) {
         onChange(!next);
         setErr("저장에 실패했어요.");
+        return;
       }
+      router.refresh();
     } catch {
       onChange(!next);
       setErr("저장에 실패했어요.");
