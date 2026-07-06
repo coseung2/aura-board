@@ -113,7 +113,8 @@ export default async function BoardPage({
     }
   };
 
-  const { id } = await params;
+  const { id: rawId } = await params;
+  const id = decodeRouteParam(rawId);
   const { view: viewParam } = await searchParams;
   // AC-13 matrix guard reads UA server-side. Best-effort — iPad Pro in
   // desktop-mode Safari reports a Mac UA and slips through; documented
@@ -918,4 +919,12 @@ export default async function BoardPage({
       </main>
     </BoardSlideshowProvider>
   );
+}
+
+function decodeRouteParam(value: string) {
+  try {
+    return decodeURIComponent(value);
+  } catch {
+    return value;
+  }
 }
