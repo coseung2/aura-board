@@ -13,7 +13,11 @@ import type { Provider } from "@auth/core/providers";
 import { PrismaAdapter } from "@auth/prisma-adapter";
 import { db } from "./db";
 
-const providers: Provider[] = [Google];
+const providers: Provider[] = [
+  Google({
+    allowDangerousEmailAccountLinking: true,
+  }),
+];
 
 const kakaoClientId = process.env.KAKAO_PARENT_CLIENT_ID ?? process.env.AUTH_KAKAO_ID;
 const kakaoClientSecret =
