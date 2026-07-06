@@ -20,6 +20,9 @@
     "seed:breakout": "tsx prisma/seed-breakout-templates.ts",
     "seed:drawing-assets": "tsx prisma/seed-drawing-assets.ts",
     "seed:speed-game": "tsx prisma/seed-speed-game-word-sets.ts",
+    "avatar:build": "node .codex/scripts/build-avatar-template-masks.cjs && node .codex/scripts/build-avatar-sheet.cjs && node .codex/scripts/make-avatar-thumbnails.cjs",
+    "avatar:validate": "node .codex/scripts/validate-avatar-assets.cjs",
+    "validate:avatar-assets": "node .codex/scripts/validate-avatar-assets.cjs",
     "postinstall": "prisma generate"
   },
   "dependencies": {

@@ -117,6 +117,7 @@ export function CharacterRoomClient() {
               equipped={displayEquipped}
               size={220}
               ariaLabel="내 캐릭터 미리보기"
+              gender={data.student.gender}
             />
           </div>
           <div className="character-preview-meta">

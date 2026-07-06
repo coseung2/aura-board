@@ -1,0 +1,13 @@
+{
+  "key": "sunglasses-basic",
+  "slot": "accessory",
+  "renderLayer": "accessory_face",
+  "bodyTemplate": "aura-body-v1",
+  "gender": "male",
+  "source": "source.png",
+  "anchor": "eyeBridge",
+  "pivot": {
+    "x": 48,
+    "y": 9
+  }
+}

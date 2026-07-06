@@ -1,0 +1,12 @@
+{
+  "key": "default-shoes",
+  "slot": "shoes",
+  "renderLayer": "shoes",
+  "bodyTemplate": "aura-body-v1",
+  "source": "source.png",
+  "anchor": "feet",
+  "pivot": {
+    "x": 0,
+    "y": 0
+  }
+}

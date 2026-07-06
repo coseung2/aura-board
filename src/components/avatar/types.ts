@@ -57,6 +57,7 @@ export type AvatarGalleryStudent = {
 
 export type AvatarGalleryResponse = {
   classroomId: string;
+  items: AvatarItem[];
   students: AvatarGalleryStudent[];
 };
 
@@ -70,6 +71,7 @@ export const AVATAR_CATEGORIES = [
   { key: "shoes", label: "신발" },
   { key: "accessory", label: "액세서리" },
   { key: "pet", label: "펫" },
+  { key: "motion", label: "모션" },
 ] as const;
 
 export const AVATAR_SLOTS = [
@@ -81,4 +83,5 @@ export const AVATAR_SLOTS = [
   "shoes",
   "accessory",
   "pet",
+  "motion",
 ] as const;

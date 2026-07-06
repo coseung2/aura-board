@@ -1,0 +1,477 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Avatar Asset Tool</title>
+  <style>
+    :root {
+      color-scheme: light;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: #eef3f8;
+      color: #172033;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      display: grid;
+      grid-template-columns: 320px minmax(0, 1fr);
+    }
+
+    aside {
+      padding: 18px;
+      border-right: 1px solid #d7e0ea;
+      background: #fff;
+      overflow: auto;
+    }
+
+    main {
+      display: grid;
+      place-items: center;
+      padding: 24px;
+    }
+
+    h1 {
+      margin: 0 0 16px;
+      font-size: 18px;
+    }
+
+    label {
+      display: block;
+      margin: 14px 0 6px;
+      font-size: 12px;
+      font-weight: 800;
+      color: #44546a;
+    }
+
+    input,
+    select,
+    button {
+      width: 100%;
+      min-height: 38px;
+      border: 1px solid #ccd7e4;
+      border-radius: 8px;
+      background: #fff;
+      color: #172033;
+      font: inherit;
+    }
+
+    input[type="range"] {
+      min-height: 28px;
+    }
+
+    button {
+      margin-top: 10px;
+      border-color: #1b87c9;
+      background: #1b87c9;
+      color: #fff;
+      font-weight: 800;
+      cursor: pointer;
+    }
+
+    button.secondary {
+      border-color: #ccd7e4;
+      background: #f7fafc;
+      color: #172033;
+    }
+
+    .row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+
+    .hint {
+      margin: 8px 0 0;
+      font-size: 12px;
+      line-height: 1.45;
+      color: #66758a;
+    }
+
+    .stage-wrap {
+      display: grid;
+      gap: 14px;
+      justify-items: center;
+    }
+
+    canvas {
+      width: 444px;
+      height: 888px;
+      border: 1px solid #c9d5e2;
+      background:
+        linear-gradient(45deg, #dce6f0 25%, transparent 25%),
+        linear-gradient(-45deg, #dce6f0 25%, transparent 25%),
+        linear-gradient(45deg, transparent 75%, #dce6f0 75%),
+        linear-gradient(-45deg, transparent 75%, #dce6f0 75%);
+      background-color: #f8fbff;
+      background-position: 0 0, 0 11px, 11px -11px, -11px 0;
+      background-size: 22px 22px;
+      image-rendering: pixelated;
+    }
+
+    .toolbar {
+      display: flex;
+      gap: 8px;
+      width: min(444px, 100%);
+    }
+
+    .toolbar button {
+      margin: 0;
+    }
+
+    @media (max-width: 860px) {
+      body {
+        grid-template-columns: 1fr;
+      }
+
+      aside {
+        border-right: 0;
+        border-bottom: 1px solid #d7e0ea;
+      }
+
+      canvas {
+        width: 333px;
+        height: 666px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <aside>
+    <h1>Avatar Asset Tool</h1>
+    <p class="hint">
+      기준 바디 위에 파츠 이미지를 올려 맞춘 뒤, 222x444 전체 프레임 PNG 또는 8x2 시트로 export합니다.
+      코드에서 x/y를 맞추지 않고 여기서 맞춘 결과를 파츠 에셋으로 씁니다.
+    </p>
+
+    <label for="baseFile">기준 바디 PNG</label>
+    <input id="baseFile" type="file" accept="image/png,image/webp,image/jpeg" />
+    <button id="loadDefaultBase" class="secondary">현재 기본 캐릭터 불러오기</button>
+
+    <label for="partFile">파츠 PNG</label>
+    <input id="partFile" type="file" accept="image/png,image/webp,image/jpeg" />
+
+    <div class="row">
+      <div>
+        <label for="x">X</label>
+        <input id="x" type="number" value="0" step="1" />
+      </div>
+      <div>
+        <label for="y">Y</label>
+        <input id="y" type="number" value="0" step="1" />
+      </div>
+    </div>
+
+    <label for="scale">Scale</label>
+    <input id="scale" type="range" min="10" max="300" value="100" />
+
+    <div class="row">
+      <button id="fitWidth" class="secondary">폭 맞춤</button>
+      <button id="centerPart" class="secondary">가운데</button>
+    </div>
+
+    <label for="slot">Export filename</label>
+    <select id="slot">
+      <option value="default-hair">default-hair.png</option>
+      <option value="default-top">default-top.png</option>
+      <option value="default-bottom">default-bottom.png</option>
+      <option value="default-shoes">default-shoes.png</option>
+      <option value="sunglasses-basic">sunglasses-basic.png</option>
+      <option value="custom-part">custom-part.png</option>
+    </select>
+
+    <button id="downloadFrame">222x444 프레임 다운로드</button>
+    <button id="downloadSheet">8x2 시트 다운로드</button>
+
+    <p class="hint">
+      사용법: 파츠를 드래그해서 위치 맞춤, 휠로 확대/축소, 다운로드한 시트를
+      <code>public/avatar/parts/</code>에 넣으면 됩니다.
+    </p>
+  </aside>
+
+  <main>
+    <div class="stage-wrap">
+      <canvas id="stage" width="222" height="444"></canvas>
+      <div class="toolbar">
+        <button id="toggleBase" class="secondary">바디 표시/숨김</button>
+        <button id="toggleAnchors" class="secondary">가이드/앵커</button>
+        <button id="reset" class="secondary">초기화</button>
+      </div>
+    </div>
+  </main>
+
+  <script>
+    const frameW = 222;
+    const frameH = 444;
+    const cols = 8;
+    const rows = 2;
+    const canvas = document.getElementById("stage");
+    const ctx = canvas.getContext("2d");
+    ctx.imageSmoothingEnabled = false;
+
+    const state = {
+      base: null,
+      part: null,
+      x: 0,
+      y: 0,
+      scale: 1,
+      showBase: true,
+      dragging: false,
+      lastX: 0,
+      lastY: 0,
+    };
+
+    const ANCHORS_URL = "/avatar/templates/aura-body-v1/anchors.json";
+    let anchors = [];
+    let showAnchors = false;
+
+    const xInput = document.getElementById("x");
+    const yInput = document.getElementById("y");
+    const scaleInput = document.getElementById("scale");
+
+    function loadImageFromFile(file) {
+      return new Promise((resolve, reject) => {
+        const img = new Image();
+        img.onload = () => resolve(img);
+        img.onerror = reject;
+        img.src = URL.createObjectURL(file);
+      });
+    }
+
+    function loadImageFromUrl(url) {
+      return new Promise((resolve, reject) => {
+        const img = new Image();
+        img.onload = () => resolve(img);
+        img.onerror = reject;
+        img.src = url;
+      });
+    }
+
+    async function loadAnchors() {
+      try {
+        const res = await fetch(ANCHORS_URL);
+        if (!res.ok) throw new Error("not available");
+        const json = await res.json();
+        if (Array.isArray(json.anchors)) {
+          anchors = json.anchors;
+          return;
+        }
+        const frameAnchors = json.genders?.male?.frames?.idle_00 ?? {};
+        anchors = Object.entries(frameAnchors).map(([name, value]) => {
+          const rect = value || {};
+          const x = typeof rect.x === "number" ? rect.x : 0;
+          const y = typeof rect.y === "number" ? rect.y : 0;
+          const w = typeof rect.w === "number" ? rect.w : 0;
+          const h = typeof rect.h === "number" ? rect.h : 0;
+          return { name, x, y, w, h };
+        });
+      } catch (e) {
+        anchors = [];
+        console.warn("[asset-tool] anchors load failed:", e);
+      }
+    }
+
+    function drawAnchors(targetCtx) {
+      if (!showAnchors || anchors.length === 0) return;
+      targetCtx.save();
+      for (const a of anchors) {
+        if (typeof a.x !== "number" || typeof a.y !== "number") continue;
+        if (typeof a.w === "number" && typeof a.h === "number" && a.w > 0 && a.h > 0) {
+          targetCtx.strokeStyle = "rgba(255, 0, 110, 0.75)";
+          targetCtx.lineWidth = 1.5;
+          targetCtx.strokeRect(a.x, a.y, a.w, a.h);
+        }
+        targetCtx.beginPath();
+        targetCtx.arc(a.x, a.y, 3, 0, Math.PI * 2);
+        targetCtx.fillStyle = "rgba(255, 0, 110, 0.7)";
+        targetCtx.fill();
+        targetCtx.strokeStyle = "rgba(255, 255, 255, 0.9)";
+        targetCtx.lineWidth = 1.5;
+        targetCtx.stroke();
+        if (typeof a.name === "string") {
+          targetCtx.fillStyle = "rgba(255, 0, 110, 0.9)";
+          targetCtx.font = "bold 10px system-ui, sans-serif";
+          targetCtx.fillText(a.name, a.x + 7, a.y + 3);
+        }
+      }
+      targetCtx.restore();
+    }
+
+    function syncInputs() {
+      xInput.value = Math.round(state.x);
+      yInput.value = Math.round(state.y);
+      scaleInput.value = Math.round(state.scale * 100);
+    }
+
+    function drawPartOnly(targetCtx) {
+      targetCtx.clearRect(0, 0, frameW, frameH);
+      targetCtx.imageSmoothingEnabled = false;
+      if (!state.part) return;
+      const w = state.part.width * state.scale;
+      const h = state.part.height * state.scale;
+      targetCtx.drawImage(state.part, Math.round(state.x), Math.round(state.y), Math.round(w), Math.round(h));
+    }
+
+    function render() {
+      ctx.clearRect(0, 0, frameW, frameH);
+      ctx.imageSmoothingEnabled = false;
+      if (state.showBase && state.base) {
+        ctx.drawImage(state.base, 0, 0, frameW, frameH);
+      }
+      drawPartOnly(ctx);
+      drawAnchors(ctx);
+    }
+
+    function setPartCentered() {
+      if (!state.part) return;
+      const w = state.part.width * state.scale;
+      const h = state.part.height * state.scale;
+      state.x = (frameW - w) / 2;
+      state.y = (frameH - h) / 2;
+      syncInputs();
+      render();
+    }
+
+    function downloadCanvas(sourceCanvas, filename) {
+      const a = document.createElement("a");
+      a.href = sourceCanvas.toDataURL("image/png");
+      a.download = filename;
+      a.click();
+    }
+
+    function buildFrameCanvas() {
+      const out = document.createElement("canvas");
+      out.width = frameW;
+      out.height = frameH;
+      drawPartOnly(out.getContext("2d"));
+      return out;
+    }
+
+    function buildSheetCanvas() {
+      const frame = buildFrameCanvas();
+      const out = document.createElement("canvas");
+      out.width = frameW * cols;
+      out.height = frameH * rows;
+      const outCtx = out.getContext("2d");
+      outCtx.imageSmoothingEnabled = false;
+      for (let row = 0; row < rows; row += 1) {
+        for (let col = 0; col < cols; col += 1) {
+          outCtx.drawImage(frame, col * frameW, row * frameH);
+        }
+      }
+      return out;
+    }
+
+    document.getElementById("baseFile").addEventListener("change", async (event) => {
+      const file = event.target.files?.[0];
+      if (!file) return;
+      state.base = await loadImageFromFile(file);
+      render();
+    });
+
+    document.getElementById("partFile").addEventListener("change", async (event) => {
+      const file = event.target.files?.[0];
+      if (!file) return;
+      state.part = await loadImageFromFile(file);
+      state.scale = Math.min(1, frameW / state.part.width);
+      setPartCentered();
+    });
+
+    document.getElementById("loadDefaultBase").addEventListener("click", async () => {
+      state.base = await loadImageFromUrl("/avatar/base-body-sprite.png");
+      render();
+    });
+
+    xInput.addEventListener("input", () => {
+      state.x = Number(xInput.value) || 0;
+      render();
+    });
+
+    yInput.addEventListener("input", () => {
+      state.y = Number(yInput.value) || 0;
+      render();
+    });
+
+    scaleInput.addEventListener("input", () => {
+      state.scale = Number(scaleInput.value) / 100;
+      render();
+    });
+
+    document.getElementById("fitWidth").addEventListener("click", () => {
+      if (!state.part) return;
+      state.scale = frameW / state.part.width;
+      setPartCentered();
+    });
+
+    document.getElementById("centerPart").addEventListener("click", setPartCentered);
+
+    document.getElementById("toggleBase").addEventListener("click", () => {
+      state.showBase = !state.showBase;
+      render();
+    });
+
+    document.getElementById("toggleAnchors").addEventListener("click", async () => {
+      if (anchors.length === 0) await loadAnchors();
+      showAnchors = !showAnchors;
+      render();
+    });
+
+    document.getElementById("reset").addEventListener("click", () => {
+      state.x = 0;
+      state.y = 0;
+      state.scale = 1;
+      syncInputs();
+      render();
+    });
+
+    document.getElementById("downloadFrame").addEventListener("click", () => {
+      downloadCanvas(buildFrameCanvas(), `${document.getElementById("slot").value}-frame.png`);
+    });
+
+    document.getElementById("downloadSheet").addEventListener("click", () => {
+      downloadCanvas(buildSheetCanvas(), `${document.getElementById("slot").value}.png`);
+    });
+
+    canvas.addEventListener("pointerdown", (event) => {
+      state.dragging = true;
+      state.lastX = event.clientX;
+      state.lastY = event.clientY;
+      canvas.setPointerCapture(event.pointerId);
+    });
+
+    canvas.addEventListener("pointermove", (event) => {
+      if (!state.dragging) return;
+      const rect = canvas.getBoundingClientRect();
+      const sx = frameW / rect.width;
+      const sy = frameH / rect.height;
+      state.x += (event.clientX - state.lastX) * sx;
+      state.y += (event.clientY - state.lastY) * sy;
+      state.lastX = event.clientX;
+      state.lastY = event.clientY;
+      syncInputs();
+      render();
+    });
+
+    canvas.addEventListener("pointerup", (event) => {
+      state.dragging = false;
+      canvas.releasePointerCapture(event.pointerId);
+    });
+
+    canvas.addEventListener("wheel", (event) => {
+      event.preventDefault();
+      const delta = event.deltaY < 0 ? 1.05 : 0.95;
+      state.scale = Math.max(0.1, Math.min(3, state.scale * delta));
+      syncInputs();
+      render();
+    }, { passive: false });
+
+    syncInputs();
+    render();
+  </script>
+</body>
+</html>

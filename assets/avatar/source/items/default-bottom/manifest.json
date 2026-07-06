@@ -1,0 +1,12 @@
+{
+  "key": "default-bottom",
+  "slot": "bottom",
+  "renderLayer": "bottom_front",
+  "bodyTemplate": "aura-body-v1",
+  "source": "source.png",
+  "anchor": "waistband",
+  "pivot": {
+    "x": 0,
+    "y": 0
+  }
+}

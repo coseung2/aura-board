@@ -48,7 +48,6 @@ const CLASSROOM_TABS = [
   { key: "store", label: "매점" },
   { key: "pay", label: "QR결제" },
   { key: "check", label: "제출 체크" },
-  { key: "morning", label: "학급게시판" },
 ] as const;
 
 function boardHref(board: TeacherNavBoard) {
@@ -175,6 +174,9 @@ export function TopNav({ showAdmin = false }: Props) {
   const classroomBoardHref = previewClassroom
     ? `/classroom/${previewClassroom.id}/boards`
     : "/classroom";
+  const classroomBulletinHref = previewClassroom
+    ? `/classroom/${previewClassroom.id}/morning`
+    : "/classroom";
   const previewClassroomBasePath = previewClassroom
     ? `/classroom/${previewClassroom.id}`
     : "/classroom";
@@ -257,6 +259,45 @@ export function TopNav({ showAdmin = false }: Props) {
           },
         ];
 
+  const bulletinClassroomLinks: MegaNavLink[] =
+    navData.classrooms.length > 0
+      ? navData.classrooms.map((classroom) => ({
+          href: `/classroom/${classroom.id}/morning`,
+          label: classroom.name,
+          active:
+            pathname.startsWith(`/classroom/${classroom.id}/morning`) ||
+            previewClassroom?.id === classroom.id,
+          onPreview: () => {
+            setPreviewClassroomId(classroom.id);
+            setPreviewCategory("ALL");
+          },
+        }))
+      : [
+          {
+            href: "/classroom",
+            label: "학급을 먼저 만들어 주세요",
+            disabled: true,
+          },
+        ];
+
+  const selectedClassroomBulletinLinks: MegaNavLink[] = previewClassroom
+    ? [
+        {
+          href: classroomBulletinHref,
+          label: "학급게시판",
+          active: pathname.startsWith(
+            `/classroom/${previewClassroom.id}/morning`,
+          ),
+        },
+      ]
+    : [
+        {
+          href: "/classroom",
+          label: "학급을 선택해 주세요",
+          disabled: true,
+        },
+      ];
+
   const selectedClassroomManagementLinks: MegaNavLink[] = previewClassroom
     ? CLASSROOM_TABS.slice(0, 4).map((tab) => ({
         href: previewClassroomTabHref(tab.key),
@@ -327,7 +368,9 @@ export function TopNav({ showAdmin = false }: Props) {
       id: "classrooms",
       label: "학급",
       href: "/classroom",
-      active: pathname.startsWith("/classroom"),
+      active:
+        pathname.startsWith("/classroom") &&
+        !/^\/classroom\/[^/]+\/morning/.test(pathname),
       groups: [
         {
           title: "학급 종류",
@@ -344,6 +387,24 @@ export function TopNav({ showAdmin = false }: Props) {
             ? `${previewClassroom.name} 운영`
             : "학급 운영",
           links: selectedClassroomOperationLinks,
+        },
+      ],
+    },
+    {
+      id: "bulletin",
+      label: "게시판",
+      href: classroomBulletinHref,
+      active: /^\/classroom\/[^/]+\/morning/.test(pathname),
+      groups: [
+        {
+          title: "학급 종류",
+          links: bulletinClassroomLinks,
+        },
+        {
+          title: previewClassroom
+            ? `${previewClassroom.name} 게시판`
+            : "학급게시판",
+          links: selectedClassroomBulletinLinks,
         },
       ],
     },

@@ -1,32 +1,24 @@
 "use client";
 
 import type { CSSProperties } from "react";
-import type { AvatarGalleryStudent } from "./types";
+import { CharacterAvatar } from "./CharacterAvatar";
+import type { AvatarGalleryStudent, AvatarItem } from "./types";
 
 type ExhibitionStyle = CSSProperties & Record<string, string | number>;
 
 type Props = {
   students: AvatarGalleryStudent[];
+  items?: AvatarItem[];
   badgesByStudentId?: Record<string, string>;
   minFloors?: number;
   ariaLabel?: string;
 };
 
-const SPRITE_COLUMNS = 8;
-const SPRITE_ROWS = 2;
 const STUDENTS_PER_FLOOR = 6;
 const DEFAULT_VISIBLE_FLOORS = 5;
-
 const SPAWN_X = [17.1, 30.9, 44.6, 58.2, 71.9, 85.6];
 const SPAWN_Y = [19.2, 36.1, 53.6, 71.4, 88.4];
 const FRAME_BY_SLOT = [0, 1, 5, 0, 1, 7];
-
-function spriteStyle(row: number, frame: number): ExhibitionStyle {
-  return {
-    "--avatar-sprite-position-x": `${(frame / (SPRITE_COLUMNS - 1)) * 100}%`,
-    "--avatar-sprite-position-y": `${(row / (SPRITE_ROWS - 1)) * 100}%`,
-  };
-}
 
 function residentStyle(floorIndex: number, slotIndex: number): ExhibitionStyle {
   const fallbackY =
@@ -37,10 +29,10 @@ function residentStyle(floorIndex: number, slotIndex: number): ExhibitionStyle {
   };
 }
 
-function spriteRowFor(student: AvatarGalleryStudent): number {
-  if (student.gender === "female") return 1;
-  if (student.gender === "male") return 0;
-  return (student.number ?? 1) % 2 === 0 ? 1 : 0;
+function fallbackGender(student: AvatarGalleryStudent): "male" | "female" {
+  if (student.gender === "female") return "female";
+  if (student.gender === "male") return "male";
+  return (student.number ?? 1) % 2 === 0 ? "female" : "male";
 }
 
 function chunkStudents(students: AvatarGalleryStudent[]) {
@@ -54,18 +46,17 @@ function chunkStudents(students: AvatarGalleryStudent[]) {
 function ExhibitionFloor({
   students,
   floorIndex,
+  items,
   badgesByStudentId,
 }: {
   students: AvatarGalleryStudent[];
   floorIndex: number;
+  items: AvatarItem[];
   badgesByStudentId: Record<string, string>;
 }) {
   return (
     <div className="character-town-floor" role="presentation">
       {students.map((student, index) => {
-        const number = student.number ?? floorIndex * STUDENTS_PER_FLOOR + index + 1;
-        const spriteRow = spriteRowFor(student);
-        const spriteFrame = FRAME_BY_SLOT[index] ?? 0;
         const badge = badgesByStudentId[student.id];
 
         return (
@@ -76,11 +67,14 @@ function ExhibitionFloor({
             role="listitem"
           >
             <div className="character-town-avatar-wrap">
-              <span
-                className="character-town-sprite"
-                style={spriteStyle(spriteRow, spriteFrame)}
-                role="img"
-                aria-label={`${student.name} 아바타`}
+              <CharacterAvatar
+                items={items}
+                equipped={student.equipped}
+                size={92}
+                className="character-town-avatar"
+                ariaLabel={`${student.name} 아바타`}
+                gender={fallbackGender(student)}
+                spriteFrame={FRAME_BY_SLOT[index] ?? 0}
               />
             </div>
             {badge && <span className="character-town-badge">{badge}</span>}
@@ -97,6 +91,7 @@ function ExhibitionFloor({
 
 export function ReadingChampionExhibition({
   students,
+  items = [],
   badgesByStudentId = {},
   minFloors = DEFAULT_VISIBLE_FLOORS,
   ariaLabel = "우리 반 독서왕 전시공간",
@@ -122,6 +117,7 @@ export function ReadingChampionExhibition({
               key={index}
               students={floorStudents}
               floorIndex={index}
+              items={items}
               badgesByStudentId={badgesByStudentId}
             />
           ))}

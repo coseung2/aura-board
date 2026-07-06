@@ -269,6 +269,7 @@ export function StudentDashboard({
                   equipped={avatar.equipped}
                   size={88}
                   ariaLabel="내 캐릭터 미리보기"
+                  gender={avatar.student.gender}
                 />
                 <div className="student-avatar-balance">
                   <span className="student-avatar-balance-label">보유 화폐</span>

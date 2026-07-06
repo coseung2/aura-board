@@ -27,12 +27,23 @@ export function ItemCard({
   onPurchase,
   busy,
 }: Props) {
-  const previewEquipped: Record<string, string | null> = { [item.slot]: item.id };
-
   return (
     <div className={`avatar-item-card${owned ? " is-owned" : ""}${equipped ? " is-equipped" : ""}`}>
       <div className="avatar-item-preview">
-        <CharacterAvatar items={[item]} equipped={previewEquipped} size={64} ariaLabel={`${item.name} 미리보기`} />
+        {item.thumbnailUrl ? (
+          <img
+            src={item.thumbnailUrl}
+            alt={item.name}
+            className="avatar-item-preview-image"
+          />
+        ) : (
+          <CharacterAvatar
+            items={[item]}
+            equipped={{ [item.slot]: item.id }}
+            size={64}
+            ariaLabel={`${item.name} 미리보기`}
+          />
+        )}
       </div>
       <div className="avatar-item-info">
         <div className="avatar-item-name-row">

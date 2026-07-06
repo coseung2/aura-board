@@ -42,9 +42,11 @@ export type AvatarPurchaseResult =
 
 // ---------- Default catalog ---------------------------------------------
 
-// Lazy-seeded on first catalog read. Art is intentionally null; the
-// frontend can render metadata-driven placeholders until the art pipeline
-// ships. Once art exists we just backfill `imageUrl` / `thumbnailUrl`.
+// Lazy-seeded on first catalog read. Equippable pixel parts use full sprite
+// sheets with the same frame grid/origin as the base body.
+// Non-sprite visual seeds (placeholder color/shape/species variants) set
+// `metadata.placeholder = true` so the renderer can skip them and fall back
+// to a generic layer.
 type DefaultSeed = {
   key: string;
   name: string;
@@ -53,8 +55,106 @@ type DefaultSeed = {
   slot: string | null;
   rarity: string;
   price: number;
+  imageUrl?: string | null;
+  thumbnailUrl?: string | null;
   metadata: Record<string, unknown>;
 };
+
+const AVATAR_SPRITE_SPEC = {
+  frameWidth: 222,
+  frameHeight: 444,
+  columns: 8,
+  rows: 2,
+} as const;
+
+const AVATAR_SPRITE_VERSION = "paperdoll-v1" as const;
+const AVATAR_BODY_TEMPLATE_KEY = "aura-body-v1" as const;
+
+// Paperdoll v2 layer keys + z values. The runtime compositor must only
+// stack baked full-frame sheets in ascending z order; runtime x/y
+// offsets are forbidden. Build-time anchors/masks stay private to the
+// asset pipeline.
+const AVATAR_PAPERDOLL_LAYERS = {
+  hair_front: 75,
+  top_front: 65,
+  accessory_face: 70,
+  bottom_front: 50,
+  shoes: 45,
+} as const;
+
+function avatarPartUrl(name: string): string {
+  return `/avatar/parts/${name}.png`;
+}
+
+function avatarThumbnailUrl(name: string): string {
+  return `/avatar/thumbnails/${name}.png`;
+}
+
+// Single render-layer entry in the v2 paperdoll contract.
+export type AvatarRenderLayer = {
+  key: string;
+  z: number;
+  spriteUrl: string;
+};
+
+export type AvatarSpriteMetadata = {
+  // Legacy v1 fields — preserved so the current frontend keeps working
+  // until the new paperdoll compositor lands.
+  spriteUrl: string;
+  sprite: {
+    frameWidth: number;
+    frameHeight: number;
+    columns: number;
+    rows: number;
+    layer: string;
+  };
+  // v2 paperdoll fields — all optional so older rows / legacy clients
+  // keep parsing. When `spriteVersion` is "paperdoll-v1", the renderer
+  // should use `renderLayers` + `templateKey` to stack full-frame
+  // sheets in ascending z order.
+  spriteVersion?: typeof AVATAR_SPRITE_VERSION;
+  templateKey?: typeof AVATAR_BODY_TEMPLATE_KEY;
+  slot?: string;
+  frameWidth?: number;
+  frameHeight?: number;
+  columns?: number;
+  rows?: number;
+  renderLayers?: AvatarRenderLayer[];
+};
+
+// Strict contract for real sprite equipment. Caller passes a slot key
+// from the avatar-spec.json `slots` set
+// (hair/top/bottom/shoes/accessory/pet/...) and the matching paperdoll
+// v2 render-layer key (e.g. "hair_front", "top_front"). The legacy
+// `spriteUrl` + `sprite` fields are preserved alongside the v2 paperdoll
+// metadata so the current frontend stays compatible.
+function equipmentMetadata(
+  slot: string,
+  spriteUrl: string,
+  renderLayerKey: keyof typeof AVATAR_PAPERDOLL_LAYERS,
+): AvatarSpriteMetadata {
+  return {
+    spriteUrl,
+    sprite: {
+      ...AVATAR_SPRITE_SPEC,
+      layer: slot,
+    },
+    spriteVersion: AVATAR_SPRITE_VERSION,
+    templateKey: AVATAR_BODY_TEMPLATE_KEY,
+    slot,
+    frameWidth: AVATAR_SPRITE_SPEC.frameWidth,
+    frameHeight: AVATAR_SPRITE_SPEC.frameHeight,
+    columns: AVATAR_SPRITE_SPEC.columns,
+    rows: AVATAR_SPRITE_SPEC.rows,
+    renderLayers: [
+      {
+        key: renderLayerKey,
+        z: AVATAR_PAPERDOLL_LAYERS[renderLayerKey],
+        spriteUrl,
+      },
+    ],
+  };
+}
 
 const DEFAULT_SEEDS: DefaultSeed[] = [
   {
@@ -85,7 +185,9 @@ const DEFAULT_SEEDS: DefaultSeed[] = [
     slot: "hair",
     rarity: "common",
     price: 0,
-    metadata: { color: "#4a3426", placeholder: true },
+    imageUrl: avatarPartUrl("default-hair"),
+    thumbnailUrl: avatarThumbnailUrl("default-hair"),
+    metadata: equipmentMetadata("hair", avatarPartUrl("default-hair"), "hair_front"),
   },
   {
     key: "default-top-01",
@@ -95,7 +197,9 @@ const DEFAULT_SEEDS: DefaultSeed[] = [
     slot: "top",
     rarity: "common",
     price: 0,
-    metadata: { color: "#1683c7", placeholder: true },
+    imageUrl: avatarPartUrl("default-top"),
+    thumbnailUrl: avatarThumbnailUrl("default-top"),
+    metadata: equipmentMetadata("top", avatarPartUrl("default-top"), "top_front"),
   },
   {
     key: "default-bottom-01",
@@ -105,7 +209,9 @@ const DEFAULT_SEEDS: DefaultSeed[] = [
     slot: "bottom",
     rarity: "common",
     price: 0,
-    metadata: { color: "#3b82f6", placeholder: true },
+    imageUrl: avatarPartUrl("default-bottom"),
+    thumbnailUrl: avatarThumbnailUrl("default-bottom"),
+    metadata: equipmentMetadata("bottom", avatarPartUrl("default-bottom"), "bottom_front"),
   },
   {
     key: "default-shoes-01",
@@ -115,7 +221,9 @@ const DEFAULT_SEEDS: DefaultSeed[] = [
     slot: "shoes",
     rarity: "common",
     price: 0,
-    metadata: { color: "#1f2937", placeholder: true },
+    imageUrl: avatarPartUrl("default-shoes"),
+    thumbnailUrl: avatarThumbnailUrl("default-shoes"),
+    metadata: equipmentMetadata("shoes", avatarPartUrl("default-shoes"), "shoes"),
   },
   {
     key: "skin-rose-01",
@@ -125,7 +233,7 @@ const DEFAULT_SEEDS: DefaultSeed[] = [
     slot: "skin",
     rarity: "rare",
     price: 200,
-    metadata: { color: "#f1a7a0" },
+    metadata: { color: "#f1a7a0", placeholder: true },
   },
   {
     key: "skin-olive-01",
@@ -135,7 +243,7 @@ const DEFAULT_SEEDS: DefaultSeed[] = [
     slot: "skin",
     rarity: "rare",
     price: 200,
-    metadata: { color: "#c9a877" },
+    metadata: { color: "#c9a877", placeholder: true },
   },
   {
     key: "hair-choco-01",
@@ -145,7 +253,7 @@ const DEFAULT_SEEDS: DefaultSeed[] = [
     slot: "hair",
     rarity: "common",
     price: 90,
-    metadata: { color: "#5c3624" },
+    metadata: { color: "#5c3624", placeholder: true },
   },
   {
     key: "top-mint-01",
@@ -155,7 +263,7 @@ const DEFAULT_SEEDS: DefaultSeed[] = [
     slot: "top",
     rarity: "common",
     price: 120,
-    metadata: { color: "#2fbf9f" },
+    metadata: { color: "#2fbf9f", placeholder: true },
   },
   {
     key: "bottom-navy-01",
@@ -165,7 +273,7 @@ const DEFAULT_SEEDS: DefaultSeed[] = [
     slot: "bottom",
     rarity: "common",
     price: 120,
-    metadata: { color: "#334155" },
+    metadata: { color: "#334155", placeholder: true },
   },
   {
     key: "shoes-red-01",
@@ -175,7 +283,7 @@ const DEFAULT_SEEDS: DefaultSeed[] = [
     slot: "shoes",
     rarity: "common",
     price: 100,
-    metadata: { color: "#ef4444" },
+    metadata: { color: "#ef4444", placeholder: true },
   },
   {
     key: "background-sunset-01",
@@ -185,7 +293,7 @@ const DEFAULT_SEEDS: DefaultSeed[] = [
     slot: "background",
     rarity: "rare",
     price: 180,
-    metadata: { colors: ["#ffb37b", "#ff6f91"] },
+    metadata: { colors: ["#ffb37b", "#ff6f91"], placeholder: true },
   },
   {
     key: "background-forest-01",
@@ -195,7 +303,7 @@ const DEFAULT_SEEDS: DefaultSeed[] = [
     slot: "background",
     rarity: "rare",
     price: 180,
-    metadata: { colors: ["#9ad3a3", "#3b7a4a"] },
+    metadata: { colors: ["#9ad3a3", "#3b7a4a"], placeholder: true },
   },
   {
     key: "accessory-glasses-01",
@@ -205,7 +313,7 @@ const DEFAULT_SEEDS: DefaultSeed[] = [
     slot: "accessory",
     rarity: "common",
     price: 80,
-    metadata: { shape: "round", color: "#222" },
+    metadata: { shape: "round", color: "#222", placeholder: true },
   },
   {
     key: "accessory-cap-01",
@@ -215,7 +323,7 @@ const DEFAULT_SEEDS: DefaultSeed[] = [
     slot: "accessory",
     rarity: "common",
     price: 80,
-    metadata: { shape: "cap", color: "#3366cc" },
+    metadata: { shape: "cap", color: "#3366cc", placeholder: true },
   },
   {
     key: "pet-cat-01",
@@ -225,7 +333,23 @@ const DEFAULT_SEEDS: DefaultSeed[] = [
     slot: "pet",
     rarity: "epic",
     price: 600,
-    metadata: { species: "cat", color: "#ffb37b" },
+    metadata: { species: "cat", color: "#ffb37b", placeholder: true },
+  },
+  {
+    key: "motion-bounce-01",
+    name: "통통 점프",
+    description: "캐릭터가 가볍게 통통 뛰는 동작 모션.",
+    category: "motion",
+    slot: "motion",
+    rarity: "rare",
+    price: 300,
+    metadata: {
+      animationKey: "bounce",
+      motionClass: "character-motion-bounce",
+      frameSequence: [0, 1, 2, 3, 4, 5, 6, 7],
+      loop: true,
+      fps: 12,
+    },
   },
 ];
 
@@ -261,8 +385,8 @@ export async function ensureDefaultAvatarItems(): Promise<void> {
           slot: seed.slot,
           rarity: seed.rarity,
           price: seed.price,
-          imageUrl: null,
-          thumbnailUrl: null,
+          imageUrl: seed.imageUrl ?? null,
+          thumbnailUrl: seed.thumbnailUrl ?? seed.imageUrl ?? null,
           metadata: seed.metadata as Prisma.InputJsonValue,
         },
       }),
@@ -334,7 +458,13 @@ export async function ensureAvatarLoadout(studentId: string): Promise<{ id: stri
 // ---------- Catalog / home snapshot -------------------------------------
 
 export type AvatarHomeSnapshot = {
-  student: { id: string; name: string; number: number | null; classroomId: string };
+  student: {
+    id: string;
+    name: string;
+    number: number | null;
+    classroomId: string;
+    gender?: string | null;
+  };
   balance: number;
   currency: { unitLabel: string };
   items: SerializedAvatarItem[];
@@ -351,6 +481,7 @@ export async function getAvatarHome(student: {
   name: string;
   number: number | null;
   classroomId: string;
+  gender?: string | null;
 }): Promise<AvatarHomeSnapshot> {
   await ensureDefaultAvatarItems();
   await ensureStarterAvatarInventory(student.id);
@@ -398,6 +529,7 @@ export async function getAvatarHome(student: {
       name: student.name,
       number: student.number,
       classroomId: student.classroomId,
+      gender: student.gender,
     },
     balance: account?.balance ?? 0,
     currency: { unitLabel: currency?.unitLabel ?? "원" },

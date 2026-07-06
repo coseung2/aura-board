@@ -1,0 +1,51 @@
+{
+  "version": "paperdoll-v1",
+  "templateKey": "aura-body-v1",
+  "frameWidth": 222,
+  "frameHeight": 444,
+  "columns": 8,
+  "rows": 2,
+  "sheetWidth": 1776,
+  "sheetHeight": 888,
+  "baseSprite": "/avatar/base-body-sprite.png",
+  "templatePath": "/avatar/templates/aura-body-v1/template.json",
+  "anchorsPath": "/avatar/templates/aura-body-v1/anchors.json",
+  "template": {
+    "key": "aura-body-v1",
+    "spriteUrl": "/avatar/base-body-sprite.png",
+    "frameWidth": 222,
+    "frameHeight": 444,
+    "columns": 8,
+    "rows": 2,
+    "origin": {
+      "x": 0,
+      "y": 0
+    }
+  },
+  "layerStack": [
+    { "key": "shoes", "z": 45 },
+    { "key": "bottom_front", "z": 50 },
+    { "key": "top_front", "z": 65 },
+    { "key": "accessory_face", "z": 70 },
+    { "key": "hair_front", "z": 75 }
+  ],
+  "layerOrder": [
+    "bottom",
+    "shoes",
+    "top",
+    "hair",
+    "accessory",
+    "pet"
+  ],
+  "slots": [
+    "skin",
+    "background",
+    "hair",
+    "top",
+    "bottom",
+    "shoes",
+    "accessory",
+    "pet",
+    "motion"
+  ]
+}

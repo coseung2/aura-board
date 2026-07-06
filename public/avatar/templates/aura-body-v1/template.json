@@ -1,0 +1,65 @@
+{
+  "key": "aura-body-v1",
+  "version": 1,
+  "frameWidth": 222,
+  "frameHeight": 444,
+  "columns": 8,
+  "rows": 2,
+  "sheetWidth": 1776,
+  "sheetHeight": 888,
+  "baseSprite": "/avatar/base-body-sprite.png",
+  "genderRows": {
+    "male": 0,
+    "female": 1
+  },
+  "frames": {
+    "idle_00": {
+      "col": 0
+    },
+    "idle_01": {
+      "col": 1
+    },
+    "idle_02": {
+      "col": 2
+    },
+    "idle_03": {
+      "col": 3
+    },
+    "idle_04": {
+      "col": 4
+    },
+    "idle_05": {
+      "col": 5
+    },
+    "idle_06": {
+      "col": 6
+    },
+    "idle_07": {
+      "col": 7
+    }
+  },
+  "layerStack": [
+    {
+      "key": "shoes",
+      "z": 45
+    },
+    {
+      "key": "bottom_front",
+      "z": 50
+    },
+    {
+      "key": "top_front",
+      "z": 65
+    },
+    {
+      "key": "accessory_face",
+      "z": 70
+    },
+    {
+      "key": "hair_front",
+      "z": 75
+    }
+  ],
+  "anchors": "/avatar/templates/aura-body-v1/anchors.json",
+  "masks": "/avatar/templates/aura-body-v1/masks"
+}

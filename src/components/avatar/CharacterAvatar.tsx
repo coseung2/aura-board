@@ -1,7 +1,10 @@
 "use client";
 
-import { useId, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
+import type { CSSProperties } from "react";
 import type { AvatarItem } from "./types";
+
+type AvatarStyle = CSSProperties & Record<string, string | number>;
 
 type Props = {
   items?: AvatarItem[];
@@ -9,50 +12,197 @@ type Props = {
   size?: number;
   className?: string;
   ariaLabel?: string;
+  gender?: string | null;
+  spriteFrame?: number;
 };
 
-const DEFAULT_COLORS: Record<string, string> = {
-  skin: "#f8d9c6",
-  skinShadow: "#eac0a8",
-  background: "#cfe6ff",
-  hair: "#4a3426",
-  eyes: "#18313f",
-  top: "#1683c7",
-  topShadow: "#0d679f",
-  bottom: "#3b82f6",
-  bottomShadow: "#2563eb",
-  shoes: "#1f2937",
-  shoesShadow: "#111827",
-  accessory: "#f59e0b",
-  pet: "#ffb37b",
+const SPRITE_COLUMNS = 8;
+const SPRITE_ROWS = 2;
+const SPRITE_FRAME_WIDTH = 222;
+const SPRITE_FRAME_HEIGHT = 444;
+const DEFAULT_SPRITE_URL = "/avatar/base-body-sprite.png";
+const LAYER_SLOTS = ["bottom", "shoes", "top", "hair", "accessory", "pet"];
+const MOTION_SLOT = "motion";
+const SKIN_SLOT = "skin";
+const DEFAULT_FRAME_SEQUENCE = [0, 1, 2, 3, 4, 5, 6, 7];
+
+const SLOT_Z_FALLBACK: Record<string, number> = {
+  shoes: 45,
+  bottom: 50,
+  top: 65,
+  accessory: 70,
+  hair: 75,
+  pet: 90,
 };
 
-function hexToRgba(hex: string, alpha: number): string {
-  const clean = hex.replace("#", "");
-  const r = parseInt(clean.substring(0, 2), 16);
-  const g = parseInt(clean.substring(2, 4), 16);
-  const b = parseInt(clean.substring(4, 6), 16);
-  if (Number.isNaN(r) || Number.isNaN(g) || Number.isNaN(b)) return hex;
-  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+const SLOT_LAYER_FALLBACK: Record<string, string> = {
+  shoes: "shoes",
+  bottom: "bottom_front",
+  top: "top_front",
+  accessory: "accessory_face",
+  hair: "hair_front",
+  pet: "pet_front",
+};
+
+type NormalizedRenderLayer = {
+  imageUrl: string;
+  z: number;
+  slot: string;
+  layer: string;
+  itemId: string;
+};
+function spriteRowFor(gender: string | null | undefined): number {
+  return gender === "female" ? 1 : 0;
 }
 
-function getColor(item: AvatarItem | undefined, key: string): string {
-  if (!item?.metadata) return DEFAULT_COLORS[key] ?? DEFAULT_COLORS.accessory;
-  const meta = item.metadata;
-  const raw = meta[key] ?? meta.color ?? meta.primaryColor;
-  return typeof raw === "string" ? raw : (DEFAULT_COLORS[key] ?? DEFAULT_COLORS.accessory);
+function spriteUrlFor(item: AvatarItem): string | null {
+  if (!isCompatibleSpriteItem(item)) return null;
+  const raw = item.metadata?.spriteUrl ?? item.metadata?.spriteSheetUrl;
+  if (typeof raw === "string" && raw.trim()) return raw.trim();
+  return item.imageUrl;
 }
 
-function getGradientColors(item: AvatarItem | undefined): [string, string] {
-  const fallback = DEFAULT_COLORS.background;
-  const raw = item?.metadata?.colors;
-  if (Array.isArray(raw)) {
-    const first = typeof raw[0] === "string" ? raw[0] : fallback;
-    const second = typeof raw[1] === "string" ? raw[1] : first;
-    return [first, second];
+function baseSpriteUrlFor(item: AvatarItem | undefined): string | null {
+  if (!item || isPlaceholderItem(item) || item.slot !== SKIN_SLOT) return null;
+  const baseSpriteUrl = item.metadata?.baseSpriteUrl;
+  if (typeof baseSpriteUrl === "string" && baseSpriteUrl.trim()) {
+    return baseSpriteUrl.trim();
   }
-  const color = getColor(item, "background");
-  return [color, hexToRgba(color, 0.72)];
+  // Compatible full-sheet skin sprite: layer/slot/grid all match the base body.
+  if (isCompatibleSpriteItem(item)) {
+    return spriteUrlFor(item);
+  }
+  return null;
+}
+
+function isPlaceholderItem(item: AvatarItem | undefined): boolean {
+  return item?.metadata?.placeholder === true;
+}
+
+function isCompatibleSpriteItem(item: AvatarItem | undefined): boolean {
+  if (!item || !item.metadata || item.metadata.placeholder === true) return false;
+  const sprite = item.metadata.sprite;
+  if (!sprite || typeof sprite !== "object" || Array.isArray(sprite)) return false;
+  const record = sprite as Record<string, unknown>;
+  return (
+    record.layer === item.slot &&
+    record.frameWidth === SPRITE_FRAME_WIDTH &&
+    record.frameHeight === SPRITE_FRAME_HEIGHT &&
+    record.columns === SPRITE_COLUMNS &&
+    record.rows === SPRITE_ROWS
+  );
+}
+
+function extractRawRenderLayers(item: AvatarItem): unknown[] | null {
+  if (!item.metadata) return null;
+  const meta = item.metadata;
+  if (meta.sprite && typeof meta.sprite === "object" && !Array.isArray(meta.sprite)) {
+    const sprite = meta.sprite as Record<string, unknown>;
+    if (Array.isArray(sprite.renderLayers)) return sprite.renderLayers;
+  }
+  if (Array.isArray(meta.renderLayers)) return meta.renderLayers;
+  return null;
+}
+
+function normalizeRenderLayers(item: AvatarItem): NormalizedRenderLayer[] {
+  const rawLayers = extractRawRenderLayers(item);
+  const fallbackZ = SLOT_Z_FALLBACK[item.slot] ?? 100;
+  const fallbackLayer = SLOT_LAYER_FALLBACK[item.slot] ?? item.slot;
+
+  if (rawLayers) {
+    const layers: NormalizedRenderLayer[] = [];
+    rawLayers.forEach((raw, index) => {
+      if (!raw || typeof raw !== "object") return;
+      const record = raw as Record<string, unknown>;
+      const imageUrl =
+        (typeof record.spriteUrl === "string" ? record.spriteUrl.trim() : "") ||
+        (typeof record.spriteSheetUrl === "string" ? record.spriteSheetUrl.trim() : "") ||
+        spriteUrlFor(item) ||
+        item.imageUrl;
+      if (!imageUrl) return;
+      const z =
+        typeof record.z === "number" && Number.isFinite(record.z)
+          ? record.z
+          : fallbackZ + index;
+      const layer =
+        typeof record.key === "string" && record.key.trim()
+          ? record.key.trim()
+          : typeof record.layer === "string" && record.layer.trim()
+            ? record.layer.trim()
+            : fallbackLayer;
+      layers.push({ imageUrl, z, slot: item.slot, layer, itemId: item.id });
+    });
+    if (layers.length > 0) return layers;
+  }
+
+  // Legacy single-sprite fallback: one layer keyed by slot with the canonical sprite URL.
+  const imageUrl = spriteUrlFor(item);
+  if (!imageUrl) return [];
+  return [{ imageUrl, z: fallbackZ, slot: item.slot, layer: fallbackLayer, itemId: item.id }];
+}
+
+function motionClassFor(item: AvatarItem | undefined): string {
+  const raw = item?.metadata?.motionClass;
+  if (typeof raw !== "string") return "";
+  const className = raw.trim();
+  return className.startsWith("character-motion-") ? className : "";
+}
+
+function motionFramesFor(item: AvatarItem | undefined): number[] {
+  const raw = item?.metadata?.frameSequence;
+  if (!Array.isArray(raw)) return item ? DEFAULT_FRAME_SEQUENCE : [];
+  const frames = raw
+    .map((value) => (typeof value === "number" ? Math.trunc(value) : NaN))
+    .filter((value) => value >= 0 && value < SPRITE_COLUMNS);
+  return frames.length > 0 ? frames : [];
+}
+
+function motionFpsFor(item: AvatarItem | undefined): number {
+  const raw = item?.metadata?.fps;
+  if (typeof raw !== "number" || !Number.isFinite(raw)) return 0;
+  return Math.min(Math.max(Math.trunc(raw), 1), 24);
+}
+
+function useMotionFrame(
+  motionItem: AvatarItem | undefined,
+  fallbackFrame: number,
+): number {
+  const [index, setIndex] = useState(0);
+  const frames = useMemo(() => motionFramesFor(motionItem), [motionItem]);
+  const fps = motionFpsFor(motionItem);
+
+  useEffect(() => {
+    setIndex(0);
+  }, [motionItem?.id]);
+
+  useEffect(() => {
+    if (!motionItem || frames.length < 2 || fps <= 0) return;
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    const interval = window.setInterval(() => {
+      setIndex((current) => (current + 1) % frames.length);
+    }, 1000 / fps);
+    return () => window.clearInterval(interval);
+  }, [fps, frames, motionItem]);
+
+  if (!motionItem || frames.length === 0) return fallbackFrame;
+  return frames[index % frames.length] ?? fallbackFrame;
+}
+
+function spriteStyle({
+  imageUrl,
+  row,
+  frame,
+}: {
+  imageUrl: string;
+  row: number;
+  frame: number;
+}): AvatarStyle {
+  return {
+    backgroundImage: `url("${imageUrl}")`,
+    backgroundPosition: `${(frame / (SPRITE_COLUMNS - 1)) * 100}% ${
+      (row / (SPRITE_ROWS - 1)) * 100
+    }%`,
+  };
 }
 
 export function CharacterAvatar({
@@ -61,8 +211,9 @@ export function CharacterAvatar({
   size = 96,
   className = "",
   ariaLabel = "캐릭터",
+  gender = null,
+  spriteFrame = 0,
 }: Props) {
-  const backgroundId = `avatar-bg-${useId().replace(/:/g, "")}`;
   const bySlot = useMemo(() => {
     const map = new Map<string, AvatarItem>();
     for (const item of items) {
@@ -73,118 +224,73 @@ export function CharacterAvatar({
     return map;
   }, [items, equipped]);
 
-  const [backgroundTop, backgroundBottom] = getGradientColors(bySlot.get("background"));
-  const skinColor = getColor(bySlot.get("skin"), "skin");
-  const skinShadow = hexToRgba(skinColor, 0.78);
-  const hairColor = getColor(bySlot.get("hair"), "hair");
-  const topColor = getColor(bySlot.get("top"), "top");
-  const topShadow = hexToRgba(getColor(bySlot.get("top"), "top"), 0.78);
-  const bottomColor = getColor(bySlot.get("bottom"), "bottom");
-  const bottomShadow = hexToRgba(getColor(bySlot.get("bottom"), "bottom"), 0.78);
-  const shoesColor = getColor(bySlot.get("shoes"), "shoes");
-  const accessory = bySlot.get("accessory");
-  const accessoryColor = getColor(accessory, "accessory");
-  const accessoryShape = typeof accessory?.metadata?.shape === "string" ? accessory.metadata.shape : "cap";
-  const petColor = getColor(bySlot.get("pet"), "pet");
-
-  const pixel = Math.max(2, Math.round(size / 32));
+  const row = spriteRowFor(gender);
+  const frame = Math.min(Math.max(spriteFrame, 0), SPRITE_COLUMNS - 1);
+  const baseScale = size / 125;
+  const spriteWidth = Math.round(84 * baseScale);
+  const spriteHeight = Math.round(168 * baseScale);
+  const motionItem = bySlot.get(MOTION_SLOT);
+  const activeFrame = useMotionFrame(motionItem, frame);
+  const skinItem = bySlot.get(SKIN_SLOT);
+  const baseImageUrl = baseSpriteUrlFor(skinItem) ?? DEFAULT_SPRITE_URL;
+  const renderLayers = useMemo(() => {
+    const layers: NormalizedRenderLayer[] = [];
+    for (const slot of LAYER_SLOTS) {
+      const item = bySlot.get(slot);
+      if (!item || isPlaceholderItem(item)) continue;
+      layers.push(...normalizeRenderLayers(item));
+    }
+    layers.sort((a, b) => a.z - b.z || a.layer.localeCompare(b.layer));
+    return layers;
+  }, [bySlot]);
+  const motionClass = motionClassFor(motionItem);
 
   return (
-    <svg
-      className={`character-avatar ${className}`}
-      width={size}
-      height={size}
-      viewBox="0 0 96 96"
+    <span
+      className={`character-avatar character-avatar-sprite-composer ${motionClass} ${className}`}
       role="img"
       aria-label={ariaLabel}
-      style={{ imageRendering: "pixelated" }}
+      style={{
+        width: size,
+        height: size,
+      }}
     >
-      <defs>
-        <linearGradient id={backgroundId} x1="0" x2="0" y1="0" y2="1">
-          <stop offset="0%" stopColor={backgroundTop} />
-          <stop offset="100%" stopColor={backgroundBottom} />
-        </linearGradient>
-      </defs>
-      <rect x="3" y="3" width="90" height="90" rx="12" fill={`url(#${backgroundId})`} opacity="0.55" />
-      <rect x="10" y="78" width="76" height="10" rx="3" fill="rgba(47, 111, 78, 0.22)" />
-
-      {/* Shadow */}
-      <ellipse cx="48" cy="88" rx="22" ry="5" fill="rgba(24, 74, 92, 0.12)" />
-
-      {/* Legs / bottom */}
-      <g>
-        <rect x="34" y="56" width="12" height="24" rx="2" fill={bottomColor} />
-        <rect x="50" y="56" width="12" height="24" rx="2" fill={bottomColor} />
-        <rect x="34" y="76" width="12" height="4" rx="1" fill={bottomShadow} />
-        <rect x="50" y="76" width="12" height="4" rx="1" fill={bottomShadow} />
-      </g>
-
-      {/* Shoes */}
-      <g>
-        <rect x="32" y="78" width="16" height="7" rx="2" fill={shoesColor} />
-        <rect x="48" y="78" width="16" height="7" rx="2" fill={shoesColor} />
-      </g>
-
-      {/* Body / top */}
-      <g>
-        <rect x="30" y="36" width="36" height="28" rx="6" fill={topColor} />
-        <rect x="30" y="58" width="36" height="6" rx="2" fill={topShadow} />
-      </g>
-
-      {/* Arms */}
-      <g>
-        <rect x="20" y="40" width="10" height="22" rx="4" fill={skinColor} />
-        <rect x="66" y="40" width="10" height="22" rx="4" fill={skinColor} />
-      </g>
-
-      {/* Head */}
-      <g>
-        <rect x="34" y="16" width="28" height="26" rx="10" fill={skinColor} />
-        <rect x="34" y="34" width="28" height="8" rx="3" fill={skinShadow} />
-      </g>
-
-      {/* Face */}
-      <g>
-        <rect x="40" y="26" width="4" height="5" rx="1.5" fill={DEFAULT_COLORS.eyes} />
-        <rect x="52" y="26" width="4" height="5" rx="1.5" fill={DEFAULT_COLORS.eyes} />
-        <rect x="45" y="34" width="6" height="3" rx="1.5" fill={skinShadow} />
-      </g>
-
-      {/* Hair */}
-      <g>
-        <rect x="32" y="12" width="32" height="10" rx="4" fill={hairColor} />
-        <rect x="30" y="16" width="8" height="14" rx="3" fill={hairColor} />
-        <rect x="58" y="16" width="8" height="14" rx="3" fill={hairColor} />
-        <rect x="34" y="20" width="28" height="6" rx="2" fill={hairColor} />
-      </g>
-
-      {/* Accessory */}
-      {accessory && accessoryShape === "round" && (
-        <g>
-          <rect x="38" y="27" width="8" height="5" rx="2" fill="none" stroke={accessoryColor} strokeWidth="2" />
-          <rect x="50" y="27" width="8" height="5" rx="2" fill="none" stroke={accessoryColor} strokeWidth="2" />
-          <rect x="46" y="29" width="4" height="1.5" fill={accessoryColor} />
-        </g>
-      )}
-      {accessory && accessoryShape !== "round" && (
-        <g>
-          <rect x="35" y="11" width="26" height="7" rx="3" fill={accessoryColor} />
-          <rect x="56" y="15" width="12" height="4" rx="2" fill={accessoryColor} />
-        </g>
-      )}
-
-      {/* Pet */}
-      {bySlot.has("pet") && (
-        <g>
-          <rect x="68" y="67" width="12" height="11" rx="4" fill={petColor} />
-          <rect x="70" y="63" width="8" height="7" rx="3" fill={petColor} />
-          <rect x="70" y="62" width="2" height="4" fill={petColor} />
-          <rect x="76" y="62" width="2" height="4" fill={petColor} />
-          <rect x="72" y="66" width="2" height="2" fill={DEFAULT_COLORS.eyes} />
-          <rect x="76" y="66" width="2" height="2" fill={DEFAULT_COLORS.eyes} />
-          <rect x="80" y="70" width="5" height="3" rx="1.5" fill={petColor} />
-        </g>
-      )}
-    </svg>
+      <span
+        className="character-avatar-motion-rig"
+        style={{
+          width: spriteWidth,
+          height: spriteHeight,
+        }}
+        aria-hidden="true"
+      >
+        <span
+          className="character-avatar-sprite-layer character-avatar-base"
+          data-avatar-layer="base"
+          data-slot="base"
+          data-render-layer="base"
+          data-frame={activeFrame}
+          data-row={row}
+          style={{
+            ...spriteStyle({ imageUrl: baseImageUrl, row, frame: activeFrame }),
+            zIndex: 0,
+          }}
+        />
+        {renderLayers.map((layer) => (
+          <span
+            key={`${layer.slot}-${layer.itemId}-${layer.layer}`}
+            className={`character-avatar-sprite-layer character-avatar-part character-avatar-part-${layer.slot}`}
+            data-avatar-layer={layer.slot}
+            data-slot={layer.slot}
+            data-render-layer={layer.layer}
+            data-frame={activeFrame}
+            data-row={row}
+            style={{
+              ...spriteStyle({ imageUrl: layer.imageUrl, row, frame: activeFrame }),
+              zIndex: layer.z,
+            }}
+          />
+        ))}
+      </span>
+    </span>
   );
 }

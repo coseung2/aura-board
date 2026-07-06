@@ -10,7 +10,7 @@ import {
 import { AppBackgroundButton } from "@/components/AppBackground";
 import { fetchAvatarGallery } from "@/components/avatar/gallery-client";
 import { ReadingChampionExhibition } from "@/components/avatar/ReadingChampionExhibition";
-import type { AvatarGalleryStudent } from "@/components/avatar/types";
+import type { AvatarGalleryStudent, AvatarItem } from "@/components/avatar/types";
 
 type Props = { classroomId: string };
 
@@ -447,6 +447,7 @@ function ReadingChampionsSection({
   champions?: ReadingChampion[];
 }) {
   const [students, setStudents] = useState<AvatarGalleryStudent[] | null>(null);
+  const [avatarItems, setAvatarItems] = useState<AvatarItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [fetchError, setFetchError] = useState<string | null>(null);
 
@@ -456,7 +457,10 @@ function ReadingChampionsSection({
     setFetchError(null);
     fetchAvatarGallery(classroomId)
       .then((data) => {
-        if (!cancelled) setStudents(data.students);
+        if (!cancelled) {
+          setStudents(data.students);
+          setAvatarItems(data.items);
+        }
       })
       .catch((e) => {
         if (!cancelled) {
@@ -532,6 +536,7 @@ function ReadingChampionsSection({
       </div>
       <ReadingChampionExhibition
         students={students}
+        items={avatarItems}
         badgesByStudentId={championMap}
       />
     </section>
