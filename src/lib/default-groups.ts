@@ -90,14 +90,14 @@ export async function saveClassroomDefaultGroups(
         order: groupIndex,
       },
     });
-    for (const [memberIndex, studentId] of group.studentIds.entries()) {
-      await tx.classroomDefaultGroupMember.create({
-        data: {
+    if (group.studentIds.length > 0) {
+      await tx.classroomDefaultGroupMember.createMany({
+        data: group.studentIds.map((studentId, memberIndex) => ({
           classroomId,
           groupId: created.id,
           studentId,
           order: memberIndex,
-        },
+        })),
       });
     }
   }
@@ -129,14 +129,14 @@ export async function saveBoardDefaultGroups(
         order: groupIndex,
       },
     });
-    for (const [memberIndex, studentId] of group.studentIds.entries()) {
-      await tx.boardDefaultGroupMember.create({
-        data: {
+    if (group.studentIds.length > 0) {
+      await tx.boardDefaultGroupMember.createMany({
+        data: group.studentIds.map((studentId, memberIndex) => ({
           boardId,
           groupId: created.id,
           studentId,
           order: memberIndex,
-        },
+        })),
       });
     }
   }
@@ -170,13 +170,13 @@ export async function saveSectionBreakoutGroups(
         order: groupIndex,
       },
     });
-    for (const studentId of group.studentIds) {
-      await tx.sectionBreakoutMembership.create({
-        data: {
+    if (group.studentIds.length > 0) {
+      await tx.sectionBreakoutMembership.createMany({
+        data: group.studentIds.map((studentId) => ({
           sectionId,
           groupId: created.id,
           studentId,
-        },
+        })),
       });
     }
     if (group.studentIds.length > 0) {

@@ -110,33 +110,36 @@ export async function PUT(
       );
     }
     let affectedBoardIds: string[] = [];
-    await db.$transaction(async (tx) => {
-      await saveClassroomDefaultGroups(tx, id, input.groups);
-      const boards = await tx.board.findMany({
-        where: { classroomId: id },
-        select: { id: true },
-      });
-      affectedBoardIds = boards.map((board) => board.id);
-      for (const board of boards) {
-        await saveBoardDefaultGroups(tx, board.id, input.groups);
-      }
-      const breakoutSections = await tx.section.findMany({
-        where: {
-          board: { classroomId: id, layout: "stream" },
-          breakoutConfig: { is: { joinMode: "teacher_assign" } },
-        },
-        select: { id: true },
-      });
-      for (const section of breakoutSections) {
-        await saveSectionBreakoutGroups(tx, section.id, input.groups);
-      }
-      if (affectedBoardIds.length > 0) {
-        await tx.board.updateMany({
-          where: { id: { in: affectedBoardIds } },
-          data: { updatedAt: new Date() },
+    await db.$transaction(
+      async (tx) => {
+        await saveClassroomDefaultGroups(tx, id, input.groups);
+        const boards = await tx.board.findMany({
+          where: { classroomId: id },
+          select: { id: true },
         });
-      }
-    });
+        affectedBoardIds = boards.map((board) => board.id);
+        for (const board of boards) {
+          await saveBoardDefaultGroups(tx, board.id, input.groups);
+        }
+        const breakoutSections = await tx.section.findMany({
+          where: {
+            board: { classroomId: id, layout: "stream" },
+            breakoutConfig: { is: { joinMode: "teacher_assign" } },
+          },
+          select: { id: true },
+        });
+        for (const section of breakoutSections) {
+          await saveSectionBreakoutGroups(tx, section.id, input.groups);
+        }
+        if (affectedBoardIds.length > 0) {
+          await tx.board.updateMany({
+            where: { id: { in: affectedBoardIds } },
+            data: { updatedAt: new Date() },
+          });
+        }
+      },
+      { timeout: 30_000 },
+    );
     await Promise.all(
       affectedBoardIds.map((boardId) => announceCardChange(boardId, "update")),
     );
