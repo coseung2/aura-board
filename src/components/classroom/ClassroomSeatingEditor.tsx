@@ -16,6 +16,7 @@ type Props = {
 
 const GROUP_SIZE = 4;
 const PLACEMENT_STEP_MS = 110;
+const MIN_GROUP_COUNT = 1;
 type StudentGender = "male" | "female";
 type PairMode = "any" | "mixed" | "same" | "male_male" | "female_female";
 type FixedPair = {
@@ -55,6 +56,13 @@ function cloneGroups(groups: GroupEditorDraft[]): GroupEditorDraft[] {
     ...group,
     studentIds: [...group.studentIds],
   }));
+}
+
+function clampGroupCount(count: number, max: number): number {
+  return Math.min(
+    Math.max(count, MIN_GROUP_COUNT),
+    Math.max(MIN_GROUP_COUNT, max),
+  );
 }
 
 function seatingTransitionName(studentId: string) {
@@ -173,6 +181,11 @@ export function ClassroomSeatingEditor({
   const arrangeableStudents = useMemo(
     () => students.filter((student) => arrangedStudentIds.has(student.id)),
     [students, arrangedStudentIds],
+  );
+  const maxGroupCount = Math.max(MIN_GROUP_COUNT, arrangeableStudents.length);
+  const groupCount = clampGroupCount(
+    groups.length || MIN_GROUP_COUNT,
+    maxGroupCount,
   );
 
   const unassigned = useMemo(
@@ -375,6 +388,28 @@ export function ClassroomSeatingEditor({
     setFixedPairs((current) => current.filter((pair) => pair.id !== pairId));
   }
 
+  function resizeGroups(rawCount: number) {
+    if (disabled) return;
+    const count = clampGroupCount(rawCount, maxGroupCount);
+    const orderedStudentIds = groups.flatMap((group) =>
+      group.studentIds.filter((studentId) => studentMap.has(studentId)),
+    );
+    const baseSize = Math.floor(orderedStudentIds.length / count);
+    const remainder = orderedStudentIds.length % count;
+    let cursor = 0;
+    const next = Array.from({ length: count }, (_, groupIndex) => {
+      const size = baseSize + (groupIndex < remainder ? 1 : 0);
+      const studentIds = orderedStudentIds.slice(cursor, cursor + size);
+      cursor += size;
+      return {
+        name: groups[groupIndex]?.name?.trim() || `${groupIndex + 1}분단`,
+        studentIds,
+      };
+    });
+    setRandomStatus("");
+    onChange(next);
+  }
+
   function randomArrange() {
     if (arrangeableStudents.length === 0) {
       setRandomStatus(
@@ -382,10 +417,7 @@ export function ClassroomSeatingEditor({
       );
       return;
     }
-    const columnCount = Math.max(
-      1,
-      Math.ceil(arrangeableStudents.length / GROUP_SIZE),
-    );
+    const columnCount = groupCount;
     const baseSize = Math.floor(arrangeableStudents.length / columnCount);
     const remainder = arrangeableStudents.length % columnCount;
     const sizes = Array.from(
@@ -573,6 +605,19 @@ export function ClassroomSeatingEditor({
   return (
     <div className="seating-editor">
       <div className="seating-random-panel">
+        <label className="seating-random-number">
+          <span>모둠 수</span>
+          <input
+            type="number"
+            min={MIN_GROUP_COUNT}
+            max={maxGroupCount}
+            value={groupCount}
+            onChange={(event) =>
+              resizeGroups(Number(event.target.value) || MIN_GROUP_COUNT)
+            }
+            disabled={disabled}
+          />
+        </label>
         <label className="seating-random-field">
           <span>짝 조건</span>
           <select

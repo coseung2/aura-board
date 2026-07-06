@@ -31,11 +31,15 @@ const ANSWER_MODES: { value: "exact" | "normalize-space" | "teacher-approval"; l
   { value: "teacher-approval", label: "교사 승인", hint: "학생 제출 후 교사가 수동 판정" },
 ];
 
-function parseKeywords(text: string): string[] {
+function parseKeywordCells(cells: string[]): string[] {
+  return cells.map((cell) => cell.trim()).filter((cell) => cell.length > 0);
+}
+
+function splitPastedKeywords(text: string): string[] {
   return text
-    .split(/\n/)
-    .map((line) => line.trim())
-    .filter((line) => line.length > 0);
+    .split(/[\s,，、]+/)
+    .map((word) => word.trim())
+    .filter((word) => word.length > 0);
 }
 
 function validateKeywords(words: string[]): string | null {
@@ -63,7 +67,7 @@ export function CreateSpeedGameBoardModal({
   const [mySets, setMySets] = useState<WordSet[]>([]);
   const [setsLoading, setSetsLoading] = useState(false);
   const [selectedSetId, setSelectedSetId] = useState<string | null>(null);
-  const [directText, setDirectText] = useState("");
+  const [directWords, setDirectWords] = useState<string[]>([""]);
   const [saveSetTitle, setSaveSetTitle] = useState("");
   const [savingSet, setSavingSet] = useState(false);
 
@@ -73,6 +77,7 @@ export function CreateSpeedGameBoardModal({
   const [rankBonusFirst, setRankBonusFirst] = useState(50);
   const [rankBonusSecond, setRankBonusSecond] = useState(30);
   const [rankBonusThird, setRankBonusThird] = useState(10);
+  const [groupCount, setGroupCount] = useState(4);
 
   useEffect(() => {
     let cancelled = false;
@@ -102,20 +107,53 @@ export function CreateSpeedGameBoardModal({
   }, [tab, selectedSetId, systemSets, mySets]);
 
   const effectiveKeywords = useMemo(() => {
-    if (tab === "direct") return parseKeywords(directText);
+    if (tab === "direct") return parseKeywordCells(directWords);
     return selectedSet?.keywords ?? [];
-  }, [tab, directText, selectedSet]);
+  }, [tab, directWords, selectedSet]);
 
   function loadSelectedSetIntoDirect() {
     if (selectedSet) {
-      setDirectText(selectedSet.keywords.join("\n"));
+      setDirectWords(selectedSet.keywords.length > 0 ? selectedSet.keywords : [""]);
       setTab("direct");
       setSelectedSetId(null);
     }
   }
 
+  function updateDirectWord(index: number, value: string) {
+    setDirectWords((current) => {
+      const next = [...current];
+      next[index] = value;
+      return next;
+    });
+  }
+
+  function pasteDirectWords(index: number, text: string) {
+    const words = splitPastedKeywords(text);
+    if (words.length <= 1) {
+      updateDirectWord(index, text);
+      return;
+    }
+    setDirectWords((current) => {
+      const next = [...current];
+      next.splice(index, 1, ...words);
+      if (next[next.length - 1]?.trim()) next.push("");
+      return next.slice(0, 100);
+    });
+  }
+
+  function addDirectWordCell() {
+    setDirectWords((current) => [...current, ""]);
+  }
+
+  function removeDirectWordCell(index: number) {
+    setDirectWords((current) => {
+      const next = current.filter((_, cellIndex) => cellIndex !== index);
+      return next.length > 0 ? next : [""];
+    });
+  }
+
   async function saveDirectAsMySet() {
-    const words = parseKeywords(directText);
+    const words = parseKeywordCells(directWords);
     const validationError = validateKeywords(words);
     if (validationError) {
       setError(validationError);
@@ -179,6 +217,7 @@ export function CreateSpeedGameBoardModal({
             rankBonusFirst,
             rankBonusSecond,
             rankBonusThird,
+            groupCount,
           },
         }),
       });
@@ -297,14 +336,44 @@ export function CreateSpeedGameBoardModal({
 
             {tab === "direct" && (
               <div className="speed-game-direct">
-                <textarea
-                  className="modal-textarea"
-                  rows={8}
-                  value={directText}
-                  onChange={(e) => setDirectText(e.target.value)}
-                  placeholder="단어를 한 줄에 하나씩 입력하세요.&#10;예: 사과&#10;바나나"
-                  disabled={busy}
-                />
+                <div className="speed-game-word-cell-grid">
+                  {directWords.map((word, index) => (
+                    <label className="speed-game-word-cell" key={index}>
+                      <span>{index + 1}</span>
+                      <input
+                        type="text"
+                        value={word}
+                        onChange={(e) => updateDirectWord(index, e.target.value)}
+                        onPaste={(e) => {
+                          const text = e.clipboardData.getData("text");
+                          if (splitPastedKeywords(text).length > 1) {
+                            e.preventDefault();
+                            pasteDirectWords(index, text);
+                          }
+                        }}
+                        placeholder="단어"
+                        disabled={busy}
+                        maxLength={80}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => removeDirectWordCell(index)}
+                        disabled={busy || directWords.length <= 1}
+                        aria-label={`${index + 1}번 단어 삭제`}
+                      >
+                        ×
+                      </button>
+                    </label>
+                  ))}
+                </div>
+                <button
+                  type="button"
+                  className="modal-btn-cancel speed-game-add-word"
+                  onClick={addDirectWordCell}
+                  disabled={busy || directWords.length >= 100}
+                >
+                  단어 칸 추가
+                </button>
                 <div className="speed-game-direct-actions">
                   <input
                     type="text"
@@ -344,6 +413,31 @@ export function CreateSpeedGameBoardModal({
 
             <p className="speed-game-word-count">
               선택된 단어: <strong>{effectiveKeywords.length}</strong>개
+            </p>
+          </div>
+
+          <div className="speed-game-section">
+            <label className="modal-field-label" htmlFor="speed-game-group-count">
+              모둠 설정
+            </label>
+            <div className="speed-game-config-row">
+              <span>모둠 수</span>
+              <input
+                id="speed-game-group-count"
+                type="number"
+                min={1}
+                max={20}
+                value={groupCount}
+                onChange={(e) =>
+                  setGroupCount(
+                    Math.min(20, Math.max(1, Number(e.target.value) || 1)),
+                  )
+                }
+                disabled={busy}
+              />
+            </div>
+            <p className="create-board-hint">
+              선택한 학급 학생을 번호순으로 나눠 이 게임 보드의 모둠으로 저장합니다.
             </p>
           </div>
 

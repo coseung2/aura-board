@@ -12,7 +12,10 @@ import {
   ASSIGNMENT_MAX_SLOTS,
   ASSIGNMENT_GUIDE_TEXT_MAX,
 } from "@/lib/assignment-schemas";
-import { snapshotClassroomGroupsToBoard } from "@/lib/default-groups";
+import {
+  saveBoardDefaultGroups,
+  snapshotClassroomGroupsToBoard,
+} from "@/lib/default-groups";
 import {
   deriveGuesserSlot,
   normalizeKeyword,
@@ -89,6 +92,7 @@ const CreateBoardSchema = z.object({
       rankBonusFirst: z.number().int().min(0).max(100000).default(300),
       rankBonusSecond: z.number().int().min(0).max(100000).default(200),
       rankBonusThird: z.number().int().min(0).max(100000).default(100),
+      groupCount: z.number().int().min(1).max(20).default(4),
       bonusRanks: z
         .string()
         .regex(/^(\d+)(,\d+){0,2}$/)
@@ -432,11 +436,23 @@ export async function POST(req: Request) {
             },
           });
         }
-        await snapshotClassroomGroupsToBoard(
-          tx,
-          ownedClassroom.id,
-          createdBoard.id,
+        const roster = await tx.student.findMany({
+          where: { classroomId: ownedClassroom.id },
+          orderBy: [{ number: "asc" }, { createdAt: "asc" }],
+          select: { id: true },
+        });
+        const groupCount = Math.min(
+          Math.max(cfg.groupCount, 1),
+          Math.max(roster.length, 1),
         );
+        const speedGameGroups = Array.from({ length: groupCount }, (_, index) => ({
+          name: `${index + 1}모둠`,
+          studentIds: [] as string[],
+        }));
+        roster.forEach((student, index) => {
+          speedGameGroups[index % groupCount].studentIds.push(student.id);
+        });
+        await saveBoardDefaultGroups(tx, createdBoard.id, speedGameGroups);
         return createdBoard;
       });
 
