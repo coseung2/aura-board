@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, type FormEvent } from "react";
-import { signIn } from "next-auth/react";
+import { signIn, signOut } from "next-auth/react";
 import { Logo } from "@/components/Logo";
 import { RoleIcon } from "@/components/login/RoleIcon";
 
@@ -88,6 +88,11 @@ export default function LoginPage() {
     );
   }
 
+  async function startTeacherSignIn(provider: "google" | "kakao") {
+    await signOut({ redirect: false });
+    await signIn(provider, { redirectTo: safeTeacherReturnTarget() });
+  }
+
   return (
     <main className="login-page">
       <div className="login-hub-card">
@@ -113,7 +118,7 @@ export default function LoginPage() {
               <button
                 type="button"
                 className="login-role-oauth login-role-oauth-google"
-                onClick={() => signIn("google", { redirectTo: safeTeacherReturnTarget() })}
+                onClick={() => startTeacherSignIn("google")}
                 aria-label="Google로 교사 로그인"
               >
                 <GoogleGlyph />
@@ -122,7 +127,7 @@ export default function LoginPage() {
               <button
                 type="button"
                 className="login-role-oauth login-role-oauth-kakao"
-                onClick={() => signIn("kakao", { redirectTo: safeTeacherReturnTarget() })}
+                onClick={() => startTeacherSignIn("kakao")}
                 aria-label="Kakao로 교사 로그인"
               >
                 <KakaoGlyph />
