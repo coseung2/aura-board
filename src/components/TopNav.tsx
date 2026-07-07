@@ -426,6 +426,11 @@ export function TopNav({ showAdmin = false }: Props) {
               active: pathname === "/admin",
             },
             {
+              href: "/admin/errors",
+              label: "에러 로그",
+              active: pathname.startsWith("/admin/errors"),
+            },
+            {
               href: "/teacher/settings",
               label: "교사 설정",
               active: pathname.startsWith("/teacher/settings"),

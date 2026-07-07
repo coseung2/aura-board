@@ -5,6 +5,7 @@ import { getCurrentStudent } from "@/lib/student-auth";
 import { ALLOWED_FILE_MIMES, isAllowedFileUpload, normalizeUploadMime } from "@/lib/file-attachment";
 import { ALLOWED_IMAGE, ALLOWED_VIDEO, MAX_SIZE, UploadPolicyError } from "./upload-policy";
 import { resizeBufferToWebPPreview, uploadWebPBuffer, extractVideoThumbnail } from "@/lib/blob";
+import { logError } from "@/lib/error-log";
 import { uploadPublicObject } from "@/lib/media-storage";
 
 /**
@@ -44,6 +45,10 @@ function verifyFileMagic(mime: string, filename: string, head: Buffer): boolean 
 }
 
 export async function POST(req: Request) {
+  let userId: string | null = null;
+  let userEmail: string | null = null;
+  let uploadMetadata: Record<string, unknown> | undefined;
+
   try {
     // 교사(NextAuth) 또는 학생(HMAC bearer/cookie) 중 하나만 있으면 허용.
     // 모바일 학생 앱이 카드/과제 첨부를 직접 업로드할 수 있게 하기 위함.
@@ -53,6 +58,11 @@ export async function POST(req: Request) {
       if (!student) {
         return NextResponse.json({ error: "unauthorized" }, { status: 401 });
       }
+      userId = student.id;
+    }
+    if (teacher) {
+      userId = teacher.id;
+      userEmail = teacher.email;
     }
 
     // 이전 Vercel Blob client-direct JSON 프로토콜은 제거됐다.
@@ -74,6 +84,11 @@ export async function POST(req: Request) {
     if (!file) {
       return NextResponse.json({ error: "No file provided" }, { status: 400 });
     }
+    uploadMetadata = {
+      fileName: file.name,
+      fileSize: file.size,
+      fileType: file.type,
+    };
 
     if (file.size > MAX_SIZE) {
       console.error(`[upload reject] oversize name=${file.name} size=${file.size} type=${file.type}`);
@@ -173,6 +188,14 @@ export async function POST(req: Request) {
         );
       } catch (e) {
         console.warn("[POST /api/upload] preview generation failed:", e);
+        await logError({
+          userId,
+          userEmail,
+          feature: "upload.preview",
+          path: "/api/upload",
+          error: e,
+          metadata: uploadMetadata,
+        });
       }
     } else if (isVideo) {
       // Video thumbnail extraction (async, non-blocking)
@@ -183,6 +206,14 @@ export async function POST(req: Request) {
         );
       } catch (e) {
         console.warn("[POST /api/upload] video thumbnail extraction failed:", e);
+        await logError({
+          userId,
+          userEmail,
+          feature: "upload.preview",
+          path: "/api/upload",
+          error: e,
+          metadata: uploadMetadata,
+        });
       }
     }
     return NextResponse.json({
@@ -201,6 +232,15 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: e.message }, { status: 400 });
     }
     console.error("[POST /api/upload]", e);
+    await logError({
+      userId,
+      userEmail,
+      feature: "upload",
+      path: "/api/upload",
+      status: 500,
+      error: e,
+      metadata: uploadMetadata,
+    });
     const msg = e instanceof Error ? e.message : "Upload failed";
     return NextResponse.json({ error: msg }, { status: 500 });
   }

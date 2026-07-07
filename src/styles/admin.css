@@ -61,6 +61,10 @@
   margin-bottom: 18px;
 }
 
+.admin-metric-grid-compact {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
 .admin-metric-card,
 .admin-section,
 .admin-forbidden {
@@ -165,6 +169,80 @@
 
 .admin-table tbody tr:last-child td {
   border-bottom: 0;
+}
+
+.admin-error-table {
+  min-width: 1040px;
+}
+
+.admin-empty-cell {
+  padding: 30px 16px;
+  color: var(--color-text-muted);
+  text-align: center;
+}
+
+.admin-code {
+  display: inline-flex;
+  max-width: 220px;
+  overflow: hidden;
+  padding: 3px 6px;
+  border-radius: 5px;
+  background: var(--color-surface-alt);
+  color: var(--color-text);
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.admin-status-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 38px;
+  min-height: 24px;
+  padding: 0 8px;
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  background: var(--color-surface-alt);
+  color: var(--color-text-muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.admin-status-pill-danger {
+  border-color: rgba(220, 38, 38, 0.32);
+  background: rgba(220, 38, 38, 0.1);
+  color: #b91c1c;
+}
+
+.admin-status-pill-warning {
+  border-color: rgba(217, 119, 6, 0.32);
+  background: rgba(217, 119, 6, 0.1);
+  color: #b45309;
+}
+
+.admin-error-details {
+  max-width: 420px;
+}
+
+.admin-error-details summary {
+  overflow: hidden;
+  cursor: pointer;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.admin-error-details pre {
+  max-height: 260px;
+  margin: 10px 0 0;
+  overflow: auto;
+  padding: 10px;
+  border-radius: 6px;
+  background: var(--color-surface-alt);
+  color: var(--color-text);
+  font-size: 12px;
+  line-height: 1.45;
+  white-space: pre-wrap;
 }
 
 .admin-user-cell {

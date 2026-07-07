@@ -147,6 +147,33 @@ model AuditEvent {
   @@index([resourceType, resourceId])
 }
 
+model ErrorLog {
+  id String @id @default(cuid())
+
+  userId String?
+
+  userEmail String?
+
+  feature String
+
+  path String?
+
+  status Int?
+
+  message String
+
+  stack String?
+
+  metadata Json?
+
+  createdAt DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([feature, createdAt])
+  @@index([userEmail, createdAt])
+  @@index([status, createdAt])
+}
+
 // ???????? Teacher LLM API Key (Seed 13 follow-up, 2026-04-22) ????????
 
 // ?????벧?녌關苡? /docs/ai-setup ???쒓낮?꾬┼??넊??????????곸죷??Claude/OpenAI/Gemini API Key.

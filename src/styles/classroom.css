@@ -4674,6 +4674,7 @@
 }
 
 .morning-photo-modal-layer {
+  z-index: var(--z-fullscreen-modal, 2147483002);
   padding: 0;
 }
 

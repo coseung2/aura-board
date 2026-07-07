@@ -1,10 +1,8 @@
 import Link from "next/link";
-import { redirect } from "next/navigation";
 import { TopNav } from "@/components/TopNav";
-import { getCurrentUser } from "@/lib/auth";
+import { AdminForbidden, requireAdminUser } from "@/lib/admin-auth";
 import { db } from "@/lib/db";
 
-const ADMIN_EMAIL = "mallagaenge@gmail.com";
 const KST_OFFSET_MS = 9 * 60 * 60 * 1000;
 
 type UserUsageRow = {
@@ -25,30 +23,8 @@ export const metadata = {
 };
 
 export default async function AdminPage() {
-  let currentUser;
-  try {
-    currentUser = await getCurrentUser();
-  } catch {
-    redirect("/login?callbackUrl=/admin");
-  }
-
-  if (currentUser.email.toLowerCase() !== ADMIN_EMAIL) {
-    return (
-      <>
-        <TopNav />
-        <main className="admin-page">
-          <section className="admin-forbidden">
-            <p className="admin-eyebrow">관리자</p>
-            <h1>접근 권한이 없습니다</h1>
-            <p>이 페이지는 지정된 관리자 계정만 볼 수 있습니다.</p>
-            <Link href="/dashboard" className="admin-link-btn">
-              대시보드로 이동
-            </Link>
-          </section>
-        </main>
-      </>
-    );
-  }
+  const auth = await requireAdminUser("/admin");
+  if (!auth.authorized) return <AdminForbidden />;
 
   const [
     totalUsers,
@@ -158,6 +134,9 @@ export default async function AdminPage() {
           </div>
           <Link href="/dashboard" className="admin-link-btn">
             대시보드
+          </Link>
+          <Link href="/admin/errors" className="admin-link-btn">
+            에러 로그
           </Link>
         </header>
 
