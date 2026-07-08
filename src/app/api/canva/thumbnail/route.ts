@@ -323,7 +323,9 @@ async function resolvePublicCanvaPageThumbnail(rawDesignUrl: string): Promise<st
       const allowed =
         imageHost === "canva.com" ||
         ALLOWED_HOST_SUFFIXES.some((suffix) => imageHost.endsWith(suffix));
-      if (allowed && absolute.protocol === "https:") {
+      const isScreenUrl =
+        imageHost.endsWith("canva.com") && absolute.pathname.endsWith("/screen");
+      if (allowed && absolute.protocol === "https:" && !isScreenUrl) {
         return absolute.toString();
       }
     }

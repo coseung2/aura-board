@@ -73,6 +73,7 @@ export const CanvaEmbedSlot = memo(function CanvaEmbedSlot({
   const [thumbnailAttempt, setThumbnailAttempt] = useState(0);
   const [lastGoodThumbnail, setLastGoodThumbnail] = useState<string | null>(null);
   const [evictedToast, setEvictedToast] = useState<string | null>(null);
+  const [allThumbnailsFailed, setAllThumbnailsFailed] = useState(false);
 
   // IntersectionObserver starts at `false` and only flips once it has
   // actually reported an intersection. Gating the auto-deactivate on
@@ -102,6 +103,7 @@ export const CanvaEmbedSlot = memo(function CanvaEmbedSlot({
 
   useEffect(() => {
     setThumbnailAttempt(0);
+    setAllThumbnailsFailed(false);
   }, [linkImage, linkUrl]);
 
   // When THIS slot is the one evicted by LRU overflow, keep the old state
@@ -164,9 +166,13 @@ export const CanvaEmbedSlot = memo(function CanvaEmbedSlot({
   }, [candidateThumbnail]);
   const handleThumbnailError = useCallback(() => {
     if (!candidateThumbnail) return;
-    setThumbnailAttempt((attempt) =>
-      attempt < thumbnailCandidates.length - 1 ? attempt + 1 : attempt
-    );
+    setThumbnailAttempt((attempt) => {
+      const next = attempt < thumbnailCandidates.length - 1 ? attempt + 1 : attempt;
+      if (next === thumbnailCandidates.length - 1) {
+        setTimeout(() => setAllThumbnailsFailed(true), 300);
+      }
+      return next;
+    });
   }, [candidateThumbnail, thumbnailCandidates.length]);
 
   // Render the iframe as soon as the user activates. We no longer gate on
@@ -207,11 +213,15 @@ export const CanvaEmbedSlot = memo(function CanvaEmbedSlot({
           // knows what they're about to see.
           <div
             className="card-canva-slot-thumbnail card-canva-slot-placeholder"
-            aria-hidden="true"
           >
-            <span className="card-canva-slot-placeholder-label">
+            <p className="card-canva-slot-placeholder-label">
               Canva 디자인
-            </span>
+            </p>
+            {allThumbnailsFailed && (
+              <p className="card-canva-slot-placeholder-hint">
+                썸네일을 불러올 수 없습니다
+              </p>
+            )}
           </div>
         )}
 
