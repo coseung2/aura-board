@@ -168,7 +168,7 @@ export function CardDetailModal({
     (isYouTubeLink(card.linkUrl) || isCanvaDesignUrl(card.linkUrl)),
   );
   const mediaLinkUrl = hasEmbeddableLink ? card.linkUrl : null;
-  const hasTextLink = Boolean(card.linkUrl);
+  const hasTextLink = Boolean(card.linkUrl && !isYouTubeLink(card.linkUrl));
   const hasMedia = hasMediaAttachment || hasEmbeddableLink;
   const hasTextContent = Boolean(
     card.title.trim() ||
