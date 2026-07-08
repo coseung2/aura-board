@@ -97,9 +97,6 @@ function TopicsTabBody({
   const [subjectOrder, setSubjectOrder] = useState<SubjectOrder>(
     normalizeSubjectOrder(initialSubjectOrder),
   );
-  const [bulkSortDirection, setBulkSortDirection] = useState<
-    "asc" | "desc" | null
-  >(null);
   const [saveState, setSaveState] = useState<
     | { status: "idle" }
     | { status: "saving" }
@@ -132,7 +129,6 @@ function TopicsTabBody({
 
   function moveUnpinned(fromIndex: number, toIndex: number) {
     if (toIndex < 0 || toIndex >= split.unpinned.length) return;
-    setBulkSortDirection(null);
     setDraft((current) => {
       const next = [...current];
       const fromAbs = split.pinned.length + fromIndex;
@@ -146,7 +142,6 @@ function TopicsTabBody({
   }
 
   function swapInGroup(group: "pinned" | "unpinned", fromIndex: number, toIndex: number) {
-    setBulkSortDirection(null);
     setDraft((current) => {
       const list = group === "pinned" ? [...split.pinned] : [...split.unpinned];
       if (toIndex < 0 || toIndex >= list.length) return current;
@@ -170,15 +165,11 @@ function TopicsTabBody({
       );
       const pinned = next.filter((s) => s.pinned);
       const unpinned = next.filter((s) => !s.pinned);
-      if (bulkSortDirection) {
-        unpinned.sort((a, b) => compareByBaseOrder(a, b, bulkSortDirection));
-      }
       return renumber([...pinned, ...unpinned], pinned.length);
     });
   }
 
   function sortAllByCreatedAt(direction: "asc" | "desc") {
-    setBulkSortDirection(direction);
     setDraft((current) => {
       const pinned = current.filter((s) => s.pinned);
       const unpinned = current.filter((s) => !s.pinned);
