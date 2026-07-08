@@ -9,12 +9,16 @@ import { StudentFeatureComingSoon } from "@/components/student/StudentFeatureCom
 export const dynamic = "force-dynamic";
 
 export default async function CharacterTownPage() {
-  // 독서왕 전시공간(캐릭터 마을)은 admin teacher만 미리 볼 수 있다.
-  const teacher = await getCurrentUser();
-  if (!isAdminEmail(teacher?.email)) redirect("/student");
-
+  const teacher = await getCurrentUser().catch(() => null);
   const student = await getCurrentStudent();
   if (!student) redirect("/login?from=/student/character-town");
+  // 독서왕 전시공간(캐릭터 마을)은 admin teacher 또는 admin teacher 학급 학생만 미리 볼 수 있다.
+  if (
+    !isAdminEmail(teacher?.email) &&
+    !isAdminEmail(student.classroom.teacher.email)
+  ) {
+    redirect("/student");
+  }
   const duties = await getStudentDuties(student.id);
 
   return (

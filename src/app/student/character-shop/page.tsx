@@ -9,13 +9,16 @@ import { StudentFeatureComingSoon } from "@/components/student/StudentFeatureCom
 export const dynamic = "force-dynamic";
 
 export default async function CharacterShopPage() {
-  // 캐릭터 상점은 admin(교사)만 미리 볼 수 있다. 학생 세션이 있어도
-  // teacher가 admin인 경우에만 진입 허용.
-  const teacher = await getCurrentUser();
-  if (!isAdminEmail(teacher?.email)) redirect("/student");
-
+  const teacher = await getCurrentUser().catch(() => null);
   const student = await getCurrentStudent();
   if (!student) redirect("/login?from=/student/character-shop");
+  // 캐릭터 상점은 admin teacher 또는 admin teacher 학급 학생만 미리 볼 수 있다.
+  if (
+    !isAdminEmail(teacher?.email) &&
+    !isAdminEmail(student.classroom.teacher.email)
+  ) {
+    redirect("/student");
+  }
   const duties = await getStudentDuties(student.id);
 
   return (

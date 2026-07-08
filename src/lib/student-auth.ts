@@ -99,7 +99,7 @@ export async function getCurrentStudentRaw() {
   if (!payload) return null;
   const student = await db.student.findUnique({
     where: { id: payload.studentId },
-    include: { classroom: true },
+    include: { classroom: { include: { teacher: { select: { email: true } } } } },
   });
   if (!student) return null;
   if (student.sessionVersion !== payload.sessionVersion) return null;
