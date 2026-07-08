@@ -760,6 +760,40 @@
   flex: 0 0 auto;
 }
 
+.topics-tab-sort-btn {
+  margin-left: 4px;
+  padding: 4px 8px;
+  font-size: 12px;
+  border: 0;
+  background: transparent;
+  color: var(--color-accent, #1683c7);
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.topics-tab-sort-btn:hover {
+  background: var(--color-accent-tinted-bg, #e0f2fe);
+}
+
+.board-settings-section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.board-settings-section-head .board-settings-section-title {
+  margin-bottom: 0;
+}
+
+.board-settings-section-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+
 .topics-tab-reorder-btn {
   border: 0;
   background: transparent;

@@ -166,6 +166,19 @@ function TopicsTabBody({
     });
   }
 
+  function sortAllByCreatedAt(direction: "asc" | "desc") {
+    setDraft((current) => {
+      const pinned = current.filter((s) => s.pinned);
+      const unpinned = current.filter((s) => !s.pinned);
+      unpinned.sort((a, b) => {
+        const byOrder = a.order - b.order;
+        const result = byOrder || a.id.localeCompare(b.id);
+        return direction === "asc" ? result : -result;
+      });
+      return renumber([...pinned, ...unpinned], pinned.length);
+    });
+  }
+
   async function save() {
     if (!dirty) return;
     setSaveState({ status: "saving" });
@@ -237,7 +250,29 @@ function TopicsTabBody({
 
   return (
     <div className="board-settings-control-stack">
-      <SettingsSection title="주제 순서">
+      <SettingsSection
+        title="주제 순서"
+        actions={
+          <>
+            <button
+              type="button"
+              className="topics-tab-sort-btn"
+              onClick={() => sortAllByCreatedAt("asc")}
+              title="한번에 먼저 만든 순서로 정렬"
+            >
+              생성 ↑
+            </button>
+            <button
+              type="button"
+              className="topics-tab-sort-btn"
+              onClick={() => sortAllByCreatedAt("desc")}
+              title="한번에 나중에 만든 순서로 정렬"
+            >
+              생성 ↓
+            </button>
+          </>
+        }
+      >
         <p className="board-settings-row-note">
           ↑/↓ 버튼으로 섹션 순서를 바꾸세요.
           <br />
@@ -409,13 +444,6 @@ function isDirty(
   return false;
 }
 
-        <span
-          className="board-settings-row-badge on"
-          aria-label="핀됨"
-          title="핀됨"
-        >
-          📌
-        </span>
 function renumber(rows: EditableSection[], pinnedCount: number) {
   // pinned 0..pinnedCount-1: order = idx (ascending)
   // unpinned pinnedCount..: order = (total - idx - 1) (descending)
