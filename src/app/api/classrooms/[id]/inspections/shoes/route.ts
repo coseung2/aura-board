@@ -15,6 +15,9 @@ const Body = z.object({
       }),
     )
     .max(200),
+  // POST accepts body.date (YYYY-MM-DD) to record findings for a
+  // different day; defaults to today. Mirrors GET ?date=.
+  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
 });
 
 async function authorize(classroomId: string) {
@@ -122,7 +125,7 @@ export async function POST(
     return NextResponse.json({ error: "검사 결과 입력값을 확인해주세요." }, { status: 400 });
   }
 
-  const dateStr = todayDateString();
+  const dateStr = parsed.data.date ?? todayDateString();
   const date = parseDateOrNull(dateStr);
   if (!date) {
     return NextResponse.json({ error: "날짜 형식을 확인해주세요." }, { status: 400 });

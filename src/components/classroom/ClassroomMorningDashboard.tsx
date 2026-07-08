@@ -3,11 +3,17 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   fetchMorningSummary,
+  fetchCleaningRoster,
+  fetchShoeRoster,
   saveShoeFindings,
+  type CleaningRosterEntry,
+  type ShoeRosterEntry,
   type ReadingChampion,
   type MorningSummary,
 } from "@/lib/inspections-client";
 import { AppBackgroundButton } from "@/components/AppBackground";
+import type { CleaningDutyRow } from "@/lib/yellow-card";
+import { todayDateString } from "@/lib/inspector-findings";
 import { fetchAvatarGallery } from "@/components/avatar/gallery-client";
 import { ReadingChampionExhibition } from "@/components/avatar/ReadingChampionExhibition";
 import type { AvatarGalleryStudent } from "@/components/avatar/types";
@@ -34,6 +40,61 @@ export function ClassroomMorningDashboard({
   const [shoeSaving, setShoeSaving] = useState(false);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
+  // Helper functions for date navigation
+  function formatDateNav(dateStr: string): string {
+    const d = new Date(dateStr + "T00:00:00");
+    return `${d.getMonth() + 1}월 ${d.getDate()}일`;
+  }
+  function prevDay(dateStr: string): string {
+    const d = new Date(dateStr + "T00:00:00");
+    d.setDate(d.getDate() - 1);
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, "0");
+    const dd = String(d.getDate()).padStart(2, "0");
+    return `${y}-${m}-${dd}`;
+  }
+  function nextDay(dateStr: string): string {
+    const d = new Date(dateStr + "T00:00:00");
+    d.setDate(d.getDate() + 1);
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, "0");
+    const dd = String(d.getDate()).padStart(2, "0");
+    return `${y}-${m}-${dd}`;
+  }
+  const [cleaningDuties, setCleaningDuties] = useState<CleaningDutyRow[]>([]);
+  const [dutiesLoaded, setDutiesLoaded] = useState(false);
+  const [inspDate, setInspDate] = useState(todayDateString());
+  const [cleaningItems, setCleaningItems] = useState<
+    MorningSummary["cleaningFindings"]
+  >([]);
+  const [shoeItems, setShoeItems] = useState<
+    MorningSummary["shoeFindings"]
+  >([]);
+  const [inspLoaded, setInspLoaded] = useState(false);
+
+  const [expandedPanels, setExpandedPanels] = useState<Record<string, boolean>>({});
+  const bodyRefs = useRef<Record<string, HTMLDivElement | null>>({});
+  const [overflowPanels, setOverflowPanels] = useState<Record<string, boolean>>({});
+  useEffect(() => {
+    const checkOverflow = () => {
+      const updates: Record<string, boolean> = {};
+      for (const [key, el] of Object.entries(bodyRefs.current)) {
+        if (el) {
+          updates[key] = el.scrollHeight > el.clientHeight;
+        }
+      }
+      setOverflowPanels(prev => ({...prev, ...updates}));
+    };
+    checkOverflow();
+    const observer = new ResizeObserver(checkOverflow);
+    for (const el of Object.values(bodyRefs.current)) {
+      if (el) observer.observe(el);
+    }
+    return () => observer.disconnect();
+  }, [summary]);
+
+
+
   const refresh = useCallback(async () => {
     setError(null);
     try {
@@ -46,6 +107,29 @@ export function ClassroomMorningDashboard({
       setLoaded(true);
     }
   }, [classroomId]);
+
+  // Fetch inspection data when inspDate changes
+  useEffect(() => {
+    let cancelled = false;
+    setInspLoaded(false);
+    fetchMorningSummary(classroomId, inspDate)
+      .then((data) => {
+        if (!cancelled) {
+          setCleaningItems(data.cleaningFindings);
+          setShoeItems(data.shoeFindings);
+          setInspLoaded(true);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setCleaningItems([]);
+          setShoeItems([]);
+          setInspLoaded(true);
+        }
+      });
+    return () => { cancelled = true; };
+  }, [classroomId, inspDate]);
+
 
   useEffect(() => {
     setLoaded(false);
@@ -65,29 +149,54 @@ export function ClassroomMorningDashboard({
   }, [refresh]);
 
   const assignmentSections = summary
-    ? summary.missingAssignments.reduce<
-        Array<{
-          id: string;
-          title: string;
-          dueDate: string | null;
-          students: MorningSummary["missingAssignments"][number]["student"][];
-        }>
-      >((sections, item) => {
-        for (const task of item.tasks) {
-          let section = sections.find((s) => s.id === task.id);
-          if (!section) {
-            section = {
-              id: task.id,
-              title: task.title,
-              dueDate: task.dueDate,
-              students: [],
-            };
-            sections.push(section);
+    ? [
+        ...summary.missingAssignments.reduce<
+          Array<{
+            id: string;
+            title: string;
+            dueDate: string | null;
+            students: MorningSummary["missingAssignments"][number]["student"][];
+          }>
+        >((sections, item) => {
+          for (const task of item.tasks) {
+            let section = sections.find((s) => s.id === task.id);
+            if (!section) {
+              section = {
+                id: task.id,
+                title: task.title,
+                dueDate: task.dueDate,
+                students: [],
+              };
+              sections.push(section);
+            }
+            section.students.push(item.student);
           }
-          section.students.push(item.student);
-        }
-        return sections;
-      }, [])
+          return sections;
+        }, []),
+        ...summary.missingAssignmentBoards.reduce<
+          Array<{
+            id: string;
+            title: string;
+            dueDate: string | null;
+            students: MorningSummary["missingAssignments"][number]["student"][];
+          }>
+        >((sections, item) => {
+          for (const board of item.boards) {
+            let section = sections.find((s) => s.id === board.id);
+            if (!section) {
+              section = {
+                id: board.id,
+                title: board.title,
+                dueDate: board.dueDate,
+                students: [],
+              };
+              sections.push(section);
+            }
+            section.students.push(item.student);
+          }
+          return sections;
+        }, []),
+      ]
     : [];
   const safeAssignmentIndex = assignmentSections[activeAssignmentIndex]
     ? activeAssignmentIndex
@@ -97,7 +206,7 @@ export function ClassroomMorningDashboard({
     ? Array.from(
         { length: Math.ceil(summary.cleaningFindings.length / 3) },
         (_, rowIndex) =>
-          summary.cleaningFindings.slice(rowIndex * 3, rowIndex * 3 + 3),
+          cleaningItems.slice(rowIndex * 3, rowIndex * 3 + 3),
       )
     : [];
 
@@ -167,6 +276,7 @@ export function ClassroomMorningDashboard({
                   </h3>
                 </div>
               </div>
+              <div className={expandedPanels["assignment"] ? "morning-panel-body is-expanded" : "morning-panel-body"} ref={(el) => { bodyRefs.current["assignment"] = el; }}>
               {assignmentSections.length === 0 ? (
                 <p className="classroom-dashboard-empty">
                   모두 제출했습니다 🎉
@@ -207,6 +317,14 @@ export function ClassroomMorningDashboard({
                   )}
                 </div>
               )}
+              </div>
+              {overflowPanels["assignment"] && (
+              <div className="morning-panel-toggle-wrap">
+                <button type="button" className="morning-panel-toggle" onClick={() => setExpandedPanels(prev => ({...prev, "assignment": !prev["assignment"]}))}>
+                  {expandedPanels["assignment"] ? "▲" : "▼"}
+                </button>
+              </div>
+              )}
             </section>
 
             <section className="classroom-dashboard-panel morning-panel">
@@ -215,12 +333,18 @@ export function ClassroomMorningDashboard({
                   <h3>
                     청소 검사 결과
                     <span className="morning-title-count">
-                      {summary.cleaningFindings.length}명
+                      {cleaningItems.length}명
                     </span>
                   </h3>
                 </div>
+                <div className="date-nav">
+                  <button type="button" className="date-nav-btn" onClick={() => setInspDate(prevDay(inspDate))}>‹</button>
+                  <span className="date-nav-label">{formatDateNav(inspDate)}</span>
+                  <button type="button" className="date-nav-btn" onClick={() => setInspDate(nextDay(inspDate))}>›</button>
+                </div>
               </div>
-              {summary.cleaningFindings.length === 0 ? (
+              <div className={expandedPanels["cleaning"] ? "morning-panel-body is-expanded" : "morning-panel-body"} ref={(el) => { bodyRefs.current["cleaning"] = el; }}>
+              {cleaningItems.length === 0 ? (
                 <p className="classroom-dashboard-empty">
                   청소 지적이 없습니다 🎉
                 </p>
@@ -282,6 +406,14 @@ export function ClassroomMorningDashboard({
                   ))}
                 </div>
               )}
+              </div>
+              {overflowPanels["cleaning"] && (
+              <div className="morning-panel-toggle-wrap">
+                <button type="button" className="morning-panel-toggle" onClick={() => setExpandedPanels(prev => ({...prev, "cleaning": !prev["cleaning"]}))}>
+                  {expandedPanels["cleaning"] ? "▲" : "▼"}
+                </button>
+              </div>
+              )}
             </section>
 
             <section className="classroom-dashboard-panel morning-panel">
@@ -290,18 +422,24 @@ export function ClassroomMorningDashboard({
                   <h3>
                     실내화 정리 결과
                     <span className="morning-title-count">
-                      {summary.shoeFindings.length}명
+                      {shoeItems.length}명
                     </span>
                   </h3>
                 </div>
+                <div className="date-nav">
+                  <button type="button" className="date-nav-btn" onClick={() => setInspDate(prevDay(inspDate))}>‹</button>
+                  <span className="date-nav-label">{formatDateNav(inspDate)}</span>
+                  <button type="button" className="date-nav-btn" onClick={() => setInspDate(nextDay(inspDate))}>›</button>
+                </div>
               </div>
-              {summary.shoeFindings.length === 0 ? (
+              <div className={expandedPanels["shoe"] ? "morning-panel-body is-expanded" : "morning-panel-body"} ref={(el) => { bodyRefs.current["shoe"] = el; }}>
+              {shoeItems.length === 0 ? (
                 <p className="classroom-dashboard-empty">
                   실내화 미정리 학생이 없습니다 🎉
                 </p>
               ) : (
                 <ul className="morning-name-list">
-                  {summary.shoeFindings.map((item) => (
+                  {shoeItems.map((item) => (
                     <li key={item.student.id}>
                       <button
                         type="button"
@@ -320,10 +458,59 @@ export function ClassroomMorningDashboard({
                   ))}
                 </ul>
               )}
+              </div>
+              {overflowPanels["shoe"] && (
+              <div className="morning-panel-toggle-wrap">
+                <button type="button" className="morning-panel-toggle" onClick={() => setExpandedPanels(prev => ({...prev, "shoe": !prev["shoe"]}))}>
+                  {expandedPanels["shoe"] ? "▲" : "▼"}
+                </button>
+              </div>
+              )}
+            </section>
+
+            {/* 오늘의 청소당번 */}
+            <section className="classroom-dashboard-panel morning-panel">
+              <div className="classroom-dashboard-panel-head">
+                <div>
+                  <h3>
+                    오늘의 청소당번
+                    <span className="morning-title-count">
+                      {cleaningDuties.length}명
+                    </span>
+                  </h3>
+                </div>
+              </div>
+              <div className={expandedPanels["duties"] ? "morning-panel-body is-expanded" : "morning-panel-body"} ref={(el) => { bodyRefs.current["duties"] = el; }}>
+              {!dutiesLoaded ? (
+                <p className="classroom-dashboard-empty">불러오는 중...</p>
+              ) : cleaningDuties.length === 0 ? (
+                <p className="classroom-dashboard-empty">
+                  오늘 청소 당번이 없습니다 🎉
+                </p>
+              ) : (
+                <ul className="morning-name-list">
+                  {cleaningDuties.map((duty) => (
+                    <li key={duty.studentId} className="morning-name-text">
+                      <span className="morning-list-num">{duty.studentNumber}</span>
+                      {" "}
+                      <span>{duty.studentName}</span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+              </div>
+              {overflowPanels["duties"] && (
+              <div className="morning-panel-toggle-wrap">
+                <button type="button" className="morning-panel-toggle" onClick={() => setExpandedPanels(prev => ({...prev, "duties": !prev["duties"]}))}>
+                  {expandedPanels["duties"] ? "▲" : "▼"}
+                </button>
+              </div>
+              )}
             </section>
           </div>
 
           {showDevFeatures && (
+
             <ReadingChampionsSection
               classroomId={classroomId}
               champions={summary.readingChampions}

@@ -422,6 +422,8 @@ function CheckRoster({
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
+  const [yelCardBusy, setYelCardBusy] = useState<string | null>(null);
+  const [yelCardReasons, setYelCardReasons] = useState<Record<string, string>>({});
 
   const refresh = useCallback(async () => {
     setError(null);
@@ -496,6 +498,44 @@ function CheckRoster({
       await onSaved();
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function handleYellowCard(studentId: string, studentName: string) {
+    const reason = yelCardReasons[studentId]?.trim();
+    if (!reason) {
+      alert("기록할 이유를 입력해주세요.");
+      return;
+    }
+    if (!window.confirm(`${studentName}님에게 노란브를 부여할까요? (이유: ${reason})`)) return;
+    setYelCardBusy(studentId);
+    setToast(null);
+    try {
+      const res = await fetch(`/api/classrooms/${classroomId}/yellow-cards`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ studentId, reason }),
+      });
+      if (!res.ok) {
+        const msg = (await res.json().catch(() => ({}))).error;
+        setError(typeof msg === "string" ? msg : "노란브 부여 실패");
+        return;
+      }
+      const data = await res.json();
+      const msg = data.promotedToCleaningDuty
+        ? `✦ ${studentName}님이 오늘의 청소 당번이 되었습니다! (구번째 노란브)`
+        : `${studentName}님 노란브 1회 (오늘 ${data.todayCount}회째)`;
+      setToast(msg);
+      setYelCardReasons((prev) => {
+        const next = { ...prev };
+        delete next[studentId];
+        return next;
+      });
+      await refresh();
+    } catch {
+      setError("노란브 부여 중 오류가 발생했습니다.");
+    } finally {
+      setYelCardBusy(null);
     }
   }
 
@@ -579,6 +619,33 @@ function CheckRoster({
                         {submitted ? "✓ 제출" : "미제출"}
                       </span>
                     </button>
+                    {!submitted && (
+                      <div className="check-yellow-card-area">
+                        <input
+                          type="text"
+                          className="check-yellow-reason"
+                          placeholder="노란브 이유"
+                          value={yelCardReasons[entry.student.id] ?? ""}
+                          onChange={(e) =>
+                            setYelCardReasons((prev) => ({
+                              ...prev,
+                              [entry.student.id]: e.target.value,
+                            }))
+                          }
+                          maxLength={100}
+                          disabled={saving || yelCardBusy !== null}
+                        />
+                        <button
+                          type="button"
+                          className="check-yellow-btn"
+                          onClick={() => handleYellowCard(entry.student.id, entry.student.name)}
+                          disabled={saving || yelCardBusy !== null || !(yelCardReasons[entry.student.id]?.trim())}
+                          title="노란브 부여"
+                        >
+                          {yelCardBusy === entry.student.id ? "..." : "타격"}
+                        </button>
+                      </div>
+                    )}
                   </li>
                 );
               })}

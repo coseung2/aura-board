@@ -25,6 +25,26 @@ function emptyDraft(): Draft {
 
 export function ClassroomCleaningInspector({ classroomId }: Props) {
   const [roster, setRoster] = useState<CleaningRosterEntry[]>([]);
+  function formatDateNav(dateStr: string): string {
+    const d = new Date(dateStr + "T00:00:00");
+    return `${d.getMonth() + 1}월 ${d.getDate()}일`;
+  }
+  function prevDay(dateStr: string): string {
+    const d = new Date(dateStr + "T00:00:00");
+    d.setDate(d.getDate() - 1);
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, "0");
+    const dd = String(d.getDate()).padStart(2, "0");
+    return `${y}-${m}-${dd}`;
+  }
+  function nextDay(dateStr: string): string {
+    const d = new Date(dateStr + "T00:00:00");
+    d.setDate(d.getDate() + 1);
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, "0");
+    const dd = String(d.getDate()).padStart(2, "0");
+    return `${y}-${m}-${dd}`;
+  }
   const [drafts, setDrafts] = useState<Record<string, Draft>>({});
   const [loaded, setLoaded] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -32,10 +52,10 @@ export function ClassroomCleaningInspector({ classroomId }: Props) {
   const [toast, setToast] = useState<string | null>(null);
   const [date, setDate] = useState<string | null>(null);
 
-  const refresh = useCallback(async () => {
+  const refresh = useCallback(async (selectedDate?: string | null) => {
     setError(null);
     try {
-      const data = await fetchCleaningRoster(classroomId);
+      const data = await fetchCleaningRoster(classroomId, selectedDate ?? null);
       setRoster(data.roster);
       setDate(data.date);
       const next: Record<string, Draft> = {};
@@ -59,8 +79,8 @@ export function ClassroomCleaningInspector({ classroomId }: Props) {
 
   useEffect(() => {
     setLoaded(false);
-    refresh();
-  }, [refresh]);
+    refresh(date);
+  }, [refresh]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const dirtyCount = useMemo(
     () => Object.values(drafts).filter((d) => d.dirty).length,
@@ -147,7 +167,7 @@ export function ClassroomCleaningInspector({ classroomId }: Props) {
     setError(null);
     setToast(null);
     try {
-      await saveCleaningFindings(classroomId, findings);
+      await saveCleaningFindings(classroomId, findings, date ?? null);
       setToast("저장되었습니다");
       await refresh();
     } catch (e) {
@@ -164,11 +184,14 @@ export function ClassroomCleaningInspector({ classroomId }: Props) {
       <header className="check-header">
         <div>
           <h2>청소 검사</h2>
-          {date && (
-            <p className="cleaning-inspector-date">
-              {new Date(date).toLocaleDateString("ko-KR")} 기준
-            </p>
-          )}
+        </div>
+
+        <div className="check-header-actions">
+              <div className="date-nav">
+                <button type="button" className="date-nav-btn" onClick={() => setDate(prevDay(date ?? ''))}>‹</button>
+                <span className="date-nav-label">{formatDateNav(date ?? '')}</span>
+                <button type="button" className="date-nav-btn" onClick={() => setDate(nextDay(date ?? ''))}>›</button>
+              </div>
         </div>
       </header>
 
@@ -277,3 +300,5 @@ export function ClassroomCleaningInspector({ classroomId }: Props) {
     </section>
   );
 }
+
+

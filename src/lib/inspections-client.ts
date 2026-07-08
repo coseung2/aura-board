@@ -48,9 +48,14 @@ export type CleaningFindingInput = {
 // GET /api/classrooms/:id/inspections/cleaning
 export async function fetchCleaningRoster(
   classroomId: string,
+  date?: string | null,
 ): Promise<CleaningRosterResponse> {
-  const res = await fetch(`/api/classrooms/${classroomId}/inspections/cleaning`, {
-    cache: "no-store",
+  const url = new URL(`/api/classrooms/${classroomId}/inspections/cleaning`, window.location.origin);
+  if (date) {
+    url.searchParams.set("date", date);
+  }
+  const res = await fetch(url.pathname + url.search, {
+   cache: "no-store",
   });
   if (!res.ok) throw new Error(await errorMessage(res));
   return (await res.json()) as CleaningRosterResponse;
@@ -60,11 +65,15 @@ export async function fetchCleaningRoster(
 export async function saveCleaningFindings(
   classroomId: string,
   findings: CleaningFindingInput[],
+  date?: string | null,
 ): Promise<{ savedAt: string }> {
   const res = await fetch(`/api/classrooms/${classroomId}/inspections/cleaning`, {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({ findings }),
+    body: JSON.stringify({
+      findings,
+      date: date ?? null,
+    }),
   });
   if (!res.ok) throw new Error(await errorMessage(res));
   return (await res.json()) as { savedAt: string };
@@ -97,9 +106,14 @@ export type ShoeFindingInput = {
 // GET /api/classrooms/:id/inspections/shoes
 export async function fetchShoeRoster(
   classroomId: string,
+  date?: string | null,
 ): Promise<ShoeRosterResponse> {
-  const res = await fetch(`/api/classrooms/${classroomId}/inspections/shoes`, {
-    cache: "no-store",
+  const url = new URL(`/api/classrooms/${classroomId}/inspections/shoes`, window.location.origin);
+  if (date) {
+    url.searchParams.set("date", date);
+  }
+  const res = await fetch(url.pathname + url.search, {
+   cache: "no-store",
   });
   if (!res.ok) throw new Error(await errorMessage(res));
   return (await res.json()) as ShoeRosterResponse;
@@ -109,11 +123,12 @@ export async function fetchShoeRoster(
 export async function saveShoeFindings(
   classroomId: string,
   findings: ShoeFindingInput[],
+  date?: string | null,
 ): Promise<{ savedAt: string }> {
   const res = await fetch(`/api/classrooms/${classroomId}/inspections/shoes`, {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({ findings }),
+    body: JSON.stringify({ findings, date: date ?? null }),
   });
   if (!res.ok) throw new Error(await errorMessage(res));
   return (await res.json()) as { savedAt: string };
@@ -135,6 +150,11 @@ export type MorningMissingAssignment = {
   student: StudentRef;
   tasks: Array<{ id: string; title: string; dueDate: string | null }>;
 };
+export type MorningMissingAssignmentBoard = {
+  student: StudentRef;
+  boards: Array<{ id: string; title: string; dueDate: string | null }>;
+};
+
 
 export type MorningCleaningItem = {
   student: StudentRef;
@@ -155,11 +175,13 @@ export type MorningSummary = {
   kpis: {
     totalStudents: number;
     missingAssignmentCount: number;
+    missingAssignmentBoardCount: number;
     cleaningDirtyCount: number;
     shoeNotArrangedCount: number;
   };
   missingAssignments: MorningMissingAssignment[];
   cleaningFindings: MorningCleaningItem[];
+  missingAssignmentBoards: MorningMissingAssignmentBoard[];
   shoeFindings: MorningShoeItem[];
   // 독서왕 leaderboard. Optional because the backend adds this in parallel;
   // the dashboard renders defensively when it is absent.
@@ -180,8 +202,10 @@ export type ReadingChampion = {
 // GET /api/classrooms/:id/morning-summary
 export async function fetchMorningSummary(
   classroomId: string,
+  date?: string,
 ): Promise<MorningSummary> {
-  const res = await fetch(`/api/classrooms/${classroomId}/morning-summary`, {
+  const query = date ? `?date=${date}` : '';
+  const res = await fetch(`/api/classrooms/${classroomId}/morning-summary${query}`, {
     cache: "no-store",
   });
   if (!res.ok) throw new Error(await errorMessage(res));

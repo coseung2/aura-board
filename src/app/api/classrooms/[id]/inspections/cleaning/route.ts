@@ -5,6 +5,7 @@ import { getCurrentUser } from "@/lib/auth";
 import { getCurrentStudent } from "@/lib/student-auth";
 import { hasPermission } from "@/lib/bank-permissions";
 import { parseDateOrNull, todayDateString } from "@/lib/inspector-findings";
+import { giveYellowCard } from "@/lib/yellow-card";
 
 const Body = z.object({
   findings: z
@@ -17,6 +18,9 @@ const Body = z.object({
       }),
     )
     .max(200),
+  // POST accepts body.date (YYYY-MM-DD) to record findings for a
+  // different day; defaults to today. Mirrors GET ?date=.
+  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
 });
 
 async function authorize(classroomId: string) {
@@ -151,7 +155,7 @@ export async function POST(
     return NextResponse.json({ error: "Invalid findings" }, { status: 400 });
   }
 
-  const dateStr = todayDateString();
+  const dateStr = parsed.data.date ?? todayDateString();
   const date = parseDateOrNull(dateStr);
   if (!date) {
     return NextResponse.json({ error: "Invalid date" }, { status: 400 });
@@ -169,6 +173,7 @@ export async function POST(
   const dirtyFindings = parsed.data.findings.filter((finding) => finding.dirty);
   const now = new Date();
 
+  // Save cleaning findings in a transaction
   await db.$transaction(async (tx) => {
     await tx.cleaningFinding.deleteMany({
       where: { classroomId, findingDate: date },
@@ -191,5 +196,38 @@ export async function POST(
     }
   });
 
-  return NextResponse.json({ savedAt: now.toISOString() });
+  // \uccad\uc18c \uac80\uc0ac\uc5d0\uc11c \uc9c0\uc801\ub41c \ud559\uc0dd\uc5d0\uac8c \ub178\ub780\uce74\ub4dc \ubd80\uc5ec (2\ud68c\uba74 \uc790\ub3d9 \uccad\uc18c\ub2f9\ubc88)
+  const yellowCardResults: Array<{
+    studentId: string;
+    todayCount: number;
+    promotedToCleaningDuty: boolean;
+  }> = [];
+  for (const finding of dirtyFindings) {
+    try {
+      const result = await giveYellowCard(
+        classroomId,
+        finding.studentId,
+        "\uccad\uc18c \ubd88\ub7c9",
+        auth.isTeacher
+          ? { kind: "teacher" as const, userId: auth.user!.id }
+          : { kind: "student" as const, studentId: auth.student!.id },
+        { now },
+      );
+      yellowCardResults.push({
+        studentId: result.card.studentId,
+        todayCount: result.todayCount,
+        promotedToCleaningDuty: result.promotedToCleaningDuty,
+      });
+    } catch {
+      // \ub178\ub780\uce74\ub4dc \ubd80\uc5ec \uc2e4\ud328\ub294 \ubb34\uc2dc (\uac80\uc0ac \uacb0\uacfc\ub294 \uc800\uc7a5\ub428)
+    }
+  }
+
+  const promotedCount = yellowCardResults.filter((r) => r.promotedToCleaningDuty).length;
+
+  return NextResponse.json({
+    savedAt: now.toISOString(),
+    yellowCards: yellowCardResults,
+    promotedToCleaningDutyCount: promotedCount,
+  });
 }

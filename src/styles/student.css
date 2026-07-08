@@ -1173,6 +1173,10 @@
   flex-direction: column;
   gap: 20px;
   width: 100%;
+  max-width: 1300px;
+  margin: 0 auto;
+  padding: 24px 24px 48px;
+  box-sizing: border-box;
 }
 
 .reading-form-card,

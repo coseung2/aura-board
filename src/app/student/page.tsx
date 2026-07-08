@@ -6,6 +6,7 @@ import { StudentTopNav } from "@/components/StudentTopNav";
 import { cloneStructure } from "@/lib/breakout";
 import { isAdminEmail } from "@/lib/admin";
 import { redirect } from "next/navigation";
+import { parseDateOrNull } from "@/lib/inspector-findings";
 
 export default async function StudentPage() {
   const student = await getCurrentStudent();
@@ -248,6 +249,35 @@ export default async function StudentPage() {
       },
     ];
   });
+  // 과제 배부(assignment layout) 보드에서도 학생 슬롯 가져오기
+  const assignmentBoardSlots = await db.assignmentSlot.findMany({
+    where: {
+      studentId: student.id,
+      board: { classroomId: student.classroomId, layout: "assignment" },
+    },
+    orderBy: { createdAt: "desc" },
+    select: {
+      id: true,
+      boardId: true,
+      submissionStatus: true,
+      createdAt: true,
+      card: { select: { id: true, createdAt: true, updatedAt: true } },
+      board: { select: { id: true, slug: true, title: true } },
+    },
+  });
+  const assignmentBoardTodos = assignmentBoardSlots.map((slot) => ({
+    id: `assign-${slot.id}`,
+    sectionId: slot.boardId,
+    boardId: slot.board.id,
+    boardSlug: slot.board.slug,
+    boardTitle: slot.board.title || "제목 없음",
+    sectionTitle: slot.board.title || "과제",
+    href: `/board/${slot.board.slug}`,
+    assignedAt: slot.createdAt.toISOString(),
+    reminderSentAt: null,
+    submitted: slot.submissionStatus === "submitted" || slot.submissionStatus === "viewed" || slot.submissionStatus === "reviewed",
+    submittedAt: slot.card.updatedAt?.toISOString() ?? slot.card.createdAt.toISOString(),
+  }));
   const checkHref = `/classroom/${student.classroomId}/check`;
   const canOpenChecks = duties.some((duty) => duty.href === checkHref);
   const checkTodos = checkTasks.map((task) => {
@@ -267,7 +297,7 @@ export default async function StudentPage() {
       submittedAt: checkedAt?.toISOString() ?? null,
     };
   });
-  const allAssignmentTodos = [...assignmentTodos, ...checkTodos];
+  const allAssignmentTodos = [...assignmentTodos, ...assignmentBoardTodos, ...checkTodos];
   const showDevFeatures = isAdminEmail(student.classroom.teacher.email);
 
   return (

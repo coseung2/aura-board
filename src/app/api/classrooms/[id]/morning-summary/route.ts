@@ -99,7 +99,7 @@ export async function GET(
   }
   const tomorrow = nextDay(date);
 
-  const [students, readingLogs, tasks, cleaning, shoes, seatLabels] = await Promise.all([
+  const [students, readingLogs, tasks, cleaning, shoes, seatLabels, assignmentSlots, sectionAssignments] = await Promise.all([
     db.student.findMany({
       where: { classroomId },
       orderBy: [{ number: "asc" }, { name: "asc" }],
@@ -142,6 +142,8 @@ export async function GET(
       },
     }),
     loadSeatLabels(classroomId),
+    loadAssignmentSlotStatus(classroomId, tomorrow),
+    loadSectionAssignmentStatus(classroomId),
   ]);
 
   const missingAssignments = students
@@ -155,6 +157,35 @@ export async function GET(
         }));
       if (missingTasks.length === 0) return null;
       return { student, tasks: missingTasks };
+    })
+    .filter((item): item is NonNullable<typeof item> => Boolean(item));
+
+  const missingAssignmentBoards = students
+    .map((student) => {
+      const entries = assignmentSlots
+        .filter((slot) => slot.studentId === student.id && isSlotMissing(slot.submissionStatus))
+        .map((slot) => ({
+          id: slot.boardId,
+          title: slot.boardTitle,
+          dueDate: slot.boardDeadline ? slot.boardDeadline.toISOString() : null,
+        }));
+      if (entries.length === 0) return null;
+      return { student, boards: entries };
+    })
+    .filter((item): item is NonNullable<typeof item> => Boolean(item));
+
+  // 주제별 보드의 섹션 과제 미제출
+  const missingSectionAssignments = students
+    .map((student) => {
+      const entries = sectionAssignments
+        .filter((section) => !section.studentIdsWithCards.includes(student.id))
+        .map((section) => ({
+          id: section.sectionId,
+          title: section.sectionTitle + ' (' + section.boardTitle + ')',
+          dueDate: section.publishedAt,
+        }));
+      if (entries.length === 0) return null;
+      return { student, boards: entries };
     })
     .filter((item): item is NonNullable<typeof item> => Boolean(item));
 
@@ -182,10 +213,12 @@ export async function GET(
     kpis: {
       totalStudents: students.length,
       missingAssignmentCount: missingAssignments.length,
+      missingAssignmentBoardCount: missingAssignmentBoards.length + missingSectionAssignments.length,
       cleaningDirtyCount: cleaningFindings.length,
       shoeNotArrangedCount: shoeFindings.length,
     },
     missingAssignments,
+    missingAssignmentBoards: [...missingAssignmentBoards, ...missingSectionAssignments],
     cleaningFindings,
     shoeFindings,
     readingChampions,
@@ -275,4 +308,128 @@ function aggregateReadingChampions(
       latestTitle: bucket.latestTitle,
       latestBookType: bucket.latestBookType,
     }));
+}
+
+
+/**
+ * Subject board (columns layout) 섹션 과제 미제출 조회 (2026-07-09)
+ *
+ * 학급에 속한 Board(layout="columns") 중 assignmentPublishedAt 이 설정된
+ * 섹션을 찾아 각 학생의 카드 제출 여부를 확인한다.
+ * 섹션 과제는 별도의 마감일이 없으므로, published 이후 하루가 지난 과제만
+ * 미제출로 표시한다 (당일 배부는 제외).
+ */
+type SectionAssignmentSnapshot = {
+  sectionId: string;
+  sectionTitle: string;
+  boardId: string;
+  boardTitle: string;
+  publishedAt: string;
+  studentIdsWithCards: string[];
+};
+
+async function loadSectionAssignmentStatus(
+  classroomId: string,
+): Promise<SectionAssignmentSnapshot[]> {
+  const sections = await db.section.findMany({
+    where: {
+      assignmentPublishedAt: { not: null },
+      board: {
+        classroomId,
+        layout: "columns",
+      },
+    },
+    select: {
+      id: true,
+      title: true,
+      assignmentPublishedAt: true,
+      board: { select: { id: true, title: true } },
+      cards: {
+        select: {
+          studentAuthorId: true,
+          authors: {
+            where: { studentId: { not: null } },
+            select: { studentId: true },
+          },
+        },
+      },
+    },
+  });
+
+  return sections.map((section) => {
+    const studentIdsWithCards = new Set<string>();
+    for (const card of section.cards) {
+      if (card.studentAuthorId) studentIdsWithCards.add(card.studentAuthorId);
+      for (const author of card.authors) {
+        if (author.studentId) studentIdsWithCards.add(author.studentId);
+      }
+    }
+    return {
+      sectionId: section.id,
+      sectionTitle: section.title,
+      boardId: section.board.id,
+      boardTitle: section.board.title,
+      publishedAt: section.assignmentPublishedAt!.toISOString(),
+      studentIdsWithCards: Array.from(studentIdsWithCards),
+    };
+  });
+}
+
+/**
+ * Assignment board 미제출 슬롯 조회 (2026-07-08)
+ *
+ * 학급에 속한 Board(layout="assignment") 중 마감 기한이 아직 지나지 않은
+ * 보드의 AssignmentSlot 을 모두 가져온다. 반환 row 는 미제출 여부 판단만
+ * 하면 되므로 board id/title/deadline + studentId + submissionStatus 만
+ * select 해서 페이로드 크기를 줄인다.
+ */
+type AssignmentSlotSnapshot = {
+  boardId: string;
+  boardTitle: string;
+  boardDeadline: Date | null;
+  studentId: string;
+  submissionStatus: string;
+};
+
+async function loadAssignmentSlotStatus(
+  classroomId: string,
+  tomorrow: Date,
+): Promise<AssignmentSlotSnapshot[]> {
+  return db.assignmentSlot.findMany({
+    where: {
+      board: {
+        classroomId,
+        layout: "assignment",
+        // deadline 이 없거나 (null) 아직 지나지 않은 보드만 활성으로 본다.
+        OR: [{ assignmentDeadline: null }, { assignmentDeadline: { lt: tomorrow } }],
+      },
+    },
+    select: {
+      boardId: true,
+      studentId: true,
+      submissionStatus: true,
+      board: { select: { title: true, assignmentDeadline: true } },
+    },
+  }).then((rows) =>
+    rows.map((row) => ({
+      boardId: row.boardId,
+      boardTitle: row.board.title,
+      boardDeadline: row.board.assignmentDeadline,
+      studentId: row.studentId,
+      submissionStatus: row.submissionStatus,
+    })),
+  );
+}
+
+/**
+ * 슬롯이 미제출인지 판정. assignment-state 의 SUBMISSION_STATUS 와 같은
+ * 의미이지만 서버 사이드에서 단일 출처로 굳이 import 하지 않고 enum 값을
+ * 하드코딩한다 (v1: assigned/returned/orphaned 만 미제출로 간주).
+ */
+function isSlotMissing(submissionStatus: string): boolean {
+  return (
+    submissionStatus === "assigned" ||
+    submissionStatus === "returned" ||
+    submissionStatus === "orphaned"
+  );
 }

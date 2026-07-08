@@ -3362,7 +3362,16 @@
 }
 
 .check-roster-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
   border-bottom: 1px solid var(--color-border);
+  padding-right: 8px;
+}
+
+.check-roster-row .check-roster-toggle {
+  flex: 1;
+  min-width: 0;
 }
 
 .check-roster-toggle {
@@ -4379,7 +4388,12 @@
 }
 
 .morning-panel {
-  min-height: 120px;
+  position: relative;
+  min-height: 240px;
+}
+
+.morning-panel .classroom-dashboard-panel-head {
+  align-items: center;
 }
 
 .morning-panel .classroom-dashboard-panel-head h3 {
@@ -5007,4 +5021,142 @@
   .avatar-exhibit-name {
     font-size: 13px;
   }
+}
+
+/* ---- Date navigation (좌우 화살표) ----------------------------------- */
+.date-nav {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  margin-top: 2px;
+.date-nav-btn {
+  display: inline;
+
+  width: auto;
+  height: auto;
+  border: none;
+  border-radius: 0;
+  background: none;
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0 4px;
+  transform: translateY(-1px);
+  vertical-align: middle;
+  transition: none;
+  padding: 0 2px;
+}
+.date-nav-btn:hover {
+  color: var(--color-primary);
+  border-color: var(--color-text-muted);
+}
+.date-nav-btn:active {
+  color: var(--color-primary);
+}
+.date-nav-label {
+  font-size: 15px;
+  font-weight: 700;
+  min-width: 44px;
+  text-align: center;
+  line-height: 1.2;
+  user-select: none;
+}
+
+
+
+/* ---- Date navigation + panel toggle --------------------------------- */
+.date-nav {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  margin-top: 2px;
+}
+.date-nav-btn {
+  display: inline;
+  width: auto;
+  height: auto;
+  border: none;
+  border-radius: 0;
+  background: none;
+  color: var(--color-text);
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0 2px;
+  transform: translateY(-1px);
+  vertical-align: middle;
+  transition: none;
+}
+.date-nav-btn:hover {
+  color: var(--color-primary);
+}
+.date-nav-btn:active {
+  color: var(--color-primary);
+}
+.date-nav-label {
+  font-size: 15px;
+  font-weight: 700;
+  min-width: 44px;
+  text-align: center;
+  line-height: 1.2;
+  user-select: none;
+}
+
+/* Panel body with max-height and toggle */
+.morning-panel-body {
+  position: relative;
+  max-height: 240px;
+  overflow: hidden;
+  transition: max-height 250ms ease;
+}
+.morning-panel-body.is-expanded {
+  max-height: none;
+}
+.morning-panel-body {
+  position: relative;
+}
+.morning-panel-body.is-expanded {
+  max-height: none !important;
+}
+.morning-panel-body.is-expanded .morning-panel-body-fade {
+  opacity: 0;
+  pointer-events: none;
+}
+.morning-panel-toggle-wrap {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  display: flex;
+  justify-content: center;
+  align-items: flex-end;
+  height: 48px;
+  background: linear-gradient(to bottom, transparent, var(--color-surface));
+  pointer-events: none;
+}
+.morning-panel-body.is-expanded .morning-panel-toggle-wrap {
+  position: static;
+  height: auto;
+  background: none;
+  padding: 4px 0 0;
+  pointer-events: auto;
+}
+.morning-panel-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: auto;
+  height: auto;
+  border: none;
+  background: none;
+  color: var(--color-text-muted);
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+  pointer-events: auto;
+  padding: 8px 12px;
+  transition: color 120ms ease;
+}
+.morning-panel-toggle:hover {
+  color: var(--color-text);
 }

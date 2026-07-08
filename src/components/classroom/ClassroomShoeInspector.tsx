@@ -11,6 +11,26 @@ type Props = { classroomId: string };
 
 export function ClassroomShoeInspector({ classroomId }: Props) {
   const [roster, setRoster] = useState<ShoeRosterEntry[]>([]);
+  function formatDateNav(dateStr: string): string {
+    const d = new Date(dateStr + "T00:00:00");
+    return `${d.getMonth() + 1}월 ${d.getDate()}일`;
+  }
+  function prevDay(dateStr: string): string {
+    const d = new Date(dateStr + "T00:00:00");
+    d.setDate(d.getDate() - 1);
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, "0");
+    const dd = String(d.getDate()).padStart(2, "0");
+    return `${y}-${m}-${dd}`;
+  }
+  function nextDay(dateStr: string): string {
+    const d = new Date(dateStr + "T00:00:00");
+    d.setDate(d.getDate() + 1);
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, "0");
+    const dd = String(d.getDate()).padStart(2, "0");
+    return `${y}-${m}-${dd}`;
+  }
   const [draft, setDraft] = useState<Record<string, boolean>>({});
   const [loaded, setLoaded] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -18,10 +38,10 @@ export function ClassroomShoeInspector({ classroomId }: Props) {
   const [toast, setToast] = useState<string | null>(null);
   const [date, setDate] = useState<string | null>(null);
 
-  const refresh = useCallback(async () => {
+  const refresh = useCallback(async (selectedDate?: string | null) => {
     setError(null);
     try {
-      const data = await fetchShoeRoster(classroomId);
+      const data = await fetchShoeRoster(classroomId, selectedDate ?? null);
       setRoster(data.roster);
       setDate(data.date);
       const next: Record<string, boolean> = {};
@@ -38,8 +58,8 @@ export function ClassroomShoeInspector({ classroomId }: Props) {
 
   useEffect(() => {
     setLoaded(false);
-    refresh();
-  }, [refresh]);
+    refresh(date);
+  }, [refresh]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const flaggedCount = useMemo(
     () => Object.values(draft).filter(Boolean).length,
@@ -69,7 +89,7 @@ export function ClassroomShoeInspector({ classroomId }: Props) {
     setError(null);
     setToast(null);
     try {
-      await saveShoeFindings(classroomId, findings);
+      await saveShoeFindings(classroomId, findings, date ?? null);
       setToast("저장되었습니다");
       await refresh();
     } catch (e) {
@@ -84,11 +104,13 @@ export function ClassroomShoeInspector({ classroomId }: Props) {
       <header className="check-header">
         <div>
           <h2>실내화 정리 검사</h2>
-          {date && (
-            <p className="cleaning-inspector-date">
-              {new Date(date).toLocaleDateString("ko-KR")} 기준
-            </p>
-          )}
+        </div>
+        <div className="check-header-actions">
+              <div className="date-nav">
+                <button type="button" className="date-nav-btn" onClick={() => setDate(prevDay(date ?? ''))}>‹</button>
+                <span className="date-nav-label">{formatDateNav(date ?? '')}</span>
+                <button type="button" className="date-nav-btn" onClick={() => setDate(nextDay(date ?? ''))}>›</button>
+              </div>
         </div>
       </header>
 
@@ -168,3 +190,5 @@ export function ClassroomShoeInspector({ classroomId }: Props) {
     </section>
   );
 }
+
+
