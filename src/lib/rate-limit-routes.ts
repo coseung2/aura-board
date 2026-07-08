@@ -131,3 +131,59 @@ export function limitBillingCheckout(userId: string): Promise<LimitVerdict> {
 export function limitBillingRefund(userId: string): Promise<LimitVerdict> {
   return runLimit("rl:billing-refund", userId, 5, "1 h");
 }
+
+/**
+ * student-auth-fail-closed: 학급 단위 코드 로그인 스파이크 / 단일 IP
+ * bruteforce를 동시에 막기 위해 IP 축과 정규화된 토큰/코드 축을 모두
+ * 검사한다. 둘 중 하나라도 한도 초과면 429. 학교/학원 NAT 환경에서
+ * 수십 명이 같은 공인 IP로 동시에 들어올 수 있으므로 IP 축은 넉넉하게
+ * 두고, 코드/토큰 축으로 bruteforce를 더 강하게 잡는다. 둘 중 어느 축이
+ * 먼저 닫혔는지는 `axis`로 함께 반환해 로그를 남길 수 있게 한다.
+ */
+export async function limitStudentAuth(opts: {
+  ipKey: string;
+  tokenKey: string;
+}): Promise<LimitVerdict & { axis?: "ip" | "token" }> {
+  // 400-student rollout: school NAT can collapse a whole cohort to one IP.
+  const [ip, token] = await Promise.all([
+    runLimit("rl:student-auth:ip", opts.ipKey, 900, "60 s"),
+    runLimit("rl:student-auth:token", opts.tokenKey, 50, "60 s"),
+  ]);
+  if (!ip.ok) return { ok: false, retryAfter: ip.retryAfter, axis: "ip" };
+  if (!token.ok) {
+    return { ok: false, retryAfter: token.retryAfter, axis: "token" };
+  }
+  return { ok: true, retryAfter: 0 };
+}
+
+/**
+ * upload-server-cap-4mb: 업로드 라우트는 인증된 사용자/학생 단위와
+ * IP 단위 모두에서 상한을 둔다. actor 축은 분당 20회로 좁게 막고,
+ * 400+ 학생이 같은 학교 NAT에 묶일 수 있어 IP 축은 분당 900회로 둔다.
+ */
+export async function limitUpload(opts: {
+  actorKey: string;
+  ipKey: string;
+}): Promise<LimitVerdict & { axis?: "actor" | "ip" }> {
+  // 400-student rollout: keep the IP axis broad; actor axis catches spam.
+  const [actor, ip] = await Promise.all([
+    runLimit("rl:upload:actor", opts.actorKey, 20, "60 s"),
+    runLimit("rl:upload:ip", opts.ipKey, 900, "60 s"),
+  ]);
+  if (!actor.ok) {
+    return { ok: false, retryAfter: actor.retryAfter, axis: "actor" };
+  }
+  if (!ip.ok) {
+    return { ok: false, retryAfter: ip.retryAfter, axis: "ip" };
+  }
+  return { ok: true, retryAfter: 0 };
+}
+
+/**
+ * Per-student speed-game answer throttle. Keep the IP axis out of this one:
+ * a whole classroom can share one school NAT while each student should only
+ * need a handful of answer attempts per minute.
+ */
+export function limitSpeedGameAnswer(studentGameKey: string): Promise<LimitVerdict> {
+  return runLimit("rl:speed-game:answer", studentGameKey, 30, "60 s");
+}

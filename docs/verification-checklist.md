@@ -42,6 +42,24 @@ creating overlapping testing-notes documents.
 - Inspect production data shape when the symptom is data-dependent.
 - Re-test the exact route, board, classroom, or student flow named by the user.
 
+## 400+ Student Rollout
+
+- Confirm production `DATABASE_URL` uses the Supabase IPv4 transaction pooler
+  with Prisma PgBouncer mode enabled, and scan Vercel logs for both
+  `Can't reach database server` and `prepared statement ... already exists`.
+- Confirm shared rate limiting is configured in production; in-memory
+  fallbacks are not enough for multi-instance Vercel traffic. Validate that
+  IP-axis limits tolerate a 400+ student same-NAT burst.
+- Test a same-class login burst with the student fixture and at least one real
+  classroom code path, then check `/api/student/auth` error and 429 logs.
+- Test upload round trips with images below 4 MB, oversized images that can be
+  client-compressed, and non-image files above 4 MB so the UI shows a clear
+  rejection instead of hanging.
+- For stream-heavy classes, open a board with multiple viewers and confirm
+  idle streams produce cheap version probes rather than repeated full snapshots;
+  confirm speed-game answer writes bump `SpeedGame.updatedAt`, then run a
+  separate load test before using speed-game with a whole cohort.
+
 ## Test Fixtures
 
 - Student login code: `DCY366`

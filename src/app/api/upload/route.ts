@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { randomBytes } from "crypto";
+import { createHash } from "crypto";
 import { getCurrentUser } from "@/lib/auth";
 import { getCurrentStudent } from "@/lib/student-auth";
 import { ALLOWED_FILE_MIMES, isAllowedFileUpload, normalizeUploadMime } from "@/lib/file-attachment";
@@ -7,6 +8,22 @@ import { ALLOWED_IMAGE, ALLOWED_VIDEO, MAX_SIZE, UploadPolicyError } from "./upl
 import { resizeBufferToWebPPreview, uploadWebPBuffer, extractVideoThumbnail } from "@/lib/blob";
 import { logError } from "@/lib/error-log";
 import { uploadPublicObject } from "@/lib/media-storage";
+import { limitUpload } from "@/lib/rate-limit-routes";
+
+// upload-server-cap-4mb: multipart boundary + 헤더 오버헤드(~32KB)를
+// 더해 pre-check한다. 실제 파일 본문은 formData 파싱 후 MAX_SIZE로
+// 한 번 더 검증한다.
+const CONTENT_LENGTH_OVERHEAD = 32 * 1024;
+
+function clientIpFor(req: Request): string {
+  const xff = req.headers.get("x-forwarded-for");
+  if (xff) return xff.split(",")[0].trim();
+  return (
+    req.headers.get("x-real-ip")?.trim() ||
+    req.headers.get("x-vercel-forwarded-for")?.trim() ||
+    "0.0.0.0"
+  );
+}
 
 /**
  * card-file-attachment — 매직바이트 검증.
@@ -78,6 +95,40 @@ export async function POST(req: Request) {
       );
     }
 
+    // upload-server-cap-4mb: Content-Length 헤더로 4MB + boundary 여유를
+    // 넘는 요청은 본문을 읽기 전에 413으로 거절한다. Vercel 함수가 메모리에
+    // formData를 다 파싱하기 전에 끊어 cold-start 비용을 아낀다.
+    const contentLengthHeader = req.headers.get("content-length");
+    if (contentLengthHeader) {
+      const declared = Number.parseInt(contentLengthHeader, 10);
+      if (Number.isFinite(declared) && declared > MAX_SIZE + CONTENT_LENGTH_OVERHEAD) {
+        const mb = (declared / 1024 / 1024).toFixed(1);
+        return NextResponse.json(
+          {
+            error: `파일이 너무 큽니다 (${mb}MB). 이 업로드 라우트는 최대 4MB까지만 지원해요.`,
+          },
+          { status: 413 },
+        );
+      }
+    }
+
+    // upload-server-cap-4mb: per-actor + per-IP rate limit. 인증된 사용자/
+    // 학생 단위와 IP 단위를 모두 본다. formData 파싱 전에 검사해 차단된
+    // 요청에 4MB 메모리 할당이 일어나지 않게 한다.
+    const ipHash = createHash("sha256")
+      .update(clientIpFor(req))
+      .digest("hex")
+      .slice(0, 16);
+    const actorKey =
+      userId != null ? `actor:${userId}` : `ip-only:${ipHash}`;
+    const rl = await limitUpload({ actorKey, ipKey: `ip:${ipHash}` });
+    if (!rl.ok) {
+      return NextResponse.json(
+        { error: "rate_limited", axis: rl.axis, retryAfter: rl.retryAfter },
+        { status: 429, headers: { "Retry-After": String(rl.retryAfter) } },
+      );
+    }
+
     // multipart 경로 — 서버 검증 후 Supabase Storage canonical 저장소에 업로드.
     const formData = await req.formData();
     const file = formData.get("file") as File | null;
@@ -90,11 +141,15 @@ export async function POST(req: Request) {
       fileType: file.type,
     };
 
+    // formData 파싱 후 본문 사이즈 재검증. Content-Length가 없거나 변조된
+    // 경우에도 MAX_SIZE(4MB) 초과를 413으로 거절한다.
     if (file.size > MAX_SIZE) {
       console.error(`[upload reject] oversize name=${file.name} size=${file.size} type=${file.type}`);
       return NextResponse.json(
-        { error: `파일이 너무 큽니다 (${(file.size / 1024 / 1024).toFixed(1)}MB, 최대 50MB)` },
-        { status: 400 }
+        {
+          error: `파일이 너무 큽니다 (${(file.size / 1024 / 1024).toFixed(1)}MB). 이 업로드 라우트는 최대 4MB까지만 지원해요.`,
+        },
+        { status: 413 }
       );
     }
 

@@ -13,6 +13,7 @@ export type UploadedFile = {
 
 const LARGE_IMAGE_REENCODE_THRESHOLD = 4 * 1024 * 1024;
 const TARGET_MULTIPART_IMAGE_BYTES = 3.5 * 1024 * 1024;
+const MAX_MULTIPART_UPLOAD_BYTES = 4 * 1024 * 1024;
 const MAX_REENCODED_IMAGE_PIXELS = 4_000_000;
 
 /**
@@ -29,6 +30,13 @@ export async function uploadFile(file: File): Promise<UploadedFile> {
   const mimeType = normalizeUploadMime(targetFile.type ?? "", targetFile.name) ||
     mimeFromExtension(targetFile.name) ||
     "application/octet-stream";
+
+  if (targetFile.size > MAX_MULTIPART_UPLOAD_BYTES) {
+    const mb = (targetFile.size / 1024 / 1024).toFixed(1);
+    throw new Error(
+      `파일이 너무 큽니다 (${mb}MB). 현재 첨부는 4MB 이하 파일만 지원해요.`,
+    );
+  }
 
   const form = new FormData();
   form.append("file", targetFile);

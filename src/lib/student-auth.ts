@@ -4,7 +4,21 @@ import { createHmac, timingSafeEqual } from "crypto";
 import { db } from "./db";
 import { getCurrentUser } from "./auth";
 
-const SECRET = process.env.AUTH_SECRET ?? "dev-secret";
+// student-auth-fail-closed: HMAC 서명 키는 운영에서 절대 디폴트 값을 쓰면 안
+// 된다. AUTH_SECRET이 비어있거나 너무 짧거나 dev-* 자리표시자이면
+// sign/verify 시점에 throw 해서 fail-closed 한다. dev/test는 의도적으로
+// 비워두는 경우가 많으므로 NODE_ENV !== "production"일 때만 폴백을 허용.
+function resolveSecret(): string {
+  const raw = process.env.AUTH_SECRET?.trim();
+  const isProd = process.env.NODE_ENV === "production";
+  if (raw && raw.length >= 16 && !raw.startsWith("dev-")) return raw;
+  if (isProd) {
+    throw new Error(
+      "[student-auth] AUTH_SECRET is missing or unsafe in production; refusing to sign/verify student sessions.",
+    );
+  }
+  return "dev-secret";
+}
 const COOKIE_NAME = "student_session";
 const MAX_AGE = 30 * 24 * 60 * 60; // 30 days
 const USE_SECURE_STUDENT_COOKIE = process.env.NODE_ENV === "production";
@@ -19,14 +33,24 @@ interface StudentPayload {
 function sign(payload: StudentPayload): string {
   const json = JSON.stringify(payload);
   const b64 = Buffer.from(json).toString("base64url");
-  const sig = createHmac("sha256", SECRET).update(b64).digest("base64url");
+  const sig = createHmac("sha256", resolveSecret()).update(b64).digest("base64url");
   return `${b64}.${sig}`;
 }
 
 function verify(token: string): StudentPayload | null {
   const [b64, sig] = token.split(".");
   if (!b64 || !sig) return null;
-  const expected = createHmac("sha256", SECRET).update(b64).digest("base64url");
+  // student-auth-fail-closed: 운영에서 AUTH_SECRET이 없거나 unsafe면
+  // resolveSecret()가 throw 한다. 이 경우 토큰을 "검증 불가"로 간주해
+  // 401(미인증)로 매핑되게 한다 — 라우트가 500을 돌려주며 디버깅 신호가
+  // 묻히지 않게 sign()은 그대로 throw 한다.
+  let secret: string;
+  try {
+    secret = resolveSecret();
+  } catch {
+    return null;
+  }
+  const expected = createHmac("sha256", secret).update(b64).digest("base64url");
   const sigBuf = Buffer.from(sig);
   const expBuf = Buffer.from(expected);
   if (sigBuf.length !== expBuf.length || !timingSafeEqual(sigBuf, expBuf)) return null;

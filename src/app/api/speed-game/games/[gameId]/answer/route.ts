@@ -15,6 +15,7 @@ import { z } from "zod";
 import { db } from "@/lib/db";
 import { getCurrentStudent } from "@/lib/student-auth";
 import { jsonPrivateNoStore } from "@/lib/http-cache";
+import { limitSpeedGameAnswer } from "@/lib/rate-limit-routes";
 import {
   answersMatch,
   computeScore,
@@ -78,6 +79,14 @@ export async function POST(req: Request, { params }: Params) {
   }
 
   // 학생 모둠 결정.
+  const rl = await limitSpeedGameAnswer(`${gameId}:${student.id}`);
+  if (!rl.ok) {
+    return jsonPrivateNoStore(
+      { error: "rate_limited", retryAfter: rl.retryAfter },
+      { status: 429, headers: { "Retry-After": String(rl.retryAfter) } },
+    );
+  }
+
   const studentGroupId = await resolveStudentGroupId(game.boardId, student.id);
   if (!studentGroupId) {
     return jsonPrivateNoStore({ error: "student_has_no_group" }, { status: 400 });
@@ -181,34 +190,46 @@ export async function POST(req: Request, { params }: Params) {
       ? "rejected"
       : "pending";
 
-  const upserted = await db.speedGameAnswer.upsert({
-    where: { roundId_groupId: { roundId: round.id, groupId } },
-    create: {
-      roundId: round.id,
-      groupId,
-      studentId: student.id,
-      correct: isCorrect,
-      score,
-      approval,
-      rawText,
-      elapsedMs,
-    },
-    update: {
-      correct: isCorrect,
-      score,
-      approval,
-      rawText,
-      elapsedMs,
-      // createdAt 은 유지 — 첫 제출 시각 기준.
-    },
-    select: {
-      id: true,
-      correct: true,
-      score: true,
-      approval: true,
-      elapsedMs: true,
-      createdAt: true,
-    },
+  const upserted = await db.$transaction(async (tx) => {
+    const answer = await tx.speedGameAnswer.upsert({
+      where: { roundId_groupId: { roundId: round.id, groupId } },
+      create: {
+        roundId: round.id,
+        groupId,
+        studentId: student.id,
+        correct: isCorrect,
+        score,
+        approval,
+        rawText,
+        elapsedMs,
+        speedGameId: game.id,
+      },
+      update: {
+        correct: isCorrect,
+        score,
+        approval,
+        rawText,
+        elapsedMs,
+        speedGameId: game.id,
+        // createdAt 은 유지 — 첫 제출 시각 기준.
+      },
+      select: {
+        id: true,
+        correct: true,
+        score: true,
+        approval: true,
+        elapsedMs: true,
+        createdAt: true,
+      },
+    });
+
+    await tx.speedGame.update({
+      where: { id: game.id },
+      data: { updatedAt: now },
+      select: { id: true },
+    });
+
+    return answer;
   });
 
   // wire DTO 는 src/components/speed-game/types.ts SpeedGameAnswer 와 일치.

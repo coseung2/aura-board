@@ -3,12 +3,14 @@ import {
   isAllowedFileUpload,
 } from "@/lib/file-attachment";
 
+// upload-server-cap-4mb: SVG는 내부 sanitizer가 없는 환경에서 stored-XSS
+// (script/onload) 표면이 되기 쉽다. 현재 코드베이스에 SVG 살균기가 없는
+// 한 화이트리스트에서 제외한다. 별도 sanitizer 도입 시 다시 허용 검토.
 export const ALLOWED_IMAGE = [
   "image/jpeg",
   "image/png",
   "image/gif",
   "image/webp",
-  "image/svg+xml",
   "image/heic",
   "image/heif",
 ] as const;
@@ -19,7 +21,12 @@ export const ALLOWED_VIDEO = [
   "video/quicktime",
 ] as const;
 
-export const MAX_SIZE = 50 * 1024 * 1024;
+// upload-server-cap-4mb: Vercel serverless 함수 본문 한도(4.5MB)와
+// formData 파싱 메모리 부담을 고려해 이 라우트의 실제 상한은 4MB.
+// 50MB는 Vercel에서 413을 만들 거리를 미리 차단하는 의미 있는 변경이다.
+// 직접 업로드(direct upload) 토큰 빌더도 같은 상수를 재사용하므로
+// 미래의 direct-upload 복귀 시에도 동일하게 4MB가 적용된다.
+export const MAX_SIZE = 4 * 1024 * 1024;
 
 export type UploadKind = "image" | "video" | "file";
 

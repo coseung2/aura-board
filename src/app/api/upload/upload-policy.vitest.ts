@@ -112,3 +112,21 @@ describe("upload-policy · buildUploadPolicy (FUNCTION_PAYLOAD_TOO_LARGE 회귀)
     expect(() => buildUploadPolicy("uploads/a.pdf", "{}")).toThrow(/clientPayload/);
   });
 });
+
+describe("upload-policy · image allowlist (upload-server-cap-4mb / SVG 차단)", () => {
+  it("ALLOWED_IMAGE은 SVG를 더 이상 포함하지 않는다 — sanitizer 없음", () => {
+    expect(ALLOWED_IMAGE as readonly string[]).not.toContain("image/svg+xml");
+  });
+
+  it("SVG 페이로드는 이미지 토큰 발급 거부", () => {
+    expect(() =>
+      buildUploadPolicy("uploads/evil.svg", payloadFor("image/svg+xml")),
+    ).toThrow(/지원하지 않는/);
+  });
+
+  it("MAX_SIZE은 4MB — Vercel 함수 본문 한도(4.5MB)와 정합", () => {
+    // upload-server-cap-4mb: 4MB(=4*1024*1024). 50MB가 아니어야 한다.
+    expect(MAX_SIZE).toBe(4 * 1024 * 1024);
+    expect(MAX_SIZE).toBeLessThan(50 * 1024 * 1024);
+  });
+});

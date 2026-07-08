@@ -1,12 +1,43 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
+import { createHash } from "crypto";
 import { z } from "zod";
 import { db } from "@/lib/db";
 import { createStudentSession } from "@/lib/student-auth";
+import { limitStudentAuth } from "@/lib/rate-limit-routes";
 
+// student-auth-fail-closed: 텍스트 코드 bruteforce / 학급 단위 로그인
+// 스파이크를 동시에 막기 위해 입력 길이에 상한을 두고 트림한다. 기존 정상
+// 사용(영숫자 코드 4~8자 + QR 토큰 64자)에는 영향 없음.
 const AuthSchema = z.object({
-  token: z.string().min(1),
+  token: z
+    .string()
+    .min(1)
+    .max(128)
+    .transform((s) => s.trim())
+    .refine((s) => s.length >= 1 && s.length <= 128, {
+      message: "token length must be 1..128",
+    }),
 });
+
+/** 학급 한정 4~8자 대문자 코드는 입력 그대로, 그 외(QR 토큰 등)는
+ *  sha256 hex 16자 해시로 축약해 Upstash 키 카디널리티와 PII 노출을
+ *  동시에 줄인다. */
+function normalizeTokenKey(raw: string): string {
+  const compact = raw.replace(/\s+/g, "").toUpperCase();
+  if (/^[A-Z0-9]{2,16}$/.test(compact)) return compact;
+  return createHash("sha256").update(compact).digest("hex").slice(0, 16);
+}
+
+function clientIpFor(req: Request): string {
+  const xff = req.headers.get("x-forwarded-for");
+  if (xff) return xff.split(",")[0].trim();
+  return (
+    req.headers.get("x-real-ip")?.trim() ||
+    req.headers.get("x-vercel-forwarded-for")?.trim() ||
+    "0.0.0.0"
+  );
+}
 
 // Student code login is an explicit identity switch. Clear Auth.js teacher
 // cookies too, otherwise getCurrentStudent() will ignore the new student cookie
@@ -32,8 +63,21 @@ function authCookieNeedsSecureDelete(name: string) {
 
 export async function POST(req: Request) {
   try {
+    // student-auth-fail-closed: 학급 단위 코드 로그인 스파이크 / IP
+    // bruteforce를 동시에 막기 위해 IP와 정규화된 토큰/코드 축을 함께
+    // 검사한다. 학교 NAT를 고려해 IP 축은 넉넉하게, 코드 축은 더 좁게 둔다.
     const body = await req.json();
     const { token } = AuthSchema.parse(body);
+    const rl = await limitStudentAuth({
+      ipKey: clientIpFor(req),
+      tokenKey: normalizeTokenKey(token),
+    });
+    if (!rl.ok) {
+      return NextResponse.json(
+        { error: "rate_limited", axis: rl.axis, retryAfter: rl.retryAfter },
+        { status: 429, headers: { "Retry-After": String(rl.retryAfter) } },
+      );
+    }
 
     // Try qrToken first, then textCode
     let student = await db.student.findUnique({ where: { qrToken: token } });

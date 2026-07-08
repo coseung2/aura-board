@@ -22,13 +22,25 @@ const ALLOWED_IMAGE = new Set([
   "image/heic",
   "image/heif",
 ]);
-const MAX_SIZE = 50 * 1024 * 1024; // 50MB — parity with /api/upload
+const MAX_SIZE = 4 * 1024 * 1024;
+const CONTENT_LENGTH_OVERHEAD = 32 * 1024;
 
 export async function POST(req: Request) {
   try {
     const student = await getCurrentStudent();
     if (!student) {
       return NextResponse.json({ error: "Student session required" }, { status: 401 });
+    }
+
+    const contentLengthHeader = req.headers.get("content-length");
+    if (contentLengthHeader) {
+      const declared = Number.parseInt(contentLengthHeader, 10);
+      if (Number.isFinite(declared) && declared > MAX_SIZE + CONTENT_LENGTH_OVERHEAD) {
+        return NextResponse.json(
+          { error: "File too large. Student asset uploads support up to 4MB." },
+          { status: 413 },
+        );
+      }
     }
 
     const form = await req.formData();
@@ -38,7 +50,10 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "No file provided" }, { status: 400 });
     }
     if (file.size > MAX_SIZE) {
-      return NextResponse.json({ error: "File too large (max 50MB)" }, { status: 400 });
+      return NextResponse.json(
+        { error: "File too large. Student asset uploads support up to 4MB." },
+        { status: 413 },
+      );
     }
     const normalizedMime = normalizeUploadMime(file.type ?? "", file.name);
     if (!ALLOWED_IMAGE.has(normalizedMime)) {
