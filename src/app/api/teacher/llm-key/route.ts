@@ -13,7 +13,8 @@ import { encryptApiKey, last4 } from "@/lib/llm/encryption";
 import { verifyApiKey, type LlmProvider } from "@/lib/llm/stream";
 import { limitLlmKeyMutation } from "@/lib/rate-limit-routes";
 
-const PROVIDERS = ["claude", "openai", "gemini", "ollama", "opencode-go"] as const;
+// 2026-07-08: claude/openai/ollama 옵션 제거 — 두 옵션만 지원
+const PROVIDERS = ["gemini", "opencode-go"] as const;
 
 // ollama 는 apiKey 선택, baseUrl + modelId 필수. 다른 provider 는 apiKey 필수.
 const SaveSchema = z.object({
@@ -21,14 +22,9 @@ const SaveSchema = z.object({
   apiKey: z.string().trim().max(500).optional().default(""),
   baseUrl: z.string().trim().url().max(500).optional(),
   modelId: z.string().trim().min(1).max(200).optional(),
-});
-
-function keyShapeOk(provider: LlmProvider, key: string): boolean {
+});function keyShapeOk(provider: LlmProvider, key: string): boolean {
   // 가벼운 sanity check. 형식이 완전하지 않아도 검증은 verifyApiKey가 처리.
-  if (provider === "claude") return key.startsWith("sk-ant-");
-  if (provider === "openai") return key.startsWith("sk-");
   if (provider === "gemini") return key.startsWith("AIza") || key.length >= 30;
-  if (provider === "ollama") return true; // key 없어도 OK
   if (provider === "opencode-go") return true; // key 불필요
   return false;
 }
@@ -91,14 +87,7 @@ export async function POST(req: Request) {
   const hasExistingKey = !!(existingKey?.apiKeyEnc);
   const isNewKey = !!apiKey;
 
-  if (provider === "ollama") {
-    if (!baseUrl || !modelId) {
-      return new Response(
-        JSON.stringify({ error: "ollama_missing_fields", detail: "baseUrl, modelId 필수" }),
-        { status: 400, headers: { "Content-Type": "application/json" } },
-      );
-    }
-  } else if (provider === "opencode-go") {
+  if (provider === "opencode-go") {
     if (!modelId) {
       return new Response(
         JSON.stringify({ error: "opencode_missing_fields", detail: "modelId 필수" }),
@@ -112,6 +101,7 @@ export async function POST(req: Request) {
       );
     }
   } else {
+    // gemini: 표준 검증
     if (isNewKey && apiKey.length < 8) {
       return new Response(
         JSON.stringify({ error: "api_key_required" }),
@@ -153,7 +143,7 @@ export async function POST(req: Request) {
     tail = existingKey!.last4;
   } else {
     enc = "";
-    tail = provider === "ollama" ? "ollama" : "";
+    tail = "";
   }
 
   const saved = await db.teacherLlmKey.upsert({
