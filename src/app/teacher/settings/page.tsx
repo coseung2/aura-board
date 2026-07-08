@@ -40,7 +40,7 @@ export default async function TeacherSettingsPage() {
           </p>
           <LlmKeyForm />
         </section>
-        <TeacherWithdrawalSection />
+        <TeacherWithdrawalSection email={user.email} />
       </article>
       </main>
     </>

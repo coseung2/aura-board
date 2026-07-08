@@ -1,15 +1,28 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { signOut } from "next-auth/react";
 
-export function TeacherWithdrawalSection() {
+type Props = {
+  // ???? ?? ???. ???? @ ???? ?? ???? ????.
+  email: string;
+};
+
+export function TeacherWithdrawalSection({ email }: Props) {
   const [showModal, setShowModal] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [confirmInput, setConfirmInput] = useState("");
+
+  const expectedLocalPart = useMemo(
+    () => (email ?? "").split("@")[0] ?? "",
+    [email],
+  );
+  const isConfirmed = confirmInput.trim() === expectedLocalPart;
 
   async function handleWithdraw() {
     if (busy) return;
+    if (!isConfirmed) return;
     setBusy(true);
     setError(null);
     try {
@@ -24,7 +37,7 @@ export function TeacherWithdrawalSection() {
       };
       if (!res.ok || !data.ok) {
         throw new Error(
-          data.detail ?? data.error ?? "탈퇴 처리 중 오류가 발생했습니다.",
+          data.detail ?? data.error ?? "?? ?? ? ??? ??????.",
         );
       }
       await signOut({ redirectTo: "/" });
@@ -33,27 +46,34 @@ export function TeacherWithdrawalSection() {
       setError(
         err instanceof Error
           ? err.message
-          : "탈퇴 처리 중 오류가 발생했습니다.",
+          : "?? ?? ? ??? ??????.",
       );
     }
+  }
+
+  function closeModal() {
+    if (busy) return;
+    setShowModal(false);
+    setConfirmInput("");
+    setError(null);
   }
 
   return (
     <>
       <section id="withdrawal" className="docs-section settings-section">
         <div className="settings-section-header">
-          <h2 className="docs-h2">계정 탈퇴</h2>
+          <h2 className="docs-h2">?? ??</h2>
         </div>
         <p className="docs-p">
-          탈퇴하면 내 학급, 학생, 보드, 카드, AI 평어 기록 등 모든 데이터가
-          영구적으로 삭제되며 복구할 수 없습니다.
+          ???? ??? ??? ?? ???? ????? ???? ??? ?
+          ????.
         </p>
         <button
           type="button"
           className="settings-action-btn is-danger withdrawal-trigger-btn"
           onClick={() => setShowModal(true)}
         >
-          탈퇴하기
+          ????
         </button>
       </section>
 
@@ -61,50 +81,59 @@ export function TeacherWithdrawalSection() {
         <div
           className="modal-backdrop"
           onClick={(e) => {
-            if (e.target === e.currentTarget && !busy) {
-              setShowModal(false);
-            }
+            if (e.target === e.currentTarget) closeModal();
           }}
         >
-          <div className="add-card-modal">
+          <div className="add-card-modal withdrawal-modal">
             <div className="modal-header">
-              <h3 className="modal-title">정말 탈퇴하시겠어요?</h3>
+              <h3 className="modal-title">?? ????????</h3>
               <button
                 type="button"
                 className="modal-close"
-                onClick={() => setShowModal(false)}
+                onClick={closeModal}
                 disabled={busy}
-                aria-label="닫기"
+                aria-label="??"
               />
             </div>
             <div className="modal-body">
-              <p className="docs-p docs-note withdrawal-warning">
-                탈퇴 즉시 아래 데이터가 영구 삭제되며 복구가 불가능합니다.
+              <p className="docs-p">
+                ????? ??? <strong>{email}</strong> ? @ ???(
+                <code className="docs-code">{expectedLocalPart}</code>)?
+                ??? ?????.
               </p>
-              <ul className="withdrawal-list">
-                <li>내가 만든 모든 학급과 학생 정보</li>
-                <li>학급 보드, 카드, 댓글, 좋아요 기록</li>
-                <li>AI 평어, 채점/피드백 기록</li>
-                <li>결제/구독 기록 및 청구 정보</li>
-              </ul>
+              <label className="withdrawal-confirm-field">
+                <span className="withdrawal-confirm-label">
+                  ??? @ ??? ??
+                </span>
+                <input
+                  type="text"
+                  className="withdrawal-confirm-input"
+                  value={confirmInput}
+                  onChange={(e) => setConfirmInput(e.target.value)}
+                  disabled={busy}
+                  autoComplete="off"
+                  spellCheck={false}
+                  placeholder={expectedLocalPart}
+                />
+              </label>
               {error && <p className="withdrawal-error">{error}</p>}
             </div>
-            <div className="modal-actions">
+            <div className="modal-actions withdrawal-actions">
               <button
                 type="button"
                 className="modal-btn-cancel"
-                onClick={() => setShowModal(false)}
+                onClick={closeModal}
                 disabled={busy}
               >
-                취소
+                ??
               </button>
               <button
                 type="button"
                 className="modal-btn-submit"
                 onClick={handleWithdraw}
-                disabled={busy}
+                disabled={busy || !isConfirmed}
               >
-                {busy ? "탈퇴 처리 중…" : "탈퇴하기"}
+                {busy ? "?? ?? ??" : "????"}
               </button>
             </div>
           </div>
