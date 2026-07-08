@@ -22,7 +22,9 @@ const SaveSchema = z.object({
   apiKey: z.string().trim().max(500).optional().default(""),
   baseUrl: z.string().trim().url().max(500).optional(),
   modelId: z.string().trim().min(1).max(200).optional(),
-});function keyShapeOk(provider: LlmProvider, key: string): boolean {
+});
+
+function keyShapeOk(provider: LlmProvider, key: string): boolean {
   // 가벼운 sanity check. 형식이 완전하지 않아도 검증은 verifyApiKey가 처리.
   if (provider === "gemini") return key.startsWith("AIza") || key.length >= 30;
   if (provider === "opencode-go") return true; // key 불필요

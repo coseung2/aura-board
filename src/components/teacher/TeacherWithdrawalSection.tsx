@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import { signOut } from "next-auth/react";
 
 type Props = {
-  // ???? ?? ???. ???? @ ???? ?? ???? ????.
+  // 로그인된 교사 이메일. 모달에서 @ 앞부분만 다시 입력받아 확인한다.
   email: string;
 };
 
@@ -37,7 +37,7 @@ export function TeacherWithdrawalSection({ email }: Props) {
       };
       if (!res.ok || !data.ok) {
         throw new Error(
-          data.detail ?? data.error ?? "?? ?? ? ??? ??????.",
+          data.detail ?? data.error ?? "탈퇴 처리 중 오류가 발생했습니다.",
         );
       }
       await signOut({ redirectTo: "/" });
@@ -46,7 +46,7 @@ export function TeacherWithdrawalSection({ email }: Props) {
       setError(
         err instanceof Error
           ? err.message
-          : "?? ?? ? ??? ??????.",
+          : "탈퇴 처리 중 오류가 발생했습니다.",
       );
     }
   }
@@ -62,18 +62,17 @@ export function TeacherWithdrawalSection({ email }: Props) {
     <>
       <section id="withdrawal" className="docs-section settings-section">
         <div className="settings-section-header">
-          <h2 className="docs-h2">?? ??</h2>
+          <h2 className="docs-h2">계정 탈퇴</h2>
         </div>
         <p className="docs-p">
-          ???? ??? ??? ?? ???? ????? ???? ??? ?
-          ????.
+          탈퇴하면 계정에 포함된 모든 데이터가 영구적으로 삭제되며 복구할 수 없습니다.
         </p>
         <button
           type="button"
           className="settings-action-btn is-danger withdrawal-trigger-btn"
           onClick={() => setShowModal(true)}
         >
-          ????
+          탈퇴하기
         </button>
       </section>
 
@@ -86,24 +85,24 @@ export function TeacherWithdrawalSection({ email }: Props) {
         >
           <div className="add-card-modal withdrawal-modal">
             <div className="modal-header">
-              <h3 className="modal-title">?? ????????</h3>
+              <h3 className="modal-title">정말 탈퇴하시겠어요?</h3>
               <button
                 type="button"
                 className="modal-close"
                 onClick={closeModal}
                 disabled={busy}
-                aria-label="??"
+                aria-label="닫기"
               />
             </div>
             <div className="modal-body">
               <p className="docs-p">
-                ????? ??? <strong>{email}</strong> ? @ ???(
-                <code className="docs-code">{expectedLocalPart}</code>)?
-                ??? ?????.
+                계속하려면 이메일 <strong>{email}</strong> 의 @ 앞부분(
+                <code className="docs-code">{expectedLocalPart}</code>)을
+                그대로 입력하세요.
               </p>
               <label className="withdrawal-confirm-field">
                 <span className="withdrawal-confirm-label">
-                  ??? @ ??? ??
+                  이메일 @ 앞부분 확인
                 </span>
                 <input
                   type="text"
@@ -125,7 +124,7 @@ export function TeacherWithdrawalSection({ email }: Props) {
                 onClick={closeModal}
                 disabled={busy}
               >
-                ??
+                취소
               </button>
               <button
                 type="button"
@@ -133,7 +132,7 @@ export function TeacherWithdrawalSection({ email }: Props) {
                 onClick={handleWithdraw}
                 disabled={busy || !isConfirmed}
               >
-                {busy ? "?? ?? ??" : "????"}
+                {busy ? "탈퇴 처리 중…" : "탈퇴하기"}
               </button>
             </div>
           </div>
