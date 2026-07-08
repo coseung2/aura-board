@@ -48,4 +48,5 @@ export type BoardSettingsPanelProps = {
   /** 보드의 기본 subjectOrder. 주제 정렬 탭과 학생이름 시드 모달에 사용. */
   initialSubjectOrder?: SubjectOrder | null;
   onAnonymousAuthorChange?: (next: boolean) => void;
+  isAdmin?: boolean;
 };

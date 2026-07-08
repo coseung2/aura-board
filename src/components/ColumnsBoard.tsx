@@ -620,11 +620,11 @@ export function ColumnsBoard({
                   className="column-add-btn column-add-btn-seed"
                   onClick={openSeedDialog}
                   disabled={seedingStudents}
-                  title="학급 학생 명단으로 칼럼을 한 번에 추가"
+                  title="학급 학생 명단으로 섹션을 한 번에 추가"
                 >
                   {seedingStudents
                     ? "추가 중…"
-                    : "🧑 학생 이름으로 칼럼 만들기"}
+                    : "🧑 학생 이름으로 섹션 추가"}
                 </button>
               )}
             </div>

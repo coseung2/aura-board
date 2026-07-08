@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo } from "react";
+import { useRouter } from "next/navigation";
 import { sortSections } from "@/lib/sort-sections";
 import {
   type SubjectOrder,
@@ -56,13 +57,22 @@ export function useSectionMutations({
     () => [...sections].sort(sortSections),
     [sections]
   );
+  const router = useRouter();
   const sectionOptions = sortedSections.map((s) => ({
     id: s.id,
     title: s.title,
   }));
 
   async function handleAddSection() {
-    const title = window.prompt("새 섹션 이름:");
+    // 일부 인앱 브라우저/iframe 환경에서는 window.prompt가 throw 하거나
+    // 차단될 수 있어 try/catch로 안전하게 감싼다.
+    let title: string | null = null;
+    try {
+      title = window.prompt("새 섹션 이름:");
+    } catch (err) {
+      console.warn("[useSectionMutations] window.prompt failed", err);
+      return;
+    }
     if (!title?.trim()) return;
     try {
       const res = await fetch(`/api/sections`, {
@@ -73,6 +83,8 @@ export function useSectionMutations({
       if (res.ok) {
         const { section } = await res.json();
         setSections((prev) => [...prev, section].sort(sortSections));
+        // BoardSettingsPanel의 sections state가 props로 동기화되도록 page 재실행.
+        router.refresh();
       }
     } catch (err) {
       console.error(err);
@@ -136,7 +148,7 @@ export function useSectionMutations({
       );
       if (!res.ok) {
         const msg = (await res.json().catch(() => ({}))).error;
-        alert(typeof msg === "string" ? msg : "칼럼 추가 실패");
+        alert(typeof msg === "string" ? msg : "섹션 추가 실패");
         return;
       }
       const { sections: created } = (await res.json()) as {
@@ -144,6 +156,8 @@ export function useSectionMutations({
         subjectOrder?: SubjectOrder;
       };
       setSections((prev) => [...prev, ...created].sort(sortSections));
+      // BoardSettingsPanel의 sections state가 props로 동기화되도록 page 재실행.
+      router.refresh();
       return created;
     } finally {
       setSeedingStudents(false);

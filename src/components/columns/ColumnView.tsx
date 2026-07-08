@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useRef, useState } from "react";
 import { createPortal, flushSync } from "react-dom";
@@ -777,7 +777,7 @@ function SubmissionStatusModal({
           </div>
           {!hasRoster && (
             <p className="column-submission-note">
-              학급이 연결되지 않은 보드예요. 학생별 제출자/미제출자 현황 대신 이 칼럼의 카드 수를 표시합니다.
+              학급이 연결되지 않은 보드예요. 학생별 제출자/미제출자 현황 대신 이 섹션의 카드 수를 표시합니다.
             </p>
           )}
 

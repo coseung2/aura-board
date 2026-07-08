@@ -32,6 +32,7 @@ type Props = {
   streamSectionsEnabled?: boolean;
   auraSettings?: AuraBoardSettings;
   subjectOrder?: SubjectOrder | null;
+  isAdmin?: boolean;
 };
 
 export function BoardSettingsLauncher({
@@ -53,6 +54,7 @@ export function BoardSettingsLauncher({
   streamSectionsEnabled,
   auraSettings,
   subjectOrder,
+  isAdmin,
 }: Props) {
   const [open, setOpen] = useState(false);
   const [anonymousAuthorState, setAnonymousAuthorState] =
@@ -96,6 +98,7 @@ export function BoardSettingsLauncher({
           initialStreamSectionsEnabled={streamSectionsEnabled ?? false}
           initialAuraSettings={auraSettings}
           initialSubjectOrder={subjectOrder ?? null}
+          isAdmin={isAdmin}
           onAnonymousAuthorChange={setAnonymousAuthorState}
         />
       )}

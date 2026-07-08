@@ -1,4 +1,4 @@
-/* ── SidePanel primitive ───────────────────────────── */
+﻿/* ?? SidePanel primitive ????????????????????????????? */
 
 .side-panel-backdrop {
   position: fixed;
@@ -91,7 +91,7 @@
   flex: 0 0 auto;
 }
 
-/* ── Tablist (used by SectionActionsPanel) ───────────── */
+/* ?? Tablist (used by SectionActionsPanel) ????????????? */
 
 .side-panel-tabs {
   display: flex;
@@ -132,7 +132,7 @@
   border-bottom-color: var(--color-danger, #c62828);
 }
 
-/* ── Section actions trigger in ColumnsBoard header ──── */
+/* ?? Section actions trigger in ColumnsBoard header ???? */
 
 .section-actions-trigger {
   background: none;
@@ -150,7 +150,7 @@
   color: var(--color-text);
 }
 
-/* ── Section rename / delete tab styles ──────────────── */
+/* ?? Section rename / delete tab styles ???????????????? */
 
 .section-rename-form {
   display: flex;
@@ -253,7 +253,7 @@
   margin-bottom: 12px;
 }
 
-/* ── Board settings (gear launcher + panel rows) ─────── */
+/* ?? Board settings (gear launcher + panel rows) ??????? */
 
 .board-settings-trigger {
   display: inline-flex;
@@ -609,7 +609,7 @@
   color: var(--color-text-muted);
 }
 
-/* ── 주제별 보드 정렬 (2026-07-08) ───────────────────────────── */
+/* ?? 二쇱젣蹂?蹂대뱶 ?뺣젹 (2026-07-08) ????????????????????????????? */
 
 .seed-students-modal-wrap {
   position: fixed;
@@ -619,20 +619,20 @@
   align-items: center;
   justify-content: center;
   padding: 16px;
-  pointer-events: none;
 }
 
 .seed-students-modal-backdrop {
-  pointer-events: auto;
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.4);
+  animation: fadeIn 150ms ease;
+  z-index: auto;
 }
 
 .seed-students-modal {
-  position: relative;
-  z-index: 1;
+  position: relative; /* override .add-card-modal position:fixed so flex centering works */
   width: min(440px, 100%);
-  pointer-events: auto;
 }
-
 .seed-students-modal-desc {
   margin: 0 0 12px;
   color: var(--color-text);
@@ -760,26 +760,37 @@
   flex: 0 0 auto;
 }
 
+.topics-tab-reorder-btn {
+  border: 0;
+  background: transparent;
+  border-radius: 0;
+  padding: 4px;
+  font-size: 14px;
+  line-height: 1;
+}
+
+.topics-tab-reorder-btn:hover:not(:disabled) {
+  opacity: 0.7;
+}
+
 .topics-tab-row-pin {
   margin-left: 4px;
-  padding: 4px 8px;
-  font-size: 12px;
-  font-weight: 600;
-  border: 1px solid var(--color-border);
-  background: var(--color-surface);
+  padding: 4px;
+  font-size: 14px;
+  border: 0;
+  background: transparent;
   color: var(--color-text);
-  border-radius: 6px;
+  border-radius: 0;
   cursor: pointer;
+  line-height: 1;
 }
 
 .topics-tab-row-pin[aria-pressed="true"] {
-  background: var(--color-accent-tinted, #e0f2fe);
-  color: var(--color-accent-tinted-text, #0369a1);
-  border-color: var(--color-accent);
+  color: #d32f2f;
 }
 
 .topics-tab-row-pin:hover {
-  border-color: var(--color-border-hover);
+  opacity: 0.7;
 }
 
 .visually-hidden {

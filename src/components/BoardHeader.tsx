@@ -37,6 +37,7 @@ type Props = {
   streamSectionsEnabled?: boolean;
   auraSettings?: AuraBoardSettings;
   subjectOrder?: SubjectOrder | null;
+  isAdmin?: boolean;
   showAuth?: boolean;
 };
 
@@ -62,6 +63,7 @@ export function BoardHeader({
   streamSectionsEnabled,
   auraSettings,
   subjectOrder,
+  isAdmin,
   showAuth = true,
 }: Props) {
   const [showQr, setShowQr] = useState(false);
@@ -103,6 +105,7 @@ export function BoardHeader({
             streamSectionsEnabled={streamSectionsEnabled}
             auraSettings={auraSettings}
             subjectOrder={subjectOrder}
+            isAdmin={isAdmin}
           />
         )}
         {canOpen && (

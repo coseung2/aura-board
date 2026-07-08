@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useMemo, useState } from "react";
 import type { BoardSection } from "./types";
@@ -6,7 +6,6 @@ import { sortSections, type SortableSection } from "@/lib/sort-sections";
 import {
   type SubjectOrder,
   normalizeSubjectOrder,
-  subjectOrderLabel,
 } from "@/lib/subject-order";
 import { SettingsSection } from "./SettingsSection";
 
@@ -123,13 +122,9 @@ function TopicsTabBody({
     setSubjectOrder(normalizeSubjectOrder(initialSubjectOrder));
   }, [initialSubjectOrder]);
 
+  // pinned 그룹 / unpinned 그룹 구분을 그대로 둔다. 핀은 항상 제일 앞으로.
   const split = splitPinnedUnpinned(draft);
-  const dirty = isDirty(
-    initialDraft,
-    draft,
-    subjectOrder,
-    normalizeSubjectOrder(initialSubjectOrder),
-  );
+  const dirty = isDirty(initialDraft, draft);
 
   function moveUnpinned(fromIndex: number, toIndex: number) {
     if (toIndex < 0 || toIndex >= split.unpinned.length) return;
@@ -176,24 +171,22 @@ function TopicsTabBody({
     setSaveState({ status: "saving" });
     try {
       const fresh = splitPinnedUnpinned(draft);
-      const orderedUnpinned = fresh.unpinned;
       const orderedPinned = fresh.pinned.slice().sort((a, b) => a.order - b.order);
+      const orderedUnpinned = fresh.unpinned;
       const payload: Array<{
         id: string;
         order: number;
         pinned?: boolean;
       }> = [];
-
       orderedPinned.forEach((s, idx) => {
         payload.push({ id: s.id, order: idx, pinned: true });
       });
-   orderedUnpinned.forEach((s, idx) => {
-     payload.push({
-       id: s.id,
-       order: MIN_ORDER + (orderedPinned.length + (orderedUnpinned.length - 1 - idx)) * ORDER_STEP,
-     });
-   });
-
+      orderedUnpinned.forEach((s, idx) => {
+        payload.push({
+          id: s.id,
+          order: MIN_ORDER + (orderedPinned.length + (orderedUnpinned.length - 1 - idx)) * ORDER_STEP,
+        });
+      });
       const res = await fetch(`/api/boards/${boardId}/sections/reorder`, {
         method: "POST",
         headers: { "content-type": "application/json" },
@@ -220,6 +213,19 @@ function TopicsTabBody({
           pinned: found?.pinned ?? s.pinned ?? false,
         };
       });
+      // TopicsTab의 draft도 같은 order/pinned로 동기화해 저장 직후 UI가
+      // 즉시 새 순서로 보이고, 패널을 닫았다 열어도 stale하지 않도록 한다.
+      setDraft((current) =>
+        current.map((row) => {
+          const found = merged.find((m) => m.id === row.id);
+          if (!found) return row;
+          return {
+            ...row,
+            order: typeof found.order === "number" ? found.order : row.order,
+            pinned: found.pinned ?? row.pinned,
+          };
+        }),
+      );
       onSectionsReordered?.(merged);
       onSubjectOrderChange?.(subjectOrder);
       setSaveState({ status: "saved", at: Date.now() });
@@ -231,61 +237,11 @@ function TopicsTabBody({
 
   return (
     <div className="board-settings-control-stack">
-      <SettingsSection title="출석번호 정렬 방향">
-        <p className="board-settings-row-note">
-          학생이름으로 칼럼 만들기를 할 때 기본으로 쓸 방향이에요. 이미 만든
-          칼럼에는 영향을 주지 않습니다.
-        </p>
-        <fieldset
-          className="seed-students-modal-fieldset topics-tab-order-fieldset"
-          disabled={saveState.status === "saving"}
-        >
-          <legend className="visually-hidden">정렬 방향 선택</legend>
-          <label
-            className={`seed-students-option ${
-              subjectOrder === "asc" ? "is-selected" : ""
-            }`}
-          >
-            <input
-              type="radio"
-              name="topics-subject-order"
-              value="asc"
-              checked={subjectOrder === "asc"}
-              onChange={() => setSubjectOrder("asc")}
-            />
-            <span className="seed-students-option-title">
-              {subjectOrderLabel("asc").short} 앞으로
-            </span>
-            <span className="seed-students-option-desc">
-              {subjectOrderLabel("asc").long}
-            </span>
-          </label>
-          <label
-            className={`seed-students-option ${
-              subjectOrder === "desc" ? "is-selected" : ""
-            }`}
-          >
-            <input
-              type="radio"
-              name="topics-subject-order"
-              value="desc"
-              checked={subjectOrder === "desc"}
-              onChange={() => setSubjectOrder("desc")}
-            />
-            <span className="seed-students-option-title">
-              {subjectOrderLabel("desc").short}부터 앞으로
-            </span>
-            <span className="seed-students-option-desc">
-              {subjectOrderLabel("desc").long}
-            </span>
-          </label>
-        </fieldset>
-      </SettingsSection>
-
       <SettingsSection title="주제 순서">
         <p className="board-settings-row-note">
-          ↑/↓ 버튼으로 칼럼(섹션) 순서를 바꾸세요. 고정한 섹션은 항상
-          왼쪽에 남아 있어요.
+          ↑/↓ 버튼으로 섹션 순서를 바꾸세요.
+          <br />
+          핀한 섹션은 항상 왼쪽에 남아 있어요.
         </p>
         <ol
           className="topics-tab-list"
@@ -367,6 +323,9 @@ function TopicRow({
   // pinned 그룹 내부: index 0..pinnedTotal-1 사이에서만 이동 가능.
   // unpinned 그룹 내부: index는 pinnedTotal 오프셋이 붙어 있지만 unpinned 안에서의
   //   위치(0..unpinnedTotal-1)만 비교하면 된다.
+  // pinned 그룹 내부: index 0..pinnedTotal-1 사이에서만 이동 가능.
+  // unpinned 그룹 내부: index는 pinnedTotal 오프셋이 붙어 있지만 unpinned 안에서의
+  //   위치(0..unpinnedTotal-1)만 비교하면 된다.
   const isFirst = pinned ? index === 0 : index - pinnedTotal === 0;
   const isLast = pinned
     ? index === pinnedTotal - 1
@@ -380,20 +339,11 @@ function TopicRow({
       <span className="topics-tab-row-name" title={section.title}>
         {section.title}
       </span>
-      {pinned && (
-        <span
-          className="board-settings-row-badge on"
-          aria-label="고정됨"
-          title="고정됨"
-        >
-          📌 고정
-        </span>
-      )}
       <div className="topics-tab-row-actions">
         <button
           type="button"
           aria-label="위로"
-          className="modal-attach-reorder-btn"
+          className="modal-attach-reorder-btn topics-tab-reorder-btn"
           onClick={onMoveUp}
           disabled={isFirst}
         >
@@ -402,7 +352,7 @@ function TopicRow({
         <button
           type="button"
           aria-label="아래로"
-          className="modal-attach-reorder-btn"
+          className="modal-attach-reorder-btn topics-tab-reorder-btn"
           onClick={onMoveDown}
           disabled={isLast}
         >
@@ -413,9 +363,9 @@ function TopicRow({
           className="topics-tab-row-pin"
           aria-pressed={pinned}
           onClick={() => onTogglePin(!pinned)}
-          title={pinned ? "고정 해제" : "고정하기"}
+          title={pinned ? "핀 해제" : "핀 고정"}
         >
-          {pinned ? "고정 해제" : "고정"}
+          📌
         </button>
       </div>
     </li>
@@ -440,8 +390,41 @@ function buildDraftFromSections(
     title: s.title,
     accessToken: s.accessToken ?? null,
     order: s.order ?? 0,
-    pinned: s.pinned,
+    pinned: s.pinned ?? false,
   }));
+}
+
+function isDirty(
+  initial: EditableSection[],
+  current: EditableSection[],
+): boolean {
+  if (initial.length !== current.length) return true;
+  for (let i = 0; i < current.length; i++) {
+    const a = current[i];
+    const b = initial[i];
+    if (!a || !b) return true;
+    if (a.id !== b.id) return true;
+    if (a.pinned !== b.pinned) return true;
+  }
+  return false;
+}
+
+        <span
+          className="board-settings-row-badge on"
+          aria-label="핀됨"
+          title="핀됨"
+        >
+          📌
+        </span>
+function renumber(rows: EditableSection[], pinnedCount: number) {
+  // pinned 0..pinnedCount-1: order = idx (ascending)
+  // unpinned pinnedCount..: order = (total - idx - 1) (descending)
+  return rows.map((row, idx) => {
+    if (idx < pinnedCount) {
+      return { ...row, order: idx };
+    }
+    return { ...row, order: rows.length - idx - 1 };
+  });
 }
 
 function splitPinnedUnpinned(draft: EditableSection[]): {
@@ -454,33 +437,4 @@ function splitPinnedUnpinned(draft: EditableSection[]): {
     (row.pinned ? pinned : unpinned).push(row);
   }
   return { pinned, unpinned };
-}
-
-function isDirty(
-  initial: EditableSection[],
-  current: EditableSection[],
-  orderNow: SubjectOrder,
-  orderThen: SubjectOrder,
-): boolean {
-  if (orderNow !== orderThen) return true;
-  if (initial.length !== current.length) return true;
-  for (let i = 0; i < current.length; i++) {
-    const a = current[i];
-    const b = initial[i];
-    if (!a || !b) return true;
-    if (a.id !== b.id) return true;
-    if (a.pinned !== b.pinned) return true;
-  }
-  return false;
-}
-
-function renumber(rows: EditableSection[], pinnedCount: number) {
-  // pinned 0..pinnedCount-1: order = idx (ascending)
-  // unpinned pinnedCount..: order = (total - idx - 1) (descending)
-  return rows.map((row, idx) => {
-    if (idx < pinnedCount) {
-      return { ...row, order: idx };
-    }
-    return { ...row, order: rows.length - idx - 1 };
-  });
 }

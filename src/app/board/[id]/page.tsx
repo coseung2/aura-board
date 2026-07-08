@@ -133,6 +133,14 @@ export default async function BoardPage({
   ]);
   if (!board) notFound();
 
+  // 개발 중 기능(dev-only) 접근 권한이 있는 관리자 계정 여부.
+  // 환경변수 AURA_ADMIN_EMAILS(콤마 구분)로 확장 가능.
+  const adminEmails = (process.env.AURA_ADMIN_EMAILS ?? "mallagaenge@gmail.com")
+    .split(",")
+    .map((e) => e.trim().toLowerCase())
+    .filter(Boolean);
+  const isAdmin = !!user?.email && adminEmails.includes(user.email.toLowerCase());
+
   // Round 2 — fan out every dependent query that this layout actually renders.
   // - Card-rendering layouts (freeform / grid / stream / columns) skip
   //   submissions, members, and quizzes.
@@ -917,6 +925,7 @@ export default async function BoardPage({
           boardId={board.id}
           title={board.title}
           layout={board.layout}
+          isAdmin={isAdmin}
           isStudent={!!studentViewer}
           backHref={studentViewer ? "/student" : "/dashboard"}
           canEdit={effectiveRole === "owner" || effectiveRole === "editor"}

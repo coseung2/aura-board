@@ -17,6 +17,7 @@ import type {
   BoardTheme,
 } from "./board-settings/types";
 import { normalizeThumbnailMode } from "./board-settings/utils";
+import { isFeatureEnabled } from "@/lib/feature-flags";
 import {
   type SubjectOrder,
   normalizeSubjectOrder,
@@ -58,10 +59,17 @@ export function BoardSettingsPanel({
     criterion: null,
   },
   initialSubjectOrder = null,
+  isAdmin = false,
   onAnonymousAuthorChange,
 }: BoardSettingsPanelProps) {
   const router = useRouter();
   const [tab, setTab] = useState<BoardSettingsTab>("basic");
+  // breakout 기능이 비활성화된 환경에서는 breakout 탭을 강제로 basic으로 되돌린다.
+  useEffect(() => {
+    if (tab === "breakout" && (!isAdmin || !isFeatureEnabled("breakoutSettings"))) {
+      setTab("basic");
+    }
+  }, [tab, isAdmin]);
   const [sections, setSections] = useState<BoardSection[]>(initialSections);
   const [subjectOrder, setSubjectOrder] = useState<SubjectOrder>(
     normalizeSubjectOrder(initialSubjectOrder),
@@ -96,9 +104,15 @@ export function BoardSettingsPanel({
   const tablistId = useId();
 
   useEffect(() => {
+    // initialSections가 외부에서 갱신되면(예: 다른 컴포넌트에서 새 섹션
+    // 추가) sections state를 항상 동기화. 패널이 닫혀있어도 다음 열림 시점에
+    // 최신 데이터를 보게 한다. open 가드는 의도적으로 두지 않는다.
+    setSections(initialSections);
+  }, [initialSections]);
+
+  useEffect(() => {
     if (!open) return;
     setTab("basic");
-    setSections(initialSections);
     setSubjectOrder(normalizeSubjectOrder(initialSubjectOrder));
     setAnonymousAuthor(initialAnonymousAuthor);
     setBoardTheme(initialBoardTheme);
@@ -114,7 +128,6 @@ export function BoardSettingsPanel({
     setAuraSettings(initialAuraSettings);
   }, [
     open,
-    initialSections,
     initialSubjectOrder,
     initialAnonymousAuthor,
     initialBoardTheme,
@@ -153,7 +166,13 @@ export function BoardSettingsPanel({
         id={tablistId}
         style={{ margin: "-16px -20px 16px" }}
       >
-        {(Object.keys(TAB_LABELS) as BoardSettingsTab[]).map((key) => (
+        {(Object.keys(TAB_LABELS) as BoardSettingsTab[]).filter((key) => {
+          // breakout 탭은 관리자 계정이고 feature flag가 켜져 있을 때만 노출한다.
+          if (key === "breakout" && (!isAdmin || !isFeatureEnabled("breakoutSettings"))) {
+            return false;
+          }
+          return true;
+        }).map((key) => (
           <button
             key={key}
             type="button"

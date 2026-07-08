@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useState } from "react";
 import {
@@ -19,7 +19,7 @@ type Props = {
 };
 
 /**
- * 학생이름으로 칼럼 만들기 모달 (2026-07-08)
+ * 학생이름으로 섹션 추가 모달 (2026-07-08)
  * - 출석번호 방향(1번부터 / 끝번호부터)을 라디오로 명시 선택
  * - 마지막 선택을 Board.subjectOrder에 보존하여 다음 시드의 기본값으로 사용
  */
@@ -63,10 +63,10 @@ export function SeedStudentsDialog({
   const descLabel = subjectOrderLabel("desc");
   const studentLine =
     studentCount == null
-      ? "학급에 등록된 학생을 출석번호 순으로 칼럼으로 추가합니다."
+      ? "학급에 등록된 학생을 출석번호 순으로 섹션으로 추가합니다."
       : studentCount === 0
         ? "이 학급에는 등록된 학생이 없습니다."
-        : `학급 ${studentCount}명의 학생을 출석번호 순으로 칼럼으로 추가합니다.`;
+        : `학급 ${studentCount}명의 학생을 출석번호 순으로 섹션으로 추가합니다.`;
 
   return (
     <div className="seed-students-modal-wrap" role="presentation">
@@ -86,7 +86,7 @@ export function SeedStudentsDialog({
       >
         <div className="modal-header">
           <h2 id="seed-students-modal-title" className="modal-title">
-            학생 이름으로 칼럼 만들기
+            학생 이름으로 섹션 추가
           </h2>
           <button
             type="button"
@@ -159,7 +159,7 @@ export function SeedStudentsDialog({
           </fieldset>
 
           <p className="seed-students-modal-hint">
-            기존에 만든 섹션은 그대로 남고, 새 학생 칼럼은 그 뒤에 추가돼요.
+            기존에 만든 섹션은 그대로 남고, 새 학생 섹션은 그 뒤에 추가돼요.
             같은 학생이 이미 있으면 이름이 같은 새 섹션이 추가로 만들어지니
             필요하면 직접 정리해 주세요.
           </p>
@@ -184,7 +184,7 @@ export function SeedStudentsDialog({
               disabled={busy || studentCount === 0}
               className="modal-btn-submit"
             >
-              {busy ? "추가 중..." : "칼럼 만들기"}
+              {busy ? "추가 중..." : "섹션 만들기"}
             </button>
           </div>
         </form>
