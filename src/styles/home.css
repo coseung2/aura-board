@@ -713,6 +713,15 @@
 
 .create-board-modal {
   width: min(94vw, 860px);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.create-board-modal .modal-body {
+  overflow-y: auto;
+  flex: 1;
+  min-height: 0;
 }
 
 /* Layout picker — handoff-style 3-column grid for first step of CreateBoardModal
