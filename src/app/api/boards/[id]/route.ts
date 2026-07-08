@@ -36,6 +36,9 @@ const PatchBoardSchema = z.object({
     .optional(),
   // BC-1: reclassify a board as lesson vs play.
   category: z.enum(["LESSON", "PLAY"]).optional(),
+  // 주제별 보드 정렬 (2026-07-08) — 출석번호 시드 모달의 기본값이자
+  // 보드설정 > 주제 정렬 탭의 저장 값.
+  subjectOrder: z.enum(["asc", "desc"]).nullable().optional(),
 });
 
 export async function GET(

@@ -34,6 +34,7 @@ import {
   normalizeStreamActivityTemplateState,
 } from "@/lib/stream-activity-templates";
 import type { BoardTheme } from "@/components/BoardSettingsPanel";
+import { normalizeSubjectOrder, type SubjectOrder } from "@/lib/subject-order";
 import type {
   AuraBoardSettings,
   AuraEvaluationLevel,
@@ -458,7 +459,20 @@ export default async function BoardPage({
     id: s.id,
     title: s.title,
     accessToken: s.accessToken,
+    order: s.order,
+    pinned: s.pinned,
   }));
+  // subjectOrder: 페이지 props로도 흘려서 ColumnsBoard / BoardHeader
+  // 양쪽에서 동일한 기본값을 보게 한다.
+  const subjectOrder: SubjectOrder = normalizeSubjectOrder(
+    (board as { subjectOrder?: string | null }).subjectOrder ?? null,
+  );
+
+  // columns + classroom 연결 보드만 학생 수를 미리 가져와 시드 모달에 노출.
+  const needsClassroomStudentCount = board.layout === "columns" && !!board.classroomId;
+  const classroomStudentCount = needsClassroomStudentCount
+    ? await db.student.count({ where: { classroomId: board.classroomId! } })
+    : null;
   const boardTheme = normalizeBoardTheme(board.boardTheme);
   const auraSettings: AuraBoardSettings = {
     evaluationEnabled: board.auraEvaluationEnabled,
@@ -582,7 +596,14 @@ export default async function BoardPage({
           />
         );
       case "columns":
-        return <ColumnsBoard {...common} initialSections={sectionProps} />;
+        return (
+          <ColumnsBoard
+            {...common}
+            initialSections={sectionProps}
+            boardSubjectOrder={subjectOrder}
+            classroomStudentCount={classroomStudentCount}
+          />
+        );
       case "dj-queue":
         return (
           <DJBoard
@@ -913,6 +934,7 @@ export default async function BoardPage({
           streamContentPrompt={board.streamContentPrompt ?? ""}
           streamSectionsEnabled={board.streamSectionsEnabled}
           auraSettings={auraSettings}
+          subjectOrder={subjectOrder}
           showAuth={false}
         />
         {renderBoard()}

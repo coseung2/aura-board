@@ -8,6 +8,7 @@ import type { ThumbnailMode } from "./BoardThumbnailPicker";
 import { AuraTab } from "./board-settings/AuraTab";
 import { BasicTab } from "./board-settings/BasicTab";
 import { BreakoutTab } from "./board-settings/BreakoutTab";
+import { TopicsTab } from "./board-settings/TopicsTab";
 import { TAB_LABELS } from "./board-settings/constants";
 import type {
   BoardSection,
@@ -16,11 +17,16 @@ import type {
   BoardTheme,
 } from "./board-settings/types";
 import { normalizeThumbnailMode } from "./board-settings/utils";
+import {
+  type SubjectOrder,
+  normalizeSubjectOrder,
+} from "@/lib/subject-order";
 
 export type { BoardSection, BoardTheme } from "./board-settings/types";
 
 const TAB_LABEL_LINES: Record<BoardSettingsTab, string[]> = {
   basic: ["기본"],
+  topics: ["주제", "정렬"],
   breakout: ["브레이크", "아웃"],
   canva: ["Canva 연동", "(준비 중)"],
   aura: ["아우라", "연동"],
@@ -51,11 +57,15 @@ export function BoardSettingsPanel({
     unit: null,
     criterion: null,
   },
+  initialSubjectOrder = null,
   onAnonymousAuthorChange,
 }: BoardSettingsPanelProps) {
   const router = useRouter();
   const [tab, setTab] = useState<BoardSettingsTab>("basic");
   const [sections, setSections] = useState<BoardSection[]>(initialSections);
+  const [subjectOrder, setSubjectOrder] = useState<SubjectOrder>(
+    normalizeSubjectOrder(initialSubjectOrder),
+  );
   const [anonymousAuthor, setAnonymousAuthor] = useState(initialAnonymousAuthor);
   const [boardTheme, setBoardTheme] = useState<BoardTheme>(initialBoardTheme);
   const [shareMode, setShareMode] = useState(initialShareMode);
@@ -89,6 +99,7 @@ export function BoardSettingsPanel({
     if (!open) return;
     setTab("basic");
     setSections(initialSections);
+    setSubjectOrder(normalizeSubjectOrder(initialSubjectOrder));
     setAnonymousAuthor(initialAnonymousAuthor);
     setBoardTheme(initialBoardTheme);
     setShareMode(initialShareMode);
@@ -104,6 +115,7 @@ export function BoardSettingsPanel({
   }, [
     open,
     initialSections,
+    initialSubjectOrder,
     initialAnonymousAuthor,
     initialBoardTheme,
     initialShareMode,
@@ -124,6 +136,11 @@ export function BoardSettingsPanel({
         s.id === sectionId ? { ...s, accessToken: nextToken } : s,
       ),
     );
+    router.refresh();
+  }
+
+  function handleSectionsReordered(next: BoardSection[]) {
+    setSections(next);
     router.refresh();
   }
 
@@ -201,6 +218,23 @@ export function BoardSettingsPanel({
             onStreamContentPromptChange={setStreamContentPrompt}
             streamSectionsEnabled={streamSectionsEnabled}
             onStreamSectionsEnabledChange={setStreamSectionsEnabled}
+          />
+        </div>
+      )}
+
+      {tab === "topics" && (
+        <div
+          role="tabpanel"
+          id={`${tablistId}-panel-topics`}
+          aria-labelledby={`${tablistId}-tab-topics`}
+        >
+          <TopicsTab
+            boardId={boardId}
+            layout={layout}
+            sections={sections}
+            initialSubjectOrder={subjectOrder}
+            onSectionsReordered={handleSectionsReordered}
+            onSubjectOrderChange={setSubjectOrder}
           />
         </div>
       )}

@@ -2,6 +2,10 @@
 
 import { useMemo } from "react";
 import { sortSections } from "@/lib/sort-sections";
+import {
+  type SubjectOrder,
+  normalizeSubjectOrder,
+} from "@/lib/subject-order";
 
 type SectionData = {
   id: string;
@@ -20,6 +24,8 @@ type UseSectionMutationsOptions = {
   sections: SectionData[];
   setSections: React.Dispatch<React.SetStateAction<SectionData[]>>;
   setCards: React.Dispatch<React.SetStateAction<any[]>>;
+  /** 보드 기본 subjectOrder (Board.subjectOrder). */
+  boardSubjectOrder?: SubjectOrder | null;
 };
 
 type UseSectionMutationsReturn = {
@@ -27,7 +33,11 @@ type UseSectionMutationsReturn = {
   sectionOptions: { id: string; title: string }[];
   handleAddSection: () => Promise<void>;
   handleSectionPin: (sectionId: string, pinned: boolean) => Promise<void>;
-  handleSeedFromStudents: (seedingStudents: boolean, setSeedingStudents: React.Dispatch<React.SetStateAction<boolean>>) => Promise<void>;
+  handleSeedFromStudents: (
+    seedingStudents: boolean,
+    setSeedingStudents: React.Dispatch<React.SetStateAction<boolean>>,
+    subjectOrder?: SubjectOrder,
+  ) => Promise<SectionData[] | undefined>;
   handleSectionRenamed: (sectionId: string, newTitle: string) => void;
   handleSectionDeleted: (sectionId: string) => void;
   moveSectionTo: (sectionId: string, targetSectionId: string) => Promise<void>;
@@ -40,6 +50,7 @@ export function useSectionMutations({
   sections,
   setSections,
   setCards,
+  boardSubjectOrder,
 }: UseSectionMutationsOptions): UseSectionMutationsReturn {
   const sortedSections = useMemo(
     () => [...sections].sort(sortSections),
@@ -106,15 +117,22 @@ export function useSectionMutations({
 
   async function handleSeedFromStudents(
     seedingStudents: boolean,
-    setSeedingStudents: React.Dispatch<React.SetStateAction<boolean>>
+    setSeedingStudents: React.Dispatch<React.SetStateAction<boolean>>,
+    subjectOrder?: SubjectOrder,
   ) {
     if (seedingStudents) return;
-    if (!window.confirm("학급 학생 명단으로 칼럼을 추가할까요?")) return;
+    const order = normalizeSubjectOrder(
+      subjectOrder ?? boardSubjectOrder ?? "asc",
+    );
     setSeedingStudents(true);
     try {
       const res = await fetch(
         `/api/boards/${boardId}/sections/seed-students`,
-        { method: "POST" }
+        {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ subjectOrder: order }),
+        }
       );
       if (!res.ok) {
         const msg = (await res.json().catch(() => ({}))).error;
@@ -123,8 +141,10 @@ export function useSectionMutations({
       }
       const { sections: created } = (await res.json()) as {
         sections: SectionData[];
+        subjectOrder?: SubjectOrder;
       };
       setSections((prev) => [...prev, ...created].sort(sortSections));
+      return created;
     } finally {
       setSeedingStudents(false);
     }

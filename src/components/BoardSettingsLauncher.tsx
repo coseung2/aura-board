@@ -7,6 +7,7 @@ import {
   type BoardTheme,
 } from "./BoardSettingsPanel";
 import type { AuraBoardSettings } from "./AuraEvaluationControl";
+import type { SubjectOrder } from "@/lib/subject-order";
 
 type Props = {
   boardId: string;
@@ -30,6 +31,7 @@ type Props = {
   streamContentPrompt?: string;
   streamSectionsEnabled?: boolean;
   auraSettings?: AuraBoardSettings;
+  subjectOrder?: SubjectOrder | null;
 };
 
 export function BoardSettingsLauncher({
@@ -50,6 +52,7 @@ export function BoardSettingsLauncher({
   streamContentPrompt,
   streamSectionsEnabled,
   auraSettings,
+  subjectOrder,
 }: Props) {
   const [open, setOpen] = useState(false);
   const [anonymousAuthorState, setAnonymousAuthorState] =
@@ -92,6 +95,7 @@ export function BoardSettingsLauncher({
           initialStreamContentPrompt={streamContentPrompt ?? ""}
           initialStreamSectionsEnabled={streamSectionsEnabled ?? false}
           initialAuraSettings={auraSettings}
+          initialSubjectOrder={subjectOrder ?? null}
           onAnonymousAuthorChange={setAnonymousAuthorState}
         />
       )}

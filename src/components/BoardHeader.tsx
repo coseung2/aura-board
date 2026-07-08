@@ -9,6 +9,7 @@ import { QrShareModal } from "./share/QrShareModal";
 import { useBoardSlideshow } from "./slideshow/BoardSlideshowProvider";
 import type { BoardSection, BoardTheme } from "./BoardSettingsPanel";
 import type { AuraBoardSettings } from "./AuraEvaluationControl";
+import type { SubjectOrder } from "@/lib/subject-order";
 
 type Props = {
   boardId?: string;
@@ -35,6 +36,7 @@ type Props = {
   streamContentPrompt?: string;
   streamSectionsEnabled?: boolean;
   auraSettings?: AuraBoardSettings;
+  subjectOrder?: SubjectOrder | null;
   showAuth?: boolean;
 };
 
@@ -59,6 +61,7 @@ export function BoardHeader({
   streamContentPrompt,
   streamSectionsEnabled,
   auraSettings,
+  subjectOrder,
   showAuth = true,
 }: Props) {
   const [showQr, setShowQr] = useState(false);
@@ -99,6 +102,7 @@ export function BoardHeader({
             streamContentPrompt={streamContentPrompt ?? ""}
             streamSectionsEnabled={streamSectionsEnabled}
             auraSettings={auraSettings}
+            subjectOrder={subjectOrder}
           />
         )}
         {canOpen && (

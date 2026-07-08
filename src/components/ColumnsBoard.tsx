@@ -15,6 +15,7 @@ import {
   type ColumnAssignmentAction,
   type ColumnAssignmentState,
 } from "./columns/ColumnView";
+import { SeedStudentsDialog } from "./columns/SeedStudentsDialog";
 import { comparatorFor, toSortMode, type SortMode } from "./columns/sort";
 import { useBoardStream, type StreamSection } from "./columns/useBoardStream";
 import { useBoardAnonymityChange } from "@/hooks/useBoardAnonymityChange";
@@ -28,6 +29,10 @@ import {
   withBoardAnonymousAuthors,
 } from "@/lib/card-anonymity";
 import { buildCanvaConnectUrl } from "@/lib/canva-connect-return";
+import {
+  type SubjectOrder,
+  normalizeSubjectOrder,
+} from "@/lib/subject-order";
 
 type SectionData = StreamSection;
 
@@ -50,6 +55,10 @@ type Props = {
   /** Board's classroomId — enables the CardAuthorEditor roster picker. */
   classroomId?: string | null;
   anonymousAuthor?: boolean;
+  /** Board.subjectOrder — 학생이름 시드 모달의 기본 선택값. */
+  boardSubjectOrder?: SubjectOrder | null;
+  /** Board.classroom 학생 수 — 시드 모달 안내 문구용. */
+  classroomStudentCount?: number | null;
 };
 
 export function ColumnsBoard({
@@ -61,6 +70,8 @@ export function ColumnsBoard({
   isStudentViewer,
   classroomId,
   anonymousAuthor = false,
+  boardSubjectOrder,
+  classroomStudentCount = null,
 }: Props) {
   const [cards, setCards] = useState<CardData[]>(
     withBoardAnonymousAuthors(initialCards, anonymousAuthor),
@@ -93,6 +104,8 @@ export function ColumnsBoard({
   );
   const [cardDropPreview, setCardDropPreview] = useState<CardDropPreview>(null);
   const [seedingStudents, setSeedingStudents] = useState(false);
+  const [seedDialogOpen, setSeedDialogOpen] = useState(false);
+  const [seedDialogError, setSeedDialogError] = useState<string | null>(null);
   const [assignmentBusySectionId, setAssignmentBusySectionId] = useState<
     string | null
   >(null);
@@ -239,7 +252,38 @@ export function ColumnsBoard({
     sections,
     setSections,
     setCards,
+    boardSubjectOrder,
   });
+
+  const openSeedDialog = useCallback(() => {
+    if (seedingStudents) return;
+    setSeedDialogError(null);
+    setSeedDialogOpen(true);
+  }, [seedingStudents]);
+
+  const closeSeedDialog = useCallback(() => {
+    if (seedingStudents) return;
+    setSeedDialogOpen(false);
+  }, [seedingStudents]);
+
+  async function handleSeedConfirm(order: SubjectOrder) {
+    setSeedDialogError(null);
+    try {
+      const created = await handleSeedFromStudents(
+        seedingStudents,
+        setSeedingStudents as React.Dispatch<React.SetStateAction<boolean>>,
+        order,
+      );
+      if (created && created.length > 0) {
+        setSeedDialogOpen(false);
+      }
+    } catch (e) {
+      console.error("[SeedStudentsDialog] confirm failed", e);
+      setSeedDialogError(
+        e instanceof Error ? e.message : "학생 시드 중 오류가 발생했어요.",
+      );
+    }
+  }
 
   // ── Sort & grouping ────────────────────────────────────────────────
 
@@ -574,14 +618,7 @@ export function ColumnsBoard({
                 <button
                   type="button"
                   className="column-add-btn column-add-btn-seed"
-                  onClick={() => {
-                    handleSeedFromStudents(
-                      seedingStudents,
-                      setSeedingStudents as React.Dispatch<
-                        React.SetStateAction<boolean>
-                      >,
-                    );
-                  }}
+                  onClick={openSeedDialog}
                   disabled={seedingStudents}
                   title="학급 학생 명단으로 칼럼을 한 번에 추가"
                 >
@@ -738,6 +775,20 @@ export function ColumnsBoard({
           roster={feedbackTarget.roster}
           sectionId={feedbackTarget.sectionId}
           onClose={() => setFeedbackTarget(null)}
+        />
+      )}
+
+      {classroomId && (
+        <SeedStudentsDialog
+          open={seedDialogOpen && canEdit}
+          studentCount={classroomStudentCount}
+          defaultOrder={normalizeSubjectOrder(
+            boardSubjectOrder ?? sections.find((s) => s.pinned)?.order ?? "asc",
+          )}
+          busy={seedingStudents}
+          errorMessage={seedDialogError}
+          onClose={closeSeedDialog}
+          onConfirm={handleSeedConfirm}
         />
       )}
     </div>

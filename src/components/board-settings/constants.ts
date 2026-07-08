@@ -2,6 +2,7 @@ import type { BoardSettingsTab, BoardTheme } from "./types";
 
 export const TAB_LABELS: Record<BoardSettingsTab, string> = {
   basic: "기본",
+  topics: "주제 정렬",
   breakout: "브레이크아웃",
   canva: "Canva 연동",
   aura: "아우라 연동",
