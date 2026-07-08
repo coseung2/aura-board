@@ -50,7 +50,7 @@ export function TeacherWithdrawalSection() {
         </p>
         <button
           type="button"
-          className="wallet-fd-cancel withdrawal-trigger-btn"
+          className="settings-action-btn is-danger withdrawal-trigger-btn"
           onClick={() => setShowModal(true)}
         >
           탈퇴하기
@@ -66,7 +66,7 @@ export function TeacherWithdrawalSection() {
             }
           }}
         >
-          <div className="add-card-modal withdrawal-modal">
+          <div className="add-card-modal">
             <div className="modal-header">
               <h3 className="modal-title">정말 탈퇴하시겠어요?</h3>
               <button
@@ -100,7 +100,7 @@ export function TeacherWithdrawalSection() {
               </button>
               <button
                 type="button"
-                className="modal-btn-submit withdrawal-confirm-btn"
+                className="modal-btn-submit"
                 onClick={handleWithdraw}
                 disabled={busy}
               >
