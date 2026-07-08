@@ -1,0 +1,76 @@
+/* Modal safe-area offsets on pages that render a global top navigation bar.
+   Board pages hide the global nav, so modals there keep the original layout. */
+:root {
+  --modal-safe-top: calc(env(safe-area-inset-top, 0px) + 76px);
+  --modal-safe-bottom: calc(env(safe-area-inset-bottom, 0px) + 24px);
+}
+
+@media (orientation: portrait), (max-width: 1199px) {
+  :root {
+    --modal-safe-top: calc(env(safe-area-inset-top, 0px) + 112px);
+    --modal-safe-bottom: calc(env(safe-area-inset-bottom, 0px) + 18px);
+  }
+}
+
+@media (orientation: portrait) and (max-width: 640px) {
+  :root {
+    --modal-safe-top: calc(env(safe-area-inset-top, 0px) + 144px);
+  }
+}
+
+/* Centered backdrops: reserve space above/below the viewport edge. */
+body:has(.ab-topnav, .student-topnav, .parent-topnav) .modal-backdrop,
+body:has(.ab-topnav, .student-topnav, .parent-topnav) .card-engagement-backdrop,
+body:has(.ab-topnav, .student-topnav, .parent-topnav) .agent-modal-overlay,
+body:has(.ab-topnav, .student-topnav, .parent-topnav) .plant-modal-backdrop,
+body:has(.ab-topnav, .student-topnav, .parent-topnav) .vs-backdrop,
+body:has(.ab-topnav, .student-topnav, .parent-topnav) .vp-backdrop,
+body:has(.ab-topnav, .student-topnav, .parent-topnav) .ds-hsv-backdrop,
+body:has(.ab-topnav, .student-topnav, .parent-topnav) .ds-save-dialog-backdrop,
+body:has(.ab-topnav, .student-topnav, .parent-topnav) .dj-recap-backdrop {
+  padding: var(--modal-safe-top) 16px var(--modal-safe-bottom);
+}
+
+/* Morning dashboard modal layer uses 24px horizontal padding. */
+body:has(.ab-topnav, .student-topnav, .parent-topnav) .morning-modal-layer {
+  padding: var(--modal-safe-top) 24px var(--modal-safe-bottom);
+}
+
+/* Full-bleed photo modal should still fill the viewport. */
+.morning-photo-modal-layer {
+  padding: 0;
+}
+
+/* Fixed-position centered modals: shrink and shift so they do not overlap
+   the top nav or the bottom safe area. */
+body:has(.ab-topnav, .student-topnav, .parent-topnav) .add-card-modal,
+body:has(.ab-topnav, .student-topnav, .parent-topnav) .card-detail-modal,
+body:has(.ab-topnav, .student-topnav, .parent-topnav) .student-breakout-modal,
+body:has(.ab-topnav, .student-topnav, .parent-topnav) .share-qr-modal,
+body:has(.ab-topnav, .student-topnav, .parent-topnav) .va-mod-modal,
+body:has(.ab-topnav, .student-topnav, .parent-topnav) .va-settings-modal {
+  top: calc(50% + (var(--modal-safe-top) - var(--modal-safe-bottom)) / 2);
+  max-height: calc(100dvh - var(--modal-safe-top) - var(--modal-safe-bottom));
+}
+
+/* Quiz modal keeps its mobile full-screen mode below 640px. */
+@media (min-width: 641px) {
+  body:has(.ab-topnav, .student-topnav, .parent-topnav) .quiz-modal {
+    top: calc(50% + (var(--modal-safe-top) - var(--modal-safe-bottom)) / 2);
+    max-height: calc(100dvh - var(--modal-safe-top) - var(--modal-safe-bottom));
+  }
+}
+
+/* Cap the height of modal contents that live inside the padded backdrops. */
+body:has(.ab-topnav, .student-topnav, .parent-topnav) .plant-modal,
+body:has(.ab-topnav, .student-topnav, .parent-topnav) .agent-modal,
+body:has(.ab-topnav, .student-topnav, .parent-topnav) .vs-studio,
+body:has(.ab-topnav, .student-topnav, .parent-topnav) .vp-modal,
+body:has(.ab-topnav, .student-topnav, .parent-topnav) .ds-hsv-panel,
+body:has(.ab-topnav, .student-topnav, .parent-topnav) .ds-save-dialog,
+body:has(.ab-topnav, .student-topnav, .parent-topnav) .dj-recap-modal,
+body:has(.ab-topnav, .student-topnav, .parent-topnav)
+  .morning-cleaning-modal:not(.morning-cleaning-photo-modal),
+body:has(.ab-topnav, .student-topnav, .parent-topnav) .card-engagement-modal {
+  max-height: calc(100dvh - var(--modal-safe-top) - var(--modal-safe-bottom));
+}
