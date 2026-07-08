@@ -89,6 +89,7 @@ export async function GET(req: Request) {
   }
 
   const host = parsed.hostname.toLowerCase();
+  const isScreenUrl = parsed.pathname.endsWith("/screen");
   const allowed =
     host === "canva.com" ||
     ALLOWED_HOST_SUFFIXES.some((suffix) => host.endsWith(suffix));
@@ -97,6 +98,25 @@ export async function GET(req: Request) {
   }
 
   try {
+    // /screen?type=thumbnail URLs return redirect/HTML from Canva, not
+    // a direct image. Skip the wasted fetch and resolve via the design
+    // page scraping / oEmbed / API chain immediately.
+    if (isScreenUrl) {
+      const fallbackUrl = await resolveDesignThumbnailFromScreenUrl(parsed);
+      if (fallbackUrl) {
+        const fallbackResponse = await fetchThumbnailFallback(
+          fallbackUrl.url,
+          w,
+          fallbackUrl.private,
+        );
+        if (fallbackResponse) return fallbackResponse;
+      }
+      return NextResponse.json(
+        { error: "thumbnail_unavailable" },
+        { status: 404 },
+      );
+    }
+
     const upstream = await fetch(parsed.toString(), {
       headers: {
         Accept: "image/avif,image/webp,image/*;q=0.8,*/*;q=0.5",
@@ -211,9 +231,6 @@ function normalizeResolvedThumbnailUrl(url: string | null | undefined): string |
   try {
     const parsed = new URL(url);
     const host = parsed.hostname.toLowerCase();
-    if (host.endsWith("canva.com") && parsed.pathname.endsWith("/screen")) {
-      return null;
-    }
     return parsed.toString();
   } catch {
     return null;
@@ -306,9 +323,7 @@ async function resolvePublicCanvaPageThumbnail(rawDesignUrl: string): Promise<st
       const allowed =
         imageHost === "canva.com" ||
         ALLOWED_HOST_SUFFIXES.some((suffix) => imageHost.endsWith(suffix));
-      const isScreenUrl =
-        imageHost.endsWith("canva.com") && absolute.pathname.endsWith("/screen");
-      if (allowed && absolute.protocol === "https:" && !isScreenUrl) {
+      if (allowed && absolute.protocol === "https:") {
         return absolute.toString();
       }
     }

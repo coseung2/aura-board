@@ -46,16 +46,27 @@ export async function POST(req: Request) {
       }
 
       try {
-        // Get design info for the item ID (design ID format for move: DAxxxxxx → item ID)
-        const design = await canvaGetDesign(token, designId);
+        let designTitle: string | undefined;
+        try {
+          const design = await canvaGetDesign(token, designId);
+          designTitle = design.title;
+        } catch {
+          // canvaGetDesign fails for team members' designs
+          designTitle = undefined;
+        }
         const moved = await canvaMoveItem(token, designId, folder.id);
-        results.push({ url, designId, moved, title: design.title, error: moved ? undefined : "move returned false" });
+        results.push({
+          url,
+          designId,
+          moved,
+          title: designTitle,
+          error: moved ? undefined : (designTitle ? "move returned false" : "팀 멤버 디자인 - Canva API 제약으로 이동 불가"),
+        });
       } catch (e: any) {
         console.warn("[POST /api/canva/organize] design move failed", {
           url,
           designId,
           errorMessage: e.message ?? String(e),
-          status: e?.status ?? e?.response?.status,
         });
         results.push({ url, designId, moved: false, error: e.message });
       }
