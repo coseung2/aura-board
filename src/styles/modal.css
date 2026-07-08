@@ -911,30 +911,19 @@
 }
 
 .card-detail-link {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: var(--control-inline-gap);
-  min-height: 34px;
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--color-primary, #097fe8);
-  text-decoration: none;
-  padding: 7px 12px;
+  display: inline-block;
+  padding: 8px 14px;
+  border-radius: var(--radius-btn);
   border: 1px solid var(--color-border);
-  border-radius: var(--radius-pill);
   background: var(--color-surface);
+  color: var(--color-text);
+  font-size: 13px;
+  font-weight: 500;
+  text-decoration: none;
+  cursor: pointer;
   align-self: flex-start;
-  transition:
-    background 120ms,
-    border-color 120ms,
-    color 120ms;
-}
-.card-detail-link img.emoji {
-  margin: 0;
 }
 .card-detail-link:hover {
-  border-color: var(--color-border-hover);
   background: var(--color-surface-alt);
 }
 

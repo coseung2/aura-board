@@ -363,7 +363,7 @@ export function CardDetailModal({
                       rel="noopener noreferrer"
                       className="card-detail-link"
                     >
-                      🔗 링크 열기
+                      링크 열기
                     </a>
                   )}
                 </div>
