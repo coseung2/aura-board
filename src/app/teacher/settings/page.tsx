@@ -4,6 +4,8 @@ import { getCurrentUser } from "@/lib/auth";
 import { LlmKeyForm } from "@/components/LlmKeyForm";
 import { TopNav } from "@/components/TopNav";
 import { TeacherWithdrawalSection } from "@/components/teacher/TeacherWithdrawalSection";
+import { isCanvaConnected } from "@/lib/canva";
+import { CanvaSettingsSection } from "@/components/teacher/CanvaSettingsSection";
 
 const ADMIN_EMAIL = "mallagaenge@gmail.com";
 
@@ -14,6 +16,7 @@ export const metadata = {
 export default async function TeacherSettingsPage() {
   const user = await getCurrentUser();
   if (!user) redirect("/login?from=/teacher/settings");
+  const canvaConnected = await isCanvaConnected(user.id);
 
   return (
     <>
@@ -31,6 +34,7 @@ export default async function TeacherSettingsPage() {
           </div>
           <LlmKeyForm />
         </section>
+        <CanvaSettingsSection initialConnected={canvaConnected} />
         <TeacherWithdrawalSection email={user.email} />
       </article>
       </main>
