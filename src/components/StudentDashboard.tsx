@@ -84,6 +84,7 @@ type Props = {
   boards: BoardItem[];
   duties: Duty[];
   assignments?: StudentAssignmentTodo[];
+  showDevFeatures?: boolean;
 };
 
 export function StudentDashboard({
@@ -92,6 +93,7 @@ export function StudentDashboard({
   classroomId,
   boards,
   assignments = [],
+  showDevFeatures = false,
 }: Props) {
   const [wallet, setWallet] = useState<WalletSummary | null>(null);
   const [avatar, setAvatar] = useState<AvatarMeResponse | null>(null);
@@ -128,11 +130,13 @@ export function StudentDashboard({
     }
 
     loadWallet();
-    loadAvatar();
+    if (showDevFeatures) {
+      loadAvatar();
+    }
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [showDevFeatures]);
 
   async function handleCancelFD(fdId: string) {
     if (!window.confirm("이 적금을 중도해지할까요? (이자 없이 원금만 반환)")) {
@@ -247,7 +251,7 @@ export function StudentDashboard({
             )}
           </div>
 
-          {avatar && (
+          {showDevFeatures && avatar && (
             <div className="student-avatar-card">
               <div className="student-avatar-header">
                 <div>

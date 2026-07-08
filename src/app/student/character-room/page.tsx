@@ -12,7 +12,6 @@ export default async function CharacterRoomPage() {
   const teacher = await getCurrentUser().catch(() => null);
   const student = await getCurrentStudent();
   if (!student) redirect("/login?from=/student/character-room");
-  // 캐릭터 피팅룸은 admin teacher 또는 admin teacher 학급 학생만 미리 볼 수 있다.
   if (
     !isAdminEmail(teacher?.email) &&
     !isAdminEmail(student.classroom.teacher.email)
@@ -27,6 +26,7 @@ export default async function CharacterRoomPage() {
         studentName={student.name}
         classroomName={student.classroom.name}
         duties={duties}
+        showDevFeatures
       />
       <StudentFeatureComingSoon
         title="내 캐릭터"

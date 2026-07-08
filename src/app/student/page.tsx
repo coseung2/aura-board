@@ -4,6 +4,7 @@ import { getStudentDuties } from "@/lib/role-portals";
 import { StudentDashboard } from "@/components/StudentDashboard";
 import { StudentTopNav } from "@/components/StudentTopNav";
 import { cloneStructure } from "@/lib/breakout";
+import { isAdminEmail } from "@/lib/admin";
 import { redirect } from "next/navigation";
 
 export default async function StudentPage() {
@@ -267,6 +268,7 @@ export default async function StudentPage() {
     };
   });
   const allAssignmentTodos = [...assignmentTodos, ...checkTodos];
+  const showDevFeatures = isAdminEmail(student.classroom.teacher.email);
 
   return (
     <>
@@ -274,6 +276,7 @@ export default async function StudentPage() {
         studentName={student.name}
         classroomName={student.classroom.name}
         duties={duties}
+        showDevFeatures={showDevFeatures}
       />
       <main className="student-page">
         <StudentDashboard
@@ -283,6 +286,7 @@ export default async function StudentPage() {
           boards={boardItems}
           duties={duties}
           assignments={allAssignmentTodos}
+          showDevFeatures={showDevFeatures}
         />
       </main>
     </>

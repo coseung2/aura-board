@@ -27,6 +27,7 @@ export default async function CharacterShopPage() {
         studentName={student.name}
         classroomName={student.classroom.name}
         duties={duties}
+        showDevFeatures
       />
       <StudentFeatureComingSoon
         title="캐릭터 상점"

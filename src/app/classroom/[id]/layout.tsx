@@ -3,8 +3,7 @@ import { StudentTopNav } from "@/components/StudentTopNav";
 import { getCurrentUser } from "@/lib/auth";
 import { getCurrentStudent } from "@/lib/student-auth";
 import { getStudentDuties } from "@/lib/role-portals";
-
-const ADMIN_EMAIL = "mallagaenge@gmail.com";
+import { isAdminEmail } from "@/lib/admin";
 
 export default async function ClassroomDetailLayout({
   children,
@@ -18,12 +17,13 @@ export default async function ClassroomDetailLayout({
   return (
     <>
       {user ? (
-        <TopNav showAdmin={user.email.toLowerCase() === ADMIN_EMAIL} />
+        <TopNav showAdmin={isAdminEmail(user.email)} />
       ) : student ? (
         <StudentTopNav
           studentName={student.name}
           classroomName={student.classroom.name}
           duties={duties}
+          showDevFeatures={isAdminEmail(student.classroom.teacher.email)}
         />
       ) : null}
       {children}

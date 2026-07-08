@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import { ClassroomMorningDashboard } from "@/components/classroom/ClassroomMorningDashboard";
 import { getCurrentUser } from "@/lib/auth";
 import { db } from "@/lib/db";
+import { isAdminEmail } from "@/lib/admin";
 
 type Props = { params: Promise<{ id: string }> };
 
@@ -18,7 +19,10 @@ export default async function ClassroomMorningPage({ params }: Props) {
 
   return (
     <main className="classroom-page classroom-page-detail classroom-morning">
-      <ClassroomMorningDashboard classroomId={id} />
+      <ClassroomMorningDashboard
+        classroomId={id}
+        showDevFeatures={isAdminEmail(user.email)}
+      />
     </main>
   );
 }

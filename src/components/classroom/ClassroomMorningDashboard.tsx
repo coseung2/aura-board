@@ -12,11 +12,14 @@ import { fetchAvatarGallery } from "@/components/avatar/gallery-client";
 import { ReadingChampionExhibition } from "@/components/avatar/ReadingChampionExhibition";
 import type { AvatarGalleryStudent } from "@/components/avatar/types";
 
-type Props = { classroomId: string };
+type Props = { classroomId: string; showDevFeatures?: boolean };
 
 const REFRESH_MS = 60_000;
 
-export function ClassroomMorningDashboard({ classroomId }: Props) {
+export function ClassroomMorningDashboard({
+  classroomId,
+  showDevFeatures = false,
+}: Props) {
   const [summary, setSummary] = useState<MorningSummary | null>(null);
   const [loaded, setLoaded] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -320,10 +323,12 @@ export function ClassroomMorningDashboard({ classroomId }: Props) {
             </section>
           </div>
 
-          <ReadingChampionsSection
-            classroomId={classroomId}
-            champions={summary.readingChampions}
-          />
+          {showDevFeatures && (
+            <ReadingChampionsSection
+              classroomId={classroomId}
+              champions={summary.readingChampions}
+            />
+          )}
 
           {lastUpdated && (
             <p className="morning-updated">

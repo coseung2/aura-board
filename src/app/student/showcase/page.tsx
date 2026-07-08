@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { db } from "@/lib/db";
 import { getCurrentStudent } from "@/lib/student-auth";
 import { getStudentDuties } from "@/lib/role-portals";
+import { isAdminEmail } from "@/lib/admin";
 import { ShowcaseGalleryView } from "@/components/portfolio/ShowcaseGalleryView";
 import { StudentTopNav } from "@/components/StudentTopNav";
 
@@ -31,6 +32,7 @@ export default async function StudentShowcasePage() {
         studentName={student.name}
         classroomName={classroom.name}
         duties={duties}
+        showDevFeatures={isAdminEmail(student.classroom.teacher.email)}
       />
       <main className="student-page-portfolio-shell">
         <ShowcaseGalleryView

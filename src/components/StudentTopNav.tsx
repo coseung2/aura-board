@@ -20,12 +20,14 @@ type Props = {
   studentName: string;
   classroomName: string;
   duties?: Duty[];
+  showDevFeatures?: boolean;
 };
 
 export function StudentTopNav({
   studentName,
   classroomName,
   duties = [],
+  showDevFeatures = false,
 }: Props) {
   const pathname = usePathname() ?? "";
   const router = useRouter();
@@ -234,6 +236,17 @@ export function StudentTopNav({
       ],
     })),
   ];
+  const visibleNavItems = showDevFeatures
+    ? navItems
+    : navItems
+        .filter((item) => item.id !== "character")
+        .map((item) => ({
+          ...item,
+          groups: item.groups.map((group) => ({
+            ...group,
+            links: group.links.filter((link) => !isDevFeatureHref(link.href)),
+          })),
+        }));
 
   async function handleLogout() {
     setLoggingOut(true);
@@ -252,7 +265,7 @@ export function StudentTopNav({
           <Logo size={32} withWordmark />
         </Link>
 
-        <MegaNav items={navItems} ariaLabel="학생 메뉴" />
+        <MegaNav items={visibleNavItems} ariaLabel="학생 메뉴" />
       </div>
 
       <div className="student-topnav-right auth-header">
@@ -280,5 +293,14 @@ export function StudentTopNav({
         </button>
       </div>
     </header>
+  );
+}
+
+function isDevFeatureHref(href: string): boolean {
+  return (
+    href === "/student/reading-champions" ||
+    href === "/student/character-town" ||
+    href === "/student/character-room" ||
+    href === "/student/character-shop"
   );
 }

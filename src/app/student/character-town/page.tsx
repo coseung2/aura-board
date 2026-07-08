@@ -27,6 +27,7 @@ export default async function CharacterTownPage() {
         studentName={student.name}
         classroomName={student.classroom.name}
         duties={duties}
+        showDevFeatures
       />
       <StudentFeatureComingSoon
         title="독서왕 전시공간"
