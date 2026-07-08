@@ -207,7 +207,11 @@ export default async function AdminPage() {
                     <td>{user.studentCount}</td>
                     <td>{user.cardCount}</td>
                     <td>{formatBytes(user.storageBytes)}</td>
-                    <td>{user.lastBoardUpdatedAt ? formatDate(user.lastBoardUpdatedAt) : "-"}</td>
+                    <td>
+                      {user.lastBoardUpdatedAt
+                        ? formatDateTime(user.lastBoardUpdatedAt)
+                        : "-"}
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -251,6 +255,17 @@ function formatDate(date: Date): string {
     year: "numeric",
     month: "2-digit",
     day: "2-digit",
+  });
+}
+
+function formatDateTime(date: Date): string {
+  return date.toLocaleString("ko-KR", {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
   });
 }
 
