@@ -14,16 +14,27 @@ import { Redis } from "@upstash/redis";
 
 export type LimitVerdict = { ok: boolean; retryAfter: number };
 
-const HAS_UPSTASH = Boolean(
-  process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN,
-);
+function redisEnv() {
+  const url =
+    process.env.KV_REST_API_URL ||
+    process.env.UPSTASH_REDIS_REST_URL ||
+    "";
+  const token =
+    process.env.KV_REST_API_TOKEN ||
+    process.env.UPSTASH_REDIS_REST_TOKEN ||
+    "";
+  return { url, token };
+}
+
+const HAS_UPSTASH = Boolean(redisEnv().url && redisEnv().token);
 
 let redis: Redis | null = null;
 function getRedis(): Redis {
   if (redis) return redis;
+  const env = redisEnv();
   redis = new Redis({
-    url: process.env.UPSTASH_REDIS_REST_URL!,
-    token: process.env.UPSTASH_REDIS_REST_TOKEN!,
+    url: env.url,
+    token: env.token,
   });
   return redis;
 }
