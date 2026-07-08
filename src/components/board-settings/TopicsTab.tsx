@@ -187,12 +187,12 @@ function TopicsTabBody({
       orderedPinned.forEach((s, idx) => {
         payload.push({ id: s.id, order: idx, pinned: true });
       });
-      orderedUnpinned.forEach((s, idx) => {
-        payload.push({
-          id: s.id,
-          order: MIN_ORDER + (orderedPinned.length + idx) * ORDER_STEP,
-        });
-      });
+   orderedUnpinned.forEach((s, idx) => {
+     payload.push({
+       id: s.id,
+       order: MIN_ORDER + (orderedPinned.length + (orderedUnpinned.length - 1 - idx)) * ORDER_STEP,
+     });
+   });
 
       const res = await fetch(`/api/boards/${boardId}/sections/reorder`, {
         method: "POST",
