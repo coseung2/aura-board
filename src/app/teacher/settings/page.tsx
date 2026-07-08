@@ -24,20 +24,11 @@ export default async function TeacherSettingsPage() {
           ← 대시보드로
         </Link>
         <h1 className="docs-title">교사 설정</h1>
-        <p className="docs-subtitle">
-          생성형 AI 연결 상태를 확인하고 관리합니다.
-        </p>
 
         <section id="llm" className="docs-section settings-section">
           <div className="settings-section-header">
             <h2 className="docs-h2">생성형 AI 연결</h2>
-            <Link href="/docs/ai-setup" className="docs-link settings-help-link">
-              발급 방법 안내 →
-            </Link>
           </div>
-          <p className="docs-p">
-            AI 평어 생성, 추후 개발될 기능에 활용 가능합니다.
-          </p>
           <LlmKeyForm />
         </section>
         <TeacherWithdrawalSection email={user.email} />

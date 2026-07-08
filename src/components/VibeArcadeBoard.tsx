@@ -179,7 +179,7 @@ export function VibeArcadeBoard(props: VibeArcadeBoardProps) {
               <p>
                 지금 열면 학생들이 Claude/ChatGPT/Gemini로 카드·게임을 만들고 공유할 수
                 있어요. 저장된 AI Key와 학급 쿼터는{" "}
-                <a href="/docs/ai-setup" className="va-gate-off-link">
+                <a href="/teacher/settings#llm" className="va-gate-off-link">
                   AI 연결 페이지
                 </a>
                 에서 조정할 수 있어요.

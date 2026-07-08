@@ -55,7 +55,7 @@ export default function SupportPage() {
               </Link>
             </li>
             <li>
-              <Link href="/docs/ai-setup" className="docs-link">
+              <Link href="/teacher/settings#llm" className="docs-link">
                 생성형 AI 연결하기 (Claude · ChatGPT · Gemini)
               </Link>
             </li>

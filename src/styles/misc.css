@@ -834,7 +834,7 @@
   color: var(--color-text);
 }
 
-/* Comparison table — /docs/ai-setup 등 모델 비교용 */
+/* Comparison table — /teacher/settings#llm 등 모델 비교용 */
 .docs-compare-table {
   width: 100%;
   border-collapse: collapse;
@@ -935,7 +935,7 @@ body > div {
   color: var(--color-text);
 }
 
-/* -------- Teacher LLM API Key form (/docs/ai-setup 하단) -------- */
+/* -------- Teacher LLM API Key form (/teacher/settings#llm 하단) -------- */
 
 .llm-key-form {
   display: flex;

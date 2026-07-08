@@ -184,42 +184,7 @@ export function LlmKeyForm() {
         : apiKey.trim().length < 8 && !status?.present);
 
   return (
-    <div className="llm-key-form">
-      {status?.present && (
-        <div className={`llm-key-status ${status.verified ? "is-ok" : "is-warn"}`}>
-          <div className="llm-key-status-row">
-            <span className="llm-key-status-dot" aria-hidden>
-              {status.verified ? "●" : "▲"}
-            </span>
-            <span className="llm-key-status-text">
-              {status.verified ? "연결됨" : "검증 실패"} ·{" "}
-              {PROVIDER_LABEL[status.provider] ?? status.provider} ·{" "}
-              {status.provider === "ollama"
-                ? `${status.modelId ?? "?"} @ ${status.baseUrl ?? "?"}`
-                : status.provider === "opencode-go"
-                  ? `${status.modelId ?? "?"} · ...${status.last4}`
-                  : `...${status.last4}`}
-            </span>
-            <button
-              type="button"
-              className="llm-key-delete"
-              onClick={handleDelete}
-              disabled={busy}
-            >
-              삭제
-            </button>
-          </div>
-          {!status.verified && status.lastError && (
-            <p className="llm-key-error">{status.lastError}</p>
-          )}
-          {status.verified && status.verifiedAt && (
-            <p className="llm-key-hint-small">
-              마지막 검증 {new Date(status.verifiedAt).toLocaleString("ko-KR")}
-            </p>
-          )}
-        </div>
-      )}
-
+    <>
       <form className="llm-key-fields" onSubmit={handleSave}>
         <label className="llm-key-field">
           <span>사용할 AI</span>
@@ -326,6 +291,6 @@ export function LlmKeyForm() {
       </form>
 
       {msg && <p className="llm-key-msg">{msg}</p>}
-    </div>
+    </>
   );
 }

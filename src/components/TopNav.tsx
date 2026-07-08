@@ -456,9 +456,9 @@ export function TopNav({ showAdmin = false }: Props) {
           title: "가이드",
           links: [
             {
-              href: "/docs/ai-setup",
+              href: "/teacher/settings#llm",
               label: "AI 연결 가이드",
-              active: pathname.startsWith("/docs/ai-setup"),
+              active: pathname.startsWith("/teacher/settings#llm"),
             },
             {
               href: "/docs/canva-setup",

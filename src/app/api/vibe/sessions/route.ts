@@ -1,7 +1,7 @@
 // Vibe-arcade session streaming (Seed 13, AC-F3 / AC-F8 / AC-F9 / AC-N5).
 // POST: student starts (or continues) a coding session. SSE stream.
 //
-// Teacher API Key resolution (2026-04-22): 교사가 /docs/ai-setup에 저장한
+// Teacher API Key resolution (2026-04-22): 교사가 /teacher/settings#llm에 저장한
 // 암호화된 TeacherLlmKey를 board → classroom.teacherId로 풀어서 사용.
 // 학생 클라이언트로는 Key 원문이 절대 내려가지 않는다.
 
@@ -74,7 +74,7 @@ export async function POST(req: Request) {
       JSON.stringify({
         error: "llm_key_missing",
         message:
-          "담임 선생님이 /docs/ai-setup에서 AI API Key를 먼저 저장해야 합니다.",
+          "담임 선생님이 /teacher/settings#llm에서 AI API Key를 먼저 저장해야 합니다.",
       }),
       { status: 503, headers: { "Content-Type": "application/json" } },
     );

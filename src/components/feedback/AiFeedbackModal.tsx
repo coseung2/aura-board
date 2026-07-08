@@ -112,9 +112,9 @@ export function AiFeedbackModal({
 
   function explainError(e: string): string {
     if (e === "ai_key_missing")
-      return "교사 LLM API Key 가 등록돼 있지 않아요. /docs/ai-setup 에서 등록 후 다시 시도하세요.";
+      return "교사 LLM API Key 가 등록돼 있지 않아요. /teacher/settings 에서 등록 후 다시 시도하세요.";
     if (e === "ai_key_decrypt_failed")
-      return "LLM Key 복호화에 실패했어요. /docs/ai-setup 에서 키를 다시 저장해주세요.";
+      return "LLM Key 복호화에 실패했어요. /teacher/settings 에서 키를 다시 저장해주세요.";
     if (e === "not_classroom_owner_or_missing")
       return "권한이 없거나 학생이 존재하지 않아요";
     if (e === "empty_text") return "LLM 이 빈 응답을 돌려줬어요";
