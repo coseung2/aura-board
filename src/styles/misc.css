@@ -1638,3 +1638,47 @@ body > div {
   font-size: 12.5px;
   color: var(--color-text-muted);
 }
+
+/* -------- Teacher account withdrawal (/teacher/settings) -------- */
+
+.withdrawal-trigger-btn {
+  margin-top: 4px;
+}
+
+.withdrawal-modal {
+  width: min(480px, calc(100vw - 32px));
+}
+
+.withdrawal-warning {
+  border-left-color: var(--color-danger, #dc3545);
+  background: color-mix(in srgb, var(--color-danger, #dc3545) 8%, var(--color-surface-alt));
+}
+
+.withdrawal-list {
+  margin: 0 0 12px;
+  padding-left: 18px;
+  font-size: 13.5px;
+  line-height: 1.7;
+  color: var(--color-text);
+}
+
+.withdrawal-list li {
+  margin-bottom: 4px;
+}
+
+.withdrawal-error {
+  margin: 8px 0 0;
+  padding: 10px 14px;
+  border-radius: var(--radius-btn);
+  background: rgba(220, 53, 69, 0.08);
+  color: var(--color-danger, #dc3545);
+  font-size: 13px;
+}
+
+.withdrawal-confirm-btn {
+  background: var(--color-danger, #dc3545);
+}
+
+.withdrawal-confirm-btn:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--color-danger, #dc3545) 88%, #000);
+}

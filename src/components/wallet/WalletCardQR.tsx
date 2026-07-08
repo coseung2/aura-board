@@ -10,9 +10,23 @@ export function WalletCardQR({ card }: Props) {
   const [token, setToken] = useState<string | null>(null);
   const [qrDataUrl, setQrDataUrl] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
-  const [designing, setDesigning] = useState(false);
-  const [designError, setDesignError] = useState<string | null>(null);
-  const fetchRef = useRef(false);
+ const [designing, setDesigning] = useState(false);
+ const [designError, setDesignError] = useState<string | null>(null);
+ const fetchRef = useRef(false);
+
+  // Canva OAuth redirect errors (e.g. ?canva=invalid_scope)
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    const canvaErr = params.get("canva");
+    if (!canvaErr) return;
+    setDesignError(getCanvaErrorMessage(canvaErr));
+    params.delete("canva");
+    const nextUrl =
+      window.location.pathname +
+      (params.toString() ? `?${params.toString()}` : "");
+    window.history.replaceState({}, "", nextUrl);
+  }, []);
 
   const fetchToken = useCallback(async () => {
     if (fetchRef.current) return;
@@ -86,6 +100,16 @@ export function WalletCardQR({ card }: Props) {
     } finally {
       setDesigning(false);
     }
+  }
+
+  function getCanvaErrorMessage(code: string): string {
+    if (code === "invalid_scope") {
+      return "Canva 연결에 필요한 권한이 앱에 설정되지 않았어요. 관리자가 Canva Developer Portal에서 design:content:write, asset:read, asset:write scope을 활성화해야 해요.";
+    }
+    if (code === "access_denied") {
+      return "Canva 연결을 허용하지 않았어요. 다시 시도해서 권한을 허용해주세요.";
+    }
+    return `Canva 연결 중 오류가 났어요. (${code})`;
   }
 
   return (

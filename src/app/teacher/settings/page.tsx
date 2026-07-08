@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
 import { LlmKeyForm } from "@/components/LlmKeyForm";
 import { TopNav } from "@/components/TopNav";
+import { TeacherWithdrawalSection } from "@/components/teacher/TeacherWithdrawalSection";
 
 const ADMIN_EMAIL = "mallagaenge@gmail.com";
 
@@ -39,6 +40,7 @@ export default async function TeacherSettingsPage() {
           </p>
           <LlmKeyForm />
         </section>
+        <TeacherWithdrawalSection />
       </article>
       </main>
     </>
