@@ -1,12 +1,11 @@
 import { db } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
+import { isAdminEmail } from "@/lib/admin";
 import { getCurrentTierAsync } from "@/lib/tier";
 import { Dashboard } from "@/components/Dashboard";
 import { TopNav } from "@/components/TopNav";
 import { AppBackgroundButton } from "@/components/AppBackground";
 import { redirect } from "next/navigation";
-
-const ADMIN_EMAIL = "mallagaenge@gmail.com";
 
 export default async function DashboardPage() {
   let user;
@@ -72,7 +71,7 @@ export default async function DashboardPage() {
 
   return (
     <>
-      <TopNav showAdmin={user.email.toLowerCase() === ADMIN_EMAIL} />
+      <TopNav showAdmin={isAdminEmail(user.email)} />
       <main className="home-page">
         <header className="home-header">
           <div className="home-header-top">
@@ -89,6 +88,7 @@ export default async function DashboardPage() {
           boards={boardItems}
           classrooms={classroomItems}
           userTier={tier}
+          isAdmin={isAdminEmail(user.email)}
         />
       </main>
     </>

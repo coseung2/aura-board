@@ -34,6 +34,7 @@ type Props = {
   boards: BoardItem[];
   classrooms: ClassroomItem[];
   userTier?: "free" | "pro";
+  isAdmin?: boolean;
 };
 
 type BoardSectionTabsProps = {
@@ -186,7 +187,12 @@ function BoardSectionTabs({
   );
 }
 
-export function Dashboard({ boards, classrooms, userTier = "pro" }: Props) {
+export function Dashboard({
+  boards,
+  classrooms,
+  userTier = "pro",
+  isAdmin = false,
+}: Props) {
   const router = useRouter();
   const [showCreate, setShowCreate] = useState(false);
   const [editingBoard, setEditingBoard] = useState<BoardItem | null>(null);
@@ -249,6 +255,7 @@ export function Dashboard({ boards, classrooms, userTier = "pro" }: Props) {
         <CreateBoardModal
           classrooms={classrooms}
           userTier={userTier}
+          isAdmin={isAdmin}
           onClose={() => setShowCreate(false)}
         />
       )}

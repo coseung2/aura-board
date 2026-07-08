@@ -70,12 +70,14 @@ type ClassroomItem = {
 type Props = {
   classrooms: ClassroomItem[];
   userTier?: "free" | "pro";
+  isAdmin?: boolean;
   onClose: () => void;
 };
 
 export function CreateBoardModal({
   classrooms,
   userTier = "pro",
+  isAdmin = false,
   onClose,
 }: Props) {
   const router = useRouter();
@@ -189,7 +191,10 @@ export function CreateBoardModal({
     : null;
   const requiresClassroom = selectedLayout === "dj-queue" || selectedLayout === "kordle";
   const visibleLayoutsForCategory = VISIBLE_LAYOUTS.filter((layout) =>
-    category === "PLAY" ? PLAY_LAYOUT_IDS.has(layout.id) : !PLAY_LAYOUT_IDS.has(layout.id),
+    (layout.ready || isAdmin) &&
+    (category === "PLAY"
+      ? PLAY_LAYOUT_IDS.has(layout.id)
+      : !PLAY_LAYOUT_IDS.has(layout.id)),
   );
 
   const renderLayoutGrid = (layouts: typeof VISIBLE_LAYOUTS) => (

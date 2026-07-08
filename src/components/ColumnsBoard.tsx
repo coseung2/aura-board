@@ -33,6 +33,11 @@ import {
   type SubjectOrder,
   normalizeSubjectOrder,
 } from "@/lib/subject-order";
+import {
+  BOARD_SECTIONS_REORDERED_EVENT,
+  type BoardSectionsReorderedDetail,
+} from "@/lib/board-section-events";
+import { sortSections } from "@/lib/sort-sections";
 
 type SectionData = StreamSection;
 
@@ -79,12 +84,7 @@ export function ColumnsBoard({
   const cardsRef = useRef(cards);
   cardsRef.current = cards;
   const [sections, setSections] = useState<SectionData[]>(
-    [...initialSections].sort((a, b) => {
-      if (a.pinned && !b.pinned) return -1;
-      if (!a.pinned && b.pinned) return 1;
-      if (a.pinned && b.pinned) return a.order - b.order;
-      return b.order - a.order;
-    }),
+    [...initialSections].sort(sortSections),
   );
   const [scrollRailWidth, setScrollRailWidth] = useState(0);
   const [authorEditCard, setAuthorEditCard] = useState<CardData | null>(null);
@@ -130,6 +130,45 @@ export function ColumnsBoard({
   useEffect(() => {
     applyAnonymousAuthor(anonymousAuthor);
   }, [anonymousAuthor, applyAnonymousAuthor]);
+
+  useEffect(() => {
+    setSections([...initialSections].sort(sortSections));
+  }, [initialSections]);
+
+  useEffect(() => {
+    function handleSectionsReordered(event: Event) {
+      const detail = (event as CustomEvent<BoardSectionsReorderedDetail>).detail;
+      if (!detail || detail.boardId !== boardId) return;
+      const orderById = new Map(
+        detail.sections.map((section) => [section.id, section] as const),
+      );
+      setSections((list) =>
+        list
+          .map((section) => {
+            const updated = orderById.get(section.id);
+            return updated
+              ? {
+                  ...section,
+                  order: updated.order,
+                  pinned: updated.pinned,
+                }
+              : section;
+          })
+          .sort(sortSections),
+      );
+    }
+
+    window.addEventListener(
+      BOARD_SECTIONS_REORDERED_EVENT,
+      handleSectionsReordered,
+    );
+    return () => {
+      window.removeEventListener(
+        BOARD_SECTIONS_REORDERED_EVENT,
+        handleSectionsReordered,
+      );
+    };
+  }, [boardId]);
 
   useBoardAnonymityChange(boardId, applyAnonymousAuthor);
 

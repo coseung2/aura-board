@@ -1,4 +1,6 @@
 import { redirect } from "next/navigation";
+import { getCurrentUser } from "@/lib/auth";
+import { isAdminEmail } from "@/lib/admin";
 import { getCurrentStudent } from "@/lib/student-auth";
 import { getStudentDuties } from "@/lib/role-portals";
 import { StudentTopNav } from "@/components/StudentTopNav";
@@ -7,6 +9,10 @@ import { StudentFeatureComingSoon } from "@/components/student/StudentFeatureCom
 export const dynamic = "force-dynamic";
 
 export default async function CharacterRoomPage() {
+  // 캐릭터 피팅룸은 admin teacher만 미리 볼 수 있다.
+  const teacher = await getCurrentUser();
+  if (!isAdminEmail(teacher?.email)) redirect("/student");
+
   const student = await getCurrentStudent();
   if (!student) redirect("/login?from=/student/character-room");
   const duties = await getStudentDuties(student.id);

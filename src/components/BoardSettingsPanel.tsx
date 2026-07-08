@@ -22,6 +22,10 @@ import {
   type SubjectOrder,
   normalizeSubjectOrder,
 } from "@/lib/subject-order";
+import {
+  BOARD_SECTIONS_REORDERED_EVENT,
+  type BoardSectionsReorderedDetail,
+} from "@/lib/board-section-events";
 
 export type { BoardSection, BoardTheme } from "./board-settings/types";
 
@@ -154,6 +158,21 @@ export function BoardSettingsPanel({
 
   function handleSectionsReordered(next: BoardSection[]) {
     setSections(next);
+    window.dispatchEvent(
+      new CustomEvent<BoardSectionsReorderedDetail>(
+        BOARD_SECTIONS_REORDERED_EVENT,
+        {
+          detail: {
+            boardId,
+            sections: next.map((section) => ({
+              id: section.id,
+              order: section.order ?? 0,
+              pinned: section.pinned ?? false,
+            })),
+          },
+        },
+      ),
+    );
     router.refresh();
   }
 
