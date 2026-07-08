@@ -49,8 +49,14 @@ export async function POST(req: Request) {
         // Get design info for the item ID (design ID format for move: DAxxxxxx → item ID)
         const design = await canvaGetDesign(token, designId);
         const moved = await canvaMoveItem(token, designId, folder.id);
-        results.push({ url, designId, moved, title: design.title });
+        results.push({ url, designId, moved, title: design.title, error: moved ? undefined : "move returned false" });
       } catch (e: any) {
+        console.warn("[POST /api/canva/organize] design move failed", {
+          url,
+          designId,
+          errorMessage: e.message ?? String(e),
+          status: e?.status ?? e?.response?.status,
+        });
         results.push({ url, designId, moved: false, error: e.message });
       }
     }

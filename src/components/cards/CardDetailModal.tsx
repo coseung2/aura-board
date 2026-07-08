@@ -168,7 +168,7 @@ export function CardDetailModal({
     (isYouTubeLink(card.linkUrl) || isCanvaDesignUrl(card.linkUrl)),
   );
   const mediaLinkUrl = hasEmbeddableLink ? card.linkUrl : null;
-  const hasTextLink = Boolean(card.linkUrl && !hasEmbeddableLink);
+  const hasTextLink = Boolean(card.linkUrl);
   const hasMedia = hasMediaAttachment || hasEmbeddableLink;
   const hasTextContent = Boolean(
     card.title.trim() ||
@@ -251,16 +251,6 @@ export function CardDetailModal({
                     attachments={mediaAttachments}
                     onImageClick={(i) => setLightboxIndex(i)}
                   />
-                  {hasEmbeddableLink && card.linkUrl && (
-                    <a
-                      href={card.linkUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="card-detail-media-link"
-                    >
-                      🔗 링크 열기
-                    </a>
-                  )}
                 </div>
               )}
               {hasTextContent && (

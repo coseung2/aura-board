@@ -10,8 +10,17 @@ export async function GET() {
   if (!user) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
+
   const connected = await isCanvaConnected(user.id);
-  return NextResponse.json({ connected });
+  const row = await db.canvaConnectAccount.findUnique({
+    where: { userId: user.id },
+    select: { createdAt: true },
+  });
+
+  return NextResponse.json({
+    connected,
+    connectedAt: row?.createdAt?.toISOString() ?? null,
+  });
 }
 
 export async function DELETE() {

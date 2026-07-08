@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
+import { db } from "@/lib/db";
 import { LlmKeyForm } from "@/components/LlmKeyForm";
 import { TopNav } from "@/components/TopNav";
 import { TeacherWithdrawalSection } from "@/components/teacher/TeacherWithdrawalSection";
@@ -17,6 +18,10 @@ export default async function TeacherSettingsPage() {
   const user = await getCurrentUser();
   if (!user) redirect("/login?from=/teacher/settings");
   const canvaConnected = await isCanvaConnected(user.id);
+  const canvaRow = await db.canvaConnectAccount.findUnique({
+    where: { userId: user.id },
+    select: { createdAt: true },
+  });
 
   return (
     <>
@@ -34,7 +39,10 @@ export default async function TeacherSettingsPage() {
           </div>
           <LlmKeyForm />
         </section>
-        <CanvaSettingsSection initialConnected={canvaConnected} />
+        <CanvaSettingsSection
+          initialConnected={canvaConnected}
+          connectedAt={canvaRow?.createdAt?.toISOString() ?? null}
+        />
         <TeacherWithdrawalSection email={user.email} />
       </article>
       </main>
