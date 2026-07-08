@@ -4,10 +4,9 @@ import {
   extractCanvaDesignId,
   expandCanvaShortLink,
   getAccessToken,
+  resolveCanvaEmbedUrl,
 } from "@/lib/canva";
-import { resolveCanvaEmbedUrlCached } from "@/lib/canva-preview-cache";
 import { getCurrentUser } from "@/lib/auth";
-import { getPreviewCache, setPreviewCache } from "@/lib/preview-cache";
 
 /**
  * Server-side proxy for Canva (and similar CDN) thumbnails. Clients
@@ -30,20 +29,6 @@ const ALLOWED_HOST_SUFFIXES = [
 ];
 const MAX_HTML_BYTES = 512 * 1024;
 
-// Single point of truth for writes to the shared `canva-thumbnail` cache.
-// Only non-null URLs are stored, and callers are responsible for ensuring
-// the URL is publicly resolvable (e.g. came from resolveCanvaEmbedUrlCached
-// or resolvePublicCanvaPageThumbnail). User-token-derived thumbnails must
-// NEVER be passed here; they are kept off the shared cache and served with
-// `Cache-Control: private, no-store` via the `privateThumbnail` flag below.
-async function cacheSharedCanvaThumbnail(
-  design: string,
-  url: string | null,
-): Promise<void> {
-  if (!url) return;
-  await setPreviewCache("canva-thumbnail", design, { url }, true);
-}
-
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
   const design = searchParams.get("design");
@@ -62,21 +47,10 @@ export async function GET(req: Request) {
   }
 
   if (!url && design) {
-    const cached = await getPreviewCache<{ url: string | null }>("canva-thumbnail", design);
-    if (cached.hit) {
-      url = cached.status === "ok" ? cached.payload.url : null;
-    } else {
-      const embed = await resolveCanvaEmbedUrlCached(design);
+    url = await resolvePublicCanvaPageThumbnail(design);
+    if (!url) {
+      const embed = await resolveCanvaEmbedUrl(design);
       url = normalizeResolvedThumbnailUrl(embed?.thumbnailUrl);
-      // Invariant: the shared `canva-thumbnail` key may only store
-      // publicly resolvable URLs. Negative outcomes are intentionally
-      // NOT cached here; otherwise a logged-in user with a Canva token
-      // (whose private thumbnail lookup would succeed) is short-circuited
-      // to a 404. The oembed layer caches its own `canva-oembed`
-      // negatives, so we do not lose upstream protection.
-      if (url) {
-        await cacheSharedCanvaThumbnail(design, url);
-      }
     }
     if (!url) {
       const designId = extractCanvaDesignId(design);
@@ -90,15 +64,6 @@ export async function GET(req: Request) {
         } catch {
           url = null;
         }
-      }
-    }
-    if (!url) {
-      url = await resolvePublicCanvaPageThumbnail(design);
-      if (url) {
-        // Public HTML scrape produces a CDN URL on the canva.com
-        // allowlist, so it is safe to share. User-token thumbnails are
-        // never routed through this path.
-        await cacheSharedCanvaThumbnail(design, url);
       }
     }
     if (!url) {
@@ -221,12 +186,12 @@ async function resolveDesignThumbnailFromScreenUrl(
   const designUrl = shareToken
     ? `https://www.canva.com/design/${designId}/${shareToken}/view`
     : `https://www.canva.com/design/${designId}/view`;
-  const embed = await resolveCanvaEmbedUrlCached(designUrl);
-  const embedThumbnail = normalizeResolvedThumbnailUrl(embed?.thumbnailUrl);
-  if (embedThumbnail) return { url: embedThumbnail, private: false };
-
   const publicThumbnail = await resolvePublicCanvaPageThumbnail(designUrl);
   if (publicThumbnail) return { url: publicThumbnail, private: false };
+
+  const embed = await resolveCanvaEmbedUrl(designUrl);
+  const embedThumbnail = normalizeResolvedThumbnailUrl(embed?.thumbnailUrl);
+  if (embedThumbnail) return { url: embedThumbnail, private: false };
 
   const user = await getCurrentUser().catch(() => null);
   const token = user ? await getAccessToken(user.id) : null;

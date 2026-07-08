@@ -30,9 +30,15 @@ export async function getPreviewCache<T>(
   kind: string,
   url: string
 ): Promise<{ hit: true; status: "ok"; payload: T } | { hit: true; status: "miss" } | { hit: false }> {
-  const row = await db.previewFetchCache.findUnique({
-    where: { key: previewCacheKey(kind, url) },
-  });
+  let row;
+  try {
+    row = await db.previewFetchCache.findUnique({
+      where: { key: previewCacheKey(kind, url) },
+    });
+  } catch (error) {
+    console.warn(`[preview-cache] read failed for ${kind}`, error);
+    return { hit: false };
+  }
   if (!row || row.expiresAt <= new Date()) return { hit: false };
   if (row.status === "ok") {
     return { hit: true, status: "ok", payload: row.payload as T };
@@ -48,22 +54,26 @@ export async function setPreviewCache(
   error?: string
 ): Promise<void> {
   const ttl = ok ? POSITIVE_TTL_MS : negativeTtlMs(kind);
-  await db.previewFetchCache.upsert({
-    where: { key: previewCacheKey(kind, url) },
-    create: {
-      key: previewCacheKey(kind, url),
-      kind,
-      url,
-      status: ok ? "ok" : "miss",
-      payload: ok ? payload ?? undefined : undefined,
-      error: ok ? null : error ?? "miss",
-      expiresAt: new Date(Date.now() + ttl),
-    },
-    update: {
-      status: ok ? "ok" : "miss",
-      payload: ok ? payload ?? undefined : undefined,
-      error: ok ? null : error ?? "miss",
-      expiresAt: new Date(Date.now() + ttl),
-    },
-  });
+  try {
+    await db.previewFetchCache.upsert({
+      where: { key: previewCacheKey(kind, url) },
+      create: {
+        key: previewCacheKey(kind, url),
+        kind,
+        url,
+        status: ok ? "ok" : "miss",
+        payload: ok ? payload ?? undefined : undefined,
+        error: ok ? null : error ?? "miss",
+        expiresAt: new Date(Date.now() + ttl),
+      },
+      update: {
+        status: ok ? "ok" : "miss",
+        payload: ok ? payload ?? undefined : undefined,
+        error: ok ? null : error ?? "miss",
+        expiresAt: new Date(Date.now() + ttl),
+      },
+    });
+  } catch (cacheError) {
+    console.warn(`[preview-cache] write failed for ${kind}`, cacheError);
+  }
 }
