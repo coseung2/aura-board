@@ -4,6 +4,7 @@ import { db } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
 import { getCurrentStudent } from "@/lib/student-auth";
 import { jsonPrivateNoStore } from "@/lib/http-cache";
+import { announceKordlePuzzleChange } from "@/lib/realtime-broadcast";
 import { normalizeWord } from "@/features/kordle/engine";
 import {
   KORDLE_WORD_LENGTH,
@@ -324,6 +325,12 @@ export async function PATCH(req: Request, { params }: Params) {
   if (result === "not_startable") {
     return NextResponse.json({ error: "puzzle_not_startable" }, { status: 409 });
   }
+
+  await announceKordlePuzzleChange(board.id, {
+    puzzleId: result.id,
+    status: result.status,
+    updatedAt: new Date().toISOString(),
+  });
 
   return NextResponse.json({ puzzle: result });
 }

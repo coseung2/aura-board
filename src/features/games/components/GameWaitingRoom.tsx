@@ -16,6 +16,7 @@ type Props = {
   onReady: () => void;
   isReadyStatus?: (status: string | null | undefined) => boolean;
   pollDelayMs?: number;
+  participantsOverride?: GameParticipant[] | null;
   className?: string;
   children?: ReactNode;
 };
@@ -32,10 +33,12 @@ export function GameWaitingRoom({
   onReady,
   isReadyStatus = defaultIsReadyStatus,
   pollDelayMs = 1800,
+  participantsOverride,
   className,
   children,
 }: Props) {
   const [participants, setParticipants] = useState<GameParticipant[]>([]);
+  const displayedParticipants = participantsOverride ?? participants;
 
   useEffect(() => {
     let cancelled = false;
@@ -72,8 +75,8 @@ export function GameWaitingRoom({
       {message ? <p>{message}</p> : null}
       {children}
       <div className="game-waiting-participants" aria-label="입장한 학생">
-        <span>입장한 사람 {participants.length}명</span>
-        <GameParticipantsList participants={participants} label="" />
+        <span>입장한 사람 {displayedParticipants.length}명</span>
+        <GameParticipantsList participants={displayedParticipants} label="" />
       </div>
     </main>
   );

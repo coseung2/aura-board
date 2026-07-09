@@ -90,7 +90,11 @@ export default async function KordlePlayPage({ params }: Props) {
           canEdit={false}
           showAuth={false}
         />
-        <KordleWaitingRoom boardId={boardId} />
+        <KordleWaitingRoom
+          boardId={boardId}
+          studentId={student.id}
+          studentName={student.name}
+        />
       </main>
     );
   }
@@ -118,7 +122,11 @@ export default async function KordlePlayPage({ params }: Props) {
           canEdit={false}
           showAuth={false}
         />
-        <KordleWaitingRoom boardId={boardId} />
+        <KordleWaitingRoom
+          boardId={boardId}
+          studentId={student.id}
+          studentName={student.name}
+        />
       </main>
     );
   }

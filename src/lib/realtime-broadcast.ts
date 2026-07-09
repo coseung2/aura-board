@@ -9,8 +9,10 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import {
   KORDLE_GUESS_SUBMITTED_EVENT,
+  KORDLE_PUZZLE_CHANGED_EVENT,
   kordleBoardChannelKey,
   type KordleLiveEvent,
+  type KordlePuzzleChangedEvent,
 } from "@/features/kordle/realtime";
 import type { BoardRealtimeEvent } from "./realtime";
 import { boardChannelKey } from "./realtime";
@@ -189,6 +191,28 @@ export async function announceKordleGuess(
     await client.channel(kordleBoardChannelKey(boardId)).send({
       type: "broadcast",
       event: KORDLE_GUESS_SUBMITTED_EVENT,
+      payload: event,
+    });
+  } catch {
+    // ignore
+  }
+}
+
+/**
+ * Broadcast a Kordle puzzle lifecycle change. Waiting clients can refresh
+ * immediately when a teacher starts the puzzle.
+ */
+export async function announceKordlePuzzleChange(
+  boardId: string,
+  event: KordlePuzzleChangedEvent,
+): Promise<void> {
+  if (!boardId || !event.puzzleId) return;
+  const client = getServerClient();
+  if (!client) return;
+  try {
+    await client.channel(kordleBoardChannelKey(boardId)).send({
+      type: "broadcast",
+      event: KORDLE_PUZZLE_CHANGED_EVENT,
       payload: event,
     });
   } catch {
