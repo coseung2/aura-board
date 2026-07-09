@@ -16,6 +16,7 @@ export type LayoutKey =
   | "vibe-arcade"
   | "vibe-gallery"
   | "speed-game"
+  | "shadow-alliance"
   | "plant-roadmap"
   | "event-signup"
   | "question-board";
@@ -42,6 +43,7 @@ export const LAYOUT_META: Record<LayoutKey, { emoji: string; label: string }> =
     "vibe-arcade": { emoji: "💻", label: "코딩 교실" },
     "vibe-gallery": { emoji: "🖼️", label: "코딩 갤러리" },
     "speed-game": { emoji: "⚡", label: "스피드게임" },
+    "shadow-alliance": { emoji: "♟", label: "그림자연합" },
     "plant-roadmap": { emoji: "🌱", label: "식물 관찰일지" },
     "event-signup": { emoji: "🎪", label: "행사 신청" },
     "question-board": { emoji: "💭", label: "질문 보드" },

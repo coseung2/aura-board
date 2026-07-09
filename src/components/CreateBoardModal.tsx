@@ -29,6 +29,7 @@ const PICKER_ROWS: PickerRow[] = [
   { id: "vibe-gallery", desc: "승인된 코딩 결과물 전시와 체험" },
   { id: "kordle", desc: "학생들이 매일 푸는 단어 추리 게임" },
   { id: "speed-game", desc: "모둠별 실시간 단어 설명 맞추기 게임" },
+  { id: "shadow-alliance", desc: "Supabase Realtime으로 진행하는 팀 추리 숫자 게임" },
   { id: "question-board", desc: "학생 응답을 다양한 시각화로 표시" },
 ];
 
@@ -39,6 +40,7 @@ const READY_LAYOUT_IDS = new Set<LayoutKey>([
   "plant-roadmap",
   "kordle",
   "speed-game",
+  "shadow-alliance",
 ]);
 
 const UNLOCKED_DEV_LAYOUT_IDS = new Set<LayoutKey>(["stream"]);
@@ -59,7 +61,7 @@ const LAYOUTS = PICKER_ROWS.map((row) => ({
 const VISIBLE_LAYOUTS = LAYOUTS.filter((layout) => !layout.hidden).sort(
   (a, b) => Number(b.selectable) - Number(a.selectable)
 );
-const PLAY_LAYOUT_IDS = new Set<LayoutKey>(["kordle", "speed-game"]);
+const PLAY_LAYOUT_IDS = new Set<LayoutKey>(["kordle", "speed-game", "shadow-alliance"]);
 
 type ClassroomItem = {
   id: string;
@@ -189,7 +191,10 @@ export function CreateBoardModal({
   const selectedLayoutMeta = selectedLayout
     ? LAYOUTS.find((layout) => layout.id === selectedLayout)
     : null;
-  const requiresClassroom = selectedLayout === "dj-queue" || selectedLayout === "kordle";
+  const requiresClassroom =
+    selectedLayout === "dj-queue" ||
+    selectedLayout === "kordle" ||
+    selectedLayout === "shadow-alliance";
   const visibleLayoutsForCategory = VISIBLE_LAYOUTS.filter((layout) =>
     (layout.ready || isAdmin) &&
     (category === "PLAY"

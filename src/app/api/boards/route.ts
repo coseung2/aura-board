@@ -54,6 +54,7 @@ const CreateBoardSchema = z.object({
     "kordle",
     "question-board",
     "speed-game",
+    "shadow-alliance",
   ]),
   description: z.string().max(2000).default(""),
   // BC-1: lesson vs play grouping. Defaults to LESSON to keep legacy clients working.
@@ -531,6 +532,37 @@ export async function POST(req: Request) {
           ownedClassroom.id,
           createdBoard.id,
         );
+        return createdBoard;
+      });
+
+      return NextResponse.json({ board });
+    }
+
+    if (input.layout === "shadow-alliance") {
+      if (!ownedClassroom) {
+        return NextResponse.json(
+          { error: "그림자연합 보드는 학급을 선택해야 합니다." },
+          { status: 400 },
+        );
+      }
+
+      const board = await db.$transaction(async (tx) => {
+        const createdBoard = await tx.board.create({
+          data: {
+            title: input.title || "그림자연합",
+            slug,
+            layout: "shadow-alliance",
+            description: input.description,
+            category: "PLAY",
+            classroomId: ownedClassroom.id,
+            thumbnailMode: input.thumbnailMode,
+            thumbnailUrl: input.thumbnailUrl,
+            members: {
+              create: { userId: user.id, role: "owner" },
+            },
+          },
+        });
+        await snapshotClassroomGroupsToBoard(tx, ownedClassroom.id, createdBoard.id);
         return createdBoard;
       });
 

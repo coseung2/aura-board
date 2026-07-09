@@ -21,6 +21,7 @@ import { VibeArcadeBoard } from "@/components/VibeArcadeBoard";
 import { VibeGalleryBoard } from "@/components/VibeGalleryBoard";
 import { QuestionBoard } from "@/components/QuestionBoard";
 import { SpeedGameBoard } from "@/components/speed-game/SpeedGameBoard";
+import { ShadowAllianceBoard } from "@/components/ShadowAllianceBoard";
 import { KordleTeacherBoard } from "@/features/kordle/components/KordleTeacherBoard";
 import { cloneStructure } from "@/lib/breakout";
 import { loadGameSnapshot } from "@/lib/speed-game/runtime";
@@ -150,6 +151,7 @@ export default async function BoardPage({
   const needsBreakoutData = board.layout === "breakout";
   const needsQuestionData = board.layout === "question-board";
   const needsSpeedGameData = board.layout === "speed-game";
+  const needsShadowAllianceData = board.layout === "shadow-alliance";
   const needsCards =
     !needsAssignmentData &&
     !needsQuizData &&
@@ -157,7 +159,8 @@ export default async function BoardPage({
     !needsEventData &&
     !needsDrawingData &&
     !needsQuestionData &&
-    !needsSpeedGameData;
+    !needsSpeedGameData &&
+    !needsShadowAllianceData;
   // Breakout reuses cards + sections both.
   const needsSections =
     board.layout === "columns" ||
@@ -895,6 +898,13 @@ export default async function BoardPage({
           />
         );
       }
+      case "shadow-alliance":
+        return (
+          <ShadowAllianceBoard
+            boardId={board!.id}
+            boardTitle={board!.title || "그림자연합"}
+          />
+        );
       case "kordle": {
         if (studentViewer) {
           redirect(`/board/${board!.slug ?? board!.id}/play/kordle`);
