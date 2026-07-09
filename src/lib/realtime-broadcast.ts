@@ -7,6 +7,11 @@
  */
 
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import {
+  KORDLE_GUESS_SUBMITTED_EVENT,
+  kordleBoardChannelKey,
+  type KordleLiveEvent,
+} from "@/features/kordle/realtime";
 import type { BoardRealtimeEvent } from "./realtime";
 import { boardChannelKey } from "./realtime";
 
@@ -162,6 +167,28 @@ export async function announceQuestionChange(
     await client.channel(boardChannelKey(boardId)).send({
       type: "broadcast",
       event: "question_changed",
+      payload: event,
+    });
+  } catch {
+    // ignore
+  }
+}
+
+/**
+ * Broadcast a Kordle guess event to the live toast/chat feed.
+ * The mutation is already committed, so failures here must not fail gameplay.
+ */
+export async function announceKordleGuess(
+  boardId: string,
+  event: KordleLiveEvent,
+): Promise<void> {
+  if (!boardId || !event.id) return;
+  const client = getServerClient();
+  if (!client) return;
+  try {
+    await client.channel(kordleBoardChannelKey(boardId)).send({
+      type: "broadcast",
+      event: KORDLE_GUESS_SUBMITTED_EVENT,
       payload: event,
     });
   } catch {

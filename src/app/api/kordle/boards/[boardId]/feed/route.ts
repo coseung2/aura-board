@@ -2,14 +2,9 @@ import { db } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
 import { getCurrentStudent } from "@/lib/student-auth";
 import { jsonPrivateNoStore } from "@/lib/http-cache";
-import type { GuessFeedback } from "@/features/kordle/engine";
+import { kordleCorrectCount } from "@/features/kordle/realtime";
 
 type Params = { params: Promise<{ boardId: string }> };
-
-function correctCount(feedback: unknown): number {
-  if (!Array.isArray(feedback)) return 0;
-  return (feedback as GuessFeedback).filter((item) => item?.state === "correct").length;
-}
 
 export async function GET(req: Request, { params }: Params) {
   const { boardId: boardIdOrSlug } = await params;
@@ -89,7 +84,7 @@ export async function GET(req: Request, { params }: Params) {
 
   const events = guesses
     .map((guess) => {
-      const count = correctCount(guess.feedback);
+      const count = kordleCorrectCount(guess.feedback);
       return {
         id: guess.id,
         name: guess.attempt.student?.name ?? guess.attempt.teacherUser?.name ?? "누군가",
