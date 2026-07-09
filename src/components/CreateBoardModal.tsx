@@ -29,7 +29,7 @@ const PICKER_ROWS: PickerRow[] = [
   { id: "vibe-gallery", desc: "승인된 코딩 결과물 전시와 체험" },
   { id: "kordle", desc: "학생들이 매일 푸는 단어 추리 게임" },
   { id: "speed-game", desc: "모둠별 실시간 단어 설명 맞추기 게임" },
-  { id: "shadow-alliance", desc: "Supabase Realtime으로 진행하는 팀 추리 숫자 게임" },
+  { id: "shadow-alliance", desc: "익명으로 진행하는 팀 추리 숫자 게임" },
   { id: "question-board", desc: "학생 응답을 다양한 시각화로 표시" },
 ];
 

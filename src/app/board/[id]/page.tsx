@@ -898,13 +898,20 @@ export default async function BoardPage({
           />
         );
       }
-      case "shadow-alliance":
-        return (
+      case "shadow-alliance": {
+        const viewer = studentViewer
+          ? "student"
+          : effectiveRole === "owner" || effectiveRole === "editor"
+            ? "teacher"
+            : null;
+        return viewer ? (
           <ShadowAllianceBoard
             boardId={board!.id}
-            boardTitle={board!.title || "그림자연합"}
+            boardTitle={board!.title}
+            viewer={viewer}
           />
-        );
+        ) : null;
+      }
       case "kordle": {
         if (studentViewer) {
           redirect(`/board/${board!.slug ?? board!.id}/play/kordle`);

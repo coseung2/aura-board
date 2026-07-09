@@ -1,0 +1,44 @@
+"use client";
+
+import { ShadowAllianceStudentGame } from "./ShadowAllianceStudentGame";
+import { ShadowAllianceTeacherGame } from "./ShadowAllianceTeacherGame";
+import { useShadowAllianceGame } from "../useShadowAllianceGame";
+
+type Props = {
+  boardId: string;
+  viewer: "teacher" | "student";
+};
+
+export function ShadowAllianceGame({ boardId, viewer }: Props) {
+  const game = useShadowAllianceGame({ boardId, viewer });
+
+  if (viewer === "student") {
+    return (
+      <ShadowAllianceStudentGame
+        connection={game.connection}
+        joinPending={game.joinPending}
+        player={game.studentPlayer}
+        snapshot={game.snapshot}
+        onRetryJoin={game.requestJoin}
+        onSubmitNumber={game.submitNumber}
+      />
+    );
+  }
+
+  return (
+    <ShadowAllianceTeacherGame
+      game={game.game}
+      connection={game.connection}
+      rankings={game.rankings}
+      onAddPlayer={game.addPlayer}
+      onRemovePlayer={game.removePlayer}
+      onRebalanceTeams={game.rebalanceTeams}
+      onSetSettings={game.setSettings}
+      onStartGame={game.startGame}
+      onNextRound={game.nextRound}
+      onRevealRound={game.revealRound}
+      onShowPostround={game.showPostround}
+      onSetTimerRunning={game.setTimerRunning}
+    />
+  );
+}

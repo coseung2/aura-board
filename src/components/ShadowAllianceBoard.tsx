@@ -1,19 +1,19 @@
+import { ShadowAllianceGame } from "@/features/shadow-alliance/components/ShadowAllianceGame";
+
 type ShadowAllianceBoardProps = {
   boardId: string;
   boardTitle: string;
+  viewer: "teacher" | "student";
 };
 
-export function ShadowAllianceBoard({ boardId, boardTitle }: ShadowAllianceBoardProps) {
-  const src = `/games/shadow-alliance?boardId=${encodeURIComponent(boardId)}`;
-
+export function ShadowAllianceBoard({
+  boardId,
+  boardTitle,
+  viewer,
+}: ShadowAllianceBoardProps) {
   return (
     <section className="shadow-alliance-board" aria-label={boardTitle}>
-      <iframe
-        className="shadow-alliance-frame"
-        title={boardTitle || "그림자연합"}
-        src={src}
-        sandbox="allow-scripts allow-same-origin allow-forms allow-modals"
-      />
+      <ShadowAllianceGame boardId={boardId} viewer={viewer} />
     </section>
   );
 }

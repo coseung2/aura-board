@@ -557,12 +557,14 @@ export async function POST(req: Request) {
             classroomId: ownedClassroom.id,
             thumbnailMode: input.thumbnailMode,
             thumbnailUrl: input.thumbnailUrl,
-            members: {
-              create: { userId: user.id, role: "owner" },
-            },
+            members: { create: { userId: user.id, role: "owner" } },
           },
         });
-        await snapshotClassroomGroupsToBoard(tx, ownedClassroom.id, createdBoard.id);
+        await snapshotClassroomGroupsToBoard(
+          tx,
+          ownedClassroom.id,
+          createdBoard.id,
+        );
         return createdBoard;
       });
 

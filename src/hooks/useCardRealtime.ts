@@ -50,17 +50,10 @@ export function useCardRealtime<
         hash?: string;
       };
       lastHashRef.current = data.hash ?? "";
-      setCards((prev) => {
-        const next = data.cards.filter(
+      setCards(() => {
+        return data.cards.filter(
           (c) => !deletingIds.current.has(c.id),
         );
-        const serverIds = new Set(next.map((c) => c.id));
-        for (const lc of prev) {
-          if (!serverIds.has(lc.id) && !deletingIds.current.has(lc.id)) {
-            next.push(lc);
-          }
-        }
-        return next;
       });
       if (data.sections && setSections) {
         setSections([...data.sections].sort(sortSections));
@@ -104,14 +97,35 @@ export function useCardRealtime<
           .on("broadcast", { event: "card_changed" }, () => {
             void refetch();
           })
-          .subscribe();
+          .subscribe((status: string) => {
+            if (status === "SUBSCRIBED") {
+              void refetch();
+            }
+          });
       } catch {
         // Subscription failure — non-fatal.
       }
     })();
 
+    function catchUpWhenVisible() {
+      if (!document.hidden) {
+        void refetch();
+      }
+    }
+
+    function catchUpOnNetworkRestore() {
+      void refetch();
+    }
+
+    window.addEventListener("online", catchUpOnNetworkRestore);
+    window.addEventListener("focus", catchUpWhenVisible);
+    document.addEventListener("visibilitychange", catchUpWhenVisible);
+
     return () => {
       cancelled = true;
+      window.removeEventListener("online", catchUpOnNetworkRestore);
+      window.removeEventListener("focus", catchUpWhenVisible);
+      document.removeEventListener("visibilitychange", catchUpWhenVisible);
       if (supabase && channel) {
         try {
           void supabase.removeChannel(channel);

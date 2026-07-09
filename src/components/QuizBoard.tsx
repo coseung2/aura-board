@@ -100,7 +100,6 @@ export function QuizBoard({ boardId, quizzes: initial }: Props) {
       } catch {}
     });
 
-    es.onerror = () => es.close();
     return () => es.close();
   }, [quiz?.id, quiz?.status]);
 
