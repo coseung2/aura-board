@@ -18,6 +18,7 @@ type Props = {
   puzzleId: string;
   initialParticipants: GameParticipant[];
   initialStatus?: string | null;
+  maxGuesses: number;
   pollDelayMs?: number;
 };
 
@@ -41,13 +42,15 @@ export function KordleTeacherParticipants({
   puzzleId,
   initialParticipants,
   initialStatus,
+  maxGuesses,
   pollDelayMs = 2000,
 }: Props) {
   const [participants, setParticipants] = useState(initialParticipants);
   const [status, setStatus] = useState(initialStatus ?? null);
   const [round, setRound] = useState<RoundSnapshot | null>(null);
-  const [nowMs, setNowMs] = useState(() => Date.now());
   const [realtimeReady, setRealtimeReady] = useState(false);
+  const [advancing, setAdvancing] = useState(false);
+  const [controlError, setControlError] = useState<string | null>(null);
 
   useEffect(() => {
     setParticipants(initialParticipants);
@@ -143,17 +146,33 @@ export function KordleTeacherParticipants({
     };
   }, [applySnapshot, boardId, fetchSnapshot]);
 
-  useEffect(() => {
-    if (!round?.roundEndsAt) return;
-    setNowMs(Date.now());
-    const timer = window.setInterval(() => setNowMs(Date.now()), 500);
-    return () => window.clearInterval(timer);
-  }, [round?.roundEndsAt]);
+  async function advanceLine() {
+    if (advancing || !round?.currentGuessIndex || round.currentGuessIndex >= maxGuesses) {
+      return;
+    }
+    setAdvancing(true);
+    setControlError(null);
+    try {
+      const res = await fetch(`/api/kordle/boards/${encodeURIComponent(boardId)}/puzzle`, {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ action: "advance", puzzleId }),
+      });
+      if (!res.ok) {
+        setControlError("다음 줄로 넘기지 못했습니다.");
+        return;
+      }
+      const snapshot = await fetchSnapshot();
+      applySnapshot(snapshot);
+    } finally {
+      setAdvancing(false);
+    }
+  }
 
-  const roundEndsAtMs = round?.roundEndsAt ? Date.parse(round.roundEndsAt) : NaN;
-  const remainingMs = Number.isFinite(roundEndsAtMs)
-    ? Math.max(0, roundEndsAtMs - nowMs)
-    : (round?.remainingMs ?? 0);
+  const canAdvance =
+    status === "LIVE" &&
+    !!round?.currentGuessIndex &&
+    round.currentGuessIndex < maxGuesses;
 
   return (
     <div className="kordle-teacher-participants" aria-live="polite">
@@ -175,11 +194,19 @@ export function KordleTeacherParticipants({
         <div className="kordle-round-progress">
           <div className="kordle-round-progress-header">
             <span>{round.currentGuessIndex}줄</span>
-            <strong>{Math.ceil(remainingMs / 1000)}초</strong>
+            <button
+              type="button"
+              className="kordle-next-line-btn"
+              onClick={() => void advanceLine()}
+              disabled={!canAdvance || advancing}
+            >
+              다음 줄
+            </button>
           </div>
           <p>
             {round.submittedCount}/{round.totalCount}명 제출 완료
           </p>
+          {controlError && <small role="alert">{controlError}</small>}
           {round.pendingParticipants.length > 0 ? (
             <GameParticipantsList
               className="kordle-participant-list"

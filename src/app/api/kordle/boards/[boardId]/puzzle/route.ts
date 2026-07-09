@@ -22,7 +22,7 @@ const CreatePuzzleSchema = z.object({
 });
 
 const PuzzleActionSchema = z.object({
-  action: z.enum(["start", "stop"]),
+  action: z.enum(["start", "stop", "advance"]),
   puzzleId: z.string().min(1),
 });
 
@@ -276,7 +276,7 @@ export async function PATCH(req: Request, { params }: Params) {
         id: parsed.data.puzzleId,
         game: { boardId: board.id },
       },
-      select: { id: true, gameId: true, status: true },
+      select: { id: true, gameId: true, status: true, currentGuessIndex: true, game: { select: { maxGuesses: true } } },
     });
     if (!puzzle) return null;
 
@@ -287,7 +287,22 @@ export async function PATCH(req: Request, { params }: Params) {
           status: "CLOSED",
           endsAt: new Date(),
         },
-        select: { id: true, status: true, startsAt: true },
+        select: { id: true, status: true, startsAt: true, currentGuessIndex: true },
+      });
+    }
+    if (parsed.data.action === "advance") {
+      if (puzzle.status !== "LIVE") {
+        return "not_startable" as const;
+      }
+      if (puzzle.currentGuessIndex >= puzzle.game.maxGuesses) {
+        return "last_guess" as const;
+      }
+      return await tx.kordlePuzzle.update({
+        where: { id: puzzle.id },
+        data: {
+          currentGuessIndex: { increment: 1 },
+        },
+        select: { id: true, status: true, startsAt: true, currentGuessIndex: true },
       });
     }
     if (puzzle.status !== "DRAFT") {
@@ -310,10 +325,11 @@ export async function PATCH(req: Request, { params }: Params) {
       where: { id: puzzle.id },
       data: {
         status: "LIVE",
+        currentGuessIndex: 1,
         startsAt: new Date(),
         endsAt: null,
       },
-      select: { id: true, status: true, startsAt: true },
+      select: { id: true, status: true, startsAt: true, currentGuessIndex: true },
     });
 
     return livePuzzle;
@@ -325,10 +341,14 @@ export async function PATCH(req: Request, { params }: Params) {
   if (result === "not_startable") {
     return NextResponse.json({ error: "puzzle_not_startable" }, { status: 409 });
   }
+  if (result === "last_guess") {
+    return NextResponse.json({ error: "already_last_guess" }, { status: 409 });
+  }
 
   await announceKordlePuzzleChange(board.id, {
     puzzleId: result.id,
     status: result.status,
+    currentGuessIndex: result.currentGuessIndex,
     updatedAt: new Date().toISOString(),
   });
 

@@ -18,6 +18,7 @@ export type KordlePuzzleChangedEvent = {
   puzzleId: string;
   status: KordlePuzzleStatus;
   updatedAt: string;
+  currentGuessIndex?: number | null;
 };
 
 export type KordlePresencePayload = {

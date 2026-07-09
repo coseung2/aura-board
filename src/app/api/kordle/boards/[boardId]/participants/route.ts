@@ -1,7 +1,6 @@
 import { db } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
 import { jsonPrivateNoStore } from "@/lib/http-cache";
-import { KORDLE_ROUND_DURATION_MS } from "@/features/kordle/server/kordleServer";
 
 type Params = { params: Promise<{ boardId: string }> };
 
@@ -17,16 +16,15 @@ type AttemptSnapshot = {
 function getRoundSnapshot(
   attempts: AttemptSnapshot[],
   maxGuesses: number,
-  puzzleStartedAt: Date | null,
+  currentGuessIndex: number,
 ) {
-  const now = new Date();
   const activeAttempts = attempts.filter((attempt) => attempt.status === "IN_PROGRESS" && attempt.student);
   if (activeAttempts.length === 0) {
     return {
       currentGuessIndex: null,
       submittedCount: 0,
       totalCount: 0,
-      roundDurationMs: KORDLE_ROUND_DURATION_MS,
+      roundDurationMs: 0,
       roundStartedAt: null,
       roundEndsAt: null,
       remainingMs: 0,
@@ -34,70 +32,25 @@ function getRoundSnapshot(
     };
   }
 
-  let currentGuessIndex = 1;
-  let roundStartedAt =
-    puzzleStartedAt ??
-    new Date(Math.min(...activeAttempts.map((attempt) => attempt.startedAt.getTime())));
-
-  while (currentGuessIndex < maxGuesses) {
-    const submittedForRound = activeAttempts.filter((attempt) =>
-      attempt.guesses.some((guess) => guess.guessIndex === currentGuessIndex),
-    );
-    const roundEndsAt = new Date(roundStartedAt.getTime() + KORDLE_ROUND_DURATION_MS);
-    if (submittedForRound.length < activeAttempts.length && now < roundEndsAt) {
-      break;
-    }
-    const latestSubmissionAt =
-      submittedForRound.length === activeAttempts.length
-        ? new Date(
-            Math.max(
-              ...submittedForRound.map((attempt) =>
-                Math.max(
-                  ...attempt.guesses
-                    .filter((guess) => guess.guessIndex === currentGuessIndex)
-                    .map((guess) => guess.createdAt.getTime()),
-                ),
-              ),
-            ),
-          )
-        : null;
-    roundStartedAt = latestSubmissionAt && latestSubmissionAt < roundEndsAt ? latestSubmissionAt : roundEndsAt;
-    currentGuessIndex += 1;
-  }
-
-  const roundEndsAt = new Date(roundStartedAt.getTime() + KORDLE_ROUND_DURATION_MS);
+  const activeGuessIndex = Math.min(Math.max(currentGuessIndex, 1), maxGuesses);
   const submittedAttempts = activeAttempts.filter((attempt) =>
-    attempt.guesses.some((guess) => guess.guessIndex === currentGuessIndex),
+    attempt.guesses.some((guess) => guess.guessIndex === activeGuessIndex),
   );
-  const roundExpired = now >= roundEndsAt;
   const pendingParticipants = activeAttempts
-    .filter((attempt) => !attempt.guesses.some((guess) => guess.guessIndex === currentGuessIndex))
+    .filter((attempt) => !attempt.guesses.some((guess) => guess.guessIndex === activeGuessIndex))
     .map((attempt) => ({
       id: attempt.student!.id,
       name: attempt.student!.name,
     }));
 
-  if (currentGuessIndex >= maxGuesses && roundExpired && pendingParticipants.length > 0) {
-    return {
-      currentGuessIndex: null,
-      submittedCount: submittedAttempts.length,
-      totalCount: activeAttempts.length,
-      roundDurationMs: KORDLE_ROUND_DURATION_MS,
-      roundStartedAt: roundStartedAt.toISOString(),
-      roundEndsAt: roundEndsAt.toISOString(),
-      remainingMs: 0,
-      pendingParticipants: [],
-    };
-  }
-
   return {
-    currentGuessIndex,
+    currentGuessIndex: activeGuessIndex,
     submittedCount: submittedAttempts.length,
     totalCount: activeAttempts.length,
-    roundDurationMs: KORDLE_ROUND_DURATION_MS,
-    roundStartedAt: roundStartedAt.toISOString(),
-    roundEndsAt: roundEndsAt.toISOString(),
-    remainingMs: Math.max(0, roundEndsAt.getTime() - now.getTime()),
+    roundDurationMs: 0,
+    roundStartedAt: null,
+    roundEndsAt: null,
+    remainingMs: 0,
     pendingParticipants,
   };
 }
@@ -141,6 +94,7 @@ export async function GET(req: Request, { params }: Params) {
           id: true,
           status: true,
           startsAt: true,
+          currentGuessIndex: true,
           game: { select: { maxGuesses: true } },
           attempts: {
             where: { studentId: { not: null } },
@@ -162,7 +116,7 @@ export async function GET(req: Request, { params }: Params) {
 
   const puzzle = game?.puzzles[0] ?? null;
   const round = puzzle
-    ? getRoundSnapshot(puzzle.attempts, puzzle.game.maxGuesses, puzzle.startsAt)
+    ? getRoundSnapshot(puzzle.attempts, puzzle.game.maxGuesses, puzzle.currentGuessIndex)
     : null;
   return jsonPrivateNoStore({
     puzzle: puzzle

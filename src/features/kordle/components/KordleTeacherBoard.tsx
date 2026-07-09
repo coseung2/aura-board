@@ -174,6 +174,7 @@ export async function KordleTeacherBoard({ boardId, teacherUserId }: Props) {
                 puzzleId={puzzle.id}
                 initialStatus={puzzle.status}
                 initialParticipants={participants}
+                maxGuesses={game.maxGuesses}
               />
             </aside>
           </div>
@@ -231,6 +232,7 @@ export async function KordleTeacherBoard({ boardId, teacherUserId }: Props) {
                 puzzleId={puzzle.id}
                 initialStatus={puzzle.status}
                 initialParticipants={participants}
+                maxGuesses={game.maxGuesses}
               />
             )}
 

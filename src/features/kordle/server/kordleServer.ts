@@ -13,7 +13,7 @@ import type {
   KordleWinnerStats,
 } from "../engine";
 
-export const KORDLE_ROUND_DURATION_MS = 30_000;
+export const KORDLE_ROUND_DURATION_MS = 0;
 
 export async function loadGameConfig(boardId: string): Promise<{
   gameId: string;
@@ -202,14 +202,13 @@ async function loadWinnerStats(
 async function getTurnState(
   client: Prisma.TransactionClient | typeof db,
   puzzleId: string,
-  puzzleStartedAt: Date | null,
+  puzzleCurrentGuessIndex: number,
   maxGuesses: number,
   actorGuessCount: number,
   actorStatus: "IN_PROGRESS" | "WON" | "LOST" | "ABANDONED",
   actorStartedAt: Date,
   isStudentActor: boolean,
 ): Promise<KordleTurnState> {
-  const now = new Date();
   const studentAttempts = await client.kordleAttempt.findMany({
     where: {
       puzzleId,
@@ -227,48 +226,15 @@ async function getTurnState(
     },
   });
 
-  const firstGuess = await client.kordleGuess.findFirst({
-    where: {
-      guessIndex: 1,
-      attempt: {
-        puzzleId,
-        studentId: { not: null },
-      },
-    },
-    orderBy: { createdAt: "asc" },
-    select: { createdAt: true },
-  });
-  const joinedAttempts = firstGuess
-    ? studentAttempts.filter(
-        (attempt) =>
-          attempt._count.guesses > 0 || attempt.startedAt <= firstGuess.createdAt,
-      )
-    : studentAttempts;
-  const latestGuessBeforeJoin = isStudentActor
-    ? await client.kordleGuess.findFirst({
-        where: {
-          createdAt: { lte: actorStartedAt },
-          attempt: {
-            puzzleId,
-            studentId: { not: null },
-          },
-        },
-        orderBy: { createdAt: "desc" },
-        select: { guessIndex: true },
-      })
-    : null;
-  const lateJoinTargetGuessIndex =
-    isStudentActor && actorGuessCount === 0 && latestGuessBeforeJoin
-      ? Math.min(latestGuessBeforeJoin.guessIndex + 1, maxGuesses)
-      : null;
+  void actorStartedAt;
+  void isStudentActor;
+  const joinedAttempts = studentAttempts;
   const activeAttempts = joinedAttempts.filter((attempt) => attempt.status === "IN_PROGRESS");
+  const currentGuessIndex =
+    actorStatus === "IN_PROGRESS" && actorGuessCount < maxGuesses
+      ? Math.min(Math.max(puzzleCurrentGuessIndex, 1), maxGuesses)
+      : null;
   if (activeAttempts.length === 0) {
-    const currentGuessIndex =
-      actorStatus === "IN_PROGRESS" && actorGuessCount < maxGuesses
-        ? actorGuessCount + 1
-        : null;
-    const fallbackStart = puzzleStartedAt ?? actorStartedAt;
-    const fallbackEndsAt = new Date(fallbackStart.getTime() + KORDLE_ROUND_DURATION_MS);
     return {
       currentGuessIndex,
       nextGuessIndex: currentGuessIndex,
@@ -277,68 +243,35 @@ async function getTurnState(
       isWaiting: false,
       isPendingJoin: false,
       roundDurationMs: KORDLE_ROUND_DURATION_MS,
-      roundStartedAt: currentGuessIndex === null ? null : fallbackStart.toISOString(),
-      roundEndsAt: currentGuessIndex === null ? null : fallbackEndsAt.toISOString(),
-      remainingMs: currentGuessIndex === null ? 0 : Math.max(0, fallbackEndsAt.getTime() - now.getTime()),
+      roundStartedAt: null,
+      roundEndsAt: null,
+      remainingMs: 0,
     };
   }
 
-  let currentGuessIndex = 1;
-  let roundStartedAt =
-    puzzleStartedAt ??
-    new Date(Math.min(...activeAttempts.map((attempt) => attempt.startedAt.getTime())));
-  while (currentGuessIndex < maxGuesses) {
-    const submittedForRound = activeAttempts.filter((attempt) =>
-      attempt.guesses.some((guess) => guess.guessIndex === currentGuessIndex),
-    );
-    const roundEndsAt = new Date(roundStartedAt.getTime() + KORDLE_ROUND_DURATION_MS);
-    if (submittedForRound.length < activeAttempts.length && now < roundEndsAt) {
-      break;
-    }
-    const latestSubmissionAt =
-      submittedForRound.length === activeAttempts.length
-        ? new Date(Math.max(...submittedForRound.map((attempt) =>
-            Math.max(
-              ...attempt.guesses
-                .filter((guess) => guess.guessIndex === currentGuessIndex)
-                .map((guess) => guess.createdAt.getTime()),
-            ),
-          )))
-        : null;
-    roundStartedAt = latestSubmissionAt && latestSubmissionAt < roundEndsAt ? latestSubmissionAt : roundEndsAt;
-    currentGuessIndex += 1;
-  }
-  currentGuessIndex = Math.min(currentGuessIndex, maxGuesses);
-  const submittedCount = activeAttempts.filter(
-    (attempt) => attempt.guesses.some((guess) => guess.guessIndex === currentGuessIndex),
-  ).length;
-  const roundEndsAt = new Date(roundStartedAt.getTime() + KORDLE_ROUND_DURATION_MS);
-  const roundExpired = now >= roundEndsAt;
-  if (currentGuessIndex >= maxGuesses && roundExpired && submittedCount < activeAttempts.length) {
+  if (currentGuessIndex === null) {
     return {
       currentGuessIndex: null,
       nextGuessIndex: null,
-      submittedCount,
+      submittedCount: 0,
       totalCount: activeAttempts.length,
       isWaiting: false,
       isPendingJoin: false,
       roundDurationMs: KORDLE_ROUND_DURATION_MS,
-      roundStartedAt: roundStartedAt.toISOString(),
-      roundEndsAt: roundEndsAt.toISOString(),
+      roundStartedAt: null,
+      roundEndsAt: null,
       remainingMs: 0,
     };
   }
-  const pendingJoin =
-    actorStatus === "IN_PROGRESS" &&
-    lateJoinTargetGuessIndex !== null &&
-    currentGuessIndex < lateJoinTargetGuessIndex;
+
+  const submittedCount = activeAttempts.filter(
+    (attempt) => attempt.guesses.some((guess) => guess.guessIndex === currentGuessIndex),
+  ).length;
   const actorNextGuessIndex =
     actorStatus === "IN_PROGRESS"
-      ? pendingJoin
-        ? lateJoinTargetGuessIndex
-        : actorGuessCount >= currentGuessIndex
-          ? Math.min(actorGuessCount + 1, maxGuesses)
-          : (lateJoinTargetGuessIndex ?? currentGuessIndex)
+      ? actorGuessCount >= currentGuessIndex
+        ? Math.min(actorGuessCount + 1, maxGuesses)
+        : currentGuessIndex
       : null;
 
   return {
@@ -348,14 +281,13 @@ async function getTurnState(
     totalCount: activeAttempts.length,
     isWaiting:
       actorStatus === "IN_PROGRESS" &&
-      (pendingJoin || actorGuessCount >= currentGuessIndex) &&
-      submittedCount < activeAttempts.length &&
-      !roundExpired,
-    isPendingJoin: pendingJoin,
+      actorGuessCount >= currentGuessIndex &&
+      currentGuessIndex < maxGuesses,
+    isPendingJoin: false,
     roundDurationMs: KORDLE_ROUND_DURATION_MS,
-    roundStartedAt: roundStartedAt.toISOString(),
-    roundEndsAt: roundEndsAt.toISOString(),
-    remainingMs: Math.max(0, roundEndsAt.getTime() - now.getTime()),
+    roundStartedAt: null,
+    roundEndsAt: null,
+    remainingMs: 0,
   };
 }
 
@@ -456,7 +388,7 @@ export async function submitGuess(
     const turnBeforeGuess = await getTurnState(
       tx,
       attempt.puzzleId,
-      attempt.puzzle.startsAt,
+      attempt.puzzle.currentGuessIndex,
       config.maxGuesses,
       latestGuessIndex(attempt.guesses),
       attempt.status,
@@ -468,7 +400,7 @@ export async function submitGuess(
       opts.expectedGuessIndex !== undefined &&
       opts.expectedGuessIndex !== turnBeforeGuess.currentGuessIndex
     ) {
-      return { ok: false as const, reason: "round_time_expired" };
+      return { ok: false as const, reason: "line_not_active" };
     }
     if (guessIndex === null || guessIndex > config.maxGuesses) {
       return { ok: false as const, reason: "no_attempts_left" };
@@ -523,9 +455,9 @@ export async function submitGuess(
     const turn = await getTurnState(
       tx,
       attempt.puzzleId,
-      attempt.puzzle.startsAt,
+      attempt.puzzle.currentGuessIndex,
       config.maxGuesses,
-      allGuesses.length,
+      latestGuessIndex([...attempt.guesses, { guessIndex }]),
       updated.status,
       attempt.startedAt,
       !!attempt.studentId,
@@ -604,7 +536,7 @@ export async function getPublicState(opts: {
   const turn = await getTurnState(
     db,
     attempt.puzzleId,
-    attempt.puzzle.startsAt,
+    attempt.puzzle.currentGuessIndex,
     config.maxGuesses,
     latestGuessIndex(attempt.guesses),
     attempt.status,

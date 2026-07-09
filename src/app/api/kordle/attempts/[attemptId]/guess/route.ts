@@ -47,7 +47,7 @@ export async function POST(req: Request, { params }: Params) {
     const status =
       result.reason === "forbidden" ? 403 :
       result.reason === "attempt_not_found" ? 404 :
-      result.reason === "puzzle_closed" || result.reason === "round_time_expired" ? 409 :
+      result.reason === "puzzle_closed" || result.reason === "line_not_active" ? 409 :
       400;
     return NextResponse.json({ error: result.reason }, { status });
   }
@@ -79,7 +79,6 @@ async function announceLatestGuess(attemptId: string): Promise<void> {
     if (!guess) return;
 
     const correctCount = kordleCorrectCount(guess.feedback);
-    if (!guess.isCorrect && correctCount === 0) return;
 
     await announceKordleGuess(guess.attempt.puzzle.game.boardId, {
       id: guess.id,

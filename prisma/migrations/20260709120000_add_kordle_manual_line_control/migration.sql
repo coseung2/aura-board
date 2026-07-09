@@ -1,0 +1,2 @@
+ALTER TABLE "KordlePuzzle"
+ADD COLUMN "currentGuessIndex" INTEGER NOT NULL DEFAULT 1;

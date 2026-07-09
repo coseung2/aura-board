@@ -69,6 +69,7 @@ export function KordleLiveToasts({ boardId }: Props) {
             ({ payload }: { payload: KordleLiveEvent }) => {
               if (cancelled || !payload?.id) return;
               sinceRef.current = payload.createdAt;
+              if (!payload.isCorrect && payload.correctCount <= 0) return;
               pushFresh([payload]);
             },
           )

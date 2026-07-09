@@ -3690,6 +3690,7 @@ model KordlePuzzle {
   // toggles). Null until scheduled.
   startsAt       DateTime?
   endsAt         DateTime?
+  currentGuessIndex Int                @default(1)
   // Optional deterministic seed so two classrooms get the same word for the
   // same date without sharing a row.
   seed           String?
