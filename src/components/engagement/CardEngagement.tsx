@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { formatRelativeTime } from "@/lib/card-engagement-format";
 import { useShareSession, type ShareSession } from "@/components/share/ShareSessionContext";
@@ -101,6 +101,7 @@ export function CardEngagement({
     Boolean(cachedState) || !initialCounts,
   );
   const [showModal, setShowModal] = useState(false);
+  const likeInFlightRef = useRef(false);
 
   const refresh = useCallback(async () => {
     try {
@@ -218,14 +219,16 @@ export function CardEngagement({
   }, [cardId, refresh, shareSession, boardId]);
 
   const toggleLike = useCallback(async () => {
-    if (!state?.canInteract) return;
+    if (!state?.canInteract || likeInFlightRef.current) return;
+    const desiredLiked = !state.isLiked;
+    likeInFlightRef.current = true;
     // optimistic
     setState((s) => {
       if (!s) return s;
       const next = {
         ...s,
-        isLiked: !s.isLiked,
-        likeCount: s.likeCount + (s.isLiked ? -1 : 1),
+        isLiked: desiredLiked,
+        likeCount: Math.max(0, s.likeCount + (desiredLiked ? 1 : -1)),
       };
       engagementStateCache.set(cacheKey, next);
       return next;
@@ -238,11 +241,16 @@ export function CardEngagement({
             body: JSON.stringify({
               shareToken: shareSession.shareToken,
               guestId: shareSession.guestId,
+              liked: desiredLiked,
             }),
           })
         : await fetch(`/api/cards/${cardId}/like`, {
             method: "POST",
-            headers: studentViewerHeaders(!!isStudentViewer),
+            headers: {
+              "content-type": "application/json",
+              ...studentViewerHeaders(!!isStudentViewer),
+            },
+            body: JSON.stringify({ liked: desiredLiked }),
           });
       if (!r.ok) {
         await refresh();
@@ -257,8 +265,10 @@ export function CardEngagement({
       });
     } catch {
       await refresh();
+    } finally {
+      likeInFlightRef.current = false;
     }
-  }, [cacheKey, cardId, refresh, shareSession, state?.canInteract]);
+  }, [cacheKey, cardId, refresh, shareSession, state?.canInteract, state?.isLiked, isStudentViewer]);
 
   if (!state) {
     return mode === "chips" ? (

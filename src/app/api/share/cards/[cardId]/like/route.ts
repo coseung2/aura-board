@@ -1,12 +1,14 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { db } from "@/lib/db";
+import { applyCardLikeMutation, getPrismaErrorCode } from "@/lib/card-like-toggle";
 import { authorizeShareAccess } from "@/lib/share/share-auth";
 import { announceEngagementChange } from "@/lib/realtime-broadcast";
 
 const LikeSchema = z.object({
   shareToken: z.string().min(1),
   guestId: z.string().min(1).max(120),
+  liked: z.boolean().optional(),
 });
 
 export const dynamic = "force-dynamic";
@@ -44,34 +46,33 @@ export async function POST(
     return NextResponse.json({ error: "board_mismatch" }, { status: 403 });
   }
 
-  const where = {
-    cardId_externalLikerKey: {
+  let liked: boolean;
+  try {
+    liked = await applyCardLikeMutation(
+      db.cardLike,
       cardId,
-      externalLikerKey: parsed.guestId,
-    },
-  };
-  const existing = await db.cardLike.findUnique({ where });
-  if (existing) {
-    await db.cardLike.delete({ where: { id: existing.id } });
-    const [count, commentCount] = await Promise.all([
-      db.cardLike.count({ where: { cardId } }),
-      db.cardComment.count({ where: { cardId, deletedAt: null } }),
-    ]);
-    await announceEngagementChange(card.boardId, cardId, count, commentCount);
-    return NextResponse.json({ liked: false, count });
+      { kind: "external", id: parsed.guestId },
+      parsed.liked,
+    );
+  } catch (error) {
+    const code = getPrismaErrorCode(error);
+    console.error(JSON.stringify({
+      level: "error",
+      msg: "share_card_like_failed",
+      route: "/api/share/cards/[cardId]/like",
+      cardId,
+      prismaCode: code,
+    }));
+    if (code === "P2003") {
+      return NextResponse.json({ error: "not_found" }, { status: 404 });
+    }
+    return NextResponse.json({ error: "like_failed" }, { status: 500 });
   }
 
-  await db.cardLike.create({
-    data: {
-      cardId,
-      likerKind: "external",
-      externalLikerKey: parsed.guestId,
-    },
-  });
   const [count, commentCount] = await Promise.all([
     db.cardLike.count({ where: { cardId } }),
     db.cardComment.count({ where: { cardId, deletedAt: null } }),
   ]);
   await announceEngagementChange(card.boardId, cardId, count, commentCount);
-  return NextResponse.json({ liked: true, count });
+  return NextResponse.json({ liked, count });
 }
