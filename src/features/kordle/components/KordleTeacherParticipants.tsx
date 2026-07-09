@@ -1,6 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
+import type { RealtimeChannel, SupabaseClient } from "@supabase/supabase-js";
+import {
+  KORDLE_GUESS_SUBMITTED_EVENT,
+  KORDLE_PUZZLE_CHANGED_EVENT,
+  kordleBoardChannelKey,
+  type KordlePuzzleChangedEvent,
+} from "../realtime";
 import {
   GameParticipantsList,
   type GameParticipant,
@@ -23,6 +30,12 @@ type RoundSnapshot = {
   pendingParticipants: GameParticipant[];
 };
 
+type ParticipantsSnapshot = {
+  participants: GameParticipant[];
+  status: string | null;
+  round: RoundSnapshot | null;
+};
+
 export function KordleTeacherParticipants({
   boardId,
   puzzleId,
@@ -34,6 +47,7 @@ export function KordleTeacherParticipants({
   const [status, setStatus] = useState(initialStatus ?? null);
   const [round, setRound] = useState<RoundSnapshot | null>(null);
   const [nowMs, setNowMs] = useState(() => Date.now());
+  const [realtimeReady, setRealtimeReady] = useState(false);
 
   useEffect(() => {
     setParticipants(initialParticipants);
@@ -41,27 +55,42 @@ export function KordleTeacherParticipants({
     setRound(null);
   }, [initialParticipants, initialStatus, puzzleId]);
 
+  const fetchSnapshot = useCallback(async (): Promise<ParticipantsSnapshot | null> => {
+    const res = await fetch(
+      `/api/kordle/boards/${encodeURIComponent(boardId)}/participants?puzzleId=${encodeURIComponent(puzzleId)}`,
+      { cache: "no-store" },
+    );
+    if (!res.ok) return null;
+    const data = await res.json().catch(() => null);
+    const nextParticipants = data?.puzzle?.participants;
+    if (Array.isArray(nextParticipants)) {
+      return {
+        participants: nextParticipants,
+        status: data?.puzzle?.status ?? null,
+        round: data?.puzzle?.round ?? null,
+      };
+    }
+    return null;
+  }, [boardId, puzzleId]);
+
+  const applySnapshot = useCallback((snapshot: ParticipantsSnapshot | null) => {
+    if (!snapshot) return;
+    setParticipants(snapshot.participants);
+    setStatus(snapshot.status);
+    setRound(snapshot.round);
+  }, []);
+
   useEffect(() => {
     let cancelled = false;
     let timer: number | null = null;
 
     async function poll() {
       try {
-        const res = await fetch(
-          `/api/kordle/boards/${encodeURIComponent(boardId)}/participants?puzzleId=${encodeURIComponent(puzzleId)}`,
-          { cache: "no-store" },
-        );
-        if (!res.ok) return;
-        const data = await res.json().catch(() => null);
-        const nextParticipants = data?.puzzle?.participants;
-        if (!cancelled && Array.isArray(nextParticipants)) {
-          setParticipants(nextParticipants);
-          setStatus(data?.puzzle?.status ?? null);
-          setRound(data?.puzzle?.round ?? null);
-        }
+        const snapshot = await fetchSnapshot();
+        if (!cancelled) applySnapshot(snapshot);
       } finally {
         if (!cancelled) {
-          timer = window.setTimeout(poll, pollDelayMs);
+          timer = window.setTimeout(poll, realtimeReady ? 30000 : pollDelayMs);
         }
       }
     }
@@ -71,7 +100,48 @@ export function KordleTeacherParticipants({
       cancelled = true;
       if (timer !== null) window.clearTimeout(timer);
     };
-  }, [boardId, pollDelayMs, puzzleId]);
+  }, [applySnapshot, fetchSnapshot, pollDelayMs, realtimeReady]);
+
+  useEffect(() => {
+    let cancelled = false;
+    let supabase: SupabaseClient | null = null;
+    let channel: RealtimeChannel | null = null;
+
+    async function subscribe() {
+      try {
+        const { createPublicSupabaseClient } = await import("@/lib/supabase/client");
+        if (cancelled) return;
+        supabase = createPublicSupabaseClient();
+        channel = supabase
+          .channel(kordleBoardChannelKey(boardId))
+          .on("broadcast", { event: KORDLE_GUESS_SUBMITTED_EVENT }, async () => {
+            const snapshot = await fetchSnapshot();
+            if (!cancelled) applySnapshot(snapshot);
+          })
+          .on(
+            "broadcast",
+            { event: KORDLE_PUZZLE_CHANGED_EVENT },
+            async ({ payload }: { payload: KordlePuzzleChangedEvent }) => {
+              if (cancelled) return;
+              if (payload?.status) setStatus(payload.status);
+              const snapshot = await fetchSnapshot();
+              if (!cancelled) applySnapshot(snapshot);
+            },
+          )
+          .subscribe((nextStatus) => {
+            if (!cancelled) setRealtimeReady(nextStatus === "SUBSCRIBED");
+          });
+      } catch {
+        if (!cancelled) setRealtimeReady(false);
+      }
+    }
+
+    void subscribe();
+    return () => {
+      cancelled = true;
+      if (supabase && channel) void supabase.removeChannel(channel);
+    };
+  }, [applySnapshot, boardId, fetchSnapshot]);
 
   useEffect(() => {
     if (!round?.roundEndsAt) return;
