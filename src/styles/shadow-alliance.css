@@ -549,10 +549,12 @@
   min-height: calc(100dvh - 150px);
   margin: 0 auto;
   display: grid;
+  justify-items: center;
   align-content: center;
   gap: var(--sa-space-4);
   padding: 24px 0 48px;
 }
+.shadow-alliance-postround-page > * { width: 100%; }
 .shadow-alliance-postround-shell {
   display: grid;
   place-items: center;
@@ -564,7 +566,7 @@
   min-height: 0;
   padding: 0;
 }
-.shadow-alliance-postround-summary { padding-bottom: var(--sa-space-3); border-bottom: 1px solid var(--sa-line-soft); }
+.shadow-alliance-postround-summary { padding-bottom: var(--sa-space-3); border-bottom: 1px solid var(--sa-line-soft); text-align: center; }
 .shadow-alliance-postround-summary h2 { margin-top: 6px; color: var(--sa-gold); font-size: clamp(28px, 5vw, 44px); }
 .shadow-alliance-postround-card { display: grid; gap: var(--sa-space-3); padding: 20px; border: 1px solid var(--sa-line); border-radius: var(--sa-radius-panel); background: var(--sa-panel); box-shadow: var(--sa-shadow-panel); }
 .shadow-alliance-numbers-strip { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; }
