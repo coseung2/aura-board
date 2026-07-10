@@ -9,6 +9,7 @@ import type {
   SpeedGameStatus,
   SpeedGameWire,
 } from "./types";
+import { PlayBoardContinueButton } from "@/components/PlayBoardContinueButton";
 
 type Props = {
   boardId: string;
@@ -244,6 +245,9 @@ export function SpeedGameBoard({
 
   return (
     <section className="speed-game-board">
+      <PlayBoardContinueButton
+        href={viewerKind === "teacher" ? "/dashboard" : "/student"}
+      />
       {error && <p className="speed-game-error">{error}</p>}
 
       {viewerKind === "none" && (

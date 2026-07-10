@@ -6,11 +6,13 @@ import { createPublicSupabaseClient } from "@/lib/supabase/client";
 import {
   addShadowAlliancePlayer,
   createShadowAllianceGame,
+  endShadowAllianceGame,
   moveShadowAllianceToPostround,
   nextShadowAllianceRound,
   rebalanceShadowAllianceTeams,
   removeShadowAlliancePlayer,
   revealShadowAllianceRound,
+  resetShadowAllianceGame,
   setShadowAllianceSettings,
   setShadowAllianceTimerRunning,
   shadowAllianceRankings,
@@ -114,6 +116,11 @@ export function useShadowAllianceGame({
         const next = updater(current);
         if (next !== current) {
           gameRef.current = next;
+          if (viewer === "teacher") {
+            try {
+              window.localStorage.setItem(gameStorageKey(boardId), JSON.stringify(next));
+            } catch {}
+          }
           publishSnapshot(next);
         }
         return next;
@@ -272,6 +279,8 @@ export function useShadowAllianceGame({
     setSettings: (settings: Parameters<typeof setShadowAllianceSettings>[1]) =>
       updateGame((current) => setShadowAllianceSettings(current, settings)),
     startGame: () => updateGame(startShadowAllianceGame),
+    endGame: () => updateGame(endShadowAllianceGame),
+    resetGame: () => updateGame(() => resetShadowAllianceGame()),
     nextRound: () => updateGame(nextShadowAllianceRound),
     revealRound: () => updateGame(revealShadowAllianceRound),
     showPostround: () => updateGame(moveShadowAllianceToPostround),

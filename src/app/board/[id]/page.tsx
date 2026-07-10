@@ -481,6 +481,9 @@ export default async function BoardPage({
     ? await db.student.count({ where: { classroomId: board.classroomId! } })
     : null;
   const boardTheme = normalizeBoardTheme(board.boardTheme);
+  const isPlayBoard = ["kordle", "speed-game", "shadow-alliance"].includes(
+    board.layout,
+  );
   const auraSettings: AuraBoardSettings = {
     evaluationEnabled: board.auraEvaluationEnabled,
     subject: board.auraSubject,
@@ -491,12 +494,14 @@ export default async function BoardPage({
   if (!effectiveRole) {
     return (
       <main className="board-page" data-board-theme={boardTheme}>
-        <BoardHeader
-          title={board.title}
-          layout={board.layout}
-          canEdit={false}
-          showAuth={false}
-        />
+        {!isPlayBoard && (
+          <BoardHeader
+            title={board.title}
+            layout={board.layout}
+            canEdit={false}
+            showAuth={false}
+          />
+        )}
         <div className="forbidden-card">
           <h2>접근 불가</h2>
           <p>이 보드에 접근할 권한이 없습니다.</p>
@@ -932,33 +937,39 @@ export default async function BoardPage({
 
   return (
     <BoardSlideshowProvider>
-      <main className="board-page" data-board-theme={boardTheme}>
+      <main
+        className="board-page"
+        data-board-theme={boardTheme}
+        data-play-board={isPlayBoard ? "true" : undefined}
+      >
         <BoardVisitTracker boardId={board.id} />
-        <BoardHeader
-          boardId={board.id}
-          title={board.title}
-          layout={board.layout}
-          isAdmin={isAdmin}
-          isStudent={!!studentViewer}
-          backHref={studentViewer ? "/student" : "/dashboard"}
-          canEdit={effectiveRole === "owner" || effectiveRole === "editor"}
-          classrooms={settingsClassrooms}
-          classroomId={board.classroomId}
-          thumbnailMode={board.thumbnailMode}
-          thumbnailUrl={(board as { thumbnailUrl?: string | null }).thumbnailUrl ?? null}
-          settingsSections={settingsSections}
-          anonymousAuthor={board.anonymousAuthor}
-          boardTheme={boardTheme}
-          shareMode={board.shareMode}
-          shareToken={board.shareToken}
-          shareShortCode={board.shareShortCode}
-          streamTitlePrompt={board.streamTitlePrompt ?? ""}
-          streamContentPrompt={board.streamContentPrompt ?? ""}
-          streamSectionsEnabled={board.streamSectionsEnabled}
-          auraSettings={auraSettings}
-          subjectOrder={subjectOrder}
-          showAuth={false}
-        />
+        {!isPlayBoard && (
+          <BoardHeader
+            boardId={board.id}
+            title={board.title}
+            layout={board.layout}
+            isAdmin={isAdmin}
+            isStudent={!!studentViewer}
+            backHref={studentViewer ? "/student" : "/dashboard"}
+            canEdit={effectiveRole === "owner" || effectiveRole === "editor"}
+            classrooms={settingsClassrooms}
+            classroomId={board.classroomId}
+            thumbnailMode={board.thumbnailMode}
+            thumbnailUrl={(board as { thumbnailUrl?: string | null }).thumbnailUrl ?? null}
+            settingsSections={settingsSections}
+            anonymousAuthor={board.anonymousAuthor}
+            boardTheme={boardTheme}
+            shareMode={board.shareMode}
+            shareToken={board.shareToken}
+            shareShortCode={board.shareShortCode}
+            streamTitlePrompt={board.streamTitlePrompt ?? ""}
+            streamContentPrompt={board.streamContentPrompt ?? ""}
+            streamSectionsEnabled={board.streamSectionsEnabled}
+            auraSettings={auraSettings}
+            subjectOrder={subjectOrder}
+            showAuth={false}
+          />
+        )}
         {renderBoard()}
       </main>
     </BoardSlideshowProvider>

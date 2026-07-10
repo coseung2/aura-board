@@ -3,10 +3,17 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
+import type { RealtimeChannel } from "@supabase/supabase-js";
 import { ShowcaseHighlightStrip } from "@/components/portfolio/ShowcaseHighlightStrip";
 import { layoutLabel, layoutThumbnail } from "@/lib/layout-meta";
 import { CharacterAvatar } from "@/components/avatar/CharacterAvatar";
 import type { AvatarMeResponse } from "@/components/avatar/types";
+import { createPublicSupabaseClient } from "@/lib/supabase/client";
+import { SHADOW_ALLIANCE_STATUS_LABELS } from "@/features/shadow-alliance/types";
+import type {
+  ShadowAllianceBoardStatus,
+  ShadowAllianceSnapshot,
+} from "@/features/shadow-alliance/types";
 
 const FALLBACK_THUMBNAIL = "/board-type-thumbnails/card-board.png";
 const STUDENT_ASSIGNMENT_VISIBLE_LIMIT = 4;
@@ -23,6 +30,7 @@ type BoardItem = {
   thumbnailUrl?: string | null;
   quizzes?: { roomCode: string; status: string }[];
   kordleStatus?: string | null;
+  speedGameStatus?: string | null;
   breakout?: StudentBreakout | null;
 };
 
@@ -450,12 +458,55 @@ function StudentBoardSections({
   onOpenBreakout,
 }: StudentBoardSectionsProps) {
   const router = useRouter();
+  const [shadowAllianceStatuses, setShadowAllianceStatuses] = useState<
+    Record<string, ShadowAllianceBoardStatus>
+  >({});
   const [activeCategory, setActiveCategory] = useState<"LESSON" | "PLAY">(() =>
     boards.some((b) => b.category === "LESSON") ? "LESSON" : "PLAY",
   );
   const lessonBoards = boards.filter((b) => b.category === "LESSON");
   const playBoards = boards.filter((b) => b.category === "PLAY");
   const activeBoards = activeCategory === "LESSON" ? lessonBoards : playBoards;
+
+  useEffect(() => {
+    const shadowAllianceBoards = boards.filter(
+      (board) => board.layout === "shadow-alliance",
+    );
+    if (shadowAllianceBoards.length === 0) return;
+
+    let disposed = false;
+    const client = createPublicSupabaseClient();
+    const channels: RealtimeChannel[] = [];
+    const statusFromPhase = (
+      phase: ShadowAllianceSnapshot["phase"],
+    ): ShadowAllianceBoardStatus =>
+      phase === "lobby" ? "waiting" : phase === "final" ? "ended" : "active";
+
+    for (const board of shadowAllianceBoards) {
+      const channel = client.channel(`shadow-alliance-board-${board.id}`, {
+        config: { broadcast: { self: false } },
+      });
+      channel.on("broadcast", { event: "snapshot" }, ({ payload }) => {
+        const snapshot = (payload as { snapshot?: ShadowAllianceSnapshot }).snapshot;
+        if (!snapshot || disposed) return;
+        setShadowAllianceStatuses((current) => ({
+          ...current,
+          [board.id]: statusFromPhase(snapshot.phase),
+        }));
+      });
+      channel.subscribe((status) => {
+        if (status === "SUBSCRIBED") {
+          void channel.send({ type: "broadcast", event: "hello", payload: {} });
+        }
+      });
+      channels.push(channel);
+    }
+
+    return () => {
+      disposed = true;
+      for (const channel of channels) void client.removeChannel(channel);
+    };
+  }, [boards]);
 
   const boardThumbnail = (board: BoardItem) => {
     if (board.thumbnailMode === "custom" && board.thumbnailUrl) {
@@ -470,11 +521,24 @@ function StudentBoardSections({
     const kordleMeta =
       board.layout === "kordle"
         ? board.kordleStatus === "LIVE"
-          ? "꼬들 · 게임 진행 중"
+          ? "진행 중"
           : board.kordleStatus === "DRAFT"
-            ? "꼬들 · 시작 대기"
-            : "꼬들 · 게임 없음"
+            ? "시작 대기"
+            : "게임 없음"
         : null;
+    const gameMeta =
+      kordleMeta ??
+      (board.layout === "speed-game"
+        ? board.speedGameStatus === "running"
+          ? "진행 중"
+          : board.speedGameStatus === "finished"
+            ? "종료"
+            : "시작 대기"
+        : board.layout === "shadow-alliance"
+          ? SHADOW_ALLIANCE_STATUS_LABELS[
+              shadowAllianceStatuses[board.id] ?? "waiting"
+            ]
+          : null);
     const href = quizCode
       ? `/quiz/${quizCode}`
       : board.layout === "kordle"
@@ -525,7 +589,7 @@ function StudentBoardSections({
         <div className="student-board-card-body">
           <span className="student-board-card-title">{board.title}</span>
           <span className="student-board-card-meta">
-            {kordleMeta ?? layoutLabel(board.layout)}
+            {gameMeta ?? layoutLabel(board.layout)}
             {quizCode && " · 참여하기"}
           </span>
         </div>

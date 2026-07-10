@@ -238,6 +238,15 @@ export function moveShadowAllianceToPostround(
   return { ...cloneGame(game), phase: "postround" };
 }
 
+export function endShadowAllianceGame(game: ShadowAllianceGame): ShadowAllianceGame {
+  if (game.phase === "final") return game;
+  return { ...cloneGame(game), phase: "final", timerRunning: false };
+}
+
+export function resetShadowAllianceGame(): ShadowAllianceGame {
+  return createShadowAllianceGame();
+}
+
 export function shadowAllianceRankings(game: ShadowAllianceGame): ShadowAlliancePlayer[] {
   return [...game.players].sort((left, right) => right.power - left.power);
 }
