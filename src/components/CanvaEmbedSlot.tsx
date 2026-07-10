@@ -70,7 +70,6 @@ export const CanvaEmbedSlot = memo(function CanvaEmbedSlot({
   const [iframeLoaded, setIframeLoaded] = useState(false);
   const [iframeFailed, setIframeFailed] = useState(false);
   const [thumbnailAttempt, setThumbnailAttempt] = useState(0);
-  const [lastGoodThumbnail, setLastGoodThumbnail] = useState<string | null>(null);
   const [evictedToast, setEvictedToast] = useState<string | null>(null);
 
   // IntersectionObserver starts at `false` and only flips once it has
@@ -101,7 +100,6 @@ export const CanvaEmbedSlot = memo(function CanvaEmbedSlot({
 
   useEffect(() => {
     setThumbnailAttempt(0);
-    setLastGoodThumbnail(null);
   }, [linkImage, linkUrl]);
 
   // When THIS slot is the one evicted by LRU overflow, keep the old state
@@ -157,15 +155,8 @@ export const CanvaEmbedSlot = memo(function CanvaEmbedSlot({
     ].filter((candidate): candidate is string => Boolean(candidate));
     return [...new Set(candidates)];
   }, [linkImage, linkUrl]);
-  const candidateThumbnail =
-    thumbnailCandidates[thumbnailAttempt] ?? CLIENT_FALLBACK_THUMBNAIL;
   const effectiveLinkImage =
-    candidateThumbnail ?? lastGoodThumbnail ?? CLIENT_FALLBACK_THUMBNAIL;
-  const handleThumbnailLoad = useCallback(() => {
-    if (candidateThumbnail) {
-      setLastGoodThumbnail(candidateThumbnail);
-    }
-  }, [candidateThumbnail]);
+    thumbnailCandidates[thumbnailAttempt] ?? CLIENT_FALLBACK_THUMBNAIL;
   const handleThumbnailError = useCallback(() => {
     setThumbnailAttempt((attempt) =>
       attempt < thumbnailCandidates.length - 1 ? attempt + 1 : attempt,
@@ -189,12 +180,11 @@ export const CanvaEmbedSlot = memo(function CanvaEmbedSlot({
     >
       <div className="card-canva-slot-frame">
         <img
-          key={candidateThumbnail}
+          key={effectiveLinkImage}
           src={effectiveLinkImage}
           alt={`${title} 썸네일`}
           loading="lazy"
           decoding="async"
-          onLoad={handleThumbnailLoad}
           onError={handleThumbnailError}
           className="card-canva-slot-thumbnail"
         />
