@@ -43,6 +43,7 @@ export default async function KordlePlayPage({ params }: Props) {
       title: true,
       layout: true,
       boardTheme: true,
+      category: true,
       classroomId: true,
       classroom: { select: { teacherId: true } },
     },
@@ -80,7 +81,7 @@ export default async function KordlePlayPage({ params }: Props) {
   const puzzle = game.puzzles[0];
   if (!puzzle) {
     return (
-      <main className="board-page kordle-waiting-page" data-board-theme={boardTheme} data-play-board="true">
+      <main className="board-page kordle-waiting-page" data-board-theme={boardTheme} data-play-board="true" data-board-category={board.category}>
         <PlayBoardContinueButton />
         <KordleWaitingRoom
           boardId={boardId}
@@ -104,7 +105,7 @@ export default async function KordlePlayPage({ params }: Props) {
   });
   if (livePuzzle?.status !== "LIVE") {
     return (
-      <main className="board-page kordle-waiting-page" data-board-theme={boardTheme} data-play-board="true">
+      <main className="board-page kordle-waiting-page" data-board-theme={boardTheme} data-play-board="true" data-board-category={board.category}>
         <PlayBoardContinueButton />
         <KordleWaitingRoom
           boardId={boardId}
@@ -119,7 +120,7 @@ export default async function KordlePlayPage({ params }: Props) {
   if (!state) notFound();
 
   return (
-    <main className="board-page kordle-play-page" data-board-theme={boardTheme} data-play-board="true">
+    <main className="board-page kordle-play-page" data-board-theme={boardTheme} data-play-board="true" data-board-category={board.category}>
       <PlayBoardContinueButton />
       <KordleBoard
         boardId={boardId}

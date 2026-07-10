@@ -481,9 +481,7 @@ export default async function BoardPage({
     ? await db.student.count({ where: { classroomId: board.classroomId! } })
     : null;
   const boardTheme = normalizeBoardTheme(board.boardTheme);
-  const isPlayBoard = ["kordle", "speed-game", "shadow-alliance"].includes(
-    board.layout,
-  );
+  const isPlayBoard = board.category === "PLAY";
   const auraSettings: AuraBoardSettings = {
     evaluationEnabled: board.auraEvaluationEnabled,
     subject: board.auraSubject,
@@ -941,6 +939,7 @@ export default async function BoardPage({
         className="board-page"
         data-board-theme={boardTheme}
         data-play-board={isPlayBoard ? "true" : undefined}
+        data-board-category={board.category}
       >
         <BoardVisitTracker boardId={board.id} />
         {!isPlayBoard && (

@@ -421,6 +421,7 @@ button.assign-modal__close.assign-modal__close::after {
   transform: rotate(-45deg);
 }
 
+body:has(main[data-board-category="PLAY"]) .app-footer,
 body:has(main[data-play-board="true"], .shadow-alliance-game, .speed-game-board, .kordle-play-page, .kordle-waiting-page) .app-footer {
   display: none;
 }
