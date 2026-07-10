@@ -320,13 +320,36 @@ async function resolvePublicCanvaPageThumbnail(rawDesignUrl: string): Promise<st
 }
 
 function readCanvaThumbnailUrls(html: string): string[] {
-  const urls = new Set<string>();
-  const pattern =
-    /https:\/\/document-export\.canva\.com\/[^"'\\\s<>]+?\/thumbnail\/[^"'\\\s<>]+?\.(?:png|jpe?g|webp)(?:\?[^"'\\\s<>]*)?/gi;
-  for (const match of html.matchAll(pattern)) {
-    urls.add(match[0]);
+  const normalizedHtml = decodeHtmlEntities(html)
+    .replace(/\\+u0026/gi, "&")
+    .replace(/\\+u003d/gi, "=")
+    .replace(/\\+u002f/gi, "/")
+    .replace(/\\+\//g, "/");
+  const firstPageUrls = new Set<string>();
+  const documentImagePattern =
+    /https:\/\/media\.canva\.com\/v2\/document-image\/[^"'\\\s<>]+/gi;
+  for (const match of normalizedHtml.matchAll(documentImagePattern)) {
+    try {
+      const candidate = new URL(match[0]);
+      if (
+        candidate.hostname.toLowerCase() === "media.canva.com" &&
+        candidate.pathname.startsWith("/v2/document-image/") &&
+        candidate.searchParams.get("page") === "1"
+      ) {
+        firstPageUrls.add(candidate.toString());
+      }
+    } catch {
+      // Ignore malformed embedded values and continue to legacy candidates.
+    }
   }
-  return [...urls];
+
+  const legacyUrls = new Set<string>();
+  const legacyPattern =
+    /https:\/\/document-export\.canva\.com\/[^"'\\\s<>]+?\/thumbnail\/[^"'\\\s<>]+?\.(?:png|jpe?g|webp)(?:\?[^"'\\\s<>]*)?/gi;
+  for (const match of normalizedHtml.matchAll(legacyPattern)) {
+    legacyUrls.add(match[0]);
+  }
+  return [...firstPageUrls, ...legacyUrls];
 }
 
 function readMetaContent(html: string, property: string): string | null {
