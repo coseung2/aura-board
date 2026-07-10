@@ -168,7 +168,7 @@ export default function StudentPortfolioScreen() {
                       selected && styles.studentMetaOn,
                     ]}
                   >
-                    작품 {student.cardCount}개 · 자랑 {student.showcaseCount}개
+                    작품 {student.cardCount}개
                   </Text>
                 </SurfacePressable>
               );

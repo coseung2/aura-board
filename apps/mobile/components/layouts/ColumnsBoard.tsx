@@ -24,9 +24,11 @@ import { useBoardRealtime } from "../../lib/use-board-realtime";
 export function ColumnsBoard({
   data,
   onMutate,
+  writableSectionIds,
 }: {
   data: BoardDetailResponse;
   onMutate: () => void;
+  writableSectionIds?: string[];
 }) {
   const [cards, setCards] = useState<BoardCard[]>(() =>
     withBoardAnonymousAuthors(data.cards, data.board),
@@ -35,6 +37,11 @@ export function ColumnsBoard({
   const [activeSection, setActiveSection] = useState<string | null>(null);
   const [composerOpen, setComposerOpen] = useState(false);
   const boardTheme = boardThemes[normalizeBoardTheme(data.board.boardTheme)];
+  const writableSections = useMemo(
+    () =>
+      writableSectionIds === undefined ? null : new Set(writableSectionIds),
+    [writableSectionIds],
+  );
 
   useEffect(() => {
     // server 정렬이 order asc 라도 mobile 에서 안정화 한 번 더.
@@ -126,14 +133,17 @@ export function ColumnsBoard({
                   {column.cards.length}
                 </Pill>
               </SurfaceCard>
-              <AppButton
-                variant="secondary"
-                style={styles.addBtn}
-                textStyle={styles.addText}
-                onPress={() => openComposer(column.id)}
-              >
-                + 카드 추가
-              </AppButton>
+              {column.id !== null &&
+              (writableSections === null || writableSections.has(column.id)) ? (
+                <AppButton
+                  variant="secondary"
+                  style={styles.addBtn}
+                  textStyle={styles.addText}
+                  onPress={() => openComposer(column.id)}
+                >
+                  + 카드 추가
+                </AppButton>
+              ) : null}
               <ScrollView
                 style={styles.colBodyScroll}
                 contentContainerStyle={styles.colBodyContent}

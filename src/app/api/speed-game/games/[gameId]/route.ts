@@ -12,6 +12,7 @@ import {
   authenticateGameViewer,
   loadGameSnapshot,
 } from "@/lib/speed-game/runtime";
+import { sanitizeGameSnapshotForStudent } from "@/lib/speed-game/student-snapshot";
 
 type Params = { params: Promise<{ gameId: string }> };
 
@@ -32,7 +33,12 @@ export async function GET(_req: Request, { params }: Params) {
   if (!snap) {
     return jsonPrivateNoStore({ error: "game_not_found" }, { status: 404 });
   }
-  return jsonPrivateNoStore({ game: snap });
+  return jsonPrivateNoStore({
+    game:
+      auth.kind === "student"
+        ? sanitizeGameSnapshotForStudent(snap, auth.studentId)
+        : snap,
+  });
 }
 
 const PatchSchema = z.object({

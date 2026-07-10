@@ -16,7 +16,28 @@ export type BoardMeta = {
   thumbnailUrl?: string | null;
   boardTheme?: string | null;
   streamSectionsEnabled?: boolean;
+  category?: "LESSON" | "PLAY";
+  cardCount?: number;
+  quizzes?: Array<{ roomCode: string; status: string }>;
+  kordleStatus?: string | null;
+  speedGameStatus?: string | null;
+  shadowAllianceStatus?: "waiting" | "active" | "ended" | null;
+  breakout?: StudentHomeBreakout | null;
   _count?: { cards: number };
+};
+
+export type StudentHomeBreakout = {
+  assignmentId: string;
+  boardSlug: string;
+  boardTitle: string;
+  groupCapacity: number;
+  selectedSectionId: string | null;
+  groups: Array<{
+    groupIndex: number;
+    entrySectionId: string;
+    totalCount: number;
+    sections: Array<{ id: string; title: string; count: number }>;
+  }>;
 };
 
 export type StudentAssignmentTodo = {
@@ -31,6 +52,23 @@ export type StudentAssignmentTodo = {
   reminderSentAt?: string | null;
   submitted: boolean;
   submittedAt?: string | null;
+};
+
+export type StudentNotificationItem = {
+  id: string;
+  kind: "like" | "comment";
+  actorLabel: string;
+  cardTitle: string;
+  boardTitle: string;
+  href: string;
+  createdAt: string;
+  content?: string;
+  read: boolean;
+};
+
+export type StudentNotificationPayload = {
+  count: number;
+  items: StudentNotificationItem[];
 };
 
 export type MeResponse = {
@@ -62,6 +100,42 @@ export type StudentDuty = {
   roleLabel: string;
   emoji: string | null;
   href: string;
+};
+
+export type SpeedGameWire = {
+  id: string;
+  boardId: string;
+  boardSlug: string;
+  classroomId: string;
+  status: "waiting" | "active" | "finished";
+  roundIndex: number;
+  answerMode: "exact" | "normalize-space" | "teacher-approval";
+  baseScore: number;
+  minScore: number;
+  bonusRanks: number[];
+  timeLimitMs: number;
+  rounds: Array<{
+    id: string;
+    order: number;
+    keyword: string;
+    guesserSlot: number;
+    startedAt: string | null;
+    endedAt: string | null;
+  }>;
+  answers: Array<{
+    id: string;
+    roundId: string;
+    groupId: string;
+    studentId: string;
+    answer: string;
+    correct: boolean | null;
+    elapsedMs: number;
+    rank: number | null;
+    score: number | null;
+    createdAt: string;
+  }>;
+  groups: Array<{ id: string; name: string; studentIds: string[] }>;
+  leaderboard: Array<{ groupId: string; groupName: string; score: number }>;
 };
 
 export type WalletSummary = {
@@ -386,6 +460,24 @@ export type BoardDetailResponse = {
         observations: ObservationDTO[];
       }>;
     };
+    speedGame?: { game: SpeedGameWire | null };
+    eventSignup?: {
+      accessMode: string;
+      accessToken: string | null;
+      applicationStart: string | null;
+      applicationEnd: string | null;
+      eventPosterUrl: string | null;
+      venue: string | null;
+      maxSelections: number | null;
+    };
+    breakout?: {
+      assignmentId: string;
+      status: string;
+      visibility: "own-only" | "peek-others";
+      sectionIds: string[];
+      ownSectionIds: string[];
+      writableSectionIds: string[];
+    } | null;
   };
 };
 

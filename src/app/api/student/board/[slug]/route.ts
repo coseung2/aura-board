@@ -3,6 +3,8 @@ import { db } from "@/lib/db";
 import { getCurrentStudent } from "@/lib/student-auth";
 import { getEffectiveBoardRole } from "@/lib/rbac";
 import { resolveCardAuthorLabels } from "@/lib/card-author-labels";
+import { loadGameSnapshot } from "@/lib/speed-game/runtime";
+import { sanitizeGameSnapshotForStudent } from "@/lib/speed-game/student-snapshot";
 
 const ANONYMOUS_AUTHOR_LABEL = "익명";
 
@@ -52,6 +54,7 @@ export async function GET(
     }
 
     const layoutData: Record<string, unknown> = {};
+    let allowedBreakoutSectionIds: Set<string> | null = null;
 
     if (board.layout === "quiz") {
       const room = await db.quiz.findFirst({
@@ -167,11 +170,89 @@ export async function GET(
       layoutData.plantRoadmap = { plants };
     }
 
+    if (board.layout === "speed-game") {
+      const game = await db.speedGame.findFirst({
+        where: { boardId: board.id },
+        orderBy: { createdAt: "desc" },
+        select: { id: true },
+      });
+      const snapshot = game ? await loadGameSnapshot(game.id) : null;
+      layoutData.speedGame = {
+        game: snapshot
+          ? sanitizeGameSnapshotForStudent(snapshot, student.id)
+          : null,
+      };
+    }
+
+    if (board.layout === "event-signup") {
+      layoutData.eventSignup = {
+        accessMode: board.accessMode,
+        accessToken: board.accessMode === "public-link" ? board.accessToken : null,
+        applicationStart: board.applicationStart?.toISOString() ?? null,
+        applicationEnd: board.applicationEnd?.toISOString() ?? null,
+        eventPosterUrl: board.eventPosterUrl,
+        venue: board.venue,
+        maxSelections: board.maxSelections,
+      };
+    }
+
+    if (board.layout === "breakout") {
+      const assignment = await db.breakoutAssignment.findUnique({
+        where: { boardId: board.id },
+        include: { template: true },
+      });
+      if (assignment) {
+        const structure = assignment.template.structure as {
+          sharedSections?: Array<{ title: string }>;
+        } | null;
+        const sharedTitles = new Set(
+          (structure?.sharedSections ?? []).map((section) => section.title),
+        );
+        const visibility =
+          (assignment.visibilityOverride as "own-only" | "peek-others" | null) ??
+          (assignment.template.recommendedVisibility as "own-only" | "peek-others");
+        const memberships = await db.breakoutMembership.findMany({
+          where: { assignmentId: assignment.id, studentId: student.id },
+          select: { sectionId: true },
+        });
+        const ownIds = new Set(memberships.map((membership) => membership.sectionId));
+        const sharedIds = new Set(
+          board.sections
+            .filter((section) => sharedTitles.has(section.title))
+            .map((section) => section.id),
+        );
+        allowedBreakoutSectionIds = new Set(
+          board.sections
+            .filter(
+              (section) =>
+                sharedTitles.has(section.title) ||
+                visibility === "peek-others" ||
+                ownIds.has(section.id),
+            )
+            .map((section) => section.id),
+        );
+        layoutData.breakout = {
+          assignmentId: assignment.id,
+          status: assignment.status,
+          visibility,
+          sectionIds: [...allowedBreakoutSectionIds],
+          ownSectionIds: [...ownIds],
+          writableSectionIds:
+            assignment.status === "archived"
+              ? []
+              : [...new Set([...ownIds, ...sharedIds])],
+        };
+      } else {
+        layoutData.breakout = null;
+        allowedBreakoutSectionIds = new Set();
+      }
+    }
+
     const role = await getEffectiveBoardRole(board.id, {
       studentId: student.id,
     });
     const canControlQueue = role === "owner" || role === "editor";
-    const visibleCards =
+    const layoutVisibleCards =
       board.layout === "dj-queue"
         ? board.cards.filter((card) => {
             if (!card.queueStatus) return false;
@@ -184,6 +265,12 @@ export async function GET(
             );
           })
         : board.cards;
+    const visibleCards = allowedBreakoutSectionIds
+      ? layoutVisibleCards.filter(
+          (card) =>
+            card.sectionId !== null && allowedBreakoutSectionIds.has(card.sectionId),
+        )
+      : layoutVisibleCards;
     const cards = await Promise.all(
       visibleCards.map(async (card) => {
         const { _count, ...rest } = card;
@@ -252,7 +339,9 @@ export async function GET(
         _count: { cards: visibleCards.length },
       },
       cards,
-      sections: board.sections,
+      sections: allowedBreakoutSectionIds
+        ? board.sections.filter((section) => allowedBreakoutSectionIds.has(section.id))
+        : board.sections,
       currentStudent: {
         id: student.id,
         name: student.name,

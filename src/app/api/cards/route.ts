@@ -210,6 +210,7 @@ export async function POST(req: Request) {
     let student: Awaited<ReturnType<typeof getCurrentStudent>> = null;
     let boardClassroomId: string | null = null;
     let boardAnonymousAuthor = false;
+    let boardLayout: string | null = null;
 
     if (teacherUser) {
       await requirePermission(input.boardId, teacherUser.id, "edit");
@@ -217,10 +218,11 @@ export async function POST(req: Request) {
       currentUserName = teacherUser.name;
       const board = await db.board.findUnique({
         where: { id: input.boardId },
-        select: { classroomId: true, anonymousAuthor: true },
+        select: { classroomId: true, anonymousAuthor: true, layout: true },
       });
       boardClassroomId = board?.classroomId ?? null;
       boardAnonymousAuthor = board?.anonymousAuthor ?? false;
+      boardLayout = board?.layout ?? null;
     } else {
       student = preferStudentSession
         ? await getCurrentStudentRaw()
@@ -231,6 +233,7 @@ export async function POST(req: Request) {
           select: {
             classroomId: true,
             anonymousAuthor: true,
+            layout: true,
             classroom: { select: { teacherId: true } },
           },
         });
@@ -242,6 +245,7 @@ export async function POST(req: Request) {
         }
         boardClassroomId = board.classroomId;
         boardAnonymousAuthor = board.anonymousAuthor;
+        boardLayout = board.layout;
         authorId = board.classroom.teacherId;
         studentAuthorId = student.id;
         externalAuthorName = student.name;
@@ -398,13 +402,46 @@ export async function POST(req: Request) {
     if (input.sectionId) {
       const section = await db.section.findUnique({
         where: { id: input.sectionId },
-        select: { boardId: true },
+        select: { boardId: true, title: true },
       });
       if (!section || section.boardId !== input.boardId) {
         return NextResponse.json(
           { error: "sectionId does not belong to boardId" },
           { status: 422 },
         );
+      }
+
+      if (boardLayout === "breakout" && studentAuthorId && !teacherUser) {
+        const assignment = await db.breakoutAssignment.findUnique({
+          where: { boardId: input.boardId },
+          include: { template: true },
+        });
+        if (!assignment || assignment.status === "archived") {
+          return NextResponse.json(
+            { error: "breakout_not_writable" },
+            { status: 403 },
+          );
+        }
+        const structure = assignment.template.structure as {
+          sharedSections?: Array<{ title: string }>;
+        } | null;
+        const sharedTitles = new Set(
+          (structure?.sharedSections ?? []).map((item) => item.title),
+        );
+        const membership = await db.breakoutMembership.findFirst({
+          where: {
+            assignmentId: assignment.id,
+            studentId: studentAuthorId,
+            sectionId: input.sectionId,
+          },
+          select: { id: true },
+        });
+        if (!sharedTitles.has(section.title) && !membership) {
+          return NextResponse.json(
+            { error: "breakout_section_forbidden" },
+            { status: 403 },
+          );
+        }
       }
     }
 

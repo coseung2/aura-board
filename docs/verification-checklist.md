@@ -42,6 +42,22 @@ creating overlapping testing-notes documents.
 - Inspect production data shape when the symptom is data-dependent.
 - Re-test the exact route, board, classroom, or student flow named by the user.
 
+## Mobile Parity And Android Release
+
+- Run `npm run typecheck` and `npm run design:check` in `apps/mobile`.
+- Run `npx expo export --platform android --clear` to prove the Metro bundle and
+  font/assets graph before requesting a signed build.
+- Compare student and parent navigation, loading, empty, error, session-expiry,
+  notification, and save states at phone and tablet widths.
+- For a mobile save or submit action, verify the server response and reload the
+  same route before treating optimistic state as proof.
+- Before EAS build, bump the user-visible app version when the release is a
+  material UX change and enable remote Android `versionCode` auto-increment.
+- Build with the final pushed commit. Confirm the EAS build `gitCommitHash`,
+  version, versionCode, artifact type (`.aab`), and finished status.
+- Submit the exact verified build ID. Confirm the Google Play production track
+  and release status; a successful AAB build alone is not a Play release.
+
 ## Test Fixtures
 
 - Student login code: `DCY366`

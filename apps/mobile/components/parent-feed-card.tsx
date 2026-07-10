@@ -1,5 +1,5 @@
 import { Image } from "expo-image";
-import { StyleSheet, Text, View } from "react-native";
+import { StyleSheet, Text, View, useWindowDimensions } from "react-native";
 import type { BoardCard, PortfolioCardDTO } from "../lib/types";
 import { layoutEmoji } from "../theme/layout-meta";
 import {
@@ -13,6 +13,10 @@ import {
   typography,
 } from "../theme/tokens";
 import { ControlPressable, MediaPressable, SurfaceCard } from "./ui";
+import {
+  countParentFeedAttachments,
+  resolveParentFeedAuthor,
+} from "../lib/parent-feed-presentation";
 
 type Props = {
   card: PortfolioCardDTO;
@@ -21,15 +25,19 @@ type Props = {
 };
 
 export function ParentFeedCard({ card, childName, onOpen }: Props) {
+  const { width } = useWindowDimensions();
+  const isNarrow = width < 768;
   const previewUrl = getPreviewUrl(card);
   const sourceLabel = buildSourceLabel(card);
   const title = card.title.trim();
   const content = card.content.trim();
+  const authorName = resolveParentFeedAuthor(card, childName);
+  const attachmentCount = countParentFeedAttachments(card);
   const mediaLabel = `${childName}의 ${title || sourceLabel} 게시물 상세 보기`;
 
   return (
     <SurfaceCard
-      style={styles.card}
+      style={[styles.card, isNarrow && styles.cardNarrow]}
       accessible={false}
       accessibilityLabel={`${childName}의 게시물`}
     >
@@ -39,7 +47,7 @@ export function ParentFeedCard({ card, childName, onOpen }: Props) {
         </View>
         <View style={styles.headerCopy}>
           <Text selectable style={styles.author} numberOfLines={1}>
-            {childName}
+            {authorName}
           </Text>
           <Text selectable style={styles.source} numberOfLines={1}>
             {sourceLabel}
@@ -78,10 +86,10 @@ export function ParentFeedCard({ card, childName, onOpen }: Props) {
             <Text style={styles.playText}>▶</Text>
           </View>
         ) : null}
-        {card.attachments.length > 1 ? (
+        {attachmentCount > 1 ? (
           <View style={styles.attachmentBadge} pointerEvents="none">
             <Text style={styles.attachmentBadgeText}>
-              1/{card.attachments.length}
+              1/{attachmentCount}
             </Text>
           </View>
         ) : null}
@@ -178,7 +186,7 @@ export function toParentFeedBoardCard(
         order: attachment.order,
       })),
     authors: card.authors,
-    authorName: card.authorName ?? fallbackAuthorName,
+    authorName: resolveParentFeedAuthor(card, fallbackAuthorName),
     studentAuthorName: card.studentAuthorName ?? fallbackAuthorName,
     anonymousAuthor: card.sourceBoard.anonymousAuthor,
   };
@@ -222,7 +230,15 @@ function formatCount(value: number): string {
 const styles = StyleSheet.create({
   card: {
     width: "100%",
+    maxWidth: parent.portfolioCardMinWidth * 2 - spacing.lg,
+    alignSelf: "center",
     overflow: "hidden",
+  },
+  cardNarrow: {
+    borderRadius: radii.none,
+    borderLeftWidth: borders.none,
+    borderRightWidth: borders.none,
+    boxShadow: "none",
   },
   header: {
     minHeight: parent.feedPostHeaderMinHeight,

@@ -13,40 +13,21 @@ import type {
   ShadowAllianceBoardStatus,
   ShadowAllianceSnapshot,
 } from "@/features/shadow-alliance/types";
+import type {
+  StudentAssignmentTodo,
+  StudentHomeBoard as BoardItem,
+  StudentHomeBreakout as StudentBreakout,
+} from "@/lib/student-home-types";
+import { isStudentAssignmentReminded } from "@/lib/student-home-types";
 
 const FALLBACK_THUMBNAIL = "/board-type-thumbnails/card-board.png";
 const STUDENT_ASSIGNMENT_VISIBLE_LIMIT = 4;
-
-type BoardItem = {
-  id: string;
-  slug: string;
-  title: string;
-  layout: string;
-  // BC-1: "LESSON" or "PLAY" - drives the lesson/play section split below.
-  category: "LESSON" | "PLAY";
-  // Thumbnail/fallback matches the teacher Dashboard board cards.
-  thumbnailMode?: string | null;
-  thumbnailUrl?: string | null;
-  quizzes?: { roomCode: string; status: string }[];
-  kordleStatus?: string | null;
-  speedGameStatus?: string | null;
-  breakout?: StudentBreakout | null;
-};
 
 type BreakoutGroup = {
   groupIndex: number;
   entrySectionId: string;
   totalCount: number;
   sections: Array<{ id: string; title: string; count: number }>;
-};
-
-type StudentBreakout = {
-  assignmentId: string;
-  boardSlug: string;
-  boardTitle: string;
-  groupCapacity: number;
-  selectedSectionId: string | null;
-  groups: BreakoutGroup[];
 };
 
 type Duty = {
@@ -56,20 +37,6 @@ type Duty = {
   roleLabel: string;
   emoji: string | null;
   href: string;
-};
-
-type StudentAssignmentTodo = {
-  id: string;
-  sectionId: string;
-  boardId: string;
-  boardSlug: string;
-  boardTitle: string;
-  sectionTitle: string;
-  href?: string | null;
-  assignedAt: string;
-  reminderSentAt?: string | null;
-  submitted: boolean;
-  submittedAt?: string | null;
 };
 
 type WalletSummary = {
@@ -379,11 +346,7 @@ function StudentAssignmentTodos({
           const className = `student-assignment-item ${
             submitted ? "is-submitted" : "is-missing"
           }`;
-          const reminded =
-            !submitted &&
-            item.reminderSentAt !== null &&
-            item.reminderSentAt !== undefined &&
-            item.reminderSentAt !== item.assignedAt;
+          const reminded = isStudentAssignmentReminded(item);
           const content = (
             <>
               <span className="student-assignment-check" aria-hidden="true">

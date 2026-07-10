@@ -2,15 +2,9 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import type { ParentPendingLinkView } from "@/lib/parent-pending-link";
 
-export type ParentPendingLink = {
-  id: string;
-  studentName: string;
-  studentNumber: number | null;
-  classroomName: string;
-  requestedAtLabel: string;
-  expiresInDays: number;
-};
+export type ParentPendingLink = ParentPendingLinkView;
 
 type Props = {
   links: ParentPendingLink[];

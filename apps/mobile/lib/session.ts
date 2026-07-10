@@ -10,6 +10,7 @@ const STUDENT_KEY = "aura_student_cache";
 // 학부모 세션 토큰 · 프로필 캐시.
 const PARENT_TOKEN_KEY = "aura_parent_token";
 const PARENT_KEY = "aura_parent_cache";
+const PARENT_SELECTED_CHILD_KEY = "aura_parent_selected_child";
 
 function canUseWebStorage(): boolean {
   return (
@@ -96,6 +97,7 @@ export async function loadParentToken(): Promise<string | null> {
 export async function clearParentSession(): Promise<void> {
   await deleteStoredItem(PARENT_TOKEN_KEY).catch(() => undefined);
   await deleteStoredItem(PARENT_KEY).catch(() => undefined);
+  await deleteStoredItem(PARENT_SELECTED_CHILD_KEY).catch(() => undefined);
 }
 
 export async function saveParentCache(parent: CachedParent): Promise<void> {
@@ -110,4 +112,12 @@ export async function loadParentCache(): Promise<CachedParent | null> {
   } catch {
     return null;
   }
+}
+
+export async function saveParentSelectedChild(studentId: string): Promise<void> {
+  await setStoredItem(PARENT_SELECTED_CHILD_KEY, studentId);
+}
+
+export async function loadParentSelectedChild(): Promise<string | null> {
+  return getStoredItem(PARENT_SELECTED_CHILD_KEY);
 }

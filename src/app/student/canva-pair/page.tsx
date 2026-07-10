@@ -13,57 +13,15 @@
  */
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import { randomBytes } from "crypto";
 import { getCurrentStudent } from "@/lib/student-auth";
 import { getStudentDuties } from "@/lib/role-portals";
 import { isAdminEmail } from "@/lib/admin";
 import { StudentTopNav } from "@/components/StudentTopNav";
-import { db } from "@/lib/db";
+import { issueStudentCanvaPairCode } from "@/lib/canva-pair";
 import { CopyButton } from "./CopyButton";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Canva 앱 연결 · Aura-board" };
-
-const PAIR_CODE_TTL_MS = 5 * 60 * 1000;
-// Readable charset — no 0/O, 1/I confusion. Uppercase base32-ish.
-const PAIR_ALPHABET = "23456789ABCDEFGHJKMNPQRSTUVWXYZ";
-
-function generatePairCode(): string {
-  const buf = randomBytes(8);
-  let out = "";
-  for (let i = 0; i < 8; i++) {
-    out += PAIR_ALPHABET[(buf[i] ?? 0) % PAIR_ALPHABET.length];
-  }
-  return out;
-}
-
-async function issuePairCode(studentId: string): Promise<string> {
-  // Retry a couple of times in the unlikely event of a collision.
-  for (let i = 0; i < 3; i++) {
-    const code = generatePairCode();
-    try {
-      await db.oAuthAuthCode.create({
-        data: {
-          code,
-          studentId,
-          clientId: "canva",
-          redirectUri: "aura://pair",
-          scope: "cards:write",
-          codeChallenge: "",
-          codeChallengeMethod: "plain",
-          state: null,
-          expiresAt: new Date(Date.now() + PAIR_CODE_TTL_MS),
-        },
-      });
-      return code;
-    } catch (e) {
-      const prismaCode = (e as { code?: string }).code;
-      if (prismaCode === "P2002") continue; // unique violation → retry
-      throw e;
-    }
-  }
-  throw new Error("pair_code_issue_retry_exhausted");
-}
 
 export default async function CanvaPairPage() {
   const student = await getCurrentStudent();
@@ -71,8 +29,8 @@ export default async function CanvaPairPage() {
     redirect("/login?from=/student/canva-pair");
   }
 
-  const [code, duties] = await Promise.all([
-    issuePairCode(student.id),
+  const [{ code }, duties] = await Promise.all([
+    issueStudentCanvaPairCode(student.id),
     getStudentDuties(student.id),
   ]);
   // Split into two groups of 4 for easier reading on a tablet ("A3K7-BN9X").

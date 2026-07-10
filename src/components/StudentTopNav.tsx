@@ -183,6 +183,24 @@ export function StudentTopNav({
         },
       ],
     },
+    {
+      id: "canva",
+      label: "Canva",
+      href: "/student/canva-pair",
+      active: pathname.startsWith("/student/canva-pair"),
+      groups: [
+        {
+          title: "활동",
+          links: [
+            {
+              href: "/student/canva-pair",
+              label: "Canva 연결",
+              active: pathname.startsWith("/student/canva-pair"),
+            },
+          ],
+        },
+      ],
+    },
     ...duties.map((duty) => ({
       id: `duty-${duty.classroomId}-${duty.roleKey}`,
       label: duty.roleLabel,

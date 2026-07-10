@@ -4,11 +4,10 @@ import { getCurrentParent } from "@/lib/parent-session";
 import { ParentDashboard } from "@/components/parent/ParentDashboard";
 import type { ChildRow } from "@/components/parent/ParentChildSelector";
 import { ParentPendingLinks, type ParentPendingLink } from "@/components/parent/ParentPendingLinks";
+import { toParentPendingLink } from "@/lib/parent-pending-link";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
-const PENDING_EXPIRES_DAYS = 7;
-const DAY_MS = 24 * 60 * 60 * 1000;
 
 // parent-redesign (2026-04-26): 학부모 대시보드.
 // 풀폭 헤더 + 자녀 chip 셀렉터 + 자녀 portfolio 본문(자녀 카드 + 학급
@@ -48,7 +47,7 @@ export default async function ParentHomePage({
   const activeLinks = links.filter((link) => link.status === "active");
   const pendingLinks: ParentPendingLink[] = links
     .filter((link) => link.status === "pending")
-    .map((link) => toPendingLink(link));
+    .map((link) => toParentPendingLink(link));
 
   if (activeLinks.length === 0) {
     return (
@@ -108,31 +107,4 @@ export default async function ParentHomePage({
       />
     </main>
   );
-}
-
-function toPendingLink(link: {
-  id: string;
-  requestedAt: Date;
-  student: {
-    name: string;
-    number: number | null;
-    classroom: { name: string };
-  };
-}): ParentPendingLink {
-  const elapsedDays = Math.ceil((Date.now() - link.requestedAt.getTime()) / DAY_MS);
-  return {
-    id: link.id,
-    studentName: link.student.name,
-    studentNumber: link.student.number,
-    classroomName: link.student.classroom.name,
-    requestedAtLabel: formatDate(link.requestedAt),
-    expiresInDays: Math.max(0, PENDING_EXPIRES_DAYS - elapsedDays),
-  };
-}
-
-function formatDate(date: Date): string {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-  return `${year}.${month}.${day}`;
 }

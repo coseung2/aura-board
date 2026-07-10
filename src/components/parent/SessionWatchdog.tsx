@@ -33,7 +33,10 @@ export function SessionWatchdog() {
           cache: "no-store",
           credentials: "same-origin",
         });
-        if (res.status === 401) {
+        const payload: { state?: string } | null = res.ok
+          ? await res.json().catch(() => null)
+          : null;
+        if (res.status === 401 || payload?.state === "anonymous") {
           if (!cancelled) router.replace("/parent/logged-out");
           return;
         }

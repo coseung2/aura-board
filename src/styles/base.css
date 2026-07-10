@@ -109,8 +109,8 @@ img.emoji {
   --control-inline-gap: 6px;
 
   /* Typography */
-  --font-display: "Pretendard Variable", "SUIT", "Noto Sans KR", "Segoe UI", sans-serif;
-  --font-body: "Pretendard Variable", "SUIT", "Noto Sans KR", "Segoe UI", sans-serif;
+  --font-display: "Noto Sans KR", "Pretendard Variable", "SUIT", "Segoe UI", sans-serif;
+  --font-body: "Noto Sans KR", "Pretendard Variable", "SUIT", "Segoe UI", sans-serif;
   --font-display-tracking: 0;
 
   /* Shadows — multi-layer soft (Notion signature) */

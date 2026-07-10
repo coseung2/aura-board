@@ -1,6 +1,6 @@
 # Mobile Component Mapping
 
-Updated: 2026-06-17
+Updated: 2026-07-10
 
 The web app remains the source of truth. This file maps web UI patterns to
 mobile components so mobile parity work happens through shared primitives
@@ -22,12 +22,20 @@ instead of route-local patches.
 | Modal | `.add-card-modal`, detail modals | `AppModal` | Use `colors.overlay`, `SurfaceCard`, tokenized close button, shared accessibility defaults, and `align="right"` for side panels. |
 | Card detail | `CardDetailModal` web patterns | `CardDetailModal` mobile | Keep media full-bleed, controls tokenized. |
 | Board cards | `Dashboard` board cards | student/parent board list card components | Use board thumbnails/layout metadata where available. |
-| Showcase gallery | `ShowcaseGalleryView`, `ShowcaseCardChip` | `ShowcaseCardGrid` + `CardDetailModal` | Student and parent showcase routes share the same card grid primitive; parent opens detail in place. |
+| Student navigation | web student dashboard navigation | `StudentBottomNav`, `StudentNotificationButton` | Production items are board, portfolio, wallet, reading, Canva, notifications, plus assigned duties. |
+| Parent navigation | web parent bottom navigation | `ParentBottomNav` | Keep `home / notifications / add / account` identical; showcase is not a production route. |
 | Card board | `GridBoard`, freeform grid card style | `CardsBoard`, `ReadOnlyCardsBoard`, `CardView` | Masonry/grid density should not become oversized single-column on tablet. |
 | Topic board | `ColumnsBoard` | `ColumnsBoard` | Preserve horizontal column scanning on tablet. |
 | Stream board | `StreamBoard` + FAB composer | mobile stream/read-only path | Posting should use the shared `Fab` pattern. |
 | Plant journal | `PlantRoadmapBoard` web | `PlantRoadmapBoard` mobile plant components | Timeline and stage cards must share surface tokens. |
 | DJ board | `DJBoard` | `DJQueueBoard`, `DJRecapModal` | Now-playing, queue, and side panels map to `SurfaceCard` and `AppModal`. |
+| Question board | `QuestionBoard` | `QuestionBoard` | Snapshot, response submission, silent refresh, retry states. |
+| Assessment | assessment student flow | `AssessmentBoard` | Bootstrap, answer save, timer, final submit. |
+| Word/game boards | Kordle, Speed Game, Shadow Alliance | `KordleBoard`, `SpeedGameBoard`, `ShadowAllianceBoard` | Preserve role visibility, secret-word filtering, polling/realtime, and final states. |
+| Event signup | public event application | `EventSignupBoard` | Render the same web form in an origin-restricted in-app WebView. |
+| Breakout | breakout columns and membership | `BreakoutBoard` + `ColumnsBoard` | Server-provided visible and writable section IDs are authoritative. |
+| Drawing | web drawing studio/gallery | `DrawingBoard` | Native canvas saves through student-assets and reloads the class gallery. |
+| Student inspection | web cleaning/shoes role pages | `StudentInspectionScreen` | Preserve findings and photo upload round trips; shoes remains photo-free. |
 
 ## Modal Exceptions
 

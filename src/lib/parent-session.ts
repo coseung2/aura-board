@@ -82,17 +82,7 @@ export async function createParentSession(params: {
  * On a successful lookup, bumps lastSeenAt (best-effort; errors swallowed).
  */
 export async function getCurrentParent() {
-  const headerList = await headers();
-  const authHeader =
-    headerList.get("authorization") ?? headerList.get("Authorization");
-  let token: string | null = null;
-  if (authHeader && authHeader.toLowerCase().startsWith("bearer ")) {
-    token = authHeader.slice(7).trim();
-  }
-  if (!token) {
-    const cookieStore = await cookies();
-    token = cookieStore.get(COOKIE_NAME)?.value ?? null;
-  }
+  const token = await getRequestSessionToken();
   if (!token) return null;
 
   const tokenHash = hashToken(token);
@@ -122,7 +112,7 @@ export async function getCurrentParent() {
 /** Clear the cookie + revoke the current session row. */
 export async function clearParentSession() {
   const cookieStore = await cookies();
-  const token = cookieStore.get(COOKIE_NAME)?.value;
+  const token = await getRequestSessionToken(cookieStore.get(COOKIE_NAME)?.value ?? null);
   if (token) {
     const tokenHash = hashToken(token);
     await db.parentSession
@@ -133,6 +123,19 @@ export async function clearParentSession() {
       .catch(() => undefined);
   }
   cookieStore.delete(COOKIE_NAME);
+}
+
+async function getRequestSessionToken(cookieToken?: string | null): Promise<string | null> {
+  const headerList = await headers();
+  const authHeader =
+    headerList.get("authorization") ?? headerList.get("Authorization");
+  if (authHeader && authHeader.toLowerCase().startsWith("bearer ")) {
+    const bearerToken = authHeader.slice(7).trim();
+    if (bearerToken) return bearerToken;
+  }
+  if (cookieToken !== undefined) return cookieToken;
+  const cookieStore = await cookies();
+  return cookieStore.get(COOKIE_NAME)?.value ?? null;
 }
 
 export { COOKIE_NAME as PARENT_SESSION_COOKIE_NAME };

@@ -1,6 +1,6 @@
 # Mobile UI Parity
 
-Updated: 2026-06-18
+Updated: 2026-07-10
 
 ## Source Of Truth
 

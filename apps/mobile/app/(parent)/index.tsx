@@ -13,8 +13,10 @@ import { ApiError, parentApiFetch } from "../../lib/api";
 import {
   clearParentSession,
   loadParentCache,
+  loadParentSelectedChild,
   loadParentToken,
   saveParentCache,
+  saveParentSelectedChild,
 } from "../../lib/session";
 import type {
   ParentChild,
@@ -67,7 +69,10 @@ export default function ParentHome() {
   const loadChildren = useCallback(
     async (showLoading: boolean) => {
       if (showLoading) setChildrenLoading(true);
-      const cached = await loadParentCache();
+      const [cached, storedSelectedChild] = await Promise.all([
+        loadParentCache(),
+        loadParentSelectedChild(),
+      ]);
       if (cached?.name) setParentName(cached.name);
 
       const token = await loadParentToken();
@@ -91,8 +96,10 @@ export default function ParentHome() {
         setChildren(response.children);
         setPendingLinks(response.pendingLinks);
         setSelectedChildId((current) =>
-          response.children.some((child) => child.studentId === current)
-            ? current
+          response.children.some(
+            (child) => child.studentId === (current ?? storedSelectedChild),
+          )
+            ? (current ?? storedSelectedChild)
             : response.children[0]?.studentId ?? null,
         );
         setChildrenError(null);
@@ -134,17 +141,13 @@ export default function ParentHome() {
   const selectChild = useCallback((studentId: string) => {
     setOpenCard(null);
     setSelectedChildId(studentId);
+    void saveParentSelectedChild(studentId);
     listRef.current?.scrollToOffset({ offset: 0, animated: false });
   }, []);
 
   const handleRefresh = useCallback(async () => {
     await Promise.all([loadChildren(false), feed.refresh()]);
   }, [feed, loadChildren]);
-
-  const handleLogout = useCallback(async () => {
-    await clearParentSession();
-    router.replace("/");
-  }, [router]);
 
   if (childrenLoading) {
     return (
@@ -322,11 +325,11 @@ export default function ParentHome() {
       />
 
       <ParentBottomNav
-        classroomId={feed.child?.classroomId ?? selectedChild?.classroom?.id}
-        onFeedPress={() =>
+        active="home"
+        notificationCount={pendingLinks.length}
+        onHomePress={() =>
           listRef.current?.scrollToOffset({ offset: 0, animated: true })
         }
-        onLogout={handleLogout}
       />
       <CardDetailModal card={modalCard} onClose={() => setOpenCard(null)} />
     </SafeAreaView>
@@ -348,11 +351,14 @@ const styles = StyleSheet.create({
     maxWidth: parent.feedHeaderNameMaxWidth,
   },
   listContent: {
-    paddingHorizontal: spacing.lg,
     paddingBottom: spacing.xl,
-    gap: spacing.lg,
+    gap: spacing.md,
   },
-  listHeader: { gap: spacing.lg, paddingTop: spacing.lg },
+  listHeader: {
+    gap: spacing.lg,
+    paddingTop: spacing.lg,
+    paddingHorizontal: spacing.lg,
+  },
   childStrip: { gap: spacing.sm, paddingRight: spacing.lg },
   childChip: {
     minWidth: parent.navMinWidth,

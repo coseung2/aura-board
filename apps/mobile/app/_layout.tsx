@@ -1,6 +1,11 @@
 import { useEffect, useRef } from "react";
 import { Stack, useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
+import * as SplashScreen from "expo-splash-screen";
+import { useFonts } from "expo-font";
+import { NotoSansKR_400Regular } from "@expo-google-fonts/noto-sans-kr/400Regular";
+import { NotoSansKR_600SemiBold } from "@expo-google-fonts/noto-sans-kr/600SemiBold";
+import { NotoSansKR_700Bold } from "@expo-google-fonts/noto-sans-kr/700Bold";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import * as Linking from "expo-linking";
 import { colors } from "../theme/tokens";
@@ -11,6 +16,8 @@ import { clearParentSession, saveParentToken } from "../lib/session";
 // 앱이 cold/foreground 상태일 때 모두 잡아서 처리한다.
 
 const CALLBACK_PATH = "parent/auth/callback";
+
+void SplashScreen.preventAutoHideAsync();
 
 function parseCallback(url: string) {
   if (!url.startsWith("auraboard://")) return null;
@@ -89,6 +96,20 @@ function DeepLinkHandler() {
 }
 
 export default function RootLayout() {
+  const [fontsLoaded, fontError] = useFonts({
+    NotoSansKR_400Regular,
+    NotoSansKR_600SemiBold,
+    NotoSansKR_700Bold,
+  });
+
+  useEffect(() => {
+    if (fontsLoaded || fontError) {
+      void SplashScreen.hideAsync();
+    }
+  }, [fontError, fontsLoaded]);
+
+  if (!fontsLoaded && !fontError) return null;
+
   return (
     <SafeAreaProvider>
       <StatusBar style="dark" />

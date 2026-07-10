@@ -22,6 +22,15 @@ import { AssignmentBoard } from "../../../components/layouts/AssignmentBoard";
 import { PlantRoadmapBoard } from "../../../components/layouts/PlantRoadmapBoard";
 import { DJQueueBoard } from "../../../components/layouts/DJQueueBoard";
 import { ReadOnlyCardsBoard } from "../../../components/layouts/ReadOnlyCardsBoard";
+import { QuestionBoard } from "../../../components/layouts/QuestionBoard";
+import { AssessmentBoard } from "../../../components/layouts/AssessmentBoard";
+import { KordleBoard } from "../../../components/layouts/KordleBoard";
+import { VibeGalleryBoard } from "../../../components/layouts/VibeGalleryBoard";
+import { SpeedGameBoard } from "../../../components/layouts/SpeedGameBoard";
+import { EventSignupBoard } from "../../../components/layouts/EventSignupBoard";
+import { BreakoutBoard } from "../../../components/layouts/BreakoutBoard";
+import { DrawingBoard } from "../../../components/layouts/DrawingBoard";
+import { ShadowAllianceBoard } from "../../../components/layouts/ShadowAllianceBoard";
 import { AppButton } from "../../../components/ui";
 
 // 학생 앱 보드 상세 dispatcher. /api/student/board/:slug 한 번 fetch 후
@@ -112,16 +121,29 @@ function renderLayout(data: BoardDetailResponse, reload: () => void) {
       return <PlantRoadmapBoard data={data} onMutate={reload} />;
     case "dj-queue":
       return <DJQueueBoard data={data} onMutate={reload} />;
+    case "question-board":
+      return <QuestionBoard data={data} />;
+    case "assessment":
+      return <AssessmentBoard data={data} />;
+    case "kordle":
+      return <KordleBoard data={data} />;
+    case "vibe-gallery":
+      return <VibeGalleryBoard data={data} />;
+    case "speed-game":
+      return <SpeedGameBoard data={data} />;
+    case "event-signup":
+      return <EventSignupBoard data={data} />;
+    case "breakout":
+      return <BreakoutBoard data={data} onMutate={reload} />;
+    case "drawing":
+      return <DrawingBoard data={data} />;
+    case "shadow-alliance":
+      return <ShadowAllianceBoard data={data} />;
     case "freeform":
     case "grid":
     case "stream":
       return <CardsBoard data={data} onMutate={reload} />;
     // 카드 기반 read-heavy 레이아웃들 — 작성은 제한하고 읽기 + 본인 카드 추가만.
-    case "vibe-gallery":
-    case "event-signup":
-    case "breakout":
-    case "assessment":
-    case "drawing":
     default:
       return <ReadOnlyCardsBoard data={data} />;
   }

@@ -1,11 +1,10 @@
-import type { Href } from "expo-router";
 import type { StudentDuty } from "./types";
 
 export type StudentNavTarget = {
   id: string;
   label: string;
   emoji: string;
-  href: Href;
+  href: string;
   pathname: string;
 };
 
@@ -14,29 +13,36 @@ export const studentBaseNavTargets: StudentNavTarget[] = [
     id: "boards",
     label: "보드",
     emoji: "▦",
-    href: "/(student)" as Href,
+    href: "/(student)",
     pathname: "/",
   },
   {
     id: "portfolio",
     label: "포트폴리오",
     emoji: "🗂️",
-    href: "/(student)/portfolio" as Href,
+    href: "/(student)/portfolio",
     pathname: "/portfolio",
-  },
-  {
-    id: "showcase",
-    label: "자랑해요",
-    emoji: "🌟",
-    href: "/(student)/showcase" as Href,
-    pathname: "/showcase",
   },
   {
     id: "wallet",
     label: "통장",
     emoji: "💳",
-    href: "/(student)/wallet" as Href,
+    href: "/(student)/wallet",
     pathname: "/wallet",
+  },
+  {
+    id: "reading",
+    label: "독서",
+    emoji: "📚",
+    href: "/(student)/reading",
+    pathname: "/reading",
+  },
+  {
+    id: "canva",
+    label: "Canva",
+    emoji: "🎨",
+    href: "/(student)/canva",
+    pathname: "/canva",
   },
 ];
 
@@ -51,22 +57,36 @@ export function studentDutyTarget(duty: StudentDuty): StudentNavTarget | null {
   if (duty.href.endsWith("/bank")) {
     return {
       ...base,
-      href: `/(student)/bank?classroomId=${classroomId}` as Href,
+      href: `/(student)/bank?classroomId=${classroomId}`,
       pathname: "/bank",
     };
   }
   if (duty.href.endsWith("/pay")) {
     return {
       ...base,
-      href: `/(student)/pay?classroomId=${classroomId}` as Href,
+      href: `/(student)/pay?classroomId=${classroomId}`,
       pathname: "/pay",
     };
   }
   if (duty.href.endsWith("/check") || duty.roleKey === "checker") {
     return {
       ...base,
-      href: `/(student)/check?classroomId=${classroomId}` as Href,
+      href: `/(student)/check?classroomId=${classroomId}`,
       pathname: "/check",
+    };
+  }
+  if (duty.href.endsWith("/cleaning") || duty.roleKey === "cleaning-inspector") {
+    return {
+      ...base,
+      href: `/(student)/cleaning?classroomId=${classroomId}`,
+      pathname: "/cleaning",
+    };
+  }
+  if (duty.href.endsWith("/shoes") || duty.roleKey === "shoe-inspector") {
+    return {
+      ...base,
+      href: `/(student)/shoes?classroomId=${classroomId}`,
+      pathname: "/shoes",
     };
   }
   return null;
@@ -76,6 +96,8 @@ export function roleEmoji(roleKey: string): string {
   if (roleKey === "banker") return "🏦";
   if (roleKey === "store-clerk") return "🛒";
   if (roleKey === "checker") return "✅";
+  if (roleKey === "cleaning-inspector") return "🧹";
+  if (roleKey === "shoe-inspector") return "👟";
   return "•";
 }
 

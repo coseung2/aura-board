@@ -33,6 +33,7 @@ import {
   SurfacePressable,
   TextField,
 } from "../../components/ui";
+import { ParentBottomNav } from "../../components/parent-bottom-nav";
 
 export default function LinkChildScreen() {
   const router = useRouter();
@@ -176,7 +177,7 @@ export default function LinkChildScreen() {
   }
 
   return (
-    <SafeAreaView style={styles.container} edges={["top", "bottom"]}>
+    <SafeAreaView style={styles.container} edges={["top"]}>
       <AppHeader title="자녀 연결" onBack={handleGoHome} />
 
       {step === "code" && (
@@ -301,6 +302,7 @@ export default function LinkChildScreen() {
           />
         </View>
       )}
+      <ParentBottomNav active="add" />
     </SafeAreaView>
   );
 }

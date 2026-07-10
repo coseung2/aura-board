@@ -2,6 +2,10 @@
 
 import Image from "next/image";
 import type { PortfolioCardDTO } from "@/lib/portfolio-dto";
+import {
+  countParentFeedAttachments,
+  resolveParentFeedAuthor,
+} from "@/lib/parent-feed-presentation";
 import { buildSourceLabel } from "./source-label";
 
 type Props = {
@@ -24,10 +28,8 @@ export function ParentFeedPost({ card, childName, onOpen }: Props) {
     card.linkImage;
   const videoUrl =
     card.videoUrl ?? card.attachments.find((item) => item.kind === "video")?.url ?? null;
-  const attachmentCount = card.attachments.length + (card.imageUrl ? 1 : 0) + (card.videoUrl ? 1 : 0);
-  const authorName = card.sourceBoard.anonymousAuthor
-    ? "익명"
-    : card.studentAuthorName ?? card.externalAuthorName ?? childName;
+  const attachmentCount = countParentFeedAttachments(card);
+  const authorName = resolveParentFeedAuthor(card, childName);
 
   return (
     <article className="parent-feed-post">

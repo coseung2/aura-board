@@ -42,7 +42,7 @@ type ChatMessage = {
   content: string;
 };
 
-type PlayProject = {
+export type PlayProject = {
   id: string;
   title: string;
 };
@@ -245,12 +245,12 @@ export function VibeArcadeBoard({ data }: { data: BoardDetailResponse }) {
         </View>
       </SurfaceCard>
 
-      <PlayModal project={playTarget} onClose={() => setPlayTarget(null)} />
+      <VibeProjectPlayModal project={playTarget} onClose={() => setPlayTarget(null)} />
     </View>
   );
 }
 
-function PlayModal({
+export function VibeProjectPlayModal({
   project,
   onClose,
 }: {

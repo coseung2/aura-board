@@ -1,5 +1,5 @@
 import { ScrollView, StyleSheet, Text, View } from "react-native";
-import { usePathname, useRouter } from "expo-router";
+import { usePathname, useRouter, type Href } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
   borders,
@@ -19,6 +19,7 @@ import {
   type StudentNavTarget,
 } from "../lib/student-navigation";
 import { ControlPressable } from "./ui";
+import { StudentNotificationButton } from "./StudentNotificationButton";
 
 type Props = {
   studentName?: string;
@@ -57,16 +58,19 @@ export function StudentBottomNav({
             {classroomName ?? "학급"}
           </Text>
         </View>
-        <ControlPressable
-          style={styles.logoutButton}
-          onPress={onLogout}
-          disabled={loggingOut}
-          accessibilityLabel="로그아웃"
-        >
-          <Text style={styles.logoutText}>
-            {loggingOut ? "로그아웃 중" : "로그아웃"}
-          </Text>
-        </ControlPressable>
+        <View style={styles.accountActions}>
+          <StudentNotificationButton />
+          <ControlPressable
+            style={styles.logoutButton}
+            onPress={onLogout}
+            disabled={loggingOut}
+            accessibilityLabel="로그아웃"
+          >
+            <Text style={styles.logoutText}>
+              {loggingOut ? "로그아웃 중" : "로그아웃"}
+            </Text>
+          </ControlPressable>
+        </View>
       </View>
 
       <ScrollView
@@ -86,7 +90,7 @@ export function StudentBottomNav({
                 active && styles.tabActive,
               ]}
               onPress={() => {
-                if (!active) router.push(target.href);
+                if (!active) router.push(target.href as Href);
               }}
               accessibilityLabel={target.label}
               accessibilityState={{ selected: active }}
@@ -128,6 +132,7 @@ const styles = StyleSheet.create({
     flex: 1,
     minWidth: spacing.none,
   },
+  accountActions: { flexDirection: "row", alignItems: "center", gap: spacing.xs },
   studentName: {
     ...typography.label,
     color: colors.text,

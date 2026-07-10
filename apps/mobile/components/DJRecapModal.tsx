@@ -424,8 +424,8 @@ const styles = StyleSheet.create({
   pos: {
     width: recap.positionWidth,
     textAlign: "center",
-    fontFamily: "monospace",
     ...typography.label,
+    fontFamily: "monospace",
     color: colors.textMuted,
   },
   posTop: { color: colors.rankingGold },

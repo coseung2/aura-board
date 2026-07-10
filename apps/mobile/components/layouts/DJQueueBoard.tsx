@@ -875,8 +875,8 @@ const styles = StyleSheet.create({
   rankingPos: {
     width: dj.rankingPositionWidth,
     textAlign: "center",
-    fontFamily: "monospace",
     ...typography.label,
+    fontFamily: "monospace",
     color: colors.textMuted,
   },
   rankingPosTop: { color: colors.rankingGold },

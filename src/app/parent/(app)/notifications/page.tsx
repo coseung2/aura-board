@@ -1,34 +1,49 @@
-// Stub notifications page (nav target). Weekly digest history + in-app badges
-// land in v2+. For v1, just show a placeholder explaining where digests will
-// appear. Session is already enforced by the (app) layout.
+import { db } from "@/lib/db";
+import { getCurrentParent } from "@/lib/parent-session";
+import { toParentPendingLink } from "@/lib/parent-pending-link";
+import { ParentPendingLinks } from "@/components/parent/ParentPendingLinks";
 
 export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
 
-export default function ParentNotificationsPage() {
+export default async function ParentNotificationsPage() {
+  const current = (await getCurrentParent())!;
+  const rows = await db.parentChildLink.findMany({
+    where: {
+      parentId: current.parent.id,
+      status: "pending",
+      deletedAt: null,
+    },
+    orderBy: { requestedAt: "desc" },
+    select: {
+      id: true,
+      requestedAt: true,
+      student: {
+        select: {
+          name: true,
+          number: true,
+          classroom: { select: { name: true } },
+        },
+      },
+    },
+  });
+  const links = rows.map((row) => toParentPendingLink(row));
+
   return (
-    <main
-      style={{
-        maxWidth: 480,
-        margin: "0 auto",
-        padding: 16,
-        fontFamily: "var(--font-sans, system-ui, sans-serif)",
-        color: "var(--color-text, #111827)",
-      }}
-    >
-      <h1 style={{ fontSize: 20, margin: "8px 0 16px" }}>알림</h1>
-      <div
-        style={{
-          padding: 20,
-          background: "var(--color-surface, #fff)",
-          border: "1px dashed var(--color-border, #e5e7eb)",
-          borderRadius: 12,
-          color: "var(--color-text-muted, #6b7280)",
-          fontSize: 14,
-          lineHeight: 1.5,
-        }}
-      >
-        주간 활동 요약과 교사 공지가 이곳에 표시됩니다.
-      </div>
+    <main className="parent-feed-page parent-notifications-page">
+      <header className="parent-feed-section-header">
+        <p>알림</p>
+        <h1>자녀 연결 상태</h1>
+        <span>승인 대기 중인 신청과 만료일을 확인할 수 있어요.</span>
+      </header>
+      {links.length > 0 ? (
+        <ParentPendingLinks links={links} />
+      ) : (
+        <section className="parent-feed-empty">
+          <strong>새 알림이 없어요</strong>
+          <span>자녀 연결 신청 상태가 바뀌면 이곳에서 확인할 수 있어요.</span>
+        </section>
+      )}
     </main>
   );
 }

@@ -114,52 +114,71 @@ export const shadows = {
   },
 } as const;
 
+export const fontFamilies = {
+  regular: "NotoSansKR_400Regular",
+  semibold: "NotoSansKR_600SemiBold",
+  bold: "NotoSansKR_700Bold",
+} as const;
+
 /** 8-role type scale. 웹 design-system.md §2 와 동일한 semantic 이름. */
 export const typography = {
   display: {
+    fontFamily: fontFamilies.bold,
     fontSize: 26,
     fontWeight: "700",
     letterSpacing: 0,
     lineHeight: 32,
   } as const,
   title: {
+    fontFamily: fontFamilies.bold,
     fontSize: 20,
     fontWeight: "700",
     letterSpacing: 0,
     lineHeight: 26,
   } as const,
   subtitle: {
+    fontFamily: fontFamilies.bold,
     fontSize: 16,
     fontWeight: "700",
     letterSpacing: 0,
     lineHeight: 22,
   } as const,
   section: {
+    fontFamily: fontFamilies.bold,
     fontSize: 15,
     fontWeight: "700",
     letterSpacing: 0,
     lineHeight: 21,
   } as const,
-  body: { fontSize: 15, fontWeight: "400", lineHeight: 22 } as const,
+  body: {
+    fontFamily: fontFamilies.regular,
+    fontSize: 15,
+    fontWeight: "400",
+    lineHeight: 22,
+  } as const,
   label: {
+    fontFamily: fontFamilies.semibold,
     fontSize: 13,
     fontWeight: "600",
     letterSpacing: 0,
     lineHeight: 18,
   } as const,
   badge: {
+    fontFamily: fontFamilies.semibold,
     fontSize: 12,
     fontWeight: "600",
     letterSpacing: 0,
     lineHeight: 16,
   } as const,
   micro: {
+    fontFamily: fontFamilies.semibold,
     fontSize: 11,
     fontWeight: "600",
     letterSpacing: 0,
     lineHeight: 15,
   } as const,
   code: {
+    fontFamily: fontFamilies.bold,
     fontSize: 40,
     fontWeight: "700",
     letterSpacing: 0,
@@ -415,6 +434,11 @@ export const studentNav = {
   tabMinWidth: 72,
   dutyTabMaxWidth: 128,
   logoutMinWidth: 76,
+  notificationButtonSize: 40,
+  notificationBadgeSize: 18,
+  notificationUnreadDotSize: 8,
+  inspectionNumberWidth: 28,
+  canvaCardMaxWidth: 480,
 } as const;
 
 export const store = {

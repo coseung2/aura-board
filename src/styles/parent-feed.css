@@ -518,6 +518,39 @@ body:has(.parent-sidebar) .board-toolkit-fab {
   .parent-feed-skeleton { border-inline: 0; border-radius: 0; }
 }
 
+.parent-notifications-page {
+  max-width: 760px;
+}
+
+.parent-feed-section-header {
+  display: grid;
+  gap: 5px;
+  margin-bottom: 18px;
+  padding: 0 4px;
+}
+
+.parent-feed-section-header p,
+.parent-feed-section-header h1,
+.parent-feed-section-header span {
+  margin: 0;
+}
+
+.parent-feed-section-header p {
+  color: var(--color-accent);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.parent-feed-section-header h1 {
+  font-size: 24px;
+  letter-spacing: -.025em;
+}
+
+.parent-feed-section-header span {
+  color: var(--color-text-muted);
+  font-size: 13px;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .parent-feed-skeleton > * { animation: none; }
   .parent-sidebar-link { transition: none; }

@@ -25,11 +25,10 @@ import { layoutLabel, layoutThumbnail } from "../../theme/layout-meta";
 import { apiFetch, ApiError, getApiUrl } from "../../lib/api";
 import { clearSessionToken } from "../../lib/session";
 import { roleEmoji, studentDutyTarget } from "../../lib/student-navigation";
+import { isAssignmentReminderVisible } from "../../lib/student-notifications";
 import type {
   BoardMeta,
   MeResponse,
-  PortfolioCardDTO,
-  ShowcaseEntryDTO,
   StudentAssignmentTodo,
   StudentDuty,
   WalletSummary,
@@ -42,9 +41,7 @@ import {
   SurfacePressable,
 } from "../../components/ui";
 
-// 학생 대시보드. /api/student/me 로 본인 + 학급 보드 로딩,
-// /api/my/wallet, /api/showcase/classroom/:id 로 위젯 추가.
-// 웹 StudentDashboard 시각/구조 1:1 포팅.
+// 학생 대시보드. 웹과 같은 /api/student/me 계약을 사용한다.
 
 const FALLBACK_THUMBNAIL = "/board-type-thumbnails/card-board.png";
 
@@ -54,10 +51,7 @@ export default function StudentHome() {
   const [me, setMe] = useState<MeResponse | null>(null);
   const [wallet, setWallet] = useState<WalletSummary | null>(null);
   const [walletLoading, setWalletLoading] = useState(false);
-  const [showcaseEntries, setShowcaseEntries] = useState<
-    ShowcaseEntryDTO[] | null
-  >(null);
-  const [showcaseLoading, setShowcaseLoading] = useState(false);
+  const [activeCategory, setActiveCategory] = useState<"LESSON" | "PLAY">("LESSON");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -71,20 +65,6 @@ export default function StudentHome() {
           ? 3
           : 4;
   const gridGap = spacing.lg;
-
-  const loadShowcase = useCallback(async (classroomId: string) => {
-    setShowcaseLoading(true);
-    try {
-      const res = await apiFetch<{ entries: ShowcaseEntryDTO[] }>(
-        `/api/showcase/classroom/${encodeURIComponent(classroomId)}?limit=${dashboard.showcaseLimit}`,
-      );
-      setShowcaseEntries(res.entries);
-    } catch {
-      setShowcaseEntries([]);
-    } finally {
-      setShowcaseLoading(false);
-    }
-  }, []);
 
   const loadWallet = useCallback(async () => {
     setWalletLoading(true);
@@ -106,13 +86,6 @@ export default function StudentHome() {
         setMe(res);
         setError(null);
 
-        // 위젯 데이터는 학생 정보 확인 후 병렬 로딩.
-        const classroomId = res.student.classroom?.id;
-        if (classroomId) {
-          loadShowcase(classroomId);
-        } else {
-          setShowcaseEntries([]);
-        }
         loadWallet();
       } catch (e) {
         if (e instanceof ApiError && e.status === 401) {
@@ -126,7 +99,7 @@ export default function StudentHome() {
         if (isRefresh) setRefreshing(false);
       }
     },
-    [router, loadShowcase, loadWallet],
+    [router, loadWallet],
   );
 
   useFocusEffect(
@@ -169,8 +142,20 @@ export default function StudentHome() {
   const boards = me?.boards ?? [];
   const duties = me?.duties ?? [];
   const assignments = me?.assignments ?? [];
-  const classroomId = me?.student.classroom?.id;
   const classroomName = me?.student.classroom?.name ?? "학급 미배정";
+  const hasLessonBoards = boards.some(
+    (board) => (board.category ?? "LESSON") === "LESSON",
+  );
+  const hasPlayBoards = boards.some((board) => board.category === "PLAY");
+  const visibleCategory =
+    activeCategory === "LESSON" && !hasLessonBoards && hasPlayBoards
+      ? "PLAY"
+      : activeCategory === "PLAY" && !hasPlayBoards && hasLessonBoards
+        ? "LESSON"
+        : activeCategory;
+  const visibleBoards = boards.filter(
+    (board) => (board.category ?? "LESSON") === visibleCategory,
+  );
 
   return (
     <SafeAreaView style={styles.container} edges={["top"]}>
@@ -192,27 +177,6 @@ export default function StudentHome() {
             <Pill tone="accent">{classroomName}</Pill>
           </View>
         </View>
-
-        <ShowcaseBand
-          classroomId={classroomId}
-          entries={showcaseEntries}
-          loading={showcaseLoading}
-          onMore={() => router.push("/(student)/showcase" as Href)}
-          onCardPress={(entry) =>
-            router.push({
-              pathname: "/(student)/portfolio",
-              params: { studentId: entry.studentId },
-            } as unknown as Href)
-          }
-        />
-
-        <AppButton
-          variant="secondary"
-          style={styles.portfolioCtaCompact}
-          onPress={() => router.push("/(student)/portfolio" as Href)}
-        >
-          🗂️ 우리 학급 포트폴리오 보기
-        </AppButton>
 
         <WalletCardCompact
           wallet={wallet}
@@ -237,9 +201,57 @@ export default function StudentHome() {
           </View>
         ) : (
           <>
-            <Text style={styles.sectionSub}>오늘의 보드</Text>
+            <View style={styles.boardSectionHeader}>
+              <Text style={styles.sectionSub}>
+                {visibleCategory === "LESSON" ? "학습 보드" : "놀이 보드"}
+              </Text>
+              <View style={styles.categoryTabs}>
+                <ControlPressable
+                  style={[
+                    styles.categoryTab,
+                    visibleCategory === "LESSON" && styles.categoryTabActive,
+                  ]}
+                  onPress={() => setActiveCategory("LESSON")}
+                  disabled={!hasLessonBoards}
+                  accessibilityState={{
+                    selected: visibleCategory === "LESSON",
+                    disabled: !hasLessonBoards,
+                  }}
+                >
+                  <Text
+                    style={[
+                      styles.categoryTabText,
+                      visibleCategory === "LESSON" && styles.categoryTabTextActive,
+                    ]}
+                  >
+                    학습 {boards.filter((board) => (board.category ?? "LESSON") === "LESSON").length}
+                  </Text>
+                </ControlPressable>
+                <ControlPressable
+                  style={[
+                    styles.categoryTab,
+                    visibleCategory === "PLAY" && styles.categoryTabActive,
+                  ]}
+                  onPress={() => setActiveCategory("PLAY")}
+                  disabled={!hasPlayBoards}
+                  accessibilityState={{
+                    selected: visibleCategory === "PLAY",
+                    disabled: !hasPlayBoards,
+                  }}
+                >
+                  <Text
+                    style={[
+                      styles.categoryTabText,
+                      visibleCategory === "PLAY" && styles.categoryTabTextActive,
+                    ]}
+                  >
+                    놀이 {boards.filter((board) => board.category === "PLAY").length}
+                  </Text>
+                </ControlPressable>
+              </View>
+            </View>
             <View style={styles.boardGrid}>
-              {chunk(boards, columnCount).map((row, rowIdx) => (
+              {chunk(visibleBoards, columnCount).map((row, rowIdx) => (
                 <View
                   key={rowIdx}
                   style={[
@@ -418,11 +430,7 @@ function AssignmentRow({
   onPress?: () => void;
 }) {
   const submitted = item.submitted;
-  const reminded =
-    !submitted &&
-    item.reminderSentAt !== null &&
-    item.reminderSentAt !== undefined &&
-    item.reminderSentAt !== item.assignedAt;
+  const reminded = isAssignmentReminderVisible(item);
 
   const dateText = submitted
     ? item.submittedAt
@@ -484,136 +492,6 @@ function AssignmentRow({
     >
       {content}
     </View>
-  );
-}
-
-function ShowcaseBand({
-  classroomId,
-  entries,
-  loading,
-  onMore,
-  onCardPress,
-}: {
-  classroomId: string | undefined;
-  entries: ShowcaseEntryDTO[] | null;
-  loading: boolean;
-  onMore: () => void;
-  onCardPress: (entry: ShowcaseEntryDTO) => void;
-}) {
-  if (!classroomId) return null;
-
-  if (loading || entries === null) {
-    return (
-      <View style={styles.showcaseBand}>
-        <View style={styles.showcaseHead}>
-          <Text style={styles.showcaseTitle}>
-            <Text style={styles.showcaseTitleIcon}>🌟</Text> 우리 학급 자랑해요
-          </Text>
-        </View>
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.showcaseRowContent}
-        >
-          {[0, 1, 2].map((i) => (
-            <View key={i} style={styles.showcaseChipSkeleton} />
-          ))}
-        </ScrollView>
-      </View>
-    );
-  }
-
-  if (entries.length === 0) return null;
-
-  return (
-    <View style={styles.showcaseBand}>
-      <View style={styles.showcaseHead}>
-        <Text style={styles.showcaseTitle}>
-          <Text style={styles.showcaseTitleIcon}>🌟</Text> 우리 학급 자랑해요
-        </Text>
-        <AppButton
-          variant="quiet"
-          textStyle={styles.showcaseMore}
-          onPress={onMore}
-          hitSlop={8}
-        >
-          더 보기 →
-        </AppButton>
-      </View>
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.showcaseRowContent}
-      >
-        {entries.map((e) => (
-          <ShowcaseChip
-            key={`${e.cardId}:${e.studentId}`}
-            entry={e}
-            onPress={() => onCardPress(e)}
-          />
-        ))}
-      </ScrollView>
-    </View>
-  );
-}
-
-function ShowcaseChip({
-  entry,
-  onPress,
-}: {
-  entry: ShowcaseEntryDTO;
-  onPress: () => void;
-}) {
-  const card = entry.card;
-  const previewImage = getCardPreviewImage(card);
-  const hasVideo = hasCardVideo(card);
-  const authorLabel = card.sourceBoard.anonymousAuthor
-    ? "익명"
-    : entry.studentName;
-
-  return (
-    <SurfacePressable style={styles.showcaseChip} onPress={onPress}>
-      <View style={styles.showcaseChipBadge}>
-        <Text style={styles.showcaseChipBadgeText}>🌟</Text>
-      </View>
-      <View style={styles.showcasePreview}>
-        {previewImage ? (
-          <Image
-            source={{ uri: previewImage }}
-            style={styles.showcasePreviewImage}
-            resizeMode="cover"
-          />
-        ) : null}
-        {hasVideo ? (
-          <View style={styles.showcasePlay}>
-            <Text style={styles.showcasePlayText}>▶</Text>
-          </View>
-        ) : null}
-      </View>
-      <View style={styles.showcaseChipBody}>
-        <Text style={styles.showcaseChipTitle} numberOfLines={2}>
-          {card.title || "제목 없음"}
-        </Text>
-        {card.content ? (
-          <Text style={styles.showcaseChipContent} numberOfLines={3}>
-            {card.content}
-          </Text>
-        ) : null}
-        <View style={styles.showcaseMetaRow}>
-          <Pill
-            tone="accent"
-            numberOfLines={1}
-            style={styles.showcaseAuthor}
-            textStyle={styles.showcaseAuthorText}
-          >
-            {authorLabel}
-          </Pill>
-          <Text style={styles.showcaseDate}>
-            {formatShortDate(card.createdAt)}
-          </Text>
-        </View>
-      </View>
-    </SurfacePressable>
   );
 }
 
@@ -686,7 +564,7 @@ function DutySectionCompact({
         <SurfacePressable
           key={`${duty.classroomId}-${duty.roleKey}`}
           style={styles.dutyChip}
-          onPress={() => onOpen(target.href)}
+          onPress={() => onOpen(target.href as Href)}
         >
           <Text style={styles.dutyChipEmoji}>
             {duty.emoji ?? roleEmoji(duty.roleKey)}
@@ -697,26 +575,6 @@ function DutySectionCompact({
       ))}
     </View>
   );
-}
-
-function getCardPreviewImage(card: PortfolioCardDTO): string | null {
-  if (card.thumbUrl) return card.thumbUrl;
-  if (card.imageUrl) return card.imageUrl;
-  if (card.linkImage) return card.linkImage;
-  const imageAttachment = card.attachments?.find(
-    (a) => a.kind === "image" && (a.previewUrl || a.url),
-  );
-  return imageAttachment?.previewUrl ?? imageAttachment?.url ?? null;
-}
-
-function hasCardVideo(card: PortfolioCardDTO): boolean {
-  return !!(card.videoUrl || card.attachments?.some((a) => a.kind === "video"));
-}
-
-function formatShortDate(value: string): string {
-  const d = new Date(value);
-  if (Number.isNaN(d.getTime())) return "";
-  return `${d.getFullYear()}. ${d.getMonth() + 1}. ${d.getDate()}.`;
 }
 
 function BoardCard({ board }: { board: BoardMeta }) {
@@ -739,10 +597,38 @@ function BoardCard({ board }: { board: BoardMeta }) {
         <Text style={styles.boardCardTitle} numberOfLines={2}>
           {board.title}
         </Text>
-        <Text style={styles.boardCardMeta}>{layoutLabel(board.layout)}</Text>
+        <Text style={styles.boardCardMeta}>{boardStatusLabel(board)}</Text>
       </View>
     </SurfacePressable>
   );
+}
+
+function boardStatusLabel(board: BoardMeta): string {
+  if (board.breakout) {
+    return board.breakout.selectedSectionId ? "모둠 참여 중" : "모둠 선택 필요";
+  }
+  if (board.layout === "quiz") {
+    const status = board.quizzes?.[0]?.status;
+    return status === "active" || status === "running" ? "진행 중" : "시작 대기";
+  }
+  if (board.layout === "kordle") {
+    return board.kordleStatus === "LIVE" ? "진행 중" : "시작 대기";
+  }
+  if (board.layout === "speed-game") {
+    return board.speedGameStatus === "running"
+      ? "진행 중"
+      : board.speedGameStatus === "finished"
+        ? "종료"
+        : "시작 대기";
+  }
+  if (board.layout === "shadow-alliance") {
+    return board.shadowAllianceStatus === "active"
+      ? "진행 중"
+      : board.shadowAllianceStatus === "ended"
+        ? "종료"
+        : "시작 대기";
+  }
+  return layoutLabel(board.layout);
 }
 
 function boardThumbUri(board: BoardMeta): string {
@@ -973,6 +859,22 @@ const styles = StyleSheet.create({
     marginTop: spacing.md,
     marginBottom: -spacing.xs,
   },
+  boardSectionHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: spacing.md,
+  },
+  categoryTabs: { flexDirection: "row", gap: spacing.xs },
+  categoryTab: {
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderRadius: radii.pill,
+    backgroundColor: colors.surfaceAlt,
+  },
+  categoryTabActive: { backgroundColor: colors.accentTintedBg },
+  categoryTabText: { ...typography.label, color: colors.textMuted },
+  categoryTabTextActive: { color: colors.accentTintedText },
   boardGrid: { marginTop: spacing.xs },
   gridRow: { flexDirection: "row" },
   gridCell: { flex: 1 },
