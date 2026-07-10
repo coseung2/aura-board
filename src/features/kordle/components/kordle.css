@@ -880,6 +880,11 @@
   text-align: center;
 }
 
+.board-page[data-board-category="PLAY"] .kordle-waiting,
+.board-page[data-board-category="PLAY"].kordle-play-page {
+  min-height: 100dvh;
+}
+
 .game-waiting h1,
 .kordle-waiting h1 {
   margin: 0;

@@ -653,3 +653,8 @@
 body:has(.shadow-alliance-game) .app-footer {
   display: none !important;
 }
+
+.board-page[data-board-category="PLAY"] .shadow-alliance-board,
+.board-page[data-board-category="PLAY"] .shadow-alliance-game {
+  min-height: 100dvh;
+}
