@@ -89,6 +89,7 @@
   gap: 16px;
   max-width: 1120px;
   margin: 0 auto;
+  align-items: start;
 }
 
 .shadow-alliance-panel,
@@ -99,14 +100,97 @@
   background: rgba(20, 23, 32, 0.94);
 }
 
-.shadow-alliance-lobby-note {
+.shadow-alliance-lobby-guide {
+  grid-column: 1 / -1;
   display: grid;
-  align-content: center;
-  min-height: 194px;
-  gap: 12px;
+  min-height: 320px;
+  gap: 22px;
+  background:
+    radial-gradient(circle at 80% 20%, rgba(204, 171, 92, 0.16), transparent 36%),
+    rgba(20, 23, 32, 0.94);
 }
 
-.shadow-alliance-lobby-note > p:last-child,
+.shadow-alliance-guide-header,
+.shadow-alliance-guide-nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.shadow-alliance-guide-count {
+  margin-top: 5px !important;
+  color: var(--sa-muted);
+  font-size: 13px;
+}
+
+.shadow-alliance-guide-pagination {
+  display: flex;
+  gap: 6px;
+}
+
+.shadow-alliance-guide-pagination button {
+  width: 32px;
+  height: 32px;
+  border: 1px solid var(--sa-line);
+  border-radius: 50%;
+  color: var(--sa-muted);
+  background: transparent;
+  cursor: pointer;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.shadow-alliance-guide-pagination button:hover,
+.shadow-alliance-guide-pagination button.is-active {
+  border-color: var(--sa-gold);
+  color: #16130d;
+  background: var(--sa-gold);
+}
+
+.shadow-alliance-guide-content {
+  display: grid;
+  grid-template-columns: 96px minmax(0, 1fr);
+  align-items: center;
+  gap: 24px;
+  min-height: 150px;
+}
+
+.shadow-alliance-guide-number {
+  color: rgba(228, 199, 120, 0.28);
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: clamp(58px, 8vw, 104px);
+  font-weight: 700;
+  line-height: 1;
+}
+
+.shadow-alliance-guide-copy {
+  display: grid;
+  gap: 10px;
+  max-width: 900px;
+}
+
+.shadow-alliance-guide-copy h2 {
+  font-size: clamp(28px, 4vw, 44px);
+}
+
+.shadow-alliance-guide-copy p {
+  max-width: 860px;
+  color: var(--sa-text);
+  font-size: clamp(18px, 2.1vw, 26px);
+  line-height: 1.65;
+}
+
+.shadow-alliance-guide-nav {
+  margin-top: auto;
+}
+
+.shadow-alliance-guide-nav > span {
+  color: var(--sa-muted);
+  font-size: 13px;
+}
+
 .shadow-alliance-empty,
 .shadow-alliance-student-card > p {
   color: var(--sa-muted);
@@ -130,7 +214,7 @@
 
 .shadow-alliance-check { display: flex; gap: 8px; margin-top: 16px; color: var(--sa-muted); font-size: 14px; }
 
-.shadow-alliance-roster { grid-row: span 2; }
+.shadow-alliance-roster { grid-row: auto; }
 .shadow-alliance-player-list { display: grid; gap: 7px; margin: 16px 0 0; padding: 0; list-style: none; }
 .shadow-alliance-player-list li { min-height: 36px; gap: 9px; padding: 7px 9px; border: 1px solid rgba(52, 58, 74, 0.8); background: rgba(7, 9, 13, 0.42); }
 .shadow-alliance-player-list li span:nth-child(2) { flex: 1; }
@@ -192,6 +276,10 @@
   .shadow-alliance-teacher-grid,
   .shadow-alliance-round-layout { grid-template-columns: 1fr; }
   .shadow-alliance-roster { grid-row: auto; }
+  .shadow-alliance-lobby-guide { grid-column: 1; min-height: 360px; }
+  .shadow-alliance-guide-content { grid-template-columns: 1fr; gap: 12px; }
+  .shadow-alliance-guide-number { font-size: 58px; }
+  .shadow-alliance-guide-copy p { font-size: 18px; }
   .shadow-alliance-command-panel { min-height: 290px; }
   .shadow-alliance-result-grid { grid-template-columns: repeat(2, 1fr); }
   .shadow-alliance-topbar { align-items: flex-start; }
