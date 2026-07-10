@@ -4,6 +4,7 @@ import { db } from "@/lib/db";
 import { applyCardLikeMutation, getPrismaErrorCode } from "@/lib/card-like-toggle";
 import { authorizeCardAccess, getCurrentCardActor } from "@/lib/card-engagement-actor";
 import { announceEngagementChange } from "@/lib/realtime-broadcast";
+import { touchBoardUpdatedAt } from "@/lib/board-touch";
 
 // card-comments-likes (2026-04-26): POST toggle like / GET state.
 
@@ -83,6 +84,11 @@ export async function POST(
     db.cardComment.count({ where: { cardId, deletedAt: null } }),
   ]);
   if (card) {
+    await touchBoardUpdatedAt(card.boardId, {
+      action: liked ? "like.created" : "like.deleted",
+      actorType: actor.kind === "teacher" ? "teacher" : "student",
+      actorId: actor.id,
+    });
     await announceEngagementChange(card.boardId, cardId, count, commentCount);
   }
   return NextResponse.json({ liked, count });

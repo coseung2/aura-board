@@ -30,7 +30,11 @@ export async function POST(req: Request) {
     });
 
     // classroom-boards-tab "🟢 새 활동" 배지 — 섹션 생성도 구조적 활동 → touch.
-    await touchBoardUpdatedAt(input.boardId);
+    await touchBoardUpdatedAt(input.boardId, {
+      action: "section.created",
+      actorType: "teacher",
+      actorId: user.id,
+    });
 
     return NextResponse.json({ section });
   } catch (e) {

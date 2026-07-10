@@ -12,6 +12,11 @@ type ErrorLogInput = {
 };
 
 export async function logError(input: ErrorLogInput): Promise<void> {
+  // The administrator error log is for incidents experienced by users on the
+  // deployed service. Local development may use the same database, so never
+  // write its failures into this production-only signal.
+  if (process.env.VERCEL_ENV !== "production") return;
+
   try {
     const error =
       input.error instanceof Error
@@ -28,12 +33,17 @@ export async function logError(input: ErrorLogInput): Promise<void> {
         message: error.message || "Unknown error",
         stack: trimStack(error.stack),
         metadata: (input.metadata as never) ?? null,
+        environment: "production",
       },
     });
   } catch (err) {
-    if (process.env.NODE_ENV !== "production") {
-      console.warn("[error-log] failed:", (err as Error).message);
-    }
+    // Never throw from telemetry, but never hide a broken telemetry pipeline
+    // in production either. Hosting logs remain the fallback signal.
+    console.error("[error-log] persistence failed", {
+      feature: input.feature,
+      path: input.path ?? null,
+      error: err instanceof Error ? err.message : String(err),
+    });
   }
 }
 

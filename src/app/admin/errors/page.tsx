@@ -2,6 +2,7 @@ import Link from "next/link";
 import { TopNav } from "@/components/TopNav";
 import { AdminForbidden, requireAdminUser } from "@/lib/admin-auth";
 import { db } from "@/lib/db";
+import { ErrorLogCopyButton } from "@/components/admin/ErrorLogCopyButton";
 
 export const metadata = {
   title: "에러 로그 · Aura-board",
@@ -13,12 +14,14 @@ export default async function AdminErrorsPage() {
 
   const [logs, totalErrors, recentErrors] = await Promise.all([
     db.errorLog.findMany({
+      where: { environment: "production" },
       orderBy: { createdAt: "desc" },
       take: 100,
     }),
-    db.errorLog.count(),
+    db.errorLog.count({ where: { environment: "production" } }),
     db.errorLog.count({
       where: {
+        environment: "production",
         createdAt: {
           gte: new Date(Date.now() - 24 * 60 * 60 * 1000),
         },
@@ -94,10 +97,13 @@ export default async function AdminErrorsPage() {
                         </span>
                       </td>
                       <td>
-                        <details className="admin-error-details">
-                          <summary>{log.message}</summary>
-                          {log.stack && <pre>{log.stack}</pre>}
-                        </details>
+                        <div className="admin-error-message">
+                          <details className="admin-error-details">
+                            <summary>{log.message}</summary>
+                            {log.stack && <pre>{log.stack}</pre>}
+                          </details>
+                          <ErrorLogCopyButton value={log.message} />
+                        </div>
                       </td>
                     </tr>
                   ))

@@ -4,6 +4,7 @@ import { db } from "@/lib/db";
 import { authorizeCardAccess, getCurrentCardActor } from "@/lib/card-engagement-actor";
 import { formatEngagementAuthor } from "@/lib/card-engagement-format";
 import { announceEngagementChange } from "@/lib/realtime-broadcast";
+import { touchBoardUpdatedAt } from "@/lib/board-touch";
 
 // card-comments-likes (2026-04-26): GET list / POST create.
 
@@ -108,6 +109,11 @@ export async function POST(
       db.card.findUnique({ where: { id: cardId }, select: { boardId: true } }),
     ]);
     if (card) {
+      await touchBoardUpdatedAt(card.boardId, {
+        action: "comment.created",
+        actorType: isTeacher ? "teacher" : "student",
+        actorId: actor.id,
+      });
       await announceEngagementChange(card.boardId, cardId, likeCount, commentCount);
     }
   } catch {

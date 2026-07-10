@@ -12,6 +12,7 @@ type StudentNotificationItem = {
   href: string;
   createdAt: string;
   content?: string;
+  read: boolean;
 };
 
 type Payload = {
@@ -22,6 +23,7 @@ type Payload = {
 export function StudentNotificationBell() {
   const [payload, setPayload] = useState<Payload | null>(null);
   const [open, setOpen] = useState(false);
+  const [markingAll, setMarkingAll] = useState(false);
   const detailsRef = useRef<HTMLDetailsElement | null>(null);
 
   useEffect(() => {
@@ -71,6 +73,47 @@ export function StudentNotificationBell() {
   const count = payload?.count ?? 0;
   const items = payload?.items ?? [];
 
+  function markRead(item: StudentNotificationItem) {
+    if (item.read) return;
+    const sourceId = item.id.slice(`${item.kind}:`.length);
+    setPayload((current) =>
+      current
+        ? {
+            count: Math.max(0, current.count - 1),
+            items: current.items.map((currentItem) =>
+              currentItem.id === item.id ? { ...currentItem, read: true } : currentItem,
+            ),
+          }
+        : current,
+    );
+    void fetch("/api/student/notifications", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ action: "mark_read", kind: item.kind, id: sourceId }),
+      keepalive: true,
+    });
+  }
+
+  async function markAllRead() {
+    if (markingAll || count === 0) return;
+    setMarkingAll(true);
+    try {
+      const res = await fetch("/api/student/notifications", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ action: "mark_all_read" }),
+      });
+      if (!res.ok) return;
+      setPayload((current) =>
+        current
+          ? { count: 0, items: current.items.map((item) => ({ ...item, read: true })) }
+          : current,
+      );
+    } finally {
+      setMarkingAll(false);
+    }
+  }
+
   return (
     <details
       ref={detailsRef}
@@ -91,7 +134,20 @@ export function StudentNotificationBell() {
         )}
       </summary>
       <div className="auth-notify-panel" role="menu">
-        <div className="auth-notify-header">좋아요와 댓글</div>
+        <div className="auth-notify-header">
+          <span>좋아요와 댓글</span>
+          {count > 0 && (
+            <button
+              type="button"
+              className="auth-notify-mark-all"
+              onClick={() => void markAllRead()}
+              disabled={markingAll}
+              role="menuitem"
+            >
+              {markingAll ? "처리 중" : "전체 읽음"}
+            </button>
+          )}
+        </div>
         {payload === null ? (
           <div className="auth-notify-empty">불러오는 중...</div>
         ) : items.length === 0 ? (
@@ -101,9 +157,12 @@ export function StudentNotificationBell() {
             <Link
               key={item.id}
               href={item.href}
-              className="auth-notify-item"
+              className={`auth-notify-item${item.read ? " is-read" : ""}`}
               role="menuitem"
-              onClick={() => setOpen(false)}
+              onClick={() => {
+                markRead(item);
+                setOpen(false);
+              }}
             >
               <div className="auth-notify-item-title">
                 {item.kind === "like"

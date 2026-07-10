@@ -170,12 +170,43 @@ model ErrorLog {
 
   metadata Json?
 
+  // "production" is written only by the deployed Vercel production runtime.
+  // Existing rows are intentionally "unknown" so local history is never
+  // mistaken for a production incident.
+  environment String @default("unknown")
+
   createdAt DateTime @default(now())
 
   @@index([createdAt])
   @@index([feature, createdAt])
   @@index([userEmail, createdAt])
   @@index([status, createdAt])
+  @@index([environment, createdAt])
+}
+
+// Operational activity is deliberately separate from AuditEvent. AuditEvent
+// records sensitive or administrative actions; this table powers the admin
+// dashboard's factual, board-scoped activity feed.
+model BoardActivityEvent {
+  id String @id @default(cuid())
+
+  boardId String
+
+  action String
+
+  actorType String @default("system")
+
+  actorId String?
+
+  metadata Json?
+
+  createdAt DateTime @default(now())
+
+  board Board @relation(fields: [boardId], references: [id], onDelete: Cascade)
+
+  @@index([createdAt])
+  @@index([boardId, createdAt])
+  @@index([actorType, createdAt])
 }
 
 // ???????? Teacher LLM API Key (Seed 13 follow-up, 2026-04-22) ????????
@@ -555,6 +586,10 @@ model Student {
 
   cardLikes CardLike[] @relation("StudentCardLikes")
 
+  notificationState StudentNotificationState?
+
+  notificationReceipts StudentNotificationReceipt[]
+
   // comment-area poll (2026-06-28): 학생이 누른 카드별 투표.
   cardPollVotes CardPollVote[] @relation("StudentCardPollVotes")
 
@@ -593,6 +628,38 @@ model Student {
   @@index([classroomId])
   @@index([qrToken])
   @@index([textCode])
+}
+
+// Per-student read cursor and receipts for the in-app like/comment feed.
+// This is intentionally separate from CardLike/CardComment because one event
+// can notify more than one student when a card has multiple authors.
+model StudentNotificationState {
+  id String @id @default(cuid())
+
+  studentId String @unique
+
+  lastReadAt DateTime?
+
+  updatedAt DateTime @updatedAt
+
+  student Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+}
+
+model StudentNotificationReceipt {
+  id String @id @default(cuid())
+
+  studentId String
+
+  notificationType String
+
+  notificationId String
+
+  readAt DateTime @default(now())
+
+  student Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@unique([studentId, notificationType, notificationId])
+  @@index([studentId, readAt])
 }
 
 // ???????? AI ??繹먮굞苑?(2026-04-24) ????????
@@ -920,6 +987,8 @@ model Board {
   responses BoardResponse[]
 
   cardEvaluations CardEvaluation[]
+
+  activityEvents BoardActivityEvent[]
 
   // BC-1: speeds up the lesson/play split in the dashboard filter.
   @@index([classroomId, category])

@@ -34,6 +34,11 @@ export default async function AdminPage() {
     totalCards,
     userRows,
     recentUsers,
+    activeBoards,
+    recentErrors,
+    serverErrors,
+    recentAuditEvents,
+    recentBoardActivityRows,
   ] = await Promise.all([
     db.user.count(),
     db.board.count(),
@@ -108,6 +113,44 @@ export default async function AdminPage() {
       },
       select: { createdAt: true },
     }),
+    db.board.count({
+      where: { updatedAt: { gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) } },
+    }),
+    db.errorLog.count({
+      where: {
+        environment: "production",
+        createdAt: { gte: new Date(Date.now() - 24 * 60 * 60 * 1000) },
+      },
+    }),
+    db.errorLog.count({
+      where: {
+        environment: "production",
+        createdAt: { gte: new Date(Date.now() - 24 * 60 * 60 * 1000) },
+        status: { gte: 500 },
+      },
+    }),
+    db.auditEvent.findMany({
+      orderBy: { createdAt: "desc" },
+      take: 8,
+      select: {
+        id: true,
+        actorType: true,
+        action: true,
+        resourceType: true,
+        createdAt: true,
+      },
+    }),
+    db.boardActivityEvent.findMany({
+      orderBy: { createdAt: "desc" },
+      take: 10,
+      select: {
+        id: true,
+        action: true,
+        actorType: true,
+        createdAt: true,
+        board: { select: { title: true, slug: true } },
+      },
+    }),
   ]);
 
   const users = userRows.map((row) => ({
@@ -121,23 +164,42 @@ export default async function AdminPage() {
   const totalStorageBytes = users.reduce((sum, row) => sum + row.storageBytes, 0);
   const signupTrend = buildSignupTrend(recentUsers.map((user) => user.createdAt));
   const peakSignupCount = Math.max(...signupTrend.map((day) => day.count), 1);
+  const weeklySignups = signupTrend.slice(-7).reduce((sum, day) => sum + day.count, 0);
+  const healthTone = serverErrors > 0 ? "danger" : recentErrors > 0 ? "warning" : "good";
+  const recentBoardActivities = recentBoardActivityRows.map((activity) => ({
+    id: activity.id,
+    action: activity.action,
+    boardTitle: activity.board.title,
+    boardSlug: activity.board.slug,
+    actorLabel: formatActivityActor(activity.actorType),
+    createdAt: activity.createdAt,
+  }));
 
   return (
     <>
       <TopNav showAdmin />
       <main className="admin-page">
-        <header className="admin-header">
+        <header className="admin-header admin-command-header">
           <div>
             <p className="admin-eyebrow">관리자</p>
             <h1>Aura-board 운영 현황</h1>
             <p>가입자별 사용량과 최근 가입 추이를 확인합니다.</p>
           </div>
+          <div className="admin-header-actions">
+          <span className={`admin-health-chip is-${healthTone}`}>
+            {serverErrors > 0
+              ? `서버 오류 ${serverErrors}건`
+              : recentErrors > 0
+                ? `주의 필요 ${recentErrors}건`
+                : "최근 캡처 오류 없음"}
+          </span>
           <Link href="/dashboard" className="admin-link-btn">
             대시보드
           </Link>
           <Link href="/admin/errors" className="admin-link-btn">
             에러 로그
           </Link>
+          </div>
         </header>
 
         <section className="admin-metric-grid" aria-label="전체 지표">
@@ -148,6 +210,99 @@ export default async function AdminPage() {
           <MetricCard label="카드" value={`${totalCards}개`} />
           <MetricCard label="총 용량" value={formatBytes(totalStorageBytes)} />
         </section>
+
+        <div className="admin-overview-grid">
+          <section className="admin-section admin-attention-panel" aria-label="운영 우선순위">
+            <div className="admin-section-head">
+              <div>
+                <h2>운영 우선순위</h2>
+                <p>지금 확인할 항목</p>
+              </div>
+              <Link href="/admin/errors" className="admin-section-link">전체 로그</Link>
+            </div>
+            <div className="admin-attention-list">
+              <div className={`admin-attention-item is-${healthTone}`}>
+                <span>오류 캡처</span>
+                <strong>
+                  {serverErrors > 0
+                    ? `서버 오류 ${serverErrors}건`
+                    : recentErrors > 0
+                      ? `최근 오류 ${recentErrors}건`
+                      : "캡처된 오류 없음"}
+                </strong>
+                <small>최근 24시간 수집 기준</small>
+              </div>
+              <div className="admin-attention-item">
+                <span>이번 주 활성도</span>
+                <strong>보드 {activeBoards}개 · 가입 {weeklySignups}명</strong>
+                <small>최근 7일 기준</small>
+              </div>
+            </div>
+          </section>
+
+          <div className="admin-activity-stack">
+            <section className="admin-section admin-activity-panel" aria-label="최근 보드 활동">
+              <div className="admin-section-head admin-section-head-compact">
+                <div>
+                  <h2>최근 보드 활동</h2>
+                  <p>보드 변경과 작성 활동</p>
+                </div>
+              </div>
+              <ol className="admin-activity-list">
+                {recentBoardActivities.length === 0 ? (
+                  <li className="admin-activity-empty">최근 보드 활동이 없습니다.</li>
+                ) : (
+                  recentBoardActivities.map((activity) => (
+                    <li key={activity.id}>
+                      <span className="admin-activity-type">
+                        {formatBoardActivityAction(activity.action)}
+                      </span>
+                      <div>
+                        <Link
+                          href={`/board/${activity.boardSlug}`}
+                          className="admin-activity-board-link"
+                        >
+                          {activity.boardTitle}
+                        </Link>
+                        <small>
+                          {activity.actorLabel} · {formatRelativeTime(activity.createdAt)}
+                        </small>
+                      </div>
+                    </li>
+                  ))
+                )}
+              </ol>
+            </section>
+
+            <section className="admin-section admin-activity-panel" aria-label="보안·관리 이력">
+              <div className="admin-section-head admin-section-head-compact">
+                <div>
+                  <h2>보안·관리 이력</h2>
+                  <p>감사 이벤트</p>
+                </div>
+              </div>
+              <ol className="admin-activity-list">
+                {recentAuditEvents.length === 0 ? (
+                  <li className="admin-activity-empty">기록된 보안·관리 이력이 없습니다.</li>
+                ) : (
+                  recentAuditEvents.map((event) => (
+                    <li key={event.id}>
+                      <span className="admin-activity-type">
+                        {formatActivityActor(event.actorType)}
+                      </span>
+                      <div>
+                        <strong>{formatAuditAction(event.action)}</strong>
+                        <small>
+                          {event.resourceType ?? "서비스"} · {formatRelativeTime(event.createdAt)}
+                        </small>
+                      </div>
+                    </li>
+                  ))
+                )}
+              </ol>
+            </section>
+          </div>
+        </div>
 
         <section className="admin-section">
           <div className="admin-section-head">
@@ -189,7 +344,7 @@ export default async function AdminPage() {
                   <th>학생</th>
                   <th>카드</th>
                   <th>용량</th>
-                  <th>최근 보드 활동</th>
+                  <th>최근 보드 변경</th>
                 </tr>
               </thead>
               <tbody>
@@ -230,6 +385,53 @@ function MetricCard({ label, value }: { label: string; value: string }) {
       <strong>{value}</strong>
     </article>
   );
+}
+
+function formatBoardActivityAction(action: string): string {
+  const labels: Record<string, string> = {
+    "board.updated": "보드 변경",
+    "board.settings.updated": "보드 설정 변경",
+    "section.created": "섹션 생성",
+    "section.updated": "섹션 변경",
+    "section.deleted": "섹션 삭제",
+    "card.created": "카드 작성",
+    "card.updated": "카드 수정",
+    "card.deleted": "카드 삭제",
+    "card.moved": "카드 이동",
+    "comment.created": "댓글 작성",
+    "like.created": "좋아요",
+    "like.deleted": "좋아요 취소",
+  };
+  return labels[action] ?? action;
+}
+
+function formatActivityActor(actorType: string): string {
+  const labels: Record<string, string> = {
+    teacher: "교사",
+    student: "학생",
+    guest: "공유 방문자",
+    system: "시스템",
+  };
+  return labels[actorType] ?? actorType;
+}
+
+function formatAuditAction(action: string): string {
+  if (action.startsWith("admin.rotate_tokens.")) return "관리자 토큰 교체";
+  const labels: Record<string, string> = {
+    "vibe.moderation.approve": "Vibe 프로젝트 승인",
+    "vibe.moderation.reject": "Vibe 프로젝트 반려",
+    "billing.refund": "결제 환불",
+  };
+  return labels[action] ?? action;
+}
+
+function formatRelativeTime(date: Date): string {
+  const minutes = Math.max(0, Math.floor((Date.now() - date.getTime()) / 60000));
+  if (minutes < 1) return "방금";
+  if (minutes < 60) return `${minutes}분 전`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}시간 전`;
+  return `${Math.floor(hours / 24)}일 전`;
 }
 
 function toNumber(value: bigint | number | null | undefined): number {

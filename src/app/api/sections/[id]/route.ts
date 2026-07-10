@@ -114,7 +114,13 @@ export async function PATCH(
       data,
     });
 
-    await touchBoardUpdatedAt(section.boardId);
+    await touchBoardUpdatedAt(section.boardId, {
+      action: "section.updated",
+      actorType: studentCanReorder ? "student" : "teacher",
+      actorId: studentCanReorder
+        ? identities.student?.studentId ?? null
+        : identities.teacher?.userId ?? null,
+    });
     await announceCardChange(section.boardId, "update");
 
     return NextResponse.json({ section: updated });
@@ -163,7 +169,11 @@ export async function DELETE(
     ]);
     await enqueueBlobDeletion(blobUrls, "section.delete", "Section", id);
 
-    await touchBoardUpdatedAt(section.boardId);
+    await touchBoardUpdatedAt(section.boardId, {
+      action: "section.deleted",
+      actorType: "teacher",
+      actorId: user.id,
+    });
 
     return NextResponse.json({ ok: true });
   } catch (e) {

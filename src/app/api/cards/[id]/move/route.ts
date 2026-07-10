@@ -56,7 +56,7 @@ export async function PATCH(
     });
 
     // classroom-boards-tab "🟢 새 활동" 배지 — 카드 이동도 활동 신호로 간주.
-    await touchBoardUpdatedAt(card.boardId);
+    await touchBoardUpdatedAt(card.boardId, { action: "card.moved" });
 
     return NextResponse.json({ card: updated });
   } catch (e) {

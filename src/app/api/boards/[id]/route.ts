@@ -4,6 +4,7 @@ import { db } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
 import { requirePermission, ForbiddenError } from "@/lib/rbac";
 import { enqueueBlobDeletion } from "@/lib/blob-cleanup";
+import { touchBoardUpdatedAt } from "@/lib/board-touch";
 import { snapshotClassroomGroupsToBoard } from "@/lib/default-groups";
 
 const PatchBoardSchema = z.object({
@@ -186,6 +187,11 @@ export async function PATCH(
         }
       }
       return next;
+    });
+    await touchBoardUpdatedAt(board.id, {
+      action: "board.settings.updated",
+      actorType: "teacher",
+      actorId: user.id,
     });
     if (
       Object.prototype.hasOwnProperty.call(input, "thumbnailUrl") &&

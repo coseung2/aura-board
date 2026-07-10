@@ -591,7 +591,11 @@ export async function POST(req: Request) {
 
     // classroom-boards-tab "🟢 새 활동" 배지 — 카드 생성으로 부모 board touch.
     // 본 트랜잭션 바깥에서 best-effort로 실행해 실패해도 create는 성공 유지.
-    await touchBoardUpdatedAt(input.boardId);
+    await touchBoardUpdatedAt(input.boardId, {
+      action: "card.created",
+      actorType: teacherUser ? "teacher" : studentAuthorId ? "student" : "guest",
+      actorId: teacherUser?.id ?? studentAuthorId,
+    });
     void announceCardChange(input.boardId, "insert");
 
     // 응답에 저장된 attachments 포함 (클라이언트 상태 즉시 반영).

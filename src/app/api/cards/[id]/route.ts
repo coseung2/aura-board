@@ -391,7 +391,11 @@ export async function PATCH(
     });
 
     // classroom-boards-tab "🟢 새 활동" 배지 — 카드 수정으로 부모 board touch.
-    await touchBoardUpdatedAt(card.boardId);
+    await touchBoardUpdatedAt(card.boardId, {
+      action: "card.updated",
+      actorType: identity.teacher ? "teacher" : identity.student ? "student" : "guest",
+      actorId: identity.teacher?.userId ?? identity.student?.studentId ?? null,
+    });
     void announceCardChange(card.boardId, "update");
     if (pollConfigChanged) {
       await announcePollChange(card.boardId, id);
@@ -505,7 +509,11 @@ export async function DELETE(
 
     // classroom-boards-tab "🟢 새 활동" 배지 — 카드 삭제도 활동으로 간주.
     // Board row 자체는 카드 cascade의 부모라 여전히 존재하므로 정상 touch.
-    await touchBoardUpdatedAt(card.boardId);
+    await touchBoardUpdatedAt(card.boardId, {
+      action: "card.deleted",
+      actorType: identity.teacher ? "teacher" : identity.student ? "student" : "guest",
+      actorId: identity.teacher?.userId ?? identity.student?.studentId ?? null,
+    });
     void announceCardChange(card.boardId, "delete");
 
     return NextResponse.json({ ok: true });

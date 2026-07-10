@@ -440,12 +440,37 @@
   gap: 2px;
 }
 .auth-notify-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
   padding: 8px 12px 6px;
   font-size: 11px;
   font-weight: 700;
   color: var(--color-text-muted);
   text-transform: uppercase;
   letter-spacing: 0.4px;
+}
+
+.auth-notify-mark-all {
+  border: 0;
+  background: transparent;
+  color: var(--color-accent);
+  cursor: pointer;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 3px 0;
+}
+
+.auth-notify-mark-all:hover,
+.auth-notify-mark-all:focus-visible {
+  text-decoration: underline;
+}
+
+.auth-notify-mark-all:disabled {
+  cursor: wait;
+  opacity: 0.65;
 }
 .auth-notify-empty {
   padding: 16px 12px;
@@ -463,6 +488,10 @@
 }
 .auth-notify-item:hover {
   background: var(--color-surface-alt);
+}
+
+.auth-notify-item.is-read {
+  opacity: 0.6;
 }
 .auth-notify-item-title {
   font-size: 13px;
