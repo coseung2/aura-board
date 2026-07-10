@@ -1,15 +1,10 @@
 import { NextResponse } from "next/server";
-import {
-  expandCanvaShortLink,
-  hasCanvaShareToken,
-  isCanvaDesignUrl,
-} from "@/lib/canva";
+import { expandCanvaShortLink, isCanvaDesignUrl } from "@/lib/canva";
 
 const ALLOWED_WIDTHS = new Set([160, 320, 640]);
 const PUBLIC_CACHE_CONTROL =
   "public, max-age=86400, s-maxage=86400, stale-while-revalidate=604800";
-const FALLBACK_CACHE_CONTROL =
-  "public, max-age=60, s-maxage=300, stale-while-revalidate=3600";
+const PRIVATE_CACHE_CONTROL = "private, no-store, max-age=0";
 
 /**
  * Always returns an image for a valid Canva card.
@@ -41,7 +36,10 @@ export async function GET(req: Request) {
     () => rawDesignUrl,
   );
   if (!isCanvaDesignUrl(designUrl)) {
-    return NextResponse.json({ error: "invalid Canva design URL" }, { status: 400 });
+    return NextResponse.json(
+      { error: "invalid Canva design URL" },
+      { status: 400 },
+    );
   }
 
   const sourceUrl = new URL("/api/canva/thumbnail", requestUrl);
@@ -69,15 +67,19 @@ export async function GET(req: Request) {
     });
     const contentType = upstream.headers.get("content-type") ?? "";
     if (upstream.ok && upstream.body && contentType.startsWith("image/")) {
-      const publicShare = hasCanvaShareToken(designUrl);
+      const upstreamCacheControl =
+        upstream.headers.get("cache-control")?.toLowerCase() ?? "";
+      const allowSharedCache =
+        /(?:^|,)\s*public\b/.test(upstreamCacheControl) &&
+        !/(?:^|,)\s*(?:private|no-store)\b/.test(upstreamCacheControl);
       return new Response(upstream.body, {
         status: 200,
         headers: {
           "Content-Type": contentType,
-          "Cache-Control": publicShare
+          "Cache-Control": allowSharedCache
             ? PUBLIC_CACHE_CONTROL
-            : "private, no-store, max-age=0",
-          ...(publicShare ? {} : { Vary: "Cookie, Authorization" }),
+            : PRIVATE_CACHE_CONTROL,
+          ...(allowSharedCache ? {} : { Vary: "Cookie, Authorization" }),
           "X-Canva-Thumbnail-Source": "resolved",
           "X-Content-Type-Options": "nosniff",
         },
@@ -112,7 +114,8 @@ function fallbackThumbnail(width: number) {
     status: 200,
     headers: {
       "Content-Type": "image/svg+xml; charset=utf-8",
-      "Cache-Control": FALLBACK_CACHE_CONTROL,
+      "Cache-Control": PRIVATE_CACHE_CONTROL,
+      Vary: "Cookie, Authorization",
       "X-Canva-Thumbnail-Source": "fallback",
       "X-Content-Type-Options": "nosniff",
     },
