@@ -2,7 +2,15 @@
 
 import { useMemo } from "react";
 import { useRouter } from "next/navigation";
+import type { CardData } from "../DraggableCard";
 import { sortSections } from "@/lib/sort-sections";
+import {
+  mergeSectionPositions,
+  moveSectionToTarget,
+  setSectionPinned,
+  toSectionReorderPayload,
+  type SectionPosition,
+} from "@/lib/section-order";
 import {
   type SubjectOrder,
   normalizeSubjectOrder,
@@ -24,7 +32,7 @@ type UseSectionMutationsOptions = {
   classroomId?: string | null;
   sections: SectionData[];
   setSections: React.Dispatch<React.SetStateAction<SectionData[]>>;
-  setCards: React.Dispatch<React.SetStateAction<any[]>>;
+  setCards: React.Dispatch<React.SetStateAction<CardData[]>>;
   /** 보드 기본 subjectOrder (Board.subjectOrder). */
   boardSubjectOrder?: SubjectOrder | null;
 };
@@ -47,7 +55,6 @@ type UseSectionMutationsReturn = {
 export function useSectionMutations({
   boardId,
   canEdit,
-  classroomId,
   sections,
   setSections,
   setCards,
@@ -55,13 +62,46 @@ export function useSectionMutations({
 }: UseSectionMutationsOptions): UseSectionMutationsReturn {
   const sortedSections = useMemo(
     () => [...sections].sort(sortSections),
-    [sections]
+    [sections],
   );
   const router = useRouter();
-  const sectionOptions = sortedSections.map((s) => ({
-    id: s.id,
-    title: s.title,
+  const sectionOptions = sortedSections.map((section) => ({
+    id: section.id,
+    title: section.title,
   }));
+
+  async function persistSectionPositions(
+    previous: SectionData[],
+    optimistic: SectionData[],
+    failureMessage: string,
+  ): Promise<boolean> {
+    const payload = toSectionReorderPayload(optimistic);
+    setSections(optimistic);
+
+    try {
+      const res = await fetch(`/api/boards/${boardId}/sections/reorder`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ sections: payload }),
+      });
+      if (!res.ok) {
+        throw new Error(await res.text().catch(() => ""));
+      }
+
+      const body = (await res.json().catch(() => null)) as {
+        sections?: SectionPosition[];
+      } | null;
+      setSections((current) =>
+        mergeSectionPositions(current, body?.sections ?? payload),
+      );
+      return true;
+    } catch (error) {
+      console.error("[useSectionMutations] section order save failed", error);
+      setSections((current) => mergeSectionPositions(current, previous));
+      alert(failureMessage);
+      return false;
+    }
+  }
 
   async function handleAddSection() {
     // 일부 인앱 브라우저/iframe 환경에서는 window.prompt가 throw 하거나
@@ -81,8 +121,8 @@ export function useSectionMutations({
         body: JSON.stringify({ boardId, title: title.trim() }),
       });
       if (res.ok) {
-        const { section } = await res.json();
-        setSections((prev) => [...prev, section].sort(sortSections));
+        const { section } = (await res.json()) as { section: SectionData };
+        setSections((previous) => [...previous, section].sort(sortSections));
         // BoardSettingsPanel의 sections state가 props로 동기화되도록 page 재실행.
         router.refresh();
       }
@@ -93,38 +133,14 @@ export function useSectionMutations({
 
   async function handleSectionPin(sectionId: string, pinned: boolean) {
     if (!canEdit) return;
-    const prev = sections;
-    const current = sections.find((s) => s.id === sectionId);
-    if (!current) return;
+    const next = setSectionPinned(sections, sectionId, pinned);
+    if (!next) return;
 
-    const nextOrder = pinned
-      ? Math.max(-1, ...sections.filter((s) => s.pinned).map((s) => s.order)) + 1
-      : current.order;
-
-    setSections((list) =>
-      list
-        .map((s) =>
-          s.id === sectionId ? { ...s, pinned, order: nextOrder } : s
-        )
-        .sort(sortSections)
+    await persistSectionPositions(
+      sections,
+      next,
+      "고정 상태 변경에 실패했어요.",
     );
-
-    try {
-      const res = await fetch(`/api/sections/${sectionId}`, {
-        method: "PATCH",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify(
-          pinned ? { pinned, order: nextOrder } : { pinned }
-        ),
-      });
-      if (!res.ok) {
-        setSections(prev);
-        alert(`고정 상태 변경 실패: ${await res.text().catch(() => "")}`);
-      }
-    } catch (err) {
-      console.error(err);
-      setSections(prev);
-    }
   }
 
   async function handleSeedFromStudents(
@@ -144,7 +160,7 @@ export function useSectionMutations({
           method: "POST",
           headers: { "content-type": "application/json" },
           body: JSON.stringify({ subjectOrder: order }),
-        }
+        },
       );
       if (!res.ok) {
         const msg = (await res.json().catch(() => ({}))).error;
@@ -155,7 +171,9 @@ export function useSectionMutations({
         sections: SectionData[];
         subjectOrder?: SubjectOrder;
       };
-      setSections((prev) => [...prev, ...created].sort(sortSections));
+      setSections((previous) =>
+        [...previous, ...created].sort(sortSections),
+      );
       // BoardSettingsPanel의 sections state가 props로 동기화되도록 page 재실행.
       router.refresh();
       return created;
@@ -166,62 +184,31 @@ export function useSectionMutations({
 
   function handleSectionRenamed(sectionId: string, newTitle: string) {
     setSections((list) =>
-      list.map((s) => (s.id === sectionId ? { ...s, title: newTitle } : s))
+      list.map((section) =>
+        section.id === sectionId ? { ...section, title: newTitle } : section,
+      ),
     );
   }
 
   function handleSectionDeleted(sectionId: string) {
-    setSections((list) => list.filter((s) => s.id !== sectionId));
-    setCards((list) => list.filter((c: any) => c.sectionId !== sectionId));
+    setSections((list) =>
+      list.filter((section) => section.id !== sectionId),
+    );
+    setCards((list) => list.filter((card) => card.sectionId !== sectionId));
   }
 
   async function moveSectionTo(
     sectionId: string,
-    targetSectionId: string
+    targetSectionId: string,
   ) {
-    if (sectionId === targetSectionId) return;
-    const visualSections = [...sections].sort(sortSections);
-    const fromIdx = visualSections.findIndex((s) => s.id === sectionId);
-    const toIdx = visualSections.findIndex((s) => s.id === targetSectionId);
-    if (fromIdx === -1 || toIdx === -1) return;
+    const next = moveSectionToTarget(sections, sectionId, targetSectionId);
+    if (!next) return;
 
-    const prev = sections;
-    const next = [...visualSections];
-    const [moved] = next.splice(fromIdx, 1);
-    next.splice(toIdx, 0, moved!);
-
-    const pinned = next.filter((s) => s.pinned);
-    const unpinned = next.filter((s) => !s.pinned);
-    const orderById = new Map<string, number>();
-    pinned.forEach((s, i) => orderById.set(s.id, i));
-    unpinned.forEach((s, i) => orderById.set(s.id, unpinned.length - 1 - i));
-
-    const normalised = next.map((s) => ({
-      ...s,
-      order: orderById.get(s.id) ?? s.order,
-    }));
-    setSections(normalised);
-
-    const prevById = new Map(prev.map((s) => [s.id, s] as const));
-    const changed = normalised.filter((s) => prevById.get(s.id)?.order !== s.order);
-    try {
-      const responses = await Promise.all(
-        changed.map((s) =>
-          fetch(`/api/sections/${s.id}`, {
-            method: "PATCH",
-            headers: { "content-type": "application/json" },
-            body: JSON.stringify({ order: s.order }),
-          })
-        )
-      );
-      if (responses.some((r) => !r.ok)) {
-        console.error("섹션 순서 변경 실패");
-        setSections(prev);
-      }
-    } catch (err) {
-      console.error(err);
-      setSections(prev);
-    }
+    await persistSectionPositions(
+      sections,
+      next,
+      "섹션 순서 변경에 실패했어요.",
+    );
   }
 
   return {
