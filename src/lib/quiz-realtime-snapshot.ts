@@ -1,6 +1,7 @@
 import "server-only";
 
 import { db } from "@/lib/db";
+import { announceQuizSnapshot } from "@/lib/realtime-broadcast";
 import type { QuizRealtimeSnapshot } from "@/features/quiz/realtime";
 
 const EMPTY_DISTRIBUTION: QuizRealtimeSnapshot["distribution"] = {
@@ -91,6 +92,18 @@ export async function loadQuizRealtimeSnapshot(
     totalAnswers,
     updatedAt: new Date().toISOString(),
   };
+}
+
+/**
+ * Read once after a successful mutation, send that exact committed state to
+ * every connected client, and return it for the mutation caller's local UI.
+ */
+export async function publishQuizRealtimeSnapshot(
+  quizId: string,
+): Promise<QuizRealtimeSnapshot | null> {
+  const snapshot = await loadQuizRealtimeSnapshot(quizId);
+  if (snapshot) await announceQuizSnapshot(snapshot);
+  return snapshot;
 }
 
 function normalizeQuizStatus(
