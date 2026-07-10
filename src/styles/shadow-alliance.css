@@ -649,3 +649,7 @@
   .shadow-alliance-reveal-winner,
   .shadow-alliance-reveal-log p { animation: none; }
 }
+
+body:has(.shadow-alliance-game) .app-footer {
+  display: none !important;
+}
