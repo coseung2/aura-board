@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   buildColumnsPresencePayload,
+  columnsPresenceActorStorageKey,
   summarizeColumnsPresence,
   type ColumnsPresencePayload,
 } from "@/lib/columns-presence";
@@ -20,6 +21,18 @@ function presence(
 }
 
 describe("columns presence", () => {
+  it("scopes actor storage to both the board and current user", () => {
+    const firstTab = columnsPresenceActorStorageKey("board-a", "user-a");
+
+    expect(columnsPresenceActorStorageKey("board-a", "user-a")).toBe(firstTab);
+    expect(columnsPresenceActorStorageKey("board-b", "user-a")).not.toBe(
+      firstTab,
+    );
+    expect(columnsPresenceActorStorageKey("board-a", "user-b")).not.toBe(
+      firstTab,
+    );
+  });
+
   it("builds a minimal payload without application identity or board ids", () => {
     const payload = buildColumnsPresencePayload({
       actorKey: "actor-a",

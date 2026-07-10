@@ -39,6 +39,15 @@ export const EMPTY_COLUMNS_PRESENCE_SUMMARY: ColumnsPresenceSummary = {
   remoteWorkingCount: 0,
 };
 
+export function columnsPresenceActorStorageKey(
+  boardId: string,
+  currentUserId: string,
+): string {
+  return `aura.columns.presence.actor.${hashScope(boardId)}.${hashScope(
+    currentUserId || "guest",
+  )}`;
+}
+
 const PRESENCE_MODES = new Set<ColumnsPresenceMode>([
   "browsing",
   "viewing",
@@ -129,4 +138,12 @@ function isWorkingMode(mode: ColumnsPresenceMode): boolean {
 
 function isShortString(value: unknown): value is string {
   return typeof value === "string" && value.length > 0 && value.length <= 200;
+}
+
+function hashScope(value: string): string {
+  let hash = 5381;
+  for (let index = 0; index < value.length; index += 1) {
+    hash = (hash * 33) ^ value.charCodeAt(index);
+  }
+  return (hash >>> 0).toString(36);
 }

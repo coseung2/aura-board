@@ -7,6 +7,7 @@ import type { StreamActivityTemplateState } from "@/lib/stream-activity-template
 import type { PublicSupabaseClient } from "@/lib/supabase/client";
 import {
   buildColumnsPresencePayload,
+  columnsPresenceActorStorageKey,
   EMPTY_COLUMNS_PRESENCE_SUMMARY,
   summarizeColumnsPresence,
   type ColumnsPresenceActivity,
@@ -46,6 +47,9 @@ type UseBoardStreamResult = {
   presence: ColumnsPresenceSummary;
 };
 
+const MAX_PRESENCE_TRACK_RETRIES = 3;
+const PRESENCE_TRACK_RETRY_BASE_MS = 250;
+
 export function useBoardStream({
   boardId,
   currentUserId,
@@ -81,8 +85,11 @@ export function useBoardStream({
     let supabase: PublicSupabaseClient | null = null;
     let channel: BoardRealtimeChannel | null = null;
     let subscribed = false;
+    let presenceTracking = false;
+    let presenceTrackQueued = false;
+    let presenceTrackAttempts = 0;
 
-    const actorKey = getOrCreateActorKey(currentUserId);
+    const actorKey = getOrCreateActorKey(boardId, currentUserId);
     const sessionId = createRandomKey("session");
 
     function clearRetryTimer() {
@@ -209,34 +216,78 @@ export function useBoardStream({
       setSections([...serverSections].sort(sortSections));
     }
 
-    function schedulePresenceTrack(delayMs = 120) {
+    function schedulePresenceTrack(delayMs = 120, resetAttempts = true) {
       if (stopped || !channel || !subscribed) return;
+      if (resetAttempts) presenceTrackAttempts = 0;
+      if (presenceTracking) {
+        presenceTrackQueued = true;
+        return;
+      }
       if (presenceTimer) clearTimeout(presenceTimer);
       presenceTimer = setTimeout(() => {
         presenceTimer = null;
-        if (stopped || !channel || !subscribed) return;
-        const payload = buildColumnsPresencePayload({
-          actorKey,
-          sessionId,
-          activity: activityRef.current,
-          visible: !document.hidden,
-        });
-        void channel.track(payload).catch(() => {
-          if (!stopped) setStatus("reconnecting");
-        });
+        void trackPresence();
       }, delayMs);
+    }
+
+    async function trackPresence() {
+      if (stopped || !channel || !subscribed || presenceTracking) return;
+      presenceTracking = true;
+      const payload = buildColumnsPresencePayload({
+        actorKey,
+        sessionId,
+        activity: activityRef.current,
+        visible: !document.hidden,
+      });
+
+      let trackStatus: string;
+      try {
+        trackStatus = await channel.track(payload);
+      } catch {
+        trackStatus = "error";
+      } finally {
+        presenceTracking = false;
+      }
+
+      if (stopped || !subscribed) return;
+      if (trackStatus === "ok") {
+        presenceTrackAttempts = 0;
+        setStatus("live");
+        if (presenceTrackQueued) {
+          presenceTrackQueued = false;
+          schedulePresenceTrack(0);
+        }
+        return;
+      }
+
+      setStatus("reconnecting");
+      if (presenceTrackQueued) {
+        presenceTrackQueued = false;
+        schedulePresenceTrack(0);
+        return;
+      }
+      if (presenceTrackAttempts >= MAX_PRESENCE_TRACK_RETRIES) {
+        setStatus("unavailable");
+        return;
+      }
+
+      presenceTrackAttempts += 1;
+      schedulePresenceTrack(
+        PRESENCE_TRACK_RETRY_BASE_MS * 2 ** (presenceTrackAttempts - 1),
+        false,
+      );
     }
 
     requestPresenceTrackRef.current = () => schedulePresenceTrack();
 
     (async () => {
       try {
-        const { createPublicSupabaseClient } = await import(
+        const { createIsolatedPublicSupabaseClient } = await import(
           "@/lib/supabase/client"
         );
         if (stopped) return;
 
-        supabase = createPublicSupabaseClient();
+        supabase = createIsolatedPublicSupabaseClient();
         const nextChannel = supabase.channel(boardChannelKey(boardId), {
           config: {
             presence: { key: sessionId },
@@ -261,7 +312,7 @@ export function useBoardStream({
           .subscribe((nextStatus: string) => {
             if (nextStatus === "SUBSCRIBED") {
               subscribed = true;
-              setStatus("live");
+              presenceTrackAttempts = 0;
               schedulePresenceTrack(0);
               requestRefresh();
               return;
@@ -272,6 +323,12 @@ export function useBoardStream({
               nextStatus === "CLOSED"
             ) {
               subscribed = false;
+              presenceTrackQueued = false;
+              presenceTrackAttempts = 0;
+              if (presenceTimer) {
+                clearTimeout(presenceTimer);
+                presenceTimer = null;
+              }
               setPresence(EMPTY_COLUMNS_PRESENCE_SUMMARY);
               if (!stopped) setStatus("reconnecting");
             }
@@ -323,10 +380,8 @@ export function useBoardStream({
   return { status, presence };
 }
 
-function getOrCreateActorKey(currentUserId: string): string {
-  const storageKey = `aura.columns.presence.actor.${hashScope(
-    currentUserId || "guest",
-  )}`;
+function getOrCreateActorKey(boardId: string, currentUserId: string): string {
+  const storageKey = columnsPresenceActorStorageKey(boardId, currentUserId);
   try {
     const existing = window.localStorage.getItem(storageKey);
     if (existing) return existing;
@@ -343,12 +398,4 @@ function createRandomKey(prefix: string): string {
   return uuid
     ? `${prefix}-${uuid}`
     : `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
-}
-
-function hashScope(value: string): string {
-  let hash = 5381;
-  for (let index = 0; index < value.length; index += 1) {
-    hash = (hash * 33) ^ value.charCodeAt(index);
-  }
-  return (hash >>> 0).toString(36);
 }
