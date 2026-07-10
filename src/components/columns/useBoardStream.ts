@@ -1,9 +1,20 @@
 "use client";
 
-import { useEffect, type MutableRefObject } from "react";
+import { useEffect, useRef, useState, type MutableRefObject } from "react";
 import type { CardData } from "../DraggableCard";
 import { sortSections } from "@/lib/sort-sections";
 import type { StreamActivityTemplateState } from "@/lib/stream-activity-templates";
+import type { PublicSupabaseClient } from "@/lib/supabase/client";
+import {
+  buildColumnsPresencePayload,
+  EMPTY_COLUMNS_PRESENCE_SUMMARY,
+  summarizeColumnsPresence,
+  type ColumnsPresenceActivity,
+  type ColumnsPresenceRole,
+  type ColumnsPresenceSummary,
+  type ColumnsRealtimeStatus,
+} from "@/lib/columns-presence";
+import { boardChannelKey } from "@/lib/realtime";
 
 export type StreamSection = {
   id: string;
@@ -18,37 +29,100 @@ export type StreamSection = {
   activityTemplateState?: StreamActivityTemplateState | null;
 };
 
+type BoardRealtimeChannel = ReturnType<PublicSupabaseClient["channel"]>;
+
 type Options = {
   boardId: string;
+  currentUserId: string;
+  currentRole: ColumnsPresenceRole;
+  activity: ColumnsPresenceActivity;
   pendingCardIds: MutableRefObject<Set<string>>;
   setCards: React.Dispatch<React.SetStateAction<CardData[]>>;
   setSections: React.Dispatch<React.SetStateAction<StreamSection[]>>;
 };
 
+type UseBoardStreamResult = {
+  status: ColumnsRealtimeStatus;
+  presence: ColumnsPresenceSummary;
+};
+
 export function useBoardStream({
   boardId,
+  currentUserId,
+  currentRole,
+  activity,
   pendingCardIds,
   setCards,
   setSections,
-}: Options) {
+}: Options): UseBoardStreamResult {
+  const [status, setStatus] = useState<ColumnsRealtimeStatus>("connecting");
+  const [presence, setPresence] = useState<ColumnsPresenceSummary>(
+    EMPTY_COLUMNS_PRESENCE_SUMMARY,
+  );
+  const activityRef = useRef(activity);
+  activityRef.current = activity;
+  const requestPresenceTrackRef = useRef<(() => void) | null>(null);
+
+  useEffect(() => {
+    requestPresenceTrackRef.current?.();
+  }, [activity.mode, activity.sectionId, activity.cardId]);
+
   useEffect(() => {
     let retryTimer: ReturnType<typeof setTimeout> | null = null;
+    let broadcastTimer: ReturnType<typeof setTimeout> | null = null;
+    let presenceTimer: ReturnType<typeof setTimeout> | null = null;
     let stopped = false;
     let retryCount = 0;
     let lastHash = "";
     let inflight: Promise<void> | null = null;
+    let refreshQueued = false;
+    let supabase: PublicSupabaseClient | null = null;
+    let channel: BoardRealtimeChannel | null = null;
+    let subscribed = false;
+
+    const actorKey = getOrCreateActorKey(currentUserId);
+    const sessionId = createRandomKey("session");
+    const onlineAt = new Date().toISOString();
+
+    function clearRetryTimer() {
+      if (!retryTimer) return;
+      clearTimeout(retryTimer);
+      retryTimer = null;
+    }
 
     function scheduleRetry(delayMs?: number) {
       if (stopped || retryTimer) return;
       const backoff = Math.min(60_000, 5_000 * 2 ** retryCount);
       retryTimer = setTimeout(() => {
         retryTimer = null;
-        void refresh();
+        requestRefresh();
       }, delayMs ?? backoff);
     }
 
+    function requestRefresh(delayMs = 0) {
+      if (stopped) return;
+      if (delayMs > 0) {
+        if (broadcastTimer) clearTimeout(broadcastTimer);
+        broadcastTimer = setTimeout(() => {
+          broadcastTimer = null;
+          requestRefresh();
+        }, delayMs);
+        return;
+      }
+      if (inflight) {
+        // A broadcast received during a snapshot request must not be dropped.
+        // Run one trailing read after the current response settles.
+        refreshQueued = true;
+        return;
+      }
+      void refresh();
+    }
+
     function refresh(): Promise<void> {
-      if (inflight) return inflight;
+      if (inflight) {
+        refreshQueued = true;
+        return inflight;
+      }
 
       const request = (async () => {
         if (stopped) return;
@@ -59,6 +133,7 @@ export function useBoardStream({
           });
           if (res.status === 304) {
             retryCount = 0;
+            clearRetryTimer();
             return;
           }
           if (res.status === 401 || res.status === 403) {
@@ -77,16 +152,21 @@ export function useBoardStream({
             hash?: string;
           };
           retryCount = 0;
+          clearRetryTimer();
           lastHash = data.hash ?? "";
           mergeCards(data.cards);
           mergeSections(data.sections);
-        } catch (e) {
-          console.error("[board snapshot refresh]", e);
+        } catch (error) {
+          console.error("[board snapshot refresh]", error);
           retryCount += 1;
           scheduleRetry();
         }
       })().finally(() => {
         if (inflight === request) inflight = null;
+        if (refreshQueued && !stopped) {
+          refreshQueued = false;
+          queueMicrotask(() => requestRefresh());
+        }
       });
 
       inflight = request;
@@ -95,23 +175,23 @@ export function useBoardStream({
 
     function mergeCards(serverCards: CardData[]) {
       setCards((local) => {
-        const localById = new Map(local.map((c) => [c.id, c] as const));
+        const localById = new Map(local.map((card) => [card.id, card] as const));
         const next: CardData[] = [];
-        for (const sc of serverCards) {
-          if (pendingCardIds.current.has(sc.id)) {
-            const localCopy = localById.get(sc.id);
-            if (localCopy) next.push(localCopy);
-            else next.push(sc);
+        const serverIds = new Set(serverCards.map((card) => card.id));
+
+        for (const serverCard of serverCards) {
+          if (pendingCardIds.current.has(serverCard.id)) {
+            next.push(localById.get(serverCard.id) ?? serverCard);
           } else {
-            next.push(sc);
+            next.push(serverCard);
           }
         }
-        for (const lc of local) {
+        for (const localCard of local) {
           if (
-            pendingCardIds.current.has(lc.id) &&
-            !serverCards.some((sc) => sc.id === lc.id)
+            pendingCardIds.current.has(localCard.id) &&
+            !serverIds.has(localCard.id)
           ) {
-            next.push(lc);
+            next.push(localCard);
           }
         }
         return next;
@@ -119,71 +199,152 @@ export function useBoardStream({
     }
 
     function mergeSections(serverSections: StreamSection[]) {
-      setSections(() =>
-        [...serverSections].sort(sortSections)
-      );
+      setSections([...serverSections].sort(sortSections));
     }
 
-    let supabase: any = null;
-    let channel: any = null;
-    let cancelled = false;
+    function schedulePresenceTrack(delayMs = 120) {
+      if (stopped || !channel || !subscribed) return;
+      if (presenceTimer) clearTimeout(presenceTimer);
+      presenceTimer = setTimeout(() => {
+        presenceTimer = null;
+        if (stopped || !channel || !subscribed) return;
+        const payload = buildColumnsPresencePayload({
+          actorKey,
+          sessionId,
+          role: currentRole,
+          activity: activityRef.current,
+          visible: !document.hidden,
+          onlineAt,
+        });
+        void channel.track(payload).catch(() => {
+          if (!stopped) setStatus("reconnecting");
+        });
+      }, delayMs);
+    }
+
+    requestPresenceTrackRef.current = () => schedulePresenceTrack();
 
     (async () => {
       try {
         const { createPublicSupabaseClient } = await import(
           "@/lib/supabase/client"
         );
-        if (cancelled) return;
+        if (stopped) return;
+
         supabase = createPublicSupabaseClient();
-        channel = supabase
-          .channel(`board:${boardId}`)
+        const nextChannel = supabase.channel(boardChannelKey(boardId), {
+          config: {
+            presence: { key: sessionId },
+          },
+        });
+        channel = nextChannel;
+
+        nextChannel
           .on("broadcast", { event: "card_changed" }, () => {
-            void refresh();
+            // Card reorder currently emits one event per PATCH. Coalesce the
+            // burst into one snapshot while retaining a trailing refresh when
+            // another event arrives during the request.
+            requestRefresh(80);
           })
-          .subscribe((status: string) => {
-            if (status === "SUBSCRIBED") {
-              void refresh();
+          .on("presence", { event: "sync" }, () => {
+            const state = nextChannel.presenceState() as unknown as Record<
+              string,
+              unknown
+            >;
+            setPresence(summarizeColumnsPresence(state, actorKey));
+          })
+          .subscribe((nextStatus: string) => {
+            if (nextStatus === "SUBSCRIBED") {
+              subscribed = true;
+              setStatus("live");
+              schedulePresenceTrack(0);
+              requestRefresh();
+              return;
+            }
+            if (
+              nextStatus === "CHANNEL_ERROR" ||
+              nextStatus === "TIMED_OUT" ||
+              nextStatus === "CLOSED"
+            ) {
+              subscribed = false;
+              if (!stopped) setStatus("reconnecting");
             }
           });
       } catch {
-        // Supabase is optional. Snapshot refresh still works on mount.
+        // Supabase is optional. Snapshot refresh still works on mount/focus.
+        if (!stopped) setStatus("unavailable");
       }
     })();
 
     function catchUpWhenVisible() {
-      if (!document.hidden) {
-        void refresh();
-      }
+      schedulePresenceTrack(0);
+      if (!document.hidden) requestRefresh();
     }
 
     function catchUpOnNetworkRestore() {
-      void refresh();
+      setStatus((current) =>
+        current === "unavailable" ? current : "reconnecting",
+      );
+      requestRefresh();
     }
 
     window.addEventListener("online", catchUpOnNetworkRestore);
     window.addEventListener("focus", catchUpWhenVisible);
     document.addEventListener("visibilitychange", catchUpWhenVisible);
 
-    // The initial snapshot makes the board useful before Realtime finishes
-    // subscribing. Later snapshots are driven by broadcast or catch-up.
-    void refresh();
+    // The initial snapshot makes the board useful before Realtime subscribes.
+    requestRefresh();
 
     return () => {
       stopped = true;
-      cancelled = true;
-      if (retryTimer) clearTimeout(retryTimer);
+      subscribed = false;
+      requestPresenceTrackRef.current = null;
+      clearRetryTimer();
+      if (broadcastTimer) clearTimeout(broadcastTimer);
+      if (presenceTimer) clearTimeout(presenceTimer);
       window.removeEventListener("online", catchUpOnNetworkRestore);
       window.removeEventListener("focus", catchUpWhenVisible);
       document.removeEventListener("visibilitychange", catchUpWhenVisible);
+      setPresence(EMPTY_COLUMNS_PRESENCE_SUMMARY);
       if (supabase && channel) {
-        try {
-          void supabase.removeChannel(channel);
-        } catch {
-          // ignore
-        }
+        void channel.untrack().catch(() => undefined);
+        void supabase.removeChannel(channel).catch(() => undefined);
       }
     };
-    // boardId is the only stable dependency; merges read refs via closures.
+    // Presence identity changes require a fresh channel key. State setters and
+    // pendingCardIds are stable refs supplied by the board component.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [boardId]);
+  }, [boardId, currentRole, currentUserId]);
+
+  return { status, presence };
+}
+
+function getOrCreateActorKey(currentUserId: string): string {
+  const storageKey = `aura.columns.presence.actor.${hashScope(
+    currentUserId || "guest",
+  )}`;
+  try {
+    const existing = window.localStorage.getItem(storageKey);
+    if (existing) return existing;
+    const created = createRandomKey("actor");
+    window.localStorage.setItem(storageKey, created);
+    return created;
+  } catch {
+    return createRandomKey("actor");
+  }
+}
+
+function createRandomKey(prefix: string): string {
+  const uuid = globalThis.crypto?.randomUUID?.();
+  return uuid
+    ? `${prefix}-${uuid}`
+    : `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
+}
+
+function hashScope(value: string): string {
+  let hash = 5381;
+  for (let index = 0; index < value.length; index += 1) {
+    hash = (hash * 33) ^ value.charCodeAt(index);
+  }
+  return (hash >>> 0).toString(36);
 }
