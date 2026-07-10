@@ -1,8 +1,19 @@
 "use client";
 
-import { useMemo } from "react";
+import {
+  useMemo,
+  type Dispatch,
+  type SetStateAction,
+} from "react";
 import { useRouter } from "next/navigation";
+import type { CardData } from "../DraggableCard";
 import { sortSections } from "@/lib/sort-sections";
+import {
+  applySectionReorder,
+  buildSectionReorderPayload,
+  reorderSectionForDrop,
+  type SectionOrderUpdate,
+} from "@/lib/section-reorder";
 import {
   type SubjectOrder,
   normalizeSubjectOrder,
@@ -23,8 +34,8 @@ type UseSectionMutationsOptions = {
   canEdit: boolean;
   classroomId?: string | null;
   sections: SectionData[];
-  setSections: React.Dispatch<React.SetStateAction<SectionData[]>>;
-  setCards: React.Dispatch<React.SetStateAction<any[]>>;
+  setSections: Dispatch<SetStateAction<SectionData[]>>;
+  setCards: Dispatch<SetStateAction<CardData[]>>;
   /** 보드 기본 subjectOrder (Board.subjectOrder). */
   boardSubjectOrder?: SubjectOrder | null;
 };
@@ -36,7 +47,7 @@ type UseSectionMutationsReturn = {
   handleSectionPin: (sectionId: string, pinned: boolean) => Promise<void>;
   handleSeedFromStudents: (
     seedingStudents: boolean,
-    setSeedingStudents: React.Dispatch<React.SetStateAction<boolean>>,
+    setSeedingStudents: Dispatch<SetStateAction<boolean>>,
     subjectOrder?: SubjectOrder,
   ) => Promise<SectionData[] | undefined>;
   handleSectionRenamed: (sectionId: string, newTitle: string) => void;
@@ -53,110 +64,132 @@ export function useSectionMutations({
   setCards,
   boardSubjectOrder,
 }: UseSectionMutationsOptions): UseSectionMutationsReturn {
+  const router = useRouter();
   const sortedSections = useMemo(
     () => [...sections].sort(sortSections),
-    [sections]
+    [sections],
   );
-  const router = useRouter();
-  const sectionOptions = sortedSections.map((s) => ({
-    id: s.id,
-    title: s.title,
+  const sectionOptions = sortedSections.map((section) => ({
+    id: section.id,
+    title: section.title,
   }));
 
   async function handleAddSection() {
-    // 일부 인앱 브라우저/iframe 환경에서는 window.prompt가 throw 하거나
-    // 차단될 수 있어 try/catch로 안전하게 감싼다.
+    if (!canEdit) return;
+
     let title: string | null = null;
     try {
       title = window.prompt("새 섹션 이름:");
-    } catch (err) {
-      console.warn("[useSectionMutations] window.prompt failed", err);
+    } catch (error) {
+      console.warn("[useSectionMutations] window.prompt failed", error);
       return;
     }
     if (!title?.trim()) return;
+
     try {
-      const res = await fetch(`/api/sections`, {
+      const response = await fetch("/api/sections", {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ boardId, title: title.trim() }),
       });
-      if (res.ok) {
-        const { section } = await res.json();
-        setSections((prev) => [...prev, section].sort(sortSections));
-        // BoardSettingsPanel의 sections state가 props로 동기화되도록 page 재실행.
-        router.refresh();
+      if (!response.ok) {
+        alert(await readErrorMessage(response, "섹션 추가에 실패했어요."));
+        return;
       }
-    } catch (err) {
-      console.error(err);
+
+      const { section } = (await response.json()) as { section: SectionData };
+      setSections((current) => [...current, section].sort(sortSections));
+      router.refresh();
+    } catch (error) {
+      console.error("[useSectionMutations] add section failed", error);
+      alert("섹션 추가 중 오류가 발생했어요.");
     }
   }
 
   async function handleSectionPin(sectionId: string, pinned: boolean) {
     if (!canEdit) return;
-    const prev = sections;
-    const current = sections.find((s) => s.id === sectionId);
-    if (!current) return;
+
+    const previous = sections.find((section) => section.id === sectionId);
+    if (!previous) return;
 
     const nextOrder = pinned
-      ? Math.max(-1, ...sections.filter((s) => s.pinned).map((s) => s.order)) + 1
-      : current.order;
+      ? Math.max(
+          -1,
+          ...sections
+            .filter((section) => section.pinned)
+            .map((section) => section.order),
+        ) + 1
+      : previous.order;
 
-    setSections((list) =>
-      list
-        .map((s) =>
-          s.id === sectionId ? { ...s, pinned, order: nextOrder } : s
+    setSections((current) =>
+      current
+        .map((section) =>
+          section.id === sectionId
+            ? { ...section, pinned, order: nextOrder }
+            : section,
         )
-        .sort(sortSections)
+        .sort(sortSections),
     );
 
     try {
-      const res = await fetch(`/api/sections/${sectionId}`, {
+      const response = await fetch(`/api/sections/${sectionId}`, {
         method: "PATCH",
         headers: { "content-type": "application/json" },
         body: JSON.stringify(
-          pinned ? { pinned, order: nextOrder } : { pinned }
+          pinned ? { pinned, order: nextOrder } : { pinned },
         ),
       });
-      if (!res.ok) {
-        setSections(prev);
-        alert(`고정 상태 변경 실패: ${await res.text().catch(() => "")}`);
+      if (!response.ok) {
+        throw new Error(
+          await readErrorMessage(response, "핀 상태 변경에 실패했어요."),
+        );
       }
-    } catch (err) {
-      console.error(err);
-      setSections(prev);
+      router.refresh();
+    } catch (error) {
+      console.error("[useSectionMutations] pin section failed", error);
+      setSections((current) =>
+        current
+          .map((section) =>
+            section.id === sectionId ? previous : section,
+          )
+          .sort(sortSections),
+      );
+      alert(error instanceof Error ? error.message : "핀 상태 변경에 실패했어요.");
     }
   }
 
   async function handleSeedFromStudents(
     seedingStudents: boolean,
-    setSeedingStudents: React.Dispatch<React.SetStateAction<boolean>>,
+    setSeedingStudents: Dispatch<SetStateAction<boolean>>,
     subjectOrder?: SubjectOrder,
   ) {
-    if (seedingStudents) return;
+    if (seedingStudents || !canEdit || !classroomId) return;
+
     const order = normalizeSubjectOrder(
       subjectOrder ?? boardSubjectOrder ?? "asc",
     );
     setSeedingStudents(true);
+
     try {
-      const res = await fetch(
+      const response = await fetch(
         `/api/boards/${boardId}/sections/seed-students`,
         {
           method: "POST",
           headers: { "content-type": "application/json" },
           body: JSON.stringify({ subjectOrder: order }),
-        }
+        },
       );
-      if (!res.ok) {
-        const msg = (await res.json().catch(() => ({}))).error;
-        alert(typeof msg === "string" ? msg : "섹션 추가 실패");
-        return;
+      if (!response.ok) {
+        throw new Error(
+          await readErrorMessage(response, "학생 섹션 추가에 실패했어요."),
+        );
       }
-      const { sections: created } = (await res.json()) as {
+
+      const { sections: created } = (await response.json()) as {
         sections: SectionData[];
         subjectOrder?: SubjectOrder;
       };
-      setSections((prev) => [...prev, ...created].sort(sortSections));
-      // BoardSettingsPanel의 sections state가 props로 동기화되도록 page 재실행.
+      setSections((current) => [...current, ...created].sort(sortSections));
       router.refresh();
       return created;
     } finally {
@@ -165,62 +198,75 @@ export function useSectionMutations({
   }
 
   function handleSectionRenamed(sectionId: string, newTitle: string) {
-    setSections((list) =>
-      list.map((s) => (s.id === sectionId ? { ...s, title: newTitle } : s))
+    setSections((current) =>
+      current.map((section) =>
+        section.id === sectionId ? { ...section, title: newTitle } : section,
+      ),
     );
   }
 
   function handleSectionDeleted(sectionId: string) {
-    setSections((list) => list.filter((s) => s.id !== sectionId));
-    setCards((list) => list.filter((c: any) => c.sectionId !== sectionId));
+    setSections((current) =>
+      current.filter((section) => section.id !== sectionId),
+    );
+    setCards((current) =>
+      current.filter((card) => card.sectionId !== sectionId),
+    );
   }
 
-  async function moveSectionTo(
-    sectionId: string,
-    targetSectionId: string
-  ) {
-    if (sectionId === targetSectionId) return;
+  async function moveSectionTo(sectionId: string, targetSectionId: string) {
+    if (!canEdit || sectionId === targetSectionId) return;
+
     const visualSections = [...sections].sort(sortSections);
-    const fromIdx = visualSections.findIndex((s) => s.id === sectionId);
-    const toIdx = visualSections.findIndex((s) => s.id === targetSectionId);
-    if (fromIdx === -1 || toIdx === -1) return;
+    const nextVisualSections = reorderSectionForDrop(
+      visualSections,
+      sectionId,
+      targetSectionId,
+    );
+    const changed = nextVisualSections.some(
+      (section, index) => section.id !== visualSections[index]?.id,
+    );
+    if (!changed) return;
 
-    const prev = sections;
-    const next = [...visualSections];
-    const [moved] = next.splice(fromIdx, 1);
-    next.splice(toIdx, 0, moved!);
-
-    const pinned = next.filter((s) => s.pinned);
-    const unpinned = next.filter((s) => !s.pinned);
-    const orderById = new Map<string, number>();
-    pinned.forEach((s, i) => orderById.set(s.id, i));
-    unpinned.forEach((s, i) => orderById.set(s.id, unpinned.length - 1 - i));
-
-    const normalised = next.map((s) => ({
-      ...s,
-      order: orderById.get(s.id) ?? s.order,
+    const updates = buildSectionReorderPayload(nextVisualSections);
+    const rollbackUpdates: SectionOrderUpdate[] = sections.map((section) => ({
+      id: section.id,
+      order: section.order,
+      pinned: section.pinned,
     }));
-    setSections(normalised);
 
-    const prevById = new Map(prev.map((s) => [s.id, s] as const));
-    const changed = normalised.filter((s) => prevById.get(s.id)?.order !== s.order);
+    setSections(applySectionReorder(nextVisualSections, updates));
+
     try {
-      const responses = await Promise.all(
-        changed.map((s) =>
-          fetch(`/api/sections/${s.id}`, {
-            method: "PATCH",
-            headers: { "content-type": "application/json" },
-            body: JSON.stringify({ order: s.order }),
-          })
-        )
+      const response = await fetch(
+        `/api/boards/${boardId}/sections/reorder`,
+        {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ sections: updates }),
+        },
       );
-      if (responses.some((r) => !r.ok)) {
-        console.error("섹션 순서 변경 실패");
-        setSections(prev);
+      if (!response.ok) {
+        throw new Error(
+          await readErrorMessage(response, "섹션 순서 저장에 실패했어요."),
+        );
       }
-    } catch (err) {
-      console.error(err);
-      setSections(prev);
+
+      const body = (await response.json().catch(() => null)) as {
+        sections?: SectionOrderUpdate[];
+      } | null;
+      const persistedUpdates =
+        body?.sections?.length === updates.length ? body.sections : updates;
+      setSections((current) =>
+        applySectionReorder(current, persistedUpdates),
+      );
+      router.refresh();
+    } catch (error) {
+      console.error("[useSectionMutations] move section failed", error);
+      setSections((current) =>
+        applySectionReorder(current, rollbackUpdates),
+      );
+      alert(error instanceof Error ? error.message : "섹션 순서 저장에 실패했어요.");
     }
   }
 
@@ -234,4 +280,23 @@ export function useSectionMutations({
     handleSectionDeleted,
     moveSectionTo,
   };
+}
+
+async function readErrorMessage(
+  response: Response,
+  fallback: string,
+): Promise<string> {
+  const text = await response.text().catch(() => "");
+  if (!text.trim()) return fallback;
+
+  try {
+    const body = JSON.parse(text) as { error?: unknown };
+    if (typeof body.error === "string" && body.error.trim()) {
+      return body.error;
+    }
+  } catch {
+    // Plain-text responses are returned below.
+  }
+
+  return text.trim() || fallback;
 }
