@@ -10,7 +10,6 @@ import {
   EMPTY_COLUMNS_PRESENCE_SUMMARY,
   summarizeColumnsPresence,
   type ColumnsPresenceActivity,
-  type ColumnsPresenceRole,
   type ColumnsPresenceSummary,
   type ColumnsRealtimeStatus,
 } from "@/lib/columns-presence";
@@ -34,7 +33,6 @@ type BoardRealtimeChannel = ReturnType<PublicSupabaseClient["channel"]>;
 type Options = {
   boardId: string;
   currentUserId: string;
-  currentRole: ColumnsPresenceRole;
   activity: ColumnsPresenceActivity;
   pendingCardIds: MutableRefObject<Set<string>>;
   setCards: React.Dispatch<React.SetStateAction<CardData[]>>;
@@ -49,7 +47,6 @@ type UseBoardStreamResult = {
 export function useBoardStream({
   boardId,
   currentUserId,
-  currentRole,
   activity,
   pendingCardIds,
   setCards,
@@ -65,9 +62,12 @@ export function useBoardStream({
 
   useEffect(() => {
     requestPresenceTrackRef.current?.();
-  }, [activity.mode, activity.sectionId, activity.cardId]);
+  }, [activity.mode]);
 
   useEffect(() => {
+    setStatus("connecting");
+    setPresence(EMPTY_COLUMNS_PRESENCE_SUMMARY);
+
     let retryTimer: ReturnType<typeof setTimeout> | null = null;
     let broadcastTimer: ReturnType<typeof setTimeout> | null = null;
     let presenceTimer: ReturnType<typeof setTimeout> | null = null;
@@ -82,7 +82,6 @@ export function useBoardStream({
 
     const actorKey = getOrCreateActorKey(currentUserId);
     const sessionId = createRandomKey("session");
-    const onlineAt = new Date().toISOString();
 
     function clearRetryTimer() {
       if (!retryTimer) return;
@@ -108,6 +107,10 @@ export function useBoardStream({
           requestRefresh();
         }, delayMs);
         return;
+      }
+      if (broadcastTimer) {
+        clearTimeout(broadcastTimer);
+        broadcastTimer = null;
       }
       if (inflight) {
         // A broadcast received during a snapshot request must not be dropped.
@@ -138,6 +141,8 @@ export function useBoardStream({
           }
           if (res.status === 401 || res.status === 403) {
             stopped = true;
+            setStatus("unavailable");
+            setPresence(EMPTY_COLUMNS_PRESENCE_SUMMARY);
             return;
           }
           if (!res.ok) {
@@ -211,10 +216,8 @@ export function useBoardStream({
         const payload = buildColumnsPresencePayload({
           actorKey,
           sessionId,
-          role: currentRole,
           activity: activityRef.current,
           visible: !document.hidden,
-          onlineAt,
         });
         void channel.track(payload).catch(() => {
           if (!stopped) setStatus("reconnecting");
@@ -267,6 +270,7 @@ export function useBoardStream({
               nextStatus === "CLOSED"
             ) {
               subscribed = false;
+              setPresence(EMPTY_COLUMNS_PRESENCE_SUMMARY);
               if (!stopped) setStatus("reconnecting");
             }
           });
@@ -305,16 +309,14 @@ export function useBoardStream({
       window.removeEventListener("online", catchUpOnNetworkRestore);
       window.removeEventListener("focus", catchUpWhenVisible);
       document.removeEventListener("visibilitychange", catchUpWhenVisible);
-      setPresence(EMPTY_COLUMNS_PRESENCE_SUMMARY);
       if (supabase && channel) {
         void channel.untrack().catch(() => undefined);
         void supabase.removeChannel(channel).catch(() => undefined);
       }
     };
-    // Presence identity changes require a fresh channel key. State setters and
-    // pendingCardIds are stable refs supplied by the board component.
+    // State setters and pendingCardIds are stable refs supplied by the board.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [boardId, currentRole, currentUserId]);
+  }, [boardId, currentUserId]);
 
   return { status, presence };
 }
