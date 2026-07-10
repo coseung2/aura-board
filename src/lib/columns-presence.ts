@@ -7,6 +7,9 @@ export type ColumnsPresenceMode =
 
 export type ColumnsPresenceActivity = {
   mode: ColumnsPresenceMode;
+  /** Local-only context. These identifiers are never copied into Presence. */
+  sectionId?: string | null;
+  cardId?: string | null;
 };
 
 export type ColumnsPresencePayload = {
