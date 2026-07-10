@@ -1,6 +1,8 @@
 "use client";
 
-import { useCallback, useEffect, useRef } from "react";
+import { useCallback, useRef } from "react";
+import { boardChannelKey } from "@/lib/realtime";
+import { useRealtimeInvalidation } from "@/hooks/useRealtimeInvalidation";
 
 export type BoardSnapshot = {
   hash?: string;
@@ -8,22 +10,10 @@ export type BoardSnapshot = {
 };
 
 /**
- * Subscribes to the Supabase Realtime broadcast channel `board:{boardId}` for
- * the given event(s) and refetches `/api/boards/:id/snapshot` on initial mount
- * and on every broadcast. Refetches are de-duplicated in-flight (concurrent
- * broadcasts coalesce into one request) and conditional via the snapshot
- * `hash` query param.
- *
- * The caller supplies an `apply` callback that merges a fetched snapshot into
- * local component state; the hook owns only the subscription + fetch loop.
- *
- * Degrades silently when Supabase env vars are not configured or subscription
- * fails: the mount refetch still runs, so the board renders from a snapshot
- * even without realtime.
- *
- * @param boardId Board ID to listen on.
- * @param events  Broadcast event names to react to (e.g. ["queue_changed"]).
- * @param apply   Receives the parsed snapshot JSON; merge into local state.
+ * Durable board snapshot transport used by DJ queue and other event-specific
+ * board views. Broadcast is the fast invalidation signal; the board snapshot
+ * remains authoritative, and slow polling activates only while Realtime is
+ * unavailable.
  */
 export function useBoardSnapshotRealtime(
   boardId: string,
@@ -31,101 +21,32 @@ export function useBoardSnapshotRealtime(
   apply: (data: BoardSnapshot) => void,
 ) {
   const lastHashRef = useRef("");
-  const inflightRef = useRef<Promise<void> | null>(null);
-  const stoppedRef = useRef(false);
-  const boardIdRef = useRef(boardId);
-  boardIdRef.current = boardId;
-
-  // Keep latest callbacks without resubscribing on every render.
   const applyRef = useRef(apply);
   applyRef.current = apply;
-  const eventsRef = useRef(events);
-  eventsRef.current = events;
 
-  const refetch = useCallback(() => {
-    if (stoppedRef.current) return Promise.resolve();
-    if (inflightRef.current) return inflightRef.current;
-
-    const request = (async () => {
-      try {
-        const qs = lastHashRef.current
-          ? `?hash=${encodeURIComponent(lastHashRef.current)}`
-          : "";
-        const res = await fetch(`/api/boards/${boardId}/snapshot${qs}`, {
-          cache: "no-store",
-        });
-        if (res.status === 401 || res.status === 403) {
-          // Auth lost: stop refetching so broadcasts don't hammer a 401.
-          if (boardIdRef.current === boardId) stoppedRef.current = true;
-          return;
-        }
-        if (res.status === 304) return;
-        if (!res.ok) return;
-        const data = (await res.json()) as BoardSnapshot;
-        if (boardIdRef.current !== boardId) return;
-        lastHashRef.current = data.hash ?? "";
-        applyRef.current(data);
-      } catch {
-        // Transient; next broadcast retries.
-      }
-    })().finally(() => {
-      if (inflightRef.current === request) inflightRef.current = null;
+  const refetch = useCallback(async () => {
+    const query = lastHashRef.current
+      ? `?hash=${encodeURIComponent(lastHashRef.current)}`
+      : "";
+    const response = await fetch(`/api/boards/${boardId}/snapshot${query}`, {
+      cache: "no-store",
     });
+    if (response.status === 304) return;
+    if (response.status === 401 || response.status === 403) return;
+    if (!response.ok) {
+      throw new Error(`board snapshot failed: ${response.status}`);
+    }
 
-    inflightRef.current = request;
-    return request;
+    const data = (await response.json()) as BoardSnapshot;
+    lastHashRef.current = data.hash ?? "";
+    applyRef.current(data);
   }, [boardId]);
 
-  const eventsKey = events.join("|");
-
-  useEffect(() => {
-    stoppedRef.current = false;
-    lastHashRef.current = "";
-    let supabase: ReturnType<
-      typeof import("@/lib/supabase/client")["createPublicSupabaseClient"]
-    > | null = null;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    let channel: any = null;
-    let cancelled = false;
-
-    (async () => {
-      // Initial mount snapshot (independent of realtime availability).
-      void refetch();
-
-      try {
-        const { createPublicSupabaseClient } = await import(
-          "@/lib/supabase/client"
-        );
-        if (cancelled) return;
-        supabase = createPublicSupabaseClient();
-      } catch {
-        // Supabase env vars not configured: realtime disabled, mount fetch done.
-        return;
-      }
-
-      if (cancelled || !supabase) return;
-      try {
-        let ch = supabase.channel(`board:${boardId}`);
-        for (const event of eventsRef.current) {
-          ch = ch.on("broadcast", { event }, () => {
-            void refetch();
-          });
-        }
-        channel = ch.subscribe();
-      } catch {
-        // Subscription failure: non-fatal.
-      }
-    })();
-
-    return () => {
-      cancelled = true;
-      if (supabase && channel) {
-        try {
-          void supabase.removeChannel(channel);
-        } catch {
-          // ignore
-        }
-      }
-    };
-  }, [boardId, eventsKey, refetch]);
+  useRealtimeInvalidation({
+    channelName: boardChannelKey(boardId),
+    event: events,
+    refresh: refetch,
+    debounceMs: 80,
+    fallbackPollMs: 30_000,
+  });
 }
