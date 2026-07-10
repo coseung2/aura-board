@@ -4,6 +4,7 @@ import { db } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
 import { requirePermission, ForbiddenError } from "@/lib/rbac";
 import { touchBoardUpdatedAt } from "@/lib/board-touch";
+import { announceCardChange } from "@/lib/realtime-broadcast";
 import {
   normalizeSubjectOrder,
   subjectOrderToBaseIndex,
@@ -129,8 +130,9 @@ export async function POST(
       });
     }
 
-    // best-effort touch
+    // best-effort touch + realtime snapshot invalidation
     await touchBoardUpdatedAt(boardId);
+    await announceCardChange(boardId, "update");
 
     return NextResponse.json({ sections: created, subjectOrder });
   } catch (e) {

@@ -4,6 +4,7 @@ import { db } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
 import { requirePermission, ForbiddenError } from "@/lib/rbac";
 import { touchBoardUpdatedAt } from "@/lib/board-touch";
+import { announceCardChange } from "@/lib/realtime-broadcast";
 
 const CreateSectionSchema = z.object({
   boardId: z.string().min(1),
@@ -35,6 +36,7 @@ export async function POST(req: Request) {
       actorType: "teacher",
       actorId: user.id,
     });
+    await announceCardChange(input.boardId, "update");
 
     return NextResponse.json({ section });
   } catch (e) {

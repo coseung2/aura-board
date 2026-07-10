@@ -16,6 +16,7 @@ import {
   type ColumnAssignmentState,
 } from "./columns/ColumnView";
 import { SeedStudentsDialog } from "./columns/SeedStudentsDialog";
+import { ColumnsRealtimeStatus } from "./columns/ColumnsRealtimeStatus";
 import { comparatorFor, toSortMode, type SortMode } from "./columns/sort";
 import { useBoardStream, type StreamSection } from "./columns/useBoardStream";
 import { useBoardAnonymityChange } from "@/hooks/useBoardAnonymityChange";
@@ -29,6 +30,7 @@ import {
   withBoardAnonymousAuthors,
 } from "@/lib/card-anonymity";
 import { buildCanvaConnectUrl } from "@/lib/canva-connect-return";
+import type { ColumnsPresenceActivity } from "@/lib/columns-presence";
 import {
   type SubjectOrder,
   normalizeSubjectOrder,
@@ -198,7 +200,88 @@ export function ColumnsBoard({
     setCards,
   });
 
-  useBoardStream({ boardId, pendingCardIds, setCards, setSections });
+  const presenceActivity = useMemo<ColumnsPresenceActivity>(() => {
+    if (editingCard) {
+      return {
+        mode: "editing",
+        sectionId: editingCard.sectionId ?? null,
+        cardId: editingCard.id,
+      };
+    }
+    if (authorEditCard) {
+      return {
+        mode: "editing",
+        sectionId: authorEditCard.sectionId ?? null,
+        cardId: authorEditCard.id,
+      };
+    }
+    if (panelState) {
+      return { mode: "editing", sectionId: panelState.sectionId };
+    }
+    if (feedbackTarget) {
+      return { mode: "editing", sectionId: feedbackTarget.sectionId };
+    }
+    if (organizing) {
+      return { mode: "editing", sectionId: organizing };
+    }
+    if (addForSection) {
+      return { mode: "adding", sectionId: addForSection };
+    }
+    if (folderSectionId) {
+      return { mode: "adding", sectionId: folderSectionId };
+    }
+    if (seedDialogOpen) {
+      return { mode: "adding" };
+    }
+    if (cardDropPreview) {
+      return {
+        mode: "dragging",
+        sectionId: cardDropPreview.sectionId,
+        cardId: cardDropPreview.draggedCardId,
+      };
+    }
+    if (draggingSectionId || overSectionId) {
+      return {
+        mode: "dragging",
+        sectionId: overSectionId ?? draggingSectionId,
+      };
+    }
+    if (exportSectionId) {
+      return { mode: "viewing", sectionId: exportSectionId };
+    }
+    if (openCard) {
+      return {
+        mode: "viewing",
+        sectionId: openCard.sectionId ?? null,
+        cardId: openCard.id,
+      };
+    }
+    return { mode: "browsing" };
+  }, [
+    addForSection,
+    authorEditCard,
+    cardDropPreview,
+    draggingSectionId,
+    editingCard,
+    exportSectionId,
+    feedbackTarget,
+    folderSectionId,
+    openCard,
+    organizing,
+    overSectionId,
+    panelState,
+    seedDialogOpen,
+  ]);
+
+  const realtime = useBoardStream({
+    boardId,
+    currentUserId,
+    currentRole,
+    activity: presenceActivity,
+    pendingCardIds,
+    setCards,
+    setSections,
+  });
 
   async function handleToggleGuide(card: CardData, guidePinned: boolean) {
     const prevCards = cards;
@@ -569,7 +652,14 @@ export function ColumnsBoard({
 
   /* ── Render ──────────────────────────────────────────────────────── */
   return (
-    <div className="board-canvas-wrap board-canvas-wrap-columns">
+    <div
+      className="board-canvas-wrap board-canvas-wrap-columns"
+      style={{ position: "relative" }}
+    >
+      <ColumnsRealtimeStatus
+        status={realtime.status}
+        presence={realtime.presence}
+      />
       <div ref={scrollAreaRef} className="columns-scroll-area">
         <div ref={columnsBoardRef} className="columns-board">
           {sortedSections.map((section) => (
