@@ -12,6 +12,10 @@ import {
   type SectionPosition,
 } from "@/lib/section-order";
 import {
+  BOARD_SECTIONS_UPDATED_EVENT,
+  type BoardSectionsUpdatedDetail,
+} from "@/lib/board-section-events";
+import {
   type SubjectOrder,
   normalizeSubjectOrder,
 } from "@/lib/subject-order";
@@ -21,6 +25,7 @@ type SectionData = {
   title: string;
   order: number;
   pinned: boolean;
+  accessToken?: string | null;
   sortMode?: string | null;
   assignmentPublishedAt?: string | null;
   assignmentReminderSentAt?: string | null;
@@ -70,13 +75,33 @@ export function useSectionMutations({
     title: section.title,
   }));
 
+  function publishSections(next: SectionData[]) {
+    const detail: BoardSectionsUpdatedDetail = {
+      boardId,
+      sections: [...next].sort(sortSections).map((section) => ({
+        id: section.id,
+        title: section.title,
+        accessToken: section.accessToken ?? null,
+        order: section.order,
+        pinned: section.pinned,
+      })),
+    };
+    window.dispatchEvent(
+      new CustomEvent<BoardSectionsUpdatedDetail>(
+        BOARD_SECTIONS_UPDATED_EVENT,
+        { detail },
+      ),
+    );
+  }
+
   async function persistSectionPositions(
     previous: SectionData[],
     optimistic: SectionData[],
     failureMessage: string,
   ): Promise<boolean> {
     const payload = toSectionReorderPayload(optimistic);
-    setSections(optimistic);
+    setSections((current) => mergeSectionPositions(current, payload));
+    publishSections(optimistic);
 
     try {
       const res = await fetch(`/api/boards/${boardId}/sections/reorder`, {
@@ -91,13 +116,18 @@ export function useSectionMutations({
       const body = (await res.json().catch(() => null)) as {
         sections?: SectionPosition[];
       } | null;
+      const confirmedPositions = body?.sections ?? payload;
       setSections((current) =>
-        mergeSectionPositions(current, body?.sections ?? payload),
+        mergeSectionPositions(current, confirmedPositions),
+      );
+      publishSections(
+        mergeSectionPositions(optimistic, confirmedPositions),
       );
       return true;
     } catch (error) {
       console.error("[useSectionMutations] section order save failed", error);
       setSections((current) => mergeSectionPositions(current, previous));
+      publishSections(previous);
       alert(failureMessage);
       return false;
     }
@@ -120,14 +150,28 @@ export function useSectionMutations({
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ boardId, title: title.trim() }),
       });
-      if (res.ok) {
-        const { section } = (await res.json()) as { section: SectionData };
-        setSections((previous) => [...previous, section].sort(sortSections));
-        // BoardSettingsPanel의 sections state가 props로 동기화되도록 page 재실행.
-        router.refresh();
+      if (!res.ok) {
+        alert(`섹션 추가 실패: ${await res.text().catch(() => "")}`);
+        return;
       }
+
+      const { section } = (await res.json()) as { section: SectionData };
+      const next = [
+        ...sections.filter((current) => current.id !== section.id),
+        section,
+      ].sort(sortSections);
+      setSections((current) =>
+        [
+          ...current.filter((existing) => existing.id !== section.id),
+          section,
+        ].sort(sortSections),
+      );
+      // 생성 응답 자체가 최신 상태이므로 즉시 표시한다. 여기서 router.refresh()
+      // 를 호출하면 잠시 오래된 RSC payload가 방금 만든 섹션을 덮어쓸 수 있다.
+      publishSections(next);
     } catch (err) {
       console.error(err);
+      alert("섹션 추가 중 오류가 발생했어요.");
     }
   }
 
@@ -171,10 +215,12 @@ export function useSectionMutations({
         sections: SectionData[];
         subjectOrder?: SubjectOrder;
       };
+      const next = [...sections, ...created].sort(sortSections);
       setSections((previous) =>
         [...previous, ...created].sort(sortSections),
       );
-      // BoardSettingsPanel의 sections state가 props로 동기화되도록 page 재실행.
+      publishSections(next);
+      // subjectOrder 등 보드 단위 설정을 서버 props와 동기화한다.
       router.refresh();
       return created;
     } finally {
@@ -183,18 +229,24 @@ export function useSectionMutations({
   }
 
   function handleSectionRenamed(sectionId: string, newTitle: string) {
+    const next = sections.map((section) =>
+      section.id === sectionId ? { ...section, title: newTitle } : section,
+    );
     setSections((list) =>
       list.map((section) =>
         section.id === sectionId ? { ...section, title: newTitle } : section,
       ),
     );
+    publishSections(next);
   }
 
   function handleSectionDeleted(sectionId: string) {
+    const next = sections.filter((section) => section.id !== sectionId);
     setSections((list) =>
       list.filter((section) => section.id !== sectionId),
     );
     setCards((list) => list.filter((card) => card.sectionId !== sectionId));
+    publishSections(next);
   }
 
   async function moveSectionTo(
