@@ -100,7 +100,7 @@ export function ShadowAllianceStudentGame({
         </section>
       )}
 
-      {result && snapshot.phase !== "playing" && (
+      {result && (snapshot.phase === "revealing" || snapshot.phase === "postround") && (
         <section className="shadow-alliance-panel shadow-alliance-student-card">
           <p className="shadow-alliance-eyebrow">라운드 결과</p>
           <h2>

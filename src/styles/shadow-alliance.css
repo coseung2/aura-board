@@ -1,18 +1,32 @@
+@import url("https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700;900&family=JetBrains+Mono:wght@500;700&family=Nanum+Myeongjo:wght@400;700;800&display=swap");
+
 .shadow-alliance-board {
   min-height: calc(100dvh - 84px);
   background: #0a0a0c;
 }
 
 .shadow-alliance-game {
+  --sa-font-body: "Nanum Myeongjo", "Noto Serif KR", serif;
+  --sa-font-display: "Cinzel", Georgia, serif;
+  --sa-font-mono: "JetBrains Mono", "SF Mono", Consolas, monospace;
   --sa-black: #08090d;
   --sa-panel: #141720;
   --sa-panel-soft: #1c202b;
   --sa-line: #343a4a;
+  --sa-line-soft: rgba(52, 58, 74, 0.64);
   --sa-text: #f5f1e7;
   --sa-muted: #a9afbd;
   --sa-gold: #e4c778;
   --sa-black-team: #7180a4;
   --sa-white-team: #f0e5c3;
+  --sa-space-1: 8px;
+  --sa-space-2: 12px;
+  --sa-space-3: 16px;
+  --sa-space-4: 24px;
+  --sa-space-5: 32px;
+  --sa-radius-panel: 12px;
+  --sa-radius-control: 8px;
+  --sa-shadow-panel: 0 18px 48px rgba(0, 0, 0, 0.18);
   box-sizing: border-box;
   min-height: calc(100dvh - 84px);
   padding: 28px;
@@ -20,7 +34,8 @@
   background:
     linear-gradient(145deg, rgba(107, 89, 42, 0.18), transparent 38%),
     var(--sa-black);
-  font-family: var(--font-geist-sans), Arial, sans-serif;
+  font-family: var(--sa-font-body);
+  word-break: keep-all;
 }
 
 .shadow-alliance-game *,
@@ -46,6 +61,12 @@
   margin: 0 auto 24px;
   gap: 16px;
 }
+.shadow-alliance-topbar { position: relative; z-index: 10; }
+.shadow-alliance-topbar-status { display: flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: 8px; margin-left: auto; }
+.shadow-alliance-board-status { border: 1px solid var(--sa-line); border-radius: 999px; padding: 7px 11px; color: var(--sa-muted); font-size: 12px; font-weight: 700; }
+.shadow-alliance-board-status.is-waiting { border-color: var(--sa-line); color: var(--sa-muted); }
+.shadow-alliance-board-status.is-active { border-color: #447b63; color: #9ce2bd; }
+.shadow-alliance-board-status.is-ended { border-color: #8e5c5c; color: #e9a6a6; }
 
 .shadow-alliance-game h1,
 .shadow-alliance-game h2,
@@ -55,14 +76,15 @@
 
 .shadow-alliance-game h1,
 .shadow-alliance-game h2 {
-  font-family: Georgia, "Times New Roman", serif;
-  letter-spacing: 0;
+  font-family: var(--sa-font-display);
+  letter-spacing: 0.06em;
 }
 
 .shadow-alliance-game h1 { font-size: 32px; }
 .shadow-alliance-game h2 { font-size: 22px; line-height: 1.3; }
 
 .shadow-alliance-eyebrow {
+  font-family: var(--sa-font-mono);
   color: var(--sa-gold);
   font-size: 12px;
   font-weight: 700;
@@ -85,26 +107,33 @@
 .shadow-alliance-teacher-grid,
 .shadow-alliance-round-layout {
   display: grid;
-  grid-template-columns: minmax(0, 1.2fr) minmax(320px, 0.8fr);
-  gap: 16px;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--sa-space-5);
   max-width: 1120px;
   margin: 0 auto;
   align-items: start;
 }
 
-.shadow-alliance-panel,
-.shadow-alliance-command-panel {
+.shadow-alliance-teacher-grid {
+  grid-template-areas:
+    "guide guide"
+    "roster settings"
+    "start start";
+}
+
+.shadow-alliance-panel {
   border: 1px solid var(--sa-line);
-  border-radius: 8px;
+  border-radius: var(--sa-radius-panel);
   padding: 22px;
   background: rgba(20, 23, 32, 0.94);
+  box-shadow: var(--sa-shadow-panel);
 }
 
 .shadow-alliance-lobby-guide {
-  grid-column: 1 / -1;
+  grid-area: guide;
   display: grid;
-  min-height: 320px;
-  gap: 22px;
+  min-height: 300px;
+  gap: var(--sa-space-4);
   background:
     radial-gradient(circle at 80% 20%, rgba(204, 171, 92, 0.16), transparent 36%),
     rgba(20, 23, 32, 0.94);
@@ -151,39 +180,75 @@
 
 .shadow-alliance-guide-content {
   display: grid;
-  grid-template-columns: 96px minmax(0, 1fr);
+  grid-template-columns: clamp(118px, 11vw, 150px) minmax(0, 860px);
   align-items: center;
-  gap: 24px;
-  min-height: 150px;
+  gap: var(--sa-space-4);
+  min-height: 138px;
 }
 
 .shadow-alliance-guide-number {
   color: rgba(228, 199, 120, 0.28);
-  font-family: Georgia, "Times New Roman", serif;
-  font-size: clamp(58px, 8vw, 104px);
+  font-family: var(--sa-font-display);
+  font-size: clamp(52px, 7vw, 88px);
   font-weight: 700;
   line-height: 1;
 }
 
 .shadow-alliance-guide-copy {
   display: grid;
-  gap: 10px;
-  max-width: 900px;
+  gap: var(--sa-space-1);
+  min-width: 0;
+  max-width: 860px;
 }
 
 .shadow-alliance-guide-copy h2 {
-  font-size: clamp(28px, 4vw, 44px);
+  max-width: 100%;
+  font-family: var(--sa-font-display);
+  font-size: clamp(22px, 4vw, 30px);
+  line-height: 1.25;
+  letter-spacing: 0.06em;
+  text-wrap: balance;
 }
 
-.shadow-alliance-guide-copy p {
+.shadow-alliance-guide-body {
+  display: grid;
+  gap: var(--sa-space-3);
+  max-width: 860px;
+}
+.shadow-alliance-guide-body p {
   max-width: 860px;
   color: var(--sa-text);
-  font-size: clamp(18px, 2.1vw, 26px);
-  line-height: 1.65;
+  font-size: clamp(16px, 2.4vw, 20px);
+  line-height: 1.9;
+  text-wrap: pretty;
 }
+.shadow-alliance-guide-body strong { color: var(--sa-gold); font-weight: 700; }
+.shadow-alliance-guide-keep { display: inline-block; white-space: nowrap; }
+.shadow-alliance-guide-body .shadow-alliance-guide-black { color: var(--sa-black-team); }
+.shadow-alliance-guide-body .shadow-alliance-guide-white { color: var(--sa-white-team); }
+.shadow-alliance-guide-formula {
+  justify-self: start;
+  padding: 11px 17px;
+  border: 1px solid rgba(228, 199, 120, 0.44);
+  border-radius: var(--sa-radius-control);
+  color: var(--sa-gold);
+  background: rgba(228, 199, 120, 0.08);
+  font-family: var(--sa-font-mono);
+  font-size: clamp(14px, 1.8vw, 19px);
+  letter-spacing: 0.02em;
+}
+.shadow-alliance-guide-example {
+  display: grid;
+  gap: var(--sa-space-2);
+  margin-top: 2px;
+  padding: 0;
+}
+.shadow-alliance-guide-example p { font-size: clamp(15px, 1.55vw, 18px); line-height: 1.7; }
 
 .shadow-alliance-guide-nav {
   margin-top: auto;
+  padding-top: var(--sa-space-3);
+  border-top: 1px solid var(--sa-line-soft);
 }
 
 .shadow-alliance-guide-nav > span {
@@ -214,12 +279,124 @@
 
 .shadow-alliance-check { display: flex; gap: 8px; margin-top: 16px; color: var(--sa-muted); font-size: 14px; }
 
-.shadow-alliance-roster { grid-row: auto; }
+.shadow-alliance-roster {
+  grid-area: roster;
+  border: 0;
+  border-radius: 0;
+  padding: 4px 0 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.shadow-alliance-settings {
+  grid-area: settings;
+  align-self: stretch;
+  border: 0;
+  border-left: 1px solid var(--sa-line-soft);
+  border-radius: 0;
+  padding: 4px 0 0 var(--sa-space-4);
+  background: transparent;
+  box-shadow: none;
+}
+
+.shadow-alliance-settings .shadow-alliance-panel-heading {
+  padding-bottom: var(--sa-space-3);
+  border-bottom: 1px solid var(--sa-line-soft);
+}
+
+.shadow-alliance-team-roster-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--sa-space-5);
+  margin-top: var(--sa-space-3);
+}
+
+.shadow-alliance-team-roster {
+  min-width: 0;
+  padding: var(--sa-space-3) 0 0;
+  border: 0;
+  border-top: 2px solid var(--sa-line);
+  border-radius: 0;
+  background: transparent;
+}
+
+.shadow-alliance-team-roster-black { border-top-color: var(--sa-black-team); }
+.shadow-alliance-team-roster-white { border-top-color: var(--sa-white-team); }
+
+.shadow-alliance-team-roster-heading,
+.shadow-alliance-team-roster-label {
+  display: flex;
+  align-items: center;
+}
+
+.shadow-alliance-team-roster-heading {
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.shadow-alliance-team-roster-label {
+  min-width: 0;
+  gap: 8px;
+}
+
+.shadow-alliance-team-roster-label h3 {
+  overflow: hidden;
+  margin: 0;
+  font-family: var(--sa-font-display);
+  font-size: 20px;
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.shadow-alliance-team-roster-black .shadow-alliance-team-roster-label h3 { color: var(--sa-black-team); }
+.shadow-alliance-team-roster-white .shadow-alliance-team-roster-label h3 { color: var(--sa-white-team); }
+.shadow-alliance-team-roster-heading strong { color: var(--sa-gold); font-size: 13px; }
+
+.shadow-alliance-team-player-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: 0 var(--sa-space-2);
+  margin: var(--sa-space-2) 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.shadow-alliance-team-player-list li {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+  min-height: 42px;
+  padding: 7px 0;
+  border-bottom: 1px solid var(--sa-line-soft);
+}
+
+.shadow-alliance-team-player-list li > span {
+  min-width: 0;
+  overflow: hidden;
+  flex: 1;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.shadow-alliance-team-player-list .shadow-alliance-icon-button { flex: none; }
+
+.shadow-alliance-team-empty {
+  margin: 12px 0 0;
+  color: var(--sa-muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
 .shadow-alliance-player-list { display: grid; gap: 7px; margin: 16px 0 0; padding: 0; list-style: none; }
 .shadow-alliance-player-list li { min-height: 36px; gap: 9px; padding: 7px 9px; border: 1px solid rgba(52, 58, 74, 0.8); background: rgba(7, 9, 13, 0.42); }
 .shadow-alliance-player-list li span:nth-child(2) { flex: 1; }
 .shadow-alliance-player-list li b { color: var(--sa-gold); font-size: 13px; }
 .shadow-alliance-player-list.compact { max-height: 340px; overflow: auto; }
+.shadow-alliance-round-controls .shadow-alliance-player-list.compact { grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); }
+.shadow-alliance-round-controls .shadow-alliance-action-row { justify-content: flex-end; }
+.shadow-alliance-round-controls { transform: translateY(calc(-1 * clamp(72px, 15vh, 144px))); }
 
 .shadow-alliance-team { width: 10px; height: 10px; border-radius: 50%; flex: none; }
 .shadow-alliance-team-black { background: var(--sa-black-team); }
@@ -228,9 +405,9 @@
 .shadow-alliance-button,
 .shadow-alliance-icon-button {
   border: 1px solid transparent;
-  border-radius: 5px;
+  border-radius: var(--sa-radius-control);
   min-height: 38px;
-  padding: 8px 12px;
+  padding: 8px var(--sa-space-2);
   cursor: pointer;
   font: inherit;
   font-size: 14px;
@@ -240,15 +417,44 @@
 .shadow-alliance-button.primary { color: #16130d; background: var(--sa-gold); }
 .shadow-alliance-button.secondary,
 .shadow-alliance-icon-button { border-color: var(--sa-line); color: var(--sa-text); background: transparent; }
+.shadow-alliance-button.danger { border-color: #8e5c5c; color: #f1b0b0; background: rgba(142, 92, 92, 0.12); }
+.shadow-alliance-button.shadow-alliance-end-game-button {
+  border-color: #8e5c5c;
+  border-radius: 4px;
+  min-height: 0;
+  padding: 7px 10px;
+  color: #f1b0b0;
+  background: rgba(142, 92, 92, 0.12);
+  font-size: 12px;
+  font-weight: 400;
+}
+.shadow-alliance-button.shadow-alliance-end-game-button:hover:not(:disabled) {
+  border-color: #d87878;
+  color: #ffd0d0;
+  background: rgba(142, 92, 92, 0.24);
+}
+.shadow-alliance-button:hover:not(:disabled),
+.shadow-alliance-icon-button:hover:not(:disabled) {
+  border-color: var(--sa-gold);
+  transform: translateY(-1px);
+}
+.shadow-alliance-button:active:not(:disabled),
+.shadow-alliance-icon-button:active:not(:disabled) { transform: translateY(0); }
+.shadow-alliance-button:focus-visible,
+.shadow-alliance-icon-button:focus-visible,
+.shadow-alliance-guide-pagination button:focus-visible,
+.shadow-alliance-field select:focus-visible,
+.shadow-alliance-check input:focus-visible { outline: 2px solid var(--sa-gold); outline-offset: 3px; }
 .shadow-alliance-button:disabled { cursor: not-allowed; opacity: 0.45; }
 .shadow-alliance-icon-button { min-height: 28px; padding: 2px 8px; color: var(--sa-muted); }
-.shadow-alliance-action-row { flex-wrap: wrap; gap: 8px; margin-top: 16px; }
-.shadow-alliance-start { grid-column: 1 / -1; justify-self: center; min-width: 220px; }
+.shadow-alliance-action-row { flex-wrap: wrap; gap: var(--sa-space-1); margin-top: var(--sa-space-3); }
+.shadow-alliance-roster .shadow-alliance-action-row { padding-top: var(--sa-space-3); border-top: 1px solid var(--sa-line-soft); }
+.shadow-alliance-start { grid-area: start; justify-self: end; min-width: 260px; margin-top: -4px; }
 
-.shadow-alliance-command-panel { display: grid; min-height: 430px; align-content: center; justify-items: center; gap: 12px; text-align: center; background: radial-gradient(circle, rgba(204, 171, 92, 0.18), transparent 54%), var(--sa-panel); }
+.shadow-alliance-round-focus { display: grid; min-height: clamp(320px, 52vh, 480px); align-content: center; justify-items: center; gap: 12px; padding: 36px 24px; text-align: center; transform: translateY(calc(-1 * clamp(72px, 15vh, 144px))); }
 .shadow-alliance-command-label { color: var(--sa-muted); font-size: 14px; }
-.shadow-alliance-command-panel > strong,
-.shadow-alliance-student-command { color: var(--sa-gold); font-family: Georgia, "Times New Roman", serif; font-size: clamp(88px, 18vw, 170px); font-weight: 700; line-height: 0.9; }
+.shadow-alliance-round-focus > strong,
+.shadow-alliance-student-command { color: var(--sa-gold); font-family: var(--sa-font-display); font-size: clamp(88px, 18vw, 170px); font-weight: 700; line-height: 0.9; }
 .shadow-alliance-timer { color: var(--sa-text); font-variant-numeric: tabular-nums; font-size: 30px; }
 
 .shadow-alliance-result-panel,
@@ -256,10 +462,136 @@
 .shadow-alliance-result-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
 .shadow-alliance-result-grid span { display: grid; gap: 4px; padding: 11px; color: var(--sa-muted); background: var(--sa-panel-soft); font-size: 13px; }
 .shadow-alliance-result-grid b { color: var(--sa-text); font-size: 18px; }
+.shadow-alliance-reveal-page {
+  max-width: 1120px;
+  min-height: calc(100dvh - 150px);
+  margin: 0 auto;
+  display: grid;
+  align-content: center;
+  gap: var(--sa-space-4);
+  padding: 24px 0 48px;
+  background: transparent;
+}
+.shadow-alliance-reveal-page > .shadow-alliance-button {
+  justify-self: center;
+  width: fit-content;
+}
+.shadow-alliance-reveal-heading,
+.shadow-alliance-reveal-current,
+.shadow-alliance-reveal-team,
+.shadow-alliance-reveal-winner,
+.shadow-alliance-reveal-note { text-align: center; }
+.shadow-alliance-reveal-heading { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; }
+.shadow-alliance-reveal-heading h2 { margin-top: 5px; color: var(--sa-text); font-size: clamp(24px, 4vw, 38px); }
+.shadow-alliance-reveal-round-mark { color: var(--sa-gold); font-size: 12px; letter-spacing: 0.08em; white-space: nowrap; }
+.shadow-alliance-reveal-status {
+  min-height: 128px;
+  display: grid;
+  align-items: center;
+  border-top: 1px solid var(--sa-line-soft);
+  border-bottom: 1px solid var(--sa-line-soft);
+}
+.shadow-alliance-reveal-log { display: grid; gap: 7px; width: min(100%, 720px); margin: 0 auto; }
+.shadow-alliance-reveal-log p,
+.shadow-alliance-reveal-current {
+  color: var(--sa-muted);
+  font-family: var(--sa-font-mono);
+  font-size: clamp(13px, 1.7vw, 17px);
+  letter-spacing: 0.02em;
+}
+.shadow-alliance-reveal-log p { opacity: 0.45; }
+.shadow-alliance-reveal-log p.is-current,
+.shadow-alliance-reveal-current { color: var(--sa-gold); text-shadow: 0 0 22px rgba(228, 199, 120, 0.28); }
+.shadow-alliance-reveal-log p span,
+.shadow-alliance-reveal-current span { margin-right: 8px; color: var(--sa-gold); }
+.shadow-alliance-reveal-current { animation: shadow-alliance-reveal-pulse 1.8s ease-in-out infinite; }
+.shadow-alliance-reveal-team-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--sa-space-3); }
+.shadow-alliance-reveal-team {
+  min-height: 188px;
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: 8px;
+  padding: 24px;
+  border: 1px solid var(--sa-line);
+  border-top-width: 3px;
+  background: rgba(8, 9, 13, 0.72);
+  opacity: 0;
+  filter: brightness(0.12);
+  transform: scale(0.96);
+  transition: opacity 1.1s ease, filter 1.1s ease, transform 1.1s ease, box-shadow 0.7s ease;
+}
+.shadow-alliance-reveal-team-black { border-top-color: var(--sa-black-team); }
+.shadow-alliance-reveal-team-white { border-top-color: var(--sa-white-team); }
+.shadow-alliance-reveal-team.is-visible { opacity: 1; filter: brightness(1); transform: scale(1); }
+.shadow-alliance-reveal-team.is-winner { border-color: var(--sa-gold); box-shadow: 0 0 0 2px var(--sa-gold), 0 0 42px rgba(228, 199, 120, 0.24); }
+.shadow-alliance-reveal-team.is-loser { filter: grayscale(0.65) brightness(0.68); }
+.shadow-alliance-reveal-team h3 { font-family: var(--sa-font-display); font-size: 20px; }
+.shadow-alliance-reveal-team-black h3 { color: var(--sa-black-team); }
+.shadow-alliance-reveal-team-white h3 { color: var(--sa-white-team); }
+.shadow-alliance-reveal-team strong { color: var(--sa-text); font-family: var(--sa-font-mono); font-size: clamp(38px, 6vw, 64px); line-height: 1; }
+.shadow-alliance-reveal-team p { color: var(--sa-muted); font-size: 13px; }
+.shadow-alliance-reveal-team p b { color: var(--sa-text); font-family: var(--sa-font-mono); }
+.shadow-alliance-reveal-winner {
+  color: var(--sa-gold);
+  font-family: var(--sa-font-display);
+  font-size: clamp(28px, 5vw, 48px);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-shadow: 0 0 30px rgba(228, 199, 120, 0.28);
+  animation: shadow-alliance-reveal-winner 0.7s cubic-bezier(0.2, 1.4, 0.4, 1) both;
+}
+.shadow-alliance-reveal-winner.is-tie { color: var(--sa-muted); }
+.shadow-alliance-reveal-winner small { display: block; margin-top: 6px; color: var(--sa-muted); font-family: var(--sa-font-body); font-size: 13px; font-weight: 400; letter-spacing: 0; }
+.shadow-alliance-reveal-note { color: var(--sa-muted); font-size: 13px; }
+.shadow-alliance-postround-page {
+  max-width: 760px;
+  min-height: calc(100dvh - 150px);
+  margin: 0 auto;
+  display: grid;
+  align-content: center;
+  gap: var(--sa-space-4);
+  padding: 24px 0 48px;
+}
+.shadow-alliance-postround-shell {
+  display: grid;
+  place-items: center;
+  padding: clamp(24px, 5vw, 72px);
+}
+.shadow-alliance-postround-shell .shadow-alliance-postround-page {
+  width: min(100%, 760px);
+  max-width: none;
+  min-height: 0;
+  padding: 0;
+}
+.shadow-alliance-postround-summary { padding-bottom: var(--sa-space-3); border-bottom: 1px solid var(--sa-line-soft); }
+.shadow-alliance-postround-summary h2 { margin-top: 6px; color: var(--sa-gold); font-size: clamp(28px, 5vw, 44px); }
+.shadow-alliance-postround-card { display: grid; gap: var(--sa-space-3); padding: 20px; border: 1px solid var(--sa-line); border-radius: var(--sa-radius-panel); background: var(--sa-panel); box-shadow: var(--sa-shadow-panel); }
+.shadow-alliance-numbers-strip { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; }
+.shadow-alliance-numbers-strip span { min-width: 54px; padding: 9px 13px; border: 1px solid var(--sa-gold); border-radius: var(--sa-radius-control); color: var(--sa-gold); background: rgba(228, 199, 120, 0.08); font-family: var(--sa-font-mono); font-weight: 700; text-align: center; }
+.shadow-alliance-postround-note { color: var(--sa-muted); font-size: 13px; text-align: center; }
+.shadow-alliance-postround-ranking { display: grid; gap: 7px; margin: 0; padding: 0; list-style: none; }
+.shadow-alliance-postround-ranking li { display: flex; align-items: center; gap: 10px; padding: 11px 12px; border-bottom: 1px solid var(--sa-line-soft); }
+.shadow-alliance-postround-ranking li:last-child { border-bottom: 0; }
+.shadow-alliance-postround-ranking li.is-secret { color: var(--sa-gold); background: rgba(228, 199, 120, 0.06); }
+.shadow-alliance-postround-rank { width: 24px; color: var(--sa-gold); font-weight: 700; text-align: center; }
+.shadow-alliance-postround-name { flex: 1; font-weight: 700; }
+.shadow-alliance-postround-name small { display: block; margin-top: 2px; color: var(--sa-muted); font-size: 11px; font-weight: 400; }
+.shadow-alliance-postround-ranking li > strong { color: var(--sa-gold); font-family: var(--sa-font-mono); }
+.shadow-alliance-postround-page > .shadow-alliance-button { justify-self: center; width: fit-content; }
+@keyframes shadow-alliance-reveal-pulse {
+  0%, 100% { opacity: 0.7; }
+  50% { opacity: 1; }
+}
+@keyframes shadow-alliance-reveal-winner {
+  from { opacity: 0; transform: scale(0.8); }
+  to { opacity: 1; transform: scale(1); }
+}
 .shadow-alliance-ranking-panel ol { display: grid; gap: 7px; margin: 0; padding: 0; list-style: none; }
 .shadow-alliance-ranking-panel li { gap: 10px; padding: 10px; background: var(--sa-panel-soft); }
 .shadow-alliance-ranking-panel li > span { width: 24px; color: var(--sa-gold); font-weight: 700; }
 .shadow-alliance-ranking-panel li b { flex: 1; }
+.shadow-alliance-new-game { justify-self: end; width: fit-content; }
 
 .shadow-alliance-centered { display: grid; align-content: center; justify-items: center; gap: 14px; text-align: center; }
 .shadow-alliance-student { max-width: 720px; margin: 0 auto; }
@@ -275,12 +607,45 @@
   .shadow-alliance-game h1 { font-size: 26px; }
   .shadow-alliance-teacher-grid,
   .shadow-alliance-round-layout { grid-template-columns: 1fr; }
+  .shadow-alliance-teacher-grid {
+    grid-template-areas:
+      "guide"
+      "roster"
+      "settings"
+      "start";
+  }
   .shadow-alliance-roster { grid-row: auto; }
+  .shadow-alliance-settings {
+    border-top: 1px solid var(--sa-line-soft);
+    border-left: 0;
+    padding: var(--sa-space-4) 0 0;
+  }
+  .shadow-alliance-team-roster-grid { grid-template-columns: 1fr; }
   .shadow-alliance-lobby-guide { grid-column: 1; min-height: 360px; }
   .shadow-alliance-guide-content { grid-template-columns: 1fr; gap: 12px; }
   .shadow-alliance-guide-number { font-size: 58px; }
-  .shadow-alliance-guide-copy p { font-size: 18px; }
-  .shadow-alliance-command-panel { min-height: 290px; }
+  .shadow-alliance-guide-body p { font-size: 18px; }
+  .shadow-alliance-guide-keep { white-space: normal; }
+  .shadow-alliance-round-focus { min-height: 290px; }
+  .shadow-alliance-round-controls { transform: translateY(calc(-1 * clamp(28px, 6vh, 56px))); }
   .shadow-alliance-result-grid { grid-template-columns: repeat(2, 1fr); }
+  .shadow-alliance-reveal-page { min-height: 0; padding: 18px 14px 28px; }
+  .shadow-alliance-postround-page { min-height: 0; padding: 18px 0 28px; }
+  .shadow-alliance-postround-shell { display: block; padding: 18px 14px 28px; }
+  .shadow-alliance-postround-shell .shadow-alliance-postround-page { padding: 0; }
+  .shadow-alliance-reveal-heading { align-items: flex-start; flex-direction: column; }
+  .shadow-alliance-reveal-round-mark { align-self: flex-end; }
+  .shadow-alliance-reveal-team-grid { grid-template-columns: 1fr; }
   .shadow-alliance-topbar { align-items: flex-start; }
+  .shadow-alliance-topbar-status { margin-left: 0; justify-content: flex-start; }
+  .shadow-alliance-start { justify-self: stretch; min-width: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .shadow-alliance-button,
+  .shadow-alliance-icon-button,
+  .shadow-alliance-reveal-team,
+  .shadow-alliance-reveal-current { transition: none; animation: none; }
+  .shadow-alliance-reveal-winner,
+  .shadow-alliance-reveal-log p { animation: none; }
 }

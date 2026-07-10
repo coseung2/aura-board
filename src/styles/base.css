@@ -420,3 +420,37 @@ button.card-engagement-modal-close.card-engagement-modal-close::after,
 button.assign-modal__close.assign-modal__close::after {
   transform: rotate(-45deg);
 }
+
+body:has(main[data-play-board="true"], .shadow-alliance-game, .speed-game-board, .kordle-play-page, .kordle-waiting-page) .app-footer {
+  display: none;
+}
+
+.play-board-continue-button {
+  position: fixed;
+  top: 16px;
+  right: 20px;
+  z-index: 20;
+  min-height: 0;
+  border: 1px solid rgba(169, 175, 189, 0.72);
+  border-radius: 4px;
+  padding: 7px 10px;
+  cursor: pointer;
+  font: inherit;
+  color: #a9afbd;
+  background: rgba(20, 24, 36, 0.5);
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 1.4;
+}
+
+.shadow-alliance-topbar .play-board-continue-button {
+  position: static;
+  top: auto;
+  right: auto;
+}
+
+.play-board-continue-button:hover {
+  border-color: #e4c778;
+  color: #f5f1e7;
+  background: rgba(20, 24, 36, 0.78);
+}

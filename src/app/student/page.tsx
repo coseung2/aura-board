@@ -39,6 +39,9 @@ export default async function StudentPage() {
             },
           },
         },
+        speedGame: {
+          select: { status: true },
+        },
       },
       orderBy: { createdAt: "desc" },
     }),
@@ -216,6 +219,8 @@ export default async function StudentPage() {
           b.layout === "kordle"
             ? b.kordleGame?.puzzles[0]?.status ?? null
             : null,
+        speedGameStatus:
+          b.layout === "speed-game" ? b.speedGame?.status ?? "lobby" : null,
         breakout: linkedBreakout
           ? buildDashboardBreakout({
               board: linkedBreakout.board,

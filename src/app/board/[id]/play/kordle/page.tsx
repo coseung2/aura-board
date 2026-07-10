@@ -2,7 +2,7 @@ import { notFound, redirect } from "next/navigation";
 import { db } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
 import { getCurrentStudent } from "@/lib/student-auth";
-import { BoardHeader } from "@/components/BoardHeader";
+import { PlayBoardContinueButton } from "@/components/PlayBoardContinueButton";
 import { KordleBoard } from "@/features/kordle/components/KordleBoard";
 import { KordleLiveToasts } from "@/features/kordle/components/KordleLiveToasts";
 import { KordleWaitingRoom } from "@/features/kordle/components/KordleWaitingRoom";
@@ -80,16 +80,8 @@ export default async function KordlePlayPage({ params }: Props) {
   const puzzle = game.puzzles[0];
   if (!puzzle) {
     return (
-      <main className="board-page kordle-waiting-page" data-board-theme={boardTheme}>
-        <BoardHeader
-          boardId={boardId}
-          title={board.title}
-          layout={board.layout}
-          isStudent
-          backHref="/student"
-          canEdit={false}
-          showAuth={false}
-        />
+      <main className="board-page kordle-waiting-page" data-board-theme={boardTheme} data-play-board="true">
+        <PlayBoardContinueButton />
         <KordleWaitingRoom
           boardId={boardId}
           studentId={student.id}
@@ -112,16 +104,8 @@ export default async function KordlePlayPage({ params }: Props) {
   });
   if (livePuzzle?.status !== "LIVE") {
     return (
-      <main className="board-page kordle-waiting-page" data-board-theme={boardTheme}>
-        <BoardHeader
-          boardId={boardId}
-          title={board.title}
-          layout={board.layout}
-          isStudent
-          backHref="/student"
-          canEdit={false}
-          showAuth={false}
-        />
+      <main className="board-page kordle-waiting-page" data-board-theme={boardTheme} data-play-board="true">
+        <PlayBoardContinueButton />
         <KordleWaitingRoom
           boardId={boardId}
           studentId={student.id}
@@ -135,16 +119,8 @@ export default async function KordlePlayPage({ params }: Props) {
   if (!state) notFound();
 
   return (
-    <main className="board-page kordle-play-page" data-board-theme={boardTheme}>
-      <BoardHeader
-        boardId={boardId}
-        title={board.title}
-        layout={board.layout}
-        isStudent
-        backHref="/student"
-        canEdit={false}
-        showAuth={false}
-      />
+    <main className="board-page kordle-play-page" data-board-theme={boardTheme} data-play-board="true">
+      <PlayBoardContinueButton />
       <KordleBoard
         boardId={boardId}
         attemptId={attemptId}
