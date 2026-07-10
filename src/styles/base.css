@@ -423,7 +423,19 @@ button.assign-modal__close.assign-modal__close::after {
 
 body:has(main[data-board-category="PLAY"]) .app-footer,
 body:has(main[data-play-board="true"], .shadow-alliance-game, .speed-game-board, .kordle-play-page, .kordle-waiting-page) .app-footer {
+  display: none !important;
+}
+
+body:has(main[data-board-category="PLAY"]) {
+  background: #0a0a0c;
+}
+
+body:has(main[data-board-category="PLAY"]) .app-background-layer {
   display: none;
+}
+
+main[data-board-category="PLAY"] {
+  min-height: 100dvh;
 }
 
 .play-board-continue-button {
