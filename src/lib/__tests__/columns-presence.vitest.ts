@@ -13,25 +13,19 @@ function presence(
     version: 1,
     actorKey: overrides.actorKey,
     sessionId: overrides.sessionId,
-    role: overrides.role ?? "viewer",
     mode: overrides.mode ?? "browsing",
-    sectionId: overrides.sectionId ?? null,
-    cardId: overrides.cardId ?? null,
     visible: overrides.visible ?? true,
-    onlineAt: overrides.onlineAt ?? "2026-07-10T00:00:00.000Z",
     updatedAt: overrides.updatedAt ?? "2026-07-10T00:00:01.000Z",
   };
 }
 
 describe("columns presence", () => {
-  it("builds a payload without exposing an application user id", () => {
+  it("builds a minimal payload without application identity or board ids", () => {
     const payload = buildColumnsPresencePayload({
       actorKey: "actor-a",
       sessionId: "session-a",
-      role: "editor",
-      activity: { mode: "editing", sectionId: "section-a", cardId: "card-a" },
+      activity: { mode: "editing" },
       visible: true,
-      onlineAt: "2026-07-10T00:00:00.000Z",
       now: "2026-07-10T00:00:02.000Z",
     });
 
@@ -39,15 +33,15 @@ describe("columns presence", () => {
       version: 1,
       actorKey: "actor-a",
       sessionId: "session-a",
-      role: "editor",
       mode: "editing",
-      sectionId: "section-a",
-      cardId: "card-a",
       visible: true,
-      onlineAt: "2026-07-10T00:00:00.000Z",
       updatedAt: "2026-07-10T00:00:02.000Z",
     });
     expect(payload).not.toHaveProperty("userId");
+    expect(payload).not.toHaveProperty("studentId");
+    expect(payload).not.toHaveProperty("role");
+    expect(payload).not.toHaveProperty("sectionId");
+    expect(payload).not.toHaveProperty("cardId");
     expect(payload).not.toHaveProperty("name");
   });
 
@@ -61,57 +55,43 @@ describe("columns presence", () => {
       "actor-a",
     );
 
-    expect(summary.onlineCount).toBe(2);
-    expect(summary.otherOnlineCount).toBe(1);
+    expect(summary).toEqual({
+      onlineCount: 2,
+      otherOnlineCount: 1,
+      remoteWorkingCount: 0,
+    });
   });
 
-  it("aggregates remote working modes and active sections", () => {
+  it("aggregates editing, adding, and dragging as remote work", () => {
     const summary = summarizeColumnsPresence(
       {
-        a: [
+        self: [
           presence({
             actorKey: "actor-self",
             sessionId: "self",
             mode: "editing",
-            sectionId: "section-a",
           }),
         ],
-        b: [
-          presence({
-            actorKey: "actor-b",
-            sessionId: "b",
-            mode: "editing",
-            sectionId: "section-a",
-          }),
+        edit: [
+          presence({ actorKey: "actor-b", sessionId: "b", mode: "editing" }),
         ],
-        c: [
-          presence({
-            actorKey: "actor-c",
-            sessionId: "c",
-            mode: "adding",
-            sectionId: "section-b",
-          }),
+        add: [
+          presence({ actorKey: "actor-c", sessionId: "c", mode: "adding" }),
         ],
-        d: [
-          presence({
-            actorKey: "actor-d",
-            sessionId: "d",
-            mode: "dragging",
-            sectionId: "section-b",
-          }),
+        drag: [
+          presence({ actorKey: "actor-d", sessionId: "d", mode: "dragging" }),
+        ],
+        view: [
+          presence({ actorKey: "actor-e", sessionId: "e", mode: "viewing" }),
         ],
       },
       "actor-self",
     );
 
-    expect(summary).toMatchObject({
-      onlineCount: 4,
-      otherOnlineCount: 3,
+    expect(summary).toEqual({
+      onlineCount: 5,
+      otherOnlineCount: 4,
       remoteWorkingCount: 3,
-      remoteEditingCount: 1,
-      remoteAddingCount: 1,
-      remoteDraggingCount: 1,
-      remoteActiveSectionCount: 2,
     });
   });
 
@@ -134,7 +114,10 @@ describe("columns presence", () => {
       "actor-self",
     );
 
-    expect(summary.onlineCount).toBe(1);
-    expect(summary.otherOnlineCount).toBe(1);
+    expect(summary).toEqual({
+      onlineCount: 1,
+      otherOnlineCount: 1,
+      remoteWorkingCount: 0,
+    });
   });
 });
