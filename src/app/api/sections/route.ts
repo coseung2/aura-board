@@ -36,7 +36,7 @@ export async function POST(req: Request) {
       actorType: "teacher",
       actorId: user.id,
     });
-    void announceCardChange(input.boardId, "update");
+    await announceCardChange(input.boardId, "update");
 
     return NextResponse.json({ section });
   } catch (e) {
