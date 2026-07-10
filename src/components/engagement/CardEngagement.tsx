@@ -6,6 +6,12 @@ import { formatRelativeTime } from "@/lib/card-engagement-format";
 import { useShareSession, type ShareSession } from "@/components/share/ShareSessionContext";
 import { createPublicSupabaseClient } from "@/lib/supabase/client";
 import { useBoardEngagement, useBoardPollChange } from "@/hooks/useBoardEngagementRealtime";
+import {
+  BOARD_ENGAGEMENT_CONTEXT_EVENT,
+  EMPTY_BOARD_ENGAGEMENT_CONTEXT,
+  readBoardEngagementContext,
+  type BoardEngagementContext,
+} from "@/lib/board-engagement-context";
 
 // card-comments-likes (2026-04-26): 카드별 좋아요 + 댓글 UI.
 // mode="chips"  — 인라인 보드 카드 footer (좋아요 토글 + 댓글 카운트
@@ -87,10 +93,15 @@ export function CardEngagement({
   const initialLikeCount = initialCounts?.likeCount;
   const initialCommentCount = initialCounts?.commentCount;
   const shareSession = useShareSession();
+  const boardContext = useBoardPageEngagementContext();
+  const effectiveBoardId = boardId ?? boardContext.boardId;
+  const effectiveIsStudentViewer = Boolean(
+    isStudentViewer || boardContext.isStudentViewer,
+  );
   const cacheKey = getEngagementCacheKey({
     cardId,
-    boardId,
-    isStudentViewer,
+    boardId: effectiveBoardId,
+    isStudentViewer: effectiveIsStudentViewer,
     shareSession,
   });
   const cachedState = engagementStateCache.get(cacheKey);
@@ -110,12 +121,14 @@ export function CardEngagement({
             cache: "no-store",
             headers: {
               "x-share-token": shareSession.shareToken,
-              ...(shareSession.guestId ? { "x-share-guest-id": shareSession.guestId } : {}),
+              ...(shareSession.guestId
+                ? { "x-share-guest-id": shareSession.guestId }
+                : {}),
             },
           })
         : await fetch(`/api/cards/${cardId}/engagement`, {
             cache: "no-store",
-            headers: studentViewerHeaders(!!isStudentViewer),
+            headers: studentViewerHeaders(effectiveIsStudentViewer),
           });
       if (!r.ok) {
         if (shareSession) {
@@ -153,7 +166,7 @@ export function CardEngagement({
     } finally {
       setEngagementReady(true);
     }
-  }, [cacheKey, cardId, shareSession, isStudentViewer]);
+  }, [cacheKey, cardId, shareSession, effectiveIsStudentViewer]);
 
   useEffect(() => {
     const cached = engagementStateCache.get(cacheKey);
@@ -166,7 +179,7 @@ export function CardEngagement({
 
   // Live-update counts from board-level engagement broadcasts. Only counts
   // move; isLiked is the current user's own state (handled in toggleLike).
-  useBoardEngagement(boardId, cardId, (event) => {
+  useBoardEngagement(effectiveBoardId, cardId, (event) => {
     if (event.type !== "engagement_changed") return;
     setState((current) => {
       if (!current) return current;
@@ -184,7 +197,7 @@ export function CardEngagement({
     // When a boardId is wired, board-level broadcasts drive updates and we
     // skip the per-card postgres_changes channel. Share sessions without a
     // boardId keep the per-card subscription.
-    if (!shareSession || boardId) return;
+    if (!shareSession || effectiveBoardId) return;
     const supabase = createPublicSupabaseClient({
       "x-share-token": shareSession.shareToken,
       "x-share-guest-id": shareSession.guestId,
@@ -216,7 +229,7 @@ export function CardEngagement({
     return () => {
       void supabase.removeChannel(channel);
     };
-  }, [cardId, refresh, shareSession, boardId]);
+  }, [cardId, refresh, shareSession, effectiveBoardId]);
 
   const toggleLike = useCallback(async () => {
     if (!state?.canInteract || likeInFlightRef.current) return;
@@ -248,7 +261,7 @@ export function CardEngagement({
             method: "POST",
             headers: {
               "content-type": "application/json",
-              ...studentViewerHeaders(!!isStudentViewer),
+              ...studentViewerHeaders(effectiveIsStudentViewer),
             },
             body: JSON.stringify({ liked: desiredLiked }),
           });
@@ -268,7 +281,15 @@ export function CardEngagement({
     } finally {
       likeInFlightRef.current = false;
     }
-  }, [cacheKey, cardId, refresh, shareSession, state?.canInteract, state?.isLiked, isStudentViewer]);
+  }, [
+    cacheKey,
+    cardId,
+    refresh,
+    shareSession,
+    state?.canInteract,
+    state?.isLiked,
+    effectiveIsStudentViewer,
+  ]);
 
   if (!state) {
     return mode === "chips" ? (
@@ -307,10 +328,17 @@ export function CardEngagement({
           {chipsActionsEnd}
         </div>
         {showModal && (
-          <CommentsModal cardId={cardId} canInteract={state.canInteract} shareSession={shareSession} isStudentViewer={!!isStudentViewer} boardId={boardId} onClose={() => {
-            setShowModal(false);
-            void refresh();
-          }} />
+          <CommentsModal
+            cardId={cardId}
+            canInteract={state.canInteract}
+            shareSession={shareSession}
+            isStudentViewer={effectiveIsStudentViewer}
+            boardId={effectiveBoardId}
+            onClose={() => {
+              setShowModal(false);
+              void refresh();
+            }}
+          />
         )}
       </>
     );
@@ -351,14 +379,33 @@ export function CardEngagement({
           cardId={cardId}
           canInteract={state.canInteract}
           shareSession={shareSession}
-          isStudentViewer={!!isStudentViewer}
-          boardId={boardId}
+          isStudentViewer={effectiveIsStudentViewer}
+          boardId={effectiveBoardId}
           onChange={refresh}
           inputId={commentInputId}
         />
       )}
     </div>
   );
+}
+
+function useBoardPageEngagementContext(): BoardEngagementContext {
+  const [context, setContext] = useState<BoardEngagementContext>(() =>
+    typeof document === "undefined"
+      ? EMPTY_BOARD_ENGAGEMENT_CONTEXT
+      : readBoardEngagementContext(),
+  );
+
+  useEffect(() => {
+    const update = () => setContext(readBoardEngagementContext());
+    update();
+    window.addEventListener(BOARD_ENGAGEMENT_CONTEXT_EVENT, update);
+    return () => {
+      window.removeEventListener(BOARD_ENGAGEMENT_CONTEXT_EVENT, update);
+    };
+  }, []);
+
+  return context;
 }
 
 function studentViewerHeaders(isStudentViewer: boolean): Record<string, string> {
@@ -512,7 +559,10 @@ function CommentsBlock({
         setErr("댓글 작성에 실패했어요");
         return;
       }
-      const j = (await r.json()) as { item?: CommentItem; comment?: CommentItem };
+      const j = (await r.json()) as {
+        item?: CommentItem;
+        comment?: CommentItem;
+      };
       const item = j.item ?? j.comment;
       if (!item) {
         setErr("댓글 작성에 실패했어요");
@@ -662,7 +712,13 @@ function CommentsPoll({
   });
 
   const vote = async (optionIndex: number) => {
-    if (shareSession || voting || !poll?.canVote || poll.selectedOption === optionIndex) return;
+    if (
+      shareSession ||
+      voting ||
+      !poll?.canVote ||
+      poll.selectedOption === optionIndex
+    )
+      return;
     setVoting(true);
     setOpenOption(optionIndex);
     setPoll((current) => {
