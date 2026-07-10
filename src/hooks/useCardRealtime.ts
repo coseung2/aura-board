@@ -1,22 +1,18 @@
 "use client";
 
-import { useEffect, useRef, useCallback } from "react";
+import { useCallback, useRef } from "react";
 import type { CardData } from "@/components/DraggableCard";
 import { sortSections } from "@/lib/sort-sections";
+import { boardChannelKey } from "@/lib/realtime";
+import { useRealtimeInvalidation } from "@/hooks/useRealtimeInvalidation";
 
 /**
- * Subscribes to Supabase Realtime broadcast channel `board:{boardId}`.
+ * Reconciles card-based content boards from a server snapshot.
  *
- * When the server broadcasts a `card_changed` event (after any card
- * mutation — insert/update/delete), this hook refetches a single
- * snapshot from /api/boards/:id/snapshot and merges it into local state.
- *
- * If Supabase is not configured or connection fails, the hook silently
- * degrades — the page still works, just without realtime updates.
- *
- * @param boardId     Board ID to listen on.
- * @param setCards    State setter for cards.
- * @param deletingIds Ref to a Set of card IDs being actively deleted.
+ * Supabase Broadcast is only an invalidation signal. The authoritative cards
+ * and sections are always read from /api/boards/:id/snapshot. When Realtime is
+ * unavailable, useRealtimeInvalidation enables a slow visible-tab poll; it
+ * also catches up after focus, visibility, and network restoration.
  */
 export function useCardRealtime<
   TSection extends { order: number; pinned: boolean } = {
@@ -30,109 +26,41 @@ export function useCardRealtime<
   setSections?: React.Dispatch<React.SetStateAction<TSection[]>>,
 ) {
   const lastHashRef = useRef("");
-  const inflightRef = useRef<Promise<void> | null>(null);
 
-  const refetch = useCallback(() => {
-    if (inflightRef.current) return inflightRef.current;
-
-    const request = (async () => {
-      try {
-      const qs = lastHashRef.current
-        ? `?hash=${encodeURIComponent(lastHashRef.current)}`
-        : "";
-      const res = await fetch(`/api/boards/${boardId}/snapshot${qs}`, {
-        cache: "no-store",
-      });
-      if (!res.ok) return;
-      const data = (await res.json()) as {
-        cards: CardData[];
-        sections?: TSection[];
-        hash?: string;
-      };
-      lastHashRef.current = data.hash ?? "";
-      setCards(() => {
-        return data.cards.filter(
-          (c) => !deletingIds.current.has(c.id),
-        );
-      });
-      if (data.sections && setSections) {
-        setSections([...data.sections].sort(sortSections));
-      }
-      } catch {
-        // Transient — next broadcast will retry.
-      }
-    })().finally(() => {
-      if (inflightRef.current === request) inflightRef.current = null;
+  const refetch = useCallback(async () => {
+    const qs = lastHashRef.current
+      ? `?hash=${encodeURIComponent(lastHashRef.current)}`
+      : "";
+    const res = await fetch(`/api/boards/${boardId}/snapshot${qs}`, {
+      cache: "no-store",
     });
 
-    inflightRef.current = request;
-    return request;
-  }, [boardId, setCards, deletingIds, setSections]);
-
-  useEffect(() => {
-    // Dynamic import: Supabase 클라이언트를 브라우저에서만 지연 로드.
-    // 정적 import는 SSR 단계에서 모듈 평가 에러를 일으킬 수 있음.
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    let supabase: any = null;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    let channel: any = null;
-    let cancelled = false;
-
-    (async () => {
-      try {
-        const { createPublicSupabaseClient } = await import(
-          "@/lib/supabase/client"
-        );
-        if (cancelled) return;
-        supabase = createPublicSupabaseClient();
-      } catch {
-        // Supabase env vars not configured — realtime disabled.
-        return;
-      }
-
-      try {
-        if (cancelled || !supabase) return;
-        channel = supabase
-          .channel(`board:${boardId}`)
-          .on("broadcast", { event: "card_changed" }, () => {
-            void refetch();
-          })
-          .subscribe((status: string) => {
-            if (status === "SUBSCRIBED") {
-              void refetch();
-            }
-          });
-      } catch {
-        // Subscription failure — non-fatal.
-      }
-    })();
-
-    function catchUpWhenVisible() {
-      if (!document.hidden) {
-        void refetch();
-      }
+    if (res.status === 304) return;
+    if (res.status === 401 || res.status === 403) return;
+    if (!res.ok) {
+      throw new Error(`board snapshot failed: ${res.status}`);
     }
 
-    function catchUpOnNetworkRestore() {
-      void refetch();
-    }
-
-    window.addEventListener("online", catchUpOnNetworkRestore);
-    window.addEventListener("focus", catchUpWhenVisible);
-    document.addEventListener("visibilitychange", catchUpWhenVisible);
-
-    return () => {
-      cancelled = true;
-      window.removeEventListener("online", catchUpOnNetworkRestore);
-      window.removeEventListener("focus", catchUpWhenVisible);
-      document.removeEventListener("visibilitychange", catchUpWhenVisible);
-      if (supabase && channel) {
-        try {
-          void supabase.removeChannel(channel);
-        } catch {
-          // ignore
-        }
-      }
+    const data = (await res.json()) as {
+      cards: CardData[];
+      sections?: TSection[];
+      hash?: string;
     };
-  }, [boardId, refetch]);
+    lastHashRef.current = data.hash ?? "";
+
+    setCards(
+      data.cards.filter((card) => !deletingIds.current.has(card.id)),
+    );
+    if (data.sections && setSections) {
+      setSections([...data.sections].sort(sortSections));
+    }
+  }, [boardId, deletingIds, setCards, setSections]);
+
+  useRealtimeInvalidation({
+    channelName: boardChannelKey(boardId),
+    event: "card_changed",
+    refresh: refetch,
+    debounceMs: 80,
+    fallbackPollMs: 30_000,
+  });
 }
