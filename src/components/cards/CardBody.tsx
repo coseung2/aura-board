@@ -63,6 +63,7 @@ type Props = {
   // 포트폴리오 그리드는 모달로 전체 내용을 보므로 "static", 상세 모달은 "full".
   contentDisplay?: "expandable" | "static" | "full";
   boardId?: string;
+  isStudentViewer?: boolean;
 };
 
 function isLongContent(content: string): boolean {
@@ -79,6 +80,7 @@ export const CardBody = memo(function CardBody({
   attachmentsVariant = "thumbnail",
   contentDisplay = "expandable",
   boardId,
+  isStudentViewer,
 }: Props) {
   const Title = titleAs;
   const [isExpanded, setIsExpanded] = useState(false);
@@ -164,6 +166,7 @@ export const CardBody = memo(function CardBody({
           cardId={card.id}
           mode="chips"
           boardId={boardId}
+          isStudentViewer={isStudentViewer}
           initialCounts={initialCounts}
           chipsActionsEnd={editAuthorsAction}
         />

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef } from "react";
+import { AppState } from "react-native";
 import { apiFetch } from "./api";
 import type { BoardDetailResponse } from "./types";
 
@@ -20,14 +21,48 @@ export function useBoardRealtime({
 }) {
   const reloadRef = useRef(onReload);
   reloadRef.current = onReload;
+  const reloadTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const reloadInFlightRef = useRef<Promise<void> | null>(null);
+  const reloadQueuedRef = useRef(false);
+  const mountedRef = useRef(true);
+  const flushReloadRef = useRef<() => void>(() => {});
 
-  const reload = useCallback(() => {
-    return Promise.resolve(reloadRef.current());
+  const reload = useCallback((delayMs = 0) => {
+    if (!mountedRef.current) return;
+    reloadQueuedRef.current = true;
+    if (reloadTimerRef.current) clearTimeout(reloadTimerRef.current);
+    reloadTimerRef.current = setTimeout(() => {
+      reloadTimerRef.current = null;
+      flushReloadRef.current();
+    }, delayMs);
   }, []);
 
+  flushReloadRef.current = () => {
+    if (!mountedRef.current || reloadInFlightRef.current || !reloadQueuedRef.current) {
+      return;
+    }
+    reloadQueuedRef.current = false;
+    const request = Promise.resolve(reloadRef.current())
+      .catch(() => undefined)
+      .finally(() => {
+        if (reloadInFlightRef.current === request) reloadInFlightRef.current = null;
+        if (mountedRef.current && reloadQueuedRef.current) {
+          queueMicrotask(() => flushReloadRef.current());
+        }
+      });
+    reloadInFlightRef.current = request;
+  };
+
   useEffect(() => {
+    mountedRef.current = true;
+    if (!slug) {
+      return () => {
+        mountedRef.current = false;
+      };
+    }
     let cancelled = false;
-    let channel: { unsubscribe: () => void } | null = null;
+    let client: { removeChannel: (ch: unknown) => Promise<unknown> } | null = null;
+    let channel: unknown = null;
     (async () => {
       try {
         // 모바일 번들에 @supabase/supabase-js 가 정적으로 포함돼 있지 않을 수 있어
@@ -41,7 +76,7 @@ export function useBoardRealtime({
         const url = process.env.EXPO_PUBLIC_SUPABASE_URL;
         const key = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
         if (!url || !key) return;
-        const client = createClient(url, key, {
+        const nextClient = createClient(url, key, {
           auth: { persistSession: false, autoRefreshToken: false },
         }) as {
           channel: (name: string) => {
@@ -55,20 +90,33 @@ export function useBoardRealtime({
           removeChannel: (ch: unknown) => Promise<unknown>;
         };
         if (cancelled) return;
-        const ch = client.channel(`board:${slug}`);
-        ch.on("broadcast", { event: "card_changed" }, () => void reload());
-        ch.on("broadcast", { event: "board_changed" }, () => void reload());
-        ch.on("broadcast", { event: "queue_changed" }, () => void reload());
-        ch.subscribe();
-        channel = ch as unknown as { unsubscribe: () => void };
+        client = nextClient;
+        const ch = nextClient.channel(`board:${slug}`);
+        ch.on("broadcast", { event: "card_changed" }, () => reload(80));
+        ch.on("broadcast", { event: "board_changed" }, () => reload(80));
+        ch.on("broadcast", { event: "queue_changed" }, () => reload(80));
+        ch.subscribe((status) => {
+          if (status === "SUBSCRIBED") reload();
+        });
+        channel = ch;
       } catch {
         // broadcast 미가용 — refetch on focus 가 1차 보장선.
       }
     })();
+    const appStateSubscription = AppState.addEventListener("change", (state) => {
+      if (state === "active") reload();
+    });
     return () => {
       cancelled = true;
+      mountedRef.current = false;
+      reloadQueuedRef.current = false;
+      if (reloadTimerRef.current) {
+        clearTimeout(reloadTimerRef.current);
+        reloadTimerRef.current = null;
+      }
+      appStateSubscription.remove();
       try {
-        channel?.unsubscribe();
+        if (client && channel) void client.removeChannel(channel);
       } catch {
         // ignore
       }

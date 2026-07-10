@@ -10,6 +10,7 @@ export type BoardEngagementEvent = {
   cardId: string;
   likeCount: number;
   commentCount: number;
+  changeType?: "like" | "comment";
   updatedAt: string;
 };
 
@@ -35,21 +36,10 @@ type BoardEntry = {
   remove: () => void;
 };
 
-// Module-level singleton: one Supabase channel per boardId, shared by all
-// card components on that board. Ref-counted so the channel is removed when
-// the last subscriber unmounts. Keeps us from opening a channel per card.
+// One isolated Supabase client/channel per board, shared by card components on
+// that board. Isolation prevents removing this topic from disrupting another
+// feature that happens to subscribe to the same `board:{boardId}` topic.
 const boards = new Map<string, BoardEntry>();
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-let supabasePromise: Promise<any> | null = null;
-
-function getSupabase() {
-  if (!supabasePromise) {
-    supabasePromise = import("@/lib/supabase/client")
-      .then((m) => m.createPublicSupabaseClient())
-      .catch(() => null);
-  }
-  return supabasePromise;
-}
 
 function dispatch(boardId: string, event: BoardRealtimeEvent) {
   const entry = boards.get(boardId);
@@ -80,10 +70,12 @@ function dispatch(boardId: string, event: BoardRealtimeEvent) {
 async function startBoard(boardId: string, entry: BoardEntry) {
   if (entry.started) return;
   entry.started = true;
-  const supabase = await getSupabase();
-  if (!supabase) return;
-  if (boards.get(boardId) !== entry) return;
   try {
+    const { createIsolatedPublicSupabaseClient } = await import(
+      "@/lib/supabase/client"
+    );
+    if (boards.get(boardId) !== entry) return;
+    const supabase = createIsolatedPublicSupabaseClient();
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const channel = (supabase as any)
       .channel(`board:${boardId}`)

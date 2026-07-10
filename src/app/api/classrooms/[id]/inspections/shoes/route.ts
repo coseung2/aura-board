@@ -5,6 +5,7 @@ import { getCurrentUser } from "@/lib/auth";
 import { getCurrentStudent } from "@/lib/student-auth";
 import { hasPermission } from "@/lib/bank-permissions";
 import { parseDateOrNull, todayDateString } from "@/lib/inspector-findings";
+import { announceClassroomMorningChange } from "@/lib/realtime-broadcast";
 
 const Body = z.object({
   findings: z
@@ -166,6 +167,12 @@ export async function POST(
       });
     }
   });
+
+  await announceClassroomMorningChange(
+    classroomId,
+    "shoe_inspection",
+    dateStr,
+  );
 
   return NextResponse.json({ savedAt: now.toISOString() });
 }

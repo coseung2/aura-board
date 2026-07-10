@@ -188,6 +188,21 @@ export type MorningSummary = {
   readingChampions?: ReadingChampion[];
 };
 
+export type CleaningDutyItem = {
+  id: string;
+  studentId: string;
+  studentName: string;
+  studentNumber: number | null;
+  dutyDate: string;
+  source: string;
+  assignedAt: string;
+};
+
+export type CleaningDutyResponse = {
+  date: string;
+  duties: CleaningDutyItem[];
+};
+
 // ---- Reading champions (독서왕) --------------------------------------
 // Surfaced on the teacher morning dashboard. Scoring formula is TBD on the
 // backend; the UI only presents the score, it does not encode policy.
@@ -210,6 +225,20 @@ export async function fetchMorningSummary(
   });
   if (!res.ok) throw new Error(await errorMessage(res));
   return (await res.json()) as MorningSummary;
+}
+
+// GET /api/classrooms/:id/cleaning-duty
+export async function fetchCleaningDuties(
+  classroomId: string,
+  date?: string,
+): Promise<CleaningDutyResponse> {
+  const query = date ? `?date=${encodeURIComponent(date)}` : "";
+  const res = await fetch(
+    `/api/classrooms/${classroomId}/cleaning-duty${query}`,
+    { cache: "no-store" },
+  );
+  if (!res.ok) throw new Error(await errorMessage(res));
+  return (await res.json()) as CleaningDutyResponse;
 }
 
 async function errorMessage(res: Response): Promise<string> {

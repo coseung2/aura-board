@@ -33,6 +33,25 @@ export function classroomShowcaseChannelKey(classroomId: string): string {
   return `classroom:${classroomId}:showcase`;
 }
 
+/** Classroom morning checks and duty roster channel. */
+export function classroomMorningChannelKey(classroomId: string): string {
+  if (!classroomId)
+    throw new Error("classroomMorningChannelKey: classroomId required");
+  return `classroom:${classroomId}:morning`;
+}
+
+export type ClassroomMorningRealtimeEvent = {
+  type: "morning_changed";
+  classroomId: string;
+  changeType:
+    | "cleaning_inspection"
+    | "shoe_inspection"
+    | "yellow_card"
+    | "cleaning_duty";
+  date: string;
+  updatedAt: string;
+};
+
 export type ShowcaseRealtimeEvent =
   | {
       type: "showcase_added";
@@ -60,6 +79,7 @@ export type BoardRealtimeEvent =
       cardId: string;
       likeCount: number;
       commentCount: number;
+      changeType?: "like" | "comment";
       updatedAt: string;
     }
   | {

@@ -4,6 +4,7 @@ import { db } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
 import { parseDateOrNull, todayDateString } from "@/lib/inspector-findings";
 import { getTodayCleaningDuty } from "@/lib/yellow-card";
+import { announceClassroomMorningChange } from "@/lib/realtime-broadcast";
 
 /**
  * GET  /api/classrooms/:id/cleaning-duty
@@ -159,6 +160,12 @@ export async function POST(
       added += 1;
     }
   }
+
+  await announceClassroomMorningChange(
+    classroomId,
+    "cleaning_duty",
+    dateStr,
+  );
 
   return NextResponse.json({ date: dateStr, added });
 }
