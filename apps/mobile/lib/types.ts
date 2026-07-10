@@ -423,6 +423,8 @@ export type PortfolioCardDTO = {
   title: string;
   content: string;
   color: string | null;
+  width: number;
+  height: number;
   imageUrl: string | null;
   thumbUrl: string | null;
   linkUrl: string | null;
@@ -434,6 +436,17 @@ export type PortfolioCardDTO = {
   fileName: string | null;
   fileSize: number | null;
   fileMimeType: string | null;
+  externalAuthorName: string | null;
+  studentAuthorName: string | null;
+  authorName: string | null;
+  likeCount: number;
+  commentCount: number;
+  authors: Array<{
+    id: string;
+    studentId: string | null;
+    displayName: string;
+    order: number;
+  }>;
   attachments: Array<{
     id: string;
     kind: string;
@@ -484,15 +497,16 @@ export type PortfolioStudentDTO = {
   cards: PortfolioCardDTO[];
 };
 
-export type ParentPortfolioResponse = {
+export type ParentFeedResponse = {
   child: {
     id: string;
     name: string;
     number: number | null;
     classroomId: string;
+    classroomName: string;
   };
-  ownCards: PortfolioCardDTO[];
-  classroomShowcase: ShowcaseEntryDTO[];
+  items: PortfolioCardDTO[];
+  nextCursor: string | null;
 };
 
 // ─── Parent Child-Link DTO types ───

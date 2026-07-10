@@ -453,6 +453,12 @@ export const wallet = {
 export const parent = {
   linkCodeLength: 5,
   navMinWidth: 80,
+  feedHeaderNameMaxWidth: 120,
+  feedChildNameMaxWidth: 84,
+  feedTabMinHeight: 52,
+  feedPostHeaderMinHeight: 60,
+  feedAvatarSize: 40,
+  feedPlayButtonSize: 56,
   childAvatarSize: 48,
   childDetailAvatarSize: 56,
   doneIconSize: 56,

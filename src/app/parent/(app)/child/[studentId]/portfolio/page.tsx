@@ -19,7 +19,12 @@ export default async function ParentChildPortfolioPage({
   const { studentId } = await params;
   const child = await db.student.findUnique({
     where: { id: studentId },
-    select: { id: true, name: true },
+    select: {
+      id: true,
+      name: true,
+      number: true,
+      classroom: { select: { name: true } },
+    },
   });
   if (!child) {
     return (
@@ -28,5 +33,12 @@ export default async function ParentChildPortfolioPage({
       </div>
     );
   }
-  return <ParentPortfolioView childId={child.id} childName={child.name} />;
+  return (
+    <ParentPortfolioView
+      childId={child.id}
+      childName={child.name}
+      childNumber={child.number}
+      classroomName={child.classroom.name}
+    />
+  );
 }

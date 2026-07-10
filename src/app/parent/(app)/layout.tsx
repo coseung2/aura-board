@@ -77,7 +77,7 @@ export default async function ParentAppLayout({ children }: { children: ReactNod
         canSwitchToTeacher={Boolean(teacherRole)}
         teacherSwitchHref={hasMatchingTeacherSession ? "/dashboard" : "/login?from=/dashboard"}
       />
-      {children}
+      <div className="parent-app-content">{children}</div>
       <SessionWatchdog />
     </>
   );

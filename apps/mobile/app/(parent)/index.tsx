@@ -1,21 +1,15 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
+  ScrollView,
   StyleSheet,
   Text,
   View,
 } from "react-native";
-import { useRouter, type Href } from "expo-router";
+import { useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
-import {
-  colors,
-  iconSizes,
-  parent,
-  spacing,
-  typography,
-} from "../../theme/tokens";
-import { ApiError, apiFetch } from "../../lib/api";
+import { ApiError, parentApiFetch } from "../../lib/api";
 import {
   clearParentSession,
   loadParentCache,
@@ -26,301 +20,389 @@ import type {
   ParentChild,
   ParentChildrenResponse,
   ParentPendingLink,
+  PortfolioCardDTO,
 } from "../../lib/types";
+import { useParentFeed } from "../../hooks/use-parent-feed";
+import { CardDetailModal } from "../../components/CardDetailModal";
+import { ParentBottomNav } from "../../components/parent-bottom-nav";
+import {
+  ParentFeedCard,
+  toParentFeedBoardCard,
+} from "../../components/parent-feed-card";
 import {
   AppButton,
+  AppHeader,
+  ControlPressable,
   EmptyState,
   SurfaceCard,
-  SurfacePressable,
 } from "../../components/ui";
+import {
+  borders,
+  colors,
+  iconSizes,
+  parent,
+  radii,
+  spacing,
+  typography,
+} from "../../theme/tokens";
 
 export default function ParentHome() {
   const router = useRouter();
+  const listRef = useRef<FlatList<PortfolioCardDTO>>(null);
   const [parentName, setParentName] = useState("학부모");
   const [children, setChildren] = useState<ParentChild[]>([]);
   const [pendingLinks, setPendingLinks] = useState<ParentPendingLink[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [selectedChildId, setSelectedChildId] = useState<string | null>(null);
+  const [childrenLoading, setChildrenLoading] = useState(true);
+  const [childrenError, setChildrenError] = useState<string | null>(null);
+  const [openCard, setOpenCard] = useState<PortfolioCardDTO | null>(null);
 
-  useEffect(() => {
-    let mounted = true;
-    (async () => {
+  const handleUnauthorized = useCallback(async () => {
+    await clearParentSession();
+    router.replace(
+      "/(parent)/login?error=로그인이 만료되었어요. 다시 로그인해 주세요.",
+    );
+  }, [router]);
+
+  const loadChildren = useCallback(
+    async (showLoading: boolean) => {
+      if (showLoading) setChildrenLoading(true);
       const cached = await loadParentCache();
-      if (mounted && cached?.name) setParentName(cached.name);
+      if (cached?.name) setParentName(cached.name);
 
       const token = await loadParentToken();
       if (!token) {
-        if (mounted) {
-          router.replace("/(parent)/login");
-        }
+        router.replace("/(parent)/login");
         return;
       }
 
       try {
-        const res = await apiFetch<ParentChildrenResponse>(
+        const response = await parentApiFetch<ParentChildrenResponse>(
           "/api/parent/children",
-          { parentAuth: true },
         );
-        if (mounted) {
-          const nextParentName = res.parent.name || "학부모";
-          void saveParentCache({
-            id: res.parent.id,
-            name: nextParentName,
-            email: res.parent.email,
-            linkedStudentIds: res.children.map((child) => child.studentId),
-          });
-          setParentName(nextParentName);
-          setChildren(res.children);
-          setPendingLinks(res.pendingLinks);
-          setError(null);
+        const nextParentName = response.parent.name || "학부모";
+        void saveParentCache({
+          id: response.parent.id,
+          name: nextParentName,
+          email: response.parent.email,
+          linkedStudentIds: response.children.map((child) => child.studentId),
+        });
+        setParentName(nextParentName);
+        setChildren(response.children);
+        setPendingLinks(response.pendingLinks);
+        setSelectedChildId((current) =>
+          response.children.some((child) => child.studentId === current)
+            ? current
+            : response.children[0]?.studentId ?? null,
+        );
+        setChildrenError(null);
+      } catch (cause) {
+        if (cause instanceof ApiError && cause.status === 401) {
+          await handleUnauthorized();
+          return;
         }
-      } catch (e) {
-        if (mounted) {
-          if (e instanceof ApiError && e.status === 401) {
-            await clearParentSession();
-            router.replace(
-              "/(parent)/login?error=로그인이 만료되었어요. 다시 로그인해 주세요.",
-            );
-            return;
-          }
-          setError("자녀 목록을 불러오지 못했어요.");
-          setChildren([]);
-          setPendingLinks([]);
-        }
+        setChildrenError("자녀 정보를 불러오지 못했어요.");
       } finally {
-        if (mounted) setLoading(false);
+        setChildrenLoading(false);
       }
-    })();
-    return () => {
-      mounted = false;
-    };
-  }, [router]);
+    },
+    [handleUnauthorized, router],
+  );
+
+  useEffect(() => {
+    void loadChildren(true);
+  }, [loadChildren]);
+
+  const feed = useParentFeed({
+    childId: selectedChildId,
+    onUnauthorized: handleUnauthorized,
+  });
+
+  const selectedChild =
+    children.find((child) => child.studentId === selectedChildId) ?? null;
+  const modalCard = useMemo(
+    () =>
+      openCard
+        ? toParentFeedBoardCard(
+            openCard,
+            feed.child?.name ?? selectedChild?.name ?? "자녀",
+          )
+        : null,
+    [feed.child?.name, openCard, selectedChild?.name],
+  );
+
+  const selectChild = useCallback((studentId: string) => {
+    setOpenCard(null);
+    setSelectedChildId(studentId);
+    listRef.current?.scrollToOffset({ offset: 0, animated: false });
+  }, []);
+
+  const handleRefresh = useCallback(async () => {
+    await Promise.all([loadChildren(false), feed.refresh()]);
+  }, [feed, loadChildren]);
 
   const handleLogout = useCallback(async () => {
     await clearParentSession();
     router.replace("/");
   }, [router]);
 
-  const firstClassroomId = children.find((child) => child.classroom?.id)?.classroom?.id;
-
-  if (loading) {
+  if (childrenLoading) {
     return (
       <SafeAreaView style={styles.container} edges={["top", "bottom"]}>
-        <View style={styles.loadingCenter}>
+        <View style={styles.center}>
           <ActivityIndicator size="large" color={colors.accent} />
-          <Text style={styles.loadingText}>불러오는 중…</Text>
+          <Text selectable style={styles.mutedText}>
+            자녀 피드를 준비하고 있어요.
+          </Text>
         </View>
       </SafeAreaView>
     );
   }
 
+  const childName = feed.child?.name ?? selectedChild?.name ?? "자녀";
+  const isSwitchingChild = Boolean(
+    selectedChildId && feed.child?.id !== selectedChildId,
+  );
+  const visibleItems = isSwitchingChild ? [] : feed.items;
+
   return (
-    <SafeAreaView style={styles.container} edges={["top", "bottom"]}>
-      <View style={styles.header}>
-        <View style={styles.headerCopy}>
-          <Text style={styles.greeting}>{parentName}님, 안녕하세요!</Text>
-          <Text style={styles.subText}>
-            자녀 {children.length}명 · 활동을 확인하세요
-            {pendingLinks.length > 0 ? ` · 승인 대기 ${pendingLinks.length}건` : ""}
+    <SafeAreaView style={styles.container} edges={["top"]}>
+      <AppHeader
+        title="자녀 피드"
+        right={
+          <Text selectable style={styles.parentName} numberOfLines={1}>
+            {parentName}
           </Text>
-        </View>
-        <View style={styles.actions}>
-          {firstClassroomId ? (
-            <AppButton
-              variant="secondary"
-              onPress={() =>
-                router.push({
-                  pathname: "/(parent)/showcase",
-                  params: { classroomId: firstClassroomId },
-                } as unknown as Href)
-              }
-            >
-              자랑해요
-            </AppButton>
-          ) : null}
-          <AppButton
-            onPress={() => router.push("./link-child")}
-          >
-            + 자녀 연결
-          </AppButton>
-          <AppButton
-            variant="secondary"
-            onPress={handleLogout}
-          >
-            로그아웃
-          </AppButton>
-        </View>
-      </View>
-
-      {error ? (
-        <SurfaceCard style={styles.errorBanner}>
-          <Text style={styles.errorBannerText}>{error}</Text>
-        </SurfaceCard>
-      ) : null}
-
-      <FlatList
-        data={children}
-        keyExtractor={(c) => c.id}
-        contentContainerStyle={styles.listContent}
-        renderItem={({ item }) => (
-          <SurfacePressable
-            style={styles.childCard}
-            onPress={() =>
-              router.push(`/(parent)/child/${item.studentId}`)
-            }
-          >
-            <View style={styles.childAvatar}>
-              <Text style={styles.childEmoji}>🧒</Text>
-            </View>
-            <View style={styles.childInfo}>
-              <Text style={styles.childName}>{item.name}</Text>
-              <Text style={styles.childClass}>
-                {item.classroom?.name ?? "학급 미배정"}
-                {item.number != null ? ` · ${item.number}번` : ""}
-              </Text>
-            </View>
-            <Text style={styles.chevron}>›</Text>
-          </SurfacePressable>
-        )}
-        ListHeaderComponent={
-          pendingLinks.length > 0 ? (
-            <View style={styles.pendingSection}>
-              <Text style={styles.pendingTitle}>승인 대기 중</Text>
-              {pendingLinks.map((item) => (
-                <PendingLinkCard key={item.id} item={item} />
-              ))}
-            </View>
-          ) : null
-        }
-        ListEmptyComponent={
-          <EmptyState
-            style={styles.emptyState}
-            icon={<Text style={styles.emptyEmoji}>👨‍👩‍👧</Text>}
-            title="연결된 자녀가 없어요"
-            description="학교에서 자녀 연결을 설정하면 여기에 나타나요."
-            action={(
-              <AppButton onPress={() => router.push("./link-child")}>
-                자녀 연결하기
-              </AppButton>
-            )}
-          />
         }
       />
+
+      <FlatList
+        ref={listRef}
+        data={visibleItems}
+        keyExtractor={(item) => item.id}
+        renderItem={({ item }) => (
+          <ParentFeedCard
+            card={item}
+            childName={childName}
+            onOpen={setOpenCard}
+          />
+        )}
+        contentInsetAdjustmentBehavior="automatic"
+        contentContainerStyle={styles.listContent}
+        refreshing={feed.refreshing}
+        onRefresh={handleRefresh}
+        onEndReached={() => void feed.loadMore()}
+        onEndReachedThreshold={0.4}
+        ListHeaderComponent={
+          <View style={styles.listHeader}>
+            {children.length > 0 ? (
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.childStrip}
+                accessibilityRole="tablist"
+              >
+                {children.map((child) => {
+                  const selected = child.studentId === selectedChildId;
+                  return (
+                    <ControlPressable
+                      key={child.studentId}
+                      style={[
+                        styles.childChip,
+                        selected && styles.childChipSelected,
+                      ]}
+                      onPress={() => selectChild(child.studentId)}
+                      accessibilityRole="tab"
+                      accessibilityState={{ selected }}
+                      accessibilityLabel={`${child.name}, ${child.classroom?.name ?? "학급 미배정"}`}
+                    >
+                      <View
+                        style={[
+                          styles.childAvatar,
+                          selected && styles.childAvatarSelected,
+                        ]}
+                      >
+                        <Text style={styles.childAvatarText}>
+                          {child.name.slice(0, 1)}
+                        </Text>
+                      </View>
+                      <Text
+                        selectable
+                        style={[
+                          styles.childChipText,
+                          selected && styles.childChipTextSelected,
+                        ]}
+                        numberOfLines={1}
+                      >
+                        {child.name}
+                      </Text>
+                    </ControlPressable>
+                  );
+                })}
+              </ScrollView>
+            ) : null}
+
+            {pendingLinks.length > 0 ? (
+              <SurfaceCard style={styles.pendingCard}>
+                <Text selectable style={styles.pendingTitle}>
+                  승인 대기 {pendingLinks.length}건
+                </Text>
+                <Text selectable style={styles.pendingText} numberOfLines={2}>
+                  {pendingLinks.map((item) => item.name).join(", ")} 학생의 연결을
+                  선생님이 확인하고 있어요.
+                </Text>
+              </SurfaceCard>
+            ) : null}
+
+            {selectedChild ? (
+              <View style={styles.profileSummary}>
+                <Text selectable style={styles.profileTitle}>
+                  {childName}의 새 소식
+                </Text>
+                <Text selectable style={styles.profileSubtitle}>
+                  {feed.child?.classroomName ??
+                    selectedChild.classroom?.name ??
+                    "학급 미배정"}
+                  {selectedChild.number != null
+                    ? ` · ${selectedChild.number}번`
+                    : ""}
+                </Text>
+              </View>
+            ) : null}
+          </View>
+        }
+        ListEmptyComponent={
+          feed.loading || isSwitchingChild ? (
+            <View style={styles.feedLoading}>
+              <ActivityIndicator color={colors.accent} />
+              <Text selectable style={styles.mutedText}>
+                게시물을 불러오는 중이에요.
+              </Text>
+            </View>
+          ) : childrenError ? (
+            <EmptyState
+              icon={<Text style={styles.emptyEmoji}>!</Text>}
+              title="자녀 정보를 불러오지 못했어요"
+              description={childrenError}
+              action={<AppButton onPress={() => loadChildren(true)}>다시 시도</AppButton>}
+            />
+          ) : children.length === 0 ? (
+            <EmptyState
+              icon={<Text style={styles.emptyEmoji}>👨‍👩‍👧</Text>}
+              title="연결된 자녀가 없어요"
+              description="자녀를 연결하면 새 게시물이 이 피드에 나타나요."
+              action={
+                <AppButton onPress={() => router.push("/(parent)/link-child")}>
+                  자녀 연결하기
+                </AppButton>
+              }
+            />
+          ) : feed.error ? (
+            <EmptyState
+              icon={<Text style={styles.emptyEmoji}>↻</Text>}
+              title="피드를 불러오지 못했어요"
+              description={feed.error}
+              action={<AppButton onPress={feed.retry}>다시 시도</AppButton>}
+            />
+          ) : (
+            <EmptyState
+              icon={<Text style={styles.emptyEmoji}>📭</Text>}
+              title="아직 게시물이 없어요"
+              description="자녀가 보드에 작품을 올리면 이곳에서 바로 확인할 수 있어요."
+            />
+          )
+        }
+        ListFooterComponent={
+          feed.loadingMore ? (
+            <ActivityIndicator style={styles.footerLoader} color={colors.accent} />
+          ) : feed.hasMore ? (
+            <View style={styles.footerSpace} />
+          ) : null
+        }
+      />
+
+      <ParentBottomNav
+        classroomId={feed.child?.classroomId ?? selectedChild?.classroom?.id}
+        onFeedPress={() =>
+          listRef.current?.scrollToOffset({ offset: 0, animated: true })
+        }
+        onLogout={handleLogout}
+      />
+      <CardDetailModal card={modalCard} onClose={() => setOpenCard(null)} />
     </SafeAreaView>
   );
 }
 
-function PendingLinkCard({ item }: { item: ParentPendingLink }) {
-  return (
-    <SurfaceCard style={styles.pendingCard}>
-      <View style={styles.childAvatar}>
-        <Text style={styles.childEmoji}>🕒</Text>
-      </View>
-      <View style={styles.childInfo}>
-        <Text style={styles.childName}>{item.name}</Text>
-        <Text style={styles.childClass}>
-          {item.classroom?.name ?? "학급 미배정"}
-          {item.number != null ? ` · ${item.number}번` : ""}
-        </Text>
-        <Text style={styles.pendingMeta}>
-          선생님 승인 대기 · {formatPendingExpiry(item.expiresAt)}
-        </Text>
-      </View>
-    </SurfaceCard>
-  );
-}
-
-function formatPendingExpiry(value: string): string {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "만료일 확인 중";
-  const days = Math.ceil((date.getTime() - Date.now()) / 86_400_000);
-  if (days <= 0) return "오늘 만료";
-  return `${days}일 후 만료`;
-}
-
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg },
-  loadingCenter: {
+  center: {
     flex: 1,
     alignItems: "center",
     justifyContent: "center",
     gap: spacing.md,
+    padding: spacing.xxl,
   },
-  loadingText: { ...typography.body, color: colors.textMuted },
-  header: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "flex-end",
-    paddingHorizontal: spacing.xxl,
-    paddingTop: spacing.xl,
-    paddingBottom: spacing.lg,
-  },
-  greeting: { ...typography.display, color: colors.text },
-  subText: {
-    ...typography.body,
+  parentName: {
+    ...typography.label,
     color: colors.textMuted,
-    marginTop: spacing.xs,
-  },
-  actions: {
-    flexDirection: "row",
-    alignItems: "center",
-    flexWrap: "wrap",
-    gap: spacing.md,
-  },
-  headerCopy: { flex: 1 },
-  errorBanner: {
-    marginHorizontal: spacing.xxl,
-    marginBottom: spacing.lg,
-    padding: spacing.lg,
-    backgroundColor: colors.statusReturnedBg,
-  },
-  errorBannerText: {
-    ...typography.body,
-    color: colors.statusReturnedText,
-    textAlign: "center",
+    maxWidth: parent.feedHeaderNameMaxWidth,
   },
   listContent: {
-    paddingHorizontal: spacing.xxl,
-    paddingBottom: spacing.xxl,
+    paddingHorizontal: spacing.lg,
+    paddingBottom: spacing.xl,
     gap: spacing.lg,
   },
-  pendingSection: {
-    gap: spacing.md,
-  },
-  pendingTitle: { ...typography.title, color: colors.text },
-  pendingCard: {
-    flexDirection: "row",
+  listHeader: { gap: spacing.lg, paddingTop: spacing.lg },
+  childStrip: { gap: spacing.sm, paddingRight: spacing.lg },
+  childChip: {
+    minWidth: parent.navMinWidth,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.sm,
     alignItems: "center",
-    padding: spacing.xl,
-    gap: spacing.lg,
-    backgroundColor: colors.statusSubmittedBg,
+    gap: spacing.xs,
+    borderColor: colors.transparent,
+    backgroundColor: colors.transparent,
   },
-  pendingMeta: { ...typography.micro, color: colors.statusSubmittedText },
-  childCard: {
-    flexDirection: "row",
-    alignItems: "center",
-    padding: spacing.xl,
-    gap: spacing.lg,
+  childChipSelected: {
+    borderColor: colors.accent,
+    backgroundColor: colors.accentTintedBg,
   },
   childAvatar: {
-    width: parent.childDetailAvatarSize,
-    height: parent.childDetailAvatarSize,
-    borderRadius: parent.childDetailAvatarSize,
-    backgroundColor: colors.accentTintedBg,
+    width: parent.childAvatarSize,
+    height: parent.childAvatarSize,
+    borderRadius: radii.pill,
     alignItems: "center",
     justifyContent: "center",
+    backgroundColor: colors.surfaceAlt,
+    borderWidth: borders.hairline,
+    borderColor: colors.border,
   },
-  childEmoji: { fontSize: iconSizes.lg },
-  childInfo: { flex: 1, gap: spacing.xs },
-  childName: { ...typography.subtitle, color: colors.text },
-  childClass: { ...typography.body, color: colors.textMuted },
-  chevron: {
-    fontSize: iconSizes.lg,
-    color: colors.textFaint,
-    fontWeight: "300",
+  childAvatarSelected: { borderColor: colors.accent },
+  childAvatarText: { ...typography.subtitle, color: colors.accentTintedText },
+  childChipText: {
+    ...typography.label,
+    color: colors.textMuted,
+    maxWidth: parent.feedChildNameMaxWidth,
   },
-  emptyState: {
-    paddingTop: spacing.xxxl,
+  childChipTextSelected: { color: colors.accentTintedText },
+  pendingCard: {
+    padding: spacing.lg,
+    gap: spacing.xs,
+    backgroundColor: colors.statusSubmittedBg,
   },
+  pendingTitle: { ...typography.label, color: colors.statusSubmittedText },
+  pendingText: { ...typography.body, color: colors.textMuted },
+  profileSummary: { gap: spacing.xs },
+  profileTitle: { ...typography.title, color: colors.text },
+  profileSubtitle: { ...typography.body, color: colors.textMuted },
+  feedLoading: {
+    minHeight: parent.portfolioEmptyMinHeight,
+    alignItems: "center",
+    justifyContent: "center",
+    gap: spacing.md,
+  },
+  mutedText: { ...typography.body, color: colors.textMuted, textAlign: "center" },
   emptyEmoji: { fontSize: iconSizes.empty },
+  footerLoader: { padding: spacing.xl },
+  footerSpace: { height: spacing.xl },
 });
