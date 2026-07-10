@@ -8,6 +8,10 @@ import {
 } from "./BoardSettingsPanel";
 import type { AuraBoardSettings } from "./AuraEvaluationControl";
 import type { SubjectOrder } from "@/lib/subject-order";
+import {
+  BOARD_SECTIONS_UPDATED_EVENT,
+  type BoardSectionsUpdatedDetail,
+} from "@/lib/board-section-events";
 
 type Props = {
   boardId: string;
@@ -59,10 +63,34 @@ export function BoardSettingsLauncher({
   const [open, setOpen] = useState(false);
   const [anonymousAuthorState, setAnonymousAuthorState] =
     useState(anonymousAuthor);
+  const [sectionState, setSectionState] = useState(sections);
 
   useEffect(() => {
     setAnonymousAuthorState(anonymousAuthor);
   }, [anonymousAuthor]);
+
+  useEffect(() => {
+    setSectionState(sections);
+  }, [sections]);
+
+  useEffect(() => {
+    function handleSectionsUpdated(event: Event) {
+      const detail = (event as CustomEvent<BoardSectionsUpdatedDetail>).detail;
+      if (!detail || detail.boardId !== boardId) return;
+      setSectionState(detail.sections);
+    }
+
+    window.addEventListener(
+      BOARD_SECTIONS_UPDATED_EVENT,
+      handleSectionsUpdated,
+    );
+    return () => {
+      window.removeEventListener(
+        BOARD_SECTIONS_UPDATED_EVENT,
+        handleSectionsUpdated,
+      );
+    };
+  }, [boardId]);
 
   return (
     <>
@@ -87,7 +115,7 @@ export function BoardSettingsLauncher({
           initialThumbnailUrl={thumbnailUrl}
           boardId={boardId}
           layout={layout}
-          initialSections={sections}
+          initialSections={sectionState}
           initialAnonymousAuthor={anonymousAuthorState}
           initialBoardTheme={boardTheme}
           initialShareMode={shareMode}
