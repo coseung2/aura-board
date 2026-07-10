@@ -77,9 +77,7 @@ export function PortfolioRoster({
                   aria-selected={isSelected}
                   aria-label={`${s.name}${
                     s.number != null ? `, 출석번호 ${s.number}` : ""
-                  }, 작품 ${s.cardCount}개${
-                    s.showcaseCount > 0 ? `, 자랑해요 ${s.showcaseCount}개` : ""
-                  }${isSelf ? ", 나" : ""}`}
+                  }, 작품 ${s.cardCount}개${isSelf ? ", 나" : ""}`}
                   title={s.name}
                   onClick={() => onSelect(s.id)}
                 >
@@ -102,14 +100,6 @@ export function PortfolioRoster({
                     >
                       작품 {s.cardCount}개
                     </span>
-                    {s.showcaseCount > 0 && (
-                      <span
-                        className="portfolio-roster-showcase"
-                        aria-label={`자랑해요 ${s.showcaseCount}개`}
-                      >
-                        🌟 {s.showcaseCount}
-                      </span>
-                    )}
                   </span>
                 </button>
               </li>

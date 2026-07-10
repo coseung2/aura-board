@@ -2,7 +2,9 @@ import { describe, expect, it } from "vitest";
 import {
   computeShadowAllianceRound,
   createShadowAllianceGame,
+  endShadowAllianceGame,
   revealShadowAllianceRound,
+  resetShadowAllianceGame,
   startShadowAllianceGame,
   submitShadowAllianceNumber,
   toShadowAllianceSnapshot,
@@ -68,5 +70,17 @@ describe("Shadow Alliance engine", () => {
     const revealed = revealShadowAllianceRound(active);
     expect(active.phase).toBe("playing");
     expect(revealed.phase).toBe("revealing");
+  });
+
+  it("ends an active game and can reset it to the waiting state", () => {
+    const active = startShadowAllianceGame({
+      ...createShadowAllianceGame(),
+      players: [player("black", "black", null), player("white", "white", null)],
+    });
+    const ended = endShadowAllianceGame({ ...active, timerRunning: true });
+
+    expect(ended.phase).toBe("final");
+    expect(ended.timerRunning).toBe(false);
+    expect(resetShadowAllianceGame().phase).toBe("lobby");
   });
 });

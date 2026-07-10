@@ -345,6 +345,11 @@
   color: var(--color-text);
 }
 
+.auth-mode-switch:disabled {
+  cursor: wait;
+  opacity: 0.65;
+}
+
 .auth-logout-icon {
   width: 17px;
   height: 17px;

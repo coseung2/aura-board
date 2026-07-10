@@ -3,10 +3,7 @@ import { db } from "@/lib/db";
 import { resolvePortfolioViewer } from "@/lib/portfolio-acl";
 import { EXCLUDED_BOARD_LAYOUTS } from "@/lib/portfolio-acl-pure";
 import { mapPortfolioCard } from "@/lib/portfolio-card-mapper";
-import type {
-  PortfolioCardDTO,
-  ShowcaseEntryDTO,
-} from "@/lib/portfolio-dto";
+import type { PortfolioCardDTO } from "@/lib/portfolio-dto";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -85,57 +82,9 @@ export async function GET(req: Request) {
     orderBy: { createdAt: "desc" },
   });
 
-  // 자녀 학급의 자랑해요. 카드 자체가 EXCLUDED layout 이면 자랑해요였어도
-  // 학부모/학생 노출 X (방어적 — POST /api/showcase 가 이미 막지만 과거
-  // 데이터 보호).
-  const showcase = await db.showcaseEntry.findMany({
-    where: {
-      classroomId: child.classroomId,
-      card: {
-        board: { layout: { notIn: [...EXCLUDED_BOARD_LAYOUTS] } },
-        OR: [{ queueStatus: null }, { queueStatus: { not: "played" } }],
-      },
-    },
-    orderBy: { createdAt: "desc" },
-    take: 30,
-    include: {
-      student: { select: { id: true, name: true, number: true } },
-      card: {
-        include: {
-          author: { select: { name: true } },
-          studentAuthor: { select: { name: true } },
-          board: {
-            select: { id: true, slug: true, title: true, layout: true, anonymousAuthor: true },
-          },
-          section: { select: { id: true, title: true } },
-          authors: {
-            orderBy: { order: "asc" },
-            select: {
-              id: true,
-              studentId: true,
-              displayName: true,
-              order: true,
-            },
-          },
-          attachments: { orderBy: { order: "asc" } },
-          showcaseEntries: { select: { studentId: true } },
-          _count: { select: { likes: true, comments: true } },
-        },
-      },
-    },
-  });
-
   const ownCardsDTO: PortfolioCardDTO[] = ownCards.map((c) =>
     mapPortfolioCard(c, null)
   );
-  const showcaseDTO: ShowcaseEntryDTO[] = showcase.map((e) => ({
-    cardId: e.cardId,
-    studentId: e.studentId,
-    studentName: e.student.name,
-    studentNumber: e.student.number,
-    card: mapPortfolioCard(e.card, null),
-    createdAt: e.createdAt.toISOString(),
-  }));
 
   return NextResponse.json({
     child: {
@@ -145,6 +94,5 @@ export async function GET(req: Request) {
       classroomId: child.classroomId,
     },
     ownCards: ownCardsDTO,
-    classroomShowcase: showcaseDTO,
   });
 }

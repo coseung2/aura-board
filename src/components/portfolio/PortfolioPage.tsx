@@ -1,15 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useRef, useState } from "react";
-import type {
-  PortfolioCardDTO,
-  PortfolioRosterDTO,
-} from "@/lib/portfolio-dto";
+import { useEffect, useState } from "react";
+import type { PortfolioRosterDTO } from "@/lib/portfolio-dto";
 import { PortfolioRoster } from "./PortfolioRoster";
 import { PortfolioStudentView } from "./PortfolioStudentView";
-import { ShowcaseLimitModal } from "./ShowcaseLimitModal";
-import { useShowcaseToggle } from "./useShowcaseToggle";
 
 type Props = {
   initialRoster: PortfolioRosterDTO;
@@ -24,7 +19,7 @@ export function PortfolioPage({
   selfStudentId,
   defaultStudentId,
 }: Props) {
-  const [roster, setRoster] = useState(initialRoster);
+  const roster = initialRoster;
   // 모바일에선 좌측 학생 클릭 시 우측 stack push 패턴 — 뷰포트 폭으로 분기
   const [isMobile, setIsMobile] = useState(false);
   useEffect(() => {
@@ -40,41 +35,6 @@ export function PortfolioPage({
   const [selectedStudentId, setSelectedStudentId] = useState<string | null>(
     initialStudentId
   );
-
-  // 자식 컴포넌트의 카드 state 패치 함수 등록 (자랑해요 토글 후 동기화)
-  const cardPatcherRef = useRef<((cardId: string, on: boolean) => void) | null>(
-    null
-  );
-
-  function handleAfterToggle(cardId: string, on: boolean) {
-    cardPatcherRef.current?.(cardId, on);
-    // 좌측 로스터 자랑해요 카운트도 업데이트
-    if (selfStudentId) {
-      setRoster((r) => ({
-        ...r,
-        students: r.students.map((s) =>
-          s.id === selfStudentId
-            ? {
-                ...s,
-                showcaseCount: Math.max(
-                  0,
-                  s.showcaseCount + (on ? 1 : -1)
-                ),
-              }
-            : s
-        ),
-      }));
-    }
-  }
-
-  const { toggle, busy, limitModal, replaceWith, dismissLimit } =
-    useShowcaseToggle({
-      onAfterToggle: handleAfterToggle,
-    });
-
-  function onCardToggle(card: PortfolioCardDTO) {
-    void toggle(card);
-  }
 
   // 모바일 stack 모드 — 학생 선택 시 listView 숨기고 detail 만 표시
   const [mobileShowDetail, setMobileShowDetail] = useState(false);
@@ -194,11 +154,6 @@ export function PortfolioPage({
               key={selectedStudentId}
               studentId={selectedStudentId}
               selfStudentId={selfStudentId}
-              busyCardId={busy}
-              onToggleShowcase={onCardToggle}
-              registerCardPatcher={(p) => {
-                cardPatcherRef.current = p;
-              }}
             />
           ) : (
             <div className="portfolio-empty">
@@ -206,14 +161,6 @@ export function PortfolioPage({
             </div>
           )}
         </main>
-
-        {limitModal && (
-          <ShowcaseLimitModal
-            showcased={limitModal.showcased}
-            onCancel={dismissLimit}
-            onConfirm={(removeId) => void replaceWith(removeId)}
-          />
-        )}
       </div>
     </>
   );

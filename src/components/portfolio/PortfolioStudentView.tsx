@@ -11,24 +11,13 @@ import { portfolioCardToCardData } from "./portfolio-card-adapter";
 
 type Props = {
   studentId: string;
-  /** 본인 학생 id — 자랑해요 토글 권한 결정용. 학부모/교사 viewer 면 null */
+  /** 본인 학생 id. 학부모/교사 viewer 면 null */
   selfStudentId: string | null;
-  /** 자랑해요 토글 진행 중 카드 id (낙관적 표시 + 메뉴 비활성) */
-  busyCardId: string | null;
-  /** 토글 요청 — 부모(PortfolioPage) 가 useShowcaseToggle 로 처리 */
-  onToggleShowcase: (card: PortfolioCardDTO) => void;
-  /** 부모가 자랑해요 변경 시 호출 → 이 컴포넌트의 카드 state 패치용 */
-  registerCardPatcher?: (
-    patch: (cardId: string, on: boolean) => void
-  ) => void;
 };
 
 export function PortfolioStudentView({
   studentId,
   selfStudentId,
-  busyCardId,
-  onToggleShowcase,
-  registerCardPatcher,
 }: Props) {
   const [data, setData] = useState<PortfolioStudentDTO | null>(null);
   const [loading, setLoading] = useState(true);
@@ -64,28 +53,6 @@ export function PortfolioStudentView({
   }, [studentId]);
 
   // 부모가 토글 결과를 알리면 이 컴포넌트의 카드 state 패치.
-  useEffect(() => {
-    if (!registerCardPatcher) return;
-    registerCardPatcher((cardId, on) => {
-      setData((prev) =>
-        prev
-          ? {
-              ...prev,
-              cards: prev.cards.map((c) =>
-                c.id === cardId
-                  ? {
-                      ...c,
-                      isShowcasedByMe: on,
-                      hasAnyShowcase: on || c.hasAnyShowcase,
-                    }
-                  : c
-              ),
-            }
-          : prev
-      );
-    });
-  }, [registerCardPatcher]);
-
   if (loading && !data) {
     return (
       <section className="portfolio-student-view is-loading">
@@ -139,24 +106,9 @@ export function PortfolioStudentView({
         </div>
       ) : (
         <div className="portfolio-grid">
-          {data.cards.map((c) => {
-            // 모달에 보이는 카드 객체는 patch state 와 sync — isShowcasedByMe
-            // 변경이 모달에도 반영되도록.
-            const live = data.cards.find((x) => x.id === c.id) ?? c;
-            void live;
-            return (
-              <PortfolioCardItem
-                key={c.id}
-                card={c}
-                canToggleShowcase={
-                  isViewingSelf && selfStudentId !== null
-                }
-                busy={busyCardId === c.id}
-                onToggleShowcase={onToggleShowcase}
-                onOpen={setOpenCard}
-              />
-            );
-          })}
+          {data.cards.map((card) => (
+            <PortfolioCardItem key={card.id} card={card} onOpen={setOpenCard} />
+          ))}
         </div>
       )}
       <CardDetailModal

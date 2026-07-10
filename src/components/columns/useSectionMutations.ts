@@ -83,8 +83,6 @@ export function useSectionMutations({
       if (res.ok) {
         const { section } = await res.json();
         setSections((prev) => [...prev, section].sort(sortSections));
-        // BoardSettingsPanel의 sections state가 props로 동기화되도록 page 재실행.
-        router.refresh();
       }
     } catch (err) {
       console.error(err);
@@ -156,8 +154,6 @@ export function useSectionMutations({
         subjectOrder?: SubjectOrder;
       };
       setSections((prev) => [...prev, ...created].sort(sortSections));
-      // BoardSettingsPanel의 sections state가 props로 동기화되도록 page 재실행.
-      router.refresh();
       return created;
     } finally {
       setSeedingStudents(false);

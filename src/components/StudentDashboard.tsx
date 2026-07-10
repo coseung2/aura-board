@@ -4,7 +4,6 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import type { RealtimeChannel } from "@supabase/supabase-js";
-import { ShowcaseHighlightStrip } from "@/components/portfolio/ShowcaseHighlightStrip";
 import { layoutLabel, layoutThumbnail } from "@/lib/layout-meta";
 import { CharacterAvatar } from "@/components/avatar/CharacterAvatar";
 import type { AvatarMeResponse } from "@/components/avatar/types";
@@ -182,11 +181,6 @@ export function StudentDashboard({
         <h1 className="student-greeting">{studentName}님, 안녕하세요</h1>
         <span className="student-classroom-badge">{classroomName}</span>
       </div>
-
-      <ShowcaseHighlightStrip
-        classroomId={classroomId}
-        hrefBase="/student/showcase"
-      />
 
       <div className="student-overview-row">
         <section className="student-utilities" aria-label="바로가기">

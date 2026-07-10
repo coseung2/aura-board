@@ -6,8 +6,8 @@
  *
  * Multi-identity: a single browser can legitimately carry a NextAuth
  * teacher session, a student_session cookie (from prior testing), and
- * a parent-session cookie (if the teacher is also a parent of a
- * student in another classroom). resolveIdentities returns every
+ * a parent-session cookie for the same email account (if the teacher is also
+ * a parent of a student in another classroom). resolveIdentities returns every
  * resolved credential so predicate OR-ing in card-permissions.ts can
  * surface the widest access the caller actually has.
  *
@@ -19,6 +19,7 @@ import { db } from "./db";
 import { getCurrentUser } from "./auth";
 import { getCurrentStudent } from "./student-auth";
 import { getCurrentParent } from "./parent-session";
+import { isSameAccountPrincipal } from "./account-principal";
 import type {
   Identities,
   Identity,
@@ -37,6 +38,16 @@ export async function resolveIdentities(): Promise<Identities> {
     getCurrentStudent(),
     getCurrentParent(),
   ]);
+
+  // Defense in depth for cookies issued before the login-time handoff was
+  // added: two different accounts must never contribute permissions to the
+  // same request. The teacher session remains the primary session here.
+  const compatibleParentCtx =
+    teacherUser &&
+    parentCtx &&
+    !isSameAccountPrincipal(teacherUser.email, parentCtx.parent.email)
+      ? null
+      : parentCtx;
 
   let teacher: TeacherIdentity | null = null;
   if (teacherUser) {
@@ -61,17 +72,17 @@ export async function resolveIdentities(): Promise<Identities> {
   }
 
   let parent: ParentIdentity | null = null;
-  if (parentCtx?.parent) {
+  if (compatibleParentCtx?.parent) {
     const links = await db.parentChildLink.findMany({
       where: {
-        parentId: parentCtx.parent.id,
+        parentId: compatibleParentCtx.parent.id,
         status: "active",
         deletedAt: null,
       },
       select: { studentId: true },
     });
     parent = {
-      parentId: parentCtx.parent.id,
+      parentId: compatibleParentCtx.parent.id,
       childStudentIds: new Set(links.map((l) => l.studentId)),
     };
   }

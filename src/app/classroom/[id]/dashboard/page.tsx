@@ -2,7 +2,6 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { db } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
-import { EXCLUDED_BOARD_LAYOUTS } from "@/lib/portfolio-acl-pure";
 
 type Props = {
   params: Promise<{ id: string }>;
@@ -10,23 +9,6 @@ type Props = {
 
 function formatNumber(value: number) {
   return value.toLocaleString("ko-KR");
-}
-
-function cardPreview(card: {
-  thumbUrl: string | null;
-  imageUrl: string | null;
-  linkImage: string | null;
-  attachments: Array<{ kind: string; previewUrl: string | null; url: string }>;
-}) {
-  const imageAttachment = card.attachments.find((a) => a.kind === "image");
-  return (
-    card.thumbUrl ??
-    imageAttachment?.previewUrl ??
-    imageAttachment?.url ??
-    card.imageUrl ??
-    card.linkImage ??
-    null
-  );
 }
 
 export default async function ClassroomDashboardPage({ params }: Props) {
@@ -70,28 +52,7 @@ export default async function ClassroomDashboardPage({ params }: Props) {
     notFound();
   }
 
-  const [showcaseEntries, authoredCardCounts] = await Promise.all([
-    db.showcaseEntry.findMany({
-      where: {
-        classroomId: id,
-        card: {
-          board: { layout: { notIn: [...EXCLUDED_BOARD_LAYOUTS] } },
-          OR: [{ queueStatus: null }, { queueStatus: { not: "played" } }],
-        },
-      },
-      orderBy: { createdAt: "desc" },
-      take: 6,
-      include: {
-        student: { select: { id: true, name: true, number: true } },
-        card: {
-          include: {
-            board: { select: { id: true, slug: true, title: true } },
-            attachments: { orderBy: { order: "asc" } },
-          },
-        },
-      },
-    }),
-    db.card.groupBy({
+  const authoredCardCounts = await db.card.groupBy({
       by: ["studentAuthorId"],
       where: {
         studentAuthorId: { not: null },
@@ -99,8 +60,7 @@ export default async function ClassroomDashboardPage({ params }: Props) {
         OR: [{ queueStatus: null }, { queueStatus: { not: "played" } }],
       },
       _count: { _all: true },
-    }),
-  ]);
+  });
 
   const authoredCountByStudent = new Map(
     authoredCardCounts
@@ -167,37 +127,6 @@ export default async function ClassroomDashboardPage({ params }: Props) {
       </section>
 
       <div className="classroom-dashboard-grid">
-        <section className="classroom-dashboard-panel classroom-dashboard-panel-wide">
-          <div className="classroom-dashboard-panel-head">
-            <div>
-              <span>Showcase</span>
-              <h3>자랑해요</h3>
-            </div>
-          </div>
-          {showcaseEntries.length > 0 ? (
-            <div className="classroom-showcase-strip">
-              {showcaseEntries.map((entry) => {
-                const preview = cardPreview(entry.card);
-                return (
-                  <Link
-                    key={entry.id}
-                    href={`/board/${entry.card.board.slug}`}
-                    className="classroom-showcase-card"
-                  >
-                    {preview ? <img src={preview} alt="" /> : <div className="classroom-showcase-fallback">작품</div>}
-                    <span className="classroom-showcase-overlay">
-                      <strong>{entry.card.title || "제목 없음"}</strong>
-                      <small>{entry.student.number ?? "-"}번 {entry.student.name} · {entry.card.board.title}</small>
-                    </span>
-                  </Link>
-                );
-              })}
-            </div>
-          ) : (
-            <p className="classroom-dashboard-empty">아직 자랑해요에 올라온 작품이 없습니다.</p>
-          )}
-        </section>
-
         <section className="classroom-dashboard-panel">
           <div className="classroom-dashboard-panel-head">
             <div>

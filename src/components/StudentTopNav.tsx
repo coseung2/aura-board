@@ -68,11 +68,6 @@ export function StudentTopNav({
               active: pathname.startsWith("/student/portfolio"),
             },
             {
-              href: "/student/showcase",
-              label: "자랑해요",
-              active: pathname.startsWith("/student/showcase"),
-            },
-            {
               href: "/student/reading",
               label: "독서 기록",
               active: readingRecordActive,
@@ -108,34 +103,6 @@ export function StudentTopNav({
         {
           title: "작품",
           links: [
-            {
-              href: "/student/portfolio",
-              label: "포트폴리오",
-              active: pathname.startsWith("/student/portfolio"),
-            },
-            {
-              href: "/student/showcase",
-              label: "자랑해요",
-              active: pathname.startsWith("/student/showcase"),
-            },
-          ],
-        },
-      ],
-    },
-    {
-      id: "showcase",
-      label: "자랑해요",
-      href: "/student/showcase",
-      active: pathname.startsWith("/student/showcase"),
-      groups: [
-        {
-          title: "전시",
-          links: [
-            {
-              href: "/student/showcase",
-              label: "자랑해요",
-              active: pathname.startsWith("/student/showcase"),
-            },
             {
               href: "/student/portfolio",
               label: "포트폴리오",

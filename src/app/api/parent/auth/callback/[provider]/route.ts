@@ -10,6 +10,8 @@ import {
   type ProviderId,
 } from "@/lib/parent-oauth";
 import { createParentSession } from "@/lib/parent-session";
+import { auth, signOut } from "@/lib/auth-config";
+import { isSameAccountPrincipal } from "@/lib/account-principal";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -105,6 +107,16 @@ export async function GET(
   }
 
   // ParentSession 발급
+  // A different account's parent login replaces the teacher session. Matching
+  // emails keep both role sessions so one person can switch roles freely.
+  const teacherSession = await auth().catch(() => null);
+  if (
+    teacherSession?.user &&
+    !isSameAccountPrincipal(teacherSession.user.email, info.email)
+  ) {
+    await signOut({ redirect: false }).catch(() => undefined);
+  }
+
   await createParentSession({
     parentId: result.parentId,
     userAgent: req.headers.get("user-agent") ?? null,

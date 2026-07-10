@@ -21,6 +21,7 @@ type Props = {
   childRows?: ChildRow[];
   pendingNotificationCount?: number;
   canSwitchToTeacher?: boolean;
+  teacherSwitchHref?: string;
 };
 
 const LS_KEY = "parent-dashboard-last-child";
@@ -30,6 +31,7 @@ export function ParentTopNav({
   childRows = [],
   pendingNotificationCount = 0,
   canSwitchToTeacher = false,
+  teacherSwitchHref = "/login?from=/dashboard",
 }: Props) {
   const pathname = usePathname() ?? "";
   const searchParams = useSearchParams();
@@ -107,11 +109,6 @@ export function ParentTopNav({
               active:
                 pathname === "/parent/home" ||
                 pathname.startsWith("/parent/home"),
-            },
-            {
-              href: "/parent/showcase",
-              label: "자랑해요",
-              active: pathname.startsWith("/parent/showcase"),
             },
           ],
         },
@@ -212,7 +209,7 @@ export function ParentTopNav({
         <ParentNotificationBell pendingCount={pendingNotificationCount} />
         {canSwitchToTeacher && (
           <Link
-            href="/dashboard"
+            href={teacherSwitchHref}
             className="auth-mode-switch"
             title="교사 화면으로 전환"
             aria-label="교사 화면으로 전환"

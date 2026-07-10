@@ -173,7 +173,6 @@ export function BoardSettingsPanel({
         },
       ),
     );
-    router.refresh();
   }
 
   return (

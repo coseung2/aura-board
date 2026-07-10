@@ -7,7 +7,8 @@ import { TeacherNotificationBell } from "./TeacherNotificationBell";
 
 export function AuthHeader() {
   const { data: session, status } = useSession();
-  const [hasParentSession, setHasParentSession] = useState(false);
+  const [canSwitchToParent, setCanSwitchToParent] = useState(false);
+  const [switchingToParent, setSwitchingToParent] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -18,8 +19,8 @@ export function AuthHeader() {
           credentials: "same-origin",
         });
         if (!res.ok) return;
-        const data = (await res.json()) as { state?: string };
-        if (!cancelled) setHasParentSession(data.state !== "anonymous");
+        const data = (await res.json()) as { canSwitchToParent?: boolean };
+        if (!cancelled) setCanSwitchToParent(Boolean(data.canSwitchToParent));
       } catch {
         /* parent session is optional */
       }
@@ -38,6 +39,24 @@ export function AuthHeader() {
     return null;
   }
 
+  async function switchToParent() {
+    if (switchingToParent) return;
+    setSwitchingToParent(true);
+    try {
+      const res = await fetch("/api/parent/session/switch", {
+        method: "POST",
+        credentials: "same-origin",
+      });
+      const data = (await res.json().catch(() => null)) as {
+        redirect?: string;
+      } | null;
+      if (!res.ok || !data?.redirect) throw new Error("parent_switch_failed");
+      window.location.assign(data.redirect);
+    } catch {
+      setSwitchingToParent(false);
+    }
+  }
+
   return (
     <div className="auth-header">
       {session.user.image && (
@@ -51,16 +70,16 @@ export function AuthHeader() {
       )}
       <span className="auth-name">{session.user.name}</span>
       <TeacherNotificationBell />
-      {hasParentSession && (
-        <Link
-          href="/parent/home"
+      {canSwitchToParent && (
+        <button
+          type="button"
           className="auth-mode-switch"
-          title="학부모 화면으로 전환"
-          aria-label="학부모 화면으로 전환"
+          onClick={switchToParent}
+          disabled={switchingToParent}
         >
           <span aria-hidden>👪</span>
-          <span>학부모</span>
-        </Link>
+          <span>{switchingToParent ? "전환 중…" : "학부모"}</span>
+        </button>
       )}
       <SettingsMenu />
       <button

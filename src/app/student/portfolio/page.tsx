@@ -10,7 +10,7 @@ import type { PortfolioRosterDTO } from "@/lib/portfolio-dto";
 export const dynamic = "force-dynamic";
 
 // student-portfolio (2026-04-26): 학생 포트폴리오 — 좌측 학급 학생 리스트 +
-// 우측 선택 학생 카드 그리드. 본인이면 우클릭 메뉴에 자랑해요 토글 노출.
+// 우측 선택 학생의 카드 그리드.
 //
 // roster 는 SSR 로 prefetch (좌측 리스트 즉시 렌더). 학생별 상세 카드는
 // 클라이언트에서 fetch.
@@ -39,7 +39,7 @@ export default async function StudentPortfolioPage() {
     select: { id: true, name: true, number: true },
   });
 
-  // 학생별 카드 수 + 자랑해요 수 단일 round-trip.
+  // 학생별 카드 수를 한 번에 조회한다.
   // dj-queue 음악 신청은 결과물 아니라 카드 수에서 제외 (API roster 와 동일).
   const counts = await db.$queryRaw<
     Array<{ studentId: string; cardCount: bigint }>
@@ -58,15 +58,6 @@ export default async function StudentPortfolioPage() {
   const cardCountById = new Map(
     counts.map((r) => [r.studentId, Number(r.cardCount)])
   );
-  const showcaseCounts = await db.showcaseEntry.groupBy({
-    by: ["studentId"],
-    where: { classroomId },
-    _count: { _all: true },
-  });
-  const showcaseCountById = new Map(
-    showcaseCounts.map((r) => [r.studentId, r._count._all])
-  );
-
   const initialRoster: PortfolioRosterDTO = {
     classroom: { id: classroom.id, name: classroom.name },
     students: students.map((s) => ({
@@ -74,7 +65,6 @@ export default async function StudentPortfolioPage() {
       name: s.name,
       number: s.number,
       cardCount: cardCountById.get(s.id) ?? 0,
-      showcaseCount: showcaseCountById.get(s.id) ?? 0,
     })),
   };
 

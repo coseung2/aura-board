@@ -12,12 +12,23 @@ import Kakao, { type KakaoProfile } from "next-auth/providers/kakao";
 import type { Provider } from "@auth/core/providers";
 import { PrismaAdapter } from "@auth/prisma-adapter";
 import { db } from "./db";
+import { isSameAccountPrincipal } from "./account-principal";
+import { clearParentSession, getCurrentParent } from "./parent-session";
 
-const providers: Provider[] = [
-  Google({
-    allowDangerousEmailAccountLinking: true,
-  }),
-];
+const googleClientId = process.env.AUTH_GOOGLE_ID;
+const googleClientSecret = process.env.AUTH_GOOGLE_SECRET;
+
+const providers: Provider[] = [];
+
+if (googleClientId && googleClientSecret) {
+  providers.push(
+    Google({
+      clientId: googleClientId,
+      clientSecret: googleClientSecret,
+      allowDangerousEmailAccountLinking: true,
+    }),
+  );
+}
 
 const kakaoClientId = process.env.KAKAO_PARENT_CLIENT_ID ?? process.env.AUTH_KAKAO_ID;
 const kakaoClientSecret =
@@ -55,6 +66,21 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     signIn: "/login",
   },
   callbacks: {
+    /**
+     * A browser may retain a parent cookie while a teacher signs in. Keep it
+     * only if both role sessions resolve to the same email account; otherwise
+     * this is an account switch, so revoke the previous parent session.
+     */
+    async signIn({ user }) {
+      const parentContext = await getCurrentParent().catch(() => null);
+      if (
+        parentContext &&
+        !isSameAccountPrincipal(user.email, parentContext.parent.email)
+      ) {
+        await clearParentSession().catch(() => undefined);
+      }
+      return true;
+    },
     jwt({ token, user }) {
       if (user) {
         token.id = user.id;

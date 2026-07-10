@@ -3,6 +3,8 @@ import { redirect } from "next/navigation";
 import { db } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
 import { getCurrentParent } from "@/lib/parent-session";
+import { findTeacherRoleByEmail } from "@/lib/role-switch";
+import { isSameAccountPrincipal } from "@/lib/account-principal";
 import { ParentTopNav } from "@/components/parent/ParentTopNav";
 import { SessionWatchdog } from "@/components/parent/SessionWatchdog";
 import type { ChildRow } from "@/components/parent/ParentChildSelector";
@@ -26,7 +28,7 @@ export default async function ParentAppLayout({ children }: { children: ReactNod
     redirect("/parent/join?error=session_required");
   }
   const parent = current.parent;
-  const [activeLinks, pendingCount, teacherUser] = await Promise.all([
+  const [activeLinks, pendingCount, teacherSessionUser, teacherRole] = await Promise.all([
     db.parentChildLink.findMany({
       where: {
         parentId: parent.id,
@@ -53,6 +55,7 @@ export default async function ParentAppLayout({ children }: { children: ReactNod
       },
     }),
     getCurrentUser().catch(() => null),
+    findTeacherRoleByEmail(parent.email),
   ]);
   const childRows: ChildRow[] = activeLinks.map((link) => ({
     studentId: link.studentId,
@@ -60,6 +63,10 @@ export default async function ParentAppLayout({ children }: { children: ReactNod
     studentNumber: link.student.number,
     classroomName: link.student.classroom.name,
   }));
+  const hasMatchingTeacherSession = Boolean(
+    teacherSessionUser &&
+      isSameAccountPrincipal(teacherSessionUser.email, parent.email)
+  );
 
   return (
     <>
@@ -67,7 +74,8 @@ export default async function ParentAppLayout({ children }: { children: ReactNod
         parent={{ name: parent.name, email: parent.email }}
         childRows={childRows}
         pendingNotificationCount={pendingCount}
-        canSwitchToTeacher={Boolean(teacherUser)}
+        canSwitchToTeacher={Boolean(teacherRole)}
+        teacherSwitchHref={hasMatchingTeacherSession ? "/dashboard" : "/login?from=/dashboard"}
       />
       {children}
       <SessionWatchdog />

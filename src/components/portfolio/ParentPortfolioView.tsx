@@ -3,13 +3,10 @@
 import { useEffect, useState } from "react";
 import type {
   PortfolioCardDTO,
-  ShowcaseEntryDTO,
 } from "@/lib/portfolio-dto";
 import { CardDetailModal } from "../cards/CardDetailModal";
 import { PortfolioCardItem } from "./PortfolioCardItem";
-import { ShowcaseCardChip } from "./ShowcaseCardChip";
 import { portfolioCardToCardData } from "./portfolio-card-adapter";
-import { StarFilledIcon } from "../icons/UiIcons";
 
 type Props = {
   childId: string;
@@ -19,7 +16,6 @@ type Props = {
 type Payload = {
   child: { id: string; name: string; number: number | null; classroomId: string };
   ownCards: PortfolioCardDTO[];
-  classroomShowcase: ShowcaseEntryDTO[];
 };
 
 export function ParentPortfolioView({ childId, childName }: Props) {
@@ -79,9 +75,7 @@ export function ParentPortfolioView({ childId, childName }: Props) {
   }
 
   const selectedCard = openCard
-    ? data.ownCards.find((c) => c.id === openCard.id) ??
-      data.classroomShowcase.find((e) => e.card.id === openCard.id)?.card ??
-      openCard
+    ? data.ownCards.find((c) => c.id === openCard.id) ?? openCard
     : null;
 
   return (
@@ -99,37 +93,10 @@ export function ParentPortfolioView({ childId, childName }: Props) {
             <PortfolioCardItem
               key={c.id}
               card={c}
-              canToggleShowcase={false}
-              readOnly
-              busy={false}
-              onToggleShowcase={() => {}}
               onOpen={setOpenCard}
             />
           ))}
         </div>
-      )}
-
-      {data.classroomShowcase.length > 0 && (
-        <section
-          className="parent-portfolio-showcase"
-          aria-label="우리 학급 자랑해요"
-        >
-          <header className="showcase-strip-head">
-            <h3 className="showcase-strip-title">
-              <StarFilledIcon size={20} />
-              <span>우리 학급 자랑해요 ({data.classroomShowcase.length}개)</span>
-            </h3>
-          </header>
-          <div className="showcase-strip-row">
-            {data.classroomShowcase.map((e) => (
-              <ShowcaseCardChip
-                key={e.cardId + ":" + e.studentId}
-                entry={e}
-                onOpen={(entry) => setOpenCard(entry.card)}
-              />
-            ))}
-          </div>
-        </section>
       )}
 
       <CardDetailModal

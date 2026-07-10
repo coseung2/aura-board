@@ -66,7 +66,6 @@ export type PortfolioRosterStudentDTO = {
   name: string;
   number: number | null;
   cardCount: number;
-  showcaseCount: number;
 };
 
 export type PortfolioRosterDTO = {

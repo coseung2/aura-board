@@ -85,15 +85,6 @@ export async function GET(req: Request) {
     counts.map((r) => [r.studentId, Number(r.cardCount)])
   );
 
-  const showcaseCounts = await db.showcaseEntry.groupBy({
-    by: ["studentId"],
-    where: { classroomId },
-    _count: { _all: true },
-  });
-  const showcaseCountById = new Map(
-    showcaseCounts.map((r) => [r.studentId, r._count._all])
-  );
-
   const dto: PortfolioRosterDTO = {
     classroom,
     students: students.map((s) => ({
@@ -101,7 +92,6 @@ export async function GET(req: Request) {
       name: s.name,
       number: s.number,
       cardCount: cardCountById.get(s.id) ?? 0,
-      showcaseCount: showcaseCountById.get(s.id) ?? 0,
     })),
   };
   return NextResponse.json(dto);

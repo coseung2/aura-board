@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
+import { getCurrentUser } from "@/lib/auth";
 import { getCurrentParent } from "@/lib/parent-session";
+import { findParentRoleByEmail } from "@/lib/role-switch";
 
 // parent-class-invite-v2 — GET /api/parent/session/status.
 // Returns the parent's onboarding state for client-side routing decisions.
@@ -21,13 +23,20 @@ type SessionState =
   | "revoked";
 
 export async function GET(_req: Request) {
-  const current = await getCurrentParent();
+  const [current, teacher] = await Promise.all([
+    getCurrentParent(),
+    getCurrentUser().catch(() => null),
+  ]);
+  const canSwitchToParent = teacher
+    ? Boolean(await findParentRoleByEmail(teacher.email))
+    : false;
   if (!current) {
     return NextResponse.json({
       state: "anonymous" satisfies SessionState,
       activeLinks: 0,
       pendingLinks: 0,
       rejectedReason: null,
+      canSwitchToParent,
     });
   }
 
@@ -56,5 +65,6 @@ export async function GET(_req: Request) {
     activeLinks,
     pendingLinks,
     rejectedReason,
+    canSwitchToParent,
   });
 }
