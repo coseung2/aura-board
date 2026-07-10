@@ -132,7 +132,7 @@ export async function POST(
 
     // best-effort touch + realtime snapshot invalidation
     await touchBoardUpdatedAt(boardId);
-    void announceCardChange(boardId, "update");
+    await announceCardChange(boardId, "update");
 
     return NextResponse.json({ sections: created, subjectOrder });
   } catch (e) {
