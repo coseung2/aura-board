@@ -22,20 +22,20 @@ const PatchSectionSchema = z.object({
   assignmentReminderSentAt: z.coerce.date().nullable().optional(),
   activityTemplate: ActivityTemplateSchema.nullable().optional(),
   activityTemplateState: z
-	    .object({
-	      wordCloudPublished: z.boolean().optional(),
-	      activityTemplateOrder: z.number().int().nonnegative().optional(),
-	      slideshowEnabled: z.boolean().optional(),
-	      streamTitlePrompt: z.string().trim().max(120).optional(),
-	      streamContentPrompt: z.string().trim().max(300).optional(),
-	    })
+    .object({
+      wordCloudPublished: z.boolean().optional(),
+      activityTemplateOrder: z.number().int().nonnegative().optional(),
+      slideshowEnabled: z.boolean().optional(),
+      streamTitlePrompt: z.string().trim().max(120).optional(),
+      streamContentPrompt: z.string().trim().max(300).optional(),
+    })
     .nullable()
     .optional(),
 });
 
 export async function PATCH(
   req: Request,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: Promise<{ id: string }> },
 ) {
   try {
     const { id } = await params;
@@ -138,7 +138,7 @@ export async function PATCH(
 
 export async function DELETE(
   _req: Request,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: Promise<{ id: string }> },
 ) {
   try {
     const { id } = await params;
@@ -160,7 +160,10 @@ export async function DELETE(
       card.linkImage,
       card.videoUrl,
       card.fileUrl,
-      ...card.attachments.flatMap((a) => [a.url, a.previewUrl]),
+      ...card.attachments.flatMap((attachment) => [
+        attachment.url,
+        attachment.previewUrl,
+      ]),
     ]);
 
     await db.$transaction([
@@ -174,6 +177,7 @@ export async function DELETE(
       actorType: "teacher",
       actorId: user.id,
     });
+    void announceCardChange(section.boardId, "update");
 
     return NextResponse.json({ ok: true });
   } catch (e) {
