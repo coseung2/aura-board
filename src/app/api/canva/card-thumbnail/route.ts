@@ -47,6 +47,10 @@ export async function GET(req: Request) {
   const sourceUrl = new URL("/api/canva/thumbnail", requestUrl);
   sourceUrl.searchParams.set("design", designUrl);
   sourceUrl.searchParams.set("w", String(width));
+  const deploymentShare = requestUrl.searchParams.get("_vercel_share");
+  if (deploymentShare) {
+    sourceUrl.searchParams.set("_vercel_share", deploymentShare);
+  }
 
   const forwardedHeaders = new Headers({
     Accept: "image/avif,image/webp,image/*;q=0.9,*/*;q=0.5",
