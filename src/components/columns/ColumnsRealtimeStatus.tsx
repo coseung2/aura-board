@@ -24,26 +24,11 @@ export function ColumnsRealtimeStatus({ status, presence }: Props) {
     live && presence.remoteWorkingCount > 0
       ? ` · 다른 사용자 ${presence.remoteWorkingCount}명 작업 중`
       : "";
-  const titleParts = [statusLabel];
-  if (presence.remoteActiveSectionCount > 0) {
-    titleParts.push(
-      `다른 사용자가 ${presence.remoteActiveSectionCount}개 주제에서 활동 중`,
-    );
-  }
-  if (presence.remoteEditingCount > 0) {
-    titleParts.push(`카드·주제 편집 ${presence.remoteEditingCount}명`);
-  }
-  if (presence.remoteAddingCount > 0) {
-    titleParts.push(`카드 추가 ${presence.remoteAddingCount}명`);
-  }
-  if (presence.remoteDraggingCount > 0) {
-    titleParts.push(`이동·정렬 ${presence.remoteDraggingCount}명`);
-  }
 
   return (
     <div
       aria-live="polite"
-      title={titleParts.join(" · ")}
+      title={`${statusLabel}${workingLabel}`}
       style={{
         position: "absolute",
         top: 6,
