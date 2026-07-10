@@ -33,6 +33,8 @@ type BoardRealtimeChannel = ReturnType<PublicSupabaseClient["channel"]>;
 type Options = {
   boardId: string;
   currentUserId: string;
+  /** Kept local for call-site context; never copied into public Presence. */
+  currentRole?: "owner" | "editor" | "viewer";
   activity: ColumnsPresenceActivity;
   pendingCardIds: MutableRefObject<Set<string>>;
   setCards: React.Dispatch<React.SetStateAction<CardData[]>>;
