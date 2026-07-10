@@ -14,6 +14,11 @@ import {
   type KordleLiveEvent,
   type KordlePuzzleChangedEvent,
 } from "@/features/kordle/realtime";
+import {
+  QUIZ_SNAPSHOT_EVENT,
+  quizChannelKey,
+  type QuizRealtimeSnapshot,
+} from "@/features/quiz/realtime";
 import type { BoardRealtimeEvent } from "./realtime";
 import { boardChannelKey } from "./realtime";
 
@@ -173,6 +178,28 @@ export async function announceQuestionChange(
     });
   } catch {
     // ignore
+  }
+}
+
+/**
+ * Broadcast a safe, committed quiz snapshot. Unlike content boards, game
+ * clients can apply this compact payload directly; focus/reconnect polling
+ * still reads the same snapshot endpoint as the recovery source of truth.
+ */
+export async function announceQuizSnapshot(
+  snapshot: QuizRealtimeSnapshot,
+): Promise<void> {
+  if (!snapshot.quizId) return;
+  const client = getServerClient();
+  if (!client) return;
+  try {
+    await client.channel(quizChannelKey(snapshot.quizId)).send({
+      type: "broadcast",
+      event: QUIZ_SNAPSHOT_EVENT,
+      payload: snapshot,
+    });
+  } catch {
+    // Mutation already committed; recovery polling will reconcile clients.
   }
 }
 
