@@ -7,6 +7,22 @@ export type ShadowAlliancePhase =
   | "postround"
   | "final";
 
+export type ShadowAllianceBoardStatus = "waiting" | "active" | "ended";
+
+export function getShadowAllianceBoardStatus(
+  phase: ShadowAlliancePhase,
+): ShadowAllianceBoardStatus {
+  if (phase === "lobby") return "waiting";
+  if (phase === "final") return "ended";
+  return "active";
+}
+
+export const SHADOW_ALLIANCE_STATUS_LABELS: Record<ShadowAllianceBoardStatus, string> = {
+  waiting: "시작 대기",
+  active: "진행 중",
+  ended: "종료",
+};
+
 export type ShadowAlliancePlayer = {
   id: string;
   nick: string;
