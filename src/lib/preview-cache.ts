@@ -4,6 +4,12 @@ import type { Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
 
 const POSITIVE_TTL_MS = 30 * 24 * 60 * 60 * 1000;
+// Canva's design thumbnail URLs are short-lived. Caching the whole oEmbed
+// response for the generic 30-day TTL leaves cards pointing at an expired URL.
+// Keep this below Canva's published 15-minute thumbnail lifetime.
+const POSITIVE_TTL_OVERRIDES_MS: Record<string, number> = {
+  "canva-oembed-v2": 10 * 60 * 1000,
+};
 // Default negative cache TTL. Keep it short enough that transient upstream
 // failures don't leave a pasted link blank for the rest of the school day.
 const NEGATIVE_TTL_MS = 60 * 60 * 1000;
@@ -16,10 +22,15 @@ const NEGATIVE_TTL_OVERRIDES_MS: Record<string, number> = {
   // strand any channel URL pasted during that window. 5min lets the
   // next user retry cheaply while still protecting upstream.
   "link-preview-youtube-channel": 5 * 60 * 1000,
+  "canva-oembed-v2": 5 * 60 * 1000,
 };
 
 export function previewCacheKey(kind: string, url: string): string {
   return `${kind}:${createHash("sha256").update(url).digest("hex")}`;
+}
+
+function positiveTtlMs(kind: string): number {
+  return POSITIVE_TTL_OVERRIDES_MS[kind] ?? POSITIVE_TTL_MS;
 }
 
 function negativeTtlMs(kind: string): number {
@@ -53,7 +64,7 @@ export async function setPreviewCache(
   ok: boolean,
   error?: string
 ): Promise<void> {
-  const ttl = ok ? POSITIVE_TTL_MS : negativeTtlMs(kind);
+  const ttl = ok ? positiveTtlMs(kind) : negativeTtlMs(kind);
   try {
     await db.previewFetchCache.upsert({
       where: { key: previewCacheKey(kind, url) },

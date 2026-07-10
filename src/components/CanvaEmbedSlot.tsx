@@ -26,17 +26,16 @@ import {
   type KeyboardEvent,
   type MouseEvent,
 } from "react";
-import {
-  buildCanvaEmbedSrc,
-  deriveCanvaThumbnailUrl,
-  proxiedCanvaThumbnailUrl,
-} from "@/lib/canva";
+import { buildCanvaEmbedSrc } from "@/lib/canva";
 import {
   useIframeBudget,
   useLastEviction,
 } from "@/hooks/useIframeBudget";
 import { useInViewport } from "@/hooks/useInViewport";
 import { PlayIcon } from "./icons/UiIcons";
+
+const CANVA_THUMBNAIL_WIDTH = 640;
+const CLIENT_FALLBACK_THUMBNAIL = buildClientFallbackThumbnail();
 
 type Props = {
   designId: string;
@@ -71,7 +70,6 @@ export const CanvaEmbedSlot = memo(function CanvaEmbedSlot({
   const [iframeLoaded, setIframeLoaded] = useState(false);
   const [iframeFailed, setIframeFailed] = useState(false);
   const [thumbnailAttempt, setThumbnailAttempt] = useState(0);
-  const [lastGoodThumbnail, setLastGoodThumbnail] = useState<string | null>(null);
   const [evictedToast, setEvictedToast] = useState<string | null>(null);
 
   // IntersectionObserver starts at `false` and only flips once it has
@@ -148,26 +146,22 @@ export const CanvaEmbedSlot = memo(function CanvaEmbedSlot({
   }, [linkUrl, designId]);
   const title = linkTitle || "Canva design";
   void linkDesc;
+
   const thumbnailCandidates = useMemo(() => {
     const candidates = [
-      proxiedCanvaThumbnailUrl(linkImage, 640),
-      deriveCanvaThumbnailUrl(linkUrl),
+      durableThumbnailCandidate(linkImage),
+      buildResilientThumbnailUrl(linkUrl),
+      CLIENT_FALLBACK_THUMBNAIL,
     ].filter((candidate): candidate is string => Boolean(candidate));
     return [...new Set(candidates)];
   }, [linkImage, linkUrl]);
-  const candidateThumbnail = thumbnailCandidates[thumbnailAttempt] ?? null;
-  const effectiveLinkImage = candidateThumbnail ?? lastGoodThumbnail;
-  const handleThumbnailLoad = useCallback(() => {
-    if (candidateThumbnail) {
-      setLastGoodThumbnail(candidateThumbnail);
-    }
-  }, [candidateThumbnail]);
+  const effectiveLinkImage =
+    thumbnailCandidates[thumbnailAttempt] ?? CLIENT_FALLBACK_THUMBNAIL;
   const handleThumbnailError = useCallback(() => {
-    if (!candidateThumbnail) return;
     setThumbnailAttempt((attempt) =>
-      attempt < thumbnailCandidates.length - 1 ? attempt + 1 : attempt
+      attempt < thumbnailCandidates.length - 1 ? attempt + 1 : attempt,
     );
-  }, [candidateThumbnail, thumbnailCandidates.length]);
+  }, [thumbnailCandidates.length]);
 
   // Render the iframe as soon as the user activates. We no longer gate on
   // inView — the auto-deactivate useEffect above handles off-screen
@@ -182,38 +176,18 @@ export const CanvaEmbedSlot = memo(function CanvaEmbedSlot({
       className="card-canva-slot"
       data-active={shouldRenderIframe ? "true" : "false"}
       data-loaded={shouldRenderIframe && iframeLoaded ? "true" : "false"}
-      data-preview={
-        !shouldRenderIframe && !effectiveLinkImage ? "true" : "false"
-      }
+      data-preview={!shouldRenderIframe ? "true" : "false"}
     >
       <div className="card-canva-slot-frame">
-        {effectiveLinkImage ? (
-          // Thumbnail always painted underneath — acts as LCP image and as
-          // the background that shows through while iframe boots (and after
-          // eviction). loading="lazy" is safe because the slot is cheap.
-          <img
-            src={effectiveLinkImage}
-            alt={`${title} 썸네일`}
-            loading="lazy"
-            decoding="async"
-            onLoad={handleThumbnailLoad}
-            onError={handleThumbnailError}
-            className="card-canva-slot-thumbnail"
-          />
-        ) : (
-          // No oEmbed thumbnail (anonymous 401 is the common case) —
-          // paint a neutral placeholder so the slot isn't visually empty
-          // before the iframe loads. Labelled "Canva 디자인" so the user
-          // knows what they're about to see.
-          <div
-            className="card-canva-slot-thumbnail card-canva-slot-placeholder"
-            aria-hidden="true"
-          >
-            <span className="card-canva-slot-placeholder-label">
-              Canva 디자인
-            </span>
-          </div>
-        )}
+        <img
+          key={effectiveLinkImage}
+          src={effectiveLinkImage}
+          alt={`${title} 썸네일`}
+          loading="lazy"
+          decoding="async"
+          onError={handleThumbnailError}
+          className="card-canva-slot-thumbnail"
+        />
 
         {shouldRenderIframe && (
           <iframe
@@ -246,3 +220,50 @@ export const CanvaEmbedSlot = memo(function CanvaEmbedSlot({
     </div>
   );
 });
+
+function buildResilientThumbnailUrl(linkUrl: string): string {
+  return `/api/canva/card-thumbnail?design=${encodeURIComponent(
+    linkUrl,
+  )}&w=${CANVA_THUMBNAIL_WIDTH}`;
+}
+
+/**
+ * Only trust thumbnails that are already outside Canva's expiring CDN/proxy
+ * path. Old cards often contain `/api/canva/thumbnail?url=<temporary-url>` or
+ * a raw canva-web-files URL; both must be resolved again from the design URL.
+ */
+function durableThumbnailCandidate(rawUrl: string | null): string | null {
+  if (!rawUrl) return null;
+  if (rawUrl.startsWith("/api/canva/thumbnail?")) return null;
+
+  try {
+    const parsed = new URL(rawUrl, "https://aura-board.local");
+    const host = parsed.hostname.toLowerCase();
+    const isCanvaHost =
+      host === "canva.com" ||
+      host.endsWith(".canva.com") ||
+      host.endsWith(".canva-web-files.com");
+    return isCanvaHost ? null : rawUrl;
+  } catch {
+    return null;
+  }
+}
+
+function buildClientFallbackThumbnail(): string {
+  const svg = `
+    <svg xmlns="http://www.w3.org/2000/svg" width="640" height="360" viewBox="0 0 640 360">
+      <defs>
+        <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0" stop-color="#7d2ae8"/>
+          <stop offset="1" stop-color="#00c4cc"/>
+        </linearGradient>
+      </defs>
+      <rect width="640" height="360" rx="24" fill="url(#bg)"/>
+      <circle cx="116" cy="180" r="70" fill="rgba(255,255,255,.18)"/>
+      <text x="116" y="207" text-anchor="middle" font-family="Arial, sans-serif" font-size="88" font-weight="700" fill="#fff">C</text>
+      <text x="208" y="172" font-family="Arial, sans-serif" font-size="42" font-weight="700" fill="#fff">Canva 디자인</text>
+      <text x="210" y="218" font-family="Arial, sans-serif" font-size="22" fill="rgba(255,255,255,.86)">클릭하여 디자인 열기</text>
+    </svg>
+  `.trim();
+  return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
+}
