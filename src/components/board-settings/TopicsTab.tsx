@@ -104,6 +104,8 @@ function TopicsTabBody({
 
   useEffect(() => {
     const previousBaseline = savedDraftRef.current;
+    const baselineChanged = isDirty(previousBaseline, initialDraft);
+
     setDraft((current) => {
       const hasUnsavedChanges = isDirty(previousBaseline, current);
       if (
@@ -116,7 +118,7 @@ function TopicsTabBody({
     });
     savedDraftRef.current = initialDraft;
     setSavedDraft(initialDraft);
-    setSaveState({ status: "idle" });
+    if (baselineChanged) setSaveState({ status: "idle" });
   }, [initialDraft]);
 
   const split = splitPinnedUnpinned(draft);
@@ -168,7 +170,7 @@ function TopicsTabBody({
     });
   }
 
-  function sortAllByCreatedAt(direction: "asc" | "desc") {
+  function sortAllByBaseOrder(direction: "asc" | "desc") {
     updateDraft((current) => {
       const currentSplit = splitPinnedUnpinned(current);
       const unpinned = [...currentSplit.unpinned].sort((a, b) =>
@@ -233,7 +235,7 @@ function TopicsTabBody({
             <button
               type="button"
               className="topics-tab-sort-btn"
-              onClick={() => sortAllByCreatedAt("asc")}
+              onClick={() => sortAllByBaseOrder("asc")}
               title="한번에 먼저 만든 순서로 정렬"
               disabled={saving}
             >
@@ -242,7 +244,7 @@ function TopicsTabBody({
             <button
               type="button"
               className="topics-tab-sort-btn"
-              onClick={() => sortAllByCreatedAt("desc")}
+              onClick={() => sortAllByBaseOrder("desc")}
               title="한번에 나중에 만든 순서로 정렬"
               disabled={saving}
             >
@@ -501,14 +503,18 @@ function mergeBoardSections(
     source.map((section) => [section.id, section] as const),
   );
 
-  return draft.map((section) => ({
-    ...sourceById.get(section.id),
-    id: section.id,
-    title: section.title,
-    accessToken: section.accessToken,
-    order: section.order,
-    pinned: section.pinned,
-  }));
+  return draft.map((section) => {
+    const original = sourceById.get(section.id);
+    return {
+      ...(original ?? {
+        id: section.id,
+        title: section.title,
+        accessToken: section.accessToken,
+      }),
+      order: section.order,
+      pinned: section.pinned,
+    };
+  });
 }
 
 async function readErrorMessage(
