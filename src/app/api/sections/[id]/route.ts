@@ -177,7 +177,7 @@ export async function DELETE(
       actorType: "teacher",
       actorId: user.id,
     });
-    void announceCardChange(section.boardId, "update");
+    await announceCardChange(section.boardId, "update");
 
     return NextResponse.json({ ok: true });
   } catch (e) {
