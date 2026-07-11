@@ -57,6 +57,7 @@ const targetIcons: Record<string, LucideIcon> = {
   boards: LayoutGrid,
   portfolio: BriefcaseBusiness,
   reading: BookOpen,
+  walking: Footprints,
   more: MoreHorizontal,
   wallet: WalletCards,
   canva: Palette,

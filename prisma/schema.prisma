@@ -624,10 +624,31 @@ model Student {
   cleaningDuties         CleaningDuty[]  @relation("CleaningDutyStudent")
   cleaningDutiesAssigned CleaningDuty[]  @relation("CleaningDutyAssignedBy")
 
+  walkingDailyStats StudentWalkingDailyStat[]
+
   @@unique([classroomId, number])
   @@index([classroomId])
   @@index([qrToken])
   @@index([textCode])
+}
+
+model StudentWalkingDailyStat {
+  id String @id
+
+  studentId String
+  day DateTime @db.Date
+  steps Int @default(0)
+  distanceMeters Float @default(0)
+  source String @default("health_connect")
+  syncedAt DateTime @default(now())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  student Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@unique([studentId, day], map: "StudentWalkingDailyStat_studentId_day_key")
+  @@index([day], map: "StudentWalkingDailyStat_day_idx")
+  @@index([studentId, syncedAt], map: "StudentWalkingDailyStat_studentId_syncedAt_idx")
 }
 
 // Per-student read cursor and receipts for the in-app like/comment feed.

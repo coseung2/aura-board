@@ -297,8 +297,8 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 32px;
-  height: 32px;
+  width: 44px;
+  height: 44px;
   padding: 0;
   border: 1px solid var(--color-border);
   background: var(--color-surface);
@@ -324,7 +324,7 @@
   align-items: center;
   justify-content: center;
   gap: var(--control-inline-gap, 4px);
-  min-height: 32px;
+  min-height: 44px;
   padding: 0 10px;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-pill);
@@ -363,6 +363,7 @@
 .auth-login-link {
   display: inline-flex;
   align-items: center;
+  min-height: 44px;
   padding: 6px 16px;
   font-size: 13px;
   font-weight: 600;
@@ -388,8 +389,8 @@
   align-items: center;
   justify-content: center;
   position: relative;
-  width: 32px;
-  height: 32px;
+  width: 44px;
+  height: 44px;
   padding: 0;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-pill);

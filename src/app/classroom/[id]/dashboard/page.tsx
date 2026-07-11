@@ -53,51 +53,63 @@ export default async function ClassroomDashboardPage({ params }: Props) {
   }
 
   const authoredCardCounts = await db.card.groupBy({
-      by: ["studentAuthorId"],
-      where: {
-        studentAuthorId: { not: null },
-        studentAuthor: { classroomId: id },
-        OR: [{ queueStatus: null }, { queueStatus: { not: "played" } }],
-      },
-      _count: { _all: true },
+    by: ["studentAuthorId"],
+    where: {
+      studentAuthorId: { not: null },
+      studentAuthor: { classroomId: id },
+      OR: [{ queueStatus: null }, { queueStatus: { not: "played" } }],
+    },
+    _count: { _all: true },
   });
 
   const authoredCountByStudent = new Map(
     authoredCardCounts
       .filter((row) => row.studentAuthorId)
-      .map((row) => [row.studentAuthorId!, row._count._all])
+      .map((row) => [row.studentAuthorId!, row._count._all]),
   );
 
   const unit = classroom.currency?.unitLabel ?? "원";
   const students = classroom.students;
-  const totalBalance = students.reduce((sum, s) => sum + (s.account?.balance ?? 0), 0);
-  const activeDeposits = students.flatMap((s) =>
-    (s.account?.fixedDeposits ?? []).map((fd) => ({
-      ...fd,
-      studentName: s.name,
-      studentNumber: s.number,
-    }))
+  const totalBalance = students.reduce(
+    (sum, student) => sum + (student.account?.balance ?? 0),
+    0,
   );
-  const activeDepositTotal = activeDeposits.reduce((sum, fd) => sum + fd.principal, 0);
-  const studentsWithRole = students.filter((s) => s.roleAssignments.length > 0).length;
+  const activeDeposits = students.flatMap((student) =>
+    (student.account?.fixedDeposits ?? []).map((fixedDeposit) => ({
+      ...fixedDeposit,
+      studentName: student.name,
+      studentNumber: student.number,
+    })),
+  );
+  const activeDepositTotal = activeDeposits.reduce(
+    (sum, fixedDeposit) => sum + fixedDeposit.principal,
+    0,
+  );
+  const studentsWithRole = students.filter(
+    (student) => student.roleAssignments.length > 0,
+  ).length;
 
   const topSavings = [...students]
     .sort((a, b) => (b.account?.balance ?? 0) - (a.account?.balance ?? 0))
     .slice(0, 6);
 
   const portfolioRows = students
-    .map((s) => ({
-      id: s.id,
-      number: s.number,
-      name: s.name,
-      cardCount: authoredCountByStudent.get(s.id) ?? s.cardsAuthored.length,
-      assetCount: s.assets.length,
+    .map((student) => ({
+      id: student.id,
+      number: student.number,
+      name: student.name,
+      cardCount:
+        authoredCountByStudent.get(student.id) ?? student.cardsAuthored.length,
+      assetCount: student.assets.length,
     }))
-    .sort((a, b) => b.cardCount + b.assetCount - (a.cardCount + a.assetCount))
+    .sort(
+      (a, b) =>
+        b.cardCount + b.assetCount - (a.cardCount + a.assetCount),
+    )
     .slice(0, 8);
 
   const roleRows = students
-    .filter((s) => s.roleAssignments.length > 0)
+    .filter((student) => student.roleAssignments.length > 0)
     .slice(0, 10);
 
   return (
@@ -106,6 +118,9 @@ export default async function ClassroomDashboardPage({ params }: Props) {
         &larr; 학급 목록
       </a>
       <h1 className="classroom-page-title">{classroom.name}</h1>
+      <Link href={`/classroom/${id}/walking`} className="classroom-back-link">
+        걷기 현황 보기 &rarr;
+      </Link>
 
       <section className="classroom-dashboard-kpis" aria-label="학급 요약">
         <article className="classroom-dashboard-kpi">
@@ -136,7 +151,11 @@ export default async function ClassroomDashboardPage({ params }: Props) {
           </div>
           <div className="classroom-dashboard-list">
             {portfolioRows.map((student) => (
-              <Link key={student.id} href={`/classroom/${id}/students`} className="classroom-dashboard-row">
+              <Link
+                key={student.id}
+                href={`/classroom/${id}/students`}
+                className="classroom-dashboard-row"
+              >
                 <span>{student.number ?? "-"}번 {student.name}</span>
                 <strong>{student.cardCount + student.assetCount}개</strong>
               </Link>
@@ -170,10 +189,12 @@ export default async function ClassroomDashboardPage({ params }: Props) {
             </div>
           </div>
           <div className="classroom-dashboard-list">
-            {activeDeposits.slice(0, 6).map((fd) => (
-              <div key={fd.id} className="classroom-dashboard-row">
-                <span>{fd.studentNumber ?? "-"}번 {fd.studentName}</span>
-                <strong>{formatNumber(fd.principal)} {unit}</strong>
+            {activeDeposits.slice(0, 6).map((fixedDeposit) => (
+              <div key={fixedDeposit.id} className="classroom-dashboard-row">
+                <span>
+                  {fixedDeposit.studentNumber ?? "-"}번 {fixedDeposit.studentName}
+                </span>
+                <strong>{formatNumber(fixedDeposit.principal)} {unit}</strong>
               </div>
             ))}
             {activeDeposits.length === 0 && (

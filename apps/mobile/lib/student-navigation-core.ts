@@ -38,6 +38,13 @@ export const studentBaseNavTargets: StudentNavTarget[] = [
     pathname: "/reading",
   },
   {
+    id: "walking",
+    label: "걷기",
+    emoji: "👣",
+    href: "/(student)/walking",
+    pathname: "/walking",
+  },
+  {
     id: "more",
     label: "더보기",
     emoji: "•••",

@@ -257,7 +257,7 @@ $config = Read-AppConfig -SourceDir $AppSource -SchemeOverride $DeepLinkScheme
 if (-not $config.Package) { throw 'android.package is required in app.json/app.config.ts.' }
 if (-not $config.VersionName) { throw 'version is required in app.json/app.config.ts.' }
 
-foreach ($dir in @('app', 'assets', 'components', 'constants', 'hooks', 'lib', 'providers', 'scripts', 'theme')) {
+foreach ($dir in @('app', 'assets', 'components', 'constants', 'hooks', 'lib', 'modules', 'plugins', 'providers', 'scripts', 'theme')) {
   Mirror-Directory -Source (Join-Path $AppSource $dir) -Destination (Join-Path $BuildDir $dir) -BuildRoot $BuildRoot
 }
 foreach ($file in @('app.json', 'app.config.ts', 'package.json', 'package-lock.json', 'tsconfig.json', 'eas.json', 'google-services.json', 'credentials.json', '.npmrc', 'expo-env.d.ts')) {
