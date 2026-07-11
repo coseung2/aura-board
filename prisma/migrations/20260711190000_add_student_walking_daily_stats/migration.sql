@@ -10,6 +10,10 @@ CREATE TABLE "StudentWalkingDailyStat" (
   "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
   CONSTRAINT "StudentWalkingDailyStat_pkey" PRIMARY KEY ("id"),
+  CONSTRAINT "StudentWalkingDailyStat_steps_check"
+    CHECK ("steps" >= 0 AND "steps" <= 200000),
+  CONSTRAINT "StudentWalkingDailyStat_distanceMeters_check"
+    CHECK ("distanceMeters" >= 0 AND "distanceMeters" <= 300000),
   CONSTRAINT "StudentWalkingDailyStat_studentId_fkey"
     FOREIGN KEY ("studentId") REFERENCES "Student"("id")
     ON DELETE CASCADE ON UPDATE CASCADE

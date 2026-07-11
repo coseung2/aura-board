@@ -83,11 +83,6 @@ export function StudentTopNav({
           title: "활동",
           links: [
             {
-              href: "/student/walking",
-              label: "걷기 기록",
-              active: walkingActive,
-            },
-            {
               href: "/student/canva-pair",
               label: "캔바 연결",
               active: pathname.startsWith("/student/canva-pair"),

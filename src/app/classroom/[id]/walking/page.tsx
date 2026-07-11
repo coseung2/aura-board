@@ -15,7 +15,8 @@ type Props = {
 
 export default async function ClassroomWalkingPage({ params }: Props) {
   const { id } = await params;
-  const user = await getCurrentUser();
+  const user = await getCurrentUser().catch(() => null);
+  if (!user) notFound();
   const classroom = await db.classroom.findUnique({
     where: { id },
     select: { id: true, name: true, teacherId: true },
@@ -66,30 +67,43 @@ export default async function ClassroomWalkingPage({ params }: Props) {
         <div className="classroom-dashboard-panel-head">
           <div>
             <span>Students</span>
-            <h3>학생별 최근 7일</h3>
+            <h2>학생별 최근 7일</h2>
           </div>
         </div>
         <div className="classroom-dashboard-list">
           {students.map((student) => {
             const percentage = Math.round((student.sevenDaySteps / maxSteps) * 100);
             return (
-              <div key={student.studentId} className="classroom-dashboard-row">
-                <span style={{ minWidth: "8rem" }}>
-                  {student.studentNumber ?? "-"}번 {student.studentName}
+              <div
+                key={student.studentId}
+                className="classroom-dashboard-row walking-student-row"
+                aria-label={`${student.studentNumber ?? "번호 없음"}번 ${student.studentName}, 오늘 ${numberFormatter.format(student.todaySteps)}걸음, 최근 7일 ${numberFormatter.format(student.sevenDaySteps)}걸음${student.lastSyncedAt ? "" : ", 아직 동기화되지 않음"}`}
+              >
+                <span className="walking-student-name">
+                  <strong>{student.studentNumber ?? "-"}번 {student.studentName}</strong>
+                  <small>
+                    {student.lastSyncedAt
+                      ? `마지막 동기화 ${new Date(student.lastSyncedAt).toLocaleString("ko-KR")}`
+                      : "아직 동기화되지 않음"}
+                  </small>
                 </span>
-                <span style={{ flex: 1, marginInline: "1rem" }}>
+                <span className="walking-bar" aria-hidden="true">
                   <span
+                    className="walking-bar-fill"
                     style={{
-                      display: "block",
                       width: `${percentage}%`,
                       minWidth: student.sevenDaySteps > 0 ? "4px" : 0,
-                      height: "10px",
-                      background: "var(--color-primary)",
                     }}
                   />
                 </span>
-                <span>{numberFormatter.format(student.todaySteps)} 오늘</span>
-                <strong>{numberFormatter.format(student.sevenDaySteps)}걸음</strong>
+                <span className="walking-metric">
+                  <small>오늘</small>
+                  <strong>{numberFormatter.format(student.todaySteps)}걸음</strong>
+                </span>
+                <span className="walking-metric">
+                  <small>최근 7일</small>
+                  <strong>{numberFormatter.format(student.sevenDaySteps)}걸음</strong>
+                </span>
               </div>
             );
           })}
@@ -103,7 +117,7 @@ export default async function ClassroomWalkingPage({ params }: Props) {
         <div className="classroom-dashboard-panel-head">
           <div>
             <span>Privacy</span>
-            <h3>건강 데이터 처리 범위</h3>
+            <h2>건강 데이터 처리 범위</h2>
           </div>
         </div>
         <p className="classroom-dashboard-empty">

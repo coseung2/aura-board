@@ -32,9 +32,11 @@ import type {
 import {
   borders,
   colors,
+  iconSizes,
   layout,
   spacing,
   typography,
+  walking,
 } from "../../theme/tokens";
 import { AppButton, AppHeader, SurfaceCard } from "../../components/ui";
 
@@ -52,6 +54,22 @@ function dayLabel(day: string, today: string) {
     day: "numeric",
     weekday: "short",
   }).format(new Date(year, month - 1, date));
+}
+
+function localizedWalkingError(nextError: unknown, fallback: string) {
+  if (nextError instanceof ApiError) {
+    if (nextError.status === 403) return "걷기 기록을 볼 권한이 없어요.";
+    if (nextError.status >= 500) {
+      return "걷기 기록을 불러오지 못했어요. 인터넷 연결을 확인하고 다시 시도해 주세요.";
+    }
+    return fallback;
+  }
+
+  if (nextError instanceof Error && /[가-힣]/u.test(nextError.message)) {
+    return nextError.message;
+  }
+
+  return "네트워크에 연결되지 않았어요. 연결을 확인하고 다시 시도해 주세요.";
 }
 
 export default function StudentWalkingScreen() {
@@ -106,11 +124,7 @@ export default function StudentWalkingScreen() {
       }
     } catch (nextError) {
       if (!(await handleAuthError(nextError))) {
-        setError(
-          nextError instanceof Error
-            ? nextError.message
-            : "걷기 기록을 불러오지 못했어요.",
-        );
+        setError(localizedWalkingError(nextError, "걷기 기록을 불러오지 못했어요."));
       }
     } finally {
       setLoading(false);
@@ -130,7 +144,9 @@ export default function StudentWalkingScreen() {
       const granted = await requestHealthConnectPermissions();
       setPermissions(granted);
       if (!hasRequiredHealthConnectPermissions(granted)) {
-        setError("걸음 수와 거리 권한을 모두 허용해 주세요.");
+        setError(
+          "권한을 허용하지 않아 연결되지 않았어요. 권한 관리에서 다시 허용할 수 있어요.",
+        );
         return;
       }
       setRows(await readAndSyncWalkingDays(7));
@@ -138,11 +154,7 @@ export default function StudentWalkingScreen() {
       setMessage("Health Connect 연결과 첫 동기화를 완료했어요.");
     } catch (nextError) {
       if (!(await handleAuthError(nextError))) {
-        setError(
-          nextError instanceof Error
-            ? nextError.message
-            : "Health Connect 연결에 실패했어요.",
-        );
+        setError(localizedWalkingError(nextError, "Health Connect 연결에 실패했어요."));
       }
     } finally {
       setBusy(null);
@@ -158,9 +170,7 @@ export default function StudentWalkingScreen() {
       setMessage("최근 7일 걷기 기록을 동기화했어요.");
     } catch (nextError) {
       if (!(await handleAuthError(nextError))) {
-        setError(
-          nextError instanceof Error ? nextError.message : "동기화하지 못했어요.",
-        );
+        setError(localizedWalkingError(nextError, "동기화하지 못했어요."));
       }
     } finally {
       setBusy(null);
@@ -173,9 +183,7 @@ export default function StudentWalkingScreen() {
     try {
       await openHealthConnectSettings();
     } catch (nextError) {
-      setError(
-        nextError instanceof Error ? nextError.message : "설정을 열지 못했어요.",
-      );
+      setError(localizedWalkingError(nextError, "설정을 열지 못했어요."));
     } finally {
       setBusy(null);
     }
@@ -187,6 +195,9 @@ export default function StudentWalkingScreen() {
   const totalDistance = days.reduce((sum, row) => sum + row.distanceMeters, 0);
   const averageSteps = Math.round(totalSteps / days.length);
   const maxSteps = Math.max(1, ...days.map((row) => row.steps));
+  const hasSyncedData = rows.length > 0;
+  const showInitialLoading = loading && rows.length === 0;
+  const showEmptyState = !loading && !error && !hasSyncedData;
 
   const connectionLabel = Platform.OS !== "android"
     ? "Android에서 동기화 가능"
@@ -215,7 +226,7 @@ export default function StudentWalkingScreen() {
       >
         <SurfaceCard style={styles.connectionCard}>
           <View style={styles.iconBadge}>
-            <ShieldCheck size={24} color={colors.accent} />
+            <ShieldCheck size={iconSizes.md} color={colors.accent} accessible={false} />
           </View>
           <View style={styles.connectionCopy}>
             <Text style={styles.connectionTitle}>{connectionLabel}</Text>
@@ -226,9 +237,25 @@ export default function StudentWalkingScreen() {
         </SurfaceCard>
 
         {status === "available" && !connected ? (
-          <AppButton loading={busy === "connect"} onPress={() => void connect()}>
-            Health Connect 연결
-          </AppButton>
+          <View style={styles.buttonRow}>
+            <AppButton
+              loading={busy === "connect"}
+              style={styles.flexButton}
+              onPress={() => void connect()}
+              accessibilityLabel="Health Connect 연결"
+            >
+              Health Connect 연결
+            </AppButton>
+            <AppButton
+              variant="secondary"
+              style={styles.flexButton}
+              loading={busy === "settings"}
+              onPress={() => void openSettings()}
+              accessibilityLabel="Health Connect 권한 관리"
+            >
+              권한 관리
+            </AppButton>
+          </View>
         ) : null}
 
         {status === "available" && connected ? (
@@ -245,8 +272,9 @@ export default function StudentWalkingScreen() {
               style={styles.flexButton}
               loading={busy === "settings"}
               onPress={() => void openSettings()}
+              accessibilityLabel="Health Connect 권한 관리"
             >
-              연결 설정
+              권한 관리
             </AppButton>
           </View>
         ) : null}
@@ -257,59 +285,121 @@ export default function StudentWalkingScreen() {
           </AppButton>
         ) : null}
 
-        {error ? <Text style={styles.error}>{error}</Text> : null}
-        {message ? <Text style={styles.notice}>{message}</Text> : null}
+        {showInitialLoading ? (
+          <SurfaceCard
+            style={styles.stateCard}
+            accessible
+            accessibilityRole="progressbar"
+            accessibilityLabel="걷기 기록을 불러오는 중"
+          >
+            <ActivityIndicator color={colors.accent} />
+            <Text style={styles.stateTitle}>걷기 기록을 불러오는 중…</Text>
+          </SurfaceCard>
+        ) : null}
 
-        <View style={styles.summaryGrid}>
-          <SummaryCard label="오늘" value={`${numberFormatter.format(today.steps)}걸음`} />
-          <SummaryCard label="최근 7일" value={`${numberFormatter.format(totalSteps)}걸음`} />
-          <SummaryCard label="하루 평균" value={`${numberFormatter.format(averageSteps)}걸음`} />
-          <SummaryCard
-            label="이동 거리"
-            value={`${distanceFormatter.format(totalDistance / 1000)}km`}
-          />
-        </View>
+        {error ? (
+          <SurfaceCard
+            style={styles.errorCard}
+            accessible
+            accessibilityRole="alert"
+            accessibilityLiveRegion="polite"
+          >
+            <Text style={styles.error}>{error}</Text>
+            <AppButton
+              variant="secondary"
+              loading={loading || refreshing}
+              onPress={() => void load(true)}
+              accessibilityLabel="걷기 기록 다시 시도"
+            >
+              다시 시도
+            </AppButton>
+          </SurfaceCard>
+        ) : null}
 
-        <SurfaceCard style={styles.chartCard}>
-          <View style={styles.sectionHeader}>
-            <View>
-              <Text style={styles.sectionTitle}>최근 7일</Text>
-              <Text style={styles.muted}>날짜별 걸음 수</Text>
+        {message ? (
+          <Text
+            style={styles.notice}
+            accessibilityLiveRegion="polite"
+            accessibilityRole="text"
+          >
+            {message}
+          </Text>
+        ) : null}
+
+        {showEmptyState ? (
+          <SurfaceCard style={styles.stateCard} accessible accessibilityRole="text">
+            <Text style={styles.stateTitle}>아직 걷기 기록이 없어요.</Text>
+            <Text style={styles.muted}>
+              Android 앱에서 Health Connect를 연결하면 최근 기록이 여기에 표시돼요.
+            </Text>
+          </SurfaceCard>
+        ) : null}
+
+        {!showInitialLoading && hasSyncedData ? (
+          <>
+            <View style={styles.summaryGrid} accessibilityRole="summary">
+              <SummaryCard label="오늘" value={`${numberFormatter.format(today.steps)}걸음`} />
+              <SummaryCard label="최근 7일" value={`${numberFormatter.format(totalSteps)}걸음`} />
+              <SummaryCard label="하루 평균" value={`${numberFormatter.format(averageSteps)}걸음`} />
+              <SummaryCard
+                label="이동 거리"
+                value={`${distanceFormatter.format(totalDistance / 1000)}km`}
+              />
             </View>
-            {loading ? (
-              <ActivityIndicator color={colors.accent} />
-            ) : (
-              <Footprints size={22} color={colors.accent} />
-            )}
-          </View>
 
-          <View style={styles.chartRows}>
-            {days.map((row) => {
-              const barWidth = `${Math.round((row.steps / maxSteps) * 100)}%` as `${number}%`;
-              return (
-                <View key={row.day} style={styles.chartRow}>
-                  <Text style={styles.dayLabel}>{dayLabel(row.day, today.day)}</Text>
-                  <View style={styles.barTrack}>
-                    <View style={[styles.barFill, { width: barWidth }]} />
-                  </View>
-                  <Text style={styles.stepLabel}>
-                    {numberFormatter.format(row.steps)}
+            <SurfaceCard style={styles.chartCard} accessible accessibilityRole="summary">
+              <View style={styles.sectionHeader}>
+                <View>
+                  <Text accessibilityRole="header" style={styles.sectionTitle}>
+                    최근 7일
                   </Text>
+                  <Text style={styles.muted}>날짜별 걸음 수</Text>
                 </View>
-              );
-            })}
-          </View>
-        </SurfaceCard>
+                {loading ? (
+                  <ActivityIndicator
+                    color={colors.accent}
+                    accessibilityLabel="걷기 기록을 동기화하는 중"
+                  />
+                ) : (
+                  <Footprints color={colors.accent} accessible={false} size={22} />
+                )}
+              </View>
+
+              <View style={styles.chartRows}>
+                {days.map((row) => {
+                  const label = dayLabel(row.day, today.day);
+                  const value = numberFormatter.format(row.steps);
+                  const barWidth = `${Math.round((row.steps / maxSteps) * 100)}%` as `${number}%`;
+                  return (
+                    <View
+                      key={row.day}
+                      style={styles.chartRow}
+                      accessible
+                      accessibilityRole="text"
+                      accessibilityLabel={`${label}: ${value}걸음`}
+                    >
+                      <Text accessible={false} style={styles.dayLabel}>{label}</Text>
+                      <View accessible={false} style={styles.barTrack}>
+                        <View style={[styles.barFill, { width: barWidth }]} />
+                      </View>
+                      <Text accessible={false} style={styles.stepLabel}>{value}걸음</Text>
+                    </View>
+                  );
+                })}
+              </View>
+            </SurfaceCard>
+          </>
+        ) : null}
 
         <SurfaceCard style={styles.privacyCard}>
           <View style={styles.privacyRow}>
-            <RefreshCw size={20} color={colors.accent} />
+            <RefreshCw size={iconSizes.md} color={colors.accent} accessible={false} />
             <Text style={styles.privacyText}>
               Android에서 동기화한 결과는 웹 걷기 페이지에도 표시돼요.
             </Text>
           </View>
           <View style={styles.privacyRow}>
-            <Settings size={20} color={colors.accent} />
+            <Settings size={iconSizes.md} color={colors.accent} accessible={false} />
             <Text style={styles.privacyText}>
               권한은 Health Connect 설정에서 언제든 철회할 수 있어요.
             </Text>
@@ -344,10 +434,11 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: spacing.md,
+    padding: spacing.lg,
   },
   iconBadge: {
-    width: 48,
-    height: 48,
+    width: walking.iconBadgeSize,
+    height: walking.iconBadgeSize,
     alignItems: "center",
     justifyContent: "center",
     backgroundColor: colors.accentTintedBg,
@@ -359,16 +450,28 @@ const styles = StyleSheet.create({
   flexButton: { flex: 1 },
   error: { ...typography.body, color: colors.danger },
   notice: { ...typography.body, color: colors.accentTintedText },
+  stateCard: {
+    alignItems: "center",
+    gap: spacing.sm,
+    padding: spacing.lg,
+  },
+  stateTitle: { ...typography.section, color: colors.text, textAlign: "center" },
+  errorCard: {
+    gap: spacing.sm,
+    padding: spacing.lg,
+    backgroundColor: colors.dangerTintedBg,
+  },
   summaryGrid: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm },
   summaryCard: {
     flexGrow: 1,
     flexBasis: "47%",
-    minWidth: 140,
+    minWidth: walking.summaryCardMinWidth,
     gap: spacing.xs,
+    padding: spacing.lg,
   },
   summaryLabel: { ...typography.label, color: colors.textMuted },
   summaryValue: { ...typography.section, color: colors.text },
-  chartCard: { gap: spacing.lg },
+  chartCard: { gap: spacing.lg, padding: spacing.lg },
   sectionHeader: {
     flexDirection: "row",
     alignItems: "center",
@@ -380,10 +483,14 @@ const styles = StyleSheet.create({
   sectionTitle: { ...typography.section, color: colors.text },
   chartRows: { gap: spacing.md },
   chartRow: { flexDirection: "row", alignItems: "center", gap: spacing.sm },
-  dayLabel: { ...typography.micro, color: colors.textMuted, width: 72 },
+  dayLabel: {
+    ...typography.micro,
+    color: colors.textMuted,
+    width: walking.chartDayLabelWidth,
+  },
   barTrack: {
     flex: 1,
-    height: 10,
+    height: walking.chartBarHeight,
     backgroundColor: colors.accentTintedBg,
     overflow: "hidden",
   },
@@ -391,10 +498,10 @@ const styles = StyleSheet.create({
   stepLabel: {
     ...typography.micro,
     color: colors.text,
-    width: 56,
+    width: walking.chartStepLabelWidth,
     textAlign: "right",
   },
-  privacyCard: { gap: spacing.md },
+  privacyCard: { gap: spacing.md, padding: spacing.lg },
   privacyRow: {
     flexDirection: "row",
     alignItems: "flex-start",

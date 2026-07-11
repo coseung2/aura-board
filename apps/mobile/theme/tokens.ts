@@ -451,6 +451,14 @@ export const studentNav = {
   canvaCardMaxWidth: 480,
 } as const;
 
+export const walking = {
+  iconBadgeSize: 48,
+  chartBarHeight: 10,
+  chartDayLabelWidth: 72,
+  chartStepLabelWidth: 76,
+  summaryCardMinWidth: 140,
+} as const;
+
 export const store = {
   headerHeight: 72,
   itemCardWidth: 160,

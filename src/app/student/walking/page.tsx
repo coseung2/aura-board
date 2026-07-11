@@ -2,7 +2,12 @@ import { redirect } from "next/navigation";
 import { isAdminEmail } from "@/lib/admin";
 import { getCurrentStudent } from "@/lib/student-auth";
 import { getStudentHomePayload } from "@/lib/student-home";
-import { getStudentWalkingDays, type WalkingDay } from "@/lib/walking";
+import {
+  addWalkingDays,
+  getStudentWalkingDays,
+  getWalkingDayKey,
+  type WalkingDay,
+} from "@/lib/walking";
 import { StudentTopNav } from "@/components/StudentTopNav";
 
 const numberFormatter = new Intl.NumberFormat("ko-KR");
@@ -11,20 +16,11 @@ const distanceFormatter = new Intl.NumberFormat("ko-KR", {
   maximumFractionDigits: 1,
 });
 
-function dayKey(date: Date) {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
-}
-
 function fillDays(rows: WalkingDay[]) {
   const byDay = new Map(rows.map((row) => [row.day, row]));
-  const today = new Date();
+  const today = getWalkingDayKey();
   return Array.from({ length: 7 }, (_, index) => {
-    const date = new Date(today);
-    date.setDate(today.getDate() - (6 - index));
-    const key = dayKey(date);
+    const key = addWalkingDays(today, -(6 - index));
     return byDay.get(key) ?? {
       day: key,
       steps: 0,
@@ -83,6 +79,21 @@ export default async function StudentWalkingPage() {
           </div>
         </header>
 
+        {!latestSync ? (
+          <section className="classroom-dashboard-panel" aria-labelledby="walking-empty-title">
+            <div className="classroom-dashboard-panel-head">
+              <div>
+                <span>Get started</span>
+                <h2 id="walking-empty-title">아직 동기화된 걷기 기록이 없습니다</h2>
+              </div>
+            </div>
+            <p className="classroom-dashboard-empty">
+              Android 앱의 걷기 화면에서 Health Connect를 연결하고 동기화하면
+              오늘과 최근 7일 기록이 여기에 표시됩니다.
+            </p>
+          </section>
+        ) : null}
+
         <section className="classroom-dashboard-kpis" aria-label="걷기 요약">
           <article className="classroom-dashboard-kpi">
             <span>오늘</span>
@@ -106,7 +117,7 @@ export default async function StudentWalkingPage() {
           <div className="classroom-dashboard-panel-head">
             <div>
               <span>Recent 7 days</span>
-              <h3>날짜별 걸음 수</h3>
+              <h2>날짜별 걸음 수</h2>
             </div>
             <span>
               {latestSync
@@ -118,11 +129,14 @@ export default async function StudentWalkingPage() {
             {rows.map((row) => {
               const percentage = Math.round((row.steps / maxSteps) * 100);
               return (
-                <div key={row.day} className="classroom-dashboard-row">
+                <div
+                  key={row.day}
+                  className="classroom-dashboard-row"
+                  aria-label={`${formatDay(row.day, today.day)}, ${numberFormatter.format(row.steps)}걸음`}
+                >
                   <span>{formatDay(row.day, today.day)}</span>
-                  <span style={{ flex: 1, marginInline: "1rem" }}>
+                  <span style={{ flex: 1, marginInline: "1rem" }} aria-hidden="true">
                     <span
-                      aria-label={`최대 걸음 수 대비 ${percentage}%`}
                       style={{
                         display: "block",
                         width: `${percentage}%`,
@@ -143,7 +157,7 @@ export default async function StudentWalkingPage() {
           <div className="classroom-dashboard-panel-head">
             <div>
               <span>Privacy</span>
-              <h3>저장되는 정보</h3>
+              <h2>저장되는 정보</h2>
             </div>
           </div>
           <p className="classroom-dashboard-empty">

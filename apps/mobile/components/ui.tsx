@@ -228,11 +228,21 @@ export function AppButton({
   style,
   textStyle,
   disabled,
+  accessibilityLabel,
+  accessibilityState,
   ...props
 }: AppButtonProps) {
+  const label = accessibilityLabel ?? (typeof children === "string" ? children : undefined);
+
   return (
     <Pressable
       accessibilityRole="button"
+      accessibilityLabel={label}
+      accessibilityState={{
+        ...accessibilityState,
+        busy: loading,
+        disabled: disabled || loading,
+      }}
       disabled={disabled || loading}
       style={({ pressed }) => [
         styles.button,
@@ -244,7 +254,10 @@ export function AppButton({
       {...props}
     >
       {loading ? (
-        <ActivityIndicator color={indicatorColors[variant]} />
+        <ActivityIndicator
+          color={indicatorColors[variant]}
+          accessibilityLabel={label ? `${label} 처리 중` : "처리 중"}
+        />
       ) : (
         <Text style={[styles.buttonText, textVariantStyles[variant], textStyle]}>
           {children}
@@ -380,7 +393,11 @@ export function AppHeader({ title, onBack, right, style }: AppHeaderProps) {
           <Text style={styles.appHeaderBackText}>←</Text>
         </IconButton>
       ) : null}
-      <Text style={styles.appHeaderTitle} numberOfLines={1}>
+      <Text
+        accessibilityRole="header"
+        style={styles.appHeaderTitle}
+        numberOfLines={1}
+      >
         {title}
       </Text>
       {right ? <View style={styles.appHeaderRight}>{right}</View> : null}

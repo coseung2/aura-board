@@ -4,17 +4,20 @@ import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import android.os.RemoteException
 import androidx.health.connect.client.HealthConnectClient
 import androidx.health.connect.client.PermissionController
 import androidx.health.connect.client.permission.HealthPermission
 import androidx.health.connect.client.records.DistanceRecord
 import androidx.health.connect.client.records.StepsRecord
-import androidx.health.connect.client.request.AggregateRequest
+import androidx.health.connect.client.request.AggregateGroupByDurationRequest
 import androidx.health.connect.client.time.TimeRangeFilter
 import expo.modules.kotlin.activityresult.AppContextActivityResultContract
 import expo.modules.kotlin.activityresult.AppContextActivityResultLauncher
 import expo.modules.kotlin.modules.Module
 import expo.modules.kotlin.modules.ModuleDefinition
+import java.io.IOException
+import java.time.Duration
 import java.time.LocalDate
 import java.time.ZoneId
 import java.time.temporal.ChronoUnit
@@ -22,6 +25,13 @@ import java.util.ArrayList
 
 private const val HEALTH_CONNECT_PACKAGE = "com.google.android.apps.healthdata"
 private const val MAX_READ_DAYS = 31L
+private const val WALKING_TIME_ZONE = "Asia/Seoul"
+
+private const val ERROR_PERMISSION_REQUIRED = "HEALTH_CONNECT_PERMISSION_REQUIRED"
+private const val ERROR_PROVIDER_UNAVAILABLE = "HEALTH_CONNECT_PROVIDER_UNAVAILABLE"
+private const val ERROR_PROVIDER_UPDATE_REQUIRED = "HEALTH_CONNECT_PROVIDER_UPDATE_REQUIRED"
+private const val ERROR_PROVIDER_ERROR = "HEALTH_CONNECT_PROVIDER_ERROR"
+private const val ERROR_RATE_LIMITED = "HEALTH_CONNECT_RATE_LIMITED"
 
 private class HealthConnectPermissionsContract :
   AppContextActivityResultContract<ArrayList<String>, Set<String>> {
@@ -56,7 +66,18 @@ class AuraBoardHealthConnectModule : Module() {
 
     AsyncFunction("getGrantedPermissions").SuspendBody<List<String>> {
       val client = requireAvailableClient()
-      permissionLabels(client.permissionController.getGrantedPermissions())
+      val granted = try {
+        client.permissionController.getGrantedPermissions()
+      } catch (error: SecurityException) {
+        throw IllegalStateException(ERROR_PERMISSION_REQUIRED, error)
+      } catch (error: RemoteException) {
+        throw healthConnectOperationError(error)
+      } catch (error: IOException) {
+        throw healthConnectOperationError(error)
+      } catch (error: IllegalStateException) {
+        throw healthConnectOperationError(error)
+      }
+      permissionLabels(granted)
     }
 
     AsyncFunction("requestPermissions").SuspendBody<List<String>> {
@@ -86,10 +107,16 @@ class AuraBoardHealthConnectModule : Module() {
 
   private fun requireAvailableClient(): HealthConnectClient {
     val context = reactContext()
-    check(HealthConnectClient.getSdkStatus(context) == HealthConnectClient.SDK_AVAILABLE) {
-      "Health Connect를 사용할 수 없거나 업데이트가 필요합니다."
+    return when (HealthConnectClient.getSdkStatus(context)) {
+      HealthConnectClient.SDK_AVAILABLE -> try {
+        HealthConnectClient.getOrCreate(context)
+      } catch (error: IllegalStateException) {
+        throw healthConnectOperationError(error)
+      }
+      HealthConnectClient.SDK_UNAVAILABLE_PROVIDER_UPDATE_REQUIRED ->
+        error(ERROR_PROVIDER_UPDATE_REQUIRED)
+      else -> error(ERROR_PROVIDER_UNAVAILABLE)
     }
-    return HealthConnectClient.getOrCreate(context)
   }
 
   private fun permissionLabels(granted: Set<String>): List<String> = buildList {
@@ -113,30 +140,71 @@ class AuraBoardHealthConnectModule : Module() {
     require(inclusiveDays in 1L..MAX_READ_DAYS) { "한 번에 최대 31일까지만 읽을 수 있습니다." }
 
     val client = requireAvailableClient()
-    val granted = client.permissionController.getGrantedPermissions()
-    check(granted.containsAll(requiredPermissions)) {
-      "걸음 수와 거리 읽기 권한이 필요합니다."
+    val granted = try {
+      client.permissionController.getGrantedPermissions()
+    } catch (error: SecurityException) {
+      throw IllegalStateException(ERROR_PERMISSION_REQUIRED, error)
+    } catch (error: RemoteException) {
+      throw healthConnectOperationError(error)
+    } catch (error: IOException) {
+      throw healthConnectOperationError(error)
+    } catch (error: IllegalStateException) {
+      throw healthConnectOperationError(error)
+    }
+    if (!granted.containsAll(requiredPermissions)) {
+      error(ERROR_PERMISSION_REQUIRED)
     }
 
-    val zoneId = ZoneId.systemDefault()
-    return (0L until inclusiveDays).map { offset ->
-      val day = startDay.plusDays(offset)
-      val startInstant = day.atStartOfDay(zoneId).toInstant()
-      val endInstant = day.plusDays(1).atStartOfDay(zoneId).toInstant()
-      val result = client.aggregate(
-        AggregateRequest(
+    // Asia/Seoul has no DST transitions, so one 24-hour duration bucket from
+    // Seoul midnight preserves the canonical day boundary while using one IPC.
+    val zoneId = ZoneId.of(WALKING_TIME_ZONE)
+    val grouped = try {
+      client.aggregateGroupByDuration(
+        AggregateGroupByDurationRequest(
           metrics = setOf(StepsRecord.COUNT_TOTAL, DistanceRecord.DISTANCE_TOTAL),
-          timeRangeFilter = TimeRangeFilter.between(startInstant, endInstant)
+          timeRangeFilter = TimeRangeFilter.between(
+            startDay.atStartOfDay(zoneId).toInstant(),
+            endDay.plusDays(1).atStartOfDay(zoneId).toInstant()
+          ),
+          timeRangeSlicer = Duration.ofDays(1)
         )
       )
+    } catch (error: SecurityException) {
+      throw IllegalStateException(ERROR_PERMISSION_REQUIRED, error)
+    } catch (error: RemoteException) {
+      throw healthConnectOperationError(error)
+    } catch (error: IOException) {
+      throw healthConnectOperationError(error)
+    } catch (error: IllegalStateException) {
+      throw healthConnectOperationError(error)
+    }
 
+    val groupedByDay = grouped.associateBy { result ->
+      result.startTime.atZone(zoneId).toLocalDate()
+    }
+
+    return (0L until inclusiveDays).map { offset ->
+      val day = startDay.plusDays(offset)
+      val result = groupedByDay[day]?.result
       mapOf<String, Any>(
         "day" to day.toString(),
-        "steps" to (result[StepsRecord.COUNT_TOTAL] ?: 0L),
-        "distanceMeters" to (result[DistanceRecord.DISTANCE_TOTAL]?.inMeters ?: 0.0)
+        "steps" to (result?.get(StepsRecord.COUNT_TOTAL) ?: 0L),
+        "distanceMeters" to (result?.get(DistanceRecord.DISTANCE_TOTAL)?.inMeters ?: 0.0)
       )
     }
   }
+
+  private fun healthConnectOperationError(error: Throwable): IllegalStateException =
+    when {
+      error is SecurityException -> IllegalStateException(ERROR_PERMISSION_REQUIRED, error)
+      isRateLimitError(error) -> IllegalStateException(ERROR_RATE_LIMITED, error)
+      else -> IllegalStateException(ERROR_PROVIDER_ERROR, error)
+    }
+
+  private fun isRateLimitError(error: Throwable): Boolean =
+    generateSequence(error) { it.cause }.any { cause ->
+      cause.message?.contains(Regex("(?i)quota|rate[ -]?limit|too many|throttl")) == true
+    }
 
   private fun openHealthConnectSettings() {
     val context = reactContext()
@@ -154,7 +222,7 @@ class AuraBoardHealthConnectModule : Module() {
           putExtra("overlay", true)
           putExtra("callerId", context.packageName)
         }
-      else -> throw IllegalStateException("이 기기에서는 Health Connect를 사용할 수 없습니다.")
+      else -> error(ERROR_PROVIDER_UNAVAILABLE)
     }.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
 
     try {
