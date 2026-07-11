@@ -12,7 +12,7 @@
  * foundation agent — handled by BR-5/BR-6 via the existing
  * /board/[id]/s/[sectionId] route (T0-①).
  */
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { AddCardButton } from "./AddCardButton";
 import { AddCardModal, type AddCardData } from "./AddCardModal";
@@ -28,6 +28,7 @@ import type {
 import { BreakoutHeader } from "./breakout/BreakoutHeader";
 import { GroupColumn } from "./breakout/GroupColumn";
 import { PoolColumn } from "./breakout/PoolColumn";
+import { useCardRealtime } from "@/hooks/useCardRealtime";
 
 type SectionData = {
   id: string;
@@ -66,35 +67,35 @@ type Props = {
  * Returns null if the title isn't a group section (e.g. teacher-pool).
  */
 function parseGroupSection(
-  title: string
+  title: string,
 ): { groupIndex: number; tabTitle: string } | null {
-  const m = /^모둠\s+(\d+)\s+·\s+(.+)$/.exec(title);
-  if (!m) return null;
-  return { groupIndex: Number(m[1]), tabTitle: m[2] };
+  const match = /^모둠\s+(\d+)\s+·\s+(.+)$/.exec(title);
+  if (!match) return null;
+  return { groupIndex: Number(match[1]), tabTitle: match[2] };
 }
 
 /** Server returns Card rows as plain JSON; map them into our CardData shape. */
 function normalizeCopiedCard(
-  c: Record<string, unknown>,
-  fallbackAuthorId: string
+  card: Record<string, unknown>,
+  fallbackAuthorId: string,
 ): CardData {
   return {
-    id: String(c.id),
-    title: String(c.title ?? ""),
-    content: String(c.content ?? ""),
-    color: (c.color as string | null) ?? null,
-    imageUrl: (c.imageUrl as string | null) ?? null,
-    linkUrl: (c.linkUrl as string | null) ?? null,
-    linkTitle: (c.linkTitle as string | null) ?? null,
-    linkDesc: (c.linkDesc as string | null) ?? null,
-    linkImage: (c.linkImage as string | null) ?? null,
-    videoUrl: (c.videoUrl as string | null) ?? null,
-    fileUrl: (c.fileUrl as string | null) ?? null,
-    fileName: (c.fileName as string | null) ?? null,
-    fileSize: (c.fileSize as number | null) ?? null,
-    fileMimeType: (c.fileMimeType as string | null) ?? null,
+    id: String(card.id),
+    title: String(card.title ?? ""),
+    content: String(card.content ?? ""),
+    color: (card.color as string | null) ?? null,
+    imageUrl: (card.imageUrl as string | null) ?? null,
+    linkUrl: (card.linkUrl as string | null) ?? null,
+    linkTitle: (card.linkTitle as string | null) ?? null,
+    linkDesc: (card.linkDesc as string | null) ?? null,
+    linkImage: (card.linkImage as string | null) ?? null,
+    videoUrl: (card.videoUrl as string | null) ?? null,
+    fileUrl: (card.fileUrl as string | null) ?? null,
+    fileName: (card.fileName as string | null) ?? null,
+    fileSize: (card.fileSize as number | null) ?? null,
+    fileMimeType: (card.fileMimeType as string | null) ?? null,
     attachments:
-      (c.attachments as
+      (card.attachments as
         | Array<{
             id: string;
             kind: string;
@@ -106,17 +107,20 @@ function normalizeCopiedCard(
             order: number;
           }>
         | undefined) ?? [],
-    commentVoteOptionCount: (c.commentVoteOptionCount as number | null) ?? null,
-    commentVoteOptionLabels: Array.isArray(c.commentVoteOptionLabels)
-      ? c.commentVoteOptionLabels.filter((label): label is string => typeof label === "string")
+    commentVoteOptionCount:
+      (card.commentVoteOptionCount as number | null) ?? null,
+    commentVoteOptionLabels: Array.isArray(card.commentVoteOptionLabels)
+      ? card.commentVoteOptionLabels.filter(
+          (label): label is string => typeof label === "string",
+        )
       : null,
-    x: Number(c.x ?? 0),
-    y: Number(c.y ?? 0),
-    width: Number(c.width ?? 240),
-    height: Number(c.height ?? 160),
-    order: Number(c.order ?? 0),
-    sectionId: (c.sectionId as string | null) ?? null,
-    authorId: String(c.authorId ?? fallbackAuthorId),
+    x: Number(card.x ?? 0),
+    y: Number(card.y ?? 0),
+    width: Number(card.width ?? 240),
+    height: Number(card.height ?? 160),
+    order: Number(card.order ?? 0),
+    sectionId: (card.sectionId as string | null) ?? null,
+    authorId: String(card.authorId ?? fallbackAuthorId),
   };
 }
 
@@ -135,7 +139,7 @@ export function BreakoutBoard({
   const router = useRouter();
   const [cards, setCards] = useState<CardData[]>(initialCards);
   const [sections, setSections] = useState<SectionData[]>(
-    [...initialSections].sort((a, b) => a.order - b.order)
+    [...initialSections].sort((a, b) => a.order - b.order),
   );
   const [memberships, setMemberships] =
     useState<BreakoutMembershipData[]>(initialMemberships);
@@ -146,40 +150,52 @@ export function BreakoutBoard({
   const [managerOpen, setManagerOpen] = useState(false);
   const [archiving, setArchiving] = useState(false);
   const [localStatus, setLocalStatus] = useState<"active" | "archived">(
-    assignment.status
+    assignment.status,
   );
-  // sections setter is referenced (for membership/section edits via manager).
+  const deletingIds = useRef<Set<string>>(new Set());
+
+  // Breakout is a durable content board, not a game lobby: use Broadcast as an
+  // invalidation signal and the board snapshot as the source of truth. Presence
+  // is intentionally absent.
+  useCardRealtime(boardId, setCards, deletingIds);
+
+  // sections setter is referenced by the assignment manager's future section
+  // edit path; keep it available without adding a separate realtime contract.
   void setSections;
   const canEdit = currentRole === "owner" || currentRole === "editor";
   const canBulkCopy = currentRole === "owner";
   const isOwner = currentRole === "owner";
 
   const membershipsBySection = useMemo(() => {
-    const m = new Map<string, BreakoutMembershipData[]>();
+    const map = new Map<string, BreakoutMembershipData[]>();
     for (const row of memberships) {
-      const arr = m.get(row.sectionId);
-      if (arr) arr.push(row);
-      else m.set(row.sectionId, [row]);
+      const current = map.get(row.sectionId);
+      if (current) current.push(row);
+      else map.set(row.sectionId, [row]);
     }
-    return m;
+    return map;
   }, [memberships]);
 
   async function handleArchive() {
     if (!isOwner) return;
     if (
       !window.confirm(
-        "세션을 종료하면 읽기 전용 아카이브로 전환돼요. 계속할까요?"
+        "세션을 종료하면 읽기 전용 아카이브로 전환돼요. 계속할까요?",
       )
-    )
+    ) {
       return;
+    }
     setArchiving(true);
     try {
-      const res = await fetch(`/api/breakout/assignments/${assignment.id}`, {
-        method: "PATCH",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ status: "archived" }),
-      });
-      if (res.ok) {
+      const response = await fetch(
+        `/api/breakout/assignments/${assignment.id}`,
+        {
+          method: "PATCH",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ status: "archived" }),
+        },
+      );
+      if (response.ok) {
         setLocalStatus("archived");
         router.replace(`/board/${boardSlug}/archive`);
       } else {
@@ -192,7 +208,7 @@ export function BreakoutBoard({
 
   const poolTitles = useMemo(
     () => new Set(assignment.sharedSectionTitles),
-    [assignment.sharedSectionTitles]
+    [assignment.sharedSectionTitles],
   );
 
   // Split sections into teacher-pool vs group. Group sections are grouped by
@@ -200,20 +216,20 @@ export function BreakoutBoard({
   const { poolSections, groupedSections } = useMemo(() => {
     const pool: SectionData[] = [];
     const groups = new Map<number, SectionData[]>();
-    for (const s of sections) {
-      if (poolTitles.has(s.title)) {
-        pool.push(s);
+    for (const section of sections) {
+      if (poolTitles.has(section.title)) {
+        pool.push(section);
         continue;
       }
-      const parsed = parseGroupSection(s.title);
+      const parsed = parseGroupSection(section.title);
       if (!parsed) {
         // Unrecognised — treat as pool so it still renders.
-        pool.push(s);
+        pool.push(section);
         continue;
       }
-      const arr = groups.get(parsed.groupIndex);
-      if (arr) arr.push(s);
-      else groups.set(parsed.groupIndex, [s]);
+      const current = groups.get(parsed.groupIndex);
+      if (current) current.push(section);
+      else groups.set(parsed.groupIndex, [section]);
     }
     const sortedGroups = [...groups.entries()].sort((a, b) => a[0] - b[0]);
     return { poolSections: pool, groupedSections: sortedGroups };
@@ -222,11 +238,11 @@ export function BreakoutBoard({
   const cardsBySection = useMemo(() => {
     const map = new Map<string, CardData[]>();
     const sorted = [...cards].sort((a, b) => a.order - b.order);
-    for (const c of sorted) {
-      const key = c.sectionId ?? "";
-      const bucket = map.get(key);
-      if (bucket) bucket.push(c);
-      else map.set(key, [c]);
+    for (const card of sorted) {
+      const key = card.sectionId ?? "";
+      const current = map.get(key);
+      if (current) current.push(card);
+      else map.set(key, [card]);
     }
     return map;
   }, [cards]);
@@ -238,9 +254,11 @@ export function BreakoutBoard({
   async function handleAdd(data: AddCardData) {
     const targetSection =
       data.sectionId ?? addForSection ?? sections[0]?.id ?? null;
-    const order = targetSection ? getCardsForSection(targetSection).length : 0;
+    const order = targetSection
+      ? getCardsForSection(targetSection).length
+      : 0;
     try {
-      const res = await fetch(`/api/cards`, {
+      const response = await fetch("/api/cards", {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
@@ -262,73 +280,87 @@ export function BreakoutBoard({
           sectionId: targetSection,
         }),
       });
-      if (res.ok) {
-        const { card } = await res.json();
-        setCards((prev) => [...prev, card]);
+      if (response.ok) {
+        const { card } = await response.json();
+        setCards((previous) => [...previous, card]);
       } else {
-        alert(`카드 추가 실패: ${await res.text()}`);
+        alert(`카드 추가 실패: ${await response.text()}`);
       }
-    } catch (err) {
-      console.error(err);
+    } catch (error) {
+      console.error(error);
     }
   }
 
   async function handleDeleteCard(id: string) {
     if (!window.confirm("이 카드를 삭제할까요?")) return;
-    const prev = [...cards];
-    setCards((list) => list.filter((c) => c.id !== id));
+    deletingIds.current.add(id);
+    const previous = [...cards];
+    setCards((list) => list.filter((card) => card.id !== id));
     try {
-      const res = await fetch(`/api/cards/${id}`, { method: "DELETE" });
-      if (!res.ok) setCards(prev);
+      const response = await fetch(`/api/cards/${id}`, { method: "DELETE" });
+      if (!response.ok) {
+        deletingIds.current.delete(id);
+        setCards(previous);
+      }
     } catch {
-      setCards(prev);
+      deletingIds.current.delete(id);
+      setCards(previous);
     }
   }
 
   async function handleEditCardSave(updates: EditCardUpdates) {
     if (!editingCard) return;
-    const prev = [...cards];
+    const previous = [...cards];
     const cardId = editingCard.id;
     const { attachments: updateAttachments, ...restUpdates } = updates;
     const optimisticUpdates: Partial<CardData> = { ...restUpdates };
     if (updateAttachments) {
-      optimisticUpdates.attachments = updateAttachments.map((a, idx) => ({
-        id: a.tempId,
-        kind: a.kind,
-        url: a.url,
-        previewUrl: a.previewUrl ?? null,
-        fileName: a.fileName ?? null,
-        fileSize: a.fileSize ?? null,
-        mimeType: a.mimeType ?? null,
-        order: idx,
-      }));
+      optimisticUpdates.attachments = updateAttachments.map(
+        (attachment, index) => ({
+          id: attachment.tempId,
+          kind: attachment.kind,
+          url: attachment.url,
+          previewUrl: attachment.previewUrl ?? null,
+          fileName: attachment.fileName ?? null,
+          fileSize: attachment.fileSize ?? null,
+          mimeType: attachment.mimeType ?? null,
+          order: index,
+        }),
+      );
     }
     setCards((list) =>
-      list.map((c) => (c.id === cardId ? { ...c, ...optimisticUpdates } : c))
+      list.map((card) =>
+        card.id === cardId ? { ...card, ...optimisticUpdates } : card,
+      ),
     );
     try {
-      const res = await fetch(`/api/cards/${cardId}`, {
+      const response = await fetch(`/api/cards/${cardId}`, {
         method: "PATCH",
         headers: { "content-type": "application/json" },
         body: JSON.stringify(updates),
       });
-      if (!res.ok) {
-        setCards(prev);
+      if (!response.ok) {
+        setCards(previous);
         return;
       }
-      const data = (await res.json()) as { card?: CardData };
-      if (data.card) {
-        setCards((list) => list.map((c) => (c.id === cardId ? data.card! : c)));
+      const payload = (await response.json()) as { card?: CardData };
+      if (payload.card) {
+        setCards((list) =>
+          list.map((card) =>
+            card.id === cardId ? payload.card! : card,
+          ),
+        );
       }
     } catch {
-      setCards(prev);
+      setCards(previous);
     }
   }
 
   async function handleCopyToAllGroups(sourceCard: CardData) {
     if (
       poolTitles.has(
-        sections.find((s) => s.id === sourceCard.sectionId)?.title ?? ""
+        sections.find((section) => section.id === sourceCard.sectionId)?.title ??
+          "",
       )
     ) {
       alert("팀 공용 자료 섹션의 카드는 일괄 복제 대상이 아니에요.");
@@ -336,39 +368,40 @@ export function BreakoutBoard({
     }
     if (
       !window.confirm(
-        `"${sourceCard.title}" 카드를 모든 모둠 섹션에 복제할까요?\n(팀 공용 섹션 제외)`
+        `"${sourceCard.title}" 카드를 모든 모둠 섹션에 복제할까요?\n(팀 공용 섹션 제외)`,
       )
-    )
+    ) {
       return;
+    }
 
     setCopying(sourceCard.id);
     try {
-      const res = await fetch(
+      const response = await fetch(
         `/api/breakout/assignments/${assignment.id}/copy-card`,
         {
           method: "POST",
           headers: { "content-type": "application/json" },
           body: JSON.stringify({ sourceCardId: sourceCard.id }),
-        }
+        },
       );
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        alert(`복제 실패: ${data.error ?? res.statusText}`);
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({}));
+        alert(`복제 실패: ${data.error ?? response.statusText}`);
         return;
       }
-      const { copiedTo, cards: newCards } = await res.json();
+      const { copiedTo, cards: newCards } = await response.json();
 
       if (Array.isArray(newCards) && newCards.length > 0) {
-        setCards((prev) => [
-          ...prev,
-          ...newCards.map((c: Record<string, unknown>) =>
-            normalizeCopiedCard(c, currentUserId)
+        setCards((previous) => [
+          ...previous,
+          ...newCards.map((card: Record<string, unknown>) =>
+            normalizeCopiedCard(card, currentUserId),
           ),
         ]);
       }
       alert(`${copiedTo}개 섹션에 카드가 복제되었어요.`);
-    } catch (err) {
-      console.error(err);
+    } catch (error) {
+      console.error(error);
       alert("복제 중 오류가 발생했습니다.");
     } finally {
       setCopying(null);
@@ -376,22 +409,24 @@ export function BreakoutBoard({
   }
 
   async function handleToggleGuide(card: CardData, guidePinned: boolean) {
-    const prev = [...cards];
+    const previous = [...cards];
     setCards((list) =>
-      list.map((c) => (c.id === card.id ? { ...c, guidePinned } : c)),
+      list.map((current) =>
+        current.id === card.id ? { ...current, guidePinned } : current,
+      ),
     );
     try {
-      const res = await fetch(`/api/cards/${card.id}`, {
+      const response = await fetch(`/api/cards/${card.id}`, {
         method: "PATCH",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ guidePinned }),
       });
-      if (!res.ok) {
-        setCards(prev);
+      if (!response.ok) {
+        setCards(previous);
         alert("가이드 설정에 실패했어요.");
       }
     } catch {
-      setCards(prev);
+      setCards(previous);
       alert("가이드 설정에 실패했어요.");
     }
   }
@@ -433,7 +468,10 @@ export function BreakoutBoard({
     return items;
   }
 
-  const sectionOptions = sections.map((s) => ({ id: s.id, title: s.title }));
+  const sectionOptions = sections.map((section) => ({
+    id: section.id,
+    title: section.title,
+  }));
 
   return (
     <div className="board-canvas-wrap">
@@ -452,13 +490,16 @@ export function BreakoutBoard({
       />
 
       {poolSections.length > 0 && (
-        <section style={{ padding: "8px 16px 16px" }} aria-label="팀 공용 자료">
-          {poolSections.map((s) => (
+        <section
+          style={{ padding: "8px 16px 16px" }}
+          aria-label="팀 공용 자료"
+        >
+          {poolSections.map((section) => (
             <PoolColumn
-              key={s.id}
-              sectionId={s.id}
-              sectionTitle={s.title}
-              sectionCards={getCardsForSection(s.id)}
+              key={section.id}
+              sectionId={section.id}
+              sectionTitle={section.title}
+              sectionCards={getCardsForSection(section.id)}
               canEdit={canEdit}
               cardMenuItems={cardMenuItems}
               onOpenCard={setOpenCard}
@@ -471,13 +512,13 @@ export function BreakoutBoard({
       <div className="columns-board" style={{ alignItems: "flex-start" }}>
         {groupedSections.map(([groupIndex, groupSections]) => {
           const groupMembers = groupSections.flatMap(
-            (s) => membershipsBySection.get(s.id) ?? []
+            (section) => membershipsBySection.get(section.id) ?? [],
           );
           // Per teacher dashboard: show the most recent card updatedAt per group
           // to surface stalled groups. Foundation CardData doesn't carry updatedAt,
           // so we approximate with "has cards" presence.
           const hasAnyCard = groupSections.some(
-            (s) => getCardsForSection(s.id).length > 0
+            (section) => getCardsForSection(section.id).length > 0,
           );
           return (
             <GroupColumn
@@ -512,7 +553,6 @@ export function BreakoutBoard({
           onChange={setMemberships}
           onRosterChange={(newStudents) => {
             // Update via parent wouldn't re-render server list; callers refresh.
-            // For now we simply extend local roster via location reload hint.
             if (newStudents && newStudents.length > 0) {
               // Caller will `router.refresh()` in the manager.
             }

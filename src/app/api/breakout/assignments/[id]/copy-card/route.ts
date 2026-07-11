@@ -16,17 +16,18 @@ import { getCurrentUser } from "@/lib/auth";
 import { requirePermission, ForbiddenError } from "@/lib/rbac";
 import { cloneStructure, TemplateStructure } from "@/lib/breakout";
 import { touchBoardUpdatedAt } from "@/lib/board-touch";
+import { announceCardChange } from "@/lib/realtime-broadcast";
 
 const Body = z.object({
   sourceCardId: z.string().min(1),
 });
 
 function sharedSectionTitles(structure: TemplateStructure): Set<string> {
-  const s = new Set<string>();
+  const titles = new Set<string>();
   if (structure.sharedSections) {
-    for (const row of structure.sharedSections) s.add(row.title);
+    for (const row of structure.sharedSections) titles.add(row.title);
   }
-  return s;
+  return titles;
 }
 
 export async function POST(
@@ -85,8 +86,8 @@ export async function POST(
       select: { id: true, title: true },
     });
     const groupSectionIds = allSections
-      .filter((s) => !poolTitles.has(s.title))
-      .map((s) => s.id);
+      .filter((section) => !poolTitles.has(section.title))
+      .map((section) => section.id);
 
     if (groupSectionIds.length === 0) {
       return NextResponse.json({ error: "no_group_sections" }, { status: 400 });
@@ -105,7 +106,7 @@ export async function POST(
           where: { sectionId },
           _max: { order: true },
         });
-        const c = await tx.card.create({
+        const card = await tx.card.create({
           data: {
             boardId: assignment.boardId,
             sectionId,
@@ -134,52 +135,53 @@ export async function POST(
         // multi-attachment: 첨부 배열 복제. createMany로 벌크 삽입.
         if (sourceCard.attachments.length > 0) {
           await tx.cardAttachment.createMany({
-            data: sourceCard.attachments.map((a) => ({
-              cardId: c.id,
-              kind: a.kind,
-              url: a.url,
-              fileName: a.fileName,
-              fileSize: a.fileSize,
-              mimeType: a.mimeType,
-              order: a.order,
+            data: sourceCard.attachments.map((attachment) => ({
+              cardId: card.id,
+              kind: attachment.kind,
+              url: attachment.url,
+              fileName: attachment.fileName,
+              fileSize: attachment.fileSize,
+              mimeType: attachment.mimeType,
+              order: attachment.order,
             })),
           });
         }
         const newAttachments = await tx.cardAttachment.findMany({
-          where: { cardId: c.id },
+          where: { cardId: card.id },
           orderBy: { order: "asc" },
         });
-        cards.push({ ...c, attachments: newAttachments });
+        cards.push({ ...card, attachments: newAttachments });
       }
       return cards;
     });
 
     // classroom-boards-tab "🟢 새 활동" 배지 — 벌크 복사로 카드 다수 생성 → touch.
     await touchBoardUpdatedAt(assignment.boardId);
+    await announceCardChange(assignment.boardId, "insert");
 
     return NextResponse.json({
       copiedTo: createdCards.length,
-      cards: createdCards.map((c) => ({
-        ...c,
-        attachments: c.attachments.map((a) => ({
-          id: a.id,
-          kind: a.kind,
-          url: a.url,
-          fileName: a.fileName,
-          fileSize: a.fileSize,
-          mimeType: a.mimeType,
-          order: a.order,
+      cards: createdCards.map((card) => ({
+        ...card,
+        attachments: card.attachments.map((attachment) => ({
+          id: attachment.id,
+          kind: attachment.kind,
+          url: attachment.url,
+          fileName: attachment.fileName,
+          fileSize: attachment.fileSize,
+          mimeType: attachment.mimeType,
+          order: attachment.order,
         })),
       })),
     });
-  } catch (e) {
-    if (e instanceof ForbiddenError) {
-      return NextResponse.json({ error: e.message }, { status: 403 });
+  } catch (error) {
+    if (error instanceof ForbiddenError) {
+      return NextResponse.json({ error: error.message }, { status: 403 });
     }
-    if (e instanceof z.ZodError) {
-      return NextResponse.json({ error: e.message }, { status: 400 });
+    if (error instanceof z.ZodError) {
+      return NextResponse.json({ error: error.message }, { status: 400 });
     }
-    console.error("[POST /api/breakout/assignments/[id]/copy-card]", e);
+    console.error("[POST /api/breakout/assignments/[id]/copy-card]", error);
     return NextResponse.json({ error: "internal" }, { status: 500 });
   }
 }
