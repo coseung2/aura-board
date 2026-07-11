@@ -31,7 +31,12 @@ const config: ExpoConfig = {
   web: {
     favicon: "./assets/favicon.png",
   },
-  plugins: ["expo-router", "expo-font", "expo-secure-store"],
+  plugins: [
+    "expo-router",
+    "expo-font",
+    "expo-secure-store",
+    "./plugins/with-aura-board-health-connect",
+  ],
   experiments: {
     typedRoutes: true,
   },
