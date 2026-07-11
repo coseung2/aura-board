@@ -11,7 +11,7 @@ import {
 import { useFocusEffect, useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Footprints, RefreshCw, Settings, ShieldCheck } from "lucide-react-native";
-import { apiFetch, ApiError } from "../../lib/api";
+import { ApiError } from "../../lib/api";
 import { clearSessionToken } from "../../lib/session";
 import {
   fetchWalkingDays,
@@ -106,7 +106,11 @@ export default function StudentWalkingScreen() {
       }
     } catch (nextError) {
       if (!(await handleAuthError(nextError))) {
-        setError(nextError instanceof Error ? nextError.message : "걷기 기록을 불러오지 못했어요.");
+        setError(
+          nextError instanceof Error
+            ? nextError.message
+            : "걷기 기록을 불러오지 못했어요.",
+        );
       }
     } finally {
       setLoading(false);
@@ -133,11 +137,17 @@ export default function StudentWalkingScreen() {
       setStatus("available");
       setMessage("Health Connect 연결과 첫 동기화를 완료했어요.");
     } catch (nextError) {
-      setError(nextError instanceof Error ? nextError.message : "Health Connect 연결에 실패했어요.");
+      if (!(await handleAuthError(nextError))) {
+        setError(
+          nextError instanceof Error
+            ? nextError.message
+            : "Health Connect 연결에 실패했어요.",
+        );
+      }
     } finally {
       setBusy(null);
     }
-  }, []);
+  }, [handleAuthError]);
 
   const sync = useCallback(async () => {
     setBusy("sync");
@@ -148,7 +158,9 @@ export default function StudentWalkingScreen() {
       setMessage("최근 7일 걷기 기록을 동기화했어요.");
     } catch (nextError) {
       if (!(await handleAuthError(nextError))) {
-        setError(nextError instanceof Error ? nextError.message : "동기화하지 못했어요.");
+        setError(
+          nextError instanceof Error ? nextError.message : "동기화하지 못했어요.",
+        );
       }
     } finally {
       setBusy(null);
@@ -161,7 +173,9 @@ export default function StudentWalkingScreen() {
     try {
       await openHealthConnectSettings();
     } catch (nextError) {
-      setError(nextError instanceof Error ? nextError.message : "설정을 열지 못했어요.");
+      setError(
+        nextError instanceof Error ? nextError.message : "설정을 열지 못했어요.",
+      );
     } finally {
       setBusy(null);
     }
@@ -250,7 +264,10 @@ export default function StudentWalkingScreen() {
           <SummaryCard label="오늘" value={`${numberFormatter.format(today.steps)}걸음`} />
           <SummaryCard label="최근 7일" value={`${numberFormatter.format(totalSteps)}걸음`} />
           <SummaryCard label="하루 평균" value={`${numberFormatter.format(averageSteps)}걸음`} />
-          <SummaryCard label="이동 거리" value={`${distanceFormatter.format(totalDistance / 1000)}km`} />
+          <SummaryCard
+            label="이동 거리"
+            value={`${distanceFormatter.format(totalDistance / 1000)}km`}
+          />
         </View>
 
         <SurfaceCard style={styles.chartCard}>
@@ -267,31 +284,35 @@ export default function StudentWalkingScreen() {
           </View>
 
           <View style={styles.chartRows}>
-            {days.map((row) => (
-              <View key={row.day} style={styles.chartRow}>
-                <Text style={styles.dayLabel}>{dayLabel(row.day, today.day)}</Text>
-                <View style={styles.barTrack}>
-                  <View
-                    style={[
-                      styles.barFill,
-                      { width: `${Math.round((row.steps / maxSteps) * 100)}%` },
-                    ]}
-                  />
+            {days.map((row) => {
+              const barWidth = `${Math.round((row.steps / maxSteps) * 100)}%` as `${number}%`;
+              return (
+                <View key={row.day} style={styles.chartRow}>
+                  <Text style={styles.dayLabel}>{dayLabel(row.day, today.day)}</Text>
+                  <View style={styles.barTrack}>
+                    <View style={[styles.barFill, { width: barWidth }]} />
+                  </View>
+                  <Text style={styles.stepLabel}>
+                    {numberFormatter.format(row.steps)}
+                  </Text>
                 </View>
-                <Text style={styles.stepLabel}>{numberFormatter.format(row.steps)}</Text>
-              </View>
-            ))}
+              );
+            })}
           </View>
         </SurfaceCard>
 
         <SurfaceCard style={styles.privacyCard}>
           <View style={styles.privacyRow}>
             <RefreshCw size={20} color={colors.accent} />
-            <Text style={styles.privacyText}>Android에서 동기화한 결과는 웹 걷기 페이지에도 표시돼요.</Text>
+            <Text style={styles.privacyText}>
+              Android에서 동기화한 결과는 웹 걷기 페이지에도 표시돼요.
+            </Text>
           </View>
           <View style={styles.privacyRow}>
             <Settings size={20} color={colors.accent} />
-            <Text style={styles.privacyText}>권한은 Health Connect 설정에서 언제든 철회할 수 있어요.</Text>
+            <Text style={styles.privacyText}>
+              권한은 Health Connect 설정에서 언제든 철회할 수 있어요.
+            </Text>
           </View>
         </SurfaceCard>
       </ScrollView>
@@ -319,7 +340,11 @@ const styles = StyleSheet.create({
     paddingBottom: spacing.xxxl + spacing.xxl,
     gap: spacing.md,
   },
-  connectionCard: { flexDirection: "row", alignItems: "center", gap: spacing.md },
+  connectionCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.md,
+  },
   iconBadge: {
     width: 48,
     height: 48,
@@ -335,7 +360,12 @@ const styles = StyleSheet.create({
   error: { ...typography.body, color: colors.danger },
   notice: { ...typography.body, color: colors.accentTintedText },
   summaryGrid: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm },
-  summaryCard: { flexGrow: 1, flexBasis: "47%", minWidth: 140, gap: spacing.xs },
+  summaryCard: {
+    flexGrow: 1,
+    flexBasis: "47%",
+    minWidth: 140,
+    gap: spacing.xs,
+  },
   summaryLabel: { ...typography.label, color: colors.textMuted },
   summaryValue: { ...typography.section, color: colors.text },
   chartCard: { gap: spacing.lg },
@@ -351,10 +381,24 @@ const styles = StyleSheet.create({
   chartRows: { gap: spacing.md },
   chartRow: { flexDirection: "row", alignItems: "center", gap: spacing.sm },
   dayLabel: { ...typography.micro, color: colors.textMuted, width: 72 },
-  barTrack: { flex: 1, height: 10, backgroundColor: colors.accentTintedBg, overflow: "hidden" },
+  barTrack: {
+    flex: 1,
+    height: 10,
+    backgroundColor: colors.accentTintedBg,
+    overflow: "hidden",
+  },
   barFill: { height: "100%", backgroundColor: colors.accent },
-  stepLabel: { ...typography.micro, color: colors.text, width: 56, textAlign: "right" },
+  stepLabel: {
+    ...typography.micro,
+    color: colors.text,
+    width: 56,
+    textAlign: "right",
+  },
   privacyCard: { gap: spacing.md },
-  privacyRow: { flexDirection: "row", alignItems: "flex-start", gap: spacing.sm },
+  privacyRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: spacing.sm,
+  },
   privacyText: { ...typography.label, color: colors.textMuted, flex: 1 },
 });
