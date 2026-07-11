@@ -7,7 +7,7 @@ import { touchBoardUpdatedAt } from "@/lib/board-touch";
 import { announceCardChange } from "@/lib/realtime-broadcast";
 import {
   normalizeSubjectOrder,
-  subjectOrderToBaseIndex,
+  subjectOrderToAppendOrder,
 } from "@/lib/subject-order";
 
 const BodySchema = z
@@ -21,7 +21,7 @@ const BodySchema = z
  *
  * classroom-linked columns 보드에서 학급 학생 명단을 출석번호 순으로
  * 섹션(칼럼)을 한 번에 생성한다. 교사(owner/editor) 전용.
- * 생성된 섹션은 기존 섹션 뒤에 append된다.
+ * 생성된 섹션은 기존 unpinned 섹션 뒤에 append된다.
  * 정렬 방향(보드 왼쪽 = 1번 / N번)은 body.subjectOrder → board.subjectOrder → "asc" 순으로 결정된다.
  *
  * 1회성 시드라는 의미에서 중복 실행 시 기존 섹션과 이름이 겹쳐도
@@ -75,7 +75,11 @@ export async function POST(
     // 학급 학생 조회 — 출석번호 정렬
     const students = await db.student.findMany({
       where: { classroomId: board.classroomId },
-      orderBy: { number: { sort: "asc", nulls: "last" } },
+      orderBy: [
+        { number: { sort: "asc", nulls: "last" } },
+        { name: "asc" },
+        { id: "asc" },
+      ],
       select: { id: true, name: true, number: true },
     });
 
@@ -86,49 +90,58 @@ export async function POST(
       );
     }
 
-    // 고정 섹션은 앞쪽에 유지하고, 새 학생 섹션은 그 다음부터 배치한다.
-    const pinnedCount = await db.section.count({
-      where: { boardId, pinned: true },
-    });
-
     const subjectOrder = normalizeSubjectOrder(
       body?.subjectOrder ?? board.subjectOrder,
     );
 
     // 학생별 섹션 생성 (출석번호 이름 형식: "1. 홍길동").
     // 정렬 방향:
-    //   asc  → 1번 학생이 보드 왼쪽 (order DESC: pinnedCount + (N-1-i))
-    //   desc → N번 학생이 보드 왼쪽 (order ASC : pinnedCount + i)
+    //   asc  → 1번 학생이 보드 왼쪽 (order DESC)
+    //   desc → N번 학생이 보드 왼쪽 (order DESC)
     // unpinned 섹션은 sortSections에서 order DESC로 표시되므로
     // 보드 왼쪽 = 큰 order 이다.
-    const created = await db.$transaction(
-      students.map((s, studentIndex) => {
-        const baseIndex = subjectOrderToBaseIndex(
-          subjectOrder,
-          studentIndex,
-          students.length,
-        );
-        return db.section.create({
-          data: {
-            boardId,
-            title: s.number != null ? `${s.number}. ${s.name}` : s.name,
-            order: pinnedCount + baseIndex,
-          },
-        });
-      })
-    );
-
-    // 사용자가 명시적으로 body로 보낸 경우에만 보드 기본값을 기억해 둔다.
-    // 보드에 저장된 subjectOrder가 그대로면 best-effort 스킵.
-    if (
-      body?.subjectOrder !== undefined &&
-      body.subjectOrder !== board.subjectOrder
-    ) {
-      await db.board.update({
-        where: { id: boardId },
-        data: { subjectOrder },
+    const created = await db.$transaction(async (tx) => {
+      const existing = await tx.section.aggregate({
+        where: { boardId, pinned: false },
+        _min: { order: true },
       });
-    }
+      const minimumExistingOrder = existing._min.order;
+      const rows = [];
+
+      for (const [studentIndex, student] of students.entries()) {
+        rows.push(
+          await tx.section.create({
+            data: {
+              boardId,
+              title:
+                student.number != null
+                  ? `${student.number}. ${student.name}`
+                  : student.name,
+              order: subjectOrderToAppendOrder(
+                subjectOrder,
+                studentIndex,
+                students.length,
+                minimumExistingOrder,
+              ),
+            },
+          }),
+        );
+      }
+
+      // 사용자가 명시적으로 body로 보낸 경우에만 보드 기본값을 기억해 둔다.
+      // 보드에 저장된 subjectOrder가 그대로면 best-effort 스킵.
+      if (
+        body?.subjectOrder !== undefined &&
+        body.subjectOrder !== board.subjectOrder
+      ) {
+        await tx.board.update({
+          where: { id: boardId },
+          data: { subjectOrder },
+        });
+      }
+
+      return rows;
+    });
 
     // best-effort touch + realtime snapshot invalidation
     await touchBoardUpdatedAt(boardId);

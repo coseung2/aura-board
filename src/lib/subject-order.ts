@@ -34,6 +34,28 @@ export function subjectOrderToBaseIndex(
   return order === "asc" ? totalStudents - 1 - studentIndex : studentIndex;
 }
 
+/**
+ * 기존 unpinned 섹션보다 뒤에 학생 섹션 묶음을 붙일 order를 계산한다.
+ *
+ * unpinned 섹션은 order DESC로 보이므로 새 묶음의 가장 큰 값도 기존 최솟값보다
+ * 작아야 한다. 기존 섹션이 없으면 -1부터 시작해 이후 일반 섹션(order >= 0)이
+ * 현재 UX대로 학생 묶음 앞에 추가될 수 있게 한다.
+ */
+export function subjectOrderToAppendOrder(
+  order: SubjectOrder,
+  studentIndex: number,
+  totalStudents: number,
+  minimumExistingOrder: number | null,
+): number {
+  if (totalStudents <= 0) return minimumExistingOrder ?? 0;
+
+  const groupBottom = (minimumExistingOrder ?? 0) - totalStudents;
+  return (
+    groupBottom +
+    subjectOrderToBaseIndex(order, studentIndex, totalStudents)
+  );
+}
+
 export function subjectOrderLabel(order: SubjectOrder): {
   short: string;
   long: string;
