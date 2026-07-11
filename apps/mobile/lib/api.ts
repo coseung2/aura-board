@@ -23,7 +23,9 @@ export function getApiBase(): string {
   const fromExtra =
     (Constants.expoConfig?.extra as { apiBase?: string } | undefined)?.apiBase;
   if (fromExtra) return fromExtra.replace(/\/$/, "");
-  return "https://aura-board-app.vercel.app";
+  // Start on the canonical origin so a cross-origin redirect cannot discard
+  // the mobile Bearer token.
+  return "https://aura-board.com";
 }
 
 type FetchOpts = RequestInit & {

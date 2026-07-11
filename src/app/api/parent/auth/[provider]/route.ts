@@ -11,6 +11,22 @@ import {
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
+const MOBILE_DEEP_LINK = "auraboard://parent/auth/callback";
+
+function mobileErrorRedirect(error: string) {
+  const url = new URL(MOBILE_DEEP_LINK);
+  url.hash = `error=${encodeURIComponent(error)}`;
+  return NextResponse.redirect(url);
+}
+
+function providerDisabledRedirect(req: Request) {
+  const client = new URL(req.url).searchParams.get("client");
+  if (client === "mobile") return mobileErrorRedirect("provider_disabled");
+  return NextResponse.redirect(
+    new URL("/parent/onboard/signup?error=provider_disabled", req.url),
+  );
+}
+
 // GET /api/parent/auth/{provider} — OAuth 시작
 //   1) state + (Google) PKCE codeVerifier 발급
 //   2) state cookie set (HMAC signed, 10분 TTL)
@@ -20,7 +36,7 @@ export const runtime = "nodejs";
 //   Google scope: openid email profile (default sufficient)
 //   Kakao scope: account_email profile_nickname profile_image
 export async function GET(
-  _req: Request,
+  req: Request,
   { params }: { params: Promise<{ provider: string }> }
 ) {
   const { provider } = await params;
@@ -29,10 +45,10 @@ export async function GET(
   }
   const providerId = provider as ProviderId;
   if (!isProviderEnabled(providerId)) {
-    return NextResponse.redirect(
-      new URL("/parent/onboard/signup?error=provider_disabled", _req.url)
-    );
+    return providerDisabledRedirect(req);
   }
+
+  const isMobile = new URL(req.url).searchParams.get("client") === "mobile";
 
   const state = generateState();
   let url: URL;
@@ -55,6 +71,6 @@ export async function GET(
     ]);
   }
 
-  await setStateCookie({ state, codeVerifier });
+  await setStateCookie({ state, codeVerifier, ...(isMobile ? { client: "mobile" } : {}) });
   return NextResponse.redirect(url);
 }

@@ -12,7 +12,7 @@
         "gradleCommand": ":app:assembleDebug"
       },
       "env": {
-        "EXPO_PUBLIC_API_BASE": "https://aura-board-app.vercel.app"
+        "EXPO_PUBLIC_API_BASE": "https://aura-board.com"
       }
     },
     "preview": {
@@ -22,7 +22,7 @@
         "buildType": "apk"
       },
       "env": {
-        "EXPO_PUBLIC_API_BASE": "https://aura-board-app.vercel.app"
+        "EXPO_PUBLIC_API_BASE": "https://aura-board.com"
       }
     },
     "production": {
@@ -32,7 +32,7 @@
         "buildType": "app-bundle"
       },
       "env": {
-        "EXPO_PUBLIC_API_BASE": "https://aura-board-app.vercel.app"
+        "EXPO_PUBLIC_API_BASE": "https://aura-board.com"
       }
     }
   },

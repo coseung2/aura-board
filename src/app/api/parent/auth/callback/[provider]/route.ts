@@ -23,7 +23,22 @@ export const runtime = "nodejs";
 //   4) upsertParentFromOAuth → parentId
 //   5) createParentSession (cookie set)
 //   6) 302 — 활성/대기 link 있으면 /parent/home, 없으면 onboard/match/code
-function errRedirect(req: Request, code: string) {
+const MOBILE_DEEP_LINK = "auraboard://parent/auth/callback";
+
+function mobileRedirect(params: { token?: string; expiresAt?: string; error?: string }) {
+  const url = new URL(MOBILE_DEEP_LINK);
+  if (params.error) {
+    url.hash = `error=${encodeURIComponent(params.error)}`;
+  } else if (params.token && params.expiresAt) {
+    url.hash = `token=${encodeURIComponent(params.token)}&expiresAt=${encodeURIComponent(
+      params.expiresAt,
+    )}`;
+  }
+  return NextResponse.redirect(url);
+}
+
+function errRedirect(req: Request, code: string, isMobile = false) {
+  if (isMobile) return mobileRedirect({ error: code });
   // 학부모 OAuth 에러는 진입점(/parent/onboard/signup) 으로 되돌림.
   // /parent/auth 는 page.tsx 가 없는 디렉토리(callback route handler 만 존재).
   const url = new URL(`/parent/onboard/signup?error=${code}`, req.url);
@@ -31,7 +46,8 @@ function errRedirect(req: Request, code: string) {
 }
 
 function restartAuth(req: Request, provider: ProviderId) {
-  return NextResponse.redirect(new URL(`/api/parent/auth/${provider}`, req.url));
+  const url = new URL(`/api/parent/auth/${provider}`, req.url);
+  return NextResponse.redirect(url);
 }
 
 export async function GET(
@@ -48,15 +64,20 @@ export async function GET(
   const code = searchParams.get("code");
   const incomingState = searchParams.get("state");
   const oauthError = searchParams.get("error");
+  // Pop even when the provider omits state so a mobile attempt can return an
+  // in-app error instead of silently falling back to the web login flow.
+  const stateRecord = await popStateCookie();
+  const isMobile = stateRecord?.client === "mobile";
+
   if (oauthError) {
-    return errRedirect(req, `provider_${oauthError}`);
+    return errRedirect(req, `provider_${oauthError}`, isMobile);
   }
   if (!code || !incomingState) {
+    if (isMobile) return errRedirect(req, "missing_params", true);
     return restartAuth(req, providerId);
   }
-
-  const stateRecord = await popStateCookie();
   if (!stateRecord || stateRecord.state !== incomingState) {
+    if (isMobile) return errRedirect(req, "invalid_state", true);
     return restartAuth(req, providerId);
   }
 
@@ -65,8 +86,9 @@ export async function GET(
   try {
     if (providerId === "google") {
       const client = googleClient();
-      if (!client) return errRedirect(req, "provider_disabled");
+      if (!client) return errRedirect(req, "provider_disabled", isMobile);
       if (!stateRecord.codeVerifier) {
+        if (isMobile) return errRedirect(req, "missing_pkce", true);
         return restartAuth(req, providerId);
       }
       const tokens = await client.validateAuthorizationCode(
@@ -76,13 +98,13 @@ export async function GET(
       accessToken = tokens.accessToken();
     } else {
       const client = kakaoClient();
-      if (!client) return errRedirect(req, "provider_disabled");
+      if (!client) return errRedirect(req, "provider_disabled", isMobile);
       const tokens = await client.validateAuthorizationCode(code);
       accessToken = tokens.accessToken();
     }
   } catch (e) {
     console.error(`[parent-oauth ${providerId}] token exchange failed`, e);
-    return errRedirect(req, "token_exchange_failed");
+    return errRedirect(req, "token_exchange_failed", isMobile);
   }
 
   // user info 조회
@@ -94,7 +116,7 @@ export async function GET(
         : await fetchKakaoUserInfo(accessToken);
   } catch (e) {
     console.error(`[parent-oauth ${providerId}] userinfo failed`, e);
-    return errRedirect(req, "userinfo_failed");
+    return errRedirect(req, "userinfo_failed", isMobile);
   }
 
   // Parent + ParentOAuthAccount upsert
@@ -103,7 +125,7 @@ export async function GET(
     result = await upsertParentFromOAuth(providerId, info);
   } catch (e) {
     console.error(`[parent-oauth ${providerId}] upsert failed`, e);
-    return errRedirect(req, "upsert_failed");
+    return errRedirect(req, "upsert_failed", isMobile);
   }
 
   // ParentSession 발급
@@ -117,11 +139,18 @@ export async function GET(
     await signOut({ redirect: false }).catch(() => undefined);
   }
 
-  await createParentSession({
+  const parentSession = await createParentSession({
     parentId: result.parentId,
     userAgent: req.headers.get("user-agent") ?? null,
     ipHash: null,
   });
+
+  if (isMobile) {
+    return mobileRedirect({
+      token: parentSession.token,
+      expiresAt: parentSession.expiresAt.toISOString(),
+    });
+  }
 
   // redirect 분기 — 활성/대기 자녀 link 있으면 dashboard, 없으면 onboard
   const links = await db.parentChildLink.findMany({
