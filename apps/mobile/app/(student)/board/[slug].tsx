@@ -43,9 +43,9 @@ export default function BoardDetail() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (showLoading = false) => {
     try {
-      setLoading(true);
+      if (showLoading) setLoading(true);
       const res = await apiFetch<BoardDetailResponse>(
         `/api/student/board/${encodeURIComponent(slug!)}`,
       );
@@ -59,16 +59,16 @@ export default function BoardDetail() {
       }
       if (e instanceof ApiError && e.status === 404) {
         setError("이 보드에 접근할 수 없어요.");
-      } else {
+      } else if (showLoading) {
         setError(e instanceof Error ? e.message : "불러올 수 없어요");
       }
     } finally {
-      setLoading(false);
+      if (showLoading) setLoading(false);
     }
   }, [slug, router]);
 
   useEffect(() => {
-    load();
+    void load(true);
   }, [load]);
 
   if (loading) {
@@ -102,7 +102,7 @@ export default function BoardDetail() {
       edges={["top"]}
     >
       <BoardHeader title={board.title} layout={board.layout} />
-      <View style={styles.body}>{renderLayout(data, load)}</View>
+      <View style={styles.body}>{renderLayout(data, () => load(false))}</View>
     </SafeAreaView>
   );
 }

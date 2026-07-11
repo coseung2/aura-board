@@ -7,7 +7,8 @@ import {
 import {
   studentBaseNavTargets,
   studentDutyTarget,
-} from "../../../apps/mobile/lib/student-navigation";
+  studentOptionalNavTargets,
+} from "../../../apps/mobile/lib/student-navigation-core";
 import {
   inspectionPhotoBlocksSave,
   inspectionPhotoPreviewUri,
@@ -38,11 +39,16 @@ describe("student assignment reminder parity", () => {
 describe("student mobile navigation parity", () => {
   it("contains only production student base destinations", () => {
     expect(studentBaseNavTargets.map((target) => target.id)).toEqual([
+      "home",
       "boards",
       "portfolio",
-      "wallet",
       "reading",
+      "more",
+    ]);
+    expect(studentOptionalNavTargets.map((target) => target.id)).toEqual([
+      "wallet",
       "canva",
+      "notifications",
     ]);
   });
 

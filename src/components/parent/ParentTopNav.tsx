@@ -100,22 +100,28 @@ export function ParentTopNav({
         </Link>
 
         <nav className="parent-sidebar-links">
-          {items.map((item) => (
-            <Link
-              key={item.href}
-              href={item.href}
-              className={`parent-sidebar-link${item.active ? " is-active" : ""}`}
-              aria-current={item.active ? "page" : undefined}
-            >
-              <span className="parent-sidebar-icon">
-                <ParentNavIcon name={item.icon} />
-                {item.badge ? (
-                  <span className="parent-nav-badge">{Math.min(item.badge, 99)}</span>
-                ) : null}
-              </span>
-              <span>{item.label}</span>
-            </Link>
-          ))}
+          {items
+            .filter(
+              (item) =>
+                item.href !== "/parent/notifications" &&
+                item.href !== "/parent/onboard/match/code",
+            )
+            .map((item) => (
+              <Link
+                key={item.href}
+                href={item.href}
+                className={`parent-sidebar-link${item.active ? " is-active" : ""}`}
+                aria-current={item.active ? "page" : undefined}
+              >
+                <span className="parent-sidebar-icon">
+                  <ParentNavIcon name={item.icon} />
+                  {item.badge ? (
+                    <span className="parent-nav-badge">{Math.min(item.badge, 99)}</span>
+                  ) : null}
+                </span>
+                <span>{item.label}</span>
+              </Link>
+            ))}
         </nav>
 
         <div className="parent-sidebar-footer">

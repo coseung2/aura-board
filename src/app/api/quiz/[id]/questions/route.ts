@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { resolveIdentities } from "@/lib/identity";
 import { canManageQuiz } from "@/lib/quiz-permissions";
+import { publishQuizRealtimeSnapshot } from "@/lib/quiz-realtime-snapshot";
 import type { QuizDraftQuestion } from "@/types/quiz";
 
 export async function PUT(
@@ -66,8 +67,9 @@ export async function PUT(
         include: { questions: { orderBy: { order: "asc" } } },
       });
     });
+    const snapshot = await publishQuizRealtimeSnapshot(id);
 
-    return NextResponse.json({ quiz });
+    return NextResponse.json({ quiz, snapshot });
   } catch (e) {
     const message = e instanceof Error ? e.message : "Questions update failed";
     console.error("[PUT /api/quiz/[id]/questions]", e);

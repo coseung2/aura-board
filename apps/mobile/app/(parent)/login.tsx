@@ -6,6 +6,7 @@ import {
   useWindowDimensions,
 } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
+import { Platform } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import * as Linking from "expo-linking";
 import Svg, { Path } from "react-native-svg";
@@ -70,18 +71,22 @@ export default function ParentLogin() {
 
   async function handleOAuth(provider: OAuthProvider) {
     const providerLabel = provider === "google" ? "Google" : "Kakao";
-    const url = `${getApiBase()}/api/parent/auth/${provider}`;
+    const url = new URL(`/api/parent/auth/${provider}`, getApiBase());
+    if (Platform.OS !== "web") {
+      url.searchParams.set("client", "mobile");
+    }
     setError(null);
     setOpeningProvider(provider);
     try {
       if (
+        Platform.OS === "web" &&
         typeof window !== "undefined" &&
         typeof window.location?.assign === "function"
       ) {
-        window.location.assign(url);
+        window.location.assign(url.toString());
         return;
       }
-      await Linking.openURL(url);
+      await Linking.openURL(url.toString());
     } catch {
       setError(`${providerLabel} 로그인을 시작하지 못했어요.`);
       setOpeningProvider(null);
@@ -143,6 +148,16 @@ export default function ParentLogin() {
               </Text>
             </ControlPressable>
           </View>
+
+          {__DEV__ ? (
+            <AppButton
+              variant="quiet"
+              onPress={() => router.push("/(parent)/dev-preview")}
+              accessibilityLabel="개발용 학부모 피드 미리보기 열기"
+            >
+              개발용 미리보기
+            </AppButton>
+          ) : null}
 
           <AppButton
             variant="quiet"

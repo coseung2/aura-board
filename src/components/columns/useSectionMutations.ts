@@ -1,8 +1,21 @@
 "use client";
 
-import { useMemo } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { useRouter } from "next/navigation";
+import type { CardData } from "../DraggableCard";
 import { sortSections } from "@/lib/sort-sections";
+import {
+  mergeSectionPositions,
+  moveSectionToTarget,
+  setSectionPinned,
+  toSectionReorderPayload,
+  type SectionPosition,
+} from "@/lib/section-order";
+import {
+  BOARD_SECTIONS_UPDATED_EVENT,
+  type BoardSectionsUpdatedDetail,
+  type BoardSectionsUpdatedMode,
+} from "@/lib/board-section-events";
 import {
   type SubjectOrder,
   normalizeSubjectOrder,
@@ -13,6 +26,7 @@ type SectionData = {
   title: string;
   order: number;
   pinned: boolean;
+  accessToken?: string | null;
   sortMode?: string | null;
   assignmentPublishedAt?: string | null;
   assignmentReminderSentAt?: string | null;
@@ -24,7 +38,7 @@ type UseSectionMutationsOptions = {
   classroomId?: string | null;
   sections: SectionData[];
   setSections: React.Dispatch<React.SetStateAction<SectionData[]>>;
-  setCards: React.Dispatch<React.SetStateAction<any[]>>;
+  setCards: React.Dispatch<React.SetStateAction<CardData[]>>;
   /** 보드 기본 subjectOrder (Board.subjectOrder). */
   boardSubjectOrder?: SubjectOrder | null;
 };
@@ -47,7 +61,6 @@ type UseSectionMutationsReturn = {
 export function useSectionMutations({
   boardId,
   canEdit,
-  classroomId,
   sections,
   setSections,
   setCards,
@@ -55,13 +68,133 @@ export function useSectionMutations({
 }: UseSectionMutationsOptions): UseSectionMutationsReturn {
   const sortedSections = useMemo(
     () => [...sections].sort(sortSections),
-    [sections]
+    [sections],
   );
   const router = useRouter();
-  const sectionOptions = sortedSections.map((s) => ({
-    id: s.id,
-    title: s.title,
+  const sectionOptions = sortedSections.map((section) => ({
+    id: section.id,
+    title: section.title,
   }));
+
+  // React state commits are asynchronous. Keep the latest local snapshot
+  // synchronously so overlapping section operations compose in invocation order
+  // instead of calculating from a stale render closure.
+  const sectionsRef = useRef(sections);
+  sectionsRef.current = sections;
+  const sectionMutationQueueRef = useRef<Promise<void>>(Promise.resolve());
+  const sectionMutationVersionRef = useRef(0);
+  const pendingReorderCountRef = useRef(0);
+  const confirmedPositionsRef = useRef<SectionPosition[] | null>(null);
+  if (confirmedPositionsRef.current === null) {
+    confirmedPositionsRef.current = toSectionReorderPayload(sections);
+  }
+  useEffect(() => {
+    // Settings/realtime updates can change positions outside this hook. Once
+    // the local reorder queue is idle, treat that snapshot as the new rollback
+    // baseline instead of restoring an older render's order.
+    if (pendingReorderCountRef.current === 0) {
+      confirmedPositionsRef.current = toSectionReorderPayload(sections);
+    }
+  }, [sections]);
+
+  function setCurrentSections(next: SectionData[]) {
+    const sorted = [...next].sort(sortSections);
+    sectionsRef.current = sorted;
+    setSections(sorted);
+    return sorted;
+  }
+
+  function publishSections(mode: BoardSectionsUpdatedMode = "snapshot") {
+    const detail: BoardSectionsUpdatedDetail = {
+      boardId,
+      mode,
+      sections: [...sectionsRef.current].sort(sortSections).map((section) => ({
+        id: section.id,
+        title: section.title,
+        accessToken: section.accessToken ?? null,
+        order: section.order,
+        pinned: section.pinned,
+      })),
+    };
+    window.dispatchEvent(
+      new CustomEvent<BoardSectionsUpdatedDetail>(
+        BOARD_SECTIONS_UPDATED_EVENT,
+        { detail },
+      ),
+    );
+  }
+
+  async function persistSectionPositions(
+    optimistic: SectionData[],
+    failureMessage: string,
+  ): Promise<boolean> {
+    const previousPositions =
+      confirmedPositionsRef.current ??
+      toSectionReorderPayload(sectionsRef.current);
+    const payload = toSectionReorderPayload(optimistic);
+    pendingReorderCountRef.current += 1;
+    setCurrentSections(mergeSectionPositions(sectionsRef.current, payload));
+    publishSections("positions");
+
+    const version = ++sectionMutationVersionRef.current;
+    const request = async () => {
+      try {
+        const res = await fetch(`/api/boards/${boardId}/sections/reorder`, {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ sections: payload }),
+        });
+        if (!res.ok) {
+          throw new Error(await res.text().catch(() => ""));
+        }
+
+        const body = (await res.json().catch(() => null)) as {
+          sections?: SectionPosition[];
+        } | null;
+        const confirmedPositions = body?.sections ?? payload;
+        confirmedPositionsRef.current = mergeSectionPositions(
+          sectionsRef.current,
+          confirmedPositions,
+        ).map(({ id, order, pinned }) => ({ id, order, pinned }));
+        if (version !== sectionMutationVersionRef.current) return true;
+
+        setCurrentSections(
+          mergeSectionPositions(sectionsRef.current, confirmedPositions),
+        );
+        publishSections("positions");
+        return true;
+      } catch (error) {
+        // A newer operation owns the optimistic state. Its request will either
+        // confirm or roll it back, so an older failure must stay silent.
+        if (version !== sectionMutationVersionRef.current) return false;
+
+        console.error(
+          "[useSectionMutations] section order save failed",
+          error,
+        );
+        setCurrentSections(
+          mergeSectionPositions(
+            sectionsRef.current,
+            confirmedPositionsRef.current ?? previousPositions,
+          ),
+        );
+        publishSections("positions");
+        alert(failureMessage);
+        return false;
+      } finally {
+        pendingReorderCountRef.current -= 1;
+      }
+    };
+
+    // The queue serializes writes on the server in invocation order. Keep the
+    // queue alive even when an individual request fails.
+    const queued = sectionMutationQueueRef.current.then(request, request);
+    sectionMutationQueueRef.current = queued.then(
+      () => undefined,
+      () => undefined,
+    );
+    return queued;
+  }
 
   async function handleAddSection() {
     // 일부 인앱 브라우저/iframe 환경에서는 window.prompt가 throw 하거나
@@ -80,49 +213,41 @@ export function useSectionMutations({
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ boardId, title: title.trim() }),
       });
-      if (res.ok) {
-        const { section } = await res.json();
-        setSections((prev) => [...prev, section].sort(sortSections));
+      if (!res.ok) {
+        alert(`섹션 추가 실패: ${await res.text().catch(() => "")}`);
+        return;
       }
+
+      const { section } = (await res.json()) as { section: SectionData };
+      const next = [
+        ...sectionsRef.current.filter((current) => current.id !== section.id),
+        section,
+      ];
+      setCurrentSections(next);
+      if (confirmedPositionsRef.current) {
+        confirmedPositionsRef.current = [
+          ...confirmedPositionsRef.current.filter(
+            (position) => position.id !== section.id,
+          ),
+          { id: section.id, order: section.order, pinned: section.pinned },
+        ];
+      }
+      // 생성 응답 자체가 최신 상태이므로 즉시 표시한다. 여기서 router.refresh()
+      // 를 호출하면 잠시 오래된 RSC payload가 방금 만든 섹션을 덮어쓸 수 있다.
+      publishSections();
     } catch (err) {
       console.error(err);
+      alert("섹션 추가 중 오류가 발생했어요.");
     }
   }
 
   async function handleSectionPin(sectionId: string, pinned: boolean) {
     if (!canEdit) return;
-    const prev = sections;
-    const current = sections.find((s) => s.id === sectionId);
-    if (!current) return;
+    const current = sectionsRef.current;
+    const next = setSectionPinned(current, sectionId, pinned);
+    if (!next) return;
 
-    const nextOrder = pinned
-      ? Math.max(-1, ...sections.filter((s) => s.pinned).map((s) => s.order)) + 1
-      : current.order;
-
-    setSections((list) =>
-      list
-        .map((s) =>
-          s.id === sectionId ? { ...s, pinned, order: nextOrder } : s
-        )
-        .sort(sortSections)
-    );
-
-    try {
-      const res = await fetch(`/api/sections/${sectionId}`, {
-        method: "PATCH",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify(
-          pinned ? { pinned, order: nextOrder } : { pinned }
-        ),
-      });
-      if (!res.ok) {
-        setSections(prev);
-        alert(`고정 상태 변경 실패: ${await res.text().catch(() => "")}`);
-      }
-    } catch (err) {
-      console.error(err);
-      setSections(prev);
-    }
+    await persistSectionPositions(next, "고정 상태 변경에 실패했어요.");
   }
 
   async function handleSeedFromStudents(
@@ -142,7 +267,7 @@ export function useSectionMutations({
           method: "POST",
           headers: { "content-type": "application/json" },
           body: JSON.stringify({ subjectOrder: order }),
-        }
+        },
       );
       if (!res.ok) {
         const msg = (await res.json().catch(() => ({}))).error;
@@ -153,7 +278,19 @@ export function useSectionMutations({
         sections: SectionData[];
         subjectOrder?: SubjectOrder;
       };
-      setSections((prev) => [...prev, ...created].sort(sortSections));
+      setCurrentSections([...sectionsRef.current, ...created]);
+      if (confirmedPositionsRef.current) {
+        const createdIds = new Set(created.map((section) => section.id));
+        confirmedPositionsRef.current = [
+          ...confirmedPositionsRef.current.filter(
+            (position) => !createdIds.has(position.id),
+          ),
+          ...created.map(({ id, order, pinned }) => ({ id, order, pinned })),
+        ];
+      }
+      publishSections();
+      // subjectOrder 등 보드 단위 설정을 서버 props와 동기화한다.
+      router.refresh();
       return created;
     } finally {
       setSeedingStudents(false);
@@ -161,63 +298,39 @@ export function useSectionMutations({
   }
 
   function handleSectionRenamed(sectionId: string, newTitle: string) {
-    setSections((list) =>
-      list.map((s) => (s.id === sectionId ? { ...s, title: newTitle } : s))
+    setCurrentSections(
+      sectionsRef.current.map((section) =>
+        section.id === sectionId ? { ...section, title: newTitle } : section,
+      ),
     );
+    publishSections();
   }
 
   function handleSectionDeleted(sectionId: string) {
-    setSections((list) => list.filter((s) => s.id !== sectionId));
-    setCards((list) => list.filter((c: any) => c.sectionId !== sectionId));
+    setCurrentSections(
+      sectionsRef.current.filter((section) => section.id !== sectionId),
+    );
+    if (confirmedPositionsRef.current) {
+      confirmedPositionsRef.current = confirmedPositionsRef.current.filter(
+        (position) => position.id !== sectionId,
+      );
+    }
+    setCards((list) => list.filter((card) => card.sectionId !== sectionId));
+    publishSections();
   }
 
   async function moveSectionTo(
     sectionId: string,
-    targetSectionId: string
+    targetSectionId: string,
   ) {
-    if (sectionId === targetSectionId) return;
-    const visualSections = [...sections].sort(sortSections);
-    const fromIdx = visualSections.findIndex((s) => s.id === sectionId);
-    const toIdx = visualSections.findIndex((s) => s.id === targetSectionId);
-    if (fromIdx === -1 || toIdx === -1) return;
+    const next = moveSectionToTarget(
+      sectionsRef.current,
+      sectionId,
+      targetSectionId,
+    );
+    if (!next) return;
 
-    const prev = sections;
-    const next = [...visualSections];
-    const [moved] = next.splice(fromIdx, 1);
-    next.splice(toIdx, 0, moved!);
-
-    const pinned = next.filter((s) => s.pinned);
-    const unpinned = next.filter((s) => !s.pinned);
-    const orderById = new Map<string, number>();
-    pinned.forEach((s, i) => orderById.set(s.id, i));
-    unpinned.forEach((s, i) => orderById.set(s.id, unpinned.length - 1 - i));
-
-    const normalised = next.map((s) => ({
-      ...s,
-      order: orderById.get(s.id) ?? s.order,
-    }));
-    setSections(normalised);
-
-    const prevById = new Map(prev.map((s) => [s.id, s] as const));
-    const changed = normalised.filter((s) => prevById.get(s.id)?.order !== s.order);
-    try {
-      const responses = await Promise.all(
-        changed.map((s) =>
-          fetch(`/api/sections/${s.id}`, {
-            method: "PATCH",
-            headers: { "content-type": "application/json" },
-            body: JSON.stringify({ order: s.order }),
-          })
-        )
-      );
-      if (responses.some((r) => !r.ok)) {
-        console.error("섹션 순서 변경 실패");
-        setSections(prev);
-      }
-    } catch (err) {
-      console.error(err);
-      setSections(prev);
-    }
+    await persistSectionPositions(next, "섹션 순서 변경에 실패했어요.");
   }
 
   return {

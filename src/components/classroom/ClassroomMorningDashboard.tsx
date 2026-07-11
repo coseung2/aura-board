@@ -2,18 +2,16 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
+  fetchCleaningDuties,
   fetchMorningSummary,
-  fetchCleaningRoster,
-  fetchShoeRoster,
   saveShoeFindings,
-  type CleaningRosterEntry,
-  type ShoeRosterEntry,
+  type CleaningDutyItem,
   type ReadingChampion,
   type MorningSummary,
 } from "@/lib/inspections-client";
 import { AppBackgroundButton } from "@/components/AppBackground";
-import type { CleaningDutyRow } from "@/lib/yellow-card";
 import { todayDateString } from "@/lib/inspector-findings";
+import { useClassroomMorningRealtime } from "@/hooks/useClassroomMorningRealtime";
 import { fetchAvatarGallery } from "@/components/avatar/gallery-client";
 import { ReadingChampionExhibition } from "@/components/avatar/ReadingChampionExhibition";
 import type { AvatarGalleryStudent } from "@/components/avatar/types";
@@ -39,6 +37,9 @@ export function ClassroomMorningDashboard({
   >(null);
   const [shoeSaving, setShoeSaving] = useState(false);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const classroomIdRef = useRef(classroomId);
+  classroomIdRef.current = classroomId;
+  const summaryRequestRef = useRef(0);
 
   // Helper functions for date navigation
   function formatDateNav(dateStr: string): string {
@@ -61,8 +62,9 @@ export function ClassroomMorningDashboard({
     const dd = String(d.getDate()).padStart(2, "0");
     return `${y}-${m}-${dd}`;
   }
-  const [cleaningDuties, setCleaningDuties] = useState<CleaningDutyRow[]>([]);
+  const [cleaningDuties, setCleaningDuties] = useState<CleaningDutyItem[]>([]);
   const [dutiesLoaded, setDutiesLoaded] = useState(false);
+  const [dutiesError, setDutiesError] = useState<string | null>(null);
   const [inspDate, setInspDate] = useState(todayDateString());
   const [cleaningItems, setCleaningItems] = useState<
     MorningSummary["cleaningFindings"]
@@ -71,6 +73,10 @@ export function ClassroomMorningDashboard({
     MorningSummary["shoeFindings"]
   >([]);
   const [inspLoaded, setInspLoaded] = useState(false);
+  const inspDateRef = useRef(inspDate);
+  inspDateRef.current = inspDate;
+  const inspectionRequestRef = useRef(0);
+  const dutiesRequestRef = useRef(0);
 
   const [expandedPanels, setExpandedPanels] = useState<Record<string, boolean>>({});
   const bodyRefs = useRef<Record<string, HTMLDivElement | null>>({});
@@ -86,6 +92,7 @@ export function ClassroomMorningDashboard({
       setOverflowPanels(prev => ({...prev, ...updates}));
     };
     checkOverflow();
+    if (typeof ResizeObserver === "undefined") return;
     const observer = new ResizeObserver(checkOverflow);
     for (const el of Object.values(bodyRefs.current)) {
       if (el) observer.observe(el);
@@ -96,57 +103,149 @@ export function ClassroomMorningDashboard({
 
 
   const refresh = useCallback(async () => {
+    const requestId = ++summaryRequestRef.current;
     setError(null);
     try {
       const data = await fetchMorningSummary(classroomId);
+      if (
+        requestId !== summaryRequestRef.current ||
+        classroomIdRef.current !== classroomId
+      ) {
+        return;
+      }
       setSummary(data);
       setLastUpdated(new Date());
     } catch (e) {
+      if (
+        requestId !== summaryRequestRef.current ||
+        classroomIdRef.current !== classroomId
+      ) {
+        return;
+      }
       setError(e instanceof Error ? e.message : "아침 정보를 불러오지 못했습니다.");
     } finally {
-      setLoaded(true);
+      if (
+        requestId === summaryRequestRef.current &&
+        classroomIdRef.current === classroomId
+      ) {
+        setLoaded(true);
+      }
     }
   }, [classroomId]);
 
-  // Fetch inspection data when inspDate changes
+  const refreshInspections = useCallback(
+    async (date: string) => {
+      const requestId = ++inspectionRequestRef.current;
+      try {
+        const data = await fetchMorningSummary(classroomId, date);
+        if (
+          requestId !== inspectionRequestRef.current ||
+          classroomIdRef.current !== classroomId ||
+          inspDateRef.current !== date
+        ) {
+          return;
+        }
+        setCleaningItems(data.cleaningFindings);
+        setShoeItems(data.shoeFindings);
+      } catch {
+        if (
+          requestId !== inspectionRequestRef.current ||
+          classroomIdRef.current !== classroomId ||
+          inspDateRef.current !== date
+        ) {
+          return;
+        }
+        setCleaningItems([]);
+        setShoeItems([]);
+      } finally {
+        if (
+          requestId === inspectionRequestRef.current &&
+          classroomIdRef.current === classroomId &&
+          inspDateRef.current === date
+        ) {
+          setInspLoaded(true);
+        }
+      }
+    },
+    [classroomId],
+  );
+
+  const refreshDuties = useCallback(async () => {
+    const requestId = ++dutiesRequestRef.current;
+    setDutiesError(null);
+    try {
+      const data = await fetchCleaningDuties(classroomId, todayDateString());
+      if (
+        requestId !== dutiesRequestRef.current ||
+        classroomIdRef.current !== classroomId
+      ) {
+        return;
+      }
+      setCleaningDuties(data.duties);
+    } catch (e) {
+      if (
+        requestId !== dutiesRequestRef.current ||
+        classroomIdRef.current !== classroomId
+      ) {
+        return;
+      }
+      setDutiesError(
+        e instanceof Error ? e.message : "청소 당번을 불러오지 못했습니다.",
+      );
+    } finally {
+      if (
+        requestId === dutiesRequestRef.current &&
+        classroomIdRef.current === classroomId
+      ) {
+        setDutiesLoaded(true);
+      }
+    }
+  }, [classroomId]);
+
+  const refreshRealtimeData = useCallback(async () => {
+    const selectedDate = inspDateRef.current;
+    await Promise.all([
+      refresh(),
+      refreshInspections(selectedDate),
+      refreshDuties(),
+    ]);
+  }, [refresh, refreshDuties, refreshInspections]);
+
+  useClassroomMorningRealtime({
+    classroomId,
+    onRefresh: refreshRealtimeData,
+  });
+
+  // Fetch inspection data when inspDate changes.
   useEffect(() => {
-    let cancelled = false;
     setInspLoaded(false);
-    fetchMorningSummary(classroomId, inspDate)
-      .then((data) => {
-        if (!cancelled) {
-          setCleaningItems(data.cleaningFindings);
-          setShoeItems(data.shoeFindings);
-          setInspLoaded(true);
-        }
-      })
-      .catch(() => {
-        if (!cancelled) {
-          setCleaningItems([]);
-          setShoeItems([]);
-          setInspLoaded(true);
-        }
-      });
-    return () => { cancelled = true; };
-  }, [classroomId, inspDate]);
+    void refreshInspections(inspDate);
+  }, [inspDate, refreshInspections]);
 
 
   useEffect(() => {
     setLoaded(false);
-    refresh();
+    void refresh();
   }, [refresh]);
+
+  useEffect(() => {
+    setDutiesLoaded(false);
+    void refreshDuties();
+  }, [refreshDuties]);
 
   useEffect(() => {
     if (timerRef.current) {
       clearInterval(timerRef.current);
       timerRef.current = null;
     }
-    timerRef.current = setInterval(refresh, REFRESH_MS);
+    timerRef.current = setInterval(() => {
+      void refreshRealtimeData();
+    }, REFRESH_MS);
     return () => {
       if (timerRef.current) clearInterval(timerRef.current);
       timerRef.current = null;
     };
-  }, [refresh]);
+  }, [refreshRealtimeData]);
 
   const assignmentSections = summary
     ? [
@@ -202,13 +301,10 @@ export function ClassroomMorningDashboard({
     ? activeAssignmentIndex
     : 0;
   const activeAssignment = assignmentSections[safeAssignmentIndex] ?? null;
-  const cleaningRows = summary
-    ? Array.from(
-        { length: Math.ceil(summary.cleaningFindings.length / 3) },
-        (_, rowIndex) =>
-          cleaningItems.slice(rowIndex * 3, rowIndex * 3 + 3),
-      )
-    : [];
+  const cleaningRows = Array.from(
+    { length: Math.ceil(cleaningItems.length / 3) },
+    (_, rowIndex) => cleaningItems.slice(rowIndex * 3, rowIndex * 3 + 3),
+  );
 
   async function completeShoeFinding() {
     if (!selectedShoe || shoeSaving) return;
@@ -344,7 +440,9 @@ export function ClassroomMorningDashboard({
                 </div>
               </div>
               <div className={expandedPanels["cleaning"] ? "morning-panel-body is-expanded" : "morning-panel-body"} ref={(el) => { bodyRefs.current["cleaning"] = el; }}>
-              {cleaningItems.length === 0 ? (
+              {!inspLoaded ? (
+                <p className="classroom-dashboard-empty">불러오는 중...</p>
+              ) : cleaningItems.length === 0 ? (
                 <p className="classroom-dashboard-empty">
                   청소 지적이 없습니다 🎉
                 </p>
@@ -433,7 +531,9 @@ export function ClassroomMorningDashboard({
                 </div>
               </div>
               <div className={expandedPanels["shoe"] ? "morning-panel-body is-expanded" : "morning-panel-body"} ref={(el) => { bodyRefs.current["shoe"] = el; }}>
-              {shoeItems.length === 0 ? (
+              {!inspLoaded ? (
+                <p className="classroom-dashboard-empty">불러오는 중...</p>
+              ) : shoeItems.length === 0 ? (
                 <p className="classroom-dashboard-empty">
                   실내화 미정리 학생이 없습니다 🎉
                 </p>
@@ -483,6 +583,10 @@ export function ClassroomMorningDashboard({
               <div className={expandedPanels["duties"] ? "morning-panel-body is-expanded" : "morning-panel-body"} ref={(el) => { bodyRefs.current["duties"] = el; }}>
               {!dutiesLoaded ? (
                 <p className="classroom-dashboard-empty">불러오는 중...</p>
+              ) : dutiesError ? (
+                <p className="check-error" role="alert">
+                  {dutiesError}
+                </p>
               ) : cleaningDuties.length === 0 ? (
                 <p className="classroom-dashboard-empty">
                   오늘 청소 당번이 없습니다 🎉

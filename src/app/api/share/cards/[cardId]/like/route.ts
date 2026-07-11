@@ -73,6 +73,12 @@ export async function POST(
     db.cardLike.count({ where: { cardId } }),
     db.cardComment.count({ where: { cardId, deletedAt: null } }),
   ]);
-  await announceEngagementChange(card.boardId, cardId, count, commentCount);
+  await announceEngagementChange(
+    card.boardId,
+    cardId,
+    count,
+    commentCount,
+    "like",
+  );
   return NextResponse.json({ liked, count });
 }

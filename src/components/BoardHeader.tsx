@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { AuthHeader } from "./AuthHeader";
 import { EditableTitle } from "./EditableTitle";
@@ -10,6 +10,7 @@ import { useBoardSlideshow } from "./slideshow/BoardSlideshowProvider";
 import type { BoardSection, BoardTheme } from "./BoardSettingsPanel";
 import type { AuraBoardSettings } from "./AuraEvaluationControl";
 import type { SubjectOrder } from "@/lib/subject-order";
+import { BOARD_ENGAGEMENT_CONTEXT_EVENT } from "@/lib/board-engagement-context";
 
 type Props = {
   boardId?: string;
@@ -70,8 +71,16 @@ export function BoardHeader({
   const isShared = shareMode && shareMode !== "private" && !!shareToken;
   const { canOpen, openSlideshow } = useBoardSlideshow();
 
+  useEffect(() => {
+    window.dispatchEvent(new Event(BOARD_ENGAGEMENT_CONTEXT_EVENT));
+  }, [boardId, isStudent]);
+
   return (
-    <header className="board-header">
+    <header
+      className="board-header"
+      data-aura-board-id={boardId ?? ""}
+      data-aura-student-viewer={isStudent ? "true" : "false"}
+    >
       <div className="board-header-left">
         <Link
           href={backHref ?? "/"}

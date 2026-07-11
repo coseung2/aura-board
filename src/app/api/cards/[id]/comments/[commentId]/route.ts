@@ -57,7 +57,13 @@ export async function DELETE(
       db.card.findUnique({ where: { id: cardId }, select: { boardId: true } }),
     ]);
     if (card) {
-      await announceEngagementChange(card.boardId, cardId, likeCount, commentCount);
+      await announceEngagementChange(
+        card.boardId,
+        cardId,
+        likeCount,
+        commentCount,
+        "comment",
+      );
     }
   } catch {
     // Broadcast side-effects are non-fatal.

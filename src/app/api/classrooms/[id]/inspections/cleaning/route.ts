@@ -6,6 +6,7 @@ import { getCurrentStudent } from "@/lib/student-auth";
 import { hasPermission } from "@/lib/bank-permissions";
 import { parseDateOrNull, todayDateString } from "@/lib/inspector-findings";
 import { giveYellowCard } from "@/lib/yellow-card";
+import { announceClassroomMorningChange } from "@/lib/realtime-broadcast";
 
 const Body = z.object({
   findings: z
@@ -224,6 +225,12 @@ export async function POST(
   }
 
   const promotedCount = yellowCardResults.filter((r) => r.promotedToCleaningDuty).length;
+
+  await announceClassroomMorningChange(
+    classroomId,
+    "cleaning_inspection",
+    dateStr,
+  );
 
   return NextResponse.json({
     savedAt: now.toISOString(),

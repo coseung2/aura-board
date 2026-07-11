@@ -5,6 +5,7 @@ import { db } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
 import { getCurrentStudent } from "@/lib/student-auth";
 import { getEffectiveBoardRole, type Role } from "@/lib/rbac";
+import { shouldUseStudentBoardViewer } from "@/lib/board-engagement-context";
 import { BoardCanvas } from "@/components/BoardCanvas";
 import { GridBoard } from "@/components/GridBoard";
 import { StreamBoard } from "@/components/StreamBoard";
@@ -134,6 +135,13 @@ export default async function BoardPage({
     getCurrentStudent(),
   ]);
   if (!board) notFound();
+  const studentViewRequested = viewParam === "student";
+  const useStudentViewer = shouldUseStudentBoardViewer({
+    boardClassroomId: board.classroomId,
+    studentClassroomId: student?.classroomId,
+    hasTeacherSession: Boolean(user),
+    studentViewRequested,
+  });
 
   // 개발 중 기능(dev-only) 접근 권한이 있는 관리자 계정 여부.
   const isAdmin = isAdminEmail(user?.email);
@@ -274,8 +282,8 @@ export default async function BoardPage({
   // Effective role = teacher via BoardMember OR classroom-role-granted student
   // OR classroom-student baseline (viewer) OR null.
   const rolePromise: Promise<Role | null> = getEffectiveBoardRole(board.id, {
-    userId: user?.id,
-    studentId: student?.id,
+    userId: useStudentViewer ? undefined : user?.id,
+    studentId: useStudentViewer ? student?.id : undefined,
   });
   const breakoutAssignmentPromise = needsBreakoutAssignment
     ? db.breakoutAssignment.findUnique({
@@ -345,18 +353,11 @@ export default async function BoardPage({
 
   // Role resolution moved into getEffectiveBoardRole (teacher + student DJ +
   // classroom-student baseline). studentViewer is the identity signal for
-  // downstream viewer-kind checks — it must ONLY be set when the caller is
-  // resolving as a student. When a NextAuth user session is present (teacher)
-  // the teacher identity wins, even if a stale student cookie coexists in the
-  // same browser (a common teacher-testing scenario that otherwise renders
-  // the teacher header with a random student's name).
+  // downstream viewer-kind checks. Teacher identity remains the default when
+  // both sessions coexist; `?view=student` is the explicit per-tab override
+  // emitted by the student dashboard after the student session is validated.
   let studentViewer: { id: string; name: string; classroomId: string } | null = null;
-  if (
-    !user &&
-    student &&
-    board.classroomId &&
-    student.classroomId === board.classroomId
-  ) {
+  if (useStudentViewer && student) {
     studentViewer = {
       id: student.id,
       name: student.name,

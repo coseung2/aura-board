@@ -500,7 +500,7 @@ function StudentBoardSections({
       ? `/quiz/${quizCode}`
       : board.layout === "kordle"
         ? `/board/${board.slug}/play/kordle`
-        : `/board/${board.slug}`;
+        : `/board/${board.slug}?view=student`;
     const breakout = board.breakout;
     if (breakout) {
       return (
@@ -511,7 +511,7 @@ function StudentBoardSections({
           onClick={() => {
             if (breakout.selectedSectionId) {
               router.push(
-                `/board/${breakout.boardSlug}/s/${breakout.selectedSectionId}`,
+                `/board/${breakout.boardSlug}/s/${breakout.selectedSectionId}?view=student`,
               );
               return;
             }
@@ -616,13 +616,15 @@ function StudentBreakoutModal({
         },
       );
       if (res.ok) {
-        router.push(`/board/${breakout.boardSlug}/s/${group.entrySectionId}`);
+        router.push(
+          `/board/${breakout.boardSlug}/s/${group.entrySectionId}?view=student`,
+        );
         return;
       }
       const data = await res.json().catch(() => ({}));
       if (res.status === 409 && data.membership?.sectionId) {
         router.push(
-          `/board/${breakout.boardSlug}/s/${data.membership.sectionId}`,
+          `/board/${breakout.boardSlug}/s/${data.membership.sectionId}?view=student`,
         );
         return;
       }

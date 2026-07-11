@@ -6,6 +6,7 @@ import {
   StyleSheet,
   Text,
   View,
+  useWindowDimensions,
 } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -14,8 +15,9 @@ import {
   borders,
   colors,
   dashboard,
+  layout as layoutTokens,
   media,
-  portfolio,
+  portfolio as portfolioTokens,
   radii,
   shadows,
   spacing,
@@ -24,7 +26,12 @@ import {
 import { layoutLabel } from "../../theme/layout-meta";
 import { apiFetch, ApiError } from "../../lib/api";
 import { clearSessionToken } from "../../lib/session";
-import { AppHeader, SurfaceCard, SurfacePressable } from "../../components/ui";
+import {
+  AppHeader,
+  ControlPressable,
+  SurfaceCard,
+  SurfacePressable,
+} from "../../components/ui";
 import type {
   BoardCard,
   MeResponse,
@@ -35,6 +42,7 @@ import type {
 
 export default function StudentPortfolioScreen() {
   const router = useRouter();
+  const { width, height } = useWindowDimensions();
   const params = useLocalSearchParams<{ studentId?: string }>();
   const [me, setMe] = useState<MeResponse | null>(null);
   const [roster, setRoster] = useState<PortfolioRosterDTO | null>(null);
@@ -44,6 +52,10 @@ export default function StudentPortfolioScreen() {
   const [loading, setLoading] = useState(true);
   const [portfolioLoading, setPortfolioLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const isLandscapeLayout = width > height && width >= dashboard.columns.one;
+  const horizontalPadding = isLandscapeLayout ? spacing.xxl : spacing.xl;
+  const isWideGrid =
+    width >= portfolioTokens.cardWidth * 2 + spacing.lg + horizontalPadding * 2;
   const modalCards = useMemo(() => {
     if (!portfolio) return [];
     return portfolio.cards.map((card) => toBoardCard(card, portfolio.student));
@@ -123,19 +135,25 @@ export default function StudentPortfolioScreen() {
 
   return (
     <SafeAreaView style={styles.container} edges={["top"]}>
-      <AppHeader title="우리 학급 포트폴리오" onBack={() => router.back()} />
+      <AppHeader title="포트폴리오" />
 
       {loading ? (
         <View style={styles.center}>
           <ActivityIndicator size="large" color={colors.accent} />
-          <Text style={styles.muted}>불러오는 중이에요.</Text>
+          <Text style={styles.loadingText}>불러오는 중이에요.</Text>
         </View>
       ) : error ? (
         <View style={styles.center}>
           <Text style={styles.error}>{error}</Text>
         </View>
       ) : (
-        <ScrollView contentContainerStyle={styles.content}>
+        <ScrollView
+          contentInsetAdjustmentBehavior="automatic"
+          contentContainerStyle={[
+            styles.content,
+            isLandscapeLayout && styles.contentLandscape,
+          ]}
+        >
           <Text style={styles.classroom}>{roster?.classroom.name}</Text>
           <ScrollView
             horizontal
@@ -146,10 +164,13 @@ export default function StudentPortfolioScreen() {
               const selected = student.id === selectedId;
               const self = student.id === me?.student.id;
               return (
-                <SurfacePressable
+                <ControlPressable
                   key={student.id}
                   style={[styles.studentChip, selected && styles.studentChipOn]}
                   onPress={() => selectStudent(student.id)}
+                  accessibilityLabel={`${student.number != null ? `${student.number}번 ` : ""}${student.name}${self ? ", 나" : ""}, 작품 ${student.cardCount}개`}
+                  accessibilityState={{ selected }}
+                  accessibilityHint="학생 포트폴리오를 열어요"
                 >
                   <Text
                     style={[
@@ -170,7 +191,7 @@ export default function StudentPortfolioScreen() {
                   >
                     작품 {student.cardCount}개
                   </Text>
-                </SurfacePressable>
+                </ControlPressable>
               );
             })}
           </ScrollView>
@@ -179,6 +200,9 @@ export default function StudentPortfolioScreen() {
             <Text style={styles.sectionTitle}>
               {portfolio?.student.name ?? "학생"}의 작품
             </Text>
+            {portfolio ? (
+              <Text style={styles.sectionCount}>{portfolio.cards.length}개</Text>
+            ) : null}
           </View>
 
           {portfolioLoading ? (
@@ -186,12 +210,13 @@ export default function StudentPortfolioScreen() {
               <ActivityIndicator color={colors.accent} />
             </View>
           ) : portfolio?.cards.length ? (
-            <View style={styles.cardGrid}>
+            <View style={[styles.cardGrid, isWideGrid && styles.cardGridWide]}>
               {portfolio.cards.map((card, index) => (
                 <PortfolioCard
                   key={card.id}
                   card={card}
                   student={portfolio.student}
+                  isWide={isWideGrid}
                   onPress={() => setSelectedCard(modalCards[index] ?? null)}
                 />
               ))}
@@ -214,24 +239,34 @@ export default function StudentPortfolioScreen() {
 function PortfolioCard({
   card,
   student,
+  isWide,
   onPress,
 }: {
   card: PortfolioCardDTO;
   student: PortfolioStudentDTO["student"];
+  isWide: boolean;
   onPress: () => void;
 }) {
   const image = getCardPreviewImage(card);
   const authorLabel = card.sourceBoard.anonymousAuthor ? "익명" : student.name;
   return (
     <SurfacePressable
-      style={styles.card}
+      style={[styles.card, isWide && styles.cardWide]}
       onPress={onPress}
       accessibilityLabel={`${authorLabel}의 작품 ${card.title || "제목 없음"} 열기`}
+      accessibilityHint="작품 내용을 자세히 봐요"
     >
       <View style={styles.preview}>
         {image ? (
-          <Image source={{ uri: image }} style={styles.previewImage} />
-        ) : null}
+          <Image
+            source={{ uri: image }}
+            style={styles.previewImage}
+            resizeMode="cover"
+            accessible={false}
+          />
+        ) : (
+          <Text style={styles.previewPlaceholder}>미리보기 없음</Text>
+        )}
         {card.videoUrl ? (
           <View style={styles.play}>
             <Text style={styles.playText}>▶</Text>
@@ -335,15 +370,25 @@ const styles = StyleSheet.create({
     gap: spacing.md,
     padding: spacing.xxl,
   },
+  loadingText: { ...typography.body, color: colors.textMuted },
   content: {
-    padding: spacing.xxl,
+    width: "100%",
+    maxWidth: layoutTokens.readableMaxWidth,
+    alignSelf: "center",
+    paddingHorizontal: spacing.xl,
+    paddingTop: spacing.lg,
+    paddingBottom: spacing.xxxl,
     gap: spacing.lg,
   },
-  classroom: { ...typography.section, color: colors.text },
+  contentLandscape: {
+    paddingHorizontal: spacing.xxl,
+    gap: spacing.xl,
+  },
+  classroom: { ...typography.label, color: colors.textMuted },
   rosterRow: { gap: spacing.sm, paddingBottom: spacing.xs },
   studentChip: {
-    width: portfolio.rosterChipWidth,
-    minHeight: portfolio.rosterChipMinHeight,
+    width: portfolioTokens.rosterChipWidth,
+    minHeight: portfolioTokens.rosterChipMinHeight,
     padding: spacing.md,
     gap: spacing.xs,
   },
@@ -359,18 +404,37 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
+    gap: spacing.md,
+    borderTopWidth: borders.hairline,
+    borderTopColor: colors.border,
+    paddingTop: spacing.lg,
   },
-  sectionTitle: { ...typography.section, color: colors.text },
-  inlineLoading: { paddingVertical: spacing.xl },
+  sectionTitle: { ...typography.subtitle, color: colors.text },
+  sectionCount: { ...typography.label, color: colors.accent },
+  inlineLoading: {
+    minHeight: portfolioTokens.rosterChipMinHeight,
+    alignItems: "center",
+    justifyContent: "center",
+    gap: spacing.sm,
+  },
   cardGrid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
     gap: spacing.lg,
   },
+  cardGridWide: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    alignItems: "stretch",
+  },
   card: {
-    width: portfolio.cardWidth,
-    minHeight: portfolio.cardMinHeight,
+    width: "100%",
+    minHeight: portfolioTokens.cardMinHeight,
     overflow: "hidden",
+  },
+  cardWide: {
+    width: portfolioTokens.cardWidth,
+    flexGrow: 1,
+    minWidth: 0,
+    maxWidth: "100%",
   },
   preview: {
     height: dashboard.showcasePreviewHeight,
@@ -381,6 +445,7 @@ const styles = StyleSheet.create({
     borderBottomColor: colors.border,
   },
   previewImage: { width: "100%", height: "100%" },
+  previewPlaceholder: { ...typography.micro, color: colors.textFaint },
   play: {
     position: "absolute",
     width: dashboard.playSize,
@@ -391,13 +456,19 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     ...shadows.card,
   },
-  playText: { ...typography.section, color: colors.text, marginLeft: media.playOffset },
+  playText: {
+    ...typography.section,
+    color: colors.text,
+    marginLeft: media.playOffset,
+  },
   cardBody: { padding: spacing.lg, gap: spacing.sm },
-  cardTitle: { ...typography.section, color: colors.text },
+  cardTitle: { ...typography.subtitle, color: colors.text },
   cardContent: { ...typography.body, color: colors.textMuted },
   cardMeta: { ...typography.micro, color: colors.textMuted, marginTop: "auto" },
   emptyBox: {
     padding: spacing.xl,
+    alignItems: "center",
+    justifyContent: "center",
   },
   muted: { ...typography.body, color: colors.textMuted },
   error: { ...typography.body, color: colors.danger, textAlign: "center" },

@@ -89,7 +89,13 @@ export async function POST(
       actorType: actor.kind === "teacher" ? "teacher" : "student",
       actorId: actor.id,
     });
-    await announceEngagementChange(card.boardId, cardId, count, commentCount);
+    await announceEngagementChange(
+      card.boardId,
+      cardId,
+      count,
+      commentCount,
+      "like",
+    );
   }
   return NextResponse.json({ liked, count });
 }

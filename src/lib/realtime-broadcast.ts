@@ -14,8 +14,16 @@ import {
   type KordleLiveEvent,
   type KordlePuzzleChangedEvent,
 } from "@/features/kordle/realtime";
-import type { BoardRealtimeEvent } from "./realtime";
-import { boardChannelKey } from "./realtime";
+import {
+  QUIZ_SNAPSHOT_EVENT,
+  quizChannelKey,
+  type QuizRealtimeSnapshot,
+} from "@/features/quiz/realtime";
+import type {
+  BoardRealtimeEvent,
+  ClassroomMorningRealtimeEvent,
+} from "./realtime";
+import { boardChannelKey, classroomMorningChannelKey } from "./realtime";
 
 let serverClient: SupabaseClient | null = null;
 
@@ -33,6 +41,31 @@ function getServerClient(): SupabaseClient | null {
   return serverClient;
 }
 
+async function broadcast(
+  channelKey: string,
+  event: string,
+  payload: unknown,
+): Promise<void> {
+  let client: SupabaseClient | null = null;
+  let channel: ReturnType<SupabaseClient["channel"]> | null = null;
+  try {
+    client = getServerClient();
+    if (!client) return;
+    channel = client.channel(channelKey);
+    await channel.httpSend(event, payload, { timeout: 1500 });
+  } catch {
+    // Realtime is best-effort and must never fail a committed mutation.
+  } finally {
+    if (client && channel) {
+      try {
+        void client.removeChannel(channel).catch(() => {});
+      } catch {
+        // ignore cleanup errors
+      }
+    }
+  }
+}
+
 /**
  * Broadcast a card-change event on the board's realtime channel.
  * Clients listening on `board:{boardId}` will refetch a snapshot.
@@ -41,17 +74,12 @@ export async function announceCardChange(
   boardId: string,
   changeType: "insert" | "update" | "delete" = "insert",
 ): Promise<void> {
-  const client = getServerClient();
-  if (!client) return;
-  try {
-    await client.channel(boardChannelKey(boardId)).send({
-      type: "broadcast",
-      event: "card_changed",
-      payload: { boardId, changeType, ts: Date.now() },
-    });
-  } catch {
-    // ignore
-  }
+  if (!boardId) return;
+  await broadcast(boardChannelKey(boardId), "card_changed", {
+    boardId,
+    changeType,
+    ts: Date.now(),
+  });
 }
 
 /**
@@ -64,27 +92,40 @@ export async function announceEngagementChange(
   cardId: string,
   likeCount: number,
   commentCount: number,
+  changeType?: "like" | "comment",
 ): Promise<void> {
   if (!boardId || !cardId) return;
-  const client = getServerClient();
-  if (!client) return;
   const event: BoardRealtimeEvent = {
     type: "engagement_changed",
     boardId,
     cardId,
     likeCount,
     commentCount,
+    ...(changeType ? { changeType } : {}),
     updatedAt: new Date().toISOString(),
   };
-  try {
-    await client.channel(boardChannelKey(boardId)).send({
-      type: "broadcast",
-      event: "board_changed",
-      payload: event,
-    });
-  } catch {
-    // ignore
-  }
+  await broadcast(boardChannelKey(boardId), "board_changed", event);
+}
+
+/** Broadcast a classroom morning-check or duty-roster mutation. */
+export async function announceClassroomMorningChange(
+  classroomId: string,
+  changeType: ClassroomMorningRealtimeEvent["changeType"],
+  date: string,
+): Promise<void> {
+  if (!classroomId || !date) return;
+  const event: ClassroomMorningRealtimeEvent = {
+    type: "morning_changed",
+    classroomId,
+    changeType,
+    date,
+    updatedAt: new Date().toISOString(),
+  };
+  await broadcast(
+    classroomMorningChannelKey(classroomId),
+    "morning_changed",
+    event,
+  );
 }
 
 /**
@@ -97,8 +138,6 @@ export async function announceQueueChange(
   changeType: "submit" | "status" | "move" | "delete",
 ): Promise<void> {
   if (!boardId || !cardId) return;
-  const client = getServerClient();
-  if (!client) return;
   const event: BoardRealtimeEvent = {
     type: "queue_changed",
     boardId,
@@ -106,15 +145,7 @@ export async function announceQueueChange(
     changeType,
     updatedAt: new Date().toISOString(),
   };
-  try {
-    await client.channel(boardChannelKey(boardId)).send({
-      type: "broadcast",
-      event: "queue_changed",
-      payload: event,
-    });
-  } catch {
-    // ignore
-  }
+  await broadcast(boardChannelKey(boardId), "queue_changed", event);
 }
 
 /**
@@ -126,23 +157,13 @@ export async function announcePollChange(
   cardId: string,
 ): Promise<void> {
   if (!boardId || !cardId) return;
-  const client = getServerClient();
-  if (!client) return;
   const event: BoardRealtimeEvent = {
     type: "poll_changed",
     boardId,
     cardId,
     updatedAt: new Date().toISOString(),
   };
-  try {
-    await client.channel(boardChannelKey(boardId)).send({
-      type: "broadcast",
-      event: "board_changed",
-      payload: event,
-    });
-  } catch {
-    // ignore
-  }
+  await broadcast(boardChannelKey(boardId), "board_changed", event);
 }
 
 /**
@@ -156,8 +177,6 @@ export async function announceQuestionChange(
 ): Promise<void> {
   if (!boardId) return;
   if (changeType !== "config" && !responseId) return;
-  const client = getServerClient();
-  if (!client) return;
   const event: BoardRealtimeEvent = {
     type: "question_changed",
     boardId,
@@ -165,15 +184,19 @@ export async function announceQuestionChange(
     ...(responseId ? { responseId } : {}),
     updatedAt: new Date().toISOString(),
   };
-  try {
-    await client.channel(boardChannelKey(boardId)).send({
-      type: "broadcast",
-      event: "question_changed",
-      payload: event,
-    });
-  } catch {
-    // ignore
-  }
+  await broadcast(boardChannelKey(boardId), "question_changed", event);
+}
+
+/**
+ * Broadcast a safe, committed quiz snapshot. Unlike content boards, game
+ * clients can apply this compact payload directly; focus/reconnect polling
+ * still reads the same snapshot endpoint as the recovery source of truth.
+ */
+export async function announceQuizSnapshot(
+  snapshot: QuizRealtimeSnapshot,
+): Promise<void> {
+  if (!snapshot.quizId) return;
+  await broadcast(quizChannelKey(snapshot.quizId), QUIZ_SNAPSHOT_EVENT, snapshot);
 }
 
 /**
@@ -185,17 +208,11 @@ export async function announceKordleGuess(
   event: KordleLiveEvent,
 ): Promise<void> {
   if (!boardId || !event.id) return;
-  const client = getServerClient();
-  if (!client) return;
-  try {
-    await client.channel(kordleBoardChannelKey(boardId)).send({
-      type: "broadcast",
-      event: KORDLE_GUESS_SUBMITTED_EVENT,
-      payload: event,
-    });
-  } catch {
-    // ignore
-  }
+  await broadcast(
+    kordleBoardChannelKey(boardId),
+    KORDLE_GUESS_SUBMITTED_EVENT,
+    event,
+  );
 }
 
 /**
@@ -207,15 +224,9 @@ export async function announceKordlePuzzleChange(
   event: KordlePuzzleChangedEvent,
 ): Promise<void> {
   if (!boardId || !event.puzzleId) return;
-  const client = getServerClient();
-  if (!client) return;
-  try {
-    await client.channel(kordleBoardChannelKey(boardId)).send({
-      type: "broadcast",
-      event: KORDLE_PUZZLE_CHANGED_EVENT,
-      payload: event,
-    });
-  } catch {
-    // ignore
-  }
+  await broadcast(
+    kordleBoardChannelKey(boardId),
+    KORDLE_PUZZLE_CHANGED_EVENT,
+    event,
+  );
 }
