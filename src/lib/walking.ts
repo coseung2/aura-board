@@ -74,7 +74,7 @@ export async function getClassroomWalkingSummary(classroomId: string) {
       AND w."day" <= CURRENT_DATE
     WHERE s."classroomId" = ${classroomId}
     GROUP BY s."id", s."number", s."name"
-    ORDER BY s."number" ASC NULLS LAST, s."createdAt" ASC
+    ORDER BY s."number" ASC NULLS LAST, s."name" ASC
   `);
 
   return rows.map((row) => ({
