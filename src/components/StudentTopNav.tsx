@@ -48,8 +48,8 @@ export function StudentTopNav({
   const readingRecordActive =
     pathname === "/student/reading" || pathname.startsWith("/student/reading/");
   const readingChampionsActive = pathname.startsWith("/student/reading-champions");
-  const readingActive =
-    readingRecordActive || readingChampionsActive;
+  const readingActive = readingRecordActive || readingChampionsActive;
+  const walkingActive = pathname.startsWith("/student/walking");
 
   const navItems: MegaNavItem[] = [
     {
@@ -82,6 +82,11 @@ export function StudentTopNav({
         {
           title: "활동",
           links: [
+            {
+              href: "/student/walking",
+              label: "걷기 기록",
+              active: walkingActive,
+            },
             {
               href: "/student/canva-pair",
               label: "캔바 연결",
@@ -143,6 +148,24 @@ export function StudentTopNav({
       ],
     },
     {
+      id: "walking",
+      label: "걷기",
+      href: "/student/walking",
+      active: walkingActive,
+      groups: [
+        {
+          title: "건강",
+          links: [
+            {
+              href: "/student/walking",
+              label: "걷기 기록",
+              active: walkingActive,
+            },
+          ],
+        },
+      ],
+    },
+    {
       id: "wallet",
       label: "통장",
       href: "/my/wallet",
@@ -170,10 +193,10 @@ export function StudentTopNav({
           title: "학습",
           links: [
             {
-                href: "/student/reading",
-                label: "독서 기록",
-                active: readingRecordActive,
-              },
+              href: "/student/reading",
+              label: "독서 기록",
+              active: readingRecordActive,
+            },
             {
               href: "/student/reading-champions",
               label: "독서왕 전시",
