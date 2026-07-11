@@ -33,6 +33,7 @@ import {
 } from "../theme/tokens";
 import type { BoardCard } from "../lib/types";
 import { apiFetch } from "../lib/api";
+import { useBoardRealtime } from "../lib/use-board-realtime";
 import { maskAnonymousLabel, resolveCardAuthorName } from "../lib/card-privacy";
 import { EmbeddedMedia } from "./EmbeddedMedia";
 import {
@@ -131,6 +132,13 @@ export function CardDetailModal({
       setComments([]);
     }
   }, [card]);
+
+  useBoardRealtime({
+    slug: card?.boardId ?? "",
+    onReload: async () => {
+      await Promise.all([loadEngagement(), loadComments()]);
+    },
+  });
 
   const updateCommentOffset = useCallback(
     (key: keyof typeof commentOffsets, value: number) => {

@@ -10,9 +10,10 @@ import {
   maybeAutoJoinLinkFixed,
 } from "@/lib/rbac";
 import { SectionBreakoutView } from "@/components/SectionBreakoutView";
+import { shouldUseStudentBoardViewer } from "@/lib/board-engagement-context";
 
 type PageParams = { id: string; sectionId: string };
-type PageSearchParams = { token?: string };
+type PageSearchParams = { token?: string; view?: string };
 
 export default async function BreakoutPage({
   params,
@@ -22,7 +23,7 @@ export default async function BreakoutPage({
   searchParams: Promise<PageSearchParams>;
 }) {
   const { id: boardParam, sectionId } = await params;
-  const { token } = await searchParams;
+  const { token, view } = await searchParams;
 
   // Resolve board first (supports slug or id in the route segment, like /board/[id]).
   const board = await db.board.findFirst({
@@ -36,11 +37,17 @@ export default async function BreakoutPage({
     getCurrentUser().catch(() => null),
     getCurrentStudent(),
   ]);
+  const isStudentViewer = shouldUseStudentBoardViewer({
+    boardClassroomId: board.classroomId,
+    studentClassroomId: student?.classroomId,
+    hasTeacherSession: Boolean(user),
+    studentViewRequested: view === "student",
+  });
 
   let section;
   try {
     section = await viewSection(sectionId, {
-      userId: user?.id ?? null,
+      userId: isStudentViewer ? null : user?.id ?? null,
       studentClassroomId: student?.classroomId ?? null,
       token: token ?? null,
     });
@@ -86,7 +93,7 @@ export default async function BreakoutPage({
     await assertBreakoutVisibility({
       sectionId: section.id,
       boardId: board.id,
-      userId: user?.id ?? null,
+      userId: isStudentViewer ? null : user?.id ?? null,
       studentId: student?.id ?? null,
       token: token ?? null,
     });
@@ -128,7 +135,7 @@ export default async function BreakoutPage({
   });
 
   // Owner sees a "공유 관리" link.
-  const role = user ? await getBoardRole(board.id, user.id) : null;
+  const role = user && !isStudentViewer ? await getBoardRole(board.id, user.id) : null;
   const shareManagementHref = role === "owner"
     ? `/board/${board.id}/s/${section.id}/share`
     : null;
@@ -160,6 +167,7 @@ export default async function BreakoutPage({
         createdAt: c.createdAt.toISOString(),
       }))}
       shareManagementHref={shareManagementHref}
+      isStudentViewer={isStudentViewer}
       autoJoinWarning={
         autoJoinError === "capacity_reached"
           ? "이 모둠은 정원이 꽉 찼어요. 교사에게 다른 모둠 배정을 요청해 주세요."

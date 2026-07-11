@@ -138,7 +138,13 @@ export async function POST(
       db.cardLike.count({ where: { cardId } }),
       db.cardComment.count({ where: { cardId, deletedAt: null } }),
     ]);
-    await announceEngagementChange(card.boardId, cardId, likeCount, commentCount);
+    await announceEngagementChange(
+      card.boardId,
+      cardId,
+      likeCount,
+      commentCount,
+      "comment",
+    );
   } catch {
     // Broadcast side-effects are non-fatal.
   }

@@ -114,7 +114,13 @@ export async function POST(
         actorType: isTeacher ? "teacher" : "student",
         actorId: actor.id,
       });
-      await announceEngagementChange(card.boardId, cardId, likeCount, commentCount);
+      await announceEngagementChange(
+        card.boardId,
+        cardId,
+        likeCount,
+        commentCount,
+        "comment",
+      );
     }
   } catch {
     // Broadcast side-effects are non-fatal.

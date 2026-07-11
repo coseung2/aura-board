@@ -1,7 +1,6 @@
-import { useCallback, useState, type ReactNode } from "react";
+import { useCallback, useRef, useState, type ReactNode } from "react";
 import {
   ActivityIndicator,
-  Image,
   RefreshControl,
   ScrollView,
   StyleSheet,
@@ -19,15 +18,15 @@ import {
   radii,
   shadows,
   spacing,
+  studentNav,
+  tapMin,
   typography,
 } from "../../theme/tokens";
-import { layoutLabel, layoutThumbnail } from "../../theme/layout-meta";
-import { apiFetch, ApiError, getApiUrl } from "../../lib/api";
+import { apiFetch, ApiError } from "../../lib/api";
 import { clearSessionToken } from "../../lib/session";
 import { roleEmoji, studentDutyTarget } from "../../lib/student-navigation";
 import { isAssignmentReminderVisible } from "../../lib/student-notifications";
 import type {
-  BoardMeta,
   MeResponse,
   StudentAssignmentTodo,
   StudentDuty,
@@ -37,34 +36,24 @@ import {
   AppButton,
   ControlPressable,
   Pill,
-  SurfaceCard,
-  SurfacePressable,
 } from "../../components/ui";
+import { StudentNotificationButton } from "../../components/StudentNotificationButton";
 
 // 학생 대시보드. 웹과 같은 /api/student/me 계약을 사용한다.
 
-const FALLBACK_THUMBNAIL = "/board-type-thumbnails/card-board.png";
-
 export default function StudentHome() {
   const router = useRouter();
-  const { width } = useWindowDimensions();
+  const { width, height } = useWindowDimensions();
   const [me, setMe] = useState<MeResponse | null>(null);
   const [wallet, setWallet] = useState<WalletSummary | null>(null);
   const [walletLoading, setWalletLoading] = useState(false);
-  const [activeCategory, setActiveCategory] = useState<"LESSON" | "PLAY">("LESSON");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [loggingOut, setLoggingOut] = useState(false);
+  const loggingOutRef = useRef(false);
 
-  const columnCount =
-    width < dashboard.columns.one
-      ? 1
-      : width < dashboard.columns.two
-        ? 2
-        : width < dashboard.columns.three
-          ? 3
-          : 4;
-  const gridGap = spacing.lg;
+  const isLandscapeLayout = width > height && width >= dashboard.columns.one;
 
   const loadWallet = useCallback(async () => {
     setWalletLoading(true);
@@ -101,6 +90,22 @@ export default function StudentHome() {
     },
     [router, loadWallet],
   );
+
+  const handleLogout = useCallback(async () => {
+    if (loggingOutRef.current) return;
+    loggingOutRef.current = true;
+    setLoggingOut(true);
+    try {
+      await apiFetch("/api/student/logout", { method: "POST" }).catch(
+        () => undefined,
+      );
+      await clearSessionToken();
+      router.replace("/(student)/login");
+    } finally {
+      loggingOutRef.current = false;
+      setLoggingOut(false);
+    }
+  }, [router]);
 
   useFocusEffect(
     useCallback(() => {
@@ -139,23 +144,20 @@ export default function StudentHome() {
     );
   }
 
-  const boards = me?.boards ?? [];
   const duties = me?.duties ?? [];
   const assignments = me?.assignments ?? [];
   const classroomName = me?.student.classroom?.name ?? "학급 미배정";
-  const hasLessonBoards = boards.some(
-    (board) => (board.category ?? "LESSON") === "LESSON",
+  const overviewLandscape = isLandscapeLayout && assignments.length > 0;
+  const walletCard = (
+    <WalletCardCompact
+      wallet={wallet}
+      loading={walletLoading}
+      onDetail={() => router.push("/(student)/wallet" as Href)}
+      duties={duties}
+      onOpen={(path) => router.push(path as Href)}
+    />
   );
-  const hasPlayBoards = boards.some((board) => board.category === "PLAY");
-  const visibleCategory =
-    activeCategory === "LESSON" && !hasLessonBoards && hasPlayBoards
-      ? "PLAY"
-      : activeCategory === "PLAY" && !hasPlayBoards && hasLessonBoards
-        ? "LESSON"
-        : activeCategory;
-  const visibleBoards = boards.filter(
-    (board) => (board.category ?? "LESSON") === visibleCategory,
-  );
+  const assignmentPanel = <AssignmentPanel assignments={assignments} />;
 
   return (
     <SafeAreaView style={styles.container} edges={["top"]}>
@@ -169,128 +171,60 @@ export default function StudentHome() {
           />
         }
       >
-        <View style={styles.greetingRow}>
-          <View style={styles.greetingCluster}>
-            <Text style={styles.greeting}>
-              {me?.student.name}님, 안녕하세요
+        <View style={styles.accountRow}>
+          <View style={styles.accountIdentity}>
+            <Text style={styles.accountName} numberOfLines={1} ellipsizeMode="tail">
+              {me?.student.name ?? "학생"}
             </Text>
-            <Pill tone="accent">{classroomName}</Pill>
+            <Text
+              style={styles.accountClassroom}
+              numberOfLines={1}
+              ellipsizeMode="tail"
+            >
+              {classroomName}
+            </Text>
+          </View>
+          <View style={styles.accountActions}>
+            <StudentNotificationButton />
+            <ControlPressable
+              style={styles.logoutButton}
+              onPress={handleLogout}
+              disabled={loggingOut}
+              accessibilityLabel={loggingOut ? "로그아웃 중" : "로그아웃"}
+              accessibilityState={{ disabled: loggingOut }}
+            >
+              <View style={styles.logoutIcon} accessible={false}>
+                <View style={styles.logoutDoor} />
+                <Text style={styles.logoutArrow}>→</Text>
+              </View>
+            </ControlPressable>
           </View>
         </View>
 
-        <WalletCardCompact
-          wallet={wallet}
-          loading={walletLoading}
-          onDetail={() => router.push("/(student)/wallet" as Href)}
-        />
-
-        <DutySectionCompact
-          duties={duties}
-          onOpen={(path) => router.push(path as Href)}
-        />
-
-        <AssignmentPanel assignments={assignments} />
-
-        {boards.length === 0 ? (
-          <View style={styles.emptyWrap}>
-            <Text style={styles.emptyEmoji}>📭</Text>
-            <Text style={styles.emptyTitle}>아직 보드가 없어요</Text>
-            <Text style={styles.emptyMsg}>
-              선생님이 새 보드를 만들면 여기에 나타나요.
-            </Text>
+        <View style={overviewLandscape ? styles.landscapeOverview : styles.overviewStack}>
+          <View
+            style={[
+              styles.overviewItem,
+              overviewLandscape && styles.landscapeOverviewItem,
+            ]}
+          >
+            {walletCard}
           </View>
-        ) : (
-          <>
-            <View style={styles.boardSectionHeader}>
-              <Text style={styles.sectionSub}>
-                {visibleCategory === "LESSON" ? "학습 보드" : "놀이 보드"}
-              </Text>
-              <View style={styles.categoryTabs}>
-                <ControlPressable
-                  style={[
-                    styles.categoryTab,
-                    visibleCategory === "LESSON" && styles.categoryTabActive,
-                  ]}
-                  onPress={() => setActiveCategory("LESSON")}
-                  disabled={!hasLessonBoards}
-                  accessibilityState={{
-                    selected: visibleCategory === "LESSON",
-                    disabled: !hasLessonBoards,
-                  }}
-                >
-                  <Text
-                    style={[
-                      styles.categoryTabText,
-                      visibleCategory === "LESSON" && styles.categoryTabTextActive,
-                    ]}
-                  >
-                    학습 {boards.filter((board) => (board.category ?? "LESSON") === "LESSON").length}
-                  </Text>
-                </ControlPressable>
-                <ControlPressable
-                  style={[
-                    styles.categoryTab,
-                    visibleCategory === "PLAY" && styles.categoryTabActive,
-                  ]}
-                  onPress={() => setActiveCategory("PLAY")}
-                  disabled={!hasPlayBoards}
-                  accessibilityState={{
-                    selected: visibleCategory === "PLAY",
-                    disabled: !hasPlayBoards,
-                  }}
-                >
-                  <Text
-                    style={[
-                      styles.categoryTabText,
-                      visibleCategory === "PLAY" && styles.categoryTabTextActive,
-                    ]}
-                  >
-                    놀이 {boards.filter((board) => board.category === "PLAY").length}
-                  </Text>
-                </ControlPressable>
-              </View>
+          {assignments.length > 0 ? (
+            <View
+              style={[
+                styles.overviewItem,
+                overviewLandscape && styles.landscapeOverviewItem,
+              ]}
+            >
+              {assignmentPanel}
             </View>
-            <View style={styles.boardGrid}>
-              {chunk(visibleBoards, columnCount).map((row, rowIdx) => (
-                <View
-                  key={rowIdx}
-                  style={[
-                    styles.gridRow,
-                    { gap: gridGap, marginBottom: gridGap },
-                  ]}
-                >
-                  {row.map((board) => (
-                    <View key={board.id} style={styles.gridCell}>
-                      <BoardCard board={board} />
-                    </View>
-                  ))}
-                  {row.length < columnCount
-                    ? Array.from({ length: columnCount - row.length }).map(
-                        (_, idx) => (
-                          <View
-                            key={`placeholder-${idx}`}
-                            style={styles.gridCell}
-                            pointerEvents="none"
-                          />
-                        ),
-                      )
-                    : null}
-                </View>
-              ))}
-            </View>
-          </>
-        )}
+          ) : null}
+        </View>
+
       </ScrollView>
     </SafeAreaView>
   );
-}
-
-function chunk<T>(arr: T[], size: number): T[][] {
-  const out: T[][] = [];
-  for (let i = 0; i < arr.length; i += size) {
-    out.push(arr.slice(i, i + size));
-  }
-  return out;
 }
 
 const ASSIGNMENT_VISIBLE_LIMIT = 4;
@@ -321,6 +255,7 @@ function AssignmentPanel({
   const [filter, setFilter] = useState<"missing" | "completed">(
     missingCount > 0 ? "missing" : "completed",
   );
+  const [showAll, setShowAll] = useState(false);
 
   if (assignments.length === 0) return null;
 
@@ -331,7 +266,10 @@ function AssignmentPanel({
   const filtered = ordered.filter((item) =>
     filter === "missing" ? !item.submitted : item.submitted,
   );
-  const visibleItems = filtered.slice(0, ASSIGNMENT_VISIBLE_LIMIT);
+  const visibleItems = showAll
+    ? filtered
+    : filtered.slice(0, ASSIGNMENT_VISIBLE_LIMIT);
+  const hiddenCount = Math.max(filtered.length - visibleItems.length, 0);
 
   const emptyMessage =
     filter === "missing"
@@ -339,13 +277,12 @@ function AssignmentPanel({
       : "완료한 과제가 없어요";
 
   return (
-    <SurfaceCard style={styles.assignmentPanel}>
+    <View style={styles.assignmentPanel}>
       <View style={styles.assignmentHeader}>
         <View>
-          <Text style={styles.assignmentEyebrow}>과제 목록</Text>
-          <Text style={styles.assignmentTitle}>해야 할 과제</Text>
+            <Text style={styles.assignmentEyebrow}>과제 목록</Text>
         </View>
-        <View style={styles.assignmentFilter}>
+        <View style={styles.inlineTabGroup}>
           <FilterChip
             active={filter === "missing"}
             onPress={() => setFilter("missing")}
@@ -373,14 +310,28 @@ function AssignmentPanel({
               <AssignmentRow
                 key={item.id}
                 item={item}
-                isLast={index === visibleItems.length - 1}
+                isLast={!showAll && index === visibleItems.length - 1}
                 onPress={target ? () => router.push(target as Href) : undefined}
               />
             );
           })
         )}
       </View>
-    </SurfaceCard>
+      {filtered.length > ASSIGNMENT_VISIBLE_LIMIT ? (
+        <ControlPressable
+          style={styles.assignmentExpand}
+          onPress={() => setShowAll((current) => !current)}
+          accessibilityRole="button"
+          accessibilityState={{ expanded: showAll }}
+        >
+          <Text style={styles.assignmentExpandText}>
+            {showAll
+              ? "접기 ↑"
+              : `${filter === "missing" ? "미제출" : "완료"} 과제 ${hiddenCount}개 더 보기 ↓`}
+          </Text>
+        </ControlPressable>
+      ) : null}
+    </View>
   );
 }
 
@@ -399,9 +350,9 @@ function FilterChip({
     <ControlPressable
       onPress={onPress}
       style={[
-        styles.filterChip,
-        active && styles.filterChipActive,
-        tone === "danger" && active && styles.filterChipDangerActive,
+        styles.inlineTab,
+        active && styles.inlineTabActive,
+        tone === "danger" && active && styles.inlineTabDangerActive,
       ]}
       accessibilityRole="button"
       accessibilityState={{ selected: active }}
@@ -413,6 +364,7 @@ function FilterChip({
           tone === "danger" && active && styles.filterChipTextDangerActive,
         ]}
         numberOfLines={1}
+        ellipsizeMode="tail"
       >
         {children}
       </Text>
@@ -499,48 +451,113 @@ function WalletCardCompact({
   wallet,
   loading,
   onDetail,
+  duties,
+  onOpen,
 }: {
   wallet: WalletSummary | null;
   loading: boolean;
   onDetail: () => void;
+  duties: StudentDuty[];
+  onOpen: (path: Href) => void;
 }) {
+  const [panel, setPanel] = useState<"wallet" | "duties">("wallet");
+  const hasDuties = duties.some((duty) => studentDutyTarget(duty) !== null);
+  const showDuties = hasDuties && panel === "duties";
+
   return (
-    <SurfaceCard style={styles.walletCardCompact}>
+    <View style={styles.walletCardCompact}>
       <View style={styles.walletHeaderCompact}>
-        <View>
-          <Text style={styles.walletEyebrowCompact}>개인 금융</Text>
-          <Text style={styles.walletTitleCompact}>내 통장과 적금</Text>
+        <View style={styles.walletHeaderCopy}>
+          <Text style={styles.walletEyebrowCompact}>
+            {showDuties ? "1인 1역" : "은행"}
+          </Text>
         </View>
-        <AppButton
-          variant="secondary"
-          onPress={onDetail}
-          hitSlop={8}
-          textStyle={styles.walletDetailBtnText}
-        >
-          자세히
-        </AppButton>
+        <View style={styles.walletHeaderActions}>
+          {hasDuties ? (
+            <View style={styles.inlineTabGroup}>
+              <ControlPressable
+                style={[
+                  styles.inlineTab,
+                  !showDuties && styles.inlineTabActive,
+                ]}
+                onPress={() => setPanel("wallet")}
+                accessibilityState={{ selected: !showDuties }}
+              >
+                <Text
+                  style={[
+                    styles.walletPanelTabText,
+                    !showDuties && styles.walletPanelTabTextActive,
+                  ]}
+                  numberOfLines={1}
+                  ellipsizeMode="tail"
+                >
+                  통장
+                </Text>
+              </ControlPressable>
+              <ControlPressable
+                style={[
+                  styles.inlineTab,
+                  showDuties && styles.inlineTabActive,
+                ]}
+                onPress={() => setPanel("duties")}
+                accessibilityState={{ selected: showDuties }}
+              >
+                <Text
+                  style={[
+                    styles.walletPanelTabText,
+                    showDuties && styles.walletPanelTabTextActive,
+                  ]}
+                  numberOfLines={1}
+                  ellipsizeMode="tail"
+                >
+                  1인 1역
+                </Text>
+              </ControlPressable>
+            </View>
+          ) : null}
+          {!showDuties ? (
+            <ControlPressable
+              style={styles.walletDetailLink}
+              onPress={onDetail}
+              hitSlop={8}
+              accessibilityLabel="통장 자세히 보기"
+            >
+              <Text
+                style={styles.walletDetailLinkText}
+                numberOfLines={1}
+                ellipsizeMode="tail"
+              >
+                자세히 →
+              </Text>
+            </ControlPressable>
+          ) : null}
+        </View>
       </View>
 
-      {loading || !wallet ? (
-        <Text style={styles.walletEmptyCompact}>
-          통장 정보를 불러오는 중이에요.
-        </Text>
+      {showDuties ? (
+        <DutySectionCompact duties={duties} onOpen={onOpen} />
       ) : (
-        <>
-          <View style={styles.walletBalanceRowCompact}>
-            <Text style={styles.walletBalanceLabelCompact}>현재 잔고</Text>
-            <Text style={styles.walletBalanceValueCompact}>
-              {wallet.balance.toLocaleString()} {wallet.currency.unitLabel}
-            </Text>
-          </View>
-          {wallet.activeFDs.length > 0 && (
-            <Pill tone="accent" textStyle={styles.walletFdPillText}>
-              적금 {wallet.activeFDs.length}개
-            </Pill>
-          )}
-        </>
+        loading || !wallet ? (
+          <Text style={styles.walletEmptyCompact}>
+            통장 정보를 불러오는 중이에요.
+          </Text>
+        ) : (
+          <>
+            <View style={styles.walletBalanceRowCompact}>
+              <Text style={styles.walletBalanceLabelCompact}>현재 잔고</Text>
+              <Text style={styles.walletBalanceValueCompact}>
+                {wallet.balance.toLocaleString()} {wallet.currency.unitLabel}
+              </Text>
+            </View>
+            {wallet.activeFDs.length > 0 && (
+              <Pill tone="accent" textStyle={styles.walletFdPillText}>
+                적금 {wallet.activeFDs.length}개
+              </Pill>
+            )}
+          </>
+        )
       )}
-    </SurfaceCard>
+    </View>
   );
 }
 
@@ -559,84 +576,32 @@ function DutySectionCompact({
   if (visible.length === 0) return null;
 
   return (
-    <View style={styles.dutyStrip}>
-      {visible.map(({ duty, target }) => (
-        <SurfacePressable
+    <View style={styles.dutyList}>
+      {visible.map(({ duty, target }, index) => (
+        <ControlPressable
           key={`${duty.classroomId}-${duty.roleKey}`}
-          style={styles.dutyChip}
+          style={[styles.dutyRow, index === visible.length - 1 && styles.dutyRowLast]}
           onPress={() => onOpen(target.href as Href)}
+          accessibilityLabel={`${duty.classroomName} ${duty.roleLabel} 시작`}
         >
-          <Text style={styles.dutyChipEmoji}>
+          <Text style={styles.dutyRowEmoji} accessible={false}>
             {duty.emoji ?? roleEmoji(duty.roleKey)}
           </Text>
-          <Text style={styles.dutyChipRole}>{duty.roleLabel}</Text>
-          <Text style={styles.dutyChipCta}>시작</Text>
-        </SurfacePressable>
+          <View style={styles.dutyRowCopy}>
+            <Text style={styles.dutyRowRole} numberOfLines={1} ellipsizeMode="tail">
+              {duty.roleLabel}
+            </Text>
+            <Text style={styles.dutyRowClassroom} numberOfLines={1} ellipsizeMode="tail">
+              {duty.classroomName}
+            </Text>
+          </View>
+          <Text style={styles.dutyRowCta} accessible={false}>
+            시작
+          </Text>
+        </ControlPressable>
       ))}
     </View>
   );
-}
-
-function BoardCard({ board }: { board: BoardMeta }) {
-  const router = useRouter();
-  return (
-    <SurfacePressable
-      style={styles.boardCard}
-      onPress={() =>
-        router.push(`/(student)/board/${board.slug}?layout=${board.layout}`)
-      }
-    >
-      <View style={styles.boardThumb}>
-        <Image
-          source={{ uri: boardThumbUri(board) }}
-          style={styles.boardThumbImage}
-          resizeMode="cover"
-        />
-      </View>
-      <View style={styles.boardCardBody}>
-        <Text style={styles.boardCardTitle} numberOfLines={2}>
-          {board.title}
-        </Text>
-        <Text style={styles.boardCardMeta}>{boardStatusLabel(board)}</Text>
-      </View>
-    </SurfacePressable>
-  );
-}
-
-function boardStatusLabel(board: BoardMeta): string {
-  if (board.breakout) {
-    return board.breakout.selectedSectionId ? "모둠 참여 중" : "모둠 선택 필요";
-  }
-  if (board.layout === "quiz") {
-    const status = board.quizzes?.[0]?.status;
-    return status === "active" || status === "running" ? "진행 중" : "시작 대기";
-  }
-  if (board.layout === "kordle") {
-    return board.kordleStatus === "LIVE" ? "진행 중" : "시작 대기";
-  }
-  if (board.layout === "speed-game") {
-    return board.speedGameStatus === "running"
-      ? "진행 중"
-      : board.speedGameStatus === "finished"
-        ? "종료"
-        : "시작 대기";
-  }
-  if (board.layout === "shadow-alliance") {
-    return board.shadowAllianceStatus === "active"
-      ? "진행 중"
-      : board.shadowAllianceStatus === "ended"
-        ? "종료"
-        : "시작 대기";
-  }
-  return layoutLabel(board.layout);
-}
-
-function boardThumbUri(board: BoardMeta): string {
-  const thumb =
-    board.thumbnailMode === "custom" && board.thumbnailUrl
-      ? board.thumbnailUrl
-      : (layoutThumbnail(board.layout) ?? FALLBACK_THUMBNAIL);
-  return thumb.startsWith("http") ? thumb : getApiUrl(thumb);
 }
 
 const styles = StyleSheet.create({
@@ -664,26 +629,93 @@ const styles = StyleSheet.create({
     textAlign: "center",
   },
   scrollContent: {
-    paddingHorizontal: spacing.xxl,
+    paddingHorizontal: spacing.xl,
     paddingBottom: spacing.xxl,
+    gap: spacing.md,
+  },
+  landscapeOverview: {
+    flexDirection: "row",
+    alignItems: "stretch",
     gap: spacing.lg,
   },
-
-  greetingRow: {
-    flexDirection: "row",
-    alignItems: "flex-end",
-    justifyContent: "space-between",
+  overviewStack: {
     gap: spacing.md,
-    paddingTop: spacing.xl,
   },
-  greetingCluster: {
+  overviewItem: {
+    minWidth: 0,
+  },
+  landscapeOverviewItem: {
     flex: 1,
+    minWidth: 0,
+  },
+
+  accountRow: {
     flexDirection: "row",
     alignItems: "center",
-    flexWrap: "wrap",
+    justifyContent: "space-between",
+    gap: spacing.md,
+    paddingTop: spacing.xs,
+    paddingBottom: spacing.xs,
+  },
+  accountIdentity: {
+    flex: 1,
+    minWidth: 0,
+    flexDirection: "row",
+    alignItems: "center",
     gap: spacing.sm,
   },
-  greeting: { ...typography.display, color: colors.text },
+  accountName: {
+    ...typography.label,
+    color: colors.text,
+    flexShrink: 1,
+  },
+  accountClassroom: {
+    ...typography.micro,
+    color: colors.textMuted,
+    flexShrink: 1,
+    maxWidth: "48%",
+  },
+  accountActions: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.xs,
+    flexShrink: 0,
+  },
+  logoutButton: {
+    minWidth: tapMin,
+    minHeight: tapMin,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: borders.none,
+    borderColor: colors.transparent,
+    borderRadius: radii.none,
+    backgroundColor: colors.transparent,
+  },
+  logoutIcon: {
+    width: studentNav.logoutIconWidth,
+    height: studentNav.logoutIconHeight,
+    alignItems: "center",
+    justifyContent: "center",
+    position: "relative",
+  },
+  logoutDoor: {
+    position: "absolute",
+    left: 2,
+    top: 2,
+    width: studentNav.logoutDoorWidth,
+    height: studentNav.logoutDoorHeight,
+    borderWidth: borders.hairline,
+    borderRightWidth: borders.none,
+    borderColor: colors.textMuted,
+  },
+  logoutArrow: {
+    ...typography.body,
+    color: colors.textMuted,
+    lineHeight: studentNav.logoutArrowLineHeight,
+    position: "absolute",
+    right: 0,
+    top: 1,
+  },
   showcaseBand: {
     marginHorizontal: -spacing.xxl,
     paddingHorizontal: spacing.xxl,
@@ -788,22 +820,60 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.md,
   },
   walletCardCompact: {
-    padding: spacing.lg,
-    gap: spacing.md,
+    paddingVertical: spacing.md,
+    gap: spacing.sm,
+    borderTopWidth: borders.hairline,
+    borderTopColor: colors.border,
   },
   walletHeaderCompact: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
     gap: spacing.md,
+    flexWrap: "wrap",
+  },
+  walletHeaderCopy: {
+    flex: 1,
+    minWidth: 0,
+  },
+  walletHeaderActions: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "flex-end",
+    gap: spacing.xs,
+    flexShrink: 1,
+    flexWrap: "wrap",
   },
   walletEyebrowCompact: {
     ...typography.badge,
     color: colors.accent,
-    marginBottom: spacing.xs,
+    marginBottom: spacing.xxs,
   },
   walletTitleCompact: { ...typography.subtitle, color: colors.text },
-  walletDetailBtnText: { ...typography.label },
+  walletDetailLink: {
+    minHeight: tapMin,
+    minWidth: 0,
+    paddingHorizontal: spacing.xs,
+    paddingVertical: spacing.xs,
+    borderWidth: borders.none,
+    borderColor: colors.transparent,
+    borderRadius: radii.none,
+    backgroundColor: colors.transparent,
+    alignItems: "center",
+    justifyContent: "center",
+    flexShrink: 1,
+  },
+  walletDetailLinkText: {
+    ...typography.badge,
+    color: colors.accent,
+  },
+  walletPanelTabText: {
+    ...typography.badge,
+    color: colors.textMuted,
+  },
+  walletPanelTabTextActive: {
+    color: colors.accentTintedText,
+  },
   walletBalanceRowCompact: {
     flexDirection: "row",
     alignItems: "center",
@@ -816,8 +886,11 @@ const styles = StyleSheet.create({
     color: colors.textMuted,
   },
   walletBalanceValueCompact: {
-    ...typography.title,
+    ...typography.subtitle,
     color: colors.text,
+    borderBottomWidth: borders.hairline,
+    borderBottomColor: colors.text,
+    paddingBottom: spacing.xxs,
   },
   walletFdPillText: {
     ...typography.badge,
@@ -826,56 +899,91 @@ const styles = StyleSheet.create({
   walletEmptyCompact: {
     ...typography.body,
     color: colors.textMuted,
-    padding: spacing.md,
-    backgroundColor: colors.bg,
-    borderRadius: radii.btn,
+    paddingVertical: spacing.xs,
   },
 
-  dutyStrip: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: spacing.sm,
+  dutyList: {
+    overflow: "hidden",
   },
-  dutyChip: {
+  dutyRow: {
     flexDirection: "row",
     alignItems: "center",
     gap: spacing.sm,
-    paddingVertical: spacing.sm,
-    paddingHorizontal: spacing.md,
-    backgroundColor: colors.accentTintedBg,
-    borderRadius: radii.pill,
+    minHeight: tapMin,
+    paddingVertical: spacing.xs,
+    paddingHorizontal: spacing.none,
+    borderWidth: borders.none,
+    borderRadius: radii.none,
+    borderBottomWidth: borders.hairline,
+    borderBottomColor: colors.border,
+    backgroundColor: colors.transparent,
   },
-  dutyChipEmoji: { fontSize: iconSizes.md },
-  dutyChipRole: { ...typography.label, color: colors.accentTintedText },
-  dutyChipCta: {
+  dutyRowLast: {
+    borderBottomWidth: borders.none,
+  },
+  dutyRowEmoji: { fontSize: iconSizes.md },
+  dutyRowCopy: {
+    flex: 1,
+    minWidth: 0,
+    gap: spacing.xxs,
+  },
+  dutyRowRole: {
+    ...typography.label,
+    color: colors.text,
+  },
+  dutyRowClassroom: {
+    ...typography.micro,
+    color: colors.textMuted,
+  },
+  dutyRowCta: {
     ...typography.badge,
-    color: colors.accentTintedText,
-    opacity: dashboard.dutyCtaOpacity,
+    color: colors.accent,
   },
 
   sectionSub: {
     ...typography.section,
     color: colors.text,
-    marginTop: spacing.md,
-    marginBottom: -spacing.xs,
   },
   boardSectionHeader: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
     gap: spacing.md,
+    flexWrap: "wrap",
+    paddingTop: spacing.md,
+    borderTopWidth: borders.hairline,
+    borderTopColor: colors.border,
   },
-  categoryTabs: { flexDirection: "row", gap: spacing.xs },
-  categoryTab: {
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    borderRadius: radii.pill,
-    backgroundColor: colors.surfaceAlt,
+  inlineTabGroup: {
+    flexDirection: "row",
+    alignItems: "stretch",
+    gap: spacing.xs,
+    flexShrink: 1,
+    flexWrap: "wrap",
   },
-  categoryTabActive: { backgroundColor: colors.accentTintedBg },
+  inlineTab: {
+    minHeight: tapMin,
+    minWidth: 0,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs,
+    borderWidth: borders.none,
+    borderRadius: radii.none,
+    borderColor: colors.transparent,
+    backgroundColor: colors.transparent,
+    flexShrink: 1,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  inlineTabActive: {
+    borderBottomWidth: borders.hairline,
+    borderBottomColor: colors.accent,
+  },
+  inlineTabDangerActive: {
+    borderBottomColor: colors.danger,
+  },
   categoryTabText: { ...typography.label, color: colors.textMuted },
   categoryTabTextActive: { color: colors.accentTintedText },
-  boardGrid: { marginTop: spacing.xs },
+  boardGrid: { marginTop: spacing.xxs },
   gridRow: { flexDirection: "row" },
   gridCell: { flex: 1 },
   boardCard: {
@@ -919,51 +1027,33 @@ const styles = StyleSheet.create({
     textAlign: "center",
   },
   assignmentPanel: {
-    padding: spacing.lg,
-    gap: spacing.md,
+    paddingVertical: spacing.md,
+    gap: spacing.sm,
+    borderTopWidth: borders.hairline,
+    borderTopColor: colors.border,
   },
   assignmentHeader: {
     flexDirection: "row",
     alignItems: "flex-start",
     justifyContent: "space-between",
     gap: spacing.md,
+    flexWrap: "wrap",
   },
   assignmentEyebrow: {
     ...typography.badge,
     color: colors.accent,
-    marginBottom: spacing.xs,
+    marginBottom: spacing.xxs,
   },
   assignmentTitle: {
     ...typography.subtitle,
     color: colors.text,
-  },
-  assignmentFilter: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    justifyContent: "flex-end",
-    gap: spacing.sm,
-  },
-  filterChip: {
-    borderRadius: radii.pill,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.xs,
-    backgroundColor: colors.surfaceAlt,
-    borderColor: colors.transparent,
-  },
-  filterChipActive: {
-    backgroundColor: colors.surfaceAlt,
-    borderColor: colors.borderHover,
-  },
-  filterChipDangerActive: {
-    backgroundColor: colors.statusReturnedBg,
-    borderColor: colors.borderHover,
   },
   filterChipText: {
     ...typography.badge,
     color: colors.textMuted,
   },
   filterChipTextActive: {
-    color: colors.text,
+    color: colors.accentTintedText,
   },
   filterChipTextDangerActive: {
     color: colors.statusReturnedText,
@@ -971,16 +1061,29 @@ const styles = StyleSheet.create({
   assignmentList: {
     overflow: "hidden",
   },
+  assignmentExpand: {
+    minHeight: tapMin,
+    alignItems: "flex-start",
+    justifyContent: "center",
+    paddingVertical: spacing.xs,
+    borderWidth: borders.none,
+    borderRadius: radii.none,
+    backgroundColor: colors.transparent,
+  },
+  assignmentExpandText: {
+    ...typography.badge,
+    color: colors.accent,
+  },
   assignmentEmpty: {
     ...typography.body,
     color: colors.textMuted,
-    padding: spacing.lg,
+    paddingVertical: spacing.md,
     textAlign: "center",
   },
   assignmentRow: {
-    minHeight: dashboard.dutyMinHeight,
-    paddingVertical: spacing.sm,
-    paddingHorizontal: spacing.md,
+    minHeight: tapMin,
+    paddingVertical: spacing.xs,
+    paddingHorizontal: spacing.none,
     borderWidth: borders.none,
     borderRadius: radii.none,
     borderBottomWidth: borders.hairline,

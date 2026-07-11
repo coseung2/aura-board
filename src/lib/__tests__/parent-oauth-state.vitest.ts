@@ -68,11 +68,12 @@ describe("parent-oauth-state — HMAC sign/verify", () => {
     expect(verifyStateToken("", SECRET)).toBe(null);
   });
 
-  it("optional 필드 (codeVerifier, redirect) 보존", () => {
+  it("optional 필드 (codeVerifier, redirect, client) 보존", () => {
     const payload = {
       state: "abc",
       codeVerifier: "verifier-string",
       redirect: "/parent/home",
+      client: "mobile" as const,
       exp: Date.now() + 60_000,
     };
     const token = signStatePayload(payload, SECRET);

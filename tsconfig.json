@@ -38,6 +38,7 @@
   ],
   "exclude": [
     "node_modules",
+    "**/*.vitest.ts",
     "apps/**",
     ".agents/**",
     ".claude/**",

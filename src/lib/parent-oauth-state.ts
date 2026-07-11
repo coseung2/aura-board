@@ -9,6 +9,8 @@ export type StatePayload = {
   codeVerifier?: string;
   exp: number;
   redirect?: string;
+  /** Native clients return through the fixed auraboard:// callback. */
+  client?: "mobile";
 };
 
 export function signStatePayload(payload: StatePayload, secret: string): string {

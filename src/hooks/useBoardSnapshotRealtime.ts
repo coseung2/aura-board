@@ -82,7 +82,7 @@ export function useBoardSnapshotRealtime(
     stoppedRef.current = false;
     lastHashRef.current = "";
     let supabase: ReturnType<
-      typeof import("@/lib/supabase/client")["createPublicSupabaseClient"]
+      typeof import("@/lib/supabase/client")["createIsolatedPublicSupabaseClient"]
     > | null = null;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     let channel: any = null;
@@ -93,11 +93,11 @@ export function useBoardSnapshotRealtime(
       void refetch();
 
       try {
-        const { createPublicSupabaseClient } = await import(
+        const { createIsolatedPublicSupabaseClient } = await import(
           "@/lib/supabase/client"
         );
         if (cancelled) return;
-        supabase = createPublicSupabaseClient();
+        supabase = createIsolatedPublicSupabaseClient();
       } catch {
         // Supabase env vars not configured: realtime disabled, mount fetch done.
         return;

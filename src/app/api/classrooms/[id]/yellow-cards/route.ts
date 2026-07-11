@@ -9,6 +9,8 @@ import {
   getTodayYellowCards,
   getTodayCleaningDuty,
 } from "@/lib/yellow-card";
+import { announceClassroomMorningChange } from "@/lib/realtime-broadcast";
+import { todayDateString } from "@/lib/inspector-findings";
 
 /**
  * GET  /api/classrooms/:id/yellow-cards
@@ -106,6 +108,11 @@ export async function POST(
     parsed.data.studentId,
     parsed.data.reason,
     actor,
+  );
+  await announceClassroomMorningChange(
+    classroomId,
+    "yellow_card",
+    todayDateString(),
   );
   return NextResponse.json({
     card: {

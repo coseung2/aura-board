@@ -1,15 +1,12 @@
 "use client";
 
-import { useEffect, useRef, useState, type MutableRefObject } from "react";
+import { useEffect, type MutableRefObject } from "react";
 import type { CardData } from "../DraggableCard";
 import { sortSections } from "@/lib/sort-sections";
 import type { StreamActivityTemplateState } from "@/lib/stream-activity-templates";
 import type { PublicSupabaseClient } from "@/lib/supabase/client";
 import {
-  buildColumnsPresencePayload,
-  columnsPresenceActorStorageKey,
   EMPTY_COLUMNS_PRESENCE_SUMMARY,
-  summarizeColumnsPresence,
   type ColumnsPresenceActivity,
   type ColumnsPresenceSummary,
   type ColumnsRealtimeStatus,
@@ -33,8 +30,8 @@ type BoardRealtimeChannel = ReturnType<PublicSupabaseClient["channel"]>;
 
 type Options = {
   boardId: string;
+  /** Retained for call-site compatibility; general columns boards do not track Presence. */
   currentUserId: string;
-  /** Kept local for call-site context; never copied into public Presence. */
   currentRole?: "owner" | "editor" | "viewer";
   activity: ColumnsPresenceActivity;
   pendingCardIds: MutableRefObject<Set<string>>;
@@ -47,36 +44,25 @@ type UseBoardStreamResult = {
   presence: ColumnsPresenceSummary;
 };
 
-const MAX_PRESENCE_TRACK_RETRIES = 3;
-const PRESENCE_TRACK_RETRY_BASE_MS = 250;
+const HIDDEN_PRESENCE_RESULT: UseBoardStreamResult = {
+  status: "unavailable",
+  presence: EMPTY_COLUMNS_PRESENCE_SUMMARY,
+};
 
+/**
+ * Keeps a columns board converged through Broadcast plus authoritative snapshot
+ * reads. Presence is intentionally excluded from general/duplicated boards, so
+ * the game-status collaboration chip is not shown here.
+ */
 export function useBoardStream({
   boardId,
-  currentUserId,
-  activity,
   pendingCardIds,
   setCards,
   setSections,
 }: Options): UseBoardStreamResult {
-  const [status, setStatus] = useState<ColumnsRealtimeStatus>("connecting");
-  const [presence, setPresence] = useState<ColumnsPresenceSummary>(
-    EMPTY_COLUMNS_PRESENCE_SUMMARY,
-  );
-  const activityRef = useRef(activity);
-  activityRef.current = activity;
-  const requestPresenceTrackRef = useRef<(() => void) | null>(null);
-
   useEffect(() => {
-    requestPresenceTrackRef.current?.();
-  }, [activity.mode]);
-
-  useEffect(() => {
-    setStatus("connecting");
-    setPresence(EMPTY_COLUMNS_PRESENCE_SUMMARY);
-
     let retryTimer: ReturnType<typeof setTimeout> | null = null;
     let broadcastTimer: ReturnType<typeof setTimeout> | null = null;
-    let presenceTimer: ReturnType<typeof setTimeout> | null = null;
     let stopped = false;
     let retryCount = 0;
     let lastHash = "";
@@ -84,18 +70,40 @@ export function useBoardStream({
     let refreshQueued = false;
     let supabase: PublicSupabaseClient | null = null;
     let channel: BoardRealtimeChannel | null = null;
-    let subscribed = false;
-    let presenceTracking = false;
-    let presenceTrackQueued = false;
-    let presenceTrackAttempts = 0;
-
-    const actorKey = getOrCreateActorKey(boardId, currentUserId);
-    const sessionId = createRandomKey("session");
+    let shutdownPromise: Promise<void> | null = null;
 
     function clearRetryTimer() {
       if (!retryTimer) return;
       clearTimeout(retryTimer);
       retryTimer = null;
+    }
+
+    function shutdownRealtime(): Promise<void> {
+      if (shutdownPromise) return shutdownPromise;
+      stopped = true;
+      refreshQueued = false;
+      clearRetryTimer();
+      if (broadcastTimer) {
+        clearTimeout(broadcastTimer);
+        broadcastTimer = null;
+      }
+      window.removeEventListener("online", catchUpOnNetworkRestore);
+      window.removeEventListener("focus", catchUpWhenVisible);
+      document.removeEventListener("visibilitychange", catchUpWhenVisible);
+
+      const ownedSupabase = supabase;
+      const ownedChannel = channel;
+      supabase = null;
+      channel = null;
+      shutdownPromise = (async () => {
+        if (!ownedSupabase || !ownedChannel) return;
+        try {
+          await ownedSupabase.removeChannel(ownedChannel);
+        } catch {
+          // Realtime cleanup is best effort.
+        }
+      })();
+      return shutdownPromise;
     }
 
     function scheduleRetry(delayMs?: number) {
@@ -122,8 +130,6 @@ export function useBoardStream({
         broadcastTimer = null;
       }
       if (inflight) {
-        // A broadcast received during a snapshot request must not be dropped.
-        // Run one trailing read after the current response settles.
         refreshQueued = true;
         return;
       }
@@ -140,37 +146,38 @@ export function useBoardStream({
         if (stopped) return;
         try {
           const qs = lastHash ? `?hash=${encodeURIComponent(lastHash)}` : "";
-          const res = await fetch(`/api/boards/${boardId}/snapshot${qs}`, {
+          const response = await fetch(`/api/boards/${boardId}/snapshot${qs}`, {
             cache: "no-store",
           });
-          if (res.status === 304) {
+          if (stopped) return;
+          if (response.status === 304) {
             retryCount = 0;
             clearRetryTimer();
             return;
           }
-          if (res.status === 401 || res.status === 403) {
-            stopped = true;
-            setStatus("unavailable");
-            setPresence(EMPTY_COLUMNS_PRESENCE_SUMMARY);
+          if (response.status === 401 || response.status === 403) {
+            void shutdownRealtime();
             return;
           }
-          if (!res.ok) {
+          if (!response.ok) {
             retryCount += 1;
             scheduleRetry();
             return;
           }
 
-          const data = (await res.json()) as {
+          const data = (await response.json()) as {
             cards: CardData[];
             sections: StreamSection[];
             hash?: string;
           };
+          if (stopped) return;
           retryCount = 0;
           clearRetryTimer();
           lastHash = data.hash ?? "";
           mergeCards(data.cards);
-          mergeSections(data.sections);
+          setSections([...data.sections].sort(sortSections));
         } catch (error) {
+          if (stopped) return;
           console.error("[board snapshot refresh]", error);
           retryCount += 1;
           scheduleRetry();
@@ -188,19 +195,21 @@ export function useBoardStream({
     }
 
     function mergeCards(serverCards: CardData[]) {
-      setCards((local) => {
-        const localById = new Map(local.map((card) => [card.id, card] as const));
+      setCards((localCards) => {
+        const localById = new Map(
+          localCards.map((card) => [card.id, card] as const),
+        );
         const next: CardData[] = [];
         const serverIds = new Set(serverCards.map((card) => card.id));
 
         for (const serverCard of serverCards) {
-          if (pendingCardIds.current.has(serverCard.id)) {
-            next.push(localById.get(serverCard.id) ?? serverCard);
-          } else {
-            next.push(serverCard);
-          }
+          next.push(
+            pendingCardIds.current.has(serverCard.id)
+              ? localById.get(serverCard.id) ?? serverCard
+              : serverCard,
+          );
         }
-        for (const localCard of local) {
+        for (const localCard of localCards) {
           if (
             pendingCardIds.current.has(localCard.id) &&
             !serverIds.has(localCard.id)
@@ -212,190 +221,46 @@ export function useBoardStream({
       });
     }
 
-    function mergeSections(serverSections: StreamSection[]) {
-      setSections([...serverSections].sort(sortSections));
-    }
-
-    function schedulePresenceTrack(delayMs = 120, resetAttempts = true) {
-      if (stopped || !channel || !subscribed) return;
-      if (resetAttempts) presenceTrackAttempts = 0;
-      if (presenceTracking) {
-        presenceTrackQueued = true;
-        return;
-      }
-      if (presenceTimer) clearTimeout(presenceTimer);
-      presenceTimer = setTimeout(() => {
-        presenceTimer = null;
-        void trackPresence();
-      }, delayMs);
-    }
-
-    async function trackPresence() {
-      if (stopped || !channel || !subscribed || presenceTracking) return;
-      presenceTracking = true;
-      const payload = buildColumnsPresencePayload({
-        actorKey,
-        sessionId,
-        activity: activityRef.current,
-        visible: !document.hidden,
-      });
-
-      let trackStatus: string;
-      try {
-        trackStatus = await channel.track(payload);
-      } catch {
-        trackStatus = "error";
-      } finally {
-        presenceTracking = false;
-      }
-
-      if (stopped || !subscribed) return;
-      if (trackStatus === "ok") {
-        presenceTrackAttempts = 0;
-        setStatus("live");
-        if (presenceTrackQueued) {
-          presenceTrackQueued = false;
-          schedulePresenceTrack(0);
-        }
-        return;
-      }
-
-      setStatus("reconnecting");
-      if (presenceTrackQueued) {
-        presenceTrackQueued = false;
-        schedulePresenceTrack(0);
-        return;
-      }
-      if (presenceTrackAttempts >= MAX_PRESENCE_TRACK_RETRIES) {
-        setStatus("unavailable");
-        return;
-      }
-
-      presenceTrackAttempts += 1;
-      schedulePresenceTrack(
-        PRESENCE_TRACK_RETRY_BASE_MS * 2 ** (presenceTrackAttempts - 1),
-        false,
-      );
-    }
-
-    requestPresenceTrackRef.current = () => schedulePresenceTrack();
-
     (async () => {
       try {
         const { createIsolatedPublicSupabaseClient } = await import(
           "@/lib/supabase/client"
         );
         if (stopped) return;
-
         supabase = createIsolatedPublicSupabaseClient();
-        const nextChannel = supabase.channel(boardChannelKey(boardId), {
-          config: {
-            presence: { key: sessionId },
-          },
-        });
+        const nextChannel = supabase.channel(boardChannelKey(boardId));
         channel = nextChannel;
-
         nextChannel
           .on("broadcast", { event: "card_changed" }, () => {
-            // Card reorder currently emits one event per PATCH. Coalesce the
-            // burst into one snapshot while retaining a trailing refresh when
-            // another event arrives during the request.
             requestRefresh(80);
           })
-          .on("presence", { event: "sync" }, () => {
-            const state = nextChannel.presenceState() as unknown as Record<
-              string,
-              unknown
-            >;
-            setPresence(summarizeColumnsPresence(state, actorKey));
-          })
-          .subscribe((nextStatus: string) => {
-            if (nextStatus === "SUBSCRIBED") {
-              subscribed = true;
-              presenceTrackAttempts = 0;
-              schedulePresenceTrack(0);
-              requestRefresh();
-              return;
-            }
-            if (
-              nextStatus === "CHANNEL_ERROR" ||
-              nextStatus === "TIMED_OUT" ||
-              nextStatus === "CLOSED"
-            ) {
-              subscribed = false;
-              presenceTrackQueued = false;
-              presenceTrackAttempts = 0;
-              if (presenceTimer) {
-                clearTimeout(presenceTimer);
-                presenceTimer = null;
-              }
-              setPresence(EMPTY_COLUMNS_PRESENCE_SUMMARY);
-              if (!stopped) setStatus("reconnecting");
-            }
+          .subscribe((status: string) => {
+            if (!stopped && status === "SUBSCRIBED") requestRefresh();
           });
       } catch {
-        // Supabase is optional. Snapshot refresh still works on mount/focus.
-        if (!stopped) setStatus("unavailable");
+        // Realtime is optional. Initial/focus/online snapshots remain active.
       }
     })();
 
     function catchUpWhenVisible() {
-      schedulePresenceTrack(0);
       if (!document.hidden) requestRefresh();
     }
 
     function catchUpOnNetworkRestore() {
-      setStatus((current) =>
-        current === "unavailable" ? current : "reconnecting",
-      );
       requestRefresh();
     }
 
     window.addEventListener("online", catchUpOnNetworkRestore);
     window.addEventListener("focus", catchUpWhenVisible);
     document.addEventListener("visibilitychange", catchUpWhenVisible);
-
-    // The initial snapshot makes the board useful before Realtime subscribes.
     requestRefresh();
 
     return () => {
-      stopped = true;
-      subscribed = false;
-      requestPresenceTrackRef.current = null;
-      clearRetryTimer();
-      if (broadcastTimer) clearTimeout(broadcastTimer);
-      if (presenceTimer) clearTimeout(presenceTimer);
-      window.removeEventListener("online", catchUpOnNetworkRestore);
-      window.removeEventListener("focus", catchUpWhenVisible);
-      document.removeEventListener("visibilitychange", catchUpWhenVisible);
-      if (supabase && channel) {
-        void channel.untrack().catch(() => undefined);
-        void supabase.removeChannel(channel).catch(() => undefined);
-      }
+      void shutdownRealtime();
     };
     // State setters and pendingCardIds are stable refs supplied by the board.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [boardId, currentUserId]);
+  }, [boardId]);
 
-  return { status, presence };
-}
-
-function getOrCreateActorKey(boardId: string, currentUserId: string): string {
-  const storageKey = columnsPresenceActorStorageKey(boardId, currentUserId);
-  try {
-    const existing = window.localStorage.getItem(storageKey);
-    if (existing) return existing;
-    const created = createRandomKey("actor");
-    window.localStorage.setItem(storageKey, created);
-    return created;
-  } catch {
-    return createRandomKey("actor");
-  }
-}
-
-function createRandomKey(prefix: string): string {
-  const uuid = globalThis.crypto?.randomUUID?.();
-  return uuid
-    ? `${prefix}-${uuid}`
-    : `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
+  return HIDDEN_PRESENCE_RESULT;
 }

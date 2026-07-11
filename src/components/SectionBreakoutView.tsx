@@ -42,6 +42,7 @@ type Props = {
   boardTitle: string;
   sectionTitle: string;
   cards: CardLike[];
+  isStudentViewer?: boolean;
   shareManagementHref?: string | null; // owner only
   autoJoinWarning?: string | null; // BR-5 link-fixed feedback
 };
@@ -55,6 +56,7 @@ export function SectionBreakoutView({
   boardTitle,
   sectionTitle,
   cards,
+  isStudentViewer = false,
   shareManagementHref,
   autoJoinWarning,
 }: Props) {
@@ -63,7 +65,11 @@ export function SectionBreakoutView({
     <main className="board-page">
       <header className="board-header">
         <div className="board-header-left">
-          <Link href={`/board/${boardId}`} className="board-back-link" aria-label="보드 전체 보기로">
+          <Link
+            href={`/board/${boardId}${isStudentViewer ? "?view=student" : ""}`}
+            className="board-back-link"
+            aria-label="보드 전체 보기로"
+          >
             ←
           </Link>
           <h1 className="board-title">{sectionTitle}</h1>
@@ -116,7 +122,12 @@ export function SectionBreakoutView({
                 }
               }}
             >
-              <CardBody card={c} titleAs="h4" boardId={boardId} />
+              <CardBody
+                card={c}
+                titleAs="h4"
+                boardId={boardId}
+                isStudentViewer={isStudentViewer}
+              />
             </article>
           ))}
         </div>
@@ -126,6 +137,7 @@ export function SectionBreakoutView({
         card={openCard ? (openCard as unknown as CardData) : null}
         onClose={() => setOpenCard(null)}
         boardId={boardId}
+        isStudentViewer={isStudentViewer}
       />
     </main>
   );

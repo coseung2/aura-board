@@ -6,6 +6,12 @@ import { formatRelativeTime } from "@/lib/card-engagement-format";
 import { useShareSession, type ShareSession } from "@/components/share/ShareSessionContext";
 import { createPublicSupabaseClient } from "@/lib/supabase/client";
 import { useBoardEngagement, useBoardPollChange } from "@/hooks/useBoardEngagementRealtime";
+import {
+  BOARD_ENGAGEMENT_CONTEXT_EVENT,
+  EMPTY_BOARD_ENGAGEMENT_CONTEXT,
+  readBoardEngagementContext,
+  type BoardEngagementContext,
+} from "@/lib/board-engagement-context";
 
 // card-comments-likes (2026-04-26): 카드별 좋아요 + 댓글 UI.
 // mode="chips"  — 인라인 보드 카드 footer (좋아요 토글 + 댓글 카운트
@@ -87,10 +93,14 @@ export function CardEngagement({
   const initialLikeCount = initialCounts?.likeCount;
   const initialCommentCount = initialCounts?.commentCount;
   const shareSession = useShareSession();
+  const boardContext = useBoardPageEngagementContext();
+  const effectiveBoardId = boardId ?? boardContext.boardId;
+  const effectiveIsStudentViewer =
+    isStudentViewer ?? boardContext.isStudentViewer;
   const cacheKey = getEngagementCacheKey({
     cardId,
-    boardId,
-    isStudentViewer,
+    boardId: effectiveBoardId,
+    isStudentViewer: effectiveIsStudentViewer,
     shareSession,
   });
   const cachedState = engagementStateCache.get(cacheKey);
@@ -115,7 +125,7 @@ export function CardEngagement({
           })
         : await fetch(`/api/cards/${cardId}/engagement`, {
             cache: "no-store",
-            headers: studentViewerHeaders(!!isStudentViewer),
+            headers: studentViewerHeaders(effectiveIsStudentViewer),
           });
       if (!r.ok) {
         if (shareSession) {
@@ -153,7 +163,7 @@ export function CardEngagement({
     } finally {
       setEngagementReady(true);
     }
-  }, [cacheKey, cardId, shareSession, isStudentViewer]);
+  }, [cacheKey, cardId, shareSession, effectiveIsStudentViewer]);
 
   useEffect(() => {
     const cached = engagementStateCache.get(cacheKey);
@@ -166,7 +176,7 @@ export function CardEngagement({
 
   // Live-update counts from board-level engagement broadcasts. Only counts
   // move; isLiked is the current user's own state (handled in toggleLike).
-  useBoardEngagement(boardId, cardId, (event) => {
+  useBoardEngagement(effectiveBoardId, cardId, (event) => {
     if (event.type !== "engagement_changed") return;
     setState((current) => {
       if (!current) return current;
@@ -184,7 +194,7 @@ export function CardEngagement({
     // When a boardId is wired, board-level broadcasts drive updates and we
     // skip the per-card postgres_changes channel. Share sessions without a
     // boardId keep the per-card subscription.
-    if (!shareSession || boardId) return;
+    if (!shareSession || effectiveBoardId) return;
     const supabase = createPublicSupabaseClient({
       "x-share-token": shareSession.shareToken,
       "x-share-guest-id": shareSession.guestId,
@@ -216,7 +226,7 @@ export function CardEngagement({
     return () => {
       void supabase.removeChannel(channel);
     };
-  }, [cardId, refresh, shareSession, boardId]);
+  }, [cardId, refresh, shareSession, effectiveBoardId]);
 
   const toggleLike = useCallback(async () => {
     if (!state?.canInteract || likeInFlightRef.current) return;
@@ -248,7 +258,7 @@ export function CardEngagement({
             method: "POST",
             headers: {
               "content-type": "application/json",
-              ...studentViewerHeaders(!!isStudentViewer),
+              ...studentViewerHeaders(effectiveIsStudentViewer),
             },
             body: JSON.stringify({ liked: desiredLiked }),
           });
@@ -268,7 +278,15 @@ export function CardEngagement({
     } finally {
       likeInFlightRef.current = false;
     }
-  }, [cacheKey, cardId, refresh, shareSession, state?.canInteract, state?.isLiked, isStudentViewer]);
+  }, [
+    cacheKey,
+    cardId,
+    refresh,
+    shareSession,
+    state?.canInteract,
+    state?.isLiked,
+    effectiveIsStudentViewer,
+  ]);
 
   if (!state) {
     return mode === "chips" ? (
@@ -307,10 +325,17 @@ export function CardEngagement({
           {chipsActionsEnd}
         </div>
         {showModal && (
-          <CommentsModal cardId={cardId} canInteract={state.canInteract} shareSession={shareSession} isStudentViewer={!!isStudentViewer} boardId={boardId} onClose={() => {
-            setShowModal(false);
-            void refresh();
-          }} />
+          <CommentsModal
+            cardId={cardId}
+            canInteract={state.canInteract}
+            shareSession={shareSession}
+            isStudentViewer={effectiveIsStudentViewer}
+            boardId={effectiveBoardId}
+            onClose={() => {
+              setShowModal(false);
+              void refresh();
+            }}
+          />
         )}
       </>
     );
@@ -351,14 +376,33 @@ export function CardEngagement({
           cardId={cardId}
           canInteract={state.canInteract}
           shareSession={shareSession}
-          isStudentViewer={!!isStudentViewer}
-          boardId={boardId}
+          isStudentViewer={effectiveIsStudentViewer}
+          boardId={effectiveBoardId}
           onChange={refresh}
           inputId={commentInputId}
         />
       )}
     </div>
   );
+}
+
+function useBoardPageEngagementContext(): BoardEngagementContext {
+  const [context, setContext] = useState<BoardEngagementContext>(() =>
+    typeof document === "undefined"
+      ? EMPTY_BOARD_ENGAGEMENT_CONTEXT
+      : readBoardEngagementContext(),
+  );
+
+  useEffect(() => {
+    const update = () => setContext(readBoardEngagementContext());
+    update();
+    window.addEventListener(BOARD_ENGAGEMENT_CONTEXT_EVENT, update);
+    return () => {
+      window.removeEventListener(BOARD_ENGAGEMENT_CONTEXT_EVENT, update);
+    };
+  }, []);
+
+  return context;
 }
 
 function studentViewerHeaders(isStudentViewer: boolean): Record<string, string> {
@@ -458,8 +502,15 @@ function CommentsBlock({
   const [content, setContent] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  const loadInFlightRef = useRef<Promise<void> | null>(null);
+  const loadQueuedRef = useRef(false);
+  const loadTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const loadGenerationRef = useRef(0);
+  const commentsMountedRef = useRef(false);
+  const loadRef = useRef<(generation: number) => Promise<void>>(async () => {});
+  const runLoadRef = useRef<() => void>(() => {});
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (generation: number) => {
     try {
       const r = shareSession
         ? await fetch(`/api/share/cards/${cardId}/comments`, {
@@ -472,15 +523,81 @@ function CommentsBlock({
           });
       if (!r.ok) return;
       const j = (await r.json()) as { items: CommentItem[] };
+      if (
+        !commentsMountedRef.current ||
+        generation !== loadGenerationRef.current
+      ) {
+        return;
+      }
       setItems(j.items);
     } catch {
       /* ignore */
     }
   }, [cardId, shareSession, isStudentViewer]);
+  loadRef.current = load;
+
+  const runLoad = useCallback(() => {
+    if (!commentsMountedRef.current) return;
+    if (loadInFlightRef.current) {
+      loadQueuedRef.current = true;
+      return;
+    }
+
+    const generation = loadGenerationRef.current;
+    const request = loadRef.current(generation).finally(() => {
+      if (loadInFlightRef.current === request) {
+        loadInFlightRef.current = null;
+      }
+      if (loadQueuedRef.current && commentsMountedRef.current) {
+        loadQueuedRef.current = false;
+        queueMicrotask(() => runLoadRef.current());
+      }
+    });
+    loadInFlightRef.current = request;
+  }, []);
+  runLoadRef.current = runLoad;
+
+  const requestLoad = useCallback(
+    (delayMs = 0) => {
+      if (delayMs > 0) {
+        if (loadTimerRef.current) clearTimeout(loadTimerRef.current);
+        loadTimerRef.current = setTimeout(() => {
+          loadTimerRef.current = null;
+          runLoad();
+        }, delayMs);
+        return;
+      }
+
+      if (loadTimerRef.current) {
+        clearTimeout(loadTimerRef.current);
+        loadTimerRef.current = null;
+      }
+      runLoad();
+    },
+    [runLoad],
+  );
 
   useEffect(() => {
-    void load();
-  }, [load]);
+    commentsMountedRef.current = true;
+    loadGenerationRef.current += 1;
+    requestLoad();
+    return () => {
+      commentsMountedRef.current = false;
+      loadGenerationRef.current += 1;
+      loadQueuedRef.current = false;
+      if (loadTimerRef.current) {
+        clearTimeout(loadTimerRef.current);
+        loadTimerRef.current = null;
+      }
+    };
+  }, [load, requestLoad]);
+
+  useBoardEngagement(boardId, cardId, (event) => {
+    // Older servers did not send changeType; treat those events as a possible
+    // comment change for backwards compatibility. Likes never fetch comments.
+    if (event.changeType === "like") return;
+    requestLoad(60);
+  });
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();

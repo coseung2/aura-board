@@ -1,6 +1,7 @@
+import { useState } from "react";
 import { Image } from "expo-image";
-import { StyleSheet, Text, View, useWindowDimensions } from "react-native";
-import type { BoardCard, PortfolioCardDTO } from "../lib/types";
+import { ScrollView, StyleSheet, Text, View, useWindowDimensions } from "react-native";
+import type { PortfolioCardDTO } from "../lib/types";
 import { layoutEmoji } from "../theme/layout-meta";
 import {
   borders,
@@ -9,31 +10,35 @@ import {
   parent,
   radii,
   spacing,
-  tapMin,
   typography,
 } from "../theme/tokens";
-import { ControlPressable, MediaPressable, SurfaceCard } from "./ui";
-import {
-  countParentFeedAttachments,
-  resolveParentFeedAuthor,
-} from "../lib/parent-feed-presentation";
+import { SurfaceCard } from "./ui";
+import { resolveParentFeedAuthor } from "../lib/parent-feed-presentation";
 
 type Props = {
   card: PortfolioCardDTO;
   childName: string;
-  onOpen: (card: PortfolioCardDTO) => void;
 };
 
-export function ParentFeedCard({ card, childName, onOpen }: Props) {
+type FeedMediaItem = {
+  id: string;
+  kind: "image" | "video" | "file" | "link" | "text";
+  uri: string | null;
+  previewUri: string | null;
+  label: string;
+  detail: string | null;
+};
+
+export function ParentFeedCard({ card, childName }: Props) {
+  const [activeMediaIndex, setActiveMediaIndex] = useState(0);
+  const [mediaWidth, setMediaWidth] = useState(0);
   const { width } = useWindowDimensions();
   const isNarrow = width < 768;
-  const previewUrl = getPreviewUrl(card);
   const sourceLabel = buildSourceLabel(card);
   const title = card.title.trim();
   const content = card.content.trim();
   const authorName = resolveParentFeedAuthor(card, childName);
-  const attachmentCount = countParentFeedAttachments(card);
-  const mediaLabel = `${childName}의 ${title || sourceLabel} 게시물 상세 보기`;
+  const mediaItems = buildMediaItems(card, title, sourceLabel);
 
   return (
     <SurfaceCard
@@ -58,42 +63,125 @@ export function ParentFeedCard({ card, childName, onOpen }: Props) {
         </Text>
       </View>
 
-      <MediaPressable
-        accessibilityRole="button"
-        accessibilityLabel={mediaLabel}
-        onPress={() => onOpen(card)}
+      <View
         style={styles.media}
+        onLayout={(event) => setMediaWidth(event.nativeEvent.layout.width)}
       >
-        {previewUrl ? (
-          <Image
-            source={{ uri: previewUrl }}
-            style={styles.image}
-            contentFit="cover"
-            accessibilityLabel={title || `${sourceLabel} 첨부 이미지`}
-          />
-        ) : (
-          <View style={styles.fallback}>
-            <Text style={styles.fallbackEmoji}>
-              {layoutEmoji(card.sourceBoard.layout)}
-            </Text>
-            <Text selectable style={styles.fallbackText}>
-              {hasVideo(card) ? "동영상 게시물" : "게시물 자세히 보기"}
-            </Text>
-          </View>
-        )}
-        {hasVideo(card) ? (
-          <View style={styles.playBadge} pointerEvents="none">
-            <Text style={styles.playText}>▶</Text>
-          </View>
-        ) : null}
-        {attachmentCount > 1 ? (
+        <ScrollView
+          horizontal
+          pagingEnabled
+          nestedScrollEnabled
+          showsHorizontalScrollIndicator={false}
+          scrollEventThrottle={16}
+          onMomentumScrollEnd={(event) => {
+            const width = event.nativeEvent.layoutMeasurement.width;
+            if (width > 0) {
+              setActiveMediaIndex(
+                Math.min(
+                  mediaItems.length - 1,
+                  Math.max(
+                    0,
+                    Math.round(event.nativeEvent.contentOffset.x / width),
+                  ),
+                ),
+              );
+            }
+          }}
+          contentContainerStyle={styles.mediaPagerContent}
+          style={styles.mediaPager}
+        >
+          {mediaItems.map((item, index) => (
+            <View
+              key={item.id}
+              style={[styles.mediaPage, mediaWidth > 0 && { width: mediaWidth }]}
+              accessible
+              accessibilityLabel={`첨부 ${index + 1}/${mediaItems.length}: ${item.label}`}
+            >
+              {item.kind === "image" ? (
+                <Image
+                  source={{ uri: item.previewUri ?? item.uri ?? "" }}
+                  style={styles.image}
+                  contentFit="cover"
+                  accessibilityLabel={item.label}
+                />
+              ) : item.kind === "video" ? (
+                <View style={styles.fallback}>
+                  {item.previewUri ? (
+                    <Image
+                      source={{ uri: item.previewUri }}
+                      style={styles.image}
+                      contentFit="cover"
+                      accessibilityLabel={`${item.label} 미리보기`}
+                    />
+                  ) : null}
+                  <View style={styles.videoOverlay} pointerEvents="none">
+                    <Text style={styles.playText}>▶</Text>
+                    <Text selectable style={styles.fallbackText}>
+                      동영상 첨부
+                    </Text>
+                  </View>
+                </View>
+              ) : item.kind === "file" ? (
+                <View style={styles.attachmentPage}>
+                  <Text style={styles.attachmentEmoji}>📎</Text>
+                  <Text selectable style={styles.attachmentTitle}>
+                    {item.label}
+                  </Text>
+                  {item.detail ? (
+                    <Text
+                      selectable
+                      style={styles.attachmentDetail}
+                      numberOfLines={2}
+                    >
+                      {item.detail}
+                    </Text>
+                  ) : null}
+                </View>
+              ) : item.kind === "link" ? (
+                <View style={styles.linkPage}>
+                  {item.previewUri ? (
+                    <Image
+                      source={{ uri: item.previewUri }}
+                      style={styles.linkImage}
+                      contentFit="cover"
+                      accessibilityLabel={`${item.label} 미리보기`}
+                    />
+                  ) : null}
+                  <Text style={styles.attachmentEmoji}>🔗</Text>
+                  <Text selectable style={styles.attachmentTitle}>
+                    {item.label}
+                  </Text>
+                  {item.detail ? (
+                    <Text
+                      selectable
+                      style={styles.attachmentDetail}
+                      numberOfLines={3}
+                    >
+                      {item.detail}
+                    </Text>
+                  ) : null}
+                </View>
+              ) : (
+                <View style={styles.fallback}>
+                  <Text style={styles.fallbackEmoji}>
+                    {layoutEmoji(card.sourceBoard.layout)}
+                  </Text>
+                  <Text selectable style={styles.fallbackText}>
+                    게시물
+                  </Text>
+                </View>
+              )}
+            </View>
+          ))}
+        </ScrollView>
+        {mediaItems.length > 1 ? (
           <View style={styles.attachmentBadge} pointerEvents="none">
             <Text style={styles.attachmentBadgeText}>
-              1/{attachmentCount}
+              {activeMediaIndex + 1}/{mediaItems.length}
             </Text>
           </View>
         ) : null}
-      </MediaPressable>
+      </View>
 
       <View style={styles.body}>
         <View
@@ -118,94 +206,152 @@ export function ParentFeedCard({ card, childName, onOpen }: Props) {
               </Text>
             ) : null}
             {content ? (
-              <Text selectable style={styles.content} numberOfLines={3}>
+              <Text selectable style={styles.content}>
                 {content}
               </Text>
             ) : null}
           </View>
         ) : null}
-
-        <ControlPressable
-          style={styles.detailButton}
-          onPress={() => onOpen(card)}
-          accessibilityLabel={`${title || sourceLabel} 게시물 상세와 댓글 보기`}
-        >
-          <Text style={styles.detailButtonText}>상세와 댓글 보기</Text>
-        </ControlPressable>
       </View>
     </SurfaceCard>
   );
 }
 
-export function toParentFeedBoardCard(
+function buildMediaItems(
   card: PortfolioCardDTO,
-  fallbackAuthorName: string,
-): BoardCard {
-  return {
-    id: card.id,
-    boardId: card.sourceBoard.id,
-    title: card.title,
-    content: card.content,
-    color: card.color,
-    imageUrl: card.imageUrl,
-    thumbUrl: card.thumbUrl,
-    linkUrl: card.linkUrl,
-    linkTitle: card.linkTitle,
-    linkDesc: card.linkDesc,
-    linkImage: card.linkImage,
-    videoUrl: card.videoUrl,
-    fileUrl: card.fileUrl,
-    fileName: card.fileName,
-    fileSize: card.fileSize,
-    fileMimeType: card.fileMimeType,
-    x: 0,
-    y: 0,
-    width: card.width,
-    height: card.height,
-    order: 0,
-    sectionId: card.sourceSection?.id ?? null,
-    authorId: null,
-    externalAuthorName: card.externalAuthorName,
-    studentAuthorId: null,
-    createdAt: card.createdAt,
-    updatedAt: card.createdAt,
-    likeCount: card.likeCount,
-    commentCount: card.commentCount,
-    attachments: card.attachments
-      .filter((attachment) =>
-        ["image", "video", "file"].includes(attachment.kind),
-      )
-      .map((attachment) => ({
-        id: attachment.id,
-        kind: attachment.kind as "image" | "video" | "file",
-        url: attachment.url,
-        previewUrl: attachment.previewUrl,
-        fileName: attachment.fileName,
-        fileSize: attachment.fileSize,
-        mimeType: attachment.mimeType,
-        order: attachment.order,
-      })),
-    authors: card.authors,
-    authorName: resolveParentFeedAuthor(card, fallbackAuthorName),
-    studentAuthorName: card.studentAuthorName ?? fallbackAuthorName,
-    anonymousAuthor: card.sourceBoard.anonymousAuthor,
+  title: string,
+  sourceLabel: string,
+): FeedMediaItem[] {
+  const items: FeedMediaItem[] = [];
+  const seen = new Set<string>();
+  const add = (item: FeedMediaItem, key?: string) => {
+    if (key && seen.has(key)) return;
+    if (key) seen.add(key);
+    items.push(item);
   };
-}
 
-function getPreviewUrl(card: PortfolioCardDTO): string | null {
-  return (
-    card.thumbUrl ??
-    card.imageUrl ??
-    card.attachments.find((item) => item.kind === "image")?.previewUrl ??
-    card.attachments.find((item) => item.kind === "image")?.url ??
-    card.linkImage
-  );
-}
+  const primaryImage = card.imageUrl ?? card.thumbUrl;
+  if (primaryImage) {
+    add(
+      {
+        id: "primary-image",
+        kind: "image",
+        uri: primaryImage,
+        previewUri: card.thumbUrl,
+        label: title || `${sourceLabel} 첨부 이미지`,
+        detail: null,
+      },
+      primaryImage,
+    );
+  }
 
-function hasVideo(card: PortfolioCardDTO): boolean {
-  return Boolean(
-    card.videoUrl || card.attachments.some((item) => item.kind === "video"),
-  );
+  for (const attachment of [...card.attachments].sort(
+    (a, b) => a.order - b.order,
+  )) {
+    const label = attachment.fileName?.trim() || "첨부 파일";
+    const detail = attachment.mimeType || "파일 첨부";
+    if (attachment.kind === "image") {
+      add(
+        {
+          id: attachment.id,
+          kind: "image",
+          uri: attachment.url,
+          previewUri: attachment.previewUrl,
+          label: label === "첨부 파일" ? `${sourceLabel} 첨부 이미지` : label,
+          detail: null,
+        },
+        attachment.url,
+      );
+    } else if (attachment.kind === "video") {
+      add(
+        {
+          id: attachment.id,
+          kind: "video",
+          uri: attachment.url,
+          previewUri: attachment.previewUrl,
+          label: label === "첨부 파일" ? "동영상 첨부" : label,
+          detail,
+        },
+        attachment.url,
+      );
+    } else if (attachment.kind === "link") {
+      add(
+        {
+          id: attachment.id,
+          kind: "link",
+          uri: attachment.url,
+          previewUri: attachment.previewUrl,
+          label: label === "첨부 파일" ? "링크 첨부" : label,
+          detail: attachment.url,
+        },
+        attachment.url,
+      );
+    } else {
+      add(
+        {
+          id: attachment.id,
+          kind: "file",
+          uri: attachment.url,
+          previewUri: attachment.previewUrl,
+          label,
+          detail,
+        },
+        attachment.url,
+      );
+    }
+  }
+
+  if (card.videoUrl) {
+    add(
+      {
+        id: "legacy-video",
+        kind: "video",
+        uri: card.videoUrl,
+        previewUri: null,
+        label: "동영상 첨부",
+        detail: "재생 가능한 동영상",
+      },
+      card.videoUrl,
+    );
+  }
+  if (card.fileUrl) {
+    add(
+      {
+        id: "legacy-file",
+        kind: "file",
+        uri: card.fileUrl,
+        previewUri: null,
+        label: card.fileName?.trim() || "첨부 파일",
+        detail: card.fileMimeType || "파일 첨부",
+      },
+      card.fileUrl,
+    );
+  }
+  if (card.linkUrl) {
+    add(
+      {
+        id: "link",
+        kind: "link",
+        uri: card.linkUrl,
+        previewUri: card.linkImage,
+        label: card.linkTitle?.trim() || "링크 첨부",
+        detail: card.linkDesc?.trim() || card.linkUrl,
+      },
+      card.linkUrl,
+    );
+  }
+
+  if (items.length === 0) {
+    add({
+      id: "text",
+      kind: "text",
+      uri: null,
+      previewUri: null,
+      label: title || "텍스트 게시물",
+      detail: null,
+    });
+  }
+  return items;
 }
 
 function buildSourceLabel(card: PortfolioCardDTO): string {
@@ -233,12 +379,13 @@ const styles = StyleSheet.create({
     maxWidth: parent.portfolioCardMinWidth * 2 - spacing.lg,
     alignSelf: "center",
     overflow: "hidden",
+    borderRadius: radii.none,
+    borderWidth: borders.none,
+    boxShadow: "none",
   },
   cardNarrow: {
-    borderRadius: radii.none,
     borderLeftWidth: borders.none,
     borderRightWidth: borders.none,
-    boxShadow: "none",
   },
   header: {
     minHeight: parent.feedPostHeaderMinHeight,
@@ -272,6 +419,9 @@ const styles = StyleSheet.create({
     borderBottomWidth: borders.hairline,
     borderColor: colors.border,
   },
+  mediaPager: { flex: 1 },
+  mediaPagerContent: { flexGrow: 1 },
+  mediaPage: { width: "100%", height: "100%" },
   image: { width: "100%", height: "100%" },
   fallback: {
     flex: 1,
@@ -282,20 +432,12 @@ const styles = StyleSheet.create({
   },
   fallbackEmoji: { fontSize: iconSizes.hero },
   fallbackText: { ...typography.body, color: colors.accentTintedText },
-  playBadge: {
-    position: "absolute",
-    left: "50%",
-    top: "50%",
-    width: parent.feedPlayButtonSize,
-    height: parent.feedPlayButtonSize,
-    borderRadius: radii.pill,
+  videoOverlay: {
+    ...StyleSheet.absoluteFillObject,
     alignItems: "center",
     justifyContent: "center",
+    gap: spacing.sm,
     backgroundColor: colors.overlay,
-    transform: [
-      { translateX: -parent.feedPlayButtonSize / 2 },
-      { translateY: -parent.feedPlayButtonSize / 2 },
-    ],
   },
   playText: { ...typography.title, color: colors.onAccent },
   attachmentBadge: {
@@ -312,6 +454,34 @@ const styles = StyleSheet.create({
     color: colors.onAccent,
     fontVariant: ["tabular-nums"],
   },
+  attachmentPage: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    gap: spacing.sm,
+    padding: spacing.xl,
+    backgroundColor: colors.surfaceAlt,
+  },
+  linkPage: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    gap: spacing.sm,
+    padding: spacing.lg,
+    backgroundColor: colors.surfaceAlt,
+  },
+  linkImage: { width: "100%", height: "55%", marginBottom: spacing.sm },
+  attachmentEmoji: { fontSize: iconSizes.hero },
+  attachmentTitle: {
+    ...typography.section,
+    color: colors.text,
+    textAlign: "center",
+  },
+  attachmentDetail: {
+    ...typography.body,
+    color: colors.textMuted,
+    textAlign: "center",
+  },
   body: { gap: spacing.md, padding: spacing.lg },
   counts: { flexDirection: "row", alignItems: "center", gap: spacing.lg },
   countText: {
@@ -322,13 +492,4 @@ const styles = StyleSheet.create({
   caption: { gap: spacing.xs },
   title: { ...typography.section, color: colors.text },
   content: { ...typography.body, color: colors.text },
-  detailButton: {
-    alignSelf: "flex-start",
-    minHeight: tapMin,
-    paddingHorizontal: spacing.md,
-    justifyContent: "center",
-    backgroundColor: colors.transparent,
-    borderColor: colors.transparent,
-  },
-  detailButtonText: { ...typography.label, color: colors.textMuted },
 });

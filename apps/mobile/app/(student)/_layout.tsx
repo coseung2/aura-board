@@ -13,7 +13,6 @@ export default function StudentLayout() {
   const pathname = usePathname();
   const hideNav = pathname === "/login" || pathname.endsWith("/login");
   const [me, setMe] = useState<MeResponse | null>(null);
-  const [loggingOut, setLoggingOut] = useState(false);
 
   const loadMe = useCallback(async () => {
     if (hideNav) {
@@ -36,21 +35,6 @@ export default function StudentLayout() {
     loadMe();
   }, [loadMe, pathname]);
 
-  async function handleLogout() {
-    if (loggingOut) return;
-    setLoggingOut(true);
-    try {
-      await apiFetch("/api/student/logout", { method: "POST" }).catch(
-        () => undefined,
-      );
-      await clearSessionToken();
-      setMe(null);
-      router.replace("/(student)/login");
-    } finally {
-      setLoggingOut(false);
-    }
-  }
-
   return (
     <View style={styles.shell}>
       <View style={styles.stack}>
@@ -63,13 +47,7 @@ export default function StudentLayout() {
         />
       </View>
       {!hideNav ? (
-        <StudentBottomNav
-          studentName={me?.student.name}
-          classroomName={me?.student.classroom?.name ?? undefined}
-          duties={me?.duties}
-          loggingOut={loggingOut}
-          onLogout={handleLogout}
-        />
+        <StudentBottomNav duties={me?.duties} />
       ) : null}
     </View>
   );
