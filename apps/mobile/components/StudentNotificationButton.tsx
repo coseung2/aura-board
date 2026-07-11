@@ -4,7 +4,14 @@ import { usePathname, useRouter } from "expo-router";
 import { apiFetch, ApiError } from "../lib/api";
 import { clearSessionToken } from "../lib/session";
 import type { StudentNotificationPayload } from "../lib/types";
-import { colors, radii, spacing, studentNav, typography } from "../theme/tokens";
+import {
+  borders,
+  colors,
+  radii,
+  spacing,
+  studentNav,
+  typography,
+} from "../theme/tokens";
 import { ControlPressable } from "./ui";
 
 export function StudentNotificationButton() {
@@ -44,7 +51,10 @@ export function StudentNotificationButton() {
       onPress={() => router.push("/(student)/notifications")}
       accessibilityLabel={count > 0 ? `알림 ${count}건` : "알림"}
     >
-      <Text style={styles.icon}>🔔</Text>
+      <View style={styles.icon} accessible={false}>
+        <View style={styles.bellBody} />
+        <View style={styles.bellClapper} />
+      </View>
       {count > 0 ? (
         <View style={styles.badge}>
           <Text style={styles.badgeText}>{count > 9 ? "9+" : count}</Text>
@@ -60,10 +70,35 @@ const styles = StyleSheet.create({
     minHeight: studentNav.notificationButtonSize,
     alignItems: "center",
     justifyContent: "center",
-    borderRadius: radii.pill,
+    borderWidth: borders.none,
+    borderColor: colors.transparent,
+    borderRadius: radii.none,
+    backgroundColor: colors.transparent,
     position: "relative",
   },
-  icon: { ...typography.section },
+  icon: {
+    width: studentNav.notificationIconWidth,
+    height: studentNav.notificationIconHeight,
+    alignItems: "center",
+    justifyContent: "flex-start",
+  },
+  bellBody: {
+    width: studentNav.notificationBellWidth,
+    height: studentNav.notificationBellHeight,
+    borderWidth: borders.hairline,
+    borderColor: colors.textMuted,
+    borderTopLeftRadius: radii.pill,
+    borderTopRightRadius: radii.pill,
+    borderBottomLeftRadius: radii.control,
+    borderBottomRightRadius: radii.control,
+  },
+  bellClapper: {
+    width: studentNav.notificationClapperSize,
+    height: studentNav.notificationClapperSize,
+    marginTop: -borders.hairline,
+    borderRadius: radii.pill,
+    backgroundColor: colors.textMuted,
+  },
   badge: {
     position: "absolute",
     top: spacing.none,

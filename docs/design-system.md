@@ -232,20 +232,6 @@ hover 시:
 box-shadow: var(--shadow-card-hover);
 border-color: var(--color-border-hover);
 ```
-### Container Discipline
-
-Do not use an extra box, card, or panel as the default way to group UI.
-Prefer boxless hierarchy first: spacing, alignment, dividers, typography,
-icons, inline actions, underlined tabs, subtle color/state changes, or layout
-grouping.
-
-Use bordered or filled containers only when the element is a truly independent
-object, such as a repeated card, modal, form surface, or tool panel.
-
-In particular, header actions, status labels, simple metadata, filters, tabs,
-group selectors, and small control clusters should usually stay inline or use
-lightweight separators instead of becoming nested cards or boxed panels.
-
 ### 버튼
 
 | 타입 | 배경 | 텍스트 | 반경 | 그림자 |
