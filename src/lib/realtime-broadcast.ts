@@ -14,6 +14,11 @@ import {
   type KordleLiveEvent,
   type KordlePuzzleChangedEvent,
 } from "@/features/kordle/realtime";
+import {
+  QUIZ_SNAPSHOT_EVENT,
+  quizChannelKey,
+  type QuizRealtimeSnapshot,
+} from "@/features/quiz/realtime";
 import type {
   BoardRealtimeEvent,
   ClassroomMorningRealtimeEvent,
@@ -180,6 +185,18 @@ export async function announceQuestionChange(
     updatedAt: new Date().toISOString(),
   };
   await broadcast(boardChannelKey(boardId), "question_changed", event);
+}
+
+/**
+ * Broadcast a safe, committed quiz snapshot. Unlike content boards, game
+ * clients can apply this compact payload directly; focus/reconnect polling
+ * still reads the same snapshot endpoint as the recovery source of truth.
+ */
+export async function announceQuizSnapshot(
+  snapshot: QuizRealtimeSnapshot,
+): Promise<void> {
+  if (!snapshot.quizId) return;
+  await broadcast(quizChannelKey(snapshot.quizId), QUIZ_SNAPSHOT_EVENT, snapshot);
 }
 
 /**

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
+import { publishQuizRealtimeSnapshot } from "@/lib/quiz-realtime-snapshot";
 
 export async function POST(req: Request) {
   try {
@@ -64,6 +65,7 @@ export async function POST(req: Request) {
         studentId: resolvedStudentId,
       },
     });
+    const snapshot = await publishQuizRealtimeSnapshot(quiz.id);
 
     return NextResponse.json({
       player,
@@ -73,6 +75,7 @@ export async function POST(req: Request) {
         status: quiz.status,
         questionCount: quiz.questions.length,
       },
+      snapshot,
     });
   } catch (e) {
     console.error("[POST /api/quiz/join]", e);

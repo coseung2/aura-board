@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
+import { publishQuizRealtimeSnapshot } from "@/lib/quiz-realtime-snapshot";
 
 export async function GET(
   _req: Request,
@@ -67,5 +68,6 @@ export async function PATCH(
     return NextResponse.json({ error: "Invalid action" }, { status: 400 });
   }
 
-  return NextResponse.json({ quiz: updated });
+  const snapshot = await publishQuizRealtimeSnapshot(id);
+  return NextResponse.json({ quiz: updated, snapshot });
 }
