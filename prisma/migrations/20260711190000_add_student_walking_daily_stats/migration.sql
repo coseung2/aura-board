@@ -19,6 +19,11 @@ CREATE TABLE "StudentWalkingDailyStat" (
     ON DELETE CASCADE ON UPDATE CASCADE
 );
 
+-- This table is accessed only through authenticated server-side Prisma routes.
+-- Keep it closed to direct Supabase Data API access, matching the other
+-- server-owned public tables in this project.
+ALTER TABLE public."StudentWalkingDailyStat" ENABLE ROW LEVEL SECURITY;
+
 CREATE UNIQUE INDEX "StudentWalkingDailyStat_studentId_day_key"
   ON "StudentWalkingDailyStat"("studentId", "day");
 
