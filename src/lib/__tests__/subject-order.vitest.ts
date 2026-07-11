@@ -3,6 +3,7 @@ import {
   isSubjectOrder,
   normalizeSubjectOrder,
   subjectOrderLabel,
+  subjectOrderToAppendOrder,
   subjectOrderToBaseIndex,
   type SubjectOrder,
 } from "../subject-order";
@@ -58,6 +59,32 @@ describe("subjectOrderToBaseIndex — unpinned order 매핑", () => {
   it("학급 0명 방어 — baseIndex = 0", () => {
     expect(subjectOrderToBaseIndex("asc", 0, 0)).toBe(0);
     expect(subjectOrderToBaseIndex("desc", 0, 0)).toBe(0);
+  });
+});
+
+describe("subjectOrderToAppendOrder", () => {
+  it("기존 주제보다 작은 order 범위에 asc 학생 묶음을 붙인다", () => {
+    expect(
+      [0, 1, 2].map((index) =>
+        subjectOrderToAppendOrder("asc", index, 3, -10),
+      ),
+    ).toEqual([-11, -12, -13]);
+  });
+
+  it("desc는 같은 범위를 사용하되 끝번호가 왼쪽에 오도록 배치한다", () => {
+    expect(
+      [0, 1, 2].map((index) =>
+        subjectOrderToAppendOrder("desc", index, 3, -10),
+      ),
+    ).toEqual([-13, -12, -11]);
+  });
+
+  it("기존 주제가 없으면 -1 이하에서 시작한다", () => {
+    expect(
+      [0, 1].map((index) =>
+        subjectOrderToAppendOrder("asc", index, 2, null),
+      ),
+    ).toEqual([-1, -2]);
   });
 });
 

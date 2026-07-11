@@ -24,6 +24,7 @@ import {
 } from "@/lib/subject-order";
 import {
   BOARD_SECTIONS_REORDERED_EVENT,
+  mergeBoardSectionPositions,
   type BoardSectionsReorderedDetail,
 } from "@/lib/board-section-events";
 
@@ -157,18 +158,19 @@ export function BoardSettingsPanel({
   }
 
   function handleSectionsReordered(next: BoardSection[]) {
-    setSections(next);
+    const positions = next.map((section) => ({
+      id: section.id,
+      order: section.order ?? 0,
+      pinned: section.pinned ?? false,
+    }));
+    setSections((current) => mergeBoardSectionPositions(current, positions));
     window.dispatchEvent(
       new CustomEvent<BoardSectionsReorderedDetail>(
         BOARD_SECTIONS_REORDERED_EVENT,
         {
           detail: {
             boardId,
-            sections: next.map((section) => ({
-              id: section.id,
-              order: section.order ?? 0,
-              pinned: section.pinned ?? false,
-            })),
+            sections: positions,
           },
         },
       ),
