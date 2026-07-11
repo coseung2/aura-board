@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
@@ -25,12 +25,8 @@ import type {
   PortfolioCardDTO,
 } from "../../lib/types";
 import { useParentFeed } from "../../hooks/use-parent-feed";
-import { CardDetailModal } from "../../components/CardDetailModal";
 import { ParentBottomNav } from "../../components/parent-bottom-nav";
-import {
-  ParentFeedCard,
-  toParentFeedBoardCard,
-} from "../../components/parent-feed-card";
+import { ParentFeedCard } from "../../components/parent-feed-card";
 import {
   AppButton,
   AppHeader,
@@ -57,7 +53,6 @@ export default function ParentHome() {
   const [selectedChildId, setSelectedChildId] = useState<string | null>(null);
   const [childrenLoading, setChildrenLoading] = useState(true);
   const [childrenError, setChildrenError] = useState<string | null>(null);
-  const [openCard, setOpenCard] = useState<PortfolioCardDTO | null>(null);
 
   const handleUnauthorized = useCallback(async () => {
     await clearParentSession();
@@ -127,19 +122,8 @@ export default function ParentHome() {
 
   const selectedChild =
     children.find((child) => child.studentId === selectedChildId) ?? null;
-  const modalCard = useMemo(
-    () =>
-      openCard
-        ? toParentFeedBoardCard(
-            openCard,
-            feed.child?.name ?? selectedChild?.name ?? "자녀",
-          )
-        : null,
-    [feed.child?.name, openCard, selectedChild?.name],
-  );
 
   const selectChild = useCallback((studentId: string) => {
-    setOpenCard(null);
     setSelectedChildId(studentId);
     void saveParentSelectedChild(studentId);
     listRef.current?.scrollToOffset({ offset: 0, animated: false });
@@ -187,9 +171,9 @@ export default function ParentHome() {
           <ParentFeedCard
             card={item}
             childName={childName}
-            onOpen={setOpenCard}
           />
         )}
+        ItemSeparatorComponent={() => <View style={styles.feedSeparator} />}
         contentInsetAdjustmentBehavior="automatic"
         contentContainerStyle={styles.listContent}
         refreshing={feed.refreshing}
@@ -331,7 +315,6 @@ export default function ParentHome() {
           listRef.current?.scrollToOffset({ offset: 0, animated: true })
         }
       />
-      <CardDetailModal card={modalCard} onClose={() => setOpenCard(null)} />
     </SafeAreaView>
   );
 }
@@ -352,7 +335,6 @@ const styles = StyleSheet.create({
   },
   listContent: {
     paddingBottom: spacing.xl,
-    gap: spacing.md,
   },
   listHeader: {
     gap: spacing.lg,
@@ -401,6 +383,10 @@ const styles = StyleSheet.create({
   profileSummary: { gap: spacing.xs },
   profileTitle: { ...typography.title, color: colors.text },
   profileSubtitle: { ...typography.body, color: colors.textMuted },
+  feedSeparator: {
+    height: borders.hairline,
+    backgroundColor: colors.border,
+  },
   feedLoading: {
     minHeight: parent.portfolioEmptyMinHeight,
     alignItems: "center",

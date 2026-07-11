@@ -5,6 +5,7 @@ import {
   StyleSheet,
   Text,
   View,
+  Platform,
   useWindowDimensions,
 } from "react-native";
 import { useRouter } from "expo-router";
@@ -143,15 +144,19 @@ export default function Landing() {
   }
 
   async function handleParentOAuth(provider: ParentOAuthProvider) {
-    const url = `${getApiBase()}/api/parent/auth/${provider}`;
+    const url = new URL(`/api/parent/auth/${provider}`, getApiBase());
+    if (Platform.OS !== "web") {
+      url.searchParams.set("client", "mobile");
+    }
     if (
+      Platform.OS === "web" &&
       typeof window !== "undefined" &&
       typeof window.location?.assign === "function"
     ) {
-      window.location.assign(url);
+      window.location.assign(url.toString());
       return;
     }
-    await Linking.openURL(url);
+    await Linking.openURL(url.toString());
   }
 
   if (booting) {
@@ -251,6 +256,17 @@ export default function Landing() {
                 <KakaoGlyph />
                 <Text style={styles.oauthKakaoText}>Kakao로 로그인</Text>
               </ControlPressable>
+              {__DEV__ ? (
+                <ControlPressable
+                  style={styles.devPreviewButton}
+                  onPress={() => router.push("/(parent)/dev-preview")}
+                  accessibilityLabel="개발용 학부모 피드 미리보기 열기"
+                >
+                  <Text style={styles.devPreviewButtonText}>
+                    개발용 미리보기
+                  </Text>
+                </ControlPressable>
+              ) : null}
             </View>
           </SurfaceCard>
         </View>
@@ -451,5 +467,16 @@ const styles = StyleSheet.create({
   oauthKakaoText: {
     ...typography.label,
     color: colors.text,
+  },
+  devPreviewButton: {
+    width: "100%",
+    minHeight: tapMin,
+    alignItems: "center",
+    justifyContent: "center",
+    borderColor: colors.transparent,
+  },
+  devPreviewButtonText: {
+    ...typography.label,
+    color: colors.accent,
   },
 });
