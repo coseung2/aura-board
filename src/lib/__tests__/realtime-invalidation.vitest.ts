@@ -27,6 +27,7 @@ describe("createTrailingRefreshRunner", () => {
     const current = runner.run();
     void runner.run();
     void runner.run();
+    await flushMicrotasks();
     expect(calls).toBe(1);
 
     first.resolve();
@@ -35,6 +36,7 @@ describe("createTrailingRefreshRunner", () => {
     expect(calls).toBe(2);
 
     second.resolve();
+    await flushMicrotasks();
     await flushMicrotasks();
     expect(runner.isRunning()).toBe(false);
   });
