@@ -327,11 +327,10 @@ export function buildMobileSectionSummaries(
   cards: BoardCard[],
   sections: Section[],
 ): MobileSectionSummary[] {
-  const orderedSections = [...sections].sort((left, right) => {
-    if (left.order !== right.order) return left.order - right.order;
-    return left.title.localeCompare(right.title, "ko");
-  });
-  const result = orderedSections.map((section) =>
+  // `/api/student/board/:slug` already returns sections in the board's visual
+  // order. Preserve that order instead of reinterpreting mixed pinned/order
+  // semantics in the mobile client.
+  const result = sections.map((section) =>
     summarizeSection(section.id, section.title, cards),
   );
   const unsectioned = cards.filter((card) => !card.sectionId);
@@ -347,12 +346,15 @@ function summarizeSection(
   cards: BoardCard[],
 ): MobileSectionSummary {
   const sectionCards =
-    id === null ? cards.filter((card) => !card.sectionId) : cards.filter((card) => card.sectionId === id);
-  const latestCard = [...sectionCards].sort(
-    (left, right) =>
-      new Date(right.updatedAt || right.createdAt).getTime() -
-      new Date(left.updatedAt || left.createdAt).getTime(),
-  )[0] ?? null;
+    id === null
+      ? cards.filter((card) => !card.sectionId)
+      : cards.filter((card) => card.sectionId === id);
+  const latestCard =
+    [...sectionCards].sort(
+      (left, right) =>
+        new Date(right.updatedAt || right.createdAt).getTime() -
+        new Date(left.updatedAt || left.createdAt).getTime(),
+    )[0] ?? null;
 
   return {
     id,
