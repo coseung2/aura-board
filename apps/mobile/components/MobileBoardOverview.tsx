@@ -42,10 +42,7 @@ export function BoardSummaryStrip({
         {metrics.map((metric, index) => (
           <View
             key={metric.label}
-            style={[
-              styles.metric,
-              index > 0 && styles.metricBorder,
-            ]}
+            style={[styles.metric, index > 0 && styles.metricBorder]}
           >
             <Text
               style={[
@@ -145,7 +142,10 @@ export function MobileViewToggle<T extends string>({
         return (
           <ControlPressable
             key={option.value}
-            style={[styles.viewToggleButton, active && styles.viewToggleButtonActive]}
+            style={[
+              styles.viewToggleButton,
+              active && styles.viewToggleButtonActive,
+            ]}
             onPress={() => onChange(option.value)}
             accessibilityRole="tab"
             accessibilityState={{ selected: active }}
@@ -193,7 +193,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     gap: spacing.xxs,
-    minWidth: 0,
+    minWidth: spacing.none,
   },
   metricBorder: {
     borderLeftWidth: borders.hairline,
@@ -229,7 +229,7 @@ const styles = StyleSheet.create({
     paddingRight: spacing.lg,
   },
   filterChip: {
-    minHeight: 0,
+    minHeight: spacing.none,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
     borderRadius: radii.pill,
@@ -256,7 +256,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
   },
   viewToggleButton: {
-    minHeight: 0,
+    minHeight: spacing.none,
     borderWidth: borders.none,
     borderRadius: radii.none,
     paddingHorizontal: spacing.md,
