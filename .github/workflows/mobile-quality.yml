@@ -1,0 +1,70 @@
+name: Mobile Quality
+
+on:
+  pull_request:
+    paths:
+      - "apps/mobile/**"
+      - "src/lib/__tests__/mobile-board-overview.vitest.ts"
+      - ".github/workflows/mobile-quality.yml"
+
+concurrency:
+  group: mobile-quality-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  expo:
+    name: Expo typecheck and design system
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/mobile
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: apps/mobile/package-lock.json
+      - name: Install mobile dependencies
+        run: npm ci --silent
+      - name: Typecheck
+        run: npm run typecheck
+      - name: Check design system
+        run: npm run design:check
+
+  model-tests:
+    name: Mobile overview model tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            apps/mobile/package-lock.json
+      - name: Install web dependencies
+        run: npm ci --silent
+      - name: Install mobile config dependencies
+        run: npm ci --prefix apps/mobile --silent
+      - name: Run mobile overview tests
+        shell: bash
+        run: |
+          set +e
+          npx vitest run src/lib/__tests__/mobile-board-overview.vitest.ts --reporter=verbose > mobile-overview-test.log 2>&1
+          status=$?
+          cat mobile-overview-test.log
+          exit $status
+      - name: Upload mobile overview diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mobile-overview-test-log
+          path: mobile-overview-test.log
+          if-no-files-found: error
+          retention-days: 1
