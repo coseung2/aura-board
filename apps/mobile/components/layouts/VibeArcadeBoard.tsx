@@ -16,6 +16,7 @@ import {
   colors,
   controls,
   iconSizes,
+  media,
   radii,
   spacing,
   typography,
@@ -378,7 +379,8 @@ const styles = StyleSheet.create({
     paddingRight: spacing.md,
   },
   galleryItem: {
-    padding: spacing.sm,
+    paddingVertical: spacing.xs,
+    paddingHorizontal: spacing.sm,
     backgroundColor: colors.bg,
     gap: spacing.xs,
     marginBottom: spacing.sm,
@@ -388,7 +390,7 @@ const styles = StyleSheet.create({
   },
   thumb: {
     width: "100%",
-    aspectRatio: vibe.thumbnailAspectRatio,
+    aspectRatio: media.previewAspectRatio,
     backgroundColor: colors.surfaceAlt,
   },
   thumbFallback: { alignItems: "center", justifyContent: "center" },

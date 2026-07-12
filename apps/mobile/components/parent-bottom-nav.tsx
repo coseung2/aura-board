@@ -68,7 +68,7 @@ export function ParentBottomNav({
               }
               router.push(ROUTES[item]);
             }}
-            style={styles.tab}
+            style={[styles.tab, selected && styles.tabSelected]}
           >
             <View style={styles.iconWrap}>
               <ParentNavIcon name={item} active={selected} />
@@ -91,7 +91,12 @@ export function ParentBottomNav({
 function ParentNavIcon({ name, active }: { name: ParentNavItem; active: boolean }) {
   const stroke = active ? colors.accent : colors.textMuted;
   return (
-    <Svg width={23} height={23} viewBox="0 0 24 24" fill="none">
+    <Svg
+      width={iconSizes.lg}
+      height={iconSizes.lg}
+      viewBox="0 0 24 24"
+      fill="none"
+    >
       {name === "home" ? (
         <>
           <Path d="M3 10.8 12 3l9 7.8" stroke={stroke} strokeWidth={1.8} />
@@ -129,12 +134,19 @@ const styles = StyleSheet.create({
     flex: 1,
     minWidth: 0,
     minHeight: parent.feedTabMinHeight,
+    marginHorizontal: spacing.xs,
+    marginVertical: spacing.xs,
     justifyContent: "center",
     alignItems: "center",
     gap: spacing.xxs,
     borderWidth: borders.none,
     borderRadius: radii.none,
     backgroundColor: colors.transparent,
+  },
+  tabSelected: {
+    borderRadius: radii.control,
+    borderColor: colors.accentTintedBg,
+    backgroundColor: colors.accentTintedBg,
   },
   iconWrap: { position: "relative" },
   label: { ...typography.micro, color: colors.textMuted, fontWeight: "600" },
@@ -145,7 +157,7 @@ const styles = StyleSheet.create({
     right: -11,
     minWidth: iconSizes.sm,
     height: iconSizes.sm,
-    paddingHorizontal: 4,
+    paddingHorizontal: spacing.xs,
     borderRadius: radii.pill,
     alignItems: "center",
     justifyContent: "center",

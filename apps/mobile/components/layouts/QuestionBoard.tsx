@@ -178,9 +178,14 @@ const styles = StyleSheet.create({
   composer: { padding: spacing.md, gap: spacing.md },
   input: { minHeight: assignment.contentInputMinHeight, textAlignVertical: "top" },
   count: { ...typography.section, color: colors.text },
-  responseCard: { padding: spacing.lg, gap: spacing.md, marginBottom: spacing.md },
+  responseCard: {
+    paddingVertical: spacing.xs,
+    paddingHorizontal: spacing.sm,
+    gap: spacing.xs,
+    marginBottom: spacing.sm,
+  },
   responseText: { ...typography.body, color: colors.text },
-  metaRow: { flexDirection: "row", justifyContent: "space-between", gap: spacing.md },
+  metaRow: { flexDirection: "row", justifyContent: "space-between", gap: spacing.xs },
   author: { ...typography.badge, color: colors.textMuted, flex: 1 },
   date: { ...typography.micro, color: colors.textFaint },
   error: {

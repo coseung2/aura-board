@@ -18,17 +18,15 @@ import {
   colors,
   composer,
   layout,
-  radii,
   spacing,
-  tapMin,
   typography,
 } from "../../theme/tokens";
 import {
   AppButton,
   AppHeader,
-  ControlPressable,
-  Pill,
-  SurfaceCard,
+  SemanticNav,
+  SemanticNavItem,
+  SectionHeader,
   TextField,
 } from "../../components/ui";
 
@@ -121,48 +119,29 @@ export default function StudentReadingScreen() {
         >
           <View style={[styles.formColumn, isLandscape && styles.landscapeFormColumn]}>
             <View style={styles.formSection}>
+              <SectionHeader title="새 기록" />
               <View style={styles.formIntro}>
-                <Text style={styles.eyebrow}>오늘의 독서</Text>
-                <Text style={styles.title}>읽은 책의 감상을 기록해 보세요.</Text>
-                <Text style={styles.description}>
-                  책을 고르고, 기억에 남는 장면을 짧게 남겨 보세요.
-                </Text>
+                <Text style={styles.description}>오늘 읽은 책의 감상을 기록해 보세요.</Text>
               </View>
 
               <View style={styles.fieldGroup}>
                 <Text style={styles.fieldLabel}>책 종류</Text>
-                <View style={styles.typeRow}>
-                  <ControlPressable
-                    style={[styles.typeOption, bookType === "story" && styles.typeOptionActive]}
+                <SemanticNav style={styles.typeNav} accessibilityLabel="책 종류">
+                  <SemanticNavItem
+                    selected={bookType === "story"}
                     onPress={() => setBookType("story")}
                     accessibilityLabel="이야기책"
-                    accessibilityState={{ selected: bookType === "story" }}
                   >
-                    <Text
-                      style={[
-                        styles.typeOptionText,
-                        bookType === "story" && styles.typeOptionTextActive,
-                      ]}
-                    >
-                      이야기책
-                    </Text>
-                  </ControlPressable>
-                  <ControlPressable
-                    style={[styles.typeOption, bookType === "comic" && styles.typeOptionActive]}
+                    이야기책
+                  </SemanticNavItem>
+                  <SemanticNavItem
+                    selected={bookType === "comic"}
                     onPress={() => setBookType("comic")}
                     accessibilityLabel="만화책"
-                    accessibilityState={{ selected: bookType === "comic" }}
                   >
-                    <Text
-                      style={[
-                        styles.typeOptionText,
-                        bookType === "comic" && styles.typeOptionTextActive,
-                      ]}
-                    >
-                      만화책
-                    </Text>
-                  </ControlPressable>
-                </View>
+                    만화책
+                  </SemanticNavItem>
+                </SemanticNav>
               </View>
 
               <View style={styles.fieldGroup}>
@@ -220,12 +199,14 @@ export default function StudentReadingScreen() {
           </View>
 
           <View style={[styles.historyColumn, isLandscape && styles.landscapeHistoryColumn]}>
-            <View style={styles.sectionHeader}>
-              <Text style={styles.sectionTitle}>내 독서 기록</Text>
-              {!loading && entries.length > 0 ? (
-                <Text style={styles.entryCount}>{entries.length}개</Text>
-              ) : null}
-            </View>
+            <SectionHeader
+              title="내 독서 기록"
+              right={
+                !loading && entries.length > 0 ? (
+                  <Text style={styles.entryCount}>{entries.length}개</Text>
+                ) : undefined
+              }
+            />
 
             {loading ? (
               <View style={styles.loadingState}>
@@ -233,34 +214,36 @@ export default function StudentReadingScreen() {
                 <Text style={styles.muted}>독서 기록을 불러오는 중이에요.</Text>
               </View>
             ) : entries.length === 0 ? (
-              <View style={styles.emptyState}>
+              <View style={styles.emptyState} accessible accessibilityRole="text">
                 <Text style={styles.emptyTitle}>아직 기록이 없어요.</Text>
                 <Text style={styles.emptyDescription}>
                   오늘 읽은 책을 첫 번째 기록으로 남겨 보세요.
                 </Text>
               </View>
             ) : (
-              entries.map((entry) => (
-                <SurfaceCard key={entry.id} style={styles.entry}>
+              entries.map((entry, index) => (
+                <View
+                  key={entry.id}
+                  style={[styles.entry, index === entries.length - 1 && styles.entryLast]}
+                >
                   <View style={styles.entryTopline}>
-                    <Pill tone="accent">
+                    <Text style={styles.entryType}>
                       {entry.bookType === "comic" ? "만화책" : "이야기책"}
-                    </Pill>
+                    </Text>
                     <Text style={styles.entryDate}>
                       {new Date(entry.createdAt).toLocaleDateString("ko-KR")}
                     </Text>
                   </View>
                   <Text style={styles.entryTitle}>{entry.title}</Text>
                   <Text style={styles.meta}>{entry.author}</Text>
-                  <View style={styles.divider} />
                   <Text style={styles.body}>{entry.reflection}</Text>
                   {entry.aiFeedback ? (
-                    <View style={styles.feedbackBox}>
+                    <View style={styles.feedbackRow}>
                       <Text style={styles.feedbackScore}>{entry.aiScore ?? 0}점</Text>
                       <Text style={styles.feedback}>{entry.aiFeedback}</Text>
                     </View>
                   ) : null}
-                </SurfaceCard>
+                </View>
               ))
             )}
           </View>
@@ -300,40 +283,14 @@ const styles = StyleSheet.create({
     borderBottomColor: colors.border,
   },
   formIntro: { gap: spacing.xs },
-  eyebrow: { ...typography.label, color: colors.accent },
-  title: { ...typography.subtitle, color: colors.text },
   description: { ...typography.body, color: colors.textMuted },
   fieldGroup: { gap: spacing.xs },
   fieldLabel: { ...typography.label, color: colors.textMuted },
-  typeRow: { flexDirection: "row", gap: spacing.sm },
-  typeOption: {
-    flex: 1,
-    minHeight: tapMin,
-    alignItems: "center",
-    justifyContent: "center",
-    paddingHorizontal: spacing.md,
-    borderWidth: borders.hairline,
-    borderColor: colors.border,
-    borderRadius: radii.control,
-    backgroundColor: colors.surface,
-  },
-  typeOptionActive: {
-    borderColor: colors.accent,
-    backgroundColor: colors.accentTintedBg,
-  },
-  typeOptionText: { ...typography.label, color: colors.textMuted },
-  typeOptionTextActive: { color: colors.accentTintedText },
+  typeNav: { alignSelf: "flex-start" },
   reflectionInput: { minHeight: composer.contentMinHeight, textAlignVertical: "top" },
   error: { ...typography.body, color: colors.danger },
   notice: { ...typography.body, color: colors.statusReviewedText },
   statusStack: { gap: spacing.xs },
-  sectionHeader: {
-    flexDirection: "row",
-    alignItems: "baseline",
-    justifyContent: "space-between",
-    gap: spacing.md,
-  },
-  sectionTitle: { ...typography.subtitle, color: colors.text },
   entryCount: { ...typography.micro, color: colors.textMuted },
   loadingState: {
     alignItems: "center",
@@ -342,32 +299,38 @@ const styles = StyleSheet.create({
   },
   muted: { ...typography.body, color: colors.textMuted },
   emptyState: {
-    gap: spacing.xs,
     paddingVertical: spacing.xl,
-    borderTopWidth: borders.hairline,
-    borderTopColor: colors.border,
+    gap: spacing.xs,
+    borderBottomWidth: borders.hairline,
+    borderBottomColor: colors.border,
   },
   emptyTitle: { ...typography.section, color: colors.text },
   emptyDescription: { ...typography.body, color: colors.textMuted },
-  entry: { gap: spacing.sm, padding: spacing.lg },
+  entry: {
+    gap: spacing.sm,
+    paddingVertical: spacing.lg,
+    borderBottomWidth: borders.hairline,
+    borderBottomColor: colors.border,
+  },
+  entryLast: { borderBottomWidth: borders.none },
   entryTopline: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
     gap: spacing.md,
   },
+  entryType: { ...typography.badge, color: colors.accentTintedText },
   entryDate: { ...typography.micro, color: colors.textMuted },
   entryTitle: { ...typography.section, color: colors.text },
   meta: { ...typography.micro, color: colors.textMuted },
-  divider: { borderTopWidth: borders.hairline, borderTopColor: colors.border },
   body: { ...typography.body, color: colors.text },
-  feedbackBox: {
+  feedbackRow: {
     flexDirection: "row",
     alignItems: "flex-start",
     gap: spacing.sm,
-    padding: spacing.md,
-    borderRadius: radii.control,
-    backgroundColor: colors.accentTintedBg,
+    paddingTop: spacing.md,
+    borderTopWidth: borders.hairline,
+    borderTopColor: colors.border,
   },
   feedbackScore: { ...typography.label, color: colors.accentTintedText },
   feedback: { ...typography.body, color: colors.accentTintedText, flex: 1 },

@@ -15,9 +15,9 @@ import {
   colors,
   iconSizes,
   layout,
+  media,
   spacing,
   typography,
-  vibe,
 } from "../../theme/tokens";
 import { AppButton, EmptyState, SurfacePressable } from "../ui";
 import {
@@ -40,19 +40,11 @@ export function VibeGalleryBoard({ data }: { data: BoardDetailResponse }) {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const { width } = useWindowDimensions();
+  const { width, height } = useWindowDimensions();
   const available = Math.max(0, width - layout.boardGridPadding * 2);
-  const columns = Math.max(
-    1,
-    Math.floor(
-      (available + layout.boardGridGap) /
-        (layout.boardGridMinCardWidth + layout.boardGridGap),
-    ),
-  );
+  const columns = width > height ? 4 : 2;
   const cardWidth =
-    columns === 1
-      ? available
-      : (available - (columns - 1) * layout.boardGridGap) / columns;
+    (available - (columns - 1) * layout.boardGridGap) / columns;
 
   const load = useCallback(async (refresh = false) => {
     refresh ? setRefreshing(true) : setLoading(true);
@@ -152,16 +144,16 @@ const styles = StyleSheet.create({
   error: { gap: spacing.sm, paddingTop: spacing.md },
   errorText: { ...typography.body, color: colors.danger },
   card: { overflow: "hidden", marginBottom: spacing.md },
-  thumbnail: { width: "100%", aspectRatio: vibe.thumbnailAspectRatio, backgroundColor: colors.surfaceAlt },
+  thumbnail: { width: "100%", aspectRatio: media.previewAspectRatio, backgroundColor: colors.surfaceAlt },
   thumbnailFallback: {
     width: "100%",
-    aspectRatio: vibe.thumbnailAspectRatio,
+    aspectRatio: media.previewAspectRatio,
     backgroundColor: colors.surfaceAlt,
     alignItems: "center",
     justifyContent: "center",
   },
   fallbackIcon: { fontSize: iconSizes.gate },
-  meta: { padding: spacing.md, gap: spacing.xs },
+  meta: { padding: spacing.sm, gap: spacing.xs },
   cardTitle: { ...typography.section, color: colors.text },
   description: { ...typography.body, color: colors.textMuted },
   stats: { flexDirection: "row", gap: spacing.md },

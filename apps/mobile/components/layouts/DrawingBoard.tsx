@@ -16,6 +16,8 @@ import type { BoardDetailResponse } from "../../lib/types";
 import {
   assignment,
   colors,
+  layout,
+  media,
   radii,
   spacing,
   typography,
@@ -41,7 +43,11 @@ export function DrawingBoard({ data }: { data: BoardDetailResponse }) {
   const [assets, setAssets] = useState<Asset[]>([]);
   const [galleryLoading, setGalleryLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const { width } = useWindowDimensions();
+  const { width, height } = useWindowDimensions();
+  const galleryColumns = width > height ? 4 : 2;
+  const galleryAvailable = Math.max(0, width - layout.boardGridPadding * 2);
+  const galleryCardWidth =
+    (galleryAvailable - spacing.md * (galleryColumns - 1)) / galleryColumns;
 
   const pan = useMemo(
     () => PanResponder.create({
@@ -168,7 +174,10 @@ export function DrawingBoard({ data }: { data: BoardDetailResponse }) {
           {!galleryLoading && assets.length === 0 ? <EmptyState title="공유된 그림이 아직 없어요" /> : null}
           <View style={styles.gallery}>
             {assets.map((asset) => (
-              <SurfaceCard key={asset.id} style={styles.assetCard}>
+              <SurfaceCard
+                key={asset.id}
+                style={[styles.assetCard, { width: galleryCardWidth }]}
+              >
                 <Image source={{ uri: asset.thumbnailUrl ?? asset.fileUrl }} style={styles.assetImage} contentFit="cover" accessibilityLabel={asset.title || "공유 그림"} />
                 <Text style={styles.assetTitle} numberOfLines={2}>{asset.title || "제목 없음"}</Text>
               </SurfaceCard>
@@ -192,7 +201,16 @@ const styles = StyleSheet.create({
   actions: { flexDirection: "row", gap: spacing.sm },
   error: { ...typography.body, color: colors.danger, textAlign: "center" },
   gallery: { flexDirection: "row", flexWrap: "wrap", gap: spacing.md },
-  assetCard: { width: "47%", overflow: "hidden" },
-  assetImage: { width: "100%", aspectRatio: 1, backgroundColor: colors.surfaceAlt },
-  assetTitle: { ...typography.badge, color: colors.text, padding: spacing.sm },
+  assetCard: { overflow: "hidden" },
+  assetImage: {
+    width: "100%",
+    aspectRatio: media.previewAspectRatio,
+    backgroundColor: colors.surfaceAlt,
+  },
+  assetTitle: {
+    ...typography.badge,
+    color: colors.text,
+    paddingVertical: spacing.xs,
+    paddingHorizontal: spacing.sm,
+  },
 });

@@ -16,6 +16,7 @@ import {
   colors,
   dashboard,
   iconSizes,
+  media,
   radii,
   shadows,
   spacing,
@@ -24,6 +25,13 @@ import {
 } from "../../theme/tokens";
 import { apiFetch, ApiError } from "../../lib/api";
 import { clearSessionToken } from "../../lib/session";
+import {
+  BOARD_LIST_CACHE_KEY,
+  STUDENT_HOME_CACHE_KEY,
+  readBoardCache,
+  revalidateBoardCache,
+  writeBoardCache,
+} from "../../lib/board-cache";
 import { roleEmoji, studentDutyTarget } from "../../lib/student-navigation";
 import { isAssignmentReminderVisible } from "../../lib/student-notifications";
 import type {
@@ -37,6 +45,7 @@ import {
   AppHeader,
   ControlPressable,
   Pill,
+  SectionHeader,
   SemanticNav,
   SemanticNavItem,
 } from "../../components/ui";
@@ -47,11 +56,16 @@ import { StudentNotificationButton } from "../../components/StudentNotificationB
 export default function StudentHome() {
   const router = useRouter();
   const { width, height } = useWindowDimensions();
-  const [me, setMe] = useState<MeResponse | null>(null);
+  const initialHomeCache = readBoardCache<MeResponse>(STUDENT_HOME_CACHE_KEY, {
+    kind: "boards",
+  });
+  const [me, setMe] = useState<MeResponse | null>(
+    () => initialHomeCache?.data ?? null,
+  );
   const [wallet, setWallet] = useState<WalletSummary | null>(null);
   const [walletLoading, setWalletLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(() => !initialHomeCache);
   const [refreshing, setRefreshing] = useState(false);
   const [loggingOut, setLoggingOut] = useState(false);
   const loggingOutRef = useRef(false);
@@ -72,9 +86,28 @@ export default function StudentHome() {
 
   const load = useCallback(
     async (isRefresh = false) => {
+      const cached = readBoardCache<MeResponse>(STUDENT_HOME_CACHE_KEY, {
+        kind: "boards",
+      });
+      if (cached) {
+        setMe(cached.data);
+        setLoading(false);
+      } else {
+        setLoading(true);
+      }
       try {
         if (isRefresh) setRefreshing(true);
-        const res = await apiFetch<MeResponse>("/api/student/me");
+        const res = await revalidateBoardCache<MeResponse>(
+          STUDENT_HOME_CACHE_KEY,
+          async () => {
+            const response = await apiFetch<MeResponse>("/api/student/me");
+            writeBoardCache(BOARD_LIST_CACHE_KEY, response.boards, {
+              kind: "boards",
+            });
+            return response;
+          },
+          { force: isRefresh, kind: "boards" },
+        );
         setMe(res);
         setError(null);
 
@@ -281,32 +314,30 @@ function AssignmentPanel({
 
   return (
     <View style={styles.assignmentPanel}>
-      <View style={styles.assignmentHeader}>
-        <View>
-          <Text
-            accessibilityRole="header"
-            style={styles.assignmentSectionTitle}
+      <SectionHeader
+        title="과제 목록"
+        right={
+          <SemanticNav
+            style={styles.sectionSemanticNav}
+            accessibilityLabel="과제 필터"
           >
-            과제 목록
-          </Text>
-        </View>
-        <SemanticNav>
-          <FilterChip
-            active={filter === "missing"}
-            onPress={() => setFilter("missing")}
-            tone="danger"
-          >
-            미제출 {missingCount}
-          </FilterChip>
-          <FilterChip
-            active={filter === "completed"}
-            onPress={() => setFilter("completed")}
-            tone="neutral"
-          >
-            완료 {completedCount}
-          </FilterChip>
-        </SemanticNav>
-      </View>
+            <FilterChip
+              active={filter === "missing"}
+              onPress={() => setFilter("missing")}
+              tone="danger"
+            >
+              미제출 {missingCount}
+            </FilterChip>
+            <FilterChip
+              active={filter === "completed"}
+              onPress={() => setFilter("completed")}
+              tone="neutral"
+            >
+              완료 {completedCount}
+            </FilterChip>
+          </SemanticNav>
+        }
+      />
 
       <View style={styles.assignmentList}>
         <View style={styles.assignmentRows}>
@@ -457,41 +488,34 @@ function WalletCardCompact({
 
   return (
     <View style={styles.walletCardCompact}>
-      <View style={styles.walletHeaderCompact}>
-        <View style={styles.walletHeaderCopy}>
-          <View style={styles.walletHeaderTitleRow}>
-            <Text
-              accessibilityRole="header"
-              style={styles.walletSectionTitle}
+      <SectionHeader
+        title={showDuties ? "내 역할" : "은행"}
+        titleAccessory={
+          !showDuties ? (
+            <ControlPressable
+              style={styles.walletDetailLink}
+              onPress={onDetail}
+              hitSlop={8}
+              accessibilityLabel="통장 자세히 보기"
             >
-              {showDuties ? "내 역할" : "은행"}
-            </Text>
-            {!showDuties ? (
-              <ControlPressable
-                style={styles.walletDetailLink}
-                onPress={onDetail}
-                hitSlop={8}
-                accessibilityLabel="통장 자세히 보기"
-              >
-                <Text
-                  style={styles.walletDetailLinkText}
-                  numberOfLines={1}
-                >
-                  자세히
-                </Text>
-                <ChevronRight
-                  size={iconSizes.sm}
-                  color={colors.textMuted}
-                  strokeWidth={2}
-                  accessible={false}
-                />
-              </ControlPressable>
-            ) : null}
-          </View>
-        </View>
-        <View style={styles.walletHeaderActions}>
-          {hasDuties ? (
-            <SemanticNav>
+              <Text style={styles.walletDetailLinkText} numberOfLines={1}>
+                자세히
+              </Text>
+              <ChevronRight
+                size={iconSizes.sm}
+                color={colors.textMuted}
+                strokeWidth={2}
+                accessible={false}
+              />
+            </ControlPressable>
+          ) : undefined
+        }
+        right={
+          hasDuties ? (
+            <SemanticNav
+              style={styles.sectionSemanticNav}
+              accessibilityLabel="은행 보기"
+            >
               <SemanticNavItem
                 selected={!showDuties}
                 onPress={() => setPanel("wallet")}
@@ -505,9 +529,9 @@ function WalletCardCompact({
                 내 역할
               </SemanticNavItem>
             </SemanticNav>
-          ) : null}
-        </View>
-      </View>
+          ) : undefined
+        }
+      />
 
       {showDuties ? (
         <DutySectionCompact duties={duties} onOpen={onOpen} />
@@ -615,7 +639,7 @@ const styles = StyleSheet.create({
     gap: spacing.lg,
   },
   overviewStack: {
-    gap: spacing.md,
+    gap: spacing.none,
   },
   overviewItem: {
     minWidth: 0,
@@ -647,12 +671,12 @@ const styles = StyleSheet.create({
     backgroundColor: colors.transparent,
   },
   showcaseBand: {
-    marginHorizontal: -spacing.xxl,
-    paddingHorizontal: spacing.xxl,
-    paddingTop: spacing.lg,
-    paddingBottom: spacing.md,
+    marginHorizontal: -spacing.xl,
+    paddingHorizontal: spacing.xl,
+    paddingTop: spacing.md,
+    paddingBottom: spacing.sm,
     backgroundColor: colors.showcaseBand,
-    gap: spacing.md,
+    gap: spacing.sm,
   },
   showcaseHead: {
     flexDirection: "row",
@@ -670,25 +694,25 @@ const styles = StyleSheet.create({
     color: colors.accent,
   },
   showcaseRowContent: {
-    gap: spacing.lg,
+    gap: spacing.md,
     paddingBottom: spacing.xs,
   },
   showcaseChip: {
-    width: dashboard.showcaseCardWidth,
-    minHeight: dashboard.showcaseCardMinHeight,
+    width: dashboard.compactCardSize,
+    minHeight: dashboard.compactCardSize,
     overflow: "hidden",
     position: "relative",
   },
   showcaseChipSkeleton: {
-    width: dashboard.showcaseCardWidth,
-    height: dashboard.showcaseSkeletonHeight,
+    width: dashboard.compactCardSize,
+    height: dashboard.compactCardSize,
     borderRadius: radii.card,
     backgroundColor: colors.surfaceAlt,
   },
   showcaseChipBadge: {
     position: "absolute",
-    top: spacing.md,
-    right: spacing.md,
+    top: spacing.sm,
+    right: spacing.sm,
     width: dashboard.badgeSize,
     height: dashboard.badgeSize,
     borderRadius: radii.pill,
@@ -698,7 +722,7 @@ const styles = StyleSheet.create({
   },
   showcaseChipBadgeText: { ...typography.badge },
   showcasePreview: {
-    height: dashboard.showcasePreviewHeight,
+    aspectRatio: media.previewAspectRatio,
     backgroundColor: colors.bgAlt,
     alignItems: "center",
     justifyContent: "center",
@@ -711,8 +735,8 @@ const styles = StyleSheet.create({
   },
   showcasePlay: {
     position: "absolute",
-    width: dashboard.playSize,
-    height: dashboard.playSize,
+    width: spacing.xxl,
+    height: spacing.xxl,
     borderRadius: radii.pill,
     backgroundColor: colors.surface,
     alignItems: "center",
@@ -724,7 +748,7 @@ const styles = StyleSheet.create({
     fontSize: iconSizes.md,
     marginLeft: spacing.xs,
   },
-  showcaseChipBody: { gap: spacing.xs, padding: spacing.lg },
+  showcaseChipBody: { gap: spacing.xs, padding: spacing.sm },
   showcaseChipTitle: { ...typography.section, color: colors.text },
   showcaseChipContent: {
     ...typography.body,
@@ -753,34 +777,8 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.md,
     gap: spacing.md,
   },
-  walletHeaderCompact: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: spacing.md,
-    flexWrap: "wrap",
-  },
-  walletHeaderCopy: {
-    flex: 1,
-    minWidth: 0,
-  },
-  walletHeaderTitleRow: {
-    flexDirection: "row",
-    alignItems: "flex-end",
-    gap: spacing.sm,
-    flexWrap: "wrap",
-  },
-  walletHeaderActions: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "flex-end",
-    gap: spacing.xs,
-    flexShrink: 1,
-    flexWrap: "wrap",
-  },
-  walletSectionTitle: {
-    ...typography.subtitle,
-    color: colors.text,
+  sectionSemanticNav: {
+    paddingTop: spacing.xs,
   },
   walletTitleCompact: { ...typography.subtitle, color: colors.text },
   walletDetailLink: {
@@ -927,21 +925,7 @@ const styles = StyleSheet.create({
   },
   assignmentPanel: {
     paddingVertical: spacing.md,
-    gap: spacing.md,
-    borderTopWidth: borders.hairline,
-    borderTopColor: colors.border,
-  },
-  assignmentHeader: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-    justifyContent: "space-between",
-    gap: spacing.md,
-    flexWrap: "wrap",
-  },
-  assignmentSectionTitle: {
-    ...typography.subtitle,
-    color: colors.text,
-    marginBottom: spacing.xs,
+    gap: spacing.none,
   },
   assignmentTitle: {
     ...typography.subtitle,
@@ -949,8 +933,6 @@ const styles = StyleSheet.create({
   },
   assignmentList: {
     paddingBottom: spacing.xs,
-    borderBottomWidth: borders.hairline,
-    borderBottomColor: colors.border,
   },
   assignmentRows: {
     overflow: "hidden",

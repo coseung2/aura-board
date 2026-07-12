@@ -11,13 +11,26 @@ import {
 import { useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { ParentBottomNav } from "../../components/parent-bottom-nav";
-import { AppButton, AppHeader, EmptyState, SurfaceCard } from "../../components/ui";
+import {
+  AppButton,
+  AppHeader,
+  EmptyState,
+  SectionHeader,
+  SurfaceCard,
+} from "../../components/ui";
 import { useParentOverview } from "../../hooks/use-parent-overview";
 import { ApiError, parentApiFetch } from "../../lib/api";
 import { logoutParentSession } from "../../lib/parent-session-actions";
 import { clearParentSession } from "../../lib/session";
 import type { ParentChild, ParentPendingLink } from "../../lib/types";
-import { colors, parent, radii, spacing, typography } from "../../theme/tokens";
+import {
+  borders,
+  colors,
+  parent,
+  radii,
+  spacing,
+  typography,
+} from "../../theme/tokens";
 
 type AccountLink =
   | { kind: "active"; value: ParentChild }
@@ -139,7 +152,7 @@ export default function ParentAccountScreen() {
             </SurfaceCard>
 
             <SurfaceCard style={styles.sectionCard}>
-              <Text selectable style={styles.sectionTitle}>자녀 연결</Text>
+              <SectionHeader title="자녀 연결" />
               <Text selectable style={styles.help}>
                 승인 전에는 신청 취소, 승인 후에는 연결 해제를 할 수 있어요.
               </Text>
@@ -204,13 +217,12 @@ const styles = StyleSheet.create({
   center: { minHeight: parent.portfolioEmptyMinHeight, alignItems: "center", justifyContent: "center" },
   sections: { width: "100%", maxWidth: parent.portfolioCardMinWidth * 2 - spacing.lg, alignSelf: "center", gap: spacing.lg },
   profileCard: { flexDirection: "row", alignItems: "center", padding: spacing.lg, gap: spacing.md },
-  avatar: { width: parent.childAvatarSize, height: parent.childAvatarSize, borderRadius: radii.pill, backgroundColor: colors.accentTintedBg, alignItems: "center", justifyContent: "center" },
+  avatar: { width: parent.childAvatarSize, height: parent.childAvatarSize, borderRadius: radii.pill, backgroundColor: colors.accentTintedBg, borderWidth: borders.hairline, borderColor: colors.border, alignItems: "center", justifyContent: "center" },
   avatarText: { ...typography.title, color: colors.accent },
   profileCopy: { flex: 1, gap: spacing.xs },
   profileName: { ...typography.title, color: colors.text },
   profileEmail: { ...typography.body, color: colors.textMuted },
   sectionCard: { padding: spacing.lg, gap: spacing.md },
-  sectionTitle: { ...typography.subtitle, color: colors.text },
   help: { ...typography.body, color: colors.textMuted },
   linkList: { gap: spacing.sm },
   linkRow: { flexDirection: "row", alignItems: "center", gap: spacing.md, paddingVertical: spacing.sm },

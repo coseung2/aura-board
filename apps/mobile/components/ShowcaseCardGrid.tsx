@@ -1,8 +1,9 @@
-import { Image, StyleSheet, Text, View } from "react-native";
+import { Image, StyleSheet, Text, View, useWindowDimensions } from "react-native";
 import {
   borders,
   colors,
   dashboard,
+  layout as layoutTokens,
   layers,
   media,
   radii,
@@ -21,6 +22,21 @@ type Props = {
 };
 
 export function ShowcaseCardGrid({ entries, emptyText, onOpen }: Props) {
+  const { width, height } = useWindowDimensions();
+  const columns = width > height ? 4 : 2;
+  const horizontalPadding =
+    width >= layoutTokens.mobileBreakpoint ? spacing.xxl : spacing.xl;
+  const gridWidth = Math.max(
+    Math.min(width, layoutTokens.readableMaxWidth) - horizontalPadding * 2,
+    0,
+  );
+  const cardWidth = Math.max(
+    1,
+    Math.floor(
+      (gridWidth - layoutTokens.boardGridGap * (columns - 1)) / columns,
+    ),
+  );
+
   if (entries.length === 0) {
     return (
       <SurfaceCard style={styles.emptyBox}>
@@ -34,7 +50,7 @@ export function ShowcaseCardGrid({ entries, emptyText, onOpen }: Props) {
       {entries.map((entry) => (
         <SurfacePressable
           key={`${entry.cardId}:${entry.studentId}`}
-          style={styles.card}
+          style={[styles.card, { width: cardWidth, minHeight: cardWidth }]}
           onPress={() => onOpen(entry)}
         >
           <ShowcasePreview entry={entry} />
@@ -103,17 +119,20 @@ function formatShortDate(value: string): string {
 }
 
 const styles = StyleSheet.create({
-  grid: { flexDirection: "row", flexWrap: "wrap", gap: spacing.lg },
+  grid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    columnGap: layoutTokens.boardGridGap,
+    rowGap: layoutTokens.boardGridGap,
+  },
   card: {
-    width: dashboard.showcaseCardWidth,
-    minHeight: dashboard.showcaseCardMinHeight,
     overflow: "hidden",
     position: "relative",
   },
   badge: {
     position: "absolute",
-    top: spacing.md,
-    right: spacing.md,
+    top: spacing.sm,
+    right: spacing.sm,
     zIndex: layers.badge,
     width: dashboard.badgeSize,
     height: dashboard.badgeSize,
@@ -124,7 +143,7 @@ const styles = StyleSheet.create({
   },
   badgeText: { ...typography.badge },
   preview: {
-    height: dashboard.showcasePreviewHeight,
+    aspectRatio: media.previewAspectRatio,
     backgroundColor: colors.bgAlt,
     alignItems: "center",
     justifyContent: "center",
@@ -134,8 +153,8 @@ const styles = StyleSheet.create({
   previewImage: { width: "100%", height: "100%" },
   play: {
     position: "absolute",
-    width: dashboard.playSize,
-    height: dashboard.playSize,
+    width: spacing.xxl,
+    height: spacing.xxl,
     borderRadius: radii.pill,
     backgroundColor: colors.surface,
     alignItems: "center",
@@ -143,7 +162,7 @@ const styles = StyleSheet.create({
     ...shadows.card,
   },
   playText: { ...typography.section, color: colors.text, marginLeft: media.playOffset },
-  body: { padding: spacing.lg, gap: spacing.sm },
+  body: { padding: spacing.sm, gap: spacing.xs },
   cardTitle: { ...typography.section, color: colors.text },
   cardContent: { ...typography.body, color: colors.textMuted },
   metaRow: {

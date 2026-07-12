@@ -26,6 +26,7 @@ import {
   colors,
   dashboard,
   iconSizes,
+  layout,
   radii,
   spacing,
   tapMin,
@@ -36,6 +37,7 @@ import {
   AppButton,
   AppHeader,
   ControlPressable,
+  SectionHeader,
 } from "../../components/ui";
 
 export default function StudentMoreScreen() {
@@ -115,6 +117,15 @@ export default function StudentMoreScreen() {
     });
   }, [enabledIds, targets]);
 
+  const menuTargets = useMemo(
+    () => orderedTargets.filter((target) => !target.id.startsWith("duty:")),
+    [orderedTargets],
+  );
+  const roleTargets = useMemo(
+    () => orderedTargets.filter((target) => target.id.startsWith("duty:")),
+    [orderedTargets],
+  );
+
   const enabledCount = useMemo(
     () => targets.filter((target) => enabledIds.includes(target.id)).length,
     [enabledIds, targets],
@@ -155,29 +166,7 @@ export default function StudentMoreScreen() {
 
   return (
     <SafeAreaView style={styles.container} edges={["top"]}>
-      <AppHeader
-        title="더보기"
-        right={
-          <ControlPressable
-            style={styles.logoutButton}
-            onPress={() => void handleLogout()}
-            disabled={loggingOut}
-            accessibilityLabel={loggingOut ? "로그아웃 중" : "로그아웃"}
-            accessibilityState={{ disabled: loggingOut }}
-          >
-            {loggingOut ? (
-              <ActivityIndicator color={colors.textMuted} size="small" />
-            ) : (
-              <LogOut
-                size={iconSizes.md}
-                color={colors.textMuted}
-                strokeWidth={2}
-                accessible={false}
-              />
-            )}
-          </ControlPressable>
-        }
-      />
+      <AppHeader title="더보기" />
       <ScrollView
         style={styles.scroll}
         contentInsetAdjustmentBehavior="automatic"
@@ -220,43 +209,112 @@ export default function StudentMoreScreen() {
           ]}
         >
           <View style={styles.sectionColumn}>
-            <View style={styles.settingsSection}>
-              <View style={styles.sectionHeader}>
-                <View style={styles.sectionHeaderCopy}>
-                  <Text style={styles.sectionTitle}>하단 메뉴 설정</Text>
-                  <Text style={styles.sectionDescription}>
-                    {loading
-                      ? "메뉴를 불러오는 중…"
-                      : saving
-                        ? "변경 내용을 저장하는 중…"
-                        : `${enabledCount}개 메뉴가 하단에 표시 중`}
-                  </Text>
-                </View>
+            <SectionHeader title="하단 메뉴 설정" />
+            <Text style={styles.sectionDescription}>
+              {loading
+                ? "메뉴를 불러오는 중…"
+                : saving
+                  ? "변경 내용을 저장하는 중…"
+                  : `${enabledCount}개 메뉴가 하단에 표시 중`}
+            </Text>
+
+            {saveError ? (
+              <Text style={styles.saveError} accessibilityRole="alert">
+                {saveError}
+              </Text>
+            ) : null}
+
+            {loading ? (
+              <View style={styles.loadingRow}>
+                <ActivityIndicator color={colors.accent} />
+                <Text style={styles.mutedText}>잠시만 기다려 주세요.</Text>
               </View>
+            ) : orderedTargets.length ? (
+              orderedTargets.map((target, index) => {
+                const enabled = enabledIds.includes(target.id);
+                const enabledIndex = enabledIds.indexOf(target.id);
+                const Icon = studentNavIcon(target);
+                return (
+                  <View
+                    key={target.id}
+                    style={[
+                      styles.settingRow,
+                      index === orderedTargets.length - 1 && styles.rowLast,
+                    ]}
+                  >
+                    <View style={styles.menuIcon} accessible={false}>
+                      <Icon
+                        size={iconSizes.md}
+                        color={colors.textMuted}
+                        strokeWidth={2}
+                      />
+                    </View>
+                    <View style={styles.targetCopy}>
+                      <Text style={styles.label}>{target.label}</Text>
+                      <Text style={styles.targetMeta}>
+                        {enabled ? "하단 메뉴에 표시 중" : "더보기에서만 열기"}
+                      </Text>
+                    </View>
+                    {enabled ? (
+                      <View style={styles.orderButtons}>
+                        <AppButton
+                          variant="quiet"
+                          style={styles.orderButton}
+                          textStyle={styles.orderButtonText}
+                          disabled={enabledIndex === 0}
+                          onPress={() => move(target.id, -1)}
+                          accessibilityLabel={`${target.label} 앞으로 이동`}
+                        >
+                          ↑
+                        </AppButton>
+                        <AppButton
+                          variant="quiet"
+                          style={styles.orderButton}
+                          textStyle={styles.orderButtonText}
+                          disabled={enabledIndex === enabledIds.length - 1}
+                          onPress={() => move(target.id, 1)}
+                          accessibilityLabel={`${target.label} 뒤로 이동`}
+                        >
+                          ↓
+                        </AppButton>
+                      </View>
+                    ) : null}
+                    <Switch
+                      value={enabled}
+                      onValueChange={(value) => toggle(target.id, value)}
+                      trackColor={{
+                        false: colors.border,
+                        true: colors.accent,
+                      }}
+                      thumbColor={colors.surface}
+                      accessibilityLabel={`${target.label} 하단 메뉴 ${enabled ? "끄기" : "켜기"}`}
+                    />
+                  </View>
+                );
+              })
+            ) : (
+              <Text style={styles.mutedText}>추가할 메뉴가 없어요.</Text>
+            )}
+          </View>
 
-              {saveError ? (
-                <Text style={styles.saveError} accessibilityRole="alert">
-                  {saveError}
-                </Text>
-              ) : null}
-
-              {loading ? (
-                <View style={styles.loadingRow}>
-                  <ActivityIndicator color={colors.accent} />
-                  <Text style={styles.mutedText}>잠시만 기다려 주세요.</Text>
-                </View>
-              ) : orderedTargets.length ? (
-                orderedTargets.map((target, index) => {
-                  const enabled = enabledIds.includes(target.id);
-                  const enabledIndex = enabledIds.indexOf(target.id);
+          <View style={styles.sectionColumn}>
+            <SectionHeader title="전체 메뉴" />
+            <Text style={styles.sectionDescription}>
+              하단 메뉴에 추가하지 않아도 여기서 바로 열 수 있어요.
+            </Text>
+            {menuTargets.length ? (
+              <View style={styles.linkList}>
+                {menuTargets.map((target, index) => {
                   const Icon = studentNavIcon(target);
                   return (
-                    <View
+                    <ControlPressable
                       key={target.id}
                       style={[
-                        styles.settingRow,
-                        index === orderedTargets.length - 1 && styles.rowLast,
+                        styles.linkRow,
+                        index < menuTargets.length - 1 && styles.rowDivider,
                       ]}
+                      onPress={() => router.push(target.href as Href)}
+                      accessibilityLabel={`${target.label} 열기`}
                     >
                       <View style={styles.menuIcon} accessible={false}>
                         <Icon
@@ -265,79 +323,26 @@ export default function StudentMoreScreen() {
                           strokeWidth={2}
                         />
                       </View>
-                      <View style={styles.targetCopy}>
-                        <Text style={styles.label} numberOfLines={1}>
-                          {target.label}
-                        </Text>
-                        <Text style={styles.targetMeta}>
-                          {enabled
-                            ? "하단 메뉴에 표시 중"
-                            : "더보기에서만 열기"}
-                        </Text>
-                      </View>
-                      {enabled ? (
-                        <View style={styles.orderButtons}>
-                          <AppButton
-                            variant="quiet"
-                            style={styles.orderButton}
-                            textStyle={styles.orderButtonText}
-                            disabled={enabledIndex === 0}
-                            onPress={() => move(target.id, -1)}
-                            accessibilityLabel={`${target.label} 앞으로 이동`}
-                          >
-                            ↑
-                          </AppButton>
-                          <AppButton
-                            variant="quiet"
-                            style={styles.orderButton}
-                            textStyle={styles.orderButtonText}
-                            disabled={enabledIndex === enabledIds.length - 1}
-                            onPress={() => move(target.id, 1)}
-                            accessibilityLabel={`${target.label} 뒤로 이동`}
-                          >
-                            ↓
-                          </AppButton>
-                        </View>
-                      ) : null}
-                      <Switch
-                        value={enabled}
-                        onValueChange={(value) => toggle(target.id, value)}
-                        trackColor={{
-                          false: colors.border,
-                          true: colors.accent,
-                        }}
-                        thumbColor={colors.surface}
-                        accessibilityLabel={`${target.label} 하단 메뉴 ${enabled ? "끄기" : "켜기"}`}
-                      />
-                    </View>
+                      <Text style={styles.label}>{target.label}</Text>
+                      <Text style={styles.chevron}>›</Text>
+                    </ControlPressable>
                   );
-                })
-              ) : (
-                <Text style={styles.mutedText}>추가할 메뉴가 없어요.</Text>
-              )}
-            </View>
-          </View>
-
-          <View style={styles.sectionColumn}>
-            <View style={styles.linksSection}>
-              <View style={styles.sectionHeader}>
-                <View style={styles.sectionHeaderCopy}>
-                  <Text style={styles.sectionTitle}>전체 메뉴</Text>
-                  <Text style={styles.sectionDescription}>
-                    하단 메뉴에 추가하지 않아도 여기서 바로 열 수 있어요.
-                  </Text>
-                </View>
+                })}
               </View>
-              {orderedTargets.length ? (
+            ) : null}
+
+            {roleTargets.length ? (
+              <View style={styles.roleSection}>
+                <SectionHeader title="내 역할" />
                 <View style={styles.linkList}>
-                  {orderedTargets.map((target, index) => {
+                  {roleTargets.map((target, index) => {
                     const Icon = studentNavIcon(target);
                     return (
                       <ControlPressable
                         key={target.id}
                         style={[
                           styles.linkRow,
-                          index < orderedTargets.length - 1 && styles.rowDivider,
+                          index < roleTargets.length - 1 && styles.rowDivider,
                         ]}
                         onPress={() => router.push(target.href as Href)}
                         accessibilityLabel={`${target.label} 열기`}
@@ -349,21 +354,42 @@ export default function StudentMoreScreen() {
                             strokeWidth={2}
                           />
                         </View>
-                        <Text style={styles.label} numberOfLines={1}>
-                          {target.label}
-                        </Text>
+                        <Text style={styles.label}>{target.label}</Text>
                         <Text style={styles.chevron}>›</Text>
                       </ControlPressable>
                     );
                   })}
                 </View>
-              ) : (
-                <Text style={styles.mutedText}>
-                  추가 메뉴가 준비되면 여기에 표시돼요.
-                </Text>
-              )}
-            </View>
+              </View>
+            ) : !menuTargets.length ? (
+              <Text style={styles.mutedText}>
+                추가 메뉴가 준비되면 여기에 표시돼요.
+              </Text>
+            ) : null}
           </View>
+        </View>
+
+        <View style={styles.accountSection}>
+          <SectionHeader title="계정" />
+          <ControlPressable
+            style={styles.accountRow}
+            onPress={() => void handleLogout()}
+            disabled={loggingOut}
+            accessibilityLabel={loggingOut ? "로그아웃 중" : "로그아웃"}
+            accessibilityState={{ disabled: loggingOut }}
+          >
+            <LogOut
+              size={iconSizes.md}
+              color={colors.danger}
+              strokeWidth={2}
+              accessible={false}
+            />
+            <View style={styles.accountCopy}>
+              <Text style={styles.accountLabel}>로그아웃</Text>
+              <Text style={styles.accountMeta}>현재 계정에서 안전하게 나가요.</Text>
+            </View>
+            {loggingOut ? <ActivityIndicator color={colors.danger} /> : null}
+          </ControlPressable>
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -374,8 +400,12 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg },
   scroll: { flex: 1 },
   content: {
+    width: "100%",
+    maxWidth: layout.readableMaxWidth,
+    alignSelf: "center",
+    flexGrow: 1,
     padding: spacing.xl,
-    paddingBottom: spacing.xxxl,
+    paddingBottom: spacing.xxxl + spacing.xl,
     gap: spacing.xl,
   },
   contentLandscape: {
@@ -392,11 +422,11 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
     gap: spacing.md,
-    padding: spacing.md,
-    borderWidth: borders.hairline,
+    paddingVertical: spacing.md,
+    borderTopWidth: borders.hairline,
+    borderBottomWidth: borders.hairline,
     borderColor: colors.danger,
-    borderRadius: radii.control,
-    backgroundColor: colors.dangerTintedBg,
+    backgroundColor: colors.transparent,
   },
   errorCopy: { flex: 1, gap: spacing.xxs },
   errorTitle: { ...typography.label, color: colors.danger },
@@ -404,16 +434,6 @@ const styles = StyleSheet.create({
   sections: { gap: spacing.xl },
   sectionsLandscape: { flexDirection: "row", alignItems: "flex-start" },
   sectionColumn: { flex: 1, minWidth: 0 },
-  settingsSection: {
-    gap: spacing.sm,
-    paddingBottom: spacing.lg,
-    borderBottomWidth: borders.hairline,
-    borderBottomColor: colors.border,
-  },
-  linksSection: { gap: spacing.sm },
-  sectionHeader: { flexDirection: "row", alignItems: "center" },
-  sectionHeaderCopy: { flex: 1, gap: spacing.xxs },
-  sectionTitle: { ...typography.subtitle, color: colors.text },
   sectionDescription: { ...typography.micro, color: colors.textMuted },
   loadingRow: {
     minHeight: tapMin,
@@ -449,6 +469,7 @@ const styles = StyleSheet.create({
   },
   orderButtonText: { ...typography.title, color: colors.textMuted },
   linkList: { gap: spacing.none },
+  roleSection: { marginTop: spacing.xxl },
   linkRow: {
     minHeight: tapMin,
     flexDirection: "row",
@@ -464,12 +485,21 @@ const styles = StyleSheet.create({
     borderBottomColor: colors.border,
   },
   chevron: { ...typography.title, color: colors.textMuted },
-  logoutButton: {
-    width: tapMin,
-    height: tapMin,
+  accountSection: {
+    marginTop: "auto",
+  },
+  accountRow: {
+    minHeight: tapMin,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.sm,
+    paddingVertical: spacing.sm,
     borderWidth: borders.none,
     borderColor: colors.transparent,
     borderRadius: radii.none,
     backgroundColor: colors.transparent,
   },
+  accountCopy: { flex: 1, minWidth: 0, gap: spacing.xxs },
+  accountLabel: { ...typography.label, color: colors.danger },
+  accountMeta: { ...typography.micro, color: colors.textMuted },
 });

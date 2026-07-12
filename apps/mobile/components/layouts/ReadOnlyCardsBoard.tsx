@@ -26,20 +26,11 @@ import {
 // 카드 추가를 아직 모바일에서 지원하지 않는 레이아웃의 공통 뷰어.
 // vibe-gallery / dj-queue / event-signup / breakout / assessment / drawing.
 
-function useBoardGridMetrics(width: number) {
+function useBoardGridMetrics(width: number, height: number) {
   const padding = layout.boardGridPadding * 2;
   const gap = layout.boardGridGap;
   const available = Math.max(0, width - padding);
-  const columns =
-    width < layout.mobileBreakpoint
-      ? 2
-      : Math.min(
-          4,
-          Math.max(
-            1,
-            Math.floor((available + gap) / (layout.boardGridMinCardWidth + gap)),
-          ),
-        );
+  const columns = width > height ? 4 : 2;
   const cardWidth = (available - (columns - 1) * gap) / columns;
   return { columns, cardWidth };
 }
@@ -49,8 +40,8 @@ export function ReadOnlyCardsBoard({ data }: { data: BoardDetailResponse }) {
   const [cards, setCards] = useState<BoardCard[]>(() =>
     withBoardAnonymousAuthors(data.cards, data.board),
   );
-  const { width } = useWindowDimensions();
-  const { columns, cardWidth } = useBoardGridMetrics(width);
+  const { width, height } = useWindowDimensions();
+  const { columns, cardWidth } = useBoardGridMetrics(width, height);
   const boardTheme = boardThemes[normalizeBoardTheme(data.board.boardTheme)];
   const selectedIndex = selectedCard
     ? cards.findIndex((card) => card.id === selectedCard.id)

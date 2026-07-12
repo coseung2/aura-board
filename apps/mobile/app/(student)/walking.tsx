@@ -35,10 +35,11 @@ import {
   iconSizes,
   layout,
   spacing,
+  tapMin,
   typography,
   walking,
 } from "../../theme/tokens";
-import { AppButton, AppHeader, SurfaceCard } from "../../components/ui";
+import { AppButton, AppHeader, SectionHeader } from "../../components/ui";
 
 const numberFormatter = new Intl.NumberFormat("ko-KR");
 const distanceFormatter = new Intl.NumberFormat("ko-KR", {
@@ -224,17 +225,18 @@ export default function StudentWalkingScreen() {
           />
         }
       >
-        <SurfaceCard style={styles.connectionCard}>
-          <View style={styles.iconBadge}>
-            <ShieldCheck size={iconSizes.md} color={colors.accent} accessible={false} />
-          </View>
-          <View style={styles.connectionCopy}>
-            <Text style={styles.connectionTitle}>{connectionLabel}</Text>
-            <Text style={styles.muted}>
-              걸음 수와 이동 거리의 날짜별 합계만 저장하며 GPS 경로는 저장하지 않아요.
-            </Text>
-          </View>
-        </SurfaceCard>
+        <View style={styles.connectionSection}>
+          <SectionHeader
+            title="Health Connect"
+            titleAccessory={
+              <ShieldCheck size={iconSizes.md} color={colors.accent} accessible={false} />
+            }
+          />
+          <Text style={styles.connectionStatus}>{connectionLabel}</Text>
+          <Text style={styles.muted}>
+            걸음 수와 이동 거리의 날짜별 합계만 저장하며 GPS 경로는 저장하지 않아요.
+          </Text>
+        </View>
 
         {status === "available" && !connected ? (
           <View style={styles.buttonRow}>
@@ -286,20 +288,20 @@ export default function StudentWalkingScreen() {
         ) : null}
 
         {showInitialLoading ? (
-          <SurfaceCard
-            style={styles.stateCard}
+          <View
+            style={styles.stateSection}
             accessible
             accessibilityRole="progressbar"
             accessibilityLabel="걷기 기록을 불러오는 중"
           >
             <ActivityIndicator color={colors.accent} />
             <Text style={styles.stateTitle}>걷기 기록을 불러오는 중…</Text>
-          </SurfaceCard>
+          </View>
         ) : null}
 
         {error ? (
-          <SurfaceCard
-            style={styles.errorCard}
+          <View
+            style={styles.errorSection}
             accessible
             accessibilityRole="alert"
             accessibilityLiveRegion="polite"
@@ -313,7 +315,7 @@ export default function StudentWalkingScreen() {
             >
               다시 시도
             </AppButton>
-          </SurfaceCard>
+          </View>
         ) : null}
 
         {message ? (
@@ -327,43 +329,45 @@ export default function StudentWalkingScreen() {
         ) : null}
 
         {showEmptyState ? (
-          <SurfaceCard style={styles.stateCard} accessible accessibilityRole="text">
+          <View style={styles.emptySection} accessible accessibilityRole="text">
             <Text style={styles.stateTitle}>아직 걷기 기록이 없어요.</Text>
             <Text style={styles.muted}>
               Android 앱에서 Health Connect를 연결하면 최근 기록이 여기에 표시돼요.
             </Text>
-          </SurfaceCard>
+          </View>
         ) : null}
 
         {!showInitialLoading && hasSyncedData ? (
           <>
-            <View style={styles.summaryGrid} accessibilityRole="summary">
-              <SummaryCard label="오늘" value={`${numberFormatter.format(today.steps)}걸음`} />
-              <SummaryCard label="최근 7일" value={`${numberFormatter.format(totalSteps)}걸음`} />
-              <SummaryCard label="하루 평균" value={`${numberFormatter.format(averageSteps)}걸음`} />
-              <SummaryCard
-                label="이동 거리"
-                value={`${distanceFormatter.format(totalDistance / 1000)}km`}
-              />
+            <View style={styles.summarySection} accessibilityRole="summary">
+              <SectionHeader title="요약" />
+              <View style={styles.summaryRows}>
+                <SummaryRow label="오늘" value={`${numberFormatter.format(today.steps)}걸음`} />
+                <SummaryRow label="최근 7일" value={`${numberFormatter.format(totalSteps)}걸음`} />
+                <SummaryRow label="하루 평균" value={`${numberFormatter.format(averageSteps)}걸음`} />
+                <SummaryRow
+                  label="이동 거리"
+                  value={`${distanceFormatter.format(totalDistance / 1000)}km`}
+                  last
+                />
+              </View>
             </View>
 
-            <SurfaceCard style={styles.chartCard} accessible accessibilityRole="summary">
-              <View style={styles.sectionHeader}>
-                <View>
-                  <Text accessibilityRole="header" style={styles.sectionTitle}>
-                    최근 7일
-                  </Text>
-                  <Text style={styles.muted}>날짜별 걸음 수</Text>
-                </View>
-                {loading ? (
-                  <ActivityIndicator
-                    color={colors.accent}
-                    accessibilityLabel="걷기 기록을 동기화하는 중"
-                  />
-                ) : (
-                  <Footprints color={colors.accent} accessible={false} size={22} />
-                )}
-              </View>
+            <View style={styles.chartSection} accessible accessibilityRole="summary">
+              <SectionHeader
+                title="최근 7일"
+                right={
+                  loading ? (
+                    <ActivityIndicator
+                      color={colors.accent}
+                      accessibilityLabel="걷기 기록을 동기화하는 중"
+                    />
+                  ) : (
+                    <Footprints color={colors.accent} accessible={false} size={iconSizes.md} />
+                  )
+                }
+              />
+              <Text style={styles.muted}>날짜별 걸음 수</Text>
 
               <View style={styles.chartRows}>
                 {days.map((row) => {
@@ -387,11 +391,12 @@ export default function StudentWalkingScreen() {
                   );
                 })}
               </View>
-            </SurfaceCard>
+            </View>
           </>
         ) : null}
 
-        <SurfaceCard style={styles.privacyCard}>
+        <View style={styles.privacySection}>
+          <SectionHeader title="동기화 및 개인정보" />
           <View style={styles.privacyRow}>
             <RefreshCw size={iconSizes.md} color={colors.accent} accessible={false} />
             <Text style={styles.privacyText}>
@@ -404,18 +409,26 @@ export default function StudentWalkingScreen() {
               권한은 Health Connect 설정에서 언제든 철회할 수 있어요.
             </Text>
           </View>
-        </SurfaceCard>
+        </View>
       </ScrollView>
     </SafeAreaView>
   );
 }
 
-function SummaryCard({ label, value }: { label: string; value: string }) {
+function SummaryRow({
+  label,
+  value,
+  last = false,
+}: {
+  label: string;
+  value: string;
+  last?: boolean;
+}) {
   return (
-    <SurfaceCard style={styles.summaryCard}>
+    <View style={[styles.summaryRow, last && styles.summaryRowLast]}>
       <Text style={styles.summaryLabel}>{label}</Text>
       <Text style={styles.summaryValue}>{value}</Text>
-    </SurfaceCard>
+    </View>
   );
 }
 
@@ -430,57 +443,63 @@ const styles = StyleSheet.create({
     paddingBottom: spacing.xxxl + spacing.xxl,
     gap: spacing.md,
   },
-  connectionCard: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: spacing.md,
-    padding: spacing.lg,
-  },
-  iconBadge: {
-    width: walking.iconBadgeSize,
-    height: walking.iconBadgeSize,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: colors.accentTintedBg,
-  },
-  connectionCopy: { flex: 1, gap: spacing.xxs },
-  connectionTitle: { ...typography.section, color: colors.text },
-  muted: { ...typography.label, color: colors.textMuted },
-  buttonRow: { flexDirection: "row", gap: spacing.sm },
-  flexButton: { flex: 1 },
-  error: { ...typography.body, color: colors.danger },
-  notice: { ...typography.body, color: colors.accentTintedText },
-  stateCard: {
-    alignItems: "center",
+  connectionSection: {
     gap: spacing.sm,
-    padding: spacing.lg,
-  },
-  stateTitle: { ...typography.section, color: colors.text, textAlign: "center" },
-  errorCard: {
-    gap: spacing.sm,
-    padding: spacing.lg,
-    backgroundColor: colors.dangerTintedBg,
-  },
-  summaryGrid: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm },
-  summaryCard: {
-    flexGrow: 1,
-    flexBasis: "47%",
-    minWidth: walking.summaryCardMinWidth,
-    gap: spacing.xs,
-    padding: spacing.lg,
-  },
-  summaryLabel: { ...typography.label, color: colors.textMuted },
-  summaryValue: { ...typography.section, color: colors.text },
-  chartCard: { gap: spacing.lg, padding: spacing.lg },
-  sectionHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingBottom: spacing.md,
+    paddingBottom: spacing.lg,
     borderBottomWidth: borders.hairline,
     borderBottomColor: colors.border,
   },
-  sectionTitle: { ...typography.section, color: colors.text },
+  connectionStatus: {
+    ...typography.badge,
+    color: colors.accentTintedText,
+    textAlign: "right",
+  },
+  muted: { ...typography.label, color: colors.textMuted },
+  buttonRow: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm },
+  flexButton: { flex: 1 },
+  error: { ...typography.body, color: colors.danger },
+  notice: { ...typography.body, color: colors.accentTintedText },
+  stateSection: {
+    alignItems: "center",
+    gap: spacing.sm,
+    paddingVertical: spacing.xl,
+    borderBottomWidth: borders.hairline,
+    borderBottomColor: colors.border,
+  },
+  stateTitle: { ...typography.section, color: colors.text, textAlign: "center" },
+  errorSection: {
+    gap: spacing.sm,
+    paddingVertical: spacing.lg,
+    borderBottomWidth: borders.hairline,
+    borderBottomColor: colors.border,
+  },
+  emptySection: {
+    gap: spacing.sm,
+    paddingVertical: spacing.xl,
+    borderBottomWidth: borders.hairline,
+    borderBottomColor: colors.border,
+  },
+  summarySection: { gap: spacing.sm },
+  summaryRows: { borderTopWidth: borders.hairline, borderTopColor: colors.border },
+  summaryRow: {
+    minHeight: tapMin,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: spacing.md,
+    paddingVertical: spacing.sm,
+    borderBottomWidth: borders.hairline,
+    borderBottomColor: colors.border,
+  },
+  summaryRowLast: { borderBottomWidth: borders.none },
+  summaryLabel: { ...typography.label, color: colors.textMuted },
+  summaryValue: { ...typography.section, color: colors.text },
+  chartSection: {
+    gap: spacing.lg,
+    paddingVertical: spacing.lg,
+    borderBottomWidth: borders.hairline,
+    borderBottomColor: colors.border,
+  },
   chartRows: { gap: spacing.md },
   chartRow: { flexDirection: "row", alignItems: "center", gap: spacing.sm },
   dayLabel: {
@@ -501,7 +520,10 @@ const styles = StyleSheet.create({
     width: walking.chartStepLabelWidth,
     textAlign: "right",
   },
-  privacyCard: { gap: spacing.md, padding: spacing.lg },
+  privacySection: {
+    gap: spacing.md,
+    paddingTop: spacing.lg,
+  },
   privacyRow: {
     flexDirection: "row",
     alignItems: "flex-start",

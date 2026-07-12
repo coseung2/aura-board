@@ -244,7 +244,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
     alignItems: "center",
     justifyContent: "center",
-    padding: spacing.md,
+    padding: spacing.sm,
   },
   imageFallbackText: {
     ...typography.label,
@@ -252,7 +252,8 @@ const styles = StyleSheet.create({
     textAlign: "center",
   },
   body: {
-    padding: spacing.sm,
+    paddingVertical: spacing.xs,
+    paddingHorizontal: spacing.sm,
     gap: spacing.xs,
   },
   title: {
@@ -290,7 +291,7 @@ const styles = StyleSheet.create({
   fileBox: {
     flexDirection: "row",
     alignItems: "center",
-    gap: spacing.sm,
+    gap: spacing.xs,
     padding: spacing.sm,
   },
   fileIcon: { ...typography.label },
@@ -302,7 +303,7 @@ const styles = StyleSheet.create({
   authorFooter: {
     flexDirection: "row",
     alignItems: "center",
-    gap: spacing.sm,
+    gap: spacing.xs,
     marginTop: spacing.xs,
     paddingTop: spacing.xs,
     borderTopWidth: borders.hairline,
@@ -322,7 +323,7 @@ const styles = StyleSheet.create({
   },
   engagement: {
     flexDirection: "row",
-    gap: spacing.sm,
+    gap: spacing.xs,
     alignItems: "center",
     marginTop: spacing.xs,
   },

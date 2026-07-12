@@ -12,12 +12,15 @@ type Props = {
   selfStudentId: string | null;
   /** 학부모가 자녀 본인 페이지 진입 시: 자녀 id를 default 선택 */
   defaultStudentId: string | null;
+  /** 학생 포털에서 본인 포트폴리오만 노출하고 학생 선택 UI를 숨김 */
+  selfOnly?: boolean;
 };
 
 export function PortfolioPage({
   initialRoster,
   selfStudentId,
   defaultStudentId,
+  selfOnly = false,
 }: Props) {
   const roster = initialRoster;
   // 모바일에선 좌측 학생 클릭 시 우측 stack push 패턴 — 뷰포트 폭으로 분기
@@ -31,7 +34,11 @@ export function PortfolioPage({
   }, []);
 
   const initialStudentId =
-    defaultStudentId ?? selfStudentId ?? initialRoster.students[0]?.id ?? null;
+    (selfOnly ? selfStudentId : null) ??
+    defaultStudentId ??
+    selfStudentId ??
+    initialRoster.students[0]?.id ??
+    null;
   const [selectedStudentId, setSelectedStudentId] = useState<string | null>(
     initialStudentId
   );
@@ -62,7 +69,7 @@ export function PortfolioPage({
   }
 
   // 데스크톱: 드로어 (fixed-position overlay). 모바일: 인라인 stack.
-  const showMobileRoster = isMobile && !mobileShowDetail;
+  const showMobileRoster = !selfOnly && isMobile && !mobileShowDetail;
 
   return (
     <>
@@ -80,7 +87,7 @@ export function PortfolioPage({
           <h1 className="portfolio-page-title">포트폴리오</h1>
         </div>
         <div className="portfolio-page-header-actions">
-          {!isMobile && (
+          {!selfOnly && !isMobile && (
             <button
               type="button"
               className="portfolio-header-btn"
@@ -97,7 +104,7 @@ export function PortfolioPage({
       </header>
 
       {/* 데스크톱 드로어 백드롭 — 메인 위에 어둡게 깔림. 클릭 시 닫힘. */}
-      {!isMobile && (
+      {!selfOnly && !isMobile && (
         <div
           className={`portfolio-roster-backdrop${rosterOpen ? " is-open" : ""}`}
           onClick={() => setRosterOpen(false)}
@@ -125,6 +132,7 @@ export function PortfolioPage({
           "portfolio-page",
           isMobile ? "is-mobile" : "",
           isMobile && mobileShowDetail ? "is-detail" : "",
+          selfOnly ? "is-self-only" : "",
         ]
           .filter(Boolean)
           .join(" ")}
@@ -139,7 +147,7 @@ export function PortfolioPage({
           />
         )}
         <main className="portfolio-main">
-          {isMobile && mobileShowDetail && (
+          {!selfOnly && isMobile && mobileShowDetail && (
             <button
               type="button"
               className="portfolio-mobile-back"

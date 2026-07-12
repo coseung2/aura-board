@@ -11,7 +11,13 @@ import {
 import { useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { ParentBottomNav } from "../../components/parent-bottom-nav";
-import { AppButton, AppHeader, EmptyState, SurfaceCard } from "../../components/ui";
+import {
+  AppButton,
+  AppHeader,
+  EmptyState,
+  SectionHeader,
+  SurfaceCard,
+} from "../../components/ui";
 import { useParentOverview } from "../../hooks/use-parent-overview";
 import { clearParentSession } from "../../lib/session";
 import type { ParentPendingLink } from "../../lib/types";
@@ -74,9 +80,9 @@ export default function ParentNotificationsScreen() {
             description="자녀 연결 신청 상태가 바뀌면 이곳에서 확인할 수 있어요."
           />
         ) : (
-          <View style={styles.list}>
+            <View style={styles.list}>
             <View style={styles.intro}>
-              <Text selectable style={styles.eyebrow}>승인 대기</Text>
+              <SectionHeader title="승인 대기" />
               <Text selectable style={styles.title}>선생님의 승인을 기다리고 있어요</Text>
               <Text selectable style={styles.muted}>
                 잘못 신청했다면 만료 전에 취소하고 다시 연결할 수 있어요.
@@ -132,7 +138,6 @@ const styles = StyleSheet.create({
   center: { minHeight: parent.portfolioEmptyMinHeight, alignItems: "center", justifyContent: "center", gap: spacing.md },
   list: { width: "100%", maxWidth: parent.portfolioCardMinWidth * 2 - spacing.lg, alignSelf: "center", gap: spacing.md },
   intro: { paddingVertical: spacing.sm, gap: spacing.xs },
-  eyebrow: { ...typography.badge, color: colors.accent },
   title: { ...typography.title, color: colors.text },
   muted: { ...typography.body, color: colors.textMuted },
   card: { padding: spacing.lg, gap: spacing.md },

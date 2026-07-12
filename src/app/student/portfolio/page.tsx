@@ -9,11 +9,8 @@ import type { PortfolioRosterDTO } from "@/lib/portfolio-dto";
 
 export const dynamic = "force-dynamic";
 
-// student-portfolio (2026-04-26): 학생 포트폴리오 — 좌측 학급 학생 리스트 +
-// 우측 선택 학생의 카드 그리드.
-//
-// roster 는 SSR 로 prefetch (좌측 리스트 즉시 렌더). 학생별 상세 카드는
-// 클라이언트에서 fetch.
+// student-portfolio (2026-04-26): 학생 포트폴리오 — 현재 학생 본인의 카드
+// 그리드. 학생별 상세 카드는 클라이언트에서 fetch.
 export default async function StudentPortfolioPage() {
   const student = await getCurrentStudent();
   if (!student) {
@@ -33,14 +30,9 @@ export default async function StudentPortfolioPage() {
     redirect("/login?from=/student/portfolio");
   }
 
-  const students = await db.student.findMany({
-    where: { classroomId },
-    orderBy: [{ number: "asc" }, { name: "asc" }],
-    select: { id: true, name: true, number: true },
-  });
-
-  // 학생별 카드 수를 한 번에 조회한다.
-  // dj-queue 음악 신청은 결과물 아니라 카드 수에서 제외 (API roster 와 동일).
+  // 학생 포털에서는 현재 로그인한 학생의 카드 수만 준비한다. 학급 전체
+  // roster를 SSR props로 전달하지 않아 다른 학생의 포트폴리오 식별자와
+  // 작품 수가 브라우저에 노출되지 않도록 한다.
   const counts = await db.$queryRaw<
     Array<{ studentId: string; cardCount: bigint }>
   >`
@@ -52,7 +44,7 @@ export default async function StudentPortfolioPage() {
       AND c."boardId" IN (SELECT id FROM "Board" WHERE layout != 'dj-queue')
       AND (c."queueStatus" IS NULL OR c."queueStatus" != 'played')
     )
-    WHERE s."classroomId" = ${classroomId}
+    WHERE s."id" = ${student.id}
     GROUP BY s.id
   `;
   const cardCountById = new Map(
@@ -60,12 +52,12 @@ export default async function StudentPortfolioPage() {
   );
   const initialRoster: PortfolioRosterDTO = {
     classroom: { id: classroom.id, name: classroom.name },
-    students: students.map((s) => ({
-      id: s.id,
-      name: s.name,
-      number: s.number,
-      cardCount: cardCountById.get(s.id) ?? 0,
-    })),
+    students: [{
+      id: student.id,
+      name: student.name,
+      number: student.number,
+      cardCount: cardCountById.get(student.id) ?? 0,
+    }],
   };
 
   return (
@@ -83,6 +75,7 @@ export default async function StudentPortfolioPage() {
           initialRoster={initialRoster}
           selfStudentId={student.id}
           defaultStudentId={student.id}
+          selfOnly
         />
       </main>
     </>

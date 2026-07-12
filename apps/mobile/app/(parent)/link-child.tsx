@@ -9,10 +9,12 @@ import {
 import { useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import {
+  borders,
   colors,
   iconSizes,
   parent,
   spacing,
+  tapMin,
   typography,
 } from "../../theme/tokens";
 import { ApiError, parentApiFetch } from "../../lib/api";
@@ -29,6 +31,7 @@ import {
   AppButton,
   AppHeader,
   EmptyState,
+  SectionHeader,
   SurfaceCard,
   SurfacePressable,
   TextField,
@@ -220,7 +223,7 @@ export default function LinkChildScreen() {
       {step === "roster" && (
         <View style={styles.rosterWrap}>
           <View style={styles.rosterHeader}>
-            <Text style={styles.heading}>{classroomName}</Text>
+            <SectionHeader title={classroomName} />
             <Text style={styles.sub}>연결할 자녀를 선택해 주세요.</Text>
           </View>
 
@@ -357,6 +360,7 @@ const styles = StyleSheet.create({
   studentCard: {
     flexDirection: "row",
     alignItems: "center",
+    minHeight: tapMin,
     padding: spacing.xl,
     gap: spacing.lg,
   },
@@ -365,6 +369,8 @@ const styles = StyleSheet.create({
     height: parent.childAvatarSize,
     borderRadius: parent.childAvatarSize,
     backgroundColor: colors.accentTintedBg,
+    borderWidth: borders.hairline,
+    borderColor: colors.border,
     alignItems: "center",
     justifyContent: "center",
   },

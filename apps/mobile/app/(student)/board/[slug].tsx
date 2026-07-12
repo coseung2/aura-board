@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { ActivityIndicator, StyleSheet, Text, View } from "react-native";
-import { useLocalSearchParams, useRouter } from "expo-router";
+import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import {
   boardThemes,
@@ -12,6 +12,14 @@ import {
 } from "../../../theme/tokens";
 import { BoardHeader } from "../../../components/BoardShell";
 import { apiFetch, ApiError } from "../../../lib/api";
+import {
+  BOARD_LIST_CACHE_KEY,
+  STUDENT_HOME_CACHE_KEY,
+  boardDetailCacheKey,
+  invalidateBoardCache,
+  readBoardCache,
+  revalidateBoardCache,
+} from "../../../lib/board-cache";
 import { clearSessionToken } from "../../../lib/session";
 import type { BoardDetailResponse } from "../../../lib/types";
 import { CardsBoard } from "../../../components/layouts/CardsBoard";
@@ -37,39 +45,102 @@ import { AppButton } from "../../../components/ui";
 // board.layout 에 따라 맞는 레이아웃 컴포넌트 렌더.
 
 export default function BoardDetail() {
-  const { slug } = useLocalSearchParams<{ slug: string }>();
+  const { slug: rawSlug } = useLocalSearchParams<{
+    slug?: string | string[];
+  }>();
+  const slug = Array.isArray(rawSlug) ? rawSlug[0] ?? "" : rawSlug ?? "";
   const router = useRouter();
-  const [data, setData] = useState<BoardDetailResponse | null>(null);
-  const [loading, setLoading] = useState(true);
+  const cacheKey = boardDetailCacheKey(slug);
+  const initialCache = readBoardCache<BoardDetailResponse>(cacheKey, {
+    kind: "detail",
+  });
+  const [data, setData] = useState<BoardDetailResponse | null>(
+    () => initialCache?.data ?? null,
+  );
+  const [loading, setLoading] = useState(() => !initialCache);
   const [error, setError] = useState<string | null>(null);
-
-  const load = useCallback(async (showLoading = false) => {
-    try {
-      if (showLoading) setLoading(true);
-      const res = await apiFetch<BoardDetailResponse>(
-        `/api/student/board/${encodeURIComponent(slug!)}`,
-      );
-      setData(res);
-      setError(null);
-    } catch (e) {
-      if (e instanceof ApiError && e.status === 401) {
-        await clearSessionToken();
-        router.replace("/(student)/login");
-        return;
-      }
-      if (e instanceof ApiError && e.status === 404) {
-        setError("이 보드에 접근할 수 없어요.");
-      } else if (showLoading) {
-        setError(e instanceof Error ? e.message : "불러올 수 없어요");
-      }
-    } finally {
-      if (showLoading) setLoading(false);
-    }
-  }, [slug, router]);
+  const sequenceRef = useRef(0);
+  const previousCacheKeyRef = useRef(cacheKey);
 
   useEffect(() => {
-    void load(true);
-  }, [load]);
+    if (previousCacheKeyRef.current === cacheKey) return;
+    previousCacheKeyRef.current = cacheKey;
+    sequenceRef.current += 1;
+    const cached = readBoardCache<BoardDetailResponse>(cacheKey, {
+      kind: "detail",
+    });
+    setData(cached?.data ?? null);
+    setLoading(!cached);
+    setError(null);
+  }, [cacheKey]);
+
+  const load = useCallback(
+    async (force = false) => {
+      const sequence = ++sequenceRef.current;
+      const cached = readBoardCache<BoardDetailResponse>(cacheKey, {
+        kind: "detail",
+      });
+      if (cached) {
+        setData(cached.data);
+        setLoading(false);
+      } else {
+        setLoading(true);
+      }
+
+      if (!slug) {
+        setLoading(false);
+        return;
+      }
+
+      try {
+        setError(null);
+        const nextData = await revalidateBoardCache<BoardDetailResponse>(
+          cacheKey,
+          () =>
+            apiFetch<BoardDetailResponse>(
+              `/api/student/board/${encodeURIComponent(slug)}`,
+            ),
+          { force, kind: "detail" },
+        );
+        if (sequence !== sequenceRef.current) return;
+        setData(nextData);
+        setError(null);
+        // A detail mutation/realtime refresh can change the card count and
+        // status shown in the hub list. Mark that summary stale; the next hub
+        // focus will perform one deduped revalidation.
+        if (force) {
+          invalidateBoardCache(BOARD_LIST_CACHE_KEY);
+          invalidateBoardCache(STUDENT_HOME_CACHE_KEY);
+        }
+      } catch (e) {
+        if (e instanceof ApiError && e.status === 401) {
+          await clearSessionToken();
+          router.replace("/(student)/login");
+          return;
+        }
+        if (sequence !== sequenceRef.current) return;
+        if (e instanceof ApiError && e.status === 404) {
+          setError("이 보드에 접근할 수 없어요.");
+        } else if (!cached) {
+          setError(e instanceof Error ? e.message : "불러올 수 없어요");
+        }
+      } finally {
+        if (sequence === sequenceRef.current) setLoading(false);
+      }
+    },
+    [cacheKey, router, slug],
+  );
+
+  useFocusEffect(
+    useCallback(() => {
+      void load(false);
+      return () => {
+        // Invalidate a response that belongs to a previous slug/focus. The
+        // cache itself remains useful for the next visit.
+        sequenceRef.current += 1;
+      };
+    }, [load]),
+  );
 
   if (loading) {
     return (
@@ -82,7 +153,7 @@ export default function BoardDetail() {
     );
   }
 
-  if (error || !data) {
+  if (!data) {
     return (
       <SafeAreaView style={styles.container} edges={["top"]}>
         <View style={styles.center}>
@@ -102,7 +173,7 @@ export default function BoardDetail() {
       edges={["top"]}
     >
       <BoardHeader title={board.title} layout={board.layout} />
-      <View style={styles.body}>{renderLayout(data, () => load(false))}</View>
+      <View style={styles.body}>{renderLayout(data, () => load(true))}</View>
     </SafeAreaView>
   );
 }

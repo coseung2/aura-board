@@ -415,6 +415,7 @@ export const dashboard = {
   showcaseCardWidth: 310,
   showcaseCardMinHeight: 282,
   showcasePreviewHeight: 150,
+  compactCardSize: 240,
   showcaseSkeletonHeight: 282,
   badgeSize: 24,
   playSize: 48,
@@ -427,7 +428,7 @@ export const dashboard = {
 } as const;
 
 export const navigation = {
-  headerHeight: 72,
+  headerHeight: 68,
 } as const;
 
 export const studentNav = {

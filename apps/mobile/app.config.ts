@@ -5,7 +5,7 @@ const config: ExpoConfig = {
   name: "Aura-board",
   slug: "aura-board-mobile",
   scheme: "auraboard",
-  version: "0.2.2",
+  version: "0.2.3",
   orientation: "default",
   icon: "./assets/icon.png",
   userInterfaceStyle: "light",
@@ -20,15 +20,10 @@ const config: ExpoConfig = {
     requireFullScreen: false,
   },
   android: {
-    adaptiveIcon: {
-      foregroundImage: "./assets/adaptive-icon.png",
-      backgroundImage: "./assets/adaptive-icon-background.png",
-      backgroundColor: "#8e8cff",
-    },
     edgeToEdgeEnabled: true,
     predictiveBackGestureEnabled: false,
     package: "com.auraboard.app",
-    versionCode: 3,
+    versionCode: 4,
   },
   web: {
     favicon: "./assets/favicon.png",

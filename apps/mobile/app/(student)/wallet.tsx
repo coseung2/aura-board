@@ -15,13 +15,18 @@ import {
   colors,
   radii,
   spacing,
+  tapMin,
   typography,
   wallet as walletTokens,
 } from "../../theme/tokens";
 import { apiFetch, ApiError } from "../../lib/api";
 import { clearSessionToken } from "../../lib/session";
 import type { WalletSummary } from "../../lib/types";
-import { AppButton, AppHeader, EmptyState, SurfaceCard } from "../../components/ui";
+import {
+  AppButton,
+  AppHeader,
+  SectionHeader,
+} from "../../components/ui";
 export default function StudentWalletScreen() {
   const router = useRouter();
   const [wallet, setWallet] = useState<WalletSummary | null>(null);
@@ -112,22 +117,19 @@ export default function StudentWalletScreen() {
         </View>
       ) : (
         <ScrollView contentContainerStyle={styles.content}>
-          <SurfaceCard style={styles.summaryCard}>
-            <View>
-              <Text style={styles.eyebrow}>현재 잔고</Text>
+          <View style={styles.balanceSection}>
+            <SectionHeader title="현재 잔고" />
+            <View style={styles.balanceRow}>
               <Text style={styles.balance}>
-                {wallet.balance.toLocaleString()} {wallet.currency.unitLabel}
+                {wallet.balance.toLocaleString()}
               </Text>
+              <Text style={styles.balanceUnit}>{wallet.currency.unitLabel}</Text>
             </View>
-          </SurfaceCard>
+          </View>
 
-          <SurfaceCard style={styles.qrCard}>
-            <View style={styles.qrHeader}>
-              <View>
-                <Text style={styles.eyebrow}>매점 결제</Text>
-                <Text style={styles.qrTitle}>학생 QR 지갑</Text>
-              </View>
-            </View>
+          <View style={styles.qrSection}>
+            <SectionHeader title="매점 결제" />
+            <Text style={styles.qrTitle}>학생 QR 지갑</Text>
             <View style={styles.qrFrame}>
               {qr?.token ? (
                 <QRCode
@@ -144,21 +146,29 @@ export default function StudentWalletScreen() {
                 고정 QR
               </Text>
             ) : null}
-          </SurfaceCard>
+          </View>
 
-          <Text style={styles.sectionTitle}>진행 중인 적금</Text>
+          <SectionHeader title="진행 중인 적금" />
           {wallet.activeFDs.length === 0 ? (
-            <EmptyState title="아직 진행 중인 적금이 없어요." />
+            <Text style={styles.emptyRow}>아직 진행 중인 적금이 없어요.</Text>
           ) : (
-            <View style={styles.stack}>
-              {wallet.activeFDs.map((fd) => (
-                <SurfaceCard key={fd.id} style={styles.listCard}>
-                  <Text style={styles.listTitle}>
-                    {fd.principal.toLocaleString()} {wallet.currency.unitLabel}
-                  </Text>
-                  <Text style={styles.muted}>
-                    월 {fd.monthlyRate}% · 만기 {formatShortDate(fd.maturityDate)}
-                  </Text>
+            <View style={styles.fdList}>
+              {wallet.activeFDs.map((fd, index) => (
+                <View
+                  key={fd.id}
+                  style={[
+                    styles.fdRow,
+                    index === wallet.activeFDs.length - 1 && styles.fdRowLast,
+                  ]}
+                >
+                  <View style={styles.fdCopy}>
+                    <Text style={styles.listTitle}>
+                      {fd.principal.toLocaleString()} {wallet.currency.unitLabel}
+                    </Text>
+                    <Text style={styles.muted}>
+                      월 {fd.monthlyRate}% · 만기 {formatShortDate(fd.maturityDate)}
+                    </Text>
+                  </View>
                   <AppButton
                     variant="secondary"
                     style={styles.fdCancelBtn}
@@ -175,16 +185,22 @@ export default function StudentWalletScreen() {
                   >
                     해지
                   </AppButton>
-                </SurfaceCard>
+                </View>
               ))}
             </View>
           )}
 
-          <Text style={styles.sectionTitle}>최근 거래</Text>
+          <SectionHeader title="최근 거래" />
           {wallet.recentTransactions?.length ? (
-            <View style={styles.stack}>
-              {wallet.recentTransactions.map((tx) => (
-                <SurfaceCard key={tx.id} style={styles.txRow}>
+            <View style={styles.txList}>
+              {wallet.recentTransactions.map((tx, index) => (
+                <View
+                  key={tx.id}
+                  style={[
+                    styles.txRow,
+                    index === wallet.recentTransactions!.length - 1 && styles.txRowLast,
+                  ]}
+                >
                   <View style={styles.txInfo}>
                     <Text style={styles.listTitle}>{tx.note ?? tx.type}</Text>
                     <Text style={styles.muted}>{formatShortDate(tx.createdAt)}</Text>
@@ -198,11 +214,11 @@ export default function StudentWalletScreen() {
                     {tx.amount > 0 ? "+" : ""}
                     {tx.amount.toLocaleString()}
                   </Text>
-                </SurfaceCard>
+                </View>
               ))}
             </View>
           ) : (
-            <EmptyState title="최근 거래가 없어요." />
+            <Text style={styles.emptyRow}>최근 거래가 없어요.</Text>
           )}
         </ScrollView>
       )}
@@ -225,27 +241,37 @@ const styles = StyleSheet.create({
     gap: spacing.md,
     padding: spacing.xxl,
   },
-  content: { padding: spacing.xxl, gap: spacing.lg },
-  summaryCard: {
-    minHeight: walletTokens.summaryMinHeight,
-    padding: spacing.xl,
+  content: {
+    paddingHorizontal: spacing.xl,
+    paddingTop: spacing.lg,
+    paddingBottom: spacing.xxl,
+    gap: spacing.lg,
   },
-  eyebrow: { ...typography.badge, color: colors.accent, marginBottom: spacing.sm },
-  balance: { ...typography.display, color: colors.text },
-  qrCard: {
-    padding: spacing.xl,
-    gap: spacing.md,
+  balanceSection: {
+    gap: spacing.none,
   },
-  qrHeader: {
+  balanceRow: {
+    minHeight: tapMin,
     flexDirection: "row",
-    alignItems: "flex-start",
-    justifyContent: "space-between",
+    alignItems: "baseline",
+    flexWrap: "wrap",
+    columnGap: spacing.xs,
+    rowGap: spacing.xxs,
+    paddingVertical: spacing.lg,
+    borderBottomWidth: borders.hairline,
+    borderBottomColor: colors.border,
+  },
+  balance: { ...typography.display, color: colors.text },
+  balanceUnit: { ...typography.label, color: colors.textMuted },
+  qrSection: {
     gap: spacing.md,
+    paddingBottom: spacing.xs,
   },
   qrTitle: { ...typography.title, color: colors.text },
   qrFrame: {
     alignSelf: "center",
-    width: walletTokens.qrFrameSize,
+    width: "100%",
+    maxWidth: walletTokens.qrFrameSize,
     minHeight: walletTokens.qrFrameSize,
     alignItems: "center",
     justifyContent: "center",
@@ -261,21 +287,53 @@ const styles = StyleSheet.create({
     textAlign: "center",
     fontVariant: ["tabular-nums"],
   },
-  sectionTitle: { ...typography.section, color: colors.text, marginTop: spacing.md },
-  stack: { gap: spacing.sm },
-  listCard: {
-    padding: spacing.lg,
+  emptyRow: {
+    ...typography.body,
+    color: colors.textMuted,
+    paddingVertical: spacing.lg,
+    borderBottomWidth: borders.hairline,
+    borderBottomColor: colors.border,
+  },
+  fdList: {
+    borderBottomWidth: borders.hairline,
+    borderBottomColor: colors.border,
+  },
+  fdRow: {
+    minHeight: tapMin,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.md,
+    paddingVertical: spacing.md,
+    borderBottomWidth: borders.hairline,
+    borderBottomColor: colors.border,
+  },
+  fdRowLast: {
+    borderBottomWidth: borders.none,
+  },
+  fdCopy: {
+    flex: 1,
+    minWidth: 0,
   },
   fdCancelBtn: {
-    alignSelf: "flex-start",
-    marginTop: spacing.sm,
+    alignSelf: "center",
   },
   listTitle: { ...typography.label, color: colors.text },
+  txList: {
+    borderBottomWidth: borders.hairline,
+    borderBottomColor: colors.border,
+  },
   txRow: {
+    minHeight: tapMin,
     padding: spacing.lg,
     flexDirection: "row",
     alignItems: "center",
     gap: spacing.md,
+    paddingHorizontal: spacing.none,
+    borderBottomWidth: borders.hairline,
+    borderBottomColor: colors.border,
+  },
+  txRowLast: {
+    borderBottomWidth: borders.none,
   },
   txInfo: { flex: 1 },
   txAmount: { ...typography.section },

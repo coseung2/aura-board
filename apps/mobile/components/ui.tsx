@@ -507,6 +507,38 @@ export function AppHeader({
   );
 }
 
+type SectionHeaderProps = {
+  title: string;
+  titleAccessory?: ReactNode;
+  right?: ReactNode;
+  style?: StyleProp<ViewStyle>;
+};
+
+export function SectionHeader({
+  title,
+  titleAccessory,
+  right,
+  style,
+}: SectionHeaderProps) {
+  return (
+    <View style={[styles.sectionHeader, style]}>
+      <View style={styles.sectionHeaderCopy}>
+        <View style={styles.sectionHeaderTitleRow}>
+          <Text
+            accessibilityRole="header"
+            style={styles.sectionHeaderTitle}
+            numberOfLines={1}
+          >
+            {title}
+          </Text>
+          {titleAccessory}
+        </View>
+      </View>
+      {right ? <View style={styles.sectionHeaderRight}>{right}</View> : null}
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
   surfaceCard: {
     backgroundColor: colors.surface,
@@ -717,6 +749,37 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: spacing.sm,
+  },
+  sectionHeader: {
+    minHeight: tapMin + spacing.xs,
+    flexDirection: "row",
+    alignItems: "flex-end",
+    gap: spacing.md,
+    borderBottomWidth: borders.hairline,
+    borderBottomColor: colors.border,
+  },
+  sectionHeaderCopy: {
+    flex: 1,
+    minWidth: 0,
+    minHeight: tapMin + spacing.xs,
+    paddingBottom: spacing.xs,
+    justifyContent: "flex-end",
+  },
+  sectionHeaderTitleRow: {
+    minWidth: 0,
+    flexDirection: "row",
+    alignItems: "flex-end",
+    gap: spacing.sm,
+    flexWrap: "nowrap",
+  },
+  sectionHeaderTitle: {
+    ...typography.subtitle,
+    color: colors.text,
+    flexShrink: 1,
+  },
+  sectionHeaderRight: {
+    flexShrink: 0,
+    alignSelf: "flex-end",
   },
 });
 

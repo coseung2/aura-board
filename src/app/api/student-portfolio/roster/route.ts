@@ -12,7 +12,7 @@ export const runtime = "nodejs";
 // 리스트 + 학부모 다자녀 셀렉터에서 사용.
 //
 // 권한:
-//   - student: 자기 학급만
+//   - student: 자기 학생만
 //   - parent: 자녀가 속한 학급
 //   - teacher_owner: 자기 학급
 export async function GET(req: Request) {
@@ -49,7 +49,10 @@ export async function GET(req: Request) {
   // cardCount = 학생이 작성한 카드(studentAuthorId) + 공동작성한 카드(authors)
   // 의 합집합. 단순 _count 는 두 관계 합 계산이 어려우니 raw 쿼리로 1회.
   const students = await db.student.findMany({
-    where: { classroomId },
+    where:
+      viewer.kind === "student"
+        ? { id: viewer.id, classroomId }
+        : { classroomId },
     orderBy: [{ number: "asc" }, { name: "asc" }],
     select: { id: true, name: true, number: true },
   });

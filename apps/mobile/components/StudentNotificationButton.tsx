@@ -12,6 +12,7 @@ import {
   radii,
   spacing,
   studentNav,
+  tapMin,
   typography,
 } from "../theme/tokens";
 import { ControlPressable } from "./ui";
@@ -70,8 +71,8 @@ export function StudentNotificationButton() {
 
 const styles = StyleSheet.create({
   button: {
-    minWidth: studentNav.notificationButtonSize,
-    minHeight: studentNav.notificationButtonSize,
+    minWidth: tapMin,
+    minHeight: tapMin,
     alignItems: "center",
     justifyContent: "center",
     borderWidth: borders.none,

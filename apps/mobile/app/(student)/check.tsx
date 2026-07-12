@@ -29,8 +29,10 @@ import type {
 import {
   AppButton,
   AppHeader,
+  ControlPressable,
   EmptyState,
   Pill,
+  SectionHeader,
   SurfaceCard,
   SurfacePressable,
 } from "../../components/ui";
@@ -239,14 +241,14 @@ export default function StudentCheckScreen() {
           }
           contentContainerStyle={styles.content}
         >
-          <View style={styles.titleRow}>
-            <View>
-              <Text style={styles.screenTitle}>진행 중인 체크</Text>
-              <Text style={styles.screenSub}>
-                제출물을 확인하고 학생별 상태를 저장해 주세요.
-              </Text>
-            </View>
-            <Pill tone="accent">{tasks.length}개</Pill>
+          <View style={styles.intro}>
+            <SectionHeader
+              title="진행 중인 체크"
+              right={<Pill tone="accent">{tasks.length}개</Pill>}
+            />
+            <Text style={styles.screenSub}>
+              제출물을 확인하고 학생별 상태를 저장해 주세요.
+            </Text>
           </View>
 
           {tasks.length === 0 ? (
@@ -416,7 +418,7 @@ function RosterPanel({
             {roster.map((entry) => {
               const submitted = !!draft[entry.student.id];
               return (
-                <SurfacePressable
+                <ControlPressable
                   key={entry.student.id}
                   style={[
                     styles.rosterRow,
@@ -455,7 +457,7 @@ function RosterPanel({
                   >
                     {submitted ? "제출" : "미제출"}
                   </Text>
-                </SurfacePressable>
+                </ControlPressable>
               );
             })}
           </View>
@@ -508,23 +510,18 @@ const styles = StyleSheet.create({
     padding: spacing.xxl,
   },
   content: {
-    padding: spacing.xxl,
+    paddingHorizontal: spacing.xl,
+    paddingTop: spacing.lg,
+    paddingBottom: spacing.xxl,
     gap: spacing.lg,
-  },
-  titleRow: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-    justifyContent: "space-between",
-    gap: spacing.md,
-  },
-  screenTitle: {
-    ...typography.title,
-    color: colors.text,
   },
   screenSub: {
     ...typography.body,
     color: colors.textMuted,
-    marginTop: spacing.xs,
+    flexShrink: 1,
+  },
+  intro: {
+    gap: spacing.xs,
   },
   muted: {
     ...typography.body,
@@ -585,6 +582,9 @@ const styles = StyleSheet.create({
   },
   rosterHeader: {
     gap: spacing.md,
+    paddingBottom: spacing.md,
+    borderBottomWidth: borders.hairline,
+    borderBottomColor: colors.border,
   },
   rosterTitleBlock: {
     gap: spacing.xs,

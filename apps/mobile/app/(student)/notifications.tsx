@@ -16,13 +16,21 @@ import type {
   StudentNotificationPayload,
 } from "../../lib/types";
 import { studentNotificationTarget } from "../../lib/student-notifications";
-import { colors, spacing, states, studentNav, typography } from "../../theme/tokens";
+import {
+  borders,
+  colors,
+  layout,
+  radii,
+  spacing,
+  studentNav,
+  tapMin,
+  typography,
+} from "../../theme/tokens";
 import {
   AppButton,
   AppHeader,
-  EmptyState,
-  Pill,
-  SurfacePressable,
+  ControlPressable,
+  SectionHeader,
 } from "../../components/ui";
 
 export default function StudentNotificationsScreen() {
@@ -102,55 +110,128 @@ export default function StudentNotificationsScreen() {
           contentContainerStyle={styles.content}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => void load(true)} />}
         >
-          <View style={styles.headerRow}>
-            <View>
-              <Text style={styles.title}>좋아요와 댓글</Text>
-              <Text style={styles.subtitle}>내 게시물에 새로 생긴 반응이에요.</Text>
-            </View>
-            {payload?.count ? (
-              <AppButton variant="quiet" loading={markingAll} onPress={() => void markAllRead()}>
-                전체 읽음
-              </AppButton>
-            ) : null}
-          </View>
+          <SectionHeader
+            title="좋아요와 댓글"
+            right={
+              payload?.count ? (
+                <AppButton
+                  variant="quiet"
+                  loading={markingAll}
+                  onPress={() => void markAllRead()}
+                >
+                  전체 읽음
+                </AppButton>
+              ) : undefined
+            }
+          />
+          <Text style={styles.subtitle}>내 게시물에 새로 생긴 반응이에요.</Text>
           {!payload?.items.length ? (
-            <EmptyState title="새 알림이 없어요." />
-          ) : payload.items.map((item) => (
-            <SurfacePressable
-              key={item.id}
-              style={[styles.item, item.read && styles.itemRead]}
-              onPress={() => void markRead(item)}
-            >
-              <View style={styles.itemTop}>
-                <Pill tone={item.kind === "like" ? "accent" : "neutral"}>
-                  {item.kind === "like" ? "좋아요" : "댓글"}
-                </Pill>
-                {!item.read ? <View style={styles.unreadDot} /> : null}
-              </View>
-              <Text style={styles.itemTitle}>
-                {item.actorLabel}님이 {item.kind === "like" ? "좋아요를 눌렀어요." : "댓글을 남겼어요."}
+            <View style={styles.emptyState}>
+              <Text style={styles.emptyTitle}>새 알림이 없어요.</Text>
+              <Text style={styles.emptyDescription}>
+                내 게시물에 반응이 생기면 이곳에서 확인할 수 있어요.
               </Text>
-              {item.content ? <Text style={styles.contentText}>{item.content}</Text> : null}
-              <Text style={styles.meta}>{item.cardTitle || "제목 없는 카드"} · {item.boardTitle}</Text>
-            </SurfacePressable>
-          ))}
+            </View>
+          ) : (
+            <View style={styles.itemList}>
+              {payload.items.map((item, index) => (
+                <ControlPressable
+                  key={item.id}
+                  style={[
+                    styles.item,
+                    item.read && styles.itemRead,
+                    index < payload.items.length - 1 && styles.itemDivider,
+                  ]}
+                  onPress={() => void markRead(item)}
+                  accessibilityLabel={`${item.actorLabel} ${item.kind === "like" ? "좋아요" : "댓글"} 알림 열기`}
+                >
+                  <View style={styles.itemTop}>
+                    <Text
+                      style={[
+                        styles.kind,
+                        item.kind === "like" ? styles.kindLike : styles.kindComment,
+                      ]}
+                    >
+                      {item.kind === "like" ? "좋아요" : "댓글"}
+                    </Text>
+                    <View style={styles.itemTimeRow}>
+                      <Text style={styles.time}>{formatRelativeTime(item.createdAt)}</Text>
+                      {!item.read ? <View style={styles.unreadDot} /> : null}
+                    </View>
+                  </View>
+                  <Text style={[styles.itemTitle, !item.read && styles.itemTitleUnread]}>
+                    {item.actorLabel}님이 {item.kind === "like" ? "좋아요를 눌렀어요." : "댓글을 남겼어요."}
+                  </Text>
+                  {item.content ? <Text style={styles.contentText}>{item.content}</Text> : null}
+                  <Text style={styles.meta}>
+                    {item.cardTitle || "제목 없는 카드"} · {item.boardTitle}
+                  </Text>
+                </ControlPressable>
+              ))}
+            </View>
+          )}
         </ScrollView>
       )}
     </SafeAreaView>
   );
 }
 
+function formatRelativeTime(value: string): string {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  const minutes = Math.max(0, Math.floor((Date.now() - date.getTime()) / 60_000));
+  if (minutes < 1) return "방금";
+  if (minutes < 60) return `${minutes}분 전`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}시간 전`;
+  const days = Math.floor(hours / 24);
+  if (days < 7) return `${days}일 전`;
+  return `${date.getMonth() + 1}월 ${date.getDate()}일`;
+}
+
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg },
   center: { flex: 1, alignItems: "center", justifyContent: "center", gap: spacing.md, padding: spacing.xl },
-  content: { padding: spacing.xl, gap: spacing.md },
-  headerRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: spacing.md },
-  title: { ...typography.title, color: colors.text },
+  content: {
+    width: "100%",
+    maxWidth: layout.readableMaxWidth,
+    alignSelf: "center",
+    padding: spacing.xl,
+    paddingBottom: spacing.xxxl + spacing.xl,
+    gap: spacing.md,
+  },
   subtitle: { ...typography.body, color: colors.textMuted },
   error: { ...typography.body, color: colors.danger },
-  item: { gap: spacing.sm, padding: spacing.lg },
-  itemRead: { opacity: states.pressedOpacity },
-  itemTop: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+  itemList: { gap: spacing.none },
+  item: {
+    minHeight: tapMin,
+    gap: spacing.xs,
+    paddingVertical: spacing.lg,
+    paddingHorizontal: spacing.xs,
+    borderWidth: borders.none,
+    borderRadius: radii.none,
+    backgroundColor: colors.transparent,
+  },
+  itemRead: { backgroundColor: colors.transparent },
+  itemDivider: {
+    borderBottomWidth: borders.hairline,
+    borderBottomColor: colors.border,
+  },
+  itemTop: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: spacing.md,
+  },
+  kind: { ...typography.badge },
+  kindLike: { color: colors.accent },
+  kindComment: { color: colors.textMuted },
+  itemTimeRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.sm,
+  },
+  time: { ...typography.micro, color: colors.textMuted },
   unreadDot: {
     width: studentNav.notificationUnreadDotSize,
     height: studentNav.notificationUnreadDotSize,
@@ -158,6 +239,15 @@ const styles = StyleSheet.create({
     backgroundColor: colors.accent,
   },
   itemTitle: { ...typography.section, color: colors.text },
+  itemTitleUnread: { color: colors.accentTintedText },
   contentText: { ...typography.body, color: colors.text },
   meta: { ...typography.micro, color: colors.textMuted },
+  emptyState: {
+    alignItems: "flex-start",
+    gap: spacing.xs,
+    paddingVertical: spacing.xxxl,
+    paddingHorizontal: spacing.xs,
+  },
+  emptyTitle: { ...typography.subtitle, color: colors.text },
+  emptyDescription: { ...typography.body, color: colors.textMuted },
 });

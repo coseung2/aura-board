@@ -32,6 +32,7 @@ import {
   AppHeader,
   ControlPressable,
   EmptyState,
+  SectionHeader,
   SurfaceCard,
 } from "../../components/ui";
 import {
@@ -41,6 +42,7 @@ import {
   parent,
   radii,
   spacing,
+  tapMin,
   typography,
 } from "../../theme/tokens";
 
@@ -243,9 +245,7 @@ export default function ParentHome() {
 
             {selectedChild ? (
               <View style={styles.profileSummary}>
-                <Text selectable style={styles.profileTitle}>
-                  {childName}의 새 소식
-                </Text>
+                <SectionHeader title={`${childName}의 새 소식`} />
                 <Text selectable style={styles.profileSubtitle}>
                   {feed.child?.classroomName ??
                     selectedChild.classroom?.name ??
@@ -344,10 +344,13 @@ const styles = StyleSheet.create({
   childStrip: { gap: spacing.sm, paddingRight: spacing.lg },
   childChip: {
     minWidth: parent.navMinWidth,
+    minHeight: tapMin,
     paddingHorizontal: spacing.sm,
     paddingVertical: spacing.sm,
     alignItems: "center",
     gap: spacing.xs,
+    borderWidth: borders.hairline,
+    borderRadius: radii.pill,
     borderColor: colors.transparent,
     backgroundColor: colors.transparent,
   },
@@ -381,7 +384,6 @@ const styles = StyleSheet.create({
   pendingTitle: { ...typography.label, color: colors.statusSubmittedText },
   pendingText: { ...typography.body, color: colors.textMuted },
   profileSummary: { gap: spacing.xs },
-  profileTitle: { ...typography.title, color: colors.text },
   profileSubtitle: { ...typography.body, color: colors.textMuted },
   feedSeparator: {
     height: borders.hairline,

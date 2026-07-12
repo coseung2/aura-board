@@ -14,12 +14,17 @@ import {
   colors,
   dj,
   iconSizes,
+  media,
   radii,
   spacing,
   typography,
 } from "../../theme/tokens";
 import { apiFetch, ApiError } from "../../lib/api";
-import { useBoardRealtime } from "../../lib/use-board-realtime";
+import {
+  BOARD_REALTIME_FALLBACK_POLL_INTERVAL_MS,
+  shouldUseBoardFallbackPolling,
+  useBoardRealtime,
+} from "../../lib/use-board-realtime";
 import { buildMediaItems } from "../../lib/media";
 import type { BoardDetailResponse, BoardCard } from "../../lib/types";
 import { withBoardAnonymousAuthor, withBoardAnonymousAuthors } from "../../lib/card-privacy";
@@ -60,10 +65,14 @@ export function DJQueueBoard({
   const canControl = data.capabilities?.canControlQueue === true;
   // 실시간: queue_changed/card_changed broadcast 가 오면 부모 refetch.
   // 서버 channel key 가 board.id 기준이므로 id 로 구독해야 한다.
-  useBoardRealtime({ slug: data.board.id, onReload: onMutate });
+  const { status: realtimeStatus } = useBoardRealtime({
+    slug: data.board.id,
+    onReload: onMutate,
+  });
 
-  // 2초 폴링으로 교사의 승인/재생 완료 반영.
+  // Realtime이 불가능할 때만 15초 스냅샷으로 교사의 승인/재생 완료를 보정한다.
   useEffect(() => {
+    if (!shouldUseBoardFallbackPolling(realtimeStatus)) return;
     const handle = setInterval(async () => {
       try {
         const res = await apiFetch<BoardDetailResponse>(
@@ -94,9 +103,9 @@ export function DJQueueBoard({
       } catch {
         // swallow — next tick.
       }
-    }, dj.pollIntervalMs);
+    }, BOARD_REALTIME_FALLBACK_POLL_INTERVAL_MS);
     return () => clearInterval(handle);
-  }, [data.board.slug]);
+  }, [data.board.slug, realtimeStatus]);
 
   const activeQueue = useMemo(
     () =>
@@ -803,8 +812,9 @@ const styles = StyleSheet.create({
   queueItem: {
     flexDirection: "row",
     alignItems: "center",
-    gap: spacing.md,
-    padding: spacing.md,
+    gap: spacing.sm,
+    paddingVertical: spacing.xs,
+    paddingHorizontal: spacing.sm,
     borderRadius: radii.btn,
     backgroundColor: colors.transparent,
   },
@@ -818,7 +828,7 @@ const styles = StyleSheet.create({
   },
   queueThumb: {
     width: dj.queueThumbWidth,
-    height: dj.queueThumbHeight,
+    aspectRatio: media.previewAspectRatio,
     borderRadius: radii.btn,
     backgroundColor: colors.mediaLilac,
   },
@@ -829,7 +839,7 @@ const styles = StyleSheet.create({
   queueSubRow: { flexDirection: "row", alignItems: "center", flexWrap: "wrap", gap: spacing.xs, marginTop: spacing.xs },
   queueSub: { ...typography.micro, color: colors.textMuted },
   pendingPill: {
-    marginLeft: spacing.sm,
+    marginLeft: spacing.xs,
   },
   pendingText: { ...typography.badge, color: colors.warningTintedText },
   queueCtrls: { flexDirection: "row", gap: spacing.xs },
@@ -922,14 +932,14 @@ const styles = StyleSheet.create({
   drawerItem: {
     flexDirection: "row",
     alignItems: "center",
-    gap: spacing.md,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
+    gap: spacing.sm,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs,
     borderRadius: radii.btn,
   },
   drawerThumb: {
     width: dj.drawerThumbWidth,
-    height: dj.drawerThumbHeight,
+    aspectRatio: media.previewAspectRatio,
     borderRadius: radii.btn,
     backgroundColor: colors.mediaNeutral,
   },

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import {
   FlatList,
   ScrollView,
+  SectionList,
   StyleSheet,
   Text,
   useWindowDimensions,
@@ -20,9 +21,21 @@ import {
   typography,
 } from "../../theme/tokens";
 import { CardView } from "../CardView";
+import { CompactCardRow } from "../CompactCardRow";
 import { CardComposer } from "../CardComposer";
 import { CardDetailModal } from "../CardDetailModal";
+import {
+  BoardSummaryStrip,
+  MobileFilterBar,
+  MobileViewToggle,
+  type FilterOption,
+} from "../MobileBoardOverview";
 import type { BoardDetailResponse, BoardCard, Section } from "../../lib/types";
+import {
+  filterMobileCards,
+  summarizeMobileCards,
+  type MobileCardFilter,
+} from "../../lib/mobile-board-overview";
 import {
   withBoardAnonymousAuthor,
   withBoardAnonymousAuthors,
@@ -36,6 +49,13 @@ import { useBoardRealtime } from "../../lib/use-board-realtime";
 type SectionGroup = {
   section: Section | { id: string; title: string; order: number; color: null };
   cards: BoardCard[];
+};
+
+type CardViewMode = "compact" | "gallery";
+
+type CompactSection = {
+  title: string;
+  data: BoardCard[];
 };
 
 function sortCards(cards: BoardCard[]): BoardCard[] {
@@ -95,20 +115,11 @@ function chunk<T>(items: T[], size: number): T[][] {
   return result;
 }
 
-function useBoardGridMetrics(width: number) {
+function useBoardGridMetrics(width: number, height: number) {
   const padding = layout.boardGridPadding * 2;
   const gap = layout.boardGridGap;
   const available = Math.max(0, width - padding);
-  const columns =
-    width < layout.mobileBreakpoint
-      ? 2
-      : Math.min(
-          4,
-          Math.max(
-            1,
-            Math.floor((available + gap) / (layout.boardGridMinCardWidth + gap)),
-          ),
-        );
+  const columns = width > height ? 4 : 2;
   const cardWidth = (available - (columns - 1) * gap) / columns;
   return { columns, cardWidth };
 }
@@ -126,8 +137,13 @@ export function CardsBoard({
   const [cards, setCards] = useState<BoardCard[]>(() =>
     withBoardAnonymousAuthors(sortCards(data.cards), data.board),
   );
-  const { width } = useWindowDimensions();
-  const { columns, cardWidth } = useBoardGridMetrics(width);
+  const { width, height } = useWindowDimensions();
+  const [viewMode, setViewMode] = useState<CardViewMode>(() =>
+    width < layout.mobileBreakpoint ? "compact" : "gallery",
+  );
+  const [filter, setFilter] = useState<MobileCardFilter>("all");
+  const [query, setQuery] = useState("");
+  const { columns, cardWidth } = useBoardGridMetrics(width, height);
   const boardTheme = boardThemes[normalizeBoardTheme(data.board.boardTheme)];
   const selectedIndex = selectedCard
     ? cards.findIndex((card) => card.id === selectedCard.id)
@@ -136,10 +152,44 @@ export function CardsBoard({
   const streamSectionsEnabled =
     data.board.layout === "stream" && Boolean(data.board.streamSectionsEnabled);
 
+  const summary = useMemo(
+    () => summarizeMobileCards(cards, data.sections),
+    [cards, data.sections],
+  );
+  const filteredCards = useMemo(
+    () => filterMobileCards(cards, filter, query),
+    [cards, filter, query],
+  );
+  const sectionTitleById = useMemo(
+    () => new Map(data.sections.map((section) => [section.id, section.title] as const)),
+    [data.sections],
+  );
+
   const sectionGroups = useMemo(
     () =>
-      streamSectionsEnabled ? groupCardsBySection(cards, data.sections) : [],
-    [streamSectionsEnabled, cards, data.sections],
+      streamSectionsEnabled
+        ? groupCardsBySection(filteredCards, data.sections)
+        : [],
+    [streamSectionsEnabled, filteredCards, data.sections],
+  );
+  const compactSections = useMemo<CompactSection[]>(
+    () =>
+      streamSectionsEnabled
+        ? sectionGroups.map((group) => ({
+            title: group.section.title,
+            data: group.cards,
+          }))
+        : [{ title: "", data: sortCards(filteredCards) }],
+    [filteredCards, sectionGroups, streamSectionsEnabled],
+  );
+  const filterOptions = useMemo<Array<FilterOption<MobileCardFilter>>>(
+    () => [
+      { value: "all", label: "전체", count: summary.total },
+      { value: "mine", label: "내 카드", count: summary.mine },
+      { value: "media", label: "미디어", count: summary.media },
+      { value: "comments", label: "댓글 있음" },
+    ],
+    [summary],
   );
 
   useEffect(() => {
@@ -155,6 +205,42 @@ export function CardsBoard({
   // 서버 broadcast channel key 가 board.id 기준이므로 id 로 구독한다.
   useBoardRealtime({ slug: data.board.id, onReload: onMutate });
 
+  const header = (
+    <View style={styles.headerContent}>
+      <BoardSummaryStrip
+        title="보드 한눈에 보기"
+        description="카드 크기보다 작성·미디어·반응 상태를 먼저 비교해요."
+        metrics={[
+          { label: "카드", value: summary.total },
+          { label: "내 카드", value: summary.mine, tone: "accent" },
+          { label: "댓글", value: summary.comments },
+          {
+            label: streamSectionsEnabled ? "섹션" : "좋아요",
+            value: streamSectionsEnabled ? summary.sections : summary.likes,
+          },
+        ]}
+      />
+      <MobileFilterBar
+        query={query}
+        onQueryChange={setQuery}
+        queryPlaceholder="제목·내용·작성자 검색"
+        options={filterOptions}
+        value={filter}
+        onChange={setFilter}
+        trailing={
+          <MobileViewToggle
+            options={[
+              { value: "compact", label: "목록" },
+              { value: "gallery", label: "카드" },
+            ]}
+            value={viewMode}
+            onChange={setViewMode}
+          />
+        }
+      />
+    </View>
+  );
+
   const emptyState = (
     <View style={styles.empty}>
       <Text style={styles.emptyEmoji}>✨</Text>
@@ -167,9 +253,41 @@ export function CardsBoard({
 
   return (
     <View style={[styles.root, { backgroundColor: boardTheme.background }]}>
-      {streamSectionsEnabled ? (
+      {viewMode === "compact" ? (
+        <SectionList
+          sections={compactSections}
+          keyExtractor={(card) => card.id}
+          contentContainerStyle={styles.compactContent}
+          ListHeaderComponent={header}
+          renderSectionHeader={({ section }) =>
+            section.title ? (
+              <View style={styles.compactSectionHeader}>
+                <Text style={styles.compactSectionTitle}>{section.title}</Text>
+                <Text style={styles.compactSectionCount}>{section.data.length}개</Text>
+              </View>
+            ) : null
+          }
+          renderItem={({ item }) => (
+            <CompactCardRow
+              card={item}
+              showSection={
+                streamSectionsEnabled
+                  ? null
+                  : sectionTitleById.get(item.sectionId ?? "") ?? null
+              }
+              onPress={() => setSelectedCard(item)}
+            />
+          )}
+          ItemSeparatorComponent={() => <View style={styles.compactSeparator} />}
+          SectionSeparatorComponent={() => <View style={styles.sectionSeparator} />}
+          ListEmptyComponent={emptyState}
+          stickySectionHeadersEnabled={false}
+          keyboardShouldPersistTaps="handled"
+        />
+      ) : streamSectionsEnabled ? (
         <ScrollView contentContainerStyle={styles.content}>
-          {cards.length === 0
+          {header}
+          {filteredCards.length === 0
             ? emptyState
             : sectionGroups.map(({ section, cards: sectionCards }) => (
                 <View
@@ -202,12 +320,13 @@ export function CardsBoard({
         </ScrollView>
       ) : (
         <FlatList
-          data={cards}
+          data={filteredCards}
           key={`cards-${columns}`}
           keyExtractor={(c) => c.id}
           numColumns={columns}
           columnWrapperStyle={columns > 1 ? styles.row : undefined}
           contentContainerStyle={styles.content}
+          ListHeaderComponent={header}
           renderItem={({ item }) => (
             <View style={[styles.cardWrap, { width: cardWidth }]}>
               <CardView card={item} onPress={() => setSelectedCard(item)} />
@@ -288,6 +407,38 @@ function mergeUpdatedCard(
 
 const styles = StyleSheet.create({
   root: { flex: 1 },
+  headerContent: {
+    gap: spacing.lg,
+    paddingBottom: spacing.lg,
+  },
+  compactContent: {
+    padding: layout.boardGridPadding,
+    paddingBottom: spacing.xxxl + controls.fab,
+  },
+  compactSectionHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: spacing.md,
+    paddingTop: spacing.md,
+    paddingBottom: spacing.sm,
+    backgroundColor: colors.transparent,
+  },
+  compactSectionTitle: {
+    ...typography.section,
+    color: colors.text,
+    flex: 1,
+  },
+  compactSectionCount: {
+    ...typography.badge,
+    color: colors.accentTintedText,
+  },
+  compactSeparator: {
+    height: spacing.sm,
+  },
+  sectionSeparator: {
+    height: spacing.md,
+  },
   content: {
     padding: layout.boardGridPadding,
     gap: layout.boardGridGap,

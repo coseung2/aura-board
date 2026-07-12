@@ -23,7 +23,15 @@ import {
 import { apiFetch, ApiError } from "../../lib/api";
 import { clearSessionToken } from "../../lib/session";
 import type { StoreChargeReceipt, StoreItem } from "../../lib/types";
-import { AppButton, AppHeader, EmptyState, IconButton, SurfaceCard, SurfacePressable } from "../../components/ui";
+import {
+  AppButton,
+  AppHeader,
+  EmptyState,
+  IconButton,
+  SectionHeader,
+  SurfaceCard,
+  SurfacePressable,
+} from "../../components/ui";
 
 export default function StoreChargeScreen() {
   const router = useRouter();
@@ -174,7 +182,7 @@ export default function StoreChargeScreen() {
         </View>
       ) : (
         <ScrollView contentContainerStyle={styles.content}>
-          <Text style={styles.sectionTitle}>상품</Text>
+          <SectionHeader title="상품" />
           {items.length === 0 ? (
             <EmptyState title="등록된 상품이 없어요." />
           ) : (
@@ -202,10 +210,10 @@ export default function StoreChargeScreen() {
           )}
 
           <SurfaceCard style={styles.cartCard}>
-            <View style={styles.cartHeader}>
-              <Text style={styles.sectionTitle}>결제 바구니</Text>
-              <Text style={styles.total}>{total.toLocaleString()}원</Text>
-            </View>
+            <SectionHeader
+              title="결제 바구니"
+              right={<Text style={styles.total}>{total.toLocaleString()}원</Text>}
+            />
             {cartList.length === 0 ? (
               <Text style={styles.muted}>상품을 선택해 주세요.</Text>
             ) : (
@@ -331,10 +339,14 @@ const styles = StyleSheet.create({
     gap: spacing.md,
     padding: spacing.xxl,
   },
-  content: { padding: spacing.xxl, gap: spacing.lg },
+  content: {
+    paddingHorizontal: spacing.xl,
+    paddingTop: spacing.lg,
+    paddingBottom: spacing.xxl,
+    gap: spacing.lg,
+  },
   muted: { ...typography.body, color: colors.textMuted },
   error: { ...typography.body, color: colors.danger },
-  sectionTitle: { ...typography.section, color: colors.text },
   itemGrid: { flexDirection: "row", flexWrap: "wrap", gap: spacing.md },
   itemCard: {
     width: store.itemCardWidth,
@@ -355,12 +367,6 @@ const styles = StyleSheet.create({
   cartCard: {
     gap: spacing.md,
     padding: spacing.lg,
-  },
-  cartHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: spacing.md,
   },
   total: { ...typography.title, color: colors.accent },
   cartRow: {

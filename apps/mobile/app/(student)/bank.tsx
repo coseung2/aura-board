@@ -10,15 +10,24 @@ import {
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import {
+  borders,
   bank,
   colors,
+  radii,
   spacing,
+  tapMin,
   typography,
 } from "../../theme/tokens";
 import { apiFetch, ApiError } from "../../lib/api";
 import { clearSessionToken } from "../../lib/session";
 import type { BankOverview } from "../../lib/types";
-import { AppButton, AppHeader, SurfaceCard, SurfacePressable, TextField } from "../../components/ui";
+import {
+  AppButton,
+  AppHeader,
+  ControlPressable,
+  SectionHeader,
+  TextField,
+} from "../../components/ui";
 
 type ActionKind = "deposit" | "withdraw" | "fd_open";
 
@@ -145,36 +154,66 @@ export default function StudentBankScreen() {
         </View>
       ) : data ? (
         <ScrollView contentContainerStyle={styles.content}>
-          <View style={styles.summaryGrid}>
-            <Summary label="총 예치금" value={`${data.totals.totalBalance.toLocaleString()} ${data.currency.unitLabel}`} />
-            <Summary label="활성 적금" value={`${data.activeFDs.length}건`} />
+          <View style={styles.metricsSection}>
+            <SectionHeader title="은행 현황" />
+            <View style={styles.metricsList}>
+              <View style={styles.metricRow}>
+                <Text style={styles.metricLabel}>총 예치금</Text>
+                <Text style={styles.metricValue}>
+                  {data.totals.totalBalance.toLocaleString()} {data.currency.unitLabel}
+                </Text>
+              </View>
+              <View style={[styles.metricRow, styles.metricRowLast]}>
+                <Text style={styles.metricLabel}>활성 적금</Text>
+                <Text style={styles.metricValue}>{data.activeFDs.length}건</Text>
+              </View>
+            </View>
           </View>
 
-          <Text style={styles.sectionTitle}>학생 계좌</Text>
-          <View style={styles.studentList}>
+          <SectionHeader title="학생 계좌" />
+          <View style={styles.studentList} accessibilityRole="list">
             {data.students.map((student) => {
               const selectedRow = student.id === selectedId;
               return (
-                <SurfacePressable
+                <ControlPressable
                   key={student.id}
                   style={[styles.studentRow, selectedRow && styles.studentRowOn]}
                   onPress={() => setSelectedId(student.id)}
+                  accessibilityState={{ selected: selectedRow }}
                 >
+                  <View style={styles.studentIndicatorSlot} accessibilityElementsHidden>
+                    {selectedRow ? (
+                      <Text style={styles.studentIndicator} accessible={false}>
+                        ✓
+                      </Text>
+                    ) : null}
+                  </View>
                   <Text style={styles.studentNumber}>{student.number ?? "-"}</Text>
-                  <Text style={styles.studentName}>{student.name}</Text>
+                  <Text style={[styles.studentName, selectedRow && styles.studentNameOn]}>
+                    {student.name}
+                  </Text>
                   <Text style={styles.studentBalance}>
                     {student.balance.toLocaleString()} {data.currency.unitLabel}
                   </Text>
-                </SurfacePressable>
+                </ControlPressable>
               );
             })}
           </View>
 
-          <Text style={styles.sectionTitle}>처리</Text>
-          <SurfaceCard style={styles.actionCard}>
-            <Text style={styles.selectedText}>
-              {selected ? `${selected.name} 학생 선택됨` : "학생을 선택하세요"}
-            </Text>
+          <SectionHeader title="처리" />
+          <View style={styles.actionSection}>
+            <View style={styles.selectedRow}>
+              <View style={styles.selectedIndicatorSlot} accessibilityElementsHidden>
+                {selected ? (
+                  <Text style={styles.selectedIndicator} accessible={false}>
+                    ✓
+                  </Text>
+                ) : null}
+              </View>
+              <Text style={styles.selectedText} numberOfLines={2}>
+                {selected ? `${selected.name} 학생 선택됨` : "학생을 선택하세요"}
+              </Text>
+            </View>
             <TextField
               style={styles.input}
               value={amount}
@@ -200,19 +239,10 @@ export default function StudentBankScreen() {
                 onPress={() => runAction("fd_open")}
               />
             </View>
-          </SurfaceCard>
+          </View>
         </ScrollView>
       ) : null}
     </SafeAreaView>
-  );
-}
-
-function Summary({ label, value }: { label: string; value: string }) {
-  return (
-    <SurfaceCard style={styles.summaryCard}>
-      <Text style={styles.summaryLabel}>{label}</Text>
-      <Text style={styles.summaryValue}>{value}</Text>
-    </SurfaceCard>
   );
 }
 
@@ -249,41 +279,137 @@ const styles = StyleSheet.create({
     gap: spacing.md,
     padding: spacing.xxl,
   },
-  content: { padding: spacing.xxl, gap: spacing.lg },
+  content: {
+    paddingHorizontal: spacing.xl,
+    paddingTop: spacing.lg,
+    paddingBottom: spacing.xxl,
+    gap: spacing.lg,
+  },
   muted: { ...typography.body, color: colors.textMuted },
   error: { ...typography.body, color: colors.danger },
-  summaryGrid: { flexDirection: "row", gap: spacing.md },
-  summaryCard: {
-    flex: 1,
-    padding: spacing.lg,
+  metricsSection: {
+    gap: spacing.none,
   },
-  summaryLabel: { ...typography.micro, color: colors.textMuted },
-  summaryValue: { ...typography.section, color: colors.text, marginTop: spacing.xs },
-  sectionTitle: { ...typography.section, color: colors.text },
-  studentList: { gap: spacing.sm },
+  metricsList: {
+    borderBottomWidth: borders.hairline,
+    borderBottomColor: colors.border,
+  },
+  metricRow: {
+    minHeight: tapMin,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    flexWrap: "wrap",
+    gap: spacing.md,
+    paddingVertical: spacing.md,
+    borderBottomWidth: borders.hairline,
+    borderBottomColor: colors.border,
+  },
+  metricRowLast: {
+    borderBottomWidth: borders.none,
+  },
+  metricLabel: { ...typography.body, color: colors.textMuted },
+  metricValue: {
+    ...typography.section,
+    color: colors.text,
+    fontVariant: ["tabular-nums"],
+    flexShrink: 0,
+  },
+  studentList: {
+    borderBottomWidth: borders.hairline,
+    borderBottomColor: colors.border,
+  },
   studentRow: {
     minHeight: bank.studentRowMinHeight,
     flexDirection: "row",
     alignItems: "center",
     gap: spacing.md,
-    padding: spacing.md,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.none,
+    borderWidth: borders.none,
+    borderRadius: radii.none,
+    borderBottomWidth: borders.hairline,
+    borderBottomColor: colors.border,
+    backgroundColor: colors.transparent,
   },
-  studentRowOn: { borderColor: colors.accent, backgroundColor: colors.accentTintedBg },
-  studentNumber: { ...typography.label, color: colors.textMuted, width: bank.studentNumberWidth },
-  studentName: { ...typography.section, color: colors.text, flex: 1 },
-  studentBalance: { ...typography.label, color: colors.text },
-  actionCard: {
+  studentRowOn: {
+    borderLeftWidth: borders.medium,
+    borderLeftColor: colors.accent,
+    backgroundColor: colors.accentTintedBg,
+  },
+  studentIndicatorSlot: {
+    width: spacing.lg,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  studentIndicator: {
+    ...typography.label,
+    color: colors.accentTintedText,
+    fontWeight: "700",
+  },
+  studentNumber: {
+    ...typography.label,
+    color: colors.textMuted,
+    width: bank.studentNumberWidth,
+    flexShrink: 0,
+  },
+  studentName: {
+    ...typography.section,
+    color: colors.text,
+    flex: 1,
+    minWidth: 0,
+  },
+  studentNameOn: {
+    color: colors.accentTintedText,
+    fontWeight: "700",
+  },
+  studentBalance: {
+    ...typography.label,
+    color: colors.text,
+    fontVariant: ["tabular-nums"],
+    flexShrink: 0,
+  },
+  actionSection: {
     gap: spacing.md,
-    padding: spacing.lg,
+    paddingVertical: spacing.md,
   },
-  selectedText: { ...typography.label, color: colors.accent },
+  selectedRow: {
+    minHeight: tapMin,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.sm,
+  },
+  selectedIndicatorSlot: {
+    width: spacing.lg,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  selectedIndicator: {
+    ...typography.label,
+    color: colors.accentTintedText,
+    fontWeight: "700",
+  },
+  selectedText: {
+    ...typography.label,
+    color: colors.accentTintedText,
+    fontWeight: "700",
+    flex: 1,
+    minWidth: 0,
+  },
   input: {
     minHeight: bank.inputMinHeight,
-    backgroundColor: colors.bg,
+    backgroundColor: colors.surface,
   },
-  actionRow: { flexDirection: "row", gap: spacing.sm },
+  actionRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: spacing.sm,
+  },
   actionBtn: {
-    flex: 1,
+    flexGrow: 1,
+    flexShrink: 1,
+    flexBasis: 108,
+    minWidth: 108,
     minHeight: bank.actionMinHeight,
   },
 });

@@ -10,10 +10,12 @@ import { useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import {
   auth,
+  brand,
   colors,
   spacing,
   typography,
 } from "../../theme/tokens";
+import { LogoLockup } from "../../components/LogoLockup";
 import { apiFetch, ApiError, getApiBase } from "../../lib/api";
 import {
   loadSessionToken,
@@ -105,6 +107,11 @@ export default function StudentLogin() {
         keyboardShouldPersistTaps="handled"
       >
         <SurfaceCard style={styles.loginCard}>
+          <LogoLockup
+            size={brand.logoSize}
+            style={styles.brandLockup}
+            wordmarkStyle={styles.brandWordmark}
+          />
           <Text style={styles.loginTitle}>학생 로그인</Text>
 
           <TextField
@@ -123,7 +130,11 @@ export default function StudentLogin() {
             onSubmitEditing={handleSubmit}
           />
 
-          {error ? <Text style={styles.errorText}>{error}</Text> : null}
+          {error ? (
+            <Text style={styles.errorText} accessibilityRole="alert">
+              {error}
+            </Text>
+          ) : null}
 
           <AppButton
             onPress={handleSubmit}
@@ -160,6 +171,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.xxl,
     gap: spacing.lg,
   },
+  brandLockup: { justifyContent: "center" },
+  brandWordmark: { ...typography.title, color: colors.text },
   loginTitle: {
     ...typography.display,
     color: colors.text,

@@ -21,7 +21,6 @@ import {
   radii,
   responsive,
   spacing,
-  states,
   tapMin,
   typography,
   auth,
@@ -38,6 +37,7 @@ import { apiFetch, ApiError, getApiBase } from "../lib/api";
 import { webSafeWidthStyle } from "../lib/responsive";
 import { LogoLockup } from "../components/LogoLockup";
 import {
+  AppButton,
   ControlPressable,
   SurfaceCard,
   TextField,
@@ -215,19 +215,14 @@ export default function Landing() {
               {studentError ? (
                 <Text style={styles.studentErrorText}>{studentError}</Text>
               ) : null}
-              <ControlPressable
-                style={[
-                  styles.studentLoginButton,
-                  (studentLoading || studentCode.trim().length === 0) &&
-                    styles.studentLoginButtonDisabled,
-                ]}
+              <AppButton
+                style={styles.studentLoginButton}
                 onPress={handleStudentLogin}
-                disabled={studentLoading || studentCode.trim().length === 0}
+                disabled={studentCode.trim().length === 0}
+                loading={studentLoading}
               >
-                <Text style={styles.studentLoginButtonText}>
-                  {studentLoading ? "확인 중..." : "학생 로그인"}
-                </Text>
-              </ControlPressable>
+                학생 로그인
+              </AppButton>
             </View>
           </SurfaceCard>
 
@@ -419,20 +414,6 @@ const styles = StyleSheet.create({
   },
   studentLoginButton: {
     width: "100%",
-    height: tapMin,
-    borderRadius: radii.btn,
-    borderColor: colors.accent,
-    backgroundColor: colors.accent,
-    paddingHorizontal: spacing.lg,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  studentLoginButtonDisabled: {
-    opacity: states.disabledOpacity,
-  },
-  studentLoginButtonText: {
-    ...typography.label,
-    color: colors.onAccent,
   },
   oauthActions: {
     width: "100%",

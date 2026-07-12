@@ -37,6 +37,12 @@
     }
   },
   "submit": {
+    "closed": {
+      "android": {
+        "track": "alpha",
+        "releaseStatus": "completed"
+      }
+    },
     "production": {
       "android": {
         "track": "production",

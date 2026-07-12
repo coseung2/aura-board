@@ -28,15 +28,17 @@ import {
   radii,
   spacing,
   studentNav,
+  tapMin,
   typography,
 } from "../theme/tokens";
 import {
   AppButton,
   AppHeader,
+  ControlPressable,
   EmptyState,
   Pill,
   SurfaceCard,
-  SurfacePressable,
+  SectionHeader,
   TextField,
 } from "./ui";
 
@@ -272,17 +274,25 @@ export function StudentInspectionScreen({ mode }: { mode: Mode }) {
       ) : (
         <ScrollView
           contentContainerStyle={styles.content}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => void load(true)} />}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={() => void load(true)}
+              tintColor={colors.accent}
+            />
+          }
         >
-          <View style={styles.summary}>
-            <View>
-              <Text style={styles.title}>{title}</Text>
-              <Text style={styles.subtitle}>{payload?.date}</Text>
-            </View>
-            <Pill tone={flaggedCount > 0 ? "danger" : "accent"}>
-              지적 {flaggedCount}/{payload?.roster.length ?? 0}
-            </Pill>
-          </View>
+          <SectionHeader
+            title={title}
+            titleAccessory={
+              payload?.date ? <Text style={styles.subtitle}>{payload.date}</Text> : undefined
+            }
+            right={
+              <Pill tone={flaggedCount > 0 ? "danger" : "accent"}>
+                지적 {flaggedCount}/{payload?.roster.length ?? 0}
+              </Pill>
+            }
+          />
           {!payload?.roster.length ? (
             <EmptyState title="검사할 학생이 없어요." />
           ) : payload.roster.map((entry) => {
@@ -290,9 +300,10 @@ export function StudentInspectionScreen({ mode }: { mode: Mode }) {
             const previewUri = inspectionPhotoPreviewUri(value);
             return (
               <SurfaceCard key={entry.student.id} style={styles.row}>
-                <SurfacePressable
+                <ControlPressable
                   style={styles.toggle}
                   onPress={() => update(entry.student.id, { flagged: !value.flagged })}
+                  accessibilityState={{ selected: value.flagged }}
                 >
                   <Text style={styles.number}>{entry.student.number ?? "-"}</Text>
                   <View style={styles.studentText}>
@@ -302,7 +313,7 @@ export function StudentInspectionScreen({ mode }: { mode: Mode }) {
                   <Pill tone={value.flagged ? "danger" : "submitted"}>
                     {value.flagged ? (mode === "cleaning" ? "지적" : "정리 안 됨") : "정상"}
                   </Pill>
-                </SurfacePressable>
+                </ControlPressable>
                 {mode === "cleaning" && value.flagged ? (
                   <View style={styles.cleaningEvidence}>
                     <TextField
@@ -403,11 +414,15 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg },
   center: { flex: 1, alignItems: "center", justifyContent: "center", gap: spacing.md, padding: spacing.xl },
   content: { padding: spacing.xl, gap: spacing.md },
-  summary: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: spacing.md },
-  title: { ...typography.title, color: colors.text },
   subtitle: { ...typography.micro, color: colors.textMuted },
   row: { padding: spacing.sm, gap: spacing.sm },
-  toggle: { flexDirection: "row", alignItems: "center", gap: spacing.md, padding: spacing.sm },
+  toggle: {
+    minHeight: tapMin,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.md,
+    padding: spacing.sm,
+  },
   number: { ...typography.label, color: colors.textMuted, width: studentNav.inspectionNumberWidth },
   studentText: { flex: 1 },
   name: { ...typography.section, color: colors.text },

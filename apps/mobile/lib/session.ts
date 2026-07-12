@@ -1,5 +1,6 @@
 import * as SecureStore from "expo-secure-store";
 import { Platform } from "react-native";
+import { clearBoardCache } from "./board-cache";
 
 // 학생 세션 토큰 · 학생 프로필 캐시.
 // SecureStore = 안드로이드에선 AndroidKeystore 로 AES 암호화.
@@ -51,6 +52,9 @@ export type CachedStudent = {
 };
 
 export async function saveSessionToken(token: string): Promise<void> {
+  // A login/token replacement starts a new auth scope. Never let a previous
+  // student's in-memory board data survive that boundary.
+  clearBoardCache();
   await setStoredItem(TOKEN_KEY, token);
 }
 
@@ -59,6 +63,7 @@ export async function loadSessionToken(): Promise<string | null> {
 }
 
 export async function clearSessionToken(): Promise<void> {
+  clearBoardCache();
   await deleteStoredItem(TOKEN_KEY).catch(() => undefined);
   await deleteStoredItem(STUDENT_KEY).catch(() => undefined);
 }
