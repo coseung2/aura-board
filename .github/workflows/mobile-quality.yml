@@ -61,7 +61,7 @@ jobs:
           cat mobile-overview-test.log
           exit $status
       - name: Upload mobile overview diagnostics
-        if: always()
+        if: failure()
         uses: actions/upload-artifact@v4
         with:
           name: mobile-overview-test-log
