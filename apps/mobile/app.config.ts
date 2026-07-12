@@ -22,7 +22,8 @@ const config: ExpoConfig = {
   android: {
     adaptiveIcon: {
       foregroundImage: "./assets/adaptive-icon.png",
-      backgroundColor: baseColors.bg,
+      backgroundImage: "./assets/adaptive-icon-background.png",
+      backgroundColor: "#8e8cff",
     },
     edgeToEdgeEnabled: true,
     predictiveBackGestureEnabled: false,
