@@ -28,7 +28,7 @@ jobs:
           cache: npm
           cache-dependency-path: apps/mobile/package-lock.json
       - name: Install mobile dependencies
-        run: npm ci
+        run: npm ci --silent
       - name: Typecheck
         run: npm run typecheck
       - name: Check design system
@@ -47,6 +47,6 @@ jobs:
           cache: npm
           cache-dependency-path: package-lock.json
       - name: Install web dependencies
-        run: npm ci
+        run: npm ci --silent
       - name: Run mobile overview tests
-        run: npx vitest run src/lib/__tests__/mobile-board-overview.vitest.ts
+        run: npx vitest run src/lib/__tests__/mobile-board-overview.vitest.ts --reporter=verbose
