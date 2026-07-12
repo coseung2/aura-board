@@ -11,7 +11,6 @@ import {
   colors,
   controls,
   iconSizes,
-  layout,
   media,
   normalizeBoardTheme,
   radii,
@@ -49,6 +48,12 @@ import { useBoardRealtime } from "../../lib/use-board-realtime";
 
 type SectionFilter = "all" | "with-cards" | "mine";
 
+const UNSECTIONED_KEY = "__unsectioned__";
+
+function sectionKey(sectionId: string | null): string {
+  return sectionId ?? UNSECTIONED_KEY;
+}
+
 export function ColumnsBoard({
   data,
   onMutate,
@@ -62,7 +67,9 @@ export function ColumnsBoard({
     withBoardAnonymousAuthors(data.cards, data.board),
   );
   const [selectedCard, setSelectedCard] = useState<BoardCard | null>(null);
-  const [selectedSectionId, setSelectedSectionId] = useState<string | null>(null);
+  const [selectedSectionKey, setSelectedSectionKey] = useState<string | null>(
+    null,
+  );
   const [composerSectionId, setComposerSectionId] = useState<string | null>(null);
   const [composerOpen, setComposerOpen] = useState(false);
   const [sectionFilter, setSectionFilter] = useState<SectionFilter>("all");
@@ -101,8 +108,13 @@ export function ColumnsBoard({
     [cards, data.sections],
   );
   const selectedSummary = useMemo(
-    () => summaries.find((summary) => summary.id === selectedSectionId) ?? null,
-    [selectedSectionId, summaries],
+    () =>
+      selectedSectionKey === null
+        ? null
+        : (summaries.find(
+            (summary) => sectionKey(summary.id) === selectedSectionKey,
+          ) ?? null),
+    [selectedSectionKey, summaries],
   );
   const selectedCards = useMemo(() => {
     if (!selectedSummary) return [];
@@ -172,12 +184,14 @@ export function ColumnsBoard({
 
   useEffect(() => {
     if (
-      selectedSectionId !== null &&
-      !summaries.some((summary) => summary.id === selectedSectionId)
+      selectedSectionKey !== null &&
+      !summaries.some(
+        (summary) => sectionKey(summary.id) === selectedSectionKey,
+      )
     ) {
-      setSelectedSectionId(null);
+      setSelectedSectionKey(null);
     }
-  }, [selectedSectionId, summaries]);
+  }, [selectedSectionKey, summaries]);
 
   function handleCreated(card: BoardCard) {
     setCards((prev) => [...prev, withBoardAnonymousAuthor(card, data.board)]);
@@ -190,7 +204,7 @@ export function ColumnsBoard({
   }
 
   function selectSection(sectionId: string | null) {
-    setSelectedSectionId(sectionId);
+    setSelectedSectionKey(sectionKey(sectionId));
     setCardFilter("all");
     setQuery("");
   }
@@ -215,7 +229,7 @@ export function ColumnsBoard({
                 <ControlPressable
                   style={styles.backToOverview}
                   onPress={() => {
-                    setSelectedSectionId(null);
+                    setSelectedSectionKey(null);
                     setQuery("");
                   }}
                   accessibilityLabel="전체 주제 보기"
@@ -238,7 +252,11 @@ export function ColumnsBoard({
                 description="선택한 주제의 카드와 반응을 압축 목록으로 확인해요."
                 metrics={[
                   { label: "카드", value: selectedCardSummary.total },
-                  { label: "내 카드", value: selectedCardSummary.mine, tone: "accent" },
+                  {
+                    label: "내 카드",
+                    value: selectedCardSummary.mine,
+                    tone: "accent",
+                  },
                   { label: "댓글", value: selectedCardSummary.comments },
                   { label: "좋아요", value: selectedCardSummary.likes },
                 ]}
@@ -254,7 +272,10 @@ export function ColumnsBoard({
             </View>
           }
           renderItem={({ item }) => (
-            <CompactCardRow card={item} onPress={() => setSelectedCard(item)} />
+            <CompactCardRow
+              card={item}
+              onPress={() => setSelectedCard(item)}
+            />
           )}
           ItemSeparatorComponent={() => <View style={styles.listSeparator} />}
           ListEmptyComponent={
@@ -278,7 +299,7 @@ export function ColumnsBoard({
         <FlatList
           data={visibleSummaries}
           key={`section-overview-${tileMetrics.columns}`}
-          keyExtractor={(summary) => summary.id ?? "__unsectioned__"}
+          keyExtractor={(summary) => sectionKey(summary.id)}
           numColumns={tileMetrics.columns}
           columnWrapperStyle={
             tileMetrics.columns > 1 ? styles.overviewRow : undefined
@@ -292,7 +313,11 @@ export function ColumnsBoard({
                 metrics={[
                   { label: "주제", value: summaries.length },
                   { label: "카드", value: boardSummary.total },
-                  { label: "내 카드", value: boardSummary.mine, tone: "accent" },
+                  {
+                    label: "내 카드",
+                    value: boardSummary.mine,
+                    tone: "accent",
+                  },
                   { label: "댓글", value: boardSummary.comments },
                 ]}
               />
@@ -322,7 +347,9 @@ export function ColumnsBoard({
             <SurfaceCard style={styles.emptyOverview}>
               <Text style={styles.emptyEmoji}>📊</Text>
               <Text style={styles.emptyTitle}>
-                {summaries.length === 0 ? "주제가 아직 없어요" : "조건에 맞는 주제가 없어요"}
+                {summaries.length === 0
+                  ? "주제가 아직 없어요"
+                  : "조건에 맞는 주제가 없어요"}
               </Text>
               <Text style={styles.emptyMessage}>
                 {summaries.length === 0
@@ -443,7 +470,9 @@ function sectionGridMetrics(width: number) {
   return {
     columns,
     tileWidth:
-      columns === 1 ? available : (available - gap * (columns - 1)) / columns,
+      columns === 1
+        ? available
+        : (available - gap * (columns - 1)) / columns,
   };
 }
 
