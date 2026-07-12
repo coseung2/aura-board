@@ -1,6 +1,5 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import {
-  ScrollView,
   StyleSheet,
   Text,
   useWindowDimensions,
@@ -8,23 +7,6 @@ import {
 } from "react-native";
 import { usePathname, useRouter, type Href } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import {
-  Bell,
-  BookOpen,
-  BriefcaseBusiness,
-  BrushCleaning,
-  CheckCircle2,
-  CircleHelp,
-  Footprints,
-  Home,
-  Landmark,
-  LayoutGrid,
-  MoreHorizontal,
-  Palette,
-  ShoppingCart,
-  WalletCards,
-  type LucideIcon,
-} from "lucide-react-native";
 import {
   borders,
   colors,
@@ -46,39 +28,12 @@ import {
   subscribeStudentNavPreferences,
   type StudentNavTarget,
 } from "../lib/student-navigation";
+import { studentNavIcon } from "../lib/student-navigation-icons";
 import { ControlPressable } from "./ui";
 
 type Props = {
   duties?: StudentDuty[];
 };
-
-const targetIcons: Record<string, LucideIcon> = {
-  home: Home,
-  boards: LayoutGrid,
-  portfolio: BriefcaseBusiness,
-  reading: BookOpen,
-  walking: Footprints,
-  more: MoreHorizontal,
-  wallet: WalletCards,
-  canva: Palette,
-  notifications: Bell,
-};
-
-const dutyIcons: Record<string, LucideIcon> = {
-  banker: Landmark,
-  "store-clerk": ShoppingCart,
-  checker: CheckCircle2,
-  "cleaning-inspector": BrushCleaning,
-  "shoe-inspector": Footprints,
-};
-
-function iconForTarget(target: StudentNavTarget): LucideIcon {
-  if (target.id.startsWith("duty:")) {
-    const roleKey = target.id.slice(target.id.lastIndexOf(":") + 1);
-    return dutyIcons[roleKey] ?? CircleHelp;
-  }
-  return targetIcons[target.id] ?? CircleHelp;
-}
 
 export function StudentBottomNav({ duties = [] }: Props) {
   const router = useRouter();
@@ -89,44 +44,24 @@ export function StudentBottomNav({ duties = [] }: Props) {
   const bottomPadding = isLandscape
     ? insets.bottom
     : Math.max(insets.bottom, spacing.xs);
-  const scrollViewRef = useRef<ScrollView>(null);
-  const tabLayoutsRef = useRef<Record<string, { x: number; width: number }>>({});
-  const [viewportWidth, setViewportWidth] = useState(0);
   const [optionalTargetIds, setOptionalTargetIds] = useState<string[]>([]);
   const optionalTargets = [
     ...studentOptionalNavTargets,
     ...duties.map(studentDutyTarget).filter((target): target is StudentNavTarget => target !== null),
   ];
+  const moreTarget = studentBaseNavTargets.find((target) => target.id === "more");
   const targets = [
-    ...studentBaseNavTargets,
+    ...studentBaseNavTargets.filter((target) => target.id !== "more"),
     ...optionalTargetIds
       .map((id) => optionalTargets.find((target) => target.id === id))
       .filter((target): target is StudentNavTarget => target !== undefined),
+    ...(moreTarget ? [moreTarget] : []),
   ];
-  const activeTargetId = targets.find((target) =>
-    isStudentNavTargetActive(target, pathname),
-  )?.id;
-  const targetKey = targets.map((target) => target.id).join("|");
-
-  const scrollActiveTabIntoView = useCallback(
-    (targetId?: string) => {
-      if (!targetId || viewportWidth <= 0) return;
-      const layout = tabLayoutsRef.current[targetId];
-      if (!layout) return;
-      const x = Math.max(0, layout.x + layout.width / 2 - viewportWidth / 2);
-      scrollViewRef.current?.scrollTo({ x, animated: true });
-    },
-    [viewportWidth],
-  );
 
   useEffect(() => {
     void loadStudentNavPreferences().then(setOptionalTargetIds);
     return subscribeStudentNavPreferences(setOptionalTargetIds);
   }, []);
-
-  useEffect(() => {
-    scrollActiveTabIntoView(activeTargetId);
-  }, [activeTargetId, pathname, targetKey, scrollActiveTabIntoView]);
 
   return (
     <View
@@ -135,20 +70,13 @@ export function StudentBottomNav({ duties = [] }: Props) {
         { paddingBottom: bottomPadding },
       ]}
     >
-      <ScrollView
-        ref={scrollViewRef}
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={[styles.tabRow, isLandscape && styles.tabRowLandscape]}
-        onLayout={(event) => {
-          const width = event.nativeEvent.layout.width;
-          setViewportWidth((current) => (current === width ? current : width));
-        }}
+      <View
+        style={[styles.tabRow, isLandscape && styles.tabRowLandscape]}
       >
         {targets.map((target) => {
           const active = isStudentNavTargetActive(target, pathname);
           const isDuty = target.id.startsWith("duty:");
-          const Icon = iconForTarget(target);
+          const Icon = studentNavIcon(target);
           return (
             <ControlPressable
               key={target.id}
@@ -158,11 +86,6 @@ export function StudentBottomNav({ duties = [] }: Props) {
                 isDuty && styles.dutyTab,
                 active && styles.tabActive,
               ]}
-              onLayout={(event) => {
-                const { x, width } = event.nativeEvent.layout;
-                tabLayoutsRef.current[target.id] = { x, width };
-                if (active) scrollActiveTabIntoView(target.id);
-              }}
               onPress={() => {
                 if (!active) router.push(target.href as Href);
               }}
@@ -171,8 +94,9 @@ export function StudentBottomNav({ duties = [] }: Props) {
             >
               <Icon
                 size={isLandscape ? 18 : 20}
-                color={active ? colors.accentTintedText : colors.textMuted}
-                strokeWidth={2}
+                color={active ? colors.text : colors.textMuted}
+                fill={active ? colors.text : colors.transparent}
+                strokeWidth={active ? 1.75 : 2}
               />
               <Text
                 style={[styles.tabLabel, active && styles.tabTextActive]}
@@ -183,7 +107,7 @@ export function StudentBottomNav({ duties = [] }: Props) {
             </ControlPressable>
           );
         })}
-      </ScrollView>
+      </View>
     </View>
   );
 }
@@ -196,20 +120,20 @@ const styles = StyleSheet.create({
     ...shadows.lift,
   },
   tabRow: {
+    width: "100%",
+    flexDirection: "row",
     alignItems: "center",
-    gap: spacing.xs,
-    paddingHorizontal: spacing.sm,
+    paddingHorizontal: spacing.xxs,
     paddingTop: spacing.xs,
     paddingBottom: spacing.xs,
   },
   tabRowLandscape: {
-    flexGrow: 1,
-    minWidth: "100%",
     paddingTop: spacing.none,
     paddingBottom: spacing.none,
   },
   tab: {
-    minWidth: studentNav.tabMinWidth,
+    flex: 1,
+    minWidth: 0,
     minHeight: tapMin,
     alignItems: "center",
     justifyContent: "center",
@@ -222,10 +146,7 @@ const styles = StyleSheet.create({
   },
   tabLandscape: {
     flexDirection: "row",
-    flexGrow: 1,
-    flexBasis: 0,
-    flexShrink: 0,
-    minWidth: tapMin,
+    flexShrink: 1,
     gap: spacing.xs,
     paddingVertical: spacing.none,
   },
@@ -235,8 +156,8 @@ const styles = StyleSheet.create({
     borderRadius: radii.none,
   },
   tabActive: {
-    borderColor: colors.accent,
-    backgroundColor: colors.accentTintedBg,
+    borderColor: colors.transparent,
+    backgroundColor: colors.transparent,
     borderRadius: radii.none,
   },
   tabLabel: {
@@ -244,7 +165,8 @@ const styles = StyleSheet.create({
     color: colors.textMuted,
   },
   tabTextActive: {
-    color: colors.accentTintedText,
+    color: colors.text,
+    fontWeight: "700",
     opacity: states.visibleOpacity,
   },
 });

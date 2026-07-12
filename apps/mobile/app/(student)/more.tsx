@@ -10,6 +10,7 @@ import {
 } from "react-native";
 import { useRouter, type Href } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { LogOut } from "lucide-react-native";
 import { apiFetch, ApiError } from "../../lib/api";
 import { clearSessionToken } from "../../lib/session";
 import type { MeResponse } from "../../lib/types";
@@ -30,6 +31,7 @@ import {
   tapMin,
   typography,
 } from "../../theme/tokens";
+import { studentNavIcon } from "../../lib/student-navigation-icons";
 import {
   AppButton,
   AppHeader,
@@ -166,10 +168,12 @@ export default function StudentMoreScreen() {
             {loggingOut ? (
               <ActivityIndicator color={colors.textMuted} size="small" />
             ) : (
-              <View style={styles.logoutIcon} accessible={false}>
-                <View style={styles.logoutDoor} />
-                <Text style={styles.logoutArrow}>→</Text>
-              </View>
+              <LogOut
+                size={iconSizes.md}
+                color={colors.textMuted}
+                strokeWidth={2}
+                accessible={false}
+              />
             )}
           </ControlPressable>
         }
@@ -185,7 +189,7 @@ export default function StudentMoreScreen() {
         <View style={styles.intro}>
           <Text style={styles.title}>필요한 메뉴를 하단에 꺼내 두세요.</Text>
           <Text style={styles.subtitle}>
-            홈·보드·포트폴리오·독서·더보기는 항상 표시돼요.
+            홈·보드·포트폴리오·독서·걷기·더보기는 항상 표시돼요.
           </Text>
         </View>
 
@@ -245,6 +249,7 @@ export default function StudentMoreScreen() {
                 orderedTargets.map((target, index) => {
                   const enabled = enabledIds.includes(target.id);
                   const enabledIndex = enabledIds.indexOf(target.id);
+                  const Icon = studentNavIcon(target);
                   return (
                     <View
                       key={target.id}
@@ -253,7 +258,13 @@ export default function StudentMoreScreen() {
                         index === orderedTargets.length - 1 && styles.rowLast,
                       ]}
                     >
-                      <Text style={styles.emoji}>{target.emoji}</Text>
+                      <View style={styles.menuIcon} accessible={false}>
+                        <Icon
+                          size={iconSizes.md}
+                          color={colors.textMuted}
+                          strokeWidth={2}
+                        />
+                      </View>
                       <View style={styles.targetCopy}>
                         <Text style={styles.label} numberOfLines={1}>
                           {target.label}
@@ -319,23 +330,32 @@ export default function StudentMoreScreen() {
               </View>
               {orderedTargets.length ? (
                 <View style={styles.linkList}>
-                  {orderedTargets.map((target, index) => (
-                    <ControlPressable
-                      key={target.id}
-                      style={[
-                        styles.linkRow,
-                        index < orderedTargets.length - 1 && styles.rowDivider,
-                      ]}
-                      onPress={() => router.push(target.href as Href)}
-                      accessibilityLabel={`${target.label} 열기`}
-                    >
-                      <Text style={styles.emoji}>{target.emoji}</Text>
-                      <Text style={styles.label} numberOfLines={1}>
-                        {target.label}
-                      </Text>
-                      <Text style={styles.chevron}>›</Text>
-                    </ControlPressable>
-                  ))}
+                  {orderedTargets.map((target, index) => {
+                    const Icon = studentNavIcon(target);
+                    return (
+                      <ControlPressable
+                        key={target.id}
+                        style={[
+                          styles.linkRow,
+                          index < orderedTargets.length - 1 && styles.rowDivider,
+                        ]}
+                        onPress={() => router.push(target.href as Href)}
+                        accessibilityLabel={`${target.label} 열기`}
+                      >
+                        <View style={styles.menuIcon} accessible={false}>
+                          <Icon
+                            size={iconSizes.md}
+                            color={colors.textMuted}
+                            strokeWidth={2}
+                          />
+                        </View>
+                        <Text style={styles.label} numberOfLines={1}>
+                          {target.label}
+                        </Text>
+                        <Text style={styles.chevron}>›</Text>
+                      </ControlPressable>
+                    );
+                  })}
                 </View>
               ) : (
                 <Text style={styles.mutedText}>
@@ -413,10 +433,10 @@ const styles = StyleSheet.create({
     borderBottomColor: colors.border,
   },
   rowLast: { borderBottomWidth: borders.none },
-  emoji: {
-    ...typography.section,
+  menuIcon: {
     width: tapMin,
-    textAlign: "center",
+    alignItems: "center",
+    justifyContent: "center",
   },
   targetCopy: { flex: 1, minWidth: 0, gap: spacing.xxs },
   label: { ...typography.body, color: colors.text, flexShrink: 1 },
@@ -451,30 +471,5 @@ const styles = StyleSheet.create({
     borderColor: colors.transparent,
     borderRadius: radii.none,
     backgroundColor: colors.transparent,
-  },
-  logoutIcon: {
-    width: iconSizes.md,
-    height: iconSizes.md,
-    alignItems: "center",
-    justifyContent: "center",
-    position: "relative",
-  },
-  logoutDoor: {
-    position: "absolute",
-    left: spacing.xxs,
-    top: spacing.xxs,
-    width: spacing.sm,
-    height: spacing.lg,
-    borderWidth: borders.hairline,
-    borderRightWidth: borders.none,
-    borderColor: colors.textMuted,
-  },
-  logoutArrow: {
-    ...typography.body,
-    color: colors.textMuted,
-    lineHeight: typography.body.lineHeight,
-    position: "absolute",
-    right: spacing.none,
-    top: spacing.xxs,
   },
 });

@@ -92,6 +92,9 @@ export function ColumnsBoard({
     }
     return ordered;
   }, [cards, data.sections]);
+  const selectedIndex = selectedCard
+    ? cards.findIndex((card) => card.id === selectedCard.id)
+    : -1;
 
   function handleCreated(card: BoardCard) {
     setCards((prev) => [...prev, withBoardAnonymousAuthor(card, data.board)]);
@@ -172,6 +175,10 @@ export function ColumnsBoard({
       <CardDetailModal
         card={selectedCard}
         onClose={() => setSelectedCard(null)}
+        hasPrevious={selectedIndex > 0}
+        hasNext={selectedIndex >= 0 && selectedIndex < cards.length - 1}
+        onPrevious={() => setSelectedCard(cards[selectedIndex - 1] ?? null)}
+        onNext={() => setSelectedCard(cards[selectedIndex + 1] ?? null)}
         onUpdated={(c) => {
           const selectedNext =
             selectedCard?.id === c.id

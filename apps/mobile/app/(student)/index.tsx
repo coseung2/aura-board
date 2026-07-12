@@ -10,6 +10,7 @@ import {
 } from "react-native";
 import { useFocusEffect, useRouter, type Href } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { ChevronRight, LogOut } from "lucide-react-native";
 import {
   borders,
   colors,
@@ -18,7 +19,6 @@ import {
   radii,
   shadows,
   spacing,
-  studentNav,
   tapMin,
   typography,
 } from "../../theme/tokens";
@@ -34,8 +34,11 @@ import type {
 } from "../../lib/types";
 import {
   AppButton,
+  AppHeader,
   ControlPressable,
   Pill,
+  SemanticNav,
+  SemanticNavItem,
 } from "../../components/ui";
 import { StudentNotificationButton } from "../../components/StudentNotificationButton";
 
@@ -116,6 +119,7 @@ export default function StudentHome() {
   if (loading && !me) {
     return (
       <SafeAreaView style={styles.container} edges={["top"]}>
+        <AppHeader title="홈" />
         <View style={styles.loadingCenter}>
           <ActivityIndicator size="large" color={colors.accent} />
           <Text style={styles.loadingText}>보드를 불러오는 중…</Text>
@@ -127,6 +131,7 @@ export default function StudentHome() {
   if (error && !me) {
     return (
       <SafeAreaView style={styles.container} edges={["top"]}>
+        <AppHeader title="홈" />
         <View style={styles.errorCenter}>
           <Text style={styles.errorEmoji}>😵</Text>
           <Text style={styles.errorTitle}>연결할 수 없어요</Text>
@@ -146,7 +151,7 @@ export default function StudentHome() {
 
   const duties = me?.duties ?? [];
   const assignments = me?.assignments ?? [];
-  const classroomName = me?.student.classroom?.name ?? "학급 미배정";
+  const studentName = me?.student.name ?? "학생";
   const overviewLandscape = isLandscapeLayout && assignments.length > 0;
   const walletCard = (
     <WalletCardCompact
@@ -158,9 +163,37 @@ export default function StudentHome() {
     />
   );
   const assignmentPanel = <AssignmentPanel assignments={assignments} />;
+  const headerActions = (
+    <View style={styles.accountActions}>
+      <StudentNotificationButton />
+      <ControlPressable
+        style={styles.logoutButton}
+        onPress={handleLogout}
+        disabled={loggingOut}
+        accessibilityLabel={loggingOut ? "로그아웃 중" : "로그아웃"}
+        accessibilityState={{ disabled: loggingOut }}
+      >
+        <LogOut
+          size={iconSizes.md}
+          color={colors.textMuted}
+          strokeWidth={2}
+          accessible={false}
+        />
+      </ControlPressable>
+    </View>
+  );
 
   return (
     <SafeAreaView style={styles.container} edges={["top"]}>
+      <AppHeader
+        title="홈"
+        titleAccessory={
+          <Text style={styles.headerStudentName} numberOfLines={1}>
+            {studentName}
+          </Text>
+        }
+        right={headerActions}
+      />
       <ScrollView
         contentContainerStyle={styles.scrollContent}
         refreshControl={
@@ -171,36 +204,6 @@ export default function StudentHome() {
           />
         }
       >
-        <View style={styles.accountRow}>
-          <View style={styles.accountIdentity}>
-            <Text style={styles.accountName} numberOfLines={1} ellipsizeMode="tail">
-              {me?.student.name ?? "학생"}
-            </Text>
-            <Text
-              style={styles.accountClassroom}
-              numberOfLines={1}
-              ellipsizeMode="tail"
-            >
-              {classroomName}
-            </Text>
-          </View>
-          <View style={styles.accountActions}>
-            <StudentNotificationButton />
-            <ControlPressable
-              style={styles.logoutButton}
-              onPress={handleLogout}
-              disabled={loggingOut}
-              accessibilityLabel={loggingOut ? "로그아웃 중" : "로그아웃"}
-              accessibilityState={{ disabled: loggingOut }}
-            >
-              <View style={styles.logoutIcon} accessible={false}>
-                <View style={styles.logoutDoor} />
-                <Text style={styles.logoutArrow}>→</Text>
-              </View>
-            </ControlPressable>
-          </View>
-        </View>
-
         <View style={overviewLandscape ? styles.landscapeOverview : styles.overviewStack}>
           <View
             style={[
@@ -280,9 +283,14 @@ function AssignmentPanel({
     <View style={styles.assignmentPanel}>
       <View style={styles.assignmentHeader}>
         <View>
-            <Text style={styles.assignmentEyebrow}>과제 목록</Text>
+          <Text
+            accessibilityRole="header"
+            style={styles.assignmentSectionTitle}
+          >
+            과제 목록
+          </Text>
         </View>
-        <View style={styles.inlineTabGroup}>
+        <SemanticNav>
           <FilterChip
             active={filter === "missing"}
             onPress={() => setFilter("missing")}
@@ -297,40 +305,41 @@ function AssignmentPanel({
           >
             완료 {completedCount}
           </FilterChip>
-        </View>
+        </SemanticNav>
       </View>
 
       <View style={styles.assignmentList}>
-        {filtered.length === 0 ? (
-          <Text style={styles.assignmentEmpty}>{emptyMessage}</Text>
-        ) : (
-          visibleItems.map((item, index) => {
-            const target = assignmentTarget(item);
-            return (
-              <AssignmentRow
-                key={item.id}
-                item={item}
-                isLast={!showAll && index === visibleItems.length - 1}
-                onPress={target ? () => router.push(target as Href) : undefined}
-              />
-            );
-          })
-        )}
+        <View style={styles.assignmentRows}>
+          {filtered.length === 0 ? (
+            <Text style={styles.assignmentEmpty}>{emptyMessage}</Text>
+          ) : (
+            visibleItems.map((item) => {
+              const target = assignmentTarget(item);
+              return (
+                <AssignmentRow
+                  key={item.id}
+                  item={item}
+                  onPress={target ? () => router.push(target as Href) : undefined}
+                />
+              );
+            })
+          )}
+        </View>
+        {filtered.length > ASSIGNMENT_VISIBLE_LIMIT ? (
+          <ControlPressable
+            style={styles.assignmentExpand}
+            onPress={() => setShowAll((current) => !current)}
+            accessibilityRole="button"
+            accessibilityState={{ expanded: showAll }}
+          >
+            <Text style={styles.assignmentExpandText}>
+              {showAll
+                ? "접기 ↑"
+                : `${filter === "missing" ? "미제출" : "완료"} 과제 ${hiddenCount}개 더 보기 ↓`}
+            </Text>
+          </ControlPressable>
+        ) : null}
       </View>
-      {filtered.length > ASSIGNMENT_VISIBLE_LIMIT ? (
-        <ControlPressable
-          style={styles.assignmentExpand}
-          onPress={() => setShowAll((current) => !current)}
-          accessibilityRole="button"
-          accessibilityState={{ expanded: showAll }}
-        >
-          <Text style={styles.assignmentExpandText}>
-            {showAll
-              ? "접기 ↑"
-              : `${filter === "missing" ? "미제출" : "완료"} 과제 ${hiddenCount}개 더 보기 ↓`}
-          </Text>
-        </ControlPressable>
-      ) : null}
     </View>
   );
 }
@@ -347,38 +356,21 @@ function FilterChip({
   children: ReactNode;
 }) {
   return (
-    <ControlPressable
+    <SemanticNavItem
+      selected={active}
+      tone={tone}
       onPress={onPress}
-      style={[
-        styles.inlineTab,
-        active && styles.inlineTabActive,
-        tone === "danger" && active && styles.inlineTabDangerActive,
-      ]}
-      accessibilityRole="button"
-      accessibilityState={{ selected: active }}
     >
-      <Text
-        style={[
-          styles.filterChipText,
-          active && styles.filterChipTextActive,
-          tone === "danger" && active && styles.filterChipTextDangerActive,
-        ]}
-        numberOfLines={1}
-        ellipsizeMode="tail"
-      >
-        {children}
-      </Text>
-    </ControlPressable>
+      {children}
+    </SemanticNavItem>
   );
 }
 
 function AssignmentRow({
   item,
-  isLast,
   onPress,
 }: {
   item: StudentAssignmentTodo;
-  isLast: boolean;
   onPress?: () => void;
 }) {
   const submitted = item.submitted;
@@ -426,7 +418,7 @@ function AssignmentRow({
   if (onPress) {
     return (
       <ControlPressable
-        style={[styles.assignmentRow, isLast && styles.assignmentRowLast]}
+        style={styles.assignmentRow}
         onPress={onPress}
       >
         {content}
@@ -439,7 +431,6 @@ function AssignmentRow({
       style={[
         styles.assignmentRow,
         styles.assignmentRowStatic,
-        isLast && styles.assignmentRowLast,
       ]}
     >
       {content}
@@ -468,68 +459,52 @@ function WalletCardCompact({
     <View style={styles.walletCardCompact}>
       <View style={styles.walletHeaderCompact}>
         <View style={styles.walletHeaderCopy}>
-          <Text style={styles.walletEyebrowCompact}>
-            {showDuties ? "1인 1역" : "은행"}
-          </Text>
+          <View style={styles.walletHeaderTitleRow}>
+            <Text
+              accessibilityRole="header"
+              style={styles.walletSectionTitle}
+            >
+              {showDuties ? "내 역할" : "은행"}
+            </Text>
+            {!showDuties ? (
+              <ControlPressable
+                style={styles.walletDetailLink}
+                onPress={onDetail}
+                hitSlop={8}
+                accessibilityLabel="통장 자세히 보기"
+              >
+                <Text
+                  style={styles.walletDetailLinkText}
+                  numberOfLines={1}
+                >
+                  자세히
+                </Text>
+                <ChevronRight
+                  size={iconSizes.sm}
+                  color={colors.textMuted}
+                  strokeWidth={2}
+                  accessible={false}
+                />
+              </ControlPressable>
+            ) : null}
+          </View>
         </View>
         <View style={styles.walletHeaderActions}>
           {hasDuties ? (
-            <View style={styles.inlineTabGroup}>
-              <ControlPressable
-                style={[
-                  styles.inlineTab,
-                  !showDuties && styles.inlineTabActive,
-                ]}
+            <SemanticNav>
+              <SemanticNavItem
+                selected={!showDuties}
                 onPress={() => setPanel("wallet")}
-                accessibilityState={{ selected: !showDuties }}
               >
-                <Text
-                  style={[
-                    styles.walletPanelTabText,
-                    !showDuties && styles.walletPanelTabTextActive,
-                  ]}
-                  numberOfLines={1}
-                  ellipsizeMode="tail"
-                >
-                  통장
-                </Text>
-              </ControlPressable>
-              <ControlPressable
-                style={[
-                  styles.inlineTab,
-                  showDuties && styles.inlineTabActive,
-                ]}
+                통장
+              </SemanticNavItem>
+              <SemanticNavItem
+                selected={showDuties}
                 onPress={() => setPanel("duties")}
-                accessibilityState={{ selected: showDuties }}
               >
-                <Text
-                  style={[
-                    styles.walletPanelTabText,
-                    showDuties && styles.walletPanelTabTextActive,
-                  ]}
-                  numberOfLines={1}
-                  ellipsizeMode="tail"
-                >
-                  1인 1역
-                </Text>
-              </ControlPressable>
-            </View>
-          ) : null}
-          {!showDuties ? (
-            <ControlPressable
-              style={styles.walletDetailLink}
-              onPress={onDetail}
-              hitSlop={8}
-              accessibilityLabel="통장 자세히 보기"
-            >
-              <Text
-                style={styles.walletDetailLinkText}
-                numberOfLines={1}
-                ellipsizeMode="tail"
-              >
-                자세히 →
-              </Text>
-            </ControlPressable>
+                내 역할
+              </SemanticNavItem>
+            </SemanticNav>
           ) : null}
         </View>
       </View>
@@ -630,6 +605,7 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     paddingHorizontal: spacing.xl,
+    paddingTop: spacing.lg,
     paddingBottom: spacing.xxl,
     gap: spacing.md,
   },
@@ -649,31 +625,10 @@ const styles = StyleSheet.create({
     minWidth: 0,
   },
 
-  accountRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: spacing.md,
-    paddingTop: spacing.xs,
-    paddingBottom: spacing.xs,
-  },
-  accountIdentity: {
-    flex: 1,
-    minWidth: 0,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: spacing.sm,
-  },
-  accountName: {
+  headerStudentName: {
     ...typography.label,
-    color: colors.text,
-    flexShrink: 1,
-  },
-  accountClassroom: {
-    ...typography.micro,
     color: colors.textMuted,
     flexShrink: 1,
-    maxWidth: "48%",
   },
   accountActions: {
     flexDirection: "row",
@@ -690,31 +645,6 @@ const styles = StyleSheet.create({
     borderColor: colors.transparent,
     borderRadius: radii.none,
     backgroundColor: colors.transparent,
-  },
-  logoutIcon: {
-    width: studentNav.logoutIconWidth,
-    height: studentNav.logoutIconHeight,
-    alignItems: "center",
-    justifyContent: "center",
-    position: "relative",
-  },
-  logoutDoor: {
-    position: "absolute",
-    left: 2,
-    top: 2,
-    width: studentNav.logoutDoorWidth,
-    height: studentNav.logoutDoorHeight,
-    borderWidth: borders.hairline,
-    borderRightWidth: borders.none,
-    borderColor: colors.textMuted,
-  },
-  logoutArrow: {
-    ...typography.body,
-    color: colors.textMuted,
-    lineHeight: studentNav.logoutArrowLineHeight,
-    position: "absolute",
-    right: 0,
-    top: 1,
   },
   showcaseBand: {
     marginHorizontal: -spacing.xxl,
@@ -821,9 +751,7 @@ const styles = StyleSheet.create({
   },
   walletCardCompact: {
     paddingVertical: spacing.md,
-    gap: spacing.sm,
-    borderTopWidth: borders.hairline,
-    borderTopColor: colors.border,
+    gap: spacing.md,
   },
   walletHeaderCompact: {
     flexDirection: "row",
@@ -836,6 +764,12 @@ const styles = StyleSheet.create({
     flex: 1,
     minWidth: 0,
   },
+  walletHeaderTitleRow: {
+    flexDirection: "row",
+    alignItems: "flex-end",
+    gap: spacing.sm,
+    flexWrap: "wrap",
+  },
   walletHeaderActions: {
     flexDirection: "row",
     alignItems: "center",
@@ -844,35 +778,29 @@ const styles = StyleSheet.create({
     flexShrink: 1,
     flexWrap: "wrap",
   },
-  walletEyebrowCompact: {
-    ...typography.badge,
-    color: colors.accent,
-    marginBottom: spacing.xxs,
+  walletSectionTitle: {
+    ...typography.subtitle,
+    color: colors.text,
   },
   walletTitleCompact: { ...typography.subtitle, color: colors.text },
   walletDetailLink: {
     minHeight: tapMin,
     minWidth: 0,
+    flexDirection: "row",
+    gap: spacing.xxs,
     paddingHorizontal: spacing.xs,
-    paddingVertical: spacing.xs,
+    paddingVertical: spacing.none,
     borderWidth: borders.none,
     borderColor: colors.transparent,
     borderRadius: radii.none,
     backgroundColor: colors.transparent,
-    alignItems: "center",
+    alignItems: "flex-end",
     justifyContent: "center",
     flexShrink: 1,
   },
   walletDetailLinkText: {
     ...typography.badge,
-    color: colors.accent,
-  },
-  walletPanelTabText: {
-    ...typography.badge,
     color: colors.textMuted,
-  },
-  walletPanelTabTextActive: {
-    color: colors.accentTintedText,
   },
   walletBalanceRowCompact: {
     flexDirection: "row",
@@ -954,35 +882,6 @@ const styles = StyleSheet.create({
     borderTopWidth: borders.hairline,
     borderTopColor: colors.border,
   },
-  inlineTabGroup: {
-    flexDirection: "row",
-    alignItems: "stretch",
-    gap: spacing.xs,
-    flexShrink: 1,
-    flexWrap: "wrap",
-  },
-  inlineTab: {
-    minHeight: tapMin,
-    minWidth: 0,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: spacing.xs,
-    borderWidth: borders.none,
-    borderRadius: radii.none,
-    borderColor: colors.transparent,
-    backgroundColor: colors.transparent,
-    flexShrink: 1,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  inlineTabActive: {
-    borderBottomWidth: borders.hairline,
-    borderBottomColor: colors.accent,
-  },
-  inlineTabDangerActive: {
-    borderBottomColor: colors.danger,
-  },
-  categoryTabText: { ...typography.label, color: colors.textMuted },
-  categoryTabTextActive: { color: colors.accentTintedText },
   boardGrid: { marginTop: spacing.xxs },
   gridRow: { flexDirection: "row" },
   gridCell: { flex: 1 },
@@ -1028,7 +927,7 @@ const styles = StyleSheet.create({
   },
   assignmentPanel: {
     paddingVertical: spacing.md,
-    gap: spacing.sm,
+    gap: spacing.md,
     borderTopWidth: borders.hairline,
     borderTopColor: colors.border,
   },
@@ -1039,26 +938,21 @@ const styles = StyleSheet.create({
     gap: spacing.md,
     flexWrap: "wrap",
   },
-  assignmentEyebrow: {
-    ...typography.badge,
-    color: colors.accent,
-    marginBottom: spacing.xxs,
+  assignmentSectionTitle: {
+    ...typography.subtitle,
+    color: colors.text,
+    marginBottom: spacing.xs,
   },
   assignmentTitle: {
     ...typography.subtitle,
     color: colors.text,
   },
-  filterChipText: {
-    ...typography.badge,
-    color: colors.textMuted,
-  },
-  filterChipTextActive: {
-    color: colors.accentTintedText,
-  },
-  filterChipTextDangerActive: {
-    color: colors.statusReturnedText,
-  },
   assignmentList: {
+    paddingBottom: spacing.xs,
+    borderBottomWidth: borders.hairline,
+    borderBottomColor: colors.border,
+  },
+  assignmentRows: {
     overflow: "hidden",
   },
   assignmentExpand: {
@@ -1086,12 +980,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.none,
     borderWidth: borders.none,
     borderRadius: radii.none,
-    borderBottomWidth: borders.hairline,
-    borderBottomColor: colors.border,
     backgroundColor: colors.transparent,
-  },
-  assignmentRowLast: {
-    borderBottomWidth: borders.none,
   },
   assignmentRowStatic: {
     backgroundColor: colors.transparent,

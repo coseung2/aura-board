@@ -1,6 +1,7 @@
-import { useState } from "react";
+import { memo, useEffect, useState } from "react";
 import type { GestureResponderEvent } from "react-native";
-import { Image, Linking, StyleSheet, Text, View } from "react-native";
+import { Linking, StyleSheet, Text, View } from "react-native";
+import { Image } from "expo-image";
 import {
   borders,
   colors,
@@ -17,7 +18,7 @@ import {
 } from "../lib/media";
 import { ControlPressable, Pill, SurfaceCard, SurfacePressable } from "./ui";
 
-export function CardView({
+export const CardView = memo(function CardView({
   card,
   onPress,
 }: {
@@ -28,12 +29,21 @@ export function CardView({
   const youTubeThumb = getYouTubeThumbnailUrlFromLink(
     card.linkUrl ?? card.videoUrl,
   );
+  const imageAttachment = card.attachments?.find(
+    (attachment) => attachment.kind === "image",
+  );
+  const primaryImage = card.imageUrl
+    ? imageAttachment?.url === card.imageUrl
+      ? (imageAttachment.previewUrl ?? card.imageUrl)
+      : card.imageUrl
+    : (imageAttachment?.previewUrl ?? imageAttachment?.url);
   const firstImage =
-    card.imageUrl ??
-    card.attachments?.find((attachment) => attachment.kind === "image")?.url ??
+    card.thumbUrl ??
+    primaryImage ??
     card.linkImage ??
     youTubeThumb ??
     null;
+  useEffect(() => setImageFailed(false), [firstImage]);
   const authorName = resolveCardAuthorName(card);
   const dateText = formatCardDate(card.createdAt);
   const fileUrl =
@@ -54,7 +64,10 @@ export function CardView({
         <Image
           source={{ uri: firstImage }}
           style={styles.image}
-          resizeMode="cover"
+          contentFit="cover"
+          cachePolicy="memory-disk"
+          recyclingKey={`${card.id}:${firstImage}`}
+          transition={0}
           onError={() => setImageFailed(true)}
         />
       ) : hasImageFallback ? (
@@ -67,12 +80,12 @@ export function CardView({
 
       <View style={styles.body}>
         {card.title ? (
-          <Text style={styles.title} numberOfLines={3}>
+          <Text style={styles.title} numberOfLines={1}>
             {card.title}
           </Text>
         ) : null}
         {card.content ? (
-          <Text style={styles.content} numberOfLines={6}>
+          <Text style={styles.content} numberOfLines={2}>
             {card.content}
           </Text>
         ) : null}
@@ -127,7 +140,7 @@ export function CardView({
           <View style={styles.authorFooter}>
             {authorName ? (
               <Pill
-                tone="accent"
+                tone="neutral"
                 numberOfLines={1}
                 style={styles.authorChip}
                 textStyle={styles.authorName}
@@ -169,7 +182,9 @@ export function CardView({
   return (
     <SurfaceCard style={[styles.card, { backgroundColor }]}>{body}</SurfaceCard>
   );
-}
+}, (previous, next) =>
+  previous.card === next.card && Boolean(previous.onPress) === Boolean(next.onPress),
+);
 
 function openInlineTarget(
   event: GestureResponderEvent,
@@ -220,12 +235,12 @@ const styles = StyleSheet.create({
   },
   image: {
     width: "100%",
-    height: media.cardImageHeight,
+    aspectRatio: media.previewAspectRatio,
     backgroundColor: colors.surfaceAlt,
   },
   imageFallback: {
     width: "100%",
-    height: media.cardImageHeight,
+    aspectRatio: media.previewAspectRatio,
     backgroundColor: colors.surface,
     alignItems: "center",
     justifyContent: "center",
@@ -237,15 +252,15 @@ const styles = StyleSheet.create({
     textAlign: "center",
   },
   body: {
-    padding: spacing.md,
-    gap: spacing.sm,
+    padding: spacing.sm,
+    gap: spacing.xs,
   },
   title: {
-    ...typography.subtitle,
+    ...typography.section,
     color: colors.text,
   },
   content: {
-    ...typography.micro,
+    ...typography.body,
     color: colors.textMuted,
   },
   linkBox: {
@@ -288,16 +303,17 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: spacing.sm,
-    marginTop: spacing.sm,
-    paddingTop: spacing.sm,
+    marginTop: spacing.xs,
+    paddingTop: spacing.xs,
     borderTopWidth: borders.hairline,
     borderTopColor: colors.border,
   },
   authorChip: {
     maxWidth: sizing.authorChipMaxWidth,
+    backgroundColor: colors.transparent,
   },
   authorName: {
-    ...typography.micro,
+    ...typography.label,
     color: colors.accentTintedText,
   },
   authorTime: {
@@ -308,7 +324,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     gap: spacing.sm,
     alignItems: "center",
-    marginTop: spacing.sm,
+    marginTop: spacing.xs,
   },
   engageItem: {
     flexDirection: "row",

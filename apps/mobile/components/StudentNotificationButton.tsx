@@ -1,12 +1,14 @@
 import { useCallback, useEffect, useState } from "react";
 import { AppState, StyleSheet, Text, View } from "react-native";
 import { usePathname, useRouter } from "expo-router";
+import { Bell } from "lucide-react-native";
 import { apiFetch, ApiError } from "../lib/api";
 import { clearSessionToken } from "../lib/session";
 import type { StudentNotificationPayload } from "../lib/types";
 import {
   borders,
   colors,
+  iconSizes,
   radii,
   spacing,
   studentNav,
@@ -51,10 +53,12 @@ export function StudentNotificationButton() {
       onPress={() => router.push("/(student)/notifications")}
       accessibilityLabel={count > 0 ? `알림 ${count}건` : "알림"}
     >
-      <View style={styles.icon} accessible={false}>
-        <View style={styles.bellBody} />
-        <View style={styles.bellClapper} />
-      </View>
+      <Bell
+        size={iconSizes.md}
+        color={colors.textMuted}
+        strokeWidth={2}
+        accessible={false}
+      />
       {count > 0 ? (
         <View style={styles.badge}>
           <Text style={styles.badgeText}>{count > 9 ? "9+" : count}</Text>
@@ -75,29 +79,6 @@ const styles = StyleSheet.create({
     borderRadius: radii.none,
     backgroundColor: colors.transparent,
     position: "relative",
-  },
-  icon: {
-    width: studentNav.notificationIconWidth,
-    height: studentNav.notificationIconHeight,
-    alignItems: "center",
-    justifyContent: "flex-start",
-  },
-  bellBody: {
-    width: studentNav.notificationBellWidth,
-    height: studentNav.notificationBellHeight,
-    borderWidth: borders.hairline,
-    borderColor: colors.textMuted,
-    borderTopLeftRadius: radii.pill,
-    borderTopRightRadius: radii.pill,
-    borderBottomLeftRadius: radii.control,
-    borderBottomRightRadius: radii.control,
-  },
-  bellClapper: {
-    width: studentNav.notificationClapperSize,
-    height: studentNav.notificationClapperSize,
-    marginTop: -borders.hairline,
-    borderRadius: radii.pill,
-    backgroundColor: colors.textMuted,
   },
   badge: {
     position: "absolute",

@@ -10,6 +10,7 @@ import { SafeAreaProvider } from "react-native-safe-area-context";
 import * as Linking from "expo-linking";
 import { colors } from "../theme/tokens";
 import { clearParentSession, saveParentToken } from "../lib/session";
+import { useAndroidBackBehavior } from "../hooks/use-android-back-behavior";
 
 // 루트 레이아웃. 모든 스크린을 Stack 으로 감싸되 헤더는 각 segment 에서 커스텀.
 // 학부모 이메일 매직링크 콜백(auraboard://parent/auth/callback#...) 을
@@ -96,6 +97,8 @@ function DeepLinkHandler() {
 }
 
 export default function RootLayout() {
+  useAndroidBackBehavior();
+
   const [fontsLoaded, fontError] = useFonts({
     NotoSansKR_400Regular,
     NotoSansKR_600SemiBold,

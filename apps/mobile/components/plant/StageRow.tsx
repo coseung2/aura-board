@@ -1,5 +1,6 @@
-import { StyleSheet, Text, View } from "react-native";
+import { ScrollView, StyleSheet, Text, View } from "react-native";
 import {
+  borders,
   colors,
   iconSizes,
   plant,
@@ -11,7 +12,7 @@ import { StageRail, type StageState } from "./StageRail";
 import { ObservationCard } from "./ObservationCard";
 import { StageCompare } from "./StageCompare";
 import type { StageDTO, ObservationDTO } from "../../lib/types";
-import { AppButton, Pill, SurfaceCard } from "../ui";
+import { AppButton, Pill } from "../ui";
 
 interface Props {
   stage: StageDTO;
@@ -60,11 +61,11 @@ export function StageRow({
         isFirst={isFirst}
         isLast={isLast}
       />
-      <SurfaceCard
+      <View
         style={[
           styles.body,
-          state === "active" && styles.bodyActive,
           state === "upcoming" && styles.bodyUpcoming,
+          isLast && styles.bodyLast,
         ]}
       >
         {/* 헤더 */}
@@ -103,7 +104,11 @@ export function StageRow({
         ) : observations.length === 0 ? (
           <Text style={styles.emptyText}>아직 기록이 없어요.</Text>
         ) : (
-          <View style={styles.obsGrid}>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.obsGrid}
+          >
             {observations.map((obs) => (
               <View key={obs.id} style={styles.obsGridItem}>
                 <ObservationCard
@@ -115,7 +120,7 @@ export function StageRow({
                 />
               </View>
             ))}
-          </View>
+          </ScrollView>
         )}
 
         {/* 사진 비교 */}
@@ -142,7 +147,7 @@ export function StageRow({
             )}
           </View>
         )}
-      </SurfaceCard>
+      </View>
     </View>
   );
 }
@@ -157,13 +162,14 @@ const styles = StyleSheet.create({
     padding: spacing.lg,
     marginBottom: spacing.md,
     gap: spacing.sm,
-  },
-  bodyActive: {
-    borderColor: colors.plantActive,
+    borderBottomWidth: borders.hairline,
+    borderBottomColor: colors.border,
   },
   bodyUpcoming: {
     opacity: states.disabledOpacity,
-    borderStyle: "dashed" as never, // RN doesn't support dashed natively; fallback to solid
+  },
+  bodyLast: {
+    borderBottomWidth: borders.none,
   },
   header: {
     gap: spacing.xs,
@@ -210,7 +216,6 @@ const styles = StyleSheet.create({
   },
   obsGrid: {
     flexDirection: "row",
-    flexWrap: "wrap",
     gap: spacing.sm,
     alignItems: "flex-start",
   },

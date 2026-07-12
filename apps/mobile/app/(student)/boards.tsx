@@ -16,6 +16,7 @@ import {
   borders,
   colors,
   layout as layoutTokens,
+  radii,
   spacing,
   tapMin,
   typography,
@@ -27,16 +28,26 @@ import {
   AppButton,
   AppHeader,
   EmptyState,
-  Pill,
+  SemanticNav,
+  SemanticNavItem,
   SurfacePressable,
 } from "../../components/ui";
 
 const FALLBACK_THUMBNAIL = "/board-type-thumbnails/card-board.png";
+const BOARD_CATEGORIES = [
+  { key: "LESSON", label: "수업" },
+  { key: "PLAY", label: "놀이" },
+] as const;
+type BoardCategory = (typeof BOARD_CATEGORIES)[number]["key"];
+type StudentBoardsResponse = { boards: BoardMeta[] };
 
 export default function StudentBoardsScreen() {
   const router = useRouter();
   const { width, height } = useWindowDimensions();
   const [boards, setBoards] = useState<BoardMeta[]>([]);
+  const [selectedCategory, setSelectedCategory] = useState<BoardCategory | null>(
+    null,
+  );
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -55,12 +66,34 @@ export default function StudentBoardsScreen() {
         boardColumns,
     ),
   );
+  const lessonBoards = boards.filter(
+    (board) => boardCategory(board) === "LESSON",
+  );
+  const playBoards = boards.filter((board) => boardCategory(board) === "PLAY");
+  const activeCategory: BoardCategory =
+    selectedCategory ?? (lessonBoards.length > 0 ? "LESSON" : "PLAY");
+  const activeBoards = activeCategory === "LESSON" ? lessonBoards : playBoards;
+  const activeCategoryLabel =
+    BOARD_CATEGORIES.find((category) => category.key === activeCategory)?.label ??
+    "보드";
 
   const load = useCallback(async (refresh = false) => {
     if (refresh) setRefreshing(true);
     try {
       setError(null);
-      const response = await apiFetch<MeResponse>("/api/student/me");
+      let response: StudentBoardsResponse;
+      try {
+        response = await apiFetch<StudentBoardsResponse>("/api/student/boards");
+      } catch (requestError) {
+        // 기존 원격 서버가 경량 목록 라우트보다 먼저 배포된 앱을 지원한다.
+        // 로컬/최신 서버에서는 위의 전용 API를 사용하고, 아직 경로가 없는
+        // 원격 서버에서만 기존 홈 payload의 boards로 안전하게 되돌아간다.
+        if (!(requestError instanceof ApiError) || requestError.status !== 404) {
+          throw requestError;
+        }
+        const legacy = await apiFetch<MeResponse>("/api/student/me");
+        response = { boards: legacy.boards };
+      }
       setBoards(response.boards);
     } catch (nextError) {
       if (nextError instanceof ApiError && nextError.status === 401) {
@@ -77,9 +110,34 @@ export default function StudentBoardsScreen() {
 
   useFocusEffect(useCallback(() => { void load(); }, [load]));
 
+  const categoryTabs = boards.length > 0 ? (
+    <SemanticNav
+      style={styles.categoryTabs}
+      accessibilityLabel="보드 구분"
+    >
+      {BOARD_CATEGORIES.map((category) => {
+        const isActive = activeCategory === category.key;
+        return (
+          <SemanticNavItem
+            key={category.key}
+            onPress={() => setSelectedCategory(category.key)}
+            accessibilityLabel={`${category.label} 보드`}
+            selected={isActive}
+          >
+            {category.label}
+          </SemanticNavItem>
+        );
+      })}
+    </SemanticNav>
+  ) : null;
+
   return (
     <SafeAreaView style={styles.container} edges={["top"]}>
-      <AppHeader title="보드" />
+      <AppHeader
+        title="보드"
+        right={categoryTabs}
+        rightStyle={styles.categoryTabsRight}
+      />
       {loading ? (
         <View style={styles.center}>
           <ActivityIndicator size="large" color={colors.accent} />
@@ -110,58 +168,72 @@ export default function StudentBoardsScreen() {
             />
           ) : (
             <>
-              <View style={styles.sectionHeader}>
-                <View style={styles.sectionHeadingCopy}>
-                  <Text style={styles.sectionTitle}>참여 중인 보드</Text>
-                  <Text style={styles.sectionHint}>보드를 선택해 활동을 이어가세요.</Text>
-                </View>
-                <Text style={styles.sectionCount}>{boards.length}개</Text>
-              </View>
-              <View style={styles.boardGrid}>
-                {boards.map((board) => {
-                  const statusLabel = boardStatusLabel(board);
-                  return (
-                    <SurfacePressable
-                      key={board.id}
-                      style={[styles.boardCard, { width: boardTileSize }]}
-                      onPress={() =>
-                        router.push(`/(student)/board/${board.slug}?layout=${board.layout}`)
-                      }
-                      accessibilityLabel={`${board.title}, ${layoutLabel(board.layout)}, ${statusLabel}`}
-                      accessibilityHint="보드를 열어요"
-                    >
-                      <Image
-                        source={{ uri: boardThumbUri(board) }}
-                        style={styles.thumbnail}
-                        resizeMode="cover"
-                        accessible={false}
-                      />
-                      <View style={styles.boardBody}>
-                        <Text style={styles.boardTitle} numberOfLines={1}>
-                          {board.title}
-                        </Text>
-                        <View style={styles.boardMetaRow}>
-                          <Text style={styles.boardLayout} numberOfLines={1}>
-                            {layoutLabel(board.layout)}
+              {activeBoards.length === 0 ? (
+                <EmptyState
+                  title={`${activeCategoryLabel} 보드가 없어요.`}
+                  description="다른 구분을 선택하거나 선생님이 보드를 열어 주면 이곳에 표시돼요."
+                  style={styles.categoryEmptyState}
+                />
+              ) : (
+                <View style={styles.boardGrid}>
+                  {activeBoards.map((board) => {
+                    const statusLabel = boardStatusLabel(board);
+                    const layout = layoutLabel(board.layout);
+                    const statusIsDistinct = statusLabel !== layout;
+                    return (
+                      <SurfacePressable
+                        key={board.id}
+                        style={[styles.boardCard, { width: boardTileSize }]}
+                        onPress={() =>
+                          router.push(`/(student)/board/${board.slug}?layout=${board.layout}`)
+                        }
+                        accessibilityLabel={`${board.title}, ${layout}, ${statusLabel}`}
+                        accessibilityHint="보드를 열어요"
+                      >
+                        <Image
+                          source={{ uri: boardThumbUri(board) }}
+                          style={styles.thumbnail}
+                          resizeMode="cover"
+                          accessible={false}
+                        />
+                        <View style={styles.boardBody}>
+                          <Text style={styles.boardTitle} numberOfLines={1}>
+                            {board.title}
                           </Text>
-                          <Pill
-                            tone={boardStatusTone(board)}
-                            style={styles.boardStatusPill}
-                          >
-                            {statusLabel}
-                          </Pill>
+                          <View style={styles.boardMetaRow}>
+                            <Text style={styles.boardLayout} numberOfLines={1}>
+                              {layout}
+                            </Text>
+                            {statusIsDistinct ? (
+                              <Text
+                                style={[
+                                  styles.boardStatus,
+                                  boardStatusTone(board) === "accent" && styles.boardStatusAccent,
+                                  boardStatusTone(board) === "danger" && styles.boardStatusDanger,
+                                ]}
+                                numberOfLines={1}
+                              >
+                                {statusLabel}
+                              </Text>
+                            ) : null}
+                          </View>
                         </View>
-                      </View>
-                    </SurfacePressable>
-                  );
-                })}
-              </View>
+                      </SurfacePressable>
+                    );
+                  })}
+                </View>
+              )}
             </>
           )}
         </ScrollView>
       )}
     </SafeAreaView>
   );
+}
+
+/** Keep a malformed/new category visible under the schema's safe default. */
+function boardCategory(board: BoardMeta): BoardCategory {
+  return board.category === "PLAY" ? "PLAY" : "LESSON";
 }
 
 function boardStatusLabel(board: BoardMeta): string {
@@ -205,19 +277,15 @@ const styles = StyleSheet.create({
     gap: spacing.md,
   },
   contentWide: { paddingHorizontal: spacing.xxl },
-  sectionHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: spacing.md,
-    paddingBottom: spacing.sm,
-    borderBottomWidth: borders.hairline,
-    borderBottomColor: colors.border,
+  categoryTabs: {
+    alignSelf: "stretch",
+    height: "100%",
   },
-  sectionHeadingCopy: { flex: 1, minWidth: 0, gap: spacing.xxs },
-  sectionTitle: { ...typography.section, color: colors.text },
-  sectionHint: { ...typography.label, color: colors.textMuted },
-  sectionCount: { ...typography.label, color: colors.accent },
+  categoryTabsRight: {
+    alignSelf: "stretch",
+    marginBottom: -borders.hairline,
+  },
+  categoryEmptyState: { width: "100%", marginTop: spacing.xs },
   boardGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
@@ -241,7 +309,8 @@ const styles = StyleSheet.create({
     flex: 1,
     minWidth: 0,
     justifyContent: "center",
-    padding: spacing.xs,
+    paddingVertical: spacing.xs,
+    paddingHorizontal: spacing.sm,
     gap: spacing.xxs,
   },
   boardTitle: { ...typography.label, color: colors.text },
@@ -252,6 +321,8 @@ const styles = StyleSheet.create({
     gap: spacing.xs,
   },
   boardLayout: { ...typography.badge, color: colors.textMuted, flex: 1 },
-  boardStatusPill: { paddingHorizontal: spacing.sm, paddingVertical: spacing.xxs },
+  boardStatus: { ...typography.badge, color: colors.textMuted, flexShrink: 1 },
+  boardStatusAccent: { color: colors.accentTintedText },
+  boardStatusDanger: { color: colors.danger },
   emptyState: { width: "100%", marginTop: spacing.xs },
 });

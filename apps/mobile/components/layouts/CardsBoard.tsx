@@ -99,12 +99,17 @@ function useBoardGridMetrics(width: number) {
   const padding = layout.boardGridPadding * 2;
   const gap = layout.boardGridGap;
   const available = Math.max(0, width - padding);
-  const columns = Math.max(
-    1,
-    Math.floor((available + gap) / (layout.boardGridMinCardWidth + gap)),
-  );
-  const cardWidth =
-    columns === 1 ? available : (available - (columns - 1) * gap) / columns;
+  const columns =
+    width < layout.mobileBreakpoint
+      ? 2
+      : Math.min(
+          4,
+          Math.max(
+            1,
+            Math.floor((available + gap) / (layout.boardGridMinCardWidth + gap)),
+          ),
+        );
+  const cardWidth = (available - (columns - 1) * gap) / columns;
   return { columns, cardWidth };
 }
 
@@ -124,6 +129,9 @@ export function CardsBoard({
   const { width } = useWindowDimensions();
   const { columns, cardWidth } = useBoardGridMetrics(width);
   const boardTheme = boardThemes[normalizeBoardTheme(data.board.boardTheme)];
+  const selectedIndex = selectedCard
+    ? cards.findIndex((card) => card.id === selectedCard.id)
+    : -1;
 
   const streamSectionsEnabled =
     data.board.layout === "stream" && Boolean(data.board.streamSectionsEnabled);
@@ -206,10 +214,19 @@ export function CardsBoard({
             </View>
           )}
           ListEmptyComponent={emptyState}
+          initialNumToRender={8}
+          maxToRenderPerBatch={8}
+          updateCellsBatchingPeriod={40}
+          windowSize={7}
+          removeClippedSubviews
         />
       )}
 
-      <Fab style={styles.fab} onPress={() => setComposerOpen(true)}>
+      <Fab
+        style={styles.fab}
+        onPress={() => setComposerOpen(true)}
+        accessibilityLabel="카드 추가"
+      >
         <Text style={styles.fabPlus}>＋</Text>
       </Fab>
       <CardComposer
@@ -221,6 +238,10 @@ export function CardsBoard({
       <CardDetailModal
         card={selectedCard}
         onClose={() => setSelectedCard(null)}
+        hasPrevious={selectedIndex > 0}
+        hasNext={selectedIndex >= 0 && selectedIndex < cards.length - 1}
+        onPrevious={() => setSelectedCard(cards[selectedIndex - 1] ?? null)}
+        onNext={() => setSelectedCard(cards[selectedIndex + 1] ?? null)}
         onUpdated={(c) => {
           const selectedNext =
             selectedCard?.id === c.id
@@ -302,7 +323,7 @@ const styles = StyleSheet.create({
     bottom: spacing.xxl,
   },
   fabPlus: {
-    fontSize: iconSizes.xl,
+    fontSize: iconSizes.lg,
     color: colors.onAccent,
     fontWeight: "300",
     marginTop: -spacing.xs,

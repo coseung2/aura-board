@@ -11,7 +11,7 @@ import {
   useWindowDimensions,
   View,
 } from "react-native";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type ElementRef } from "react";
 import {
   AppButton,
   ControlPressable,
@@ -70,6 +70,10 @@ interface Props {
   // 서버 저장 후 부모 board 리스트를 정확히 갱신하기 위한 콜백.
   onUpdated?: (card: BoardCard) => void;
   onDeleted?: (cardId: string) => void;
+  hasPrevious?: boolean;
+  hasNext?: boolean;
+  onPrevious?: () => void;
+  onNext?: () => void;
 }
 
 export function CardDetailModal({
@@ -77,6 +81,10 @@ export function CardDetailModal({
   onClose,
   onUpdated,
   onDeleted,
+  hasPrevious,
+  hasNext,
+  onPrevious,
+  onNext,
 }: Props) {
   const { width, height } = useWindowDimensions();
   const [expanded, setExpanded] = useState(false);
@@ -101,6 +109,7 @@ export function CardDetailModal({
     form: 0,
   });
   const railScrollRef = useRef<ScrollView>(null);
+  const commentInputRef = useRef<ElementRef<typeof TextField>>(null);
   const commentOffsetsRef = useRef(commentOffsets);
 
   const loadEngagement = useCallback(async () => {
@@ -236,6 +245,12 @@ export function CardDetailModal({
     isLiked: false,
     canInteract: false,
   };
+
+  function focusCommentInput() {
+    commentInputRef.current?.focus();
+    setTimeout(scrollCommentInputIntoView, 80);
+  }
+
   const hasMedia = mediaItems.length > 0;
   const hasTextContent = Boolean(
     title || content || fileItems.length > 0 || hasTextLink,
@@ -443,6 +458,7 @@ export function CardDetailModal({
           <IconButton
             onPress={onClose}
             style={styles.closeBtn}
+            hitSlop={4}
             accessibilityLabel="카드 상세 닫기"
           >
             <View pointerEvents="none" style={styles.closeIcon}>
@@ -450,13 +466,16 @@ export function CardDetailModal({
               <View style={[styles.closeStroke, styles.closeStrokeB]} />
             </View>
           </IconButton>
-          <IconButton
-            onPress={() => setExpanded((value) => !value)}
-            style={styles.fullscreenBtn}
-            accessibilityLabel={expanded ? "전체화면 끄기" : "전체화면 켜기"}
-          >
-            <FullscreenGlyph expanded={expanded} />
-          </IconButton>
+          {hasMedia ? (
+            <IconButton
+              onPress={() => setExpanded((value) => !value)}
+              style={styles.fullscreenBtn}
+              hitSlop={4}
+              accessibilityLabel={expanded ? "전체화면 끄기" : "전체화면 켜기"}
+            >
+              <FullscreenGlyph expanded={expanded} />
+            </IconButton>
+          ) : null}
           <View
             style={[
               styles.body,
@@ -575,7 +594,7 @@ export function CardDetailModal({
                 </View>
               ) : null}
 
-              {shouldRenderContent ? (
+              {shouldRenderContent && (!expanded || !hasMedia) ? (
                 <ScrollView
                   style={styles.contentScroll}
                   keyboardShouldPersistTaps="handled"
@@ -682,7 +701,7 @@ export function CardDetailModal({
               ) : null}
             </View>
 
-            {!expanded ? (
+            {!expanded || !hasMedia ? (
               <ScrollView
                 ref={railScrollRef}
                 style={[
@@ -749,7 +768,6 @@ export function CardDetailModal({
                       <ControlPressable
                         style={[
                           styles.likeButton,
-                          displayedEngagement.isLiked && styles.likeButtonLiked,
                         ]}
                         disabled={
                           !displayedEngagement.canInteract || engagementBusy
@@ -779,16 +797,17 @@ export function CardDetailModal({
                           {displayedEngagement.likeCount}
                         </Text>
                       </ControlPressable>
-                      <View
+                      <ControlPressable
                         style={styles.commentMeta}
-                        accessible
-                        accessibilityRole="text"
+                        onPress={focusCommentInput}
+                        accessibilityRole="button"
+                        accessibilityLabel={`댓글 ${displayedEngagement.commentCount}개`}
                       >
                         <Text style={styles.commentMetaIcon}>💬</Text>
                         <Text style={styles.commentMetaCount}>
                           {displayedEngagement.commentCount}
                         </Text>
-                      </View>
+                      </ControlPressable>
                     </View>
                     <View
                       style={styles.commentsBlock}
@@ -807,6 +826,7 @@ export function CardDetailModal({
                           }
                         >
                           <TextField
+                            ref={commentInputRef}
                             value={commentText}
                             onChangeText={setCommentText}
                             placeholder="댓글을 입력하세요"
@@ -885,6 +905,26 @@ export function CardDetailModal({
               </ScrollView>
             ) : null}
           </View>
+          {!expanded && (onPrevious || onNext) ? (
+            <>
+              <IconButton
+                onPress={onPrevious}
+                disabled={!hasPrevious || !onPrevious}
+                style={[styles.cardNav, styles.cardNavPrevious]}
+                accessibilityLabel="이전 게시글"
+              >
+                <Text style={styles.cardNavGlyph}>‹</Text>
+              </IconButton>
+              <IconButton
+                onPress={onNext}
+                disabled={!hasNext || !onNext}
+                style={[styles.cardNav, styles.cardNavNext]}
+                accessibilityLabel="다음 게시글"
+              >
+                <Text style={styles.cardNavGlyph}>›</Text>
+              </IconButton>
+            </>
+          ) : null}
         </View>
         {lightboxIndex !== null ? (
           <CardImageLightbox
@@ -1007,7 +1047,7 @@ function MediaBlock({
         accessibilityLabel="이미지 크게 보기"
       >
         <Image
-          source={{ uri: item.previewUrl ?? item.url }}
+          source={{ uri: item.url }}
           style={[
             styles.image,
             isWide && styles.imageWide,
@@ -1178,13 +1218,11 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     position: "absolute",
-    top: cardDetail.closeButtonOffset,
-    right: cardDetail.closeButtonOffset,
+    top: 14,
+    right: 14,
     zIndex: layers.overlayControl,
-    backgroundColor: colors.surfaceGlass,
-    borderWidth: borders.hairline,
-    borderColor: colors.border,
-    ...shadows.card,
+    backgroundColor: colors.transparent,
+    borderWidth: borders.none,
   },
   closeIcon: {
     width: cardDetail.closeIconSize,
@@ -1216,18 +1254,16 @@ const styles = StyleSheet.create({
   closeStrokeB: { transform: [{ rotate: "-45deg" }] },
   fullscreenBtn: {
     position: "absolute",
-    right: spacing.lg,
-    bottom: spacing.lg,
+    right: 14,
+    bottom: 14,
     zIndex: layers.overlayControl,
-    width: cardDetail.iconButtonSize,
-    height: cardDetail.iconButtonSize,
-    borderRadius: radii.pill,
+    width: controls.closeButton,
+    height: controls.closeButton,
+    borderRadius: radii.btn,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: colors.surfaceGlassStrong,
-    borderWidth: borders.hairline,
-    borderColor: colors.border,
-    ...shadows.card,
+    backgroundColor: colors.transparent,
+    borderWidth: borders.none,
   },
   fullscreenGlyph: {
     width: cardDetail.fullscreenGlyphSize,
@@ -1261,6 +1297,19 @@ const styles = StyleSheet.create({
   body: {
     flex: 1,
     paddingTop: spacing.none,
+  },
+  cardNav: {
+    position: "absolute",
+    top: "50%",
+    marginTop: -controls.iconButton / 2,
+    zIndex: layers.overlayControl,
+    backgroundColor: colors.surfaceGlassStrong,
+  },
+  cardNavPrevious: { left: spacing.sm },
+  cardNavNext: { right: spacing.sm },
+  cardNavGlyph: {
+    ...typography.display,
+    color: colors.text,
   },
   bodyHorizontal: {
     flexDirection: "row",
@@ -1451,11 +1500,19 @@ const styles = StyleSheet.create({
   fileMeta: { ...typography.micro, color: colors.textFaint },
   externalLinkBtn: {
     alignSelf: "flex-start",
-    paddingHorizontal: spacing.md,
+    paddingHorizontal: 14,
     paddingVertical: spacing.sm,
     alignItems: "center",
+    backgroundColor: colors.surface,
+    borderWidth: borders.hairline,
+    borderColor: colors.border,
+    borderRadius: radii.btn,
   },
-  externalLinkText: { ...typography.label, color: colors.accentTintedText },
+  externalLinkText: {
+    ...typography.label,
+    fontWeight: "500",
+    color: colors.text,
+  },
   rail: {
     borderTopWidth: borders.hairline,
     borderTopColor: colors.border,
@@ -1545,13 +1602,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.xs,
     borderRadius: radii.pill,
-    borderWidth: borders.hairline,
-    borderColor: colors.border,
-    backgroundColor: colors.surface,
-  },
-  likeButtonLiked: {
-    borderColor: colors.danger,
-    backgroundColor: colors.dangerTintedBg,
+    borderWidth: borders.none,
+    borderColor: colors.transparent,
+    backgroundColor: colors.transparent,
   },
   likeIcon: {
     ...typography.subtitle,
@@ -1564,9 +1617,15 @@ const styles = StyleSheet.create({
     color: colors.danger,
   },
   commentMeta: {
+    minHeight: tapMin,
     flexDirection: "row",
     alignItems: "center",
     gap: spacing.xs,
+    borderWidth: borders.none,
+    borderColor: colors.transparent,
+    backgroundColor: colors.transparent,
+    paddingHorizontal: spacing.xs,
+    paddingVertical: spacing.none,
   },
   commentMetaIcon: {
     ...typography.micro,

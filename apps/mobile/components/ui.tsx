@@ -1,6 +1,8 @@
-import type { ReactNode } from "react";
+import { forwardRef, useEffect, useRef, type ReactNode } from "react";
 import {
   ActivityIndicator,
+  Animated,
+  Easing,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -97,6 +99,89 @@ export function ControlPressable({
     >
       {children}
     </Pressable>
+  );
+}
+
+type SemanticNavProps = {
+  children: ReactNode;
+  style?: StyleProp<ViewStyle>;
+  accessibilityLabel?: string;
+};
+
+export function SemanticNav({
+  children,
+  style,
+  accessibilityLabel,
+}: SemanticNavProps) {
+  return (
+    <View
+      style={[styles.semanticNav, style]}
+      accessibilityRole="tablist"
+      accessibilityLabel={accessibilityLabel}
+    >
+      {children}
+    </View>
+  );
+}
+
+type SemanticNavItemProps = {
+  children: ReactNode;
+  selected?: boolean;
+  tone?: "neutral" | "danger";
+  onPress: () => void;
+  accessibilityLabel?: string;
+};
+
+export function SemanticNavItem({
+  children,
+  selected = false,
+  tone = "neutral",
+  onPress,
+  accessibilityLabel,
+}: SemanticNavItemProps) {
+  const activeProgress = useRef(new Animated.Value(selected ? 1 : 0)).current;
+
+  useEffect(() => {
+    const animation = Animated.timing(activeProgress, {
+      toValue: selected ? 1 : 0,
+      duration: 180,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: true,
+    });
+    animation.start();
+    return () => animation.stop();
+  }, [activeProgress, selected]);
+
+  return (
+    <ControlPressable
+      style={styles.semanticNavItem}
+      onPress={onPress}
+      accessibilityRole="tab"
+      accessibilityLabel={accessibilityLabel}
+      accessibilityState={{ selected }}
+    >
+      <Text
+        style={[
+          styles.semanticNavText,
+          selected && styles.semanticNavTextSelected,
+          tone === "danger" && selected && styles.semanticNavTextDanger,
+        ]}
+        numberOfLines={1}
+      >
+        {children}
+      </Text>
+      <Animated.View
+        pointerEvents="none"
+        style={[
+          styles.semanticNavActiveLine,
+          tone === "danger" && styles.semanticNavActiveLineDanger,
+          {
+            opacity: activeProgress,
+            transform: [{ scaleX: activeProgress }],
+          },
+        ]}
+      />
+    </ControlPressable>
   );
 }
 
@@ -201,15 +286,18 @@ type TextFieldProps = TextInputProps & {
   style?: StyleProp<TextStyle>;
 };
 
-export function TextField({ style, ...props }: TextFieldProps) {
-  return (
-    <TextInput
-      placeholderTextColor={colors.textFaint}
-      style={[styles.textField, style]}
-      {...props}
-    />
-  );
-}
+export const TextField = forwardRef<TextInput, TextFieldProps>(
+  function TextField({ style, ...props }, ref) {
+    return (
+      <TextInput
+        ref={ref}
+        placeholderTextColor={colors.textFaint}
+        style={[styles.textField, style]}
+        {...props}
+      />
+    );
+  },
+);
 
 type ButtonVariant = "primary" | "secondary" | "quiet" | "success" | "danger";
 
@@ -376,12 +464,21 @@ export function EmptyState({
 
 type AppHeaderProps = {
   title: string;
+  titleAccessory?: ReactNode;
   onBack?: () => void;
   right?: ReactNode;
+  rightStyle?: StyleProp<ViewStyle>;
   style?: StyleProp<ViewStyle>;
 };
 
-export function AppHeader({ title, onBack, right, style }: AppHeaderProps) {
+export function AppHeader({
+  title,
+  titleAccessory,
+  onBack,
+  right,
+  rightStyle,
+  style,
+}: AppHeaderProps) {
   return (
     <View style={[styles.appHeader, style]}>
       {onBack ? (
@@ -393,14 +490,19 @@ export function AppHeader({ title, onBack, right, style }: AppHeaderProps) {
           <Text style={styles.appHeaderBackText}>←</Text>
         </IconButton>
       ) : null}
-      <Text
-        accessibilityRole="header"
-        style={styles.appHeaderTitle}
-        numberOfLines={1}
-      >
-        {title}
-      </Text>
-      {right ? <View style={styles.appHeaderRight}>{right}</View> : null}
+      <View style={styles.appHeaderTitleGroup}>
+        <Text
+          accessibilityRole="header"
+          style={styles.appHeaderTitle}
+          numberOfLines={1}
+        >
+          {title}
+        </Text>
+        {titleAccessory}
+      </View>
+      {right ? (
+        <View style={[styles.appHeaderRight, rightStyle]}>{right}</View>
+      ) : null}
     </View>
   );
 }
@@ -427,6 +529,49 @@ const styles = StyleSheet.create({
   controlPressed: {
     borderColor: colors.borderHover,
     backgroundColor: colors.surfaceAlt,
+  },
+  semanticNav: {
+    flexDirection: "row",
+    alignItems: "stretch",
+    borderBottomWidth: borders.hairline,
+    borderBottomColor: colors.border,
+  },
+  semanticNavItem: {
+    minHeight: tapMin,
+    minWidth: 0,
+    flexShrink: 1,
+    paddingHorizontal: spacing.sm,
+    paddingTop: spacing.xs,
+    paddingBottom: spacing.xs,
+    alignItems: "center",
+    justifyContent: "flex-end",
+    borderWidth: borders.none,
+    borderColor: colors.transparent,
+    borderRadius: radii.none,
+    backgroundColor: colors.transparent,
+    position: "relative",
+  },
+  semanticNavText: {
+    ...typography.badge,
+    color: colors.textMuted,
+  },
+  semanticNavTextSelected: {
+    color: colors.accentTintedText,
+    fontWeight: "700",
+  },
+  semanticNavTextDanger: {
+    color: colors.danger,
+  },
+  semanticNavActiveLine: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    bottom: -borders.hairline,
+    height: borders.medium,
+    backgroundColor: colors.accentTintedText,
+  },
+  semanticNavActiveLineDanger: {
+    backgroundColor: colors.danger,
   },
   modalBackdrop: {
     flex: 1,
@@ -499,8 +644,8 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     borderRadius: radii.pill,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.xs,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xxs,
   },
   pillText: {
     ...typography.badge,
@@ -544,7 +689,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: spacing.md,
-    paddingHorizontal: spacing.xxl,
+    paddingHorizontal: spacing.xl,
     borderBottomWidth: borders.hairline,
     borderBottomColor: colors.border,
     backgroundColor: colors.surface,
@@ -556,10 +701,17 @@ const styles = StyleSheet.create({
     ...typography.title,
     color: colors.text,
   },
+  appHeaderTitleGroup: {
+    flex: 1,
+    minWidth: 0,
+    flexDirection: "row",
+    alignItems: "flex-end",
+    gap: spacing.sm,
+  },
   appHeaderTitle: {
     ...typography.title,
     color: colors.text,
-    flex: 1,
+    flexShrink: 1,
   },
   appHeaderRight: {
     flexDirection: "row",
