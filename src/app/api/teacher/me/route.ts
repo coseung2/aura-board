@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
+import { disconnectTeacherCanva } from "@/lib/canva";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -9,6 +10,22 @@ export async function DELETE() {
   const user = await getCurrentUser().catch(() => null);
   if (!user) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+  }
+
+  try {
+    const disconnected = await disconnectTeacherCanva(user.id);
+    if (!disconnected) {
+      return NextResponse.json(
+        { error: "canva_disconnect_failed" },
+        { status: 502 },
+      );
+    }
+  } catch (error) {
+    console.error("Teacher Canva disconnect failed:", error);
+    return NextResponse.json(
+      { error: "canva_disconnect_failed" },
+      { status: 502 },
+    );
   }
 
   try {
