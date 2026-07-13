@@ -9,11 +9,18 @@
 import NextAuth from "next-auth";
 import Google from "next-auth/providers/google";
 import Kakao, { type KakaoProfile } from "next-auth/providers/kakao";
+import Credentials from "next-auth/providers/credentials";
 import type { Provider } from "@auth/core/providers";
 import { PrismaAdapter } from "@auth/prisma-adapter";
 import { db } from "./db";
 import { isSameAccountPrincipal } from "./account-principal";
 import { clearParentSession, getCurrentParent } from "./parent-session";
+import {
+  getCanvaReviewerCredentialConfig,
+  verifyConfiguredCanvaReviewer,
+} from "./canva-reviewer-credentials";
+import { extractIp, hashIp } from "./rate-limit";
+import { limitCanvaReviewerLogin } from "./rate-limit-routes";
 
 const googleClientId = process.env.AUTH_GOOGLE_ID;
 const googleClientSecret = process.env.AUTH_GOOGLE_SECRET;
@@ -53,6 +60,38 @@ if (kakaoClientId && kakaoClientSecret) {
           email: emailVerified ? account?.email : null,
           image: account?.profile?.profile_image_url,
         };
+      },
+    }),
+  );
+}
+
+const reviewerConfig = getCanvaReviewerCredentialConfig();
+
+if (reviewerConfig) {
+  providers.push(
+    Credentials({
+      id: "canva-reviewer",
+      name: "Canva reviewer account",
+      credentials: {
+        email: { label: "Email", type: "email" },
+        password: { label: "Password", type: "password" },
+      },
+      async authorize(credentials, request) {
+        const email = typeof credentials.email === "string" ? credentials.email : "";
+        const password =
+          typeof credentials.password === "string" ? credentials.password : "";
+        const rateLimit = await limitCanvaReviewerLogin(
+          hashIp(extractIp(request)),
+          hashIp(email.trim().toLowerCase()),
+        );
+        if (!rateLimit.ok) return null;
+
+        const verified = verifyConfiguredCanvaReviewer(email, password);
+        if (!verified) return null;
+
+        const user = await db.user.findUnique({ where: { email: verified.email } });
+        if (!user) return null;
+        return { id: user.id, email: user.email, name: user.name, image: user.image };
       },
     }),
   );

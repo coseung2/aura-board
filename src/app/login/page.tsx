@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { signIn, signOut } from "next-auth/react";
 import { Logo } from "@/components/Logo";
 import { RoleIcon } from "@/components/login/RoleIcon";
@@ -13,6 +13,16 @@ export default function LoginPage() {
   const [studentCode, setStudentCode] = useState("");
   const [studentError, setStudentError] = useState("");
   const [studentBusy, setStudentBusy] = useState(false);
+  const [showReviewerLogin, setShowReviewerLogin] = useState(false);
+  const [reviewerEmail, setReviewerEmail] = useState("");
+  const [reviewerPassword, setReviewerPassword] = useState("");
+  const [reviewerError, setReviewerError] = useState("");
+  const [reviewerBusy, setReviewerBusy] = useState(false);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    setShowReviewerLogin(params.get("review") === "canva");
+  }, []);
 
   async function handleStudentLogin(e: FormEvent) {
     e.preventDefault();
@@ -93,6 +103,36 @@ export default function LoginPage() {
     await signIn(provider, { redirectTo: safeTeacherReturnTarget() });
   }
 
+  async function handleReviewerLogin(e: FormEvent) {
+    e.preventDefault();
+    if (!reviewerEmail.trim() || reviewerPassword.length < 16) {
+      setReviewerError("이메일과 비밀번호를 확인해주세요.");
+      return;
+    }
+
+    setReviewerBusy(true);
+    setReviewerError("");
+    try {
+      await signOut({ redirect: false });
+      const redirectTo = safeTeacherReturnTarget();
+      const result = await signIn("canva-reviewer", {
+        email: reviewerEmail.trim(),
+        password: reviewerPassword,
+        redirect: false,
+        redirectTo,
+      });
+      if (result?.error) {
+        setReviewerError("이메일 또는 비밀번호가 올바르지 않습니다.");
+        return;
+      }
+      window.location.assign(result?.url ?? redirectTo);
+    } catch {
+      setReviewerError("로그인에 실패했습니다. 잠시 후 다시 시도해주세요.");
+    } finally {
+      setReviewerBusy(false);
+    }
+  }
+
   return (
     <main className="login-page">
       <div className="login-hub-card">
@@ -134,6 +174,58 @@ export default function LoginPage() {
                 <span>Kakao로 로그인</span>
               </button>
             </div>
+            {showReviewerLogin ? (
+              <>
+                <div className="login-reviewer-separator" role="separator">
+                  Canva review
+                </div>
+                <form className="login-reviewer-form" onSubmit={handleReviewerLogin}>
+                  <label className="login-reviewer-label">
+                    <span>Email</span>
+                    <input
+                      className="login-reviewer-input"
+                      type="email"
+                      value={reviewerEmail}
+                      onChange={(e) => {
+                        setReviewerEmail(e.target.value);
+                        setReviewerError("");
+                      }}
+                      autoComplete="username"
+                      maxLength={254}
+                      required
+                    />
+                  </label>
+                  <label className="login-reviewer-label">
+                    <span>Password</span>
+                    <input
+                      className="login-reviewer-input"
+                      type="password"
+                      value={reviewerPassword}
+                      onChange={(e) => {
+                        setReviewerPassword(e.target.value);
+                        setReviewerError("");
+                      }}
+                      autoComplete="current-password"
+                      minLength={16}
+                      maxLength={256}
+                      required
+                    />
+                  </label>
+                  {reviewerError ? (
+                    <p className="login-role-error" role="alert">
+                      {reviewerError}
+                    </p>
+                  ) : null}
+                  <button
+                    type="submit"
+                    className="login-role-cta"
+                    disabled={reviewerBusy}
+                  >
+                    {reviewerBusy ? "Signing in…" : "Reviewer sign in"}
+                  </button>
+                </form>
+              </>
+            ) : null}
           </div>
 
           {/* 학생 카드 — QR/코드 진입. OAuth 가 아니라 별도 라우팅이라

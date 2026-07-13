@@ -211,6 +211,60 @@
   border-color: #fada0a;
 }
 
+.login-reviewer-separator {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+  color: var(--color-text-muted);
+  font-size: 11px;
+}
+
+.login-reviewer-separator::before,
+.login-reviewer-separator::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: var(--color-border);
+}
+
+.login-reviewer-form {
+  width: 100%;
+  display: grid;
+  gap: 8px;
+}
+
+.login-reviewer-label {
+  display: grid;
+  gap: 4px;
+  text-align: left;
+  color: var(--color-text-muted);
+  font-size: 11px;
+}
+
+.login-reviewer-input {
+  width: 100%;
+  height: 36px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-btn);
+  background: var(--color-surface);
+  color: var(--color-text);
+  padding: 0 10px;
+  font: inherit;
+  font-size: 13px;
+  outline: none;
+}
+
+.login-reviewer-input:focus {
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 3px rgba(0, 117, 222, 0.15);
+}
+
+.login-reviewer-form .login-role-cta {
+  margin-top: 0;
+}
+
 .login-logo {
   /* PNG lockup wrapper — inner <Logo> renders the mark. Layout-only (T2-2). */
   margin: 0 auto 20px;

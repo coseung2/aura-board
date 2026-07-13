@@ -60,4 +60,17 @@ creating overlapping testing-notes documents.
 
 ## Test Fixtures
 
+### Canva reviewer credentials
+
+- Open `/login?review=canva` in a signed-out private browser and confirm the
+  reviewer email/password form is visible while `/login` keeps the normal UI.
+- Confirm a wrong email and wrong password return the same generic error and do
+  not create a `User` row.
+- Confirm the provisioned reviewer account signs in, reaches
+  `/teacher/settings#canva`, and remains signed in after a page reload.
+- Confirm Google and Kakao teacher sign-in still work after the credentials
+  provider is enabled.
+- Confirm repeated invalid reviewer attempts are rate-limited and that a
+  transient production rate-limit failure is fail-closed for this provider.
+
 - Student login code: `DCY366`

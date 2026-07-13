@@ -22,6 +22,8 @@
     "seed:drawing-assets": "tsx prisma/seed-drawing-assets.ts",
     "seed:speed-game": "tsx prisma/seed-speed-game-word-sets.ts",
     "canva:encrypt-secrets": "tsx scripts/encrypt-canva-secrets.ts",
+    "canva:reviewer:generate": "node scripts/generate-canva-reviewer-credentials.mjs",
+    "canva:reviewer:provision": "node scripts/provision-canva-reviewer.mjs",
     "postinstall": "prisma generate"
   },
   "dependencies": {

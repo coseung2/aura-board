@@ -89,6 +89,7 @@ async function runLimit(
   id: string,
   limit: number,
   window: WindowKey,
+  failClosed = false,
 ): Promise<LimitVerdict> {
   if (HAS_UPSTASH) {
     try {
@@ -97,7 +98,7 @@ async function runLimit(
       return { ok: r.success, retryAfter: retryAfter || 1 };
     } catch (err) {
       console.warn(`[rate-limit-routes:${prefix}] upstash failed — fallback`, err);
-      if (process.env.RL_FAIL_MODE === "close") {
+      if (failClosed || process.env.RL_FAIL_MODE === "close") {
         return { ok: false, retryAfter: 5 };
       }
       return { ok: true, retryAfter: 0 };
@@ -130,4 +131,17 @@ export function limitBillingCheckout(userId: string): Promise<LimitVerdict> {
 /** 교사 1인의 환불 요청 — 시간당 5회. 부정환불 탐색 방지. */
 export function limitBillingRefund(userId: string): Promise<LimitVerdict> {
   return runLimit("rl:billing-refund", userId, 5, "1 h");
+}
+
+/** Canva review credentials: independent IP and account limits, both fail-closed. */
+export async function limitCanvaReviewerLogin(
+  ipKey: string,
+  accountKey: string,
+): Promise<LimitVerdict> {
+  const [ip, account] = await Promise.all([
+    runLimit("rl:canva-reviewer-login:ip", ipKey, 20, "1 h", true),
+    runLimit("rl:canva-reviewer-login:account", accountKey, 10, "1 h", true),
+  ]);
+  if (!ip.ok) return ip;
+  return account;
 }

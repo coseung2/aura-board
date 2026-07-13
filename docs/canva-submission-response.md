@@ -60,6 +60,8 @@ workflows.
 
 Application URL: https://aura-board.com
 
+Direct reviewer login URL: https://aura-board.com/login?review=canva
+
 Teacher account:
 
 - Email: integrations-support@canva.com

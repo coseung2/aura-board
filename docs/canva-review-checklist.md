@@ -18,6 +18,9 @@
 - `CANVA_TOKEN_ENCRYPTION_KEY` (운영 전용 랜덤 값)
 - `AUTH_SECRET`
 - `NEXT_PUBLIC_APP_BASE_URL=https://aura-board.com`
+- `CANVA_REVIEWER_EMAIL=integrations-support@canva.com`
+- `CANVA_REVIEWER_NAME=Canva Integration Reviewer`
+- `CANVA_REVIEWER_PASSWORD_HASH` (`npm run canva:reviewer:generate`로 생성)
 
 운영 환경 변수의 실제 값은 이 문서나 저장소에 기록하지 않는다.
 
@@ -91,6 +94,8 @@ Save/publish 흐름은 UI 표시만 보지 말고 API 성공, 서버 상태, 새
 
 - Canva Developer Portal의 production redirect URL이 `aura-board.com`인지 확인한다.
 - 심사용 `integrations-support@canva.com` 계정과 데모 학급/보드를 준비한다.
+- `npm run canva:reviewer:provision`으로 운영 DB 심사 계정을 준비하고
+  `https://aura-board.com/login?review=canva`에서 직접 로그인을 확인한다.
 - `/terms`, `/privacy`, `/support`가 로그아웃 상태에서 200으로 열리는지 확인한다.
 - 운영 환경에 전용 `CANVA_TOKEN_ENCRYPTION_KEY`가 설정되어 있는지 확인한다.
 - 마지막 침투 테스트가 없다면 Canva 설문의 pen test 날짜는 비워 둔다.
