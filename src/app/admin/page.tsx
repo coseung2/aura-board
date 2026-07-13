@@ -1,6 +1,12 @@
 import Link from "next/link";
 import { TopNav } from "@/components/TopNav";
 import { AdminForbidden, requireAdminUser } from "@/lib/admin-auth";
+import {
+  formatActivityRelativeTime,
+  formatAdminActivityActor,
+  formatBoardActivityAction,
+  loadAdminActivityActors,
+} from "@/lib/admin-activity";
 import { db } from "@/lib/db";
 
 const KST_OFFSET_MS = 9 * 60 * 60 * 1000;
@@ -156,31 +162,10 @@ export default async function AdminPage() {
     }),
   ]);
 
-  const actorIds = Array.from(
-    new Set(
-      [...recentAuditEvents, ...recentBoardActivityRows]
-        .map((event) => event.actorId)
-        .filter((id): id is string => Boolean(id)),
-    ),
-  );
-  const [actorUsers, actorStudents] = await Promise.all([
-    db.user.findMany({
-      where: { id: { in: actorIds } },
-      select: { id: true, name: true, email: true },
-    }),
-    db.student.findMany({
-      where: { id: { in: actorIds } },
-      select: {
-        id: true,
-        name: true,
-        classroom: {
-          select: { teacher: { select: { name: true, email: true } } },
-        },
-      },
-    }),
+  const actors = await loadAdminActivityActors([
+    ...recentAuditEvents,
+    ...recentBoardActivityRows,
   ]);
-  const actorUserById = new Map(actorUsers.map((user) => [user.id, user]));
-  const actorStudentById = new Map(actorStudents.map((student) => [student.id, student]));
 
   const users = userRows.map((row) => ({
     ...row,
@@ -200,11 +185,10 @@ export default async function AdminPage() {
     action: activity.action,
     boardTitle: activity.board.title,
     boardSlug: activity.board.slug,
-    actorLabel: formatActivityActor(
+    actorLabel: formatAdminActivityActor(
       activity.actorType,
       activity.actorId,
-      actorUserById,
-      actorStudentById,
+      actors,
     ),
     createdAt: activity.createdAt,
   }));
@@ -232,6 +216,9 @@ export default async function AdminPage() {
           </Link>
           <Link href="/admin/errors" className="admin-link-btn">
             에러 로그
+          </Link>
+          <Link href="/admin/activity" className="admin-link-btn">
+            보드 활동
           </Link>
           </div>
         </header>
@@ -281,6 +268,7 @@ export default async function AdminPage() {
                   <h2>최근 보드 활동</h2>
                   <p>보드 변경과 작성 활동</p>
                 </div>
+                <Link href="/admin/activity" className="admin-section-link">전체 보기</Link>
               </div>
               <ol className="admin-activity-list">
                 {recentBoardActivities.length === 0 ? (
@@ -299,7 +287,7 @@ export default async function AdminPage() {
                           {activity.boardTitle}
                         </Link>
                         <small>
-                          {activity.actorLabel} · {formatRelativeTime(activity.createdAt)}
+                          {activity.actorLabel} · {formatActivityRelativeTime(activity.createdAt)}
                         </small>
                       </div>
                     </li>
@@ -322,17 +310,16 @@ export default async function AdminPage() {
                   recentAuditEvents.map((event) => (
                     <li key={event.id}>
                       <span className="admin-activity-type">
-                        {formatActivityActor(
+                        {formatAdminActivityActor(
                           event.actorType,
                           event.actorId,
-                          actorUserById,
-                          actorStudentById,
+                          actors,
                         )}
                       </span>
                       <div>
                         <strong>{formatAuditAction(event.action)}</strong>
                         <small>
-                          {event.resourceType ?? "서비스"} · {formatRelativeTime(event.createdAt)}
+                          {event.resourceType ?? "서비스"} · {formatActivityRelativeTime(event.createdAt)}
                         </small>
                       </div>
                     </li>
@@ -426,60 +413,6 @@ function MetricCard({ label, value }: { label: string; value: string }) {
   );
 }
 
-function formatBoardActivityAction(action: string): string {
-  const labels: Record<string, string> = {
-    "board.updated": "보드 변경",
-    "board.settings.updated": "보드 설정 변경",
-    "section.created": "섹션 생성",
-    "section.updated": "섹션 변경",
-    "section.deleted": "섹션 삭제",
-    "card.created": "카드 작성",
-    "card.updated": "카드 수정",
-    "card.deleted": "카드 삭제",
-    "card.moved": "카드 이동",
-    "comment.created": "댓글 작성",
-    "like.created": "좋아요",
-    "like.deleted": "좋아요 취소",
-  };
-  return labels[action] ?? action;
-}
-
-type ActivityUser = { name: string; email: string };
-type ActivityStudent = {
-  name: string;
-  classroom: { teacher: { name: string; email: string } };
-};
-
-function formatActivityActor(
-  actorType: string,
-  actorId: string | null,
-  users: Map<string, ActivityUser>,
-  students: Map<string, ActivityStudent>,
-): string {
-  if (actorId && (actorType === "teacher" || actorType === "admin")) {
-    const user = users.get(actorId);
-    if (user) return user.name.trim() || user.email;
-  }
-
-  if (actorId && actorType === "student") {
-    const student = students.get(actorId);
-    if (student) {
-      const teacherName = student.classroom.teacher.name.trim()
-        || student.classroom.teacher.email;
-      return `${student.name} 학생 · ${teacherName} 교사`;
-    }
-  }
-
-  const labels: Record<string, string> = {
-    teacher: "교사",
-    student: "학생",
-    guest: "공유 방문자",
-    system: "시스템",
-    admin: "관리자",
-  };
-  return labels[actorType] ?? actorType;
-}
-
 function formatAuditAction(action: string): string {
   if (action.startsWith("admin.rotate_tokens.")) return "관리자 토큰 교체";
   const labels: Record<string, string> = {
@@ -488,15 +421,6 @@ function formatAuditAction(action: string): string {
     "billing.refund": "결제 환불",
   };
   return labels[action] ?? action;
-}
-
-function formatRelativeTime(date: Date): string {
-  const minutes = Math.max(0, Math.floor((Date.now() - date.getTime()) / 60000));
-  if (minutes < 1) return "방금";
-  if (minutes < 60) return `${minutes}분 전`;
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours}시간 전`;
-  return `${Math.floor(hours / 24)}일 전`;
 }
 
 function toNumber(value: bigint | number | null | undefined): number {
