@@ -4,6 +4,7 @@ import { AdminForbidden, requireAdminUser } from "@/lib/admin-auth";
 import { db } from "@/lib/db";
 
 const KST_OFFSET_MS = 9 * 60 * 60 * 1000;
+const ADMIN_OVERVIEW_ITEM_LIMIT = 5;
 
 type UserUsageRow = {
   id: string;
@@ -131,10 +132,11 @@ export default async function AdminPage() {
     }),
     db.auditEvent.findMany({
       orderBy: { createdAt: "desc" },
-      take: 8,
+      take: ADMIN_OVERVIEW_ITEM_LIMIT,
       select: {
         id: true,
         actorType: true,
+        actorId: true,
         action: true,
         resourceType: true,
         createdAt: true,
@@ -142,16 +144,43 @@ export default async function AdminPage() {
     }),
     db.boardActivityEvent.findMany({
       orderBy: { createdAt: "desc" },
-      take: 10,
+      take: ADMIN_OVERVIEW_ITEM_LIMIT,
       select: {
         id: true,
         action: true,
         actorType: true,
+        actorId: true,
         createdAt: true,
         board: { select: { title: true, slug: true } },
       },
     }),
   ]);
+
+  const actorIds = Array.from(
+    new Set(
+      [...recentAuditEvents, ...recentBoardActivityRows]
+        .map((event) => event.actorId)
+        .filter((id): id is string => Boolean(id)),
+    ),
+  );
+  const [actorUsers, actorStudents] = await Promise.all([
+    db.user.findMany({
+      where: { id: { in: actorIds } },
+      select: { id: true, name: true, email: true },
+    }),
+    db.student.findMany({
+      where: { id: { in: actorIds } },
+      select: {
+        id: true,
+        name: true,
+        classroom: {
+          select: { teacher: { select: { name: true, email: true } } },
+        },
+      },
+    }),
+  ]);
+  const actorUserById = new Map(actorUsers.map((user) => [user.id, user]));
+  const actorStudentById = new Map(actorStudents.map((student) => [student.id, student]));
 
   const users = userRows.map((row) => ({
     ...row,
@@ -171,7 +200,12 @@ export default async function AdminPage() {
     action: activity.action,
     boardTitle: activity.board.title,
     boardSlug: activity.board.slug,
-    actorLabel: formatActivityActor(activity.actorType),
+    actorLabel: formatActivityActor(
+      activity.actorType,
+      activity.actorId,
+      actorUserById,
+      actorStudentById,
+    ),
     createdAt: activity.createdAt,
   }));
 
@@ -288,7 +322,12 @@ export default async function AdminPage() {
                   recentAuditEvents.map((event) => (
                     <li key={event.id}>
                       <span className="admin-activity-type">
-                        {formatActivityActor(event.actorType)}
+                        {formatActivityActor(
+                          event.actorType,
+                          event.actorId,
+                          actorUserById,
+                          actorStudentById,
+                        )}
                       </span>
                       <div>
                         <strong>{formatAuditAction(event.action)}</strong>
@@ -405,12 +444,38 @@ function formatBoardActivityAction(action: string): string {
   return labels[action] ?? action;
 }
 
-function formatActivityActor(actorType: string): string {
+type ActivityUser = { name: string; email: string };
+type ActivityStudent = {
+  name: string;
+  classroom: { teacher: { name: string; email: string } };
+};
+
+function formatActivityActor(
+  actorType: string,
+  actorId: string | null,
+  users: Map<string, ActivityUser>,
+  students: Map<string, ActivityStudent>,
+): string {
+  if (actorId && (actorType === "teacher" || actorType === "admin")) {
+    const user = users.get(actorId);
+    if (user) return user.name.trim() || user.email;
+  }
+
+  if (actorId && actorType === "student") {
+    const student = students.get(actorId);
+    if (student) {
+      const teacherName = student.classroom.teacher.name.trim()
+        || student.classroom.teacher.email;
+      return `${student.name} 학생 · ${teacherName} 교사`;
+    }
+  }
+
   const labels: Record<string, string> = {
     teacher: "교사",
     student: "학생",
     guest: "공유 방문자",
     system: "시스템",
+    admin: "관리자",
   };
   return labels[actorType] ?? actorType;
 }

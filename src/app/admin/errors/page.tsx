@@ -28,6 +28,36 @@ export default async function AdminErrorsPage() {
       },
     }),
   ]);
+  const loggedActorIds = Array.from(
+    new Set(logs.map((log) => log.userId).filter((id): id is string => Boolean(id))),
+  );
+  const loggedActorEmails = Array.from(
+    new Set(logs.map((log) => log.userEmail).filter((email): email is string => Boolean(email))),
+  );
+  const [loggedUsers, loggedStudents] = await Promise.all([
+    db.user.findMany({
+      where: {
+        OR: [
+          { id: { in: loggedActorIds } },
+          { email: { in: loggedActorEmails } },
+        ],
+      },
+      select: { id: true, name: true, email: true },
+    }),
+    db.student.findMany({
+      where: { id: { in: loggedActorIds } },
+      select: {
+        id: true,
+        name: true,
+        classroom: {
+          select: { teacher: { select: { name: true, email: true } } },
+        },
+      },
+    }),
+  ]);
+  const loggedUserById = new Map(loggedUsers.map((user) => [user.id, user]));
+  const loggedUserByEmail = new Map(loggedUsers.map((user) => [user.email, user]));
+  const loggedStudentById = new Map(loggedStudents.map((student) => [student.id, student]));
 
   return (
     <>
@@ -78,13 +108,21 @@ export default async function AdminErrorsPage() {
                     </td>
                   </tr>
                 ) : (
-                  logs.map((log) => (
+                  logs.map((log) => {
+                    const actor = formatErrorActor(
+                      log.userId,
+                      log.userEmail,
+                      loggedUserById,
+                      loggedUserByEmail,
+                      loggedStudentById,
+                    );
+                    return (
                     <tr key={log.id}>
                       <td>{formatDateTime(log.createdAt)}</td>
                       <td>
                         <div className="admin-user-cell">
-                          <strong>{log.userEmail ?? "알 수 없음"}</strong>
-                          {log.userId && <span>{log.userId}</span>}
+                          <strong>{actor.primary}</strong>
+                          {actor.secondary && <span>{actor.secondary}</span>}
                         </div>
                       </td>
                       <td>{featureLabel(log.feature)}</td>
@@ -106,7 +144,8 @@ export default async function AdminErrorsPage() {
                         </div>
                       </td>
                     </tr>
-                  ))
+                    );
+                  })
                 )}
               </tbody>
             </table>
@@ -140,6 +179,57 @@ function statusClassName(status: number | null): string {
   if (status >= 500) return `${base} admin-status-pill-danger`;
   if (status >= 400) return `${base} admin-status-pill-warning`;
   return base;
+}
+
+type ErrorUser = { name: string; email: string };
+type ErrorStudent = {
+  name: string;
+  classroom: { teacher: { name: string; email: string } };
+};
+
+function formatErrorActor(
+  actorId: string | null,
+  recordedEmail: string | null,
+  users: Map<string, ErrorUser>,
+  usersByEmail: Map<string, ErrorUser>,
+  students: Map<string, ErrorStudent>,
+): { primary: string; secondary: string | null } {
+  if (actorId) {
+    const user = users.get(actorId);
+    if (user) {
+      const name = user.name.trim();
+      return {
+        primary: name || user.email,
+        secondary: name ? user.email : null,
+      };
+    }
+
+    const student = students.get(actorId);
+    if (student) {
+      const teacherName = student.classroom.teacher.name.trim()
+        || student.classroom.teacher.email;
+      return {
+        primary: `${student.name} 학생`,
+        secondary: `소속 교사 ${teacherName}`,
+      };
+    }
+  }
+
+  if (recordedEmail) {
+    const user = usersByEmail.get(recordedEmail);
+    if (user) {
+      const name = user.name.trim();
+      return {
+        primary: name || user.email,
+        secondary: name ? user.email : null,
+      };
+    }
+  }
+
+  return {
+    primary: recordedEmail ?? "알 수 없음",
+    secondary: actorId,
+  };
 }
 
 function formatDateTime(date: Date): string {
