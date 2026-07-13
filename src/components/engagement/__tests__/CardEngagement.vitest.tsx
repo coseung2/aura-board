@@ -37,6 +37,38 @@ describe("CardEngagement comment realtime", () => {
     vi.unstubAllGlobals();
   });
 
+  it("uses complete server engagement state without a blocking engagement fetch", async () => {
+    const fetchMock = vi.fn((_input: RequestInfo | URL) =>
+      Promise.resolve(response({}, false)),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(
+      <CardEngagement
+        cardId="server-state-card"
+        boardId="board-server-state"
+        mode="chips"
+        initialCounts={{
+          likeCount: 3,
+          commentCount: 2,
+          isLiked: true,
+          canInteract: true,
+        }}
+      />,
+    );
+
+    const likeButton = screen.getByRole("button", { name: "좋아요 취소" });
+    expect((likeButton as HTMLButtonElement).disabled).toBe(false);
+    expect(likeButton.getAttribute("aria-pressed")).toBe("true");
+    await waitFor(() =>
+      expect(
+        fetchMock.mock.calls.some(([input]) =>
+          input.toString().endsWith("/server-state-card/engagement"),
+        ),
+      ).toBe(false),
+    );
+  });
+
   it("uses the per-tab student marker while preserving an explicit prop override", async () => {
     document.body.innerHTML =
       '<header data-aura-board-id="board-marker" data-aura-student-viewer="true"></header>';

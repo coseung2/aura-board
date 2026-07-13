@@ -149,6 +149,8 @@ export function StreamPost({
           initialCounts={{
             likeCount: card.likeCount ?? 0,
             commentCount: card.commentCount ?? 0,
+            isLiked: card.isLiked,
+            canInteract: card.canInteract,
           }}
         />
       </div>

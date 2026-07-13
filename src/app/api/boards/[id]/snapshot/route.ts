@@ -44,6 +44,8 @@ type CardWire = {
   anonymousAuthor: boolean;
   likeCount: number;
   commentCount: number;
+  isLiked: boolean;
+  canInteract: boolean;
   commentVoteOptionCount: number | null;
   commentVoteOptionLabels: string[] | null;
   authors: Array<{
@@ -97,6 +99,7 @@ export async function GET(
       getCurrentStudent().catch(() => null),
     ]);
     const shareToken = req.headers.get("x-share-token");
+    const preferStudent = req.headers.get("x-aura-student-viewer") === "1";
 
     const board = await db.board.findFirst({
       where: { OR: [{ id: boardIdOrSlug }, { slug: boardIdOrSlug }] },
@@ -169,6 +172,18 @@ export async function GET(
             },
           },
           _count: { select: { likes: true, comments: true } },
+          likes: {
+            where:
+              preferStudent && student
+                ? { likerStudentId: student.id }
+                : user
+                  ? { likerUserId: user.id }
+                  : student
+                    ? { likerStudentId: student.id }
+                    : { id: "" },
+            select: { id: true },
+            take: 1,
+          },
         },
       }),
       db.section.findMany({ where: { boardId: board.id } }),
@@ -250,6 +265,8 @@ export async function GET(
       anonymousAuthor: board.anonymousAuthor,
       likeCount: c._count.likes,
       commentCount: c._count.comments,
+      isLiked: c.likes.length > 0,
+      canInteract: Boolean(user || student),
       commentVoteOptionCount: c.commentVoteOptionCount ?? null,
       commentVoteOptionLabels: Array.isArray(c.commentVoteOptionLabels)
         ? c.commentVoteOptionLabels.filter(

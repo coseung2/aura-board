@@ -24,6 +24,7 @@ export function useCardRealtime<
   setCards: React.Dispatch<React.SetStateAction<CardData[]>>,
   deletingIds: React.RefObject<Set<string>>,
   setSections?: React.Dispatch<React.SetStateAction<TSection[]>>,
+  isStudentViewer = false,
 ) {
   const lastHashRef = useRef("");
 
@@ -33,6 +34,7 @@ export function useCardRealtime<
       : "";
     const res = await fetch(`/api/boards/${boardId}/snapshot${qs}`, {
       cache: "no-store",
+      headers: isStudentViewer ? { "x-aura-student-viewer": "1" } : {},
     });
 
     if (res.status === 304) return;
@@ -54,7 +56,7 @@ export function useCardRealtime<
     if (data.sections && setSections) {
       setSections([...data.sections].sort(sortSections));
     }
-  }, [boardId, deletingIds, setCards, setSections]);
+  }, [boardId, deletingIds, isStudentViewer, setCards, setSections]);
 
   useRealtimeInvalidation({
     channelName: boardChannelKey(boardId),

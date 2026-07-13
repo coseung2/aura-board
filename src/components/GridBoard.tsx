@@ -66,7 +66,7 @@ export function GridBoard({
   }
 
   const deletingIds = useRef<Set<string>>(new Set());
-  useCardRealtime(boardId, setCards, deletingIds);
+  useCardRealtime(boardId, setCards, deletingIds, undefined, !!isStudentViewer);
 
   const applyAnonymousAuthor = useCallback((next: boolean) => {
     setCards((list) => withBoardAnonymousAuthors(list, next));

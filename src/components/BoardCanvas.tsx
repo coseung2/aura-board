@@ -76,7 +76,7 @@ export function BoardCanvas({
   const deletingIds = useRef<Set<string>>(new Set());
   const masonryGridRef = useRef<HTMLDivElement | null>(null);
   const masonryCardRefs = useRef(new Map<string, HTMLElement>());
-  useCardRealtime(boardId, setCards, deletingIds);
+  useCardRealtime(boardId, setCards, deletingIds, undefined, !!isStudentViewer);
 
   const applyAnonymousAuthor = useCallback((next: boolean) => {
     setCards((list) => withBoardAnonymousAuthors(list, next));

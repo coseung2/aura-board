@@ -42,6 +42,8 @@ type Props = {
     createdAt?: string | Date | null;
     likeCount?: number;
     commentCount?: number;
+    isLiked?: boolean;
+    canInteract?: boolean;
     // 보드 단위 익명 토글 (Board.anonymousAuthor) — 호출처에서 주입.
     anonymousAuthor?: boolean;
   };
@@ -112,6 +114,8 @@ export const CardBody = memo(function CardBody({
       ? {
           likeCount: card.likeCount ?? 0,
           commentCount: card.commentCount ?? 0,
+          isLiked: card.isLiked,
+          canInteract: card.canInteract,
         }
       : undefined;
 

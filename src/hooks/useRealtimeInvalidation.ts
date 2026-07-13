@@ -134,6 +134,9 @@ export function useRealtimeInvalidation({
     window.addEventListener("online", catchUpOnNetworkRestore);
     window.addEventListener("focus", catchUpWhenVisible);
     document.addEventListener("visibilitychange", catchUpWhenVisible);
+    // Reconcile immediately on mount. Realtime is only an invalidation
+    // transport; initial board correctness must not wait for its 10s timeout.
+    requestRefresh();
 
     return () => {
       stopped = true;

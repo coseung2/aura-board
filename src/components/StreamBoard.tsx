@@ -158,7 +158,7 @@ export function StreamBoard({
   const deletingIds = useRef<Set<string>>(new Set());
 
   // ── Realtime polling ──────────────────────────────────────────────
-  useCardRealtime(boardId, setCards, deletingIds, setSections);
+  useCardRealtime(boardId, setCards, deletingIds, setSections, !!isStudentViewer);
 
   const applyAnonymousAuthor = useCallback((next: boolean) => {
     setCards((list) => withBoardAnonymousAuthors(list, next));

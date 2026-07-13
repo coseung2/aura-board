@@ -33,6 +33,7 @@ type Options = {
   /** Retained for call-site compatibility; general columns boards do not track Presence. */
   currentUserId: string;
   currentRole?: "owner" | "editor" | "viewer";
+  isStudentViewer?: boolean;
   activity: ColumnsPresenceActivity;
   pendingCardIds: MutableRefObject<Set<string>>;
   setCards: React.Dispatch<React.SetStateAction<CardData[]>>;
@@ -56,6 +57,7 @@ const HIDDEN_PRESENCE_RESULT: UseBoardStreamResult = {
  */
 export function useBoardStream({
   boardId,
+  isStudentViewer,
   pendingCardIds,
   setCards,
   setSections,
@@ -148,6 +150,7 @@ export function useBoardStream({
           const qs = lastHash ? `?hash=${encodeURIComponent(lastHash)}` : "";
           const response = await fetch(`/api/boards/${boardId}/snapshot${qs}`, {
             cache: "no-store",
+            headers: isStudentViewer ? { "x-aura-student-viewer": "1" } : {},
           });
           if (stopped) return;
           if (response.status === 304) {
@@ -260,7 +263,7 @@ export function useBoardStream({
     };
     // State setters and pendingCardIds are stable refs supplied by the board.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [boardId]);
+  }, [boardId, isStudentViewer]);
 
   return HIDDEN_PRESENCE_RESULT;
 }

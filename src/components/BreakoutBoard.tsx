@@ -60,6 +60,7 @@ type Props = {
   rosterStudents: BreakoutRosterStudent[];
   currentUserId: string;
   currentRole: "owner" | "editor" | "viewer";
+  isStudentViewer?: boolean;
 };
 
 /**
@@ -135,6 +136,7 @@ export function BreakoutBoard({
   rosterStudents,
   currentUserId,
   currentRole,
+  isStudentViewer,
 }: Props) {
   const router = useRouter();
   const [cards, setCards] = useState<CardData[]>(initialCards);
@@ -157,7 +159,7 @@ export function BreakoutBoard({
   // Breakout is a durable content board, not a game lobby: use Broadcast as an
   // invalidation signal and the board snapshot as the source of truth. Presence
   // is intentionally absent.
-  useCardRealtime(boardId, setCards, deletingIds);
+  useCardRealtime(boardId, setCards, deletingIds, undefined, !!isStudentViewer);
 
   // sections setter is referenced by the assignment manager's future section
   // edit path; keep it available without adding a separate realtime contract.

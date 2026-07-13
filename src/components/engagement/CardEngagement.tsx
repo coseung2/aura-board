@@ -43,6 +43,8 @@ interface Props {
   initialCounts?: {
     likeCount: number;
     commentCount: number;
+    isLiked?: boolean;
+    canInteract?: boolean;
   };
   chipsActionsEnd?: ReactNode;
   panelActionsEnd?: ReactNode;
@@ -51,13 +53,15 @@ interface Props {
 function initialEngagementState(
   likeCount: number | undefined,
   commentCount: number | undefined,
+  isLiked: boolean | undefined,
+  canInteract: boolean | undefined,
 ): EngagementState | null {
   return likeCount !== undefined || commentCount !== undefined
     ? {
         likeCount: likeCount ?? 0,
         commentCount: commentCount ?? 0,
-        isLiked: false,
-        canInteract: false,
+        isLiked: isLiked ?? false,
+        canInteract: canInteract ?? false,
       }
     : null;
 }
@@ -92,6 +96,10 @@ export function CardEngagement({
 }: Props) {
   const initialLikeCount = initialCounts?.likeCount;
   const initialCommentCount = initialCounts?.commentCount;
+  const initialIsLiked = initialCounts?.isLiked;
+  const initialCanInteract = initialCounts?.canInteract;
+  const hasCompleteInitialState =
+    initialIsLiked !== undefined && initialCanInteract !== undefined;
   const shareSession = useShareSession();
   const boardContext = useBoardPageEngagementContext();
   const effectiveBoardId = boardId ?? boardContext.boardId;
@@ -105,10 +113,16 @@ export function CardEngagement({
   });
   const cachedState = engagementStateCache.get(cacheKey);
   const [state, setState] = useState<EngagementState | null>(() =>
-    cachedState ?? initialEngagementState(initialLikeCount, initialCommentCount),
+    cachedState ??
+      initialEngagementState(
+        initialLikeCount,
+        initialCommentCount,
+        initialIsLiked,
+        initialCanInteract,
+      ),
   );
   const [engagementReady, setEngagementReady] = useState(
-    Boolean(cachedState) || !initialCounts,
+    Boolean(cachedState) || hasCompleteInitialState || !initialCounts,
   );
   const [showModal, setShowModal] = useState(false);
   const likeInFlightRef = useRef(false);
@@ -167,12 +181,29 @@ export function CardEngagement({
 
   useEffect(() => {
     const cached = engagementStateCache.get(cacheKey);
-    setEngagementReady(Boolean(cached));
-    setState(
-      cached ?? initialEngagementState(initialLikeCount, initialCommentCount),
+    const initial = initialEngagementState(
+      initialLikeCount,
+      initialCommentCount,
+      initialIsLiked,
+      initialCanInteract,
     );
-    void refresh();
-  }, [cacheKey, refresh, initialLikeCount, initialCommentCount]);
+    const next = cached ?? initial;
+    setEngagementReady(Boolean(cached) || hasCompleteInitialState);
+    setState(next);
+    if (!cached && initial && hasCompleteInitialState) {
+      engagementStateCache.set(cacheKey, initial);
+      return;
+    }
+    if (!cached && !hasCompleteInitialState) void refresh();
+  }, [
+    cacheKey,
+    refresh,
+    initialLikeCount,
+    initialCommentCount,
+    initialIsLiked,
+    initialCanInteract,
+    hasCompleteInitialState,
+  ]);
 
   // Live-update counts from board-level engagement broadcasts. Only counts
   // move; isLiked is the current user's own state (handled in toggleLike).

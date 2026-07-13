@@ -277,6 +277,7 @@ export function ColumnsBoard({
     boardId,
     currentUserId,
     currentRole,
+    isStudentViewer,
     activity: presenceActivity,
     pendingCardIds,
     setCards,

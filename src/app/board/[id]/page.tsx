@@ -209,6 +209,13 @@ export default async function BoardPage({
             },
           },
           _count: { select: { likes: true, comments: true } },
+          likes: {
+            where: useStudentViewer
+              ? { likerStudentId: student?.id ?? "" }
+              : { likerUserId: user?.id ?? "" },
+            select: { id: true },
+            take: 1,
+          },
         },
       })
     : null;
@@ -404,6 +411,8 @@ export default async function BoardPage({
     authorName: c.author?.name ?? null,
     likeCount: c._count.likes,
     commentCount: c._count.comments,
+    isLiked: c.likes.length > 0,
+    canInteract: true,
     commentVoteOptionCount: c.commentVoteOptionCount ?? null,
     commentVoteOptionLabels: Array.isArray(c.commentVoteOptionLabels)
       ? c.commentVoteOptionLabels.filter((label): label is string => typeof label === "string")
@@ -675,6 +684,7 @@ export default async function BoardPage({
             }))}
             currentUserId={effectiveUserId}
             currentRole={effectiveRole!}
+            isStudentViewer={!!studentViewer}
             boardSlug={board!.slug}
           />
         );
@@ -935,7 +945,7 @@ export default async function BoardPage({
   }
 
   return (
-    <BoardSlideshowProvider>
+    <BoardSlideshowProvider key={board.id}>
       <main
         className="board-page"
         data-board-theme={boardTheme}
