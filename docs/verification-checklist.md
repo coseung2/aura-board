@@ -51,6 +51,11 @@ creating overlapping testing-notes documents.
   notification, and save states at phone and tablet widths.
 - For a mobile save or submit action, verify the server response and reload the
   same route before treating optimistic state as proof.
+- At phone and tablet widths, verify multiline placeholders and entered Korean
+  text are fully visible and top-aligned; shared back buttons are flat,
+  vertically centered with the title, and retain a 44px hit target.
+- Reject redundant card-within-control framing: ordinary forms use spacing and
+  hierarchy unless the whole region is a genuinely separate card surface.
 - Before EAS build, bump the user-visible app version when the release is a
   material UX change and enable remote Android `versionCode` auto-increment.
 - Build with the final pushed commit. Confirm the EAS build `gitCommitHash`,

@@ -173,9 +173,11 @@ const styles = StyleSheet.create({
   },
   author: {
     maxWidth: sizing.authorChipMaxWidth,
+    minWidth: 0,
+    flexShrink: 1,
   },
   authorText: { ...typography.badge, color: colors.accentTintedText },
-  date: { ...typography.micro, color: colors.textMuted },
+  date: { ...typography.micro, color: colors.textMuted, flexShrink: 0 },
   emptyBox: {
     padding: spacing.xl,
   },

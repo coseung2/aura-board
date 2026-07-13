@@ -13,6 +13,7 @@ import {
   borders,
   check,
   colors,
+  pageChrome,
   radii,
   spacing,
   typography,
@@ -231,7 +232,6 @@ export default function StudentCheckScreen() {
         </View>
       ) : (
         <ScrollView
-          contentInsetAdjustmentBehavior="automatic"
           refreshControl={
             <RefreshControl
               refreshing={refreshing}
@@ -511,7 +511,7 @@ const styles = StyleSheet.create({
   },
   content: {
     paddingHorizontal: spacing.xl,
-    paddingTop: spacing.lg,
+    paddingTop: pageChrome.directContentStartGap,
     paddingBottom: spacing.xxl,
     gap: spacing.lg,
   },

@@ -26,6 +26,7 @@ import type { ParentChild, ParentPendingLink } from "../../lib/types";
 import {
   borders,
   colors,
+  pageChrome,
   parent,
   radii,
   spacing,
@@ -119,7 +120,6 @@ export default function ParentAccountScreen() {
     <SafeAreaView style={styles.container} edges={["top"]}>
       <AppHeader title="계정" />
       <ScrollView
-        contentInsetAdjustmentBehavior="automatic"
         contentContainerStyle={styles.content}
         refreshControl={
           <RefreshControl
@@ -213,7 +213,12 @@ export default function ParentAccountScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg },
-  content: { flexGrow: 1, padding: spacing.lg, paddingBottom: spacing.xxl },
+  content: {
+    flexGrow: 1,
+    paddingHorizontal: spacing.lg,
+    paddingTop: pageChrome.directContentStartGap,
+    paddingBottom: spacing.xxl,
+  },
   center: { minHeight: parent.portfolioEmptyMinHeight, alignItems: "center", justifyContent: "center" },
   sections: { width: "100%", maxWidth: parent.portfolioCardMinWidth * 2 - spacing.lg, alignSelf: "center", gap: spacing.lg },
   profileCard: { flexDirection: "row", alignItems: "center", padding: spacing.lg, gap: spacing.md },

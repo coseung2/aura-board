@@ -44,23 +44,21 @@ export function StudentBottomNav({ duties = [] }: Props) {
   const bottomPadding = isLandscape
     ? insets.bottom
     : Math.max(insets.bottom, spacing.xs);
-  const [optionalTargetIds, setOptionalTargetIds] = useState<string[]>([]);
-  const optionalTargets = [
+  const [targetIds, setTargetIds] = useState<string[]>(() =>
+    studentBaseNavTargets.map((target) => target.id),
+  );
+  const allTargets = [
+    ...studentBaseNavTargets,
     ...studentOptionalNavTargets,
     ...duties.map(studentDutyTarget).filter((target): target is StudentNavTarget => target !== null),
   ];
-  const moreTarget = studentBaseNavTargets.find((target) => target.id === "more");
-  const targets = [
-    ...studentBaseNavTargets.filter((target) => target.id !== "more"),
-    ...optionalTargetIds
-      .map((id) => optionalTargets.find((target) => target.id === id))
-      .filter((target): target is StudentNavTarget => target !== undefined),
-    ...(moreTarget ? [moreTarget] : []),
-  ];
+  const targets = targetIds
+    .map((id) => allTargets.find((target) => target.id === id))
+    .filter((target): target is StudentNavTarget => target !== undefined);
 
   useEffect(() => {
-    void loadStudentNavPreferences().then(setOptionalTargetIds);
-    return subscribeStudentNavPreferences(setOptionalTargetIds);
+    void loadStudentNavPreferences().then(setTargetIds);
+    return subscribeStudentNavPreferences(setTargetIds);
   }, []);
 
   return (
@@ -138,7 +136,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     gap: spacing.xxs,
-    paddingHorizontal: spacing.sm,
+    paddingHorizontal: spacing.xxs,
     paddingVertical: spacing.xs,
     borderRadius: radii.none,
     borderColor: colors.transparent,

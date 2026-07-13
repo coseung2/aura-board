@@ -19,11 +19,14 @@ import {
   type ViewProps,
   type ViewStyle,
 } from "react-native";
+import { ArrowLeft } from "lucide-react-native";
+import { DailyBanner, useDailyBannerRole } from "./DailyBanner";
 import {
   colors,
   borders,
   composer,
   controls,
+  iconSizes,
   radii,
   shadows,
   navigation,
@@ -130,6 +133,7 @@ type SemanticNavItemProps = {
   tone?: "neutral" | "danger";
   onPress: () => void;
   accessibilityLabel?: string;
+  style?: StyleProp<ViewStyle>;
 };
 
 export function SemanticNavItem({
@@ -138,6 +142,7 @@ export function SemanticNavItem({
   tone = "neutral",
   onPress,
   accessibilityLabel,
+  style,
 }: SemanticNavItemProps) {
   const activeProgress = useRef(new Animated.Value(selected ? 1 : 0)).current;
 
@@ -154,7 +159,7 @@ export function SemanticNavItem({
 
   return (
     <ControlPressable
-      style={styles.semanticNavItem}
+      style={[styles.semanticNavItem, style]}
       onPress={onPress}
       accessibilityRole="tab"
       accessibilityLabel={accessibilityLabel}
@@ -287,12 +292,17 @@ type TextFieldProps = TextInputProps & {
 };
 
 export const TextField = forwardRef<TextInput, TextFieldProps>(
-  function TextField({ style, ...props }, ref) {
+  function TextField({ style, multiline, ...props }, ref) {
     return (
       <TextInput
         ref={ref}
         placeholderTextColor={colors.textFaint}
-        style={[styles.textField, style]}
+        multiline={multiline}
+        style={[
+          styles.textField,
+          multiline ? styles.textFieldMultiline : styles.textFieldSingleLine,
+          style,
+        ]}
         {...props}
       />
     );
@@ -469,6 +479,7 @@ type AppHeaderProps = {
   right?: ReactNode;
   rightStyle?: StyleProp<ViewStyle>;
   style?: StyleProp<ViewStyle>;
+  showDailyBanner?: boolean;
 };
 
 export function AppHeader({
@@ -478,32 +489,49 @@ export function AppHeader({
   right,
   rightStyle,
   style,
+  showDailyBanner = true,
 }: AppHeaderProps) {
+  const dailyBannerRole = useDailyBannerRole();
+  const shouldRenderBanner = showDailyBanner && dailyBannerRole !== null;
+
   return (
-    <View style={[styles.appHeader, style]}>
-      {onBack ? (
-        <IconButton
-          style={styles.appHeaderBack}
-          onPress={onBack}
-          accessibilityLabel="뒤로가기"
-        >
-          <Text style={styles.appHeaderBackText}>←</Text>
-        </IconButton>
-      ) : null}
-      <View style={styles.appHeaderTitleGroup}>
-        <Text
-          accessibilityRole="header"
-          style={styles.appHeaderTitle}
-          numberOfLines={1}
-        >
-          {title}
-        </Text>
-        {titleAccessory}
+    <>
+      <View
+        style={[
+          styles.appHeader,
+          shouldRenderBanner && styles.appHeaderWithBanner,
+          style,
+        ]}
+      >
+        {onBack ? (
+          <IconButton
+            style={styles.appHeaderBack}
+            onPress={onBack}
+            accessibilityLabel="뒤로가기"
+          >
+            <ArrowLeft
+              size={iconSizes.md}
+              color={colors.text}
+              strokeWidth={2}
+            />
+          </IconButton>
+        ) : null}
+        <View style={styles.appHeaderTitleGroup}>
+          <Text
+            accessibilityRole="header"
+            style={styles.appHeaderTitle}
+            numberOfLines={1}
+          >
+            {title}
+          </Text>
+          {titleAccessory}
+        </View>
+        {right ? (
+          <View style={[styles.appHeaderRight, rightStyle]}>{right}</View>
+        ) : null}
       </View>
-      {right ? (
-        <View style={[styles.appHeaderRight, rightStyle]}>{right}</View>
-      ) : null}
-    </View>
+      {shouldRenderBanner ? <DailyBanner role={dailyBannerRole} /> : null}
+    </>
   );
 }
 
@@ -652,15 +680,27 @@ const styles = StyleSheet.create({
     opacity: states.disabledOpacity,
   },
   textField: {
-    minHeight: tapMin,
+    minHeight: controls.inputHeight,
     borderWidth: borders.hairline,
     borderColor: colors.border,
     borderRadius: radii.control,
     backgroundColor: colors.surface,
     paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
     color: colors.text,
-    ...typography.body,
+    fontFamily: typography.body.fontFamily,
+    fontSize: typography.body.fontSize,
+    fontWeight: typography.body.fontWeight,
+  },
+  textFieldSingleLine: {
+    paddingVertical: spacing.none,
+    textAlignVertical: "center",
+  },
+  textFieldMultiline: {
+    minHeight: controls.multilineInputMinHeight,
+    paddingTop: spacing.md,
+    paddingBottom: spacing.md,
+    textAlignVertical: "top",
+    lineHeight: typography.body.lineHeight,
   },
   iconButton: {
     width: controls.iconButton,
@@ -726,18 +766,17 @@ const styles = StyleSheet.create({
     borderBottomColor: colors.border,
     backgroundColor: colors.surface,
   },
-  appHeaderBack: {
-    backgroundColor: colors.surfaceAlt,
+  appHeaderWithBanner: {
+    borderBottomWidth: borders.none,
   },
-  appHeaderBackText: {
-    ...typography.title,
-    color: colors.text,
+  appHeaderBack: {
+    backgroundColor: colors.transparent,
   },
   appHeaderTitleGroup: {
     flex: 1,
     minWidth: 0,
     flexDirection: "row",
-    alignItems: "flex-end",
+    alignItems: "center",
     gap: spacing.sm,
   },
   appHeaderTitle: {

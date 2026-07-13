@@ -346,6 +346,35 @@
   border-bottom: 0;
 }
 
+.admin-banner-actions {
+  display: grid;
+  gap: 6px;
+}
+
+.admin-banner-actions p {
+  margin: 0;
+  color: var(--color-danger);
+  font-size: 12px;
+}
+
+.admin-banner-unpublish {
+  min-height: 32px;
+  padding: 0 10px;
+  border: 1px solid var(--color-danger);
+  border-radius: var(--radius-btn);
+  background: var(--color-surface);
+  color: var(--color-danger);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.admin-banner-unpublish:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
 .admin-error-table {
   min-width: 1040px;
 }

@@ -93,6 +93,14 @@ tokenLines.forEach((line, index) => {
   }
 });
 
+const sharedUiSource = readFileSync(join(root, "components", "ui.tsx"), "utf8");
+if (!/textFieldMultiline:\s*\{[\s\S]*?minHeight:\s*controls\.multilineInputMinHeight/.test(sharedUiSource)) {
+  failures.push("components/ui.tsx multiline TextField must use controls.multilineInputMinHeight");
+}
+if (!/appHeaderBack:\s*\{[\s\S]*?backgroundColor:\s*colors\.transparent/.test(sharedUiSource)) {
+  failures.push("components/ui.tsx AppHeader back control must remain flat and transparent");
+}
+
 for (const scanRoot of scanRoots) {
   const fullRoot = join(root, scanRoot);
   for (const filePath of walk(fullRoot)) {

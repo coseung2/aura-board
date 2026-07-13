@@ -17,6 +17,7 @@ import {
   dashboard,
   iconSizes,
   media,
+  pageChrome,
   radii,
   shadows,
   spacing,
@@ -628,8 +629,8 @@ const styles = StyleSheet.create({
     textAlign: "center",
   },
   scrollContent: {
-    paddingHorizontal: spacing.xl,
-    paddingTop: spacing.lg,
+    paddingHorizontal: pageChrome.horizontalPadding,
+    paddingTop: pageChrome.contentStartGap,
     paddingBottom: spacing.xxl,
     gap: spacing.md,
   },
@@ -774,7 +775,7 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.md,
   },
   walletCardCompact: {
-    paddingVertical: spacing.md,
+    paddingBottom: spacing.md,
     gap: spacing.md,
   },
   sectionSemanticNav: {

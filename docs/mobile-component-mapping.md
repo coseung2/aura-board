@@ -10,12 +10,14 @@ instead of route-local patches.
 |---|---|---|---|
 | Page canvas | `body`, `.home-page`, `.board-page` | route `SafeAreaView` using `colors.bg` | No route-local background colors. |
 | Logo lockup | `Logo` / app icon usage | `LogoLockup` | Use real app icon, not emoji marks. |
-| Top/board header | `TopNav`, `BoardHeader` | `AppHeader`, `BoardHeader` | Use tokenized surface, border, compact title scale, and shared back button treatment. |
+| Top/board header | `TopNav`, `BoardHeader` | `AppHeader`, `BoardHeader` | Use tokenized surface and compact title scale. Back is a flat, vertically centered 44px icon target with pressed feedback only; never add a persistent box. |
+| Page banner chrome | Page title divider / campaign banner | `AppHeader` + `DailyBanner` + `pageChrome` tokens | Render below the page title and above content. Use `contentStartGap` before a shared `SectionHeader`, or `directContentStartGap` before cards, grids, and body copy. Do not combine either with automatic scroll insets or route-local first-child top padding. Board-internal pages opt out. |
 | Card surface | `.board-grid-card`, `.grid-card`, `.stream-post` | `SurfaceCard` | No local shadow/elevation recipes. |
 | Primary button | `.btn-primary`, modal submit buttons | `AppButton variant="primary"` | Use `colors.accent` and `colors.onAccent`. |
 | Secondary button | `.btn-secondary`, quiet actions | `AppButton variant="secondary"` or `quiet` | No local border/radius values. |
 | Icon button | close, back, settings, menu | `IconButton` | Icon-only buttons use shared hit area and pressed state. |
 | Inline control row | bordered link/file/radio rows | `ControlPressable` | Use for pressable rows inside cards or sheets that should not become nested cards. |
+| Multiline input | textarea/composer input | `TextField multiline` | Shared multiline minimum height and top alignment are mandatory; placeholders must remain fully visible on Android. |
 | Media press target | image/lightbox/backdrop taps | `MediaPressable` | Use only for full-bleed media hit areas where button chrome would be wrong. |
 | Badge/chip | author chips, status chips, counters | `Pill` | Use semantic tones: neutral/accent/danger/warning/submitted/reviewed. Returned/rejected states use `danger`. |
 | FAB | `.add-card-fab` | `Fab` | One floating action recipe across boards. |

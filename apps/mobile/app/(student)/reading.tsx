@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
@@ -10,6 +10,7 @@ import {
   useWindowDimensions,
 } from "react-native";
 import { useRouter } from "expo-router";
+import { ChevronDown, ChevronUp } from "lucide-react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { apiFetch, ApiError } from "../../lib/api";
 import { clearSessionToken } from "../../lib/session";
@@ -18,12 +19,15 @@ import {
   colors,
   composer,
   layout,
+  pageChrome,
+  radii,
   spacing,
   typography,
 } from "../../theme/tokens";
 import {
   AppButton,
   AppHeader,
+  ControlPressable,
   SemanticNav,
   SemanticNavItem,
   SectionHeader,
@@ -55,6 +59,19 @@ export default function StudentReadingScreen() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [expandedEntryId, setExpandedEntryId] = useState<string | null>(null);
+  const [historyBookType, setHistoryBookType] = useState<BookType>("story");
+  const readingCounts = useMemo(
+    () => ({
+      story: entries.filter((entry) => entry.bookType === "story").length,
+      comic: entries.filter((entry) => entry.bookType === "comic").length,
+    }),
+    [entries],
+  );
+  const visibleEntries = useMemo(
+    () => entries.filter((entry) => entry.bookType === historyBookType),
+    [entries, historyBookType],
+  );
 
   const handleError = useCallback(async (nextError: unknown) => {
     if (nextError instanceof ApiError && nextError.status === 401) {
@@ -69,6 +86,12 @@ export default function StudentReadingScreen() {
     try {
       const payload = await apiFetch<{ entries: ReadingEntry[] }>("/api/student/reading");
       setEntries(payload.entries);
+      if (
+        !payload.entries.some((entry) => entry.bookType === "story") &&
+        payload.entries.some((entry) => entry.bookType === "comic")
+      ) {
+        setHistoryBookType("comic");
+      }
     } catch (nextError) {
       if (!(await handleError(nextError))) setError("독서 기록을 불러오지 못했어요.");
     } finally {
@@ -94,6 +117,7 @@ export default function StudentReadingScreen() {
         json: { bookType, title: title.trim(), author: author.trim(), reflection: reflection.trim() },
       });
       setEntries((current) => [payload.entry, ...current]);
+      setHistoryBookType(payload.entry.bookType);
       setTitle("");
       setAuthor("");
       setReflection("");
@@ -119,30 +143,27 @@ export default function StudentReadingScreen() {
         >
           <View style={[styles.formColumn, isLandscape && styles.landscapeFormColumn]}>
             <View style={styles.formSection}>
-              <SectionHeader title="새 기록" />
-              <View style={styles.formIntro}>
-                <Text style={styles.description}>오늘 읽은 책의 감상을 기록해 보세요.</Text>
-              </View>
-
-              <View style={styles.fieldGroup}>
-                <Text style={styles.fieldLabel}>책 종류</Text>
-                <SemanticNav style={styles.typeNav} accessibilityLabel="책 종류">
-                  <SemanticNavItem
-                    selected={bookType === "story"}
-                    onPress={() => setBookType("story")}
-                    accessibilityLabel="이야기책"
-                  >
-                    이야기책
-                  </SemanticNavItem>
-                  <SemanticNavItem
-                    selected={bookType === "comic"}
-                    onPress={() => setBookType("comic")}
-                    accessibilityLabel="만화책"
-                  >
-                    만화책
-                  </SemanticNavItem>
-                </SemanticNav>
-              </View>
+              <SectionHeader
+                title="책 종류"
+                right={
+                  <SemanticNav accessibilityLabel="책 종류">
+                    <SemanticNavItem
+                      selected={bookType === "story"}
+                      onPress={() => setBookType("story")}
+                      accessibilityLabel="이야기책"
+                    >
+                      이야기책
+                    </SemanticNavItem>
+                    <SemanticNavItem
+                      selected={bookType === "comic"}
+                      onPress={() => setBookType("comic")}
+                      accessibilityLabel="만화책"
+                    >
+                      만화책
+                    </SemanticNavItem>
+                  </SemanticNav>
+                }
+              />
 
               <View style={styles.fieldGroup}>
                 <Text style={styles.fieldLabel}>책 제목</Text>
@@ -203,7 +224,24 @@ export default function StudentReadingScreen() {
               title="내 독서 기록"
               right={
                 !loading && entries.length > 0 ? (
-                  <Text style={styles.entryCount}>{entries.length}개</Text>
+                  <SemanticNav accessibilityLabel="독서 기록 종류">
+                    <SemanticNavItem
+                      style={styles.historyTypeNavItem}
+                      selected={historyBookType === "story"}
+                      onPress={() => setHistoryBookType("story")}
+                      accessibilityLabel={`이야기책 ${readingCounts.story}개`}
+                    >
+                      {`이야기책 ${readingCounts.story}`}
+                    </SemanticNavItem>
+                    <SemanticNavItem
+                      style={styles.historyTypeNavItem}
+                      selected={historyBookType === "comic"}
+                      onPress={() => setHistoryBookType("comic")}
+                      accessibilityLabel={`만화책 ${readingCounts.comic}개`}
+                    >
+                      {`만화책 ${readingCounts.comic}`}
+                    </SemanticNavItem>
+                  </SemanticNav>
                 ) : undefined
               }
             />
@@ -221,30 +259,75 @@ export default function StudentReadingScreen() {
                 </Text>
               </View>
             ) : (
-              entries.map((entry, index) => (
-                <View
-                  key={entry.id}
-                  style={[styles.entry, index === entries.length - 1 && styles.entryLast]}
-                >
-                  <View style={styles.entryTopline}>
-                    <Text style={styles.entryType}>
-                      {entry.bookType === "comic" ? "만화책" : "이야기책"}
-                    </Text>
-                    <Text style={styles.entryDate}>
-                      {new Date(entry.createdAt).toLocaleDateString("ko-KR")}
-                    </Text>
-                  </View>
-                  <Text style={styles.entryTitle}>{entry.title}</Text>
-                  <Text style={styles.meta}>{entry.author}</Text>
-                  <Text style={styles.body}>{entry.reflection}</Text>
-                  {entry.aiFeedback ? (
-                    <View style={styles.feedbackRow}>
-                      <Text style={styles.feedbackScore}>{entry.aiScore ?? 0}점</Text>
-                      <Text style={styles.feedback}>{entry.aiFeedback}</Text>
+              visibleEntries.length === 0 ? (
+                <Text style={styles.emptyTypeEntry}>
+                  아직 {historyBookType === "story" ? "이야기책" : "만화책"} 기록이 없어요.
+                </Text>
+              ) : visibleEntries.map((entry) => {
+                const expanded = expandedEntryId === entry.id;
+                const typeLabel = entry.bookType === "comic" ? "만화책" : "이야기책";
+                return (
+                  <View key={entry.id} style={styles.entry}>
+                    <View style={styles.entryIndex} accessible={false} />
+                    <View
+                      style={[
+                        styles.entryContent,
+                        expanded && styles.entryExpanded,
+                      ]}
+                    >
+                      <ControlPressable
+                        style={styles.entryToggle}
+                        onPress={() =>
+                          setExpandedEntryId((current) =>
+                            current === entry.id ? null : entry.id,
+                          )
+                        }
+                        accessibilityRole="button"
+                        accessibilityLabel={`${entry.title} ${expanded ? "접기" : "펼치기"}`}
+                        accessibilityState={{ expanded }}
+                      >
+                        <Text style={styles.entryTitle} numberOfLines={1}>
+                          {entry.title}
+                        </Text>
+                        {expanded ? (
+                          <ChevronUp
+                            size={16}
+                            color={colors.textFaint}
+                            strokeWidth={2}
+                            accessible={false}
+                          />
+                        ) : (
+                          <ChevronDown
+                            size={16}
+                            color={colors.textFaint}
+                            strokeWidth={2}
+                            accessible={false}
+                          />
+                        )}
+                      </ControlPressable>
+
+                      {expanded ? (
+                        <View style={styles.entryDetails}>
+                          <View style={styles.entryTopline}>
+                            <Text style={styles.entryType}>{typeLabel}</Text>
+                            <Text style={styles.entryDate}>
+                              {new Date(entry.createdAt).toLocaleDateString("ko-KR")}
+                            </Text>
+                          </View>
+                          <Text style={styles.meta}>{entry.author}</Text>
+                          <Text style={styles.body}>{entry.reflection}</Text>
+                          {entry.aiFeedback ? (
+                            <View style={styles.feedbackRow}>
+                              <Text style={styles.feedbackScore}>{entry.aiScore ?? 0}점</Text>
+                              <Text style={styles.feedback}>{entry.aiFeedback}</Text>
+                            </View>
+                          ) : null}
+                        </View>
+                      ) : null}
                     </View>
-                  ) : null}
-                </View>
-              ))
+                  </View>
+                );
+              })
             )}
           </View>
         </ScrollView>
@@ -258,8 +341,8 @@ const styles = StyleSheet.create({
   keyboardWrap: { flex: 1 },
   content: {
     flexGrow: 1,
-    paddingHorizontal: spacing.xl,
-    paddingTop: spacing.lg,
+    paddingHorizontal: pageChrome.horizontalPadding,
+    paddingTop: pageChrome.contentStartGap,
     paddingBottom: spacing.xxxl + spacing.xxl,
     gap: spacing.lg,
   },
@@ -279,25 +362,21 @@ const styles = StyleSheet.create({
   formSection: {
     gap: spacing.lg,
     paddingBottom: spacing.xl,
-    borderBottomWidth: borders.hairline,
-    borderBottomColor: colors.border,
   },
-  formIntro: { gap: spacing.xs },
-  description: { ...typography.body, color: colors.textMuted },
   fieldGroup: { gap: spacing.xs },
   fieldLabel: { ...typography.label, color: colors.textMuted },
-  typeNav: { alignSelf: "flex-start" },
   reflectionInput: { minHeight: composer.contentMinHeight, textAlignVertical: "top" },
   error: { ...typography.body, color: colors.danger },
   notice: { ...typography.body, color: colors.statusReviewedText },
   statusStack: { gap: spacing.xs },
-  entryCount: { ...typography.micro, color: colors.textMuted },
+  historyTypeNavItem: { minWidth: 84, alignItems: "center" },
   loadingState: {
     alignItems: "center",
     gap: spacing.sm,
     paddingVertical: spacing.xl,
   },
   muted: { ...typography.body, color: colors.textMuted },
+  emptyTypeEntry: { ...typography.body, color: colors.textFaint, paddingVertical: spacing.md },
   emptyState: {
     paddingVertical: spacing.xl,
     gap: spacing.xs,
@@ -307,12 +386,31 @@ const styles = StyleSheet.create({
   emptyTitle: { ...typography.section, color: colors.text },
   emptyDescription: { ...typography.body, color: colors.textMuted },
   entry: {
+    flexDirection: "row",
+    alignItems: "stretch",
     gap: spacing.sm,
-    paddingVertical: spacing.lg,
-    borderBottomWidth: borders.hairline,
-    borderBottomColor: colors.border,
   },
-  entryLast: { borderBottomWidth: borders.none },
+  entryIndex: {
+    width: borders.medium,
+    borderRadius: radii.pill,
+    backgroundColor: colors.accent,
+  },
+  entryContent: {
+    flex: 1,
+    minWidth: 0,
+    paddingHorizontal: spacing.xs,
+    paddingVertical: spacing.xs,
+    borderRadius: radii.btn,
+  },
+  entryExpanded: {
+    padding: spacing.sm,
+    backgroundColor: colors.surfaceAlt,
+  },
+  entryToggle: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.sm,
+  },
   entryTopline: {
     flexDirection: "row",
     alignItems: "center",
@@ -321,7 +419,8 @@ const styles = StyleSheet.create({
   },
   entryType: { ...typography.badge, color: colors.accentTintedText },
   entryDate: { ...typography.micro, color: colors.textMuted },
-  entryTitle: { ...typography.section, color: colors.text },
+  entryTitle: { ...typography.section, color: colors.text, flex: 1 },
+  entryDetails: { gap: spacing.sm },
   meta: { ...typography.micro, color: colors.textMuted },
   body: { ...typography.body, color: colors.text },
   feedbackRow: {

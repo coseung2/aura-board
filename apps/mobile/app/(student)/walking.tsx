@@ -30,10 +30,10 @@ import type {
   HealthConnectStatus,
 } from "../../modules/aura-board-health-connect/src/AuraBoardHealthConnect.types";
 import {
-  borders,
   colors,
   iconSizes,
   layout,
+  pageChrome,
   spacing,
   tapMin,
   typography,
@@ -152,7 +152,11 @@ export default function StudentWalkingScreen() {
       }
       setRows(await readAndSyncWalkingDays(7));
       setStatus("available");
-      setMessage("Health Connect 연결과 첫 동기화를 완료했어요.");
+      setMessage(
+        Platform.OS === "ios"
+          ? "권한을 요청했어요. 걸음 수가 보이지 않으면 Apple 건강 앱에서 권한을 확인해 주세요."
+          : "Health Connect 연결과 첫 동기화를 완료했어요.",
+      );
     } catch (nextError) {
       if (!(await handleAuthError(nextError))) {
         setError(localizedWalkingError(nextError, "Health Connect 연결에 실패했어요."));
@@ -200,17 +204,20 @@ export default function StudentWalkingScreen() {
   const showInitialLoading = loading && rows.length === 0;
   const showEmptyState = !loading && !error && !hasSyncedData;
 
-  const connectionLabel = Platform.OS !== "android"
-    ? "Android에서 동기화 가능"
+  const healthServiceName = Platform.OS === "ios" ? "Apple 건강" : "Health Connect";
+  const connectionLabel = Platform.OS === "web"
+    ? "모바일 앱에서 동기화 가능"
     : !isHealthConnectModuleAvailable()
-      ? "새 Android 앱 빌드 필요"
+      ? Platform.OS === "ios"
+        ? "새 iPhone 앱 빌드 필요"
+        : "새 Android 앱 빌드 필요"
       : status === "needs_update"
         ? "Health Connect 업데이트 필요"
         : status === "unavailable"
-          ? "Health Connect 사용 불가"
+          ? `${healthServiceName} 사용 불가`
           : connected
-            ? "Health Connect 연결됨"
-            : "Health Connect 연결 필요";
+            ? `${healthServiceName} 연결됨`
+            : `${healthServiceName} 연결 필요`;
 
   return (
     <SafeAreaView style={styles.container} edges={["top"]}>
@@ -227,14 +234,14 @@ export default function StudentWalkingScreen() {
       >
         <View style={styles.connectionSection}>
           <SectionHeader
-            title="Health Connect"
+            title="걸음 수 연결"
             titleAccessory={
               <ShieldCheck size={iconSizes.md} color={colors.accent} accessible={false} />
             }
           />
           <Text style={styles.connectionStatus}>{connectionLabel}</Text>
           <Text style={styles.muted}>
-            걸음 수와 이동 거리의 날짜별 합계만 저장하며 GPS 경로는 저장하지 않아요.
+            걸음 수와 이동 거리의 날짜별 합계만 읽어요. 위치나 이동 경로는 보지 않아요.
           </Text>
         </View>
 
@@ -246,7 +253,7 @@ export default function StudentWalkingScreen() {
               onPress={() => void connect()}
               accessibilityLabel="Health Connect 연결"
             >
-              Health Connect 연결
+              권한 연결
             </AppButton>
             <AppButton
               variant="secondary"
@@ -255,7 +262,7 @@ export default function StudentWalkingScreen() {
               onPress={() => void openSettings()}
               accessibilityLabel="Health Connect 권한 관리"
             >
-              권한 관리
+              {Platform.OS === "ios" ? "iPhone 설정" : "설정 열기"}
             </AppButton>
           </View>
         ) : null}
@@ -276,7 +283,7 @@ export default function StudentWalkingScreen() {
               onPress={() => void openSettings()}
               accessibilityLabel="Health Connect 권한 관리"
             >
-              권한 관리
+              {Platform.OS === "ios" ? "iPhone 설정" : "설정 열기"}
             </AppButton>
           </View>
         ) : null}
@@ -439,15 +446,12 @@ const styles = StyleSheet.create({
     maxWidth: layout.readableMaxWidth,
     alignSelf: "center",
     paddingHorizontal: spacing.xl,
-    paddingTop: spacing.lg,
+    paddingTop: pageChrome.contentStartGap,
     paddingBottom: spacing.xxxl + spacing.xxl,
-    gap: spacing.md,
+    gap: spacing.xxl,
   },
   connectionSection: {
     gap: spacing.sm,
-    paddingBottom: spacing.lg,
-    borderBottomWidth: borders.hairline,
-    borderBottomColor: colors.border,
   },
   connectionStatus: {
     ...typography.badge,
@@ -463,24 +467,18 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: spacing.sm,
     paddingVertical: spacing.xl,
-    borderBottomWidth: borders.hairline,
-    borderBottomColor: colors.border,
   },
   stateTitle: { ...typography.section, color: colors.text, textAlign: "center" },
   errorSection: {
     gap: spacing.sm,
     paddingVertical: spacing.lg,
-    borderBottomWidth: borders.hairline,
-    borderBottomColor: colors.border,
   },
   emptySection: {
     gap: spacing.sm,
     paddingVertical: spacing.xl,
-    borderBottomWidth: borders.hairline,
-    borderBottomColor: colors.border,
   },
   summarySection: { gap: spacing.sm },
-  summaryRows: { borderTopWidth: borders.hairline, borderTopColor: colors.border },
+  summaryRows: { gap: spacing.md },
   summaryRow: {
     minHeight: tapMin,
     flexDirection: "row",
@@ -488,17 +486,12 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     gap: spacing.md,
     paddingVertical: spacing.sm,
-    borderBottomWidth: borders.hairline,
-    borderBottomColor: colors.border,
   },
-  summaryRowLast: { borderBottomWidth: borders.none },
+  summaryRowLast: {},
   summaryLabel: { ...typography.label, color: colors.textMuted },
   summaryValue: { ...typography.section, color: colors.text },
   chartSection: {
     gap: spacing.lg,
-    paddingVertical: spacing.lg,
-    borderBottomWidth: borders.hairline,
-    borderBottomColor: colors.border,
   },
   chartRows: { gap: spacing.md },
   chartRow: { flexDirection: "row", alignItems: "center", gap: spacing.sm },
@@ -522,7 +515,6 @@ const styles = StyleSheet.create({
   },
   privacySection: {
     gap: spacing.md,
-    paddingTop: spacing.lg,
   },
   privacyRow: {
     flexDirection: "row",

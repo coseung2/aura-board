@@ -221,6 +221,19 @@ export const layout = {
   boardGridPadding: spacing.xl,
   boardGridGap: spacing.md,
   boardGridMinCardWidth: 260,
+  mobileBoardColumns: 2,
+} as const;
+
+/** Shared title -> banner -> page-content geometry for mobile screens. */
+export const pageChrome = {
+  horizontalPadding: spacing.xl,
+  /** First child is a shared 48px SectionHeader. */
+  contentStartGap: spacing.lg,
+  /** Cards, grids, or body copy start directly after the banner. */
+  directContentStartGap: spacing.xl + spacing.lg,
+  bannerTickerMinHeight: typography.label.lineHeight + spacing.lg,
+  bannerImageAspectRatio: 3,
+  bannerImageMaxHeight: 180,
 } as const;
 
 export type BoardThemeKey =
@@ -267,6 +280,9 @@ export const controls = {
   radioSize: 18,
   iconButton: tapMin,
   backButton: 44,
+  inputHeight: 48,
+  multilineInputMinHeight: 96,
+  compactChipHeight: 36,
   fab: 56,
   closeButton: 36,
 } as const;

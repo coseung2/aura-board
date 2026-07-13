@@ -14,6 +14,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import {
   borders,
   colors,
+  pageChrome,
   radii,
   spacing,
   states,
@@ -341,7 +342,7 @@ const styles = StyleSheet.create({
   },
   content: {
     paddingHorizontal: spacing.xl,
-    paddingTop: spacing.lg,
+    paddingTop: pageChrome.contentStartGap,
     paddingBottom: spacing.xxl,
     gap: spacing.lg,
   },

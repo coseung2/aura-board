@@ -39,6 +39,7 @@ import {
   borders,
   colors,
   iconSizes,
+  pageChrome,
   parent,
   radii,
   spacing,
@@ -176,7 +177,6 @@ export default function ParentHome() {
           />
         )}
         ItemSeparatorComponent={() => <View style={styles.feedSeparator} />}
-        contentInsetAdjustmentBehavior="automatic"
         contentContainerStyle={styles.listContent}
         refreshing={feed.refreshing}
         onRefresh={handleRefresh}
@@ -338,7 +338,7 @@ const styles = StyleSheet.create({
   },
   listHeader: {
     gap: spacing.lg,
-    paddingTop: spacing.lg,
+    paddingTop: pageChrome.directContentStartGap,
     paddingHorizontal: spacing.lg,
   },
   childStrip: { gap: spacing.sm, paddingRight: spacing.lg },

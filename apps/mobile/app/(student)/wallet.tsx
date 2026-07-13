@@ -13,6 +13,7 @@ import QRCode from "react-native-qrcode-svg";
 import {
   borders,
   colors,
+  pageChrome,
   radii,
   spacing,
   tapMin,
@@ -243,7 +244,7 @@ const styles = StyleSheet.create({
   },
   content: {
     paddingHorizontal: spacing.xl,
-    paddingTop: spacing.lg,
+    paddingTop: pageChrome.contentStartGap,
     paddingBottom: spacing.xxl,
     gap: spacing.lg,
   },

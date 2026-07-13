@@ -156,8 +156,15 @@ function normalizeNativeDay(row: HealthConnectDailyStats): WalkingDay {
   };
 }
 
+export function isWalkingHealthModuleAvailable() {
+  return (
+    (Platform.OS === "android" || Platform.OS === "ios") &&
+    AuraBoardHealthConnectModule !== null
+  );
+}
+
 export function isHealthConnectModuleAvailable() {
-  return Platform.OS === "android" && AuraBoardHealthConnectModule !== null;
+  return isWalkingHealthModuleAvailable();
 }
 
 export async function getHealthConnectStatus(): Promise<HealthConnectStatus> {

@@ -120,5 +120,8 @@ export function isStudentNavTargetActive(
 ): boolean {
   if (target.id === "home") return pathname === "/";
   if (target.id === "boards") return pathname === "/boards" || pathname.startsWith("/board/");
+  if (target.id === "more") {
+    return pathname === "/more" || pathname.startsWith("/more/") || pathname === "/daily-banner-submit";
+  }
   return pathname === target.pathname || pathname.startsWith(`${target.pathname}/`);
 }

@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
@@ -17,6 +17,7 @@ import {
   colors,
   layout as layoutTokens,
   media,
+  pageChrome,
   radii,
   spacing,
   typography,
@@ -31,13 +32,11 @@ import {
 } from "../../lib/board-cache";
 import {
   buildMobileBoardOverview,
-  defaultMobileBoardFilter,
   filterMobileBoardRows,
   type MobileBoardFilter,
   type MobileBoardRow,
 } from "../../lib/mobile-board-overview";
 import {
-  BoardSummaryStrip,
   MobileFilterBar,
   type FilterOption,
 } from "../../components/MobileBoardOverview";
@@ -45,7 +44,6 @@ import {
   AppButton,
   AppHeader,
   EmptyState,
-  Pill,
   SurfacePressable,
 } from "../../components/ui";
 
@@ -64,13 +62,8 @@ export default function StudentBoardsScreen() {
   const [loading, setLoading] = useState(() => !initialCache);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [filter, setFilter] = useState<MobileBoardFilter>(() =>
-    initialCache
-      ? defaultMobileBoardFilter(buildMobileBoardOverview(initialCache.data))
-      : "all",
-  );
+  const [filter, setFilter] = useState<MobileBoardFilter>("all");
   const [query, setQuery] = useState("");
-  const hasChosenFilterRef = useRef(false);
   const useWidePadding = width >= layoutTokens.mobileBreakpoint;
   const overview = useMemo(() => buildMobileBoardOverview(boards), [boards]);
   const visibleRows = useMemo(
@@ -79,10 +72,9 @@ export default function StudentBoardsScreen() {
   );
   const filterOptions = useMemo<Array<FilterOption<MobileBoardFilter>>>(
     () => [
-      { value: "priority", label: "지금 할 것", count: overview.summary.priority },
+      { value: "all", label: "전체", count: overview.summary.total },
       { value: "lesson", label: "수업", count: overview.summary.lesson },
       { value: "play", label: "놀이", count: overview.summary.play },
-      { value: "all", label: "전체", count: overview.summary.total },
     ],
     [overview.summary],
   );
@@ -95,9 +87,6 @@ export default function StudentBoardsScreen() {
       if (cached) {
         setBoards(cached.data);
         setLoading(false);
-        if (!hasChosenFilterRef.current) {
-          setFilter(defaultMobileBoardFilter(buildMobileBoardOverview(cached.data)));
-        }
       } else {
         setLoading(true);
       }
@@ -126,9 +115,6 @@ export default function StudentBoardsScreen() {
           { force: refresh, kind: "boards" },
         );
         setBoards(nextBoards);
-        if (!hasChosenFilterRef.current) {
-          setFilter(defaultMobileBoardFilter(buildMobileBoardOverview(nextBoards)));
-        }
       } catch (nextError) {
         if (nextError instanceof ApiError && nextError.status === 401) {
           await clearSessionToken();
@@ -177,7 +163,8 @@ export default function StudentBoardsScreen() {
           initialNumToRender={8}
           maxToRenderPerBatch={8}
           windowSize={5}
-          contentInsetAdjustmentBehavior="automatic"
+          numColumns={layoutTokens.mobileBoardColumns}
+          columnWrapperStyle={styles.columnWrapper}
           contentContainerStyle={[
             styles.content,
             useWidePadding && styles.contentWide,
@@ -191,20 +178,6 @@ export default function StudentBoardsScreen() {
           }
           ListHeaderComponent={
             <View style={styles.headerContent}>
-              <BoardSummaryStrip
-                title="한눈에 보기"
-                description={`참여 중인 보드에 카드 ${overview.summary.totalCards}개가 있어요.`}
-                metrics={[
-                  { label: "전체", value: overview.summary.total },
-                  {
-                    label: "지금 할 것",
-                    value: overview.summary.priority,
-                    tone: overview.summary.priority > 0 ? "danger" : "default",
-                  },
-                  { label: "수업", value: overview.summary.lesson },
-                  { label: "놀이", value: overview.summary.play, tone: "accent" },
-                ]}
-              />
               <MobileFilterBar
                 query={query}
                 onQueryChange={setQuery}
@@ -212,7 +185,6 @@ export default function StudentBoardsScreen() {
                 options={filterOptions}
                 value={filter}
                 onChange={(nextFilter) => {
-                  hasChosenFilterRef.current = true;
                   setFilter(nextFilter);
                 }}
               />
@@ -249,7 +221,6 @@ export default function StudentBoardsScreen() {
                   <AppButton
                     variant="secondary"
                     onPress={() => {
-                      hasChosenFilterRef.current = true;
                       setFilter("all");
                       setQuery("");
                     }}
@@ -270,9 +241,9 @@ function BoardRow({ row, onPress }: { row: MobileBoardRow; onPress: () => void }
   const { board } = row;
   return (
     <SurfacePressable
-      style={styles.boardRow}
+      style={styles.boardCard}
       onPress={onPress}
-      accessibilityLabel={`${board.title}, ${layoutLabel(board.layout)}, ${row.statusLabel}`}
+      accessibilityLabel={`${board.title}, ${layoutLabel(board.layout)}`}
       accessibilityHint="보드를 열어요"
     >
       <Image
@@ -283,51 +254,28 @@ function BoardRow({ row, onPress }: { row: MobileBoardRow; onPress: () => void }
         recyclingKey={`${board.id}:${board.thumbnailUrl ?? board.layout}`}
         accessible={false}
       />
-      <View style={styles.boardCopy}>
-        <View style={styles.boardTitleRow}>
-          <Text style={styles.boardTitle} numberOfLines={1}>
-            {board.title}
-          </Text>
-          <Pill tone={row.statusTone} style={styles.statusPill}>
-            {row.statusLabel}
-          </Pill>
-        </View>
-        <Text style={styles.boardDescription} numberOfLines={2}>
-          {board.description?.trim() || boardDescriptionFallback(row)}
+      <View style={styles.boardCardBody}>
+        <Text style={styles.boardTitle} numberOfLines={2}>
+          {board.title}
         </Text>
-        <View style={styles.boardMetaRow}>
-          <Text style={styles.boardMeta}>{layoutLabel(board.layout)}</Text>
-          <Text style={styles.boardMeta}>카드 {row.cardCount}개</Text>
-          <Text style={styles.boardMeta}>
-            {row.category === "PLAY" ? "놀이" : "수업"}
-          </Text>
-        </View>
+        <Text style={styles.boardType} numberOfLines={1}>
+          {layoutLabel(board.layout)}
+        </Text>
       </View>
-      <Text style={styles.chevron} accessible={false}>
-        ›
-      </Text>
     </SurfacePressable>
   );
 }
 
 function filterTitle(filter: MobileBoardFilter): string {
-  if (filter === "priority") return "지금 참여할 보드";
   if (filter === "lesson") return "수업 보드";
   if (filter === "play") return "놀이 보드";
-  return "모든 보드";
+  return "전체 보드";
 }
 
 function filterHint(filter: MobileBoardFilter): string {
-  if (filter === "priority") return "진행 중이거나 선택이 필요한 활동을 먼저 보여줘요.";
   if (filter === "lesson") return "수업 자료와 제출 활동을 모아서 봐요.";
   if (filter === "play") return "게임과 놀이 활동의 현재 상태를 확인해요.";
-  return "큰 썸네일 대신 상태와 카드 수를 함께 비교해요.";
-}
-
-function boardDescriptionFallback(row: MobileBoardRow): string {
-  if (row.needsAction) return "참여할 모둠을 선택해야 활동을 시작할 수 있어요.";
-  if (row.isLive) return "현재 진행 중인 활동이에요. 바로 참여할 수 있어요.";
-  return `${layoutLabel(row.board.layout)} 활동을 이어가세요.`;
+  return "참여 중인 보드를 이름과 종류로 확인해요.";
 }
 
 function boardThumbUri(board: MeResponse["boards"][number]): string {
@@ -359,7 +307,7 @@ const styles = StyleSheet.create({
     maxWidth: layoutTokens.readableMaxWidth,
     alignSelf: "center",
     paddingHorizontal: spacing.lg,
-    paddingTop: spacing.md,
+    paddingTop: pageChrome.directContentStartGap,
     paddingBottom: spacing.xxxl,
   },
   contentWide: { paddingHorizontal: spacing.xxl },
@@ -384,55 +332,36 @@ const styles = StyleSheet.create({
   resultTitle: { ...typography.section, color: colors.text },
   resultHint: { ...typography.micro, color: colors.textMuted },
   resultCount: { ...typography.badge, color: colors.accentTintedText },
-  boardRow: {
-    minHeight: media.previewThumb + spacing.lg * 2,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: spacing.md,
-    padding: spacing.md,
-    borderRadius: radii.card,
+  columnWrapper: {
+    gap: layoutTokens.boardGridGap,
   },
-  thumbnail: {
-    width: media.previewThumb,
-    height: media.previewThumb,
-    borderRadius: radii.control,
-    backgroundColor: colors.surfaceAlt,
-  },
-  boardCopy: {
+  boardCard: {
     flex: 1,
     minWidth: 0,
-    gap: spacing.xs,
+    overflow: "hidden",
+    borderWidth: borders.hairline,
+    borderColor: colors.border,
+    borderRadius: radii.card,
+    backgroundColor: colors.surface,
   },
-  boardTitleRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: spacing.sm,
+  thumbnail: {
+    width: "100%",
+    aspectRatio: media.previewAspectRatio,
+    borderRadius: radii.none,
+    backgroundColor: colors.surfaceAlt,
+  },
+  boardCardBody: {
+    minWidth: 0,
+    gap: spacing.xs,
+    padding: spacing.md,
   },
   boardTitle: {
     ...typography.subtitle,
     color: colors.text,
-    flex: 1,
   },
-  statusPill: {
-    flexShrink: 0,
-  },
-  boardDescription: {
+  boardType: {
     ...typography.micro,
     color: colors.textMuted,
-  },
-  boardMetaRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    flexWrap: "wrap",
-    gap: spacing.md,
-  },
-  boardMeta: {
-    ...typography.micro,
-    color: colors.textFaint,
-  },
-  chevron: {
-    ...typography.title,
-    color: colors.textFaint,
   },
   separator: {
     height: spacing.sm,

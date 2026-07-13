@@ -402,10 +402,11 @@ const styles = StyleSheet.create({
   },
   studentCodeInput: {
     width: "100%",
-    height: tapMin,
     backgroundColor: colors.surface,
     textAlign: "center",
-    ...typography.subtitle,
+    fontFamily: typography.subtitle.fontFamily,
+    fontSize: typography.subtitle.fontSize,
+    fontWeight: typography.subtitle.fontWeight,
   },
   studentErrorText: {
     ...typography.micro,

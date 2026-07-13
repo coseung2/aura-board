@@ -16,6 +16,7 @@ export function BoardHeader({
     <AppHeader
       title={title}
       onBack={() => router.back()}
+      showDailyBanner={false}
       right={layoutTitle !== title ? <Pill>{layoutTitle}</Pill> : undefined}
     />
   );

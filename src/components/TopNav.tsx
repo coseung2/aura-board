@@ -48,6 +48,7 @@ const CLASSROOM_TABS = [
   { key: "store", label: "매점" },
   { key: "pay", label: "QR결제" },
   { key: "check", label: "제출 체크" },
+  { key: "daily-banners", label: "일일 배너" },
 ] as const;
 
 function boardHref(board: TeacherNavBoard) {
@@ -429,6 +430,11 @@ export function TopNav({ showAdmin = false }: Props) {
               href: "/admin/errors",
               label: "에러 로그",
               active: pathname.startsWith("/admin/errors"),
+            },
+            {
+              href: "/admin/daily-banners",
+              label: "일일 배너",
+              active: pathname.startsWith("/admin/daily-banners"),
             },
             {
               href: "/teacher/settings",

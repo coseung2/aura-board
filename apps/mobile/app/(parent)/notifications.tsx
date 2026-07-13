@@ -21,7 +21,14 @@ import {
 import { useParentOverview } from "../../hooks/use-parent-overview";
 import { clearParentSession } from "../../lib/session";
 import type { ParentPendingLink } from "../../lib/types";
-import { colors, iconSizes, parent, spacing, typography } from "../../theme/tokens";
+import {
+  colors,
+  iconSizes,
+  pageChrome,
+  parent,
+  spacing,
+  typography,
+} from "../../theme/tokens";
 
 export default function ParentNotificationsScreen() {
   const router = useRouter();
@@ -52,7 +59,6 @@ export default function ParentNotificationsScreen() {
     <SafeAreaView style={styles.container} edges={["top"]}>
       <AppHeader title="알림" />
       <ScrollView
-        contentInsetAdjustmentBehavior="automatic"
         contentContainerStyle={styles.content}
         refreshControl={
           <RefreshControl
@@ -134,7 +140,13 @@ function formatExpiry(value: string): string {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg },
-  content: { flexGrow: 1, padding: spacing.lg, paddingBottom: spacing.xxl, gap: spacing.lg },
+  content: {
+    flexGrow: 1,
+    paddingHorizontal: spacing.lg,
+    paddingTop: pageChrome.directContentStartGap,
+    paddingBottom: spacing.xxl,
+    gap: spacing.lg,
+  },
   center: { minHeight: parent.portfolioEmptyMinHeight, alignItems: "center", justifyContent: "center", gap: spacing.md },
   list: { width: "100%", maxWidth: parent.portfolioCardMinWidth * 2 - spacing.lg, alignSelf: "center", gap: spacing.md },
   intro: { paddingVertical: spacing.sm, gap: spacing.xs },

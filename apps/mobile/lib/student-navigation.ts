@@ -1,5 +1,6 @@
 import * as SecureStore from "expo-secure-store";
 import { Platform } from "react-native";
+import { studentBaseNavTargets } from "./student-navigation-core";
 
 export {
   isStudentNavTargetActive,
@@ -13,6 +14,15 @@ export type { StudentNavTarget } from "./student-navigation-core";
 const NAV_PREFERENCES_KEY = "aura_student_nav_preferences_v1";
 const preferenceListeners = new Set<(ids: string[]) => void>();
 
+function normalizeIds(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  return [...new Set(value.filter((id): id is string => typeof id === "string"))];
+}
+
+function legacyDefaultIds() {
+  return studentBaseNavTargets.map((target) => target.id);
+}
+
 async function readPreferenceValue(): Promise<string | null> {
   if (Platform.OS === "web" && typeof window !== "undefined") {
     return window.localStorage.getItem(NAV_PREFERENCES_KEY);
@@ -22,23 +32,31 @@ async function readPreferenceValue(): Promise<string | null> {
 
 export async function loadStudentNavPreferences(): Promise<string[]> {
   const raw = await readPreferenceValue();
-  if (!raw) return [];
+  if (!raw) return legacyDefaultIds();
   try {
     const value = JSON.parse(raw);
-    return Array.isArray(value) ? value.filter((id): id is string => typeof id === "string") : [];
+    if (Array.isArray(value)) {
+      // v1 only stored optional menu IDs. Keep the former fixed menu items.
+      return [...new Set([...legacyDefaultIds(), ...normalizeIds(value)])];
+    }
+    if (value && typeof value === "object" && "ids" in value) {
+      return normalizeIds(value.ids);
+    }
+    return legacyDefaultIds();
   } catch {
-    return [];
+    return legacyDefaultIds();
   }
 }
 
 export async function saveStudentNavPreferences(ids: string[]): Promise<void> {
-  const value = JSON.stringify(ids);
+  const normalizedIds = normalizeIds(ids);
+  const value = JSON.stringify({ version: 2, ids: normalizedIds });
   if (Platform.OS === "web" && typeof window !== "undefined") {
     window.localStorage.setItem(NAV_PREFERENCES_KEY, value);
   } else {
     await SecureStore.setItemAsync(NAV_PREFERENCES_KEY, value);
   }
-  preferenceListeners.forEach((listener) => listener(ids));
+  preferenceListeners.forEach((listener) => listener(normalizedIds));
 }
 
 export function subscribeStudentNavPreferences(listener: (ids: string[]) => void) {

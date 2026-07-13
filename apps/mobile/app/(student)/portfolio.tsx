@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
-  Image,
   ScrollView,
   StyleSheet,
   Text,
@@ -9,6 +8,7 @@ import {
   useWindowDimensions,
 } from "react-native";
 import { useRouter } from "expo-router";
+import { Image } from "expo-image";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { CardDetailModal } from "../../components/CardDetailModal";
 import {
@@ -17,6 +17,7 @@ import {
   dashboard,
   layout as layoutTokens,
   media,
+  pageChrome,
   portfolio as portfolioTokens,
   radii,
   shadows,
@@ -24,11 +25,10 @@ import {
   typography,
 } from "../../theme/tokens";
 import { layoutLabel } from "../../theme/layout-meta";
-import { apiFetch, ApiError } from "../../lib/api";
+import { apiFetch, ApiError, getApiBase } from "../../lib/api";
 import { clearSessionToken } from "../../lib/session";
 import {
   AppHeader,
-  SectionHeader,
   SurfaceCard,
   SurfacePressable,
 } from "../../components/ui";
@@ -66,6 +66,26 @@ export default function StudentPortfolioScreen() {
     if (!portfolio) return [];
     return portfolio.cards.map((card) => toBoardCard(card, portfolio.student));
   }, [portfolio]);
+  const cardColumnsData = useMemo(() => {
+    if (!portfolio) return [];
+    const columns = Array.from(
+      { length: cardColumns },
+      () => [] as Array<{ card: PortfolioCardDTO; index: number }>,
+    );
+    const columnHeights = Array.from({ length: cardColumns }, () => 0);
+
+    portfolio.cards.forEach((card, index) => {
+      const targetColumn = columnHeights.reduce(
+        (shortestIndex, height, columnIndex) =>
+          height < columnHeights[shortestIndex] ? columnIndex : shortestIndex,
+        0,
+      );
+      columns[targetColumn].push({ card, index });
+      columnHeights[targetColumn] += estimatePortfolioCardHeight(card, cardWidth);
+    });
+
+    return columns;
+  }, [cardColumns, cardWidth, portfolio]);
 
   const handleAuthError = useCallback(
     async (e: unknown) => {
@@ -115,7 +135,14 @@ export default function StudentPortfolioScreen() {
 
   return (
     <SafeAreaView style={styles.container} edges={["top"]}>
-      <AppHeader title="포트폴리오" />
+      <AppHeader
+        title="포트폴리오"
+        right={
+          portfolio ? (
+            <Text style={styles.headerCount}>{portfolio.cards.length}개</Text>
+          ) : undefined
+        }
+      />
 
       {loading ? (
         <View style={styles.center}>
@@ -128,36 +155,30 @@ export default function StudentPortfolioScreen() {
         </View>
       ) : (
         <ScrollView
-          contentInsetAdjustmentBehavior="automatic"
           contentContainerStyle={[
             styles.content,
             useWidePadding && styles.contentWide,
             isLandscapeLayout && styles.contentLandscape,
           ]}
         >
-          <SectionHeader
-            title="내 작품"
-            right={
-              portfolio ? (
-                <Text style={styles.sectionCount}>{portfolio.cards.length}개</Text>
-              ) : undefined
-            }
-          />
-
           {portfolioLoading ? (
             <View style={styles.inlineLoading}>
               <ActivityIndicator color={colors.accent} />
             </View>
           ) : portfolio?.cards.length ? (
             <View style={styles.cardGrid}>
-              {portfolio.cards.map((card, index) => (
-                <PortfolioCard
-                  key={card.id}
-                  card={card}
-                  student={portfolio.student}
-                  cardWidth={cardWidth}
-                  onPress={() => setSelectedCard(modalCards[index] ?? null)}
-                />
+              {cardColumnsData.map((column, columnIndex) => (
+                <View key={`portfolio-column-${columnIndex}`} style={styles.cardColumn}>
+                  {column.map(({ card, index }) => (
+                    <PortfolioCard
+                      key={card.id}
+                      card={card}
+                      student={portfolio.student}
+                      cardWidth={cardWidth}
+                      onPress={() => setSelectedCard(modalCards[index] ?? null)}
+                    />
+                  ))}
+                </View>
               ))}
             </View>
           ) : (
@@ -190,7 +211,7 @@ function PortfolioCard({
   const authorLabel = card.sourceBoard.anonymousAuthor ? "익명" : student.name;
   return (
     <SurfacePressable
-      style={[styles.card, { width: cardWidth, minHeight: cardWidth }]}
+      style={[styles.card, { width: cardWidth }]}
       onPress={onPress}
       accessibilityLabel={`${authorLabel}의 작품 ${card.title || "제목 없음"} 열기`}
       accessibilityHint="작품 내용을 자세히 봐요"
@@ -200,7 +221,8 @@ function PortfolioCard({
           <Image
             source={{ uri: image }}
             style={styles.previewImage}
-            resizeMode="cover"
+            contentFit="cover"
+            transition={150}
             accessible={false}
           />
         ) : (
@@ -287,13 +309,57 @@ function toBoardCard(
 }
 
 function getCardPreviewImage(card: PortfolioCardDTO): string | null {
-  if (card.thumbUrl) return card.thumbUrl;
-  if (card.imageUrl) return card.imageUrl;
-  if (card.linkImage) return card.linkImage;
+  if (card.thumbUrl) return resolvePortfolioAssetUrl(card.thumbUrl);
+  if (card.imageUrl) return resolvePortfolioAssetUrl(card.imageUrl);
+  if (card.linkImage) return resolvePortfolioAssetUrl(card.linkImage);
   const imageAttachment = card.attachments?.find(
     (a) => a.kind === "image" && (a.previewUrl || a.url),
   );
-  return imageAttachment?.previewUrl ?? imageAttachment?.url ?? null;
+  const image = imageAttachment?.previewUrl ?? imageAttachment?.url ?? null;
+  return image ? resolvePortfolioAssetUrl(image) : null;
+}
+
+function resolvePortfolioAssetUrl(value: string): string {
+  const apiBase = getApiBase();
+  try {
+    const assetUrl = new URL(value, apiBase);
+    const apiOrigin = new URL(apiBase).origin;
+    const isAuraBoardAsset =
+      assetUrl.hostname === "aura-board.com" ||
+      assetUrl.hostname === "www.aura-board.com";
+
+    if (isAuraBoardAsset && apiOrigin !== assetUrl.origin) {
+      return `${apiOrigin}${assetUrl.pathname}${assetUrl.search}`;
+    }
+
+    if (assetUrl.origin !== apiOrigin) {
+      return `${apiOrigin}/api/link-preview/image?url=${encodeURIComponent(
+        assetUrl.toString(),
+      )}`;
+    }
+    return assetUrl.toString();
+  } catch {
+    return value;
+  }
+}
+
+function estimatePortfolioCardHeight(card: PortfolioCardDTO, cardWidth: number) {
+  const charactersPerLine = Math.max(9, Math.floor(cardWidth / 13));
+  const estimatedLines = (text: string, maximum: number) =>
+    Math.min(
+      maximum,
+      Math.max(1, Math.ceil(text.trim().length / charactersPerLine)),
+    );
+  const titleLines = estimatedLines(card.title || "제목 없음", 2);
+  const contentLines = card.content ? estimatedLines(card.content, 3) : 0;
+
+  return (
+    cardWidth / media.previewAspectRatio +
+    spacing.sm * 2 +
+    typography.subtitle.lineHeight * titleLines +
+    (contentLines ? typography.label.lineHeight * contentLines + spacing.xs : 0) +
+    typography.micro.lineHeight
+  );
 }
 
 const styles = StyleSheet.create({
@@ -310,8 +376,8 @@ const styles = StyleSheet.create({
     width: "100%",
     maxWidth: layoutTokens.readableMaxWidth,
     alignSelf: "center",
-    paddingHorizontal: spacing.xl,
-    paddingTop: spacing.lg,
+    paddingHorizontal: pageChrome.horizontalPadding,
+    paddingTop: pageChrome.directContentStartGap,
     paddingBottom: spacing.xxxl,
     gap: spacing.lg,
   },
@@ -321,7 +387,7 @@ const styles = StyleSheet.create({
   contentLandscape: {
     gap: spacing.xl,
   },
-  sectionCount: { ...typography.label, color: colors.accent },
+  headerCount: { ...typography.label, color: colors.accent },
   inlineLoading: {
     minHeight: portfolioTokens.rosterChipMinHeight,
     alignItems: "center",
@@ -330,10 +396,12 @@ const styles = StyleSheet.create({
   },
   cardGrid: {
     flexDirection: "row",
-    flexWrap: "wrap",
-    alignItems: "flex-start",
     columnGap: layoutTokens.boardGridGap,
-    rowGap: layoutTokens.boardGridGap,
+  },
+  cardColumn: {
+    flex: 1,
+    minWidth: 0,
+    gap: layoutTokens.boardGridGap,
   },
   card: {
     overflow: "hidden",
@@ -364,9 +432,15 @@ const styles = StyleSheet.create({
     marginLeft: media.playOffset,
   },
   cardBody: { padding: spacing.sm, gap: spacing.xs },
-  cardTitle: { ...typography.section, color: colors.text },
-  cardContent: { ...typography.body, color: colors.textMuted },
-  cardMeta: { ...typography.micro, color: colors.textMuted, marginTop: "auto" },
+  cardTitle: { ...typography.subtitle, color: colors.text },
+  cardContent: {
+    fontFamily: typography.body.fontFamily,
+    fontSize: typography.label.fontSize,
+    fontWeight: typography.body.fontWeight,
+    lineHeight: typography.label.lineHeight,
+    color: colors.textMuted,
+  },
+  cardMeta: { ...typography.micro, color: colors.textFaint },
   emptyBox: {
     padding: spacing.xl,
     alignItems: "center",

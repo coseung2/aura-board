@@ -30,7 +30,7 @@ class AuraBoardHealthConnectRationaleActivity : Activity() {
     })
 
     content.addView(TextView(this).apply {
-      text = "Health Connect 연결은 선택 사항이며, 사용자가 권한을 허용한 경우에만 동작합니다."
+      text = "걸음 수 기록은 선택 사항이에요. 권한을 허용한 경우에만 작동합니다."
       textSize = 16f
       setTextColor(Color.rgb(82, 82, 82))
       setLineSpacing(0f, 1.35f)
@@ -38,12 +38,10 @@ class AuraBoardHealthConnectRationaleActivity : Activity() {
     })
 
     val sections = listOf(
-      "읽는 정보" to "걸음 수와 이동 거리만 읽습니다.",
-      "저장하는 정보" to "학생 계정에는 날짜별 걸음 수와 거리 합계만 저장합니다.",
-      "수집하지 않는 정보" to "GPS 위치, 이동 경로, 원본 센서 샘플은 수집하거나 저장하지 않습니다.",
-      "사용 목적" to "학생과 담당 교사가 걷기 현황을 확인하는 데만 사용합니다.",
-      "광고 및 AI" to "Health Connect 데이터는 광고 개인화나 AI 학습에 사용하지 않습니다.",
-      "권한 관리" to "Android의 Health Connect 설정에서 언제든 권한을 철회할 수 있습니다."
+      "필요한 권한" to "걸음 수와 이동 거리만 읽습니다.",
+      "저장하는 정보" to "날짜별 걸음 수와 거리 합계만 저장합니다.",
+      "읽지 않는 정보" to "GPS 위치와 이동 경로는 읽거나 저장하지 않습니다.",
+      "권한 관리" to "Health Connect 설정에서 언제든 권한을 바꿀 수 있습니다."
     )
 
     sections.forEach { (title, body) ->
@@ -64,7 +62,7 @@ class AuraBoardHealthConnectRationaleActivity : Activity() {
     }
 
     content.addView(Button(this).apply {
-      text = "닫기"
+      text = "확인"
       isAllCaps = false
       setOnClickListener { finish() }
       layoutParams = LinearLayout.LayoutParams(

@@ -119,6 +119,10 @@ model User {
   // Teacher-owned word sets. System sets live with userId = NULL; user sets
   // scope to a single teacher (no classroom-level sharing in v1).
   speedGameWordSets SpeedGameWordSet[]
+
+  // Global daily banner moderation/publication.
+  dailyBannerReviews DailyBannerSubmission[] @relation("DailyBannerReviewedBy")
+  dailyBannerPublications DailyBannerPublication[] @relation("DailyBannerPublishedBy")
 }
 
 // ???????? Audit Log (Seed 14 security, 2026-04-22) ????????
@@ -469,6 +473,9 @@ model Classroom {
   // Classroom check tasks in this classroom (1인1역할: 체크원, 2026-06-28)
   checkTasks ClassroomCheckTask[]
 
+  // Global daily banner submissions from this classroom.
+  dailyBannerSubmissions DailyBannerSubmission[]
+
   // Inspector findings (2026-07-02)
   cleaningFindings CleaningFinding[]
   shoeFindings     ShoeFinding[]
@@ -611,10 +618,74 @@ model Student {
 
   walkingDailyStats StudentWalkingDailyStat[]
 
+  // Global daily banner submissions.
+  dailyBannerSubmissions DailyBannerSubmission[] @relation("DailyBannerSubmissionStudent")
+
   @@unique([classroomId, number])
   @@index([classroomId])
   @@index([qrToken])
   @@index([textCode])
+}
+
+// A student-submitted marquee text or image waiting for the submitting
+// student's classroom teacher to moderate it.  The publication row below is
+// deliberately separate: its unique day is the global at-most-one gate.
+enum DailyBannerSubmissionKind {
+  text
+  image
+}
+
+enum DailyBannerSubmissionStatus {
+  pending
+  approved
+  rejected
+}
+
+model DailyBannerSubmission {
+  id String @id @default(cuid())
+
+  studentId String
+  classroomId String
+
+  // Calendar day in Asia/Seoul. The API accepts YYYY-MM-DD and stores it as
+  // a PostgreSQL DATE so server timezone changes cannot move the banner.
+  targetDay DateTime @db.Date
+
+  kind DailyBannerSubmissionKind
+  text String? @db.Text
+  imageUrl String?
+
+  status DailyBannerSubmissionStatus @default(pending)
+  reviewedAt DateTime?
+  reviewedById String?
+  rejectionReason String? @db.Text
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  student Student @relation("DailyBannerSubmissionStudent", fields: [studentId], references: [id], onDelete: Cascade)
+  classroom Classroom @relation(fields: [classroomId], references: [id], onDelete: Cascade)
+  reviewedBy User? @relation("DailyBannerReviewedBy", fields: [reviewedById], references: [id], onDelete: SetNull)
+  publication DailyBannerPublication?
+
+  @@index([targetDay, status, createdAt])
+  @@index([classroomId, targetDay, status])
+  @@index([studentId, targetDay, createdAt])
+}
+
+// One globally visible banner per KST calendar day. Approval inserts this row
+// in the same transaction that marks the submission approved; the unique day
+// constraint makes concurrent teacher approvals race-safe.
+model DailyBannerPublication {
+  id String @id @default(cuid())
+
+  day DateTime @db.Date @unique
+  submissionId String @unique
+  approvedById String
+  publishedAt DateTime @default(now())
+
+  submission DailyBannerSubmission @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+  approvedBy User @relation("DailyBannerPublishedBy", fields: [approvedById], references: [id], onDelete: Cascade)
 }
 
 model StudentWalkingDailyStat {

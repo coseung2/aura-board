@@ -374,17 +374,24 @@ const styles = StyleSheet.create({
 
   progressBar: {
     flexDirection: "row",
+    flexWrap: "wrap",
     gap: spacing.md,
   },
   progressPill: {
-    flex: 1,
+    flexBasis: "45%",
+    flexGrow: 1,
     borderWidth: borders.medium,
     borderRadius: radii.card,
     padding: spacing.md,
     alignItems: "center",
   },
   progressCount: { ...typography.display },
-  progressLabel: { ...typography.label, color: colors.textMuted, marginTop: spacing.xs },
+  progressLabel: {
+    ...typography.label,
+    color: colors.textMuted,
+    marginTop: spacing.xs,
+    textAlign: "center",
+  },
 
   mySlotCard: {
     padding: spacing.xl,

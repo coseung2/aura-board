@@ -3,6 +3,7 @@ import { ScrollView, StyleSheet, Text, View } from "react-native";
 import {
   borders,
   colors,
+  controls,
   radii,
   spacing,
   tapMin,
@@ -106,6 +107,7 @@ export function MobileFilterBar<T extends string>({
             <ControlPressable
               key={option.value}
               style={[styles.filterChip, active && styles.filterChipActive]}
+              hitSlop={{ top: spacing.xs, bottom: spacing.xs }}
               onPress={() => onChange(option.value)}
               accessibilityState={{ selected: active }}
             >
@@ -230,11 +232,12 @@ const styles = StyleSheet.create({
     paddingRight: spacing.lg,
   },
   filterChip: {
-    minHeight: tapMin,
+    minHeight: controls.compactChipHeight,
     paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
+    paddingVertical: spacing.xs,
     borderRadius: radii.pill,
     backgroundColor: colors.surface,
+    justifyContent: "center",
   },
   filterChipActive: {
     borderColor: colors.accent,

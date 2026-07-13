@@ -30,6 +30,26 @@ must compose tokens and shared primitives.
   actions use `Fab`; chips/badges use `Pill`.
 - Repeated route headers use `AppHeader`; board-specific headers use
   `BoardHeader`.
+- `AppHeader` back navigation is a flat 44px icon hit target. It must stay
+  vertically centered with the title and use only the shared pressed-state
+  feedback; do not add a persistent gray surface, border, or rounded wrapper.
+- Student and parent page chrome follows one sequence: `AppHeader` ->
+  `DailyBanner` -> page content. Board-internal headers opt out. Banner height,
+  image ratio, horizontal padding, and the first content gap come from
+  `pageChrome` in `apps/mobile/theme/tokens.ts`.
+- Routes inside a top-edge `SafeAreaView` must not add automatic scroll insets
+  below `DailyBanner`. If the first child is the shared 48px `SectionHeader`,
+  use `pageChrome.contentStartGap`. If cards, a grid, or body copy start
+  directly, use `pageChrome.directContentStartGap` so the first visible content
+  baseline stays aligned. First-child sections must not add a second top
+  padding. This keeps home, reading, portfolio, and the remaining menu pages on
+  the same visual rhythm without route-local spacing values.
+- Multiline `TextField` controls use the shared semantic minimum height and
+  top-aligned text. A multiline field must leave vertical glyph room beyond
+  one line plus padding so Korean placeholder and input text are never clipped.
+- `SurfaceCard` is for content that is meaningfully a separate card. Do not
+  wrap an ordinary form or page section in a card when its inputs and selectors
+  already provide their own boundaries; use spacing and section hierarchy.
 - Pressable rows inside cards or sheets use `ControlPressable`; larger card
   targets use `SurfacePressable`.
 - Full-bleed image/backdrop hit areas use `MediaPressable`, keeping raw
@@ -66,6 +86,8 @@ Before changing a mobile screen, check:
 3. Is the web equivalent already using a component pattern that has a mobile
    mapping in `docs/mobile-component-mapping.md`?
 4. Does the screen still typecheck after the refactor?
+5. Are multiline placeholders fully visible, back controls flat and centered,
+   and form controls free of redundant outer card wrappers?
 
 If a component needs a visual value that does not exist in tokens, add a
 semantic token first and document which web token or web component required it.

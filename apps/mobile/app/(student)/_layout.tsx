@@ -6,6 +6,8 @@ import { apiFetch, ApiError } from "../../lib/api";
 import { clearSessionToken } from "../../lib/session";
 import type { MeResponse } from "../../lib/types";
 import { StudentBottomNav } from "../../components/StudentBottomNav";
+import { WalkingPermissionOnboarding } from "../../components/WalkingPermissionOnboarding";
+import { DailyBannerProvider } from "../../components/DailyBanner";
 
 // Student segment 전체 공통 layout.
 export default function StudentLayout() {
@@ -37,17 +39,22 @@ export default function StudentLayout() {
 
   return (
     <View style={styles.shell}>
-      <View style={styles.stack}>
-        <Stack
-          screenOptions={{
-            headerShown: false,
-            contentStyle: { backgroundColor: colors.bg },
-            animation: "fade",
-          }}
-        />
-      </View>
+      <DailyBannerProvider role="student">
+        <View style={styles.stack}>
+          <Stack
+            screenOptions={{
+              headerShown: false,
+              contentStyle: { backgroundColor: colors.bg },
+              animation: "fade",
+            }}
+          />
+        </View>
+      </DailyBannerProvider>
       {!hideNav ? (
         <StudentBottomNav duties={me?.duties} />
+      ) : null}
+      {!hideNav && me ? (
+        <WalkingPermissionOnboarding studentId={me.student.id} />
       ) : null}
     </View>
   );

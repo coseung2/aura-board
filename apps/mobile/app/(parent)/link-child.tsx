@@ -12,6 +12,7 @@ import {
   borders,
   colors,
   iconSizes,
+  pageChrome,
   parent,
   spacing,
   tapMin,
@@ -354,6 +355,7 @@ const styles = StyleSheet.create({
   },
   listContent: {
     paddingHorizontal: spacing.xxl,
+    paddingTop: pageChrome.directContentStartGap,
     paddingBottom: spacing.xxl,
     gap: spacing.lg,
   },
