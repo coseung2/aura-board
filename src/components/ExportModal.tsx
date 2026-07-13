@@ -12,7 +12,9 @@ type Props = {
   onClose: () => void;
 };
 
-type ExportLayout = "a4-auto" | "a4-fit" | "original";
+type ExportLayout = "a4-fit" | "original";
+
+const MAX_EXPORT_ITEMS = 10;
 
 type ExportItem = {
   id: string;
@@ -31,35 +33,30 @@ const EXPORT_LAYOUTS: Array<{
   description: string;
 }> = [
   {
-    value: "a4-auto",
-    label: "A4 자동 배치",
-    description: "선택한 Canva 페이지와 이미지를 A4에 알맞게 묶어서 배치",
-  },
-  {
     value: "a4-fit",
-    label: "A4 한 장씩",
-    description: "각 페이지와 이미지를 A4 한 장에 크게 맞춤",
+    label: "A4 한 장",
+    description: "이미지 한 개를 A4 한 장에 크게 맞춤",
   },
   {
     value: "original",
     label: "원본 크기",
-    description: "Canva PDF와 이미지 원본 크기를 그대로 유지",
+    description: "이미지 원본 크기를 유지",
   },
 ];
 
 export function ExportModal({ sectionTitle, cards, onClose }: Props) {
   const exportItems = useMemo(() => buildExportItems(cards), [cards]);
   const [items, setItems] = useState<ExportItem[]>(exportItems);
-  const [selected, setSelected] = useState<Set<string>>(
-    new Set(exportItems.map((item) => item.id)),
+  const [selected, setSelected] = useState<Set<string>>(() =>
+    createInitialSelection(exportItems),
   );
-  const [layout, setLayout] = useState<ExportLayout>("a4-auto");
+  const [layout, setLayout] = useState<ExportLayout>("a4-fit");
   const [exporting, setExporting] = useState(false);
   const [progress, setProgress] = useState("");
 
   useEffect(() => {
     setItems(exportItems);
-    setSelected(new Set(exportItems.map((item) => item.id)));
+    setSelected(createInitialSelection(exportItems));
   }, [exportItems]);
 
   useEffect(() => {
@@ -113,72 +110,108 @@ export function ExportModal({ sectionTitle, cards, onClose }: Props) {
     setSelected((prev) => {
       const next = new Set(prev);
       if (next.has(id)) next.delete(id);
-      else next.add(id);
+      else if (next.size < MAX_EXPORT_ITEMS) next.add(id);
       return next;
     });
   }
 
   const selectedItems = items.filter((item) => selected.has(item.id));
-  const totalSourcePages = selectedItems.reduce(
-    (sum, item) => sum + (item.pageCount ?? 1),
-    0,
-  );
+  const hasSelectedImages = selectedItems.some((item) => item.type === "image");
 
   async function handleExport() {
     if (selectedItems.length === 0) return;
 
+    const total = selectedItems.length;
+    const usedFilenames = new Set<string>();
+    const failures: string[] = [];
+    let completed = 0;
+    let successCount = 0;
+
     setExporting(true);
-    setProgress(`${selectedItems.length}개 항목 PDF 내보내는 중...`);
+    setProgress(`0/${total} 준비 중...`);
 
-    try {
-      const res = await fetch("/api/export/canva-pdf", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          layout,
-          items: selectedItems.map((item) => ({
-            type: item.type,
-            url: item.url,
-            title: item.title,
-          })),
-        }),
-      });
+    for (const [index, item] of selectedItems.entries()) {
+      const itemNumber = index + 1;
+      let itemFailed = false;
+      setProgress(`${itemNumber}/${total} 처리 중 · ${item.title}`);
 
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({ error: "unknown" }));
-        if (data.error === "canva_not_connected" || data.error === "canva_token_expired") {
-          if (window.confirm("Canva 계정 연결이 필요합니다. 지금 연결할까요?")) {
-            window.location.href = buildCanvaConnectUrl();
+      try {
+        const res = await fetch("/api/export/canva-pdf", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            layout,
+            items: [
+              {
+                type: item.type,
+                url: item.url,
+                title: item.title,
+              },
+            ],
+          }),
+        });
+
+        if (!res.ok) {
+          const data = await res.json().catch(() => ({ error: "unknown" }));
+          if (
+            data.error === "canva_not_connected" ||
+            data.error === "canva_token_expired"
+          ) {
+            if (
+              window.confirm("Canva 계정 연결이 필요합니다. 지금 연결할까요?")
+            ) {
+              setProgress("Canva 연결 페이지로 이동 중...");
+              setExporting(false);
+              window.location.href = buildCanvaConnectUrl();
+              return;
+            }
+            itemFailed = true;
+            failures.push(`${item.title}: Canva 계정 연결이 필요합니다.`);
+          } else {
+            itemFailed = true;
+            failures.push(
+              `${item.title}: ${getCanvaExportErrorMessage(data.error)}`,
+            );
           }
-          setExporting(false);
-          setProgress("");
-          return;
+        } else {
+          const blob = await res.blob();
+          downloadBlob(
+            blob,
+            buildDownloadFilename(
+              sectionTitle,
+              item.title,
+              usedFilenames,
+              itemNumber,
+            ),
+          );
+          successCount += 1;
         }
-        alert(getCanvaExportErrorMessage(data.error));
-        setExporting(false);
-        setProgress("");
-        return;
+      } catch (err) {
+        console.error(`[Export] ${item.title}`, err);
+        itemFailed = true;
+        failures.push(
+          `${item.title}: 네트워크 오류로 다운로드하지 못했습니다.`,
+        );
       }
 
-      setProgress("PDF 다운로드 중...");
-      const blob = await res.blob();
-      const downloadUrl = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = downloadUrl;
-      a.download = `${sectionTitle}_export.pdf`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(downloadUrl);
-
-      setProgress("완료!");
-      setTimeout(onClose, 1500);
-    } catch (err) {
-      console.error(err);
-      alert("내보내기 중 오류가 발생했습니다.");
-      setExporting(false);
-      setProgress("");
+      completed = itemNumber;
+      setProgress(
+        itemFailed
+          ? `${completed}/${total} 완료 · ${item.title} 실패`
+          : `${completed}/${total} 완료 · ${item.title}`,
+      );
     }
+
+    setExporting(false);
+    if (failures.length > 0) {
+      setProgress(
+        `${successCount}/${total}개 PDF 다운로드 완료 · 실패: ${failures.join(" · ")}`,
+      );
+      return;
+    }
+
+    setProgress(`완료 · ${successCount}/${total}개 PDF 다운로드 완료`);
+    window.setTimeout(onClose, 1500);
   }
 
   return (
@@ -206,31 +239,50 @@ export function ExportModal({ sectionTitle, cards, onClose }: Props) {
             <p className="export-hint">이 섹션에 내보낼 Canva 링크나 이미지가 없습니다.</p>
           ) : (
             <>
-              <p className="export-summary">
-                항목 {selected.size}개 선택 · 원본 {totalSourcePages}페이지
+              <p className="export-summary" id="export-summary">
+                항목 {selectedItems.length}개 선택 · 각 항목을 별도 PDF 파일로
+                다운로드
+              </p>
+              <p className="export-selection-limit" id="export-selection-limit">
+                한 번에 최대 {MAX_EXPORT_ITEMS}개까지 선택할 수 있습니다.
+                {items.length > MAX_EXPORT_ITEMS
+                  ? ` 처음 ${MAX_EXPORT_ITEMS}개 항목이 기본으로 선택되었습니다.`
+                  : ""}
+                {selectedItems.length > 1
+                  ? " 브라우저에서 여러 파일 다운로드 허용을 요청할 수 있습니다."
+                  : ""}
               </p>
 
-              <div className="export-layout-options" aria-label="PDF 배치 방식">
-                {EXPORT_LAYOUTS.map((option) => (
-                  <label
-                    key={option.value}
-                    className={`export-layout-option ${layout === option.value ? "active" : ""}`}
-                  >
-                    <input
-                      type="radio"
-                      name="export-layout"
-                      value={option.value}
-                      checked={layout === option.value}
-                      disabled={exporting}
-                      onChange={() => setLayout(option.value)}
-                    />
-                    <span>
-                      <strong>{option.label}</strong>
-                      <small>{option.description}</small>
-                    </span>
-                  </label>
-                ))}
-              </div>
+              <p className="export-hint">
+                Canva 디자인은 Canva에서 받은 원본 PDF 그대로 다운로드합니다.
+              </p>
+
+              {hasSelectedImages && (
+                <div
+                  className="export-layout-options"
+                  aria-label="이미지 PDF 페이지 크기"
+                >
+                  {EXPORT_LAYOUTS.map((option) => (
+                    <label
+                      key={option.value}
+                      className={`export-layout-option ${layout === option.value ? "active" : ""}`}
+                    >
+                      <input
+                        type="radio"
+                        name="export-layout"
+                        value={option.value}
+                        checked={layout === option.value}
+                        disabled={exporting}
+                        onChange={() => setLayout(option.value)}
+                      />
+                      <span>
+                        <strong>{option.label}</strong>
+                        <small>{option.description}</small>
+                      </span>
+                    </label>
+                  ))}
+                </div>
+              )}
 
               <div className="export-design-list">
                 {items.map((d) => (
@@ -242,7 +294,13 @@ export function ExportModal({ sectionTitle, cards, onClose }: Props) {
                       type="checkbox"
                       checked={selected.has(d.id)}
                       onChange={() => toggle(d.id)}
-                      disabled={exporting}
+                      disabled={
+                        exporting ||
+                        (!selected.has(d.id) &&
+                          selectedItems.length >= MAX_EXPORT_ITEMS)
+                      }
+                      aria-describedby="export-selection-limit"
+                      aria-label={`${d.title} 선택`}
                       className="export-item-check"
                     />
                     {d.thumbnail && (
@@ -285,10 +343,12 @@ export function ExportModal({ sectionTitle, cards, onClose }: Props) {
                 <button
                   type="button"
                   onClick={handleExport}
-                  disabled={exporting || selected.size === 0}
+                  disabled={exporting || selectedItems.length === 0}
                   className="modal-btn-submit"
                 >
-                  {exporting ? "내보내는 중..." : `PDF 내보내기 (${selected.size})`}
+                  {exporting
+                    ? "내보내는 중..."
+                    : `PDF 내보내기 (${selectedItems.length})`}
                 </button>
               </div>
             </>
@@ -297,6 +357,55 @@ export function ExportModal({ sectionTitle, cards, onClose }: Props) {
       </div>
     </>
   );
+}
+
+function createInitialSelection(items: ExportItem[]): Set<string> {
+  return new Set(items.slice(0, MAX_EXPORT_ITEMS).map((item) => item.id));
+}
+
+function downloadBlob(blob: Blob, filename: string): void {
+  const downloadUrl = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = downloadUrl;
+  anchor.download = filename;
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+  window.setTimeout(() => URL.revokeObjectURL(downloadUrl), 1000);
+}
+
+function buildDownloadFilename(
+  sectionTitle: string,
+  itemTitle: string,
+  usedFilenames: Set<string>,
+  itemNumber: number,
+): string {
+  const section = sanitizeFilenamePart(sectionTitle);
+  const item = sanitizeFilenamePart(itemTitle);
+  const base =
+    [section, item].filter(Boolean).join(" - ") || `export-${itemNumber}`;
+  const trimmedBase =
+    base.slice(0, 120).replace(/[. ]+$/g, "") || `export-${itemNumber}`;
+
+  let filename = `${trimmedBase}.pdf`;
+  let suffix = 2;
+  while (usedFilenames.has(filename.toLowerCase())) {
+    filename = `${trimmedBase}-${suffix}.pdf`;
+    suffix += 1;
+  }
+  usedFilenames.add(filename.toLowerCase());
+  return filename;
+}
+
+function sanitizeFilenamePart(value: string): string {
+  return value
+    .normalize("NFKC")
+    .replace(/[<>:"/\\|?*\u0000-\u001F]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .replace(/[. ]+$/g, "")
+    .slice(0, 80)
+    .replace(/[. ]+$/g, "");
 }
 
 function buildExportItems(cards: CardData[]): ExportItem[] {

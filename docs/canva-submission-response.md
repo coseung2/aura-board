@@ -75,13 +75,19 @@ Steps:
 3. Open teacher settings and connect a Canva account available to the review team.
 4. In the section named `test`, use `Canva에서 가져오기`, browse a folder,
    select a design, and confirm its title and thumbnail appear on the board.
-5. Export the selected Canva design as PDF using the review-approved export mode.
+5. Export one or more selected Canva designs as PDF. Confirm that each design
+   downloads as a separate PDF file and that Aura Board does not combine Canva
+   designs or images into a derived PDF.
 6. Use `Canva 폴더로 정리` and confirm the Canva folder is named after the
    Aura Board section (`test`).
 7. Disconnect Canva in teacher settings and confirm the disconnected state remains after
    reloading the page.
 
 No paid Aura subscription is required for the review account.
+
+The Canva Connect integration is available only to authenticated teacher
+accounts. Students cannot connect a Canva account or directly access the Canva
+Connect integration.
 
 ## Scope rationale
 
@@ -148,7 +154,7 @@ requests per second during active user operations. Expected peak remains below
 ## Questionnaire selections
 
 - Respects Canva API and developer terms: **Pending — do not submit Yes** until
-  the multi-design PDF processing terms and under-age user terms are resolved
+  the separate-PDF production behavior and teacher-only access are verified
 - Reviewed against OWASP Top 10: **Yes** (code review; not a penetration test)
 - Revokes OAuth tokens and deletes personal data within 30 days: **No**, until
   the teacher account-deletion path also revokes Canva consent/token lineage

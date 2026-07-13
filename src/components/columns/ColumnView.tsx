@@ -354,12 +354,13 @@ export function ColumnView(props: Props) {
       onClick: onFolder,
     });
 
+    items.push({
+      label: "PDF 내보내기",
+      icon: "📄",
+      onClick: onExport,
+    });
+
     if (hasCanva) {
-      items.push({
-        label: "PDF 내보내기",
-        icon: "📄",
-        onClick: onExport,
-      });
       items.push({
         label: organizing === section.id ? "정리 중..." : "Canva 폴더로 정리",
         icon: "📂",

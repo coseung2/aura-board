@@ -36,8 +36,6 @@ type RenderUnit = {
 
 const A4 = { width: 595.28, height: 841.89 };
 const A4_MARGIN = 36;
-const A4_GAP = 10;
-const AUTO_MAX_CELLS = 16;
 
 export async function POST(req: Request) {
   try {
@@ -58,8 +56,19 @@ export async function POST(req: Request) {
     if (items.length === 0) {
       return NextResponse.json({ error: "No export items provided" }, { status: 400 });
     }
+    if (items.length > 1) {
+      return NextResponse.json(
+        {
+          error: "exactly_one_export_item_required",
+          message: "Exactly one export item is required.",
+        },
+        { status: 400 },
+      );
+    }
 
-    const hasCanvaItems = items.some((item) => item.type === "canva");
+    const item = items[0];
+
+    const hasCanvaItems = item.type === "canva";
     let token: string | null = null;
     if (hasCanvaItems) {
       if (!(await isCanvaConnected(user.id))) {
@@ -78,54 +87,101 @@ export async function POST(req: Request) {
       }
     }
 
-    const mergedPdf = await PDFDocument.create();
-    let canvaFound = false;
-
-    if (layout === "original") {
-      for (const item of items) {
-        try {
-          if (item.type === "canva") {
-            if (!token) continue;
-            const result = await appendCanvaPdfPages(mergedPdf, item.url, token, req.url);
-            canvaFound = canvaFound || result.canvaFound;
-          } else {
-            await appendImagePageFromUrl(mergedPdf, item.url, req.url);
-          }
-        } catch (e) {
-          console.error("[Export] item failed:", e);
-        }
-      }
-    } else {
-      const units: RenderUnit[] = [];
-      for (const item of items) {
-        try {
-          if (item.type === "canva") {
-            if (!token) continue;
-            const result = await collectCanvaPdfUnits(mergedPdf, item.url, token, req.url);
-            canvaFound = canvaFound || result.canvaFound;
-            units.push(...result.units);
-          } else {
-            const unit = await collectImageUnit(mergedPdf, item.url, req.url);
-            if (unit) units.push(unit);
-          }
-        } catch (e) {
-          console.error("[Export] item failed:", e);
-        }
+    if (item.type === "canva") {
+      if (!token) {
+        return NextResponse.json({ error: "canva_token_expired" }, { status: 401 });
       }
 
-      if (layout === "a4-auto") appendUnitsAsAutoA4Grid(mergedPdf, units);
-      else appendUnitsAsA4Pages(mergedPdf, units);
-    }
-
-    if (mergedPdf.getPageCount() === 0) {
-      if (hasCanvaItems && !canvaFound && items.every((item) => item.type === "canva")) {
+      const designId = await resolveCanvaDesignId(item.url);
+      if (!designId) {
         return NextResponse.json({ error: "No valid Canva designs found" }, { status: 422 });
       }
+
+      let exportUrls: string[];
+      try {
+        exportUrls = await canvaExportDesign(token, designId, "pdf");
+      } catch (e) {
+        console.error("[Export] Canva PDF export failed:", e);
+        return NextResponse.json(
+          { error: "canva_pdf_export_failed", message: "Canva PDF export failed." },
+          { status: 502 },
+        );
+      }
+
+      if (exportUrls.length === 0) {
+        return NextResponse.json(
+          {
+            error: "canva_pdf_export_url_missing",
+            message: "Canva PDF export did not return a download URL.",
+          },
+          { status: 502 },
+        );
+      }
+      if (exportUrls.length > 1) {
+        return NextResponse.json(
+          {
+            error: "canva_pdf_export_multiple_urls",
+            message: "Canva PDF export returned multiple download URLs.",
+          },
+          { status: 502 },
+        );
+      }
+
+      const pdfUrl = exportUrls[0];
+      if (typeof pdfUrl !== "string" || !pdfUrl.trim()) {
+        return NextResponse.json(
+          {
+            error: "canva_pdf_export_url_missing",
+            message: "Canva PDF export did not return a valid download URL.",
+          },
+          { status: 502 },
+        );
+      }
+
+      let pdfResponse: Response;
+      try {
+        pdfResponse = await fetch(resolveFetchUrl(pdfUrl, req.url));
+      } catch (e) {
+        console.error("[Export] Canva PDF download failed:", e);
+        return NextResponse.json(
+          { error: "canva_pdf_download_failed", message: "Canva PDF download failed." },
+          { status: 502 },
+        );
+      }
+
+      if (!pdfResponse.ok) {
+        return NextResponse.json(
+          { error: "canva_pdf_download_failed", message: "Canva PDF download failed." },
+          { status: 502 },
+        );
+      }
+
+      return new NextResponse(await pdfResponse.arrayBuffer(), {
+        status: 200,
+        headers: {
+          "Content-Type": "application/pdf",
+          "Content-Disposition": "attachment; filename=canva_export.pdf",
+        },
+      });
+    }
+
+    const pdf = await PDFDocument.create();
+    try {
+      if (layout === "original") {
+        await appendImagePageFromUrl(pdf, item.url, req.url);
+      } else {
+        const unit = await collectImageUnit(pdf, item.url, req.url);
+        if (unit) appendUnitsAsA4Pages(pdf, [unit]);
+      }
+    } catch (e) {
+      console.error("[Export] image item failed:", e);
+    }
+
+    if (pdf.getPageCount() === 0) {
       return NextResponse.json({ error: "No pages in merged PDF" }, { status: 500 });
     }
 
-    const pdfBytes = await mergedPdf.save();
-
+    const pdfBytes = await pdf.save();
     return new NextResponse(pdfBytes.buffer as ArrayBuffer, {
       status: 200,
       headers: {
@@ -176,80 +232,6 @@ function normalizeExportItem(item: unknown): ExportItem | null {
 function normalizeLayout(value: unknown): ExportLayout {
   if (value === "a4-fit" || value === "a4-auto" || value === "original") return value;
   return "original";
-}
-
-async function appendCanvaPdfPages(
-  mergedPdf: PDFDocument,
-  canvaUrl: string,
-  token: string,
-  baseUrl: string,
-): Promise<{ canvaFound: boolean; pageCount: number }> {
-  const designId = await resolveCanvaDesignId(canvaUrl);
-  if (!designId) return { canvaFound: false, pageCount: 0 };
-
-  let pageCount = 0;
-  const exportUrls = await canvaExportDesign(token, designId, "pdf");
-  for (const pdfUrl of exportUrls) {
-    pageCount += await appendPdfFromUrl(mergedPdf, pdfUrl, baseUrl);
-  }
-
-  return { canvaFound: true, pageCount };
-}
-
-async function appendPdfFromUrl(
-  mergedPdf: PDFDocument,
-  pdfUrl: string,
-  baseUrl: string,
-): Promise<number> {
-  const res = await fetch(resolveFetchUrl(pdfUrl, baseUrl));
-  if (!res.ok) return 0;
-  const buffer = await res.arrayBuffer();
-  const sourcePdf = await PDFDocument.load(buffer);
-  const pages = await mergedPdf.copyPages(sourcePdf, sourcePdf.getPageIndices());
-  for (const page of pages) {
-    mergedPdf.addPage(page);
-  }
-  return pages.length;
-}
-
-async function collectCanvaPdfUnits(
-  mergedPdf: PDFDocument,
-  canvaUrl: string,
-  token: string,
-  baseUrl: string,
-): Promise<{ canvaFound: boolean; units: RenderUnit[] }> {
-  const designId = await resolveCanvaDesignId(canvaUrl);
-  if (!designId) return { canvaFound: false, units: [] };
-
-  const units: RenderUnit[] = [];
-  const exportUrls = await canvaExportDesign(token, designId, "pdf");
-  for (const pdfUrl of exportUrls) {
-    units.push(...(await collectPdfUnitsFromUrl(mergedPdf, pdfUrl, baseUrl)));
-  }
-
-  return { canvaFound: true, units };
-}
-
-async function collectPdfUnitsFromUrl(
-  mergedPdf: PDFDocument,
-  pdfUrl: string,
-  baseUrl: string,
-): Promise<RenderUnit[]> {
-  const res = await fetch(resolveFetchUrl(pdfUrl, baseUrl));
-  if (!res.ok) return [];
-
-  const buffer = await res.arrayBuffer();
-  const sourcePdf = await PDFDocument.load(buffer);
-  const pageIndices = sourcePdf.getPageIndices();
-  const embeddedPages = await mergedPdf.embedPdf(buffer, pageIndices);
-
-  return embeddedPages.map((embeddedPage) => ({
-    width: embeddedPage.width,
-    height: embeddedPage.height,
-    draw: (page, box) => {
-      page.drawPage(embeddedPage, box);
-    },
-  }));
 }
 
 async function appendImagePageFromUrl(
@@ -307,75 +289,6 @@ function appendUnitsAsA4Pages(mergedPdf: PDFDocument, units: RenderUnit[]) {
   }
 }
 
-function appendUnitsAsAutoA4Grid(mergedPdf: PDFDocument, units: RenderUnit[]) {
-  let index = 0;
-  while (index < units.length) {
-    const remaining = units.slice(index);
-    const grid = pickAutoGrid(remaining);
-    const page = mergedPdf.addPage([A4.width, A4.height]);
-    const contentWidth = A4.width - A4_MARGIN * 2;
-    const contentHeight = A4.height - A4_MARGIN * 2;
-    const cellWidth = (contentWidth - A4_GAP * (grid.columns - 1)) / grid.columns;
-    const cellHeight = (contentHeight - A4_GAP * (grid.rows - 1)) / grid.rows;
-
-    for (let i = 0; i < grid.count; i += 1) {
-      const unit = units[index + i];
-      const row = Math.floor(i / grid.columns);
-      const column = i % grid.columns;
-      const cell = {
-        x: A4_MARGIN + column * (cellWidth + A4_GAP),
-        y: A4.height - A4_MARGIN - (row + 1) * cellHeight - row * A4_GAP,
-        width: cellWidth,
-        height: cellHeight,
-      };
-      unit.draw(page, fitIntoBox(unit.width, unit.height, cell));
-    }
-
-    index += grid.count;
-  }
-}
-
-function pickAutoGrid(units: RenderUnit[]): { columns: number; rows: number; count: number } {
-  const maxCount = Math.min(units.length, AUTO_MAX_CELLS);
-  let best = { columns: 1, rows: 1, count: 1, score: Number.NEGATIVE_INFINITY };
-  const contentWidth = A4.width - A4_MARGIN * 2;
-  const contentHeight = A4.height - A4_MARGIN * 2;
-
-  for (let columns = 1; columns <= 4; columns += 1) {
-    for (let rows = 1; rows <= 8; rows += 1) {
-      const cells = columns * rows;
-      if (cells > AUTO_MAX_CELLS) continue;
-
-      const count = Math.min(cells, units.length);
-      if (count === 0) continue;
-
-      const cellWidth = (contentWidth - A4_GAP * (columns - 1)) / columns;
-      const cellHeight = (contentHeight - A4_GAP * (rows - 1)) / rows;
-      if (cellWidth < 90 || cellHeight < 90) continue;
-
-      const sampled = units.slice(0, count);
-      let totalDrawArea = 0;
-      let shapeScore = 0;
-      for (const unit of sampled) {
-        const fitted = fitSize(unit.width, unit.height, cellWidth, cellHeight);
-        totalDrawArea += fitted.width * fitted.height;
-        shapeScore += compareAspect(cellWidth / cellHeight, unit.width / unit.height);
-      }
-
-      const fillScore = totalDrawArea / (contentWidth * contentHeight);
-      const countScore = count / maxCount;
-      const emptyPenalty = ((cells - count) / cells) * 0.12;
-      const score = fillScore * 0.55 + countScore * 0.45 + (shapeScore / count) * 0.1 - emptyPenalty;
-
-      if (score > best.score) {
-        best = { columns, rows, count, score };
-      }
-    }
-  }
-
-  return { columns: best.columns, rows: best.rows, count: best.count };
-}
-
 function fitIntoBox(sourceWidth: number, sourceHeight: number, box: DrawBox): DrawBox {
   const fitted = fitSize(sourceWidth, sourceHeight, box.width, box.height);
   return {
@@ -392,11 +305,6 @@ function fitSize(sourceWidth: number, sourceHeight: number, maxWidth: number, ma
     width: sourceWidth * scale,
     height: sourceHeight * scale,
   };
-}
-
-function compareAspect(cellAspect: number, sourceAspect: number): number {
-  const distance = Math.abs(Math.log(cellAspect / sourceAspect));
-  return Math.max(0, 1 - distance / 2);
 }
 
 function resolveFetchUrl(rawUrl: string, baseUrl: string): string {
