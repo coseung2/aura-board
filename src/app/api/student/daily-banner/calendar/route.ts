@@ -3,7 +3,10 @@ import "server-only";
 import { db } from "@/lib/db";
 import { dateToKstDay, kstDayToDate, parseKstDay } from "@/lib/daily-banner";
 import { jsonPrivateNoStore } from "@/lib/http-cache";
-import { getCurrentStudent } from "@/lib/student-auth";
+import {
+  getCurrentStudent,
+  getCurrentStudentRaw,
+} from "@/lib/student-auth";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -58,7 +61,15 @@ function parseMonth(value: string | null): MonthRange | null {
 // Returns only globally occupied publication days. Submission content and
 // submitter identity are intentionally never selected or serialized here.
 export async function GET(req: Request) {
-  const student = await getCurrentStudent().catch(() => null);
+  // Mobile requests carry an explicit Bearer session token. Respect that
+  // token even when the same browser also has a teacher NextAuth session;
+  // getCurrentStudent() intentionally gives the teacher session precedence
+  // for cookie-based web requests to avoid stale student-cookie attribution.
+  const hasBearerToken = /^Bearer\s+/i.test(req.headers.get("authorization") ?? "");
+  const student = await (hasBearerToken
+    ? getCurrentStudentRaw()
+    : getCurrentStudent()
+  ).catch(() => null);
   if (!student) {
     return jsonPrivateNoStore({ error: "unauthorized" }, { status: 401 });
   }
