@@ -58,7 +58,7 @@ export function AuthHeader() {
   }
 
   return (
-    <div className="auth-header">
+    <div className="auth-header auth-header-teacher">
       {session.user.image && (
         <img
           src={session.user.image}

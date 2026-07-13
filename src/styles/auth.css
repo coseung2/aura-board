@@ -612,6 +612,28 @@
   color: var(--color-accent);
 }
 
+/* Teacher header icons keep their full click targets without visible circles. */
+.auth-header-teacher .auth-notify-trigger,
+.auth-header-teacher .auth-settings-trigger,
+.auth-header-teacher .auth-logout-btn {
+  border-color: transparent;
+  background: transparent;
+  box-shadow: none;
+}
+
+.auth-header-teacher .auth-notify-trigger:hover,
+.auth-header-teacher .auth-settings-trigger:hover,
+.auth-header-teacher .auth-logout-btn:hover {
+  border-color: transparent;
+  background: transparent;
+  color: var(--color-text);
+}
+
+.auth-header-teacher .auth-notify[open] .auth-notify-trigger,
+.auth-header-teacher .auth-settings.is-active .auth-settings-trigger {
+  border-color: transparent;
+}
+
 .auth-settings-panel {
   position: absolute;
   top: calc(100% + 6px);
