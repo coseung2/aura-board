@@ -63,15 +63,22 @@ Teacher account:
 - Email: integrations-support@canva.com
 - Password: [TEST PASSWORD]
 
+Prepared demo board:
+
+- Name: `test for review`
+- URL: https://aura-board.com/board/board-mrirxqwp
+
 Steps:
 
 1. Sign in to Aura Board with the teacher test account.
-2. Open the prepared demo classroom and board named `[BOARD NAME]`.
-3. Open teacher settings and connect a Canva test account.
-4. Add or open a card with a Canva design and confirm its title and thumbnail.
-5. Export the prepared Canva cards as PDF.
-6. Create a Canva folder from the board and move the test design into it.
-7. Disconnect Canva and confirm the disconnected state remains after
+2. Open the prepared board named `test for review`.
+3. Open teacher settings and connect a Canva account available to the review team.
+4. In the section named `test`, use `Canva에서 가져오기`, browse a folder,
+   select a design, and confirm its title and thumbnail appear on the board.
+5. Export the selected Canva design as PDF using the review-approved export mode.
+6. Use `Canva 폴더로 정리` and confirm the Canva folder is named after the
+   Aura Board section (`test`).
+7. Disconnect Canva in teacher settings and confirm the disconnected state remains after
    reloading the page.
 
 No paid Aura subscription is required for the review account.
@@ -133,17 +140,21 @@ steps but must not include passwords or active access tokens.
 
 **Normal traffic levels**
 
-Use production observability data. Do not submit an estimate until average and
-peak/P99 Canva API request rates have been measured.
+Average: below 0.1 requests per second. Observed peak: approximately 2
+requests per second during active user operations. Expected peak remains below
+5 requests per second. Measurement source: Vercel production runtime logs,
+24-hour window ending 13 July 2026.
 
 ## Questionnaire selections
 
-- Respects Canva API and developer terms: **Yes**
+- Respects Canva API and developer terms: **Pending — do not submit Yes** until
+  the multi-design PDF processing terms and under-age user terms are resolved
 - Reviewed against OWASP Top 10: **Yes** (code review; not a penetration test)
-- Revokes OAuth tokens and deletes personal data within 30 days: **Yes**, only
-  after production deployment and disconnect-flow verification
-- Client secrets encrypted at rest on a secure backend: **Yes**, only after
-  confirming production server-only environment configuration
+- Revokes OAuth tokens and deletes personal data within 30 days: **No**, until
+  the teacher account-deletion path also revokes Canva consent/token lineage
+- Client secrets encrypted at rest on a secure backend: **Yes** — production
+  uses server-only protected environment variables and a dedicated Canva token
+  encryption key
 - SSO: **No**
 - SAML: **No**
 - Dedicated security team: **No**
