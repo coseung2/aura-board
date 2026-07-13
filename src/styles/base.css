@@ -1,8 +1,7 @@
 /* =====================================================
    Aura-board — globals.css
-   Notion-inspired theme (locked in 2026-04-10, phase6).
-   Rejected Figma / Miro variants archived:
-     tasks/2026-04-09-initial-padlet-app/phase5/rejected/
+   Notion-inspired theme. Current tokens and component rules live in
+   docs/design-system.md.
    ===================================================== */
 
 /* Twemoji — TwemojiRoot가 <img class="emoji">로 교체한 이모지.

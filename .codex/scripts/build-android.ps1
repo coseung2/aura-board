@@ -166,6 +166,18 @@ function Write-Utf8NoBom {
   [System.IO.File]::WriteAllText($Path, $Text, $encoding)
 }
 
+function Get-Sha256 {
+  param([string]$Path)
+  $stream = [System.IO.File]::OpenRead($Path)
+  $hasher = [System.Security.Cryptography.SHA256]::Create()
+  try {
+    return ([System.BitConverter]::ToString($hasher.ComputeHash($stream))).Replace('-', '')
+  } finally {
+    $hasher.Dispose()
+    $stream.Dispose()
+  }
+}
+
 function Convert-ToGradlePropertiesPath {
   param([string]$Path)
   return $Path.Replace('\', '/')
@@ -345,7 +357,7 @@ foreach ($candidate in @($apk, $aab)) {
     $artifacts += [pscustomobject]@{
       Path = $item.FullName
       SizeBytes = $item.Length
-      SHA256 = (Get-FileHash -Algorithm SHA256 -LiteralPath $item.FullName).Hash
+      SHA256 = Get-Sha256 -Path $item.FullName
       LastWriteTime = $item.LastWriteTime
     }
   }

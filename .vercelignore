@@ -30,6 +30,10 @@ dev.log
 .agents/**
 .agents/skills
 .agents/skills/**
+.codex/
+.codex/**
+.codex-remote-attachments/
+.playwright-cli/
 .claude/
 .claude/**
 .claude/skills
@@ -48,5 +52,3 @@ uploads/
 jaw.db*
 mcp.json
 settings.json
-SESSION_STATE.md
-_handoff.md

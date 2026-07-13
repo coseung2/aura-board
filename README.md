@@ -169,7 +169,6 @@ docs/                     아키텍처, 현재 기능, 외부 API, 디자인 시
 - `docs/design-system.md`
 - `docs/mobile-android-build.md`
 - `docs/external-api.md`
-- `CLAUDE.md`
 - `AGENTS.md`
 
 ---

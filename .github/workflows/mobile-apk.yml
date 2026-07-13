@@ -1,19 +1,9 @@
 name: Mobile APK Build (EAS Preview)
 
-# main 브랜치에서 apps/mobile/ 변경 시 자동 APK 빌드. 수동 실행도 지원.
-#
-# 사전 조건 (1회성, 사용자 수행):
-#   1. https://expo.dev 계정 생성 + `aura-board-mobile` 프로젝트 등록
-#      → `eas init` 또는 대시보드에서 projectId 발급
-#   2. apps/mobile/app.json 의 REPLACE_WITH_EAS_PROJECT_ID 두 곳을 실제 값으로 교체
-#   3. https://expo.dev/accounts/<name>/settings/access-tokens 에서 Personal
-#      Access Token 생성
-#   4. GitHub repo > Settings > Secrets and variables > Actions > New secret:
-#      Name: EXPO_TOKEN
-#      Value: 위에서 복사한 token
-#
-# 이후부터는 main 에 mobile 변경 커밋 시 자동 APK 생성. Actions 탭에서 빌드 URL
-# 확인하거나, expo.dev 대시보드에서 diretly 다운로드.
+# main 브랜치의 apps/mobile 변경 시 EAS APK를 자동 제출하며 수동 실행도 지원합니다.
+# 사전 조건: Expo 프로젝트가 app.config.ts에 연결되어 있고 GitHub Actions secret
+# EXPO_TOKEN이 등록되어 있어야 합니다. 빌드 결과와 상세 로그는 Actions/EAS에서
+# 확인합니다.
 
 on:
   push:
