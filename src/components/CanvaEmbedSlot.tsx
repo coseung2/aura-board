@@ -26,7 +26,7 @@ import {
   type KeyboardEvent,
   type MouseEvent,
 } from "react";
-import { buildCanvaEmbedSrc } from "@/lib/canva";
+import { buildCanvaEmbedSrc } from "@/lib/canva-url";
 import {
   useIframeBudget,
   useLastEviction,

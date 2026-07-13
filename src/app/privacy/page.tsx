@@ -10,7 +10,7 @@ export default function PrivacyPage() {
       <article className="docs-article">
         <Link href="/dashboard" className="docs-back">← 홈으로</Link>
         <h1 className="docs-title">개인정보처리방침</h1>
-        <p className="docs-subtitle">최종 수정일: 2026년 6월 16일 | 시행일: 2026년 6월 16일</p>
+        <p className="docs-subtitle">최종 수정일: 2026년 7월 13일 | 시행일: 2026년 7월 13일</p>
 
         <section className="docs-section">
           <h2 className="docs-h2">1. 개인정보 처리자</h2>
@@ -69,6 +69,7 @@ export default function PrivacyPage() {
           <p className="docs-p">
             회원 탈퇴 시 수집된 개인정보는 지체 없이 파기합니다. 다만, 관련 법령에 따라 일정 기간 보관이 필요한 경우 해당 기간 동안 보관합니다.
             학생 정보는 교사가 학급을 삭제하거나 탈퇴 시 함께 삭제됩니다.
+            Canva 연결을 해제하면 Canva OAuth 접근·갱신 토큰과 임시 인증 정보는 즉시 폐기하며, Canva에 토큰 폐기를 요청합니다.
             전자적 파일은 복구 불가능한 방법으로 삭제하며, 종이 문서는 분쇄 또는 소각합니다.
           </p>
         </section>
@@ -88,6 +89,7 @@ export default function PrivacyPage() {
             <li><strong>Vercel, Inc.</strong> - 웹/모바일 앱 호스팅, 서버리스 함수 실행</li>
             <li><strong>Resend, Inc.</strong> - 이메일 발송</li>
             <li><strong>Google, Kakao</strong> - OAuth 소셜 로그인</li>
+            <li><strong>Canva Pty Ltd</strong> - Canva OAuth 계정 연결, 디자인·에셋·폴더 연동 및 내보내기</li>
             <li><strong>YouTube(Google)</strong> - 영상 임베드 콘텐츠 제공</li>
             <li><strong>Upstash</strong> - 서비스 부하 제어 및 캐싱</li>
           </ul>
@@ -124,7 +126,8 @@ export default function PrivacyPage() {
         <section className="docs-section">
           <h2 className="docs-h2">10. 개인정보의 안전성 확보 조치</h2>
           <ul className="docs-list">
-            <li>데이터베이스 암호화 및 안전한 접근 통로(SSL/TLS) 사용</li>
+            <li>Canva OAuth 토큰 등 중요 인증정보의 암호화 저장</li>
+            <li>데이터베이스 보호 및 안전한 접근 통로(SSL/TLS) 사용</li>
             <li>접근 권한 최소화 및 감사 로그 기록</li>
             <li>정기적인 보안 점검 및 업데이트</li>
           </ul>

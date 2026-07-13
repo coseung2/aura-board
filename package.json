@@ -21,6 +21,7 @@
     "seed:breakout": "tsx prisma/seed-breakout-templates.ts",
     "seed:drawing-assets": "tsx prisma/seed-drawing-assets.ts",
     "seed:speed-game": "tsx prisma/seed-speed-game-word-sets.ts",
+    "canva:encrypt-secrets": "tsx scripts/encrypt-canva-secrets.ts",
     "postinstall": "prisma generate"
   },
   "dependencies": {
@@ -73,7 +74,7 @@
     "vitest": "^4.1.4"
   },
   "overrides": {
-    "dompurify": "^3.4.8",
+    "dompurify": "^3.4.12",
     "postcss": "^8.5.15"
   }
 }

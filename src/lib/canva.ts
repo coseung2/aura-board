@@ -7,11 +7,32 @@
  * Function cold starts. Earlier in-memory Maps (tokenStore / pkceStore)
  * silently logged teachers out whenever a new container handled a request.
  */
+import "server-only";
+
+import { createHmac, randomBytes, timingSafeEqual } from "crypto";
 import { db } from "./db";
+import {
+  decryptCanvaSecret,
+  encryptCanvaSecret,
+  isEncryptedCanvaSecret,
+} from "./canva-token-crypto";
+import {
+  extractCanvaDesignId,
+  isCanvaDesignUrl,
+} from "./canva-url";
+export {
+  buildCanvaEmbedSrc,
+  deriveCanvaThumbnailUrl,
+  extractCanvaDesignId,
+  hasCanvaShareToken,
+  isCanvaDesignUrl,
+  proxiedCanvaThumbnailUrl,
+} from "./canva-url";
 
 const CANVA_API = "https://api.canva.com/rest/v1";
 const CANVA_AUTH = "https://www.canva.com/api/oauth/authorize";
 const CANVA_TOKEN = `${CANVA_API}/oauth/token`;
+const CANVA_REVOKE = `${CANVA_API}/oauth/revoke`;
 const CANVA_DEFAULT_SCOPES = "design:meta:read design:content:read folder:read folder:write";
 const CANVA_STUDENT_CARD_SCOPES =
   "design:meta:read design:content:write asset:read asset:write";
@@ -28,6 +49,14 @@ export type CanvaAuthState =
       returnTo: string | null;
     };
 
+type CanvaAuthStateClaims = CanvaAuthState & { exp: number };
+
+function stateSecret(): string {
+  const secret = process.env.AUTH_SECRET;
+  if (!secret) throw new Error("AUTH_SECRET must be configured for Canva OAuth");
+  return secret;
+}
+
 export function getCanvaClientId() {
   return process.env.CANVA_CLIENT_ID ?? "";
 }
@@ -41,16 +70,38 @@ function getRedirectUri() {
 }
 
 function encodeAuthState(state: CanvaAuthState): string {
-  return Buffer.from(JSON.stringify(state)).toString("base64url");
+  const body = Buffer.from(
+    JSON.stringify({ ...state, exp: Date.now() + 10 * 60 * 1000 }),
+  ).toString("base64url");
+  const signature = createHmac("sha256", stateSecret())
+    .update(body)
+    .digest("base64url");
+  return `v1.${body}.${signature}`;
 }
 
 export function decodeCanvaAuthState(raw: string): CanvaAuthState | null {
   try {
-    const parsed = JSON.parse(Buffer.from(raw, "base64url").toString("utf8")) as unknown;
+    const [version, body, signature] = raw.split(".");
+    if (version !== "v1" || !body || !signature) return null;
+    const expected = createHmac("sha256", stateSecret())
+      .update(body)
+      .digest("base64url");
+    const actualBuffer = Buffer.from(signature);
+    const expectedBuffer = Buffer.from(expected);
+    if (
+      actualBuffer.length !== expectedBuffer.length ||
+      !timingSafeEqual(actualBuffer, expectedBuffer)
+    ) {
+      return null;
+    }
+    const parsed = JSON.parse(
+      Buffer.from(body, "base64url").toString("utf8"),
+    ) as unknown;
     if (!parsed || typeof parsed !== "object") return null;
-    const row = parsed as Record<string, unknown>;
+    const row = parsed as Record<string, unknown> & CanvaAuthStateClaims;
     if (row.kind !== "teacher" && row.kind !== "student") return null;
     if (typeof row.id !== "string" || !row.id) return null;
+    if (typeof row.exp !== "number" || row.exp < Date.now()) return null;
     const returnTo = typeof row.returnTo === "string" ? row.returnTo : null;
     return { kind: row.kind, id: row.id, returnTo };
   } catch {
@@ -65,9 +116,7 @@ export function decodeStudentAuthState(raw: string): CanvaAuthState | null {
 
 /* ── PKCE helpers ── */
 function generateCodeVerifier(): string {
-  const array = new Uint8Array(32);
-  crypto.getRandomValues(array);
-  return Buffer.from(array).toString("base64url");
+  return randomBytes(32).toString("base64url");
 }
 
 async function generateCodeChallenge(verifier: string): Promise<string> {
@@ -91,8 +140,8 @@ export async function buildAuthorizationUrl(
   // session; they're only rewritten on successful exchangeCode.
   await db.canvaConnectAccount.upsert({
     where: { userId },
-    create: { userId, pkceVerifier: verifier },
-    update: { pkceVerifier: verifier },
+    create: { userId, pkceVerifier: encryptCanvaSecret(verifier) },
+    update: { pkceVerifier: encryptCanvaSecret(verifier) },
   });
 
   const params = new URLSearchParams({
@@ -117,8 +166,8 @@ export async function buildStudentCardDesignAuthorizationUrl(
 
   await db.canvaStudentConnectAccount.upsert({
     where: { studentId },
-    create: { studentId, pkceVerifier: verifier },
-    update: { pkceVerifier: verifier },
+    create: { studentId, pkceVerifier: encryptCanvaSecret(verifier) },
+    update: { pkceVerifier: encryptCanvaSecret(verifier) },
   });
 
   const params = new URLSearchParams({
@@ -136,7 +185,9 @@ export async function buildStudentCardDesignAuthorizationUrl(
 
 export async function exchangeCode(userId: string, code: string): Promise<boolean> {
   const row = await db.canvaConnectAccount.findUnique({ where: { userId } });
-  const verifier = row?.pkceVerifier;
+  const verifier = row?.pkceVerifier
+    ? decryptCanvaSecret(row.pkceVerifier)
+    : null;
   if (!verifier) return false;
 
   const basic = Buffer.from(`${getCanvaClientId()}:${getCanvaClientSecret()}`).toString("base64");
@@ -164,8 +215,8 @@ export async function exchangeCode(userId: string, code: string): Promise<boolea
   await db.canvaConnectAccount.update({
     where: { userId },
     data: {
-      accessToken: data.access_token,
-      refreshToken: data.refresh_token,
+      accessToken: encryptCanvaSecret(data.access_token),
+      refreshToken: encryptCanvaSecret(data.refresh_token),
       expiresAt: new Date(Date.now() + data.expires_in * 1000),
       pkceVerifier: null,
     },
@@ -175,7 +226,9 @@ export async function exchangeCode(userId: string, code: string): Promise<boolea
 
 export async function exchangeStudentCode(studentId: string, code: string): Promise<boolean> {
   const row = await db.canvaStudentConnectAccount.findUnique({ where: { studentId } });
-  const verifier = row?.pkceVerifier;
+  const verifier = row?.pkceVerifier
+    ? decryptCanvaSecret(row.pkceVerifier)
+    : null;
   if (!verifier) return false;
 
   const basic = Buffer.from(`${getCanvaClientId()}:${getCanvaClientSecret()}`).toString("base64");
@@ -203,8 +256,8 @@ export async function exchangeStudentCode(studentId: string, code: string): Prom
   await db.canvaStudentConnectAccount.update({
     where: { studentId },
     data: {
-      accessToken: data.access_token,
-      refreshToken: data.refresh_token,
+      accessToken: encryptCanvaSecret(data.access_token),
+      refreshToken: encryptCanvaSecret(data.refresh_token),
       expiresAt: new Date(Date.now() + data.expires_in * 1000),
       pkceVerifier: null,
     },
@@ -226,7 +279,7 @@ async function refreshAccessToken(userId: string): Promise<string | null> {
     },
     body: new URLSearchParams({
       grant_type: "refresh_token",
-      refresh_token: row.refreshToken,
+      refresh_token: decryptCanvaSecret(row.refreshToken),
     }),
   });
 
@@ -240,12 +293,25 @@ async function refreshAccessToken(userId: string): Promise<string | null> {
     return null;
   }
 
-  const data = await res.json();
+  const data = (await res.json()) as {
+    access_token?: string;
+    refresh_token?: string;
+    expires_in?: number;
+  };
+  if (!data.access_token || !data.expires_in) {
+    await db.canvaConnectAccount.update({
+      where: { userId },
+      data: { accessToken: null, refreshToken: null, expiresAt: null },
+    });
+    return null;
+  }
   await db.canvaConnectAccount.update({
     where: { userId },
     data: {
-      accessToken: data.access_token,
-      refreshToken: data.refresh_token,
+      accessToken: encryptCanvaSecret(data.access_token),
+      refreshToken: data.refresh_token
+        ? encryptCanvaSecret(data.refresh_token)
+        : row.refreshToken,
       expiresAt: new Date(Date.now() + data.expires_in * 1000),
     },
   });
@@ -266,7 +332,7 @@ async function refreshStudentAccessToken(studentId: string): Promise<string | nu
     },
     body: new URLSearchParams({
       grant_type: "refresh_token",
-      refresh_token: row.refreshToken,
+      refresh_token: decryptCanvaSecret(row.refreshToken),
     }),
   });
 
@@ -278,12 +344,25 @@ async function refreshStudentAccessToken(studentId: string): Promise<string | nu
     return null;
   }
 
-  const data = await res.json();
+  const data = (await res.json()) as {
+    access_token?: string;
+    refresh_token?: string;
+    expires_in?: number;
+  };
+  if (!data.access_token || !data.expires_in) {
+    await db.canvaStudentConnectAccount.update({
+      where: { studentId },
+      data: { accessToken: null, refreshToken: null, expiresAt: null },
+    });
+    return null;
+  }
   await db.canvaStudentConnectAccount.update({
     where: { studentId },
     data: {
-      accessToken: data.access_token,
-      refreshToken: data.refresh_token,
+      accessToken: encryptCanvaSecret(data.access_token),
+      refreshToken: data.refresh_token
+        ? encryptCanvaSecret(data.refresh_token)
+        : row.refreshToken,
       expiresAt: new Date(Date.now() + data.expires_in * 1000),
     },
   });
@@ -298,7 +377,22 @@ export async function getAccessToken(userId: string): Promise<string | null> {
   if (row.expiresAt.getTime() - Date.now() < 5 * 60 * 1000) {
     return refreshAccessToken(userId);
   }
-  return row.accessToken;
+  const token = decryptCanvaSecret(row.accessToken);
+  if (
+    !isEncryptedCanvaSecret(row.accessToken) ||
+    (row.refreshToken && !isEncryptedCanvaSecret(row.refreshToken))
+  ) {
+    await db.canvaConnectAccount.update({
+      where: { userId },
+      data: {
+        accessToken: encryptCanvaSecret(token),
+        refreshToken: row.refreshToken
+          ? encryptCanvaSecret(decryptCanvaSecret(row.refreshToken))
+          : null,
+      },
+    });
+  }
+  return token;
 }
 
 export async function getStudentCanvaAccessToken(studentId: string): Promise<string | null> {
@@ -308,12 +402,83 @@ export async function getStudentCanvaAccessToken(studentId: string): Promise<str
   if (row.expiresAt.getTime() - Date.now() < 5 * 60 * 1000) {
     return refreshStudentAccessToken(studentId);
   }
-  return row.accessToken;
+  const token = decryptCanvaSecret(row.accessToken);
+  if (
+    !isEncryptedCanvaSecret(row.accessToken) ||
+    (row.refreshToken && !isEncryptedCanvaSecret(row.refreshToken))
+  ) {
+    await db.canvaStudentConnectAccount.update({
+      where: { studentId },
+      data: {
+        accessToken: encryptCanvaSecret(token),
+        refreshToken: row.refreshToken
+          ? encryptCanvaSecret(decryptCanvaSecret(row.refreshToken))
+          : null,
+      },
+    });
+  }
+  return token;
+}
+
+async function revokeCanvaToken(token: string): Promise<boolean> {
+  const basic = Buffer.from(
+    `${getCanvaClientId()}:${getCanvaClientSecret()}`,
+  ).toString("base64");
+  const response = await fetch(CANVA_REVOKE, {
+    method: "POST",
+    headers: {
+      Authorization: `Basic ${basic}`,
+      "Content-Type": "application/x-www-form-urlencoded",
+    },
+    body: new URLSearchParams({ token }),
+  });
+  if (response.ok) return true;
+  if (response.status !== 400) return false;
+  const error = (await response.json().catch(() => null)) as {
+    code?: string;
+    message?: string;
+  } | null;
+  return (
+    error?.code === "bad_request_params" &&
+    /neither an access token nor a refresh token/i.test(error.message ?? "")
+  );
+}
+
+export async function disconnectTeacherCanva(userId: string): Promise<boolean> {
+  const row = await db.canvaConnectAccount.findUnique({ where: { userId } });
+  if (!row) return true;
+  const storedToken = row.refreshToken ?? row.accessToken;
+  if (storedToken) {
+    const revoked = await revokeCanvaToken(decryptCanvaSecret(storedToken));
+    if (!revoked) return false;
+  }
+  await db.canvaConnectAccount.delete({ where: { userId } });
+  return true;
+}
+
+export async function disconnectStudentCanva(studentId: string): Promise<boolean> {
+  const row = await db.canvaStudentConnectAccount.findUnique({ where: { studentId } });
+  if (!row) return true;
+  const storedToken = row.refreshToken ?? row.accessToken;
+  if (storedToken) {
+    const revoked = await revokeCanvaToken(decryptCanvaSecret(storedToken));
+    if (!revoked) return false;
+  }
+  await db.canvaStudentConnectAccount.delete({ where: { studentId } });
+  return true;
 }
 
 export async function isCanvaConnected(userId: string): Promise<boolean> {
   const row = await db.canvaConnectAccount.findUnique({
     where: { userId },
+    select: { accessToken: true },
+  });
+  return !!row?.accessToken;
+}
+
+export async function isStudentCanvaConnected(studentId: string): Promise<boolean> {
+  const row = await db.canvaStudentConnectAccount.findUnique({
+    where: { studentId },
     select: { accessToken: true },
   });
   return !!row?.accessToken;
@@ -624,14 +789,29 @@ export async function resolveCanvaDesignId(url: string): Promise<string | null> 
  * accept it and open the live-iframe gate.
  */
 export async function expandCanvaShortLink(url: string): Promise<string> {
-  if (!url.includes("canva.link")) return url;
+  let parsed: URL;
   try {
-    const res = await fetch(url, {
+    parsed = new URL(url);
+  } catch {
+    return url;
+  }
+  const hostname = parsed.hostname.toLowerCase();
+  if (hostname !== "canva.link" && hostname !== "www.canva.link") return url;
+  try {
+    const res = await fetch(parsed.toString(), {
       redirect: "manual",
       signal: AbortSignal.timeout(2000),
     });
     const loc = res.headers.get("location");
-    return loc ?? url;
+    if (!loc) return url;
+    const resolved = new URL(loc, parsed);
+    if (
+      resolved.hostname.toLowerCase() !== "canva.com" &&
+      resolved.hostname.toLowerCase() !== "www.canva.com"
+    ) {
+      return url;
+    }
+    return resolved.toString();
   } catch {
     return url;
   }
@@ -650,147 +830,6 @@ export type CanvaEmbed = {
   height: number;
   designId: string;
 };
-
-// Pure sync predicate — no network. Accepts www-prefixed and bare variants.
-export function isCanvaDesignUrl(rawUrl: string): boolean {
-  if (!rawUrl) return false;
-  let host: string;
-  let pathname: string;
-  try {
-    const u = new URL(rawUrl);
-    host = u.hostname.toLowerCase();
-    pathname = u.pathname;
-  } catch {
-    return false;
-  }
-  const canonicalHost =
-    host === "canva.com" || host === "www.canva.com" || host === "canva.link";
-  if (!canonicalHost) return false;
-  if (host === "canva.link") return true;
-  return /\/design\/[A-Za-z0-9_-]+/.test(pathname);
-}
-
-// Pure sync extractor — returns null when the URL is not a canva.com design
-// page we can name a designId for. Does NOT resolve canva.link short-links.
-export function extractCanvaDesignId(rawUrl: string): string | null {
-  if (!rawUrl) return null;
-  try {
-    const u = new URL(rawUrl);
-    const host = u.hostname.toLowerCase();
-    if (host !== "canva.com" && host !== "www.canva.com") return null;
-    const m = u.pathname.match(/\/design\/([A-Za-z0-9_-]+)/);
-    return m?.[1] ?? null;
-  } catch {
-    return null;
-  }
-}
-
-/**
- * Build the iframe src for a canva.com design URL.
- *
- * Canva's official oEmbed response returns an iframe src in the form
- *   `/design/{designId}/{shareToken}/view?embed&meta`
- * regardless of whether the user's "공개 보기 링크" surface is `/view`
- * (gallery / document / poster) or `/watch` (presentation player). We
- * normalise every paste to that canonical form.
- *
- * Previous attempts to simplify the URL (dropping `&meta`, or rewriting
- * `/view` → `/watch`) broke embedding: `/watch?embed` returns 403 +
- * `X-Frame-Options: SAMEORIGIN`, and `?embed` without `&meta` leaves some
- * multi-page designs in a half-loaded state. Keep the exact format
- * Canva blesses via oEmbed.
- *
- * Also preserve the share-token path segment — without it Canva shows its
- * login gate instead of the design.
- *
- * Returns null for URLs we don't recognise as canva design pages.
- */
-export function buildCanvaEmbedSrc(rawUrl: string): string | null {
-  if (!rawUrl) return null;
-  try {
-    const u = new URL(rawUrl);
-    const host = u.hostname.toLowerCase();
-    if (host !== "canva.com" && host !== "www.canva.com") return null;
-
-    // Accept /design/{id}/(view|watch|edit|present), or the full share form
-    // /design/{id}/{shareToken}/(view|watch|edit|present). Canva's "링크 공유"
-    // button gives an /edit URL; we always rewrite it to /view for the
-    // iframe (embedding the editor surface is blocked by X-Frame).
-    const m = u.pathname.match(
-      /\/design\/([A-Za-z0-9_-]+)(?:\/([A-Za-z0-9_-]+))?\/(?:view|watch|edit|present)/
-    );
-    if (!m) return null;
-    const [, designId, shareToken] = m;
-    const pathPrefix = shareToken
-      ? `/design/${designId}/${shareToken}/view`
-      : `/design/${designId}/view`;
-    return `https://www.canva.com${pathPrefix}?embed&meta`;
-  } catch {
-    return null;
-  }
-}
-
-/**
- * True when the URL carries a share token — i.e. is publicly viewable
- * without a Canva login. Used as a gate for attempting the live iframe
- * embed even when the server-side oEmbed thumbnail fetch failed (which
- * happens for anonymous callers — Canva's oEmbed endpoint rejects anon
- * requests with 401, so we can't rely on linkImage alone to mean
- * "embed is safe").
- */
-export function hasCanvaShareToken(rawUrl: string | null | undefined): boolean {
-  if (!rawUrl) return false;
-  try {
-    const u = new URL(rawUrl);
-    const host = u.hostname.toLowerCase();
-    if (host !== "canva.com" && host !== "www.canva.com") return false;
-    // Accept view / watch / edit / present — Canva hands out /edit URLs for the
-    // "링크 공유" (anyone-with-link) share flow; buildCanvaEmbedSrc
-    // rewrites to /view for the iframe.
-    const m = u.pathname.match(
-      /\/design\/[A-Za-z0-9_-]+\/([A-Za-z0-9_-]+)\/(?:view|watch|edit|present)/
-    );
-    return !!m?.[1];
-  } catch {
-    return false;
-  }
-}
-
-export function deriveCanvaThumbnailUrl(rawUrl: string | null | undefined): string | null {
-  if (!rawUrl) return null;
-  try {
-    const u = new URL(rawUrl);
-    const host = u.hostname.toLowerCase();
-    if (host !== "canva.com" && host !== "www.canva.com") return null;
-    const m = u.pathname.match(
-      /\/design\/([A-Za-z0-9_-]+)(?:\/([A-Za-z0-9_-]+))?\/(?:view|watch|edit)/
-    );
-    if (!m) return null;
-    return `/api/canva/thumbnail?design=${encodeURIComponent(u.toString())}&w=640`;
-  } catch {
-    return null;
-  }
-}
-
-export function proxiedCanvaThumbnailUrl(
-  rawUrl: string | null | undefined,
-  width: 160 | 320 | 640 = 640
-): string | null {
-  if (!rawUrl) return null;
-  if (rawUrl.startsWith("/api/canva/thumbnail?")) return rawUrl;
-  try {
-    const u = new URL(rawUrl);
-    const host = u.hostname.toLowerCase();
-    const isCanvaHost =
-      host === "canva.com" ||
-      host.endsWith(".canva.com") ||
-      host.endsWith(".canva-web-files.com");
-    if (!isCanvaHost) return rawUrl;
-    return `/api/canva/thumbnail?url=${encodeURIComponent(u.toString())}&w=${width}`;
-  } catch {
-    return rawUrl;
-  }
-}
 
 // Async resolver — may do 1 short-link HEAD plus 1 oEmbed fetch.
 // Returns null on any failure so callers can fall back to the link-preview
@@ -858,7 +897,7 @@ async function fetchCanvaOEmbed(
     const res = await fetch(endpoint, {
       signal: AbortSignal.timeout(3000),
       headers: {
-        "User-Agent": "Aura-board/1.0 (+https://aura-board-app.vercel.app)",
+        "User-Agent": "Aura-board/1.0 (+https://aura-board.com)",
       },
     });
     if (!res.ok) return null;

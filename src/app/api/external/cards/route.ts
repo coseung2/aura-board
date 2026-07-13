@@ -13,7 +13,7 @@
  *   9. sectionId must belong to board → 422
  *  10. Streaming Blob upload (multipart) → 500 on failure
  *  11. Card INSERT (defaults width=240 height=160 content="" authorId=token.user)
- *  12. 200 { id, url: https://aura-board-app.vercel.app/board/<slug>#c/<cardId> }
+ *  12. 200 { id, url: https://aura-board.com/board/<slug>#c/<cardId> }
  */
 import { NextResponse } from "next/server";
 import { z } from "zod";
@@ -39,7 +39,7 @@ const MAX_BODY_BYTES = 4 * 1024 * 1024; // 4.0 MB hard guard (Vercel 4.5MB ceili
 
 const CARD_URL_BASE =
   process.env.NEXT_PUBLIC_APP_BASE_URL?.replace(/\/$/, "") ??
-  "https://aura-board-app.vercel.app";
+  "https://aura-board.com";
 
 // Zod strict body schema per Seed 8 §1.6 — 4 fields, unknown = 422.
 // Using z.string().min(1) for boardId/sectionId (cuid-ish; SQLite lacks the

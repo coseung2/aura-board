@@ -29,6 +29,19 @@ export default function SupportPage() {
         </section>
 
         <section className="docs-section">
+          <h2 className="docs-h2">보안 문제 신고</h2>
+          <p className="docs-p">
+            계정, 개인정보 또는 연동 보안 문제가 의심되면 제목에
+            &ldquo;보안 신고&rdquo;를 적어
+            <a href="mailto:mallagaenge@gmail.com" className="docs-link">
+              mallagaenge@gmail.com
+            </a>
+            으로 재현 단계와 영향을 보내주세요. 민감한 토큰이나 비밀번호는
+            이메일 본문에 포함하지 마세요.
+          </p>
+        </section>
+
+        <section className="docs-section">
           <h2 className="docs-h2">자주 묻는 질문</h2>
           <h3 className="docs-h3">Canva 앱에서 &ldquo;보드 목록을 불러오지 못했어요&rdquo; 에러가 나요</h3>
           <p className="docs-p">

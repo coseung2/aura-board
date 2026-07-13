@@ -61,7 +61,7 @@ Up to **10 active tokens** per account. Revoke from the same page.
 ```json
 {
   "id": "<Card.cuid>",
-  "url": "https://aura-board-app.vercel.app/board/<slug>#c/<cardId>"
+  "url": "https://aura-board.com/board/<slug>#c/<cardId>"
 }
 ```
 
@@ -120,7 +120,7 @@ returned in response), `kind` implied via presence of `imageUrl`.
 
 ```bash
 # 1. Minimum valid request (PNG data URL required)
-curl -sS https://aura-board-app.vercel.app/api/external/cards \
+curl -sS https://aura-board.com/api/external/cards \
   -H "Authorization: Bearer aurapat_ABCD1234_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx" \
   -H "Content-Type: application/json" \
   -d '{

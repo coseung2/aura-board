@@ -4,7 +4,7 @@
 
 ## 현재 HEAD: `96a5d65` — Vercel prod 배포 중 (3/3 commit)
 
-배포 URL: `https://aura-board-app.vercel.app` (리전 icn1)
+배포 URL: `https://aura-board.com` (리전 icn1)
 
 ## 4-커밋 파이프라인 (2026-04-22 저녁)
 

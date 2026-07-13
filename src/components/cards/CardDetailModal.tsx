@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { isCanvaDesignUrl } from "@/lib/canva";
+import { isCanvaDesignUrl } from "@/lib/canva-url";
 import { isYouTubeLink } from "@/lib/card-content-policy";
 import { CardAttachments } from "../CardAttachments";
 import { CardAuthorFooter } from "./CardAuthorFooter";

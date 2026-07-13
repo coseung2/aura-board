@@ -32,12 +32,12 @@
 
 | Method | URL | 용도 |
 |---|---|---|
-| GET | `https://aura-board-app.vercel.app/oauth/authorize` | 동의 화면. 교사가 Google 로그인 + "허용" 클릭 → auth code 발급 후 redirect_uri 로 302 |
-| POST | `https://aura-board-app.vercel.app/api/oauth/token` | code → access/refresh 교환 + refresh rotation |
-| POST | `https://aura-board-app.vercel.app/api/oauth/revoke` | access 또는 refresh token 폐기 (RFC 7009) |
-| GET | `https://aura-board-app.vercel.app/api/oauth/me` | 디버그/헬스체크. Bearer access token 으로 호출 시 `{teacherId, email, name, scope, clientId}` |
-| GET | `https://aura-board-app.vercel.app/api/external/feedbacks` | AI 평어 풀 (OAuth 또는 bridge) |
-| GET | `https://aura-board-app.vercel.app/api/external/grades` | OMR 채점 결과 풀 (OAuth 또는 bridge) |
+| GET | `https://aura-board.com/oauth/authorize` | 동의 화면. 교사가 Google 로그인 + "허용" 클릭 → auth code 발급 후 redirect_uri 로 302 |
+| POST | `https://aura-board.com/api/oauth/token` | code → access/refresh 교환 + refresh rotation |
+| POST | `https://aura-board.com/api/oauth/revoke` | access 또는 refresh token 폐기 (RFC 7009) |
+| GET | `https://aura-board.com/api/oauth/me` | 디버그/헬스체크. Bearer access token 으로 호출 시 `{teacherId, email, name, scope, clientId}` |
+| GET | `https://aura-board.com/api/external/feedbacks` | AI 평어 풀 (OAuth 또는 bridge) |
+| GET | `https://aura-board.com/api/external/grades` | OMR 채점 결과 풀 (OAuth 또는 bridge) |
 
 ### 2.1 `/oauth/authorize` 호출 파라미터
 
@@ -211,7 +211,7 @@ rm -f /tmp/.env.prod
 
 ```bash
 # fake refresh 로 token endpoint 인증 통과 여부 확인
-curl -X POST https://aura-board-app.vercel.app/api/oauth/token \
+curl -X POST https://aura-board.com/api/oauth/token \
   -H 'Content-Type: application/x-www-form-urlencoded' \
   -d "grant_type=refresh_token&refresh_token=fake&client_id=aura-companion&client_secret=<NEW_SECRET>"
 # → {"error":"invalid_grant"} = 정상 (client 인증 OK, refresh 만 fake 라 grant 실패)

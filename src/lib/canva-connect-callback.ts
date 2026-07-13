@@ -7,6 +7,7 @@ import {
   exchangeStudentCode,
 } from "./canva";
 import { getCurrentStudent } from "./student-auth";
+import { getCurrentUser } from "./auth";
 
 function safeReturnTo(
   value: string | null | undefined,
@@ -47,12 +48,24 @@ export async function handleCanvaConnectCallback(req: Request) {
   }
 
   const canvaState = decodeCanvaAuthState(state);
+  if (!canvaState) {
+    return NextResponse.json({ error: "Invalid or expired OAuth state" }, { status: 400 });
+  }
+  if (canvaState.kind === "teacher") {
+    const teacher = await getCurrentUser().catch(() => null);
+    if (!teacher || teacher.id !== canvaState.id) {
+      return NextResponse.json({ error: "OAuth session mismatch" }, { status: 403 });
+    }
+  } else {
+    const student = await getCurrentStudent().catch(() => null);
+    if (!student || student.id !== canvaState.id) {
+      return NextResponse.json({ error: "OAuth session mismatch" }, { status: 403 });
+    }
+  }
   const success =
-    canvaState?.kind === "student"
+    canvaState.kind === "student"
       ? await exchangeStudentCode(canvaState.id, code)
-      : canvaState?.kind === "teacher"
-        ? await exchangeCode(canvaState.id, code)
-        : await exchangeCode(state, code);
+      : await exchangeCode(canvaState.id, code);
   if (!success) {
     return NextResponse.json({ error: "Token exchange failed" }, { status: 500 });
   }

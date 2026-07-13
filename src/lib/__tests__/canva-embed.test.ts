@@ -6,7 +6,7 @@
  * so it can be executed with `npx tsx src/lib/__tests__/canva-embed.test.ts`.
  * When a test framework is adopted, the cases below should port cleanly.
  */
-import { buildCanvaEmbedSrc, isCanvaDesignUrl, extractCanvaDesignId } from "../canva";
+import { buildCanvaEmbedSrc, isCanvaDesignUrl, extractCanvaDesignId } from "../canva-url";
 
 type Row<TFn extends (arg: string) => unknown> = {
   name: string;

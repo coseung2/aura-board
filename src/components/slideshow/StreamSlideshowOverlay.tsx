@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { formatRelativeTime } from "@/lib/card-engagement-format";
 import { isYouTubeLink } from "@/lib/card-content-policy";
-import { buildCanvaEmbedSrc } from "@/lib/canva";
+import { buildCanvaEmbedSrc } from "@/lib/canva-url";
 import { extractVideoId } from "@/lib/youtube";
 import type { CardData } from "../DraggableCard";
 import {

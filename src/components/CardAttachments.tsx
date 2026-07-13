@@ -1,7 +1,7 @@
 "use client";
 
 import { memo, useEffect, useState } from "react";
-import { extractCanvaDesignId } from "@/lib/canva";
+import { extractCanvaDesignId } from "@/lib/canva-url";
 import { extractVideoId } from "@/lib/youtube";
 import { shouldPromoteLinkPreview } from "@/lib/card-content-policy";
 import { fileMimeToIcon, fileMimeToLabel, formatBytes } from "@/lib/file-attachment";

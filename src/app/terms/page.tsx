@@ -10,7 +10,7 @@ export default function TermsPage() {
       <article className="docs-article">
         <Link href="/dashboard" className="docs-back">← 홈으로</Link>
         <h1 className="docs-title">이용약관</h1>
-        <p className="docs-subtitle">최종 업데이트: 2026-04-14</p>
+        <p className="docs-subtitle">최종 업데이트: 2026-07-13</p>
 
         <section className="docs-section">
           <h2 className="docs-h2">1. 서비스 개요</h2>
@@ -36,7 +36,9 @@ export default function TermsPage() {
             학생이 Canva 에디터에서 Aura-board 앱 패널으로 로그인한 뒤
             생성한 디자인이 보드에 카드로 게시됩니다. 게시된 카드에는
             디자인의 공개 미리보기 URL과 썸네일 이미지가 저장되며, 로그인
-            세션은 학생 계정 단위로 발급·폐기됩니다.
+            세션은 학생 계정 단위로 발급·폐기됩니다. 교사와 학생은 서비스의
+            설정에서 Canva 계정 연결을 해제할 수 있으며, 해제 즉시 저장된
+            Canva OAuth 인증정보가 삭제됩니다.
           </p>
         </section>
 

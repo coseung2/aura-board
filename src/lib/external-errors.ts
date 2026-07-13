@@ -63,7 +63,7 @@ const DEFAULT_MESSAGE: Record<ExternalErrorCode, string> = {
   forbidden_scope: "Token does not include cards:write scope",
   not_found: "Board does not exist",
   tier_required:
-    "Pro tier required for cards:write — upgrade at https://aura-board-app.vercel.app/pricing",
+    "Pro tier required for cards:write — upgrade at https://aura-board.com/pricing",
   token_limit_exceeded: "Maximum 10 active tokens per user reached",
   invalid_data_url: "Request body failed strict validation",
   payload_too_large: "Request body exceeds 4.0MB hard limit",
