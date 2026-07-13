@@ -33,12 +33,17 @@ export default function TermsPage() {
         <section className="docs-section">
           <h2 className="docs-h2">3. Canva 앱 연동</h2>
           <p className="docs-p">
-            학생이 Canva 에디터에서 Aura-board 앱 패널으로 로그인한 뒤
-            생성한 디자인이 보드에 카드로 게시됩니다. 게시된 카드에는
-            디자인의 공개 미리보기 URL과 썸네일 이미지가 저장되며, 로그인
-            세션은 학생 계정 단위로 발급·폐기됩니다. 교사와 학생은 서비스의
-            설정에서 Canva 계정 연결을 해제할 수 있으며, 해제 즉시 저장된
-            Canva OAuth 인증정보가 삭제됩니다.
+            교사가 Canva 계정을 연결하면 자신이 접근할 수 있는 Canva
+            디자인을 확인해 PDF로 내보내거나 보드 섹션 이름의 Canva 폴더로
+            정리할 수 있습니다. 게시된 Canva 디자인 카드에는 공개 미리보기
+            URL과 썸네일 이미지가 저장될 수 있습니다. 교사는 서비스의
+            설정에서 Canva 계정 연결을 해제할 수 있으며, 해제 시 Canva에
+            토큰 폐기를 요청한 뒤 저장된 Canva OAuth 인증정보와 계정 연결
+            식별자를 삭제합니다. 별도의 Canva Content Publisher 패널에서는
+            학생이 Aura-board 계정으로 로그인해 자신이 선택한 Canva 디자인의
+            공개 링크와 썸네일을 보드 카드로 게시할 수 있습니다. 이 게시
+            기능은 학생의 Canva Connect 계정을 연결하거나 Aura 카드 디자인을
+            생성하지 않습니다.
           </p>
         </section>
 

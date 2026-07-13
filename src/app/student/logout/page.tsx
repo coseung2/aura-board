@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { CanvaAttribution } from "@/components/canva/CanvaAttribution";
 
 /**
  * /student/logout — clears the top-level student_session cookie via
@@ -54,6 +55,7 @@ export default function StudentLogoutPage() {
         {done ? "로그아웃되었습니다" : "로그아웃 중…"}
       </h1>
       <p style={{ color: "#666" }}>이 창을 닫으면 앱으로 돌아갑니다.</p>
+      <CanvaAttribution />
     </div>
   );
 }

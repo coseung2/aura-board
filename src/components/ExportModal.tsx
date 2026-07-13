@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import type { CardData } from "./DraggableCard";
 import { OptimizedImage } from "./ui/OptimizedImage";
 import { buildCanvaConnectUrl } from "@/lib/canva-connect-return";
+import { CanvaAttribution } from "./canva/CanvaAttribution";
 
 type Props = {
   sectionTitle: string;
@@ -153,7 +154,7 @@ export function ExportModal({ sectionTitle, cards, onClose }: Props) {
           setProgress("");
           return;
         }
-        alert(`내보내기 실패: ${data.message || data.error}`);
+        alert(getCanvaExportErrorMessage(data.error));
         setExporting(false);
         setProgress("");
         return;
@@ -185,7 +186,10 @@ export function ExportModal({ sectionTitle, cards, onClose }: Props) {
       <div className="modal-backdrop" onClick={exporting ? undefined : onClose} />
       <div className="add-card-modal export-modal">
         <div className="modal-header">
-          <h2 className="modal-title">{sectionTitle} - PDF 내보내기</h2>
+          <div className="canva-modal-heading">
+            <h2 className="modal-title">{sectionTitle} - PDF 내보내기</h2>
+            <CanvaAttribution />
+          </div>
           <button
             type="button"
             className="modal-close"
@@ -263,7 +267,11 @@ export function ExportModal({ sectionTitle, cards, onClose }: Props) {
                 ))}
               </div>
 
-              {progress && <div className="export-ready-msg">{progress}</div>}
+              {progress && (
+                <div className="export-ready-msg" role="status" aria-live="polite">
+                  {progress}
+                </div>
+              )}
 
               <div className="modal-actions">
                 <button
@@ -360,4 +368,17 @@ function isCanvaUrl(url: string): boolean {
   } catch {
     return url.includes("canva.link") || url.includes("canva.com");
   }
+}
+
+function getCanvaExportErrorMessage(error: unknown): string {
+  if (error === "No export items provided") {
+    return "내보낼 항목을 선택해주세요.";
+  }
+  if (error === "No valid Canva designs found") {
+    return "현재 연결된 Canva 계정으로 내보낼 수 있는 디자인이 없습니다. 디자인 접근 권한을 확인해주세요.";
+  }
+  if (error === "No pages in merged PDF") {
+    return "선택한 항목에서 PDF 페이지를 만들 수 없습니다. 다른 항목을 선택해 다시 시도해주세요.";
+  }
+  return "PDF를 내보내지 못했습니다. 잠시 후 다시 시도해주세요.";
 }

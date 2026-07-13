@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { OptimizedImage } from "./ui/OptimizedImage";
 import { buildCanvaConnectUrl } from "@/lib/canva-connect-return";
+import { CanvaAttribution } from "./canva/CanvaAttribution";
 
 type FolderItem = {
   type: "design" | "folder";
@@ -48,12 +49,12 @@ export function CanvaFolderModal({ sectionTitle, onImport, onClose }: Props) {
           onClose();
           return;
         }
-        throw new Error(data.error ?? "Failed");
+        throw new Error("canva_folder_load_failed");
       }
       const { items: folderItems } = await res.json();
       setItems(folderItems);
-    } catch (e: any) {
-      setError(e.message);
+    } catch {
+      setError("Canva 폴더를 불러오지 못했습니다. 잠시 후 다시 시도해주세요.");
     }
     setLoading(false);
   }
@@ -118,8 +119,13 @@ export function CanvaFolderModal({ sectionTitle, onImport, onClose }: Props) {
       <div className="modal-backdrop" onClick={onClose} />
       <div className="add-card-modal export-modal">
         <div className="modal-header">
-          <h2 className="modal-title">Canva 폴더</h2>
-          <button type="button" className="modal-close" onClick={onClose}>×</button>
+          <div className="canva-modal-heading">
+            <h2 className="modal-title">Canva 폴더</h2>
+            <CanvaAttribution />
+          </div>
+          <button type="button" className="modal-close" onClick={onClose} aria-label="닫기">
+            ×
+          </button>
         </div>
 
         <div className="modal-body">
@@ -142,8 +148,16 @@ export function CanvaFolderModal({ sectionTitle, onImport, onClose }: Props) {
             ))}
           </div>
 
-          {loading && <div className="export-hint">로딩 중...</div>}
-          {error && <div className="export-hint" style={{ color: "var(--color-danger)" }}>{error}</div>}
+          {loading && (
+            <div className="export-hint" role="status" aria-live="polite">
+              Canva 폴더를 불러오는 중...
+            </div>
+          )}
+          {error && (
+            <div className="export-hint" role="alert" style={{ color: "var(--color-danger)" }}>
+              {error}
+            </div>
+          )}
 
           {!loading && (
             <div className="export-design-list">

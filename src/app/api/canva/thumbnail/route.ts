@@ -6,6 +6,7 @@ import {
   getAccessToken,
   resolveCanvaEmbedUrl,
 } from "@/lib/canva";
+import { limitCanvaRead } from "@/lib/rate-limit-routes";
 import { getCurrentUser } from "@/lib/auth";
 
 /**
@@ -55,7 +56,8 @@ export async function GET(req: Request) {
     if (!url) {
       const designId = extractCanvaDesignId(design);
       const user = await getCurrentUser().catch(() => null);
-      const token = user ? await getAccessToken(user.id) : null;
+      const rateLimit = user ? await limitCanvaRead(user.id) : null;
+      const token = user && rateLimit?.ok ? await getAccessToken(user.id) : null;
       if (designId && token) {
         try {
           const info = await canvaGetDesign(token, designId);
@@ -194,7 +196,8 @@ async function resolveDesignThumbnailFromScreenUrl(
   if (embedThumbnail) return { url: embedThumbnail, private: false };
 
   const user = await getCurrentUser().catch(() => null);
-  const token = user ? await getAccessToken(user.id) : null;
+  const rateLimit = user ? await limitCanvaRead(user.id) : null;
+  const token = user && rateLimit?.ok ? await getAccessToken(user.id) : null;
   if (!token) return null;
   try {
     const info = await canvaGetDesign(token, designId);

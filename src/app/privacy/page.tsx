@@ -44,7 +44,14 @@ export default function PrivacyPage() {
             <li>보드/카드/댓글/좋아요 등 서비스 이용 콘텐츠</li>
           </ul>
 
-          <h3 className="docs-h3">2.3 모바일 앱에서 수집하는 정보</h3>
+          <h3 className="docs-h3">2.3 Canva 연동 정보</h3>
+          <ul className="docs-list">
+            <li><strong>계정 연결 정보:</strong> Canva 사용자 식별자, 팀 식별자, OAuth 접근·갱신 토큰 및 만료 시각</li>
+            <li><strong>기능 처리 정보:</strong> 교사가 선택한 Canva 디자인·폴더의 식별자, 제목, 썸네일 URL 등 기능 수행에 필요한 메타데이터</li>
+            <li><strong>내보내기 정보:</strong> PDF 생성에 필요한 디자인 파일은 요청 처리 중 서버 메모리에서 처리하며 Aura-board 데이터베이스에 저장하지 않음</li>
+          </ul>
+
+          <h3 className="docs-h3">2.4 모바일 앱에서 수집하는 정보</h3>
           <ul className="docs-list">
             <li><strong>칩/사진:</strong> 카드에 이미지를 첨부할 때 사용자 동의 하에 칩라/갤러리 접근</li>
             <li><strong>문서:</strong> 파일 첨부 시 사용자가 직접 선택한 문서</li>
@@ -69,7 +76,7 @@ export default function PrivacyPage() {
           <p className="docs-p">
             회원 탈퇴 시 수집된 개인정보는 지체 없이 파기합니다. 다만, 관련 법령에 따라 일정 기간 보관이 필요한 경우 해당 기간 동안 보관합니다.
             학생 정보는 교사가 학급을 삭제하거나 탈퇴 시 함께 삭제됩니다.
-            Canva 연결을 해제하면 Canva OAuth 접근·갱신 토큰과 임시 인증 정보는 즉시 폐기하며, Canva에 토큰 폐기를 요청합니다.
+            교사가 Canva 연결을 해제하면 Canva OAuth 접근·갱신 토큰, Canva 사용자·팀 식별자와 임시 인증 정보는 즉시 폐기하며, Canva에 토큰 폐기를 요청합니다.
             전자적 파일은 복구 불가능한 방법으로 삭제하며, 종이 문서는 분쇄 또는 소각합니다.
           </p>
         </section>
@@ -89,7 +96,7 @@ export default function PrivacyPage() {
             <li><strong>Vercel, Inc.</strong> - 웹/모바일 앱 호스팅, 서버리스 함수 실행</li>
             <li><strong>Resend, Inc.</strong> - 이메일 발송</li>
             <li><strong>Google, Kakao</strong> - OAuth 소셜 로그인</li>
-            <li><strong>Canva Pty Ltd</strong> - Canva OAuth 계정 연결, 디자인·에셋·폴더 연동 및 내보내기</li>
+            <li><strong>Canva Pty Ltd</strong> - 교사 Canva OAuth 계정 연결, 디자인·폴더 연동 및 내보내기</li>
             <li><strong>YouTube(Google)</strong> - 영상 임베드 콘텐츠 제공</li>
             <li><strong>Upstash</strong> - 서비스 부하 제어 및 캐싱</li>
           </ul>

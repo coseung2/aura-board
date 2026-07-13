@@ -31,28 +31,24 @@ https://aura-board.com/privacy
 ## Integration overview
 
 Aura Board is a classroom collaboration platform for teachers and students.
-Its Canva integration lets users connect their Canva accounts, attach Canva
+Its Canva integration lets teachers connect their Canva account, attach Canva
 designs to collaborative boards, display design previews, and export selected
-designs for classroom use. Teachers can organize board-related designs into
-Canva folders. Students can create a personalized Aura card: Aura Board
-generates a QR-code image, uploads it to the student’s Canva account, and
-creates an editable Canva design containing that asset. The integration
-reduces manual download and re-upload work and helps teachers and students
-move smoothly between Canva’s design tools and Aura Board’s classroom
-workflows.
+designs as PDF files for classroom use. Teachers can also browse Canva folder
+contents and organize board-related designs into folders named after Aura
+Board sections. The integration reduces repetitive download and organization
+work while helping teachers move smoothly between Canva’s design tools and
+their classroom workflows.
 
 ## Integration functionality
 
-1. Teachers and students connect their Canva account using OAuth 2.0
-   Authorization Code flow with PKCE.
+1. Teachers connect their Canva account using OAuth 2.0 Authorization Code
+   flow with PKCE.
 2. Aura Board reads design metadata to show titles, thumbnails, and design
    links on collaborative board cards.
 3. Teachers export selected Canva designs as PDF files for classroom use.
 4. Teachers create Canva folders, list folder contents, and move selected
    designs into those folders.
-5. Aura Board uploads a generated QR-code image to a student’s Canva account
-   and creates an editable personalized Aura card design.
-6. Teachers and students can disconnect Canva. Aura Board revokes the Canva
+5. Teachers can disconnect Canva. Aura Board revokes the Canva
    refresh-token lineage from its backend and immediately deletes the locally
    stored OAuth credentials and temporary authentication data.
 
@@ -67,12 +63,6 @@ Teacher account:
 - Email: integrations-support@canva.com
 - Password: [TEST PASSWORD]
 
-Student account:
-
-- Classroom/code: [CLASSROOM OR LOGIN CODE]
-- Student name/number: [STUDENT LOGIN]
-- PIN/password, if applicable: [STUDENT SECRET]
-
 Steps:
 
 1. Sign in to Aura Board with the teacher test account.
@@ -81,24 +71,19 @@ Steps:
 4. Add or open a card with a Canva design and confirm its title and thumbnail.
 5. Export the prepared Canva cards as PDF.
 6. Create a Canva folder from the board and move the test design into it.
-7. Sign out and sign in with the prepared student credentials.
-8. Open My Wallet, connect Canva, and create the student’s Aura card design.
-9. Confirm the QR-code asset and editable design were created in Canva.
-10. Disconnect Canva from both test accounts and confirm the disconnected
-    state remains after reloading the page.
+7. Disconnect Canva and confirm the disconnected state remains after
+   reloading the page.
 
 No paid Aura subscription is required for the review account.
 
 ## Scope rationale
 
 - `design:content:read`: Export user-selected Canva designs as PDF files.
-- `design:content:write`: Create an editable personalized Aura card design.
 - `design:meta:read`: Read title, page count, thumbnail, and design URLs.
 - `folder:read`: List Canva folder contents for the folder picker.
 - `folder:write`: Create folders and move user-selected designs into them.
-- `asset:read`: Poll the status and result of Aura Board’s asset upload job.
-- `asset:write`: Upload the generated Aura card QR-code image.
-- All permission, comment, and brand template scopes: `n/a`.
+- All write-design, asset, permission, comment, and brand template scopes:
+  `n/a`.
 
 ## Security practices
 

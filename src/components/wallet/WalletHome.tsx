@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { WalletCardQR } from "./WalletCardQR";
-import { CanvaConnectionCard } from "@/components/CanvaConnectionCard";
 
 type FD = {
   id: string;
@@ -42,7 +41,7 @@ const TYPE_LABEL: Record<string, string> = {
   avatar_purchase: "캐릭터 상점 구매",
 };
 
-export function WalletHome({ canvaConnected }: { canvaConnected: boolean }) {
+export function WalletHome() {
   const [data, setData] = useState<WalletData | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [cancellingFD, setCancellingFD] = useState<string | null>(null);
@@ -111,11 +110,6 @@ export function WalletHome({ canvaConnected }: { canvaConnected: boolean }) {
           </div>
         </div>
       </header>
-
-      <section className="wallet-card-section">
-        <h3>Canva 계정 연결</h3>
-        <CanvaConnectionCard actor="student" initialConnected={canvaConnected} />
-      </section>
 
       <div className="wallet-grid">
         <section className="wallet-card-section">

@@ -1,20 +1,17 @@
 "use client";
 
 import { useState } from "react";
+import { CanvaAttribution } from "./canva/CanvaAttribution";
 
 type Props = {
-  actor: "teacher" | "student";
   initialConnected: boolean;
 };
 
-export function CanvaConnectionCard({ actor, initialConnected }: Props) {
+export function CanvaConnectionCard({ initialConnected }: Props) {
   const [connected, setConnected] = useState(initialConnected);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const connectUrl =
-    actor === "teacher"
-      ? "/api/auth/canva?returnTo=/teacher/settings"
-      : "/api/auth/canva/student?returnTo=/my/wallet";
+  const connectUrl = "/api/auth/canva?returnTo=/teacher/settings";
 
   async function disconnect() {
     if (busy) return;
@@ -39,9 +36,12 @@ export function CanvaConnectionCard({ actor, initialConnected }: Props) {
   }
 
   return (
-    <div className="connected-app-row">
+    <div className="connected-app-row" aria-busy={busy}>
       <div className="connected-app-main">
-        <strong className="connected-app-name">Canva</strong>
+        <div className="connected-app-heading">
+          <strong className="connected-app-name">Canva</strong>
+          <CanvaAttribution />
+        </div>
         <span className="connected-app-meta">
           {connected ? "계정이 연결되어 있습니다." : "연결된 Canva 계정이 없습니다."}
         </span>
@@ -56,6 +56,7 @@ export function CanvaConnectionCard({ actor, initialConnected }: Props) {
           className="settings-action-btn is-danger"
           onClick={disconnect}
           disabled={busy}
+          aria-busy={busy}
         >
           {busy ? "해제 중…" : "연결 해제"}
         </button>

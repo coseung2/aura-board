@@ -10,23 +10,7 @@ export function WalletCardQR({ card }: Props) {
   const [token, setToken] = useState<string | null>(null);
   const [qrDataUrl, setQrDataUrl] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
- const [designing, setDesigning] = useState(false);
- const [designError, setDesignError] = useState<string | null>(null);
- const fetchRef = useRef(false);
-
-  // Canva OAuth redirect errors (e.g. ?canva=invalid_scope)
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    const params = new URLSearchParams(window.location.search);
-    const canvaErr = params.get("canva");
-    if (!canvaErr) return;
-    setDesignError(getCanvaErrorMessage(canvaErr));
-    params.delete("canva");
-    const nextUrl =
-      window.location.pathname +
-      (params.toString() ? `?${params.toString()}` : "");
-    window.history.replaceState({}, "", nextUrl);
-  }, []);
+  const fetchRef = useRef(false);
 
   const fetchToken = useCallback(async () => {
     if (fetchRef.current) return;
@@ -60,58 +44,6 @@ export function WalletCardQR({ card }: Props) {
     }
   }
 
-  async function handleCanvaDesign() {
-    if (designing) return;
-    setDesigning(true);
-    setDesignError(null);
-    const popup = window.open("about:blank", "_blank");
-    try {
-      const res = await fetch("/api/my/wallet/canva-card", {
-        method: "POST",
-        cache: "no-store",
-      });
-      const data = (await res.json().catch(() => ({}))) as {
-        editUrl?: string;
-        connectUrl?: string;
-        error?: string;
-      };
-
-      if (res.status === 401 && data.connectUrl) {
-        if (popup) {
-          popup.location.href = data.connectUrl;
-        } else {
-          window.location.href = data.connectUrl;
-        }
-        return;
-      }
-
-      if (!res.ok || !data.editUrl) {
-        throw new Error(data.error ?? "canva_design_failed");
-      }
-
-      if (popup) {
-        popup.location.href = data.editUrl;
-      } else {
-        window.location.href = data.editUrl;
-      }
-    } catch {
-      popup?.close();
-      setDesignError("Canva 디자인을 만들 수 없어요.");
-    } finally {
-      setDesigning(false);
-    }
-  }
-
-  function getCanvaErrorMessage(code: string): string {
-    if (code === "invalid_scope") {
-      return "Canva 연결에 필요한 권한이 앱에 설정되지 않았어요. 관리자가 Canva Developer Portal에서 design:content:write, asset:read, asset:write scope을 활성화해야 해요.";
-    }
-    if (code === "access_denied") {
-      return "Canva 연결을 허용하지 않았어요. 다시 시도해서 권한을 허용해주세요.";
-    }
-    return `Canva 연결 중 오류가 났어요. (${code})`;
-  }
-
   return (
     <div className="wallet-card-qr">
       <header className="wallet-card-header">
@@ -141,20 +73,7 @@ export function WalletCardQR({ card }: Props) {
         >
           {copied ? "복사됨!" : "토큰 복사"}
         </button>
-        <button
-          type="button"
-          className="wallet-qr-canva"
-          onClick={handleCanvaDesign}
-          disabled={!token || designing}
-        >
-          {designing ? "준비 중…" : "Canva에서 카드 디자인"}
-        </button>
       </div>
-      {designError && (
-        <p className="wallet-qr-design-error" role="alert">
-          {designError}
-        </p>
-      )}
     </div>
   );
 }

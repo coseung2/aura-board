@@ -8,6 +8,7 @@ import {
   canvaGetDesign,
   resolveCanvaDesignId,
 } from "@/lib/canva";
+import { limitCanvaMutation } from "@/lib/rate-limit-routes";
 
 /**
  * POST /api/canva/organize
@@ -17,6 +18,16 @@ import {
 export async function POST(req: Request) {
   try {
     const user = await getCurrentUser();
+    const rateLimit = await limitCanvaMutation(user.id);
+    if (!rateLimit.ok) {
+      return NextResponse.json(
+        { error: "rate_limited" },
+        {
+          status: 429,
+          headers: { "Retry-After": String(rateLimit.retryAfter) },
+        },
+      );
+    }
 
     if (!(await isCanvaConnected(user.id))) {
       return NextResponse.json({ error: "canva_not_connected" }, { status: 401 });
@@ -50,8 +61,8 @@ export async function POST(req: Request) {
         const design = await canvaGetDesign(token, designId);
         const moved = await canvaMoveItem(token, designId, folder.id);
         results.push({ url, designId, moved, title: design.title });
-      } catch (e: any) {
-        results.push({ url, designId, moved: false, error: e.message });
+      } catch {
+        results.push({ url, designId, moved: false, error: "move_failed" });
       }
     }
 

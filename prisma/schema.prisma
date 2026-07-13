@@ -359,6 +359,10 @@ model PaymentEvent {
 model CanvaConnectAccount {
   userId String @id
 
+  canvaUserId String?
+
+  canvaTeamId String?
+
   accessToken String?
 
   refreshToken String?
@@ -372,24 +376,6 @@ model CanvaConnectAccount {
   createdAt DateTime @default(now())
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-}
-
-model CanvaStudentConnectAccount {
-  studentId String @id
-
-  accessToken String?
-
-  refreshToken String?
-
-  expiresAt DateTime?
-
-  pkceVerifier String?
-
-  updatedAt DateTime @updatedAt
-
-  createdAt DateTime @default(now())
-
-  student Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
 }
 
 model Account {
@@ -550,7 +536,6 @@ model Student {
   oauthRefreshTokens OAuthRefreshToken[]
 
   canvaAppLink CanvaAppLink?
-  canvaConnect CanvaStudentConnectAccount?
 
   assignmentSlots AssignmentSlot[] @relation("StudentAssignmentSlots")
 

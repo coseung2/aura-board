@@ -11,13 +11,9 @@ function encrypted(value: string | null): string | null {
 }
 
 async function main() {
-  const [teachers, students] = await Promise.all([
-    db.canvaConnectAccount.findMany(),
-    db.canvaStudentConnectAccount.findMany(),
-  ]);
+  const teachers = await db.canvaConnectAccount.findMany();
 
   let teacherUpdates = 0;
-  let studentUpdates = 0;
 
   for (const row of teachers) {
     const accessToken = encrypted(row.accessToken);
@@ -37,26 +33,8 @@ async function main() {
     teacherUpdates += 1;
   }
 
-  for (const row of students) {
-    const accessToken = encrypted(row.accessToken);
-    const refreshToken = encrypted(row.refreshToken);
-    const pkceVerifier = encrypted(row.pkceVerifier);
-    if (
-      accessToken === row.accessToken &&
-      refreshToken === row.refreshToken &&
-      pkceVerifier === row.pkceVerifier
-    ) {
-      continue;
-    }
-    await db.canvaStudentConnectAccount.update({
-      where: { studentId: row.studentId },
-      data: { accessToken, refreshToken, pkceVerifier },
-    });
-    studentUpdates += 1;
-  }
-
   console.log(
-    JSON.stringify({ teacherUpdates, studentUpdates, status: "complete" }),
+    JSON.stringify({ teacherUpdates, status: "complete" }),
   );
 }
 

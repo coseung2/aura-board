@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { PDFDocument, type PDFPage } from "pdf-lib";
 import sharp from "sharp";
 import { getCurrentUser } from "@/lib/auth";
+import { limitCanvaExport } from "@/lib/rate-limit-routes";
 import {
   getAccessToken,
   isCanvaConnected,
@@ -41,6 +42,16 @@ const AUTO_MAX_CELLS = 16;
 export async function POST(req: Request) {
   try {
     const user = await getCurrentUser();
+    const rateLimit = await limitCanvaExport(user.id);
+    if (!rateLimit.ok) {
+      return NextResponse.json(
+        { error: "rate_limited", message: "잠시 후 다시 시도해주세요." },
+        {
+          status: 429,
+          headers: { "Retry-After": String(rateLimit.retryAfter) },
+        },
+      );
+    }
 
     const body = await req.json();
     const { items, layout } = normalizeExportRequest(body);

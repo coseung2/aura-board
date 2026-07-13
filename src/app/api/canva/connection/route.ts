@@ -1,11 +1,8 @@
 import { NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth";
-import { getCurrentStudent } from "@/lib/student-auth";
 import {
-  disconnectStudentCanva,
   disconnectTeacherCanva,
   isCanvaConnected,
-  isStudentCanvaConnected,
 } from "@/lib/canva";
 
 function privateJson(body: unknown, status = 200) {
@@ -15,22 +12,11 @@ function privateJson(body: unknown, status = 200) {
   });
 }
 
-async function currentActor() {
-  const teacher = await getCurrentUser().catch(() => null);
-  if (teacher) return { kind: "teacher" as const, id: teacher.id };
-  const student = await getCurrentStudent().catch(() => null);
-  if (student) return { kind: "student" as const, id: student.id };
-  return null;
-}
-
 export async function GET() {
-  const actor = await currentActor();
-  if (!actor) return privateJson({ error: "Unauthorized" }, 401);
-  const connected =
-    actor.kind === "teacher"
-      ? await isCanvaConnected(actor.id)
-      : await isStudentCanvaConnected(actor.id);
-  return privateJson({ connected, actor: actor.kind });
+  const teacher = await getCurrentUser().catch(() => null);
+  if (!teacher) return privateJson({ error: "Unauthorized" }, 401);
+  const connected = await isCanvaConnected(teacher.id);
+  return privateJson({ connected, actor: "teacher" });
 }
 
 export async function DELETE(request: Request) {
@@ -39,14 +25,11 @@ export async function DELETE(request: Request) {
   if (!origin || origin !== requestOrigin) {
     return privateJson({ error: "Invalid request origin" }, 403);
   }
-  const actor = await currentActor();
-  if (!actor) return privateJson({ error: "Unauthorized" }, 401);
+  const teacher = await getCurrentUser().catch(() => null);
+  if (!teacher) return privateJson({ error: "Unauthorized" }, 401);
 
   try {
-    const disconnected =
-      actor.kind === "teacher"
-        ? await disconnectTeacherCanva(actor.id)
-        : await disconnectStudentCanva(actor.id);
+    const disconnected = await disconnectTeacherCanva(teacher.id);
     if (!disconnected) {
       return privateJson(
         { error: "Canva에서 연결을 해제하지 못했습니다. 잠시 후 다시 시도해주세요." },

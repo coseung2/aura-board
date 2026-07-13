@@ -6,6 +6,7 @@ import type { CardData } from "../DraggableCard";
 import { CardBody } from "../cards/CardBody";
 import { ContextMenu } from "../ContextMenu";
 import { ColumnMenu } from "./ColumnMenu";
+import { CanvaAttribution } from "../canva/CanvaAttribution";
 import type { SortMode } from "./sort";
 import type { RosterEntry } from "./useColumnRoster";
 
@@ -449,6 +450,7 @@ export function ColumnView(props: Props) {
             canSort={canEdit}
             onSetSort={onSetSort}
             actions={menuItems}
+            footer={<CanvaAttribution />}
           />
         )}
       </div>

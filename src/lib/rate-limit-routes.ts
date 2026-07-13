@@ -133,6 +133,21 @@ export function limitBillingRefund(userId: string): Promise<LimitVerdict> {
   return runLimit("rl:billing-refund", userId, 5, "1 h");
 }
 
+/** Canva metadata/folder reads — 교사 1인당 분당 120회. */
+export function limitCanvaRead(userId: string): Promise<LimitVerdict> {
+  return runLimit("rl:canva-read", userId, 120, "60 s");
+}
+
+/** Canva folder creation/move — 교사 1인당 분당 30회. */
+export function limitCanvaMutation(userId: string): Promise<LimitVerdict> {
+  return runLimit("rl:canva-mutation", userId, 30, "60 s");
+}
+
+/** Canva PDF export — 교사 1인당 분당 10회. */
+export function limitCanvaExport(userId: string): Promise<LimitVerdict> {
+  return runLimit("rl:canva-export", userId, 10, "60 s");
+}
+
 /** Canva review credentials: independent IP and account limits, both fail-closed. */
 export async function limitCanvaReviewerLogin(
   ipKey: string,

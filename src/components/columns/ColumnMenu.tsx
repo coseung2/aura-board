@@ -1,6 +1,6 @@
 ﻿"use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import type { MenuItem } from "../ContextMenu";
 
@@ -20,6 +20,7 @@ type Props = {
   /** Non-sort actions (rename, clear, delete, …). Rendered after sort section. */
   actions?: MenuItem[];
   triggerTitle?: string;
+  footer?: ReactNode;
 };
 
 /**
@@ -33,6 +34,7 @@ export function ColumnMenu({
   onSetSort,
   actions = [],
   triggerTitle,
+  footer,
 }: Props) {
   const [open, setOpen] = useState(false);
   const [pos, setPos] = useState<{ top: number; right: number } | null>(null);
@@ -130,6 +132,7 @@ export function ColumnMenu({
             {a.label}
           </button>
         ))}
+        {footer && <div className="ctx-menu-footer">{footer}</div>}
       </div>
     ) : null;
 

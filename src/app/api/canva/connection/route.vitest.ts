@@ -2,22 +2,14 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   getCurrentUser: vi.fn(),
-  getCurrentStudent: vi.fn(),
   disconnectTeacherCanva: vi.fn(),
-  disconnectStudentCanva: vi.fn(),
   isCanvaConnected: vi.fn(),
-  isStudentCanvaConnected: vi.fn(),
 }));
 
 vi.mock("@/lib/auth", () => ({ getCurrentUser: mocks.getCurrentUser }));
-vi.mock("@/lib/student-auth", () => ({
-  getCurrentStudent: mocks.getCurrentStudent,
-}));
 vi.mock("@/lib/canva", () => ({
   disconnectTeacherCanva: mocks.disconnectTeacherCanva,
-  disconnectStudentCanva: mocks.disconnectStudentCanva,
   isCanvaConnected: mocks.isCanvaConnected,
-  isStudentCanvaConnected: mocks.isStudentCanvaConnected,
 }));
 
 import { DELETE, GET } from "./route";
@@ -33,9 +25,7 @@ describe("/api/canva/connection", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.getCurrentUser.mockResolvedValue(null);
-    mocks.getCurrentStudent.mockResolvedValue(null);
     mocks.disconnectTeacherCanva.mockResolvedValue(true);
-    mocks.disconnectStudentCanva.mockResolvedValue(true);
   });
 
   it("returns the current teacher connection status privately", async () => {
@@ -48,7 +38,6 @@ describe("/api/canva/connection", () => {
     expect(response.headers.get("cache-control")).toContain("no-store");
     expect(await response.json()).toEqual({ connected: true, actor: "teacher" });
     expect(mocks.isCanvaConnected).toHaveBeenCalledWith("teacher-1");
-    expect(mocks.isStudentCanvaConnected).not.toHaveBeenCalled();
   });
 
   it("disconnects only the authenticated teacher account", async () => {
@@ -58,17 +47,6 @@ describe("/api/canva/connection", () => {
 
     expect(response.status).toBe(200);
     expect(mocks.disconnectTeacherCanva).toHaveBeenCalledWith("teacher-1");
-    expect(mocks.disconnectStudentCanva).not.toHaveBeenCalled();
-  });
-
-  it("disconnects only the authenticated student account", async () => {
-    mocks.getCurrentStudent.mockResolvedValue({ id: "student-1" });
-
-    const response = await DELETE(deleteRequest());
-
-    expect(response.status).toBe(200);
-    expect(mocks.disconnectStudentCanva).toHaveBeenCalledWith("student-1");
-    expect(mocks.disconnectTeacherCanva).not.toHaveBeenCalled();
   });
 
   it("rejects cross-origin disconnect attempts before authentication", async () => {

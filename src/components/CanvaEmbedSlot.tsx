@@ -27,6 +27,7 @@ import {
   type MouseEvent,
 } from "react";
 import { buildCanvaEmbedSrc } from "@/lib/canva-url";
+import { CanvaAttribution } from "./canva/CanvaAttribution";
 import {
   useIframeBudget,
   useLastEviction,
@@ -216,6 +217,7 @@ export const CanvaEmbedSlot = memo(function CanvaEmbedSlot({
             </span>
           </div>
         )}
+        <CanvaAttribution className="card-canva-slot-attribution" />
       </div>
     </div>
   );

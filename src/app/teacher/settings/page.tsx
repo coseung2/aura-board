@@ -41,7 +41,7 @@ export default async function TeacherSettingsPage() {
           <p className="docs-p">
             Canva 디자인 가져오기, PDF 내보내기, 폴더 정리에 사용하는 계정을 관리합니다.
           </p>
-          <CanvaConnectionCard actor="teacher" initialConnected={canvaConnected} />
+          <CanvaConnectionCard initialConnected={canvaConnected} />
         </section>
         <TeacherWithdrawalSection email={user.email} />
       </article>
