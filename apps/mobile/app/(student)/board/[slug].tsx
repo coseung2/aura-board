@@ -11,6 +11,7 @@ import {
   typography,
 } from "../../../theme/tokens";
 import { BoardHeader } from "../../../components/BoardShell";
+import { DailyBanner } from "../../../components/DailyBanner";
 import { apiFetch, ApiError } from "../../../lib/api";
 import {
   BOARD_LIST_CACHE_KEY,
@@ -59,6 +60,9 @@ export default function BoardDetail() {
   );
   const [loading, setLoading] = useState(() => !initialCache);
   const [error, setError] = useState<string | null>(null);
+  const [activeSectionTitle, setActiveSectionTitle] = useState<string | null>(
+    null,
+  );
   const sequenceRef = useRef(0);
   const previousCacheKeyRef = useRef(cacheKey);
 
@@ -72,6 +76,7 @@ export default function BoardDetail() {
     setData(cached?.data ?? null);
     setLoading(!cached);
     setError(null);
+    setActiveSectionTitle(null);
   }, [cacheKey]);
 
   const load = useCallback(
@@ -172,16 +177,32 @@ export default function BoardDetail() {
       style={[styles.container, { backgroundColor: boardTheme.background }]}
       edges={["top"]}
     >
-      <BoardHeader title={board.title} layout={board.layout} />
-      <View style={styles.body}>{renderLayout(data, () => load(true))}</View>
+      <BoardHeader
+        title={activeSectionTitle ?? board.title}
+        layout={board.layout}
+      />
+      <DailyBanner role="student" />
+      <View style={styles.body}>
+        {renderLayout(data, () => load(true), setActiveSectionTitle)}
+      </View>
     </SafeAreaView>
   );
 }
 
-function renderLayout(data: BoardDetailResponse, reload: () => void) {
+function renderLayout(
+  data: BoardDetailResponse,
+  reload: () => void,
+  onSectionTitleChange: (title: string | null) => void,
+) {
   switch (data.board.layout) {
     case "columns":
-      return <ColumnsBoard data={data} onMutate={reload} />;
+      return (
+        <ColumnsBoard
+          data={data}
+          onMutate={reload}
+          onSectionTitleChange={onSectionTitleChange}
+        />
+      );
     case "vibe-arcade":
       return <VibeArcadeBoard data={data} />;
     case "quiz":

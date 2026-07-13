@@ -5,7 +5,7 @@ const config: ExpoConfig = {
   name: "Aura-board",
   slug: "aura-board-mobile",
   scheme: "auraboard",
-  version: "0.2.3",
+  version: "0.2.4",
   orientation: "default",
   icon: "./assets/icon.png",
   userInterfaceStyle: "light",
@@ -23,7 +23,7 @@ const config: ExpoConfig = {
     edgeToEdgeEnabled: true,
     predictiveBackGestureEnabled: false,
     package: "com.auraboard.app",
-    versionCode: 4,
+    versionCode: 5,
   },
   web: {
     favicon: "./assets/favicon.png",

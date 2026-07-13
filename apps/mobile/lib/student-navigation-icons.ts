@@ -1,30 +1,30 @@
 import {
   Bell,
   BookOpen,
-  BriefcaseBusiness,
   BrushCleaning,
   CheckCircle2,
   CircleHelp,
+  FolderOpen,
   Footprints,
   Home,
   Landmark,
-  LayoutGrid,
   MoreHorizontal,
   Palette,
+  PiggyBank,
+  Presentation,
   ShoppingCart,
-  WalletCards,
   type LucideIcon,
 } from "lucide-react-native";
 import type { StudentNavTarget } from "./student-navigation-core";
 
 const targetIcons: Record<string, LucideIcon> = {
   home: Home,
-  boards: LayoutGrid,
-  portfolio: BriefcaseBusiness,
+  boards: Presentation,
+  portfolio: FolderOpen,
   reading: BookOpen,
   walking: Footprints,
   more: MoreHorizontal,
-  wallet: WalletCards,
+  wallet: PiggyBank,
   canva: Palette,
   notifications: Bell,
 };

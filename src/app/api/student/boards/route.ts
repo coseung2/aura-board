@@ -52,6 +52,7 @@ export async function GET() {
     });
 
     return NextResponse.json({
+      classroomName: student.classroom?.name ?? null,
       boards: boards.map((board) => ({
         id: board.id,
         slug: board.slug,

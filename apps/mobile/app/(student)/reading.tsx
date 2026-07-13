@@ -410,6 +410,10 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: spacing.sm,
+    borderWidth: borders.none,
+    borderColor: colors.transparent,
+    borderRadius: radii.none,
+    backgroundColor: colors.transparent,
   },
   entryTopline: {
     flexDirection: "row",

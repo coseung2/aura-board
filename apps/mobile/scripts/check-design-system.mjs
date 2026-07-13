@@ -41,6 +41,14 @@ const allowed = [
     patterns: [/<Modal\b/],
   },
   {
+    file: "components/CommentBottomSheet.tsx",
+    patterns: [/<Modal\b/],
+  },
+  {
+    file: "components/CardAuthorBottomSheet.tsx",
+    patterns: [/<Modal\b/],
+  },
+  {
     file: "components/plant/ImageLightbox.tsx",
     patterns: [/<Modal\b/],
   },

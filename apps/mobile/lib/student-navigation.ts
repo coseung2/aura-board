@@ -12,15 +12,26 @@ export {
 export type { StudentNavTarget } from "./student-navigation-core";
 
 const NAV_PREFERENCES_KEY = "aura_student_nav_preferences_v1";
+const MORE_NAV_ID = "more";
 const preferenceListeners = new Set<(ids: string[]) => void>();
 
-function normalizeIds(value: unknown): string[] {
+export function normalizeStudentNavIds(value: unknown): string[] {
   if (!Array.isArray(value)) return [];
-  return [...new Set(value.filter((id): id is string => typeof id === "string"))];
+  const ids = [
+    ...new Set(value.filter((id): id is string => typeof id === "string")),
+  ];
+  // Keep the entry point to the full menu after every enabled tab.
+  const moreIndex = ids.indexOf(MORE_NAV_ID);
+  if (moreIndex < 0) return ids;
+  ids.splice(moreIndex, 1);
+  ids.push(MORE_NAV_ID);
+  return ids;
 }
 
 function legacyDefaultIds() {
-  return studentBaseNavTargets.map((target) => target.id);
+  return normalizeStudentNavIds(
+    studentBaseNavTargets.map((target) => target.id),
+  );
 }
 
 async function readPreferenceValue(): Promise<string | null> {
@@ -37,10 +48,10 @@ export async function loadStudentNavPreferences(): Promise<string[]> {
     const value = JSON.parse(raw);
     if (Array.isArray(value)) {
       // v1 only stored optional menu IDs. Keep the former fixed menu items.
-      return [...new Set([...legacyDefaultIds(), ...normalizeIds(value)])];
+      return normalizeStudentNavIds([...legacyDefaultIds(), ...value]);
     }
     if (value && typeof value === "object" && "ids" in value) {
-      return normalizeIds(value.ids);
+      return normalizeStudentNavIds(value.ids);
     }
     return legacyDefaultIds();
   } catch {
@@ -49,7 +60,7 @@ export async function loadStudentNavPreferences(): Promise<string[]> {
 }
 
 export async function saveStudentNavPreferences(ids: string[]): Promise<void> {
-  const normalizedIds = normalizeIds(ids);
+  const normalizedIds = normalizeStudentNavIds(ids);
   const value = JSON.stringify({ version: 2, ids: normalizedIds });
   if (Platform.OS === "web" && typeof window !== "undefined") {
     window.localStorage.setItem(NAV_PREFERENCES_KEY, value);

@@ -10,6 +10,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
   borders,
   colors,
+  iconSizes,
   radii,
   shadows,
   spacing,
@@ -34,6 +35,8 @@ import { ControlPressable } from "./ui";
 type Props = {
   duties?: StudentDuty[];
 };
+
+const SOLID_ACTIVE_ICON_IDS = new Set(["boards", "walking", "more"]);
 
 export function StudentBottomNav({ duties = [] }: Props) {
   const router = useRouter();
@@ -75,6 +78,9 @@ export function StudentBottomNav({ duties = [] }: Props) {
           const active = isStudentNavTargetActive(target, pathname);
           const isDuty = target.id.startsWith("duty:");
           const Icon = studentNavIcon(target);
+          const iconSize = isLandscape ? 18 : 20;
+          const showActiveCutout =
+            active && !SOLID_ACTIVE_ICON_IDS.has(target.id);
           return (
             <ControlPressable
               key={target.id}
@@ -90,12 +96,25 @@ export function StudentBottomNav({ duties = [] }: Props) {
               accessibilityLabel={target.label}
               accessibilityState={{ selected: active }}
             >
-              <Icon
-                size={isLandscape ? 18 : 20}
-                color={active ? colors.text : colors.textMuted}
-                fill={active ? colors.text : colors.transparent}
-                strokeWidth={active ? 1.75 : 2}
-              />
+              <View style={styles.iconWrap} accessible={false}>
+                <Icon
+                  size={iconSize}
+                  color={active ? colors.text : colors.textMuted}
+                  fill={active ? colors.text : colors.transparent}
+                  strokeWidth={active ? 2 : 2}
+                />
+                {showActiveCutout ? (
+                  <Icon
+                    size={iconSize}
+                    color={colors.surface}
+                    stroke={colors.surface}
+                    fill={colors.transparent}
+                    strokeWidth={3}
+                    style={styles.activeIconCutout}
+                    accessible={false}
+                  />
+                ) : null}
+              </View>
               <Text
                 style={[styles.tabLabel, active && styles.tabTextActive]}
                 numberOfLines={1}
@@ -147,6 +166,15 @@ const styles = StyleSheet.create({
     flexShrink: 1,
     gap: spacing.xs,
     paddingVertical: spacing.none,
+  },
+  iconWrap: {
+    width: iconSizes.md,
+    height: iconSizes.md,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  activeIconCutout: {
+    position: "absolute",
   },
   dutyTab: {
     maxWidth: studentNav.dutyTabMaxWidth,

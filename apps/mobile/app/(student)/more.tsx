@@ -16,6 +16,7 @@ import { clearSessionToken } from "../../lib/session";
 import type { MeResponse } from "../../lib/types";
 import {
   loadStudentNavPreferences,
+  normalizeStudentNavIds,
   saveStudentNavPreferences,
   studentBaseNavTargets,
   studentDutyTarget,
@@ -62,7 +63,7 @@ export default function StudentMoreScreen() {
         loadStudentNavPreferences(),
       ]);
       setMe(response);
-      setEnabledIds(savedIds);
+      setEnabledIds(normalizeStudentNavIds(savedIds));
     } catch (nextError) {
       if (nextError instanceof ApiError && nextError.status === 401) {
         await clearSessionToken();
@@ -103,11 +104,12 @@ export default function StudentMoreScreen() {
   }, [enabledIds, targets]);
 
   const persist = useCallback(async (ids: string[]) => {
-    setEnabledIds(ids);
+    const normalizedIds = normalizeStudentNavIds(ids);
+    setEnabledIds(normalizedIds);
     setSaveError(null);
     setSaving(true);
     try {
-      await saveStudentNavPreferences(ids);
+      await saveStudentNavPreferences(normalizedIds);
     } catch {
       setSaveError("메뉴 설정을 저장하지 못했어요. 다시 시도해 주세요.");
     } finally {
@@ -128,6 +130,7 @@ export default function StudentMoreScreen() {
     if (currentIndex < 0 || nextIndex < 0 || nextIndex >= enabledIds.length) {
       return;
     }
+    if (targetId === "more" || enabledIds[nextIndex] === "more") return;
     const next = [...enabledIds];
     [next[currentIndex], next[nextIndex]] = [
       next[nextIndex],
@@ -171,9 +174,6 @@ export default function StudentMoreScreen() {
             <Text style={styles.bannerCalloutTitle} selectable>
               오늘의 배너를 제안해 보세요.
             </Text>
-            <Text style={styles.bannerCalloutDescription} selectable>
-              짧은 문구나 이미지를 제출하면 모두의 화면에 소개될 수 있어요.
-            </Text>
           </View>
           <AppButton
             variant="secondary"
@@ -200,6 +200,7 @@ export default function StudentMoreScreen() {
               {orderedTargets.map((target, index) => {
                 const enabled = enabledIds.includes(target.id);
                 const enabledIndex = enabledIds.indexOf(target.id);
+                const isMore = target.id === "more";
                 const Icon = studentNavIcon(target);
                 return (
                   <View
@@ -226,7 +227,7 @@ export default function StudentMoreScreen() {
                       <View style={styles.orderButtons}>
                         <ControlPressable
                           style={styles.orderButton}
-                          disabled={!enabled || enabledIndex === 0}
+                          disabled={!enabled || isMore || enabledIndex === 0}
                           onPress={() => move(target.id, -1)}
                           accessibilityLabel={`${target.label} 위로 이동`}
                         >
@@ -239,7 +240,10 @@ export default function StudentMoreScreen() {
                         <ControlPressable
                           style={styles.orderButton}
                           disabled={
-                            !enabled || enabledIndex === enabledIds.length - 1
+                            !enabled ||
+                            isMore ||
+                            enabledIndex === enabledIds.length - 1 ||
+                            enabledIds[enabledIndex + 1] === "more"
                           }
                           onPress={() => move(target.id, 1)}
                           accessibilityLabel={`${target.label} 아래로 이동`}
@@ -285,7 +289,7 @@ const styles = StyleSheet.create({
     alignSelf: "center",
     flexGrow: 1,
     paddingHorizontal: pageChrome.horizontalPadding,
-    paddingTop: pageChrome.directContentStartGap,
+    paddingTop: pageChrome.contentStartGap,
     paddingBottom: spacing.xxxl + spacing.xl,
     gap: spacing.xl,
   },
@@ -311,15 +315,11 @@ const styles = StyleSheet.create({
   bannerCallout: {
     flexDirection: "row",
     alignItems: "center",
-    gap: spacing.md,
-    paddingVertical: spacing.md,
-    borderTopWidth: borders.hairline,
-    borderBottomWidth: borders.hairline,
-    borderColor: colors.border,
-  },
-  bannerCalloutCopy: { flex: 1, minWidth: 0, gap: spacing.xxs },
-  bannerCalloutTitle: { ...typography.label, color: colors.text },
-  bannerCalloutDescription: { ...typography.micro, color: colors.textMuted },
+  gap: spacing.md,
+  paddingVertical: spacing.md,
+},
+  bannerCalloutCopy: { flex: 1, minWidth: 0 },
+  bannerCalloutTitle: { ...typography.section, color: colors.text },
   menuSection: { gap: spacing.sm },
   loadingRow: {
     minHeight: tapMin,

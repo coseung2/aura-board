@@ -20,6 +20,7 @@ import {
   pageChrome,
   radii,
   spacing,
+  tapMin,
   typography,
 } from "../../theme/tokens";
 import { apiFetch, ApiError, getApiUrl } from "../../lib/api";
@@ -29,6 +30,7 @@ import {
   BOARD_LIST_CACHE_KEY,
   readBoardCache,
   revalidateBoardCache,
+  STUDENT_HOME_CACHE_KEY,
 } from "../../lib/board-cache";
 import {
   buildMobileBoardOverview,
@@ -37,55 +39,82 @@ import {
   type MobileBoardRow,
 } from "../../lib/mobile-board-overview";
 import {
-  MobileFilterBar,
-  type FilterOption,
-} from "../../components/MobileBoardOverview";
-import {
   AppButton,
   AppHeader,
   EmptyState,
+  SemanticNav,
+  SemanticNavItem,
   SurfacePressable,
 } from "../../components/ui";
 
 const FALLBACK_THUMBNAIL = "/board-type-thumbnails/card-board.png";
-type StudentBoardsResponse = { boards: MeResponse["boards"] };
+type StudentBoardsResponse = {
+  boards: MeResponse["boards"];
+  classroomName: string | null;
+};
+type LegacyStudentBoardsResponse = MeResponse["boards"];
+
+function normalizeStudentBoardsResponse(
+  response: StudentBoardsResponse | LegacyStudentBoardsResponse,
+): StudentBoardsResponse {
+  if (Array.isArray(response)) {
+    return { boards: response, classroomName: null };
+  }
+  return response;
+}
 
 export default function StudentBoardsScreen() {
   const router = useRouter();
   const { width } = useWindowDimensions();
-  const initialCache = readBoardCache<MeResponse["boards"]>(
-    BOARD_LIST_CACHE_KEY,
-  );
+  const initialCache = readBoardCache<
+    StudentBoardsResponse | LegacyStudentBoardsResponse
+  >(BOARD_LIST_CACHE_KEY);
+  const initialResponse = initialCache
+    ? normalizeStudentBoardsResponse(initialCache.data)
+    : null;
+  const homeCache = readBoardCache<MeResponse>(STUDENT_HOME_CACHE_KEY);
+  const cachedClassroomName = homeCache?.data.student.classroom?.name ?? null;
   const [boards, setBoards] = useState<MeResponse["boards"]>(
-    () => initialCache?.data ?? [],
+    () => initialResponse?.boards ?? [],
+  );
+  const [classroomName, setClassroomName] = useState<string | null>(
+    () => initialResponse?.classroomName ?? null,
   );
   const [loading, setLoading] = useState(() => !initialCache);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState<MobileBoardFilter>("all");
-  const [query, setQuery] = useState("");
   const useWidePadding = width >= layoutTokens.mobileBreakpoint;
+  const horizontalPadding = useWidePadding ? spacing.xxl : spacing.lg;
+  const boardGridWidth = Math.max(
+    Math.min(width, layoutTokens.readableMaxWidth) - horizontalPadding * 2,
+    0,
+  );
+  const boardCardWidth = Math.max(
+    1,
+    Math.floor(
+      (boardGridWidth -
+        layoutTokens.boardGridGap * (layoutTokens.mobileBoardColumns - 1)) /
+        layoutTokens.mobileBoardColumns,
+    ),
+  );
   const overview = useMemo(() => buildMobileBoardOverview(boards), [boards]);
   const visibleRows = useMemo(
-    () => filterMobileBoardRows(overview, filter, query),
-    [filter, overview, query],
-  );
-  const filterOptions = useMemo<Array<FilterOption<MobileBoardFilter>>>(
-    () => [
-      { value: "all", label: "전체", count: overview.summary.total },
-      { value: "lesson", label: "수업", count: overview.summary.lesson },
-      { value: "play", label: "놀이", count: overview.summary.play },
-    ],
-    [overview.summary],
+    () => filterMobileBoardRows(overview, filter, ""),
+    [filter, overview],
   );
 
   const load = useCallback(
     async (refresh = false) => {
-      const cached = readBoardCache<MeResponse["boards"]>(
-        BOARD_LIST_CACHE_KEY,
-      );
+      const cached = readBoardCache<
+        StudentBoardsResponse | LegacyStudentBoardsResponse
+      >(BOARD_LIST_CACHE_KEY);
+      const cachedResponse = cached
+        ? normalizeStudentBoardsResponse(cached.data)
+        : null;
       if (cached) {
-        setBoards(cached.data);
+        setBoards(cachedResponse!.boards);
+        setClassroomName(cachedResponse!.classroomName);
         setLoading(false);
       } else {
         setLoading(true);
@@ -94,12 +123,13 @@ export default function StudentBoardsScreen() {
 
       try {
         setError(null);
-        const nextBoards = await revalidateBoardCache<MeResponse["boards"]>(
+        const nextResponse = await revalidateBoardCache<
+          StudentBoardsResponse | LegacyStudentBoardsResponse
+        >(
           BOARD_LIST_CACHE_KEY,
           async () => {
-            let response: StudentBoardsResponse;
             try {
-              response = await apiFetch<StudentBoardsResponse>("/api/student/boards");
+              return await apiFetch<StudentBoardsResponse>("/api/student/boards");
             } catch (requestError) {
               if (
                 !(requestError instanceof ApiError) ||
@@ -108,13 +138,17 @@ export default function StudentBoardsScreen() {
                 throw requestError;
               }
               const legacy = await apiFetch<MeResponse>("/api/student/me");
-              response = { boards: legacy.boards };
+              return {
+                boards: legacy.boards,
+                classroomName: legacy.student.classroom?.name ?? null,
+              };
             }
-            return response.boards;
           },
-          { force: refresh, kind: "boards" },
+          { force: refresh || Array.isArray(cached?.data), kind: "boards" },
         );
-        setBoards(nextBoards);
+        const response = normalizeStudentBoardsResponse(nextResponse);
+        setBoards(response.boards);
+        setClassroomName(response.classroomName);
       } catch (nextError) {
         if (nextError instanceof ApiError && nextError.status === 401) {
           await clearSessionToken();
@@ -178,28 +212,43 @@ export default function StudentBoardsScreen() {
           }
           ListHeaderComponent={
             <View style={styles.headerContent}>
-              <MobileFilterBar
-                query={query}
-                onQueryChange={setQuery}
-                queryPlaceholder="보드 이름·유형 검색"
-                options={filterOptions}
-                value={filter}
-                onChange={(nextFilter) => {
-                  setFilter(nextFilter);
-                }}
-              />
-              <View style={styles.resultHeader}>
-                <View style={styles.resultCopy}>
-                  <Text style={styles.resultTitle}>{filterTitle(filter)}</Text>
-                  <Text style={styles.resultHint}>{filterHint(filter)}</Text>
-                </View>
-                <Text style={styles.resultCount}>{visibleRows.length}개</Text>
+              <View style={styles.boardFilterHeader}>
+                <Text style={styles.boardHeaderTitle} accessibilityRole="header">
+                  {classroomName ?? cachedClassroomName ?? "내 학급"}
+                </Text>
+                <SemanticNav
+                  style={styles.filterNav}
+                  accessibilityLabel="보드 필터"
+                >
+                  <SemanticNavItem
+                    selected={filter === "all"}
+                    onPress={() => setFilter("all")}
+                    accessibilityLabel={`전체 보드 ${overview.summary.total}개`}
+                  >
+                    {`전체 ${overview.summary.total}`}
+                  </SemanticNavItem>
+                  <SemanticNavItem
+                    selected={filter === "lesson"}
+                    onPress={() => setFilter("lesson")}
+                    accessibilityLabel={`수업 보드 ${overview.summary.lesson}개`}
+                  >
+                    {`수업 ${overview.summary.lesson}`}
+                  </SemanticNavItem>
+                  <SemanticNavItem
+                    selected={filter === "play"}
+                    onPress={() => setFilter("play")}
+                    accessibilityLabel={`놀이 보드 ${overview.summary.play}개`}
+                  >
+                    {`놀이 ${overview.summary.play}`}
+                  </SemanticNavItem>
+                </SemanticNav>
               </View>
             </View>
           }
           renderItem={({ item }) => (
             <BoardRow
               row={item}
+              cardWidth={boardCardWidth}
               onPress={() =>
                 router.push(
                   `/(student)/board/${item.board.slug}?layout=${item.board.layout}`,
@@ -210,19 +259,14 @@ export default function StudentBoardsScreen() {
           ItemSeparatorComponent={() => <View style={styles.separator} />}
           ListEmptyComponent={
             <EmptyState
-              title={query ? "검색 결과가 없어요" : "지금 바로 할 보드가 없어요"}
-              description={
-                query
-                  ? "검색어를 바꾸거나 전체 보드에서 확인해 보세요."
-                  : "전체 탭에서 수업 자료와 지난 활동을 확인할 수 있어요."
-              }
+              title="지금 바로 할 보드가 없어요"
+              description="전체 탭에서 수업 자료와 지난 활동을 확인할 수 있어요."
               action={
-                filter !== "all" || query ? (
+                filter !== "all" ? (
                   <AppButton
                     variant="secondary"
                     onPress={() => {
                       setFilter("all");
-                      setQuery("");
                     }}
                   >
                     전체 보드 보기
@@ -237,11 +281,19 @@ export default function StudentBoardsScreen() {
   );
 }
 
-function BoardRow({ row, onPress }: { row: MobileBoardRow; onPress: () => void }) {
+function BoardRow({
+  row,
+  cardWidth,
+  onPress,
+}: {
+  row: MobileBoardRow;
+  cardWidth: number;
+  onPress: () => void;
+}) {
   const { board } = row;
   return (
     <SurfacePressable
-      style={styles.boardCard}
+      style={[styles.boardCard, { width: cardWidth }]}
       onPress={onPress}
       accessibilityLabel={`${board.title}, ${layoutLabel(board.layout)}`}
       accessibilityHint="보드를 열어요"
@@ -264,18 +316,6 @@ function BoardRow({ row, onPress }: { row: MobileBoardRow; onPress: () => void }
       </View>
     </SurfacePressable>
   );
-}
-
-function filterTitle(filter: MobileBoardFilter): string {
-  if (filter === "lesson") return "수업 보드";
-  if (filter === "play") return "놀이 보드";
-  return "전체 보드";
-}
-
-function filterHint(filter: MobileBoardFilter): string {
-  if (filter === "lesson") return "수업 자료와 제출 활동을 모아서 봐요.";
-  if (filter === "play") return "게임과 놀이 활동의 현재 상태를 확인해요.";
-  return "참여 중인 보드를 이름과 종류로 확인해요.";
 }
 
 function boardThumbUri(board: MeResponse["boards"][number]): string {
@@ -307,37 +347,39 @@ const styles = StyleSheet.create({
     maxWidth: layoutTokens.readableMaxWidth,
     alignSelf: "center",
     paddingHorizontal: spacing.lg,
-    paddingTop: pageChrome.directContentStartGap,
+    paddingTop: pageChrome.contentStartGap,
     paddingBottom: spacing.xxxl,
   },
   contentWide: { paddingHorizontal: spacing.xxl },
   headerContent: {
-    gap: spacing.lg,
     paddingBottom: spacing.md,
   },
-  resultHeader: {
+  boardFilterHeader: {
+    minHeight: tapMin + spacing.xs,
     flexDirection: "row",
-    alignItems: "center",
+    alignItems: "flex-end",
     justifyContent: "space-between",
     gap: spacing.md,
-    paddingBottom: spacing.sm,
     borderBottomWidth: borders.hairline,
     borderBottomColor: colors.border,
   },
-  resultCopy: {
+  boardHeaderTitle: {
+    ...typography.section,
+    color: colors.text,
     flex: 1,
     minWidth: 0,
-    gap: spacing.xxs,
+    paddingBottom: spacing.xs,
   },
-  resultTitle: { ...typography.section, color: colors.text },
-  resultHint: { ...typography.micro, color: colors.textMuted },
-  resultCount: { ...typography.badge, color: colors.accentTintedText },
+  filterNav: {
+    borderBottomWidth: borders.none,
+    flexShrink: 0,
+  },
   columnWrapper: {
     gap: layoutTokens.boardGridGap,
   },
   boardCard: {
-    flex: 1,
     minWidth: 0,
+    flexShrink: 0,
     overflow: "hidden",
     borderWidth: borders.hairline,
     borderColor: colors.border,

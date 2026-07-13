@@ -815,8 +815,6 @@ const styles = StyleSheet.create({
   walletBalanceValueCompact: {
     ...typography.subtitle,
     color: colors.text,
-    borderBottomWidth: borders.hairline,
-    borderBottomColor: colors.text,
     paddingBottom: spacing.xxs,
   },
   walletFdPillText: {
