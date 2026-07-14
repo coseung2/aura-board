@@ -128,6 +128,13 @@ export async function getStudentWalkingDays(studentId: string, days = 7) {
   }));
 }
 
+/** Delete every synced walking result owned by one student. */
+export async function deleteStudentWalkingStats(studentId: string) {
+  return db.studentWalkingDailyStat.deleteMany({
+    where: { studentId },
+  });
+}
+
 export async function getClassroomWalkingSummary(classroomId: string) {
   const rows = await db.$queryRaw<RawClassroomWalkingRow[]>(Prisma.sql`
     SELECT

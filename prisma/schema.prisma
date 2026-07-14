@@ -3270,6 +3270,13 @@ model Transaction {
 
   note String?
 
+  // Optional source linkage for idempotent, source-specific mutations. Reading
+  // rewards and their deletion reversals use this pair so a teacher can
+  // withdraw only the currency created for one reading log without touching
+  // purchases or unrelated deposits.
+  sourceType String?
+  sourceRef  String?
+
   storeItemId String?
 
   fixedDepositId String?
@@ -3289,6 +3296,8 @@ model Transaction {
   fixedDeposit FixedDeposit? @relation(fields: [fixedDepositId], references: [id], onDelete: SetNull)
 
   @@index([accountId, createdAt])
+  @@unique([sourceType, sourceRef])
+  @@index([accountId, sourceType, sourceRef])
   @@index([fixedDepositId])
 }
 

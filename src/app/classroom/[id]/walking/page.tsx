@@ -3,6 +3,7 @@ import { ClassroomFeatureHeader } from "@/components/classroom/ClassroomFeatureH
 import { db } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
 import { getClassroomWalkingSummary } from "@/lib/walking";
+import { WalkingStudentDeleteAction } from "@/components/classroom/WalkingStudentDeleteAction";
 
 const numberFormatter = new Intl.NumberFormat("ko-KR");
 const distanceFormatter = new Intl.NumberFormat("ko-KR", {
@@ -82,6 +83,7 @@ export default async function ClassroomWalkingPage({ params }: Props) {
             <span role="columnheader">활동 비교</span>
             <span role="columnheader">오늘</span>
             <span role="columnheader">최근 7일</span>
+            <span role="columnheader">관리</span>
           </div>
           {students.map((student) => {
             const percentage = Math.round((student.sevenDaySteps / maxSteps) * 100);
@@ -117,6 +119,11 @@ export default async function ClassroomWalkingPage({ params }: Props) {
                   <small>최근 7일</small>
                   <strong>{numberFormatter.format(student.sevenDaySteps)}걸음</strong>
                 </span>
+                <WalkingStudentDeleteAction
+                  classroomId={id}
+                  studentId={student.studentId}
+                  studentName={student.studentName}
+                />
               </div>
             );
           })}

@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 
 import { ClassroomFeatureHeader } from "@/components/classroom/ClassroomFeatureHeader";
+import { ReadingLogDeleteButton } from "@/components/classroom/ReadingLogDeleteButton";
 import { getCurrentUser } from "@/lib/auth";
 import { db } from "@/lib/db";
 
@@ -116,6 +117,7 @@ export default async function ClassroomReadingPage({ params }: Props) {
             <span role="columnheader">독서 감상</span>
             <span role="columnheader">점수</span>
             <span role="columnheader">작성일</span>
+            <span role="columnheader">관리</span>
           </div>
 
           {readingLogs.map((log) => (
@@ -146,6 +148,12 @@ export default async function ClassroomReadingPage({ params }: Props) {
               >
                 {formatDate(log.createdAt)}
               </time>
+              <ReadingLogDeleteButton
+                classroomId={classroom.id}
+                readingLogId={log.id}
+                studentLabel={log.student?.name ?? "알 수 없는 학생"}
+                title={log.title}
+              />
             </article>
           ))}
 

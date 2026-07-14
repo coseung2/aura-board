@@ -83,9 +83,6 @@ export function TopNav({ showAdmin = false }: Props) {
   const [previewClassroomId, setPreviewClassroomId] = useState<string | null>(
     null,
   );
-  const [previewCategory, setPreviewCategory] = useState<
-    "ALL" | "LESSON" | "PLAY"
-  >("ALL");
 
   const currentClassroomId =
     pathname.match(/^\/classroom\/([^/]+)/)?.[1] ?? null;
@@ -171,8 +168,11 @@ export function TopNav({ showAdmin = false }: Props) {
     navData.classrooms[0] ??
     null;
 
-  const previewClassroomBoards = (previewClassroom?.boards ?? []).filter(
-    (board) => previewCategory === "ALL" || board.category === previewCategory,
+  const previewClassroomLessonBoards = (previewClassroom?.boards ?? []).filter(
+    (board) => board.category === "LESSON",
+  );
+  const previewClassroomPlayBoards = (previewClassroom?.boards ?? []).filter(
+    (board) => board.category === "PLAY",
   );
 
   const recentBoards = recentBoardIds
@@ -204,7 +204,6 @@ export function TopNav({ showAdmin = false }: Props) {
             previewClassroom?.id === classroom.id,
           onPreview: () => {
             setPreviewClassroomId(classroom.id);
-            setPreviewCategory("ALL");
           },
         }))
       : [
@@ -215,9 +214,12 @@ export function TopNav({ showAdmin = false }: Props) {
           },
         ];
 
-  const previewClassroomBoardLinks: MegaNavLink[] =
-    previewClassroomBoards.length > 0
-      ? previewClassroomBoards.slice(0, 7).map((board) => ({
+  const classroomBoardLinks = (
+    boards: TeacherNavBoard[],
+    emptyLabel: string,
+  ): MegaNavLink[] =>
+    boards.length > 0
+      ? boards.slice(0, 7).map((board) => ({
           href: boardHref(board),
           label: board.title,
           active: pathname === boardHref(board),
@@ -225,12 +227,19 @@ export function TopNav({ showAdmin = false }: Props) {
       : [
           {
             href: classroomBoardHref,
-            label: previewClassroom
-              ? "이 학급에 연결된 보드 없음"
-              : "학급을 선택해 주세요",
+            label: previewClassroom ? emptyLabel : "학급을 선택해 주세요",
             disabled: true,
           },
         ];
+
+  const lessonBoardLinks = classroomBoardLinks(
+    previewClassroomLessonBoards,
+    "수업보드 없음",
+  );
+  const playBoardLinks = classroomBoardLinks(
+    previewClassroomPlayBoards,
+    "놀이보드 없음",
+  );
 
   const recentBoardLinks: MegaNavLink[] =
     recentBoards.length > 0
@@ -257,7 +266,6 @@ export function TopNav({ showAdmin = false }: Props) {
               previewClassroom?.id === classroom.id,
             onPreview: () => {
               setPreviewClassroomId(classroom.id);
-              setPreviewCategory("ALL");
             },
           }))
       : [
@@ -278,7 +286,6 @@ export function TopNav({ showAdmin = false }: Props) {
             previewClassroom?.id === classroom.id,
           onPreview: () => {
             setPreviewClassroomId(classroom.id);
-            setPreviewCategory("ALL");
           },
         }))
       : [
@@ -346,25 +353,12 @@ export function TopNav({ showAdmin = false }: Props) {
           links: classroomLinks,
         },
         {
-          title: "보드 종류",
-          links: [
-            {
-              href: classroomBoardHref,
-              label: "수업보드",
-              active: previewCategory === "LESSON",
-              onPreview: () => setPreviewCategory("LESSON"),
-            },
-            {
-              href: classroomBoardHref,
-              label: "놀이보드",
-              active: previewCategory === "PLAY",
-              onPreview: () => setPreviewCategory("PLAY"),
-            },
-          ],
+          title: "수업보드",
+          links: lessonBoardLinks,
         },
         {
-          title: previewClassroom ? `${previewClassroom.name} 보드` : "학급 보드",
-          links: previewClassroomBoardLinks,
+          title: "놀이보드",
+          links: playBoardLinks,
         },
         {
           title: "최근 이용 보드",
@@ -391,9 +385,7 @@ export function TopNav({ showAdmin = false }: Props) {
           links: selectedClassroomManagementLinks,
         },
         {
-          title: previewClassroom
-            ? `${previewClassroom.name} 운영`
-            : "학급 운영",
+          title: "1인1역할",
           links: selectedClassroomOperationLinks,
         },
         {
