@@ -38,18 +38,25 @@ const EMPTY_NAV_DATA: TeacherNavData = {
   boards: [],
 };
 
-const CLASSROOM_TABS = [
+const CLASSROOM_MANAGEMENT_TABS = [
   { key: "dashboard", label: "대시보드" },
   { key: "students", label: "학생 명단" },
   { key: "groups", label: "자리 배치" },
   { key: "boards", label: "학급 보드" },
+] as const;
+
+const CLASSROOM_OPERATION_TABS = [
   { key: "roles", label: "학급 역할" },
   { key: "bank", label: "은행" },
   { key: "store", label: "매점" },
   { key: "pay", label: "QR결제" },
   { key: "check", label: "제출 체크" },
+] as const;
+
+const CLASSROOM_ACTIVITY_TABS = [
   { key: "walking", label: "걷기 현황" },
   { key: "daily-banners", label: "일일 배너" },
+  { key: "reading", label: "독서" },
 ] as const;
 
 function boardHref(board: TeacherNavBoard) {
@@ -300,33 +307,32 @@ export function TopNav({ showAdmin = false }: Props) {
         },
       ];
 
-  const selectedClassroomManagementLinks: MegaNavLink[] = previewClassroom
-    ? CLASSROOM_TABS.slice(0, 4).map((tab) => ({
+  const classroomTabLinks = (
+    tabs: ReadonlyArray<{ key: string; label: string }>,
+  ): MegaNavLink[] =>
+    previewClassroom
+      ? tabs.map((tab) => ({
         href: previewClassroomTabHref(tab.key),
         label: tab.label,
         active: isPreviewClassroomTabActive(tab.key),
       }))
-    : [
-        {
-          href: "/classroom",
-          label: "학급을 선택해 주세요",
-          disabled: true,
-        },
-      ];
+      : [
+          {
+            href: "/classroom",
+            label: "학급을 선택해 주세요",
+            disabled: true,
+          },
+        ];
 
-  const selectedClassroomOperationLinks: MegaNavLink[] = previewClassroom
-    ? CLASSROOM_TABS.slice(4).map((tab) => ({
-        href: previewClassroomTabHref(tab.key),
-        label: tab.label,
-        active: isPreviewClassroomTabActive(tab.key),
-      }))
-    : [
-        {
-          href: "/classroom",
-          label: "학급을 선택해 주세요",
-          disabled: true,
-        },
-      ];
+  const selectedClassroomManagementLinks = classroomTabLinks(
+    CLASSROOM_MANAGEMENT_TABS,
+  );
+  const selectedClassroomOperationLinks = classroomTabLinks(
+    CLASSROOM_OPERATION_TABS,
+  );
+  const selectedClassroomActivityLinks = classroomTabLinks(
+    CLASSROOM_ACTIVITY_TABS,
+  );
 
   const navItems: MegaNavItem[] = [
     {
@@ -389,6 +395,10 @@ export function TopNav({ showAdmin = false }: Props) {
             ? `${previewClassroom.name} 운영`
             : "학급 운영",
           links: selectedClassroomOperationLinks,
+        },
+        {
+          title: "기타 활동",
+          links: selectedClassroomActivityLinks,
         },
       ],
     },

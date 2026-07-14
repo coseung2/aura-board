@@ -5096,6 +5096,7 @@
   align-items: center;
   gap: 2px;
   margin-top: 2px;
+}
 .date-nav-btn {
   display: inline;
 
@@ -5234,12 +5235,16 @@
 
 .classroom-feature-header {
   display: flex;
-  align-items: flex-end;
+  align-items: stretch;
   justify-content: space-between;
   gap: 32px;
   margin: 18px 0 28px;
-  padding-bottom: 18px;
+  padding-bottom: 0;
   border-bottom: 1px solid var(--color-border);
+}
+
+.classroom-feature-header > div {
+  padding-bottom: 18px;
 }
 
 .classroom-feature-header .classroom-page-title {
@@ -5267,12 +5272,19 @@
 
 .classroom-feature-switcher {
   display: flex;
+  align-self: stretch;
+  align-items: flex-end;
   flex: 0 0 auto;
-  gap: 18px;
+  gap: 0;
+  border-bottom: 1px solid var(--color-border);
 }
 
 .classroom-feature-switcher a {
-  padding: 7px 0;
+  display: inline-flex;
+  align-items: flex-end;
+  min-height: 44px;
+  margin-bottom: -1px;
+  padding: 8px 12px;
   border-bottom: 2px solid transparent;
   color: var(--color-text-muted);
   font-size: 13px;
@@ -5281,7 +5293,7 @@
 }
 
 .classroom-feature-switcher a[aria-current="page"] {
-  border-color: var(--color-primary);
+  border-color: var(--color-accent-tinted-text);
   color: var(--color-text);
 }
 
@@ -5346,6 +5358,63 @@
 .classroom-feature-disclosure summary { cursor: pointer; font-weight: 800; }
 .classroom-feature-disclosure p { max-width: 760px; margin: 10px 0 0; line-height: 1.7; }
 .classroom-feature-empty { margin: 0; padding: 32px 0; color: var(--color-text-muted); font-size: 13px; }
+
+.classroom-reading-list { border-top: 2px solid var(--color-text); }
+.classroom-reading-list-head,
+.classroom-reading-row {
+  display: grid;
+  grid-template-columns:
+    minmax(8rem, 1.1fr)
+    minmax(11rem, 1.35fr)
+    minmax(7rem, 0.8fr)
+    minmax(14rem, 2fr)
+    minmax(4.5rem, 0.6fr)
+    minmax(7rem, 0.8fr);
+  gap: 16px;
+  align-items: start;
+}
+.classroom-reading-list-head {
+  padding: 9px 0;
+  border-bottom: 1px solid var(--color-border);
+  color: var(--color-text-muted);
+  font-size: 11px;
+  font-weight: 800;
+}
+.classroom-reading-row {
+  padding: 16px 0;
+  border-bottom: 1px solid var(--color-border);
+  font-size: 13px;
+}
+.classroom-reading-row > [role="cell"] { min-width: 0; }
+.classroom-reading-student,
+.classroom-reading-book {
+  display: grid;
+  gap: 3px;
+}
+.classroom-reading-student strong,
+.classroom-reading-book strong {
+  overflow-wrap: anywhere;
+}
+.classroom-reading-book small,
+.classroom-reading-date,
+.classroom-reading-author {
+  color: var(--color-text-muted);
+  font-size: 12px;
+}
+.classroom-reading-author,
+.classroom-reading-date { overflow-wrap: anywhere; }
+.classroom-reading-reflection {
+  margin: 0;
+  color: var(--color-text-muted);
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+.classroom-reading-score strong {
+  color: var(--color-accent-tinted-text);
+  white-space: nowrap;
+}
+.classroom-reading-date { text-align: right; }
 
 .classroom-banner-workspace { display: grid; gap: 26px; }
 .classroom-banner-toolbar {
@@ -5456,11 +5525,33 @@
 
 @media (max-width: 760px) {
   .classroom-feature-header { align-items: flex-start; flex-direction: column; gap: 12px; }
+  .classroom-feature-header > div { padding-bottom: 0; }
+  .classroom-feature-switcher { align-self: stretch; width: 100%; min-height: 44px; }
   .classroom-feature-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .classroom-feature-metrics > div:nth-child(2) { border-right: 0; }
   .classroom-feature-metrics > div:nth-child(-n + 2) { border-bottom: 1px solid var(--color-border); }
   .classroom-feature-metrics > div:nth-child(3) { padding-left: 0; }
   .walking-roster-head { display: none; }
+  .classroom-reading-list-head { display: none; }
+  .classroom-reading-row {
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 12px;
+  }
+  .classroom-reading-row > [data-label]::before {
+    display: block;
+    margin-bottom: 3px;
+    color: var(--color-text-muted);
+    content: attr(data-label);
+    font-size: 10px;
+    font-weight: 800;
+    letter-spacing: 0.04em;
+  }
+  .classroom-reading-student,
+  .classroom-reading-book,
+  .classroom-reading-author,
+  .classroom-reading-reflection { grid-column: 1 / -1; }
+  .classroom-reading-score { grid-column: 1; }
+  .classroom-reading-date { grid-column: 2; text-align: right; }
   .classroom-banner-toolbar,
   .classroom-banner-list-head { align-items: flex-start; flex-direction: column; gap: 12px; }
   .classroom-banner-item { grid-template-columns: 1fr; gap: 12px; }

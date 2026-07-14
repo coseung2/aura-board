@@ -221,7 +221,6 @@ export function DailyBannerModerationPanel({
                   <span className={`classroom-banner-status is-${item.status}`}>
                     {statusLabel(item.status)}
                   </span>
-                  <span>{item.kind === "image" ? "이미지" : "흐르는 문구"}</span>
                 </div>
 
                 <div className="classroom-banner-preview">

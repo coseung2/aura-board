@@ -1,5 +1,5 @@
 import { notFound } from "next/navigation";
-import Link from "next/link";
+import { ClassroomFeatureHeader } from "@/components/classroom/ClassroomFeatureHeader";
 import { db } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
 import { getClassroomWalkingSummary } from "@/lib/walking";
@@ -38,24 +38,12 @@ export default async function ClassroomWalkingPage({ params }: Props) {
 
   return (
     <main className="classroom-page classroom-page-detail classroom-feature-page">
-      <header className="classroom-feature-header">
-        <div>
-          <Link href={`/classroom/${id}/dashboard`} className="classroom-back-link">
-            &larr; 학급 대시보드
-          </Link>
-          <p className="classroom-feature-eyebrow">{classroom.name}</p>
-          <h1 className="classroom-page-title">걷기 현황</h1>
-          <p className="classroom-feature-description">
-            학생 앱에서 동기화한 오늘 기록과 최근 7일 활동량을 확인합니다.
-          </p>
-        </div>
-        <nav className="classroom-feature-switcher" aria-label="학급 활동 관리">
-          <Link href={`/classroom/${id}/walking`} aria-current="page">
-            걷기 현황
-          </Link>
-          <Link href={`/classroom/${id}/daily-banners`}>배너 관리</Link>
-        </nav>
-      </header>
+      <ClassroomFeatureHeader
+        classroomId={id}
+        eyebrow={classroom.name}
+        description="학생 앱에서 동기화한 오늘 기록과 최근 7일 활동량을 확인합니다."
+        active="walking"
+      />
 
       <section className="classroom-feature-metrics" aria-label="학급 걷기 요약">
         <div>
