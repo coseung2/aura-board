@@ -48,6 +48,7 @@ const CLASSROOM_TABS = [
   { key: "store", label: "매점" },
   { key: "pay", label: "QR결제" },
   { key: "check", label: "제출 체크" },
+  { key: "walking", label: "걷기 현황" },
   { key: "daily-banners", label: "일일 배너" },
 ] as const;
 

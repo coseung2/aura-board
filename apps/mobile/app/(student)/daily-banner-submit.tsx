@@ -587,7 +587,12 @@ export default function DailyBannerSubmitScreen() {
           </IconButton>
         </View>
 
-        <View style={styles.modalContent}>
+        <ScrollView
+          style={styles.modalScroll}
+          contentContainerStyle={styles.modalContent}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+        >
           <View style={styles.form}>
             <View style={styles.fieldGroup}>
               <Text style={styles.label}>미리보기</Text>
@@ -639,7 +644,7 @@ export default function DailyBannerSubmitScreen() {
               제안 제출
             </AppButton>
           </View>
-        </View>
+        </ScrollView>
       </AppModal>
     </SafeAreaView>
   );
@@ -736,6 +741,7 @@ const styles = StyleSheet.create({
   modalTitleGroup: { flex: 1, minWidth: 0, gap: spacing.xxs },
   modalTitle: { ...typography.title, color: colors.text },
   modalDate: { ...typography.body, color: colors.textMuted },
+  modalScroll: { flexShrink: 1 },
   modalContent: {
     paddingHorizontal: spacing.xl,
     paddingTop: spacing.sm,

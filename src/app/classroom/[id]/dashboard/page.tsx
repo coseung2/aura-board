@@ -118,9 +118,15 @@ export default async function ClassroomDashboardPage({ params }: Props) {
         &larr; 학급 목록
       </a>
       <h1 className="classroom-page-title">{classroom.name}</h1>
-      <Link href={`/classroom/${id}/walking`} className="classroom-back-link">
-        걷기 현황 보기 &rarr;
-      </Link>
+      <nav className="classroom-dashboard-tools" aria-label="학급 활동 바로가기">
+        <span>학급 활동</span>
+        <Link href={`/classroom/${id}/walking`}>
+          걷기 현황 <span aria-hidden="true">&rarr;</span>
+        </Link>
+        <Link href={`/classroom/${id}/daily-banners`}>
+          배너 관리 <span aria-hidden="true">&rarr;</span>
+        </Link>
+      </nav>
 
       <section className="classroom-dashboard-kpis" aria-label="학급 요약">
         <article className="classroom-dashboard-kpi">
