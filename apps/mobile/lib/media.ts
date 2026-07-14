@@ -3,6 +3,8 @@
 
 import type { CardAttachment } from "./types";
 
+export const MOBILE_EMBED_ORIGIN = "https://aura-board.com";
+
 const YT_VIDEO_ID_RE = /^[A-Za-z0-9_-]{11}$/;
 const YT_HOSTS = new Set([
   "youtube.com",
@@ -12,6 +14,8 @@ const YT_HOSTS = new Set([
   "www.youtube-nocookie.com",
   "youtu.be",
 ]);
+const CANVA_DESIGN_HOSTS = new Set(["canva.com", "www.canva.com"]);
+const CANVA_SHORT_HOSTS = new Set(["canva.link", "www.canva.link"]);
 
 export type MediaItem = {
   id: string;
@@ -33,9 +37,9 @@ export function extractYouTubeVideoId(raw: string): string | null {
     return null;
   }
   if (u.protocol !== "https:" && u.protocol !== "http:") return null;
-  if (!YT_HOSTS.has(u.hostname)) return null;
+  if (!YT_HOSTS.has(u.hostname.toLowerCase())) return null;
 
-  if (u.hostname === "youtu.be") {
+  if (u.hostname.toLowerCase() === "youtu.be") {
     const id = u.pathname.slice(1).split("/")[0];
     return YT_VIDEO_ID_RE.test(id) ? id : null;
   }
@@ -55,8 +59,27 @@ export function extractYouTubeVideoId(raw: string): string | null {
   return null;
 }
 
-export function buildYouTubeEmbedUrl(videoId: string): string {
-  return `https://www.youtube.com/embed/${encodeURIComponent(videoId)}`;
+/**
+ * Build a WebView-safe YouTube embed URL.
+ *
+ * `enablejsapi` lets the wrapper page receive player errors, while `origin`
+ * and `widget_referrer` identify the native app's trusted web origin. Without
+ * that identity Android WebView requests can be rejected by YouTube with
+ * player error 153.
+ */
+export function buildYouTubeEmbedUrl(
+  videoId: string,
+  origin = MOBILE_EMBED_ORIGIN,
+): string {
+  const embed = new URL(
+    `https://www.youtube.com/embed/${encodeURIComponent(videoId)}`,
+  );
+  embed.searchParams.set("enablejsapi", "1");
+  embed.searchParams.set("playsinline", "1");
+  embed.searchParams.set("rel", "0");
+  embed.searchParams.set("origin", origin);
+  embed.searchParams.set("widget_referrer", origin);
+  return embed.toString();
 }
 
 export function isYouTubeVideoUrl(raw: string): boolean {
@@ -87,11 +110,10 @@ export function isCanvaDesignUrl(raw: string): boolean {
   } catch {
     return false;
   }
-  const canonicalHost =
-    host === "canva.com" || host === "www.canva.com" || host === "canva.link";
-  if (!canonicalHost) return false;
-  if (host === "canva.link") return true;
-  return /\/design\/[A-Za-z0-9_-]+/.test(pathname);
+  if (CANVA_SHORT_HOSTS.has(host)) return true;
+  return (
+    CANVA_DESIGN_HOSTS.has(host) && /\/design\/[A-Za-z0-9_-]+/.test(pathname)
+  );
 }
 
 /** Extract design id from www.canva.com design URL (not canva.link). */
@@ -100,7 +122,7 @@ export function extractCanvaDesignId(raw: string): string | null {
   try {
     const u = new URL(raw);
     const host = u.hostname.toLowerCase();
-    if (host !== "canva.com" && host !== "www.canva.com") return null;
+    if (!CANVA_DESIGN_HOSTS.has(host)) return null;
     const m = u.pathname.match(/\/design\/([A-Za-z0-9_-]+)/);
     return m?.[1] ?? null;
   } catch {
@@ -109,15 +131,16 @@ export function extractCanvaDesignId(raw: string): string | null {
 }
 
 /**
- * Build the Canva embed URL from a design share URL.
+ * Build the Canva embed URL from a canonical design share URL.
  * Preserves share tokens so public "anyone with link" designs stay viewable.
+ * Short canva.link URLs must be expanded by the server before they can embed.
  */
 export function buildCanvaEmbedUrl(raw: string): string | null {
   if (!raw) return null;
   try {
     const u = new URL(raw);
     const host = u.hostname.toLowerCase();
-    if (host !== "canva.com" && host !== "www.canva.com") return null;
+    if (!CANVA_DESIGN_HOSTS.has(host)) return null;
     const m = u.pathname.match(
       /\/design\/([A-Za-z0-9_-]+)(?:\/([A-Za-z0-9_-]+))?\/(?:view|watch|edit|present)/,
     );
@@ -147,6 +170,63 @@ export function isDirectVideoUrl(raw: string): boolean {
 
 export type EmbedKind = "youtube" | "canva" | "video" | null;
 
+export function embedOriginWhitelist(
+  kind: EmbedKind,
+  embedUrl: string | null,
+): string[] {
+  const origins = [`${MOBILE_EMBED_ORIGIN}/*`, "about:blank"];
+  if (kind === "youtube") {
+    origins.push("https://www.youtube.com/*", "https://youtube.com/*");
+  } else if (kind === "canva") {
+    origins.push("https://www.canva.com/*", "https://canva.com/*");
+  } else if (kind === "video" && embedUrl) {
+    try {
+      origins.push(`${new URL(embedUrl).origin}/*`);
+    } catch {
+      // The classifier rejects malformed direct-video URLs before this point.
+    }
+  }
+  return origins;
+}
+
+export function isAllowedEmbedNavigation(
+  raw: string,
+  kind: EmbedKind,
+  embedUrl: string | null,
+): boolean {
+  if (raw === "about:blank") return true;
+  try {
+    const target = new URL(raw);
+    const wrapper = new URL(MOBILE_EMBED_ORIGIN);
+    if (
+      target.origin === wrapper.origin &&
+      target.pathname.startsWith("/mobile-embed/")
+    ) {
+      return true;
+    }
+    if (kind === "youtube") {
+      return (
+        (target.hostname === "youtube.com" ||
+          target.hostname === "www.youtube.com") &&
+        target.pathname.startsWith("/embed/")
+      );
+    }
+    if (kind === "canva") {
+      return (
+        (target.hostname === "canva.com" ||
+          target.hostname === "www.canva.com") &&
+        target.pathname.startsWith("/design/")
+      );
+    }
+    if (kind === "video" && embedUrl) {
+      return target.origin === new URL(embedUrl).origin;
+    }
+  } catch {
+    return false;
+  }
+  return false;
+}
+
 /** Decide how a URL should be embedded, if at all. */
 export function classifyMediaUrl(raw: string): {
   kind: EmbedKind;
@@ -165,12 +245,13 @@ export function classifyMediaUrl(raw: string): {
   if (canvaUrl) {
     return { kind: "canva", embedUrl: canvaUrl, externalUrl: raw };
   }
-  if (isCanvaDesignUrl(raw)) {
-    return { kind: "canva", embedUrl: raw, externalUrl: raw };
-  }
   if (isDirectVideoUrl(raw)) {
     return { kind: "video", embedUrl: raw, externalUrl: raw };
   }
+  // A canva.link short URL or a non-public Canva editor URL is still useful
+  // as an external link, but loading it as the WebView's top-level document
+  // causes redirect / X-Frame / login failures. Only canonical embed URLs are
+  // considered embeddable here.
   return { kind: null, embedUrl: null, externalUrl: raw };
 }
 
@@ -278,6 +359,22 @@ export function fileAttachments(items: MediaItem[]): MediaItem[] {
 
 export function mediaAttachments(items: MediaItem[]): MediaItem[] {
   return items.filter((a) => a.kind !== "file");
+}
+
+/** Pick one display image for each logical media attachment. */
+export function mediaPreviewUrls(items: MediaItem[]): string[] {
+  const urls = items.flatMap((item) => {
+    if (item.kind === "image") {
+      return [item.previewUrl ?? item.url];
+    }
+    if (item.kind === "video" || item.kind === "link") {
+      const preview = item.previewUrl ?? getYouTubeThumbnailUrlFromLink(item.url);
+      return preview ? [preview] : [];
+    }
+    return [];
+  });
+
+  return [...new Set(urls)];
 }
 
 export function safeHost(url: string | null | undefined): string {

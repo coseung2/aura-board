@@ -1,4 +1,4 @@
-import { ScrollView, StyleSheet, Text, View } from "react-native";
+import { StyleSheet, Text, View } from "react-native";
 import {
   borders,
   colors,
@@ -49,10 +49,6 @@ export function StageRow({
   onOpenImage,
   busyAdvance,
 }: Props) {
-  const observationPoints = Array.isArray(stage.observationPoints)
-    ? stage.observationPoints
-    : [];
-
   return (
     <View style={styles.row}>
       <StageRail
@@ -86,31 +82,15 @@ export function StageRow({
           ) : null}
         </View>
 
-        {/* 관찰 포인트 */}
-        {state !== "upcoming" && observationPoints.length > 0 && (
-          <View style={styles.points}>
-            <Text style={styles.pointsTitle}>관찰 포인트</Text>
-            {observationPoints.map((point, idx) => (
-              <Text key={`${stage.id}-pt-${idx}`} style={styles.pointItem}>
-                • {point}
-              </Text>
-            ))}
-          </View>
-        )}
-
         {/* 관찰 기록 */}
         {state === "upcoming" ? (
           <Text style={styles.emptyText}>아직 도달 전</Text>
         ) : observations.length === 0 ? (
           <Text style={styles.emptyText}>아직 기록이 없어요.</Text>
         ) : (
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.obsGrid}
-          >
+          <View style={styles.observationStream}>
             {observations.map((obs) => (
-              <View key={obs.id} style={styles.obsGridItem}>
+              <View key={obs.id} style={styles.observationItem}>
                 <ObservationCard
                   observation={obs}
                   canEdit={canEdit}
@@ -120,7 +100,7 @@ export function StageRow({
                 />
               </View>
             ))}
-          </ScrollView>
+          </View>
         )}
 
         {/* 사진 비교 */}
@@ -195,33 +175,14 @@ const styles = StyleSheet.create({
     ...typography.body,
     color: colors.textMuted,
   },
-  points: {
-    gap: spacing.xs,
-    paddingTop: spacing.xs,
-  },
-  pointsTitle: {
-    ...typography.label,
-    color: colors.textMuted,
-  },
-  pointItem: {
-    ...typography.body,
-    color: colors.text,
-    paddingLeft: spacing.sm,
-  },
   emptyText: {
     ...typography.body,
     color: colors.textFaint,
     textAlign: "center",
     paddingVertical: spacing.md,
   },
-  obsGrid: {
-    flexDirection: "row",
-    gap: spacing.sm,
-    alignItems: "flex-start",
-  },
-  obsGridItem: {
-    width: plant.observationCardWidth,
-  },
+  observationStream: { gap: spacing.md },
+  observationItem: { width: "100%" },
   actions: {
     flexDirection: "row",
     gap: spacing.md,

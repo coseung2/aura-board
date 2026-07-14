@@ -1,51 +1,27 @@
-import {
-  FlatList,
-  StyleSheet,
-  Text,
-  useWindowDimensions,
-  View,
-} from "react-native";
+import { FlatList, StyleSheet, Text, View } from "react-native";
 import { useEffect, useState } from "react";
 import {
   boardThemes,
   colors,
   iconSizes,
-  layout,
   normalizeBoardTheme,
   spacing,
   typography,
 } from "../../theme/tokens";
-import { CardView } from "../CardView";
-import { CardDetailModal } from "../CardDetailModal";
+import { CommentBottomSheet } from "../CommentBottomSheet";
 import type { BoardDetailResponse, BoardCard } from "../../lib/types";
-import {
-  withBoardAnonymousAuthor,
-  withBoardAnonymousAuthors,
-} from "../../lib/card-privacy";
+import { withBoardAnonymousAuthors } from "../../lib/card-privacy";
+import { StreamFeedPost } from "./ColumnsBoard";
 
 // 카드 추가를 아직 모바일에서 지원하지 않는 레이아웃의 공통 뷰어.
 // vibe-gallery / dj-queue / event-signup / breakout / assessment / drawing.
 
-function useBoardGridMetrics(width: number, height: number) {
-  const padding = layout.boardGridPadding * 2;
-  const gap = layout.boardGridGap;
-  const available = Math.max(0, width - padding);
-  const columns = width > height ? 4 : 2;
-  const cardWidth = (available - (columns - 1) * gap) / columns;
-  return { columns, cardWidth };
-}
-
 export function ReadOnlyCardsBoard({ data }: { data: BoardDetailResponse }) {
-  const [selectedCard, setSelectedCard] = useState<BoardCard | null>(null);
+  const [commentCard, setCommentCard] = useState<BoardCard | null>(null);
   const [cards, setCards] = useState<BoardCard[]>(() =>
     withBoardAnonymousAuthors(data.cards, data.board),
   );
-  const { width, height } = useWindowDimensions();
-  const { columns, cardWidth } = useBoardGridMetrics(width, height);
   const boardTheme = boardThemes[normalizeBoardTheme(data.board.boardTheme)];
-  const selectedIndex = selectedCard
-    ? cards.findIndex((card) => card.id === selectedCard.id)
-    : -1;
 
   useEffect(() => {
     setCards(withBoardAnonymousAuthors(data.cards, data.board));
@@ -55,16 +31,15 @@ export function ReadOnlyCardsBoard({ data }: { data: BoardDetailResponse }) {
     <View style={[styles.root, { backgroundColor: boardTheme.background }]}>
       <FlatList
         data={cards}
-        key={`readonly-cards-${columns}`}
         keyExtractor={(c) => c.id}
-        numColumns={columns}
-        columnWrapperStyle={columns > 1 ? styles.row : undefined}
         contentContainerStyle={styles.content}
         renderItem={({ item }) => (
-          <View style={[styles.cardWrap, { width: cardWidth }]}>
-            <CardView card={item} onPress={() => setSelectedCard(item)} />
-          </View>
+          <StreamFeedPost
+            card={item}
+            onOpenComments={() => setCommentCard(item)}
+          />
         )}
+        ItemSeparatorComponent={() => <View style={styles.separator} />}
         ListEmptyComponent={
           <View style={styles.empty}>
             <Text style={styles.emptyEmoji}>🗂️</Text>
@@ -80,63 +55,35 @@ export function ReadOnlyCardsBoard({ data }: { data: BoardDetailResponse }) {
         windowSize={7}
         removeClippedSubviews
       />
-      <CardDetailModal
-        card={selectedCard}
-        onClose={() => setSelectedCard(null)}
-        hasPrevious={selectedIndex > 0}
-        hasNext={selectedIndex >= 0 && selectedIndex < cards.length - 1}
-        onPrevious={() => setSelectedCard(cards[selectedIndex - 1] ?? null)}
-        onNext={() => setSelectedCard(cards[selectedIndex + 1] ?? null)}
-        onUpdated={(c) => {
-          const selectedNext =
-            selectedCard?.id === c.id
-              ? mergeUpdatedCard(selectedCard, c, data.board)
-              : null;
-          setCards((prev) =>
-            prev.map((existing) =>
-              existing.id === c.id
-                ? mergeUpdatedCard(existing, c, data.board)
-                : existing,
+      <CommentBottomSheet
+        cardId={commentCard?.id ?? null}
+        visible={commentCard !== null}
+        onClose={() => setCommentCard(null)}
+        onCommentCountChange={(change) => {
+          if (!commentCard) return;
+          setCards((current) =>
+            current.map((card) =>
+              card.id === commentCard.id
+                ? {
+                    ...card,
+                    commentCount: Math.max(
+                      0,
+                      (card.commentCount ?? 0) + change,
+                    ),
+                  }
+                : card,
             ),
           );
-          setSelectedCard((current) =>
-            current?.id === c.id
-              ? (selectedNext ?? mergeUpdatedCard(current, c, data.board))
-              : current,
-          );
-        }}
-        onDeleted={(id) => {
-          setCards((prev) => prev.filter((c) => c.id !== id));
-          setSelectedCard((current) => (current?.id === id ? null : current));
         }}
       />
     </View>
   );
 }
 
-function mergeUpdatedCard(
-  existing: BoardCard,
-  updated: BoardCard,
-  board: BoardDetailResponse["board"],
-): BoardCard {
-  return withBoardAnonymousAuthor(
-    {
-      ...existing,
-      ...updated,
-      isMine: existing.isMine,
-      canEdit: existing.canEdit,
-      canDelete: existing.canDelete,
-      isOwnPendingQueue: existing.isOwnPendingQueue,
-    },
-    board,
-  );
-}
-
 const styles = StyleSheet.create({
   root: { flex: 1 },
-  content: { padding: layout.boardGridPadding, gap: layout.boardGridGap },
-  row: { gap: layout.boardGridGap },
-  cardWrap: { marginBottom: spacing.md },
+  content: { padding: spacing.lg, paddingBottom: spacing.xxxl },
+  separator: { height: spacing.lg },
   empty: {
     alignItems: "center",
     paddingTop: spacing.xxxl,

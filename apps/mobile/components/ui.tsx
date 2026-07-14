@@ -5,6 +5,7 @@ import {
   Easing,
   KeyboardAvoidingView,
   Modal,
+  PanResponder,
   Platform,
   Pressable,
   StyleSheet,
@@ -202,11 +203,7 @@ export function MediaPressable({
   ...props
 }: MediaPressableProps) {
   return (
-    <Pressable
-      disabled={disabled}
-      style={style}
-      {...props}
-    >
+    <Pressable disabled={disabled} style={style} {...props}>
       {children}
     </Pressable>
   );
@@ -242,7 +239,9 @@ export function AppModal({
   const sheet = (
     <View
       onStartShouldSetResponder={() => true}
-      style={align === "right" ? styles.modalSideSheetWrap : styles.modalSheetWrap}
+      style={
+        align === "right" ? styles.modalSideSheetWrap : styles.modalSheetWrap
+      }
     >
       <SurfaceCard
         accessibilityLabel={accessibilityLabel}
@@ -283,6 +282,125 @@ export function AppModal({
           sheet
         )}
       </BackdropComponent>
+    </Modal>
+  );
+}
+
+type AppBottomSheetProps = {
+  visible: boolean;
+  onClose: () => void;
+  children: ReactNode;
+  sheetStyle?: StyleProp<ViewStyle>;
+  backdropStyle?: StyleProp<ViewStyle>;
+  accessibilityLabel?: string;
+  keyboardAvoiding?: boolean;
+};
+
+/** Shared draggable bottom sheet for mobile flows. */
+export function AppBottomSheet({
+  visible,
+  onClose,
+  children,
+  sheetStyle,
+  backdropStyle,
+  accessibilityLabel,
+  keyboardAvoiding,
+}: AppBottomSheetProps) {
+  const translateY = useRef(new Animated.Value(0)).current;
+  const onCloseRef = useRef(onClose);
+  const dismissRef = useRef<() => void>(() => undefined);
+  onCloseRef.current = onClose;
+
+  useEffect(() => {
+    if (visible) translateY.setValue(0);
+  }, [translateY, visible]);
+
+  dismissRef.current = () => {
+    Animated.timing(translateY, {
+      toValue: 720,
+      duration: 180,
+      useNativeDriver: true,
+    }).start(() => {
+      translateY.setValue(0);
+      onCloseRef.current();
+    });
+  };
+
+  const panResponder = useRef(
+    PanResponder.create({
+      onMoveShouldSetPanResponder: (_event, gesture) =>
+        gesture.dy > 4 && Math.abs(gesture.dy) > Math.abs(gesture.dx),
+      onPanResponderMove: (_event, gesture) => {
+        translateY.setValue(Math.max(0, gesture.dy));
+      },
+      onPanResponderRelease: (_event, gesture) => {
+        if (gesture.dy > 104 || gesture.vy > 0.7) {
+          dismissRef.current();
+          return;
+        }
+        Animated.spring(translateY, {
+          toValue: 0,
+          useNativeDriver: true,
+        }).start();
+      },
+      onPanResponderTerminate: () => {
+        Animated.spring(translateY, {
+          toValue: 0,
+          useNativeDriver: true,
+        }).start();
+      },
+    }),
+  ).current;
+
+  const sheet = (
+    <Animated.View
+      accessibilityLabel={accessibilityLabel}
+      accessibilityViewIsModal={visible}
+      importantForAccessibility="yes"
+      style={[styles.bottomSheet, sheetStyle, { transform: [{ translateY }] }]}
+    >
+      <View
+        {...panResponder.panHandlers}
+        style={styles.bottomSheetHandleArea}
+        accessibilityLabel={
+          accessibilityLabel ? `${accessibilityLabel} 닫기` : "시트 닫기"
+        }
+        accessibilityHint="아래로 끌어 닫기"
+      >
+        <View style={styles.bottomSheetHandle} />
+      </View>
+      {children}
+    </Animated.View>
+  );
+
+  return (
+    <Modal
+      visible={visible}
+      animationType="none"
+      transparent
+      onRequestClose={() => dismissRef.current()}
+      statusBarTranslucent
+    >
+      <View style={styles.bottomSheetRoot}>
+        <Pressable
+          style={[styles.bottomSheetBackdrop, backdropStyle]}
+          onPress={() => dismissRef.current()}
+          accessibilityRole="button"
+          accessibilityLabel={
+            accessibilityLabel ? `${accessibilityLabel} 닫기` : "시트 닫기"
+          }
+        />
+        {keyboardAvoiding ? (
+          <KeyboardAvoidingView
+            behavior={Platform.OS === "ios" ? "padding" : undefined}
+            style={styles.bottomSheetKeyboardWrap}
+          >
+            {sheet}
+          </KeyboardAvoidingView>
+        ) : (
+          sheet
+        )}
+      </View>
     </Modal>
   );
 }
@@ -330,7 +448,8 @@ export function AppButton({
   accessibilityState,
   ...props
 }: AppButtonProps) {
-  const label = accessibilityLabel ?? (typeof children === "string" ? children : undefined);
+  const label =
+    accessibilityLabel ?? (typeof children === "string" ? children : undefined);
 
   return (
     <Pressable
@@ -357,7 +476,9 @@ export function AppButton({
           accessibilityLabel={label ? `${label} 처리 중` : "처리 중"}
         />
       ) : (
-        <Text style={[styles.buttonText, textVariantStyles[variant], textStyle]}>
+        <Text
+          style={[styles.buttonText, textVariantStyles[variant], textStyle]}
+        >
           {children}
         </Text>
       )}
@@ -648,7 +769,7 @@ const styles = StyleSheet.create({
   modalSheetWrap: {
     width: "100%",
     maxWidth: composer.sheetMaxWidth,
-    maxHeight: composer.sheetMaxHeight,
+    maxHeight: "100%",
   },
   modalSideSheetWrap: {
     height: "100%",
@@ -656,13 +777,43 @@ const styles = StyleSheet.create({
   modalKeyboardWrap: {
     width: "100%",
     maxWidth: composer.sheetMaxWidth,
-    maxHeight: composer.sheetMaxHeight,
+    height: composer.sheetMaxHeight,
+    justifyContent: "center",
   },
   modalSheet: {
     width: "100%",
     maxWidth: composer.sheetMaxWidth,
-    maxHeight: composer.sheetMaxHeight,
+    maxHeight: "100%",
     overflow: "hidden",
+  },
+  bottomSheetRoot: {
+    flex: 1,
+    justifyContent: "flex-end",
+  },
+  bottomSheetBackdrop: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: colors.modalBackdrop,
+  },
+  bottomSheetKeyboardWrap: {
+    width: "100%",
+    justifyContent: "flex-end",
+  },
+  bottomSheet: {
+    maxHeight: "90%",
+    backgroundColor: colors.surface,
+    borderTopLeftRadius: radii.card,
+    borderTopRightRadius: radii.card,
+    overflow: "hidden",
+  },
+  bottomSheetHandleArea: {
+    alignItems: "center",
+    paddingVertical: spacing.sm,
+  },
+  bottomSheetHandle: {
+    width: spacing.xxl,
+    height: spacing.xs,
+    borderRadius: radii.pill,
+    backgroundColor: colors.borderHover,
   },
   button: {
     minHeight: tapMin,
@@ -690,6 +841,8 @@ const styles = StyleSheet.create({
     fontFamily: typography.body.fontFamily,
     fontSize: typography.body.fontSize,
     fontWeight: typography.body.fontWeight,
+    lineHeight: typography.body.lineHeight,
+    includeFontPadding: false,
   },
   textFieldSingleLine: {
     paddingVertical: spacing.none,

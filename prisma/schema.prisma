@@ -105,6 +105,8 @@ model User {
 
   cardLikes CardLike[] @relation("UserCardLikes")
 
+  commentLikes CardCommentLike[] @relation("UserCardCommentLikes")
+
   // Classroom check tasks created by this teacher (checker role, 2026-06-28)
   classroomCheckTasks ClassroomCheckTask[] @relation("ClassroomCheckTaskCreatedBy")
 
@@ -112,8 +114,8 @@ model User {
   shoeFindingsReported     ShoeFinding[]     @relation("ShoeFindingReporterUser")
 
   // Yellow card + cleaning duty (2026-07-08)
-  yellowCardsGivenByUser  YellowCard[]   @relation("YellowCardGivenByUser")
-  cleaningDutiesAssigned  CleaningDuty[] @relation("CleaningDutyAssignedBy")
+  yellowCardsGivenByUser YellowCard[]   @relation("YellowCardGivenByUser")
+  cleaningDutiesAssigned CleaningDuty[] @relation("CleaningDutyAssignedBy")
 
   // ===== Speed Game (스피드게임, 2026-07-06) =====
   // Teacher-owned word sets. System sets live with userId = NULL; user sets
@@ -121,7 +123,7 @@ model User {
   speedGameWordSets SpeedGameWordSet[]
 
   // Global daily banner moderation/publication.
-  dailyBannerReviews DailyBannerSubmission[] @relation("DailyBannerReviewedBy")
+  dailyBannerReviews      DailyBannerSubmission[]  @relation("DailyBannerReviewedBy")
   dailyBannerPublications DailyBannerPublication[] @relation("DailyBannerPublishedBy")
 }
 
@@ -578,6 +580,8 @@ model Student {
 
   cardLikes CardLike[] @relation("StudentCardLikes")
 
+  commentLikes CardCommentLike[] @relation("StudentCardCommentLikes")
+
   notificationState StudentNotificationState?
 
   notificationReceipts StudentNotificationReceipt[]
@@ -611,10 +615,10 @@ model Student {
   speedGameAnswers SpeedGameAnswer[]
 
   // Yellow card + cleaning duty (2026-07-08)
-  yellowCardsReceived    YellowCard[]    @relation("YellowCardStudent")
-  yellowCardsGiven       YellowCard[]    @relation("YellowCardGivenBy")
-  cleaningDuties         CleaningDuty[]  @relation("CleaningDutyStudent")
-  cleaningDutiesAssigned CleaningDuty[]  @relation("CleaningDutyAssignedBy")
+  yellowCardsReceived    YellowCard[]   @relation("YellowCardStudent")
+  yellowCardsGiven       YellowCard[]   @relation("YellowCardGivenBy")
+  cleaningDuties         CleaningDuty[] @relation("CleaningDutyStudent")
+  cleaningDutiesAssigned CleaningDuty[] @relation("CleaningDutyAssignedBy")
 
   walkingDailyStats StudentWalkingDailyStat[]
 
@@ -644,28 +648,28 @@ enum DailyBannerSubmissionStatus {
 model DailyBannerSubmission {
   id String @id @default(cuid())
 
-  studentId String
+  studentId   String
   classroomId String
 
   // Calendar day in Asia/Seoul. The API accepts YYYY-MM-DD and stores it as
   // a PostgreSQL DATE so server timezone changes cannot move the banner.
   targetDay DateTime @db.Date
 
-  kind DailyBannerSubmissionKind
-  text String? @db.Text
+  kind     DailyBannerSubmissionKind
+  text     String?                   @db.Text
   imageUrl String?
 
-  status DailyBannerSubmissionStatus @default(pending)
-  reviewedAt DateTime?
-  reviewedById String?
-  rejectionReason String? @db.Text
+  status          DailyBannerSubmissionStatus @default(pending)
+  reviewedAt      DateTime?
+  reviewedById    String?
+  rejectionReason String?                     @db.Text
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  student Student @relation("DailyBannerSubmissionStudent", fields: [studentId], references: [id], onDelete: Cascade)
-  classroom Classroom @relation(fields: [classroomId], references: [id], onDelete: Cascade)
-  reviewedBy User? @relation("DailyBannerReviewedBy", fields: [reviewedById], references: [id], onDelete: SetNull)
+  student     Student                 @relation("DailyBannerSubmissionStudent", fields: [studentId], references: [id], onDelete: Cascade)
+  classroom   Classroom               @relation(fields: [classroomId], references: [id], onDelete: Cascade)
+  reviewedBy  User?                   @relation("DailyBannerReviewedBy", fields: [reviewedById], references: [id], onDelete: SetNull)
   publication DailyBannerPublication?
 
   @@index([targetDay, status, createdAt])
@@ -679,26 +683,26 @@ model DailyBannerSubmission {
 model DailyBannerPublication {
   id String @id @default(cuid())
 
-  day DateTime @db.Date @unique
-  submissionId String @unique
+  day          DateTime @unique @db.Date
+  submissionId String   @unique
   approvedById String
-  publishedAt DateTime @default(now())
+  publishedAt  DateTime @default(now())
 
   submission DailyBannerSubmission @relation(fields: [submissionId], references: [id], onDelete: Cascade)
-  approvedBy User @relation("DailyBannerPublishedBy", fields: [approvedById], references: [id], onDelete: Cascade)
+  approvedBy User                  @relation("DailyBannerPublishedBy", fields: [approvedById], references: [id], onDelete: Cascade)
 }
 
 model StudentWalkingDailyStat {
   id String @id
 
-  studentId String
-  day DateTime @db.Date
-  steps Int @default(0)
-  distanceMeters Float @default(0)
-  source String @default("health_connect")
-  syncedAt DateTime @default(now())
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  studentId      String
+  day            DateTime @db.Date
+  steps          Int      @default(0)
+  distanceMeters Float    @default(0)
+  source         String   @default("health_connect")
+  syncedAt       DateTime @default(now())
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 
   student Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
 
@@ -1582,9 +1586,35 @@ model CardComment {
 
   authorStudent Student? @relation("StudentCardComments", fields: [authorStudentId], references: [id], onDelete: SetNull)
 
+  likes CardCommentLike[]
+
   @@index([cardId, createdAt])
   @@index([authorUserId])
   @@index([authorStudentId])
+}
+
+model CardCommentLike {
+  id String @id @default(cuid())
+
+  commentId String
+
+  likerKind CommentAuthorKind
+
+  likerUserId String? // teacher
+
+  likerStudentId String? // student
+
+  createdAt DateTime @default(now())
+
+  comment CardComment @relation(fields: [commentId], references: [id], onDelete: Cascade)
+
+  likerUser User? @relation("UserCardCommentLikes", fields: [likerUserId], references: [id], onDelete: Cascade)
+
+  likerStudent Student? @relation("StudentCardCommentLikes", fields: [likerStudentId], references: [id], onDelete: Cascade)
+
+  @@unique([commentId, likerUserId])
+  @@unique([commentId, likerStudentId])
+  @@index([commentId])
 }
 
 model CardLike {
@@ -3351,20 +3381,20 @@ model CleaningFinding {
 // 등록된다 (CleaningDuty row 1개를 같은 트랜잭션으로 생성).
 // 일 단위 카운트는 givenAt 의 UTC 날짜로 한다.
 model YellowCard {
-  id          String   @id @default(cuid())
-  classroomId String
-  studentId   String
+  id               String   @id @default(cuid())
+  classroomId      String
+  studentId        String
   // 부여한 사람: 학생 (검사 역할) 또는 교사. 둘 중 하나는 반드시 존재.
   givenByStudentId String?
   givenByUserId    String?
   reason           String   @db.Text
-  givenAt    DateTime @default(now())
-  createdAt  DateTime @default(now())
+  givenAt          DateTime @default(now())
+  createdAt        DateTime @default(now())
 
-  classroom  Classroom @relation(fields: [classroomId], references: [id], onDelete: Cascade)
-  student    Student   @relation("YellowCardStudent",       fields: [studentId],        references: [id], onDelete: Cascade)
-  givenBy    Student?  @relation("YellowCardGivenBy",       fields: [givenByStudentId], references: [id], onDelete: SetNull)
-  givenByUser User?    @relation("YellowCardGivenByUser",   fields: [givenByUserId],    references: [id], onDelete: SetNull)
+  classroom   Classroom @relation(fields: [classroomId], references: [id], onDelete: Cascade)
+  student     Student   @relation("YellowCardStudent", fields: [studentId], references: [id], onDelete: Cascade)
+  givenBy     Student?  @relation("YellowCardGivenBy", fields: [givenByStudentId], references: [id], onDelete: SetNull)
+  givenByUser User?     @relation("YellowCardGivenByUser", fields: [givenByUserId], references: [id], onDelete: SetNull)
 
   @@index([classroomId, givenAt])
   @@index([classroomId, studentId, givenAt])
@@ -3376,22 +3406,22 @@ model YellowCard {
 // (classroomId, studentId, dutyDate) unique 로 가드한다. POST 는
 // upsert 의미론을 사용한다 (이미 있으면 그대로 유지).
 model CleaningDuty {
-  id            String   @id @default(cuid())
-  classroomId   String
-  studentId     String
+  id                  String   @id @default(cuid())
+  classroomId         String
+  studentId           String
   // 청소 당번 날짜. UTC 자정 (parseDateOrNull 결과) 그대로 저장.
-  dutyDate      DateTime
+  dutyDate            DateTime
   // "manual" = 교사가 직접 지정, "yellow_card" = 노란 카드 자동 부여.
-  source        String   @default("manual")
+  source              String   @default("manual")
   assignedByStudentId String?
   assignedByUserId    String?
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
 
-  classroom     Classroom @relation(fields: [classroomId], references: [id], onDelete: Cascade)
-  student       Student   @relation("CleaningDutyStudent",     fields: [studentId],         references: [id], onDelete: Cascade)
-  assignedBy    Student?  @relation("CleaningDutyAssignedBy",  fields: [assignedByStudentId], references: [id], onDelete: SetNull)
-  assignedByUser User?    @relation("CleaningDutyAssignedBy",  fields: [assignedByUserId],  references: [id], onDelete: SetNull)
+  classroom      Classroom @relation(fields: [classroomId], references: [id], onDelete: Cascade)
+  student        Student   @relation("CleaningDutyStudent", fields: [studentId], references: [id], onDelete: Cascade)
+  assignedBy     Student?  @relation("CleaningDutyAssignedBy", fields: [assignedByStudentId], references: [id], onDelete: SetNull)
+  assignedByUser User?     @relation("CleaningDutyAssignedBy", fields: [assignedByUserId], references: [id], onDelete: SetNull)
 
   @@unique([classroomId, studentId, dutyDate])
   @@index([classroomId, dutyDate])
@@ -3825,24 +3855,24 @@ model KordleGame {
 }
 
 model KordlePuzzle {
-  id             String             @id @default(cuid())
-  gameId         String
-  game           KordleGame         @relation(fields: [gameId], references: [id], onDelete: Cascade)
+  id                String             @id @default(cuid())
+  gameId            String
+  game              KordleGame         @relation(fields: [gameId], references: [id], onDelete: Cascade)
   // The solution word. KordleWord.locale must match KordleGame.locale.
-  solutionWordId String
-  solutionWord   KordleWord         @relation(fields: [solutionWordId], references: [id])
-  status         KordlePuzzleStatus @default(DRAFT)
+  solutionWordId    String
+  solutionWord      KordleWord         @relation(fields: [solutionWordId], references: [id])
+  status            KordlePuzzleStatus @default(DRAFT)
   // When the puzzle goes live (DAILY mode uses startsAt; LIVE_CLASS uses live
   // toggles). Null until scheduled.
-  startsAt       DateTime?
-  endsAt         DateTime?
+  startsAt          DateTime?
+  endsAt            DateTime?
   currentGuessIndex Int                @default(1)
   // Optional deterministic seed so two classrooms get the same word for the
   // same date without sharing a row.
-  seed           String?
-  attempts       KordleAttempt[]
-  createdAt      DateTime           @default(now())
-  updatedAt      DateTime           @updatedAt
+  seed              String?
+  attempts          KordleAttempt[]
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
 
   @@index([gameId, startsAt])
   @@index([status, startsAt])

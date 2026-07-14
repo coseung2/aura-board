@@ -1,11 +1,8 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
-  Animated,
   KeyboardAvoidingView,
-  Modal,
-  PanResponder,
   Platform,
   ScrollView,
   StyleSheet,
@@ -14,7 +11,8 @@ import {
 } from "react-native";
 import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { AppButton, ControlPressable, TextField } from "./ui";
+import { AppBottomSheet, AppButton, ControlPressable, TextField } from "./ui";
+import { CommentLikeButton } from "./CommentLikeButton";
 import { apiFetch, ApiError } from "../lib/api";
 import { clearSessionToken } from "../lib/session";
 import {
@@ -32,6 +30,8 @@ type CommentItem = {
   content: string;
   createdAt: string;
   authorLabel: string;
+  likeCount?: number;
+  isLiked?: boolean;
   canDelete: boolean;
 };
 
@@ -50,23 +50,11 @@ export function CommentBottomSheet({
 }: Props) {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const translateY = useRef(new Animated.Value(0)).current;
   const [items, setItems] = useState<CommentItem[]>([]);
   const [commentText, setCommentText] = useState("");
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  const closeSheet = useCallback(() => {
-    Animated.timing(translateY, {
-      toValue: 720,
-      duration: 180,
-      useNativeDriver: true,
-    }).start(() => {
-      translateY.setValue(0);
-      onClose();
-    });
-  }, [onClose, translateY]);
 
   const handleAuthError = useCallback(
     async (nextError: unknown) => {
@@ -100,35 +88,9 @@ export function CommentBottomSheet({
 
   useEffect(() => {
     if (!visible || !cardId) return;
-    translateY.setValue(0);
     setCommentText("");
     void loadComments();
-  }, [cardId, loadComments, translateY, visible]);
-
-  const panResponder = useRef(
-    PanResponder.create({
-      onMoveShouldSetPanResponder: (_, gesture) => gesture.dy > 4,
-      onPanResponderMove: (_, gesture) => {
-        translateY.setValue(Math.max(0, gesture.dy));
-      },
-      onPanResponderRelease: (_, gesture) => {
-        if (gesture.dy > 104 || gesture.vy > 0.7) {
-          closeSheet();
-          return;
-        }
-        Animated.spring(translateY, {
-          toValue: 0,
-          useNativeDriver: true,
-        }).start();
-      },
-      onPanResponderTerminate: () => {
-        Animated.spring(translateY, {
-          toValue: 0,
-          useNativeDriver: true,
-        }).start();
-      },
-    }),
-  ).current;
+  }, [cardId, loadComments, visible]);
 
   async function submitComment() {
     const content = commentText.trim();
@@ -184,101 +146,104 @@ export function CommentBottomSheet({
   }
 
   return (
-    <Modal
-      transparent
+    <AppBottomSheet
       visible={visible}
-      animationType="slide"
-      onRequestClose={closeSheet}
-      statusBarTranslucent
+      onClose={onClose}
+      sheetStyle={[styles.sheet, { paddingBottom: insets.bottom + spacing.sm }]}
+      accessibilityLabel="댓글"
     >
-      <View style={styles.backdrop}>
-        <ControlPressable
-          style={styles.backdropPressable}
-          onPress={closeSheet}
-          accessibilityLabel="댓글 닫기"
-        >
-          <View />
-        </ControlPressable>
-        <Animated.View
-          style={[styles.sheet, { paddingBottom: insets.bottom + spacing.sm, transform: [{ translateY }] }]}
-        >
-          <View style={styles.dragArea} {...panResponder.panHandlers}>
-            <View style={styles.dragHandle} />
-            <Text style={styles.title} accessibilityRole="header">
-              댓글
-            </Text>
-          </View>
+      <Text style={styles.title} accessibilityRole="header">
+        댓글
+      </Text>
 
-          <KeyboardAvoidingView
-            style={styles.flex}
-            behavior={Platform.OS === "ios" ? "padding" : undefined}
+      <KeyboardAvoidingView
+        style={styles.flex}
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+      >
+        {loading ? (
+          <View style={styles.center}>
+            <ActivityIndicator color={colors.accent} />
+          </View>
+        ) : (
+          <ScrollView
+            contentContainerStyle={styles.listContent}
+            keyboardShouldPersistTaps="handled"
           >
-            {loading ? (
-              <View style={styles.center}>
-                <ActivityIndicator color={colors.accent} />
+            {error ? (
+              <View style={styles.errorBlock}>
+                <Text style={styles.errorText}>{error}</Text>
+                <AppButton variant="quiet" onPress={() => void loadComments()}>
+                  다시 시도
+                </AppButton>
               </View>
-            ) : (
-              <ScrollView
-                contentContainerStyle={styles.listContent}
-                keyboardShouldPersistTaps="handled"
-              >
-                {error ? (
-                  <View style={styles.errorBlock}>
-                    <Text style={styles.errorText}>{error}</Text>
-                    <AppButton variant="quiet" onPress={() => void loadComments()}>
-                      다시 시도
-                    </AppButton>
-                  </View>
-                ) : null}
-                {!error && items.length === 0 ? (
-                  <Text style={styles.emptyText}>아직 댓글이 없어요</Text>
-                ) : null}
-                {items.map((item) => (
-                  <View key={item.id} style={styles.commentItem}>
+            ) : null}
+            {!error && items.length === 0 ? (
+              <Text style={styles.emptyText}>아직 댓글이 없어요</Text>
+            ) : null}
+            {items.map((item) => (
+              <View key={item.id} style={styles.commentItem}>
+                <View style={styles.commentItemRow}>
+                  <View style={styles.commentTextBlock}>
                     <View style={styles.commentHeader}>
-                      <Text style={styles.commentAuthor} numberOfLines={1}>
-                        {item.authorLabel || "작성자"}
-                      </Text>
-                      <Text style={styles.commentDate}>
-                        {formatCommentDate(item.createdAt)}
-                      </Text>
+                      <View style={styles.commentIdentity}>
+                        <Text style={styles.commentAuthor} numberOfLines={1}>
+                          {item.authorLabel || "작성자"}
+                        </Text>
+                        <Text style={styles.commentDate}>
+                          {formatCommentDate(item.createdAt)}
+                        </Text>
+                      </View>
                     </View>
                     <Text style={styles.commentContent}>{item.content}</Text>
-                    {item.canDelete ? (
-                      <ControlPressable
-                        style={styles.deleteButton}
-                        onPress={() => confirmDelete(item)}
-                        accessibilityLabel="댓글 삭제"
-                      >
-                        <Text style={styles.deleteLabel}>삭제</Text>
-                      </ControlPressable>
-                    ) : null}
                   </View>
-                ))}
-              </ScrollView>
-            )}
-            <View style={styles.composer}>
-              <TextField
-                value={commentText}
-                onChangeText={setCommentText}
-                placeholder="댓글을 입력하세요"
-                maxLength={1000}
-                editable={!submitting}
-                style={styles.commentInput}
-              />
-              <AppButton
-                onPress={() => void submitComment()}
-                disabled={!commentText.trim() || submitting || !cardId}
-                loading={submitting}
-                style={styles.submitButton}
-              >
-                등록
-              </AppButton>
-            </View>
-          </KeyboardAvoidingView>
-        </Animated.View>
-      </View>
-    </Modal>
+                  <CommentLikeButton
+                    cardId={cardId ?? ""}
+                    commentId={item.id}
+                    likeCount={item.likeCount}
+                    isLiked={item.isLiked}
+                    onUnauthorized={handleAuthError}
+                    onChanged={(next) => {
+                      setItems((current) =>
+                        current.map((entry) =>
+                          entry.id === item.id ? { ...entry, ...next } : entry,
+                        ),
+                      );
+                    }}
+                  />
+                </View>
+                {item.canDelete ? (
+                  <ControlPressable
+                    style={styles.deleteButton}
+                    onPress={() => confirmDelete(item)}
+                    accessibilityLabel="댓글 삭제"
+                  >
+                    <Text style={styles.deleteLabel}>삭제</Text>
+                  </ControlPressable>
+                ) : null}
+              </View>
+            ))}
+          </ScrollView>
+        )}
+        <View style={styles.composer}>
+          <TextField
+            value={commentText}
+            onChangeText={setCommentText}
+            placeholder="댓글을 입력하세요"
+            maxLength={1000}
+            editable={!submitting}
+            style={styles.commentInput}
+          />
+          <AppButton
+            onPress={() => void submitComment()}
+            disabled={!commentText.trim() || submitting || !cardId}
+            loading={submitting}
+            style={styles.submitButton}
+          >
+            등록
+          </AppButton>
+        </View>
+      </KeyboardAvoidingView>
+    </AppBottomSheet>
   );
 }
 
@@ -289,30 +254,59 @@ function formatCommentDate(value: string): string {
 }
 
 const styles = StyleSheet.create({
-  backdrop: { flex: 1, justifyContent: "flex-end", backgroundColor: colors.modalBackdrop },
-  backdropPressable: { ...StyleSheet.absoluteFillObject, backgroundColor: colors.transparent },
   sheet: {
     maxHeight: "80%",
     minHeight: "52%",
     borderTopLeftRadius: radii.card,
     borderTopRightRadius: radii.card,
     backgroundColor: colors.bg,
-    overflow: "hidden",
   },
-  dragArea: { alignItems: "center", paddingTop: spacing.sm, paddingBottom: spacing.md },
-  dragHandle: { width: spacing.xxl, height: spacing.xs, borderRadius: radii.pill, backgroundColor: colors.borderHover },
-  title: { ...typography.section, color: colors.text, marginTop: spacing.sm },
+  title: {
+    ...typography.section,
+    color: colors.text,
+    textAlign: "center",
+    paddingBottom: spacing.md,
+  },
   flex: { flex: 1 },
   center: { flex: 1, alignItems: "center", justifyContent: "center" },
-  listContent: { paddingHorizontal: spacing.lg, paddingBottom: spacing.lg, gap: spacing.lg },
+  listContent: {
+    paddingHorizontal: spacing.lg,
+    paddingBottom: spacing.lg,
+    gap: spacing.lg,
+  },
   commentItem: { gap: spacing.xs },
-  commentHeader: { flexDirection: "row", alignItems: "center", gap: spacing.sm },
-  commentAuthor: { ...typography.label, color: colors.text, flex: 1 },
+  commentItemRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.md,
+  },
+  commentTextBlock: { flex: 1, gap: spacing.xs },
+  commentHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: spacing.md,
+  },
+  commentIdentity: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.xs,
+    flex: 1,
+  },
+  commentAuthor: { ...typography.label, color: colors.text, flexShrink: 1 },
   commentDate: { ...typography.micro, color: colors.textMuted },
   commentContent: { ...typography.body, color: colors.text },
-  deleteButton: { alignSelf: "flex-start", minHeight: tapMin, justifyContent: "center" },
+  deleteButton: {
+    alignSelf: "flex-start",
+    minHeight: tapMin,
+    justifyContent: "center",
+  },
   deleteLabel: { ...typography.micro, color: colors.danger },
-  emptyText: { ...typography.body, color: colors.textMuted, paddingVertical: spacing.xl },
+  emptyText: {
+    ...typography.body,
+    color: colors.textMuted,
+    paddingVertical: spacing.xl,
+  },
   errorBlock: { gap: spacing.xs, alignItems: "flex-start" },
   errorText: { ...typography.body, color: colors.danger },
   composer: {

@@ -118,6 +118,7 @@ export const fontFamilies = {
   regular: "NotoSansKR_400Regular",
   semibold: "NotoSansKR_600SemiBold",
   bold: "NotoSansKR_700Bold",
+  banner: "NeoDunggeunmo",
 } as const;
 
 /** 8-role type scale. 웹 design-system.md §2 와 동일한 semantic 이름. */
@@ -231,9 +232,9 @@ export const pageChrome = {
   contentStartGap: spacing.lg,
   /** Cards, grids, or body copy start directly after the banner. */
   directContentStartGap: spacing.xl + spacing.lg,
-  bannerTickerMinHeight: typography.label.lineHeight + spacing.lg,
+  bannerTickerMinHeight: (typography.label.lineHeight + spacing.lg) * 2,
   bannerImageAspectRatio: 3,
-  bannerImageMaxHeight: 180,
+  bannerImageMaxHeight: 360,
 } as const;
 
 export type BoardThemeKey =
@@ -583,4 +584,6 @@ export const plant = {
   lightboxImageHeightRatio: 0.7,
   lightboxCloseBottom: 60,
   observationCardWidth: 220,
+  roadmapStepWidth: 64,
+  roadmapStepMinHeight: 72,
 } as const;

@@ -13,6 +13,7 @@ import {
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { AppButton, AppHeader, ControlPressable, TextField } from "../../../../components/ui";
+import { CommentLikeButton } from "../../../../components/CommentLikeButton";
 import { apiFetch, ApiError } from "../../../../lib/api";
 import { clearSessionToken } from "../../../../lib/session";
 import {
@@ -33,6 +34,8 @@ type CommentItem = {
   createdAt: string;
   authorKind: "teacher" | "student" | "external";
   authorLabel: string;
+  likeCount?: number;
+  isLiked?: boolean;
   canDelete: boolean;
 };
 
@@ -206,26 +209,44 @@ export default function StudentCardCommentsScreen() {
               <View style={styles.commentList}>
                 {items.map((item) => (
                   <View key={item.id} style={styles.commentItem}>
-                    <View style={styles.commentHeader}>
-                      <Text style={styles.commentAuthor} numberOfLines={1}>
-                        {item.authorLabel || "작성자"}
-                      </Text>
-                      <View style={styles.commentMeta}>
-                        <Text style={styles.commentDate}>
-                          {formatCommentDate(item.createdAt)}
-                        </Text>
-                        {item.canDelete ? (
-                          <ControlPressable
-                            style={styles.deleteButton}
-                            onPress={() => confirmDelete(item)}
-                            accessibilityLabel="댓글 삭제"
-                          >
-                            <Text style={styles.deleteLabel}>삭제</Text>
-                          </ControlPressable>
-                        ) : null}
+                    <View style={styles.commentItemRow}>
+                      <View style={styles.commentTextBlock}>
+                        <View style={styles.commentHeader}>
+                          <View style={styles.commentIdentity}>
+                            <Text style={styles.commentAuthor} numberOfLines={1}>
+                              {item.authorLabel || "작성자"}
+                            </Text>
+                            <Text style={styles.commentDate}>
+                              {formatCommentDate(item.createdAt)}
+                            </Text>
+                          </View>
+                          {item.canDelete ? (
+                            <ControlPressable
+                              style={styles.deleteButton}
+                              onPress={() => confirmDelete(item)}
+                              accessibilityLabel="댓글 삭제"
+                            >
+                              <Text style={styles.deleteLabel}>삭제</Text>
+                            </ControlPressable>
+                          ) : null}
+                        </View>
+                        <Text style={styles.commentContent}>{item.content}</Text>
                       </View>
+                      <CommentLikeButton
+                        cardId={cardId}
+                        commentId={item.id}
+                        likeCount={item.likeCount}
+                        isLiked={item.isLiked}
+                        onUnauthorized={handleAuthError}
+                        onChanged={(next) => {
+                          setItems((current) =>
+                            current.map((entry) =>
+                              entry.id === item.id ? { ...entry, ...next } : entry,
+                            ),
+                          );
+                        }}
+                      />
                     </View>
-                    <Text style={styles.commentContent}>{item.content}</Text>
                   </View>
                 ))}
               </View>
@@ -296,21 +317,31 @@ const styles = StyleSheet.create({
     borderBottomWidth: borders.hairline,
     borderBottomColor: colors.border,
   },
+  commentItemRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.md,
+  },
+  commentTextBlock: {
+    flex: 1,
+    gap: spacing.xs,
+  },
   commentHeader: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
     gap: spacing.md,
   },
+  commentIdentity: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.xs,
+    flex: 1,
+  },
   commentAuthor: {
     ...typography.label,
     color: colors.text,
-    flex: 1,
-  },
-  commentMeta: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: spacing.sm,
+    flexShrink: 1,
   },
   commentDate: {
     ...typography.micro,

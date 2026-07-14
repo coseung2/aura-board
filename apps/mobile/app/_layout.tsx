@@ -70,7 +70,9 @@ function useParentDeepLink() {
         router.replace("/(parent)");
       } else {
         await clearParentSession();
-        const msg = parsed.error ? errorMessage(parsed.error) : "로그인 링크가 유효하지 않아요.";
+        const msg = parsed.error
+          ? errorMessage(parsed.error)
+          : "로그인 링크가 유효하지 않아요.";
         router.replace(`/(parent)/login?error=${encodeURIComponent(msg)}`);
       }
     }
@@ -103,6 +105,7 @@ export default function RootLayout() {
     NotoSansKR_400Regular,
     NotoSansKR_600SemiBold,
     NotoSansKR_700Bold,
+    NeoDunggeunmo: require("../assets/fonts/NeoDunggeunmo.ttf"),
   });
 
   useEffect(() => {

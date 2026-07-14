@@ -5,6 +5,7 @@ import { getEffectiveBoardRole } from "@/lib/rbac";
 import { resolveCardAuthorLabels } from "@/lib/card-author-labels";
 import { loadGameSnapshot } from "@/lib/speed-game/runtime";
 import { sanitizeGameSnapshotForStudent } from "@/lib/speed-game/student-snapshot";
+import { parseObservationPoints } from "@/lib/plant-schemas";
 
 const ANONYMOUS_AUTHOR_LABEL = "익명";
 
@@ -167,7 +168,20 @@ export async function GET(
           },
         },
       });
-      layoutData.plantRoadmap = { plants };
+      layoutData.plantRoadmap = {
+        plants: plants.map((plant) => ({
+          ...plant,
+          species: {
+            ...plant.species,
+            stages: plant.species.stages.map((stage) => ({
+              ...stage,
+              observationPoints: parseObservationPoints(
+                stage.observationPoints,
+              ),
+            })),
+          },
+        })),
+      };
     }
 
     if (board.layout === "speed-game") {
@@ -187,7 +201,8 @@ export async function GET(
     if (board.layout === "event-signup") {
       layoutData.eventSignup = {
         accessMode: board.accessMode,
-        accessToken: board.accessMode === "public-link" ? board.accessToken : null,
+        accessToken:
+          board.accessMode === "public-link" ? board.accessToken : null,
         applicationStart: board.applicationStart?.toISOString() ?? null,
         applicationEnd: board.applicationEnd?.toISOString() ?? null,
         eventPosterUrl: board.eventPosterUrl,
@@ -209,13 +224,20 @@ export async function GET(
           (structure?.sharedSections ?? []).map((section) => section.title),
         );
         const visibility =
-          (assignment.visibilityOverride as "own-only" | "peek-others" | null) ??
-          (assignment.template.recommendedVisibility as "own-only" | "peek-others");
+          (assignment.visibilityOverride as
+            | "own-only"
+            | "peek-others"
+            | null) ??
+          (assignment.template.recommendedVisibility as
+            | "own-only"
+            | "peek-others");
         const memberships = await db.breakoutMembership.findMany({
           where: { assignmentId: assignment.id, studentId: student.id },
           select: { sectionId: true },
         });
-        const ownIds = new Set(memberships.map((membership) => membership.sectionId));
+        const ownIds = new Set(
+          memberships.map((membership) => membership.sectionId),
+        );
         const sharedIds = new Set(
           board.sections
             .filter((section) => sharedTitles.has(section.title))
@@ -268,7 +290,8 @@ export async function GET(
     const visibleCards = allowedBreakoutSectionIds
       ? layoutVisibleCards.filter(
           (card) =>
-            card.sectionId !== null && allowedBreakoutSectionIds.has(card.sectionId),
+            card.sectionId !== null &&
+            allowedBreakoutSectionIds.has(card.sectionId),
         )
       : layoutVisibleCards;
     const cards = await Promise.all(
@@ -340,7 +363,9 @@ export async function GET(
       },
       cards,
       sections: allowedBreakoutSectionIds
-        ? board.sections.filter((section) => allowedBreakoutSectionIds.has(section.id))
+        ? board.sections.filter((section) =>
+            allowedBreakoutSectionIds.has(section.id),
+          )
         : board.sections,
       currentStudent: {
         id: student.id,

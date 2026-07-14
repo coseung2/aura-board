@@ -238,7 +238,11 @@ export default function StudentHome() {
           />
         }
       >
-        <View style={overviewLandscape ? styles.landscapeOverview : styles.overviewStack}>
+        <View
+          style={
+            overviewLandscape ? styles.landscapeOverview : styles.overviewStack
+          }
+        >
           <View
             style={[
               styles.overviewItem,
@@ -258,7 +262,6 @@ export default function StudentHome() {
             </View>
           ) : null}
         </View>
-
       </ScrollView>
     </SafeAreaView>
   );
@@ -309,9 +312,7 @@ function AssignmentPanel({
   const hiddenCount = Math.max(filtered.length - visibleItems.length, 0);
 
   const emptyMessage =
-    filter === "missing"
-      ? "미제출 과제가 없어요"
-      : "완료한 과제가 없어요";
+    filter === "missing" ? "미제출 과제가 없어요" : "완료한 과제가 없어요";
 
   return (
     <View style={styles.assignmentPanel}>
@@ -351,7 +352,9 @@ function AssignmentPanel({
                 <AssignmentRow
                   key={item.id}
                   item={item}
-                  onPress={target ? () => router.push(target as Href) : undefined}
+                  onPress={
+                    target ? () => router.push(target as Href) : undefined
+                  }
                 />
               );
             })
@@ -388,11 +391,7 @@ function FilterChip({
   children: ReactNode;
 }) {
   return (
-    <SemanticNavItem
-      selected={active}
-      tone={tone}
-      onPress={onPress}
-    >
+    <SemanticNavItem selected={active} tone={tone} onPress={onPress}>
       {children}
     </SemanticNavItem>
   );
@@ -449,22 +448,14 @@ function AssignmentRow({
 
   if (onPress) {
     return (
-      <ControlPressable
-        style={styles.assignmentRow}
-        onPress={onPress}
-      >
+      <ControlPressable style={styles.assignmentRow} onPress={onPress}>
         {content}
       </ControlPressable>
     );
   }
 
   return (
-    <View
-      style={[
-        styles.assignmentRow,
-        styles.assignmentRowStatic,
-      ]}
-    >
+    <View style={[styles.assignmentRow, styles.assignmentRowStatic]}>
       {content}
     </View>
   );
@@ -536,26 +527,24 @@ function WalletCardCompact({
 
       {showDuties ? (
         <DutySectionCompact duties={duties} onOpen={onOpen} />
+      ) : loading || !wallet ? (
+        <Text style={styles.walletEmptyCompact}>
+          통장 정보를 불러오는 중이에요.
+        </Text>
       ) : (
-        loading || !wallet ? (
-          <Text style={styles.walletEmptyCompact}>
-            통장 정보를 불러오는 중이에요.
-          </Text>
-        ) : (
-          <>
-            <View style={styles.walletBalanceRowCompact}>
-              <Text style={styles.walletBalanceLabelCompact}>현재 잔고</Text>
-              <Text style={styles.walletBalanceValueCompact}>
-                {wallet.balance.toLocaleString()} {wallet.currency.unitLabel}
-              </Text>
-            </View>
-            {wallet.activeFDs.length > 0 && (
-              <Pill tone="accent" textStyle={styles.walletFdPillText}>
-                적금 {wallet.activeFDs.length}개
-              </Pill>
-            )}
-          </>
-        )
+        <>
+          <View style={styles.walletBalanceRowCompact}>
+            <Text style={styles.walletBalanceLabelCompact}>현재 잔고</Text>
+            <Text style={styles.walletBalanceValueCompact}>
+              {wallet.balance.toLocaleString()} {wallet.currency.unitLabel}
+            </Text>
+          </View>
+          {wallet.activeFDs.length > 0 && (
+            <Pill tone="accent" textStyle={styles.walletFdPillText}>
+              적금 {wallet.activeFDs.length}개
+            </Pill>
+          )}
+        </>
       )}
     </View>
   );
@@ -570,8 +559,13 @@ function DutySectionCompact({
 }) {
   const visible = duties
     .map((duty) => ({ duty, target: studentDutyTarget(duty) }))
-    .filter((item): item is { duty: StudentDuty; target: NonNullable<ReturnType<typeof studentDutyTarget>> } =>
-      item.target !== null,
+    .filter(
+      (
+        item,
+      ): item is {
+        duty: StudentDuty;
+        target: NonNullable<ReturnType<typeof studentDutyTarget>>;
+      } => item.target !== null,
     );
   if (visible.length === 0) return null;
 
@@ -580,7 +574,10 @@ function DutySectionCompact({
       {visible.map(({ duty, target }, index) => (
         <ControlPressable
           key={`${duty.classroomId}-${duty.roleKey}`}
-          style={[styles.dutyRow, index === visible.length - 1 && styles.dutyRowLast]}
+          style={[
+            styles.dutyRow,
+            index === visible.length - 1 && styles.dutyRowLast,
+          ]}
           onPress={() => onOpen(target.href as Href)}
           accessibilityLabel={`${duty.classroomName} ${duty.roleLabel} 시작`}
         >
@@ -588,10 +585,18 @@ function DutySectionCompact({
             {duty.emoji ?? roleEmoji(duty.roleKey)}
           </Text>
           <View style={styles.dutyRowCopy}>
-            <Text style={styles.dutyRowRole} numberOfLines={1} ellipsizeMode="tail">
+            <Text
+              style={styles.dutyRowRole}
+              numberOfLines={1}
+              ellipsizeMode="tail"
+            >
               {duty.roleLabel}
             </Text>
-            <Text style={styles.dutyRowClassroom} numberOfLines={1} ellipsizeMode="tail">
+            <Text
+              style={styles.dutyRowClassroom}
+              numberOfLines={1}
+              ellipsizeMode="tail"
+            >
               {duty.classroomName}
             </Text>
           </View>
@@ -654,6 +659,7 @@ const styles = StyleSheet.create({
     ...typography.label,
     color: colors.textMuted,
     flexShrink: 1,
+    alignSelf: "flex-end",
   },
   accountActions: {
     flexDirection: "row",

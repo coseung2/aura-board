@@ -22,6 +22,7 @@ import {
 import { CardComposer } from "../CardComposer";
 import { CardAuthorBottomSheet } from "../CardAuthorBottomSheet";
 import { CommentBottomSheet } from "../CommentBottomSheet";
+import { EmbeddedMedia } from "../EmbeddedMedia";
 import type { BoardDetailResponse, BoardCard } from "../../lib/types";
 import { apiFetch } from "../../lib/api";
 import {
@@ -33,7 +34,12 @@ import {
   withBoardAnonymousAuthor,
   withBoardAnonymousAuthors,
 } from "../../lib/card-privacy";
-import { getYouTubeThumbnailUrlFromLink } from "../../lib/media";
+import {
+  buildMediaItems,
+  isCanvaDesignUrl,
+  isYouTubeVideoUrl,
+  mediaPreviewUrls,
+} from "../../lib/media";
 import {
   ControlPressable,
   SemanticNav,
@@ -66,7 +72,9 @@ export function ColumnsBoard({
   const [selectedSectionKey, setSelectedSectionKey] = useState<string | null>(
     null,
   );
-  const [composerSectionId, setComposerSectionId] = useState<string | null>(null);
+  const [composerSectionId, setComposerSectionId] = useState<string | null>(
+    null,
+  );
   const [composerOpen, setComposerOpen] = useState(false);
   const [commentCard, setCommentCard] = useState<BoardCard | null>(null);
   const [authorCard, setAuthorCard] = useState<BoardCard | null>(null);
@@ -275,7 +283,10 @@ export function ColumnsBoard({
               card.id === commentCard.id
                 ? {
                     ...card,
-                    commentCount: Math.max(0, (card.commentCount ?? 0) + change),
+                    commentCount: Math.max(
+                      0,
+                      (card.commentCount ?? 0) + change,
+                    ),
                   }
                 : card,
             ),
@@ -284,7 +295,9 @@ export function ColumnsBoard({
       />
       <CardAuthorBottomSheet
         cardId={authorCard?.id ?? null}
-        classroomId={data.board.classroomId ?? data.currentStudent?.classroomId ?? null}
+        classroomId={
+          data.board.classroomId ?? data.currentStudent?.classroomId ?? null
+        }
         initialAuthors={authorCard?.authors ?? []}
         visible={authorCard !== null}
         onClose={() => setAuthorCard(null)}
@@ -314,20 +327,26 @@ export function ColumnsBoard({
   );
 }
 
-function StreamFeedPost({
+export function StreamFeedPost({
   card,
   onOpenComments,
   onOpenAuthorPicker,
 }: {
   card: BoardCard;
-  onOpenComments: () => void;
-  onOpenAuthorPicker: () => void;
+  onOpenComments?: () => void;
+  onOpenAuthorPicker?: () => void;
 }) {
   const author = resolveCardAuthorName(card);
   const title = card.title.trim();
   const content = card.content.trim();
+  const collapsedContent = streamPostCollapsedContent(content);
   const mediaItems = streamPostImages(card);
   const mediaLabel = streamPostMediaLabel(card);
+  const embedUrl =
+    card.linkUrl &&
+    (isYouTubeVideoUrl(card.linkUrl) || isCanvaDesignUrl(card.linkUrl))
+      ? card.linkUrl
+      : null;
   const [likeCount, setLikeCount] = useState(Math.max(0, card.likeCount ?? 0));
   const [liked, setLiked] = useState(false);
   const [likeBusy, setLikeBusy] = useState(false);
@@ -336,8 +355,6 @@ function StreamFeedPost({
   const [expanded, setExpanded] = useState(false);
   const [mediaIndex, setMediaIndex] = useState(0);
   const { width } = useWindowDimensions();
-  const [canExpandContent, setCanExpandContent] = useState(false);
-  const [collapsedContent, setCollapsedContent] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -357,8 +374,6 @@ function StreamFeedPost({
   }, [card.id, card.likeCount]);
 
   useEffect(() => {
-    setCanExpandContent(false);
-    setCollapsedContent(null);
     setExpanded(false);
   }, [content]);
 
@@ -396,7 +411,13 @@ function StreamFeedPost({
         </View>
       </View>
 
-      {mediaItems.length > 0 ? (
+      {embedUrl ? (
+        <EmbeddedMedia
+          url={embedUrl}
+          title={title || undefined}
+          style={styles.feedPostEmbed}
+        />
+      ) : mediaItems.length > 0 ? (
         <View>
           <ScrollView
             horizontal
@@ -410,16 +431,20 @@ function StreamFeedPost({
             accessibilityLabel={`${title || "게시글"} 미디어 ${mediaItems.length}개`}
           >
             {mediaItems.map((uri) => (
-              <Image
+              <View
                 key={`${card.id}:${uri}`}
-                source={{ uri }}
-                style={[styles.feedPostMedia, { width }]}
-                contentFit="cover"
-                cachePolicy="memory-disk"
-                recyclingKey={`${card.id}:${uri}`}
-                transition={0}
-                accessible={false}
-              />
+                style={[styles.feedPostMediaFrame, { width }]}
+              >
+                <Image
+                  source={{ uri }}
+                  style={styles.feedPostMedia}
+                  contentFit="contain"
+                  cachePolicy="memory-disk"
+                  recyclingKey={`${card.id}:${uri}`}
+                  transition={0}
+                  accessible={false}
+                />
+              </View>
             ))}
           </ScrollView>
           {mediaItems.length > 1 ? (
@@ -450,7 +475,9 @@ function StreamFeedPost({
             style={styles.feedPostLikeAction}
             onPress={() => void toggleLike()}
             disabled={likeBusy}
-            accessibilityLabel={liked ? `좋아요 ${likeCount}, 취소` : `좋아요 ${likeCount}`}
+            accessibilityLabel={
+              liked ? `좋아요 ${likeCount}, 취소` : `좋아요 ${likeCount}`
+            }
             accessibilityState={{ selected: liked }}
           >
             <Heart
@@ -462,35 +489,39 @@ function StreamFeedPost({
             />
             <Text style={styles.feedPostEngagementCount}>{likeCount}</Text>
           </ControlPressable>
-          <ControlPressable
-            style={styles.feedPostCommentAction}
-            onPress={onOpenComments}
-            hitSlop={{ top: spacing.sm, bottom: spacing.sm }}
-            accessibilityLabel={`댓글 ${commentCount}`}
-          >
-            <View style={styles.feedPostEngagementItem}>
-              <MessageCircle
+          {onOpenComments ? (
+            <ControlPressable
+              style={styles.feedPostCommentAction}
+              onPress={onOpenComments}
+              hitSlop={{ top: spacing.sm, bottom: spacing.sm }}
+              accessibilityLabel={`댓글 ${commentCount}`}
+            >
+              <View style={styles.feedPostEngagementItem}>
+                <MessageCircle
+                  size={iconSizes.md}
+                  color={colors.textMuted}
+                  strokeWidth={1.75}
+                  accessible={false}
+                />
+                <Text style={styles.feedPostCommentLabel}>{commentCount}</Text>
+              </View>
+            </ControlPressable>
+          ) : null}
+          {onOpenAuthorPicker ? (
+            <ControlPressable
+              style={styles.feedPostAuthorAssignAction}
+              onPress={onOpenAuthorPicker}
+              accessibilityLabel="작성자 지정"
+            >
+              <UserRound
                 size={iconSizes.md}
-                color={colors.textMuted}
+                color={colors.accentTintedText}
                 strokeWidth={1.75}
                 accessible={false}
               />
-              <Text style={styles.feedPostCommentLabel}>{commentCount}</Text>
-            </View>
-          </ControlPressable>
-          <ControlPressable
-            style={styles.feedPostAuthorAssignAction}
-            onPress={onOpenAuthorPicker}
-            accessibilityLabel="작성자 지정"
-          >
-            <UserRound
-              size={iconSizes.md}
-              color={colors.accentTintedText}
-              strokeWidth={1.75}
-              accessible={false}
-            />
-            <Text style={styles.feedPostAuthorAssignLabel}>작성자 지정</Text>
-          </ControlPressable>
+              <Text style={styles.feedPostAuthorAssignLabel}>작성자 지정</Text>
+            </ControlPressable>
+          ) : null}
         </View>
       </View>
 
@@ -502,84 +533,73 @@ function StreamFeedPost({
         ) : null}
         {content ? (
           <View style={styles.feedPostContentWrap}>
-            <Text
-              style={styles.feedPostContent}
-            >
-              {expanded || !canExpandContent
-                ? content
-                : (collapsedContent ?? content)}
-              {canExpandContent ? (
+            {!collapsedContent.truncated ? (
+              <Text style={styles.feedPostContent}>{content}</Text>
+            ) : expanded ? (
+              <Text style={styles.feedPostContent}>
+                {content}
                 <Text
                   style={styles.feedPostTextToggleLabel}
-                  onPress={() => setExpanded((value) => !value)}
+                  onPress={() => setExpanded(false)}
                   accessibilityRole="button"
-                  accessibilityLabel={expanded ? "간단히보기" : "더보기"}
+                  accessibilityLabel="간단히 보기"
                 >
-                  {expanded ? " 간단히보기" : "...더보기"}
+                  {"\u00A0간\u2060단\u2060히\u00A0보\u2060기"}
                 </Text>
-              ) : null}
-            </Text>
-            <View style={styles.feedPostContentMeasureWrap} pointerEvents="none">
-              <Text
-                style={styles.feedPostContent}
-                onTextLayout={(event) => {
-                  const lines = event.nativeEvent.lines;
-                  const nextCanExpand = lines.length > 4;
-                  setCanExpandContent((current) =>
-                    current === nextCanExpand ? current : nextCanExpand,
-                  );
-                  if (nextCanExpand) {
-                    const fourthLine = lines
-                      .slice(0, 4)
-                      .map((line) => line.text)
-                      .join("")
-                      .trimEnd();
-                    const linkReserve = 8;
-                    const preview = fourthLine
-                      .slice(0, Math.max(0, fourthLine.length - linkReserve))
-                      .trimEnd();
-                    setCollapsedContent((current) =>
-                      current === preview ? current : preview,
-                    );
-                  }
-                }}
-                accessible={false}
-              >
-                {content}
               </Text>
-            </View>
+            ) : (
+              <Text style={styles.feedPostContent}>
+                {collapsedContent.preview}
+                <Text
+                  style={styles.feedPostTextToggleLabel}
+                  onPress={() => setExpanded(true)}
+                  accessibilityRole="button"
+                  accessibilityLabel="더보기"
+                >
+                  {"\u00A0.\u2060.\u2060.\u2060더\u2060보\u2060기"}
+                </Text>
+              </Text>
+            )}
           </View>
         ) : null}
         {date ? <Text style={styles.feedPostDate}>{date}</Text> : null}
       </View>
-
     </View>
   );
 }
 
 function streamPostImages(card: BoardCard): string[] {
-  const imageAttachment = card.attachments?.find(
-    (attachment) => attachment.kind === "image",
-  );
-  const candidates = [
-    card.thumbUrl,
-    card.imageUrl,
-    imageAttachment?.previewUrl,
-    imageAttachment?.url,
-    ...((card.attachments ?? [])
-      .filter((attachment) => attachment.kind === "image")
-      .flatMap((attachment) => [attachment.previewUrl, attachment.url])),
-    card.linkImage,
-    getYouTubeThumbnailUrlFromLink(card.linkUrl ?? card.videoUrl),
-  ];
-  return [...new Set(candidates.filter((uri): uri is string => Boolean(uri)))];
+  return mediaPreviewUrls(buildMediaItems(card));
+}
+
+function streamPostCollapsedContent(content: string): {
+  preview: string;
+  truncated: boolean;
+} {
+  let sentenceEnds = 0;
+  for (let index = 0; index < content.length; index += 1) {
+    if (/[.!?。！？]/u.test(content[index])) {
+      sentenceEnds += 1;
+      if (sentenceEnds === 2) {
+        const preview = content.slice(0, index + 1).trimEnd();
+        return {
+          preview,
+          truncated: content.slice(index + 1).trim().length > 0,
+        };
+      }
+    }
+  }
+  return { preview: content, truncated: false };
 }
 
 function streamPostMediaLabel(card: BoardCard): string | null {
   const fileAttachment = card.attachments?.find(
     (attachment) => attachment.kind === "file",
   );
-  if (card.videoUrl || card.attachments?.some((item) => item.kind === "video")) {
+  if (
+    card.videoUrl ||
+    card.attachments?.some((item) => item.kind === "video")
+  ) {
     return "▶ 영상";
   }
   if (card.fileUrl || fileAttachment) {
@@ -591,7 +611,9 @@ function streamPostMediaLabel(card: BoardCard): string | null {
   return null;
 }
 
-function formatStreamPostDate(value: string | Date | null | undefined): string | null {
+function formatStreamPostDate(
+  value: string | Date | null | undefined,
+): string | null {
   if (!value) return null;
   const date = typeof value === "string" ? new Date(value) : value;
   if (Number.isNaN(date.getTime())) return null;
@@ -766,10 +788,6 @@ const styles = StyleSheet.create({
   feedPostContentWrap: {
     position: "relative",
   },
-  feedPostContentMeasureWrap: {
-    height: spacing.none,
-    overflow: "hidden",
-  },
   feedPostDate: {
     ...typography.micro,
     color: colors.textFaint,
@@ -778,8 +796,18 @@ const styles = StyleSheet.create({
     ...typography.body,
     color: colors.accentTintedText,
   },
-  feedPostMedia: {
+  feedPostMediaFrame: {
     aspectRatio: media.previewAspectRatio,
+    padding: spacing.xs,
+    backgroundColor: colors.surfaceAlt,
+  },
+  feedPostMedia: {
+    width: "100%",
+    height: "100%",
+  },
+  feedPostEmbed: {
+    width: "100%",
+    borderRadius: radii.none,
     backgroundColor: colors.surfaceAlt,
   },
   feedPostPagination: {

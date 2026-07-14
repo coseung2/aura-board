@@ -45,7 +45,7 @@ export function CompactCardRow({ card, onPress, showSection }: Props) {
         <Image
           source={{ uri: thumbnail }}
           style={styles.thumbnail}
-          resizeMode="cover"
+          resizeMode="contain"
           accessible={false}
         />
       ) : (
@@ -77,7 +77,9 @@ export function CompactCardRow({ card, onPress, showSection }: Props) {
               {author}
             </Text>
           ) : null}
-          <Text style={styles.date}>{formatCardDate(card.updatedAt || card.createdAt)}</Text>
+          <Text style={styles.date}>
+            {formatCardDate(card.updatedAt || card.createdAt)}
+          </Text>
         </View>
         <View style={styles.signalRow}>
           {mediaLabel.label ? (
@@ -98,7 +100,8 @@ function cardThumbnail(card: BoardCard): string | null {
   return (
     card.thumbUrl ??
     card.imageUrl ??
-    card.attachments?.find((attachment) => attachment.kind === "image")?.previewUrl ??
+    card.attachments?.find((attachment) => attachment.kind === "image")
+      ?.previewUrl ??
     card.attachments?.find((attachment) => attachment.kind === "image")?.url ??
     card.linkImage ??
     getYouTubeThumbnailUrlFromLink(card.linkUrl ?? card.videoUrl) ??
@@ -106,8 +109,13 @@ function cardThumbnail(card: BoardCard): string | null {
   );
 }
 
-function cardMediaLabel(card: BoardCard): { icon: string; label: string | null } {
-  const attachmentKinds = new Set(card.attachments?.map((item) => item.kind) ?? []);
+function cardMediaLabel(card: BoardCard): {
+  icon: string;
+  label: string | null;
+} {
+  const attachmentKinds = new Set(
+    card.attachments?.map((item) => item.kind) ?? [],
+  );
   if (card.videoUrl || attachmentKinds.has("video")) {
     return { icon: "▶", label: "영상" };
   }
@@ -117,7 +125,12 @@ function cardMediaLabel(card: BoardCard): { icon: string; label: string | null }
   if (card.linkUrl || attachmentKinds.has("link")) {
     return { icon: "↗", label: "링크" };
   }
-  if (card.imageUrl || card.thumbUrl || card.linkImage || attachmentKinds.has("image")) {
+  if (
+    card.imageUrl ||
+    card.thumbUrl ||
+    card.linkImage ||
+    attachmentKinds.has("image")
+  ) {
     return { icon: "▧", label: "이미지" };
   }
   return { icon: "✎", label: null };
@@ -149,6 +162,7 @@ const styles = StyleSheet.create({
     width: media.previewThumb,
     height: media.previewThumb,
     borderRadius: radii.control,
+    padding: spacing.xxs,
     backgroundColor: colors.surfaceAlt,
   },
   thumbnailFallback: {

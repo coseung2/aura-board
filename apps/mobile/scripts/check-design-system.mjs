@@ -37,12 +37,12 @@ const allowed = [
     patterns: [/<Modal\b/, /<Pressable\b/, /<TextInput\b/, /navigation\.headerHeight/],
   },
   {
-    file: "components/CardDetailModal.tsx",
+    file: "components/CommentBottomSheet.tsx",
     patterns: [/<Modal\b/],
   },
   {
-    file: "components/CommentBottomSheet.tsx",
-    patterns: [/<Modal\b/],
+    file: "components/CommentLikeButton.tsx",
+    patterns: [/<Pressable\b/, /style=\{\{/],
   },
   {
     file: "components/CardAuthorBottomSheet.tsx",
@@ -60,6 +60,8 @@ const allowed = [
     file: "components/EmbeddedMedia.tsx",
     patterns: [
       /body, html \{ width: 100%; height: 100%;/,
+      /html, body(?:, #player)? \{ width: 100%; height: 100%;/,
+      /iframe \{ display: block; width: 100%; height: 100%;/,
       /video \{ width: 100%; height: 100%;/,
     ],
   },

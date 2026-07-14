@@ -9,6 +9,7 @@ import {
   useWindowDimensions,
   View,
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
   borders,
   colors,
@@ -17,6 +18,7 @@ import {
   media,
   radii,
   spacing,
+  tapMin,
   typography,
 } from "../../theme/tokens";
 import { apiFetch, ApiError } from "../../lib/api";
@@ -27,10 +29,20 @@ import {
 } from "../../lib/use-board-realtime";
 import { buildMediaItems } from "../../lib/media";
 import type { BoardDetailResponse, BoardCard } from "../../lib/types";
-import { withBoardAnonymousAuthor, withBoardAnonymousAuthors } from "../../lib/card-privacy";
+import {
+  withBoardAnonymousAuthor,
+  withBoardAnonymousAuthors,
+} from "../../lib/card-privacy";
 import { DJRecapModal } from "../DJRecapModal";
 import { EmbeddedMedia } from "../EmbeddedMedia";
-import { AppButton, AppModal, IconButton, Pill, SurfaceCard, TextField } from "../ui";
+import {
+  AppBottomSheet,
+  AppButton,
+  AppModal,
+  IconButton,
+  Pill,
+  TextField,
+} from "../ui";
 
 // DJ 큐 보드 — 웹 디자인 핸드오프 DJBoardPage.jsx 를 네이티브로 이식.
 //   [헤더: 제목 + 카운트 + 재생완료 토글]
@@ -56,11 +68,13 @@ export function DJQueueBoard({
   const [submitUrl, setSubmitUrl] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const [queueSheetOpen, setQueueSheetOpen] = useState(false);
   const [playedOpen, setPlayedOpen] = useState(false);
   const [recapOpen, setRecapOpen] = useState(false);
   const pendingIds = useRef<Set<string>>(new Set());
   const boardId = data.board.id;
   const { width } = useWindowDimensions();
+  const insets = useSafeAreaInsets();
   const compact = width < dj.compactBreakpoint;
   const canControl = data.capabilities?.canControlQueue === true;
   // 실시간: queue_changed/card_changed broadcast 가 오면 부모 refetch.
@@ -133,8 +147,12 @@ export function DJQueueBoard({
   );
   const upNext = activeQueue.filter((c) => c.id !== nowPlaying?.id);
 
-  const pendingCount = activeQueue.filter((c) => c.queueStatus === "pending").length;
-  const approvedCount = activeQueue.filter((c) => c.queueStatus === "approved").length;
+  const pendingCount = activeQueue.filter(
+    (c) => c.queueStatus === "pending",
+  ).length;
+  const approvedCount = activeQueue.filter(
+    (c) => c.queueStatus === "approved",
+  ).length;
 
   const ranking = useMemo(() => {
     const counts = new Map<string, number>();
@@ -149,7 +167,10 @@ export function DJQueueBoard({
       .slice(0, dj.rankingLimit);
   }, [cards]);
 
-  async function trackMutation<T>(id: string, run: () => Promise<T>): Promise<T> {
+  async function trackMutation<T>(
+    id: string,
+    run: () => Promise<T>,
+  ): Promise<T> {
     pendingIds.current.add(id);
     try {
       return await run();
@@ -170,11 +191,16 @@ export function DJQueueBoard({
       );
       setCards((prev) => [...prev, withBoardAnonymousAuthor(card, data.board)]);
       setSubmitUrl("");
+      setQueueSheetOpen(false);
       onMutate();
     } catch (e) {
       if (e instanceof ApiError) {
         const body = e.body as { error?: string } | string;
-        setSubmitError(typeof body === "object" && body?.error ? body.error : `제출 실패 (${e.status})`);
+        setSubmitError(
+          typeof body === "object" && body?.error
+            ? body.error
+            : `제출 실패 (${e.status})`,
+        );
       } else {
         setSubmitError(e instanceof Error ? e.message : "제출 실패");
       }
@@ -191,10 +217,13 @@ export function DJQueueBoard({
     );
     await trackMutation(cardId, async () => {
       try {
-        await apiFetch(`/api/boards/${encodeURIComponent(boardId)}/queue/${cardId}`, {
-          method: "PATCH",
-          json: { status },
-        });
+        await apiFetch(
+          `/api/boards/${encodeURIComponent(boardId)}/queue/${cardId}`,
+          {
+            method: "PATCH",
+            json: { status },
+          },
+        );
         onMutate();
       } catch (e) {
         setCards(prev);
@@ -221,9 +250,12 @@ export function DJQueueBoard({
           setCards((list) => list.filter((c) => c.id !== cardId));
           await trackMutation(cardId, async () => {
             try {
-              await apiFetch(`/api/boards/${encodeURIComponent(boardId)}/queue/${cardId}`, {
-                method: "DELETE",
-              });
+              await apiFetch(
+                `/api/boards/${encodeURIComponent(boardId)}/queue/${cardId}`,
+                {
+                  method: "DELETE",
+                },
+              );
               onMutate();
             } catch (e) {
               setCards(prev);
@@ -288,10 +320,13 @@ export function DJQueueBoard({
     await trackMutation(cardId, async () => {
       try {
         await Promise.all([
-          apiFetch(`/api/boards/${encodeURIComponent(boardId)}/queue/${cardId}`, {
-            method: "PATCH",
-            json: { status: "approved" },
-          }),
+          apiFetch(
+            `/api/boards/${encodeURIComponent(boardId)}/queue/${cardId}`,
+            {
+              method: "PATCH",
+              json: { status: "approved" },
+            },
+          ),
           apiFetch(
             `/api/boards/${encodeURIComponent(boardId)}/queue/${cardId}/move`,
             { method: "PATCH", json: { order: targetOrder } },
@@ -310,133 +345,181 @@ export function DJQueueBoard({
 
   return (
     <View style={styles.root}>
-      <View style={[styles.header, compact && styles.headerCompact]}>
-        <View style={styles.headerCopy}>
-          <Text style={styles.title}>🎧 {data.board.title}</Text>
-          <Text style={styles.subtitle}>
-            DJ 큐 · 대기 {pendingCount} · 승인 {approvedCount} · 재생 완료 {playedCards.length}
-          </Text>
-        </View>
-        <View style={[styles.headerActions, compact && styles.headerActionsCompact]}>
-          <AppButton
-            variant="secondary"
-            style={styles.headerBtn}
-            onPress={() => setRecapOpen(true)}
-          >
-            📊 이달의 리캡
-          </AppButton>
-          <AppButton
-            variant="secondary"
-            style={styles.headerBtn}
-            onPress={() => setPlayedOpen(true)}
-          >
-            🕘 재생 완료 ({playedCards.length})
-          </AppButton>
-        </View>
-      </View>
-
-      {nowPlaying ? (
-        <NowPlayingCard
-          card={nowPlaying}
-          compact={compact}
-          canControl={canControl}
-          onNext={() => handleStatus(nowPlaying.id, "played")}
-        />
-      ) : null}
-
-      <View style={[styles.layout, compact && styles.layoutCompact]}>
-        <SurfaceCard style={styles.queueCard}>
-          <View style={styles.queueTitleRow}>
-            <Text style={styles.queueTitle}>대기열</Text>
-            <Text style={styles.queueHint}>
-              {canControl ? "↑↓ 로 순서 변경 · 재생 완료에서도 복귀" : "선생님이 승인하면 재생 목록에 올라갑니다"}
+      <ScrollView
+        style={styles.feed}
+        contentContainerStyle={styles.feedContent}
+        contentInsetAdjustmentBehavior="automatic"
+        keyboardShouldPersistTaps="handled"
+      >
+        <View style={[styles.header, compact && styles.headerCompact]}>
+          <View style={styles.headerCopy}>
+            <Text style={styles.title}>🎧 {data.board.title}</Text>
+            <Text style={styles.subtitle}>
+              DJ 큐 · 대기 {pendingCount} · 승인 {approvedCount} · 재생 완료{" "}
+              {playedCards.length}
             </Text>
           </View>
-          {upNext.length === 0 ? (
-            <Text style={styles.empty}>
-              {nowPlaying ? "다음 곡이 없습니다. 오른쪽에서 신청해 보세요." : "신청곡이 없습니다. 오른쪽에서 신청해 보세요."}
-            </Text>
+          <View
+            style={[
+              styles.headerActions,
+              compact && styles.headerActionsCompact,
+            ]}
+          >
+            <AppButton
+              variant="secondary"
+              style={styles.headerBtn}
+              onPress={() => setRecapOpen(true)}
+            >
+              📊 이달의 리캡
+            </AppButton>
+            <AppButton
+              variant="secondary"
+              style={styles.headerBtn}
+              onPress={() => setPlayedOpen(true)}
+            >
+              🕘 재생 완료 ({playedCards.length})
+            </AppButton>
+          </View>
+        </View>
+
+        {nowPlaying ? (
+          <NowPlayingCard
+            card={nowPlaying}
+            compact={compact}
+            canControl={canControl}
+            onNext={() => handleStatus(nowPlaying.id, "played")}
+          />
+        ) : null}
+
+        <View style={styles.feedSection}>
+          <Text style={styles.sectionTitle}>곡 신청 · 대기열</Text>
+          <AppButton
+            variant="secondary"
+            style={styles.menuAction}
+            onPress={() => setQueueSheetOpen(true)}
+          >
+            ＋ 곡 신청 · 대기열 ({upNext.length})
+          </AppButton>
+          <Text style={styles.submitNote}>
+            신청곡과 대기열은 아래 시트에서 확인할 수 있어요.
+          </Text>
+        </View>
+        <View style={styles.rankingSection}>
+          <Text style={styles.sectionTitle}>신청 TOP</Text>
+          {ranking.length === 0 ? (
+            <Text style={styles.submitNote}>아직 신청 기록이 없어요.</Text>
           ) : (
-            <FlatList
-              data={upNext}
-              keyExtractor={(c) => c.id}
-              scrollEnabled={false}
-              renderItem={({ item, index }) => (
-                <QueueItem
-                  card={item}
-                  rank={(nowPlaying ? 2 : 1) + index}
-                  onApprove={() => handleStatus(item.id, "approved")}
-                  onReject={() => handleStatus(item.id, "rejected")}
-                  onMarkPlayed={() => handleStatus(item.id, "played")}
-                  onDelete={() => handleDelete(item.id)}
-                  onMoveUp={() => handleMove(item.id, -1)}
-                  onMoveDown={() => handleMove(item.id, 1)}
-                  canMoveUp={index > 0 || !!nowPlaying}
-                  canMoveDown={index < upNext.length - 1}
-                  canControl={canControl}
-                />
-              )}
-              ItemSeparatorComponent={() => <View style={styles.separator} />}
+            ranking.map((item, index) => (
+              <View key={item.name} style={styles.rankingRow}>
+                <Text
+                  style={[styles.rankingPos, index < 3 && styles.rankingPosTop]}
+                >
+                  {index + 1}
+                </Text>
+                <View
+                  style={[
+                    styles.rankingAvatar,
+                    index === 0 && styles.rankingAvatarTop,
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.rankingAvatarText,
+                      index === 0 && styles.rankingAvatarTextTop,
+                    ]}
+                  >
+                    {item.name[0]}
+                  </Text>
+                </View>
+                <Text style={styles.rankingName} numberOfLines={1}>
+                  {item.name}
+                </Text>
+                <Text style={styles.rankingCount}>{item.count}곡</Text>
+              </View>
+            ))
+          )}
+        </View>
+      </ScrollView>
+
+      <AppBottomSheet
+        visible={queueSheetOpen}
+        onClose={() => setQueueSheetOpen(false)}
+        sheetStyle={[
+          styles.queueSheet,
+          { paddingBottom: insets.bottom + spacing.md },
+        ]}
+        accessibilityLabel="곡 신청 및 대기열"
+        keyboardAvoiding
+      >
+        <View style={styles.sheetHeader}>
+          <Text style={styles.sheetTitle}>곡 신청</Text>
+          <Text style={styles.sheetDescription}>
+            YouTube 링크를 보내 주세요.
+          </Text>
+        </View>
+        <TextField
+          style={styles.submitInput}
+          placeholder="YouTube 링크"
+          value={submitUrl}
+          onChangeText={(text) => {
+            setSubmitUrl(text);
+            if (submitError) setSubmitError(null);
+          }}
+          editable={!submitting}
+          onSubmitEditing={handleSubmit}
+          autoCapitalize="none"
+          autoCorrect={false}
+        />
+        <AppButton
+          style={styles.submitBtn}
+          onPress={handleSubmit}
+          disabled={!submitUrl.trim() || submitting}
+          loading={submitting}
+        >
+          신청하기
+        </AppButton>
+        {submitError ? (
+          <Text style={styles.submitError}>{submitError}</Text>
+        ) : null}
+        <View style={styles.sheetHeader}>
+          <Text style={styles.sheetTitle}>대기열</Text>
+          <Text style={styles.sheetDescription}>
+            {canControl
+              ? "↑↓로 순서를 변경할 수 있어요."
+              : "선생님이 승인하면 재생 목록에 올라갑니다."}
+          </Text>
+        </View>
+        <FlatList
+          data={upNext}
+          keyExtractor={(card) => card.id}
+          style={styles.queueSheetList}
+          contentContainerStyle={styles.queueSheetContent}
+          keyboardShouldPersistTaps="handled"
+          renderItem={({ item, index }) => (
+            <QueueItem
+              card={item}
+              rank={(nowPlaying ? 2 : 1) + index}
+              onApprove={() => handleStatus(item.id, "approved")}
+              onReject={() => handleStatus(item.id, "rejected")}
+              onMarkPlayed={() => handleStatus(item.id, "played")}
+              onDelete={() => handleDelete(item.id)}
+              onMoveUp={() => handleMove(item.id, -1)}
+              onMoveDown={() => handleMove(item.id, 1)}
+              canMoveUp={index > 0 || !!nowPlaying}
+              canMoveDown={index < upNext.length - 1}
+              canControl={canControl}
             />
           )}
-        </SurfaceCard>
-
-        <View style={[styles.side, compact && styles.sideCompact]}>
-          <SurfaceCard style={styles.submitCard}>
-            <Text style={styles.sideTitle}>신청곡 추가</Text>
-            <TextField
-              style={styles.submitInput}
-              placeholder="YouTube 링크 또는 곡 제목"
-              value={submitUrl}
-              onChangeText={(t) => {
-                setSubmitUrl(t);
-                if (submitError) setSubmitError(null);
-              }}
-              editable={!submitting}
-              onSubmitEditing={handleSubmit}
-              autoCapitalize="none"
-              autoCorrect={false}
-            />
-            <AppButton
-              style={styles.submitBtn}
-              onPress={handleSubmit}
-              disabled={!submitUrl.trim() || submitting}
-              loading={submitting}
-            >
-              신청하기
-            </AppButton>
-            {submitError ? (
-              <Text style={styles.submitError}>{submitError}</Text>
-            ) : (
-              <Text style={styles.submitNote}>
-                학생 신청은 대기 상태로 등록되고, 선생님 승인 후 재생 목록에 올라갑니다.
-              </Text>
-            )}
-          </SurfaceCard>
-
-          <SurfaceCard style={styles.rankingCard}>
-            <Text style={styles.sideTitle}>신청 TOP</Text>
-            {ranking.length === 0 ? (
-              <Text style={styles.submitNote}>아직 신청 기록이 없어요.</Text>
-            ) : (
-              ranking.map((r, i) => (
-                <View key={r.name} style={styles.rankingRow}>
-                  <Text style={[styles.rankingPos, i < 3 && styles.rankingPosTop]}>
-                    {i + 1}
-                  </Text>
-                  <View style={[styles.rankingAvatar, i === 0 && styles.rankingAvatarTop]}>
-                    <Text style={[styles.rankingAvatarText, i === 0 && styles.rankingAvatarTextTop]}>
-                      {r.name[0]}
-                    </Text>
-                  </View>
-                  <Text style={styles.rankingName} numberOfLines={1}>{r.name}</Text>
-                  <Text style={styles.rankingCount}>{r.count}곡</Text>
-                </View>
-              ))
-            )}
-          </SurfaceCard>
-        </View>
-      </View>
+          ItemSeparatorComponent={() => <View style={styles.separator} />}
+          ListEmptyComponent={
+            <Text style={styles.empty}>
+              {nowPlaying
+                ? "다음 곡이 없습니다."
+                : "신청곡이 없습니다. 첫 곡을 신청해 보세요."}
+            </Text>
+          }
+        />
+      </AppBottomSheet>
 
       <PlayedDrawer
         open={playedOpen}
@@ -472,39 +555,46 @@ function NowPlayingCard({
   const mediaUrl = getNowPlayingMediaUrl(card);
   const hasImage = !!card.linkImage;
   return (
-    <SurfaceCard style={styles.now}>
+    <View style={styles.now}>
       <Text style={styles.nowLabel}>▶ NOW PLAYING</Text>
       <View style={[styles.nowBody, compact && styles.nowBodyCompact]}>
         {mediaUrl ? (
           <View style={[styles.nowPlayer, compact && styles.nowPlayerCompact]}>
-            <EmbeddedMedia url={mediaUrl} title={card.title} aspectRatio={dj.mediaAspectRatio} />
+            <EmbeddedMedia
+              url={mediaUrl}
+              title={card.title}
+              aspectRatio={dj.mediaAspectRatio}
+            />
           </View>
         ) : hasImage ? (
-          <Image source={{ uri: card.linkImage! }} style={styles.nowThumb} resizeMode="cover" />
+          <Image
+            source={{ uri: card.linkImage! }}
+            style={styles.nowThumb}
+            resizeMode="cover"
+          />
         ) : (
           <View style={[styles.nowThumb, styles.nowThumbFallback]}>
             <Text style={styles.nowThumbEmoji}>♪</Text>
           </View>
         )}
         <View style={styles.nowInfo}>
-          <Text style={styles.nowTitle} numberOfLines={2}>{card.title}</Text>
+          <Text style={styles.nowTitle} numberOfLines={2}>
+            {card.title}
+          </Text>
           <Text style={styles.nowMeta}>
             {card.linkDesc ? `${card.linkDesc} · ` : ""}
             {submitter ? `${submitter}님 신청` : ""}
           </Text>
           {canControl ? (
             <View style={styles.nowActions}>
-              <AppButton
-                variant="secondary"
-                onPress={onNext}
-              >
+              <AppButton variant="secondary" onPress={onNext}>
                 ⏭ 다음 곡
               </AppButton>
             </View>
           ) : null}
         </View>
       </View>
-    </SurfaceCard>
+    </View>
   );
 }
 
@@ -516,7 +606,8 @@ function getNowPlayingMediaUrl(card: BoardCard): string | null {
 }
 
 function resolveQueueAuthorName(card: BoardCard): string {
-  const resolved = card.externalAuthorName ?? card.studentAuthorName ?? card.authorName ?? "";
+  const resolved =
+    card.externalAuthorName ?? card.studentAuthorName ?? card.authorName ?? "";
   return card.anonymousAuthor && resolved ? "익명" : resolved;
 }
 
@@ -550,32 +641,54 @@ function QueueItem({
   const isPending = status === "pending";
 
   return (
-    <View style={[styles.queueItem, isPending && styles.queueItemPending]}>
-      <Text style={styles.queueRank}>{rank}</Text>
-      {card.linkImage ? (
-        <Image source={{ uri: card.linkImage }} style={styles.queueThumb} resizeMode="cover" />
-      ) : (
-        <View style={[styles.queueThumb, styles.queueThumbFallback]}>
-          <Text style={styles.queueThumbEmoji}>♪</Text>
+    <View style={styles.queueItem}>
+      <View style={styles.queueItemMain}>
+        <Text style={styles.queueRank}>{rank}</Text>
+        {card.linkImage ? (
+          <Image
+            source={{ uri: card.linkImage }}
+            style={styles.queueThumb}
+            resizeMode="cover"
+          />
+        ) : (
+          <View style={[styles.queueThumb, styles.queueThumbFallback]}>
+            <Text style={styles.queueThumbEmoji}>♪</Text>
+          </View>
+        )}
+        <View style={styles.queueInfo}>
+          <Text style={styles.queueTrack} numberOfLines={2}>
+            {card.title}
+          </Text>
+          <View style={styles.queueSubRow}>
+            {card.linkDesc ? (
+              <Text style={styles.queueSub}>{card.linkDesc}</Text>
+            ) : null}
+            {submitter ? (
+              <Text style={styles.queueSub}>
+                {card.linkDesc ? " · " : ""}
+                {submitter}
+              </Text>
+            ) : null}
+            {isPending ? (
+              <Pill
+                tone="warning"
+                style={styles.pendingPill}
+                textStyle={styles.pendingText}
+              >
+                대기
+              </Pill>
+            ) : null}
+          </View>
         </View>
-      )}
-      <View style={styles.queueInfo}>
-        <Text style={styles.queueTrack} numberOfLines={1}>{card.title}</Text>
-        <View style={styles.queueSubRow}>
-          {card.linkDesc ? (
-            <Text style={styles.queueSub}>{card.linkDesc}</Text>
-          ) : null}
-          {submitter ? (
-            <Text style={styles.queueSub}>
-              {card.linkDesc ? " · " : ""}{submitter}
-            </Text>
-          ) : null}
-          {isPending ? (
-            <Pill tone="warning" style={styles.pendingPill} textStyle={styles.pendingText}>
-              대기
-            </Pill>
-          ) : null}
-        </View>
+        {canControl && isPending ? (
+          <AppButton
+            style={styles.queueApproveButton}
+            textStyle={styles.queueApproveText}
+            onPress={onApprove}
+          >
+            승인
+          </AppButton>
+        ) : null}
       </View>
       {canControl ? (
         <View style={styles.queueCtrls}>
@@ -593,16 +706,6 @@ function QueueItem({
           >
             <Text style={styles.iconBtnText}>↓</Text>
           </IconButton>
-          {isPending ? (
-            <AppButton
-              variant="secondary"
-              style={[styles.ctrlBtn, styles.ctrlApprove]}
-              textStyle={styles.ctrlText}
-              onPress={onApprove}
-            >
-              승인
-            </AppButton>
-          ) : null}
           <AppButton
             variant="quiet"
             style={styles.ctrlBtn}
@@ -665,7 +768,9 @@ function PlayedDrawer({
       <View style={styles.drawerHead}>
         <View style={styles.drawerCopy}>
           <Text style={styles.drawerTitle}>재생 완료</Text>
-          <Text style={styles.drawerSubtitle}>대기열로 복귀시킬 수 있습니다</Text>
+          <Text style={styles.drawerSubtitle}>
+            대기열로 복귀시킬 수 있습니다
+          </Text>
         </View>
         <IconButton style={styles.drawerClose} onPress={onClose}>
           <Text style={styles.drawerCloseText}>×</Text>
@@ -678,14 +783,20 @@ function PlayedDrawer({
           played.map((p) => (
             <View key={p.id} style={styles.drawerItem}>
               {p.linkImage ? (
-                <Image source={{ uri: p.linkImage }} style={styles.drawerThumb} resizeMode="cover" />
+                <Image
+                  source={{ uri: p.linkImage }}
+                  style={styles.drawerThumb}
+                  resizeMode="cover"
+                />
               ) : (
                 <View style={[styles.drawerThumb, styles.drawerThumbFallback]}>
                   <Text style={styles.drawerThumbEmoji}>♪</Text>
                 </View>
               )}
               <View style={styles.drawerInfo}>
-                <Text style={styles.drawerItemTitle} numberOfLines={1}>{p.title}</Text>
+                <Text style={styles.drawerItemTitle} numberOfLines={1}>
+                  {p.title}
+                </Text>
                 <Text style={styles.drawerItemSub} numberOfLines={1}>
                   {p.linkDesc ? `${p.linkDesc} · ` : ""}
                   {resolveQueueAuthorName(p)}
@@ -719,12 +830,19 @@ function PlayedDrawer({
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, padding: spacing.xl, gap: spacing.lg },
+  root: { flex: 1, backgroundColor: colors.bg },
+  feed: { flex: 1 },
+  feedContent: { paddingBottom: spacing.xl },
   header: {
     flexDirection: "row",
     alignItems: "flex-start",
     justifyContent: "space-between",
     gap: spacing.md,
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.lg,
+    paddingBottom: spacing.md,
+    borderBottomWidth: borders.hairline,
+    borderBottomColor: colors.border,
   },
   headerCompact: {
     flexDirection: "column",
@@ -735,15 +853,22 @@ const styles = StyleSheet.create({
     flexWrap: "wrap",
   },
   title: { ...typography.title, color: colors.text },
-  subtitle: { ...typography.body, color: colors.textMuted, marginTop: spacing.xs },
+  subtitle: {
+    ...typography.body,
+    color: colors.textMuted,
+    marginTop: spacing.xs,
+  },
   headerBtn: {
     flexShrink: 0,
   },
 
   // NOW PLAYING
   now: {
-    padding: spacing.xl,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.lg,
     gap: spacing.md,
+    borderBottomWidth: borders.hairline,
+    borderBottomColor: colors.border,
   },
   nowLabel: { ...typography.badge, color: colors.accent },
   nowBody: {
@@ -774,51 +899,88 @@ const styles = StyleSheet.create({
   nowThumbFallback: { alignItems: "center", justifyContent: "center" },
   nowThumbEmoji: { fontSize: iconSizes.xl, color: colors.onAccent },
   nowInfo: { flex: 1, minWidth: 0 },
-  nowTitle: { ...typography.title, color: colors.text, marginBottom: spacing.xs },
+  nowTitle: {
+    ...typography.title,
+    color: colors.text,
+    marginBottom: spacing.xs,
+  },
   nowMeta: { ...typography.body, color: colors.textMuted },
-  nowActions: { flexDirection: "row", gap: spacing.sm, marginTop: spacing.md, flexWrap: "wrap" },
-  // Layout
-  layout: {
-    flex: 1,
+  nowActions: {
     flexDirection: "row",
-    gap: spacing.lg,
-  },
-  layoutCompact: {
-    flexDirection: "column",
-  },
-  queueCard: {
-    flex: 1,
-    padding: spacing.md,
-  },
-  queueTitleRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: spacing.sm,
+    gap: spacing.sm,
+    marginTop: spacing.md,
     flexWrap: "wrap",
-    gap: spacing.xs,
   },
-  queueTitle: { ...typography.section, color: colors.text },
-  queueHint: { ...typography.micro, color: colors.textMuted },
-  separator: { height: spacing.xs },
+  // Stream sections
+  feedSection: {
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.lg,
+    borderBottomWidth: borders.hairline,
+    borderBottomColor: colors.border,
+  },
+  sectionTitle: { ...typography.section, color: colors.text },
+  menuAction: {
+    marginTop: spacing.md,
+  },
+  sheetHeader: {
+    gap: spacing.xxs,
+    paddingHorizontal: spacing.lg,
+    paddingBottom: spacing.md,
+  },
+  sheetTitle: { ...typography.section, color: colors.text },
+  sheetDescription: { ...typography.micro, color: colors.textMuted },
+  submitInput: {
+    backgroundColor: colors.surface,
+    marginHorizontal: spacing.lg,
+  },
+  submitBtn: {
+    marginHorizontal: spacing.lg,
+    marginTop: spacing.sm,
+  },
+  submitNote: {
+    ...typography.micro,
+    color: colors.textMuted,
+    marginTop: spacing.sm,
+  },
+  submitError: {
+    ...typography.micro,
+    color: colors.danger,
+    marginTop: spacing.sm,
+  },
+  queueSheet: {
+    height: "82%",
+    maxHeight: "82%",
+    minHeight: tapMin * 6,
+  },
+  queueSheetList: { flex: 1 },
+  queueSheetContent: {
+    paddingBottom: spacing.lg,
+  },
+  separator: {
+    height: borders.hairline,
+    marginHorizontal: spacing.lg,
+    backgroundColor: colors.border,
+  },
   empty: {
     ...typography.body,
     color: colors.textMuted,
     textAlign: "center",
     padding: spacing.xl,
+    borderBottomWidth: borders.hairline,
+    borderBottomColor: colors.border,
   },
 
   // Queue item
   queueItem: {
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
+    gap: spacing.sm,
+  },
+  queueItemMain: {
     flexDirection: "row",
     alignItems: "center",
     gap: spacing.sm,
-    paddingVertical: spacing.xs,
-    paddingHorizontal: spacing.sm,
-    borderRadius: radii.btn,
-    backgroundColor: colors.transparent,
   },
-  queueItemPending: { backgroundColor: colors.warningTintedBg },
   queueRank: {
     width: dj.queueRankWidth,
     textAlign: "center",
@@ -835,14 +997,30 @@ const styles = StyleSheet.create({
   queueThumbFallback: { alignItems: "center", justifyContent: "center" },
   queueThumbEmoji: { fontSize: iconSizes.sm, color: colors.onAccent },
   queueInfo: { flex: 1, minWidth: 0 },
+  queueApproveButton: {
+    minHeight: tapMin,
+    paddingHorizontal: spacing.md,
+  },
+  queueApproveText: { ...typography.badge, color: colors.onAccent },
   queueTrack: { ...typography.label, color: colors.text },
-  queueSubRow: { flexDirection: "row", alignItems: "center", flexWrap: "wrap", gap: spacing.xs, marginTop: spacing.xs },
+  queueSubRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    flexWrap: "wrap",
+    gap: spacing.xs,
+    marginTop: spacing.xs,
+  },
   queueSub: { ...typography.micro, color: colors.textMuted },
   pendingPill: {
     marginLeft: spacing.xs,
   },
   pendingText: { ...typography.badge, color: colors.warningTintedText },
-  queueCtrls: { flexDirection: "row", gap: spacing.xs },
+  queueCtrls: {
+    flexDirection: "row",
+    justifyContent: "flex-end",
+    flexWrap: "wrap",
+    gap: spacing.xs,
+  },
   iconBtn: {
     width: dj.compactIconButton,
     height: dj.compactIconButton,
@@ -854,27 +1032,15 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.sm,
     paddingVertical: spacing.xs,
   },
-  ctrlApprove: { borderColor: colors.plantActive, backgroundColor: colors.statusReviewedBg },
   ctrlText: { ...typography.badge, color: colors.textMuted },
 
-  // Side
-  side: { width: dj.sideWidth, gap: spacing.md },
-  sideCompact: { width: "100%" },
-  submitCard: {
-    padding: spacing.lg,
-  },
-  sideTitle: { ...typography.label, color: colors.text, marginBottom: spacing.md },
-  submitInput: {
-    backgroundColor: colors.bg,
-  },
-  submitBtn: {
+  // Ranking feed section
+  rankingSection: {
     marginTop: spacing.sm,
-  },
-  submitNote: { ...typography.micro, color: colors.textMuted, marginTop: spacing.sm },
-  submitError: { ...typography.micro, color: colors.danger, marginTop: spacing.sm },
-
-  rankingCard: {
-    padding: spacing.lg,
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.lg,
+    borderTopWidth: borders.hairline,
+    borderTopColor: colors.border,
   },
   rankingRow: {
     flexDirection: "row",
@@ -902,7 +1068,11 @@ const styles = StyleSheet.create({
   rankingAvatarText: { ...typography.micro, color: colors.text },
   rankingAvatarTextTop: { color: colors.onAccent },
   rankingName: { flex: 1, ...typography.body, color: colors.text },
-  rankingCount: { ...typography.body, color: colors.textMuted, fontVariant: ["tabular-nums"] },
+  rankingCount: {
+    ...typography.body,
+    color: colors.textMuted,
+    fontVariant: ["tabular-nums"],
+  },
 
   // Drawer
   drawer: {
@@ -922,7 +1092,11 @@ const styles = StyleSheet.create({
   },
   drawerCopy: { flex: 1 },
   drawerTitle: { ...typography.section, color: colors.text },
-  drawerSubtitle: { ...typography.micro, color: colors.textMuted, marginTop: spacing.xs },
+  drawerSubtitle: {
+    ...typography.micro,
+    color: colors.textMuted,
+    marginTop: spacing.xs,
+  },
   drawerClose: {
     borderWidth: borders.hairline,
     borderColor: colors.border,
@@ -947,7 +1121,11 @@ const styles = StyleSheet.create({
   drawerThumbEmoji: { fontSize: iconSizes.sm, color: colors.onAccent },
   drawerInfo: { flex: 1, minWidth: 0 },
   drawerItemTitle: { ...typography.label, color: colors.text },
-  drawerItemSub: { ...typography.micro, color: colors.textMuted, marginTop: spacing.xs },
+  drawerItemSub: {
+    ...typography.micro,
+    color: colors.textMuted,
+    marginTop: spacing.xs,
+  },
   drawerBtn: {
     borderRadius: radii.btn,
   },

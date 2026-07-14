@@ -35,6 +35,19 @@ export async function GET(
     include: {
       authorUser: { select: { id: true, name: true } },
       authorStudent: { select: { id: true, name: true } },
+      _count: { select: { likes: true } },
+      // A comment like is limited to one row per actor by the schema's
+      // composite unique index, so this relation is at most one row.
+      likes: {
+        where:
+          actor.kind === "teacher"
+            ? { likerUserId: actor.id }
+            : actor.kind === "student"
+              ? { likerStudentId: actor.id }
+              : { id: "__parent_cannot_like_comments__" },
+        select: { id: true },
+        take: 1,
+      },
     },
   });
 
@@ -57,6 +70,8 @@ export async function GET(
         anonymous: access.ctx.anonymousAuthor,
       }),
       canDelete: ownByMe || actor.kind === "teacher",
+      likeCount: r._count.likes,
+      isLiked: r.likes.length > 0,
     };
   });
 
@@ -139,6 +154,8 @@ export async function POST(
         anonymous: access.ctx.anonymousAuthor,
       }),
       canDelete: true,
+      likeCount: 0,
+      isLiked: false,
     },
   });
 }

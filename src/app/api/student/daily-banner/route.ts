@@ -62,9 +62,9 @@ export async function GET(req: Request) {
   const status =
     statusValue === null || statusValue === ""
       ? undefined
-      : (["pending", "approved", "rejected"].includes(statusValue)
-          ? (statusValue as "pending" | "approved" | "rejected")
-          : "invalid");
+      : ["pending", "approved", "rejected"].includes(statusValue)
+        ? (statusValue as "pending" | "approved" | "rejected")
+        : "invalid";
   if (status === "invalid") return json({ error: "invalid_status" }, 400);
 
   const submissions = await db.dailyBannerSubmission.findMany({
@@ -84,7 +84,7 @@ export async function GET(req: Request) {
 
 // POST /api/student/daily-banner
 // Body: { targetDay, kind: "text", text } or
-//       { targetDay, kind: "image", imageUrl }.
+//       { targetDay, kind: "image", imageUrl, text? }.
 export async function POST(req: Request) {
   const student = await requireStudent();
   if (!student) return json({ error: "unauthorized" }, 401);
@@ -99,7 +99,9 @@ export async function POST(req: Request) {
   if (!parsed.success) return json({ error: "invalid_input" }, 400);
 
   const input = parsed.data;
-  const day = parseKstDay(input.targetDay ?? input.day ?? input.date ?? getKstDay());
+  const day = parseKstDay(
+    input.targetDay ?? input.day ?? input.date ?? getKstDay(),
+  );
   if (!day) return json({ error: "invalid_day" }, 400);
 
   const requestedKind = input.kind ?? input.type;
@@ -118,13 +120,12 @@ export async function POST(req: Request) {
   if (!kind) return json({ error: "content_required" }, 400);
 
   if (kind === "text") {
-    if (!input.text || imageUrl) return json({ error: "invalid_text_banner" }, 400);
+    if (!input.text || imageUrl)
+      return json({ error: "invalid_text_banner" }, 400);
   } else if (!isAllowedDailyBannerImageUrl(imageUrl)) {
     // Do not accept arbitrary remote URLs. Clients must use /api/upload first;
     // isAllowedFileUrl permits only the configured public upload locations.
     return json({ error: "invalid_image_url" }, 400);
-  } else if (input.text) {
-    return json({ error: "invalid_image_banner" }, 400);
   }
 
   try {
@@ -134,7 +135,7 @@ export async function POST(req: Request) {
         classroomId: student.classroomId,
         targetDay: kstDayToDate(day),
         kind,
-        text: kind === "text" ? input.text! : null,
+        text: input.text ?? null,
         imageUrl: kind === "image" ? imageUrl! : null,
       },
     });

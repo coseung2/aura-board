@@ -8,7 +8,6 @@ import {
   View,
 } from "react-native";
 import * as ImagePicker from "expo-image-picker";
-import { Image } from "expo-image";
 import { useRouter } from "expo-router";
 import { ChevronLeft, ChevronRight, X } from "lucide-react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -33,6 +32,7 @@ import {
   IconButton,
   TextField,
 } from "../../components/ui";
+import { DailyBannerPreview } from "../../components/DailyBanner";
 
 type BannerMode = "marquee" | "image";
 
@@ -180,7 +180,8 @@ async function uploadImage(uri: string, name: string, mimeType: string) {
     headers: token ? { Authorization: `Bearer ${token}` } : {},
     body: form as unknown as BodyInit,
   });
-  if (!response.ok) throw new Error(`이미지를 업로드하지 못했어요. (${response.status})`);
+  if (!response.ok)
+    throw new Error(`이미지를 업로드하지 못했어요. (${response.status})`);
   const body = (await response.json()) as { url?: unknown };
   if (typeof body.url !== "string" || !body.url) {
     throw new Error("업로드된 이미지 주소를 확인하지 못했어요.");
@@ -190,7 +191,6 @@ async function uploadImage(uri: string, name: string, mimeType: string) {
 
 export default function DailyBannerSubmitScreen() {
   const router = useRouter();
-  const [mode, setMode] = useState<BannerMode>("marquee");
   const [month, setMonth] = useState(() => todayIso().slice(0, 7));
   const [date, setDate] = useState<string | null>(null);
   const [text, setText] = useState("");
@@ -222,26 +222,29 @@ export default function DailyBannerSubmitScreen() {
     }
   }, [router]);
 
-  const loadCalendar = useCallback(async (monthKey: string) => {
-    setCalendarLoading(true);
-    setCalendarError(null);
-    try {
-      const response = await apiFetch<unknown>(
-        `/api/student/daily-banner/calendar?month=${encodeURIComponent(monthKey)}`,
-      );
-      setOccupiedDays(parseOccupiedDays(response));
-    } catch (nextError) {
-      if (nextError instanceof ApiError && nextError.status === 401) {
-        await clearSessionToken();
-        router.replace("/(student)/login");
-        return;
+  const loadCalendar = useCallback(
+    async (monthKey: string) => {
+      setCalendarLoading(true);
+      setCalendarError(null);
+      try {
+        const response = await apiFetch<unknown>(
+          `/api/student/daily-banner/calendar?month=${encodeURIComponent(monthKey)}`,
+        );
+        setOccupiedDays(parseOccupiedDays(response));
+      } catch (nextError) {
+        if (nextError instanceof ApiError && nextError.status === 401) {
+          await clearSessionToken();
+          router.replace("/(student)/login");
+          return;
+        }
+        setOccupiedDays([]);
+        setCalendarError("예약 현황을 불러오지 못했어요.");
+      } finally {
+        setCalendarLoading(false);
       }
-      setOccupiedDays([]);
-      setCalendarError("예약 현황을 불러오지 못했어요.");
-    } finally {
-      setCalendarLoading(false);
-    }
-  }, [router]);
+    },
+    [router],
+  );
 
   useEffect(() => {
     void loadSubmissions();
@@ -259,18 +262,19 @@ export default function DailyBannerSubmitScreen() {
         submissions
           .filter(
             (submission) =>
-              submission.status === "pending" || submission.status === "approved",
+              submission.status === "pending" ||
+              submission.status === "approved",
           )
           .map((submission) => submission.date),
       ),
     [submissions],
   );
-  const fallbackReservation = useMemo(() => demoReservationDays(month), [month]);
+  const fallbackReservation = useMemo(
+    () => demoReservationDays(month),
+    [month],
+  );
   const displayedOccupiedSet = useMemo(
-    () =>
-      calendarError
-        ? new Set(fallbackReservation.occupied)
-        : occupiedSet,
+    () => (calendarError ? new Set(fallbackReservation.occupied) : occupiedSet),
     [calendarError, fallbackReservation.occupied, occupiedSet],
   );
   const displayedOwnSet = useMemo(
@@ -295,9 +299,13 @@ export default function DailyBannerSubmitScreen() {
 
   async function pickImage() {
     try {
-      const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      const permission =
+        await ImagePicker.requestMediaLibraryPermissionsAsync();
       if (!permission.granted) {
-        Alert.alert("권한 필요", "사진을 선택하려면 사진 보관함 권한을 허용해 주세요.");
+        Alert.alert(
+          "권한 필요",
+          "사진을 선택하려면 사진 보관함 권한을 허용해 주세요.",
+        );
         return;
       }
       const result = await ImagePicker.launchImageLibraryAsync({
@@ -309,11 +317,18 @@ export default function DailyBannerSubmitScreen() {
       setBusy(true);
       setError(null);
       const name = asset.fileName ?? `daily-banner-${Date.now()}.jpg`;
-      const url = await uploadImage(asset.uri, name, asset.mimeType ?? "image/jpeg");
+      const url = await uploadImage(
+        asset.uri,
+        name,
+        asset.mimeType ?? "image/jpeg",
+      );
       setImage({ uri: asset.uri, url, name });
-      setMode("image");
     } catch (nextError) {
-      setError(nextError instanceof Error ? nextError.message : "이미지를 준비하지 못했어요.");
+      setError(
+        nextError instanceof Error
+          ? nextError.message
+          : "이미지를 준비하지 못했어요.",
+      );
     } finally {
       setBusy(false);
     }
@@ -326,12 +341,8 @@ export default function DailyBannerSubmitScreen() {
       setError("캘린더에서 게시할 날짜를 선택해 주세요.");
       return;
     }
-    if (mode === "marquee" && !normalizedText) {
-      setError("움직이는 문구를 입력해 주세요.");
-      return;
-    }
-    if (mode === "image" && !image) {
-      setError("배너 이미지를 선택해 주세요.");
+    if (!normalizedText) {
+      setError("문구를 입력해 주세요.");
       return;
     }
 
@@ -341,10 +352,14 @@ export default function DailyBannerSubmitScreen() {
     try {
       await apiFetch("/api/student/daily-banner", {
         method: "POST",
-        json:
-          mode === "marquee"
-            ? { targetDay: normalizedDate, kind: "text", text: normalizedText }
-            : { targetDay: normalizedDate, kind: mode, imageUrl: image?.url },
+        json: image
+          ? {
+              targetDay: normalizedDate,
+              kind: "image",
+              text: normalizedText,
+              imageUrl: image.url,
+            }
+          : { targetDay: normalizedDate, kind: "text", text: normalizedText },
       });
       setSuccess(true);
       setText("");
@@ -357,7 +372,9 @@ export default function DailyBannerSubmitScreen() {
         router.replace("/(student)/login");
         return;
       }
-      setError(nextError instanceof Error ? nextError.message : "제출하지 못했어요.");
+      setError(
+        nextError instanceof Error ? nextError.message : "제출하지 못했어요.",
+      );
     } finally {
       setBusy(false);
     }
@@ -384,7 +401,7 @@ export default function DailyBannerSubmitScreen() {
                 disabled={month <= todayIso().slice(0, 7)}
                 accessibilityLabel="이전 달"
               >
-                <ChevronLeft size={20} color={colors.icon} />
+                <ChevronLeft size={20} color={colors.textMuted} />
               </IconButton>
               <Text style={styles.calendarMonth} selectable>
                 {monthLabel(month)}
@@ -393,7 +410,7 @@ export default function DailyBannerSubmitScreen() {
                 onPress={() => setMonth((current) => shiftMonth(current, 1))}
                 accessibilityLabel="다음 달"
               >
-                <ChevronRight size={20} color={colors.icon} />
+                <ChevronRight size={20} color={colors.textMuted} />
               </IconButton>
             </View>
           </View>
@@ -426,10 +443,17 @@ export default function DailyBannerSubmitScreen() {
                 <View key={`${month}-${weekIndex}`} style={styles.weekRow}>
                   {week.map((calendarDay, dayIndex) => {
                     if (!calendarDay) {
-                      return <View key={`empty-${dayIndex}`} style={styles.dayCell} />;
+                      return (
+                        <View
+                          key={`empty-${dayIndex}`}
+                          style={styles.dayCell}
+                        />
+                      );
                     }
                     const isPast = calendarDay.date < todayIso();
-                    const isOccupied = displayedOccupiedSet.has(calendarDay.date);
+                    const isOccupied = displayedOccupiedSet.has(
+                      calendarDay.date,
+                    );
                     const isMine = displayedOwnSet.has(calendarDay.date);
                     const disabled = isPast || isOccupied || isMine;
                     const status = isOccupied ? "마감" : isMine ? "신청" : null;
@@ -458,7 +482,9 @@ export default function DailyBannerSubmitScreen() {
                         >
                           {calendarDay.day}
                         </Text>
-                        {status ? <Text style={styles.dayStatus}>{status}</Text> : null}
+                        {status ? (
+                          <Text style={styles.dayStatus}>{status}</Text>
+                        ) : null}
                       </ControlPressable>
                     );
                   })}
@@ -482,14 +508,19 @@ export default function DailyBannerSubmitScreen() {
                 </AppButton>
               </View>
               <Text style={styles.calendarFallbackNote} selectable>
-                임시 표시예요. 회색 ‘마감’은 이미 승인된 날짜, 파란 ‘신청’은 내 제안이에요.
+                임시 표시예요. 회색 ‘마감’은 이미 승인된 날짜, 파란 ‘신청’은 내
+                제안이에요.
               </Text>
             </View>
           ) : null}
         </View>
 
         {success ? (
-          <Text style={styles.success} accessibilityLiveRegion="polite" selectable>
+          <Text
+            style={styles.success}
+            accessibilityLiveRegion="polite"
+            selectable
+          >
             제안이 접수됐어요. 승인 결과를 기다려 주세요.
           </Text>
         ) : null}
@@ -507,9 +538,15 @@ export default function DailyBannerSubmitScreen() {
               {submissions.slice(0, 5).map((submission) => (
                 <View key={submission.id} style={styles.historyRow}>
                   <View style={styles.historyCopy}>
-                    <Text style={styles.historyDate} selectable>{submission.date}</Text>
-                    <Text style={styles.historyKind} numberOfLines={1} selectable>
-                      {submission.kind === "marquee" ? submission.text : "이미지 배너"}
+                    <Text style={styles.historyDate} selectable>
+                      {submission.date}
+                    </Text>
+                    <Text
+                      style={styles.historyKind}
+                      numberOfLines={1}
+                      selectable
+                    >
+                      {submission.text ?? "이미지 배너"}
                     </Text>
                   </View>
                   <Text style={styles.status} selectable>
@@ -541,79 +578,68 @@ export default function DailyBannerSubmitScreen() {
               </Text>
             ) : null}
           </View>
-          <IconButton onPress={closeEditor} disabled={busy} accessibilityLabel="닫기">
-            <X size={20} color={colors.icon} />
+          <IconButton
+            onPress={closeEditor}
+            disabled={busy}
+            accessibilityLabel="닫기"
+          >
+            <X size={20} color={colors.textMuted} />
           </IconButton>
         </View>
 
-        <ScrollView
-          keyboardShouldPersistTaps="handled"
-          contentContainerStyle={styles.modalContent}
-        >
+        <View style={styles.modalContent}>
           <View style={styles.form}>
             <View style={styles.fieldGroup}>
-              <Text style={styles.label}>배너 유형</Text>
-              <View style={styles.modeRow}>
-                <ControlPressable
-                  style={[styles.modeButton, mode === "marquee" && styles.modeSelected]}
-                  onPress={() => setMode("marquee")}
-                  disabled={busy}
-                  accessibilityState={{ selected: mode === "marquee" }}
-                >
-                  <Text style={[styles.modeText, mode === "marquee" && styles.modeTextSelected]}>
-                    움직이는 문구
-                  </Text>
-                </ControlPressable>
-                <ControlPressable
-                  style={[styles.modeButton, mode === "image" && styles.modeSelected]}
-                  onPress={() => setMode("image")}
-                  disabled={busy}
-                  accessibilityState={{ selected: mode === "image" }}
-                >
-                  <Text style={[styles.modeText, mode === "image" && styles.modeTextSelected]}>
-                    이미지
-                  </Text>
-                </ControlPressable>
-              </View>
+              <Text style={styles.label}>미리보기</Text>
+              <DailyBannerPreview
+                text={text.trim() || undefined}
+                imageUrl={image?.uri}
+              />
+              {image ? (
+                <Text style={styles.fileName} numberOfLines={1} selectable>
+                  {image.name}
+                </Text>
+              ) : null}
             </View>
 
-            {mode === "marquee" ? (
-              <View style={styles.fieldGroup}>
-                <Text style={styles.label}>문구</Text>
-                <TextField
-                  value={text}
-                  onChangeText={(value) => setText(value.slice(0, 120))}
-                  placeholder="친구들에게 전할 짧은 소식"
-                  maxLength={120}
-                  multiline
-                  editable={!busy}
-                  accessibilityLabel="움직이는 배너 문구"
-                />
-                <Text style={styles.hint}>{text.length}/120</Text>
-              </View>
-            ) : (
-              <View style={styles.fieldGroup}>
-                <Text style={styles.label}>이미지</Text>
-                <AppButton variant="secondary" onPress={() => void pickImage()} disabled={busy}>
-                  {image ? "이미지 다시 선택" : "이미지 선택"}
-                </AppButton>
-                {image ? (
-                  <View style={styles.previewWrap}>
-                    <Image source={{ uri: image.uri }} style={styles.preview} contentFit="cover" />
-                    <Text style={styles.fileName} numberOfLines={1} selectable>
-                      {image.name}
-                    </Text>
-                  </View>
-                ) : null}
-              </View>
-            )}
+            <View style={styles.fieldGroup}>
+              <Text style={styles.label}>문구</Text>
+              <TextField
+                value={text}
+                onChangeText={(value) => setText(value.slice(0, 120))}
+                placeholder="친구들에게 전할 짧은 소식"
+                maxLength={120}
+                multiline
+                editable={!busy}
+                accessibilityLabel="배너 문구"
+              />
+              <Text style={styles.hint}>{text.length}/120</Text>
+            </View>
 
-            {error ? <Text style={styles.fieldError} accessibilityRole="alert">{error}</Text> : null}
+            <View style={styles.fieldGroup}>
+              <Text style={styles.label}>이미지</Text>
+              <Text style={styles.imageGuide} selectable>
+                권장 제작 크기: 1500 × 500px (가로 3:1)
+              </Text>
+              <AppButton
+                variant="secondary"
+                onPress={() => void pickImage()}
+                disabled={busy}
+              >
+                {image ? "이미지 변경" : "이미지 추가"}
+              </AppButton>
+            </View>
+
+            {error ? (
+              <Text style={styles.fieldError} accessibilityRole="alert">
+                {error}
+              </Text>
+            ) : null}
             <AppButton onPress={() => void submit()} loading={busy}>
               제안 제출
             </AppButton>
           </View>
-        </ScrollView>
+        </View>
       </AppModal>
     </SafeAreaView>
   );
@@ -696,8 +722,7 @@ const styles = StyleSheet.create({
   calendarFallbackNote: { ...typography.micro, color: colors.textMuted },
   retryButton: { alignSelf: "center" },
   modalSheet: {
-    height: composer.sheetMaxHeight,
-    maxHeight: composer.sheetMaxHeight,
+    maxHeight: "100%",
   },
   modalHeader: {
     flexDirection: "row",
@@ -719,32 +744,8 @@ const styles = StyleSheet.create({
   form: { gap: spacing.lg },
   fieldGroup: { gap: spacing.sm },
   label: { ...typography.label, color: colors.text },
-  modeRow: { flexDirection: "row", gap: spacing.sm },
-  modeButton: {
-    flex: 1,
-    minHeight: tapMin,
-    alignItems: "center",
-    justifyContent: "center",
-    paddingHorizontal: spacing.md,
-    borderWidth: borders.hairline,
-    borderColor: colors.border,
-    borderRadius: radii.control,
-    backgroundColor: colors.surface,
-  },
-  modeSelected: {
-    borderColor: colors.accent,
-    backgroundColor: colors.accentTintedBg,
-  },
-  modeText: { ...typography.label, color: colors.textMuted },
-  modeTextSelected: { color: colors.accentTintedText, fontWeight: "700" },
   hint: { ...typography.micro, color: colors.textMuted, textAlign: "right" },
-  previewWrap: { gap: spacing.xs },
-  preview: {
-    width: "100%",
-    aspectRatio: 3 / 2,
-    borderRadius: radii.control,
-    backgroundColor: colors.surfaceAlt,
-  },
+  imageGuide: { ...typography.micro, color: colors.textMuted },
   fileName: { ...typography.micro, color: colors.textMuted },
   fieldError: { ...typography.body, color: colors.danger },
   success: { ...typography.body, color: colors.plantActive },

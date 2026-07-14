@@ -1,18 +1,22 @@
 import { useCallback, useMemo, useState } from "react";
+import { Alert, ScrollView, StyleSheet, Text, View } from "react-native";
 import {
-  Alert,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
-} from "react-native";
-import { colors, iconSizes, spacing, typography } from "../../theme/tokens";
+  borders,
+  colors,
+  controls,
+  iconSizes,
+  plant,
+  radii,
+  spacing,
+  typography,
+} from "../../theme/tokens";
 import * as ImagePicker from "expo-image-picker";
 import { PlantHero } from "../plant/PlantHero";
 import { StageRow } from "../plant/StageRow";
 import { ImageLightbox } from "../plant/ImageLightbox";
 import { ObservationEditor } from "../plant/ObservationEditor";
 import { NoPhotoReasonModal } from "../plant/NoPhotoReasonModal";
+import { AppButton, AppModal, ControlPressable } from "../ui";
 import type {
   BoardDetailResponse,
   ObservationDTO,
@@ -40,7 +44,9 @@ function groupObservationsByStage(observations: ObservationDTO[]) {
   return map;
 }
 
-function computeDaysSinceLastObs(observations: ObservationDTO[]): number | null {
+function computeDaysSinceLastObs(
+  observations: ObservationDTO[],
+): number | null {
   if (observations.length === 0) return null;
   const latest = observations.reduce((a, b) =>
     new Date(a.observedAt) > new Date(b.observedAt) ? a : b,
@@ -49,10 +55,27 @@ function computeDaysSinceLastObs(observations: ObservationDTO[]): number | null 
   return Math.floor(diff / (1000 * 60 * 60 * 24));
 }
 
+function normalizeObservationPoints(value: unknown): string[] {
+  if (Array.isArray(value)) {
+    return value
+      .filter((point): point is string => typeof point === "string")
+      .map((point) => point.trim())
+      .filter(Boolean);
+  }
+  if (typeof value !== "string" || !value.trim()) return [];
+  try {
+    return normalizeObservationPoints(JSON.parse(value));
+  } catch {
+    return [];
+  }
+}
+
 // API/raw 데이터를 안전하게 StudentPlantDTO 로 정규화.
 function normalizePlant(
   raw:
-    | NonNullable<BoardDetailResponse["layoutData"]["plantRoadmap"]>["plants"][number]
+    | NonNullable<
+        BoardDetailResponse["layoutData"]["plantRoadmap"]
+      >["plants"][number]
     | StudentPlantDTO,
 ): StudentPlantDTO | null {
   if (!raw || !raw.species) return null;
@@ -62,7 +85,15 @@ function normalizePlant(
     speciesId: raw.speciesId ?? raw.species.id,
     nickname: raw.nickname,
     currentStageId: raw.currentStageId ?? rawWithStage.currentStage?.id ?? "",
-    species: raw.species,
+    species: {
+      ...raw.species,
+      stages: (raw.species.stages ?? []).map((stage) => ({
+        ...stage,
+        observationPoints: normalizeObservationPoints(
+          (stage as { observationPoints?: unknown }).observationPoints,
+        ),
+      })),
+    },
     observations: (raw.observations ?? []).map((obs) => ({
       ...obs,
       images: obs.images ?? [],
@@ -105,6 +136,8 @@ export function PlantRoadmapBoard({
   const [editingObs, setEditingObs] = useState<ObservationDTO | null>(null);
   const [reasonModalVisible, setReasonModalVisible] = useState(false);
   const [reasonBusy, setReasonBusy] = useState(false);
+  const [selectedRoadmapStage, setSelectedRoadmapStage] =
+    useState<StageDTO | null>(null);
 
   // ─── 파생 데이터 ───
   const stages = useMemo(
@@ -113,7 +146,8 @@ export function PlantRoadmapBoard({
   );
 
   const currentStage = useMemo(
-    () => stages.find((s) => s.id === plant?.currentStageId) ?? stages[0] ?? null,
+    () =>
+      stages.find((s) => s.id === plant?.currentStageId) ?? stages[0] ?? null,
     [stages, plant?.currentStageId],
   );
 
@@ -123,7 +157,11 @@ export function PlantRoadmapBoard({
   );
 
   const totalPhotos = useMemo(
-    () => (plant?.observations ?? []).reduce((sum, o) => sum + (o.images?.length ?? 0), 0),
+    () =>
+      (plant?.observations ?? []).reduce(
+        (sum, o) => sum + (o.images?.length ?? 0),
+        0,
+      ),
     [plant?.observations],
   );
 
@@ -152,11 +190,14 @@ export function PlantRoadmapBoard({
   }, [plant]);
 
   // 관찰 추가 모달 열기
-  const handleOpenEditor = useCallback((stageId: string, obs?: ObservationDTO) => {
-    setEditorStageId(stageId);
-    setEditingObs(obs ?? null);
-    setEditorVisible(true);
-  }, []);
+  const handleOpenEditor = useCallback(
+    (stageId: string, obs?: ObservationDTO) => {
+      setEditorStageId(stageId);
+      setEditingObs(obs ?? null);
+      setEditorVisible(true);
+    },
+    [],
+  );
 
   // 관찰 추가/수정 제출
   const handleEditorSubmit = useCallback(
@@ -165,7 +206,10 @@ export function PlantRoadmapBoard({
       if (editingObs) {
         await apiUpdateObservation(plant.id, editingObs.id, payload);
       } else {
-        await createObservation(plant.id, { stageId: editorStageId, ...payload });
+        await createObservation(plant.id, {
+          stageId: editorStageId,
+          ...payload,
+        });
       }
       setEditorVisible(false);
       setEditingObs(null);
@@ -179,7 +223,10 @@ export function PlantRoadmapBoard({
   const handlePickImage = useCallback(async (): Promise<string | null> => {
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!permission.granted) {
-      Alert.alert("사진 권한 필요", "관찰 사진을 올리려면 사진 접근 권한이 필요해요.");
+      Alert.alert(
+        "사진 권한 필요",
+        "관찰 사진을 올리려면 사진 접근 권한이 필요해요.",
+      );
       return null;
     }
 
@@ -289,9 +336,14 @@ export function PlantRoadmapBoard({
     : editorStageId
       ? (() => {
           const s = stages.find((st) => st.id === editorStageId);
-          return s ? `${s.order}단계 · ${s.nameKo} 기록 추가` : "관찰 기록 추가";
+          return s
+            ? `${s.order}단계 · ${s.nameKo} 기록 추가`
+            : "관찰 기록 추가";
         })()
       : "관찰 기록 추가";
+  const selectedRoadmapPoints = normalizeObservationPoints(
+    selectedRoadmapStage?.observationPoints,
+  );
 
   return (
     <View style={styles.root}>
@@ -309,8 +361,50 @@ export function PlantRoadmapBoard({
           daysSinceLastObs={daysSinceLastObs}
         />
 
-        {/* 세로 타임라인 */}
-        <Text style={styles.sectionTitle}>🛣️ 성장 타임라인</Text>
+        <View style={styles.roadmapSection}>
+          <Text style={styles.sectionTitle}>🛣️ 성장 로드맵</Text>
+          <Text style={styles.roadmapHint}>
+            단계를 누르면 주요 관찰 포인트를 볼 수 있어요.
+          </Text>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.roadmapTrack}
+          >
+            {stages.map((stage, index) => {
+              const isComplete = stage.order < currentStage.order;
+              const isCurrent = stage.id === currentStage.id;
+              return (
+                <View key={stage.id} style={styles.roadmapStepWrap}>
+                  <ControlPressable
+                    onPress={() => setSelectedRoadmapStage(stage)}
+                    accessibilityLabel={`${stage.order}단계 ${stage.nameKo} 관찰 포인트`}
+                    style={[
+                      styles.roadmapStep,
+                      isComplete && styles.roadmapStepComplete,
+                      isCurrent && styles.roadmapStepCurrent,
+                    ]}
+                  >
+                    <Text style={styles.roadmapStepIcon}>{stage.icon}</Text>
+                    <Text style={styles.roadmapStepLabel} numberOfLines={1}>
+                      {stage.order}단계
+                    </Text>
+                  </ControlPressable>
+                  {index < stages.length - 1 ? (
+                    <View
+                      style={[
+                        styles.roadmapConnector,
+                        isComplete && styles.roadmapConnectorComplete,
+                      ]}
+                    />
+                  ) : null}
+                </View>
+              );
+            })}
+          </ScrollView>
+        </View>
+
+        <Text style={styles.sectionTitle}>관찰 기록</Text>
         {stages.map((stage, idx) => {
           const state =
             stage.order < currentStage.order
@@ -322,22 +416,34 @@ export function PlantRoadmapBoard({
           const isCurrent = stage.id === currentStage.id;
 
           return (
-            <StageRow
-              key={stage.id}
-              stage={stage}
-              state={state}
-              isFirst={idx === 0}
-              isLast={idx === stages.length - 1}
-              isCurrent={isCurrent}
-              observations={observations}
-              canEdit={state !== "upcoming"}
-              onAddObservation={() => handleOpenEditor(stage.id)}
-              onEditObservation={(obs) => handleOpenEditor(stage.id, obs)}
-              onDeleteObservation={handleDeleteObservation}
-              onAdvance={handleAdvance}
-              onOpenImage={(url) => setLightboxUrl(url)}
-              busyAdvance={busyAdvance}
-            />
+            <View key={stage.id} style={styles.stageGroup}>
+              <View
+                style={[
+                  styles.stageHighlight,
+                  state === "visited" && styles.stageHighlightVisited,
+                  state === "active" && styles.stageHighlightActive,
+                ]}
+              >
+                <Text style={styles.stageHighlightText}>
+                  {stage.order}단계 · {stage.nameKo}
+                </Text>
+              </View>
+              <StageRow
+                stage={stage}
+                state={state}
+                isFirst={idx === 0}
+                isLast={idx === stages.length - 1}
+                isCurrent={isCurrent}
+                observations={observations}
+                canEdit={state !== "upcoming"}
+                onAddObservation={() => handleOpenEditor(stage.id)}
+                onEditObservation={(obs) => handleOpenEditor(stage.id, obs)}
+                onDeleteObservation={handleDeleteObservation}
+                onAdvance={handleAdvance}
+                onOpenImage={(url) => setLightboxUrl(url)}
+                busyAdvance={busyAdvance}
+              />
+            </View>
           );
         })}
       </ScrollView>
@@ -369,6 +475,45 @@ export function PlantRoadmapBoard({
         onSubmit={handleReasonSubmit}
         busy={reasonBusy}
       />
+
+      <AppModal
+        visible={selectedRoadmapStage !== null}
+        onClose={() => setSelectedRoadmapStage(null)}
+        closeOnBackdropPress
+        accessibilityLabel="단계별 주요 관찰 포인트"
+      >
+        {selectedRoadmapStage ? (
+          <View style={styles.stagePointModal}>
+            <Text style={styles.stagePointTitle}>
+              {selectedRoadmapStage.icon} {selectedRoadmapStage.order}단계 ·{" "}
+              {selectedRoadmapStage.nameKo}
+            </Text>
+            {selectedRoadmapStage.description ? (
+              <Text style={styles.stagePointDescription}>
+                {selectedRoadmapStage.description}
+              </Text>
+            ) : null}
+            <Text style={styles.stagePointLabel}>주요 관찰 포인트</Text>
+            {selectedRoadmapPoints.length > 0 ? (
+              selectedRoadmapPoints.map((point, index) => (
+                <Text
+                  key={`${selectedRoadmapStage.id}-${index}`}
+                  style={styles.stagePoint}
+                >
+                  • {point}
+                </Text>
+              ))
+            ) : (
+              <Text style={styles.stagePointEmpty}>
+                등록된 주요 관찰 포인트가 없어요.
+              </Text>
+            )}
+            <AppButton onPress={() => setSelectedRoadmapStage(null)}>
+              닫기
+            </AppButton>
+          </View>
+        ) : null}
+      </AppModal>
     </View>
   );
 }
@@ -397,4 +542,51 @@ const styles = StyleSheet.create({
     color: colors.text,
     marginBottom: spacing.md,
   },
+  roadmapSection: { gap: spacing.xs, marginBottom: spacing.xl },
+  roadmapHint: { ...typography.micro, color: colors.textMuted },
+  roadmapTrack: { alignItems: "center", paddingVertical: spacing.xs },
+  roadmapStepWrap: { flexDirection: "row", alignItems: "center" },
+  roadmapStep: {
+    width: plant.roadmapStepWidth,
+    minHeight: plant.roadmapStepMinHeight,
+    alignItems: "center",
+    justifyContent: "center",
+    gap: spacing.xxs,
+    padding: spacing.xs,
+    borderRadius: radii.card,
+    backgroundColor: colors.surfaceAlt,
+  },
+  roadmapStepComplete: { backgroundColor: colors.accentTintedBg },
+  roadmapStepCurrent: {
+    backgroundColor: colors.accent,
+  },
+  roadmapStepIcon: { fontSize: iconSizes.md },
+  roadmapStepLabel: { ...typography.micro, color: colors.text },
+  roadmapConnector: {
+    width: spacing.lg,
+    height: borders.medium,
+    backgroundColor: colors.border,
+  },
+  roadmapConnectorComplete: { backgroundColor: colors.accent },
+  stageGroup: { gap: spacing.sm },
+  stageHighlight: {
+    minHeight: controls.compactChipHeight,
+    justifyContent: "center",
+    paddingHorizontal: spacing.md,
+    borderLeftWidth: borders.medium,
+    borderLeftColor: colors.border,
+    backgroundColor: colors.surfaceAlt,
+  },
+  stageHighlightVisited: { borderLeftColor: colors.plantActive },
+  stageHighlightActive: {
+    borderLeftColor: colors.accent,
+    backgroundColor: colors.accentTintedBg,
+  },
+  stageHighlightText: { ...typography.label, color: colors.text },
+  stagePointModal: { gap: spacing.md, padding: spacing.xl },
+  stagePointTitle: { ...typography.title, color: colors.text },
+  stagePointDescription: { ...typography.body, color: colors.textMuted },
+  stagePointLabel: { ...typography.label, color: colors.text },
+  stagePoint: { ...typography.body, color: colors.text },
+  stagePointEmpty: { ...typography.body, color: colors.textMuted },
 });
