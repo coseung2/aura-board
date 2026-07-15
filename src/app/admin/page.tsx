@@ -20,7 +20,6 @@ import { db } from "@/lib/db";
 
 const KST_OFFSET_MS = 9 * 60 * 60 * 1000;
 const ADMIN_OVERVIEW_ITEM_LIMIT = 5;
-const ADMIN_TREND_DAYS = 365;
 
 type UserUsageRow = {
   id: string;
@@ -47,7 +46,6 @@ export const metadata = {
 export default async function AdminPage() {
   const auth = await requireAdminUser("/admin");
   if (!auth.authorized) return <AdminForbidden />;
-  const trendStart = startOfKstDay(ADMIN_TREND_DAYS - 1);
 
   const [
     totalUsers,
@@ -132,14 +130,12 @@ export default async function AdminPage() {
     db.$queryRaw<DailyTrendRow[]>`
       SELECT TO_CHAR("createdAt" + INTERVAL '9 hours', 'YYYY-MM-DD') AS "day", COUNT(*) AS "count"
       FROM "User"
-      WHERE "createdAt" >= ${trendStart}
       GROUP BY 1
       ORDER BY 1
     `,
     db.$queryRaw<DailyTrendRow[]>`
       SELECT TO_CHAR("createdAt" + INTERVAL '9 hours', 'YYYY-MM-DD') AS "day", COUNT(*) AS "count"
       FROM "BoardActivityEvent"
-      WHERE "createdAt" >= ${trendStart}
       GROUP BY 1
       ORDER BY 1
     `,
@@ -250,7 +246,6 @@ export default async function AdminPage() {
               <div className="admin-section-head">
                 <div>
                   <h2>운영 우선순위</h2>
-                  <p>지금 확인할 항목</p>
                 </div>
                 <Link href="/admin/errors" className="admin-section-link">전체 로그</Link>
               </div>
@@ -281,7 +276,6 @@ export default async function AdminPage() {
               <div className="admin-section-head admin-section-head-compact">
                 <div>
                   <h2>최근 보드 활동</h2>
-                  <p>보드 변경과 작성 활동</p>
                 </div>
                 <Link href="/admin/activity" className="admin-section-link">전체 보기</Link>
               </div>
@@ -315,7 +309,6 @@ export default async function AdminPage() {
               <div className="admin-section-head admin-section-head-compact">
                 <div>
                   <h2>보안·관리 이력</h2>
-                  <p>감사 이벤트</p>
                 </div>
               </div>
               <ol className="admin-activity-list">
@@ -431,9 +424,19 @@ function buildAdminTrendPoints(
   }
 
   const nowKst = new Date(Date.now() + KST_OFFSET_MS);
-  return Array.from({ length: ADMIN_TREND_DAYS }, (_, index) => {
-    const day = new Date(nowKst);
-    day.setUTCDate(nowKst.getUTCDate() - (ADMIN_TREND_DAYS - 1 - index));
+  const today = nowKst.toISOString().slice(0, 10);
+  const firstDay = [signupRows[0]?.day, activityRows[0]?.day]
+    .filter((day): day is string => Boolean(day))
+    .sort()[0] ?? today;
+  const start = new Date(`${firstDay}T00:00:00Z`);
+  const dayCount = Math.max(
+    1,
+    Math.floor((nowKst.getTime() - start.getTime()) / (24 * 60 * 60 * 1000)) + 1,
+  );
+
+  return Array.from({ length: dayCount }, (_, index) => {
+    const day = new Date(start);
+    day.setUTCDate(start.getUTCDate() + index);
     const key = day.toISOString().slice(0, 10);
     return {
       date: key,
@@ -442,11 +445,3 @@ function buildAdminTrendPoints(
     };
   });
 }
-
-function startOfKstDay(daysAgo: number): Date {
-  const nowKst = new Date(Date.now() + KST_OFFSET_MS);
-  nowKst.setUTCHours(0, 0, 0, 0);
-  nowKst.setUTCDate(nowKst.getUTCDate() - daysAgo);
-  return new Date(nowKst.getTime() - KST_OFFSET_MS);
-}
-

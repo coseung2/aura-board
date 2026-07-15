@@ -100,6 +100,10 @@ if (reviewerConfig) {
 export const { handlers, auth, signIn, signOut } = NextAuth({
   adapter: PrismaAdapter(db),
   providers,
+  // An empty local AUTH_URL prevents Auth.js v5 from inferring its normal
+  // development host trust. Trust localhost/127.0.0.1 only in development;
+  // production keeps Auth.js's default host validation.
+  ...(process.env.NODE_ENV === "development" ? { trustHost: true } : {}),
   session: { strategy: "jwt" },
   pages: {
     signIn: "/login",

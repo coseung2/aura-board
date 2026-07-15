@@ -44,6 +44,15 @@ export function ChevronRightIcon({ size = 24, className }: IconProps) {
   );
 }
 
+export function ChevronsRightIcon({ size = 24, className }: IconProps) {
+  return (
+    <svg {...base(size)} className={className} aria-hidden="true">
+      <polyline points="7 6 13 12 7 18" />
+      <polyline points="13 6 19 12 13 18" />
+    </svg>
+  );
+}
+
 export function ChevronUpIcon({ size = 24, className }: IconProps) {
   return (
     <svg {...base(size)} className={className} aria-hidden="true">

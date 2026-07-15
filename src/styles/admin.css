@@ -203,7 +203,7 @@
 .admin-overview-grid {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-  align-items: start;
+  align-items: stretch;
   gap: 40px;
   margin-top: 0;
 }
@@ -211,9 +211,40 @@
 .admin-overview-grid .admin-section { margin-top: 0; }
 
 .admin-overview-primary {
-  display: grid;
+  display: flex;
+  flex-direction: column;
   gap: 32px;
   min-width: 0;
+  min-height: 0;
+}
+
+.admin-overview-primary .admin-trend-panel {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.admin-overview-primary .admin-combined-chart {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.admin-overview-primary .admin-combined-chart-frame,
+.admin-overview-primary .admin-combined-chart-scroll,
+.admin-overview-primary .admin-combined-chart-canvas {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.admin-overview-primary .admin-combined-chart-plot {
+  flex: 1 1 auto;
+  height: auto;
+  min-height: 220px;
 }
 
 .admin-activity-stack {
@@ -338,19 +369,30 @@
   align-items: flex-end;
 }
 
+.admin-trend-controls {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+  min-height: 33px;
+  border-bottom: 2px solid var(--color-text);
+}
+
 .admin-period-nav {
-  display: inline-flex;
-  min-height: 32px;
-  padding: 2px;
-  border: 1px solid var(--color-border);
-  border-radius: 999px;
-  background: var(--color-surface-alt);
+  display: flex;
+  align-items: flex-end;
+}
+
+.admin-period-nav > div {
+  display: flex;
+  align-items: flex-end;
 }
 
 .admin-period-nav button {
-  min-width: 34px;
+  min-height: 32px;
+  margin-bottom: 0;
+  padding: 0 9px;
   border: 0;
-  border-radius: 999px;
   background: transparent;
   color: var(--color-text-muted);
   font: inherit;
@@ -359,10 +401,24 @@
   cursor: pointer;
 }
 
+.admin-period-nav button + button {
+  position: relative;
+}
+
+.admin-period-nav button + button::before {
+  position: absolute;
+  top: 50%;
+  left: 0;
+  width: 1px;
+  height: 1em;
+  background: var(--color-border);
+  content: "";
+  pointer-events: none;
+  transform: translateY(-50%);
+}
+
 .admin-period-nav button[aria-selected="true"] {
-  background: var(--color-surface);
-  box-shadow: var(--shadow-card);
-  color: var(--color-text);
+  color: var(--color-accent-tinted-text);
 }
 
 .admin-period-nav button:focus-visible {
@@ -398,13 +454,106 @@
   width: 14px;
   height: 0;
   border-radius: 0;
-  border-top: 2px solid var(--color-accent-tinted-text);
+  border-top: 2px solid var(--color-showcase);
   background: transparent;
 }
 
 .admin-combined-chart {
-  border-top: 2px solid var(--color-text);
+  --admin-chart-axis-width: 36px;
+  --admin-chart-inset-inline: 16px;
+  --admin-chart-inset-block-start: 14px;
+  --admin-chart-inset-block-end: 8px;
+  --admin-chart-label-height: 32px;
   border-bottom: 1px solid var(--color-border);
+}
+
+.admin-combined-chart-frame {
+  position: relative;
+  min-width: 0;
+}
+
+.admin-combined-chart-scroll {
+  min-width: 0;
+  overflow-x: auto;
+  cursor: grab;
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+  touch-action: pan-y;
+}
+
+.admin-combined-chart-scroll::-webkit-scrollbar {
+  display: none;
+}
+
+.admin-combined-chart-scroll.is-dragging {
+  cursor: grabbing;
+  user-select: none;
+}
+
+.admin-combined-chart-canvas {
+  position: relative;
+  min-width: 100%;
+}
+
+.admin-combined-chart-axis {
+  position: absolute;
+  top: var(--admin-chart-inset-block-start);
+  bottom: calc(var(--admin-chart-inset-block-end) + var(--admin-chart-label-height));
+  z-index: 2;
+  display: flex;
+  width: calc(var(--admin-chart-axis-width) - 4px);
+  color: var(--color-text-muted);
+  font-size: 10px;
+  line-height: 1;
+  pointer-events: none;
+}
+
+.admin-combined-chart-axis.is-left {
+  left: 4px;
+  justify-content: flex-end;
+  text-align: right;
+}
+
+.admin-combined-chart-axis.is-right {
+  right: 4px;
+  justify-content: flex-start;
+  text-align: left;
+}
+
+.admin-combined-chart-axis-label {
+  display: none;
+}
+
+.admin-combined-chart-axis-values {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+.admin-chart-jump-latest {
+  position: absolute;
+  top: 8px;
+  right: calc(var(--admin-chart-axis-width) + 8px);
+  z-index: 3;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-btn);
+  background: var(--color-surface);
+  color: var(--color-text-muted);
+  cursor: pointer;
+}
+
+.admin-chart-jump-latest:hover,
+.admin-chart-jump-latest:focus-visible {
+  border-color: var(--color-border-hover);
+  color: var(--color-text);
+  outline: none;
 }
 
 .admin-combined-chart-plot {
@@ -412,7 +561,10 @@
   display: grid;
   align-items: end;
   height: 142px;
-  padding: 14px 0 8px;
+  padding: var(--admin-chart-inset-block-start)
+    0
+    var(--admin-chart-inset-block-end);
+  box-sizing: border-box;
 }
 
 .admin-combined-chart-column {
@@ -424,46 +576,66 @@
 }
 
 .admin-combined-chart-bar {
-  width: min(52%, 8px);
-  min-width: 3px;
+  width: 8px;
+  min-width: 8px;
   border-radius: 4px 4px 0 0;
   background: var(--color-accent);
 }
 
 .admin-combined-chart-line {
   position: absolute;
-  inset: 14px 0 8px;
+  top: var(--admin-chart-inset-block-start);
+  right: 0;
+  left: 0;
   width: 100%;
+  height: calc(
+    100% - var(--admin-chart-inset-block-start) - var(--admin-chart-inset-block-end)
+  );
   overflow: visible;
   pointer-events: none;
 }
 
 .admin-combined-chart-line polyline {
   fill: none;
-  stroke: var(--color-accent-tinted-text);
+  stroke: var(--color-showcase);
   stroke-width: 1.8;
   vector-effect: non-scaling-stroke;
 }
 
-.admin-combined-chart-line circle {
-  fill: var(--color-surface);
-  stroke: var(--color-accent-tinted-text);
-  stroke-width: 1.2;
-  vector-effect: non-scaling-stroke;
+.admin-combined-chart-marker-layer {
+  position: absolute;
+  top: var(--admin-chart-inset-block-start);
+  right: 0;
+  bottom: var(--admin-chart-inset-block-end);
+  left: 0;
+  pointer-events: none;
+}
+
+.admin-combined-chart-marker {
+  position: absolute;
+  width: 3px;
+  height: 3px;
+  background: #000;
+  transform: translate(-50%, -50%);
 }
 
 .admin-combined-chart-labels {
   display: grid;
-  min-height: 25px;
+  min-height: var(--admin-chart-label-height);
+  padding-top: 0;
   padding-bottom: 7px;
+  box-sizing: border-box;
 }
 
 .admin-combined-chart-labels span {
-  overflow: hidden;
+  display: block;
+  width: max-content;
+  overflow: visible;
   color: var(--color-text-muted);
   font-size: 10px;
   text-align: center;
   white-space: nowrap;
+  transform: translateX(-50%);
 }
 
 .admin-table-wrap {
@@ -705,6 +877,12 @@
   }
 
   .admin-overview-grid { grid-template-columns: 1fr; }
+
+  .admin-overview-primary .admin-combined-chart-plot {
+    flex: 0 0 auto;
+    height: 142px;
+    min-height: 142px;
+  }
 }
 
 @media (max-width: 760px) {

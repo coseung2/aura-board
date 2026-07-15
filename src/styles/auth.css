@@ -373,33 +373,118 @@
   opacity: 0.55;
 }
 
-.auth-mode-switch {
+.auth-role-menu {
+  position: relative;
+}
+
+.auth-role-trigger {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: var(--control-inline-gap, 4px);
-  min-height: 44px;
-  padding: 0 10px;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-pill);
-  background: var(--color-surface);
+  min-height: 32px;
+  padding: 4px 0;
+  border: 0;
+  background: transparent;
   color: var(--color-text-muted);
   font-size: 13px;
   font-weight: 600;
   line-height: 1;
-  text-decoration: none;
   white-space: nowrap;
-  transition: border-color 150ms ease, background 150ms ease, color 150ms ease;
+  cursor: pointer;
+  list-style: none;
+  transition: color 150ms ease;
 }
 
-.auth-mode-switch:hover,
-.auth-mode-switch:focus-visible {
-  border-color: var(--color-border-hover);
-  background: var(--color-surface-alt);
+.auth-role-trigger-content {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  min-height: 32px;
+}
+
+.auth-role-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 17px;
+  width: 17px;
+  height: 17px;
+  color: currentColor;
+}
+
+.auth-role-icon > svg {
+  width: 17px;
+  height: 17px;
+}
+
+.auth-role-chevron {
+  flex: 0 0 auto;
+}
+
+.auth-role-trigger::-webkit-details-marker {
+  display: none;
+}
+
+.auth-role-trigger:hover,
+.auth-role-trigger:focus-visible {
   color: var(--color-text);
 }
 
-.auth-mode-switch:disabled {
+.auth-role-menu[open] .auth-role-trigger {
+  color: var(--color-text);
+}
+
+.auth-role-menu-panel {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  min-width: 124px;
+  padding: 5px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-card-hover);
+  z-index: 60;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.auth-role-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 34px;
+  padding: 7px 10px;
+  border: 0;
+  border-radius: var(--radius-btn);
+  background: transparent;
+  color: var(--color-text);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  text-align: left;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.auth-role-option-button {
+  cursor: pointer;
+}
+
+.auth-role-option-button:hover,
+.auth-role-option-button:focus-visible {
+  background: var(--color-surface-alt);
+}
+
+.auth-role-option.is-current {
+  color: var(--color-text-muted);
+  cursor: default;
+}
+
+.auth-role-option-button:disabled {
   cursor: wait;
   opacity: 0.65;
 }

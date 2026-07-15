@@ -2,13 +2,16 @@
 
 import { useSession, signOut } from "next-auth/react";
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { TeacherNotificationBell } from "./TeacherNotificationBell";
+import { ChevronDownIcon } from "./icons/UiIcons";
+import { RoleIcon } from "./login/RoleIcon";
 
 export function AuthHeader() {
   const { data: session, status } = useSession();
   const [canSwitchToParent, setCanSwitchToParent] = useState(false);
   const [switchingToParent, setSwitchingToParent] = useState(false);
+  const roleMenuRef = useRef<HTMLDetailsElement>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -30,6 +33,28 @@ export function AuthHeader() {
       cancelled = true;
     };
   }, []);
+
+  useEffect(() => {
+    if (!canSwitchToParent) return;
+    const menu = roleMenuRef.current;
+    if (!menu) return;
+
+    const closeOnOutsideClick = (event: PointerEvent) => {
+      if (!menu.contains(event.target as Node)) menu.open = false;
+    };
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key !== "Escape" || !menu.open) return;
+      menu.open = false;
+      menu.querySelector<HTMLElement>("summary")?.focus();
+    };
+
+    document.addEventListener("pointerdown", closeOnOutsideClick, true);
+    document.addEventListener("keydown", closeOnEscape);
+    return () => {
+      document.removeEventListener("pointerdown", closeOnOutsideClick, true);
+      document.removeEventListener("keydown", closeOnEscape);
+    };
+  }, [canSwitchToParent]);
 
   if (status === "loading") {
     return null;
@@ -69,18 +94,34 @@ export function AuthHeader() {
         />
       )}
       <span className="auth-name">{session.user.name}</span>
-      <TeacherNotificationBell />
       {canSwitchToParent && (
-        <button
-          type="button"
-          className="auth-mode-switch"
-          onClick={switchToParent}
-          disabled={switchingToParent}
-        >
-          <span aria-hidden>👪</span>
-          <span>{switchingToParent ? "전환 중…" : "학부모"}</span>
-        </button>
+        <details ref={roleMenuRef} className="auth-role-menu">
+          <summary className="auth-role-trigger" aria-label="사용자 유형 전환">
+            <span className="auth-role-trigger-content">
+              <span className="auth-role-icon"><RoleIcon role="teacher" /></span>
+              <span>교사</span>
+              <ChevronDownIcon size={14} className="auth-role-chevron" />
+            </span>
+          </summary>
+          <div className="auth-role-menu-panel" role="menu" aria-label="사용자 유형">
+            <span className="auth-role-option is-current" role="menuitem" aria-current="page">
+              <span className="auth-role-icon"><RoleIcon role="teacher" /></span>
+              <span>교사</span>
+            </span>
+            <button
+              type="button"
+              className="auth-role-option auth-role-option-button"
+              role="menuitem"
+              onClick={switchToParent}
+              disabled={switchingToParent}
+            >
+              <span className="auth-role-icon"><RoleIcon role="parent" /></span>
+              <span>{switchingToParent ? "전환 중…" : "학부모"}</span>
+            </button>
+          </div>
+        </details>
       )}
+      <TeacherNotificationBell />
       <SettingsMenu />
       <button
         type="button"
