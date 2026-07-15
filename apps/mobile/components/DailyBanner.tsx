@@ -2,6 +2,7 @@ import {
   createContext,
   useContext,
   useEffect,
+  useMemo,
   useRef,
   useState,
   type ReactNode,
@@ -17,6 +18,10 @@ import {
   typography,
 } from "../theme/tokens";
 import { apiFetch, parentApiFetch } from "../lib/api";
+import {
+  loadParentSelectedChild,
+  subscribeParentSelectedChild,
+} from "../lib/session";
 
 export type DailyBannerKind = "image" | "marquee";
 
@@ -31,6 +36,7 @@ export type DailyBannerRole = "student" | "parent";
 
 type Props = {
   role: DailyBannerRole;
+  studentId?: string | null;
 };
 
 type DailyBannerPreviewProps = {
@@ -39,7 +45,12 @@ type DailyBannerPreviewProps = {
   onImageError?: () => void;
 };
 
-const DailyBannerRoleContext = createContext<DailyBannerRole | null>(null);
+type DailyBannerScope = {
+  role: DailyBannerRole;
+  studentId?: string | null;
+};
+
+const DailyBannerScopeContext = createContext<DailyBannerScope | null>(null);
 
 export function DailyBannerProvider({
   role,
@@ -48,15 +59,45 @@ export function DailyBannerProvider({
   role: DailyBannerRole;
   children: ReactNode;
 }) {
+  const [studentId, setStudentId] = useState<string | null | undefined>(
+    role === "parent" ? undefined : null,
+  );
+
+  useEffect(() => {
+    if (role !== "parent") {
+      setStudentId(null);
+      return;
+    }
+
+    let active = true;
+    let receivedSelection = false;
+    const unsubscribe = subscribeParentSelectedChild((selectedStudentId) => {
+      receivedSelection = true;
+      if (active) setStudentId(selectedStudentId);
+    });
+    void loadParentSelectedChild().then((selectedStudentId) => {
+      if (active && !receivedSelection) setStudentId(selectedStudentId);
+    });
+    return () => {
+      active = false;
+      unsubscribe();
+    };
+  }, [role]);
+
+  const scope = useMemo(
+    () => ({ role, studentId }),
+    [role, studentId],
+  );
+
   return (
-    <DailyBannerRoleContext.Provider value={role}>
+    <DailyBannerScopeContext.Provider value={scope}>
       {children}
-    </DailyBannerRoleContext.Provider>
+    </DailyBannerScopeContext.Provider>
   );
 }
 
-export function useDailyBannerRole() {
-  return useContext(DailyBannerRoleContext);
+export function useDailyBannerScope() {
+  return useContext(DailyBannerScopeContext);
 }
 
 function parseBanner(value: unknown): DailyBannerValue | null {
@@ -104,7 +145,7 @@ function parseBanner(value: unknown): DailyBannerValue | null {
 /**
  * One-line, role-aware ticker rendered directly below a page title.
  */
-export function DailyBanner({ role }: Props) {
+export function DailyBanner({ role, studentId }: Props) {
   const [banner, setBanner] = useState<DailyBannerValue | null>(null);
   const [imageFailed, setImageFailed] = useState(false);
 
@@ -116,7 +157,11 @@ export function DailyBanner({ role }: Props) {
     const path =
       role === "student"
         ? "/api/student/daily-banner/current"
-        : "/api/parent/daily-banner/current";
+        : `/api/parent/daily-banner/current${
+            studentId
+              ? `?studentId=${encodeURIComponent(studentId)}`
+              : ""
+          }`;
 
     const fetchCurrent = role === "student" ? apiFetch : parentApiFetch;
     void fetchCurrent<unknown>(path)
@@ -133,7 +178,7 @@ export function DailyBanner({ role }: Props) {
     return () => {
       cancelled = true;
     };
-  }, [role]);
+  }, [role, studentId]);
 
   const publishedBanner = banner;
 

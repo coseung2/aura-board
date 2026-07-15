@@ -21,7 +21,7 @@ import {
   type ViewStyle,
 } from "react-native";
 import { ArrowLeft } from "lucide-react-native";
-import { DailyBanner, useDailyBannerRole } from "./DailyBanner";
+import { DailyBanner, useDailyBannerScope } from "./DailyBanner";
 import {
   colors,
   borders,
@@ -612,8 +612,14 @@ export function AppHeader({
   style,
   showDailyBanner = true,
 }: AppHeaderProps) {
-  const dailyBannerRole = useDailyBannerRole();
-  const shouldRenderBanner = showDailyBanner && dailyBannerRole !== null;
+  const dailyBannerScope = useDailyBannerScope();
+  const shouldRenderBanner =
+    showDailyBanner &&
+    dailyBannerScope !== null &&
+    !(
+      dailyBannerScope.role === "parent" &&
+      dailyBannerScope.studentId === undefined
+    );
 
   return (
     <>
@@ -651,7 +657,12 @@ export function AppHeader({
           <View style={[styles.appHeaderRight, rightStyle]}>{right}</View>
         ) : null}
       </View>
-      {shouldRenderBanner ? <DailyBanner role={dailyBannerRole} /> : null}
+      {shouldRenderBanner && dailyBannerScope ? (
+        <DailyBanner
+          role={dailyBannerScope.role}
+          studentId={dailyBannerScope.studentId}
+        />
+      ) : null}
     </>
   );
 }

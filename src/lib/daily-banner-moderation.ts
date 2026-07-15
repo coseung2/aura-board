@@ -27,6 +27,7 @@ type ModerationResult = {
   submission: DailyBannerSubmissionPayload;
   publication: {
     id: string;
+    classroomId: string;
     day: string;
     submissionId: string;
     approvedById: string;
@@ -46,6 +47,7 @@ function isUniqueConstraintError(error: unknown): boolean {
 
 function serializePublication(row: {
   id: string;
+  classroomId: string;
   day: Date;
   submissionId: string;
   approvedById: string;
@@ -53,6 +55,7 @@ function serializePublication(row: {
 }) {
   return {
     id: row.id,
+    classroomId: row.classroomId,
     day: dateToKstDay(row.day),
     submissionId: row.submissionId,
     approvedById: row.approvedById,
@@ -82,11 +85,12 @@ async function loadSubmissionForTeacher(submissionId: string, classroomId: strin
 }
 
 /**
- * Approve a submission and publish it globally for its target day.
+ * Approve a submission and publish it for its classroom and target day.
  *
  * The status transition and publication insert are one transaction. The
- * publication table's unique day is the global race gate: if another teacher
- * wins the day, this transaction rolls back to pending and returns a 409.
+ * publication table's classroom/day unique key is the race gate: if another
+ * submission in the classroom wins the day, this transaction rolls back to
+ * pending and returns a 409.
  */
 export async function approveDailyBannerSubmission(input: {
   submissionId: string;
@@ -103,7 +107,11 @@ export async function approveDailyBannerSubmission(input: {
     return await db.$transaction(async (tx) => {
       const now = new Date();
       const changed = await tx.dailyBannerSubmission.updateMany({
-        where: { id: selected.id, status: "pending" },
+        where: {
+          id: selected.id,
+          classroomId: input.classroomId,
+          status: "pending",
+        },
         data: {
           status: "approved",
           reviewedAt: now,
@@ -135,6 +143,7 @@ export async function approveDailyBannerSubmission(input: {
 
       const publication = await tx.dailyBannerPublication.create({
         data: {
+          classroomId: selected.classroomId,
           day: selected.targetDay,
           submissionId: selected.id,
           approvedById: input.reviewerId,
@@ -155,7 +164,8 @@ export async function approveDailyBannerSubmission(input: {
 
     // A duplicate approval for the same submission may race its first call.
     // Once the winning transaction commits, returning its publication makes
-    // the operation idempotent. Otherwise the day was won by another row.
+    // the operation idempotent. Otherwise the classroom/day was won by
+    // another row.
     const ownPublication = await db.dailyBannerPublication.findUnique({
       where: { submissionId: selected.id },
     });

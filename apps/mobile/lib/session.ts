@@ -12,6 +12,9 @@ const STUDENT_KEY = "aura_student_cache";
 const PARENT_TOKEN_KEY = "aura_parent_token";
 const PARENT_KEY = "aura_parent_cache";
 const PARENT_SELECTED_CHILD_KEY = "aura_parent_selected_child";
+const parentSelectedChildListeners = new Set<
+  (studentId: string | null) => void
+>();
 
 function canUseWebStorage(): boolean {
   return (
@@ -103,6 +106,7 @@ export async function clearParentSession(): Promise<void> {
   await deleteStoredItem(PARENT_TOKEN_KEY).catch(() => undefined);
   await deleteStoredItem(PARENT_KEY).catch(() => undefined);
   await deleteStoredItem(PARENT_SELECTED_CHILD_KEY).catch(() => undefined);
+  for (const listener of parentSelectedChildListeners) listener(null);
 }
 
 export async function saveParentCache(parent: CachedParent): Promise<void> {
@@ -121,8 +125,16 @@ export async function loadParentCache(): Promise<CachedParent | null> {
 
 export async function saveParentSelectedChild(studentId: string): Promise<void> {
   await setStoredItem(PARENT_SELECTED_CHILD_KEY, studentId);
+  for (const listener of parentSelectedChildListeners) listener(studentId);
 }
 
 export async function loadParentSelectedChild(): Promise<string | null> {
   return getStoredItem(PARENT_SELECTED_CHILD_KEY);
+}
+
+export function subscribeParentSelectedChild(
+  listener: (studentId: string | null) => void,
+): () => void {
+  parentSelectedChildListeners.add(listener);
+  return () => parentSelectedChildListeners.delete(listener);
 }

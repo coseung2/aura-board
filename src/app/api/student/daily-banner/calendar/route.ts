@@ -58,8 +58,9 @@ function parseMonth(value: string | null): MonthRange | null {
 }
 
 // GET /api/student/daily-banner/calendar?month=YYYY-MM
-// Returns only globally occupied publication days. Submission content and
-// submitter identity are intentionally never selected or serialized here.
+// Returns only publication days occupied in the student's classroom.
+// Submission content and submitter identity are intentionally never selected
+// or serialized here.
 export async function GET(req: Request) {
   // Mobile requests carry an explicit Bearer session token. Respect that
   // token even when the same browser also has a teacher NextAuth session;
@@ -82,6 +83,7 @@ export async function GET(req: Request) {
   try {
     const publications = await db.dailyBannerPublication.findMany({
       where: {
+        classroomId: student.classroomId,
         day: {
           gte: range.firstDay,
           lte: range.lastDay,

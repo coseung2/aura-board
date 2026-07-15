@@ -144,13 +144,18 @@ export function serializeDailyBannerSubmission(row: {
   };
 }
 
-/**
- * Read the one globally published banner for a KST day. No classroom scope is
- * applied: students and authenticated parents see the same publication.
- */
-export async function getDailyBanner(day = getKstDay()) {
+/** Read the published banner for one classroom and KST day. */
+export async function getDailyBanner(
+  classroomId: string,
+  day = getKstDay(),
+) {
   const publication = await db.dailyBannerPublication.findUnique({
-    where: { day: kstDayToDate(day) },
+    where: {
+      classroomId_day: {
+        classroomId,
+        day: kstDayToDate(day),
+      },
+    },
     include: {
       submission: {
         select: {

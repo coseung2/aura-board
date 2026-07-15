@@ -98,7 +98,7 @@ export function DailyBannerModerationPanel({
     if (
       action === "approve" &&
       !window.confirm(
-        "이 배너를 해당 날짜의 전교 배너로 확정할까요? 같은 날짜에는 하나만 게시할 수 있습니다.",
+        "이 배너를 해당 날짜의 학급 배너로 확정할까요? 학급별로 같은 날짜에는 하나만 게시할 수 있습니다.",
       )
     ) {
       return;
@@ -120,14 +120,14 @@ export function DailyBannerModerationPanel({
       );
       if (response.status === 409 && action === "approve") {
         setMessageKind("error");
-        setMessage("이미 다른 학급의 배너가 이 날짜에 확정되었습니다.");
+        setMessage("이 학급에는 이미 해당 날짜의 배너가 확정되었습니다.");
       } else if (!response.ok) {
         throw new Error(`status ${response.status}`);
       } else {
         setMessageKind("success");
         setMessage(
           action === "approve"
-            ? "전교 배너로 확정했습니다."
+            ? "학급 배너로 확정했습니다."
             : "신청을 반려했습니다.",
         );
         setRejectingId(null);
@@ -155,7 +155,7 @@ export function DailyBannerModerationPanel({
           />
         </div>
         <p>
-          승인한 배너는 해당 날짜에 전교 학생·학부모 앱에 노출됩니다.
+          승인한 배너는 해당 날짜에 이 학급의 학생·학부모 앱에 노출됩니다.
         </p>
       </div>
 

@@ -475,7 +475,7 @@ model Classroom {
   // Classroom check tasks in this classroom (1인1역할: 체크원, 2026-06-28)
   checkTasks ClassroomCheckTask[]
 
-  // Global daily banner submissions from this classroom.
+  // Daily banner submissions scoped to this classroom.
   dailyBannerSubmissions DailyBannerSubmission[]
 
   // Inspector findings (2026-07-02)
@@ -672,24 +672,30 @@ model DailyBannerSubmission {
   reviewedBy  User?                   @relation("DailyBannerReviewedBy", fields: [reviewedById], references: [id], onDelete: SetNull)
   publication DailyBannerPublication?
 
+  @@unique([id, classroomId, targetDay])
   @@index([targetDay, status, createdAt])
   @@index([classroomId, targetDay, status])
   @@index([studentId, targetDay, createdAt])
 }
 
-// One globally visible banner per KST calendar day. Approval inserts this row
-// in the same transaction that marks the submission approved; the unique day
-// constraint makes concurrent teacher approvals race-safe.
+// One visible banner per classroom and KST calendar day. Approval inserts this
+// row in the same transaction that marks the submission approved; the compound
+// unique constraint makes concurrent approvals within a classroom race-safe.
 model DailyBannerPublication {
   id String @id @default(cuid())
 
-  day          DateTime @unique @db.Date
+  classroomId  String
+  day          DateTime @db.Date
   submissionId String   @unique
   approvedById String
   publishedAt  DateTime @default(now())
 
-  submission DailyBannerSubmission @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+  submission DailyBannerSubmission @relation(fields: [submissionId, classroomId, day], references: [id, classroomId, targetDay], onDelete: Cascade)
   approvedBy User                  @relation("DailyBannerPublishedBy", fields: [approvedById], references: [id], onDelete: Cascade)
+
+  @@unique([classroomId, day])
+  @@unique([submissionId, classroomId, day])
+  @@index([day])
 }
 
 model StudentWalkingDailyStat {
@@ -3295,8 +3301,8 @@ model Transaction {
 
   fixedDeposit FixedDeposit? @relation(fields: [fixedDepositId], references: [id], onDelete: SetNull)
 
-  @@index([accountId, createdAt])
   @@unique([sourceType, sourceRef])
+  @@index([accountId, createdAt])
   @@index([accountId, sourceType, sourceRef])
   @@index([fixedDepositId])
 }

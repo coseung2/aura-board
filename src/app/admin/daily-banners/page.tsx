@@ -35,14 +35,14 @@ export default async function AdminDailyBannersPage() {
       <main className="admin-page">
         <AdminFeatureHeader
           eyebrow="콘텐츠 운영"
-          description="전교 학생·학부모 화면에 노출되는 하루 한 개의 배너를 확인하고 게시를 취소할 수 있습니다."
+          description="학급별 학생·학부모 화면에 노출되는 일일 배너를 확인하고 게시를 취소할 수 있습니다."
           active="daily-banners"
         />
 
         <section className="admin-metric-grid admin-metric-grid-compact" aria-label="배너 운영 현황">
           <MetricCard label="확정 배너" value={`${publications.length}건`} />
           <MetricCard label="심사 대기" value={`${pendingCount}건`} />
-          <MetricCard label="운영 규칙" value="하루 1개" />
+          <MetricCard label="운영 규칙" value="학급별 하루 1개" />
         </section>
 
         <section className="admin-section">

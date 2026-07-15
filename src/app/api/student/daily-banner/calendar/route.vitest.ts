@@ -44,8 +44,14 @@ import { GET } from "./route";
 describe("GET /api/student/daily-banner/calendar", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mocks.getCurrentStudent.mockResolvedValue({ id: "cookie-student" });
-    mocks.getCurrentStudentRaw.mockResolvedValue({ id: "bearer-student" });
+    mocks.getCurrentStudent.mockResolvedValue({
+      id: "cookie-student",
+      classroomId: "classroom-cookie",
+    });
+    mocks.getCurrentStudentRaw.mockResolvedValue({
+      id: "bearer-student",
+      classroomId: "classroom-bearer",
+    });
     mocks.findMany.mockResolvedValue([
       { day: new Date("2026-07-04T00:00:00.000Z") },
     ]);
@@ -62,6 +68,11 @@ describe("GET /api/student/daily-banner/calendar", () => {
     expect(response.status).toBe(200);
     expect(mocks.getCurrentStudentRaw).toHaveBeenCalledTimes(1);
     expect(mocks.getCurrentStudent).not.toHaveBeenCalled();
+    expect(mocks.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({ classroomId: "classroom-bearer" }),
+      }),
+    );
     expect(await response.json()).toEqual({
       month: "2026-07",
       occupiedDays: ["2026-07-04"],

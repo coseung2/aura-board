@@ -21,7 +21,7 @@ export async function GET() {
   }
 
   const day = getKstDay();
-  const banner = await getDailyBanner(day);
+  const banner = await getDailyBanner(student.classroomId, day);
   return NextResponse.json(
     { day, banner },
     { headers: PRIVATE_NO_STORE_HEADERS },

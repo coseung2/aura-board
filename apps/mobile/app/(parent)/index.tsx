@@ -118,6 +118,10 @@ export default function ParentHome() {
     void loadChildren(true);
   }, [loadChildren]);
 
+  useEffect(() => {
+    if (selectedChildId) void saveParentSelectedChild(selectedChildId);
+  }, [selectedChildId]);
+
   const feed = useParentFeed({
     childId: selectedChildId,
     onUnauthorized: handleUnauthorized,
@@ -128,7 +132,6 @@ export default function ParentHome() {
 
   const selectChild = useCallback((studentId: string) => {
     setSelectedChildId(studentId);
-    void saveParentSelectedChild(studentId);
     listRef.current?.scrollToOffset({ offset: 0, animated: false });
   }, []);
 
