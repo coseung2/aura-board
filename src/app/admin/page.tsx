@@ -1,6 +1,14 @@
 import Link from "next/link";
 import { TopNav } from "@/components/TopNav";
 import { AdminFeatureHeader } from "@/components/admin/AdminFeatureHeader";
+import {
+  AdminUsageTable,
+  type AdminUsageTableRow,
+} from "@/components/admin/AdminUsageTable";
+import {
+  AdminSignupActivityChart,
+  type AdminTrendPoint,
+} from "@/components/admin/AdminSignupActivityChart";
 import { AdminForbidden, requireAdminUser } from "@/lib/admin-auth";
 import {
   formatActivityRelativeTime,
@@ -12,6 +20,7 @@ import { db } from "@/lib/db";
 
 const KST_OFFSET_MS = 9 * 60 * 60 * 1000;
 const ADMIN_OVERVIEW_ITEM_LIMIT = 5;
+const ADMIN_TREND_DAYS = 365;
 
 type UserUsageRow = {
   id: string;
@@ -26,6 +35,11 @@ type UserUsageRow = {
   lastBoardUpdatedAt: Date | null;
 };
 
+type DailyTrendRow = {
+  day: string;
+  count: bigint | number;
+};
+
 export const metadata = {
   title: "관리자 · Aura-board",
 };
@@ -33,6 +47,7 @@ export const metadata = {
 export default async function AdminPage() {
   const auth = await requireAdminUser("/admin");
   if (!auth.authorized) return <AdminForbidden />;
+  const trendStart = startOfKstDay(ADMIN_TREND_DAYS - 1);
 
   const [
     totalUsers,
@@ -41,7 +56,8 @@ export default async function AdminPage() {
     totalStudents,
     totalCards,
     userRows,
-    recentUsers,
+    signupTrendRows,
+    boardActivityTrendRows,
     activeBoards,
     recentErrors,
     serverErrors,
@@ -113,14 +129,20 @@ export default async function AdminPage() {
       FROM "User" u
       ORDER BY u."createdAt" DESC
     `,
-    db.user.findMany({
-      where: {
-        createdAt: {
-          gte: new Date(Date.now() - 31 * 24 * 60 * 60 * 1000),
-        },
-      },
-      select: { createdAt: true },
-    }),
+    db.$queryRaw<DailyTrendRow[]>`
+      SELECT TO_CHAR("createdAt" + INTERVAL '9 hours', 'YYYY-MM-DD') AS "day", COUNT(*) AS "count"
+      FROM "User"
+      WHERE "createdAt" >= ${trendStart}
+      GROUP BY 1
+      ORDER BY 1
+    `,
+    db.$queryRaw<DailyTrendRow[]>`
+      SELECT TO_CHAR("createdAt" + INTERVAL '9 hours', 'YYYY-MM-DD') AS "day", COUNT(*) AS "count"
+      FROM "BoardActivityEvent"
+      WHERE "createdAt" >= ${trendStart}
+      GROUP BY 1
+      ORDER BY 1
+    `,
     db.board.count({
       where: { updatedAt: { gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) } },
     }),
@@ -177,9 +199,18 @@ export default async function AdminPage() {
     storageBytes: toNumber(row.storageBytes),
   }));
   const totalStorageBytes = users.reduce((sum, row) => sum + row.storageBytes, 0);
-  const signupTrend = buildSignupTrend(recentUsers.map((user) => user.createdAt));
-  const peakSignupCount = Math.max(...signupTrend.map((day) => day.count), 1);
-  const weeklySignups = signupTrend.slice(-7).reduce((sum, day) => sum + day.count, 0);
+  const usageTableRows: AdminUsageTableRow[] = users.map((user) => ({
+    ...user,
+    createdAt: user.createdAt.toISOString(),
+    lastBoardUpdatedAt: user.lastBoardUpdatedAt?.toISOString() ?? null,
+  }));
+  const signupTrend = buildAdminTrendPoints(
+    signupTrendRows,
+    boardActivityTrendRows,
+  );
+  const weeklySignups = signupTrend
+    .slice(-7)
+    .reduce((sum, day) => sum + day.signups, 0);
   const healthTone = serverErrors > 0 ? "danger" : recentErrors > 0 ? "warning" : "good";
   const recentBoardActivities = recentBoardActivityRows.map((activity) => ({
     id: activity.id,
@@ -214,33 +245,36 @@ export default async function AdminPage() {
         </section>
 
         <div className="admin-overview-grid">
-          <section className="admin-section admin-attention-panel" aria-label="운영 우선순위">
-            <div className="admin-section-head">
-              <div>
-                <h2>운영 우선순위</h2>
-                <p>지금 확인할 항목</p>
+          <div className="admin-overview-primary">
+            <section className="admin-section admin-attention-panel" aria-label="운영 우선순위">
+              <div className="admin-section-head">
+                <div>
+                  <h2>운영 우선순위</h2>
+                  <p>지금 확인할 항목</p>
+                </div>
+                <Link href="/admin/errors" className="admin-section-link">전체 로그</Link>
               </div>
-              <Link href="/admin/errors" className="admin-section-link">전체 로그</Link>
-            </div>
-            <div className="admin-attention-list">
-              <div className={`admin-attention-item is-${healthTone}`}>
-                <span>오류 캡처</span>
-                <strong>
-                  {serverErrors > 0
-                    ? `서버 오류 ${serverErrors}건`
-                    : recentErrors > 0
-                      ? `최근 오류 ${recentErrors}건`
-                      : "캡처된 오류 없음"}
-                </strong>
-                <small>최근 24시간 수집 기준</small>
+              <div className="admin-attention-list">
+                <div className={`admin-attention-item is-${healthTone}`}>
+                  <span>오류 캡처</span>
+                  <strong>
+                    {serverErrors > 0
+                      ? `서버 오류 ${serverErrors}건`
+                      : recentErrors > 0
+                        ? `최근 오류 ${recentErrors}건`
+                        : "캡처된 오류 없음"}
+                  </strong>
+                  <small>최근 24시간 수집 기준</small>
+                </div>
+                <div className="admin-attention-item">
+                  <span>이번 주 활성도</span>
+                  <strong>보드 {activeBoards}개 · 가입 {weeklySignups}명</strong>
+                  <small>최근 7일 기준</small>
+                </div>
               </div>
-              <div className="admin-attention-item">
-                <span>이번 주 활성도</span>
-                <strong>보드 {activeBoards}개 · 가입 {weeklySignups}명</strong>
-                <small>최근 7일 기준</small>
-              </div>
-            </div>
-          </section>
+            </section>
+            <AdminSignupActivityChart points={signupTrend} />
+          </div>
 
           <div className="admin-activity-stack">
             <section className="admin-section admin-activity-panel" aria-label="최근 보드 활동">
@@ -314,71 +348,12 @@ export default async function AdminPage() {
         <section className="admin-section">
           <div className="admin-section-head">
             <div>
-              <h2>가입 추이</h2>
-              <p>최근 30일 기준</p>
-            </div>
-          </div>
-          <div className="admin-trend" aria-label="최근 30일 가입 추이">
-            {signupTrend.map((day) => (
-              <div key={day.key} className="admin-trend-day">
-                <div
-                  className="admin-trend-bar"
-                  style={{ height: `${Math.max(8, (day.count / peakSignupCount) * 100)}%` }}
-                  title={`${day.label}: ${day.count}명`}
-                />
-                <span>{day.shortLabel}</span>
-              </div>
-            ))}
-          </div>
-        </section>
-
-        <section className="admin-section">
-          <div className="admin-section-head">
-            <div>
               <h2>가입자별 사용량</h2>
               <p>보드 소유자 기준으로 카드와 첨부 용량을 집계합니다.</p>
             </div>
           </div>
 
-          <div className="admin-table-wrap">
-            <table className="admin-table">
-              <thead>
-                <tr>
-                  <th>가입자</th>
-                  <th>가입일</th>
-                  <th>보드</th>
-                  <th>학급</th>
-                  <th>학생</th>
-                  <th>카드</th>
-                  <th>용량</th>
-                  <th>최근 보드 변경</th>
-                </tr>
-              </thead>
-              <tbody>
-                {users.map((user) => (
-                  <tr key={user.id}>
-                    <td>
-                      <div className="admin-user-cell">
-                        <strong>{user.name || "이름 없음"}</strong>
-                        <span>{user.email}</span>
-                      </div>
-                    </td>
-                    <td>{formatDate(user.createdAt)}</td>
-                    <td>{user.boardCount}</td>
-                    <td>{user.classroomCount}</td>
-                    <td>{user.studentCount}</td>
-                    <td>{user.cardCount}</td>
-                    <td>{formatBytes(user.storageBytes)}</td>
-                    <td>
-                      {user.lastBoardUpdatedAt
-                        ? formatDateTime(user.lastBoardUpdatedAt)
-                        : "-"}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <AdminUsageTable rows={usageTableRows} />
         </section>
       </main>
     </>
@@ -442,28 +417,36 @@ function formatDateTime(date: Date): string {
   });
 }
 
-function buildSignupTrend(createdAts: Date[]) {
-  const counts = new Map<string, number>();
-  for (const createdAt of createdAts) {
-    const key = toKstDayKey(createdAt);
-    counts.set(key, (counts.get(key) ?? 0) + 1);
+function buildAdminTrendPoints(
+  signupRows: DailyTrendRow[],
+  activityRows: DailyTrendRow[],
+): AdminTrendPoint[] {
+  const signupCounts = new Map<string, number>();
+  const activityCounts = new Map<string, number>();
+  for (const row of signupRows) {
+    signupCounts.set(row.day, toNumber(row.count));
+  }
+  for (const row of activityRows) {
+    activityCounts.set(row.day, toNumber(row.count));
   }
 
   const nowKst = new Date(Date.now() + KST_OFFSET_MS);
-  return Array.from({ length: 30 }, (_, index) => {
+  return Array.from({ length: ADMIN_TREND_DAYS }, (_, index) => {
     const day = new Date(nowKst);
-    day.setUTCDate(nowKst.getUTCDate() - (29 - index));
+    day.setUTCDate(nowKst.getUTCDate() - (ADMIN_TREND_DAYS - 1 - index));
     const key = day.toISOString().slice(0, 10);
-    const [, month, date] = key.split("-");
     return {
-      key,
-      label: `${month}.${date}`,
-      shortLabel: index % 5 === 0 || index === 29 ? `${Number(month)}/${Number(date)}` : "",
-      count: counts.get(key) ?? 0,
+      date: key,
+      signups: signupCounts.get(key) ?? 0,
+      boardActivities: activityCounts.get(key) ?? 0,
     };
   });
 }
 
-function toKstDayKey(date: Date): string {
-  return new Date(date.getTime() + KST_OFFSET_MS).toISOString().slice(0, 10);
+function startOfKstDay(daysAgo: number): Date {
+  const nowKst = new Date(Date.now() + KST_OFFSET_MS);
+  nowKst.setUTCHours(0, 0, 0, 0);
+  nowKst.setUTCDate(nowKst.getUTCDate() - daysAgo);
+  return new Date(nowKst.getTime() - KST_OFFSET_MS);
 }
+

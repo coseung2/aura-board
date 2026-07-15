@@ -22,6 +22,7 @@ import {
 import { CardComposer } from "../CardComposer";
 import { CardAuthorBottomSheet } from "../CardAuthorBottomSheet";
 import { CommentBottomSheet } from "../CommentBottomSheet";
+import { ExpandablePostContent } from "../ExpandablePostContent";
 import { EmbeddedMedia } from "../EmbeddedMedia";
 import type { BoardDetailResponse, BoardCard } from "../../lib/types";
 import { apiFetch } from "../../lib/api";
@@ -36,8 +37,7 @@ import {
 } from "../../lib/card-privacy";
 import {
   buildMediaItems,
-  isCanvaDesignUrl,
-  isYouTubeVideoUrl,
+  findPlayableMediaUrl,
   mediaPreviewUrls,
 } from "../../lib/media";
 import {
@@ -339,20 +339,14 @@ export function StreamFeedPost({
   const author = resolveCardAuthorName(card);
   const title = card.title.trim();
   const content = card.content.trim();
-  const collapsedContent = streamPostCollapsedContent(content);
   const mediaItems = streamPostImages(card);
   const mediaLabel = streamPostMediaLabel(card);
-  const embedUrl =
-    card.linkUrl &&
-    (isYouTubeVideoUrl(card.linkUrl) || isCanvaDesignUrl(card.linkUrl))
-      ? card.linkUrl
-      : null;
+  const embedUrl = findPlayableMediaUrl(card);
   const [likeCount, setLikeCount] = useState(Math.max(0, card.likeCount ?? 0));
   const [liked, setLiked] = useState(false);
   const [likeBusy, setLikeBusy] = useState(false);
   const commentCount = Math.max(0, card.commentCount ?? 0);
   const date = formatStreamPostDate(card.createdAt);
-  const [expanded, setExpanded] = useState(false);
   const [mediaIndex, setMediaIndex] = useState(0);
   const { width } = useWindowDimensions();
 
@@ -372,10 +366,6 @@ export function StreamFeedPost({
       cancelled = true;
     };
   }, [card.id, card.likeCount]);
-
-  useEffect(() => {
-    setExpanded(false);
-  }, [content]);
 
   async function toggleLike() {
     if (likeBusy) return;
@@ -532,35 +522,11 @@ export function StreamFeedPost({
           </Text>
         ) : null}
         {content ? (
-          <View style={styles.feedPostContentWrap}>
-            {!collapsedContent.truncated ? (
-              <Text style={styles.feedPostContent}>{content}</Text>
-            ) : expanded ? (
-              <Text style={styles.feedPostContent}>
-                {content}
-                <Text
-                  style={styles.feedPostTextToggleLabel}
-                  onPress={() => setExpanded(false)}
-                  accessibilityRole="button"
-                  accessibilityLabel="간단히 보기"
-                >
-                  {"\u00A0간\u2060단\u2060히\u00A0보\u2060기"}
-                </Text>
-              </Text>
-            ) : (
-              <Text style={styles.feedPostContent}>
-                {collapsedContent.preview}
-                <Text
-                  style={styles.feedPostTextToggleLabel}
-                  onPress={() => setExpanded(true)}
-                  accessibilityRole="button"
-                  accessibilityLabel="더보기"
-                >
-                  {"\u00A0.\u2060.\u2060.\u2060더\u2060보\u2060기"}
-                </Text>
-              </Text>
-            )}
-          </View>
+          <ExpandablePostContent
+            content={content}
+            containerStyle={styles.feedPostContentWrap}
+            style={styles.feedPostContent}
+          />
         ) : null}
         {date ? <Text style={styles.feedPostDate}>{date}</Text> : null}
       </View>
@@ -570,26 +536,6 @@ export function StreamFeedPost({
 
 function streamPostImages(card: BoardCard): string[] {
   return mediaPreviewUrls(buildMediaItems(card));
-}
-
-function streamPostCollapsedContent(content: string): {
-  preview: string;
-  truncated: boolean;
-} {
-  let sentenceEnds = 0;
-  for (let index = 0; index < content.length; index += 1) {
-    if (/[.!?。！？]/u.test(content[index])) {
-      sentenceEnds += 1;
-      if (sentenceEnds === 2) {
-        const preview = content.slice(0, index + 1).trimEnd();
-        return {
-          preview,
-          truncated: content.slice(index + 1).trim().length > 0,
-        };
-      }
-    }
-  }
-  return { preview: content, truncated: false };
 }
 
 function streamPostMediaLabel(card: BoardCard): string | null {
@@ -791,10 +737,6 @@ const styles = StyleSheet.create({
   feedPostDate: {
     ...typography.micro,
     color: colors.textFaint,
-  },
-  feedPostTextToggleLabel: {
-    ...typography.body,
-    color: colors.accentTintedText,
   },
   feedPostMediaFrame: {
     aspectRatio: media.previewAspectRatio,

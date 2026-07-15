@@ -33,6 +33,7 @@ const config: ExpoConfig = {
     "expo-font",
     "expo-secure-store",
     "./plugins/with-aura-board-health-connect",
+    "./plugins/with-android-debug-network-security",
   ],
   experiments: {
     typedRoutes: true,

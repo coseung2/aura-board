@@ -23,6 +23,7 @@ import {
 import { apiFetch, getApiBase } from "../../lib/api";
 import { loadSessionToken } from "../../lib/session";
 import type { BoardDetailResponse } from "../../lib/types";
+import { ExpandablePostContent } from "../ExpandablePostContent";
 import { AppButton, AppModal, IconButton, Pill, SurfaceCard, TextField } from "../ui";
 
 // 과제 배부(assignment) — 본인 slot 만 강조해서 보여주고, 나머지는 반 전체 진행 현황 요약.
@@ -99,7 +100,10 @@ export function AssignmentBoard({
           </Pill>
         </View>
         {mySlot.card.content ? (
-          <Text style={styles.slotBody}>{mySlot.card.content}</Text>
+          <ExpandablePostContent
+            content={mySlot.card.content}
+            style={styles.slotBody}
+          />
         ) : null}
         {mySlot.returnReason ? (
           <View style={styles.returnNote}>

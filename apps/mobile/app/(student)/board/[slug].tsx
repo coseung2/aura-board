@@ -172,9 +172,14 @@ export default function BoardDetail() {
 
   const { board } = data;
   const boardTheme = boardThemes[normalizeBoardTheme(board.boardTheme)];
+  const usesCardStream =
+    board.layout === "freeform" ||
+    board.layout === "grid" ||
+    board.layout === "stream";
+  const boardBackground = usesCardStream ? colors.bg : boardTheme.background;
   return (
     <SafeAreaView
-      style={[styles.container, { backgroundColor: boardTheme.background }]}
+      style={[styles.container, { backgroundColor: boardBackground }]}
       edges={["top"]}
     >
       <BoardHeader

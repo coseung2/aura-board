@@ -27,7 +27,7 @@ import {
   shouldUseBoardFallbackPolling,
   useBoardRealtime,
 } from "../../lib/use-board-realtime";
-import { buildMediaItems } from "../../lib/media";
+import { buildMediaItems, findPlayableMediaUrl } from "../../lib/media";
 import type { BoardDetailResponse, BoardCard } from "../../lib/types";
 import {
   withBoardAnonymousAuthor,
@@ -599,6 +599,8 @@ function NowPlayingCard({
 }
 
 function getNowPlayingMediaUrl(card: BoardCard): string | null {
+  const playableUrl = findPlayableMediaUrl(card);
+  if (playableUrl) return playableUrl;
   const mediaItem = buildMediaItems(card).find(
     (item) => item.kind === "video" || item.kind === "link",
   );

@@ -1,29 +1,16 @@
-import { useEffect, useMemo, useState } from "react";
-import { SectionList, StyleSheet, Text, View } from "react-native";
+import { useEffect, useState } from "react";
+import { FlatList, StyleSheet, Text, View } from "react-native";
 import {
-  boardThemes,
   colors,
   controls,
   iconSizes,
-  layout,
-  normalizeBoardTheme,
   spacing,
   typography,
 } from "../../theme/tokens";
 import { CardComposer } from "../CardComposer";
 import { CardAuthorBottomSheet } from "../CardAuthorBottomSheet";
 import { CommentBottomSheet } from "../CommentBottomSheet";
-import {
-  BoardSummaryStrip,
-  MobileFilterBar,
-  type FilterOption,
-} from "../MobileBoardOverview";
-import type { BoardDetailResponse, BoardCard, Section } from "../../lib/types";
-import {
-  filterMobileCards,
-  summarizeMobileCards,
-  type MobileCardFilter,
-} from "../../lib/mobile-board-overview";
+import type { BoardDetailResponse, BoardCard } from "../../lib/types";
 import {
   withBoardAnonymousAuthor,
   withBoardAnonymousAuthors,
@@ -34,11 +21,6 @@ import { StreamFeedPost } from "./ColumnsBoard";
 
 // freeform / grid / stream 공용 — 모바일에서는 세로 피드로 일관되게 보여준다.
 
-type SectionGroup = {
-  section: Section | { id: string; title: string; order: number; color: null };
-  cards: BoardCard[];
-};
-
 function sortCards(cards: BoardCard[]): BoardCard[] {
   return [...cards].sort((a, b) => {
     const ao = a.order ?? 0;
@@ -46,46 +28,6 @@ function sortCards(cards: BoardCard[]): BoardCard[] {
     if (ao !== bo) return ao - bo;
     return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
   });
-}
-
-function groupCardsBySection(
-  cards: BoardCard[],
-  sections: Section[],
-): SectionGroup[] {
-  const knownIds = new Set(sections.map((s) => s.id));
-  const bySection = new Map<string, BoardCard[]>();
-  const unsectioned: BoardCard[] = [];
-
-  for (const card of cards) {
-    const sid = card.sectionId ?? null;
-    if (sid && knownIds.has(sid)) {
-      const bucket = bySection.get(sid) ?? [];
-      bucket.push(card);
-      bySection.set(sid, bucket);
-    } else {
-      unsectioned.push(card);
-    }
-  }
-
-  const groups: SectionGroup[] = [];
-  for (const section of sections) {
-    const bucket = bySection.get(section.id);
-    if (bucket && bucket.length > 0) {
-      groups.push({ section, cards: sortCards(bucket) });
-    }
-  }
-  if (unsectioned.length > 0) {
-    groups.push({
-      section: {
-        id: "__unsectioned__",
-        title: "섹션 없음",
-        order: Number.MAX_SAFE_INTEGER,
-        color: null,
-      },
-      cards: sortCards(unsectioned),
-    });
-  }
-  return groups;
 }
 
 export function CardsBoard({
@@ -102,40 +44,6 @@ export function CardsBoard({
   const [cards, setCards] = useState<BoardCard[]>(() =>
     withBoardAnonymousAuthors(sortCards(data.cards), data.board),
   );
-  const [filter, setFilter] = useState<MobileCardFilter>("all");
-  const [query, setQuery] = useState("");
-  const boardTheme = boardThemes[normalizeBoardTheme(data.board.boardTheme)];
-
-  const summary = useMemo(
-    () => summarizeMobileCards(cards, data.sections),
-    [cards, data.sections],
-  );
-  const filteredCards = useMemo(
-    () => filterMobileCards(cards, filter, query),
-    [cards, filter, query],
-  );
-  const sectionGroups = useMemo(
-    () => groupCardsBySection(filteredCards, data.sections),
-    [filteredCards, data.sections],
-  );
-  const streamSections = useMemo(
-    () =>
-      sectionGroups.map((group) => ({
-        title: group.section.title,
-        data: group.cards,
-      })),
-    [sectionGroups],
-  );
-  const filterOptions = useMemo<Array<FilterOption<MobileCardFilter>>>(
-    () => [
-      { value: "all", label: "전체", count: summary.total },
-      { value: "mine", label: "내 카드", count: summary.mine },
-      { value: "media", label: "미디어", count: summary.media },
-      { value: "comments", label: "댓글 있음" },
-    ],
-    [summary],
-  );
-
   useEffect(() => {
     setCards(withBoardAnonymousAuthors(sortCards(data.cards), data.board));
   }, [data.cards, data.board]);
@@ -149,29 +57,6 @@ export function CardsBoard({
   // 서버 broadcast channel key 가 board.id 기준이므로 id 로 구독한다.
   useBoardRealtime({ slug: data.board.id, onReload: onMutate });
 
-  const header = (
-    <View style={styles.headerContent}>
-      <BoardSummaryStrip
-        title="보드 한눈에 보기"
-        description="카드 크기보다 작성·미디어·반응 상태를 먼저 비교해요."
-        metrics={[
-          { label: "카드", value: summary.total },
-          { label: "내 카드", value: summary.mine, tone: "accent" },
-          { label: "댓글", value: summary.comments },
-          { label: "섹션", value: summary.sections },
-        ]}
-      />
-      <MobileFilterBar
-        query={query}
-        onQueryChange={setQuery}
-        queryPlaceholder="제목·내용·작성자 검색"
-        options={filterOptions}
-        value={filter}
-        onChange={setFilter}
-      />
-    </View>
-  );
-
   const emptyState = (
     <View style={styles.empty}>
       <Text style={styles.emptyEmoji}>✨</Text>
@@ -183,18 +68,11 @@ export function CardsBoard({
   );
 
   return (
-    <View style={[styles.root, { backgroundColor: boardTheme.background }]}>
-      <SectionList
-        sections={streamSections}
+    <View style={styles.root}>
+      <FlatList
+        data={cards}
         keyExtractor={(card) => card.id}
         contentContainerStyle={styles.streamContent}
-        ListHeaderComponent={header}
-        renderSectionHeader={({ section }) => (
-          <View style={styles.streamSectionHeader}>
-            <Text style={styles.streamSectionTitle}>{section.title}</Text>
-            <Text style={styles.streamSectionCount}>{section.data.length}개</Text>
-          </View>
-        )}
         renderItem={({ item }) => (
           <StreamFeedPost
             card={item}
@@ -205,9 +83,7 @@ export function CardsBoard({
           />
         )}
         ItemSeparatorComponent={() => <View style={styles.streamSeparator} />}
-        SectionSeparatorComponent={() => <View style={styles.streamSectionSeparator} />}
         ListEmptyComponent={emptyState}
-        stickySectionHeadersEnabled={false}
         keyboardShouldPersistTaps="handled"
         initialNumToRender={8}
         maxToRenderPerBatch={8}
@@ -285,38 +161,13 @@ export function CardsBoard({
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1 },
-  headerContent: {
-    gap: spacing.lg,
-    paddingBottom: spacing.lg,
-  },
+  root: { flex: 1, backgroundColor: colors.bg },
   streamContent: {
-    padding: layout.boardGridPadding,
+    paddingHorizontal: spacing.none,
     paddingBottom: spacing.xxxl + controls.fab,
   },
-  streamSectionHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: spacing.md,
-    paddingTop: spacing.md,
-    paddingBottom: spacing.sm,
-    backgroundColor: colors.transparent,
-  },
-  streamSectionTitle: {
-    ...typography.section,
-    color: colors.text,
-    flex: 1,
-  },
-  streamSectionCount: {
-    ...typography.badge,
-    color: colors.accentTintedText,
-  },
   streamSeparator: {
-    height: spacing.sm,
-  },
-  streamSectionSeparator: {
-    height: spacing.md,
+    height: spacing.lg,
   },
   empty: {
     alignItems: "center",

@@ -5,6 +5,7 @@ import {
   buildYouTubeEmbedUrl,
   classifyMediaUrl,
   embedOriginWhitelist,
+  findPlayableMediaUrl,
   isAllowedEmbedNavigation,
   mediaPreviewUrls,
   MOBILE_EMBED_ORIGIN,
@@ -83,6 +84,41 @@ describe("mobile media previews", () => {
         "https://www.canva.com/design/DAFabc123/TOKEN_456/edit?utm_source=share",
       ),
     ).toBe("https://www.canva.com/design/DAFabc123/TOKEN_456/view?embed&meta");
+  });
+
+  it("normalizes Canva embed share URLs to the shared player URL", () => {
+    expect(
+      buildCanvaEmbedUrl(
+        "https://www.canva.com/design/DAFabc123/TOKEN_456/embed",
+      ),
+    ).toBe("https://www.canva.com/design/DAFabc123/TOKEN_456/view?embed&meta");
+  });
+
+  it("resolves playable attachments before stale legacy links", () => {
+    const youtubeUrl = "https://youtu.be/dQw4w9WgXcQ";
+    expect(
+      findPlayableMediaUrl({
+        attachments: [
+          {
+            id: "youtube-attachment",
+            kind: "link",
+            url: youtubeUrl,
+            previewUrl: null,
+            fileName: null,
+            fileSize: null,
+            mimeType: null,
+            order: 0,
+          },
+        ],
+        linkUrl: "https://example.com/stale-preview",
+      }),
+    ).toBe(youtubeUrl);
+  });
+
+  it("resolves legacy video URLs through the same player path", () => {
+    const canvaUrl =
+      "https://www.canva.com/design/DAFabc123/TOKEN_456/view";
+    expect(findPlayableMediaUrl({ videoUrl: canvaUrl })).toBe(canvaUrl);
   });
 
   it("does not treat unresolved Canva short links as live embeds", () => {

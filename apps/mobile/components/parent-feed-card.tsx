@@ -15,6 +15,7 @@ import {
   typography,
 } from "../theme/tokens";
 import { SurfaceCard } from "./ui";
+import { ExpandablePostContent } from "./ExpandablePostContent";
 import { resolveParentFeedAuthor } from "../lib/parent-feed-presentation";
 
 type Props = {
@@ -208,9 +209,7 @@ export function ParentFeedCard({ card, childName }: Props) {
               </Text>
             ) : null}
             {content ? (
-              <Text selectable style={styles.content}>
-                {content}
-              </Text>
+              <ExpandablePostContent content={content} style={styles.content} />
             ) : null}
           </View>
         ) : null}

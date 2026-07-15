@@ -142,7 +142,7 @@ export function buildCanvaEmbedUrl(raw: string): string | null {
     const host = u.hostname.toLowerCase();
     if (!CANVA_DESIGN_HOSTS.has(host)) return null;
     const m = u.pathname.match(
-      /\/design\/([A-Za-z0-9_-]+)(?:\/([A-Za-z0-9_-]+))?\/(?:view|watch|edit|present)/,
+      /\/design\/([A-Za-z0-9_-]+)(?:\/([A-Za-z0-9_-]+))?\/(?:view|watch|edit|present|embed)/,
     );
     if (!m) return null;
     const [, designId, shareToken] = m;
@@ -351,6 +351,18 @@ export function buildMediaItems({
   }
 
   return items.sort((a, b) => a.order - b.order);
+}
+
+/** Resolve the first media URL that the shared mobile player can render. */
+export function findPlayableMediaUrl(
+  card: Parameters<typeof buildMediaItems>[0],
+): string | null {
+  const item = buildMediaItems(card).find(
+    (candidate) =>
+      (candidate.kind === "video" || candidate.kind === "link") &&
+      classifyMediaUrl(candidate.url).kind !== null,
+  );
+  return item?.url ?? null;
 }
 
 export function fileAttachments(items: MediaItem[]): MediaItem[] {
