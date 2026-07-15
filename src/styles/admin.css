@@ -1,74 +1,93 @@
 .admin-page {
-  width: min(1180px, calc(100% - 48px));
+  width: min(1120px, calc(100% - 48px));
   margin: 0 auto;
   padding: 36px 0 56px;
   color: var(--color-text);
 }
 
-.admin-header {
+.admin-feature-header {
   display: flex;
-  align-items: flex-start;
+  align-items: stretch;
   justify-content: space-between;
-  gap: 20px;
-  margin-bottom: 24px;
+  gap: 32px;
+  margin: 18px 0 28px;
+  border-bottom: 1px solid var(--color-border);
 }
 
-.admin-command-header {
-  align-items: center;
-  padding: 22px 24px;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-card);
-  background:
-    linear-gradient(120deg, color-mix(in srgb, var(--color-accent) 12%, transparent), transparent 42%),
-    var(--color-surface);
-  box-shadow: var(--shadow-card);
+.admin-feature-header > div {
+  padding-bottom: 18px;
 }
 
-.admin-header-actions {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
-.admin-health-chip {
-  display: inline-flex;
-  align-items: center;
-  min-height: 34px;
-  padding: 0 10px;
-  border: 1px solid var(--color-border);
-  border-radius: 999px;
-  background: var(--color-surface-alt);
+.admin-back-link {
   color: var(--color-text-muted);
   font-size: 12px;
   font-weight: 700;
+  text-decoration: none;
 }
 
-.admin-health-chip.is-good { color: #15803d; }
-.admin-health-chip.is-warning { color: #b45309; }
-.admin-health-chip.is-danger { color: #b91c1c; }
-
-.admin-eyebrow {
-  margin: 0 0 8px;
-  color: var(--color-accent);
-  font-size: 13px;
-  font-weight: 700;
+.admin-back-link:hover {
+  color: var(--color-text);
 }
 
-.admin-header h1,
+.admin-feature-eyebrow {
+  margin: 14px 0 0;
+  color: var(--color-text-muted);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.admin-feature-title {
+  margin: 4px 0 6px;
+  font-size: 28px;
+  letter-spacing: -0.25px;
+}
+
 .admin-forbidden h1 {
   margin: 0;
   font-size: 28px;
   letter-spacing: -0.25px;
 }
 
-.admin-header p,
+.admin-feature-description {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
 .admin-forbidden p,
 .admin-section-head p {
   margin: 8px 0 0;
   color: var(--color-text-muted);
   font-size: 14px;
+}
+
+.admin-feature-switcher {
+  display: flex;
+  align-self: stretch;
+  align-items: flex-end;
+  flex: 0 0 auto;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.admin-feature-switcher a {
+  display: inline-flex;
+  align-items: flex-end;
+  min-height: 44px;
+  margin-bottom: -1px;
+  padding: 8px 12px;
+  border-bottom: 2px solid transparent;
+  color: var(--color-text-muted);
+  font-size: 13px;
+  font-weight: 800;
+  text-decoration: none;
+}
+
+.admin-feature-switcher a[aria-current="page"] {
+  border-color: var(--color-accent-tinted-text);
+  color: var(--color-text);
 }
 
 .admin-link-btn {
@@ -515,16 +534,26 @@
 
 @media (max-width: 640px) {
   .admin-page {
-    width: min(100% - 24px, 1180px);
+    width: min(100% - 24px, 1120px);
     padding-top: 24px;
   }
 
-  .admin-header {
+  .admin-feature-header {
+    align-items: flex-start;
     flex-direction: column;
+    gap: 12px;
   }
 
-  .admin-command-header { align-items: flex-start; }
-  .admin-header-actions { justify-content: flex-start; }
+  .admin-feature-header > div { padding-bottom: 0; }
+
+  .admin-feature-switcher {
+    align-self: stretch;
+    width: 100%;
+    min-height: 44px;
+    overflow-x: auto;
+  }
+
+  .admin-feature-switcher a { white-space: nowrap; }
 
   .admin-metric-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));

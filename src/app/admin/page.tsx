@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { TopNav } from "@/components/TopNav";
+import { AdminFeatureHeader } from "@/components/admin/AdminFeatureHeader";
 import { AdminForbidden, requireAdminUser } from "@/lib/admin-auth";
 import {
   formatActivityRelativeTime,
@@ -197,31 +198,11 @@ export default async function AdminPage() {
     <>
       <TopNav showAdmin />
       <main className="admin-page">
-        <header className="admin-header admin-command-header">
-          <div>
-            <p className="admin-eyebrow">관리자</p>
-            <h1>Aura-board 운영 현황</h1>
-            <p>가입자별 사용량과 최근 가입 추이를 확인합니다.</p>
-          </div>
-          <div className="admin-header-actions">
-          <span className={`admin-health-chip is-${healthTone}`}>
-            {serverErrors > 0
-              ? `서버 오류 ${serverErrors}건`
-              : recentErrors > 0
-                ? `주의 필요 ${recentErrors}건`
-                : "최근 캡처 오류 없음"}
-          </span>
-          <Link href="/dashboard" className="admin-link-btn">
-            대시보드
-          </Link>
-          <Link href="/admin/errors" className="admin-link-btn">
-            에러 로그
-          </Link>
-          <Link href="/admin/activity" className="admin-link-btn">
-            보드 활동
-          </Link>
-          </div>
-        </header>
+        <AdminFeatureHeader
+          eyebrow="서비스 운영"
+          description="가입자별 사용량과 최근 가입 추이를 확인합니다."
+          active="overview"
+        />
 
         <section className="admin-metric-grid" aria-label="전체 지표">
           <MetricCard label="가입자" value={`${totalUsers}명`} />

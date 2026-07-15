@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { TopNav } from "@/components/TopNav";
+import { AdminFeatureHeader } from "@/components/admin/AdminFeatureHeader";
 import { AdminForbidden, requireAdminUser } from "@/lib/admin-auth";
 import {
   formatAdminActivityActor,
@@ -52,16 +53,11 @@ export default async function AdminActivityPage({
     <>
       <TopNav showAdmin />
       <main className="admin-page">
-        <header className="admin-header">
-          <div>
-            <p className="admin-eyebrow">관리자</p>
-            <h1>최근 보드 활동</h1>
-            <p>보드, 섹션, 카드와 참여 활동을 최신순으로 확인합니다.</p>
-          </div>
-          <Link href="/admin" className="admin-link-btn">
-            운영 현황
-          </Link>
-        </header>
+        <AdminFeatureHeader
+          eyebrow="보드 활동"
+          description="보드, 섹션, 카드와 참여 활동을 최신순으로 확인합니다."
+          active="activity"
+        />
 
         <section className="admin-metric-grid admin-metric-grid-compact" aria-label="보드 활동 지표">
           <MetricCard label="전체 활동" value={`${totalActivities}건`} />

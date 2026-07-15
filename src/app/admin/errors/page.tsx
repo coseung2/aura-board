@@ -1,5 +1,5 @@
-import Link from "next/link";
 import { TopNav } from "@/components/TopNav";
+import { AdminFeatureHeader } from "@/components/admin/AdminFeatureHeader";
 import { AdminForbidden, requireAdminUser } from "@/lib/admin-auth";
 import { db } from "@/lib/db";
 import { ErrorLogCopyButton } from "@/components/admin/ErrorLogCopyButton";
@@ -63,16 +63,11 @@ export default async function AdminErrorsPage() {
     <>
       <TopNav showAdmin />
       <main className="admin-page">
-        <header className="admin-header">
-          <div>
-            <p className="admin-eyebrow">관리자</p>
-            <h1>에러 로그</h1>
-            <p>서버에서 기록한 최근 오류를 확인합니다.</p>
-          </div>
-          <Link href="/admin" className="admin-link-btn">
-            운영 현황
-          </Link>
-        </header>
+        <AdminFeatureHeader
+          eyebrow="오류 모니터링"
+          description="서버에서 기록한 최근 오류를 확인합니다."
+          active="errors"
+        />
 
         <section className="admin-metric-grid admin-metric-grid-compact" aria-label="에러 지표">
           <MetricCard label="전체 에러" value={`${totalErrors}건`} />

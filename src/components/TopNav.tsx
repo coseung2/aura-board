@@ -435,6 +435,11 @@ export function TopNav({ showAdmin = false }: Props) {
               active: pathname.startsWith("/admin/errors"),
             },
             {
+              href: "/admin/activity",
+              label: "보드 활동",
+              active: pathname.startsWith("/admin/activity"),
+            },
+            {
               href: "/admin/daily-banners",
               label: "일일 배너",
               active: pathname.startsWith("/admin/daily-banners"),

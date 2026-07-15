@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { TopNav } from "@/components/TopNav";
+import { AdminFeatureHeader } from "@/components/admin/AdminFeatureHeader";
 import { DailyBannerAdminActions } from "@/components/admin/DailyBannerAdminActions";
 import { AdminForbidden, requireAdminUser } from "@/lib/admin-auth";
 import { dateToKstDay } from "@/lib/daily-banner";
@@ -32,14 +33,11 @@ export default async function AdminDailyBannersPage() {
     <>
       <TopNav showAdmin />
       <main className="admin-page">
-        <header className="admin-header">
-          <div>
-            <p className="admin-eyebrow">관리자</p>
-            <h1>일일 배너 관리</h1>
-            <p>전교 학생·학부모 화면에 노출되는 하루 한 개의 배너를 확인하고 게시를 취소할 수 있습니다.</p>
-          </div>
-          <Link href="/admin" className="admin-link-btn">운영 현황</Link>
-        </header>
+        <AdminFeatureHeader
+          eyebrow="콘텐츠 운영"
+          description="전교 학생·학부모 화면에 노출되는 하루 한 개의 배너를 확인하고 게시를 취소할 수 있습니다."
+          active="daily-banners"
+        />
 
         <section className="admin-metric-grid admin-metric-grid-compact" aria-label="배너 운영 현황">
           <MetricCard label="확정 배너" value={`${publications.length}건`} />

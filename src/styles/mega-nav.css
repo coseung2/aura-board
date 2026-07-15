@@ -149,6 +149,32 @@
   isolation: isolate;
 }
 
+@media (min-width: 1024px) {
+  .ab-topnav {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  }
+
+  .ab-topnav-left {
+    display: contents;
+  }
+
+  .ab-topnav-logo {
+    grid-column: 1;
+    justify-self: start;
+  }
+
+  .ab-topnav-left > .mega-nav {
+    grid-column: 2;
+    justify-self: center;
+  }
+
+  .ab-topnav-right {
+    grid-column: 3;
+    justify-self: end;
+  }
+}
+
 @media (max-width: 760px) {
   .mega-nav {
     flex: 1 1 auto;
