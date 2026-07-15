@@ -1,26 +1,26 @@
 import { describe, expect, it } from "vitest";
 import { applyCardLikeMutation } from "@/lib/card-like-toggle";
 
-function uniqueConflict() {
-  return Object.assign(new Error("Unique constraint failed"), { code: "P2002" });
-}
-
 function createDelegate(options: {
   deleteCount?: number;
-  createError?: unknown;
+  createManyCount?: number;
+  createManyError?: unknown;
 }) {
   const calls: string[] = [];
+  const createManyArgs: unknown[] = [];
   return {
     calls,
+    createManyArgs,
     delegate: {
       async deleteMany() {
         calls.push("deleteMany");
         return { count: options.deleteCount ?? 0 };
       },
-      async create() {
-        calls.push("create");
-        if (options.createError) throw options.createError;
-        return {};
+      async createMany(args: unknown) {
+        calls.push("createMany");
+        createManyArgs.push(args);
+        if (options.createManyError) throw options.createManyError;
+        return { count: options.createManyCount ?? 1 };
       },
     },
   };
@@ -34,17 +34,41 @@ describe("applyCardLikeMutation", () => {
       applyCardLikeMutation(fake.delegate, "card-1", { kind: "teacher", id: "user-1" }, true),
     ).resolves.toBe(true);
 
-    expect(fake.calls).toEqual(["create"]);
+    expect(fake.calls).toEqual(["createMany"]);
+    expect(fake.createManyArgs).toEqual([
+      {
+        data: {
+          cardId: "card-1",
+          likerKind: "teacher",
+          likerUserId: "user-1",
+          likerStudentId: null,
+          externalLikerKey: null,
+        },
+        skipDuplicates: true,
+      },
+    ]);
   });
 
-  it("treats unique conflicts as already liked", async () => {
-    const fake = createDelegate({ createError: uniqueConflict() });
+  it("treats a skipped duplicate student like as already liked", async () => {
+    const fake = createDelegate({ createManyCount: 0 });
 
     await expect(
       applyCardLikeMutation(fake.delegate, "card-1", { kind: "student", id: "student-1" }, true),
     ).resolves.toBe(true);
 
-    expect(fake.calls).toEqual(["create"]);
+    expect(fake.calls).toEqual(["createMany"]);
+    expect(fake.createManyArgs).toEqual([
+      {
+        data: {
+          cardId: "card-1",
+          likerKind: "student",
+          likerUserId: null,
+          likerStudentId: "student-1",
+          externalLikerKey: null,
+        },
+        skipDuplicates: true,
+      },
+    ]);
   });
 
   it("deletes likes for an idempotent liked=false request", async () => {
@@ -67,13 +91,22 @@ describe("applyCardLikeMutation", () => {
     expect(fake.calls).toEqual(["deleteMany"]);
   });
 
-  it("legacy duplicate creates collapse to liked instead of throwing", async () => {
-    const fake = createDelegate({ createError: uniqueConflict() });
+  it("legacy duplicate creates collapse to liked without a constraint error", async () => {
+    const fake = createDelegate({ createManyCount: 0 });
 
     await expect(
       applyCardLikeMutation(fake.delegate, "card-1", { kind: "student", id: "student-1" }, undefined),
     ).resolves.toBe(true);
 
-    expect(fake.calls).toEqual(["deleteMany", "create"]);
+    expect(fake.calls).toEqual(["deleteMany", "createMany"]);
+  });
+
+  it("still surfaces non-duplicate database failures", async () => {
+    const failure = Object.assign(new Error("Foreign key constraint failed"), { code: "P2003" });
+    const fake = createDelegate({ createManyError: failure });
+
+    await expect(
+      applyCardLikeMutation(fake.delegate, "missing-card", { kind: "student", id: "student-1" }, true),
+    ).rejects.toBe(failure);
   });
 });

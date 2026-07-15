@@ -6,7 +6,10 @@ export type CardLikeActor =
   | { kind: "external"; id: string };
 
 type CardLikeDelegate = {
-  create(args: { data: Prisma.CardLikeUncheckedCreateInput }): Promise<unknown>;
+  createMany(args: {
+    data: Prisma.CardLikeUncheckedCreateInput;
+    skipDuplicates: true;
+  }): Promise<{ count: number }>;
   deleteMany(args: { where: Prisma.CardLikeWhereInput }): Promise<{ count: number }>;
 };
 
@@ -14,10 +17,6 @@ export function getPrismaErrorCode(error: unknown): string | null {
   return error && typeof error === "object" && "code" in error
     ? String((error as { code?: unknown }).code)
     : null;
-}
-
-function isUniqueConflict(error: unknown): boolean {
-  return getPrismaErrorCode(error) === "P2002";
 }
 
 function cardLikeWhere(cardId: string, actor: CardLikeActor): Prisma.CardLikeWhereInput {
@@ -66,11 +65,13 @@ async function ensureLiked(
   cardId: string,
   actor: CardLikeActor,
 ): Promise<true> {
-  try {
-    await cardLike.create({ data: cardLikeCreateData(cardId, actor) });
-  } catch (error) {
-    if (!isUniqueConflict(error)) throw error;
-  }
+  // PostgreSQL translates skipDuplicates into ON CONFLICT DO NOTHING. That
+  // keeps repeated/concurrent liked=true requests idempotent without first
+  // raising a 23505 error that pollutes Supabase's Postgres error logs.
+  await cardLike.createMany({
+    data: cardLikeCreateData(cardId, actor),
+    skipDuplicates: true,
+  });
   return true;
 }
 
@@ -78,8 +79,8 @@ async function ensureLiked(
  * Applies a card-like mutation without throwing on same-user concurrent clicks.
  *
  * - desiredLiked=true/false is idempotent for new clients.
- * - desiredLiked=undefined preserves legacy "toggle" behavior, but duplicate
- *   concurrent creates collapse to "liked" instead of surfacing P2002.
+ * - desiredLiked=undefined preserves legacy "toggle" behavior, while duplicate
+ *   concurrent creates collapse to "liked" at the database write boundary.
  */
 export async function applyCardLikeMutation(
   cardLike: CardLikeDelegate,
