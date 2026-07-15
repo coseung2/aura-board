@@ -21,6 +21,7 @@ import {
 import { apiFetch, ApiError, getApiBase } from "../../lib/api";
 import { clearSessionToken } from "../../lib/session";
 import { AppHeader, SurfaceCard } from "../../components/ui";
+import { StudentHeaderActions } from "../../components/StudentHeaderActions";
 import type {
   BoardCard,
   MeResponse,
@@ -90,9 +91,12 @@ export default function StudentPortfolioScreen() {
       <AppHeader
         title="포트폴리오"
         right={
-          portfolio ? (
-            <Text style={styles.headerCount}>{portfolio.cards.length}개</Text>
-          ) : undefined
+          <View style={styles.headerRight}>
+            {portfolio ? (
+              <Text style={styles.headerCount}>{portfolio.cards.length}개</Text>
+            ) : null}
+            <StudentHeaderActions />
+          </View>
         }
       />
 
@@ -277,6 +281,11 @@ const styles = StyleSheet.create({
     gap: spacing.lg,
   },
   headerCount: { ...typography.label, color: colors.accent },
+  headerRight: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.xs,
+  },
   inlineLoading: {
     minHeight: portfolioTokens.rosterChipMinHeight,
     alignItems: "center",

@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState, type ReactNode } from "react";
+import { useCallback, useState, type ReactNode } from "react";
 import {
   ActivityIndicator,
   RefreshControl,
@@ -10,7 +10,7 @@ import {
 } from "react-native";
 import { useFocusEffect, useRouter, type Href } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { ChevronRight, LogOut } from "lucide-react-native";
+import { ChevronRight } from "lucide-react-native";
 import {
   borders,
   colors,
@@ -50,7 +50,7 @@ import {
   SemanticNav,
   SemanticNavItem,
 } from "../../components/ui";
-import { StudentNotificationButton } from "../../components/StudentNotificationButton";
+import { StudentHeaderActions } from "../../components/StudentHeaderActions";
 
 // 학생 대시보드. 웹과 같은 /api/student/me 계약을 사용한다.
 
@@ -68,8 +68,6 @@ export default function StudentHome() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(() => !initialHomeCache);
   const [refreshing, setRefreshing] = useState(false);
-  const [loggingOut, setLoggingOut] = useState(false);
-  const loggingOutRef = useRef(false);
 
   const isLandscapeLayout = width > height && width >= dashboard.columns.one;
 
@@ -128,22 +126,6 @@ export default function StudentHome() {
     [router, loadWallet],
   );
 
-  const handleLogout = useCallback(async () => {
-    if (loggingOutRef.current) return;
-    loggingOutRef.current = true;
-    setLoggingOut(true);
-    try {
-      await apiFetch("/api/student/logout", { method: "POST" }).catch(
-        () => undefined,
-      );
-      await clearSessionToken();
-      router.replace("/(student)/login");
-    } finally {
-      loggingOutRef.current = false;
-      setLoggingOut(false);
-    }
-  }, [router]);
-
   useFocusEffect(
     useCallback(() => {
       load();
@@ -197,25 +179,7 @@ export default function StudentHome() {
     />
   );
   const assignmentPanel = <AssignmentPanel assignments={assignments} />;
-  const headerActions = (
-    <View style={styles.accountActions}>
-      <StudentNotificationButton />
-      <ControlPressable
-        style={styles.logoutButton}
-        onPress={handleLogout}
-        disabled={loggingOut}
-        accessibilityLabel={loggingOut ? "로그아웃 중" : "로그아웃"}
-        accessibilityState={{ disabled: loggingOut }}
-      >
-        <LogOut
-          size={iconSizes.md}
-          color={colors.textMuted}
-          strokeWidth={2}
-          accessible={false}
-        />
-      </ControlPressable>
-    </View>
-  );
+  const headerActions = <StudentHeaderActions />;
 
   return (
     <SafeAreaView style={styles.container} edges={["top"]}>
@@ -660,22 +624,6 @@ const styles = StyleSheet.create({
     color: colors.textMuted,
     flexShrink: 1,
     alignSelf: "flex-end",
-  },
-  accountActions: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: spacing.xs,
-    flexShrink: 0,
-  },
-  logoutButton: {
-    minWidth: tapMin,
-    minHeight: tapMin,
-    alignItems: "center",
-    justifyContent: "center",
-    borderWidth: borders.none,
-    borderColor: colors.transparent,
-    borderRadius: radii.none,
-    backgroundColor: colors.transparent,
   },
   showcaseBand: {
     marginHorizontal: -spacing.xl,

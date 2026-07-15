@@ -33,6 +33,7 @@ import {
   SectionHeader,
   TextField,
 } from "../../components/ui";
+import { StudentHeaderActions } from "../../components/StudentHeaderActions";
 
 type BookType = "comic" | "story";
 type ReadingEntry = {
@@ -131,7 +132,7 @@ export default function StudentReadingScreen() {
 
   return (
     <SafeAreaView style={styles.container} edges={["top"]}>
-      <AppHeader title="독서" />
+      <AppHeader title="독서" right={<StudentHeaderActions />} />
       <KeyboardAvoidingView
         behavior={Platform.OS === "ios" ? "padding" : undefined}
         style={styles.keyboardWrap}

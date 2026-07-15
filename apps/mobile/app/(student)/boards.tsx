@@ -46,6 +46,7 @@ import {
   SemanticNavItem,
   SurfacePressable,
 } from "../../components/ui";
+import { StudentHeaderActions } from "../../components/StudentHeaderActions";
 
 const FALLBACK_THUMBNAIL = "/board-type-thumbnails/card-board.png";
 type StudentBoardsResponse = {
@@ -172,7 +173,7 @@ export default function StudentBoardsScreen() {
 
   return (
     <SafeAreaView style={styles.container} edges={["top"]}>
-      <AppHeader title="보드" />
+      <AppHeader title="보드" right={<StudentHeaderActions />} />
       {loading ? (
         <View style={styles.center}>
           <ActivityIndicator size="large" color={colors.accent} />

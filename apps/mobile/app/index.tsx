@@ -21,6 +21,7 @@ import {
   radii,
   responsive,
   spacing,
+  studentNav,
   tapMin,
   typography,
   auth,
@@ -39,7 +40,8 @@ import { LogoLockup } from "../components/LogoLockup";
 import {
   AppButton,
   ControlPressable,
-  SurfaceCard,
+  SemanticNav,
+  SemanticNavItem,
   TextField,
 } from "../components/ui";
 import type { ParentChildrenResponse, StudentAuthResponse } from "../lib/types";
@@ -56,6 +58,9 @@ export default function Landing() {
   const [studentCode, setStudentCode] = useState("");
   const [studentLoading, setStudentLoading] = useState(false);
   const [studentError, setStudentError] = useState<string | null>(null);
+  const [activeRole, setActiveRole] = useState<"student" | "parent">(
+    "student",
+  );
   const isNarrow = width < layout.mobileBreakpoint;
   const webNarrowContentStyle = webSafeWidthStyle(width, {
     enabled: isNarrow,
@@ -176,10 +181,35 @@ export default function Landing() {
         contentContainerStyle={styles.inner}
         keyboardShouldPersistTaps="handled"
       >
-        <View style={styles.brandRow}>
-          <LogoLockup size={brand.logoSize} wordmarkStyle={styles.brandTitle} />
+        <View style={styles.topLogo}>
+          <LogoLockup size={brand.logoSize * 2} withWordmark={false} />
         </View>
-
+        <View style={styles.loginHeader}>
+          <View style={styles.loginTitleCell}>
+            <Text style={styles.loginBrandTitle}>Aura-board</Text>
+          </View>
+          <SemanticNav
+            style={styles.roleNav}
+            accessibilityLabel="로그인 역할 선택"
+          >
+            <SemanticNavItem
+              style={styles.roleNavItem}
+              selected={activeRole === "student"}
+              onPress={() => setActiveRole("student")}
+              accessibilityLabel="학생 로그인"
+            >
+              학생
+            </SemanticNavItem>
+            <SemanticNavItem
+              style={styles.roleNavItem}
+              selected={activeRole === "parent"}
+              onPress={() => setActiveRole("parent")}
+              accessibilityLabel="학부모 로그인"
+            >
+              학부모
+            </SemanticNavItem>
+          </SemanticNav>
+        </View>
         <View
           style={[
             styles.cardRow,
@@ -187,8 +217,12 @@ export default function Landing() {
             webNarrowContentStyle,
           ]}
         >
-          <SurfaceCard
-            style={[styles.roleCard, isNarrow && styles.roleCardNarrow]}
+          <View
+            style={[
+              styles.roleCard,
+              isNarrow && styles.roleCardNarrow,
+              activeRole !== "student" && styles.hiddenRoleCard,
+            ]}
           >
             <RoleLineIcon role="student" />
             <Text style={styles.roleTitle}>학생</Text>
@@ -224,10 +258,14 @@ export default function Landing() {
                 학생 로그인
               </AppButton>
             </View>
-          </SurfaceCard>
+          </View>
 
-          <SurfaceCard
-            style={[styles.roleCard, isNarrow && styles.roleCardNarrow]}
+          <View
+            style={[
+              styles.roleCard,
+              isNarrow && styles.roleCardNarrow,
+              activeRole !== "parent" && styles.hiddenRoleCard,
+            ]}
           >
             <RoleLineIcon role="parent" />
             <Text style={styles.roleTitle}>학부모</Text>
@@ -251,19 +289,8 @@ export default function Landing() {
                 <KakaoGlyph />
                 <Text style={styles.oauthKakaoText}>Kakao로 로그인</Text>
               </ControlPressable>
-              {__DEV__ ? (
-                <ControlPressable
-                  style={styles.devPreviewButton}
-                  onPress={() => router.push("/(parent)/dev-preview")}
-                  accessibilityLabel="개발용 학부모 피드 미리보기 열기"
-                >
-                  <Text style={styles.devPreviewButtonText}>
-                    개발용 미리보기
-                  </Text>
-                </ControlPressable>
-              ) : null}
             </View>
-          </SurfaceCard>
+          </View>
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -364,13 +391,45 @@ const styles = StyleSheet.create({
     padding: spacing.xxl,
     gap: spacing.lg,
   },
-  brandRow: {
+  loginHeader: {
+    width: "100%",
+    maxWidth: layout.roleCardNarrowMaxWidth,
     flexDirection: "row",
+    alignItems: "stretch",
+    backgroundColor: colors.bg,
+  },
+  topLogo: {
     alignItems: "center",
-    gap: spacing.md,
+    justifyContent: "center",
     marginBottom: spacing.sm,
   },
-  brandTitle: { ...typography.display, color: colors.text },
+  loginTitleCell: {
+    flex: 1,
+    minWidth: 0,
+    minHeight: tapMin,
+    justifyContent: "center",
+    paddingHorizontal: spacing.md,
+    borderBottomWidth: borders.hairline,
+    borderBottomColor: colors.border,
+  },
+  loginBrandTitle: {
+    ...typography.title,
+    fontFamily: Platform.select({
+      android: "sans-serif-rounded",
+      default: typography.title.fontFamily,
+    }),
+    color: colors.text,
+    flexShrink: 1,
+  },
+  roleNav: {
+    width: studentNav.tabMinWidth * 2,
+    flexGrow: 0,
+    flexShrink: 0,
+  },
+  roleNavItem: {
+    flex: 1,
+    paddingHorizontal: spacing.xs,
+  },
   cardRow: {
     flexDirection: "row",
     gap: spacing.xl,
@@ -382,12 +441,16 @@ const styles = StyleSheet.create({
   },
   roleCard: {
     width: layout.roleCardWidth,
+    minHeight: layout.roleCardMinHeight,
     padding: spacing.xxl,
     alignItems: "center",
     gap: spacing.md,
   },
   roleCardNarrow: {
     width: "100%",
+  },
+  hiddenRoleCard: {
+    display: "none",
   },
   roleTitle: { ...typography.title, color: colors.text },
   roleDesc: {
@@ -449,16 +512,5 @@ const styles = StyleSheet.create({
   oauthKakaoText: {
     ...typography.label,
     color: colors.text,
-  },
-  devPreviewButton: {
-    width: "100%",
-    minHeight: tapMin,
-    alignItems: "center",
-    justifyContent: "center",
-    borderColor: colors.transparent,
-  },
-  devPreviewButtonText: {
-    ...typography.label,
-    color: colors.accent,
   },
 });

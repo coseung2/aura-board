@@ -40,6 +40,7 @@ import {
   walking,
 } from "../../theme/tokens";
 import { AppButton, AppHeader, SectionHeader } from "../../components/ui";
+import { StudentHeaderActions } from "../../components/StudentHeaderActions";
 
 const numberFormatter = new Intl.NumberFormat("ko-KR");
 const distanceFormatter = new Intl.NumberFormat("ko-KR", {
@@ -221,7 +222,7 @@ export default function StudentWalkingScreen() {
 
   return (
     <SafeAreaView style={styles.container} edges={["top"]}>
-      <AppHeader title="걷기" />
+      <AppHeader title="걷기" right={<StudentHeaderActions />} />
       <ScrollView
         contentContainerStyle={styles.content}
         refreshControl={

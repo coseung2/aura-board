@@ -41,6 +41,7 @@ import {
   AppHeader,
   ControlPressable,
 } from "../../components/ui";
+import { StudentHeaderActions } from "../../components/StudentHeaderActions";
 
 export default function StudentMoreScreen() {
   const router = useRouter();
@@ -141,7 +142,7 @@ export default function StudentMoreScreen() {
 
   return (
     <SafeAreaView style={styles.container} edges={["top"]}>
-      <AppHeader title="더보기" />
+      <AppHeader title="더보기" right={<StudentHeaderActions />} />
       <ScrollView
         style={styles.scroll}
         contentContainerStyle={[

@@ -217,6 +217,7 @@ export const layout = {
   readableMaxWidth: 960,
   roleCardWidth: 240,
   roleCardNarrowMaxWidth: 320,
+  roleCardMinHeight: 320,
   mobileBreakpoint: 640,
   authTwoPaneBreakpoint: 720,
   boardGridPadding: spacing.xl,
