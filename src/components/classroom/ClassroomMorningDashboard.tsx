@@ -1,34 +1,120 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type KeyboardEvent as ReactKeyboardEvent,
+} from "react";
+import Link from "next/link";
 import {
   fetchCleaningDuties,
   fetchMorningSummary,
   saveShoeFindings,
   type CleaningDutyItem,
-  type ReadingChampion,
   type MorningSummary,
 } from "@/lib/inspections-client";
 import { AppBackgroundButton } from "@/components/AppBackground";
 import { todayDateString } from "@/lib/inspector-findings";
 import { useClassroomMorningRealtime } from "@/hooks/useClassroomMorningRealtime";
-import { fetchAvatarGallery } from "@/components/avatar/gallery-client";
-import { ReadingChampionExhibition } from "@/components/avatar/ReadingChampionExhibition";
-import type { AvatarGalleryStudent } from "@/components/avatar/types";
 
-type Props = { classroomId: string; showDevFeatures?: boolean };
+type Props = {
+  classroomId: string;
+  classroomName: string;
+  // Kept for callers that gate development-only features at the route level.
+  showDevFeatures?: boolean;
+};
+
+type RoleTab = "cleaning" | "shoe";
+
+type DateNavigationProps = {
+  date: string;
+  onPrevious: () => void;
+  onNext: () => void;
+};
 
 const REFRESH_MS = 60_000;
+const ROLE_TABS: readonly RoleTab[] = ["cleaning", "shoe"];
+const MORNING_ROSTER_COLUMNS = 4;
+
+function formatDateNav(dateStr: string): string {
+  const date = new Date(`${dateStr}T00:00:00`);
+  return `${date.getMonth() + 1}월 ${date.getDate()}일`;
+}
+
+function shiftDate(dateStr: string, days: number): string {
+  const date = new Date(`${dateStr}T00:00:00`);
+  date.setDate(date.getDate() + days);
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function DateNavigation({
+  date,
+  onPrevious,
+  onNext,
+}: DateNavigationProps) {
+  return (
+    <div className="date-nav">
+      <button
+        type="button"
+        className="date-nav-btn"
+        aria-label="이전 날짜"
+        onClick={onPrevious}
+      >
+        ‹
+      </button>
+      <span className="date-nav-label">{formatDateNav(date)}</span>
+      <button
+        type="button"
+        className="date-nav-btn"
+        aria-label="다음 날짜"
+        onClick={onNext}
+      >
+        ›
+      </button>
+    </div>
+  );
+}
+
+function PanelToggle({
+  label,
+  expanded,
+  onToggle,
+}: {
+  label: string;
+  expanded: boolean;
+  onToggle: () => void;
+}) {
+  return (
+    <div className="morning-panel-toggle-wrap">
+      <button
+        type="button"
+        className="morning-panel-toggle"
+        aria-label={label}
+        aria-expanded={expanded}
+        onClick={onToggle}
+      >
+        {expanded ? "▲" : "▼"}
+      </button>
+    </div>
+  );
+}
 
 export function ClassroomMorningDashboard({
   classroomId,
-  showDevFeatures = false,
+  classroomName,
 }: Props) {
   const [summary, setSummary] = useState<MorningSummary | null>(null);
   const [loaded, setLoaded] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
-  const [activeAssignmentIndex, setActiveAssignmentIndex] = useState(0);
+  const [activeAssignmentIndex, setActiveAssignmentIndex] = useState<number | null>(
+    null,
+  );
   const [selectedCleaning, setSelectedCleaning] = useState<
     MorningSummary["cleaningFindings"][number] | null
   >(null);
@@ -36,32 +122,11 @@ export function ClassroomMorningDashboard({
     MorningSummary["shoeFindings"][number] | null
   >(null);
   const [shoeSaving, setShoeSaving] = useState(false);
-  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const classroomIdRef = useRef(classroomId);
-  classroomIdRef.current = classroomId;
-  const summaryRequestRef = useRef(0);
-
-  // Helper functions for date navigation
-  function formatDateNav(dateStr: string): string {
-    const d = new Date(dateStr + "T00:00:00");
-    return `${d.getMonth() + 1}월 ${d.getDate()}일`;
-  }
-  function prevDay(dateStr: string): string {
-    const d = new Date(dateStr + "T00:00:00");
-    d.setDate(d.getDate() - 1);
-    const y = d.getFullYear();
-    const m = String(d.getMonth() + 1).padStart(2, "0");
-    const dd = String(d.getDate()).padStart(2, "0");
-    return `${y}-${m}-${dd}`;
-  }
-  function nextDay(dateStr: string): string {
-    const d = new Date(dateStr + "T00:00:00");
-    d.setDate(d.getDate() + 1);
-    const y = d.getFullYear();
-    const m = String(d.getMonth() + 1).padStart(2, "0");
-    const dd = String(d.getDate()).padStart(2, "0");
-    return `${y}-${m}-${dd}`;
-  }
+  const [activeRoleTab, setActiveRoleTab] = useState<RoleTab>("cleaning");
+  const roleTabRefs = useRef<Record<RoleTab, HTMLButtonElement | null>>({
+    cleaning: null,
+    shoe: null,
+  });
   const [cleaningDuties, setCleaningDuties] = useState<CleaningDutyItem[]>([]);
   const [dutiesLoaded, setDutiesLoaded] = useState(false);
   const [dutiesError, setDutiesError] = useState<string | null>(null);
@@ -69,38 +134,42 @@ export function ClassroomMorningDashboard({
   const [cleaningItems, setCleaningItems] = useState<
     MorningSummary["cleaningFindings"]
   >([]);
-  const [shoeItems, setShoeItems] = useState<
-    MorningSummary["shoeFindings"]
-  >([]);
+  const [shoeItems, setShoeItems] = useState<MorningSummary["shoeFindings"]>(
+    [],
+  );
   const [inspLoaded, setInspLoaded] = useState(false);
+  const [expandedPanels, setExpandedPanels] = useState<Record<string, boolean>>(
+    {},
+  );
+  const bodyRefs = useRef<Record<string, HTMLDivElement | null>>({});
+  const [overflowPanels, setOverflowPanels] = useState<Record<string, boolean>>(
+    {},
+  );
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const classroomIdRef = useRef(classroomId);
+  classroomIdRef.current = classroomId;
+  const summaryRequestRef = useRef(0);
   const inspDateRef = useRef(inspDate);
   inspDateRef.current = inspDate;
   const inspectionRequestRef = useRef(0);
   const dutiesRequestRef = useRef(0);
 
-  const [expandedPanels, setExpandedPanels] = useState<Record<string, boolean>>({});
-  const bodyRefs = useRef<Record<string, HTMLDivElement | null>>({});
-  const [overflowPanels, setOverflowPanels] = useState<Record<string, boolean>>({});
   useEffect(() => {
     const checkOverflow = () => {
       const updates: Record<string, boolean> = {};
-      for (const [key, el] of Object.entries(bodyRefs.current)) {
-        if (el) {
-          updates[key] = el.scrollHeight > el.clientHeight;
-        }
+      for (const [key, element] of Object.entries(bodyRefs.current)) {
+        if (element) updates[key] = element.scrollHeight > element.clientHeight;
       }
-      setOverflowPanels(prev => ({...prev, ...updates}));
+      setOverflowPanels((previous) => ({ ...previous, ...updates }));
     };
     checkOverflow();
     if (typeof ResizeObserver === "undefined") return;
     const observer = new ResizeObserver(checkOverflow);
-    for (const el of Object.values(bodyRefs.current)) {
-      if (el) observer.observe(el);
+    for (const element of Object.values(bodyRefs.current)) {
+      if (element) observer.observe(element);
     }
     return () => observer.disconnect();
-  }, [summary]);
-
-
+  }, [summary, activeRoleTab]);
 
   const refresh = useCallback(async () => {
     const requestId = ++summaryRequestRef.current;
@@ -115,14 +184,18 @@ export function ClassroomMorningDashboard({
       }
       setSummary(data);
       setLastUpdated(new Date());
-    } catch (e) {
+    } catch (reason) {
       if (
         requestId !== summaryRequestRef.current ||
         classroomIdRef.current !== classroomId
       ) {
         return;
       }
-      setError(e instanceof Error ? e.message : "아침 정보를 불러오지 못했습니다.");
+      setError(
+        reason instanceof Error
+          ? reason.message
+          : "아침 정보를 불러오지 못했습니다.",
+      );
     } finally {
       if (
         requestId === summaryRequestRef.current &&
@@ -182,7 +255,7 @@ export function ClassroomMorningDashboard({
         return;
       }
       setCleaningDuties(data.duties);
-    } catch (e) {
+    } catch (reason) {
       if (
         requestId !== dutiesRequestRef.current ||
         classroomIdRef.current !== classroomId
@@ -190,7 +263,9 @@ export function ClassroomMorningDashboard({
         return;
       }
       setDutiesError(
-        e instanceof Error ? e.message : "청소 당번을 불러오지 못했습니다.",
+        reason instanceof Error
+          ? reason.message
+          : "청소 당번을 불러오지 못했습니다.",
       );
     } finally {
       if (
@@ -216,12 +291,10 @@ export function ClassroomMorningDashboard({
     onRefresh: refreshRealtimeData,
   });
 
-  // Fetch inspection data when inspDate changes.
   useEffect(() => {
     setInspLoaded(false);
     void refreshInspections(inspDate);
   }, [inspDate, refreshInspections]);
-
 
   useEffect(() => {
     setLoaded(false);
@@ -234,10 +307,7 @@ export function ClassroomMorningDashboard({
   }, [refreshDuties]);
 
   useEffect(() => {
-    if (timerRef.current) {
-      clearInterval(timerRef.current);
-      timerRef.current = null;
-    }
+    if (timerRef.current) clearInterval(timerRef.current);
     timerRef.current = setInterval(() => {
       void refreshRealtimeData();
     }, REFRESH_MS);
@@ -258,7 +328,7 @@ export function ClassroomMorningDashboard({
           }>
         >((sections, item) => {
           for (const task of item.tasks) {
-            let section = sections.find((s) => s.id === task.id);
+            let section = sections.find((candidate) => candidate.id === task.id);
             if (!section) {
               section = {
                 id: task.id,
@@ -281,7 +351,7 @@ export function ClassroomMorningDashboard({
           }>
         >((sections, item) => {
           for (const board of item.boards) {
-            let section = sections.find((s) => s.id === board.id);
+            let section = sections.find((candidate) => candidate.id === board.id);
             if (!section) {
               section = {
                 id: board.id,
@@ -297,14 +367,34 @@ export function ClassroomMorningDashboard({
         }, []),
       ]
     : [];
-  const safeAssignmentIndex = assignmentSections[activeAssignmentIndex]
-    ? activeAssignmentIndex
-    : 0;
-  const activeAssignment = assignmentSections[safeAssignmentIndex] ?? null;
   const cleaningRows = Array.from(
-    { length: Math.ceil(cleaningItems.length / 3) },
-    (_, rowIndex) => cleaningItems.slice(rowIndex * 3, rowIndex * 3 + 3),
+    { length: Math.ceil(cleaningItems.length / MORNING_ROSTER_COLUMNS) },
+    (_, rowIndex) =>
+      cleaningItems.slice(
+        rowIndex * MORNING_ROSTER_COLUMNS,
+        rowIndex * MORNING_ROSTER_COLUMNS + MORNING_ROSTER_COLUMNS,
+      ),
   );
+
+  function handleRoleTabKeyDown(event: ReactKeyboardEvent<HTMLButtonElement>) {
+    const currentIndex = ROLE_TABS.indexOf(activeRoleTab);
+    let nextIndex = currentIndex;
+    if (event.key === "ArrowRight" || event.key === "ArrowDown") {
+      nextIndex = (currentIndex + 1) % ROLE_TABS.length;
+    } else if (event.key === "ArrowLeft" || event.key === "ArrowUp") {
+      nextIndex = (currentIndex - 1 + ROLE_TABS.length) % ROLE_TABS.length;
+    } else if (event.key === "Home") {
+      nextIndex = 0;
+    } else if (event.key === "End") {
+      nextIndex = ROLE_TABS.length - 1;
+    } else {
+      return;
+    }
+    event.preventDefault();
+    const nextTab = ROLE_TABS[nextIndex];
+    setActiveRoleTab(nextTab);
+    roleTabRefs.current[nextTab]?.focus();
+  }
 
   async function completeShoeFinding() {
     if (!selectedShoe || shoeSaving) return;
@@ -315,29 +405,29 @@ export function ClassroomMorningDashboard({
       await saveShoeFindings(classroomId, [
         { studentId: shoe.student.id, notArranged: false },
       ]);
-      setSummary((prev) =>
-        prev
+      setSummary((previous) =>
+        previous
           ? {
-              ...prev,
+              ...previous,
               kpis: {
-                ...prev.kpis,
+                ...previous.kpis,
                 shoeNotArrangedCount: Math.max(
                   0,
-                  prev.kpis.shoeNotArrangedCount - 1,
+                  previous.kpis.shoeNotArrangedCount - 1,
                 ),
               },
-              shoeFindings: prev.shoeFindings.filter(
+              shoeFindings: previous.shoeFindings.filter(
                 (item) => item.student.id !== shoe.student.id,
               ),
             }
-          : prev,
+          : previous,
       );
       setSelectedShoe(null);
       await refresh();
-    } catch (e) {
+    } catch (reason) {
       setError(
-        e instanceof Error
-          ? e.message
+        reason instanceof Error
+          ? reason.message
           : "실내화 정리 완료 처리에 실패했습니다.",
       );
     } finally {
@@ -347,279 +437,457 @@ export function ClassroomMorningDashboard({
 
   return (
     <section className="morning-dashboard">
-      <header className="morning-board-header">
-        <h1>학급게시판</h1>
-        <AppBackgroundButton />
+      <header className="morning-dashboard-toolbar">
+        <div className="morning-dashboard-context">
+          <Link
+            href={`/classroom/${classroomId}/dashboard`}
+            className="classroom-back-link"
+          >
+            &larr; 학급 대시보드
+          </Link>
+          <span className="morning-dashboard-classroom">{classroomName}</span>
+        </div>
+        <div className="morning-dashboard-actions">
+          <div
+            className="morning-background-action"
+            role="button"
+            tabIndex={0}
+            aria-label="배경 설정"
+            onKeyDown={(event) => {
+              if (event.key !== "Enter" && event.key !== " ") return;
+              event.preventDefault();
+              event.currentTarget.querySelector("input")?.click();
+            }}
+          >
+            <AppBackgroundButton />
+          </div>
+        </div>
       </header>
 
       {!loaded ? (
-        <p className="check-loading">불러오는 중…</p>
+        <p className="morning-state check-loading" role="status">
+          불러오는 중…
+        </p>
       ) : error ? (
-        <p className="check-error">{error}</p>
+        <p className="morning-state check-error" role="alert">
+          {error}
+        </p>
       ) : !summary ? (
-        <p className="check-empty">표시할 아침 정보가 없습니다.</p>
+        <p className="morning-state check-empty" role="status">
+          표시할 아침 정보가 없습니다.
+        </p>
       ) : (
         <>
           <div className="morning-grid">
-            <section className="classroom-dashboard-panel morning-panel">
-              <div className="classroom-dashboard-panel-head">
-                <div>
-                  <h3>
-                    미제출 과제
-                    <span className="morning-title-count">
-                      {activeAssignment?.students.length ?? 0}명
-                    </span>
-                  </h3>
-                </div>
-              </div>
-              <div className={expandedPanels["assignment"] ? "morning-panel-body is-expanded" : "morning-panel-body"} ref={(el) => { bodyRefs.current["assignment"] = el; }}>
-              {assignmentSections.length === 0 ? (
-                <p className="classroom-dashboard-empty">
-                  모두 제출했습니다 🎉
-                </p>
-              ) : (
-                <div className="morning-assignment-box">
-                  <nav className="morning-assignment-nav" aria-label="미제출 과제 선택">
-                    {assignmentSections.map((section, index) => (
-                      <button
-                        key={section.id}
-                        type="button"
-                        className={`morning-assignment-tab ${
-                          safeAssignmentIndex === index ? "is-active" : ""
-                        }`}
-                        onClick={() => setActiveAssignmentIndex(index)}
-                      >
-                        {section.title}
-                        {section.dueDate && (
-                          <span>
-                            {new Date(section.dueDate).toLocaleDateString("ko-KR")}
-                          </span>
-                        )}
-                      </button>
-                    ))}
-                  </nav>
-                  {activeAssignment && (
-                    <ul className="morning-name-list">
-                      {activeAssignment.students.map((student) => (
-                        <li key={student.id} className="morning-name-text">
-                          {student.number && (
-                            <span className="morning-list-num">{student.number}</span>
-                          )}
-                          {" "}
-                          <span>{student.name}</span>
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                </div>
-              )}
-              </div>
-              {overflowPanels["assignment"] && (
-              <div className="morning-panel-toggle-wrap">
-                <button type="button" className="morning-panel-toggle" onClick={() => setExpandedPanels(prev => ({...prev, "assignment": !prev["assignment"]}))}>
-                  {expandedPanels["assignment"] ? "▲" : "▼"}
-                </button>
-              </div>
-              )}
-            </section>
-
-            <section className="classroom-dashboard-panel morning-panel">
-              <div className="classroom-dashboard-panel-head">
-                <div>
-                  <h3>
-                    청소 검사 결과
-                    <span className="morning-title-count">
-                      {cleaningItems.length}명
-                    </span>
-                  </h3>
-                </div>
-                <div className="date-nav">
-                  <button type="button" className="date-nav-btn" onClick={() => setInspDate(prevDay(inspDate))}>‹</button>
-                  <span className="date-nav-label">{formatDateNav(inspDate)}</span>
-                  <button type="button" className="date-nav-btn" onClick={() => setInspDate(nextDay(inspDate))}>›</button>
-                </div>
-              </div>
-              <div className={expandedPanels["cleaning"] ? "morning-panel-body is-expanded" : "morning-panel-body"} ref={(el) => { bodyRefs.current["cleaning"] = el; }}>
-              {!inspLoaded ? (
-                <p className="classroom-dashboard-empty">불러오는 중...</p>
-              ) : cleaningItems.length === 0 ? (
-                <p className="classroom-dashboard-empty">
-                  청소 지적이 없습니다 🎉
-                </p>
-              ) : (
-                <div className="morning-cleaning-table">
-                  {cleaningRows.map((row, rowIndex) => (
-                    <div key={rowIndex} className="morning-cleaning-table-row">
-                      {[0, 1, 2].map((cellIndex) => {
-                        const item = row[cellIndex];
-                        if (!item) {
-                          return (
-                            <span
-                              key={`empty-${cellIndex}`}
-                              className="morning-cleaning-cell is-empty"
-                            />
-                          );
-                        }
-                        const content = (
-                          <>
-                            {item.student.number && (
-                              <span className="morning-list-num">
-                                {item.student.number}
+            <section
+              className="morning-group morning-assignment-group"
+              aria-labelledby="morning-assignment-heading"
+            >
+              <header className="morning-group-heading">
+                <h2 id="morning-assignment-heading">과제</h2>
+              </header>
+              <div className="morning-assignment-list">
+                {assignmentSections.length === 0 ? (
+                  <p className="classroom-dashboard-empty">
+                    모든 과제를 제출했습니다 🎉
+                  </p>
+                ) : (
+                  <ul>
+                    {assignmentSections.map((section, index) => {
+                      const rowId = `morning-assignment-panel-${index}`;
+                      const buttonId = `morning-assignment-row-${index}`;
+                      const isExpanded = activeAssignmentIndex === index;
+                      return (
+                        <li key={section.id} className="morning-assignment-row">
+                          <button
+                            id={buttonId}
+                            type="button"
+                            className="morning-assignment-row-button"
+                            aria-expanded={isExpanded}
+                            aria-controls={rowId}
+                            onClick={() =>
+                              setActiveAssignmentIndex(
+                                isExpanded ? null : index,
+                              )
+                            }
+                          >
+                            <span className="morning-assignment-row-title">
+                              {section.title}
+                            </span>
+                            {section.dueDate && (
+                              <span className="morning-assignment-row-due">
+                                {new Date(section.dueDate).toLocaleDateString(
+                                  "ko-KR",
+                                )}
                               </span>
                             )}
-                            {" "}
-                            <span>{item.student.name}</span>
-                            {item.photoUrl ? (
-                              <svg
-                                className="morning-photo-icon"
-                                viewBox="0 0 24 24"
-                                aria-label="사진 있음"
-                                role="img"
-                              >
-                                <path d="M4 6.5A2.5 2.5 0 0 1 6.5 4h11A2.5 2.5 0 0 1 20 6.5v11a2.5 2.5 0 0 1-2.5 2.5h-11A2.5 2.5 0 0 1 4 17.5v-11Z" />
-                                <path d="M7 16.5 10.2 13l2.2 2.4 1.7-1.8 3 2.9" />
-                                <circle cx="16" cy="8.5" r="1.4" />
-                              </svg>
-                            ) : (
-                              <span className="morning-photo-spacer" aria-hidden="true" />
-                            )}
-                          </>
-                        );
-                        return item.photoUrl ? (
-                          <button
-                            key={item.student.id}
-                            type="button"
-                            className="morning-cleaning-cell morning-name-clickable"
-                            onClick={() => setSelectedCleaning(item)}
-                          >
-                            {content}
+                            <span className="morning-assignment-row-count">
+                              미제출 {section.students.length}명
+                            </span>
                           </button>
-                        ) : (
-                          <span key={item.student.id} className="morning-cleaning-cell">
-                            {content}
+                          {isExpanded && (
+                            <div
+                              id={rowId}
+                              role="region"
+                              aria-labelledby={buttonId}
+                              className="morning-assignment-row-panel"
+                            >
+                              <ul className="morning-name-list">
+                                {section.students.map((student) => (
+                                  <li
+                                    key={student.id}
+                                    className="morning-name-text"
+                                  >
+                                    {student.number && (
+                                      <span className="morning-list-num">
+                                        {student.number}
+                                      </span>
+                                    )}
+                                    {" "}
+                                    <span>{student.name}</span>
+                                  </li>
+                                ))}
+                              </ul>
+                            </div>
+                          )}
+                        </li>
+                      );
+                    })}
+                  </ul>
+                )}
+              </div>
+            </section>
+
+            <section
+              className="morning-group morning-role-group"
+              aria-labelledby="morning-role-heading"
+            >
+              <header className="classroom-strong-section-header morning-role-heading">
+                <h2
+                  id="morning-role-heading"
+                  className="classroom-strong-section-title"
+                >
+                  1인1역할
+                </h2>
+                <div
+                  className="classroom-strong-section-navigation morning-role-tabs"
+                  role="tablist"
+                  aria-label="1인1역할"
+                >
+                <button
+                  ref={(element) => {
+                    roleTabRefs.current.cleaning = element;
+                  }}
+                  id="morning-role-tab-cleaning"
+                  type="button"
+                  role="tab"
+                  aria-selected={activeRoleTab === "cleaning"}
+                  aria-controls="morning-role-panel-cleaning"
+                  tabIndex={activeRoleTab === "cleaning" ? 0 : -1}
+                  className={`classroom-strong-section-tab morning-role-tab ${
+                    activeRoleTab === "cleaning" ? "is-active" : ""
+                  }`}
+                  onClick={() => setActiveRoleTab("cleaning")}
+                  onKeyDown={handleRoleTabKeyDown}
+                >
+                  교실 청소
+                </button>
+                <button
+                  ref={(element) => {
+                    roleTabRefs.current.shoe = element;
+                  }}
+                  id="morning-role-tab-shoe"
+                  type="button"
+                  role="tab"
+                  aria-selected={activeRoleTab === "shoe"}
+                  aria-controls="morning-role-panel-shoe"
+                  tabIndex={activeRoleTab === "shoe" ? 0 : -1}
+                  className={`classroom-strong-section-tab morning-role-tab ${
+                    activeRoleTab === "shoe" ? "is-active" : ""
+                  }`}
+                  onClick={() => setActiveRoleTab("shoe")}
+                  onKeyDown={handleRoleTabKeyDown}
+                >
+                  실내화 정리
+                </button>
+                </div>
+              </header>
+
+              {activeRoleTab === "cleaning" ? (
+                <div
+                  id="morning-role-panel-cleaning"
+                  role="tabpanel"
+                  aria-labelledby="morning-role-tab-cleaning"
+                  tabIndex={0}
+                  className="morning-role-panel-stack"
+                >
+                  <section
+                    className="classroom-dashboard-panel morning-panel morning-subsection"
+                    aria-labelledby="morning-cleaning-heading"
+                  >
+                    <div className="classroom-dashboard-panel-head">
+                      <div>
+                        <h3 id="morning-cleaning-heading">
+                          청소 검사 결과
+                          <span className="morning-title-count">
+                            {cleaningItems.length}명
                           </span>
-                        );
-                      })}
+                        </h3>
+                      </div>
+                      <DateNavigation
+                        date={inspDate}
+                        onPrevious={() => setInspDate(shiftDate(inspDate, -1))}
+                        onNext={() => setInspDate(shiftDate(inspDate, 1))}
+                      />
                     </div>
-                  ))}
-                </div>
-              )}
-              </div>
-              {overflowPanels["cleaning"] && (
-              <div className="morning-panel-toggle-wrap">
-                <button type="button" className="morning-panel-toggle" onClick={() => setExpandedPanels(prev => ({...prev, "cleaning": !prev["cleaning"]}))}>
-                  {expandedPanels["cleaning"] ? "▲" : "▼"}
-                </button>
-              </div>
-              )}
-            </section>
+                    <div
+                      className={
+                        expandedPanels.cleaning
+                          ? "morning-panel-body is-expanded"
+                          : "morning-panel-body"
+                      }
+                      ref={(element) => {
+                        bodyRefs.current.cleaning = element;
+                      }}
+                    >
+                      {!inspLoaded ? (
+                        <p className="classroom-dashboard-empty">불러오는 중...</p>
+                      ) : cleaningItems.length === 0 ? (
+                        <p className="classroom-dashboard-empty">
+                          청소 지적이 없습니다 🎉
+                        </p>
+                      ) : (
+                        <div className="morning-cleaning-table">
+                          {cleaningRows.map((row, rowIndex) => (
+                            <div
+                              key={rowIndex}
+                              className="morning-cleaning-table-row"
+                            >
+                              {Array.from(
+                                { length: MORNING_ROSTER_COLUMNS },
+                                (_, cellIndex) => cellIndex,
+                              ).map((cellIndex) => {
+                                const item = row[cellIndex];
+                                if (!item) {
+                                  return (
+                                    <span
+                                      key={`empty-${cellIndex}`}
+                                      className="morning-cleaning-cell is-empty"
+                                    />
+                                  );
+                                }
+                                const content = (
+                                  <>
+                                    {item.student.number && (
+                                      <span className="morning-list-num">
+                                        {item.student.number}
+                                      </span>
+                                    )}
+                                    {" "}
+                                    <span>{item.student.name}</span>
+                                    {item.photoUrl ? (
+                                      <svg
+                                        className="morning-photo-icon"
+                                        viewBox="0 0 24 24"
+                                        aria-label="사진 있음"
+                                        role="img"
+                                      >
+                                        <path d="M4 6.5A2.5 2.5 0 0 1 6.5 4h11A2.5 2.5 0 0 1 20 6.5v11a2.5 2.5 0 0 1-2.5 2.5h-11A2.5 2.5 0 0 1 4 17.5v-11Z" />
+                                        <path d="M7 16.5 10.2 13l2.2 2.4 1.7-1.8 3 2.9" />
+                                        <circle cx="16" cy="8.5" r="1.4" />
+                                      </svg>
+                                    ) : (
+                                      <span
+                                        className="morning-photo-spacer"
+                                        aria-hidden="true"
+                                      />
+                                    )}
+                                  </>
+                                );
+                                return item.photoUrl ? (
+                                  <button
+                                    key={item.student.id}
+                                    type="button"
+                                    className="morning-cleaning-cell morning-name-clickable"
+                                    onClick={() => setSelectedCleaning(item)}
+                                  >
+                                    {content}
+                                  </button>
+                                ) : (
+                                  <span
+                                    key={item.student.id}
+                                    className="morning-cleaning-cell"
+                                  >
+                                    {content}
+                                  </span>
+                                );
+                              })}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                    {overflowPanels.cleaning && (
+                      <PanelToggle
+                        label="청소 검사 결과 전체 보기"
+                        expanded={Boolean(expandedPanels.cleaning)}
+                        onToggle={() =>
+                          setExpandedPanels((previous) => ({
+                            ...previous,
+                            cleaning: !previous.cleaning,
+                          }))
+                        }
+                      />
+                    )}
+                  </section>
 
-            <section className="classroom-dashboard-panel morning-panel">
-              <div className="classroom-dashboard-panel-head">
-                <div>
-                  <h3>
-                    실내화 정리 결과
-                    <span className="morning-title-count">
-                      {shoeItems.length}명
-                    </span>
-                  </h3>
-                </div>
-                <div className="date-nav">
-                  <button type="button" className="date-nav-btn" onClick={() => setInspDate(prevDay(inspDate))}>‹</button>
-                  <span className="date-nav-label">{formatDateNav(inspDate)}</span>
-                  <button type="button" className="date-nav-btn" onClick={() => setInspDate(nextDay(inspDate))}>›</button>
-                </div>
-              </div>
-              <div className={expandedPanels["shoe"] ? "morning-panel-body is-expanded" : "morning-panel-body"} ref={(el) => { bodyRefs.current["shoe"] = el; }}>
-              {!inspLoaded ? (
-                <p className="classroom-dashboard-empty">불러오는 중...</p>
-              ) : shoeItems.length === 0 ? (
-                <p className="classroom-dashboard-empty">
-                  실내화 미정리 학생이 없습니다 🎉
-                </p>
-              ) : (
-                <ul className="morning-name-list">
-                  {shoeItems.map((item) => (
-                    <li key={item.student.id}>
-                      <button
-                        type="button"
-                        className="morning-name-button morning-name-clickable"
-                        onClick={() => setSelectedShoe(item)}
-                      >
-                        {item.student.number && (
-                          <span className="morning-list-num">
-                            {item.student.number}
+                  <section
+                    className="classroom-dashboard-panel morning-panel morning-subsection"
+                    aria-labelledby="morning-duties-heading"
+                  >
+                    <div className="classroom-dashboard-panel-head">
+                      <div>
+                        <h3 id="morning-duties-heading">
+                          오늘의 청소당번
+                          <span className="morning-title-count">
+                            {cleaningDuties.length}명
                           </span>
-                        )}
-                        {" "}
-                        <span>{item.student.name}</span>
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              )}
-              </div>
-              {overflowPanels["shoe"] && (
-              <div className="morning-panel-toggle-wrap">
-                <button type="button" className="morning-panel-toggle" onClick={() => setExpandedPanels(prev => ({...prev, "shoe": !prev["shoe"]}))}>
-                  {expandedPanels["shoe"] ? "▲" : "▼"}
-                </button>
-              </div>
-              )}
-            </section>
-
-            {/* 오늘의 청소당번 */}
-            <section className="classroom-dashboard-panel morning-panel">
-              <div className="classroom-dashboard-panel-head">
-                <div>
-                  <h3>
-                    오늘의 청소당번
-                    <span className="morning-title-count">
-                      {cleaningDuties.length}명
-                    </span>
-                  </h3>
+                        </h3>
+                      </div>
+                    </div>
+                    <div
+                      className={
+                        expandedPanels.duties
+                          ? "morning-panel-body is-expanded"
+                          : "morning-panel-body"
+                      }
+                      ref={(element) => {
+                        bodyRefs.current.duties = element;
+                      }}
+                    >
+                      {!dutiesLoaded ? (
+                        <p className="classroom-dashboard-empty">불러오는 중...</p>
+                      ) : dutiesError ? (
+                        <p className="check-error" role="alert">
+                          {dutiesError}
+                        </p>
+                      ) : cleaningDuties.length === 0 ? (
+                        <p className="classroom-dashboard-empty">
+                          오늘 청소 당번이 없습니다 🎉
+                        </p>
+                      ) : (
+                        <ul className="morning-name-list">
+                          {cleaningDuties.map((duty) => (
+                            <li
+                              key={duty.studentId}
+                              className="morning-name-text"
+                            >
+                              <span className="morning-list-num">
+                                {duty.studentNumber}
+                              </span>
+                              {" "}
+                              <span>{duty.studentName}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </div>
+                    {overflowPanels.duties && (
+                      <PanelToggle
+                        label="오늘의 청소당번 전체 보기"
+                        expanded={Boolean(expandedPanels.duties)}
+                        onToggle={() =>
+                          setExpandedPanels((previous) => ({
+                            ...previous,
+                            duties: !previous.duties,
+                          }))
+                        }
+                      />
+                    )}
+                  </section>
                 </div>
-              </div>
-              <div className={expandedPanels["duties"] ? "morning-panel-body is-expanded" : "morning-panel-body"} ref={(el) => { bodyRefs.current["duties"] = el; }}>
-              {!dutiesLoaded ? (
-                <p className="classroom-dashboard-empty">불러오는 중...</p>
-              ) : dutiesError ? (
-                <p className="check-error" role="alert">
-                  {dutiesError}
-                </p>
-              ) : cleaningDuties.length === 0 ? (
-                <p className="classroom-dashboard-empty">
-                  오늘 청소 당번이 없습니다 🎉
-                </p>
               ) : (
-                <ul className="morning-name-list">
-                  {cleaningDuties.map((duty) => (
-                    <li key={duty.studentId} className="morning-name-text">
-                      <span className="morning-list-num">{duty.studentNumber}</span>
-                      {" "}
-                      <span>{duty.studentName}</span>
-                    </li>
-                  ))}
-                </ul>
-              )}
-              </div>
-              {overflowPanels["duties"] && (
-              <div className="morning-panel-toggle-wrap">
-                <button type="button" className="morning-panel-toggle" onClick={() => setExpandedPanels(prev => ({...prev, "duties": !prev["duties"]}))}>
-                  {expandedPanels["duties"] ? "▲" : "▼"}
-                </button>
-              </div>
+                <div
+                  id="morning-role-panel-shoe"
+                  role="tabpanel"
+                  aria-labelledby="morning-role-tab-shoe"
+                  tabIndex={0}
+                  className="morning-role-panel-stack"
+                >
+                  <section
+                    className="classroom-dashboard-panel morning-panel morning-subsection"
+                    aria-labelledby="morning-shoe-heading"
+                  >
+                    <div className="classroom-dashboard-panel-head">
+                      <div>
+                        <h3 id="morning-shoe-heading">
+                          실내화 정리 결과
+                          <span className="morning-title-count">
+                            {shoeItems.length}명
+                          </span>
+                        </h3>
+                      </div>
+                      <DateNavigation
+                        date={inspDate}
+                        onPrevious={() => setInspDate(shiftDate(inspDate, -1))}
+                        onNext={() => setInspDate(shiftDate(inspDate, 1))}
+                      />
+                    </div>
+                    <div
+                      className={
+                        expandedPanels.shoe
+                          ? "morning-panel-body is-expanded"
+                          : "morning-panel-body"
+                      }
+                      ref={(element) => {
+                        bodyRefs.current.shoe = element;
+                      }}
+                    >
+                      {!inspLoaded ? (
+                        <p className="classroom-dashboard-empty">불러오는 중...</p>
+                      ) : shoeItems.length === 0 ? (
+                        <p className="classroom-dashboard-empty">
+                          실내화 미정리 학생이 없습니다 🎉
+                        </p>
+                      ) : (
+                        <ul className="morning-name-list">
+                          {shoeItems.map((item) => (
+                            <li key={item.student.id}>
+                              <button
+                                type="button"
+                                className="morning-name-button morning-name-clickable"
+                                onClick={() => setSelectedShoe(item)}
+                              >
+                                {item.student.number && (
+                                  <span className="morning-list-num">
+                                    {item.student.number}
+                                  </span>
+                                )}
+                                {" "}
+                                <span>{item.student.name}</span>
+                              </button>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </div>
+                    {overflowPanels.shoe && (
+                      <PanelToggle
+                        label="실내화 정리 결과 전체 보기"
+                        expanded={Boolean(expandedPanels.shoe)}
+                        onToggle={() =>
+                          setExpandedPanels((previous) => ({
+                            ...previous,
+                            shoe: !previous.shoe,
+                          }))
+                        }
+                      />
+                    )}
+                  </section>
+                </div>
               )}
             </section>
           </div>
-
-          {showDevFeatures && (
-
-            <ReadingChampionsSection
-              classroomId={classroomId}
-              champions={summary.readingChampions}
-            />
-          )}
 
           {lastUpdated && (
             <p className="morning-updated">
@@ -630,7 +898,10 @@ export function ClassroomMorningDashboard({
       )}
 
       {selectedCleaning && (
-        <div className="morning-modal-layer morning-photo-modal-layer" role="presentation">
+        <div
+          className="morning-modal-layer morning-photo-modal-layer"
+          role="presentation"
+        >
           <button
             type="button"
             className="morning-modal-backdrop"
@@ -731,105 +1002,6 @@ export function ClassroomMorningDashboard({
           </section>
         </div>
       )}
-    </section>
-  );
-}
-
-function ReadingChampionsSection({
-  classroomId,
-  champions,
-}: {
-  classroomId: string;
-  champions?: ReadingChampion[];
-}) {
-  const [students, setStudents] = useState<AvatarGalleryStudent[] | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [fetchError, setFetchError] = useState<string | null>(null);
-
-  useEffect(() => {
-    let cancelled = false;
-    setLoading(true);
-    setFetchError(null);
-    fetchAvatarGallery(classroomId)
-      .then((data) => {
-        if (!cancelled) setStudents(data.students);
-      })
-      .catch((e) => {
-        if (!cancelled) {
-          setFetchError(
-            e instanceof Error ? e.message : "전시 공간을 불러오지 못했습니다.",
-          );
-        }
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [classroomId]);
-
-  const championMap = useMemo(() => {
-    const map: Record<string, string> = {};
-    for (const c of champions ?? []) {
-      map[c.student.id] = `독서왕 ${c.totalScore}점`;
-    }
-    return map;
-  }, [champions]);
-
-  const header = (
-    <div className="classroom-dashboard-panel-head">
-      <div>
-        <h3>독서왕 전시공간</h3>
-        <span className="classroom-dashboard-eyebrow">
-          번호 순서대로 나열된 우리 반 아바타
-        </span>
-      </div>
-    </div>
-  );
-
-  if (loading) {
-    return (
-      <section className="classroom-dashboard-panel morning-panel morning-reading-panel">
-        {header}
-        <p className="classroom-dashboard-empty">친구들을 불러오는 중…</p>
-      </section>
-    );
-  }
-
-  if (fetchError) {
-    return (
-      <section className="classroom-dashboard-panel morning-panel morning-reading-panel">
-        {header}
-        <p className="check-error">{fetchError}</p>
-      </section>
-    );
-  }
-
-  if (!students || students.length === 0) {
-    return (
-      <section className="classroom-dashboard-panel morning-panel morning-reading-panel">
-        {header}
-        <p className="classroom-dashboard-empty">아직 전시할 친구가 없어요.</p>
-      </section>
-    );
-  }
-
-  return (
-    <section className="classroom-dashboard-panel morning-panel morning-reading-panel">
-      <div className="classroom-dashboard-panel-head">
-        <div>
-          <h3>독서왕 전시공간</h3>
-          <span className="classroom-dashboard-eyebrow">
-            번호 순서대로 나열된 우리 반 아바타
-          </span>
-        </div>
-        <span className="morning-title-count">{students.length}명</span>
-      </div>
-      <ReadingChampionExhibition
-        students={students}
-        badgesByStudentId={championMap}
-      />
     </section>
   );
 }

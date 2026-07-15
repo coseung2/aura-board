@@ -232,6 +232,54 @@ hover 시:
 box-shadow: var(--shadow-card-hover);
 border-color: var(--color-border-hover);
 ```
+
+### 학급 섹션 페이지 셸
+
+학급 하위 페이지는 `ClassroomSectionHeader`를 사용해 공통 헤더 구조를 유지한다. 컴포넌트가 학급 대시보드 back link를 포함하며, 왼쪽에는 제목 영역을, 오른쪽에는 `aria-label`이 있는 시맨틱 로컬 내비게이션을 배치하고 헤더 하단선을 공유한다.
+
+- 구조 클래스: `classroom-section-header`, `classroom-section-heading`, `classroom-section-eyebrow`, `classroom-section-title`, `classroom-section-description`, `classroom-section-navigation`, `classroom-section-actions`
+- 주요 props: `classroomId`, `eyebrow`, `title`, 선택 `description`, `ariaLabel`, `{ key, label, href }` 배열인 `links`, 현재 탭 `activeKey`, 선택 `actions`
+- 링크가 하나뿐인 페이지도 같은 셸을 사용한다. `actions`는 내비게이션이 아닌 보조 작업 버튼·컨트롤을 전달할 때만 사용한다.
+
+```tsx
+<ClassroomSectionHeader
+  classroomId={classroom.id}
+  eyebrow={classroom.name}
+  title="기타 활동"
+  description="학급 활동을 한곳에서 확인합니다."
+  ariaLabel="기타 활동"
+  links={[{ key: "walking", label: "걷기 현황", href: `/classroom/${classroom.id}/walking` }]}
+  activeKey="walking"
+  actions={<button type="button">내보내기</button>}
+/>
+```
+
+반응형에서는 제목 영역과 내비게이션을 좁은 화면에서 세로로 쌓고 링크와 액션의 터치 영역을 최소 44px로 유지한다. 내비게이션은 `aria-current="page"`로 현재 링크를 표시하고, 모든 링크와 `actions` 컨트롤은 키보드 포커스와 `:focus-visible` 규칙을 준수한다.
+
+### 진한 구분선 위 시맨틱 내비
+
+동급의 주요 섹션 제목 오른쪽에 로컬 탭을 붙일 때는 `classroom-strong-section-*` 패턴을 사용한다. 헤더 전체가 하나의 `2px solid var(--color-text)` 기준선을 공유하며, 탭 자체에는 하단선을 그리지 않는다. 이 패턴은 일반 학급 페이지 섹션 내비게이션(`classroom-section-navigation`)의 `1px` 기준선과 활성 링크 underline 패턴과 구분된다.
+
+- 구조 클래스: `classroom-strong-section-header`, `classroom-strong-section-title`, `classroom-strong-section-navigation`, `classroom-strong-section-tab`
+- 활성 상태: `aria-selected="true"` 또는 `is-active`에서 `var(--color-accent)` 텍스트만 강조한다. 개별 탭의 `border-bottom`은 사용하지 않는다.
+- 항목 구분: 인접한 탭 사이에는 `1px × 1em` 세로 구분자를 가운데 정렬한다. 전체 높이 선이나 별도 박스 경계는 사용하지 않는다.
+- 사용성: 탭은 최소 44px 높이와 충분한 가로 hit area를 유지하고, 좁은 화면에서는 내비게이션을 줄바꿈한다. `:focus-visible` outline을 항상 표시한다.
+- ARIA와 키보드: 컨테이너는 `role="tablist"`와 이름을 갖고, 각 탭은 `role="tab"`, `aria-selected`, `aria-controls`, roving `tabIndex`를 갖는다. 좌우 또는 위아래 화살표, Home, End로 탭을 이동하고 패널은 `role="tabpanel"`과 `aria-labelledby`로 연결한다.
+
+```tsx
+<header className="classroom-strong-section-header">
+  <h2 className="classroom-strong-section-title">1인1역할</h2>
+  <div className="classroom-strong-section-navigation" role="tablist" aria-label="1인1역할">
+    <button className="classroom-strong-section-tab" role="tab" aria-selected={active === "cleaning"}>
+      교실 청소
+    </button>
+    <button className="classroom-strong-section-tab" role="tab" aria-selected={active === "shoe"}>
+      실내화 정리
+    </button>
+  </div>
+</header>
+```
+
 ### 버튼
 
 | 타입 | 배경 | 텍스트 | 반경 | 그림자 |

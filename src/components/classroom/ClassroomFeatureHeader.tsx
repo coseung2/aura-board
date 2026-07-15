@@ -1,5 +1,6 @@
-import Link from "next/link";
 import type { ReactNode } from "react";
+
+import { ClassroomSectionHeader } from "./ClassroomSectionHeader";
 
 export type ClassroomFeatureKey = "walking" | "daily-banners" | "reading";
 
@@ -29,30 +30,18 @@ export function ClassroomFeatureHeader({
   const basePath = `/classroom/${classroomId}`;
 
   return (
-    <header className="classroom-feature-header">
-      <div>
-        <Link href={`${basePath}/dashboard`} className="classroom-back-link">
-          &larr; 학급 대시보드
-        </Link>
-        <p className="classroom-feature-eyebrow">{eyebrow}</p>
-        <h1 className="classroom-page-title">기타 활동</h1>
-        <p className="classroom-feature-description">{description}</p>
-      </div>
-      <nav className="classroom-feature-switcher" aria-label="기타 활동">
-        {FEATURE_LINKS.map((link) => {
-          const href = `${basePath}/${link.path}`;
-          const isActive = link.key === active;
-          return (
-            <Link
-              key={link.key}
-              href={href}
-              aria-current={isActive ? "page" : undefined}
-            >
-              {link.label}
-            </Link>
-          );
-        })}
-      </nav>
-    </header>
+    <ClassroomSectionHeader
+      classroomId={classroomId}
+      eyebrow={eyebrow}
+      title="기타 활동"
+      description={description}
+      ariaLabel="기타 활동"
+      links={FEATURE_LINKS.map(({ key, label, path }) => ({
+        key,
+        label,
+        href: `${basePath}/${path}`,
+      }))}
+      activeKey={active}
+    />
   );
 }

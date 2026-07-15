@@ -13,14 +13,15 @@ export default async function ClassroomMorningPage({ params }: Props) {
 
   const classroom = await db.classroom.findUnique({
     where: { id },
-    select: { id: true, teacherId: true },
+    select: { id: true, name: true, teacherId: true },
   });
   if (!classroom || classroom.teacherId !== user.id) notFound();
 
   return (
-    <main className="classroom-page classroom-page-detail classroom-morning">
+    <main className="classroom-page classroom-page-detail classroom-section-page classroom-morning">
       <ClassroomMorningDashboard
-        classroomId={id}
+        classroomId={classroom.id}
+        classroomName={classroom.name}
         showDevFeatures={isAdminEmail(user.email)}
       />
     </main>

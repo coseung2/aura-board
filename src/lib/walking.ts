@@ -93,6 +93,7 @@ type RawClassroomWalkingRow = {
   sevenDaySteps: number;
   sevenDayDistanceMeters: number;
   lastSyncedAt: Date | string | null;
+  recentDailySteps: unknown;
 };
 
 function normalizeDay(value: Date | string) {
@@ -105,6 +106,30 @@ function normalizeDate(value: Date | string | null) {
   if (!value) return null;
   const date = value instanceof Date ? value : new Date(value);
   return Number.isNaN(date.getTime()) ? null : date.toISOString();
+}
+
+/**
+ * Keep the chart payload JSON-safe when the database driver returns a JSON
+ * string (or an unexpected value) for the aggregate column.
+ */
+function normalizeStepsHistory(value: unknown) {
+  let parsed = value;
+  if (typeof parsed === "string") {
+    try {
+      parsed = JSON.parse(parsed);
+    } catch {
+      parsed = [];
+    }
+  }
+
+  const values: unknown[] = Array.isArray(parsed) ? parsed : [];
+
+  const normalized = values
+    .map((step) => (typeof step === "number" ? step : Number(step)))
+    .filter((step): step is number => Number.isFinite(step) && step >= 0)
+    .slice(-7);
+
+  return [...Array(Math.max(0, 7 - normalized.length)).fill(0), ...normalized];
 }
 
 export async function getStudentWalkingDays(studentId: string, days = 7) {
@@ -144,7 +169,21 @@ export async function getClassroomWalkingSummary(classroomId: string) {
       COALESCE(SUM(CASE WHEN w."day" = (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Seoul')::date THEN w."steps" ELSE 0 END), 0)::int AS "todaySteps",
       COALESCE(SUM(CASE WHEN w."day" >= ((CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Seoul')::date - 6) THEN w."steps" ELSE 0 END), 0)::int AS "sevenDaySteps",
       COALESCE(SUM(CASE WHEN w."day" >= ((CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Seoul')::date - 6) THEN w."distanceMeters" ELSE 0 END), 0)::float8 AS "sevenDayDistanceMeters",
-      MAX(w."syncedAt") AS "lastSyncedAt"
+      MAX(w."syncedAt") AS "lastSyncedAt",
+      COALESCE(
+        (
+          SELECT json_agg(COALESCE(day_stat."steps", 0) ORDER BY day_series."day")
+          FROM generate_series(
+            ((CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Seoul')::date - 6),
+            (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Seoul')::date,
+            interval '1 day'
+          ) AS day_series("day")
+          LEFT JOIN "StudentWalkingDailyStat" day_stat
+            ON day_stat."studentId" = s."id"
+            AND day_stat."day" = day_series."day"::date
+        ),
+        '[]'::json
+      ) AS "recentDailySteps"
     FROM "Student" s
     LEFT JOIN "StudentWalkingDailyStat" w
       ON w."studentId" = s."id"
@@ -163,5 +202,6 @@ export async function getClassroomWalkingSummary(classroomId: string) {
     sevenDaySteps: Number(row.sevenDaySteps) || 0,
     sevenDayDistanceMeters: Number(row.sevenDayDistanceMeters) || 0,
     lastSyncedAt: normalizeDate(row.lastSyncedAt),
+    recentDailySteps: normalizeStepsHistory(row.recentDailySteps),
   }));
 }

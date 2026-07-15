@@ -1,8 +1,9 @@
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { ClassroomFeatureHeader } from "@/components/classroom/ClassroomFeatureHeader";
 import { db } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
 import { getClassroomWalkingSummary } from "@/lib/walking";
+import { ActivitySparkline } from "@/components/classroom/ActivitySparkline";
 import { WalkingStudentDeleteAction } from "@/components/classroom/WalkingStudentDeleteAction";
 
 const numberFormatter = new Intl.NumberFormat("ko-KR");
@@ -18,7 +19,9 @@ type Props = {
 export default async function ClassroomWalkingPage({ params }: Props) {
   const { id } = await params;
   const user = await getCurrentUser().catch(() => null);
-  if (!user) notFound();
+  if (!user) {
+    redirect(`/login?from=${encodeURIComponent(`/classroom/${id}/walking`)}`);
+  }
   const classroom = await db.classroom.findUnique({
     where: { id },
     select: { id: true, name: true, teacherId: true },
@@ -34,7 +37,6 @@ export default async function ClassroomWalkingPage({ params }: Props) {
     (sum, student) => sum + student.sevenDayDistanceMeters,
     0,
   );
-  const maxSteps = Math.max(1, ...students.map((student) => student.sevenDaySteps));
   const notConnectedStudents = students.length - connectedStudents.length;
 
   return (
@@ -73,7 +75,7 @@ export default async function ClassroomWalkingPage({ params }: Props) {
         <div className="classroom-feature-section-head">
           <div>
             <h2>학생별 활동</h2>
-            <p>최근 7일 걸음이 많은 학생을 기준으로 막대 길이를 비교합니다.</p>
+            <p>최근 7일의 날짜별 걸음 추이를 비교합니다.</p>
           </div>
           <span>{students.length}명</span>
         </div>
@@ -85,9 +87,7 @@ export default async function ClassroomWalkingPage({ params }: Props) {
             <span role="columnheader">최근 7일</span>
             <span role="columnheader">관리</span>
           </div>
-          {students.map((student) => {
-            const percentage = Math.round((student.sevenDaySteps / maxSteps) * 100);
-            return (
+          {students.map((student) => (
               <div
                 key={student.studentId}
                 className="walking-student-row"
@@ -102,21 +102,17 @@ export default async function ClassroomWalkingPage({ params }: Props) {
                       : "아직 동기화되지 않음"}
                   </small>
                 </span>
-                <span className="walking-bar" role="cell" aria-hidden="true">
-                  <span
-                    className="walking-bar-fill"
-                    style={{
-                      width: `${percentage}%`,
-                      minWidth: student.sevenDaySteps > 0 ? "4px" : 0,
-                    }}
+                <span className="walking-activity-cell" role="cell">
+                  <ActivitySparkline
+                    values={student.recentDailySteps}
+                    label={`${student.studentName} 최근 7일 걸음 추이`}
+                    tone="success"
                   />
                 </span>
                 <span className="walking-metric" role="cell">
-                  <small>오늘</small>
                   <strong>{numberFormatter.format(student.todaySteps)}걸음</strong>
                 </span>
                 <span className="walking-metric" role="cell">
-                  <small>최근 7일</small>
                   <strong>{numberFormatter.format(student.sevenDaySteps)}걸음</strong>
                 </span>
                 <WalkingStudentDeleteAction
@@ -125,8 +121,7 @@ export default async function ClassroomWalkingPage({ params }: Props) {
                   studentName={student.studentName}
                 />
               </div>
-            );
-          })}
+          ))}
           {students.length === 0 ? (
             <p className="classroom-feature-empty">등록된 학생이 없습니다.</p>
           ) : null}
