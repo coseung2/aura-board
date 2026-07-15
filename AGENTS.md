@@ -12,6 +12,9 @@ for bounded specialist tasks. The project source of truth is the current code,
 - Do not read secret env files unless explicitly asked and required.
 - Do not run git commit, push, branch, reset, or clean unless the user
   explicitly asks in the same turn.
+- When the user explicitly requests commit and push, commit directly to the
+  current default branch (`main`) and push it. Create or use a separate branch
+  only when the user explicitly asks for a branch, pull request, or draft PR.
 - Report changed files, verification commands, and remaining risk.
 - Use `docs/verification-checklist.md` as the single verification source of
   truth, especially for save/publish flows, optimistic UI, production issues,
