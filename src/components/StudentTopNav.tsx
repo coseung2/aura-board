@@ -50,6 +50,7 @@ export function StudentTopNav({
   const readingChampionsActive = pathname.startsWith("/student/reading-champions");
   const readingActive = readingRecordActive || readingChampionsActive;
   const walkingActive = pathname.startsWith("/student/walking");
+  const petsActive = pathname.startsWith("/student/pets");
 
   const navItems: MegaNavItem[] = [
     {
@@ -107,6 +108,24 @@ export function StudentTopNav({
               href: "/student/portfolio",
               label: "포트폴리오",
               active: pathname.startsWith("/student/portfolio"),
+            },
+          ],
+        },
+      ],
+    },
+    {
+      id: "pets",
+      label: "펫",
+      href: "/student/pets",
+      active: petsActive,
+      groups: [
+        {
+          title: "원소 펫",
+          links: [
+            {
+              href: "/student/pets",
+              label: "프론트·수집·상점",
+              active: petsActive,
             },
           ],
         },
