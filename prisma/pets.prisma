@@ -1,0 +1,57 @@
+/// Elemental pet ownership and progression.
+///
+/// Foreign keys and check constraints live in the additive SQL migration so
+/// this schema fragment can remain independent from the very large legacy
+/// Student and Transaction model blocks. Runtime mutations go through
+/// src/lib/pets/server.ts and parameterized SQL transactions.
+model StudentPet {
+  id            String   @id
+  studentId     String
+  lineageId     String
+  stage         Int      @default(0)
+  nickname      String?
+  hatchProgress Int      @default(0)
+  hatchRequired Int      @default(100)
+  experience    Int      @default(0)
+  equipped      Boolean  @default(false)
+  backgroundKey String?
+  acquiredVia   String   @default("purchase")
+  acquiredAt    DateTime @default(now())
+  hatchedAt     DateTime?
+  evolvedAt     DateTime?
+  updatedAt     DateTime @default(now())
+
+  @@index([studentId, acquiredAt])
+  @@index([studentId, lineageId])
+}
+
+/// Consumable care items and durable fitting-room effects.
+model StudentPetItem {
+  id        String   @id
+  studentId String
+  itemKey   String
+  quantity  Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now())
+
+  @@unique([studentId, itemKey])
+  @@index([studentId])
+}
+
+/// Purchase audit that joins the existing classroom Transaction ledger to a
+/// pet product and, for egg purchases, the resulting StudentPet row.
+model PetPurchase {
+  id            String   @id
+  studentId     String
+  productKey    String
+  productKind   String
+  unitPrice     Int
+  quantity      Int      @default(1)
+  transactionId String?  @unique
+  resultPetId   String?  @unique
+  metadata      Json?
+  createdAt     DateTime @default(now())
+
+  @@index([studentId, createdAt])
+  @@index([productKey])
+}
