@@ -12,7 +12,7 @@ export default async function AdminDailyBannersPage() {
   const auth = await requireAdminUser("/admin/daily-banners");
   if (!auth.authorized) return <AdminForbidden />;
 
-  const [publications, pendingCount] = await Promise.all([
+  const [publications, pendingSubmissions, pendingCount] = await Promise.all([
     db.dailyBannerPublication.findMany({
       include: {
         submission: {
@@ -24,6 +24,15 @@ export default async function AdminDailyBannersPage() {
         approvedBy: { select: { name: true, email: true } },
       },
       orderBy: [{ day: "asc" }],
+      take: 90,
+    }),
+    db.dailyBannerSubmission.findMany({
+      where: { status: "pending" },
+      include: {
+        student: { select: { name: true, number: true } },
+        classroom: { select: { name: true } },
+      },
+      orderBy: [{ targetDay: "asc" }, { createdAt: "asc" }],
       take: 90,
     }),
     db.dailyBannerSubmission.count({ where: { status: "pending" } }),
@@ -43,6 +52,37 @@ export default async function AdminDailyBannersPage() {
           <MetricCard label="확정 배너" value={`${publications.length}건`} />
           <MetricCard label="심사 대기" value={`${pendingCount}건`} />
           <MetricCard label="운영 규칙" value="학급별 하루 1개" />
+        </section>
+
+        <section className="admin-section">
+          <div className="admin-section-head">
+            <div>
+              <h2>심사 대기 신청</h2>
+              <p>학급 교사가 아직 승인하거나 반려하지 않은 배너 신청입니다.</p>
+            </div>
+          </div>
+          <div className="admin-table-wrap">
+            <table className="admin-table">
+              <thead>
+                <tr>
+                  <th>날짜</th><th>형식</th><th>제작 학생</th><th>신청 학급</th><th>신청 내용</th>
+                </tr>
+              </thead>
+              <tbody>
+                {pendingSubmissions.length === 0 ? (
+                  <tr><td colSpan={5} className="admin-empty-cell">심사 대기 중인 배너가 없습니다.</td></tr>
+                ) : pendingSubmissions.map((submission) => (
+                  <tr key={submission.id}>
+                    <td>{dateToKstDay(submission.targetDay)}</td>
+                    <td>{submission.kind === "image" ? "이미지" : "흐르는 문구"}</td>
+                    <td>{submission.student.name}{submission.student.number ? ` (${submission.student.number}번)` : ""}</td>
+                    <td>{submission.classroom.name}</td>
+                    <td>{submission.text?.trim() || (submission.kind === "image" ? "이미지 배너" : "-")}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </section>
 
         <section className="admin-section">
