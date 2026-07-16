@@ -36,13 +36,14 @@ const BAR_WIDTH_PX = 8;
 const BAR_GAP_PX = 6;
 const CHART_INSET_PX = 34;
 const MIN_CHART_WIDTH_PX = 260;
+const DAILY_SIGNUP_AXIS_MIN = 100;
 
 export function AdminSignupActivityChart({
   points,
 }: {
   points: AdminTrendPoint[];
 }) {
-  const [period, setPeriod] = useState<Period>("month");
+  const [period, setPeriod] = useState<Period>("day");
   const [viewportWidth, setViewportWidth] = useState(MIN_CHART_WIDTH_PX);
   const [canJumpToLatest, setCanJumpToLatest] = useState(false);
   const [dragging, setDragging] = useState(false);
@@ -54,7 +55,7 @@ export function AdminSignupActivityChart({
     ...buckets.map((bucket) => bucket.boardActivities),
     1,
   );
-  const signupAxisMax = niceAxisMax(maxSignups);
+  const signupAxisMax = signupAxisMaxForPeriod(period, maxSignups);
   const activityAxisMax = niceAxisMax(maxActivities);
   const chartSeriesWidth = Math.max(
     0,
@@ -337,7 +338,14 @@ function ChartAxis({
 }
 
 function axisValues(max: number): Array<number | null> {
-  return [max, Math.round(max / 2), null];
+  return [max, Math.round(max / 2), 0];
+}
+
+function signupAxisMaxForPeriod(period: Period, maxSignups: number): number {
+  const automaticMax = niceAxisMax(maxSignups);
+  return period === "day"
+    ? Math.max(DAILY_SIGNUP_AXIS_MIN, automaticMax)
+    : automaticMax;
 }
 
 function niceAxisMax(value: number): number {

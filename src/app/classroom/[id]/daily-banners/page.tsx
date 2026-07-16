@@ -14,7 +14,6 @@ export default async function ClassroomDailyBannersPage({ params }: { params: Pr
       <ClassroomFeatureHeader
         classroomId={id}
         eyebrow="학생 제안 관리"
-        description="학생이 보낸 문구와 이미지를 날짜별로 검토해 학생·학부모 앱에 게시합니다."
         active="daily-banners"
       />
       <DailyBannerModerationPanel classroomId={classroom.id} />

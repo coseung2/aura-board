@@ -16,6 +16,13 @@ type Submission = {
 
 type ReviewFilter = "pending" | "reviewed" | "all";
 
+type CalendarDay = {
+  date: string;
+  day: number;
+};
+
+const WEEKDAY_LABELS = ["일", "월", "화", "수", "목", "금", "토"];
+
 function todayKst() {
   const parts = new Intl.DateTimeFormat("en-CA", {
     timeZone: "Asia/Seoul",
@@ -26,10 +33,55 @@ function todayKst() {
   return `${values.year}-${values.month}-${values.day}`;
 }
 
+function monthLabel(monthKey: string) {
+  const [year, month] = monthKey.split("-").map(Number);
+  return `${year}년 ${month}월`;
+}
+
+function shiftMonth(monthKey: string, offset: number) {
+  const [year, month] = monthKey.split("-").map(Number);
+  const shifted = new Date(Date.UTC(year, month - 1 + offset, 1));
+  return `${shifted.getUTCFullYear()}-${String(shifted.getUTCMonth() + 1).padStart(2, "0")}`;
+}
+
+function buildMonthWeeks(monthKey: string): Array<Array<CalendarDay | null>> {
+  const [year, month] = monthKey.split("-").map(Number);
+  const firstWeekday = new Date(Date.UTC(year, month - 1, 1)).getUTCDay();
+  const dayCount = new Date(Date.UTC(year, month, 0)).getUTCDate();
+  const cells: Array<CalendarDay | null> = Array.from(
+    { length: firstWeekday },
+    () => null,
+  );
+
+  for (let day = 1; day <= dayCount; day += 1) {
+    cells.push({
+      day,
+      date: `${monthKey}-${String(day).padStart(2, "0")}`,
+    });
+  }
+  while (cells.length % 7 !== 0) cells.push(null);
+
+  const weeks: Array<Array<CalendarDay | null>> = [];
+  for (let index = 0; index < cells.length; index += 7) {
+    weeks.push(cells.slice(index, index + 7));
+  }
+  return weeks;
+}
+
+function selectedDateLabel(date: string) {
+  const [year, month, day] = date.split("-").map(Number);
+  return `${year}년 ${month}월 ${day}일`;
+}
+
+function applicantLabel(names: string[]) {
+  if (names.length > 1) return `${names[0]} 외 ${names.length - 1}명`;
+  return names[0] ?? null;
+}
+
 function statusLabel(status: Submission["status"]) {
   if (status === "approved") return "게시 확정";
   if (status === "rejected") return "반려";
-  return "검토 대기";
+  return "심사 대기";
 }
 
 export function DailyBannerModerationPanel({
@@ -37,7 +89,8 @@ export function DailyBannerModerationPanel({
 }: {
   classroomId: string;
 }) {
-  const [day, setDay] = useState(todayKst);
+  const [day, setDay] = useState(() => todayKst());
+  const [month, setMonth] = useState(() => todayKst().slice(0, 7));
   const [items, setItems] = useState<Submission[]>([]);
   const [filter, setFilter] = useState<ReviewFilter>("pending");
   const [loading, setLoading] = useState(true);
@@ -51,7 +104,7 @@ export function DailyBannerModerationPanel({
     setLoading(true);
     try {
       const response = await fetch(
-        `/api/classrooms/${encodeURIComponent(classroomId)}/daily-banners?targetDay=${day}&status=all`,
+        `/api/classrooms/${encodeURIComponent(classroomId)}/daily-banners?month=${month}&status=all`,
         { cache: "no-store" },
       );
       if (!response.ok) throw new Error(`status ${response.status}`);
@@ -69,26 +122,63 @@ export function DailyBannerModerationPanel({
     setMessage(null);
     setRejectingId(null);
     void load();
-  }, [day]);
+  }, [classroomId, month]);
+
+  const selectedItems = useMemo(
+    () => items.filter((item) => item.targetDay === day),
+    [day, items],
+  );
 
   const counts = useMemo(
     () => ({
-      pending: items.filter((item) => item.status === "pending").length,
-      approved: items.filter((item) => item.status === "approved").length,
-      rejected: items.filter((item) => item.status === "rejected").length,
+      pending: selectedItems.filter((item) => item.status === "pending").length,
+      approved: selectedItems.filter((item) => item.status === "approved").length,
+      rejected: selectedItems.filter((item) => item.status === "rejected").length,
     }),
-    [items],
+    [selectedItems],
   );
+
+  const submissionNamesByDay = useMemo(() => {
+    const namesByDay = new Map<string, { pending: string[]; approved: string[] }>();
+    for (const item of items) {
+      if (item.status === "rejected") continue;
+      const names = namesByDay.get(item.targetDay) ?? { pending: [], approved: [] };
+      const name = item.student?.name?.trim() || "학생";
+      if (!names[item.status].includes(name)) names[item.status].push(name);
+      namesByDay.set(item.targetDay, names);
+    }
+    return namesByDay;
+  }, [items]);
 
   const visibleItems = useMemo(() => {
     if (filter === "pending") {
-      return items.filter((item) => item.status === "pending");
+      return selectedItems.filter((item) => item.status === "pending");
     }
     if (filter === "reviewed") {
-      return items.filter((item) => item.status !== "pending");
+      return selectedItems.filter((item) => item.status !== "pending");
     }
-    return items;
-  }, [filter, items]);
+    return selectedItems;
+  }, [filter, selectedItems]);
+
+  const monthWeeks = useMemo(() => buildMonthWeeks(month), [month]);
+
+  function selectDay(nextDay: string) {
+    setDay(nextDay);
+    setMessage(null);
+    setRejectingId(null);
+  }
+
+  function navigateMonth(offset: number) {
+    const nextMonth = shiftMonth(month, offset);
+    setMonth(nextMonth);
+    selectDay(`${nextMonth}-01`);
+  }
+
+  function selectToday() {
+    const current = todayKst();
+    setMonth(current.slice(0, 7));
+    selectDay(current);
+  }
 
   async function moderate(
     id: string,
@@ -120,7 +210,7 @@ export function DailyBannerModerationPanel({
       );
       if (response.status === 409 && action === "approve") {
         setMessageKind("error");
-        setMessage("이 학급에는 이미 해당 날짜의 배너가 확정되었습니다.");
+        setMessage("해당 날짜에는 이미 확정된 배너가 있습니다.");
       } else if (!response.ok) {
         throw new Error(`status ${response.status}`);
       } else {
@@ -145,36 +235,99 @@ export function DailyBannerModerationPanel({
   return (
     <section className="classroom-banner-workspace" aria-labelledby="banner-review-title">
       <div className="classroom-banner-toolbar">
-        <div>
-          <p className="classroom-feature-eyebrow">게시 날짜</p>
-          <input
-            type="date"
-            value={day}
-            onChange={(event) => setDay(event.target.value)}
-            aria-label="게시 날짜"
-          />
+        <div className="classroom-banner-calendar-heading">
+          <p className="classroom-feature-eyebrow">게시 일정</p>
+          <div className="classroom-banner-calendar-controls">
+            <button type="button" onClick={() => navigateMonth(-1)} aria-label="이전 달">
+              ‹
+            </button>
+            <strong>{monthLabel(month)}</strong>
+            <button type="button" onClick={() => navigateMonth(1)} aria-label="다음 달">
+              ›
+            </button>
+            <button type="button" className="is-today" onClick={selectToday}>
+              오늘
+            </button>
+          </div>
         </div>
-        <p>
-          승인한 배너는 해당 날짜에 이 학급의 학생·학부모 앱에 노출됩니다.
-        </p>
+      </div>
+
+      <div className="classroom-banner-calendar" aria-label={`${monthLabel(month)} 배너 신청 달력`}>
+        <div className="classroom-banner-calendar-weekdays" aria-hidden="true">
+          {WEEKDAY_LABELS.map((label) => (
+            <span key={label}>{label}</span>
+          ))}
+        </div>
+        <div className="classroom-banner-calendar-grid" role="grid">
+          {monthWeeks.flatMap((week, weekIndex) =>
+            week.map((calendarDay, dayIndex) => {
+              if (!calendarDay) {
+                return (
+                  <span
+                    key={`empty-${weekIndex}-${dayIndex}`}
+                    className="classroom-banner-calendar-cell is-empty"
+                    aria-hidden="true"
+                  />
+                );
+              }
+
+              const applicantNames = submissionNamesByDay.get(calendarDay.date);
+              const calendarMarkers = [
+                { status: "pending" as const, label: applicantLabel(applicantNames?.pending ?? []) },
+                { status: "approved" as const, label: applicantLabel(applicantNames?.approved ?? []) },
+              ].filter((marker): marker is { status: "pending" | "approved"; label: string } => Boolean(marker.label));
+              const calendarStatusLabel = calendarMarkers
+                .map((marker) => `${statusLabel(marker.status)} ${marker.label}`)
+                .join(", ");
+              const isSelected = calendarDay.date === day;
+              const isToday = calendarDay.date === todayKst();
+              return (
+                <span key={calendarDay.date} className="classroom-banner-calendar-cell" role="gridcell">
+                  <button
+                    type="button"
+                    className={`classroom-banner-calendar-day${isSelected ? " is-selected" : ""}${isToday ? " is-today" : ""}`}
+                    aria-label={`${selectedDateLabel(calendarDay.date)}${calendarStatusLabel ? `, ${calendarStatusLabel}` : ", 신청 없음"}`}
+                    aria-pressed={isSelected}
+                    onClick={() => selectDay(calendarDay.date)}
+                  >
+                    <span className="classroom-banner-calendar-day-number">{calendarDay.day}</span>
+                    {calendarMarkers.length > 0 ? (
+                      <span className="classroom-banner-calendar-day-markers">
+                        {calendarMarkers.map((marker) => (
+                          <span
+                            key={marker.status}
+                            className={`classroom-banner-calendar-day-count is-${marker.status}`}
+                          >
+                            <i aria-hidden="true" /> {marker.status === "approved" ? `[확정] ${marker.label}` : marker.label}
+                          </span>
+                        ))}
+                      </span>
+                    ) : (
+                      <span className="classroom-banner-calendar-day-placeholder" aria-hidden="true" />
+                    )}
+                  </button>
+                </span>
+              );
+            }),
+          )}
+        </div>
       </div>
 
       <div className="classroom-banner-summary" aria-label="배너 검토 요약">
-        <span><strong>{counts.pending}</strong> 검토 대기</span>
+        <span><strong>{counts.pending}</strong> 심사 대기</span>
         <span><strong>{counts.approved}</strong> 게시 확정</span>
         <span><strong>{counts.rejected}</strong> 반려</span>
       </div>
 
       <div className="classroom-banner-list-head">
         <div>
-          <h2 id="banner-review-title">학생 제안</h2>
-          <p>내용을 확인한 뒤 게시 확정 또는 반려하세요.</p>
+          <h2 id="banner-review-title">{selectedDateLabel(day)} 신청</h2>
         </div>
         <div className="classroom-banner-filters" role="group" aria-label="검토 상태 필터">
           {([
             ["pending", `대기 ${counts.pending}`],
             ["reviewed", `처리 ${counts.approved + counts.rejected}`],
-            ["all", `전체 ${items.length}`],
+            ["all", `전체 ${selectedItems.length}`],
           ] as const).map(([value, label]) => (
             <button
               key={value}
@@ -203,8 +356,8 @@ export function DailyBannerModerationPanel({
       ) : visibleItems.length === 0 ? (
         <p className="classroom-feature-empty">
           {filter === "pending"
-            ? "이 날짜에 기다리는 제안이 없습니다."
-            : "이 조건에 맞는 제안이 없습니다."}
+            ? "이 날짜에 심사 대기 중인 신청이 없습니다."
+            : "현재 조건에 맞는 신청이 없습니다."}
         </p>
       ) : (
         <div className="classroom-banner-list">

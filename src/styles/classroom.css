@@ -5348,9 +5348,7 @@
 }
 
 .classroom-section-description,
-.classroom-feature-section-head p,
-.classroom-banner-toolbar > p,
-.classroom-banner-list-head p {
+.classroom-feature-section-head p {
   margin: 0;
   color: var(--color-text-muted);
   font-size: 13px;
@@ -5401,7 +5399,7 @@
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   margin-bottom: 32px;
-  border-block: 1px solid var(--color-border);
+  border-bottom: 1px solid var(--color-border);
 }
 
 .classroom-feature-metrics > div {
@@ -5556,20 +5554,133 @@
 .classroom-banner-workspace { display: grid; gap: 26px; }
 .classroom-banner-toolbar {
   align-items: center;
-  padding-bottom: 16px;
-  border-bottom: 1px solid var(--color-border);
+  padding-bottom: 0;
 }
 .classroom-banner-toolbar .classroom-feature-eyebrow { margin: 0 0 4px; }
-.classroom-banner-toolbar input[type="date"] {
-  min-height: 38px;
-  padding: 0;
+.classroom-banner-calendar-heading { display: grid; gap: 4px; }
+.classroom-banner-calendar-controls {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.classroom-banner-calendar-controls strong {
+  min-width: 116px;
+  color: var(--color-text);
+  font-size: 16px;
+  text-align: center;
+}
+.classroom-banner-calendar-controls button {
+  min-width: 32px;
+  min-height: 32px;
+  padding: 0 8px;
+  border: 0;
+  background: transparent;
+  color: var(--color-text-muted);
+  font: inherit;
+  font-size: 18px;
+  font-weight: 800;
+  cursor: pointer;
+}
+.classroom-banner-calendar-controls button:hover,
+.classroom-banner-calendar-controls button:focus-visible {
+  color: var(--color-text);
+  outline: 1px solid var(--color-border-strong);
+  outline-offset: -1px;
+}
+.classroom-banner-calendar-controls button.is-today {
+  margin-left: 4px;
+  border-bottom: 1px solid var(--color-border-strong);
+  color: var(--color-text-muted);
+  font-size: 11px;
+}
+
+.classroom-banner-calendar {
+  overflow: hidden;
+  border-top: 2px solid var(--color-text);
+  border-bottom: 1px solid var(--color-border);
+}
+.classroom-banner-calendar-weekdays,
+.classroom-banner-calendar-grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+}
+.classroom-banner-calendar-weekdays {
+  padding: 9px 0;
+  border-bottom: 1px solid var(--color-border);
+  color: var(--color-text-muted);
+  font-size: 11px;
+  font-weight: 800;
+  text-align: center;
+}
+.classroom-banner-calendar-weekdays span:first-child { color: var(--color-danger); }
+.classroom-banner-calendar-weekdays span:last-child { color: var(--color-accent-tinted-text); }
+.classroom-banner-calendar-cell {
+  min-width: 0;
+  min-height: 104px;
+  border-right: 1px solid var(--color-border);
+  border-bottom: 1px solid var(--color-border);
+}
+.classroom-banner-calendar-cell:nth-child(7n) { border-right: 0; }
+.classroom-banner-calendar-cell:nth-last-child(-n + 7) { border-bottom: 0; }
+.classroom-banner-calendar-cell.is-empty { background: var(--color-surface-alt); }
+.classroom-banner-calendar-day {
+  display: flex;
+  width: 100%;
+  height: 100%;
+  min-height: 104px;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 10px;
   border: 0;
   background: transparent;
   color: var(--color-text);
   font: inherit;
-  font-size: 16px;
+  text-align: left;
+  cursor: pointer;
+}
+.classroom-banner-calendar-day:hover,
+.classroom-banner-calendar-day:focus-visible {
+  background: var(--color-surface-alt);
+  outline: 2px solid var(--color-accent-tinted-text);
+  outline-offset: -2px;
+}
+.classroom-banner-calendar-day.is-selected { background: var(--color-surface-alt); }
+.classroom-banner-calendar-day-number {
+  display: inline-grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  font-size: 13px;
   font-weight: 800;
 }
+.classroom-banner-calendar-day.is-today .classroom-banner-calendar-day-number {
+  background: var(--color-primary);
+  color: var(--color-surface);
+}
+.classroom-banner-calendar-day-count {
+  display: inline-flex;
+  max-width: 100%;
+  align-items: center;
+  gap: 5px;
+  overflow: hidden;
+  color: var(--color-primary);
+  font-size: 11px;
+  font-weight: 800;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.classroom-banner-calendar-day-markers { display: grid; gap: 3px; min-width: 0; max-width: 100%; }
+.classroom-banner-calendar-day-count.is-pending { color: var(--color-primary); }
+.classroom-banner-calendar-day-count.is-approved { color: var(--color-success, #277a5b); }
+.classroom-banner-calendar-day-count i {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+}
+.classroom-banner-calendar-day-placeholder { min-height: 15px; }
 
 .classroom-banner-summary { display: flex; gap: 28px; }
 .classroom-banner-summary span { color: var(--color-text-muted); font-size: 12px; }
@@ -5709,6 +5820,12 @@
   .classroom-reading-delete-error { max-width: none; text-align: left; }
   .classroom-banner-toolbar,
   .classroom-banner-list-head { align-items: flex-start; flex-direction: column; gap: 12px; }
+  .classroom-banner-calendar-cell,
+  .classroom-banner-calendar-day { min-height: 76px; }
+  .classroom-banner-calendar-day { gap: 4px; padding: 6px; }
+  .classroom-banner-calendar-day-number { width: 22px; height: 22px; font-size: 12px; }
+  .classroom-banner-calendar-day-count { gap: 3px; font-size: 10px; }
+  .classroom-banner-calendar-day-count i { width: 5px; height: 5px; }
   .classroom-banner-item { grid-template-columns: 1fr; gap: 12px; }
   .classroom-banner-review,
   .classroom-banner-review-note { justify-self: start; }

@@ -7,7 +7,7 @@ export type ClassroomFeatureKey = "walking" | "daily-banners" | "reading";
 type Props = {
   classroomId: string;
   eyebrow: string;
-  description: ReactNode;
+  description?: ReactNode;
   active: ClassroomFeatureKey;
 };
 
