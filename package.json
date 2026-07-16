@@ -8,13 +8,13 @@
     "prebuild": "npm run ensure-native",
     "dev": "next dev",
     "build": "next build",
-    "db:migrate": "prisma migrate deploy",
+    "db:migrate": "prisma migrate deploy --schema prisma",
     "start": "next start",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
-    "db:push": "prisma db push",
-    "db:reset": "prisma db push --force-reset",
+    "db:push": "prisma db push --schema prisma",
+    "db:reset": "prisma db push --force-reset --schema prisma",
     "ds:check": "bash scripts/ds-check.sh",
     "seed": "tsx prisma/seed.ts",
     "seed:plant": "tsx prisma/seed-plant-journal.ts",
@@ -24,7 +24,7 @@
     "canva:encrypt-secrets": "tsx scripts/encrypt-canva-secrets.ts",
     "canva:reviewer:generate": "node scripts/generate-canva-reviewer-credentials.mjs",
     "canva:reviewer:provision": "node scripts/provision-canva-reviewer.mjs",
-    "postinstall": "prisma generate"
+    "postinstall": "prisma generate --schema prisma"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.102.0",
