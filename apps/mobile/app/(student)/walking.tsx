@@ -10,7 +10,7 @@ import {
 } from "react-native";
 import { useFocusEffect, useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { Footprints, RefreshCw, Settings, ShieldCheck } from "lucide-react-native";
+import { Footprints, ShieldCheck } from "lucide-react-native";
 import { ApiError } from "../../lib/api";
 import { clearSessionToken } from "../../lib/session";
 import {
@@ -39,7 +39,14 @@ import {
   typography,
   walking,
 } from "../../theme/tokens";
-import { AppButton, AppHeader, SectionHeader } from "../../components/ui";
+import {
+  AppButton,
+  AppHeader,
+  SectionHeader,
+  SemanticNav,
+  SemanticNavItem,
+  SurfaceCard,
+} from "../../components/ui";
 import { StudentHeaderActions } from "../../components/StudentHeaderActions";
 
 const numberFormatter = new Intl.NumberFormat("ko-KR");
@@ -47,6 +54,11 @@ const distanceFormatter = new Intl.NumberFormat("ko-KR", {
   minimumFractionDigits: 1,
   maximumFractionDigits: 1,
 });
+
+const DAILY_MISSION_GOAL = 6_000;
+const WEEKLY_MISSION_GOAL = 3;
+
+type WalkingView = "record" | "missions";
 
 function dayLabel(day: string, today: string) {
   if (day === today) return "오늘";
@@ -82,6 +94,7 @@ export default function StudentWalkingScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [busy, setBusy] = useState<"connect" | "sync" | "settings" | null>(null);
+  const [activeView, setActiveView] = useState<WalkingView>("record");
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -156,7 +169,7 @@ export default function StudentWalkingScreen() {
       setMessage(
         Platform.OS === "ios"
           ? "권한을 요청했어요. 걸음 수가 보이지 않으면 Apple 건강 앱에서 권한을 확인해 주세요."
-          : "Health Connect 연결과 첫 동기화를 완료했어요.",
+          : "Health Connect 연결을 완료했어요.",
       );
     } catch (nextError) {
       if (!(await handleAuthError(nextError))) {
@@ -207,7 +220,7 @@ export default function StudentWalkingScreen() {
 
   const healthServiceName = Platform.OS === "ios" ? "Apple 건강" : "Health Connect";
   const connectionLabel = Platform.OS === "web"
-    ? "모바일 앱에서 동기화 가능"
+    ? "모바일 앱에서 걸음 수 사용 가능"
     : !isHealthConnectModuleAvailable()
       ? Platform.OS === "ios"
         ? "새 iPhone 앱 빌드 필요"
@@ -241,9 +254,6 @@ export default function StudentWalkingScreen() {
             }
           />
           <Text style={styles.connectionStatus}>{connectionLabel}</Text>
-          <Text style={styles.muted}>
-            걸음 수와 이동 거리의 날짜별 합계만 읽어요. 위치나 이동 경로는 보지 않아요.
-          </Text>
         </View>
 
         {status === "available" && !connected ? (
@@ -289,22 +299,27 @@ export default function StudentWalkingScreen() {
           </View>
         ) : null}
 
+        <SemanticNav accessibilityLabel="걷기 활동 보기" style={styles.viewNav}>
+          <SemanticNavItem
+            selected={activeView === "record"}
+            onPress={() => setActiveView("record")}
+            accessibilityLabel="걷기 기록 보기"
+          >
+            걷기 기록
+          </SemanticNavItem>
+          <SemanticNavItem
+            selected={activeView === "missions"}
+            onPress={() => setActiveView("missions")}
+            accessibilityLabel="걷기 미션 보기"
+          >
+            미션
+          </SemanticNavItem>
+        </SemanticNav>
+
         {status === "needs_update" ? (
           <AppButton loading={busy === "settings"} onPress={() => void openSettings()}>
             Health Connect 업데이트
           </AppButton>
-        ) : null}
-
-        {showInitialLoading ? (
-          <View
-            style={styles.stateSection}
-            accessible
-            accessibilityRole="progressbar"
-            accessibilityLabel="걷기 기록을 불러오는 중"
-          >
-            <ActivityIndicator color={colors.accent} />
-            <Text style={styles.stateTitle}>걷기 기록을 불러오는 중…</Text>
-          </View>
         ) : null}
 
         {error ? (
@@ -334,6 +349,21 @@ export default function StudentWalkingScreen() {
           >
             {message}
           </Text>
+        ) : null}
+
+        {activeView === "record" ? (
+          <>
+
+        {showInitialLoading ? (
+          <View
+            style={styles.stateSection}
+            accessible
+            accessibilityRole="progressbar"
+            accessibilityLabel="걷기 기록을 불러오는 중"
+          >
+            <ActivityIndicator color={colors.accent} />
+            <Text style={styles.stateTitle}>걷기 기록을 불러오는 중…</Text>
+          </View>
         ) : null}
 
         {showEmptyState ? (
@@ -368,7 +398,7 @@ export default function StudentWalkingScreen() {
                   loading ? (
                     <ActivityIndicator
                       color={colors.accent}
-                      accessibilityLabel="걷기 기록을 동기화하는 중"
+                      accessibilityLabel="걷기 기록을 불러오는 중"
                     />
                   ) : (
                     <Footprints color={colors.accent} accessible={false} size={iconSizes.md} />
@@ -402,22 +432,13 @@ export default function StudentWalkingScreen() {
             </View>
           </>
         ) : null}
-
-        <View style={styles.privacySection}>
-          <SectionHeader title="동기화 및 개인정보" />
-          <View style={styles.privacyRow}>
-            <RefreshCw size={iconSizes.md} color={colors.accent} accessible={false} />
-            <Text style={styles.privacyText}>
-              Android에서 동기화한 결과는 웹 걷기 페이지에도 표시돼요.
-            </Text>
-          </View>
-          <View style={styles.privacyRow}>
-            <Settings size={iconSizes.md} color={colors.accent} accessible={false} />
-            <Text style={styles.privacyText}>
-              권한은 Health Connect 설정에서 언제든 철회할 수 있어요.
-            </Text>
-          </View>
-        </View>
+          </>
+        ) : (
+          <WalkingMissionPanel
+            todaySteps={today.steps}
+            activeDays={days.filter((row) => row.steps > 0).length}
+          />
+        )}
       </ScrollView>
     </SafeAreaView>
   );
@@ -440,6 +461,58 @@ function SummaryRow({
   );
 }
 
+function WalkingMissionPanel({
+  todaySteps,
+  activeDays,
+}: {
+  todaySteps: number;
+  activeDays: number;
+}) {
+  const dailyProgress = Math.min(todaySteps / DAILY_MISSION_GOAL, 1);
+  const weeklyProgress = Math.min(activeDays / WEEKLY_MISSION_GOAL, 1);
+
+  return (
+    <View style={styles.missionSection} accessibilityRole="summary">
+      <SectionHeader title="미션" />
+      <Text style={styles.muted}>걷기 기록으로 달성하는 작은 목표예요.</Text>
+
+      <SurfaceCard style={styles.missionCard}>
+        <Text style={styles.missionEyebrow}>오늘의 미션</Text>
+        <Text style={styles.missionTitle}>오늘 6,000걸음 걷기</Text>
+        <Text style={styles.missionProgressText}>
+          {numberFormatter.format(todaySteps)} / {numberFormatter.format(DAILY_MISSION_GOAL)}걸음
+        </Text>
+        <View
+          accessible
+          accessibilityRole="progressbar"
+          accessibilityLabel="오늘 걸음 미션 진행률"
+          accessibilityValue={{ min: 0, max: DAILY_MISSION_GOAL, now: todaySteps }}
+          style={styles.missionTrack}
+        >
+          <View style={[styles.missionFill, { width: `${dailyProgress * 100}%` }]} />
+        </View>
+      </SurfaceCard>
+
+      <SurfaceCard style={styles.missionCard}>
+        <Text style={styles.missionEyebrow}>이번 주 미션</Text>
+        <Text style={styles.missionTitle}>3일 이상 걷기</Text>
+        <Text style={styles.missionProgressText}>
+          {activeDays} / {WEEKLY_MISSION_GOAL}일
+        </Text>
+        <View
+          accessible
+          accessibilityRole="progressbar"
+          accessibilityLabel="이번 주 걷기 미션 진행률"
+          accessibilityValue={{ min: 0, max: WEEKLY_MISSION_GOAL, now: activeDays }}
+          style={styles.missionTrack}
+        >
+          <View style={[styles.missionFill, { width: `${weeklyProgress * 100}%` }]} />
+        </View>
+      </SurfaceCard>
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg },
   content: {
@@ -450,6 +523,9 @@ const styles = StyleSheet.create({
     paddingTop: pageChrome.contentStartGap,
     paddingBottom: spacing.xxxl + spacing.xxl,
     gap: spacing.xxl,
+  },
+  viewNav: {
+    alignSelf: "stretch",
   },
   connectionSection: {
     gap: spacing.sm,
@@ -494,6 +570,33 @@ const styles = StyleSheet.create({
   chartSection: {
     gap: spacing.lg,
   },
+  missionSection: {
+    gap: spacing.md,
+  },
+  missionCard: {
+    gap: spacing.sm,
+  },
+  missionEyebrow: {
+    ...typography.micro,
+    color: colors.accentTintedText,
+  },
+  missionTitle: {
+    ...typography.section,
+    color: colors.text,
+  },
+  missionProgressText: {
+    ...typography.label,
+    color: colors.textMuted,
+  },
+  missionTrack: {
+    height: walking.chartBarHeight,
+    backgroundColor: colors.accentTintedBg,
+    overflow: "hidden",
+  },
+  missionFill: {
+    height: "100%",
+    backgroundColor: colors.accent,
+  },
   chartRows: { gap: spacing.md },
   chartRow: { flexDirection: "row", alignItems: "center", gap: spacing.sm },
   dayLabel: {
@@ -514,13 +617,4 @@ const styles = StyleSheet.create({
     width: walking.chartStepLabelWidth,
     textAlign: "right",
   },
-  privacySection: {
-    gap: spacing.md,
-  },
-  privacyRow: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-    gap: spacing.sm,
-  },
-  privacyText: { ...typography.label, color: colors.textMuted, flex: 1 },
 });

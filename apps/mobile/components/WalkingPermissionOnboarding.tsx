@@ -25,8 +25,11 @@ export function WalkingPermissionOnboarding({ studentId }: Props) {
   const [message, setMessage] = useState<string | null>(null);
 
   const dismiss = useCallback(async () => {
-    await SecureStore.setItemAsync(promptKey(studentId), "shown").catch(() => undefined);
+    // Close the modal immediately. SecureStore can be slow on Android after
+    // the Health Connect activity returns, and awaiting it keeps the button in
+    // its loading state even though permission setup already succeeded.
     setVisible(false);
+    await SecureStore.setItemAsync(promptKey(studentId), "shown").catch(() => undefined);
   }, [studentId]);
 
   useEffect(() => {

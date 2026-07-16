@@ -145,7 +145,7 @@ export default function StudentReadingScreen() {
           <View style={[styles.formColumn, isLandscape && styles.landscapeFormColumn]}>
             <View style={styles.formSection}>
               <SectionHeader
-                title="책 종류"
+                title="기록"
                 right={
                   <SemanticNav accessibilityLabel="책 종류">
                     <SemanticNavItem
