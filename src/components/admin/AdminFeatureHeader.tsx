@@ -5,7 +5,9 @@ export type AdminFeatureKey =
   | "overview"
   | "errors"
   | "activity"
-  | "daily-banners";
+  | "daily-banners"
+  | "shop"
+  | "creatures";
 
 type Props = {
   eyebrow: string;
@@ -22,6 +24,8 @@ const FEATURE_LINKS: Array<{
   { key: "errors", label: "에러 로그", href: "/admin/errors" },
   { key: "activity", label: "보드 활동", href: "/admin/activity" },
   { key: "daily-banners", label: "일일 배너", href: "/admin/daily-banners" },
+  { key: "shop", label: "상점", href: "/admin/shop" },
+  { key: "creatures", label: "펫", href: "/admin/aura-pet" },
 ];
 
 export function AdminFeatureHeader({ eyebrow, description, active }: Props) {

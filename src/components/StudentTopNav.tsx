@@ -170,6 +170,24 @@ export function StudentTopNav({
         },
       ],
     },
+    {
+      id: "creatures",
+      label: "펫",
+      href: "/student/aura-pet",
+      active: pathname.startsWith("/student/aura-pet"),
+      groups: [
+        {
+          title: "펫",
+          links: [
+            {
+              href: "/student/aura-pet",
+              label: "펫",
+              active: pathname.startsWith("/student/aura-pet"),
+            },
+          ],
+        },
+      ],
+    },
   ];
 
   const visibleNavItems = showDevFeatures

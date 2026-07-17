@@ -13,6 +13,7 @@ import "server-only";
 import { db } from "./db";
 import { ensureAccountFor } from "./bank";
 import { Prisma } from "@prisma/client";
+import { applyVerifiedRewardProgress } from "./creatures/reward-progress";
 
 export type ReadingRewardResult = {
   amount: number;
@@ -55,6 +56,27 @@ export type ReadingRewardReversalResult = {
 // Default per-classroom config matches the schema defaults.
 const DEFAULT_REWARD_PER_POINT = 10;
 const DEFAULT_MIN_SCORE = 5;
+const MAX_READING_REWARD_TRANSACTION_ATTEMPTS = 3;
+
+export function isSerializableTransactionConflict(error: unknown): boolean {
+  return error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2034";
+}
+
+/** Retry only serialization conflicts; each attempt reruns wallet + growth atomically. */
+export async function retryReadingRewardTransaction<T>(
+  operation: () => Promise<T>,
+  maxAttempts = MAX_READING_REWARD_TRANSACTION_ATTEMPTS,
+): Promise<T> {
+  let attempts = 0;
+  while (true) {
+    try {
+      return await operation();
+    } catch (error) {
+      attempts += 1;
+      if (!isSerializableTransactionConflict(error) || attempts >= maxAttempts) throw error;
+    }
+  }
+}
 
 export async function awardReadingReward(
   input: AwardReadingRewardInput,
@@ -81,41 +103,53 @@ export async function awardReadingReward(
 
   let rewardedAmount: number;
   try {
-    rewardedAmount = await db.$transaction(async (tx) => {
-      // A retried POST (or a client retry after a network timeout) must not
-      // credit the same reading log twice. The compound unique index is the
-      // final race gate; this lookup handles the normal retry path.
-      const existing = await tx.transaction.findFirst({
-        where: {
-          accountId,
-          sourceType: READING_REWARD_SOURCE_TYPE,
-          sourceRef: input.readingLogId,
-          type: "deposit",
-        },
-        select: { amount: true },
-      });
-      if (existing) return existing.amount;
+    rewardedAmount = await retryReadingRewardTransaction(() =>
+      db.$transaction(async (tx) => {
+        // A retried POST (or a client retry after a network timeout) must not
+        // credit the same reading log twice. The compound unique index is the
+        // final race gate; this lookup handles the normal retry path.
+        const existing = await tx.transaction.findFirst({
+          where: {
+            accountId,
+            sourceType: READING_REWARD_SOURCE_TYPE,
+            sourceRef: input.readingLogId,
+            type: "deposit",
+          },
+          select: { amount: true },
+        });
+        if (existing) return existing.amount;
 
-      const updated = await tx.studentAccount.update({
-        where: { id: accountId },
-        data: { balance: { increment: amount } },
-        select: { balance: true },
-      });
-      await tx.transaction.create({
-        data: {
-          accountId,
-          type: "deposit",
-          amount,
-          balanceAfter: updated.balance,
-          note: `${LEGACY_READING_REWARD_NOTE_PREFIX} \uBCF4\uC0C1 [reading-log:${input.readingLogId}] (\uC810\uC218: ${score})`,
+        const updated = await tx.studentAccount.update({
+          where: { id: accountId },
+          data: { balance: { increment: amount } },
+          select: { balance: true },
+        });
+        await tx.transaction.create({
+          data: {
+            accountId,
+            type: "deposit",
+            amount,
+            balanceAfter: updated.balance,
+            note: `${LEGACY_READING_REWARD_NOTE_PREFIX} \uBCF4\uC0C1 [reading-log:${input.readingLogId}] (\uC810\uC218: ${score})`,
+            sourceType: READING_REWARD_SOURCE_TYPE,
+            sourceRef: input.readingLogId,
+            performedById: input.student.id,
+            performedByKind: "owner",
+          } satisfies Prisma.TransactionUncheckedCreateInput,
+        });
+        // The wallet deposit and the creature event share this transaction.
+        // The helper computes the fixed v1 +1 delta from the verified source;
+        // it never spends the amount or trusts a client-provided stage.
+        await applyVerifiedRewardProgress(tx, {
+          studentId: input.student.id,
+          classroomId: input.student.classroomId,
           sourceType: READING_REWARD_SOURCE_TYPE,
           sourceRef: input.readingLogId,
-          performedById: input.student.id,
-          performedByKind: "owner",
-        } satisfies Prisma.TransactionUncheckedCreateInput,
-      });
-      return amount;
-    });
+          currencyAmount: amount,
+        });
+        return amount;
+      }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable }),
+    );
   } catch (error) {
     // If two requests race before either sees the source row, the unique
     // constraint collapses the loser into the same idempotent result.

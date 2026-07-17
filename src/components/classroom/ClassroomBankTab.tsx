@@ -46,6 +46,8 @@ const TYPE_LABEL: Record<string, string> = {
   fd_open: "적금 가입",
   fd_matured: "적금 만기",
   fd_cancelled: "적금 해지",
+  creature_egg_purchase: "펫 알 구매",
+  creature_item_purchase: "펫 아이템 구매",
 };
 
 type Props = { classroomId: string };

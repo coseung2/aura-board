@@ -1,0 +1,168 @@
+{
+  "format": "classroom.behavior-sheet.v2",
+  "canvas": {
+    "width": 1536,
+    "height": 1536,
+    "background": "transparent"
+  },
+  "grid": {
+    "rows": 3,
+    "columns": 3,
+    "frameWidth": 512,
+    "frameHeight": 512,
+    "gap": 0,
+    "padding": 0
+  },
+  "sequences": [
+    {
+      "id": "normal",
+      "label": "Normal",
+      "row": 0,
+      "playback": {
+        "loop": true,
+        "frameDurationMs": 320,
+        "frames": [
+          "normal-01",
+          "normal-02",
+          "normal-03",
+          "normal-03"
+        ]
+      },
+      "frames": [
+        {
+          "id": "normal-01",
+          "label": "Settle",
+          "description": "Phase 1 of 3: settle into a friendly ready pose, keeping the full body centered and the identity unchanged.",
+          "rect": {
+            "x": 0,
+            "y": 0,
+            "width": 512,
+            "height": 512
+          }
+        },
+        {
+          "id": "normal-02",
+          "label": "Small motion",
+          "description": "Phase 2 of 3: make one small upbeat idle motion while preserving the face, silhouette, palette, and camera.",
+          "rect": {
+            "x": 512,
+            "y": 0,
+            "width": 512,
+            "height": 512
+          }
+        },
+        {
+          "id": "normal-03",
+          "label": "Return",
+          "description": "Phase 3 of 3: gently return to the same ready pose for a seamless friendly loop.",
+          "rect": {
+            "x": 1024,
+            "y": 0,
+            "width": 512,
+            "height": 512
+          }
+        }
+      ]
+    },
+    {
+      "id": "lazy",
+      "label": "Lazy",
+      "row": 1,
+      "playback": {
+        "loop": true,
+        "frameDurationMs": 520,
+        "frames": [
+          "lazy-01",
+          "lazy-02",
+          "lazy-03",
+          "lazy-03"
+        ]
+      },
+      "frames": [
+        {
+          "id": "lazy-01",
+          "label": "Relax",
+          "description": "Phase 1 of 3: settle into a comfortable relaxed pose with a soft, unhurried expression.",
+          "rect": {
+            "x": 0,
+            "y": 512,
+            "width": 512,
+            "height": 512
+          }
+        },
+        {
+          "id": "lazy-02",
+          "label": "Drift",
+          "description": "Phase 2 of 3: add one slow, gentle sway or blink without changing the character design.",
+          "rect": {
+            "x": 512,
+            "y": 512,
+            "width": 512,
+            "height": 512
+          }
+        },
+        {
+          "id": "lazy-03",
+          "label": "Rest",
+          "description": "Phase 3 of 3: ease back to the same restful pose for a calm seamless loop.",
+          "rect": {
+            "x": 1024,
+            "y": 512,
+            "width": 512,
+            "height": 512
+          }
+        }
+      ]
+    },
+    {
+      "id": "signature",
+      "label": "Signature",
+      "row": 2,
+      "playback": {
+        "loop": true,
+        "frameDurationMs": 520,
+        "frames": [
+          "signature-01",
+          "signature-02",
+          "signature-03",
+          "signature-03"
+        ]
+      },
+      "frames": [
+        {
+          "id": "signature-01",
+          "label": "Prepare",
+          "description": "Phase 1 of 3: prepare the line-specific signature action with a friendly, contained gesture and no combat intent.",
+          "rect": {
+            "x": 0,
+            "y": 1024,
+            "width": 512,
+            "height": 512
+          }
+        },
+        {
+          "id": "signature-02",
+          "label": "Signature action",
+          "description": "Phase 2 of 3: perform the line-specific signature action clearly while keeping the same centered full-body identity.",
+          "rect": {
+            "x": 512,
+            "y": 1024,
+            "width": 512,
+            "height": 512
+          }
+        },
+        {
+          "id": "signature-03",
+          "label": "Finish",
+          "description": "Phase 3 of 3: finish the gentle signature action and return toward the starting pose without adding scenery.",
+          "rect": {
+            "x": 1024,
+            "y": 1024,
+            "width": 512,
+            "height": 512
+          }
+        }
+      ]
+    }
+  ]
+}

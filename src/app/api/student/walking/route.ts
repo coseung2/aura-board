@@ -3,6 +3,13 @@ import { Prisma } from "@prisma/client";
 import { NextRequest } from "next/server";
 import { z } from "zod";
 import { db } from "@/lib/db";
+import { ensureAccountFor } from "@/lib/bank";
+import {
+  awardActivityReward,
+  retryActivityRewardTransaction,
+  shouldAwardWalkingReward,
+  walkingRewardSourceRef,
+} from "@/lib/creatures/activity-rewards";
 import { jsonPrivateNoStore } from "@/lib/http-cache";
 import { getCurrentStudent } from "@/lib/student-auth";
 import { getWalkingDayRange, isValidWalkingDay } from "@/lib/walking";
@@ -108,38 +115,105 @@ export async function POST(request: NextRequest) {
       return jsonPrivateNoStore({ error: "day_out_of_range" }, { status: 400 });
     }
 
-    await db.$transaction(
-      rows.map((row) =>
-        db.$executeRaw(Prisma.sql`
-          INSERT INTO "StudentWalkingDailyStat" (
-            "id",
-            "studentId",
-            "day",
-            "steps",
-            "distanceMeters",
-            "source",
-            "syncedAt",
-            "createdAt",
-            "updatedAt"
-          ) VALUES (
-            ${randomUUID()},
-            ${student.id},
-            ${row.day}::date,
-            ${row.steps},
-            ${Math.round(row.distanceMeters * 100) / 100},
-            'health_connect',
-            CURRENT_TIMESTAMP,
-            CURRENT_TIMESTAMP,
-            CURRENT_TIMESTAMP
-          )
-          ON CONFLICT ("studentId", "day") DO UPDATE SET
-            "steps" = EXCLUDED."steps",
-            "distanceMeters" = EXCLUDED."distanceMeters",
-            "source" = EXCLUDED."source",
-            "syncedAt" = CURRENT_TIMESTAMP,
-            "updatedAt" = CURRENT_TIMESTAMP
-        `),
-      ),
+    const { accountId } = await ensureAccountFor(student);
+    const sourceRefs = rows.map((row) =>
+      walkingRewardSourceRef(student.id, row.day),
+    );
+    await retryActivityRewardTransaction(
+      () =>
+        db.$transaction(
+          async (tx) => {
+            const config = await tx.avatarRewardConfig.findUnique({
+              where: { classroomId: student.classroomId },
+              select: {
+                walkingRewardStepThreshold: true,
+                walkingRewardAmount: true,
+              },
+            });
+            const threshold = config?.walkingRewardStepThreshold ?? 5000;
+            const amount = config?.walkingRewardAmount ?? 20;
+
+            for (const row of rows) {
+              await tx.$executeRaw(Prisma.sql`
+                INSERT INTO "StudentWalkingDailyStat" (
+                  "id",
+                  "studentId",
+                  "day",
+                  "steps",
+                  "distanceMeters",
+                  "source",
+                  "syncedAt",
+                  "createdAt",
+                  "updatedAt"
+                ) VALUES (
+                  ${randomUUID()},
+                  ${student.id},
+                  ${row.day}::date,
+                  ${row.steps},
+                  ${Math.round(row.distanceMeters * 100) / 100},
+                  'health_connect',
+                  CURRENT_TIMESTAMP,
+                  CURRENT_TIMESTAMP,
+                  CURRENT_TIMESTAMP
+                )
+                ON CONFLICT ("studentId", "day") DO UPDATE SET
+                  "steps" = EXCLUDED."steps",
+                  "distanceMeters" = EXCLUDED."distanceMeters",
+                  "source" = EXCLUDED."source",
+                  "syncedAt" = CURRENT_TIMESTAMP,
+                  "updatedAt" = CURRENT_TIMESTAMP
+              `);
+
+              // The accepted Health Connect row is the trust boundary. The
+              // source key is immutable per student/day, so re-syncs and
+              // changing step values cannot pay a second time.
+              if (shouldAwardWalkingReward(row.steps, threshold, amount)) {
+                await awardActivityReward({
+                  tx,
+                  studentId: student.id,
+                  classroomId: student.classroomId,
+                  accountId,
+                  sourceType: "walking_reward",
+                  sourceRef: walkingRewardSourceRef(student.id, row.day),
+                  amount,
+                });
+              }
+            }
+          },
+          { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+        ),
+      3,
+      async (error) => {
+        if (
+          !(error instanceof Prisma.PrismaClientKnownRequestError) ||
+          error.code !== "P2002"
+        ) {
+          return false;
+        }
+
+        // Retry the entire batch only for this reward's source uniqueness
+        // conflict. The source row may still be invisible while the winner
+        // commits, so inspect the unique target as well as committed rows.
+        const target = (error.meta as { target?: unknown } | undefined)?.target;
+        if (
+          (Array.isArray(target) &&
+            target.includes("sourceType") &&
+            target.includes("sourceRef")) ||
+          String(target ?? "").includes("sourceType")
+        ) {
+          return true;
+        }
+        const raced = await db.transaction.findFirst({
+          where: {
+            accountId,
+            sourceType: "walking_reward",
+            sourceRef: { in: sourceRefs },
+            type: "deposit",
+          },
+          select: { id: true },
+        });
+        return raced !== null;
+      },
     );
 
     return jsonPrivateNoStore({ rows: await readRows(student.id, 31) });

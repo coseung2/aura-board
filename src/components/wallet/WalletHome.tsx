@@ -39,6 +39,8 @@ const TYPE_LABEL: Record<string, string> = {
   fd_matured: "적금 만기",
   fd_cancelled: "적금 해지",
   avatar_purchase: "캐릭터 상점 구매",
+  creature_egg_purchase: "펫 알 구매",
+  creature_item_purchase: "펫 아이템 구매",
 };
 
 export function WalletHome() {

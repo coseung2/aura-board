@@ -493,6 +493,12 @@ model Classroom {
   avatarRewardConfigs  AvatarRewardConfig[]
   avatarGalleryEntries AvatarGalleryEntry[]
 
+  // Creature growth and classroom inventory (creature system v1)
+  studentCreatures       StudentCreature[]
+  creatureProgressEvents CreatureProgressEvent[]
+  creatureItems          StudentCreatureItem[]
+  creatureItemUses       CreatureItemUse[]
+
   @@index([teacherId])
   @@index([code])
 }
@@ -608,6 +614,12 @@ model Student {
   avatarLoadout        AvatarLoadout?
   avatarPurchases      AvatarPurchase[]
   avatarGalleryEntries AvatarGalleryEntry[]
+
+  // Creature growth and classroom inventory (creature system v1)
+  creatures              StudentCreature[]
+  creatureProgressEvents CreatureProgressEvent[]
+  creatureItems          StudentCreatureItem[]
+  creatureItemUses       CreatureItemUse[]
 
   // ===== Speed Game (스피드게임, 2026-07-06) =====
   // 학생이 한 보드의 여러 라운드에 답을 제출. groupId는 String(FK 아님,
@@ -3293,9 +3305,10 @@ model Transaction {
 
   createdAt DateTime @default(now())
 
-  account        StudentAccount  @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  account             StudentAccount   @relation(fields: [accountId], references: [id], onDelete: Cascade)
   // Avatar customization MVP (2026-07-02)
-  avatarPurchase AvatarPurchase?
+  avatarPurchase      AvatarPurchase?
+  creatureEggPurchase StudentCreature? @relation("CreatureEggPurchase")
 
   storeItem StoreItem? @relation(fields: [storeItemId], references: [id], onDelete: SetNull)
 
@@ -3305,6 +3318,137 @@ model Transaction {
   @@index([accountId, createdAt])
   @@index([accountId, sourceType, sourceRef])
   @@index([fixedDepositId])
+}
+
+// ===== Creature system v1 =====
+//
+// Static lines, stages, products, and catalog odds live in
+// src/lib/creatures/catalog.ts. These rows only persist a student's
+// server-authoritative creature state, progress audit, and item inventory.
+
+model StudentCreature {
+  id String @id @default(cuid())
+
+  studentId   String
+  classroomId String
+
+  lineKey         String
+  stage           String  @default("egg")
+  isActive        Boolean @default(true)
+  isFeatured      Boolean @default(false)
+  progressPoints  Int     @default(0)
+  rulesVersion    String  @default("creature-rules-v1")
+  catalogRevision String
+  purchaseMode    String
+  oddsSnapshot    Json?
+
+  originSourceType String
+  originSourceRef  String
+
+  purchaseTransactionId String @unique
+
+  incubatingStartedAt DateTime  @default(now())
+  hatchedAt           DateTime?
+  juvenileAt          DateTime?
+  evolvedAt           DateTime?
+  completedAt         DateTime?
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+
+  student             Student                 @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  classroom           Classroom               @relation(fields: [classroomId], references: [id], onDelete: Cascade)
+  purchaseTransaction Transaction             @relation("CreatureEggPurchase", fields: [purchaseTransactionId], references: [id], onDelete: Restrict)
+  progressEvents      CreatureProgressEvent[]
+  itemUses            CreatureItemUse[]
+
+  @@unique([originSourceType, originSourceRef])
+  @@index([studentId, isActive])
+  @@index([studentId, lineKey])
+  @@index([classroomId])
+}
+
+model CreatureProgressEvent {
+  id String @id @default(cuid())
+
+  studentCreatureId String
+  studentId         String
+  classroomId       String
+
+  sourceType     String
+  sourceRef      String
+  idempotencyKey String    @unique
+  rulesVersion   String
+  currencyAmount Int
+  progressDelta  Int
+  progressBefore Int
+  progressAfter  Int
+  stageBefore    String
+  stageAfter     String
+  appliedAt      DateTime  @default(now())
+  reversedAt     DateTime?
+
+  creature  StudentCreature @relation(fields: [studentCreatureId], references: [id], onDelete: Cascade)
+  student   Student         @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  classroom Classroom       @relation(fields: [classroomId], references: [id], onDelete: Cascade)
+
+  @@unique([studentId, sourceType, sourceRef])
+  @@index([studentCreatureId, appliedAt])
+  @@index([classroomId])
+}
+
+model StudentCreatureItem {
+  id String @id @default(cuid())
+
+  studentId   String
+  classroomId String
+
+  itemKey    String
+  itemKind   String
+  quantity   Int      @default(0)
+  isEquipped Boolean  @default(false)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  student   Student           @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  classroom Classroom         @relation(fields: [classroomId], references: [id], onDelete: Cascade)
+  itemUses  CreatureItemUse[] @relation("CreatureItemUseInventory")
+
+  @@unique([studentId, itemKey])
+  @@index([studentId, itemKind])
+  @@index([classroomId])
+}
+
+model CreatureItemUse {
+  id String @id @default(cuid())
+
+  studentId   String
+  classroomId String
+
+  studentCreatureId String?
+  inventoryItemId   String?
+
+  itemKey        String
+  itemKind       String
+  quantity       Int    @default(1)
+  effectSnapshot Json
+  progressBefore Int
+  progressAfter  Int
+  stageBefore    String
+  stageAfter     String
+
+  idempotencyKey String   @unique
+  sourceType     String   @default("creature_item_use")
+  sourceRef      String
+  usedAt         DateTime @default(now())
+
+  inventoryItem StudentCreatureItem? @relation("CreatureItemUseInventory", fields: [inventoryItemId], references: [id], onDelete: SetNull)
+  creature      StudentCreature?     @relation(fields: [studentCreatureId], references: [id], onDelete: SetNull)
+  student       Student              @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  classroom     Classroom            @relation(fields: [classroomId], references: [id], onDelete: Cascade)
+
+  @@unique([studentId, sourceType, sourceRef])
+  @@index([studentCreatureId, usedAt])
+  @@index([classroomId])
 }
 
 model ClassroomRolePermission {
@@ -4072,11 +4216,16 @@ model AvatarPurchase {
 }
 
 model AvatarRewardConfig {
-  classroomId              String @id
+  classroomId                String @id
   // Wallet reward per reading score point (e.g. 10 won per point).
-  readingRewardPerPoint    Int    @default(10)
+  readingRewardPerPoint      Int    @default(10)
   // Minimum aiScore required to trigger a payout (0..10 evaluator range).
-  readingMinScoreForPayout Int    @default(5)
+  readingMinScoreForPayout   Int    @default(5)
+  // Walking and assignment activity reward policy seeds. Values <= 0 disable
+  // the corresponding reward without requiring another migration.
+  walkingRewardStepThreshold Int    @default(5000)
+  walkingRewardAmount        Int    @default(20)
+  assignmentRewardAmount     Int    @default(20)
 
   classroom Classroom @relation(fields: [classroomId], references: [id], onDelete: Cascade)
 }

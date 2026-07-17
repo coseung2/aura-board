@@ -1,5 +1,13 @@
 import { NextResponse } from "next/server";
+import { Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
+import { ensureAccountFor } from "@/lib/bank";
+import {
+  awardActivityReward,
+  assignmentRewardSourceRef,
+  isFirstAssignmentSubmission,
+  retryActivityRewardTransaction,
+} from "@/lib/creatures/activity-rewards";
 import { getCurrentStudent } from "@/lib/student-auth";
 import { StudentSubmitSchema } from "@/lib/assignment-schemas";
 import type {
@@ -14,6 +22,20 @@ import { touchBoardUpdatedAt } from "@/lib/board-touch";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
+
+class SubmissionTransactionError extends Error {
+  constructor(
+    public readonly code:
+      | "slot_not_found"
+      | "slot_not_mine"
+      | "orphaned_slot"
+      | "submission_locked"
+      | "invalid_transition",
+  ) {
+    super(code);
+    this.name = "SubmissionTransactionError";
+  }
+}
 
 export async function POST(
   req: Request,
@@ -68,8 +90,8 @@ export async function POST(
     return NextResponse.json({ error: "submission_locked" }, { status: 403 });
   }
 
-  const transition = computeStudentSubmit(slot.submissionStatus as AssignmentSubmissionStatus);
-  if (!transition.ok) {
+  const initialTransition = computeStudentSubmit(slot.submissionStatus as AssignmentSubmissionStatus);
+  if (!initialTransition.ok) {
     return NextResponse.json({ error: "invalid_transition" }, { status: 409 });
   }
 
@@ -95,52 +117,192 @@ export async function POST(
     }
   }
 
-  const updated = await db.$transaction(async (tx) => {
-    await tx.card.update({
-      where: { id: slot.cardId },
-      data: {
-        ...(content !== undefined ? { content } : {}),
-        ...(linkUrl !== undefined ? { linkUrl } : {}),
-        ...(imageUrl !== undefined ? { imageUrl } : {}),
-        ...(thumbUrl !== undefined ? { thumbUrl } : {}),
-      },
-    });
-
-    // Submission.userId stays null for student submissions — assignmentSlotId
-    // is the canonical identity anchor (NextAuth User ≠ Student row).
-    await tx.submission.upsert({
-      where: { assignmentSlotId: slot.id },
-      create: {
-        boardId: slot.boardId,
-        userId: null,
-        assignmentSlotId: slot.id,
-        content: content ?? "",
-        linkUrl: linkUrl ?? null,
-        fileUrl: fileUrl ?? null,
-        status: "submitted",
-      },
-      update: {
-        content: content ?? "",
-        linkUrl: linkUrl ?? null,
-        fileUrl: fileUrl ?? null,
-        status: "submitted",
-        updatedAt: now,
-      },
-    });
-
-    return tx.assignmentSlot.update({
-      where: { id: slot.id },
-      data: {
-        submissionStatus: transition.next,
-        // Reset grading state when the student resubmits after a return,
-        // matching data_model.md §1.4 "returned → submitted" row.
-        ...(slot.submissionStatus === "returned"
-          ? { gradingStatus: "not_graded", returnedAt: null, returnReason: null }
-          : {}),
-      },
-      include: SLOT_INCLUDE_DEFAULT,
-    });
+  // Resolve server-owned wallet identity and policy before entering the
+  // mutation transaction. The reward helper re-checks account ownership in
+  // the same transaction before changing balance.
+  const { accountId } = await ensureAccountFor(student);
+  const rewardConfig = await db.avatarRewardConfig.findUnique({
+    where: { classroomId: student.classroomId },
+    select: { assignmentRewardAmount: true },
   });
+  const assignmentRewardAmount = rewardConfig?.assignmentRewardAmount ?? 20;
+  const assignmentSourceRef = assignmentRewardSourceRef(student.id, slot.id);
+
+  let updated: Parameters<typeof slotRowToDTO>[0] & { updatedAt: Date };
+  try {
+    updated = await retryActivityRewardTransaction(() =>
+      db.$transaction(
+        async (tx) => {
+          // Re-read inside Serializable scope. This makes the first-submit
+          // decision against the row that will actually be updated, so two
+          // concurrent submissions cannot both earn the source reward.
+          const current = await tx.assignmentSlot.findUnique({
+            where: { id: slot.id },
+            select: {
+              id: true,
+              boardId: true,
+              cardId: true,
+              studentId: true,
+              submissionStatus: true,
+              gradingStatus: true,
+              board: {
+                select: {
+                  assignmentAllowLate: true,
+                  assignmentDeadline: true,
+                },
+              },
+              submission: { select: { id: true } },
+            },
+          });
+          if (!current) throw new SubmissionTransactionError("slot_not_found");
+          if (current.studentId !== student.id) {
+            throw new SubmissionTransactionError("slot_not_mine");
+          }
+          if (current.submissionStatus === "orphaned") {
+            throw new SubmissionTransactionError("orphaned_slot");
+          }
+
+          const currentAllowed = canStudentSubmit(
+            {
+              submissionStatus: current.submissionStatus as AssignmentSubmissionStatus,
+              gradingStatus: current.gradingStatus as AssignmentGradingStatus,
+            },
+            {
+              assignmentAllowLate: current.board.assignmentAllowLate,
+              assignmentDeadline: current.board.assignmentDeadline,
+            },
+          );
+          if (!currentAllowed) {
+            throw new SubmissionTransactionError("submission_locked");
+          }
+
+          const currentTransition = computeStudentSubmit(
+            current.submissionStatus as AssignmentSubmissionStatus,
+          );
+          if (!currentTransition.ok) {
+            throw new SubmissionTransactionError("invalid_transition");
+          }
+
+          const firstSubmission = isFirstAssignmentSubmission({
+            submissionStatus: current.submissionStatus,
+            hasExistingSubmission: current.submission !== null,
+          });
+
+          await tx.card.update({
+            where: { id: current.cardId },
+            data: {
+              ...(content !== undefined ? { content } : {}),
+              ...(linkUrl !== undefined ? { linkUrl } : {}),
+              ...(imageUrl !== undefined ? { imageUrl } : {}),
+              ...(thumbUrl !== undefined ? { thumbUrl } : {}),
+            },
+          });
+
+          // Submission.userId stays null for student submissions —
+          // assignmentSlotId is the canonical identity anchor (NextAuth User
+          // ≠ Student row).
+          await tx.submission.upsert({
+            where: { assignmentSlotId: current.id },
+            create: {
+              boardId: current.boardId,
+              userId: null,
+              assignmentSlotId: current.id,
+              content: content ?? "",
+              linkUrl: linkUrl ?? null,
+              fileUrl: fileUrl ?? null,
+              status: "submitted",
+            },
+            update: {
+              content: content ?? "",
+              linkUrl: linkUrl ?? null,
+              fileUrl: fileUrl ?? null,
+              status: "submitted",
+              updatedAt: now,
+            },
+          });
+
+          const next = await tx.assignmentSlot.update({
+            where: { id: current.id },
+            data: {
+              submissionStatus: currentTransition.next,
+              // Reset grading state when the student resubmits after a
+              // return, matching data_model.md §1.4.
+              ...(current.submissionStatus === "returned"
+                ? { gradingStatus: "not_graded", returnedAt: null, returnReason: null }
+                : {}),
+            },
+            include: SLOT_INCLUDE_DEFAULT,
+          });
+
+          if (firstSubmission && assignmentRewardAmount > 0) {
+            await awardActivityReward({
+              tx,
+              studentId: student.id,
+              classroomId: student.classroomId,
+              accountId,
+              sourceType: "assignment_reward",
+              sourceRef: assignmentSourceRef,
+              amount: assignmentRewardAmount,
+            });
+          }
+
+          return next;
+        },
+        { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+      ),
+    );
+  } catch (error) {
+    if (error instanceof SubmissionTransactionError) {
+      const status =
+          error.code === "slot_not_found"
+          ? 404
+          : error.code === "slot_not_mine"
+            ? 403
+            : error.code === "orphaned_slot"
+              ? 409
+            : error.code === "submission_locked"
+              ? 403
+              : 409;
+      return NextResponse.json({ error: error.code }, { status });
+    }
+
+    // If a concurrent first submission won the source unique index, resolve
+    // the committed slot after the failed transaction. Any unrelated P2002
+    // remains an internal error rather than being mistaken for a replay.
+    if (
+      error instanceof Prisma.PrismaClientKnownRequestError &&
+      error.code === "P2002"
+    ) {
+      const raced = await db.transaction.findFirst({
+        where: {
+          accountId,
+          sourceType: "assignment_reward",
+          sourceRef: assignmentSourceRef,
+          type: "deposit",
+        },
+        select: { id: true },
+      });
+      if (raced) {
+        const committed = await db.assignmentSlot.findUnique({
+          where: { id: slot.id },
+          include: SLOT_INCLUDE_DEFAULT,
+        });
+        // The reward source is created in the same transaction as the first
+        // submit. Only treat this as a replay when that winner also committed
+        // the requested slot transition; otherwise preserve the original
+        // P2002 instead of claiming a partial success.
+        if (committed?.submissionStatus === "submitted" && committed.submission) {
+          updated = committed;
+        } else {
+          throw error;
+        }
+      } else {
+        throw error;
+      }
+    } else {
+      throw error;
+    }
+  }
 
   console.log(
     `[AssignmentSlot] transition slotId=${slot.id} from=${slot.submissionStatus} to=${updated.submissionStatus} actor=student actorId=${student.id}`
