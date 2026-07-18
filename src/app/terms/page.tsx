@@ -1,14 +1,24 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 
-export const metadata = {
+export const metadata: Metadata = {
   title: "이용약관 · Aura-board",
+  description: "Aura-board 서비스의 이용 조건, 계정, 연동 기능, 금지 행위 및 책임 범위를 안내합니다.",
+  alternates: {
+    canonical: "/terms",
+  },
+  openGraph: {
+    title: "이용약관 · Aura-board",
+    description: "Aura-board 서비스의 이용 조건, 계정, 연동 기능, 금지 행위 및 책임 범위를 안내합니다.",
+    url: "https://aura-board.com/terms",
+  },
 };
 
 export default function TermsPage() {
   return (
     <main className="docs-page">
       <article className="docs-article">
-        <Link href="/dashboard" className="docs-back">← 홈으로</Link>
+        <Link href="/landing" className="docs-back">← 홈으로</Link>
         <h1 className="docs-title">이용약관</h1>
         <p className="docs-subtitle">최종 업데이트: 2026-07-13</p>
 

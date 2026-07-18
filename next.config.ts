@@ -6,6 +6,7 @@ import type { NextConfig } from "next";
 // keep working exactly as before.
 const FRAME_SRC_ALLOWLIST = [
   "'self'",
+  "https://www.googletagmanager.com",
   "https://www.canva.com",
   "https://www.youtube.com",
 ];
@@ -43,6 +44,15 @@ const nextConfig: NextConfig = {
     deviceSizes: [360, 640, 750, 828, 1080, 1200, 1920],
     imageSizes: [16, 32, 64, 96, 160, 320, 480, 640],
     formats: ["image/webp"],
+  },
+  async redirects() {
+    return [
+      {
+        source: "/privacy.html",
+        destination: "/privacy",
+        permanent: true,
+      },
+    ];
   },
   async headers() {
     return [

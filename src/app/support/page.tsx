@@ -1,7 +1,17 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 
-export const metadata = {
+export const metadata: Metadata = {
   title: "지원 · Aura-board",
+  description: "Aura-board 사용 문의, 문제 신고, 보안 제보 및 자주 묻는 질문을 확인하세요.",
+  alternates: {
+    canonical: "/support",
+  },
+  openGraph: {
+    title: "지원 · Aura-board",
+    description: "Aura-board 사용 문의, 문제 신고, 보안 제보 및 자주 묻는 질문을 확인하세요.",
+    url: "https://aura-board.com/support",
+  },
 };
 
 export default function SupportPage() {
@@ -68,7 +78,7 @@ export default function SupportPage() {
               </Link>
             </li>
             <li>
-              <Link href="/teacher/settings#llm" className="docs-link">
+              <Link href="/teacher/settings#llm" className="docs-link" rel="nofollow">
                 생성형 AI 연결하기 (Claude · ChatGPT · Gemini)
               </Link>
             </li>

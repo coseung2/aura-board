@@ -1,14 +1,24 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 
-export const metadata = {
+export const metadata: Metadata = {
   title: "개인정보처리방침 · Aura-board",
+  description: "Aura-board의 개인정보 수집, 이용, 보관, 보호 및 이용자 권리를 안내합니다.",
+  alternates: {
+    canonical: "/privacy",
+  },
+  openGraph: {
+    title: "개인정보처리방침 · Aura-board",
+    description: "Aura-board의 개인정보 수집, 이용, 보관, 보호 및 이용자 권리를 안내합니다.",
+    url: "https://aura-board.com/privacy",
+  },
 };
 
 export default function PrivacyPage() {
   return (
     <main className="docs-page">
       <article className="docs-article">
-        <Link href="/dashboard" className="docs-back">← 홈으로</Link>
+        <Link href="/landing" className="docs-back">← 홈으로</Link>
         <h1 className="docs-title">개인정보처리방침</h1>
         <p className="docs-subtitle">최종 수정일: 2026년 7월 13일 | 시행일: 2026년 7월 13일</p>
 

@@ -1,5 +1,23 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { Logo } from "@/components/Logo";
+
+const title = "Aura-board | 학급 활동을 한곳에서";
+const description =
+  "교사가 학급 보드와 수업 자료를 만들고 학생 제출물, Canva 링크, 이미지, 파일, 피드백을 한곳에서 관리하는 온라인 학급 활동 플랫폼입니다.";
+
+export const metadata: Metadata = {
+  title,
+  description,
+  alternates: {
+    canonical: "/landing",
+  },
+  openGraph: {
+    title,
+    description,
+    url: "https://aura-board.com/landing",
+  },
+};
 
 const features = [
   {
