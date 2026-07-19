@@ -6,6 +6,8 @@ import { db } from "@/lib/db";
 import { jsonPrivateNoStore } from "@/lib/http-cache";
 import { getCurrentStudent } from "@/lib/student-auth";
 import { getWalkingDayRange, isValidWalkingDay } from "@/lib/walking";
+import { awardWalkingMilestones } from "@/lib/pets/rewards";
+import { isFeatureEnabled } from "@/lib/feature-flags";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -142,7 +144,12 @@ export async function POST(request: NextRequest) {
       ),
     );
 
-    return jsonPrivateNoStore({ rows: await readRows(student.id, 31) });
+    if (!isFeatureEnabled("petGame")) {
+      return jsonPrivateNoStore({ rows: await readRows(student.id, 31) });
+    }
+
+    const rewards = await awardWalkingMilestones(student, rows);
+    return jsonPrivateNoStore({ rows: await readRows(student.id, 31), rewards });
   } catch (error) {
     console.error("[POST /api/student/walking]", error);
     return jsonPrivateNoStore({ error: "internal" }, { status: 500 });

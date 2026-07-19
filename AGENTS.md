@@ -31,3 +31,14 @@ for bounded specialist tasks. The project source of truth is the current code,
 
 For frontend verification after design changes, clear `.next` and restart the
 dev server before browser checks when practical.
+
+## Pet Game Preview Policy
+
+- Pet-game development is Preview-only. Keep it disabled and unexposed in
+  Production until the user explicitly authorizes Production exposure in a
+  later turn.
+- Codex owns routine environment and deployment configuration within its
+  available access. Ask the user only when required credentials or authority
+  are genuinely unavailable.
+- Follow `docs/verification-checklist.md` for the pet-game runtime contract,
+  migration gate, redeployment requirement, and Preview/Production checks.

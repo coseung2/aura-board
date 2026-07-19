@@ -622,6 +622,12 @@ model Student {
 
   walkingDailyStats StudentWalkingDailyStat[]
 
+  pets              StudentPet[]
+  petDexEntries     PetDexEntry[]
+  petEggs           StudentEgg[]
+  petSynergyLoadout PetSynergyLoadout?
+  petActivityGrants PetActivityGrant[]
+
   // Global daily banner submissions.
   dailyBannerSubmissions DailyBannerSubmission[] @relation("DailyBannerSubmissionStudent")
 
@@ -715,6 +721,122 @@ model StudentWalkingDailyStat {
   @@unique([studentId, day], map: "StudentWalkingDailyStat_studentId_day_key")
   @@index([day], map: "StudentWalkingDailyStat_day_idx")
   @@index([studentId, syncedAt], map: "StudentWalkingDailyStat_studentId_syncedAt_idx")
+}
+
+model PetSpecies {
+  id              String   @id @default(cuid())
+  key             String   @unique
+  name            String
+  type            String
+  rarity          String
+  stage           Int
+  familyKey       String
+  effectKey       String
+  baseEffectBps   Int
+  spriteKey       String
+  hatchWeight     Int      @default(0)
+  nextEvolutionId String?  @unique
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  nextEvolution     PetSpecies?   @relation("PetSpeciesEvolution", fields: [nextEvolutionId], references: [id], onDelete: SetNull)
+  previousEvolution PetSpecies?   @relation("PetSpeciesEvolution")
+  studentPets       StudentPet[]
+  dexEntries        PetDexEntry[]
+  eggResults        StudentEgg[]
+
+  @@index([type, stage])
+  @@index([familyKey, stage])
+}
+
+model StudentPet {
+  id               String   @id @default(cuid())
+  studentId        String
+  speciesId        String
+  enhancementLevel Int      @default(0)
+  evolutionXp      Int      @default(0)
+  shards           Int      @default(0)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  student      Student          @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  species      PetSpecies       @relation(fields: [speciesId], references: [id], onDelete: Restrict)
+  loadoutSlots PetSynergySlot[]
+
+  @@unique([studentId, speciesId])
+  @@index([studentId])
+}
+
+model PetDexEntry {
+  id           String   @id @default(cuid())
+  studentId    String
+  speciesId    String
+  discoveredAt DateTime @default(now())
+
+  student Student    @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  species PetSpecies @relation(fields: [speciesId], references: [id], onDelete: Cascade)
+
+  @@unique([studentId, speciesId])
+  @@index([studentId])
+}
+
+model StudentEgg {
+  id               String    @id @default(cuid())
+  studentId        String
+  resultSpeciesId  String
+  eggType          String
+  eggName          String
+  status           String    @default("incubating")
+  baseHatchSeconds Int
+  progressSeconds  Float     @default(0)
+  lastProgressAt   DateTime  @default(now())
+  hatchedAt        DateTime?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  student       Student    @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  resultSpecies PetSpecies @relation(fields: [resultSpeciesId], references: [id], onDelete: Restrict)
+
+  @@index([studentId, status])
+}
+
+model PetSynergyLoadout {
+  id        String   @id @default(cuid())
+  studentId String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  student Student          @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  slots   PetSynergySlot[]
+}
+
+model PetSynergySlot {
+  id        String @id @default(cuid())
+  loadoutId String
+  petId     String
+  slotIndex Int
+
+  loadout PetSynergyLoadout @relation(fields: [loadoutId], references: [id], onDelete: Cascade)
+  pet     StudentPet        @relation(fields: [petId], references: [id], onDelete: Cascade)
+
+  @@unique([loadoutId, slotIndex])
+  @@unique([loadoutId, petId])
+  @@index([petId])
+}
+
+model PetActivityGrant {
+  id         String   @id @default(cuid())
+  studentId  String
+  sourceType String
+  sourceRef  String
+  baseXp     Int
+  awardedXp  Int
+  createdAt  DateTime @default(now())
+
+  student Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@unique([studentId, sourceType, sourceRef])
+  @@index([studentId, createdAt])
 }
 
 // Per-student read cursor and receipts for the in-app like/comment feed.

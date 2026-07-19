@@ -6,6 +6,8 @@ import {
   type ReadingBookType,
 } from "@/lib/reading-evaluator";
 import { awardReadingReward } from "@/lib/avatar-rewards";
+import { awardActivePetEvolutionXp } from "@/lib/pets/service";
+import { isFeatureEnabled } from "@/lib/feature-flags";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -212,6 +214,19 @@ export async function POST(req: Request) {
     });
   } catch (e) {
     console.error("[reading] reward hook failed", e);
+  }
+
+  if (isFeatureEnabled("petGame")) {
+    try {
+      await awardActivePetEvolutionXp({
+        studentId: student.id,
+        sourceType: "reading_log",
+        sourceRef: created.id,
+        baseXp: 10,
+      });
+    } catch (e) {
+      console.error("[reading] pet evolution XP hook failed", e);
+    }
   }
 
   return NextResponse.json({ entry: serialize(created), reward }, { status: 201 });

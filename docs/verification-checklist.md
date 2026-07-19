@@ -42,6 +42,25 @@ creating overlapping testing-notes documents.
 - Inspect production data shape when the symptom is data-dependent.
 - Re-test the exact route, board, classroom, or student flow named by the user.
 
+## Pet Game Preview Gate
+
+- Keep pet-game development Preview-only. Local `next dev` defaults to enabled,
+  and Vercel Preview is the primary user-facing review surface.
+- Set `NEXT_PUBLIC_FF_petGame=1` for Vercel Preview and
+  `NEXT_PUBLIC_FF_petGame=0` for Production; prefer explicit `0` over an absent
+  value. These public variables are embedded at build time, so redeploy after
+  changing them.
+- Before testing any environment with pet features enabled, apply the pet
+  Prisma migration in that environment.
+- On the deployed Preview URL, verify that the pet navigation, page, and API
+  are available. Exercise the pet persistence flows through a successful
+  response and page reload; optimistic UI alone is not sufficient.
+- On the deployed Production URL, verify that pet navigation is absent and the
+  pet page and API remain unavailable. Confirm legacy reading and walking
+  behavior still works.
+- Do not enable or expose the pet game in Production unless the user explicitly
+  authorizes it in a later turn.
+
 ## Mobile Parity And Android Release
 
 - Run `npm run typecheck` and `npm run design:check` in `apps/mobile`.

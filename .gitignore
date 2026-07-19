@@ -68,3 +68,5 @@ apps/mobile/credentials/
 apps/mobile/android/keystores/
 apps/mobile/android/gradle.properties.local
 
+
+.vercel

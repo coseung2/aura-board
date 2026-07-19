@@ -6,6 +6,7 @@ import { useState } from "react";
 import { Logo } from "./Logo";
 import { MegaNav, type MegaNavItem } from "./MegaNav";
 import { StudentNotificationBell } from "./StudentNotificationBell";
+import { isFeatureEnabled } from "@/lib/feature-flags";
 
 type Duty = {
   classroomId: string;
@@ -50,6 +51,7 @@ export function StudentTopNav({
   const readingChampionsActive = pathname.startsWith("/student/reading-champions");
   const readingActive = readingRecordActive || readingChampionsActive;
   const walkingActive = pathname.startsWith("/student/walking");
+  const petsActive = pathname.startsWith("/student/pets");
 
   const navItems: MegaNavItem[] = [
     {
@@ -137,6 +139,24 @@ export function StudentTopNav({
               href: "/student/character-shop",
               label: "상점",
               active: pathname === "/student/character-shop",
+            },
+          ],
+        },
+      ],
+    },
+    {
+      id: "pets",
+      label: "펫",
+      href: "/student/pets",
+      active: petsActive,
+      groups: [
+        {
+          title: "펫 게임",
+          links: [
+            {
+              href: "/student/pets",
+              label: "펫",
+              active: petsActive,
             },
           ],
         },
@@ -239,9 +259,12 @@ export function StudentTopNav({
       ],
     })),
   ];
-  const visibleNavItems = showDevFeatures
+  const featureNavItems = isFeatureEnabled("petGame")
     ? navItems
-    : navItems
+    : navItems.filter((item) => item.id !== "pets");
+  const visibleNavItems = showDevFeatures
+    ? featureNavItems
+    : featureNavItems
         .filter((item) => item.id !== "character")
         .map((item) => ({
           ...item,

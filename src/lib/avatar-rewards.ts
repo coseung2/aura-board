@@ -13,6 +13,8 @@ import "server-only";
 import { db } from "./db";
 import { ensureAccountFor } from "./bank";
 import { Prisma } from "@prisma/client";
+import { getStudentPetEffects } from "./pets/service";
+import { isFeatureEnabled } from "./feature-flags";
 
 export type ReadingRewardResult = {
   amount: number;
@@ -69,7 +71,13 @@ export async function awardReadingReward(
   const minScore = config?.readingMinScoreForPayout ?? DEFAULT_MIN_SCORE;
   if (score < minScore) return null;
 
-  const amount = score * rewardPerPoint;
+  const baseAmount = score * rewardPerPoint;
+  const amount = isFeatureEnabled("petGame")
+    ? Math.round(
+        baseAmount *
+          (1 + (await getStudentPetEffects(db, input.student.id)).readingRewardBps / 10_000),
+      )
+    : baseAmount;
   if (amount <= 0) return null;
 
   const { accountId } = await ensureAccountFor(input.student);
