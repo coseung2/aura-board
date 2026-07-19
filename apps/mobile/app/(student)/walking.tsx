@@ -1,6 +1,7 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
+  AppState,
   Platform,
   RefreshControl,
   ScrollView,
@@ -56,6 +57,7 @@ const distanceFormatter = new Intl.NumberFormat("ko-KR", {
 });
 
 const DAILY_MISSION_GOAL = 6_000;
+const FOREGROUND_SYNC_INTERVAL_MS = 60_000;
 const WEEKLY_MISSION_GOAL = 3;
 
 type WalkingView = "record" | "missions";
@@ -94,6 +96,7 @@ export default function StudentWalkingScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [busy, setBusy] = useState<"connect" | "sync" | "settings" | null>(null);
+  const silentSyncInFlight = useRef(false);
   const [activeView, setActiveView] = useState<WalkingView>("record");
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -147,9 +150,44 @@ export default function StudentWalkingScreen() {
     }
   }, [handleAuthError]);
 
+  const syncLatestSilently = useCallback(async () => {
+    if (silentSyncInFlight.current || !isHealthConnectModuleAvailable()) return;
+
+    silentSyncInFlight.current = true;
+    try {
+      const nextPermissions = await getGrantedHealthConnectPermissions();
+      setPermissions(nextPermissions);
+      if (hasRequiredHealthConnectPermissions(nextPermissions)) {
+        setRows(await readAndSyncWalkingDays(7));
+      }
+    } catch (nextError) {
+      if (!(await handleAuthError(nextError))) {
+        setError(localizedWalkingError(nextError, "걸음 수를 자동 동기화하지 못했어요."));
+      }
+    } finally {
+      silentSyncInFlight.current = false;
+    }
+  }, [handleAuthError]);
+
   useFocusEffect(useCallback(() => {
     void load(true);
-  }, [load]));
+
+    let previousAppState = AppState.currentState;
+    const interval = setInterval(() => {
+      if (AppState.currentState === "active") void syncLatestSilently();
+    }, FOREGROUND_SYNC_INTERVAL_MS);
+    const appStateSubscription = AppState.addEventListener("change", (nextAppState) => {
+      if (previousAppState !== "active" && nextAppState === "active") {
+        void syncLatestSilently();
+      }
+      previousAppState = nextAppState;
+    });
+
+    return () => {
+      clearInterval(interval);
+      appStateSubscription.remove();
+    };
+  }, [load, syncLatestSilently]));
 
   const connect = useCallback(async () => {
     setBusy("connect");
