@@ -22,6 +22,7 @@ import {
   rankCorrectAnswers,
 } from "@/lib/speed-game/score";
 import { resolveStudentGroupId } from "@/lib/speed-game/runtime";
+import { limitSpeedGameAnswer } from "@/lib/rate-limit-routes";
 
 const BodySchema = z
   .object({
@@ -119,6 +120,17 @@ export async function POST(req: Request, { params }: Params) {
     return jsonPrivateNoStore({ error: "group_mismatch" }, { status: 403 });
   }
 
+  const limit = await limitSpeedGameAnswer(gameId, student.id);
+  if (!limit.ok) {
+    return jsonPrivateNoStore(
+      { error: "rate_limited", retryAfter: limit.retryAfter },
+      {
+        status: 429,
+        headers: { "Retry-After": String(Math.max(1, limit.retryAfter)) },
+      },
+    );
+  }
+
   const groupId = studentGroupId;
   const rawText = parsed.data.text;
   const now = new Date();
@@ -127,12 +139,6 @@ export async function POST(req: Request, { params }: Params) {
     typeof parsed.data.elapsedMs === "number"
       ? parsed.data.elapsedMs
       : Math.max(0, now.getTime() - round.startedAt.getTime());
-
-  // 같은 모둠이 이미 답을 제출했으면 update, 아니면 create.
-  const existing = await db.speedGameAnswer.findUnique({
-    where: { roundId_groupId: { roundId: round.id, groupId } },
-    select: { id: true, createdAt: true },
-  });
 
   // 판정: exact / normalize-space 는 자동, teacher-approval 은 pending.
   const isAutoJudge =
@@ -143,73 +149,109 @@ export async function POST(req: Request, { params }: Params) {
       : answersMatch(round.keywordNormalized, rawText)
     : false;
 
-  // rank 계산: 현재 시점까지 accepted correct 답 수 + 1 (이번 답 포함).
-  // teacher-approval 모드에서는 rank=0, score=0 이 MVP 디폴트.
-  let score = 0;
-  if (isCorrect) {
-    const others = await db.speedGameAnswer.findMany({
-      where: {
-        roundId: round.id,
-        correct: true,
-        approval: "accepted",
-        ...(existing ? { id: { not: existing.id } } : {}),
-      },
-      select: { id: true, createdAt: true, correct: true },
-    });
-    const othersRanked = rankCorrectAnswers(
-      others.map((g) => ({
-        answerId: g.id,
-        createdAt: g.createdAt,
-        correct: g.correct,
-      })),
-    );
-    const othersRank = othersRanked.size; // 다른 모둠이 맞춘 수
-    const bonusRanks = parseBonusRanks(game.bonusRanks);
-    score = computeScore({
-      correct: true,
-      elapsedMs,
-      rank: othersRank + 1,
-      bonusRanks,
-      baseScore: game.baseScore,
-      minScore: game.minScore,
-    });
-  }
-
   const approval = isCorrect
     ? "accepted"
     : isAutoJudge
       ? "rejected"
       : "pending";
+  const activeRoundId = round.id;
+  const activeStudentId = student.id;
+  const bonusRanks = parseBonusRanks(game.bonusRanks);
+  const baseScore = game.baseScore;
+  const minScore = game.minScore;
 
-  const upserted = await db.speedGameAnswer.upsert({
-    where: { roundId_groupId: { roundId: round.id, groupId } },
-    create: {
-      roundId: round.id,
-      groupId,
-      studentId: student.id,
-      correct: isCorrect,
-      score,
-      approval,
-      rawText,
-      elapsedMs,
-    },
-    update: {
-      correct: isCorrect,
-      score,
-      approval,
-      rawText,
-      elapsedMs,
-      // createdAt 은 유지 — 첫 제출 시각 기준.
-    },
-    select: {
-      id: true,
-      correct: true,
-      score: true,
-      approval: true,
-      elapsedMs: true,
-      createdAt: true,
-    },
-  });
+  async function persistAnswer() {
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      try {
+        return await db.$transaction(
+          async (tx) => {
+            // Rank-dependent scoring must share one serializable snapshot.
+            // Otherwise simultaneous correct answers can receive the same
+            // bonus rank even though they belong to different groups.
+            const existing = await tx.speedGameAnswer.findUnique({
+              where: { roundId_groupId: { roundId: activeRoundId, groupId } },
+              select: { id: true },
+            });
+
+            let score = 0;
+            if (isCorrect) {
+              const others = await tx.speedGameAnswer.findMany({
+                where: {
+                  roundId: activeRoundId,
+                  correct: true,
+                  approval: "accepted",
+                  ...(existing ? { id: { not: existing.id } } : {}),
+                },
+                select: { id: true, createdAt: true, correct: true },
+              });
+              const othersRanked = rankCorrectAnswers(
+                others.map((candidate) => ({
+                  answerId: candidate.id,
+                  createdAt: candidate.createdAt,
+                  correct: candidate.correct,
+                })),
+              );
+              score = computeScore({
+                correct: true,
+                elapsedMs,
+                rank: othersRanked.size + 1,
+                bonusRanks,
+                baseScore,
+                minScore,
+              });
+            }
+
+            const answer = await tx.speedGameAnswer.upsert({
+              where: { roundId_groupId: { roundId: activeRoundId, groupId } },
+              create: {
+                roundId: activeRoundId,
+                groupId,
+                studentId: activeStudentId,
+                correct: isCorrect,
+                score,
+                approval,
+                rawText,
+                elapsedMs,
+              },
+              update: {
+                correct: isCorrect,
+                score,
+                approval,
+                rawText,
+                elapsedMs,
+                // createdAt 은 유지 — 첫 제출 시각 기준.
+              },
+              select: {
+                id: true,
+                correct: true,
+                score: true,
+                approval: true,
+                elapsedMs: true,
+                createdAt: true,
+              },
+            });
+
+            await tx.speedGame.update({
+              where: { id: gameId },
+              data: { updatedAt: new Date() },
+            });
+
+            return answer;
+          },
+          { isolationLevel: "Serializable" },
+        );
+      } catch (error) {
+        const code =
+          error && typeof error === "object" && "code" in error
+            ? (error as { code?: unknown }).code
+            : undefined;
+        if (code !== "P2034" || attempt === 2) throw error;
+      }
+    }
+    throw new Error("speed_game_answer_transaction_failed");
+  }
+
+  const upserted = await persistAnswer();
 
   // wire DTO 는 src/components/speed-game/types.ts SpeedGameAnswer 와 일치.
   return jsonPrivateNoStore({

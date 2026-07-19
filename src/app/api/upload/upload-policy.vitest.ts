@@ -10,6 +10,23 @@ import {
 
 const payloadFor = (mimeType: string) => JSON.stringify({ mimeType });
 
+describe("production upload limits", () => {
+  it("uses a 4 MiB maximum", () => {
+    expect(MAX_SIZE).toBe(4 * 1024 * 1024);
+    expect(
+      buildUploadPolicy("uploads/photo.png", payloadFor("image/png"))
+        .maximumSizeInBytes,
+    ).toBe(MAX_SIZE);
+  });
+
+  it("rejects SVG uploads", () => {
+    expect(ALLOWED_IMAGE).not.toContain("image/svg+xml");
+    expect(() =>
+      buildUploadPolicy("uploads/vector.svg", payloadFor("image/svg+xml")),
+    ).toThrow(UploadPolicyError);
+  });
+});
+
 describe("upload-policy · buildUploadPolicy (FUNCTION_PAYLOAD_TOO_LARGE 회귀)", () => {
   it("허용 PDF는 policy를 반환한다 — client-direct upload 통과 경로", () => {
     const p = buildUploadPolicy(

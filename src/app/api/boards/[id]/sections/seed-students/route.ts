@@ -36,17 +36,26 @@ export async function POST(
     const user = await getCurrentUser();
 
     let body: z.infer<typeof BodySchema> = undefined;
-    try {
-      const raw = await req.json().catch(() => undefined);
-      body = BodySchema.parse(raw ?? undefined);
-    } catch (parseErr) {
-      if (parseErr instanceof z.ZodError) {
-        return NextResponse.json(
-          { error: parseErr.issues[0]?.message ?? "invalid_body" },
-          { status: 400 }
-        );
+    const rawText = await req.text();
+    if (rawText.trim() !== "") {
+      let raw: unknown;
+      try {
+        raw = JSON.parse(rawText);
+      } catch {
+        return NextResponse.json({ error: "invalid_json" }, { status: 400 });
       }
-      // no body is also fine
+
+      try {
+        body = BodySchema.parse(raw);
+      } catch (parseErr) {
+        if (parseErr instanceof z.ZodError) {
+          return NextResponse.json(
+            { error: parseErr.issues[0]?.message ?? "invalid_body" },
+            { status: 400 }
+          );
+        }
+        throw parseErr;
+      }
     }
 
     // 교사 권한 확인 + board 존재 + classroomId 검증

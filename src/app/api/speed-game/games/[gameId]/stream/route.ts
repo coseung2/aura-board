@@ -14,6 +14,16 @@ import {
 
 type Params = { params: Promise<{ gameId: string }> };
 
+const PROBE_INTERVAL_MS = 3_000;
+const PROBE_JITTER_MS = 1_000;
+const KEEPALIVE_INTERVAL_MS = 25_000;
+
+function toUpdatedAtMs(value: Date | string | number | null | undefined): number | null {
+  if (value === null || value === undefined) return null;
+  const ms = value instanceof Date ? value.getTime() : new Date(value).getTime();
+  return Number.isFinite(ms) ? ms : null;
+}
+
 function hashSnapshot(snap: GameSnapshot): string {
   // roundIndex/status 변경 + 새 답 변경 + 리더보드 변경을 잡기 위한 단순 해시.
   // approval/rawText/correctCount/wrongCount 는 wire 에서 빠졌으므로 사용 안 함.
@@ -34,7 +44,7 @@ export async function GET(_req: Request, { params }: Params) {
 
   const game = await db.speedGame.findUnique({
     where: { id: gameId },
-    select: { boardId: true },
+    select: { boardId: true, updatedAt: true },
   });
   if (!game) {
     return jsonPrivateNoStore({ error: "game_not_found" }, { status: 404 });
@@ -45,11 +55,27 @@ export async function GET(_req: Request, { params }: Params) {
   }
 
   let cancelled = false;
+  let timer: ReturnType<typeof setTimeout> | null = null;
   const stream = new ReadableStream({
     async start(controller) {
       const encoder = new TextEncoder();
       let lastHash = "";
-      let lastAuthKind: string = auth.kind;
+      let lastUpdatedAt = toUpdatedAtMs(game.updatedAt);
+      let lastKeepalive = Date.now();
+
+      function finish() {
+        if (cancelled) return;
+        cancelled = true;
+        if (timer) {
+          clearTimeout(timer);
+          timer = null;
+        }
+        try {
+          controller.close();
+        } catch {
+          // The client may have already cancelled the stream.
+        }
+      }
 
       function send(event: string, data: unknown) {
         if (cancelled) return;
@@ -62,41 +88,106 @@ export async function GET(_req: Request, { params }: Params) {
         }
       }
 
+      function sendComment(comment: string) {
+        if (cancelled) return;
+        try {
+          controller.enqueue(encoder.encode(`: ${comment}\n\n`));
+        } catch {
+          cancelled = true;
+        }
+      }
+
+      function sendSnapshot(snap: GameSnapshot) {
+        const hash = hashSnapshot(snap);
+        const prev = lastHash;
+        lastHash = hash;
+        send("snapshot", { game: snap, prevHash: prev });
+      }
+
+      async function readProbe() {
+        return db.speedGame.findUnique({
+          where: { id: gameId },
+          select: { updatedAt: true, status: true },
+        });
+      }
+
       async function tick() {
         if (cancelled) return;
         try {
-          const snap = await loadGameSnapshot(gameId);
-          if (!snap) {
+          const probe = await readProbe();
+          if (!probe) {
             send("error", { message: "game_not_found" });
-            controller.close();
-            cancelled = true;
+            finish();
             return;
           }
-          const hash = hashSnapshot(snap);
-          if (hash !== lastHash) {
-            const prev = lastHash;
-            lastHash = hash;
-            send("snapshot", { game: snap, prevHash: prev });
+
+          const updatedAt = toUpdatedAtMs(probe.updatedAt);
+          if (updatedAt !== lastUpdatedAt) {
+            const snap = await loadGameSnapshot(gameId);
+            if (!snap) {
+              send("error", { message: "game_not_found" });
+              finish();
+              return;
+            }
+            // Consume the probe timestamp only after hydration succeeds. A
+            // transient snapshot failure must retry on the next probe.
+            lastUpdatedAt = updatedAt;
+            sendSnapshot(snap);
+            if (snap.status === "finished") {
+              send("finished", { game: snap });
+              finish();
+              return;
+            }
           }
-          if (lastAuthKind !== auth.kind) {
-            lastAuthKind = auth.kind;
-            send("viewer", { kind: auth.kind });
-          }
-          if (snap.status === "finished") {
-            send("finished", { game: snap });
-            controller.close();
-            cancelled = true;
-            return;
+
+          const now = Date.now();
+          if (now - lastKeepalive >= KEEPALIVE_INTERVAL_MS) {
+            sendComment("ping");
+            lastKeepalive = now;
           }
         } catch (e) {
           console.error("[speed-game stream]", e);
         }
-        if (!cancelled) setTimeout(tick, 1000);
+
+        if (!cancelled) {
+          const jitter = Math.floor(Math.random() * (PROBE_JITTER_MS + 1));
+          timer = setTimeout(tick, PROBE_INTERVAL_MS + jitter);
+        }
       }
-      tick();
+
+      let initial: GameSnapshot | null;
+      try {
+        initial = await loadGameSnapshot(gameId);
+      } catch (error) {
+        console.error("[speed-game stream initial]", error);
+        // Force the first cheap probe to hydrate again. Do not terminate a
+        // recoverable stream just because its initial snapshot read failed.
+        lastUpdatedAt = null;
+        timer = setTimeout(tick, PROBE_INTERVAL_MS);
+        return;
+      }
+      if (!initial) {
+        send("error", { message: "game_not_found" });
+        finish();
+        return;
+      }
+      sendSnapshot(initial);
+      if (initial.status === "finished") {
+        send("finished", { game: initial });
+        finish();
+        return;
+      }
+
+      // The first full snapshot is sent immediately; subsequent ticks only
+      // perform the cheap updatedAt probe and hydrate when it changes.
+      timer = setTimeout(tick, PROBE_INTERVAL_MS);
     },
     cancel() {
       cancelled = true;
+      if (timer) {
+        clearTimeout(timer);
+        timer = null;
+      }
     },
   });
 

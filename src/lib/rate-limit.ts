@@ -22,6 +22,7 @@ import "server-only";
 import { createHash } from "crypto";
 import { Ratelimit } from "@upstash/ratelimit";
 import { Redis } from "@upstash/redis";
+import { getUpstashRedisConfig } from "./upstash-env";
 
 export type RateLimitVerdict = {
   ok: boolean;
@@ -29,9 +30,8 @@ export type RateLimitVerdict = {
   axis?: "token" | "teacher" | "ip";
 };
 
-const HAS_UPSTASH = Boolean(
-  process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN
-);
+const upstashConfig = getUpstashRedisConfig();
+const HAS_UPSTASH = upstashConfig !== null;
 
 // ── Upstash-backed limiters (lazy singletons) ────────────────────────────
 let redis: Redis | null = null;
@@ -41,9 +41,10 @@ let ipLimiter: Ratelimit | null = null;
 
 function ensureUpstash(): void {
   if (!HAS_UPSTASH || redis) return;
+  if (!upstashConfig) return;
   redis = new Redis({
-    url: process.env.UPSTASH_REDIS_REST_URL!,
-    token: process.env.UPSTASH_REDIS_REST_TOKEN!,
+    url: upstashConfig.url,
+    token: upstashConfig.token,
   });
   tokenLimiter = new Ratelimit({
     redis,

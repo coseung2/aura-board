@@ -8,6 +8,11 @@ import { resizeBufferToWebPPreview, uploadWebPBuffer, extractVideoThumbnail } fr
 import { logError } from "@/lib/error-log";
 import { uploadPublicObject } from "@/lib/media-storage";
 
+// Multipart boundaries and per-part headers are part of Content-Length. Keep a
+// small envelope allowance while still rejecting obviously oversized requests
+// before Request.formData() buffers them.
+const MAX_MULTIPART_ENVELOPE_BYTES = 64 * 1024;
+
 /**
  * card-file-attachment — 매직바이트 검증.
  * file.type(multipart 메타)은 클라이언트가 조작 가능하므로, 실제 바이트의
@@ -44,6 +49,17 @@ function verifyFileMagic(mime: string, filename: string, head: Buffer): boolean 
   return true;
 }
 
+function uploadTooLargeResponse() {
+  return NextResponse.json(
+    {
+      error: "파일 크기는 4 MiB 이하여야 합니다.",
+      code: "file_too_large",
+      maximumSizeInBytes: MAX_SIZE,
+    },
+    { status: 413 },
+  );
+}
+
 export async function POST(req: Request) {
   let userId: string | null = null;
   let userEmail: string | null = null;
@@ -63,6 +79,14 @@ export async function POST(req: Request) {
     if (teacher) {
       userId = teacher.id;
       userEmail = teacher.email;
+    }
+
+    const contentLength = Number(req.headers.get("content-length"));
+    if (
+      Number.isFinite(contentLength) &&
+      contentLength > MAX_SIZE + MAX_MULTIPART_ENVELOPE_BYTES
+    ) {
+      return uploadTooLargeResponse();
     }
 
     // 이전 Vercel Blob client-direct JSON 프로토콜은 제거됐다.
@@ -91,11 +115,7 @@ export async function POST(req: Request) {
     };
 
     if (file.size > MAX_SIZE) {
-      console.error(`[upload reject] oversize name=${file.name} size=${file.size} type=${file.type}`);
-      return NextResponse.json(
-        { error: `파일이 너무 큽니다 (${(file.size / 1024 / 1024).toFixed(1)}MB, 최대 50MB)` },
-        { status: 400 }
-      );
+      return uploadTooLargeResponse();
     }
 
     // OneDrive 드래그·Files On-Demand 등에서 브라우저가 file.type을
@@ -103,6 +123,17 @@ export async function POST(req: Request) {
     // 확장자로 canonical MIME을 추론하고, 이후 모든 화이트리스트/매직바이트
     // 검사는 정상화된 MIME을 사용한다.
     const normalizedMime = normalizeUploadMime(file.type ?? "", file.name);
+
+    if (
+      normalizedMime === "image/svg+xml" ||
+      file.type.toLowerCase() === "image/svg+xml" ||
+      /\.svg$/i.test(file.name)
+    ) {
+      return NextResponse.json(
+        { error: "SVG 파일은 업로드할 수 없습니다.", code: "svg_not_allowed" },
+        { status: 400 },
+      );
+    }
 
     const isImage = (ALLOWED_IMAGE as readonly string[]).includes(normalizedMime);
     const isVideo = (ALLOWED_VIDEO as readonly string[]).includes(normalizedMime);

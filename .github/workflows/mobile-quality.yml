@@ -1,0 +1,75 @@
+name: Mobile PR Quality
+
+on:
+  pull_request:
+    paths:
+      - "apps/mobile/**"
+      - "src/lib/**"
+      - "src/lib/__tests__/**"
+      - "package.json"
+      - "package-lock.json"
+      - "apps/mobile/package.json"
+      - "apps/mobile/package-lock.json"
+      - "vitest.config.ts"
+      - ".github/workflows/mobile-quality.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  mobile-quality:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            apps/mobile/package-lock.json
+
+      - name: Install root dependencies
+        run: npm ci
+
+      - name: Install mobile dependencies
+        working-directory: apps/mobile
+        run: npm ci --legacy-peer-deps
+
+      - name: Prepare diagnostics
+        run: mkdir -p .artifacts/mobile-quality
+
+      - name: Mobile typecheck
+        working-directory: apps/mobile
+        run: |
+          set -o pipefail
+          npm run typecheck 2>&1 | tee "$GITHUB_WORKSPACE/.artifacts/mobile-quality/typecheck.log"
+
+      - name: Mobile design system check
+        working-directory: apps/mobile
+        run: |
+          set -o pipefail
+          npm run design:check 2>&1 | tee "$GITHUB_WORKSPACE/.artifacts/mobile-quality/design-check.log"
+
+      - name: Mobile overview and model tests
+        run: |
+          set -o pipefail
+          npm run test -- \
+            src/lib/__tests__/mobile-board-overview.vitest.ts \
+            src/lib/__tests__/mobile-board-cache.vitest.ts \
+            src/lib/__tests__/mobile-board-realtime.vitest.ts \
+            src/lib/__tests__/mobile-media.vitest.ts \
+            2>&1 | tee .artifacts/mobile-quality/mobile-model-tests.log
+
+      - name: Upload failure diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mobile-quality-diagnostics
+          path: .artifacts/mobile-quality/*.log
+          if-no-files-found: ignore

@@ -11,19 +11,20 @@
 import "server-only";
 import { Ratelimit } from "@upstash/ratelimit";
 import { Redis } from "@upstash/redis";
+import { getUpstashRedisConfig } from "./upstash-env";
 
 export type LimitVerdict = { ok: boolean; retryAfter: number };
 
-const HAS_UPSTASH = Boolean(
-  process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN,
-);
+const upstashConfig = getUpstashRedisConfig();
+const HAS_UPSTASH = upstashConfig !== null;
 
 let redis: Redis | null = null;
 function getRedis(): Redis {
   if (redis) return redis;
+  if (!upstashConfig) throw new Error("Upstash Redis is not configured");
   redis = new Redis({
-    url: process.env.UPSTASH_REDIS_REST_URL!,
-    token: process.env.UPSTASH_REDIS_REST_TOKEN!,
+    url: upstashConfig.url,
+    token: upstashConfig.token,
   });
   return redis;
 }
@@ -104,6 +105,9 @@ async function runLimit(
       return { ok: true, retryAfter: 0 };
     }
   }
+  if (failClosed && process.env.NODE_ENV === "production") {
+    return { ok: false, retryAfter: 5 };
+  }
   return memSlidingWindow(
     `${prefix}:${id}`,
     limit,
@@ -116,6 +120,33 @@ async function runLimit(
 /** 학생 1인의 vibe-arcade 프롬프트 호출 — 분당 30회 (Gemini RPM 15 기본 대비 여유). */
 export function limitVibeSession(studentId: string): Promise<LimitVerdict> {
   return runLimit("rl:vibe-session", studentId, 30, "60 s");
+}
+
+/** 학생 1인의 게임별 정답 제출 — 분당 30회, 운영에서는 반드시 분산 제한. */
+export function limitSpeedGameAnswer(
+  gameId: string,
+  studentId: string,
+): Promise<LimitVerdict> {
+  return runLimit(
+    "rl:speed-game-answer",
+    `${gameId}:${studentId}`,
+    30,
+    "60 s",
+    true,
+  );
+}
+
+/** 학생 코드 로그인 — IP와 코드 각각 시간당 제한, 운영에서는 fail-closed. */
+export async function limitStudentLogin(
+  ipKey: string,
+  credentialKey: string,
+): Promise<LimitVerdict> {
+  const [ip, credential] = await Promise.all([
+    runLimit("rl:student-login:ip", ipKey, 30, "1 h", true),
+    runLimit("rl:student-login:credential", credentialKey, 10, "1 h", true),
+  ]);
+  if (!ip.ok) return ip;
+  return credential;
 }
 
 /** 교사 1인의 LLM Key 저장·삭제 — 분당 10회 (검증 spam 방지). */

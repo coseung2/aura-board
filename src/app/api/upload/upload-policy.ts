@@ -2,13 +2,13 @@ import {
   ALLOWED_FILE_MIMES,
   isAllowedFileUpload,
 } from "@/lib/file-attachment";
+import { MAX_UPLOAD_SIZE_BYTES } from "@/lib/upload-limits";
 
 export const ALLOWED_IMAGE = [
   "image/jpeg",
   "image/png",
   "image/gif",
   "image/webp",
-  "image/svg+xml",
   "image/heic",
   "image/heif",
 ] as const;
@@ -19,7 +19,7 @@ export const ALLOWED_VIDEO = [
   "video/quicktime",
 ] as const;
 
-export const MAX_SIZE = 50 * 1024 * 1024;
+export const MAX_SIZE = MAX_UPLOAD_SIZE_BYTES;
 
 export type UploadKind = "image" | "video" | "file";
 

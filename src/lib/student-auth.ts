@@ -4,7 +4,6 @@ import { createHmac, timingSafeEqual } from "crypto";
 import { db } from "./db";
 import { getCurrentUser } from "./auth";
 
-const SECRET = process.env.AUTH_SECRET ?? "dev-secret";
 const COOKIE_NAME = "student_session";
 const MAX_AGE = 30 * 24 * 60 * 60; // 30 days
 const USE_SECURE_STUDENT_COOKIE = process.env.NODE_ENV === "production";
@@ -16,17 +15,27 @@ interface StudentPayload {
   exp: number;
 }
 
+function getSecret(): string | null {
+  const configured = process.env.AUTH_SECRET?.trim();
+  if (configured) return configured;
+  return process.env.NODE_ENV === "production" ? null : "dev-secret";
+}
+
 function sign(payload: StudentPayload): string {
+  const secret = getSecret();
+  if (!secret) throw new Error("AUTH_SECRET is required in production");
   const json = JSON.stringify(payload);
   const b64 = Buffer.from(json).toString("base64url");
-  const sig = createHmac("sha256", SECRET).update(b64).digest("base64url");
+  const sig = createHmac("sha256", secret).update(b64).digest("base64url");
   return `${b64}.${sig}`;
 }
 
 function verify(token: string): StudentPayload | null {
+  const secret = getSecret();
+  if (!secret) return null;
   const [b64, sig] = token.split(".");
   if (!b64 || !sig) return null;
-  const expected = createHmac("sha256", SECRET).update(b64).digest("base64url");
+  const expected = createHmac("sha256", secret).update(b64).digest("base64url");
   const sigBuf = Buffer.from(sig);
   const expBuf = Buffer.from(expected);
   if (sigBuf.length !== expBuf.length || !timingSafeEqual(sigBuf, expBuf)) return null;

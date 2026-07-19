@@ -3,10 +3,12 @@ import { cookies } from "next/headers";
 import { z } from "zod";
 import { db } from "@/lib/db";
 import { createStudentSession } from "@/lib/student-auth";
+import { extractIp, hashIp } from "@/lib/rate-limit";
+import { limitStudentLogin } from "@/lib/rate-limit-routes";
 
 const AuthSchema = z.object({
-  token: z.string().min(1),
-});
+  token: z.string().trim().min(1).max(256),
+}).strict();
 
 // Student code login is an explicit identity switch. Clear Auth.js teacher
 // cookies too, otherwise getCurrentStudent() will ignore the new student cookie
@@ -31,9 +33,25 @@ function authCookieNeedsSecureDelete(name: string) {
 }
 
 export async function POST(req: Request) {
+  let credentialHash = "unparsed";
   try {
     const body = await req.json();
     const { token } = AuthSchema.parse(body);
+    credentialHash = hashIp(token.toUpperCase());
+
+    const limit = await limitStudentLogin(
+      hashIp(extractIp(req)),
+      credentialHash,
+    );
+    if (!limit.ok) {
+      return NextResponse.json(
+        { error: "rate_limited" },
+        {
+          status: 429,
+          headers: { "Retry-After": String(Math.max(1, limit.retryAfter)) },
+        },
+      );
+    }
 
     // Try qrToken first, then textCode
     let student = await db.student.findUnique({ where: { qrToken: token } });
@@ -77,9 +95,12 @@ export async function POST(req: Request) {
     return response;
   } catch (e) {
     if (e instanceof z.ZodError) {
-      return NextResponse.json({ error: e.message }, { status: 400 });
+      return NextResponse.json({ error: "invalid_request" }, { status: 400 });
     }
-    console.error("[POST /api/student/auth]", e);
+    console.error("[POST /api/student/auth]", {
+      credentialHash,
+      error: e instanceof Error ? e.name : "unknown",
+    });
     return NextResponse.json({ error: "internal" }, { status: 500 });
   }
 }

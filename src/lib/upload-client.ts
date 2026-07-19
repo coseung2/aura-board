@@ -1,6 +1,7 @@
 "use client";
 
 import { normalizeUploadMime, mimeFromExtension } from "./file-attachment";
+import { MAX_UPLOAD_SIZE_BYTES } from "./upload-limits";
 
 export type UploadedFile = {
   url: string;
@@ -29,6 +30,13 @@ export async function uploadFile(file: File): Promise<UploadedFile> {
   const mimeType = normalizeUploadMime(targetFile.type ?? "", targetFile.name) ||
     mimeFromExtension(targetFile.name) ||
     "application/octet-stream";
+
+  if (mimeType === "image/svg+xml" || /\.svg$/i.test(targetFile.name)) {
+    throw new Error("SVG 파일은 업로드할 수 없습니다.");
+  }
+  if (targetFile.size > MAX_UPLOAD_SIZE_BYTES) {
+    throw new Error("파일 크기는 4 MiB 이하여야 합니다. 더 작은 파일을 선택해 주세요.");
+  }
 
   const form = new FormData();
   form.append("file", targetFile);

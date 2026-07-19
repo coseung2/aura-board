@@ -8,7 +8,7 @@ type RealtimeChannel = ReturnType<PublicSupabaseClient["channel"]>;
 
 type Options = {
   channelName: string;
-  event: string;
+  event: string | string[];
   refresh: () => Promise<void>;
   enabled?: boolean;
   debounceMs?: number;
@@ -41,6 +41,12 @@ export function useRealtimeInvalidation({
 }: Options) {
   const refreshRef = useRef(refresh);
   refreshRef.current = refresh;
+
+  // Accept both the original single-event API and a list of broadcast event
+  // names. Keeping the key separate from the array identity avoids tearing
+  // down/recreating a channel when callers provide an inline array.
+  const events = Array.isArray(event) ? event : [event];
+  const eventsKey = JSON.stringify(events);
 
   useEffect(() => {
     if (!enabled) return;
@@ -86,6 +92,10 @@ export function useRealtimeInvalidation({
       }, delayMs);
     }
 
+    // Cover the state where subscribe neither succeeds nor reports an error.
+    // A successful subscription below stops this timer before its first tick.
+    startFallbackPolling();
+
     (async () => {
       try {
         const { createIsolatedPublicSupabaseClient } = await import(
@@ -94,27 +104,36 @@ export function useRealtimeInvalidation({
         if (stopped) return;
 
         supabase = createIsolatedPublicSupabaseClient();
-        const nextChannel = supabase.channel(channelName);
+        let nextChannel = supabase.channel(channelName);
         channel = nextChannel;
-        nextChannel
-          .on("broadcast", { event }, () => requestRefresh(debounceMs))
-          .subscribe((status: string) => {
-            if (status === "SUBSCRIBED") {
-              subscribed = true;
-              stopFallbackPolling();
-              requestRefresh();
-              return;
-            }
-            if (
-              status === "CHANNEL_ERROR" ||
-              status === "TIMED_OUT" ||
-              status === "CLOSED"
-            ) {
-              subscribed = false;
-              startFallbackPolling();
-              requestRefresh();
-            }
-          });
+        for (const eventName of events) {
+          nextChannel = nextChannel.on(
+            "broadcast",
+            { event: eventName },
+            () => requestRefresh(debounceMs),
+          );
+        }
+        // Supabase currently returns the same channel from `.on`, but retain
+        // the chained value so cleanup follows transports that return a new
+        // channel wrapper.
+        channel = nextChannel;
+        nextChannel.subscribe((status: string) => {
+          if (status === "SUBSCRIBED") {
+            subscribed = true;
+            stopFallbackPolling();
+            requestRefresh();
+            return;
+          }
+          if (
+            status === "CHANNEL_ERROR" ||
+            status === "TIMED_OUT" ||
+            status === "CLOSED"
+          ) {
+            subscribed = false;
+            startFallbackPolling();
+            requestRefresh();
+          }
+        });
       } catch {
         // Missing public Supabase env or client initialization failure.
         // The current server-rendered state remains usable and slow polling
@@ -150,5 +169,5 @@ export function useRealtimeInvalidation({
         void supabase.removeChannel(channel).catch(() => undefined);
       }
     };
-  }, [channelName, debounceMs, enabled, event, fallbackPollMs]);
+  }, [channelName, debounceMs, enabled, eventsKey, fallbackPollMs]);
 }
