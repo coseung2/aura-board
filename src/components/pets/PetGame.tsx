@@ -249,7 +249,7 @@ export function PetGame() {
               </div>
               {home.egg ? (
                 <div className="pet-active-egg">
-                  <img src="/game-ui/incubator-egg.svg" alt={`${home.egg.eggName}이 부화기 안에서 자라고 있어요`} />
+                  <img src="/game-ui/incubator-egg.webp" alt={`${home.egg.eggName}이 부화기 안에서 자라고 있어요`} />
                   <div className="pet-egg-info">
                     <strong>{home.egg.eggName}</strong>
                     <span>기본 {formatDuration(home.egg.baseHatchSeconds)}</span>
@@ -272,7 +272,7 @@ export function PetGame() {
               ) : (
                 <div className="pet-egg-shop">
                   <div className="pet-empty-copy">
-                    <img src="/game-ui/empty-nest.svg" alt="" aria-hidden="true" />
+                    <img src="/game-ui/empty-nest.webp" alt="" aria-hidden="true" />
                   </div>
                   <div className="pet-shop-list">
                     {home.eggShop.map((egg) => {
