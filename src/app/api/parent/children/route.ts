@@ -19,7 +19,7 @@ const PENDING_LINK_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 //     parent: { id, name, email },      // minimal mobile profile cache
 //     children: [{
 //       id,                            // ParentChildLink.id (stable selector)
-//       studentId,                     // Student.id (for /api/parent/portfolio?childId=)
+//       studentId,                     // Student.id (for /api/parent/children/[id]/posts)
 //       number,                        // Student.number (출석번호, nullable)
 //       name,                          // Student.name
 //       classroom: { id, name },

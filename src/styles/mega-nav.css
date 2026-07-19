@@ -150,26 +150,36 @@
 }
 
 @media (min-width: 1024px) {
-  .ab-topnav {
+  .ab-topnav,
+  .student-topnav,
+  .parent-topnav {
     display: grid;
     grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
   }
 
-  .ab-topnav-left {
+  .ab-topnav-left,
+  .student-topnav-left,
+  .parent-topnav-left {
     display: contents;
   }
 
-  .ab-topnav-logo {
+  .ab-topnav-logo,
+  .student-topnav-logo,
+  .parent-topnav-logo {
     grid-column: 1;
     justify-self: start;
   }
 
-  .ab-topnav-left > .mega-nav {
+  .ab-topnav-left > .mega-nav,
+  .student-topnav-left > .mega-nav,
+  .parent-topnav-left > .mega-nav {
     grid-column: 2;
     justify-self: center;
   }
 
-  .ab-topnav-right {
+  .ab-topnav-right,
+  .student-topnav-right,
+  .parent-topnav-tools {
     grid-column: 3;
     justify-self: end;
   }

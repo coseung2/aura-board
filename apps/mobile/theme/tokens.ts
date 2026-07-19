@@ -513,6 +513,13 @@ export const parent = {
   childDetailAvatarSize: 56,
   doneIconSize: 56,
   emptyIconSize: 48,
+  contentCardMinWidth: 220,
+  contentEmptyMinHeight: 180,
+  gridTileGap: 2,
+  gridPhoneColumns: 3,
+  gridTabletColumns: 4,
+  gridWideColumns: 5,
+  // Compatibility aliases for parent utility screens that have not migrated yet.
   portfolioCardWidth: "31.8%",
   portfolioCardMinWidth: 220,
   portfolioImageHeight: 132,

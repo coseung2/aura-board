@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { OnboardingShell } from "../_shell";
 
 // parent-class-invite-v2 — legacy P5 Pending URL.
-// Pending state now lives inside /parent/home so the authenticated dashboard
+// Pending state now lives inside /parent/feed so the authenticated feed
 // remains visible.
 
 export default function PendingPage() {
@@ -28,7 +28,7 @@ export default function PendingPage() {
         if (j.state === "active" || j.state === "pending") {
           hasRedirected = true;
           if (int) clearInterval(int);
-          router.replace("/parent/home");
+          router.replace("/parent/feed");
         } else if (j.state === "rejected") {
           hasRedirected = true;
           if (int) clearInterval(int);

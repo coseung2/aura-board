@@ -6,7 +6,7 @@ import { extractClientIp, hashIp } from "@/lib/parent-rate-limit";
 
 // GET /parent/auth/callback?token=<magic-link>[&client=mobile]
 // Verifies the HMAC-signed magic link, creates a ParentSession, sets the
-// HttpOnly cookie, and redirects to /parent/home.
+// HttpOnly cookie, and redirects to /parent/feed.
 //
 // Mobile handoff (Phase 3+):
 //   When `client=mobile` is present, the issued session token + expiry are
@@ -93,8 +93,8 @@ export async function GET(req: Request) {
     select: { status: true },
   });
   let next = "/parent/onboard/match/code";
-  if (links.some((l) => l.status === "active")) next = "/parent/home";
-  else if (links.some((l) => l.status === "pending")) next = "/parent/home";
+  if (links.some((l) => l.status === "active")) next = "/parent/feed";
+  else if (links.some((l) => l.status === "pending")) next = "/parent/feed";
   else if (links.some((l) => l.status === "rejected")) next = "/parent/onboard/rejected";
 
   return NextResponse.redirect(new URL(next, origin).toString());

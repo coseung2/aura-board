@@ -389,7 +389,7 @@ export function TopNav({ showAdmin = false }: Props) {
           links: selectedClassroomOperationLinks,
         },
         {
-          title: "기타 활동",
+          title: "자율활동",
           links: selectedClassroomActivityLinks,
         },
       ],

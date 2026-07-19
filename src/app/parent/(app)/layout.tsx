@@ -7,7 +7,6 @@ import { findTeacherRoleByEmail } from "@/lib/role-switch";
 import { isSameAccountPrincipal } from "@/lib/account-principal";
 import { ParentTopNav } from "@/components/parent/ParentTopNav";
 import { SessionWatchdog } from "@/components/parent/SessionWatchdog";
-import type { ChildRow } from "@/components/parent/ParentChildSelector";
 
 // Authenticated parent segment layout (PV-6).
 //
@@ -28,25 +27,7 @@ export default async function ParentAppLayout({ children }: { children: ReactNod
     redirect("/parent/join?error=session_required");
   }
   const parent = current.parent;
-  const [activeLinks, pendingCount, teacherSessionUser, teacherRole] = await Promise.all([
-    db.parentChildLink.findMany({
-      where: {
-        parentId: parent.id,
-        status: "active",
-        deletedAt: null,
-      },
-      select: {
-        studentId: true,
-        student: {
-          select: {
-            name: true,
-            number: true,
-            classroom: { select: { name: true } },
-          },
-        },
-      },
-      orderBy: { requestedAt: "asc" },
-    }),
+  const [pendingCount, teacherSessionUser, teacherRole] = await Promise.all([
     db.parentChildLink.count({
       where: {
         parentId: parent.id,
@@ -57,12 +38,6 @@ export default async function ParentAppLayout({ children }: { children: ReactNod
     getCurrentUser().catch(() => null),
     findTeacherRoleByEmail(parent.email),
   ]);
-  const childRows: ChildRow[] = activeLinks.map((link) => ({
-    studentId: link.studentId,
-    studentName: link.student.name,
-    studentNumber: link.student.number,
-    classroomName: link.student.classroom.name,
-  }));
   const hasMatchingTeacherSession = Boolean(
     teacherSessionUser &&
       isSameAccountPrincipal(teacherSessionUser.email, parent.email)
@@ -72,7 +47,6 @@ export default async function ParentAppLayout({ children }: { children: ReactNod
     <>
       <ParentTopNav
         parent={{ name: parent.name, email: parent.email }}
-        childRows={childRows}
         pendingNotificationCount={pendingCount}
         canSwitchToTeacher={Boolean(teacherRole)}
         teacherSwitchHref={hasMatchingTeacherSession ? "/dashboard" : "/login?from=/dashboard"}

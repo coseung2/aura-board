@@ -1,6 +1,6 @@
 import { useRouter, type Href } from "expo-router";
+import { Grid3X3, StretchHorizontal } from "lucide-react-native";
 import { StyleSheet, Text, View } from "react-native";
-import Svg, { Circle, Path, Rect } from "react-native-svg";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
   borders,
@@ -13,112 +13,65 @@ import {
 } from "../theme/tokens";
 import { ControlPressable } from "./ui";
 
-export type ParentNavItem = "home" | "notifications" | "add" | "account";
+export type ParentNavItem = "feed" | "home";
+type LegacyParentDestination = "notifications" | "add" | "account";
 
 type Props = {
-  active: ParentNavItem;
+  active: ParentNavItem | LegacyParentDestination;
   notificationCount?: number;
+  onFeedPress?: () => void;
+  /** @deprecated Compatibility for the former default Home/feed tab. */
   onHomePress?: () => void;
 };
 
-const ROUTES: Record<ParentNavItem, Href> = {
-  home: "/(parent)",
-  notifications: "/(parent)/notifications",
-  add: "/(parent)/link-child",
-  account: "/(parent)/account",
-};
+const ITEMS: Array<{
+  name: ParentNavItem;
+  label: string;
+  route: Href;
+  Icon: typeof StretchHorizontal;
+}> = [
+  { name: "feed", label: "피드", route: "/(parent)", Icon: StretchHorizontal },
+  { name: "home", label: "홈", route: "/(parent)/home", Icon: Grid3X3 },
+];
 
-const LABELS: Record<ParentNavItem, string> = {
-  home: "홈",
-  notifications: "알림",
-  add: "추가",
-  account: "계정",
-};
-
-export function ParentBottomNav({
-  active,
-  notificationCount = 0,
-  onHomePress,
-}: Props) {
+export function ParentBottomNav({ active, onFeedPress, onHomePress }: Props) {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const items = Object.keys(ROUTES) as ParentNavItem[];
 
   return (
     <View
-      style={[
-        styles.container,
-        { paddingBottom: Math.max(insets.bottom, spacing.xs) },
-      ]}
+      style={[styles.container, { paddingBottom: Math.max(insets.bottom, spacing.xs) }]}
       accessibilityRole="tablist"
+      accessibilityLabel="학부모 주요 메뉴"
     >
-      {items.map((item) => {
-        const selected = active === item;
-        const badge = item === "notifications" ? notificationCount : 0;
+      {ITEMS.map(({ name, label, route, Icon }) => {
+        const selected = active === name;
         return (
           <ControlPressable
-            key={item}
+            key={name}
             accessibilityRole="tab"
-            accessibilityLabel={LABELS[item]}
-            accessibilityState={{ selected }}
+            accessibilityLabel={label}
+            accessibilityState={{ selected: Boolean(selected) }}
             onPress={() => {
-              if (item === "home" && selected && onHomePress) {
-                onHomePress();
+              if (name === "feed" && selected) {
+                (onFeedPress ?? onHomePress)?.();
                 return;
               }
-              router.push(ROUTES[item]);
+              router.replace(route);
             }}
             style={[styles.tab, selected && styles.tabSelected]}
           >
-            <View style={styles.iconWrap}>
-              <ParentNavIcon name={item} active={selected} />
-              {badge > 0 ? (
-                <View style={styles.badge}>
-                  <Text style={styles.badgeText}>{Math.min(badge, 99)}</Text>
-                </View>
-              ) : null}
-            </View>
-            <Text style={[styles.label, selected && styles.labelActive]}>
-              {LABELS[item]}
-            </Text>
+            <Icon
+              size={iconSizes.lg}
+              color={selected ? colors.accent : colors.textMuted}
+              strokeWidth={selected ? 2.4 : 2}
+              accessible={false}
+            />
+            <Text style={[styles.label, selected && styles.labelActive]}>{label}</Text>
           </ControlPressable>
         );
       })}
     </View>
-  );
-}
-
-function ParentNavIcon({ name, active }: { name: ParentNavItem; active: boolean }) {
-  const stroke = active ? colors.accent : colors.textMuted;
-  return (
-    <Svg
-      width={iconSizes.lg}
-      height={iconSizes.lg}
-      viewBox="0 0 24 24"
-      fill="none"
-    >
-      {name === "home" ? (
-        <>
-          <Path d="M3 10.8 12 3l9 7.8" stroke={stroke} strokeWidth={1.8} />
-          <Path d="M5.5 9.7V21h13V9.7M9.5 21v-6.5h5V21" stroke={stroke} strokeWidth={1.8} />
-        </>
-      ) : name === "notifications" ? (
-        <>
-          <Path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9" stroke={stroke} strokeWidth={1.8} />
-          <Path d="M10 21h4" stroke={stroke} strokeWidth={1.8} />
-        </>
-      ) : name === "add" ? (
-        <>
-          <Rect x={3} y={3} width={18} height={18} rx={5} stroke={stroke} strokeWidth={1.8} />
-          <Path d="M12 8v8M8 12h8" stroke={stroke} strokeWidth={1.8} />
-        </>
-      ) : (
-        <>
-          <Circle cx={12} cy={8} r={4} stroke={stroke} strokeWidth={1.8} />
-          <Path d="M4.5 21a7.5 7.5 0 0 1 15 0" stroke={stroke} strokeWidth={1.8} />
-        </>
-      )}
-    </Svg>
   );
 }
 
@@ -140,30 +93,10 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: spacing.xxs,
     borderWidth: borders.none,
-    borderRadius: radii.none,
+    borderRadius: radii.control,
     backgroundColor: colors.transparent,
   },
-  tabSelected: {
-    borderRadius: radii.control,
-    borderColor: colors.accentTintedBg,
-    backgroundColor: colors.accentTintedBg,
-  },
-  iconWrap: { position: "relative" },
+  tabSelected: { backgroundColor: colors.accentTintedBg },
   label: { ...typography.micro, color: colors.textMuted, fontWeight: "600" },
   labelActive: { color: colors.accent },
-  badge: {
-    position: "absolute",
-    top: -6,
-    right: -11,
-    minWidth: iconSizes.sm,
-    height: iconSizes.sm,
-    paddingHorizontal: spacing.xs,
-    borderRadius: radii.pill,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: colors.danger,
-    borderWidth: borders.medium,
-    borderColor: colors.surface,
-  },
-  badgeText: { ...typography.micro, color: colors.onAccent },
 });

@@ -2,20 +2,24 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { encodeParentFeedCursor } from "@/lib/parent-feed-cursor";
 
 const mocks = vi.hoisted(() => ({
-  studentFindUnique: vi.fn(),
+  studentFindMany: vi.fn(),
+  cardFindFirst: vi.fn(),
   cardFindMany: vi.fn(),
-  withParentScopeForStudent: vi.fn(),
+  withParentScope: vi.fn(),
 }));
 
 vi.mock("@/lib/db", () => ({
   db: {
-    student: { findUnique: mocks.studentFindUnique },
-    card: { findMany: mocks.cardFindMany },
+    student: { findMany: mocks.studentFindMany },
+    card: {
+      findFirst: mocks.cardFindFirst,
+      findMany: mocks.cardFindMany,
+    },
   },
 }));
 
 vi.mock("@/lib/parent-scope", () => ({
-  withParentScopeForStudent: mocks.withParentScopeForStudent,
+  withParentScope: mocks.withParentScope,
 }));
 
 vi.mock("@/lib/portfolio-card-mapper", () => ({
@@ -28,28 +32,43 @@ vi.mock("@/lib/portfolio-acl-pure", () => ({
 
 import { GET } from "./route";
 
+const CHILDREN = [
+  {
+    id: "student_1",
+    name: "아우라",
+    number: 7,
+    classroomId: "class_1",
+    classroom: { name: "1반" },
+  },
+  {
+    id: "student_2",
+    name: "보드",
+    number: 8,
+    classroomId: "class_1",
+    classroom: { name: "1반" },
+  },
+];
+
 describe("GET /api/parent/feed", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mocks.withParentScopeForStudent.mockImplementation(
-      async (_req: Request, _studentId: string, fn: () => Promise<unknown>) =>
-        fn(),
+    mocks.withParentScope.mockImplementation(
+      async (_req: Request, fn: (ctx: unknown) => Promise<unknown>) =>
+        fn({
+          childLinks: [
+            { studentId: "student_1" },
+            { studentId: "student_2" },
+          ],
+        }),
     );
-    mocks.studentFindUnique.mockResolvedValue({
-      id: "student_1",
-      name: "아우라",
-      number: 7,
-      classroomId: "class_1",
-      classroom: { name: "1반" },
-    });
+    mocks.studentFindMany.mockResolvedValue(CHILDREN);
+    mocks.cardFindFirst.mockResolvedValue(null);
     mocks.cardFindMany.mockResolvedValue([]);
   });
 
   it("rejects an invalid cursor before resolving parent scope", async () => {
     const res = await GET(
-      new Request(
-        "https://example.test/api/parent/feed?childId=student_1&cursor=bad+cursor",
-      ),
+      new Request("https://example.test/api/parent/feed?cursor=bad+cursor"),
     );
 
     expect(res.status).toBe(400);
@@ -57,64 +76,109 @@ describe("GET /api/parent/feed", () => {
     expect(res.headers.get("cache-control")).toBe(
       "private, no-store, max-age=0",
     );
-    expect(mocks.withParentScopeForStudent).not.toHaveBeenCalled();
+    expect(mocks.withParentScope).not.toHaveBeenCalled();
   });
 
-  it("uses the parent child scope and returns a bounded first page", async () => {
-    const first = { id: "card_b", createdAt: new Date("2026-07-10T02:00:00.000Z") };
-    const extra = { id: "card_a", createdAt: new Date("2026-07-10T01:00:00.000Z") };
+  it("returns one deduplicated card with every matching linked child", async () => {
+    const first = {
+      id: "card_shared",
+      createdAt: new Date("2026-07-10T02:00:00.000Z"),
+      studentAuthorId: "student_1",
+      authors: [{ studentId: "student_1" }, { studentId: "student_2" }],
+      imageUrl: "https://cdn.example.test/shared.jpg",
+      thumbUrl: null,
+      videoUrl: null,
+      linkImage: null,
+      attachments: [],
+    };
+    const extra = {
+      id: "card_extra",
+      createdAt: new Date("2026-07-10T01:00:00.000Z"),
+      studentAuthorId: "student_2",
+      authors: [],
+      imageUrl: null,
+      thumbUrl: null,
+      videoUrl: null,
+      linkImage: null,
+      attachments: [],
+    };
     mocks.cardFindMany.mockResolvedValue([first, extra]);
-    const req = new Request(
-      "https://example.test/api/parent/feed?childId=student_1&limit=1",
-    );
 
-    const res = await GET(req);
+    const res = await GET(
+      new Request("https://example.test/api/parent/feed?limit=1"),
+    );
     const body = await res.json();
 
-    expect(mocks.withParentScopeForStudent).toHaveBeenCalledWith(
-      req,
-      "student_1",
-      expect.any(Function),
-    );
-    const query = mocks.cardFindMany.mock.calls[0][0];
-    expect(query).toEqual(
+    expect(mocks.studentFindMany).toHaveBeenCalledWith(
       expect.objectContaining({
-        orderBy: [{ createdAt: "desc" }, { id: "desc" }],
-        take: 2,
+        where: { id: { in: ["student_1", "student_2"] } },
       }),
     );
-    expect(query.where.AND).toEqual([
+    const query = mocks.cardFindMany.mock.calls[0][0];
+    expect(query.where.AND[0]).toEqual({
+      OR: [
+        { studentAuthorId: { in: ["student_1", "student_2"] } },
+        {
+          authors: {
+            some: { studentId: { in: ["student_1", "student_2"] } },
+          },
+        },
+      ],
+    });
+    expect(query.where.AND[1]).toEqual({
+      OR: [{ queueStatus: null }, { queueStatus: { not: "played" } }],
+    });
+    expect(query.where.board).toEqual({ layout: { notIn: ["dj-queue"] } });
+    expect(query.orderBy).toEqual([{ createdAt: "desc" }, { id: "desc" }]);
+    expect(query.take).toBe(2);
+    expect(body.items).toEqual([
       {
-        OR: [
-          { studentAuthorId: "student_1" },
-          { authors: { some: { studentId: "student_1" } } },
+        id: "card_shared",
+        contentKind: "media",
+        linkedChildren: [
+          {
+            id: "student_1",
+            name: "아우라",
+            number: 7,
+            classroomId: "class_1",
+            classroomName: "1반",
+          },
+          {
+            id: "student_2",
+            name: "보드",
+            number: 8,
+            classroomId: "class_1",
+            classroomName: "1반",
+          },
         ],
       },
-      { OR: [{ queueStatus: null }, { queueStatus: { not: "played" } }] },
     ]);
-    expect(query.where.board).toEqual({
-      layout: { notIn: ["dj-queue"] },
-    });
-    expect(body.child).toEqual({
-      id: "student_1",
-      name: "아우라",
-      number: 7,
-      classroomId: "class_1",
-      classroomName: "1반",
-    });
-    expect(body.items).toEqual([{ id: "card_b" }]);
     expect(body.nextCursor).toBe(
       encodeParentFeedCursor({ createdAt: first.createdAt, id: first.id }),
     );
+    expect(body).not.toHaveProperty("child");
   });
 
-  it("adds a createdAt/id keyset boundary for subsequent pages", async () => {
+  it("returns an empty page without querying cards when there are no active children", async () => {
+    mocks.withParentScope.mockImplementationOnce(
+      async (_req: Request, fn: (ctx: unknown) => Promise<unknown>) =>
+        fn({ childLinks: [] }),
+    );
+
+    const res = await GET(new Request("https://example.test/api/parent/feed"));
+
+    expect(await res.json()).toEqual({ items: [], nextCursor: null });
+    expect(mocks.studentFindMany).not.toHaveBeenCalled();
+    expect(mocks.cardFindMany).not.toHaveBeenCalled();
+  });
+
+  it("adds a createdAt/id keyset boundary and caps the limit", async () => {
     const createdAt = new Date("2026-07-10T02:00:00.000Z");
     const cursor = encodeParentFeedCursor({ createdAt, id: "card_b" });
 
     await GET(
       new Request(
-        `https://example.test/api/parent/feed?childId=student_1&cursor=${cursor}`,
+        `https://example.test/api/parent/feed?limit=100&cursor=${cursor}`,
       ),
     );
 
@@ -125,32 +189,68 @@ describe("GET /api/parent/feed", () => {
         { createdAt, id: { lt: "card_b" } },
       ],
     });
-    expect(query.take).toBe(13);
+    expect(query.take).toBe(25);
   });
 
-  it("caps the requested limit at 24", async () => {
-    await GET(
-      new Request(
-        "https://example.test/api/parent/feed?childId=student_1&limit=100",
-      ),
+  it("starts a focused page at an eligible linked-child post", async () => {
+    const target = {
+      id: "card_target",
+      createdAt: new Date("2026-07-10T02:00:00.000Z"),
+      studentAuthorId: "student_2",
+      authors: [],
+      imageUrl: null,
+      thumbUrl: null,
+      videoUrl: null,
+      linkImage: null,
+      attachments: [],
+    };
+    mocks.cardFindFirst.mockResolvedValue({
+      id: target.id,
+      createdAt: target.createdAt,
+    });
+    mocks.cardFindMany.mockResolvedValue([target]);
+
+    const res = await GET(
+      new Request("https://example.test/api/parent/feed?post=card_target"),
+    );
+    const body = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(mocks.cardFindFirst.mock.calls[0][0].where.AND[1]).toEqual({
+      id: "card_target",
+    });
+    expect(mocks.cardFindMany.mock.calls[0][0].where.AND).toContainEqual({
+      OR: [
+        { createdAt: { lt: target.createdAt } },
+        { createdAt: target.createdAt, id: { lte: target.id } },
+      ],
+    });
+    expect(body.items[0]).toEqual(
+      expect.objectContaining({ id: "card_target", contentKind: "text" }),
+    );
+  });
+
+  it("does not disclose an ineligible or unlinked focused post", async () => {
+    const res = await GET(
+      new Request("https://example.test/api/parent/feed?post=foreign_card"),
     );
 
-    expect(mocks.cardFindMany.mock.calls[0][0].take).toBe(25);
+    expect(res.status).toBe(404);
+    expect(await res.json()).toEqual({ error: "post_not_found" });
+    expect(mocks.cardFindMany).not.toHaveBeenCalled();
   });
 
   it("applies private no-store headers to scope errors", async () => {
-    mocks.withParentScopeForStudent.mockResolvedValueOnce(
-      new Response(JSON.stringify({ error: "forbidden_student" }), {
-        status: 403,
+    mocks.withParentScope.mockResolvedValueOnce(
+      new Response(JSON.stringify({ error: "unauthorized" }), {
+        status: 401,
         headers: { "Content-Type": "application/json" },
       }),
     );
 
-    const res = await GET(
-      new Request("https://example.test/api/parent/feed?childId=student_2"),
-    );
+    const res = await GET(new Request("https://example.test/api/parent/feed"));
 
-    expect(res.status).toBe(403);
+    expect(res.status).toBe(401);
     expect(res.headers.get("cache-control")).toBe(
       "private, no-store, max-age=0",
     );

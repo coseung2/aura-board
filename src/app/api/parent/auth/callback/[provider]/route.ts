@@ -22,7 +22,7 @@ export const runtime = "nodejs";
 //   3) provider user info fetch
 //   4) upsertParentFromOAuth → parentId
 //   5) createParentSession (cookie set)
-//   6) 302 — 활성/대기 link 있으면 /parent/home, 없으면 onboard/match/code
+//   6) 302 — 활성/대기 link 있으면 /parent/feed, 없으면 onboard/match/code
 const MOBILE_DEEP_LINK = "auraboard://parent/auth/callback";
 
 function mobileRedirect(params: { token?: string; expiresAt?: string; error?: string }) {
@@ -162,7 +162,7 @@ export async function GET(
   });
   let dest = "/parent/onboard/match/code";
   if (links.some((link) => link.status === "active" || link.status === "pending")) {
-    dest = "/parent/home";
+    dest = "/parent/feed";
   } else if (links.some((link) => link.status === "rejected")) {
     const rejected = links.find((link) => link.status === "rejected");
     const reason = rejected?.rejectedReason ?? "other";

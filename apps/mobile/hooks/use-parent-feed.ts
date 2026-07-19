@@ -1,33 +1,41 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ApiError, parentApiFetch } from "../lib/api";
-import type { ParentFeedResponse, PortfolioCardDTO } from "../lib/types";
+import type { ParentFeedResponse, ParentPostDTO } from "../lib/types";
 
 const PAGE_SIZE = 10;
 
-type ParentFeedChild = ParentFeedResponse["child"];
-
 type Options = {
-  childId: string | null;
+  focusPostId?: string | null;
   onUnauthorized: () => void | Promise<void>;
 };
 
-export function useParentFeed({ childId, onUnauthorized }: Options) {
-  const [child, setChild] = useState<ParentFeedChild | null>(null);
-  const [items, setItems] = useState<PortfolioCardDTO[]>([]);
+export function useParentFeed({ focusPostId, onUnauthorized }: Options) {
+  const endpoint = `/api/parent/feed${focusPostId ? `?post=${encodeURIComponent(focusPostId)}` : ""}`;
+  return useParentPostCollection({ endpoint, onUnauthorized });
+}
+
+type CollectionOptions = {
+  endpoint: string | null;
+  onUnauthorized: () => void | Promise<void>;
+};
+
+export function useParentPostCollection({ endpoint, onUnauthorized }: CollectionOptions) {
+  const [items, setItems] = useState<ParentPostDTO[]>([]);
   const [nextCursor, setNextCursor] = useState<string | null>(null);
-  const [loading, setLoading] = useState(Boolean(childId));
+  const [loading, setLoading] = useState(Boolean(endpoint));
   const [refreshing, setRefreshing] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
+  const [loadMoreError, setLoadMoreError] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const requestVersion = useRef(0);
 
   const loadFirstPage = useCallback(
     async (asRefresh: boolean) => {
-      if (!childId) {
-        setChild(null);
+      if (!endpoint) {
         setItems([]);
         setNextCursor(null);
         setError(null);
+        setLoadMoreError(null);
         setLoading(false);
         setRefreshing(false);
         return;
@@ -37,19 +45,19 @@ export function useParentFeed({ childId, onUnauthorized }: Options) {
       if (asRefresh) {
         setRefreshing(true);
       } else {
-        setChild(null);
         setItems([]);
         setNextCursor(null);
         setError(null);
+        setLoadMoreError(null);
         setLoading(true);
       }
 
       try {
+        const separator = endpoint.includes("?") ? "&" : "?";
         const response = await parentApiFetch<ParentFeedResponse>(
-          `/api/parent/feed?childId=${encodeURIComponent(childId)}&limit=${PAGE_SIZE}`,
+          `${endpoint}${separator}limit=${PAGE_SIZE}`,
         );
         if (version !== requestVersion.current) return;
-        setChild(response.child);
         setItems(response.items);
         setNextCursor(response.nextCursor);
         setError(null);
@@ -59,12 +67,13 @@ export function useParentFeed({ childId, onUnauthorized }: Options) {
           await onUnauthorized();
           return;
         }
-        setChild(null);
         setItems([]);
         setNextCursor(null);
         setError(
           cause instanceof ApiError && cause.status === 403
             ? "자녀 정보를 볼 권한이 없어요."
+            : cause instanceof ApiError && cause.status === 404
+              ? "요청한 게시물을 찾을 수 없어요."
             : "게시물을 불러오지 못했어요. 잠시 후 다시 시도해 주세요.",
         );
       } finally {
@@ -74,7 +83,7 @@ export function useParentFeed({ childId, onUnauthorized }: Options) {
         }
       }
     },
-    [childId, onUnauthorized],
+    [endpoint, onUnauthorized],
   );
 
   useEffect(() => {
@@ -85,16 +94,18 @@ export function useParentFeed({ childId, onUnauthorized }: Options) {
   }, [loadFirstPage]);
 
   const loadMore = useCallback(async () => {
-    if (!childId || !nextCursor || loading || refreshing || loadingMore) return;
+    if (!endpoint || !nextCursor || loading || refreshing || loadingMore) return;
     const version = requestVersion.current;
     const cursor = nextCursor;
     setLoadingMore(true);
+    setLoadMoreError(null);
     try {
+      const paginationEndpoint = endpoint.replace(/([?&])post=[^&]*&?/, "$1").replace(/[?&]$/, "");
+      const separator = paginationEndpoint.includes("?") ? "&" : "?";
       const response = await parentApiFetch<ParentFeedResponse>(
-        `/api/parent/feed?childId=${encodeURIComponent(childId)}&limit=${PAGE_SIZE}&cursor=${encodeURIComponent(cursor)}`,
+        `${paginationEndpoint}${separator}limit=${PAGE_SIZE}&cursor=${encodeURIComponent(cursor)}`,
       );
       if (version !== requestVersion.current) return;
-      setChild(response.child);
       setItems((current) => {
         const seen = new Set(current.map((item) => item.id));
         return [...current, ...response.items.filter((item) => !seen.has(item.id))];
@@ -104,12 +115,14 @@ export function useParentFeed({ childId, onUnauthorized }: Options) {
       if (version !== requestVersion.current) return;
       if (cause instanceof ApiError && cause.status === 401) {
         await onUnauthorized();
+      } else {
+        setLoadMoreError("게시물을 더 불러오지 못했어요.");
       }
     } finally {
       if (version === requestVersion.current) setLoadingMore(false);
     }
   }, [
-    childId,
+    endpoint,
     loading,
     loadingMore,
     nextCursor,
@@ -118,11 +131,11 @@ export function useParentFeed({ childId, onUnauthorized }: Options) {
   ]);
 
   return {
-    child,
     items,
     loading,
     refreshing,
     loadingMore,
+    loadMoreError,
     error,
     hasMore: Boolean(nextCursor),
     refresh: () => loadFirstPage(true),

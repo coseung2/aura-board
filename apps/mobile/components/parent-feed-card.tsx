@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Image } from "expo-image";
 import { ScrollView, StyleSheet, Text, View, useWindowDimensions } from "react-native";
-import type { PortfolioCardDTO } from "../lib/types";
+import type { ParentPostDTO, PortfolioCardDTO } from "../lib/types";
 import { layoutEmoji } from "../theme/layout-meta";
 import {
   borders,
@@ -19,8 +19,9 @@ import { ExpandablePostContent } from "./ExpandablePostContent";
 import { resolveParentFeedAuthor } from "../lib/parent-feed-presentation";
 
 type Props = {
-  card: PortfolioCardDTO;
-  childName: string;
+  card: ParentPostDTO | PortfolioCardDTO;
+  childName?: string;
+  highlighted?: boolean;
 };
 
 type FeedMediaItem = {
@@ -32,26 +33,35 @@ type FeedMediaItem = {
   detail: string | null;
 };
 
-export function ParentFeedCard({ card, childName }: Props) {
+export function ParentFeedCard({ card, childName, highlighted = false }: Props) {
   const [activeMediaIndex, setActiveMediaIndex] = useState(0);
   const [mediaWidth, setMediaWidth] = useState(0);
   const { width } = useWindowDimensions();
   const isNarrow = width < 768;
+  const linkedChildNames =
+    "linkedChildren" in card
+      ? card.linkedChildren.map((child) => child.name).filter(Boolean).join(" · ")
+      : "";
+  const attribution = linkedChildNames || childName || "우리 아이";
   const sourceLabel = buildSourceLabel(card);
   const title = card.title.trim();
   const content = card.content.trim();
-  const authorName = resolveParentFeedAuthor(card, childName);
+  const authorName = resolveParentFeedAuthor(card, attribution);
   const mediaItems = buildMediaItems(card, title, sourceLabel);
 
   return (
     <SurfaceCard
-      style={[styles.card, isNarrow && styles.cardNarrow]}
+      style={[
+        styles.card,
+        isNarrow && styles.cardNarrow,
+        highlighted && styles.cardHighlighted,
+      ]}
       accessible={false}
-      accessibilityLabel={`${childName}의 게시물`}
+      accessibilityLabel={`${attribution}의 게시물${highlighted ? ", 선택한 게시물" : ""}`}
     >
       <View style={styles.header}>
         <View style={styles.avatar} accessible accessibilityRole="image">
-          <Text style={styles.avatarText}>{childName.slice(0, 1)}</Text>
+          <Text style={styles.avatarText}>{attribution.slice(0, 1)}</Text>
         </View>
         <View style={styles.headerCopy}>
           <Text selectable style={styles.author} numberOfLines={1}>
@@ -377,7 +387,7 @@ function formatCount(value: number): string {
 const styles = StyleSheet.create({
   card: {
     width: "100%",
-    maxWidth: parent.portfolioCardMinWidth * 2 - spacing.lg,
+    maxWidth: parent.contentCardMinWidth * 2 - spacing.lg,
     alignSelf: "center",
     overflow: "hidden",
     borderRadius: radii.none,
@@ -387,6 +397,10 @@ const styles = StyleSheet.create({
   cardNarrow: {
     borderLeftWidth: borders.none,
     borderRightWidth: borders.none,
+  },
+  cardHighlighted: {
+    borderWidth: borders.medium,
+    borderColor: colors.accent,
   },
   header: {
     minHeight: tapMin,

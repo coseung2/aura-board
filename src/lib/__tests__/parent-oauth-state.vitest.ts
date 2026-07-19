@@ -72,7 +72,7 @@ describe("parent-oauth-state — HMAC sign/verify", () => {
     const payload = {
       state: "abc",
       codeVerifier: "verifier-string",
-      redirect: "/parent/home",
+      redirect: "/parent/feed",
       client: "mobile" as const,
       exp: Date.now() + 60_000,
     };

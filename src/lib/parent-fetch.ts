@@ -6,7 +6,7 @@
 // to /parent/logged-out — no waiting for the next 45s poll tick.
 //
 // Usage:
-//   const res = await parentFetch(`/api/parent/children/${id}/plant`);
+//   const res = await parentFetch(`/api/parent/children/${id}/posts?kind=media`);
 //   if (!res) return; // redirect already triggered, bail out
 //   const data = await res.json();
 

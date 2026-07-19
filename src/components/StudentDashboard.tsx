@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import type { RealtimeChannel } from "@supabase/supabase-js";
 import { layoutLabel, layoutThumbnail } from "@/lib/layout-meta";
@@ -415,15 +415,35 @@ function StudentBoardSections({
   onOpenBreakout,
 }: StudentBoardSectionsProps) {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [shadowAllianceStatuses, setShadowAllianceStatuses] = useState<
     Record<string, ShadowAllianceBoardStatus>
   >({});
-  const [activeCategory, setActiveCategory] = useState<"LESSON" | "PLAY">(() =>
-    boards.some((b) => b.category === "LESSON") ? "LESSON" : "PLAY",
+  const requestedCategory =
+    searchParams.get("board") === "lesson"
+      ? "LESSON"
+      : searchParams.get("board") === "play"
+        ? "PLAY"
+        : null;
+  const [activeCategory, setActiveCategory] = useState<"LESSON" | "PLAY">(
+    () =>
+      requestedCategory ??
+      (boards.some((board) => board.category === "LESSON") ? "LESSON" : "PLAY"),
   );
   const lessonBoards = boards.filter((b) => b.category === "LESSON");
   const playBoards = boards.filter((b) => b.category === "PLAY");
   const activeBoards = activeCategory === "LESSON" ? lessonBoards : playBoards;
+
+  useEffect(() => {
+    if (requestedCategory) setActiveCategory(requestedCategory);
+  }, [requestedCategory]);
+
+  function selectCategory(category: "LESSON" | "PLAY") {
+    setActiveCategory(category);
+    const nextSearchParams = new URLSearchParams(searchParams.toString());
+    nextSearchParams.set("board", category.toLowerCase());
+    router.replace(`/student?${nextSearchParams.toString()}`, { scroll: false });
+  }
 
   useEffect(() => {
     const shadowAllianceBoards = boards.filter(
@@ -563,7 +583,7 @@ function StudentBoardSections({
             role="tab"
             aria-selected={activeCategory === "LESSON"}
             className={`board-section-tab ${activeCategory === "LESSON" ? "is-active" : ""}`}
-            onClick={() => setActiveCategory("LESSON")}
+            onClick={() => selectCategory("LESSON")}
           >
             수업
             <span className="board-section-tab-count">
@@ -575,7 +595,7 @@ function StudentBoardSections({
             role="tab"
             aria-selected={activeCategory === "PLAY"}
             className={`board-section-tab ${activeCategory === "PLAY" ? "is-active" : ""}`}
-            onClick={() => setActiveCategory("PLAY")}
+            onClick={() => selectCategory("PLAY")}
           >
             놀이
             <span className="board-section-tab-count">{playBoards.length}</span>

@@ -420,7 +420,8 @@ VibeCodingStudio · PlayModal · ReviewPanel · TeacherModerationDashboard · 8 
 | POST | `/api/showcase` body `{cardId}` | student session only. transaction COUNT 한도 3 검증. 초과 시 409 + 현재 자랑해요 카드 응답 |
 | DELETE | `/api/showcase?cardId=X` | student session, 본인 슬롯만 |
 | GET | `/api/showcase/classroom/:classroomId` | LIMIT 30 학급 자랑해요 chronological |
-| GET | `/api/parent/portfolio?childId=X` | parent only. 자녀 카드 + 자녀 학급 자랑해요. AC-8 학부모 leak 0건 보장 |
+| GET | `/api/parent/feed` | parent only. 연결된 모든 자녀 게시물을 최신순 통합 피드로 반환 |
+| GET | `/api/parent/children/:id/posts?kind=media\|text` | parent only. 연결된 특정 자녀 게시물을 홈 그리드용으로 반환. AC-8 학부모 leak 0건 보장 |
 
 `classroomShowcaseChannelKey(classroomId)` — `src/lib/realtime.ts` 신규 헬퍼. `publish()` 는 no-op 승계 (엔진 미정).
 
@@ -437,7 +438,7 @@ VibeCodingStudio · PlayModal · ReviewPanel · TeacherModerationDashboard · 8 
 - `PortfolioCardItem` — CardBody 재사용 + 출처 라벨 + 🌟 배지 + 컨텍스트 메뉴
 - `ShowcaseHighlightStrip` / `ShowcaseCardChip` — 학급 dashboard 가로 carousel
 - `ShowcaseLimitModal` — 4번째 토글 시 "내릴 카드 1개 선택" 모달
-- `ParentPortfolioView` — 자녀 카드 + 학급 자랑해요 통합
+- `ParentFeed` / `ParentHomeGrid` — 전체 자녀 통합 피드와 자녀별 미디어·텍스트 그리드
 - `useShowcaseToggle` — 낙관적 + 409 한도 모달 트리거 훅
 - `source-label.ts` — 출처 라벨 빌더 (`columns` 면 `보드·칼럼`, 그 외 `보드`)
 
@@ -488,18 +489,17 @@ VibeCodingStudio · PlayModal · ReviewPanel · TeacherModerationDashboard · 8 
 | GET | `/api/parent/auth/callback/{provider}` | code → token 교환 + user info + upsert + ParentSession 발급 + redirect |
 
 ### Routes
-- `/parent/(app)/home` 풀 재설계: 풀폭 헤더(DJ 패턴) + 자녀 chip 셀렉터 + ParentPortfolioView 본문 + 자랑해요/자녀 추가 액션
-- `/parent/(app)/showcase` 신규: ShowcaseGalleryView 학급 자랑해요 그리드 (`/student/showcase` 등가)
-- `/parent/(app)/child/[id]/{plant,drawing,assignments,events,breakout}` 5개 → redirect /parent/home (backwards safety)
-- `/parent/(app)/child/[id]/portfolio` 유지
-- `/parent/(app)/child/[id]/page.tsx` redirect → /parent/home?child=ID
+- `/parent/(app)/feed`: 활성 연결 자녀 전체 게시물을 최신순으로 통합하고 `?post=ID` 게시물에 초점
+- `/parent/(app)/home`: 자녀 프로필 선택 + 서버 필터 기반 미디어/텍스트 게시물 그리드
+- 홈 그리드 항목은 모달을 열지 않고 `/parent/feed?post=ID`로 이동
+- 기존 `/parent/(app)/child/[id]/**` 학부모 전용 상세 경로 제거
 - `/parent/onboard/signup` UI 갱신: ParentAuthButtons 우선 + "이메일 매직링크" 토글 fallback
 
 ### Components
-- `<ParentDashboard />` — 풀폭 헤더 + 자녀 셀렉터 + portfolio 본문, URL ?child=ID + localStorage 복원
-- `<ParentChildSelector />` — 자녀 1명: 정적 chip / ≥2명: dropdown (listbox role + 키보드 + outside click)
+- `<ParentFeed />` — 모든 자녀의 게시물 스트림 + 특정 게시물 초점
+- `<ParentHomeGrid />` — 자녀 프로필 탭 + 미디어/텍스트 그리드
 - `<ParentAuthButtons />` — Google + Kakao SVG icon 버튼
-- (재사용) `<ParentPortfolioView />` `<ShowcaseGalleryView />` `<PortfolioCardModal />`
+- 피드 카드 상세 상호작용에는 공용 카드 상세 모달을 재사용하되, 홈 그리드에서는 사용하지 않음
 - `<ChildTabs />` 삭제
 
 ### Design tokens (2 신규)

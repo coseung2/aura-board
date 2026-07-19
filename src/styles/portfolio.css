@@ -723,21 +723,6 @@
   font-size: 0.875rem;
 }
 
-/* ── 학부모 포트폴리오 뷰 ── */
-.parent-portfolio {
-  padding: 16px;
-}
-.parent-portfolio-head h2 {
-  margin: 0 0 12px;
-  font-size: 1.1rem;
-  font-weight: 600;
-}
-.parent-portfolio-showcase {
-  margin-top: 24px;
-  padding-top: 16px;
-  border-top: 1px solid var(--color-border);
-}
-
 /* ── 모바일 ── */
 @media (max-width: 767px) {
   .portfolio-page {

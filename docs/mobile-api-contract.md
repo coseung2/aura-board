@@ -37,10 +37,10 @@ Expo React Native 모바일 앱(student + parent)용 API 계약서.
 | Session status | ✅ mobile-ready | Bearer accepted by `getCurrentParent` since Phase 1. |
 | Link child (code → select → request) | ⚠️ web-only | 3-step flow; needs mobile auth adapter |
 | Children list | ✅ mobile-ready | `GET /api/parent/children` (Bearer accepted; active links only) |
-| Child portfolio | ✅ live | `GET /api/parent/portfolio?childId=` |
+| Unified child feed | ✅ live | `GET /api/parent/feed` |
+| Child post grid | ✅ live | `GET /api/parent/children/[id]/posts?kind=media\|text` |
 | Child assignments | ✅ live | `GET /api/parent/children/[id]/assignments` |
 | Child events | ✅ live | `GET /api/parent/children/[id]/events` |
-| Child plant journal | ✅ live | `GET /api/parent/children/[id]/plant` |
 | Child drawing library | ✅ live | `GET /api/parent/children/[id]/drawing` |
 | Child breakout | ✅ live | `GET /api/parent/children/[id]/breakout` |
 | Account withdraw | ⚠️ web-only | Cookie-based |
@@ -441,19 +441,21 @@ Expo React Native 모바일 앱(student + parent)용 API 계약서.
 - **Auth**: parent session (cookie)
 - **Response 200**: `{ "ok": true, "status": "rejected|revoked" }`
 
-#### GET /api/parent/portfolio?childId=
+#### GET /api/parent/feed
 
-- **Purpose**: 자녀 포트폴리오 (본인 카드 + 학급 자랑해요)
-- **Auth**: parent session + childId ∈ active ParentChildLink
-- **Response 200**:
-  ```json
-  {
-    "child": { "id", "name", "number", "classroomId" },
-    "ownCards": [ /* PortfolioCardDTO[] */ ],
-    "classroomShowcase": [ /* ShowcaseEntryDTO[] */ ]
-  }
-  ```
-- **Errors**: 401, 403 parent_only, 403 forbidden, 400 childId_required
+- **Purpose**: 연결된 모든 자녀의 게시물을 최신순으로 합친 학부모 피드
+- **Auth**: parent session
+- **Query**: `limit`, `cursor`, 선택적 `post` (지정 게시물부터 보기)
+- **Response 200**: `{ "items": [/* ParentPostDTO[] */], "nextCursor": "..." | null }`
+- **Errors**: 401, 400 invalid_limit/invalid_cursor, 404 post_not_found
+
+#### GET /api/parent/children/[id]/posts
+
+- **Purpose**: 선택한 자녀의 게시물을 홈 그리드용으로 조회
+- **Auth**: parent session + studentId ∈ active ParentChildLink
+- **Query**: `kind=media|text`, `limit`, `cursor`
+- **Response 200**: `{ "child": {/* ParentChildSummary */}, "items": [/* ParentPostDTO[] */], "nextCursor": "..." | null }`
+- **Errors**: 401, 403, 400 invalid_kind/invalid_limit/invalid_cursor
 
 #### GET /api/parent/children/[id]/assignments
 
@@ -466,12 +468,6 @@ Expo React Native 모바일 앱(student + parent)용 API 계약서.
 - **Purpose**: 자녀 이벤트 신청 현황
 - **Auth**: parent session + studentId ∈ parent.children
 - **Response 200**: `{ "events": [{ "board": {...}, "mySubmissions": [...] }] }`
-
-#### GET /api/parent/children/[id]/plant
-
-- **Purpose**: 자녀 식물 관찰일지
-- **Auth**: parent session + studentId ∈ parent.children
-- **Response 200**: `{ "plants": [...] }`
 
 #### GET /api/parent/children/[id]/drawing
 
@@ -508,7 +504,7 @@ Expo React Native 모바일 앱(student + parent)용 API 계약서.
 | **HMAC 토큰 발급/검증** | `/api/student/auth`, `/api/student/me` |
 | **OAuth 콜백 + 세션 생성** | `/api/parent/auth/*` |
 | **Prisma 트랜잭션 + 서버 비즈니스 로직** | `/api/cards` POST/PATCH/DELETE, `/api/upload` |
-| **부모 scope 검증 (parent-child link)** | `/api/parent/portfolio`, `/api/parent/children/*` |
+| **부모 scope 검증 (parent-child link)** | `/api/parent/feed`, `/api/parent/children/*` |
 | **RBAC + permission check** | `/api/boards/[id]/snapshot`, `/api/boards/[id]/stream` |
 | **Rate limiting** | `/api/student/auth`, `/api/parent/match/*`, `/api/parent/signup` |
 
@@ -578,7 +574,7 @@ Expo React Native 모바일 앱(student + parent)용 API 계약서.
 |---|---|
 | 부모 이메일은 교사에게만 노출 | `/api/parent/approvals` → `parentEmail` 필드 (teacher auth required) |
 | 부모의 자녀 목록은 본인만 조회 | `withParentScope` → `childIds` set (parent session required) |
-| 자녀 외 학생 카드 0건 누출 | `/api/parent/portfolio` → `childId ∈ viewer.childIds` 체크 (AC-8) |
+| 자녀 외 학생 카드 0건 누출 | `/api/parent/children/[id]/posts` → active parent-child link 체크 (AC-8) |
 | cross-parent link enumeration 차단 | `requireParentChildLinkOwned` → linkId 소유주 아니면 404 (AC-6) |
 | cross-student probing 차단 | `withParentScopeForStudent` → studentId 미매핑 시 403 (AC-5) |
 | 부모 이름/프로필 이미지 | `ParentOAuthAccount`에 저장되지만 API 응답에 포함하지 않음 (현재) |

@@ -84,7 +84,7 @@ async function hit(
 }
 
 async function runAC5(): Promise<TestResult> {
-  const r = await hit(`/api/parent/children/${B_STUDENT}/plant`, PARENT_A_COOKIE);
+  const r = await hit(`/api/parent/children/${B_STUDENT}/posts`, PARENT_A_COOKIE);
   const pass = r.status === 403;
   return {
     name: "AC-5 parent A + student B API → 403",
@@ -148,8 +148,8 @@ async function runAC7Prep(): Promise<void> {
 
 async function runAC7(): Promise<TestResult> {
   await runAC7Prep();
-  // Now parent A's cookie should produce 401 on the plant endpoint.
-  const r = await hit(`/api/parent/children/${A_STUDENT}/plant`, PARENT_A_COOKIE);
+  // Now parent A's cookie should produce 401 on the child-post endpoint.
+  const r = await hit(`/api/parent/children/${A_STUDENT}/posts`, PARENT_A_COOKIE);
   const pass = r.status === 401;
   return {
     name: "AC-7 teacher revoke → parent A next request → 401",

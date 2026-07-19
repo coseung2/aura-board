@@ -57,7 +57,7 @@ export function ParentNotificationBell({ pendingCount }: Props) {
         <div className="auth-notify-header">알림</div>
         {pendingCount > 0 ? (
           <Link
-            href="/parent/home"
+            href="/parent/feed"
             className="auth-notify-item"
             role="menuitem"
             onClick={() => setOpen(false)}

@@ -33,9 +33,9 @@ export function ClassroomFeatureHeader({
     <ClassroomSectionHeader
       classroomId={classroomId}
       eyebrow={eyebrow}
-      title="기타 활동"
+      title="자율활동"
       description={description}
-      ariaLabel="기타 활동"
+      ariaLabel="자율활동"
       links={FEATURE_LINKS.map(({ key, label, path }) => ({
         key,
         label,

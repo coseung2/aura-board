@@ -165,7 +165,7 @@ const DEV_FEED_CARDS: PortfolioCardDTO[] = [
     sourceBoard: {
       id: "dev-board-reflection",
       slug: "dev-reflection",
-      title: "성장 기록",
+      title: "주간 회고",
       layout: "freeform",
       anonymousAuthor: false,
     },

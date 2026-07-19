@@ -39,5 +39,5 @@ export async function POST(req: Request) {
     });
   }
 
-  return NextResponse.json({ redirect: "/parent/home" });
+  return NextResponse.json({ redirect: "/parent/feed" });
 }

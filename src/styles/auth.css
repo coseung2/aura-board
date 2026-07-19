@@ -697,25 +697,38 @@
   color: var(--color-accent);
 }
 
-/* Teacher header icons keep their full click targets without visible circles. */
+/* Portal header icons keep their full click targets without visible circles. */
 .auth-header-teacher .auth-notify-trigger,
 .auth-header-teacher .auth-settings-trigger,
-.auth-header-teacher .auth-logout-btn {
+.auth-header-teacher .auth-logout-btn,
+.auth-header-flat .auth-notify-trigger,
+.auth-header-flat .auth-settings-trigger,
+.auth-header-flat .auth-logout-btn {
   border-color: transparent;
   background: transparent;
   box-shadow: none;
 }
 
+.auth-header-flat .auth-settings-trigger {
+  width: 44px;
+  height: 44px;
+}
+
 .auth-header-teacher .auth-notify-trigger:hover,
 .auth-header-teacher .auth-settings-trigger:hover,
-.auth-header-teacher .auth-logout-btn:hover {
+.auth-header-teacher .auth-logout-btn:hover,
+.auth-header-flat .auth-notify-trigger:hover,
+.auth-header-flat .auth-settings-trigger:hover,
+.auth-header-flat .auth-logout-btn:hover {
   border-color: transparent;
   background: transparent;
   color: var(--color-text);
 }
 
 .auth-header-teacher .auth-notify[open] .auth-notify-trigger,
-.auth-header-teacher .auth-settings.is-active .auth-settings-trigger {
+.auth-header-teacher .auth-settings.is-active .auth-settings-trigger,
+.auth-header-flat .auth-notify[open] .auth-notify-trigger,
+.auth-header-flat .auth-settings.is-active .auth-settings-trigger {
   border-color: transparent;
 }
 
@@ -911,3 +924,4 @@
   border-color: var(--color-border-hover);
   background: var(--color-surface-alt);
 }
+
