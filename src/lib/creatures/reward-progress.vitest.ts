@@ -194,5 +194,8 @@ describe("verified reward creature progress", () => {
     expect(creatureRewardIdempotencyKey("student-1", "reading_reward", "same-id")).toContain(
       CREATURE_RULES_VERSION,
     );
+    expect(creatureRewardIdempotencyKey("student-1", "walking_reward", "same-id")).not.toBe(
+      creatureRewardIdempotencyKey("student-1", "walking_weekly_reward", "same-id"),
+    );
   });
 });

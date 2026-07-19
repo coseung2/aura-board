@@ -6,14 +6,13 @@
 // with type `deposit` and performerKind `owner` (the existing convention for
 // student-owned wallet actions).
 //
-// This module is intentionally narrow. It is called from
-// /api/student/reading POST *after* the ReadingLog is created, so a
-// failure to credit does not roll back the log entry.
+// The student reading route supplies its own transaction so ReadingLog,
+// wallet, Transaction, and growth either commit or roll back together.
 import "server-only";
 import { db } from "./db";
 import { ensureAccountFor } from "./bank";
 import { Prisma } from "@prisma/client";
-import { applyVerifiedRewardProgress } from "./creatures/reward-progress";
+import { awardCappedPolicyReward, loadRewardPolicy } from "./reward-service";
 
 export type ReadingRewardResult = {
   amount: number;
@@ -24,6 +23,8 @@ export type AwardReadingRewardInput = {
   student: { id: string; classroomId: string };
   score: number | null;
   readingLogId: string;
+  tx?: Prisma.TransactionClient;
+  accountId?: string;
 };
 
 /** Stable source keys used to make reward mutations idempotent. */
@@ -53,9 +54,6 @@ export type ReadingRewardReversalResult = {
   legacyRewardCandidates: number;
 };
 
-// Default per-classroom config matches the schema defaults.
-const DEFAULT_REWARD_PER_POINT = 10;
-const DEFAULT_MIN_SCORE = 5;
 const MAX_READING_REWARD_TRANSACTION_ATTEMPTS = 3;
 
 export function isSerializableTransactionConflict(error: unknown): boolean {
@@ -84,71 +82,45 @@ export async function awardReadingReward(
   const score = input.score;
   if (typeof score !== "number" || score <= 0) return null;
 
-  const config = await db.avatarRewardConfig.findUnique({
-    where: { classroomId: input.student.classroomId },
-  });
-  const rewardPerPoint = config?.readingRewardPerPoint ?? DEFAULT_REWARD_PER_POINT;
-  const minScore = config?.readingMinScoreForPayout ?? DEFAULT_MIN_SCORE;
-  if (score < minScore) return null;
+  const awardInTransaction = async (
+    tx: Prisma.TransactionClient,
+    accountId: string,
+  ): Promise<ReadingRewardResult> => {
+    const [currency, policy] = await Promise.all([
+      tx.classroomCurrency.findUnique({
+        where: { classroomId: input.student.classroomId },
+        select: { unitLabel: true },
+      }),
+      loadRewardPolicy(tx, input.student.classroomId),
+    ]);
+    if (score < policy.readingMinScoreForPayout) return null;
+    const result = await awardCappedPolicyReward({
+      tx,
+      studentId: input.student.id,
+      classroomId: input.student.classroomId,
+      accountId,
+      area: "reading",
+      sourceRef: input.readingLogId,
+      baseAmount: score * policy.readingRewardPerPoint,
+      note: `독서 기록 보상 [reading-log:${input.readingLogId}] (점수: ${score})`,
+      policy,
+    });
+    return result ? { amount: result.amount, unitLabel: currency?.unitLabel ?? "원" } : null;
+  };
 
-  const amount = score * rewardPerPoint;
-  if (amount <= 0) return null;
+  if (input.tx) {
+    if (!input.accountId) throw new Error("Reading reward account is required in caller transaction");
+    return awardInTransaction(input.tx, input.accountId);
+  }
 
   const { accountId } = await ensureAccountFor(input.student);
-  const currency = await db.classroomCurrency.findUnique({
-    where: { classroomId: input.student.classroomId },
-    select: { unitLabel: true },
-  });
-  const unitLabel = currency?.unitLabel ?? "\uC6D0";
-
-  let rewardedAmount: number;
+  let reward: ReadingRewardResult;
   try {
-    rewardedAmount = await retryReadingRewardTransaction(() =>
-      db.$transaction(async (tx) => {
-        // A retried POST (or a client retry after a network timeout) must not
-        // credit the same reading log twice. The compound unique index is the
-        // final race gate; this lookup handles the normal retry path.
-        const existing = await tx.transaction.findFirst({
-          where: {
-            accountId,
-            sourceType: READING_REWARD_SOURCE_TYPE,
-            sourceRef: input.readingLogId,
-            type: "deposit",
-          },
-          select: { amount: true },
-        });
-        if (existing) return existing.amount;
-
-        const updated = await tx.studentAccount.update({
-          where: { id: accountId },
-          data: { balance: { increment: amount } },
-          select: { balance: true },
-        });
-        await tx.transaction.create({
-          data: {
-            accountId,
-            type: "deposit",
-            amount,
-            balanceAfter: updated.balance,
-            note: `${LEGACY_READING_REWARD_NOTE_PREFIX} \uBCF4\uC0C1 [reading-log:${input.readingLogId}] (\uC810\uC218: ${score})`,
-            sourceType: READING_REWARD_SOURCE_TYPE,
-            sourceRef: input.readingLogId,
-            performedById: input.student.id,
-            performedByKind: "owner",
-          } satisfies Prisma.TransactionUncheckedCreateInput,
-        });
-        // The wallet deposit and the creature event share this transaction.
-        // The helper computes the fixed v1 +1 delta from the verified source;
-        // it never spends the amount or trusts a client-provided stage.
-        await applyVerifiedRewardProgress(tx, {
-          studentId: input.student.id,
-          classroomId: input.student.classroomId,
-          sourceType: READING_REWARD_SOURCE_TYPE,
-          sourceRef: input.readingLogId,
-          currencyAmount: amount,
-        });
-        return amount;
-      }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable }),
+    reward = await retryReadingRewardTransaction(() =>
+      db.$transaction(
+        (tx) => awardInTransaction(tx, accountId),
+        { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+      ),
     );
   } catch (error) {
     // If two requests race before either sees the source row, the unique
@@ -166,10 +138,14 @@ export async function awardReadingReward(
       select: { amount: true },
     });
     if (!existing) throw error;
-    rewardedAmount = existing.amount;
+    const currency = await db.classroomCurrency.findUnique({
+      where: { classroomId: input.student.classroomId },
+      select: { unitLabel: true },
+    });
+    reward = { amount: existing.amount, unitLabel: currency?.unitLabel ?? "원" };
   }
 
-  return { amount: rewardedAmount, unitLabel };
+  return reward;
 }
 
 /**
@@ -209,6 +185,15 @@ export async function reverseReadingReward(
     select: { amount: true },
   });
   if (existingReversal) {
+    await tx.creatureProgressEvent.updateMany({
+      where: {
+        studentId: input.studentId,
+        sourceType: READING_REWARD_SOURCE_TYPE,
+        sourceRef: input.readingLogId,
+        reversedAt: null,
+      },
+      data: { reversedAt: new Date() },
+    });
     return {
       amount: existingReversal.amount,
       balance: account.balance,
@@ -261,6 +246,17 @@ export async function reverseReadingReward(
       performedById: input.performerId,
       performedByKind: "teacher",
     } satisfies Prisma.TransactionUncheckedCreateInput,
+  });
+  // Wallet compensation is reversible; growth stays monotonic. The original
+  // event is marked for audit without subtracting points or downgrading stage.
+  await tx.creatureProgressEvent.updateMany({
+    where: {
+      studentId: input.studentId,
+      sourceType: READING_REWARD_SOURCE_TYPE,
+      sourceRef: input.readingLogId,
+      reversedAt: null,
+    },
+    data: { reversedAt: new Date() },
   });
 
   return {

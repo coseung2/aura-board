@@ -56,7 +56,7 @@ export type StudentAssignmentTodo = {
 
 export type StudentNotificationItem = {
   id: string;
-  kind: "like" | "comment";
+  kind: "like" | "comment" | "reward";
   actorLabel: string;
   cardTitle: string;
   boardTitle: string;

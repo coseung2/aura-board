@@ -9,8 +9,11 @@ import {
 
 /** Activity reward namespaces owned by the server. */
 export const ACTIVITY_REWARD_SOURCE_TYPES = [
+  "reading_reward",
   "walking_reward",
+  "walking_weekly_reward",
   "assignment_reward",
+  "comment_reward",
 ] as const;
 
 export type ActivityRewardSourceType = (typeof ACTIVITY_REWARD_SOURCE_TYPES)[number];
@@ -23,6 +26,7 @@ export type ActivityRewardInput = {
   sourceType: ActivityRewardSourceType;
   sourceRef: string;
   amount: number;
+  note?: string;
 };
 
 export type ActivityRewardProgressSummary = {
@@ -157,7 +161,7 @@ export async function awardActivityReward(
       type: "deposit",
       amount: input.amount,
       balanceAfter: updated.balance,
-      note: `${input.sourceType} reward [${input.sourceRef}]`,
+      note: input.note ?? `${input.sourceType} reward [${input.sourceRef}]`,
       sourceType: input.sourceType,
       sourceRef: input.sourceRef,
       performedById: input.studentId,

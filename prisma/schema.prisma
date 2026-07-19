@@ -1596,6 +1596,9 @@ model CardComment {
 
   content String
 
+  // Optional student-client retry key. Null keeps existing callers compatible.
+  clientRequestId String?
+
   createdAt DateTime @default(now())
 
   deletedAt DateTime?
@@ -1611,6 +1614,7 @@ model CardComment {
   @@index([cardId, createdAt])
   @@index([authorUserId])
   @@index([authorStudentId])
+  @@unique([authorStudentId, cardId, clientRequestId])
 }
 
 model CardCommentLike {
@@ -3376,6 +3380,8 @@ model StudentSlime {
   studentId   String
   classroomId String
   color       String
+  // Only equipped slimes contribute their server-calculated reward effect.
+  isEquipped Boolean @default(true)
 
   purchaseTransactionId String @unique
 
@@ -4241,14 +4247,27 @@ model AvatarPurchase {
 model AvatarRewardConfig {
   classroomId                String @id
   // Wallet reward per reading score point (e.g. 10 won per point).
-  readingRewardPerPoint      Int    @default(10)
+  readingRewardPerPoint      Int    @default(5)
   // Minimum aiScore required to trigger a payout (0..10 evaluator range).
   readingMinScoreForPayout   Int    @default(5)
+  readingDailyRewardCap      Int    @default(1)
+  readingWeeklyRewardCap     Int    @default(2)
+  commentRewardAmount        Int    @default(5)
+  commentDailyRewardCap      Int    @default(1)
+  commentWeeklyRewardCap     Int    @default(2)
+  commentMinMeaningfulLength Int    @default(4)
   // Walking and assignment activity reward policy seeds. Values <= 0 disable
   // the corresponding reward without requiring another migration.
   walkingRewardStepThreshold Int    @default(5000)
-  walkingRewardAmount        Int    @default(20)
+  walkingRewardAmount        Int    @default(10)
+  walkingDailyUnitCap        Int    @default(2)
+  walkingWeeklyRewardDayCap  Int    @default(5)
+  walkingWeeklyGoalSteps     Int    @default(25000)
+  walkingWeeklyGoalAmount    Int    @default(20)
   assignmentRewardAmount     Int    @default(20)
+  assignmentDailyRewardCap   Int    @default(1)
+  assignmentWeeklyRewardCap  Int    @default(2)
+  rewardBuffCapBps           Int    @default(2000)
 
   classroom Classroom @relation(fields: [classroomId], references: [id], onDelete: Cascade)
 }

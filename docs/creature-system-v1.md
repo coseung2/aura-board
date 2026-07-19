@@ -60,7 +60,7 @@ If the deployment uses PostgreSQL, add partial unique indexes in the migration (
 - Duplicate request protection is mandatory: the same purchase idempotency key returns the original creature and transaction without another charge. A concurrent request cannot create two active eggs. When multiple approved lines exist, draw from unowned line keys first; after all published lines are owned, repeat outcomes are allowed and the full weighted table is disclosed.
 - Affinity and shop tier affect egg price and random-draw weight only. They never change reward amounts, thresholds, classroom access, or combat power. There are no battle stats in v1.
 - Eggs and growth are classroom activities, never a real-money purchase. Do not expose a card/checkout path or premium currency.
-- Reading, walking, and first assignment submission are the only v1 reward sources. A source is eligible only after the corresponding server verification succeeds; a client cannot post an arbitrary reward event.
+- Reading, comment, daily walking, weekly walking, and first assignment submission are the bounded reward sources. A source is eligible only after its route-specific checks succeed; no client can post an arbitrary reward event.
 - Creature-specific accessories and trading remain later slices. V1 inventory contains food, egg-only hatch accelerators, and one equippable background effect per student.
 - There is one rules version (`creature-rules-v1`) and one straight-line stage map. A future rules version must be additive and must not reinterpret existing events.
 
@@ -70,8 +70,10 @@ Use the existing `Transaction.sourceType/sourceRef` pair and use the same pair o
 
 | Activity | `sourceType` | `sourceRef` | Wallet effect | Progress effect |
 | --- | --- | --- | --- | --- |
-| Reading reward | `reading_reward` | `readingLogId` | Existing source-linked deposit | `+1` after the reading score/payout gate passes |
-| Walking reward | `walking_reward` | `studentId:YYYY-MM-DD:daily-threshold` | Deposit 20 once when the accepted Health Connect daily row reaches 5,000 steps | `+1` in the same serializable transaction |
+| Reading reward | `reading_reward` | `readingLogId` | Score 5+; 5 per score point; KST day 1/week 2 | `+1` in the same serializable transaction |
+| Comment reward | `comment_reward` | `commentId` | 5 for one meaningful normalized student comment; KST day 1/week 2 | `+1` in the same serializable transaction |
+| Daily walking unit | `walking_reward` | `studentId:YYYY-MM-DD:unit:N` | 10 per 5,000 steps, at most two units/day and five rewarded days/week | `+1` per paid unit in the same serializable transaction |
+| Weekly walking goal | `walking_weekly_reward` | `studentId:weekMonday:weekly-goal` | 20 once when that KST week reaches 25,000 steps | `+1` in the same serializable transaction |
 | First assignment submission | `assignment_reward` | `studentId:assignmentSlotId:first-submit` | Deposit 20 once for the first accepted submission | `+1` in the same serializable transaction |
 | Egg purchase | `creature_egg_purchase` | caller idempotency key | Guarded withdrawal/purchase transaction | Creates the egg; it is not a growth event |
 
@@ -113,7 +115,7 @@ model CreatureProgressEvent {
   studentCreatureId String
   studentId         String
   classroomId       String
-  sourceType        String   // reading_reward | walking_reward | assignment_reward
+  sourceType        String   // reading_reward | comment_reward | walking_reward | walking_weekly_reward | assignment_reward
   sourceRef         String
   idempotencyKey     String   @unique
   rulesVersion       String
@@ -159,9 +161,9 @@ Reward hooks should call one server helper after source verification:
 3. If an active creature exists, check `CreatureProgressEvent.idempotencyKey`/`(studentId, sourceType, sourceRef)`. If present, return the recorded stage and progress. Otherwise increment `progressPoints` by the server-computed delta, calculate the monotonic stage transition for `rulesVersion`, insert the event with before/after snapshots, and update the creature. On the first `egg -> hatchling` crossing, set `isFeatured = true` only if no representative exists. When the transition reaches `evolved`, set `isActive = false` and `completedAt` while preserving `isFeatured`.
 4. Commit the wallet deposit and progress event together when the source record itself is created in this hook. If an upstream record must be created first, use an outbox/retry path rather than silently losing progress.
 
-Reading, walking, and first-assignment rewards now call the shared server-owned growth helper. Each newly created wallet deposit and its creature progress event commit in the same serializable transaction; a replay of an already-existing deposit does not retroactively add growth. No endpoint accepts a raw `CreatureProgressEvent` from a client.
+Reading, comments, daily/weekly walking, and first-assignment rewards call the shared server-owned growth helper. Each newly created wallet deposit and its creature progress event commit in the same serializable transaction; reading also creates its `ReadingLog` in that transaction. A replay of an already-existing deposit does not retroactively add growth. No endpoint accepts a raw `CreatureProgressEvent` from a client.
 
-Walking defaults to one 20-unit reward per student/day after an accepted Health Connect row reaches 5,000 steps. The first accepted assignment submission defaults to 20 units per student/slot. `AvatarRewardConfig` owns both thresholds/amounts, and non-positive values disable the corresponding reward.
+Walking defaults to 10 per 5,000-step unit (two units/day), five rewarded days/week, plus a separate 20-unit weekly reward at 25,000 steps. The first accepted assignment submission defaults to 20. `AvatarRewardConfig` owns the persisted defaults, while server guardrails enforce the maximum frequencies and 20% effect cap. The reward-policy migration changes existing rows only when they still equal the former schema defaults (`readingRewardPerPoint = 10`, `walkingRewardAmount = 20`); because the old schema stored no customization marker, an intentionally customized value equal to an old default cannot be distinguished and is migrated too.
 
 ### Reversal recommendation
 
@@ -200,7 +202,7 @@ These route names are an outline for implementation; they do not authorize a new
 - `POST /api/student/creatures/use` body `{ itemKey, idempotencyKey }` uses food or an egg-only hatch accelerator on the server-resolved active creature.
 - `POST /api/student/creatures/equip` body `{ itemKey }` equips one owned background effect; `null` removes the equipped background.
 - `POST /api/student/creatures/feature` body `{ creatureId }` atomically replaces the representative with one owned non-egg pet. Missing or foreign IDs return `404`; an egg returns `409`.
-- Internal reward helper (called by reading/walking/assignment handlers), not a client endpoint: `{ studentId, classroomId, sourceType, sourceRef, currencyAmount, verifiedAt }` -> `{ transactionId, progressEventId: string | null, progressDelta, stageBefore, stageAfter }`.
+- Internal reward helper (called by reading/comment/walking/assignment handlers), not a client endpoint: `{ studentId, classroomId, sourceType, sourceRef, currencyAmount, verifiedAt }` -> `{ transactionId, progressEventId: string | null, progressDelta, stageBefore, stageAfter }`.
 - Teacher/admin reversal endpoint, protected by existing classroom permissions: `{ sourceType, sourceRef, reason }` -> `{ withdrawalTransactionId, progressReversal: "marked_only" }`.
 
 ## Administrator operations
@@ -246,7 +248,7 @@ Use [`docs/verification-checklist.md`](./verification-checklist.md) as the singl
 - Run `npm run typecheck`, targeted creature/wallet tests, and `npm run test` when shared wallet logic changes.
 - For the Prisma migration, run `npx prisma validate` and `npx prisma generate`.
 - Exercise two concurrent purchase requests with the same and different idempotency keys: one charge/egg for a replay, never a negative balance, and never two active eggs.
-- Exercise reading, walking, and first-assignment source events twice; assert one deposit and one progress event per source, with stage transitions at 3/8/15 points.
+- Exercise reading, comment, daily/weekly walking, and first-assignment source events twice; assert one deposit and one progress event per source, with stage transitions at 3/8/15 points.
 - Exercise a failed/insufficient-balance purchase and a reward reversal; assert no orphan charge, no negative balance, and no automatic stage downgrade.
 - Verify the full save/publish round trip and reload for the student creature screen, as required by the checklist's “Save And Publish Flows” section. Confirm teacher reversal permissions and downstream collection state.
 - Validate all 28 stage outputs with Character Asset Studio's validators before publication: transparent 1536×1536 sheet, nine 512×512 RGBA frames, and stable normal/lazy/signature row ordering.
@@ -254,9 +256,41 @@ Use [`docs/verification-checklist.md`](./verification-checklist.md) as the singl
 ## Current implementation gaps and known risks
 
 - The creature migration must be applied to the connected database before persistence-backed routes and the full student flow can run there.
-- The Health Connect daily row is the walking reward trust boundary; device attestation and anti-tamper verification are not part of v1.
-- Reading-log creation still precedes its reward transaction. Reward deposit and creature growth are atomic with each other, but a payout failure does not roll back the already-created reading log.
+- Walking sync trusts the authenticated client's submitted Health Connect-shaped row after server range/date validation. Device attestation and anti-tamper verification are not implemented, so in-range forged step counts remain a residual risk.
+- Reading-log creation, wallet deposit, transaction event, and creature progress now share one serializable transaction; a payout failure rolls the log back too.
 - All 28 generation manifests and published stage packages exist; visual review should continue to watch for magenta fringe around a few transparent effect edges.
 - Existing avatar purchase code reads the balance before decrementing and has a concurrent-purchase race. The creature helper must use the guarded conditional decrement above, and the shared wallet purchase path should be hardened before code is consolidated.
 - Wallet presenters register `creature_egg_purchase` and `creature_item_purchase` as outgoing purchases; keep this mapping covered whenever another creature spend type is introduced.
 - Existing source-linked transactions use a global `(sourceType, sourceRef)` uniqueness constraint. Creature source keys must be stable and namespace-safe to avoid collisions with existing rewards.
+## 영역별 학생 보상 경제
+
+서버의 단일 정책 소스는 `src/lib/reward-policy.ts`이며 지급 실행은
+`src/lib/reward-service.ts`를 통한다. 금액은 정수 원 단위이고, 장착한
+슬라임/세트의 같은 영역 효과를 합산한 뒤 영역별 최대 20%(2,000bps)로
+제한한다. 최종 지급액은 `floor(기본액 * (10000 + bps) / 10000)`이다.
+
+- 독서(초록): AI 점수 5점 이상, 점수당 5원, KST 일 1회·월요일 시작 주 2회.
+- 댓글(빨강): 의미 있는 정규화 댓글 1건당 5원, KST 일 1회·주 2회.
+  공백/유니코드를 정규화하고 문자·숫자 4자 미만과 같은 학생의 동일 문구
+  재게시는 지급하지 않는다. 삭제된 댓글을 다시 올려도 기존 문구 이력이
+  남아 지급 대상이 되지 않으며, 삭제가 일·주 한도를 다시 열지 않는다.
+  이미 지급한 금액은 잔액 부족이나 교사 모더레이션 실패를 만들지 않도록
+  삭제 시 자동 환수하지 않는다.
+- 과제(보라): 유효한 첫 제출 20원, KST 일 1회·주 2회.
+- 걷기(노랑): KST 활동일마다 5,000보 단위 10원, 일 최대 2단위. 한 주에
+  최대 5개의 활동일만 일간 보상을 받고, 같은 주 누적 25,000보 달성 시
+  20원을 1회 별도 지급한다. 재동기화는 `학생:활동일:unit:N`, 주간 보너스는
+  `학생:주월요일:weekly-goal` 소스로 중복 지급을 막는다.
+
+걷기 입력의 신뢰 경계는 인증된 학생 세션과 서버가 적용하는 형식/범위 제한이다.
+서버는 하루 0~200,000보, 거리 0~300,000m, 요청당 최대 31일 및 허용 날짜
+범위를 검증하지만 현재 Health Connect 기기 증명이나 서명된 attestation을
+검증하지 않는다. 따라서 변조된 클라이언트가 허용 범위 안의 수치를 제출할
+잔여 위험이 있다. 이 구현은 존재하지 않는 attestation을 가정하지 않으며,
+운영 단계에서 기기 증명 도입 전까지 이 위험을 신뢰 경계로 명시한다.
+
+지급은 Serializable 트랜잭션 안에서 학생 소유 `StudentAccount` 잔액과
+`Transaction` 입금을 함께 기록한다. `Transaction(sourceType, sourceRef)`의
+고유 키가 재시도·동시성 최종 게이트이며, 이 행 자체가 보상 알림의 원자적
+이벤트다. 별도 알림 행은 만들지 않는다. 수동 입출금 등 기존 거래는
+source가 nullable이라 그대로 호환된다.

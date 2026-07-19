@@ -5,6 +5,9 @@ export function studentNotificationTarget(href: string): string {
   if (boardMatch) {
     return `/(student)/board/${encodeURIComponent(decodeURIComponent(boardMatch[1]))}`;
   }
+  if (href === "/my/wallet" || href === "/student/wallet") {
+    return "/(student)/wallet";
+  }
   return "/(student)";
 }
 

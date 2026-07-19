@@ -112,7 +112,7 @@ export default function StudentNotificationsScreen() {
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => void load(true)} />}
         >
           <SectionHeader
-            title="좋아요와 댓글"
+            title="알림"
             right={
               payload?.count ? (
                 <AppButton
@@ -125,7 +125,7 @@ export default function StudentNotificationsScreen() {
               ) : undefined
             }
           />
-          <Text style={styles.subtitle}>내 게시물에 새로 생긴 반응이에요.</Text>
+          <Text style={styles.subtitle}>좋아요, 댓글과 보상 소식이에요.</Text>
           {!payload?.items.length ? (
             <View style={styles.emptyState}>
               <Text style={styles.emptyTitle}>새 알림이 없어요.</Text>
@@ -144,16 +144,28 @@ export default function StudentNotificationsScreen() {
                     index < payload.items.length - 1 && styles.itemDivider,
                   ]}
                   onPress={() => void markRead(item)}
-                  accessibilityLabel={`${item.actorLabel} ${item.kind === "like" ? "좋아요" : "댓글"} 알림 열기`}
+                  accessibilityLabel={
+                    item.kind === "reward"
+                      ? `${item.cardTitle || "보상"} 알림 열기`
+                      : `${item.actorLabel} ${item.kind === "like" ? "좋아요" : "댓글"} 알림 열기`
+                  }
                 >
                   <View style={styles.itemTop}>
                     <Text
                       style={[
                         styles.kind,
-                        item.kind === "like" ? styles.kindLike : styles.kindComment,
+                        item.kind === "like"
+                          ? styles.kindLike
+                          : item.kind === "comment"
+                            ? styles.kindComment
+                            : styles.kindReward,
                       ]}
                     >
-                      {item.kind === "like" ? "좋아요" : "댓글"}
+                      {item.kind === "like"
+                        ? "좋아요"
+                        : item.kind === "comment"
+                          ? "댓글"
+                          : "보상"}
                     </Text>
                     <View style={styles.itemTimeRow}>
                       <Text style={styles.time}>{formatRelativeTime(item.createdAt)}</Text>
@@ -161,11 +173,15 @@ export default function StudentNotificationsScreen() {
                     </View>
                   </View>
                   <Text style={[styles.itemTitle, !item.read && styles.itemTitleUnread]}>
-                    {item.actorLabel}님이 {item.kind === "like" ? "좋아요를 눌렀어요." : "댓글을 남겼어요."}
+                    {item.kind === "reward"
+                      ? `${item.cardTitle || "보상"}을 받았어요.`
+                      : `${item.actorLabel}님이 ${item.kind === "like" ? "좋아요를 눌렀어요." : "댓글을 남겼어요."}`}
                   </Text>
                   {item.content ? <Text style={styles.contentText}>{item.content}</Text> : null}
                   <Text style={styles.meta}>
-                    {item.cardTitle || "제목 없는 카드"} · {item.boardTitle}
+                    {item.kind === "reward"
+                      ? item.boardTitle || "내 통장"
+                      : `${item.cardTitle || "제목 없는 카드"} · ${item.boardTitle}`}
                   </Text>
                 </ControlPressable>
               ))}
@@ -228,6 +244,7 @@ const styles = StyleSheet.create({
   kind: { ...typography.badge },
   kindLike: { color: colors.accent },
   kindComment: { color: colors.textMuted },
+  kindReward: { color: colors.bankPositive },
   itemTimeRow: {
     flexDirection: "row",
     alignItems: "center",

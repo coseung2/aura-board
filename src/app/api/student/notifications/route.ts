@@ -7,7 +7,15 @@ export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
 const RECENT_LIMIT = 20;
-type NotificationKind = "like" | "comment";
+const REWARD_SOURCE_TYPES = [
+  "reading_reward",
+  "comment_reward",
+  "walking_reward",
+  "walking_weekly_reward",
+  "assignment_reward",
+] as const;
+type RewardSourceType = (typeof REWARD_SOURCE_TYPES)[number];
+type NotificationKind = "like" | "comment" | "reward";
 
 export async function GET() {
   const student = await getCurrentStudent();
@@ -15,14 +23,19 @@ export async function GET() {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
 
-  const { likeWhere, commentWhere } = notificationWhere(student);
-  const [state, receipts] = await Promise.all([
+  const { likeWhere, commentWhere, rewardWhere } = notificationWhere(student);
+  const [state, receipts, currency] = await Promise.all([
     db.studentNotificationState.findUnique({ where: { studentId: student.id } }),
     db.studentNotificationReceipt.findMany({
       where: { studentId: student.id },
       select: { notificationType: true, notificationId: true },
     }),
+    db.classroomCurrency?.findUnique({
+      where: { classroomId: student.classroomId },
+      select: { unitLabel: true },
+    }) ?? null,
   ]);
+  const rewardUnit = currency?.unitLabel ?? "원";
   const lastReadAt = state?.lastReadAt ?? null;
   const readKeys = new Set(
     receipts.map((receipt) => `${receipt.notificationType}:${receipt.notificationId}`),
@@ -33,9 +46,12 @@ export async function GET() {
   const unreadCommentIds = receipts
     .filter((receipt) => receipt.notificationType === "comment")
     .map((receipt) => receipt.notificationId);
+  const unreadRewardIds = receipts
+    .filter((receipt) => receipt.notificationType === "reward")
+    .map((receipt) => receipt.notificationId);
   const unreadSince = lastReadAt ? { createdAt: { gt: lastReadAt } } : {};
 
-  const [likeCount, commentCount, likes, comments] = await Promise.all([
+  const [likeCount, commentCount, rewardCount, likes, comments, rewards] = await Promise.all([
     db.cardLike.count({
       where: {
         ...likeWhere,
@@ -48,6 +64,13 @@ export async function GET() {
         ...commentWhere,
         ...unreadSince,
         ...(unreadCommentIds.length > 0 ? { id: { notIn: unreadCommentIds } } : {}),
+      },
+    }),
+    db.transaction.count({
+      where: {
+        ...rewardWhere,
+        ...unreadSince,
+        ...(unreadRewardIds.length > 0 ? { id: { notIn: unreadRewardIds } } : {}),
       },
     }),
     db.cardLike.findMany({
@@ -78,6 +101,18 @@ export async function GET() {
             board: { select: { slug: true, title: true, anonymousAuthor: true } },
           },
         },
+      },
+    }),
+    db.transaction.findMany({
+      where: rewardWhere,
+      orderBy: { createdAt: "desc" },
+      take: RECENT_LIMIT,
+      select: {
+        id: true,
+        amount: true,
+        note: true,
+        sourceType: true,
+        createdAt: true,
       },
     }),
   ]);
@@ -126,14 +161,34 @@ export async function GET() {
     read: isRead("comment", comment.id, comment.createdAt),
   }));
 
-  const items = [...likeItems, ...commentItems]
+  const rewardItems = rewards.map((transaction) => {
+    const sourceType = isRewardSourceType(transaction.sourceType)
+      ? transaction.sourceType
+      : null;
+    const title = sourceType ? rewardTitle(sourceType) : "보상";
+    const amount = `+${transaction.amount.toLocaleString("ko-KR")} ${rewardUnit}`;
+    const note = transaction.note ? truncate(transaction.note, 120) : null;
+    return {
+      id: `reward:${transaction.id}`,
+      kind: "reward" as const,
+      actorLabel: "보상",
+      cardTitle: title,
+      boardTitle: "내 통장",
+      href: "/my/wallet",
+      createdAt: transaction.createdAt.toISOString(),
+      content: [note, amount].filter(Boolean).join(" · "),
+      read: isRead("reward", transaction.id, transaction.createdAt),
+    };
+  });
+
+  const items = [...likeItems, ...commentItems, ...rewardItems]
     .sort(
       (a, b) =>
         new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
     )
     .slice(0, RECENT_LIMIT);
 
-  return NextResponse.json({ count: likeCount + commentCount, items });
+  return NextResponse.json({ count: likeCount + commentCount + rewardCount, items });
 }
 
 export async function POST(req: Request) {
@@ -160,7 +215,7 @@ export async function POST(req: Request) {
 
   if (
     input.action !== "mark_read" ||
-    (input.kind !== "like" && input.kind !== "comment") ||
+    (input.kind !== "like" && input.kind !== "comment" && input.kind !== "reward") ||
     typeof input.id !== "string" ||
     input.id.length === 0 ||
     input.id.length > 128
@@ -169,14 +224,19 @@ export async function POST(req: Request) {
   }
 
   const kind = input.kind as NotificationKind;
-  const { likeWhere, commentWhere } = notificationWhere(student);
+  const { likeWhere, commentWhere, rewardWhere } = notificationWhere(student);
   const notification =
     kind === "like"
       ? await db.cardLike.findFirst({ where: { ...likeWhere, id: input.id }, select: { id: true } })
-      : await db.cardComment.findFirst({
-          where: { ...commentWhere, id: input.id },
-          select: { id: true },
-        });
+      : kind === "comment"
+        ? await db.cardComment.findFirst({
+            where: { ...commentWhere, id: input.id },
+            select: { id: true },
+          })
+        : await db.transaction.findFirst({
+            where: { ...rewardWhere, id: input.id },
+            select: { id: true },
+          });
   if (!notification) {
     return NextResponse.json({ error: "not_found" }, { status: 404 });
   }
@@ -203,6 +263,7 @@ export async function POST(req: Request) {
 function notificationWhere(student: { id: string; classroomId: string }): {
   likeWhere: Prisma.CardLikeWhereInput;
   commentWhere: Prisma.CardCommentWhereInput;
+  rewardWhere: Prisma.TransactionWhereInput;
 } {
   const ownedCardWhere: Prisma.CardWhereInput = {
     board: { classroomId: student.classroomId },
@@ -229,7 +290,31 @@ function notificationWhere(student: { id: string; classroomId: string }): {
         { authorKind: "student", authorStudentId: { not: student.id } },
       ],
     },
+    rewardWhere: {
+      account: { studentId: student.id, classroomId: student.classroomId },
+      type: "deposit",
+      sourceType: { in: [...REWARD_SOURCE_TYPES] },
+    },
   };
+}
+
+function isRewardSourceType(value: string | null): value is RewardSourceType {
+  return value !== null && (REWARD_SOURCE_TYPES as readonly string[]).includes(value);
+}
+
+function rewardTitle(sourceType: RewardSourceType): string {
+  switch (sourceType) {
+    case "reading_reward":
+      return "독서 보상";
+    case "comment_reward":
+      return "댓글 보상";
+    case "walking_reward":
+      return "걷기 보상";
+    case "walking_weekly_reward":
+      return "주간 걷기 보상";
+    case "assignment_reward":
+      return "과제 제출 보상";
+  }
 }
 
 function formatActorLabel({

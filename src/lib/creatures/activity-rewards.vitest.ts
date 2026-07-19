@@ -88,7 +88,13 @@ describe("activity reward source policy", () => {
   });
 
   it("keeps walking and assignment source namespaces distinct", () => {
-    expect(ACTIVITY_REWARD_SOURCE_TYPES).toEqual(["walking_reward", "assignment_reward"]);
+    expect(ACTIVITY_REWARD_SOURCE_TYPES).toEqual([
+      "reading_reward",
+      "walking_reward",
+      "walking_weekly_reward",
+      "assignment_reward",
+      "comment_reward",
+    ]);
     expect(walkingRewardSourceRef("student-1", "2026-07-17")).toBe(
       "student-1:2026-07-17:daily-threshold",
     );

@@ -5,7 +5,7 @@ import Link from "next/link";
 
 type StudentNotificationItem = {
   id: string;
-  kind: "like" | "comment";
+  kind: "like" | "comment" | "reward";
   actorLabel: string;
   cardTitle: string;
   boardTitle: string;
@@ -135,7 +135,7 @@ export function StudentNotificationBell() {
       </summary>
       <div className="auth-notify-panel" role="menu">
         <div className="auth-notify-header">
-          <span>좋아요와 댓글</span>
+          <span>알림</span>
           {count > 0 && (
             <button
               type="button"
@@ -167,14 +167,17 @@ export function StudentNotificationBell() {
               <div className="auth-notify-item-title">
                 {item.kind === "like"
                   ? `${item.actorLabel}님이 좋아요를 눌렀어요.`
-                  : `${item.actorLabel}님이 댓글을 남겼어요.`}
+                  : item.kind === "comment"
+                    ? `${item.actorLabel}님이 댓글을 남겼어요.`
+                    : `${item.cardTitle || "보상"}을 받았어요.`}
               </div>
               {item.content && (
                 <div className="auth-notify-item-body">{item.content}</div>
               )}
               <div className="auth-notify-item-meta">
-                {item.cardTitle || "제목 없는 카드"} · {item.boardTitle} ·{" "}
-                {formatRelative(item.createdAt)}
+                {item.kind === "reward"
+                  ? `${item.boardTitle || "내 통장"} · ${formatRelative(item.createdAt)}`
+                  : `${item.cardTitle || "제목 없는 카드"} · ${item.boardTitle} · ${formatRelative(item.createdAt)}`}
               </div>
             </Link>
           ))

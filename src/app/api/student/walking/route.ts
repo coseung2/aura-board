@@ -5,14 +5,23 @@ import { z } from "zod";
 import { db } from "@/lib/db";
 import { ensureAccountFor } from "@/lib/bank";
 import {
-  awardActivityReward,
   retryActivityRewardTransaction,
-  shouldAwardWalkingReward,
-  walkingRewardSourceRef,
 } from "@/lib/creatures/activity-rewards";
 import { jsonPrivateNoStore } from "@/lib/http-cache";
 import { getCurrentStudent } from "@/lib/student-auth";
 import { getWalkingDayRange, isValidWalkingDay } from "@/lib/walking";
+import {
+  canRewardWalkingDay,
+  getKstWeekStartDay,
+  walkingRewardUnits,
+  walkingUnitSourceRef,
+  walkingWeeklyGoalSourceRef,
+  WALKING_WEEKLY_REWARD_SOURCE_TYPE,
+} from "@/lib/reward-policy";
+import {
+  awardWalkingPolicyReward,
+  loadRewardPolicy,
+} from "@/lib/reward-service";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -116,24 +125,19 @@ export async function POST(request: NextRequest) {
     }
 
     const { accountId } = await ensureAccountFor(student);
-    const sourceRefs = rows.map((row) =>
-      walkingRewardSourceRef(student.id, row.day),
-    );
+    const weekStarts = [...new Set(rows.map((row) => getKstWeekStartDay(row.day)))];
+    const sourceRefs = rows.flatMap((row) => [
+      walkingUnitSourceRef(student.id, row.day, 1),
+      walkingUnitSourceRef(student.id, row.day, 2),
+      walkingWeeklyGoalSourceRef(student.id, getKstWeekStartDay(row.day)),
+    ]);
     await retryActivityRewardTransaction(
       () =>
         db.$transaction(
           async (tx) => {
-            const config = await tx.avatarRewardConfig.findUnique({
-              where: { classroomId: student.classroomId },
-              select: {
-                walkingRewardStepThreshold: true,
-                walkingRewardAmount: true,
-              },
-            });
-            const threshold = config?.walkingRewardStepThreshold ?? 5000;
-            const amount = config?.walkingRewardAmount ?? 20;
+            const policy = await loadRewardPolicy(tx, student.classroomId);
 
-            for (const row of rows) {
+            for (const row of rows.sort((a, b) => a.day.localeCompare(b.day))) {
               await tx.$executeRaw(Prisma.sql`
                 INSERT INTO "StudentWalkingDailyStat" (
                   "id",
@@ -163,21 +167,78 @@ export async function POST(request: NextRequest) {
                   "syncedAt" = CURRENT_TIMESTAMP,
                   "updatedAt" = CURRENT_TIMESTAMP
               `);
+            }
 
-              // The accepted Health Connect row is the trust boundary. The
-              // source key is immutable per student/day, so re-syncs and
-              // changing step values cannot pay a second time.
-              if (shouldAwardWalkingReward(row.steps, threshold, amount)) {
-                await awardActivityReward({
+            const previous = await tx.transaction.findMany({
+              where: {
+                accountId,
+                sourceType: "walking_reward",
+                sourceRef: { startsWith: `${student.id}:` },
+                type: "deposit",
+              },
+              select: { sourceRef: true },
+            });
+            const rewardedRefs = new Set(
+              previous.map((entry) => entry.sourceRef).filter((ref): ref is string => Boolean(ref)),
+            );
+
+            for (const row of rows) {
+              const units = walkingRewardUnits(
+                row.steps,
+                policy.walkingRewardStepThreshold,
+                policy.walkingDailyUnitCap,
+              );
+              if (units === 0) continue;
+              const weekStart = getKstWeekStartDay(row.day);
+              const rewardedDays = new Set<string>();
+              for (const ref of rewardedRefs) {
+                const match = ref.match(
+                  /^[^:]+:(\d{4}-\d{2}-\d{2}):(?:unit:[12]|daily-threshold)$/,
+                );
+                if (match && getKstWeekStartDay(match[1]) === weekStart) rewardedDays.add(match[1]);
+              }
+              // The former one-shot 5,000-step payout was 20 won, equivalent
+              // to both new 10-won units. Preserve it without a migration-time
+              // double payment.
+              if (rewardedRefs.has(`${student.id}:${row.day}:daily-threshold`)) continue;
+              if (!canRewardWalkingDay(rewardedDays, row.day, policy.walkingWeeklyRewardDayCap)) continue;
+              for (let unit = 1; unit <= units; unit += 1) {
+                const sourceRef = walkingUnitSourceRef(student.id, row.day, unit);
+                await awardWalkingPolicyReward({
                   tx,
                   studentId: student.id,
                   classroomId: student.classroomId,
                   accountId,
-                  sourceType: "walking_reward",
-                  sourceRef: walkingRewardSourceRef(student.id, row.day),
-                  amount,
+                  sourceRef,
+                  baseAmount: policy.walkingRewardAmount,
+                  note: `걷기 ${policy.walkingRewardStepThreshold.toLocaleString("ko-KR")}보 보상 (${unit}/${policy.walkingDailyUnitCap}) [${row.day}]`,
+                  policy,
                 });
+                rewardedRefs.add(sourceRef);
               }
+            }
+
+            for (const weekStart of weekStarts) {
+              const totals = await tx.$queryRaw<Array<{ steps: bigint | number | null }>>(Prisma.sql`
+                SELECT SUM("steps") AS "steps"
+                FROM "StudentWalkingDailyStat"
+                WHERE "studentId" = ${student.id}
+                  AND "day" >= ${weekStart}::date
+                  AND "day" < (${weekStart}::date + 7)
+              `);
+              const steps = Number(totals[0]?.steps ?? 0);
+              if (steps < policy.walkingWeeklyGoalSteps) continue;
+              await awardWalkingPolicyReward({
+                tx,
+                studentId: student.id,
+                classroomId: student.classroomId,
+                accountId,
+                sourceRef: walkingWeeklyGoalSourceRef(student.id, weekStart),
+                sourceType: WALKING_WEEKLY_REWARD_SOURCE_TYPE,
+                baseAmount: policy.walkingWeeklyGoalAmount,
+                note: `주간 걷기 ${policy.walkingWeeklyGoalSteps.toLocaleString("ko-KR")}보 달성 보상 [${weekStart}]`,
+                policy,
+              });
             }
           },
           { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
@@ -206,7 +267,7 @@ export async function POST(request: NextRequest) {
         const raced = await db.transaction.findFirst({
           where: {
             accountId,
-            sourceType: "walking_reward",
+            sourceType: { in: ["walking_reward", WALKING_WEEKLY_REWARD_SOURCE_TYPE] },
             sourceRef: { in: sourceRefs },
             type: "deposit",
           },

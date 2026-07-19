@@ -3,11 +3,11 @@ import { Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
 import { ensureAccountFor } from "@/lib/bank";
 import {
-  awardActivityReward,
   assignmentRewardSourceRef,
   isFirstAssignmentSubmission,
   retryActivityRewardTransaction,
 } from "@/lib/creatures/activity-rewards";
+import { awardCappedPolicyReward, loadRewardPolicy } from "@/lib/reward-service";
 import { getCurrentStudent } from "@/lib/student-auth";
 import { StudentSubmitSchema } from "@/lib/assignment-schemas";
 import type {
@@ -121,11 +121,6 @@ export async function POST(
   // mutation transaction. The reward helper re-checks account ownership in
   // the same transaction before changing balance.
   const { accountId } = await ensureAccountFor(student);
-  const rewardConfig = await db.avatarRewardConfig.findUnique({
-    where: { classroomId: student.classroomId },
-    select: { assignmentRewardAmount: true },
-  });
-  const assignmentRewardAmount = rewardConfig?.assignmentRewardAmount ?? 20;
   const assignmentSourceRef = assignmentRewardSourceRef(student.id, slot.id);
 
   let updated: Parameters<typeof slotRowToDTO>[0] & { updatedAt: Date };
@@ -234,15 +229,18 @@ export async function POST(
             include: SLOT_INCLUDE_DEFAULT,
           });
 
-          if (firstSubmission && assignmentRewardAmount > 0) {
-            await awardActivityReward({
+          if (firstSubmission) {
+            const policy = await loadRewardPolicy(tx, student.classroomId);
+            await awardCappedPolicyReward({
               tx,
               studentId: student.id,
               classroomId: student.classroomId,
               accountId,
-              sourceType: "assignment_reward",
+              area: "assignment",
               sourceRef: assignmentSourceRef,
-              amount: assignmentRewardAmount,
+              baseAmount: policy.assignmentRewardAmount,
+              note: `과제 첫 제출 보상 [assignment-slot:${slot.id}]`,
+              policy,
             });
           }
 

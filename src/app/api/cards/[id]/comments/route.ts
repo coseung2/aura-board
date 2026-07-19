@@ -1,10 +1,15 @@
 import { NextResponse } from "next/server";
+import { Prisma } from "@prisma/client";
 import { z } from "zod";
 import { db } from "@/lib/db";
+import { ensureAccountFor } from "@/lib/bank";
 import { authorizeCardAccess, getCurrentCardActor } from "@/lib/card-engagement-actor";
 import { formatEngagementAuthor } from "@/lib/card-engagement-format";
 import { announceEngagementChange } from "@/lib/realtime-broadcast";
 import { touchBoardUpdatedAt } from "@/lib/board-touch";
+import { retryActivityRewardTransaction } from "@/lib/creatures/activity-rewards";
+import { isMeaningfulRewardComment, normalizeRewardComment } from "@/lib/reward-policy";
+import { awardCappedPolicyReward, loadRewardPolicy } from "@/lib/reward-service";
 
 // card-comments-likes (2026-04-26): GET list / POST create.
 
@@ -13,6 +18,7 @@ export const runtime = "nodejs";
 
 const CreateSchema = z.object({
   content: z.string().min(1).max(1000),
+  clientRequestId: z.string().trim().min(8).max(100).optional(),
 });
 
 export async function GET(
@@ -103,19 +109,111 @@ export async function POST(
   }
 
   const isTeacher = actor.kind === "teacher";
-  const created = await db.cardComment.create({
-    data: {
-      cardId,
-      authorKind: isTeacher ? "teacher" : "student",
-      authorUserId: isTeacher ? actor.id : null,
-      authorStudentId: !isTeacher ? actor.id : null,
-      content: parsed.data.content,
-    },
-    include: {
-      authorUser: { select: { id: true, name: true } },
-      authorStudent: { select: { id: true, name: true } },
-    },
-  });
+  const studentActor = actor.kind === "student" ? actor : null;
+  const storedContent = parsed.data.content.trim();
+  const normalizedContent = normalizeRewardComment(storedContent);
+  if (!normalizedContent) {
+    return NextResponse.json({ error: "invalid_input" }, { status: 400 });
+  }
+  const accountId = !studentActor
+    ? null
+    : (await ensureAccountFor({ id: studentActor.id, classroomId: studentActor.classroomId })).accountId;
+  const includeAuthors = {
+    authorUser: { select: { id: true, name: true } },
+    authorStudent: { select: { id: true, name: true } },
+  } as const;
+  let reward: { amount: number; baseAmount: number; buffBps: number } | null = null;
+  let created;
+  try {
+    const result = await retryActivityRewardTransaction(() =>
+      db.$transaction(async (tx) => {
+        if (!isTeacher && parsed.data.clientRequestId) {
+          const replay = await tx.cardComment.findUnique({
+            where: {
+              authorStudentId_cardId_clientRequestId: {
+                authorStudentId: actor.id,
+                cardId,
+                clientRequestId: parsed.data.clientRequestId,
+              },
+            },
+            include: includeAuthors,
+          });
+          if (replay) return { created: replay, reward: null };
+        }
+
+        const recentStudentComments = !isTeacher
+          ? await tx.cardComment.findMany({
+              where: {
+                authorStudentId: actor.id,
+              },
+              select: { content: true },
+            })
+          : [];
+        const duplicate = recentStudentComments.some(
+          (comment) => normalizeRewardComment(comment.content) === normalizedContent,
+        );
+        const comment = await tx.cardComment.create({
+          data: {
+            cardId,
+            authorKind: isTeacher ? "teacher" : "student",
+            authorUserId: isTeacher ? actor.id : null,
+            authorStudentId: !isTeacher ? actor.id : null,
+            clientRequestId: !isTeacher ? parsed.data.clientRequestId : null,
+            content: storedContent,
+          },
+          include: includeAuthors,
+        });
+
+        if (isTeacher || !accountId || duplicate) return { created: comment, reward: null };
+        if (!studentActor) return { created: comment, reward: null };
+        const policy = await loadRewardPolicy(tx, studentActor.classroomId);
+        if (!isMeaningfulRewardComment(normalizedContent, policy.commentMinMeaningfulLength)) {
+          return { created: comment, reward: null };
+        }
+        const paid = await awardCappedPolicyReward({
+          tx,
+          studentId: actor.id,
+          classroomId: studentActor.classroomId,
+          accountId,
+          area: "comment",
+          sourceRef: comment.id,
+          baseAmount: policy.commentRewardAmount,
+          note: `댓글 작성 보상 [comment:${comment.id}]`,
+          policy,
+        });
+        return { created: comment, reward: paid };
+      }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable }),
+    );
+    created = result.created;
+    reward = result.reward
+      ? {
+          amount: result.reward.amount,
+          baseAmount: result.reward.baseAmount,
+          buffBps: result.reward.buffBps,
+        }
+      : null;
+  } catch (error) {
+    if (
+      !isTeacher &&
+      parsed.data.clientRequestId &&
+      error instanceof Prisma.PrismaClientKnownRequestError &&
+      error.code === "P2002"
+    ) {
+      created = await db.cardComment.findUnique({
+        where: {
+          authorStudentId_cardId_clientRequestId: {
+            authorStudentId: actor.id,
+            cardId,
+            clientRequestId: parsed.data.clientRequestId,
+          },
+        },
+        include: includeAuthors,
+      });
+      if (!created) throw error;
+    } else {
+      throw error;
+    }
+  }
 
   try {
     const [likeCount, commentCount, card] = await Promise.all([
@@ -143,6 +241,7 @@ export async function POST(
 
   const rawName = isTeacher ? created.authorUser?.name ?? "" : created.authorStudent?.name ?? "";
   return NextResponse.json({
+    reward,
     item: {
       id: created.id,
       content: created.content,
