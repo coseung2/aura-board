@@ -1,0 +1,939 @@
+.page {
+  --pet-ink: #18233b;
+  --pet-muted: #61708b;
+  --pet-line: rgba(37, 55, 89, 0.13);
+  --pet-card: rgba(255, 255, 255, 0.92);
+  --pet-accent: #5b5bd6;
+  --pet-accent-soft: #ececff;
+  min-height: calc(100dvh - 64px);
+  padding: 28px clamp(16px, 4vw, 56px) 64px;
+  color: var(--pet-ink);
+  background:
+    radial-gradient(circle at 12% 0%, rgba(133, 197, 255, 0.26), transparent 30rem),
+    radial-gradient(circle at 88% 8%, rgba(255, 223, 125, 0.25), transparent 28rem),
+    linear-gradient(180deg, #f7f8ff, #eef4fb 48%, #f8fbff);
+}
+
+.hero {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 24px;
+  max-width: 1480px;
+  margin: 0 auto 18px;
+  padding: 24px 26px;
+  border: 1px solid var(--pet-line);
+  border-radius: 24px;
+  background: rgba(255, 255, 255, 0.74);
+  box-shadow: 0 24px 70px -48px rgba(33, 51, 88, 0.5);
+  backdrop-filter: blur(18px);
+}
+
+.hero h1 {
+  margin: 5px 0 8px;
+  font-size: clamp(28px, 4vw, 46px);
+  letter-spacing: -0.045em;
+}
+
+.hero p {
+  max-width: 760px;
+  margin: 0;
+  color: var(--pet-muted);
+  line-height: 1.65;
+}
+
+.eyebrow,
+.sectionHeader span,
+.panelHeading span {
+  color: var(--pet-accent);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+}
+
+.wallet {
+  flex: 0 0 auto;
+  min-width: 180px;
+  padding: 13px 16px;
+  border: 1px solid rgba(91, 91, 214, 0.18);
+  border-radius: 16px;
+  background: linear-gradient(135deg, #f2f1ff, #fff);
+}
+
+.wallet span {
+  display: block;
+  margin-bottom: 4px;
+  color: var(--pet-muted);
+  font-size: 12px;
+}
+
+.wallet strong {
+  font-size: 20px;
+}
+
+.tabs {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 9px;
+  max-width: 1480px;
+  margin: 0 auto 18px;
+}
+
+.tabs button {
+  display: grid;
+  gap: 3px;
+  padding: 13px 12px;
+  border: 1px solid var(--pet-line);
+  border-radius: 15px;
+  color: var(--pet-muted);
+  background: rgba(255, 255, 255, 0.74);
+  cursor: pointer;
+  transition: transform 160ms ease, border-color 160ms ease, background 160ms ease;
+}
+
+.tabs button:hover {
+  transform: translateY(-2px);
+  border-color: rgba(91, 91, 214, 0.35);
+}
+
+.tabs strong {
+  color: var(--pet-ink);
+  font-size: 14px;
+}
+
+.tabs span {
+  font-size: 11px;
+}
+
+.tabs .tabActive {
+  border-color: rgba(91, 91, 214, 0.42);
+  background: linear-gradient(135deg, #eeeeff, #fff);
+  box-shadow: 0 12px 32px -24px rgba(91, 91, 214, 0.75);
+}
+
+.alertSuccess,
+.alertError {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  max-width: 1480px;
+  margin: 0 auto 18px;
+  padding: 12px 16px;
+  border-radius: 13px;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.alertSuccess {
+  border: 1px solid rgba(24, 139, 91, 0.25);
+  color: #166442;
+  background: #e9f9f0;
+}
+
+.alertError {
+  border: 1px solid rgba(197, 55, 75, 0.25);
+  color: #9a2638;
+  background: #fff0f2;
+}
+
+.alertSuccess button,
+.alertError button {
+  border: 0;
+  color: inherit;
+  background: transparent;
+  font-size: 20px;
+  cursor: pointer;
+}
+
+.frontGrid,
+.fittingGrid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.55fr) minmax(320px, 0.75fr);
+  gap: 18px;
+  max-width: 1480px;
+  margin: 0 auto;
+}
+
+.habitat,
+.fittingStage {
+  position: relative;
+  overflow: hidden;
+  min-height: 620px;
+  border: 1px solid rgba(255, 255, 255, 0.75);
+  border-radius: 28px;
+  box-shadow: 0 30px 80px -52px rgba(29, 48, 83, 0.75);
+  isolation: isolate;
+}
+
+.backgroundDefault {
+  background:
+    radial-gradient(circle at 68% 24%, rgba(255, 255, 255, 0.92), transparent 8rem),
+    linear-gradient(180deg, #b9ddff 0 55%, #dbecc5 55% 100%);
+}
+
+.backgroundMeadow {
+  background:
+    radial-gradient(circle at 16% 24%, rgba(255, 248, 179, 0.75), transparent 8rem),
+    radial-gradient(ellipse at 50% 105%, #5aa86a 0 38%, transparent 39%),
+    linear-gradient(180deg, #aee3ff 0 58%, #8fce79 58% 100%);
+  animation: meadowGlow 8s ease-in-out infinite alternate;
+}
+
+.backgroundRiverlight {
+  background:
+    radial-gradient(circle at 72% 18%, rgba(255, 255, 255, 0.85), transparent 7rem),
+    repeating-radial-gradient(ellipse at 52% 88%, rgba(255, 255, 255, 0.3) 0 7px, transparent 8px 28px),
+    linear-gradient(180deg, #9fdfff 0 48%, #50bfd0 48% 100%);
+  background-size: auto, 170% 80%, auto;
+  animation: riverDrift 10s linear infinite;
+}
+
+.backgroundEmber {
+  background:
+    radial-gradient(circle at 20% 82%, rgba(255, 177, 75, 0.55), transparent 10rem),
+    radial-gradient(circle at 78% 24%, rgba(255, 102, 64, 0.42), transparent 12rem),
+    linear-gradient(160deg, #482b48, #8c3d42 55%, #db6a3b);
+  animation: emberPulse 6s ease-in-out infinite alternate;
+}
+
+.backgroundAurora {
+  background:
+    radial-gradient(circle at 80% 14%, rgba(255, 255, 255, 0.75), transparent 7rem),
+    linear-gradient(118deg, rgba(100, 225, 204, 0.5), transparent 35%),
+    linear-gradient(240deg, rgba(187, 117, 255, 0.56), transparent 40%),
+    linear-gradient(160deg, #13244f, #273674 52%, #17224f);
+  background-size: auto, 180% 180%, 180% 180%, auto;
+  animation: auroraFlow 9s ease-in-out infinite alternate;
+}
+
+.habitat::after,
+.fittingStage::after {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  left: -10%;
+  right: -10%;
+  bottom: -70px;
+  height: 190px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.18);
+  box-shadow: 0 -24px 60px rgba(255, 255, 255, 0.15);
+}
+
+.habitatGlow {
+  position: absolute;
+  inset: 10% 12% auto;
+  height: 52%;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.26), transparent 68%);
+  filter: blur(10px);
+}
+
+.wanderer {
+  position: absolute;
+  z-index: 2;
+  left: calc(50% - 150px);
+  bottom: 105px;
+  transform-origin: center bottom;
+  transition: transform 2.3s cubic-bezier(0.3, 0.75, 0.35, 1);
+}
+
+.sprite {
+  flex: 0 0 auto;
+  background-repeat: no-repeat;
+  filter: drop-shadow(0 24px 24px rgba(20, 30, 55, 0.22));
+  image-rendering: auto;
+}
+
+.habitatLabel {
+  position: absolute;
+  z-index: 3;
+  left: 22px;
+  bottom: 20px;
+  display: grid;
+  gap: 3px;
+  padding: 12px 15px;
+  border: 1px solid rgba(255, 255, 255, 0.45);
+  border-radius: 14px;
+  color: #fff;
+  background: rgba(17, 31, 60, 0.46);
+  backdrop-filter: blur(14px);
+}
+
+.habitatLabel span {
+  font-size: 11px;
+  opacity: 0.82;
+}
+
+.habitatLabel strong {
+  font-size: 18px;
+}
+
+.controlPanel,
+.fittingPanel {
+  padding: 22px;
+  border: 1px solid var(--pet-line);
+  border-radius: 24px;
+  background: var(--pet-card);
+  box-shadow: 0 24px 70px -48px rgba(29, 48, 83, 0.6);
+}
+
+.panelHeading {
+  display: flex;
+  justify-content: space-between;
+  gap: 14px;
+  align-items: flex-start;
+  margin-bottom: 18px;
+}
+
+.panelHeading h2 {
+  margin: 4px 0 0;
+  font-size: 23px;
+  letter-spacing: -0.03em;
+}
+
+.textButton {
+  border: 0;
+  color: var(--pet-accent);
+  background: transparent;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.petChips,
+.actionSelector,
+.shopFilters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+
+.petChips {
+  margin-bottom: 16px;
+}
+
+.petChips button,
+.actionSelector button,
+.shopFilters button {
+  padding: 8px 11px;
+  border: 1px solid var(--pet-line);
+  border-radius: 999px;
+  color: var(--pet-muted);
+  background: #fff;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.petChips .petChipActive,
+.actionSelector .actionActive,
+.shopFilters .shopFilterActive {
+  border-color: rgba(91, 91, 214, 0.38);
+  color: var(--pet-accent);
+  background: var(--pet-accent-soft);
+}
+
+.actionSelector {
+  padding: 14px 0 18px;
+  border-top: 1px solid var(--pet-line);
+  border-bottom: 1px solid var(--pet-line);
+}
+
+.actionSelector button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.progressBlock {
+  padding: 20px 0;
+}
+
+.progressBlock > div:first-child {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 9px;
+  font-size: 12px;
+}
+
+.progressBlock span {
+  color: var(--pet-muted);
+}
+
+.progressTrack,
+.miniMeter {
+  overflow: hidden;
+  height: 10px;
+  border-radius: 999px;
+  background: #e8ecf4;
+}
+
+.progressTrack span,
+.miniMeter span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #5b5bd6, #8c75ee, #5dc5d9);
+  transition: width 300ms ease;
+}
+
+.quickActions,
+.cardActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.quickActions button,
+.cardActions button,
+.productFooter button,
+.inputRow button,
+.primaryButton,
+.stateCard button {
+  min-height: 40px;
+  padding: 9px 13px;
+  border: 1px solid var(--pet-line);
+  border-radius: 11px;
+  color: var(--pet-ink);
+  background: #fff;
+  font-weight: 750;
+  cursor: pointer;
+}
+
+.quickActions button:hover:not(:disabled),
+.cardActions button:hover:not(:disabled),
+.productFooter button:hover:not(:disabled),
+.inputRow button:hover:not(:disabled),
+.primaryButton:hover:not(:disabled) {
+  transform: translateY(-1px);
+  border-color: rgba(91, 91, 214, 0.4);
+}
+
+.quickActions button:disabled,
+.cardActions button:disabled,
+.productFooter button:disabled,
+.inputRow button:disabled,
+.primaryButton:disabled {
+  opacity: 0.46;
+  cursor: not-allowed;
+}
+
+.evolveButton,
+.primaryButton {
+  border-color: transparent !important;
+  color: #fff !important;
+  background: linear-gradient(135deg, #5b5bd6, #8368e8) !important;
+  box-shadow: 0 12px 26px -18px rgba(91, 91, 214, 0.75);
+}
+
+.emptyStage,
+.stateCard {
+  display: grid;
+  place-items: center;
+  max-width: 1480px;
+  min-height: 480px;
+  margin: 0 auto;
+  padding: 32px;
+  text-align: center;
+  border: 1px dashed rgba(91, 91, 214, 0.3);
+  border-radius: 26px;
+  background: rgba(255, 255, 255, 0.76);
+}
+
+.emptyStage h2,
+.stateCard h1 {
+  margin: 12px 0 6px;
+  letter-spacing: -0.03em;
+}
+
+.emptyStage p,
+.stateCard p {
+  max-width: 540px;
+  margin: 0 0 18px;
+  color: var(--pet-muted);
+}
+
+.emptyEgg {
+  font-size: 70px;
+  animation: eggBob 1.8s ease-in-out infinite;
+}
+
+.sectionHeader {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 20px;
+  max-width: 1480px;
+  margin: 4px auto 16px;
+}
+
+.sectionHeader h2 {
+  margin: 3px 0 0;
+  font-size: 26px;
+  letter-spacing: -0.035em;
+}
+
+.sectionHeader p {
+  margin: 0;
+  color: var(--pet-muted);
+  font-size: 13px;
+}
+
+.collectionGrid,
+.shopGrid,
+.dexGrid {
+  display: grid;
+  gap: 14px;
+  max-width: 1480px;
+  margin: 0 auto;
+}
+
+.collectionGrid {
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+}
+
+.petCard,
+.productCard,
+.dexCard {
+  overflow: hidden;
+  border: 1px solid var(--pet-line);
+  border-radius: 20px;
+  background: var(--pet-card);
+  box-shadow: 0 18px 52px -42px rgba(29, 48, 83, 0.6);
+}
+
+.petCardSelected {
+  border-color: rgba(91, 91, 214, 0.45);
+  box-shadow: 0 18px 44px -32px rgba(91, 91, 214, 0.55);
+}
+
+.petCardPreview {
+  position: relative;
+  display: grid;
+  width: 100%;
+  place-items: center;
+  min-height: 210px;
+  border: 0;
+  background: linear-gradient(180deg, #eaf5ff, #f7f4ff);
+  cursor: pointer;
+}
+
+.equippedBadge {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  padding: 5px 8px;
+  border-radius: 999px;
+  color: #fff;
+  background: var(--pet-accent);
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.petCardBody,
+.productBody {
+  padding: 16px;
+}
+
+.petCardBody h3,
+.productBody h3 {
+  margin: 6px 0 5px;
+  font-size: 18px;
+}
+
+.petCardBody p,
+.productBody p {
+  margin: 0 0 12px;
+  color: var(--pet-muted);
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+.elementPill {
+  display: inline-flex;
+  padding: 4px 8px;
+  border-radius: 999px;
+  color: #42516e;
+  background: #eef3fa;
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.miniMeter {
+  height: 7px;
+  margin-bottom: 13px;
+}
+
+.cardActions button {
+  flex: 1 1 auto;
+  min-height: 34px;
+  padding: 7px 9px;
+  font-size: 11px;
+}
+
+.shopFilters {
+  max-width: 1480px;
+  margin: 0 auto 14px;
+}
+
+.shopGrid {
+  grid-template-columns: repeat(auto-fill, minmax(270px, 1fr));
+}
+
+.productVisual {
+  display: grid;
+  min-height: 180px;
+  place-items: center;
+  border-bottom: 1px solid var(--pet-line);
+  background: linear-gradient(135deg, #eff6ff, #f5efff);
+}
+
+.productVisual > span {
+  font-size: 68px;
+  filter: drop-shadow(0 16px 16px rgba(30, 45, 75, 0.18));
+}
+
+.productMeta,
+.productFooter {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.productMeta {
+  color: var(--pet-muted);
+  font-size: 10px;
+}
+
+.rarity {
+  padding: 4px 7px;
+  border-radius: 999px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.rarityCommon { color: #526277; background: #edf1f5; }
+.rarityRare { color: #2066a3; background: #e4f2ff; }
+.rarityEpic { color: #7c3db4; background: #f2e7ff; }
+.rarityLegendary { color: #9a6218; background: #fff1c9; }
+
+.productFooter {
+  padding-top: 12px;
+  border-top: 1px solid var(--pet-line);
+}
+
+.productFooter strong {
+  font-size: 15px;
+}
+
+.productFooter button {
+  min-height: 35px;
+  padding: 7px 12px;
+  color: #fff;
+  background: var(--pet-accent);
+}
+
+.fittingStage {
+  display: grid;
+  place-items: center;
+  min-height: 620px;
+}
+
+.fittingStage > div:last-child {
+  position: absolute;
+  left: 22px;
+  bottom: 20px;
+  display: grid;
+  gap: 2px;
+  padding: 11px 14px;
+  border-radius: 13px;
+  color: #fff;
+  background: rgba(17, 31, 60, 0.45);
+  backdrop-filter: blur(12px);
+}
+
+.fittingStage > div:last-child span {
+  font-size: 11px;
+  opacity: 0.8;
+}
+
+.fittingPanel {
+  display: flex;
+  flex-direction: column;
+  gap: 17px;
+}
+
+.fieldLabel {
+  display: grid;
+  gap: 8px;
+  color: var(--pet-muted);
+  font-size: 12px;
+  font-weight: 750;
+}
+
+.fieldLabel select,
+.fieldLabel input {
+  width: 100%;
+  min-height: 42px;
+  padding: 9px 11px;
+  border: 1px solid var(--pet-line);
+  border-radius: 11px;
+  color: var(--pet-ink);
+  background: #fff;
+}
+
+.inputRow {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 8px;
+}
+
+.backgroundOptions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.backgroundOptions button {
+  overflow: hidden;
+  display: grid;
+  grid-template-columns: 48px 1fr;
+  align-items: center;
+  gap: 9px;
+  padding: 7px;
+  text-align: left;
+  border: 1px solid var(--pet-line);
+  border-radius: 11px;
+  color: var(--pet-ink);
+  background: #fff;
+  font-size: 11px;
+  font-weight: 750;
+  cursor: pointer;
+}
+
+.backgroundOptions button > span {
+  display: block;
+  width: 48px;
+  height: 38px;
+  border-radius: 8px;
+}
+
+.backgroundOptions .backgroundOptionActive {
+  border-color: rgba(91, 91, 214, 0.48);
+  background: var(--pet-accent-soft);
+}
+
+.mutedNote {
+  margin: 0;
+  color: var(--pet-muted);
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+.dexGrid {
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+}
+
+.dexCard header {
+  display: grid;
+  grid-template-columns: 44px 1fr auto;
+  align-items: center;
+  gap: 8px;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--pet-line);
+}
+
+.dexCard header span {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 11px;
+  color: var(--pet-accent);
+  background: var(--pet-accent-soft);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.dexCard header small {
+  color: var(--pet-muted);
+  font-weight: 800;
+}
+
+.dexStages {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 5px;
+  padding: 12px;
+}
+
+.dexStages > div {
+  position: relative;
+  display: grid;
+  justify-items: center;
+  min-width: 0;
+  padding: 6px 3px 10px;
+  border-radius: 13px;
+  background: #f5f7fb;
+}
+
+.dexStages strong {
+  overflow: hidden;
+  max-width: 100%;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 11px;
+}
+
+.dexStages span {
+  color: var(--pet-muted);
+  font-size: 9px;
+}
+
+.dexLocked .sprite {
+  filter: grayscale(1) opacity(0.25);
+}
+
+.dexLocked::after {
+  content: "🔒";
+  position: absolute;
+  top: 48px;
+  font-size: 22px;
+}
+
+.dexDiscovered {
+  background: linear-gradient(180deg, #eef7ff, #f5f1ff) !important;
+}
+
+.dexCard > p {
+  margin: 0;
+  padding: 0 16px 14px;
+  color: var(--pet-muted);
+  font-size: 11px;
+}
+
+.stateCard {
+  min-height: calc(100dvh - 160px);
+}
+
+.stateOrb {
+  width: 82px;
+  height: 82px;
+  border-radius: 50%;
+  background: conic-gradient(from 40deg, #5b5bd6, #65cbd6, #ffe68a, #5b5bd6);
+  box-shadow: inset 0 0 0 15px rgba(255, 255, 255, 0.66), 0 18px 34px -18px rgba(91, 91, 214, 0.65);
+  animation: stateSpin 2.4s linear infinite;
+}
+
+@keyframes eggBob {
+  0%, 100% { transform: translateY(0) rotate(-2deg); }
+  50% { transform: translateY(-9px) rotate(3deg); }
+}
+
+@keyframes meadowGlow {
+  to { filter: saturate(1.08) brightness(1.04); }
+}
+
+@keyframes riverDrift {
+  to { background-position: 0 0, 130% 0, 0 0; }
+}
+
+@keyframes emberPulse {
+  to { filter: brightness(1.12) saturate(1.08); }
+}
+
+@keyframes auroraFlow {
+  to { background-position: 0 0, 90% 40%, 20% 80%, 0 0; }
+}
+
+@keyframes stateSpin {
+  to { transform: rotate(360deg); }
+}
+
+@media (max-width: 980px) {
+  .frontGrid,
+  .fittingGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .habitat,
+  .fittingStage {
+    min-height: 520px;
+  }
+
+  .controlPanel,
+  .fittingPanel {
+    min-height: auto;
+  }
+}
+
+@media (max-width: 720px) {
+  .page {
+    padding: 16px 12px 48px;
+  }
+
+  .hero,
+  .sectionHeader {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .wallet {
+    width: 100%;
+  }
+
+  .tabs {
+    grid-template-columns: repeat(5, 128px);
+    overflow-x: auto;
+    padding-bottom: 5px;
+    scrollbar-width: none;
+  }
+
+  .tabs::-webkit-scrollbar {
+    display: none;
+  }
+
+  .habitat,
+  .fittingStage {
+    min-height: 430px;
+    border-radius: 20px;
+  }
+
+  .wanderer {
+    left: calc(50% - 125px);
+    bottom: 88px;
+  }
+
+  .controlPanel,
+  .fittingPanel {
+    padding: 17px;
+    border-radius: 18px;
+  }
+
+  .collectionGrid,
+  .shopGrid,
+  .dexGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .backgroundOptions {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .backgroundMeadow,
+  .backgroundRiverlight,
+  .backgroundEmber,
+  .backgroundAurora,
+  .eggShell,
+  .stateOrb {
+    animation: none !important;
+  }
+
+  .wanderer {
+    transition: none;
+  }
+}
