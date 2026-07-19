@@ -495,6 +495,7 @@ model Classroom {
 
   // Creature growth and classroom inventory (creature system v1)
   studentCreatures       StudentCreature[]
+  studentSlimes          StudentSlime[]
   creatureProgressEvents CreatureProgressEvent[]
   creatureItems          StudentCreatureItem[]
   creatureItemUses       CreatureItemUse[]
@@ -617,6 +618,7 @@ model Student {
 
   // Creature growth and classroom inventory (creature system v1)
   creatures              StudentCreature[]
+  slimes                 StudentSlime[]
   creatureProgressEvents CreatureProgressEvent[]
   creatureItems          StudentCreatureItem[]
   creatureItemUses       CreatureItemUse[]
@@ -3309,6 +3311,7 @@ model Transaction {
   // Avatar customization MVP (2026-07-02)
   avatarPurchase      AvatarPurchase?
   creatureEggPurchase StudentCreature? @relation("CreatureEggPurchase")
+  slimePurchase       StudentSlime?     @relation("SlimePurchase")
 
   storeItem StoreItem? @relation(fields: [storeItemId], references: [id], onDelete: SetNull)
 
@@ -3364,6 +3367,26 @@ model StudentCreature {
   @@unique([originSourceType, originSourceRef])
   @@index([studentId, isActive])
   @@index([studentId, lineKey])
+  @@index([classroomId])
+}
+
+model StudentSlime {
+  id String @id @default(cuid())
+
+  studentId   String
+  classroomId String
+  color       String
+
+  purchaseTransactionId String @unique
+
+  createdAt DateTime @default(now())
+
+  student             Student      @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  classroom           Classroom    @relation(fields: [classroomId], references: [id], onDelete: Cascade)
+  purchaseTransaction Transaction  @relation("SlimePurchase", fields: [purchaseTransactionId], references: [id], onDelete: Restrict)
+
+  @@unique([studentId, color])
+  @@index([studentId, createdAt])
   @@index([classroomId])
 }
 

@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { getStudentDuties } from "@/lib/role-portals";
 import { getCurrentStudent } from "@/lib/student-auth";
 import { StudentTopNav } from "@/components/StudentTopNav";
-import { CreatureHub } from "@/components/creatures/CreatureHub";
+import { SlimePetPage } from "@/components/creatures/SlimePetPage";
 
 export const dynamic = "force-dynamic";
 
@@ -20,7 +20,7 @@ export default async function StudentAuraPetPage() {
         classroomName={student.classroom.name}
         duties={duties}
       />
-      <CreatureHub />
+      <SlimePetPage />
     </>
   );
 }

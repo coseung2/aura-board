@@ -1,0 +1,451 @@
+.page {
+  width: min(1120px, 100%);
+  margin: 0 auto;
+  padding: clamp(22px, 4vw, 44px) clamp(16px, 4vw, 32px) 64px;
+  color: var(--color-text);
+  font-family: var(--font-body);
+}
+
+.header,
+.sectionHeading,
+.breakdownHeading,
+.drawerHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
+}
+
+.header {
+  align-items: end;
+  padding-bottom: 24px;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.eyebrow {
+  margin: 0 0 8px;
+  color: var(--color-accent-tinted-text);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+}
+
+.title {
+  margin: 0;
+  font-size: clamp(24px, 4vw, 34px);
+  letter-spacing: -0.04em;
+}
+
+.subtitle,
+.sectionHeading p {
+  margin: 8px 0 0;
+  color: var(--color-text-muted);
+  font-size: 14px;
+  line-height: 1.55;
+}
+
+.walletActions {
+  display: flex;
+  align-items: stretch;
+  gap: 12px;
+}
+
+.walletSummary {
+  display: grid;
+  justify-items: end;
+  gap: 2px;
+  min-width: 150px;
+  padding-left: 16px;
+  border-left: 1px solid var(--color-border);
+  text-align: right;
+}
+
+.walletLabel,
+.count {
+  color: var(--color-text-muted);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.walletSummary strong {
+  color: var(--color-accent);
+  font-size: 22px;
+  letter-spacing: -0.03em;
+}
+
+.status,
+.drawerNotice {
+  min-height: 22px;
+  margin: 16px 0 -6px;
+  color: var(--color-text-muted);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.drawerNotice {
+  margin: 16px 0 0;
+  padding: 10px 12px;
+  border-left: 3px solid var(--color-accent);
+  background: var(--color-accent-tinted-bg);
+}
+
+.statusError {
+  color: var(--color-danger, #b42318);
+}
+
+.section {
+  padding: 28px 0;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.section:last-child {
+  border-bottom: 0;
+}
+
+.sectionHeading h2,
+.breakdownHeading h2,
+.drawerHeader h2 {
+  margin: 0;
+  font-size: 18px;
+  letter-spacing: -0.03em;
+}
+
+.sectionHeading .count {
+  padding-top: 3px;
+  white-space: nowrap;
+}
+
+.slimeGrid,
+.breakdown,
+.shopList {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.slimeGrid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 16px;
+  margin-top: 20px;
+}
+
+.slimeItem {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+  padding: 0 0 16px;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.slimeItemSelected {
+  border-bottom-color: var(--color-accent);
+}
+
+.spriteFrame,
+.shopImageFrame {
+  display: grid;
+  min-height: 96px;
+  place-items: center;
+}
+
+.spriteFrame img {
+  display: block;
+  width: 88px;
+  height: 88px;
+  object-fit: contain;
+  image-rendering: pixelated;
+}
+
+.itemCopy,
+.shopItemCopy {
+  min-width: 0;
+}
+
+.itemCopy h3,
+.shopItemCopy h3 {
+  margin: 0;
+  overflow: hidden;
+  font-size: 14px;
+  letter-spacing: -0.02em;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.itemCopy p,
+.shopItemCopy p {
+  margin: 5px 0 0;
+  color: var(--color-text-muted);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.actionButton,
+.shopTrigger,
+.shopBuyButton,
+.filterButton,
+.closeButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  min-width: 0;
+  min-height: 44px;
+  padding: 8px 10px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-btn);
+  color: var(--color-text-muted);
+  background: transparent;
+  cursor: pointer;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.25;
+  text-align: center;
+}
+
+.shopTrigger {
+  min-width: 84px;
+  border-color: var(--color-accent);
+  color: var(--color-accent-active);
+}
+
+.actionButton:hover,
+.shopTrigger:hover,
+.shopBuyButton:hover,
+.filterButton:hover,
+.closeButton:hover {
+  border-color: var(--color-accent);
+  color: var(--color-accent-active);
+}
+
+.actionButton[aria-pressed="true"],
+.filterButton[aria-pressed="true"] {
+  border-color: var(--color-accent);
+  color: var(--color-accent-active);
+  font-weight: 700;
+}
+
+.actionButton:disabled,
+.shopBuyButton:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.actionButton[aria-pressed="true"]:disabled {
+  opacity: 1;
+}
+
+.actionButton:focus-visible,
+.shopTrigger:focus-visible,
+.shopBuyButton:focus-visible,
+.filterButton:focus-visible,
+.closeButton:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+.spriteSlot {
+  --sprite-size: 1.1em;
+  display: inline-grid;
+  width: var(--sprite-size);
+  height: var(--sprite-size);
+  flex: 0 0 auto;
+  place-items: center;
+  line-height: 1;
+}
+
+.buttonLabel {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.breakdownHeading {
+  align-items: center;
+}
+
+.breakdown {
+  display: grid;
+  gap: 0;
+  margin-top: 12px;
+  color: var(--color-text-muted);
+  font-size: 13px;
+}
+
+.breakdown li {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.breakdown li:last-child {
+  border-bottom: 0;
+}
+
+.drawerLayer {
+  position: fixed;
+  z-index: 1000;
+  inset: 0;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.drawerBackdrop {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border: 0;
+  background: rgba(24, 49, 63, 0.34);
+  cursor: default;
+}
+
+.drawer {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  width: min(440px, 100%);
+  height: 100%;
+  padding: 24px;
+  overflow-y: auto;
+  border-left: 1px solid var(--color-border);
+  background: var(--color-surface);
+  box-shadow: -8px 0 24px rgba(24, 74, 92, 0.12), var(--shadow-card);
+  animation: drawerIn 180ms ease-out;
+}
+
+.drawerHeader {
+  align-items: flex-start;
+}
+
+.closeButton {
+  width: 44px;
+  padding: 0;
+  font-size: 25px;
+  line-height: 1;
+}
+
+.shopFilters {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 6px;
+  margin-top: 24px;
+}
+
+.filterButton {
+  width: 100%;
+  padding-inline: 8px;
+}
+
+.shopList {
+  display: grid;
+  gap: 12px;
+  margin-top: 18px;
+}
+
+.shopItem {
+  display: grid;
+  grid-template-columns: 76px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.shopImageFrame {
+  min-height: 72px;
+}
+
+.shopImageFrame img {
+  display: block;
+  width: 72px;
+  height: 72px;
+  object-fit: contain;
+  image-rendering: pixelated;
+}
+
+.shopItemCopy strong {
+  display: block;
+  margin-top: 6px;
+  color: var(--color-accent-active);
+  font-size: 13px;
+}
+
+.shopBuyButton {
+  min-width: 76px;
+}
+
+@keyframes drawerIn {
+  from {
+    transform: translateX(18px);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .drawer {
+    animation: none;
+  }
+}
+
+@media (max-width: 900px) {
+  .slimeGrid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 560px) {
+  .header,
+  .sectionHeading {
+    display: block;
+  }
+
+  .walletActions {
+    align-items: stretch;
+    margin-top: 18px;
+  }
+
+  .walletSummary {
+    flex: 1;
+    justify-items: start;
+    margin-top: 0;
+    padding-top: 12px;
+    padding-left: 0;
+    border-top: 1px solid var(--color-border);
+    border-left: 0;
+    text-align: left;
+  }
+
+  .shopTrigger {
+    align-self: end;
+  }
+
+  .sectionHeading .count {
+    display: inline-block;
+    margin-top: 10px;
+  }
+
+  .slimeGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 16px 12px;
+  }
+
+  .drawer {
+    width: 100%;
+    padding: 20px 16px;
+  }
+
+  .breakdown li {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 3px;
+  }
+}
