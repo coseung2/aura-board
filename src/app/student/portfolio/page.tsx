@@ -2,7 +2,6 @@ import { redirect } from "next/navigation";
 import { db } from "@/lib/db";
 import { getCurrentStudent } from "@/lib/student-auth";
 import { getStudentDuties } from "@/lib/role-portals";
-import { isAdminEmail } from "@/lib/admin";
 import { PortfolioPage } from "@/components/portfolio/PortfolioPage";
 import { StudentTopNav } from "@/components/StudentTopNav";
 import type { PortfolioRosterDTO } from "@/lib/portfolio-dto";
@@ -66,7 +65,6 @@ export default async function StudentPortfolioPage() {
         studentName={student.name}
         classroomName={classroom.name}
         duties={duties}
-        showDevFeatures={isAdminEmail(student.classroom.teacher.email)}
       />
       <main className="student-page-portfolio-shell">
         {/* 헤더는 PortfolioPage 가 own — DJ 보드 패턴 일치 (제목 + action 동일

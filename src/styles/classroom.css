@@ -999,6 +999,33 @@
   min-width: 0;
 }
 
+.student-walking-page .classroom-dashboard-kpis {
+  gap: 0;
+  border-block: 1px solid var(--color-border);
+}
+
+.student-walking-page .classroom-dashboard-kpi {
+  padding: 16px 18px;
+  border: 0;
+  border-right: 1px solid var(--color-border);
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.student-walking-page .classroom-dashboard-kpi:last-child {
+  border-right: 0;
+}
+
+.student-walking-page .classroom-dashboard-panel {
+  padding: 24px 0;
+  border: 0;
+  border-top: 1px solid var(--color-border);
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
 .classroom-dashboard-panel-wide {
   grid-column: 1 / -1;
 }

@@ -102,10 +102,6 @@ export function ReadingForm() {
     <div className="reading-page">
       <section className="reading-form-card">
         <h1 className="reading-page-title">독서</h1>
-        <p className="reading-page-subtitle">
-          오늘 읽은 책의 감상을 기록해 보세요.
-        </p>
-
         <form className="reading-form" onSubmit={handleSubmit}>
           <div className="reading-form-row">
             <label className="reading-field">

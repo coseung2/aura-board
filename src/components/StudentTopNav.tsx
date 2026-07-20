@@ -20,14 +20,12 @@ type Props = {
   studentName: string;
   classroomName: string;
   duties?: Duty[];
-  showDevFeatures?: boolean;
 };
 
 export function StudentTopNav({
   studentName,
   classroomName,
   duties = [],
-  showDevFeatures = false,
 }: Props) {
   const pathname = usePathname() ?? "";
   const router = useRouter();
@@ -43,14 +41,6 @@ export function StudentTopNav({
 
   const readingRecordActive =
     pathname === "/student/reading" || pathname.startsWith("/student/reading/");
-  const readingChampionsActive = pathname.startsWith(
-    "/student/reading-champions",
-  );
-  const characterActive =
-    readingChampionsActive ||
-    pathname === "/student/character-town" ||
-    pathname === "/student/character-room" ||
-    pathname === "/student/character-shop";
   const walkingActive = pathname.startsWith("/student/walking");
   const walletActive = pathname.startsWith("/my/wallet");
   const portfolioActive = pathname.startsWith("/student/portfolio");
@@ -141,36 +131,6 @@ export function StudentTopNav({
       ],
     },
     {
-      id: "character",
-      label: "캐릭터",
-      href: "/student/reading-champions",
-      active: characterActive,
-      groups: [
-        {
-          title: "캐릭터",
-          links: [
-            {
-              href: "/student/reading-champions",
-              label: "독서왕 전시",
-              active:
-                readingChampionsActive ||
-                pathname === "/student/character-town",
-            },
-            {
-              href: "/student/character-room",
-              label: "캐릭터 룸",
-              active: pathname === "/student/character-room",
-            },
-            {
-              href: "/student/character-shop",
-              label: "상점",
-              active: pathname === "/student/character-shop",
-            },
-          ],
-        },
-      ],
-    },
-    {
       id: "creatures",
       label: "펫",
       href: "/student/aura-pet",
@@ -189,10 +149,6 @@ export function StudentTopNav({
       ],
     },
   ];
-
-  const visibleNavItems = showDevFeatures
-    ? navItems
-    : navItems.filter((item) => item.id !== "character");
 
   async function handleLogout() {
     setLoggingOut(true);
@@ -215,7 +171,7 @@ export function StudentTopNav({
           <Logo size={32} withWordmark />
         </Link>
 
-        <MegaNav items={visibleNavItems} ariaLabel="학생 메뉴" />
+        <MegaNav items={navItems} ariaLabel="학생 메뉴" />
       </div>
 
       <div className="student-topnav-right auth-header auth-header-flat">

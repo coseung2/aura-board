@@ -1,5 +1,4 @@
 import { redirect } from "next/navigation";
-import { isAdminEmail } from "@/lib/admin";
 import { db } from "@/lib/db";
 import { loadRewardPolicy } from "@/lib/reward-service";
 import { getCurrentStudent } from "@/lib/student-auth";
@@ -112,16 +111,11 @@ export default async function StudentWalkingPage() {
         studentName={student.name}
         classroomName={student.classroom.name}
         duties={home.duties}
-        showDevFeatures={isAdminEmail(student.classroom.teacher.email)}
       />
-      <main className="student-page">
+      <main className="student-page student-walking-page">
         <header className="home-header">
           <div>
-            <p className="home-subtitle">Health Connect</p>
             <h1 className="home-title">걷기</h1>
-            <p className="home-subtitle">
-              Android 앱에서 동기화한 이번 주 걸음 수와 이동 거리를 확인해요.
-            </p>
           </div>
         </header>
 
@@ -129,14 +123,9 @@ export default async function StudentWalkingPage() {
           <section className="classroom-dashboard-panel" aria-labelledby="walking-empty-title">
             <div className="classroom-dashboard-panel-head">
               <div>
-                <span>Get started</span>
                 <h2 id="walking-empty-title">아직 동기화된 걷기 기록이 없습니다</h2>
               </div>
             </div>
-            <p className="classroom-dashboard-empty">
-              Android 앱의 걷기 화면에서 Health Connect를 연결하고 동기화하면
-              이번 주 월요일부터 오늘까지의 기록이 여기에 표시됩니다.
-            </p>
           </section>
         ) : null}
 
@@ -221,11 +210,6 @@ export default async function StudentWalkingPage() {
               {reachedAmount}원 / {weeklyRewardTotal}원
             </strong>
           </div>
-          <p className="student-walking-reward-copy">
-            주간 합계 {numberFormatter.format(totalSteps)}걸음 · 월요일–일요일 기준 · {numberFormatter.format(
-              rewardPolicy.walkingRewardStepThreshold,
-            )}걸음마다 {numberFormatter.format(rewardPolicy.walkingRewardAmount)}원 · 주 {rewardPolicy.walkingWeeklyRewardDayCap}일
-          </p>
           <div className="student-walking-tier-grid" role="list" aria-label="주간 걷기 보상 단계">
             {weeklyTiers.map((tier, index) => {
               const achieved = totalSteps >= tier.steps;
@@ -253,18 +237,6 @@ export default async function StudentWalkingPage() {
           </p>
         </section>
 
-        <section className="classroom-dashboard-panel">
-          <div className="classroom-dashboard-panel-head">
-            <div>
-              <span>Privacy</span>
-              <h2>저장되는 정보</h2>
-            </div>
-          </div>
-          <p className="classroom-dashboard-empty">
-            날짜별 걸음 수와 이동 거리 합계만 저장합니다. GPS 위치, 이동 경로,
-            원본 센서 샘플은 저장하지 않습니다.
-          </p>
-        </section>
       </main>
     </>
   );

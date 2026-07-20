@@ -2,7 +2,6 @@ import { redirect } from "next/navigation";
 import { db } from "@/lib/db";
 import { getCurrentStudent } from "@/lib/student-auth";
 import { getStudentDuties } from "@/lib/role-portals";
-import { isAdminEmail } from "@/lib/admin";
 import { StudentTopNav } from "@/components/StudentTopNav";
 import { ReadingForm } from "./ReadingForm";
 
@@ -30,7 +29,6 @@ export default async function StudentReadingPage() {
         studentName={student.name}
         classroomName={classroom.name}
         duties={duties}
-        showDevFeatures={isAdminEmail(student.classroom.teacher.email)}
       />
       <main className="student-page-portfolio-shell">
         <ReadingForm />

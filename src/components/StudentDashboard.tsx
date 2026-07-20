@@ -69,7 +69,6 @@ type Props = {
   boards: BoardItem[];
   duties: Duty[];
   assignments?: StudentAssignmentTodo[];
-  showDevFeatures?: boolean;
 };
 
 const SLIME_COLOR_LABELS: Record<SlimeColor, string> = {
@@ -186,7 +185,6 @@ export function StudentDashboard({
           <div className="student-wallet-card">
             <div className="student-wallet-header">
               <div>
-                <p className="student-wallet-eyebrow">개인 금융</p>
                 <h2 className="student-wallet-title">내 통장과 적금</h2>
               </div>
               <Link href="/my/wallet" className="student-wallet-link">
@@ -304,7 +302,6 @@ function StudentSlimeCard({
     <div className="student-slime-card" data-testid="student-slime-card">
       <div className="student-slime-header">
         <div>
-          <p className="student-slime-eyebrow">나만의 슬라임</p>
           <h2 className="student-slime-title">내 슬라임</h2>
         </div>
         <Link href="/student/aura-pet" className="student-slime-link">
@@ -372,7 +369,6 @@ function StudentAssignmentTodos({
     <section className="student-assignment-panel" aria-label="과제 목록">
       <div className="student-assignment-header">
         <div>
-          <p className="student-assignment-eyebrow">과제 목록</p>
           <h2 className="student-assignment-title">
             {filter === "missing" ? "해야 할 과제" : "완료한 과제"}
           </h2>

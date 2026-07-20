@@ -58,7 +58,6 @@ describe("StudentDashboard slime card", () => {
         classroomId="classroom-1"
         boards={[]}
         duties={[]}
-        showDevFeatures
       />,
     );
 
