@@ -2,10 +2,14 @@ import { describe, it, expect } from "vitest";
 import {
   pickAuthorName,
   formatAuthorList,
+  formatRelativeKo,
   type AuthorLike,
 } from "../card-author";
 
-const A = (order: number, displayName: string): AuthorLike => ({ order, displayName });
+const A = (order: number, displayName: string): AuthorLike => ({
+  order,
+  displayName,
+});
 
 describe("pickAuthorName — legacy fallback chain", () => {
   it("prefers external over student over author", () => {
@@ -30,9 +34,9 @@ describe("formatAuthorList", () => {
     expect(formatAuthorList([A(0, "김철수")], null, null, null)).toBe("김철수");
   });
   it("2 authors — polite pair label", () => {
-    expect(formatAuthorList([A(0, "김철수"), A(1, "이영희")], null, null, null)).toBe(
-      "김철수님과 이영희님"
-    );
+    expect(
+      formatAuthorList([A(0, "김철수"), A(1, "이영희")], null, null, null),
+    ).toBe("김철수님과 이영희님");
   });
   it("3 authors — first author plus remaining count", () => {
     expect(
@@ -40,8 +44,8 @@ describe("formatAuthorList", () => {
         [A(0, "김철수"), A(1, "이영희"), A(2, "박민수")],
         null,
         null,
-        null
-      )
+        null,
+      ),
     ).toBe("김철수님과 2명");
   });
   it("4+ authors — first author plus remaining count", () => {
@@ -50,29 +54,48 @@ describe("formatAuthorList", () => {
         [A(0, "김"), A(1, "이"), A(2, "박"), A(3, "최")],
         null,
         null,
-        null
-      )
+        null,
+      ),
     ).toBe("김님과 3명");
     expect(
       formatAuthorList(
         [A(0, "a"), A(1, "b"), A(2, "c"), A(3, "d"), A(4, "e"), A(5, "f")],
         null,
         null,
-        null
-      )
+        null,
+      ),
     ).toBe("a님과 5명");
   });
   it("respects order — primary is smallest order", () => {
     expect(
-      formatAuthorList([A(1, "이영희"), A(0, "김철수")], null, null, null)
+      formatAuthorList([A(1, "이영희"), A(0, "김철수")], null, null, null),
     ).toBe("김철수님과 이영희님");
   });
   it("filters empty displayName", () => {
     expect(
-      formatAuthorList([A(0, "김"), A(1, "   "), A(2, "박")], null, null, null)
+      formatAuthorList([A(0, "김"), A(1, "   "), A(2, "박")], null, null, null),
     ).toBe("김님과 박님");
   });
   it("all empty strings → fallback", () => {
-    expect(formatAuthorList([A(0, ""), A(1, "   ")], "ex", null, null)).toBe("ex");
+    expect(formatAuthorList([A(0, ""), A(1, "   ")], "ex", null, null)).toBe(
+      "ex",
+    );
+  });
+});
+
+describe("formatRelativeKo", () => {
+  const now = Date.parse("2026-04-13T12:00:00Z");
+
+  it("keeps the absolute title in Korean KST regardless of runtime locale", () => {
+    expect(formatRelativeKo("2026-04-13T00:00:00Z", now)).toEqual({
+      rel: "12시간 전",
+      abs: "2026. 4. 13. 오전 9:00:00",
+    });
+  });
+
+  it("uses the same KST calendar date for old cards", () => {
+    expect(formatRelativeKo("2026-03-01T15:00:00Z", now).rel).toBe(
+      "2026. 3. 2.",
+    );
   });
 });

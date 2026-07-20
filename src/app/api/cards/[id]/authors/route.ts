@@ -2,7 +2,11 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { db } from "@/lib/db";
 import { resolveIdentities } from "@/lib/identity";
-import { canEditCard, type BoardLike, type CardLike } from "@/lib/card-permissions";
+import {
+  canEditCard,
+  type BoardLike,
+  type CardLike,
+} from "@/lib/card-permissions";
 import {
   setCardAuthors,
   MAX_AUTHORS_PER_CARD,
@@ -10,6 +14,7 @@ import {
   CardAuthorError,
 } from "@/lib/card-authors-service";
 import { touchBoardUpdatedAt } from "@/lib/board-touch";
+import { normalizeStudentAuthorInputs } from "@/lib/student-card-authors";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -37,7 +42,7 @@ const BodySchema = z.object({
  */
 export async function PUT(
   req: Request,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: Promise<{ id: string }> },
 ) {
   try {
     const { id } = await params;
@@ -86,17 +91,34 @@ export async function PUT(
     if (!parsed.success) {
       return NextResponse.json(
         { error: "invalid_input", detail: parsed.error.issues[0]?.message },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
+    let authorInputs = parsed.data.authors;
+    if (!identity.teacher && identity.student) {
+      const roster = await db.student.findMany({
+        where: { classroomId: board.classroomId ?? undefined },
+        select: { id: true, name: true },
+      });
+      const normalized = normalizeStudentAuthorInputs(
+        authorInputs,
+        identity.student.studentId,
+        roster,
+      );
+      if (!normalized.ok) {
+        return NextResponse.json({ error: normalized.error }, { status: 400 });
+      }
+      authorInputs = normalized.authors;
+    }
+
     const result = await db.$transaction(async (tx) => {
-      return await setCardAuthors(tx, card.id, parsed.data.authors, {
+      return await setCardAuthors(tx, card.id, authorInputs, {
         classroomId: board.classroomId,
       });
     });
 
-    const authors = await db.cardAuthor.findMany({
+    const savedAuthors = await db.cardAuthor.findMany({
       where: { cardId: card.id },
       orderBy: { order: "asc" },
       select: { id: true, studentId: true, displayName: true, order: true },
@@ -106,7 +128,7 @@ export async function PUT(
     await touchBoardUpdatedAt(card.boardId);
 
     return NextResponse.json({
-      authors,
+      authors: savedAuthors,
       primary: {
         studentAuthorId: result.primaryStudentId,
         externalAuthorName: result.externalAuthorName,
@@ -114,7 +136,10 @@ export async function PUT(
     });
   } catch (e) {
     if (e instanceof CardAuthorError) {
-      return NextResponse.json({ error: e.code, detail: e.message }, { status: 400 });
+      return NextResponse.json(
+        { error: e.code, detail: e.message },
+        { status: 400 },
+      );
     }
     if (e instanceof z.ZodError) {
       return NextResponse.json({ error: "invalid_input" }, { status: 400 });

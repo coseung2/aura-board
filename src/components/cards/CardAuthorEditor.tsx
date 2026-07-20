@@ -30,6 +30,8 @@ type Props = {
   cardId: string;
   classroomId: string | null;
   initialAuthors: SavedAuthor[];
+  isStudentViewer?: boolean;
+  studentOwnerId?: string | null;
   onSaved: (authors: SavedAuthor[]) => void;
   onClose: () => void;
 };
@@ -50,6 +52,8 @@ export function CardAuthorEditor({
   cardId,
   classroomId,
   initialAuthors,
+  isStudentViewer = false,
+  studentOwnerId = null,
   onSaved,
   onClose,
 }: Props) {
@@ -63,7 +67,7 @@ export function CardAuthorEditor({
         key: a.id,
         studentId: a.studentId,
         displayName: a.displayName,
-      }))
+      })),
   );
   const [busy, setBusy] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -81,12 +85,16 @@ export function CardAuthorEditor({
     let cancelled = false;
     const load = async (force = false) => {
       try {
-        const nextStudents = await fetchClassroomStudents<Student>(classroomId, {
-          force,
-        });
+        const nextStudents = await fetchClassroomStudents<Student>(
+          classroomId,
+          {
+            force,
+          },
+        );
         if (!cancelled) setStudents(nextStudents);
       } catch (e) {
-        if (!cancelled) setFetchError(e instanceof Error ? e.message : "load_failed");
+        if (!cancelled)
+          setFetchError(e instanceof Error ? e.message : "load_failed");
       }
     };
     void load();
@@ -104,21 +112,31 @@ export function CardAuthorEditor({
   }, [rows]);
 
   const capped = rows.length >= MAX_AUTHORS_PER_CARD;
+  const studentRestricted = isStudentViewer && Boolean(studentOwnerId);
+  const studentSelectionValid =
+    !studentRestricted ||
+    (rows[0]?.studentId === studentOwnerId &&
+      rows.every((row) => Boolean(row.studentId)));
 
   function toggleStudent(s: Student) {
     if (selectedStudentIds.has(s.id)) {
+      if (studentRestricted && s.id === studentOwnerId) return;
       setRows((prev) => prev.filter((r) => r.studentId !== s.id));
       return;
     }
     if (capped) return;
     setRows((prev) => [
       ...prev,
-      { key: `row-${crypto.randomUUID()}`, studentId: s.id, displayName: s.name },
+      {
+        key: `row-${crypto.randomUUID()}`,
+        studentId: s.id,
+        displayName: s.name,
+      },
     ]);
   }
 
   function addFreeFormRow() {
-    if (capped) return;
+    if (capped || studentRestricted) return;
     setRows((prev) => [
       ...prev,
       { key: `row-${crypto.randomUUID()}`, studentId: null, displayName: "" },
@@ -126,7 +144,9 @@ export function CardAuthorEditor({
   }
 
   function updateRow(key: string, patch: Partial<AuthorRow>) {
-    setRows((prev) => prev.map((r) => (r.key === key ? { ...r, ...patch } : r)));
+    setRows((prev) =>
+      prev.map((r) => (r.key === key ? { ...r, ...patch } : r)),
+    );
   }
 
   function removeRow(key: string) {
@@ -137,6 +157,13 @@ export function CardAuthorEditor({
     const next = [...rows];
     const target = index + delta;
     if (target < 0 || target >= next.length) return;
+    if (
+      studentRestricted &&
+      (next[index]?.studentId === studentOwnerId ||
+        next[target]?.studentId === studentOwnerId)
+    ) {
+      return;
+    }
     [next[index], next[target]] = [next[target], next[index]];
     setRows(next);
   }
@@ -153,7 +180,10 @@ export function CardAuthorEditor({
         .filter((r) => r.displayName.length > 0);
       const res = await fetch(`/api/cards/${cardId}/authors`, {
         method: "PUT",
-        headers: { "content-type": "application/json" },
+        headers: {
+          "content-type": "application/json",
+          ...(isStudentViewer ? { "x-aura-student-viewer": "1" } : {}),
+        },
         body: JSON.stringify({ authors: cleaned }),
       });
       if (!res.ok) {
@@ -174,7 +204,10 @@ export function CardAuthorEditor({
 
   return createPortal(
     <>
-      <div className="modal-backdrop card-author-editor-backdrop" onClick={onClose} />
+      <div
+        className="modal-backdrop card-author-editor-backdrop"
+        onClick={onClose}
+      />
       <div
         className="add-card-modal card-author-editor"
         role="dialog"
@@ -188,9 +221,9 @@ export function CardAuthorEditor({
             ×
           </button>
         </div>
-	        <div className="modal-body card-author-editor-body">
-	          {classroomId && (
-	            <section className="card-author-roster">
+        <div className="modal-body card-author-editor-body">
+          {classroomId && (
+            <section className="card-author-roster">
               <h3 className="card-author-section-title">학급 학생</h3>
               {!students && !fetchError && (
                 <p className="card-author-loading">불러오는 중...</p>
@@ -218,12 +251,19 @@ export function CardAuthorEditor({
                             type="checkbox"
                             checked={selected}
                             onChange={() => toggleStudent(s)}
-                            disabled={!selected && capped}
+                            disabled={
+                              (selected &&
+                                studentRestricted &&
+                                s.id === studentOwnerId) ||
+                              (!selected && capped)
+                            }
                           />
                           <span className="card-author-num">
                             {s.number != null ? `${s.number}` : "-"}
                           </span>
-                          <span className="card-author-name-cell">{s.name}</span>
+                          <span className="card-author-name-cell">
+                            {s.name}
+                          </span>
                         </label>
                       </li>
                     );
@@ -261,6 +301,7 @@ export function CardAuthorEditor({
                       type="text"
                       className="card-author-name-input"
                       value={r.displayName}
+                      readOnly={studentRestricted}
                       maxLength={MAX_DISPLAY_NAME_LEN}
                       onChange={(e) =>
                         updateRow(r.key, { displayName: e.target.value })
@@ -272,7 +313,12 @@ export function CardAuthorEditor({
                         type="button"
                         aria-label="위로 이동"
                         onClick={() => move(i, -1)}
-                        disabled={i === 0}
+                        disabled={
+                          i === 0 ||
+                          (studentRestricted &&
+                            (r.studentId === studentOwnerId ||
+                              rows[i - 1]?.studentId === studentOwnerId))
+                        }
                       >
                         ↑
                       </button>
@@ -280,7 +326,12 @@ export function CardAuthorEditor({
                         type="button"
                         aria-label="아래로 이동"
                         onClick={() => move(i, 1)}
-                        disabled={i === rows.length - 1}
+                        disabled={
+                          i === rows.length - 1 ||
+                          (studentRestricted &&
+                            (r.studentId === studentOwnerId ||
+                              rows[i + 1]?.studentId === studentOwnerId))
+                        }
                       >
                         ↓
                       </button>
@@ -289,6 +340,9 @@ export function CardAuthorEditor({
                         aria-label="삭제"
                         className="card-author-row-remove"
                         onClick={() => removeRow(r.key)}
+                        disabled={
+                          studentRestricted && r.studentId === studentOwnerId
+                        }
                       >
                         ×
                       </button>
@@ -297,14 +351,27 @@ export function CardAuthorEditor({
                 ))}
               </ol>
             )}
-            <button
-              type="button"
-              className="card-author-add-freeform"
-              onClick={addFreeFormRow}
-              disabled={capped}
-            >
-              + 이름만 추가
-            </button>
+            {studentRestricted ? (
+              <p className="card-author-empty">
+                본인을 대표 작성자로 두고 학급 학생만 공동 작성자로 지정할 수
+                있어요.
+              </p>
+            ) : (
+              <button
+                type="button"
+                className="card-author-add-freeform"
+                onClick={addFreeFormRow}
+                disabled={capped}
+              >
+                + 이름만 추가
+              </button>
+            )}
+            {!studentSelectionValid && (
+              <p className="card-author-error">
+                본인을 첫 번째 작성자로 선택하고 직접 입력 작성자는 제거해
+                주세요.
+              </p>
+            )}
           </section>
 
           {saveError && (
@@ -326,7 +393,7 @@ export function CardAuthorEditor({
               type="button"
               className="modal-btn-submit"
               onClick={handleSave}
-              disabled={busy}
+              disabled={busy || !studentSelectionValid}
             >
               {busy ? "저장 중..." : "저장"}
             </button>
@@ -334,6 +401,6 @@ export function CardAuthorEditor({
         </div>
       </div>
     </>,
-    document.body
+    document.body,
   );
 }

@@ -4,6 +4,20 @@
 
 import { normalizeDbTimestamp } from "./db-timestamp";
 
+const CARD_DATE_TIME_ZONE = "Asia/Seoul";
+const cardDateTimeFormatter = new Intl.DateTimeFormat("en-US", {
+  calendar: "iso8601",
+  numberingSystem: "latn",
+  timeZone: CARD_DATE_TIME_ZONE,
+  year: "numeric",
+  month: "numeric",
+  day: "numeric",
+  hour: "numeric",
+  minute: "2-digit",
+  second: "2-digit",
+  hourCycle: "h23",
+});
+
 export function pickAuthorName(
   external?: string | null,
   student?: string | null,
@@ -55,7 +69,10 @@ function withNim(name: string): string {
   return name.endsWith("님") ? name : `${name}님`;
 }
 
-export function formatRelativeKo(iso: string, now: number = Date.now()): {
+export function formatRelativeKo(
+  iso: string,
+  now: number = Date.now(),
+): {
   rel: string;
   abs: string;
 } {
@@ -72,8 +89,50 @@ export function formatRelativeKo(iso: string, now: number = Date.now()): {
   else if (hr < 1) rel = `${min}분 전`;
   else if (day < 1) rel = `${hr}시간 전`;
   else if (day < 7) rel = `${day}일 전`;
-  else rel = date.toLocaleDateString("ko-KR");
+  else rel = formatCardDate(date);
 
-  const abs = date.toLocaleString("ko-KR");
+  const abs = formatCardDateTime(date);
   return { rel, abs };
+}
+
+type CardDateTimeParts = {
+  year: string;
+  month: string;
+  day: string;
+  hour: string;
+  minute: string;
+  second: string;
+};
+
+function getCardDateTimeParts(date: Date): CardDateTimeParts {
+  const parts = Object.fromEntries(
+    cardDateTimeFormatter
+      .formatToParts(date)
+      .filter(({ type }) => type !== "literal")
+      .map(({ type, value }) => [type, value]),
+  );
+
+  return {
+    year: parts.year,
+    month: parts.month,
+    day: parts.day,
+    hour: parts.hour,
+    minute: parts.minute,
+    second: parts.second,
+  };
+}
+
+function formatCardDate(date: Date): string {
+  if (Number.isNaN(date.getTime())) return "Invalid Date";
+  const { year, month, day } = getCardDateTimeParts(date);
+  return `${year}. ${Number(month)}. ${Number(day)}.`;
+}
+
+function formatCardDateTime(date: Date): string {
+  if (Number.isNaN(date.getTime())) return "Invalid Date";
+  const { year, month, day, hour, minute, second } = getCardDateTimeParts(date);
+  const hour24 = Number(hour);
+  const period = hour24 < 12 ? "오전" : "오후";
+  const hour12 = hour24 % 12 || 12;
+  return `${year}. ${Number(month)}. ${Number(day)}. ${period} ${hour12}:${minute}:${second}`;
 }

@@ -3,12 +3,11 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { AddCardButton } from "./AddCardButton";
 import type { AddCardData } from "./AddCardModal";
-import { CardBody } from "./cards/CardBody";
 import { CardDetailModal } from "./cards/CardDetailModal";
 import { CardAuthorEditor, type SavedAuthor } from "./cards/CardAuthorEditor";
-import { ContextMenu } from "./ContextMenu";
 import { EditCardModal, type EditCardUpdates } from "./EditCardModal";
 import type { CardData } from "./DraggableCard";
+import { GridBoardCard } from "./GridBoardCard";
 import { useBoardAnonymityChange } from "@/hooks/useBoardAnonymityChange";
 import { useCardRealtime } from "@/hooks/useCardRealtime";
 import { formatAuthorList } from "@/lib/card-author";
@@ -17,7 +16,6 @@ import {
   withBoardAnonymousAuthors,
 } from "@/lib/card-anonymity";
 import {
-  AuraEvaluationControl,
   type AuraBoardSettings,
   type AuraEvaluationLevel,
 } from "./AuraEvaluationControl";
@@ -56,6 +54,9 @@ export function GridBoard({
   const [authorEditCard, setAuthorEditCard] = useState<CardData | null>(null);
   const canEdit = currentRole === "owner" || currentRole === "editor";
   const canAddCard = canEdit || !!isStudentViewer;
+  const studentViewerHeaders: Record<string, string> = isStudentViewer
+    ? { "x-aura-student-viewer": "1" }
+    : {};
   const showAuraControl = canEdit && !!auraSettings?.evaluationEnabled;
   const [auraLevels, setAuraLevels] = useState<
     Record<string, AuraEvaluationLevel>
@@ -85,7 +86,10 @@ export function GridBoard({
     try {
       const res = await fetch(`/api/cards`, {
         method: "POST",
-        headers: { "content-type": "application/json" },
+        headers: {
+          "content-type": "application/json",
+          ...studentViewerHeaders,
+        },
         body: JSON.stringify({
           boardId,
           title: data.title,
@@ -106,7 +110,10 @@ export function GridBoard({
       });
       if (res.ok) {
         const { card } = await res.json();
-        setCards((prev) => [...prev, card]);
+        setCards((prev) => [
+          ...prev,
+          withBoardAnonymousAuthor(card, anonymousAuthor),
+        ]);
       } else {
         alert(`카드 추가 실패: ${await res.text()}`);
       }
@@ -120,7 +127,10 @@ export function GridBoard({
     const prev = cards;
     setCards((list) => list.filter((c) => c.id !== id));
     try {
-      const res = await fetch(`/api/cards/${id}`, { method: "DELETE" });
+      const res = await fetch(`/api/cards/${id}`, {
+        method: "DELETE",
+        headers: studentViewerHeaders,
+      });
       if (!res.ok) {
         deletingIds.current.delete(id);
         setCards(prev);
@@ -169,7 +179,10 @@ export function GridBoard({
     try {
       const res = await fetch(`/api/cards/${cardId}`, {
         method: "PATCH",
-        headers: { "content-type": "application/json" },
+        headers: {
+          "content-type": "application/json",
+          ...studentViewerHeaders,
+        },
         body: JSON.stringify(updates),
       });
       if (!res.ok) {
@@ -177,14 +190,20 @@ export function GridBoard({
         return;
       }
 
-      const refreshed = await fetch(`/api/cards/${cardId}`).catch(() => null);
+      const refreshed = await fetch(`/api/cards/${cardId}`, {
+        headers: studentViewerHeaders,
+      }).catch(() => null);
       if (refreshed?.ok) {
         const data = await refreshed.json();
         if (data.card) {
-          setCards((list) =>
-            list.map((c) => (c.id === cardId ? data.card : c)),
+          const refreshedCard = withBoardAnonymousAuthor(
+            data.card,
+            anonymousAuthor,
           );
-          setOpenCard((card) => (card?.id === cardId ? data.card : card));
+          setCards((list) =>
+            list.map((c) => (c.id === cardId ? refreshedCard : c)),
+          );
+          setOpenCard((card) => (card?.id === cardId ? refreshedCard : card));
         }
       }
     } catch (err) {
@@ -197,7 +216,10 @@ export function GridBoard({
     try {
       const res = await fetch(`/api/cards`, {
         method: "POST",
-        headers: { "content-type": "application/json" },
+        headers: {
+          "content-type": "application/json",
+          ...studentViewerHeaders,
+        },
         body: JSON.stringify({
           boardId,
           title: `${card.title} (복사)`,
@@ -225,7 +247,10 @@ export function GridBoard({
       });
       if (res.ok) {
         const { card: newCard } = await res.json();
-        setCards((prev) => [...prev, newCard]);
+        setCards((prev) => [
+          ...prev,
+          withBoardAnonymousAuthor(newCard, anonymousAuthor),
+        ]);
       } else {
         alert(`카드 복제 실패: ${await res.text()}`);
       }
@@ -240,13 +265,14 @@ export function GridBoard({
     setCards((list) =>
       list.map((c) => (c.id === card.id ? { ...c, guidePinned } : c)),
     );
-    setOpenCard((c) =>
-      c?.id === card.id ? { ...c, guidePinned } : c,
-    );
+    setOpenCard((c) => (c?.id === card.id ? { ...c, guidePinned } : c));
     try {
       const res = await fetch(`/api/cards/${card.id}`, {
         method: "PATCH",
-        headers: { "content-type": "application/json" },
+        headers: {
+          "content-type": "application/json",
+          ...studentViewerHeaders,
+        },
         body: JSON.stringify({ guidePinned }),
       });
       if (!res.ok) {
@@ -265,8 +291,7 @@ export function GridBoard({
   const openCardIndex = openCard
     ? cards.findIndex((card) => card.id === openCard.id)
     : -1;
-  const previousOpenCard =
-    openCardIndex > 0 ? cards[openCardIndex - 1] : null;
+  const previousOpenCard = openCardIndex > 0 ? cards[openCardIndex - 1] : null;
   const nextOpenCard =
     openCardIndex >= 0 && openCardIndex < cards.length - 1
       ? cards[openCardIndex + 1]
@@ -284,83 +309,40 @@ export function GridBoard({
             </p>
           </div>
         )}
-        {cards.map((c) => {
-          const canModify =
-            currentRole === "owner" ||
-            (currentRole === "editor" && c.authorId === currentUserId) ||
-            c.studentAuthorId === currentUserId;
-
-          return (
-            <article
-              key={c.id}
-              className="grid-card is-clickable"
-              style={{ backgroundColor: c.color ?? undefined }}
-              aria-label={c.title}
-              onClick={() => setOpenCard(c)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" || e.key === " ") {
-                  e.preventDefault();
-                  setOpenCard(c);
-                }
-              }}
-              tabIndex={0}
-              role="button"
-            >
-              <CardBody
-                card={c}
-                boardId={boardId}
-                onEditAuthors={
-                  canEdit || c.studentAuthorId === currentUserId
-                    ? () => setAuthorEditCard(c)
-                    : undefined
-                }
-              />
-              {showAuraControl && (
-                <AuraEvaluationControl
-                  cardId={c.id}
-                  initialLevel={auraLevels[c.id] ?? null}
-                  onSaved={(level) => handleAuraSaved(c.id, level)}
-                />
-              )}
-              {canModify && (
-                <div
-                  className="card-ctx-menu"
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  <ContextMenu
-                    items={[
-                      {
-                        label: "수정",
-                        onClick: () => setEditingCard(c),
-                      },
-                      ...(canEdit && !!c.authorId && !c.studentAuthorId
-                        ? [
-                            {
-                              label: c.guidePinned ? "가이드 해제" : "가이드 고정",
-                              onClick: () => handleToggleGuide(c, !c.guidePinned),
-                            },
-                          ]
-                        : []),
-                      {
-                        label: "복제",
-                        onClick: () => handleDuplicate(c),
-                      },
-                      {
-                        label: "삭제",
-                        danger: true,
-                        onClick: () => {
-                          if (window.confirm(`"${c.title}" 카드를 삭제할까요?`)) {
-                            handleDelete(c.id);
-                          }
-                        },
-                      },
-                    ]}
-                  />
-                </div>
-              )}
-            </article>
-          );
-        })}
+        {cards.map((card) => (
+          <GridBoardCard
+            key={card.id}
+            card={card}
+            boardId={boardId}
+            isStudentViewer={isStudentViewer}
+            canEdit={canEdit}
+            canModify={
+              currentRole === "owner" ||
+              (currentRole === "editor" && card.authorId === currentUserId) ||
+              card.studentAuthorId === currentUserId
+            }
+            showAuraControl={showAuraControl}
+            auraLevel={auraLevels[card.id] ?? null}
+            isOpen={openCard?.id === card.id}
+            onOpen={() => setOpenCard(card)}
+            onEdit={() => setEditingCard(card)}
+            onEditAuthors={
+              canEdit || card.studentAuthorId === currentUserId
+                ? () => setAuthorEditCard(card)
+                : undefined
+            }
+            onAuraSaved={(level) => handleAuraSaved(card.id, level)}
+            onToggleGuide={(guidePinned) =>
+              handleToggleGuide(card, guidePinned)
+            }
+            onDuplicate={() => handleDuplicate(card)}
+            onDelete={() => {
+              if (window.confirm(`"${card.title}" 카드를 삭제할까요?`)) {
+                void handleDelete(card.id);
+              }
+            }}
+          />
+        ))}
       </div>
       {canAddCard && (
         <AddCardButton
@@ -382,6 +364,7 @@ export function GridBoard({
         onEditAuthors={(c) => setAuthorEditCard(c)}
         canEditAuthors={(c) => canEdit || c.studentAuthorId === currentUserId}
         boardId={boardId}
+        isStudentViewer={isStudentViewer}
         auraEvaluation={
           showAuraControl && openCard
             ? {
@@ -397,13 +380,17 @@ export function GridBoard({
           card={editingCard}
           onSave={(updates) => handleEditCardSave(editingCard, updates)}
           onClose={() => setEditingCard(null)}
-          canConfigurePoll={canEdit || editingCard.studentAuthorId === currentUserId}
+          canConfigurePoll={
+            canEdit || editingCard.studentAuthorId === currentUserId
+          }
         />
       )}
       {authorEditCard && (
         <CardAuthorEditor
           cardId={authorEditCard.id}
           classroomId={classroomId ?? null}
+          isStudentViewer={isStudentViewer}
+          studentOwnerId={isStudentViewer ? currentUserId : null}
           initialAuthors={(authorEditCard.authors ?? []).map((a) => ({
             id: a.id,
             studentId: a.studentId,
@@ -421,9 +408,7 @@ export function GridBoard({
             };
             setCards((prev) =>
               prev.map((c) =>
-                c.id === authorEditCard.id
-                  ? { ...c, ...authorPatch }
-                  : c,
+                c.id === authorEditCard.id ? { ...c, ...authorPatch } : c,
               ),
             );
             setOpenCard((current) =>

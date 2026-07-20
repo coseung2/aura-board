@@ -1,28 +1,19 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { AddCardButton } from "./AddCardButton";
-import { AddCardModal, type AddCardData } from "./AddCardModal";
-import { CardDetailModal } from "./cards/CardDetailModal";
-import { CardAuthorEditor, type SavedAuthor } from "./cards/CardAuthorEditor";
-import { EditCardModal, type EditCardUpdates } from "./EditCardModal";
-import { ExportModal } from "./ExportModal";
-import { CanvaFolderModal } from "./CanvaFolderModal";
-import { SectionActionsPanel } from "./SectionActionsPanel";
-import { AiFeedbackModal } from "./feedback/AiFeedbackModal";
-import {
-  ColumnView,
-  type ColumnAssignmentAction,
-  type ColumnAssignmentState,
+import type {
+  ColumnAssignmentAction,
+  ColumnAssignmentState,
 } from "./columns/ColumnView";
-import { SeedStudentsDialog } from "./columns/SeedStudentsDialog";
-import { ColumnsRealtimeStatus } from "./columns/ColumnsRealtimeStatus";
+import { ColumnsBoardOverlays } from "./columns/ColumnsBoardOverlays";
+import { ColumnsBoardCanvas } from "./columns/ColumnsBoardCanvas";
 import { comparatorFor, toSortMode, type SortMode } from "./columns/sort";
-import { useBoardStream, type StreamSection } from "./columns/useBoardStream";
+import { useBoardStream } from "./columns/useBoardStream";
 import { useBoardAnonymityChange } from "@/hooks/useBoardAnonymityChange";
-import { useColumnRoster, type RosterEntry } from "./columns/useColumnRoster";
+import { useColumnRoster } from "./columns/useColumnRoster";
 import { useCardMutations } from "./columns/useCardMutations";
 import { useSectionMutations } from "./columns/useSectionMutations";
+import type { SavedAuthor } from "./cards/CardAuthorEditor";
 import type { CardData } from "./DraggableCard";
 import { formatAuthorList } from "@/lib/card-author";
 import {
@@ -31,26 +22,20 @@ import {
 } from "@/lib/card-anonymity";
 import { buildCanvaConnectUrl } from "@/lib/canva-connect-return";
 import type { ColumnsPresenceActivity } from "@/lib/columns-presence";
-import {
-  type SubjectOrder,
-  normalizeSubjectOrder,
-} from "@/lib/subject-order";
+import type { SubjectOrder } from "@/lib/subject-order";
 import {
   BOARD_SECTIONS_REORDERED_EVENT,
   type BoardSectionsReorderedDetail,
 } from "@/lib/board-section-events";
 import { sortSections } from "@/lib/sort-sections";
+import type {
+  ColumnsCardDropPreview,
+  ColumnsFeedbackTarget,
+  ColumnsPanelState,
+  ColumnsSection,
+} from "./columns/columns-board-types";
 
-type SectionData = StreamSection;
-
-type PanelTab = "rename" | "delete";
-type CardDropPreview = {
-  sectionId: string;
-  draggedCardId: string;
-  cardId: string;
-  position: "before" | "after";
-  placeholderHeight: number;
-} | null;
+type SectionData = ColumnsSection;
 
 type Props = {
   boardId: string;
@@ -93,10 +78,7 @@ export function ColumnsBoard({
   const [overSectionId, setOverSectionId] = useState<string | null>(null);
   const [editingCard, setEditingCard] = useState<CardData | null>(null);
   const [openCard, setOpenCard] = useState<CardData | null>(null);
-  const [panelState, setPanelState] = useState<{
-    sectionId: string;
-    tab: PanelTab;
-  } | null>(null);
+  const [panelState, setPanelState] = useState<ColumnsPanelState | null>(null);
   const [addForSection, setAddForSection] = useState<string | null>(null);
   const [exportSectionId, setExportSectionId] = useState<string | null>(null);
   const [folderSectionId, setFolderSectionId] = useState<string | null>(null);
@@ -104,20 +86,16 @@ export function ColumnsBoard({
   const [draggingSectionId, setDraggingSectionId] = useState<string | null>(
     null,
   );
-  const [cardDropPreview, setCardDropPreview] = useState<CardDropPreview>(null);
+  const [cardDropPreview, setCardDropPreview] =
+    useState<ColumnsCardDropPreview>(null);
   const [seedingStudents, setSeedingStudents] = useState(false);
   const [seedDialogOpen, setSeedDialogOpen] = useState(false);
   const [seedDialogError, setSeedDialogError] = useState<string | null>(null);
   const [assignmentBusySectionId, setAssignmentBusySectionId] = useState<
     string | null
   >(null);
-  const [feedbackTarget, setFeedbackTarget] = useState<{
-    studentId: string | null;
-    name: string | null;
-    number: number | null;
-    roster: RosterEntry[];
-    sectionId: string;
-  } | null>(null);
+  const [feedbackTarget, setFeedbackTarget] =
+    useState<ColumnsFeedbackTarget | null>(null);
 
   const canEdit = currentRole === "owner" || currentRole === "editor";
   const canAddCard = canEdit || !!isStudentViewer;
@@ -651,276 +629,149 @@ export function ColumnsBoard({
     if (cardId) moveCard(cardId, targetSectionId);
   }
 
+  function handleAuthorsSaved(cardId: string, authors: SavedAuthor[]) {
+    const authorPatch: Partial<CardData> = {
+      authors,
+      studentAuthorId: authors[0]?.studentId ?? null,
+      externalAuthorName:
+        authors.length > 0
+          ? formatAuthorList(authors, null, null, null)
+          : null,
+    };
+    setCards((prev) =>
+      prev.map((card) => (card.id === cardId ? { ...card, ...authorPatch } : card)),
+    );
+    setOpenCard((current) =>
+      current?.id === cardId ? { ...current, ...authorPatch } : current,
+    );
+    setAuthorEditCard((current) =>
+      current?.id === cardId ? { ...current, ...authorPatch } : current,
+    );
+  }
+
   /* ── Render ──────────────────────────────────────────────────────── */
   return (
     <div
       className="board-canvas-wrap board-canvas-wrap-columns"
       style={{ position: "relative" }}
     >
-      <ColumnsRealtimeStatus
-        status={realtime.status}
-        presence={realtime.presence}
+      <ColumnsBoardCanvas
+        realtime={{ status: realtime.status, presence: realtime.presence }}
+        scrollAreaRef={scrollAreaRef}
+        columnsBoardRef={columnsBoardRef}
+        scrollBarRef={scrollBarRef}
+        scrollRailWidth={scrollRailWidth}
+        sortedSections={sortedSections}
+        sortModeById={sortModeById}
+        getCardsForSection={getCardsForSection}
+        boardId={boardId}
+        canEdit={canEdit}
+        canAddCard={canAddCard}
+        currentRole={currentRole}
+        currentUserId={currentUserId}
+        classroomId={classroomId}
+        overSectionId={overSectionId}
+        draggingSectionId={draggingSectionId}
+        cardDropPreview={cardDropPreview}
+        organizing={organizing}
+        assignmentBusySectionId={assignmentBusySectionId}
+        roster={roster}
+        authorsForSection={authorsForSection}
+        studentForSectionTitle={studentForSectionTitle}
+        onSetSort={setSortFor}
+        onAssignmentAction={handleSectionAssignment}
+        onPin={handleSectionPin}
+        onSectionDragStart={(id) => setDraggingSectionId(id)}
+        onSectionDragEnd={() => setDraggingSectionId(null)}
+        onCardDragStart={handleDragStart}
+        onCardDragEnd={(event) => {
+          setCardDropPreview(null);
+          handleDragEnd(event);
+        }}
+        onCardDropReorder={handleCardReorder}
+        onDragOver={handleDragOver}
+        onDragEnter={(id) => setOverSectionId(id)}
+        onDragLeave={(event) => {
+          if (!event.currentTarget.contains(event.relatedTarget as Node)) {
+            setOverSectionId(null);
+            setCardDropPreview(null);
+          }
+        }}
+        onDrop={handleDrop}
+        onCardDropPreview={setCardDropPreview}
+        onClearCardDropPreview={() => setCardDropPreview(null)}
+        onRename={(sectionId) => setPanelState({ sectionId, tab: "rename" })}
+        onDelete={(sectionId) => setPanelState({ sectionId, tab: "delete" })}
+        onFolder={(sectionId) => setFolderSectionId(sectionId)}
+        onExport={(sectionId) => setExportSectionId(sectionId)}
+        onOrganize={handleOrganizeToCanva}
+        onFeedback={(args) => setFeedbackTarget(args)}
+        onCardOpen={(card) => setOpenCard(card)}
+        onCardEdit={(card) => setEditingCard(card)}
+        onCardEditAuthors={(card) => setAuthorEditCard(card)}
+        onCardDuplicate={handleDuplicateCard}
+        onCardDelete={handleDeleteCard}
+        onCardToggleGuide={handleToggleGuide}
+        onAddInColumn={(sectionId) => setAddForSection(sectionId)}
+        onAddSection={handleAddSection}
+        onSeedStudents={openSeedDialog}
+        seedingStudents={seedingStudents}
       />
-      <div ref={scrollAreaRef} className="columns-scroll-area">
-        <div ref={columnsBoardRef} className="columns-board">
-          {sortedSections.map((section) => (
-            <ColumnView
-              key={section.id}
-              section={{
-                id: section.id,
-                title: section.title,
-              }}
-              pinned={section.pinned}
-              sectionCards={getCardsForSection(section.id)}
-              boardId={boardId}
-              canEdit={canEdit}
-              currentRole={currentRole}
-              currentUserId={currentUserId}
-              classroomId={classroomId}
-              sortMode={sortModeById[section.id] ?? "manual"}
-              overSectionId={overSectionId}
-              draggingSectionId={draggingSectionId}
-              cardDropPreview={cardDropPreview}
-              organizing={organizing}
-              assignmentState={getSectionAssignmentState(
-                section,
-                assignmentBusySectionId === section.id,
-              )}
-              roster={roster}
-              authorsForSection={authorsForSection}
-              studentForSectionTitle={studentForSectionTitle}
-              onSetSort={(mode) => setSortFor(section.id, mode)}
-              onAssignmentAction={(action) =>
-                handleSectionAssignment(section.id, action)
-              }
-              onPin={(pinned) => handleSectionPin(section.id, pinned)}
-              onSectionDragStart={(id) => setDraggingSectionId(id)}
-              onSectionDragEnd={() => setDraggingSectionId(null)}
-              onCardDragStart={handleDragStart}
-              onCardDragEnd={(e) => {
-                setCardDropPreview(null);
-                handleDragEnd(e);
-              }}
-              onCardDropReorder={handleCardReorder}
-              onDragOver={handleDragOver}
-              onDragEnter={(id) => setOverSectionId(id)}
-              onDragLeave={(e) => {
-                if (!e.currentTarget.contains(e.relatedTarget as Node)) {
-                  setOverSectionId(null);
-                  setCardDropPreview(null);
-                }
-              }}
-              onDrop={handleDrop}
-              onCardDropPreview={setCardDropPreview}
-              onClearCardDropPreview={() => setCardDropPreview(null)}
-              onRename={() =>
-                setPanelState({ sectionId: section.id, tab: "rename" })
-              }
-              onDelete={() =>
-                setPanelState({ sectionId: section.id, tab: "delete" })
-              }
-              onFolder={() => setFolderSectionId(section.id)}
-              onExport={() => setExportSectionId(section.id)}
-              onOrganize={() => handleOrganizeToCanva(section.id)}
-              onFeedback={(args) => setFeedbackTarget(args)}
-              onCardOpen={(c) => setOpenCard(c)}
-              onCardEdit={(c) => setEditingCard(c)}
-              onCardEditAuthors={(c) => setAuthorEditCard(c)}
-              onCardDuplicate={handleDuplicateCard}
-              onCardDelete={handleDeleteCard}
-              onCardToggleGuide={handleToggleGuide}
-              onAddInColumn={
-                canAddCard ? () => setAddForSection(section.id) : undefined
-              }
-            />
-          ))}
-
-          {canEdit && (
-            <div className="column-add-stack">
-              <button
-                type="button"
-                className="column-add-btn"
-                onClick={handleAddSection}
-              >
-                + 섹션 추가
-              </button>
-              {classroomId && (
-                <button
-                  type="button"
-                  className="column-add-btn column-add-btn-seed"
-                  onClick={openSeedDialog}
-                  disabled={seedingStudents}
-                  title="학급 학생 명단으로 섹션을 한 번에 추가"
-                >
-                  {seedingStudents
-                    ? "추가 중…"
-                    : "🧑 학생 이름으로 섹션 추가"}
-                </button>
-              )}
-            </div>
-          )}
-        </div>
-      </div>
-      <div
-        ref={scrollBarRef}
-        className={`columns-scrollbar ${scrollRailWidth > 0 ? "is-visible" : ""}`}
-        aria-hidden="true"
-      >
-        <div
-          className="columns-scrollbar-rail"
-          style={{ width: scrollRailWidth }}
-        />
-      </div>
-
-      {canAddCard && (
-        <AddCardButton
-          onAdd={handleAdd}
-          sections={sectionOptions}
-          canAssignAuthors={canEdit}
-          canConfigurePoll={canEdit || !!isStudentViewer}
-          classroomId={classroomId}
-        />
-      )}
-
-      {addForSection && (
-        <AddCardModal
-          onAdd={handleAdd}
-          onClose={() => setAddForSection(null)}
-          sections={sectionOptions}
-          defaultSectionId={addForSection}
-          canAssignAuthors={canEdit}
-          canConfigurePoll={canEdit || !!isStudentViewer}
-          classroomId={classroomId}
-        />
-      )}
-
-      {editingCard && (
-        <EditCardModal
-          card={editingCard}
-          onSave={(updates) => handleEditCardSave(editingCard, updates)}
-          onClose={() => setEditingCard(null)}
-          canConfigurePoll={canEdit || editingCard.studentAuthorId === currentUserId}
-        />
-      )}
-
-      {authorEditCard && (
-        <CardAuthorEditor
-          cardId={authorEditCard.id}
-          classroomId={classroomId ?? null}
-          initialAuthors={(authorEditCard.authors ?? []).map((a) => ({
-            id: a.id,
-            studentId: a.studentId,
-            displayName: a.displayName,
-            order: a.order,
-          }))}
-          onSaved={(authors: SavedAuthor[]) => {
-            const authorPatch: Partial<CardData> = {
-              authors,
-              studentAuthorId: authors[0]?.studentId ?? null,
-              externalAuthorName:
-                authors.length > 0
-                  ? formatAuthorList(authors, null, null, null)
-                  : null,
-            };
-            setCards((prev) =>
-              prev.map((c) =>
-                c.id === authorEditCard.id
-                  ? { ...c, ...authorPatch }
-                  : c,
-              ),
-            );
-            setOpenCard((current) =>
-              current?.id === authorEditCard.id
-                ? { ...current, ...authorPatch }
-                : current,
-            );
-            setAuthorEditCard((current) =>
-              current?.id === authorEditCard.id
-                ? { ...current, ...authorPatch }
-                : current,
-            );
-          }}
-          onClose={() => setAuthorEditCard(null)}
-        />
-      )}
-
-      <CardDetailModal
-        card={openCard}
-        onClose={() => setOpenCard(null)}
-        hasPrevious={!!previousOpenCard}
-        hasNext={!!nextOpenCard}
-        onPrevious={
+      <ColumnsBoardOverlays
+        boardId={boardId}
+        currentUserId={currentUserId}
+        currentRole={currentRole}
+        isStudentViewer={isStudentViewer}
+        classroomId={classroomId}
+        classroomStudentCount={classroomStudentCount}
+        boardSubjectOrder={boardSubjectOrder}
+        canEdit={canEdit}
+        canAddCard={canAddCard}
+        sections={sections}
+        sectionOptions={sectionOptions}
+        onAdd={handleAdd}
+        onEditCardSave={handleEditCardSave}
+        onAuthorSaved={handleAuthorsSaved}
+        onSeedConfirm={handleSeedConfirm}
+        addForSection={addForSection}
+        onCloseAdd={() => setAddForSection(null)}
+        editingCard={editingCard}
+        onCloseEditing={() => setEditingCard(null)}
+        authorEditCard={authorEditCard}
+        onCloseAuthorEdit={() => setAuthorEditCard(null)}
+        openCard={openCard}
+        onCloseCard={() => setOpenCard(null)}
+        hasPreviousCard={!!previousOpenCard}
+        hasNextCard={!!nextOpenCard}
+        onPreviousCard={
           previousOpenCard ? () => setOpenCard(previousOpenCard) : undefined
         }
-        onNext={nextOpenCard ? () => setOpenCard(nextOpenCard) : undefined}
-        onEditAuthors={(c) => setAuthorEditCard(c)}
-        canEditAuthors={(c) => canEdit || c.studentAuthorId === currentUserId}
-        boardId={boardId}
+        onNextCard={nextOpenCard ? () => setOpenCard(nextOpenCard) : undefined}
+        onEditAuthors={(card) => setAuthorEditCard(card)}
+        canEditAuthors={(card) =>
+          canEdit || card.studentAuthorId === currentUserId
+        }
+        panelState={panelState}
+        onClosePanel={() => setPanelState(null)}
+        onRenameSection={handleSectionRenamed}
+        onDeleteSection={handleSectionDeleted}
+        folderSectionId={folderSectionId}
+        onImportFromCanva={(designs) =>
+          folderSectionId
+            ? handleImportFromCanva(folderSectionId, designs)
+            : undefined
+        }
+        onCloseFolder={() => setFolderSectionId(null)}
+        exportSectionId={exportSectionId}
+        onCloseExport={() => setExportSectionId(null)}
+        getCardsForSection={getCardsForSection}
+        feedbackTarget={feedbackTarget}
+        onCloseFeedback={() => setFeedbackTarget(null)}
+        seedDialogOpen={seedDialogOpen}
+        seedingStudents={seedingStudents}
+        seedDialogError={seedDialogError}
+        onCloseSeedDialog={closeSeedDialog}
       />
-
-      {panelState &&
-        (() => {
-          const section = sections.find((s) => s.id === panelState.sectionId);
-          if (!section) return null;
-          return (
-            <SectionActionsPanel
-              open={true}
-              onClose={() => setPanelState(null)}
-              section={{ id: section.id, title: section.title }}
-              currentRole={currentRole}
-              defaultTab={panelState.tab}
-              onRenamed={(t) => handleSectionRenamed(section.id, t)}
-              onDeleted={() => handleSectionDeleted(section.id)}
-            />
-          );
-        })()}
-
-      {folderSectionId && (
-        <CanvaFolderModal
-          sectionTitle={
-            sections.find((s) => s.id === folderSectionId)?.title ?? ""
-          }
-          onImport={(designs) =>
-            handleImportFromCanva(folderSectionId, designs)
-          }
-          onClose={() => setFolderSectionId(null)}
-        />
-      )}
-
-      {exportSectionId && (
-        <ExportModal
-          sectionTitle={
-            sections.find((s) => s.id === exportSectionId)?.title ?? ""
-          }
-          cards={getCardsForSection(exportSectionId)}
-          onClose={() => setExportSectionId(null)}
-        />
-      )}
-
-      {feedbackTarget && (
-        <AiFeedbackModal
-          studentId={feedbackTarget.studentId}
-          studentName={feedbackTarget.name}
-          studentNumber={feedbackTarget.number}
-          roster={feedbackTarget.roster}
-          sectionId={feedbackTarget.sectionId}
-          onClose={() => setFeedbackTarget(null)}
-        />
-      )}
-
-      {classroomId && (
-        <SeedStudentsDialog
-          open={seedDialogOpen && canEdit}
-          studentCount={classroomStudentCount}
-          defaultOrder={normalizeSubjectOrder(
-            boardSubjectOrder ?? sections.find((s) => s.pinned)?.order ?? "asc",
-          )}
-          busy={seedingStudents}
-          errorMessage={seedDialogError}
-          onClose={closeSeedDialog}
-          onConfirm={handleSeedConfirm}
-        />
-      )}
     </div>
   );
 }

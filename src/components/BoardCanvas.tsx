@@ -64,6 +64,9 @@ export function BoardCanvas({
   const [authorEditCard, setAuthorEditCard] = useState<CardData | null>(null);
   const canEdit = currentRole === "owner" || currentRole === "editor";
   const canAddCard = canEdit || !!isStudentViewer;
+  const studentViewerHeaders: Record<string, string> = isStudentViewer
+    ? { "x-aura-student-viewer": "1" }
+    : {};
   const showAuraControl = canEdit && !!auraSettings?.evaluationEnabled;
   const [auraLevels, setAuraLevels] = useState<
     Record<string, AuraEvaluationLevel>
@@ -141,7 +144,10 @@ export function BoardCanvas({
     try {
       const res = await fetch(`/api/cards`, {
         method: "POST",
-        headers: { "content-type": "application/json" },
+        headers: {
+          "content-type": "application/json",
+          ...studentViewerHeaders,
+        },
         body: JSON.stringify({
           boardId,
           title: data.title,
@@ -178,7 +184,10 @@ export function BoardCanvas({
     const prevCards = cards;
     setCards((list) => list.filter((c) => c.id !== id));
     try {
-      const res = await fetch(`/api/cards/${id}`, { method: "DELETE" });
+      const res = await fetch(`/api/cards/${id}`, {
+        method: "DELETE",
+        headers: studentViewerHeaders,
+      });
       if (!res.ok) {
         deletingIds.current.delete(id);
         setCards(prevCards);
@@ -206,7 +215,9 @@ export function BoardCanvas({
     if (updateAttachments) {
       optimisticUpdates.attachments = updateAttachments.map((a, idx) => ({
         id:
-          a.tempId && !a.tempId.startsWith("legacy-") && !a.tempId.startsWith("tmp-")
+          a.tempId &&
+          !a.tempId.startsWith("legacy-") &&
+          !a.tempId.startsWith("tmp-")
             ? a.tempId
             : `opt-${idx}-${a.kind}`,
         kind: a.kind,
@@ -229,7 +240,10 @@ export function BoardCanvas({
     try {
       const res = await fetch(`/api/cards/${cardId}`, {
         method: "PATCH",
-        headers: { "content-type": "application/json" },
+        headers: {
+          "content-type": "application/json",
+          ...studentViewerHeaders,
+        },
         body: JSON.stringify(updates),
       });
       if (!res.ok) {
@@ -237,7 +251,9 @@ export function BoardCanvas({
         return;
       }
 
-      const refreshed = await fetch(`/api/cards/${cardId}`).catch(() => null);
+      const refreshed = await fetch(`/api/cards/${cardId}`, {
+        headers: studentViewerHeaders,
+      }).catch(() => null);
       if (refreshed?.ok) {
         const data = await refreshed.json();
         if (data.card) {
@@ -257,7 +273,10 @@ export function BoardCanvas({
     try {
       const res = await fetch(`/api/cards`, {
         method: "POST",
-        headers: { "content-type": "application/json" },
+        headers: {
+          "content-type": "application/json",
+          ...studentViewerHeaders,
+        },
         body: JSON.stringify({
           boardId,
           title: `${card.title} (복사)`,
@@ -300,13 +319,14 @@ export function BoardCanvas({
     setCards((list) =>
       list.map((c) => (c.id === card.id ? { ...c, guidePinned } : c)),
     );
-    setOpenCard((c) =>
-      c?.id === card.id ? { ...c, guidePinned } : c,
-    );
+    setOpenCard((c) => (c?.id === card.id ? { ...c, guidePinned } : c));
     try {
       const res = await fetch(`/api/cards/${card.id}`, {
         method: "PATCH",
-        headers: { "content-type": "application/json" },
+        headers: {
+          "content-type": "application/json",
+          ...studentViewerHeaders,
+        },
         body: JSON.stringify({ guidePinned }),
       });
       if (!res.ok) {
@@ -325,8 +345,7 @@ export function BoardCanvas({
   const openCardIndex = openCard
     ? cards.findIndex((card) => card.id === openCard.id)
     : -1;
-  const previousOpenCard =
-    openCardIndex > 0 ? cards[openCardIndex - 1] : null;
+  const previousOpenCard = openCardIndex > 0 ? cards[openCardIndex - 1] : null;
   const nextOpenCard =
     openCardIndex >= 0 && openCardIndex < cards.length - 1
       ? cards[openCardIndex + 1]
@@ -338,7 +357,9 @@ export function BoardCanvas({
         {cards.length === 0 && (
           <div className="board-empty-inline">
             {canEdit ? (
-              <p>아직 카드가 없어요. 더하기 버튼을 눌러 첫 카드를 추가하세요.</p>
+              <p>
+                아직 카드가 없어요. 더하기 버튼을 눌러 첫 카드를 추가하세요.
+              </p>
             ) : (
               <p>아직 카드가 없습니다.</p>
             )}
@@ -396,7 +417,9 @@ export function BoardCanvas({
                     ...(canEdit && !!c.authorId && !c.studentAuthorId
                       ? [
                           {
-                            label: c.guidePinned ? "가이드 해제" : "가이드 고정",
+                            label: c.guidePinned
+                              ? "가이드 해제"
+                              : "가이드 고정",
                             onClick: () => handleToggleGuide(c, !c.guidePinned),
                           },
                         ]
@@ -441,6 +464,7 @@ export function BoardCanvas({
         onEditAuthors={(c) => setAuthorEditCard(c)}
         canEditAuthors={(c) => canEdit || c.studentAuthorId === currentUserId}
         boardId={boardId}
+        isStudentViewer={isStudentViewer}
         auraEvaluation={
           showAuraControl && openCard
             ? {
@@ -456,13 +480,17 @@ export function BoardCanvas({
           card={editingCard}
           onSave={(updates) => handleEditCardSave(editingCard, updates)}
           onClose={() => setEditingCard(null)}
-          canConfigurePoll={canEdit || editingCard.studentAuthorId === currentUserId}
+          canConfigurePoll={
+            canEdit || editingCard.studentAuthorId === currentUserId
+          }
         />
       )}
       {authorEditCard && (
         <CardAuthorEditor
           cardId={authorEditCard.id}
           classroomId={classroomId ?? null}
+          isStudentViewer={isStudentViewer}
+          studentOwnerId={isStudentViewer ? currentUserId : null}
           initialAuthors={(authorEditCard.authors ?? []).map((a) => ({
             id: a.id,
             studentId: a.studentId,
@@ -480,9 +508,7 @@ export function BoardCanvas({
             };
             setCards((prev) =>
               prev.map((c) =>
-                c.id === authorEditCard.id
-                  ? { ...c, ...authorPatch }
-                  : c,
+                c.id === authorEditCard.id ? { ...c, ...authorPatch } : c,
               ),
             );
             setOpenCard((current) =>
