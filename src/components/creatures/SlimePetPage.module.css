@@ -158,6 +158,7 @@
 }
 
 .ownedChip,
+.effectBadge,
 .shopOwnedChip {
   display: inline-flex;
   align-items: center;
@@ -175,6 +176,18 @@
   top: 0;
   right: 0;
   padding: 5px 8px;
+}
+
+.effectBadge {
+  position: absolute;
+  top: 0;
+  left: 0;
+  max-width: calc(50% - 6px);
+  padding: 5px 8px;
+  overflow: hidden;
+  color: var(--color-accent-active);
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .shopOwnedChip {
@@ -203,6 +216,7 @@
 }
 
 .slimeItemSelected {
+  padding-top: 30px;
   border-bottom-color: var(--color-accent);
 }
 
@@ -221,9 +235,17 @@
 }
 
 .spriteFrame {
+  --slime-art-scale: 2;
+  --slime-art-slot: 176px;
   position: relative;
-  width: 96px;
+  width: var(--slime-art-slot);
+  min-height: var(--slime-art-slot);
   margin-inline: auto;
+}
+
+.spriteFrame > div {
+  transform: scale(var(--slime-art-scale));
+  transform-origin: center;
 }
 
 .spriteFrame img {
@@ -256,14 +278,41 @@
   line-height: 1.45;
 }
 
-.itemCopy .equipmentSummary {
-  color: var(--color-accent-active);
-  font-weight: 600;
+.growthSummary {
+  display: grid;
+  gap: 6px;
+  margin-top: 8px;
 }
 
-.itemCopy .growthSummary {
+.growthMeta {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
   color: var(--color-accent-active);
+  font-size: 12px;
   font-weight: 700;
+}
+
+.growthMeta strong {
+  flex: 0 0 auto;
+  font-variant-numeric: tabular-nums;
+}
+
+.growthTrack {
+  height: 8px;
+  overflow: hidden;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-pill);
+  background: var(--color-accent-tinted-bg);
+}
+
+.growthFill {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--color-accent);
+  transition: width 180ms ease-out;
 }
 
 .wardrobeButton,
@@ -684,6 +733,11 @@
     gap: 16px 12px;
   }
 
+  .spriteFrame {
+    --slime-art-scale: 1.75;
+    --slime-art-slot: 154px;
+  }
+
   .drawer {
     width: 100%;
     padding: 20px 16px;
@@ -712,6 +766,13 @@
     align-items: flex-start;
     flex-direction: column;
     gap: 3px;
+  }
+}
+
+@media (max-width: 380px) {
+  .spriteFrame {
+    --slime-art-scale: 1.5;
+    --slime-art-slot: 132px;
   }
 }
 

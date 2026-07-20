@@ -1,4 +1,8 @@
-import type { SlimeGrowthSnapshot } from "@/lib/pets/growth";
+import {
+  SLIME_GROWTH_STAGE_THRESHOLDS_SECONDS,
+  type SlimeGrowthSnapshot,
+  type SlimeGrowthStage,
+} from "@/lib/pets/growth";
 import type {
   SlimeColor,
   SlimeEffectKey,
@@ -37,6 +41,34 @@ export type SlimeGrowthSnapshotPayload = Pick<
   lastSettledAt?: string | Date;
   appliedSpeedBps?: number;
 };
+
+/**
+ * Return the percentage completed within the current growth stage.
+ *
+ * The API snapshot stores cumulative effective seconds, so each stage starts
+ * at its persisted threshold rather than at zero.  Keep the stage-3 state
+ * complete even if an older row has not yet reached the final threshold, and
+ * clamp malformed/temporarily stale values so the UI never renders an
+ * impossible meter width or ARIA value.
+ */
+export function calculateSlimeGrowthPercent(
+  snapshot: Pick<SlimeGrowthSnapshotPayload, "stage" | "growthSeconds">,
+): number {
+  const stage = snapshot.stage >= 3 ? 3 : snapshot.stage >= 2 ? 2 : 1;
+  if (stage === 3) return 100;
+
+  const currentStage = stage as SlimeGrowthStage;
+  const nextStage = (stage + 1) as SlimeGrowthStage;
+  const start = SLIME_GROWTH_STAGE_THRESHOLDS_SECONDS[currentStage];
+  const target = SLIME_GROWTH_STAGE_THRESHOLDS_SECONDS[nextStage];
+  const seconds = Number.isFinite(snapshot.growthSeconds)
+    ? snapshot.growthSeconds
+    : start;
+  const span = target - start;
+  if (span <= 0) return 100;
+
+  return Math.min(100, Math.max(0, Math.round(((seconds - start) / span) * 100)));
+}
 
 export type EquippedItemsByColor = Partial<Record<SlimeColor, string[]>>;
 

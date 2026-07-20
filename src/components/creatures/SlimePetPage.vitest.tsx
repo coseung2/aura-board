@@ -41,6 +41,55 @@ describe("SlimePetPage", () => {
     expect(screen.queryByText("500원 구매")).toBeNull();
   });
 
+  it("renders deterministic stage growth percentages as accessible progress bars", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(() =>
+        json(
+          home({
+            ownedColors: ["blue", "green"],
+            growthByColor: {
+              blue: {
+                stage: 1,
+                growthSeconds: 5 * 24 * 60 * 60,
+                growthRemainderBps: 0,
+                growthAppliedSpeedBps: 0,
+                nextStage: 2,
+                remainingSeconds: 5 * 24 * 60 * 60,
+                remainingMinutes: 5 * 24 * 60,
+              },
+              green: {
+                stage: 3,
+                growthSeconds: 1,
+                growthRemainderBps: 0,
+                growthAppliedSpeedBps: 0,
+                nextStage: null,
+                remainingSeconds: 0,
+                remainingMinutes: 0,
+              },
+            },
+          }),
+        ),
+      ),
+    );
+    render(<SlimePetPage />);
+
+    const blueMeter = await screen.findByRole("progressbar", {
+      name: "블루 슬라임 성장 1단계 진행도 50%",
+    });
+    expect(blueMeter.getAttribute("aria-valuemin")).toBe("0");
+    expect(blueMeter.getAttribute("aria-valuemax")).toBe("100");
+    expect(blueMeter.getAttribute("aria-valuenow")).toBe("50");
+    expect(screen.getByText("50%")).toBeTruthy();
+
+    const greenMeter = screen.getByRole("progressbar", {
+      name: "그린 슬라임 성장 3단계 진행도 100%",
+    });
+    expect(greenMeter.getAttribute("aria-valuenow")).toBe("100");
+    expect(screen.getByText("100%")).toBeTruthy();
+    expect(screen.queryByText(/남은 시간/)).toBeNull();
+  });
+
   it("opens the right shop drawer with exactly four filters and filters products", async () => {
     vi.stubGlobal("fetch", vi.fn(() => json(home())));
     render(<SlimePetPage />);
@@ -192,7 +241,7 @@ describe("SlimePetPage", () => {
     await screen.findByText("물웅덩이 배경을(를) 환불했어요.");
     expect(screen.getByTestId("slime-wallet-balance").textContent).toContain("350");
     expect(within(drawer).getByRole("button", { name: "물웅덩이 배경 구매" })).toBeTruthy();
-    expect(screen.getByText("장착한 아이템 없음")).toBeTruthy();
+    expect(screen.queryByText("장착한 아이템 없음")).toBeNull();
     expect(fetchMock.mock.calls[1][0]).toBe("/api/student/slimes/items/refund");
     expect(JSON.parse(fetchMock.mock.calls[1][1].body as string)).toEqual({
       itemKey: "water-puddle-background",
@@ -240,7 +289,7 @@ describe("SlimePetPage", () => {
     const apply = within(drawer).getByRole("button", { name: "물웅덩이 배경 적용" });
     fireEvent.click(apply);
     await screen.findByText("물웅덩이 배경을(를) 블루 슬라임에 적용했어요.");
-    expect(screen.getByText("장착: 물웅덩이 배경")).toBeTruthy();
+    expect(screen.queryByText("장착: 물웅덩이 배경")).toBeNull();
     expect(
       document.querySelector(
         '[data-slime-color="blue"][data-slime-action="floor-interaction"][data-equipped-floor="water-puddle"]',
@@ -255,7 +304,7 @@ describe("SlimePetPage", () => {
 
     fireEvent.click(within(drawer).getByRole("button", { name: "물웅덩이 배경 해제" }));
     await screen.findByText("물웅덩이 배경을(를) 블루 슬라임에 해제했어요.");
-    expect(screen.getByText("장착한 아이템 없음")).toBeTruthy();
+    expect(screen.queryByText("장착한 아이템 없음")).toBeNull();
     expect(fetchMock.mock.calls[2][0]).toBe("/api/student/slimes/items/equip");
     expect(JSON.parse(fetchMock.mock.calls[2][1].body as string)).toEqual({
       slimeColor: "blue",

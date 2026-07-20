@@ -1,7 +1,6 @@
 import { useState } from "react";
 
 import { formatBpsPercent, type calculateCatalogSlimeEffects } from "@/lib/pets/math";
-import { formatSlimeGrowthRemaining } from "@/lib/pets/growth";
 import {
   SLIME_SHARED_ASSETS,
   type EquippedFloor,
@@ -12,6 +11,7 @@ import type { SlimeColor, SlimeDefinition, SlimeShopItem } from "@/lib/pets/type
 import styles from "./SlimePetPage.module.css";
 import { SlimeCharacterSprite } from "./SlimeCharacterSprite";
 import {
+  calculateSlimeGrowthPercent,
   EFFECT_LABELS,
   type EquippedItemsByColor,
   type SlimeGrowthSnapshotPayload,
@@ -108,6 +108,9 @@ export function SlimeCollectionSection({
             .map((itemKey) => shopCatalog.find((item) => item.key === itemKey))
             .filter((item): item is SlimeShopItem => Boolean(item));
           const growth = growthByColor[slime.color];
+          const growthPercent = growth
+            ? calculateSlimeGrowthPercent(growth)
+            : null;
           const floor = normalizeFloor(
             equippedFloorByColor[slime.color],
             floorFromItems(assignedItems),
@@ -125,6 +128,9 @@ export function SlimeCollectionSection({
           };
           return (
             <li key={slime.key} className={`${styles.slimeItem} ${styles.slimeItemSelected}`}>
+              <span className={styles.effectBadge}>
+                {EFFECT_LABELS[slime.effectKey]} +{formatBpsPercent(slime.baseBuffBps)}
+              </span>
               <span className={styles.ownedChip}>
                 {representativeColor === slime.color ? "대표" : "보유 중"}
               </span>
@@ -147,17 +153,28 @@ export function SlimeCollectionSection({
               </div>
               <div className={styles.itemCopy}>
                 <h3>{slime.nameKo}</h3>
-                <p>{EFFECT_LABELS[slime.effectKey]} +{formatBpsPercent(slime.baseBuffBps)}</p>
-                {growth ? (
-                  <p className={styles.growthSummary} data-testid={`slime-growth-${slime.color}`}>
-                    성장 {growth.stage}단계 · {formatSlimeGrowthRemaining(growth.remainingSeconds)}
-                  </p>
+                {growth && growthPercent !== null ? (
+                  <div className={styles.growthSummary} data-testid={`slime-growth-${slime.color}`}>
+                    <div className={styles.growthMeta}>
+                      <span>성장 {growth.stage}단계</span>
+                      <strong>{growthPercent}%</strong>
+                    </div>
+                    <div
+                      className={styles.growthTrack}
+                      role="progressbar"
+                      aria-label={`${slime.nameKo} 성장 ${growth.stage}단계 진행도 ${growthPercent}%`}
+                      aria-valuemin={0}
+                      aria-valuemax={100}
+                      aria-valuenow={growthPercent}
+                      aria-valuetext={`${growth.stage}단계 ${growthPercent}%`}
+                    >
+                      <span
+                        className={styles.growthFill}
+                        style={{ width: `${growthPercent}%` }}
+                      />
+                    </div>
+                  </div>
                 ) : null}
-                <p className={styles.equipmentSummary} aria-live="polite">
-                  {assignedItems.length > 0
-                    ? `장착: ${assignedItems.map((item) => item.labelKo).join(", ")}`
-                    : "장착한 아이템 없음"}
-                </p>
               </div>
               <div className={styles.slimeActions}>
                 <div
