@@ -23,6 +23,10 @@ export async function POST(req: Request) {
     body && typeof body === "object" && typeof (body as { itemKey?: unknown }).itemKey === "string"
       ? (body as { itemKey: string }).itemKey
       : null;
+  const slimeColor =
+    body && typeof body === "object" && typeof (body as { slimeColor?: unknown }).slimeColor === "string"
+      ? (body as { slimeColor: string }).slimeColor
+      : null;
   const rawEquipped =
     body && typeof body === "object"
       ? (body as { isEquipped?: unknown; equipped?: unknown }).isEquipped ??
@@ -30,13 +34,14 @@ export async function POST(req: Request) {
       : undefined;
   const isEquipped = typeof rawEquipped === "boolean" ? rawEquipped : null;
   const idempotencyKey = req.headers.get("Idempotency-Key");
-  if (!itemKey || isEquipped === null || !idempotencyKey) {
+  if (!slimeColor || !itemKey || isEquipped === null || !idempotencyKey) {
     return jsonPrivateNoStore({ error: "invalid_body" }, { status: 400 });
   }
 
   try {
     const result = await equipSlimeShopItem(
       { id: student.id, classroomId: student.classroomId },
+      slimeColor,
       itemKey,
       isEquipped,
       idempotencyKey,

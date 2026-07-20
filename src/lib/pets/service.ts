@@ -62,6 +62,7 @@ export type SlimeHome = {
   catalog: typeof SLIME_CATALOG;
   ownedItemKeys: string[];
   equippedItemKeys: string[];
+  equippedItemsByColor: Partial<Record<SlimeColor, string[]>>;
   shopCatalog: typeof SLIME_SHOP_CATALOG;
   effects: ReturnType<typeof calculateCatalogSlimeEffects>;
 };
@@ -79,9 +80,11 @@ export type SlimeShopPurchaseResult = {
 };
 
 export type SlimeShopEquipResult = {
+  slimeColor: SlimeColor;
   itemKey: string;
   isEquipped: boolean;
   equippedItemKeys: string[];
+  equippedItemsByColor: Partial<Record<SlimeColor, string[]>>;
   idempotent: boolean;
 };
 
@@ -178,7 +181,7 @@ export async function getSlimeHome(student: StudentIdentity): Promise<SlimeHome>
       // Slime ownership follows the student if they move classrooms. The
       // classroomId remains an audit snapshot of where it was purchased.
       where: { studentId: student.id },
-      select: { color: true, isEquipped: true },
+      select: { color: true, isEquipped: true, equippedItemKeys: true },
       orderBy: { createdAt: "asc" },
     }),
     // The inventory delegate was added with the creature system. Keeping the
@@ -200,10 +203,15 @@ export async function getSlimeHome(student: StudentIdentity): Promise<SlimeHome>
   const ownedItemKeys = ownedItems
     .map((item) => item.itemKey)
     .filter((itemKey) => Boolean(getSlimeShopItem(itemKey)));
-  const equippedItemKeys = ownedItems
-    .filter((item) => item.isEquipped === true)
-    .map((item) => item.itemKey)
-    .filter((itemKey) => Boolean(getSlimeShopItem(itemKey)));
+  const equippedItemsByColor = Object.fromEntries(
+    owned.map((slime) => [
+      slime.color,
+      (slime.equippedItemKeys ?? []).filter((itemKey) => Boolean(getSlimeShopItem(itemKey))),
+    ]),
+  ) as Partial<Record<SlimeColor, string[]>>;
+  const equippedItemKeys = Array.from(
+    new Set(Object.values(equippedItemsByColor).flatMap((keys) => keys ?? [])),
+  );
   return {
     balance: account.balance,
     currency: { unitLabel: currency?.unitLabel?.trim() || "원" },
@@ -212,6 +220,7 @@ export async function getSlimeHome(student: StudentIdentity): Promise<SlimeHome>
     catalog: SLIME_CATALOG,
     ownedItemKeys,
     equippedItemKeys,
+    equippedItemsByColor,
     shopCatalog: SLIME_SHOP_CATALOG,
     effects: calculateCatalogSlimeEffects(Array.from(equippedSet), equippedItemKeys),
   };
@@ -484,13 +493,15 @@ export async function purchaseSlimeShopItem(
  */
 export async function equipSlimeShopItem(
   student: StudentIdentity,
+  slimeColor: string,
   itemKey: string,
   isEquipped: boolean,
   idempotencyKey: string,
 ): Promise<SlimeShopEquipResult> {
+  const slime = getSlimeDefinition(slimeColor);
   const normalizedKey = typeof itemKey === "string" ? itemKey.trim() : "";
   const item = getSlimeShopItem(normalizedKey);
-  if (!item || typeof isEquipped !== "boolean") {
+  if (!slime || !item || typeof isEquipped !== "boolean") {
     throw new SlimeServiceError("invalid_body");
   }
   // Equip requests are replay-safe state transitions. We still validate the
@@ -498,6 +509,11 @@ export async function equipSlimeShopItem(
   assertIdempotencyKey(idempotencyKey);
 
   return serializable(async (tx) => {
+    const ownedSlime = await tx.studentSlime.findUnique({
+      where: { studentId_color: { studentId: student.id, color: slime.color } },
+      select: { id: true, equippedItemKeys: true },
+    });
+    if (!ownedSlime) throw new SlimeServiceError("not_owned");
     const inventory = await tx.studentCreatureItem.findUnique({
       where: { studentId_itemKey: { studentId: student.id, itemKey: item.key } },
     });
@@ -509,43 +525,51 @@ export async function equipSlimeShopItem(
       throw new SlimeServiceError("not_owned");
     }
 
-    const alreadyInRequestedState = inventory.isEquipped === isEquipped;
-    let resetOtherBackgrounds = 0;
-    if (isEquipped && item.category === "background") {
-      const reset = await tx.studentCreatureItem.updateMany({
-        where: {
-          studentId: student.id,
-          itemKind: "slime-background",
-          itemKey: { not: item.key },
-          quantity: { gt: 0 },
-          isEquipped: true,
-        },
-        data: { isEquipped: false },
-      });
-      resetOtherBackgrounds = reset.count;
-    }
-
-    if (!alreadyInRequestedState) {
-      await tx.studentCreatureItem.update({
-        where: { id: inventory.id },
-        data: { isEquipped },
-      });
-    }
-
-    const rows = await tx.studentCreatureItem.findMany({
-      where: { studentId: student.id, quantity: { gt: 0 } },
-      select: { itemKey: true, isEquipped: true },
-      orderBy: { itemKey: "asc" },
+    const slimeRowsBefore = await tx.studentSlime.findMany({
+      where: { studentId: student.id },
+      select: { id: true, color: true, equippedItemKeys: true },
+      orderBy: { createdAt: "asc" },
     });
-    const equippedItemKeys = rows
-      .filter((row) => row.isEquipped)
-      .map((row) => row.itemKey)
-      .filter((key) => Boolean(getSlimeShopItem(key)));
+    const currentKeys = ownedSlime.equippedItemKeys.filter((key: string) => Boolean(getSlimeShopItem(key)));
+    const alreadyInRequestedState = currentKeys.includes(item.key) === isEquipped;
+    let nextKeys = currentKeys.filter((key) => key !== item.key);
+    if (isEquipped) {
+      nextKeys = nextKeys.filter((key: string) => getSlimeShopItem(key)?.category !== item.category);
+      nextKeys.push(item.key);
+      await Promise.all(
+        slimeRowsBefore
+          .filter((row) => row.color !== slime.color && row.equippedItemKeys.includes(item.key))
+          .map((row) =>
+            tx.studentSlime.update({
+              where: { id: row.id },
+              data: { equippedItemKeys: row.equippedItemKeys.filter((key: string) => key !== item.key) },
+            }),
+          ),
+      );
+    }
+    if (!alreadyInRequestedState || nextKeys.length !== currentKeys.length) {
+      await tx.studentSlime.update({ where: { id: ownedSlime.id }, data: { equippedItemKeys: nextKeys } });
+    }
+    const slimeRows = await tx.studentSlime.findMany({
+      where: { studentId: student.id },
+      select: { color: true, equippedItemKeys: true },
+      orderBy: { createdAt: "asc" },
+    });
+    const equippedItemsByColor = Object.fromEntries(
+      slimeRows.map((row) => [row.color, row.color === slime.color ? nextKeys : row.equippedItemKeys]),
+    ) as Partial<Record<SlimeColor, string[]>>;
+    const equippedItemKeys = Array.from(new Set(Object.values(equippedItemsByColor).flatMap((keys) => keys ?? [])));
+    await tx.studentCreatureItem.update({
+      where: { id: inventory.id },
+      data: { isEquipped: equippedItemKeys.includes(item.key) },
+    });
     return {
+      slimeColor: slime.color,
       itemKey: item.key,
       isEquipped,
       equippedItemKeys,
-      idempotent: alreadyInRequestedState && resetOtherBackgrounds === 0,
+      equippedItemsByColor,
+      idempotent: alreadyInRequestedState,
     };
   });
 }

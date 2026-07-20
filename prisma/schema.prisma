@@ -3409,6 +3409,9 @@ model StudentSlime {
   color       String
   // Only equipped slimes contribute their server-calculated reward effect.
   isEquipped Boolean @default(true)
+  // Shop cosmetics are assigned per owned slime. Each category is kept to one
+  // item by the slime equipment service.
+  equippedItemKeys String[] @default([])
 
   purchaseTransactionId String @unique
 

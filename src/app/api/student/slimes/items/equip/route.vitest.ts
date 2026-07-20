@@ -29,9 +29,11 @@ describe("POST /api/student/slimes/items/equip", () => {
     vi.clearAllMocks();
     mocks.getCurrentStudent.mockResolvedValue({ id: "student-1", classroomId: "classroom-1" });
     mocks.equipSlimeShopItem.mockResolvedValue({
+      slimeColor: "blue",
       itemKey: "water-puddle-background",
       isEquipped: true,
       equippedItemKeys: ["water-puddle-background"],
+      equippedItemsByColor: { blue: ["water-puddle-background"] },
       idempotent: false,
     });
   });
@@ -46,13 +48,14 @@ describe("POST /api/student/slimes/items/equip", () => {
   it("passes only cookie-authenticated identity and the requested state", async () => {
     const response = await POST(
       request(
-        { itemKey: "water-puddle-background", isEquipped: true, studentId: "other" },
+        { slimeColor: "blue", itemKey: "water-puddle-background", isEquipped: true, studentId: "other" },
         "equip-attempt-1",
       ),
     );
     expect(response.status).toBe(200);
     expect(mocks.equipSlimeShopItem).toHaveBeenCalledWith(
       { id: "student-1", classroomId: "classroom-1" },
+      "blue",
       "water-puddle-background",
       true,
       "equip-attempt-1",
@@ -65,7 +68,7 @@ describe("POST /api/student/slimes/items/equip", () => {
 
   it("returns ownership and catalog validation errors", async () => {
     mocks.equipSlimeShopItem.mockRejectedValue({ code: "not_owned", status: 403 });
-    const response = await POST(request({ itemKey: "water-puddle-background", isEquipped: true }, "equip-2"));
+    const response = await POST(request({ slimeColor: "blue", itemKey: "water-puddle-background", isEquipped: true }, "equip-2"));
     expect(response.status).toBe(403);
     expect(await response.json()).toEqual({ error: "not_owned" });
   });

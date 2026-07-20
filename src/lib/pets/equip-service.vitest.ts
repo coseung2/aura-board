@@ -51,10 +51,24 @@ function installState(overrides: Partial<{ quantity: number; isEquipped: boolean
     }),
     findMany: vi.fn(async () => [...rows.values()]),
   };
+  const slimeRows = [
+    { id: "slime-1", studentId: student.id, color: "blue", equippedItemKeys: [] as string[] },
+  ];
+  const slimes = {
+    findUnique: vi.fn(async () => slimeRows[0]),
+    findMany: vi.fn(async () => slimeRows),
+    updateMany: vi.fn(async () => ({ count: 0 })),
+    update: vi.fn(async ({ where, data }: { where: { id: string }; data: { equippedItemKeys: string[] } }) => {
+      const row = slimeRows.find((candidate) => candidate.id === where.id);
+      if (!row) throw new Error("missing slime");
+      row.equippedItemKeys = data.equippedItemKeys;
+      return row;
+    }),
+  };
   mocks.transaction.mockImplementation(async (operation: (tx: unknown) => Promise<unknown>) =>
-    operation({ studentCreatureItem: inventory }),
+    operation({ studentCreatureItem: inventory, studentSlime: slimes }),
   );
-  return { rows, inventory };
+  return { rows, inventory, slimeRows, slimes };
 }
 
 describe("slime shop item equipment", () => {
@@ -63,8 +77,9 @@ describe("slime shop item equipment", () => {
   it("applies, removes, and replays an owned item without duplicating state", async () => {
     const state = installState();
 
-    const applied = await equipSlimeShopItem(student, background.key, true, "equip-1");
+    const applied = await equipSlimeShopItem(student, "blue", background.key, true, "equip-1");
     expect(applied).toMatchObject({
+      slimeColor: "blue",
       itemKey: background.key,
       isEquipped: true,
       equippedItemKeys: [background.key],
@@ -72,11 +87,11 @@ describe("slime shop item equipment", () => {
     });
     expect(state.rows.get(background.key)?.isEquipped).toBe(true);
 
-    const replay = await equipSlimeShopItem(student, background.key, true, "equip-1");
+    const replay = await equipSlimeShopItem(student, "blue", background.key, true, "equip-1");
     expect(replay).toMatchObject({ isEquipped: true, idempotent: true });
-    expect(state.inventory.update).toHaveBeenCalledTimes(1);
+    expect(state.slimes.update).toHaveBeenCalledTimes(1);
 
-    const removed = await equipSlimeShopItem(student, background.key, false, "equip-2");
+    const removed = await equipSlimeShopItem(student, "blue", background.key, false, "equip-2");
     expect(removed).toMatchObject({
       itemKey: background.key,
       isEquipped: false,
@@ -88,13 +103,13 @@ describe("slime shop item equipment", () => {
   it("blocks unowned, empty, and mismatched item rows", async () => {
     const missing = installState({ quantity: 0 });
     await expect(
-      equipSlimeShopItem(student, background.key, true, "missing"),
+      equipSlimeShopItem(student, "blue", background.key, true, "missing"),
     ).rejects.toMatchObject<Partial<SlimeServiceError>>({ code: "not_owned", status: 403 });
     expect(missing.rows.get(background.key)?.isEquipped).toBe(false);
 
     const wrongKind = installState({ itemKind: "creature-food" });
     await expect(
-      equipSlimeShopItem(student, background.key, true, "wrong-kind"),
+      equipSlimeShopItem(student, "blue", background.key, true, "wrong-kind"),
     ).rejects.toMatchObject<Partial<SlimeServiceError>>({ code: "not_owned", status: 403 });
     expect(wrongKind.inventory.update).not.toHaveBeenCalled();
   });

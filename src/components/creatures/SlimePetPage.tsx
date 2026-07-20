@@ -37,6 +37,7 @@ type SlimeHome = {
   catalog: SlimeDefinition[];
   ownedItemKeys?: string[];
   equippedItemKeys?: string[];
+  equippedItemsByColor?: Partial<Record<SlimeColor, string[]>>;
   shopCatalog?: SlimeShopItem[];
 };
 
@@ -63,6 +64,7 @@ export function SlimePetPage() {
   const [shopCatalog, setShopCatalog] = useState<SlimeShopItem[]>([]);
   const [ownedItemKeys, setOwnedItemKeys] = useState<string[]>([]);
   const [equippedItemKeys, setEquippedItemKeys] = useState<string[]>([]);
+  const [equippedItemsByColor, setEquippedItemsByColor] = useState<Partial<Record<SlimeColor, string[]>>>({});
   const [balance, setBalance] = useState(0);
   const [unitLabel, setUnitLabel] = useState("원");
   const [loading, setLoading] = useState(true);
@@ -71,8 +73,9 @@ export function SlimePetPage() {
   const [notice, setNotice] = useState<Notice | null>(null);
   const [shopNotice, setShopNotice] = useState<Notice | null>(null);
   const [shopOpen, setShopOpen] = useState(false);
+  const [wardrobeColor, setWardrobeColor] = useState<SlimeColor | null>(null);
   const [shopFilter, setShopFilter] = useState<"all" | SlimeShopCategory>("all");
-  const shopTriggerRef = useRef<HTMLButtonElement>(null);
+  const drawerTriggerRef = useRef<HTMLButtonElement | null>(null);
   const shopCloseRef = useRef<HTMLButtonElement>(null);
   const hadOpenDrawer = useRef(false);
   const slimeRetryKeys = useRef(new Map<SlimeColor, string>());
@@ -90,6 +93,9 @@ export function SlimePetPage() {
         : shopCatalog.filter((item) => item.category === shopFilter),
     [shopCatalog, shopFilter],
   );
+  const drawerItems = wardrobeColor
+    ? visibleShopItems.filter((item) => ownedItemKeys.includes(item.key))
+    : visibleShopItems;
 
   useEffect(() => {
     const controller = new AbortController();
@@ -105,6 +111,7 @@ export function SlimePetPage() {
         setShopCatalog(home.shopCatalog ?? SLIME_SHOP_CATALOG.slice());
         setOwnedItemKeys(home.ownedItemKeys ?? []);
         setEquippedItemKeys(home.equippedItemKeys ?? []);
+        setEquippedItemsByColor(home.equippedItemsByColor ?? {});
         setBalance(home.balance);
         setUnitLabel(home.currency.unitLabel || "원");
       })
@@ -122,7 +129,7 @@ export function SlimePetPage() {
     if (!shopOpen) {
       if (hadOpenDrawer.current) {
         hadOpenDrawer.current = false;
-        shopTriggerRef.current?.focus();
+        drawerTriggerRef.current?.focus();
       }
       return;
     }
@@ -234,7 +241,7 @@ export function SlimePetPage() {
     }
   };
 
-  const equipShopItem = async (item: SlimeShopItem, nextEquipped: boolean) => {
+  const equipShopItem = async (color: SlimeColor, item: SlimeShopItem, nextEquipped: boolean) => {
     if (busyItemKey || !ownedItemKeys.includes(item.key)) return;
     const idempotencyKey =
       itemEquipRetryKeys.current.get(item.key) ??
@@ -249,19 +256,20 @@ export function SlimePetPage() {
           "Content-Type": "application/json",
           "Idempotency-Key": idempotencyKey,
         },
-        body: JSON.stringify({ itemKey: item.key, isEquipped: nextEquipped }),
+        body: JSON.stringify({ slimeColor: color, itemKey: item.key, isEquipped: nextEquipped }),
       });
       const payload = (await response.json().catch(() => ({}))) as {
         error?: string;
         itemKey?: string;
         isEquipped?: boolean;
         equippedItemKeys?: string[];
+        equippedItemsByColor?: Partial<Record<SlimeColor, string[]>>;
       };
       if (
         !response.ok ||
         payload.itemKey !== item.key ||
         payload.isEquipped !== nextEquipped ||
-        !Array.isArray(payload.equippedItemKeys)
+        !Array.isArray(payload.equippedItemKeys) || !payload.equippedItemsByColor
       ) {
         if (response.status < 500) itemEquipRetryKeys.current.delete(item.key);
         setShopNotice({
@@ -272,9 +280,10 @@ export function SlimePetPage() {
       }
       itemEquipRetryKeys.current.delete(item.key);
       setEquippedItemKeys(payload.equippedItemKeys);
+      setEquippedItemsByColor(payload.equippedItemsByColor);
       setShopNotice({
         kind: "success",
-        text: `${item.labelKo}을(를) ${nextEquipped ? "적용" : "해제"}했어요.`,
+        text: `${item.labelKo}을(를) ${catalog.find((entry) => entry.color === color)?.nameKo ?? "슬라임"}에 ${nextEquipped ? "적용" : "해제"}했어요.`,
       });
     } catch {
       setShopNotice({
@@ -286,12 +295,9 @@ export function SlimePetPage() {
     }
   };
 
-  const toggleShopItem = (item: SlimeShopItem, owned: boolean, equipped: boolean) => {
-    if (owned) {
-      void equipShopItem(item, !equipped);
-      return;
-    }
-    void purchaseShopItem(item);
+  const closeDrawer = () => {
+    setShopOpen(false);
+    setWardrobeColor(null);
   };
 
   return (
@@ -312,11 +318,12 @@ export function SlimePetPage() {
             </strong>
           </div>
           <button
-            ref={shopTriggerRef}
             type="button"
             className={styles.shopTrigger}
-            onClick={() => {
+            onClick={(event) => {
+              drawerTriggerRef.current = event.currentTarget;
               setShopNotice(null);
+              setWardrobeColor(null);
               setShopOpen(true);
             }}
             aria-haspopup="dialog"
@@ -355,6 +362,9 @@ export function SlimePetPage() {
           ) : catalog.map((slime) => {
             const owned = ownedKeys.includes(slime.key);
             const busy = busyColor === slime.key;
+            const assignedItems = (equippedItemsByColor[slime.color] ?? [])
+              .map((itemKey) => shopCatalog.find((item) => item.key === itemKey))
+              .filter((item): item is SlimeShopItem => Boolean(item));
             return (
               <li
                 key={slime.key}
@@ -375,6 +385,13 @@ export function SlimePetPage() {
                   <p>
                     {EFFECT_LABELS[slime.effectKey]} +{formatBpsPercent(slime.baseBuffBps)}
                   </p>
+                  {owned ? (
+                    <p className={styles.equipmentSummary} aria-live="polite">
+                      {assignedItems.length > 0
+                        ? `장착: ${assignedItems.map((item) => item.labelKo).join(", ")}`
+                        : "장착한 아이템 없음"}
+                    </p>
+                  ) : null}
                 </div>
                 <button
                   type="button"
@@ -394,6 +411,22 @@ export function SlimePetPage() {
                         : `${slime.price.toLocaleString("ko-KR")}${unitLabel} 구매`}
                   </span>
                 </button>
+                {owned ? (
+                  <button
+                    type="button"
+                    className={styles.wardrobeButton}
+                    onClick={(event) => {
+                      drawerTriggerRef.current = event.currentTarget;
+                      setShopNotice(null);
+                      setShopFilter("all");
+                      setWardrobeColor(slime.color);
+                      setShopOpen(true);
+                    }}
+                    aria-label={`${slime.nameKo} 꾸미기`}
+                  >
+                    꾸미기 · 장착 관리
+                  </button>
+                ) : null}
               </li>
             );
           })}
@@ -427,26 +460,31 @@ export function SlimePetPage() {
             role="presentation"
             aria-hidden="true"
             onClick={(event) => {
-              if (event.target === event.currentTarget) setShopOpen(false);
+              if (event.target === event.currentTarget) closeDrawer();
             }}
           />
           <aside
             className={styles.drawer}
             role="dialog"
             aria-modal="true"
-            aria-labelledby="slime-shop-title"
+            aria-labelledby="slime-drawer-title"
           >
             <div className={styles.drawerHeader}>
               <div>
-                <p className={styles.eyebrow}>SLIME SHOP</p>
-                <h2 id="slime-shop-title">슬라임 상점</h2>
+                <p className={styles.eyebrow}>{wardrobeColor ? "SLIME DRESS UP" : "SLIME SHOP"}</p>
+                <h2 id="slime-drawer-title">
+                  {wardrobeColor
+                    ? `${catalog.find((slime) => slime.color === wardrobeColor)?.nameKo ?? "슬라임"} 꾸미기`
+                    : "슬라임 상점"}
+                </h2>
+                {wardrobeColor ? <p className={styles.drawerSubtitle}>보유한 아이템을 골라 이 슬라임에 적용하세요.</p> : null}
               </div>
               <button
                 ref={shopCloseRef}
                 type="button"
                 className={styles.closeButton}
-                onClick={() => setShopOpen(false)}
-                aria-label="상점 닫기"
+                onClick={closeDrawer}
+                aria-label={wardrobeColor ? "꾸미기 닫기" : "상점 닫기"}
               >
                 ×
               </button>
@@ -479,11 +517,13 @@ export function SlimePetPage() {
             )}
 
             <ul className={styles.shopList} aria-label="상점 상품 목록">
-              {visibleShopItems.length === 0 ? (
-                <li className={styles.emptyState}>이 분류에는 상품이 없어요.</li>
-              ) : visibleShopItems.map((item) => {
+              {drawerItems.length === 0 ? (
+                <li className={styles.emptyState}>{wardrobeColor ? "이 분류에 보유한 아이템이 없어요. 상점에서 먼저 구매해 주세요." : "이 분류에는 상품이 없어요."}</li>
+              ) : drawerItems.map((item) => {
                 const owned = ownedItemKeys.includes(item.key);
-                const equipped = equippedItemKeys.includes(item.key);
+                const equipped = wardrobeColor
+                  ? (equippedItemsByColor[wardrobeColor] ?? []).includes(item.key)
+                  : equippedItemKeys.includes(item.key);
                 const busy = busyItemKey === item.key;
                 return (
                   <li key={item.key} className={styles.shopItem}>
@@ -499,24 +539,24 @@ export function SlimePetPage() {
                     <button
                       type="button"
                       className={`${styles.shopBuyButton} ${equipped ? styles.shopBuyButtonEquipped : ""}`}
-                      disabled={busyItemKey !== null}
-                      onClick={() => toggleShopItem(item, owned, equipped)}
-                      aria-pressed={owned ? equipped : undefined}
-                      aria-label={`${item.labelKo} ${owned ? (equipped ? "적용 중, 해제" : "적용") : "구매"}`}
+                      disabled={busyItemKey !== null || (!wardrobeColor && owned)}
+                      onClick={() => wardrobeColor
+                        ? void equipShopItem(wardrobeColor, item, !equipped)
+                        : void purchaseShopItem(item)}
+                      aria-pressed={wardrobeColor ? equipped : undefined}
+                      aria-label={`${item.labelKo} ${wardrobeColor ? (equipped ? "적용 중, 해제" : "적용") : owned ? "보유 중" : "구매"}`}
                     >
                       <span className={styles.spriteSlot} aria-hidden="true">
-                        {busy ? "…" : owned && equipped ? "✓" : owned ? "＋" : "+"}
+                        {busy ? "…" : wardrobeColor && equipped ? "✓" : owned ? "✓" : "+"}
                       </span>
                       <span className={styles.buttonLabel}>
                         {busy
                           ? owned
                             ? "적용 중…"
                             : "구매 중…"
-                          : owned
-                            ? equipped
-                              ? "적용 중 · 해제"
-                              : "적용"
-                            : "구매"}
+                          : wardrobeColor
+                            ? equipped ? "적용 중 · 해제" : "적용"
+                            : owned ? "보유 중" : "구매"}
                       </span>
                     </button>
                   </li>

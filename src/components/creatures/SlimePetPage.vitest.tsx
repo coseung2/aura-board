@@ -109,9 +109,9 @@ describe("SlimePetPage", () => {
     await screen.findByText("물웅덩이 배경 구매를 완료했어요.");
     expect(screen.getByTestId("slime-wallet-balance").textContent).toContain("320");
     const ownedButton = within(drawer).getByRole("button", {
-      name: "물웅덩이 배경 적용",
+      name: "물웅덩이 배경 보유 중",
     });
-    expect(ownedButton.hasAttribute("disabled")).toBe(false);
+    expect(ownedButton.hasAttribute("disabled")).toBe(true);
     expect(fetchMock.mock.calls[1][0]).toBe("/api/student/slimes/items/purchase");
     expect(JSON.parse(fetchMock.mock.calls[1][1].body as string)).toEqual({
       itemKey: "water-puddle-background",
@@ -124,45 +124,55 @@ describe("SlimePetPage", () => {
       .mockImplementationOnce(() =>
         json(
           home({
+            ownedColors: ["blue"],
             ownedItemKeys: ["water-puddle-background"],
             equippedItemKeys: [],
+            equippedItemsByColor: { blue: [] },
           }),
         ),
       )
       .mockImplementationOnce(() =>
         json({
+          slimeColor: "blue",
           itemKey: "water-puddle-background",
           isEquipped: true,
           equippedItemKeys: ["water-puddle-background"],
+          equippedItemsByColor: { blue: ["water-puddle-background"] },
           idempotent: false,
         }),
       )
       .mockImplementationOnce(() =>
         json({
+          slimeColor: "blue",
           itemKey: "water-puddle-background",
           isEquipped: false,
           equippedItemKeys: [],
+          equippedItemsByColor: { blue: [] },
           idempotent: false,
         }),
       );
     vi.stubGlobal("fetch", fetchMock);
     render(<SlimePetPage />);
 
-    fireEvent.click(await screen.findByRole("button", { name: "상점" }));
-    const drawer = await screen.findByRole("dialog", { name: "슬라임 상점" });
+    fireEvent.click(await screen.findByRole("button", { name: "블루 슬라임 꾸미기" }));
+    const drawer = await screen.findByRole("dialog", { name: "블루 슬라임 꾸미기" });
     const apply = within(drawer).getByRole("button", { name: "물웅덩이 배경 적용" });
     fireEvent.click(apply);
-    await screen.findByText("물웅덩이 배경을(를) 적용했어요.");
+    await screen.findByText("물웅덩이 배경을(를) 블루 슬라임에 적용했어요.");
+    expect(screen.getByText("장착: 물웅덩이 배경")).toBeTruthy();
     expect(fetchMock.mock.calls[1][0]).toBe("/api/student/slimes/items/equip");
     expect(JSON.parse(fetchMock.mock.calls[1][1].body as string)).toEqual({
+      slimeColor: "blue",
       itemKey: "water-puddle-background",
       isEquipped: true,
     });
 
     fireEvent.click(within(drawer).getByRole("button", { name: "물웅덩이 배경 적용 중, 해제" }));
-    await screen.findByText("물웅덩이 배경을(를) 해제했어요.");
+    await screen.findByText("물웅덩이 배경을(를) 블루 슬라임에 해제했어요.");
+    expect(screen.getByText("장착한 아이템 없음")).toBeTruthy();
     expect(fetchMock.mock.calls[2][0]).toBe("/api/student/slimes/items/equip");
     expect(JSON.parse(fetchMock.mock.calls[2][1].body as string)).toEqual({
+      slimeColor: "blue",
       itemKey: "water-puddle-background",
       isEquipped: false,
     });
