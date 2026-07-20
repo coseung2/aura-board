@@ -8,6 +8,10 @@
   margin: 0 auto;
 }
 
+.student-walking-page {
+  padding-block: 24px;
+}
+
 /* Self-directed activity pages share the same bold section rule as the
    classroom feature headers while keeping student navigation page-semantic. */
 .student-activity-header {
@@ -17,6 +21,10 @@
   gap: 24px;
   margin: 0 0 28px;
   border-bottom: 2px solid var(--color-text);
+}
+
+.student-walking-page .student-activity-header {
+  margin-bottom: 0;
 }
 
 .student-activity-heading {
@@ -51,14 +59,22 @@
   overflow-y: hidden;
 }
 
-.student-activity-navigation a {
+.student-walking-page .student-activity-title {
+  font-size: 22px;
+}
+
+.student-activity-tab {
   position: relative;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   min-height: 44px;
   padding: 8px 14px;
+  border: 0;
+  background: transparent;
   color: var(--color-text-muted);
+  cursor: pointer;
+  font: inherit;
   font-size: 13px;
   font-weight: 800;
   line-height: 1.4;
@@ -66,7 +82,7 @@
   white-space: nowrap;
 }
 
-.student-activity-navigation a + a::before {
+.student-activity-tab + .student-activity-tab::before {
   position: absolute;
   left: 0;
   top: 50%;
@@ -77,15 +93,15 @@
   transform: translateY(-50%);
 }
 
-.student-activity-navigation a:hover {
+.student-activity-tab:hover {
   color: var(--color-text);
 }
 
-.student-activity-navigation a[aria-current="page"] {
+.student-activity-tab[aria-selected="true"] {
   color: var(--color-accent);
 }
 
-.student-activity-navigation a:focus-visible {
+.student-activity-tab:focus-visible {
   outline: 2px solid var(--color-accent-tinted-text);
   outline-offset: -2px;
 }
@@ -105,13 +121,724 @@
     font-size: 28px;
   }
 
+  .student-walking-page .student-activity-title {
+    font-size: 22px;
+  }
+
   .student-activity-navigation {
     width: 100%;
   }
 
-  .student-activity-navigation a {
+  .student-activity-tab {
     flex: 1 1 0;
   }
+
+  .student-walking-page {
+    padding-block: 24px;
+  }
+}
+
+.student-walking-days {
+  display: grid;
+  gap: 14px;
+}
+
+.student-walking-leaderboard-list {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  margin: 0;
+  padding: 0;
+  border-block: 1px solid var(--color-border);
+  list-style: none;
+}
+
+.student-walking-leaderboard-list li {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 4px 8px;
+  min-width: 0;
+  padding: 14px 12px;
+  border-right: 1px solid var(--color-border);
+}
+
+.student-walking-leaderboard-list li:last-child {
+  border-right: 0;
+}
+
+.student-walking-leaderboard-list li.is-current {
+  background: var(--color-accent-tinted-bg);
+}
+
+.student-walking-leaderboard-rank {
+  grid-row: 1 / span 2;
+  color: var(--color-accent-tinted-text);
+  font-size: 18px;
+  line-height: 1;
+}
+
+.student-walking-leaderboard-name,
+.student-walking-leaderboard-steps {
+  min-width: 0;
+  overflow: hidden;
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.student-walking-leaderboard-name {
+  color: var(--color-text);
+  font-weight: 800;
+}
+
+.student-walking-leaderboard-steps {
+  color: var(--color-text-muted);
+}
+
+.student-walking-day-row {
+  display: grid;
+  grid-template-columns: 92px minmax(0, 1fr) 88px;
+  align-items: center;
+  gap: 12px;
+  min-height: 24px;
+}
+
+.student-walking-day-label,
+.student-walking-step-label {
+  color: var(--color-text-muted);
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.4;
+}
+
+.student-walking-step-label {
+  color: var(--color-text);
+  text-align: right;
+}
+
+.student-walking-bar-track {
+  display: block;
+  height: 10px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--color-surface-alt);
+}
+
+.student-walking-bar-fill {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--color-accent);
+  transition: width 180ms ease;
+}
+
+.student-walking-future-day {
+  color: var(--color-text-faint);
+}
+
+/* Walking view tabs replace the content below the activity header. Keep both
+   panels in the DOM for stable hydration while `hidden` controls visibility. */
+.student-walking-tabpanel[hidden] {
+  display: none;
+}
+
+.student-walking-tabpanel:focus-visible {
+  outline: 2px solid var(--color-accent-tinted-text);
+  outline-offset: 4px;
+}
+
+.student-walking-missions-content {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: start;
+  gap: 16px;
+}
+
+.student-walking-mission-dashboard {
+  display: contents;
+}
+
+.student-walking-achievements {
+  grid-column: 1 / -1;
+  min-width: 0;
+}
+
+.student-walking-achievement-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.student-walking-achievement {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+}
+
+.student-walking-achievement-image {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 4 / 1;
+  opacity: 0.32;
+  filter: grayscale(1);
+}
+
+.student-walking-achievement-image img {
+  object-fit: contain;
+  image-rendering: pixelated;
+}
+
+.student-walking-achievement.is-earned .student-walking-achievement-image {
+  opacity: 1;
+  filter: none;
+}
+
+.student-walking-achievement-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  color: var(--color-text-muted);
+  font-size: 11px;
+}
+
+.student-walking-achievement-meta strong {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--color-text);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.student-walking-achievement.is-earned .student-walking-achievement-meta span {
+  color: var(--color-accent-tinted-text);
+  font-weight: 800;
+}
+
+.student-walking-mission-summary {
+  display: grid;
+  grid-column: 2;
+  grid-row: 1;
+  align-content: start;
+  gap: 8px;
+  min-width: 0;
+}
+
+.student-walking-page .student-walking-attendance-panel {
+  display: flex;
+  grid-column: 1;
+  grid-row: 1;
+  flex-direction: column;
+  padding-top: 12px;
+  border-top: 0;
+}
+
+.student-walking-page .student-walking-rewards {
+  min-width: 0;
+}
+
+.student-walking-mission-section {
+  display: grid;
+  gap: 12px;
+}
+
+.student-walking-mission-section + .student-walking-mission-section,
+.student-walking-mission-section + .student-walking-rewards {
+  border-top: 1px solid var(--color-border);
+}
+
+.student-walking-mission-status {
+  flex: 0 0 auto;
+  color: var(--color-text-muted);
+  font-size: 13px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.student-walking-mission-status.is-complete {
+  color: var(--color-accent);
+}
+
+.student-walking-mission-progress {
+  display: grid;
+  gap: 12px;
+}
+
+.student-walking-mission-progress-labels {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  color: var(--color-text-muted);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.student-walking-mission-progress-labels span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.student-walking-mission-progress-labels strong {
+  flex: 0 0 auto;
+  color: var(--color-text);
+  font-size: 14px;
+}
+
+.student-walking-progress-track {
+  height: 10px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--color-surface-alt);
+}
+
+.student-walking-progress-track span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--color-accent);
+  transition: width 180ms ease;
+}
+
+.student-walking-daily-milestones {
+  position: relative;
+  height: 64px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.student-walking-daily-milestones li {
+  position: absolute;
+  top: -18px;
+  display: grid;
+  min-width: 64px;
+  justify-items: center;
+  gap: 3px;
+  transform: translateX(-50%);
+  color: var(--color-text-muted);
+  font-size: 10px;
+  font-weight: 800;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.student-walking-daily-milestones li:last-child {
+  justify-items: end;
+  transform: translateX(-100%);
+}
+
+.student-walking-daily-milestone-dot {
+  width: 10px;
+  height: 10px;
+  border: 2px solid var(--color-accent);
+  border-radius: 50%;
+  background: var(--color-surface);
+  outline: 2px solid var(--color-accent-tinted-bg);
+}
+
+.student-walking-daily-milestones strong {
+  display: grid;
+  width: 40px;
+  height: 40px;
+  place-items: center;
+  border: 1px solid var(--color-border);
+  border-radius: 50%;
+  background: var(--color-surface-alt);
+  color: var(--color-text);
+  font-size: 11px;
+}
+
+/* Weekly walking mission graph. Milestones stay anchored to the same rounded
+   progress track on desktop and the one-column layout, with the coin itself
+   acting as the keyboard/touch target. */
+.student-walking-mission-graph {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  padding: 10px 0 0;
+}
+
+.student-walking-mission-graph-track {
+  position: relative;
+  height: 12px;
+  overflow: hidden;
+  border-radius: var(--radius-pill);
+  background: var(--color-surface-alt);
+}
+
+.student-walking-mission-graph-fill {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--color-accent);
+  transition: width var(--t-slow);
+}
+
+.student-walking-mission-milestones {
+  position: relative;
+  height: 96px;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.student-walking-mission-milestone {
+  position: absolute;
+  top: -18px;
+  display: grid;
+  justify-items: center;
+  gap: 4px;
+  width: min(124px, 30%);
+  min-width: 88px;
+  transform: translateX(-50%);
+  text-align: center;
+}
+
+.student-walking-mission-milestone.is-start {
+  justify-items: start;
+  text-align: left;
+  transform: none;
+}
+
+.student-walking-mission-milestone.is-end {
+  justify-items: end;
+  text-align: right;
+  transform: translateX(-100%);
+}
+
+.student-walking-mission-milestone-dot {
+  width: 12px;
+  height: 12px;
+  border: 2px solid var(--color-accent);
+  border-radius: 50%;
+  background: var(--color-surface);
+  outline: 3px solid var(--color-accent-tinted-bg);
+}
+
+.student-walking-mission-milestone-steps {
+  max-width: 100%;
+  color: var(--color-text-muted);
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 1.2;
+  overflow-wrap: anywhere;
+}
+
+.student-walking-mission-coin {
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: 1px;
+  width: 64px;
+  min-width: 64px;
+  height: 64px;
+  min-height: 64px;
+  padding: 4px;
+  border: 2px solid var(--color-border);
+  border-radius: 50%;
+  background: var(--color-surface-alt);
+  color: var(--color-text-muted);
+  cursor: pointer;
+  font: inherit;
+  line-height: 1.1;
+  transition:
+    background var(--t-normal),
+    border-color var(--t-normal),
+    box-shadow var(--t-normal),
+    transform var(--t-normal);
+}
+
+.student-walking-mission-coin:not(:disabled):hover {
+  border-color: var(--color-accent-active);
+  background: var(--color-accent-tinted-bg);
+  box-shadow: var(--shadow-accent);
+  transform: translateY(-2px);
+}
+
+.student-walking-mission-coin:focus-visible {
+  outline: 3px solid var(--color-accent-tinted-text);
+  outline-offset: 3px;
+}
+
+.student-walking-mission-coin:disabled {
+  cursor: not-allowed;
+}
+
+.student-walking-mission-coin.is-locked {
+  opacity: 0.62;
+}
+
+.student-walking-mission-coin.is-claimable {
+  border-color: var(--color-accent);
+  background: var(--color-accent-tinted-bg);
+  color: var(--color-accent-tinted-text);
+}
+
+.student-walking-mission-coin.is-pending {
+  border-color: var(--color-warning);
+  background: var(--color-warning-tinted-bg);
+  color: var(--color-text);
+  cursor: wait;
+}
+
+.student-walking-mission-coin.is-claimed {
+  border-color: var(--color-plant-active);
+  background: var(--color-learning-mint);
+  color: var(--color-text);
+}
+
+.student-walking-mission-coin.is-error {
+  border-color: var(--color-danger);
+  background: var(--color-status-returned-bg);
+  color: var(--color-danger);
+}
+
+.student-walking-mission-coin-amount {
+  max-width: 100%;
+  font-size: 13px;
+  font-weight: 900;
+  overflow-wrap: anywhere;
+}
+
+.student-walking-mission-coin-state {
+  max-width: 100%;
+  font-size: 10px;
+  font-weight: 800;
+  overflow-wrap: anywhere;
+}
+
+.student-walking-mission-error {
+  width: min(150px, 100%);
+  color: var(--color-danger);
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+
+.student-walking-mission-progress-copy {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: 13px;
+  font-weight: 700;
+  text-align: right;
+}
+
+.student-walking-attendance-board {
+  display: grid;
+  grid-template-rows: auto auto;
+  align-content: start;
+  gap: 8px;
+  width: 100%;
+  min-width: 0;
+  aspect-ratio: 1;
+  overflow: hidden;
+}
+
+.student-walking-ordinal-grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  align-content: start;
+  align-items: start;
+  gap: clamp(4px, 0.8vw, 8px);
+  width: 100%;
+  min-height: 0;
+}
+
+.student-walking-ordinal-slot {
+  width: 100%;
+  min-width: 0;
+  aspect-ratio: 1;
+}
+
+.student-walking-ordinal-cell {
+  position: relative;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  align-content: space-between;
+  gap: 4px;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  overflow: hidden;
+  padding: clamp(4px, 0.8vw, 8px);
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  background: var(--color-surface-alt);
+  color: var(--color-text-faint);
+  font: inherit;
+  text-align: left;
+}
+
+.student-walking-ordinal-cell.is-earned {
+  border-color: var(--color-accent);
+  background: var(--color-accent-tinted-bg);
+  color: var(--color-text);
+  cursor: pointer;
+  transition:
+    background var(--t-normal),
+    border-color var(--t-normal),
+    transform var(--t-normal);
+}
+
+.student-walking-ordinal-cell.is-earned:hover {
+  border-color: var(--color-accent-active);
+  background: var(--color-surface);
+  transform: translateY(-1px);
+}
+
+.student-walking-ordinal-cell.is-earned:focus-visible {
+  outline: 2px solid var(--color-accent-tinted-text);
+  outline-offset: -2px;
+}
+
+.student-walking-ordinal-cell.is-stamped {
+  border-color: var(--color-danger);
+  background: var(--color-surface);
+}
+
+.student-walking-ordinal-cell.is-item-reward {
+  border-style: dashed;
+  border-color: var(--color-accent-tinted-text);
+}
+
+.student-walking-ordinal-cell.is-earned.is-item-reward {
+  background: var(--color-accent-tinted-bg);
+}
+
+.student-walking-ordinal-number {
+  color: inherit;
+  font-size: clamp(10px, 1.3vw, 14px);
+  font-weight: 900;
+  line-height: 1;
+}
+
+.student-walking-ordinal-reward {
+  align-self: end;
+  color: var(--color-text-muted);
+  font-size: clamp(9px, 1.15vw, 12px);
+  font-weight: 800;
+  line-height: 1.15;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.student-walking-ordinal-cell.is-earned .student-walking-ordinal-reward {
+  color: var(--color-accent-tinted-text);
+}
+
+.student-walking-ordinal-reward.is-item-reward {
+  display: grid;
+  gap: 2px;
+  color: var(--color-accent);
+}
+
+.student-walking-ordinal-reward.is-item-reward small {
+  color: var(--color-text-muted);
+  font-size: 0.78em;
+  font-weight: 700;
+}
+
+.student-walking-ordinal-stamp {
+  position: absolute;
+  inset: 50% auto auto 50%;
+  display: grid;
+  width: clamp(28px, 4.8vw, 44px);
+  height: clamp(28px, 4.8vw, 44px);
+  place-items: center;
+  border: 2px double var(--color-danger);
+  border-radius: 50%;
+  color: var(--color-danger);
+  font-family: var(--font-display);
+  font-size: clamp(8px, 1.05vw, 11px);
+  line-height: 1;
+  pointer-events: none;
+  transform: translate(-50%, -50%) rotate(-10deg);
+}
+
+@media (max-width: 900px) {
+  .student-walking-missions-content {
+    grid-template-columns: 1fr;
+    gap: 0;
+  }
+
+  .student-walking-page .student-walking-attendance-panel,
+  .student-walking-mission-summary,
+  .student-walking-page .student-walking-rewards {
+    grid-column: 1;
+    grid-row: auto;
+  }
+
+  .student-walking-mission-graph {
+    padding-top: 10px;
+  }
+
+  .student-walking-leaderboard-list {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .student-walking-leaderboard-list li:nth-child(2n) {
+    border-right: 0;
+  }
+
+  .student-walking-leaderboard-list li:nth-child(n + 3) {
+    border-top: 1px solid var(--color-border);
+  }
+
+  .student-walking-achievement-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 560px) {
+  .student-walking-leaderboard-list,
+  .student-walking-achievement-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .student-walking-leaderboard-list li {
+    border-right: 0;
+    border-top: 1px solid var(--color-border);
+  }
+
+  .student-walking-leaderboard-list li:first-child {
+    border-top: 0;
+  }
+
+  .student-walking-ordinal-grid {
+    gap: 3px;
+  }
+
+  .student-walking-ordinal-cell {
+    gap: 2px;
+    padding: 4px;
+    border-radius: 8px;
+  }
+
+  .student-walking-ordinal-reward {
+    font-size: 9px;
+  }
+
+  .student-walking-mission-milestone {
+    width: min(108px, 34%);
+    min-width: 76px;
+  }
+
+  .student-walking-mission-coin {
+    width: 60px;
+    min-width: 60px;
+    height: 60px;
+    min-height: 60px;
+  }
+
+  .student-walking-mission-coin-amount {
+    font-size: 12px;
+  }
+
 }
 
 .student-coming-soon-page {

@@ -5,6 +5,7 @@ import { z } from "zod";
 import { db } from "@/lib/db";
 import { ensureAccountFor } from "@/lib/bank";
 import {
+  awardActivityReward,
   retryActivityRewardTransaction,
 } from "@/lib/creatures/activity-rewards";
 import { jsonPrivateNoStore } from "@/lib/http-cache";
@@ -17,13 +18,20 @@ import {
 } from "@/lib/walking";
 import {
   canRewardWalkingDay,
+  getKstRewardMonthRange,
+  getKstRewardMonthRangeForDay,
   getKstRewardWeekRange,
   getWalkingWeeklyRewardTiers,
   getKstWeekStartDay,
   walkingRewardUnits,
+  walkingMonthlyAttendanceRewardAmount,
+  walkingMonthlyAttendanceSourceRef,
   walkingUnitSourceRef,
   walkingWeeklyTierSourceRef,
   walkingWeeklyGoalSourceRef,
+  WALKING_MONTHLY_ATTENDANCE_ITEM_ORDINAL,
+  WALKING_MONTHLY_ATTENDANCE_ORDINALS,
+  WALKING_MONTHLY_REWARD_SOURCE_TYPE,
   WALKING_WEEKLY_REWARD_SOURCE_TYPE,
 } from "@/lib/reward-policy";
 import {
@@ -72,6 +80,36 @@ type WalkingResponseRange = {
   weekStart: string;
   /** Next KST Monday at 00:00, represented as an exclusive calendar date. */
   weekEnd: string;
+};
+
+type MonthlyAttendanceReward = {
+  month: string;
+  monthDays: number;
+  attendanceCount: number;
+  cashEarned: number;
+  cashPaid: number;
+  nextOrdinalReward: {
+    ordinal: number;
+    type: "cash" | "item";
+    amount: number;
+  } | null;
+  itemRewardOrdinal: number;
+  itemEarned: boolean;
+};
+
+type WeeklyStepReward = {
+  key: string;
+  steps: number;
+  amount: number;
+  achieved: boolean;
+  claimed: boolean;
+};
+
+type WeeklyStepRewards = {
+  weekStart: string;
+  totalSteps: number;
+  maxSteps: number;
+  tiers: WeeklyStepReward[];
 };
 
 function parseReadWindow(
@@ -129,6 +167,146 @@ async function readRows(studentId: string, window: WalkingReadWindow) {
   }));
 }
 
+function attendanceDaysInOrder(rows: Array<{ day: string }>) {
+  return [...new Set(rows.map((row) => row.day))].sort((a, b) => a.localeCompare(b));
+}
+
+function buildMonthlyAttendanceReward(
+  monthRange: ReturnType<typeof getKstRewardMonthRange>,
+  rows: Array<{ day: string }>,
+  paidByOrdinal: ReadonlyMap<number, number>,
+): MonthlyAttendanceReward {
+  const attendanceCount = Math.min(
+    WALKING_MONTHLY_ATTENDANCE_ORDINALS,
+    attendanceDaysInOrder(rows).filter(
+      (day) => day >= monthRange.monthStart && day < monthRange.monthEnd,
+    ).length,
+  );
+  const itemRewardOrdinal = WALKING_MONTHLY_ATTENDANCE_ITEM_ORDINAL;
+  let cashEarned = 0;
+  let cashPaid = 0;
+  for (let ordinal = 1; ordinal <= attendanceCount; ordinal += 1) {
+    if (ordinal === itemRewardOrdinal) continue;
+    cashEarned += walkingMonthlyAttendanceRewardAmount(ordinal);
+    cashPaid += paidByOrdinal.get(ordinal) ?? 0;
+  }
+  const nextOrdinal =
+    attendanceCount < WALKING_MONTHLY_ATTENDANCE_ORDINALS
+      ? attendanceCount + 1
+      : null;
+  const nextOrdinalReward = nextOrdinal
+    ? {
+        ordinal: nextOrdinal,
+        type: nextOrdinal === itemRewardOrdinal ? ("item" as const) : ("cash" as const),
+        amount:
+          nextOrdinal === itemRewardOrdinal
+            ? 0
+            : walkingMonthlyAttendanceRewardAmount(nextOrdinal),
+      }
+    : null;
+  return {
+    month: monthRange.month,
+    monthDays: WALKING_MONTHLY_ATTENDANCE_ORDINALS,
+    attendanceCount,
+    cashEarned,
+    cashPaid,
+    nextOrdinalReward,
+    itemRewardOrdinal,
+    itemEarned: attendanceCount >= itemRewardOrdinal,
+  };
+}
+
+async function readMonthlyAttendanceReward(
+  studentId: string,
+  monthRange = getKstRewardMonthRange(),
+  rows?: Array<{ day: string }>,
+): Promise<MonthlyAttendanceReward> {
+  const attendanceRows = rows ??
+    await readRows(studentId, {
+      startDay: monthRange.monthStart,
+      endDayExclusive: monthRange.monthEnd,
+    });
+  const prefix = `${studentId}:${monthRange.month}:attendance:`;
+  const deposits = await db.transaction.findMany({
+    where: {
+      sourceType: WALKING_MONTHLY_REWARD_SOURCE_TYPE,
+      sourceRef: { startsWith: prefix },
+      type: "deposit",
+    },
+    select: { sourceRef: true, amount: true },
+  });
+  const paidByOrdinal = new Map<number, number>();
+  for (const deposit of deposits) {
+    const sourceRef = deposit.sourceRef ?? "";
+    const ordinal = Number(sourceRef.slice(prefix.length));
+    if (
+      !Number.isSafeInteger(ordinal) ||
+      ordinal < 1 ||
+      ordinal > WALKING_MONTHLY_ATTENDANCE_ORDINALS
+    ) {
+      continue;
+    }
+    paidByOrdinal.set(ordinal, (paidByOrdinal.get(ordinal) ?? 0) + Number(deposit.amount) || 0);
+  }
+  return buildMonthlyAttendanceReward(monthRange, attendanceRows, paidByOrdinal);
+}
+
+async function readWeeklyStepRewards(
+  studentId: string,
+  range: WalkingResponseRange,
+  policy: Awaited<ReturnType<typeof loadRewardPolicy>>,
+  rows?: Array<{ day: string; steps: number }>,
+): Promise<WeeklyStepRewards> {
+  const weekRows = rows ??
+    await readRows(studentId, {
+      startDay: range.weekStart,
+      endDayExclusive: range.weekEnd,
+    });
+  const totalSteps = weekRows.reduce(
+    (sum, row) => sum + (Number.isSafeInteger(row.steps) ? Math.max(0, row.steps) : 0),
+    0,
+  );
+  const weeklyTiers = getWalkingWeeklyRewardTiers(policy);
+  const tierSourceRefs = weeklyTiers.map((tier) =>
+    walkingWeeklyTierSourceRef(studentId, range.weekStart, tier.key),
+  );
+  // `weekly-goal` is the pre-tier source used by historical automatic payouts.
+  // It settles tier 1 for the week so old rewards remain visibly claimed.
+  const legacyTier1SourceRef = walkingWeeklyGoalSourceRef(studentId, range.weekStart);
+  const deposits = await db.transaction.findMany({
+    where: {
+      sourceType: WALKING_WEEKLY_REWARD_SOURCE_TYPE,
+      sourceRef: { in: [...tierSourceRefs, legacyTier1SourceRef] },
+      type: "deposit",
+    },
+    select: { sourceRef: true },
+  });
+  const claimedRefs = new Set(
+    deposits
+      .map((deposit) => deposit.sourceRef)
+      .filter((sourceRef): sourceRef is string => Boolean(sourceRef)),
+  );
+  const maxSteps = weeklyTiers.reduce(
+    (max, tier) => Math.max(max, Number.isSafeInteger(tier.steps) ? Math.max(0, tier.steps) : 0),
+    0,
+  );
+  return {
+    weekStart: range.weekStart,
+    totalSteps,
+    maxSteps,
+    tiers: weeklyTiers.map((tier) => ({
+      key: tier.key,
+      steps: tier.steps,
+      amount: tier.amount,
+      achieved:
+        Number.isSafeInteger(tier.steps) && tier.steps > 0 && totalSteps >= tier.steps,
+      claimed:
+        claimedRefs.has(walkingWeeklyTierSourceRef(studentId, range.weekStart, tier.key)) ||
+        (tier.key === "tier1" && claimedRefs.has(legacyTier1SourceRef)),
+    })),
+  };
+}
+
 export async function GET(request: NextRequest) {
   try {
     const student = await getCurrentStudent();
@@ -140,8 +318,24 @@ export async function GET(request: NextRequest) {
     const policy = await db.$transaction((tx) =>
       loadRewardPolicy(tx, student.classroomId),
     );
+    const rows = await readRows(student.id, readRange.window);
+    const weeklyRows =
+      readRange.window.startDay === readRange.range.weekStart &&
+      readRange.window.endDayExclusive === readRange.range.weekEnd
+        ? rows
+        : undefined;
+    const weeklyStepRewards = await readWeeklyStepRewards(
+      student.id,
+      readRange.range,
+      policy,
+      weeklyRows,
+    );
+    const monthlyAttendanceReward = await readMonthlyAttendanceReward(
+      student.id,
+      getKstRewardMonthRange(),
+    );
     return jsonPrivateNoStore({
-      rows: await readRows(student.id, readRange.window),
+      rows,
       range: readRange.range,
       policy: {
         stepThreshold: policy.walkingRewardStepThreshold,
@@ -152,6 +346,8 @@ export async function GET(request: NextRequest) {
           ({ key, steps, amount }) => ({ key, steps, amount }),
         ),
       },
+      monthlyAttendanceReward,
+      weeklyStepRewards,
     });
   } catch (error) {
     console.error("[GET /api/student/walking]", error);
@@ -190,25 +386,41 @@ export async function POST(request: NextRequest) {
     }
 
     const { accountId } = await ensureAccountFor(student);
-    const weekStarts = [...new Set(rows.map((row) => getKstWeekStartDay(row.day)))];
-    const sourceRefs = rows.flatMap((row) => [
-      walkingUnitSourceRef(student.id, row.day, 1),
-      walkingUnitSourceRef(student.id, row.day, 2),
-      walkingUnitSourceRef(student.id, row.day, 3),
-      walkingUnitSourceRef(student.id, row.day, 4),
-      walkingWeeklyGoalSourceRef(student.id, getKstWeekStartDay(row.day)),
-      walkingWeeklyTierSourceRef(student.id, getKstWeekStartDay(row.day), "tier1"),
-      walkingWeeklyTierSourceRef(student.id, getKstWeekStartDay(row.day), "tier2"),
-      walkingWeeklyTierSourceRef(student.id, getKstWeekStartDay(row.day), "tier3"),
-    ]);
+    const sortedRows = [...rows].sort((a, b) => a.day.localeCompare(b.day));
+    const monthRanges = [
+      ...new Map(
+        sortedRows.map((row) => {
+          const monthRange = getKstRewardMonthRangeForDay(row.day);
+          return [monthRange.month, monthRange] as const;
+        }),
+      ).values(),
+    ].sort((a, b) => a.month.localeCompare(b.month));
+    const monthlySourceRefs = monthRanges.flatMap((monthRange) =>
+      Array.from(
+        { length: WALKING_MONTHLY_ATTENDANCE_ORDINALS },
+        (_, index) => index + 1,
+      )
+        .filter((ordinal) => ordinal !== WALKING_MONTHLY_ATTENDANCE_ITEM_ORDINAL)
+        .map((ordinal) =>
+          walkingMonthlyAttendanceSourceRef(student.id, monthRange.month, ordinal),
+        ),
+    );
+    const sourceRefs = [
+      ...sortedRows.flatMap((row) => [
+        walkingUnitSourceRef(student.id, row.day, 1),
+        walkingUnitSourceRef(student.id, row.day, 2),
+        walkingUnitSourceRef(student.id, row.day, 3),
+        walkingUnitSourceRef(student.id, row.day, 4),
+      ]),
+      ...monthlySourceRefs,
+    ];
     await retryActivityRewardTransaction(
       () =>
         db.$transaction(
           async (tx) => {
             const policy = await loadRewardPolicy(tx, student.classroomId);
-            const weeklyTiers = getWalkingWeeklyRewardTiers(policy);
 
-            for (const row of rows.sort((a, b) => a.day.localeCompare(b.day))) {
+            for (const row of sortedRows) {
               await tx.$executeRaw(Prisma.sql`
                 INSERT INTO "StudentWalkingDailyStat" (
                   "id",
@@ -253,7 +465,7 @@ export async function POST(request: NextRequest) {
               previous.map((entry) => entry.sourceRef).filter((ref): ref is string => Boolean(ref)),
             );
 
-            for (const row of rows) {
+            for (const row of sortedRows) {
               const units = walkingRewardUnits(
                 row.steps,
                 policy.walkingRewardStepThreshold,
@@ -289,55 +501,47 @@ export async function POST(request: NextRequest) {
               }
             }
 
-            for (const weekStart of weekStarts) {
-              const totals = await tx.$queryRaw<Array<{ steps: bigint | number | null }>>(Prisma.sql`
-                SELECT SUM("steps") AS "steps"
+            // Monthly attendance ordinals are assigned from distinct synced
+            // calendar dates in chronological order. The item slot replaces
+            // cash and is intentionally only reported as earned; no asset or
+            // inventory grant is performed here.
+            for (const monthRange of monthRanges) {
+              const monthRows = await tx.$queryRaw<Array<{ day: Date | string }>>(Prisma.sql`
+                SELECT "day"
                 FROM "StudentWalkingDailyStat"
                 WHERE "studentId" = ${student.id}
-                  AND "day" >= ${weekStart}::date
-                  AND "day" < (${weekStart}::date + 7)
+                  AND "day" >= ${monthRange.monthStart}::date
+                  AND "day" < ${monthRange.monthEnd}::date
+                ORDER BY "day" ASC
               `);
-              const steps = Number(totals[0]?.steps ?? 0);
-              for (const tier of weeklyTiers) {
-                if (
-                  !Number.isSafeInteger(tier.steps) ||
-                  tier.steps <= 0 ||
-                  !Number.isSafeInteger(tier.amount) ||
-                  tier.amount <= 0 ||
-                  steps < tier.steps
-                ) {
-                  continue;
-                }
-
-                const sourceRef = walkingWeeklyTierSourceRef(
+              const attendedDays = attendanceDaysInOrder(
+                monthRows.map((row) => ({ day: toDayKey(row.day) })),
+              );
+              const ordinalCount = Math.min(
+                WALKING_MONTHLY_ATTENDANCE_ORDINALS,
+                attendedDays.length,
+              );
+              for (let ordinal = 1; ordinal <= ordinalCount; ordinal += 1) {
+                if (ordinal === WALKING_MONTHLY_ATTENDANCE_ITEM_ORDINAL) continue;
+                const sourceRef = walkingMonthlyAttendanceSourceRef(
                   student.id,
-                  weekStart,
-                  tier.key,
+                  monthRange.month,
+                  ordinal,
                 );
-                // The pre-tier implementation paid the first 25k total under
-                // this legacy source key. Treat that source as tier 1 already
-                // settled so a resync does not double-pay the migrated week.
-                if (
-                  tier.key === "tier1" &&
-                  !rewardedRefs.has(sourceRef) &&
-                  rewardedRefs.has(walkingWeeklyGoalSourceRef(student.id, weekStart))
-                ) {
-                  rewardedRefs.add(sourceRef);
-                  continue;
-                }
-
-                const paid = await awardWalkingPolicyReward({
+                if (rewardedRefs.has(sourceRef)) continue;
+                const amount = walkingMonthlyAttendanceRewardAmount(ordinal);
+                const day = attendedDays[ordinal - 1];
+                await awardActivityReward({
                   tx,
                   studentId: student.id,
                   classroomId: student.classroomId,
                   accountId,
+                  sourceType: WALKING_MONTHLY_REWARD_SOURCE_TYPE,
                   sourceRef,
-                  sourceType: WALKING_WEEKLY_REWARD_SOURCE_TYPE,
-                  baseAmount: tier.amount,
-                  note: `주간 걷기 ${tier.steps.toLocaleString("ko-KR")}보 달성 보상 (${tier.key}) [${weekStart}]`,
-                  policy,
+                  amount,
+                  note: `월간 걷기 출석 ${ordinal}일차 보상 [${monthRange.month}:${day}]`,
                 });
-                if (paid) rewardedRefs.add(sourceRef);
+                rewardedRefs.add(sourceRef);
               }
             }
           },
@@ -378,11 +582,16 @@ export async function POST(request: NextRequest) {
     );
 
     const latestDay = getWalkingDayKey();
+    const responseRows = await readRows(student.id, {
+      startDay: addWalkingDays(latestDay, -30),
+      endDayExclusive: addWalkingDays(latestDay, 1),
+    });
     return jsonPrivateNoStore({
-      rows: await readRows(student.id, {
-        startDay: addWalkingDays(latestDay, -30),
-        endDayExclusive: addWalkingDays(latestDay, 1),
-      }),
+      rows: responseRows,
+      monthlyAttendanceReward: await readMonthlyAttendanceReward(
+        student.id,
+        getKstRewardMonthRange(),
+      ),
     });
   } catch (error) {
     console.error("[POST /api/student/walking]", error);

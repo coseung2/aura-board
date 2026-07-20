@@ -9,12 +9,28 @@ export type RewardArea = keyof typeof REWARD_SOURCE_TYPES;
 export type RewardSourceType = (typeof REWARD_SOURCE_TYPES)[RewardArea];
 export const WALKING_WEEKLY_REWARD_SOURCE_TYPE = "walking_weekly_reward" as const;
 
+/**
+ * Monthly attendance uses the existing server-owned walking reward namespace.
+ * Keeping the namespace stable avoids a schema change while the source ref
+ * below separates monthly attendance ordinals from weekly step tiers and any
+ * historical weekly attendance deposits.
+ */
+export const WALKING_MONTHLY_REWARD_SOURCE_TYPE =
+  WALKING_WEEKLY_REWARD_SOURCE_TYPE;
+
+/** Every month uses the same four-row attendance reward board. */
+export const WALKING_MONTHLY_ATTENDANCE_ORDINALS = 28 as const;
+export const WALKING_MONTHLY_ATTENDANCE_ITEM_ORDINAL = 28 as const;
+
 /** Weekly walking rewards are independent threshold payouts. */
 export const WALKING_WEEKLY_REWARD_TIERS = [
   { key: "tier1", steps: 25_000, amount: 20 },
   { key: "tier2", steps: 50_000, amount: 40 },
   { key: "tier3", steps: 75_000, amount: 100 },
 ] as const;
+
+/** Cash amounts for monthly attendance ordinals within each seven-day cycle. */
+export const WALKING_MONTHLY_ATTENDANCE_REWARD_AMOUNTS = [10, 10, 10, 10, 10, 10, 20] as const;
 
 export type WalkingWeeklyRewardTierKey = (typeof WALKING_WEEKLY_REWARD_TIERS)[number]["key"];
 
@@ -101,6 +117,47 @@ export function getKstRewardWeekRange(at = new Date()): {
     weekStart: toKstDayKey(bounds.weekStart),
     weekEnd: toKstDayKey(bounds.weekEnd),
   };
+}
+
+/** Return the KST calendar month containing `at` as a half-open date range. */
+export function getKstRewardMonthRange(at = new Date()): {
+  month: string;
+  monthStart: string;
+  monthEnd: string;
+  monthDays: number;
+} {
+  const { year, month } = kstDateParts(at);
+  const monthStartDate = kstMidnightUtc(year, month, 1);
+  const nextMonthYear = month === 12 ? year + 1 : year;
+  const nextMonth = month === 12 ? 1 : month + 1;
+  const monthEndDate = kstMidnightUtc(nextMonthYear, nextMonth, 1);
+  return {
+    month: `${year}-${String(month).padStart(2, "0")}`,
+    monthStart: toKstDayKey(monthStartDate),
+    monthEnd: toKstDayKey(monthEndDate),
+    monthDays: Math.round((monthEndDate.getTime() - monthStartDate.getTime()) / DAY_MS),
+  };
+}
+
+/** Return the KST calendar month containing a canonical walking day. */
+export function getKstRewardMonthRangeForDay(dayKey: string) {
+  const [year, month, day] = dayKey.split("-").map(Number);
+  if (
+    !Number.isInteger(year) ||
+    !Number.isInteger(month) ||
+    !Number.isInteger(day) ||
+    month < 1 ||
+    month > 12 ||
+    day < 1 ||
+    day > 31
+  ) {
+    throw new RangeError("invalid_day");
+  }
+  const range = getKstRewardMonthRange(kstMidnightUtc(year, month, day));
+  if (range.month !== `${year}-${String(month).padStart(2, "0")}`) {
+    throw new RangeError("invalid_day");
+  }
+  return range;
 }
 
 const KST_OFFSET_MS = 9 * 60 * 60 * 1_000;
@@ -199,4 +256,19 @@ export function walkingWeeklyTierSourceRef(
 /** Legacy source key used by the pre-tier 25,000-step payout. */
 export function walkingWeeklyGoalSourceRef(studentId: string, weekStartDay: string): string {
   return `${studentId}:${weekStartDay}:weekly-goal`;
+}
+
+/** Stable source key for one monthly attendance ordinal payout. */
+export function walkingMonthlyAttendanceSourceRef(
+  studentId: string,
+  month: string,
+  ordinal: number,
+): string {
+  return `${studentId}:${month}:attendance:${ordinal}`;
+}
+
+/** Cash payout for an ordinal; the seventh position pays 20 won. */
+export function walkingMonthlyAttendanceRewardAmount(ordinal: number): number {
+  if (!Number.isSafeInteger(ordinal) || ordinal < 1) return 0;
+  return WALKING_MONTHLY_ATTENDANCE_REWARD_AMOUNTS[(ordinal - 1) % 7] ?? 0;
 }

@@ -13,6 +13,9 @@ import {
   walkingUnitSourceRef,
   walkingWeeklyTierSourceRef,
   walkingWeeklyGoalSourceRef,
+  walkingMonthlyAttendanceSourceRef,
+  walkingMonthlyAttendanceRewardAmount,
+  getKstRewardMonthRange,
   getWalkingWeeklyRewardTiers,
   getKstRewardWeekRange,
   WALKING_WEEKLY_REWARD_TIERS,
@@ -96,7 +99,26 @@ describe("area reward policy", () => {
     expect(walkingWeeklyTierSourceRef("student-1", "2026-07-20", "tier2")).toBe(
       "student-1:2026-07-20:weekly-tier:tier2",
     );
+    expect(walkingMonthlyAttendanceSourceRef("student-1", "2026-07", 7)).toBe(
+      "student-1:2026-07:attendance:7",
+    );
+    expect(walkingMonthlyAttendanceRewardAmount(1)).toBe(10);
+    expect(walkingMonthlyAttendanceRewardAmount(6)).toBe(10);
+    expect(walkingMonthlyAttendanceRewardAmount(7)).toBe(20);
+    expect(walkingMonthlyAttendanceRewardAmount(8)).toBe(10);
     expect(WALKING_WEEKLY_REWARD_SOURCE_TYPE).toBe("walking_weekly_reward");
+  });
+
+  it.each([
+    ["2026-02-10T00:00:00.000Z", "2026-02", 28],
+    ["2028-02-10T00:00:00.000Z", "2028-02", 29],
+    ["2026-04-10T00:00:00.000Z", "2026-04", 30],
+    ["2026-07-10T00:00:00.000Z", "2026-07", 31],
+  ])("resolves KST month length for %s", (instant, month, monthDays) => {
+    expect(getKstRewardMonthRange(new Date(instant))).toMatchObject({
+      month,
+      monthDays,
+    });
   });
 
   it("uses independent weekly threshold payouts", () => {

@@ -1001,11 +1001,13 @@
 
 .student-walking-page .classroom-dashboard-kpis {
   gap: 0;
-  border-block: 1px solid var(--color-border);
+  margin-bottom: 0;
+  border-top: 0;
+  border-bottom: 1px solid var(--color-border);
 }
 
 .student-walking-page .classroom-dashboard-kpi {
-  padding: 16px 18px;
+  padding: 18px;
   border: 0;
   border-right: 1px solid var(--color-border);
   border-radius: 0;
@@ -1018,12 +1020,22 @@
 }
 
 .student-walking-page .classroom-dashboard-panel {
-  padding: 24px 0;
+  padding: 18px 0;
   border: 0;
   border-top: 1px solid var(--color-border);
   border-radius: 0;
   background: transparent;
   box-shadow: none;
+}
+
+.student-walking-page .student-walking-week-chart {
+  border-top: 0;
+  border-bottom: 0;
+}
+
+.student-walking-page .student-walking-week-chart .classroom-dashboard-panel-head {
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--color-border);
 }
 
 .classroom-dashboard-panel-wide {
@@ -1036,6 +1048,17 @@
   align-items: flex-start;
   gap: 16px;
   margin-bottom: 14px;
+}
+
+.student-walking-page .classroom-dashboard-panel-head {
+  margin-bottom: 12px;
+}
+
+.student-walking-page .classroom-dashboard-panel-head h2 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 700;
+  line-height: 1.35;
 }
 
 .classroom-dashboard-panel-head h3 {
