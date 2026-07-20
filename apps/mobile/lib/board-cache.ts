@@ -178,6 +178,16 @@ export function invalidateBoardCache(key?: string): void {
 
 export const markBoardCacheDirty = invalidateBoardCache;
 
+/**
+ * Remove one cached board response when the server says it no longer exists
+ * or is no longer visible to the current student. Unlike invalidation, this
+ * prevents a forbidden detail snapshot from being rendered again on the next
+ * focus before revalidation completes.
+ */
+export function removeBoardCache(key: string): void {
+  entries.delete(key);
+}
+
 /** Remove expired/least-recently-used entries while respecting the cap. */
 export function pruneBoardCache(now = Date.now()): void {
   for (const [key, entry] of entries) {

@@ -19,6 +19,7 @@ import {
   boardDetailCacheKey,
   invalidateBoardCache,
   readBoardCache,
+  removeBoardCache,
   revalidateBoardCache,
 } from "../../../lib/board-cache";
 import { clearSessionToken } from "../../../lib/session";
@@ -93,6 +94,7 @@ export default function BoardDetail() {
       }
 
       if (!slug) {
+        setError("보드 링크가 올바르지 않아요.");
         setLoading(false);
         return;
       }
@@ -125,6 +127,10 @@ export default function BoardDetail() {
         }
         if (sequence !== sequenceRef.current) return;
         if (e instanceof ApiError && e.status === 404) {
+          // A stale detail snapshot must not remain visible after the server
+          // revokes access or the board is disconnected from the classroom.
+          removeBoardCache(cacheKey);
+          setData(null);
           setError("이 보드에 접근할 수 없어요.");
         } else if (!cached) {
           setError(e instanceof Error ? e.message : "불러올 수 없어요");
@@ -164,7 +170,17 @@ export default function BoardDetail() {
         <View style={styles.center}>
           <Text style={styles.errorEmoji}>🚫</Text>
           <Text style={styles.errorTitle}>{error ?? "알 수 없는 오류"}</Text>
-          <AppButton onPress={() => router.back()}>돌아가기</AppButton>
+          <AppButton
+            onPress={() => {
+              if (router.canGoBack()) {
+                router.back();
+              } else {
+                router.replace("/(student)/boards");
+              }
+            }}
+          >
+            돌아가기
+          </AppButton>
         </View>
       </SafeAreaView>
     );
