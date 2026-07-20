@@ -1,15 +1,12 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { db } from "@/lib/db";
-import { getCurrentUser } from "@/lib/auth";
 import { getCurrentStudent } from "@/lib/student-auth";
-import { hasPermission } from "@/lib/bank-permissions";
 import { ensureAccountFor } from "@/lib/bank";
 
 const Body = z.object({
-  studentId: z.string().min(1),
   principal: z.number().int().positive(),
-});
+}).strict();
 
 const MATURITY_DAYS = 30;
 
@@ -18,6 +15,10 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id: classroomId } = await params;
+  const origin = req.headers.get("origin");
+  if (origin && origin !== new URL(req.url).origin) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
 
   let body: unknown;
   try {
@@ -28,25 +29,16 @@ export async function POST(
   const parsed = Body.safeParse(body);
   if (!parsed.success) {
     return NextResponse.json(
-      { error: "studentId / principal 필수" },
+      { error: "principal 필수" },
       { status: 400 }
     );
   }
 
-  const [user, student] = await Promise.all([
-    getCurrentUser().catch(() => null),
-    getCurrentStudent().catch(() => null),
-  ]);
-  if (!user && !student) {
+  const student = await getCurrentStudent().catch(() => null);
+  if (!student) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
-
-  const allowed = await hasPermission(
-    classroomId,
-    { userId: user?.id, studentId: student?.id },
-    "bank.fd.open"
-  );
-  if (!allowed) {
+  if (student.classroomId !== classroomId) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
@@ -62,35 +54,18 @@ export async function POST(
     );
   }
 
-  const target = await db.student.findUnique({
-    where: { id: parsed.data.studentId },
-    select: { id: true, classroomId: true },
-  });
-  if (!target || target.classroomId !== classroomId) {
-    return NextResponse.json(
-      { error: "학급 소속 학생이 아닙니다" },
-      { status: 400 }
-    );
-  }
-
-  const { accountId } = await ensureAccountFor(target);
-  const performerId = user?.id ?? student?.id ?? "system";
-  const performerKind = user ? "teacher" : "banker";
+  const { accountId } = await ensureAccountFor(student);
   const maturityDate = new Date(Date.now() + MATURITY_DAYS * 24 * 60 * 60 * 1000);
 
   try {
     const result = await db.$transaction(async (tx) => {
-      const acc = await tx.studentAccount.findUnique({
-        where: { id: accountId },
-        select: { id: true, balance: true },
-      });
-      if (!acc) throw new Error("account_missing");
-      if (acc.balance < parsed.data.principal) {
-        throw new Error("insufficient_balance");
-      }
-      const updated = await tx.studentAccount.update({
-        where: { id: acc.id },
+      const debited = await tx.studentAccount.updateMany({
+        where: { id: accountId, balance: { gte: parsed.data.principal } },
         data: { balance: { decrement: parsed.data.principal } },
+      });
+      if (debited.count === 0) throw new Error("insufficient_balance");
+      const updated = await tx.studentAccount.findUniqueOrThrow({
+        where: { id: accountId },
         select: { id: true, balance: true },
       });
       const fd = await tx.fixedDeposit.create({
@@ -99,8 +74,8 @@ export async function POST(
           principal: parsed.data.principal,
           monthlyRate: currency.monthlyInterestRate as number,
           maturityDate,
-          openedById: performerId,
-          openedByKind: performerKind,
+          openedById: student.id,
+          openedByKind: "owner",
         },
       });
       await tx.transaction.create({
@@ -110,8 +85,8 @@ export async function POST(
           amount: parsed.data.principal,
           balanceAfter: updated.balance,
           fixedDepositId: fd.id,
-          performedById: performerId,
-          performedByKind: performerKind,
+          performedById: student.id,
+          performedByKind: "owner",
         },
       });
       return { fd, balance: updated.balance };

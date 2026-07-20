@@ -14,6 +14,8 @@ import type { SlimeColor, SlimeShopItem } from "./types";
 
 export const SLIME_PURCHASE_SOURCE_TYPE = "slime_purchase" as const;
 export const SLIME_ITEM_PURCHASE_SOURCE_TYPE = "slime_item_purchase" as const;
+export const SLIME_REFUND_SOURCE_TYPE = "slime_refund" as const;
+export const SLIME_ITEM_REFUND_SOURCE_TYPE = "slime_item_refund" as const;
 
 export type SlimeServiceErrorCode =
   | "invalid_body"
@@ -23,6 +25,7 @@ export type SlimeServiceErrorCode =
   | "already_owned"
   | "unknown_item"
   | "not_owned"
+  | "not_refundable"
   | "idempotency_key_reused";
 
 const ERROR_STATUS: Record<SlimeServiceErrorCode, number> = {
@@ -33,6 +36,7 @@ const ERROR_STATUS: Record<SlimeServiceErrorCode, number> = {
   already_owned: 409,
   unknown_item: 400,
   not_owned: 403,
+  not_refundable: 409,
   idempotency_key_reused: 409,
 };
 
@@ -87,6 +91,17 @@ export type SlimeShopEquipResult = {
   equippedItemKeys: string[];
   equippedItemsByColor: Partial<Record<SlimeColor, string[]>>;
   idempotent: boolean;
+};
+
+export type SlimeRefundResult = {
+  refundedColor: SlimeColor;
+  balance: number;
+  representativeColor: SlimeColor | null;
+};
+
+export type SlimeItemRefundResult = {
+  refundedItemKey: string;
+  balance: number;
 };
 
 function assertIdempotencyKey(key: string): string {
@@ -488,7 +503,11 @@ export async function purchaseSlimeShopItem(
       if (owned) {
         await tx.studentCreatureItem.update({
           where: { id: owned.id },
-          data: { quantity: 1, itemKind: `slime-${item.category}` },
+          data: {
+            quantity: 1,
+            itemKind: `slime-${item.category}`,
+            purchaseTransactionId: transaction.id,
+          },
         });
       } else {
         await tx.studentCreatureItem.create({
@@ -498,6 +517,7 @@ export async function purchaseSlimeShopItem(
             itemKey: item.key,
             itemKind: `slime-${item.category}`,
             quantity: 1,
+            purchaseTransactionId: transaction.id,
           },
         });
       }
@@ -521,6 +541,222 @@ export async function purchaseSlimeShopItem(
     }
     throw error;
   }
+}
+
+export async function refundSlime(
+  student: StudentIdentity,
+  color: string,
+): Promise<SlimeRefundResult> {
+  const slime = getSlimeDefinition(color);
+  if (!slime) throw new SlimeServiceError("unknown_slime");
+
+  return serializable(async (tx) => {
+    const owned = await tx.studentSlime.findUnique({
+      where: { studentId_color: { studentId: student.id, color: slime.color } },
+      select: {
+        id: true,
+        isRepresentative: true,
+        purchaseTransaction: {
+          select: {
+            id: true,
+            amount: true,
+            accountId: true,
+            type: true,
+            sourceType: true,
+            account: { select: { studentId: true } },
+          },
+        },
+      },
+    });
+    if (!owned) throw new SlimeServiceError("not_owned");
+    if (
+      !owned.purchaseTransaction ||
+      owned.purchaseTransaction.amount <= 0 ||
+      owned.purchaseTransaction.type !== SLIME_PURCHASE_SOURCE_TYPE ||
+      owned.purchaseTransaction.sourceType !== SLIME_PURCHASE_SOURCE_TYPE ||
+      owned.purchaseTransaction.account.studentId !== student.id
+    ) {
+      throw new SlimeServiceError("not_refundable");
+    }
+
+    const alreadyRefunded = await tx.transaction.findFirst({
+      where: {
+        sourceType: SLIME_REFUND_SOURCE_TYPE,
+        sourceRef: owned.purchaseTransaction.id,
+        account: { studentId: student.id },
+      },
+      select: { id: true },
+    });
+    if (alreadyRefunded) throw new SlimeServiceError("not_refundable");
+
+    const account = await tx.studentAccount.update({
+      where: { id: owned.purchaseTransaction.accountId },
+      data: { balance: { increment: owned.purchaseTransaction.amount } },
+      select: { balance: true },
+    });
+    await tx.transaction.create({
+      data: {
+        accountId: owned.purchaseTransaction.accountId,
+        type: "refund",
+        amount: owned.purchaseTransaction.amount,
+        balanceAfter: account.balance,
+        note: `slime-refund:${slime.color}`,
+        sourceType: SLIME_REFUND_SOURCE_TYPE,
+        sourceRef: owned.purchaseTransaction.id,
+        performedById: student.id,
+        performedByKind: "owner",
+      },
+    });
+    await tx.studentSlime.delete({ where: { id: owned.id } });
+
+    let representativeColor: SlimeColor | null = null;
+    if (owned.isRepresentative) {
+      const replacement = await tx.studentSlime.findFirst({
+        where: { studentId: student.id },
+        orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+        select: { id: true, color: true },
+      });
+      if (replacement) {
+        await tx.studentSlime.update({
+          where: { id: replacement.id },
+          data: { isRepresentative: true },
+        });
+        representativeColor = replacement.color as SlimeColor;
+      }
+    } else {
+      const representative = await tx.studentSlime.findFirst({
+        where: { studentId: student.id, isRepresentative: true },
+        select: { color: true },
+      });
+      representativeColor = (representative?.color as SlimeColor | undefined) ?? null;
+    }
+
+    return { refundedColor: slime.color, balance: account.balance, representativeColor };
+  }).catch((error: unknown) => {
+    if (
+      isPrismaCode(error, "P2002") ||
+      isPrismaCode(error, "P2025") ||
+      isPrismaCode(error, "P2034")
+    ) {
+      throw new SlimeServiceError("not_refundable");
+    }
+    throw error;
+  });
+}
+
+export async function refundSlimeShopItem(
+  student: StudentIdentity,
+  itemKey: string,
+): Promise<SlimeItemRefundResult> {
+  const item = getSlimeShopItem(itemKey);
+  if (!item) throw new SlimeServiceError("unknown_item");
+
+  return serializable(async (tx) => {
+    const inventory = await tx.studentCreatureItem.findUnique({
+      where: { studentId_itemKey: { studentId: student.id, itemKey: item.key } },
+      select: {
+        id: true,
+        quantity: true,
+        itemKind: true,
+        purchaseTransaction: {
+          select: {
+            id: true,
+            amount: true,
+            accountId: true,
+            type: true,
+            sourceType: true,
+            account: { select: { studentId: true } },
+          },
+        },
+      },
+    });
+    if (!inventory || inventory.quantity <= 0) throw new SlimeServiceError("not_owned");
+    const purchase = inventory.purchaseTransaction ?? await tx.transaction.findFirst({
+      where: {
+        type: SLIME_ITEM_PURCHASE_SOURCE_TYPE,
+        sourceType: SLIME_ITEM_PURCHASE_SOURCE_TYPE,
+        note: shopPurchaseNote(item.key),
+        account: { studentId: student.id },
+      },
+      orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+      select: {
+        id: true,
+        amount: true,
+        accountId: true,
+        type: true,
+        sourceType: true,
+        account: { select: { studentId: true } },
+      },
+    });
+    if (
+      inventory.itemKind !== `slime-${item.category}` ||
+      !purchase ||
+      purchase.amount <= 0 ||
+      purchase.type !== SLIME_ITEM_PURCHASE_SOURCE_TYPE ||
+      purchase.sourceType !== SLIME_ITEM_PURCHASE_SOURCE_TYPE ||
+      purchase.account.studentId !== student.id
+    ) {
+      throw new SlimeServiceError("not_refundable");
+    }
+
+    const alreadyRefunded = await tx.transaction.findFirst({
+      where: {
+        sourceType: SLIME_ITEM_REFUND_SOURCE_TYPE,
+        sourceRef: purchase.id,
+        account: { studentId: student.id },
+      },
+      select: { id: true },
+    });
+    if (alreadyRefunded) throw new SlimeServiceError("not_refundable");
+
+    const account = await tx.studentAccount.update({
+      where: { id: purchase.accountId },
+      data: { balance: { increment: purchase.amount } },
+      select: { balance: true },
+    });
+    await tx.transaction.create({
+      data: {
+        accountId: purchase.accountId,
+        type: "refund",
+        amount: purchase.amount,
+        balanceAfter: account.balance,
+        note: `slime-item-refund:${item.key}`,
+        sourceType: SLIME_ITEM_REFUND_SOURCE_TYPE,
+        sourceRef: purchase.id,
+        performedById: student.id,
+        performedByKind: "owner",
+      },
+    });
+    await tx.studentCreatureItem.update({
+      where: { id: inventory.id },
+      data: {
+        quantity: 0,
+        isEquipped: false,
+        purchaseTransactionId: purchase.id,
+      },
+    });
+    const slimes = await tx.studentSlime.findMany({
+      where: { studentId: student.id, equippedItemKeys: { has: item.key } },
+      select: { id: true, equippedItemKeys: true },
+    });
+    for (const ownedSlime of slimes) {
+      await tx.studentSlime.update({
+        where: { id: ownedSlime.id },
+        data: { equippedItemKeys: ownedSlime.equippedItemKeys.filter((key) => key !== item.key) },
+      });
+    }
+
+    return { refundedItemKey: item.key, balance: account.balance };
+  }).catch((error: unknown) => {
+    if (
+      isPrismaCode(error, "P2002") ||
+      isPrismaCode(error, "P2025") ||
+      isPrismaCode(error, "P2034")
+    ) {
+      throw new SlimeServiceError("not_refundable");
+    }
+    throw error;
+  });
 }
 
 /**

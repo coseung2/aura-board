@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { isCreditTransactionType, isCorrectionTransaction } from "@/lib/bank-transactions";
 
 type Student = {
   id: string;
@@ -20,12 +21,15 @@ type FixedDeposit = {
 type Transaction = {
   id: string;
   accountId: string;
+  student: { id: string; name: string; number: number | null };
   type: string;
   amount: number;
   balanceAfter: number;
   note: string | null;
   performedByKind: string;
   createdAt: string;
+  corrected: boolean;
+  correctable: boolean;
 };
 
 type Overview = {
@@ -34,6 +38,12 @@ type Overview = {
   activeFDs: FixedDeposit[];
   totals: { totalBalance: number; activeFDTotal: number };
   recentTransactions: Transaction[];
+  transactionPagination: {
+    page: number;
+    pageSize: number;
+    total: number;
+    totalPages: number;
+  };
   viewerKind: "teacher" | "banker";
   canCancelFD: boolean;
 };
@@ -48,11 +58,19 @@ const TYPE_LABEL: Record<string, string> = {
   fd_cancelled: "적금 해지",
   creature_egg_purchase: "펫 알 구매",
   creature_item_purchase: "펫 아이템 구매",
+  slime_purchase: "펫 구매",
+  slime_item_purchase: "펫 꾸미기 구매",
+  avatar_purchase: "아바타 구매",
+  correction_credit: "정정 입금",
+  correction_debit: "정정 출금",
 };
 
-type Props = { classroomId: string };
+type Props = {
+  classroomId: string;
+  view?: "actions" | "history";
+};
 
-export function ClassroomBankTab({ classroomId }: Props) {
+export function ClassroomBankTab({ classroomId, view = "actions" }: Props) {
   const [data, setData] = useState<Overview | null>(null);
   const [selectedStudent, setSelectedStudent] = useState<string | null>(null);
   const [amount, setAmount] = useState<string>("");
@@ -61,9 +79,11 @@ export function ClassroomBankTab({ classroomId }: Props) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
+  const [transactionPage, setTransactionPage] = useState(1);
 
   const refresh = useCallback(async () => {
-    const res = await fetch(`/api/classrooms/${classroomId}/bank/overview`, {
+    const query = view === "history" ? `?page=${transactionPage}` : "";
+    const res = await fetch(`/api/classrooms/${classroomId}/bank/overview${query}`, {
       cache: "no-store",
     });
     if (!res.ok) return;
@@ -72,13 +92,13 @@ export function ClassroomBankTab({ classroomId }: Props) {
     if (payload.currency.monthlyInterestRate !== null && rateInput === "") {
       setRateInput(String(payload.currency.monthlyInterestRate));
     }
-  }, [classroomId, rateInput]);
+  }, [classroomId, rateInput, transactionPage, view]);
 
   useEffect(() => {
     refresh();
   }, [refresh]);
 
-  async function handleAction(action: "deposit" | "withdraw" | "fd_open") {
+  async function handleAction(action: "deposit" | "withdraw") {
     if (!selectedStudent) {
       setError("학생을 먼저 선택하세요");
       return;
@@ -95,13 +115,8 @@ export function ClassroomBankTab({ classroomId }: Props) {
       const path =
         action === "deposit"
           ? `/api/classrooms/${classroomId}/bank/deposit`
-          : action === "withdraw"
-            ? `/api/classrooms/${classroomId}/bank/withdraw`
-            : `/api/classrooms/${classroomId}/bank/fixed-deposits`;
-      const body =
-        action === "fd_open"
-          ? { studentId: selectedStudent, principal: n }
-          : { studentId: selectedStudent, amount: n, note: note || undefined };
+          : `/api/classrooms/${classroomId}/bank/withdraw`;
+      const body = { studentId: selectedStudent, amount: n, note: note || undefined };
       const res = await fetch(path, {
         method: "POST",
         headers: { "content-type": "application/json" },
@@ -117,9 +132,7 @@ export function ClassroomBankTab({ classroomId }: Props) {
       setToast(
         action === "deposit"
           ? "입금 완료"
-          : action === "withdraw"
-            ? "출금 완료"
-            : "적금 가입 완료"
+          : "출금 완료"
       );
       await refresh();
     } finally {
@@ -141,6 +154,37 @@ export function ClassroomBankTab({ classroomId }: Props) {
         return;
       }
       setToast("적금 해지 완료");
+      await refresh();
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleCorrect(transaction: Transaction) {
+    const reason = window.prompt(
+      `${transaction.student.name} 학생의 ${TYPE_LABEL[transaction.type] ?? transaction.type} ${transaction.amount.toLocaleString()} ${data?.currency.unitLabel ?? "원"} 거래를 정정합니다.\n정정 사유를 입력하세요.`,
+    )?.trim();
+    if (!reason) return;
+    if (!window.confirm("원 거래의 반대 금액을 반영하고 정정 기록을 남길까요?")) return;
+
+    setBusy(true);
+    setError(null);
+    setToast(null);
+    try {
+      const res = await fetch(
+        `/api/classrooms/${classroomId}/bank/transactions/${transaction.id}/correct`,
+        {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ reason }),
+        },
+      );
+      if (!res.ok) {
+        const message = (await res.json().catch(() => ({}))).error;
+        setError(typeof message === "string" ? message : "거래 정정 실패");
+        return;
+      }
+      setToast("거래를 정정하고 감사 기록을 남겼습니다");
       await refresh();
     } finally {
       setBusy(false);
@@ -222,7 +266,7 @@ export function ClassroomBankTab({ classroomId }: Props) {
         </div>
       )}
 
-      <div className="bank-action-grid">
+      {view === "actions" ? <div className="bank-action-grid">
         <div className="bank-student-panel">
           <h3>학생 선택</h3>
           <ul className="bank-student-list">
@@ -288,30 +332,13 @@ export function ClassroomBankTab({ classroomId }: Props) {
             >
               ⬇ 출금
             </button>
-            <button
-              type="button"
-              className="bank-btn bank-btn-fd"
-              onClick={() => handleAction("fd_open")}
-              disabled={
-                busy ||
-                !selectedStudent ||
-                data.currency.monthlyInterestRate === null
-              }
-              title={
-                data.currency.monthlyInterestRate === null
-                  ? "교사가 이자율 설정 필요"
-                  : undefined
-              }
-            >
-              💰 적금 가입
-            </button>
           </div>
           {error && <p className="bank-error">{error}</p>}
           {toast && <p className="bank-toast">{toast}</p>}
         </div>
-      </div>
+      </div> : null}
 
-      {data.activeFDs.length > 0 && (
+      {view === "actions" && data.activeFDs.length > 0 && (
         <section className="bank-fd-section">
           <h3>활성 적금</h3>
           <ul className="bank-fd-list">
@@ -350,35 +377,78 @@ export function ClassroomBankTab({ classroomId }: Props) {
         </section>
       )}
 
-      <section className="bank-txn-section">
+      {view === "history" ? <section className="bank-txn-section">
         <h3>
-          {isTeacher ? "전체 거래 (최근 30건)" : "내가 처리한 거래 (최근 30건)"}
+          {isTeacher
+            ? `전체 금전 활동 (${data.transactionPagination.total}건)`
+            : "내가 처리한 거래 (최근 30건)"}
         </h3>
         {data.recentTransactions.length === 0 ? (
           <p className="bank-empty">거래 내역이 없어요.</p>
         ) : (
-          <ul className="bank-txn-list">
-            {data.recentTransactions.map((t) => (
+          <>
+            <ul className="bank-txn-list">
+              {data.recentTransactions.map((t) => (
               <li key={t.id} className={`bank-txn-row bank-txn-${t.type}`}>
                 <span className="bank-txn-time">
                   {new Date(t.createdAt).toLocaleString("ko-KR")}
+                </span>
+                <span className="bank-txn-student">
+                  {t.student.number === null ? "" : `${t.student.number}번 `}
+                  {t.student.name}
                 </span>
                 <span className="bank-txn-type">
                   {TYPE_LABEL[t.type] ?? t.type}
                 </span>
                 <span className="bank-txn-amount">
-                  {t.type === "deposit" || t.type === "fd_matured" || t.type === "fd_cancelled"
-                    ? "+"
-                    : "-"}
+                  {isCreditTransactionType(t.type) ? "+" : "-"}
                   {t.amount.toLocaleString()} {unit}
                 </span>
                 <span className="bank-txn-note">{t.note ?? ""}</span>
+                <span className="bank-txn-balance">잔액 {t.balanceAfter.toLocaleString()} {unit}</span>
                 <span className="bank-txn-by">by {t.performedByKind}</span>
+                {isTeacher ? (
+                  t.corrected ? (
+                    <span className="bank-txn-corrected">정정됨</span>
+                  ) : isCorrectionTransaction(t.type) ? (
+                    <span className="bank-txn-corrected">정정 기록</span>
+                  ) : t.correctable ? (
+                    <button
+                      type="button"
+                      className="bank-txn-correct"
+                      onClick={() => void handleCorrect(t)}
+                      disabled={busy}
+                    >
+                      {t.type === "deposit" ? "오입금 정정" : "오출금 정정"}
+                    </button>
+                  ) : (
+                    <span className="bank-txn-corrected">-</span>
+                  )
+                ) : null}
               </li>
-            ))}
-          </ul>
+              ))}
+            </ul>
+            {data.transactionPagination.totalPages > 1 ? (
+              <nav className="bank-pagination" aria-label="거래 기록 페이지">
+                {Array.from(
+                  { length: data.transactionPagination.totalPages },
+                  (_, index) => index + 1,
+                ).map((page) => (
+                  <button
+                    key={page}
+                    type="button"
+                    aria-current={page === data.transactionPagination.page ? "page" : undefined}
+                    onClick={() => setTransactionPage(page)}
+                    disabled={page === data.transactionPagination.page}
+                  >
+                    {page}
+                  </button>
+                ))}
+              </nav>
+            ) : null}
+          </>
         )}
-      </section>
+      </section> : null}
     </section>
   );
 }

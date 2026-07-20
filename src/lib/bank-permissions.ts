@@ -24,12 +24,6 @@ export const PERMISSION_CATALOG = {
     category: "bank",
     defaultRoles: ["banker"],
   },
-  "bank.fd.open": {
-    label: "적금 가입",
-    description: "학생 통장에서 적금 상품 가입 처리",
-    category: "bank",
-    defaultRoles: ["banker"],
-  },
   "bank.fd.cancel": {
     label: "적금 중도해지",
     description: "가입된 적금 해지 (원금만 반환)",

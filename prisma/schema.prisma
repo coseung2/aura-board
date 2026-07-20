@@ -3343,6 +3343,7 @@ model Transaction {
   avatarPurchase      AvatarPurchase?
   creatureEggPurchase StudentCreature? @relation("CreatureEggPurchase")
   slimePurchase       StudentSlime?     @relation("SlimePurchase")
+  slimeItemPurchase   StudentCreatureItem? @relation("SlimeItemPurchase")
 
   storeItem StoreItem? @relation(fields: [storeItemId], references: [id], onDelete: SetNull)
 
@@ -3468,11 +3469,13 @@ model StudentCreatureItem {
   itemKind   String
   quantity   Int      @default(0)
   isEquipped Boolean  @default(false)
+  purchaseTransactionId String? @unique
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
 
   student   Student           @relation(fields: [studentId], references: [id], onDelete: Cascade)
   classroom Classroom         @relation(fields: [classroomId], references: [id], onDelete: Cascade)
+  purchaseTransaction Transaction? @relation("SlimeItemPurchase", fields: [purchaseTransactionId], references: [id], onDelete: Restrict)
   itemUses  CreatureItemUse[] @relation("CreatureItemUseInventory")
 
   @@unique([studentId, itemKey])

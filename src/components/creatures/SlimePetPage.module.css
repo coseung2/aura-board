@@ -250,6 +250,7 @@
 .shopTrigger,
 .galleryLink,
 .shopBuyButton,
+.refundButton,
 .filterButton,
 .closeButton {
   display: inline-flex;
@@ -282,6 +283,7 @@
 .shopTrigger:hover,
 .galleryLink:hover,
 .shopBuyButton:hover,
+.refundButton:hover,
 .filterButton:hover,
 .closeButton:hover {
   border-color: var(--color-accent);
@@ -299,11 +301,17 @@
   opacity: 0.5;
 }
 
+.refundButton:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
 .wardrobeButton:focus-visible,
 .representativeButton:focus-visible,
 .shopTrigger:focus-visible,
 .galleryLink:focus-visible,
 .shopBuyButton:focus-visible,
+.refundButton:focus-visible,
 .filterButton:focus-visible,
 .closeButton:focus-visible {
   outline: 2px solid var(--color-accent);
@@ -490,6 +498,25 @@
 
 .shopBuyButton {
   min-width: 76px;
+}
+
+.shopItemActions {
+  display: grid;
+  justify-items: end;
+  gap: 7px;
+}
+
+.refundButton {
+  min-width: 64px;
+  min-height: 32px;
+  padding: 5px 9px;
+  border-color: var(--color-danger);
+  color: var(--color-danger);
+}
+
+.refundButton:hover {
+  border-color: var(--color-danger-active);
+  color: var(--color-danger-active);
 }
 
 .shopBuyButtonRemove {

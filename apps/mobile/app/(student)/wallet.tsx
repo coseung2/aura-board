@@ -27,6 +27,7 @@ import {
   AppButton,
   AppHeader,
   SectionHeader,
+  TextField,
 } from "../../components/ui";
 export default function StudentWalletScreen() {
   const router = useRouter();
@@ -35,6 +36,8 @@ export default function StudentWalletScreen() {
   const [qrError, setQrError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [fdPrincipal, setFdPrincipal] = useState("");
+  const [fdBusy, setFdBusy] = useState(false);
 
   const handleAuthError = useCallback(
     async (e: unknown) => {
@@ -85,6 +88,34 @@ export default function StudentWalletScreen() {
     },
     [wallet?.classroomId],
   );
+
+  const openFd = useCallback(async () => {
+    if (!wallet?.classroomId || fdBusy) return;
+    const principal = Number(fdPrincipal.replace(/,/g, ""));
+    if (!Number.isInteger(principal) || principal <= 0) {
+      Alert.alert("가입 금액 확인", "1 이상의 정수 금액을 입력해 주세요.");
+      return;
+    }
+    setFdBusy(true);
+    try {
+      await apiFetch(
+        `/api/classrooms/${encodeURIComponent(wallet.classroomId)}/bank/fixed-deposits`,
+        { method: "POST", json: { principal } },
+      );
+      const res = await apiFetch<WalletSummary>("/api/my/wallet");
+      setWallet(res);
+      setFdPrincipal("");
+      Alert.alert("가입 완료", "적금에 가입했어요.");
+    } catch (e) {
+      if (await handleAuthError(e)) return;
+      Alert.alert(
+        "가입 실패",
+        e instanceof Error ? e.message : "적금에 가입하지 못했어요.",
+      );
+    } finally {
+      setFdBusy(false);
+    }
+  }, [fdBusy, fdPrincipal, handleAuthError, wallet?.classroomId]);
 
   useEffect(() => {
     (async () => {
@@ -148,6 +179,27 @@ export default function StudentWalletScreen() {
               </Text>
             ) : null}
           </View>
+
+          <SectionHeader title="적금 가입" />
+          {wallet.currency.monthlyInterestRate === null ? (
+            <Text style={styles.emptyRow}>현재 가입 가능한 적금 상품이 없어요.</Text>
+          ) : (
+            <View style={styles.fdOpenSection}>
+              <Text style={styles.listTitle}>
+                30일 적금 · 월 {wallet.currency.monthlyInterestRate}%
+              </Text>
+              <TextField
+                value={fdPrincipal}
+                onChangeText={(value) => setFdPrincipal(value.replace(/[^\d,]/g, ""))}
+                keyboardType="number-pad"
+                placeholder="가입 금액"
+                editable={!fdBusy}
+              />
+              <AppButton loading={fdBusy} onPress={() => void openFd()}>
+                적금 가입
+              </AppButton>
+            </View>
+          )}
 
           <SectionHeader title="진행 중인 적금" />
           {wallet.activeFDs.length === 0 ? (
@@ -296,6 +348,12 @@ const styles = StyleSheet.create({
     borderBottomColor: colors.border,
   },
   fdList: {
+    borderBottomWidth: borders.hairline,
+    borderBottomColor: colors.border,
+  },
+  fdOpenSection: {
+    gap: spacing.md,
+    paddingVertical: spacing.md,
     borderBottomWidth: borders.hairline,
     borderBottomColor: colors.border,
   },

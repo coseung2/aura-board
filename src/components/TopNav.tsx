@@ -43,11 +43,11 @@ const CLASSROOM_MANAGEMENT_TABS = [
   { key: "students", label: "학생 명단" },
   { key: "groups", label: "자리 배치" },
   { key: "boards", label: "학급 보드" },
+  { key: "bank", label: "금융 관리" },
 ] as const;
 
 const CLASSROOM_OPERATION_TABS = [
   { key: "roles", label: "학급 역할" },
-  { key: "bank", label: "은행" },
   { key: "store", label: "매점" },
   { key: "pay", label: "QR결제" },
   { key: "check", label: "제출 체크" },

@@ -4,11 +4,17 @@ import { getCurrentStudent } from "@/lib/student-auth";
 import { hasPermission } from "@/lib/bank-permissions";
 import { notFound } from "next/navigation";
 import { ClassroomBankTab } from "@/components/classroom/ClassroomBankTab";
+import { ClassroomSectionHeader } from "@/components/classroom/ClassroomSectionHeader";
 
-type Props = { params: Promise<{ id: string }> };
+type Props = {
+  params: Promise<{ id: string }>;
+  searchParams: Promise<{ view?: string }>;
+};
 
-export default async function ClassroomBankPage({ params }: Props) {
+export default async function ClassroomBankPage({ params, searchParams }: Props) {
   const { id } = await params;
+  const { view: rawView } = await searchParams;
+  const view = rawView === "history" ? "history" : "actions";
   const [user, student] = await Promise.all([
     getCurrentUser().catch(() => null),
     getCurrentStudent().catch(() => null),
@@ -28,11 +34,24 @@ export default async function ClassroomBankPage({ params }: Props) {
 
   return (
     <main className="classroom-page classroom-page-detail">
-      <a href="/classroom" className="classroom-back-link">
-        &larr; 학급 목록
-      </a>
-      <h1 className="classroom-page-title">{classroom.name}</h1>
-      <ClassroomBankTab classroomId={classroom.id} />
+      <ClassroomSectionHeader
+        classroomId={classroom.id}
+        eyebrow={classroom.name}
+        title="금융 관리"
+        ariaLabel="금융 관리 메뉴"
+        activeKey={view}
+        backHref="/classroom"
+        backLabel="학급 목록"
+        links={[
+          { key: "actions", label: "입출금", href: `/classroom/${classroom.id}/bank` },
+          {
+            key: "history",
+            label: "거래 기록",
+            href: `/classroom/${classroom.id}/bank?view=history`,
+          },
+        ]}
+      />
+      <ClassroomBankTab classroomId={classroom.id} view={view} />
     </main>
   );
 }

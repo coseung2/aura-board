@@ -16,6 +16,8 @@ export type ClassroomSectionHeaderProps = {
   links: Array<ClassroomSectionLink>;
   activeKey: string;
   actions?: ReactNode;
+  backHref?: string;
+  backLabel?: string;
 };
 
 export function ClassroomSectionHeader({
@@ -27,15 +29,17 @@ export function ClassroomSectionHeader({
   links,
   activeKey,
   actions,
+  backHref,
+  backLabel = "학급 대시보드",
 }: ClassroomSectionHeaderProps) {
   return (
     <header className="classroom-section-header">
       <div className="classroom-section-heading">
         <Link
-          href={`/classroom/${classroomId}/dashboard`}
+          href={backHref ?? `/classroom/${classroomId}/dashboard`}
           className="classroom-back-link"
         >
-          &larr; 학급 대시보드
+          &larr; {backLabel}
         </Link>
         <p className="classroom-section-eyebrow">{eyebrow}</p>
         <h1 className="classroom-section-title">{title}</h1>

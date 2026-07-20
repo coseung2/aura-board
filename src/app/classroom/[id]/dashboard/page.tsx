@@ -175,7 +175,7 @@ export default async function ClassroomDashboardPage({ params }: Props) {
               <span>Savings</span>
               <h3>저축 현황</h3>
             </div>
-            <Link href={`/classroom/${id}/bank`}>은행</Link>
+            <Link href={`/classroom/${id}/bank`}>금융 관리</Link>
           </div>
           <div className="classroom-dashboard-list">
             {topSavings.map((student) => (

@@ -30,7 +30,7 @@ import {
   TextField,
 } from "../../components/ui";
 
-type ActionKind = "deposit" | "withdraw" | "fd_open";
+type ActionKind = "deposit" | "withdraw";
 
 export default function StudentBankScreen() {
   const router = useRouter();
@@ -102,13 +102,8 @@ export default function StudentBankScreen() {
     const path =
       kind === "deposit"
         ? "deposit"
-        : kind === "withdraw"
-          ? "withdraw"
-          : "fixed-deposits";
-    const body =
-      kind === "fd_open"
-        ? { studentId: selected.id, principal: n }
-        : { studentId: selected.id, amount: n, note: note.trim() || undefined };
+        : "withdraw";
+    const body = { studentId: selected.id, amount: n, note: note.trim() || undefined };
 
     setBusy(true);
     setError(null);
@@ -122,7 +117,7 @@ export default function StudentBankScreen() {
       await load();
       Alert.alert(
         "처리 완료",
-        kind === "deposit" ? "입금했어요." : kind === "withdraw" ? "출금했어요." : "적금에 가입했어요.",
+        kind === "deposit" ? "입금했어요." : "출금했어요.",
       );
     } catch (e) {
       if (await handleAuthError(e)) return;
@@ -234,11 +229,6 @@ export default function StudentBankScreen() {
             <View style={styles.actionRow}>
               <ActionButton label="입금" disabled={busy || !selected} onPress={() => runAction("deposit")} />
               <ActionButton label="출금" disabled={busy || !selected} onPress={() => runAction("withdraw")} />
-              <ActionButton
-                label="적금"
-                disabled={busy || !selected || data.currency.monthlyInterestRate === null}
-                onPress={() => runAction("fd_open")}
-              />
             </View>
           </View>
         </ScrollView>

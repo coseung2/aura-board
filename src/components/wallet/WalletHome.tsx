@@ -48,6 +48,9 @@ export function WalletHome() {
   const [error, setError] = useState<string | null>(null);
   const [cancellingFD, setCancellingFD] = useState<string | null>(null);
   const [fdError, setFdError] = useState<string | null>(null);
+  const [fdPrincipal, setFdPrincipal] = useState("");
+  const [openingFD, setOpeningFD] = useState(false);
+  const [fdNotice, setFdNotice] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -90,6 +93,38 @@ export function WalletHome() {
       await load();
     } finally {
       setCancellingFD(null);
+    }
+  }
+
+  async function handleOpenFD() {
+    if (!data || openingFD) return;
+    const principal = Number(fdPrincipal.replace(/,/g, ""));
+    if (!Number.isInteger(principal) || principal <= 0) {
+      setFdError("가입 금액은 1 이상 정수로 입력하세요.");
+      return;
+    }
+    setOpeningFD(true);
+    setFdError(null);
+    setFdNotice(null);
+    try {
+      const res = await fetch(
+        `/api/classrooms/${data.classroomId}/bank/fixed-deposits`,
+        {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ principal }),
+        },
+      );
+      if (!res.ok) {
+        const message = (await res.json().catch(() => ({}))).error;
+        setFdError(typeof message === "string" ? message : "적금 가입에 실패했어요.");
+        return;
+      }
+      setFdPrincipal("");
+      setFdNotice("적금에 가입했어요.");
+      await load();
+    } finally {
+      setOpeningFD(false);
     }
   }
 
@@ -161,10 +196,42 @@ export function WalletHome() {
         </section>
       </div>
 
-      {data.activeFDs.length > 0 && (
-        <section className="wallet-fd-section">
-          <h3>진행중 적금</h3>
-          <ul className="wallet-fd-list">
+      <section className="wallet-fd-section">
+        <h3>적금</h3>
+        {data.currency.monthlyInterestRate === null ? (
+          <p className="wallet-fd-empty">현재 가입 가능한 적금 상품이 없어요.</p>
+        ) : (
+          <div className="wallet-fd-open">
+            <div>
+              <strong>30일 적금</strong>
+              <span>월 이자율 {data.currency.monthlyInterestRate}%</span>
+            </div>
+            <label>
+              <span>가입 금액</span>
+              <input
+                type="text"
+                inputMode="numeric"
+                value={fdPrincipal}
+                onChange={(event) => setFdPrincipal(event.target.value.replace(/[^\d,]/g, ""))}
+                placeholder="0"
+                disabled={openingFD}
+              />
+            </label>
+            <button type="button" onClick={() => void handleOpenFD()} disabled={openingFD}>
+              {openingFD ? "가입 중…" : "적금 가입"}
+            </button>
+          </div>
+        )}
+        {fdNotice ? <p className="wallet-fd-notice" role="status">{fdNotice}</p> : null}
+        {fdError && (
+          <p className="wallet-fd-error" role="alert">
+            {fdError}
+          </p>
+        )}
+        {data.activeFDs.length > 0 ? (
+          <>
+            <h4>진행 중인 적금</h4>
+            <ul className="wallet-fd-list">
             {data.activeFDs.map((fd) => {
               const maturity = new Date(fd.maturityDate);
               const daysLeft = Math.max(
@@ -197,14 +264,10 @@ export function WalletHome() {
                 </li>
               );
             })}
-          </ul>
-          {fdError && (
-            <p className="wallet-fd-error" role="alert">
-              {fdError}
-            </p>
-          )}
-        </section>
-      )}
+            </ul>
+          </>
+        ) : null}
+      </section>
     </div>
   );
 }

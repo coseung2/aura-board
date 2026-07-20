@@ -115,11 +115,48 @@ describe("SlimePetPage", () => {
 
     await screen.findByText("물웅덩이 배경 구매를 완료했어요.");
     expect(screen.getByTestId("slime-wallet-balance").textContent).toContain("320");
-    const ownedButton = within(drawer).getByRole("button", {
-      name: "물웅덩이 배경 보유 중",
-    });
-    expect(ownedButton.hasAttribute("disabled")).toBe(true);
+    expect(within(drawer).getByText("보유 중")).toBeTruthy();
+    expect(within(drawer).getByRole("button", { name: "물웅덩이 배경 환불" })).toBeTruthy();
     expect(fetchMock.mock.calls[1][0]).toBe("/api/student/slimes/items/purchase");
+    expect(JSON.parse(fetchMock.mock.calls[1][1].body as string)).toEqual({
+      itemKey: "water-puddle-background",
+    });
+  });
+
+  it("refunds an owned item, restores the balance, and removes its equipped state", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockImplementationOnce(() =>
+        json(
+          home({
+            balance: 320,
+            ownedColors: ["blue"],
+            ownedItemKeys: ["water-puddle-background"],
+            equippedItemKeys: ["water-puddle-background"],
+            equippedItemsByColor: { blue: ["water-puddle-background"] },
+          }),
+        ),
+      )
+      .mockImplementationOnce(() =>
+        json({
+          refundedItemKey: "water-puddle-background",
+          balance: 350,
+        }),
+      );
+    vi.stubGlobal("fetch", fetchMock);
+    vi.stubGlobal("confirm", vi.fn(() => true));
+    render(<SlimePetPage />);
+
+    fireEvent.click(await screen.findByRole("button", { name: "상점" }));
+    const drawer = await screen.findByRole("dialog", { name: "슬라임 상점" });
+    fireEvent.click(within(drawer).getByRole("button", { name: "전체" }));
+    fireEvent.click(within(drawer).getByRole("button", { name: "물웅덩이 배경 환불" }));
+
+    await screen.findByText("물웅덩이 배경을(를) 환불했어요.");
+    expect(screen.getByTestId("slime-wallet-balance").textContent).toContain("350");
+    expect(within(drawer).getByRole("button", { name: "물웅덩이 배경 구매" })).toBeTruthy();
+    expect(screen.getByText("장착한 아이템 없음")).toBeTruthy();
+    expect(fetchMock.mock.calls[1][0]).toBe("/api/student/slimes/items/refund");
     expect(JSON.parse(fetchMock.mock.calls[1][1].body as string)).toEqual({
       itemKey: "water-puddle-background",
     });

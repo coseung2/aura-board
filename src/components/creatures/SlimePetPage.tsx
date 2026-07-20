@@ -56,6 +56,8 @@ const PURCHASE_ERROR: Record<string, string> = {
   idempotency_key_reused: "같은 구매 요청이 다른 상품에 사용됐어요. 다시 시도해 주세요.",
   account_not_found: "학생 지갑을 찾을 수 없어요.",
   unauthenticated: "로그인이 만료됐어요. 다시 로그인해 주세요.",
+  not_owned: "이미 환불했거나 보유하지 않은 상품이에요.",
+  not_refundable: "환불할 수 없는 상품이에요.",
 };
 
 function newIdempotencyKey(prefix: string, key: string): string {
@@ -280,6 +282,93 @@ export function SlimePetPage() {
         kind: "error",
         text: "네트워크 오류가 발생했어요. 다시 시도해 주세요.",
       });
+    } finally {
+      setBusyItemKey(null);
+    }
+  };
+
+  const refundSlimePurchase = async (slime: SlimeDefinition) => {
+    if (busyColor || !ownedKeys.includes(slime.color)) return;
+    if (!window.confirm(`${slime.nameKo}을(를) 환불할까요? 장착한 꾸미기는 보유 목록에 남아요.`)) return;
+
+    setBusyColor(slime.color);
+    setShopNotice(null);
+    try {
+      const response = await fetch("/api/student/slimes/refund", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ color: slime.color }),
+      });
+      const payload = (await response.json().catch(() => ({}))) as {
+        error?: string;
+        refundedColor?: SlimeColor;
+        balance?: number;
+        representativeColor?: SlimeColor | null;
+      };
+      if (!response.ok || payload.refundedColor !== slime.color || typeof payload.balance !== "number") {
+        setShopNotice({
+          kind: "error",
+          text: PURCHASE_ERROR[payload.error ?? ""] ?? "환불하지 못했어요. 다시 시도해 주세요.",
+        });
+        return;
+      }
+
+      setOwnedKeys((current) => current.filter((color) => color !== slime.color));
+      setEquippedKeys((current) => current.filter((color) => color !== slime.color));
+      setEquippedItemsByColor((current) => {
+        const next = { ...current };
+        delete next[slime.color];
+        return next;
+      });
+      setRepresentativeColor(payload.representativeColor ?? null);
+      setBalance(payload.balance);
+      setShopNotice({ kind: "success", text: `${slime.nameKo}을(를) 환불했어요.` });
+    } catch {
+      setShopNotice({ kind: "error", text: "네트워크 오류가 발생했어요. 다시 시도해 주세요." });
+    } finally {
+      setBusyColor(null);
+    }
+  };
+
+  const refundShopItem = async (item: SlimeShopItem) => {
+    if (busyItemKey || !ownedItemKeys.includes(item.key)) return;
+    if (!window.confirm(`${item.labelKo}을(를) 환불할까요? 모든 펫에서 자동으로 해제돼요.`)) return;
+
+    setBusyItemKey(item.key);
+    setShopNotice(null);
+    try {
+      const response = await fetch("/api/student/slimes/items/refund", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ itemKey: item.key }),
+      });
+      const payload = (await response.json().catch(() => ({}))) as {
+        error?: string;
+        refundedItemKey?: string;
+        balance?: number;
+      };
+      if (!response.ok || payload.refundedItemKey !== item.key || typeof payload.balance !== "number") {
+        setShopNotice({
+          kind: "error",
+          text: PURCHASE_ERROR[payload.error ?? ""] ?? "환불하지 못했어요. 다시 시도해 주세요.",
+        });
+        return;
+      }
+
+      setOwnedItemKeys((current) => current.filter((key) => key !== item.key));
+      setEquippedItemKeys((current) => current.filter((key) => key !== item.key));
+      setEquippedItemsByColor((current) =>
+        Object.fromEntries(
+          Object.entries(current).map(([color, keys]) => [
+            color,
+            (keys ?? []).filter((key) => key !== item.key),
+          ]),
+        ) as Partial<Record<SlimeColor, string[]>>,
+      );
+      setBalance(payload.balance);
+      setShopNotice({ kind: "success", text: `${item.labelKo}을(를) 환불했어요.` });
+    } catch {
+      setShopNotice({ kind: "error", text: "네트워크 오류가 발생했어요. 다시 시도해 주세요." });
     } finally {
       setBusyItemKey(null);
     }
@@ -577,7 +666,18 @@ export function SlimePetPage() {
                         <strong>{slime.price.toLocaleString("ko-KR")}{unitLabel}</strong>
                       </div>
                       {owned ? (
-                        <span className={styles.shopOwnedChip}>보유 중</span>
+                        <div className={styles.shopItemActions}>
+                          <span className={styles.shopOwnedChip}>보유 중</span>
+                          <button
+                            type="button"
+                            className={styles.refundButton}
+                            disabled={busyColor !== null}
+                            onClick={() => void refundSlimePurchase(slime)}
+                            aria-label={`${slime.nameKo} 환불`}
+                          >
+                            {busy ? "환불 중…" : "환불"}
+                          </button>
+                        </div>
                       ) : (
                         <button
                           type="button"
@@ -614,29 +714,42 @@ export function SlimePetPage() {
                       <p>{SHOP_CATEGORY_LABELS[item.category]}</p>
                       <strong>{item.price.toLocaleString("ko-KR")}{unitLabel}</strong>
                     </div>
-                    <button
-                      type="button"
-                      className={`${styles.shopBuyButton} ${equipped ? styles.shopBuyButtonRemove : ""}`}
-                      disabled={busyItemKey !== null || (!wardrobeColor && owned)}
-                      onClick={() => wardrobeColor
-                        ? void equipShopItem(wardrobeColor, item, !equipped)
-                        : void purchaseShopItem(item)}
-                      aria-pressed={wardrobeColor ? equipped : undefined}
-                      aria-label={`${item.labelKo} ${wardrobeColor ? (equipped ? "해제" : "적용") : owned ? "보유 중" : "구매"}`}
-                    >
-                      <span className={styles.spriteSlot} aria-hidden="true">
-                        {busy ? "…" : wardrobeColor && equipped ? "✓" : owned ? "✓" : "+"}
-                      </span>
-                      <span className={styles.buttonLabel}>
-                        {busy
-                          ? owned
-                            ? "적용 중…"
-                            : "구매 중…"
-                          : wardrobeColor
-                            ? equipped ? "해제" : "적용"
-                            : owned ? "보유 중" : "구매"}
-                      </span>
-                    </button>
+                    {!wardrobeColor && owned ? (
+                      <div className={styles.shopItemActions}>
+                        <span className={styles.shopOwnedChip}>보유 중</span>
+                        <button
+                          type="button"
+                          className={styles.refundButton}
+                          disabled={busyItemKey !== null}
+                          onClick={() => void refundShopItem(item)}
+                          aria-label={`${item.labelKo} 환불`}
+                        >
+                          {busy ? "환불 중…" : "환불"}
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        type="button"
+                        className={`${styles.shopBuyButton} ${equipped ? styles.shopBuyButtonRemove : ""}`}
+                        disabled={busyItemKey !== null}
+                        onClick={() => wardrobeColor
+                          ? void equipShopItem(wardrobeColor, item, !equipped)
+                          : void purchaseShopItem(item)}
+                        aria-pressed={wardrobeColor ? equipped : undefined}
+                        aria-label={`${item.labelKo} ${wardrobeColor ? (equipped ? "해제" : "적용") : "구매"}`}
+                      >
+                        <span className={styles.spriteSlot} aria-hidden="true">
+                          {busy ? "…" : wardrobeColor && equipped ? "✓" : "+"}
+                        </span>
+                        <span className={styles.buttonLabel}>
+                          {busy
+                            ? wardrobeColor ? "적용 중…" : "구매 중…"
+                            : wardrobeColor
+                              ? equipped ? "해제" : "적용"
+                              : "구매"}
+                        </span>
+                      </button>
+                    )}
                   </li>
                 );
               })}
