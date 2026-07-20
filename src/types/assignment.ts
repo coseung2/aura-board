@@ -16,6 +16,12 @@ export type AssignmentSlotDTO = {
   viewedAt: string | null;
   returnedAt: string | null;
   returnReason: string | null;
+  /** Added by assignment-slot APIs; optional keeps server-rendered legacy snapshots compatible. */
+  dueAt?: string | null;
+  submissionRevision?: number;
+  submittedAt?: string | null;
+  submittedOnTime?: boolean | null;
+  rewardEligible?: boolean;
   card: {
     id: string;
     content: string;

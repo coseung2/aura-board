@@ -9,6 +9,7 @@ import {
   SLIME_CATALOG,
   SLIME_SHOP_CATALOG,
 } from "./catalog";
+import { calculateCatalogSlimeEffects } from "./math";
 import type { SlimeColor, SlimeShopItem } from "./types";
 
 export const SLIME_PURCHASE_SOURCE_TYPE = "slime_purchase" as const;
@@ -21,6 +22,7 @@ export type SlimeServiceErrorCode =
   | "insufficient_funds"
   | "already_owned"
   | "unknown_item"
+  | "not_owned"
   | "idempotency_key_reused";
 
 const ERROR_STATUS: Record<SlimeServiceErrorCode, number> = {
@@ -30,6 +32,7 @@ const ERROR_STATUS: Record<SlimeServiceErrorCode, number> = {
   insufficient_funds: 402,
   already_owned: 409,
   unknown_item: 400,
+  not_owned: 403,
   idempotency_key_reused: 409,
 };
 
@@ -55,9 +58,12 @@ export type SlimeHome = {
   balance: number;
   currency: { unitLabel: string };
   ownedColors: SlimeColor[];
+  equippedColors: SlimeColor[];
   catalog: typeof SLIME_CATALOG;
   ownedItemKeys: string[];
+  equippedItemKeys: string[];
   shopCatalog: typeof SLIME_SHOP_CATALOG;
+  effects: ReturnType<typeof calculateCatalogSlimeEffects>;
 };
 
 export type SlimePurchaseResult = {
@@ -69,6 +75,13 @@ export type SlimePurchaseResult = {
 export type SlimeShopPurchaseResult = {
   ownedItemKey: string;
   balance: number;
+  idempotent: boolean;
+};
+
+export type SlimeShopEquipResult = {
+  itemKey: string;
+  isEquipped: boolean;
+  equippedItemKeys: string[];
   idempotent: boolean;
 };
 
@@ -165,7 +178,7 @@ export async function getSlimeHome(student: StudentIdentity): Promise<SlimeHome>
       // Slime ownership follows the student if they move classrooms. The
       // classroomId remains an audit snapshot of where it was purchased.
       where: { studentId: student.id },
-      select: { color: true },
+      select: { color: true, isEquipped: true },
       orderBy: { createdAt: "asc" },
     }),
     // The inventory delegate was added with the creature system. Keeping the
@@ -173,21 +186,34 @@ export async function getSlimeHome(student: StudentIdentity): Promise<SlimeHome>
     // ownership) continue to exercise the original home response.
     db.studentCreatureItem?.findMany?.({
       where: { studentId: student.id, quantity: { gt: 0 } },
-      select: { itemKey: true },
+      select: { itemKey: true, isEquipped: true },
       orderBy: { createdAt: "asc" },
-    }) ?? Promise.resolve([] as { itemKey: string }[]),
+    }) ?? Promise.resolve([] as { itemKey: string; isEquipped?: boolean }[]),
   ]);
   if (!account) throw new SlimeServiceError("account_not_found");
   const ownedSet = new Set(owned.map((row) => row.color));
+  const equippedSet = new Set(
+    owned
+      .filter((row) => row.isEquipped !== false)
+      .map((row) => row.color),
+  );
+  const ownedItemKeys = ownedItems
+    .map((item) => item.itemKey)
+    .filter((itemKey) => Boolean(getSlimeShopItem(itemKey)));
+  const equippedItemKeys = ownedItems
+    .filter((item) => item.isEquipped === true)
+    .map((item) => item.itemKey)
+    .filter((itemKey) => Boolean(getSlimeShopItem(itemKey)));
   return {
     balance: account.balance,
     currency: { unitLabel: currency?.unitLabel?.trim() || "원" },
     ownedColors: SLIME_CATALOG.map((slime) => slime.color).filter((color) => ownedSet.has(color)),
+    equippedColors: SLIME_CATALOG.map((slime) => slime.color).filter((color) => equippedSet.has(color)),
     catalog: SLIME_CATALOG,
-    ownedItemKeys: ownedItems
-      .map((item) => item.itemKey)
-      .filter((itemKey) => Boolean(getSlimeShopItem(itemKey))),
+    ownedItemKeys,
+    equippedItemKeys,
     shopCatalog: SLIME_SHOP_CATALOG,
+    effects: calculateCatalogSlimeEffects(Array.from(equippedSet), equippedItemKeys),
   };
 }
 
@@ -448,4 +474,78 @@ export async function purchaseSlimeShopItem(
     }
     throw error;
   }
+}
+
+/**
+ * Toggle one owned slime-home item without touching the purchase ledger.
+ * Backgrounds are a single-slot category; other catalog categories may be
+ * equipped together. The serializable transaction keeps the category reset
+ * and target update atomic under concurrent clicks.
+ */
+export async function equipSlimeShopItem(
+  student: StudentIdentity,
+  itemKey: string,
+  isEquipped: boolean,
+  idempotencyKey: string,
+): Promise<SlimeShopEquipResult> {
+  const normalizedKey = typeof itemKey === "string" ? itemKey.trim() : "";
+  const item = getSlimeShopItem(normalizedKey);
+  if (!item || typeof isEquipped !== "boolean") {
+    throw new SlimeServiceError("invalid_body");
+  }
+  // Equip requests are replay-safe state transitions. We still validate the
+  // key so malformed callers cannot bypass the ownership/type checks below.
+  assertIdempotencyKey(idempotencyKey);
+
+  return serializable(async (tx) => {
+    const inventory = await tx.studentCreatureItem.findUnique({
+      where: { studentId_itemKey: { studentId: student.id, itemKey: item.key } },
+    });
+    if (
+      !inventory ||
+      inventory.itemKind !== `slime-${item.category}` ||
+      inventory.quantity < 1
+    ) {
+      throw new SlimeServiceError("not_owned");
+    }
+
+    const alreadyInRequestedState = inventory.isEquipped === isEquipped;
+    let resetOtherBackgrounds = 0;
+    if (isEquipped && item.category === "background") {
+      const reset = await tx.studentCreatureItem.updateMany({
+        where: {
+          studentId: student.id,
+          itemKind: "slime-background",
+          itemKey: { not: item.key },
+          quantity: { gt: 0 },
+          isEquipped: true,
+        },
+        data: { isEquipped: false },
+      });
+      resetOtherBackgrounds = reset.count;
+    }
+
+    if (!alreadyInRequestedState) {
+      await tx.studentCreatureItem.update({
+        where: { id: inventory.id },
+        data: { isEquipped },
+      });
+    }
+
+    const rows = await tx.studentCreatureItem.findMany({
+      where: { studentId: student.id, quantity: { gt: 0 } },
+      select: { itemKey: true, isEquipped: true },
+      orderBy: { itemKey: "asc" },
+    });
+    const equippedItemKeys = rows
+      .filter((row) => row.isEquipped)
+      .map((row) => row.itemKey)
+      .filter((key) => Boolean(getSlimeShopItem(key)));
+    return {
+      itemKey: item.key,
+      isEquipped,
+      equippedItemKeys,
+      idempotent: alreadyInRequestedState && resetOtherBackgrounds === 0,
+    };
+  });
 }

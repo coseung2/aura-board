@@ -17,6 +17,9 @@ export const ASSIGNMENT_MAX_SLOTS = 30;
 export const ASSIGNMENT_RETURN_REASON_MAX = 200;
 export const ASSIGNMENT_GUIDE_TEXT_MAX = 5000;
 export const ASSIGNMENT_GRADE_MAX = 50;
+export const ASSIGNMENT_IDEMPOTENCY_KEY_MAX = 100;
+
+const RequiredDueAtSchema = z.string().datetime({ offset: true });
 
 /** Create board — assignment layout input. Extends CreateBoardSchema branch. */
 export const CreateAssignmentBoardSchema = z.object({
@@ -48,6 +51,7 @@ export type SlotTransitionInput = z.infer<typeof SlotTransitionSchema>;
 /** Student POST body. At least one of content / links / files / image. */
 export const StudentSubmitSchema = z
   .object({
+    idempotencyKey: z.string().trim().min(8).max(ASSIGNMENT_IDEMPOTENCY_KEY_MAX),
     content: z.string().max(5000).optional(),
     linkUrl: z.string().url().max(2000).optional(),
     fileUrl: z.string().url().max(2000).optional(),
@@ -61,6 +65,11 @@ export const StudentSubmitSchema = z
       v.imageUrl,
     { message: "submission_empty" }
   );
+
+/** Teacher distribution body. dueAt is an absolute ISO-8601 instant. */
+export const AssignmentDistributionSchema = z.object({
+  dueAt: RequiredDueAtSchema,
+});
 
 /** Reminder POST body. */
 export const ReminderSchema = z.object({

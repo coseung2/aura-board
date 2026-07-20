@@ -1086,6 +1086,74 @@
   gap: 8px;
 }
 
+.student-walking-week-range {
+  margin: -4px 0 12px;
+  color: var(--color-text-muted);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.student-walking-future-day {
+  color: var(--color-text-faint);
+}
+
+.student-walking-rewards {
+  display: grid;
+  gap: 12px;
+}
+
+.student-walking-rewards .classroom-dashboard-panel-head {
+  margin-bottom: 0;
+}
+
+.student-walking-reward-total {
+  color: var(--color-accent);
+  white-space: nowrap;
+}
+
+.student-walking-reward-copy,
+.student-walking-reward-next {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: 13px;
+}
+
+.student-walking-tier-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.student-walking-tier {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: var(--color-surface-alt);
+}
+
+.student-walking-tier span {
+  color: var(--color-text-muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.student-walking-tier strong {
+  color: var(--color-text);
+  font-size: 16px;
+}
+
+.student-walking-tier.is-achieved {
+  border-color: var(--color-accent);
+  background: var(--color-accent-tinted-bg);
+}
+
+.student-walking-tier.is-achieved strong {
+  color: var(--color-accent);
+}
+
 .classroom-dashboard-row {
   display: flex;
   justify-content: space-between;
@@ -1292,6 +1360,10 @@
 @media (max-width: 640px) {
   .classroom-page {
     padding-inline: 16px;
+  }
+
+  .student-walking-rewards .classroom-dashboard-panel-head {
+    flex-direction: column;
   }
 
   .classroom-showcase-strip,

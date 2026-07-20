@@ -35,13 +35,14 @@ export async function loadRewardPolicy(
   }
   // Product guardrails are hard limits even if an older/admin row contains
   // larger values. Amounts and score thresholds remain classroom-configurable.
-  policy.readingDailyRewardCap = Math.min(policy.readingDailyRewardCap, 1);
-  policy.readingWeeklyRewardCap = Math.min(policy.readingWeeklyRewardCap, 2);
-  policy.commentDailyRewardCap = Math.min(policy.commentDailyRewardCap, 1);
-  policy.commentWeeklyRewardCap = Math.min(policy.commentWeeklyRewardCap, 2);
-  policy.assignmentDailyRewardCap = Math.min(policy.assignmentDailyRewardCap, 1);
-  policy.assignmentWeeklyRewardCap = Math.min(policy.assignmentWeeklyRewardCap, 2);
-  policy.walkingDailyUnitCap = Math.min(policy.walkingDailyUnitCap, 2);
+  policy.readingDailyRewardCap = Math.min(policy.readingDailyRewardCap, 10);
+  policy.readingWeeklyRewardCap = Math.min(policy.readingWeeklyRewardCap, 20);
+  policy.commentDailyRewardCap = Math.min(policy.commentDailyRewardCap, 10);
+  policy.commentWeeklyRewardCap = Math.min(policy.commentWeeklyRewardCap, 30);
+  // Assignment caps use zero as the explicit unlimited value. Positive
+  // classroom overrides remain supported for deployments that still want a
+  // local throttle; the product default is unlimited per valid submission.
+  policy.walkingDailyUnitCap = Math.min(policy.walkingDailyUnitCap, 4);
   policy.walkingWeeklyRewardDayCap = Math.min(policy.walkingWeeklyRewardDayCap, 5);
   policy.rewardBuffCapBps = Math.min(policy.rewardBuffCapBps, 2_000);
   return policy;
@@ -115,7 +116,11 @@ export async function awardCappedPolicyReward(input: {
 
   const policy = input.policy ?? await loadRewardPolicy(input.tx, input.classroomId);
   const caps = capsForArea(input.area, policy);
-  if (input.baseAmount <= 0 || caps.daily <= 0 || caps.weekly <= 0) return null;
+  if (input.baseAmount <= 0) return null;
+  // Reading/comment zero values are a disable switch. Assignment zero means
+  // unlimited, so only positive configured dimensions participate in the
+  // count gate below.
+  if (input.area !== "assignment" && (caps.daily <= 0 || caps.weekly <= 0)) return null;
   const bounds = getKstRewardBounds(input.now);
   const [dailyCount, weeklyCount] = await Promise.all([
     input.tx.transaction.count({
@@ -135,7 +140,8 @@ export async function awardCappedPolicyReward(input: {
       },
     }),
   ]);
-  if (dailyCount >= caps.daily || weeklyCount >= caps.weekly) return null;
+  if ((caps.daily > 0 && dailyCount >= caps.daily) ||
+      (caps.weekly > 0 && weeklyCount >= caps.weekly)) return null;
 
   const buffBps = await loadEquippedRewardBuffBps(
     input.tx,

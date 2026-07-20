@@ -17,6 +17,7 @@ export type BoardWithClassroom = {
   id: string;
   slug: string;
   title: string;
+  layout: string;
   classroomId: string | null;
   assignmentGuideText: string | null;
   assignmentAllowLate: boolean;
@@ -31,6 +32,7 @@ export async function getBoardWithClassroom(boardId: string): Promise<BoardWithC
       id: true,
       slug: true,
       title: true,
+      layout: true,
       classroomId: true,
       assignmentGuideText: true,
       assignmentAllowLate: true,
@@ -69,6 +71,8 @@ type RawSlotRow = {
   viewedAt: Date | null;
   returnedAt: Date | null;
   returnReason: string | null;
+  dueAt: Date | null;
+  submissionRevision: number;
   student: { name: string };
   card: {
     id: string;
@@ -79,6 +83,7 @@ type RawSlotRow = {
     updatedAt: Date;
   };
   submission: { fileUrl: string | null } | null;
+  submissionAttempts: Array<{ submittedAt: Date; submittedOnTime: boolean }>;
 };
 
 export function slotRowToDTO(row: RawSlotRow): AssignmentSlotDTO {
@@ -93,6 +98,15 @@ export function slotRowToDTO(row: RawSlotRow): AssignmentSlotDTO {
     viewedAt: row.viewedAt?.toISOString() ?? null,
     returnedAt: row.returnedAt?.toISOString() ?? null,
     returnReason: row.returnReason,
+    dueAt: row.dueAt?.toISOString() ?? null,
+    submissionRevision: row.submissionRevision,
+    submittedAt: row.submissionAttempts[0]?.submittedAt.toISOString() ?? null,
+    submittedOnTime: row.submissionAttempts[0]?.submittedOnTime ?? null,
+    rewardEligible:
+      row.dueAt !== null &&
+      Date.now() <= row.dueAt.getTime() &&
+      row.gradingStatus === "not_graded" &&
+      row.submissionStatus !== "orphaned",
     card: {
       id: row.card.id,
       content: row.card.content,
@@ -121,4 +135,9 @@ export const SLOT_INCLUDE_DEFAULT = {
     },
   },
   submission: { select: { fileUrl: true } },
+  submissionAttempts: {
+    orderBy: { revision: "desc" },
+    take: 1,
+    select: { submittedAt: true, submittedOnTime: true },
+  },
 } as const;

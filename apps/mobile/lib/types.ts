@@ -22,6 +22,8 @@ export type BoardMeta = {
   kordleStatus?: string | null;
   speedGameStatus?: string | null;
   shadowAllianceStatus?: "waiting" | "active" | "ended" | null;
+  assignmentDeadline?: string | null;
+  assignmentAllowLate?: boolean;
   breakout?: StudentHomeBreakout | null;
   _count?: { cards: number };
 };
@@ -49,6 +51,7 @@ export type StudentAssignmentTodo = {
   sectionTitle: string;
   href?: string | null;
   assignedAt: string;
+  dueAt?: string | null;
   reminderSentAt?: string | null;
   submitted: boolean;
   submittedAt?: string | null;
@@ -415,6 +418,11 @@ export type BoardDetailResponse = {
         gradingStatus: string;
         grade: string | null;
         returnReason: string | null;
+        dueAt?: string | null;
+        submissionRevision?: number;
+        submittedAt?: string | null;
+        submittedOnTime?: boolean | null;
+        rewardEligible?: boolean;
         card: {
           id: string;
           title: string;
@@ -431,6 +439,11 @@ export type BoardDetailResponse = {
           fileUrl: string | null;
           linkUrl: string | null;
           submittedAt: string;
+          submittedOnTime?: boolean | null;
+          rewardEligible?: boolean;
+          rewardAwarded?: boolean;
+          rewardAmount?: number;
+          idempotent?: boolean;
         } | null;
       }>;
     };

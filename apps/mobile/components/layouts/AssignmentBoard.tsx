@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Alert,
   FlatList,
@@ -20,11 +20,40 @@ import {
   spacing,
   typography,
 } from "../../theme/tokens";
-import { apiFetch, getApiBase } from "../../lib/api";
+import { ApiError, apiFetch, getApiBase } from "../../lib/api";
 import { loadSessionToken } from "../../lib/session";
 import type { BoardDetailResponse } from "../../lib/types";
 import { ExpandablePostContent } from "../ExpandablePostContent";
 import { AppButton, AppModal, IconButton, Pill, SurfaceCard, TextField } from "../ui";
+
+type SubmissionResult = {
+  submittedOnTime?: boolean;
+  rewardEligible?: boolean;
+  rewardAwarded?: boolean;
+  rewardAmount?: number;
+  idempotent?: boolean;
+};
+
+function createIdempotencyKey() {
+  const cryptoApi = typeof globalThis.crypto !== "undefined" ? globalThis.crypto : null;
+  if (cryptoApi?.randomUUID) return cryptoApi.randomUUID();
+  return `assignment-${Date.now()}-${Math.random().toString(36).slice(2, 18)}`;
+}
+
+function formatDeadlineKst(value: string | null | undefined) {
+  if (!value) return null;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return null;
+  return new Intl.DateTimeFormat("ko-KR", {
+    timeZone: "Asia/Seoul",
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: false,
+  }).format(date);
+}
 
 // 과제 배부(assignment) — 본인 slot 만 강조해서 보여주고, 나머지는 반 전체 진행 현황 요약.
 // 제출: content(텍스트) + 이미지 또는 파일 업로드.
@@ -43,6 +72,8 @@ export function AssignmentBoard({
     [slots, data.currentStudent.id],
   );
   const [modalOpen, setModalOpen] = useState(false);
+  const [submissionNotice, setSubmissionNotice] = useState<string | null>(null);
+  const [now, setNow] = useState(() => Date.now());
   const peerColumns =
     width < assignment.peerBreakpoints.one
       ? 1
@@ -62,6 +93,22 @@ export function AssignmentBoard({
     }
     return s;
   }, [slots]);
+
+  const deadline = mySlot?.dueAt ?? data.board.assignmentDeadline ?? null;
+  const deadlineLabel = formatDeadlineKst(deadline);
+  const deadlinePassed = deadline ? new Date(deadline).getTime() < now : false;
+  const assignmentAllowLate = data.board.assignmentAllowLate !== false;
+  const gradingLocked =
+    mySlot?.gradingStatus === "graded" || mySlot?.gradingStatus === "released";
+  const submissionLocked =
+    mySlot?.submissionStatus === "orphaned" ||
+    gradingLocked ||
+    (deadlinePassed && !assignmentAllowLate);
+
+  useEffect(() => {
+    const timer = setInterval(() => setNow(Date.now()), 30_000);
+    return () => clearInterval(timer);
+  }, []);
 
   if (!mySlot) {
     return (
@@ -99,6 +146,26 @@ export function AssignmentBoard({
             {statusLabel[mySlot.submissionStatus] ?? mySlot.submissionStatus}
           </Pill>
         </View>
+        {deadlineLabel ? (
+          <View style={[styles.deadlinePanel, deadlinePassed && styles.deadlinePanelLate]}>
+            <View style={styles.deadlineCopy}>
+              <Text style={styles.deadlineLabel}>제출 기한</Text>
+              <Text style={styles.deadlineText}>{deadlineLabel} KST</Text>
+            </View>
+            <Pill tone={deadlinePassed || gradingLocked ? "danger" : "accent"}>
+              {gradingLocked ? "제출 잠김" : deadlinePassed ? "기한 지남" : "제출 가능"}
+            </Pill>
+            {gradingLocked ? (
+              <Text style={styles.deadlineHint}>채점이 완료되어 수정할 수 없습니다.</Text>
+            ) : deadlinePassed && mySlot.submissionStatus === "assigned" ? (
+              <Text style={styles.deadlineHint}>
+                {assignmentAllowLate
+                  ? "늦은 제출은 저장될 수 있지만 보상은 없어요."
+                  : "마감이 지나 제출할 수 없습니다."}
+              </Text>
+            ) : null}
+          </View>
+        ) : null}
         {mySlot.card.content ? (
           <ExpandablePostContent
             content={mySlot.card.content}
@@ -114,9 +181,19 @@ export function AssignmentBoard({
         {mySlot.submission ? (
           <SubmissionPreview submission={mySlot.submission} />
         ) : null}
+        {submissionNotice ? (
+          <Text style={styles.submissionNotice} accessibilityRole="alert">
+            {submissionNotice}
+          </Text>
+        ) : null}
         <AppButton
           style={styles.submitBtn}
-          onPress={() => setModalOpen(true)}
+          disabled={submissionLocked}
+          onPress={() => {
+            if (submissionLocked) return;
+            setSubmissionNotice(null);
+            setModalOpen(true);
+          }}
         >
           {mySlot.submission ? "다시 제출하기" : "제출하기"}
         </AppButton>
@@ -149,9 +226,20 @@ export function AssignmentBoard({
       <SubmitModal
         visible={modalOpen}
         slotId={mySlot.id}
+        dueAt={deadline}
+        canSubmit={!submissionLocked}
         onClose={() => setModalOpen(false)}
-        onSubmitted={() => {
+        onSubmitted={(result) => {
           setModalOpen(false);
+          if (result.submittedOnTime === false) {
+            setSubmissionNotice("늦게 제출했어요. 제출은 저장되지만 보상은 없어요.");
+          } else if (result.rewardAwarded && (result.rewardAmount ?? 0) > 0) {
+            setSubmissionNotice(`기한 내 제출 보상 +${result.rewardAmount}원`);
+          } else if (result.submittedOnTime) {
+            setSubmissionNotice("기한 내 제출했어요.");
+          } else {
+            setSubmissionNotice("제출했어요.");
+          }
           onMutate();
         }}
       />
@@ -195,18 +283,29 @@ function SubmissionPreview({
 function SubmitModal({
   visible,
   slotId,
+  dueAt,
+  canSubmit,
   onClose,
   onSubmitted,
 }: {
   visible: boolean;
   slotId: string;
+  dueAt: string | null;
+  canSubmit: boolean;
   onClose: () => void;
-  onSubmitted: () => void;
+  onSubmitted: (result: SubmissionResult) => void;
 }) {
   const [content, setContent] = useState("");
   const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [fileUrl, setFileUrl] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const idempotencyKeyRef = useRef<string | null>(null);
+  const deadlineLabel = formatDeadlineKst(dueAt);
+  const deadlinePassed = dueAt ? new Date(dueAt).getTime() < Date.now() : false;
+
+  useEffect(() => {
+    idempotencyKeyRef.current = null;
+  }, [slotId]);
 
   async function upload(uri: string, name: string, mime: string): Promise<string> {
     const token = await loadSessionToken();
@@ -265,25 +364,34 @@ function SubmitModal({
   }
 
   async function submit() {
+    if (!canSubmit) return;
     if (!content.trim() && !imageUrl && !fileUrl) {
       Alert.alert("비어있어요", "내용·이미지·파일 중 하나는 제출해야 해요.");
       return;
     }
     setSubmitting(true);
+    const idempotencyKey = idempotencyKeyRef.current ?? createIdempotencyKey();
+    idempotencyKeyRef.current = idempotencyKey;
     try {
       const payload: Record<string, unknown> = {};
       if (content.trim()) payload.content = content.trim();
       if (imageUrl) payload.imageUrl = imageUrl;
       if (fileUrl) payload.fileUrl = fileUrl;
-      await apiFetch(`/api/assignment-slots/${encodeURIComponent(slotId)}/submission`, {
-        method: "POST",
-        json: payload,
-      });
+      const response = await apiFetch<{ submission: SubmissionResult }>(
+        `/api/assignment-slots/${encodeURIComponent(slotId)}/submission`,
+        {
+          method: "POST",
+          json: { ...payload, idempotencyKey },
+        },
+      );
       setContent("");
       setImageUrl(null);
       setFileUrl(null);
-      onSubmitted();
+      idempotencyKeyRef.current = null;
+      onSubmitted(response.submission ?? {});
     } catch (e) {
+      // Keep the key for a network retry so the server can replay one attempt.
+      if (e instanceof ApiError) idempotencyKeyRef.current = null;
       Alert.alert("제출 실패", e instanceof Error ? e.message : String(e));
     } finally {
       setSubmitting(false);
@@ -309,13 +417,24 @@ function SubmitModal({
         contentContainerStyle={styles.modalBodyContent}
         keyboardShouldPersistTaps="handled"
       >
+        {deadlineLabel ? (
+          <View style={[styles.deadlinePanel, deadlinePassed && styles.deadlinePanelLate]}>
+            <View style={styles.deadlineCopy}>
+              <Text style={styles.deadlineLabel}>제출 기한</Text>
+              <Text style={styles.deadlineText}>{deadlineLabel} KST</Text>
+            </View>
+            {deadlinePassed ? (
+              <Text style={styles.deadlineHint}>늦은 제출은 저장될 수 있지만 보상은 없어요.</Text>
+            ) : null}
+          </View>
+        ) : null}
         <TextField
           style={styles.contentInput}
           value={content}
           onChangeText={setContent}
           placeholder="내용을 적어주세요"
           multiline
-          editable={!submitting}
+          editable={!submitting && canSubmit}
         />
         <View style={styles.modalRow}>
           <AppButton
@@ -323,7 +442,7 @@ function SubmitModal({
             style={styles.attachBtn}
             textStyle={styles.attachText}
             onPress={pickImage}
-            disabled={submitting}
+            disabled={submitting || !canSubmit}
           >
             🖼️ 이미지 {imageUrl ? "✓" : ""}
           </AppButton>
@@ -332,7 +451,7 @@ function SubmitModal({
             style={styles.attachBtn}
             textStyle={styles.attachText}
             onPress={pickFile}
-            disabled={submitting}
+            disabled={submitting || !canSubmit}
           >
             📎 파일 {fileUrl ? "✓" : ""}
           </AppButton>
@@ -341,6 +460,7 @@ function SubmitModal({
           style={styles.modalSubmit}
           onPress={submit}
           loading={submitting}
+          disabled={!canSubmit}
         >
           제출하기
         </AppButton>
@@ -409,6 +529,26 @@ const styles = StyleSheet.create({
   },
   slotTitle: { ...typography.title, color: colors.text, flex: 1 },
   slotBody: { ...typography.body, color: colors.text },
+
+  deadlinePanel: {
+    padding: spacing.md,
+    borderRadius: radii.btn,
+    backgroundColor: colors.surfaceAlt,
+    gap: spacing.xs,
+  },
+  deadlinePanelLate: {
+    backgroundColor: colors.statusReturnedBg,
+  },
+  deadlineCopy: {
+    gap: spacing.xs,
+  },
+  deadlineLabel: { ...typography.micro, color: colors.textMuted },
+  deadlineText: { ...typography.label, color: colors.text },
+  deadlineHint: { ...typography.micro, color: colors.statusReturnedText },
+  submissionNotice: {
+    ...typography.label,
+    color: colors.accent,
+  },
 
   returnNote: {
     padding: spacing.md,

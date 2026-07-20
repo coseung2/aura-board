@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import { SLIME_SHOP_CATALOG } from "@/lib/pets/catalog";
-import { calculateSlimeEffects, formatBpsPercent } from "@/lib/pets/math";
+import { calculateCatalogSlimeEffects, formatBpsPercent } from "@/lib/pets/math";
 import type {
   SlimeColor,
   SlimeDefinition,
@@ -33,8 +33,10 @@ type SlimeHome = {
   balance: number;
   currency: { unitLabel: string };
   ownedColors: SlimeColor[];
+  equippedColors?: SlimeColor[];
   catalog: SlimeDefinition[];
   ownedItemKeys?: string[];
+  equippedItemKeys?: string[];
   shopCatalog?: SlimeShopItem[];
 };
 
@@ -57,8 +59,10 @@ function newIdempotencyKey(prefix: string, key: string): string {
 export function SlimePetPage() {
   const [catalog, setCatalog] = useState<SlimeDefinition[]>([]);
   const [ownedKeys, setOwnedKeys] = useState<SlimeColor[]>([]);
+  const [equippedKeys, setEquippedKeys] = useState<SlimeColor[]>([]);
   const [shopCatalog, setShopCatalog] = useState<SlimeShopItem[]>([]);
   const [ownedItemKeys, setOwnedItemKeys] = useState<string[]>([]);
+  const [equippedItemKeys, setEquippedItemKeys] = useState<string[]>([]);
   const [balance, setBalance] = useState(0);
   const [unitLabel, setUnitLabel] = useState("원");
   const [loading, setLoading] = useState(true);
@@ -73,10 +77,11 @@ export function SlimePetPage() {
   const hadOpenDrawer = useRef(false);
   const slimeRetryKeys = useRef(new Map<SlimeColor, string>());
   const itemRetryKeys = useRef(new Map<string, string>());
+  const itemEquipRetryKeys = useRef(new Map<string, string>());
 
   const effects = useMemo(
-    () => calculateSlimeEffects(catalog.filter((slime) => ownedKeys.includes(slime.color))),
-    [catalog, ownedKeys],
+    () => calculateCatalogSlimeEffects(equippedKeys, equippedItemKeys),
+    [equippedItemKeys, equippedKeys],
   );
   const visibleShopItems = useMemo(
     () =>
@@ -96,8 +101,10 @@ export function SlimePetPage() {
       .then((home) => {
         setCatalog(home.catalog);
         setOwnedKeys(home.ownedColors);
+        setEquippedKeys(home.equippedColors ?? home.ownedColors);
         setShopCatalog(home.shopCatalog ?? SLIME_SHOP_CATALOG.slice());
         setOwnedItemKeys(home.ownedItemKeys ?? []);
+        setEquippedItemKeys(home.equippedItemKeys ?? []);
         setBalance(home.balance);
         setUnitLabel(home.currency.unitLabel || "원");
       })
@@ -168,6 +175,10 @@ export function SlimePetPage() {
       setOwnedKeys((current) =>
         current.includes(payload.ownedColor!) ? current : [...current, payload.ownedColor!],
       );
+      // Newly purchased slimes follow the server's default equipped state.
+      setEquippedKeys((current) =>
+        current.includes(payload.ownedColor!) ? current : [...current, payload.ownedColor!],
+      );
       setBalance(payload.balance);
       const name = catalog.find((slime) => slime.color === payload.ownedColor)?.nameKo ?? "슬라임";
       setNotice({ kind: "success", text: `${name} 구매를 완료했어요.` });
@@ -223,6 +234,66 @@ export function SlimePetPage() {
     }
   };
 
+  const equipShopItem = async (item: SlimeShopItem, nextEquipped: boolean) => {
+    if (busyItemKey || !ownedItemKeys.includes(item.key)) return;
+    const idempotencyKey =
+      itemEquipRetryKeys.current.get(item.key) ??
+      newIdempotencyKey("slime-item-equip", `${item.key}-${nextEquipped ? "on" : "off"}`);
+    itemEquipRetryKeys.current.set(item.key, idempotencyKey);
+    setBusyItemKey(item.key);
+    setShopNotice(null);
+    try {
+      const response = await fetch("/api/student/slimes/items/equip", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Idempotency-Key": idempotencyKey,
+        },
+        body: JSON.stringify({ itemKey: item.key, isEquipped: nextEquipped }),
+      });
+      const payload = (await response.json().catch(() => ({}))) as {
+        error?: string;
+        itemKey?: string;
+        isEquipped?: boolean;
+        equippedItemKeys?: string[];
+      };
+      if (
+        !response.ok ||
+        payload.itemKey !== item.key ||
+        payload.isEquipped !== nextEquipped ||
+        !Array.isArray(payload.equippedItemKeys)
+      ) {
+        if (response.status < 500) itemEquipRetryKeys.current.delete(item.key);
+        setShopNotice({
+          kind: "error",
+          text: PURCHASE_ERROR[payload.error ?? ""] ?? "아이템 적용에 실패했어요. 다시 시도해 주세요.",
+        });
+        return;
+      }
+      itemEquipRetryKeys.current.delete(item.key);
+      setEquippedItemKeys(payload.equippedItemKeys);
+      setShopNotice({
+        kind: "success",
+        text: `${item.labelKo}을(를) ${nextEquipped ? "적용" : "해제"}했어요.`,
+      });
+    } catch {
+      setShopNotice({
+        kind: "error",
+        text: "네트워크 오류가 발생했어요. 다시 시도해 주세요.",
+      });
+    } finally {
+      setBusyItemKey(null);
+    }
+  };
+
+  const toggleShopItem = (item: SlimeShopItem, owned: boolean, equipped: boolean) => {
+    if (owned) {
+      void equipShopItem(item, !equipped);
+      return;
+    }
+    void purchaseShopItem(item);
+  };
+
   return (
     <main className={styles.page} data-testid="slime-pet-page">
       <header className={styles.header}>
@@ -271,7 +342,7 @@ export function SlimePetPage() {
         <div className={styles.sectionHeading}>
           <div>
             <h2 id="slime-selection-title">슬라임 선택</h2>
-            <p>보유한 슬라임의 버프가 해당 활동에 적용돼요.</p>
+            <p>장착한 슬라임의 버프가 해당 활동에 적용돼요.</p>
           </div>
           <span className={styles.count}>
             {ownedKeys.length} / {catalog.length} 보유
@@ -279,7 +350,9 @@ export function SlimePetPage() {
         </div>
 
         <ul className={styles.slimeGrid} aria-label="슬라임 목록">
-          {catalog.map((slime) => {
+          {catalog.length === 0 ? (
+            <li className={styles.emptyState}>표시할 슬라임이 없어요.</li>
+          ) : catalog.map((slime) => {
             const owned = ownedKeys.includes(slime.key);
             const busy = busyColor === slime.key;
             return (
@@ -333,7 +406,7 @@ export function SlimePetPage() {
         </div>
         <ul className={styles.breakdown} aria-live="polite">
           {effects.breakdown.length === 0 ? (
-            <li>슬라임을 보유하면 개별 버프가 표시돼요.</li>
+            <li>슬라임을 장착하면 개별 버프가 표시돼요.</li>
           ) : (
             effects.breakdown.map((entry) => (
               <li key={`${entry.source}:${entry.key}`}>
@@ -406,8 +479,11 @@ export function SlimePetPage() {
             )}
 
             <ul className={styles.shopList} aria-label="상점 상품 목록">
-              {visibleShopItems.map((item) => {
+              {visibleShopItems.length === 0 ? (
+                <li className={styles.emptyState}>이 분류에는 상품이 없어요.</li>
+              ) : visibleShopItems.map((item) => {
                 const owned = ownedItemKeys.includes(item.key);
+                const equipped = equippedItemKeys.includes(item.key);
                 const busy = busyItemKey === item.key;
                 return (
                   <li key={item.key} className={styles.shopItem}>
@@ -418,20 +494,29 @@ export function SlimePetPage() {
                     <div className={styles.shopItemCopy}>
                       <h3>{item.labelKo}</h3>
                       <p>{SHOP_CATEGORY_LABELS[item.category]}</p>
-                      <strong>{item.price.toLocaleString("ko-KR")}원</strong>
+                      <strong>{item.price.toLocaleString("ko-KR")}{unitLabel}</strong>
                     </div>
                     <button
                       type="button"
-                      className={styles.shopBuyButton}
-                      disabled={owned || busyItemKey !== null}
-                      onClick={() => void purchaseShopItem(item)}
-                      aria-label={`${item.labelKo} ${owned ? "보유 중" : "구매"}`}
+                      className={`${styles.shopBuyButton} ${equipped ? styles.shopBuyButtonEquipped : ""}`}
+                      disabled={busyItemKey !== null}
+                      onClick={() => toggleShopItem(item, owned, equipped)}
+                      aria-pressed={owned ? equipped : undefined}
+                      aria-label={`${item.labelKo} ${owned ? (equipped ? "적용 중, 해제" : "적용") : "구매"}`}
                     >
                       <span className={styles.spriteSlot} aria-hidden="true">
-                        {owned ? "✓" : busy ? "…" : "+"}
+                        {busy ? "…" : owned && equipped ? "✓" : owned ? "＋" : "+"}
                       </span>
                       <span className={styles.buttonLabel}>
-                        {owned ? "보유 중" : busy ? "구매 중…" : "구매"}
+                        {busy
+                          ? owned
+                            ? "적용 중…"
+                            : "구매 중…"
+                          : owned
+                            ? equipped
+                              ? "적용 중 · 해제"
+                              : "적용"
+                            : "구매"}
                       </span>
                     </button>
                   </li>

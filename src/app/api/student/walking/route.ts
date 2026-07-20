@@ -9,12 +9,20 @@ import {
 } from "@/lib/creatures/activity-rewards";
 import { jsonPrivateNoStore } from "@/lib/http-cache";
 import { getCurrentStudent } from "@/lib/student-auth";
-import { getWalkingDayRange, isValidWalkingDay } from "@/lib/walking";
+import {
+  addWalkingDays,
+  getWalkingDayKey,
+  getWalkingDayRange,
+  isValidWalkingDay,
+} from "@/lib/walking";
 import {
   canRewardWalkingDay,
+  getKstRewardWeekRange,
+  getWalkingWeeklyRewardTiers,
   getKstWeekStartDay,
   walkingRewardUnits,
   walkingUnitSourceRef,
+  walkingWeeklyTierSourceRef,
   walkingWeeklyGoalSourceRef,
   WALKING_WEEKLY_REWARD_SOURCE_TYPE,
 } from "@/lib/reward-policy";
@@ -54,7 +62,49 @@ function parseDays(request: NextRequest) {
   return Math.min(31, Math.max(1, Math.round(raw)));
 }
 
-async function readRows(studentId: string, days: number) {
+type WalkingReadWindow = {
+  startDay: string;
+  endDayExclusive: string;
+};
+
+type WalkingResponseRange = {
+  /** KST Monday at 00:00, represented as an inclusive calendar date. */
+  weekStart: string;
+  /** Next KST Monday at 00:00, represented as an exclusive calendar date. */
+  weekEnd: string;
+};
+
+function parseReadWindow(
+  request: NextRequest,
+  now = new Date(),
+): { window: WalkingReadWindow; range: WalkingResponseRange } {
+  const week = request.nextUrl.searchParams.get("week");
+  const hasDays = request.nextUrl.searchParams.has("days");
+  const range = getKstRewardWeekRange(now);
+
+  // The default response is the fixed KST Monday-to-next-Monday window. Keep
+  // `days` as an explicit compatibility escape hatch for existing consumers.
+  if (week === "current" || (!hasDays && week !== "rolling")) {
+    return {
+      window: { startDay: range.weekStart, endDayExclusive: range.weekEnd },
+      range,
+    };
+  }
+
+  const days = parseDays(request);
+  const maxDay = getWalkingDayKey(now);
+  return {
+    window: {
+      startDay: addWalkingDays(maxDay, -(days - 1)),
+      endDayExclusive: addWalkingDays(maxDay, 1),
+    },
+    // Preserve the policy range metadata even when rows use the legacy
+    // rolling-days query so clients can label the current fixed week clearly.
+    range,
+  };
+}
+
+async function readRows(studentId: string, window: WalkingReadWindow) {
   const rows = await db.$queryRaw<RawWalkingRow[]>(Prisma.sql`
     SELECT
       "day",
@@ -63,8 +113,8 @@ async function readRows(studentId: string, days: number) {
       "syncedAt"
     FROM "StudentWalkingDailyStat"
     WHERE "studentId" = ${studentId}
-      AND "day" >= ((CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Seoul')::date - (${days - 1})::int)
-      AND "day" <= (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Seoul')::date
+      AND "day" >= ${window.startDay}::date
+      AND "day" < ${window.endDayExclusive}::date
     ORDER BY "day" ASC
   `);
 
@@ -86,8 +136,23 @@ export async function GET(request: NextRequest) {
       return jsonPrivateNoStore({ error: "unauthorized" }, { status: 401 });
     }
 
-    const days = parseDays(request);
-    return jsonPrivateNoStore({ rows: await readRows(student.id, days) });
+    const readRange = parseReadWindow(request);
+    const policy = await db.$transaction((tx) =>
+      loadRewardPolicy(tx, student.classroomId),
+    );
+    return jsonPrivateNoStore({
+      rows: await readRows(student.id, readRange.window),
+      range: readRange.range,
+      policy: {
+        stepThreshold: policy.walkingRewardStepThreshold,
+        dailyUnitAmount: policy.walkingRewardAmount,
+        dailyUnitCap: policy.walkingDailyUnitCap,
+        weeklyRewardDayCap: policy.walkingWeeklyRewardDayCap,
+        weeklyTiers: getWalkingWeeklyRewardTiers(policy).map(
+          ({ key, steps, amount }) => ({ key, steps, amount }),
+        ),
+      },
+    });
   } catch (error) {
     console.error("[GET /api/student/walking]", error);
     return jsonPrivateNoStore({ error: "internal" }, { status: 500 });
@@ -129,13 +194,19 @@ export async function POST(request: NextRequest) {
     const sourceRefs = rows.flatMap((row) => [
       walkingUnitSourceRef(student.id, row.day, 1),
       walkingUnitSourceRef(student.id, row.day, 2),
+      walkingUnitSourceRef(student.id, row.day, 3),
+      walkingUnitSourceRef(student.id, row.day, 4),
       walkingWeeklyGoalSourceRef(student.id, getKstWeekStartDay(row.day)),
+      walkingWeeklyTierSourceRef(student.id, getKstWeekStartDay(row.day), "tier1"),
+      walkingWeeklyTierSourceRef(student.id, getKstWeekStartDay(row.day), "tier2"),
+      walkingWeeklyTierSourceRef(student.id, getKstWeekStartDay(row.day), "tier3"),
     ]);
     await retryActivityRewardTransaction(
       () =>
         db.$transaction(
           async (tx) => {
             const policy = await loadRewardPolicy(tx, student.classroomId);
+            const weeklyTiers = getWalkingWeeklyRewardTiers(policy);
 
             for (const row of rows.sort((a, b) => a.day.localeCompare(b.day))) {
               await tx.$executeRaw(Prisma.sql`
@@ -172,7 +243,7 @@ export async function POST(request: NextRequest) {
             const previous = await tx.transaction.findMany({
               where: {
                 accountId,
-                sourceType: "walking_reward",
+                sourceType: { in: ["walking_reward", WALKING_WEEKLY_REWARD_SOURCE_TYPE] },
                 sourceRef: { startsWith: `${student.id}:` },
                 type: "deposit",
               },
@@ -193,7 +264,7 @@ export async function POST(request: NextRequest) {
               const rewardedDays = new Set<string>();
               for (const ref of rewardedRefs) {
                 const match = ref.match(
-                  /^[^:]+:(\d{4}-\d{2}-\d{2}):(?:unit:[12]|daily-threshold)$/,
+                  /^[^:]+:(\d{4}-\d{2}-\d{2}):(?:unit:[1-4]|daily-threshold)$/,
                 );
                 if (match && getKstWeekStartDay(match[1]) === weekStart) rewardedDays.add(match[1]);
               }
@@ -227,18 +298,47 @@ export async function POST(request: NextRequest) {
                   AND "day" < (${weekStart}::date + 7)
               `);
               const steps = Number(totals[0]?.steps ?? 0);
-              if (steps < policy.walkingWeeklyGoalSteps) continue;
-              await awardWalkingPolicyReward({
-                tx,
-                studentId: student.id,
-                classroomId: student.classroomId,
-                accountId,
-                sourceRef: walkingWeeklyGoalSourceRef(student.id, weekStart),
-                sourceType: WALKING_WEEKLY_REWARD_SOURCE_TYPE,
-                baseAmount: policy.walkingWeeklyGoalAmount,
-                note: `주간 걷기 ${policy.walkingWeeklyGoalSteps.toLocaleString("ko-KR")}보 달성 보상 [${weekStart}]`,
-                policy,
-              });
+              for (const tier of weeklyTiers) {
+                if (
+                  !Number.isSafeInteger(tier.steps) ||
+                  tier.steps <= 0 ||
+                  !Number.isSafeInteger(tier.amount) ||
+                  tier.amount <= 0 ||
+                  steps < tier.steps
+                ) {
+                  continue;
+                }
+
+                const sourceRef = walkingWeeklyTierSourceRef(
+                  student.id,
+                  weekStart,
+                  tier.key,
+                );
+                // The pre-tier implementation paid the first 25k total under
+                // this legacy source key. Treat that source as tier 1 already
+                // settled so a resync does not double-pay the migrated week.
+                if (
+                  tier.key === "tier1" &&
+                  !rewardedRefs.has(sourceRef) &&
+                  rewardedRefs.has(walkingWeeklyGoalSourceRef(student.id, weekStart))
+                ) {
+                  rewardedRefs.add(sourceRef);
+                  continue;
+                }
+
+                const paid = await awardWalkingPolicyReward({
+                  tx,
+                  studentId: student.id,
+                  classroomId: student.classroomId,
+                  accountId,
+                  sourceRef,
+                  sourceType: WALKING_WEEKLY_REWARD_SOURCE_TYPE,
+                  baseAmount: tier.amount,
+                  note: `주간 걷기 ${tier.steps.toLocaleString("ko-KR")}보 달성 보상 (${tier.key}) [${weekStart}]`,
+                  policy,
+                });
+                if (paid) rewardedRefs.add(sourceRef);
+              }
             }
           },
           { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
@@ -277,7 +377,13 @@ export async function POST(request: NextRequest) {
       },
     );
 
-    return jsonPrivateNoStore({ rows: await readRows(student.id, 31) });
+    const latestDay = getWalkingDayKey();
+    return jsonPrivateNoStore({
+      rows: await readRows(student.id, {
+        startDay: addWalkingDays(latestDay, -30),
+        endDayExclusive: addWalkingDays(latestDay, 1),
+      }),
+    });
   } catch (error) {
     console.error("[POST /api/student/walking]", error);
     return jsonPrivateNoStore({ error: "internal" }, { status: 500 });

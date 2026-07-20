@@ -34,7 +34,7 @@ import {
 
 const student = { id: "student-1", classroomId: "classroom-1" };
 
-function installPurchaseState(startingBalance = 250) {
+function installPurchaseState(startingBalance = 600) {
   let balance = startingBalance;
   const owned = new Map<string, { id: string; color: string }>();
   const ledger = new Map<
@@ -128,7 +128,7 @@ describe("slime wallet service", () => {
     expect(home.catalog).toHaveLength(5);
     expect(mocks.slimeFindMany).toHaveBeenCalledWith({
       where: { studentId: student.id },
-      select: { color: true },
+      select: { color: true, isEquipped: true },
       orderBy: { createdAt: "asc" },
     });
   });
@@ -138,14 +138,14 @@ describe("slime wallet service", () => {
 
     const result = await purchaseSlime(student, "blue", "attempt-1");
 
-    expect(result).toEqual({ ownedColor: "blue", balance: 150, idempotent: false });
-    expect(state.balance).toBe(150);
+    expect(result).toEqual({ ownedColor: "blue", balance: 100, idempotent: false });
+    expect(state.balance).toBe(100);
     expect(state.owned.get("blue")).toBeTruthy();
     expect(mocks.transaction).toHaveBeenCalledTimes(1);
     expect(mocks.ledgerCreate).toHaveBeenCalledWith({
       data: expect.objectContaining({
         type: "slime_purchase",
-        amount: 100,
+        amount: 500,
         sourceRef: "student-1:attempt-1",
       }),
     });
@@ -157,8 +157,8 @@ describe("slime wallet service", () => {
 
     const replay = await purchaseSlime(student, "green", "same-attempt");
 
-    expect(replay).toEqual({ ownedColor: "green", balance: 150, idempotent: true });
-    expect(state.balance).toBe(150);
+    expect(replay).toEqual({ ownedColor: "green", balance: 100, idempotent: true });
+    expect(state.balance).toBe(100);
     expect(mocks.accountUpdateMany).toHaveBeenCalledTimes(1);
   });
 
@@ -180,12 +180,12 @@ describe("slime wallet service", () => {
       status: 409,
     });
 
-    const poorState = installPurchaseState(99);
+    const poorState = installPurchaseState(499);
     await expect(purchaseSlime(student, "yellow", "poor-attempt")).rejects.toMatchObject({
       code: "insufficient_funds",
       status: 402,
     });
-    expect(poorState.balance).toBe(99);
+    expect(poorState.balance).toBe(499);
     expect(poorState.owned.size).toBe(0);
   });
 

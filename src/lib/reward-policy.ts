@@ -9,6 +9,21 @@ export type RewardArea = keyof typeof REWARD_SOURCE_TYPES;
 export type RewardSourceType = (typeof REWARD_SOURCE_TYPES)[RewardArea];
 export const WALKING_WEEKLY_REWARD_SOURCE_TYPE = "walking_weekly_reward" as const;
 
+/** Weekly walking rewards are independent threshold payouts. */
+export const WALKING_WEEKLY_REWARD_TIERS = [
+  { key: "tier1", steps: 25_000, amount: 20 },
+  { key: "tier2", steps: 50_000, amount: 40 },
+  { key: "tier3", steps: 75_000, amount: 100 },
+] as const;
+
+export type WalkingWeeklyRewardTierKey = (typeof WALKING_WEEKLY_REWARD_TIERS)[number]["key"];
+
+export type WalkingWeeklyRewardTier = {
+  key: WalkingWeeklyRewardTierKey;
+  steps: number;
+  amount: number;
+};
+
 export const REWARD_EFFECT_BY_AREA = {
   reading: "reading_reward",
   walking: "walking_reward",
@@ -19,25 +34,74 @@ export const REWARD_EFFECT_BY_AREA = {
 export const DEFAULT_REWARD_POLICY = {
   readingRewardPerPoint: 5,
   readingMinScoreForPayout: 5,
-  readingDailyRewardCap: 1,
-  readingWeeklyRewardCap: 2,
+  readingDailyRewardCap: 10,
+  readingWeeklyRewardCap: 20,
   commentRewardAmount: 5,
-  commentDailyRewardCap: 1,
-  commentWeeklyRewardCap: 2,
+  commentDailyRewardCap: 10,
+  commentWeeklyRewardCap: 30,
   commentMinMeaningfulLength: 4,
   walkingRewardStepThreshold: 5_000,
   walkingRewardAmount: 10,
-  walkingDailyUnitCap: 2,
+  walkingDailyUnitCap: 4,
   walkingWeeklyRewardDayCap: 5,
-  walkingWeeklyGoalSteps: 25_000,
-  walkingWeeklyGoalAmount: 20,
+  walkingWeeklyTier1Steps: WALKING_WEEKLY_REWARD_TIERS[0].steps,
+  walkingWeeklyTier1Amount: WALKING_WEEKLY_REWARD_TIERS[0].amount,
+  walkingWeeklyTier2Steps: WALKING_WEEKLY_REWARD_TIERS[1].steps,
+  walkingWeeklyTier2Amount: WALKING_WEEKLY_REWARD_TIERS[1].amount,
+  walkingWeeklyTier3Steps: WALKING_WEEKLY_REWARD_TIERS[2].steps,
+  walkingWeeklyTier3Amount: WALKING_WEEKLY_REWARD_TIERS[2].amount,
   assignmentRewardAmount: 20,
-  assignmentDailyRewardCap: 1,
-  assignmentWeeklyRewardCap: 2,
+  // Zero means unlimited. Assignment rewards are paid for every valid
+  // submission; reading/comment zero values continue to disable payouts.
+  assignmentDailyRewardCap: 0,
+  assignmentWeeklyRewardCap: 0,
   rewardBuffCapBps: 2_000,
 } as const;
 
 export type RewardPolicy = { -readonly [K in keyof typeof DEFAULT_REWARD_POLICY]: number };
+
+/** Resolve the configured threshold payouts from the classroom policy. */
+export function getWalkingWeeklyRewardTiers(
+  policy: Pick<RewardPolicy,
+    | "walkingWeeklyTier1Steps"
+    | "walkingWeeklyTier1Amount"
+    | "walkingWeeklyTier2Steps"
+    | "walkingWeeklyTier2Amount"
+    | "walkingWeeklyTier3Steps"
+    | "walkingWeeklyTier3Amount"
+  > = DEFAULT_REWARD_POLICY,
+): WalkingWeeklyRewardTier[] {
+  const configured = [
+    {
+      key: WALKING_WEEKLY_REWARD_TIERS[0].key,
+      steps: policy.walkingWeeklyTier1Steps,
+      amount: policy.walkingWeeklyTier1Amount,
+    },
+    {
+      key: WALKING_WEEKLY_REWARD_TIERS[1].key,
+      steps: policy.walkingWeeklyTier2Steps,
+      amount: policy.walkingWeeklyTier2Amount,
+    },
+    {
+      key: WALKING_WEEKLY_REWARD_TIERS[2].key,
+      steps: policy.walkingWeeklyTier3Steps,
+      amount: policy.walkingWeeklyTier3Amount,
+    },
+  ];
+  return configured;
+}
+
+/** Return the current KST Monday-to-next-Monday half-open week. */
+export function getKstRewardWeekRange(at = new Date()): {
+  weekStart: string;
+  weekEnd: string;
+} {
+  const bounds = getKstRewardBounds(at);
+  return {
+    weekStart: toKstDayKey(bounds.weekStart),
+    weekEnd: toKstDayKey(bounds.weekEnd),
+  };
+}
 
 const KST_OFFSET_MS = 9 * 60 * 60 * 1_000;
 const DAY_MS = 24 * 60 * 60 * 1_000;
@@ -122,6 +186,17 @@ export function walkingUnitSourceRef(studentId: string, day: string, unit: numbe
   return `${studentId}:${day}:unit:${unit}`;
 }
 
+/** Stable source key for one independent weekly tier payout. */
+export function walkingWeeklyTierSourceRef(
+  studentId: string,
+  weekStartDay: string,
+  tier: WalkingWeeklyRewardTierKey | number,
+): string {
+  const key = typeof tier === "number" ? `tier${tier}` : tier;
+  return `${studentId}:${weekStartDay}:weekly-tier:${key}`;
+}
+
+/** Legacy source key used by the pre-tier 25,000-step payout. */
 export function walkingWeeklyGoalSourceRef(studentId: string, weekStartDay: string): string {
   return `${studentId}:${weekStartDay}:weekly-goal`;
 }

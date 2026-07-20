@@ -60,7 +60,7 @@ If the deployment uses PostgreSQL, add partial unique indexes in the migration (
 - Duplicate request protection is mandatory: the same purchase idempotency key returns the original creature and transaction without another charge. A concurrent request cannot create two active eggs. When multiple approved lines exist, draw from unowned line keys first; after all published lines are owned, repeat outcomes are allowed and the full weighted table is disclosed.
 - Affinity and shop tier affect egg price and random-draw weight only. They never change reward amounts, thresholds, classroom access, or combat power. There are no battle stats in v1.
 - Eggs and growth are classroom activities, never a real-money purchase. Do not expose a card/checkout path or premium currency.
-- Reading, comment, daily walking, weekly walking, and first assignment submission are the bounded reward sources. A source is eligible only after its route-specific checks succeed; no client can post an arbitrary reward event.
+- Reading, comment, daily walking, weekly walking, and on-time assignment submissions are the bounded reward sources. A source is eligible only after its route-specific checks succeed; no client can post an arbitrary reward event.
 - Creature-specific accessories and trading remain later slices. V1 inventory contains food, egg-only hatch accelerators, and one equippable background effect per student.
 - There is one rules version (`creature-rules-v1`) and one straight-line stage map. A future rules version must be additive and must not reinterpret existing events.
 
@@ -70,11 +70,13 @@ Use the existing `Transaction.sourceType/sourceRef` pair and use the same pair o
 
 | Activity | `sourceType` | `sourceRef` | Wallet effect | Progress effect |
 | --- | --- | --- | --- | --- |
-| Reading reward | `reading_reward` | `readingLogId` | Score 5+; 5 per score point; KST day 1/week 2 | `+1` in the same serializable transaction |
-| Comment reward | `comment_reward` | `commentId` | 5 for one meaningful normalized student comment; KST day 1/week 2 | `+1` in the same serializable transaction |
-| Daily walking unit | `walking_reward` | `studentId:YYYY-MM-DD:unit:N` | 10 per 5,000 steps, at most two units/day and five rewarded days/week | `+1` per paid unit in the same serializable transaction |
-| Weekly walking goal | `walking_weekly_reward` | `studentId:weekMonday:weekly-goal` | 20 once when that KST week reaches 25,000 steps | `+1` in the same serializable transaction |
-| First assignment submission | `assignment_reward` | `studentId:assignmentSlotId:first-submit` | Deposit 20 once for the first accepted submission | `+1` in the same serializable transaction |
+| Reading reward | `reading_reward` | `readingLogId` | Score 5+; 5 per score point; KST day 10/week 20 | `+1` in the same serializable transaction |
+| Comment reward | `comment_reward` | `commentId` | 5 for one meaningful normalized student comment; KST day 10/week 30 | `+1` in the same serializable transaction |
+| Daily walking unit | `walking_reward` | `studentId:YYYY-MM-DD:unit:N` | 10 per 5,000 steps, at most four units/day and five rewarded days/week | `+1` per paid unit in the same serializable transaction |
+| Weekly walking tier 1 | `walking_weekly_reward` | `studentId:weekMonday:weekly-tier:tier1` | +20 when that KST week reaches 25,000 steps | `+1` in the same serializable transaction |
+| Weekly walking tier 2 | `walking_weekly_reward` | `studentId:weekMonday:weekly-tier:tier2` | +40 when that KST week reaches 50,000 steps | `+1` in the same serializable transaction |
+| Weekly walking tier 3 | `walking_weekly_reward` | `studentId:weekMonday:weekly-tier:tier3` | +100 when that KST week reaches 75,000 steps | `+1` in the same serializable transaction |
+| Assignment submission | `assignment_reward` | `studentId:assignmentSlotId:attempt:<attemptKey>` | Deposit 20 for each valid, on-time submission by default | `+1` in the same serializable transaction |
 | Egg purchase | `creature_egg_purchase` | caller idempotency key | Guarded withdrawal/purchase transaction | Creates the egg; it is not a growth event |
 
 The existing `Transaction` compound unique index on `(sourceType, sourceRef)` is global. Choose source references that cannot collide across source types and do not reuse a reading-log ID for an assignment event. A progress event also carries `rulesVersion` and a stable `idempotencyKey` such as `studentId:sourceType:sourceRef:rulesVersion`; retries must return the already-applied result.
@@ -161,9 +163,9 @@ Reward hooks should call one server helper after source verification:
 3. If an active creature exists, check `CreatureProgressEvent.idempotencyKey`/`(studentId, sourceType, sourceRef)`. If present, return the recorded stage and progress. Otherwise increment `progressPoints` by the server-computed delta, calculate the monotonic stage transition for `rulesVersion`, insert the event with before/after snapshots, and update the creature. On the first `egg -> hatchling` crossing, set `isFeatured = true` only if no representative exists. When the transition reaches `evolved`, set `isActive = false` and `completedAt` while preserving `isFeatured`.
 4. Commit the wallet deposit and progress event together when the source record itself is created in this hook. If an upstream record must be created first, use an outbox/retry path rather than silently losing progress.
 
-Reading, comments, daily/weekly walking, and first-assignment rewards call the shared server-owned growth helper. Each newly created wallet deposit and its creature progress event commit in the same serializable transaction; reading also creates its `ReadingLog` in that transaction. A replay of an already-existing deposit does not retroactively add growth. No endpoint accepts a raw `CreatureProgressEvent` from a client.
+Reading, comments, daily/weekly walking, and assignment-submission rewards call the shared server-owned growth helper. Each newly created wallet deposit and its creature progress event commit in the same serializable transaction; reading also creates its `ReadingLog` in that transaction. A replay of an already-existing deposit does not retroactively add growth. No endpoint accepts a raw `CreatureProgressEvent` from a client.
 
-Walking defaults to 10 per 5,000-step unit (two units/day), five rewarded days/week, plus a separate 20-unit weekly reward at 25,000 steps. The first accepted assignment submission defaults to 20. `AvatarRewardConfig` owns the persisted defaults, while server guardrails enforce the maximum frequencies and 20% effect cap. The reward-policy migration changes existing rows only when they still equal the former schema defaults (`readingRewardPerPoint = 10`, `walkingRewardAmount = 20`); because the old schema stored no customization marker, an intentionally customized value equal to an old default cannot be distinguished and is migrated too.
+Walking defaults to 10 per 5,000-step unit (four units/day), five rewarded days/week, plus independent weekly tier payouts of 20 at 25,000 steps, 40 at 50,000 steps, and 100 at 75,000 steps (160 won when all three thresholds are reached). Each tier has its own source key, so retries and Monday KST week changes are idempotent. Valid, on-time assignment submissions default to 20 each; a zero assignment cap means unlimited submissions while positive classroom overrides remain possible. `AvatarRewardConfig` owns the persisted defaults, while server guardrails enforce the reading/comment frequency caps (10/day and 20/week for reading; 10/day and 30/week for comments) and 20% effect cap. The reward-policy migration changes existing rows only when they still equal the former schema defaults; because the old schema stored no customization marker, an intentionally customized value equal to an old default cannot be distinguished and is migrated too. The former single weekly-goal fields are copied to tier 1 before they are removed; tier 2 and tier 3 use the new reviewed defaults.
 
 ### Reversal recommendation
 
@@ -239,7 +241,7 @@ These route names are an outline for implementation; they do not authorize a new
 3. Add stage-transition and item-use services plus the student read/purchase/use/equip routes. Confirm an evolved row closes the active slot and remains in the collection.
 4. Generate and approve all 28 stage behavior sheets in Character Asset Studio, then publish their JSON, sheet PNG, and nine canonical frames under the runtime paths.
 5. Build the responsive student hub for exhibition, shop, fitting room, and codex; verify purchases and equipment survive reload.
-6. Add a shared reward-application helper and source-specific tests. Make reading reward delivery durable, then add verified walking and first-assignment reward hooks.
+6. Add a shared reward-application helper and source-specific tests. Make reading reward delivery durable, then add verified walking and assignment-submission reward hooks.
 
 ## Verification checklist
 
@@ -248,7 +250,7 @@ Use [`docs/verification-checklist.md`](./verification-checklist.md) as the singl
 - Run `npm run typecheck`, targeted creature/wallet tests, and `npm run test` when shared wallet logic changes.
 - For the Prisma migration, run `npx prisma validate` and `npx prisma generate`.
 - Exercise two concurrent purchase requests with the same and different idempotency keys: one charge/egg for a replay, never a negative balance, and never two active eggs.
-- Exercise reading, comment, daily/weekly walking, and first-assignment source events twice; assert one deposit and one progress event per source, with stage transitions at 3/8/15 points.
+- Exercise reading, comment, daily/weekly walking, and assignment-submission source events twice; assert one deposit and one progress event per source, with stage transitions at 3/8/15 points.
 - Exercise a failed/insufficient-balance purchase and a reward reversal; assert no orphan charge, no negative balance, and no automatic stage downgrade.
 - Verify the full save/publish round trip and reload for the student creature screen, as required by the checklist's “Save And Publish Flows” section. Confirm teacher reversal permissions and downstream collection state.
 - Validate all 28 stage outputs with Character Asset Studio's validators before publication: transparent 1536×1536 sheet, nine 512×512 RGBA frames, and stable normal/lazy/signature row ordering.
@@ -269,18 +271,20 @@ Use [`docs/verification-checklist.md`](./verification-checklist.md) as the singl
 슬라임/세트의 같은 영역 효과를 합산한 뒤 영역별 최대 20%(2,000bps)로
 제한한다. 최종 지급액은 `floor(기본액 * (10000 + bps) / 10000)`이다.
 
-- 독서(초록): AI 점수 5점 이상, 점수당 5원, KST 일 1회·월요일 시작 주 2회.
-- 댓글(빨강): 의미 있는 정규화 댓글 1건당 5원, KST 일 1회·주 2회.
+- 독서(초록): AI 점수 5점 이상, 점수당 5원, KST 일 10회·월요일 시작 주 20회.
+- 댓글(빨강): 의미 있는 정규화 댓글 1건당 5원, KST 일 10회·주 30회.
   공백/유니코드를 정규화하고 문자·숫자 4자 미만과 같은 학생의 동일 문구
   재게시는 지급하지 않는다. 삭제된 댓글을 다시 올려도 기존 문구 이력이
   남아 지급 대상이 되지 않으며, 삭제가 일·주 한도를 다시 열지 않는다.
   이미 지급한 금액은 잔액 부족이나 교사 모더레이션 실패를 만들지 않도록
   삭제 시 자동 환수하지 않는다.
-- 과제(보라): 유효한 첫 제출 20원, KST 일 1회·주 2회.
-- 걷기(노랑): KST 활동일마다 5,000보 단위 10원, 일 최대 2단위. 한 주에
-  최대 5개의 활동일만 일간 보상을 받고, 같은 주 누적 25,000보 달성 시
-  20원을 1회 별도 지급한다. 재동기화는 `학생:활동일:unit:N`, 주간 보너스는
-  `학생:주월요일:weekly-goal` 소스로 중복 지급을 막는다.
+- 과제(보라): 기한 내 유효한 제출마다 20원(기본 cap 0, 무제한).
+- 걷기(노랑): KST 활동일마다 5,000보 단위 10원, 일 최대 4단위. 한 주에
+  최대 5개의 활동일만 일간 보상을 받고, 같은 주 각 tier를 25,000보/20원,
+  50,000보/40원, 75,000보/100원으로 각각 지급하며 모두 달성하면 주간
+  160원이 된다.
+  재동기화는 `학생:활동일:unit:N`, 주간 tier마다
+  `학생:주월요일:weekly-tier:tierN` 고유 소스로 중복 지급을 막는다.
 
 걷기 입력의 신뢰 경계는 인증된 학생 세션과 서버가 적용하는 형식/범위 제한이다.
 서버는 하루 0~200,000보, 거리 0~300,000m, 요청당 최대 31일 및 허용 날짜
@@ -288,6 +292,12 @@ Use [`docs/verification-checklist.md`](./verification-checklist.md) as the singl
 검증하지 않는다. 따라서 변조된 클라이언트가 허용 범위 안의 수치를 제출할
 잔여 위험이 있다. 이 구현은 존재하지 않는 attestation을 가정하지 않으며,
 운영 단계에서 기기 증명 도입 전까지 이 위험을 신뢰 경계로 명시한다.
+
+`GET /api/student/walking`은 기본적으로 현재 KST 월요일 00:00부터 다음
+월요일 00:00 직전까지의 고정 주간을 조회하며, 응답 `range.weekStart`와
+`range.weekEnd`는 각각 포함 시작일과 배타적 종료일이다. `week=current`도
+같은 고정 범위를 명시하고, 기존 `days=N` 요청은 호환을 위해 rolling 조회로
+유지한다.
 
 지급은 Serializable 트랜잭션 안에서 학생 소유 `StudentAccount` 잔액과
 `Transaction` 입금을 함께 기록한다. `Transaction(sourceType, sourceRef)`의

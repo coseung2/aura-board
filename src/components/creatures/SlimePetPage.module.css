@@ -142,6 +142,13 @@
   border-bottom-color: var(--color-accent);
 }
 
+.emptyState {
+  grid-column: 1 / -1;
+  padding: 18px 0;
+  color: var(--color-text-muted);
+  font-size: 13px;
+}
+
 .spriteFrame,
 .shopImageFrame {
   display: grid;
@@ -377,6 +384,12 @@
 
 .shopBuyButton {
   min-width: 76px;
+}
+
+.shopBuyButtonEquipped {
+  border-color: var(--color-accent);
+  color: var(--color-accent-active);
+  background: var(--color-accent-tinted-bg);
 }
 
 @keyframes drawerIn {

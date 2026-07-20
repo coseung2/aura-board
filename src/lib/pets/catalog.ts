@@ -7,7 +7,7 @@ import type {
 } from "./types";
 
 const SLIME_ASSET_ROOT = "/creatures/slimes";
-export const SLIME_DEFAULT_PRICE = 100;
+export const SLIME_DEFAULT_PRICE = 500;
 export const SLIME_DEFAULT_BUFF_BPS = 200;
 export const SLIME_SHOP_DEFAULT_PRICE = 30;
 

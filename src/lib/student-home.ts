@@ -97,7 +97,13 @@ export async function getStudentHomePayload(
           id: true,
           boardId: true,
           submissionStatus: true,
+          dueAt: true,
           createdAt: true,
+          submissionAttempts: {
+            orderBy: { revision: "desc" },
+            take: 1,
+            select: { submittedAt: true },
+          },
           card: { select: { id: true, createdAt: true, updatedAt: true } },
           board: { select: { id: true, slug: true, title: true } },
         },
@@ -219,6 +225,7 @@ export async function getStudentHomePayload(
       sectionTitle: section.title,
       href: `/board/${section.board.slug}`,
       assignedAt: section.assignmentPublishedAt.toISOString(),
+      dueAt: null,
       reminderSentAt: section.assignmentReminderSentAt?.toISOString() ?? null,
       submitted: Boolean(submittedCard),
       submittedAt: submittedCard?.createdAt.toISOString() ?? null,
@@ -233,9 +240,10 @@ export async function getStudentHomePayload(
     sectionTitle: slot.board.title || "과제",
     href: `/board/${slot.board.slug}`,
     assignedAt: slot.createdAt.toISOString(),
+    dueAt: slot.dueAt?.toISOString() ?? null,
     reminderSentAt: null,
     submitted: ["submitted", "viewed", "reviewed"].includes(slot.submissionStatus),
-    submittedAt: slot.card.updatedAt?.toISOString() ?? slot.card.createdAt.toISOString(),
+    submittedAt: slot.submissionAttempts[0]?.submittedAt.toISOString() ?? null,
   }));
   const checkHref = `/classroom/${student.classroomId}/check`;
   const canOpenChecks = duties.some((duty) => duty.href === checkHref);
@@ -251,7 +259,8 @@ export async function getStudentHomePayload(
       sectionTitle: task.title,
       href: canOpenChecks ? checkHref : null,
       assignedAt: (task.dueDate ?? task.createdAt).toISOString(),
-      reminderSentAt: task.dueDate?.toISOString() ?? null,
+      dueAt: task.dueDate?.toISOString() ?? null,
+      reminderSentAt: null,
       submitted: submission?.submitted === true,
       submittedAt: checkedAt?.toISOString() ?? null,
     };

@@ -29,6 +29,7 @@ describe("student assignment reminder parity", () => {
   it.each([
     { ...baseAssignment, submitted: true },
     { ...baseAssignment, reminderSentAt: null },
+    { ...baseAssignment, reminderSentAt: undefined },
     { ...baseAssignment, reminderSentAt: baseAssignment.assignedAt },
   ])("hides non-actionable reminder state %#", (item) => {
     expect(isStudentAssignmentReminded(item)).toBe(false);
@@ -37,6 +38,17 @@ describe("student assignment reminder parity", () => {
 });
 
 describe("student mobile navigation parity", () => {
+
+  it("keeps a due date separate from reminder state", () => {
+    const item = {
+      ...baseAssignment,
+      dueAt: "2026-07-11T00:00:00.000Z",
+      reminderSentAt: null,
+    };
+    expect(isStudentAssignmentReminded(item)).toBe(false);
+    expect(isAssignmentReminderVisible(item)).toBe(false);
+  });
+
   it("contains only production student base destinations", () => {
     expect(studentBaseNavTargets.map((target) => target.id)).toEqual([
       "home",

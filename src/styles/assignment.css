@@ -444,6 +444,89 @@
   padding-bottom: 32px;
 }
 
+/* Required teacher distribution control. The form is an independent widget,
+   while the guide and slot grid remain ordinary board content. */
+.assign-deadline {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  padding: 16px 18px;
+  margin-bottom: 16px;
+}
+.assign-deadline__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 12px;
+}
+.assign-deadline__eyebrow {
+  margin: 0 0 3px;
+  color: var(--color-text-muted);
+  font-size: 12px;
+  font-weight: 600;
+}
+.assign-deadline__title {
+  margin: 0;
+  font-size: 17px;
+  line-height: 1.3;
+}
+.assign-deadline__current {
+  color: var(--color-text-muted);
+  font-size: 12px;
+  line-height: 1.4;
+  text-align: right;
+}
+.assign-deadline__form {
+  display: flex;
+  align-items: flex-end;
+  gap: 12px;
+}
+.assign-deadline__field {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  min-width: min(100%, 280px);
+}
+.assign-deadline__field label {
+  color: var(--color-text);
+  font-size: 13px;
+  font-weight: 600;
+}
+.assign-deadline__field input {
+  min-height: 44px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-btn);
+  background: var(--color-bg-alt);
+  color: var(--color-text);
+  padding: 8px 10px;
+  font: inherit;
+}
+.assign-deadline__field input:focus {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 1px;
+}
+.assign-deadline__help {
+  color: var(--color-text-muted);
+  font-size: 12px;
+  line-height: 1.35;
+}
+.assign-deadline__form .assign-btn {
+  min-height: 44px;
+  white-space: nowrap;
+}
+.assign-deadline__error,
+.assign-deadline__notice {
+  margin: 10px 0 0;
+  font-size: 13px;
+}
+.assign-deadline__error {
+  color: var(--color-status-returned-text);
+}
+.assign-deadline__notice {
+  color: var(--color-status-submitted-text);
+}
+
 .assign-guide {
   background: var(--color-surface);
   border: 1px solid var(--color-border);
@@ -462,6 +545,56 @@
   font-size: 15px;
   line-height: 1.5;
   white-space: pre-wrap;
+}
+
+.assign-deadline-status {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  padding: 14px 18px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.assign-deadline-status > div {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+.assign-deadline-status__label {
+  color: var(--color-text-muted);
+  font-size: 12px;
+  font-weight: 600;
+}
+.assign-deadline-status strong {
+  font-size: 15px;
+  line-height: 1.35;
+}
+.assign-deadline-status__state {
+  margin-left: auto;
+  border-radius: var(--radius-pill);
+  background: var(--color-status-submitted-bg);
+  color: var(--color-status-submitted-text);
+  padding: 3px 9px;
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.assign-deadline-status.is-overdue {
+  border-color: var(--color-status-returned-text);
+}
+.assign-deadline-status.is-overdue .assign-deadline-status__state {
+  background: var(--color-status-returned-bg);
+  color: var(--color-status-returned-text);
+}
+.assign-deadline-status p {
+  flex-basis: 100%;
+  margin: 0;
+  color: var(--color-status-returned-text);
+  font-size: 12px;
+  line-height: 1.4;
 }
 
 .assign-inline-error {
@@ -696,9 +829,16 @@
   font-size: 13px;
   color: var(--color-status-returned-text);
 }
+.assign-submit-card__success {
+  margin: 0;
+  color: var(--color-status-submitted-text);
+  font-size: 13px;
+  font-weight: 600;
+}
 
 /* Buttons */
 .assign-btn {
+  min-height: 44px;
   padding: 8px 16px;
   border-radius: var(--radius-btn);
   font-size: 14px;
@@ -950,6 +1090,26 @@
    let the card shrink. Below 768px fall back to 3 columns so slot labels
    stay readable. */
 @media (max-width: 767px) {
+  .assign-deadline__header {
+    flex-direction: column;
+    gap: 8px;
+  }
+  .assign-deadline__current {
+    text-align: left;
+  }
+  .assign-deadline__form {
+    align-items: stretch;
+    flex-direction: column;
+  }
+  .assign-deadline__field {
+    min-width: 0;
+  }
+  .assign-deadline__form .assign-btn {
+    width: 100%;
+  }
+  .assign-deadline-status__state {
+    margin-left: 0;
+  }
   .assign-grid {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }

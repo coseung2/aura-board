@@ -43,6 +43,8 @@ export type StudentAssignmentTodo = {
   sectionTitle: string;
   href: string | null;
   assignedAt: string;
+  /** Assignment-slot deadline snapshot; unrelated to notification/reminder time. */
+  dueAt?: string | null;
   reminderSentAt: string | null;
   submitted: boolean;
   submittedAt: string | null;
@@ -65,6 +67,7 @@ export function isStudentAssignmentReminded(
   return (
     !item.submitted &&
     item.reminderSentAt !== null &&
+    item.reminderSentAt !== undefined &&
     item.reminderSentAt !== item.assignedAt
   );
 }

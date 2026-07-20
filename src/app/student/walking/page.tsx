@@ -1,5 +1,7 @@
 import { redirect } from "next/navigation";
 import { isAdminEmail } from "@/lib/admin";
+import { db } from "@/lib/db";
+import { loadRewardPolicy } from "@/lib/reward-service";
 import { getCurrentStudent } from "@/lib/student-auth";
 import { getStudentHomePayload } from "@/lib/student-home";
 import {
@@ -8,6 +10,7 @@ import {
   getWalkingDayKey,
   type WalkingDay,
 } from "@/lib/walking";
+import { getWalkingWeeklyRewardTiers } from "@/lib/reward-policy";
 import { StudentTopNav } from "@/components/StudentTopNav";
 
 const numberFormatter = new Intl.NumberFormat("ko-KR");
@@ -16,11 +19,23 @@ const distanceFormatter = new Intl.NumberFormat("ko-KR", {
   maximumFractionDigits: 1,
 });
 
-function fillDays(rows: WalkingDay[]) {
-  const byDay = new Map(rows.map((row) => [row.day, row]));
+function getCurrentWeekRange() {
   const today = getWalkingDayKey();
+  const [year, month, day] = today.split("-").map(Number);
+  const weekday = new Date(Date.UTC(year, month - 1, day)).getUTCDay();
+  const daysSinceMonday = (weekday + 6) % 7;
+  const weekStart = addWalkingDays(today, -daysSinceMonday);
+  return {
+    weekStart,
+    weekEnd: addWalkingDays(weekStart, 6),
+    today,
+  };
+}
+
+function fillDays(rows: WalkingDay[], weekStart: string) {
+  const byDay = new Map(rows.map((row) => [row.day, row]));
   return Array.from({ length: 7 }, (_, index) => {
-    const key = addWalkingDays(today, -(6 - index));
+    const key = addWalkingDays(weekStart, index);
     return byDay.get(key) ?? {
       day: key,
       steps: 0,
@@ -33,32 +48,63 @@ function fillDays(rows: WalkingDay[]) {
 function formatDay(value: string, today: string) {
   if (value === today) return "오늘";
   const [year, month, day] = value.split("-").map(Number);
-  return new Intl.DateTimeFormat("ko-KR", {
-    month: "numeric",
-    day: "numeric",
+  const weekday = new Intl.DateTimeFormat("ko-KR", {
     weekday: "short",
-  }).format(new Date(year, month - 1, day));
+    timeZone: "Asia/Seoul",
+  }).format(new Date(Date.UTC(year, month - 1, day, 12)));
+  return `${month}월 ${day}일(${weekday})`;
+}
+
+function formatWeekRange(weekStart: string, weekEnd: string) {
+  return `${formatDay(weekStart, "")}–${formatDay(weekEnd, "")}`;
 }
 
 export default async function StudentWalkingPage() {
   const student = await getCurrentStudent();
   if (!student) redirect("/login?from=/student/walking");
 
-  const [home, storedRows] = await Promise.all([
+  const [home, storedRows, rewardPolicy] = await Promise.all([
     getStudentHomePayload(student),
     getStudentWalkingDays(student.id, 7),
+    db.$transaction((tx) => loadRewardPolicy(tx, student.classroomId)),
   ]);
-  const rows = fillDays(storedRows);
-  const today = rows[rows.length - 1];
-  const totalSteps = rows.reduce((sum, row) => sum + row.steps, 0);
-  const totalDistance = rows.reduce((sum, row) => sum + row.distanceMeters, 0);
+  const weeklyTiers = getWalkingWeeklyRewardTiers(rewardPolicy);
+  const weeklyRewardTotal = weeklyTiers.reduce((sum, tier) => sum + tier.amount, 0);
+  const weekRange = getCurrentWeekRange();
+  const rows = fillDays(storedRows, weekRange.weekStart);
+  const today = rows.find((row) => row.day === weekRange.today) ?? rows[0];
+  const totalSteps = rows.reduce(
+    (sum, row) => (row.day <= weekRange.today ? sum + row.steps : sum),
+    0,
+  );
+  const totalDistance = rows.reduce(
+    (sum, row) => (row.day <= weekRange.today ? sum + row.distanceMeters : sum),
+    0,
+  );
   const averageSteps = Math.round(totalSteps / rows.length);
-  const maxSteps = Math.max(1, ...rows.map((row) => row.steps));
+  const maxSteps = Math.max(
+    1,
+    ...rows.filter((row) => row.day <= weekRange.today).map((row) => row.steps),
+  );
   const latestSync = storedRows.reduce<string | null>((latest, row) => {
+    if (row.day < weekRange.weekStart || row.day > weekRange.today) return latest;
     if (!row.syncedAt) return latest;
     if (!latest) return row.syncedAt;
     return new Date(row.syncedAt) > new Date(latest) ? row.syncedAt : latest;
   }, null);
+  const hasSyncedData = rows.some(
+    (row) => row.day >= weekRange.weekStart && row.day <= weekRange.today && row.syncedAt,
+  );
+  const reachedTier = [...weeklyTiers]
+    .reverse()
+    .find((tier) => totalSteps >= tier.steps);
+  const nextTier = weeklyTiers.find((tier) => totalSteps < tier.steps);
+  const reachedAmount = reachedTier
+    ? weeklyTiers.slice(
+        0,
+        weeklyTiers.findIndex((tier) => tier.key === reachedTier.key) + 1,
+      ).reduce((sum, tier) => sum + tier.amount, 0)
+    : 0;
 
   return (
     <>
@@ -74,12 +120,12 @@ export default async function StudentWalkingPage() {
             <p className="home-subtitle">Health Connect</p>
             <h1 className="home-title">걷기</h1>
             <p className="home-subtitle">
-              Android 앱에서 동기화한 최근 7일 걸음 수와 이동 거리를 확인해요.
+              Android 앱에서 동기화한 이번 주 걸음 수와 이동 거리를 확인해요.
             </p>
           </div>
         </header>
 
-        {!latestSync ? (
+        {!hasSyncedData ? (
           <section className="classroom-dashboard-panel" aria-labelledby="walking-empty-title">
             <div className="classroom-dashboard-panel-head">
               <div>
@@ -89,7 +135,7 @@ export default async function StudentWalkingPage() {
             </div>
             <p className="classroom-dashboard-empty">
               Android 앱의 걷기 화면에서 Health Connect를 연결하고 동기화하면
-              오늘과 최근 7일 기록이 여기에 표시됩니다.
+              이번 주 월요일부터 오늘까지의 기록이 여기에 표시됩니다.
             </p>
           </section>
         ) : null}
@@ -100,7 +146,7 @@ export default async function StudentWalkingPage() {
             <strong>{numberFormatter.format(today.steps)}걸음</strong>
           </article>
           <article className="classroom-dashboard-kpi">
-            <span>최근 7일</span>
+            <span>이번 주 합계</span>
             <strong>{numberFormatter.format(totalSteps)}걸음</strong>
           </article>
           <article className="classroom-dashboard-kpi">
@@ -116,41 +162,95 @@ export default async function StudentWalkingPage() {
         <section className="classroom-dashboard-panel">
           <div className="classroom-dashboard-panel-head">
             <div>
-              <span>Recent 7 days</span>
-              <h2>날짜별 걸음 수</h2>
+              <span>Current KST week</span>
+              <h2>이번 주 걸음 수</h2>
             </div>
             <span>
               {latestSync
-                ? `마지막 동기화 ${new Date(latestSync).toLocaleString("ko-KR")}`
+                ? `마지막 동기화 ${new Date(latestSync).toLocaleString("ko-KR", {
+                    timeZone: "Asia/Seoul",
+                  })}`
                 : "아직 동기화되지 않음"}
             </span>
           </div>
-          <div className="classroom-dashboard-list">
+          <p className="student-walking-week-range" aria-label="걷기 기록 기간">
+            {formatWeekRange(weekRange.weekStart, weekRange.weekEnd)}
+          </p>
+          <div className="classroom-dashboard-list student-walking-days" role="list">
             {rows.map((row) => {
-              const percentage = Math.round((row.steps / maxSteps) * 100);
+              const isFuture = row.day > weekRange.today;
+              const displaySteps = isFuture ? 0 : row.steps;
+              const percentage = Math.round((displaySteps / maxSteps) * 100);
               return (
                 <div
                   key={row.day}
                   className="classroom-dashboard-row"
-                  aria-label={`${formatDay(row.day, today.day)}, ${numberFormatter.format(row.steps)}걸음`}
+                  role="listitem"
+                  aria-label={`${formatDay(row.day, today.day)}, ${numberFormatter.format(displaySteps)}걸음${
+                    isFuture ? ", 아직 날짜가 오지 않았어요" : row.syncedAt ? "" : ", 미동기화"
+                  }`}
                 >
-                  <span>{formatDay(row.day, today.day)}</span>
+                  <span className={isFuture ? "student-walking-future-day" : undefined}>
+                    {formatDay(row.day, today.day)}
+                  </span>
                   <span style={{ flex: 1, marginInline: "1rem" }} aria-hidden="true">
                     <span
                       style={{
                         display: "block",
                         width: `${percentage}%`,
-                        minWidth: row.steps > 0 ? "4px" : 0,
+                        minWidth: displaySteps > 0 ? "4px" : 0,
                         height: "10px",
                         background: "var(--color-primary)",
                       }}
                     />
                   </span>
-                  <strong>{numberFormatter.format(row.steps)}걸음</strong>
+                  <strong>{isFuture ? "—" : `${numberFormatter.format(displaySteps)}걸음`}</strong>
                 </div>
               );
             })}
           </div>
+        </section>
+
+        <section className="classroom-dashboard-panel student-walking-rewards" aria-labelledby="walking-rewards-title">
+          <div className="classroom-dashboard-panel-head">
+            <div>
+              <span>Weekly reward</span>
+              <h2 id="walking-rewards-title">이번 주 보상 진행</h2>
+            </div>
+            <strong className="student-walking-reward-total">
+              {reachedAmount}원 / {weeklyRewardTotal}원
+            </strong>
+          </div>
+          <p className="student-walking-reward-copy">
+            주간 합계 {numberFormatter.format(totalSteps)}걸음 · 월요일–일요일 기준 · {numberFormatter.format(
+              rewardPolicy.walkingRewardStepThreshold,
+            )}걸음마다 {numberFormatter.format(rewardPolicy.walkingRewardAmount)}원 · 주 {rewardPolicy.walkingWeeklyRewardDayCap}일
+          </p>
+          <div className="student-walking-tier-grid" role="list" aria-label="주간 걷기 보상 단계">
+            {weeklyTiers.map((tier, index) => {
+              const achieved = totalSteps >= tier.steps;
+              return (
+                <div
+                  key={tier.key}
+                  className={`student-walking-tier${achieved ? " is-achieved" : ""}`}
+                  role="listitem"
+                  aria-label={`${numberFormatter.format(tier.steps)}걸음 ${
+                    achieved ? "달성" : "미달성"
+                  }, ${index === 0 ? `${tier.amount}원` : `추가 ${tier.amount}원`}`}
+                >
+                  <span>{numberFormatter.format(tier.steps)}걸음</span>
+                  <strong>{index === 0 ? `${tier.amount}원` : `+${tier.amount}원`}</strong>
+                </div>
+              );
+            })}
+          </div>
+          <p className="student-walking-reward-next">
+            {nextTier
+              ? `${numberFormatter.format(nextTier.steps)}걸음까지 ${numberFormatter.format(
+                  Math.max(0, nextTier.steps - totalSteps),
+                )}걸음 남았어요.`
+              : "75,000걸음 보상을 모두 달성했어요."}
+          </p>
         </section>
 
         <section className="classroom-dashboard-panel">

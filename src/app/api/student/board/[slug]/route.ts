@@ -105,7 +105,10 @@ export async function GET(
             ? {
                 id: slot.submission.id,
                 content: slot.submission.content,
-                imageUrl: null,
+                // Assignment submissions persist images on the materialized
+                // slot card; expose that value through the submission-shaped
+                // mobile DTO so previews survive a reload.
+                imageUrl: slot.card.imageUrl,
                 fileUrl: slot.submission.fileUrl,
                 linkUrl: slot.submission.linkUrl,
                 submittedAt: slot.submission.createdAt.toISOString(),
@@ -353,6 +356,8 @@ export async function GET(
         description: board.description,
         classroomId: board.classroomId,
         anonymousAuthor: board.anonymousAuthor,
+        assignmentDeadline: board.assignmentDeadline?.toISOString() ?? null,
+        assignmentAllowLate: board.assignmentAllowLate,
         // 보드 썸네일/테마/스트림 섹션 토글 (2026-06-27 모바일 student DTO 확장).
         // 교사 보드 설정에서 저장된 값을 그대로 내려주며, 폴백 처리는 프론트에서 한다.
         thumbnailMode: board.thumbnailMode,

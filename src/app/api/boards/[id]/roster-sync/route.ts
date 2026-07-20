@@ -41,6 +41,7 @@ export async function POST(
       id: true,
       layout: true,
       classroomId: true,
+      assignmentDeadline: true,
       classroom: { select: { teacherId: true } },
     },
   });
@@ -148,6 +149,7 @@ export async function POST(
           studentId: s.id,
           slotNumber: n,
           cardId: card.id,
+          dueAt: board.assignmentDeadline,
         },
       });
       await tx.cardAuthor.create({

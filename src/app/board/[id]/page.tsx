@@ -38,6 +38,7 @@ import {
 } from "@/lib/stream-activity-templates";
 import type { BoardTheme } from "@/components/BoardSettingsPanel";
 import { normalizeSubjectOrder, type SubjectOrder } from "@/lib/subject-order";
+import { SLOT_INCLUDE_DEFAULT, slotRowToDTO } from "@/lib/assignment-api";
 import type {
   AuraBoardSettings,
   AuraEvaluationLevel,
@@ -255,20 +256,7 @@ export default async function BoardPage({
     ? db.assignmentSlot.findMany({
         where: { boardId: board.id },
         orderBy: { slotNumber: "asc" },
-        include: {
-          student: { select: { id: true, name: true } },
-          card: {
-            select: {
-              id: true,
-              content: true,
-              imageUrl: true,
-              thumbUrl: true,
-              linkUrl: true,
-              updatedAt: true,
-            },
-          },
-          submission: { select: { fileUrl: true } },
-        },
+        include: SLOT_INCLUDE_DEFAULT,
       })
     : null;
   const quizzesPromise = needsQuizData
@@ -711,43 +699,15 @@ export default async function BoardPage({
         }
         const slotDTOs = slotRows
           .filter((row) => viewer === "teacher" || row.studentId === studentViewer?.id)
-          .map((row) => ({
-            id: row.id,
-            slotNumber: row.slotNumber,
-            studentId: row.studentId,
-            studentName: row.student.name,
-            submissionStatus: row.submissionStatus as
-              | "assigned"
-              | "submitted"
-              | "viewed"
-              | "returned"
-              | "reviewed"
-              | "orphaned",
-            gradingStatus: row.gradingStatus as
-              | "not_graded"
-              | "graded"
-              | "released",
-            grade: row.grade,
-            viewedAt: row.viewedAt?.toISOString() ?? null,
-            returnedAt: row.returnedAt?.toISOString() ?? null,
-            returnReason: row.returnReason,
-            card: {
-              id: row.card.id,
-              content: row.card.content,
-              imageUrl: row.card.imageUrl,
-              thumbUrl: row.card.thumbUrl ?? row.card.imageUrl,
-              linkUrl: row.card.linkUrl,
-              fileUrl: row.submission?.fileUrl ?? null,
-              updatedAt: row.card.updatedAt.toISOString(),
-            },
-          }));
+          .map(slotRowToDTO);
         const mySlot = viewer === "student" ? slotDTOs[0] ?? null : null;
+        const effectiveDeadline = mySlot?.dueAt ?? board!.assignmentDeadline;
         const canSubmit =
           viewer === "student" && mySlot
             ? mySlot.gradingStatus === "not_graded" &&
               mySlot.submissionStatus !== "orphaned" &&
-              (board!.assignmentDeadline == null ||
-                new Date() <= new Date(board!.assignmentDeadline) ||
+              (effectiveDeadline == null ||
+                new Date() <= new Date(effectiveDeadline) ||
                 board!.assignmentAllowLate)
             : true;
         return (

@@ -1,11 +1,12 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { AssignmentSlotDTO, AssignmentBoardDTO } from "@/types/assignment";
 import { AssignmentGridView } from "./assignment/AssignmentGridView";
 import { AssignmentFullscreenModal } from "./assignment/AssignmentFullscreenModal";
 import { AssignmentStudentView } from "./assignment/AssignmentStudentView";
+import { AssignmentDeadlineForm } from "./assignment/AssignmentDeadlineForm";
 import {
   AttachClassroomModal,
   type ClassroomOption,
@@ -43,9 +44,18 @@ export function AssignmentBoard({
 }: Props) {
   const router = useRouter();
   const [slots, setSlots] = useState<AssignmentSlotDTO[]>(initialSlots);
+  const initialDeadline =
+    board.assignmentDeadline ?? initialSlots.find((slot) => slot.dueAt)?.dueAt ?? null;
+  const [assignmentDeadline, setAssignmentDeadline] = useState<string | null>(
+    initialDeadline,
+  );
   const [openSlotId, setOpenSlotId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [attachOpen, setAttachOpen] = useState(false);
+
+  useEffect(() => {
+    setAssignmentDeadline(initialDeadline);
+  }, [initialDeadline]);
 
   const attachMode: "attach" | "sync" = boundClassroom ? "sync" : "attach";
   const newStudentCount = boundClassroom
@@ -150,6 +160,8 @@ export function AssignmentBoard({
             slot={slots[0] ?? null}
             guideText={board.assignmentGuideText}
             canSubmit={canStudentSubmit ?? true}
+            boardDeadline={board.assignmentDeadline}
+            assignmentAllowLate={board.assignmentAllowLate}
           />
         </div>
       </div>
@@ -163,6 +175,17 @@ export function AssignmentBoard({
   return (
     <div className="board-canvas-wrap">
       <div className={teacherClass}>
+        <AssignmentDeadlineForm
+          boardId={board.id}
+          deadline={assignmentDeadline}
+          slotCount={slots.length}
+          onSaved={(dueAt) => {
+            setAssignmentDeadline(dueAt);
+            setSlots((previous) =>
+              previous.map((slot) => ({ ...slot, dueAt })),
+            );
+          }}
+        />
         {board.assignmentGuideText && (
           <section className="assign-guide" aria-labelledby="assign-guide-label">
             <div id="assign-guide-label" className="assign-guide__label">

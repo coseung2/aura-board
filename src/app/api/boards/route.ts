@@ -339,6 +339,7 @@ export async function POST(req: Request) {
                 studentId: s.id,
                 slotNumber: n,
                 cardId: card.id,
+                dueAt: input.assignmentDeadline ? new Date(input.assignmentDeadline) : null,
               },
             });
             // Seed the CardAuthor row so author source-of-truth lives on

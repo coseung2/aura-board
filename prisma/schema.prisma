@@ -1916,6 +1916,15 @@ model AssignmentSlot {
 
   returnReason String?
 
+  // Per-distribution deadline snapshot. Nullable only for slots created before
+  // deadline-aware distribution was introduced.
+  dueAt DateTime?
+
+  // Monotonic accepted submission event number. The current Submission row is
+  // still the materialized latest value; attempts below are the immutable
+  // idempotency/reward ledger.
+  submissionRevision Int @default(0)
+
   createdAt DateTime @default(now())
 
   updatedAt DateTime @updatedAt
@@ -1928,9 +1937,27 @@ model AssignmentSlot {
 
   submission Submission?
 
+  submissionAttempts AssignmentSubmissionAttempt[]
+
   @@unique([boardId, studentId])
   @@unique([boardId, slotNumber])
   @@index([studentId])
+}
+
+model AssignmentSubmissionAttempt {
+  id String @id @default(cuid())
+
+  assignmentSlotId String
+  idempotencyKey String
+  revision Int
+  submittedAt DateTime @default(now())
+  submittedOnTime Boolean
+
+  assignmentSlot AssignmentSlot @relation(fields: [assignmentSlotId], references: [id], onDelete: Cascade)
+
+  @@unique([assignmentSlotId, idempotencyKey])
+  @@unique([assignmentSlotId, revision])
+  @@index([assignmentSlotId, submittedAt])
 }
 
 // ???? Event-signup reviews (ES-1, ES-9) ??????????????????????????????????????????????????????????
@@ -4250,23 +4277,28 @@ model AvatarRewardConfig {
   readingRewardPerPoint      Int    @default(5)
   // Minimum aiScore required to trigger a payout (0..10 evaluator range).
   readingMinScoreForPayout   Int    @default(5)
-  readingDailyRewardCap      Int    @default(1)
-  readingWeeklyRewardCap     Int    @default(2)
+  readingDailyRewardCap      Int    @default(10)
+  readingWeeklyRewardCap     Int    @default(20)
   commentRewardAmount        Int    @default(5)
-  commentDailyRewardCap      Int    @default(1)
-  commentWeeklyRewardCap     Int    @default(2)
+  commentDailyRewardCap      Int    @default(10)
+  commentWeeklyRewardCap     Int    @default(30)
   commentMinMeaningfulLength Int    @default(4)
-  // Walking and assignment activity reward policy seeds. Values <= 0 disable
-  // the corresponding reward without requiring another migration.
+  // Walking activity reward policy seeds. Values <= 0 disable the
+  // corresponding walking reward without requiring another migration.
   walkingRewardStepThreshold Int    @default(5000)
   walkingRewardAmount        Int    @default(10)
-  walkingDailyUnitCap        Int    @default(2)
+  walkingDailyUnitCap        Int    @default(4)
   walkingWeeklyRewardDayCap  Int    @default(5)
-  walkingWeeklyGoalSteps     Int    @default(25000)
-  walkingWeeklyGoalAmount    Int    @default(20)
+  walkingWeeklyTier1Steps    Int    @default(25000)
+  walkingWeeklyTier1Amount   Int    @default(20)
+  walkingWeeklyTier2Steps    Int    @default(50000)
+  walkingWeeklyTier2Amount   Int    @default(40)
+  walkingWeeklyTier3Steps    Int    @default(75000)
+  walkingWeeklyTier3Amount   Int    @default(100)
   assignmentRewardAmount     Int    @default(20)
-  assignmentDailyRewardCap   Int    @default(1)
-  assignmentWeeklyRewardCap  Int    @default(2)
+  // Zero means unlimited submissions for the assignment reward.
+  assignmentDailyRewardCap   Int    @default(0)
+  assignmentWeeklyRewardCap  Int    @default(0)
   rewardBuffCapBps           Int    @default(2000)
 
   classroom Classroom @relation(fields: [classroomId], references: [id], onDelete: Cascade)

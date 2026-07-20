@@ -3,6 +3,7 @@ import type {
   AssignmentGradingStatus,
   SlotTransitionInput,
 } from "./assignment-schemas";
+import { effectiveAssignmentDeadline } from "./assignment-submission";
 
 /**
  * Assignment-board state machine (AB-1).
@@ -21,6 +22,7 @@ export type SlotSnapshot = {
 export type BoardDeadlineSnapshot = {
   assignmentAllowLate: boolean;
   assignmentDeadline: Date | null;
+  slotDueAt?: Date | null;
 };
 
 /** Is a student currently allowed to submit / overwrite? */
@@ -32,7 +34,10 @@ export function canStudentSubmit(
   if (slot.submissionStatus === "orphaned") return false;
   // Graded/released locks further edits regardless of deadline.
   if (slot.gradingStatus !== "not_graded") return false;
-  const deadline = board.assignmentDeadline;
+  const deadline = effectiveAssignmentDeadline({
+    slotDueAt: board.slotDueAt ?? null,
+    boardDeadline: board.assignmentDeadline,
+  });
   if (!deadline) return true;
   if (now.getTime() <= deadline.getTime()) return true;
   return board.assignmentAllowLate;

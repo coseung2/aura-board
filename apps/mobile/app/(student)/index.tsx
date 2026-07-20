@@ -377,7 +377,9 @@ function AssignmentRow({
       : "제출 완료"
     : reminded
       ? `알림 ${formatAssignmentDate(item.reminderSentAt)}`
-      : item.assignedAt
+      : item.dueAt
+        ? `마감 ${formatAssignmentDate(item.dueAt)}`
+        : item.assignedAt
         ? `배부 ${formatAssignmentDate(item.assignedAt)}`
         : "과제 배부됨";
 

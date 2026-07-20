@@ -14,8 +14,54 @@ export type WalkingDay = {
   syncedAt: string | null;
 };
 
+export type WalkingWeekRange = {
+  weekStart: string;
+  weekEnd: string;
+  today: string;
+};
+
+export type WalkingWeeklyRewardTier = {
+  key: string;
+  steps: number;
+  amount: number;
+};
+
+export type WalkingPolicy = {
+  stepThreshold: number;
+  dailyUnitAmount: number;
+  dailyUnitCap: number;
+  weeklyRewardDayCap: number;
+  weeklyTiers: WalkingWeeklyRewardTier[];
+};
+
+/**
+ * Keep the mobile progress view aligned with the server's weekly reward
+ * contract (`src/lib/reward-policy.ts`). The server is the source of truth
+ * for payouts; these values are only used to explain progress in the student
+ * UI.
+ */
+export const WALKING_WEEKLY_REWARD_TIERS = [
+  { key: "tier1", steps: 25_000, amount: 20 },
+  { key: "tier2", steps: 50_000, amount: 40 },
+  { key: "tier3", steps: 75_000, amount: 100 },
+] as const satisfies ReadonlyArray<{
+  key: `tier${1 | 2 | 3}`;
+  steps: number;
+  amount: number;
+}>;
+
+/** Mirrors the server's default daily walking reward threshold. */
+export const WALKING_DAILY_REWARD_STEP_THRESHOLD = 5_000;
+
+export const DEFAULT_WALKING_POLICY: WalkingPolicy = {
+  stepThreshold: WALKING_DAILY_REWARD_STEP_THRESHOLD,
+  dailyUnitAmount: 10,
+  dailyUnitCap: 4,
+  weeklyRewardDayCap: 5,
+  weeklyTiers: WALKING_WEEKLY_REWARD_TIERS.map((tier) => ({ ...tier })),
+};
+
 const REQUIRED_PERMISSIONS: HealthConnectPermission[] = ["steps", "distance"];
-const MAX_WALKING_DAYS = 31;
 const MAX_STEPS_PER_DAY = 200_000;
 const MAX_DISTANCE_METERS_PER_DAY = 300_000;
 
@@ -83,11 +129,6 @@ function asWalkingHealthError(error: unknown) {
   );
 }
 
-function clampDays(days: number) {
-  if (!Number.isFinite(days)) return 7;
-  return Math.min(MAX_WALKING_DAYS, Math.max(1, Math.round(days)));
-}
-
 function formatUtcDayKey(date: Date) {
   const year = date.getUTCFullYear();
   const month = String(date.getUTCMonth() + 1).padStart(2, "0");
@@ -111,24 +152,30 @@ export function toLocalDayKey(date: Date) {
   return `${values.year}-${values.month}-${values.day}`;
 }
 
-export function getRecentDayRange(days = 7) {
-  const normalizedDays = clampDays(days);
-  const endDay = toLocalDayKey(new Date());
-  const start = parseDayKey(endDay);
-  start.setUTCDate(start.getUTCDate() - (normalizedDays - 1));
+/** Return the current KST Monday-to-Sunday calendar week. */
+export function getCurrentWalkingWeekRange(now = new Date()): WalkingWeekRange {
+  const today = toLocalDayKey(now);
+  const start = parseDayKey(today);
+  const daysSinceMonday = (start.getUTCDay() + 6) % 7;
+  start.setUTCDate(start.getUTCDate() - daysSinceMonday);
+  const end = new Date(start);
+  end.setUTCDate(start.getUTCDate() + 6);
   return {
-    days: normalizedDays,
-    startDay: formatUtcDayKey(start),
-    endDay,
+    weekStart: formatUtcDayKey(start),
+    weekEnd: formatUtcDayKey(end),
+    today,
   };
 }
 
-export function fillRecentWalkingDays(rows: WalkingDay[], days = 7) {
-  const { days: count, startDay } = getRecentDayRange(days);
+/** Fill a Monday-Sunday week, keeping future days visible but unsynced. */
+export function fillCurrentWalkingWeek(
+  rows: WalkingDay[],
+  range: WalkingWeekRange = getCurrentWalkingWeekRange(),
+) {
   const byDay = new Map(rows.map((row) => [row.day, row]));
-  const start = parseDayKey(startDay);
+  const start = parseDayKey(range.weekStart);
 
-  return Array.from({ length: count }, (_, index) => {
+  return Array.from({ length: 7 }, (_, index) => {
     const date = new Date(start);
     date.setUTCDate(start.getUTCDate() + index);
     const day = formatUtcDayKey(date);
@@ -139,6 +186,17 @@ export function fillRecentWalkingDays(rows: WalkingDay[], days = 7) {
       syncedAt: null,
     };
   });
+}
+
+/** @deprecated Use getCurrentWalkingWeekRange for all new callers. */
+export function getRecentDayRange(_days = 7) {
+  const range = getCurrentWalkingWeekRange();
+  return { days: 7, startDay: range.weekStart, endDay: range.today };
+}
+
+/** @deprecated Use fillCurrentWalkingWeek for all new callers. */
+export function fillRecentWalkingDays(rows: WalkingDay[], _days = 7) {
+  return fillCurrentWalkingWeek(rows);
 }
 
 function normalizeNativeDay(row: HealthConnectDailyStats): WalkingDay {
@@ -215,32 +273,98 @@ export async function openHealthConnectSettings() {
   }
 }
 
-export async function fetchWalkingDays(days = 7) {
-  const payload = await apiFetch<{ rows: WalkingDay[] }>(
-    `/api/student/walking?days=${clampDays(days)}`,
-  );
-  return payload.rows;
+export type WalkingResponse = {
+  rows: WalkingDay[];
+  range?: Pick<WalkingWeekRange, "weekStart" | "weekEnd">;
+  policy: WalkingPolicy;
+};
+
+function safePolicyInteger(value: unknown, fallback: number, minimum = 0) {
+  const candidate = Number(value);
+  return Number.isSafeInteger(candidate) && candidate >= minimum ? candidate : fallback;
 }
 
-export async function readAndSyncWalkingDays(days = 7) {
+/** Normalize the additive API policy while keeping older servers compatible. */
+export function normalizeWalkingPolicy(value: unknown): WalkingPolicy {
+  if (!value || typeof value !== "object") return DEFAULT_WALKING_POLICY;
+  const raw = value as Record<string, unknown>;
+  const rawTiers = Array.isArray(raw.weeklyTiers) ? raw.weeklyTiers : [];
+  const weeklyTiers = rawTiers
+    .map((entry, index) => {
+      if (!entry || typeof entry !== "object") return null;
+      const tier = entry as Record<string, unknown>;
+      const fallback = DEFAULT_WALKING_POLICY.weeklyTiers[index];
+      if (!fallback || typeof tier.key !== "string" || tier.key.length === 0) return null;
+      return {
+        key: tier.key,
+        steps: safePolicyInteger(tier.steps, fallback.steps, 1),
+        amount: safePolicyInteger(tier.amount, fallback.amount),
+      };
+    })
+    .filter((tier): tier is WalkingWeeklyRewardTier => tier !== null);
+
+  return {
+    stepThreshold: safePolicyInteger(
+      raw.stepThreshold,
+      DEFAULT_WALKING_POLICY.stepThreshold,
+      1,
+    ),
+    dailyUnitAmount: safePolicyInteger(
+      raw.dailyUnitAmount,
+      DEFAULT_WALKING_POLICY.dailyUnitAmount,
+    ),
+    dailyUnitCap: safePolicyInteger(raw.dailyUnitCap, DEFAULT_WALKING_POLICY.dailyUnitCap),
+    weeklyRewardDayCap: safePolicyInteger(
+      raw.weeklyRewardDayCap,
+      DEFAULT_WALKING_POLICY.weeklyRewardDayCap,
+    ),
+    weeklyTiers:
+      weeklyTiers.length > 0 ? weeklyTiers : DEFAULT_WALKING_POLICY.weeklyTiers,
+  };
+}
+
+export async function fetchWalkingSnapshot(_days?: number): Promise<WalkingResponse> {
+  const payload = await apiFetch<{
+    rows: WalkingDay[];
+    range?: Pick<WalkingWeekRange, "weekStart" | "weekEnd">;
+    policy?: unknown;
+  }>("/api/student/walking?week=current");
+  return {
+    rows: payload.rows,
+    range: payload.range,
+    policy: normalizeWalkingPolicy(payload.policy),
+  };
+}
+
+export async function fetchWalkingDays(_days?: number) {
+  return (await fetchWalkingSnapshot()).rows;
+}
+
+export async function readAndSyncWalkingDays(_days?: number) {
   if (!isHealthConnectModuleAvailable() || !AuraBoardHealthConnectModule) {
     throw new WalkingHealthError("module_unavailable");
   }
 
-  const range = getRecentDayRange(days);
+  const range = getCurrentWalkingWeekRange();
   let nativeRows: WalkingDay[];
   try {
     nativeRows = (
-      await AuraBoardHealthConnectModule.readDailyStats(range.startDay, range.endDay)
+      await AuraBoardHealthConnectModule.readDailyStats(range.weekStart, range.today)
     ).map(normalizeNativeDay);
   } catch (error) {
     throw asWalkingHealthError(error);
   }
 
+  // Health Connect should never send a future day to the API, even when the
+  // provider returns an unexpected row outside the requested interval.
+  const boundedNativeRows = nativeRows.filter(
+    (row) => row.day >= range.weekStart && row.day <= range.today,
+  );
+
   const payload = await apiFetch<{ rows: WalkingDay[] }>("/api/student/walking", {
     method: "POST",
     json: {
-      rows: nativeRows.map((row) => ({
+      rows: boundedNativeRows.map((row) => ({
         day: row.day,
         steps: row.steps,
         distanceMeters:
@@ -251,6 +375,6 @@ export async function readAndSyncWalkingDays(days = 7) {
   });
 
   return payload.rows.filter(
-    (row) => row.day >= range.startDay && row.day <= range.endDay,
+    (row) => row.day >= range.weekStart && row.day <= range.today,
   );
 }

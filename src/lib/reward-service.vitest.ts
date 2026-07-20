@@ -14,9 +14,13 @@ import {
 } from "./reward-service";
 import { WALKING_WEEKLY_REWARD_SOURCE_TYPE } from "./reward-policy";
 
-function fakeTx(counts: number[] = [0, 0], colors: string[] = []) {
+function fakeTx(
+  counts: number[] = [0, 0],
+  colors: string[] = [],
+  rewardConfig: Record<string, number> | null = null,
+) {
   return {
-    avatarRewardConfig: { findUnique: vi.fn(async () => null) },
+    avatarRewardConfig: { findUnique: vi.fn(async () => rewardConfig) },
     transaction: {
       findFirst: vi.fn(async () => null),
       count: vi.fn(async () => counts.shift() ?? 0),
@@ -40,7 +44,7 @@ describe("reward service caps and buffs", () => {
   });
 
   it("stops a second reading reward in the same KST day", async () => {
-    const tx = fakeTx([1, 1]);
+    const tx = fakeTx([10, 10]);
     const result = await awardCappedPolicyReward({
       tx,
       studentId: "student-1",
@@ -57,7 +61,7 @@ describe("reward service caps and buffs", () => {
   });
 
   it("stops a third assignment reward in the same KST week", async () => {
-    const tx = fakeTx([0, 2]);
+    const tx = fakeTx([0, 2], [], { assignmentDailyRewardCap: 1, assignmentWeeklyRewardCap: 2 });
     const result = await awardCappedPolicyReward({
       tx,
       studentId: "student-1",
@@ -102,16 +106,35 @@ describe("reward service caps and buffs", () => {
       rewardBuffCapBps: 99_999,
     });
     await expect(loadRewardPolicy(tx, "classroom-1")).resolves.toMatchObject({
-      readingDailyRewardCap: 1,
-      readingWeeklyRewardCap: 2,
-      commentDailyRewardCap: 1,
-      commentWeeklyRewardCap: 2,
-      assignmentDailyRewardCap: 1,
-      assignmentWeeklyRewardCap: 2,
-      walkingDailyUnitCap: 2,
+      readingDailyRewardCap: 10,
+      readingWeeklyRewardCap: 20,
+      commentDailyRewardCap: 10,
+      commentWeeklyRewardCap: 30,
+      assignmentDailyRewardCap: 99,
+      assignmentWeeklyRewardCap: 99,
+      walkingDailyUnitCap: 4,
       walkingWeeklyRewardDayCap: 5,
       rewardBuffCapBps: 2_000,
     });
+  });
+
+  it("treats zero assignment caps as unlimited while preserving count queries", async () => {
+    const tx = fakeTx([10, 20]);
+    const policy = await loadRewardPolicy(tx, "classroom-1");
+    const result = await awardCappedPolicyReward({
+      tx,
+      studentId: "student-1",
+      classroomId: "classroom-1",
+      accountId: "account-1",
+      area: "assignment",
+      sourceRef: "assignment-attempt-3",
+      baseAmount: 20,
+      note: "과제 제출 보상",
+      policy,
+    });
+    expect(result).toMatchObject({ amount: 20, baseAmount: 20 });
+    expect(mocks.award).toHaveBeenCalledWith(expect.objectContaining({ amount: 20 }));
+    expect(tx.transaction.count).toHaveBeenCalledTimes(2);
   });
 
   it("treats a disabled zero-amount policy as no payout", async () => {

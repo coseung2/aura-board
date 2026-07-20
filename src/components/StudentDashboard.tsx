@@ -5,8 +5,8 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import type { RealtimeChannel } from "@supabase/supabase-js";
 import { layoutLabel, layoutThumbnail } from "@/lib/layout-meta";
-import { CharacterAvatar } from "@/components/avatar/CharacterAvatar";
-import type { AvatarMeResponse } from "@/components/avatar/types";
+import { formatBpsPercent } from "@/lib/pets/math";
+import type { SlimeColor, SlimeEffectKey, SlimeDefinition } from "@/lib/pets/types";
 import { createPublicSupabaseClient } from "@/lib/supabase/client";
 import { SHADOW_ALLIANCE_STATUS_LABELS } from "@/features/shadow-alliance/types";
 import type {
@@ -51,6 +51,17 @@ type WalletSummary = {
   }>;
 };
 
+type StudentSlimeHome = {
+  balance: number;
+  currency: { unitLabel: string };
+  ownedColors: SlimeColor[];
+  equippedColors?: SlimeColor[];
+  catalog: SlimeDefinition[];
+  effects?: {
+    totals?: Partial<Record<SlimeEffectKey, number>>;
+  };
+};
+
 type Props = {
   studentName: string;
   classroomName: string;
@@ -61,16 +72,33 @@ type Props = {
   showDevFeatures?: boolean;
 };
 
+const SLIME_COLOR_LABELS: Record<SlimeColor, string> = {
+  blue: "파랑",
+  green: "초록",
+  yellow: "노랑",
+  purple: "보라",
+  red: "빨강",
+};
+
+const SLIME_EFFECT_LABELS: Record<SlimeEffectKey, string> = {
+  growth_speed: "성장 속도",
+  reading_reward: "독서 보상",
+  walking_reward: "걷기 보상",
+  assignment_reward: "과제 제출 보상",
+  comment_reward: "댓글 보상",
+};
+
 export function StudentDashboard({
   studentName,
   classroomName,
   classroomId,
   boards,
   assignments = [],
-  showDevFeatures = false,
 }: Props) {
   const [wallet, setWallet] = useState<WalletSummary | null>(null);
-  const [avatar, setAvatar] = useState<AvatarMeResponse | null>(null);
+  const [slimeHome, setSlimeHome] = useState<StudentSlimeHome | null>(null);
+  const [slimeLoading, setSlimeLoading] = useState(true);
+  const [slimeError, setSlimeError] = useState(false);
   const [cancellingFD, setCancellingFD] = useState<string | null>(null);
   const [fdError, setFdError] = useState<string | null>(null);
   const [breakoutModal, setBreakoutModal] = useState<{
@@ -92,25 +120,29 @@ export function StudentDashboard({
       }
     }
 
-    async function loadAvatar() {
+    async function loadSlimeHome() {
+      if (!cancelled) {
+        setSlimeLoading(true);
+        setSlimeError(false);
+      }
       try {
-        const res = await fetch("/api/avatar/me", { cache: "no-store" });
-        if (!res.ok) return;
-        const payload = (await res.json()) as AvatarMeResponse;
-        if (!cancelled) setAvatar(payload);
+        const res = await fetch("/api/student/slimes", { cache: "no-store" });
+        if (!res.ok) throw new Error("slime_home_load_failed");
+        const payload = (await res.json()) as StudentSlimeHome;
+        if (!cancelled) setSlimeHome(payload);
       } catch {
-        // Ignore avatar load failures on the dashboard.
+        if (!cancelled) setSlimeError(true);
+      } finally {
+        if (!cancelled) setSlimeLoading(false);
       }
     }
 
     loadWallet();
-    if (showDevFeatures) {
-      loadAvatar();
-    }
+    loadSlimeHome();
     return () => {
       cancelled = true;
     };
-  }, [showDevFeatures]);
+  }, []);
 
   async function handleCancelFD(fdId: string) {
     if (!window.confirm("이 적금을 중도해지할까요? (이자 없이 원금만 반환)")) {
@@ -220,38 +252,11 @@ export function StudentDashboard({
             )}
           </div>
 
-          {showDevFeatures && avatar && (
-            <div className="student-avatar-card">
-              <div className="student-avatar-header">
-                <div>
-                  <p className="student-avatar-eyebrow">나만의 캐릭터</p>
-                  <h2 className="student-avatar-title">내 캐릭터</h2>
-                </div>
-                <div className="student-avatar-links">
-                  <Link href="/student/character-room" className="student-wallet-link">
-                    피팅룸
-                  </Link>
-                  <Link href="/student/character-shop" className="student-wallet-link">
-                    상점
-                  </Link>
-                </div>
-              </div>
-              <div className="student-avatar-body">
-                <CharacterAvatar
-                  items={avatar.items}
-                  equipped={avatar.equipped}
-                  size={88}
-                  ariaLabel="내 캐릭터 미리보기"
-                />
-                <div className="student-avatar-balance">
-                  <span className="student-avatar-balance-label">보유 화폐</span>
-                  <strong className="student-avatar-balance-value">
-                    {avatar.balance.toLocaleString()} {avatar.currency.unitLabel}
-                  </strong>
-                </div>
-              </div>
-            </div>
-          )}
+          <StudentSlimeCard
+            snapshot={slimeHome}
+            loading={slimeLoading}
+            error={slimeError}
+          />
         </section>
 
         <StudentAssignmentTodos assignments={assignments} />
@@ -276,6 +281,65 @@ export function StudentDashboard({
         />
       )}
     </>
+  );
+}
+
+function StudentSlimeCard({
+  snapshot,
+  loading,
+  error,
+}: {
+  snapshot: StudentSlimeHome | null;
+  loading: boolean;
+  error: boolean;
+}) {
+  const equippedColors = snapshot?.equippedColors ?? snapshot?.ownedColors ?? [];
+  const equippedColor = equippedColors[0] ?? null;
+  const slime = snapshot?.catalog.find((candidate) => candidate.color === equippedColor) ?? null;
+  const activeBuffBps = slime
+    ? snapshot?.effects?.totals?.[slime.effectKey] ?? slime.baseBuffBps
+    : 0;
+
+  return (
+    <div className="student-slime-card" data-testid="student-slime-card">
+      <div className="student-slime-header">
+        <div>
+          <p className="student-slime-eyebrow">나만의 슬라임</p>
+          <h2 className="student-slime-title">내 슬라임</h2>
+        </div>
+        <Link href="/student/aura-pet" className="student-slime-link">
+          내 펫
+        </Link>
+      </div>
+
+      {loading ? (
+        <p className="student-slime-status" role="status">슬라임 정보를 불러오는 중이에요.</p>
+      ) : error ? (
+        <p className="student-slime-status" role="alert">슬라임 정보를 불러오지 못했어요.</p>
+      ) : !snapshot || !slime ? (
+        <div className="student-slime-empty">
+          <p>아직 장착한 슬라임이 없어요.</p>
+          <span>내 펫에서 슬라임을 만나 보세요.</span>
+        </div>
+      ) : (
+        <div className="student-slime-body">
+          <div className="student-slime-sprite">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={slime.spritePath} alt={`${slime.nameKo} GIF`} width={88} height={88} />
+          </div>
+          <div className="student-slime-copy">
+            <strong className="student-slime-name">{slime.nameKo}</strong>
+            <span className="student-slime-color">{SLIME_COLOR_LABELS[slime.color]} 슬라임</span>
+            <span className="student-slime-buff">
+              활성 보상 버프 · {SLIME_EFFECT_LABELS[slime.effectKey]} +{formatBpsPercent(activeBuffBps)}
+            </span>
+            <span className="student-slime-balance">
+              잔액 {snapshot.balance.toLocaleString()} {snapshot.currency.unitLabel}
+            </span>
+          </div>
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -369,7 +433,9 @@ function StudentAssignmentTodos({
                   ? `제출 ${formatAssignmentDate(item.submittedAt)}`
                   : submitted
                     ? "제출 완료"
-                    : reminded
+                    : item.dueAt
+                      ? `마감 ${formatAssignmentDate(item.dueAt)}`
+                      : reminded
                     ? `알림 ${formatAssignmentDate(item.reminderSentAt)}`
                     : item.assignedAt
                       ? `배부 ${formatAssignmentDate(item.assignedAt)}`
