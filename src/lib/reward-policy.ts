@@ -21,6 +21,10 @@ export const WALKING_MONTHLY_REWARD_SOURCE_TYPE =
 /** Every month uses the same four-row attendance reward board. */
 export const WALKING_MONTHLY_ATTENDANCE_ORDINALS = 28 as const;
 export const WALKING_MONTHLY_ATTENDANCE_ITEM_ORDINAL = 28 as const;
+export const WALKING_MONTHLY_COOKIE_REWARD_ORDINALS = [7, 14, 21] as const;
+export const WALKING_MONTHLY_COOKIE_ITEM_KEY = "slime-cookie" as const;
+export const WALKING_MONTHLY_COOKIE_REWARD_SOURCE_TYPE =
+  "walking_attendance_cookie_reward" as const;
 
 /** Weekly walking rewards are independent threshold payouts. */
 export const WALKING_WEEKLY_REWARD_TIERS = [
@@ -265,6 +269,19 @@ export function walkingMonthlyAttendanceSourceRef(
   ordinal: number,
 ): string {
   return `${studentId}:${month}:attendance:${ordinal}`;
+}
+
+/** Stable source key for one cookie granted at a monthly attendance milestone. */
+export function walkingMonthlyCookieRewardSourceRef(
+  studentId: string,
+  month: string,
+  ordinal: number,
+): string {
+  return `${studentId}:${month}:attendance:${ordinal}:cookie`;
+}
+
+export function isWalkingMonthlyCookieRewardOrdinal(ordinal: number): boolean {
+  return (WALKING_MONTHLY_COOKIE_REWARD_ORDINALS as readonly number[]).includes(ordinal);
 }
 
 /** Cash payout for an ordinal; the seventh position pays 20 won. */

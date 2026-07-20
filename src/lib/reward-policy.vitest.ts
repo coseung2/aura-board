@@ -14,7 +14,9 @@ import {
   walkingWeeklyTierSourceRef,
   walkingWeeklyGoalSourceRef,
   walkingMonthlyAttendanceSourceRef,
+  walkingMonthlyCookieRewardSourceRef,
   walkingMonthlyAttendanceRewardAmount,
+  isWalkingMonthlyCookieRewardOrdinal,
   getKstRewardMonthRange,
   getWalkingWeeklyRewardTiers,
   getKstRewardWeekRange,
@@ -102,6 +104,15 @@ describe("area reward policy", () => {
     expect(walkingMonthlyAttendanceSourceRef("student-1", "2026-07", 7)).toBe(
       "student-1:2026-07:attendance:7",
     );
+    expect(walkingMonthlyCookieRewardSourceRef("student-1", "2026-07", 7)).toBe(
+      "student-1:2026-07:attendance:7:cookie",
+    );
+    expect([7, 14, 21].map(isWalkingMonthlyCookieRewardOrdinal)).toEqual([
+      true,
+      true,
+      true,
+    ]);
+    expect(isWalkingMonthlyCookieRewardOrdinal(28)).toBe(false);
     expect(walkingMonthlyAttendanceRewardAmount(1)).toBe(10);
     expect(walkingMonthlyAttendanceRewardAmount(6)).toBe(10);
     expect(walkingMonthlyAttendanceRewardAmount(7)).toBe(20);

@@ -737,7 +737,13 @@
   color: var(--color-accent);
 }
 
-.student-walking-ordinal-reward.is-item-reward small {
+.student-walking-ordinal-reward.is-cookie-reward {
+  display: grid;
+  gap: 2px;
+}
+
+.student-walking-ordinal-reward.is-item-reward small,
+.student-walking-ordinal-reward.is-cookie-reward small {
   color: var(--color-text-muted);
   font-size: 0.78em;
   font-weight: 700;

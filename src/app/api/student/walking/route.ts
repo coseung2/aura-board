@@ -26,11 +26,14 @@ import {
   walkingRewardUnits,
   walkingMonthlyAttendanceRewardAmount,
   walkingMonthlyAttendanceSourceRef,
+  walkingMonthlyCookieRewardSourceRef,
+  isWalkingMonthlyCookieRewardOrdinal,
   walkingUnitSourceRef,
   walkingWeeklyTierSourceRef,
   walkingWeeklyGoalSourceRef,
   WALKING_MONTHLY_ATTENDANCE_ITEM_ORDINAL,
   WALKING_MONTHLY_ATTENDANCE_ORDINALS,
+  WALKING_MONTHLY_COOKIE_REWARD_SOURCE_TYPE,
   WALKING_MONTHLY_REWARD_SOURCE_TYPE,
   WALKING_WEEKLY_REWARD_SOURCE_TYPE,
 } from "@/lib/reward-policy";
@@ -38,6 +41,7 @@ import {
   awardWalkingPolicyReward,
   loadRewardPolicy,
 } from "@/lib/reward-service";
+import { awardWalkingAttendanceCookie } from "@/lib/walking-attendance-rewards";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -405,6 +409,16 @@ export async function POST(request: NextRequest) {
           walkingMonthlyAttendanceSourceRef(student.id, monthRange.month, ordinal),
         ),
     );
+    const monthlyCookieSourceRefs = monthRanges.flatMap((monthRange) =>
+      Array.from(
+        { length: WALKING_MONTHLY_ATTENDANCE_ORDINALS },
+        (_, index) => index + 1,
+      )
+        .filter(isWalkingMonthlyCookieRewardOrdinal)
+        .map((ordinal) =>
+          walkingMonthlyCookieRewardSourceRef(student.id, monthRange.month, ordinal),
+        ),
+    );
     const sourceRefs = [
       ...sortedRows.flatMap((row) => [
         walkingUnitSourceRef(student.id, row.day, 1),
@@ -413,6 +427,7 @@ export async function POST(request: NextRequest) {
         walkingUnitSourceRef(student.id, row.day, 4),
       ]),
       ...monthlySourceRefs,
+      ...monthlyCookieSourceRefs,
     ];
     await retryActivityRewardTransaction(
       () =>
@@ -455,9 +470,15 @@ export async function POST(request: NextRequest) {
             const previous = await tx.transaction.findMany({
               where: {
                 accountId,
-                sourceType: { in: ["walking_reward", WALKING_WEEKLY_REWARD_SOURCE_TYPE] },
+                sourceType: {
+                  in: [
+                    "walking_reward",
+                    WALKING_WEEKLY_REWARD_SOURCE_TYPE,
+                    WALKING_MONTHLY_COOKIE_REWARD_SOURCE_TYPE,
+                  ],
+                },
                 sourceRef: { startsWith: `${student.id}:` },
-                type: "deposit",
+                type: { in: ["deposit", "item_grant"] },
               },
               select: { sourceRef: true },
             });
@@ -502,9 +523,8 @@ export async function POST(request: NextRequest) {
             }
 
             // Monthly attendance ordinals are assigned from distinct synced
-            // calendar dates in chronological order. The item slot replaces
-            // cash and is intentionally only reported as earned; no asset or
-            // inventory grant is performed here.
+            // calendar dates in chronological order. Cookie milestones are
+            // granted in the same transaction as their attendance payout.
             for (const monthRange of monthRanges) {
               const monthRows = await tx.$queryRaw<Array<{ day: Date | string }>>(Prisma.sql`
                 SELECT "day"
@@ -528,20 +548,41 @@ export async function POST(request: NextRequest) {
                   monthRange.month,
                   ordinal,
                 );
-                if (rewardedRefs.has(sourceRef)) continue;
-                const amount = walkingMonthlyAttendanceRewardAmount(ordinal);
                 const day = attendedDays[ordinal - 1];
-                await awardActivityReward({
-                  tx,
-                  studentId: student.id,
-                  classroomId: student.classroomId,
-                  accountId,
-                  sourceType: WALKING_MONTHLY_REWARD_SOURCE_TYPE,
-                  sourceRef,
-                  amount,
-                  note: `월간 걷기 출석 ${ordinal}일차 보상 [${monthRange.month}:${day}]`,
-                });
-                rewardedRefs.add(sourceRef);
+                if (!rewardedRefs.has(sourceRef)) {
+                  const amount = walkingMonthlyAttendanceRewardAmount(ordinal);
+                  await awardActivityReward({
+                    tx,
+                    studentId: student.id,
+                    classroomId: student.classroomId,
+                    accountId,
+                    sourceType: WALKING_MONTHLY_REWARD_SOURCE_TYPE,
+                    sourceRef,
+                    amount,
+                    note: `월간 걷기 출석 ${ordinal}일차 보상 [${monthRange.month}:${day}]`,
+                  });
+                  rewardedRefs.add(sourceRef);
+                }
+
+                if (isWalkingMonthlyCookieRewardOrdinal(ordinal)) {
+                  const cookieSourceRef = walkingMonthlyCookieRewardSourceRef(
+                    student.id,
+                    monthRange.month,
+                    ordinal,
+                  );
+                  if (!rewardedRefs.has(cookieSourceRef)) {
+                    await awardWalkingAttendanceCookie({
+                      tx,
+                      studentId: student.id,
+                      classroomId: student.classroomId,
+                      accountId,
+                      month: monthRange.month,
+                      ordinal,
+                      attendedDay: day,
+                    });
+                    rewardedRefs.add(cookieSourceRef);
+                  }
+                }
               }
             }
           },
@@ -571,9 +612,15 @@ export async function POST(request: NextRequest) {
         const raced = await db.transaction.findFirst({
           where: {
             accountId,
-            sourceType: { in: ["walking_reward", WALKING_WEEKLY_REWARD_SOURCE_TYPE] },
+            sourceType: {
+              in: [
+                "walking_reward",
+                WALKING_WEEKLY_REWARD_SOURCE_TYPE,
+                WALKING_MONTHLY_COOKIE_REWARD_SOURCE_TYPE,
+              ],
+            },
             sourceRef: { in: sourceRefs },
-            type: "deposit",
+            type: { in: ["deposit", "item_grant"] },
           },
           select: { id: true },
         });

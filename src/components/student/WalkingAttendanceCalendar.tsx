@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { WALKING_MONTHLY_COOKIE_REWARD_ORDINALS } from "@/lib/reward-policy";
 
 type Props = {
   studentId: string;
@@ -11,6 +12,9 @@ type Props = {
 
 const MIN_MONTH_DAYS = 28;
 const MAX_MONTH_DAYS = 28;
+const COOKIE_REWARD_ORDINALS: ReadonlySet<number> = new Set(
+  WALKING_MONTHLY_COOKIE_REWARD_ORDINALS,
+);
 
 function clampMonthDays(value: number) {
   if (!Number.isFinite(value)) return 30;
@@ -22,9 +26,16 @@ function clampAttendanceCount(value: number, monthDays: number) {
   return Math.min(monthDays, Math.max(0, Math.floor(value)));
 }
 
+function cashRewardLabel(ordinal: number) {
+  return ordinal % 7 === 0 ? "20원" : "10원";
+}
+
 function rewardLabel(ordinal: number, itemRewardOrdinal: number) {
   if (ordinal === itemRewardOrdinal) return "아이템 보상";
-  return ordinal % 7 === 0 ? "20원" : "10원";
+  const cashLabel = cashRewardLabel(ordinal);
+  return COOKIE_REWARD_ORDINALS.has(ordinal)
+    ? `${cashLabel} + 쿠키 1개`
+    : cashLabel;
 }
 
 /**
@@ -100,6 +111,7 @@ export function WalkingAttendanceCalendar({
           const earned = ordinal <= safeAttendanceCount;
           const stamped = stampedOrdinals.has(ordinal);
           const isItemReward = ordinal === itemRewardOrdinal;
+          const isCookieReward = COOKIE_REWARD_ORDINALS.has(ordinal);
           const label = rewardLabel(ordinal, itemRewardOrdinal);
           const content = (
             <>
@@ -107,12 +119,17 @@ export function WalkingAttendanceCalendar({
               <span
                 className={`student-walking-ordinal-reward${
                   isItemReward ? " is-item-reward" : ""
-                }`}
+                }${isCookieReward ? " is-cookie-reward" : ""}`}
               >
                 {isItemReward ? (
                   <>
                     <span>아이템</span>
                     <small>보상 자리</small>
+                  </>
+                ) : isCookieReward ? (
+                  <>
+                    <span>{cashRewardLabel(ordinal)}</span>
+                    <small>쿠키 1개</small>
                   </>
                 ) : (
                   label
