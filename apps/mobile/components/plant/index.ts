@@ -7,3 +7,6 @@ export { ImageLightbox } from "./ImageLightbox";
 export { StageCompare } from "./StageCompare";
 export { ObservationEditor } from "./ObservationEditor";
 export { NoPhotoReasonModal } from "./NoPhotoReasonModal";
+export { PlantNickname } from "./PlantNickname";
+export { PlantRoadmapTimeline } from "./PlantRoadmapTimeline";
+export { RoadmapStagePicker } from "./RoadmapStagePicker";

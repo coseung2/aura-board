@@ -11,6 +11,8 @@ import { borders, colors, plant, radii, spacing, typography } from "../../theme/
 import type { ObservationDTO } from "../../lib/types";
 import { AppButton, AppModal, IconButton, SurfacePressable, TextField } from "../ui";
 
+const MAX_MEMO = 500;
+
 interface Props {
   visible: boolean;
   title: string;
@@ -128,10 +130,10 @@ export function ObservationEditor({
           onChangeText={setMemo}
           multiline
           textAlignVertical="top"
-          maxLength={1000}
+          maxLength={MAX_MEMO}
           editable={!busy}
         />
-        <Text style={styles.charCount}>{memo.length}/1000</Text>
+        <Text style={styles.charCount}>{memo.length}/{MAX_MEMO}</Text>
 
         <View style={styles.imageGrid}>
           {images.map((img, idx) => (

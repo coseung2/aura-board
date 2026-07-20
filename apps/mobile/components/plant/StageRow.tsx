@@ -4,6 +4,7 @@ import {
   colors,
   iconSizes,
   plant,
+  radii,
   spacing,
   states,
   typography,
@@ -13,6 +14,7 @@ import { ObservationCard } from "./ObservationCard";
 import { StageCompare } from "./StageCompare";
 import type { StageDTO, ObservationDTO } from "../../lib/types";
 import { AppButton, Pill } from "../ui";
+import { STALL_THRESHOLD_DAYS } from "./plant-roadmap-utils";
 
 interface Props {
   stage: StageDTO;
@@ -21,6 +23,7 @@ interface Props {
   isLast: boolean;
   isCurrent: boolean;
   observations: ObservationDTO[];
+  daysSinceLastObs: number | null;
   canEdit: boolean;
   onAddObservation: () => void;
   onEditObservation: (obs: ObservationDTO) => void;
@@ -41,6 +44,7 @@ export function StageRow({
   isLast,
   isCurrent,
   observations,
+  daysSinceLastObs,
   canEdit,
   onAddObservation,
   onEditObservation,
@@ -83,6 +87,40 @@ export function StageRow({
         </View>
 
         {/* 관찰 기록 */}
+        {isCurrent ? (
+          <View
+            style={[
+              styles.stallNotice,
+              daysSinceLastObs === null
+                ? styles.stallNoticePending
+                : daysSinceLastObs >= STALL_THRESHOLD_DAYS
+                  ? styles.stallNoticeWarn
+                  : styles.stallNoticeOk,
+            ]}
+          >
+            <Text style={styles.stallText}>
+              {daysSinceLastObs === null
+                ? "아직 첫 관찰이 없어요. 오늘 사진이나 메모를 남겨 보세요."
+                : daysSinceLastObs === 0
+                  ? "오늘 관찰했어요."
+                  : daysSinceLastObs >= STALL_THRESHOLD_DAYS
+                    ? `${daysSinceLastObs}일째 관찰이 멈췄어요.`
+                    : `최근에 관찰했어요. 마지막 기록은 ${daysSinceLastObs}일 전이에요.`}
+            </Text>
+          </View>
+        ) : null}
+
+        {stage.observationPoints.length > 0 ? (
+          <View style={styles.points}>
+            <Text style={styles.pointsTitle}>관찰 포인트</Text>
+            {stage.observationPoints.map((point, index) => (
+              <Text key={`${stage.id}-point-${index}`} style={styles.point}>
+                • {point}
+              </Text>
+            ))}
+          </View>
+        ) : null}
+
         {state === "upcoming" ? (
           <Text style={styles.emptyText}>아직 도달 전</Text>
         ) : observations.length === 0 ? (
@@ -172,6 +210,32 @@ const styles = StyleSheet.create({
     color: colors.accentTintedText,
   },
   description: {
+    ...typography.body,
+    color: colors.textMuted,
+  },
+  stallNotice: {
+    borderRadius: radii.btn,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+  },
+  stallNoticeOk: { backgroundColor: colors.accentTintedBg },
+  stallNoticePending: { backgroundColor: colors.warningTintedBg },
+  stallNoticeWarn: { backgroundColor: colors.dangerTintedBg },
+  stallText: {
+    ...typography.micro,
+    color: colors.textMuted,
+  },
+  points: {
+    gap: spacing.xxs,
+    padding: spacing.md,
+    borderRadius: radii.btn,
+    backgroundColor: colors.surfaceAlt,
+  },
+  pointsTitle: {
+    ...typography.label,
+    color: colors.text,
+  },
+  point: {
     ...typography.body,
     color: colors.textMuted,
   },

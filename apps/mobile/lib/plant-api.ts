@@ -120,7 +120,6 @@ export async function uploadImage(uri: string): Promise<string> {
   const res = await apiFetch<{ url: string }>("/api/upload", {
     method: "POST",
     body: formData,
-    headers: { "Content-Type": "multipart/form-data" },
   });
   return res.url;
 }

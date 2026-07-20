@@ -1,7 +1,8 @@
 import { StyleSheet, Text, View } from "react-native";
 import { colors, plant, radii, spacing, typography } from "../../theme/tokens";
 import type { StudentPlantDTO, StageDTO } from "../../lib/types";
-import { SurfaceCard } from "../ui";
+import { AppButton, SurfaceCard } from "../ui";
+import { PlantNickname } from "./PlantNickname";
 
 interface Props {
   plant: StudentPlantDTO;
@@ -10,6 +11,8 @@ interface Props {
   totalObservations: number;
   totalPhotos: number;
   daysSinceLastObs: number | null;
+  onSaveNickname?: (nickname: string) => Promise<void>;
+  onStartObservation?: () => void;
 }
 
 function formatLastObserved(days: number | null): string {
@@ -29,6 +32,8 @@ export function PlantHero({
   totalObservations,
   totalPhotos,
   daysSinceLastObs,
+  onSaveNickname,
+  onStartObservation,
 }: Props) {
   const stagePoints = Array.isArray(currentStage.observationPoints)
     ? currentStage.observationPoints
@@ -47,7 +52,11 @@ export function PlantHero({
           <Text style={styles.emoji}>{plant.species.emoji}</Text>
           <View style={styles.titleText}>
             <Text style={styles.speciesName}>{plant.species.nameKo}</Text>
-            <Text style={styles.nickname}>{plant.nickname}</Text>
+            {onSaveNickname ? (
+              <PlantNickname nickname={plant.nickname} onSave={onSaveNickname} />
+            ) : (
+              <Text style={styles.nickname}>{plant.nickname}</Text>
+            )}
           </View>
         </View>
 
@@ -89,6 +98,15 @@ export function PlantHero({
             • {point}
           </Text>
         ))}
+        {onStartObservation ? (
+          <AppButton
+            variant="success"
+            onPress={onStartObservation}
+            style={styles.missionAction}
+          >
+            사진으로 관찰 시작
+          </AppButton>
+        ) : null}
       </SurfaceCard>
     </View>
   );
@@ -182,5 +200,9 @@ const styles = StyleSheet.create({
     ...typography.body,
     color: colors.textMuted,
     paddingLeft: spacing.sm,
+  },
+  missionAction: {
+    alignSelf: "flex-start",
+    marginTop: spacing.sm,
   },
 });

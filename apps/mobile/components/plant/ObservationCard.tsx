@@ -16,17 +16,15 @@ interface Props {
  * 웹의 .plant-obs-card 와 시각적으로 동일.
  */
 export function ObservationCard({ observation, canEdit, onEdit, onDelete, onOpenImage }: Props) {
-  const dateStr = new Date(observation.observedAt).toLocaleDateString("ko-KR", {
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-  });
+  const dateStr = new Date(observation.observedAt).toLocaleString("ko-KR");
 
   return (
     <SurfaceCard style={styles.card}>
       {/* 메타 (날짜) */}
       <View style={styles.meta}>
-        <Text style={styles.date}>{dateStr}</Text>
+        <Text style={styles.date} numberOfLines={1}>
+          {dateStr}
+        </Text>
         {canEdit && (
           <View style={styles.actionRow}>
             <AppButton
