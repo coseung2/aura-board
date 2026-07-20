@@ -6,7 +6,13 @@ import { useEffect, useState } from "react";
 import type { RealtimeChannel } from "@supabase/supabase-js";
 import { layoutLabel, layoutThumbnail } from "@/lib/layout-meta";
 import { formatBpsPercent } from "@/lib/pets/math";
-import type { SlimeColor, SlimeEffectKey, SlimeDefinition } from "@/lib/pets/types";
+import type {
+  SlimeColor,
+  SlimeEffectKey,
+  SlimeDefinition,
+  SlimeShopItem,
+} from "@/lib/pets/types";
+import { SlimeCharacterSprite } from "@/components/creatures/SlimeCharacterSprite";
 import { createPublicSupabaseClient } from "@/lib/supabase/client";
 import { SHADOW_ALLIANCE_STATUS_LABELS } from "@/features/shadow-alliance/types";
 import type {
@@ -56,7 +62,10 @@ type StudentSlimeHome = {
   currency: { unitLabel: string };
   ownedColors: SlimeColor[];
   equippedColors?: SlimeColor[];
+  representativeColor?: SlimeColor | null;
   catalog: SlimeDefinition[];
+  equippedItemsByColor?: Partial<Record<SlimeColor, string[]>>;
+  shopCatalog?: SlimeShopItem[];
   effects?: {
     totals?: Partial<Record<SlimeEffectKey, number>>;
   };
@@ -291,9 +300,14 @@ function StudentSlimeCard({
   loading: boolean;
   error: boolean;
 }) {
-  const equippedColors = snapshot?.equippedColors ?? snapshot?.ownedColors ?? [];
-  const equippedColor = equippedColors[0] ?? null;
-  const slime = snapshot?.catalog.find((candidate) => candidate.color === equippedColor) ?? null;
+  const representativeColor =
+    snapshot?.representativeColor ?? snapshot?.equippedColors?.[0] ?? snapshot?.ownedColors?.[0] ?? null;
+  const slime = snapshot?.catalog.find((candidate) => candidate.color === representativeColor) ?? null;
+  const assignedItems = slime
+    ? (snapshot?.equippedItemsByColor?.[slime.color] ?? [])
+        .map((itemKey) => snapshot?.shopCatalog?.find((item) => item.key === itemKey))
+        .filter((item): item is SlimeShopItem => Boolean(item))
+    : [];
   const activeBuffBps = slime
     ? snapshot?.effects?.totals?.[slime.effectKey] ?? slime.baseBuffBps
     : 0;
@@ -315,14 +329,13 @@ function StudentSlimeCard({
         <p className="student-slime-status" role="alert">슬라임 정보를 불러오지 못했어요.</p>
       ) : !snapshot || !slime ? (
         <div className="student-slime-empty">
-          <p>아직 장착한 슬라임이 없어요.</p>
-          <span>내 펫에서 슬라임을 만나 보세요.</span>
+          <p>아직 대표 슬라임이 없어요.</p>
+          <span>내 펫에서 대표 슬라임을 지정해 보세요.</span>
         </div>
       ) : (
         <div className="student-slime-body">
           <div className="student-slime-sprite">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={slime.spritePath} alt={`${slime.nameKo} GIF`} width={88} height={88} />
+            <SlimeCharacterSprite slime={slime} items={assignedItems} />
           </div>
           <div className="student-slime-copy">
             <strong className="student-slime-name">{slime.nameKo}</strong>

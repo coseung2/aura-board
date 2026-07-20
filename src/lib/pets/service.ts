@@ -59,6 +59,7 @@ export type SlimeHome = {
   currency: { unitLabel: string };
   ownedColors: SlimeColor[];
   equippedColors: SlimeColor[];
+  representativeColor: SlimeColor | null;
   catalog: typeof SLIME_CATALOG;
   ownedItemKeys: string[];
   equippedItemKeys: string[];
@@ -181,7 +182,7 @@ export async function getSlimeHome(student: StudentIdentity): Promise<SlimeHome>
       // Slime ownership follows the student if they move classrooms. The
       // classroomId remains an audit snapshot of where it was purchased.
       where: { studentId: student.id },
-      select: { color: true, isEquipped: true, equippedItemKeys: true },
+      select: { color: true, isEquipped: true, isRepresentative: true, equippedItemKeys: true },
       orderBy: { createdAt: "asc" },
     }),
     // The inventory delegate was added with the creature system. Keeping the
@@ -217,6 +218,8 @@ export async function getSlimeHome(student: StudentIdentity): Promise<SlimeHome>
     currency: { unitLabel: currency?.unitLabel?.trim() || "원" },
     ownedColors: SLIME_CATALOG.map((slime) => slime.color).filter((color) => ownedSet.has(color)),
     equippedColors: SLIME_CATALOG.map((slime) => slime.color).filter((color) => equippedSet.has(color)),
+    representativeColor:
+      (owned.find((row) => row.isRepresentative)?.color as SlimeColor | undefined) ?? null,
     catalog: SLIME_CATALOG,
     ownedItemKeys,
     equippedItemKeys,
@@ -226,10 +229,37 @@ export async function getSlimeHome(student: StudentIdentity): Promise<SlimeHome>
   };
 }
 
+export async function setRepresentativeSlime(
+  student: StudentIdentity,
+  color: string,
+): Promise<{ representativeColor: SlimeColor }> {
+  const slime = getSlimeDefinition(color);
+  if (!slime) throw new SlimeServiceError("unknown_slime");
+
+  return serializable(async (tx) => {
+    const owned = await tx.studentSlime.findUnique({
+      where: { studentId_color: { studentId: student.id, color: slime.color } },
+      select: { id: true },
+    });
+    if (!owned) throw new SlimeServiceError("not_owned");
+
+    await tx.studentSlime.updateMany({
+      where: { studentId: student.id, isRepresentative: true },
+      data: { isRepresentative: false },
+    });
+    await tx.studentSlime.update({
+      where: { id: owned.id },
+      data: { isRepresentative: true },
+    });
+    return { representativeColor: slime.color };
+  });
+}
+
 export async function purchaseSlime(
   student: StudentIdentity,
   color: string,
   idempotencyKey: string,
+  retryRepresentativeConflict = true,
 ): Promise<SlimePurchaseResult> {
   const slime = getSlimeDefinition(color);
   if (!slime) throw new SlimeServiceError("unknown_slime");
@@ -304,11 +334,16 @@ export async function purchaseSlime(
           performedByKind: "owner",
         },
       });
+      const existingRepresentative = await tx.studentSlime.findFirst({
+        where: { studentId: student.id, isRepresentative: true },
+        select: { id: true },
+      });
       await tx.studentSlime.create({
         data: {
           studentId: student.id,
           classroomId: student.classroomId,
           color: slime.color,
+          isRepresentative: !existingRepresentative,
           purchaseTransactionId: transaction.id,
         },
       });
@@ -327,6 +362,9 @@ export async function purchaseSlime(
         select: { id: true },
       });
       if (owned) throw new SlimeServiceError("already_owned");
+      if (retryRepresentativeConflict) {
+        return purchaseSlime(student, color, idempotencyKey, false);
+      }
       throw new SlimeServiceError("idempotency_key_reused");
     }
     throw error;

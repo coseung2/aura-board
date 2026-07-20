@@ -1,0 +1,33 @@
+.frame {
+  position: relative;
+  display: grid;
+  width: 88px;
+  height: 88px;
+  place-items: center;
+}
+
+.frame img {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 88px;
+  height: 88px;
+  object-fit: contain;
+  image-rendering: pixelated;
+}
+
+.background {
+  z-index: 0;
+}
+
+.character {
+  z-index: 1;
+}
+
+.filterDefinition {
+  position: absolute;
+  width: 0;
+  height: 0;
+  overflow: hidden;
+  pointer-events: none;
+}

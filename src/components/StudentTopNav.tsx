@@ -141,8 +141,13 @@ export function StudentTopNav({
           links: [
             {
               href: "/student/aura-pet",
-              label: "펫",
-              active: pathname.startsWith("/student/aura-pet"),
+              label: "내 펫",
+              active: pathname === "/student/aura-pet",
+            },
+            {
+              href: "/student/aura-pet/classroom",
+              label: "우리 반 펫",
+              active: pathname.startsWith("/student/aura-pet/classroom"),
             },
           ],
         },

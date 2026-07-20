@@ -35,6 +35,17 @@ describe("StudentDashboard slime card", () => {
         currency: { unitLabel: "원" },
         ownedColors: ["blue"],
         equippedColors: ["blue"],
+        representativeColor: "blue",
+        equippedItemsByColor: { blue: ["slime-blue-trampoline"] },
+        shopCatalog: [
+          {
+            key: "slime-blue-trampoline",
+            category: "ride",
+            labelKo: "트램펄린",
+            price: 30,
+            spritePath: "/creatures/slimes/shop/slime-blue-trampoline.gif",
+          },
+        ],
         catalog: [
           {
             key: "blue",
@@ -65,8 +76,10 @@ describe("StudentDashboard slime card", () => {
     expect(screen.getByText("파랑 슬라임")).toBeTruthy();
     expect(screen.getByText("활성 보상 버프 · 성장 속도 +2%")).toBeTruthy();
     expect(screen.getByText("잔액 320 원")).toBeTruthy();
-    expect(screen.getByRole("img", { name: "블루 슬라임 GIF" }).getAttribute("src")).toBe(
-      "/creatures/slimes/blue/idle.gif",
+    expect(
+      screen.getByRole("img", { name: "블루 슬라임, 트램펄린 적용 미리보기" }).getAttribute("src"),
+    ).toBe(
+      "/creatures/slimes/shop/slime-blue-trampoline.gif",
     );
     expect(screen.getByRole("link", { name: "내 펫" }).getAttribute("href")).toBe(
       "/student/aura-pet",

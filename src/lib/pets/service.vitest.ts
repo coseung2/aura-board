@@ -7,6 +7,7 @@ const mocks = vi.hoisted(() => ({
   currencyFind: vi.fn(),
   slimeFindMany: vi.fn(),
   slimeFindUnique: vi.fn(),
+  slimeFindFirst: vi.fn(),
   slimeCreate: vi.fn(),
   ledgerFind: vi.fn(),
   ledgerCreate: vi.fn(),
@@ -20,6 +21,7 @@ vi.mock("@/lib/db", () => ({
     studentSlime: {
       findMany: mocks.slimeFindMany,
       findUnique: mocks.slimeFindUnique,
+      findFirst: mocks.slimeFindFirst,
     },
     transaction: { findFirst: mocks.ledgerFind },
   },
@@ -70,6 +72,9 @@ function installPurchaseState(startingBalance = 600) {
       },
       studentSlime: {
         findUnique: mocks.slimeFindUnique,
+        findFirst: mocks.slimeFindFirst.mockImplementation(async () =>
+          [...owned.values()].find((row) => (row as { isRepresentative?: boolean }).isRepresentative) ?? null,
+        ),
         create: mocks.slimeCreate.mockImplementation(async ({ data }: { data: { color: string; purchaseTransactionId: string } }) => {
           const row = { id: `slime-${data.color}`, color: data.color };
           owned.set(data.color, row);
@@ -118,17 +123,21 @@ describe("slime wallet service", () => {
   it("returns wallet balance, currency fallback, owned colors, and catalog", async () => {
     mocks.accountFind.mockResolvedValue({ balance: 320 });
     mocks.currencyFind.mockResolvedValue(null);
-    mocks.slimeFindMany.mockResolvedValue([{ color: "red" }, { color: "blue" }]);
+    mocks.slimeFindMany.mockResolvedValue([
+      { color: "red", isRepresentative: false },
+      { color: "blue", isRepresentative: true },
+    ]);
 
     const home = await getSlimeHome(student);
 
     expect(home.balance).toBe(320);
     expect(home.currency.unitLabel).toBe("원");
     expect(home.ownedColors).toEqual(["blue", "red"]);
+    expect(home.representativeColor).toBe("blue");
     expect(home.catalog).toHaveLength(5);
     expect(mocks.slimeFindMany).toHaveBeenCalledWith({
       where: { studentId: student.id },
-      select: { color: true, isEquipped: true, equippedItemKeys: true },
+      select: { color: true, isEquipped: true, isRepresentative: true, equippedItemKeys: true },
       orderBy: { createdAt: "asc" },
     });
   });
@@ -148,6 +157,9 @@ describe("slime wallet service", () => {
         amount: 500,
         sourceRef: "student-1:attempt-1",
       }),
+    });
+    expect(mocks.slimeCreate).toHaveBeenCalledWith({
+      data: expect.objectContaining({ color: "blue", isRepresentative: true }),
     });
   });
 

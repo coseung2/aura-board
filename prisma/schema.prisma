@@ -3409,6 +3409,8 @@ model StudentSlime {
   color       String
   // Only equipped slimes contribute their server-calculated reward effect.
   isEquipped Boolean @default(true)
+  // Exactly one owned slime is shown as the student's representative.
+  isRepresentative Boolean @default(false)
   // Shop cosmetics are assigned per owned slime. Each category is kept to one
   // item by the slime equipment service.
   equippedItemKeys String[] @default([])
@@ -3423,6 +3425,7 @@ model StudentSlime {
 
   @@unique([studentId, color])
   @@index([studentId, createdAt])
+  @@index([studentId, isRepresentative])
   @@index([classroomId])
 }
 

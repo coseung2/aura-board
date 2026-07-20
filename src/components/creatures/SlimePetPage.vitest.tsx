@@ -36,6 +36,9 @@ describe("SlimePetPage", () => {
     expect(screen.queryByRole("heading", { name: "소품 세트" })).toBeNull();
     expect(screen.queryByText("효과 내역")).toBeTruthy();
     expect(screen.getAllByText("블루 슬라임").length).toBeGreaterThan(0);
+    expect(screen.getByText("대표")).toBeTruthy();
+    expect(screen.getAllByLabelText("빈 슬라임 자리")).toHaveLength(4);
+    expect(screen.queryByText("500원 구매")).toBeNull();
   });
 
   it("opens the right shop drawer with exactly four filters and filters products", async () => {
@@ -52,10 +55,13 @@ describe("SlimePetPage", () => {
     );
 
     const filters = within(drawer).getByRole("group", { name: "상점 분류" });
-    expect(within(filters).getAllByRole("button")).toHaveLength(4);
-    for (const label of ["전체", "배경", "탈 것", "음료"]) {
+    expect(within(filters).getAllByRole("button")).toHaveLength(5);
+    for (const label of ["슬라임", "전체", "배경", "탈 것", "음료"]) {
       expect(within(filters).getByRole("button", { name: label })).toBeTruthy();
     }
+    expect(within(drawer).getByRole("button", { name: "그린 슬라임 구매" })).toBeTruthy();
+
+    fireEvent.click(within(filters).getByRole("button", { name: "전체" }));
     expect(within(drawer).getByText("물웅덩이 배경")).toBeTruthy();
     expect(within(drawer).getByText("트램펄린")).toBeTruthy();
     expect(within(drawer).getByText("레모네이드")).toBeTruthy();
@@ -104,6 +110,7 @@ describe("SlimePetPage", () => {
 
     fireEvent.click(await screen.findByRole("button", { name: "상점" }));
     const drawer = await screen.findByRole("dialog", { name: "슬라임 상점" });
+    fireEvent.click(within(drawer).getByRole("button", { name: "전체" }));
     fireEvent.click(within(drawer).getByRole("button", { name: "물웅덩이 배경 구매" }));
 
     await screen.findByText("물웅덩이 배경 구매를 완료했어요.");
@@ -160,6 +167,18 @@ describe("SlimePetPage", () => {
     fireEvent.click(apply);
     await screen.findByText("물웅덩이 배경을(를) 블루 슬라임에 적용했어요.");
     expect(screen.getByText("장착: 물웅덩이 배경")).toBeTruthy();
+    expect(
+      screen
+        .getByRole("img", {
+          name: "블루 슬라임, 물웅덩이 배경 적용 미리보기",
+        })
+        .getAttribute("src"),
+    ).toBe("/creatures/slimes/blue/idle.gif");
+    expect(
+      document.querySelector(
+        'img[src="/creatures/slimes/shop/water-puddle.gif"]',
+      ),
+    ).toBeTruthy();
     expect(fetchMock.mock.calls[1][0]).toBe("/api/student/slimes/items/equip");
     expect(JSON.parse(fetchMock.mock.calls[1][1].body as string)).toEqual({
       slimeColor: "blue",
@@ -167,7 +186,7 @@ describe("SlimePetPage", () => {
       isEquipped: true,
     });
 
-    fireEvent.click(within(drawer).getByRole("button", { name: "물웅덩이 배경 적용 중, 해제" }));
+    fireEvent.click(within(drawer).getByRole("button", { name: "물웅덩이 배경 해제" }));
     await screen.findByText("물웅덩이 배경을(를) 블루 슬라임에 해제했어요.");
     expect(screen.getByText("장착한 아이템 없음")).toBeTruthy();
     expect(fetchMock.mock.calls[2][0]).toBe("/api/student/slimes/items/equip");
@@ -177,4 +196,28 @@ describe("SlimePetPage", () => {
       isEquipped: false,
     });
   });
+
+  it("marks a composite animation for the owning slime color", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(() =>
+        json(
+          home({
+            ownedColors: ["purple"],
+            ownedItemKeys: ["slime-blue-drink-lemonade"],
+            equippedItemKeys: ["slime-blue-drink-lemonade"],
+            equippedItemsByColor: { purple: ["slime-blue-drink-lemonade"] },
+          }),
+        ),
+      ),
+    );
+
+    render(<SlimePetPage />);
+
+    const preview = await screen.findByRole("img", {
+      name: "퍼플 슬라임, 레모네이드 적용 미리보기",
+    });
+    expect(preview.getAttribute("data-slime-color")).toBe("purple");
+  });
+
 });

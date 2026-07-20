@@ -131,11 +131,57 @@
 }
 
 .slimeItem {
+  position: relative;
   display: grid;
   gap: 10px;
   min-width: 0;
   padding: 0 0 16px;
   border-bottom: 1px solid var(--color-border);
+}
+
+.ownedChip,
+.shopOwnedChip {
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
+  border-radius: var(--radius-pill);
+  color: var(--color-accent-tinted-text);
+  background: var(--color-accent-tinted-bg);
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.ownedChip {
+  position: absolute;
+  top: 0;
+  right: 0;
+  padding: 5px 8px;
+}
+
+.shopOwnedChip {
+  padding: 6px 9px;
+}
+
+.slimePlaceholder {
+  min-height: 246px;
+  align-content: center;
+  justify-items: center;
+  border-bottom-color: var(--color-border);
+}
+
+.placeholderSprite {
+  width: 72px;
+  height: 72px;
+  border: 1px dashed var(--color-border-hover);
+  border-radius: 50%;
+  background: var(--color-surface-alt);
+}
+
+.placeholderLabel {
+  color: var(--color-text-faint);
+  font-size: 12px;
+  font-weight: 600;
 }
 
 .slimeItemSelected {
@@ -156,6 +202,12 @@
   place-items: center;
 }
 
+.spriteFrame {
+  position: relative;
+  width: 96px;
+  margin-inline: auto;
+}
+
 .spriteFrame img {
   display: block;
   width: 88px;
@@ -163,6 +215,7 @@
   object-fit: contain;
   image-rendering: pixelated;
 }
+
 
 .itemCopy,
 .shopItemCopy {
@@ -192,9 +245,10 @@
   font-weight: 600;
 }
 
-.actionButton,
 .wardrobeButton,
+.representativeButton,
 .shopTrigger,
+.galleryLink,
 .shopBuyButton,
 .filterButton,
 .closeButton {
@@ -223,9 +277,10 @@
   color: var(--color-accent-active);
 }
 
-.actionButton:hover,
 .wardrobeButton:hover,
+.representativeButton:hover,
 .shopTrigger:hover,
+.galleryLink:hover,
 .shopBuyButton:hover,
 .filterButton:hover,
 .closeButton:hover {
@@ -233,26 +288,21 @@
   color: var(--color-accent-active);
 }
 
-.actionButton[aria-pressed="true"],
 .filterButton[aria-pressed="true"] {
   border-color: var(--color-accent);
   color: var(--color-accent-active);
   font-weight: 700;
 }
 
-.actionButton:disabled,
 .shopBuyButton:disabled {
   cursor: not-allowed;
   opacity: 0.5;
 }
 
-.actionButton[aria-pressed="true"]:disabled {
-  opacity: 1;
-}
-
-.actionButton:focus-visible,
 .wardrobeButton:focus-visible,
+.representativeButton:focus-visible,
 .shopTrigger:focus-visible,
+.galleryLink:focus-visible,
 .shopBuyButton:focus-visible,
 .filterButton:focus-visible,
 .closeButton:focus-visible {
@@ -281,16 +331,42 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-height: 40px;
-  padding: 8px 10px;
-  border: 1px solid var(--color-accent);
-  border-radius: var(--radius-btn);
+  min-height: 32px;
+  width: fit-content;
+  padding: 5px 0;
+  border: 0;
+  border-radius: 0;
   color: var(--color-accent-active);
-  background: var(--color-accent-tinted-bg);
+  background: transparent;
   cursor: pointer;
   font: inherit;
   font-size: 12px;
   font-weight: 700;
+}
+
+.slimeActions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.representativeButton {
+  min-height: 32px;
+  width: fit-content;
+  padding: 5px 0;
+  border: 0;
+  border-radius: 0;
+  color: var(--color-text-muted);
+  background: transparent;
+  cursor: pointer;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.representativeButton:disabled {
+  cursor: wait;
+  opacity: 0.55;
 }
 
 .drawerSubtitle {
@@ -368,7 +444,7 @@
 
 .shopFilters {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 6px;
   margin-top: 24px;
 }
@@ -416,10 +492,16 @@
   min-width: 76px;
 }
 
-.shopBuyButtonEquipped {
-  border-color: var(--color-accent);
-  color: var(--color-accent-active);
-  background: var(--color-accent-tinted-bg);
+.shopBuyButtonRemove {
+  border-color: var(--color-danger);
+  color: var(--color-danger);
+  background: var(--color-status-returned-bg);
+}
+
+.shopBuyButtonRemove:hover {
+  border-color: var(--color-danger-active);
+  color: var(--color-danger-active);
+  background: var(--color-status-returned-bg);
 }
 
 @keyframes drawerIn {
@@ -467,7 +549,7 @@
     text-align: left;
   }
 
-  .shopTrigger {
+.shopTrigger {
     align-self: end;
   }
 
@@ -491,4 +573,10 @@
     flex-direction: column;
     gap: 3px;
   }
+}
+
+.galleryLink {
+  min-width: 84px;
+  color: var(--color-text-muted);
+  text-decoration: none;
 }

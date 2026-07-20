@@ -78,7 +78,8 @@
   margin: 0 auto;
   padding: 28px 0 34px;
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(180px, 240px));
+  justify-content: center;
   gap: 44px;
 }
 
