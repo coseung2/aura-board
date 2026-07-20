@@ -81,4 +81,21 @@ describe("OfficialSlimeSprite", () => {
     }
     expect(sprite.getAttribute("data-frame-index")).toBe("0");
   });
+
+  it("keeps the grass floor visible with a complete legacy item sprite", () => {
+    const { container } = render(
+      <OfficialSlimeSprite
+        slimeColor="red"
+        equippedFloor="grass-floor"
+        itemSpritePath="/creatures/slimes/items/red-ball.gif"
+      />,
+    );
+
+    expect(
+      container.querySelector('img[src="/creatures/slimes/items/red-ball.gif"]'),
+    ).toBeTruthy();
+    expect(
+      container.querySelector('img[src="/creatures/slimes/official/shared/grass-floor.png"]'),
+    ).toBeTruthy();
+  });
 });

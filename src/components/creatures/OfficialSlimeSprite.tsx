@@ -195,7 +195,7 @@ export function OfficialSlimeSprite({
             width: "100%",
             height: "100%",
             objectFit: "contain",
-            zIndex: 4,
+            zIndex: 1,
           }}
           draggable={false}
         />
@@ -237,9 +237,11 @@ export function OfficialSlimeSprite({
           draggable={false}
         />
           ) : null}
-          {staticFloor ? (
+        </>
+      )}
+      {staticFloor ? (
         // Grass is a static composition layer. It deliberately comes after
-        // slime/crown so its foreground pixels cover the feet.
+        // every character path so its foreground pixels cover the feet.
         // eslint-disable-next-line @next/next/no-img-element
         <img
           src={staticFloor.imageUrl}
@@ -252,9 +254,7 @@ export function OfficialSlimeSprite({
           }}
           draggable={false}
         />
-          ) : null}
-        </>
-      )}
+      ) : null}
     </div>
   );
 }
