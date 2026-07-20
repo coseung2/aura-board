@@ -7,6 +7,7 @@ export const SLIME_PURCHASE_SOURCE_TYPE = "slime_purchase" as const;
 export const SLIME_ITEM_PURCHASE_SOURCE_TYPE = "slime_item_purchase" as const;
 export const SLIME_REFUND_SOURCE_TYPE = "slime_refund" as const;
 export const SLIME_ITEM_REFUND_SOURCE_TYPE = "slime_item_refund" as const;
+export const SLIME_COOKIE_USE_SOURCE_TYPE = "slime_cookie_use" as const;
 
 export type SlimeServiceErrorCode =
   | "invalid_body"
@@ -57,6 +58,7 @@ export type SlimeHome = {
   representativeColor: SlimeColor | null;
   catalog: typeof SLIME_CATALOG;
   ownedItemKeys: string[];
+  ownedItemQuantities: Record<string, number>;
   equippedItemKeys: string[];
   equippedItemsByColor: Partial<Record<SlimeColor, string[]>>;
   equippedFloorByColor: Partial<Record<SlimeColor, SlimeFloor>>;
@@ -113,4 +115,10 @@ export type SlimeRefundResult = {
 export type SlimeItemRefundResult = {
   refundedItemKey: string;
   balance: number;
+};
+
+export type SlimeCookieConsumeResult = {
+  itemKey: "slime-cookie";
+  remainingQuantity: number;
+  growth: SlimeGrowthSnapshot;
 };

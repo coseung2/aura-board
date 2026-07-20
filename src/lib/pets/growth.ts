@@ -43,6 +43,15 @@ export const SLIME_GROWTH_STAGE_THRESHOLDS_SECONDS: Readonly<
 export const SLIME_GROWTH_FINAL_SECONDS =
   SLIME_GROWTH_STAGE_THRESHOLDS_SECONDS[3];
 
+/** Cookie effect: 2% of the complete stage-1 span (stage 1 → stage 2). */
+export const SLIME_COOKIE_GROWTH_BPS = 200;
+export const SLIME_COOKIE_GROWTH_SECONDS = Math.floor(
+  ((SLIME_GROWTH_STAGE_THRESHOLDS_SECONDS[2] -
+    SLIME_GROWTH_STAGE_THRESHOLDS_SECONDS[1]) *
+    SLIME_COOKIE_GROWTH_BPS) /
+    SLIME_GROWTH_BPS_BASE,
+);
+
 function safeNonNegativeInteger(value: number): number {
   if (!Number.isFinite(value)) return 0;
   return Math.max(0, Math.trunc(value));
@@ -151,6 +160,35 @@ export function settleSlimeGrowthWithSpeed(
   return {
     ...settleSlimeGrowth(state, now),
     growthAppliedSpeedBps: normalizeSlimeGrowthSpeedBps(growthSpeedBps),
+  };
+}
+
+/**
+ * Add whole effective seconds to a settled state, preserving its fractional
+ * remainder and clamping both progress and stage to the final threshold.
+ * Callers should settle wall-clock progress before applying a bonus.
+ */
+export function addSlimeGrowthSeconds(
+  state: SlimeGrowthState,
+  bonusSeconds: number,
+): SlimeGrowthState {
+  const bonus = safeNonNegativeInteger(bonusSeconds);
+  const growthSeconds = Math.min(
+    SLIME_GROWTH_FINAL_SECONDS,
+    safeNonNegativeInteger(state.growthSeconds) + bonus,
+  );
+  const stage = Math.max(
+    normalizeSlimeGrowthStage(state.stage),
+    slimeGrowthStageForSeconds(growthSeconds),
+  ) as SlimeGrowthStage;
+  return {
+    ...state,
+    stage,
+    growthSeconds,
+    growthRemainderBps:
+      growthSeconds >= SLIME_GROWTH_FINAL_SECONDS
+        ? 0
+        : safeRemainderBps(state.growthRemainderBps),
   };
 }
 

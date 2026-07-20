@@ -157,8 +157,34 @@ export default async function ClassroomSlimeGalleryPage() {
                     .map((key) => getSlimeShopItem(key))
                     .filter((item): item is SlimeShopItem => Boolean(item))
                 : [];
+              const equippedFloor = items.reduce<"none" | "grass-floor" | "water-puddle" | "trampoline">(
+                (floor, item) => item.floor ?? floor,
+                "none",
+              );
+              const hasPassiveDrink = items.some((item) => item.category === "drink");
+              const action =
+                equippedFloor === "water-puddle" || equippedFloor === "trampoline"
+                  ? "floor-interaction"
+                  : hasPassiveDrink
+                    ? "drink"
+                    : "idle";
               return (
                 <li key={row.id} className={styles.student}>
+                  <div className={styles.spriteSlot}>
+                    {slime ? (
+                      <SlimeCharacterSprite
+                        slime={slime}
+                        items={items}
+                        className={styles.classroomSprite}
+                        growthStage={row.representative?.growthStage}
+                        action={action}
+                        repeat={hasPassiveDrink}
+                        equippedFloor={equippedFloor}
+                      />
+                    ) : (
+                      <div className={styles.placeholder} aria-label="대표 슬라임 미지정" />
+                    )}
+                  </div>
                   <div className={styles.titleSlot}>
                     {title ? (
                       <div className={styles.walkingTitle} data-title={title.key}>
@@ -172,17 +198,6 @@ export default async function ClassroomSlimeGalleryPage() {
                       </div>
                     ) : (
                       <div className={styles.titlePlaceholder}>칭호 도전 중</div>
-                    )}
-                  </div>
-                  <div className={styles.spriteSlot}>
-                    {slime ? (
-                      <SlimeCharacterSprite
-                        slime={slime}
-                        items={items}
-                        growthStage={row.representative?.growthStage}
-                      />
-                    ) : (
-                      <div className={styles.placeholder} aria-label="대표 슬라임 미지정" />
                     )}
                   </div>
                   <strong>{row.number !== null ? `${row.number}번 ${row.name}` : row.name}</strong>

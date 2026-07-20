@@ -49,6 +49,10 @@ export function StudentPetSectionHeader({
         ) : null}
       </div>
 
+      {actions !== undefined && actions !== null ? (
+        <div className={styles.actions}>{actions}</div>
+      ) : null}
+
       <nav className={styles.navigation} aria-label="펫 메뉴">
         {PET_LINKS.map((link) => {
           const isActive = link.key === active;
@@ -63,10 +67,6 @@ export function StudentPetSectionHeader({
           );
         })}
       </nav>
-
-      {actions !== undefined && actions !== null ? (
-        <div className={styles.actions}>{actions}</div>
-      ) : null}
     </header>
   );
 }

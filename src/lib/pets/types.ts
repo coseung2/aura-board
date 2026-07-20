@@ -12,6 +12,19 @@ export const SLIME_COLORS = [
 
 export type SlimeColor = (typeof SLIME_COLORS)[number];
 
+/** Ball props imported from SlimeAssets/props/ball. */
+export const SLIME_BALL_SLUGS = [
+  "american-football",
+  "baseball",
+  "basketball",
+  "black-ball",
+  "dark-blue-ball",
+  "soccer-ball",
+  "tennis-ball",
+] as const;
+
+export type SlimeBallSlug = (typeof SLIME_BALL_SLUGS)[number];
+
 export const SLIME_FLOORS = [
   "none",
   "grass-floor",
@@ -49,7 +62,7 @@ export type SlimeDefinition = {
   readonly spritePath: string;
 };
 
-export const SLIME_SHOP_CATEGORIES = ["background", "ride", "drink"] as const;
+export const SLIME_SHOP_CATEGORIES = ["background", "ride", "drink", "food", "prop"] as const;
 
 export type SlimeShopCategory = (typeof SLIME_SHOP_CATEGORIES)[number];
 
@@ -61,6 +74,10 @@ export type SlimeShopItem = {
   readonly labelKo: string;
   readonly price: number;
   readonly spritePath: string;
+};
+
+export type SlimeBallShopItem = SlimeShopItem & {
+  readonly slug: SlimeBallSlug;
 };
 
 export type SlimeAccessoryDefinition = {

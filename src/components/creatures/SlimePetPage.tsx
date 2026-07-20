@@ -16,6 +16,8 @@ import type {
 
 import styles from "./SlimePetPage.module.css";
 import {
+  SLIME_COOKIE_ITEM_KEY,
+  shopFilterForItem,
   type Notice,
   type ShopFilter,
   type SlimeGrowthSnapshotPayload,
@@ -32,6 +34,7 @@ type SlimeHome = {
   representativeColor?: SlimeColor | null;
   catalog: SlimeDefinition[];
   ownedItemKeys?: string[];
+  ownedItemQuantities?: Record<string, number>;
   equippedItemKeys?: string[];
   equippedItemsByColor?: Partial<Record<SlimeColor, string[]>>;
   equippedFloorByColor?: Partial<Record<SlimeColor, SlimeFloor>>;
@@ -96,6 +99,7 @@ export function SlimePetPage() {
   const [representativeColor, setRepresentativeColor] = useState<SlimeColor | null>(null);
   const [shopCatalog, setShopCatalog] = useState<SlimeShopItem[]>([]);
   const [ownedItemKeys, setOwnedItemKeys] = useState<string[]>([]);
+  const [ownedItemQuantities, setOwnedItemQuantities] = useState<Record<string, number>>({});
   const [equippedItemKeys, setEquippedItemKeys] = useState<string[]>([]);
   const [equippedItemsByColor, setEquippedItemsByColor] = useState<Partial<Record<SlimeColor, string[]>>>({});
   const [equippedFloorByColor, setEquippedFloorByColor] = useState<Partial<Record<SlimeColor, SlimeFloor>>>({});
@@ -108,33 +112,40 @@ export function SlimePetPage() {
   const [busyColor, setBusyColor] = useState<SlimeColor | null>(null);
   const [busyRepresentative, setBusyRepresentative] = useState<SlimeColor | null>(null);
   const [busyItemKey, setBusyItemKey] = useState<string | null>(null);
+  const [busyCookieColor, setBusyCookieColor] = useState<SlimeColor | null>(null);
   const [notice, setNotice] = useState<Notice | null>(null);
   const [shopNotice, setShopNotice] = useState<Notice | null>(null);
   const [shopOpen, setShopOpen] = useState(false);
   const [wardrobeColor, setWardrobeColor] = useState<SlimeColor | null>(null);
-  const [shopFilter, setShopFilter] = useState<ShopFilter>("slimes");
+  const [shopFilter, setShopFilter] = useState<ShopFilter>("character");
   const drawerTriggerRef = useRef<HTMLButtonElement | null>(null);
   const shopCloseRef = useRef<HTMLButtonElement>(null);
   const hadOpenDrawer = useRef(false);
   const slimeRetryKeys = useRef(new Map<SlimeColor, string>());
   const itemRetryKeys = useRef(new Map<string, string>());
   const itemEquipRetryKeys = useRef(new Map<string, string>());
+  const cookieRetryKeys = useRef(new Map<SlimeColor, string>());
 
   const effects = useMemo(
-    () => calculateCatalogSlimeEffects(equippedKeys, equippedItemKeys),
-    [equippedItemKeys, equippedKeys],
+    () => calculateCatalogSlimeEffects(
+      ownedKeys,
+      equippedItemKeys,
+    ),
+    [equippedItemKeys, ownedKeys],
   );
   const visibleShopItems = useMemo(
     () =>
-      shopFilter === "slimes"
-        ? []
-        : shopFilter === "all"
+      shopFilter === "all"
         ? shopCatalog
-        : shopCatalog.filter((item) => item.category === shopFilter),
+        : shopCatalog.filter((item) => shopFilterForItem(item) === shopFilter),
     [shopCatalog, shopFilter],
   );
   const drawerItems = wardrobeColor
-    ? visibleShopItems.filter((item) => ownedItemKeys.includes(item.key))
+    ? visibleShopItems.filter(
+        (item) =>
+          ownedItemKeys.includes(item.key) &&
+          (item.category as string) !== "food",
+      )
     : visibleShopItems;
 
   useEffect(() => {
@@ -155,8 +166,18 @@ export function SlimePetPage() {
         );
         const resolvedShopCatalog = home.shopCatalog ?? SLIME_SHOP_CATALOG.slice();
         const resolvedItemsByColor = home.equippedItemsByColor ?? {};
+        const resolvedItemQuantities = { ...(home.ownedItemQuantities ?? {}) };
+        // Older snapshots only exposed ownedItemKeys. Treat a legacy cookie
+        // row as one item until the quantity payload is available.
+        if (
+          (home.ownedItemKeys ?? []).includes(SLIME_COOKIE_ITEM_KEY) &&
+          typeof resolvedItemQuantities[SLIME_COOKIE_ITEM_KEY] !== "number"
+        ) {
+          resolvedItemQuantities[SLIME_COOKIE_ITEM_KEY] = 1;
+        }
         setShopCatalog(resolvedShopCatalog);
         setOwnedItemKeys(home.ownedItemKeys ?? []);
+        setOwnedItemQuantities(resolvedItemQuantities);
         setEquippedItemKeys(home.equippedItemKeys ?? []);
         setEquippedItemsByColor(resolvedItemsByColor);
         setEquippedFloorByColor({
@@ -343,7 +364,8 @@ export function SlimePetPage() {
   };
 
   const purchaseShopItem = async (item: SlimeShopItem) => {
-    if (busyItemKey || ownedItemKeys.includes(item.key)) return;
+    const repeatable = item.key === SLIME_COOKIE_ITEM_KEY;
+    if (busyItemKey || (!repeatable && ownedItemKeys.includes(item.key))) return;
     const idempotencyKey =
       itemRetryKeys.current.get(item.key) ?? newIdempotencyKey("slime-item", item.key);
     itemRetryKeys.current.set(item.key, idempotencyKey);
@@ -361,6 +383,8 @@ export function SlimePetPage() {
       const payload = (await response.json().catch(() => ({}))) as {
         error?: string;
         ownedItemKey?: string;
+        ownedItemQuantity?: number;
+        quantity?: number;
         balance?: number;
       };
       if (!response.ok || payload.ownedItemKey !== item.key || typeof payload.balance !== "number") {
@@ -375,8 +399,30 @@ export function SlimePetPage() {
       setOwnedItemKeys((current) =>
         current.includes(item.key) ? current : [...current, item.key],
       );
+      if (repeatable) {
+        const returnedQuantity =
+          typeof payload.ownedItemQuantity === "number"
+            ? payload.ownedItemQuantity
+            : typeof payload.quantity === "number"
+              ? payload.quantity
+              : null;
+        setOwnedItemQuantities((current) => ({
+          ...current,
+          [item.key]: Math.max(
+            0,
+            Math.floor(
+              returnedQuantity ?? ((current[item.key] ?? 0) + 1),
+            ),
+          ),
+        }));
+      }
       setBalance(payload.balance);
-      setShopNotice({ kind: "success", text: `${item.labelKo} 구매를 완료했어요.` });
+      setShopNotice({
+        kind: "success",
+        text: repeatable
+          ? `${item.labelKo} 구매를 완료했어요. 보유 수량이 늘었어요.`
+          : `${item.labelKo} 구매를 완료했어요.`,
+      });
     } catch {
       setShopNotice({
         kind: "error",
@@ -384,6 +430,75 @@ export function SlimePetPage() {
       });
     } finally {
       setBusyItemKey(null);
+    }
+  };
+
+  /** Consume one repeatable cookie and trust the returned growth snapshot. */
+  const consumeCookie = async (color: SlimeColor): Promise<boolean> => {
+    const quantity = ownedItemQuantities[SLIME_COOKIE_ITEM_KEY] ?? 0;
+    if (busyCookieColor || quantity <= 0) return false;
+
+    const idempotencyKey =
+      cookieRetryKeys.current.get(color) ??
+      newIdempotencyKey("slime-cookie-consume", color);
+    cookieRetryKeys.current.set(color, idempotencyKey);
+    setBusyCookieColor(color);
+    setNotice(null);
+    try {
+      const response = await fetch("/api/student/slimes/items/consume", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Idempotency-Key": idempotencyKey,
+        },
+        body: JSON.stringify({ itemKey: SLIME_COOKIE_ITEM_KEY, color }),
+      });
+      const payload = (await response.json().catch(() => ({}))) as {
+        error?: string;
+        itemKey?: string;
+        remainingQuantity?: number;
+        growth?: SlimeGrowthSnapshotPayload;
+      };
+      if (
+        !response.ok ||
+        payload.itemKey !== SLIME_COOKIE_ITEM_KEY ||
+        typeof payload.remainingQuantity !== "number" ||
+        !payload.growth
+      ) {
+        if (response.status < 500) cookieRetryKeys.current.delete(color);
+        setNotice({
+          kind: "error",
+          text: PURCHASE_ERROR[payload.error ?? ""] ??
+            "쿠키를 먹이지 못했어요. 다시 시도해 주세요.",
+        });
+        return false;
+      }
+
+      cookieRetryKeys.current.delete(color);
+      const remainingQuantity = Math.max(0, Math.floor(payload.remainingQuantity));
+      setOwnedItemQuantities((current) => ({
+        ...current,
+        [SLIME_COOKIE_ITEM_KEY]: remainingQuantity,
+      }));
+      setOwnedItemKeys((current) =>
+        current.includes(SLIME_COOKIE_ITEM_KEY)
+          ? current
+          : [...current, SLIME_COOKIE_ITEM_KEY],
+      );
+      setGrowthByColor((current) => ({
+        ...current,
+        [color]: payload.growth!,
+      }));
+      setNotice({
+        kind: "success",
+        text: `${catalog.find((entry) => entry.color === color)?.nameKo ?? "슬라임"}에게 쿠키를 먹였어요.`,
+      });
+      return true;
+    } catch {
+      setNotice({ kind: "error", text: "네트워크 오류가 발생했어요. 다시 시도해 주세요." });
+      return false;
+    } finally {
+      setBusyCookieColor(null);
     }
   };
 
@@ -572,7 +687,7 @@ export function SlimePetPage() {
                 drawerTriggerRef.current = event.currentTarget;
                 setShopNotice(null);
                 setWardrobeColor(null);
-                setShopFilter("slimes");
+                setShopFilter("character");
                 setShopOpen(true);
               }}
               aria-haspopup="dialog"
@@ -612,13 +727,16 @@ export function SlimePetPage() {
         ownedKeys={ownedKeys}
         representativeColor={representativeColor}
         shopCatalog={shopCatalog}
+        ownedItemQuantities={ownedItemQuantities}
         equippedItemsByColor={equippedItemsByColor}
         equippedFloorByColor={equippedFloorByColor}
         growthByColor={growthByColor}
+        effects={effects}
         loading={loading}
         loadFailed={loadError}
         busyRepresentative={busyRepresentative}
         onSetRepresentative={(color) => void setRepresentative(color)}
+        onFeedCookie={consumeCookie}
         onOpenWardrobe={(color, trigger) => {
           drawerTriggerRef.current = trigger;
           setShopNotice(null);
@@ -636,6 +754,7 @@ export function SlimePetPage() {
           drawerItems={drawerItems}
           ownedKeys={ownedKeys}
           ownedItemKeys={ownedItemKeys}
+          ownedItemQuantities={ownedItemQuantities}
           equippedItemKeys={equippedItemKeys}
           equippedItemsByColor={equippedItemsByColor}
           wardrobeColor={wardrobeColor}

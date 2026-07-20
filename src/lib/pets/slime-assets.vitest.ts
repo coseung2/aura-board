@@ -8,6 +8,7 @@ import {
   getSlimeFrame,
   getSlimeFrameDuration,
   resolveSlimeAsset,
+  resolveSlimeBallAsset,
   type EquippedFloor,
   type SlimeAction,
   type SlimeEvolution,
@@ -16,6 +17,7 @@ import {
   SLIME_WEB_ASSET_REGISTRY,
   SLIME_WEB_CROWN_OVERLAY_REGISTRY,
 } from "./slime-assets.generated";
+import { SLIME_BALL_WEB_ASSET_REGISTRY } from "./slime-ball-assets.generated";
 
 const state = (
   evolution: SlimeEvolution,
@@ -113,6 +115,28 @@ describe("official slime asset resolver", () => {
     expect(evolvedHappy.crownOverlay?.key).toBe("gold-crown-red-gem/red");
     expect(evolvedIdle.crownOverlay?.differingPixels).toBeGreaterThan(0);
     expect(evolvedHappy.crownOverlay?.differingPixels).toBeGreaterThan(0);
+  });
+
+  it("resolves each ball slug to its matching colour animation and loops it", () => {
+    expect(Object.keys(SLIME_BALL_WEB_ASSET_REGISTRY)).toHaveLength(35);
+    const soccer = resolveSlimeBallAsset("purple", "soccer-ball");
+    expect(soccer).toMatchObject({
+      key: "soccer-ball/purple",
+      ballSlug: "soccer-ball",
+      slimeColor: "purple",
+      sheetUrl: "/creatures/slimes/official/props/ball/soccer-ball/purple/slime-purple-soccer-ball-hit-sheet.png",
+      gifUrl: "/creatures/slimes/official/props/ball/soccer-ball/purple/slime-purple-soccer-ball-hit.gif",
+      frameCount: 18,
+      frameSize: { x: 0, y: 0, w: 64, h: 64 },
+      playback: { loop: true, oneShot: false },
+      loop: true,
+      oneShot: false,
+    });
+    expect(soccer.metadata.meta.size).toEqual({ w: 384, h: 192 });
+    expect(soccer.metadata.frames.every((frame) => frame.duration > 0)).toBe(true);
+    const withBall = resolveSlimeAsset(state("base", "purple", "idle", "none"), "soccer-ball");
+    expect(withBall.ball?.key).toBe("soccer-ball/purple");
+    expect(withBall.loop).toBe(true);
   });
 
 });

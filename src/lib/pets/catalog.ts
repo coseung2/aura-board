@@ -1,16 +1,22 @@
 import type {
   SlimeAccessoryDefinition,
   SlimeColor,
+  SlimeBallShopItem,
+  SlimeBallSlug,
   SlimeDefinition,
   SlimeFloor,
   SlimeShopItem,
   SlimeSetDefinition,
 } from "./types";
+import { SLIME_SHARED_ASSETS } from "./slime-assets";
+import { SLIME_BALL_SLUGS } from "./types";
 
 const SLIME_ASSET_ROOT = "/creatures/slimes";
 export const SLIME_DEFAULT_PRICE = 500;
 export const SLIME_DEFAULT_BUFF_BPS = 200;
-export const SLIME_SHOP_DEFAULT_PRICE = 30;
+export const SLIME_SHOP_DEFAULT_PRICE = 100;
+export const SLIME_COOKIE_PRICE = 30;
+export const SLIME_BALL_PRICE = 100;
 
 /** The five generated colour variants used by the web preview. */
 export const SLIME_CATALOG: readonly SlimeDefinition[] = [
@@ -61,6 +67,35 @@ export const SLIME_CATALOG: readonly SlimeDefinition[] = [
   },
 ] as const;
 
+const SLIME_BALL_PREVIEW_COLOR: SlimeColor = "blue";
+
+const slimeBallPreviewPath = (slug: SlimeBallSlug): string =>
+  `${SLIME_ASSET_ROOT}/official/props/ball/${slug}/${SLIME_BALL_PREVIEW_COLOR}/slime-${SLIME_BALL_PREVIEW_COLOR}-${slug}-hit-4x.gif`;
+
+const SLIME_BALL_LABELS: Readonly<Record<SlimeBallSlug, string>> = {
+  "american-football": "미식축구공",
+  baseball: "야구공",
+  basketball: "농구공",
+  "black-ball": "검은 공",
+  "dark-blue-ball": "남색 공",
+  "soccer-ball": "축구공",
+  "tennis-ball": "테니스공",
+};
+
+/** Ball props use the matching colour animation when equipped. */
+export const SLIME_BALL_CATALOG: readonly SlimeBallShopItem[] = SLIME_BALL_SLUGS.map((slug) => ({
+  key: `slime-ball-${slug}`,
+  slug,
+  category: "prop",
+  floor: null,
+  labelKo: SLIME_BALL_LABELS[slug],
+  price: SLIME_BALL_PRICE,
+  spritePath: slimeBallPreviewPath(slug),
+}));
+
+/** Alias kept explicit for callers that distinguish shop props from all items. */
+export const SLIME_BALL_SHOP_CATALOG = SLIME_BALL_CATALOG;
+
 /** Student-owned slime home items sold through the shared won wallet. */
 export const SLIME_SHOP_CATALOG: readonly SlimeShopItem[] = [
   {
@@ -94,6 +129,15 @@ export const SLIME_SHOP_CATALOG: readonly SlimeShopItem[] = [
     labelKo: "레모네이드",
     price: SLIME_SHOP_DEFAULT_PRICE,
     spritePath: `${SLIME_ASSET_ROOT}/shop/slime-blue-drink-lemonade.gif`,
+  },
+  ...SLIME_BALL_CATALOG,
+  {
+    key: "slime-cookie",
+    category: "food",
+    floor: null,
+    labelKo: "쿠키",
+    price: SLIME_COOKIE_PRICE,
+    spritePath: SLIME_SHARED_ASSETS.cookie.imageUrl,
   },
 ] as const;
 
@@ -150,6 +194,9 @@ const accessoryByKey = new Map<string, SlimeAccessoryDefinition>(
 const slimeShopItemByKey = new Map<string, SlimeShopItem>(
   SLIME_SHOP_CATALOG.map((item) => [item.key, item]),
 );
+const slimeBallBySlug = new Map<SlimeBallSlug, SlimeBallShopItem>(
+  SLIME_BALL_CATALOG.map((item) => [item.slug, item]),
+);
 
 export function getSlimeDefinition(key: string): SlimeDefinition | undefined {
   return slimeByKey.get(key as SlimeColor);
@@ -163,6 +210,10 @@ export function getSlimeAccessoryDefinition(
 
 export function getSlimeShopItem(key: string): SlimeShopItem | undefined {
   return slimeShopItemByKey.get(key);
+}
+
+export function getSlimeBallDefinition(slug: string): SlimeBallShopItem | undefined {
+  return slimeBallBySlug.get(slug as SlimeBallSlug);
 }
 
 /** Legacy rows may contain several floors; the last equipped key wins. */

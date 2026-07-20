@@ -3,7 +3,15 @@ import {
   SLIME_WEB_CROWN_OVERLAY_REGISTRY,
   SLIME_WEB_SHARED_ASSETS,
 } from "./slime-assets.generated";
+import {
+  SLIME_BALL_WEB_ASSET_REGISTRY,
+} from "./slime-ball-assets.generated";
+import type { SlimeBallSlug } from "./types";
 export const SLIME_SHARED_ASSETS = SLIME_WEB_SHARED_ASSETS;
+export {
+  SLIME_BALL_ASSET_REGISTRY,
+  SLIME_BALL_WEB_ASSET_REGISTRY,
+} from "./slime-ball-assets.generated";
 
 export const SLIME_ASSET_COLORS = ["blue", "green", "yellow", "purple", "red"] as const;
 export type SlimeColor = (typeof SLIME_ASSET_COLORS)[number];
@@ -21,6 +29,7 @@ export type SlimeFloorInteraction = Extract<EquippedFloor, "water-puddle" | "tra
 export type SlimeSheetAction = "idle" | "happy" | "drink" | SlimeFloorInteraction;
 export type SlimeAssetKey = `${SlimeEvolution}/${SlimeColor}/${SlimeSheetAction}`;
 export type SlimeCrownOverlayKey = `${Exclude<SlimeEvolution, "base">}/${SlimeColor}`;
+export type SlimeBallAssetKey = `${SlimeBallSlug}/${SlimeColor}`;
 
 export type SlimeFrameRect = Readonly<{ x: number; y: number; w: number; h: number }>;
 export type SlimeFrame = Readonly<{
@@ -42,6 +51,34 @@ export type SlimeSheetMetadata = Readonly<{
     frameTags?: readonly Readonly<Record<string, unknown>>[];
     layers?: readonly Readonly<Record<string, unknown>>[];
   }>;
+}>;
+
+type GeneratedBallEntry = (typeof SLIME_BALL_WEB_ASSET_REGISTRY)[keyof typeof SLIME_BALL_WEB_ASSET_REGISTRY];
+
+export type SlimeBallAssetEntry = Readonly<{
+  key: SlimeBallAssetKey;
+  slug: SlimeBallSlug;
+  color: SlimeColor;
+  sheetUrl: string;
+  sheet4xUrl: string;
+  gifUrl: string;
+  gif4xUrl: string;
+  metadata: SlimeSheetMetadata;
+}>;
+
+export type SlimeBallAssetState = Readonly<{
+  slimeColor: SlimeColor;
+  ballSlug: SlimeBallSlug;
+}>;
+
+export type SlimeBallAssetResolution = SlimeBallAssetEntry & Readonly<{
+  ballSlug: SlimeBallSlug;
+  slimeColor: SlimeColor;
+  frameCount: number;
+  frameSize: SlimeFrameRect;
+  playback: SlimePlayback;
+  loop: true;
+  oneShot: false;
 }>;
 
 type GeneratedWebEntry = (typeof SLIME_WEB_ASSET_REGISTRY)[keyof typeof SLIME_WEB_ASSET_REGISTRY];
@@ -80,6 +117,10 @@ export type SlimeAssetState = Readonly<{
   evolution: SlimeEvolution;
   action: SlimeAction;
   equippedFloor: EquippedFloor;
+  /** Optional prop selected for the current slime. */
+  equippedBall?: SlimeBallSlug | null;
+  /** Alias accepted while older persisted snapshots migrate. */
+  ballSlug?: SlimeBallSlug | null;
 }>;
 
 export type SlimeAssetResolution = Readonly<{
@@ -102,10 +143,12 @@ export type SlimeAssetResolution = Readonly<{
   playback: SlimePlayback;
   loop: boolean;
   oneShot: boolean;
+  ball: SlimeBallAssetResolution | null;
 }>;
 
 const webEntries = SLIME_WEB_ASSET_REGISTRY as Record<string, GeneratedWebEntry>;
 const webOverlays = SLIME_WEB_CROWN_OVERLAY_REGISTRY as Record<string, GeneratedWebOverlay>;
+const ballEntries = SLIME_BALL_WEB_ASSET_REGISTRY as Record<string, GeneratedBallEntry>;
 
 const isCrowned = (evolution: SlimeEvolution): evolution is Exclude<SlimeEvolution, "base"> => evolution !== "base";
 
@@ -153,6 +196,78 @@ function generatedOverlay(key: SlimeCrownOverlayKey | null): SlimeCrownOverlay |
   return overlay as SlimeCrownOverlay;
 }
 
+function ballKey(slug: SlimeBallSlug, slimeColor: SlimeColor): SlimeBallAssetKey {
+  return `${slug}/${slimeColor}` as SlimeBallAssetKey;
+}
+
+function generatedBallEntry(key: SlimeBallAssetKey): SlimeBallAssetEntry {
+  const entry = ballEntries[key];
+  if (!entry) throw new Error(`Missing imported slime ball asset: ${key}`);
+  return entry as SlimeBallAssetEntry;
+}
+
+export function slimeBallAssetKey(
+  ballSlug: SlimeBallSlug,
+  slimeColor: SlimeColor,
+): SlimeBallAssetKey;
+export function slimeBallAssetKey(
+  slimeColor: SlimeColor,
+  ballSlug: SlimeBallSlug,
+): SlimeBallAssetKey;
+export function slimeBallAssetKey(
+  first: SlimeBallSlug | SlimeColor,
+  second: SlimeBallSlug | SlimeColor,
+): SlimeBallAssetKey {
+  const isColor = (value: string): value is SlimeColor =>
+    (SLIME_ASSET_COLORS as readonly string[]).includes(value);
+  return isColor(first)
+    ? ballKey(second as SlimeBallSlug, first)
+    : ballKey(first as SlimeBallSlug, second as SlimeColor);
+}
+
+export function resolveSlimeBallAsset(state: SlimeBallAssetState): SlimeBallAssetResolution;
+export function resolveSlimeBallAsset(
+  slimeColor: SlimeColor,
+  ballSlug: SlimeBallSlug,
+): SlimeBallAssetResolution;
+export function resolveSlimeBallAsset(
+  ballSlug: SlimeBallSlug,
+  slimeColor: SlimeColor,
+): SlimeBallAssetResolution;
+export function resolveSlimeBallAsset(
+  stateOrFirst: SlimeBallAssetState | SlimeColor | SlimeBallSlug,
+  maybeSecond?: SlimeBallSlug | SlimeColor,
+): SlimeBallAssetResolution {
+  const isColor = (value: string): value is SlimeColor =>
+    (SLIME_ASSET_COLORS as readonly string[]).includes(value);
+  const slimeColor = typeof stateOrFirst === "string"
+    ? isColor(stateOrFirst)
+      ? stateOrFirst
+      : maybeSecond as SlimeColor
+    : stateOrFirst.slimeColor;
+  const ballSlug = typeof stateOrFirst === "string"
+    ? isColor(stateOrFirst)
+      ? maybeSecond as SlimeBallSlug
+      : stateOrFirst
+    : stateOrFirst.ballSlug;
+  if (!ballSlug) throw new Error("A slime ball slug is required to resolve a ball asset");
+
+  const key = ballKey(ballSlug, slimeColor);
+  const entry = generatedBallEntry(key);
+  const firstFrame = entry.metadata.frames[0];
+  if (!firstFrame) throw new Error(`Imported slime ball asset has no frames: ${key}`);
+  return {
+    ...entry,
+    ballSlug,
+    slimeColor,
+    frameCount: entry.metadata.frames.length,
+    frameSize: firstFrame.frame,
+    playback: { loop: true, oneShot: false },
+    loop: true,
+    oneShot: false,
+  };
+}
+
 export function slimeAssetKey(
   evolution: SlimeEvolution,
   slimeColor: SlimeColor,
@@ -162,7 +277,10 @@ export function slimeAssetKey(
 }
 
 /** Resolve persisted state to an imported sheet without reading the source package. */
-export function resolveSlimeAsset(state: SlimeAssetState): SlimeAssetResolution {
+export function resolveSlimeAsset(
+  state: SlimeAssetState,
+  ballSlug?: SlimeBallSlug | null,
+): SlimeAssetResolution {
   const floorAction = state.action === "floor-interaction"
     && (state.equippedFloor === "water-puddle" || state.equippedFloor === "trampoline")
     ? state.equippedFloor
@@ -177,6 +295,7 @@ export function resolveSlimeAsset(state: SlimeAssetState): SlimeAssetResolution 
   if (!firstFrame) throw new Error(`Imported slime asset has no frames: ${key}`);
   const crownOverlay = usesBaseWithOverlay ? generatedOverlay(overlayKey(state.evolution, state.slimeColor)) : null;
   const playback = playbackFor(resolvedAction);
+  const equippedBall = ballSlug !== undefined ? ballSlug : state.equippedBall ?? state.ballSlug ?? null;
   const result: SlimeAssetResolution = {
     key,
     assetKey: key,
@@ -197,6 +316,7 @@ export function resolveSlimeAsset(state: SlimeAssetState): SlimeAssetResolution 
     playback,
     loop: playback.loop,
     oneShot: playback.oneShot,
+    ball: equippedBall ? resolveSlimeBallAsset(state.slimeColor, equippedBall) : null,
   };
   return result;
 }

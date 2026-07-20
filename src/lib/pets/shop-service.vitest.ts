@@ -72,10 +72,12 @@ function installState(startingBalance = 100) {
     inventory.set(data.itemKey, row);
     return row;
   });
-  mocks.inventoryUpdate.mockImplementation(async ({ where, data }: { where: { id: string }; data: { quantity: number } }) => {
+  mocks.inventoryUpdate.mockImplementation(async ({ where, data }: { where: { id: string }; data: { quantity: number | { increment: number } } }) => {
     const row = [...inventory.values()].find((entry) => entry.id === where.id);
     if (!row) return null;
-    row.quantity = data.quantity;
+    row.quantity = typeof data.quantity === "number"
+      ? data.quantity
+      : row.quantity + data.quantity.increment;
     return row;
   });
   mocks.transaction.mockImplementation(async (operation: (tx: unknown) => Promise<unknown>) =>
@@ -115,8 +117,9 @@ describe("slime shop service", () => {
 
     const home = await getSlimeHome(student);
 
-    expect(home.shopCatalog).toHaveLength(4);
+    expect(home.shopCatalog).toHaveLength(SLIME_SHOP_CATALOG.length);
     expect(home.ownedItemKeys).toEqual([SLIME_SHOP_CATALOG[0].key]);
+    expect(home.ownedItemQuantities).toEqual({ [SLIME_SHOP_CATALOG[0].key]: 1 });
     expect(home.equippedFloorByColor).toEqual({});
     expect(home.equippedFloor).toBe("none");
   });
@@ -152,19 +155,19 @@ describe("slime shop service", () => {
     const item = SLIME_SHOP_CATALOG[0];
 
     const result = await purchaseSlimeShopItem(student, item.key, "shop-attempt");
-    expect(result).toEqual({ ownedItemKey: item.key, balance: 70, idempotent: false });
+    expect(result).toEqual({ ownedItemKey: item.key, balance: 0, idempotent: false });
     expect(state.inventory.get(item.key)).toMatchObject({ quantity: 1 });
     expect(mocks.ledgerCreate).toHaveBeenCalledWith({
       data: expect.objectContaining({
         type: "slime_item_purchase",
         sourceType: "slime_item_purchase",
         sourceRef: "student-1:shop-attempt",
-        amount: 30,
+        amount: 100,
       }),
     });
 
     const replay = await purchaseSlimeShopItem(student, item.key, "shop-attempt");
-    expect(replay).toEqual({ ownedItemKey: item.key, balance: 70, idempotent: true });
+    expect(replay).toEqual({ ownedItemKey: item.key, balance: 0, idempotent: true });
     expect(mocks.accountUpdateMany).toHaveBeenCalledTimes(1);
   });
 
@@ -179,11 +182,11 @@ describe("slime shop service", () => {
       purchaseSlimeShopItem(student, SLIME_SHOP_CATALOG[0].key, "new-key"),
     ).rejects.toMatchObject<Partial<SlimeServiceError>>({ code: "already_owned", status: 409 });
 
-    const poor = installState(29);
+    const poor = installState(99);
     await expect(
       purchaseSlimeShopItem(student, SLIME_SHOP_CATALOG[1].key, "poor-key"),
     ).rejects.toMatchObject<Partial<SlimeServiceError>>({ code: "insufficient_funds", status: 402 });
-    expect(poor.balance).toBe(29);
+    expect(poor.balance).toBe(99);
 
     const reused = installState();
     await purchaseSlimeShopItem(student, SLIME_SHOP_CATALOG[0].key, "same-key");
@@ -193,6 +196,21 @@ describe("slime shop service", () => {
       code: "idempotency_key_reused",
       status: 409,
     });
-    expect(reused.balance).toBe(70);
+    expect(reused.balance).toBe(0);
+  });
+
+  it("allows repeatable cookie purchases and keeps each idempotency key single-charge", async () => {
+    const state = installState(100);
+    const cookie = SLIME_SHOP_CATALOG.find((item) => item.key === "slime-cookie");
+    if (!cookie) throw new Error("cookie catalog item missing");
+
+    await purchaseSlimeShopItem(student, cookie.key, "cookie-1");
+    await purchaseSlimeShopItem(student, cookie.key, "cookie-2");
+    const replay = await purchaseSlimeShopItem(student, cookie.key, "cookie-2");
+
+    expect(state.balance).toBe(40);
+    expect(state.inventory.get(cookie.key)?.quantity).toBe(2);
+    expect(replay).toEqual({ ownedItemKey: cookie.key, balance: 40, idempotent: true });
+    expect(mocks.accountUpdateMany).toHaveBeenCalledTimes(2);
   });
 });

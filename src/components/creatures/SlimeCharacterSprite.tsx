@@ -5,6 +5,7 @@ import type { SlimeDefinition, SlimeShopItem } from "@/lib/pets/types";
 
 import { OfficialSlimeSprite } from "./OfficialSlimeSprite";
 import styles from "./SlimeCharacterSprite.module.css";
+import { slimeItemSpritePath } from "./SlimePetModel";
 
 export type SlimeGrowthStage = 1 | 2 | 3;
 
@@ -63,9 +64,15 @@ export function SlimeCharacterSprite({
   const evolution = evolutionForStage(growthStage);
   // Only unsupported legacy props may fall back to a complete character GIF.
   // Drinks and floors have canonical color/evolution-specific official sheets.
-  const itemSpritePath = items.find(
-    (item) => !item.floor && item.category !== "background" && item.category !== "drink",
-  )?.spritePath;
+  // Ball props are complete, color-specific looping GIFs rather than an
+  // overlay sheet. Resolve them from the equipped slime color before falling
+  // back to legacy prop paths.
+  const ballItem = items.find((item) => item.key.startsWith("slime-ball-"));
+  const itemSpritePath = ballItem
+    ? slimeItemSpritePath(ballItem, slime.color as SlimeColor)
+    : items.find(
+        (item) => !item.floor && item.category !== "background" && item.category !== "drink",
+      )?.spritePath;
   const itemLabels = items.map((item) => item.labelKo).join(", ");
   const alt = items.length > 0
     ? `${slime.nameKo}, ${itemLabels} 적용 미리보기`
@@ -79,7 +86,7 @@ export function SlimeCharacterSprite({
         action={action}
         equippedFloor={floor}
         itemSpritePath={itemSpritePath}
-        repeat={repeat}
+        repeat={repeat || Boolean(ballItem)}
         alt={alt}
         dataSlimeColor={slime.color as SlimeColor}
         onComplete={onComplete}

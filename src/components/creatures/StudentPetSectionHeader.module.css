@@ -43,6 +43,7 @@
   display: flex;
   align-items: flex-end;
   min-width: 0;
+  margin-left: auto;
   margin-bottom: -2px;
   overflow-x: auto;
   overflow-y: hidden;
@@ -111,6 +112,8 @@
 
   .navigation {
     width: 100%;
+    margin-left: 0;
+    order: 3;
   }
 
   .navigation a {

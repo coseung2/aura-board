@@ -12,7 +12,10 @@ import styles from "./SlimePetPage.module.css";
 import { SlimeCharacterSprite } from "./SlimeCharacterSprite";
 import {
   calculateSlimeGrowthPercent,
+  calculateGrowthTimeComparison,
   EFFECT_LABELS,
+  formatGrowthHours,
+  SLIME_COOKIE_ITEM_KEY,
   type EquippedItemsByColor,
   type SlimeGrowthSnapshotPayload,
 } from "./SlimePetModel";
@@ -22,13 +25,16 @@ type SlimeCollectionSectionProps = {
   ownedKeys: SlimeColor[];
   representativeColor: SlimeColor | null;
   shopCatalog: SlimeShopItem[];
+  ownedItemQuantities: Record<string, number>;
   equippedItemsByColor: EquippedItemsByColor;
   equippedFloorByColor?: Partial<Record<SlimeColor, EquippedFloor>>;
   growthByColor: Partial<Record<SlimeColor, SlimeGrowthSnapshotPayload>>;
+  effects: ReturnType<typeof calculateCatalogSlimeEffects>;
   loading: boolean;
   loadFailed: boolean;
   busyRepresentative: SlimeColor | null;
   onSetRepresentative: (color: SlimeColor) => void;
+  onFeedCookie: (color: SlimeColor) => Promise<boolean>;
   onOpenWardrobe: (color: SlimeColor, trigger: HTMLButtonElement) => void;
 };
 
@@ -60,16 +66,24 @@ export function SlimeCollectionSection({
   ownedKeys,
   representativeColor,
   shopCatalog,
+  ownedItemQuantities,
   equippedItemsByColor,
   equippedFloorByColor = {},
   growthByColor,
+  effects,
   loading,
   loadFailed,
   busyRepresentative,
   onSetRepresentative,
+  onFeedCookie,
   onOpenWardrobe,
 }: SlimeCollectionSectionProps) {
   const [actionsByColor, setActionsByColor] = useState<Partial<Record<SlimeColor, SlimeAction>>>({});
+  const [pendingCookieByColor, setPendingCookieByColor] = useState<Partial<Record<SlimeColor, boolean>>>({});
+  const [openEffectColor, setOpenEffectColor] = useState<SlimeColor | null>(null);
+  const [openGrowthColor, setOpenGrowthColor] = useState<SlimeColor | null>(null);
+  const accessoryEffects = effects.breakdown.filter((entry) => entry.source !== "slime");
+  const growthSpeedBps = effects.totals.growth_speed;
 
   return (
     <section className={styles.section} aria-labelledby="slime-selection-title">
@@ -111,6 +125,9 @@ export function SlimeCollectionSection({
           const growthPercent = growth
             ? calculateSlimeGrowthPercent(growth)
             : null;
+          const growthTime = growth
+            ? calculateGrowthTimeComparison(growth.remainingSeconds, growthSpeedBps)
+            : null;
           const floor = normalizeFloor(
             equippedFloorByColor[slime.color],
             floorFromItems(assignedItems),
@@ -118,19 +135,92 @@ export function SlimeCollectionSection({
           const drinkItem = assignedItems.find((item) => item.category === "drink");
           const hasInteractiveFloor = floor === "water-puddle" || floor === "trampoline";
           const hasPassiveDrink = Boolean(drinkItem);
-          const action: SlimeAction = hasInteractiveFloor
+          const passiveAction: SlimeAction = hasInteractiveFloor
             ? "floor-interaction"
             : hasPassiveDrink
               ? "drink"
-              : actionsByColor[slime.color] ?? "idle";
-          const setAction = (nextAction: SlimeAction) => {
-            setActionsByColor((current) => ({ ...current, [slime.color]: nextAction }));
+              : "idle";
+          const manualAction = actionsByColor[slime.color];
+          const action: SlimeAction = manualAction ?? passiveAction;
+          const cookieQuantity = Math.max(
+            0,
+            Math.floor(ownedItemQuantities[SLIME_COOKIE_ITEM_KEY] ?? 0),
+          );
+          const cookiePending = pendingCookieByColor[slime.color] === true;
+          const clearAction = () => {
+            setActionsByColor((current) => {
+              if (!(slime.color in current)) return current;
+              const next = { ...current };
+              delete next[slime.color];
+              return next;
+            });
           };
+          const feedCookie = async () => {
+            if (cookieQuantity <= 0 || cookiePending || manualAction === "happy") return;
+            setPendingCookieByColor((current) => ({ ...current, [slime.color]: true }));
+            try {
+              const consumed = await onFeedCookie(slime.color);
+              if (consumed) {
+                setActionsByColor((current) => ({ ...current, [slime.color]: "happy" }));
+              }
+            } finally {
+              setPendingCookieByColor((current) => {
+                const next = { ...current };
+                delete next[slime.color];
+                return next;
+              });
+            }
+          };
+          const effectDetailId = `slime-effect-detail-${slime.color}`;
           return (
             <li key={slime.key} className={`${styles.slimeItem} ${styles.slimeItemSelected}`}>
-              <span className={styles.effectBadge}>
-                {EFFECT_LABELS[slime.effectKey]} +{formatBpsPercent(slime.baseBuffBps)}
-              </span>
+              <div className={styles.effectDetail}>
+                <button
+                  type="button"
+                  className={styles.effectBadge}
+                  aria-expanded={openEffectColor === slime.color}
+                  aria-controls={effectDetailId}
+                  aria-label={`${slime.nameKo} 효과 상세 보기`}
+                  onClick={() => setOpenEffectColor((current) =>
+                    current === slime.color ? null : slime.color,
+                  )}
+                >
+                  <img
+                    className={styles.effectArrowIcon}
+                    src="/creatures/slimes/ui/growth-buff-arrow.png"
+                    alt=""
+                    aria-hidden="true"
+                  />
+                  <span className={styles.visuallyHidden}>
+                    {EFFECT_LABELS[slime.effectKey]} +{formatBpsPercent(slime.baseBuffBps)}
+                  </span>
+                </button>
+                <div
+                  id={effectDetailId}
+                  className={`${styles.effectPopover} ${openEffectColor === slime.color ? styles.effectPopoverOpen : ""}`}
+                  role="region"
+                  aria-label={`${slime.nameKo} 효과 상세`}
+                  aria-hidden={openEffectColor !== slime.color}
+                >
+                  <strong>활성 효과</strong>
+                  <div className={styles.effectGroup}>
+                    <span className={styles.effectGroupLabel}>펫 기본 효과</span>
+                    <span>{EFFECT_LABELS[slime.effectKey]} +{formatBpsPercent(slime.baseBuffBps)}</span>
+                  </div>
+                  {accessoryEffects.length > 0 ? (
+                    <div className={styles.effectGroup}>
+                      <span className={styles.effectGroupLabel}>소품 추가 효과</span>
+                      <ul className={styles.effectItemList}>
+                        {accessoryEffects.map((entry) => (
+                          <li key={`${entry.source}:${entry.key}`}>
+                            {entry.label} · {EFFECT_LABELS[entry.effectKey]} +{formatBpsPercent(entry.bps)}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  ) : null}
+                </div>
+              </div>
               <span className={styles.ownedChip}>
                 {representativeColor === slime.color ? "대표" : "보유 중"}
               </span>
@@ -140,21 +230,36 @@ export function SlimeCollectionSection({
                   items={assignedItems}
                   growthStage={growth?.stage ?? 1}
                   action={action}
-                  repeat={hasPassiveDrink}
+                  repeat={!manualAction && hasPassiveDrink}
                   equippedFloor={floor}
-                  onComplete={hasInteractiveFloor || hasPassiveDrink ? undefined : () => {
-                    setActionsByColor((current) =>
-                      current[slime.color] === action
-                        ? { ...current, [slime.color]: "idle" }
-                        : current,
-                    );
-                  }}
+                  onComplete={manualAction
+                    ? clearAction
+                    : hasInteractiveFloor || hasPassiveDrink
+                      ? undefined
+                      : () => {
+                          setActionsByColor((current) => {
+                            if (!(slime.color in current)) return current;
+                            const next = { ...current };
+                            delete next[slime.color];
+                            return next;
+                          });
+                        }}
                 />
               </div>
               <div className={styles.itemCopy}>
                 <h3>{slime.nameKo}</h3>
                 {growth && growthPercent !== null ? (
-                  <div className={styles.growthSummary} data-testid={`slime-growth-${slime.color}`}>
+                  <button
+                    type="button"
+                    className={styles.growthSummary}
+                    data-testid={`slime-growth-${slime.color}`}
+                    aria-expanded={openGrowthColor === slime.color}
+                    aria-controls={`slime-growth-detail-${slime.color}`}
+                    aria-label={`${slime.nameKo} 성장 시간 비교 보기`}
+                    onClick={() => setOpenGrowthColor((current) =>
+                      current === slime.color ? null : slime.color,
+                    )}
+                  >
                     <div className={styles.growthMeta}>
                       <span>성장 {growth.stage}단계</span>
                       <strong>{growthPercent}%</strong>
@@ -173,7 +278,19 @@ export function SlimeCollectionSection({
                         style={{ width: `${growthPercent}%` }}
                       />
                     </div>
-                  </div>
+                    {growthTime && growth.remainingSeconds > 0 ? (
+                      <span
+                        id={`slime-growth-detail-${slime.color}`}
+                        className={`${styles.growthPopover} ${openGrowthColor === slime.color ? styles.growthPopoverOpen : ""}`}
+                        role="region"
+                        aria-label={`${slime.nameKo} 성장 시간 비교`}
+                      >
+                        <strong>성장 속도 +{formatBpsPercent(growthSpeedBps)} 적용 중</strong>
+                        <span>버프 없음 {formatGrowthHours(growthTime.withoutBuffSeconds)}</span>
+                        <span>적용 후 {formatGrowthHours(growthTime.withBuffSeconds)}</span>
+                      </span>
+                    ) : null}
+                  </button>
                 ) : null}
               </div>
               <div className={styles.slimeActions}>
@@ -185,13 +302,23 @@ export function SlimeCollectionSection({
                   <button
                     type="button"
                     className={styles.slimeActionButton}
-                    disabled={action !== "idle"}
-                    onClick={() => setAction("happy")}
-                    aria-label={`${slime.nameKo}에게 쿠키 주기`}
+                    disabled={cookieQuantity <= 0 || cookiePending || manualAction === "happy"}
+                    onClick={() => void feedCookie()}
+                    aria-label={
+                      cookieQuantity > 0
+                        ? `${slime.nameKo}에게 쿠키 주기 (보유 ${cookieQuantity}개)`
+                        : `${slime.nameKo}에게 쿠키 주기 (쿠키 없음)`
+                    }
                     title="쿠키 주기"
+                    data-testid={`slime-cookie-feed-${slime.color}`}
                   >
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img src={SLIME_SHARED_ASSETS.cookie.imageUrl} alt="" aria-hidden="true" />
+                    {cookieQuantity > 0 ? (
+                      <span className={styles.cookieQuantity} aria-hidden="true">
+                        {cookieQuantity}
+                      </span>
+                    ) : null}
                   </button>
                 </div>
                 {representativeColor !== slime.color ? (
@@ -226,6 +353,8 @@ type SlimeEffectsSectionProps = {
 };
 
 export function SlimeEffectsSection({ effects }: SlimeEffectsSectionProps) {
+  const baseEffects = effects.breakdown.filter((entry) => entry.source === "slime");
+  const accessoryEffects = effects.breakdown.filter((entry) => entry.source !== "slime");
   return (
     <section className={styles.section} aria-labelledby="slime-breakdown-title">
       <div className={styles.breakdownHeading}>
@@ -234,12 +363,40 @@ export function SlimeEffectsSection({ effects }: SlimeEffectsSectionProps) {
       <ul className={styles.breakdown} aria-live="polite">
         {effects.breakdown.length === 0 ? (
           <li>슬라임을 장착하면 개별 버프가 표시돼요.</li>
-        ) : effects.breakdown.map((entry) => (
-          <li key={`${entry.source}:${entry.key}`}>
-            <span>{entry.label}</span>
-            <span>{EFFECT_LABELS[entry.effectKey]} +{formatBpsPercent(entry.bps)}</span>
-          </li>
-        ))}
+        ) : (
+          <>
+            {baseEffects.length > 0 ? (
+              <li className={styles.breakdownGroup}>
+                <strong className={styles.breakdownGroupLabel}>펫 기본 효과</strong>
+                <ul className={styles.breakdownGroupList}>
+                  {baseEffects.map((entry) => (
+                    <li key={`${entry.source}:${entry.key}`}>
+                      <span className={styles.breakdownEffectLabel}>
+                        <span>{entry.label}</span>
+                      </span>
+                      <span>{EFFECT_LABELS[entry.effectKey]} +{formatBpsPercent(entry.bps)}</span>
+                    </li>
+                  ))}
+                </ul>
+              </li>
+            ) : null}
+            {accessoryEffects.length > 0 ? (
+              <li className={styles.breakdownGroup}>
+                <strong className={styles.breakdownGroupLabel}>소품 추가 효과</strong>
+                <ul className={styles.breakdownGroupList}>
+                  {accessoryEffects.map((entry) => (
+                    <li key={`${entry.source}:${entry.key}`}>
+                      <span className={styles.breakdownEffectLabel}>
+                        <span>{entry.label}</span>
+                      </span>
+                      <span>{EFFECT_LABELS[entry.effectKey]} +{formatBpsPercent(entry.bps)}</span>
+                    </li>
+                  ))}
+                </ul>
+              </li>
+            ) : null}
+          </>
+        )}
       </ul>
     </section>
   );

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  addSlimeGrowthSeconds,
   calculateSlimeGrowthSnapshot,
   formatSlimeGrowthRemaining,
   settleSlimeGrowth,
@@ -8,6 +9,7 @@ import {
   slimeGrowthProgressForElapsedSeconds,
   slimeGrowthStageForSeconds,
   SLIME_GROWTH_SECONDS_PER_DAY,
+  SLIME_COOKIE_GROWTH_SECONDS,
 } from "./growth";
 
 const at = (seconds: number) => new Date(seconds * 1000);
@@ -75,5 +77,22 @@ describe("slime wall-clock growth", () => {
     expect(snapshot.remainingMinutes).toBe(2);
     expect(formatSlimeGrowthRemaining(90)).toBe("남은 시간 약 2분");
     expect(formatSlimeGrowthRemaining(0)).toBe("최종 성장 완료");
+  });
+
+  it("adds the cookie's fixed 2% of stage-1 duration and advances stage safely", () => {
+    expect(SLIME_COOKIE_GROWTH_SECONDS).toBe(Math.floor(10 * SLIME_GROWTH_SECONDS_PER_DAY * 0.02));
+    const stageOne = addSlimeGrowthSeconds(state({ growthSeconds: 0 }), SLIME_COOKIE_GROWTH_SECONDS);
+    expect(stageOne.stage).toBe(1);
+    expect(stageOne.growthSeconds).toBe(SLIME_COOKIE_GROWTH_SECONDS);
+
+    const stageTwo = addSlimeGrowthSeconds(
+      state({ stage: 2, growthSeconds: 10 * SLIME_GROWTH_SECONDS_PER_DAY }),
+      SLIME_COOKIE_GROWTH_SECONDS,
+    );
+    expect(stageTwo.stage).toBe(2);
+    expect(stageTwo.growthSeconds).toBe(10 * SLIME_GROWTH_SECONDS_PER_DAY + SLIME_COOKIE_GROWTH_SECONDS);
+    const snapshot = calculateSlimeGrowthSnapshot(stageTwo, at(0));
+    // Stage 2 spans 15 days, so the same absolute bonus is <2% of this stage.
+    expect(snapshot.remainingSeconds).toBe(15 * SLIME_GROWTH_SECONDS_PER_DAY - SLIME_COOKIE_GROWTH_SECONDS);
   });
 });

@@ -11,6 +11,10 @@ import {
   SLIME_SHOP_CATALOG,
 } from "./catalog";
 import {
+  addSlimeGrowthSeconds,
+  calculateSlimeGrowthSnapshot,
+  normalizeSlimeGrowthStage,
+  SLIME_COOKIE_GROWTH_SECONDS,
   settleSlimeGrowth,
   settleSlimeGrowthWithSpeed,
 } from "./growth";
@@ -18,12 +22,14 @@ import { calculateCatalogSlimeEffects } from "./math";
 import {
   SLIME_ITEM_PURCHASE_SOURCE_TYPE,
   SLIME_ITEM_REFUND_SOURCE_TYPE,
+  SLIME_COOKIE_USE_SOURCE_TYPE,
   SLIME_PURCHASE_SOURCE_TYPE,
   SLIME_REFUND_SOURCE_TYPE,
   SlimeServiceError,
   type SlimeEquipResult,
   type SlimeHome,
   type SlimeItemRefundResult,
+  type SlimeCookieConsumeResult,
   type SlimePurchaseResult,
   type SlimeRefundResult,
   type SlimeShopEquipResult,
@@ -41,6 +47,7 @@ import type { SlimeColor, SlimeFloor, SlimeShopItem } from "./types";
 export {
   SLIME_ITEM_PURCHASE_SOURCE_TYPE,
   SLIME_ITEM_REFUND_SOURCE_TYPE,
+  SLIME_COOKIE_USE_SOURCE_TYPE,
   SLIME_PURCHASE_SOURCE_TYPE,
   SLIME_REFUND_SOURCE_TYPE,
   SlimeServiceError,
@@ -55,6 +62,7 @@ export type {
   SlimeServiceErrorCode,
   SlimeShopEquipResult,
   SlimeShopPurchaseResult,
+  SlimeCookieConsumeResult,
 } from "./service-contract";
 
 type StudentIdentity = { id: string; classroomId: string };
@@ -165,9 +173,9 @@ export async function getSlimeHome(student: StudentIdentity): Promise<SlimeHome>
     // ownership) continue to exercise the original home response.
     db.studentCreatureItem?.findMany?.({
       where: { studentId: student.id, quantity: { gt: 0 } },
-      select: { itemKey: true, isEquipped: true },
+      select: { itemKey: true, quantity: true, isEquipped: true },
       orderBy: { createdAt: "asc" },
-    }) ?? Promise.resolve([] as { itemKey: string; isEquipped?: boolean }[]),
+    }) ?? Promise.resolve([] as { itemKey: string; quantity?: number; isEquipped?: boolean }[]),
   ]);
   if (!account) throw new SlimeServiceError("account_not_found");
   const growthRows = Array.isArray(growthRowsResult) ? growthRowsResult : [];
@@ -175,9 +183,20 @@ export async function getSlimeHome(student: StudentIdentity): Promise<SlimeHome>
   const equippedSet = new Set(
     owned.filter((row) => row.isEquipped !== false).map((row) => row.color),
   );
-  const ownedItemKeys = ownedItems
-    .map((item) => item.itemKey)
-    .filter((itemKey) => Boolean(getSlimeShopItem(itemKey)));
+  const ownedItemQuantities: Record<string, number> = {};
+  for (const inventoryItem of Array.isArray(ownedItems) ? ownedItems : []) {
+    if (!getSlimeShopItem(inventoryItem.itemKey)) continue;
+    // Isolated service fixtures predate the quantity field; those rows still
+    // represent one owned item because the query filters out zero quantities.
+    const quantity = Number.isFinite(inventoryItem.quantity)
+      ? Math.max(0, Math.trunc(inventoryItem.quantity as number))
+      : 1;
+    if (quantity > 0) {
+      ownedItemQuantities[inventoryItem.itemKey] =
+        (ownedItemQuantities[inventoryItem.itemKey] ?? 0) + quantity;
+    }
+  }
+  const ownedItemKeys = Object.keys(ownedItemQuantities);
   const equippedItemsByColor = Object.fromEntries(
     owned.map((slime) => [
       slime.color,
@@ -196,7 +215,8 @@ export async function getSlimeHome(student: StudentIdentity): Promise<SlimeHome>
   const representativeColor =
     (owned.find((row) => row.isRepresentative)?.color as SlimeColor | undefined) ?? null;
   const equippedColors = SLIME_CATALOG.map((slime) => slime.color).filter((color) => equippedSet.has(color));
-  const effects = calculateCatalogSlimeEffects(equippedColors, equippedItemKeys);
+  const ownedColors = SLIME_CATALOG.map((slime) => slime.color).filter((color) => ownedSet.has(color));
+  const effects = calculateCatalogSlimeEffects(ownedColors, equippedItemKeys);
   const now = new Date();
   const hasPersistedGrowth = growthRows.some(
     (row) => row.growthLastSettledAt != null,
@@ -220,11 +240,12 @@ export async function getSlimeHome(student: StudentIdentity): Promise<SlimeHome>
   return {
     balance: account.balance,
     currency: { unitLabel: currency?.unitLabel?.trim() || "원" },
-    ownedColors: SLIME_CATALOG.map((slime) => slime.color).filter((color) => ownedSet.has(color)),
+    ownedColors,
     equippedColors,
     representativeColor,
     catalog: SLIME_CATALOG,
     ownedItemKeys,
+    ownedItemQuantities,
     equippedItemKeys,
     equippedItemsByColor,
     equippedFloorByColor,
@@ -304,14 +325,17 @@ export async function equipSlime(
             row.color === candidate && nextIsEquipped,
         ),
     );
-    const effects = growthEffectsForColors(nextEquippedColors);
+    const ownedColors = SLIME_CATALOG.map((candidate) => candidate.color).filter((candidate) =>
+      settledRows.some(({ row }) => row.color === candidate),
+    );
+    const effects = growthEffectsForColors(ownedColors);
     const growthSpeedBps = effects.totals.growth_speed;
     const updatedRows: SlimeGrowthRow[] = [];
 
     for (const { row, settled, nextIsEquipped } of settledRows) {
       const nextState = settleSlimeGrowthWithSpeed(
         settled,
-        nextIsEquipped ? growthSpeedBps : 0,
+        growthSpeedBps,
         now,
       );
       await tx.studentSlime.update({
@@ -427,14 +451,14 @@ export async function purchaseSlime(
             })
           : [];
       const existingGrowthRows = (Array.isArray(growthRowsResult) ? growthRowsResult : []) as SlimeGrowthRow[];
-      const initialEquippedColors = SLIME_CATALOG.map((candidate) => candidate.color).filter(
+      const initialOwnedColors = SLIME_CATALOG.map((candidate) => candidate.color).filter(
         (candidate) =>
           candidate === slime.color ||
           existingGrowthRows.some(
-            (row) => row.color === candidate && row.isEquipped !== false,
+            (row) => row.color === candidate,
           ),
       );
-      const initialGrowthSpeedBps = growthEffectsForColors(initialEquippedColors).totals.growth_speed;
+      const initialGrowthSpeedBps = growthEffectsForColors(initialOwnedColors).totals.growth_speed;
 
       const guarded = await tx.studentAccount.updateMany({
         where: { id: account.id, studentId: student.id, balance: { gte: slime.price } },
@@ -486,7 +510,7 @@ export async function purchaseSlime(
           const settled = settleSlimeGrowth(growthStateFromRow(row, purchasedAt), purchasedAt);
           const nextState = settleSlimeGrowthWithSpeed(
             settled,
-            row.isEquipped !== false ? initialGrowthSpeedBps : 0,
+            initialGrowthSpeedBps,
             purchasedAt,
           );
           await txSlimes.update({
@@ -566,6 +590,7 @@ export async function purchaseSlimeShopItem(
   if (!Number.isSafeInteger(item.price) || item.price <= 0) {
     throw new SlimeServiceError("unknown_item", "Invalid slime item price");
   }
+  const isConsumable = item.category === "food";
 
   const sourceRef = slimeShopPurchaseSourceRef(student.id, idempotencyKey);
   const replay = await replaySlimeShopPurchase(student, sourceRef, item);
@@ -581,7 +606,7 @@ export async function purchaseSlimeShopItem(
     where: { studentId_itemKey: { studentId: student.id, itemKey: item.key } },
     select: { id: true, quantity: true },
   });
-  if (inventory && inventory.quantity > 0) {
+  if (inventory && inventory.quantity > 0 && !isConsumable) {
     throw new SlimeServiceError("already_owned");
   }
 
@@ -609,7 +634,7 @@ export async function purchaseSlimeShopItem(
         where: { studentId_itemKey: { studentId: student.id, itemKey: item.key } },
         select: { id: true, quantity: true },
       });
-      if (owned && owned.quantity > 0) {
+      if (owned && owned.quantity > 0 && !isConsumable) {
         throw new SlimeServiceError("already_owned");
       }
 
@@ -643,7 +668,7 @@ export async function purchaseSlimeShopItem(
         await tx.studentCreatureItem.update({
           where: { id: owned.id },
           data: {
-            quantity: 1,
+            quantity: isConsumable ? { increment: 1 } : 1,
             itemKind: `slime-${item.category}`,
             purchaseTransactionId: transaction.id,
           },
@@ -676,6 +701,225 @@ export async function purchaseSlimeShopItem(
         select: { id: true, quantity: true },
       });
       if (owned && owned.quantity > 0) throw new SlimeServiceError("already_owned");
+      throw new SlimeServiceError("idempotency_key_reused");
+    }
+    throw error;
+  }
+}
+
+export function slimeCookieUseSourceRef(
+  studentId: string,
+  idempotencyKey: string,
+): string {
+  return `${studentId}:${assertIdempotencyKey(idempotencyKey)}`;
+}
+
+type CookieGrowthSnapshot = ReturnType<typeof calculateSlimeGrowthSnapshot>;
+
+function serializeCookieGrowth(snapshot: CookieGrowthSnapshot) {
+  return {
+    ...snapshot,
+    growthLastSettledAt: snapshot.growthLastSettledAt.toISOString(),
+    lastSettledAt: snapshot.lastSettledAt.toISOString(),
+  };
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
+
+function deserializeCookieGrowth(value: unknown): CookieGrowthSnapshot {
+  if (!isRecord(value)) throw new SlimeServiceError("idempotency_key_reused");
+  const growthLastSettledAt = new Date(String(value.growthLastSettledAt ?? value.lastSettledAt ?? ""));
+  const lastSettledAt = new Date(String(value.lastSettledAt ?? value.growthLastSettledAt ?? ""));
+  if (!Number.isFinite(growthLastSettledAt.getTime()) || !Number.isFinite(lastSettledAt.getTime())) {
+    throw new SlimeServiceError("idempotency_key_reused");
+  }
+  const stageValue = Number(value.stage);
+  const growthSecondsValue = Number(value.growthSeconds);
+  const growthRemainderValue = Number(value.growthRemainderBps);
+  const growthSpeedValue = Number(value.growthAppliedSpeedBps);
+  const remainingSecondsValue = Number(value.remainingSeconds);
+  const remainingMinutesValue = Number(value.remainingMinutes);
+  if (
+    !Number.isFinite(stageValue) ||
+    !Number.isFinite(growthSecondsValue) ||
+    !Number.isFinite(growthRemainderValue) ||
+    !Number.isFinite(growthSpeedValue) ||
+    !Number.isFinite(remainingSecondsValue) ||
+    !Number.isFinite(remainingMinutesValue)
+  ) {
+    throw new SlimeServiceError("idempotency_key_reused");
+  }
+  const stage = normalizeSlimeGrowthStage(stageValue);
+  const growthSeconds = Math.max(0, Math.trunc(growthSecondsValue));
+  const growthRemainderBps = Math.max(0, Math.trunc(growthRemainderValue));
+  const growthAppliedSpeedBps = Math.max(0, Math.trunc(growthSpeedValue));
+  const nextStage = value.nextStage === null
+    ? null
+    : value.nextStage === 2 || value.nextStage === 3
+      ? value.nextStage
+      : stage < 3 ? ((stage + 1) as 2 | 3) : null;
+  const remainingSeconds = Math.max(0, Math.trunc(remainingSecondsValue));
+  const remainingMinutes = Math.max(0, Math.trunc(remainingMinutesValue));
+  return {
+    stage,
+    growthSeconds,
+    growthRemainderBps,
+    growthLastSettledAt,
+    growthAppliedSpeedBps,
+    nextStage,
+    remainingSeconds,
+    remainingMinutes,
+    growthProgressSeconds: growthSeconds,
+    lastSettledAt,
+    appliedSpeedBps: growthAppliedSpeedBps,
+  };
+}
+
+function decodeCookieUse(
+  use: { itemKey: string; effectSnapshot: unknown },
+  color: SlimeColor,
+): SlimeCookieConsumeResult {
+  if (use.itemKey !== "slime-cookie" || !isRecord(use.effectSnapshot)) {
+    throw new SlimeServiceError("idempotency_key_reused");
+  }
+  const effect = use.effectSnapshot;
+  if (effect.kind !== "slime-cookie" || effect.color !== color) {
+    throw new SlimeServiceError("idempotency_key_reused");
+  }
+  const remainingQuantity = Number(effect.remainingQuantity);
+  if (!Number.isSafeInteger(remainingQuantity) || remainingQuantity < 0) {
+    throw new SlimeServiceError("idempotency_key_reused");
+  }
+  return {
+    itemKey: "slime-cookie",
+    remainingQuantity,
+    growth: deserializeCookieGrowth(effect.growth),
+  };
+}
+
+async function replaySlimeCookieUse(
+  student: StudentIdentity,
+  sourceRef: string,
+  color: SlimeColor,
+): Promise<SlimeCookieConsumeResult | null> {
+  const use = await db.creatureItemUse.findFirst({
+    where: {
+      studentId: student.id,
+      sourceType: SLIME_COOKIE_USE_SOURCE_TYPE,
+      sourceRef,
+    },
+    select: { itemKey: true, effectSnapshot: true },
+  });
+  if (!use) return null;
+  return decodeCookieUse(use, color);
+}
+
+/** Consume one owned cookie and grant a fixed absolute growth bonus. */
+export async function consumeSlimeCookie(
+  student: StudentIdentity,
+  itemKey: string,
+  color: string,
+  idempotencyKey: string,
+): Promise<SlimeCookieConsumeResult> {
+  const slime = getSlimeDefinition(color);
+  if (itemKey !== "slime-cookie") throw new SlimeServiceError("unknown_item");
+  if (!slime) throw new SlimeServiceError("unknown_slime");
+  const sourceRef = slimeCookieUseSourceRef(student.id, idempotencyKey);
+  const replay = await replaySlimeCookieUse(student, sourceRef, slime.color);
+  if (replay) return replay;
+
+  try {
+    return await serializable(async (tx) => {
+      const existing = await tx.creatureItemUse.findFirst({
+        where: {
+          studentId: student.id,
+          sourceType: SLIME_COOKIE_USE_SOURCE_TYPE,
+          sourceRef,
+        },
+        select: { itemKey: true, effectSnapshot: true },
+      });
+      if (existing) return decodeCookieUse(existing, slime.color);
+
+      const ownedSlime = await tx.studentSlime.findUnique({
+        where: { studentId_color: { studentId: student.id, color: slime.color } },
+        select: slimeGrowthSelect,
+      });
+      if (!ownedSlime) throw new SlimeServiceError("not_owned");
+
+      const inventory = await tx.studentCreatureItem.findUnique({
+        where: { studentId_itemKey: { studentId: student.id, itemKey: "slime-cookie" } },
+        select: { id: true, quantity: true, itemKind: true },
+      });
+      if (!inventory || inventory.itemKind !== "slime-food" || inventory.quantity < 1) {
+        throw new SlimeServiceError("not_owned");
+      }
+
+      const now = new Date();
+      const settled = settleSlimeGrowth(
+        growthStateFromRow(ownedSlime as SlimeGrowthRow),
+        now,
+      );
+      const nextState = addSlimeGrowthSeconds(settled, SLIME_COOKIE_GROWTH_SECONDS);
+      const growth = calculateSlimeGrowthSnapshot(nextState, now);
+      await tx.studentSlime.update({
+        where: { id: ownedSlime.id },
+        data: {
+          growthStage: nextState.stage,
+          growthSeconds: nextState.growthSeconds,
+          growthRemainderBps: nextState.growthRemainderBps,
+          growthLastSettledAt: nextState.growthLastSettledAt,
+          growthAppliedSpeedBps: nextState.growthAppliedSpeedBps,
+        },
+      });
+
+      const guarded = await tx.studentCreatureItem.updateMany({
+        where: { id: inventory.id, quantity: { gte: 1 } },
+        data: { quantity: { decrement: 1 } },
+      });
+      if (guarded.count !== 1) throw new SlimeServiceError("not_owned");
+      const updatedInventory = await tx.studentCreatureItem.findUnique({
+        where: { id: inventory.id },
+        select: { quantity: true },
+      });
+      if (!updatedInventory) throw new SlimeServiceError("not_owned");
+
+      const effectSnapshot = {
+        kind: "slime-cookie",
+        color: slime.color,
+        remainingQuantity: updatedInventory.quantity,
+        growth: serializeCookieGrowth(growth),
+      } as unknown as Prisma.InputJsonValue;
+      await tx.creatureItemUse.create({
+        data: {
+          studentId: student.id,
+          classroomId: student.classroomId,
+          inventoryItemId: inventory.id,
+          itemKey: "slime-cookie",
+          itemKind: "slime-food",
+          quantity: 1,
+          effectSnapshot,
+          progressBefore: settled.growthSeconds,
+          progressAfter: nextState.growthSeconds,
+          stageBefore: String(settled.stage),
+          stageAfter: String(nextState.stage),
+          idempotencyKey: sourceRef,
+          sourceType: SLIME_COOKIE_USE_SOURCE_TYPE,
+          sourceRef,
+          usedAt: now,
+        },
+      });
+      return {
+        itemKey: "slime-cookie",
+        remainingQuantity: updatedInventory.quantity,
+        growth,
+      };
+    });
+  } catch (error) {
+    if (isPrismaCode(error, "P2002")) {
+      const resolved = await replaySlimeCookieUse(student, sourceRef, slime.color);
+      if (resolved) return resolved;
       throw new SlimeServiceError("idempotency_key_reused");
     }
     throw error;

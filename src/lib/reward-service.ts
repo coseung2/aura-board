@@ -56,7 +56,7 @@ export async function loadEquippedRewardBuffBps(
 ): Promise<number> {
   const [slimes, equippedItems] = await Promise.all([
     tx.studentSlime.findMany({
-      where: { studentId, isEquipped: true },
+      where: { studentId },
       select: { color: true },
     }),
     tx.studentCreatureItem.findMany({
