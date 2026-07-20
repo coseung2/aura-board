@@ -226,6 +226,26 @@ export default function StudentHome() {
             </View>
           ) : null}
         </View>
+        <ControlPressable
+          style={styles.slimeHomeEntry}
+          onPress={() => router.push("/(student)/slime" as Href)}
+          accessibilityLabel="슬라임 방 열기"
+        >
+          <Text style={styles.slimeHomeEntryIcon} accessible={false}>
+            🫧
+          </Text>
+          <View style={styles.slimeHomeEntryCopy}>
+            <Text style={styles.slimeHomeEntryTitle}>슬라임 방</Text>
+            <Text style={styles.slimeHomeEntrySubtitle}>
+              성장 상태와 바닥 인벤토리를 확인해요
+            </Text>
+          </View>
+          <ChevronRight
+            size={iconSizes.md}
+            color={colors.textMuted}
+            accessible={false}
+          />
+        </ControlPressable>
       </ScrollView>
     </SafeAreaView>
   );
@@ -819,6 +839,34 @@ const styles = StyleSheet.create({
   dutyRowCta: {
     ...typography.badge,
     color: colors.accent,
+  },
+
+  slimeHomeEntry: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.md,
+    minHeight: tapMin,
+    padding: spacing.md,
+    borderWidth: borders.hairline,
+    borderColor: colors.border,
+    borderRadius: radii.control,
+    backgroundColor: colors.surface,
+  },
+  slimeHomeEntryIcon: {
+    fontSize: iconSizes.lg,
+  },
+  slimeHomeEntryCopy: {
+    flex: 1,
+    minWidth: 0,
+    gap: spacing.xxs,
+  },
+  slimeHomeEntryTitle: {
+    ...typography.label,
+    color: colors.text,
+  },
+  slimeHomeEntrySubtitle: {
+    ...typography.micro,
+    color: colors.textMuted,
   },
 
   sectionSub: {
