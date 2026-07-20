@@ -51,6 +51,7 @@ import {
   SemanticNavItem,
 } from "../../components/ui";
 import { StudentHeaderActions } from "../../components/StudentHeaderActions";
+import { studentPetHref } from "../../lib/slimes";
 
 // 학생 대시보드. 웹과 같은 /api/student/me 계약을 사용한다.
 
@@ -226,26 +227,33 @@ export default function StudentHome() {
             </View>
           ) : null}
         </View>
-        <ControlPressable
-          style={styles.slimeHomeEntry}
-          onPress={() => router.push("/(student)/slime" as Href)}
-          accessibilityLabel="슬라임 방 열기"
-        >
-          <Text style={styles.slimeHomeEntryIcon} accessible={false}>
-            🫧
-          </Text>
-          <View style={styles.slimeHomeEntryCopy}>
-            <Text style={styles.slimeHomeEntryTitle}>슬라임 방</Text>
-            <Text style={styles.slimeHomeEntrySubtitle}>
-              성장 상태와 바닥 인벤토리를 확인해요
-            </Text>
-          </View>
-          <ChevronRight
-            size={iconSizes.md}
-            color={colors.textMuted}
-            accessible={false}
-          />
-        </ControlPressable>
+        <SectionHeader title="펫" />
+        <View style={styles.petLinks}>
+          <ControlPressable
+            style={styles.slimeHomeEntry}
+            onPress={() => router.push(studentPetHref("mine") as Href)}
+            accessibilityLabel="내 펫"
+          >
+            <Text style={styles.slimeHomeEntryIcon} accessible={false}>🫧</Text>
+            <View style={styles.slimeHomeEntryCopy}>
+              <Text style={styles.slimeHomeEntryTitle}>내 펫</Text>
+              <Text style={styles.slimeHomeEntrySubtitle}>대표 펫과 성장 상태를 확인해요</Text>
+            </View>
+            <ChevronRight size={iconSizes.md} color={colors.textMuted} accessible={false} />
+          </ControlPressable>
+          <ControlPressable
+            style={styles.slimeHomeEntry}
+            onPress={() => router.push(studentPetHref("classroom") as Href)}
+            accessibilityLabel="우리 반 펫"
+          >
+            <Text style={styles.slimeHomeEntryIcon} accessible={false}>👥</Text>
+            <View style={styles.slimeHomeEntryCopy}>
+              <Text style={styles.slimeHomeEntryTitle}>우리 반 펫</Text>
+              <Text style={styles.slimeHomeEntrySubtitle}>친구들의 대표 펫을 확인해요</Text>
+            </View>
+            <ChevronRight size={iconSizes.md} color={colors.textMuted} accessible={false} />
+          </ControlPressable>
+        </View>
       </ScrollView>
     </SafeAreaView>
   );
@@ -852,6 +860,7 @@ const styles = StyleSheet.create({
     borderRadius: radii.control,
     backgroundColor: colors.surface,
   },
+  petLinks: { gap: spacing.sm },
   slimeHomeEntryIcon: {
     fontSize: iconSizes.lg,
   },

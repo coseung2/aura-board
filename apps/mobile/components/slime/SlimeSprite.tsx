@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Image, type ImageProps } from "expo-image";
 import { StyleSheet, View } from "react-native";
+import { getApiBase } from "../../lib/api";
 import {
   getSlimeFrame,
   resolveSlimeAsset,
@@ -63,6 +64,8 @@ export function SlimeSprite({
   equippedFloor = "none",
   displayScale: requestedDisplayScale = DEFAULT_DISPLAY_SCALE,
   accessibilityLabel,
+  repeat = false,
+  itemSpritePath,
   onComplete,
 }: SlimeSpriteProps) {
   const displayScale = integerDisplayScale(requestedDisplayScale);
@@ -98,7 +101,7 @@ export function SlimeSprite({
     const currentFrame = getSlimeFrame(resolution, frameIndex);
     const timeoutId = setTimeout(() => {
       const isLastFrame = frameIndex >= resolution.frameCount - 1;
-      if (resolution.oneShot && isLastFrame) {
+      if (resolution.oneShot && isLastFrame && !repeat) {
         if (completedPlaybackRef.current !== playbackKey) {
           completedPlaybackRef.current = playbackKey;
           onCompleteRef.current?.();
@@ -107,16 +110,41 @@ export function SlimeSprite({
       }
 
       setFrameIndex((current) =>
-        resolution.loop
+        resolution.loop || repeat
           ? (current + 1) % resolution.frameCount
           : Math.min(current + 1, resolution.frameCount - 1),
       );
     }, Math.max(0, currentFrame.duration));
 
     return () => clearTimeout(timeoutId);
-  }, [frameIndex, playbackKey, resolution]);
+  }, [frameIndex, playbackKey, repeat, resolution]);
 
   const crownOverlay = resolution.crownOverlay;
+
+  if (itemSpritePath) {
+    const uri = itemSpritePath.startsWith("http")
+      ? itemSpritePath
+      : `${getApiBase()}${itemSpritePath.startsWith("/") ? "" : "/"}${itemSpritePath}`;
+    const size = 256 * displayScale;
+    const itemSizeStyle = { width: size, height: size };
+    return (
+      <View
+        style={[styles.viewport, itemSizeStyle]}
+        accessible
+        accessibilityRole="image"
+        accessibilityLabel={accessibilityLabel ?? `${slimeColor} 슬라임 장착 소품 모습`}
+        testID="slime-sprite"
+      >
+        <Image
+          source={{ uri }}
+          style={itemSizeStyle}
+          contentFit="contain"
+          transition={0}
+          accessible={false}
+        />
+      </View>
+    );
+  }
 
   return (
     <View

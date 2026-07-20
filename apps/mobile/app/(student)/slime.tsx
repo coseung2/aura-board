@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   RefreshControl,
@@ -8,7 +8,7 @@ import {
   View,
   useWindowDimensions,
 } from "react-native";
-import { useFocusEffect, useRouter } from "expo-router";
+import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Image, type ImageProps } from "expo-image";
 import {
@@ -16,6 +16,7 @@ import {
   Check,
   Droplets,
   GlassWater,
+  ShoppingBag,
   Sparkles,
 } from "lucide-react-native";
 import {
@@ -23,6 +24,8 @@ import {
   AppHeader,
   ControlPressable,
   SectionHeader,
+  SemanticNav,
+  SemanticNavItem,
   SurfaceCard,
 } from "../../components/ui";
 import { SlimeSprite } from "../../components/slime/SlimeSprite";
@@ -34,16 +37,26 @@ import {
   type SlimeColor,
 } from "../../lib/slime-assets";
 import {
+  calculateGrowthTimeComparison,
+  calculateSlimeGrowthPercent,
   evolutionForStage,
+  formatGrowthHours,
   floorLabel,
   newSlimeIdempotencyKey,
+  normalizeSlimeClassroom,
   normalizeSlimeHome,
+  shopFilterForItem,
+  slimeBallSpritePath,
+  SLIME_COOKIE_ITEM_KEY,
   SLIME_COLOR_LABELS,
   SLIME_COLOR_SWATCHES,
   SLIME_STAGE_LABELS,
+  SLIME_SHOP_NAV_ITEMS,
   stageForColor,
   type MobileSlimeHome,
+  type MobileSlimeClassmate,
   type SlimeShopItem,
+  type SlimeShopFilter,
 } from "../../lib/slimes";
 import { ApiError, apiFetch } from "../../lib/api";
 import { clearSessionToken } from "../../lib/session";
@@ -57,6 +70,7 @@ import {
   radii,
   spacing,
   states,
+  slime,
   tapMin,
   typography,
 } from "../../theme/tokens";
@@ -103,6 +117,7 @@ function itemFloor(item: SlimeShopItem): Exclude<EquippedFloor, "none"> | null {
 
 export default function StudentSlimeScreen() {
   const router = useRouter();
+  const params = useLocalSearchParams<{ section?: string }>();
   const { width } = useWindowDimensions();
   const [home, setHome] = useState<MobileSlimeHome | null>(null);
   const [selectedColor, setSelectedColor] = useState<SlimeColor>("blue");
@@ -112,6 +127,12 @@ export default function StudentSlimeScreen() {
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<Notice | null>(null);
   const [busyItemKey, setBusyItemKey] = useState<string | null>(null);
+  const [busyColor, setBusyColor] = useState<SlimeColor | null>(null);
+  const [busyRepresentative, setBusyRepresentative] = useState<SlimeColor | null>(null);
+  const [shopFilter, setShopFilter] = useState<SlimeShopFilter>("character");
+  const [classmates, setClassmates] = useState<MobileSlimeClassmate[] | null>(null);
+  const [classroomLoading, setClassroomLoading] = useState(false);
+  const [classroomError, setClassroomError] = useState<string | null>(null);
   const retryKeysRef = useRef(new Map<string, string>());
 
   const load = useCallback(
@@ -151,6 +172,8 @@ export default function StudentSlimeScreen() {
   );
 
   const selectedStage = home ? stageForColor(home, selectedColor) : 1;
+  const owned = home?.ownedColors.includes(selectedColor) ?? false;
+  const stageGrowth = home?.growthByColor[selectedColor];
   const evolution = evolutionForStage(selectedStage);
   const equippedFloor =
     home?.equippedFloorByColor[selectedColor] ??
@@ -160,6 +183,7 @@ export default function StudentSlimeScreen() {
   );
   const lemonade = home?.shopCatalog.find((item) => item.category === "drink");
   const equippedItems = home?.equippedItemsByColor[selectedColor] ?? [];
+  const equippedBallSpritePath = slimeBallSpritePath(equippedItems, selectedColor);
   const lemonadeEquipped = Boolean(
     lemonade && equippedItems.includes(lemonade.key),
   );
@@ -169,6 +193,51 @@ export default function StudentSlimeScreen() {
       home.shopCatalog.find((item) => itemFloor(item) === floor),
     ).filter((item): item is SlimeShopItem => item !== undefined);
   }, [home]);
+  const cookieQuantity = home?.ownedItemQuantities[SLIME_COOKIE_ITEM_KEY] ?? 0;
+  const visibleShopItems = useMemo(
+    () => home?.shopCatalog.filter((item) => shopFilterForItem(item) === shopFilter) ?? [],
+    [home, shopFilter],
+  );
+  const growthPercent = stageGrowth ? calculateSlimeGrowthPercent(stageGrowth) : 0;
+  const growthTime = stageGrowth
+    ? calculateGrowthTimeComparison(stageGrowth.remainingSeconds, home?.growthSpeedBps ?? 0)
+    : null;
+  const section = params.section === "classroom" ? "classroom" : "mine";
+  const passiveAction: SlimeAction = lemonadeEquipped
+    ? "drink"
+    : equippedFloor === "water-puddle" || equippedFloor === "trampoline"
+      ? "floor-interaction"
+      : "idle";
+  const displayedAction = action === "idle" ? passiveAction : action;
+
+  const loadClassroom = useCallback(async () => {
+    setClassroomLoading(true);
+    setClassroomError(null);
+    try {
+      const response = await apiFetch<unknown>("/api/student/slimes/classroom");
+      setClassmates(normalizeSlimeClassroom(response));
+    } catch (loadError) {
+      if (loadError instanceof ApiError && loadError.status === 401) {
+        await clearSessionToken();
+        router.replace("/(student)/login");
+        return;
+      }
+      setClassroomError(apiErrorMessage(loadError));
+    } finally {
+      setClassroomLoading(false);
+    }
+  }, [router]);
+
+  useEffect(() => {
+    if (
+      section === "classroom" &&
+      classmates === null &&
+      !classroomLoading &&
+      classroomError === null
+    ) {
+      void loadClassroom();
+    }
+  }, [classmates, classroomError, classroomLoading, loadClassroom, section]);
 
   const runAction = useCallback(
     (nextAction: SlimeAction, requires?: "lemonade" | "floor") => {
@@ -193,6 +262,10 @@ export default function StudentSlimeScreen() {
     const created = newSlimeIdempotencyKey(scope, identity);
     retryKeysRef.current.set(mapKey, created);
     return created;
+  }, []);
+
+  const clearRetryKey = useCallback((scope: string, identity: string) => {
+    retryKeysRef.current.delete(`${scope}:${identity}`);
   }, []);
 
   const mutateFloor = useCallback(
@@ -231,6 +304,8 @@ export default function StudentSlimeScreen() {
             },
           });
           setNotice({ kind: "success", text: `${item.labelKo}를 구매하고 장착했어요.` });
+          clearRetryKey(scope, keyIdentity);
+          clearRetryKey("slime-floor-equip", `${selectedColor}:${item.key}`);
         } else {
           await apiFetch("/api/student/slimes/items/equip", {
             method: "POST",
@@ -238,6 +313,7 @@ export default function StudentSlimeScreen() {
             headers: { "Idempotency-Key": retryKey(scope, keyIdentity) },
           });
           setNotice({ kind: "success", text: `${item.labelKo}를 장착했어요.` });
+          clearRetryKey(scope, keyIdentity);
         }
         await load(true);
       } catch (mutationError) {
@@ -251,8 +327,118 @@ export default function StudentSlimeScreen() {
         setBusyItemKey(null);
       }
     },
-    [home, load, retryKey, router, runAction, selectedColor],
+    [clearRetryKey, home, load, retryKey, router, runAction, selectedColor],
   );
+
+  const purchaseSlime = useCallback(async (color: SlimeColor) => {
+    if (!home || busyColor || home.ownedColors.includes(color)) return;
+    setBusyColor(color);
+    setNotice(null);
+    try {
+      await apiFetch("/api/student/slimes/purchase", {
+        method: "POST",
+        json: { color },
+        headers: { "Idempotency-Key": retryKey("slime-purchase", color) },
+      });
+      clearRetryKey("slime-purchase", color);
+      setNotice({ kind: "success", text: `${SLIME_COLOR_LABELS[color]} 슬라임을 구매했어요.` });
+      await load(true);
+    } catch (mutationError) {
+      setNotice({ kind: "error", text: apiErrorMessage(mutationError) });
+    } finally {
+      setBusyColor(null);
+    }
+  }, [busyColor, clearRetryKey, home, load, retryKey]);
+
+  const setRepresentative = useCallback(async () => {
+    if (!home || !owned || busyRepresentative) return;
+    setBusyRepresentative(selectedColor);
+    setNotice(null);
+    try {
+      await apiFetch("/api/student/slimes/representative", {
+        method: "POST",
+        json: { color: selectedColor },
+      });
+      setNotice({ kind: "success", text: `${SLIME_COLOR_LABELS[selectedColor]} 슬라임을 대표로 지정했어요.` });
+      await load(true);
+    } catch (mutationError) {
+      setNotice({ kind: "error", text: apiErrorMessage(mutationError) });
+    } finally {
+      setBusyRepresentative(null);
+    }
+  }, [busyRepresentative, home, load, owned, selectedColor]);
+
+  const purchaseItem = useCallback(async (item: SlimeShopItem) => {
+    if (!home || busyItemKey) return;
+    setBusyItemKey(item.key);
+    setNotice(null);
+    try {
+      await apiFetch("/api/student/slimes/items/purchase", {
+        method: "POST",
+        json: { itemKey: item.key },
+        headers: { "Idempotency-Key": retryKey("slime-item-purchase", item.key) },
+      });
+      clearRetryKey("slime-item-purchase", item.key);
+      setNotice({ kind: "success", text: `${item.labelKo}를 구매했어요.` });
+      await load(true);
+    } catch (mutationError) {
+      setNotice({ kind: "error", text: apiErrorMessage(mutationError) });
+    } finally {
+      setBusyItemKey(null);
+    }
+  }, [busyItemKey, clearRetryKey, home, load, retryKey]);
+
+  const toggleItem = useCallback(async (item: SlimeShopItem) => {
+    if (!home || !owned || busyItemKey || item.category === "food") return;
+    const isEquipped = !equippedItems.includes(item.key);
+    setBusyItemKey(item.key);
+    setNotice(null);
+    try {
+      await apiFetch("/api/student/slimes/items/equip", {
+        method: "POST",
+        json: { itemKey: item.key, slimeColor: selectedColor, isEquipped },
+        headers: {
+          "Idempotency-Key": retryKey(
+            "slime-item-equip",
+            `${selectedColor}:${item.key}:${isEquipped}`,
+          ),
+        },
+      });
+      clearRetryKey(
+        "slime-item-equip",
+        `${selectedColor}:${item.key}:${isEquipped}`,
+      );
+      setNotice({ kind: "success", text: `${item.labelKo}를 ${isEquipped ? "적용" : "해제"}했어요.` });
+      await load(true);
+    } catch (mutationError) {
+      setNotice({ kind: "error", text: apiErrorMessage(mutationError) });
+    } finally {
+      setBusyItemKey(null);
+    }
+  }, [busyItemKey, clearRetryKey, equippedItems, home, load, owned, retryKey, selectedColor]);
+
+  const feedCookie = useCallback(async () => {
+    if (!home || !owned || cookieQuantity <= 0 || busyItemKey) return;
+    setBusyItemKey(SLIME_COOKIE_ITEM_KEY);
+    setNotice(null);
+    try {
+      await apiFetch("/api/student/slimes/items/consume", {
+        method: "POST",
+        json: { itemKey: SLIME_COOKIE_ITEM_KEY, color: selectedColor },
+        headers: {
+          "Idempotency-Key": retryKey("slime-cookie-use", selectedColor),
+        },
+      });
+      clearRetryKey("slime-cookie-use", selectedColor);
+      setAction("happy");
+      setNotice({ kind: "success", text: `${SLIME_COLOR_LABELS[selectedColor]} 슬라임에게 쿠키를 먹였어요.` });
+      await load(true);
+    } catch (mutationError) {
+      setNotice({ kind: "error", text: apiErrorMessage(mutationError) });
+    } finally {
+      setBusyItemKey(null);
+    }
+  }, [busyItemKey, clearRetryKey, cookieQuantity, home, load, owned, retryKey, selectedColor]);
 
   if (loading && !home) {
     return (
@@ -280,13 +466,11 @@ export default function StudentSlimeScreen() {
     );
   }
 
-  const owned = home?.ownedColors.includes(selectedColor) ?? false;
-  const stageGrowth = home?.growthByColor[selectedColor];
   const spriteWidth = width >= 520 ? 300 : 256;
 
   return (
     <SafeAreaView style={styles.container} edges={["top"]}>
-      <AppHeader title="슬라임 방" onBack={() => router.back()} />
+      <AppHeader title="펫" onBack={() => router.back()} />
       <ScrollView
         contentContainerStyle={[
           styles.scrollContent,
@@ -300,6 +484,97 @@ export default function StudentSlimeScreen() {
           />
         }
       >
+        <SemanticNav accessibilityLabel="펫 섹션">
+          <SemanticNavItem
+            selected={section === "mine"}
+            onPress={() => router.setParams({ section: "mine" })}
+          >
+            내 펫
+          </SemanticNavItem>
+          <SemanticNavItem
+            selected={section === "classroom"}
+            onPress={() => router.setParams({ section: "classroom" })}
+          >
+            우리 반 펫
+          </SemanticNavItem>
+        </SemanticNav>
+
+        {section === "classroom" ? (
+          classroomLoading && classmates === null ? (
+            <View style={styles.classroomState}>
+              <ActivityIndicator size="large" color={colors.accent} />
+              <Text style={styles.classroomText}>우리 반 펫을 불러오는 중…</Text>
+            </View>
+          ) : classroomError && classmates === null ? (
+            <SurfaceCard style={styles.classroomCard}>
+              <Text style={styles.classroomEmoji} accessible={false}>😵</Text>
+              <Text style={styles.classroomTitle}>우리 반 펫을 불러오지 못했어요</Text>
+              <Text style={styles.classroomText}>{classroomError}</Text>
+              <AppButton onPress={() => void loadClassroom()}>다시 시도</AppButton>
+            </SurfaceCard>
+          ) : classmates?.length === 0 ? (
+            <SurfaceCard style={styles.classroomCard}>
+              <Text style={styles.classroomEmoji} accessible={false}>🫧</Text>
+              <Text style={styles.classroomTitle}>아직 소개할 펫이 없어요</Text>
+              <Text style={styles.classroomText}>친구들이 대표 펫을 지정하면 여기에 보여요.</Text>
+            </SurfaceCard>
+          ) : (
+            <View style={styles.classroomList} accessibilityLabel="우리 반 대표 펫 목록">
+              {classmates?.map((student) => {
+                const representative = student.representative;
+                const classItems = representative
+                  ? home?.shopCatalog.filter((item) =>
+                      representative.equippedItemKeys.includes(item.key),
+                    ) ?? []
+                  : [];
+                const classFloor = classItems.reduce<EquippedFloor>(
+                  (current, item) => item.floor ?? current,
+                  "none",
+                );
+                const classAction: SlimeAction = classItems.some(
+                  (item) => item.category === "drink",
+                )
+                  ? "drink"
+                  : classFloor === "water-puddle" || classFloor === "trampoline"
+                    ? "floor-interaction"
+                    : "idle";
+                const classBallSpritePath = representative
+                  ? slimeBallSpritePath(representative.equippedItemKeys, representative.color)
+                  : undefined;
+                return (
+                  <SurfaceCard key={student.id} style={styles.classmateCard}>
+                    <Text style={styles.classmateName} numberOfLines={1}>
+                      {student.number !== null ? `${student.number}번 ` : ""}{student.name}
+                    </Text>
+                    {representative ? (
+                      <>
+                        <View style={styles.classmateSprite}>
+                          <SlimeSprite
+                            slimeColor={representative.color}
+                            evolution={evolutionForStage(representative.growthStage)}
+                            action={classAction}
+                            equippedFloor={classFloor}
+                            repeat={classAction !== "idle"}
+                            itemSpritePath={classBallSpritePath}
+                            accessibilityLabel={`${student.name}의 ${SLIME_COLOR_LABELS[representative.color]} 대표 펫`}
+                          />
+                        </View>
+                        <Text style={styles.classmateMeta}>
+                          {SLIME_COLOR_LABELS[representative.color]} · {SLIME_STAGE_LABELS[representative.growthStage]}
+                        </Text>
+                      </>
+                    ) : (
+                      <View style={styles.noRepresentative}>
+                        <Text style={styles.classroomText}>대표 펫 미지정</Text>
+                      </View>
+                    )}
+                  </SurfaceCard>
+                );
+              })}
+            </View>
+          )
+        ) : (
+          <>
         <SurfaceCard style={styles.heroCard}>
           <View style={styles.heroHeading}>
             <View style={styles.heroHeadingCopy}>
@@ -322,9 +597,11 @@ export default function StudentSlimeScreen() {
               <SlimeSprite
                 slimeColor={selectedColor}
                 evolution={evolution}
-                action={action}
+                action={displayedAction}
                 equippedFloor={equippedFloor}
-                accessibilityLabel={`${SLIME_COLOR_LABELS[selectedColor]} 슬라임 ${SLIME_STAGE_LABELS[selectedStage]} 단계 ${action} 모습`}
+                repeat={action === "idle" && passiveAction !== "idle"}
+                itemSpritePath={equippedBallSpritePath}
+                accessibilityLabel={`${SLIME_COLOR_LABELS[selectedColor]} 슬라임 ${SLIME_STAGE_LABELS[selectedStage]} 단계 ${displayedAction} 모습`}
                 onComplete={() => setAction("idle")}
               />
             ) : (
@@ -339,9 +616,26 @@ export default function StudentSlimeScreen() {
             <Text style={styles.evolutionValue}>{SLIME_STAGE_LABELS[selectedStage]}</Text>
           </View>
           {stageGrowth && stageGrowth.remainingSeconds > 0 ? (
-            <Text style={styles.growthText}>
-              다음 단계까지 약 {Math.max(1, stageGrowth.remainingMinutes)}분
-            </Text>
+            <View style={styles.growthBlock}>
+              <View style={styles.growthTrack} accessibilityRole="progressbar" accessibilityValue={{ min: 0, max: 100, now: growthPercent }}>
+                <View style={[styles.growthFill, { width: `${growthPercent}%` }]} />
+              </View>
+              <Text style={styles.growthText}>성장 {growthPercent}% · 다음 단계까지 약 {Math.max(1, stageGrowth.remainingMinutes)}분</Text>
+              {growthTime && (home?.growthSpeedBps ?? 0) > 0 ? (
+                <Text style={styles.growthCompare}>
+                  버프 없음 {formatGrowthHours(growthTime.withoutBuffSeconds)} · 적용 후 {formatGrowthHours(growthTime.withBuffSeconds)}
+                </Text>
+              ) : null}
+            </View>
+          ) : null}
+          {owned ? (
+            <AppButton
+              variant={home?.representativeColor === selectedColor ? "secondary" : "primary"}
+              disabled={home?.representativeColor === selectedColor || busyRepresentative !== null}
+              onPress={() => void setRepresentative()}
+            >
+              {home?.representativeColor === selectedColor ? "대표 펫" : busyRepresentative ? "지정 중…" : "대표로 지정"}
+            </AppButton>
           ) : null}
         </SurfaceCard>
 
@@ -372,13 +666,13 @@ export default function StudentSlimeScreen() {
           })}
         </View>
 
-        <SectionHeader title="행동" />
+        <SectionHeader title="먹이 주기" />
         <SurfaceCard style={styles.actionCard}>
           <ControlPressable
             style={styles.actionButton}
-            onPress={() => runAction("happy")}
-            disabled={!owned}
-            accessibilityLabel="쿠키 먹고 행복해하기"
+            onPress={() => void feedCookie()}
+            disabled={!owned || cookieQuantity <= 0 || busyItemKey !== null}
+            accessibilityLabel={`쿠키 먹이기, 보유 ${cookieQuantity}개`}
           >
             <Image
               source={localSource(SLIME_SHARED_ASSETS.cookie.image)}
@@ -389,7 +683,7 @@ export default function StudentSlimeScreen() {
               accessible={false}
             />
             <Text style={styles.actionButtonText}>쿠키</Text>
-            <Text style={styles.actionButtonHint}>행복</Text>
+            <Text style={styles.actionButtonHint}>{cookieQuantity}개 보유</Text>
           </ControlPressable>
           <ControlPressable
             style={[styles.actionButton, !lemonadeEquipped && styles.actionButtonDisabled]}
@@ -405,9 +699,40 @@ export default function StudentSlimeScreen() {
         </SurfaceCard>
 
         <SectionHeader
-          title="바닥 인벤토리"
+          title="상점"
           right={<Text style={styles.sectionMeta}>{home?.balance.toLocaleString() ?? 0}{home?.unitLabel ?? "원"}</Text>}
         />
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.shopTabs} accessibilityRole="tablist">
+          {SLIME_SHOP_NAV_ITEMS.map((tab) => (
+            <ControlPressable
+              key={tab.key}
+              style={[styles.shopTab, shopFilter === tab.key && styles.shopTabSelected]}
+              onPress={() => setShopFilter(tab.key)}
+              accessibilityRole="tab"
+              accessibilityState={{ selected: shopFilter === tab.key }}
+            >
+              <Text style={[styles.shopTabText, shopFilter === tab.key && styles.shopTabTextSelected]}>{tab.label}</Text>
+            </ControlPressable>
+          ))}
+        </ScrollView>
+        {shopFilter === "character" ? (
+          <View style={styles.floorList}>
+            {home?.catalog.map((slime) => {
+              const isOwned = home.ownedColors.includes(slime.color);
+              const busy = busyColor === slime.color;
+              return (
+                <ControlPressable key={slime.key} style={styles.floorRow} disabled={isOwned || busyColor !== null} onPress={() => void purchaseSlime(slime.color)} accessibilityLabel={`${slime.nameKo} ${isOwned ? "보유 중" : "구매"}`}>
+                  <View style={[styles.colorSwatch, { backgroundColor: SLIME_COLOR_SWATCHES[slime.color] }]} />
+                  <View style={styles.floorCopy}>
+                    <Text style={styles.floorTitle}>{slime.nameKo}</Text>
+                    <Text style={styles.floorSubtitle}>기본 효과 +{slime.baseBuffBps / 100}%</Text>
+                  </View>
+                  <Text style={[styles.floorStatusText, !isOwned && styles.floorStatusBuy]}>{busy ? "구매 중…" : isOwned ? "보유 중" : `${slime.price.toLocaleString()}${home.unitLabel}`}</Text>
+                </ControlPressable>
+              );
+            })}
+          </View>
+        ) : shopFilter === "floor" ? (
         <View style={styles.floorList} accessibilityLabel="바닥 인벤토리">
           {floorItems.length === 0 ? (
             <SurfaceCard style={styles.emptyCard}>
@@ -455,6 +780,35 @@ export default function StudentSlimeScreen() {
             })
           )}
         </View>
+        ) : (
+          <View style={styles.floorList}>
+            {visibleShopItems.length === 0 ? (
+              <SurfaceCard style={styles.emptyCard}><Text style={styles.emptyText}>이 분류에는 상품이 없어요.</Text></SurfaceCard>
+            ) : visibleShopItems.map((item) => {
+              const quantity = home?.ownedItemQuantities[item.key] ?? 0;
+              const repeatable = item.key === SLIME_COOKIE_ITEM_KEY;
+              const ownedItem = repeatable ? quantity > 0 : home?.ownedItemKeys.includes(item.key) ?? false;
+              const equipped = equippedItems.includes(item.key);
+              const busy = busyItemKey === item.key;
+              return (
+                <ControlPressable
+                  key={item.key}
+                  style={[styles.floorRow, equipped && styles.floorRowEquipped]}
+                  disabled={busyItemKey !== null}
+                  onPress={() => void (ownedItem && !repeatable ? toggleItem(item) : purchaseItem(item))}
+                  accessibilityLabel={`${item.labelKo} ${repeatable && quantity > 0 ? `${quantity}개 보유, 구매` : equipped ? "해제" : ownedItem ? "적용" : "구매"}`}
+                >
+                  <View style={styles.floorIcon}><ShoppingBag size={iconSizes.md} color={colors.accent} /></View>
+                  <View style={styles.floorCopy}>
+                    <Text style={styles.floorTitle}>{item.labelKo}</Text>
+                    <Text style={styles.floorSubtitle}>{repeatable ? `${quantity}개 보유` : equipped ? "적용 중" : ownedItem ? "보유 중" : `${item.price.toLocaleString()}${home?.unitLabel ?? "원"}`}</Text>
+                  </View>
+                  <Text style={[styles.floorStatusText, !ownedItem && styles.floorStatusBuy]}>{busy ? "처리 중…" : repeatable ? `${item.price}${home?.unitLabel ?? "원"}` : equipped ? "해제" : ownedItem ? "적용" : "구매"}</Text>
+                </ControlPressable>
+              );
+            })}
+          </View>
+        )}
 
         {notice ? (
           <View style={[styles.notice, notice.kind === "error" ? styles.noticeError : styles.noticeSuccess]} accessibilityRole="alert">
@@ -462,6 +816,8 @@ export default function StudentSlimeScreen() {
             <Text style={[styles.noticeText, notice.kind === "error" ? styles.noticeErrorText : styles.noticeSuccessText]}>{notice.text}</Text>
           </View>
         ) : null}
+          </>
+        )}
       </ScrollView>
     </SafeAreaView>
   );
@@ -492,6 +848,10 @@ const styles = StyleSheet.create({
   evolutionLabel: { ...typography.label, color: colors.textMuted },
   evolutionValue: { ...typography.label, color: colors.text, flexShrink: 1, textAlign: "right" },
   growthText: { ...typography.micro, color: colors.textMuted, textAlign: "right" },
+  growthCompare: { ...typography.micro, color: colors.accentTintedText, textAlign: "right" },
+  growthBlock: { gap: spacing.xs },
+  growthTrack: { height: slime.progressHeight, overflow: "hidden", borderRadius: radii.pill, backgroundColor: colors.surfaceAlt },
+  growthFill: { height: "100%", borderRadius: radii.pill, backgroundColor: colors.accent },
   sectionMeta: { ...typography.micro, color: colors.textMuted },
   colorGrid: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm },
   colorButton: { flexGrow: 1, flexBasis: "28%", minWidth: 92, minHeight: tapMin, paddingHorizontal: spacing.sm, paddingVertical: spacing.xs, borderWidth: borders.hairline, borderColor: colors.border, borderRadius: radii.control, backgroundColor: colors.surface, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: spacing.xs },
@@ -508,6 +868,11 @@ const styles = StyleSheet.create({
   actionButtonHint: { ...typography.micro, color: colors.textMuted },
   textMuted: { color: colors.textFaint },
   floorList: { gap: spacing.sm },
+  shopTabs: { gap: spacing.sm, paddingBottom: spacing.xs },
+  shopTab: { minHeight: tapMin, paddingHorizontal: spacing.md, alignItems: "center", justifyContent: "center", borderRadius: radii.pill, backgroundColor: colors.surface },
+  shopTabSelected: { backgroundColor: colors.accentTintedBg },
+  shopTabText: { ...typography.label, color: colors.textMuted },
+  shopTabTextSelected: { color: colors.accentTintedText },
   floorRow: { minHeight: controls.inputHeight + spacing.md + spacing.xs, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, borderWidth: borders.hairline, borderColor: colors.border, borderRadius: radii.control, backgroundColor: colors.surface, flexDirection: "row", alignItems: "center", gap: spacing.md },
   floorRowEquipped: { borderColor: colors.accent, backgroundColor: colors.accentTintedBg },
   floorIcon: { width: controls.iconButton, height: controls.iconButton, borderRadius: radii.control, alignItems: "center", justifyContent: "center", backgroundColor: colors.surfaceAlt },
@@ -529,4 +894,15 @@ const styles = StyleSheet.create({
   noticeText: { ...typography.label, flex: 1 },
   noticeSuccessText: { color: colors.plantActive },
   noticeErrorText: { color: colors.danger },
+  classroomCard: { padding: spacing.xxl, alignItems: "center", gap: spacing.md },
+  classroomEmoji: { fontSize: iconSizes.gate },
+  classroomTitle: { ...typography.title, color: colors.text },
+  classroomText: { ...typography.body, color: colors.textMuted, textAlign: "center" },
+  classroomState: { padding: spacing.xxl, alignItems: "center", gap: spacing.md },
+  classroomList: { gap: spacing.md },
+  classmateCard: { padding: spacing.lg, alignItems: "center", gap: spacing.sm, overflow: "hidden" },
+  classmateName: { ...typography.section, color: colors.text, alignSelf: "stretch", textAlign: "center" },
+  classmateSprite: { minHeight: iconSizes.empty * 4, alignItems: "center", justifyContent: "center" },
+  classmateMeta: { ...typography.label, color: colors.textMuted },
+  noRepresentative: { minHeight: controls.inputHeight + spacing.xl, alignItems: "center", justifyContent: "center" },
 });

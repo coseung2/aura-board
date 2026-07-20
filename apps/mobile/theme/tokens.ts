@@ -500,6 +500,10 @@ export const wallet = {
   qrFrameSize: 252,
 } as const;
 
+export const slime = {
+  progressHeight: 8,
+} as const;
+
 export const parent = {
   linkCodeLength: 5,
   navMinWidth: 80,

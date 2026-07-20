@@ -31,6 +31,7 @@ export const SLIME_STAGE_LABELS: Record<1 | 2 | 3, string> = {
 export type SlimeGrowth = {
   stage: 1 | 2 | 3;
   growthSeconds: number;
+  growthAppliedSpeedBps: number;
   remainingSeconds: number;
   remainingMinutes: number;
 };
@@ -40,16 +41,45 @@ export type SlimeCatalogItem = {
   color: SlimeColor;
   nameKo: string;
   effectKey: string;
+  baseBuffBps: number;
   price: number;
 };
 
 export type SlimeShopItem = {
   key: string;
-  category: "background" | "ride" | "drink";
+  category: "background" | "ride" | "drink" | "food" | "prop" | "level-up";
   floor: Exclude<EquippedFloor, "none"> | null;
   labelKo: string;
   price: number;
+  spritePath: string;
 };
+
+export type SlimeShopFilter = "character" | "floor" | "food" | "prop" | "level-up";
+
+export const SLIME_SHOP_NAV_ITEMS: readonly { key: SlimeShopFilter; label: string }[] = [
+  { key: "character", label: "캐릭터" },
+  { key: "floor", label: "바닥" },
+  { key: "food", label: "먹이" },
+  { key: "prop", label: "소품" },
+  { key: "level-up", label: "레벨업" },
+];
+
+export const SLIME_COOKIE_ITEM_KEY = "slime-cookie";
+
+export function slimeBallSpritePath(
+  itemKeys: readonly string[],
+  slimeColor: SlimeColor,
+): string | undefined {
+  const key = itemKeys.find((itemKey) => itemKey.startsWith("slime-ball-"));
+  if (!key) return undefined;
+  const slug = key.slice("slime-ball-".length);
+  if (!slug || !/^[a-z0-9-]+$/.test(slug)) return undefined;
+  return `/creatures/slimes/official/props/ball/${slug}/${slimeColor}/slime-${slimeColor}-${slug}-hit-4x.gif`;
+}
+
+export function studentPetHref(section: "mine" | "classroom"): string {
+  return `/(student)/slime?section=${section}`;
+}
 
 export type MobileSlimeHome = {
   balance: number;
@@ -59,12 +89,25 @@ export type MobileSlimeHome = {
   representativeColor: SlimeColor | null;
   catalog: SlimeCatalogItem[];
   ownedItemKeys: string[];
+  ownedItemQuantities: Record<string, number>;
   equippedItemKeys: string[];
   equippedItemsByColor: Partial<Record<SlimeColor, string[]>>;
   equippedFloorByColor: Partial<Record<SlimeColor, EquippedFloor>>;
   equippedFloor: EquippedFloor;
   shopCatalog: SlimeShopItem[];
+  growthSpeedBps: number;
   growthByColor: Partial<Record<SlimeColor, SlimeGrowth>>;
+};
+
+export type MobileSlimeClassmate = {
+  id: string;
+  number: number | null;
+  name: string;
+  representative: {
+    color: SlimeColor;
+    growthStage: 1 | 2 | 3;
+    equippedItemKeys: string[];
+  } | null;
 };
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
@@ -110,6 +153,10 @@ function normalizeGrowth(value: unknown): SlimeGrowth {
   return {
     stage: stageValue(item.stage),
     growthSeconds: Math.max(0, Math.trunc(numberValue(item.growthSeconds))),
+    growthAppliedSpeedBps: Math.max(
+      0,
+      Math.trunc(numberValue(item.growthAppliedSpeedBps ?? item.appliedSpeedBps)),
+    ),
     remainingSeconds: Math.max(0, Math.trunc(numberValue(item.remainingSeconds))),
     remainingMinutes: Math.max(0, Math.trunc(numberValue(item.remainingMinutes))),
   };
@@ -130,6 +177,7 @@ function normalizeCatalog(value: unknown): SlimeCatalogItem[] {
             ? entry.nameKo
             : `${SLIME_COLOR_LABELS[itemColor]} 슬라임`,
         effectKey: typeof entry.effectKey === "string" ? entry.effectKey : "",
+        baseBuffBps: Math.max(0, Math.trunc(numberValue(entry.baseBuffBps))),
         price: Math.max(0, Math.trunc(numberValue(entry.price))),
       },
     ];
@@ -141,7 +189,14 @@ function normalizeShopCatalog(value: unknown): SlimeShopItem[] {
   return value.flatMap((entry) => {
     if (!isRecord(entry) || typeof entry.key !== "string") return [];
     const category = entry.category;
-    if (category !== "background" && category !== "ride" && category !== "drink") {
+    if (
+      category !== "background" &&
+      category !== "ride" &&
+      category !== "drink" &&
+      category !== "food" &&
+      category !== "prop" &&
+      category !== "level-up"
+    ) {
       return [];
     }
     const parsedFloor = entry.floor === null ? "none" : floor(entry.floor);
@@ -153,6 +208,7 @@ function normalizeShopCatalog(value: unknown): SlimeShopItem[] {
         floor: itemFloor,
         labelKo: typeof entry.labelKo === "string" ? entry.labelKo : entry.key,
         price: Math.max(0, Math.trunc(numberValue(entry.price))),
+        spritePath: typeof entry.spritePath === "string" ? entry.spritePath : "",
       },
     ];
   });
@@ -180,6 +236,15 @@ function normalizeFloorsByColor(
   return result;
 }
 
+function normalizeQuantities(value: unknown): Record<string, number> {
+  if (!isRecord(value)) return {};
+  const result: Record<string, number> = {};
+  for (const [key, quantity] of Object.entries(value)) {
+    result[key] = Math.max(0, Math.trunc(numberValue(quantity)));
+  }
+  return result;
+}
+
 export function normalizeSlimeHome(payload: unknown): MobileSlimeHome {
   const value = isRecord(payload) ? payload : {};
   const growthSource = isRecord(value.growthByColor)
@@ -196,6 +261,14 @@ export function normalizeSlimeHome(payload: unknown): MobileSlimeHome {
 
   const representativeColor = color(value.representativeColor);
   const equippedFloorByColor = normalizeFloorsByColor(value.equippedFloorByColor);
+  const ownedItemKeys = stringList(value.ownedItemKeys);
+  const ownedItemQuantities = normalizeQuantities(value.ownedItemQuantities);
+  if (
+    ownedItemKeys.includes(SLIME_COOKIE_ITEM_KEY) &&
+    ownedItemQuantities[SLIME_COOKIE_ITEM_KEY] === undefined
+  ) {
+    ownedItemQuantities[SLIME_COOKIE_ITEM_KEY] = 1;
+  }
   return {
     balance: Math.max(0, Math.trunc(numberValue(value.balance))),
     unitLabel:
@@ -206,14 +279,87 @@ export function normalizeSlimeHome(payload: unknown): MobileSlimeHome {
     equippedColors: colorsList(value.equippedColors),
     representativeColor,
     catalog: normalizeCatalog(value.catalog),
-    ownedItemKeys: stringList(value.ownedItemKeys),
+    ownedItemKeys,
+    ownedItemQuantities,
     equippedItemKeys: stringList(value.equippedItemKeys),
     equippedItemsByColor: normalizeItemsByColor(value.equippedItemsByColor),
     equippedFloorByColor,
     equippedFloor: floor(value.equippedFloor),
     shopCatalog: normalizeShopCatalog(value.shopCatalog),
+    growthSpeedBps: Math.max(0, Math.trunc(numberValue(value.growthSpeedBps))),
     growthByColor,
   };
+}
+
+export function normalizeSlimeClassroom(payload: unknown): MobileSlimeClassmate[] {
+  if (!isRecord(payload) || !Array.isArray(payload.students)) return [];
+  return payload.students.flatMap((entry) => {
+    if (!isRecord(entry) || typeof entry.id !== "string" || typeof entry.name !== "string") {
+      return [];
+    }
+    const representative = isRecord(entry.representative) ? entry.representative : null;
+    const representativeColor = representative ? color(representative.color) : null;
+    return [{
+      id: entry.id,
+      number:
+        typeof entry.number === "number" && Number.isFinite(entry.number)
+          ? Math.trunc(entry.number)
+          : null,
+      name: entry.name,
+      representative: representative && representativeColor
+        ? {
+            color: representativeColor,
+            growthStage: stageValue(representative.growthStage),
+            equippedItemKeys: stringList(representative.equippedItemKeys),
+          }
+        : null,
+    }];
+  });
+}
+
+export function shopFilterForItem(item: Pick<SlimeShopItem, "category">): Exclude<SlimeShopFilter, "character"> {
+  if (item.category === "background" || item.category === "ride") return "floor";
+  if (item.category === "food") return "food";
+  if (item.category === "level-up") return "level-up";
+  return "prop";
+}
+
+const STAGE_START_SECONDS: Record<1 | 2 | 3, number> = {
+  1: 0,
+  2: 10 * 86_400,
+  3: 25 * 86_400,
+};
+
+export function calculateSlimeGrowthPercent(
+  growth: Pick<SlimeGrowth, "stage" | "growthSeconds">,
+): number {
+  if (growth.stage >= 3) return 100;
+  const start = STAGE_START_SECONDS[growth.stage];
+  const target = STAGE_START_SECONDS[(growth.stage + 1) as 2 | 3];
+  if (target <= start) return 100;
+  return Math.min(
+    100,
+    Math.max(0, Math.round(((growth.growthSeconds - start) / (target - start)) * 100)),
+  );
+}
+
+export function calculateGrowthTimeComparison(
+  remainingEffectiveSeconds: number,
+  growthSpeedBps: number,
+) {
+  const withoutBuffSeconds = Math.max(0, Math.ceil(remainingEffectiveSeconds));
+  const safeBps = Number.isFinite(growthSpeedBps)
+    ? Math.max(0, Math.round(growthSpeedBps))
+    : 0;
+  return {
+    withoutBuffSeconds,
+    withBuffSeconds: Math.ceil((withoutBuffSeconds * 10_000) / (10_000 + safeBps)),
+  };
+}
+
+export function formatGrowthHours(seconds: number): string {
+  const hours = Math.round((Math.max(0, seconds) / 3_600) * 10) / 10;
+  return `${hours.toLocaleString("ko-KR", { maximumFractionDigits: 1 })}시간`;
 }
 
 export function evolutionForStage(stage: 1 | 2 | 3): SlimeEvolution {
