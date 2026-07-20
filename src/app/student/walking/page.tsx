@@ -11,6 +11,7 @@ import {
 } from "@/lib/walking";
 import { getWalkingWeeklyRewardTiers } from "@/lib/reward-policy";
 import { StudentTopNav } from "@/components/StudentTopNav";
+import { StudentActivityHeader } from "@/components/student/StudentActivityHeader";
 
 const numberFormatter = new Intl.NumberFormat("ko-KR");
 const distanceFormatter = new Intl.NumberFormat("ko-KR", {
@@ -113,11 +114,7 @@ export default async function StudentWalkingPage() {
         duties={home.duties}
       />
       <main className="student-page student-walking-page">
-        <header className="home-header">
-          <div>
-            <h1 className="home-title">걷기</h1>
-          </div>
-        </header>
+        <StudentActivityHeader active="walking" />
 
         {!hasSyncedData ? (
           <section className="classroom-dashboard-panel" aria-labelledby="walking-empty-title">

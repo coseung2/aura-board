@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { StudentTopNav } from "@/components/StudentTopNav";
 import { SlimeCharacterSprite } from "@/components/creatures/SlimeCharacterSprite";
+import { StudentPetSectionHeader } from "@/components/creatures/StudentPetSectionHeader";
 import { db } from "@/lib/db";
 import { getSlimeDefinition, getSlimeShopItem } from "@/lib/pets/catalog";
 import {
@@ -56,13 +57,10 @@ export default async function ClassroomSlimeGalleryPage() {
         duties={duties}
       />
       <main className={styles.page}>
-        <header className={styles.header}>
-          <div>
-            <p className={styles.eyebrow}>CLASS PETS</p>
-            <h1 className={styles.title}>우리 반 펫</h1>
-          </div>
-          <span className={styles.count}>{roster.length}명</span>
-        </header>
+        <StudentPetSectionHeader
+          active="classroom"
+          actions={<span className={styles.count}>{roster.length}명</span>}
+        />
 
         <section className={styles.stage} aria-label="우리 반 대표 펫 전시">
           <div className={styles.backgroundLayer} data-sprite-slot="background" aria-hidden="true" />

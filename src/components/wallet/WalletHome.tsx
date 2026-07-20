@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { getSlimeDefinition, getSlimeShopItem } from "@/lib/pets/catalog";
 import { WalletCardQR } from "./WalletCardQR";
 
 type FD = {
@@ -41,7 +42,61 @@ const TYPE_LABEL: Record<string, string> = {
   avatar_purchase: "캐릭터 상점 구매",
   creature_egg_purchase: "펫 알 구매",
   creature_item_purchase: "펫 아이템 구매",
+  slime_purchase: "슬라임 구매",
+  slime_item_purchase: "슬라임 아이템 구매",
+  correction_credit: "정정 입금",
+  correction_debit: "정정 출금",
 };
+
+const TRANSACTIONS_PER_PAGE = 10;
+
+function formatTransactionNote(note: string): string {
+  const separatorIndex = note.indexOf(":");
+  if (separatorIndex === -1) return note.normalize("NFC");
+
+  const action = note.slice(0, separatorIndex);
+  const itemKey = note.slice(separatorIndex + 1);
+
+  if (action === "slime-purchase" || action === "slime-refund") {
+    const slime = getSlimeDefinition(itemKey);
+    if (slime) {
+      return `${slime.nameKo} ${action === "slime-refund" ? "환불" : "구매"}`;
+    }
+  }
+
+  if (action === "slime-item-purchase" || action === "slime-item-refund") {
+    const item = getSlimeShopItem(itemKey);
+    if (item) {
+      return `${item.labelKo} ${action === "slime-item-refund" ? "환불" : "구매"}`;
+    }
+  }
+
+  return note.normalize("NFC");
+}
+
+function stripRewardAchievementDate(type: string, note: string | null) {
+  if (type !== "deposit" || !note?.includes("보상")) return null;
+
+  const match = note.match(/\s*\[(\d{4})-(\d{2})-(\d{2})\]\s*$/);
+  if (!match) return null;
+
+  const [, year, month, day] = match;
+  return {
+    note: note.slice(0, match.index).trimEnd(),
+    achievementDateLabel: `${Number(year)}. ${Number(month)}. ${Number(day)}.`,
+  };
+}
+
+function formatTransactionDateTime(createdAt: string) {
+  return new Date(createdAt).toLocaleString("ko-KR", {
+    year: "numeric",
+    month: "numeric",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  });
+}
 
 export function WalletHome() {
   const [data, setData] = useState<WalletData | null>(null);
@@ -51,6 +106,7 @@ export function WalletHome() {
   const [fdPrincipal, setFdPrincipal] = useState("");
   const [openingFD, setOpeningFD] = useState(false);
   const [fdNotice, setFdNotice] = useState<string | null>(null);
+  const [transactionPage, setTransactionPage] = useState(1);
 
   const load = useCallback(async () => {
     try {
@@ -72,6 +128,15 @@ export function WalletHome() {
     const i = setInterval(load, 15_000); // 15초마다 백그라운드 새로고침
     return () => clearInterval(i);
   }, [load]);
+
+  useEffect(() => {
+    if (!data) return;
+    const totalPages = Math.max(
+      1,
+      Math.ceil(data.recentTransactions.length / TRANSACTIONS_PER_PAGE),
+    );
+    setTransactionPage((currentPage) => Math.min(currentPage, totalPages));
+  }, [data]);
 
   async function handleCancelFD(fdId: string) {
     if (!data) return;
@@ -135,6 +200,13 @@ export function WalletHome() {
     return <p className="wallet-loading">불러오는 중…</p>;
   }
   const unit = data.currency.unitLabel;
+  const transactionPageCount = Math.ceil(
+    data.recentTransactions.length / TRANSACTIONS_PER_PAGE,
+  );
+  const visibleTransactions = data.recentTransactions.slice(
+    (transactionPage - 1) * TRANSACTIONS_PER_PAGE,
+    transactionPage * TRANSACTIONS_PER_PAGE,
+  );
 
   return (
     <div className="wallet-home">
@@ -162,8 +234,17 @@ export function WalletHome() {
           {data.recentTransactions.length === 0 ? (
             <p className="wallet-txn-empty">아직 거래가 없어요.</p>
           ) : (
+            <>
             <ul className="wallet-txn-list">
-              {data.recentTransactions.map((t) => {
+              {visibleTransactions.map((t) => {
+                const rewardAchievement = stripRewardAchievementDate(t.type, t.note);
+                const transactionNote = t.note
+                  ? formatTransactionNote(rewardAchievement?.note ?? t.note)
+                  : null;
+                const fixedDepositNote =
+                  t.type === "fd_matured"
+                    ? transactionNote?.match(/^(.*?)\s+(\([^)]*\))$/)
+                    : null;
                 const sign =
                   t.type === "deposit" ||
                   t.type === "fd_matured" ||
@@ -179,19 +260,59 @@ export function WalletHome() {
                       {sign}
                       {t.amount.toLocaleString()} {unit}
                     </span>
-                    {t.note && <span className="wallet-txn-note">{t.note}</span>}
+                    {t.note && (
+                      <span className="wallet-txn-note">
+                        {fixedDepositNote ? (
+                          <>
+                            <span>{fixedDepositNote[1]}</span>
+                            <span className="wallet-txn-note-detail">
+                              {fixedDepositNote[2]}
+                            </span>
+                          </>
+                        ) : (
+                          transactionNote
+                        )}
+                      </span>
+                    )}
                     <span className="wallet-txn-time">
-                      {new Date(t.createdAt).toLocaleString("ko-KR", {
-                        month: "numeric",
-                        day: "numeric",
-                        hour: "2-digit",
-                        minute: "2-digit",
-                      })}
+                      {rewardAchievement ? (
+                        <>
+                          <span className="wallet-txn-achieved-at">
+                            달성 {rewardAchievement.achievementDateLabel}
+                          </span>
+                          <span className="wallet-txn-paid-at">
+                            지급 {formatTransactionDateTime(t.createdAt)}
+                          </span>
+                        </>
+                      ) : (
+                        formatTransactionDateTime(t.createdAt)
+                      )}
                     </span>
                   </li>
                 );
               })}
             </ul>
+            {transactionPageCount > 1 ? (
+              <nav className="wallet-txn-pagination" aria-label="거래 기록 페이지">
+                {Array.from({ length: transactionPageCount }, (_, index) => {
+                  const page = index + 1;
+                  const isCurrent = page === transactionPage;
+                  return (
+                    <button
+                      key={page}
+                      type="button"
+                      className={isCurrent ? "is-current" : undefined}
+                      aria-current={isCurrent ? "page" : undefined}
+                      aria-label={`${page}페이지`}
+                      onClick={() => setTransactionPage(page)}
+                    >
+                      {page}
+                    </button>
+                  );
+                })}
+              </nav>
+            ) : null}
+            </>
           )}
         </section>
       </div>

@@ -101,7 +101,6 @@ export function ReadingForm() {
   return (
     <div className="reading-page">
       <section className="reading-form-card">
-        <h1 className="reading-page-title">독서</h1>
         <form className="reading-form" onSubmit={handleSubmit}>
           <div className="reading-form-row">
             <label className="reading-field">

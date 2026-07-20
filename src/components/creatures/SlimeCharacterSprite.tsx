@@ -5,13 +5,22 @@ import type { SlimeDefinition, SlimeShopItem } from "@/lib/pets/types";
 import styles from "./SlimeCharacterSprite.module.css";
 
 const HUE_ANGLES = { green: 275, yellow: 205, purple: 70, red: 155 } as const;
+const GROWTH_CROWN_PATHS = {
+  2: "/creatures/slimes/growth/stage-2-crown.png",
+  3: "/creatures/slimes/growth/stage-3-crown.png",
+} as const;
+
+export type SlimeGrowthStage = 1 | 2 | 3;
 
 export function SlimeCharacterSprite({
   slime,
   items = [],
+  growthStage = 1,
 }: {
   slime: SlimeDefinition;
   items?: SlimeShopItem[];
+  /** Persisted server stage; callers may use stage one while loading. */
+  growthStage?: SlimeGrowthStage;
 }) {
   const rawId = useId();
   const filterId = `slime-${rawId.replace(/:/g, "")}-${slime.color}`;
@@ -19,10 +28,12 @@ export function SlimeCharacterSprite({
   const characterItem = items.find((item) => item.category !== "background");
   const angle = slime.color === "blue" ? null : HUE_ANGLES[slime.color];
   const itemLabels = items.map((item) => item.labelKo).join(", ");
+  const shouldRecolorCharacter = Boolean(characterItem) && angle !== null;
+  const growthCrownPath = growthStage >= 3 ? GROWTH_CROWN_PATHS[3] : growthStage >= 2 ? GROWTH_CROWN_PATHS[2] : null;
 
   return (
     <div className={styles.frame}>
-      {characterItem && angle !== null ? (
+      {shouldRecolorCharacter ? (
         <svg className={styles.filterDefinition} aria-hidden="true" focusable="false">
           <defs>
             <filter id={filterId} colorInterpolationFilters="sRGB">
@@ -52,9 +63,14 @@ export function SlimeCharacterSprite({
         className={styles.character}
         src={characterItem?.spritePath ?? slime.spritePath}
         data-slime-color={characterItem ? slime.color : undefined}
-        style={characterItem && angle !== null ? { filter: `url(#${filterId})` } : undefined}
+        style={shouldRecolorCharacter ? { filter: `url(#${filterId})` } : undefined}
         alt={items.length > 0 ? `${slime.nameKo}, ${itemLabels} 적용 미리보기` : `${slime.nameKo} 미리보기`}
       />
+      {growthCrownPath ? (
+        // Full positioning can be finalized in Aseprite/CSS after the crown layers are cut out.
+        // eslint-disable-next-line @next/next/no-img-element
+        <img className={styles.growthCrown} src={growthCrownPath} alt="" aria-hidden="true" />
+      ) : null}
     </div>
   );
 }

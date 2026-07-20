@@ -8,6 +8,112 @@
   margin: 0 auto;
 }
 
+/* Self-directed activity pages share the same bold section rule as the
+   classroom feature headers while keeping student navigation page-semantic. */
+.student-activity-header {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 24px;
+  margin: 0 0 28px;
+  border-bottom: 2px solid var(--color-text);
+}
+
+.student-activity-heading {
+  min-width: 0;
+  padding: 0 0 14px;
+}
+
+.student-activity-eyebrow {
+  margin: 0 0 6px;
+  color: var(--color-text-muted);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.student-activity-title {
+  margin: 0;
+  color: var(--color-text);
+  font-family: var(--font-display);
+  font-size: 32px;
+  font-weight: 700;
+  line-height: 1.15;
+}
+
+.student-activity-navigation {
+  display: flex;
+  align-items: flex-end;
+  min-width: 0;
+  margin-bottom: -2px;
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
+.student-activity-navigation a {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  padding: 8px 14px;
+  color: var(--color-text-muted);
+  font-size: 13px;
+  font-weight: 800;
+  line-height: 1.4;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.student-activity-navigation a + a::before {
+  position: absolute;
+  left: 0;
+  top: 50%;
+  width: 1px;
+  height: 1em;
+  background: var(--color-border);
+  content: "";
+  transform: translateY(-50%);
+}
+
+.student-activity-navigation a:hover {
+  color: var(--color-text);
+}
+
+.student-activity-navigation a[aria-current="page"] {
+  color: var(--color-accent);
+}
+
+.student-activity-navigation a:focus-visible {
+  outline: 2px solid var(--color-accent-tinted-text);
+  outline-offset: -2px;
+}
+
+@media (max-width: 760px) {
+  .student-activity-header {
+    align-items: flex-start;
+    flex-wrap: wrap;
+    gap: 4px;
+  }
+
+  .student-activity-heading {
+    padding-bottom: 10px;
+  }
+
+  .student-activity-title {
+    font-size: 28px;
+  }
+
+  .student-activity-navigation {
+    width: 100%;
+  }
+
+  .student-activity-navigation a {
+    flex: 1 1 0;
+  }
+}
+
 .student-coming-soon-page {
   min-height: calc(100vh - 64px);
   display: grid;
@@ -1268,6 +1374,11 @@
   margin: 0 auto;
   padding: 24px 24px 48px;
   box-sizing: border-box;
+}
+
+.student-reading-page .reading-page {
+  max-width: none;
+  padding: 0 0 48px;
 }
 
 .reading-form-card,

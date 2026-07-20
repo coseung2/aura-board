@@ -1,10 +1,17 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import Link from "next/link";
 
 import { SLIME_SHOP_CATALOG } from "@/lib/pets/catalog";
-import { calculateCatalogSlimeEffects, formatBpsPercent } from "@/lib/pets/math";
+import {
+  calculateCatalogSlimeEffects,
+  formatBpsPercent,
+} from "@/lib/pets/math";
+import {
+  calculateSlimeGrowthSnapshot,
+  formatSlimeGrowthRemaining,
+  type SlimeGrowthSnapshot,
+} from "@/lib/pets/growth";
 import type {
   SlimeColor,
   SlimeDefinition,
@@ -15,6 +22,7 @@ import type {
 
 import styles from "./SlimePetPage.module.css";
 import { SlimeCharacterSprite } from "./SlimeCharacterSprite";
+import { StudentPetSectionHeader } from "./StudentPetSectionHeader";
 
 const EFFECT_LABELS: Record<SlimeEffectKey, string> = {
   growth_speed: "성장 속도",
@@ -45,6 +53,24 @@ type SlimeHome = {
   equippedItemKeys?: string[];
   equippedItemsByColor?: Partial<Record<SlimeColor, string[]>>;
   shopCatalog?: SlimeShopItem[];
+  growthSpeedBps?: number;
+  growthByColor?: Partial<Record<SlimeColor, SlimeGrowthSnapshotPayload>>;
+  growth?: Partial<Record<SlimeColor, SlimeGrowthSnapshotPayload>>;
+};
+
+type SlimeGrowthSnapshotPayload = Pick<
+  SlimeGrowthSnapshot,
+  | "stage"
+  | "growthSeconds"
+  | "growthRemainderBps"
+  | "growthAppliedSpeedBps"
+  | "nextStage"
+  | "remainingSeconds"
+  | "remainingMinutes"
+> & {
+  growthLastSettledAt?: string | Date;
+  lastSettledAt?: string | Date;
+  appliedSpeedBps?: number;
 };
 
 type Notice = { kind: "success" | "error"; text: string };
@@ -74,10 +100,12 @@ export function SlimePetPage() {
   const [ownedItemKeys, setOwnedItemKeys] = useState<string[]>([]);
   const [equippedItemKeys, setEquippedItemKeys] = useState<string[]>([]);
   const [equippedItemsByColor, setEquippedItemsByColor] = useState<Partial<Record<SlimeColor, string[]>>>({});
+  const [growthByColor, setGrowthByColor] = useState<Partial<Record<SlimeColor, SlimeGrowthSnapshotPayload>>>({});
   const [balance, setBalance] = useState(0);
   const [unitLabel, setUnitLabel] = useState("원");
   const [loading, setLoading] = useState(true);
   const [busyColor, setBusyColor] = useState<SlimeColor | null>(null);
+  const [busyEquipColor, setBusyEquipColor] = useState<SlimeColor | null>(null);
   const [busyRepresentative, setBusyRepresentative] = useState<SlimeColor | null>(null);
   const [busyItemKey, setBusyItemKey] = useState<string | null>(null);
   const [notice, setNotice] = useState<Notice | null>(null);
@@ -127,6 +155,7 @@ export function SlimePetPage() {
         setOwnedItemKeys(home.ownedItemKeys ?? []);
         setEquippedItemKeys(home.equippedItemKeys ?? []);
         setEquippedItemsByColor(home.equippedItemsByColor ?? {});
+        setGrowthByColor(home.growthByColor ?? home.growth ?? {});
         setBalance(home.balance);
         setUnitLabel(home.currency.unitLabel || "원");
       })
@@ -138,6 +167,47 @@ export function SlimePetPage() {
         if (!controller.signal.aborted) setLoading(false);
       });
     return () => controller.abort();
+  }, []);
+
+  // Keep the wall-clock projection fresh while the page is open.  The server
+  // remains authoritative; this only advances the last persisted snapshot and
+  // deliberately refreshes at minute cadence so the UI never shows seconds.
+  useEffect(() => {
+    const tick = () => {
+      setGrowthByColor((current) => {
+        let changed = false;
+        const next = { ...current };
+        const now = new Date();
+        for (const [color, growth] of Object.entries(current) as [
+          SlimeColor,
+          SlimeGrowthSnapshotPayload | undefined,
+        ][]) {
+          if (!growth) continue;
+          const lastSettledAt = growth.growthLastSettledAt ?? growth.lastSettledAt;
+          if (!lastSettledAt) continue;
+          const projected = calculateSlimeGrowthSnapshot(
+            {
+              stage: growth.stage,
+              growthSeconds: growth.growthSeconds,
+              growthRemainderBps: growth.growthRemainderBps ?? 0,
+              growthLastSettledAt: new Date(lastSettledAt),
+              growthAppliedSpeedBps:
+                growth.growthAppliedSpeedBps ?? growth.appliedSpeedBps ?? 0,
+            },
+            now,
+          );
+          next[color] = {
+            ...growth,
+            ...projected,
+            growthLastSettledAt: projected.growthLastSettledAt.toISOString(),
+          };
+          changed = true;
+        }
+        return changed ? next : current;
+      });
+    };
+    const interval = window.setInterval(tick, 60_000);
+    return () => window.clearInterval(interval);
   }, []);
 
   useEffect(() => {
@@ -209,6 +279,46 @@ export function SlimePetPage() {
       setShopNotice({ kind: "error", text: "네트워크 오류가 발생했어요. 다시 시도해 주세요." });
     } finally {
       setBusyColor(null);
+    }
+  };
+
+  const toggleSlime = async (color: SlimeColor, nextEquipped: boolean) => {
+    if (busyEquipColor) return;
+    setBusyEquipColor(color);
+    setNotice(null);
+    try {
+      const response = await fetch("/api/student/slimes/equip", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ color, isEquipped: nextEquipped }),
+      });
+      const payload = (await response.json().catch(() => ({}))) as {
+        error?: string;
+        slimeColor?: SlimeColor;
+        isEquipped?: boolean;
+        equippedColors?: SlimeColor[];
+        growthByColor?: Partial<Record<SlimeColor, SlimeGrowthSnapshotPayload>>;
+        growth?: Partial<Record<SlimeColor, SlimeGrowthSnapshotPayload>>;
+      };
+      if (
+        !response.ok ||
+        payload.slimeColor !== color ||
+        payload.isEquipped !== nextEquipped ||
+        !Array.isArray(payload.equippedColors)
+      ) {
+        setNotice({ kind: "error", text: "슬라임 장착 상태를 바꾸지 못했어요." });
+        return;
+      }
+      setEquippedKeys(payload.equippedColors);
+      setGrowthByColor(payload.growthByColor ?? payload.growth ?? {});
+      setNotice({
+        kind: "success",
+        text: `${catalog.find((entry) => entry.color === color)?.nameKo ?? "슬라임"}을(를) ${nextEquipped ? "장착" : "해제"}했어요.`,
+      });
+    } catch {
+      setNotice({ kind: "error", text: "네트워크 오류가 발생했어요. 다시 시도해 주세요." });
+    } finally {
+      setBusyEquipColor(null);
     }
   };
 
@@ -435,39 +545,35 @@ export function SlimePetPage() {
 
   return (
     <main className={styles.page} data-testid="slime-pet-page">
-      <header className={styles.header}>
-        <div>
-          <p className={styles.eyebrow}>MY PET</p>
-          <h1 className={styles.title}>나의 펫</h1>
-        </div>
-        <div className={styles.walletActions}>
-          <div className={styles.walletSummary} aria-live="polite">
-            <span className={styles.walletLabel}>내 지갑</span>
-            <strong data-testid="slime-wallet-balance">
-              {balance.toLocaleString("ko-KR")} {unitLabel}
-            </strong>
+      <StudentPetSectionHeader
+        active="mine"
+        actions={
+          <div className={styles.walletActions}>
+            <div className={styles.walletSummary} aria-live="polite">
+              <span className={styles.walletLabel}>내 지갑</span>
+              <strong data-testid="slime-wallet-balance">
+                {balance.toLocaleString("ko-KR")} {unitLabel}
+              </strong>
+            </div>
+            <button
+              type="button"
+              className={styles.shopTrigger}
+              onClick={(event) => {
+                drawerTriggerRef.current = event.currentTarget;
+                setShopNotice(null);
+                setWardrobeColor(null);
+                setShopFilter("slimes");
+                setShopOpen(true);
+              }}
+              aria-haspopup="dialog"
+              aria-expanded={shopOpen}
+            >
+              <span className={styles.spriteSlot} aria-hidden="true">🛍</span>
+              <span className={styles.buttonLabel}>상점</span>
+            </button>
           </div>
-          <button
-            type="button"
-            className={styles.shopTrigger}
-            onClick={(event) => {
-              drawerTriggerRef.current = event.currentTarget;
-              setShopNotice(null);
-              setWardrobeColor(null);
-              setShopFilter("slimes");
-              setShopOpen(true);
-            }}
-            aria-haspopup="dialog"
-            aria-expanded={shopOpen}
-          >
-            <span className={styles.spriteSlot} aria-hidden="true">🛍</span>
-            <span className={styles.buttonLabel}>상점</span>
-          </button>
-          <Link href="/student/aura-pet/classroom" className={styles.galleryLink}>
-            우리 반 펫
-          </Link>
-        </div>
-      </header>
+        }
+      />
 
       {loading && <p className={styles.status} role="status">슬라임 정보를 불러오는 중…</p>}
       {notice && (
@@ -510,6 +616,8 @@ export function SlimePetPage() {
             const assignedItems = (equippedItemsByColor[slime.color] ?? [])
               .map((itemKey) => shopCatalog.find((item) => item.key === itemKey))
               .filter((item): item is SlimeShopItem => Boolean(item));
+            const growth = growthByColor[slime.color];
+            const isEquipped = equippedKeys.includes(slime.color);
             return (
               <li
                 key={slime.key}
@@ -519,13 +627,22 @@ export function SlimePetPage() {
                   {representativeColor === slime.color ? "대표" : "보유 중"}
                 </span>
                 <div className={styles.spriteFrame}>
-                  <SlimeCharacterSprite slime={slime} items={assignedItems} />
+                  <SlimeCharacterSprite
+                    slime={slime}
+                    items={assignedItems}
+                    growthStage={growth?.stage ?? 1}
+                  />
                 </div>
                 <div className={styles.itemCopy}>
                   <h3>{slime.nameKo}</h3>
                   <p>
                     {EFFECT_LABELS[slime.effectKey]} +{formatBpsPercent(slime.baseBuffBps)}
                   </p>
+                  {growth ? (
+                    <p className={styles.growthSummary} data-testid={`slime-growth-${slime.color}`}>
+                      성장 {growth.stage}단계 · {formatSlimeGrowthRemaining(growth.remainingSeconds)}
+                    </p>
+                  ) : null}
                   <p className={styles.equipmentSummary} aria-live="polite">
                     {assignedItems.length > 0
                       ? `장착: ${assignedItems.map((item) => item.labelKo).join(", ")}`
@@ -533,6 +650,16 @@ export function SlimePetPage() {
                   </p>
                 </div>
                 <div className={styles.slimeActions}>
+                  <button
+                    type="button"
+                    className={styles.equipButton}
+                    disabled={busyEquipColor !== null}
+                    onClick={() => void toggleSlime(slime.color, !isEquipped)}
+                    aria-pressed={isEquipped}
+                    data-testid={`slime-equip-${slime.color}`}
+                  >
+                    {busyEquipColor === slime.color ? "처리 중…" : isEquipped ? "장착 해제" : "장착"}
+                  </button>
                   {representativeColor !== slime.color ? (
                     <button
                       type="button"

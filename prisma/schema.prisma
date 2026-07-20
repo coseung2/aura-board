@@ -3412,6 +3412,14 @@ model StudentSlime {
   isEquipped Boolean @default(true)
   // Exactly one owned slime is shown as the student's representative.
   isRepresentative Boolean @default(false)
+  // Passive slime growth is an effective wall-clock timer.  The service
+  // settles growthSeconds using growthAppliedSpeedBps before changing either
+  // the equipped state or the applied rate.
+  growthStage           Int      @default(1)
+  growthSeconds         Int      @default(0)
+  growthRemainderBps    Int      @default(0)
+  growthLastSettledAt   DateTime @default(now())
+  growthAppliedSpeedBps Int      @default(0)
   // Shop cosmetics are assigned per owned slime. Each category is kept to one
   // item by the slime equipment service.
   equippedItemKeys String[] @default([])

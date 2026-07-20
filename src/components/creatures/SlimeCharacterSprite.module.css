@@ -24,6 +24,16 @@
   z-index: 1;
 }
 
+.frame img.growthCrown {
+  z-index: 2;
+  inset: 7px auto auto 50%;
+  width: auto;
+  height: auto;
+  max-width: 32px;
+  transform: translateX(-50%);
+  pointer-events: none;
+}
+
 .filterDefinition {
   position: absolute;
   width: 0;

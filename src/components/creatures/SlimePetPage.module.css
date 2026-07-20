@@ -245,6 +245,11 @@
   font-weight: 600;
 }
 
+.itemCopy .growthSummary {
+  color: var(--color-accent-active);
+  font-weight: 700;
+}
+
 .wardrobeButton,
 .representativeButton,
 .shopTrigger,
@@ -356,6 +361,37 @@
   display: flex;
   align-items: center;
   gap: 12px;
+  flex-wrap: wrap;
+}
+
+.equipButton {
+  min-height: 32px;
+  width: fit-content;
+  padding: 5px 8px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-btn);
+  color: var(--color-text-muted);
+  background: transparent;
+  cursor: pointer;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.equipButton[aria-pressed="true"] {
+  border-color: var(--color-accent);
+  color: var(--color-accent-active);
+}
+
+.equipButton:hover,
+.equipButton:focus-visible {
+  border-color: var(--color-accent);
+  color: var(--color-accent-active);
+}
+
+.equipButton:disabled {
+  cursor: wait;
+  opacity: 0.55;
 }
 
 .representativeButton {

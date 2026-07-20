@@ -3,6 +3,7 @@ import { db } from "@/lib/db";
 import { getCurrentStudent } from "@/lib/student-auth";
 import { getStudentDuties } from "@/lib/role-portals";
 import { StudentTopNav } from "@/components/StudentTopNav";
+import { StudentActivityHeader } from "@/components/student/StudentActivityHeader";
 import { ReadingForm } from "./ReadingForm";
 
 export const dynamic = "force-dynamic";
@@ -30,7 +31,8 @@ export default async function StudentReadingPage() {
         classroomName={classroom.name}
         duties={duties}
       />
-      <main className="student-page-portfolio-shell">
+      <main className="student-page student-reading-page">
+        <StudentActivityHeader active="reading" />
         <ReadingForm />
       </main>
     </>

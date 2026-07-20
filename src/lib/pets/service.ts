@@ -9,6 +9,14 @@ import {
   SLIME_CATALOG,
   SLIME_SHOP_CATALOG,
 } from "./catalog";
+import {
+  calculateSlimeGrowthSnapshot,
+  normalizeSlimeGrowthStage,
+  settleSlimeGrowth,
+  settleSlimeGrowthWithSpeed,
+  type SlimeGrowthSnapshot,
+  type SlimeGrowthState,
+} from "./growth";
 import { calculateCatalogSlimeEffects } from "./math";
 import type { SlimeColor, SlimeShopItem } from "./types";
 
@@ -70,6 +78,9 @@ export type SlimeHome = {
   equippedItemsByColor: Partial<Record<SlimeColor, string[]>>;
   shopCatalog: typeof SLIME_SHOP_CATALOG;
   effects: ReturnType<typeof calculateCatalogSlimeEffects>;
+  growthSpeedBps: number;
+  growthByColor: Partial<Record<SlimeColor, SlimeGrowthSnapshot>>;
+  growth: Partial<Record<SlimeColor, SlimeGrowthSnapshot>>;
 };
 
 export type SlimePurchaseResult = {
@@ -91,6 +102,17 @@ export type SlimeShopEquipResult = {
   equippedItemKeys: string[];
   equippedItemsByColor: Partial<Record<SlimeColor, string[]>>;
   idempotent: boolean;
+};
+
+export type SlimeEquipResult = {
+  slimeColor: SlimeColor;
+  isEquipped: boolean;
+  equippedColors: SlimeColor[];
+  growthSpeedBps: number;
+  growthByColor: Partial<Record<SlimeColor, SlimeGrowthSnapshot>>;
+  /** Alias kept for mobile callers that use the shorter payload key. */
+  growth: Partial<Record<SlimeColor, SlimeGrowthSnapshot>>;
+  effects: ReturnType<typeof calculateCatalogSlimeEffects>;
 };
 
 export type SlimeRefundResult = {
@@ -156,6 +178,60 @@ async function serializable<T>(operation: (tx: Prisma.TransactionClient) => Prom
   }
 }
 
+type SlimeGrowthRow = {
+  id: string;
+  color: string;
+  isEquipped: boolean;
+  growthStage: number;
+  growthSeconds: number;
+  growthRemainderBps: number;
+  growthLastSettledAt: Date;
+  growthAppliedSpeedBps: number;
+};
+
+const slimeGrowthSelect = {
+  id: true,
+  color: true,
+  isEquipped: true,
+  growthStage: true,
+  growthSeconds: true,
+  growthRemainderBps: true,
+  growthLastSettledAt: true,
+  growthAppliedSpeedBps: true,
+} as const;
+
+function growthStateFromRow(row: SlimeGrowthRow, fallbackNow = new Date()): SlimeGrowthState {
+  return {
+    stage: normalizeSlimeGrowthStage(row.growthStage),
+    growthSeconds: row.growthSeconds,
+    growthRemainderBps: row.growthRemainderBps,
+    growthLastSettledAt:
+      row.growthLastSettledAt instanceof Date ? row.growthLastSettledAt : fallbackNow,
+    growthAppliedSpeedBps:
+      row.isEquipped !== false ? row.growthAppliedSpeedBps : 0,
+  };
+}
+
+function growthSnapshotByColor(
+  rows: readonly SlimeGrowthRow[],
+  now: Date,
+): Partial<Record<SlimeColor, SlimeGrowthSnapshot>> {
+  const result: Partial<Record<SlimeColor, SlimeGrowthSnapshot>> = {};
+  for (const row of rows) {
+    const slime = getSlimeDefinition(row.color);
+    if (!slime) continue;
+    result[slime.color] = calculateSlimeGrowthSnapshot(
+      growthStateFromRow(row),
+      now,
+    );
+  }
+  return result;
+}
+
+function growthEffectsForColors(equippedColors: readonly SlimeColor[]) {
+  return calculateCatalogSlimeEffects(equippedColors, []);
+}
+
 async function replayPurchase(
   student: StudentIdentity,
   sourceRef: string,
@@ -184,7 +260,7 @@ async function replayPurchase(
 }
 
 export async function getSlimeHome(student: StudentIdentity): Promise<SlimeHome> {
-  const [account, currency, owned, ownedItems] = await Promise.all([
+  const [account, currency, owned, growthRowsResult, ownedItems] = await Promise.all([
     db.studentAccount.findUnique({
       where: { studentId: student.id },
       select: { balance: true },
@@ -200,6 +276,11 @@ export async function getSlimeHome(student: StudentIdentity): Promise<SlimeHome>
       select: { color: true, isEquipped: true, isRepresentative: true, equippedItemKeys: true },
       orderBy: { createdAt: "asc" },
     }),
+    db.studentSlime.findMany({
+      where: { studentId: student.id },
+      select: slimeGrowthSelect,
+      orderBy: { createdAt: "asc" },
+    }),
     // The inventory delegate was added with the creature system. Keeping the
     // runtime guard makes older isolated service tests (which mock only slime
     // ownership) continue to exercise the original home response.
@@ -210,11 +291,10 @@ export async function getSlimeHome(student: StudentIdentity): Promise<SlimeHome>
     }) ?? Promise.resolve([] as { itemKey: string; isEquipped?: boolean }[]),
   ]);
   if (!account) throw new SlimeServiceError("account_not_found");
+  const growthRows = Array.isArray(growthRowsResult) ? growthRowsResult : [];
   const ownedSet = new Set(owned.map((row) => row.color));
   const equippedSet = new Set(
-    owned
-      .filter((row) => row.isEquipped !== false)
-      .map((row) => row.color),
+    owned.filter((row) => row.isEquipped !== false).map((row) => row.color),
   );
   const ownedItemKeys = ownedItems
     .map((item) => item.itemKey)
@@ -228,11 +308,33 @@ export async function getSlimeHome(student: StudentIdentity): Promise<SlimeHome>
   const equippedItemKeys = Array.from(
     new Set(Object.values(equippedItemsByColor).flatMap((keys) => keys ?? [])),
   );
+  const equippedColors = SLIME_CATALOG.map((slime) => slime.color).filter((color) => equippedSet.has(color));
+  const effects = calculateCatalogSlimeEffects(equippedColors, equippedItemKeys);
+  const now = new Date();
+  const hasPersistedGrowth = growthRows.some(
+    (row) => row.growthLastSettledAt != null,
+  );
+  const growthSource = hasPersistedGrowth
+    ? growthRows
+    : owned.map((row) => ({
+        id: `legacy-${row.color}`,
+        color: row.color,
+        isEquipped: row.isEquipped !== false,
+        growthStage: 1,
+        growthSeconds: 0,
+        growthRemainderBps: 0,
+        growthLastSettledAt: now,
+        growthAppliedSpeedBps: 0,
+      }));
+  const growthByColor = growthSnapshotByColor(
+    growthSource as SlimeGrowthRow[],
+    now,
+  );
   return {
     balance: account.balance,
     currency: { unitLabel: currency?.unitLabel?.trim() || "원" },
     ownedColors: SLIME_CATALOG.map((slime) => slime.color).filter((color) => ownedSet.has(color)),
-    equippedColors: SLIME_CATALOG.map((slime) => slime.color).filter((color) => equippedSet.has(color)),
+    equippedColors,
     representativeColor:
       (owned.find((row) => row.isRepresentative)?.color as SlimeColor | undefined) ?? null,
     catalog: SLIME_CATALOG,
@@ -240,7 +342,10 @@ export async function getSlimeHome(student: StudentIdentity): Promise<SlimeHome>
     equippedItemKeys,
     equippedItemsByColor,
     shopCatalog: SLIME_SHOP_CATALOG,
-    effects: calculateCatalogSlimeEffects(Array.from(equippedSet), equippedItemKeys),
+    effects,
+    growthSpeedBps: effects.totals.growth_speed,
+    growthByColor,
+    growth: growthByColor,
   };
 }
 
@@ -270,6 +375,93 @@ export async function setRepresentativeSlime(
   });
 }
 
+/**
+ * Toggle a student's owned slime.  Every row is settled under its persisted
+ * rate first; only then is the aggregate equipped growth speed applied.  This
+ * keeps an equip/unequip request from valuing earlier elapsed time at the new
+ * rate and makes the state transition atomic under concurrent clicks.
+ */
+export async function equipSlime(
+  student: StudentIdentity,
+  color: string,
+  isEquipped: boolean,
+): Promise<SlimeEquipResult> {
+  const slime = getSlimeDefinition(color);
+  if (!slime || typeof isEquipped !== "boolean") {
+    throw new SlimeServiceError("invalid_body");
+  }
+
+  return serializable(async (tx) => {
+    const rowsResult = await tx.studentSlime.findMany({
+      where: { studentId: student.id },
+      select: slimeGrowthSelect,
+      orderBy: { createdAt: "asc" },
+    });
+    const rows = (Array.isArray(rowsResult) ? rowsResult : []) as unknown as SlimeGrowthRow[];
+    const target = rows.find((row) => row.color === slime.color);
+    if (!target) throw new SlimeServiceError("not_owned");
+
+    const now = new Date();
+    const settledRows = rows.map((row) => ({
+      row,
+      settled: settleSlimeGrowth(growthStateFromRow(row), now),
+      nextIsEquipped: row.color === slime.color ? isEquipped : row.isEquipped !== false,
+    }));
+    const nextEquippedColors = SLIME_CATALOG.map((candidate) => candidate.color).filter(
+      (candidate) =>
+        settledRows.some(
+          ({ row, nextIsEquipped }) =>
+            row.color === candidate && nextIsEquipped,
+        ),
+    );
+    const effects = growthEffectsForColors(nextEquippedColors);
+    const growthSpeedBps = effects.totals.growth_speed;
+    const updatedRows: SlimeGrowthRow[] = [];
+
+    for (const { row, settled, nextIsEquipped } of settledRows) {
+      const nextState = settleSlimeGrowthWithSpeed(
+        settled,
+        nextIsEquipped ? growthSpeedBps : 0,
+        now,
+      );
+      await tx.studentSlime.update({
+        where: { id: row.id },
+        data: {
+          isEquipped: nextIsEquipped,
+          growthStage: nextState.stage,
+          growthSeconds: nextState.growthSeconds,
+          growthRemainderBps: nextState.growthRemainderBps,
+          growthLastSettledAt: nextState.growthLastSettledAt,
+          growthAppliedSpeedBps: nextState.growthAppliedSpeedBps,
+        },
+      });
+      updatedRows.push({
+        ...row,
+        isEquipped: nextIsEquipped,
+        growthStage: nextState.stage,
+        growthSeconds: nextState.growthSeconds,
+        growthRemainderBps: nextState.growthRemainderBps,
+        growthLastSettledAt: nextState.growthLastSettledAt,
+        growthAppliedSpeedBps: nextState.growthAppliedSpeedBps,
+      });
+    }
+
+    const growthByColor = growthSnapshotByColor(updatedRows, now);
+    return {
+      slimeColor: slime.color,
+      isEquipped,
+      equippedColors: nextEquippedColors,
+      growthSpeedBps,
+      growthByColor,
+      growth: growthByColor,
+      effects,
+    };
+  });
+}
+
+/** Descriptive alias for callers that prefer a setter-shaped name. */
+export const setSlimeEquipped = equipSlime;
+
 export async function purchaseSlime(
   student: StudentIdentity,
   color: string,
@@ -295,6 +487,8 @@ export async function purchaseSlime(
     select: { id: true },
   });
   if (alreadyOwned) throw new SlimeServiceError("already_owned");
+
+  const purchasedAt = new Date();
 
   try {
     return await serializable(async (tx) => {
@@ -325,6 +519,32 @@ export async function purchaseSlime(
         select: { id: true },
       });
       if (owned) throw new SlimeServiceError("already_owned");
+
+      // Read growth rows inside the same serializable transaction as the
+      // purchase.  Older isolated service mocks may not expose findMany or
+      // update; in that case the new row still receives a correct standalone
+      // rate and no existing row can be mutated accidentally.
+      const txSlimes = tx.studentSlime as unknown as {
+        findMany?: (args: unknown) => Promise<unknown[]>;
+        update?: (args: unknown) => Promise<unknown>;
+      };
+      const growthRowsResult =
+        typeof txSlimes.findMany === "function"
+          ? await txSlimes.findMany({
+              where: { studentId: student.id },
+              select: slimeGrowthSelect,
+              orderBy: { createdAt: "asc" },
+            })
+          : [];
+      const existingGrowthRows = (Array.isArray(growthRowsResult) ? growthRowsResult : []) as SlimeGrowthRow[];
+      const initialEquippedColors = SLIME_CATALOG.map((candidate) => candidate.color).filter(
+        (candidate) =>
+          candidate === slime.color ||
+          existingGrowthRows.some(
+            (row) => row.color === candidate && row.isEquipped !== false,
+          ),
+      );
+      const initialGrowthSpeedBps = growthEffectsForColors(initialEquippedColors).totals.growth_speed;
 
       const guarded = await tx.studentAccount.updateMany({
         where: { id: account.id, studentId: student.id, balance: { gte: slime.price } },
@@ -359,9 +579,38 @@ export async function purchaseSlime(
           classroomId: student.classroomId,
           color: slime.color,
           isRepresentative: !existingRepresentative,
+          growthStage: 1,
+          growthSeconds: 0,
+          growthRemainderBps: 0,
+          growthLastSettledAt: purchasedAt,
+          growthAppliedSpeedBps: initialGrowthSpeedBps,
           purchaseTransactionId: transaction.id,
         },
       });
+
+      // Buying an equipped growth slime changes the rate for every equipped
+      // timer.  Settle each existing row under its persisted old rate, then
+      // apply the new aggregate rate before this transaction commits.
+      if (existingGrowthRows.length > 0 && typeof txSlimes.update === "function") {
+        for (const row of existingGrowthRows) {
+          const settled = settleSlimeGrowth(growthStateFromRow(row, purchasedAt), purchasedAt);
+          const nextState = settleSlimeGrowthWithSpeed(
+            settled,
+            row.isEquipped !== false ? initialGrowthSpeedBps : 0,
+            purchasedAt,
+          );
+          await txSlimes.update({
+            where: { id: row.id },
+            data: {
+              growthStage: nextState.stage,
+              growthSeconds: nextState.growthSeconds,
+              growthRemainderBps: nextState.growthRemainderBps,
+              growthLastSettledAt: nextState.growthLastSettledAt,
+              growthAppliedSpeedBps: nextState.growthAppliedSpeedBps,
+            },
+          });
+        }
+      }
       return {
         ownedColor: slime.color,
         balance: updatedAccount.balance,
