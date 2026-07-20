@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import type { CardData } from "../DraggableCard";
+import { DJ_PLAYED_DRAG_TYPE } from "./dj-queue-state";
 import { DJQueueItem } from "./DJQueueItem";
 
 type Props = {
@@ -43,7 +44,8 @@ export function DJQueueList({
     e: React.DragEvent<HTMLLIElement>,
     cardId: string
   ) {
-    if (!canControl || !draggingId) return;
+    const restoringPlayed = e.dataTransfer.types.includes(DJ_PLAYED_DRAG_TYPE);
+    if (!canControl || (!draggingId && !restoringPlayed)) return;
     e.preventDefault();
     setOverId(cardId);
   }
@@ -52,10 +54,12 @@ export function DJQueueList({
     e: React.DragEvent<HTMLLIElement>,
     targetCardId: string
   ) {
-    if (!canControl || !draggingId) return;
+    const restoredId = e.dataTransfer.getData(DJ_PLAYED_DRAG_TYPE);
+    const draggedId = restoredId || draggingId;
+    if (!canControl || !draggedId) return;
     e.preventDefault();
+    e.stopPropagation();
     setOverId(null);
-    const draggedId = draggingId;
     setDraggingId(null);
     if (draggedId === targetCardId) return;
     const target = cards.find((c) => c.id === targetCardId);

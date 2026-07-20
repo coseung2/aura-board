@@ -8,6 +8,11 @@ import { DJSubmitForm } from "./dj/DJSubmitForm";
 import { DJRanking } from "./dj/DJRanking";
 import { DJPlayedStack } from "./dj/DJPlayedStack";
 import { DJRecapModal } from "./dj/DJRecapModal";
+import {
+  DJ_PLAYED_DRAG_TYPE,
+  deriveDJQueueState,
+  mergeDJQueueSnapshot,
+} from "./dj/dj-queue-state";
 import { useBoardSnapshotRealtime } from "@/hooks/useBoardSnapshotRealtime";
 
 type Props = {
@@ -124,57 +129,23 @@ export function DJBoard({
   const applyQueueSnapshot = useCallback((data: { [key: string]: unknown }) => {
     const snapshot = data as { cards: CardData[] };
     if (!Array.isArray(snapshot.cards)) return;
-    setCards((local) => {
-      const localById = new Map(local.map((c) => [c.id, c] as const));
-      const next: CardData[] = [];
-      for (const sc of snapshot.cards) {
-        if (pendingCardIds.current.has(sc.id)) {
-          const l = localById.get(sc.id);
-          next.push(l ?? sc);
-        } else {
-          next.push(sc);
-        }
-      }
-      for (const l of local) {
-        if (
-          pendingCardIds.current.has(l.id) &&
-          !snapshot.cards.some((sc) => sc.id === l.id)
-        ) {
-          next.push(l);
-        }
-      }
-      return next;
-    });
+    setCards((local) =>
+      mergeDJQueueSnapshot(snapshot.cards, local, pendingCardIds.current),
+    );
   }, []);
 
   useBoardSnapshotRealtime(boardId, ["queue_changed"], applyQueueSnapshot);
 
   // Active queue = pending + approved (non-played). Played cards go into the
   // left drawer so they can be dragged back.
-  const activeQueue = useMemo(() => {
-    const visible = cards.filter(
-      (c) =>
-        c.queueStatus &&
-        c.queueStatus !== "played" &&
-        (canControl || c.queueStatus !== "rejected"),
-    );
-    return [...visible].sort((a, b) => a.order - b.order);
-  }, [cards, canControl]);
-
-  const playedCards = useMemo(() => {
-    return cards
-      .filter((c) => c.queueStatus === "played")
-      .sort((a, b) => b.order - a.order);
-  }, [cards]);
-
-  const nowPlaying = useMemo(() => {
-    return activeQueue.find((c) => c.queueStatus === "approved") ?? null;
-  }, [activeQueue]);
-
-  const upNext = activeQueue.filter((c) => c.id !== nowPlaying?.id);
-
-  const pendingCount = activeQueue.filter((c) => c.queueStatus === "pending").length;
-  const approvedCount = activeQueue.filter((c) => c.queueStatus === "approved").length;
+  const {
+    activeQueue,
+    playedCards,
+    nowPlaying,
+    upNext,
+    pendingCount,
+    approvedCount,
+  } = useMemo(() => deriveDJQueueState(cards, canControl), [cards, canControl]);
   const studentRequests = useMemo(() => {
     if (!currentStudentId || canControl) return [];
     return cards
@@ -252,14 +223,11 @@ export function DJBoard({
       }),
     );
     await trackMutation(cardId, async () => {
-      const res = await fetch(
-        `/api/boards/${boardId}/queue/${cardId}/move`,
-        {
-          method: "PATCH",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify({ order: newOrder }),
-        },
-      );
+      const res = await fetch(`/api/boards/${boardId}/queue/${cardId}/move`, {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ order: newOrder }),
+      });
       if (!res.ok) setCards(prev);
     });
   }
@@ -323,6 +291,7 @@ export function DJBoard({
         open={playedOpen}
         onClose={() => setPlayedOpen(false)}
         onRestore={handleRestorePlayed}
+        onMarkPlayed={(cardId) => void handleStatus(cardId, "played")}
         onDelete={handleDelete}
       />
 
@@ -331,7 +300,8 @@ export function DJBoard({
           <div>
             <h1>🎧 {boardTitle}</h1>
             <p className="dj-board-subtitle">
-              DJ 큐 · 대기 {pendingCount} · 승인 {approvedCount} · 재생 완료 {playedCards.length}
+              DJ 큐 · 대기 {pendingCount} · 승인 {approvedCount} · 재생 완료{" "}
+              {playedCards.length}
             </p>
           </div>
           <div className="dj-header-actions">
@@ -362,10 +332,16 @@ export function DJBoard({
             onNext={handleNextTrack}
           />
         ) : (
-          <section className="dj-nowplaying dj-nowplaying-empty-card" aria-label="재생 중인 곡 없음">
+          <section
+            className="dj-nowplaying dj-nowplaying-empty-card"
+            aria-label="재생 중인 곡 없음"
+          >
             <div className="dj-nowplaying-label">▶ NOW PLAYING</div>
             <div className="dj-nowplaying-body">
-              <div className="dj-thumb-lg dj-nowplaying-placeholder" aria-hidden="true">
+              <div
+                className="dj-thumb-lg dj-nowplaying-placeholder"
+                aria-hidden="true"
+              >
                 ♪
               </div>
               <div className="dj-nowplaying-info">
@@ -379,11 +355,30 @@ export function DJBoard({
         )}
 
         <div className="dj-layout">
-          <section className="dj-queue-card">
+          <section
+            className="dj-queue-card"
+            onDragOver={(event) => {
+              if (
+                canControl &&
+                event.dataTransfer.types.includes(DJ_PLAYED_DRAG_TYPE)
+              ) {
+                event.preventDefault();
+              }
+            }}
+            onDrop={(event) => {
+              if (!canControl) return;
+              const cardId = event.dataTransfer.getData(DJ_PLAYED_DRAG_TYPE);
+              if (!cardId) return;
+              event.preventDefault();
+              void handleRestorePlayed(cardId);
+            }}
+          >
             <h3 className="dj-queue-title">
               대기열
               <span className="dj-queue-hint">
-                {canControl ? "드래그해서 순서 변경 · 재생 완료에서도 복귀 가능" : "선생님이 승인하면 재생 목록에 올라갑니다"}
+                {canControl
+                  ? "드래그해서 순서 변경 · 재생 완료에서도 복귀 가능"
+                  : "선생님이 승인하면 재생 목록에 올라갑니다"}
               </span>
             </h3>
             {upNext.length === 0 ? (

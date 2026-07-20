@@ -1,6 +1,10 @@
 "use client";
 
 import type { CardData } from "../DraggableCard";
+import {
+  DJ_PLAYED_DRAG_TYPE,
+  resolveDJQueueAuthorName,
+} from "./dj-queue-state";
 
 type Props = {
   cards: CardData[];
@@ -11,6 +15,7 @@ type Props = {
   /** Called when the user drags a played card back into the main queue.
    *  DJBoard maps that to: queueStatus = "approved" + reinsert at the end. */
   onRestore: (cardId: string) => void;
+  onMarkPlayed: (cardId: string) => void;
   /** Called when the user taps the delete button on a played card.
    *  DJBoard maps that to DELETE /api/boards/:id/queue/:cardId. */
   onDelete: (cardId: string) => void;
@@ -27,16 +32,14 @@ export function DJPlayedStack({
   open,
   onClose,
   onRestore,
+  onMarkPlayed,
   onDelete,
 }: Props) {
-  function handleDragStart(
-    e: React.DragEvent<HTMLLIElement>,
-    cardId: string,
-  ) {
+  function handleDragStart(e: React.DragEvent<HTMLLIElement>, cardId: string) {
     if (!canControl) return;
     e.dataTransfer.effectAllowed = "move";
     // 쪽 구분용 MIME — queue 가 외부 드롭인지 내부 재정렬인지 구분.
-    e.dataTransfer.setData("application/x-dj-played", cardId);
+    e.dataTransfer.setData(DJ_PLAYED_DRAG_TYPE, cardId);
     e.dataTransfer.setData("text/plain", cardId);
   }
 
@@ -52,16 +55,29 @@ export function DJPlayedStack({
         aria-label="재생 완료된 곡"
         aria-hidden={!open}
         onDragOver={(e) => {
-          // queue 아이템을 드롭하면 played 로 이동 가능 — 상위 DJBoard 에서 처리.
-          if (canControl && e.dataTransfer.types.includes("text/plain")) {
+          const queueItemDrag =
+            e.dataTransfer.types.includes("text/plain") &&
+            !e.dataTransfer.types.includes(DJ_PLAYED_DRAG_TYPE);
+          if (canControl && queueItemDrag) {
             e.preventDefault();
           }
+        }}
+        onDrop={(e) => {
+          const queueItemDrag =
+            e.dataTransfer.types.includes("text/plain") &&
+            !e.dataTransfer.types.includes(DJ_PLAYED_DRAG_TYPE);
+          if (!canControl || !queueItemDrag) return;
+          e.preventDefault();
+          const cardId = e.dataTransfer.getData("text/plain");
+          if (cardId) onMarkPlayed(cardId);
         }}
       >
         <header className="dj-played-head">
           <div>
             <div className="dj-played-title">재생 완료</div>
-            <div className="dj-played-subtitle">드래그로 대기열에 복귀시킬 수 있습니다</div>
+            <div className="dj-played-subtitle">
+              드래그로 대기열에 복귀시킬 수 있습니다
+            </div>
           </div>
           <button
             type="button"
@@ -86,7 +102,11 @@ export function DJPlayedStack({
                 draggable={canControl}
                 onDragStart={(e) => handleDragStart(e, card.id)}
                 onDoubleClick={() => canControl && onRestore(card.id)}
-                title={canControl ? "끌어서 큐로 되돌리기 · 더블클릭으로 복귀" : card.title}
+                title={
+                  canControl
+                    ? "끌어서 큐로 되돌리기 · 더블클릭으로 복귀"
+                    : card.title
+                }
               >
                 {card.linkImage ? (
                   <img
@@ -105,7 +125,7 @@ export function DJPlayedStack({
                   <div className="dj-track">{card.title}</div>
                   <div className="dj-sub">
                     {card.linkDesc ? <>{card.linkDesc} · </> : null}
-                    {card.externalAuthorName ?? card.studentAuthorName ?? card.authorName ?? ""}
+                    {resolveDJQueueAuthorName(card)}
                   </div>
                 </div>
                 {canControl ? (

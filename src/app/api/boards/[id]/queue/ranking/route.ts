@@ -24,7 +24,7 @@ export async function GET(
 
   const board = await db.board.findFirst({
     where: { OR: [{ id: boardIdOrSlug }, { slug: boardIdOrSlug }] },
-    select: { id: true },
+    select: { id: true, anonymousAuthor: true },
   });
   if (!board) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
@@ -106,9 +106,15 @@ export async function GET(
     if (entry) entry.count += 1;
     else submitterMap.set(key, { key, name, count: 1, isStudent });
   }
-  const submitters = [...submitterMap.values()]
-    .sort((a, b) => b.count - a.count)
-    .slice(0, 10);
+  const submitters = board.anonymousAuthor
+    ? []
+    : [...submitterMap.values()]
+        .sort((a, b) => b.count - a.count)
+        .slice(0, 10);
 
-  return NextResponse.json({ songs, submitters });
+  return NextResponse.json({
+    songs,
+    submitters,
+    submittersHidden: board.anonymousAuthor,
+  });
 }

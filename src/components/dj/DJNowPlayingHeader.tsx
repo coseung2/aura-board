@@ -3,6 +3,7 @@
 import { useEffect, useRef } from "react";
 import type { CardData } from "../DraggableCard";
 import { useDJPlayer } from "./DJPlayerProvider";
+import { resolveDJQueueAuthorName } from "./dj-queue-state";
 
 type Props = {
   card: CardData;
@@ -30,7 +31,12 @@ function extractVideoId(url: string | null | undefined): string | null {
  * - 썸네일 `<img>` 는 iframe 이 덮는 영역과 동일 - iframe 이 불투명해서
  *   시각적으로 숨겨지고, 재생 중이 아닐 땐 썸네일이 자연스럽게 보임.
  */
-export function DJNowPlayingHeader({ card, boardId, canControl, onNext }: Props) {
+export function DJNowPlayingHeader({
+  card,
+  boardId,
+  canControl,
+  onNext,
+}: Props) {
   const {
     activeCard,
     playing,
@@ -43,11 +49,7 @@ export function DJNowPlayingHeader({ card, boardId, canControl, onNext }: Props)
   } = useDJPlayer();
   const hostRef = useRef<HTMLDivElement | null>(null);
 
-  const submitter =
-    card.externalAuthorName ??
-    card.studentAuthorName ??
-    card.authorName ??
-    "";
+  const submitter = resolveDJQueueAuthorName(card);
   const videoId = extractVideoId(card.videoUrl ?? card.linkUrl);
   const isActive = activeCard?.id === card.id;
 

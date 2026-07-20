@@ -1,4 +1,5 @@
 import type { CardData } from "../DraggableCard";
+import { resolveDJQueueAuthorName } from "./dj-queue-state";
 
 /**
  * 핸드오프 DJBoardPage.jsx 의 `.ab-dj-item` 그리드 구조를 그대로 포팅:
@@ -36,11 +37,7 @@ export function DJQueueItem({
   onMarkPlayed,
   onDelete,
 }: Props) {
-  const submitter =
-    card.externalAuthorName ??
-    card.studentAuthorName ??
-    card.authorName ??
-    "";
+  const submitter = resolveDJQueueAuthorName(card);
   const status = card.queueStatus ?? "pending";
   const isPending = status === "pending";
 

@@ -36,15 +36,13 @@ export async function GET(
   }
 
   // 접근 권한 — 학생: 자기 학급 / 교사: getEffectiveBoardRole.
-  if (student) {
-    if (board.classroomId !== student.classroomId) {
-      return NextResponse.json({ error: "forbidden" }, { status: 403 });
-    }
-  } else if (user) {
+  if (user) {
     const role = await getEffectiveBoardRole(board.id, { userId: user.id });
     if (!role) {
       return NextResponse.json({ error: "forbidden" }, { status: 403 });
     }
+  } else if (student && board.classroomId !== student.classroomId) {
+    return NextResponse.json({ error: "forbidden" }, { status: 403 });
   }
 
   const card = await db.card.findFirst({

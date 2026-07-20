@@ -30,6 +30,7 @@ type RecapData = {
   };
   topSongs: Song[];
   topSubmitters: Submitter[];
+  submittersHidden?: boolean;
   byDay: Array<{ date: string; plays: number }>;
   spotlight: { topSong: Song | null; topSubmitter: Submitter | null };
 };
@@ -214,14 +215,20 @@ export function DJRecapModal({ boardId, boardTitle, onClose }: Props) {
             <section className="dj-recap-section">
               <h3 className="dj-recap-sectiontitle">신청 TOP</h3>
               <ul className="dj-recap-ranking">
-                {data.topSubmitters.map((s, i) => (
-                  <li key={`${s.id ?? s.name}`} className="dj-recap-rankrow">
-                    <span className={`dj-recap-pos${i < 3 ? " top" : ""}`}>{i + 1}</span>
-                    <span className={`dj-recap-avatar${i === 0 ? " top" : ""}`}>{s.name[0]}</span>
-                    <span className="dj-recap-rankname">{s.name}</span>
-                    <span className="dj-recap-rankcount">{s.plays}회 · {s.uniqueSongs}곡</span>
+                {data.submittersHidden ? (
+                  <li className="dj-recap-empty">
+                    익명 보드에서는 신청자 순위를 숨겨요.
                   </li>
-                ))}
+                ) : (
+                  data.topSubmitters.map((s, i) => (
+                    <li key={`${s.id ?? s.name}`} className="dj-recap-rankrow">
+                      <span className={`dj-recap-pos${i < 3 ? " top" : ""}`}>{i + 1}</span>
+                      <span className={`dj-recap-avatar${i === 0 ? " top" : ""}`}>{s.name[0]}</span>
+                      <span className="dj-recap-rankname">{s.name}</span>
+                      <span className="dj-recap-rankcount">{s.plays}회 · {s.uniqueSongs}곡</span>
+                    </li>
+                  ))
+                )}
               </ul>
             </section>
 

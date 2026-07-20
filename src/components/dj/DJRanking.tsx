@@ -25,6 +25,7 @@ type Props = {
 export function DJRanking({ boardId, refreshKey }: Props) {
   const [songs, setSongs] = useState<Song[]>([]);
   const [submitters, setSubmitters] = useState<Submitter[]>([]);
+  const [submittersHidden, setSubmittersHidden] = useState(false);
   const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
@@ -37,6 +38,7 @@ export function DJRanking({ boardId, refreshKey }: Props) {
         if (cancelled) return;
         setSongs(data.songs ?? []);
         setSubmitters(data.submitters ?? []);
+        setSubmittersHidden(data.submittersHidden === true);
       } catch {
         // silent — sidebar is non-critical
       } finally {
@@ -93,6 +95,10 @@ export function DJRanking({ boardId, refreshKey }: Props) {
         <p className="dj-ranking-meta">{monthLabel}</p>
         {!loaded ? (
           <p className="dj-ranking-loading">불러오는 중…</p>
+        ) : submittersHidden ? (
+          <p className="dj-ranking-empty">
+            익명 보드에서는 신청자 순위를 숨겨요
+          </p>
         ) : submitters.length === 0 ? (
           <p className="dj-ranking-empty">아직 신청이 없어요</p>
         ) : (

@@ -68,22 +68,26 @@ export async function GET(req: Request) {
 
   const board = await db.board.findFirst({
     where: { OR: [{ id: boardIdOrSlug }, { slug: boardIdOrSlug }] },
-    select: { id: true, classroomId: true, title: true, layout: true },
+    select: {
+      id: true,
+      classroomId: true,
+      title: true,
+      layout: true,
+      anonymousAuthor: true,
+    },
   });
   if (!board) {
     return NextResponse.json({ error: "not_found" }, { status: 404 });
   }
 
   // 학생은 자기 학급 보드만. 교사는 getEffectiveBoardRole 기반 access.
-  if (student) {
-    if (board.classroomId !== student.classroomId) {
-      return NextResponse.json({ error: "forbidden" }, { status: 403 });
-    }
-  } else if (user) {
+  if (user) {
     const role = await getEffectiveBoardRole(board.id, { userId: user.id });
     if (!role) {
       return NextResponse.json({ error: "forbidden" }, { status: 403 });
     }
+  } else if (student && board.classroomId !== student.classroomId) {
+    return NextResponse.json({ error: "forbidden" }, { status: 403 });
   }
 
   const { from, to, label } = parseMonth(monthRaw);
@@ -170,6 +174,15 @@ export async function GET(req: Request) {
     .sort((a, b) => b.plays - a.plays || a.name.localeCompare(b.name))
     .slice(0, 10);
 
+  const submittersHidden = board.anonymousAuthor;
+  const safeTopSongs = submittersHidden
+    ? topSongs.map((song) => ({
+        ...song,
+        firstSubmitter: song.firstSubmitter ? "익명" : null,
+      }))
+    : topSongs;
+  const safeTopSubmitters = submittersHidden ? [] : topSubmitters;
+
   const byDayArr = (() => {
     const out: Array<{ date: string; plays: number }> = [];
     // month 전체 범위를 채워서 sparkline 공백 없게.
@@ -197,12 +210,13 @@ export async function GET(req: Request) {
       uniqueSubmitters: submitterBy.size,
       totalMinutes: Math.round(totalSeconds / 60),
     },
-    topSongs,
-    topSubmitters,
+    topSongs: safeTopSongs,
+    topSubmitters: safeTopSubmitters,
+    submittersHidden,
     byDay: byDayArr,
     spotlight: {
-      topSong: topSongs[0] ?? null,
-      topSubmitter: topSubmitters[0] ?? null,
+      topSong: safeTopSongs[0] ?? null,
+      topSubmitter: safeTopSubmitters[0] ?? null,
     },
   });
 }
