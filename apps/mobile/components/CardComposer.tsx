@@ -28,6 +28,7 @@ type Props = {
   visible: boolean;
   boardId: string;
   sectionId?: string | null;
+  order?: number;
   onClose: () => void;
   onCreated: (card: BoardCard) => void;
 };
@@ -39,7 +40,14 @@ type UploadResult = {
   mimeType: string;
 };
 
-export function CardComposer({ visible, boardId, sectionId, onClose, onCreated }: Props) {
+export function CardComposer({
+  visible,
+  boardId,
+  sectionId,
+  order,
+  onClose,
+  onCreated,
+}: Props) {
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
   const [linkUrl, setLinkUrl] = useState("");
@@ -174,6 +182,7 @@ export function CardComposer({ visible, boardId, sectionId, onClose, onCreated }
         content: content.trim(),
       };
       if (sectionId) payload.sectionId = sectionId;
+      if (Number.isFinite(order)) payload.order = order;
       if (normalizedLink) payload.linkUrl = normalizedLink;
       if (attachments.length) payload.attachments = attachments;
       // 이미지가 있으면 호환성을 위해 imageUrl 도 채움.

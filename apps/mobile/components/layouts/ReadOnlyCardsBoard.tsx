@@ -12,6 +12,7 @@ import { CommentBottomSheet } from "../CommentBottomSheet";
 import type { BoardDetailResponse, BoardCard } from "../../lib/types";
 import { withBoardAnonymousAuthors } from "../../lib/card-privacy";
 import { StreamFeedPost } from "./ColumnsBoard";
+import { sortCards, updateCardCommentCount } from "./cards-board-utils";
 
 // 카드 추가를 아직 모바일에서 지원하지 않는 레이아웃의 공통 뷰어.
 // vibe-gallery / dj-queue / event-signup / breakout / assessment / drawing.
@@ -19,12 +20,12 @@ import { StreamFeedPost } from "./ColumnsBoard";
 export function ReadOnlyCardsBoard({ data }: { data: BoardDetailResponse }) {
   const [commentCard, setCommentCard] = useState<BoardCard | null>(null);
   const [cards, setCards] = useState<BoardCard[]>(() =>
-    withBoardAnonymousAuthors(data.cards, data.board),
+    withBoardAnonymousAuthors(sortCards(data.cards), data.board),
   );
   const boardTheme = boardThemes[normalizeBoardTheme(data.board.boardTheme)];
 
   useEffect(() => {
-    setCards(withBoardAnonymousAuthors(data.cards, data.board));
+    setCards(withBoardAnonymousAuthors(sortCards(data.cards), data.board));
   }, [data.cards, data.board]);
 
   return (
@@ -49,6 +50,7 @@ export function ReadOnlyCardsBoard({ data }: { data: BoardDetailResponse }) {
             </Text>
           </View>
         }
+        keyboardShouldPersistTaps="handled"
         initialNumToRender={8}
         maxToRenderPerBatch={8}
         updateCellsBatchingPeriod={40}
@@ -62,17 +64,7 @@ export function ReadOnlyCardsBoard({ data }: { data: BoardDetailResponse }) {
         onCommentCountChange={(change) => {
           if (!commentCard) return;
           setCards((current) =>
-            current.map((card) =>
-              card.id === commentCard.id
-                ? {
-                    ...card,
-                    commentCount: Math.max(
-                      0,
-                      (card.commentCount ?? 0) + change,
-                    ),
-                  }
-                : card,
-            ),
+            updateCardCommentCount(current, commentCard.id, change),
           );
         }}
       />

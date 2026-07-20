@@ -18,17 +18,13 @@ import {
 import { Fab } from "../ui";
 import { useBoardRealtime } from "../../lib/use-board-realtime";
 import { StreamFeedPost } from "./ColumnsBoard";
+import {
+  nextCardOrder,
+  sortCards,
+  updateCardCommentCount,
+} from "./cards-board-utils";
 
 // freeform / grid / stream 공용 — 모바일에서는 세로 피드로 일관되게 보여준다.
-
-function sortCards(cards: BoardCard[]): BoardCard[] {
-  return [...cards].sort((a, b) => {
-    const ao = a.order ?? 0;
-    const bo = b.order ?? 0;
-    if (ao !== bo) return ao - bo;
-    return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
-  });
-}
 
 export function CardsBoard({
   data,
@@ -49,7 +45,9 @@ export function CardsBoard({
   }, [data.cards, data.board]);
 
   function handleCreated(card: BoardCard) {
-    setCards((prev) => [...prev, withBoardAnonymousAuthor(card, data.board)]);
+    setCards((prev) =>
+      sortCards([...prev, withBoardAnonymousAuthor(card, data.board)]),
+    );
     onMutate();
   }
 
@@ -102,6 +100,7 @@ export function CardsBoard({
       <CardComposer
         visible={composerOpen}
         boardId={data.board.id}
+        order={nextCardOrder(cards)}
         onClose={() => setComposerOpen(false)}
         onCreated={handleCreated}
       />
@@ -112,17 +111,7 @@ export function CardsBoard({
         onCommentCountChange={(change) => {
           if (!commentCard) return;
           setCards((current) =>
-            current.map((card) =>
-              card.id === commentCard.id
-                ? {
-                    ...card,
-                    commentCount: Math.max(
-                      0,
-                      (card.commentCount ?? 0) + change,
-                    ),
-                  }
-                : card,
-            ),
+            updateCardCommentCount(current, commentCard.id, change),
           );
         }}
       />
