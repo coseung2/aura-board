@@ -67,7 +67,7 @@ describe("student slime shop refunds", () => {
   });
 
   it("refunds an owned cosmetic and removes it from every slime", async () => {
-    const item = SLIME_SHOP_CATALOG[0];
+    const item = SLIME_SHOP_CATALOG.find((candidate) => candidate.key === "water-puddle-background")!;
     const slimeRows = [
       { id: "slime-blue", equippedItemKeys: [item.key, "another-item"] },
       { id: "slime-purple", equippedItemKeys: [item.key] },

@@ -1,0 +1,41 @@
+.viewport {
+  position: relative;
+  display: block;
+  flex: 0 0 auto;
+  overflow: hidden;
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+  contain: paint;
+}
+
+.sheet,
+.crown,
+.floor,
+.puddle {
+  position: absolute;
+  left: 0;
+  top: 0;
+  display: block;
+  max-width: none;
+  pointer-events: none;
+  user-select: none;
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+  transition: none;
+}
+
+.puddle {
+  z-index: 0;
+}
+
+.sheet {
+  z-index: 1;
+}
+
+.crown {
+  z-index: 2;
+}
+
+.floor {
+  z-index: 3;
+}

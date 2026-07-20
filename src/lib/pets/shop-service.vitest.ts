@@ -115,8 +115,36 @@ describe("slime shop service", () => {
 
     const home = await getSlimeHome(student);
 
-    expect(home.shopCatalog).toHaveLength(3);
+    expect(home.shopCatalog).toHaveLength(4);
     expect(home.ownedItemKeys).toEqual([SLIME_SHOP_CATALOG[0].key]);
+    expect(home.equippedFloorByColor).toEqual({});
+    expect(home.equippedFloor).toBe("none");
+  });
+
+  it("derives representative floor state with last-equipped-key precedence", async () => {
+    mocks.accountFind.mockResolvedValue({ balance: 320 });
+    mocks.slimeFindMany
+      .mockResolvedValueOnce([
+        {
+          color: "blue",
+          isEquipped: true,
+          isRepresentative: true,
+          equippedItemKeys: ["slime-blue-trampoline", "water-puddle-background"],
+        },
+        {
+          color: "red",
+          isEquipped: true,
+          isRepresentative: false,
+          equippedItemKeys: ["slime-blue-drink-lemonade"],
+        },
+      ])
+      .mockResolvedValueOnce([]);
+    mocks.inventoryFindMany.mockResolvedValue([]);
+
+    const home = await getSlimeHome(student);
+
+    expect(home.equippedFloorByColor).toEqual({ blue: "water-puddle", red: "none" });
+    expect(home.equippedFloor).toBe("water-puddle");
   });
 
   it("debits once, records source linkage, creates inventory, and replays", async () => {

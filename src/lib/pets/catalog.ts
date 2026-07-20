@@ -2,6 +2,7 @@ import type {
   SlimeAccessoryDefinition,
   SlimeColor,
   SlimeDefinition,
+  SlimeFloor,
   SlimeShopItem,
   SlimeSetDefinition,
 } from "./types";
@@ -63,8 +64,17 @@ export const SLIME_CATALOG: readonly SlimeDefinition[] = [
 /** Student-owned slime home items sold through the shared won wallet. */
 export const SLIME_SHOP_CATALOG: readonly SlimeShopItem[] = [
   {
+    key: "grass-floor-background",
+    category: "background",
+    floor: "grass-floor",
+    labelKo: "잔디 바닥",
+    price: SLIME_SHOP_DEFAULT_PRICE,
+    spritePath: `${SLIME_ASSET_ROOT}/official/shared/grass-floor.png`,
+  },
+  {
     key: "water-puddle-background",
     category: "background",
+    floor: "water-puddle",
     labelKo: "물웅덩이 배경",
     price: SLIME_SHOP_DEFAULT_PRICE,
     spritePath: `${SLIME_ASSET_ROOT}/shop/water-puddle.gif`,
@@ -72,6 +82,7 @@ export const SLIME_SHOP_CATALOG: readonly SlimeShopItem[] = [
   {
     key: "slime-blue-trampoline",
     category: "ride",
+    floor: "trampoline",
     labelKo: "트램펄린",
     price: SLIME_SHOP_DEFAULT_PRICE,
     spritePath: `${SLIME_ASSET_ROOT}/shop/slime-blue-trampoline.gif`,
@@ -79,6 +90,7 @@ export const SLIME_SHOP_CATALOG: readonly SlimeShopItem[] = [
   {
     key: "slime-blue-drink-lemonade",
     category: "drink",
+    floor: null,
     labelKo: "레모네이드",
     price: SLIME_SHOP_DEFAULT_PRICE,
     spritePath: `${SLIME_ASSET_ROOT}/shop/slime-blue-drink-lemonade.gif`,
@@ -151,4 +163,14 @@ export function getSlimeAccessoryDefinition(
 
 export function getSlimeShopItem(key: string): SlimeShopItem | undefined {
   return slimeShopItemByKey.get(key);
+}
+
+/** Legacy rows may contain several floors; the last equipped key wins. */
+export function getEquippedSlimeFloor(itemKeys: readonly string[]): SlimeFloor {
+  let floor: SlimeFloor = "none";
+  for (const itemKey of itemKeys) {
+    const candidate = getSlimeShopItem(itemKey)?.floor;
+    if (candidate) floor = candidate;
+  }
+  return floor;
 }

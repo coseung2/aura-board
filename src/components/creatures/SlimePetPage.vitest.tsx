@@ -91,6 +91,43 @@ describe("SlimePetPage", () => {
     expect(document.activeElement).toBe(trigger);
   });
 
+  it("keeps keyboard focus inside the open shop drawer", async () => {
+    vi.stubGlobal("fetch", vi.fn(() => json(home())));
+    render(<SlimePetPage />);
+
+    fireEvent.click(await screen.findByRole("button", { name: "상점" }));
+    const drawer = await screen.findByRole("dialog", { name: "슬라임 상점" });
+    const buttons = within(drawer).getAllByRole("button");
+    const first = buttons[0];
+    const last = buttons.at(-1)!;
+
+    await waitFor(() => expect(document.activeElement).toBe(first));
+    fireEvent.keyDown(window, { key: "Tab", shiftKey: true });
+    expect(document.activeElement).toBe(last);
+
+    fireEvent.keyDown(window, { key: "Tab" });
+    expect(document.activeElement).toBe(first);
+  });
+
+  it("offers a retry after the initial load fails", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockRejectedValueOnce(new Error("offline"))
+      .mockImplementationOnce(() => json(home()));
+    vi.stubGlobal("fetch", fetchMock);
+    render(<SlimePetPage />);
+
+    expect(await screen.findByText("슬라임 정보를 불러오지 못했어요.")).toBeTruthy();
+    expect(screen.queryByText("표시할 슬라임이 없어요.")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "다시 시도" }));
+
+    expect(await screen.findByText("350 원")).toBeTruthy();
+    await waitFor(() =>
+      expect(screen.queryByText("슬라임 정보를 불러오지 못했어요.")).toBeNull(),
+    );
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
   it("updates balance and ownership only after a successful shop purchase", async () => {
     const fetchMock = vi
       .fn()
@@ -205,15 +242,8 @@ describe("SlimePetPage", () => {
     await screen.findByText("물웅덩이 배경을(를) 블루 슬라임에 적용했어요.");
     expect(screen.getByText("장착: 물웅덩이 배경")).toBeTruthy();
     expect(
-      screen
-        .getByRole("img", {
-          name: "블루 슬라임, 물웅덩이 배경 적용 미리보기",
-        })
-        .getAttribute("src"),
-    ).toBe("/creatures/slimes/blue/idle.gif");
-    expect(
       document.querySelector(
-        'img[src="/creatures/slimes/shop/water-puddle.gif"]',
+        '[data-slime-color="blue"][data-slime-action="floor-interaction"][data-equipped-floor="water-puddle"]',
       ),
     ).toBeTruthy();
     expect(fetchMock.mock.calls[1][0]).toBe("/api/student/slimes/items/equip");

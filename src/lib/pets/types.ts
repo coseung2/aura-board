@@ -12,6 +12,23 @@ export const SLIME_COLORS = [
 
 export type SlimeColor = (typeof SLIME_COLORS)[number];
 
+export const SLIME_FLOORS = [
+  "none",
+  "grass-floor",
+  "water-puddle",
+  "trampoline",
+] as const;
+
+export type SlimeFloor = (typeof SLIME_FLOORS)[number];
+
+export const SLIME_EVOLUTIONS = [
+  "base",
+  "gold-crown-red-gem",
+  "silver-crown-blue-gem",
+] as const;
+
+export type SlimeEvolution = (typeof SLIME_EVOLUTIONS)[number];
+
 export const SLIME_EFFECT_KEYS = [
   "growth_speed",
   "reading_reward",
@@ -39,6 +56,8 @@ export type SlimeShopCategory = (typeof SLIME_SHOP_CATEGORIES)[number];
 export type SlimeShopItem = {
   readonly key: string;
   readonly category: SlimeShopCategory;
+  /** Semantic floor state; null means the item is not a floor. */
+  readonly floor: Exclude<SlimeFloor, "none"> | null;
   readonly labelKo: string;
   readonly price: number;
   readonly spritePath: string;

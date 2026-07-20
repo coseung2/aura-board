@@ -11,31 +11,27 @@ const student = { id: "student-1", classroomId: "classroom-1" };
 const background = SLIME_SHOP_CATALOG[0];
 
 function installState(overrides: Partial<{ quantity: number; isEquipped: boolean; itemKind: string }> = {}) {
-  const rows = new Map([
-    [
-      background.key,
-      {
-        id: "inventory-1",
-        studentId: student.id,
-        itemKey: background.key,
-        itemKind: `slime-${background.category}`,
-        quantity: 1,
-        isEquipped: false,
-        ...overrides,
-      },
-    ],
-  ]);
+  const rows = new Map(SLIME_SHOP_CATALOG.map((item, index) => [
+    item.key,
+    {
+      id: `inventory-${index + 1}`,
+      studentId: student.id,
+      itemKey: item.key,
+      itemKind: `slime-${item.category}`,
+      quantity: 1,
+      isEquipped: false,
+      ...(item.key === background.key ? overrides : {}),
+    },
+  ]));
   const inventory = {
     findUnique: vi.fn(async ({ where }: { where: { studentId_itemKey: { itemKey: string } } }) =>
       rows.get(where.studentId_itemKey.itemKey) ?? null),
-    updateMany: vi.fn(async ({ where, data }: { where: { studentId: string; itemKind: string; itemKey?: { not: string }; isEquipped?: boolean }; data: { isEquipped: boolean } }) => {
+    updateMany: vi.fn(async ({ where, data }: { where: { studentId: string; itemKey?: { in: string[] } }; data: { isEquipped: boolean } }) => {
       let count = 0;
       for (const row of rows.values()) {
         if (
           row.studentId === where.studentId &&
-          row.itemKind === where.itemKind &&
-          (where.itemKey === undefined || row.itemKey !== where.itemKey.not) &&
-          (where.isEquipped === undefined || row.isEquipped === where.isEquipped)
+          (where.itemKey === undefined || where.itemKey.in.includes(row.itemKey))
         ) {
           row.isEquipped = data.isEquipped;
           count += 1;
@@ -52,7 +48,7 @@ function installState(overrides: Partial<{ quantity: number; isEquipped: boolean
     findMany: vi.fn(async () => [...rows.values()]),
   };
   const slimeRows = [
-    { id: "slime-1", studentId: student.id, color: "blue", equippedItemKeys: [] as string[] },
+    { id: "slime-1", studentId: student.id, color: "blue", isRepresentative: true, equippedItemKeys: [] as string[] },
   ];
   const slimes = {
     findUnique: vi.fn(async () => slimeRows[0]),
@@ -83,6 +79,8 @@ describe("slime shop item equipment", () => {
       itemKey: background.key,
       isEquipped: true,
       equippedItemKeys: [background.key],
+      equippedFloorByColor: { blue: "grass-floor" },
+      equippedFloor: "grass-floor",
       idempotent: false,
     });
     expect(state.rows.get(background.key)?.isEquipped).toBe(true);
@@ -98,6 +96,51 @@ describe("slime shop item equipment", () => {
       equippedItemKeys: [],
       idempotent: false,
     });
+  });
+
+  it("replaces a floor across legacy categories without removing non-floor items", async () => {
+    const state = installState();
+    const water = SLIME_SHOP_CATALOG.find((item) => item.floor === "water-puddle")!;
+    const trampoline = SLIME_SHOP_CATALOG.find((item) => item.floor === "trampoline")!;
+    const drink = SLIME_SHOP_CATALOG.find((item) => item.floor === null)!;
+    state.slimeRows[0].equippedItemKeys = [water.key, drink.key];
+
+    const result = await equipSlimeShopItem(student, "blue", trampoline.key, true, "floor-swap");
+
+    expect(result).toMatchObject({
+      equippedItemKeys: [drink.key, trampoline.key],
+      equippedItemsByColor: { blue: [drink.key, trampoline.key] },
+      equippedFloorByColor: { blue: "trampoline" },
+      equippedFloor: "trampoline",
+      idempotent: false,
+    });
+    expect(state.rows.get(water.key)?.isEquipped).toBe(false);
+    expect(state.rows.get(trampoline.key)?.isEquipped).toBe(true);
+  });
+
+  it("moves the same floor between slimes while preserving each slime's other floor", async () => {
+    const state = installState();
+    const grass = SLIME_SHOP_CATALOG.find((item) => item.floor === "grass-floor")!;
+    const water = SLIME_SHOP_CATALOG.find((item) => item.floor === "water-puddle")!;
+    const trampoline = SLIME_SHOP_CATALOG.find((item) => item.floor === "trampoline")!;
+    state.slimeRows[0].equippedItemKeys = [water.key];
+    state.slimeRows.push({
+      id: "slime-2",
+      studentId: student.id,
+      color: "red",
+      isRepresentative: false,
+      equippedItemKeys: [grass.key, trampoline.key],
+    });
+
+    const result = await equipSlimeShopItem(student, "blue", trampoline.key, true, "move-floor");
+
+    expect(result.equippedItemsByColor).toEqual({
+      blue: [trampoline.key],
+      red: [grass.key],
+    });
+    expect(result.equippedFloorByColor).toEqual({ blue: "trampoline", red: "grass-floor" });
+    expect(state.slimeRows[1].equippedItemKeys).toEqual([grass.key]);
+    expect(state.rows.get(grass.key)?.isEquipped).toBe(true);
   });
 
   it("blocks unowned, empty, and mismatched item rows", async () => {

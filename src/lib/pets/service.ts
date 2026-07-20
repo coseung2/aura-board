@@ -5,126 +5,59 @@ import { Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
 import {
   getSlimeDefinition,
+  getEquippedSlimeFloor,
   getSlimeShopItem,
   SLIME_CATALOG,
   SLIME_SHOP_CATALOG,
 } from "./catalog";
 import {
-  calculateSlimeGrowthSnapshot,
-  normalizeSlimeGrowthStage,
   settleSlimeGrowth,
   settleSlimeGrowthWithSpeed,
-  type SlimeGrowthSnapshot,
-  type SlimeGrowthState,
 } from "./growth";
 import { calculateCatalogSlimeEffects } from "./math";
-import type { SlimeColor, SlimeShopItem } from "./types";
+import {
+  SLIME_ITEM_PURCHASE_SOURCE_TYPE,
+  SLIME_ITEM_REFUND_SOURCE_TYPE,
+  SLIME_PURCHASE_SOURCE_TYPE,
+  SLIME_REFUND_SOURCE_TYPE,
+  SlimeServiceError,
+  type SlimeEquipResult,
+  type SlimeHome,
+  type SlimeItemRefundResult,
+  type SlimePurchaseResult,
+  type SlimeRefundResult,
+  type SlimeShopEquipResult,
+  type SlimeShopPurchaseResult,
+} from "./service-contract";
+import {
+  growthEffectsForColors,
+  growthSnapshotByColor,
+  growthStateFromRow,
+  slimeGrowthSelect,
+  type SlimeGrowthRow,
+} from "./service-growth";
+import type { SlimeColor, SlimeFloor, SlimeShopItem } from "./types";
 
-export const SLIME_PURCHASE_SOURCE_TYPE = "slime_purchase" as const;
-export const SLIME_ITEM_PURCHASE_SOURCE_TYPE = "slime_item_purchase" as const;
-export const SLIME_REFUND_SOURCE_TYPE = "slime_refund" as const;
-export const SLIME_ITEM_REFUND_SOURCE_TYPE = "slime_item_refund" as const;
-
-export type SlimeServiceErrorCode =
-  | "invalid_body"
-  | "unknown_slime"
-  | "account_not_found"
-  | "insufficient_funds"
-  | "already_owned"
-  | "unknown_item"
-  | "not_owned"
-  | "not_refundable"
-  | "idempotency_key_reused";
-
-const ERROR_STATUS: Record<SlimeServiceErrorCode, number> = {
-  invalid_body: 400,
-  unknown_slime: 400,
-  account_not_found: 404,
-  insufficient_funds: 402,
-  already_owned: 409,
-  unknown_item: 400,
-  not_owned: 403,
-  not_refundable: 409,
-  idempotency_key_reused: 409,
-};
-
-export class SlimeServiceError extends Error {
-  readonly code: SlimeServiceErrorCode;
-  readonly status: number;
-
-  constructor(code: SlimeServiceErrorCode, message: string = code) {
-    super(message);
-    this.name = "SlimeServiceError";
-    this.code = code;
-    this.status = ERROR_STATUS[code];
-  }
-}
-
-export function isSlimeServiceError(error: unknown): error is SlimeServiceError {
-  return error instanceof SlimeServiceError;
-}
+export {
+  SLIME_ITEM_PURCHASE_SOURCE_TYPE,
+  SLIME_ITEM_REFUND_SOURCE_TYPE,
+  SLIME_PURCHASE_SOURCE_TYPE,
+  SLIME_REFUND_SOURCE_TYPE,
+  SlimeServiceError,
+  isSlimeServiceError,
+} from "./service-contract";
+export type {
+  SlimeEquipResult,
+  SlimeHome,
+  SlimeItemRefundResult,
+  SlimePurchaseResult,
+  SlimeRefundResult,
+  SlimeServiceErrorCode,
+  SlimeShopEquipResult,
+  SlimeShopPurchaseResult,
+} from "./service-contract";
 
 type StudentIdentity = { id: string; classroomId: string };
-
-export type SlimeHome = {
-  balance: number;
-  currency: { unitLabel: string };
-  ownedColors: SlimeColor[];
-  equippedColors: SlimeColor[];
-  representativeColor: SlimeColor | null;
-  catalog: typeof SLIME_CATALOG;
-  ownedItemKeys: string[];
-  equippedItemKeys: string[];
-  equippedItemsByColor: Partial<Record<SlimeColor, string[]>>;
-  shopCatalog: typeof SLIME_SHOP_CATALOG;
-  effects: ReturnType<typeof calculateCatalogSlimeEffects>;
-  growthSpeedBps: number;
-  growthByColor: Partial<Record<SlimeColor, SlimeGrowthSnapshot>>;
-  growth: Partial<Record<SlimeColor, SlimeGrowthSnapshot>>;
-};
-
-export type SlimePurchaseResult = {
-  ownedColor: SlimeColor;
-  balance: number;
-  idempotent: boolean;
-};
-
-export type SlimeShopPurchaseResult = {
-  ownedItemKey: string;
-  balance: number;
-  idempotent: boolean;
-};
-
-export type SlimeShopEquipResult = {
-  slimeColor: SlimeColor;
-  itemKey: string;
-  isEquipped: boolean;
-  equippedItemKeys: string[];
-  equippedItemsByColor: Partial<Record<SlimeColor, string[]>>;
-  idempotent: boolean;
-};
-
-export type SlimeEquipResult = {
-  slimeColor: SlimeColor;
-  isEquipped: boolean;
-  equippedColors: SlimeColor[];
-  growthSpeedBps: number;
-  growthByColor: Partial<Record<SlimeColor, SlimeGrowthSnapshot>>;
-  /** Alias kept for mobile callers that use the shorter payload key. */
-  growth: Partial<Record<SlimeColor, SlimeGrowthSnapshot>>;
-  effects: ReturnType<typeof calculateCatalogSlimeEffects>;
-};
-
-export type SlimeRefundResult = {
-  refundedColor: SlimeColor;
-  balance: number;
-  representativeColor: SlimeColor | null;
-};
-
-export type SlimeItemRefundResult = {
-  refundedItemKey: string;
-  balance: number;
-};
 
 function assertIdempotencyKey(key: string): string {
   const trimmed = typeof key === "string" ? key.trim() : "";
@@ -176,60 +109,6 @@ async function serializable<T>(operation: (tx: Prisma.TransactionClient) => Prom
       if (!isPrismaCode(error, "P2034") || attempt >= 3) throw error;
     }
   }
-}
-
-type SlimeGrowthRow = {
-  id: string;
-  color: string;
-  isEquipped: boolean;
-  growthStage: number;
-  growthSeconds: number;
-  growthRemainderBps: number;
-  growthLastSettledAt: Date;
-  growthAppliedSpeedBps: number;
-};
-
-const slimeGrowthSelect = {
-  id: true,
-  color: true,
-  isEquipped: true,
-  growthStage: true,
-  growthSeconds: true,
-  growthRemainderBps: true,
-  growthLastSettledAt: true,
-  growthAppliedSpeedBps: true,
-} as const;
-
-function growthStateFromRow(row: SlimeGrowthRow, fallbackNow = new Date()): SlimeGrowthState {
-  return {
-    stage: normalizeSlimeGrowthStage(row.growthStage),
-    growthSeconds: row.growthSeconds,
-    growthRemainderBps: row.growthRemainderBps,
-    growthLastSettledAt:
-      row.growthLastSettledAt instanceof Date ? row.growthLastSettledAt : fallbackNow,
-    growthAppliedSpeedBps:
-      row.isEquipped !== false ? row.growthAppliedSpeedBps : 0,
-  };
-}
-
-function growthSnapshotByColor(
-  rows: readonly SlimeGrowthRow[],
-  now: Date,
-): Partial<Record<SlimeColor, SlimeGrowthSnapshot>> {
-  const result: Partial<Record<SlimeColor, SlimeGrowthSnapshot>> = {};
-  for (const row of rows) {
-    const slime = getSlimeDefinition(row.color);
-    if (!slime) continue;
-    result[slime.color] = calculateSlimeGrowthSnapshot(
-      growthStateFromRow(row),
-      now,
-    );
-  }
-  return result;
-}
-
-function growthEffectsForColors(equippedColors: readonly SlimeColor[]) {
-  return calculateCatalogSlimeEffects(equippedColors, []);
 }
 
 async function replayPurchase(
@@ -308,6 +187,14 @@ export async function getSlimeHome(student: StudentIdentity): Promise<SlimeHome>
   const equippedItemKeys = Array.from(
     new Set(Object.values(equippedItemsByColor).flatMap((keys) => keys ?? [])),
   );
+  const equippedFloorByColor = Object.fromEntries(
+    owned.map((slime) => [
+      slime.color,
+      getEquippedSlimeFloor(equippedItemsByColor[slime.color as SlimeColor] ?? []),
+    ]),
+  ) as Partial<Record<SlimeColor, SlimeFloor>>;
+  const representativeColor =
+    (owned.find((row) => row.isRepresentative)?.color as SlimeColor | undefined) ?? null;
   const equippedColors = SLIME_CATALOG.map((slime) => slime.color).filter((color) => equippedSet.has(color));
   const effects = calculateCatalogSlimeEffects(equippedColors, equippedItemKeys);
   const now = new Date();
@@ -335,12 +222,15 @@ export async function getSlimeHome(student: StudentIdentity): Promise<SlimeHome>
     currency: { unitLabel: currency?.unitLabel?.trim() || "원" },
     ownedColors: SLIME_CATALOG.map((slime) => slime.color).filter((color) => ownedSet.has(color)),
     equippedColors,
-    representativeColor:
-      (owned.find((row) => row.isRepresentative)?.color as SlimeColor | undefined) ?? null,
+    representativeColor,
     catalog: SLIME_CATALOG,
     ownedItemKeys,
     equippedItemKeys,
     equippedItemsByColor,
+    equippedFloorByColor,
+    equippedFloor: representativeColor
+      ? equippedFloorByColor[representativeColor] ?? "none"
+      : "none",
     shopCatalog: SLIME_SHOP_CATALOG,
     effects,
     growthSpeedBps: effects.totals.growth_speed,
@@ -1010,9 +900,9 @@ export async function refundSlimeShopItem(
 
 /**
  * Toggle one owned slime-home item without touching the purchase ledger.
- * Backgrounds are a single-slot category; other catalog categories may be
- * equipped together. The serializable transaction keeps the category reset
- * and target update atomic under concurrent clicks.
+ * Floors share one semantic slot even though legacy items span background and
+ * ride categories. Other catalog categories keep their existing single-slot
+ * behavior. The serializable transaction keeps resets and updates atomic.
  */
 export async function equipSlimeShopItem(
   student: StudentIdentity,
@@ -1050,49 +940,83 @@ export async function equipSlimeShopItem(
 
     const slimeRowsBefore = await tx.studentSlime.findMany({
       where: { studentId: student.id },
-      select: { id: true, color: true, equippedItemKeys: true },
+      select: { id: true, color: true, isRepresentative: true, equippedItemKeys: true },
       orderBy: { createdAt: "asc" },
     });
     const currentKeys = ownedSlime.equippedItemKeys.filter((key: string) => Boolean(getSlimeShopItem(key)));
-    const alreadyInRequestedState = currentKeys.includes(item.key) === isEquipped;
     let nextKeys = currentKeys.filter((key) => key !== item.key);
     if (isEquipped) {
-      nextKeys = nextKeys.filter((key: string) => getSlimeShopItem(key)?.category !== item.category);
+      nextKeys = item.floor
+        ? nextKeys.filter((key: string) => !getSlimeShopItem(key)?.floor)
+        : nextKeys.filter((key: string) => getSlimeShopItem(key)?.category !== item.category);
       nextKeys.push(item.key);
-      await Promise.all(
-        slimeRowsBefore
-          .filter((row) => row.color !== slime.color && row.equippedItemKeys.includes(item.key))
-          .map((row) =>
-            tx.studentSlime.update({
-              where: { id: row.id },
-              data: { equippedItemKeys: row.equippedItemKeys.filter((key: string) => key !== item.key) },
-            }),
-          ),
-      );
     }
-    if (!alreadyInRequestedState || nextKeys.length !== currentKeys.length) {
-      await tx.studentSlime.update({ where: { id: ownedSlime.id }, data: { equippedItemKeys: nextKeys } });
-    }
-    const slimeRows = await tx.studentSlime.findMany({
-      where: { studentId: student.id },
-      select: { color: true, equippedItemKeys: true },
-      orderBy: { createdAt: "asc" },
+
+    const nextKeysBySlimeId = new Map(
+      slimeRowsBefore.map((row) => [
+        row.id,
+        row.color === slime.color
+          ? nextKeys
+          : isEquipped
+            ? row.equippedItemKeys.filter((key: string) => key !== item.key)
+            : row.equippedItemKeys,
+      ]),
+    );
+    const changedRows = slimeRowsBefore.filter((row) => {
+      const rowNextKeys = nextKeysBySlimeId.get(row.id) ?? row.equippedItemKeys;
+      return rowNextKeys.length !== row.equippedItemKeys.length ||
+        rowNextKeys.some((key, index) => key !== row.equippedItemKeys[index]);
     });
+    await Promise.all(
+      changedRows.map((row) =>
+        tx.studentSlime.update({
+          where: { id: row.id },
+          data: { equippedItemKeys: nextKeysBySlimeId.get(row.id) ?? row.equippedItemKeys },
+        }),
+      ),
+    );
+
     const equippedItemsByColor = Object.fromEntries(
-      slimeRows.map((row) => [row.color, row.color === slime.color ? nextKeys : row.equippedItemKeys]),
+      slimeRowsBefore.map((row) => [row.color, nextKeysBySlimeId.get(row.id) ?? row.equippedItemKeys]),
     ) as Partial<Record<SlimeColor, string[]>>;
     const equippedItemKeys = Array.from(new Set(Object.values(equippedItemsByColor).flatMap((keys) => keys ?? [])));
-    await tx.studentCreatureItem.update({
-      where: { id: inventory.id },
-      data: { isEquipped: equippedItemKeys.includes(item.key) },
-    });
+    if (item.floor) {
+      const floorItemKeys = SLIME_SHOP_CATALOG.filter((candidate) => candidate.floor).map((candidate) => candidate.key);
+      const equippedFloorItemKeys = equippedItemKeys.filter((key) => Boolean(getSlimeShopItem(key)?.floor));
+      await tx.studentCreatureItem.updateMany({
+        where: { studentId: student.id, itemKey: { in: floorItemKeys } },
+        data: { isEquipped: false },
+      });
+      if (equippedFloorItemKeys.length > 0) {
+        await tx.studentCreatureItem.updateMany({
+          where: { studentId: student.id, itemKey: { in: equippedFloorItemKeys } },
+          data: { isEquipped: true },
+        });
+      }
+    } else {
+      await tx.studentCreatureItem.update({
+        where: { id: inventory.id },
+        data: { isEquipped: equippedItemKeys.includes(item.key) },
+      });
+    }
+    const equippedFloorByColor = Object.fromEntries(
+      slimeRowsBefore.map((row) => [
+        row.color,
+        getEquippedSlimeFloor(equippedItemsByColor[row.color as SlimeColor] ?? []),
+      ]),
+    ) as Partial<Record<SlimeColor, SlimeFloor>>;
+    const representativeColor = slimeRowsBefore.find((row) => row.isRepresentative)?.color as SlimeColor | undefined;
     return {
       slimeColor: slime.color,
       itemKey: item.key,
       isEquipped,
       equippedItemKeys,
       equippedItemsByColor,
-      idempotent: alreadyInRequestedState,
+      equippedFloorByColor,
+      equippedFloor: representativeColor
+        ? equippedFloorByColor[representativeColor] ?? "none"
+        : "none",
+      idempotent: changedRows.length === 0,
     };
   });
 }

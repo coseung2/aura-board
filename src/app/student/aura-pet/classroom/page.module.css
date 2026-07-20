@@ -95,6 +95,39 @@
   background: var(--color-surface);
 }
 
+.titleSlot {
+  display: grid;
+  width: min(100%, 180px);
+  height: 72px;
+  place-items: center;
+}
+
+.walkingTitle {
+  position: relative;
+  display: grid;
+  width: 100%;
+  height: 68px;
+  place-items: center;
+}
+
+.walkingTitleFrame {
+  object-fit: contain;
+  image-rendering: pixelated;
+}
+
+.titlePlaceholder {
+  display: grid;
+  width: min(100%, 142px);
+  min-height: 34px;
+  place-items: center;
+  border: 1px dashed var(--color-border-hover);
+  border-radius: var(--radius-pill);
+  background: var(--color-surface);
+  color: var(--color-text-muted);
+  font-size: 11px;
+  font-weight: 700;
+}
+
 .student strong {
   max-width: 100%;
   overflow: hidden;
@@ -114,7 +147,7 @@
   }
 
   .roster {
-    grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
     padding-inline: 8px;
   }
 }

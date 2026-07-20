@@ -93,6 +93,24 @@
   color: var(--color-danger, #b42318);
 }
 
+.retryButton {
+  min-height: 44px;
+  margin-left: 10px;
+  padding: 8px 12px;
+  border: 1px solid currentColor;
+  border-radius: var(--radius-btn);
+  color: var(--color-accent-active);
+  background: transparent;
+  cursor: pointer;
+  font: inherit;
+  font-weight: 700;
+}
+
+.retryButton:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
 .section {
   padding: 28px 0;
   border-bottom: 1px solid var(--color-border);
@@ -225,11 +243,9 @@
 .itemCopy h3,
 .shopItemCopy h3 {
   margin: 0;
-  overflow: hidden;
   font-size: 14px;
   letter-spacing: -0.02em;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
 }
 
 .itemCopy p,
@@ -344,7 +360,7 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-height: 32px;
+  min-height: 44px;
   width: fit-content;
   padding: 5px 0;
   border: 0;
@@ -364,8 +380,50 @@
   flex-wrap: wrap;
 }
 
+.slimeActionButtons {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 44px;
+}
+
+.slimeActionButton {
+  display: inline-grid;
+  width: 44px;
+  height: 44px;
+  place-items: center;
+  padding: 0;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-btn);
+  color: var(--color-text-muted);
+  background: transparent;
+  cursor: pointer;
+  font: inherit;
+  font-size: 18px;
+  line-height: 1;
+}
+
+.slimeActionButton img {
+  display: block;
+  width: 28px;
+  height: 28px;
+  object-fit: contain;
+  image-rendering: pixelated;
+}
+
+.slimeActionButton:hover,
+.slimeActionButton:focus-visible {
+  border-color: var(--color-accent);
+  color: var(--color-accent-active);
+}
+
+.slimeActionButton:disabled {
+  cursor: wait;
+  opacity: 0.55;
+}
+
 .equipButton {
-  min-height: 32px;
+  min-height: 44px;
   width: fit-content;
   padding: 5px 8px;
   border: 1px solid var(--color-border);
@@ -395,7 +453,7 @@
 }
 
 .representativeButton {
-  min-height: 32px;
+  min-height: 44px;
   width: fit-content;
   padding: 5px 0;
   border: 0;
@@ -445,7 +503,7 @@
 
 .drawerLayer {
   position: fixed;
-  z-index: 1000;
+  z-index: 2147483647;
   inset: 0;
   display: flex;
   justify-content: flex-end;
@@ -544,7 +602,7 @@
 
 .refundButton {
   min-width: 64px;
-  min-height: 32px;
+  min-height: 44px;
   padding: 5px 9px;
   border-color: var(--color-danger);
   color: var(--color-danger);
@@ -629,6 +687,25 @@
   .drawer {
     width: 100%;
     padding: 20px 16px;
+  }
+
+  .shopFilters {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .shopItem {
+    grid-template-columns: 64px minmax(0, 1fr) auto;
+    gap: 10px;
+  }
+
+  .shopImageFrame,
+  .shopImageFrame img {
+    width: 64px;
+  }
+
+  .retryButton {
+    display: flex;
+    margin: 8px 0 0;
   }
 
   .breakdown li {

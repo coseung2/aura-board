@@ -4,40 +4,10 @@
   width: 88px;
   height: 88px;
   place-items: center;
+  overflow: visible;
 }
 
-.frame img {
-  position: absolute;
-  inset: 0;
-  display: block;
-  width: 88px;
-  height: 88px;
-  object-fit: contain;
-  image-rendering: pixelated;
+.frame > div {
+  flex: 0 0 auto;
 }
 
-.background {
-  z-index: 0;
-}
-
-.character {
-  z-index: 1;
-}
-
-.frame img.growthCrown {
-  z-index: 2;
-  inset: 7px auto auto 50%;
-  width: auto;
-  height: auto;
-  max-width: 32px;
-  transform: translateX(-50%);
-  pointer-events: none;
-}
-
-.filterDefinition {
-  position: absolute;
-  width: 0;
-  height: 0;
-  overflow: hidden;
-  pointer-events: none;
-}
