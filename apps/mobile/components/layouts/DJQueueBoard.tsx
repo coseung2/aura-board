@@ -2,7 +2,6 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Alert,
   FlatList,
-  Image,
   ScrollView,
   StyleSheet,
   Text,
@@ -14,9 +13,6 @@ import {
   borders,
   colors,
   dj,
-  iconSizes,
-  media,
-  radii,
   spacing,
   tapMin,
   typography,
@@ -27,22 +23,18 @@ import {
   shouldUseBoardFallbackPolling,
   useBoardRealtime,
 } from "../../lib/use-board-realtime";
-import { buildMediaItems, findPlayableMediaUrl } from "../../lib/media";
 import type { BoardDetailResponse, BoardCard } from "../../lib/types";
 import {
   withBoardAnonymousAuthor,
   withBoardAnonymousAuthors,
 } from "../../lib/card-privacy";
 import { DJRecapModal } from "../DJRecapModal";
-import { EmbeddedMedia } from "../EmbeddedMedia";
-import {
-  AppBottomSheet,
-  AppButton,
-  AppModal,
-  IconButton,
-  Pill,
-  TextField,
-} from "../ui";
+import { AppBottomSheet, AppButton, TextField } from "../ui";
+import { deriveQueueState, mergeQueueSnapshot } from "./dj-queue-state";
+import { DJQueueRanking } from "./DJQueueRanking";
+import { DJNowPlayingCard } from "./DJNowPlayingCard";
+import { DJQueueItem } from "./DJQueueItem";
+import { DJPlayedDrawer } from "./DJPlayedDrawer";
 
 // DJ 큐 보드 — 웹 디자인 핸드오프 DJBoardPage.jsx 를 네이티브로 이식.
 //   [헤더: 제목 + 카운트 + 재생완료 토글]
@@ -77,6 +69,17 @@ export function DJQueueBoard({
   const insets = useSafeAreaInsets();
   const compact = width < dj.compactBreakpoint;
   const canControl = data.capabilities?.canControlQueue === true;
+
+  // Parent refreshes replace `data` after queue_changed/card_changed. Merge
+  // that snapshot into the local optimistic queue instead of keeping only the
+  // initial mount data.
+  useEffect(() => {
+    const incoming = withBoardAnonymousAuthors(data.cards, data.board);
+    setCards((local) =>
+      mergeQueueSnapshot(incoming, local, pendingIds.current),
+    );
+  }, [data.cards, data.board]);
+
   // 실시간: queue_changed/card_changed broadcast 가 오면 부모 refetch.
   // 서버 channel key 가 board.id 기준이므로 id 로 구독해야 한다.
   const { status: realtimeStatus } = useBoardRealtime({
@@ -92,28 +95,10 @@ export function DJQueueBoard({
         const res = await apiFetch<BoardDetailResponse>(
           `/api/student/board/${encodeURIComponent(data.board.slug)}`,
         );
-        setCards((prev) => {
-          const prevById = new Map(prev.map((c) => [c.id, c] as const));
-          const next: BoardCard[] = [];
-          for (const rawCard of res.cards) {
-            const sc = withBoardAnonymousAuthor(rawCard, res.board);
-            if (pendingIds.current.has(sc.id)) {
-              const l = prevById.get(sc.id);
-              next.push(l ?? sc);
-            } else {
-              next.push(sc);
-            }
-          }
-          for (const l of prev) {
-            if (
-              pendingIds.current.has(l.id) &&
-              !res.cards.some((sc) => sc.id === l.id)
-            ) {
-              next.push(l);
-            }
-          }
-          return next;
-        });
+        const incoming = withBoardAnonymousAuthors(res.cards, res.board);
+        setCards((prev) =>
+          mergeQueueSnapshot(incoming, prev, pendingIds.current),
+        );
       } catch {
         // swallow — next tick.
       }
@@ -121,51 +106,24 @@ export function DJQueueBoard({
     return () => clearInterval(handle);
   }, [data.board.slug, realtimeStatus]);
 
-  const activeQueue = useMemo(
+  const {
+    activeQueue,
+    playedCards,
+    nowPlaying,
+    upNext,
+    pendingCount,
+    approvedCount,
+    ranking,
+  } = useMemo(
     () =>
-      [...cards]
-        // rejected 항목은 교사/DJ 만 본다. 일반 학생은 안 보이게.
-        .filter((c) => {
-          if (!c.queueStatus || c.queueStatus === "played") return false;
-          if (c.queueStatus === "rejected" && !canControl) return false;
-          return true;
-        })
-        .sort((a, b) => (a.order ?? 0) - (b.order ?? 0)),
-    // 일반 학생에게 rejected 항목이 보이지 않도록 canControl 일 때만 통과.
-    [cards, canControl],
+      deriveQueueState(
+        cards,
+        canControl,
+        dj.rankingLimit,
+        data.board.anonymousAuthor === true,
+      ),
+    [cards, canControl, data.board.anonymousAuthor],
   );
-  const playedCards = useMemo(
-    () =>
-      [...cards]
-        .filter((c) => c.queueStatus === "played")
-        .sort((a, b) => (b.order ?? 0) - (a.order ?? 0)),
-    [cards],
-  );
-  const nowPlaying = useMemo(
-    () => activeQueue.find((c) => c.queueStatus === "approved") ?? null,
-    [activeQueue],
-  );
-  const upNext = activeQueue.filter((c) => c.id !== nowPlaying?.id);
-
-  const pendingCount = activeQueue.filter(
-    (c) => c.queueStatus === "pending",
-  ).length;
-  const approvedCount = activeQueue.filter(
-    (c) => c.queueStatus === "approved",
-  ).length;
-
-  const ranking = useMemo(() => {
-    const counts = new Map<string, number>();
-    for (const c of cards) {
-      const name = resolveQueueAuthorName(c);
-      if (!name) continue;
-      counts.set(name, (counts.get(name) ?? 0) + 1);
-    }
-    return [...counts.entries()]
-      .map(([name, count]) => ({ name, count }))
-      .sort((a, b) => b.count - a.count)
-      .slice(0, dj.rankingLimit);
-  }, [cards]);
 
   async function trackMutation<T>(
     id: string,
@@ -383,7 +341,7 @@ export function DJQueueBoard({
         </View>
 
         {nowPlaying ? (
-          <NowPlayingCard
+          <DJNowPlayingCard
             card={nowPlaying}
             compact={compact}
             canControl={canControl}
@@ -404,41 +362,10 @@ export function DJQueueBoard({
             신청곡과 대기열은 아래 시트에서 확인할 수 있어요.
           </Text>
         </View>
-        <View style={styles.rankingSection}>
-          <Text style={styles.sectionTitle}>신청 TOP</Text>
-          {ranking.length === 0 ? (
-            <Text style={styles.submitNote}>아직 신청 기록이 없어요.</Text>
-          ) : (
-            ranking.map((item, index) => (
-              <View key={item.name} style={styles.rankingRow}>
-                <Text
-                  style={[styles.rankingPos, index < 3 && styles.rankingPosTop]}
-                >
-                  {index + 1}
-                </Text>
-                <View
-                  style={[
-                    styles.rankingAvatar,
-                    index === 0 && styles.rankingAvatarTop,
-                  ]}
-                >
-                  <Text
-                    style={[
-                      styles.rankingAvatarText,
-                      index === 0 && styles.rankingAvatarTextTop,
-                    ]}
-                  >
-                    {item.name[0]}
-                  </Text>
-                </View>
-                <Text style={styles.rankingName} numberOfLines={1}>
-                  {item.name}
-                </Text>
-                <Text style={styles.rankingCount}>{item.count}곡</Text>
-              </View>
-            ))
-          )}
-        </View>
+        <DJQueueRanking
+          items={ranking}
+          hidden={data.board.anonymousAuthor === true}
+        />
       </ScrollView>
 
       <AppBottomSheet
@@ -496,7 +423,7 @@ export function DJQueueBoard({
           contentContainerStyle={styles.queueSheetContent}
           keyboardShouldPersistTaps="handled"
           renderItem={({ item, index }) => (
-            <QueueItem
+            <DJQueueItem
               card={item}
               rank={(nowPlaying ? 2 : 1) + index}
               onApprove={() => handleStatus(item.id, "approved")}
@@ -521,7 +448,7 @@ export function DJQueueBoard({
         />
       </AppBottomSheet>
 
-      <PlayedDrawer
+      <DJPlayedDrawer
         open={playedOpen}
         played={playedCards}
         canControl={canControl}
@@ -537,297 +464,6 @@ export function DJQueueBoard({
         onClose={() => setRecapOpen(false)}
       />
     </View>
-  );
-}
-
-function NowPlayingCard({
-  card,
-  compact,
-  canControl,
-  onNext,
-}: {
-  card: BoardCard;
-  compact: boolean;
-  canControl: boolean;
-  onNext: () => void;
-}) {
-  const submitter = resolveQueueAuthorName(card);
-  const mediaUrl = getNowPlayingMediaUrl(card);
-  const hasImage = !!card.linkImage;
-  return (
-    <View style={styles.now}>
-      <Text style={styles.nowLabel}>▶ NOW PLAYING</Text>
-      <View style={[styles.nowBody, compact && styles.nowBodyCompact]}>
-        {mediaUrl ? (
-          <View style={[styles.nowPlayer, compact && styles.nowPlayerCompact]}>
-            <EmbeddedMedia
-              url={mediaUrl}
-              title={card.title}
-              aspectRatio={dj.mediaAspectRatio}
-            />
-          </View>
-        ) : hasImage ? (
-          <Image
-            source={{ uri: card.linkImage! }}
-            style={styles.nowThumb}
-            resizeMode="cover"
-          />
-        ) : (
-          <View style={[styles.nowThumb, styles.nowThumbFallback]}>
-            <Text style={styles.nowThumbEmoji}>♪</Text>
-          </View>
-        )}
-        <View style={styles.nowInfo}>
-          <Text style={styles.nowTitle} numberOfLines={2}>
-            {card.title}
-          </Text>
-          <Text style={styles.nowMeta}>
-            {card.linkDesc ? `${card.linkDesc} · ` : ""}
-            {submitter ? `${submitter}님 신청` : ""}
-          </Text>
-          {canControl ? (
-            <View style={styles.nowActions}>
-              <AppButton variant="secondary" onPress={onNext}>
-                ⏭ 다음 곡
-              </AppButton>
-            </View>
-          ) : null}
-        </View>
-      </View>
-    </View>
-  );
-}
-
-function getNowPlayingMediaUrl(card: BoardCard): string | null {
-  const playableUrl = findPlayableMediaUrl(card);
-  if (playableUrl) return playableUrl;
-  const mediaItem = buildMediaItems(card).find(
-    (item) => item.kind === "video" || item.kind === "link",
-  );
-  return mediaItem?.url ?? card.videoUrl ?? card.linkUrl ?? null;
-}
-
-function resolveQueueAuthorName(card: BoardCard): string {
-  const resolved =
-    card.externalAuthorName ?? card.studentAuthorName ?? card.authorName ?? "";
-  return card.anonymousAuthor && resolved ? "익명" : resolved;
-}
-
-function QueueItem({
-  card,
-  rank,
-  onApprove,
-  onReject,
-  onMarkPlayed,
-  onDelete,
-  onMoveUp,
-  onMoveDown,
-  canMoveUp,
-  canMoveDown,
-  canControl,
-}: {
-  card: BoardCard;
-  rank: number;
-  onApprove: () => void;
-  onReject: () => void;
-  onMarkPlayed: () => void;
-  onDelete: () => void;
-  onMoveUp: () => void;
-  onMoveDown: () => void;
-  canMoveUp: boolean;
-  canMoveDown: boolean;
-  canControl: boolean;
-}) {
-  const submitter = resolveQueueAuthorName(card);
-  const status = card.queueStatus ?? "pending";
-  const isPending = status === "pending";
-
-  return (
-    <View style={styles.queueItem}>
-      <View style={styles.queueItemMain}>
-        <Text style={styles.queueRank}>{rank}</Text>
-        {card.linkImage ? (
-          <Image
-            source={{ uri: card.linkImage }}
-            style={styles.queueThumb}
-            resizeMode="cover"
-          />
-        ) : (
-          <View style={[styles.queueThumb, styles.queueThumbFallback]}>
-            <Text style={styles.queueThumbEmoji}>♪</Text>
-          </View>
-        )}
-        <View style={styles.queueInfo}>
-          <Text style={styles.queueTrack} numberOfLines={2}>
-            {card.title}
-          </Text>
-          <View style={styles.queueSubRow}>
-            {card.linkDesc ? (
-              <Text style={styles.queueSub}>{card.linkDesc}</Text>
-            ) : null}
-            {submitter ? (
-              <Text style={styles.queueSub}>
-                {card.linkDesc ? " · " : ""}
-                {submitter}
-              </Text>
-            ) : null}
-            {isPending ? (
-              <Pill
-                tone="warning"
-                style={styles.pendingPill}
-                textStyle={styles.pendingText}
-              >
-                대기
-              </Pill>
-            ) : null}
-          </View>
-        </View>
-        {canControl && isPending ? (
-          <AppButton
-            style={styles.queueApproveButton}
-            textStyle={styles.queueApproveText}
-            onPress={onApprove}
-          >
-            승인
-          </AppButton>
-        ) : null}
-      </View>
-      {canControl ? (
-        <View style={styles.queueCtrls}>
-          <IconButton
-            style={styles.iconBtn}
-            onPress={onMoveUp}
-            disabled={!canMoveUp}
-          >
-            <Text style={styles.iconBtnText}>↑</Text>
-          </IconButton>
-          <IconButton
-            style={styles.iconBtn}
-            onPress={onMoveDown}
-            disabled={!canMoveDown}
-          >
-            <Text style={styles.iconBtnText}>↓</Text>
-          </IconButton>
-          <AppButton
-            variant="quiet"
-            style={styles.ctrlBtn}
-            textStyle={styles.ctrlText}
-            onPress={onMarkPlayed}
-          >
-            ✓
-          </AppButton>
-          <AppButton
-            variant="quiet"
-            style={styles.ctrlBtn}
-            textStyle={styles.ctrlText}
-            onPress={isPending ? onReject : onDelete}
-          >
-            {isPending ? "거부" : "제거"}
-          </AppButton>
-        </View>
-      ) : isPending && card.isOwnPendingQueue ? (
-        // 일반 학생도 본인 pending 신청은 취소할 수 있다.
-        <View style={styles.queueCtrls}>
-          <AppButton
-            variant="quiet"
-            style={styles.ctrlBtn}
-            textStyle={styles.ctrlText}
-            onPress={onDelete}
-          >
-            신청 취소
-          </AppButton>
-        </View>
-      ) : null}
-    </View>
-  );
-}
-
-function PlayedDrawer({
-  open,
-  played,
-  canControl,
-  onClose,
-  onRestore,
-  onDelete,
-}: {
-  open: boolean;
-  played: BoardCard[];
-  canControl: boolean;
-  onClose: () => void;
-  onRestore: (cardId: string) => void;
-  onDelete: (cardId: string) => void;
-}) {
-  return (
-    <AppModal
-      visible={open}
-      animationType="slide"
-      onClose={onClose}
-      align="right"
-      closeOnBackdropPress
-      sheetStyle={styles.drawer}
-      accessibilityLabel="재생 완료 목록"
-    >
-      <View style={styles.drawerHead}>
-        <View style={styles.drawerCopy}>
-          <Text style={styles.drawerTitle}>재생 완료</Text>
-          <Text style={styles.drawerSubtitle}>
-            대기열로 복귀시킬 수 있습니다
-          </Text>
-        </View>
-        <IconButton style={styles.drawerClose} onPress={onClose}>
-          <Text style={styles.drawerCloseText}>×</Text>
-        </IconButton>
-      </View>
-      <ScrollView contentContainerStyle={styles.drawerList}>
-        {played.length === 0 ? (
-          <Text style={styles.empty}>재생 완료된 곡이 없습니다.</Text>
-        ) : (
-          played.map((p) => (
-            <View key={p.id} style={styles.drawerItem}>
-              {p.linkImage ? (
-                <Image
-                  source={{ uri: p.linkImage }}
-                  style={styles.drawerThumb}
-                  resizeMode="cover"
-                />
-              ) : (
-                <View style={[styles.drawerThumb, styles.drawerThumbFallback]}>
-                  <Text style={styles.drawerThumbEmoji}>♪</Text>
-                </View>
-              )}
-              <View style={styles.drawerInfo}>
-                <Text style={styles.drawerItemTitle} numberOfLines={1}>
-                  {p.title}
-                </Text>
-                <Text style={styles.drawerItemSub} numberOfLines={1}>
-                  {p.linkDesc ? `${p.linkDesc} · ` : ""}
-                  {resolveQueueAuthorName(p)}
-                </Text>
-              </View>
-              {canControl ? (
-                <>
-                  <IconButton
-                    style={styles.drawerBtn}
-                    onPress={() => onRestore(p.id)}
-                  >
-                    <Text style={styles.drawerBtnText}>↺</Text>
-                  </IconButton>
-                  <IconButton
-                    style={styles.drawerBtn}
-                    onPress={() => onDelete(p.id)}
-                  >
-                    <Text style={styles.drawerBtnDangerText}>×</Text>
-                  </IconButton>
-                </>
-              ) : null}
-            </View>
-          ))
-        )}
-      </ScrollView>
-      <View style={styles.drawerFoot}>
-        <Text style={styles.drawerFootText}>총 {played.length}곡 재생됨</Text>
-      </View>
-    </AppModal>
   );
 }
 
@@ -864,55 +500,6 @@ const styles = StyleSheet.create({
     flexShrink: 0,
   },
 
-  // NOW PLAYING
-  now: {
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.lg,
-    gap: spacing.md,
-    borderBottomWidth: borders.hairline,
-    borderBottomColor: colors.border,
-  },
-  nowLabel: { ...typography.badge, color: colors.accent },
-  nowBody: {
-    flexDirection: "row",
-    gap: spacing.lg,
-    alignItems: "center",
-  },
-  nowBodyCompact: {
-    flexDirection: "column",
-    alignItems: "stretch",
-  },
-  nowPlayer: {
-    width: dj.nowPlayerWidth,
-    maxWidth: dj.nowPlayerMaxWidth,
-    borderRadius: radii.control,
-    overflow: "hidden",
-  },
-  nowPlayerCompact: {
-    width: dj.nowPlayerCompactWidth,
-    maxWidth: dj.nowPlayerCompactMaxWidth,
-  },
-  nowThumb: {
-    width: dj.nowThumbWidth,
-    height: dj.nowThumbHeight,
-    borderRadius: radii.control,
-    backgroundColor: colors.mediaLilacDark,
-  },
-  nowThumbFallback: { alignItems: "center", justifyContent: "center" },
-  nowThumbEmoji: { fontSize: iconSizes.xl, color: colors.onAccent },
-  nowInfo: { flex: 1, minWidth: 0 },
-  nowTitle: {
-    ...typography.title,
-    color: colors.text,
-    marginBottom: spacing.xs,
-  },
-  nowMeta: { ...typography.body, color: colors.textMuted },
-  nowActions: {
-    flexDirection: "row",
-    gap: spacing.sm,
-    marginTop: spacing.md,
-    flexWrap: "wrap",
-  },
   // Stream sections
   feedSection: {
     paddingHorizontal: spacing.lg,
@@ -971,173 +558,4 @@ const styles = StyleSheet.create({
     borderBottomWidth: borders.hairline,
     borderBottomColor: colors.border,
   },
-
-  // Queue item
-  queueItem: {
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
-    gap: spacing.sm,
-  },
-  queueItemMain: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: spacing.sm,
-  },
-  queueRank: {
-    width: dj.queueRankWidth,
-    textAlign: "center",
-    ...typography.label,
-    color: colors.textMuted,
-    fontFamily: "monospace",
-  },
-  queueThumb: {
-    width: dj.queueThumbWidth,
-    aspectRatio: media.previewAspectRatio,
-    borderRadius: radii.btn,
-    backgroundColor: colors.mediaLilac,
-  },
-  queueThumbFallback: { alignItems: "center", justifyContent: "center" },
-  queueThumbEmoji: { fontSize: iconSizes.sm, color: colors.onAccent },
-  queueInfo: { flex: 1, minWidth: 0 },
-  queueApproveButton: {
-    minHeight: tapMin,
-    paddingHorizontal: spacing.md,
-  },
-  queueApproveText: { ...typography.badge, color: colors.onAccent },
-  queueTrack: { ...typography.label, color: colors.text },
-  queueSubRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    flexWrap: "wrap",
-    gap: spacing.xs,
-    marginTop: spacing.xs,
-  },
-  queueSub: { ...typography.micro, color: colors.textMuted },
-  pendingPill: {
-    marginLeft: spacing.xs,
-  },
-  pendingText: { ...typography.badge, color: colors.warningTintedText },
-  queueCtrls: {
-    flexDirection: "row",
-    justifyContent: "flex-end",
-    flexWrap: "wrap",
-    gap: spacing.xs,
-  },
-  iconBtn: {
-    width: dj.compactIconButton,
-    height: dj.compactIconButton,
-    backgroundColor: colors.transparent,
-  },
-  iconBtnText: { ...typography.label, color: colors.textMuted },
-  ctrlBtn: {
-    minHeight: dj.compactIconButton,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: spacing.xs,
-  },
-  ctrlText: { ...typography.badge, color: colors.textMuted },
-
-  // Ranking feed section
-  rankingSection: {
-    marginTop: spacing.sm,
-    paddingHorizontal: spacing.lg,
-    paddingTop: spacing.lg,
-    borderTopWidth: borders.hairline,
-    borderTopColor: colors.border,
-  },
-  rankingRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: spacing.md,
-    paddingVertical: spacing.sm,
-  },
-  rankingPos: {
-    width: dj.rankingPositionWidth,
-    textAlign: "center",
-    ...typography.label,
-    fontFamily: "monospace",
-    color: colors.textMuted,
-  },
-  rankingPosTop: { color: colors.rankingGold },
-  rankingAvatar: {
-    width: dj.rankingAvatarSize,
-    height: dj.rankingAvatarSize,
-    borderRadius: radii.pill,
-    backgroundColor: colors.surfaceAlt,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  rankingAvatarTop: { backgroundColor: colors.rankingGold },
-  rankingAvatarText: { ...typography.micro, color: colors.text },
-  rankingAvatarTextTop: { color: colors.onAccent },
-  rankingName: { flex: 1, ...typography.body, color: colors.text },
-  rankingCount: {
-    ...typography.body,
-    color: colors.textMuted,
-    fontVariant: ["tabular-nums"],
-  },
-
-  // Drawer
-  drawer: {
-    width: dj.drawerWidth,
-    height: "100%",
-    maxHeight: "100%",
-    borderRadius: radii.none,
-  },
-  drawerHead: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-    justifyContent: "space-between",
-    gap: spacing.md,
-    padding: spacing.lg,
-    borderBottomWidth: borders.hairline,
-    borderBottomColor: colors.border,
-  },
-  drawerCopy: { flex: 1 },
-  drawerTitle: { ...typography.section, color: colors.text },
-  drawerSubtitle: {
-    ...typography.micro,
-    color: colors.textMuted,
-    marginTop: spacing.xs,
-  },
-  drawerClose: {
-    borderWidth: borders.hairline,
-    borderColor: colors.border,
-  },
-  drawerCloseText: { ...typography.subtitle, color: colors.textMuted },
-  drawerList: { padding: spacing.sm, gap: spacing.xs },
-  drawerItem: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: spacing.sm,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: spacing.xs,
-    borderRadius: radii.btn,
-  },
-  drawerThumb: {
-    width: dj.drawerThumbWidth,
-    aspectRatio: media.previewAspectRatio,
-    borderRadius: radii.btn,
-    backgroundColor: colors.mediaNeutral,
-  },
-  drawerThumbFallback: { alignItems: "center", justifyContent: "center" },
-  drawerThumbEmoji: { fontSize: iconSizes.sm, color: colors.onAccent },
-  drawerInfo: { flex: 1, minWidth: 0 },
-  drawerItemTitle: { ...typography.label, color: colors.text },
-  drawerItemSub: {
-    ...typography.micro,
-    color: colors.textMuted,
-    marginTop: spacing.xs,
-  },
-  drawerBtn: {
-    borderRadius: radii.btn,
-  },
-  drawerBtnText: { ...typography.label, color: colors.textMuted },
-  drawerBtnDangerText: { ...typography.label, color: colors.danger },
-  drawerFoot: {
-    padding: spacing.md,
-    borderTopWidth: borders.hairline,
-    borderTopColor: colors.border,
-    alignItems: "center",
-  },
-  drawerFootText: { ...typography.micro, color: colors.textMuted },
 });
