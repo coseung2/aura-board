@@ -18,14 +18,14 @@ import {
   spacing,
   typography,
 } from "../../theme/tokens";
-import { apiFetch, ApiError, getApiBase } from "../../lib/api";
+import { apiFetch, ApiError } from "../../lib/api";
 import { clearSessionToken } from "../../lib/session";
+import { portfolioCardToBoardCard } from "../../lib/portfolio-card";
 import { AppHeader, SurfaceCard } from "../../components/ui";
 import { StudentHeaderActions } from "../../components/StudentHeaderActions";
 import type {
   BoardCard,
   MeResponse,
-  PortfolioCardDTO,
   PortfolioStudentDTO,
 } from "../../lib/types";
 
@@ -36,9 +36,16 @@ export default function StudentPortfolioScreen() {
   const [loading, setLoading] = useState(true);
   const [portfolioLoading, setPortfolioLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const modalCards = useMemo(() => {
+  const feedCards = useMemo(() => {
     if (!portfolio) return [];
-    return portfolio.cards.map((card) => toBoardCard(card, portfolio.student));
+    return portfolio.cards.map((card) =>
+      portfolioCardToBoardCard(card, {
+        fallbackAuthor: {
+          id: portfolio.student.id,
+          name: portfolio.student.name,
+        },
+      }),
+    );
   }, [portfolio]);
   const handleAuthError = useCallback(
     async (e: unknown) => {
@@ -117,21 +124,28 @@ export default function StudentPortfolioScreen() {
             </View>
           ) : portfolio?.cards.length ? (
             <View style={styles.streamList}>
-              {portfolio.cards.map((card, index) => (
-                <View key={card.id}>
-                  <StreamFeedPost
-                    card={
-                      modalCards[index] ?? toBoardCard(card, portfolio.student)
-                    }
-                    onOpenComments={() =>
-                      setCommentCard(modalCards[index] ?? null)
-                    }
-                  />
-                  {index < portfolio.cards.length - 1 ? (
-                    <View style={styles.streamSeparator} accessible={false} />
-                  ) : null}
-                </View>
-              ))}
+              {portfolio.cards.map((card, index) => {
+                const feedCard =
+                  feedCards[index] ??
+                  portfolioCardToBoardCard(card, {
+                    fallbackAuthor: {
+                      id: portfolio.student.id,
+                      name: portfolio.student.name,
+                    },
+                  });
+
+                return (
+                  <View key={card.id}>
+                    <StreamFeedPost
+                      card={feedCard}
+                      onOpenComments={() => setCommentCard(feedCard)}
+                    />
+                    {index < portfolio.cards.length - 1 ? (
+                      <View style={styles.streamSeparator} accessible={false} />
+                    ) : null}
+                  </View>
+                );
+              })}
             </View>
           ) : (
             <SurfaceCard style={styles.emptyBox}>
@@ -165,103 +179,6 @@ export default function StudentPortfolioScreen() {
       />
     </SafeAreaView>
   );
-}
-
-function toBoardCard(
-  card: PortfolioCardDTO,
-  student: PortfolioStudentDTO["student"],
-): BoardCard {
-  const authorName = student.name;
-  return {
-    id: card.id,
-    boardId: card.sourceBoard.id,
-    title: card.title,
-    content: card.content,
-    color: card.color,
-    imageUrl: getCardPreviewImage(card),
-    linkUrl: card.linkUrl,
-    linkTitle: card.linkTitle,
-    linkDesc: card.linkDesc,
-    linkImage: card.linkImage ? resolvePortfolioAssetUrl(card.linkImage) : null,
-    videoUrl: card.videoUrl,
-    fileUrl: card.fileUrl,
-    fileName: card.fileName,
-    fileSize: card.fileSize,
-    fileMimeType: card.fileMimeType,
-    x: 0,
-    y: 0,
-    width: null,
-    height: null,
-    order: null,
-    sectionId: card.sourceSection?.id ?? null,
-    authorId: null,
-    externalAuthorName: null,
-    studentAuthorId: student.id,
-    createdAt: card.createdAt,
-    updatedAt: card.createdAt,
-    likeCount: 0,
-    commentCount: 0,
-    attachments: card.attachments
-      .filter(
-        (attachment) =>
-          attachment.kind === "image" ||
-          attachment.kind === "video" ||
-          attachment.kind === "file",
-      )
-      .map((attachment) => ({
-        id: attachment.id,
-        kind: attachment.kind as "image" | "video" | "file",
-        url: resolvePortfolioAssetUrl(attachment.url),
-        previewUrl: attachment.previewUrl
-          ? resolvePortfolioAssetUrl(attachment.previewUrl)
-          : null,
-        fileName: attachment.fileName,
-        fileSize: attachment.fileSize,
-        mimeType: attachment.mimeType,
-        order: attachment.order,
-      })),
-    authors: [
-      { id: student.id, displayName: authorName, studentId: student.id },
-    ],
-    authorName,
-    studentAuthorName: authorName,
-    anonymousAuthor: card.sourceBoard.anonymousAuthor,
-  };
-}
-
-function getCardPreviewImage(card: PortfolioCardDTO): string | null {
-  if (card.thumbUrl) return resolvePortfolioAssetUrl(card.thumbUrl);
-  if (card.imageUrl) return resolvePortfolioAssetUrl(card.imageUrl);
-  if (card.linkImage) return resolvePortfolioAssetUrl(card.linkImage);
-  const imageAttachment = card.attachments?.find(
-    (a) => a.kind === "image" && (a.previewUrl || a.url),
-  );
-  const image = imageAttachment?.previewUrl ?? imageAttachment?.url ?? null;
-  return image ? resolvePortfolioAssetUrl(image) : null;
-}
-
-function resolvePortfolioAssetUrl(value: string): string {
-  const apiBase = getApiBase();
-  try {
-    const assetUrl = new URL(value, apiBase);
-    const apiOrigin = new URL(apiBase).origin;
-    const isAuraBoardAsset =
-      assetUrl.hostname === "aura-board.com" ||
-      assetUrl.hostname === "www.aura-board.com";
-
-    if (isAuraBoardAsset && apiOrigin !== assetUrl.origin) {
-      return `${apiOrigin}${assetUrl.pathname}${assetUrl.search}`;
-    }
-
-    if (assetUrl.origin !== apiOrigin) {
-      return `${apiOrigin}/api/link-preview/image?url=${encodeURIComponent(
-        assetUrl.toString(),
-      )}`;
-    }
-    return assetUrl.toString();
-  } catch {
-    return value;
-  }
 }
 
 const styles = StyleSheet.create({

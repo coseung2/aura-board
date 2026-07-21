@@ -6,24 +6,28 @@ import {
   StyleSheet,
   Text,
   View,
-  useWindowDimensions,
 } from "react-native";
-import { Image } from "expo-image";
 import { useRouter } from "expo-router";
 import { Bell, UserPlus, UserRound } from "lucide-react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { ParentBottomNav } from "../../components/parent-bottom-nav";
+import { ParentFeedCard } from "../../components/parent-feed-card";
 import {
   AppButton,
   AppHeader,
   ControlPressable,
   EmptyState,
   IconButton,
+  SemanticNav,
+  SemanticNavItem,
 } from "../../components/ui";
 import { useParentChildPosts } from "../../hooks/use-parent-child-posts";
 import { useParentOverview } from "../../hooks/use-parent-overview";
-import { clearParentSession, loadParentSelectedChild, saveParentSelectedChild } from "../../lib/session";
-import type { ParentPostDTO } from "../../lib/types";
+import {
+  clearParentSession,
+  loadParentSelectedChild,
+  saveParentSelectedChild,
+} from "../../lib/session";
 import {
   borders,
   colors,
@@ -39,13 +43,14 @@ type ContentKind = "media" | "text";
 
 export default function ParentHomeScreen() {
   const router = useRouter();
-  const { width } = useWindowDimensions();
   const [selectedChildId, setSelectedChildId] = useState<string | null>(null);
   const [kind, setKind] = useState<ContentKind>("media");
 
   const handleUnauthorized = useCallback(async () => {
     await clearParentSession();
-    router.replace("/(parent)/login?error=로그인이 만료되었어요. 다시 로그인해 주세요.");
+    router.replace(
+      "/(parent)/login?error=로그인이 만료되었어요. 다시 로그인해 주세요.",
+    );
   }, [router]);
 
   const overview = useParentOverview(handleUnauthorized);
@@ -73,16 +78,6 @@ export default function ParentHomeScreen() {
   });
   const selectedChild =
     overview.children.find((child) => child.studentId === selectedChildId) ?? null;
-  const columns =
-    width >= 980
-      ? parent.gridWideColumns
-      : width >= 640
-        ? parent.gridTabletColumns
-        : parent.gridPhoneColumns;
-  const tileWidth = Math.floor(
-    (width - spacing.lg * 2 - parent.gridTileGap * (columns - 1)) / columns,
-  );
-  const gridKey = `${columns}-${kind}`;
 
   const header = useMemo(
     () => (
@@ -93,7 +88,11 @@ export default function ParentHomeScreen() {
             onPress={() => router.push("/(parent)/link-child")}
             accessibilityLabel="자녀 추가"
           >
-            <UserPlus size={iconSizes.sm} color={colors.textMuted} strokeWidth={2} />
+            <UserPlus
+              size={iconSizes.sm}
+              color={colors.textMuted}
+              strokeWidth={2}
+            />
             <Text style={styles.utilityText}>자녀 추가</Text>
           </ControlPressable>
           <ControlPressable
@@ -101,7 +100,11 @@ export default function ParentHomeScreen() {
             onPress={() => router.push("/(parent)/account")}
             accessibilityLabel="계정"
           >
-            <UserRound size={iconSizes.sm} color={colors.textMuted} strokeWidth={2} />
+            <UserRound
+              size={iconSizes.sm}
+              color={colors.textMuted}
+              strokeWidth={2}
+            />
             <Text style={styles.utilityText}>계정</Text>
           </ControlPressable>
         </View>
@@ -123,14 +126,27 @@ export default function ParentHomeScreen() {
                   onPress={() => setSelectedChildId(child.studentId)}
                   accessibilityRole="tab"
                   accessibilityState={{ selected }}
-                  accessibilityLabel={`${child.name}, ${child.classroom?.name ?? "학급 미배정"}`}
+                  accessibilityLabel={`${child.name}, ${
+                    child.classroom?.name ?? "학급 미배정"
+                  }`}
                 >
                   <View style={[styles.avatar, selected && styles.avatarSelected]}>
-                    <Text style={[styles.avatarText, selected && styles.avatarTextSelected]}>
+                    <Text
+                      style={[
+                        styles.avatarText,
+                        selected && styles.avatarTextSelected,
+                      ]}
+                    >
                       {child.name.trim().slice(0, 1) || "아"}
                     </Text>
                   </View>
-                  <Text selectable style={[styles.childName, selected && styles.childNameSelected]}>
+                  <Text
+                    selectable
+                    style={[
+                      styles.childName,
+                      selected && styles.childNameSelected,
+                    ]}
+                  >
                     {child.name}
                   </Text>
                   <Text selectable style={styles.childMeta} numberOfLines={1}>
@@ -145,7 +161,11 @@ export default function ParentHomeScreen() {
 
         {selectedChild ? (
           <View style={styles.profileHeading}>
-            <Text selectable accessibilityRole="header" style={styles.profileTitle}>
+            <Text
+              selectable
+              accessibilityRole="header"
+              style={styles.profileTitle}
+            >
               {selectedChild.name}
             </Text>
             <Text selectable style={styles.profileSubtitle}>
@@ -155,28 +175,21 @@ export default function ParentHomeScreen() {
         ) : null}
 
         {selectedChild ? (
-          <View
+          <SemanticNav
             style={styles.kindTabs}
-            accessibilityRole="tablist"
             accessibilityLabel="게시물 종류"
           >
-            {(["media", "text"] as const).map((value) => {
-              const selected = kind === value;
-              return (
-                <ControlPressable
-                  key={value}
-                  style={[styles.kindTab, selected && styles.kindTabSelected]}
-                  onPress={() => setKind(value)}
-                  accessibilityRole="tab"
-                  accessibilityState={{ selected }}
-                >
-                  <Text style={[styles.kindText, selected && styles.kindTextSelected]}>
-                    {value === "media" ? "미디어" : "텍스트"}
-                  </Text>
-                </ControlPressable>
-              );
-            })}
-          </View>
+            {(["media", "text"] as const).map((value) => (
+              <SemanticNavItem
+                key={value}
+                style={styles.kindTab}
+                selected={kind === value}
+                onPress={() => setKind(value)}
+              >
+                {value === "media" ? "미디어" : "텍스트"}
+              </SemanticNavItem>
+            ))}
+          </SemanticNav>
         ) : null}
       </View>
     ),
@@ -188,7 +201,9 @@ export default function ParentHomeScreen() {
       <SafeAreaView style={styles.container} edges={["top", "bottom"]}>
         <View style={styles.center}>
           <ActivityIndicator size="large" color={colors.accent} />
-          <Text selectable style={styles.muted}>홈을 준비하고 있어요.</Text>
+          <Text selectable style={styles.muted}>
+            홈을 준비하고 있어요.
+          </Text>
         </View>
       </SafeAreaView>
     );
@@ -208,28 +223,22 @@ export default function ParentHomeScreen() {
             }
           >
             <Bell size={iconSizes.md} color={colors.textMuted} strokeWidth={2} />
-            {overview.pendingLinks.length > 0 ? <View style={styles.notificationDot} /> : null}
+            {overview.pendingLinks.length > 0 ? (
+              <View style={styles.notificationDot} />
+            ) : null}
           </IconButton>
         }
       />
 
       <FlatList
-        key={gridKey}
+        key={`${selectedChildId ?? "none"}-${kind}`}
         data={posts.items}
-        numColumns={columns}
         keyExtractor={(item) => item.id}
         renderItem={({ item }) => (
-          <PostGridTile
-            post={item}
-            kind={kind}
-            width={tileWidth}
-            onPress={() =>
-              router.push({ pathname: "/(parent)", params: { post: item.id } })
-            }
-          />
+          <ParentFeedCard card={item} childName={selectedChild?.name} />
         )}
-        columnWrapperStyle={styles.gridRow}
-        contentContainerStyle={styles.gridContent}
+        ItemSeparatorComponent={() => <View style={styles.postSeparator} />}
+        contentContainerStyle={styles.listContent}
         contentInsetAdjustmentBehavior="automatic"
         ListHeaderComponent={header}
         refreshing={overview.refreshing || posts.refreshing}
@@ -256,7 +265,9 @@ export default function ParentHomeScreen() {
           ) : posts.loading ? (
             <View style={styles.center}>
               <ActivityIndicator color={colors.accent} />
-              <Text selectable style={styles.muted}>게시물을 불러오는 중이에요.</Text>
+              <Text selectable style={styles.muted}>
+                게시물을 불러오는 중이에요.
+              </Text>
             </View>
           ) : posts.error ? (
             <EmptyState
@@ -276,8 +287,12 @@ export default function ParentHomeScreen() {
             <ActivityIndicator style={styles.footer} color={colors.accent} />
           ) : posts.loadMoreError ? (
             <View style={styles.footerError}>
-              <Text selectable style={styles.muted}>{posts.loadMoreError}</Text>
-              <AppButton variant="quiet" onPress={posts.loadMore}>다시 불러오기</AppButton>
+              <Text selectable style={styles.muted}>
+                {posts.loadMoreError}
+              </Text>
+              <AppButton variant="quiet" onPress={posts.loadMore}>
+                다시 불러오기
+              </AppButton>
             </View>
           ) : null
         }
@@ -288,72 +303,13 @@ export default function ParentHomeScreen() {
   );
 }
 
-function PostGridTile({
-  post,
-  kind,
-  width,
-  onPress,
-}: {
-  post: ParentPostDTO;
-  kind: ContentKind;
-  width: number;
-  onPress: () => void;
-}) {
-  const preview = getPostPreview(post);
-  const title = post.title.trim() || (kind === "media" ? "교실 기록" : "텍스트 게시물");
-
-  return (
-    <ControlPressable
-      style={[styles.tile, { width }, kind === "text" && styles.textTile]}
-      onPress={onPress}
-      accessibilityLabel={`${title} 피드에서 보기`}
-    >
-      {kind === "media" ? (
-        preview ? (
-          <Image source={{ uri: preview }} style={styles.tileImage} contentFit="cover" />
-        ) : (
-          <View style={styles.mediaFallback}>
-            <Text style={styles.mediaFallbackIcon}>□</Text>
-            <Text selectable style={styles.mediaFallbackText} numberOfLines={2}>
-              {title}
-            </Text>
-          </View>
-        )
-      ) : (
-        <View style={styles.textTileContent}>
-          <Text selectable style={styles.textTileTitle} numberOfLines={3}>
-            {title}
-          </Text>
-          {post.content.trim() ? (
-            <Text selectable style={styles.textTileBody} numberOfLines={4}>
-              {post.content.trim()}
-            </Text>
-          ) : null}
-        </View>
-      )}
-    </ControlPressable>
-  );
-}
-
-function getPostPreview(post: ParentPostDTO): string | null {
-  return (
-    post.thumbUrl ??
-    post.imageUrl ??
-    post.attachments.find((item) => item.kind === "image")?.previewUrl ??
-    post.attachments.find((item) => item.kind === "image")?.url ??
-    post.attachments.find((item) => item.kind === "video")?.previewUrl ??
-    post.linkImage ??
-    null
-  );
-}
-
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg },
-  gridContent: { flexGrow: 1, paddingBottom: spacing.xl },
-  gridRow: {
-    gap: parent.gridTileGap,
-    paddingHorizontal: spacing.lg,
-    paddingBottom: parent.gridTileGap,
+  listContent: { flexGrow: 1, paddingBottom: spacing.xl },
+  postSeparator: {
+    height: borders.hairline,
+    marginVertical: spacing.lg,
+    backgroundColor: colors.border,
   },
   headerContent: { gap: spacing.lg, paddingVertical: spacing.lg },
   utilityRow: {
@@ -386,7 +342,10 @@ const styles = StyleSheet.create({
     borderRadius: radii.control,
     backgroundColor: colors.transparent,
   },
-  childTabSelected: { borderColor: colors.accent, backgroundColor: colors.accentTintedBg },
+  childTabSelected: {
+    borderColor: colors.accent,
+    backgroundColor: colors.accentTintedBg,
+  },
   avatar: {
     width: parent.childAvatarSize,
     height: parent.childAvatarSize,
@@ -410,51 +369,8 @@ const styles = StyleSheet.create({
   profileHeading: { gap: spacing.xs, paddingHorizontal: spacing.lg },
   profileTitle: { ...typography.title, color: colors.text },
   profileSubtitle: { ...typography.body, color: colors.textMuted },
-  kindTabs: {
-    minHeight: tapMin,
-    flexDirection: "row",
-    marginHorizontal: spacing.lg,
-    borderBottomWidth: borders.hairline,
-    borderBottomColor: colors.border,
-  },
-  kindTab: {
-    flex: 1,
-    minHeight: tapMin,
-    alignItems: "center",
-    justifyContent: "center",
-    borderBottomWidth: borders.medium,
-    borderBottomColor: colors.transparent,
-    backgroundColor: colors.transparent,
-  },
-  kindTabSelected: { borderBottomColor: colors.accent },
-  kindText: { ...typography.label, color: colors.textMuted },
-  kindTextSelected: { color: colors.accent },
-  tile: {
-    aspectRatio: 1,
-    overflow: "hidden",
-    borderWidth: borders.none,
-    borderRadius: radii.none,
-    backgroundColor: colors.surfaceAlt,
-  },
-  tileImage: { width: "100%", height: "100%" },
-  mediaFallback: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    gap: spacing.xs,
-    padding: spacing.sm,
-    backgroundColor: colors.accentTintedBg,
-  },
-  mediaFallbackIcon: { fontSize: iconSizes.md, color: colors.accent },
-  mediaFallbackText: { ...typography.micro, color: colors.accentTintedText, textAlign: "center" },
-  textTile: {
-    borderWidth: borders.hairline,
-    borderColor: colors.border,
-    backgroundColor: colors.surface,
-  },
-  textTileContent: { flex: 1, justifyContent: "space-between", gap: spacing.xs, padding: spacing.sm },
-  textTileTitle: { ...typography.label, color: colors.text },
-  textTileBody: { ...typography.micro, color: colors.textMuted },
+  kindTabs: { marginHorizontal: spacing.lg },
+  kindTab: { flex: 1 },
   center: {
     minHeight: parent.contentEmptyMinHeight,
     alignItems: "center",

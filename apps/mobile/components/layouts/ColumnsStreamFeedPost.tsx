@@ -1,11 +1,5 @@
 import { useEffect, useState } from "react";
-import {
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
-  useWindowDimensions,
-} from "react-native";
+import { ScrollView, StyleSheet, Text, View } from "react-native";
 import { Image } from "expo-image";
 import { Heart, MessageCircle, UserRound } from "lucide-react-native";
 import {
@@ -30,16 +24,29 @@ import {
 } from "../../lib/media";
 import { ControlPressable } from "../ui";
 
+export type StreamFeedPostEngagementMode = "interactive" | "summary";
+
+type Props = {
+  card: BoardCard;
+  onOpenComments?: () => void;
+  onOpenAuthorPicker?: () => void;
+  engagementMode?: StreamFeedPostEngagementMode;
+  authorLabel?: string | null;
+  sourceLabel?: string | null;
+  highlighted?: boolean;
+};
+
 export function StreamFeedPost({
   card,
   onOpenComments,
   onOpenAuthorPicker,
-}: {
-  card: BoardCard;
-  onOpenComments?: () => void;
-  onOpenAuthorPicker?: () => void;
-}) {
-  const author = resolveCardAuthorName(card);
+  engagementMode = "interactive",
+  authorLabel,
+  sourceLabel,
+  highlighted = false,
+}: Props) {
+  const author =
+    authorLabel === undefined ? resolveCardAuthorName(card) : authorLabel;
   const title = card.title.trim();
   const content = card.content.trim();
   const mediaItems = streamPostImages(card);
@@ -51,11 +58,16 @@ export function StreamFeedPost({
   const commentCount = Math.max(0, card.commentCount ?? 0);
   const date = formatStreamPostDate(card.createdAt);
   const [mediaIndex, setMediaIndex] = useState(0);
-  const { width } = useWindowDimensions();
+  const [mediaWidth, setMediaWidth] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
     setLikeCount(Math.max(0, card.likeCount ?? 0));
+    setLiked(false);
+    setLikeBusy(false);
+
+    if (engagementMode !== "interactive") return undefined;
+
     void apiFetch<{ likeCount: number; isLiked: boolean }>(
       `/api/cards/${encodeURIComponent(card.id)}/engagement`,
     )
@@ -65,13 +77,18 @@ export function StreamFeedPost({
         setLiked(engagement.isLiked);
       })
       .catch(() => undefined);
+
     return () => {
       cancelled = true;
     };
-  }, [card.id, card.likeCount]);
+  }, [card.id, card.likeCount, engagementMode]);
+
+  useEffect(() => {
+    setMediaIndex(0);
+  }, [card.id]);
 
   async function toggleLike() {
-    if (likeBusy) return;
+    if (engagementMode !== "interactive" || likeBusy) return;
     const previous = { liked, likeCount };
     const nextLiked = !liked;
     setLiked(nextLiked);
@@ -93,16 +110,28 @@ export function StreamFeedPost({
   }
 
   return (
-    <View style={styles.feedPost}>
-      <View style={styles.feedPostCopy}>
-        <View style={styles.feedPostHeader}>
-          {author ? (
-            <Text style={styles.feedPostAuthor} numberOfLines={1}>
-              {author}
-            </Text>
-          ) : null}
+    <View
+      style={[styles.feedPost, highlighted && styles.feedPostHighlighted]}
+      accessibilityLabel={`${author ? `${author}의 ` : ""}게시물`}
+    >
+      {author || sourceLabel ? (
+        <View style={styles.feedPostCopy}>
+          <View style={styles.feedPostHeader}>
+            <View style={styles.feedPostHeaderCopy}>
+              {author ? (
+                <Text selectable style={styles.feedPostAuthor} numberOfLines={1}>
+                  {author}
+                </Text>
+              ) : null}
+              {sourceLabel ? (
+                <Text selectable style={styles.feedPostSource} numberOfLines={1}>
+                  {sourceLabel}
+                </Text>
+              ) : null}
+            </View>
+          </View>
         </View>
-      </View>
+      ) : null}
 
       {embedUrl ? (
         <EmbeddedMedia
@@ -111,14 +140,28 @@ export function StreamFeedPost({
           style={styles.feedPostEmbed}
         />
       ) : mediaItems.length > 0 ? (
-        <View>
+        <View
+          onLayout={(event) => {
+            const nextWidth = event.nativeEvent.layout.width;
+            if (nextWidth > 0 && nextWidth !== mediaWidth) setMediaWidth(nextWidth);
+          }}
+        >
           <ScrollView
             horizontal
             pagingEnabled
+            nestedScrollEnabled
             showsHorizontalScrollIndicator={false}
             onMomentumScrollEnd={(event) => {
+              const pageWidth = event.nativeEvent.layoutMeasurement.width;
+              if (pageWidth <= 0) return;
               setMediaIndex(
-                Math.round(event.nativeEvent.contentOffset.x / width),
+                Math.min(
+                  mediaItems.length - 1,
+                  Math.max(
+                    0,
+                    Math.round(event.nativeEvent.contentOffset.x / pageWidth),
+                  ),
+                ),
               );
             }}
             accessibilityLabel={`${title || "게시글"} 미디어 ${mediaItems.length}개`}
@@ -126,7 +169,10 @@ export function StreamFeedPost({
             {mediaItems.map((uri) => (
               <View
                 key={`${card.id}:${uri}`}
-                style={[styles.feedPostMediaFrame, { width }]}
+                style={[
+                  styles.feedPostMediaFrame,
+                  { width: Math.max(mediaWidth, 1) },
+                ]}
               >
                 <Image
                   source={{ uri }}
@@ -164,24 +210,42 @@ export function StreamFeedPost({
 
       <View style={styles.feedPostEngagementWrap}>
         <View style={styles.feedPostEngagement}>
-          <ControlPressable
-            style={styles.feedPostLikeAction}
-            onPress={() => void toggleLike()}
-            disabled={likeBusy}
-            accessibilityLabel={
-              liked ? `좋아요 ${likeCount}, 취소` : `좋아요 ${likeCount}`
-            }
-            accessibilityState={{ selected: liked }}
-          >
-            <Heart
-              size={iconSizes.md}
-              color={liked ? colors.accent : colors.textMuted}
-              fill={liked ? colors.accent : colors.transparent}
-              strokeWidth={1.75}
-              accessible={false}
-            />
-            <Text style={styles.feedPostEngagementCount}>{likeCount}</Text>
-          </ControlPressable>
+          {engagementMode === "interactive" ? (
+            <ControlPressable
+              style={styles.feedPostLikeAction}
+              onPress={() => void toggleLike()}
+              disabled={likeBusy}
+              accessibilityLabel={
+                liked ? `좋아요 ${likeCount}, 취소` : `좋아요 ${likeCount}`
+              }
+              accessibilityState={{ selected: liked }}
+            >
+              <Heart
+                size={iconSizes.md}
+                color={liked ? colors.accent : colors.textMuted}
+                fill={liked ? colors.accent : colors.transparent}
+                strokeWidth={1.75}
+                accessible={false}
+              />
+              <Text style={styles.feedPostEngagementCount}>{likeCount}</Text>
+            </ControlPressable>
+          ) : (
+            <View
+              style={styles.feedPostEngagementItem}
+              accessible
+              accessibilityLabel={`좋아요 ${likeCount}`}
+            >
+              <Heart
+                size={iconSizes.md}
+                color={colors.textMuted}
+                fill={colors.transparent}
+                strokeWidth={1.75}
+                accessible={false}
+              />
+              <Text style={styles.feedPostEngagementCount}>{likeCount}</Text>
+            </View>
+          )}
+
           {onOpenComments ? (
             <ControlPressable
               style={styles.feedPostCommentAction}
@@ -199,8 +263,23 @@ export function StreamFeedPost({
                 <Text style={styles.feedPostCommentLabel}>{commentCount}</Text>
               </View>
             </ControlPressable>
+          ) : engagementMode === "summary" ? (
+            <View
+              style={styles.feedPostEngagementItem}
+              accessible
+              accessibilityLabel={`댓글 ${commentCount}`}
+            >
+              <MessageCircle
+                size={iconSizes.md}
+                color={colors.textMuted}
+                strokeWidth={1.75}
+                accessible={false}
+              />
+              <Text style={styles.feedPostCommentLabel}>{commentCount}</Text>
+            </View>
           ) : null}
-          {onOpenAuthorPicker ? (
+
+          {engagementMode === "interactive" && onOpenAuthorPicker ? (
             <ControlPressable
               style={styles.feedPostAuthorAssignAction}
               onPress={onOpenAuthorPicker}
@@ -220,7 +299,7 @@ export function StreamFeedPost({
 
       <View style={styles.feedPostCopy}>
         {title ? (
-          <Text style={styles.feedPostTitle} numberOfLines={2}>
+          <Text selectable style={styles.feedPostTitle} numberOfLines={2}>
             {title}
           </Text>
         ) : null}
@@ -231,7 +310,11 @@ export function StreamFeedPost({
             style={styles.feedPostContent}
           />
         ) : null}
-        {date ? <Text style={styles.feedPostDate}>{date}</Text> : null}
+        {date ? (
+          <Text selectable style={styles.feedPostDate}>
+            {date}
+          </Text>
+        ) : null}
       </View>
     </View>
   );
@@ -245,6 +328,9 @@ function streamPostMediaLabel(card: BoardCard): string | null {
   const fileAttachment = card.attachments?.find(
     (attachment) => attachment.kind === "file",
   );
+  const linkAttachment = card.attachments?.find(
+    (attachment) => attachment.kind === "link",
+  );
   if (
     card.videoUrl ||
     card.attachments?.some((item) => item.kind === "video")
@@ -254,8 +340,13 @@ function streamPostMediaLabel(card: BoardCard): string | null {
   if (card.fileUrl || fileAttachment) {
     return `📎 ${card.fileName ?? fileAttachment?.fileName ?? "파일"}`;
   }
-  if (card.linkUrl) {
-    return card.linkTitle ?? safeStreamPostHost(card.linkUrl);
+  if (card.linkUrl || linkAttachment) {
+    const linkUrl = card.linkUrl ?? linkAttachment?.url ?? "";
+    return (
+      card.linkTitle ??
+      linkAttachment?.fileName ??
+      safeStreamPostHost(linkUrl)
+    );
   }
   return null;
 }
@@ -286,6 +377,11 @@ const styles = StyleSheet.create({
     borderRadius: radii.none,
     backgroundColor: colors.transparent,
   },
+  feedPostHighlighted: {
+    paddingVertical: spacing.sm,
+    borderWidth: borders.medium,
+    borderColor: colors.accent,
+  },
   feedPostCopy: {
     gap: spacing.sm,
     paddingHorizontal: spacing.lg,
@@ -294,9 +390,18 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
   },
+  feedPostHeaderCopy: {
+    flex: 1,
+    minWidth: 0,
+    gap: spacing.xxs,
+  },
   feedPostAuthor: {
     ...typography.section,
     color: colors.text,
+  },
+  feedPostSource: {
+    ...typography.micro,
+    color: colors.textMuted,
   },
   feedPostTitle: {
     ...typography.section,
