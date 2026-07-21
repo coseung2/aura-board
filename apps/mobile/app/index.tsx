@@ -31,6 +31,7 @@ import {
   loadSessionToken,
   loadParentToken,
   saveParentCache,
+  saveParentToken,
   saveSessionToken,
   saveStudentCache,
 } from "../lib/session";
@@ -217,16 +218,25 @@ export default function Landing() {
         url.toString(),
         redirectUri,
       );
-      if (result.type === "success" && Platform.OS === "ios") {
-        // ASWebAuthenticationSession consumes its callback instead of emitting
-        // the Linking event that the root layout uses for token persistence.
-        // Re-dispatch the URL so the existing centralized handler remains the
-        // only place that parses and stores the callback token.
+      if (result.type === "success") {
+        // WebBrowser returns the callback URL on both platforms. Persist the
+        // token here before routing so platform-specific Linking delivery (or
+        // the callback screen mounting first) cannot leave the spinner stuck.
+        let token: string | null = null;
         try {
-          await Linking.openURL(result.url);
+          const callback = new URL(result.url);
+          token =
+            callback.searchParams.get("token") ??
+            new URLSearchParams(callback.hash.slice(1)).get("token");
         } catch {
-          setParentError("로그인 결과를 앱으로 가져오지 못했어요.");
+          token = null;
         }
+        if (!token) {
+          setParentError("로그인 결과가 올바르지 않아요. 다시 시도해 주세요.");
+          return;
+        }
+        await saveParentToken(token);
+        router.replace("/(parent)");
       } else if (result.type === "cancel" || result.type === "dismiss") {
         setParentError("로그인을 취소했어요.");
       }

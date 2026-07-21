@@ -30,12 +30,22 @@ function mobileRedirect(
   callbackUrl = MOBILE_DEEP_LINK,
 ) {
   const url = new URL(callbackUrl);
+  // Android intents used by Expo Go drop URL fragments. Keep release-app
+  // callbacks fragment-based, but use query params for the trusted local
+  // emulator callback so the session handoff actually reaches Expo Go.
+  const paramsTarget = url.protocol === "exp:" ? url.searchParams : null;
   if (params.error) {
-    url.hash = `error=${encodeURIComponent(params.error)}`;
+    if (paramsTarget) paramsTarget.set("error", params.error);
+    else url.hash = `error=${encodeURIComponent(params.error)}`;
   } else if (params.token && params.expiresAt) {
-    url.hash = `token=${encodeURIComponent(params.token)}&expiresAt=${encodeURIComponent(
-      params.expiresAt,
-    )}`;
+    if (paramsTarget) {
+      paramsTarget.set("token", params.token);
+      paramsTarget.set("expiresAt", params.expiresAt);
+    } else {
+      url.hash = `token=${encodeURIComponent(params.token)}&expiresAt=${encodeURIComponent(
+        params.expiresAt,
+      )}`;
+    }
   }
   return NextResponse.redirect(url);
 }
