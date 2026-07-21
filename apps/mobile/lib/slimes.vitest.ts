@@ -75,25 +75,47 @@ describe("mobile slime parity model", () => {
         id: "student-1",
         number: 3,
         name: "하늘",
+        walkingTitle: {
+          key: "weekly-50k",
+          label: "꾸준한 발걸음",
+          imagePath: "/walking/titles/weekly-50k-pixel-512.png",
+        },
         representative: {
           color: "purple",
           growthStage: 2,
           equippedItemKeys: ["water-puddle-background"],
         },
       },
-      { id: "student-2", number: null, name: "바다", representative: null },
+      {
+        id: "student-2",
+        number: null,
+        name: "바다",
+        walkingTitle: null,
+        representative: null,
+      },
     ] })).toEqual([
       {
         id: "student-1",
         number: 3,
         name: "하늘",
+        walkingTitle: {
+          key: "weekly-50k",
+          label: "꾸준한 발걸음",
+          imagePath: "/walking/titles/weekly-50k-pixel-512.png",
+        },
         representative: {
           color: "purple",
           growthStage: 2,
           equippedItemKeys: ["water-puddle-background"],
         },
       },
-      { id: "student-2", number: null, name: "바다", representative: null },
+      {
+        id: "student-2",
+        number: null,
+        name: "바다",
+        walkingTitle: null,
+        representative: null,
+      },
     ]);
   });
 });

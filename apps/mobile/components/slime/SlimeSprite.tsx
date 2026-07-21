@@ -17,9 +17,9 @@ import type { SlimeSpriteProps } from "./slime-types";
 const DEFAULT_DISPLAY_SCALE = 1;
 type LocalImageSource = ImageProps["source"];
 
-function integerDisplayScale(value: number | undefined): number {
+function normalizedDisplayScale(value: number | undefined): number {
   if (!Number.isFinite(value)) return DEFAULT_DISPLAY_SCALE;
-  return Math.max(1, Math.round(value as number));
+  return Math.max(0.25, Math.round((value as number) * 4) / 4);
 }
 
 function imageSource(value: unknown): LocalImageSource {
@@ -68,7 +68,7 @@ export function SlimeSprite({
   itemSpritePath,
   onComplete,
 }: SlimeSpriteProps) {
-  const displayScale = integerDisplayScale(requestedDisplayScale);
+  const displayScale = normalizedDisplayScale(requestedDisplayScale);
   const resolution = useMemo(
     () => resolveSlimeAsset({ slimeColor, evolution, action, equippedFloor }),
     [action, equippedFloor, evolution, slimeColor],
@@ -139,6 +139,7 @@ export function SlimeSprite({
           source={{ uri }}
           style={itemSizeStyle}
           contentFit="contain"
+          recyclingKey={`item:${uri}`}
           transition={0}
           accessible={false}
         />
@@ -159,8 +160,9 @@ export function SlimeSprite({
       <Image
         source={imageSource(resolution.sheet)}
         style={[styles.layer, packedSheetSize, offset]}
-        contentFit="none"
+        contentFit="fill"
         allowDownscaling={false}
+        recyclingKey={playbackKey}
         transition={0}
         accessible={false}
       />
@@ -175,8 +177,9 @@ export function SlimeSprite({
             },
             { left: 0, top: floorOffsetY },
           ]}
-          contentFit="none"
+          contentFit="fill"
           allowDownscaling={false}
+          recyclingKey={`${playbackKey}:crown`}
           transition={0}
           accessible={false}
         />
@@ -193,8 +196,9 @@ export function SlimeSprite({
               top: 0,
             },
           ]}
-          contentFit="none"
+          contentFit="fill"
           allowDownscaling={false}
+          recyclingKey={`${playbackKey}:floor`}
           transition={0}
           accessible={false}
         />

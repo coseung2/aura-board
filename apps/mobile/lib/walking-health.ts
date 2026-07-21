@@ -34,6 +34,36 @@ export type WalkingPolicy = {
   weeklyTiers: WalkingWeeklyRewardTier[];
 };
 
+export type WalkingMonthlyAttendanceReward = {
+  month: string;
+  monthDays: number;
+  attendanceCount: number;
+  cashEarned: number;
+  cashPaid: number;
+  nextOrdinalReward: {
+    ordinal: number;
+    type: "cash" | "item";
+    amount: number;
+  } | null;
+  itemRewardOrdinal: number;
+  itemEarned: boolean;
+};
+
+export type WalkingWeeklyStepReward = {
+  key: string;
+  steps: number;
+  amount: number;
+  achieved: boolean;
+  claimed: boolean;
+};
+
+export type WalkingWeeklyStepRewards = {
+  weekStart: string;
+  totalSteps: number;
+  maxSteps: number;
+  tiers: WalkingWeeklyStepReward[];
+};
+
 /**
  * Keep the mobile progress view aligned with the server's weekly reward
  * contract (`src/lib/reward-policy.ts`). The server is the source of truth
@@ -277,6 +307,8 @@ export type WalkingResponse = {
   rows: WalkingDay[];
   range?: Pick<WalkingWeekRange, "weekStart" | "weekEnd">;
   policy: WalkingPolicy;
+  monthlyAttendanceReward: WalkingMonthlyAttendanceReward;
+  weeklyStepRewards: WalkingWeeklyStepRewards;
 };
 
 function safePolicyInteger(value: unknown, fallback: number, minimum = 0) {
@@ -328,11 +360,15 @@ export async function fetchWalkingSnapshot(_days?: number): Promise<WalkingRespo
     rows: WalkingDay[];
     range?: Pick<WalkingWeekRange, "weekStart" | "weekEnd">;
     policy?: unknown;
+    monthlyAttendanceReward: WalkingMonthlyAttendanceReward;
+    weeklyStepRewards: WalkingWeeklyStepRewards;
   }>("/api/student/walking?week=current");
   return {
     rows: payload.rows,
     range: payload.range,
     policy: normalizeWalkingPolicy(payload.policy),
+    monthlyAttendanceReward: payload.monthlyAttendanceReward,
+    weeklyStepRewards: payload.weeklyStepRewards,
   };
 }
 

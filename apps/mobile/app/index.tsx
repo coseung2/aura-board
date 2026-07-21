@@ -21,7 +21,6 @@ import {
   radii,
   responsive,
   spacing,
-  studentNav,
   tapMin,
   typography,
   auth,
@@ -183,11 +182,9 @@ export default function Landing() {
       >
         <View style={styles.topLogo}>
           <LogoLockup size={brand.logoSize * 2} withWordmark={false} />
+          <Text style={styles.loginBrandTitle}>Aura-board</Text>
         </View>
         <View style={styles.loginHeader}>
-          <View style={styles.loginTitleCell}>
-            <Text style={styles.loginBrandTitle}>Aura-board</Text>
-          </View>
           <SemanticNav
             style={styles.roleNav}
             accessibilityLabel="로그인 역할 선택"
@@ -393,7 +390,7 @@ const styles = StyleSheet.create({
   },
   loginHeader: {
     width: "100%",
-    maxWidth: layout.roleCardNarrowMaxWidth,
+    maxWidth: layout.roleCardNarrowMaxWidth - spacing.xxl * 2,
     flexDirection: "row",
     alignItems: "stretch",
     backgroundColor: colors.bg,
@@ -401,16 +398,8 @@ const styles = StyleSheet.create({
   topLogo: {
     alignItems: "center",
     justifyContent: "center",
+    gap: spacing.md,
     marginBottom: spacing.sm,
-  },
-  loginTitleCell: {
-    flex: 1,
-    minWidth: 0,
-    minHeight: tapMin,
-    justifyContent: "center",
-    paddingHorizontal: spacing.md,
-    borderBottomWidth: borders.hairline,
-    borderBottomColor: colors.border,
   },
   loginBrandTitle: {
     ...typography.title,
@@ -419,12 +408,10 @@ const styles = StyleSheet.create({
       default: typography.title.fontFamily,
     }),
     color: colors.text,
-    flexShrink: 1,
+    textAlign: "center",
   },
   roleNav: {
-    width: studentNav.tabMinWidth * 2,
-    flexGrow: 0,
-    flexShrink: 0,
+    width: "100%",
   },
   roleNavItem: {
     flex: 1,

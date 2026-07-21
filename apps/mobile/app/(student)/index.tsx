@@ -51,7 +51,15 @@ import {
   SemanticNavItem,
 } from "../../components/ui";
 import { StudentHeaderActions } from "../../components/StudentHeaderActions";
-import { studentPetHref } from "../../lib/slimes";
+import { SlimeSprite } from "../../components/slime/SlimeSprite";
+import {
+  evolutionForStage,
+  normalizeSlimeHome,
+  slimeBallSpritePath,
+  stageForColor,
+  studentPetHref,
+  type MobileSlimeHome,
+} from "../../lib/slimes";
 
 // 학생 대시보드. 웹과 같은 /api/student/me 계약을 사용한다.
 
@@ -65,6 +73,7 @@ export default function StudentHome() {
     () => initialHomeCache?.data ?? null,
   );
   const [wallet, setWallet] = useState<WalletSummary | null>(null);
+  const [petHome, setPetHome] = useState<MobileSlimeHome | null>(null);
   const [walletLoading, setWalletLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(() => !initialHomeCache);
@@ -84,6 +93,14 @@ export default function StudentHome() {
     }
   }, []);
 
+  const loadPet = useCallback(async () => {
+    try {
+      setPetHome(normalizeSlimeHome(await apiFetch<unknown>("/api/student/slimes")));
+    } catch {
+      setPetHome(null);
+    }
+  }, []);
+
   const load = useCallback(
     async (isRefresh = false) => {
       const cached = readBoardCache<MeResponse>(STUDENT_HOME_CACHE_KEY, {
@@ -95,6 +112,7 @@ export default function StudentHome() {
       } else {
         setLoading(true);
       }
+      void loadPet();
       try {
         if (isRefresh) setRefreshing(true);
         const res = await revalidateBoardCache<MeResponse>(
@@ -124,7 +142,7 @@ export default function StudentHome() {
         if (isRefresh) setRefreshing(false);
       }
     },
-    [router, loadWallet],
+    [router, loadPet, loadWallet],
   );
 
   useFocusEffect(
@@ -203,6 +221,10 @@ export default function StudentHome() {
           />
         }
       >
+        <RepresentativePet
+          petHome={petHome}
+          onManage={() => router.push(studentPetHref("mine") as Href)}
+        />
         <View
           style={
             overviewLandscape ? styles.landscapeOverview : styles.overviewStack
@@ -227,35 +249,52 @@ export default function StudentHome() {
             </View>
           ) : null}
         </View>
-        <SectionHeader title="펫" />
-        <View style={styles.petLinks}>
-          <ControlPressable
-            style={styles.slimeHomeEntry}
-            onPress={() => router.push(studentPetHref("mine") as Href)}
-            accessibilityLabel="내 펫"
-          >
-            <Text style={styles.slimeHomeEntryIcon} accessible={false}>🫧</Text>
-            <View style={styles.slimeHomeEntryCopy}>
-              <Text style={styles.slimeHomeEntryTitle}>내 펫</Text>
-              <Text style={styles.slimeHomeEntrySubtitle}>대표 펫과 성장 상태를 확인해요</Text>
-            </View>
-            <ChevronRight size={iconSizes.md} color={colors.textMuted} accessible={false} />
-          </ControlPressable>
-          <ControlPressable
-            style={styles.slimeHomeEntry}
-            onPress={() => router.push(studentPetHref("classroom") as Href)}
-            accessibilityLabel="우리 반 펫"
-          >
-            <Text style={styles.slimeHomeEntryIcon} accessible={false}>👥</Text>
-            <View style={styles.slimeHomeEntryCopy}>
-              <Text style={styles.slimeHomeEntryTitle}>우리 반 펫</Text>
-              <Text style={styles.slimeHomeEntrySubtitle}>친구들의 대표 펫을 확인해요</Text>
-            </View>
-            <ChevronRight size={iconSizes.md} color={colors.textMuted} accessible={false} />
-          </ControlPressable>
-        </View>
       </ScrollView>
     </SafeAreaView>
+  );
+}
+
+function RepresentativePet({
+  petHome,
+  onManage,
+}: {
+  petHome: MobileSlimeHome | null;
+  onManage: () => void;
+}) {
+  const color = petHome?.representativeColor;
+  if (!petHome || !color) return null;
+
+  const stage = stageForColor(petHome, color);
+  const equippedItems = petHome.equippedItemsByColor[color] ?? [];
+  const equippedFloor =
+    petHome.equippedFloorByColor[color] ?? petHome.equippedFloor;
+
+  return (
+    <View style={styles.representativePet}>
+      <View style={styles.petManageRow}>
+        <ControlPressable
+          style={styles.petManageLink}
+          onPress={onManage}
+          accessibilityLabel="펫 관리하기"
+        >
+          <Text style={styles.petManageLinkText}>펫 관리하기</Text>
+          <ChevronRight
+            size={iconSizes.sm}
+            color={colors.textMuted}
+            strokeWidth={2}
+            accessible={false}
+          />
+        </ControlPressable>
+      </View>
+      <SlimeSprite
+        slimeColor={color}
+        evolution={evolutionForStage(stage)}
+        equippedFloor={equippedFloor}
+        itemSpritePath={slimeBallSpritePath(equippedItems, color)}
+        displayScale={0.75}
+        accessibilityLabel="내 대표 펫"
+      />
+    </View>
   );
 }
 
@@ -629,10 +668,30 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     paddingHorizontal: pageChrome.horizontalPadding,
-    paddingTop: pageChrome.contentStartGap,
+    paddingTop: spacing.sm,
     paddingBottom: spacing.xxl,
-    gap: spacing.md,
+    gap: spacing.sm,
   },
+  representativePet: {
+    alignSelf: "stretch",
+    alignItems: "center",
+    gap: spacing.xs,
+    paddingVertical: spacing.xs,
+  },
+  petManageRow: { alignSelf: "stretch", alignItems: "flex-end" },
+  petManageLink: {
+    minHeight: tapMin,
+    minWidth: 0,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.xxs,
+    paddingHorizontal: spacing.xs,
+    paddingVertical: spacing.none,
+    borderWidth: borders.none,
+    borderRadius: radii.none,
+    backgroundColor: colors.transparent,
+  },
+  petManageLinkText: { ...typography.badge, color: colors.textMuted },
   landscapeOverview: {
     flexDirection: "row",
     alignItems: "stretch",
@@ -847,35 +906,6 @@ const styles = StyleSheet.create({
   dutyRowCta: {
     ...typography.badge,
     color: colors.accent,
-  },
-
-  slimeHomeEntry: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: spacing.md,
-    minHeight: tapMin,
-    padding: spacing.md,
-    borderWidth: borders.hairline,
-    borderColor: colors.border,
-    borderRadius: radii.control,
-    backgroundColor: colors.surface,
-  },
-  petLinks: { gap: spacing.sm },
-  slimeHomeEntryIcon: {
-    fontSize: iconSizes.lg,
-  },
-  slimeHomeEntryCopy: {
-    flex: 1,
-    minWidth: 0,
-    gap: spacing.xxs,
-  },
-  slimeHomeEntryTitle: {
-    ...typography.label,
-    color: colors.text,
-  },
-  slimeHomeEntrySubtitle: {
-    ...typography.micro,
-    color: colors.textMuted,
   },
 
   sectionSub: {

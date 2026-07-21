@@ -103,11 +103,18 @@ export type MobileSlimeClassmate = {
   id: string;
   number: number | null;
   name: string;
+  walkingTitle: MobileWalkingTitle | null;
   representative: {
     color: SlimeColor;
     growthStage: 1 | 2 | 3;
     equippedItemKeys: string[];
   } | null;
+};
+
+export type MobileWalkingTitle = {
+  key: string;
+  label: string;
+  imagePath: string;
 };
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
@@ -146,6 +153,18 @@ function stageValue(value: unknown): 1 | 2 | 3 {
   if (value >= 3) return 3;
   if (value >= 2) return 2;
   return 1;
+}
+
+function walkingTitle(value: unknown): MobileWalkingTitle | null {
+  if (!isRecord(value)) return null;
+  if (
+    typeof value.key !== "string" ||
+    typeof value.label !== "string" ||
+    typeof value.imagePath !== "string"
+  ) {
+    return null;
+  }
+  return { key: value.key, label: value.label, imagePath: value.imagePath };
 }
 
 function normalizeGrowth(value: unknown): SlimeGrowth {
@@ -306,6 +325,7 @@ export function normalizeSlimeClassroom(payload: unknown): MobileSlimeClassmate[
           ? Math.trunc(entry.number)
           : null,
       name: entry.name,
+      walkingTitle: walkingTitle(entry.walkingTitle),
       representative: representative && representativeColor
         ? {
             color: representativeColor,

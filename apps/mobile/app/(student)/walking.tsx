@@ -12,7 +12,7 @@ import {
 import { useFocusEffect, useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Footprints, ShieldCheck } from "lucide-react-native";
-import { ApiError } from "../../lib/api";
+import { apiFetch, ApiError } from "../../lib/api";
 import { clearSessionToken } from "../../lib/session";
 import {
   DEFAULT_WALKING_POLICY,
@@ -27,7 +27,9 @@ import {
   readAndSyncWalkingDays,
   requestHealthConnectPermissions,
   type WalkingDay,
+  type WalkingMonthlyAttendanceReward,
   type WalkingPolicy,
+  type WalkingWeeklyStepRewards,
 } from "../../lib/walking-health";
 import type {
   HealthConnectPermission,
@@ -39,6 +41,7 @@ import {
   iconSizes,
   layout,
   pageChrome,
+  radii,
   spacing,
   tapMin,
   typography,
@@ -47,12 +50,13 @@ import {
 import {
   AppButton,
   AppHeader,
+  ControlPressable,
   SectionHeader,
   SemanticNav,
   SemanticNavItem,
-  SurfaceCard,
 } from "../../components/ui";
 import { StudentHeaderActions } from "../../components/StudentHeaderActions";
+import { WalkingAttendanceCalendar } from "../../components/walking-attendance-calendar";
 
 const numberFormatter = new Intl.NumberFormat("ko-KR");
 const distanceFormatter = new Intl.NumberFormat("ko-KR", {
@@ -98,6 +102,10 @@ export default function StudentWalkingScreen() {
   const router = useRouter();
   const [rows, setRows] = useState<WalkingDay[]>([]);
   const [policy, setPolicy] = useState<WalkingPolicy>(DEFAULT_WALKING_POLICY);
+  const [monthlyAttendanceReward, setMonthlyAttendanceReward] =
+    useState<WalkingMonthlyAttendanceReward | null>(null);
+  const [weeklyStepRewards, setWeeklyStepRewards] =
+    useState<WalkingWeeklyStepRewards | null>(null);
   const [status, setStatus] = useState<HealthConnectStatus>("unavailable");
   const [permissions, setPermissions] = useState<HealthConnectPermission[]>([]);
   const [loading, setLoading] = useState(true);
@@ -119,6 +127,15 @@ export default function StudentWalkingScreen() {
     return false;
   }, [router]);
 
+  const syncWalkingData = useCallback(async () => {
+    await readAndSyncWalkingDays();
+    const snapshot = await fetchWalkingSnapshot();
+    setRows(snapshot.rows);
+    setPolicy(snapshot.policy);
+    setMonthlyAttendanceReward(snapshot.monthlyAttendanceReward);
+    setWeeklyStepRewards(snapshot.weeklyStepRewards);
+  }, []);
+
   const load = useCallback(async (syncNative = false, refresh = false) => {
     if (refresh) setRefreshing(true);
     else setLoading(true);
@@ -129,6 +146,8 @@ export default function StudentWalkingScreen() {
       const cloudSnapshot = await fetchWalkingSnapshot();
       setRows(cloudSnapshot.rows);
       setPolicy(cloudSnapshot.policy);
+      setMonthlyAttendanceReward(cloudSnapshot.monthlyAttendanceReward);
+      setWeeklyStepRewards(cloudSnapshot.weeklyStepRewards);
 
       if (!isHealthConnectModuleAvailable()) {
         setStatus("unavailable");
@@ -146,7 +165,7 @@ export default function StudentWalkingScreen() {
       const nextPermissions = await getGrantedHealthConnectPermissions();
       setPermissions(nextPermissions);
       if (syncNative && hasRequiredHealthConnectPermissions(nextPermissions)) {
-        setRows(await readAndSyncWalkingDays());
+        await syncWalkingData();
       }
     } catch (nextError) {
       if (!(await handleAuthError(nextError))) {
@@ -156,7 +175,7 @@ export default function StudentWalkingScreen() {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [handleAuthError]);
+  }, [handleAuthError, syncWalkingData]);
 
   const syncLatestSilently = useCallback(async () => {
     if (silentSyncInFlight.current || !isHealthConnectModuleAvailable()) return;
@@ -166,7 +185,7 @@ export default function StudentWalkingScreen() {
       const nextPermissions = await getGrantedHealthConnectPermissions();
       setPermissions(nextPermissions);
       if (hasRequiredHealthConnectPermissions(nextPermissions)) {
-        setRows(await readAndSyncWalkingDays());
+        await syncWalkingData();
       }
     } catch (nextError) {
       if (!(await handleAuthError(nextError))) {
@@ -175,7 +194,7 @@ export default function StudentWalkingScreen() {
     } finally {
       silentSyncInFlight.current = false;
     }
-  }, [handleAuthError]);
+  }, [handleAuthError, syncWalkingData]);
 
   useFocusEffect(useCallback(() => {
     void load(true);
@@ -210,7 +229,7 @@ export default function StudentWalkingScreen() {
         );
         return;
       }
-      setRows(await readAndSyncWalkingDays());
+      await syncWalkingData();
       setStatus("available");
       setMessage(
         Platform.OS === "ios"
@@ -224,14 +243,14 @@ export default function StudentWalkingScreen() {
     } finally {
       setBusy(null);
     }
-  }, [handleAuthError]);
+  }, [handleAuthError, syncWalkingData]);
 
   const sync = useCallback(async () => {
     setBusy("sync");
     setError(null);
     setMessage(null);
     try {
-      setRows(await readAndSyncWalkingDays());
+      await syncWalkingData();
       setMessage("이번 주 걷기 기록을 동기화했어요.");
     } catch (nextError) {
       if (!(await handleAuthError(nextError))) {
@@ -240,7 +259,7 @@ export default function StudentWalkingScreen() {
     } finally {
       setBusy(null);
     }
-  }, [handleAuthError]);
+  }, [handleAuthError, syncWalkingData]);
 
   const openSettings = useCallback(async () => {
     setBusy("settings");
@@ -278,10 +297,6 @@ export default function StudentWalkingScreen() {
   const hasSyncedData = rows.some(
     (row) => row.day >= weekRange.weekStart && row.day <= weekRange.today,
   );
-  const weeklyTiers = policy.weeklyTiers;
-  const weeklyRewardTotal = weeklyTiers.reduce((sum, tier) => sum + tier.amount, 0);
-  const reachedTier = [...weeklyTiers].reverse().find((tier) => totalSteps >= tier.steps);
-  const nextTier = weeklyTiers.find((tier) => totalSteps < tier.steps);
   const showInitialLoading = loading && rows.length === 0;
   const showEmptyState = !loading && !error && !hasSyncedData;
 
@@ -459,13 +474,6 @@ export default function StudentWalkingScreen() {
                   last
                 />
               </View>
-              <WalkingWeeklyRewardProgress
-                totalSteps={totalSteps}
-                reachedTier={reachedTier}
-                nextTier={nextTier}
-                tiers={weeklyTiers}
-                totalReward={weeklyRewardTotal}
-              />
             </View>
 
             <View style={styles.chartSection} accessible accessibilityRole="summary">
@@ -523,13 +531,12 @@ export default function StudentWalkingScreen() {
         ) : (
           <WalkingMissionPanel
             todaySteps={today.steps}
-            activeDays={days.filter(
-              (row) => row.day <= weekRange.today && row.steps > 0,
-            ).length}
             dailyGoal={policy.stepThreshold}
             dailyRewardAmount={policy.dailyUnitAmount}
             dailyUnitCap={policy.dailyUnitCap}
-            weeklyRewardDayCap={policy.weeklyRewardDayCap}
+            monthlyAttendanceReward={monthlyAttendanceReward}
+            weeklyStepRewards={weeklyStepRewards}
+            onWeeklyStepRewardsChange={setWeeklyStepRewards}
           />
         )}
       </ScrollView>
@@ -554,151 +561,198 @@ function SummaryRow({
   );
 }
 
-type WeeklyRewardTier = WalkingPolicy["weeklyTiers"][number];
-
 function WalkingWeeklyRewardProgress({
-  totalSteps,
-  reachedTier,
-  nextTier,
-  tiers,
-  totalReward,
+  rewards,
+  onChange,
 }: {
-  totalSteps: number;
-  reachedTier: WeeklyRewardTier | undefined;
-  nextTier: WeeklyRewardTier | undefined;
-  tiers: WalkingPolicy["weeklyTiers"];
-  totalReward: number;
+  rewards: WalkingWeeklyStepRewards;
+  onChange: (rewards: WalkingWeeklyStepRewards) => void;
 }) {
-  const nextTarget = nextTier?.steps ?? tiers.at(-1)?.steps ?? 1;
-  const progress = Math.min(totalSteps / nextTarget, 1);
-  const reachedAmount = reachedTier
-    ? tiers.slice(
-        0,
-        tiers.findIndex((tier) => tier.key === reachedTier.key) + 1,
-      ).reduce((sum, tier) => sum + tier.amount, 0)
-    : 0;
+  const [pendingTierKey, setPendingTierKey] = useState<string | null>(null);
+  const [claimError, setClaimError] = useState<string | null>(null);
+  const graphMaxSteps = Math.max(
+    1,
+    rewards.maxSteps,
+    rewards.totalSteps,
+    ...rewards.tiers.map((tier) => tier.steps),
+  );
+  const progress = Math.min(rewards.totalSteps / graphMaxSteps, 1);
+  const totalReward = rewards.tiers.reduce((sum, tier) => sum + tier.amount, 0);
+  const claimedTotal = rewards.tiers
+    .filter((tier) => tier.claimed)
+    .reduce((sum, tier) => sum + tier.amount, 0);
+
+  async function claimTier(tierKey: string) {
+    const tier = rewards.tiers.find((candidate) => candidate.key === tierKey);
+    if (!tier?.achieved || tier.claimed || pendingTierKey) return;
+    setPendingTierKey(tierKey);
+    setClaimError(null);
+    try {
+      const payload = await apiFetch<{
+        tier: WalkingWeeklyStepRewards["tiers"][number];
+      }>("/api/student/walking/rewards/claim", {
+        method: "POST",
+        json: { tierKey },
+      });
+      onChange({
+        ...rewards,
+        tiers: rewards.tiers.map((candidate) =>
+          candidate.key === tierKey ? payload.tier : candidate,
+        ),
+      });
+    } catch {
+      setClaimError("보상을 받지 못했어요. 잠시 후 다시 시도해 주세요.");
+    } finally {
+      setPendingTierKey(null);
+    }
+  }
 
   return (
-    <SurfaceCard style={styles.weeklyRewardCard}>
+    <View style={styles.weeklyRewardBlock}>
       <View style={styles.weeklyRewardHeader}>
-        <View style={styles.weeklyRewardTitleGroup}>
-          <Text style={styles.weeklyRewardEyebrow}>이번 주 보상</Text>
-          <Text style={styles.weeklyRewardTitle}>최대 {totalReward}원</Text>
-        </View>
-        <Text style={styles.weeklyRewardAmount}>{reachedAmount}원 달성</Text>
+        <Text style={styles.weeklyRewardTitle}>주간미션</Text>
+        <Text style={styles.weeklyRewardAmount}>
+          달성 보상 {numberFormatter.format(claimedTotal)}원 / {numberFormatter.format(totalReward)}원
+        </Text>
       </View>
-      <Text style={styles.weeklyRewardHint}>
-        {nextTier
-          ? `${numberFormatter.format(nextTier.steps)}걸음까지 ${numberFormatter.format(
-              Math.max(0, nextTier.steps - totalSteps),
-            )}걸음 남았어요.`
-          : "모든 주간 보상을 달성했어요."}
-      </Text>
+      <View style={styles.missionProgressLabels}>
+        <Text style={styles.missionProgressText}>
+          {numberFormatter.format(rewards.totalSteps)} / {numberFormatter.format(graphMaxSteps)}걸음
+        </Text>
+        <Text style={styles.missionProgressPercent}>
+          {Math.round(progress * 100)}%
+        </Text>
+      </View>
       <View
         accessible
         accessibilityRole="progressbar"
-        accessibilityLabel="이번 주 걷기 보상 진행률"
-        accessibilityValue={{ min: 0, max: nextTarget, now: Math.min(totalSteps, nextTarget) }}
+        accessibilityLabel={`이번 주 ${numberFormatter.format(rewards.totalSteps)}걸음, 목표 ${numberFormatter.format(graphMaxSteps)}걸음`}
+        accessibilityValue={{ min: 0, max: graphMaxSteps, now: rewards.totalSteps }}
         style={styles.weeklyRewardTrack}
       >
         <View style={[styles.weeklyRewardFill, { width: `${progress * 100}%` }]} />
       </View>
-      <View style={styles.weeklyRewardTiers}>
-        {tiers.map((tier, index) => {
-          const achieved = totalSteps >= tier.steps;
+      <View style={styles.dailyMilestones}>
+        {rewards.tiers.map((tier) => {
+          const state = tier.claimed
+            ? "수령 완료"
+            : pendingTierKey === tier.key
+              ? "처리 중"
+              : tier.achieved
+                ? "받기"
+                : "잠김";
           return (
             <View
               key={tier.key}
-              accessible
-              accessibilityRole="text"
-              accessibilityLabel={`${numberFormatter.format(tier.steps)}걸음 ${
-                achieved ? "달성" : "미달성"
-              }, ${index === 0 ? `${tier.amount}원` : `추가 ${tier.amount}원`}`}
-              style={[styles.weeklyRewardTier, achieved && styles.weeklyRewardTierAchieved]}
+              style={styles.dailyMilestone}
             >
-              <Text style={styles.weeklyRewardTierSteps}>
+              <View style={styles.dailyMilestoneDot} />
+              <Text style={styles.dailyMilestoneSteps}>
                 {numberFormatter.format(tier.steps)}걸음
               </Text>
-              <Text style={styles.weeklyRewardTierAmount}>
-                {index === 0 ? `${tier.amount}원` : `+${tier.amount}원`}
-              </Text>
+              <ControlPressable
+                disabled={!tier.achieved || tier.claimed || pendingTierKey !== null}
+                onPress={() => void claimTier(tier.key)}
+                accessibilityLabel={`${numberFormatter.format(tier.steps)}걸음 보상 ${numberFormatter.format(tier.amount)}원, ${state}`}
+                style={styles.weeklyRewardClaim}
+              >
+                <Text style={styles.dailyMilestoneAmount}>
+                  {numberFormatter.format(tier.amount)}원
+                </Text>
+              </ControlPressable>
             </View>
           );
         })}
       </View>
-    </SurfaceCard>
+      {claimError ? <Text style={styles.error}>{claimError}</Text> : null}
+    </View>
   );
 }
 
 function WalkingMissionPanel({
   todaySteps,
-  activeDays,
   dailyGoal,
   dailyRewardAmount,
   dailyUnitCap,
-  weeklyRewardDayCap,
+  monthlyAttendanceReward,
+  weeklyStepRewards,
+  onWeeklyStepRewardsChange,
 }: {
   todaySteps: number;
-  activeDays: number;
   dailyGoal: number;
   dailyRewardAmount: number;
   dailyUnitCap: number;
-  weeklyRewardDayCap: number;
+  monthlyAttendanceReward: WalkingMonthlyAttendanceReward | null;
+  weeklyStepRewards: WalkingWeeklyStepRewards | null;
+  onWeeklyStepRewardsChange: (rewards: WalkingWeeklyStepRewards | null) => void;
 }) {
   const safeDailyGoal = Math.max(1, dailyGoal);
-  const safeWeeklyRewardDayCap = Math.max(1, weeklyRewardDayCap);
-  const dailyProgress = Math.min(todaySteps / safeDailyGoal, 1);
-  const weeklyProgress = Math.min(activeDays / safeWeeklyRewardDayCap, 1);
+  const safeDailyUnitCap = Math.min(4, Math.max(1, dailyUnitCap));
+  const dailyMaxSteps = safeDailyGoal * safeDailyUnitCap;
+  const dailyProgress = Math.min(todaySteps / dailyMaxSteps, 1);
+  const dailyMilestones = Array.from(
+    { length: safeDailyUnitCap },
+    (_, index) => ({
+      steps: safeDailyGoal * (index + 1),
+      amount: dailyRewardAmount,
+    }),
+  );
 
   return (
     <View style={styles.missionSection} accessibilityRole="summary">
-      <SectionHeader title="미션" />
-      <Text style={styles.muted}>걷기 기록으로 달성하는 작은 목표예요.</Text>
+      {monthlyAttendanceReward ? (
+        <WalkingAttendanceCalendar reward={monthlyAttendanceReward} />
+      ) : null}
 
-      <SurfaceCard style={styles.missionCard}>
-        <Text style={styles.missionEyebrow}>오늘의 미션</Text>
-        <Text style={styles.missionTitle}>
-          오늘 {numberFormatter.format(safeDailyGoal)}걸음 걷기
-        </Text>
-        <Text style={styles.missionProgressText}>
-          {numberFormatter.format(todaySteps)} / {numberFormatter.format(
-            safeDailyGoal,
-          )}걸음
-        </Text>
-        <Text style={styles.missionHint}>
-          달성 시 {numberFormatter.format(dailyRewardAmount)}원 · 하루 최대 {dailyUnitCap}회
-        </Text>
+      <View style={styles.missionBlock}>
+        <View style={styles.missionHeader}>
+          <Text style={styles.missionTitle}>일간미션</Text>
+          <Text style={styles.missionStatus}>
+            {todaySteps >= dailyMaxSteps ? "달성" : "진행 중"}
+          </Text>
+        </View>
+        <View style={styles.missionProgressLabels}>
+          <Text style={styles.missionProgressText}>
+            {numberFormatter.format(todaySteps)} / {numberFormatter.format(dailyMaxSteps)}걸음
+          </Text>
+          <Text style={styles.missionProgressPercent}>
+            {Math.round(dailyProgress * 100)}%
+          </Text>
+        </View>
         <View
           accessible
           accessibilityRole="progressbar"
           accessibilityLabel="오늘 걸음 미션 진행률"
           accessibilityValue={{
             min: 0,
-            max: safeDailyGoal,
+            max: dailyMaxSteps,
             now: todaySteps,
           }}
           style={styles.missionTrack}
         >
           <View style={[styles.missionFill, { width: `${dailyProgress * 100}%` }]} />
         </View>
-      </SurfaceCard>
-
-      <SurfaceCard style={styles.missionCard}>
-        <Text style={styles.missionEyebrow}>이번 주 미션</Text>
-        <Text style={styles.missionTitle}>{safeWeeklyRewardDayCap}일 이상 걷기</Text>
-        <Text style={styles.missionProgressText}>
-          {activeDays} / {safeWeeklyRewardDayCap}일
-        </Text>
-        <View
-          accessible
-          accessibilityRole="progressbar"
-          accessibilityLabel="이번 주 걷기 미션 진행률"
-          accessibilityValue={{ min: 0, max: safeWeeklyRewardDayCap, now: activeDays }}
-          style={styles.missionTrack}
-        >
-          <View style={[styles.missionFill, { width: `${weeklyProgress * 100}%` }]} />
+        <View style={styles.dailyMilestones}>
+          {dailyMilestones.map((milestone) => (
+            <View key={milestone.steps} style={styles.dailyMilestone}>
+              <View style={styles.dailyMilestoneDot} />
+              <Text style={styles.dailyMilestoneSteps}>
+                {numberFormatter.format(milestone.steps)}걸음
+              </Text>
+              <Text style={styles.dailyMilestoneAmount}>
+                {numberFormatter.format(milestone.amount)}원
+              </Text>
+            </View>
+          ))}
         </View>
-      </SurfaceCard>
+      </View>
+
+      {weeklyStepRewards ? (
+        <WalkingWeeklyRewardProgress
+          rewards={weeklyStepRewards}
+          onChange={(rewards) => onWeeklyStepRewardsChange(rewards)}
+        />
+      ) : null}
     </View>
   );
 }
@@ -757,7 +811,7 @@ const styles = StyleSheet.create({
   summaryRowLast: {},
   summaryLabel: { ...typography.label, color: colors.textMuted, flex: 1 },
   summaryValue: { ...typography.section, color: colors.text, flexShrink: 0 },
-  weeklyRewardCard: {
+  weeklyRewardBlock: {
     gap: spacing.md,
     marginTop: spacing.sm,
   },
@@ -767,60 +821,49 @@ const styles = StyleSheet.create({
     alignItems: "flex-start",
     gap: spacing.md,
   },
-  weeklyRewardTitleGroup: { gap: spacing.xs },
-  weeklyRewardEyebrow: { ...typography.micro, color: colors.accentTintedText },
   weeklyRewardTitle: { ...typography.section, color: colors.text },
   weeklyRewardAmount: { ...typography.label, color: colors.accentTintedText },
-  weeklyRewardHint: { ...typography.label, color: colors.textMuted },
   weeklyRewardTrack: {
     height: walking.chartBarHeight,
     backgroundColor: colors.accentTintedBg,
     overflow: "hidden",
   },
   weeklyRewardFill: { height: "100%", backgroundColor: colors.accent },
-  weeklyRewardTiers: {
-    flexDirection: "row",
-    gap: spacing.sm,
-  },
-  weeklyRewardTier: {
-    flex: 1,
-    gap: spacing.xs,
-    padding: spacing.sm,
-    borderWidth: borders.hairline,
-    borderColor: colors.border,
-    backgroundColor: colors.bg,
-  },
-  weeklyRewardTierAchieved: {
-    borderColor: colors.accent,
-    backgroundColor: colors.accentTintedBg,
-  },
-  weeklyRewardTierSteps: { ...typography.micro, color: colors.textMuted },
-  weeklyRewardTierAmount: { ...typography.label, color: colors.text },
+  weeklyRewardClaim: { alignItems: "center", gap: spacing.xs },
   chartSection: {
     gap: spacing.lg,
   },
   missionSection: {
     gap: spacing.md,
   },
-  missionCard: {
+  missionBlock: {
     gap: spacing.sm,
   },
-  missionEyebrow: {
-    ...typography.micro,
-    color: colors.accentTintedText,
+  missionHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: spacing.md,
   },
   missionTitle: {
     ...typography.section,
     color: colors.text,
   },
+  missionStatus: {
+    ...typography.label,
+    color: colors.accentTintedText,
+  },
+  missionProgressLabels: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: spacing.md,
+  },
   missionProgressText: {
     ...typography.label,
     color: colors.textMuted,
   },
-  missionHint: {
-    ...typography.micro,
-    color: colors.accentTintedText,
-  },
+  missionProgressPercent: { ...typography.label, color: colors.text },
   missionTrack: {
     height: walking.chartBarHeight,
     backgroundColor: colors.accentTintedBg,
@@ -829,6 +872,32 @@ const styles = StyleSheet.create({
   missionFill: {
     height: "100%",
     backgroundColor: colors.accent,
+  },
+  dailyMilestones: {
+    flexDirection: "row",
+    gap: spacing.xs,
+  },
+  dailyMilestone: {
+    flex: 1,
+    minWidth: 0,
+    alignItems: "center",
+    gap: spacing.xs,
+  },
+  dailyMilestoneDot: {
+    width: borders.medium,
+    height: borders.medium,
+    borderRadius: radii.pill,
+    backgroundColor: colors.accent,
+  },
+  dailyMilestoneSteps: {
+    ...typography.micro,
+    color: colors.textMuted,
+    textAlign: "center",
+  },
+  dailyMilestoneAmount: {
+    ...typography.label,
+    color: colors.text,
+    textAlign: "center",
   },
   chartRows: { gap: spacing.md },
   chartRow: { flexDirection: "row", alignItems: "center", gap: spacing.sm },
