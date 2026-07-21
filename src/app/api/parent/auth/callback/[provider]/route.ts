@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import {
   googleClient,
+  exchangeGoogleAuthorizationCode,
   kakaoClient,
   popStateCookie,
   fetchGoogleUserInfo,
@@ -30,17 +31,19 @@ function mobileRedirect(
   callbackUrl = MOBILE_DEEP_LINK,
 ) {
   const url = new URL(callbackUrl);
-  // Android intents used by Expo Go drop URL fragments. Keep release-app
-  // callbacks fragment-based, but use query params for the trusted local
-  // emulator callback so the session handoff actually reaches Expo Go.
-  const paramsTarget = url.protocol === "exp:" ? url.searchParams : null;
+  // Expo Go strips both fragments and query params while resolving a project
+  // deep link. Its file-route path is preserved, so the trusted emulator-only
+  // callback carries the handoff as a route segment. Installed builds retain
+  // fragment-based handoff and never expose the token in an HTTP request path.
+  const expoGo = url.protocol === "exp:";
   if (params.error) {
-    if (paramsTarget) paramsTarget.set("error", params.error);
+    if (expoGo) {
+      url.pathname = `${url.pathname.replace(/\/$/, "")}/error/${encodeURIComponent(params.error)}`;
+    }
     else url.hash = `error=${encodeURIComponent(params.error)}`;
   } else if (params.token && params.expiresAt) {
-    if (paramsTarget) {
-      paramsTarget.set("token", params.token);
-      paramsTarget.set("expiresAt", params.expiresAt);
+    if (expoGo) {
+      url.pathname = `${url.pathname.replace(/\/$/, "")}/token/${encodeURIComponent(params.token)}`;
     } else {
       url.hash = `token=${encodeURIComponent(params.token)}&expiresAt=${encodeURIComponent(
         params.expiresAt,
@@ -110,11 +113,10 @@ export async function GET(
         if (isMobile) return errRedirect(req, "missing_pkce", true, callbackUrl);
         return restartAuth(req, providerId);
       }
-      const tokens = await client.validateAuthorizationCode(
+      accessToken = await exchangeGoogleAuthorizationCode(
         code,
-        stateRecord.codeVerifier
+        stateRecord.codeVerifier,
       );
-      accessToken = tokens.accessToken();
     } else {
       const client = kakaoClient();
       if (!client) return errRedirect(req, "provider_disabled", isMobile);

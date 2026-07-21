@@ -7,7 +7,7 @@ import {
   type TextStyle,
   type ViewStyle,
 } from "react-native";
-import { colors, spacing, typography } from "../theme/tokens";
+import { borders, colors, radii, spacing, tapMin, typography } from "../theme/tokens";
 import { ControlPressable } from "./ui";
 
 const DEFAULT_PREVIEW_CHARACTER_COUNT = 140;
@@ -78,10 +78,18 @@ function buildPostPreview(content: string, characterLimit: number): {
 const styles = StyleSheet.create({
   toggle: {
     alignSelf: "flex-start",
+    minHeight: tapMin,
+    justifyContent: "center",
     marginTop: spacing.xs,
+    paddingHorizontal: spacing.none,
+    paddingVertical: spacing.none,
+    borderWidth: borders.none,
+    borderColor: colors.transparent,
+    borderRadius: radii.none,
+    backgroundColor: colors.transparent,
   },
   toggleLabel: {
-    ...typography.body,
+    ...typography.label,
     color: colors.accentTintedText,
   },
 });

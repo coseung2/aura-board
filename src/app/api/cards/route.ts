@@ -23,6 +23,7 @@ import { requireShareAuth } from "@/lib/share/with-share";
 import { isAllowedFileUrl, isAllowedStoredMime, MAX_ATTACHMENTS_PER_CARD } from "@/lib/file-attachment";
 import { touchBoardUpdatedAt } from "@/lib/board-touch";
 import { announceCardChange } from "@/lib/realtime-broadcast";
+import { dispatchLinkedParentCardPush } from "@/lib/parent-push";
 import { resizeRemoteImageToWebPPreviewUrl, extractVideoThumbnail } from "@/lib/blob";
 import {
   normalizeCommentVoteOptionCount,
@@ -634,6 +635,15 @@ export async function POST(req: Request) {
       actorId: teacherUser?.id ?? studentAuthorId,
     });
     void announceCardChange(input.boardId, "insert");
+    if (studentAuthorId && student) {
+      await dispatchLinkedParentCardPush({
+        eventKey: `card:${card.id}`,
+        studentId: studentAuthorId,
+        studentName: student.name,
+        boardId: input.boardId,
+        cardId: card.id,
+      });
+    }
 
     // 응답에 저장된 attachments 포함 (클라이언트 상태 즉시 반영).
     const attachments = await db.cardAttachment.findMany({

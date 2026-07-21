@@ -178,7 +178,7 @@ const DEV_FEED_CARDS: PortfolioCardDTO[] = [
 
 export default function ParentDevPreview() {
   if (!__DEV__) {
-    return <Redirect href="/(parent)/login" />;
+    return <Redirect href="/?role=parent" />;
   }
 
   return (

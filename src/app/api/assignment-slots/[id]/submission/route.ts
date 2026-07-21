@@ -19,6 +19,7 @@ import {
 import { assignmentChannelKey, publish } from "@/lib/realtime";
 import { resizeToWebPThumbUrl } from "@/lib/blob";
 import { touchBoardUpdatedAt } from "@/lib/board-touch";
+import { dispatchLinkedParentCardPush } from "@/lib/parent-push";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -327,6 +328,13 @@ export async function POST(
         gradingStatus: result.updated.gradingStatus,
         updatedAt: result.updated.updatedAt.toISOString(),
       },
+    });
+    await dispatchLinkedParentCardPush({
+      eventKey: `assignment-attempt:${result.attemptId}`,
+      studentId: student.id,
+      studentName: student.name,
+      boardId: slot.boardId,
+      cardId: slot.cardId,
     });
   }
 

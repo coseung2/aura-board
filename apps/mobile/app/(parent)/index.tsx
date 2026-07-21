@@ -1,18 +1,17 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import { ActivityIndicator, FlatList, StyleSheet, Text, View } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { Bell } from "lucide-react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { ParentBottomNav } from "../../components/parent-bottom-nav";
 import { ParentFeedCard } from "../../components/parent-feed-card";
-import { AppButton, AppHeader, EmptyState, IconButton } from "../../components/ui";
+import { ParentHeaderActions } from "../../components/parent-header-actions";
+import { AppButton, AppHeader, EmptyState } from "../../components/ui";
 import { useParentFeed } from "../../hooks/use-parent-feed";
-import { clearParentSession, loadParentCache, loadParentToken } from "../../lib/session";
+import { clearParentSession, loadParentToken } from "../../lib/session";
 import type { ParentPostDTO } from "../../lib/types";
 import {
   borders,
   colors,
-  iconSizes,
   parent,
   spacing,
   typography,
@@ -23,20 +22,17 @@ export default function ParentFeedScreen() {
   const params = useLocalSearchParams<{ post?: string | string[] }>();
   const focusPostId = Array.isArray(params.post) ? params.post[0] : params.post;
   const listRef = useRef<FlatList<ParentPostDTO>>(null);
-  const [parentName, setParentName] = useState("학부모");
 
   const handleUnauthorized = useCallback(async () => {
     await clearParentSession();
-    router.replace("/(parent)/login?error=로그인이 만료되었어요. 다시 로그인해 주세요.");
+    router.replace("/?role=parent&error=로그인이 만료되었어요. 다시 로그인해 주세요.");
   }, [router]);
 
   useEffect(() => {
-    void Promise.all([loadParentToken(), loadParentCache()]).then(([token, cached]) => {
+    void loadParentToken().then((token) => {
       if (!token) {
-        router.replace("/(parent)/login");
-        return;
+        router.replace("/?role=parent");
       }
-      if (cached?.name) setParentName(cached.name);
     });
   }, [router]);
 
@@ -46,19 +42,7 @@ export default function ParentFeedScreen() {
     <SafeAreaView style={styles.container} edges={["top"]}>
       <AppHeader
         title="피드"
-        right={
-          <View style={styles.headerUtilities}>
-            <Text selectable style={styles.parentName} numberOfLines={1}>
-              {parentName}
-            </Text>
-            <IconButton
-              onPress={() => router.push("/(parent)/notifications")}
-              accessibilityLabel="알림 보기"
-            >
-              <Bell size={iconSizes.md} color={colors.textMuted} strokeWidth={2} />
-            </IconButton>
-          </View>
-        }
+        right={<ParentHeaderActions />}
       />
 
       <FlatList
@@ -134,17 +118,15 @@ export default function ParentFeedScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg },
-  headerUtilities: { flexDirection: "row", alignItems: "center", gap: spacing.xs },
-  parentName: {
-    ...typography.label,
-    color: colors.textMuted,
-    maxWidth: parent.feedHeaderNameMaxWidth,
-  },
   listContent: { flexGrow: 1, paddingBottom: spacing.xl },
   intro: { gap: spacing.xs, paddingHorizontal: spacing.lg, paddingVertical: spacing.lg },
   introTitle: { ...typography.title, color: colors.text },
   introText: { ...typography.body, color: colors.textMuted },
-  separator: { height: borders.hairline, backgroundColor: colors.border },
+  separator: {
+    height: borders.hairline,
+    marginVertical: spacing.lg,
+    backgroundColor: colors.border,
+  },
   center: {
     minHeight: parent.contentEmptyMinHeight,
     alignItems: "center",

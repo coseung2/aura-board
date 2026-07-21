@@ -2511,8 +2511,39 @@ model Parent {
 
   oauthAccounts ParentOAuthAccount[]
 
+  pushDevices    ParentPushDevice[]
+  pushDispatches ParentPushDispatch[]
+
   @@index([email])
   @@index([parentDeletedAt])
+}
+
+model ParentPushDevice {
+  id String @id @default(cuid())
+
+  parentId      String
+  expoPushToken String    @unique
+  platform      String
+  disabledAt    DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  parent Parent @relation(fields: [parentId], references: [id], onDelete: Cascade)
+
+  @@index([parentId, disabledAt])
+}
+
+model ParentPushDispatch {
+  id String @id @default(cuid())
+
+  parentId  String
+  eventKey  String
+  createdAt DateTime @default(now())
+
+  parent Parent @relation(fields: [parentId], references: [id], onDelete: Cascade)
+
+  @@unique([parentId, eventKey])
+  @@index([createdAt])
 }
 
 // parent-redesign (2026-04-26): ???癲?OAuth (Google + Kakao) 1:1 癲ル슢???⑸눀?

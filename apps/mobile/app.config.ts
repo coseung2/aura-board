@@ -1,11 +1,17 @@
 import type { ExpoConfig } from "expo/config";
 import { baseColors } from "./theme/base-colors.cjs";
 
+// Expo Go loads the JavaScript bundle directly from Metro. Its bundled
+// expo-updates client must not attempt to fetch Aura Board's EAS update first.
+// This flag is set only by the local Expo Go launcher; release builds retain
+// the production update configuration below.
+const isExpoGoDevelopment = process.env.AURA_EXPO_GO === "1";
+
 const config: ExpoConfig = {
   name: "Aura-board",
   slug: "aura-board-mobile",
   scheme: "auraboard",
-  version: "0.2.5",
+  version: "0.2.6",
   orientation: "default",
   icon: "./assets/icon.png",
   userInterfaceStyle: "light",
@@ -23,7 +29,7 @@ const config: ExpoConfig = {
     edgeToEdgeEnabled: true,
     predictiveBackGestureEnabled: false,
     package: "com.auraboard.app",
-    versionCode: 6,
+    versionCode: 7,
   },
   web: {
     favicon: "./assets/favicon.png",
@@ -32,23 +38,32 @@ const config: ExpoConfig = {
     "expo-router",
     "expo-font",
     "expo-secure-store",
+    "expo-notifications",
     "./plugins/with-aura-board-health-connect",
     "./plugins/with-android-debug-network-security",
   ],
   experiments: {
     typedRoutes: true,
   },
-  runtimeVersion: {
-    policy: "appVersion",
-  },
+  ...(isExpoGoDevelopment
+    ? {
+        updates: {
+          enabled: false,
+        },
+      }
+    : {
+        runtimeVersion: {
+          policy: "appVersion",
+        },
+        updates: {
+          url: "https://u.expo.dev/fd9f26c1-ef04-4f19-8663-ed7c481af3ea",
+        },
+      }),
   extra: {
     router: {},
     eas: {
       projectId: "fd9f26c1-ef04-4f19-8663-ed7c481af3ea",
     },
-  },
-  updates: {
-    url: "https://u.expo.dev/fd9f26c1-ef04-4f19-8663-ed7c481af3ea",
   },
   owner: "coseung2",
 };

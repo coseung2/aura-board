@@ -10,19 +10,24 @@ import {
 } from "react-native";
 import { Image } from "expo-image";
 import { useRouter } from "expo-router";
-import { Bell, UserPlus, UserRound } from "lucide-react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { ParentBottomNav } from "../../components/parent-bottom-nav";
+import { ParentHeaderActions } from "../../components/parent-header-actions";
 import {
   AppButton,
   AppHeader,
   ControlPressable,
   EmptyState,
-  IconButton,
+  SemanticNav,
+  SemanticNavItem,
 } from "../../components/ui";
 import { useParentChildPosts } from "../../hooks/use-parent-child-posts";
 import { useParentOverview } from "../../hooks/use-parent-overview";
-import { clearParentSession, loadParentSelectedChild, saveParentSelectedChild } from "../../lib/session";
+import {
+  clearParentSession,
+  loadParentSelectedChild,
+  saveParentSelectedChild,
+} from "../../lib/session";
 import type { ParentPostDTO } from "../../lib/types";
 import {
   borders,
@@ -45,7 +50,7 @@ export default function ParentHomeScreen() {
 
   const handleUnauthorized = useCallback(async () => {
     await clearParentSession();
-    router.replace("/(parent)/login?error=로그인이 만료되었어요. 다시 로그인해 주세요.");
+    router.replace("/?role=parent&error=로그인이 만료되었어요. 다시 로그인해 주세요.");
   }, [router]);
 
   const overview = useParentOverview(handleUnauthorized);
@@ -82,30 +87,11 @@ export default function ParentHomeScreen() {
   const tileWidth = Math.floor(
     (width - spacing.lg * 2 - parent.gridTileGap * (columns - 1)) / columns,
   );
-  const gridKey = `${columns}-${kind}`;
+  const gridKey = `${columns}-${selectedChildId ?? "none"}-${kind}`;
 
   const header = useMemo(
     () => (
       <View style={styles.headerContent}>
-        <View style={styles.utilityRow} accessibilityLabel="홈 바로가기">
-          <ControlPressable
-            style={styles.utilityButton}
-            onPress={() => router.push("/(parent)/link-child")}
-            accessibilityLabel="자녀 추가"
-          >
-            <UserPlus size={iconSizes.sm} color={colors.textMuted} strokeWidth={2} />
-            <Text style={styles.utilityText}>자녀 추가</Text>
-          </ControlPressable>
-          <ControlPressable
-            style={styles.utilityButton}
-            onPress={() => router.push("/(parent)/account")}
-            accessibilityLabel="계정"
-          >
-            <UserRound size={iconSizes.sm} color={colors.textMuted} strokeWidth={2} />
-            <Text style={styles.utilityText}>계정</Text>
-          </ControlPressable>
-        </View>
-
         {overview.children.length > 0 ? (
           <ScrollView
             horizontal
@@ -123,14 +109,27 @@ export default function ParentHomeScreen() {
                   onPress={() => setSelectedChildId(child.studentId)}
                   accessibilityRole="tab"
                   accessibilityState={{ selected }}
-                  accessibilityLabel={`${child.name}, ${child.classroom?.name ?? "학급 미배정"}`}
+                  accessibilityLabel={`${child.name}, ${
+                    child.classroom?.name ?? "학급 미배정"
+                  }`}
                 >
                   <View style={[styles.avatar, selected && styles.avatarSelected]}>
-                    <Text style={[styles.avatarText, selected && styles.avatarTextSelected]}>
+                    <Text
+                      style={[
+                        styles.avatarText,
+                        selected && styles.avatarTextSelected,
+                      ]}
+                    >
                       {child.name.trim().slice(0, 1) || "아"}
                     </Text>
                   </View>
-                  <Text selectable style={[styles.childName, selected && styles.childNameSelected]}>
+                  <Text
+                    selectable
+                    style={[
+                      styles.childName,
+                      selected && styles.childNameSelected,
+                    ]}
+                  >
                     {child.name}
                   </Text>
                   <Text selectable style={styles.childMeta} numberOfLines={1}>
@@ -145,7 +144,11 @@ export default function ParentHomeScreen() {
 
         {selectedChild ? (
           <View style={styles.profileHeading}>
-            <Text selectable accessibilityRole="header" style={styles.profileTitle}>
+            <Text
+              selectable
+              accessibilityRole="header"
+              style={styles.profileTitle}
+            >
               {selectedChild.name}
             </Text>
             <Text selectable style={styles.profileSubtitle}>
@@ -155,28 +158,21 @@ export default function ParentHomeScreen() {
         ) : null}
 
         {selectedChild ? (
-          <View
+          <SemanticNav
             style={styles.kindTabs}
-            accessibilityRole="tablist"
             accessibilityLabel="게시물 종류"
           >
-            {(["media", "text"] as const).map((value) => {
-              const selected = kind === value;
-              return (
-                <ControlPressable
-                  key={value}
-                  style={[styles.kindTab, selected && styles.kindTabSelected]}
-                  onPress={() => setKind(value)}
-                  accessibilityRole="tab"
-                  accessibilityState={{ selected }}
-                >
-                  <Text style={[styles.kindText, selected && styles.kindTextSelected]}>
-                    {value === "media" ? "미디어" : "텍스트"}
-                  </Text>
-                </ControlPressable>
-              );
-            })}
-          </View>
+            {(["media", "text"] as const).map((value) => (
+              <SemanticNavItem
+                key={value}
+                style={styles.kindTab}
+                selected={kind === value}
+                onPress={() => setKind(value)}
+              >
+                {value === "media" ? "미디어" : "텍스트"}
+              </SemanticNavItem>
+            ))}
+          </SemanticNav>
         ) : null}
       </View>
     ),
@@ -188,7 +184,9 @@ export default function ParentHomeScreen() {
       <SafeAreaView style={styles.container} edges={["top", "bottom"]}>
         <View style={styles.center}>
           <ActivityIndicator size="large" color={colors.accent} />
-          <Text selectable style={styles.muted}>홈을 준비하고 있어요.</Text>
+          <Text selectable style={styles.muted}>
+            홈을 준비하고 있어요.
+          </Text>
         </View>
       </SafeAreaView>
     );
@@ -199,17 +197,9 @@ export default function ParentHomeScreen() {
       <AppHeader
         title="홈"
         right={
-          <IconButton
-            onPress={() => router.push("/(parent)/notifications")}
-            accessibilityLabel={
-              overview.pendingLinks.length > 0
-                ? `알림 ${overview.pendingLinks.length}건`
-                : "알림 보기"
-            }
-          >
-            <Bell size={iconSizes.md} color={colors.textMuted} strokeWidth={2} />
-            {overview.pendingLinks.length > 0 ? <View style={styles.notificationDot} /> : null}
-          </IconButton>
+          <ParentHeaderActions
+            notificationCount={overview.pendingLinks.length}
+          />
         }
       />
 
@@ -256,7 +246,9 @@ export default function ParentHomeScreen() {
           ) : posts.loading ? (
             <View style={styles.center}>
               <ActivityIndicator color={colors.accent} />
-              <Text selectable style={styles.muted}>게시물을 불러오는 중이에요.</Text>
+              <Text selectable style={styles.muted}>
+                게시물을 불러오는 중이에요.
+              </Text>
             </View>
           ) : posts.error ? (
             <EmptyState
@@ -276,8 +268,12 @@ export default function ParentHomeScreen() {
             <ActivityIndicator style={styles.footer} color={colors.accent} />
           ) : posts.loadMoreError ? (
             <View style={styles.footerError}>
-              <Text selectable style={styles.muted}>{posts.loadMoreError}</Text>
-              <AppButton variant="quiet" onPress={posts.loadMore}>다시 불러오기</AppButton>
+              <Text selectable style={styles.muted}>
+                {posts.loadMoreError}
+              </Text>
+              <AppButton variant="quiet" onPress={posts.loadMore}>
+                다시 불러오기
+              </AppButton>
             </View>
           ) : null
         }
@@ -356,24 +352,6 @@ const styles = StyleSheet.create({
     paddingBottom: parent.gridTileGap,
   },
   headerContent: { gap: spacing.lg, paddingVertical: spacing.lg },
-  utilityRow: {
-    flexDirection: "row",
-    justifyContent: "flex-end",
-    gap: spacing.sm,
-    paddingHorizontal: spacing.lg,
-  },
-  utilityButton: {
-    minHeight: tapMin,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: spacing.xs,
-    paddingHorizontal: spacing.md,
-    borderWidth: borders.hairline,
-    borderColor: colors.border,
-    borderRadius: radii.pill,
-    backgroundColor: colors.surface,
-  },
-  utilityText: { ...typography.label, color: colors.textMuted },
   childTabs: { gap: spacing.sm, paddingHorizontal: spacing.lg },
   childTab: {
     minWidth: 104,
@@ -386,7 +364,10 @@ const styles = StyleSheet.create({
     borderRadius: radii.control,
     backgroundColor: colors.transparent,
   },
-  childTabSelected: { borderColor: colors.accent, backgroundColor: colors.accentTintedBg },
+  childTabSelected: {
+    borderColor: colors.accent,
+    backgroundColor: colors.accentTintedBg,
+  },
   avatar: {
     width: parent.childAvatarSize,
     height: parent.childAvatarSize,
@@ -410,25 +391,8 @@ const styles = StyleSheet.create({
   profileHeading: { gap: spacing.xs, paddingHorizontal: spacing.lg },
   profileTitle: { ...typography.title, color: colors.text },
   profileSubtitle: { ...typography.body, color: colors.textMuted },
-  kindTabs: {
-    minHeight: tapMin,
-    flexDirection: "row",
-    marginHorizontal: spacing.lg,
-    borderBottomWidth: borders.hairline,
-    borderBottomColor: colors.border,
-  },
-  kindTab: {
-    flex: 1,
-    minHeight: tapMin,
-    alignItems: "center",
-    justifyContent: "center",
-    borderBottomWidth: borders.medium,
-    borderBottomColor: colors.transparent,
-    backgroundColor: colors.transparent,
-  },
-  kindTabSelected: { borderBottomColor: colors.accent },
-  kindText: { ...typography.label, color: colors.textMuted },
-  kindTextSelected: { color: colors.accent },
+  kindTabs: { marginHorizontal: spacing.lg },
+  kindTab: { flex: 1 },
   tile: {
     aspectRatio: 1,
     overflow: "hidden",
@@ -446,13 +410,22 @@ const styles = StyleSheet.create({
     backgroundColor: colors.accentTintedBg,
   },
   mediaFallbackIcon: { fontSize: iconSizes.md, color: colors.accent },
-  mediaFallbackText: { ...typography.micro, color: colors.accentTintedText, textAlign: "center" },
+  mediaFallbackText: {
+    ...typography.micro,
+    color: colors.accentTintedText,
+    textAlign: "center",
+  },
   textTile: {
     borderWidth: borders.hairline,
     borderColor: colors.border,
     backgroundColor: colors.surface,
   },
-  textTileContent: { flex: 1, justifyContent: "space-between", gap: spacing.xs, padding: spacing.sm },
+  textTileContent: {
+    flex: 1,
+    justifyContent: "space-between",
+    gap: spacing.xs,
+    padding: spacing.sm,
+  },
   textTileTitle: { ...typography.label, color: colors.text },
   textTileBody: { ...typography.micro, color: colors.textMuted },
   center: {
@@ -465,13 +438,4 @@ const styles = StyleSheet.create({
   muted: { ...typography.body, color: colors.textMuted, textAlign: "center" },
   footer: { padding: spacing.xl },
   footerError: { alignItems: "center", gap: spacing.sm, padding: spacing.lg },
-  notificationDot: {
-    position: "absolute",
-    top: spacing.xs,
-    right: spacing.xs,
-    width: spacing.sm,
-    height: spacing.sm,
-    borderRadius: radii.pill,
-    backgroundColor: colors.danger,
-  },
 });

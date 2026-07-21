@@ -32,11 +32,69 @@ export function getCallbackUrl(provider: ProviderId): string {
   return `${appBaseUrl()}/api/parent/auth/callback/${provider}`;
 }
 
+function googleCredentials(): { id: string; secret: string } | null {
+  const parentId = process.env.GOOGLE_PARENT_CLIENT_ID?.trim();
+  const parentSecret = process.env.GOOGLE_PARENT_CLIENT_SECRET?.trim();
+  const sharedId = process.env.AUTH_GOOGLE_ID?.trim();
+  const sharedSecret = process.env.AUTH_GOOGLE_SECRET?.trim();
+
+  // Local development uses the already-established web OAuth client. Its
+  // authorized redirects include localhost and the parent callback. Keep the
+  // dedicated parent client as the production preference.
+  if (process.env.NODE_ENV !== "production" && sharedId && sharedSecret) {
+    return { id: sharedId, secret: sharedSecret };
+  }
+  if (parentId && parentSecret) return { id: parentId, secret: parentSecret };
+  if (sharedId && sharedSecret) return { id: sharedId, secret: sharedSecret };
+  return null;
+}
+
 export function googleClient(): Google | null {
-  const id = process.env.GOOGLE_PARENT_CLIENT_ID;
-  const secret = process.env.GOOGLE_PARENT_CLIENT_SECRET;
-  if (!id || !secret) return null;
-  return new Google(id, secret, getCallbackUrl("google"));
+  const credentials = googleCredentials();
+  if (!credentials) return null;
+  return new Google(
+    credentials.id,
+    credentials.secret,
+    getCallbackUrl("google"),
+  );
+}
+
+/**
+ * Exchange Google's authorization code using an explicit string body.
+ * In the Next.js development runtime, Arctic's Request body can be consumed
+ * by the patched fetch implementation before Undici sends it, producing
+ * `expected non-null body source`. A plain form-encoded string avoids that
+ * runtime incompatibility while preserving the same OAuth + PKCE flow.
+ */
+export async function exchangeGoogleAuthorizationCode(
+  code: string,
+  codeVerifier: string,
+): Promise<string> {
+  const credentials = googleCredentials();
+  if (!credentials) throw new Error("google_provider_disabled");
+
+  const body = new URLSearchParams({
+    client_id: credentials.id,
+    client_secret: credentials.secret,
+    code,
+    code_verifier: codeVerifier,
+    grant_type: "authorization_code",
+    redirect_uri: getCallbackUrl("google"),
+  }).toString();
+  const response = await fetch("https://oauth2.googleapis.com/token", {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body,
+    cache: "no-store",
+  });
+  const payload = (await response.json().catch(() => null)) as {
+    access_token?: string;
+    error?: string;
+  } | null;
+  if (!response.ok || !payload?.access_token) {
+    throw new Error(`google_token_exchange_${payload?.error ?? response.status}`);
+  }
+  return payload.access_token;
 }
 
 export function kakaoClient(): Kakao | null {

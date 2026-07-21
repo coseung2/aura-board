@@ -11,6 +11,7 @@ import * as Linking from "expo-linking";
 import { colors } from "../theme/tokens";
 import { clearParentSession, saveParentToken } from "../lib/session";
 import { useAndroidBackBehavior } from "../hooks/use-android-back-behavior";
+import { registerParentPushNotifications } from "../lib/parent-push-notifications";
 
 // 루트 레이아웃. 모든 스크린을 Stack 으로 감싸되 헤더는 각 segment 에서 커스텀.
 // 학부모 이메일 매직링크 콜백(auraboard://parent/auth/callback#...) 을
@@ -38,7 +39,10 @@ function parseCallback(url: string) {
     parsed.pathname === "/--/parent/auth/callback";
   if (!auraCallback && !expoGoCallback) return null;
 
-  const params = new URLSearchParams(parsed.hash.slice(1));
+  const params = new URLSearchParams(parsed.search);
+  for (const [key, value] of new URLSearchParams(parsed.hash.slice(1))) {
+    if (!params.has(key)) params.set(key, value);
+  }
 
   return {
     token: params.get("token"),
@@ -73,6 +77,7 @@ function useParentDeepLink() {
 
       if (parsed.token) {
         await saveParentToken(parsed.token);
+        void registerParentPushNotifications();
         router.replace("/(parent)");
       } else {
         await clearParentSession();
@@ -106,6 +111,10 @@ function DeepLinkHandler() {
 
 export default function RootLayout() {
   useAndroidBackBehavior();
+
+  useEffect(() => {
+    void registerParentPushNotifications();
+  }, []);
 
   const [fontsLoaded, fontError] = useFonts({
     NotoSansKR_400Regular,

@@ -1,6 +1,6 @@
 import { useEffect, useRef } from "react";
 import { ActivityIndicator, StyleSheet, Text, View } from "react-native";
-import { useRouter } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import * as Linking from "expo-linking";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { brand, colors, spacing, typography } from "../../../theme/tokens";
@@ -15,6 +15,26 @@ import { clearParentSession, saveParentToken } from "../../../lib/session";
 export default function ParentAuthCallback() {
   const router = useRouter();
   const handledUrl = useRef<string | null>(null);
+  const handledRouteToken = useRef<string | null>(null);
+  const { token: routeToken, error: routeError } = useLocalSearchParams<{
+    token?: string | string[];
+    error?: string | string[];
+  }>();
+
+  useEffect(() => {
+    const token = Array.isArray(routeToken) ? routeToken[0] : routeToken;
+    const error = Array.isArray(routeError) ? routeError[0] : routeError;
+    if (token && token !== handledRouteToken.current) {
+      handledRouteToken.current = token;
+      void saveParentToken(token).then(() => router.replace("/(parent)"));
+      return;
+    }
+    if (!token && error) {
+      void clearParentSession().then(() =>
+        router.replace(`/?role=parent&error=${encodeURIComponent(error)}`),
+      );
+    }
+  }, [routeError, routeToken, router]);
 
   useEffect(() => {
     async function handle(url: string) {

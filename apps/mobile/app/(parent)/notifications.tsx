@@ -35,7 +35,7 @@ export default function ParentNotificationsScreen() {
   const handleUnauthorized = useCallback(async () => {
     await clearParentSession();
     router.replace(
-      "/(parent)/login?error=로그인이 만료되었어요. 다시 로그인해 주세요.",
+      "/?role=parent&error=로그인이 만료되었어요. 다시 로그인해 주세요.",
     );
   }, [router]);
   const overview = useParentOverview(handleUnauthorized);

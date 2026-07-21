@@ -44,7 +44,7 @@ export default function ParentAccountScreen() {
   const handleUnauthorized = useCallback(async () => {
     await clearParentSession();
     router.replace(
-      "/(parent)/login?error=로그인이 만료되었어요. 다시 로그인해 주세요.",
+      "/?role=parent&error=로그인이 만료되었어요. 다시 로그인해 주세요.",
     );
   }, [router]);
   const overview = useParentOverview(handleUnauthorized);
@@ -74,7 +74,7 @@ export default function ParentAccountScreen() {
     setActionError(null);
     try {
       await logoutParentSession();
-      router.replace("/");
+      router.replace("/?role=parent");
     } catch {
       setActionError("로그아웃에 실패했어요. 네트워크를 확인하고 다시 시도해 주세요.");
       setAccountBusy(null);
@@ -94,7 +94,7 @@ export default function ParentAccountScreen() {
     try {
       await parentApiFetch("/api/parent/account/withdraw", { method: "POST" });
       await clearParentSession();
-      router.replace("/");
+      router.replace("/?role=parent");
     } catch (cause) {
       if (cause instanceof ApiError && cause.status === 401) {
         await handleUnauthorized();
