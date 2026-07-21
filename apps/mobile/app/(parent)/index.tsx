@@ -144,7 +144,11 @@ const styles = StyleSheet.create({
   intro: { gap: spacing.xs, paddingHorizontal: spacing.lg, paddingVertical: spacing.lg },
   introTitle: { ...typography.title, color: colors.text },
   introText: { ...typography.body, color: colors.textMuted },
-  separator: { height: borders.hairline, backgroundColor: colors.border },
+  separator: {
+    height: borders.hairline,
+    marginVertical: spacing.lg,
+    backgroundColor: colors.border,
+  },
   center: {
     minHeight: parent.contentEmptyMinHeight,
     alignItems: "center",
