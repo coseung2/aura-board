@@ -598,7 +598,7 @@ export default function StudentSlimeScreen() {
                   )}
                 </View>
                 <Text style={[styles.myPetName, selected && styles.myPetNameSelected]}>{SLIME_COLOR_LABELS[itemColor]}</Text>
-                <View style={styles.myPetActions} accessibilityRole="group" accessibilityLabel={`${SLIME_COLOR_LABELS[itemColor]} 펫 관리`}>
+                <View style={styles.myPetActions} accessibilityLabel={`${SLIME_COLOR_LABELS[itemColor]} 펫 관리`}>
                   <ControlPressable
                     style={styles.myPetActionButton}
                     disabled={!isOwned}
