@@ -25,8 +25,11 @@ export const runtime = "nodejs";
 //   6) 302 — 활성/대기 link 있으면 /parent/feed, 없으면 onboard/match/code
 const MOBILE_DEEP_LINK = "auraboard://parent/auth/callback";
 
-function mobileRedirect(params: { token?: string; expiresAt?: string; error?: string }) {
-  const url = new URL(MOBILE_DEEP_LINK);
+function mobileRedirect(
+  params: { token?: string; expiresAt?: string; error?: string },
+  callbackUrl = MOBILE_DEEP_LINK,
+) {
+  const url = new URL(callbackUrl);
   if (params.error) {
     url.hash = `error=${encodeURIComponent(params.error)}`;
   } else if (params.token && params.expiresAt) {
@@ -37,8 +40,13 @@ function mobileRedirect(params: { token?: string; expiresAt?: string; error?: st
   return NextResponse.redirect(url);
 }
 
-function errRedirect(req: Request, code: string, isMobile = false) {
-  if (isMobile) return mobileRedirect({ error: code });
+function errRedirect(
+  req: Request,
+  code: string,
+  isMobile = false,
+  callbackUrl = MOBILE_DEEP_LINK,
+) {
+  if (isMobile) return mobileRedirect({ error: code }, callbackUrl);
   // 학부모 OAuth 에러는 진입점(/parent/onboard/signup) 으로 되돌림.
   // /parent/auth 는 page.tsx 가 없는 디렉토리(callback route handler 만 존재).
   const url = new URL(`/parent/onboard/signup?error=${code}`, req.url);
@@ -68,16 +76,17 @@ export async function GET(
   // in-app error instead of silently falling back to the web login flow.
   const stateRecord = await popStateCookie();
   const isMobile = stateRecord?.client === "mobile";
+  const callbackUrl = stateRecord?.redirect ?? MOBILE_DEEP_LINK;
 
   if (oauthError) {
-    return errRedirect(req, `provider_${oauthError}`, isMobile);
+    return errRedirect(req, `provider_${oauthError}`, isMobile, callbackUrl);
   }
   if (!code || !incomingState) {
-    if (isMobile) return errRedirect(req, "missing_params", true);
+    if (isMobile) return errRedirect(req, "missing_params", true, callbackUrl);
     return restartAuth(req, providerId);
   }
   if (!stateRecord || stateRecord.state !== incomingState) {
-    if (isMobile) return errRedirect(req, "invalid_state", true);
+    if (isMobile) return errRedirect(req, "invalid_state", true, callbackUrl);
     return restartAuth(req, providerId);
   }
 
@@ -86,9 +95,9 @@ export async function GET(
   try {
     if (providerId === "google") {
       const client = googleClient();
-      if (!client) return errRedirect(req, "provider_disabled", isMobile);
+      if (!client) return errRedirect(req, "provider_disabled", isMobile, callbackUrl);
       if (!stateRecord.codeVerifier) {
-        if (isMobile) return errRedirect(req, "missing_pkce", true);
+        if (isMobile) return errRedirect(req, "missing_pkce", true, callbackUrl);
         return restartAuth(req, providerId);
       }
       const tokens = await client.validateAuthorizationCode(
@@ -104,7 +113,7 @@ export async function GET(
     }
   } catch (e) {
     console.error(`[parent-oauth ${providerId}] token exchange failed`, e);
-    return errRedirect(req, "token_exchange_failed", isMobile);
+    return errRedirect(req, "token_exchange_failed", isMobile, callbackUrl);
   }
 
   // user info 조회
@@ -116,7 +125,7 @@ export async function GET(
         : await fetchKakaoUserInfo(accessToken);
   } catch (e) {
     console.error(`[parent-oauth ${providerId}] userinfo failed`, e);
-    return errRedirect(req, "userinfo_failed", isMobile);
+    return errRedirect(req, "userinfo_failed", isMobile, callbackUrl);
   }
 
   // Parent + ParentOAuthAccount upsert
@@ -125,7 +134,7 @@ export async function GET(
     result = await upsertParentFromOAuth(providerId, info);
   } catch (e) {
     console.error(`[parent-oauth ${providerId}] upsert failed`, e);
-    return errRedirect(req, "upsert_failed", isMobile);
+    return errRedirect(req, "upsert_failed", isMobile, callbackUrl);
   }
 
   // ParentSession 발급
@@ -146,10 +155,13 @@ export async function GET(
   });
 
   if (isMobile) {
-    return mobileRedirect({
-      token: parentSession.token,
-      expiresAt: parentSession.expiresAt.toISOString(),
-    });
+    return mobileRedirect(
+      {
+        token: parentSession.token,
+        expiresAt: parentSession.expiresAt.toISOString(),
+      },
+      callbackUrl,
+    );
   }
 
   // redirect 분기 — 활성/대기 자녀 link 있으면 dashboard, 없으면 onboard

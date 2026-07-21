@@ -8,9 +8,10 @@ import {
   Platform,
   useWindowDimensions,
 } from "react-native";
-import { useRouter } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import * as Linking from "expo-linking";
+import * as WebBrowser from "expo-web-browser";
 import Svg, { Circle, Line, Path } from "react-native-svg";
 import {
   brand,
@@ -50,15 +51,50 @@ import type { ParentChildrenResponse, StudentAuthResponse } from "../lib/types";
 
 type ParentOAuthProvider = "google" | "kakao";
 
+const PARENT_OAUTH_CALLBACK_PATH = "parent/auth/callback";
+
+const PARENT_OAUTH_ERROR_MESSAGES: Record<string, string> = {
+  provider_disabled:
+    "현재 OAuth 로그인이 비활성화되어 있어요. 관리자에게 문의해 주세요.",
+  invalid_provider: "지원하지 않는 로그인 방식이에요.",
+  invalid_state: "로그인 인증이 만료되었어요. 다시 시도해 주세요.",
+  missing_params: "로그인 응답이 올바르지 않아요. 다시 시도해 주세요.",
+  missing_pkce: "보안 정보가 누락되었어요. 다시 시도해 주세요.",
+  token_exchange_failed:
+    "로그인 토큰 교환에 실패했어요. 잠시 후 다시 시도해 주세요.",
+  userinfo_failed: "사용자 정보 조회에 실패했어요. 잠시 후 다시 시도해 주세요.",
+  upsert_failed: "계정 생성에 실패했어요. 잠시 후 다시 시도해 주세요.",
+};
+
+function parentAuthErrorMessage(value: string | string[] | undefined): string | null {
+  const initial = Array.isArray(value) ? value[0] : value;
+  if (!initial) return null;
+  return PARENT_OAUTH_ERROR_MESSAGES[initial] ?? initial;
+}
+
 export default function Landing() {
   const router = useRouter();
+  const { role: routeRole, error: routeError } = useLocalSearchParams<{
+    role?: string | string[];
+    error?: string | string[];
+  }>();
+  const requestedRole =
+    (Array.isArray(routeRole) ? routeRole[0] : routeRole) === "parent"
+      ? "parent"
+      : (Array.isArray(routeRole) ? routeRole[0] : routeRole) === "student"
+        ? "student"
+        : null;
   const { width } = useWindowDimensions();
   const [booting, setBooting] = useState(true);
   const [studentCode, setStudentCode] = useState("");
   const [studentLoading, setStudentLoading] = useState(false);
   const [studentError, setStudentError] = useState<string | null>(null);
+  const [parentLoading, setParentLoading] = useState(false);
+  const [parentError, setParentError] = useState<string | null>(() =>
+    parentAuthErrorMessage(routeError),
+  );
   const [activeRole, setActiveRole] = useState<"student" | "parent">(
-    "student",
+    requestedRole ?? "student",
   );
   const isNarrow = width < layout.mobileBreakpoint;
   const webNarrowContentStyle = webSafeWidthStyle(width, {
@@ -68,6 +104,12 @@ export default function Landing() {
   });
 
   useEffect(() => {
+    if (requestedRole) {
+      setActiveRole(requestedRole);
+      setBooting(false);
+      return;
+    }
+
     (async () => {
       try {
         // 기존 학생 세션 확인
@@ -103,7 +145,12 @@ export default function Landing() {
 
       setBooting(false);
     })();
-  }, [router]);
+  }, [requestedRole, router]);
+
+  useEffect(() => {
+    if (requestedRole) setActiveRole(requestedRole);
+    setParentError(parentAuthErrorMessage(routeError));
+  }, [requestedRole, routeError]);
 
   async function handleStudentLogin() {
     const trimmed = studentCode.trim().toUpperCase();
@@ -149,9 +196,12 @@ export default function Landing() {
 
   async function handleParentOAuth(provider: ParentOAuthProvider) {
     const url = new URL(`/api/parent/auth/${provider}`, getApiBase());
+    const redirectUri = Linking.createURL(PARENT_OAUTH_CALLBACK_PATH);
     if (Platform.OS !== "web") {
       url.searchParams.set("client", "mobile");
+      url.searchParams.set("returnUrl", redirectUri);
     }
+    setParentError(null);
     if (
       Platform.OS === "web" &&
       typeof window !== "undefined" &&
@@ -160,7 +210,32 @@ export default function Landing() {
       window.location.assign(url.toString());
       return;
     }
-    await Linking.openURL(url.toString());
+
+    setParentLoading(true);
+    try {
+      const result = await WebBrowser.openAuthSessionAsync(
+        url.toString(),
+        redirectUri,
+      );
+      if (result.type === "success" && Platform.OS === "ios") {
+        // ASWebAuthenticationSession consumes its callback instead of emitting
+        // the Linking event that the root layout uses for token persistence.
+        // Re-dispatch the URL so the existing centralized handler remains the
+        // only place that parses and stores the callback token.
+        try {
+          await Linking.openURL(result.url);
+        } catch {
+          setParentError("로그인 결과를 앱으로 가져오지 못했어요.");
+        }
+      } else if (result.type === "cancel" || result.type === "dismiss") {
+        setParentError("로그인을 취소했어요.");
+      }
+    } catch {
+      const providerLabel = provider === "google" ? "Google" : "Kakao";
+      setParentError(`${providerLabel} 로그인을 시작하지 못했어요.`);
+    } finally {
+      setParentLoading(false);
+    }
   }
 
   if (booting) {
@@ -269,11 +344,18 @@ export default function Landing() {
             <Text style={styles.roleDesc}>
               자녀 작품을 확인해요
             </Text>
+            {parentError ? (
+              <Text style={styles.parentErrorText} accessibilityRole="alert">
+                {parentError}
+              </Text>
+            ) : null}
             <View style={styles.oauthActions}>
               <ControlPressable
                 style={styles.oauthGoogle}
                 onPress={() => handleParentOAuth("google")}
+                disabled={parentLoading}
                 accessibilityLabel="Google로 로그인"
+                accessibilityState={{ busy: parentLoading }}
               >
                 <GoogleGlyph />
                 <Text style={styles.oauthGoogleText}>Google로 로그인</Text>
@@ -281,7 +363,9 @@ export default function Landing() {
               <ControlPressable
                 style={styles.oauthKakao}
                 onPress={() => handleParentOAuth("kakao")}
+                disabled={parentLoading}
                 accessibilityLabel="Kakao로 로그인"
+                accessibilityState={{ busy: parentLoading }}
               >
                 <KakaoGlyph />
                 <Text style={styles.oauthKakaoText}>Kakao로 로그인</Text>
@@ -460,6 +544,11 @@ const styles = StyleSheet.create({
   },
   studentErrorText: {
     ...typography.micro,
+    color: colors.danger,
+    textAlign: "center",
+  },
+  parentErrorText: {
+    ...typography.body,
     color: colors.danger,
     textAlign: "center",
   },

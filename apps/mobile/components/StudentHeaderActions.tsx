@@ -25,11 +25,14 @@ export function StudentHeaderActions() {
     loggingOutRef.current = true;
     setLoggingOut(true);
     try {
-      await apiFetch("/api/student/logout", { method: "POST" }).catch(
+      // The server logout is best effort. Start it without holding up the
+      // local cleanup or navigation when the request is slow or unavailable.
+      void apiFetch("/api/student/logout", { method: "POST" }).catch(
         () => undefined,
       );
       await clearSessionToken();
-      router.replace("/");
+      router.dismissAll();
+      router.replace("/?role=student");
     } finally {
       loggingOutRef.current = false;
       setLoggingOut(false);

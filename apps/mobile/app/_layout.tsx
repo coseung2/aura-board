@@ -21,18 +21,24 @@ const CALLBACK_PATH = "parent/auth/callback";
 void SplashScreen.preventAutoHideAsync();
 
 function parseCallback(url: string) {
-  if (!url.startsWith("auraboard://")) return null;
-
-  // host 가 parent 이거나 path 에 parent/auth/callback 가 포함되면 처리.
-  const afterScheme = url.slice("auraboard://".length);
-  const pathPart = afterScheme.split("?")[0].split("#")[0].replace(/\/$/, "");
-  if (!pathPart.endsWith(CALLBACK_PATH) && pathPart !== CALLBACK_PATH) {
+  let parsed: URL;
+  try {
+    parsed = new URL(url);
+  } catch {
     return null;
   }
 
-  const hashIdx = url.indexOf("#");
-  const fragment = hashIdx >= 0 ? url.slice(hashIdx + 1) : "";
-  const params = new URLSearchParams(fragment);
+  const auraCallback =
+    parsed.protocol === "auraboard:" &&
+    `${parsed.host}${parsed.pathname}`.replace(/^\/+|\/+$/g, "") === CALLBACK_PATH;
+  const expoGoCallback =
+    parsed.protocol === "exp:" &&
+    parsed.hostname === "10.0.2.2" &&
+    parsed.port === "8081" &&
+    parsed.pathname === "/--/parent/auth/callback";
+  if (!auraCallback && !expoGoCallback) return null;
+
+  const params = new URLSearchParams(parsed.hash.slice(1));
 
   return {
     token: params.get("token"),
@@ -73,7 +79,7 @@ function useParentDeepLink() {
         const msg = parsed.error
           ? errorMessage(parsed.error)
           : "로그인 링크가 유효하지 않아요.";
-        router.replace(`/(parent)/login?error=${encodeURIComponent(msg)}`);
+        router.replace(`/?role=parent&error=${encodeURIComponent(msg)}`);
       }
     }
 

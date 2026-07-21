@@ -12,16 +12,27 @@ export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
 const MOBILE_DEEP_LINK = "auraboard://parent/auth/callback";
+const EXPO_GO_EMULATOR_CALLBACK = "exp://10.0.2.2:8081/--/parent/auth/callback";
 
-function mobileErrorRedirect(error: string) {
-  const url = new URL(MOBILE_DEEP_LINK);
+function mobileCallbackUrl(value: string | null): string {
+  return value === EXPO_GO_EMULATOR_CALLBACK ? value : MOBILE_DEEP_LINK;
+}
+
+function mobileErrorRedirect(error: string, callbackUrl = MOBILE_DEEP_LINK) {
+  const url = new URL(callbackUrl);
   url.hash = `error=${encodeURIComponent(error)}`;
   return NextResponse.redirect(url);
 }
 
 function providerDisabledRedirect(req: Request) {
-  const client = new URL(req.url).searchParams.get("client");
-  if (client === "mobile") return mobileErrorRedirect("provider_disabled");
+  const requestUrl = new URL(req.url);
+  const client = requestUrl.searchParams.get("client");
+  if (client === "mobile") {
+    return mobileErrorRedirect(
+      "provider_disabled",
+      mobileCallbackUrl(requestUrl.searchParams.get("returnUrl")),
+    );
+  }
   return NextResponse.redirect(
     new URL("/parent/onboard/signup?error=provider_disabled", req.url),
   );
@@ -48,7 +59,9 @@ export async function GET(
     return providerDisabledRedirect(req);
   }
 
-  const isMobile = new URL(req.url).searchParams.get("client") === "mobile";
+  const requestUrl = new URL(req.url);
+  const isMobile = requestUrl.searchParams.get("client") === "mobile";
+  const callbackUrl = mobileCallbackUrl(requestUrl.searchParams.get("returnUrl"));
 
   const state = generateState();
   let url: URL;
@@ -71,6 +84,10 @@ export async function GET(
     ]);
   }
 
-  await setStateCookie({ state, codeVerifier, ...(isMobile ? { client: "mobile" } : {}) });
+  await setStateCookie({
+    state,
+    codeVerifier,
+    ...(isMobile ? { client: "mobile" as const, redirect: callbackUrl } : {}),
+  });
   return NextResponse.redirect(url);
 }
