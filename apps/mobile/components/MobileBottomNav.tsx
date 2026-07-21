@@ -8,6 +8,7 @@ import {
   radii,
   shadows,
   spacing,
+  states,
   studentNav,
   tapMin,
   typography,
@@ -46,6 +47,7 @@ export function MobileBottomNav({ items, accessibilityLabel }: Props) {
     >
       <View style={[styles.tabRow, isLandscape && styles.tabRowLandscape]}>
         {items.map((item) => {
+          const Icon = item.Icon;
           const iconSize = isLandscape ? 18 : 20;
           const showActiveCutout = item.active && !item.solidActiveIcon;
 
@@ -64,7 +66,7 @@ export function MobileBottomNav({ items, accessibilityLabel }: Props) {
               accessibilityState={{ selected: item.active }}
             >
               <View style={styles.iconWrap} accessible={false}>
-                <item.Icon
+                <Icon
                   size={iconSize}
                   color={item.active ? colors.text : colors.textMuted}
                   fill={item.active ? colors.text : colors.transparent}
@@ -72,7 +74,7 @@ export function MobileBottomNav({ items, accessibilityLabel }: Props) {
                   accessible={false}
                 />
                 {showActiveCutout ? (
-                  <item.Icon
+                  <Icon
                     size={iconSize}
                     color={colors.surface}
                     stroke={colors.surface}
@@ -161,5 +163,6 @@ const styles = StyleSheet.create({
   tabTextActive: {
     color: colors.text,
     fontWeight: "700",
+    opacity: states.visibleOpacity,
   },
 });
