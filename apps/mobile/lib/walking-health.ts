@@ -38,6 +38,8 @@ export type WalkingMonthlyAttendanceReward = {
   month: string;
   monthDays: number;
   attendanceCount: number;
+  attendanceDays?: string[];
+  eligibleAttendanceDays?: string[];
   cashEarned: number;
   cashPaid: number;
   nextOrdinalReward: {
@@ -370,6 +372,13 @@ export async function fetchWalkingSnapshot(_days?: number): Promise<WalkingRespo
     monthlyAttendanceReward: payload.monthlyAttendanceReward,
     weeklyStepRewards: payload.weeklyStepRewards,
   };
+}
+
+export async function markWalkingAttendance(days: string[]) {
+  return apiFetch<WalkingResponse>("/api/student/walking", {
+    method: "POST",
+    json: { attendanceDays: days },
+  });
 }
 
 export async function fetchWalkingDays(_days?: number) {

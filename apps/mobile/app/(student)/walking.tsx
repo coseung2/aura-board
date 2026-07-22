@@ -25,6 +25,7 @@ import {
   isHealthConnectModuleAvailable,
   openHealthConnectSettings,
   readAndSyncWalkingDays,
+  markWalkingAttendance,
   requestHealthConnectPermissions,
   type WalkingDay,
   type WalkingMonthlyAttendanceReward,
@@ -110,7 +111,7 @@ export default function StudentWalkingScreen() {
   const [permissions, setPermissions] = useState<HealthConnectPermission[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [busy, setBusy] = useState<"connect" | "sync" | "settings" | null>(null);
+  const [busy, setBusy] = useState<"connect" | "sync" | "settings" | "attendance" | null>(null);
   const silentSyncInFlight = useRef(false);
   const [activeView, setActiveView] = useState<WalkingView>("record");
   const [message, setMessage] = useState<string | null>(null);
@@ -261,6 +262,27 @@ export default function StudentWalkingScreen() {
     }
   }, [handleAuthError, syncWalkingData]);
 
+  const markAttendance = useCallback(async (days: string[]) => {
+    if (days.length === 0) return;
+    setBusy("attendance");
+    setError(null);
+    setMessage(null);
+    try {
+      const snapshot = await markWalkingAttendance(days);
+      setRows(snapshot.rows);
+      setPolicy(snapshot.policy);
+      setMonthlyAttendanceReward(snapshot.monthlyAttendanceReward);
+      setWeeklyStepRewards(snapshot.weeklyStepRewards);
+      setMessage("출석을 체크했어요.");
+    } catch (nextError) {
+      if (!(await handleAuthError(nextError))) {
+        setError(localizedWalkingError(nextError, "출석 체크에 실패했어요."));
+      }
+    } finally {
+      setBusy(null);
+    }
+  }, [handleAuthError]);
+
   const openSettings = useCallback(async () => {
     setBusy("settings");
     setError(null);
@@ -383,6 +405,7 @@ export default function StudentWalkingScreen() {
 
         <SemanticNav accessibilityLabel="걷기 활동 보기" style={styles.viewNav}>
           <SemanticNavItem
+            style={styles.viewNavItem}
             selected={activeView === "record"}
             onPress={() => setActiveView("record")}
             accessibilityLabel="걷기 기록 보기"
@@ -390,6 +413,7 @@ export default function StudentWalkingScreen() {
             걷기 기록
           </SemanticNavItem>
           <SemanticNavItem
+            style={styles.viewNavItem}
             selected={activeView === "missions"}
             onPress={() => setActiveView("missions")}
             accessibilityLabel="걷기 미션 보기"
@@ -537,6 +561,8 @@ export default function StudentWalkingScreen() {
             monthlyAttendanceReward={monthlyAttendanceReward}
             weeklyStepRewards={weeklyStepRewards}
             onWeeklyStepRewardsChange={setWeeklyStepRewards}
+            attendanceBusy={busy === "attendance"}
+            onAttendanceDays={(days) => void markAttendance(days)}
           />
         )}
       </ScrollView>
@@ -677,6 +703,8 @@ function WalkingMissionPanel({
   monthlyAttendanceReward,
   weeklyStepRewards,
   onWeeklyStepRewardsChange,
+  attendanceBusy,
+  onAttendanceDays,
 }: {
   todaySteps: number;
   dailyGoal: number;
@@ -685,6 +713,8 @@ function WalkingMissionPanel({
   monthlyAttendanceReward: WalkingMonthlyAttendanceReward | null;
   weeklyStepRewards: WalkingWeeklyStepRewards | null;
   onWeeklyStepRewardsChange: (rewards: WalkingWeeklyStepRewards | null) => void;
+  attendanceBusy: boolean;
+  onAttendanceDays: (days: string[]) => void;
 }) {
   const safeDailyGoal = Math.max(1, dailyGoal);
   const safeDailyUnitCap = Math.min(4, Math.max(1, dailyUnitCap));
@@ -701,7 +731,12 @@ function WalkingMissionPanel({
   return (
     <View style={styles.missionSection} accessibilityRole="summary">
       {monthlyAttendanceReward ? (
-        <WalkingAttendanceCalendar reward={monthlyAttendanceReward} />
+        <WalkingAttendanceCalendar
+          reward={monthlyAttendanceReward}
+          busy={attendanceBusy}
+          onDayPress={(day) => onAttendanceDays([day])}
+          onCatchUp={() => onAttendanceDays(monthlyAttendanceReward.eligibleAttendanceDays ?? [])}
+        />
       ) : null}
 
       <View style={styles.missionBlock}>
@@ -770,6 +805,9 @@ const styles = StyleSheet.create({
   },
   viewNav: {
     alignSelf: "stretch",
+  },
+  viewNavItem: {
+    flex: 1,
   },
   connectionSection: {
     gap: spacing.sm,

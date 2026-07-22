@@ -191,3 +191,16 @@ export async function limitCanvaReviewerLogin(
   if (!ip.ok) return ip;
   return account;
 }
+
+/** App Store parent review-code login: independent IP and code buckets. */
+export async function limitParentReviewLogin(
+  ipKey: string,
+  codeKey: string,
+): Promise<LimitVerdict> {
+  const [ip, code] = await Promise.all([
+    runLimit("rl:parent-review-login:ip", ipKey, 20, "1 h", true),
+    runLimit("rl:parent-review-login:code", codeKey, 10, "1 h", true),
+  ]);
+  if (!ip.ok) return ip;
+  return code;
+}

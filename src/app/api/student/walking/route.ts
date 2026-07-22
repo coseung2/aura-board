@@ -52,8 +52,27 @@ const walkingRowSchema = z.object({
   distanceMeters: z.number().finite().min(0).max(300_000),
 });
 
+const walkingDaySchema = z.string().refine(isValidWalkingDay, {
+  message: "invalid_day",
+});
+
 const syncSchema = z.object({
-  rows: z.array(walkingRowSchema).min(1).max(31),
+  // Keep the original sync payload unchanged while allowing attendance-only
+  // requests from the calendar.  A request must contain at least one kind of
+  // work; this keeps `{}` and accidental empty syncs invalid.
+  rows: z.array(walkingRowSchema).min(1).max(31).optional(),
+  attendanceDays: z.array(walkingDaySchema).min(1).max(31).optional(),
+  // Accepting a single-day alias costs nothing and makes a calendar tap easy
+  // for clients that do not need to allocate an array.
+  attendanceDay: walkingDaySchema.optional(),
+}).superRefine((value, context) => {
+  if (!value.rows?.length && !value.attendanceDays?.length && !value.attendanceDay) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["rows"],
+      message: "at_least_one_row_or_attendance_day",
+    });
+  }
 });
 
 type RawWalkingRow = {
@@ -61,7 +80,15 @@ type RawWalkingRow = {
   steps: number;
   distanceMeters: number;
   syncedAt: Date | string;
+  attendanceCompletedAt?: Date | string | null;
 };
+
+class WalkingAttendanceEligibilityError extends Error {
+  constructor(readonly days: string[]) {
+    super("attendance_day_not_synced");
+    this.name = "WalkingAttendanceEligibilityError";
+  }
+}
 
 function toDayKey(value: Date | string) {
   if (value instanceof Date) return value.toISOString().slice(0, 10);
@@ -90,6 +117,10 @@ type MonthlyAttendanceReward = {
   month: string;
   monthDays: number;
   attendanceCount: number;
+  /** Dates the student has explicitly checked in during this month. */
+  attendanceDays: string[];
+  /** Synced, non-future dates that can still be checked in. */
+  eligibleAttendanceDays: string[];
   cashEarned: number;
   cashPaid: number;
   nextOrdinalReward: {
@@ -152,7 +183,8 @@ async function readRows(studentId: string, window: WalkingReadWindow) {
       "day",
       "steps",
       "distanceMeters",
-      "syncedAt"
+      "syncedAt",
+      "attendanceCompletedAt"
     FROM "StudentWalkingDailyStat"
     WHERE "studentId" = ${studentId}
       AND "day" >= ${window.startDay}::date
@@ -160,31 +192,66 @@ async function readRows(studentId: string, window: WalkingReadWindow) {
     ORDER BY "day" ASC
   `);
 
-  return rows.map((row) => ({
-    day: toDayKey(row.day),
-    steps: Number(row.steps) || 0,
-    distanceMeters: Number(row.distanceMeters) || 0,
-    syncedAt:
+  return rows.map((row) => {
+    const syncedAt =
       row.syncedAt instanceof Date
         ? row.syncedAt.toISOString()
-        : new Date(row.syncedAt).toISOString(),
-  }));
+        : new Date(row.syncedAt).toISOString();
+    // Before the attendance marker was added, route tests and older mocked
+    // database adapters may omit the selected field altogether. Treat that
+    // shape as legacy auto-attendance, while an explicit SQL NULL remains an
+    // uncompleted, catch-up-eligible day.
+    const hasAttendanceField = Object.prototype.hasOwnProperty.call(
+      row,
+      "attendanceCompletedAt",
+    );
+    const attendanceCompletedAt =
+      row.attendanceCompletedAt == null
+        ? hasAttendanceField
+          ? null
+          : syncedAt
+        : row.attendanceCompletedAt instanceof Date
+          ? row.attendanceCompletedAt.toISOString()
+          : new Date(row.attendanceCompletedAt).toISOString();
+    return {
+      day: toDayKey(row.day),
+      steps: Number(row.steps) || 0,
+      distanceMeters: Number(row.distanceMeters) || 0,
+      syncedAt,
+      attendanceCompletedAt,
+    };
+  });
 }
 
-function attendanceDaysInOrder(rows: Array<{ day: string }>) {
+function attendanceDaysInOrder(
+  rows: Array<{ day: string; attendanceCompletedAt?: string | null }>,
+) {
   return [...new Set(rows.map((row) => row.day))].sort((a, b) => a.localeCompare(b));
 }
 
 function buildMonthlyAttendanceReward(
   monthRange: ReturnType<typeof getKstRewardMonthRange>,
-  rows: Array<{ day: string }>,
+  rows: Array<{
+    day: string;
+    attendanceCompletedAt?: string | null;
+    syncedAt?: string | null;
+  }>,
   paidByOrdinal: ReadonlyMap<number, number>,
 ): MonthlyAttendanceReward {
+  const monthRows = rows.filter(
+    (row) => row.day >= monthRange.monthStart && row.day < monthRange.monthEnd,
+  );
+  const attendanceDays = attendanceDaysInOrder(
+    monthRows.filter((row) => row.attendanceCompletedAt != null),
+  );
+  const eligibleAttendanceDays = attendanceDaysInOrder(
+    monthRows.filter(
+      (row) => row.syncedAt != null && row.attendanceCompletedAt == null,
+    ),
+  );
   const attendanceCount = Math.min(
     WALKING_MONTHLY_ATTENDANCE_ORDINALS,
-    attendanceDaysInOrder(rows).filter(
-      (day) => day >= monthRange.monthStart && day < monthRange.monthEnd,
-    ).length,
+    attendanceDays.length,
   );
   const itemRewardOrdinal = WALKING_MONTHLY_ATTENDANCE_ITEM_ORDINAL;
   let cashEarned = 0;
@@ -212,6 +279,10 @@ function buildMonthlyAttendanceReward(
     month: monthRange.month,
     monthDays: WALKING_MONTHLY_ATTENDANCE_ORDINALS,
     attendanceCount,
+    attendanceDays: attendanceDays.slice(0, WALKING_MONTHLY_ATTENDANCE_ORDINALS),
+    eligibleAttendanceDays: eligibleAttendanceDays.filter(
+      (day) => !attendanceDays.includes(day),
+    ),
     cashEarned,
     cashPaid,
     nextOrdinalReward,
@@ -223,7 +294,11 @@ function buildMonthlyAttendanceReward(
 async function readMonthlyAttendanceReward(
   studentId: string,
   monthRange = getKstRewardMonthRange(),
-  rows?: Array<{ day: string }>,
+  rows?: Array<{
+    day: string;
+    attendanceCompletedAt?: string | null;
+    syncedAt?: string | null;
+  }>,
 ): Promise<MonthlyAttendanceReward> {
   const attendanceRows = rows ??
     await readRows(studentId, {
@@ -334,13 +409,27 @@ export async function GET(request: NextRequest) {
       policy,
       weeklyRows,
     );
+    const monthRange = getKstRewardMonthRange();
+    const monthRows = await readRows(student.id, {
+      startDay: monthRange.monthStart,
+      endDayExclusive: monthRange.monthEnd,
+    });
     const monthlyAttendanceReward = await readMonthlyAttendanceReward(
       student.id,
-      getKstRewardMonthRange(),
+      monthRange,
+      monthRows,
     );
+    const syncedDays = rows
+      .filter((row) => row.syncedAt != null)
+      .map((row) => row.day);
+    const completedAttendanceDays = rows
+      .filter((row) => row.attendanceCompletedAt != null)
+      .map((row) => row.day);
     return jsonPrivateNoStore({
       rows,
       range: readRange.range,
+      syncedDays,
+      completedAttendanceDays,
       policy: {
         stepThreshold: policy.walkingRewardStepThreshold,
         dailyUnitAmount: policy.walkingRewardAmount,
@@ -382,19 +471,32 @@ export async function POST(request: NextRequest) {
     }
 
     const { minDay, maxDay } = getWalkingDayRange();
-    const uniqueRows = new Map(parsed.data.rows.map((row) => [row.day, row]));
+    const uniqueRows = new Map(
+      (parsed.data.rows ?? []).map((row) => [row.day, row]),
+    );
     const rows = [...uniqueRows.values()];
+    const requestedAttendanceDays = [
+      ...(parsed.data.attendanceDays ?? []),
+      ...(parsed.data.attendanceDay ? [parsed.data.attendanceDay] : []),
+    ];
+    const attendanceDays = [...new Set(requestedAttendanceDays)].sort((a, b) =>
+      a.localeCompare(b),
+    );
 
-    if (rows.some((row) => row.day < minDay || row.day > maxDay)) {
+    if (
+      rows.some((row) => row.day < minDay || row.day > maxDay) ||
+      attendanceDays.some((day) => day < minDay || day > maxDay)
+    ) {
       return jsonPrivateNoStore({ error: "day_out_of_range" }, { status: 400 });
     }
 
     const { accountId } = await ensureAccountFor(student);
     const sortedRows = [...rows].sort((a, b) => a.day.localeCompare(b.day));
+    const touchedDays = [...new Set([...sortedRows.map((row) => row.day), ...attendanceDays])];
     const monthRanges = [
       ...new Map(
-        sortedRows.map((row) => {
-          const monthRange = getKstRewardMonthRangeForDay(row.day);
+        touchedDays.map((day) => {
+          const monthRange = getKstRewardMonthRangeForDay(day);
           return [monthRange.month, monthRange] as const;
         }),
       ).values(),
@@ -467,6 +569,42 @@ export async function POST(request: NextRequest) {
               `);
             }
 
+            if (attendanceDays.length > 0) {
+              const requestedDateSql = Prisma.join(
+                attendanceDays.map((day) => Prisma.sql`${day}::date`),
+                ", ",
+              );
+              const syncedAttendanceRows = await tx.$queryRaw<
+                Array<{ day: Date | string; attendanceCompletedAt: Date | string | null }>
+              >(Prisma.sql`
+                SELECT "day", "attendanceCompletedAt"
+                FROM "StudentWalkingDailyStat"
+                WHERE "studentId" = ${student.id}
+                  AND "day" IN (${requestedDateSql})
+                FOR UPDATE
+              `);
+              const syncedAttendanceDays = new Set(
+                syncedAttendanceRows.map((row) => toDayKey(row.day)),
+              );
+              const missingAttendanceDays = attendanceDays.filter(
+                (day) => !syncedAttendanceDays.has(day),
+              );
+              if (missingAttendanceDays.length > 0) {
+                throw new WalkingAttendanceEligibilityError(missingAttendanceDays);
+              }
+
+              // Only the first transition creates a completion. Replays are
+              // deliberately harmless and still return the normal snapshot.
+              await tx.$executeRaw(Prisma.sql`
+                UPDATE "StudentWalkingDailyStat"
+                SET "attendanceCompletedAt" = CURRENT_TIMESTAMP,
+                    "updatedAt" = CURRENT_TIMESTAMP
+                WHERE "studentId" = ${student.id}
+                  AND "day" IN (${requestedDateSql})
+                  AND "attendanceCompletedAt" IS NULL
+              `);
+            }
+
             const previous = await tx.transaction.findMany({
               where: {
                 accountId,
@@ -474,6 +612,7 @@ export async function POST(request: NextRequest) {
                   in: [
                     "walking_reward",
                     WALKING_WEEKLY_REWARD_SOURCE_TYPE,
+                    WALKING_MONTHLY_REWARD_SOURCE_TYPE,
                     WALKING_MONTHLY_COOKIE_REWARD_SOURCE_TYPE,
                   ],
                 },
@@ -526,16 +665,27 @@ export async function POST(request: NextRequest) {
             // calendar dates in chronological order. Cookie milestones are
             // granted in the same transaction as their attendance payout.
             for (const monthRange of monthRanges) {
-              const monthRows = await tx.$queryRaw<Array<{ day: Date | string }>>(Prisma.sql`
-                SELECT "day"
+              const monthRows = await tx.$queryRaw<
+                Array<{ day: Date | string; attendanceCompletedAt: Date | string | null }>
+              >(Prisma.sql`
+                SELECT "day", "attendanceCompletedAt"
                 FROM "StudentWalkingDailyStat"
                 WHERE "studentId" = ${student.id}
                   AND "day" >= ${monthRange.monthStart}::date
                   AND "day" < ${monthRange.monthEnd}::date
+                  AND "attendanceCompletedAt" IS NOT NULL
                 ORDER BY "day" ASC
               `);
               const attendedDays = attendanceDaysInOrder(
-                monthRows.map((row) => ({ day: toDayKey(row.day) })),
+                monthRows.map((row) => ({
+                  day: toDayKey(row.day),
+                  attendanceCompletedAt:
+                    row.attendanceCompletedAt instanceof Date
+                      ? row.attendanceCompletedAt.toISOString()
+                      : row.attendanceCompletedAt
+                        ? new Date(row.attendanceCompletedAt).toISOString()
+                        : null,
+                })),
               );
               const ordinalCount = Math.min(
                 WALKING_MONTHLY_ATTENDANCE_ORDINALS,
@@ -633,14 +783,35 @@ export async function POST(request: NextRequest) {
       startDay: addWalkingDays(latestDay, -30),
       endDayExclusive: addWalkingDays(latestDay, 1),
     });
+    const responseMonthRange = getKstRewardMonthRange();
+    const responseMonthRows = responseRows.filter(
+      (row) =>
+        row.day >= responseMonthRange.monthStart &&
+        row.day < responseMonthRange.monthEnd,
+    );
+    const syncedDays = responseRows
+      .filter((row) => row.syncedAt != null)
+      .map((row) => row.day);
+    const completedAttendanceDays = responseRows
+      .filter((row) => row.attendanceCompletedAt != null)
+      .map((row) => row.day);
     return jsonPrivateNoStore({
       rows: responseRows,
+      syncedDays,
+      completedAttendanceDays,
       monthlyAttendanceReward: await readMonthlyAttendanceReward(
         student.id,
-        getKstRewardMonthRange(),
+        responseMonthRange,
+        responseMonthRows,
       ),
     });
   } catch (error) {
+    if (error instanceof WalkingAttendanceEligibilityError) {
+      return jsonPrivateNoStore(
+        { error: error.message, days: error.days },
+        { status: 400 },
+      );
+    }
     console.error("[POST /api/student/walking]", error);
     return jsonPrivateNoStore({ error: "internal" }, { status: 500 });
   }

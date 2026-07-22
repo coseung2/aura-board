@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
+  KeyboardAvoidingView,
   ScrollView,
   StyleSheet,
   Text,
@@ -12,10 +13,10 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import * as Linking from "expo-linking";
 import * as WebBrowser from "expo-web-browser";
-import Svg, { Circle, Line, Path } from "react-native-svg";
+import Svg, { Path } from "react-native-svg";
+import { BookOpen, House } from "lucide-react-native";
 import {
   brand,
-  borders,
   colors,
   iconSizes,
   layout,
@@ -79,22 +80,25 @@ export default function Landing() {
     role?: string | string[];
     error?: string | string[];
   }>();
-  const requestedRole =
+  const requestedRole: "student" | "parent" | "review" | null =
     (Array.isArray(routeRole) ? routeRole[0] : routeRole) === "parent"
       ? "parent"
-      : (Array.isArray(routeRole) ? routeRole[0] : routeRole) === "student"
-        ? "student"
-        : null;
+      : (Array.isArray(routeRole) ? routeRole[0] : routeRole) === "review"
+        ? "review"
+        : (Array.isArray(routeRole) ? routeRole[0] : routeRole) === "student"
+          ? "student"
+          : null;
   const { width } = useWindowDimensions();
   const [booting, setBooting] = useState(true);
   const [studentCode, setStudentCode] = useState("");
   const [studentLoading, setStudentLoading] = useState(false);
   const [studentError, setStudentError] = useState<string | null>(null);
   const [parentLoading, setParentLoading] = useState(false);
+  const [parentReviewCode, setParentReviewCode] = useState("");
   const [parentError, setParentError] = useState<string | null>(() =>
     parentAuthErrorMessage(routeError),
   );
-  const [activeRole, setActiveRole] = useState<"student" | "parent">(
+  const [activeRole, setActiveRole] = useState<"student" | "parent" | "review">(
     requestedRole ?? "student",
   );
   const isNarrow = width < layout.mobileBreakpoint;
@@ -248,6 +252,51 @@ export default function Landing() {
     }
   }
 
+  async function handleParentReviewLogin() {
+    const code = parentReviewCode.trim().toUpperCase();
+    if (code.length !== auth.codeLength) {
+      setParentError("심사 코드를 확인해 주세요.");
+      return;
+    }
+
+    setParentLoading(true);
+    setParentError(null);
+    try {
+      const result = await apiFetch<{ success: boolean; sessionToken: string }>(
+        "/api/parent/review-login",
+        {
+          method: "POST",
+          json: { code },
+          skipAuth: true,
+        },
+      );
+      if (!result.success || !result.sessionToken) {
+        throw new Error("parent_review_login_failed");
+      }
+      await saveParentToken(result.sessionToken);
+      const profile = await apiFetch<ParentChildrenResponse>(
+        "/api/parent/children",
+        { parentAuth: true },
+      );
+      await saveParentCache({
+        id: profile.parent.id,
+        name: profile.parent.name || "학부모",
+        email: profile.parent.email,
+        linkedStudentIds: profile.children.map((child) => child.studentId),
+      });
+      router.replace("/(parent)");
+    } catch (error) {
+      await clearParentSession();
+      if (error instanceof ApiError && error.status === 429) {
+        setParentError("잠시 후 다시 시도해 주세요.");
+      } else {
+        setParentError("심사 코드를 확인해 주세요.");
+      }
+    } finally {
+      setParentLoading(false);
+    }
+  }
+
   if (booting) {
     return (
       <SafeAreaView style={styles.container} edges={["top", "bottom"]}>
@@ -261,10 +310,15 @@ export default function Landing() {
 
   return (
     <SafeAreaView style={styles.container} edges={["top", "bottom"]}>
-      <ScrollView
-        contentContainerStyle={styles.inner}
-        keyboardShouldPersistTaps="handled"
+      <KeyboardAvoidingView
+        style={styles.flex}
+        behavior={Platform.select({ ios: "padding", android: "height" })}
       >
+        <ScrollView
+          contentContainerStyle={styles.inner}
+          keyboardShouldPersistTaps="handled"
+          automaticallyAdjustKeyboardInsets
+        >
         <View style={styles.topLogo}>
           <LogoLockup size={brand.logoSize * 2} withWordmark={false} />
           <Text style={styles.loginBrandTitle}>Aura-board</Text>
@@ -289,6 +343,14 @@ export default function Landing() {
               accessibilityLabel="학부모 로그인"
             >
               학부모
+            </SemanticNavItem>
+            <SemanticNavItem
+              style={styles.roleNavItem}
+              selected={activeRole === "review"}
+              onPress={() => setActiveRole("review")}
+              accessibilityLabel="심사용 학부모 로그인"
+            >
+              심사용
             </SemanticNavItem>
           </SemanticNav>
         </View>
@@ -382,43 +444,64 @@ export default function Landing() {
               </ControlPressable>
             </View>
           </View>
+
+          <View
+            style={[
+              styles.roleCard,
+              isNarrow && styles.roleCardNarrow,
+              activeRole !== "review" && styles.hiddenRoleCard,
+            ]}
+          >
+            <RoleLineIcon role="parent" />
+            <Text style={styles.roleTitle}>심사용 학부모</Text>
+            <Text style={styles.roleDesc}>심사 코드로 자녀 활동을 확인해요</Text>
+            {parentError ? (
+              <Text style={styles.parentErrorText} accessibilityRole="alert">
+                {parentError}
+              </Text>
+            ) : null}
+            <View style={styles.parentReviewLogin}>
+              <TextField
+                style={styles.studentCodeInput}
+                value={parentReviewCode}
+                onChangeText={(text) => {
+                  setParentReviewCode(text.toUpperCase());
+                  if (parentError) setParentError(null);
+                }}
+                placeholder="심사 코드 입력"
+                autoCapitalize="characters"
+                autoCorrect={false}
+                autoComplete="off"
+                maxLength={auth.codeLength}
+                textAlign="center"
+                editable={!parentLoading}
+                onSubmitEditing={handleParentReviewLogin}
+              />
+              <AppButton
+                onPress={handleParentReviewLogin}
+                disabled={parentReviewCode.trim().length === 0}
+                loading={parentLoading}
+              >
+                코드로 로그인
+              </AppButton>
+            </View>
+          </View>
         </View>
-      </ScrollView>
+        </ScrollView>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }
 
 function RoleLineIcon({ role }: { role: "student" | "parent" }) {
-  const common = {
-    width: iconSizes.hero,
-    height: iconSizes.hero,
-    viewBox: "0 0 48 48",
-    fill: "none",
-    stroke: colors.text,
-    strokeWidth: borders.medium,
-    strokeLinecap: "round" as const,
-    strokeLinejoin: "round" as const,
-  };
-
-  if (role === "student") {
-    return (
-      <Svg {...common} accessibilityLabel="학생">
-        <Path d="M8 10 C14 10 20 11 24 14 C28 11 34 10 40 10 L40 36 C34 36 28 37 24 40 C20 37 14 36 8 36 Z" />
-        <Line x1="24" y1="14" x2="24" y2="40" />
-        <Path d="M30 10 L30 20 L33 17 L36 20 L36 10" />
-      </Svg>
-    );
-  }
-
+  const Icon = role === "student" ? BookOpen : House;
   return (
-    <Svg {...common} accessibilityLabel="학부모">
-      <Path d="M8 22 L24 8 L40 22" />
-      <Circle cx="18" cy="28" r="3.5" />
-      <Path d="M14 42 L14 34 a4 4 0 0 1 8 0 L22 42" />
-      <Circle cx="32" cy="30" r="2.5" />
-      <Path d="M29 42 L29 36 a3 3 0 0 1 6 0 L35 42" />
-      <Line x1="22" y1="36" x2="29" y2="36" />
-    </Svg>
+    <Icon
+      size={iconSizes.hero}
+      color={colors.text}
+      strokeWidth={2}
+      accessible={false}
+    />
   );
 }
 
@@ -468,6 +551,7 @@ function KakaoGlyph() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg },
+  flex: { flex: 1 },
   bootingCenter: {
     flex: 1,
     alignItems: "center",
@@ -567,6 +651,9 @@ const styles = StyleSheet.create({
   },
   oauthActions: {
     width: "100%",
+    gap: spacing.sm,
+  },
+  parentReviewLogin: {
     gap: spacing.sm,
   },
   oauthGoogle: {

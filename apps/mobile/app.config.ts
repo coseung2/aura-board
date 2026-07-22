@@ -22,6 +22,7 @@ const config: ExpoConfig = {
     backgroundColor: baseColors.bg,
   },
   ios: {
+    bundleIdentifier: "com.auraboard.app",
     supportsTablet: true,
     requireFullScreen: false,
   },

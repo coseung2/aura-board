@@ -721,6 +721,11 @@ model StudentWalkingDailyStat {
   distanceMeters Float    @default(0)
   source         String   @default("health_connect")
   syncedAt       DateTime @default(now())
+  // A Health Connect sync makes a date eligible, but the student must
+  // explicitly check in to the monthly attendance mission.  Keeping this
+  // marker on the synced row makes the transition idempotent and preserves
+  // the existing one-row-per-student/day constraint.
+  attendanceCompletedAt DateTime?
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 

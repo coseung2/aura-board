@@ -9,13 +9,20 @@ import {
   typography,
 } from "../theme/tokens";
 import type { WalkingMonthlyAttendanceReward } from "../lib/walking-health";
+import { AppButton, ControlPressable } from "./ui";
 
 const COOKIE_REWARD_ORDINALS = new Set([7, 14, 21]);
 
 export function WalkingAttendanceCalendar({
   reward,
+  busy = false,
+  onDayPress,
+  onCatchUp,
 }: {
   reward: WalkingMonthlyAttendanceReward;
+  busy?: boolean;
+  onDayPress?: (day: string) => void;
+  onCatchUp?: () => void;
 }) {
   const [gridWidth, setGridWidth] = useState(0);
   const monthDays = Math.min(28, Math.max(28, reward.monthDays));
@@ -23,6 +30,11 @@ export function WalkingAttendanceCalendar({
     monthDays,
     Math.max(0, reward.attendanceCount),
   );
+  const attendanceDays = reward.attendanceDays ?? Array.from(
+    { length: attendanceCount },
+    (_, index) => `${reward.month}-${String(index + 1).padStart(2, "0")}`,
+  );
+  const eligibleAttendanceDays = reward.eligibleAttendanceDays ?? [];
 
   return (
     <View
@@ -39,6 +51,17 @@ export function WalkingAttendanceCalendar({
         <Text style={styles.count}>{attendanceCount} / {monthDays}일</Text>
       </View>
 
+      {eligibleAttendanceDays.length > 0 && onCatchUp ? (
+        <AppButton
+          variant="secondary"
+          loading={busy}
+          onPress={onCatchUp}
+          accessibilityLabel="출석 미완료 날짜 모두 체크"
+        >
+          미완료 날짜 모두 체크
+        </AppButton>
+      ) : null}
+
       <View
         style={styles.grid}
         onLayout={(event) => setGridWidth(event.nativeEvent.layout.width)}
@@ -47,7 +70,9 @@ export function WalkingAttendanceCalendar({
           <View key={rowIndex} style={styles.row}>
             {Array.from({ length: 7 }, (_, columnIndex) => {
             const ordinal = rowIndex * 7 + columnIndex + 1;
-            const earned = ordinal <= attendanceCount;
+            const day = `${reward.month}-${String(ordinal).padStart(2, "0")}`;
+            const earned = attendanceDays.includes(day);
+            const eligible = eligibleAttendanceDays.includes(day);
             const isItemReward = ordinal === reward.itemRewardOrdinal;
             const isCookieReward = COOKIE_REWARD_ORDINALS.has(ordinal);
             const cashAmount = ordinal % 7 === 0 ? 20 : 10;
@@ -57,8 +82,11 @@ export function WalkingAttendanceCalendar({
             ));
 
             return (
-              <View
+              <ControlPressable
                 key={ordinal}
+                disabled={!eligible || busy}
+                onPress={() => onDayPress?.(day)}
+                accessibilityRole="button"
                 style={[
                   styles.cell,
                   cellSize > 0
@@ -95,7 +123,7 @@ export function WalkingAttendanceCalendar({
                     </View>
                   </View>
                 ) : null}
-              </View>
+              </ControlPressable>
             );
             })}
           </View>

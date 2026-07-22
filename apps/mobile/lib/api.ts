@@ -4,6 +4,7 @@
 // - 쿠키를 쓰지 않으므로 CORS preflight 자체가 native fetch 에선 non-issue.
 
 import Constants from "expo-constants";
+import { Platform } from "react-native";
 import { loadParentToken, loadSessionToken } from "./session";
 
 export class ApiError extends Error {
@@ -17,12 +18,22 @@ export class ApiError extends Error {
 }
 
 export function getApiBase(): string {
-  // 1) EAS build time env, 2) expo-constants extra, 3) production fallback.
+  // 1) EAS build time env, 2) expo-constants extra, 3) local Expo dev,
+  // 4) production fallback.
   const fromEnv = process.env.EXPO_PUBLIC_API_BASE;
   if (fromEnv) return fromEnv.replace(/\/$/, "");
   const fromExtra =
     (Constants.expoConfig?.extra as { apiBase?: string } | undefined)?.apiBase;
   if (fromExtra) return fromExtra.replace(/\/$/, "");
+  if (__DEV__) {
+    // Android emulators reach the host machine through 10.0.2.2. A USB-connected
+    // phone reaches it through `adb reverse tcp:3000 tcp:3000`; Expo web and
+    // iOS simulators can use localhost directly. A physical device on Wi-Fi can
+    // override this with EXPO_PUBLIC_API_BASE (for example a LAN address).
+    return Platform.OS === "android" && !Constants.isDevice
+      ? "http://10.0.2.2:3000"
+      : "http://localhost:3000";
+  }
   // Start on the canonical origin so a cross-origin redirect cannot discard
   // the mobile Bearer token.
   return "https://aura-board.com";
