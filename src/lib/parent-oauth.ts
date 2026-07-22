@@ -17,15 +17,30 @@ import {
 const SECRET = process.env.AUTH_SECRET ?? "dev-secret";
 const STATE_COOKIE = "parent_oauth_state";
 const STATE_TTL_MS = 10 * 60 * 1000; // 10분
+const CANONICAL_APP_ORIGIN = "https://aura-board.com";
+const VERCEL_APP_ORIGIN_ALIAS = "https://aura-board-app.vercel.app";
 
 export type ProviderId = "google" | "kakao";
 
+export function normalizeParentOAuthBaseUrl(value: string): string {
+  try {
+    const parsed = new URL(value);
+    if (parsed.origin === VERCEL_APP_ORIGIN_ALIAS) {
+      return CANONICAL_APP_ORIGIN;
+    }
+  } catch {
+    // Keep the existing value so a malformed local override still surfaces
+    // through the provider request instead of silently changing its target.
+  }
+  return value.replace(/\/$/, "");
+}
+
 function appBaseUrl(): string {
-  return (
+  const configured =
     process.env.PARENT_OAUTH_REDIRECT_BASE_URL ??
     process.env.NEXTAUTH_URL ??
     "http://localhost:3000"
-  );
+  return normalizeParentOAuthBaseUrl(configured);
 }
 
 export function getCallbackUrl(provider: ProviderId): string {

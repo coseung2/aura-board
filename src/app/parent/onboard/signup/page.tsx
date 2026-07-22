@@ -1,22 +1,28 @@
-import { OnboardingShell } from "../_shell";
-import { ParentAuthButtons } from "@/components/parent/ParentAuthButtons";
+import { redirect } from "next/navigation";
 
-// parent-class-invite-v2 - P1 Signup.
-// parent-redesign (2026-04-26): OAuth(Google/Kakao) 버튼만 제공.
+// Keep the historical onboarding URL valid for bookmarks and OAuth providers,
+// but render the single canonical login surface. Successful OAuth callbacks
+// still enter the match flow directly; only this login/error entry is unified.
 
-export default function ParentSignupPage() {
-  return (
-    <OnboardingShell step={1} total={4}>
-      <h1 style={titleStyle}>학부모 로그인</h1>
-      <p style={bodyStyle}>
-        Google 또는 Kakao 계정으로 빠르게 시작할 수 있어요.
-      </p>
-      <div style={{ marginTop: 20 }}>
-        <ParentAuthButtons />
-      </div>
-    </OnboardingShell>
-  );
+type SearchParams = Promise<{
+  error?: string;
+  from?: string;
+  return?: string;
+  callbackUrl?: string;
+}>;
+
+export default async function ParentSignupRedirect({
+  searchParams,
+}: {
+  searchParams: SearchParams;
+}) {
+  const params = await searchParams;
+  const query = new URLSearchParams({ role: "parent" });
+
+  for (const key of ["error", "from", "return", "callbackUrl"] as const) {
+    const value = params[key];
+    if (typeof value === "string" && value.trim()) query.set(key, value);
+  }
+
+  redirect(`/login?${query.toString()}`);
 }
-
-const titleStyle: React.CSSProperties = { margin: 0, fontSize: 22, fontWeight: 700 };
-const bodyStyle: React.CSSProperties = { margin: "8px 0 0", fontSize: 15, color: "var(--color-text-muted)" };

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ApiError, parentApiFetch } from "../lib/api";
+import { isParentLogoutInProgress } from "../lib/session";
 import type { ParentFeedResponse, ParentPostDTO } from "../lib/types";
 
 const PAGE_SIZE = 10;
@@ -64,6 +65,7 @@ export function useParentPostCollection({ endpoint, onUnauthorized }: Collection
       } catch (cause) {
         if (version !== requestVersion.current) return;
         if (cause instanceof ApiError && cause.status === 401) {
+          if (isParentLogoutInProgress()) return;
           await onUnauthorized();
           return;
         }
@@ -114,6 +116,7 @@ export function useParentPostCollection({ endpoint, onUnauthorized }: Collection
     } catch (cause) {
       if (version !== requestVersion.current) return;
       if (cause instanceof ApiError && cause.status === 401) {
+        if (isParentLogoutInProgress()) return;
         await onUnauthorized();
       } else {
         setLoadMoreError("게시물을 더 불러오지 못했어요.");

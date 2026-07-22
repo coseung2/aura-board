@@ -21,7 +21,7 @@ import {
   wallet as walletTokens,
 } from "../../theme/tokens";
 import { apiFetch, ApiError } from "../../lib/api";
-import { clearSessionToken } from "../../lib/session";
+import { clearSessionToken, getUnifiedLoginRoute } from "../../lib/session";
 import type { WalletSummary } from "../../lib/types";
 import {
   AppButton,
@@ -43,7 +43,7 @@ export default function StudentWalletScreen() {
     async (e: unknown) => {
       if (e instanceof ApiError && e.status === 401) {
         await clearSessionToken();
-        router.replace("/(student)/login");
+        router.replace(getUnifiedLoginRoute("student"));
         return true;
       }
       return false;

@@ -18,6 +18,7 @@ import { registerParentPushNotifications } from "../lib/parent-push-notification
 // 앱이 cold/foreground 상태일 때 모두 잡아서 처리한다.
 
 const CALLBACK_PATH = "parent/auth/callback";
+const EXPO_GO_CALLBACK_HOSTS = new Set(["10.0.2.2", "127.0.0.1"]);
 
 void SplashScreen.preventAutoHideAsync();
 
@@ -34,7 +35,7 @@ function parseCallback(url: string) {
     `${parsed.host}${parsed.pathname}`.replace(/^\/+|\/+$/g, "") === CALLBACK_PATH;
   const expoGoCallback =
     parsed.protocol === "exp:" &&
-    parsed.hostname === "10.0.2.2" &&
+    EXPO_GO_CALLBACK_HOSTS.has(parsed.hostname) &&
     parsed.port === "8081" &&
     parsed.pathname === "/--/parent/auth/callback";
   if (!auraCallback && !expoGoCallback) return null;

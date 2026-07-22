@@ -3,7 +3,7 @@ import { StyleSheet, View } from "react-native";
 import { useRouter } from "expo-router";
 import { LogOut } from "lucide-react-native";
 import { apiFetch } from "../lib/api";
-import { clearSessionToken } from "../lib/session";
+import { clearSessionToken, getUnifiedLoginRoute } from "../lib/session";
 import {
   borders,
   colors,
@@ -32,7 +32,7 @@ export function StudentHeaderActions() {
       );
       await clearSessionToken();
       router.dismissAll();
-      router.replace("/?role=student");
+      router.replace(getUnifiedLoginRoute("student"));
     } finally {
       loggingOutRef.current = false;
       setLoggingOut(false);

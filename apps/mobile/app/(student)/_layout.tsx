@@ -3,7 +3,7 @@ import { StyleSheet, View } from "react-native";
 import { Stack, usePathname, useRouter } from "expo-router";
 import { colors } from "../../theme/tokens";
 import { apiFetch, ApiError } from "../../lib/api";
-import { clearSessionToken } from "../../lib/session";
+import { clearSessionToken, getUnifiedLoginRoute } from "../../lib/session";
 import type { MeResponse } from "../../lib/types";
 import { StudentBottomNav } from "../../components/StudentBottomNav";
 import { WalkingPermissionOnboarding } from "../../components/WalkingPermissionOnboarding";
@@ -28,7 +28,7 @@ export default function StudentLayout() {
       setMe(null);
       if (e instanceof ApiError && e.status === 401) {
         await clearSessionToken();
-        router.replace("/(student)/login");
+        router.replace(getUnifiedLoginRoute("student"));
       }
     }
   }, [hideNav, router]);

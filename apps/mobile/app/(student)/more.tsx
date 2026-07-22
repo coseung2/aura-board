@@ -12,7 +12,7 @@ import { useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { ChevronDown, ChevronUp } from "lucide-react-native";
 import { apiFetch, ApiError } from "../../lib/api";
-import { clearSessionToken } from "../../lib/session";
+import { clearSessionToken, getUnifiedLoginRoute } from "../../lib/session";
 import type { MeResponse } from "../../lib/types";
 import {
   loadStudentNavPreferences,
@@ -68,7 +68,7 @@ export default function StudentMoreScreen() {
     } catch (nextError) {
       if (nextError instanceof ApiError && nextError.status === 401) {
         await clearSessionToken();
-        router.replace("/(student)/login");
+        router.replace(getUnifiedLoginRoute("student"));
         return;
       }
       setError("메뉴를 불러오지 못했어요.");

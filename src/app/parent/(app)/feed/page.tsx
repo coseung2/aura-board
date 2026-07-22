@@ -10,7 +10,7 @@ export const runtime = "nodejs";
 
 export default async function ParentFeedPage() {
   const current = await getCurrentParent();
-  if (!current) redirect("/parent/join?error=session_required");
+  if (!current) redirect("/login?role=parent&error=session_required");
 
   const links = await db.parentChildLink.findMany({
     where: {

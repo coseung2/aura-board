@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { ApiError, parentApiFetch } from "../lib/api";
+import { isParentLogoutInProgress } from "../lib/session";
 import type {
   ParentChild,
   ParentChildrenResponse,
@@ -30,6 +31,7 @@ export function useParentOverview(onUnauthorized: () => void | Promise<void>) {
       setError(null);
     } catch (cause) {
       if (cause instanceof ApiError && cause.status === 401) {
+        if (isParentLogoutInProgress()) return;
         await onUnauthorized();
         return;
       }
@@ -56,6 +58,7 @@ export function useParentOverview(onUnauthorized: () => void | Promise<void>) {
       return true;
     } catch (cause) {
       if (cause instanceof ApiError && cause.status === 401) {
+        if (isParentLogoutInProgress()) return false;
         await onUnauthorized();
         return false;
       }

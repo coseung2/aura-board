@@ -61,7 +61,7 @@ import {
   type SlimeShopFilter,
 } from "../../lib/slimes";
 import { ApiError, apiFetch, getApiBase } from "../../lib/api";
-import { clearSessionToken } from "../../lib/session";
+import { clearSessionToken, getUnifiedLoginRoute } from "../../lib/session";
 import {
   borders,
   colors,
@@ -223,7 +223,7 @@ export default function StudentSlimeScreen() {
       } catch (loadError) {
         if (loadError instanceof ApiError && loadError.status === 401) {
           await clearSessionToken();
-          router.replace("/(student)/login");
+          router.replace(getUnifiedLoginRoute("student"));
           return;
         }
         setError(apiErrorMessage(loadError));
@@ -312,7 +312,7 @@ export default function StudentSlimeScreen() {
     } catch (loadError) {
       if (loadError instanceof ApiError && loadError.status === 401) {
         await clearSessionToken();
-        router.replace("/(student)/login");
+        router.replace(getUnifiedLoginRoute("student"));
         return;
       }
       setClassroomError(apiErrorMessage(loadError));
@@ -399,7 +399,7 @@ export default function StudentSlimeScreen() {
       } catch (mutationError) {
         if (mutationError instanceof ApiError && mutationError.status === 401) {
           await clearSessionToken();
-          router.replace("/(student)/login");
+          router.replace(getUnifiedLoginRoute("student"));
           return;
         }
         setNotice({ kind: "error", text: apiErrorMessage(mutationError) });

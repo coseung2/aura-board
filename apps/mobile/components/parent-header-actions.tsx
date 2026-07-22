@@ -4,6 +4,7 @@ import { useRouter } from "expo-router";
 import { Bell, LogOut, UserPlus } from "lucide-react-native";
 import { colors, iconSizes, radii, spacing } from "../theme/tokens";
 import { logoutParentSession } from "../lib/parent-session-actions";
+import { getUnifiedLoginRoute } from "../lib/session";
 import { IconButton } from "./ui";
 
 type Props = { notificationCount?: number };
@@ -17,7 +18,8 @@ export function ParentHeaderActions({ notificationCount = 0 }: Props) {
     setLoggingOut(true);
     try {
       await logoutParentSession();
-      router.replace("/?role=parent");
+      router.dismissAll();
+      router.replace(getUnifiedLoginRoute("parent"));
     } catch {
       setLoggingOut(false);
       Alert.alert(

@@ -14,7 +14,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { AppBottomSheet, AppButton, ControlPressable, TextField } from "./ui";
 import { CommentLikeButton } from "./CommentLikeButton";
 import { apiFetch, ApiError } from "../lib/api";
-import { clearSessionToken } from "../lib/session";
+import { clearSessionToken, getUnifiedLoginRoute } from "../lib/session";
 import {
   borders,
   colors,
@@ -63,7 +63,7 @@ export function CommentBottomSheet({
       }
       await clearSessionToken();
       onClose();
-      router.replace("/(student)/login");
+      router.replace(getUnifiedLoginRoute("student"));
       return true;
     },
     [onClose, router],

@@ -32,11 +32,13 @@ export default function PendingPage() {
         } else if (j.state === "rejected") {
           hasRedirected = true;
           if (int) clearInterval(int);
-          router.replace(`/parent/onboard/rejected?reason=${encodeURIComponent(j.rejectedReason ?? "other")}`);
+          router.replace(
+            `/parent/onboard/rejected?reason=${encodeURIComponent(j.rejectedReason ?? "other")}`,
+          );
         } else if (j.state === "anonymous" || j.state === "authed_prematch") {
           hasRedirected = true;
           if (int) clearInterval(int);
-          router.replace("/parent/onboard/signup");
+          router.replace("/login?role=parent&error=session_required");
         }
       } catch (e) {
         setErr((e as Error).message);
@@ -54,17 +56,42 @@ export default function PendingPage() {
     <OnboardingShell step={4} total={4}>
       <div style={{ textAlign: "center" }}>
         <div style={{ fontSize: 48 }}>⏳</div>
-        <h1 style={{ margin: "12px 0 8px", fontSize: 22, fontWeight: 700 }}>승인 대기 중</h1>
-        <p style={{ margin: 0, fontSize: 15, color: "var(--color-text-muted)", lineHeight: 1.6 }}>
+        <h1 style={{ margin: "12px 0 8px", fontSize: 22, fontWeight: 700 }}>
+          승인 대기 중
+        </h1>
+        <p
+          style={{
+            margin: 0,
+            fontSize: 15,
+            color: "var(--color-text-muted)",
+            lineHeight: 1.6,
+          }}
+        >
           선생님이 승인하면 자녀 보드를 볼 수 있습니다. 보통 1~3일 소요됩니다.
           7일 내 미승인 시 자동 만료됩니다.
         </p>
         {status === "active" && (
-          <p style={{ marginTop: 16, color: "var(--color-accent)", fontWeight: 600 }}>
+          <p
+            style={{
+              marginTop: 16,
+              color: "var(--color-accent)",
+              fontWeight: 600,
+            }}
+          >
             승인되었습니다. 잠시 후 이동합니다...
           </p>
         )}
-        {err && <p style={{ marginTop: 16, color: "var(--color-danger)", fontSize: 13 }}>{err}</p>}
+        {err && (
+          <p
+            style={{
+              marginTop: 16,
+              color: "var(--color-danger)",
+              fontSize: 13,
+            }}
+          >
+            {err}
+          </p>
+        )}
       </div>
     </OnboardingShell>
   );

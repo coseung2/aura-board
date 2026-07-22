@@ -15,6 +15,36 @@ const PARENT_SELECTED_CHILD_KEY = "aura_parent_selected_child";
 const parentSelectedChildListeners = new Set<
   (studentId: string | null) => void
 >();
+let parentLogoutInProgress = false;
+
+export type UnifiedLoginRole = "student" | "parent";
+export type UnifiedLoginRoute =
+  | `/?role=${UnifiedLoginRole}`
+  | `/?role=${UnifiedLoginRole}&error=${string}`;
+
+/**
+ * The mobile app has one login surface at the root route. Keep auth failures
+ * and explicit logout navigation pointed at that surface so stale group
+ * screens cannot render a second, divergent login flow.
+ */
+export function getUnifiedLoginRoute(
+  role: UnifiedLoginRole,
+  error?: string,
+): UnifiedLoginRoute {
+  const base: `/?role=${UnifiedLoginRole}` = `/?role=${role}`;
+  return error
+    ? (`${base}&error=${encodeURIComponent(error)}` as UnifiedLoginRoute)
+    : base;
+}
+
+/** Mark an explicit parent logout so in-flight auth guards do not navigate again. */
+export function startParentLogout(): void {
+  parentLogoutInProgress = true;
+}
+
+export function isParentLogoutInProgress(): boolean {
+  return parentLogoutInProgress;
+}
 
 function canUseWebStorage(): boolean {
   return (
@@ -95,6 +125,7 @@ export type CachedParent = {
 };
 
 export async function saveParentToken(token: string): Promise<void> {
+  parentLogoutInProgress = false;
   await setStoredItem(PARENT_TOKEN_KEY, token);
 }
 

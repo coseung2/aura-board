@@ -10,7 +10,7 @@ import {
 import { useRouter, type Href } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { apiFetch, ApiError } from "../../lib/api";
-import { clearSessionToken } from "../../lib/session";
+import { clearSessionToken, getUnifiedLoginRoute } from "../../lib/session";
 import type {
   StudentNotificationItem,
   StudentNotificationPayload,
@@ -50,7 +50,7 @@ export default function StudentNotificationsScreen() {
     } catch (nextError) {
       if (nextError instanceof ApiError && nextError.status === 401) {
         await clearSessionToken();
-        router.replace("/(student)/login");
+        router.replace(getUnifiedLoginRoute("student"));
         return;
       }
       setError("알림을 불러오지 못했어요.");

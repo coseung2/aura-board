@@ -19,7 +19,7 @@ import {
   typography,
 } from "../../theme/tokens";
 import { apiFetch, ApiError, getApiBase } from "../../lib/api";
-import { clearSessionToken } from "../../lib/session";
+import { clearSessionToken, getUnifiedLoginRoute } from "../../lib/session";
 import { AppHeader, SurfaceCard } from "../../components/ui";
 import { StudentHeaderActions } from "../../components/StudentHeaderActions";
 import type {
@@ -44,7 +44,7 @@ export default function StudentPortfolioScreen() {
     async (e: unknown) => {
       if (e instanceof ApiError && e.status === 401) {
         await clearSessionToken();
-        router.replace("/(student)/login");
+        router.replace(getUnifiedLoginRoute("student"));
         return true;
       }
       return false;

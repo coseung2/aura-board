@@ -7,9 +7,9 @@ import { useRouter } from "next/navigation";
 //
 // Polls /api/parent/session/status every 45 seconds. If the response is 401
 // (teacher revoke happened, or session expired), we redirect to
-// /parent/logged-out. We don't clear the cookie client-side (it's HttpOnly)
-// — the server invalidated it on revoke, and future requests will keep
-// returning 401 until the user visits /parent/join.
+// /login. We don't clear the cookie client-side (it's HttpOnly) — the server
+// invalidated it on revoke, and future requests will keep returning 401 until
+// the user signs in again.
 //
 // 45s polling interval was chosen so worst-case revoke latency stays under
 // the 60s SLA (AC-7) even accounting for the user being on a stale tab.
@@ -37,7 +37,8 @@ export function SessionWatchdog() {
           ? await res.json().catch(() => null)
           : null;
         if (res.status === 401 || payload?.state === "anonymous") {
-          if (!cancelled) router.replace("/parent/logged-out");
+          if (!cancelled)
+            router.replace("/login?role=parent&error=session_required");
           return;
         }
         // 200 — keep polling. Other statuses (500 etc.) we ignore so a
@@ -58,7 +59,8 @@ export function SessionWatchdog() {
     // can dispatch (see parent-fetch.ts). This gives us sub-45s latency
     // whenever the user actively navigates/interacts after a revoke.
     const onAuthLost = () => {
-      if (!cancelled) router.replace("/parent/logged-out");
+      if (!cancelled)
+        router.replace("/login?role=parent&error=session_required");
     };
     window.addEventListener("parent-auth-lost", onAuthLost);
 

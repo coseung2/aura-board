@@ -13,7 +13,7 @@ import { useRouter } from "expo-router";
 import { ChevronDown, ChevronUp } from "lucide-react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { apiFetch, ApiError } from "../../lib/api";
-import { clearSessionToken } from "../../lib/session";
+import { clearSessionToken, getUnifiedLoginRoute } from "../../lib/session";
 import {
   borders,
   colors,
@@ -77,7 +77,7 @@ export default function StudentReadingScreen() {
   const handleError = useCallback(async (nextError: unknown) => {
     if (nextError instanceof ApiError && nextError.status === 401) {
       await clearSessionToken();
-      router.replace("/(student)/login");
+      router.replace(getUnifiedLoginRoute("student"));
       return true;
     }
     return false;

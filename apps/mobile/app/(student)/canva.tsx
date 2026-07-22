@@ -3,7 +3,7 @@ import { ActivityIndicator, StyleSheet, Text, View } from "react-native";
 import { useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { apiFetch, ApiError } from "../../lib/api";
-import { clearSessionToken } from "../../lib/session";
+import { clearSessionToken, getUnifiedLoginRoute } from "../../lib/session";
 import { colors, spacing, studentNav, typography } from "../../theme/tokens";
 import { AppButton, AppHeader, SurfaceCard } from "../../components/ui";
 
@@ -23,7 +23,7 @@ export default function StudentCanvaScreen() {
     } catch (nextError) {
       if (nextError instanceof ApiError && nextError.status === 401) {
         await clearSessionToken();
-        router.replace("/(student)/login");
+        router.replace(getUnifiedLoginRoute("student"));
         return;
       }
       setError("연결 코드를 만들지 못했어요.");

@@ -12,7 +12,7 @@ import { getCurrentUser } from "@/lib/auth";
 //   4) Revoke ALL active sessions of that parent. This drives the ≤60s
 //      client-side disconnect SLA (AC-7): the next fetch from the parent
 //      PWA will read a revoked session → 401 → client redirects to
-//      /parent/logged-out.
+//      the canonical /login UI.
 //
 // We revoke every session (not just for this one child) because a single
 // parent can have multiple children, and the scope middleware re-queries
@@ -21,7 +21,7 @@ import { getCurrentUser } from "@/lib/auth";
 
 export async function DELETE(
   _req: Request,
-  ctx: { params: Promise<{ id: string }> }
+  ctx: { params: Promise<{ id: string }> },
 ) {
   const { id } = await ctx.params;
   const user = await getCurrentUser();

@@ -2,58 +2,6 @@
  *
  * 학부모 OAuth 버튼 + 자녀 셀렉터 chip dropdown + 대시보드 헤더 액션. */
 
-/* ── OAuth 버튼 ── */
-.parent-oauth-buttons {
-  display: grid;
-  gap: 12px;
-}
-.parent-oauth-btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 10px;
-  height: 48px;
-  border-radius: var(--radius-btn, 6px);
-  border: 1px solid var(--color-border);
-  background: var(--color-surface);
-  color: var(--color-text);
-  font-size: 15px;
-  font-weight: 600;
-  text-decoration: none;
-  cursor: pointer;
-  transition:
-    background 150ms,
-    border-color 150ms;
-}
-.parent-oauth-btn:hover {
-  background: var(--color-surface-alt);
-  border-color: var(--color-border-hover);
-}
-.parent-oauth-btn:focus-visible {
-  outline: 2px solid var(--color-accent-tinted-text);
-  outline-offset: 2px;
-}
-.parent-oauth-btn-google {
-  /* white bg + Google brand icon strip — guideline 일치 */
-  background: #fff;
-  color: #1f1f1f;
-}
-.parent-oauth-btn-kakao {
-  background: var(--color-oauth-kakao);
-  color: #181600;
-  border-color: var(--color-oauth-kakao);
-}
-.parent-oauth-btn-kakao:hover {
-  /* Kakao brand 색 hover 더 진한 amber */
-  background: #fada0a;
-  border-color: #fada0a;
-}
-.parent-oauth-btn-icon {
-  display: inline-flex;
-  align-items: center;
-  line-height: 1;
-}
-
 /* ── 자녀 셀렉터 chip + dropdown ── */
 .parent-child-chip-wrap {
   position: relative;

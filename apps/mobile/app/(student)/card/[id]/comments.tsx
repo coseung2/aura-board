@@ -15,7 +15,10 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { AppButton, AppHeader, ControlPressable, TextField } from "../../../../components/ui";
 import { CommentLikeButton } from "../../../../components/CommentLikeButton";
 import { apiFetch, ApiError } from "../../../../lib/api";
-import { clearSessionToken } from "../../../../lib/session";
+import {
+  clearSessionToken,
+  getUnifiedLoginRoute,
+} from "../../../../lib/session";
 import {
   borders,
   colors,
@@ -64,7 +67,7 @@ export default function StudentCardCommentsScreen() {
         return false;
       }
       await clearSessionToken();
-      router.replace("/(student)/login");
+      router.replace(getUnifiedLoginRoute("student"));
       return true;
     },
     [router],

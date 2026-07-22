@@ -46,15 +46,19 @@ function MatchCodeInner() {
       const j = await r.json().catch(() => ({}));
       if (!r.ok) {
         if (r.status === 404) setErr("이 코드를 찾을 수 없습니다");
-        else if (r.status === 410) setErr("이 코드는 만료되었습니다. 선생님께 새 코드를 요청해 주세요.");
+        else if (r.status === 410)
+          setErr("이 코드는 만료되었습니다. 선생님께 새 코드를 요청해 주세요.");
         else if (r.status === 429) setErr("잠시 후 다시 시도해 주세요 (15분)");
-        else if (r.status === 401) router.replace("/parent/onboard/signup");
+        else if (r.status === 401)
+          router.replace("/login?role=parent&error=session_required");
         else setErr("오류가 발생했습니다");
         setCode("");
         return;
       }
       const ticket = j.ticket as string;
-      router.push(`/parent/onboard/match/select?ticket=${encodeURIComponent(ticket)}`);
+      router.push(
+        `/parent/onboard/match/select?ticket=${encodeURIComponent(ticket)}`,
+      );
     } catch (e) {
       setErr((e as Error).message);
     } finally {
@@ -66,8 +70,16 @@ function MatchCodeInner() {
 
   return (
     <OnboardingShell step={2} total={4}>
-      <h1 style={{ margin: 0, fontSize: 22, fontWeight: 700 }}>학급 코드 입력</h1>
-      <p style={{ margin: "8px 0 24px", fontSize: 15, color: "var(--color-text-muted)" }}>
+      <h1 style={{ margin: 0, fontSize: 22, fontWeight: 700 }}>
+        학급 코드 입력
+      </h1>
+      <p
+        style={{
+          margin: "8px 0 24px",
+          fontSize: 15,
+          color: "var(--color-text-muted)",
+        }}
+      >
         선생님께 받은 {CODE_LENGTH}자리 코드를 입력하세요.
       </p>
       <CodeInputCells
@@ -78,7 +90,14 @@ function MatchCodeInner() {
         autoFocus
       />
       {err && (
-        <p style={{ textAlign: "center", marginTop: 12, color: "var(--color-danger)", fontSize: 13 }}>
+        <p
+          style={{
+            textAlign: "center",
+            marginTop: 12,
+            color: "var(--color-danger)",
+            fontSize: 13,
+          }}
+        >
           {err}
         </p>
       )}

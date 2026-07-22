@@ -3,7 +3,7 @@ import { AppState, StyleSheet, Text, View } from "react-native";
 import { usePathname, useRouter } from "expo-router";
 import { Bell } from "lucide-react-native";
 import { apiFetch, ApiError } from "../lib/api";
-import { clearSessionToken } from "../lib/session";
+import { clearSessionToken, getUnifiedLoginRoute } from "../lib/session";
 import type { StudentNotificationPayload } from "../lib/types";
 import {
   borders,
@@ -31,7 +31,7 @@ export function StudentNotificationButton() {
     } catch (error) {
       if (error instanceof ApiError && error.status === 401) {
         await clearSessionToken();
-        router.replace("/(student)/login");
+        router.replace(getUnifiedLoginRoute("student"));
       }
     }
   }, [router]);

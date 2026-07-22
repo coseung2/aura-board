@@ -24,7 +24,7 @@ import {
   typography,
 } from "../../theme/tokens";
 import { apiFetch, ApiError, getApiUrl } from "../../lib/api";
-import { clearSessionToken } from "../../lib/session";
+import { clearSessionToken, getUnifiedLoginRoute } from "../../lib/session";
 import type { MeResponse } from "../../lib/types";
 import {
   BOARD_LIST_CACHE_KEY,
@@ -153,7 +153,7 @@ export default function StudentBoardsScreen() {
       } catch (nextError) {
         if (nextError instanceof ApiError && nextError.status === 401) {
           await clearSessionToken();
-          router.replace("/(student)/login");
+          router.replace(getUnifiedLoginRoute("student"));
           return;
         }
         setError("보드 목록을 불러오지 못했어요.");

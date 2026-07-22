@@ -7,7 +7,12 @@ import { ParentFeedCard } from "../../components/parent-feed-card";
 import { ParentHeaderActions } from "../../components/parent-header-actions";
 import { AppButton, AppHeader, EmptyState } from "../../components/ui";
 import { useParentFeed } from "../../hooks/use-parent-feed";
-import { clearParentSession, loadParentToken } from "../../lib/session";
+import {
+  clearParentSession,
+  getUnifiedLoginRoute,
+  isParentLogoutInProgress,
+  loadParentToken,
+} from "../../lib/session";
 import type { ParentPostDTO } from "../../lib/types";
 import {
   borders,
@@ -29,11 +34,15 @@ export default function ParentFeedScreen() {
   }, [router]);
 
   useEffect(() => {
+    let cancelled = false;
     void loadParentToken().then((token) => {
-      if (!token) {
-        router.replace("/?role=parent");
+      if (!cancelled && !token && !isParentLogoutInProgress()) {
+        router.replace(getUnifiedLoginRoute("parent"));
       }
     });
+    return () => {
+      cancelled = true;
+    };
   }, [router]);
 
   const feed = useParentFeed({ focusPostId, onUnauthorized: handleUnauthorized });

@@ -24,7 +24,11 @@ import { extractClientIp, hashIp } from "@/lib/parent-rate-limit";
 
 const MOBILE_DEEP_LINK = "auraboard://parent/auth/callback";
 
-function mobileRedirect(params: { token?: string; expiresAt?: string; error?: string }) {
+function mobileRedirect(params: {
+  token?: string;
+  expiresAt?: string;
+  error?: string;
+}) {
   // URL fragment (#...) is preserved by URL when set on .hash.
   const u = new URL(MOBILE_DEEP_LINK);
   if (params.error) {
@@ -46,7 +50,8 @@ export async function GET(req: Request) {
   // browser into the app deep link with an arbitrary request.
 
   const webFail = (reason: string) => {
-    const back = new URL("/parent/join", origin);
+    const back = new URL("/login", origin);
+    back.searchParams.set("role", "parent");
     back.searchParams.set("error", reason);
     return NextResponse.redirect(back.toString());
   };
@@ -59,7 +64,9 @@ export async function GET(req: Request) {
   if (!payload) return fail("invalid_link");
 
   // Confirm the parent still exists + is not soft-deleted.
-  const parent = await db.parent.findUnique({ where: { id: payload.parentId } });
+  const parent = await db.parent.findUnique({
+    where: { id: payload.parentId },
+  });
   if (!parent || parent.parentDeletedAt) return fail("invalid_link");
 
   const ua = req.headers.get("user-agent") ?? null;
@@ -95,7 +102,8 @@ export async function GET(req: Request) {
   let next = "/parent/onboard/match/code";
   if (links.some((l) => l.status === "active")) next = "/parent/feed";
   else if (links.some((l) => l.status === "pending")) next = "/parent/feed";
-  else if (links.some((l) => l.status === "rejected")) next = "/parent/onboard/rejected";
+  else if (links.some((l) => l.status === "rejected"))
+    next = "/parent/onboard/rejected";
 
   return NextResponse.redirect(new URL(next, origin).toString());
 }

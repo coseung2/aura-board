@@ -19,7 +19,7 @@ import {
   typography,
 } from "../../theme/tokens";
 import { apiFetch, ApiError } from "../../lib/api";
-import { clearSessionToken } from "../../lib/session";
+import { clearSessionToken, getUnifiedLoginRoute } from "../../lib/session";
 import type {
   CheckRosterEntry,
   CheckTask,
@@ -59,7 +59,7 @@ export default function StudentCheckScreen() {
     async (e: unknown) => {
       if (e instanceof ApiError && e.status === 401) {
         await clearSessionToken();
-        router.replace("/(student)/login");
+        router.replace(getUnifiedLoginRoute("student"));
         return true;
       }
       return false;

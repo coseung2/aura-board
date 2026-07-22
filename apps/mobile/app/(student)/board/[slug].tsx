@@ -22,7 +22,10 @@ import {
   removeBoardCache,
   revalidateBoardCache,
 } from "../../../lib/board-cache";
-import { clearSessionToken } from "../../../lib/session";
+import {
+  clearSessionToken,
+  getUnifiedLoginRoute,
+} from "../../../lib/session";
 import type { BoardDetailResponse } from "../../../lib/types";
 import { CardsBoard } from "../../../components/layouts/CardsBoard";
 import { ColumnsBoard } from "../../../components/layouts/ColumnsBoard";
@@ -122,7 +125,7 @@ export default function BoardDetail() {
       } catch (e) {
         if (e instanceof ApiError && e.status === 401) {
           await clearSessionToken();
-          router.replace("/(student)/login");
+          router.replace(getUnifiedLoginRoute("student"));
           return;
         }
         if (sequence !== sequenceRef.current) return;

@@ -2,7 +2,12 @@ import { useEffect } from "react";
 import { AppState } from "react-native";
 import { useRouter } from "expo-router";
 import { ApiError, parentApiFetch } from "../lib/api";
-import { clearParentSession, loadParentToken } from "../lib/session";
+import {
+  clearParentSession,
+  getUnifiedLoginRoute,
+  isParentLogoutInProgress,
+  loadParentToken,
+} from "../lib/session";
 
 const POLL_MS = 45_000;
 
@@ -13,25 +18,35 @@ export function useParentSessionWatchdog() {
     let cancelled = false;
 
     const check = async () => {
-      if (cancelled || !(await loadParentToken())) return;
+      if (cancelled || isParentLogoutInProgress()) return;
+      const token = await loadParentToken();
+      if (cancelled || isParentLogoutInProgress() || !token) return;
       try {
         const status = await parentApiFetch<{ state?: string }>(
           "/api/parent/session/status",
         );
         if (status.state === "anonymous") {
+          if (isParentLogoutInProgress()) return;
           await clearParentSession();
-          if (!cancelled) {
+          if (!cancelled && !isParentLogoutInProgress()) {
             router.replace(
-              "/?role=parent&error=로그인이 만료되었어요. 다시 로그인해 주세요.",
+              getUnifiedLoginRoute(
+                "parent",
+                "로그인이 만료되었어요. 다시 로그인해 주세요.",
+              ),
             );
           }
         }
       } catch (cause) {
         if (cause instanceof ApiError && cause.status === 401) {
+          if (isParentLogoutInProgress()) return;
           await clearParentSession();
-          if (!cancelled) {
+          if (!cancelled && !isParentLogoutInProgress()) {
             router.replace(
-              "/?role=parent&error=로그인이 만료되었어요. 다시 로그인해 주세요.",
+              getUnifiedLoginRoute(
+                "parent",
+                "로그인이 만료되었어요. 다시 로그인해 주세요.",
+              ),
             );
           }
         }

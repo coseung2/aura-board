@@ -12,7 +12,11 @@ import { useRouter } from "expo-router";
 import { ChevronLeft, ChevronRight, X } from "lucide-react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { apiFetch, getApiBase, ApiError } from "../../lib/api";
-import { clearSessionToken, loadSessionToken } from "../../lib/session";
+import {
+  clearSessionToken,
+  getUnifiedLoginRoute,
+  loadSessionToken,
+} from "../../lib/session";
 import {
   borders,
   colors,
@@ -211,7 +215,7 @@ export default function DailyBannerSubmitScreen() {
     } catch (nextError) {
       if (nextError instanceof ApiError && nextError.status === 401) {
         await clearSessionToken();
-        router.replace("/(student)/login");
+        router.replace(getUnifiedLoginRoute("student"));
         return;
       }
       // A list is useful but not required to submit; keep this screen usable
@@ -234,7 +238,7 @@ export default function DailyBannerSubmitScreen() {
       } catch (nextError) {
         if (nextError instanceof ApiError && nextError.status === 401) {
           await clearSessionToken();
-          router.replace("/(student)/login");
+          router.replace(getUnifiedLoginRoute("student"));
           return;
         }
         setOccupiedDays([]);
@@ -369,7 +373,7 @@ export default function DailyBannerSubmitScreen() {
     } catch (nextError) {
       if (nextError instanceof ApiError && nextError.status === 401) {
         await clearSessionToken();
-        router.replace("/(student)/login");
+        router.replace(getUnifiedLoginRoute("student"));
         return;
       }
       setError(

@@ -11,6 +11,8 @@ import {
 } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
+import Constants, { ExecutionEnvironment } from "expo-constants";
+import * as Device from "expo-device";
 import * as Linking from "expo-linking";
 import * as WebBrowser from "expo-web-browser";
 import Svg, { Path } from "react-native-svg";
@@ -54,6 +56,43 @@ import type { ParentChildrenResponse, StudentAuthResponse } from "../lib/types";
 type ParentOAuthProvider = "google" | "kakao";
 
 const PARENT_OAUTH_CALLBACK_PATH = "parent/auth/callback";
+const EXPO_GO_PHONE_CALLBACK =
+  "exp://127.0.0.1:8081/--/parent/auth/callback";
+const DEFAULT_PARENT_OAUTH_BASE_URL = "https://aura-board.com";
+
+type MobileExpoExtra = {
+  parentOAuthBaseUrl?: string;
+};
+
+function isLocalApiBase(value: string) {
+  try {
+    const hostname = new URL(value).hostname;
+    return (
+      hostname === "127.0.0.1" ||
+      hostname === "localhost" ||
+      hostname === "10.0.2.2"
+    );
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * OAuth state is set by the origin that starts the browser session. Local
+ * mobile API traffic can stay on adb reverse, but the provider callback must
+ * return to the same public origin configured on the server.
+ */
+function getParentOAuthBase() {
+  const extra = Constants.expoConfig?.extra as MobileExpoExtra | undefined;
+  const configured =
+    process.env.EXPO_PUBLIC_PARENT_OAUTH_BASE_URL ?? extra?.parentOAuthBaseUrl;
+  if (configured) return configured.replace(/\/$/, "");
+
+  const apiBase = getApiBase();
+  return __DEV__ && isLocalApiBase(apiBase)
+    ? DEFAULT_PARENT_OAUTH_BASE_URL
+    : apiBase;
+}
 
 const PARENT_OAUTH_ERROR_MESSAGES: Record<string, string> = {
   provider_disabled:
@@ -89,7 +128,7 @@ export default function Landing() {
           ? "student"
           : null;
   const { width } = useWindowDimensions();
-  const [booting, setBooting] = useState(true);
+  const [booting, setBooting] = useState(requestedRole === null);
   const [studentCode, setStudentCode] = useState("");
   const [studentLoading, setStudentLoading] = useState(false);
   const [studentError, setStudentError] = useState<string | null>(null);
@@ -200,8 +239,18 @@ export default function Landing() {
   }
 
   async function handleParentOAuth(provider: ParentOAuthProvider) {
-    const url = new URL(`/api/parent/auth/${provider}`, getApiBase());
-    const redirectUri = Linking.createURL(PARENT_OAUTH_CALLBACK_PATH);
+    const oauthBase =
+      Platform.OS === "web" ? getApiBase() : getParentOAuthBase();
+    const url = new URL(`/api/parent/auth/${provider}`, oauthBase);
+    const isExpoGoPhysicalAndroid =
+      Platform.OS === "android" &&
+      __DEV__ &&
+      Device.isDevice &&
+      Constants.executionEnvironment === ExecutionEnvironment.StoreClient;
+    const redirectUri =
+      isExpoGoPhysicalAndroid
+        ? EXPO_GO_PHONE_CALLBACK
+        : Linking.createURL(PARENT_OAUTH_CALLBACK_PATH);
     if (Platform.OS !== "web") {
       url.searchParams.set("client", "mobile");
       url.searchParams.set("returnUrl", redirectUri);

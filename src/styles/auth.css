@@ -40,6 +40,16 @@
   margin: 32px 0 32px;
 }
 
+.login-page-error {
+  margin: 16px auto 0;
+  max-width: 520px;
+  padding: 10px 14px;
+  border: 1px solid var(--color-danger);
+  border-radius: var(--radius-btn);
+  background: var(--color-status-returned-bg, #ffebee);
+  color: var(--color-status-returned-text, var(--color-danger));
+}
+
 @media (max-width: 640px) {
   .login-hub-grid {
     grid-template-columns: 1fr;
@@ -173,6 +183,10 @@
 .login-role-card-static:hover {
   /* div 라 button hover 효과 의도 안 함 — 위 .login-role-card:hover 는 button 한정 */
   transform: none;
+}
+.login-role-card-focused {
+  border-color: var(--color-accent);
+  box-shadow: var(--shadow-card-hover);
 }
 .login-role-oauth-actions {
   margin-top: 10px;

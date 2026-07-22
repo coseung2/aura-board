@@ -3,7 +3,7 @@
 // All client-side fetch calls from /parent/** UIs should go through this
 // helper. On a 401 (revoked / expired session), we fire a CustomEvent that
 // the SessionWatchdog component listens for, causing an immediate redirect
-// to /parent/logged-out — no waiting for the next 45s poll tick.
+// to the canonical /login UI — no waiting for the next 45s poll tick.
 //
 // Usage:
 //   const res = await parentFetch(`/api/parent/children/${id}/posts?kind=media`);
@@ -12,7 +12,7 @@
 
 export async function parentFetch(
   input: RequestInfo | URL,
-  init?: RequestInit
+  init?: RequestInit,
 ): Promise<Response | null> {
   const res = await fetch(input, {
     cache: "no-store",

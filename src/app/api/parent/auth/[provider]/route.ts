@@ -4,6 +4,7 @@ import {
   googleClient,
   kakaoClient,
   isProviderEnabled,
+  getCallbackUrl,
   setStateCookie,
   type ProviderId,
 } from "@/lib/parent-oauth";
@@ -13,9 +14,12 @@ export const runtime = "nodejs";
 
 const MOBILE_DEEP_LINK = "auraboard://parent/auth/callback";
 const EXPO_GO_EMULATOR_CALLBACK = "exp://10.0.2.2:8081/--/parent/auth/callback";
+const EXPO_GO_DEVICE_CALLBACK = "exp://127.0.0.1:8081/--/parent/auth/callback";
 
 function mobileCallbackUrl(value: string | null): string {
-  return value === EXPO_GO_EMULATOR_CALLBACK ? value : MOBILE_DEEP_LINK;
+  return value === EXPO_GO_EMULATOR_CALLBACK || value === EXPO_GO_DEVICE_CALLBACK
+    ? value
+    : MOBILE_DEEP_LINK;
 }
 
 function mobileErrorRedirect(error: string, callbackUrl = MOBILE_DEEP_LINK) {
@@ -61,6 +65,24 @@ export async function GET(
 
   const requestUrl = new URL(req.url);
   const isMobile = requestUrl.searchParams.get("client") === "mobile";
+
+  // The provider callback and state cookie must share an origin. A local
+  // mobile bundle may still start this route through adb reverse, while the
+  // OAuth redirect is configured on the canonical public origin. Redirect
+  // before setting the cookie so the browser stores it where the callback
+  // will read it; web and already-canonical requests stay unchanged.
+  if (
+    isMobile &&
+    requestUrl.origin !== new URL(getCallbackUrl(providerId)).origin
+  ) {
+    return NextResponse.redirect(
+      new URL(
+        requestUrl.pathname + requestUrl.search,
+        getCallbackUrl(providerId),
+      ),
+    );
+  }
+
   const callbackUrl = mobileCallbackUrl(requestUrl.searchParams.get("returnUrl"));
 
   const state = generateState();

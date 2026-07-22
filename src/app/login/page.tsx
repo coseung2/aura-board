@@ -9,6 +9,34 @@ import { RoleIcon } from "@/components/login/RoleIcon";
 // Google 글리프 + 브랜드 컬러 OAuth 버튼으로 통일. 학생은 OAuth 가
 // 아니라 별도 라우팅이라 button-card 패턴 유지.
 
+type LoginRole = "teacher" | "student" | "parent";
+
+const LOGIN_ERROR_MESSAGES: Record<string, string> = {
+  invalid_link:
+    "로그인 링크가 만료되었거나 올바르지 않아요. 다시 로그인해 주세요.",
+  internal: "로그인 처리 중 문제가 발생했어요. 잠시 후 다시 시도해 주세요.",
+  session_required: "다시 로그인하면 학부모 화면으로 이동할 수 있어요.",
+  logged_out: "로그아웃되었습니다. 다시 로그인해 주세요.",
+  withdrawn: "탈퇴가 완료되었습니다.",
+  provider_disabled:
+    "현재 OAuth 로그인이 비활성화되어 있어요. 관리자에게 문의해 주세요.",
+  invalid_provider: "지원하지 않는 로그인 방식이에요.",
+  invalid_state: "로그인 인증이 만료됐어요. 다시 시도해 주세요.",
+  missing_params: "로그인 응답이 올바르지 않아요. 다시 시도해 주세요.",
+  missing_pkce: "보안 정보가 누락됐어요. 다시 시도해 주세요.",
+  token_exchange_failed:
+    "로그인 토큰 교환에 실패했어요. 잠시 후 다시 시도해 주세요.",
+  userinfo_failed: "사용자 정보 조회에 실패했어요. 잠시 후 다시 시도해 주세요.",
+  upsert_failed: "계정 생성에 실패했어요. 잠시 후 다시 시도해 주세요.",
+};
+
+function loginErrorMessage(value: string | null): string {
+  if (!value) return "";
+  return (
+    LOGIN_ERROR_MESSAGES[value] ?? `로그인 중 오류가 발생했어요 (${value})`
+  );
+}
+
 export default function LoginPage() {
   const [studentCode, setStudentCode] = useState("");
   const [studentError, setStudentError] = useState("");
@@ -18,9 +46,18 @@ export default function LoginPage() {
   const [reviewerPassword, setReviewerPassword] = useState("");
   const [reviewerError, setReviewerError] = useState("");
   const [reviewerBusy, setReviewerBusy] = useState(false);
+  const [loginRole, setLoginRole] = useState<LoginRole | null>(null);
+  const [loginError, setLoginError] = useState("");
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
+    const role = params.get("role");
+    setLoginRole(
+      role === "teacher" || role === "student" || role === "parent"
+        ? role
+        : null,
+    );
+    setLoginError(loginErrorMessage(params.get("error")));
     setShowReviewerLogin(params.get("review") === "canva");
   }, []);
 
@@ -134,20 +171,31 @@ export default function LoginPage() {
   }
 
   return (
-    <main className="login-page">
+    <main className="login-page" data-login-role={loginRole ?? undefined}>
       <div className="login-hub-card">
         <div className="login-logo">
           <Logo size={56} />
         </div>
         <h1 className="login-title">Aura-board</h1>
 
+        {loginError ? (
+          <p
+            id="login-error"
+            className="login-page-error login-role-error"
+            role="alert"
+          >
+            {loginError}
+          </p>
+        ) : null}
+
         <div className="login-hub-grid">
           {/* 교사 카드 — OAuth 진입점. 학부모 카드와 동일한
               div + 내부 OAuth 버튼 패턴으로 통일. */}
           <div
-            className="login-role-card login-role-card-static"
+            className={`login-role-card login-role-card-static${loginRole === "teacher" ? " login-role-card-focused" : ""}`}
             role="group"
             aria-label="교사 로그인"
+            data-role-focused={loginRole === "teacher" ? "true" : undefined}
           >
             <div className="login-role-icon">
               <RoleIcon role="teacher" />
@@ -231,9 +279,10 @@ export default function LoginPage() {
           {/* 학생 카드 — QR/코드 진입. OAuth 가 아니라 별도 라우팅이라
               button-card 패턴 유지. */}
           <div
-            className="login-role-card login-role-card-static"
+            className={`login-role-card login-role-card-static${loginRole === "student" ? " login-role-card-focused" : ""}`}
             role="group"
             aria-label="학생 로그인"
+            data-role-focused={loginRole === "student" ? "true" : undefined}
           >
             <div className="login-role-icon">
               <RoleIcon role="student" />
@@ -270,9 +319,10 @@ export default function LoginPage() {
           {/* 학부모 카드 — OAuth 2 진입점 (Google + Kakao). 클릭은 카드
               자체가 아닌 내부 두 OAuth 링크. */}
           <div
-            className="login-role-card login-role-card-static"
+            className={`login-role-card login-role-card-static${loginRole === "parent" ? " login-role-card-focused" : ""}`}
             role="group"
             aria-label="학부모 로그인"
+            data-role-focused={loginRole === "parent" ? "true" : undefined}
           >
             <div className="login-role-icon">
               <RoleIcon role="parent" />

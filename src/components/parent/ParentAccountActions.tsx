@@ -30,7 +30,7 @@ export function ParentAccountActions({ initialLinks }: Props) {
         credentials: "same-origin",
       });
       if (!res.ok) throw new Error(`status ${res.status}`);
-      router.replace("/login");
+      router.replace("/login?role=parent&error=logged_out");
     } catch (e) {
       console.error("[ParentAccountActions] logout", e);
       setError("로그아웃에 실패했습니다. 잠시 후 다시 시도해 주세요.");
@@ -45,10 +45,13 @@ export function ParentAccountActions({ initialLinks }: Props) {
     setBusy(link.id);
     setError(null);
     try {
-      const res = await fetch(`/api/parent/my-links/${encodeURIComponent(link.id)}`, {
-        method: "DELETE",
-        credentials: "same-origin",
-      });
+      const res = await fetch(
+        `/api/parent/my-links/${encodeURIComponent(link.id)}`,
+        {
+          method: "DELETE",
+          credentials: "same-origin",
+        },
+      );
       if (!res.ok) throw new Error(`status ${res.status}`);
       setLinks((current) => current.filter((item) => item.id !== link.id));
       router.refresh();
@@ -71,15 +74,37 @@ export function ParentAccountActions({ initialLinks }: Props) {
         }}
       >
         <h2 style={{ margin: "0 0 10px", fontSize: 16 }}>자녀 연결</h2>
-        <p style={{ margin: "0 0 12px", fontSize: 13, color: "var(--color-text-muted, #6b7280)", lineHeight: 1.5 }}>
-          잘못 신청한 자녀는 승인 전에는 신청 취소, 승인 후에는 연결 해제를 할 수 있습니다.
+        <p
+          style={{
+            margin: "0 0 12px",
+            fontSize: 13,
+            color: "var(--color-text-muted, #6b7280)",
+            lineHeight: 1.5,
+          }}
+        >
+          잘못 신청한 자녀는 승인 전에는 신청 취소, 승인 후에는 연결 해제를 할
+          수 있습니다.
         </p>
         {links.length === 0 ? (
-          <p style={{ margin: 0, fontSize: 13, color: "var(--color-text-muted, #6b7280)" }}>
+          <p
+            style={{
+              margin: 0,
+              fontSize: 13,
+              color: "var(--color-text-muted, #6b7280)",
+            }}
+          >
             연결된 자녀나 대기 중인 신청이 없습니다.
           </p>
         ) : (
-          <ul style={{ listStyle: "none", margin: 0, padding: 0, display: "grid", gap: 8 }}>
+          <ul
+            style={{
+              listStyle: "none",
+              margin: 0,
+              padding: 0,
+              display: "grid",
+              gap: 8,
+            }}
+          >
             {links.map((link) => (
               <li
                 key={link.id}
@@ -95,10 +120,19 @@ export function ParentAccountActions({ initialLinks }: Props) {
                 <div style={{ minWidth: 0 }}>
                   <div style={{ fontSize: 14, fontWeight: 600 }}>
                     {link.studentName}
-                    {link.studentNumber != null ? ` (${link.studentNumber}번)` : ""}
+                    {link.studentNumber != null
+                      ? ` (${link.studentNumber}번)`
+                      : ""}
                   </div>
-                  <div style={{ marginTop: 2, fontSize: 12, color: "var(--color-text-muted, #6b7280)" }}>
-                    {link.classroomName} · {link.status === "pending" ? "승인 대기" : "연결됨"}
+                  <div
+                    style={{
+                      marginTop: 2,
+                      fontSize: 12,
+                      color: "var(--color-text-muted, #6b7280)",
+                    }}
+                  >
+                    {link.classroomName} ·{" "}
+                    {link.status === "pending" ? "승인 대기" : "연결됨"}
                   </div>
                 </div>
                 <button
@@ -111,13 +145,20 @@ export function ParentAccountActions({ initialLinks }: Props) {
                     border: "1px solid var(--color-border, #e5e7eb)",
                     borderRadius: 8,
                     background: "var(--color-surface, #fff)",
-                    color: link.status === "pending" ? "var(--color-text, #111827)" : "var(--color-danger, #dc2626)",
+                    color:
+                      link.status === "pending"
+                        ? "var(--color-text, #111827)"
+                        : "var(--color-danger, #dc2626)",
                     fontSize: 12,
                     fontWeight: 600,
                     cursor: busy === link.id ? "not-allowed" : "pointer",
                   }}
                 >
-                  {busy === link.id ? "처리 중..." : link.status === "pending" ? "신청 취소" : "연결 해제"}
+                  {busy === link.id
+                    ? "처리 중..."
+                    : link.status === "pending"
+                      ? "신청 취소"
+                      : "연결 해제"}
                 </button>
               </li>
             ))}
@@ -132,7 +173,10 @@ export function ParentAccountActions({ initialLinks }: Props) {
         style={{
           width: "100%",
           padding: 14,
-          background: busy === "logout" ? "var(--color-surface-muted, #f9fafb)" : "var(--color-surface, #fff)",
+          background:
+            busy === "logout"
+              ? "var(--color-surface-muted, #f9fafb)"
+              : "var(--color-surface, #fff)",
           color: "var(--color-text, #111827)",
           border: "1px solid var(--color-border, #e5e7eb)",
           borderRadius: 12,
@@ -145,7 +189,13 @@ export function ParentAccountActions({ initialLinks }: Props) {
       </button>
 
       {error ? (
-        <p style={{ margin: 0, color: "var(--color-danger, #dc2626)", fontSize: 12 }}>
+        <p
+          style={{
+            margin: 0,
+            color: "var(--color-danger, #dc2626)",
+            fontSize: 12,
+          }}
+        >
           {error}
         </p>
       ) : null}

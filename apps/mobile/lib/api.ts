@@ -4,6 +4,7 @@
 // - 쿠키를 쓰지 않으므로 CORS preflight 자체가 native fetch 에선 non-issue.
 
 import Constants from "expo-constants";
+import * as Device from "expo-device";
 import { Platform } from "react-native";
 import { loadParentToken, loadSessionToken } from "./session";
 
@@ -31,7 +32,7 @@ export function getApiBase(): string {
     // loopback so Android does not select an unmapped IPv6 localhost address.
     // A physical device on Wi-Fi can override this with EXPO_PUBLIC_API_BASE
     // (for example a LAN address).
-    return Platform.OS === "android" && !Constants.isDevice
+    return Platform.OS === "android" && !Device.isDevice
       ? "http://10.0.2.2:3000"
       : "http://127.0.0.1:3000";
   }

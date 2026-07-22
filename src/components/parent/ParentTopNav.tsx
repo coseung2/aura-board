@@ -40,7 +40,7 @@ export function ParentTopNav({
     try {
       const response = await fetch("/api/parent/logout", { method: "POST" });
       if (!response.ok) throw new Error(`status ${response.status}`);
-      router.replace("/parent/logged-out");
+      router.replace("/login?role=parent&error=logged_out");
       router.refresh();
     } catch (error) {
       console.error("[ParentTopNav] logout failed", error);
@@ -51,7 +51,11 @@ export function ParentTopNav({
   return (
     <>
       <header className="parent-topnav">
-        <Link href="/parent/feed" className="parent-topnav-logo" aria-label="Aura Board 학부모 피드">
+        <Link
+          href="/parent/feed"
+          className="parent-topnav-logo"
+          aria-label="Aura Board 학부모 피드"
+        >
           <Logo size={32} withWordmark />
         </Link>
 
@@ -76,7 +80,9 @@ export function ParentTopNav({
             href="/parent/account"
             className="parent-topnav-action parent-topnav-account"
             aria-label="계정"
-            aria-current={pathname.startsWith("/parent/account") ? "page" : undefined}
+            aria-current={
+              pathname.startsWith("/parent/account") ? "page" : undefined
+            }
             title={parent.email}
           >
             <ParentNavIcon name="account" />
@@ -107,17 +113,27 @@ export function ParentTopNav({
       </header>
 
       <header className="parent-mobile-header">
-        <Link href="/parent/feed" className="parent-mobile-brand" aria-label="Aura Board 학부모 피드">
+        <Link
+          href="/parent/feed"
+          className="parent-mobile-brand"
+          aria-label="Aura Board 학부모 피드"
+        >
           <Logo size={30} withWordmark />
         </Link>
         <Link
           href="/parent/notifications"
           className="parent-mobile-header-action"
-          aria-label={pendingNotificationCount > 0 ? `알림 ${pendingNotificationCount}개` : "알림"}
+          aria-label={
+            pendingNotificationCount > 0
+              ? `알림 ${pendingNotificationCount}개`
+              : "알림"
+          }
         >
           <BellIcon />
           {pendingNotificationCount > 0 ? (
-            <span className="parent-nav-badge">{Math.min(pendingNotificationCount, 99)}</span>
+            <span className="parent-nav-badge">
+              {Math.min(pendingNotificationCount, 99)}
+            </span>
           ) : null}
         </Link>
       </header>
@@ -142,7 +158,11 @@ export function ParentTopNav({
   );
 }
 
-function ParentNavIcon({ name }: { name: "feed" | "home" | "account" | "teacher" | "logout" }) {
+function ParentNavIcon({
+  name,
+}: {
+  name: "feed" | "home" | "account" | "teacher" | "logout";
+}) {
   const paths: Record<typeof name, ReactNode> = {
     feed: (
       <>

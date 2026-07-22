@@ -13,7 +13,7 @@ import * as ImagePicker from "expo-image-picker";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { apiFetch, ApiError } from "../lib/api";
-import { clearSessionToken } from "../lib/session";
+import { clearSessionToken, getUnifiedLoginRoute } from "../lib/session";
 import type { MeResponse } from "../lib/types";
 import { uploadImage } from "../lib/plant-api";
 import {
@@ -88,7 +88,7 @@ export function StudentInspectionScreen({ mode }: { mode: Mode }) {
   const handleAuthError = useCallback(async (nextError: unknown) => {
     if (nextError instanceof ApiError && nextError.status === 401) {
       await clearSessionToken();
-      router.replace("/(student)/login");
+      router.replace(getUnifiedLoginRoute("student"));
       return true;
     }
     return false;

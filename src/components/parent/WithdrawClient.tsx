@@ -6,8 +6,8 @@ import { useRouter } from "next/navigation";
 // PV-11 — client-side confirm button for /parent/account/withdraw.
 //
 // Uses a native confirm() dialog (no extra modal library) since the flow is
-// terminal + irreversible + mobile-first. On success we hard-navigate to
-// /parent/logged-out so authenticated parent UI + watchdog unmount cleanly.
+// terminal + irreversible + mobile-first. On success we hard-navigate to the
+// canonical /login UI so authenticated parent UI + watchdog unmount cleanly.
 
 export function WithdrawClient() {
   const router = useRouter();
@@ -24,7 +24,7 @@ export function WithdrawClient() {
         credentials: "same-origin",
       });
       if (!res.ok) throw new Error(`status ${res.status}`);
-      router.replace("/parent/logged-out?withdrawn=1");
+      router.replace("/login?role=parent&error=withdrawn");
     } catch (e) {
       console.error("[WithdrawClient]", e);
       setErr("탈퇴 처리에 실패했습니다. 잠시 후 다시 시도해 주세요.");
@@ -41,7 +41,9 @@ export function WithdrawClient() {
         style={{
           width: "100%",
           padding: 14,
-          background: busy ? "var(--color-surface-muted, #f9fafb)" : "var(--color-danger, #dc2626)",
+          background: busy
+            ? "var(--color-surface-muted, #f9fafb)"
+            : "var(--color-danger, #dc2626)",
           color: busy ? "var(--color-text-muted, #6b7280)" : "#fff",
           border: 0,
           borderRadius: 10,

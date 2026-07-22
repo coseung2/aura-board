@@ -25,7 +25,7 @@ import {
   typography,
 } from "../../theme/tokens";
 import { apiFetch, ApiError } from "../../lib/api";
-import { clearSessionToken } from "../../lib/session";
+import { clearSessionToken, getUnifiedLoginRoute } from "../../lib/session";
 import {
   BOARD_LIST_CACHE_KEY,
   STUDENT_HOME_CACHE_KEY,
@@ -133,7 +133,7 @@ export default function StudentHome() {
       } catch (e) {
         if (e instanceof ApiError && e.status === 401) {
           await clearSessionToken();
-          router.replace("/(student)/login");
+          router.replace(getUnifiedLoginRoute("student"));
           return;
         }
         setError(e instanceof Error ? e.message : "불러올 수 없어요");

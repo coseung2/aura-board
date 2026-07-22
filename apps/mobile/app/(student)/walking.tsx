@@ -13,7 +13,7 @@ import { useFocusEffect, useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Footprints, ShieldCheck } from "lucide-react-native";
 import { apiFetch, ApiError } from "../../lib/api";
-import { clearSessionToken } from "../../lib/session";
+import { clearSessionToken, getUnifiedLoginRoute } from "../../lib/session";
 import {
   DEFAULT_WALKING_POLICY,
   fetchWalkingSnapshot,
@@ -122,7 +122,7 @@ export default function StudentWalkingScreen() {
   const handleAuthError = useCallback(async (nextError: unknown) => {
     if (nextError instanceof ApiError && nextError.status === 401) {
       await clearSessionToken();
-      router.replace("/(student)/login");
+      router.replace(getUnifiedLoginRoute("student"));
       return true;
     }
     return false;

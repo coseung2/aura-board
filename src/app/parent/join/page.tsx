@@ -7,20 +7,30 @@ import { redirect } from "next/navigation";
 // legacy /parent/join?code=<classCode> callers (e.g. older QR landing URLs)
 // are forwarded to the v2 code-input step with the code preserved as a
 // prefill query so it isn't silently dropped on the way through. When no
-// code is present we keep the current behavior of bouncing straight to
-// signup.
+// code is present we send the parent to the canonical /login surface.
 
 export default async function ParentJoinRedirect({
   searchParams,
 }: {
-  searchParams: Promise<{ code?: string }>;
+  searchParams: Promise<{
+    code?: string;
+    error?: string;
+    from?: string;
+    return?: string;
+    callbackUrl?: string;
+  }>;
 }) {
-  const { code } = await searchParams;
+  const params = await searchParams;
+  const { code } = params;
   const trimmed = typeof code === "string" ? code.trim() : "";
   if (trimmed) {
-    redirect(
-      `/parent/onboard/match/code?code=${encodeURIComponent(trimmed)}`,
-    );
+    redirect(`/parent/onboard/match/code?code=${encodeURIComponent(trimmed)}`);
   }
-  redirect("/parent/onboard/signup");
+
+  const query = new URLSearchParams({ role: "parent" });
+  for (const key of ["error", "from", "return", "callbackUrl"] as const) {
+    const value = params[key];
+    if (typeof value === "string" && value.trim()) query.set(key, value);
+  }
+  redirect(`/login?${query.toString()}`);
 }
