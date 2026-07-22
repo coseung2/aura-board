@@ -59,6 +59,11 @@ const PARENT_OAUTH_CALLBACK_PATH = "parent/auth/callback";
 const EXPO_GO_PHONE_CALLBACK =
   "exp://127.0.0.1:8081/--/parent/auth/callback";
 const DEFAULT_PARENT_OAUTH_BASE_URL = "https://aura-board.com";
+// Student join codes are fixed at six characters, but the server-side review
+// credential contract accepts any non-empty code up to 256 characters. Keep
+// the reviewer field aligned with that contract so short Expo Go codes (for
+// example, "367") are submitted instead of being rejected client-side.
+const PARENT_REVIEW_CODE_MAX_LENGTH = 256;
 
 type MobileExpoExtra = {
   parentOAuthBaseUrl?: string;
@@ -303,7 +308,10 @@ export default function Landing() {
 
   async function handleParentReviewLogin() {
     const code = parentReviewCode.trim().toUpperCase();
-    if (code.length !== auth.codeLength) {
+    if (
+      code.length === 0 ||
+      code.length > PARENT_REVIEW_CODE_MAX_LENGTH
+    ) {
       setParentError("심사 코드를 확인해 주세요.");
       return;
     }
@@ -509,7 +517,7 @@ export default function Landing() {
                 {parentError}
               </Text>
             ) : null}
-            <View style={styles.parentReviewLogin}>
+            <View style={styles.studentLoginForm}>
               <TextField
                 style={styles.studentCodeInput}
                 value={parentReviewCode}
@@ -521,12 +529,13 @@ export default function Landing() {
                 autoCapitalize="characters"
                 autoCorrect={false}
                 autoComplete="off"
-                maxLength={auth.codeLength}
+                maxLength={PARENT_REVIEW_CODE_MAX_LENGTH}
                 textAlign="center"
                 editable={!parentLoading}
                 onSubmitEditing={handleParentReviewLogin}
               />
               <AppButton
+                style={styles.studentLoginButton}
                 onPress={handleParentReviewLogin}
                 disabled={parentReviewCode.trim().length === 0}
                 loading={parentLoading}
@@ -700,9 +709,6 @@ const styles = StyleSheet.create({
   },
   oauthActions: {
     width: "100%",
-    gap: spacing.sm,
-  },
-  parentReviewLogin: {
     gap: spacing.sm,
   },
   oauthGoogle: {

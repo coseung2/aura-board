@@ -53,14 +53,11 @@ function googleCredentials(): { id: string; secret: string } | null {
   const sharedId = process.env.AUTH_GOOGLE_ID?.trim();
   const sharedSecret = process.env.AUTH_GOOGLE_SECRET?.trim();
 
-  // Local development uses the already-established web OAuth client. Its
-  // authorized redirects include localhost and the parent callback. Keep the
-  // dedicated parent client as the production preference.
-  if (process.env.NODE_ENV !== "production" && sharedId && sharedSecret) {
-    return { id: sharedId, secret: sharedSecret };
-  }
-  if (parentId && parentSecret) return { id: parentId, secret: parentSecret };
   if (sharedId && sharedSecret) return { id: sharedId, secret: sharedSecret };
+  // Fall back to the dedicated parent client only when the shared web OAuth
+  // client is not configured. The shared client is already used by teacher
+  // sign-in and is the production credential source of truth.
+  if (parentId && parentSecret) return { id: parentId, secret: parentSecret };
   return null;
 }
 

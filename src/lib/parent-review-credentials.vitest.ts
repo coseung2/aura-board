@@ -21,6 +21,9 @@ describe("parent review credentials", () => {
     expect(verifyParentReviewCode(CODE, encoded)).toBe(true);
     expect(verifyParentReviewCode("wrong", encoded)).toBe(false);
     expect(verifyParentReviewCode(" a1b2c3 ", encoded)).toBe(true);
+
+    const shortCode = createParentReviewCodeHash("367", SALT);
+    expect(verifyParentReviewCode("367", shortCode)).toBe(true);
   });
 
   it.each(["", "sha256$salt$hash", "scrypt$bad$hash", "scrypt$only-salt"])(
@@ -64,4 +67,3 @@ describe("parent review credentials", () => {
     ).toBe(false);
   });
 });
-
