@@ -27,12 +27,13 @@ export function getApiBase(): string {
   if (fromExtra) return fromExtra.replace(/\/$/, "");
   if (__DEV__) {
     // Android emulators reach the host machine through 10.0.2.2. A USB-connected
-    // phone reaches it through `adb reverse tcp:3000 tcp:3000`; Expo web and
-    // iOS simulators can use localhost directly. A physical device on Wi-Fi can
-    // override this with EXPO_PUBLIC_API_BASE (for example a LAN address).
+    // phone reaches it through `adb reverse tcp:3000 tcp:3000`; use IPv4
+    // loopback so Android does not select an unmapped IPv6 localhost address.
+    // A physical device on Wi-Fi can override this with EXPO_PUBLIC_API_BASE
+    // (for example a LAN address).
     return Platform.OS === "android" && !Constants.isDevice
       ? "http://10.0.2.2:3000"
-      : "http://localhost:3000";
+      : "http://127.0.0.1:3000";
   }
   // Start on the canonical origin so a cross-origin redirect cannot discard
   // the mobile Bearer token.
