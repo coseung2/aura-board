@@ -5,6 +5,7 @@ import {
   calculateCatalogSlimeEffects,
   calculateSlimeEffects,
   formatBpsPercent,
+  slimeBuffBpsForStage,
 } from "./math";
 
 describe("slime buff math", () => {
@@ -62,5 +63,20 @@ describe("slime buff math", () => {
     expect(formatBpsPercent(200)).toBe("2%");
     expect(formatBpsPercent(180)).toBe("1.8%");
     expect(formatBpsPercent(SLIME_EFFECT_CAP_BPS)).toBe("20%");
+  });
+
+  it("doubles a slime's base buff at each growth stage", () => {
+    expect(slimeBuffBpsForStage(200, 1)).toBe(200);
+    expect(slimeBuffBpsForStage(200, 2)).toBe(400);
+    expect(slimeBuffBpsForStage(200, 3)).toBe(800);
+
+    const effects = calculateCatalogSlimeEffects(
+      ["blue"],
+      [],
+      undefined,
+      { blue: 3 },
+    );
+    expect(effects.totals.growth_speed).toBe(800);
+    expect(effects.breakdown[0]).toMatchObject({ bps: 800 });
   });
 });

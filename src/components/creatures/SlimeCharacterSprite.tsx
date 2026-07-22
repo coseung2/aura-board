@@ -25,8 +25,8 @@ type Props = {
 
 const EVOLUTION_BY_STAGE: Record<SlimeGrowthStage, SlimeEvolution> = {
   1: "base",
-  2: "gold-crown-red-gem",
-  3: "silver-crown-blue-gem",
+  2: "silver-crown-blue-gem",
+  3: "gold-crown-red-gem",
 };
 
 function floorFromItems(items: readonly SlimeShopItem[]): EquippedFloor {

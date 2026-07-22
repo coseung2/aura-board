@@ -63,6 +63,9 @@ export function growthSnapshotByColor(
   return result;
 }
 
-export function growthEffectsForColors(equippedColors: readonly SlimeColor[]) {
-  return calculateCatalogSlimeEffects(equippedColors, []);
+export function growthEffectsForColors(
+  equippedColors: readonly SlimeColor[],
+  growthStages: Partial<Record<SlimeColor, number>> = {},
+) {
+  return calculateCatalogSlimeEffects(equippedColors, [], undefined, growthStages);
 }

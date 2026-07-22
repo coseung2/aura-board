@@ -130,8 +130,12 @@ export function SlimePetPage() {
     () => calculateCatalogSlimeEffects(
       ownedKeys,
       equippedItemKeys,
+      undefined,
+      Object.fromEntries(
+        Object.entries(growthByColor).map(([color, growth]) => [color, growth?.stage ?? 1]),
+      ),
     ),
-    [equippedItemKeys, ownedKeys],
+    [equippedItemKeys, growthByColor, ownedKeys],
   );
   const visibleShopItems = useMemo(
     () =>

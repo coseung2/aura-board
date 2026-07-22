@@ -57,7 +57,7 @@ export async function loadEquippedRewardBuffBps(
   const [slimes, equippedItems] = await Promise.all([
     tx.studentSlime.findMany({
       where: { studentId },
-      select: { color: true },
+      select: { color: true, isEquipped: true, growthStage: true },
     }),
     tx.studentCreatureItem.findMany({
       where: { studentId, isEquipped: true, quantity: { gt: 0 } },
@@ -68,6 +68,7 @@ export async function loadEquippedRewardBuffBps(
     slimes.map((slime) => slime.color),
     equippedItems.map((item) => item.itemKey),
     capBps,
+    Object.fromEntries(slimes.map((slime) => [slime.color, slime.growthStage])),
   );
   return effects.totals[REWARD_EFFECT_BY_AREA[area]];
 }

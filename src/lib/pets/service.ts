@@ -3,10 +3,13 @@ import "server-only";
 import { Prisma } from "@prisma/client";
 
 import { db } from "@/lib/db";
+import { walkingTitleForStats, type WalkingTitleStats } from "@/lib/walking-titles";
 import {
   getSlimeDefinition,
   getEquippedSlimeFloor,
   getSlimeShopItem,
+  normalizeEquippedSlimeItemKeys,
+  slimeVisualItemSlot,
   SLIME_CATALOG,
   SLIME_SHOP_CATALOG,
 } from "./catalog";
@@ -66,6 +69,42 @@ export type {
 } from "./service-contract";
 
 type StudentIdentity = { id: string; classroomId: string };
+
+async function walkingTitleForStudent(studentId: string) {
+  const [stats] = await db.$queryRaw<WalkingTitleStats[]>(Prisma.sql`
+    WITH daily AS (
+      SELECT MAX("steps")::bigint AS "maxDailySteps"
+      FROM "StudentWalkingDailyStat"
+      WHERE "studentId" = ${studentId}
+    ), weekly AS (
+      SELECT MAX("weeklySteps")::bigint AS "maxWeeklySteps"
+      FROM (
+        SELECT DATE_TRUNC('week', "day") AS "weekStart", SUM("steps")::bigint AS "weeklySteps"
+        FROM "StudentWalkingDailyStat"
+        WHERE "studentId" = ${studentId}
+        GROUP BY DATE_TRUNC('week', "day")
+      ) totals
+    ), monthly AS (
+      SELECT MAX("monthlySteps")::bigint AS "maxMonthlySteps"
+      FROM (
+        SELECT DATE_TRUNC('month', "day") AS "monthStart", SUM("steps")::bigint AS "monthlySteps"
+        FROM "StudentWalkingDailyStat"
+        WHERE "studentId" = ${studentId}
+        GROUP BY DATE_TRUNC('month', "day")
+      ) totals
+    )
+    SELECT
+      COALESCE(daily."maxDailySteps", 0)::bigint AS "maxDailySteps",
+      COALESCE(weekly."maxWeeklySteps", 0)::bigint AS "maxWeeklySteps",
+      COALESCE(monthly."maxMonthlySteps", 0)::bigint AS "maxMonthlySteps"
+    FROM daily CROSS JOIN weekly CROSS JOIN monthly
+  `);
+  return walkingTitleForStats(stats ?? {
+    maxDailySteps: 0,
+    maxWeeklySteps: 0,
+    maxMonthlySteps: 0,
+  });
+}
 
 function assertIdempotencyKey(key: string): string {
   const trimmed = typeof key === "string" ? key.trim() : "";
@@ -147,7 +186,7 @@ async function replayPurchase(
 }
 
 export async function getSlimeHome(student: StudentIdentity): Promise<SlimeHome> {
-  const [account, currency, owned, growthRowsResult, ownedItems] = await Promise.all([
+  const [account, currency, owned, growthRowsResult, ownedItems, walkingTitle] = await Promise.all([
     db.studentAccount.findUnique({
       where: { studentId: student.id },
       select: { balance: true },
@@ -176,6 +215,7 @@ export async function getSlimeHome(student: StudentIdentity): Promise<SlimeHome>
       select: { itemKey: true, quantity: true, isEquipped: true },
       orderBy: { createdAt: "asc" },
     }) ?? Promise.resolve([] as { itemKey: string; quantity?: number; isEquipped?: boolean }[]),
+    walkingTitleForStudent(student.id),
   ]);
   if (!account) throw new SlimeServiceError("account_not_found");
   const growthRows = Array.isArray(growthRowsResult) ? growthRowsResult : [];
@@ -200,7 +240,7 @@ export async function getSlimeHome(student: StudentIdentity): Promise<SlimeHome>
   const equippedItemsByColor = Object.fromEntries(
     owned.map((slime) => [
       slime.color,
-      (slime.equippedItemKeys ?? []).filter((itemKey) => Boolean(getSlimeShopItem(itemKey))),
+      normalizeEquippedSlimeItemKeys(slime.equippedItemKeys ?? []),
     ]),
   ) as Partial<Record<SlimeColor, string[]>>;
   const equippedItemKeys = Array.from(
@@ -216,7 +256,6 @@ export async function getSlimeHome(student: StudentIdentity): Promise<SlimeHome>
     (owned.find((row) => row.isRepresentative)?.color as SlimeColor | undefined) ?? null;
   const equippedColors = SLIME_CATALOG.map((slime) => slime.color).filter((color) => equippedSet.has(color));
   const ownedColors = SLIME_CATALOG.map((slime) => slime.color).filter((color) => ownedSet.has(color));
-  const effects = calculateCatalogSlimeEffects(ownedColors, equippedItemKeys);
   const now = new Date();
   const hasPersistedGrowth = growthRows.some(
     (row) => row.growthLastSettledAt != null,
@@ -236,6 +275,15 @@ export async function getSlimeHome(student: StudentIdentity): Promise<SlimeHome>
   const growthByColor = growthSnapshotByColor(
     growthSource as SlimeGrowthRow[],
     now,
+  );
+  const growthStages = Object.fromEntries(
+    Object.entries(growthByColor).map(([color, growth]) => [color, growth?.stage ?? 1]),
+  ) as Partial<Record<SlimeColor, number>>;
+  const effects = calculateCatalogSlimeEffects(
+    ownedColors,
+    equippedItemKeys,
+    undefined,
+    growthStages,
   );
   return {
     balance: account.balance,
@@ -257,6 +305,7 @@ export async function getSlimeHome(student: StudentIdentity): Promise<SlimeHome>
     growthSpeedBps: effects.totals.growth_speed,
     growthByColor,
     growth: growthByColor,
+    walkingTitle,
   };
 }
 
@@ -328,7 +377,10 @@ export async function equipSlime(
     const ownedColors = SLIME_CATALOG.map((candidate) => candidate.color).filter((candidate) =>
       settledRows.some(({ row }) => row.color === candidate),
     );
-    const effects = growthEffectsForColors(ownedColors);
+    const growthStages = Object.fromEntries(
+      settledRows.map(({ row, settled }) => [row.color, settled.stage]),
+    ) as Partial<Record<SlimeColor, number>>;
+    const effects = growthEffectsForColors(ownedColors, growthStages);
     const growthSpeedBps = effects.totals.growth_speed;
     const updatedRows: SlimeGrowthRow[] = [];
 
@@ -458,7 +510,14 @@ export async function purchaseSlime(
             (row) => row.color === candidate,
           ),
       );
-      const initialGrowthSpeedBps = growthEffectsForColors(initialOwnedColors).totals.growth_speed;
+      const initialGrowthStages = Object.fromEntries([
+        ...existingGrowthRows.map((row) => [row.color, row.growthStage]),
+        [slime.color, 1],
+      ]) as Partial<Record<SlimeColor, number>>;
+      const initialGrowthSpeedBps = growthEffectsForColors(
+        initialOwnedColors,
+        initialGrowthStages,
+      ).totals.growth_speed;
 
       const guarded = await tx.studentAccount.updateMany({
         where: { id: account.id, studentId: student.id, balance: { gte: slime.price } },
@@ -1158,7 +1217,8 @@ export async function equipSlimeShopItem(
   const slime = getSlimeDefinition(slimeColor);
   const normalizedKey = typeof itemKey === "string" ? itemKey.trim() : "";
   const item = getSlimeShopItem(normalizedKey);
-  if (!slime || !item || typeof isEquipped !== "boolean") {
+  const itemSlot = item ? slimeVisualItemSlot(item) : null;
+  if (!slime || !item || !itemSlot || typeof isEquipped !== "boolean") {
     throw new SlimeServiceError("invalid_body");
   }
   // Equip requests are replay-safe state transitions. We still validate the
@@ -1187,12 +1247,14 @@ export async function equipSlimeShopItem(
       select: { id: true, color: true, isRepresentative: true, equippedItemKeys: true },
       orderBy: { createdAt: "asc" },
     });
-    const currentKeys = ownedSlime.equippedItemKeys.filter((key: string) => Boolean(getSlimeShopItem(key)));
-    let nextKeys = currentKeys.filter((key) => key !== item.key);
+    let nextKeys = normalizeEquippedSlimeItemKeys(
+      ownedSlime.equippedItemKeys.filter((key) => key !== item.key),
+    );
     if (isEquipped) {
-      nextKeys = item.floor
-        ? nextKeys.filter((key: string) => !getSlimeShopItem(key)?.floor)
-        : nextKeys.filter((key: string) => getSlimeShopItem(key)?.category !== item.category);
+      nextKeys = nextKeys.filter((key) => {
+        const candidate = getSlimeShopItem(key);
+        return !candidate || slimeVisualItemSlot(candidate) !== itemSlot;
+      });
       nextKeys.push(item.key);
     }
 
@@ -1202,8 +1264,8 @@ export async function equipSlimeShopItem(
         row.color === slime.color
           ? nextKeys
           : isEquipped
-            ? row.equippedItemKeys.filter((key: string) => key !== item.key)
-            : row.equippedItemKeys,
+            ? normalizeEquippedSlimeItemKeys(row.equippedItemKeys.filter((key) => key !== item.key))
+            : normalizeEquippedSlimeItemKeys(row.equippedItemKeys),
       ]),
     );
     const changedRows = slimeRowsBefore.filter((row) => {
@@ -1224,23 +1286,21 @@ export async function equipSlimeShopItem(
       slimeRowsBefore.map((row) => [row.color, nextKeysBySlimeId.get(row.id) ?? row.equippedItemKeys]),
     ) as Partial<Record<SlimeColor, string[]>>;
     const equippedItemKeys = Array.from(new Set(Object.values(equippedItemsByColor).flatMap((keys) => keys ?? [])));
-    if (item.floor) {
-      const floorItemKeys = SLIME_SHOP_CATALOG.filter((candidate) => candidate.floor).map((candidate) => candidate.key);
-      const equippedFloorItemKeys = equippedItemKeys.filter((key) => Boolean(getSlimeShopItem(key)?.floor));
+    const slotItemKeys = SLIME_SHOP_CATALOG
+      .filter((candidate) => slimeVisualItemSlot(candidate) === itemSlot)
+      .map((candidate) => candidate.key);
+    const equippedSlotItemKeys = equippedItemKeys.filter((key) => {
+      const candidate = getSlimeShopItem(key);
+      return candidate ? slimeVisualItemSlot(candidate) === itemSlot : false;
+    });
+    await tx.studentCreatureItem.updateMany({
+      where: { studentId: student.id, itemKey: { in: slotItemKeys } },
+      data: { isEquipped: false },
+    });
+    if (equippedSlotItemKeys.length > 0) {
       await tx.studentCreatureItem.updateMany({
-        where: { studentId: student.id, itemKey: { in: floorItemKeys } },
-        data: { isEquipped: false },
-      });
-      if (equippedFloorItemKeys.length > 0) {
-        await tx.studentCreatureItem.updateMany({
-          where: { studentId: student.id, itemKey: { in: equippedFloorItemKeys } },
-          data: { isEquipped: true },
-        });
-      }
-    } else {
-      await tx.studentCreatureItem.update({
-        where: { id: inventory.id },
-        data: { isEquipped: equippedItemKeys.includes(item.key) },
+        where: { studentId: student.id, itemKey: { in: equippedSlotItemKeys } },
+        data: { isEquipped: true },
       });
     }
     const equippedFloorByColor = Object.fromEntries(

@@ -39,3 +39,11 @@
 .floor {
   z-index: 3;
 }
+
+.floorUnder {
+  position: absolute;
+  z-index: 0;
+  left: 0;
+  image-rendering: pixelated;
+  pointer-events: none;
+}

@@ -10,6 +10,7 @@ import type {
   SlimeDefinition,
   SlimeEffectKey,
   SlimeEffectsPayload,
+  SlimeColor,
 } from "./types";
 import { SLIME_EFFECT_KEYS } from "./types";
 
@@ -19,7 +20,7 @@ export const SLIME_EFFECT_CAP_BPS = 2_000;
 export type SlimeBuffInput = Pick<
   SlimeDefinition,
   "key" | "nameKo" | "effectKey" | "baseBuffBps"
->;
+> & { growthStage?: number };
 
 export type SlimeAccessoryInput = Pick<
   SlimeAccessoryDefinition,
@@ -35,6 +36,12 @@ function emptyTotals(): Record<SlimeEffectKey, number> {
 
 function safeBps(value: number): number {
   return Number.isFinite(value) ? Math.max(0, Math.round(value)) : 0;
+}
+
+/** Stage one uses the catalog base; stages two and three double it successively. */
+export function slimeBuffBpsForStage(baseBuffBps: number, stage?: number): number {
+  const base = safeBps(baseBuffBps);
+  return stage !== undefined && stage >= 3 ? base * 4 : stage !== undefined && stage >= 2 ? base * 2 : base;
 }
 
 /** Format integer basis points as a compact percentage for user-facing copy. */
@@ -59,7 +66,7 @@ export function calculateSlimeEffects(
 
   for (const slime of slimes) {
     if (!SLIME_EFFECT_KEYS.includes(slime.effectKey)) continue;
-    const bps = safeBps(slime.baseBuffBps);
+    const bps = slimeBuffBpsForStage(slime.baseBuffBps, slime.growthStage);
     if (bps === 0) continue;
     uncappedTotals[slime.effectKey] += bps;
     breakdown.push({
@@ -111,10 +118,12 @@ export function calculateCatalogSlimeEffects(
   slimeKeys: readonly string[],
   accessoryKeys: readonly string[] = [],
   capBps = SLIME_EFFECT_CAP_BPS,
+  growthStages: Partial<Record<SlimeColor, number>> = {},
 ): SlimeEffectsPayload {
   const slimes = slimeKeys
     .map((key) => getSlimeDefinition(key))
-    .filter((slime): slime is SlimeDefinition => Boolean(slime));
+    .filter((slime): slime is SlimeDefinition => Boolean(slime))
+    .map((slime) => ({ ...slime, growthStage: growthStages[slime.color] }));
   const accessories = accessoryKeys
     .map((key) => SLIME_ACCESSORY_CATALOG.find((item) => item.key === key))
     .filter((item): item is SlimeAccessoryDefinition => Boolean(item));

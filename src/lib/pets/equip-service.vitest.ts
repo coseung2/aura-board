@@ -118,6 +118,30 @@ describe("slime shop item equipment", () => {
     expect(state.rows.get(trampoline.key)?.isEquipped).toBe(true);
   });
 
+  it("keeps one floor with one accessory and replaces only the accessory slot", async () => {
+    const state = installState();
+    const grass = SLIME_SHOP_CATALOG.find((item) => item.floor === "grass-floor")!;
+    const drink = SLIME_SHOP_CATALOG.find((item) => item.category === "drink")!;
+    const ball = SLIME_SHOP_CATALOG.find((item) => item.category === "prop")!;
+    state.slimeRows[0].equippedItemKeys = [grass.key, drink.key];
+
+    const result = await equipSlimeShopItem(student, "blue", ball.key, true, "accessory-swap");
+
+    expect(result.equippedItemKeys).toEqual([grass.key, ball.key]);
+    expect(result.equippedFloorByColor).toEqual({ blue: "grass-floor" });
+    expect(state.rows.get(drink.key)?.isEquipped).toBe(false);
+    expect(state.rows.get(ball.key)?.isEquipped).toBe(true);
+  });
+
+  it("rejects food as a visual equipment item", async () => {
+    installState();
+    const cookie = SLIME_SHOP_CATALOG.find((item) => item.category === "food")!;
+
+    await expect(
+      equipSlimeShopItem(student, "blue", cookie.key, true, "equip-food"),
+    ).rejects.toMatchObject<Partial<SlimeServiceError>>({ code: "invalid_body", status: 400 });
+  });
+
   it("moves the same floor between slimes while preserving each slime's other floor", async () => {
     const state = installState();
     const grass = SLIME_SHOP_CATALOG.find((item) => item.floor === "grass-floor")!;

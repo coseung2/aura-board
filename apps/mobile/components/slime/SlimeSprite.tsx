@@ -5,8 +5,8 @@ import { getApiBase } from "../../lib/api";
 import {
   getSlimeFrame,
   resolveSlimeAsset,
+  SLIME_SHARED_ASSETS,
   type SlimeAction,
-  type SlimeAssetResolution,
   type SlimeColor,
   type SlimeEvolution,
   type EquippedFloor,
@@ -15,6 +15,7 @@ import {
 import type { SlimeSpriteProps } from "./slime-types";
 
 const DEFAULT_DISPLAY_SCALE = 1;
+const TRAMPOLINE_FLOOR_SOURCE = require("../../assets/slimes/shared/trampoline-floor.png");
 type LocalImageSource = ImageProps["source"];
 
 function normalizedDisplayScale(value: number | undefined): number {
@@ -29,23 +30,23 @@ function imageSource(value: unknown): LocalImageSource {
   return value as LocalImageSource;
 }
 
-function sourceSize(frame: SlimeFrame, resolution: SlimeAssetResolution, scale: number) {
+function sourceSize(frame: SlimeFrame, imageScale: number, scale: number) {
   return {
-    width: frame.sourceSize.w * resolution.imageScale * scale,
-    height: frame.sourceSize.h * resolution.imageScale * scale,
+    width: frame.sourceSize.w * imageScale * scale,
+    height: frame.sourceSize.h * imageScale * scale,
   };
 }
 
 function frameOffset(
   frame: SlimeFrame,
-  resolution: SlimeAssetResolution,
+  imageScale: number,
   scale: number,
   offsetY: number,
 ) {
   return {
-    left: (frame.spriteSourceSize.x - frame.frame.x) * resolution.imageScale * scale,
+    left: (frame.spriteSourceSize.x - frame.frame.x) * imageScale * scale,
     top:
-      (frame.spriteSourceSize.y - frame.frame.y) * resolution.imageScale * scale +
+      (frame.spriteSourceSize.y - frame.frame.y) * imageScale * scale +
       offsetY,
   };
 }
@@ -80,16 +81,19 @@ export function SlimeSprite({
   onCompleteRef.current = onComplete;
 
   const frame = getSlimeFrame(resolution, frameIndex);
-  const viewport = sourceSize(frame, resolution, displayScale);
   const staticFloor = resolution.staticFloor;
-  const floorOffsetY = staticFloor
-    ? (staticFloor.surfaceY - staticFloor.slimeFootY) * resolution.imageScale * displayScale
+  const floorRise = staticFloor
+    ? (staticFloor.slimeFootY - staticFloor.surfaceY) * resolution.imageScale * displayScale
     : 0;
+  const viewport = {
+    ...sourceSize(frame, resolution.imageScale, displayScale),
+    height: frame.sourceSize.h * resolution.imageScale * displayScale + floorRise,
+  };
   const packedSheetSize = {
     width: resolution.metadata.meta.size.w * resolution.imageScale * displayScale,
     height: resolution.metadata.meta.size.h * resolution.imageScale * displayScale,
   };
-  const offset = frameOffset(frame, resolution, displayScale, floorOffsetY);
+  const offset = frameOffset(frame, resolution.imageScale, displayScale, 0);
   const squareSourceSize = frame.sourceSize.w * resolution.imageScale * displayScale;
 
   useEffect(() => {
@@ -120,6 +124,21 @@ export function SlimeSprite({
   }, [frameIndex, playbackKey, repeat, resolution]);
 
   const crownOverlay = resolution.crownOverlay;
+  const puddleAsset = equippedFloor === "water-puddle"
+    ? SLIME_SHARED_ASSETS.sharedPuddle
+    : null;
+  const puddleFrame = puddleAsset
+    ? getSlimeFrame({ metadata: puddleAsset.metadata }, frameIndex)
+    : null;
+  const puddlePackedSheetSize = puddleAsset
+    ? {
+        width: puddleAsset.metadata.meta.size.w * puddleAsset.imageScale * displayScale,
+        height: puddleAsset.metadata.meta.size.h * puddleAsset.imageScale * displayScale,
+      }
+    : null;
+  const puddleOffset = puddleAsset && puddleFrame
+    ? frameOffset(puddleFrame, puddleAsset.imageScale, displayScale, 0)
+    : null;
 
   if (itemSpritePath) {
     const uri = itemSpritePath.startsWith("http")
@@ -127,17 +146,51 @@ export function SlimeSprite({
       : `${getApiBase()}${itemSpritePath.startsWith("/") ? "" : "/"}${itemSpritePath}`;
     const size = 256 * displayScale;
     const itemSizeStyle = { width: size, height: size };
+    const itemViewportStyle = { width: size, height: size + floorRise };
     return (
       <View
-        style={[styles.viewport, itemSizeStyle]}
+        style={[styles.viewport, itemViewportStyle]}
         accessible
         accessibilityRole="image"
         accessibilityLabel={accessibilityLabel ?? `${slimeColor} 슬라임 장착 소품 모습`}
         testID="slime-sprite"
       >
+        {puddleAsset && puddlePackedSheetSize && puddleOffset ? (
+          <Image
+            source={imageSource(puddleAsset.image)}
+            style={[styles.layer, styles.floorUnder, puddlePackedSheetSize, puddleOffset]}
+            contentFit="fill"
+            allowDownscaling={false}
+            recyclingKey={`${playbackKey}:puddle-under-item`}
+            transition={0}
+            accessible={false}
+          />
+        ) : null}
+        {staticFloor ? (
+          <Image
+            source={imageSource(staticFloor.image)}
+            style={[styles.layer, styles.floorUnder, itemSizeStyle, { top: floorRise }]}
+            contentFit="fill"
+            allowDownscaling={false}
+            recyclingKey={`${playbackKey}:floor-under-item`}
+            transition={0}
+            accessible={false}
+          />
+        ) : null}
+        {equippedFloor === "trampoline" ? (
+          <Image
+            source={imageSource(TRAMPOLINE_FLOOR_SOURCE)}
+            style={[styles.layer, styles.floorUnder, itemSizeStyle]}
+            contentFit="fill"
+            allowDownscaling={false}
+            recyclingKey={`${playbackKey}:trampoline-under-item`}
+            transition={0}
+            accessible={false}
+          />
+        ) : null}
         <Image
           source={{ uri }}
-          style={itemSizeStyle}
+          style={[styles.layer, styles.itemLayer, itemSizeStyle]}
           contentFit="contain"
           recyclingKey={`item:${uri}`}
           transition={0}
@@ -157,6 +210,26 @@ export function SlimeSprite({
       }
       testID="slime-sprite"
     >
+      {staticFloor ? (
+        <Image
+          source={imageSource(staticFloor.image)}
+          style={[
+            styles.layer,
+            styles.floorUnder,
+            {
+              width: frame.sourceSize.w * staticFloor.imageScale * displayScale,
+              height: squareSourceSize,
+              left: 0,
+              top: floorRise,
+            },
+          ]}
+          contentFit="fill"
+          allowDownscaling={false}
+          recyclingKey={`${playbackKey}:floor`}
+          transition={0}
+          accessible={false}
+        />
+      ) : null}
       <Image
         source={imageSource(resolution.sheet)}
         style={[styles.layer, packedSheetSize, offset]}
@@ -175,30 +248,11 @@ export function SlimeSprite({
               width: frame.sourceSize.w * crownOverlay.imageScale * displayScale,
               height: frame.sourceSize.w * crownOverlay.imageScale * displayScale,
             },
-            { left: 0, top: floorOffsetY },
+            { left: 0, top: 0 },
           ]}
           contentFit="fill"
           allowDownscaling={false}
           recyclingKey={`${playbackKey}:crown`}
-          transition={0}
-          accessible={false}
-        />
-      ) : null}
-      {staticFloor ? (
-        <Image
-          source={imageSource(staticFloor.image)}
-          style={[
-            styles.layer,
-            {
-              width: frame.sourceSize.w * staticFloor.imageScale * displayScale,
-              height: squareSourceSize,
-              left: 0,
-              top: 0,
-            },
-          ]}
-          contentFit="fill"
-          allowDownscaling={false}
-          recyclingKey={`${playbackKey}:floor`}
           transition={0}
           accessible={false}
         />
@@ -217,4 +271,6 @@ const styles = StyleSheet.create({
   layer: {
     position: "absolute",
   },
+  floorUnder: { zIndex: 0 },
+  itemLayer: { zIndex: 1 },
 });

@@ -69,6 +69,8 @@ export type SlimeHome = {
   growthSpeedBps: number;
   growthByColor: Partial<Record<SlimeColor, SlimeGrowthSnapshot>>;
   growth: Partial<Record<SlimeColor, SlimeGrowthSnapshot>>;
+  /** The highest walking achievement title currently earned by the student. */
+  walkingTitle: { key: string; label: string; imagePath: string } | null;
 };
 
 export type SlimePurchaseResult = {

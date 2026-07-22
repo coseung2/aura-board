@@ -36,7 +36,7 @@ type Props = {
   duties?: StudentDuty[];
 };
 
-const SOLID_ACTIVE_ICON_IDS = new Set(["boards", "walking", "more"]);
+const SOLID_ACTIVE_ICON_IDS = new Set(["boards", "walking", "more", "slime"]);
 
 export function StudentBottomNav({ duties = [] }: Props) {
   const router = useRouter();

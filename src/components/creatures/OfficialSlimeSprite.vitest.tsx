@@ -98,4 +98,31 @@ describe("OfficialSlimeSprite", () => {
       container.querySelector('img[src="/creatures/slimes/official/shared/grass-floor.png"]'),
     ).toBeTruthy();
   });
+
+  it("keeps water and trampoline floor layers visible with a complete prop sprite", () => {
+    const { container, rerender } = render(
+      <OfficialSlimeSprite
+        slimeColor="red"
+        action="floor-interaction"
+        equippedFloor="water-puddle"
+        itemSpritePath="/creatures/slimes/items/red-ball.gif"
+      />,
+    );
+
+    expect(
+      container.querySelector('img[src="/creatures/slimes/official/shared/water-puddle/sheet.png"]'),
+    ).toBeTruthy();
+
+    rerender(
+      <OfficialSlimeSprite
+        slimeColor="red"
+        action="floor-interaction"
+        equippedFloor="trampoline"
+        itemSpritePath="/creatures/slimes/items/red-ball.gif"
+      />,
+    );
+    expect(
+      container.querySelector('img[src="/creatures/slimes/official/shared/trampoline-floor.png"]'),
+    ).toBeTruthy();
+  });
 });

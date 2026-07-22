@@ -212,6 +212,31 @@ export function getSlimeShopItem(key: string): SlimeShopItem | undefined {
   return slimeShopItemByKey.get(key);
 }
 
+export type SlimeVisualItemSlot = "floor" | "accessory";
+
+/** Floors compose with one visual accessory; food is never equipable. */
+export function slimeVisualItemSlot(
+  item: Pick<SlimeShopItem, "category" | "floor">,
+): SlimeVisualItemSlot | null {
+  if (item.floor) return "floor";
+  if (item.category === "drink" || item.category === "prop") return "accessory";
+  return null;
+}
+
+/** Collapse malformed legacy arrays to one key per visual slot. Last key wins. */
+export function normalizeEquippedSlimeItemKeys(itemKeys: readonly string[]): string[] {
+  let floorKey: string | null = null;
+  let accessoryKey: string | null = null;
+  for (const itemKey of itemKeys) {
+    const item = getSlimeShopItem(itemKey);
+    if (!item) continue;
+    const slot = slimeVisualItemSlot(item);
+    if (slot === "floor") floorKey = item.key;
+    if (slot === "accessory") accessoryKey = item.key;
+  }
+  return [floorKey, accessoryKey].filter((key): key is string => key !== null);
+}
+
 export function getSlimeBallDefinition(slug: string): SlimeBallShopItem | undefined {
   return slimeBallBySlug.get(slug as SlimeBallSlug);
 }

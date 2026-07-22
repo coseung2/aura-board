@@ -177,6 +177,35 @@
   padding: 5px 8px;
 }
 
+.representativeStar {
+  position: absolute;
+  z-index: 6;
+  top: 0;
+  right: 0;
+  display: inline-grid;
+  width: 28px;
+  height: 28px;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  color: var(--color-text-faint);
+  background: transparent;
+  cursor: pointer;
+}
+
+.representativeStarSelected {
+  color: var(--color-warning);
+}
+
+.representativeStar:disabled {
+  cursor: default;
+}
+
+.representativeStar:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
 .effectBadge {
   display: inline-grid;
   min-width: 44px;
@@ -561,15 +590,16 @@
 
 .wardrobeButton {
   display: inline-flex;
+  flex: 1;
   align-items: center;
   justify-content: center;
   min-height: 44px;
-  width: fit-content;
-  padding: 5px 0;
-  border: 0;
-  border-radius: 0;
-  color: var(--color-accent-active);
-  background: transparent;
+  width: auto;
+  padding: 5px 8px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-btn);
+  color: var(--color-text);
+  background: var(--color-surface);
   cursor: pointer;
   font: inherit;
   font-size: 12px;
@@ -579,8 +609,8 @@
 .slimeActions {
   display: flex;
   align-items: center;
-  gap: 12px;
-  flex-wrap: wrap;
+  justify-content: flex-start;
+  gap: 4px;
 }
 
 .slimeActionButtons {
@@ -588,6 +618,7 @@
   align-items: center;
   gap: 4px;
   min-height: 44px;
+  flex: 0 0 44px;
 }
 
 .slimeActionButton {
@@ -596,8 +627,8 @@
   height: 44px;
   place-items: center;
   padding: 0;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-btn);
+  border: 0;
+  border-radius: 0;
   color: var(--color-text-muted);
   background: transparent;
   cursor: pointer;
@@ -616,14 +647,13 @@
 
 .slimeActionButton:hover,
 .slimeActionButton:focus-visible {
-  border-color: var(--color-accent);
   color: var(--color-accent-active);
 }
 
 .slimeActionButton:disabled {
   cursor: wait;
   filter: grayscale(1);
-  opacity: 0.55;
+  opacity: 1;
 }
 
 .cookieQuantity,
@@ -671,24 +701,6 @@
   opacity: 0.55;
 }
 
-.representativeButton {
-  min-height: 44px;
-  width: fit-content;
-  padding: 5px 0;
-  border: 0;
-  border-radius: 0;
-  color: var(--color-text-muted);
-  background: transparent;
-  cursor: pointer;
-  font: inherit;
-  font-size: 12px;
-  font-weight: 700;
-}
-
-.representativeButton:disabled {
-  cursor: wait;
-  opacity: 0.55;
-}
 
 .drawerSubtitle {
   margin: 6px 0 0;

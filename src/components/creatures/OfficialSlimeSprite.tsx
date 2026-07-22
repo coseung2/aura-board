@@ -60,10 +60,10 @@ function frameSourceStyle(
   };
 }
 
-function frameViewportStyle(frame: SlimeFrame, scale: number): CSSProperties {
+function frameViewportStyle(frame: SlimeFrame, scale: number, extraHeight = 0): CSSProperties {
   return {
     width: frame.sourceSize.w * scale,
-    height: frame.sourceSize.h * scale,
+    height: frame.sourceSize.h * scale + extraHeight,
   };
 }
 
@@ -116,22 +116,22 @@ export function OfficialSlimeSprite({
         0,
       )
     : undefined;
-  const sourceOffsetY = staticFloor
-    ? (staticFloor.surfaceY - staticFloor.slimeFootY) * scale
+  const floorRise = staticFloor
+    ? (staticFloor.slimeFootY - staticFloor.surfaceY) * scale
     : 0;
-  const viewportStyle = frameViewportStyle(frame, scale);
+  const viewportStyle = frameViewportStyle(frame, scale, floorRise);
   const sheetStyle = frameSourceStyle(
     frame,
     resolution.metadata.meta.size.w,
     resolution.metadata.meta.size.h,
     scale,
-    sourceOffsetY,
+    0,
   );
   const crownStyle = resolution.crownOverlay
     ? {
         width: 64 * resolution.crownOverlay.imageScale * scale,
         height: 64 * resolution.crownOverlay.imageScale * scale,
-        transform: `translate(0px, ${sourceOffsetY}px)`,
+        transform: "translate(0px, 0px)",
       }
     : undefined;
   const label = alt ?? `${slimeColor} 슬라임 ${resolution.action} 모습`;
@@ -179,8 +179,51 @@ export function OfficialSlimeSprite({
       data-item-sprite-path={itemSpritePath}
       data-frame-index={frameIndex}
       data-frame-duration={frame.duration}
-      data-floor-offset-source-pixels={staticFloor ? staticFloor.surfaceY - staticFloor.slimeFootY : 0}
+      data-floor-offset-source-pixels={staticFloor ? staticFloor.slimeFootY - staticFloor.surfaceY : 0}
     >
+      {puddleAsset && puddleFrame ? (
+        // Keep the shared puddle as an independent floor layer so complete
+        // prop GIFs can compose above it instead of replacing it.
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={puddleAsset.sheetUrl}
+          alt=""
+          aria-hidden="true"
+          className={styles.puddle}
+          style={puddleStyle}
+          draggable={false}
+        />
+      ) : null}
+      {staticFloor ? (
+        // The floor owns a separate lower slot. Its authored surface aligns
+        // exactly with the unchanged character foot baseline.
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={staticFloor.imageUrl}
+          alt=""
+          aria-hidden="true"
+          className={`${styles.floor} ${styles.floorUnder}`}
+          style={{
+            width: 64 * staticFloor.imageScale * scale,
+            height: 64 * staticFloor.imageScale * scale,
+            top: floorRise,
+          }}
+          draggable={false}
+        />
+      ) : null}
+      {itemSpritePath && equippedFloor === "trampoline" ? (
+        // The official trampoline sheets combine character and floor. This
+        // extracted shared floor preserves composition with complete props.
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src="/creatures/slimes/official/shared/trampoline-floor.png"
+          alt=""
+          aria-hidden="true"
+          className={styles.floorUnder}
+          style={{ width: 64 * 4 * scale, height: 64 * 4 * scale }}
+          draggable={false}
+        />
+      ) : null}
       {itemSpritePath ? (
         // Older shop props are authored as complete looping GIFs. Render the
         // persisted prop in the same viewport while keeping the semantic
@@ -193,7 +236,7 @@ export function OfficialSlimeSprite({
           className={styles.sheet}
           style={{
             width: "100%",
-            height: "100%",
+            height: frame.sourceSize.h * scale,
             objectFit: "contain",
             zIndex: 1,
           }}
@@ -201,19 +244,6 @@ export function OfficialSlimeSprite({
         />
       ) : (
         <>
-          {puddleAsset && puddleFrame ? (
-            // The slime interaction sheet contains only the character. The
-            // shared puddle sheet is authored separately and plays in sync.
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={puddleAsset.sheetUrl}
-              alt=""
-              aria-hidden="true"
-              className={styles.puddle}
-              style={puddleStyle}
-              draggable={false}
-            />
-          ) : null}
           {/* The raw packed sheet is intentionally not a Next Image. */}
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
@@ -239,22 +269,6 @@ export function OfficialSlimeSprite({
           ) : null}
         </>
       )}
-      {staticFloor ? (
-        // Grass is a static composition layer. It deliberately comes after
-        // every character path so its foreground pixels cover the feet.
-        // eslint-disable-next-line @next/next/no-img-element
-        <img
-          src={staticFloor.imageUrl}
-          alt=""
-          aria-hidden="true"
-          className={styles.floor}
-          style={{
-            width: 64 * staticFloor.imageScale * scale,
-            height: 64 * staticFloor.imageScale * scale,
-          }}
-          draggable={false}
-        />
-      ) : null}
     </div>
   );
 }

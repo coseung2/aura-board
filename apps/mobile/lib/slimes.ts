@@ -24,8 +24,8 @@ export const SLIME_COLOR_SWATCHES: Record<SlimeColor, string> = {
 
 export const SLIME_STAGE_LABELS: Record<1 | 2 | 3, string> = {
   1: "기본",
-  2: "금 왕관 · 빨강 보석",
-  3: "은 왕관 · 파랑 보석",
+  2: "은 왕관 · 파랑 보석",
+  3: "금 왕관 · 빨강 보석",
 };
 
 export type SlimeGrowth = {
@@ -34,6 +34,14 @@ export type SlimeGrowth = {
   growthAppliedSpeedBps: number;
   remainingSeconds: number;
   remainingMinutes: number;
+};
+
+export type MobileSlimeEffect = {
+  source: string;
+  key: string;
+  label: string;
+  effectKey: string;
+  bps: number;
 };
 
 export type SlimeCatalogItem = {
@@ -61,7 +69,6 @@ export const SLIME_SHOP_NAV_ITEMS: readonly { key: SlimeShopFilter; label: strin
   { key: "floor", label: "바닥" },
   { key: "food", label: "먹이" },
   { key: "prop", label: "소품" },
-  { key: "level-up", label: "레벨업" },
 ];
 
 export const SLIME_COOKIE_ITEM_KEY = "slime-cookie";
@@ -97,6 +104,8 @@ export type MobileSlimeHome = {
   shopCatalog: SlimeShopItem[];
   growthSpeedBps: number;
   growthByColor: Partial<Record<SlimeColor, SlimeGrowth>>;
+  effects: { breakdown: MobileSlimeEffect[] };
+  walkingTitle: MobileWalkingTitle | null;
 };
 
 export type MobileSlimeClassmate = {
@@ -178,6 +187,30 @@ function normalizeGrowth(value: unknown): SlimeGrowth {
     ),
     remainingSeconds: Math.max(0, Math.trunc(numberValue(item.remainingSeconds))),
     remainingMinutes: Math.max(0, Math.trunc(numberValue(item.remainingMinutes))),
+  };
+}
+
+function normalizeEffects(value: unknown): { breakdown: MobileSlimeEffect[] } {
+  if (!isRecord(value) || !Array.isArray(value.breakdown)) return { breakdown: [] };
+  return {
+    breakdown: value.breakdown.flatMap((entry) => {
+      if (
+        !isRecord(entry) ||
+        typeof entry.source !== "string" ||
+        typeof entry.key !== "string" ||
+        typeof entry.label !== "string" ||
+        typeof entry.effectKey !== "string"
+      ) {
+        return [];
+      }
+      return [{
+        source: entry.source,
+        key: entry.key,
+        label: entry.label,
+        effectKey: entry.effectKey,
+        bps: Math.max(0, Math.trunc(numberValue(entry.bps))),
+      }];
+    }),
   };
 }
 
@@ -307,6 +340,8 @@ export function normalizeSlimeHome(payload: unknown): MobileSlimeHome {
     shopCatalog: normalizeShopCatalog(value.shopCatalog),
     growthSpeedBps: Math.max(0, Math.trunc(numberValue(value.growthSpeedBps))),
     growthByColor,
+    effects: normalizeEffects(value.effects),
+    walkingTitle: walkingTitle(value.walkingTitle),
   };
 }
 
@@ -363,6 +398,12 @@ export function calculateSlimeGrowthPercent(
   );
 }
 
+/** Stage one uses the catalog base buff; later stages double it each time. */
+export function slimeBuffBpsForStage(baseBuffBps: number, stage: 1 | 2 | 3): number {
+  const base = Number.isFinite(baseBuffBps) ? Math.max(0, Math.round(baseBuffBps)) : 0;
+  return stage === 3 ? base * 4 : stage === 2 ? base * 2 : base;
+}
+
 export function calculateGrowthTimeComparison(
   remainingEffectiveSeconds: number,
   growthSpeedBps: number,
@@ -383,8 +424,8 @@ export function formatGrowthHours(seconds: number): string {
 }
 
 export function evolutionForStage(stage: 1 | 2 | 3): SlimeEvolution {
-  if (stage === 3) return "silver-crown-blue-gem";
-  if (stage === 2) return "gold-crown-red-gem";
+  if (stage === 3) return "gold-crown-red-gem";
+  if (stage === 2) return "silver-crown-blue-gem";
   return "base";
 }
 

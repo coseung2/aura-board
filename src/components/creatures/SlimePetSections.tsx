@@ -1,6 +1,6 @@
 import { useState } from "react";
 
-import { formatBpsPercent, type calculateCatalogSlimeEffects } from "@/lib/pets/math";
+import { formatBpsPercent, slimeBuffBpsForStage, type calculateCatalogSlimeEffects } from "@/lib/pets/math";
 import {
   SLIME_SHARED_ASSETS,
   type EquippedFloor,
@@ -122,6 +122,7 @@ export function SlimeCollectionSection({
             .map((itemKey) => shopCatalog.find((item) => item.key === itemKey))
             .filter((item): item is SlimeShopItem => Boolean(item));
           const growth = growthByColor[slime.color];
+          const stageBuffBps = slimeBuffBpsForStage(slime.baseBuffBps, growth?.stage);
           const growthPercent = growth
             ? calculateSlimeGrowthPercent(growth)
             : null;
@@ -135,10 +136,10 @@ export function SlimeCollectionSection({
           const drinkItem = assignedItems.find((item) => item.category === "drink");
           const hasInteractiveFloor = floor === "water-puddle" || floor === "trampoline";
           const hasPassiveDrink = Boolean(drinkItem);
-          const passiveAction: SlimeAction = hasInteractiveFloor
-            ? "floor-interaction"
-            : hasPassiveDrink
-              ? "drink"
+          const passiveAction: SlimeAction = hasPassiveDrink
+            ? "drink"
+            : hasInteractiveFloor
+              ? "floor-interaction"
               : "idle";
           const manualAction = actionsByColor[slime.color];
           const action: SlimeAction = manualAction ?? passiveAction;
@@ -192,7 +193,7 @@ export function SlimeCollectionSection({
                     aria-hidden="true"
                   />
                   <span className={styles.visuallyHidden}>
-                    {EFFECT_LABELS[slime.effectKey]} +{formatBpsPercent(slime.baseBuffBps)}
+                    {EFFECT_LABELS[slime.effectKey]} +{formatBpsPercent(stageBuffBps)}
                   </span>
                 </button>
                 <div
@@ -205,7 +206,7 @@ export function SlimeCollectionSection({
                   <strong>활성 효과</strong>
                   <div className={styles.effectGroup}>
                     <span className={styles.effectGroupLabel}>펫 기본 효과</span>
-                    <span>{EFFECT_LABELS[slime.effectKey]} +{formatBpsPercent(slime.baseBuffBps)}</span>
+                    <span>{EFFECT_LABELS[slime.effectKey]} +{formatBpsPercent(stageBuffBps)}</span>
                   </div>
                   {accessoryEffects.length > 0 ? (
                     <div className={styles.effectGroup}>
@@ -221,9 +222,16 @@ export function SlimeCollectionSection({
                   ) : null}
                 </div>
               </div>
-              <span className={styles.ownedChip}>
-                {representativeColor === slime.color ? "대표" : "보유 중"}
-              </span>
+              <button
+                type="button"
+                className={`${styles.representativeStar} ${representativeColor === slime.color ? styles.representativeStarSelected : ""}`}
+                disabled={busyRepresentative !== null || representativeColor === slime.color}
+                onClick={() => onSetRepresentative(slime.color)}
+                aria-label={representativeColor === slime.color ? `${slime.nameKo} 대표 펫` : `${slime.nameKo}을 대표 펫으로 지정`}
+                title={representativeColor === slime.color ? "대표 펫" : "대표로 지정"}
+              >
+                <span aria-hidden="true">★</span>
+              </button>
               <div className={styles.spriteFrame}>
                 <SlimeCharacterSprite
                   slime={slime}
@@ -294,6 +302,14 @@ export function SlimeCollectionSection({
                 ) : null}
               </div>
               <div className={styles.slimeActions}>
+                <button
+                  type="button"
+                  className={styles.wardrobeButton}
+                  onClick={(event) => onOpenWardrobe(slime.color, event.currentTarget)}
+                  aria-label={`${slime.nameKo} 꾸미기`}
+                >
+                  꾸미기
+                </button>
                 <div
                   className={styles.slimeActionButtons}
                   role="group"
@@ -314,31 +330,11 @@ export function SlimeCollectionSection({
                   >
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img src={SLIME_SHARED_ASSETS.cookie.imageUrl} alt="" aria-hidden="true" />
-                    {cookieQuantity > 0 ? (
-                      <span className={styles.cookieQuantity} aria-hidden="true">
-                        {cookieQuantity}
-                      </span>
-                    ) : null}
+                    <span className={styles.cookieQuantity} aria-hidden="true">
+                      {cookieQuantity}
+                    </span>
                   </button>
                 </div>
-                {representativeColor !== slime.color ? (
-                  <button
-                    type="button"
-                    className={styles.representativeButton}
-                    disabled={busyRepresentative !== null}
-                    onClick={() => onSetRepresentative(slime.color)}
-                  >
-                    {busyRepresentative === slime.color ? "지정 중…" : "대표로 지정"}
-                  </button>
-                ) : null}
-                <button
-                  type="button"
-                  className={styles.wardrobeButton}
-                  onClick={(event) => onOpenWardrobe(slime.color, event.currentTarget)}
-                  aria-label={`${slime.nameKo} 꾸미기`}
-                >
-                  꾸미기
-                </button>
               </div>
             </li>
           );
