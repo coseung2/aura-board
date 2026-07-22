@@ -1,5 +1,4 @@
 import { NextResponse } from "next/server";
-import { db } from "@/lib/db";
 import {
   googleClient,
   exchangeGoogleAuthorizationCode,
@@ -62,7 +61,9 @@ function errRedirect(
   if (isMobile) return mobileRedirect({ error: code }, callbackUrl);
   // 학부모 OAuth 에러는 진입점(/parent/onboard/signup) 으로 되돌림.
   // /parent/auth 는 page.tsx 가 없는 디렉토리(callback route handler 만 존재).
-  const url = new URL(`/parent/onboard/signup?error=${code}`, req.url);
+  const url = new URL("/login", req.url);
+  url.searchParams.set("role", "parent");
+  url.searchParams.set("error", code);
   return NextResponse.redirect(url);
 }
 
@@ -119,7 +120,13 @@ export async function GET(
       );
     } else {
       const client = kakaoClient();
-      if (!client) return errRedirect(req, "provider_disabled", isMobile);
+      if (!client)
+        return errRedirect(
+          req,
+          "provider_disabled",
+          isMobile,
+          callbackUrl,
+        );
       const tokens = await client.validateAuthorizationCode(code);
       accessToken = tokens.accessToken();
     }
@@ -177,20 +184,5 @@ export async function GET(
   }
 
   // redirect 분기 — 활성/대기 자녀 link 있으면 dashboard, 없으면 onboard
-  const links = await db.parentChildLink.findMany({
-    where: {
-      parentId: result.parentId,
-      deletedAt: null,
-    },
-    select: { status: true, rejectedReason: true },
-  });
-  let dest = "/parent/onboard/match/code";
-  if (links.some((link) => link.status === "active" || link.status === "pending")) {
-    dest = "/parent/feed";
-  } else if (links.some((link) => link.status === "rejected")) {
-    const rejected = links.find((link) => link.status === "rejected");
-    const reason = rejected?.rejectedReason ?? "other";
-    dest = `/parent/onboard/rejected?reason=${encodeURIComponent(reason)}`;
-  }
-  return NextResponse.redirect(new URL(dest, req.url));
+  return NextResponse.redirect(new URL("/parent/home", req.url));
 }
