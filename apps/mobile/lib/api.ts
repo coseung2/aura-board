@@ -41,6 +41,42 @@ export function getApiBase(): string {
   return "https://aura-board.com";
 }
 
+type MobileExpoExtra = {
+  parentOAuthBaseUrl?: string;
+};
+
+function isLocalApiBase(value: string): boolean {
+  try {
+    const hostname = new URL(value).hostname;
+    return (
+      hostname === "127.0.0.1" ||
+      hostname === "localhost" ||
+      hostname === "10.0.2.2"
+    );
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Parent bearer tokens are issued by the OAuth origin, so native parent API
+ * calls must return to that same backend. Student development traffic can
+ * still use the local port-3000 server independently.
+ */
+export function getParentApiBase(): string {
+  if (Platform.OS === "web") return getApiBase();
+
+  const extra = Constants.expoConfig?.extra as MobileExpoExtra | undefined;
+  const configured =
+    process.env.EXPO_PUBLIC_PARENT_OAUTH_BASE_URL ?? extra?.parentOAuthBaseUrl;
+  if (configured) return configured.replace(/\/$/, "");
+
+  const apiBase = getApiBase();
+  return __DEV__ && isLocalApiBase(apiBase)
+    ? "https://aura-board.com"
+    : apiBase;
+}
+
 type FetchOpts = RequestInit & {
   json?: unknown;
   skipAuth?: boolean;
@@ -74,7 +110,8 @@ export async function apiFetch<T = unknown>(
     if (token) hdrs["Authorization"] = `Bearer ${token}`;
   }
 
-  const url = path.startsWith("http") ? path : `${getApiBase()}${path}`;
+  const baseUrl = parentAuth ? getParentApiBase() : getApiBase();
+  const url = path.startsWith("http") ? path : `${baseUrl}${path}`;
   const res = await fetch(url, {
     ...rest,
     headers: hdrs,

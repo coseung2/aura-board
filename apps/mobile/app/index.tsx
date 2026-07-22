@@ -38,7 +38,13 @@ import {
   saveSessionToken,
   saveStudentCache,
 } from "../lib/session";
-import { apiFetch, ApiError, getApiBase } from "../lib/api";
+import {
+  apiFetch,
+  ApiError,
+  getApiBase,
+  getParentApiBase,
+  parentApiFetch,
+} from "../lib/api";
 import { webSafeWidthStyle } from "../lib/responsive";
 import { LogoLockup } from "../components/LogoLockup";
 import {
@@ -58,46 +64,11 @@ type ParentOAuthProvider = "google" | "kakao";
 const PARENT_OAUTH_CALLBACK_PATH = "parent/auth/callback";
 const EXPO_GO_PHONE_CALLBACK =
   "exp://127.0.0.1:8081/--/parent/auth/callback";
-const DEFAULT_PARENT_OAUTH_BASE_URL = "https://aura-board.com";
 // Student join codes are fixed at six characters, but the server-side review
 // credential contract accepts any non-empty code up to 256 characters. Keep
 // the reviewer field aligned with that contract so short Expo Go codes (for
 // example, "367") are submitted instead of being rejected client-side.
 const PARENT_REVIEW_CODE_MAX_LENGTH = 256;
-
-type MobileExpoExtra = {
-  parentOAuthBaseUrl?: string;
-};
-
-function isLocalApiBase(value: string) {
-  try {
-    const hostname = new URL(value).hostname;
-    return (
-      hostname === "127.0.0.1" ||
-      hostname === "localhost" ||
-      hostname === "10.0.2.2"
-    );
-  } catch {
-    return false;
-  }
-}
-
-/**
- * OAuth state is set by the origin that starts the browser session. Local
- * mobile API traffic can stay on adb reverse, but the provider callback must
- * return to the same public origin configured on the server.
- */
-function getParentOAuthBase() {
-  const extra = Constants.expoConfig?.extra as MobileExpoExtra | undefined;
-  const configured =
-    process.env.EXPO_PUBLIC_PARENT_OAUTH_BASE_URL ?? extra?.parentOAuthBaseUrl;
-  if (configured) return configured.replace(/\/$/, "");
-
-  const apiBase = getApiBase();
-  return __DEV__ && isLocalApiBase(apiBase)
-    ? DEFAULT_PARENT_OAUTH_BASE_URL
-    : apiBase;
-}
 
 const PARENT_OAUTH_ERROR_MESSAGES: Record<string, string> = {
   provider_disabled:
@@ -244,8 +215,7 @@ export default function Landing() {
   }
 
   async function handleParentOAuth(provider: ParentOAuthProvider) {
-    const oauthBase =
-      Platform.OS === "web" ? getApiBase() : getParentOAuthBase();
+    const oauthBase = getParentApiBase();
     const url = new URL(`/api/parent/auth/${provider}`, oauthBase);
     const isExpoGoPhysicalAndroid =
       Platform.OS === "android" &&
@@ -319,7 +289,10 @@ export default function Landing() {
     setParentLoading(true);
     setParentError(null);
     try {
-      const result = await apiFetch<{ success: boolean; sessionToken: string }>(
+      const result = await parentApiFetch<{
+        success: boolean;
+        sessionToken: string;
+      }>(
         "/api/parent/review-login",
         {
           method: "POST",
