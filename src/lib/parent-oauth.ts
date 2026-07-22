@@ -85,6 +85,19 @@ export async function exchangeGoogleAuthorizationCode(
   code: string,
   codeVerifier: string,
 ): Promise<string> {
+  const client = googleClient();
+  if (!client) throw new Error("google_provider_disabled");
+
+  // Production previously used Arctic's confidential-client exchange, which
+  // authenticates with HTTP Basic. Keep that proven path in production. The
+  // plain string body remains only for local Next.js development, where the
+  // patched fetch runtime can consume Arctic's Request body before Undici
+  // sends it.
+  if (process.env.NODE_ENV === "production") {
+    const tokens = await client.validateAuthorizationCode(code, codeVerifier);
+    return tokens.accessToken();
+  }
+
   const credentials = googleCredentials();
   if (!credentials) throw new Error("google_provider_disabled");
 
