@@ -40,7 +40,7 @@ export function ParentTopNav({
     try {
       const response = await fetch("/api/parent/logout", { method: "POST" });
       if (!response.ok) throw new Error(`status ${response.status}`);
-      router.replace("/login?role=parent&error=logged_out");
+      router.replace("/login");
       router.refresh();
     } catch (error) {
       console.error("[ParentTopNav] logout failed", error);

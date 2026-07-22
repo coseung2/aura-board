@@ -30,7 +30,7 @@ export function ParentAccountActions({ initialLinks }: Props) {
         credentials: "same-origin",
       });
       if (!res.ok) throw new Error(`status ${res.status}`);
-      router.replace("/login?role=parent&error=logged_out");
+      router.replace("/login");
     } catch (e) {
       console.error("[ParentAccountActions] logout", e);
       setError("로그아웃에 실패했습니다. 잠시 후 다시 시도해 주세요.");
