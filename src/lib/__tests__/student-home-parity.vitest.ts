@@ -60,7 +60,7 @@ describe("student mobile navigation parity", () => {
     ]);
     expect(studentOptionalNavTargets.map((target) => target.id)).toEqual([
       "wallet",
-      "canva",
+      "slime",
       "notifications",
     ]);
   });

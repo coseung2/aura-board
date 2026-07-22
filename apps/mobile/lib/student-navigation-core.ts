@@ -55,7 +55,7 @@ export const studentBaseNavTargets: StudentNavTarget[] = [
 
 export const studentOptionalNavTargets: StudentNavTarget[] = [
   { id: "wallet", label: "통장", emoji: "💳", href: "/(student)/wallet", pathname: "/wallet" },
-  { id: "canva", label: "Canva", emoji: "🎨", href: "/(student)/canva", pathname: "/canva" },
+  { id: "slime", label: "펫", emoji: "🐾", href: "/(student)/slime?section=mine", pathname: "/slime" },
   { id: "notifications", label: "알림", emoji: "🔔", href: "/(student)/notifications", pathname: "/notifications" },
 ];
 

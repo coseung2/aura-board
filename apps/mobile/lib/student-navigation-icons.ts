@@ -9,7 +9,7 @@ import {
   Home,
   Landmark,
   MoreHorizontal,
-  Palette,
+  PawPrint,
   PiggyBank,
   Presentation,
   ShoppingCart,
@@ -25,7 +25,7 @@ const targetIcons: Record<string, LucideIcon> = {
   walking: Footprints,
   more: MoreHorizontal,
   wallet: PiggyBank,
-  canva: Palette,
+  slime: PawPrint,
   notifications: Bell,
 };
 
