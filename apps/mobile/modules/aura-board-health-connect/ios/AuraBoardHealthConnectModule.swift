@@ -8,7 +8,6 @@ private let maximumReadDays = 31
 public final class AuraBoardHealthConnectModule: Module {
   private let healthStore = HKHealthStore()
   private let stepType = HKQuantityType.quantityType(forIdentifier: .stepCount)!
-  private let distanceType = HKQuantityType.quantityType(forIdentifier: .distanceWalkingRunning)!
 
   public func definition() -> ModuleDefinition {
     Name("AuraBoardHealthConnect")
@@ -34,7 +33,7 @@ public final class AuraBoardHealthConnectModule: Module {
 
         // HealthKit deliberately does not disclose individual read grants.
         // `unnecessary` means the authorization request was already handled.
-        promise.resolve(status == .shouldRequest ? [] : ["steps", "distance"])
+        promise.resolve(status == .shouldRequest ? [] : ["steps"])
       }
     }
 
@@ -52,7 +51,7 @@ public final class AuraBoardHealthConnectModule: Module {
           promise.reject("HEALTH_CONNECT_PERMISSION_REQUIRED", error.localizedDescription)
           return
         }
-        promise.resolve(success ? ["steps", "distance"] : [])
+        promise.resolve(success ? ["steps"] : [])
       }
     }.runOnQueue(.main)
 
@@ -85,7 +84,7 @@ public final class AuraBoardHealthConnectModule: Module {
   }
 
   private var requiredTypes: Set<HKObjectType> {
-    [stepType, distanceType]
+    [stepType]
   }
 
   private func readDailyStats(startDay: String, endDay: String) async throws -> [[String: Any]] {
@@ -114,12 +113,10 @@ public final class AuraBoardHealthConnectModule: Module {
             let dayEnd = calendar.date(byAdding: .day, value: 1, to: dayStart) else {
         throw WalkingHealthModuleError.invalidDateRange
       }
-      async let steps = self.quantitySum(for: self.stepType, unit: .count(), start: dayStart, end: dayEnd)
-      async let distance = self.quantitySum(for: self.distanceType, unit: .meter(), start: dayStart, end: dayEnd)
       return [
         "day": formatter.string(from: dayStart),
-        "steps": try await steps,
-        "distanceMeters": try await distance
+        "steps": try await self.quantitySum(for: self.stepType, unit: .count(), start: dayStart, end: dayEnd),
+        "distanceMeters": 0.0
       ]
     }
   }

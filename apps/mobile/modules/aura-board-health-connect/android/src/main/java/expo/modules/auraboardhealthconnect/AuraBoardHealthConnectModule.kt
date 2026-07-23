@@ -8,7 +8,6 @@ import android.os.RemoteException
 import androidx.health.connect.client.HealthConnectClient
 import androidx.health.connect.client.PermissionController
 import androidx.health.connect.client.permission.HealthPermission
-import androidx.health.connect.client.records.DistanceRecord
 import androidx.health.connect.client.records.StepsRecord
 import androidx.health.connect.client.request.AggregateGroupByDurationRequest
 import androidx.health.connect.client.time.TimeRangeFilter
@@ -46,8 +45,7 @@ private class HealthConnectPermissionsContract :
 
 class AuraBoardHealthConnectModule : Module() {
   private val requiredPermissions = setOf(
-    HealthPermission.getReadPermission(StepsRecord::class),
-    HealthPermission.getReadPermission(DistanceRecord::class)
+    HealthPermission.getReadPermission(StepsRecord::class)
   )
 
   private lateinit var permissionsLauncher:
@@ -123,9 +121,6 @@ class AuraBoardHealthConnectModule : Module() {
     if (granted.contains(HealthPermission.getReadPermission(StepsRecord::class))) {
       add("steps")
     }
-    if (granted.contains(HealthPermission.getReadPermission(DistanceRecord::class))) {
-      add("distance")
-    }
   }
 
   private suspend fun readDailyStats(
@@ -161,7 +156,7 @@ class AuraBoardHealthConnectModule : Module() {
     val grouped = try {
       client.aggregateGroupByDuration(
         AggregateGroupByDurationRequest(
-          metrics = setOf(StepsRecord.COUNT_TOTAL, DistanceRecord.DISTANCE_TOTAL),
+          metrics = setOf(StepsRecord.COUNT_TOTAL),
           timeRangeFilter = TimeRangeFilter.between(
             startDay.atStartOfDay(zoneId).toInstant(),
             endDay.plusDays(1).atStartOfDay(zoneId).toInstant()
@@ -189,7 +184,7 @@ class AuraBoardHealthConnectModule : Module() {
       mapOf<String, Any>(
         "day" to day.toString(),
         "steps" to (result?.get(StepsRecord.COUNT_TOTAL) ?: 0L),
-        "distanceMeters" to (result?.get(DistanceRecord.DISTANCE_TOTAL)?.inMeters ?: 0.0)
+        "distanceMeters" to 0.0
       )
     }
   }

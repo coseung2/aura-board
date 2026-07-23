@@ -65,8 +65,14 @@ const syncSchema = z.object({
   // Accepting a single-day alias costs nothing and makes a calendar tap easy
   // for clients that do not need to allocate an array.
   attendanceDay: walkingDaySchema.optional(),
+  attendanceVisit: z.literal(true).optional(),
 }).superRefine((value, context) => {
-  if (!value.rows?.length && !value.attendanceDays?.length && !value.attendanceDay) {
+  if (
+    !value.rows?.length &&
+    !value.attendanceDays?.length &&
+    !value.attendanceDay &&
+    !value.attendanceVisit
+  ) {
     context.addIssue({
       code: z.ZodIssueCode.custom,
       path: ["rows"],
@@ -80,6 +86,9 @@ type RawWalkingRow = {
   steps: number;
   distanceMeters: number;
   syncedAt: Date | string;
+  attendanceVisitedAt?: Date | string | null;
+  attendanceMonth?: string | null;
+  attendanceOrdinal?: number | null;
   attendanceCompletedAt?: Date | string | null;
 };
 
@@ -117,6 +126,9 @@ type MonthlyAttendanceReward = {
   month: string;
   monthDays: number;
   attendanceCount: number;
+  visitCount: number;
+  claimedOrdinals: number[];
+  claimableAttendance: Array<{ ordinal: number; day: string }>;
   /** Dates the student has explicitly checked in during this month. */
   attendanceDays: string[];
   /** Synced, non-future dates that can still be checked in. */
@@ -184,6 +196,9 @@ async function readRows(studentId: string, window: WalkingReadWindow) {
       "steps",
       "distanceMeters",
       "syncedAt",
+      "attendanceVisitedAt",
+      "attendanceMonth",
+      "attendanceOrdinal",
       "attendanceCompletedAt"
     FROM "StudentWalkingDailyStat"
     WHERE "studentId" = ${studentId}
@@ -192,6 +207,7 @@ async function readRows(studentId: string, window: WalkingReadWindow) {
     ORDER BY "day" ASC
   `);
 
+  const legacyOrdinalByDay = new Map<string, number>();
   return rows.map((row) => {
     const syncedAt =
       row.syncedAt instanceof Date
@@ -213,11 +229,30 @@ async function readRows(studentId: string, window: WalkingReadWindow) {
         : row.attendanceCompletedAt instanceof Date
           ? row.attendanceCompletedAt.toISOString()
           : new Date(row.attendanceCompletedAt).toISOString();
+    const attendanceVisitedAt =
+      row.attendanceVisitedAt == null
+        ? attendanceCompletedAt
+        : row.attendanceVisitedAt instanceof Date
+          ? row.attendanceVisitedAt.toISOString()
+          : new Date(row.attendanceVisitedAt).toISOString();
+    const day = toDayKey(row.day);
+    if (
+      attendanceVisitedAt &&
+      row.attendanceOrdinal == null &&
+      !legacyOrdinalByDay.has(day)
+    ) {
+      legacyOrdinalByDay.set(day, legacyOrdinalByDay.size + 1);
+    }
     return {
-      day: toDayKey(row.day),
+      day,
       steps: Number(row.steps) || 0,
       distanceMeters: Number(row.distanceMeters) || 0,
       syncedAt,
+      attendanceVisitedAt,
+      attendanceMonth:
+        row.attendanceMonth ?? (attendanceVisitedAt ? day.slice(0, 7) : null),
+      attendanceOrdinal:
+        row.attendanceOrdinal ?? legacyOrdinalByDay.get(day) ?? null,
       attendanceCompletedAt,
     };
   });
@@ -234,6 +269,9 @@ function buildMonthlyAttendanceReward(
   rows: Array<{
     day: string;
     attendanceCompletedAt?: string | null;
+    attendanceVisitedAt?: string | null;
+    attendanceMonth?: string | null;
+    attendanceOrdinal?: number | null;
     syncedAt?: string | null;
   }>,
   paidByOrdinal: ReadonlyMap<number, number>,
@@ -244,27 +282,50 @@ function buildMonthlyAttendanceReward(
   const attendanceDays = attendanceDaysInOrder(
     monthRows.filter((row) => row.attendanceCompletedAt != null),
   );
-  const eligibleAttendanceDays = attendanceDaysInOrder(
-    monthRows.filter(
-      (row) => row.syncedAt != null && row.attendanceCompletedAt == null,
+  const attendanceRows = monthRows
+    .filter(
+      (row) =>
+        row.attendanceVisitedAt != null &&
+        row.attendanceOrdinal != null &&
+        row.attendanceOrdinal >= 1 &&
+        row.attendanceOrdinal <= WALKING_MONTHLY_ATTENDANCE_ORDINALS,
+    )
+    .sort((a, b) => (a.attendanceOrdinal ?? 0) - (b.attendanceOrdinal ?? 0));
+  const claimedOrdinals = [
+    ...new Set(
+      attendanceRows
+        .filter((row) => row.attendanceCompletedAt != null)
+        .map((row) => row.attendanceOrdinal as number),
     ),
-  );
-  const attendanceCount = Math.min(
-    WALKING_MONTHLY_ATTENDANCE_ORDINALS,
-    attendanceDays.length,
-  );
+  ];
+  const claimableAttendance = [
+    ...new Map(
+      attendanceRows
+        .filter((row) => row.attendanceCompletedAt == null)
+        .map((row) => [
+          row.attendanceOrdinal as number,
+          { ordinal: row.attendanceOrdinal as number, day: row.day },
+        ] as const),
+    ).values(),
+  ];
+  const eligibleAttendanceDays = claimableAttendance.map((entry) => entry.day);
+  const attendanceCount = claimedOrdinals.length;
+  const visitCount = new Set(
+    attendanceRows.map((row) => row.attendanceOrdinal as number),
+  ).size;
   const itemRewardOrdinal = WALKING_MONTHLY_ATTENDANCE_ITEM_ORDINAL;
   let cashEarned = 0;
   let cashPaid = 0;
-  for (let ordinal = 1; ordinal <= attendanceCount; ordinal += 1) {
+  for (const ordinal of claimedOrdinals) {
     if (ordinal === itemRewardOrdinal) continue;
     cashEarned += walkingMonthlyAttendanceRewardAmount(ordinal);
     cashPaid += paidByOrdinal.get(ordinal) ?? 0;
   }
   const nextOrdinal =
-    attendanceCount < WALKING_MONTHLY_ATTENDANCE_ORDINALS
-      ? attendanceCount + 1
-      : null;
+    claimableAttendance[0]?.ordinal ??
+    (visitCount < WALKING_MONTHLY_ATTENDANCE_ORDINALS
+      ? Math.max(0, ...attendanceRows.map((row) => row.attendanceOrdinal ?? 0)) + 1
+      : null);
   const nextOrdinalReward = nextOrdinal
     ? {
         ordinal: nextOrdinal,
@@ -279,6 +340,9 @@ function buildMonthlyAttendanceReward(
     month: monthRange.month,
     monthDays: WALKING_MONTHLY_ATTENDANCE_ORDINALS,
     attendanceCount,
+    visitCount,
+    claimedOrdinals,
+    claimableAttendance,
     attendanceDays: attendanceDays.slice(0, WALKING_MONTHLY_ATTENDANCE_ORDINALS),
     eligibleAttendanceDays: eligibleAttendanceDays.filter(
       (day) => !attendanceDays.includes(day),
@@ -287,7 +351,7 @@ function buildMonthlyAttendanceReward(
     cashPaid,
     nextOrdinalReward,
     itemRewardOrdinal,
-    itemEarned: attendanceCount >= itemRewardOrdinal,
+    itemEarned: claimedOrdinals.includes(itemRewardOrdinal),
   };
 }
 
@@ -297,6 +361,9 @@ async function readMonthlyAttendanceReward(
   rows?: Array<{
     day: string;
     attendanceCompletedAt?: string | null;
+    attendanceVisitedAt?: string | null;
+    attendanceMonth?: string | null;
+    attendanceOrdinal?: number | null;
     syncedAt?: string | null;
   }>,
 ): Promise<MonthlyAttendanceReward> {
@@ -482,6 +549,9 @@ export async function POST(request: NextRequest) {
     const attendanceDays = [...new Set(requestedAttendanceDays)].sort((a, b) =>
       a.localeCompare(b),
     );
+    const attendanceVisitDay = parsed.data.attendanceVisit
+      ? getWalkingDayKey()
+      : null;
 
     if (
       rows.some((row) => row.day < minDay || row.day > maxDay) ||
@@ -492,7 +562,13 @@ export async function POST(request: NextRequest) {
 
     const { accountId } = await ensureAccountFor(student);
     const sortedRows = [...rows].sort((a, b) => a.day.localeCompare(b.day));
-    const touchedDays = [...new Set([...sortedRows.map((row) => row.day), ...attendanceDays])];
+    const touchedDays = [
+      ...new Set([
+        ...sortedRows.map((row) => row.day),
+        ...attendanceDays,
+        ...(attendanceVisitDay ? [attendanceVisitDay] : []),
+      ]),
+    ];
     const monthRanges = [
       ...new Map(
         touchedDays.map((day) => {
@@ -569,22 +645,97 @@ export async function POST(request: NextRequest) {
               `);
             }
 
+            if (attendanceVisitDay) {
+              const attendanceMonth = attendanceVisitDay.slice(0, 7);
+              await tx.$executeRaw(Prisma.sql`
+                SELECT pg_advisory_xact_lock(
+                  hashtext(${student.id}),
+                  hashtext(${attendanceMonth})
+                )
+              `);
+              await tx.$executeRaw(Prisma.sql`
+                WITH next_ordinal AS (
+                  SELECT COALESCE(MAX("attendanceOrdinal"), 0) + 1 AS ordinal
+                  FROM "StudentWalkingDailyStat"
+                  WHERE "studentId" = ${student.id}
+                    AND "attendanceMonth" = ${attendanceMonth}
+                )
+                INSERT INTO "StudentWalkingDailyStat" (
+                  "id",
+                  "studentId",
+                  "day",
+                  "steps",
+                  "distanceMeters",
+                  "source",
+                  "syncedAt",
+                  "attendanceVisitedAt",
+                  "attendanceMonth",
+                  "attendanceOrdinal",
+                  "createdAt",
+                  "updatedAt"
+                ) SELECT
+                  ${randomUUID()},
+                  ${student.id},
+                  ${attendanceVisitDay}::date,
+                  0,
+                  0,
+                  'app_visit',
+                  CURRENT_TIMESTAMP,
+                  CURRENT_TIMESTAMP,
+                  ${attendanceMonth},
+                  ordinal,
+                  CURRENT_TIMESTAMP,
+                  CURRENT_TIMESTAMP
+                FROM next_ordinal
+                WHERE ordinal <= ${WALKING_MONTHLY_ATTENDANCE_ORDINALS}
+                ON CONFLICT ("studentId", "day") DO UPDATE SET
+                  "attendanceVisitedAt" = COALESCE(
+                    "StudentWalkingDailyStat"."attendanceVisitedAt",
+                    CURRENT_TIMESTAMP
+                  ),
+                  "attendanceMonth" = COALESCE(
+                    "StudentWalkingDailyStat"."attendanceMonth",
+                    EXCLUDED."attendanceMonth"
+                  ),
+                  "attendanceOrdinal" = COALESCE(
+                    "StudentWalkingDailyStat"."attendanceOrdinal",
+                    EXCLUDED."attendanceOrdinal"
+                  ),
+                  "updatedAt" = CURRENT_TIMESTAMP
+              `);
+            }
+
             if (attendanceDays.length > 0) {
               const requestedDateSql = Prisma.join(
                 attendanceDays.map((day) => Prisma.sql`${day}::date`),
                 ", ",
               );
               const syncedAttendanceRows = await tx.$queryRaw<
-                Array<{ day: Date | string; attendanceCompletedAt: Date | string | null }>
+                Array<{
+                  day: Date | string;
+                  attendanceVisitedAt: Date | string | null;
+                  attendanceOrdinal: number | null;
+                  attendanceCompletedAt: Date | string | null;
+                }>
               >(Prisma.sql`
-                SELECT "day", "attendanceCompletedAt"
+                SELECT
+                  "day",
+                  "attendanceVisitedAt",
+                  "attendanceOrdinal",
+                  "attendanceCompletedAt"
                 FROM "StudentWalkingDailyStat"
                 WHERE "studentId" = ${student.id}
                   AND "day" IN (${requestedDateSql})
                 FOR UPDATE
               `);
               const syncedAttendanceDays = new Set(
-                syncedAttendanceRows.map((row) => toDayKey(row.day)),
+                syncedAttendanceRows
+                  .filter(
+                    (row) =>
+                      row.attendanceVisitedAt != null &&
+                      row.attendanceOrdinal != null,
+                  )
+                  .map((row) => toDayKey(row.day)),
               );
               const missingAttendanceDays = attendanceDays.filter(
                 (day) => !syncedAttendanceDays.has(day),
@@ -661,44 +812,37 @@ export async function POST(request: NextRequest) {
               }
             }
 
-            // Monthly attendance ordinals are assigned from distinct synced
-            // calendar dates in chronological order. Cookie milestones are
-            // granted in the same transaction as their attendance payout.
+            // Each visit receives a stable ordinal when it is first recorded.
+            // Claims may happen later or out of order without renumbering.
             for (const monthRange of monthRanges) {
               const monthRows = await tx.$queryRaw<
-                Array<{ day: Date | string; attendanceCompletedAt: Date | string | null }>
+                Array<{
+                  day: Date | string;
+                  attendanceOrdinal: number;
+                  attendanceCompletedAt: Date | string | null;
+                }>
               >(Prisma.sql`
-                SELECT "day", "attendanceCompletedAt"
+                SELECT "day", "attendanceOrdinal", "attendanceCompletedAt"
                 FROM "StudentWalkingDailyStat"
                 WHERE "studentId" = ${student.id}
-                  AND "day" >= ${monthRange.monthStart}::date
-                  AND "day" < ${monthRange.monthEnd}::date
+                  AND "attendanceMonth" = ${monthRange.month}
+                  AND "attendanceOrdinal" IS NOT NULL
                   AND "attendanceCompletedAt" IS NOT NULL
-                ORDER BY "day" ASC
+                ORDER BY "attendanceOrdinal" ASC
               `);
-              const attendedDays = attendanceDaysInOrder(
-                monthRows.map((row) => ({
-                  day: toDayKey(row.day),
-                  attendanceCompletedAt:
-                    row.attendanceCompletedAt instanceof Date
-                      ? row.attendanceCompletedAt.toISOString()
-                      : row.attendanceCompletedAt
-                        ? new Date(row.attendanceCompletedAt).toISOString()
-                        : null,
-                })),
-              );
-              const ordinalCount = Math.min(
-                WALKING_MONTHLY_ATTENDANCE_ORDINALS,
-                attendedDays.length,
-              );
-              for (let ordinal = 1; ordinal <= ordinalCount; ordinal += 1) {
+              for (const attendanceRow of monthRows) {
+                const ordinal = attendanceRow.attendanceOrdinal;
+                if (
+                  ordinal < 1 ||
+                  ordinal > WALKING_MONTHLY_ATTENDANCE_ORDINALS
+                ) continue;
                 if (ordinal === WALKING_MONTHLY_ATTENDANCE_ITEM_ORDINAL) continue;
                 const sourceRef = walkingMonthlyAttendanceSourceRef(
                   student.id,
                   monthRange.month,
                   ordinal,
                 );
-                const day = attendedDays[ordinal - 1];
+                const day = toDayKey(attendanceRow.day);
                 if (!rewardedRefs.has(sourceRef)) {
                   const amount = walkingMonthlyAttendanceRewardAmount(ordinal);
                   await awardActivityReward({

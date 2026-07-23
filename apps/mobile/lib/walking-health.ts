@@ -38,6 +38,9 @@ export type WalkingMonthlyAttendanceReward = {
   month: string;
   monthDays: number;
   attendanceCount: number;
+  visitCount?: number;
+  claimedOrdinals?: number[];
+  claimableAttendance?: Array<{ ordinal: number; day: string }>;
   attendanceDays?: string[];
   eligibleAttendanceDays?: string[];
   cashEarned: number;
@@ -93,7 +96,7 @@ export const DEFAULT_WALKING_POLICY: WalkingPolicy = {
   weeklyTiers: WALKING_WEEKLY_REWARD_TIERS.map((tier) => ({ ...tier })),
 };
 
-const REQUIRED_PERMISSIONS: HealthConnectPermission[] = ["steps", "distance"];
+const REQUIRED_PERMISSIONS: HealthConnectPermission[] = ["steps"];
 const MAX_STEPS_PER_DAY = 200_000;
 const MAX_DISTANCE_METERS_PER_DAY = 300_000;
 
@@ -115,7 +118,7 @@ const HEALTH_CONNECT_ERROR_MESSAGES: Record<WalkingHealthErrorCode, string> = {
     "Health Connect 업데이트가 필요해요. 업데이트 후 다시 시도해 주세요.",
   provider_error: "Health Connect에 연결하지 못했어요. 잠시 후 다시 시도해 주세요.",
   permission_required:
-    "걸음 수와 거리 권한이 필요해요. Health Connect 설정에서 권한을 허용해 주세요.",
+    "걸음 수 권한이 필요해요. Health Connect 설정에서 권한을 허용해 주세요.",
   rate_limited:
     "Health Connect 요청이 잠시 제한되었어요. 잠시 후 다시 시도해 주세요.",
   unknown: "Health Connect 요청에 실패했어요.",
@@ -375,9 +378,19 @@ export async function fetchWalkingSnapshot(_days?: number): Promise<WalkingRespo
 }
 
 export async function markWalkingAttendance(days: string[]) {
-  return apiFetch<WalkingResponse>("/api/student/walking", {
+  await apiFetch("/api/student/walking", {
     method: "POST",
     json: { attendanceDays: days },
+  });
+  // The mutation response is intentionally smaller than the GET snapshot and
+  // does not include policy/weekly reward fields required by the mission view.
+  return fetchWalkingSnapshot();
+}
+
+export async function recordWalkingAttendanceVisit() {
+  return apiFetch("/api/student/walking", {
+    method: "POST",
+    json: { attendanceVisit: true },
   });
 }
 
@@ -412,9 +425,9 @@ export async function readAndSyncWalkingDays(_days?: number) {
       rows: boundedNativeRows.map((row) => ({
         day: row.day,
         steps: row.steps,
-        distanceMeters:
-          Math.round(Math.min(MAX_DISTANCE_METERS_PER_DAY, row.distanceMeters) * 100) /
-          100,
+        // Keep the existing API/database contract compatible without requesting
+        // or reading a separate distance permission from the device.
+        distanceMeters: 0,
       })),
     },
   });

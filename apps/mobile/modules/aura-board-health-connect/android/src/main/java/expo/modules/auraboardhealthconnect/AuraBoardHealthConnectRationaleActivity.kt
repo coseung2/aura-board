@@ -38,8 +38,8 @@ class AuraBoardHealthConnectRationaleActivity : Activity() {
     })
 
     val sections = listOf(
-      "필요한 권한" to "걸음 수와 이동 거리만 읽습니다.",
-      "저장하는 정보" to "날짜별 걸음 수와 거리 합계만 저장합니다.",
+      "필요한 권한" to "걸음 수만 읽습니다.",
+      "저장하는 정보" to "날짜별 걸음 수 합계만 저장합니다.",
       "읽지 않는 정보" to "GPS 위치와 이동 경로는 읽거나 저장하지 않습니다.",
       "권한 관리" to "Health Connect 설정에서 언제든 권한을 바꿀 수 있습니다."
     )

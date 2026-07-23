@@ -721,10 +721,11 @@ model StudentWalkingDailyStat {
   distanceMeters Float    @default(0)
   source         String   @default("health_connect")
   syncedAt       DateTime @default(now())
-  // A Health Connect sync makes a date eligible, but the student must
-  // explicitly check in to the monthly attendance mission.  Keeping this
-  // marker on the synced row makes the transition idempotent and preserves
-  // the existing one-row-per-student/day constraint.
+  // Opening the student app makes one calendar day claimable. Claiming the
+  // corresponding monthly ordinal remains a separate, explicit action.
+  attendanceVisitedAt   DateTime?
+  attendanceMonth       String?
+  attendanceOrdinal     Int?
   attendanceCompletedAt DateTime?
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
@@ -732,6 +733,7 @@ model StudentWalkingDailyStat {
   student Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
 
   @@unique([studentId, day], map: "StudentWalkingDailyStat_studentId_day_key")
+  @@unique([studentId, attendanceMonth, attendanceOrdinal], map: "StudentWalkingDailyStat_attendance_ordinal_key")
   @@index([day], map: "StudentWalkingDailyStat_day_idx")
   @@index([studentId, syncedAt], map: "StudentWalkingDailyStat_studentId_syncedAt_idx")
 }

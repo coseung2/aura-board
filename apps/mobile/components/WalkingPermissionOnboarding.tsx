@@ -79,7 +79,7 @@ export function WalkingPermissionOnboarding({ studentId }: Props) {
 
       const permissions = await requestHealthConnectPermissions();
       if (!hasRequiredHealthConnectPermissions(permissions)) {
-        setMessage("걸음 수와 이동 거리 권한을 모두 허용해 주세요.");
+        setMessage("걸음 수 권한을 허용해 주세요.");
         return;
       }
       await dismiss();
@@ -108,11 +108,11 @@ export function WalkingPermissionOnboarding({ studentId }: Props) {
       <Text style={styles.description}>
         {needsUpdate
           ? "걸음 수를 불러오려면 Health Connect 업데이트가 필요해요."
-          : "걸음 수와 이동 거리의 날짜별 합계만 읽어요."}
+          : "날짜별 걸음 수 합계만 읽어요."}
       </Text>
       {!needsUpdate ? (
         <View style={styles.facts}>
-          <Text style={styles.fact}>필요한 권한: 걸음 수, 이동 거리</Text>
+          <Text style={styles.fact}>필요한 권한: 걸음 수</Text>
           <Text style={styles.fact}>읽지 않는 정보: 위치, 이동 경로</Text>
           <Text style={styles.fact}>권한은 언제든 Health Connect 설정에서 바꿀 수 있어요.</Text>
         </View>

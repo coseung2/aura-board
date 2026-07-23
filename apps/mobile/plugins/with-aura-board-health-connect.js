@@ -11,7 +11,7 @@ const MIN_ANDROID_SDK = 26;
 module.exports = function withAuraBoardHealthConnect(config) {
   config = withInfoPlist(config, (nextConfig) => {
     nextConfig.modResults.NSHealthShareUsageDescription =
-      "Aura Board는 날짜별 걸음 수와 이동 거리 합계를 보여 주기 위해 Apple 건강 데이터 접근 권한을 요청합니다.";
+      "Aura Board는 날짜별 걸음 수 합계를 보여 주기 위해 Apple 건강 데이터 접근 권한을 요청합니다.";
     return nextConfig;
   });
 

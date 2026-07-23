@@ -159,6 +159,42 @@ describe("GET /api/student/walking fixed KST week", () => {
     expect(body.monthlyAttendanceReward.cashPaid).toBe(0);
   });
 
+  it("keeps missed visit ordinals claimable after a later ordinal is claimed", async () => {
+    vi.setSystemTime(new Date("2026-07-23T03:00:00.000Z"));
+    mocks.queryRaw.mockResolvedValue([
+      {
+        day: "2026-07-20",
+        steps: 0,
+        distanceMeters: 0,
+        syncedAt: "2026-07-20T01:00:00.000Z",
+        attendanceVisitedAt: "2026-07-20T01:00:00.000Z",
+        attendanceMonth: "2026-07",
+        attendanceOrdinal: 1,
+        attendanceCompletedAt: null,
+      },
+      {
+        day: "2026-07-21",
+        steps: 0,
+        distanceMeters: 0,
+        syncedAt: "2026-07-21T01:00:00.000Z",
+        attendanceVisitedAt: "2026-07-21T01:00:00.000Z",
+        attendanceMonth: "2026-07",
+        attendanceOrdinal: 2,
+        attendanceCompletedAt: "2026-07-22T01:00:00.000Z",
+      },
+    ]);
+
+    const response = await GET(new NextRequest("http://localhost/api/student/walking"));
+    const body = await response.json();
+
+    expect(body.monthlyAttendanceReward).toMatchObject({
+      attendanceCount: 1,
+      visitCount: 2,
+      claimedOrdinals: [2],
+      claimableAttendance: [{ ordinal: 1, day: "2026-07-20" }],
+    });
+  });
+
   it("reports chronological attendance and paid cash without claiming an item grant", async () => {
     vi.setSystemTime(new Date("2026-07-23T03:00:00.000Z"));
     mocks.queryRaw.mockResolvedValue([

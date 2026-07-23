@@ -22,6 +22,7 @@ export const colors = {
   border: "rgba(24, 74, 92, 0.14)",
   borderHover: "rgba(24, 74, 92, 0.23)",
   onAccent: "#ffffff",
+  statusOnline: "#22c55e",
   overlay: "rgba(24, 49, 63, 0.42)",
   modalBackdrop: "rgba(15, 23, 42, 0.48)",
   surfaceGlass: "rgba(255, 255, 255, 0.82)",

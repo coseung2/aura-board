@@ -8,6 +8,7 @@ import type { MeResponse } from "../../lib/types";
 import { StudentBottomNav } from "../../components/StudentBottomNav";
 import { WalkingPermissionOnboarding } from "../../components/WalkingPermissionOnboarding";
 import { DailyBannerProvider } from "../../components/DailyBanner";
+import { recordWalkingAttendanceVisit } from "../../lib/walking-health";
 
 // Student segment 전체 공통 layout.
 export default function StudentLayout() {
@@ -24,6 +25,7 @@ export default function StudentLayout() {
     try {
       const res = await apiFetch<MeResponse>("/api/student/me");
       setMe(res);
+      void recordWalkingAttendanceVisit().catch(() => undefined);
     } catch (e) {
       setMe(null);
       if (e instanceof ApiError && e.status === 401) {

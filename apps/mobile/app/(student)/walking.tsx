@@ -11,7 +11,7 @@ import {
 } from "react-native";
 import { useFocusEffect, useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { Footprints, ShieldCheck } from "lucide-react-native";
+import { Footprints, Settings } from "lucide-react-native";
 import { apiFetch, ApiError } from "../../lib/api";
 import { clearSessionToken, getUnifiedLoginRoute } from "../../lib/session";
 import {
@@ -51,6 +51,7 @@ import {
 import {
   AppButton,
   AppHeader,
+  AppModal,
   ControlPressable,
   SectionHeader,
 } from "../../components/ui";
@@ -62,11 +63,6 @@ import { StudentHeaderActions } from "../../components/StudentHeaderActions";
 import { WalkingAttendanceCalendar } from "../../components/walking-attendance-calendar";
 
 const numberFormatter = new Intl.NumberFormat("ko-KR");
-const distanceFormatter = new Intl.NumberFormat("ko-KR", {
-  minimumFractionDigits: 1,
-  maximumFractionDigits: 1,
-});
-
 const FOREGROUND_SYNC_INTERVAL_MS = 60_000;
 
 type WalkingView = "record" | "missions";
@@ -116,6 +112,7 @@ export default function StudentWalkingScreen() {
   const [busy, setBusy] = useState<"connect" | "sync" | "settings" | "attendance" | null>(null);
   const silentSyncInFlight = useRef(false);
   const [activeView, setActiveView] = useState<WalkingView>("record");
+  const [settingsVisible, setSettingsVisible] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -309,10 +306,6 @@ export default function StudentWalkingScreen() {
     (sum, row) => (row.day <= weekRange.today ? sum + row.steps : sum),
     0,
   );
-  const totalDistance = days.reduce(
-    (sum, row) => (row.day <= weekRange.today ? sum + row.distanceMeters : sum),
-    0,
-  );
   const averageSteps = Math.round(totalSteps / days.length);
   const maxSteps = Math.max(
     1,
@@ -338,6 +331,7 @@ export default function StudentWalkingScreen() {
           : connected
             ? `${healthServiceName} 연결됨`
             : `${healthServiceName} 연결 필요`;
+  const compactConnectionLabel = connected ? "연결됨" : "연결 필요";
 
   return (
     <SafeAreaView style={styles.container} edges={["top"]}>
@@ -352,59 +346,23 @@ export default function StudentWalkingScreen() {
           />
         }
       >
-        <View style={styles.connectionSection}>
-          <SectionHeader
-            title="걸음 수 연결"
-            titleAccessory={
-              <ShieldCheck size={iconSizes.md} color={colors.accent} accessible={false} />
-            }
+        <View style={styles.connectionOverlay}>
+          <View
+            style={[
+              styles.connectionDot,
+              connected && styles.connectionDotConnected,
+            ]}
           />
-          <Text style={styles.connectionStatus}>{connectionLabel}</Text>
+          <Text style={styles.connectionOverlayText}>{compactConnectionLabel}</Text>
+          <ControlPressable
+            style={styles.connectionSettingsButton}
+            hitSlop={spacing.sm}
+            onPress={() => setSettingsVisible(true)}
+            accessibilityLabel="걷기 연동 설정"
+          >
+            <Settings size={iconSizes.sm} color={colors.textMuted} accessible={false} />
+          </ControlPressable>
         </View>
-
-        {status === "available" && !connected ? (
-          <View style={styles.buttonRow}>
-            <AppButton
-              loading={busy === "connect"}
-              style={styles.flexButton}
-              onPress={() => void connect()}
-              accessibilityLabel="Health Connect 연결"
-            >
-              권한 연결
-            </AppButton>
-            <AppButton
-              variant="secondary"
-              style={styles.flexButton}
-              loading={busy === "settings"}
-              onPress={() => void openSettings()}
-              accessibilityLabel="Health Connect 권한 관리"
-            >
-              {Platform.OS === "ios" ? "iPhone 설정" : "설정 열기"}
-            </AppButton>
-          </View>
-        ) : null}
-
-        {status === "available" && connected ? (
-          <View style={styles.buttonRow}>
-            <AppButton
-              loading={busy === "sync"}
-              style={styles.flexButton}
-              onPress={() => void sync()}
-            >
-              지금 동기화
-            </AppButton>
-            <AppButton
-              variant="secondary"
-              style={styles.flexButton}
-              loading={busy === "settings"}
-              onPress={() => void openSettings()}
-              accessibilityLabel="Health Connect 권한 관리"
-            >
-              {Platform.OS === "ios" ? "iPhone 설정" : "설정 열기"}
-            </AppButton>
-          </View>
-        ) : null}
-
         <SemanticNav
           variant="standalone"
           accessibilityLabel="걷기 활동 보기"
@@ -497,12 +455,7 @@ export default function StudentWalkingScreen() {
                   label={`이번 주 · ${weekRangeLabel(weekRange.weekStart, weekRange.weekEnd)}`}
                   value={`${numberFormatter.format(totalSteps)}걸음`}
                 />
-                <SummaryRow label="하루 평균" value={`${numberFormatter.format(averageSteps)}걸음`} />
-                <SummaryRow
-                  label="이동 거리"
-                  value={`${distanceFormatter.format(totalDistance / 1000)}km`}
-                  last
-                />
+                <SummaryRow label="하루 평균" value={`${numberFormatter.format(averageSteps)}걸음`} last />
               </View>
             </View>
 
@@ -572,6 +525,37 @@ export default function StudentWalkingScreen() {
           />
         )}
       </ScrollView>
+      <AppModal
+        visible={settingsVisible}
+        onClose={() => setSettingsVisible(false)}
+        closeOnBackdropPress
+        accessibilityLabel="걷기 연동 설정"
+        sheetStyle={styles.settingsSheet}
+      >
+        <Text style={styles.settingsTitle}>걷기 연동 설정</Text>
+        <Text style={styles.settingsDescription}>{connectionLabel}</Text>
+        {status === "available" ? (
+          <View style={styles.settingsActions}>
+            <AppButton
+              loading={busy === (connected ? "sync" : "connect")}
+              onPress={() => void (connected ? sync() : connect())}
+            >
+              {connected ? "지금 동기화" : "걸음 수 연결"}
+            </AppButton>
+            <AppButton
+              variant="secondary"
+              loading={busy === "settings"}
+              onPress={() => void openSettings()}
+            >
+              권한 설정 열기
+            </AppButton>
+          </View>
+        ) : (
+          <Text style={styles.settingsHelp}>
+            건강 데이터 연동은 새 앱 빌드에서 사용할 수 있어요.
+          </Text>
+        )}
+      </AppModal>
     </SafeAreaView>
   );
 }
@@ -741,7 +725,6 @@ function WalkingMissionPanel({
           reward={monthlyAttendanceReward}
           busy={attendanceBusy}
           onDayPress={(day) => onAttendanceDays([day])}
-          onCatchUp={() => onAttendanceDays(monthlyAttendanceReward.eligibleAttendanceDays ?? [])}
         />
       ) : null}
 
@@ -808,24 +791,47 @@ const styles = StyleSheet.create({
     paddingTop: pageChrome.contentStartGap,
     paddingBottom: spacing.xxxl + spacing.xxl,
     gap: spacing.xxl,
+    position: "relative",
   },
   viewNav: {
     alignSelf: "stretch",
+    marginTop: spacing.xl,
   },
   viewNavItem: {
     flex: 1,
   },
-  connectionSection: {
-    gap: spacing.sm,
+  connectionOverlay: {
+    position: "absolute",
+    top: spacing.xxs,
+    right: spacing.xl,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.xs,
   },
-  connectionStatus: {
-    ...typography.badge,
-    color: colors.accentTintedText,
-    textAlign: "right",
+  connectionDot: {
+    width: spacing.sm,
+    height: spacing.sm,
+    borderRadius: radii.pill,
+    backgroundColor: colors.textMuted,
+  },
+  connectionDotConnected: { backgroundColor: colors.statusOnline },
+  connectionOverlayText: { ...typography.micro, color: colors.textMuted },
+  connectionSettingsButton: {
+    width: iconSizes.lg,
+    height: iconSizes.lg,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: borders.none,
+    borderColor: colors.transparent,
+    borderRadius: radii.none,
+    backgroundColor: colors.transparent,
   },
   muted: { ...typography.label, color: colors.textMuted },
-  buttonRow: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm },
-  flexButton: { flex: 1 },
+  settingsSheet: { padding: spacing.xl, gap: spacing.md },
+  settingsTitle: { ...typography.title, color: colors.text },
+  settingsDescription: { ...typography.body, color: colors.textMuted },
+  settingsActions: { gap: spacing.sm },
+  settingsHelp: { ...typography.label, color: colors.textMuted },
   error: { ...typography.body, color: colors.danger },
   notice: { ...typography.body, color: colors.accentTintedText },
   stateSection: {

@@ -9,7 +9,7 @@ import {
   typography,
 } from "../theme/tokens";
 import type { WalkingMonthlyAttendanceReward } from "../lib/walking-health";
-import { AppButton, ControlPressable } from "./ui";
+import { ControlPressable } from "./ui";
 
 const COOKIE_REWARD_ORDINALS = new Set([7, 14, 21]);
 
@@ -17,12 +17,10 @@ export function WalkingAttendanceCalendar({
   reward,
   busy = false,
   onDayPress,
-  onCatchUp,
 }: {
   reward: WalkingMonthlyAttendanceReward;
   busy?: boolean;
   onDayPress?: (day: string) => void;
-  onCatchUp?: () => void;
 }) {
   const [gridWidth, setGridWidth] = useState(0);
   const monthDays = Math.min(28, Math.max(28, reward.monthDays));
@@ -30,37 +28,34 @@ export function WalkingAttendanceCalendar({
     monthDays,
     Math.max(0, reward.attendanceCount),
   );
-  const attendanceDays = reward.attendanceDays ?? Array.from(
-    { length: attendanceCount },
-    (_, index) => `${reward.month}-${String(index + 1).padStart(2, "0")}`,
+  const visitCount = Math.min(
+    monthDays,
+    Math.max(attendanceCount, reward.visitCount ?? attendanceCount),
   );
   const eligibleAttendanceDays = reward.eligibleAttendanceDays ?? [];
+  const claimedOrdinals = new Set(
+    reward.claimedOrdinals ??
+      Array.from({ length: attendanceCount }, (_, index) => index + 1),
+  );
+  const claimableByOrdinal = new Map(
+    reward.claimableAttendance?.map((entry) => [entry.ordinal, entry.day]) ??
+      eligibleAttendanceDays.map((day, index) => [attendanceCount + index + 1, day]),
+  );
 
   return (
     <View
       style={styles.section}
       accessible
       accessibilityRole="summary"
-      accessibilityLabel={`${reward.month} 출석미션, ${attendanceCount}/${monthDays}일 달성`}
+      accessibilityLabel={`${reward.month} 출석미션, ${visitCount}/${monthDays}회 접속`}
     >
       <View style={styles.header}>
         <View style={styles.titleGroup}>
           <Text style={styles.eyebrow}>월간 미션</Text>
           <Text style={styles.title}>출석미션</Text>
         </View>
-        <Text style={styles.count}>{attendanceCount} / {monthDays}일</Text>
+        <Text style={styles.count}>{visitCount} / {monthDays}회</Text>
       </View>
-
-      {eligibleAttendanceDays.length > 0 && onCatchUp ? (
-        <AppButton
-          variant="secondary"
-          loading={busy}
-          onPress={onCatchUp}
-          accessibilityLabel="출석 미완료 날짜 모두 체크"
-        >
-          미완료 날짜 모두 체크
-        </AppButton>
-      ) : null}
 
       <View
         style={styles.grid}
@@ -70,9 +65,9 @@ export function WalkingAttendanceCalendar({
           <View key={rowIndex} style={styles.row}>
             {Array.from({ length: 7 }, (_, columnIndex) => {
             const ordinal = rowIndex * 7 + columnIndex + 1;
-            const day = `${reward.month}-${String(ordinal).padStart(2, "0")}`;
-            const earned = attendanceDays.includes(day);
-            const eligible = eligibleAttendanceDays.includes(day);
+            const earned = claimedOrdinals.has(ordinal);
+            const eligibleDay = claimableByOrdinal.get(ordinal);
+            const eligible = Boolean(eligibleDay);
             const isItemReward = ordinal === reward.itemRewardOrdinal;
             const isCookieReward = COOKIE_REWARD_ORDINALS.has(ordinal);
             const cashAmount = ordinal % 7 === 0 ? 20 : 10;
@@ -85,7 +80,7 @@ export function WalkingAttendanceCalendar({
               <ControlPressable
                 key={ordinal}
                 disabled={!eligible || busy}
-                onPress={() => onDayPress?.(day)}
+                onPress={() => eligibleDay && onDayPress?.(eligibleDay)}
                 accessibilityRole="button"
                 style={[
                   styles.cell,
@@ -93,6 +88,7 @@ export function WalkingAttendanceCalendar({
                     ? { width: cellSize, height: cellSize }
                     : styles.cellPending,
                   earned && styles.cellEarned,
+                  eligible && styles.cellClaimable,
                   isItemReward && styles.cellItem,
                 ]}
                 accessibilityLabel={`${ordinal}번, ${
@@ -101,7 +97,7 @@ export function WalkingAttendanceCalendar({
                     : isCookieReward
                       ? `${cashAmount}원과 쿠키 1개`
                       : `${cashAmount}원`
-                }, ${earned ? "달성" : "미달성"}`}
+                }, ${earned ? "수령 완료" : eligible ? "수령 가능" : "미달성"}`}
               >
                 <Text style={[styles.ordinal, earned && styles.textEarned]}>
                   {ordinal}
@@ -176,6 +172,10 @@ const styles = StyleSheet.create({
   cellEarned: {
     borderColor: colors.accent,
     backgroundColor: colors.accentTintedBg,
+  },
+  cellClaimable: {
+    borderColor: colors.accent,
+    backgroundColor: colors.surface,
   },
   cellItem: { borderColor: colors.accent },
   ordinal: { ...typography.micro, color: colors.textMuted },
