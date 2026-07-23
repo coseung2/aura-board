@@ -50,10 +50,12 @@ import { LogoLockup } from "../components/LogoLockup";
 import {
   AppButton,
   ControlPressable,
-  SemanticNav,
-  SemanticNavItem,
   TextField,
 } from "../components/ui";
+import {
+  SemanticNav,
+  SemanticNavItem,
+} from "../components/SemanticNavigation";
 import type { ParentChildrenResponse, StudentAuthResponse } from "../lib/types";
 
 // 랜딩 화면 — 학생 / 학부모 역할 선택.
@@ -355,6 +357,7 @@ export default function Landing() {
         </View>
         <View style={styles.loginHeader}>
           <SemanticNav
+            variant="standalone"
             style={styles.roleNav}
             accessibilityLabel="로그인 역할 선택"
           >

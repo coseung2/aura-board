@@ -18,9 +18,11 @@ import {
   AppHeader,
   ControlPressable,
   EmptyState,
+} from "../../components/ui";
+import {
   SemanticNav,
   SemanticNavItem,
-} from "../../components/ui";
+} from "../../components/SemanticNavigation";
 import { useParentChildPosts } from "../../hooks/use-parent-child-posts";
 import { useParentOverview } from "../../hooks/use-parent-overview";
 import {
@@ -158,9 +160,10 @@ export default function ParentHomeScreen() {
         ) : null}
 
         {selectedChild ? (
-          <SemanticNav
-            style={styles.kindTabs}
-            accessibilityLabel="게시물 종류"
+            <SemanticNav
+              variant="standalone"
+              style={styles.kindTabs}
+              accessibilityLabel="게시물 종류"
           >
             {(["media", "text"] as const).map((value) => (
               <SemanticNavItem

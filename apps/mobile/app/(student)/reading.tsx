@@ -28,11 +28,13 @@ import {
   AppButton,
   AppHeader,
   ControlPressable,
-  SemanticNav,
-  SemanticNavItem,
   SectionHeader,
   TextField,
 } from "../../components/ui";
+import {
+  SemanticNav,
+  SemanticNavItem,
+} from "../../components/SemanticNavigation";
 import { StudentHeaderActions } from "../../components/StudentHeaderActions";
 
 type BookType = "comic" | "story";

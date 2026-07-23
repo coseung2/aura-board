@@ -42,10 +42,12 @@ import {
   AppButton,
   AppHeader,
   EmptyState,
-  SemanticNav,
-  SemanticNavItem,
   SurfacePressable,
 } from "../../components/ui";
+import {
+  SemanticNav,
+  SemanticNavItem,
+} from "../../components/SemanticNavigation";
 import { StudentHeaderActions } from "../../components/StudentHeaderActions";
 
 const FALLBACK_THUMBNAIL = "/board-type-thumbnails/card-board.png";

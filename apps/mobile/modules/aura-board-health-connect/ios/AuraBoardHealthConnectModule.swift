@@ -5,12 +5,12 @@ import UIKit
 private let seoulTimeZone = TimeZone(identifier: "Asia/Seoul")!
 private let maximumReadDays = 31
 
-final class AuraBoardHealthConnectModule: Module {
+public final class AuraBoardHealthConnectModule: Module {
   private let healthStore = HKHealthStore()
   private let stepType = HKQuantityType.quantityType(forIdentifier: .stepCount)!
   private let distanceType = HKQuantityType.quantityType(forIdentifier: .distanceWalkingRunning)!
 
-  func definition() -> ModuleDefinition {
+  public func definition() -> ModuleDefinition {
     Name("AuraBoardHealthConnect")
 
     AsyncFunction("getStatus") { () -> String in
@@ -28,7 +28,7 @@ final class AuraBoardHealthConnectModule: Module {
         read: self.requiredTypes
       ) { status, error in
         if let error {
-          promise.reject("HEALTH_CONNECT_PROVIDER_ERROR", error.localizedDescription, error)
+          promise.reject("HEALTH_CONNECT_PROVIDER_ERROR", error.localizedDescription)
           return
         }
 
@@ -49,7 +49,7 @@ final class AuraBoardHealthConnectModule: Module {
 
       self.healthStore.requestAuthorization(toShare: [], read: self.requiredTypes) { success, error in
         if let error {
-          promise.reject("HEALTH_CONNECT_PERMISSION_REQUIRED", error.localizedDescription, error)
+          promise.reject("HEALTH_CONNECT_PERMISSION_REQUIRED", error.localizedDescription)
           return
         }
         promise.resolve(success ? ["steps", "distance"] : [])
@@ -62,7 +62,7 @@ final class AuraBoardHealthConnectModule: Module {
           let rows = try await self.readDailyStats(startDay: startDay, endDay: endDay)
           promise.resolve(rows)
         } catch {
-          promise.reject("HEALTH_CONNECT_PROVIDER_ERROR", error.localizedDescription, error)
+          promise.reject("HEALTH_CONNECT_PROVIDER_ERROR", error.localizedDescription)
         }
       }
     }

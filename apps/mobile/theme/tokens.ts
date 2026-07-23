@@ -303,10 +303,23 @@ export const states = {
 } as const;
 
 export const layers = {
+  spriteFloor: 0,
+  spriteItem: 1,
   badge: 2,
+  cardOverlay: 3,
+  popover: 5,
   overlayControl: 10,
   mediaControl: 12,
   bottomNav: 20,
+  raisedContent: 30,
+  notice: 50,
+  floatingPopover: 51,
+} as const;
+
+export const slimeUi = {
+  effectArrow: 25,
+  effectPopoverWidth: 132,
+  growthPopoverWidth: 156,
 } as const;
 
 export const media = {

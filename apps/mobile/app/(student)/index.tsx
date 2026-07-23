@@ -47,9 +47,11 @@ import {
   ControlPressable,
   Pill,
   SectionHeader,
+} from "../../components/ui";
+import {
   SemanticNav,
   SemanticNavItem,
-} from "../../components/ui";
+} from "../../components/SemanticNavigation";
 import { StudentHeaderActions } from "../../components/StudentHeaderActions";
 import { SlimeSprite } from "../../components/slime/SlimeSprite";
 import {

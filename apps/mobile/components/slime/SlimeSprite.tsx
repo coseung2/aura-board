@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Image, type ImageProps } from "expo-image";
 import { StyleSheet, View } from "react-native";
+import { layers } from "../../theme/tokens";
 import { getApiBase } from "../../lib/api";
 import {
   getSlimeFrame,
@@ -271,6 +272,6 @@ const styles = StyleSheet.create({
   layer: {
     position: "absolute",
   },
-  floorUnder: { zIndex: 0 },
-  itemLayer: { zIndex: 1 },
+  floorUnder: { zIndex: layers.spriteFloor },
+  itemLayer: { zIndex: layers.spriteItem },
 });

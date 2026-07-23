@@ -29,10 +29,12 @@ import {
 } from "../../lib/card-privacy";
 import {
   ControlPressable,
-  SemanticNav,
-  SemanticNavItem,
   SurfaceCard,
 } from "../ui";
+import {
+  SemanticNav,
+  SemanticNavItem,
+} from "../SemanticNavigation";
 import { useBoardRealtime } from "../../lib/use-board-realtime";
 import { StreamFeedPost } from "./ColumnsStreamFeedPost";
 

@@ -486,3 +486,32 @@ src/styles/
 
 - UI 카피, 구분 기호, 빈 값 표기에는 긴 대시 문자 `—`를 사용하지 않는다.
 - 문장 앞 장식은 기호 없이 시작하고, 빈 값은 맥락에 맞는 `없음`, `미제출`, `미공개`처럼 명시적인 텍스트로 표시한다.
+
+---
+
+## 13. Semantic Navigation
+
+`SemanticNav`는 같은 화면에서 주요 보기나 작업 맥락을 전환하는 로컬 내비게이션이다.
+검색 조건이나 결과 범위만 좁히는 필터와 구분하며, 컨테이너는 `tablist`, 항목은
+`tab`, 현재 항목은 `selected` 상태를 제공한다.
+
+### Titled
+
+- 섹션 타이틀을 왼쪽에 배치하고 내비게이션을 오른쪽에 배치한다.
+- 내비게이션 항목은 콘텐츠 너비를 사용한다.
+- 전체 폭의 하단 구분선을 유지하고 활성선은 선택 항목 아래에만 표시한다.
+- 좁은 화면에서는 타이틀 위, 내비게이션 아래의 2행 배치를 허용한다.
+
+### Standalone
+
+- 시각적인 섹션 타이틀을 표시하지 않는다.
+- 내비게이션 항목이 전체 구분선 너비를 균등하게 나눠 사용한다.
+- 각 항목과 활성선은 할당된 동일 너비를 사용한다.
+- 보이는 타이틀이 없으므로 `accessibilityLabel`은 반드시 제공한다.
+
+```tsx
+<SemanticNav variant="standalone" accessibilityLabel="걷기 활동 보기">
+  <SemanticNavItem selected={activeView === "record"}>걷기 기록</SemanticNavItem>
+  <SemanticNavItem selected={activeView === "missions"}>걷기 미션</SemanticNavItem>
+</SemanticNav>
+```

@@ -53,9 +53,11 @@ import {
   AppHeader,
   ControlPressable,
   SectionHeader,
+} from "../../components/ui";
+import {
   SemanticNav,
   SemanticNavItem,
-} from "../../components/ui";
+} from "../../components/SemanticNavigation";
 import { StudentHeaderActions } from "../../components/StudentHeaderActions";
 import { WalkingAttendanceCalendar } from "../../components/walking-attendance-calendar";
 
@@ -403,7 +405,11 @@ export default function StudentWalkingScreen() {
           </View>
         ) : null}
 
-        <SemanticNav accessibilityLabel="걷기 활동 보기" style={styles.viewNav}>
+        <SemanticNav
+          variant="standalone"
+          accessibilityLabel="걷기 활동 보기"
+          style={styles.viewNav}
+        >
           <SemanticNavItem
             style={styles.viewNavItem}
             selected={activeView === "record"}

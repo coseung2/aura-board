@@ -4,7 +4,6 @@ import {
   Alert,
   Animated,
   Easing,
-  Pressable,
   RefreshControl,
   ScrollView,
   StyleSheet,
@@ -24,9 +23,11 @@ import {
   AppButton,
   AppHeader,
   ControlPressable,
+} from "../../components/ui";
+import {
   SemanticNav,
   SemanticNavItem,
-} from "../../components/ui";
+} from "../../components/SemanticNavigation";
 import { SlimeSprite } from "../../components/slime/SlimeSprite";
 import { StudentHeaderActions } from "../../components/StudentHeaderActions";
 import { WalkingTitleSlot } from "../../components/WalkingTitleSlot";
@@ -67,10 +68,12 @@ import {
   colors,
   controls,
   iconSizes,
+  layers,
   layout,
   pageChrome,
   radii,
   shadows,
+  slimeUi,
   spacing,
   states,
   tapMin,
@@ -571,7 +574,7 @@ export default function StudentSlimeScreen() {
   return (
     <SafeAreaView style={styles.container} edges={["top"]}>
       {openEffectColor || openGrowthColor ? (
-        <Pressable
+        <ControlPressable
           style={styles.effectDismissLayer}
           onPress={() => {
             setOpenEffectColor(null);
@@ -579,7 +582,9 @@ export default function StudentSlimeScreen() {
           }}
           accessibilityRole="button"
           accessibilityLabel="버프 상세 닫기"
-        />
+        >
+          {null}
+        </ControlPressable>
       ) : null}
       <AppHeader title="펫" onBack={() => router.back()} right={<StudentHeaderActions />} />
       <ScrollView
@@ -595,7 +600,11 @@ export default function StudentSlimeScreen() {
           />
         }
       >
-        <SemanticNav style={styles.petSectionNav} accessibilityLabel="펫 섹션">
+        <SemanticNav
+          variant="standalone"
+          style={styles.petSectionNav}
+          accessibilityLabel="펫 섹션"
+        >
           <SemanticNavItem
             style={styles.petSectionNavItem}
             selected={section === "mine"}
@@ -737,7 +746,7 @@ export default function StudentSlimeScreen() {
                   {isOwned ? (
                     <>
                       <View style={styles.myPetOverlayRow} pointerEvents="box-none">
-                        <Pressable
+                        <ControlPressable
                           style={styles.myPetEffectButton}
                           onPress={() => {
                             setOpenGrowthColor(null);
@@ -757,8 +766,8 @@ export default function StudentSlimeScreen() {
                               accessible={false}
                             />
                           </Animated.View>
-                        </Pressable>
-                        <Pressable
+                        </ControlPressable>
+                        <ControlPressable
                           style={styles.myPetStarButton}
                           disabled={busyRepresentative !== null || home?.representativeColor === itemColor}
                           onPress={() => void setRepresentative(itemColor)}
@@ -773,7 +782,7 @@ export default function StudentSlimeScreen() {
                             fill={home?.representativeColor === itemColor ? colors.warning : colors.textFaint}
                             accessible={false}
                           />
-                        </Pressable>
+                        </ControlPressable>
                       </View>
                       {openEffectColor === itemColor ? (
                         <View style={styles.myPetEffectPopover} accessibilityRole="summary">
@@ -811,7 +820,7 @@ export default function StudentSlimeScreen() {
                 </View>
                 <Text style={[styles.myPetName, selected && styles.myPetNameSelected]}>{SLIME_COLOR_LABELS[itemColor]}</Text>
                 {isOwned ? (
-                  <Pressable
+                  <ControlPressable
                     style={styles.myPetGrowth}
                     disabled={!growthTime}
                     onPress={() => {
@@ -842,7 +851,7 @@ export default function StudentSlimeScreen() {
                         </Text>
                       </View>
                     ) : null}
-                  </Pressable>
+                  </ControlPressable>
                 ) : null}
                 <View style={styles.myPetActions} accessibilityLabel={`${SLIME_COLOR_LABELS[itemColor]} 펫 관리`}>
                   <ControlPressable
@@ -856,7 +865,7 @@ export default function StudentSlimeScreen() {
                   >
                     <Text style={styles.myPetActionText}>꾸미기</Text>
                   </ControlPressable>
-                  <Pressable
+                  <ControlPressable
                     style={styles.myPetCookieButton}
                     disabled={!isOwned || cookieQuantity <= 0 || busyItemKey !== null}
                     hitSlop={spacing.xs}
@@ -877,7 +886,7 @@ export default function StudentSlimeScreen() {
                       styles.myPetCookieQuantity,
                       cookieQuantity <= 0 && styles.myPetCookieQuantityDisabled,
                     ]}>{cookieQuantity}</Text>
-                  </Pressable>
+                  </ControlPressable>
                 </View>
               </View>
             );
@@ -1055,7 +1064,11 @@ export default function StudentSlimeScreen() {
         <Text style={styles.wardrobeTitle}>
           {wardrobeColor ? `${SLIME_COLOR_LABELS[wardrobeColor]} 슬라임 꾸미기` : "슬라임 꾸미기"}
         </Text>
-        <SemanticNav style={styles.wardrobeNav} accessibilityLabel="보유 아이템 카테고리">
+        <SemanticNav
+          variant="standalone"
+          style={styles.wardrobeNav}
+          accessibilityLabel="보유 아이템 카테고리"
+        >
           {WARDROBE_NAV_ITEMS.map((item) => (
             <SemanticNavItem
               key={item.key}
@@ -1143,7 +1156,7 @@ export default function StudentSlimeScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg },
-  effectDismissLayer: { ...StyleSheet.absoluteFillObject, zIndex: 9, backgroundColor: colors.transparent },
+  effectDismissLayer: { ...StyleSheet.absoluteFillObject, zIndex: layers.overlayControl, borderWidth: borders.none, borderRadius: radii.none, backgroundColor: colors.transparent },
   loadingCenter: { flex: 1, alignItems: "center", justifyContent: "center", gap: spacing.md },
   loadingText: { ...typography.body, color: colors.textMuted },
   errorCenter: { flex: 1, alignItems: "center", justifyContent: "center", padding: spacing.xxl, gap: spacing.md },
@@ -1156,25 +1169,25 @@ const styles = StyleSheet.create({
   petSectionNavItem: { flex: 1 },
   myPetGrid: { flexDirection: "row", flexWrap: "wrap", justifyContent: "space-between", gap: spacing.xs },
   myPetCard: { position: "relative", width: "32%", minWidth: 0, alignItems: "center", gap: spacing.xs, paddingVertical: spacing.xs },
-  myPetCardEffectOpen: { zIndex: 30 },
+  myPetCardEffectOpen: { zIndex: layers.raisedContent },
   myPetCardDisabled: { opacity: states.disabledOpacity },
   myPetSprite: { position: "relative", height: iconSizes.empty + spacing.md, width: "100%", alignItems: "center", justifyContent: "center", overflow: "visible" },
-  myPetOverlayRow: { position: "absolute", left: 0, right: 0, top: 0, zIndex: 3, height: iconSizes.lg, flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
-  myPetEffectButton: { width: iconSizes.lg, height: iconSizes.lg, alignItems: "center", justifyContent: "center", backgroundColor: colors.transparent },
-  myPetEffectArrow: { width: 25, height: 25 },
-  myPetStarButton: { width: iconSizes.md, height: iconSizes.lg, alignItems: "center", justifyContent: "center", backgroundColor: colors.transparent },
-  myPetEffectPopover: { position: "absolute", left: 0, top: iconSizes.lg + spacing.xxs, zIndex: 5, width: 132, padding: spacing.sm, gap: spacing.xxs, borderWidth: borders.hairline, borderColor: colors.border, borderRadius: radii.btn, backgroundColor: colors.surface, ...shadows.lift },
+  myPetOverlayRow: { position: "absolute", left: 0, right: 0, top: 0, zIndex: layers.cardOverlay, height: iconSizes.lg, flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+  myPetEffectButton: { width: iconSizes.lg, height: iconSizes.lg, alignItems: "center", justifyContent: "center", borderWidth: borders.none, borderRadius: radii.none, backgroundColor: colors.transparent },
+  myPetEffectArrow: { width: slimeUi.effectArrow, height: slimeUi.effectArrow },
+  myPetStarButton: { width: iconSizes.md, height: iconSizes.lg, alignItems: "center", justifyContent: "center", borderWidth: borders.none, borderRadius: radii.none, backgroundColor: colors.transparent },
+  myPetEffectPopover: { position: "absolute", left: 0, top: iconSizes.lg + spacing.xxs, zIndex: layers.popover, width: slimeUi.effectPopoverWidth, padding: spacing.sm, gap: spacing.xxs, borderWidth: borders.hairline, borderColor: colors.border, borderRadius: radii.btn, backgroundColor: colors.surface, ...shadows.lift },
   myPetEffectPopoverTitle: { ...typography.micro, color: colors.text, fontWeight: "700" },
   myPetEffectPopoverText: { ...typography.micro, color: colors.textMuted },
   myPetName: { ...typography.micro, color: colors.textMuted, textAlign: "center" },
   myPetNameSelected: { color: colors.accentTintedText },
-  myPetGrowth: { position: "relative", zIndex: 50, width: "100%", gap: spacing.xs, backgroundColor: colors.transparent },
+  myPetGrowth: { position: "relative", zIndex: layers.notice, width: "100%", gap: spacing.xs, borderWidth: borders.none, borderRadius: radii.none, backgroundColor: colors.transparent },
   myPetGrowthMeta: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: spacing.xxs },
-  myPetGrowthLabel: { ...typography.micro, color: colors.textMuted, fontSize: 9 },
-  myPetGrowthPercent: { ...typography.micro, color: colors.accentTintedText, fontSize: 9, fontVariant: ["tabular-nums"] },
+  myPetGrowthLabel: { ...typography.micro, color: colors.textMuted },
+  myPetGrowthPercent: { ...typography.micro, color: colors.accentTintedText, fontVariant: ["tabular-nums"] },
   myPetGrowthTrack: { height: spacing.xs, overflow: "hidden", borderRadius: radii.pill, backgroundColor: colors.surfaceAlt },
   myPetGrowthFill: { height: "100%", borderRadius: radii.pill, backgroundColor: colors.accent },
-  myPetGrowthPopover: { position: "absolute", left: 0, bottom: iconSizes.lg + spacing.xs, zIndex: 51, elevation: 20, width: 156, padding: spacing.sm, gap: spacing.xxs, borderWidth: borders.hairline, borderColor: colors.border, borderRadius: radii.btn, backgroundColor: colors.surface, ...shadows.lift },
+  myPetGrowthPopover: { position: "absolute", left: 0, bottom: iconSizes.lg + spacing.xs, zIndex: layers.floatingPopover, width: slimeUi.growthPopoverWidth, padding: spacing.sm, gap: spacing.xxs, borderWidth: borders.hairline, borderColor: colors.border, borderRadius: radii.btn, backgroundColor: colors.surface, ...shadows.lift },
   myPetActions: { width: "100%", flexDirection: "row", flexWrap: "wrap", gap: spacing.xxs },
   appliedEffects: { width: "100%", gap: spacing.sm, paddingTop: spacing.sm },
   appliedEffectsTitle: { ...typography.label, color: colors.text },
@@ -1185,7 +1198,7 @@ const styles = StyleSheet.create({
   appliedEffectsEmpty: { ...typography.micro, color: colors.textMuted },
   myPetActionButton: { flex: 1, minWidth: 0, minHeight: tapMin - spacing.md, paddingHorizontal: spacing.xxs, paddingVertical: spacing.none, alignItems: "center", justifyContent: "center", borderWidth: borders.hairline, borderColor: colors.border, borderRadius: radii.btn, backgroundColor: colors.surface },
   myPetActionText: { ...typography.micro, color: colors.text, textAlign: "center", fontWeight: "700" },
-  myPetCookieButton: { width: iconSizes.md + spacing.xl, minHeight: tapMin - spacing.md, flexShrink: 0, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: spacing.xxs, backgroundColor: colors.transparent },
+  myPetCookieButton: { width: iconSizes.md + spacing.xl, minHeight: tapMin - spacing.md, flexShrink: 0, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: spacing.xxs, borderWidth: borders.none, borderRadius: radii.none, backgroundColor: colors.transparent },
   myPetCookieIcon: { width: iconSizes.md, height: iconSizes.md },
   myPetCookieQuantity: { ...typography.micro, color: colors.accentTintedText, fontVariant: ["tabular-nums"] },
   myPetCookieQuantityDisabled: { color: colors.textFaint },
@@ -1210,7 +1223,7 @@ const styles = StyleSheet.create({
   floorStatusBuy: { color: colors.accent },
   emptyCard: { width: "100%", padding: spacing.lg },
   emptyText: { ...typography.body, color: colors.textMuted, textAlign: "center" },
-  notice: { position: "absolute", zIndex: 50, bottom: tapMin + spacing.md, left: pageChrome.horizontalPadding, right: pageChrome.horizontalPadding, minHeight: tapMin, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, borderRadius: radii.control, flexDirection: "row", alignItems: "center", gap: spacing.sm, ...shadows.lift },
+  notice: { position: "absolute", zIndex: layers.notice, bottom: tapMin + spacing.md, left: pageChrome.horizontalPadding, right: pageChrome.horizontalPadding, minHeight: tapMin, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, borderRadius: radii.control, flexDirection: "row", alignItems: "center", gap: spacing.sm, ...shadows.lift },
   noticeSuccess: { backgroundColor: colors.plantActiveTintedBg },
   noticeError: { backgroundColor: colors.dangerTintedBg },
   noticeIcon: { transform: [{ rotate: "90deg" }] },
