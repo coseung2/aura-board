@@ -31,7 +31,6 @@ export function StudentHeaderActions() {
         () => undefined,
       );
       await clearSessionToken();
-      router.dismissAll();
       router.replace(getUnifiedLoginRoute("student"));
     } finally {
       loggingOutRef.current = false;
