@@ -264,12 +264,13 @@ function RepresentativePet({
   onManage: () => void;
 }) {
   const color = petHome?.representativeColor;
-  if (!petHome || !color) return null;
+  if (!petHome) return null;
 
-  const stage = stageForColor(petHome, color);
-  const equippedItems = petHome.equippedItemsByColor[color] ?? [];
-  const equippedFloor =
-    petHome.equippedFloorByColor[color] ?? petHome.equippedFloor;
+  const stage = color ? stageForColor(petHome, color) : null;
+  const equippedItems = color ? petHome.equippedItemsByColor[color] ?? [] : [];
+  const equippedFloor = color
+    ? petHome.equippedFloorByColor[color] ?? petHome.equippedFloor
+    : undefined;
 
   return (
     <View style={styles.representativePet}>
@@ -288,14 +289,20 @@ function RepresentativePet({
           />
         </ControlPressable>
       </View>
-      <SlimeSprite
-        slimeColor={color}
-        evolution={evolutionForStage(stage)}
-        equippedFloor={equippedFloor}
-        itemSpritePath={slimeBallSpritePath(equippedItems, color)}
-        displayScale={0.75}
-        accessibilityLabel="내 대표 펫"
-      />
+      {color && stage !== null ? (
+        <SlimeSprite
+          slimeColor={color}
+          evolution={evolutionForStage(stage)}
+          equippedFloor={equippedFloor}
+          itemSpritePath={slimeBallSpritePath(equippedItems, color)}
+          displayScale={0.75}
+          accessibilityLabel="내 대표 펫"
+        />
+      ) : (
+        <View style={styles.petEmptyState} accessibilityRole="text">
+          <Text style={styles.petEmptyText}>대표펫이 없어요</Text>
+        </View>
+      )}
     </View>
   );
 }
@@ -694,6 +701,12 @@ const styles = StyleSheet.create({
     backgroundColor: colors.transparent,
   },
   petManageLinkText: { ...typography.badge, color: colors.textMuted },
+  petEmptyState: {
+    minHeight: iconSizes.empty + spacing.md,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  petEmptyText: { ...typography.body, color: colors.textMuted },
   landscapeOverview: {
     flexDirection: "row",
     alignItems: "stretch",

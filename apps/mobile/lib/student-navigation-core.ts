@@ -24,11 +24,11 @@ export const studentBaseNavTargets: StudentNavTarget[] = [
     pathname: "/boards",
   },
   {
-    id: "portfolio",
-    label: "포트폴리오",
-    emoji: "▤",
-    href: "/(student)/portfolio",
-    pathname: "/portfolio",
+    id: "slime",
+    label: "펫",
+    emoji: "🐾",
+    href: "/(student)/slime?section=mine",
+    pathname: "/slime",
   },
   {
     id: "reading",
@@ -44,19 +44,13 @@ export const studentBaseNavTargets: StudentNavTarget[] = [
     href: "/(student)/walking",
     pathname: "/walking",
   },
-  {
-    id: "more",
-    label: "더보기",
-    emoji: "•••",
-    href: "/(student)/more",
-    pathname: "/more",
-  },
 ];
 
 export const studentOptionalNavTargets: StudentNavTarget[] = [
+  { id: "portfolio", label: "포트폴리오", emoji: "▤", href: "/(student)/portfolio", pathname: "/portfolio" },
   { id: "wallet", label: "통장", emoji: "💳", href: "/(student)/wallet", pathname: "/wallet" },
-  { id: "slime", label: "펫", emoji: "🐾", href: "/(student)/slime?section=mine", pathname: "/slime" },
   { id: "notifications", label: "알림", emoji: "🔔", href: "/(student)/notifications", pathname: "/notifications" },
+  { id: "more", label: "더보기", emoji: "•••", href: "/(student)/more", pathname: "/more" },
 ];
 
 export function studentDutyTarget(duty: StudentDuty): StudentNavTarget | null {
