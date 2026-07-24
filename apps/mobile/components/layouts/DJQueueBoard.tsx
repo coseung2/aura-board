@@ -1,18 +1,17 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Alert,
-  FlatList,
   ScrollView,
   StyleSheet,
   Text,
   useWindowDimensions,
   View,
 } from "react-native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
   borders,
   colors,
   dj,
+  pageChrome,
   spacing,
   tapMin,
   typography,
@@ -28,24 +27,61 @@ import {
   withBoardAnonymousAuthor,
   withBoardAnonymousAuthors,
 } from "../../lib/card-privacy";
-import { DJRecapModal } from "../DJRecapModal";
-import { AppBottomSheet, AppButton, TextField } from "../ui";
-import { deriveQueueState, mergeQueueSnapshot } from "./dj-queue-state";
+import {
+  ContentTab,
+  ContentTabs,
+  SectionNav,
+  SectionNavItem,
+} from "../NavigationTabs";
+import {
+  AppBottomSheet,
+  AppButton,
+  ControlPressable,
+  TextField,
+} from "../ui";
+import {
+  deriveQueueState,
+  mergeQueueSnapshot,
+} from "./dj-queue-state";
 import { DJQueueRanking } from "./DJQueueRanking";
 import { DJNowPlayingCard } from "./DJNowPlayingCard";
 import { DJQueueItem } from "./DJQueueItem";
-import { DJPlayedDrawer } from "./DJPlayedDrawer";
+import { currentMonth } from "../dj-recap-state";
 
 // DJ 큐 보드 — 웹 디자인 핸드오프 DJBoardPage.jsx 를 네이티브로 이식.
-//   [헤더: 제목 + 카운트 + 재생완료 토글]
-//   [NOW PLAYING 카드 (전체 폭)]
-//   [2열] 대기열 카드 | 사이드 (신청폼 + 랭킹)
-//   + 재생완료 드로어 = AppModal side panel
-//
 // Drag-drop 재정렬은 RN 에서 무겁기에 ↑↓ 버튼으로 대체.
-// SSE 폴링은 vibe-arcade 처럼 2초 polling (간단성).
 
 type QueueStatus = "pending" | "approved" | "rejected" | "played";
+type DJSection = "now" | "history";
+type HistoryKind = "submitters" | "songs";
+
+type QueueRankingSubmitter = {
+  key: string;
+  name: string;
+  count: number;
+  isStudent: boolean;
+  isCurrentUser?: boolean;
+};
+
+type QueueRankingSong = {
+  linkUrl: string;
+  linkImage: string | null;
+  title: string;
+  count: number;
+};
+
+type QueueRankingResponse = {
+  songs: QueueRankingSong[];
+  submitters: QueueRankingSubmitter[];
+  submittersHidden?: boolean;
+};
+
+function isInMonth(value: string, month: string): boolean {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return false;
+  const dateMonth = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
+  return dateMonth === month;
+}
 
 export function DJQueueBoard({
   data,
@@ -61,15 +97,108 @@ export function DJQueueBoard({
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [queueSheetOpen, setQueueSheetOpen] = useState(false);
-  const [playedOpen, setPlayedOpen] = useState(false);
-  const [recapOpen, setRecapOpen] = useState(false);
+  const [activeSection, setActiveSection] = useState<DJSection>("now");
+  const [historyKind, setHistoryKind] = useState<HistoryKind>("submitters");
   const pendingIds = useRef<Set<string>>(new Set());
   const boardId = data.board.id;
   const { width } = useWindowDimensions();
-  const insets = useSafeAreaInsets();
   const compact = width < dj.compactBreakpoint;
   const canControl = data.capabilities?.canControlQueue === true;
+  const recapMonth = currentMonth();
+  const [rankingData, setRankingData] =
+    useState<QueueRankingResponse | null>(null);
+  const [rankingLoading, setRankingLoading] = useState(false);
+  const [rankingError, setRankingError] = useState<string | null>(null);
+  const ownSubmitterKey = `s:${data.currentStudent.id}`;
+  const localMyPlayedCount = useMemo(
+    () =>
+      cards.filter(
+        (card) =>
+          card.isMine === true &&
+          card.queueStatus === "played" &&
+          isInMonth(card.updatedAt ?? card.createdAt, recapMonth),
+      ).length,
+    [cards, recapMonth],
+  );
+  const ownRankingSubmitter = useMemo(
+    () =>
+      rankingData?.submitters.find(
+        (submitter) => submitter.key === ownSubmitterKey,
+      ) ?? null,
+    [ownSubmitterKey, rankingData],
+  );
+  const topSubmitters = useMemo(() => {
+    if (data.board.anonymousAuthor || !rankingData) return [];
+    return rankingData.submitters.slice(0, 5).map((submitter) => ({
+      name: submitter.name,
+      count: submitter.count,
+    }));
+  }, [data.board.anonymousAuthor, rankingData]);
+  const topSongs = useMemo(() => {
+    if (!rankingData) return [];
+    return rankingData.songs.slice(0, 5).map((song) => ({
+      name: song.title,
+      count: song.count,
+    }));
+  }, [rankingData]);
+  const myPlayedCount = ownRankingSubmitter?.count ?? localMyPlayedCount;
 
+  useEffect(() => {
+    if (activeSection !== "history") return;
+    let cancelled = false;
+    setRankingData(null);
+    setRankingLoading(true);
+    setRankingError(null);
+    void apiFetch<QueueRankingResponse>(
+      `/api/boards/${encodeURIComponent(boardId)}/queue/ranking`,
+    )
+      .then((response) => {
+        if (!cancelled) {
+          setRankingData({
+            songs: Array.isArray(response.songs) ? response.songs : [],
+            submitters: Array.isArray(response.submitters)
+              ? response.submitters
+              : [],
+            submittersHidden:
+              response.submittersHidden === true || data.board.anonymousAuthor,
+          });
+        }
+      })
+      .catch((error) => {
+        if (cancelled) return;
+        setRankingData(null);
+        setRankingError(
+          error instanceof ApiError
+            ? `이번 달 신청 TOP 불러오기 실패 (${error.status})`
+            : error instanceof Error
+              ? error.message
+              : "이번 달 신청 TOP을 불러올 수 없어요.",
+        );
+      })
+      .finally(() => {
+        if (!cancelled) setRankingLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [activeSection, boardId, data.board.anonymousAuthor]);
+
+  const recentSubmissions = useMemo(
+    () =>
+      cards
+        .filter(
+          (card) =>
+            (card.isMine === true || card.isOwnPendingQueue === true) &&
+            Boolean(card.linkUrl ?? card.videoUrl),
+        )
+        .sort(
+          (left, right) =>
+            new Date(right.createdAt).getTime() -
+            new Date(left.createdAt).getTime(),
+        )
+        .slice(0, 5),
+    [cards],
+  );
   // Parent refreshes replace `data` after queue_changed/card_changed. Merge
   // that snapshot into the local optimistic queue instead of keeping only the
   // initial mount data.
@@ -108,12 +237,10 @@ export function DJQueueBoard({
 
   const {
     activeQueue,
-    playedCards,
     nowPlaying,
     upNext,
     pendingCount,
     approvedCount,
-    ranking,
   } = useMemo(
     () =>
       deriveQueueState(
@@ -137,8 +264,8 @@ export function DJQueueBoard({
     }
   }
 
-  async function handleSubmit() {
-    const url = submitUrl.trim();
+  async function submitQueueUrl(value: string) {
+    const url = value.trim();
     if (!url) return;
     setSubmitting(true);
     setSubmitError(null);
@@ -165,6 +292,16 @@ export function DJQueueBoard({
     } finally {
       setSubmitting(false);
     }
+  }
+
+  async function handleSubmit() {
+    await submitQueueUrl(submitUrl);
+  }
+
+  async function handleRecentSubmission(url: string) {
+    if (submitting) return;
+    setSubmitUrl(url);
+    await submitQueueUrl(url);
   }
 
   async function handleStatus(cardId: string, status: QueueStatus) {
@@ -263,44 +400,6 @@ export function DJQueueBoard({
     });
   }
 
-  async function handleRestore(cardId: string) {
-    if (!canControl) return;
-    const maxOrder = activeQueue.reduce((m, c) => Math.max(m, c.order ?? 0), 0);
-    const targetOrder = maxOrder + 1;
-    const prev = cards;
-    setCards((list) =>
-      list.map((c) =>
-        c.id === cardId
-          ? { ...c, queueStatus: "approved", order: targetOrder }
-          : c,
-      ),
-    );
-    await trackMutation(cardId, async () => {
-      try {
-        await Promise.all([
-          apiFetch(
-            `/api/boards/${encodeURIComponent(boardId)}/queue/${cardId}`,
-            {
-              method: "PATCH",
-              json: { status: "approved" },
-            },
-          ),
-          apiFetch(
-            `/api/boards/${encodeURIComponent(boardId)}/queue/${cardId}/move`,
-            { method: "PATCH", json: { order: targetOrder } },
-          ),
-        ]);
-        onMutate();
-      } catch (e) {
-        setCards(prev);
-        Alert.alert(
-          "복귀 실패",
-          e instanceof Error ? e.message : "곡을 대기열로 복귀하지 못했어요.",
-        );
-      }
-    });
-  }
-
   return (
     <View style={styles.root}>
       <ScrollView
@@ -309,73 +408,149 @@ export function DJQueueBoard({
         contentInsetAdjustmentBehavior="automatic"
         keyboardShouldPersistTaps="handled"
       >
-        <View style={[styles.header, compact && styles.headerCompact]}>
-          <View style={styles.headerCopy}>
-            <Text style={styles.title}>🎧 {data.board.title}</Text>
-            <Text style={styles.subtitle}>
-              DJ 큐 · 대기 {pendingCount} · 승인 {approvedCount} · 재생 완료{" "}
-              {playedCards.length}
-            </Text>
-          </View>
-          <View
-            style={[
-              styles.headerActions,
-              compact && styles.headerActionsCompact,
-            ]}
+        <ContentTabs
+          style={styles.sectionNav}
+          accessibilityLabel="DJ 보드 섹션 탐색"
+        >
+          <ContentTab
+            style={styles.sectionNavItem}
+            selected={activeSection === "now"}
+            onPress={() => setActiveSection("now")}
+            accessibilityLabel="현재 재생"
           >
-            <AppButton
-              variant="secondary"
-              style={styles.headerBtn}
-              onPress={() => setRecapOpen(true)}
-            >
-              📊 이달의 리캡
-            </AppButton>
-            <AppButton
-              variant="secondary"
-              style={styles.headerBtn}
-              onPress={() => setPlayedOpen(true)}
-            >
-              🕘 재생 완료 ({playedCards.length})
-            </AppButton>
-          </View>
-        </View>
+            현재 재생
+          </ContentTab>
+          <ContentTab
+            style={styles.sectionNavItem}
+            selected={activeSection === "history"}
+            onPress={() => setActiveSection("history")}
+            accessibilityLabel="재생 기록"
+          >
+            재생 기록
+          </ContentTab>
+        </ContentTabs>
 
-        {nowPlaying ? (
-          <DJNowPlayingCard
-            card={nowPlaying}
-            compact={compact}
-            canControl={canControl}
-            onNext={() => handleStatus(nowPlaying.id, "played")}
-          />
+        {activeSection === "now" ? (
+          <>
+            {nowPlaying ? (
+              <DJNowPlayingCard
+                card={nowPlaying}
+                compact={compact}
+                canControl={canControl}
+                onNext={() => handleStatus(nowPlaying.id, "played")}
+              />
+            ) : (
+              <View style={styles.emptyNow}>
+                <Text style={styles.emptyNowTitle}>재생 중인 곡이 없어요.</Text>
+              </View>
+            )}
+
+            <View style={styles.queueSection}>
+              <View style={styles.queueHeader}>
+                <Text style={styles.sectionTitle}>대기열</Text>
+                <Text style={styles.queueCount}>
+                  대기 {pendingCount} · 승인 {approvedCount}
+                </Text>
+              </View>
+              <AppButton
+                variant="quiet"
+                style={styles.requestButton}
+                onPress={() => setQueueSheetOpen(true)}
+              >
+                ＋ 곡 신청
+              </AppButton>
+              {upNext.length > 0 ? (
+                <View style={styles.queueList}>
+                  {upNext.map((item, index) => (
+                    <DJQueueItem
+                      key={item.id}
+                      card={item}
+                      rank={(nowPlaying ? 2 : 1) + index}
+                      onApprove={() => handleStatus(item.id, "approved")}
+                      onReject={() => handleStatus(item.id, "rejected")}
+                      onMarkPlayed={() => handleStatus(item.id, "played")}
+                      onDelete={() => handleDelete(item.id)}
+                      onMoveUp={() => handleMove(item.id, -1)}
+                      onMoveDown={() => handleMove(item.id, 1)}
+                      canMoveUp={index > 0 || !!nowPlaying}
+                      canMoveDown={index < upNext.length - 1}
+                      canControl={canControl}
+                    />
+                  ))}
+                </View>
+              ) : (
+                <Text style={styles.queueEmpty}>
+                  신청곡이 없습니다. 첫 곡을 신청해 보세요.
+                </Text>
+              )}
+            </View>
+          </>
         ) : null}
 
-        <View style={styles.feedSection}>
-          <Text style={styles.sectionTitle}>곡 신청 · 대기열</Text>
-          <AppButton
-            variant="secondary"
-            style={styles.menuAction}
-            onPress={() => setQueueSheetOpen(true)}
-          >
-            ＋ 곡 신청 · 대기열 ({upNext.length})
-          </AppButton>
-          <Text style={styles.submitNote}>
-            신청곡과 대기열은 아래 시트에서 확인할 수 있어요.
-          </Text>
-        </View>
-        <DJQueueRanking
-          items={ranking}
-          hidden={data.board.anonymousAuthor === true}
-        />
+        {activeSection === "history" ? (
+          <View style={styles.historySection}>
+            <View style={styles.historyHeader}>
+              <Text style={styles.sectionTitle} accessibilityRole="header">
+                이번 달 신청 TOP 5
+              </Text>
+              <SectionNav
+                style={styles.historyKindNav}
+                accessibilityLabel="신청 TOP 종류"
+              >
+                <SectionNavItem
+                  selected={historyKind === "submitters"}
+                  onPress={() => setHistoryKind("submitters")}
+                  accessibilityLabel="신청자"
+                >
+                  신청자
+                </SectionNavItem>
+                <SectionNavItem
+                  selected={historyKind === "songs"}
+                  onPress={() => setHistoryKind("songs")}
+                  accessibilityLabel="신청곡"
+                >
+                  신청곡
+                </SectionNavItem>
+              </SectionNav>
+            </View>
+
+            <View style={styles.historyMetric}>
+              <Text style={styles.historyMetricLabel}>내 곡 재생 횟수</Text>
+              <Text style={styles.historyMetricValue}>{myPlayedCount}회</Text>
+            </View>
+
+            {rankingLoading ? (
+              <Text style={styles.historyEmpty}>
+                이번 달 신청 TOP을 불러오는 중…
+              </Text>
+            ) : rankingError ? (
+              <Text style={styles.historyEmpty}>{rankingError}</Text>
+            ) : historyKind === "submitters" ? (
+              <DJQueueRanking
+                title=""
+                items={topSubmitters}
+                hidden={rankingData?.submittersHidden === true}
+                countUnit="회"
+                hiddenText="익명 보드에서는 신청자 순위를 숨겨요."
+                emptyText="아직 신청자 기록이 없어요."
+              />
+            ) : (
+              <DJQueueRanking
+                title=""
+                items={topSongs}
+                countUnit="회"
+                emptyText="아직 신청곡 기록이 없어요."
+              />
+            )}
+          </View>
+        ) : null}
       </ScrollView>
 
       <AppBottomSheet
         visible={queueSheetOpen}
         onClose={() => setQueueSheetOpen(false)}
-        sheetStyle={[
-          styles.queueSheet,
-          { paddingBottom: insets.bottom + spacing.md },
-        ]}
-        accessibilityLabel="곡 신청 및 대기열"
+        sheetStyle={styles.queueSheet}
+        accessibilityLabel="곡 신청"
         keyboardAvoiding
       >
         <View style={styles.sheetHeader}>
@@ -408,61 +583,41 @@ export function DJQueueBoard({
         {submitError ? (
           <Text style={styles.submitError}>{submitError}</Text>
         ) : null}
-        <View style={styles.sheetHeader}>
-          <Text style={styles.sheetTitle}>대기열</Text>
-          <Text style={styles.sheetDescription}>
-            {canControl
-              ? "↑↓로 순서를 변경할 수 있어요."
-              : "선생님이 승인하면 재생 목록에 올라갑니다."}
-          </Text>
-        </View>
-        <FlatList
-          data={upNext}
-          keyExtractor={(card) => card.id}
-          style={styles.queueSheetList}
-          contentContainerStyle={styles.queueSheetContent}
-          keyboardShouldPersistTaps="handled"
-          renderItem={({ item, index }) => (
-            <DJQueueItem
-              card={item}
-              rank={(nowPlaying ? 2 : 1) + index}
-              onApprove={() => handleStatus(item.id, "approved")}
-              onReject={() => handleStatus(item.id, "rejected")}
-              onMarkPlayed={() => handleStatus(item.id, "played")}
-              onDelete={() => handleDelete(item.id)}
-              onMoveUp={() => handleMove(item.id, -1)}
-              onMoveDown={() => handleMove(item.id, 1)}
-              canMoveUp={index > 0 || !!nowPlaying}
-              canMoveDown={index < upNext.length - 1}
-              canControl={canControl}
-            />
-          )}
-          ItemSeparatorComponent={() => <View style={styles.separator} />}
-          ListEmptyComponent={
-            <Text style={styles.empty}>
-              {nowPlaying
-                ? "다음 곡이 없습니다."
-                : "신청곡이 없습니다. 첫 곡을 신청해 보세요."}
+        {recentSubmissions.length > 0 ? (
+          <View style={styles.recentSection}>
+            <Text style={styles.recentTitle}>최근 신청곡</Text>
+            <Text style={styles.recentDescription}>
+              곡을 누르면 바로 다시 신청돼요.
             </Text>
-          }
-        />
+            <View style={styles.recentList}>
+              {recentSubmissions.map((card) => {
+                const url = card.linkUrl ?? card.videoUrl;
+                if (!url) return null;
+                return (
+                  <ControlPressable
+                    key={card.id}
+                    style={styles.recentRow}
+                    onPress={() => void handleRecentSubmission(url)}
+                    disabled={submitting}
+                    accessibilityLabel={`${card.title} 다시 신청`}
+                  >
+                    <View style={styles.recentCopy}>
+                      <Text style={styles.recentRowTitle} numberOfLines={1}>
+                        {card.title}
+                      </Text>
+                      <Text style={styles.recentRowMeta} numberOfLines={1}>
+                        {card.linkDesc || "최근 신청곡"}
+                      </Text>
+                    </View>
+                    <Text style={styles.recentAction}>신청</Text>
+                  </ControlPressable>
+                );
+              })}
+            </View>
+          </View>
+        ) : null}
       </AppBottomSheet>
 
-      <DJPlayedDrawer
-        open={playedOpen}
-        played={playedCards}
-        canControl={canControl}
-        onClose={() => setPlayedOpen(false)}
-        onRestore={handleRestore}
-        onDelete={handleDelete}
-      />
-
-      <DJRecapModal
-        open={recapOpen}
-        boardId={boardId}
-        boardTitle={data.board.title}
-        onClose={() => setRecapOpen(false)}
-      />
     </View>
   );
 }
@@ -470,64 +625,119 @@ export function DJQueueBoard({
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.bg },
   feed: { flex: 1 },
-  feedContent: { paddingBottom: spacing.xl },
-  header: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-    justifyContent: "space-between",
-    gap: spacing.md,
-    paddingHorizontal: spacing.lg,
-    paddingTop: spacing.lg,
-    paddingBottom: spacing.md,
-    borderBottomWidth: borders.hairline,
-    borderBottomColor: colors.border,
+  feedContent: { paddingBottom: spacing.xxxl },
+  sectionNav: {
+    width: "100%",
+    alignSelf: "stretch",
+    backgroundColor: colors.surface,
+    marginTop: pageChrome.contentStartGap,
   },
-  headerCompact: {
-    flexDirection: "column",
+  sectionNavItem: { flex: 1 },
+  emptyNow: {
+    marginHorizontal: pageChrome.horizontalPadding,
+    marginTop: spacing.xl,
+    paddingHorizontal: spacing.xl,
+    paddingVertical: spacing.xxl,
   },
-  headerCopy: { flex: 1 },
-  headerActions: { flexDirection: "row", gap: spacing.sm },
-  headerActionsCompact: {
-    flexWrap: "wrap",
-  },
-  title: { ...typography.title, color: colors.text },
-  subtitle: {
-    ...typography.body,
-    color: colors.textMuted,
-    marginTop: spacing.xs,
-  },
-  headerBtn: {
-    flexShrink: 0,
-  },
+  emptyNowTitle: { ...typography.subtitle, color: colors.textMuted },
 
-  // Stream sections
-  feedSection: {
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.lg,
-    borderBottomWidth: borders.hairline,
-    borderBottomColor: colors.border,
-  },
   sectionTitle: { ...typography.section, color: colors.text },
-  menuAction: {
-    marginTop: spacing.md,
-  },
   sheetHeader: {
-    gap: spacing.xxs,
-    paddingHorizontal: spacing.lg,
-    paddingBottom: spacing.md,
+    gap: spacing.xs,
+    paddingHorizontal: pageChrome.horizontalPadding,
+    paddingTop: spacing.md,
+    paddingBottom: spacing.sm,
   },
   sheetTitle: { ...typography.section, color: colors.text },
   sheetDescription: { ...typography.micro, color: colors.textMuted },
   submitInput: {
     backgroundColor: colors.surface,
-    marginHorizontal: spacing.lg,
+    marginHorizontal: pageChrome.horizontalPadding,
   },
   submitBtn: {
-    marginHorizontal: spacing.lg,
-    marginTop: spacing.sm,
+    marginHorizontal: pageChrome.horizontalPadding,
+    marginTop: spacing.md,
   },
-  submitNote: {
+  recentSection: {
+    marginTop: spacing.xxl,
+    paddingHorizontal: pageChrome.horizontalPadding,
+  },
+  recentTitle: { ...typography.section, color: colors.text },
+  recentDescription: {
     ...typography.micro,
+    color: colors.textMuted,
+    marginTop: spacing.xs,
+  },
+  recentList: { gap: spacing.sm, marginTop: spacing.md },
+  recentRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.md,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+  },
+  recentCopy: { flex: 1, minWidth: 0 },
+  recentRowTitle: { ...typography.label, color: colors.text },
+  recentRowMeta: {
+    ...typography.micro,
+    color: colors.textMuted,
+    marginTop: spacing.xxs,
+  },
+  recentAction: { ...typography.badge, color: colors.accentTintedText },
+  queueSection: {
+    marginHorizontal: pageChrome.horizontalPadding,
+    marginTop: spacing.xxl,
+  },
+  queueHeader: {
+    flexDirection: "row",
+    alignItems: "baseline",
+    justifyContent: "space-between",
+    gap: spacing.md,
+  },
+  queueCount: { ...typography.micro, color: colors.textMuted },
+  requestButton: {
+    alignSelf: "flex-start",
+    minHeight: tapMin,
+    marginTop: spacing.xs,
+    paddingHorizontal: spacing.xs,
+  },
+  queueList: {
+    gap: spacing.sm,
+    marginTop: spacing.md,
+  },
+  queueEmpty: {
+    ...typography.body,
+    color: colors.textMuted,
+    marginTop: spacing.md,
+  },
+  historySection: {
+    marginHorizontal: pageChrome.horizontalPadding,
+    marginTop: spacing.xl,
+    gap: spacing.md,
+  },
+  historyHeader: {
+    minHeight: tapMin + spacing.xs,
+    flexDirection: "row",
+    alignItems: "flex-end",
+    justifyContent: "space-between",
+    gap: spacing.md,
+    borderBottomWidth: borders.hairline,
+    borderBottomColor: colors.border,
+  },
+  historyKindNav: {
+    flexShrink: 0,
+    borderBottomWidth: borders.none,
+  },
+  historyMetric: {
+    flexDirection: "row",
+    alignItems: "baseline",
+    justifyContent: "space-between",
+    paddingVertical: spacing.sm,
+  },
+  historyMetricLabel: { ...typography.body, color: colors.textMuted },
+  historyMetricValue: { ...typography.section, color: colors.accentTintedText },
+  historyEmpty: {
+    ...typography.body,
     color: colors.textMuted,
     marginTop: spacing.sm,
   },
@@ -540,22 +750,6 @@ const styles = StyleSheet.create({
     height: "82%",
     maxHeight: "82%",
     minHeight: tapMin * 6,
-  },
-  queueSheetList: { flex: 1 },
-  queueSheetContent: {
-    paddingBottom: spacing.lg,
-  },
-  separator: {
-    height: borders.hairline,
-    marginHorizontal: spacing.lg,
-    backgroundColor: colors.border,
-  },
-  empty: {
-    ...typography.body,
-    color: colors.textMuted,
-    textAlign: "center",
-    padding: spacing.xl,
-    borderBottomWidth: borders.hairline,
-    borderBottomColor: colors.border,
+    paddingBottom: spacing.md,
   },
 });

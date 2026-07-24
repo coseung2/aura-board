@@ -5,11 +5,12 @@ import {
   dj,
   iconSizes,
   media,
+  pageChrome,
   radii,
   spacing,
   typography,
 } from "../../theme/tokens";
-import { buildMediaItems, findPlayableMediaUrl } from "../../lib/media";
+import { findPlayableMediaUrl } from "../../lib/media";
 import type { BoardCard } from "../../lib/types";
 import { EmbeddedMedia } from "../EmbeddedMedia";
 import { AppButton } from "../ui";
@@ -75,21 +76,18 @@ export function DJNowPlayingCard({
 }
 
 function getNowPlayingMediaUrl(card: BoardCard): string | null {
-  const playableUrl = findPlayableMediaUrl(card);
-  if (playableUrl) return playableUrl;
-  const mediaItem = buildMediaItems(card).find(
-    (item) => item.kind === "video" || item.kind === "link",
-  );
-  return mediaItem?.url ?? card.videoUrl ?? card.linkUrl ?? null;
+  return findPlayableMediaUrl(card);
 }
 
 const styles = StyleSheet.create({
   now: {
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.lg,
+    marginHorizontal: pageChrome.horizontalPadding,
+    marginTop: spacing.xl,
+    paddingHorizontal: spacing.xl,
+    paddingVertical: spacing.xl,
     gap: spacing.md,
-    borderBottomWidth: borders.hairline,
-    borderBottomColor: colors.border,
+    borderRadius: radii.card,
+    backgroundColor: colors.surfaceAlt,
   },
   nowLabel: { ...typography.badge, color: colors.accent },
   nowBody: {

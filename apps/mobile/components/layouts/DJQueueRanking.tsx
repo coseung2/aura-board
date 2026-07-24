@@ -1,8 +1,8 @@
 import { StyleSheet, Text, View } from "react-native";
 import {
-  borders,
   colors,
   dj,
+  pageChrome,
   radii,
   spacing,
   typography,
@@ -12,26 +12,34 @@ import type { QueueRankingItem } from "./dj-queue-state";
 export function DJQueueRanking({
   items,
   hidden = false,
+  title = "신청 TOP",
+  countUnit = "곡",
+  hiddenText = "익명 보드에서는 신청자 순위를 숨겨요.",
+  emptyText = "아직 신청 기록이 없어요.",
 }: {
   items: QueueRankingItem[];
   hidden?: boolean;
+  title?: string;
+  countUnit?: string;
+  hiddenText?: string;
+  emptyText?: string;
 }) {
   return (
-    <View style={styles.section}>
-      <Text style={styles.title}>신청 TOP</Text>
+    <View style={[styles.section, !title && styles.sectionFlush]}>
+      {title ? <Text style={styles.title}>{title}</Text> : null}
       {hidden ? (
-        <Text style={styles.empty}>익명 보드에서는 신청자 순위를 숨겨요.</Text>
+        <Text style={styles.empty}>{hiddenText}</Text>
       ) : items.length === 0 ? (
-        <Text style={styles.empty}>아직 신청 기록이 없어요.</Text>
+        <Text style={styles.empty}>{emptyText}</Text>
       ) : (
         items.map((item, index) => (
-          <View key={item.name} style={styles.row}>
+          <View key={`${item.name}-${index}`} style={styles.row}>
             <Text style={[styles.position, index < 3 && styles.positionTop]}>
               {index + 1}
             </Text>
             <View
               style={[styles.avatar, index === 0 && styles.avatarTop]}
-              accessibilityLabel={`${item.name} 신청자`}
+              accessibilityLabel={`${item.name}`}
             >
               <Text
                 style={[styles.avatarText, index === 0 && styles.avatarTextTop]}
@@ -42,7 +50,10 @@ export function DJQueueRanking({
             <Text style={styles.name} numberOfLines={1}>
               {item.name}
             </Text>
-            <Text style={styles.count}>{item.count}곡</Text>
+            <Text style={styles.count}>
+              {item.count}
+              {countUnit}
+            </Text>
           </View>
         ))
       )}
@@ -52,11 +63,13 @@ export function DJQueueRanking({
 
 const styles = StyleSheet.create({
   section: {
-    marginTop: spacing.sm,
-    paddingHorizontal: spacing.lg,
-    paddingTop: spacing.lg,
-    borderTopWidth: borders.hairline,
-    borderTopColor: colors.border,
+    marginHorizontal: pageChrome.horizontalPadding,
+    marginTop: spacing.xl,
+    paddingHorizontal: spacing.none,
+  },
+  sectionFlush: {
+    marginHorizontal: spacing.none,
+    marginTop: spacing.none,
   },
   title: { ...typography.section, color: colors.text },
   empty: {

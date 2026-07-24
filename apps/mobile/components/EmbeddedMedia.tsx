@@ -15,6 +15,7 @@ import {
   extractYouTubeVideoId,
   isAllowedEmbedNavigation,
   isDirectVideoUrl,
+  isMobileEmbedUrl,
   MOBILE_EMBED_ORIGIN,
   safeHost,
 } from "../lib/media";
@@ -52,6 +53,7 @@ export function EmbeddedMedia({
   const canEmbed = Boolean(
     embedUrl && kind !== null && (kind !== "youtube" || youtubeId),
   );
+  const canOpenExternal = !hideExternal && !isMobileEmbedUrl(externalUrl);
 
   const source = useMemo(() => {
     const fallbackTitle = title ?? "미디어";
@@ -184,7 +186,7 @@ export function EmbeddedMedia({
                 >
                   다시 시도
                 </AppButton>
-                {!hideExternal ? (
+                {canOpenExternal ? (
                   <ExternalOpenButton url={externalUrl} />
                 ) : null}
               </View>
@@ -196,7 +198,7 @@ export function EmbeddedMedia({
           <Text style={styles.unsupportedText}>
             이 영상은 앱 안에서 재생할 수 없어요.
           </Text>
-          {!hideExternal ? <ExternalOpenButton url={externalUrl} /> : null}
+          {canOpenExternal ? <ExternalOpenButton url={externalUrl} /> : null}
         </View>
       ) : (
         <View style={styles.unsupportedOverlay}>
@@ -206,7 +208,7 @@ export function EmbeddedMedia({
           <Text style={styles.unsupportedHint}>
             공개 임베드 링크가 아니어서 외부 앱에서 열어야 해요.
           </Text>
-          {!hideExternal ? <ExternalOpenButton url={externalUrl} /> : null}
+          {canOpenExternal ? <ExternalOpenButton url={externalUrl} /> : null}
         </View>
       )}
     </View>

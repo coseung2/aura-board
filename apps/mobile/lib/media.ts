@@ -5,6 +5,21 @@ import type { CardAttachment } from "./types";
 
 export const MOBILE_EMBED_ORIGIN = "https://aura-board.com";
 
+/** Internal WebView base paths are not playable media or public web pages. */
+export function isMobileEmbedUrl(raw: string | null | undefined): boolean {
+  if (!raw) return false;
+  try {
+    const target = new URL(raw.trim());
+    const wrapper = new URL(MOBILE_EMBED_ORIGIN);
+    return (
+      target.origin === wrapper.origin &&
+      target.pathname.startsWith("/mobile-embed/")
+    );
+  } catch {
+    return false;
+  }
+}
+
 const YT_VIDEO_ID_RE = /^[A-Za-z0-9_-]{11}$/;
 const YT_HOSTS = new Set([
   "youtube.com",

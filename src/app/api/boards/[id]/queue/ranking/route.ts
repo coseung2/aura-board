@@ -6,8 +6,8 @@ import { getEffectiveBoardRole } from "@/lib/rbac";
 
 // GET /api/boards/:id/queue/ranking
 // Returns top-10 played songs + top-10 submitters for the current calendar
-// month (server local time). "Played" = queueStatus="played" AND updatedAt
-// within [firstOfMonth, now].
+// month (server local time). Counts only songs that were actually played:
+// queueStatus="played" AND updatedAt within [firstOfMonth, now].
 export async function GET(
   _req: Request,
   { params }: { params: Promise<{ id: string }> }
@@ -41,7 +41,7 @@ export async function GET(
   const now = new Date();
   const firstOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
 
-  // Played songs this month — grouped by linkUrl, counted.
+  // Played songs this month — only actual plays.
   const playedThisMonth = await db.card.findMany({
     where: {
       boardId: board.id,
@@ -52,37 +52,6 @@ export async function GET(
       linkUrl: true,
       linkImage: true,
       title: true,
-    },
-  });
-
-  const songMap = new Map<
-    string,
-    { linkUrl: string; linkImage: string | null; title: string; count: number }
-  >();
-  for (const c of playedThisMonth) {
-    if (!c.linkUrl) continue;
-    const entry = songMap.get(c.linkUrl);
-    if (entry) entry.count += 1;
-    else
-      songMap.set(c.linkUrl, {
-        linkUrl: c.linkUrl,
-        linkImage: c.linkImage,
-        title: c.title,
-        count: 1,
-      });
-  }
-  const songs = [...songMap.values()]
-    .sort((a, b) => b.count - a.count)
-    .slice(0, 10);
-
-  // Submissions this month — grouped by submitter identity.
-  const submittedThisMonth = await db.card.findMany({
-    where: {
-      boardId: board.id,
-      queueStatus: { not: null },
-      createdAt: { gte: firstOfMonth },
-    },
-    select: {
       studentAuthorId: true,
       externalAuthorName: true,
       authorId: true,
@@ -90,22 +59,42 @@ export async function GET(
     },
   });
 
+  const songMap = new Map<
+    string,
+    { linkUrl: string; linkImage: string | null; title: string; count: number }
+  >();
   const submitterMap = new Map<
     string,
     { key: string; name: string; count: number; isStudent: boolean }
   >();
-  for (const c of submittedThisMonth) {
-    // Student submitter → key by studentAuthorId, name from externalAuthorName.
-    // Teacher submitter → key by authorId, name from author.name.
-    const isStudent = !!c.studentAuthorId;
-    const key = isStudent ? `s:${c.studentAuthorId}` : `u:${c.authorId}`;
+
+  for (const card of playedThisMonth) {
+    if (card.linkUrl) {
+      const song = songMap.get(card.linkUrl);
+      if (song) song.count += 1;
+      else
+        songMap.set(card.linkUrl, {
+          linkUrl: card.linkUrl,
+          linkImage: card.linkImage,
+          title: card.title,
+          count: 1,
+        });
+    }
+
+    const isStudent = !!card.studentAuthorId;
+    const key = isStudent ? `s:${card.studentAuthorId}` : `u:${card.authorId}`;
     const name = isStudent
-      ? c.externalAuthorName ?? "학생"
-      : c.author?.name ?? "선생님";
-    const entry = submitterMap.get(key);
-    if (entry) entry.count += 1;
+      ? card.externalAuthorName ?? "학생"
+      : card.author?.name ?? "선생님";
+    const submitter = submitterMap.get(key);
+    if (submitter) submitter.count += 1;
     else submitterMap.set(key, { key, name, count: 1, isStudent });
   }
+
+  const songs = [...songMap.values()]
+    .sort((a, b) => b.count - a.count)
+    .slice(0, 10);
+
   const submitters = board.anonymousAuthor
     ? []
     : [...submitterMap.values()]
