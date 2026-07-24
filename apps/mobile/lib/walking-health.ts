@@ -428,7 +428,8 @@ export async function fetchWalkingDays(_days?: number) {
   return (await fetchWalkingSnapshot()).rows;
 }
 
-export async function readAndSyncWalkingDays(_days?: number) {
+/** Read the current KST week from the device without persisting it server-side. */
+export async function readWalkingDaysFromDevice() {
   if (!isHealthConnectModuleAvailable() || !AuraBoardHealthConnectModule) {
     throw new WalkingHealthError("module_unavailable");
   }
@@ -448,6 +449,13 @@ export async function readAndSyncWalkingDays(_days?: number) {
   const boundedNativeRows = nativeRows.filter(
     (row) => row.day >= range.weekStart && row.day <= range.today,
   );
+
+  return boundedNativeRows;
+}
+
+export async function readAndSyncWalkingDays(_days?: number) {
+  const range = getCurrentWalkingWeekRange();
+  const boundedNativeRows = await readWalkingDaysFromDevice();
 
   const payload = await apiFetch<{ rows: WalkingDay[] }>("/api/student/walking", {
     method: "POST",

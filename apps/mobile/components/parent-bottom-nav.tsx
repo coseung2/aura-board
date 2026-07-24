@@ -1,11 +1,11 @@
 import { forwardRef } from "react";
 import { useRouter, type Href } from "expo-router";
-import { StretchHorizontal, type LucideIcon, type LucideProps } from "lucide-react-native";
+import { Footprints, StretchHorizontal, type LucideIcon, type LucideProps } from "lucide-react-native";
 import { StyleSheet, View } from "react-native";
 import { borders } from "../theme/tokens";
 import { MobileBottomNav } from "./MobileBottomNav";
 
-export type ParentNavItem = "feed" | "home";
+export type ParentNavItem = "feed" | "home" | "walking";
 type LegacyParentDestination = "notifications" | "add" | "account";
 type Props = { active: ParentNavItem | LegacyParentDestination; notificationCount?: number; onFeedPress?: () => void; onHomePress?: () => void };
 
@@ -57,6 +57,7 @@ const NineGridIcon = forwardRef<View, LucideProps>(function NineGridIcon(
 const ITEMS: Array<{ name: ParentNavItem; label: string; route: Href; Icon: LucideIcon }> = [
   { name: "feed", label: "피드", route: "/(parent)", Icon: StretchHorizontal },
   { name: "home", label: "홈", route: "/(parent)/home", Icon: NineGridIcon },
+  { name: "walking", label: "걷기", route: "/(parent)/walking" as Href, Icon: Footprints },
 ];
 
 const styles = StyleSheet.create({

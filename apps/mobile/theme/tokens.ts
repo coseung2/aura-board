@@ -533,6 +533,7 @@ export const parent = {
   feedPlayButtonSize: 56,
   childAvatarSize: 48,
   childDetailAvatarSize: 56,
+  walkingChildLabelWidth: 84,
   doneIconSize: 56,
   emptyIconSize: 48,
   contentCardMinWidth: 220,
