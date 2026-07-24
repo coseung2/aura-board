@@ -15,35 +15,47 @@ const PARENT_SELECTED_CHILD_KEY = "aura_parent_selected_child";
 const parentSelectedChildListeners = new Set<
   (studentId: string | null) => void
 >();
-let parentLogoutInProgress = false;
+let logoutInProgressRole: UnifiedLoginRole | null = null;
 
 export type UnifiedLoginRole = "student" | "parent";
 export type UnifiedLoginRoute =
-  | `/?role=${UnifiedLoginRole}`
-  | `/?role=${UnifiedLoginRole}&error=${string}`;
+  | `/login?role=${UnifiedLoginRole}`
+  | `/login?role=${UnifiedLoginRole}&error=${string}`;
 
 /**
- * The mobile app has one login surface at the root route. Keep auth failures
- * and explicit logout navigation pointed at that surface so stale group
- * screens cannot render a second, divergent login flow.
+ * Keep auth failures and explicit logout navigation on a dedicated top-level
+ * route. Using `/` for both boot restoration and logout allowed nested group
+ * indexes to remain active while the login UI was being mounted.
  */
 export function getUnifiedLoginRoute(
   role: UnifiedLoginRole,
   error?: string,
 ): UnifiedLoginRoute {
-  const base: `/?role=${UnifiedLoginRole}` = `/?role=${role}`;
+  const base: `/login?role=${UnifiedLoginRole}` = `/login?role=${role}`;
   return error
     ? (`${base}&error=${encodeURIComponent(error)}` as UnifiedLoginRoute)
     : base;
 }
 
-/** Mark an explicit parent logout so in-flight auth guards do not navigate again. */
+/**
+ * Mark an explicit logout before any async storage work starts. The root login
+ * screen uses this marker to suppress session restoration while nested screens
+ * are unmounting.
+ */
+export function startStudentLogout(): void {
+  logoutInProgressRole = "student";
+}
+
 export function startParentLogout(): void {
-  parentLogoutInProgress = true;
+  logoutInProgressRole = "parent";
 }
 
 export function isParentLogoutInProgress(): boolean {
-  return parentLogoutInProgress;
+  return logoutInProgressRole === "parent";
+}
+
+export function getLogoutInProgressRole(): UnifiedLoginRole | null {
+  return logoutInProgressRole;
 }
 
 function canUseWebStorage(): boolean {
@@ -87,6 +99,7 @@ export type CachedStudent = {
 export async function saveSessionToken(token: string): Promise<void> {
   // A login/token replacement starts a new auth scope. Never let a previous
   // student's in-memory board data survive that boundary.
+  logoutInProgressRole = null;
   clearBoardCache();
   await setStoredItem(TOKEN_KEY, token);
 }
@@ -125,7 +138,7 @@ export type CachedParent = {
 };
 
 export async function saveParentToken(token: string): Promise<void> {
-  parentLogoutInProgress = false;
+  logoutInProgressRole = null;
   await setStoredItem(PARENT_TOKEN_KEY, token);
 }
 
@@ -137,7 +150,24 @@ export async function clearParentSession(): Promise<void> {
   await deleteStoredItem(PARENT_TOKEN_KEY).catch(() => undefined);
   await deleteStoredItem(PARENT_KEY).catch(() => undefined);
   await deleteStoredItem(PARENT_SELECTED_CHILD_KEY).catch(() => undefined);
-  for (const listener of parentSelectedChildListeners) listener(null);
+  notifyParentSelectedChild(null);
+}
+
+/**
+ * Explicit logout exits the unified mobile login scope, not just the currently
+ * visible role. Clearing both role caches prevents the landing screen (or the
+ * next cold start) from restoring a stale session for the other role.
+ */
+export async function clearAllMobileSessions(): Promise<void> {
+  clearBoardCache();
+  await Promise.all([
+    deleteStoredItem(TOKEN_KEY).catch(() => undefined),
+    deleteStoredItem(STUDENT_KEY).catch(() => undefined),
+    deleteStoredItem(PARENT_TOKEN_KEY).catch(() => undefined),
+    deleteStoredItem(PARENT_KEY).catch(() => undefined),
+    deleteStoredItem(PARENT_SELECTED_CHILD_KEY).catch(() => undefined),
+  ]);
+  notifyParentSelectedChild(null);
 }
 
 export async function saveParentCache(parent: CachedParent): Promise<void> {
@@ -156,7 +186,7 @@ export async function loadParentCache(): Promise<CachedParent | null> {
 
 export async function saveParentSelectedChild(studentId: string): Promise<void> {
   await setStoredItem(PARENT_SELECTED_CHILD_KEY, studentId);
-  for (const listener of parentSelectedChildListeners) listener(studentId);
+  notifyParentSelectedChild(studentId);
 }
 
 export async function loadParentSelectedChild(): Promise<string | null> {
@@ -168,4 +198,14 @@ export function subscribeParentSelectedChild(
 ): () => void {
   parentSelectedChildListeners.add(listener);
   return () => parentSelectedChildListeners.delete(listener);
+}
+
+function notifyParentSelectedChild(studentId: string | null): void {
+  for (const listener of parentSelectedChildListeners) {
+    try {
+      listener(studentId);
+    } catch {
+      // A mounted screen listener must never prevent session cleanup/logout.
+    }
+  }
 }

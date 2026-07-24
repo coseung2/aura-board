@@ -82,7 +82,7 @@ export default function ParentAccountScreen() {
   };
 
   const confirmLogout = () => {
-    Alert.alert("로그아웃", "이 기기에서 로그아웃하시겠어요?", [
+    Alert.alert("로그아웃할까요?", "현재 계정에서 나가고 로그인 화면으로 돌아갑니다.", [
       { text: "취소", style: "cancel" },
       { text: "로그아웃", onPress: () => void handleLogout() },
     ]);

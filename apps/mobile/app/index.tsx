@@ -31,6 +31,7 @@ import {
 } from "../theme/tokens";
 import {
   clearParentSession,
+  getLogoutInProgressRole,
   loadSessionToken,
   loadParentToken,
   saveParentCache,
@@ -91,7 +92,7 @@ function parentAuthErrorMessage(value: string | string[] | undefined): string | 
   return PARENT_OAUTH_ERROR_MESSAGES[initial] ?? initial;
 }
 
-export default function Landing() {
+export function Landing() {
   const router = useRouter();
   const { role: routeRole, error: routeError } = useLocalSearchParams<{
     role?: string | string[];
@@ -105,8 +106,11 @@ export default function Landing() {
         : (Array.isArray(routeRole) ? routeRole[0] : routeRole) === "student"
           ? "student"
           : null;
+  const logoutRole = getLogoutInProgressRole();
   const { width } = useWindowDimensions();
-  const [booting, setBooting] = useState(requestedRole === null);
+  const [booting, setBooting] = useState(
+    requestedRole === null && logoutRole === null,
+  );
   const [studentCode, setStudentCode] = useState("");
   const [studentLoading, setStudentLoading] = useState(false);
   const [studentError, setStudentError] = useState<string | null>(null);
@@ -116,7 +120,7 @@ export default function Landing() {
     parentAuthErrorMessage(routeError),
   );
   const [activeRole, setActiveRole] = useState<"student" | "parent" | "review">(
-    requestedRole ?? "student",
+    requestedRole ?? logoutRole ?? "student",
   );
   const isNarrow = width < layout.mobileBreakpoint;
   const webNarrowContentStyle = webSafeWidthStyle(width, {
@@ -126,8 +130,8 @@ export default function Landing() {
   });
 
   useEffect(() => {
-    if (requestedRole) {
-      setActiveRole(requestedRole);
+    if (requestedRole || logoutRole) {
+      setActiveRole(requestedRole ?? logoutRole ?? "student");
       setBooting(false);
       return;
     }
@@ -167,7 +171,7 @@ export default function Landing() {
 
       setBooting(false);
     })();
-  }, [requestedRole, router]);
+  }, [logoutRole, requestedRole, router]);
 
   useEffect(() => {
     if (requestedRole) setActiveRole(requestedRole);
@@ -525,6 +529,8 @@ export default function Landing() {
     </SafeAreaView>
   );
 }
+
+export default Landing;
 
 function RoleLineIcon({ role }: { role: "student" | "parent" }) {
   const Icon = role === "student" ? BookOpen : House;

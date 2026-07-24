@@ -72,7 +72,9 @@ export async function registerParentPushNotifications(): Promise<void> {
   }
 }
 
-export async function unregisterParentPushNotifications(): Promise<void> {
+export async function unregisterParentPushNotifications(
+  authorizationToken?: string | null,
+): Promise<void> {
   if (Platform.OS !== "android" && Platform.OS !== "ios") return;
   const token = currentToken ?? (await SecureStore.getItemAsync(PUSH_TOKEN_KEY));
   if (!token) return;
@@ -80,6 +82,10 @@ export async function unregisterParentPushNotifications(): Promise<void> {
   await parentApiFetch("/api/parent/push-token", {
     method: "DELETE",
     json: { token },
+    headers: authorizationToken
+      ? { Authorization: `Bearer ${authorizationToken}` }
+      : undefined,
+    skipAuth: Boolean(authorizationToken),
   }).catch(() => undefined);
   await SecureStore.deleteItemAsync(PUSH_TOKEN_KEY).catch(() => undefined);
 }

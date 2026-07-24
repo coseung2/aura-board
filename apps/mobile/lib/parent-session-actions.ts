@@ -1,5 +1,9 @@
 import { parentApiFetch } from "./api";
-import { clearParentSession, startParentLogout } from "./session";
+import {
+  clearAllMobileSessions,
+  loadParentToken,
+  startParentLogout,
+} from "./session";
 import { unregisterParentPushNotifications } from "./parent-push-notifications";
 
 export async function logoutParentSession(
@@ -7,10 +11,18 @@ export async function logoutParentSession(
 ): Promise<void> {
   // Stop in-flight parent guards from racing the single login destination.
   startParentLogout();
+  const tokenPromise = loadParentToken().catch(() => null);
   onLogoutStarted?.();
-  await unregisterParentPushNotifications().catch(() => undefined);
-  await parentApiFetch("/api/parent/logout", { method: "POST" }).catch(
-    () => undefined,
-  );
-  await clearParentSession();
+  const token = await tokenPromise;
+  await clearAllMobileSessions();
+
+  const headers = token ? { Authorization: `Bearer ${token}` } : undefined;
+  void Promise.allSettled([
+    unregisterParentPushNotifications(token),
+    parentApiFetch("/api/parent/logout", {
+      method: "POST",
+      headers,
+      skipAuth: true,
+    }),
+  ]);
 }

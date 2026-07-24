@@ -1,9 +1,14 @@
 import { useRef, useState } from "react";
-import { StyleSheet, View } from "react-native";
+import { Alert, StyleSheet, View } from "react-native";
 import { useRouter } from "expo-router";
 import { LogOut } from "lucide-react-native";
 import { apiFetch } from "../lib/api";
-import { clearSessionToken, getUnifiedLoginRoute } from "../lib/session";
+import {
+  clearAllMobileSessions,
+  getUnifiedLoginRoute,
+  loadSessionToken,
+  startStudentLogout,
+} from "../lib/session";
 import {
   borders,
   colors,
@@ -25,17 +30,42 @@ export function StudentHeaderActions() {
     loggingOutRef.current = true;
     setLoggingOut(true);
     try {
-      // The server logout is best effort. Start it without holding up the
-      // local cleanup or navigation when the request is slow or unavailable.
-      void apiFetch("/api/student/logout", { method: "POST" }).catch(
-        () => undefined,
-      );
-      await clearSessionToken();
+      // Mark the transition and leave the authenticated stack immediately.
+      // The login route suppresses restoration while local cleanup finishes.
+      startStudentLogout();
+      const tokenPromise = loadSessionToken().catch(() => null);
       router.replace(getUnifiedLoginRoute("student"));
+
+      const token = await tokenPromise;
+      await clearAllMobileSessions();
+
+      // Use the captured old token so delayed cleanup can never target a new
+      // session created from the login screen.
+      void apiFetch("/api/student/logout", {
+        method: "POST",
+        headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+        skipAuth: true,
+      }).catch(() => undefined);
     } finally {
       loggingOutRef.current = false;
       setLoggingOut(false);
     }
+  }
+
+  function confirmLogout() {
+    if (loggingOutRef.current) return;
+    Alert.alert(
+      "로그아웃할까요?",
+      "현재 계정에서 나가고 로그인 화면으로 돌아갑니다.",
+      [
+        { text: "취소", style: "cancel" },
+        {
+          text: "로그아웃",
+          style: "destructive",
+          onPress: () => void handleLogout(),
+        },
+      ],
+    );
   }
 
   return (
@@ -43,7 +73,7 @@ export function StudentHeaderActions() {
       <StudentNotificationButton />
       <ControlPressable
         style={styles.logoutButton}
-        onPress={handleLogout}
+        onPress={confirmLogout}
         disabled={loggingOut}
         accessibilityLabel={loggingOut ? "로그아웃 중" : "로그아웃"}
         accessibilityState={{ disabled: loggingOut }}
