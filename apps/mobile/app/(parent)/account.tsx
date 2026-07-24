@@ -16,7 +16,6 @@ import {
   AppHeader,
   EmptyState,
   SectionHeader,
-  SurfaceCard,
 } from "../../components/ui";
 import { useParentOverview } from "../../hooks/use-parent-overview";
 import { ApiError, parentApiFetch } from "../../lib/api";
@@ -73,9 +72,9 @@ export default function ParentAccountScreen() {
     setAccountBusy("logout");
     setActionError(null);
     try {
-      await logoutParentSession();
-      router.dismissAll();
-      router.replace(getUnifiedLoginRoute("parent"));
+      await logoutParentSession(() =>
+        router.replace(getUnifiedLoginRoute("parent")),
+      );
     } catch {
       setActionError("로그아웃에 실패했어요. 네트워크를 확인하고 다시 시도해 주세요.");
       setAccountBusy(null);
@@ -138,11 +137,12 @@ export default function ParentAccountScreen() {
           <EmptyState
             title="계정 정보를 불러오지 못했어요"
             description={overview.error}
+            style={styles.flatSurface}
             action={<AppButton onPress={overview.reload}>다시 시도</AppButton>}
           />
         ) : (
           <View style={styles.sections}>
-            <SurfaceCard style={styles.profileCard}>
+            <View style={styles.profileCard}>
               <View style={styles.avatar}>
                 <Text style={styles.avatarText}>{overview.parent?.name.slice(0, 1) || "학"}</Text>
               </View>
@@ -150,9 +150,9 @@ export default function ParentAccountScreen() {
                 <Text selectable style={styles.profileName}>{overview.parent?.name || "학부모"}</Text>
                 <Text selectable style={styles.profileEmail}>{overview.parent?.email || "이메일 정보 없음"}</Text>
               </View>
-            </SurfaceCard>
+            </View>
 
-            <SurfaceCard style={styles.sectionCard}>
+            <View style={styles.sectionCard}>
               <SectionHeader title="자녀 연결" />
               <Text selectable style={styles.help}>
                 승인 전에는 신청 취소, 승인 후에는 연결 해제를 할 수 있어요.
@@ -182,10 +182,11 @@ export default function ParentAccountScreen() {
                   ))}
                 </View>
               )}
-            </SurfaceCard>
+            </View>
 
             <AppButton
               variant="secondary"
+              style={styles.flatAction}
               loading={accountBusy === "logout"}
               onPress={confirmLogout}
             >
@@ -193,6 +194,7 @@ export default function ParentAccountScreen() {
             </AppButton>
             <AppButton
               variant="danger"
+              style={styles.flatAction}
               loading={accountBusy === "withdraw"}
               onPress={confirmWithdraw}
             >
@@ -222,17 +224,19 @@ const styles = StyleSheet.create({
   },
   center: { minHeight: parent.portfolioEmptyMinHeight, alignItems: "center", justifyContent: "center" },
   sections: { width: "100%", maxWidth: parent.portfolioCardMinWidth * 2 - spacing.lg, alignSelf: "center", gap: spacing.lg },
-  profileCard: { flexDirection: "row", alignItems: "center", padding: spacing.lg, gap: spacing.md },
+  profileCard: { flexDirection: "row", alignItems: "center", paddingVertical: spacing.lg, gap: spacing.md, borderBottomWidth: borders.hairline, borderBottomColor: colors.border },
   avatar: { width: parent.childAvatarSize, height: parent.childAvatarSize, borderRadius: radii.pill, backgroundColor: colors.accentTintedBg, borderWidth: borders.hairline, borderColor: colors.border, alignItems: "center", justifyContent: "center" },
   avatarText: { ...typography.title, color: colors.accent },
   profileCopy: { flex: 1, gap: spacing.xs },
   profileName: { ...typography.title, color: colors.text },
   profileEmail: { ...typography.body, color: colors.textMuted },
-  sectionCard: { padding: spacing.lg, gap: spacing.md },
+  sectionCard: { paddingVertical: spacing.lg, gap: spacing.md },
   help: { ...typography.body, color: colors.textMuted },
   linkList: { gap: spacing.sm },
-  linkRow: { flexDirection: "row", alignItems: "center", gap: spacing.md, paddingVertical: spacing.sm },
+  linkRow: { flexDirection: "row", alignItems: "center", gap: spacing.md, paddingVertical: spacing.md, borderTopWidth: borders.hairline, borderTopColor: colors.border },
   linkCopy: { flex: 1, minWidth: 0, gap: spacing.xs },
   linkName: { ...typography.label, color: colors.text },
+  flatAction: { borderRadius: radii.none, boxShadow: "none" },
+  flatSurface: { backgroundColor: colors.transparent, borderWidth: borders.none, borderRadius: radii.none, boxShadow: "none" },
   error: { ...typography.body, color: colors.danger, textAlign: "center" },
 });

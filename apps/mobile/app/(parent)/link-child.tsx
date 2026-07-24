@@ -8,12 +8,13 @@ import {
 } from "react-native";
 import { useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { ParentHeaderActions } from "../../components/parent-header-actions";
 import {
   borders,
   colors,
   iconSizes,
-  pageChrome,
   parent,
+  radii,
   spacing,
   tapMin,
   typography,
@@ -33,7 +34,6 @@ import {
   AppHeader,
   EmptyState,
   SectionHeader,
-  SurfaceCard,
   SurfacePressable,
   TextField,
 } from "../../components/ui";
@@ -170,6 +170,11 @@ export default function LinkChildScreen() {
     router.replace("/(parent)");
   }
 
+  function handleBack() {
+    if (router.canGoBack()) router.back();
+    else router.replace("/(parent)/home");
+  }
+
   function handleLinkAnother() {
     setStep("code");
     setCode("");
@@ -182,11 +187,15 @@ export default function LinkChildScreen() {
 
   return (
     <SafeAreaView style={styles.container} edges={["top"]}>
-      <AppHeader title="자녀 연결" onBack={handleGoHome} />
+      <AppHeader
+        title="자녀 연결"
+        onBack={handleBack}
+        right={<ParentHeaderActions showLinkChild={false} />}
+      />
 
       {step === "code" && (
         <View style={styles.inner}>
-          <SurfaceCard style={styles.card}>
+          <View style={styles.card}>
             <Text style={styles.heading}>연결 코드 입력</Text>
             <Text style={styles.sub}>
               학급에서 안내받은 자녀 연결 코드를 입력하면 학생 명단을 확인할 수
@@ -217,7 +226,7 @@ export default function LinkChildScreen() {
             >
               코드 확인
             </AppButton>
-          </SurfaceCard>
+          </View>
         </View>
       )}
 
@@ -229,9 +238,9 @@ export default function LinkChildScreen() {
           </View>
 
           {error ? (
-            <SurfaceCard style={styles.errorBanner}>
+            <View style={styles.errorBanner}>
               <Text style={styles.errorBannerText}>{error}</Text>
-            </SurfaceCard>
+            </View>
           ) : null}
 
           <FlatList
@@ -258,7 +267,7 @@ export default function LinkChildScreen() {
             )}
             ListEmptyComponent={
               <EmptyState
-                style={styles.emptyState}
+                style={[styles.flatSurface, styles.emptyState]}
                 icon={<Text style={styles.emptyEmoji}>📝</Text>}
                 title="학생 명단이 비어있어요"
                 description="코드가 올바른지 확인해 주세요."
@@ -322,8 +331,10 @@ const styles = StyleSheet.create({
   card: {
     width: "100%",
     maxWidth: parent.portfolioCardMinWidth * 2 - spacing.lg,
-    padding: spacing.xxl,
+    paddingVertical: spacing.xl,
     gap: spacing.lg,
+    borderBottomWidth: borders.hairline,
+    borderBottomColor: colors.border,
   },
   heading: { ...typography.title, color: colors.text },
   sub: { ...typography.body, color: colors.textMuted },
@@ -338,15 +349,17 @@ const styles = StyleSheet.create({
   },
   rosterWrap: { flex: 1 },
   rosterHeader: {
-    paddingHorizontal: spacing.xxl,
-    paddingBottom: spacing.lg,
+    paddingHorizontal: spacing.xl,
+    paddingBottom: spacing.md,
     gap: spacing.xs,
   },
   errorBanner: {
-    marginHorizontal: spacing.xxl,
-    marginBottom: spacing.lg,
-    padding: spacing.lg,
-    backgroundColor: colors.statusReturnedBg,
+    marginHorizontal: spacing.xl,
+    marginBottom: spacing.md,
+    paddingVertical: spacing.md,
+    borderTopWidth: borders.hairline,
+    borderBottomWidth: borders.hairline,
+    borderColor: colors.statusReturnedText,
   },
   errorBannerText: {
     ...typography.body,
@@ -354,17 +367,23 @@ const styles = StyleSheet.create({
     textAlign: "center",
   },
   listContent: {
-    paddingHorizontal: spacing.xxl,
-    paddingTop: pageChrome.directContentStartGap,
+    paddingHorizontal: spacing.xl,
+    paddingTop: spacing.sm,
     paddingBottom: spacing.xxl,
-    gap: spacing.lg,
+    gap: spacing.none,
   },
   studentCard: {
     flexDirection: "row",
     alignItems: "center",
     minHeight: tapMin,
-    padding: spacing.xl,
-    gap: spacing.lg,
+    paddingVertical: spacing.md,
+    gap: spacing.md,
+    backgroundColor: colors.transparent,
+    borderWidth: borders.none,
+    borderRadius: radii.none,
+    borderBottomWidth: borders.hairline,
+    borderBottomColor: colors.border,
+    boxShadow: "none",
   },
   studentAvatar: {
     width: parent.childAvatarSize,
@@ -388,6 +407,7 @@ const styles = StyleSheet.create({
   emptyState: {
     paddingTop: spacing.xxxl,
   },
+  flatSurface: { backgroundColor: colors.transparent, borderWidth: borders.none, borderRadius: radii.none, boxShadow: "none" },
   emptyEmoji: { fontSize: parent.emptyIconSize },
   rosterOverlay: {
     ...StyleSheet.absoluteFillObject,
@@ -398,6 +418,10 @@ const styles = StyleSheet.create({
   doneState: {
     width: "100%",
     maxWidth: parent.portfolioCardMinWidth * 2 - spacing.lg,
+    backgroundColor: colors.transparent,
+    borderWidth: borders.none,
+    borderRadius: radii.none,
+    boxShadow: "none",
   },
   doneActions: { gap: spacing.md },
   doneEmoji: { fontSize: parent.doneIconSize },

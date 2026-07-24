@@ -7,19 +7,27 @@ import { logoutParentSession } from "../lib/parent-session-actions";
 import { getUnifiedLoginRoute } from "../lib/session";
 import { IconButton } from "./ui";
 
-type Props = { notificationCount?: number };
+type Props = {
+  notificationCount?: number;
+  showLinkChild?: boolean;
+  showNotifications?: boolean;
+};
 
-/** Shared parent header actions, kept identical across the feed and home screens. */
-export function ParentHeaderActions({ notificationCount = 0 }: Props) {
+/** Shared parent header actions. Current-page actions can be omitted to avoid duplication. */
+export function ParentHeaderActions({
+  notificationCount = 0,
+  showLinkChild = true,
+  showNotifications = true,
+}: Props) {
   const router = useRouter();
   const [loggingOut, setLoggingOut] = useState(false);
 
   const handleLogout = async () => {
     setLoggingOut(true);
     try {
-      await logoutParentSession();
-      router.dismissAll();
-      router.replace(getUnifiedLoginRoute("parent"));
+      await logoutParentSession(() =>
+        router.replace(getUnifiedLoginRoute("parent")),
+      );
     } catch {
       setLoggingOut(false);
       Alert.alert(
@@ -39,31 +47,35 @@ export function ParentHeaderActions({ notificationCount = 0 }: Props) {
 
   return (
     <View style={styles.actions}>
-      <IconButton
-        onPress={() => router.push("/(parent)/link-child")}
-        accessibilityLabel="자녀 추가"
-      >
-        <UserPlus
-          size={iconSizes.md}
-          color={colors.textMuted}
-          strokeWidth={2}
-          accessible={false}
-        />
-      </IconButton>
-      <IconButton
-        onPress={() => router.push("/(parent)/notifications")}
-        accessibilityLabel={
-          notificationCount > 0 ? `알림 ${notificationCount}건` : "알림 보기"
-        }
-      >
-        <Bell
-          size={iconSizes.md}
-          color={colors.textMuted}
-          strokeWidth={2}
-          accessible={false}
-        />
-        {notificationCount > 0 ? <View style={styles.notificationDot} /> : null}
-      </IconButton>
+      {showLinkChild ? (
+        <IconButton
+          onPress={() => router.push("/(parent)/link-child")}
+          accessibilityLabel="자녀 추가"
+        >
+          <UserPlus
+            size={iconSizes.md}
+            color={colors.textMuted}
+            strokeWidth={2}
+            accessible={false}
+          />
+        </IconButton>
+      ) : null}
+      {showNotifications ? (
+        <IconButton
+          onPress={() => router.push("/(parent)/notifications")}
+          accessibilityLabel={
+            notificationCount > 0 ? `알림 ${notificationCount}건` : "알림 보기"
+          }
+        >
+          <Bell
+            size={iconSizes.md}
+            color={colors.textMuted}
+            strokeWidth={2}
+            accessible={false}
+          />
+          {notificationCount > 0 ? <View style={styles.notificationDot} /> : null}
+        </IconButton>
+      ) : null}
       <IconButton
         onPress={confirmLogout}
         disabled={loggingOut}

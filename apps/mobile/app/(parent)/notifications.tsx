@@ -11,27 +11,33 @@ import {
 import { useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { ParentBottomNav } from "../../components/parent-bottom-nav";
+import { ParentHeaderActions } from "../../components/parent-header-actions";
 import {
   AppButton,
   AppHeader,
   EmptyState,
   SectionHeader,
-  SurfaceCard,
 } from "../../components/ui";
 import { useParentOverview } from "../../hooks/use-parent-overview";
 import { clearParentSession } from "../../lib/session";
 import type { ParentPendingLink } from "../../lib/types";
 import {
+  borders,
   colors,
   iconSizes,
   pageChrome,
   parent,
+  radii,
   spacing,
   typography,
 } from "../../theme/tokens";
 
 export default function ParentNotificationsScreen() {
   const router = useRouter();
+  const handleBack = () => {
+    if (router.canGoBack()) router.back();
+    else router.replace("/(parent)/home");
+  };
   const handleUnauthorized = useCallback(async () => {
     await clearParentSession();
     router.replace(
@@ -57,7 +63,11 @@ export default function ParentNotificationsScreen() {
 
   return (
     <SafeAreaView style={styles.container} edges={["top"]}>
-      <AppHeader title="알림" />
+      <AppHeader
+        title="알림"
+        onBack={handleBack}
+        right={<ParentHeaderActions showNotifications={false} />}
+      />
       <ScrollView
         contentContainerStyle={styles.content}
         refreshControl={
@@ -77,6 +87,7 @@ export default function ParentNotificationsScreen() {
           <EmptyState
             title="알림을 불러오지 못했어요"
             description={overview.error}
+            style={styles.flatSurface}
             action={<AppButton onPress={overview.reload}>다시 시도</AppButton>}
           />
         ) : overview.pendingLinks.length === 0 ? (
@@ -84,6 +95,7 @@ export default function ParentNotificationsScreen() {
             icon={<Text style={styles.emptyIcon}>✓</Text>}
             title="새 알림이 없어요"
             description="자녀 연결 신청 상태가 바뀌면 이곳에서 확인할 수 있어요."
+            style={styles.flatSurface}
           />
         ) : (
             <View style={styles.list}>
@@ -95,7 +107,7 @@ export default function ParentNotificationsScreen() {
               </Text>
             </View>
             {overview.pendingLinks.map((link) => (
-              <SurfaceCard key={link.id} style={styles.card}>
+              <View key={link.id} style={styles.card}>
                 <View style={styles.cardMain}>
                   <Text selectable style={styles.studentName}>
                     {link.name}{link.number != null ? ` (${link.number}번)` : ""}
@@ -112,7 +124,7 @@ export default function ParentNotificationsScreen() {
                 >
                   신청 취소
                 </AppButton>
-              </SurfaceCard>
+              </View>
             ))}
           </View>
         )}
@@ -148,13 +160,14 @@ const styles = StyleSheet.create({
     gap: spacing.lg,
   },
   center: { minHeight: parent.portfolioEmptyMinHeight, alignItems: "center", justifyContent: "center", gap: spacing.md },
-  list: { width: "100%", maxWidth: parent.portfolioCardMinWidth * 2 - spacing.lg, alignSelf: "center", gap: spacing.md },
+  list: { width: "100%", maxWidth: parent.portfolioCardMinWidth * 2 - spacing.lg, alignSelf: "center", gap: spacing.none },
   intro: { paddingVertical: spacing.sm, gap: spacing.xs },
   title: { ...typography.title, color: colors.text },
   muted: { ...typography.body, color: colors.textMuted },
-  card: { padding: spacing.lg, gap: spacing.md },
+  card: { paddingVertical: spacing.lg, gap: spacing.md, borderTopWidth: borders.hairline, borderTopColor: colors.border },
   cardMain: { gap: spacing.xs },
   studentName: { ...typography.subtitle, color: colors.text },
   meta: { ...typography.body, color: colors.textMuted },
   emptyIcon: { fontSize: iconSizes.xl, color: colors.accent },
+  flatSurface: { backgroundColor: colors.transparent, borderWidth: borders.none, borderRadius: radii.none, boxShadow: "none" },
 });
