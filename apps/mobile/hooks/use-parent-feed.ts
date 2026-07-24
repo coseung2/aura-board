@@ -1,26 +1,57 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ApiError, parentApiFetch } from "../lib/api";
 import { isParentLogoutInProgress } from "../lib/session";
-import type { ParentFeedResponse, ParentPostDTO } from "../lib/types";
+import type {
+  ParentFeedResponse,
+  ParentPostCounts,
+  ParentPostDTO,
+} from "../lib/types";
 
 const PAGE_SIZE = 10;
 
 type Options = {
-  focusPostId?: string | null;
   onUnauthorized: () => void | Promise<void>;
 };
 
-export function useParentFeed({ focusPostId, onUnauthorized }: Options) {
-  const endpoint = `/api/parent/feed${focusPostId ? `?post=${encodeURIComponent(focusPostId)}` : ""}`;
-  return useParentPostCollection({ endpoint, onUnauthorized });
+export function useParentFeed({ onUnauthorized }: Options) {
+  return useParentPostCollection({ endpoint: "/api/parent/feed", onUnauthorized });
 }
 
 type CollectionOptions = {
   endpoint: string | null;
   onUnauthorized: () => void | Promise<void>;
+  includeCounts?: boolean;
 };
 
-export function useParentPostCollection({ endpoint, onUnauthorized }: CollectionOptions) {
+type ParentPostCollectionResult = {
+  items: ParentPostDTO[];
+  loading: boolean;
+  refreshing: boolean;
+  loadingMore: boolean;
+  loadMoreError: string | null;
+  error: string | null;
+  hasMore: boolean;
+  refresh: () => Promise<void>;
+  retry: () => Promise<void>;
+  loadMore: () => Promise<void>;
+};
+
+type ParentPostCollectionWithCounts = ParentPostCollectionResult & {
+  total: number;
+  counts: ParentPostCounts;
+};
+
+export function useParentPostCollection(
+  options: CollectionOptions & { includeCounts: true },
+): ParentPostCollectionWithCounts;
+export function useParentPostCollection(
+  options: CollectionOptions,
+): ParentPostCollectionResult;
+export function useParentPostCollection({
+  endpoint,
+  onUnauthorized,
+  includeCounts = false,
+}: CollectionOptions): ParentPostCollectionResult {
   const [items, setItems] = useState<ParentPostDTO[]>([]);
   const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [loading, setLoading] = useState(Boolean(endpoint));
@@ -28,6 +59,8 @@ export function useParentPostCollection({ endpoint, onUnauthorized }: Collection
   const [loadingMore, setLoadingMore] = useState(false);
   const [loadMoreError, setLoadMoreError] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [total, setTotal] = useState(0);
+  const [counts, setCounts] = useState<ParentPostCounts>({ media: 0, text: 0 });
   const requestVersion = useRef(0);
 
   const loadFirstPage = useCallback(
@@ -39,6 +72,10 @@ export function useParentPostCollection({ endpoint, onUnauthorized }: Collection
         setLoadMoreError(null);
         setLoading(false);
         setRefreshing(false);
+        if (includeCounts) {
+          setTotal(0);
+          setCounts({ media: 0, text: 0 });
+        }
         return;
       }
 
@@ -51,6 +88,10 @@ export function useParentPostCollection({ endpoint, onUnauthorized }: Collection
         setError(null);
         setLoadMoreError(null);
         setLoading(true);
+        if (includeCounts) {
+          setTotal(0);
+          setCounts({ media: 0, text: 0 });
+        }
       }
 
       try {
@@ -61,6 +102,10 @@ export function useParentPostCollection({ endpoint, onUnauthorized }: Collection
         if (version !== requestVersion.current) return;
         setItems(response.items);
         setNextCursor(response.nextCursor);
+        if (includeCounts) {
+          setTotal(response.total ?? 0);
+          setCounts(response.counts ?? { media: 0, text: 0 });
+        }
         setError(null);
       } catch (cause) {
         if (version !== requestVersion.current) return;
@@ -71,6 +116,10 @@ export function useParentPostCollection({ endpoint, onUnauthorized }: Collection
         }
         setItems([]);
         setNextCursor(null);
+        if (includeCounts) {
+          setTotal(0);
+          setCounts({ media: 0, text: 0 });
+        }
         setError(
           cause instanceof ApiError && cause.status === 403
             ? "자녀 정보를 볼 권한이 없어요."
@@ -85,7 +134,7 @@ export function useParentPostCollection({ endpoint, onUnauthorized }: Collection
         }
       }
     },
-    [endpoint, onUnauthorized],
+    [endpoint, includeCounts, onUnauthorized],
   );
 
   useEffect(() => {
@@ -144,5 +193,6 @@ export function useParentPostCollection({ endpoint, onUnauthorized }: Collection
     refresh: () => loadFirstPage(true),
     retry: () => loadFirstPage(false),
     loadMore,
+    ...(includeCounts ? { total, counts } : {}),
   };
 }

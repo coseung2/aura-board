@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef } from "react";
-import { ActivityIndicator, FlatList, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, BackHandler, FlatList, StyleSheet, Text, View } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { ParentBottomNav } from "../../components/parent-bottom-nav";
@@ -27,6 +27,7 @@ export default function ParentFeedScreen() {
   const params = useLocalSearchParams<{ post?: string | string[] }>();
   const focusPostId = Array.isArray(params.post) ? params.post[0] : params.post;
   const listRef = useRef<FlatList<ParentPostDTO>>(null);
+  const scrolledToFocusRef = useRef<string | null>(null);
 
   const handleUnauthorized = useCallback(async () => {
     await clearParentSession();
@@ -45,12 +46,70 @@ export default function ParentFeedScreen() {
     };
   }, [router]);
 
-  const feed = useParentFeed({ focusPostId, onUnauthorized: handleUnauthorized });
+  const feed = useParentFeed({ onUnauthorized: handleUnauthorized });
+
+  const handleFocusedBack = useCallback(() => {
+    if (router.canGoBack()) router.back();
+    else router.replace("/(parent)/home");
+  }, [router]);
+
+  useEffect(() => {
+    if (!focusPostId) return;
+    const subscription = BackHandler.addEventListener(
+      "hardwareBackPress",
+      () => {
+        handleFocusedBack();
+        return true;
+      },
+    );
+    return () => subscription.remove();
+  }, [focusPostId, handleFocusedBack]);
+
+  useEffect(() => {
+    scrolledToFocusRef.current = null;
+  }, [focusPostId]);
+
+  useEffect(() => {
+    if (
+      !focusPostId ||
+      feed.loading ||
+      feed.loadingMore ||
+      feed.items.some((item) => item.id === focusPostId) ||
+      !feed.hasMore
+    ) {
+      return;
+    }
+    void feed.loadMore();
+  }, [
+    feed.hasMore,
+    feed.items,
+    feed.loadMore,
+    feed.loading,
+    feed.loadingMore,
+    focusPostId,
+  ]);
+
+  useEffect(() => {
+    if (!focusPostId || feed.loading || feed.items.length === 0) return;
+    if (scrolledToFocusRef.current === focusPostId) return;
+    const index = feed.items.findIndex((item) => item.id === focusPostId);
+    if (index < 0) return;
+    scrolledToFocusRef.current = focusPostId;
+    const handle = setTimeout(() => {
+      listRef.current?.scrollToIndex({
+        index,
+        animated: false,
+        viewPosition: 0.15,
+      });
+    }, 50);
+    return () => clearTimeout(handle);
+  }, [feed.items, feed.loading, focusPostId]);
 
   return (
     <SafeAreaView style={styles.container} edges={["top"]}>
       <AppHeader
         title="피드"
+        onBack={focusPostId ? handleFocusedBack : undefined}
         right={<ParentHeaderActions />}
       />
 
@@ -58,12 +117,7 @@ export default function ParentFeedScreen() {
         ref={listRef}
         data={feed.items}
         keyExtractor={(item) => item.id}
-        renderItem={({ item }) => (
-          <ParentFeedCard
-            card={item}
-            highlighted={Boolean(focusPostId && item.id === focusPostId)}
-          />
-        )}
+        renderItem={({ item }) => <ParentFeedCard card={item} />}
         ItemSeparatorComponent={() => <View style={styles.separator} />}
         contentContainerStyle={styles.listContent}
         contentInsetAdjustmentBehavior="automatic"
@@ -71,15 +125,21 @@ export default function ParentFeedScreen() {
         onRefresh={feed.refresh}
         onEndReached={() => void feed.loadMore()}
         onEndReachedThreshold={0.4}
+        onScrollToIndexFailed={({ index, averageItemLength }) => {
+          listRef.current?.scrollToOffset({
+            offset: Math.max(0, averageItemLength * index),
+            animated: false,
+          });
+          requestAnimationFrame(() => {
+            listRef.current?.scrollToIndex({
+              index,
+              animated: false,
+              viewPosition: 0.15,
+            });
+          });
+        }}
         ListHeaderComponent={
-          <View style={styles.intro}>
-            <Text selectable style={styles.introTitle}>
-              우리 아이들의 새 소식
-            </Text>
-            <Text selectable style={styles.introText}>
-              연결된 모든 자녀의 게시물을 최신순으로 모아 보여드려요.
-            </Text>
-          </View>
+          feed.items.length > 0 ? <View style={styles.feedTopSpacer} /> : null
         }
         ListEmptyComponent={
           feed.loading ? (
@@ -128,9 +188,7 @@ export default function ParentFeedScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg },
   listContent: { flexGrow: 1, paddingBottom: spacing.xl },
-  intro: { gap: spacing.xs, paddingHorizontal: spacing.lg, paddingVertical: spacing.lg },
-  introTitle: { ...typography.title, color: colors.text },
-  introText: { ...typography.body, color: colors.textMuted },
+  feedTopSpacer: { height: spacing.lg },
   separator: {
     height: borders.hairline,
     marginVertical: spacing.lg,

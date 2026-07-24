@@ -2,7 +2,6 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
-  ScrollView,
   StyleSheet,
   Text,
   View,
@@ -10,19 +9,22 @@ import {
 } from "react-native";
 import { Image } from "expo-image";
 import { useRouter } from "expo-router";
+import { Check, ChevronDown } from "lucide-react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { ParentBottomNav } from "../../components/parent-bottom-nav";
+import { ParentFeedCard } from "../../components/parent-feed-card";
 import { ParentHeaderActions } from "../../components/parent-header-actions";
 import {
   AppButton,
   AppHeader,
   ControlPressable,
   EmptyState,
+  SectionHeader,
 } from "../../components/ui";
 import {
-  SemanticNav,
-  SemanticNavItem,
-} from "../../components/SemanticNavigation";
+  SectionNav,
+  SectionNavItem,
+} from "../../components/NavigationTabs";
 import { useParentChildPosts } from "../../hooks/use-parent-child-posts";
 import { useParentOverview } from "../../hooks/use-parent-overview";
 import {
@@ -30,6 +32,7 @@ import {
   loadParentSelectedChild,
   saveParentSelectedChild,
 } from "../../lib/session";
+import { getPortfolioCardThumbnailUrl } from "../../lib/portfolio-card";
 import type { ParentPostDTO } from "../../lib/types";
 import {
   borders,
@@ -38,7 +41,6 @@ import {
   parent,
   radii,
   spacing,
-  tapMin,
   typography,
 } from "../../theme/tokens";
 
@@ -49,6 +51,7 @@ export default function ParentHomeScreen() {
   const { width } = useWindowDimensions();
   const [selectedChildId, setSelectedChildId] = useState<string | null>(null);
   const [kind, setKind] = useState<ContentKind>("media");
+  const [childMenuOpen, setChildMenuOpen] = useState(false);
 
   const handleUnauthorized = useCallback(async () => {
     await clearParentSession();
@@ -94,92 +97,91 @@ export default function ParentHomeScreen() {
   const header = useMemo(
     () => (
       <View style={styles.headerContent}>
-        {overview.children.length > 0 ? (
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.childTabs}
-            accessibilityRole="tablist"
-            accessibilityLabel="자녀 프로필"
-          >
-            {overview.children.map((child) => {
-              const selected = child.studentId === selectedChildId;
-              return (
-                <ControlPressable
-                  key={child.studentId}
-                  style={[styles.childTab, selected && styles.childTabSelected]}
-                  onPress={() => setSelectedChildId(child.studentId)}
-                  accessibilityRole="tab"
-                  accessibilityState={{ selected }}
-                  accessibilityLabel={`${child.name}, ${
-                    child.classroom?.name ?? "학급 미배정"
-                  }`}
-                >
-                  <View style={[styles.avatar, selected && styles.avatarSelected]}>
-                    <Text
-                      style={[
-                        styles.avatarText,
-                        selected && styles.avatarTextSelected,
-                      ]}
-                    >
-                      {child.name.trim().slice(0, 1) || "아"}
-                    </Text>
-                  </View>
-                  <Text
-                    selectable
-                    style={[
-                      styles.childName,
-                      selected && styles.childNameSelected,
-                    ]}
-                  >
-                    {child.name}
-                  </Text>
-                  <Text selectable style={styles.childMeta} numberOfLines={1}>
-                    {child.classroom?.name ?? "학급 미배정"}
-                    {child.number != null ? ` · ${child.number}번` : ""}
-                  </Text>
-                </ControlPressable>
-              );
-            })}
-          </ScrollView>
-        ) : null}
-
         {selectedChild ? (
-          <View style={styles.profileHeading}>
-            <Text
-              selectable
-              accessibilityRole="header"
-              style={styles.profileTitle}
-            >
-              {selectedChild.name}
-            </Text>
-            <Text selectable style={styles.profileSubtitle}>
-              {selectedChild.classroom?.name ?? "학급 미배정"}의 게시물
-            </Text>
-          </View>
-        ) : null}
-
-        {selectedChild ? (
-            <SemanticNav
-              variant="standalone"
-              style={styles.kindTabs}
-              accessibilityLabel="게시물 종류"
-          >
-            {(["media", "text"] as const).map((value) => (
-              <SemanticNavItem
-                key={value}
-                style={styles.kindTab}
-                selected={kind === value}
-                onPress={() => setKind(value)}
+          <>
+            <View style={styles.childSelector}>
+              <ControlPressable
+                style={styles.childSelectTrigger}
+                onPress={() => setChildMenuOpen((open) => !open)}
+                accessibilityLabel="자녀 전환"
+                accessibilityState={{ expanded: childMenuOpen }}
               >
-                {value === "media" ? "미디어" : "텍스트"}
-              </SemanticNavItem>
-            ))}
-          </SemanticNav>
+                <Text style={styles.childSelectText} numberOfLines={1}>
+                  {selectedChild.name}({selectedChild.classroom?.name ?? "학급 미배정"})
+                </Text>
+                <ChevronDown
+                  size={iconSizes.sm}
+                  color={colors.textMuted}
+                  accessible={false}
+                />
+              </ControlPressable>
+              {childMenuOpen ? (
+                <View style={styles.childMenu} accessibilityRole="menu">
+                  {overview.children.map((child) => {
+                    const selected = child.studentId === selectedChildId;
+                    return (
+                      <ControlPressable
+                        key={child.studentId}
+                        style={styles.childOption}
+                        onPress={() => {
+                          setSelectedChildId(child.studentId);
+                          setChildMenuOpen(false);
+                        }}
+                        accessibilityRole="menuitem"
+                        accessibilityState={{ selected }}
+                      >
+                        <Text style={styles.childOptionText} numberOfLines={1}>
+                          {child.name}({child.classroom?.name ?? "학급 미배정"})
+                        </Text>
+                        {selected ? (
+                          <Check
+                            size={iconSizes.sm}
+                            color={colors.accent}
+                            accessible={false}
+                          />
+                        ) : null}
+                      </ControlPressable>
+                    );
+                  })}
+                </View>
+              ) : null}
+            </View>
+            <SectionHeader
+              style={styles.profileHeading}
+              title={`${selectedChild.name}(${selectedChild.classroom?.name ?? "학급 미배정"})`}
+              right={
+                <SectionNav
+                  style={styles.kindNav}
+                  accessibilityLabel="게시물 종류"
+                >
+                  {(["media", "text"] as const).map((value) => (
+                    <SectionNavItem
+                      key={value}
+                      style={styles.kindNavItem}
+                      selected={kind === value}
+                      onPress={() => setKind(value)}
+                    >
+                      {value === "media"
+                        ? `미디어 ${posts.counts.media}`
+                        : `텍스트 ${posts.counts.text}`}
+                    </SectionNavItem>
+                  ))}
+                </SectionNav>
+              }
+            />
+          </>
         ) : null}
       </View>
     ),
-    [kind, overview.children, router, selectedChild, selectedChildId],
+    [
+      childMenuOpen,
+      kind,
+      overview.children,
+      posts.counts.media,
+      posts.counts.text,
+      selectedChild,
+      selectedChildId,
+    ],
   );
 
   if (overview.loading) {
@@ -209,20 +211,39 @@ export default function ParentHomeScreen() {
       <FlatList
         key={gridKey}
         data={posts.items}
-        numColumns={columns}
+        numColumns={kind === "media" ? columns : 1}
         keyExtractor={(item) => item.id}
-        renderItem={({ item }) => (
-          <PostGridTile
-            post={item}
-            kind={kind}
-            width={tileWidth}
-            onPress={() =>
-              router.push({ pathname: "/(parent)", params: { post: item.id } })
-            }
-          />
-        )}
-        columnWrapperStyle={styles.gridRow}
-        contentContainerStyle={styles.gridContent}
+        renderItem={({ item }) =>
+          kind === "media" ? (
+            <PostGridTile
+              post={item}
+              kind={kind}
+              width={tileWidth}
+              onPress={() =>
+                router.push({ pathname: "/(parent)", params: { post: item.id } })
+              }
+            />
+          ) : (
+            <ControlPressable
+              style={styles.textFeedItem}
+              onPress={() =>
+                router.push({ pathname: "/(parent)", params: { post: item.id } })
+              }
+              accessibilityLabel={`${item.title.trim() || "텍스트 게시물"} 피드에서 보기`}
+            >
+              <ParentFeedCard card={item} childName={selectedChild?.name} />
+            </ControlPressable>
+          )
+        }
+        columnWrapperStyle={kind === "media" ? styles.gridRow : undefined}
+        contentContainerStyle={
+          kind === "media" ? styles.gridContent : styles.feedContent
+        }
+        ItemSeparatorComponent={
+          kind === "text"
+            ? () => <View style={styles.feedSeparator} />
+            : undefined
+        }
         contentInsetAdjustmentBehavior="automatic"
         ListHeaderComponent={header}
         refreshing={overview.refreshing || posts.refreshing}
@@ -289,7 +310,6 @@ export default function ParentHomeScreen() {
 
 function PostGridTile({
   post,
-  kind,
   width,
   onPress,
 }: {
@@ -299,35 +319,22 @@ function PostGridTile({
   onPress: () => void;
 }) {
   const preview = getPostPreview(post);
-  const title = post.title.trim() || (kind === "media" ? "교실 기록" : "텍스트 게시물");
+  const title = post.title.trim() || "교실 기록";
 
   return (
     <ControlPressable
-      style={[styles.tile, { width }, kind === "text" && styles.textTile]}
+      style={[styles.tile, { width }]}
       onPress={onPress}
       accessibilityLabel={`${title} 피드에서 보기`}
     >
-      {kind === "media" ? (
-        preview ? (
-          <Image source={{ uri: preview }} style={styles.tileImage} contentFit="cover" />
-        ) : (
-          <View style={styles.mediaFallback}>
-            <Text style={styles.mediaFallbackIcon}>□</Text>
-            <Text selectable style={styles.mediaFallbackText} numberOfLines={2}>
-              {title}
-            </Text>
-          </View>
-        )
+      {preview ? (
+        <Image source={{ uri: preview }} style={styles.tileImage} contentFit="cover" />
       ) : (
-        <View style={styles.textTileContent}>
-          <Text selectable style={styles.textTileTitle} numberOfLines={3}>
+        <View style={styles.mediaFallback}>
+          <Text style={styles.mediaFallbackIcon}>□</Text>
+          <Text selectable style={styles.mediaFallbackText} numberOfLines={2}>
             {title}
           </Text>
-          {post.content.trim() ? (
-            <Text selectable style={styles.textTileBody} numberOfLines={4}>
-              {post.content.trim()}
-            </Text>
-          ) : null}
         </View>
       )}
     </ControlPressable>
@@ -335,67 +342,65 @@ function PostGridTile({
 }
 
 function getPostPreview(post: ParentPostDTO): string | null {
-  return (
-    post.thumbUrl ??
-    post.imageUrl ??
-    post.attachments.find((item) => item.kind === "image")?.previewUrl ??
-    post.attachments.find((item) => item.kind === "image")?.url ??
-    post.attachments.find((item) => item.kind === "video")?.previewUrl ??
-    post.linkImage ??
-    null
-  );
+  return getPortfolioCardThumbnailUrl(post);
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg },
   gridContent: { flexGrow: 1, paddingBottom: spacing.xl },
+  feedContent: { flexGrow: 1, paddingBottom: spacing.xl },
+  feedSeparator: {
+    height: borders.hairline,
+    marginVertical: spacing.lg,
+    backgroundColor: colors.border,
+  },
+  textFeedItem: {
+    width: "100%",
+    borderWidth: borders.none,
+    borderColor: colors.transparent,
+    borderRadius: radii.none,
+    backgroundColor: colors.transparent,
+  },
   gridRow: {
     gap: parent.gridTileGap,
     paddingHorizontal: spacing.lg,
     paddingBottom: parent.gridTileGap,
   },
   headerContent: { gap: spacing.lg, paddingVertical: spacing.lg },
-  childTabs: { gap: spacing.sm, paddingHorizontal: spacing.lg },
-  childTab: {
-    minWidth: 104,
-    minHeight: tapMin,
-    alignItems: "center",
-    gap: spacing.xs,
-    padding: spacing.sm,
-    borderWidth: borders.hairline,
-    borderColor: colors.transparent,
-    borderRadius: radii.control,
-    backgroundColor: colors.transparent,
-  },
-  childTabSelected: {
-    borderColor: colors.accent,
-    backgroundColor: colors.accentTintedBg,
-  },
-  avatar: {
-    width: parent.childAvatarSize,
-    height: parent.childAvatarSize,
+  childSelector: { alignItems: "center", paddingHorizontal: spacing.lg },
+  childSelectTrigger: {
+    flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    borderRadius: radii.pill,
-    borderWidth: borders.hairline,
-    borderColor: colors.border,
-    backgroundColor: colors.surfaceAlt,
+    gap: spacing.xs,
+    paddingHorizontal: spacing.lg,
+    backgroundColor: colors.transparent,
+    borderWidth: borders.none,
   },
-  avatarSelected: { borderColor: colors.accent },
-  avatarText: { ...typography.subtitle, color: colors.textMuted },
-  avatarTextSelected: { color: colors.accent },
-  childName: { ...typography.label, color: colors.textMuted },
-  childNameSelected: { color: colors.accentTintedText },
-  childMeta: {
-    ...typography.micro,
-    color: colors.textFaint,
-    maxWidth: parent.feedHeaderNameMaxWidth,
+  childSelectText: { ...typography.label, color: colors.text },
+  childMenu: {
+    width: "100%",
+    marginTop: spacing.xs,
+    borderTopWidth: borders.hairline,
+    borderTopColor: colors.border,
   },
-  profileHeading: { gap: spacing.xs, paddingHorizontal: spacing.lg },
-  profileTitle: { ...typography.title, color: colors.text },
-  profileSubtitle: { ...typography.body, color: colors.textMuted },
-  kindTabs: { marginHorizontal: spacing.lg },
-  kindTab: { flex: 1 },
+  childOption: {
+    width: "100%",
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: spacing.xs,
+    paddingHorizontal: spacing.md,
+    borderWidth: borders.none,
+    borderBottomWidth: borders.hairline,
+    borderBottomColor: colors.border,
+    borderRadius: radii.none,
+    backgroundColor: colors.transparent,
+  },
+  childOptionText: { ...typography.label, color: colors.text },
+  profileHeading: { marginHorizontal: spacing.lg },
+  kindNav: { borderBottomWidth: borders.none },
+  kindNavItem: { width: parent.navMinWidth },
   tile: {
     aspectRatio: 1,
     overflow: "hidden",
@@ -418,19 +423,6 @@ const styles = StyleSheet.create({
     color: colors.accentTintedText,
     textAlign: "center",
   },
-  textTile: {
-    borderWidth: borders.hairline,
-    borderColor: colors.border,
-    backgroundColor: colors.surface,
-  },
-  textTileContent: {
-    flex: 1,
-    justifyContent: "space-between",
-    gap: spacing.xs,
-    padding: spacing.sm,
-  },
-  textTileTitle: { ...typography.label, color: colors.text },
-  textTileBody: { ...typography.micro, color: colors.textMuted },
   center: {
     minHeight: parent.contentEmptyMinHeight,
     alignItems: "center",

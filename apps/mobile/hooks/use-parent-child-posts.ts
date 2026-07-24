@@ -10,5 +10,5 @@ export function useParentChildPosts({ childId, kind, onUnauthorized }: Options) 
   const endpoint = childId
     ? `/api/parent/children/${encodeURIComponent(childId)}/posts?kind=${kind}`
     : null;
-  return useParentPostCollection({ endpoint, onUnauthorized });
+  return useParentPostCollection({ endpoint, onUnauthorized, includeCounts: true });
 }

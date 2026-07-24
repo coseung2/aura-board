@@ -3,13 +3,14 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({
   studentFindMany: vi.fn(),
   cardFindMany: vi.fn(),
+  cardCount: vi.fn(),
   withParentScopeForStudent: vi.fn(),
 }));
 
 vi.mock("@/lib/db", () => ({
   db: {
     student: { findMany: mocks.studentFindMany },
-    card: { findMany: mocks.cardFindMany },
+    card: { findMany: mocks.cardFindMany, count: mocks.cardCount },
   },
 }));
 
@@ -56,6 +57,7 @@ describe("GET /api/parent/children/[id]/posts", () => {
         attachments: [],
       },
     ]);
+    mocks.cardCount.mockResolvedValue(0);
   });
 
   it("scopes the request to the route child and returns the neutral post shape", async () => {
@@ -102,7 +104,39 @@ describe("GET /api/parent/children/[id]/posts", () => {
         },
       ],
       nextCursor: null,
+      total: 0,
+      counts: { media: 0, text: 0 },
     });
+  });
+
+  it("returns exact kind total and both unfiltered content counts", async () => {
+    mocks.cardCount
+      .mockResolvedValueOnce(4)
+      .mockResolvedValueOnce(4)
+      .mockResolvedValueOnce(7);
+
+    const res = await GET(
+      new Request(
+        "https://example.test/api/parent/children/student_1/posts?kind=media",
+      ),
+      { params: Promise.resolve({ id: "student_1" }) },
+    );
+
+    expect(await res.json()).toMatchObject({
+      total: 4,
+      counts: { media: 4, text: 7 },
+    });
+    expect(mocks.cardCount).toHaveBeenCalledTimes(3);
+    expect(mocks.cardCount.mock.calls[0][0].where.AND).toContainEqual(
+      expect.objectContaining({
+        OR: expect.arrayContaining([{ imageUrl: { not: null } }]),
+      }),
+    );
+    expect(mocks.cardCount.mock.calls[2][0].where.AND).toContainEqual(
+      expect.objectContaining({
+        NOT: expect.objectContaining({ OR: expect.any(Array) }),
+      }),
+    );
   });
 
   it("preserves a cross-child 403 and private cache headers", async () => {

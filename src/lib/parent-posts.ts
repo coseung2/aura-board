@@ -21,6 +21,11 @@ export type ParentPostPagination = {
 
 export type ParentPostKind = "media" | "text";
 
+export type ParentPostCounts = {
+  media: number;
+  text: number;
+};
+
 const PARENT_MEDIA_WHERE = {
   OR: [
     { imageUrl: { not: null } },
@@ -70,16 +75,6 @@ export function parseParentPostKind(
   return { error: "invalid_kind" };
 }
 
-export function parseParentPostFocus(
-  searchParams: URLSearchParams,
-): string | null | { error: "invalid_post" } {
-  const rawPostId = searchParams.get("post");
-  if (rawPostId === null) return null;
-  const postId = rawPostId.trim();
-  if (!postId || postId.length > 200) return { error: "invalid_post" };
-  return postId;
-}
-
 export async function loadParentChildSummaries(
   studentIds: string[],
 ): Promise<ParentChildSummary[]> {
@@ -116,48 +111,72 @@ export async function fetchParentPosts({
   limit,
   cursor,
   kind = null,
-  startAt = null,
+  includeCounts = false,
 }: {
   children: ParentChildSummary[];
   limit: number;
   cursor: ParentFeedCursor | null;
   kind?: ParentPostKind | null;
-  startAt?: ParentFeedCursor | null;
-}): Promise<{ items: ParentPostDTO[]; nextCursor: string | null }> {
+  includeCounts?: boolean;
+}): Promise<{
+  items: ParentPostDTO[];
+  nextCursor: string | null;
+  total?: number;
+  counts?: ParentPostCounts;
+}> {
   const studentIds = children.map((child) => child.id);
-  if (studentIds.length === 0) return { items: [], nextCursor: null };
+  if (studentIds.length === 0) {
+    return includeCounts
+      ? { items: [], nextCursor: null, total: 0, counts: { media: 0, text: 0 } }
+      : { items: [], nextCursor: null };
+  }
 
-  const rows = await db.card.findMany({
-    where: buildParentPostWhere(studentIds, { cursor, kind, startAt }),
-    include: {
-      author: { select: { name: true } },
-      studentAuthor: { select: { name: true } },
-      board: {
-        select: {
-          id: true,
-          slug: true,
-          title: true,
-          layout: true,
-          anonymousAuthor: true,
+  const [rows, counts] = await Promise.all([
+    db.card.findMany({
+      where: buildParentPostWhere(studentIds, { cursor, kind }),
+      include: {
+        author: { select: { name: true } },
+        studentAuthor: { select: { name: true } },
+        board: {
+          select: {
+            id: true,
+            slug: true,
+            title: true,
+            layout: true,
+            anonymousAuthor: true,
+          },
         },
-      },
-      section: { select: { id: true, title: true } },
-      authors: {
-        orderBy: { order: "asc" },
-        select: {
-          id: true,
-          studentId: true,
-          displayName: true,
-          order: true,
+        section: { select: { id: true, title: true } },
+        authors: {
+          orderBy: { order: "asc" },
+          select: {
+            id: true,
+            studentId: true,
+            displayName: true,
+            order: true,
+          },
         },
+        attachments: { orderBy: { order: "asc" } },
+        showcaseEntries: { select: { studentId: true } },
+        _count: { select: { likes: true, comments: true } },
       },
-      attachments: { orderBy: { order: "asc" } },
-      showcaseEntries: { select: { studentId: true } },
-      _count: { select: { likes: true, comments: true } },
-    },
-    orderBy: [{ createdAt: "desc" }, { id: "desc" }],
-    take: limit + 1,
-  });
+      orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+      take: limit + 1,
+    }),
+    includeCounts
+      ? Promise.all([
+          db.card.count({
+            where: buildParentPostWhere(studentIds, { kind }),
+          }),
+          db.card.count({
+            where: buildParentPostWhere(studentIds, { kind: "media" }),
+          }),
+          db.card.count({
+            where: buildParentPostWhere(studentIds, { kind: "text" }),
+          }),
+        ])
+      : Promise.resolve(null),
+  ]);
 
   const hasMore = rows.length > limit;
   const pageRows = hasMore ? rows.slice(0, limit) : rows;
@@ -177,29 +196,22 @@ export async function fetchParentPosts({
   });
   const last = pageRows.at(-1);
 
-  return {
+  const response = {
     items,
     nextCursor:
       hasMore && last
         ? encodeParentFeedCursor({ createdAt: last.createdAt, id: last.id })
         : null,
   };
-}
 
-export async function findParentPostFocus(
-  children: ParentChildSummary[],
-  postId: string,
-): Promise<ParentFeedCursor | null> {
-  const studentIds = children.map((child) => child.id);
-  if (studentIds.length === 0) return null;
+  if (!counts) return response;
 
-  const post = await db.card.findFirst({
-    where: {
-      AND: [buildParentPostWhere(studentIds), { id: postId }],
-    },
-    select: { id: true, createdAt: true },
-  });
-  return post ? { id: post.id, createdAt: post.createdAt } : null;
+  const [total, media, text] = counts;
+  return {
+    ...response,
+    total,
+    counts: { media, text },
+  };
 }
 
 function buildParentPostWhere(
@@ -207,10 +219,9 @@ function buildParentPostWhere(
   options: {
     cursor?: ParentFeedCursor | null;
     kind?: ParentPostKind | null;
-    startAt?: ParentFeedCursor | null;
   } = {},
 ): Prisma.CardWhereInput {
-  const { cursor = null, kind = null, startAt = null } = options;
+  const { cursor = null, kind = null } = options;
   return {
     AND: [
       {
@@ -227,14 +238,6 @@ function buildParentPostWhere(
             OR: [
               { createdAt: { lt: cursor.createdAt } },
               { createdAt: cursor.createdAt, id: { lt: cursor.id } },
-            ],
-          }]
-        : []),
-      ...(startAt
-        ? [{
-            OR: [
-              { createdAt: { lt: startAt.createdAt } },
-              { createdAt: startAt.createdAt, id: { lte: startAt.id } },
             ],
           }]
         : []),

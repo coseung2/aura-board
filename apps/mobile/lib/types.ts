@@ -588,6 +588,31 @@ export type ParentPostDTO = PortfolioCardDTO & {
   contentKind: "media" | "text";
 };
 
+export type ParentPostCounts = {
+  media: number;
+  text: number;
+};
+
+export type ParentWalkingResponse = {
+  week: {
+    weekStart: string;
+    weekEnd: string;
+    today: string;
+  };
+  children: Array<{
+    studentId: string;
+    name: string;
+    number: number | null;
+    classroom: { id: string; name: string } | null;
+    rows: Array<{
+      day: string;
+      steps: number;
+      distanceMeters: number;
+      syncedAt: string | null;
+    }>;
+  }>;
+};
+
 export type ShowcaseEntryDTO = {
   cardId: string;
   studentId: string;
@@ -618,10 +643,14 @@ export type PortfolioStudentDTO = {
 export type ParentFeedResponse = {
   items: ParentPostDTO[];
   nextCursor: string | null;
+  total?: number;
+  counts?: ParentPostCounts;
 };
 
 export type ParentChildPostsResponse = ParentFeedResponse & {
   child: ParentChildSummary;
+  total: number;
+  counts: ParentPostCounts;
 };
 
 // ─── Parent Child-Link DTO types ───

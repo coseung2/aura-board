@@ -36,6 +36,7 @@ export async function GET(
     const page = await fetchParentPosts({
       children: [child],
       kind,
+      includeCounts: !pagination.cursor,
       ...pagination,
     });
     return json({ child, ...page });

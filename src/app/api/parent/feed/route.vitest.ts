@@ -3,7 +3,6 @@ import { encodeParentFeedCursor } from "@/lib/parent-feed-cursor";
 
 const mocks = vi.hoisted(() => ({
   studentFindMany: vi.fn(),
-  cardFindFirst: vi.fn(),
   cardFindMany: vi.fn(),
   withParentScope: vi.fn(),
 }));
@@ -11,10 +10,7 @@ const mocks = vi.hoisted(() => ({
 vi.mock("@/lib/db", () => ({
   db: {
     student: { findMany: mocks.studentFindMany },
-    card: {
-      findFirst: mocks.cardFindFirst,
-      findMany: mocks.cardFindMany,
-    },
+    card: { findMany: mocks.cardFindMany },
   },
 }));
 
@@ -62,7 +58,6 @@ describe("GET /api/parent/feed", () => {
         }),
     );
     mocks.studentFindMany.mockResolvedValue(CHILDREN);
-    mocks.cardFindFirst.mockResolvedValue(null);
     mocks.cardFindMany.mockResolvedValue([]);
   });
 
@@ -190,54 +185,6 @@ describe("GET /api/parent/feed", () => {
       ],
     });
     expect(query.take).toBe(25);
-  });
-
-  it("starts a focused page at an eligible linked-child post", async () => {
-    const target = {
-      id: "card_target",
-      createdAt: new Date("2026-07-10T02:00:00.000Z"),
-      studentAuthorId: "student_2",
-      authors: [],
-      imageUrl: null,
-      thumbUrl: null,
-      videoUrl: null,
-      linkImage: null,
-      attachments: [],
-    };
-    mocks.cardFindFirst.mockResolvedValue({
-      id: target.id,
-      createdAt: target.createdAt,
-    });
-    mocks.cardFindMany.mockResolvedValue([target]);
-
-    const res = await GET(
-      new Request("https://example.test/api/parent/feed?post=card_target"),
-    );
-    const body = await res.json();
-
-    expect(res.status).toBe(200);
-    expect(mocks.cardFindFirst.mock.calls[0][0].where.AND[1]).toEqual({
-      id: "card_target",
-    });
-    expect(mocks.cardFindMany.mock.calls[0][0].where.AND).toContainEqual({
-      OR: [
-        { createdAt: { lt: target.createdAt } },
-        { createdAt: target.createdAt, id: { lte: target.id } },
-      ],
-    });
-    expect(body.items[0]).toEqual(
-      expect.objectContaining({ id: "card_target", contentKind: "text" }),
-    );
-  });
-
-  it("does not disclose an ineligible or unlinked focused post", async () => {
-    const res = await GET(
-      new Request("https://example.test/api/parent/feed?post=foreign_card"),
-    );
-
-    expect(res.status).toBe(404);
-    expect(await res.json()).toEqual({ error: "post_not_found" });
-    expect(mocks.cardFindMany).not.toHaveBeenCalled();
   });
 
   it("applies private no-store headers to scope errors", async () => {
