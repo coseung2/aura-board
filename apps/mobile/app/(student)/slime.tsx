@@ -25,9 +25,9 @@ import {
   ControlPressable,
 } from "../../components/ui";
 import {
-  SemanticNav,
-  SemanticNavItem,
-} from "../../components/SemanticNavigation";
+  ContentTab,
+  ContentTabs,
+} from "../../components/NavigationTabs";
 import { SlimeSprite } from "../../components/slime/SlimeSprite";
 import { StudentHeaderActions } from "../../components/StudentHeaderActions";
 import { WalkingTitleSlot } from "../../components/WalkingTitleSlot";
@@ -600,26 +600,25 @@ export default function StudentSlimeScreen() {
           />
         }
       >
-        <SemanticNav
-          variant="standalone"
+        <ContentTabs
           style={styles.petSectionNav}
           accessibilityLabel="펫 섹션"
         >
-          <SemanticNavItem
+          <ContentTab
             style={styles.petSectionNavItem}
             selected={section === "mine"}
             onPress={() => router.setParams({ section: "mine" })}
           >
             내 펫
-          </SemanticNavItem>
-          <SemanticNavItem
+          </ContentTab>
+          <ContentTab
             style={styles.petSectionNavItem}
             selected={section === "classroom"}
             onPress={() => router.setParams({ section: "classroom" })}
           >
             우리 반 펫
-          </SemanticNavItem>
-          <SemanticNavItem
+          </ContentTab>
+          <ContentTab
             style={styles.petSectionNavItem}
             selected={section === "shop"}
             onPress={() => {
@@ -628,8 +627,8 @@ export default function StudentSlimeScreen() {
             }}
           >
             상점
-          </SemanticNavItem>
-        </SemanticNav>
+          </ContentTab>
+        </ContentTabs>
 
         {section === "classroom" ? (
           classroomLoading && classmates === null ? (
@@ -1064,22 +1063,21 @@ export default function StudentSlimeScreen() {
         <Text style={styles.wardrobeTitle}>
           {wardrobeColor ? `${SLIME_COLOR_LABELS[wardrobeColor]} 슬라임 꾸미기` : "슬라임 꾸미기"}
         </Text>
-        <SemanticNav
-          variant="standalone"
+        <ContentTabs
           style={styles.wardrobeNav}
           accessibilityLabel="보유 아이템 카테고리"
         >
           {WARDROBE_NAV_ITEMS.map((item) => (
-            <SemanticNavItem
+            <ContentTab
               key={item.key}
               style={styles.wardrobeNavItem}
               selected={wardrobeFilter === item.key}
               onPress={() => setWardrobeFilter(item.key)}
             >
               {item.label}
-            </SemanticNavItem>
+            </ContentTab>
           ))}
-        </SemanticNav>
+        </ContentTabs>
         <ScrollView style={styles.wardrobeList} contentContainerStyle={styles.wardrobeListContent}>
           {wardrobeFilter === "title" ? (
             home?.walkingTitle ? (
