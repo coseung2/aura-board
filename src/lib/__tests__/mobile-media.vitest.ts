@@ -143,9 +143,7 @@ describe("mobile media previews", () => {
   it("allows only the expected top-level YouTube embed navigation", () => {
     const embedUrl = buildYouTubeEmbedUrl("dQw4w9WgXcQ");
 
-    expect(embedOriginWhitelist("youtube", embedUrl)).toContain(
-      "https://www.youtube.com/*",
-    );
+    expect(embedOriginWhitelist()).toEqual(["*"]);
     expect(
       isAllowedEmbedNavigation(
         `${MOBILE_EMBED_ORIGIN}/mobile-embed/youtube/`,

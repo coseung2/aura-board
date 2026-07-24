@@ -185,23 +185,14 @@ export function isDirectVideoUrl(raw: string): boolean {
 
 export type EmbedKind = "youtube" | "canva" | "video" | null;
 
-export function embedOriginWhitelist(
-  kind: EmbedKind,
-  embedUrl: string | null,
-): string[] {
-  const origins = [`${MOBILE_EMBED_ORIGIN}/*`, "about:blank"];
-  if (kind === "youtube") {
-    origins.push("https://www.youtube.com/*", "https://youtube.com/*");
-  } else if (kind === "canva") {
-    origins.push("https://www.canva.com/*", "https://canva.com/*");
-  } else if (kind === "video" && embedUrl) {
-    try {
-      origins.push(`${new URL(embedUrl).origin}/*`);
-    } catch {
-      // The classifier rejects malformed direct-video URLs before this point.
-    }
-  }
-  return origins;
+/**
+ * Static HTML WebViews must accept every origin at the wrapper layer.
+ * react-native-webview opens URLs rejected here in the system browser before
+ * our navigation callback can inspect them. isAllowedEmbedNavigation remains
+ * the actual allowlist for top-level navigation.
+ */
+export function embedOriginWhitelist(): string[] {
+  return ["*"];
 }
 
 export function isAllowedEmbedNavigation(

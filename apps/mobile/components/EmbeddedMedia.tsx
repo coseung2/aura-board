@@ -77,10 +77,7 @@ export function EmbeddedMedia({
     }
     return { uri: externalUrl };
   }, [embedUrl, externalUrl, kind, title, youtubeId]);
-  const originWhitelist = useMemo(
-    () => embedOriginWhitelist(kind, embedUrl),
-    [embedUrl, kind],
-  );
+  const originWhitelist = useMemo(() => embedOriginWhitelist(), []);
 
   useEffect(() => {
     setLoading(canEmbed);
@@ -120,6 +117,10 @@ export function EmbeddedMedia({
             allowsInlineMediaPlayback
             mediaPlaybackRequiresUserAction={false}
             setSupportMultipleWindows={false}
+            onOpenWindow={() => {
+              // Keep target=_blank/window.open requests inside the media area.
+              // Supplying this handler makes the iOS native WebView cancel them.
+            }}
             startInLoadingState
             onShouldStartLoadWithRequest={(request) =>
               isAllowedEmbedNavigation(request.url, kind, embedUrl)
