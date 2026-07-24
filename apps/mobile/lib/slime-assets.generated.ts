@@ -24177,3 +24177,21 @@ export const SLIME_MOBILE_SHARED_ASSETS = {
   "source": "../assets/slimes/shared/water-puddle/sheet.png"
 }, image: require("../assets/slimes/shared/water-puddle/sheet.png") },
 } as const;
+
+export const SLIME_MOBILE_ANIMATION_MANIFEST = {
+  schemaVersion: 1,
+  imageScale: 4,
+  colors: ["blue", "green", "yellow", "purple", "red"],
+  evolutions: ["base", "gold-crown-red-gem", "silver-crown-blue-gem"],
+  actions: ["idle", "happy", "drink", "water-puddle", "trampoline"],
+  playbackByAction: {
+    idle: { loop: true, oneShot: false },
+    happy: { loop: false, oneShot: true },
+    drink: { loop: false, oneShot: true },
+    "water-puddle": { loop: false, oneShot: true },
+    trampoline: { loop: false, oneShot: true },
+  },
+  assets: SLIME_MOBILE_ASSET_REGISTRY,
+  crownOverlays: SLIME_MOBILE_CROWN_OVERLAY_REGISTRY,
+  shared: SLIME_MOBILE_SHARED_ASSETS,
+} as const;

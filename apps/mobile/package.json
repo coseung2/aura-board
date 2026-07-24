@@ -8,6 +8,7 @@
     "ios": "expo start --ios",
     "web": "expo start --web",
     "design:check": "node scripts/check-design-system.mjs",
+    "assets:check": "node ../../scripts/validate-mobile-slime-assets.mjs",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

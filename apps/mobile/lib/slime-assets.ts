@@ -1,15 +1,11 @@
-import {
-  SLIME_MOBILE_ASSET_REGISTRY,
-  SLIME_MOBILE_CROWN_OVERLAY_REGISTRY,
-  SLIME_MOBILE_SHARED_ASSETS,
-} from "./slime-assets.generated";
+import { SLIME_MOBILE_ANIMATION_MANIFEST } from "./slime-assets.generated";
 
-export const SLIME_SHARED_ASSETS = SLIME_MOBILE_SHARED_ASSETS;
+export const SLIME_SHARED_ASSETS = SLIME_MOBILE_ANIMATION_MANIFEST.shared;
 
-export const SLIME_ASSET_COLORS = ["blue", "green", "yellow", "purple", "red"] as const;
+export const SLIME_ASSET_COLORS = SLIME_MOBILE_ANIMATION_MANIFEST.colors;
 export type SlimeColor = (typeof SLIME_ASSET_COLORS)[number];
 
-export const SLIME_EVOLUTIONS = ["base", "gold-crown-red-gem", "silver-crown-blue-gem"] as const;
+export const SLIME_EVOLUTIONS = SLIME_MOBILE_ANIMATION_MANIFEST.evolutions;
 export type SlimeEvolution = (typeof SLIME_EVOLUTIONS)[number];
 
 export const EQUIPPED_FLOORS = ["none", "grass-floor", "water-puddle", "trampoline"] as const;
@@ -19,7 +15,8 @@ export const SLIME_ACTIONS = ["idle", "happy", "drink", "floor-interaction"] as 
 export type SlimeAction = (typeof SLIME_ACTIONS)[number];
 
 export type SlimeFloorInteraction = Extract<EquippedFloor, "water-puddle" | "trampoline">;
-export type SlimeSheetAction = "idle" | "happy" | "drink" | SlimeFloorInteraction;
+export const SLIME_SHEET_ACTIONS = SLIME_MOBILE_ANIMATION_MANIFEST.actions;
+export type SlimeSheetAction = (typeof SLIME_SHEET_ACTIONS)[number];
 export type SlimeAssetKey = `${SlimeEvolution}/${SlimeColor}/${SlimeSheetAction}`;
 export type SlimeCrownOverlayKey = `${Exclude<SlimeEvolution, "base">}/${SlimeColor}`;
 
@@ -45,8 +42,8 @@ export type SlimeSheetMetadata = Readonly<{
   }>;
 }>;
 
-type GeneratedMobileEntry = (typeof SLIME_MOBILE_ASSET_REGISTRY)[keyof typeof SLIME_MOBILE_ASSET_REGISTRY];
-type GeneratedMobileOverlay = (typeof SLIME_MOBILE_CROWN_OVERLAY_REGISTRY)[keyof typeof SLIME_MOBILE_CROWN_OVERLAY_REGISTRY];
+type GeneratedMobileEntry = (typeof SLIME_MOBILE_ANIMATION_MANIFEST.assets)[keyof typeof SLIME_MOBILE_ANIMATION_MANIFEST.assets];
+type GeneratedMobileOverlay = (typeof SLIME_MOBILE_ANIMATION_MANIFEST.crownOverlays)[keyof typeof SLIME_MOBILE_ANIMATION_MANIFEST.crownOverlays];
 
 export type SlimeMobileAssetEntry = Readonly<{
   key: SlimeAssetKey;
@@ -69,8 +66,8 @@ export type SlimeStaticFloor = Readonly<{
   key: "grass-floor";
   image: unknown;
   imageScale: 4;
-  surfaceY: 44;
-  slimeFootY: 56;
+  surfaceY: number;
+  slimeFootY: number;
 }>;
 
 export type SlimePlayback = Readonly<{
@@ -108,8 +105,8 @@ export type SlimeAssetResolution = Readonly<{
   oneShot: boolean;
 }>;
 
-const mobileEntries = SLIME_MOBILE_ASSET_REGISTRY as Record<string, GeneratedMobileEntry>;
-const mobileOverlays = SLIME_MOBILE_CROWN_OVERLAY_REGISTRY as Record<string, GeneratedMobileOverlay>;
+const mobileEntries = SLIME_MOBILE_ANIMATION_MANIFEST.assets as Record<string, GeneratedMobileEntry>;
+const mobileOverlays = SLIME_MOBILE_ANIMATION_MANIFEST.crownOverlays as Record<string, GeneratedMobileOverlay>;
 
 const isCrowned = (evolution: SlimeEvolution): evolution is Exclude<SlimeEvolution, "base"> => evolution !== "base";
 
@@ -129,16 +126,16 @@ function normalizedFrameIndex(frameIndex: number, frameCount: number): number {
 }
 
 function playbackFor(action: SlimeSheetAction): SlimePlayback {
-  return action === "idle" ? { loop: true, oneShot: false } : { loop: false, oneShot: true };
+  return SLIME_MOBILE_ANIMATION_MANIFEST.playbackByAction[action];
 }
 
 function staticFloorFor(equippedFloor: EquippedFloor): SlimeStaticFloor | null {
   return equippedFloor === "grass-floor" ? {
     key: "grass-floor",
-    image: SLIME_MOBILE_SHARED_ASSETS.grassFloor.image,
-    imageScale: 4,
-    surfaceY: 44,
-    slimeFootY: 56,
+    image: SLIME_MOBILE_ANIMATION_MANIFEST.shared.grassFloor.image,
+    imageScale: SLIME_MOBILE_ANIMATION_MANIFEST.imageScale,
+    surfaceY: SLIME_MOBILE_ANIMATION_MANIFEST.shared.grassFloor.surfaceY,
+    slimeFootY: SLIME_MOBILE_ANIMATION_MANIFEST.shared.grassFloor.slimeFootY,
   } : null;
 }
 
