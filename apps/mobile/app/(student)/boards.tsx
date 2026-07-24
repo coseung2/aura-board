@@ -45,9 +45,9 @@ import {
   SurfacePressable,
 } from "../../components/ui";
 import {
-  SemanticNav,
-  SemanticNavItem,
-} from "../../components/SemanticNavigation";
+  SectionNav,
+  SectionNavItem,
+} from "../../components/NavigationTabs";
 import { StudentHeaderActions } from "../../components/StudentHeaderActions";
 
 const FALLBACK_THUMBNAIL = "/board-type-thumbnails/card-board.png";
@@ -219,32 +219,32 @@ export default function StudentBoardsScreen() {
                 <Text style={styles.boardHeaderTitle} accessibilityRole="header">
                   {classroomName ?? cachedClassroomName ?? "내 학급"}
                 </Text>
-                <SemanticNav
+                <SectionNav
                   style={styles.filterNav}
                   accessibilityLabel="보드 필터"
                 >
-                  <SemanticNavItem
+                  <SectionNavItem
                     selected={filter === "all"}
                     onPress={() => setFilter("all")}
                     accessibilityLabel={`전체 보드 ${overview.summary.total}개`}
                   >
                     {`전체 ${overview.summary.total}`}
-                  </SemanticNavItem>
-                  <SemanticNavItem
+                  </SectionNavItem>
+                  <SectionNavItem
                     selected={filter === "lesson"}
                     onPress={() => setFilter("lesson")}
                     accessibilityLabel={`수업 보드 ${overview.summary.lesson}개`}
                   >
                     {`수업 ${overview.summary.lesson}`}
-                  </SemanticNavItem>
-                  <SemanticNavItem
+                  </SectionNavItem>
+                  <SectionNavItem
                     selected={filter === "play"}
                     onPress={() => setFilter("play")}
                     accessibilityLabel={`놀이 보드 ${overview.summary.play}개`}
                   >
                     {`놀이 ${overview.summary.play}`}
-                  </SemanticNavItem>
-                </SemanticNav>
+                  </SectionNavItem>
+                </SectionNav>
               </View>
             </View>
           }

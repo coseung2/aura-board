@@ -32,9 +32,9 @@ import {
   TextField,
 } from "../../components/ui";
 import {
-  SemanticNav,
-  SemanticNavItem,
-} from "../../components/SemanticNavigation";
+  SectionNav,
+  SectionNavItem,
+} from "../../components/NavigationTabs";
 import { StudentHeaderActions } from "../../components/StudentHeaderActions";
 
 type BookType = "comic" | "story";
@@ -149,22 +149,22 @@ export default function StudentReadingScreen() {
               <SectionHeader
                 title="기록"
                 right={
-                  <SemanticNav accessibilityLabel="책 종류">
-                    <SemanticNavItem
+                  <SectionNav accessibilityLabel="책 종류">
+                    <SectionNavItem
                       selected={bookType === "story"}
                       onPress={() => setBookType("story")}
                       accessibilityLabel="이야기책"
                     >
                       이야기책
-                    </SemanticNavItem>
-                    <SemanticNavItem
+                    </SectionNavItem>
+                    <SectionNavItem
                       selected={bookType === "comic"}
                       onPress={() => setBookType("comic")}
                       accessibilityLabel="만화책"
                     >
                       만화책
-                    </SemanticNavItem>
-                  </SemanticNav>
+                    </SectionNavItem>
+                  </SectionNav>
                 }
               />
 
@@ -227,24 +227,24 @@ export default function StudentReadingScreen() {
               title="내 독서 기록"
               right={
                 !loading && entries.length > 0 ? (
-                  <SemanticNav accessibilityLabel="독서 기록 종류">
-                    <SemanticNavItem
+                  <SectionNav accessibilityLabel="독서 기록 종류">
+                    <SectionNavItem
                       style={styles.historyTypeNavItem}
                       selected={historyBookType === "story"}
                       onPress={() => setHistoryBookType("story")}
                       accessibilityLabel={`이야기책 ${readingCounts.story}개`}
                     >
                       {`이야기책 ${readingCounts.story}`}
-                    </SemanticNavItem>
-                    <SemanticNavItem
+                    </SectionNavItem>
+                    <SectionNavItem
                       style={styles.historyTypeNavItem}
                       selected={historyBookType === "comic"}
                       onPress={() => setHistoryBookType("comic")}
                       accessibilityLabel={`만화책 ${readingCounts.comic}개`}
                     >
                       {`만화책 ${readingCounts.comic}`}
-                    </SemanticNavItem>
-                  </SemanticNav>
+                    </SectionNavItem>
+                  </SectionNav>
                 ) : undefined
               }
             />

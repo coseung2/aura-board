@@ -489,20 +489,23 @@ src/styles/
 
 ---
 
-## 13. Semantic Navigation
+## 13. Navigation
 
-`SemanticNav`는 같은 화면에서 주요 보기나 작업 맥락을 전환하는 로컬 내비게이션이다.
-검색 조건이나 결과 범위만 좁히는 필터와 구분하며, 컨테이너는 `tablist`, 항목은
-`tab`, 현재 항목은 `selected` 상태를 제공한다.
+- `MobileBottomNav`: 앱의 주요 목적지를 이동하는 전역 하단 내비게이션
+- `SectionNav` + `SectionNavItem`: 섹션 타이틀과 함께 주요 보기나 작업 맥락을 전환하는 로컬 내비게이션
+- `ContentTabs` + `ContentTab`: 시각적인 타이틀 없이 콘텐츠 안에서 보기를 전환하는 로컬 탭
 
-### Titled
+`SectionNav`와 `ContentTabs`는 검색 조건이나 결과 범위만 좁히는 필터와 구분한다.
+컨테이너는 `tablist`, 항목은 `tab`, 현재 항목은 `selected` 상태를 제공한다.
+
+### SectionNav
 
 - 섹션 타이틀을 왼쪽에 배치하고 내비게이션을 오른쪽에 배치한다.
 - 내비게이션 항목은 콘텐츠 너비를 사용한다.
 - 전체 폭의 하단 구분선을 유지하고 활성선은 선택 항목 아래에만 표시한다.
 - 좁은 화면에서는 타이틀 위, 내비게이션 아래의 2행 배치를 허용한다.
 
-### Standalone
+### ContentTabs
 
 - 시각적인 섹션 타이틀을 표시하지 않는다.
 - 내비게이션 항목이 전체 구분선 너비를 균등하게 나눠 사용한다.
@@ -510,8 +513,8 @@ src/styles/
 - 보이는 타이틀이 없으므로 `accessibilityLabel`은 반드시 제공한다.
 
 ```tsx
-<SemanticNav variant="standalone" accessibilityLabel="걷기 활동 보기">
-  <SemanticNavItem selected={activeView === "record"}>걷기 기록</SemanticNavItem>
-  <SemanticNavItem selected={activeView === "missions"}>걷기 미션</SemanticNavItem>
-</SemanticNav>
+<ContentTabs accessibilityLabel="걷기 활동 보기">
+  <ContentTab selected={activeView === "record"}>걷기 기록</ContentTab>
+  <ContentTab selected={activeView === "missions"}>걷기 미션</ContentTab>
+</ContentTabs>
 ```

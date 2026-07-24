@@ -32,9 +32,9 @@ import {
   SurfaceCard,
 } from "../ui";
 import {
-  SemanticNav,
-  SemanticNavItem,
-} from "../SemanticNavigation";
+  SectionNav,
+  SectionNavItem,
+} from "../NavigationTabs";
 import { useBoardRealtime } from "../../lib/use-board-realtime";
 import { StreamFeedPost } from "./ColumnsStreamFeedPost";
 
@@ -223,29 +223,29 @@ export function ColumnsBoard({
               <Text style={styles.topicFilterTitle} accessibilityRole="header">
                 주제
               </Text>
-              <SemanticNav
+              <SectionNav
                 style={styles.topicFilterNav}
                 accessibilityLabel="제출 상태 필터"
               >
-                <SemanticNavItem
+                <SectionNavItem
                   selected={topicFilter === "all"}
                   onPress={() => setTopicFilter("all")}
                 >
                   {`전체 ${summaries.length}`}
-                </SemanticNavItem>
-                <SemanticNavItem
+                </SectionNavItem>
+                <SectionNavItem
                   selected={topicFilter === "submitted"}
                   onPress={() => setTopicFilter("submitted")}
                 >
                   {`제출 ${submittedTopicCount}`}
-                </SemanticNavItem>
-                <SemanticNavItem
+                </SectionNavItem>
+                <SectionNavItem
                   selected={topicFilter === "pending"}
                   onPress={() => setTopicFilter("pending")}
                 >
                   {`미제출 ${summaries.length - submittedTopicCount}`}
-                </SemanticNavItem>
-              </SemanticNav>
+                </SectionNavItem>
+              </SectionNav>
             </View>
           }
           renderItem={({ item }) => (

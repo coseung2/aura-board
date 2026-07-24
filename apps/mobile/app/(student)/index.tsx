@@ -49,9 +49,9 @@ import {
   SectionHeader,
 } from "../../components/ui";
 import {
-  SemanticNav,
-  SemanticNavItem,
-} from "../../components/SemanticNavigation";
+  SectionNav,
+  SectionNavItem,
+} from "../../components/NavigationTabs";
 import { StudentHeaderActions } from "../../components/StudentHeaderActions";
 import { SlimeSprite } from "../../components/slime/SlimeSprite";
 import {
@@ -352,8 +352,8 @@ function AssignmentPanel({
       <SectionHeader
         title="과제 목록"
         right={
-          <SemanticNav
-            style={styles.sectionSemanticNav}
+          <SectionNav
+            style={styles.sectionNav}
             accessibilityLabel="과제 필터"
           >
             <FilterChip
@@ -370,7 +370,7 @@ function AssignmentPanel({
             >
               완료 {completedCount}
             </FilterChip>
-          </SemanticNav>
+          </SectionNav>
         }
       />
 
@@ -424,9 +424,9 @@ function FilterChip({
   children: ReactNode;
 }) {
   return (
-    <SemanticNavItem selected={active} tone={tone} onPress={onPress}>
+    <SectionNavItem selected={active} tone={tone} onPress={onPress}>
       {children}
-    </SemanticNavItem>
+    </SectionNavItem>
   );
 }
 
@@ -539,23 +539,23 @@ function WalletCardCompact({
         }
         right={
           hasDuties ? (
-            <SemanticNav
-              style={styles.sectionSemanticNav}
+            <SectionNav
+              style={styles.sectionNav}
               accessibilityLabel="은행 보기"
             >
-              <SemanticNavItem
+              <SectionNavItem
                 selected={!showDuties}
                 onPress={() => setPanel("wallet")}
               >
                 통장
-              </SemanticNavItem>
-              <SemanticNavItem
+              </SectionNavItem>
+              <SectionNavItem
                 selected={showDuties}
                 onPress={() => setPanel("duties")}
               >
                 내 역할
-              </SemanticNavItem>
-            </SemanticNav>
+              </SectionNavItem>
+            </SectionNav>
           ) : undefined
         }
       />
@@ -823,7 +823,7 @@ const styles = StyleSheet.create({
     paddingBottom: spacing.md,
     gap: spacing.md,
   },
-  sectionSemanticNav: {
+  sectionNav: {
     paddingTop: spacing.xs,
   },
   walletTitleCompact: { ...typography.subtitle, color: colors.text },
