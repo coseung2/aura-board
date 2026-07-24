@@ -21,6 +21,7 @@ import {
   type ViewStyle,
 } from "react-native";
 import { ArrowLeft } from "lucide-react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { DailyBanner, useDailyBannerScope } from "./DailyBanner";
 import {
   colors,
@@ -221,10 +222,17 @@ export function AppBottomSheet({
   accessibilityLabel,
   keyboardAvoiding,
 }: AppBottomSheetProps) {
+  const insets = useSafeAreaInsets();
   const translateY = useRef(new Animated.Value(0)).current;
   const onCloseRef = useRef(onClose);
   const dismissRef = useRef<() => void>(() => undefined);
   onCloseRef.current = onClose;
+  const flattenedSheetStyle = StyleSheet.flatten(sheetStyle) ?? {};
+  const contentPaddingBottom =
+    typeof flattenedSheetStyle.paddingBottom === "number"
+      ? flattenedSheetStyle.paddingBottom
+      : 0;
+  const safePaddingBottom = contentPaddingBottom + insets.bottom;
 
   useEffect(() => {
     if (visible) translateY.setValue(0);
@@ -236,7 +244,6 @@ export function AppBottomSheet({
       duration: 180,
       useNativeDriver: true,
     }).start(() => {
-      translateY.setValue(0);
       onCloseRef.current();
     });
   };
@@ -272,7 +279,11 @@ export function AppBottomSheet({
       accessibilityLabel={accessibilityLabel}
       accessibilityViewIsModal={visible}
       importantForAccessibility="yes"
-      style={[styles.bottomSheet, sheetStyle, { transform: [{ translateY }] }]}
+      style={[
+        styles.bottomSheet,
+        sheetStyle,
+        { paddingBottom: safePaddingBottom, transform: [{ translateY }] },
+      ]}
     >
       <View
         {...panResponder.panHandlers}

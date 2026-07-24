@@ -10,7 +10,6 @@ import {
   View,
 } from "react-native";
 import { useRouter } from "expo-router";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { AppBottomSheet, AppButton, ControlPressable, TextField } from "./ui";
 import { CommentLikeButton } from "./CommentLikeButton";
 import { apiFetch, ApiError } from "../lib/api";
@@ -49,7 +48,6 @@ export function CommentBottomSheet({
   onCommentCountChange,
 }: Props) {
   const router = useRouter();
-  const insets = useSafeAreaInsets();
   const [items, setItems] = useState<CommentItem[]>([]);
   const [commentText, setCommentText] = useState("");
   const [loading, setLoading] = useState(false);
@@ -149,7 +147,7 @@ export function CommentBottomSheet({
     <AppBottomSheet
       visible={visible}
       onClose={onClose}
-      sheetStyle={[styles.sheet, { paddingBottom: insets.bottom + spacing.sm }]}
+      sheetStyle={styles.sheet}
       accessibilityLabel="댓글"
     >
       <Text style={styles.title} accessibilityRole="header">
@@ -260,6 +258,7 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: radii.card,
     borderTopRightRadius: radii.card,
     backgroundColor: colors.bg,
+    paddingBottom: spacing.sm,
   },
   title: {
     ...typography.section,
