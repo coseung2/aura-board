@@ -209,7 +209,12 @@ export default async function BoardPage({
               order: true,
             },
           },
-          _count: { select: { likes: true, comments: true } },
+          _count: {
+            select: {
+              likes: true,
+              comments: { where: { audience: "public", deletedAt: null } },
+            },
+          },
           likes: {
             where: useStudentViewer
               ? { likerStudentId: student?.id ?? "" }

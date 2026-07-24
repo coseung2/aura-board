@@ -2,6 +2,8 @@ import { useCallback, useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
+  KeyboardAvoidingView,
+  Platform,
   StyleSheet,
   Text,
   View,
@@ -194,7 +196,10 @@ export default function LinkChildScreen() {
       />
 
       {step === "code" && (
-        <View style={styles.inner}>
+        <KeyboardAvoidingView
+          style={styles.inner}
+          behavior={Platform.OS === "ios" ? "padding" : undefined}
+        >
           <View style={styles.card}>
             <Text style={styles.heading}>연결 코드 입력</Text>
             <Text style={styles.sub}>
@@ -227,7 +232,7 @@ export default function LinkChildScreen() {
               코드 확인
             </AppButton>
           </View>
-        </View>
+        </KeyboardAvoidingView>
       )}
 
       {step === "roster" && (

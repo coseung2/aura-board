@@ -92,6 +92,7 @@ describe("activity reward source policy", () => {
       "reading_reward",
       "walking_reward",
       "walking_weekly_reward",
+      "walking_classroom_rank_reward",
       "assignment_reward",
       "comment_reward",
     ]);

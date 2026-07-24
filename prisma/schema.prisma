@@ -1588,6 +1588,12 @@ enum CommentAuthorKind {
   external
 }
 
+enum CardCommentAudience {
+  public
+
+  guardian
+}
+
 model CardComment {
   id String @id @default(cuid())
 
@@ -1599,7 +1605,11 @@ model CardComment {
 
   authorStudentId String? // student
 
+  authorParentId String? // parent
+
   externalAuthorName String? // share-link anonymous author
+
+  audience CardCommentAudience @default(public)
 
   content String
 
@@ -1616,12 +1626,16 @@ model CardComment {
 
   authorStudent Student? @relation("StudentCardComments", fields: [authorStudentId], references: [id], onDelete: SetNull)
 
+  authorParent Parent? @relation("ParentCardComments", fields: [authorParentId], references: [id], onDelete: SetNull)
+
   likes CardCommentLike[]
 
+  @@unique([authorStudentId, cardId, clientRequestId])
+  @@unique([authorParentId, cardId, clientRequestId])
   @@index([cardId, createdAt])
   @@index([authorUserId])
   @@index([authorStudentId])
-  @@unique([authorStudentId, cardId, clientRequestId])
+  @@index([authorParentId])
 }
 
 model CardCommentLike {
@@ -1635,6 +1649,8 @@ model CardCommentLike {
 
   likerStudentId String? // student
 
+  likerParentId String? // parent
+
   createdAt DateTime @default(now())
 
   comment CardComment @relation(fields: [commentId], references: [id], onDelete: Cascade)
@@ -1643,8 +1659,11 @@ model CardCommentLike {
 
   likerStudent Student? @relation("StudentCardCommentLikes", fields: [likerStudentId], references: [id], onDelete: Cascade)
 
+  likerParent Parent? @relation("ParentCardCommentLikes", fields: [likerParentId], references: [id], onDelete: Cascade)
+
   @@unique([commentId, likerUserId])
   @@unique([commentId, likerStudentId])
+  @@unique([commentId, likerParentId])
   @@index([commentId])
 }
 
@@ -1659,6 +1678,8 @@ model CardLike {
 
   likerStudentId String? // student
 
+  likerParentId String? // parent
+
   externalLikerKey String? // share-link anonymous visitor
 
   createdAt DateTime @default(now())
@@ -1669,8 +1690,11 @@ model CardLike {
 
   likerStudent Student? @relation("StudentCardLikes", fields: [likerStudentId], references: [id], onDelete: Cascade)
 
+  likerParent Parent? @relation("ParentCardLikes", fields: [likerParentId], references: [id], onDelete: Cascade)
+
   @@unique([cardId, likerUserId])
   @@unique([cardId, likerStudentId])
+  @@unique([cardId, likerParentId])
   @@unique([cardId, externalLikerKey])
   @@index([cardId])
 }
@@ -2520,6 +2544,10 @@ model Parent {
 
   pushDevices    ParentPushDevice[]
   pushDispatches ParentPushDispatch[]
+
+  cardComments CardComment[]     @relation("ParentCardComments")
+  cardLikes    CardLike[]        @relation("ParentCardLikes")
+  commentLikes CardCommentLike[] @relation("ParentCardCommentLikes")
 
   @@index([email])
   @@index([parentDeletedAt])

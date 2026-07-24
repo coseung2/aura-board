@@ -171,7 +171,12 @@ export async function GET(
               order: true,
             },
           },
-          _count: { select: { likes: true, comments: true } },
+          _count: {
+            select: {
+              likes: true,
+              comments: { where: { audience: "public", deletedAt: null } },
+            },
+          },
           likes: {
             where:
               preferStudent && student

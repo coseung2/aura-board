@@ -11,13 +11,12 @@ import { getCurrentParent } from "./parent-session";
 // 3가지 actor:
 //   - teacher: NextAuth 세션. 교사 본인이 학급 소유자이거나 보드 멤버면 카드 접근 가능.
 //   - student: HMAC 쿠키. 학급 소속 카드만 접근.
-//   - parent: ParentSession. 자녀(ParentChildLink active)의 학급 카드만 read.
-//             write (댓글/좋아요) 는 차단.
+//   - parent: ParentSession. active 링크된 정확한 자녀가 작성한 카드만 접근.
 
 export type CardActor =
   | { kind: "teacher"; id: string; name: string }
   | { kind: "student"; id: string; name: string; classroomId: string }
-  | { kind: "parent"; id: string };
+  | { kind: "parent"; id: string; name: string };
 
 export async function getCurrentCardActor(): Promise<CardActor | null> {
   const headerList = await headers();
@@ -37,7 +36,7 @@ export async function getCurrentCardActor(): Promise<CardActor | null> {
   const s = await getCurrentStudent().catch(() => null);
   if (s) return { kind: "student", id: s.id, name: s.name, classroomId: s.classroomId };
   const p = await getCurrentParent().catch(() => null);
-  if (p) return { kind: "parent", id: p.parent.id };
+  if (p) return { kind: "parent", id: p.parent.id, name: p.parent.name };
   return null;
 }
 
@@ -45,11 +44,14 @@ export interface CardAccessContext {
   cardId: string;
   classroomId: string | null;
   anonymousAuthor: boolean;
+  studentAuthorId: string | null;
+  studentAuthorIds: string[];
+  guardianAvailable: boolean;
 }
 
 /**
- * 카드 접근 권한을 검사. read 면 teacher/student/parent 모두, write 면
- * teacher/student 만 (parent 차단).
+ * 카드 접근 권한을 검사. 학부모는 active 링크된 정확한 자녀가 작성한
+ * 카드에서만 읽기/guardian 댓글/좋아요가 가능하다.
  *
  * 학급 단위 게이트 + 보드 멤버 게이트. 학생/학부모는 학급 매핑이 필요하지만,
  * 교사는 학급에 할당되지 않은 개인 보드도 BoardMember 이면 댓글/좋아요 가능.
@@ -57,12 +59,14 @@ export interface CardAccessContext {
 export async function authorizeCardAccess(
   cardId: string,
   actor: CardActor,
-  mode: "read" | "write"
+  _mode: "read" | "write"
 ): Promise<{ ok: true; ctx: CardAccessContext } | { ok: false; reason: "not_found" | "forbidden" | "no_classroom" }> {
   const card = await db.card.findUnique({
     where: { id: cardId },
     select: {
       id: true,
+      studentAuthorId: true,
+      authors: { select: { studentId: true } },
       board: {
         select: {
           classroomId: true,
@@ -78,10 +82,13 @@ export async function authorizeCardAccess(
   });
   if (!card) return { ok: false, reason: "not_found" };
   const classroomId = card.board.classroomId;
-
-  if (mode === "write" && actor.kind === "parent") {
-    return { ok: false, reason: "forbidden" };
-  }
+  const studentAuthorIds = Array.from(
+    new Set(
+      [card.studentAuthorId, ...card.authors.map((author) => author.studentId)].filter(
+        (studentId): studentId is string => Boolean(studentId),
+      ),
+    ),
+  );
 
   if (actor.kind === "teacher") {
     const isClassroomTeacher = card.board.classroom?.teacherId === actor.id;
@@ -96,13 +103,15 @@ export async function authorizeCardAccess(
     }
   } else {
     if (!classroomId) return { ok: false, reason: "no_classroom" };
-    // parent — must have an active ParentChildLink to a student in this classroom
+    if (studentAuthorIds.length === 0) return { ok: false, reason: "forbidden" };
+    // Parent feed includes both primary and CardAuthor co-authors. Engagement
+    // must use the same scope or a visible child post can reject likes/comments.
     const link = await db.parentChildLink.findFirst({
       where: {
         parentId: actor.id,
+        studentId: { in: studentAuthorIds },
         status: "active",
         deletedAt: null,
-        student: { classroomId },
       },
       select: { id: true },
     });
@@ -115,6 +124,13 @@ export async function authorizeCardAccess(
       cardId: card.id,
       classroomId,
       anonymousAuthor: card.board.anonymousAuthor,
+      studentAuthorId: card.studentAuthorId,
+      studentAuthorIds,
+      guardianAvailable:
+        studentAuthorIds.length > 0 &&
+        (actor.kind === "teacher" ||
+          (actor.kind === "student" && studentAuthorIds.includes(actor.id)) ||
+          actor.kind === "parent"),
     },
   };
 }

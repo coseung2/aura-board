@@ -230,22 +230,26 @@ export function DailyBannerPreview({
 function MarqueeText({ text }: { text: string }) {
   const translateX = useRef(new Animated.Value(0)).current;
   const [viewportWidth, setViewportWidth] = useState(0);
-  const characters = Array.from(text);
-  const characterCount = characters.length;
-  const glyphAdvance =
-    typography.label.fontSize * 2 + typography.label.letterSpacing;
-  const textWidth = Math.max(spacing.xl, characterCount * glyphAdvance);
-  const shouldAnimate = viewportWidth > 0;
+  const [textWidth, setTextWidth] = useState(0);
+  const characterCount = Array.from(text).length;
+  const shouldAnimate = viewportWidth > 0 && textWidth > 0;
+  // Student proposals allow up to 120 characters. Give the off-screen native
+  // Text enough room for the full line before reading its real rendered width.
+  const measureWidth = Math.max(
+    viewportWidth * 4,
+    characterCount * (typography.label.fontSize * 2 + spacing.md),
+  );
 
   useEffect(() => {
     translateX.stopAnimation();
     translateX.setValue(viewportWidth);
     if (!shouldAnimate) return;
 
-    const endPosition = -textWidth;
     const animation = Animated.loop(
       Animated.timing(translateX, {
-        toValue: endPosition,
+        // Keep a single native Text node in the moving track. On Android this
+        // avoids overlapping duplicate glyph runs from the pixel font.
+        toValue: -textWidth,
         duration: Math.max(6_000, characterCount * 550),
         easing: (value) => value,
         useNativeDriver: true,
@@ -257,29 +261,45 @@ function MarqueeText({ text }: { text: string }) {
     };
   }, [characterCount, shouldAnimate, textWidth, translateX, viewportWidth]);
 
+  useEffect(() => {
+    setTextWidth(0);
+  }, [text]);
+
   return (
     <View
       style={styles.marqueeViewport}
       accessibilityLabel={text}
       onLayout={(event) => setViewportWidth(event.nativeEvent.layout.width)}
     >
-      <Animated.View
-        style={[
-          styles.marqueeTrack,
-          { width: textWidth, transform: [{ translateX }] },
-        ]}
+      <Text
+        pointerEvents="none"
+        style={[styles.marqueeMeasure, { left: -measureWidth, width: measureWidth }]}
+        numberOfLines={1}
+        onTextLayout={(event) => {
+          const nextWidth = Math.ceil(event.nativeEvent.lines[0]?.width ?? 0);
+          if (nextWidth > 0) {
+            setTextWidth((current) => (current === nextWidth ? current : nextWidth));
+          }
+        }}
       >
-        {characters.map((character, index) => (
+        {text}
+      </Text>
+      {textWidth > 0 ? (
+        <Animated.View
+          style={[
+            styles.marqueeTrack,
+            { transform: [{ translateX }] },
+          ]}
+        >
           <Text
-            key={`${index}:${character}`}
-            style={[styles.marqueeText, { width: glyphAdvance }]}
+            style={[styles.marqueeText, { width: textWidth }]}
             numberOfLines={1}
             accessible={false}
           >
-            {character}
+            {text}
           </Text>
-        ))}
-      </Animated.View>
+        </Animated.View>
+      ) : null}
     </View>
   );
 }
@@ -297,11 +317,22 @@ const styles = StyleSheet.create({
   },
   marqueeTrack: {
     flexDirection: "row",
+    flexWrap: "nowrap",
     alignItems: "center",
     alignSelf: "flex-start",
     flexGrow: 0,
     flexShrink: 0,
     gap: spacing.none,
+  },
+  marqueeMeasure: {
+    ...typography.label,
+    position: "absolute",
+    top: 0,
+    color: colors.transparent,
+    fontSize: typography.label.fontSize * 2,
+    lineHeight: typography.label.lineHeight * 2,
+    fontFamily: fontFamilies.banner,
+    letterSpacing: typography.label.letterSpacing,
   },
   marqueeText: {
     ...typography.label,
@@ -309,7 +340,6 @@ const styles = StyleSheet.create({
     lineHeight: typography.label.lineHeight * 2,
     color: colors.onAccent,
     fontFamily: fontFamilies.banner,
-    fontWeight: "400",
     letterSpacing: typography.label.letterSpacing,
     flexShrink: 0,
   },

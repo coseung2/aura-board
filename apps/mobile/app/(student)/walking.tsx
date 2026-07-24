@@ -1,7 +1,10 @@
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
+  Animated,
   AppState,
+  Easing,
+  Image,
   Platform,
   RefreshControl,
   ScrollView,
@@ -29,8 +32,11 @@ import {
   requestHealthConnectPermissions,
   type WalkingDay,
   type ClassroomWalkingRank,
+  type ClassroomRankReward,
+  type WalkingDailyStepRewards,
   type WalkingMonthlyAttendanceReward,
   type WalkingPolicy,
+  type WalkingRepresentativeSlime,
   type WalkingWeeklyStepRewards,
 } from "../../lib/walking-health";
 import type {
@@ -41,6 +47,7 @@ import {
   borders,
   colors,
   iconSizes,
+  layers,
   layout,
   pageChrome,
   radii,
@@ -54,6 +61,7 @@ import {
   AppHeader,
   AppModal,
   ControlPressable,
+  MediaPressable,
   SectionHeader,
 } from "../../components/ui";
 import {
@@ -61,10 +69,15 @@ import {
   ContentTabs,
 } from "../../components/NavigationTabs";
 import { StudentHeaderActions } from "../../components/StudentHeaderActions";
+import { SlimeSprite } from "../../components/slime/SlimeSprite";
 import { WalkingAttendanceCalendar } from "../../components/walking-attendance-calendar";
+import { evolutionForStage } from "../../lib/slimes";
 
 const numberFormatter = new Intl.NumberFormat("ko-KR");
 const FOREGROUND_SYNC_INTERVAL_MS = 60_000;
+const REWARD_CLAIM_BUTTON_IMAGE = require("../../assets/walking/reward-claim-button.png");
+const DISABLED_REWARD_CLAIM_BUTTON_IMAGE = require("../../assets/walking/reward-claim-button-disabled.png");
+const REWARD_COIN_IMAGE = require("../../assets/walking/reward-coin.png");
 
 type WalkingView = "record" | "missions";
 
@@ -100,9 +113,17 @@ export default function StudentWalkingScreen() {
   const [policy, setPolicy] = useState<WalkingPolicy>(DEFAULT_WALKING_POLICY);
   const [monthlyAttendanceReward, setMonthlyAttendanceReward] =
     useState<WalkingMonthlyAttendanceReward | null>(null);
+  const [dailyStepRewards, setDailyStepRewards] =
+    useState<WalkingDailyStepRewards | null>(null);
   const [weeklyStepRewards, setWeeklyStepRewards] =
     useState<WalkingWeeklyStepRewards | null>(null);
+  const [representativeSlime, setRepresentativeSlime] =
+    useState<WalkingRepresentativeSlime | null>(null);
   const [classroomTopFive, setClassroomTopFive] = useState<ClassroomWalkingRank[]>([]);
+  const [classroomRankRewards, setClassroomRankRewards] =
+    useState<ClassroomRankReward[]>([]);
+  const [classroomRankNextResetAt, setClassroomRankNextResetAt] = useState<string | null>(null);
+  const [rankRewardPending, setRankRewardPending] = useState(false);
   const [status, setStatus] = useState<HealthConnectStatus>("unavailable");
   const [permissions, setPermissions] = useState<HealthConnectPermission[]>([]);
   const [loading, setLoading] = useState(true);
@@ -131,8 +152,12 @@ export default function StudentWalkingScreen() {
     setRows(snapshot.rows);
     setPolicy(snapshot.policy);
     setMonthlyAttendanceReward(snapshot.monthlyAttendanceReward);
+    setDailyStepRewards(snapshot.dailyStepRewards);
     setWeeklyStepRewards(snapshot.weeklyStepRewards);
+    setRepresentativeSlime(snapshot.representativeSlime);
     setClassroomTopFive(snapshot.classroomTopFive);
+    setClassroomRankRewards(snapshot.classroomRankRewards);
+    setClassroomRankNextResetAt(snapshot.classroomRankNextResetAt);
   }, []);
 
   const load = useCallback(async (syncNative = false, refresh = false) => {
@@ -146,8 +171,12 @@ export default function StudentWalkingScreen() {
       setRows(cloudSnapshot.rows);
         setPolicy(cloudSnapshot.policy);
         setMonthlyAttendanceReward(cloudSnapshot.monthlyAttendanceReward);
+        setDailyStepRewards(cloudSnapshot.dailyStepRewards);
         setWeeklyStepRewards(cloudSnapshot.weeklyStepRewards);
+        setRepresentativeSlime(cloudSnapshot.representativeSlime);
         setClassroomTopFive(cloudSnapshot.classroomTopFive);
+        setClassroomRankRewards(cloudSnapshot.classroomRankRewards);
+        setClassroomRankNextResetAt(cloudSnapshot.classroomRankNextResetAt);
 
       if (!isHealthConnectModuleAvailable()) {
         setStatus("unavailable");
@@ -271,7 +300,11 @@ export default function StudentWalkingScreen() {
       setRows(snapshot.rows);
       setPolicy(snapshot.policy);
       setMonthlyAttendanceReward(snapshot.monthlyAttendanceReward);
+      setDailyStepRewards(snapshot.dailyStepRewards);
       setWeeklyStepRewards(snapshot.weeklyStepRewards);
+      setClassroomTopFive(snapshot.classroomTopFive);
+      setClassroomRankRewards(snapshot.classroomRankRewards);
+      setClassroomRankNextResetAt(snapshot.classroomRankNextResetAt);
       setMessage("출석을 체크했어요.");
     } catch (nextError) {
       if (!(await handleAuthError(nextError))) {
@@ -293,6 +326,33 @@ export default function StudentWalkingScreen() {
       setBusy(null);
     }
   }, []);
+
+  const claimClassroomRankReward = useCallback(async (weekStart: string) => {
+    if (rankRewardPending) return;
+    setRankRewardPending(true);
+    setError(null);
+    setMessage(null);
+    try {
+      const payload = await apiFetch<{
+        classroomRankReward: { weekStart: string; rank: number; amount: number; claimed: true };
+      }>("/api/student/walking/rewards/claim", {
+        method: "POST",
+        json: { kind: "classroom_rank", weekStart },
+      });
+      setClassroomRankRewards((currentRewards) =>
+        currentRewards.filter(
+          (reward) => reward.weekStart !== payload.classroomRankReward.weekStart,
+        ),
+      );
+      setMessage(`${payload.classroomRankReward.rank}등 보상을 받았어요.`);
+    } catch (nextError) {
+      if (!(await handleAuthError(nextError))) {
+        setError("순위 보상을 받지 못했어요. 순위를 새로고침한 뒤 다시 시도해 주세요.");
+      }
+    } finally {
+      setRankRewardPending(false);
+    }
+  }, [handleAuthError, rankRewardPending]);
 
   const weekRange = getCurrentWalkingWeekRange();
   const days = useMemo(() => fillCurrentWalkingWeek(rows, weekRange), [
@@ -503,7 +563,13 @@ export default function StudentWalkingScreen() {
             </View>
 
             {classroomTopFive.length > 0 ? (
-              <ClassroomTopFive ranks={classroomTopFive} />
+              <ClassroomTopFive
+                ranks={classroomTopFive}
+                rankRewards={classroomRankRewards}
+                nextResetAt={classroomRankNextResetAt}
+                rewardPending={rankRewardPending}
+                onClaimReward={(weekStart) => void claimClassroomRankReward(weekStart)}
+              />
             ) : null}
           </>
         ) : null}
@@ -514,8 +580,11 @@ export default function StudentWalkingScreen() {
             dailyGoal={policy.stepThreshold}
             dailyRewardAmount={policy.dailyUnitAmount}
             dailyUnitCap={policy.dailyUnitCap}
+            dailyStepRewards={dailyStepRewards}
             monthlyAttendanceReward={monthlyAttendanceReward}
             weeklyStepRewards={weeklyStepRewards}
+            representativeSlime={representativeSlime}
+            onDailyStepRewardsChange={setDailyStepRewards}
             onWeeklyStepRewardsChange={setWeeklyStepRewards}
             attendanceBusy={busy === "attendance"}
             onAttendanceDays={(days) => void markAttendance(days)}
@@ -572,13 +641,45 @@ function SummaryRow({
   );
 }
 
-function ClassroomTopFive({ ranks }: { ranks: ClassroomWalkingRank[] }) {
+function ClassroomTopFive({
+  ranks,
+  rankRewards,
+  nextResetAt,
+  rewardPending,
+  onClaimReward,
+}: {
+  ranks: ClassroomWalkingRank[];
+  rankRewards: ClassroomRankReward[];
+  nextResetAt: string | null;
+  rewardPending: boolean;
+  onClaimReward: (weekStart: string) => void;
+}) {
   return (
     <View style={styles.classroomTopFiveSection} accessibilityRole="summary">
       <SectionHeader
         title="우리 반 Top 5"
-        right={<Text style={styles.classroomTopFivePeriod}>이번 주</Text>}
+        right={
+          <Text style={styles.classroomTopFivePeriod}>
+            {formatClassroomRankResetAt(nextResetAt)} 랭킹 초기화
+          </Text>
+        }
       />
+      {rankRewards.map((reward) => (
+        <View key={reward.weekStart} style={styles.classroomRankRewardRow}>
+          <Text style={styles.classroomRankRewardLabel}>
+            {formatClassroomRankRewardPeriod(reward.weekStart)} {reward.rank}등
+          </Text>
+          <RankRewardAmount amount={reward.amount} />
+          <View style={styles.classroomRankRewardClaimAction}>
+            <RewardClaimButton
+              disabled={rewardPending}
+              muted={rewardPending}
+              onPress={() => onClaimReward(reward.weekStart)}
+              label={`${numberFormatter.format(reward.amount)}원 순위 보상 수령`}
+            />
+          </View>
+        </View>
+      ))}
       <View accessibilityRole="list">
         {ranks.map((rank, index) => {
           return (
@@ -588,8 +689,8 @@ function ClassroomTopFive({ ranks }: { ranks: ClassroomWalkingRank[] }) {
                 styles.classroomTopFiveRow,
                 rank.isCurrent && styles.classroomTopFiveCurrentRow,
               ]}
-              accessibilityRole="text"
-              accessibilityLabel={`${index + 1}위 ${rank.studentName}, ${numberFormatter.format(rank.weeklySteps)}걸음${
+              accessibilityRole="summary"
+              accessibilityLabel={`${index + 1}위 ${rank.studentName}, ${numberFormatter.format(rank.weeklySteps)}걸음, 보상 ${numberFormatter.format(rank.rewardAmount)}원${
                 rank.isCurrent ? ", 나" : ""
               }`}
             >
@@ -600,6 +701,7 @@ function ClassroomTopFive({ ranks }: { ranks: ClassroomWalkingRank[] }) {
               <Text style={styles.classroomTopFiveSteps}>
                 {numberFormatter.format(rank.weeklySteps)}걸음
               </Text>
+              <RankRewardAmount amount={rank.rewardAmount} />
             </View>
           );
         })}
@@ -608,12 +710,233 @@ function ClassroomTopFive({ ranks }: { ranks: ClassroomWalkingRank[] }) {
   );
 }
 
+function RewardClaimButton({
+  disabled,
+  muted = false,
+  label,
+  onPress,
+}: {
+  disabled: boolean;
+  muted?: boolean;
+  label: string;
+  onPress: () => void;
+}) {
+  return (
+    <MediaPressable
+      disabled={disabled}
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      accessibilityState={{ disabled }}
+      style={styles.rewardClaimButton}
+    >
+      <Image
+        source={muted ? DISABLED_REWARD_CLAIM_BUTTON_IMAGE : REWARD_CLAIM_BUTTON_IMAGE}
+        resizeMode="contain"
+        style={styles.rewardClaimButtonImage}
+        accessible={false}
+      />
+    </MediaPressable>
+  );
+}
+
+function formatClassroomRankResetAt(value: string | null) {
+  if (!value) return "일 00:00";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "일 00:00";
+  const parts = new Intl.DateTimeFormat("en-US", {
+    day: "2-digit",
+    hour: "2-digit",
+    hour12: false,
+    month: "2-digit",
+    timeZone: "Asia/Seoul",
+    weekday: "short",
+  }).formatToParts(date);
+  const values = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+  const weekday = { Sun: "일", Mon: "월", Tue: "화", Wed: "수", Thu: "목", Fri: "금", Sat: "토" }[
+    values.weekday ?? ""
+  ] ?? "일";
+  return `${values.month}/${values.day}(${weekday}) ${values.hour}:00`;
+}
+
+function formatClassroomRankRewardPeriod(weekStart: string) {
+  const [year, month, day] = weekStart.split("-").map(Number);
+  if (!year || !month || !day) return "지난 회차";
+  // Classroom ranking periods start each Sunday, so a month’s first Sunday is week 1.
+  const weekOfMonth = Math.floor((day - 1) / 7) + 1;
+  return `${month}월 ${weekOfMonth}주차`;
+}
+
+function RankRewardAmount({ amount, claimed = false }: { amount: number; claimed?: boolean }) {
+  return (
+    <View
+      accessible
+      accessibilityRole="text"
+      accessibilityLabel={claimed ? `${numberFormatter.format(amount)}원 보상 수령 완료` : `${numberFormatter.format(amount)}원 보상`}
+      style={[styles.rankRewardAmount, claimed && styles.rankRewardAmountClaimed]}
+    >
+      <Image
+        source={REWARD_COIN_IMAGE}
+        resizeMode="contain"
+        style={styles.rankRewardCoin}
+        accessible={false}
+      />
+      <Text style={[styles.rankRewardAmountText, claimed && styles.rankRewardAmountTextClaimed]}>
+        ×{numberFormatter.format(amount)}
+      </Text>
+    </View>
+  );
+}
+
+type MissionRewardMarker = {
+  key: string;
+  steps: number;
+  amount: number;
+  claimed: boolean;
+  claimable: boolean;
+  pending: boolean;
+  onClaim: () => void;
+};
+
+function MissionRewardTrack({
+  totalSteps,
+  maxSteps,
+  label,
+  markers,
+  representativeSlime,
+}: {
+  totalSteps: number;
+  maxSteps: number;
+  label: string;
+  markers: MissionRewardMarker[];
+  representativeSlime: WalkingRepresentativeSlime | null;
+}) {
+  const safeMaxSteps = Math.max(1, maxSteps);
+  const progress = Math.min(totalSteps / safeMaxSteps, 1);
+
+  return (
+    <View style={styles.missionRewardTrack}>
+      <View style={styles.missionTrackLayer}>
+        {representativeSlime ? (
+          <MissionSlimeMarker slime={representativeSlime} progress={progress} />
+        ) : null}
+        <View
+          accessible
+          accessibilityRole="progressbar"
+          accessibilityLabel={label}
+          accessibilityValue={{ min: 0, max: safeMaxSteps, now: totalSteps }}
+          style={styles.missionTrack}
+        >
+          <View style={[styles.missionFill, { width: `${progress * 100}%` }]} />
+          {markers.map((marker, index) => {
+            const isLast = index === markers.length - 1;
+            const percentage = Math.min(Math.max((marker.steps / safeMaxSteps) * 100, 0), 100);
+            return (
+              <View
+                key={marker.key}
+                pointerEvents="none"
+                style={[
+                  styles.missionMarkerLine,
+                  isLast ? styles.missionMarkerLineEnd : { left: `${percentage}%` },
+                  marker.claimed && styles.missionMarkerLineClaimed,
+                ]}
+              />
+            );
+          })}
+        </View>
+      </View>
+      <View style={styles.dailyMilestones}>
+        {markers.map((marker) => (
+          <View key={marker.key} style={styles.dailyMilestone}>
+            <Text style={styles.dailyMilestoneSteps}>
+              {numberFormatter.format(marker.steps)}걸음
+            </Text>
+            <Text style={styles.dailyMilestoneAmount}>
+              {numberFormatter.format(marker.amount)}원
+            </Text>
+            {marker.claimed ? (
+              <Text style={styles.rewardClaimedLabel}>수령 완료</Text>
+            ) : (
+              <RewardClaimButton
+                disabled={!marker.claimable || marker.pending}
+                muted={!marker.claimable || marker.pending}
+                onPress={marker.onClaim}
+                label={`${numberFormatter.format(marker.steps)}걸음 보상 ${numberFormatter.format(marker.amount)}원${
+                  marker.claimable ? " 수령" : " 아직 수령할 수 없음"
+                }`}
+              />
+            )}
+          </View>
+        ))}
+      </View>
+    </View>
+  );
+}
+
+function MissionSlimeMarker({
+  slime,
+  progress,
+}: {
+  slime: WalkingRepresentativeSlime;
+  progress: number;
+}) {
+  const jumpOffset = useRef(new Animated.Value(0)).current;
+  const slimeJumpStyle = useMemo(
+    () => ({ transform: [{ translateY: jumpOffset }] }),
+    [jumpOffset],
+  );
+
+  useEffect(() => {
+    const animation = Animated.loop(
+      Animated.sequence([
+        Animated.timing(jumpOffset, {
+          toValue: walking.missionSlimeJumpOffset,
+          duration: 360,
+          easing: Easing.out(Easing.quad),
+          useNativeDriver: true,
+        }),
+        Animated.timing(jumpOffset, {
+          toValue: 0,
+          duration: 360,
+          easing: Easing.in(Easing.quad),
+          useNativeDriver: true,
+        }),
+      ]),
+    );
+    animation.start();
+    return () => animation.stop();
+  }, [jumpOffset]);
+
+  return (
+    <View
+      pointerEvents="none"
+      accessible={false}
+      style={[styles.missionSlimeMarker, { left: `${progress * 100}%` }]}
+    >
+      <Animated.View style={slimeJumpStyle}>
+        <View style={styles.missionSlimeScale}>
+          <SlimeSprite
+            slimeColor={slime.color}
+            evolution={evolutionForStage(slime.growthStage)}
+            // Mission progress uses the representative slime's base look;
+            // equipped floor/item presentation belongs to the creature view.
+            equippedFloor="none"
+            displayScale={0.25}
+          />
+        </View>
+      </Animated.View>
+    </View>
+  );
+}
+
 function WalkingWeeklyRewardProgress({
   rewards,
   onChange,
+  representativeSlime,
 }: {
   rewards: WalkingWeeklyStepRewards;
   onChange: (rewards: WalkingWeeklyStepRewards) => void;
+  representativeSlime: WalkingRepresentativeSlime | null;
 }) {
   const [pendingTierKey, setPendingTierKey] = useState<string | null>(null);
   const [claimError, setClaimError] = useState<string | null>(null);
@@ -635,7 +958,7 @@ function WalkingWeeklyRewardProgress({
         tier: WalkingWeeklyStepRewards["tiers"][number];
       }>("/api/student/walking/rewards/claim", {
         method: "POST",
-        json: { tierKey },
+        json: { kind: "weekly", tierKey },
       });
       onChange({
         ...rewards,
@@ -661,51 +984,21 @@ function WalkingWeeklyRewardProgress({
           {Math.round(progress * 100)}%
         </Text>
       </View>
-      <View
-        accessible
-        accessibilityRole="progressbar"
-        accessibilityLabel={`이번 주 ${numberFormatter.format(rewards.totalSteps)}걸음, 목표 ${numberFormatter.format(graphMaxSteps)}걸음`}
-        accessibilityValue={{ min: 0, max: graphMaxSteps, now: rewards.totalSteps }}
-        style={styles.missionTrack}
-      >
-        <View style={[styles.missionFill, { width: `${progress * 100}%` }]} />
-      </View>
-      <View style={styles.dailyMilestones}>
-        {rewards.tiers.map((tier) => {
-          const state = tier.claimed
-            ? "수령 완료"
-            : pendingTierKey === tier.key
-              ? "처리 중"
-              : tier.achieved
-                ? "받기"
-                : "잠김";
-          return (
-            <View key={tier.key} style={styles.dailyMilestone}>
-              <View style={styles.dailyMilestoneDot} />
-              <Text style={styles.dailyMilestoneSteps}>
-                {numberFormatter.format(tier.steps)}걸음
-              </Text>
-              <ControlPressable
-                disabled={!tier.achieved || tier.claimed || pendingTierKey !== null}
-                onPress={() => void claimTier(tier.key)}
-                accessibilityLabel={`${numberFormatter.format(tier.steps)}걸음 보상 ${numberFormatter.format(tier.amount)}원, ${state}`}
-                style={styles.weeklyRewardClaim}
-              >
-                <Text
-                  style={[
-                    styles.dailyMilestoneAmount,
-                    tier.achieved
-                      ? styles.dailyMilestoneAmountAchieved
-                      : styles.dailyMilestoneAmountPending,
-                  ]}
-                >
-                  {numberFormatter.format(tier.amount)}원
-                </Text>
-              </ControlPressable>
-            </View>
-          );
-        })}
-      </View>
+      <MissionRewardTrack
+        totalSteps={rewards.totalSteps}
+        maxSteps={graphMaxSteps}
+        label={`이번 주 ${numberFormatter.format(rewards.totalSteps)}걸음, 목표 ${numberFormatter.format(graphMaxSteps)}걸음`}
+        markers={rewards.tiers.map((tier) => ({
+          key: tier.key,
+          steps: tier.steps,
+          amount: tier.amount,
+          claimed: tier.claimed,
+          claimable: tier.achieved && !tier.claimed && pendingTierKey === null,
+          pending: pendingTierKey !== null,
+          onClaim: () => void claimTier(tier.key),
+        }))}
+        representativeSlime={representativeSlime}
+      />
       {claimError ? <Text style={styles.error}>{claimError}</Text> : null}
     </View>
   );
@@ -716,8 +1009,11 @@ function WalkingMissionPanel({
   dailyGoal,
   dailyRewardAmount,
   dailyUnitCap,
+  dailyStepRewards,
   monthlyAttendanceReward,
   weeklyStepRewards,
+  representativeSlime,
+  onDailyStepRewardsChange,
   onWeeklyStepRewardsChange,
   attendanceBusy,
   onAttendanceDays,
@@ -726,8 +1022,11 @@ function WalkingMissionPanel({
   dailyGoal: number;
   dailyRewardAmount: number;
   dailyUnitCap: number;
+  dailyStepRewards: WalkingDailyStepRewards | null;
   monthlyAttendanceReward: WalkingMonthlyAttendanceReward | null;
   weeklyStepRewards: WalkingWeeklyStepRewards | null;
+  representativeSlime: WalkingRepresentativeSlime | null;
+  onDailyStepRewardsChange: (rewards: WalkingDailyStepRewards | null) => void;
   onWeeklyStepRewardsChange: (rewards: WalkingWeeklyStepRewards | null) => void;
   attendanceBusy: boolean;
   onAttendanceDays: (days: string[]) => void;
@@ -735,7 +1034,10 @@ function WalkingMissionPanel({
   const safeDailyGoal = Math.max(1, dailyGoal);
   const safeDailyUnitCap = Math.min(4, Math.max(1, dailyUnitCap));
   const dailyMaxSteps = safeDailyGoal * safeDailyUnitCap;
-  const dailyProgress = Math.min(todaySteps / dailyMaxSteps, 1);
+  // Keep the daily marker on the exact same server-calculated progress source
+  // that drives daily reward eligibility, just as the weekly marker does.
+  const dailyTotalSteps = dailyStepRewards?.totalSteps ?? todaySteps;
+  const dailyProgress = Math.min(dailyTotalSteps / dailyMaxSteps, 1);
   const dailyMilestones = Array.from(
     { length: safeDailyUnitCap },
     (_, index) => ({
@@ -743,6 +1045,35 @@ function WalkingMissionPanel({
       amount: dailyRewardAmount,
     }),
   );
+  const [pendingDailyUnit, setPendingDailyUnit] = useState<number | null>(null);
+  const [dailyClaimError, setDailyClaimError] = useState<string | null>(null);
+
+  async function claimDailyUnit(unit: number) {
+    const tier = dailyStepRewards?.tiers.find((candidate) => candidate.unit === unit);
+    if (!tier?.claimable || pendingDailyUnit !== null) return;
+    const currentDailyRewards = dailyStepRewards;
+    if (!currentDailyRewards) return;
+    setPendingDailyUnit(unit);
+    setDailyClaimError(null);
+    try {
+      const payload = await apiFetch<{
+        dailyTier: WalkingDailyStepRewards["tiers"][number];
+      }>("/api/student/walking/rewards/claim", {
+        method: "POST",
+        json: { kind: "daily", unit },
+      });
+      onDailyStepRewardsChange({
+        ...currentDailyRewards,
+        tiers: currentDailyRewards.tiers.map((candidate) =>
+          candidate.unit === unit ? payload.dailyTier : candidate,
+        ),
+      });
+    } catch {
+      setDailyClaimError("보상을 받지 못했어요. 잠시 뒤 다시 시도해 주세요.");
+    } finally {
+      setPendingDailyUnit(null);
+    }
+  }
 
   return (
     <View style={styles.missionSection} accessibilityRole="summary">
@@ -758,53 +1089,38 @@ function WalkingMissionPanel({
         <Text style={styles.missionTitle}>일간미션</Text>
         <View style={styles.missionProgressLabels}>
           <Text style={styles.missionProgressText}>
-            {numberFormatter.format(todaySteps)} / {numberFormatter.format(dailyMaxSteps)}걸음
+            {numberFormatter.format(dailyTotalSteps)} / {numberFormatter.format(dailyMaxSteps)}걸음
           </Text>
           <Text style={styles.missionProgressPercent}>
             {Math.round(dailyProgress * 100)}%
           </Text>
         </View>
-        <View
-          accessible
-          accessibilityRole="progressbar"
-          accessibilityLabel="오늘 걸음 미션 진행률"
-          accessibilityValue={{
-            min: 0,
-            max: dailyMaxSteps,
-            now: todaySteps,
-          }}
-          style={styles.missionTrack}
-        >
-          <View style={[styles.missionFill, { width: `${dailyProgress * 100}%` }]} />
-        </View>
-        <View style={styles.dailyMilestones}>
-          {dailyMilestones.map((milestone) => {
-            const achieved = todaySteps >= milestone.steps;
-            return (
-              <View key={milestone.steps} style={styles.dailyMilestone}>
-                <View style={styles.dailyMilestoneDot} />
-                <Text style={styles.dailyMilestoneSteps}>
-                  {numberFormatter.format(milestone.steps)}걸음
-                </Text>
-                <Text
-                  style={[
-                    styles.dailyMilestoneAmount,
-                    achieved
-                      ? styles.dailyMilestoneAmountAchieved
-                      : styles.dailyMilestoneAmountPending,
-                  ]}
-                >
-                  {numberFormatter.format(milestone.amount)}원
-                </Text>
-              </View>
-            );
+        <MissionRewardTrack
+          totalSteps={dailyTotalSteps}
+          maxSteps={dailyMaxSteps}
+          label="오늘 걸음 미션 진행률"
+          markers={dailyMilestones.map((milestone) => {
+            const unit = Math.round(milestone.steps / safeDailyGoal);
+            const tier = dailyStepRewards?.tiers.find((candidate) => candidate.unit === unit);
+            return {
+              key: `daily-${unit}`,
+              steps: milestone.steps,
+              amount: milestone.amount,
+              claimed: tier?.claimed ?? false,
+              claimable: tier?.claimable === true && pendingDailyUnit === null,
+              pending: pendingDailyUnit !== null,
+              onClaim: () => void claimDailyUnit(unit),
+            };
           })}
-        </View>
+          representativeSlime={representativeSlime}
+        />
+        {dailyClaimError ? <Text style={styles.error}>{dailyClaimError}</Text> : null}
       </View>
 
       {weeklyStepRewards ? (
         <WalkingWeeklyRewardProgress
           rewards={weeklyStepRewards}
+          representativeSlime={representativeSlime}
           onChange={(rewards) => onWeeklyStepRewardsChange(rewards)}
         />
       ) : null}
@@ -901,7 +1217,7 @@ const styles = StyleSheet.create({
     minHeight: tapMin,
     flexDirection: "row",
     alignItems: "center",
-    gap: spacing.sm,
+    position: "relative",
     paddingHorizontal: spacing.sm,
     borderBottomWidth: borders.hairline,
     borderBottomColor: colors.border,
@@ -913,9 +1229,56 @@ const styles = StyleSheet.create({
     color: colors.accentTintedText,
     textAlign: "center",
   },
-  classroomTopFiveName: { ...typography.body, color: colors.text, flex: 1 },
-  classroomTopFiveSteps: { ...typography.label, color: colors.textMuted },
-  weeklyRewardClaim: { alignItems: "center", gap: spacing.xs },
+  classroomTopFiveName: {
+    ...typography.body,
+    color: colors.text,
+    flex: 1,
+    minWidth: 0,
+    marginRight: walking.classroomRankRewardWidth,
+  },
+  classroomTopFiveSteps: {
+    ...typography.label,
+    color: colors.textMuted,
+    position: "absolute",
+    left: spacing.none,
+    right: spacing.none,
+    textAlign: "center",
+  },
+  classroomRankRewardRow: {
+    minHeight: tapMin,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    position: "relative",
+    paddingHorizontal: spacing.sm,
+    backgroundColor: colors.accentTintedBg,
+  },
+  classroomRankRewardLabel: {
+    ...typography.label,
+    color: colors.text,
+    position: "absolute",
+    left: spacing.sm,
+  },
+  classroomRankRewardClaimAction: { position: "absolute", right: spacing.xs },
+  rankRewardAmount: {
+    width: walking.classroomRankRewardWidth,
+    minHeight: tapMin,
+    alignItems: "center",
+    justifyContent: "center",
+    flexDirection: "row",
+    gap: spacing.xxs,
+    opacity: walking.classroomRankRewardMutedOpacity,
+  },
+  rankRewardAmountClaimed: { opacity: walking.classroomRankRewardClaimedOpacity },
+  rankRewardCoin: {
+    width: walking.rankRewardCoinSize,
+    height: walking.rankRewardCoinSize,
+  },
+  rankRewardAmountText: {
+    ...typography.micro,
+    color: colors.text,
+  },
+  rankRewardAmountTextClaimed: { color: colors.textMuted },
   chartSection: {
     gap: spacing.lg,
   },
@@ -941,6 +1304,7 @@ const styles = StyleSheet.create({
   },
   missionProgressPercent: { ...typography.label, color: colors.text },
   missionTrack: {
+    position: "relative",
     height: walking.chartBarHeight,
     backgroundColor: colors.accentTintedBg,
     overflow: "hidden",
@@ -949,6 +1313,60 @@ const styles = StyleSheet.create({
     height: "100%",
     backgroundColor: colors.accent,
   },
+  missionTrackLayer: {
+    height: walking.chartBarHeight,
+    position: "relative",
+  },
+  missionSlimeMarker: {
+    position: "absolute",
+    // `SlimeSprite` keeps a 64px source viewport while this marker scales it
+    // to 32px around its center. The visible feet end 44px below this origin.
+    top: walking.chartBarHeight - walking.missionSlimeFootOffset,
+    marginLeft: -(walking.missionSlimeLayoutSize / 2),
+    zIndex: layers.badge,
+  },
+  missionSlimeScale: {
+    transform: [{ scale: walking.missionSlimeScale }],
+  },
+  missionRewardTrack: {
+    gap: spacing.xs,
+  },
+  missionMarkerLabels: {
+    height: spacing.xxl,
+    position: "relative",
+  },
+  missionMarkerLabel: {
+    position: "absolute",
+    bottom: spacing.none,
+    width: walking.chartStepLabelWidth,
+    gap: spacing.none,
+  },
+  missionMarkerLabelStart: { alignItems: "flex-start" },
+  missionMarkerLabelCenter: {
+    marginLeft: -(walking.chartStepLabelWidth / 2),
+    alignItems: "center",
+  },
+  missionMarkerLabelEnd: {
+    marginLeft: -walking.chartStepLabelWidth,
+    alignItems: "flex-end",
+  },
+  missionMarkerSteps: {
+    ...typography.micro,
+    color: colors.textMuted,
+  },
+  missionMarkerAmount: {
+    ...typography.micro,
+    color: colors.text,
+  },
+  missionMarkerLine: {
+    position: "absolute",
+    top: spacing.none,
+    bottom: spacing.none,
+    width: borders.hairline,
+    backgroundColor: colors.textMuted,
+  },
+  missionMarkerLineEnd: { right: spacing.none },
+  missionMarkerLineClaimed: { backgroundColor: colors.accentTintedText },
   dailyMilestones: {
     flexDirection: "row",
     gap: spacing.xs,
@@ -959,12 +1377,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: spacing.xs,
   },
-  dailyMilestoneDot: {
-    width: borders.medium,
-    height: borders.medium,
-    borderRadius: radii.pill,
-    backgroundColor: colors.accent,
-  },
   dailyMilestoneSteps: {
     ...typography.micro,
     color: colors.textMuted,
@@ -972,13 +1384,23 @@ const styles = StyleSheet.create({
   },
   dailyMilestoneAmount: {
     ...typography.label,
+    color: colors.text,
     textAlign: "center",
   },
-  dailyMilestoneAmountAchieved: {
-    color: colors.text,
+  rewardClaimButton: {
+    width: walking.rewardClaimButtonWidth,
+    minHeight: tapMin,
+    alignItems: "center",
+    justifyContent: "center",
   },
-  dailyMilestoneAmountPending: {
-    color: colors.textMuted,
+  rewardClaimButtonImage: {
+    width: "100%",
+    height: tapMin,
+  },
+  rewardClaimedLabel: {
+    ...typography.micro,
+    color: colors.accentTintedText,
+    textAlign: "center",
   },
   chartRows: { gap: spacing.md },
   chartRow: { flexDirection: "row", alignItems: "center", gap: spacing.sm },

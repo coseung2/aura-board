@@ -156,6 +156,20 @@ describe("area reward policy", () => {
     });
   });
 
+  it("rolls classroom walking ranks over at Sunday 00:00 KST", async () => {
+    const { getKstClassroomWalkingRankPeriods } = await import("./reward-policy");
+
+    expect(getKstClassroomWalkingRankPeriods(new Date("2026-07-18T14:59:59.999Z"))).toMatchObject({
+      active: { weekStart: "2026-07-12", weekEnd: "2026-07-19" },
+      closed: { weekStart: "2026-07-05", weekEnd: "2026-07-12" },
+    });
+    expect(getKstClassroomWalkingRankPeriods(new Date("2026-07-18T15:00:00.000Z"))).toMatchObject({
+      active: { weekStart: "2026-07-19", weekEnd: "2026-07-26" },
+      closed: { weekStart: "2026-07-12", weekEnd: "2026-07-19" },
+      nextResetAt: new Date("2026-07-25T15:00:00.000Z"),
+    });
+  });
+
   it("allows five walking reward days per week and resyncs an existing day", () => {
     const days = new Set([
       "2026-07-20",

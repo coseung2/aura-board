@@ -1,5 +1,11 @@
 import { Platform } from "react-native";
 import { apiFetch } from "./api";
+import {
+  EQUIPPED_FLOORS,
+  SLIME_ASSET_COLORS,
+  type EquippedFloor,
+  type SlimeColor,
+} from "./slime-assets";
 import AuraBoardHealthConnectModule from "../modules/aura-board-health-connect/src/AuraBoardHealthConnectModule";
 import type {
   HealthConnectDailyStats,
@@ -69,12 +75,40 @@ export type WalkingWeeklyStepRewards = {
   tiers: WalkingWeeklyStepReward[];
 };
 
+export type WalkingDailyStepReward = {
+  unit: number;
+  steps: number;
+  amount: number;
+  achieved: boolean;
+  claimed: boolean;
+  claimable: boolean;
+};
+
+export type WalkingDailyStepRewards = {
+  day: string;
+  totalSteps: number;
+  tiers: WalkingDailyStepReward[];
+};
+
+export type WalkingRepresentativeSlime = {
+  color: SlimeColor;
+  growthStage: 1 | 2 | 3;
+  equippedFloor: EquippedFloor;
+};
+
 export type ClassroomWalkingRank = {
   studentId: string;
   studentNumber: number | null;
   studentName: string;
   weeklySteps: number;
   isCurrent: boolean;
+  rewardAmount: number;
+};
+
+export type ClassroomRankReward = {
+  weekStart: string;
+  rank: number;
+  amount: number;
 };
 
 /**
@@ -321,8 +355,12 @@ export type WalkingResponse = {
   range?: Pick<WalkingWeekRange, "weekStart" | "weekEnd">;
   policy: WalkingPolicy;
   monthlyAttendanceReward: WalkingMonthlyAttendanceReward;
+  dailyStepRewards: WalkingDailyStepRewards;
   weeklyStepRewards: WalkingWeeklyStepRewards;
+  representativeSlime: WalkingRepresentativeSlime | null;
   classroomTopFive: ClassroomWalkingRank[];
+  classroomRankRewards: ClassroomRankReward[];
+  classroomRankNextResetAt: string | null;
 };
 
 function safePolicyInteger(value: unknown, fallback: number, minimum = 0) {
@@ -375,16 +413,50 @@ export async function fetchWalkingSnapshot(_days?: number): Promise<WalkingRespo
     range?: Pick<WalkingWeekRange, "weekStart" | "weekEnd">;
     policy?: unknown;
     monthlyAttendanceReward: WalkingMonthlyAttendanceReward;
+    dailyStepRewards: WalkingDailyStepRewards;
     weeklyStepRewards: WalkingWeeklyStepRewards;
+    representativeSlime?: unknown;
     classroomTopFive?: unknown;
+    classroomRankRewards?: unknown;
+    classroomRankNextResetAt?: unknown;
   }>("/api/student/walking?week=current");
   return {
     rows: payload.rows,
     range: payload.range,
     policy: normalizeWalkingPolicy(payload.policy),
     monthlyAttendanceReward: payload.monthlyAttendanceReward,
+    dailyStepRewards: payload.dailyStepRewards,
     weeklyStepRewards: payload.weeklyStepRewards,
+    representativeSlime: normalizeWalkingRepresentativeSlime(payload.representativeSlime),
     classroomTopFive: normalizeClassroomTopFive(payload.classroomTopFive),
+    classroomRankRewards: normalizeClassroomRankRewards(payload.classroomRankRewards),
+    classroomRankNextResetAt:
+      typeof payload.classroomRankNextResetAt === "string" &&
+      !Number.isNaN(new Date(payload.classroomRankNextResetAt).getTime())
+        ? payload.classroomRankNextResetAt
+        : null,
+  };
+}
+
+function normalizeWalkingRepresentativeSlime(value: unknown): WalkingRepresentativeSlime | null {
+  if (!value || typeof value !== "object") return null;
+  const slime = value as Record<string, unknown>;
+  if (
+    typeof slime.color !== "string" ||
+    !(SLIME_ASSET_COLORS as readonly string[]).includes(slime.color)
+  ) {
+    return null;
+  }
+  const growthStage = Number(slime.growthStage);
+  const equippedFloor =
+    typeof slime.equippedFloor === "string" &&
+    (EQUIPPED_FLOORS as readonly string[]).includes(slime.equippedFloor)
+      ? (slime.equippedFloor as EquippedFloor)
+      : "none";
+  return {
+    color: slime.color as SlimeColor,
+    growthStage: growthStage >= 3 ? 3 : growthStage >= 2 ? 2 : 1,
+    equippedFloor,
   };
 }
 
@@ -403,7 +475,25 @@ function normalizeClassroomTopFive(value: unknown): ClassroomWalkingRank[] {
       studentName: rank.studentName,
       weeklySteps: Number.isFinite(weeklySteps) ? Math.max(0, Math.round(weeklySteps)) : 0,
       isCurrent: rank.isCurrent === true,
+      rewardAmount: Math.max(0, Math.round(Number(rank.rewardAmount) || 0)),
     }];
+  });
+}
+
+function normalizeClassroomRankRewards(value: unknown): ClassroomRankReward[] {
+  if (!Array.isArray(value)) return [];
+  return value.flatMap((entry) => {
+    if (!entry || typeof entry !== "object") return [];
+    const reward = entry as Record<string, unknown>;
+    const rank = Number(reward.rank);
+    const amount = Number(reward.amount);
+    if (
+      typeof reward.weekStart !== "string" ||
+      !/^\d{4}-\d{2}-\d{2}$/.test(reward.weekStart) ||
+      !Number.isInteger(rank) || rank < 1 || rank > 5 ||
+      !Number.isFinite(amount) || amount <= 0
+    ) return [];
+    return [{ weekStart: reward.weekStart, rank, amount: Math.round(amount) }];
   });
 }
 

@@ -36,9 +36,6 @@ export async function POST(
   const { id: cardId } = await params;
   const actor = await getCurrentCardActor();
   if (!actor) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
-  if (actor.kind === "parent") {
-    return NextResponse.json({ error: "forbidden" }, { status: 403 });
-  }
 
   const access = await authorizeCardAccess(cardId, actor, "write");
   if (!access.ok) {
@@ -81,12 +78,12 @@ export async function POST(
 
   const [count, commentCount] = await Promise.all([
     db.cardLike.count({ where: { cardId } }),
-    db.cardComment.count({ where: { cardId, deletedAt: null } }),
+    db.cardComment.count({ where: { cardId, audience: "public", deletedAt: null } }),
   ]);
   if (card) {
     await touchBoardUpdatedAt(card.boardId, {
       action: liked ? "like.created" : "like.deleted",
-      actorType: actor.kind === "teacher" ? "teacher" : "student",
+      actorType: actor.kind === "teacher" ? "teacher" : actor.kind === "student" ? "student" : "guest",
       actorId: actor.id,
     });
     await announceEngagementChange(

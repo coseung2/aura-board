@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
@@ -64,6 +64,9 @@ export default function StudentReadingScreen() {
   const [notice, setNotice] = useState<string | null>(null);
   const [expandedEntryId, setExpandedEntryId] = useState<string | null>(null);
   const [historyBookType, setHistoryBookType] = useState<BookType>("story");
+  const scrollRef = useRef<ScrollView>(null);
+  const reflectionFocusTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const reflectionFieldOffset = useRef(0);
   const readingCounts = useMemo(
     () => ({
       story: entries.filter((entry) => entry.bookType === "story").length,
@@ -106,6 +109,26 @@ export default function StudentReadingScreen() {
     void load();
   }, [load]);
 
+  useEffect(
+    () => () => {
+      if (reflectionFocusTimer.current) clearTimeout(reflectionFocusTimer.current);
+    },
+    [],
+  );
+
+  function keepReflectionVisible() {
+    if (reflectionFocusTimer.current) clearTimeout(reflectionFocusTimer.current);
+    // Wait for Android's adjustResize/KAV layout pass, then keep the focused
+    // field above the soft keyboard without jumping down into the history.
+    reflectionFocusTimer.current = setTimeout(() => {
+      scrollRef.current?.scrollTo({
+        y: Math.max(0, reflectionFieldOffset.current - spacing.lg),
+        animated: true,
+      });
+      reflectionFocusTimer.current = null;
+    }, 250);
+  }
+
   async function save() {
     if (!title.trim() || !author.trim() || !reflection.trim()) {
       setError("책 제목, 지은이, 독서 감상을 모두 입력해 주세요.");
@@ -136,13 +159,15 @@ export default function StudentReadingScreen() {
     <SafeAreaView style={styles.container} edges={["top"]}>
       <AppHeader title="독서" right={<StudentHeaderActions />} />
       <KeyboardAvoidingView
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
+        behavior={Platform.select({ ios: "padding", android: "height" })}
         style={styles.keyboardWrap}
       >
         <ScrollView
+          ref={scrollRef}
           contentContainerStyle={[styles.content, isLandscape && styles.contentLandscape]}
           keyboardDismissMode={Platform.OS === "ios" ? "interactive" : "on-drag"}
           keyboardShouldPersistTaps="handled"
+          automaticallyAdjustKeyboardInsets={Platform.OS === "ios"}
         >
           <View style={[styles.formColumn, isLandscape && styles.landscapeFormColumn]}>
             <View style={styles.formSection}>
@@ -192,7 +217,12 @@ export default function StudentReadingScreen() {
                 />
               </View>
 
-              <View style={styles.fieldGroup}>
+              <View
+                style={styles.fieldGroup}
+                onLayout={(event) => {
+                  reflectionFieldOffset.current = event.nativeEvent.layout.y;
+                }}
+              >
                 <Text style={styles.fieldLabel}>독서 감상</Text>
                 <TextField
                   style={styles.reflectionInput}
@@ -202,6 +232,7 @@ export default function StudentReadingScreen() {
                   accessibilityLabel="독서 감상"
                   multiline
                   maxLength={600}
+                  onFocus={keepReflectionVisible}
                 />
               </View>
 

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ScrollView, StyleSheet, Text, View } from "react-native";
+import { Platform, ScrollView, StyleSheet, Text, View } from "react-native";
 import { apiFetch } from "../../lib/api";
 import type { BoardDetailResponse, SpeedGameWire } from "../../lib/types";
 import { colors, spacing, typography } from "../../theme/tokens";
@@ -80,7 +80,13 @@ export function SpeedGameBoard({ data }: { data: BoardDetailResponse }) {
   }
 
   return (
-    <ScrollView contentInsetAdjustmentBehavior="automatic" contentContainerStyle={styles.content}>
+    <ScrollView
+      contentInsetAdjustmentBehavior="automatic"
+      contentContainerStyle={styles.content}
+      keyboardShouldPersistTaps="handled"
+      keyboardDismissMode={Platform.OS === "ios" ? "interactive" : "on-drag"}
+      automaticallyAdjustKeyboardInsets
+    >
       <View style={styles.heading}>
         <View style={styles.headingText}>
           <Text style={styles.title}>스피드게임</Text>

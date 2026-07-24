@@ -4,6 +4,7 @@ import { useCallback, useMemo, useRef, useState, type ElementRef } from "react";
 import {
   ActivityIndicator,
   PanResponder,
+  Platform,
   ScrollView,
   StyleSheet,
   Text,
@@ -144,7 +145,13 @@ export function DrawingBoard({ data }: { data: BoardDetailResponse }) {
       </View>
 
       {tab === "studio" ? (
-        <ScrollView contentInsetAdjustmentBehavior="automatic" contentContainerStyle={styles.content}>
+        <ScrollView
+          contentInsetAdjustmentBehavior="automatic"
+          contentContainerStyle={styles.content}
+          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode={Platform.OS === "ios" ? "interactive" : "on-drag"}
+          automaticallyAdjustKeyboardInsets
+        >
           <SurfaceCard style={styles.canvasCard}>
             <Svg
               ref={svgRef}

@@ -6,7 +6,9 @@ const mocks = vi.hoisted(() => ({
   queryRaw: vi.fn(),
   transaction: vi.fn(),
   transactionFindMany: vi.fn(),
+  transactionFindFirst: vi.fn(),
   rewardConfig: vi.fn(),
+  representativeSlime: vi.fn(),
 }));
 
 vi.mock("@/lib/student-auth", () => ({
@@ -16,7 +18,11 @@ vi.mock("@/lib/db", () => ({
   db: {
     $queryRaw: mocks.queryRaw,
     $transaction: mocks.transaction,
-    transaction: { findMany: mocks.transactionFindMany },
+    transaction: {
+      findMany: mocks.transactionFindMany,
+      findFirst: mocks.transactionFindFirst,
+    },
+    studentSlime: { findFirst: mocks.representativeSlime },
   },
 }));
 
@@ -29,7 +35,9 @@ describe("GET /api/student/walking fixed KST week", () => {
     mocks.getCurrentStudent.mockResolvedValue({ id: "student-1", classroomId: "classroom-1" });
     mocks.queryRaw.mockResolvedValue([]);
     mocks.transactionFindMany.mockResolvedValue([]);
+    mocks.transactionFindFirst.mockResolvedValue(null);
     mocks.rewardConfig.mockResolvedValue(null);
+    mocks.representativeSlime.mockResolvedValue(null);
     mocks.transaction.mockImplementation(async (operation: (tx: unknown) => unknown) =>
       operation({ avatarRewardConfig: { findUnique: mocks.rewardConfig } }),
     );
@@ -67,6 +75,7 @@ describe("GET /api/student/walking fixed KST week", () => {
   });
 
   it("includes the current classroom's weekly Top 5 and marks the current student", async () => {
+    vi.setSystemTime(new Date("2026-07-23T03:00:00.000Z"));
     mocks.queryRaw
       .mockResolvedValueOnce([])
       .mockResolvedValueOnce([])
@@ -83,7 +92,8 @@ describe("GET /api/student/walking fixed KST week", () => {
           studentName: "테스트",
           weeklySteps: BigInt(5_780),
         },
-      ]);
+      ])
+      .mockResolvedValueOnce([{ rank: 2 }]);
 
     const response = await GET(new NextRequest("http://localhost/api/student/walking"));
     const body = await response.json();
@@ -95,6 +105,7 @@ describe("GET /api/student/walking fixed KST week", () => {
         studentName: "김하늘",
         weeklySteps: 21_680,
         isCurrent: false,
+        rewardAmount: 100,
       },
       {
         studentId: "student-1",
@@ -102,8 +113,35 @@ describe("GET /api/student/walking fixed KST week", () => {
         studentName: "테스트",
         weeklySteps: 5_780,
         isCurrent: true,
+        rewardAmount: 60,
       },
     ]);
+    expect(body.classroomRankRewards).toEqual([
+      { weekStart: "2026-07-12", rank: 2, amount: 60 },
+    ]);
+    expect(body.classroomRankNextResetAt).toBe("2026-07-25T15:00:00.000Z");
+  });
+
+  it("includes the current representative slime for the mission progress marker", async () => {
+    mocks.representativeSlime.mockResolvedValue({
+      color: "purple",
+      growthStage: 2,
+      equippedItemKeys: ["water-puddle-background"],
+    });
+
+    const response = await GET(new NextRequest("http://localhost/api/student/walking"));
+
+    expect(await response.json()).toMatchObject({
+      representativeSlime: {
+        color: "purple",
+        growthStage: 2,
+        equippedFloor: "water-puddle",
+      },
+    });
+    expect(mocks.representativeSlime).toHaveBeenCalledWith({
+      where: { studentId: "student-1", isRepresentative: true },
+      select: { color: true, growthStage: true, equippedItemKeys: true },
+    });
   });
 
   it("exposes classroom walking policy without leaking unrelated reward settings", async () => {

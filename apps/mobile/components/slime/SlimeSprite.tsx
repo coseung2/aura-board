@@ -211,6 +211,17 @@ export function SlimeSprite({
       }
       testID="slime-sprite"
     >
+      {puddleAsset && puddlePackedSheetSize && puddleOffset ? (
+        <Image
+          source={imageSource(puddleAsset.image)}
+          style={[styles.layer, styles.floorUnder, puddlePackedSheetSize, puddleOffset]}
+          contentFit="fill"
+          allowDownscaling={false}
+          recyclingKey={`${playbackKey}:puddle`}
+          transition={0}
+          accessible={false}
+        />
+      ) : null}
       {staticFloor ? (
         <Image
           source={imageSource(staticFloor.image)}

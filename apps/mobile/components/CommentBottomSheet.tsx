@@ -1,8 +1,7 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
-  KeyboardAvoidingView,
   Platform,
   ScrollView,
   StyleSheet,
@@ -10,10 +9,25 @@ import {
   View,
 } from "react-native";
 import { useRouter } from "expo-router";
-import { AppBottomSheet, AppButton, ControlPressable, TextField } from "./ui";
+import { AppBottomSheet, AppButton, ControlPressable, TextActionPressable, TextField } from "./ui";
 import { CommentLikeButton } from "./CommentLikeButton";
-import { apiFetch, ApiError } from "../lib/api";
-import { clearSessionToken, getUnifiedLoginRoute } from "../lib/session";
+import { ContentTab, ContentTabs } from "./NavigationTabs";
+import { apiFetch, ApiError, parentApiFetch } from "../lib/api";
+import {
+  canComposeComment,
+  commentAudienceLabel,
+  commentsPath,
+  FAMILY_THREAD_PRIVATE_MESSAGE,
+  initialCommentAudience,
+  type CommentAudience,
+  type CommentViewer,
+  visibleCommentsForViewer,
+} from "../lib/comment-audience";
+import {
+  clearParentSession,
+  clearSessionToken,
+  getUnifiedLoginRoute,
+} from "../lib/session";
 import {
   borders,
   colors,
@@ -28,6 +42,7 @@ type CommentItem = {
   id: string;
   content: string;
   createdAt: string;
+  audience?: CommentAudience;
   authorLabel: string;
   likeCount?: number;
   isLiked?: boolean;
@@ -39,6 +54,7 @@ type Props = {
   visible: boolean;
   onClose: () => void;
   onCommentCountChange?: (change: number) => void;
+  viewer?: CommentViewer;
 };
 
 export function CommentBottomSheet({
@@ -46,6 +62,7 @@ export function CommentBottomSheet({
   visible,
   onClose,
   onCommentCountChange,
+  viewer = "student",
 }: Props) {
   const router = useRouter();
   const [items, setItems] = useState<CommentItem[]>([]);
@@ -53,61 +70,115 @@ export function CommentBottomSheet({
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [audience, setAudience] = useState<CommentAudience>(() =>
+    initialCommentAudience(viewer),
+  );
+  const [guardianAvailable, setGuardianAvailable] = useState(false);
+  const requestVersion = useRef(0);
 
   const handleAuthError = useCallback(
     async (nextError: unknown) => {
       if (!(nextError instanceof ApiError) || nextError.status !== 401) {
         return false;
       }
-      await clearSessionToken();
+      if (viewer === "parent") await clearParentSession();
+      else await clearSessionToken();
       onClose();
-      router.replace(getUnifiedLoginRoute("student"));
+      router.replace(getUnifiedLoginRoute(viewer));
       return true;
     },
-    [onClose, router],
+    [onClose, router, viewer],
   );
 
-  const loadComments = useCallback(async () => {
+  const loadComments = useCallback(async (nextAudience: CommentAudience) => {
     if (!cardId) return;
+    const version = ++requestVersion.current;
     setLoading(true);
     try {
       setError(null);
-      const response = await apiFetch<{ items: CommentItem[] }>(
-        `/api/cards/${encodeURIComponent(cardId)}/comments`,
+      const request = viewer === "parent" ? parentApiFetch : apiFetch;
+      const response = await request<{
+        items: CommentItem[];
+        guardianAvailable?: boolean;
+      }>(
+        commentsPath(cardId, nextAudience),
       );
-      setItems(response.items ?? []);
+      if (version !== requestVersion.current) return;
+      const nextGuardianAvailable = response.guardianAvailable === true;
+      setGuardianAvailable(nextGuardianAvailable);
+      setItems(
+        visibleCommentsForViewer(
+          viewer,
+          nextGuardianAvailable,
+          response.items ?? [],
+        ),
+      );
+      if (viewer === "parent" && !nextGuardianAvailable) {
+        setError("가족 댓글을 열 수 없어요. 앱과 서버를 최신 버전으로 업데이트해 주세요.");
+      }
     } catch (nextError) {
+      if (version !== requestVersion.current) return;
       if (await handleAuthError(nextError)) return;
-      setError("댓글을 불러오지 못했어요.");
+      setError(
+        viewer === "student" && nextAudience === "guardian" &&
+        nextError instanceof ApiError && nextError.status === 403
+          ? FAMILY_THREAD_PRIVATE_MESSAGE
+          : "댓글을 불러오지 못했어요.",
+      );
     } finally {
-      setLoading(false);
+      if (version === requestVersion.current) setLoading(false);
     }
-  }, [cardId, handleAuthError]);
+  }, [cardId, handleAuthError, viewer]);
 
   useEffect(() => {
     if (!visible || !cardId) return;
+    setAudience(initialCommentAudience(viewer));
+    setGuardianAvailable(false);
     setCommentText("");
-    void loadComments();
+    void loadComments(initialCommentAudience(viewer));
+    return () => {
+      requestVersion.current += 1;
+    };
   }, [cardId, loadComments, visible]);
+
+  function selectAudience(nextAudience: CommentAudience) {
+    if (nextAudience === audience) return;
+    setAudience(nextAudience);
+    setCommentText("");
+    if (viewer === "student" && nextAudience === "guardian" && !guardianAvailable) {
+      setItems([]);
+      setError(FAMILY_THREAD_PRIVATE_MESSAGE);
+      return;
+    }
+    void loadComments(nextAudience);
+  }
 
   async function submitComment() {
     const content = commentText.trim();
     if (!cardId || !content || submitting) return;
     setSubmitting(true);
     try {
-      const response = await apiFetch<{
+      const request = viewer === "parent" ? parentApiFetch : apiFetch;
+      const response = await request<{
         item?: CommentItem;
         comment?: CommentItem;
-      }>(`/api/cards/${encodeURIComponent(cardId)}/comments`, {
+      }>(commentsPath(cardId, audience), {
         method: "POST",
-        json: { content },
+        json: { content, audience },
       });
       const item = response.item ?? response.comment;
       if (!item) throw new Error("missing comment");
+      if (viewer === "parent" && item.audience !== "guardian") {
+        // Do not render a possibly-public response from an outdated server.
+        // The composer is unavailable until guardianAvailable is confirmed,
+        // but retain this boundary for malformed or cached responses too.
+        setError("가족 댓글을 확인할 수 없어요. 앱과 서버를 최신 버전으로 업데이트해 주세요.");
+        return;
+      }
       setItems((current) => [item, ...current]);
       setCommentText("");
       setError(null);
-      onCommentCountChange?.(1);
+      if (audience === "public") onCommentCountChange?.(1);
     } catch (nextError) {
       if (await handleAuthError(nextError)) return;
       setError("댓글을 등록하지 못했어요.");
@@ -130,13 +201,14 @@ export function CommentBottomSheet({
   async function deleteComment(commentId: string) {
     if (!cardId) return;
     try {
-      await apiFetch(
+      const request = viewer === "parent" ? parentApiFetch : apiFetch;
+      await request(
         `/api/cards/${encodeURIComponent(cardId)}/comments/${encodeURIComponent(commentId)}`,
         { method: "DELETE" },
       );
       setItems((current) => current.filter((item) => item.id !== commentId));
       setError(null);
-      onCommentCountChange?.(-1);
+      if (audience === "public") onCommentCountChange?.(-1);
     } catch (nextError) {
       if (await handleAuthError(nextError)) return;
       setError("댓글을 삭제하지 못했어요.");
@@ -149,15 +221,38 @@ export function CommentBottomSheet({
       onClose={onClose}
       sheetStyle={styles.sheet}
       accessibilityLabel="댓글"
+      keyboardAvoiding
     >
       <Text style={styles.title} accessibilityRole="header">
         댓글
       </Text>
 
-      <KeyboardAvoidingView
-        style={styles.flex}
-        behavior={Platform.OS === "ios" ? "padding" : "height"}
-      >
+      {viewer === "parent" ? (
+        <Text style={styles.familyThreadTitle} accessibilityRole="header">
+          가족 댓글
+        </Text>
+      ) : (
+        <View style={styles.tabsInset}>
+          <ContentTabs accessibilityLabel="댓글 범위">
+            <ContentTab
+              selected={audience === "public"}
+              onPress={() => selectAudience("public")}
+              accessibilityLabel="우리반 댓글"
+            >
+              우리반
+            </ContentTab>
+            <ContentTab
+              selected={audience === "guardian"}
+              onPress={() => selectAudience("guardian")}
+              accessibilityLabel="가족 댓글"
+            >
+              가족
+            </ContentTab>
+          </ContentTabs>
+        </View>
+      )}
+
+      <View style={styles.flex}>
         {loading ? (
           <View style={styles.center}>
             <ActivityIndicator color={colors.accent} />
@@ -166,17 +261,21 @@ export function CommentBottomSheet({
           <ScrollView
             contentContainerStyle={styles.listContent}
             keyboardShouldPersistTaps="handled"
+            keyboardDismissMode="interactive"
+            automaticallyAdjustKeyboardInsets={Platform.OS === "ios"}
           >
             {error ? (
               <View style={styles.errorBlock}>
                 <Text style={styles.errorText}>{error}</Text>
-                <AppButton variant="quiet" onPress={() => void loadComments()}>
+                <AppButton variant="quiet" onPress={() => void loadComments(audience)}>
                   다시 시도
                 </AppButton>
               </View>
             ) : null}
             {!error && items.length === 0 ? (
-              <Text style={styles.emptyText}>아직 댓글이 없어요</Text>
+              <Text style={styles.emptyText}>
+                아직 {viewer === "parent" ? "가족 댓글" : commentAudienceLabel(audience)}이 없어요
+              </Text>
             ) : null}
             {items.map((item) => (
               <View key={item.id} style={styles.commentItem}>
@@ -199,6 +298,7 @@ export function CommentBottomSheet({
                     commentId={item.id}
                     likeCount={item.likeCount}
                     isLiked={item.isLiked}
+                    viewer={viewer}
                     onUnauthorized={handleAuthError}
                     onChanged={(next) => {
                       setItems((current) =>
@@ -210,37 +310,42 @@ export function CommentBottomSheet({
                   />
                 </View>
                 {item.canDelete ? (
-                  <ControlPressable
+                  <TextActionPressable
                     style={styles.deleteButton}
                     onPress={() => confirmDelete(item)}
                     accessibilityLabel="댓글 삭제"
+                    hitSlop={spacing.sm}
                   >
                     <Text style={styles.deleteLabel}>삭제</Text>
-                  </ControlPressable>
+                  </TextActionPressable>
                 ) : null}
               </View>
             ))}
           </ScrollView>
         )}
-        <View style={styles.composer}>
-          <TextField
-            value={commentText}
-            onChangeText={setCommentText}
-            placeholder="댓글을 입력하세요"
-            maxLength={1000}
-            editable={!submitting}
-            style={styles.commentInput}
-          />
-          <AppButton
-            onPress={() => void submitComment()}
-            disabled={!commentText.trim() || submitting || !cardId}
-            loading={submitting}
-            style={styles.submitButton}
-          >
-            등록
-          </AppButton>
-        </View>
-      </KeyboardAvoidingView>
+        {canComposeComment(viewer, audience) &&
+        (viewer !== "parent" || guardianAvailable) &&
+        (viewer !== "student" || audience !== "guardian" || guardianAvailable) ? (
+          <View style={styles.composer}>
+            <TextField
+              value={commentText}
+              onChangeText={setCommentText}
+              placeholder={`${commentAudienceLabel(audience)}을 입력하세요`}
+              maxLength={1000}
+              editable={!submitting}
+              style={styles.commentInput}
+            />
+            <AppButton
+              onPress={() => void submitComment()}
+              disabled={!commentText.trim() || submitting || !cardId}
+              loading={submitting}
+              style={styles.submitButton}
+            >
+              등록
+            </AppButton>
+          </View>
+        ) : null}
+      </View>
     </AppBottomSheet>
   );
 }
@@ -265,6 +370,13 @@ const styles = StyleSheet.create({
     color: colors.text,
     textAlign: "center",
     paddingBottom: spacing.md,
+  },
+  tabsInset: { marginHorizontal: spacing.lg },
+  familyThreadTitle: {
+    ...typography.label,
+    color: colors.textMuted,
+    marginHorizontal: spacing.lg,
+    paddingBottom: spacing.sm,
   },
   flex: { flex: 1 },
   center: { flex: 1, alignItems: "center", justifyContent: "center" },
@@ -299,6 +411,8 @@ const styles = StyleSheet.create({
     alignSelf: "flex-start",
     minHeight: tapMin,
     justifyContent: "center",
+    paddingHorizontal: spacing.none,
+    paddingVertical: spacing.none,
   },
   deleteLabel: { ...typography.micro, color: colors.danger },
   emptyText: {

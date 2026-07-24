@@ -15,6 +15,7 @@ const COOKIE_REWARD_ORDINALS = new Set([7, 14, 21]);
 const MILESTONE_ORDINALS = new Set([7, 14, 21, 28]);
 const COOKIE_REWARD_IMAGE = require("../assets/slimes/shared/cookie-shop-icon-256.png");
 const ATTENDANCE_STAMP_IMAGE = require("../assets/walking/attendance-stamp.png");
+const REWARD_COIN_IMAGE = require("../assets/walking/reward-coin.png");
 
 export function WalkingAttendanceCalendar({
   reward,
@@ -111,10 +112,17 @@ export function WalkingAttendanceCalendar({
                         resizeMode="contain"
                         accessible={false}
                       />
-                    ) : (
+                    ) : isItemReward ? (
                       <Text style={styles.rewardIcon}>
-                        {isItemReward ? "🎁" : "🪙"}
+                        🎁
                       </Text>
+                    ) : (
+                      <Image
+                        source={REWARD_COIN_IMAGE}
+                        style={styles.rewardImage}
+                        resizeMode="contain"
+                        accessible={false}
+                      />
                     )}
                     <Text
                       numberOfLines={1}
@@ -225,8 +233,8 @@ const styles = StyleSheet.create({
     textAlign: "center",
   },
   rewardImage: {
-    width: iconSizes.md,
-    height: iconSizes.md,
+    width: walking.rewardCoinSize,
+    height: walking.rewardCoinSize,
   },
   quantity: {
     ...typography.micro,

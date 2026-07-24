@@ -71,7 +71,7 @@ export async function POST(
 
   const [count, commentCount] = await Promise.all([
     db.cardLike.count({ where: { cardId } }),
-    db.cardComment.count({ where: { cardId, deletedAt: null } }),
+    db.cardComment.count({ where: { cardId, audience: "public", deletedAt: null } }),
   ]);
   await announceEngagementChange(
     card.boardId,

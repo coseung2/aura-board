@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
+  Platform,
   ScrollView,
   StyleSheet,
   Text,
@@ -148,7 +149,12 @@ export default function StudentWalletScreen() {
           <Text style={styles.error}>{error ?? "통장 정보를 불러올 수 없어요."}</Text>
         </View>
       ) : (
-        <ScrollView contentContainerStyle={styles.content}>
+        <ScrollView
+          contentContainerStyle={styles.content}
+          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode={Platform.OS === "ios" ? "interactive" : "on-drag"}
+          automaticallyAdjustKeyboardInsets
+        >
           <View style={styles.balanceSection}>
             <SectionHeader title="현재 잔고" />
             <View style={styles.balanceRow}>

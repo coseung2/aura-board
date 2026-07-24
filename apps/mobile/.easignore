@@ -1,0 +1,75 @@
+# Dependencies and generated build output
+node_modules/
+.next/
+out/
+dist/
+build/
+coverage/
+.turbo/
+*.tsbuildinfo
+
+# Local environment and credentials
+.env
+.env.local
+.env.*.local
+.env.production
+.env.preview
+.env.development
+*.log
+*.pem
+*.p8
+*.p12
+*.key
+*.mobileprovision
+*.jks
+credentials.json
+credentials/
+android/keystores/
+android/gradle.properties.local
+
+# Generated native and Expo directories
+.expo/
+web-build/
+expo-env.d.ts
+.kotlin/
+ios/
+android/
+apps/mobile/ios/
+apps/mobile/android/
+
+# Repository-local tooling and artifacts
+.git/
+.codegraph/
+.codex/
+.codex-remote-attachments/
+.agents/
+.opencode/
+.playwright-cli/
+.worktrees/
+artifacts/
+output/
+tasks/
+tmp/
+oracle-*.zip
+oracle-*.md
+oracle-*.txt
+oracle-*.cmd
+
+# Editor, database, cache, and server output
+.DS_Store
+.idea/
+.vscode/
+*.db
+*.db-journal
+prisma/dev.db*
+public/uploads/*
+.vercel/
+supabase/.temp/
+padlet-env-backup/
+dev.log
+.codex-dev-server.*.log
+
+# Local handoff and scratch files
+NEXT_SESSION_HANDOFF.md
+260
+x+f.b

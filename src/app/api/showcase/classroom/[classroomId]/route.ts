@@ -78,7 +78,12 @@ export async function GET(
           },
           attachments: { orderBy: { order: "asc" } },
           showcaseEntries: { select: { studentId: true } },
-          _count: { select: { likes: true, comments: true } },
+          _count: {
+            select: {
+              likes: true,
+              comments: { where: { audience: "public", deletedAt: null } },
+            },
+          },
         },
       },
     },

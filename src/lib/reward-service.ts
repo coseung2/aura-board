@@ -10,6 +10,7 @@ import {
   REWARD_EFFECT_BY_AREA,
   REWARD_SOURCE_TYPES,
   rewardAmountWithBuff,
+  WALKING_CLASSROOM_RANK_REWARD_SOURCE_TYPE,
   WALKING_WEEKLY_REWARD_SOURCE_TYPE,
   type RewardArea,
   type RewardPolicy,
@@ -173,7 +174,10 @@ export async function awardWalkingPolicyReward(input: {
   baseAmount: number;
   note: string;
   policy: RewardPolicy;
-  sourceType?: typeof REWARD_SOURCE_TYPES.walking | typeof WALKING_WEEKLY_REWARD_SOURCE_TYPE;
+  sourceType?:
+    | typeof REWARD_SOURCE_TYPES.walking
+    | typeof WALKING_WEEKLY_REWARD_SOURCE_TYPE
+    | typeof WALKING_CLASSROOM_RANK_REWARD_SOURCE_TYPE;
 }): Promise<PolicyRewardResult | null> {
   const sourceType = input.sourceType ?? REWARD_SOURCE_TYPES.walking;
   const existing = await input.tx.transaction.findFirst({

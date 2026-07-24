@@ -23,10 +23,12 @@ interface CommentItem {
   id: string;
   content: string;
   createdAt: string;
-  authorKind: "teacher" | "student" | "external";
+  authorKind: "teacher" | "student" | "parent" | "external";
   authorLabel: string;
   canDelete: boolean;
 }
+
+type CommentAudience = "public" | "guardian";
 
 interface EngagementState {
   likeCount: number;
@@ -529,6 +531,16 @@ function CommentsBlock({
   onChange?: () => void;
   inputId?: string;
 }) {
+  const isParentViewer =
+    !shareSession &&
+    typeof document !== "undefined" &&
+    document.querySelector(".parent-topnav") !== null;
+  const [audience, setAudience] = useState<CommentAudience>(() =>
+    isParentViewer ? "guardian" : "public",
+  );
+  const [guardianAvailable, setGuardianAvailable] = useState<boolean | null>(
+    null,
+  );
   const [items, setItems] = useState<CommentItem[] | null>(null);
   const [content, setContent] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -540,6 +552,12 @@ function CommentsBlock({
   const commentsMountedRef = useRef(false);
   const loadRef = useRef<(generation: number) => Promise<void>>(async () => {});
   const runLoadRef = useRef<() => void>(() => {});
+  const publicTabRef = useRef<HTMLButtonElement>(null);
+  const guardianTabRef = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => {
+    if (isParentViewer) setAudience("guardian");
+  }, [isParentViewer]);
 
   const load = useCallback(async (generation: number) => {
     try {
@@ -548,23 +566,43 @@ function CommentsBlock({
             cache: "no-store",
             headers: { "x-share-token": shareSession.shareToken },
           })
-        : await fetch(`/api/cards/${cardId}/comments`, {
+        : await fetch(`/api/cards/${cardId}/comments?audience=${audience}`, {
             cache: "no-store",
             headers: studentViewerHeaders(isStudentViewer),
           });
-      if (!r.ok) return;
-      const j = (await r.json()) as { items: CommentItem[] };
+      if (!r.ok) {
+        if (
+          audience === "guardian" &&
+          commentsMountedRef.current &&
+          generation === loadGenerationRef.current
+        ) {
+          setGuardianAvailable(false);
+          setAudience("public");
+          setItems(null);
+        }
+        return;
+      }
+      const j = (await r.json()) as {
+        items: CommentItem[];
+        guardianAvailable?: boolean;
+      };
       if (
         !commentsMountedRef.current ||
         generation !== loadGenerationRef.current
       ) {
         return;
       }
+      setGuardianAvailable(j.guardianAvailable === true);
+      if (audience === "guardian" && j.guardianAvailable !== true) {
+        setAudience("public");
+        setItems(null);
+        return;
+      }
       setItems(j.items);
     } catch {
       /* ignore */
     }
-  }, [cardId, shareSession, isStudentViewer]);
+  }, [audience, cardId, shareSession, isStudentViewer]);
   loadRef.current = load;
 
   const runLoad = useCallback(() => {
@@ -630,6 +668,24 @@ function CommentsBlock({
     requestLoad(60);
   });
 
+  const selectAudience = (nextAudience: CommentAudience) => {
+    if (submitting || nextAudience === audience) return;
+    setAudience(nextAudience);
+    setItems(null);
+    setContent("");
+    setErr(null);
+  };
+
+  const handleTabKeyDown = (e: React.KeyboardEvent<HTMLButtonElement>) => {
+    if (submitting) return;
+    if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(e.key)) return;
+    e.preventDefault();
+    const nextAudience: CommentAudience =
+      e.key === "ArrowLeft" || e.key === "Home" ? "public" : "guardian";
+    selectAudience(nextAudience);
+    (nextAudience === "public" ? publicTabRef : guardianTabRef).current?.focus();
+  };
+
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (submitting) return;
@@ -654,7 +710,7 @@ function CommentsBlock({
               "content-type": "application/json",
               ...studentViewerHeaders(isStudentViewer),
             },
-            body: JSON.stringify({ content: trimmed }),
+            body: JSON.stringify({ content: trimmed, audience }),
           });
       if (!r.ok) {
         setErr("댓글 작성에 실패했어요");
@@ -691,6 +747,13 @@ function CommentsBlock({
     }
   };
 
+  const canWriteAudience =
+    canInteract &&
+    (!isParentViewer || audience === "guardian") &&
+    (audience === "public" || guardianAvailable === true);
+  const tabsId = `card-comments-tabs-${cardId}`;
+  const panelId = `card-comments-panel-${cardId}`;
+
   return (
     <div className="card-engagement-comments">
       {/* comment-area poll (2026-06-28): 댓글 입력/목록 위에 투표 UI. */}
@@ -700,9 +763,56 @@ function CommentsBlock({
         isStudentViewer={isStudentViewer}
         boardId={boardId}
       />
+      {guardianAvailable === true && (
+        <div
+          id={tabsId}
+          className="card-engagement-comment-tabs"
+          role="tablist"
+          aria-label="댓글 대화 선택"
+        >
+          <button
+            id={`${tabsId}-public`}
+            ref={publicTabRef}
+            type="button"
+            role="tab"
+            aria-selected={audience === "public"}
+            aria-controls={panelId}
+            tabIndex={audience === "public" ? 0 : -1}
+            disabled={submitting}
+            className={`card-engagement-comment-tab${audience === "public" ? " is-active" : ""}`}
+            onClick={() => selectAudience("public")}
+            onKeyDown={handleTabKeyDown}
+          >
+            공개 대화
+          </button>
+          <button
+            id={`${tabsId}-guardian`}
+            ref={guardianTabRef}
+            type="button"
+            role="tab"
+            aria-selected={audience === "guardian"}
+            aria-controls={panelId}
+            tabIndex={audience === "guardian" ? 0 : -1}
+            disabled={submitting}
+            className={`card-engagement-comment-tab${audience === "guardian" ? " is-active" : ""}`}
+            onClick={() => selectAudience("guardian")}
+            onKeyDown={handleTabKeyDown}
+          >
+            보호자 대화
+          </button>
+        </div>
+      )}
+      <div
+        id={panelId}
+        role={guardianAvailable === true ? "tabpanel" : undefined}
+        aria-labelledby={
+          guardianAvailable === true ? `${tabsId}-${audience}` : undefined
+        }
+        className="card-engagement-comment-thread"
+      >
       {/* comments-form-top (2026-04-26): 입력 폼이 상단, 댓글 목록은 그 아래
           oldest → newest 순으로 쌓임. 새 댓글은 자연스럽게 list 끝에 추가. */}
-      {canInteract ? (
+      {canWriteAudience ? (
         <form className="card-engagement-comment-form" onSubmit={submit}>
           <textarea
             id={inputId}
@@ -722,9 +832,9 @@ function CommentsBlock({
           />
           {err && <span className="card-engagement-comment-err">{err}</span>}
         </form>
-      ) : (
+      ) : items !== null ? (
         <div className="card-engagement-readonly">읽기 전용이라 댓글을 달 수 없어요</div>
-      )}
+      ) : null}
       {items === null ? (
         <div className="card-engagement-empty">불러오는 중...</div>
       ) : items.length === 0 ? (
@@ -752,6 +862,7 @@ function CommentsBlock({
           ))}
         </ul>
       )}
+      </div>
     </div>
   );
 }

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
+  Platform,
   ScrollView,
   StyleSheet,
   Text,
@@ -202,7 +203,13 @@ export function AssessmentBoard({ data }: { data: BoardDetailResponse }) {
   const ss = String(remainingSec % 60).padStart(2, "0");
 
   return (
-    <ScrollView contentInsetAdjustmentBehavior="automatic" contentContainerStyle={styles.content}>
+    <ScrollView
+      contentInsetAdjustmentBehavior="automatic"
+      contentContainerStyle={styles.content}
+      keyboardShouldPersistTaps="handled"
+      keyboardDismissMode={Platform.OS === "ios" ? "interactive" : "on-drag"}
+      automaticallyAdjustKeyboardInsets
+    >
       <SurfaceCard style={styles.statusCard}>
         <View style={styles.statusTop}>
           <View style={styles.titleWrap}>

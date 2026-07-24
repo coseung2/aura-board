@@ -24,19 +24,20 @@ export async function GET(
 
   const [likeCount, commentCount, myLike] = await Promise.all([
     db.cardLike.count({ where: { cardId } }),
-    db.cardComment.count({ where: { cardId, deletedAt: null } }),
+    db.cardComment.count({ where: { cardId, audience: "public", deletedAt: null } }),
     actor.kind === "teacher"
       ? db.cardLike.findUnique({ where: { cardId_likerUserId: { cardId, likerUserId: actor.id } } })
       : actor.kind === "student"
       ? db.cardLike.findUnique({ where: { cardId_likerStudentId: { cardId, likerStudentId: actor.id } } })
-      : Promise.resolve(null),
+      : db.cardLike.findUnique({ where: { cardId_likerParentId: { cardId, likerParentId: actor.id } } }),
   ]);
 
   return NextResponse.json({
     likeCount,
     commentCount,
     isLiked: Boolean(myLike),
-    canInteract: actor.kind !== "parent",
+    canInteract: true,
+    guardianAvailable: access.ctx.guardianAvailable,
     anonymousAuthor: access.ctx.anonymousAuthor,
   });
 }

@@ -1,6 +1,18 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ActivityIndicator, StyleSheet, Text, View } from "react-native";
-import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
+import {
+  ActivityIndicator,
+  BackHandler,
+  KeyboardAvoidingView,
+  Platform,
+  StyleSheet,
+  Text,
+  View,
+} from "react-native";
+import {
+  useFocusEffect,
+  useLocalSearchParams,
+  useRouter,
+} from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import {
   boardThemes,
@@ -50,10 +62,14 @@ import { AppButton } from "../../../components/ui";
 // board.layout 에 따라 맞는 레이아웃 컴포넌트 렌더.
 
 export default function BoardDetail() {
-  const { slug: rawSlug } = useLocalSearchParams<{
+  const { slug: rawSlug, section: rawSection } = useLocalSearchParams<{
     slug?: string | string[];
+    section?: string | string[];
   }>();
   const slug = Array.isArray(rawSlug) ? rawSlug[0] ?? "" : rawSlug ?? "";
+  const selectedColumnSectionKey = Array.isArray(rawSection)
+    ? rawSection[0] ?? null
+    : rawSection ?? null;
   const router = useRouter();
   const cacheKey = boardDetailCacheKey(slug);
   const initialCache = readBoardCache<BoardDetailResponse>(cacheKey, {
@@ -156,6 +172,26 @@ export default function BoardDetail() {
     }, [load]),
   );
 
+  useEffect(() => {
+    const subscription = BackHandler.addEventListener(
+        "hardwareBackPress",
+        () => {
+          if (selectedColumnSectionKey === null) return false;
+        router.setParams({ section: undefined });
+        return true;
+      },
+    );
+    return () => subscription.remove();
+  }, [router, selectedColumnSectionKey]);
+
+  const handleBoardBack = useCallback(() => {
+    if (selectedColumnSectionKey !== null) {
+      router.setParams({ section: undefined });
+      return;
+    }
+    router.back();
+  }, [router, selectedColumnSectionKey]);
+
   if (loading) {
     return (
       <SafeAreaView style={styles.container} edges={["top"]}>
@@ -204,11 +240,21 @@ export default function BoardDetail() {
       <BoardHeader
         title={activeSectionTitle ?? board.title}
         layout={board.layout}
+        onBack={handleBoardBack}
       />
       <DailyBanner role="student" />
-      <View style={styles.body}>
-        {renderLayout(data, () => load(true), setActiveSectionTitle)}
-      </View>
+      <KeyboardAvoidingView
+        style={styles.body}
+        behavior={Platform.OS === "ios" ? "padding" : undefined}
+      >
+        {renderLayout(
+          data,
+          () => load(true),
+          setActiveSectionTitle,
+          selectedColumnSectionKey,
+          (key) => router.setParams({ section: key ?? undefined }),
+        )}
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }
@@ -217,6 +263,8 @@ function renderLayout(
   data: BoardDetailResponse,
   reload: () => void,
   onSectionTitleChange: (title: string | null) => void,
+  selectedColumnSectionKey: string | null,
+  onSelectedColumnSectionKeyChange: (key: string | null) => void,
 ) {
   switch (data.board.layout) {
     case "columns":
@@ -225,6 +273,8 @@ function renderLayout(
           data={data}
           onMutate={reload}
           onSectionTitleChange={onSectionTitleChange}
+          selectedSectionKey={selectedColumnSectionKey}
+          onSelectedSectionKeyChange={onSelectedColumnSectionKeyChange}
         />
       );
     case "vibe-arcade":

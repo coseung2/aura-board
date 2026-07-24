@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -14,7 +14,14 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { AppButton, AppHeader, ControlPressable, TextField } from "../../../../components/ui";
 import { CommentLikeButton } from "../../../../components/CommentLikeButton";
+import { ContentTab, ContentTabs } from "../../../../components/NavigationTabs";
 import { apiFetch, ApiError } from "../../../../lib/api";
+import {
+  commentAudienceLabel,
+  commentsPath,
+  FAMILY_THREAD_PRIVATE_MESSAGE,
+  type CommentAudience,
+} from "../../../../lib/comment-audience";
 import {
   clearSessionToken,
   getUnifiedLoginRoute,
@@ -35,7 +42,7 @@ type CommentItem = {
   id: string;
   content: string;
   createdAt: string;
-  authorKind: "teacher" | "student" | "external";
+  authorKind: "teacher" | "student" | "parent" | "external";
   authorLabel: string;
   likeCount?: number;
   isLiked?: boolean;
@@ -60,6 +67,9 @@ export default function StudentCardCommentsScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [audience, setAudience] = useState<CommentAudience>("public");
+  const [guardianAvailable, setGuardianAvailable] = useState(false);
+  const requestVersion = useRef(0);
 
   const handleAuthError = useCallback(
     async (nextError: unknown) => {
@@ -74,33 +84,62 @@ export default function StudentCardCommentsScreen() {
   );
 
   const loadComments = useCallback(
-    async (refresh = false) => {
+    async (refresh = false, nextAudience: CommentAudience = audience) => {
       if (!cardId) {
         setError("댓글을 열 게시글을 찾을 수 없어요.");
         setLoading(false);
         return;
       }
       if (refresh) setRefreshing(true);
+      else setLoading(true);
+      const version = ++requestVersion.current;
       try {
         setError(null);
-        const response = await apiFetch<{ items: CommentItem[] }>(
-          `/api/cards/${encodeURIComponent(cardId)}/comments`,
+        const response = await apiFetch<{
+          items: CommentItem[];
+          guardianAvailable?: boolean;
+        }>(
+          commentsPath(cardId, nextAudience),
         );
+        if (version !== requestVersion.current) return;
         setItems(response.items ?? []);
+        setGuardianAvailable(Boolean(response.guardianAvailable));
       } catch (nextError) {
+        if (version !== requestVersion.current) return;
         if (await handleAuthError(nextError)) return;
-        setError("댓글을 불러오지 못했어요.");
+        setError(
+          nextAudience === "guardian" &&
+          nextError instanceof ApiError && nextError.status === 403
+            ? FAMILY_THREAD_PRIVATE_MESSAGE
+            : "댓글을 불러오지 못했어요.",
+        );
       } finally {
-        setLoading(false);
-        setRefreshing(false);
+        if (version === requestVersion.current) {
+          setLoading(false);
+          setRefreshing(false);
+        }
       }
     },
-    [cardId, handleAuthError],
+    [audience, cardId, handleAuthError],
   );
 
   useEffect(() => {
-    void loadComments();
+    void loadComments(false, audience);
+    return () => {
+      requestVersion.current += 1;
+    };
   }, [loadComments]);
+
+  function selectAudience(nextAudience: CommentAudience) {
+    if (nextAudience === audience) return;
+    setAudience(nextAudience);
+    setCommentText("");
+    if (nextAudience === "guardian" && !guardianAvailable) {
+      setItems([]);
+      setError(FAMILY_THREAD_PRIVATE_MESSAGE);
+      return;
+    }
+  }
 
   async function submitComment() {
     const content = commentText.trim();
@@ -110,9 +149,9 @@ export default function StudentCardCommentsScreen() {
       const response = await apiFetch<{
         item?: CommentItem;
         comment?: CommentItem;
-      }>(`/api/cards/${encodeURIComponent(cardId)}/comments`, {
+      }>(commentsPath(cardId, audience), {
         method: "POST",
-        json: { content },
+        json: { content, audience },
       });
       const nextItem = response.item ?? response.comment;
       if (!nextItem) throw new Error("missing comment");
@@ -175,30 +214,49 @@ export default function StudentCardCommentsScreen() {
               />
             }
           >
-            <View style={styles.composer}>
-              <TextField
-                value={commentText}
-                onChangeText={setCommentText}
-                placeholder="댓글을 입력하세요"
-                multiline
-                maxLength={1000}
-                editable={!submitting}
-                style={styles.commentInput}
-              />
-              <AppButton
-                onPress={() => void submitComment()}
-                disabled={!commentText.trim() || submitting || !cardId}
-                loading={submitting}
-                style={styles.submitButton}
+            <ContentTabs accessibilityLabel="댓글 범위">
+              <ContentTab
+                selected={audience === "public"}
+                onPress={() => selectAudience("public")}
+                accessibilityLabel="우리반 댓글"
               >
-                댓글 달기
-              </AppButton>
-            </View>
+                우리반
+              </ContentTab>
+              <ContentTab
+                selected={audience === "guardian"}
+                onPress={() => selectAudience("guardian")}
+                accessibilityLabel="가족 댓글"
+              >
+                가족
+              </ContentTab>
+            </ContentTabs>
+
+            {audience !== "guardian" || guardianAvailable ? (
+              <View style={styles.composer}>
+                <TextField
+                  value={commentText}
+                  onChangeText={setCommentText}
+                  placeholder={`${commentAudienceLabel(audience)}을 입력하세요`}
+                  multiline
+                  maxLength={1000}
+                  editable={!submitting}
+                  style={styles.commentInput}
+                />
+                <AppButton
+                  onPress={() => void submitComment()}
+                  disabled={!commentText.trim() || submitting || !cardId}
+                  loading={submitting}
+                  style={styles.submitButton}
+                >
+                  댓글 달기
+                </AppButton>
+              </View>
+            ) : null}
 
             {error ? (
               <View style={styles.errorBlock}>
                 <Text style={styles.errorText}>{error}</Text>
-                <AppButton variant="quiet" onPress={() => void loadComments()}>
+                <AppButton variant="quiet" onPress={() => void loadComments(false, audience)}>
                   다시 시도
                 </AppButton>
               </View>
@@ -206,7 +264,9 @@ export default function StudentCardCommentsScreen() {
 
             {!error && items.length === 0 ? (
               <View style={styles.emptyState}>
-                <Text style={styles.emptyText}>아직 댓글이 없어요.</Text>
+                <Text style={styles.emptyText}>
+                  아직 {commentAudienceLabel(audience)}이 없어요.
+                </Text>
               </View>
             ) : (
               <View style={styles.commentList}>

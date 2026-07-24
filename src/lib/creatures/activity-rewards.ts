@@ -12,6 +12,7 @@ export const ACTIVITY_REWARD_SOURCE_TYPES = [
   "reading_reward",
   "walking_reward",
   "walking_weekly_reward",
+  "walking_classroom_rank_reward",
   "assignment_reward",
   "comment_reward",
 ] as const;

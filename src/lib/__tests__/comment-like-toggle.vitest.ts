@@ -10,15 +10,18 @@ function createDelegate(options: {
   createError?: unknown;
 }) {
   const calls: string[] = [];
+  const createArgs: unknown[] = [];
   return {
     calls,
+    createArgs,
     delegate: {
       async deleteMany() {
         calls.push("deleteMany");
         return { count: options.deleteCount ?? 0 };
       },
-      async create() {
+      async create(args: unknown) {
         calls.push("create");
+        createArgs.push(args);
         if (options.createError) throw options.createError;
         return {};
       },
@@ -40,6 +43,31 @@ describe("applyCommentLikeMutation", () => {
     ).resolves.toBe(true);
 
     expect(fake.calls).toEqual(["create"]);
+  });
+
+  it("stores a parent like under its dedicated idempotency key", async () => {
+    const fake = createDelegate({});
+
+    await expect(
+      applyCommentLikeMutation(
+        fake.delegate,
+        "comment-1",
+        { kind: "parent", id: "parent-1" },
+        true,
+      ),
+    ).resolves.toBe(true);
+
+    expect(fake.createArgs).toEqual([
+      {
+        data: {
+          commentId: "comment-1",
+          likerKind: "external",
+          likerUserId: null,
+          likerStudentId: null,
+          likerParentId: "parent-1",
+        },
+      },
+    ]);
   });
 
   it("treats a concurrent unique conflict as already liked", async () => {

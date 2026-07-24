@@ -5,9 +5,11 @@ import { AppHeader, Pill } from "./ui";
 export function BoardHeader({
   title,
   layout,
+  onBack,
 }: {
   title: string;
   layout: string;
+  onBack?: () => void;
 }) {
   const router = useRouter();
   const layoutTitle = layoutLabel(layout);
@@ -15,7 +17,7 @@ export function BoardHeader({
   return (
     <AppHeader
       title={title}
-      onBack={() => router.back()}
+      onBack={onBack ?? (() => router.back())}
       showDailyBanner={false}
       right={layoutTitle !== title ? <Pill>{layoutTitle}</Pill> : undefined}
     />

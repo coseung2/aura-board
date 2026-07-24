@@ -49,6 +49,7 @@ export function NoPhotoReasonModal({ visible, onCancel, onSubmit, busy }: Props)
       animationType="fade"
       onClose={onCancel}
       onShow={handleShow}
+      keyboardAvoiding
       sheetStyle={styles.modal}
       backdropStyle={styles.backdrop}
       accessibilityLabel="사진 없이 넘어가기 사유 선택"

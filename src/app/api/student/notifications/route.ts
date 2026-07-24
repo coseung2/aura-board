@@ -12,6 +12,7 @@ const REWARD_SOURCE_TYPES = [
   "comment_reward",
   "walking_reward",
   "walking_weekly_reward",
+  "walking_classroom_rank_reward",
   "assignment_reward",
 ] as const;
 type RewardSourceType = (typeof REWARD_SOURCE_TYPES)[number];
@@ -312,6 +313,8 @@ function rewardTitle(sourceType: RewardSourceType): string {
       return "걷기 보상";
     case "walking_weekly_reward":
       return "주간 걷기 보상";
+    case "walking_classroom_rank_reward":
+      return "우리 반 걷기 순위 보상";
     case "assignment_reward":
       return "과제 제출 보상";
   }

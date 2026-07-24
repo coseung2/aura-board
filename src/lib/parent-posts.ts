@@ -158,7 +158,12 @@ export async function fetchParentPosts({
         },
         attachments: { orderBy: { order: "asc" } },
         showcaseEntries: { select: { studentId: true } },
-        _count: { select: { likes: true, comments: true } },
+        _count: {
+          select: {
+            likes: true,
+            comments: { where: { audience: "public", deletedAt: null } },
+          },
+        },
       },
       orderBy: [{ createdAt: "desc" }, { id: "desc" }],
       take: limit + 1,

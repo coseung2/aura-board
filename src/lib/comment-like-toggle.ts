@@ -2,7 +2,8 @@ import type { Prisma } from "@prisma/client";
 
 export type CommentLikeActor =
   | { kind: "teacher"; id: string }
-  | { kind: "student"; id: string };
+  | { kind: "student"; id: string }
+  | { kind: "parent"; id: string };
 
 type CommentLikeDelegate = {
   create(args: { data: Prisma.CardCommentLikeUncheckedCreateInput }): Promise<unknown>;
@@ -23,9 +24,9 @@ export function commentLikeWhere(
   commentId: string,
   actor: CommentLikeActor,
 ): Prisma.CardCommentLikeWhereInput {
-  return actor.kind === "teacher"
-    ? { commentId, likerUserId: actor.id }
-    : { commentId, likerStudentId: actor.id };
+  if (actor.kind === "teacher") return { commentId, likerUserId: actor.id };
+  if (actor.kind === "student") return { commentId, likerStudentId: actor.id };
+  return { commentId, likerParentId: actor.id };
 }
 
 function commentLikeCreateData(
@@ -38,6 +39,16 @@ function commentLikeCreateData(
       likerKind: "teacher",
       likerUserId: actor.id,
       likerStudentId: null,
+      likerParentId: null,
+    };
+  }
+  if (actor.kind === "parent") {
+    return {
+      commentId,
+      likerKind: "external",
+      likerUserId: null,
+      likerStudentId: null,
+      likerParentId: actor.id,
     };
   }
   return {
@@ -45,6 +56,7 @@ function commentLikeCreateData(
     likerKind: "student",
     likerUserId: null,
     likerStudentId: actor.id,
+    likerParentId: null,
   };
 }
 

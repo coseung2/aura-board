@@ -3,7 +3,7 @@
 
 import { normalizeDbTimestamp } from "./db-timestamp";
 
-export type AuthorKind = "teacher" | "student" | "external";
+export type AuthorKind = "teacher" | "student" | "parent" | "external";
 
 export function formatEngagementAuthor(opts: {
   kind: AuthorKind;
@@ -11,6 +11,10 @@ export function formatEngagementAuthor(opts: {
   anonymous: boolean;
 }): string {
   if (opts.kind === "external") return opts.name.trim() || "익명 방문자";
+  if (opts.kind === "parent") {
+    const trimmed = opts.name.trim();
+    return trimmed ? `${trimmed} 학부모` : "학부모";
+  }
   if (opts.anonymous) return "익명";
   if (opts.kind === "teacher") {
     const trimmed = opts.name.trim();

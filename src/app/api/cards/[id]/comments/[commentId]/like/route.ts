@@ -42,9 +42,6 @@ export async function POST(
   const { id: cardId, commentId } = await params;
   const actor = await getCurrentCardActor();
   if (!actor) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
-  if (actor.kind === "parent") {
-    return NextResponse.json({ error: "forbidden" }, { status: 403 });
-  }
 
   const access = await authorizeCardAccess(cardId, actor, "write");
   if (!access.ok) {
@@ -56,10 +53,13 @@ export async function POST(
 
   const comment = await db.cardComment.findUnique({
     where: { id: commentId },
-    select: { id: true, cardId: true, deletedAt: true },
+    select: { id: true, cardId: true, audience: true, deletedAt: true },
   });
   if (!comment || comment.cardId !== cardId || comment.deletedAt) {
     return NextResponse.json({ error: "not_found" }, { status: 404 });
+  }
+  if (comment.audience === "guardian" && !access.ctx.guardianAvailable) {
+    return NextResponse.json({ error: "forbidden" }, { status: 403 });
   }
 
   const intent = await readLikeIntent(req);

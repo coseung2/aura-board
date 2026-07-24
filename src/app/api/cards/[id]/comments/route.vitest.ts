@@ -9,18 +9,27 @@ const mocks = vi.hoisted(() => ({
     id: "student-1",
     name: "학생",
     classroomId: "classroom-1",
-  } as { kind: "student"; id: string; name: string; classroomId: string } | { kind: "teacher"; id: string; name: string },
+  } as
+    | { kind: "student"; id: string; name: string; classroomId: string }
+    | { kind: "teacher"; id: string; name: string }
+    | { kind: "parent"; id: string; name: string },
   existingContents: [] as string[],
   replay: null as Record<string, unknown> | null,
   award: vi.fn(),
   create: vi.fn(),
+  announce: vi.fn(),
+  guardianAvailable: true,
 }));
 
 vi.mock("@/lib/card-engagement-actor", () => ({
   getCurrentCardActor: vi.fn(async () => mocks.actor),
   authorizeCardAccess: vi.fn(async () => ({
     ok: true,
-    ctx: { classroomId: "classroom-1", anonymousAuthor: false },
+    ctx: {
+      classroomId: "classroom-1",
+      anonymousAuthor: false,
+      guardianAvailable: mocks.guardianAvailable,
+    },
   })),
 }));
 
@@ -43,12 +52,15 @@ vi.mock("@/lib/creatures/activity-rewards", () => ({
 vi.mock("@/lib/card-engagement-format", () => ({
   formatEngagementAuthor: ({ name }: { name: string }) => name,
 }));
-vi.mock("@/lib/realtime-broadcast", () => ({ announceEngagementChange: vi.fn() }));
+vi.mock("@/lib/realtime-broadcast", () => ({ announceEngagementChange: mocks.announce }));
 vi.mock("@/lib/board-touch", () => ({ touchBoardUpdatedAt: vi.fn() }));
 
 vi.mock("@/lib/db", () => {
   const tx = {
     cardComment: {
+      findFirst: vi.fn(async ({ where }: { where: Record<string, unknown> }) => {
+        return mocks.replay?.cardId === where.cardId ? mocks.replay : null;
+      }),
       findUnique: vi.fn(async ({ where }: { where: Record<string, unknown> }) => {
         const key = where.authorStudentId_cardId_clientRequestId as
           | { cardId?: string }
@@ -87,11 +99,12 @@ import { POST } from "./route";
 function request(
   clientRequestId = "request-0001",
   content = "정말 좋은 글이에요",
+  audience?: "public" | "guardian",
 ) {
   return new Request("http://localhost/api/cards/card-1/comments", {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({ content, clientRequestId }),
+    body: JSON.stringify({ content, clientRequestId, audience }),
   });
 }
 
@@ -110,6 +123,8 @@ describe("student comment reward transaction", () => {
     mocks.replay = null;
     mocks.award.mockReset();
     mocks.create.mockReset();
+    mocks.announce.mockReset();
+    mocks.guardianAvailable = true;
     mocks.create.mockImplementation(async ({ data }: { data: Record<string, unknown> }) => {
       const row = {
         id: "comment-1",
@@ -117,6 +132,8 @@ describe("student comment reward transaction", () => {
         createdAt: new Date("2026-07-20T00:00:00.000Z"),
         authorUser: null,
         authorStudent: { id: "student-1", name: "학생" },
+        authorParent:
+          data.authorParentId === "parent-1" ? { id: "parent-1", name: "보호자" } : null,
       };
       mocks.comments.push(row);
       return row;
@@ -223,5 +240,53 @@ describe("student comment reward transaction", () => {
     });
     expect(mocks.create).toHaveBeenCalledTimes(1);
     expect(mocks.award).not.toHaveBeenCalled();
+  });
+
+  it("creates a parent comment only in the guardian audience without broadcasting it", async () => {
+    mocks.actor = { kind: "parent", id: "parent-1", name: "보호자" };
+
+    const response = await POST(
+      request("parent-request-1", "아이에게 남기는 댓글", "guardian"),
+      { params: Promise.resolve({ id: "card-1" }) },
+    );
+
+    expect(response.status).toBe(200);
+    expect(mocks.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          audience: "guardian",
+          authorKind: "external",
+          authorParentId: "parent-1",
+          authorStudentId: null,
+          authorUserId: null,
+        }),
+      }),
+    );
+    expect((await response.json()).item.authorKind).toBe("parent");
+    expect(mocks.award).not.toHaveBeenCalled();
+    expect(mocks.announce).not.toHaveBeenCalled();
+  });
+
+  it("rejects a legacy/default public comment from a parent", async () => {
+    mocks.actor = { kind: "parent", id: "parent-1", name: "보호자" };
+
+    const response = await POST(request("parent-request-2", "공개 댓글 시도"), {
+      params: Promise.resolve({ id: "card-1" }),
+    });
+
+    expect(response.status).toBe(403);
+    expect(mocks.create).not.toHaveBeenCalled();
+  });
+
+  it("rejects guardian comments when the actor does not own the private thread", async () => {
+    mocks.guardianAvailable = false;
+
+    const response = await POST(
+      request("request-guardian-denied", "보호자 댓글 시도", "guardian"),
+      { params: Promise.resolve({ id: "card-1" }) },
+    );
+
+    expect(response.status).toBe(403);
+    expect(mocks.create).not.toHaveBeenCalled();
   });
 });

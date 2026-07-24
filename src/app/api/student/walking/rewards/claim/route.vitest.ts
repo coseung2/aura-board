@@ -7,6 +7,7 @@ const mocks = vi.hoisted(() => ({
   queryRaw: vi.fn(),
   transaction: vi.fn(),
   transactionFindFirst: vi.fn(),
+  transactionFindMany: vi.fn(),
   loadRewardPolicy: vi.fn(),
   awardWalkingPolicyReward: vi.fn(),
   retryActivityRewardTransaction: vi.fn(),
@@ -57,7 +58,12 @@ describe("POST /api/student/walking/rewards/claim", () => {
     mocks.ensureAccountFor.mockResolvedValue({ accountId: "account-1", cardId: "card-1" });
     mocks.queryRaw.mockResolvedValue([{ steps: 75_000 }]);
     mocks.transactionFindFirst.mockResolvedValue(null);
+    mocks.transactionFindMany.mockResolvedValue([]);
     mocks.loadRewardPolicy.mockResolvedValue({
+      walkingRewardStepThreshold: 5_000,
+      walkingRewardAmount: 10,
+      walkingDailyUnitCap: 4,
+      walkingWeeklyRewardDayCap: 5,
       walkingWeeklyTier1Steps: 25_000,
       walkingWeeklyTier1Amount: 20,
       walkingWeeklyTier2Steps: 50_000,
@@ -72,7 +78,10 @@ describe("POST /api/student/walking/rewards/claim", () => {
     mocks.transaction.mockImplementation(async (operation: (tx: unknown) => unknown) =>
       operation({
         $queryRaw: mocks.queryRaw,
-        transaction: { findFirst: mocks.transactionFindFirst },
+        transaction: {
+          findFirst: mocks.transactionFindFirst,
+          findMany: mocks.transactionFindMany,
+        },
       }),
     );
   });
@@ -115,6 +124,49 @@ describe("POST /api/student/walking/rewards/claim", () => {
     );
   });
 
+  it("pays the current Top 5 rank once using the fixed rank reward", async () => {
+    mocks.queryRaw.mockResolvedValue([{ rank: 2 }]);
+    mocks.awardWalkingPolicyReward.mockResolvedValue({ amount: 60, idempotent: false });
+
+    const response = await POST(
+      request({ kind: "classroom_rank", weekStart: "2026-07-12" }),
+    );
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({
+      classroomRankReward: {
+        weekStart: "2026-07-12",
+        rank: 2,
+        amount: 60,
+        claimed: true,
+      },
+      rewardAmount: 60,
+      idempotent: false,
+    });
+    expect(mocks.awardWalkingPolicyReward).toHaveBeenCalledWith(
+      expect.objectContaining({
+        sourceRef: "student-1:2026-07-12:classroom-rank",
+        sourceType: "walking_classroom_rank_reward",
+        baseAmount: 60,
+      }),
+    );
+  });
+
+  it("does not pay students outside the current Top 5", async () => {
+    mocks.queryRaw.mockResolvedValue([{ rank: 6 }]);
+
+    const response = await POST(
+      request({ kind: "classroom_rank", weekStart: "2026-07-12" }),
+    );
+
+    expect(response.status).toBe(409);
+    expect(await response.json()).toEqual({
+      error: "classroom_rank_reward_not_eligible",
+      rank: 6,
+    });
+    expect(mocks.awardWalkingPolicyReward).not.toHaveBeenCalled();
+  });
+
   it("replays an exact source deposit without paying again", async () => {
     mocks.awardWalkingPolicyReward.mockResolvedValue({ amount: 23, idempotent: true });
     const response = await POST(request({ tierKey: "tier2" }));
@@ -124,6 +176,26 @@ describe("POST /api/student/walking/rewards/claim", () => {
       rewardAmount: 23,
       idempotent: true,
     });
+  });
+
+  it("pays an achieved daily unit only after an explicit claim", async () => {
+    mocks.queryRaw.mockResolvedValue([{ steps: 10_000 }]);
+    mocks.awardWalkingPolicyReward.mockResolvedValue({ amount: 10, idempotent: false });
+
+    const response = await POST(request({ kind: "daily", unit: 2 }));
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({
+      dailyTier: { unit: 2, steps: 10_000, amount: 10, achieved: true, claimed: true },
+      rewardAmount: 10,
+      idempotent: false,
+    });
+    expect(mocks.awardWalkingPolicyReward).toHaveBeenCalledWith(
+      expect.objectContaining({
+        sourceRef: "student-1:2026-07-23:unit:2",
+        baseAmount: 10,
+      }),
+    );
   });
 
   it("keeps historical weekly-goal tier one deposits claimed", async () => {

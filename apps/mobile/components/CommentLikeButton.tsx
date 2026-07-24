@@ -1,11 +1,13 @@
 import { useEffect, useRef, useState } from "react";
 import { Animated, Pressable, StyleSheet, Text } from "react-native";
 import { Heart } from "lucide-react-native";
-import { ApiError, apiFetch } from "../lib/api";
+import { ApiError, apiFetch, parentApiFetch } from "../lib/api";
+import type { CommentViewer } from "../lib/comment-audience";
 import {
   colors,
   iconSizes,
   states,
+  tapMin,
   typography,
 } from "../theme/tokens";
 
@@ -14,6 +16,7 @@ type Props = {
   commentId: string;
   likeCount?: number;
   isLiked?: boolean;
+  viewer?: CommentViewer;
   onUnauthorized?: (error: unknown) => Promise<boolean>;
   onChanged?: (state: { likeCount: number; isLiked: boolean }) => void;
 };
@@ -23,6 +26,7 @@ export function CommentLikeButton({
   commentId,
   likeCount: initialLikeCount,
   isLiked: initialIsLiked,
+  viewer = "student",
   onUnauthorized,
   onChanged,
 }: Props) {
@@ -84,7 +88,8 @@ export function CommentLikeButton({
     animateChange();
 
     try {
-      const response = await apiFetch<{ liked: boolean; count: number }>(
+      const request = viewer === "parent" ? parentApiFetch : apiFetch;
+      const response = await request<{ liked: boolean; count: number }>(
         `/api/cards/${encodeURIComponent(cardId)}/comments/${encodeURIComponent(commentId)}/like`,
         { method: "POST", json: { liked: nextLiked } },
       );
@@ -148,6 +153,8 @@ export function CommentLikeButton({
 
 const styles = StyleSheet.create({
   button: {
+    minWidth: tapMin,
+    minHeight: tapMin,
     alignItems: "center",
     justifyContent: "center",
   },

@@ -553,6 +553,14 @@ export function DJQueueBoard({
         accessibilityLabel="곡 신청"
         keyboardAvoiding
       >
+        <ScrollView
+          style={styles.queueSheetScroll}
+          contentContainerStyle={styles.queueSheetContent}
+          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="on-drag"
+          automaticallyAdjustKeyboardInsets
+          showsVerticalScrollIndicator={false}
+        >
         <View style={styles.sheetHeader}>
           <Text style={styles.sheetTitle}>곡 신청</Text>
           <Text style={styles.sheetDescription}>
@@ -583,9 +591,10 @@ export function DJQueueBoard({
         {submitError ? (
           <Text style={styles.submitError}>{submitError}</Text>
         ) : null}
-        {recentSubmissions.length > 0 ? (
-          <View style={styles.recentSection}>
-            <Text style={styles.recentTitle}>최근 신청곡</Text>
+        <View style={styles.recentSection}>
+          <Text style={styles.recentTitle}>최근 신청곡</Text>
+          {recentSubmissions.length > 0 ? (
+            <>
             <Text style={styles.recentDescription}>
               곡을 누르면 바로 다시 신청돼요.
             </Text>
@@ -614,8 +623,12 @@ export function DJQueueBoard({
                 );
               })}
             </View>
-          </View>
-        ) : null}
+            </>
+          ) : (
+            <Text style={styles.recentEmpty}>최근에 신청한 곡이 없어요.</Text>
+          )}
+        </View>
+        </ScrollView>
       </AppBottomSheet>
 
     </View>
@@ -667,6 +680,11 @@ const styles = StyleSheet.create({
     ...typography.micro,
     color: colors.textMuted,
     marginTop: spacing.xs,
+  },
+  recentEmpty: {
+    ...typography.body,
+    color: colors.textMuted,
+    marginTop: spacing.sm,
   },
   recentList: { gap: spacing.sm, marginTop: spacing.md },
   recentRow: {
@@ -752,4 +770,6 @@ const styles = StyleSheet.create({
     minHeight: tapMin * 6,
     paddingBottom: spacing.md,
   },
+  queueSheetScroll: { flex: 1 },
+  queueSheetContent: { paddingBottom: spacing.xl },
 });

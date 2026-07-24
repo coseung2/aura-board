@@ -21,13 +21,18 @@ import {
   getKstRewardMonthRange,
   getKstRewardMonthRangeForDay,
   getKstRewardWeekRange,
+  getKstClassroomWalkingRankPeriods,
+  getKstClassroomWalkingRankRewardPeriods,
   getWalkingWeeklyRewardTiers,
   getKstWeekStartDay,
   walkingRewardUnits,
   walkingMonthlyAttendanceRewardAmount,
   walkingMonthlyAttendanceSourceRef,
   walkingMonthlyCookieRewardSourceRef,
+  walkingClassroomRankRewardSourceRef,
   isWalkingMonthlyCookieRewardOrdinal,
+  WALKING_CLASSROOM_RANK_REWARDS,
+  WALKING_CLASSROOM_RANK_REWARD_SOURCE_TYPE,
   walkingUnitSourceRef,
   walkingWeeklyTierSourceRef,
   walkingWeeklyGoalSourceRef,
@@ -42,6 +47,7 @@ import {
   loadRewardPolicy,
 } from "@/lib/reward-service";
 import { awardWalkingAttendanceCookie } from "@/lib/walking-attendance-rewards";
+import { getEquippedSlimeFloor } from "@/lib/pets/catalog";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -159,11 +165,38 @@ type WeeklyStepRewards = {
   tiers: WeeklyStepReward[];
 };
 
+type DailyStepReward = {
+  unit: number;
+  steps: number;
+  amount: number;
+  achieved: boolean;
+  claimed: boolean;
+  claimable: boolean;
+};
+
+type DailyStepRewards = {
+  day: string;
+  totalSteps: number;
+  tiers: DailyStepReward[];
+};
+
+type WalkingRepresentativeSlime = {
+  color: string;
+  growthStage: 1 | 2 | 3;
+  equippedFloor: "none" | "grass-floor" | "water-puddle" | "trampoline";
+};
+
 type ClassroomWalkingRank = {
   studentId: string;
   studentNumber: number | null;
   studentName: string;
   weeklySteps: number | bigint;
+};
+
+type ClassroomRankReward = {
+  weekStart: string;
+  rank: number;
+  amount: number;
 };
 
 function parseReadWindow(
@@ -460,6 +493,75 @@ async function readWeeklyStepRewards(
   };
 }
 
+async function readDailyStepRewards(
+  studentId: string,
+  policy: Awaited<ReturnType<typeof loadRewardPolicy>>,
+  rows?: Array<{ day: string; steps: number }>,
+): Promise<DailyStepRewards> {
+  const day = getWalkingDayKey();
+  // The mobile snapshot is always the current week, so today's row is already
+  // available here.  Avoid a second read solely for the reward strip.
+  const row = rows?.find((candidate) => candidate.day === day);
+  const rowSteps = row?.steps;
+  const totalSteps =
+    typeof rowSteps === "number" && Number.isSafeInteger(rowSteps)
+      ? Math.max(0, rowSteps)
+      : 0;
+  const earnedUnits = walkingRewardUnits(
+    totalSteps,
+    policy.walkingRewardStepThreshold,
+    policy.walkingDailyUnitCap,
+  );
+  const range = getKstRewardWeekRange();
+  const deposits = await db.transaction.findMany({
+    where: {
+      sourceType: "walking_reward",
+      sourceRef: { startsWith: `${studentId}:` },
+      type: "deposit",
+    },
+    select: { sourceRef: true },
+  });
+  const claimedRefs = new Set(
+    deposits
+      .map((deposit) => deposit.sourceRef)
+      .filter((sourceRef): sourceRef is string => Boolean(sourceRef)),
+  );
+  const legacySourceRef = `${studentId}:${day}:daily-threshold`;
+  const legacyClaimed = claimedRefs.has(legacySourceRef);
+  const rewardedDays = new Set<string>();
+  for (const sourceRef of claimedRefs) {
+    const match = sourceRef.match(
+      /^[^:]+:(\d{4}-\d{2}-\d{2}):(?:unit:[1-4]|daily-threshold)$/,
+    );
+    if (match && getKstWeekStartDay(match[1]) === range.weekStart) {
+      rewardedDays.add(match[1]);
+    }
+  }
+  const canClaimDay = canRewardWalkingDay(
+    rewardedDays,
+    day,
+    policy.walkingWeeklyRewardDayCap,
+  );
+
+  return {
+    day,
+    totalSteps,
+    tiers: Array.from({ length: policy.walkingDailyUnitCap }, (_, index) => {
+      const unit = index + 1;
+      const achieved = unit <= earnedUnits;
+      const claimed = legacyClaimed || claimedRefs.has(walkingUnitSourceRef(studentId, day, unit));
+      return {
+        unit,
+        steps: policy.walkingRewardStepThreshold * unit,
+        amount: policy.walkingRewardAmount,
+        achieved,
+        claimed,
+        claimable: achieved && !claimed && canClaimDay,
+      };
+    }),
+  };
+}
+
 async function readClassroomTopFive(
   classroomId: string,
   range: WalkingResponseRange,
@@ -489,13 +591,84 @@ async function readClassroomTopFive(
         typeof rank.studentName === "string" &&
         (typeof rank.weeklySteps === "number" || typeof rank.weeklySteps === "bigint"),
     )
-    .map((rank) => ({
+    .map((rank, index) => ({
       studentId: rank.studentId,
       studentNumber: Number.isInteger(rank.studentNumber) ? rank.studentNumber : null,
       studentName: rank.studentName,
       weeklySteps: Number(rank.weeklySteps) || 0,
       isCurrent: rank.studentId === currentStudentId,
+      rewardAmount: WALKING_CLASSROOM_RANK_REWARDS[index] ?? 0,
     }));
+}
+
+async function readClassroomRankReward(
+  classroomId: string,
+  studentId: string,
+  range: WalkingResponseRange,
+): Promise<Omit<ClassroomRankReward, "weekStart"> | null> {
+  const rows = await db.$queryRaw<Array<{ rank: bigint | number }>>(Prisma.sql`
+    WITH ranked AS (
+      SELECT
+        student."id" AS "studentId",
+        ROW_NUMBER() OVER (
+          ORDER BY
+            COALESCE(SUM(walking."steps"), 0) DESC,
+            student."number" ASC NULLS LAST,
+            student."name" ASC
+        ) AS "rank"
+      FROM "Student" student
+      LEFT JOIN "StudentWalkingDailyStat" walking
+        ON walking."studentId" = student."id"
+        AND walking."day" >= ${range.weekStart}::date
+        AND walking."day" < ${range.weekEnd}::date
+      WHERE student."classroomId" = ${classroomId}
+      GROUP BY student."id", student."number", student."name"
+    )
+    SELECT "rank"
+    FROM ranked
+    WHERE "studentId" = ${studentId}
+  `);
+  const rank = Number(rows[0]?.rank);
+  const amount = Number.isSafeInteger(rank) && rank > 0
+    ? WALKING_CLASSROOM_RANK_REWARDS[rank - 1]
+    : undefined;
+  if (amount === undefined) return null;
+
+  return { rank, amount };
+}
+
+async function readUnclaimedClassroomRankRewards(
+  classroomId: string,
+  studentId: string,
+): Promise<ClassroomRankReward[]> {
+  const periods = getKstClassroomWalkingRankRewardPeriods();
+  if (periods.length === 0) return [];
+
+  const deposits = await db.transaction.findMany({
+    where: {
+      sourceType: WALKING_CLASSROOM_RANK_REWARD_SOURCE_TYPE,
+      sourceRef: { startsWith: `${studentId}:` },
+      type: "deposit",
+    },
+    select: { sourceRef: true },
+  });
+  const claimedRefs = new Set(
+    deposits
+      .map((deposit) => deposit.sourceRef)
+      .filter((sourceRef): sourceRef is string => Boolean(sourceRef)),
+  );
+
+  const rewards = await Promise.all(
+    periods.map(async (period) => {
+      const sourceRef = walkingClassroomRankRewardSourceRef(studentId, period.weekStart);
+      if (claimedRefs.has(sourceRef)) return null;
+      const reward = await readClassroomRankReward(classroomId, studentId, period);
+      return reward ? { weekStart: period.weekStart, ...reward } : null;
+    }),
+  );
+  return rewards
+    .filter((reward): reward is ClassroomRankReward => reward !== null)
+    .sort((a, b) => b.weekStart.localeCompare(a.weekStart));
 }
 
 export async function GET(request: NextRequest) {
@@ -515,12 +688,19 @@ export async function GET(request: NextRequest) {
       readRange.window.endDayExclusive === readRange.range.weekEnd
         ? rows
         : undefined;
-    const weeklyStepRewards = await readWeeklyStepRewards(
-      student.id,
-      readRange.range,
-      policy,
-      weeklyRows,
-    );
+    const [weeklyStepRewards, dailyStepRewards, representativeSlime] = await Promise.all([
+      readWeeklyStepRewards(
+        student.id,
+        readRange.range,
+        policy,
+        weeklyRows,
+      ),
+      readDailyStepRewards(student.id, policy, rows),
+      db.studentSlime.findFirst({
+        where: { studentId: student.id, isRepresentative: true },
+        select: { color: true, growthStage: true, equippedItemKeys: true },
+      }),
+    ]);
     const monthRange = getKstRewardMonthRange();
     const monthRows = await readRows(student.id, {
       startDay: monthRange.monthStart,
@@ -531,9 +711,14 @@ export async function GET(request: NextRequest) {
       monthRange,
       monthRows,
     );
+    const classroomRankPeriods = getKstClassroomWalkingRankPeriods();
     const classroomTopFive = await readClassroomTopFive(
       student.classroomId,
-      readRange.range,
+      classroomRankPeriods.active,
+      student.id,
+    );
+    const classroomRankRewards = await readUnclaimedClassroomRankRewards(
+      student.classroomId,
       student.id,
     );
     const syncedDays = rows
@@ -557,8 +742,18 @@ export async function GET(request: NextRequest) {
         ),
       },
       monthlyAttendanceReward,
+      dailyStepRewards,
       weeklyStepRewards,
+      representativeSlime: representativeSlime
+        ? {
+            color: representativeSlime.color,
+            growthStage: representativeSlime.growthStage as 1 | 2 | 3,
+            equippedFloor: getEquippedSlimeFloor(representativeSlime.equippedItemKeys),
+          } satisfies WalkingRepresentativeSlime
+        : null,
       classroomTopFive,
+      classroomRankRewards,
+      classroomRankNextResetAt: classroomRankPeriods.nextResetAt.toISOString(),
     });
   } catch (error) {
     console.error("[GET /api/student/walking]", error);
@@ -649,12 +844,6 @@ export async function POST(request: NextRequest) {
         ),
     );
     const sourceRefs = [
-      ...sortedRows.flatMap((row) => [
-        walkingUnitSourceRef(student.id, row.day, 1),
-        walkingUnitSourceRef(student.id, row.day, 2),
-        walkingUnitSourceRef(student.id, row.day, 3),
-        walkingUnitSourceRef(student.id, row.day, 4),
-      ]),
       ...monthlySourceRefs,
       ...monthlyCookieSourceRefs,
     ];
@@ -662,8 +851,6 @@ export async function POST(request: NextRequest) {
       () =>
         db.$transaction(
           async (tx) => {
-            const policy = await loadRewardPolicy(tx, student.classroomId);
-
             for (const row of sortedRows) {
               await tx.$executeRaw(Prisma.sql`
                 INSERT INTO "StudentWalkingDailyStat" (
@@ -812,7 +999,6 @@ export async function POST(request: NextRequest) {
                 accountId,
                 sourceType: {
                   in: [
-                    "walking_reward",
                     WALKING_WEEKLY_REWARD_SOURCE_TYPE,
                     WALKING_MONTHLY_REWARD_SOURCE_TYPE,
                     WALKING_MONTHLY_COOKIE_REWARD_SOURCE_TYPE,
@@ -826,42 +1012,6 @@ export async function POST(request: NextRequest) {
             const rewardedRefs = new Set(
               previous.map((entry) => entry.sourceRef).filter((ref): ref is string => Boolean(ref)),
             );
-
-            for (const row of sortedRows) {
-              const units = walkingRewardUnits(
-                row.steps,
-                policy.walkingRewardStepThreshold,
-                policy.walkingDailyUnitCap,
-              );
-              if (units === 0) continue;
-              const weekStart = getKstWeekStartDay(row.day);
-              const rewardedDays = new Set<string>();
-              for (const ref of rewardedRefs) {
-                const match = ref.match(
-                  /^[^:]+:(\d{4}-\d{2}-\d{2}):(?:unit:[1-4]|daily-threshold)$/,
-                );
-                if (match && getKstWeekStartDay(match[1]) === weekStart) rewardedDays.add(match[1]);
-              }
-              // The former one-shot 5,000-step payout was 20 won, equivalent
-              // to both new 10-won units. Preserve it without a migration-time
-              // double payment.
-              if (rewardedRefs.has(`${student.id}:${row.day}:daily-threshold`)) continue;
-              if (!canRewardWalkingDay(rewardedDays, row.day, policy.walkingWeeklyRewardDayCap)) continue;
-              for (let unit = 1; unit <= units; unit += 1) {
-                const sourceRef = walkingUnitSourceRef(student.id, row.day, unit);
-                await awardWalkingPolicyReward({
-                  tx,
-                  studentId: student.id,
-                  classroomId: student.classroomId,
-                  accountId,
-                  sourceRef,
-                  baseAmount: policy.walkingRewardAmount,
-                  note: `걷기 ${policy.walkingRewardStepThreshold.toLocaleString("ko-KR")}보 보상 (${unit}/${policy.walkingDailyUnitCap}) [${row.day}]`,
-                  policy,
-                });
-                rewardedRefs.add(sourceRef);
-              }
-            }
 
             // Each visit receives a stable ordinal when it is first recorded.
             // Claims may happen later or out of order without renumbering.

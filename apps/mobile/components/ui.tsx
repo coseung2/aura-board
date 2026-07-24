@@ -107,6 +107,30 @@ export function ControlPressable({
   );
 }
 
+/** A non-card pressable for inline text actions such as delete and dismiss. */
+export function TextActionPressable({
+  children,
+  style,
+  disabled,
+  ...props
+}: ControlPressableProps) {
+  return (
+    <Pressable
+      accessibilityRole="button"
+      disabled={disabled}
+      style={({ pressed }) => [
+        styles.textActionPressable,
+        pressed && !disabled && styles.textActionPressed,
+        disabled && styles.disabled,
+        style,
+      ]}
+      {...props}
+    >
+      {children}
+    </Pressable>
+  );
+}
+
 type MediaPressableProps = PressableProps & {
   children?: ReactNode;
   style?: StyleProp<ViewStyle>;
@@ -189,7 +213,7 @@ export function AppModal({
       >
         {keyboardAvoiding ? (
           <KeyboardAvoidingView
-            behavior={Platform.OS === "ios" ? "padding" : undefined}
+            behavior={Platform.OS === "ios" ? "padding" : "height"}
             style={styles.modalKeyboardWrap}
           >
             {sheet}
@@ -316,9 +340,9 @@ export function AppBottomSheet({
             accessibilityLabel ? `${accessibilityLabel} 닫기` : "시트 닫기"
           }
         />
-        {keyboardAvoiding ? (
+        {keyboardAvoiding && Platform.OS === "ios" ? (
           <KeyboardAvoidingView
-            behavior={Platform.OS === "ios" ? "padding" : undefined}
+            behavior="padding"
             style={styles.bottomSheetKeyboardWrap}
           >
             {sheet}
@@ -648,6 +672,13 @@ const styles = StyleSheet.create({
     borderColor: colors.borderHover,
     backgroundColor: colors.surfaceAlt,
   },
+  textActionPressable: {
+    minHeight: tapMin,
+    backgroundColor: colors.transparent,
+  },
+  textActionPressed: {
+    backgroundColor: colors.accentTintedBg,
+  },
   modalBackdrop: {
     flex: 1,
     backgroundColor: colors.overlay,
@@ -689,6 +720,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.modalBackdrop,
   },
   bottomSheetKeyboardWrap: {
+    flex: 1,
     width: "100%",
     justifyContent: "flex-end",
   },

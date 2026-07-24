@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
+  Platform,
   RefreshControl,
   ScrollView,
   StyleSheet,
@@ -149,6 +150,9 @@ export function KordleBoard({ data }: { data: BoardDetailResponse }) {
     <ScrollView
       contentInsetAdjustmentBehavior="automatic"
       contentContainerStyle={styles.content}
+      keyboardShouldPersistTaps="handled"
+      keyboardDismissMode={Platform.OS === "ios" ? "interactive" : "on-drag"}
+      automaticallyAdjustKeyboardInsets
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => void load("refresh")} />}
     >
       <View style={styles.heading}>

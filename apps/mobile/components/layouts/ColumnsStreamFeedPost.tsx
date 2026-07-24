@@ -15,7 +15,8 @@ import {
 import { ExpandablePostContent } from "../ExpandablePostContent";
 import { EmbeddedMedia } from "../EmbeddedMedia";
 import type { BoardCard } from "../../lib/types";
-import { apiFetch } from "../../lib/api";
+import { ApiError, apiFetch, parentApiFetch } from "../../lib/api";
+import type { CommentViewer } from "../../lib/comment-audience";
 import { resolveCardAuthorName } from "../../lib/card-privacy";
 import {
   buildMediaItems,
@@ -33,6 +34,8 @@ type Props = {
   engagementMode?: StreamFeedPostEngagementMode;
   authorLabel?: string | null;
   highlighted?: boolean;
+  viewer?: CommentViewer;
+  onUnauthorized?: (error: unknown) => void | Promise<void>;
 };
 
 export function StreamFeedPost({
@@ -42,6 +45,8 @@ export function StreamFeedPost({
   engagementMode = "interactive",
   authorLabel,
   highlighted = false,
+  viewer = "student",
+  onUnauthorized,
 }: Props) {
   const author =
     authorLabel === undefined ? resolveCardAuthorName(card) : authorLabel;
@@ -67,7 +72,8 @@ export function StreamFeedPost({
 
     if (engagementMode !== "interactive") return undefined;
 
-    void apiFetch<{ likeCount: number; isLiked: boolean }>(
+    const request = viewer === "parent" ? parentApiFetch : apiFetch;
+    void request<{ likeCount: number; isLiked: boolean }>(
       `/api/cards/${encodeURIComponent(card.id)}/engagement`,
     )
       .then((engagement) => {
@@ -75,12 +81,16 @@ export function StreamFeedPost({
         setLikeCount(Math.max(0, engagement.likeCount));
         setLiked(engagement.isLiked);
       })
-      .catch(() => undefined);
+      .catch((error) => {
+        if (error instanceof ApiError && error.status === 401) {
+          void onUnauthorized?.(error);
+        }
+      });
 
     return () => {
       cancelled = true;
     };
-  }, [card.id, card.likeCount, engagementMode]);
+  }, [card.id, card.likeCount, engagementMode, onUnauthorized, viewer]);
 
   useEffect(() => {
     setMediaIndex(0);
@@ -94,15 +104,19 @@ export function StreamFeedPost({
     setLikeCount((count) => Math.max(0, count + (nextLiked ? 1 : -1)));
     setLikeBusy(true);
     try {
-      const response = await apiFetch<{ liked: boolean; count: number }>(
+      const request = viewer === "parent" ? parentApiFetch : apiFetch;
+      const response = await request<{ liked: boolean; count: number }>(
         `/api/cards/${encodeURIComponent(card.id)}/like`,
         { method: "POST", json: { liked: nextLiked } },
       );
       setLiked(response.liked);
       setLikeCount(Math.max(0, response.count));
-    } catch {
+    } catch (error) {
       setLiked(previous.liked);
       setLikeCount(previous.likeCount);
+      if (error instanceof ApiError && error.status === 401) {
+        await onUnauthorized?.(error);
+      }
     } finally {
       setLikeBusy(false);
     }

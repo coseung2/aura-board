@@ -42,6 +42,7 @@ describe("applyCardLikeMutation", () => {
           likerKind: "teacher",
           likerUserId: "user-1",
           likerStudentId: null,
+          likerParentId: null,
           externalLikerKey: null,
         },
         skipDuplicates: true,
@@ -64,6 +65,29 @@ describe("applyCardLikeMutation", () => {
           likerKind: "student",
           likerUserId: null,
           likerStudentId: "student-1",
+          likerParentId: null,
+          externalLikerKey: null,
+        },
+        skipDuplicates: true,
+      },
+    ]);
+  });
+
+  it("stores a parent like under its dedicated idempotency key", async () => {
+    const fake = createDelegate({});
+
+    await expect(
+      applyCardLikeMutation(fake.delegate, "card-1", { kind: "parent", id: "parent-1" }, true),
+    ).resolves.toBe(true);
+
+    expect(fake.createManyArgs).toEqual([
+      {
+        data: {
+          cardId: "card-1",
+          likerKind: "external",
+          likerUserId: null,
+          likerStudentId: null,
+          likerParentId: "parent-1",
           externalLikerKey: null,
         },
         skipDuplicates: true,

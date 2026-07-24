@@ -52,18 +52,28 @@ export function ColumnsBoard({
   onMutate,
   writableSectionIds,
   onSectionTitleChange,
+  selectedSectionKey: selectedSectionKeyProp,
+  onSelectedSectionKeyChange,
 }: {
   data: BoardDetailResponse;
   onMutate: () => void;
   writableSectionIds?: string[];
   onSectionTitleChange?: (title: string | null) => void;
+  selectedSectionKey?: string | null;
+  onSelectedSectionKeyChange?: (key: string | null) => void;
 }) {
   const [cards, setCards] = useState<BoardCard[]>(() =>
     withBoardAnonymousAuthors(data.cards, data.board),
   );
-  const [selectedSectionKey, setSelectedSectionKey] = useState<string | null>(
-    null,
-  );
+  const [uncontrolledSectionKey, setUncontrolledSectionKey] = useState<
+    string | null
+  >(null);
+  const selectedSectionKey =
+    selectedSectionKeyProp === undefined
+      ? uncontrolledSectionKey
+      : selectedSectionKeyProp;
+  const setSelectedSectionKey =
+    onSelectedSectionKeyChange ?? setUncontrolledSectionKey;
   const [composerSectionId, setComposerSectionId] = useState<string | null>(
     null,
   );
@@ -109,6 +119,7 @@ export function ColumnsBoard({
   useEffect(() => {
     onSectionTitleChange?.(selectedSummary?.title ?? null);
   }, [onSectionTitleChange, selectedSummary?.title]);
+
   const visibleSummaries = useMemo(
     () =>
       summaries.filter((summary) => {

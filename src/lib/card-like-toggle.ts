@@ -3,6 +3,7 @@ import type { Prisma } from "@prisma/client";
 export type CardLikeActor =
   | { kind: "teacher"; id: string }
   | { kind: "student"; id: string }
+  | { kind: "parent"; id: string }
   | { kind: "external"; id: string };
 
 type CardLikeDelegate = {
@@ -26,6 +27,9 @@ function cardLikeWhere(cardId: string, actor: CardLikeActor): Prisma.CardLikeWhe
   if (actor.kind === "student") {
     return { cardId, likerStudentId: actor.id };
   }
+  if (actor.kind === "parent") {
+    return { cardId, likerParentId: actor.id };
+  }
   return { cardId, externalLikerKey: actor.id };
 }
 
@@ -39,6 +43,7 @@ function cardLikeCreateData(
       likerKind: "teacher",
       likerUserId: actor.id,
       likerStudentId: null,
+      likerParentId: null,
       externalLikerKey: null,
     };
   }
@@ -48,6 +53,17 @@ function cardLikeCreateData(
       likerKind: "student",
       likerUserId: null,
       likerStudentId: actor.id,
+      likerParentId: null,
+      externalLikerKey: null,
+    };
+  }
+  if (actor.kind === "parent") {
+    return {
+      cardId,
+      likerKind: "external",
+      likerUserId: null,
+      likerStudentId: null,
+      likerParentId: actor.id,
       externalLikerKey: null,
     };
   }
@@ -56,6 +72,7 @@ function cardLikeCreateData(
     likerKind: "external",
     likerUserId: null,
     likerStudentId: null,
+    likerParentId: null,
     externalLikerKey: actor.id,
   };
 }

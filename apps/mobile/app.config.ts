@@ -29,6 +29,7 @@ const config: ExpoConfig = {
   android: {
     edgeToEdgeEnabled: true,
     predictiveBackGestureEnabled: false,
+    softwareKeyboardLayoutMode: "resize",
     package: "com.auraboard.app",
     versionCode: 10,
   },

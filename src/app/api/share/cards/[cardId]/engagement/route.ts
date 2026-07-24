@@ -38,7 +38,7 @@ export async function GET(
 
   const [likeCount, commentCount, myLike] = await Promise.all([
     db.cardLike.count({ where: { cardId } }),
-    db.cardComment.count({ where: { cardId, deletedAt: null } }),
+    db.cardComment.count({ where: { cardId, audience: "public", deletedAt: null } }),
     guestId
       ? db.cardLike.findUnique({
           where: { cardId_externalLikerKey: { cardId, externalLikerKey: guestId } },

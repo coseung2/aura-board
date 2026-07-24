@@ -224,15 +224,9 @@ export default function ParentHomeScreen() {
               }
             />
           ) : (
-            <ControlPressable
-              style={styles.textFeedItem}
-              onPress={() =>
-                router.push({ pathname: "/(parent)", params: { post: item.id } })
-              }
-              accessibilityLabel={`${item.title.trim() || "텍스트 게시물"} 피드에서 보기`}
-            >
+            <View style={styles.textFeedItem}>
               <ParentFeedCard card={item} childName={selectedChild?.name} />
-            </ControlPressable>
+            </View>
           )
         }
         columnWrapperStyle={kind === "media" ? styles.gridRow : undefined}

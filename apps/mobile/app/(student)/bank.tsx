@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
+  Platform,
   ScrollView,
   StyleSheet,
   Text,
@@ -149,7 +150,12 @@ export default function StudentBankScreen() {
           <AppButton onPress={load}>다시 시도</AppButton>
         </View>
       ) : data ? (
-        <ScrollView contentContainerStyle={styles.content}>
+        <ScrollView
+          contentContainerStyle={styles.content}
+          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode={Platform.OS === "ios" ? "interactive" : "on-drag"}
+          automaticallyAdjustKeyboardInsets
+        >
           <View style={styles.metricsSection}>
             <SectionHeader title="은행 현황" />
             <View style={styles.metricsList}>

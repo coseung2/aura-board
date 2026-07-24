@@ -1,6 +1,6 @@
 import * as SecureStore from "expo-secure-store";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { AppState, ScrollView, StyleSheet, Text, View } from "react-native";
+import { AppState, Platform, ScrollView, StyleSheet, Text, View } from "react-native";
 import { createClient, type RealtimeChannel } from "@supabase/supabase-js";
 import { apiFetch } from "../../lib/api";
 import type { BoardDetailResponse } from "../../lib/types";
@@ -41,7 +41,9 @@ export function ShadowAllianceBoard({ data }: { data: BoardDetailResponse }) {
   } | null>(envUrl && envKey ? { url: envUrl, key: envKey } : null);
   const url = realtimeConfig?.url;
   const key = realtimeConfig?.key;
-  const storageKey = `shadow-alliance:player:${data.board.id}`;
+  // Android SecureStore keys allow only alphanumeric characters plus
+  // `.`, `-`, and `_`; a colon causes the board to throw during mount.
+  const storageKey = `shadow-alliance.player.${data.board.id}`;
   const channelRef = useRef<RealtimeChannel | null>(null);
   const playerIdRef = useRef<string | null>(null);
   const requestRef = useRef<string | null>(null);
@@ -187,7 +189,13 @@ export function ShadowAllianceBoard({ data }: { data: BoardDetailResponse }) {
   const result = snapshot.lastResult;
   const gain = result?.gains[player.id] ?? 0;
   return (
-    <ScrollView contentInsetAdjustmentBehavior="automatic" contentContainerStyle={styles.content}>
+    <ScrollView
+      contentInsetAdjustmentBehavior="automatic"
+      contentContainerStyle={styles.content}
+      keyboardShouldPersistTaps="handled"
+      keyboardDismissMode={Platform.OS === "ios" ? "interactive" : "on-drag"}
+      automaticallyAdjustKeyboardInsets
+    >
       <SurfaceCard style={styles.agentCard}>
         <View style={[styles.teamDot, player.team === "black" ? styles.black : styles.white]} />
         <View style={styles.agentText}>
