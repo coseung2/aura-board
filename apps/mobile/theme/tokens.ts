@@ -479,6 +479,10 @@ export const walking = {
   chartDayLabelWidth: 72,
   chartStepLabelWidth: 76,
   summaryCardMinWidth: 140,
+  missionCellMinHeight: 72,
+  milestoneBackground: "#dfff45",
+  milestoneBorder: "#a7c900",
+  milestoneText: "#18313f",
 } as const;
 
 export const store = {

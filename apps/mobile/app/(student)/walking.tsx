@@ -28,6 +28,7 @@ import {
   markWalkingAttendance,
   requestHealthConnectPermissions,
   type WalkingDay,
+  type ClassroomWalkingRank,
   type WalkingMonthlyAttendanceReward,
   type WalkingPolicy,
   type WalkingWeeklyStepRewards,
@@ -56,9 +57,9 @@ import {
   SectionHeader,
 } from "../../components/ui";
 import {
-  SemanticNav,
-  SemanticNavItem,
-} from "../../components/SemanticNavigation";
+  ContentTab,
+  ContentTabs,
+} from "../../components/NavigationTabs";
 import { StudentHeaderActions } from "../../components/StudentHeaderActions";
 import { WalkingAttendanceCalendar } from "../../components/walking-attendance-calendar";
 
@@ -75,10 +76,6 @@ function dayLabel(day: string, today: string) {
     timeZone: "Asia/Seoul",
   }).format(new Date(Date.UTC(year, month - 1, date, 12)));
   return `${month}월 ${date}일(${weekday})`;
-}
-
-function weekRangeLabel(weekStart: string, weekEnd: string) {
-  return `${dayLabel(weekStart, "")}–${dayLabel(weekEnd, "")}`;
 }
 
 function localizedWalkingError(nextError: unknown, fallback: string) {
@@ -105,6 +102,7 @@ export default function StudentWalkingScreen() {
     useState<WalkingMonthlyAttendanceReward | null>(null);
   const [weeklyStepRewards, setWeeklyStepRewards] =
     useState<WalkingWeeklyStepRewards | null>(null);
+  const [classroomTopFive, setClassroomTopFive] = useState<ClassroomWalkingRank[]>([]);
   const [status, setStatus] = useState<HealthConnectStatus>("unavailable");
   const [permissions, setPermissions] = useState<HealthConnectPermission[]>([]);
   const [loading, setLoading] = useState(true);
@@ -134,6 +132,7 @@ export default function StudentWalkingScreen() {
     setPolicy(snapshot.policy);
     setMonthlyAttendanceReward(snapshot.monthlyAttendanceReward);
     setWeeklyStepRewards(snapshot.weeklyStepRewards);
+    setClassroomTopFive(snapshot.classroomTopFive);
   }, []);
 
   const load = useCallback(async (syncNative = false, refresh = false) => {
@@ -145,9 +144,10 @@ export default function StudentWalkingScreen() {
     try {
       const cloudSnapshot = await fetchWalkingSnapshot();
       setRows(cloudSnapshot.rows);
-      setPolicy(cloudSnapshot.policy);
-      setMonthlyAttendanceReward(cloudSnapshot.monthlyAttendanceReward);
-      setWeeklyStepRewards(cloudSnapshot.weeklyStepRewards);
+        setPolicy(cloudSnapshot.policy);
+        setMonthlyAttendanceReward(cloudSnapshot.monthlyAttendanceReward);
+        setWeeklyStepRewards(cloudSnapshot.weeklyStepRewards);
+        setClassroomTopFive(cloudSnapshot.classroomTopFive);
 
       if (!isHealthConnectModuleAvailable()) {
         setStatus("unavailable");
@@ -363,28 +363,27 @@ export default function StudentWalkingScreen() {
             <Settings size={iconSizes.sm} color={colors.textMuted} accessible={false} />
           </ControlPressable>
         </View>
-        <SemanticNav
-          variant="standalone"
+        <ContentTabs
           accessibilityLabel="걷기 활동 보기"
           style={styles.viewNav}
         >
-          <SemanticNavItem
+          <ContentTab
             style={styles.viewNavItem}
             selected={activeView === "record"}
             onPress={() => setActiveView("record")}
             accessibilityLabel="걷기 기록 보기"
           >
             걷기 기록
-          </SemanticNavItem>
-          <SemanticNavItem
+          </ContentTab>
+          <ContentTab
             style={styles.viewNavItem}
             selected={activeView === "missions"}
             onPress={() => setActiveView("missions")}
             accessibilityLabel="걷기 미션 보기"
           >
             미션
-          </SemanticNavItem>
-        </SemanticNav>
+          </ContentTab>
+        </ContentTabs>
 
         {status === "needs_update" ? (
           <AppButton loading={busy === "settings"} onPress={() => void openSettings()}>
@@ -451,11 +450,8 @@ export default function StudentWalkingScreen() {
               <SectionHeader title="요약" />
               <View style={styles.summaryRows}>
                 <SummaryRow label="오늘" value={`${numberFormatter.format(today.steps)}걸음`} />
-                <SummaryRow
-                  label={`이번 주 · ${weekRangeLabel(weekRange.weekStart, weekRange.weekEnd)}`}
-                  value={`${numberFormatter.format(totalSteps)}걸음`}
-                />
-                <SummaryRow label="하루 평균" value={`${numberFormatter.format(averageSteps)}걸음`} last />
+                <SummaryRow label="주간" value={`${numberFormatter.format(totalSteps)}걸음`} />
+                <SummaryRow label="평균" value={`${numberFormatter.format(averageSteps)}걸음`} />
               </View>
             </View>
 
@@ -473,9 +469,6 @@ export default function StudentWalkingScreen() {
                   )
                 }
               />
-              <Text style={styles.muted}>
-                {weekRangeLabel(weekRange.weekStart, weekRange.weekEnd)} · 날짜별 걸음 수
-              </Text>
 
               <View style={styles.chartRows}>
                 {days.map((row) => {
@@ -508,6 +501,10 @@ export default function StudentWalkingScreen() {
                 })}
               </View>
             </View>
+
+            {classroomTopFive.length > 0 ? (
+              <ClassroomTopFive ranks={classroomTopFive} />
+            ) : null}
           </>
         ) : null}
           </>
@@ -563,16 +560,50 @@ export default function StudentWalkingScreen() {
 function SummaryRow({
   label,
   value,
-  last = false,
 }: {
   label: string;
   value: string;
-  last?: boolean;
 }) {
   return (
-    <View style={[styles.summaryRow, last && styles.summaryRowLast]}>
+    <View style={styles.summaryRow} accessible accessibilityRole="text" accessibilityLabel={`${label} ${value}`}>
       <Text style={styles.summaryLabel}>{label}</Text>
       <Text style={styles.summaryValue}>{value}</Text>
+    </View>
+  );
+}
+
+function ClassroomTopFive({ ranks }: { ranks: ClassroomWalkingRank[] }) {
+  return (
+    <View style={styles.classroomTopFiveSection} accessibilityRole="summary">
+      <SectionHeader
+        title="우리 반 Top 5"
+        right={<Text style={styles.classroomTopFivePeriod}>이번 주</Text>}
+      />
+      <View accessibilityRole="list">
+        {ranks.map((rank, index) => {
+          return (
+            <View
+              key={rank.studentId}
+              style={[
+                styles.classroomTopFiveRow,
+                rank.isCurrent && styles.classroomTopFiveCurrentRow,
+              ]}
+              accessibilityRole="text"
+              accessibilityLabel={`${index + 1}위 ${rank.studentName}, ${numberFormatter.format(rank.weeklySteps)}걸음${
+                rank.isCurrent ? ", 나" : ""
+              }`}
+            >
+              <Text style={styles.classroomTopFiveRank}>{index + 1}</Text>
+              <Text style={styles.classroomTopFiveName} numberOfLines={1}>
+                {rank.studentName}
+              </Text>
+              <Text style={styles.classroomTopFiveSteps}>
+                {numberFormatter.format(rank.weeklySteps)}걸음
+              </Text>
+            </View>
+          );
+        })}
+      </View>
     </View>
   );
 }
@@ -593,10 +624,6 @@ function WalkingWeeklyRewardProgress({
     ...rewards.tiers.map((tier) => tier.steps),
   );
   const progress = Math.min(rewards.totalSteps / graphMaxSteps, 1);
-  const totalReward = rewards.tiers.reduce((sum, tier) => sum + tier.amount, 0);
-  const claimedTotal = rewards.tiers
-    .filter((tier) => tier.claimed)
-    .reduce((sum, tier) => sum + tier.amount, 0);
 
   async function claimTier(tierKey: string) {
     const tier = rewards.tiers.find((candidate) => candidate.key === tierKey);
@@ -624,13 +651,8 @@ function WalkingWeeklyRewardProgress({
   }
 
   return (
-    <View style={styles.weeklyRewardBlock}>
-      <View style={styles.weeklyRewardHeader}>
-        <Text style={styles.weeklyRewardTitle}>주간미션</Text>
-        <Text style={styles.weeklyRewardAmount}>
-          달성 보상 {numberFormatter.format(claimedTotal)}원 / {numberFormatter.format(totalReward)}원
-        </Text>
-      </View>
+    <View style={styles.missionBlock}>
+      <Text style={styles.missionTitle}>주간미션</Text>
       <View style={styles.missionProgressLabels}>
         <Text style={styles.missionProgressText}>
           {numberFormatter.format(rewards.totalSteps)} / {numberFormatter.format(graphMaxSteps)}걸음
@@ -644,9 +666,9 @@ function WalkingWeeklyRewardProgress({
         accessibilityRole="progressbar"
         accessibilityLabel={`이번 주 ${numberFormatter.format(rewards.totalSteps)}걸음, 목표 ${numberFormatter.format(graphMaxSteps)}걸음`}
         accessibilityValue={{ min: 0, max: graphMaxSteps, now: rewards.totalSteps }}
-        style={styles.weeklyRewardTrack}
+        style={styles.missionTrack}
       >
-        <View style={[styles.weeklyRewardFill, { width: `${progress * 100}%` }]} />
+        <View style={[styles.missionFill, { width: `${progress * 100}%` }]} />
       </View>
       <View style={styles.dailyMilestones}>
         {rewards.tiers.map((tier) => {
@@ -658,10 +680,7 @@ function WalkingWeeklyRewardProgress({
                 ? "받기"
                 : "잠김";
           return (
-            <View
-              key={tier.key}
-              style={styles.dailyMilestone}
-            >
+            <View key={tier.key} style={styles.dailyMilestone}>
               <View style={styles.dailyMilestoneDot} />
               <Text style={styles.dailyMilestoneSteps}>
                 {numberFormatter.format(tier.steps)}걸음
@@ -672,7 +691,14 @@ function WalkingWeeklyRewardProgress({
                 accessibilityLabel={`${numberFormatter.format(tier.steps)}걸음 보상 ${numberFormatter.format(tier.amount)}원, ${state}`}
                 style={styles.weeklyRewardClaim}
               >
-                <Text style={styles.dailyMilestoneAmount}>
+                <Text
+                  style={[
+                    styles.dailyMilestoneAmount,
+                    tier.achieved
+                      ? styles.dailyMilestoneAmountAchieved
+                      : styles.dailyMilestoneAmountPending,
+                  ]}
+                >
                   {numberFormatter.format(tier.amount)}원
                 </Text>
               </ControlPressable>
@@ -729,12 +755,7 @@ function WalkingMissionPanel({
       ) : null}
 
       <View style={styles.missionBlock}>
-        <View style={styles.missionHeader}>
-          <Text style={styles.missionTitle}>일간미션</Text>
-          <Text style={styles.missionStatus}>
-            {todaySteps >= dailyMaxSteps ? "달성" : "진행 중"}
-          </Text>
-        </View>
+        <Text style={styles.missionTitle}>일간미션</Text>
         <View style={styles.missionProgressLabels}>
           <Text style={styles.missionProgressText}>
             {numberFormatter.format(todaySteps)} / {numberFormatter.format(dailyMaxSteps)}걸음
@@ -757,17 +778,27 @@ function WalkingMissionPanel({
           <View style={[styles.missionFill, { width: `${dailyProgress * 100}%` }]} />
         </View>
         <View style={styles.dailyMilestones}>
-          {dailyMilestones.map((milestone) => (
-            <View key={milestone.steps} style={styles.dailyMilestone}>
-              <View style={styles.dailyMilestoneDot} />
-              <Text style={styles.dailyMilestoneSteps}>
-                {numberFormatter.format(milestone.steps)}걸음
-              </Text>
-              <Text style={styles.dailyMilestoneAmount}>
-                {numberFormatter.format(milestone.amount)}원
-              </Text>
-            </View>
-          ))}
+          {dailyMilestones.map((milestone) => {
+            const achieved = todaySteps >= milestone.steps;
+            return (
+              <View key={milestone.steps} style={styles.dailyMilestone}>
+                <View style={styles.dailyMilestoneDot} />
+                <Text style={styles.dailyMilestoneSteps}>
+                  {numberFormatter.format(milestone.steps)}걸음
+                </Text>
+                <Text
+                  style={[
+                    styles.dailyMilestoneAmount,
+                    achieved
+                      ? styles.dailyMilestoneAmountAchieved
+                      : styles.dailyMilestoneAmountPending,
+                  ]}
+                >
+                  {numberFormatter.format(milestone.amount)}원
+                </Text>
+              </View>
+            );
+          })}
         </View>
       </View>
 
@@ -849,59 +880,54 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.xl,
   },
   summarySection: { gap: spacing.sm },
-  summaryRows: { gap: spacing.md },
+  summaryRows: {
+    flexDirection: "row",
+    alignItems: "stretch",
+    gap: spacing.sm,
+  },
   summaryRow: {
+    flex: 1,
+    minHeight: tapMin,
+    alignItems: "center",
+    justifyContent: "center",
+    gap: spacing.xs,
+    paddingVertical: spacing.sm,
+  },
+  summaryLabel: { ...typography.label, color: colors.textMuted, textAlign: "center" },
+  summaryValue: { ...typography.section, color: colors.text, textAlign: "center" },
+  classroomTopFiveSection: { gap: spacing.sm },
+  classroomTopFivePeriod: { ...typography.label, color: colors.textMuted },
+  classroomTopFiveRow: {
     minHeight: tapMin,
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
-    gap: spacing.md,
-    paddingVertical: spacing.sm,
+    gap: spacing.sm,
+    paddingHorizontal: spacing.sm,
+    borderBottomWidth: borders.hairline,
+    borderBottomColor: colors.border,
   },
-  summaryRowLast: {},
-  summaryLabel: { ...typography.label, color: colors.textMuted, flex: 1 },
-  summaryValue: { ...typography.section, color: colors.text, flexShrink: 0 },
-  weeklyRewardBlock: {
-    gap: spacing.md,
-    marginTop: spacing.sm,
+  classroomTopFiveCurrentRow: { backgroundColor: colors.accentTintedBg },
+  classroomTopFiveRank: {
+    width: spacing.xl,
+    ...typography.section,
+    color: colors.accentTintedText,
+    textAlign: "center",
   },
-  weeklyRewardHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "flex-start",
-    gap: spacing.md,
-  },
-  weeklyRewardTitle: { ...typography.section, color: colors.text },
-  weeklyRewardAmount: { ...typography.label, color: colors.accentTintedText },
-  weeklyRewardTrack: {
-    height: walking.chartBarHeight,
-    backgroundColor: colors.accentTintedBg,
-    overflow: "hidden",
-  },
-  weeklyRewardFill: { height: "100%", backgroundColor: colors.accent },
+  classroomTopFiveName: { ...typography.body, color: colors.text, flex: 1 },
+  classroomTopFiveSteps: { ...typography.label, color: colors.textMuted },
   weeklyRewardClaim: { alignItems: "center", gap: spacing.xs },
   chartSection: {
     gap: spacing.lg,
   },
   missionSection: {
-    gap: spacing.md,
+    gap: spacing.xxl,
   },
   missionBlock: {
     gap: spacing.sm,
   },
-  missionHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: spacing.md,
-  },
   missionTitle: {
     ...typography.section,
     color: colors.text,
-  },
-  missionStatus: {
-    ...typography.label,
-    color: colors.accentTintedText,
   },
   missionProgressLabels: {
     flexDirection: "row",
@@ -946,8 +972,13 @@ const styles = StyleSheet.create({
   },
   dailyMilestoneAmount: {
     ...typography.label,
-    color: colors.text,
     textAlign: "center",
+  },
+  dailyMilestoneAmountAchieved: {
+    color: colors.text,
+  },
+  dailyMilestoneAmountPending: {
+    color: colors.textMuted,
   },
   chartRows: { gap: spacing.md },
   chartRow: { flexDirection: "row", alignItems: "center", gap: spacing.sm },

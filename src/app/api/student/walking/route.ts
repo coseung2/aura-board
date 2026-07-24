@@ -159,6 +159,13 @@ type WeeklyStepRewards = {
   tiers: WeeklyStepReward[];
 };
 
+type ClassroomWalkingRank = {
+  studentId: string;
+  studentNumber: number | null;
+  studentName: string;
+  weeklySteps: number | bigint;
+};
+
 function parseReadWindow(
   request: NextRequest,
   now = new Date(),
@@ -453,6 +460,44 @@ async function readWeeklyStepRewards(
   };
 }
 
+async function readClassroomTopFive(
+  classroomId: string,
+  range: WalkingResponseRange,
+  currentStudentId: string,
+) {
+  const ranks = await db.$queryRaw<ClassroomWalkingRank[]>(Prisma.sql`
+    SELECT
+      student."id" AS "studentId",
+      student."number" AS "studentNumber",
+      student."name" AS "studentName",
+      COALESCE(SUM(walking."steps"), 0)::bigint AS "weeklySteps"
+    FROM "Student" student
+    LEFT JOIN "StudentWalkingDailyStat" walking
+      ON walking."studentId" = student."id"
+      AND walking."day" >= ${range.weekStart}::date
+      AND walking."day" < ${range.weekEnd}::date
+    WHERE student."classroomId" = ${classroomId}
+    GROUP BY student."id", student."number", student."name"
+    ORDER BY "weeklySteps" DESC, student."number" ASC NULLS LAST, student."name" ASC
+    LIMIT 5
+  `);
+
+  return ranks
+    .filter(
+      (rank) =>
+        typeof rank.studentId === "string" &&
+        typeof rank.studentName === "string" &&
+        (typeof rank.weeklySteps === "number" || typeof rank.weeklySteps === "bigint"),
+    )
+    .map((rank) => ({
+      studentId: rank.studentId,
+      studentNumber: Number.isInteger(rank.studentNumber) ? rank.studentNumber : null,
+      studentName: rank.studentName,
+      weeklySteps: Number(rank.weeklySteps) || 0,
+      isCurrent: rank.studentId === currentStudentId,
+    }));
+}
+
 export async function GET(request: NextRequest) {
   try {
     const student = await getCurrentStudent();
@@ -486,6 +531,11 @@ export async function GET(request: NextRequest) {
       monthRange,
       monthRows,
     );
+    const classroomTopFive = await readClassroomTopFive(
+      student.classroomId,
+      readRange.range,
+      student.id,
+    );
     const syncedDays = rows
       .filter((row) => row.syncedAt != null)
       .map((row) => row.day);
@@ -508,6 +558,7 @@ export async function GET(request: NextRequest) {
       },
       monthlyAttendanceReward,
       weeklyStepRewards,
+      classroomTopFive,
     });
   } catch (error) {
     console.error("[GET /api/student/walking]", error);

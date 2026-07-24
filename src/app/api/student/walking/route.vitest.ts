@@ -66,6 +66,46 @@ describe("GET /api/student/walking fixed KST week", () => {
     });
   });
 
+  it("includes the current classroom's weekly Top 5 and marks the current student", async () => {
+    mocks.queryRaw
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([
+        {
+          studentId: "student-2",
+          studentNumber: 4,
+          studentName: "김하늘",
+          weeklySteps: BigInt(21_680),
+        },
+        {
+          studentId: "student-1",
+          studentNumber: 25,
+          studentName: "테스트",
+          weeklySteps: BigInt(5_780),
+        },
+      ]);
+
+    const response = await GET(new NextRequest("http://localhost/api/student/walking"));
+    const body = await response.json();
+
+    expect(body.classroomTopFive).toEqual([
+      {
+        studentId: "student-2",
+        studentNumber: 4,
+        studentName: "김하늘",
+        weeklySteps: 21_680,
+        isCurrent: false,
+      },
+      {
+        studentId: "student-1",
+        studentNumber: 25,
+        studentName: "테스트",
+        weeklySteps: 5_780,
+        isCurrent: true,
+      },
+    ]);
+  });
+
   it("exposes classroom walking policy without leaking unrelated reward settings", async () => {
     mocks.rewardConfig.mockResolvedValue({
       walkingRewardStepThreshold: 6_000,

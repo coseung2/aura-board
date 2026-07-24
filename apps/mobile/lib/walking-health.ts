@@ -69,6 +69,14 @@ export type WalkingWeeklyStepRewards = {
   tiers: WalkingWeeklyStepReward[];
 };
 
+export type ClassroomWalkingRank = {
+  studentId: string;
+  studentNumber: number | null;
+  studentName: string;
+  weeklySteps: number;
+  isCurrent: boolean;
+};
+
 /**
  * Keep the mobile progress view aligned with the server's weekly reward
  * contract (`src/lib/reward-policy.ts`). The server is the source of truth
@@ -314,6 +322,7 @@ export type WalkingResponse = {
   policy: WalkingPolicy;
   monthlyAttendanceReward: WalkingMonthlyAttendanceReward;
   weeklyStepRewards: WalkingWeeklyStepRewards;
+  classroomTopFive: ClassroomWalkingRank[];
 };
 
 function safePolicyInteger(value: unknown, fallback: number, minimum = 0) {
@@ -367,6 +376,7 @@ export async function fetchWalkingSnapshot(_days?: number): Promise<WalkingRespo
     policy?: unknown;
     monthlyAttendanceReward: WalkingMonthlyAttendanceReward;
     weeklyStepRewards: WalkingWeeklyStepRewards;
+    classroomTopFive?: unknown;
   }>("/api/student/walking?week=current");
   return {
     rows: payload.rows,
@@ -374,7 +384,27 @@ export async function fetchWalkingSnapshot(_days?: number): Promise<WalkingRespo
     policy: normalizeWalkingPolicy(payload.policy),
     monthlyAttendanceReward: payload.monthlyAttendanceReward,
     weeklyStepRewards: payload.weeklyStepRewards,
+    classroomTopFive: normalizeClassroomTopFive(payload.classroomTopFive),
   };
+}
+
+function normalizeClassroomTopFive(value: unknown): ClassroomWalkingRank[] {
+  if (!Array.isArray(value)) return [];
+  return value.flatMap((entry) => {
+    if (!entry || typeof entry !== "object") return [];
+    const rank = entry as Record<string, unknown>;
+    if (typeof rank.studentId !== "string" || typeof rank.studentName !== "string") {
+      return [];
+    }
+    const weeklySteps = Number(rank.weeklySteps);
+    return [{
+      studentId: rank.studentId,
+      studentNumber: Number.isInteger(rank.studentNumber) ? Number(rank.studentNumber) : null,
+      studentName: rank.studentName,
+      weeklySteps: Number.isFinite(weeklySteps) ? Math.max(0, Math.round(weeklySteps)) : 0,
+      isCurrent: rank.isCurrent === true,
+    }];
+  });
 }
 
 export async function markWalkingAttendance(days: string[]) {
