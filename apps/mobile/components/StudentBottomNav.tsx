@@ -91,7 +91,7 @@ export function StudentBottomNav({ duties = [] }: Props) {
                 active && styles.tabActive,
               ]}
               onPress={() => {
-                if (!active) router.push(target.href as Href);
+                if (!active) router.replace(target.href as Href);
               }}
               accessibilityLabel={target.label}
               accessibilityState={{ selected: active }}

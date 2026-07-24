@@ -4,6 +4,21 @@ import { useSegments } from "expo-router";
 
 const EXIT_CONFIRMATION_WINDOW_MS = 2_000;
 const EXIT_CONFIRMATION_MESSAGE = "한 번 더 누르면 앱이 종료됩니다";
+const STUDENT_ROOT_TABS = new Set([
+  "boards",
+  "portfolio",
+  "reading",
+  "walking",
+  "more",
+  "wallet",
+  "slime",
+  "notifications",
+  "bank",
+  "pay",
+  "check",
+  "cleaning",
+  "shoes",
+]);
 
 /**
  * Handle Android's system back button for the custom bottom-navigation shell.
@@ -56,5 +71,14 @@ function isRootTabRoute(segments: readonly string[]): boolean {
   if (scope !== "(student)" && scope !== "(parent)") return false;
 
   // Login is a normal auth flow and does not render a bottom navigation bar.
-  return segments[1] !== "login" && segments.length <= 2;
+  if (segments[1] === "login") return false;
+
+  if (scope === "(parent)") {
+    return segments.length === 1 ||
+      (segments.length === 2 &&
+        (segments[1] === "home" || segments[1] === "walking"));
+  }
+
+  return segments.length === 1 ||
+    (segments.length === 2 && STUDENT_ROOT_TABS.has(segments[1] ?? ""));
 }

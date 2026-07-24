@@ -53,9 +53,9 @@ import {
   TextField,
 } from "../components/ui";
 import {
-  SemanticNav,
-  SemanticNavItem,
-} from "../components/SemanticNavigation";
+  ContentTab,
+  ContentTabs,
+} from "../components/NavigationTabs";
 import type { ParentChildrenResponse, StudentAuthResponse } from "../lib/types";
 
 // 랜딩 화면 — 학생 / 학부모 역할 선택.
@@ -356,36 +356,35 @@ export default function Landing() {
           <Text style={styles.loginBrandTitle}>Aura-board</Text>
         </View>
         <View style={styles.loginHeader}>
-          <SemanticNav
-            variant="standalone"
+          <ContentTabs
             style={styles.roleNav}
             accessibilityLabel="로그인 역할 선택"
           >
-            <SemanticNavItem
+            <ContentTab
               style={styles.roleNavItem}
               selected={activeRole === "student"}
               onPress={() => setActiveRole("student")}
               accessibilityLabel="학생 로그인"
             >
               학생
-            </SemanticNavItem>
-            <SemanticNavItem
+            </ContentTab>
+            <ContentTab
               style={styles.roleNavItem}
               selected={activeRole === "parent"}
               onPress={() => setActiveRole("parent")}
               accessibilityLabel="학부모 로그인"
             >
               학부모
-            </SemanticNavItem>
-            <SemanticNavItem
+            </ContentTab>
+            <ContentTab
               style={styles.roleNavItem}
               selected={activeRole === "review"}
               onPress={() => setActiveRole("review")}
               accessibilityLabel="심사용 학부모 로그인"
             >
               심사용
-            </SemanticNavItem>
-          </SemanticNav>
+            </ContentTab>
+          </ContentTabs>
         </View>
         <View
           style={[

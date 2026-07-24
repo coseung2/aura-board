@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import {
   ActivityIndicator,
+  BackHandler,
   RefreshControl,
   ScrollView,
   StyleSheet,
@@ -41,6 +42,22 @@ export default function StudentNotificationsScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [markingAll, setMarkingAll] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const handleBack = useCallback(() => {
+    if (router.canGoBack()) router.back();
+    else router.replace("/(student)");
+  }, [router]);
+
+  useEffect(() => {
+    const subscription = BackHandler.addEventListener(
+      "hardwareBackPress",
+      () => {
+        handleBack();
+        return true;
+      },
+    );
+    return () => subscription.remove();
+  }, [handleBack]);
 
   const load = useCallback(async (refresh = false) => {
     if (refresh) setRefreshing(true);
@@ -98,7 +115,7 @@ export default function StudentNotificationsScreen() {
 
   return (
     <SafeAreaView style={styles.container} edges={["top"]}>
-      <AppHeader title="알림" onBack={() => router.back()} />
+      <AppHeader title="알림" onBack={handleBack} />
       {loading ? (
         <View style={styles.center}><ActivityIndicator color={colors.accent} /></View>
       ) : error ? (
