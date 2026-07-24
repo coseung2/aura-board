@@ -16,7 +16,10 @@ import { resolveCanvaEmbedUrlCached } from "@/lib/canva-preview-cache";
 import { isAllowedFileUrl, isAllowedStoredMime, MAX_ATTACHMENTS_PER_CARD } from "@/lib/file-attachment";
 import { touchBoardUpdatedAt } from "@/lib/board-touch";
 import { announceCardChange, announcePollChange } from "@/lib/realtime-broadcast";
-import { resizeRemoteImageToWebPPreviewUrl } from "@/lib/blob";
+import {
+  extractVideoThumbnail,
+  resizeRemoteImageToWebPPreviewUrl,
+} from "@/lib/blob";
 import { enqueueBlobDeletion } from "@/lib/blob-cleanup";
 import {
   normalizeCommentVoteOptionCount,
@@ -325,6 +328,17 @@ export async function PATCH(
                 ...a,
                 url: attachmentUrl,
                 previewUrl,
+              };
+            }
+            if (a.kind === "video") {
+              return {
+                ...a,
+                previewUrl:
+                  a.previewUrl ??
+                  (await extractVideoThumbnail(
+                    a.url,
+                    `uploads/previews/cards/${card.boardId}/${Date.now()}-${idx}.webp`,
+                  )),
               };
             }
             return {

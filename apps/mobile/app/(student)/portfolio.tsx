@@ -19,6 +19,7 @@ import {
   typography,
 } from "../../theme/tokens";
 import { apiFetch, ApiError, getApiBase } from "../../lib/api";
+import { getPortfolioCardThumbnailUrl } from "../../lib/portfolio-card";
 import { clearSessionToken, getUnifiedLoginRoute } from "../../lib/session";
 import { AppHeader, SurfaceCard } from "../../components/ui";
 import { StudentHeaderActions } from "../../components/StudentHeaderActions";
@@ -178,7 +179,10 @@ function toBoardCard(
     title: card.title,
     content: card.content,
     color: card.color,
-    imageUrl: getCardPreviewImage(card),
+    imageUrl: getPortfolioCardThumbnailUrl(card, {
+      includeVideoPoster: false,
+      resolveExternal: true,
+    }),
     linkUrl: card.linkUrl,
     linkTitle: card.linkTitle,
     linkDesc: card.linkDesc,
@@ -227,17 +231,6 @@ function toBoardCard(
     studentAuthorName: authorName,
     anonymousAuthor: card.sourceBoard.anonymousAuthor,
   };
-}
-
-function getCardPreviewImage(card: PortfolioCardDTO): string | null {
-  if (card.thumbUrl) return resolvePortfolioAssetUrl(card.thumbUrl);
-  if (card.imageUrl) return resolvePortfolioAssetUrl(card.imageUrl);
-  if (card.linkImage) return resolvePortfolioAssetUrl(card.linkImage);
-  const imageAttachment = card.attachments?.find(
-    (a) => a.kind === "image" && (a.previewUrl || a.url),
-  );
-  const image = imageAttachment?.previewUrl ?? imageAttachment?.url ?? null;
-  return image ? resolvePortfolioAssetUrl(image) : null;
 }
 
 function resolvePortfolioAssetUrl(value: string): string {

@@ -13,6 +13,7 @@ import {
   typography,
 } from "../theme/tokens";
 import type { PortfolioCardDTO, ShowcaseEntryDTO } from "../lib/types";
+import { getPortfolioCardThumbnailUrl } from "../lib/portfolio-card";
 import { Pill, SurfaceCard, SurfacePressable } from "./ui";
 
 type Props = {
@@ -103,13 +104,7 @@ function ShowcasePreview({ entry }: { entry: ShowcaseEntryDTO }) {
 }
 
 function getCardPreviewImage(card: PortfolioCardDTO): string | null {
-  if (card.thumbUrl) return card.thumbUrl;
-  if (card.imageUrl) return card.imageUrl;
-  if (card.linkImage) return card.linkImage;
-  const imageAttachment = card.attachments?.find(
-    (a) => a.kind === "image" && (a.previewUrl || a.url),
-  );
-  return imageAttachment?.previewUrl ?? imageAttachment?.url ?? null;
+  return getPortfolioCardThumbnailUrl(card);
 }
 
 function formatShortDate(value: string): string {

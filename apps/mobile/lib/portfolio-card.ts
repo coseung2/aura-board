@@ -1,4 +1,5 @@
 import { getApiBase } from "./api";
+import { getYouTubeThumbnailUrlFromLink } from "./media";
 import type {
   BoardCard,
   CardAttachment,
@@ -68,6 +69,52 @@ export function resolvePortfolioPreviewUrl(
   }
 
   return resourceUrl;
+}
+
+/** Pick the best still image for compact portfolio/showcase thumbnails. */
+export function getPortfolioCardThumbnailUrl(
+  card: PortfolioCardDTO,
+  options: {
+    includeVideoPoster?: boolean;
+    resolveExternal?: boolean;
+  } = {},
+): string | null {
+  const imageAttachment = card.attachments.find(
+    (attachment) =>
+      attachment.kind === "image" &&
+      Boolean(attachment.previewUrl || attachment.url),
+  );
+  const linkAttachment = card.attachments.find(
+    (attachment) => attachment.kind === "link" && Boolean(attachment.previewUrl),
+  );
+  const videoAttachment = card.attachments.find(
+    (attachment) => attachment.kind === "video" && Boolean(attachment.previewUrl),
+  );
+  const youTubeThumbnail = getYouTubeThumbnailUrlFromLink(
+    card.videoUrl ?? card.linkUrl,
+  );
+  const primaryThumbnailUrl =
+    card.thumbUrl ??
+      card.imageUrl ??
+      card.linkImage ??
+      imageAttachment?.previewUrl ??
+      imageAttachment?.url ??
+      linkAttachment?.previewUrl ??
+      null;
+
+  if (primaryThumbnailUrl) {
+    return options.resolveExternal
+      ? resolvePortfolioPreviewUrl(primaryThumbnailUrl)
+      : primaryThumbnailUrl;
+  }
+  if (options.includeVideoPoster === false) return null;
+
+  // Android image loaders are less consistent with remote video posters and
+  // YouTube CDN images. Proxy only this fallback; Canva/link previews that
+  // already render correctly must keep their original URL.
+  return resolvePortfolioPreviewUrl(
+    videoAttachment?.previewUrl ?? youTubeThumbnail,
+  );
 }
 
 /** Convert student/parent portfolio DTOs into the shared student feed contract. */
