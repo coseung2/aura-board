@@ -149,7 +149,6 @@ export default function RootLayout() {
 
   const stack = (
     <Stack
-      initialRouteName="welcome"
       screenOptions={{
         headerShown: false,
         contentStyle: { backgroundColor: colors.bg },

@@ -8,7 +8,7 @@ import {
   Text,
   View,
 } from "react-native";
-import { useRouter, useSegments } from "expo-router";
+import { useRouter } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import { colors, typography } from "../theme/tokens";
 
@@ -39,13 +39,10 @@ const DIVIDER_HEIGHT = 42;
 
 export default function WelcomeScreen() {
   const router = useRouter();
-  const segments = useSegments();
   const progress = useRef(new Animated.Value(0)).current;
   const [rootLaidOut, setRootLaidOut] = useState(false);
   const [iconLoaded, setIconLoaded] = useState(false);
   const hasStartedRef = useRef(false);
-  const segmentsRef = useRef(segments);
-  segmentsRef.current = segments;
 
   const handleRootLayout = useCallback((_event: LayoutChangeEvent) => {
     setRootLaidOut(true);
@@ -78,12 +75,7 @@ export default function WelcomeScreen() {
       }, HOLD_BEFORE);
 
       routeTimer = setTimeout(() => {
-        if (
-          cancelled ||
-          (segmentsRef.current[0] as string | undefined) !== "welcome"
-        ) {
-          return;
-        }
+        if (cancelled) return;
         // Return through the normal landing route so an existing student or
         // parent session is restored instead of being forced through login.
         router.replace("/");
