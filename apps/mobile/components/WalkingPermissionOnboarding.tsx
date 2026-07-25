@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useState } from "react";
-import { Platform, StyleSheet, Text, View } from "react-native";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { AppState, Platform, StyleSheet, Text, View } from "react-native";
 import * as SecureStore from "expo-secure-store";
 import {
   getGrantedHealthConnectPermissions,
@@ -23,6 +23,7 @@ export function WalkingPermissionOnboarding({ studentId }: Props) {
   const [busy, setBusy] = useState(false);
   const [needsUpdate, setNeedsUpdate] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+  const permissionRecheckRef = useRef<Promise<boolean> | null>(null);
 
   const dismiss = useCallback(async () => {
     // Close the modal immediately. SecureStore can be slow on Android after
@@ -31,6 +32,33 @@ export function WalkingPermissionOnboarding({ studentId }: Props) {
     setVisible(false);
     await SecureStore.setItemAsync(promptKey(studentId), "shown").catch(() => undefined);
   }, [studentId]);
+
+  const recheckGrantedPermission = useCallback(() => {
+    if (permissionRecheckRef.current) return permissionRecheckRef.current;
+
+    const check = (async () => {
+      // Health Connect can resume the app before its permission controller has
+      // finished reflecting a newly granted read permission. Re-read the
+      // authoritative state briefly instead of relying only on the activity
+      // result payload.
+      for (const delayMs of [0, 200, 500]) {
+        if (delayMs > 0) {
+          await new Promise<void>((resolve) => setTimeout(resolve, delayMs));
+        }
+        const permissions = await getGrantedHealthConnectPermissions();
+        if (hasRequiredHealthConnectPermissions(permissions)) {
+          await dismiss();
+          return true;
+        }
+      }
+      return false;
+    })().finally(() => {
+      permissionRecheckRef.current = null;
+    });
+
+    permissionRecheckRef.current = check;
+    return check;
+  }, [dismiss]);
 
   useEffect(() => {
     let active = true;
@@ -67,6 +95,16 @@ export function WalkingPermissionOnboarding({ studentId }: Props) {
     };
   }, [studentId]);
 
+  useEffect(() => {
+    if (!visible || needsUpdate) return;
+
+    const subscription = AppState.addEventListener("change", (nextState) => {
+      if (nextState !== "active") return;
+      void recheckGrantedPermission().catch(() => undefined);
+    });
+    return () => subscription.remove();
+  }, [needsUpdate, recheckGrantedPermission, visible]);
+
   const connect = useCallback(async () => {
     setBusy(true);
     setMessage(null);
@@ -78,11 +116,16 @@ export function WalkingPermissionOnboarding({ studentId }: Props) {
       }
 
       const permissions = await requestHealthConnectPermissions();
-      if (!hasRequiredHealthConnectPermissions(permissions)) {
+      if (
+        !hasRequiredHealthConnectPermissions(permissions) &&
+        !(await recheckGrantedPermission())
+      ) {
         setMessage("걸음 수 권한을 허용해 주세요.");
         return;
       }
-      await dismiss();
+      if (hasRequiredHealthConnectPermissions(permissions)) {
+        await dismiss();
+      }
     } catch {
       setMessage(
         needsUpdate
@@ -92,7 +135,7 @@ export function WalkingPermissionOnboarding({ studentId }: Props) {
     } finally {
       setBusy(false);
     }
-  }, [dismiss, needsUpdate]);
+  }, [dismiss, needsUpdate, recheckGrantedPermission]);
 
   return (
     <AppModal

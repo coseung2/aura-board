@@ -10,16 +10,15 @@ import {
 } from "react-native";
 import { useRouter } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
-import { colors, typography } from "../theme/tokens";
+import { brand, colors, states, typography } from "../theme/tokens";
 
 const HOLD_BEFORE = 600;
 const ANIMATE = 900;
-const HOLD_AFTER = 1500;
-const TOTAL = HOLD_BEFORE + ANIMATE + HOLD_AFTER;
+const HOLD_AFTER = 2000;
 
 const WELCOME_BACKGROUND = colors.bg;
 const SPLASH_ICON_ASSET = require("../assets/splash-icon.png");
-const SPLASH_ICON_SIZE = 112;
+const SPLASH_ICON_SIZE = brand.splashLogoSize;
 const FINAL_ICON_SIZE = 56;
 const FINAL_ICON_SCALE = FINAL_ICON_SIZE / SPLASH_ICON_SIZE;
 const LOCKUP_GAP = 16;
@@ -71,15 +70,16 @@ export default function WelcomeScreen() {
           duration: ANIMATE,
           easing: Easing.bezier(0.22, 1, 0.36, 1),
           useNativeDriver: true,
-        }).start();
+        }).start(({ finished }) => {
+          if (!finished || cancelled) return;
+          routeTimer = setTimeout(() => {
+            if (cancelled) return;
+            // Return through the normal landing route so an existing student
+            // or parent session is restored instead of forcing a login.
+            router.replace("/");
+          }, HOLD_AFTER);
+        });
       }, HOLD_BEFORE);
-
-      routeTimer = setTimeout(() => {
-        if (cancelled) return;
-        // Return through the normal landing route so an existing student or
-        // parent session is restored instead of being forced through login.
-        router.replace("/");
-      }, TOTAL);
     };
 
     void startWelcome();
@@ -110,14 +110,26 @@ export default function WelcomeScreen() {
       <View style={styles.center}>
         <View style={styles.stage}>
           <Animated.View
-            style={[styles.iconLayer, { transform: [{ translateX: iconTranslateX }] }]}
+            style={[
+              styles.iconLayer,
+              {
+                opacity: states.visibleOpacity,
+                transform: [{ translateX: iconTranslateX }],
+              },
+            ]}
           >
             <Animated.Image
               source={SPLASH_ICON_ASSET}
               onLoadEnd={handleIconLoadEnd}
               resizeMode="contain"
               fadeDuration={0}
-              style={[styles.splashIcon, { transform: [{ scale: iconScale }] }]}
+              style={[
+                styles.splashIcon,
+                {
+                  opacity: states.visibleOpacity,
+                  transform: [{ scale: iconScale }],
+                },
+              ]}
             />
           </Animated.View>
           <Animated.View
@@ -132,7 +144,7 @@ export default function WelcomeScreen() {
             <View style={styles.divider} />
             <View style={styles.wordmarkWrap}>
               <Text style={styles.wordmark}>AURA BOARD</Text>
-              <Text style={styles.subLabel}>LEARNING WORKSPACE</Text>
+              <Text style={styles.subLabel}>CLASSROOM WORKSPACE</Text>
             </View>
           </Animated.View>
         </View>

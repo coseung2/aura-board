@@ -171,11 +171,11 @@ export default function RootLayout() {
       <StatusBar style="dark" />
       <DeepLinkHandler />
       {/* The branded welcome may render first; terms still gate every app/login route. */}
-      {(segments[0] as string | undefined) === "welcome" ? (
-        stack
-      ) : (
-        <TermsConsentGate>{stack}</TermsConsentGate>
-      )}
+      <TermsConsentGate
+        bypass={(segments[0] as string | undefined) === "welcome"}
+      >
+        {stack}
+      </TermsConsentGate>
     </SafeAreaProvider>
   );
 }

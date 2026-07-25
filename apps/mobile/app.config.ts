@@ -11,17 +11,11 @@ const config: ExpoConfig = {
   name: "Aura-board",
   slug: "aura-board-mobile",
   scheme: "auraboard",
-  version: "0.2.15",
+  version: "0.2.16",
   orientation: "default",
   icon: "./assets/icon.png",
   userInterfaceStyle: "light",
   newArchEnabled: true,
-  splash: {
-    image: "./assets/splash-icon.png",
-    imageWidth: 112,
-    resizeMode: "contain",
-    backgroundColor: baseColors.bg,
-  },
   ios: {
     bundleIdentifier: "com.auraboard.app",
     supportsTablet: true,
@@ -35,13 +29,22 @@ const config: ExpoConfig = {
     predictiveBackGestureEnabled: false,
     softwareKeyboardLayoutMode: "resize",
     package: "com.auraboard.app",
-    versionCode: 15,
+    versionCode: 16,
   },
   web: {
     favicon: "./assets/favicon.png",
   },
   plugins: [
     "expo-router",
+    [
+      "expo-splash-screen",
+      {
+        image: "./assets/splash-icon.png",
+        imageWidth: 112,
+        resizeMode: "contain",
+        backgroundColor: baseColors.bg,
+      },
+    ],
     "expo-font",
     "expo-secure-store",
     "expo-notifications",

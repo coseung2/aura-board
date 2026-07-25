@@ -378,6 +378,7 @@ export const sizing = {
 export const brand = {
   logoSize: 36,
   lockupLogoSize: 32,
+  splashLogoSize: 112,
   logoRadiusRatio: 0.22,
 } as const;
 
