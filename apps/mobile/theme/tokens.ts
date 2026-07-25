@@ -484,6 +484,7 @@ export const walking = {
   missionSlimeScale: 0.5,
   missionSlimeJumpOffset: -5,
   rewardClaimButtonWidth: 88,
+  rewardClaimButtonMinWidth: 56,
   rewardCoinSize: 20,
   rankRewardCoinSize: 22,
   classroomRankRewardWidth: 96,
@@ -501,6 +502,10 @@ export const titleCollection = {
   tagWidth: 132,
   tagHeight: 34,
   actionWidth: 76,
+} as const;
+
+export const reading = {
+  missionProgressHeight: 8,
 } as const;
 
 export const store = {

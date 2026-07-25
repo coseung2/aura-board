@@ -19,6 +19,7 @@ import {
   radii,
   spacing,
   typography,
+  pageChrome,
 } from "../../theme/tokens";
 import { ApiError, apiFetch, getApiBase } from "../../lib/api";
 import { loadSessionToken } from "../../lib/session";
@@ -484,7 +485,7 @@ function dotColorFor(status: string) {
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, padding: spacing.xl, gap: spacing.lg },
+  root: { flex: 1, paddingHorizontal: spacing.xl, paddingTop: pageChrome.directContentStartGap, paddingBottom: spacing.xl, gap: spacing.lg },
   center: {
     flex: 1,
     alignItems: "center",

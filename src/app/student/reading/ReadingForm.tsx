@@ -158,7 +158,7 @@ export function ReadingForm() {
               value={form.reflection}
               onChange={(e) => update("reflection", e.target.value)}
               placeholder="재미있었던 점이나 느낀 점을 적어 보세요."
-              rows={5}
+              rows={10}
               maxLength={600}
               disabled={submitting}
             />

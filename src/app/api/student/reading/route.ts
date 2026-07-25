@@ -3,7 +3,24 @@ import { Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
 import { ensureAccountFor } from "@/lib/bank";
 import { getCurrentStudent } from "@/lib/student-auth";
-import { getKstClassroomWalkingRankPeriods } from "@/lib/reward-policy";
+import {
+  getKstClassroomWalkingRankPeriods,
+  getKstClassroomWalkingRankRewardPeriods,
+  readingClassroomRankRewardSourceRef,
+  READING_CLASSROOM_RANK_REWARD_SOURCE_TYPE,
+  READING_WEEKLY_MISSION_REWARD_SOURCE_TYPE,
+  readingWeeklyMissionSourceRef,
+  WALKING_CLASSROOM_RANK_REWARDS,
+} from "@/lib/reward-policy";
+import {
+  buildReadingWeeklyMissionReward,
+  parseReadingMissionStepSourceRef,
+  READING_MISSION_KEYS,
+  type ReadingMissionKey,
+  type ReadingMissionStepClaim,
+  type ReadingWeeklyMissionReward,
+} from "@/lib/reading-missions";
+import { getEquippedSlimeFloor } from "@/lib/pets/catalog";
 import { readReadingTitles } from "@/lib/titles";
 import {
   evaluateReadingLog,
@@ -21,11 +38,82 @@ const MAX_REFLECTION = 600;
 const ALLOWED_BOOK_TYPES: ReadingBookType[] = ["comic", "story"];
 const TOP_FIVE_LIMIT = 5;
 
+type ReadingRepresentativeSlime = {
+  color: string;
+  growthStage: 1 | 2 | 3;
+  equippedFloor: "none" | "grass-floor" | "water-puddle" | "trampoline";
+};
+
+async function readReadingWeeklyMissionClaims(
+  studentId: string,
+  weekStart: string,
+): Promise<{
+  claimedKeys: ReadingMissionKey[];
+  claimedSteps: ReadingMissionStepClaim[];
+  legacyAllClaimed: boolean;
+}> {
+  const legacyRef = readingWeeklyMissionSourceRef(studentId, weekStart);
+  const deposits = await db.transaction.findMany({
+    where: {
+      sourceType: READING_WEEKLY_MISSION_REWARD_SOURCE_TYPE,
+      OR: [
+        { sourceRef: legacyRef },
+        { sourceRef: { startsWith: `${legacyRef}:` } },
+      ],
+      type: "deposit",
+    },
+    select: { sourceRef: true },
+  });
+  const claimedKeys = new Set<ReadingMissionKey>();
+  const claimedSteps: ReadingMissionStepClaim[] = [];
+  let legacyAllClaimed = false;
+  for (const deposit of deposits) {
+    if (!deposit.sourceRef) continue;
+    if (deposit.sourceRef === legacyRef) {
+      legacyAllClaimed = true;
+      continue;
+    }
+    const step = parseReadingMissionStepSourceRef(deposit.sourceRef, studentId, weekStart);
+    if (step) {
+      claimedSteps.push(step);
+      continue;
+    }
+    for (const key of READING_MISSION_KEYS) {
+      if (deposit.sourceRef === readingWeeklyMissionSourceRef(studentId, weekStart, key)) {
+        claimedKeys.add(key);
+      }
+    }
+  }
+  return { claimedKeys: [...claimedKeys], claimedSteps, legacyAllClaimed };
+}
+
+async function readRepresentativeSlime(
+  studentId: string,
+): Promise<ReadingRepresentativeSlime | null> {
+  const slime = await db.studentSlime.findFirst({
+    where: { studentId, isRepresentative: true },
+    select: { color: true, growthStage: true, equippedItemKeys: true },
+  });
+  if (!slime) return null;
+  return {
+    color: slime.color,
+    growthStage: slime.growthStage as 1 | 2 | 3,
+    equippedFloor: getEquippedSlimeFloor(slime.equippedItemKeys),
+  };
+}
+
+
 type ClassroomReadingRank = {
   studentId: string;
   studentNumber: number | null;
   studentName: string;
   weeklyCount: number | bigint;
+};
+
+type ClassroomRankReward = {
+  weekStart: string;
+  rank: number;
+  amount: number;
 };
 
 /**
@@ -64,13 +152,84 @@ async function readClassroomTopFive(
       (rank) =>
         typeof rank.studentId === "string" && typeof rank.studentName === "string",
     )
-    .map((rank) => ({
+    .map((rank, index) => ({
       studentId: rank.studentId,
       studentNumber: Number.isInteger(rank.studentNumber) ? rank.studentNumber : null,
       studentName: rank.studentName,
       weeklyCount: Number(rank.weeklyCount) || 0,
       isCurrent: rank.studentId === currentStudentId,
+      rewardAmount: WALKING_CLASSROOM_RANK_REWARDS[index] ?? 0,
     }));
+}
+
+async function readClassroomRankReward(
+  classroomId: string,
+  studentId: string,
+  range: { weekStart: string; weekEnd: string },
+): Promise<Omit<ClassroomRankReward, "weekStart"> | null> {
+  const weekStart = new Date(`${range.weekStart}T00:00:00+09:00`);
+  const weekEnd = new Date(`${range.weekEnd}T00:00:00+09:00`);
+  const rows = await db.$queryRaw<Array<{ rank: bigint | number }>>(Prisma.sql`
+    WITH ranked AS (
+      SELECT
+        student."id" AS "studentId",
+        ROW_NUMBER() OVER (
+          ORDER BY
+            COUNT(log."id") DESC,
+            student."number" ASC NULLS LAST,
+            student."name" ASC
+        ) AS "rank"
+      FROM "Student" student
+      LEFT JOIN "ReadingLog" log
+        ON log."studentId" = student."id"
+        AND log."classroomId" = ${classroomId}
+        AND log."createdAt" >= ${weekStart}
+        AND log."createdAt" < ${weekEnd}
+      WHERE student."classroomId" = ${classroomId}
+      GROUP BY student."id", student."number", student."name"
+    )
+    SELECT "rank"
+    FROM ranked
+    WHERE "studentId" = ${studentId}
+  `);
+  const rank = Number(rows[0]?.rank);
+  const amount = Number.isSafeInteger(rank) && rank > 0
+    ? WALKING_CLASSROOM_RANK_REWARDS[rank - 1]
+    : undefined;
+  return amount === undefined ? null : { rank, amount };
+}
+
+async function readUnclaimedClassroomRankRewards(
+  classroomId: string,
+  studentId: string,
+): Promise<ClassroomRankReward[]> {
+  const periods = getKstClassroomWalkingRankRewardPeriods();
+  if (periods.length === 0) return [];
+
+  const deposits = await db.transaction.findMany({
+    where: {
+      sourceType: READING_CLASSROOM_RANK_REWARD_SOURCE_TYPE,
+      sourceRef: { startsWith: `${studentId}:` },
+      type: "deposit",
+    },
+    select: { sourceRef: true },
+  });
+  const claimedRefs = new Set(
+    deposits
+      .map((deposit) => deposit.sourceRef)
+      .filter((sourceRef): sourceRef is string => Boolean(sourceRef)),
+  );
+  const rewards = await Promise.all(
+    periods.map(async (period) => {
+      const sourceRef = readingClassroomRankRewardSourceRef(studentId, period.weekStart);
+      if (claimedRefs.has(sourceRef)) return null;
+      const reward = await readClassroomRankReward(classroomId, studentId, period);
+      return reward ? { weekStart: period.weekStart, ...reward } : null;
+    }),
+  );
+  return rewards
+    .filter((reward): reward is ClassroomRankReward => reward !== null)
+    .sort((a, b) => b.weekStart.localeCompare(a.weekStart));
 }
 
 type SerializedReadingLog = {
@@ -150,12 +309,29 @@ export async function GET() {
   };
 
   if (!db.readingLog) {
+    const [claims, representativeSlime] = await Promise.all([
+      readReadingWeeklyMissionClaims(student.id, rankPeriods.active.weekStart),
+      readRepresentativeSlime(student.id),
+    ]);
+    const weeklyMissionReward = buildReadingWeeklyMissionReward({
+      studentId: student.id,
+      weekStart: rankPeriods.active.weekStart,
+      weekEnd: rankPeriods.active.weekEnd,
+      logs: [],
+      claimedKeys: claims.claimedKeys,
+      claimedSteps: claims.claimedSteps,
+      legacyAllClaimed: claims.legacyAllClaimed,
+    });
     return NextResponse.json({
       entries: [],
       count: 0,
       summary: emptySummary,
+      missions: weeklyMissionReward.missions,
+      weeklyMissionReward,
+      representativeSlime,
       weekRange: rankPeriods.active,
       classroomTopFive: [],
+      classroomRankRewards: [],
       classroomRankNextResetAt: rankPeriods.nextResetAt.toISOString(),
       titles: [],
     });
@@ -166,7 +342,9 @@ export async function GET() {
   let weeklyCount = 0;
   let averageScore: number | null = null;
   let classroomTopFive: Awaited<ReturnType<typeof readClassroomTopFive>> = [];
+  let classroomRankRewards: ClassroomRankReward[] = [];
   let titles: Awaited<ReturnType<typeof readReadingTitles>> = [];
+  let weeklyMissionLogs: Array<{ createdAt: Date; reflection: string }> = [];
   const weekStart = new Date(`${rankPeriods.active.weekStart}T00:00:00+09:00`);
   const weekEnd = new Date(`${rankPeriods.active.weekEnd}T00:00:00+09:00`);
   const readingWhere = {
@@ -174,7 +352,13 @@ export async function GET() {
     classroomId: student.classroomId,
   };
   try {
-    const [recentRows, completeTotalCount, completeWeeklyCount, scoreAggregate] =
+    const [
+      recentRows,
+      completeTotalCount,
+      completeWeeklyCount,
+      scoreAggregate,
+      completeWeeklyMissionLogs,
+    ] =
       await Promise.all([
         db.readingLog.findMany({
           where: readingWhere,
@@ -192,6 +376,13 @@ export async function GET() {
           where: readingWhere,
           _avg: { aiScore: true },
         }),
+        db.readingLog.findMany({
+          where: {
+            ...readingWhere,
+            createdAt: { gte: weekStart, lt: weekEnd },
+          },
+          select: { createdAt: true, reflection: true },
+        }),
       ]);
     rows = recentRows;
     totalCount = completeTotalCount;
@@ -201,9 +392,14 @@ export async function GET() {
       rawAverageScore === null
         ? null
         : Math.round(rawAverageScore * 10) / 10;
+    weeklyMissionLogs = completeWeeklyMissionLogs;
     classroomTopFive = await readClassroomTopFive(
       student.classroomId,
       rankPeriods.active,
+      student.id,
+    );
+    classroomRankRewards = await readUnclaimedClassroomRankRewards(
+      student.classroomId,
       student.id,
     );
     titles = await readReadingTitles(student.id);
@@ -211,17 +407,36 @@ export async function GET() {
     if (!isMissingReadingLogTable(e)) throw e;
     rows = [];
     classroomTopFive = [];
+    classroomRankRewards = [];
     titles = [];
+    weeklyMissionLogs = [];
   }
 
   const entries = rows.map(serialize);
+  const [claims, representativeSlime] = await Promise.all([
+    readReadingWeeklyMissionClaims(student.id, rankPeriods.active.weekStart),
+    readRepresentativeSlime(student.id),
+  ]);
+  const weeklyMissionReward = buildReadingWeeklyMissionReward({
+    studentId: student.id,
+    weekStart: rankPeriods.active.weekStart,
+    weekEnd: rankPeriods.active.weekEnd,
+    logs: weeklyMissionLogs,
+    claimedKeys: claims.claimedKeys,
+    claimedSteps: claims.claimedSteps,
+    legacyAllClaimed: claims.legacyAllClaimed,
+  });
 
   return NextResponse.json({
     entries,
     count: totalCount,
     summary: { weeklyCount, totalCount, averageScore },
+    missions: weeklyMissionReward.missions,
+    weeklyMissionReward,
+    representativeSlime,
     weekRange: rankPeriods.active,
     classroomTopFive,
+    classroomRankRewards,
     classroomRankNextResetAt: rankPeriods.nextResetAt.toISOString(),
     titles,
   });

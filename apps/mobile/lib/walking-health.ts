@@ -1,4 +1,4 @@
-import { Platform } from "react-native";
+import { PermissionsAndroid, Platform } from "react-native";
 import { apiFetch } from "./api";
 import {
   EQUIPPED_FLOORS,
@@ -11,6 +11,7 @@ import type {
   HealthConnectDailyStats,
   HealthConnectPermission,
   HealthConnectStatus,
+  LiveStepUpdate,
 } from "../modules/aura-board-health-connect/src/AuraBoardHealthConnect.types";
 
 export type WalkingDay = {
@@ -311,6 +312,57 @@ export function isWalkingHealthModuleAvailable() {
 
 export function isHealthConnectModuleAvailable() {
   return isWalkingHealthModuleAvailable();
+}
+
+/**
+ * Subscribe to display-only step deltas while the walking screen is visible.
+ * Authoritative rewards continue to use Health Connect or HealthKit aggregates.
+ */
+export async function startLiveStepUpdates(
+  onUpdate: (update: LiveStepUpdate) => void,
+): Promise<(() => void) | null> {
+  const module = AuraBoardHealthConnectModule;
+  if (
+    !isWalkingHealthModuleAvailable() ||
+    !module ||
+    typeof module.startLiveStepUpdates !== "function"
+  ) {
+    return null;
+  }
+
+  if (Platform.OS === "android" && Number(Platform.Version) >= 29) {
+    const permission = PermissionsAndroid.PERMISSIONS.ACTIVITY_RECOGNITION;
+    const alreadyGranted = await PermissionsAndroid.check(permission);
+    if (!alreadyGranted) {
+      const result = await PermissionsAndroid.request(permission, {
+        title: "걸음 수 실시간 표시",
+        message: "걷기 페이지를 보는 동안 걸음 수를 바로 표시하려면 신체 활동 권한이 필요해요.",
+        buttonPositive: "허용",
+        buttonNegative: "나중에",
+      });
+      if (result !== PermissionsAndroid.RESULTS.GRANTED) return null;
+    }
+  }
+
+  const subscription = module.addListener("onLiveStepUpdate", onUpdate);
+  try {
+    const status = await module.startLiveStepUpdates();
+    if (status !== "started") {
+      subscription.remove();
+      return null;
+    }
+  } catch {
+    subscription.remove();
+    return null;
+  }
+
+  let stopped = false;
+  return () => {
+    if (stopped) return;
+    stopped = true;
+    subscription.remove();
+    module.stopLiveStepUpdates();
+  };
 }
 
 export async function getHealthConnectStatus(): Promise<HealthConnectStatus> {

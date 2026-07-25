@@ -96,6 +96,8 @@ describe("activity reward source policy", () => {
       "assignment_reward",
       "comment_reward",
       "attendance_reward",
+      "reading_weekly_mission_reward",
+      "reading_classroom_rank_reward",
     ]);
     expect(walkingRewardSourceRef("student-1", "2026-07-17")).toBe(
       "student-1:2026-07-17:daily-threshold",

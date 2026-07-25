@@ -18,6 +18,7 @@ import {
   media,
   spacing,
   typography,
+  pageChrome,
 } from "../../theme/tokens";
 import { AppButton, EmptyState, SurfacePressable } from "../ui";
 import {
@@ -136,7 +137,7 @@ export function VibeGalleryBoard({ data }: { data: BoardDetailResponse }) {
 const styles = StyleSheet.create({
   root: { flex: 1 },
   center: { flex: 1, alignItems: "center", justifyContent: "center" },
-  content: { padding: layout.boardGridPadding, gap: layout.boardGridGap, paddingBottom: spacing.xxxl },
+  content: { paddingHorizontal: layout.boardGridPadding, paddingTop: pageChrome.directContentStartGap, gap: layout.boardGridGap, paddingBottom: spacing.xxxl },
   row: { gap: layout.boardGridGap },
   heading: { gap: spacing.xs, marginBottom: spacing.md },
   title: { ...typography.title, color: colors.text },

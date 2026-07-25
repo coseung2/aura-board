@@ -8,8 +8,9 @@ import {
 import {
   borders,
   colors,
+  controls,
   iconSizes,
-  radii,
+  pageChrome,
   spacing,
   tapMin,
   typography,
@@ -33,6 +34,7 @@ import {
 } from "../../lib/card-privacy";
 import {
   ControlPressable,
+  Fab,
   SurfaceCard,
 } from "../ui";
 import {
@@ -189,35 +191,22 @@ export function ColumnsBoard({
           data={selectedCards}
           keyExtractor={(card) => card.id}
           contentContainerStyle={styles.listContent}
-          ListHeaderComponent={
-            canWriteSelected ? (
-              <View style={styles.detailHeaderContent}>
-                <ControlPressable
-                  style={styles.addIconButton}
-                  onPress={() => openComposer(selectedSummary.id)}
-                  accessibilityLabel="카드 추가"
-                >
-                  <Text style={styles.addIconText}>＋</Text>
-                </ControlPressable>
-              </View>
-            ) : null
-          }
-            renderItem={({ item }) => (
-              <StreamFeedPost
-                card={item}
-                onOpenComments={() => setCommentCard(item)}
-                onOpenAuthorPicker={
-                  item.canEdit === true
-                    ? () => setAuthorCard(item)
-                    : undefined
-                }
-                onLongPress={
-                  item.isMine === true
-                    ? undefined
-                    : (anchor) => setModerationTarget({ card: item, anchor })
-                }
-              />
-            )}
+          renderItem={({ item }) => (
+            <StreamFeedPost
+              card={item}
+              onOpenComments={() => setCommentCard(item)}
+              onOpenAuthorPicker={
+                item.canEdit === true
+                  ? () => setAuthorCard(item)
+                  : undefined
+              }
+              onLongPress={
+                item.isMine === true
+                  ? undefined
+                  : (anchor) => setModerationTarget({ card: item, anchor })
+              }
+            />
+          )}
           ItemSeparatorComponent={() => <View style={styles.listSeparator} />}
           ListEmptyComponent={
             <View style={styles.emptyDetail}>
@@ -282,6 +271,16 @@ export function ColumnsBoard({
           keyboardShouldPersistTaps="handled"
         />
       )}
+
+      {selectedSummary && canWriteSelected ? (
+        <Fab
+          style={styles.fab}
+          onPress={() => openComposer(selectedSummary.id)}
+          accessibilityLabel="카드 추가"
+        >
+          <Text style={styles.fabPlus}>＋</Text>
+        </Fab>
+      ) : null}
 
       <CardComposer
         visible={composerOpen}
@@ -395,7 +394,8 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   overviewContent: {
-    padding: spacing.lg,
+    paddingHorizontal: spacing.lg,
+    paddingTop: pageChrome.directContentStartGap,
     paddingBottom: spacing.xxxl,
   },
   topicFilterHeader: {
@@ -455,29 +455,19 @@ const styles = StyleSheet.create({
     gap: spacing.md,
   },
   listContent: {
-    paddingTop: spacing.md,
+    paddingTop: pageChrome.directContentStartGap,
     paddingHorizontal: spacing.none,
-    paddingBottom: spacing.xxxl,
+    paddingBottom: spacing.xxxl + controls.fab,
   },
-  detailHeaderContent: {
-    paddingBottom: spacing.md,
-    alignItems: "flex-end",
+  fab: {
+    right: spacing.xxl,
+    bottom: spacing.xxl,
   },
-  addIconButton: {
-    minWidth: tapMin,
-    minHeight: tapMin,
-    alignItems: "center",
-    justifyContent: "center",
-    paddingHorizontal: spacing.none,
-    paddingVertical: spacing.none,
-    borderWidth: borders.none,
-    borderColor: colors.transparent,
-    borderRadius: radii.none,
-    backgroundColor: colors.transparent,
-  },
-  addIconText: {
-    ...typography.title,
-    color: colors.accentTintedText,
+  fabPlus: {
+    fontSize: iconSizes.lg,
+    color: colors.onAccent,
+    fontWeight: "300",
+    marginTop: -spacing.xs,
   },
   listSeparator: {
     height: spacing.lg,

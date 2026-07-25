@@ -137,9 +137,9 @@ describe("GET /api/student/walking fixed KST week", () => {
       },
     ]);
     expect(body.classroomRankRewards).toEqual([
-      { weekStart: "2026-07-12", rank: 2, amount: 60 },
+      { weekStart: "2026-07-13", rank: 2, amount: 60 },
     ]);
-    expect(body.classroomRankNextResetAt).toBe("2026-07-25T15:00:00.000Z");
+    expect(body.classroomRankNextResetAt).toBe("2026-07-26T15:00:00.000Z");
   });
 
   it("includes the current representative slime for the mission progress marker", async () => {

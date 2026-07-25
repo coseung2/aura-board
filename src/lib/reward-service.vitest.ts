@@ -9,10 +9,14 @@ vi.mock("./creatures/activity-rewards", () => ({
 
 import {
   awardCappedPolicyReward,
+  awardReadingPolicyReward,
   awardWalkingPolicyReward,
   loadRewardPolicy,
 } from "./reward-service";
-import { WALKING_WEEKLY_REWARD_SOURCE_TYPE } from "./reward-policy";
+import {
+  READING_CLASSROOM_RANK_REWARD_SOURCE_TYPE,
+  WALKING_WEEKLY_REWARD_SOURCE_TYPE,
+} from "./reward-policy";
 
 function fakeTx(
   counts: number[] = [0, 0],
@@ -178,6 +182,29 @@ describe("reward service caps and buffs", () => {
     });
     expect(mocks.award).toHaveBeenCalledWith(
       expect.objectContaining({ sourceType: "walking_weekly_reward" }),
+    );
+  });
+
+  it("records a reading classroom rank in its own reading-buff namespace", async () => {
+    const tx = fakeTx();
+    const policy = await loadRewardPolicy(tx, "classroom-1");
+    await awardReadingPolicyReward({
+      tx,
+      studentId: "student-1",
+      classroomId: "classroom-1",
+      accountId: "account-1",
+      sourceRef: "student-1:2026-07-13:reading-classroom-rank",
+      sourceType: READING_CLASSROOM_RANK_REWARD_SOURCE_TYPE,
+      baseAmount: 60,
+      note: "독서 반 랭킹 2위 보상",
+      policy,
+    });
+    expect(mocks.award).toHaveBeenCalledWith(
+      expect.objectContaining({
+        sourceType: "reading_classroom_rank_reward",
+        sourceRef: "student-1:2026-07-13:reading-classroom-rank",
+        amount: 60,
+      }),
     );
   });
 });

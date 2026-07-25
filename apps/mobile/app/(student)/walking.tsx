@@ -1,9 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
-  Animated,
   AppState,
-  Easing,
   Image,
   Platform,
   RefreshControl,
@@ -11,6 +9,7 @@ import {
   StyleSheet,
   Text,
   View,
+  useWindowDimensions,
 } from "react-native";
 import { useFocusEffect, useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -29,6 +28,7 @@ import {
   openHealthConnectSettings,
   readAndSyncWalkingDays,
   requestHealthConnectPermissions,
+  startLiveStepUpdates,
   type WalkingDay,
   type ClassroomWalkingRank,
   type ClassroomRankReward,
@@ -47,7 +47,6 @@ import {
   borders,
   colors,
   iconSizes,
-  layers,
   layout,
   pageChrome,
   radii,
@@ -69,15 +68,14 @@ import {
   ContentTabs,
 } from "../../components/NavigationTabs";
 import { StudentHeaderActions } from "../../components/StudentHeaderActions";
-import { SlimeSprite } from "../../components/slime/SlimeSprite";
+import { ClassroomTopFive } from "../../components/ClassroomTopFive";
+import { MissionProgressTrack } from "../../components/MissionProgressTrack";
 import { WalkingAttendanceCalendar } from "../../components/walking-attendance-calendar";
 import { TitleCollection } from "../../components/TitleCollection";
 import { claimStudentAttendanceReward } from "../../lib/student-attendance";
 import { claimTitle } from "../../lib/titles";
-import { evolutionForStage } from "../../lib/slimes";
 
 const numberFormatter = new Intl.NumberFormat("ko-KR");
-const FOREGROUND_SYNC_INTERVAL_MS = 60_000;
 const REWARD_CLAIM_BUTTON_IMAGE = require("../../assets/walking/reward-claim-button.png");
 const DISABLED_REWARD_CLAIM_BUTTON_IMAGE = require("../../assets/walking/reward-claim-button-disabled.png");
 const REWARD_COIN_IMAGE = require("../../assets/walking/reward-coin.png");
@@ -135,6 +133,7 @@ export default function StudentWalkingScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [busy, setBusy] = useState<"connect" | "sync" | "settings" | "attendance" | null>(null);
   const silentSyncInFlight = useRef(false);
+  const [liveStepDelta, setLiveStepDelta] = useState(0);
   const [activeView, setActiveView] = useState<WalkingView>("record");
   const [settingsVisible, setSettingsVisible] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
@@ -164,6 +163,7 @@ export default function StudentWalkingScreen() {
     setClassroomTopFive(snapshot.classroomTopFive);
     setClassroomRankRewards(snapshot.classroomRankRewards);
     setClassroomRankNextResetAt(snapshot.classroomRankNextResetAt);
+    setLiveStepDelta(0);
   }, []);
 
   const load = useCallback(async (syncNative = false, refresh = false) => {
@@ -236,9 +236,6 @@ export default function StudentWalkingScreen() {
     void load(true);
 
     let previousAppState = AppState.currentState;
-    const interval = setInterval(() => {
-      if (AppState.currentState === "active") void syncLatestSilently();
-    }, FOREGROUND_SYNC_INTERVAL_MS);
     const appStateSubscription = AppState.addEventListener("change", (nextAppState) => {
       if (previousAppState !== "active" && nextAppState === "active") {
         void syncLatestSilently();
@@ -247,10 +244,65 @@ export default function StudentWalkingScreen() {
     });
 
     return () => {
-      clearInterval(interval);
       appStateSubscription.remove();
     };
   }, [load, syncLatestSilently]));
+
+  useFocusEffect(useCallback(() => {
+    if (!connected || !isHealthConnectModuleAvailable()) {
+      setLiveStepDelta(0);
+      return undefined;
+    }
+
+    let disposed = false;
+    let starting = false;
+    let liveUpdatesUnavailable = false;
+    let stopLiveUpdates: (() => void) | null = null;
+
+    const stop = () => {
+      stopLiveUpdates?.();
+      stopLiveUpdates = null;
+    };
+    const start = async () => {
+      if (
+        disposed ||
+        starting ||
+        liveUpdatesUnavailable ||
+        stopLiveUpdates ||
+        AppState.currentState !== "active"
+      ) return;
+      starting = true;
+      const nextStop = await startLiveStepUpdates(({ delta }) => {
+        if (!disposed && Number.isInteger(delta) && delta > 0) {
+          setLiveStepDelta((current) => current + delta);
+        }
+      });
+      starting = false;
+      if (!nextStop) liveUpdatesUnavailable = true;
+
+      if (disposed || AppState.currentState !== "active") nextStop?.();
+      else stopLiveUpdates = nextStop;
+    };
+
+    setLiveStepDelta(0);
+    void start();
+    const appStateSubscription = AppState.addEventListener("change", (nextState) => {
+      if (nextState === "active") {
+        setLiveStepDelta(0);
+        void start();
+      } else {
+        stop();
+        setLiveStepDelta(0);
+      }
+    });
+
+    return () => {
+      disposed = true;
+      stop();
+      appStateSubscription.remove();
+      setLiveStepDelta(0);
+    };
+  }, [connected]));
 
   const connect = useCallback(async () => {
     setBusy("connect");
@@ -377,15 +429,23 @@ export default function StudentWalkingScreen() {
     weekRange.weekEnd,
     weekRange.today,
   ]);
-  const today = days.find((row) => row.day === weekRange.today) ?? days[0];
-  const totalSteps = days.reduce(
+  const displayDays = useMemo(
+    () => days.map((row) =>
+      row.day === weekRange.today
+        ? { ...row, steps: row.steps + liveStepDelta }
+        : row
+    ),
+    [days, liveStepDelta, weekRange.today],
+  );
+  const today = displayDays.find((row) => row.day === weekRange.today) ?? displayDays[0];
+  const totalSteps = displayDays.reduce(
     (sum, row) => (row.day <= weekRange.today ? sum + row.steps : sum),
     0,
   );
   const averageSteps = Math.round(totalSteps / days.length);
   const maxSteps = Math.max(
     1,
-    ...days.filter((row) => row.day <= weekRange.today).map((row) => row.steps),
+    ...displayDays.filter((row) => row.day <= weekRange.today).map((row) => row.steps),
   );
   const hasSyncedData = rows.some(
     (row) => row.day >= weekRange.weekStart && row.day <= weekRange.today,
@@ -411,7 +471,32 @@ export default function StudentWalkingScreen() {
 
   return (
     <SafeAreaView style={styles.container} edges={["top"]}>
-      <AppHeader title="걷기" right={<StudentHeaderActions />} />
+      <AppHeader
+        title="걷기"
+        right={
+          <View style={styles.headerActions}>
+            <View style={styles.headerConnection}>
+              <View
+                style={[
+                  styles.connectionDot,
+                  connected && styles.connectionDotConnected,
+                ]}
+              />
+              <Text style={styles.headerConnectionText}>{compactConnectionLabel}</Text>
+            </View>
+            <ControlPressable
+              style={styles.headerIconButton}
+              hitSlop={spacing.sm}
+              onPress={() => setSettingsVisible(true)}
+              accessibilityLabel="걷기 연동 설정"
+            >
+              <Settings size={iconSizes.md} color={colors.textMuted} accessible={false} />
+            </ControlPressable>
+            <StudentHeaderActions />
+          </View>
+        }
+        rightStyle={styles.headerActionsWrap}
+      />
       <View style={styles.pageTabsRow}>
         <ContentTabs
           accessibilityLabel="걷기 활동 보기"
@@ -442,23 +527,6 @@ export default function StudentWalkingScreen() {
             칭호
           </ContentTab>
         </ContentTabs>
-        <View style={styles.connectionRow}>
-          <View
-            style={[
-              styles.connectionDot,
-              connected && styles.connectionDotConnected,
-            ]}
-          />
-          <Text style={styles.connectionOverlayText}>{compactConnectionLabel}</Text>
-          <ControlPressable
-            style={styles.connectionSettingsButton}
-            hitSlop={spacing.sm}
-            onPress={() => setSettingsVisible(true)}
-            accessibilityLabel="걷기 연동 설정"
-          >
-            <Settings size={iconSizes.sm} color={colors.textMuted} accessible={false} />
-          </ControlPressable>
-        </View>
       </View>
       <ScrollView
         contentContainerStyle={styles.content}
@@ -470,43 +538,48 @@ export default function StudentWalkingScreen() {
           />
         }
       >
-        {status === "needs_update" ? (
-          <AppButton loading={busy === "settings"} onPress={() => void openSettings()}>
-            Health Connect 업데이트
-          </AppButton>
-        ) : null}
+        {status === "needs_update" || error || message ? (
+          <View style={styles.scrollLead}>
+            {status === "needs_update" ? (
+              <AppButton loading={busy === "settings"} onPress={() => void openSettings()}>
+                Health Connect 업데이트
+              </AppButton>
+            ) : null}
 
-        {error ? (
-          <View
-            style={styles.errorSection}
-            accessible
-            accessibilityRole="alert"
-            accessibilityLiveRegion="polite"
-          >
-            <Text style={styles.error}>{error}</Text>
-            <AppButton
-              variant="secondary"
-              loading={loading || refreshing}
-              onPress={() => void load(true)}
-              accessibilityLabel="걷기 기록 다시 시도"
-            >
-              다시 시도
-            </AppButton>
+            {error ? (
+              <View
+                style={styles.errorSection}
+                accessible
+                accessibilityRole="alert"
+                accessibilityLiveRegion="polite"
+              >
+                <Text style={styles.error}>{error}</Text>
+                <AppButton
+                  variant="secondary"
+                  loading={loading || refreshing}
+                  onPress={() => void load(true)}
+                  accessibilityLabel="걷기 기록 다시 시도"
+                >
+                  다시 시도
+                </AppButton>
+              </View>
+            ) : null}
+
+            {message ? (
+              <Text
+                style={styles.notice}
+                accessibilityLiveRegion="polite"
+                accessibilityRole="text"
+              >
+                {message}
+              </Text>
+            ) : null}
           </View>
         ) : null}
 
-        {message ? (
-          <Text
-            style={styles.notice}
-            accessibilityLiveRegion="polite"
-            accessibilityRole="text"
-          >
-            {message}
-          </Text>
-        ) : null}
-
-        {activeView === "record" ? (
-          <>
+        <View style={styles.tabContent}>
+          {activeView === "record" ? (
+            <>
 
         {showInitialLoading ? (
           <View
@@ -556,7 +629,7 @@ export default function StudentWalkingScreen() {
               />
 
               <View style={styles.chartRows}>
-                {days.map((row) => {
+                {displayDays.map((row) => {
                   const label = dayLabel(row.day, today.day);
                   const isFuture = row.day > weekRange.today;
                   const displaySteps = isFuture ? 0 : row.steps;
@@ -587,20 +660,27 @@ export default function StudentWalkingScreen() {
               </View>
             </View>
 
-            {classroomTopFive.length > 0 ? (
+            {classroomTopFive.length > 0 || classroomRankRewards.length > 0 ? (
               <ClassroomTopFive
-                ranks={classroomTopFive}
+                ranks={classroomTopFive.map((rank) => ({
+                  studentId: rank.studentId,
+                  studentName: rank.studentName,
+                  metricValue: rank.weeklySteps,
+                  isCurrent: rank.isCurrent,
+                  rewardAmount: rank.rewardAmount,
+                }))}
                 rankRewards={classroomRankRewards}
                 nextResetAt={classroomRankNextResetAt}
+                metricUnit="걸음"
                 rewardPending={rankRewardPending}
                 onClaimReward={(weekStart) => void claimClassroomRankReward(weekStart)}
               />
             ) : null}
           </>
         ) : null}
-          </>
-        ) : activeView === "missions" ? (
-          <WalkingMissionPanel
+            </>
+          ) : activeView === "missions" ? (
+            <WalkingMissionPanel
             todaySteps={today.steps}
             dailyGoal={policy.stepThreshold}
             dailyRewardAmount={policy.dailyUnitAmount}
@@ -613,15 +693,16 @@ export default function StudentWalkingScreen() {
             representativeSlime={representativeSlime}
             onDailyStepRewardsChange={setDailyStepRewards}
             onWeeklyStepRewardsChange={setWeeklyStepRewards}
-          />
-        ) : (
-          <TitleCollection
+            />
+          ) : (
+            <TitleCollection
             titles={titles}
             emptyHint="걸음 기록을 쌓으면 칭호를 얻을 수 있어요."
             claimingKey={claimingTitleKey}
             onClaim={(titleKey) => void claimWalkingTitle(titleKey)}
-          />
-        )}
+            />
+          )}
+        </View>
       </ScrollView>
       <AppModal
         visible={settingsVisible}
@@ -673,86 +754,20 @@ function SummaryRow({
   );
 }
 
-function ClassroomTopFive({
-  ranks,
-  rankRewards,
-  nextResetAt,
-  rewardPending,
-  onClaimReward,
-}: {
-  ranks: ClassroomWalkingRank[];
-  rankRewards: ClassroomRankReward[];
-  nextResetAt: string | null;
-  rewardPending: boolean;
-  onClaimReward: (weekStart: string) => void;
-}) {
-  return (
-    <View style={styles.classroomTopFiveSection} accessibilityRole="summary">
-      <SectionHeader
-        title="우리 반 Top 5"
-        right={
-          <Text style={styles.classroomTopFivePeriod}>
-            {formatClassroomRankResetAt(nextResetAt)} 랭킹 초기화
-          </Text>
-        }
-      />
-      {rankRewards.map((reward) => (
-        <View key={reward.weekStart} style={styles.classroomRankRewardRow}>
-          <Text style={styles.classroomRankRewardLabel}>
-            {formatClassroomRankRewardPeriod(reward.weekStart)} {reward.rank}등
-          </Text>
-          <RankRewardAmount amount={reward.amount} />
-          <View style={styles.classroomRankRewardClaimAction}>
-            <RewardClaimButton
-              disabled={rewardPending}
-              muted={rewardPending}
-              onPress={() => onClaimReward(reward.weekStart)}
-              label={`${numberFormatter.format(reward.amount)}원 순위 보상 수령`}
-            />
-          </View>
-        </View>
-      ))}
-      <View accessibilityRole="list">
-        {ranks.map((rank, index) => {
-          return (
-            <View
-              key={rank.studentId}
-              style={[
-                styles.classroomTopFiveRow,
-                rank.isCurrent && styles.classroomTopFiveCurrentRow,
-              ]}
-              accessibilityRole="summary"
-              accessibilityLabel={`${index + 1}위 ${rank.studentName}, ${numberFormatter.format(rank.weeklySteps)}걸음, 보상 ${numberFormatter.format(rank.rewardAmount)}원${
-                rank.isCurrent ? ", 나" : ""
-              }`}
-            >
-              <Text style={styles.classroomTopFiveRank}>{index + 1}</Text>
-              <Text style={styles.classroomTopFiveName} numberOfLines={1}>
-                {rank.studentName}
-              </Text>
-              <Text style={styles.classroomTopFiveSteps}>
-                {numberFormatter.format(rank.weeklySteps)}걸음
-              </Text>
-              <RankRewardAmount amount={rank.rewardAmount} />
-            </View>
-          );
-        })}
-      </View>
-    </View>
-  );
-}
-
 function RewardClaimButton({
   disabled,
   muted = false,
   label,
   onPress,
+  width,
 }: {
   disabled: boolean;
   muted?: boolean;
   label: string;
   onPress: () => void;
+  width?: number;
 }) {
+  const buttonWidth = width ?? walking.rewardClaimButtonWidth;
   return (
     <MediaPressable
       disabled={disabled}
@@ -760,43 +775,19 @@ function RewardClaimButton({
       accessibilityRole="button"
       accessibilityLabel={label}
       accessibilityState={{ disabled }}
-      style={styles.rewardClaimButton}
+      style={[styles.rewardClaimButton, { width: buttonWidth }]}
     >
       <Image
         source={muted ? DISABLED_REWARD_CLAIM_BUTTON_IMAGE : REWARD_CLAIM_BUTTON_IMAGE}
         resizeMode="contain"
-        style={styles.rewardClaimButtonImage}
+        style={[
+          styles.rewardClaimButtonImage,
+          { height: Math.max(tapMin * 0.72, buttonWidth * 0.5) },
+        ]}
         accessible={false}
       />
     </MediaPressable>
   );
-}
-
-function formatClassroomRankResetAt(value: string | null) {
-  if (!value) return "일 00:00";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "일 00:00";
-  const parts = new Intl.DateTimeFormat("en-US", {
-    day: "2-digit",
-    hour: "2-digit",
-    hour12: false,
-    month: "2-digit",
-    timeZone: "Asia/Seoul",
-    weekday: "short",
-  }).formatToParts(date);
-  const values = Object.fromEntries(parts.map((part) => [part.type, part.value]));
-  const weekday = { Sun: "일", Mon: "월", Tue: "화", Wed: "수", Thu: "목", Fri: "금", Sat: "토" }[
-    values.weekday ?? ""
-  ] ?? "일";
-  return `${values.month}/${values.day}(${weekday}) ${values.hour}:00`;
-}
-
-function formatClassroomRankRewardPeriod(weekStart: string) {
-  const [year, month, day] = weekStart.split("-").map(Number);
-  if (!year || !month || !day) return "지난 회차";
-  // Classroom ranking periods start each Sunday, so a month’s first Sunday is week 1.
-  const weekOfMonth = Math.floor((day - 1) / 7) + 1;
-  return `${month}월 ${weekOfMonth}주차`;
 }
 
 function RankRewardAmount({ amount, claimed = false }: { amount: number; claimed?: boolean }) {
@@ -818,6 +809,16 @@ function RankRewardAmount({ amount, claimed = false }: { amount: number; claimed
       </Text>
     </View>
   );
+}
+
+
+function claimButtonWidthFor(markerCount: number, trackWidth: number) {
+  const count = Math.max(1, markerCount);
+  const gap = spacing.xs;
+  const available = Math.max(0, trackWidth - gap * Math.max(0, count - 1));
+  const maxWidth = walking.rewardClaimButtonWidth;
+  const minWidth = walking.rewardClaimButtonMinWidth;
+  return Math.max(minWidth, Math.min(maxWidth, Math.floor(available / count)));
 }
 
 type MissionRewardMarker = {
@@ -844,48 +845,34 @@ function MissionRewardTrack({
   representativeSlime: WalkingRepresentativeSlime | null;
 }) {
   const safeMaxSteps = Math.max(1, maxSteps);
-  const progress = Math.min(totalSteps / safeMaxSteps, 1);
+  const [trackWidth, setTrackWidth] = useState(0);
+  const claimButtonWidth = claimButtonWidthFor(markers.length, trackWidth);
 
   return (
-    <View style={styles.missionRewardTrack}>
-      <View style={styles.missionTrackLayer}>
-        {representativeSlime ? (
-          <MissionSlimeMarker slime={representativeSlime} progress={progress} />
-        ) : null}
-        <View
-          accessible
-          accessibilityRole="progressbar"
-          accessibilityLabel={label}
-          accessibilityValue={{ min: 0, max: safeMaxSteps, now: totalSteps }}
-          style={styles.missionTrack}
-        >
-          <View style={[styles.missionFill, { width: `${progress * 100}%` }]} />
-          {markers.map((marker, index) => {
-            const isLast = index === markers.length - 1;
-            const percentage = Math.min(Math.max((marker.steps / safeMaxSteps) * 100, 0), 100);
-            return (
-              <View
-                key={marker.key}
-                pointerEvents="none"
-                style={[
-                  styles.missionMarkerLine,
-                  isLast ? styles.missionMarkerLineEnd : { left: `${percentage}%` },
-                  marker.claimed && styles.missionMarkerLineClaimed,
-                ]}
-              />
-            );
-          })}
-        </View>
-      </View>
+    <View
+      style={styles.missionRewardTrack}
+      onLayout={(event) => {
+        const nextWidth = Math.round(event.nativeEvent.layout.width);
+        setTrackWidth((current) => (current === nextWidth ? current : nextWidth));
+      }}
+    >
+      <MissionProgressTrack
+        value={totalSteps}
+        max={safeMaxSteps}
+        markerValues={markers.map((marker) => marker.steps)}
+        completedMarkerValues={markers
+          .filter((marker) => marker.claimed)
+          .map((marker) => marker.steps)}
+        accessibilityLabel={label}
+        representativeSlime={representativeSlime}
+      />
       <View style={styles.dailyMilestones}>
         {markers.map((marker) => (
           <View key={marker.key} style={styles.dailyMilestone}>
             <Text style={styles.dailyMilestoneSteps}>
               {numberFormatter.format(marker.steps)}걸음
             </Text>
-            <Text style={styles.dailyMilestoneAmount}>
-              {numberFormatter.format(marker.amount)}원
-            </Text>
+            <RankRewardAmount amount={marker.amount} />
             {marker.claimed ? (
               <Text style={styles.rewardClaimedLabel}>수령 완료</Text>
             ) : (
@@ -893,6 +880,7 @@ function MissionRewardTrack({
                 disabled={!marker.claimable || marker.pending}
                 muted={!marker.claimable || marker.pending}
                 onPress={marker.onClaim}
+                width={claimButtonWidth}
                 label={`${numberFormatter.format(marker.steps)}걸음 보상 ${numberFormatter.format(marker.amount)}원${
                   marker.claimable ? " 수령" : " 아직 수령할 수 없음"
                 }`}
@@ -901,62 +889,6 @@ function MissionRewardTrack({
           </View>
         ))}
       </View>
-    </View>
-  );
-}
-
-function MissionSlimeMarker({
-  slime,
-  progress,
-}: {
-  slime: WalkingRepresentativeSlime;
-  progress: number;
-}) {
-  const jumpOffset = useRef(new Animated.Value(0)).current;
-  const slimeJumpStyle = useMemo(
-    () => ({ transform: [{ translateY: jumpOffset }] }),
-    [jumpOffset],
-  );
-
-  useEffect(() => {
-    const animation = Animated.loop(
-      Animated.sequence([
-        Animated.timing(jumpOffset, {
-          toValue: walking.missionSlimeJumpOffset,
-          duration: 360,
-          easing: Easing.out(Easing.quad),
-          useNativeDriver: true,
-        }),
-        Animated.timing(jumpOffset, {
-          toValue: 0,
-          duration: 360,
-          easing: Easing.in(Easing.quad),
-          useNativeDriver: true,
-        }),
-      ]),
-    );
-    animation.start();
-    return () => animation.stop();
-  }, [jumpOffset]);
-
-  return (
-    <View
-      pointerEvents="none"
-      accessible={false}
-      style={[styles.missionSlimeMarker, { left: `${progress * 100}%` }]}
-    >
-      <Animated.View style={slimeJumpStyle}>
-        <View style={styles.missionSlimeScale}>
-          <SlimeSprite
-            slimeColor={slime.color}
-            evolution={evolutionForStage(slime.growthStage)}
-            // Mission progress uses the representative slime's base look;
-            // equipped floor/item presentation belongs to the creature view.
-            equippedFloor="none"
-            displayScale={0.25}
-          />
-        </View>
-      </Animated.View>
     </View>
   );
 }
@@ -1172,20 +1104,52 @@ const styles = StyleSheet.create({
     gap: spacing.xxl,
     position: "relative",
   },
-  // The activity tabs stay outside the ScrollView so the current view and the
-  // connection state remain reachable while reading long mission content.
+  tabContent: {
+    width: "100%",
+    minWidth: 0,
+    gap: spacing.xxl,
+  },
+  // Keep activity tabs sticky above the ScrollView.
   pageTabsRow: {
     width: "100%",
     maxWidth: layout.readableMaxWidth,
     alignSelf: "center",
     paddingHorizontal: spacing.xl,
   },
-  connectionRow: {
+  // Only status/error/notice stay above the main content sections.
+  scrollLead: {
+    gap: spacing.sm,
+  },
+  headerActionsWrap: {
+    gap: spacing.xs,
+    maxWidth: "70%",
+  },
+  headerActions: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "flex-end",
     gap: spacing.xs,
-    paddingTop: spacing.xs,
+    flexShrink: 1,
+  },
+  headerConnection: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.xs,
+    minHeight: tapMin,
+    paddingHorizontal: spacing.xs,
+  },
+  headerConnectionText: {
+    ...typography.micro,
+    color: colors.textMuted,
+  },
+  headerIconButton: {
+    minWidth: tapMin,
+    minHeight: tapMin,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: borders.none,
+    borderColor: colors.transparent,
+    borderRadius: radii.none,
+    backgroundColor: colors.transparent,
   },
   viewNav: {
     alignSelf: "stretch",
@@ -1200,17 +1164,6 @@ const styles = StyleSheet.create({
     backgroundColor: colors.textMuted,
   },
   connectionDotConnected: { backgroundColor: colors.statusOnline },
-  connectionOverlayText: { ...typography.micro, color: colors.textMuted },
-  connectionSettingsButton: {
-    width: iconSizes.lg,
-    height: iconSizes.lg,
-    alignItems: "center",
-    justifyContent: "center",
-    borderWidth: borders.none,
-    borderColor: colors.transparent,
-    borderRadius: radii.none,
-    backgroundColor: colors.transparent,
-  },
   muted: { ...typography.label, color: colors.textMuted },
   settingsSheet: { padding: spacing.xl, gap: spacing.md },
   settingsTitle: { ...typography.title, color: colors.text },
@@ -1249,55 +1202,6 @@ const styles = StyleSheet.create({
   },
   summaryLabel: { ...typography.label, color: colors.textMuted, textAlign: "center" },
   summaryValue: { ...typography.section, color: colors.text, textAlign: "center" },
-  classroomTopFiveSection: { gap: spacing.sm },
-  classroomTopFivePeriod: { ...typography.label, color: colors.textMuted },
-  classroomTopFiveRow: {
-    minHeight: tapMin,
-    flexDirection: "row",
-    alignItems: "center",
-    position: "relative",
-    paddingHorizontal: spacing.sm,
-    borderBottomWidth: borders.hairline,
-    borderBottomColor: colors.border,
-  },
-  classroomTopFiveCurrentRow: { backgroundColor: colors.accentTintedBg },
-  classroomTopFiveRank: {
-    width: spacing.xl,
-    ...typography.section,
-    color: colors.accentTintedText,
-    textAlign: "center",
-  },
-  classroomTopFiveName: {
-    ...typography.body,
-    color: colors.text,
-    flex: 1,
-    minWidth: 0,
-    marginRight: walking.classroomRankRewardWidth,
-  },
-  classroomTopFiveSteps: {
-    ...typography.label,
-    color: colors.textMuted,
-    position: "absolute",
-    left: spacing.none,
-    right: spacing.none,
-    textAlign: "center",
-  },
-  classroomRankRewardRow: {
-    minHeight: tapMin,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    position: "relative",
-    paddingHorizontal: spacing.sm,
-    backgroundColor: colors.accentTintedBg,
-  },
-  classroomRankRewardLabel: {
-    ...typography.label,
-    color: colors.text,
-    position: "absolute",
-    left: spacing.sm,
-  },
-  classroomRankRewardClaimAction: { position: "absolute", right: spacing.xs },
   rankRewardAmount: {
     width: walking.classroomRankRewardWidth,
     minHeight: tapMin,
@@ -1341,33 +1245,8 @@ const styles = StyleSheet.create({
     color: colors.textMuted,
   },
   missionProgressPercent: { ...typography.label, color: colors.text },
-  missionTrack: {
-    position: "relative",
-    height: walking.chartBarHeight,
-    backgroundColor: colors.accentTintedBg,
-    overflow: "hidden",
-  },
-  missionFill: {
-    height: "100%",
-    backgroundColor: colors.accent,
-  },
-  missionTrackLayer: {
-    height: walking.chartBarHeight,
-    position: "relative",
-  },
-  missionSlimeMarker: {
-    position: "absolute",
-    // `SlimeSprite` keeps a 64px source viewport while this marker scales it
-    // to 32px around its center. The visible feet end 44px below this origin.
-    top: walking.chartBarHeight - walking.missionSlimeFootOffset,
-    marginLeft: -(walking.missionSlimeLayoutSize / 2),
-    zIndex: layers.badge,
-  },
-  missionSlimeScale: {
-    transform: [{ scale: walking.missionSlimeScale }],
-  },
   missionRewardTrack: {
-    gap: spacing.xs,
+    gap: spacing.xxs,
   },
   missionMarkerLabels: {
     height: spacing.xxl,
@@ -1396,15 +1275,6 @@ const styles = StyleSheet.create({
     ...typography.micro,
     color: colors.text,
   },
-  missionMarkerLine: {
-    position: "absolute",
-    top: spacing.none,
-    bottom: spacing.none,
-    width: borders.hairline,
-    backgroundColor: colors.textMuted,
-  },
-  missionMarkerLineEnd: { right: spacing.none },
-  missionMarkerLineClaimed: { backgroundColor: colors.accentTintedText },
   dailyMilestones: {
     flexDirection: "row",
     gap: spacing.xs,
@@ -1413,7 +1283,7 @@ const styles = StyleSheet.create({
     flex: 1,
     minWidth: 0,
     alignItems: "center",
-    gap: spacing.xs,
+    gap: spacing.xxs,
   },
   dailyMilestoneSteps: {
     ...typography.micro,
@@ -1426,7 +1296,8 @@ const styles = StyleSheet.create({
     textAlign: "center",
   },
   rewardClaimButton: {
-    width: walking.rewardClaimButtonWidth,
+    minWidth: walking.rewardClaimButtonMinWidth,
+    maxWidth: walking.rewardClaimButtonWidth,
     minHeight: tapMin,
     alignItems: "center",
     justifyContent: "center",

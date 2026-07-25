@@ -4,6 +4,7 @@ import {
   colors,
   controls,
   iconSizes,
+  pageChrome,
   spacing,
   typography,
 } from "../../theme/tokens";
@@ -177,6 +178,7 @@ const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.bg },
   streamContent: {
     paddingHorizontal: spacing.none,
+    paddingTop: pageChrome.directContentStartGap,
     paddingBottom: spacing.xxxl + controls.fab,
   },
   streamSeparator: {

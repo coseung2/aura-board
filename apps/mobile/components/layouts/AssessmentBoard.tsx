@@ -15,6 +15,7 @@ import {
   colors,
   spacing,
   typography,
+  pageChrome,
 } from "../../theme/tokens";
 import {
   AppButton,
@@ -287,7 +288,7 @@ export function AssessmentBoard({ data }: { data: BoardDetailResponse }) {
 
 const styles = StyleSheet.create({
   center: { flex: 1, alignItems: "center", justifyContent: "center", gap: spacing.md, padding: spacing.xxl },
-  content: { padding: spacing.xl, gap: spacing.md, paddingBottom: spacing.xxxl },
+  content: { paddingHorizontal: spacing.xl, paddingTop: pageChrome.directContentStartGap, gap: spacing.md, paddingBottom: spacing.xxxl },
   statusCard: { padding: spacing.lg, gap: spacing.sm },
   statusTop: { flexDirection: "row", alignItems: "center", gap: spacing.md },
   titleWrap: { flex: 1, gap: spacing.xs },

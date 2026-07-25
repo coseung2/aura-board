@@ -14,6 +14,8 @@ module.exports = function withAuraBoardHealthConnect(config) {
       "Aura Board는 날짜별 걸음 수 합계를 보여 주기 위해 Apple 건강 데이터 접근 권한을 요청합니다.";
     nextConfig.modResults.NSHealthUpdateUsageDescription =
       "Aura Board는 학생의 날짜별 걸음 수를 동기화해 주간 걷기 현황을 보여 주기 위해 Apple 건강 데이터 권한을 사용합니다. 현재 건강 데이터는 추가하거나 변경하지 않습니다.";
+    nextConfig.modResults.NSMotionUsageDescription =
+      "Aura Board에서 걷기 화면을 보는 동안 실시간 걸음 수 변화를 표시하기 위해 동작 및 피트니스 권한을 사용합니다.";
     return nextConfig;
   });
 

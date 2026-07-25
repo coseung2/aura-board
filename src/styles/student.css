@@ -555,10 +555,10 @@
   place-items: center;
   align-content: center;
   gap: 1px;
-  width: 64px;
-  min-width: 64px;
-  height: 64px;
-  min-height: 64px;
+  width: clamp(48px, 14vw, 64px);
+  min-width: 48px;
+  height: clamp(48px, 14vw, 64px);
+  min-height: 48px;
   padding: 4px;
   border: 2px solid var(--color-border);
   border-radius: 50%;
@@ -930,7 +930,7 @@
 
 .student-reading-future-mission-list {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: 1fr;
   gap: 8px;
   margin: 0;
   padding: 0;
@@ -938,11 +938,115 @@
 }
 
 .student-reading-future-mission-list li {
-  padding: 10px 12px;
-  border: 1px dashed var(--color-border);
+  display: grid;
+  gap: 7px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.student-reading-future-mission-list li:first-child {
+  border-top: 1px solid var(--color-border);
+}
+
+.student-reading-mission-heading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.student-reading-mission-heading strong {
+  color: var(--color-text);
+  font-size: 14px;
+}
+
+.student-reading-mission-heading span {
+  flex: 0 0 auto;
+  color: var(--color-accent);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.student-reading-future-mission-list li.is-complete .student-reading-mission-heading span {
+  color: var(--color-success, var(--color-accent));
+}
+
+.student-reading-future-mission-list p {
+  margin: 0;
   color: var(--color-text-muted);
   font-size: 13px;
-  font-weight: 700;
+}
+
+.student-reading-mission-progress {
+  height: 8px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--color-surface-alt);
+}
+
+.student-reading-mission-reward-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.student-reading-mission-reward-row strong {
+  color: var(--color-text);
+  font-size: 13px;
+}
+
+.student-reading-future-mission-list li.is-claimable .student-reading-mission-heading span {
+  color: var(--color-accent);
+}
+
+.student-reading-mission-progress span {
+
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--color-accent);
+}
+
+.student-reading-mission-step-state {
+  display: grid;
+  place-items: center;
+  min-height: 44px;
+  padding: 0 8px;
+  border-radius: 999px;
+  background: var(--color-surface-alt);
+  color: var(--color-text-muted);
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.student-reading-final-reward {
+  display: grid;
+  gap: 10px;
+  margin-top: 4px;
+  padding-top: 12px;
+  border-top: 1px solid var(--color-border);
+}
+
+.student-reading-final-reward-copy {
+  display: grid;
+  gap: 4px;
+}
+
+.student-reading-final-reward-copy strong {
+  color: var(--color-text);
+  font-size: 14px;
+}
+
+.student-reading-final-reward-copy p {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: 13px;
+}
+
+.student-reading-final-reward .student-walking-mission-coin {
+  justify-self: start;
+  min-width: min(100%, 140px);
 }
 
 @media (max-width: 900px) {
@@ -1013,15 +1117,15 @@
   }
 
   .student-walking-mission-milestone {
-    width: min(108px, 34%);
-    min-width: 76px;
+    width: min(92px, 30%);
+    min-width: 64px;
   }
 
   .student-walking-mission-coin {
-    width: 60px;
-    min-width: 60px;
-    height: 60px;
-    min-height: 60px;
+    width: clamp(44px, 13vw, 56px);
+    min-width: 44px;
+    height: clamp(44px, 13vw, 56px);
+    min-height: 44px;
   }
 
   .student-walking-mission-coin-amount {
@@ -2400,7 +2504,7 @@
 
 .reading-textarea {
   resize: vertical;
-  min-height: 96px;
+  min-height: 230px;
   line-height: 1.5;
 }
 

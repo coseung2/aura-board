@@ -17,6 +17,7 @@ import {
   radii,
   spacing,
   typography,
+  pageChrome,
 } from "../../theme/tokens";
 import { AppButton, EmptyState, SurfaceCard, TextField } from "../ui";
 
@@ -172,7 +173,7 @@ export function QuestionBoard({ data }: { data: BoardDetailResponse }) {
 }
 
 const styles = StyleSheet.create({
-  content: { padding: spacing.xl, gap: spacing.md, paddingBottom: spacing.xxxl },
+  content: { paddingHorizontal: spacing.xl, paddingTop: pageChrome.directContentStartGap, gap: spacing.md, paddingBottom: spacing.xxxl },
   center: { flex: 1, alignItems: "center", justifyContent: "center", gap: spacing.md },
   muted: { ...typography.body, color: colors.textMuted },
   header: { gap: spacing.md, marginBottom: spacing.md },

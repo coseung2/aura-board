@@ -129,13 +129,13 @@ describe("POST /api/student/walking/rewards/claim", () => {
     mocks.awardWalkingPolicyReward.mockResolvedValue({ amount: 60, idempotent: false });
 
     const response = await POST(
-      request({ kind: "classroom_rank", weekStart: "2026-07-12" }),
+      request({ kind: "classroom_rank", weekStart: "2026-07-13" }),
     );
 
     expect(response.status).toBe(200);
     expect(await response.json()).toMatchObject({
       classroomRankReward: {
-        weekStart: "2026-07-12",
+        weekStart: "2026-07-13",
         rank: 2,
         amount: 60,
         claimed: true,
@@ -145,7 +145,7 @@ describe("POST /api/student/walking/rewards/claim", () => {
     });
     expect(mocks.awardWalkingPolicyReward).toHaveBeenCalledWith(
       expect.objectContaining({
-        sourceRef: "student-1:2026-07-12:classroom-rank",
+        sourceRef: "student-1:2026-07-13:classroom-rank",
         sourceType: "walking_classroom_rank_reward",
         baseAmount: 60,
       }),
@@ -156,7 +156,7 @@ describe("POST /api/student/walking/rewards/claim", () => {
     mocks.queryRaw.mockResolvedValue([{ rank: 6 }]);
 
     const response = await POST(
-      request({ kind: "classroom_rank", weekStart: "2026-07-12" }),
+      request({ kind: "classroom_rank", weekStart: "2026-07-13" }),
     );
 
     expect(response.status).toBe(409);

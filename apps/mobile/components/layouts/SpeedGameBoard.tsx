@@ -2,7 +2,12 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Platform, ScrollView, StyleSheet, Text, View } from "react-native";
 import { apiFetch } from "../../lib/api";
 import type { BoardDetailResponse, SpeedGameWire } from "../../lib/types";
-import { colors, spacing, typography } from "../../theme/tokens";
+import {
+  colors,
+  pageChrome,
+  spacing,
+  typography,
+} from "../../theme/tokens";
 import { AppButton, EmptyState, Pill, SurfaceCard, TextField } from "../ui";
 
 export function SpeedGameBoard({ data }: { data: BoardDetailResponse }) {
@@ -162,7 +167,7 @@ function Leaderboard({ game }: { game: SpeedGameWire }) {
 
 const styles = StyleSheet.create({
   center: { flex: 1, alignItems: "center", justifyContent: "center", padding: spacing.xl },
-  content: { padding: spacing.xl, gap: spacing.lg, paddingBottom: spacing.xxxl },
+  content: { paddingHorizontal: spacing.xl, paddingTop: pageChrome.directContentStartGap, gap: spacing.lg, paddingBottom: spacing.xxxl },
   heading: { flexDirection: "row", alignItems: "center", gap: spacing.md },
   headingText: { flex: 1, gap: spacing.xs },
   title: { ...typography.title, color: colors.text },

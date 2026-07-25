@@ -21,6 +21,7 @@ import {
   spacing,
   typography,
   vibe,
+  pageChrome,
 } from "../../theme/tokens";
 import { apiFetch, ApiError, getApiBase, streamSse } from "../../lib/api";
 import type { BoardDetailResponse } from "../../lib/types";
@@ -349,7 +350,9 @@ const styles = StyleSheet.create({
   root: {
     flex: 1,
     flexDirection: "row",
-    padding: spacing.lg,
+    paddingHorizontal: spacing.lg,
+    paddingTop: pageChrome.directContentStartGap,
+    paddingBottom: spacing.lg,
     gap: spacing.lg,
   },
   rootCompact: {

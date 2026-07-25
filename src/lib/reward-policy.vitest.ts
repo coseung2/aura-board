@@ -158,17 +158,19 @@ describe("area reward policy", () => {
     });
   });
 
-  it("rolls classroom walking ranks over at Sunday 00:00 KST", async () => {
+  it("rolls classroom walking ranks over at Monday 00:00 KST", async () => {
     const { getKstClassroomWalkingRankPeriods } = await import("./reward-policy");
 
-    expect(getKstClassroomWalkingRankPeriods(new Date("2026-07-18T14:59:59.999Z"))).toMatchObject({
-      active: { weekStart: "2026-07-12", weekEnd: "2026-07-19" },
-      closed: { weekStart: "2026-07-05", weekEnd: "2026-07-12" },
+    // Sunday 23:59:59 KST still belongs to the previous Monday-start week.
+    expect(getKstClassroomWalkingRankPeriods(new Date("2026-07-19T14:59:59.999Z"))).toMatchObject({
+      active: { weekStart: "2026-07-13", weekEnd: "2026-07-20" },
+      closed: { weekStart: "2026-07-06", weekEnd: "2026-07-13" },
     });
-    expect(getKstClassroomWalkingRankPeriods(new Date("2026-07-18T15:00:00.000Z"))).toMatchObject({
-      active: { weekStart: "2026-07-19", weekEnd: "2026-07-26" },
-      closed: { weekStart: "2026-07-12", weekEnd: "2026-07-19" },
-      nextResetAt: new Date("2026-07-25T15:00:00.000Z"),
+    // Monday 00:00:00 KST opens the next rank week.
+    expect(getKstClassroomWalkingRankPeriods(new Date("2026-07-19T15:00:00.000Z"))).toMatchObject({
+      active: { weekStart: "2026-07-20", weekEnd: "2026-07-27" },
+      closed: { weekStart: "2026-07-13", weekEnd: "2026-07-20" },
+      nextResetAt: new Date("2026-07-26T15:00:00.000Z"),
     });
   });
 

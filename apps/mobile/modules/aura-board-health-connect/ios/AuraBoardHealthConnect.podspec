@@ -18,5 +18,5 @@ Pod::Spec.new do |s|
   }
 
   s.dependency 'ExpoModulesCore'
-  s.frameworks = 'HealthKit'
+  s.frameworks = 'CoreMotion', 'HealthKit'
 end

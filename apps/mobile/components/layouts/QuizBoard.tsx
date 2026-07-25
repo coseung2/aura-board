@@ -11,6 +11,7 @@ import {
   quiz as quizTokens,
   spacing,
   typography,
+  pageChrome,
 } from "../../theme/tokens";
 import { apiFetch, ApiError } from "../../lib/api";
 import type { BoardDetailResponse } from "../../lib/types";
@@ -318,7 +319,7 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.lg,
   },
 
-  activeRoot: { flex: 1, padding: spacing.xl, gap: spacing.lg },
+  activeRoot: { flex: 1, paddingHorizontal: spacing.xl, paddingTop: pageChrome.directContentStartGap, paddingBottom: spacing.xl, gap: spacing.lg },
   topBar: {
     flexDirection: "row",
     justifyContent: "space-between",

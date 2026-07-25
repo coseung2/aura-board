@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
+  Image,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
@@ -25,12 +26,14 @@ import {
   spacing,
   tapMin,
   typography,
+  walking,
 } from "../../theme/tokens";
 import {
   AppButton,
   AppHeader,
   AppModal,
   ControlPressable,
+  MediaPressable,
   SectionHeader,
   TextField,
 } from "../../components/ui";
@@ -41,6 +44,11 @@ import {
   SectionNavItem,
 } from "../../components/NavigationTabs";
 import { StudentHeaderActions } from "../../components/StudentHeaderActions";
+import {
+  ClassroomTopFive,
+  type ClassroomRankReward,
+} from "../../components/ClassroomTopFive";
+import { MissionProgressTrack } from "../../components/MissionProgressTrack";
 import { WalkingAttendanceCalendar } from "../../components/walking-attendance-calendar";
 import { TitleCollection, type TitleProgress } from "../../components/TitleCollection";
 import { claimStudentAttendanceReward } from "../../lib/student-attendance";
@@ -48,7 +56,13 @@ import { claimTitle } from "../../lib/titles";
 import {
   fetchWalkingSnapshot,
   type WalkingMonthlyAttendanceReward,
+  type WalkingRepresentativeSlime,
 } from "../../lib/walking-health";
+
+const numberFormatter = new Intl.NumberFormat("ko-KR");
+const REWARD_CLAIM_BUTTON_IMAGE = require("../../assets/walking/reward-claim-button.png");
+const DISABLED_REWARD_CLAIM_BUTTON_IMAGE = require("../../assets/walking/reward-claim-button-disabled.png");
+const REWARD_COIN_IMAGE = require("../../assets/walking/reward-coin.png");
 
 type BookType = "comic" | "story";
 type ReadingTab = "records" | "missions" | "titles";
@@ -58,11 +72,57 @@ type ReadingRank = {
   studentName: string;
   weeklyCount: number;
   isCurrent: boolean;
+  rewardAmount: number;
 };
 type ReadingSummary = {
   weeklyCount: number;
   totalCount: number;
   averageScore: number | null;
+};
+type ReadingMissionKey = "weekly_books" | "consecutive_days" | "reflection_chars";
+type ReadingMissionStep = {
+  unit: number;
+  target: number;
+  amount: number;
+  achieved: boolean;
+  claimed: boolean;
+  claimable: boolean;
+};
+type ReadingMission = {
+  key: ReadingMissionKey;
+  title: string;
+  description: string;
+  target: number;
+  progress: number;
+  unit: string;
+  completed: boolean;
+  amount: number;
+  claimed: boolean;
+  claimable: boolean;
+  steps?: ReadingMissionStep[];
+  achievedStepCount?: number;
+  claimedStepCount?: number;
+  claimableStepCount?: number;
+  claimedAmount?: number;
+  claimableAmount?: number;
+};
+type ReadingWeeklyMissionReward = {
+  weekStart: string;
+  weekEnd: string;
+  amount: number;
+  completedCount: number;
+  totalCount: number;
+  achieved: boolean;
+  claimed: boolean;
+  claimable: boolean;
+  totalStepCount?: number;
+  achievedStepCount?: number;
+  claimedStepCount?: number;
+  claimableStepCount?: number;
+  achievedAmount?: number;
+  claimedAmount?: number;
+  claimableAmount?: number;
+  missions: ReadingMission[];
 };
 type ReadingEntry = {
   id: string;
@@ -74,25 +134,6 @@ type ReadingEntry = {
   aiFeedback: string | null;
   createdAt: string;
 };
-
-const READING_MISSION_PREVIEWS = [
-  {
-    title: "주간 독서 권수",
-    description: "이번 주에 읽은 책 권수를 함께 쌓아요.",
-  },
-  {
-    title: "연속 독서일",
-    description: "매일 읽는 습관을 이어 가요.",
-  },
-  {
-    title: "감상문 작성량",
-    description: "느낀 점을 더 풍성하게 남겨 봐요.",
-  },
-  {
-    title: "장르 탐험",
-    description: "새로운 종류의 책을 만나 봐요.",
-  },
-] as const;
 
 export default function StudentReadingScreen() {
   const router = useRouter();
@@ -112,8 +153,18 @@ export default function StudentReadingScreen() {
   const [expandedEntryId, setExpandedEntryId] = useState<string | null>(null);
   const [historyBookType, setHistoryBookType] = useState<BookType>("story");
   const [summary, setSummary] = useState<ReadingSummary | null>(null);
+  const [missions, setMissions] = useState<ReadingMission[]>([]);
+  const [weeklyMissionReward, setWeeklyMissionReward] =
+    useState<ReadingWeeklyMissionReward | null>(null);
+  const [representativeSlime, setRepresentativeSlime] =
+    useState<WalkingRepresentativeSlime | null>(null);
+  const [claimingMissionReward, setClaimingMissionReward] = useState(false);
+  const [missionClaimError, setMissionClaimError] = useState<string | null>(null);
   const [classroomTopFive, setClassroomTopFive] = useState<ReadingRank[]>([]);
+  const [classroomRankRewards, setClassroomRankRewards] =
+    useState<ClassroomRankReward[]>([]);
   const [rankResetAt, setRankResetAt] = useState<string | null>(null);
+  const [rankRewardPending, setRankRewardPending] = useState(false);
   const [titles, setTitles] = useState<TitleProgress[]>([]);
   const [attendanceReward, setAttendanceReward] =
     useState<WalkingMonthlyAttendanceReward | null>(null);
@@ -148,14 +199,23 @@ export default function StudentReadingScreen() {
         entries: ReadingEntry[];
         summary?: ReadingSummary;
         classroomTopFive?: ReadingRank[];
+        classroomRankRewards?: ClassroomRankReward[];
         classroomRankNextResetAt?: string | null;
         titles?: TitleProgress[];
+        missions?: ReadingMission[];
+        weeklyMissionReward?: ReadingWeeklyMissionReward | null;
+        representativeSlime?: WalkingRepresentativeSlime | null;
       }>("/api/student/reading");
       setEntries(payload.entries);
       setSummary(payload.summary ?? null);
       setClassroomTopFive(payload.classroomTopFive ?? []);
+      setClassroomRankRewards(payload.classroomRankRewards ?? []);
       setRankResetAt(payload.classroomRankNextResetAt ?? null);
       setTitles(payload.titles ?? []);
+      setMissions(payload.missions ?? payload.weeklyMissionReward?.missions ?? []);
+      setWeeklyMissionReward(payload.weeklyMissionReward ?? null);
+      setRepresentativeSlime(payload.representativeSlime ?? null);
+      setMissionClaimError(null);
       if (
         !payload.entries.some((entry) => entry.bookType === "story") &&
         payload.entries.some((entry) => entry.bookType === "comic")
@@ -183,6 +243,33 @@ export default function StudentReadingScreen() {
     }
   }, [handleError]);
 
+  const claimClassroomRankReward = useCallback(async (weekStart: string) => {
+    if (rankRewardPending) return;
+    setRankRewardPending(true);
+    setError(null);
+    setNotice(null);
+    try {
+      const payload = await apiFetch<{
+        classroomRankReward: { weekStart: string; rank: number; amount: number; claimed: true };
+      }>("/api/student/reading/rewards/claim", {
+        method: "POST",
+        json: { kind: "classroom_rank", weekStart },
+      });
+      setClassroomRankRewards((currentRewards) =>
+        currentRewards.filter(
+          (reward) => reward.weekStart !== payload.classroomRankReward.weekStart,
+        ),
+      );
+      setNotice(`${payload.classroomRankReward.rank}등 보상을 받았어요.`);
+    } catch (nextError) {
+      if (!(await handleError(nextError))) {
+        setError("순위 보상을 받지 못했어요. 순위를 새로고침한 뒤 다시 시도해 주세요.");
+      }
+    } finally {
+      setRankRewardPending(false);
+    }
+  }, [handleError, rankRewardPending]);
+
   const claimAttendance = useCallback(async (day: string) => {
     setAttendanceBusy(true);
     setMissionError(null);
@@ -197,6 +284,43 @@ export default function StudentReadingScreen() {
       setAttendanceBusy(false);
     }
   }, [handleError]);
+
+
+  const claimWeeklyMissionReward = useCallback(async (
+    missionKey: ReadingMissionKey,
+    unit: number,
+  ) => {
+    if (claimingMissionReward) return;
+    const mission = weeklyMissionReward?.missions.find((item) => item.key === missionKey);
+    const step = mission?.steps?.find((item) => item.unit === unit);
+    if (!mission || !step?.claimable) return;
+    setClaimingMissionReward(true);
+    setMissionClaimError(null);
+    try {
+      const payload = await apiFetch<{
+        weeklyMissionReward: ReadingWeeklyMissionReward;
+        rewardAmount: number;
+        missionKey: ReadingMissionKey;
+        unit: number;
+        step: ReadingMissionStep;
+        idempotent: boolean;
+      }>("/api/student/reading/rewards/claim", {
+        method: "POST",
+        json: { missionKey, unit },
+      });
+      setWeeklyMissionReward(payload.weeklyMissionReward);
+      setMissions(payload.weeklyMissionReward.missions);
+      setNotice(
+        `${mission.title} ${payload.step.target}${mission.unit} 보상 ${numberFormatter.format(payload.rewardAmount)}원을 받았어요.`,
+      );
+    } catch (nextError) {
+      if (!(await handleError(nextError))) {
+        setMissionClaimError("보상을 받지 못했어요. 잠시 후 다시 시도해 주세요.");
+      }
+    } finally {
+      setClaimingMissionReward(false);
+    }
+  }, [claimingMissionReward, handleError, weeklyMissionReward]);
 
   const loadMission = useCallback(async () => {
     setMissionLoading(true);
@@ -295,8 +419,9 @@ export default function StudentReadingScreen() {
           keyboardShouldPersistTaps="handled"
           automaticallyAdjustKeyboardInsets={Platform.OS === "ios"}
         >
-          {activeTab === "records" ? (
-            <>
+          <View style={styles.tabContent}>
+            {activeTab === "records" ? (
+              <>
               <View style={styles.summarySection} accessibilityRole="summary">
                 <SectionHeader title="요약" />
                 <View style={styles.summaryRows}>
@@ -435,43 +560,27 @@ export default function StudentReadingScreen() {
                 )}
               </View>
 
-              {classroomTopFive.length > 0 ? (
-                <View style={styles.topFiveSection} accessibilityRole="summary">
-                  <SectionHeader
-                    title="우리 반 Top 5"
-                    right={
-                      <Text style={styles.topFivePeriod}>
-                        {formatRankResetAt(rankResetAt)} 랭킹 초기화
-                      </Text>
-                    }
-                  />
-                  <View accessibilityRole="list">
-                    {classroomTopFive.map((rank, index) => (
-                      <View
-                        key={rank.studentId}
-                        style={[
-                          styles.topFiveRow,
-                          rank.isCurrent && styles.topFiveCurrentRow,
-                        ]}
-                        accessibilityRole="summary"
-                        accessibilityLabel={`${index + 1}위 ${rank.studentName}, ${rank.weeklyCount}권${
-                          rank.isCurrent ? ", 나" : ""
-                        }`}
-                      >
-                        <Text style={styles.topFiveRank}>{index + 1}</Text>
-                        <Text style={styles.topFiveName} numberOfLines={1}>
-                          {rank.studentName}
-                        </Text>
-                        <Text style={styles.topFiveCount}>{rank.weeklyCount}권</Text>
-                      </View>
-                    ))}
-                  </View>
-                </View>
+              {classroomTopFive.length > 0 || classroomRankRewards.length > 0 ? (
+                <ClassroomTopFive
+                  ranks={classroomTopFive.map((rank) => ({
+                    studentId: rank.studentId,
+                    studentName: rank.studentName,
+                    metricValue: rank.weeklyCount,
+                    isCurrent: rank.isCurrent,
+                    rewardAmount: Math.max(0, Number(rank.rewardAmount) || 0),
+                  }))}
+                  rankRewards={classroomRankRewards}
+                  nextResetAt={rankResetAt}
+                  metricUnit="권"
+                  rewardPending={rankRewardPending}
+                  onClaimReward={(weekStart) => void claimClassroomRankReward(weekStart)}
+                />
               ) : null}
-            </>
-          ) : activeTab === "missions" ? (
-            <View style={styles.missionScreen}>
-              <View style={styles.missionSection}>
+              </>
+            ) : activeTab === "missions" ? (
+              <View style={styles.missionScreen}>
+                {missionLoading || missionError || attendanceReward ? (
+                  <View style={styles.missionSection}>
                 {missionLoading ? (
                   <View style={styles.loadingState} accessibilityRole="progressbar">
                     <ActivityIndicator color={colors.accent} />
@@ -491,34 +600,54 @@ export default function StudentReadingScreen() {
                     onDayPress={(day) => void claimAttendance(day)}
                   />
                 ) : null}
-              </View>
+                  </View>
+                ) : null}
 
-              <View style={styles.missionSection}>
-                <SectionHeader
-                  title="독서 미션"
-                  right={<Text style={styles.pendingLabel}>준비 중</Text>}
-                />
-                <View style={styles.missionPreviewList}>
-                  {READING_MISSION_PREVIEWS.map((mission) => (
-                    <View key={mission.title} style={styles.missionPreview}>
-                      <View style={styles.missionPreviewText}>
-                        <Text style={styles.missionPreviewTitle}>{mission.title}</Text>
-                        <Text style={styles.missionPreviewDescription}>{mission.description}</Text>
-                      </View>
-                      <Text style={styles.pendingLabel}>준비 중</Text>
-                    </View>
-                  ))}
+                <View style={styles.missionSection}>
+                {loading && !weeklyMissionReward && missions.length === 0 ? (
+                  <View style={styles.loadingState} accessibilityRole="progressbar">
+                    <ActivityIndicator color={colors.accent} />
+                    <Text style={styles.muted}>독서 미션을 불러오는 중이에요.</Text>
+                  </View>
+                ) : error && !weeklyMissionReward && missions.length === 0 ? (
+                  <View style={styles.missionError} accessibilityRole="alert">
+                    <Text style={styles.error}>{error}</Text>
+                    <AppButton variant="secondary" onPress={() => void load()}>
+                      다시 시도
+                    </AppButton>
+                  </View>
+                ) : (
+                  <ReadingWeeklyMissionPanel
+                    reward={
+                      weeklyMissionReward ?? {
+                        weekStart: "",
+                        weekEnd: "",
+                        amount: missions.reduce((sum, mission) => sum + (mission.amount || 0), 0) || 50,
+                        completedCount: missions.filter((mission) => mission.completed).length,
+                        totalCount: Math.max(1, missions.length || 3),
+                        achieved: missions.length > 0 && missions.every((mission) => mission.completed),
+                        claimed: missions.length > 0 && missions.every((mission) => mission.claimed),
+                        claimable: missions.some((mission) => mission.claimable),
+                        missions,
+                      }
+                    }
+                    representativeSlime={representativeSlime}
+                    claiming={claimingMissionReward}
+                    claimError={missionClaimError}
+                    onClaim={(missionKey, unit) => void claimWeeklyMissionReward(missionKey, unit)}
+                  />
+                )}
                 </View>
               </View>
-            </View>
-          ) : (
-            <TitleCollection
-              titles={titles}
-              emptyHint="독서 기록을 쌓으면 칭호를 얻을 수 있어요."
-              claimingKey={claimingTitleKey}
-              onClaim={(titleKey) => void claimReadingTitle(titleKey)}
-            />
-          )}
+            ) : (
+              <TitleCollection
+                titles={titles}
+                emptyHint="독서 기록을 쌓으면 칭호를 얻을 수 있어요."
+                claimingKey={claimingTitleKey}
+                onClaim={(titleKey) => void claimReadingTitle(titleKey)}
+              />
+            )}
+          </View>
         </ScrollView>
       </KeyboardAvoidingView>
 
@@ -532,7 +661,6 @@ export default function StudentReadingScreen() {
         sheetStyle={styles.composerSheet}
       >
         <View style={styles.composerHeader}>
-            <Text style={styles.composerTitle}>독서 기록 작성</Text>
             <ControlPressable
               style={styles.composerClose}
               onPress={() => setComposerVisible(false)}
@@ -633,24 +761,180 @@ function SummaryRow({ label, value }: { label: string; value: string }) {
   );
 }
 
-function formatRankResetAt(value: string | null) {
-  if (!value) return "일 00:00";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "일 00:00";
-  const parts = new Intl.DateTimeFormat("en-US", {
-    day: "2-digit",
-    hour: "2-digit",
-    hour12: false,
-    month: "2-digit",
-    timeZone: "Asia/Seoul",
-    weekday: "short",
-  }).formatToParts(date);
-  const values = Object.fromEntries(parts.map((part) => [part.type, part.value]));
-  const weekday =
-    { Sun: "일", Mon: "월", Tue: "화", Wed: "수", Thu: "목", Fri: "금", Sat: "토" }[
-      values.weekday ?? ""
-    ] ?? "일";
-  return `${values.month}/${values.day}(${weekday}) ${values.hour}:00`;
+function ReadingRewardClaimButton({
+  disabled,
+  muted = false,
+  label,
+  onPress,
+}: {
+  disabled: boolean;
+  muted?: boolean;
+  label: string;
+  onPress: () => void;
+}) {
+  return (
+    <MediaPressable
+      disabled={disabled}
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      accessibilityState={{ disabled }}
+      style={styles.rewardClaimButton}
+    >
+      <Image
+        source={muted ? DISABLED_REWARD_CLAIM_BUTTON_IMAGE : REWARD_CLAIM_BUTTON_IMAGE}
+        resizeMode="contain"
+        style={styles.rewardClaimButtonImage}
+        accessible={false}
+      />
+    </MediaPressable>
+  );
+}
+
+function ReadingRewardCoinAmount({ amount }: { amount: number }) {
+  return (
+    <View
+      accessible
+      accessibilityRole="text"
+      accessibilityLabel={`${numberFormatter.format(amount)}원 보상`}
+      style={styles.rewardCoinAmount}
+    >
+      <Image
+        source={REWARD_COIN_IMAGE}
+        resizeMode="contain"
+        style={styles.rewardCoinImage}
+        accessible={false}
+      />
+      <Text style={styles.rewardCoinText}>×{numberFormatter.format(amount)}</Text>
+    </View>
+  );
+}
+
+function readingMissionMarkerValues(mission: ReadingMission) {
+  const target = Math.max(0, mission.target);
+  if (target === 0) return [];
+
+  const interval = mission.key === "reflection_chars" ? 200 : 1;
+  const markers: number[] = [];
+  for (let value = interval; value < target; value += interval) {
+    markers.push(value);
+  }
+  markers.push(target);
+  return markers;
+}
+
+function readingMissionSteps(mission: ReadingMission): ReadingMissionStep[] {
+  if (mission.steps && mission.steps.length > 0) return mission.steps;
+  return readingMissionMarkerValues(mission).map((target, index) => {
+    const achieved = mission.progress >= target;
+    return {
+      unit: index + 1,
+      target,
+      amount: 10,
+      achieved,
+      claimed: mission.claimed,
+      claimable: achieved && !mission.claimed,
+    };
+  });
+}
+
+function readingMissionBoundaryLabel(mission: ReadingMission, marker: number) {
+  return `${numberFormatter.format(marker)}${mission.unit}`;
+}
+
+function ReadingWeeklyMissionPanel({
+  reward,
+  representativeSlime,
+  claiming,
+  claimError,
+  onClaim,
+}: {
+  reward: ReadingWeeklyMissionReward;
+  representativeSlime: WalkingRepresentativeSlime | null;
+  claiming: boolean;
+  claimError: string | null;
+  onClaim: (missionKey: ReadingMissionKey, unit: number) => void;
+}) {
+  return (
+    <View style={styles.missionBlock}>
+      <View style={styles.missionPreviewList}>
+        {reward.missions.map((mission) => {
+          const steps = readingMissionSteps(mission);
+          const markerValues = steps.map((step) => step.target);
+          return (
+            <View
+              key={mission.key}
+              style={styles.missionPreview}
+              accessibilityRole="summary"
+              accessibilityLabel={`${mission.title}, ${mission.progress}/${mission.target}${mission.unit}, 보상 ${mission.amount}원${
+                mission.claimed ? ", 수령 완료" : mission.completed ? ", 수령 가능" : ""
+              }`}
+            >
+              <View style={styles.missionPreviewText}>
+                <View style={styles.missionTitleRow}>
+                  <Text style={styles.missionPreviewTitle}>{mission.title}</Text>
+                  <Text
+                    style={[
+                      styles.missionProgressLabel,
+                      mission.claimed && styles.missionProgressComplete,
+                    ]}
+                  >
+                    {mission.claimed
+                      ? "수령 완료"
+                      : mission.completed
+                        ? "수령 가능"
+                        : `${mission.progress}/${mission.target}${mission.unit}`}
+                  </Text>
+                </View>
+                <Text style={styles.missionPreviewDescription}>{mission.description}</Text>
+                <MissionProgressTrack
+                  value={mission.progress}
+                  max={mission.target}
+                  markerValues={markerValues}
+                  completedMarkerValues={steps
+                    .filter((step) => step.claimed)
+                    .map((step) => step.target)}
+                  accessibilityLabel={`${mission.title} 진행도 ${mission.progress}/${mission.target}${mission.unit}`}
+                  representativeSlime={representativeSlime}
+                />
+                <View style={styles.readingMilestones}>
+                  {steps.map((step) => {
+                    const canClaim = step.claimable && !claiming;
+                    return (
+                      <View key={step.unit} style={styles.readingMilestone}>
+                        <Text
+                          style={styles.readingMilestoneLabel}
+                          numberOfLines={1}
+                          adjustsFontSizeToFit
+                          minimumFontScale={0.75}
+                        >
+                          {readingMissionBoundaryLabel(mission, step.target)}
+                        </Text>
+                        <ReadingRewardCoinAmount amount={step.amount} />
+                        {step.claimed ? (
+                          <Text style={styles.rewardClaimedLabel}>수령 완료</Text>
+                        ) : (
+                          <ReadingRewardClaimButton
+                            disabled={!canClaim}
+                            muted={!canClaim}
+                            onPress={() => onClaim(mission.key, step.unit)}
+                            label={`${mission.title} ${step.target}${mission.unit} 보상 ${numberFormatter.format(step.amount)}원${
+                              canClaim ? " 수령" : " 아직 수령할 수 없음"
+                            }`}
+                          />
+                        )}
+                      </View>
+                    );
+                  })}
+                </View>
+              </View>
+            </View>
+          );
+        })}
+      </View>
+      {claimError ? <Text style={styles.error}>{claimError}</Text> : null}
+    </View>
+  );
 }
 
 const styles = StyleSheet.create({
@@ -670,6 +954,11 @@ const styles = StyleSheet.create({
     gap: spacing.xxl,
     paddingHorizontal: spacing.xxl,
   },
+  tabContent: {
+    width: "100%",
+    minWidth: 0,
+    gap: spacing.lg,
+  },
   summarySection: { gap: spacing.sm },
   summaryRows: {
     flexDirection: "row",
@@ -686,26 +975,6 @@ const styles = StyleSheet.create({
   },
   summaryLabel: { ...typography.label, color: colors.textMuted, textAlign: "center" },
   summaryValue: { ...typography.section, color: colors.text, textAlign: "center" },
-  topFiveSection: { gap: spacing.sm },
-  topFivePeriod: { ...typography.label, color: colors.textMuted },
-  topFiveRow: {
-    minHeight: tapMin,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: spacing.sm,
-    paddingHorizontal: spacing.sm,
-    borderBottomWidth: borders.hairline,
-    borderBottomColor: colors.border,
-  },
-  topFiveCurrentRow: { backgroundColor: colors.accentTintedBg },
-  topFiveRank: {
-    width: spacing.xl,
-    ...typography.section,
-    color: colors.accentTintedText,
-    textAlign: "center",
-  },
-  topFiveName: { ...typography.body, color: colors.text, flex: 1, minWidth: 0 },
-  topFiveCount: { ...typography.label, color: colors.textMuted },
   composerSheet: {
     width: "100%",
     maxWidth: composer.sheetMaxWidth,
@@ -724,12 +993,11 @@ const styles = StyleSheet.create({
   composerHeader: {
     flexDirection: "row",
     alignItems: "center",
-    gap: spacing.md,
+    justifyContent: "flex-end",
     paddingHorizontal: spacing.xl,
-    paddingTop: spacing.xl,
-    paddingBottom: spacing.md,
+    paddingTop: spacing.lg,
+    paddingBottom: spacing.xs,
   },
-  composerTitle: { ...typography.title, color: colors.text, flex: 1, minWidth: 0 },
   composerClose: {
     width: controls.closeButton,
     minHeight: tapMin,
@@ -744,28 +1012,74 @@ const styles = StyleSheet.create({
   landscapeHistoryColumn: { flex: 2, minWidth: 0 },
   missionScreen: { gap: spacing.xxl },
   missionSection: { gap: spacing.md },
-  pendingLabel: { ...typography.badge, color: colors.textFaint },
-  missionError: { gap: spacing.sm, paddingVertical: spacing.md },
-  missionPreviewList: {
-    borderTopWidth: borders.hairline,
-    borderTopColor: colors.border,
+  missionBlock: { gap: spacing.md },
+  rewardClaimButton: {
+    width: "100%",
+    maxWidth: walking.rewardClaimButtonWidth,
+    minHeight: tapMin,
+    alignItems: "center",
+    justifyContent: "center",
+    alignSelf: "center",
   },
+  rewardClaimButtonImage: {
+    width: "100%",
+    height: tapMin,
+  },
+  rewardClaimedLabel: {
+    ...typography.micro,
+    color: colors.accentTintedText,
+    textAlign: "center",
+  },
+  missionError: { gap: spacing.sm, paddingVertical: spacing.md },
+  missionPreviewList: {},
   missionPreview: {
     minHeight: tapMin,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: spacing.md,
     paddingVertical: spacing.md,
-    borderBottomWidth: borders.hairline,
-    borderBottomColor: colors.border,
   },
   missionPreviewText: { flex: 1, minWidth: 0, gap: spacing.xxs },
+  missionTitleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: spacing.md,
+  },
   missionPreviewTitle: { ...typography.section, color: colors.text },
   missionPreviewDescription: { ...typography.body, color: colors.textMuted },
+  missionProgressLabel: { ...typography.badge, color: colors.accentTintedText },
+  missionProgressComplete: { color: colors.statusReviewedText },
+  readingMilestones: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: spacing.xxs,
+  },
+  readingMilestone: {
+    flex: 1,
+    minWidth: 0,
+    alignItems: "center",
+    gap: spacing.xxs,
+  },
+  readingMilestoneLabel: {
+    ...typography.micro,
+    color: colors.textMuted,
+    textAlign: "center",
+  },
+  rewardCoinAmount: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.xxs,
+  },
+  rewardCoinImage: {
+    width: walking.rankRewardCoinSize,
+    height: walking.rankRewardCoinSize,
+  },
+  rewardCoinText: {
+    ...typography.micro,
+    color: colors.text,
+  },
   fieldGroup: { gap: spacing.xs },
   fieldLabel: { ...typography.label, color: colors.textMuted },
   reflectionInput: {
-    minHeight: controls.multilineInputMinHeight,
+    minHeight: Math.max(controls.multilineInputMinHeight * 2.4, 230),
     textAlignVertical: "top",
   },
   error: { ...typography.body, color: colors.danger },

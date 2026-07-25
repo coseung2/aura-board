@@ -1,9 +1,18 @@
 package expo.modules.auraboardhealthconnect
 
+import android.Manifest
 import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
+import android.hardware.Sensor
+import android.hardware.SensorEvent
+import android.hardware.SensorEventListener
+import android.hardware.SensorManager
 import android.net.Uri
+import android.os.Build
+import android.os.Handler
+import android.os.Looper
 import android.os.RemoteException
 import androidx.health.connect.client.HealthConnectClient
 import androidx.health.connect.client.PermissionController
@@ -25,6 +34,11 @@ import java.util.ArrayList
 private const val HEALTH_CONNECT_PACKAGE = "com.google.android.apps.healthdata"
 private const val MAX_READ_DAYS = 31L
 private const val WALKING_TIME_ZONE = "Asia/Seoul"
+private const val LIVE_STEP_UPDATE_EVENT = "onLiveStepUpdate"
+
+private const val LIVE_STEP_STARTED = "started"
+private const val LIVE_STEP_PERMISSION_REQUIRED = "permission_required"
+private const val LIVE_STEP_UNAVAILABLE = "unavailable"
 
 private const val ERROR_PERMISSION_REQUIRED = "HEALTH_CONNECT_PERMISSION_REQUIRED"
 private const val ERROR_PROVIDER_UNAVAILABLE = "HEALTH_CONNECT_PROVIDER_UNAVAILABLE"
@@ -48,11 +62,56 @@ class AuraBoardHealthConnectModule : Module() {
     HealthPermission.getReadPermission(StepsRecord::class)
   )
 
+  private val liveStepLock = Any()
+  private var liveStepSensorManager: SensorManager? = null
+  private var liveStepSensor: Sensor? = null
+  private var liveStepCounterBaseline: Float? = null
+  private var liveStepUpdatesStarted = false
+
+  private val liveStepListener = object : SensorEventListener {
+    override fun onSensorChanged(event: SensorEvent) {
+      synchronized(liveStepLock) {
+        val activeSensor = liveStepSensor
+        if (!liveStepUpdatesStarted || activeSensor == null || event.sensor.type != activeSensor.type) {
+          return
+        }
+
+        val currentValue = event.values.firstOrNull() ?: return
+        if (!currentValue.isFinite()) return
+
+        val delta = when (activeSensor.type) {
+          Sensor.TYPE_STEP_DETECTOR -> currentValue.toPositiveStepDelta()
+          Sensor.TYPE_STEP_COUNTER -> {
+            val baseline = liveStepCounterBaseline
+            liveStepCounterBaseline = currentValue
+            if (baseline == null || currentValue < baseline) {
+              0
+            } else {
+              (currentValue - baseline).toPositiveStepDelta()
+            }
+          }
+          else -> 0
+        }
+
+        if (delta > 0) {
+          sendEvent(LIVE_STEP_UPDATE_EVENT, mapOf("delta" to delta))
+        }
+      }
+    }
+
+    override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) = Unit
+  }
+
   private lateinit var permissionsLauncher:
     AppContextActivityResultLauncher<ArrayList<String>, Set<String>>
 
   override fun definition() = ModuleDefinition {
     Name("AuraBoardHealthConnect")
+    Events(LIVE_STEP_UPDATE_EVENT)
+
+    OnDestroy {
+      stopLiveStepUpdates()
+    }
 
     RegisterActivityContracts {
       permissionsLauncher = registerForActivityResult(HealthConnectPermissionsContract())
@@ -88,6 +147,14 @@ class AuraBoardHealthConnectModule : Module() {
       readDailyStats(startDay, endDay)
     }
 
+    AsyncFunction("startLiveStepUpdates") {
+      startLiveStepUpdates()
+    }
+
+    Function("stopLiveStepUpdates") {
+      stopLiveStepUpdates()
+    }
+
     AsyncFunction("openSettings") {
       openHealthConnectSettings()
     }
@@ -95,6 +162,70 @@ class AuraBoardHealthConnectModule : Module() {
 
   private fun reactContext(): Context =
     requireNotNull(appContext.reactContext) { "Android 컨텍스트를 사용할 수 없습니다." }
+
+  private fun startLiveStepUpdates(): String = synchronized(liveStepLock) {
+    if (liveStepUpdatesStarted) return@synchronized LIVE_STEP_STARTED
+
+    val context = reactContext()
+    if (
+      Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q &&
+      context.checkSelfPermission(Manifest.permission.ACTIVITY_RECOGNITION) !=
+        PackageManager.PERMISSION_GRANTED
+    ) {
+      return@synchronized LIVE_STEP_PERMISSION_REQUIRED
+    }
+
+    val sensorManager = context.getSystemService(Context.SENSOR_SERVICE) as? SensorManager
+      ?: return@synchronized LIVE_STEP_UNAVAILABLE
+    liveStepSensorManager = sensorManager
+    val sensors = listOfNotNull(
+      sensorManager.getDefaultSensor(Sensor.TYPE_STEP_DETECTOR),
+      sensorManager.getDefaultSensor(Sensor.TYPE_STEP_COUNTER)
+    )
+    val eventHandler = Handler(Looper.getMainLooper())
+
+    for (sensor in sensors) {
+      liveStepSensor = sensor
+      liveStepCounterBaseline = null
+
+      val registered = try {
+        sensorManager.registerListener(
+          liveStepListener,
+          sensor,
+          SensorManager.SENSOR_DELAY_NORMAL,
+          eventHandler
+        )
+      } catch (_: SecurityException) {
+        clearLiveStepState()
+        return@synchronized LIVE_STEP_PERMISSION_REQUIRED
+      }
+
+      if (registered) {
+        liveStepUpdatesStarted = true
+        return@synchronized LIVE_STEP_STARTED
+      }
+    }
+
+    clearLiveStepState()
+    LIVE_STEP_UNAVAILABLE
+  }
+
+  private fun stopLiveStepUpdates() = synchronized(liveStepLock) {
+    liveStepUpdatesStarted = false
+    liveStepSensorManager?.unregisterListener(liveStepListener)
+    clearLiveStepState()
+  }
+
+  private fun clearLiveStepState() {
+    liveStepSensorManager = null
+    liveStepSensor = null
+    liveStepCounterBaseline = null
+  }
+
+  private fun Float.toPositiveStepDelta(): Int {
+    if (this <= 0f) return 0
+    return toLong().coerceAtMost(Int.MAX_VALUE.toLong()).toInt()
+  }
 
   private fun statusLabel(context: Context): String =
     when (HealthConnectClient.getSdkStatus(context)) {

@@ -1,7 +1,13 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Alert, Platform, ScrollView, StyleSheet, Text, View } from "react-native";
 import * as ImagePicker from "expo-image-picker";
-import { colors, iconSizes, spacing, typography } from "../../theme/tokens";
+import {
+  colors,
+  iconSizes,
+  pageChrome,
+  spacing,
+  typography,
+} from "../../theme/tokens";
 import { ImageLightbox } from "../plant/ImageLightbox";
 import { NoPhotoReasonModal } from "../plant/NoPhotoReasonModal";
 import { ObservationEditor } from "../plant/ObservationEditor";
@@ -326,7 +332,8 @@ const styles = StyleSheet.create({
     backgroundColor: colors.bg,
   },
   scrollContent: {
-    padding: spacing.lg,
+    paddingHorizontal: spacing.lg,
+    paddingTop: pageChrome.directContentStartGap,
     paddingBottom: spacing.xxxl,
   },
   center: {

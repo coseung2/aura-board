@@ -1,7 +1,8 @@
-import { useCallback } from "react";
+import { useCallback, useEffect } from "react";
 import {
   ActivityIndicator,
   Alert,
+  BackHandler,
   RefreshControl,
   ScrollView,
   StyleSheet,
@@ -34,10 +35,18 @@ import {
 
 export default function ParentNotificationsScreen() {
   const router = useRouter();
-  const handleBack = () => {
+  const handleBack = useCallback(() => {
     if (router.canGoBack()) router.back();
     else router.replace("/(parent)/home");
-  };
+  }, [router]);
+
+  useEffect(() => {
+    const subscription = BackHandler.addEventListener("hardwareBackPress", () => {
+      handleBack();
+      return true;
+    });
+    return () => subscription.remove();
+  }, [handleBack]);
   const handleUnauthorized = useCallback(async () => {
     await clearParentSession();
     router.replace(

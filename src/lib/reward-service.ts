@@ -11,6 +11,8 @@ import {
   REWARD_EFFECT_BY_AREA,
   REWARD_SOURCE_TYPES,
   rewardAmountWithBuff,
+  READING_CLASSROOM_RANK_REWARD_SOURCE_TYPE,
+  READING_WEEKLY_MISSION_REWARD_SOURCE_TYPE,
   WALKING_CLASSROOM_RANK_REWARD_SOURCE_TYPE,
   WALKING_WEEKLY_REWARD_SOURCE_TYPE,
   type RewardArea,
@@ -243,4 +245,74 @@ export async function awardWalkingPolicyReward(input: {
     note: input.note,
   });
   return { ...result, baseAmount: input.baseAmount, buffBps };
+}
+
+export async function awardReadingPolicyReward(input: {
+  tx: Prisma.TransactionClient;
+  studentId: string;
+  classroomId: string;
+  accountId: string;
+  sourceRef: string;
+  baseAmount: number;
+  note: string;
+  policy: RewardPolicy;
+  sourceType:
+    | typeof READING_WEEKLY_MISSION_REWARD_SOURCE_TYPE
+    | typeof READING_CLASSROOM_RANK_REWARD_SOURCE_TYPE;
+}): Promise<PolicyRewardResult | null> {
+  const sourceType = input.sourceType;
+  const existing = await input.tx.transaction.findFirst({
+    where: {
+      sourceType,
+      sourceRef: input.sourceRef,
+      type: "deposit",
+    },
+    select: { amount: true },
+  });
+  if (input.baseAmount <= 0 && !existing) return null;
+  if (existing) {
+    const replay = await awardActivityReward({
+      tx: input.tx,
+      studentId: input.studentId,
+      classroomId: input.classroomId,
+      accountId: input.accountId,
+      sourceType,
+      sourceRef: input.sourceRef,
+      amount: existing.amount,
+      note: input.note,
+    });
+    return { ...replay, baseAmount: input.baseAmount, buffBps: 0 };
+  }
+  const buffBps = await loadEquippedRewardBuffBps(
+    input.tx,
+    input.studentId,
+    "reading",
+    input.policy.rewardBuffCapBps,
+  );
+  const amount = rewardAmountWithBuff(
+    input.baseAmount,
+    buffBps,
+    input.policy.rewardBuffCapBps,
+  );
+  const result = await awardActivityReward({
+    tx: input.tx,
+    studentId: input.studentId,
+    classroomId: input.classroomId,
+    accountId: input.accountId,
+    sourceType,
+    sourceRef: input.sourceRef,
+    amount,
+    note: input.note,
+  });
+  return { ...result, baseAmount: input.baseAmount, buffBps };
+}
+
+
+export async function awardReadingWeeklyMissionReward(
+  input: Omit<Parameters<typeof awardReadingPolicyReward>[0], "sourceType">,
+): Promise<PolicyRewardResult | null> {
+  return awardReadingPolicyReward({
+    ...input,
+    sourceType: READING_WEEKLY_MISSION_REWARD_SOURCE_TYPE,
+  });
 }

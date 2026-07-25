@@ -12,7 +12,8 @@ const STUDENT_ROOT_TABS = new Set([
   "more",
   "wallet",
   "slime",
-  "notifications",
+  // notifications is opened via push from the header, so back must return to
+  // the previous screen instead of treating this route as an app-exit root.
   "bank",
   "pay",
   "check",

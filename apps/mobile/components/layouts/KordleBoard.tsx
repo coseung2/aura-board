@@ -17,6 +17,7 @@ import {
   spacing,
   tapMin,
   typography,
+  pageChrome,
 } from "../../theme/tokens";
 import { AppButton, EmptyState, Pill, SurfaceCard, TextField } from "../ui";
 
@@ -244,7 +245,7 @@ function statusLabel(status: PublicState["status"]) {
 
 const styles = StyleSheet.create({
   center: { flex: 1, alignItems: "center", justifyContent: "center" },
-  content: { padding: spacing.xl, gap: spacing.lg, paddingBottom: spacing.xxxl },
+  content: { paddingHorizontal: spacing.xl, paddingTop: pageChrome.directContentStartGap, gap: spacing.lg, paddingBottom: spacing.xxxl },
   heading: { flexDirection: "row", alignItems: "center", gap: spacing.md },
   headingText: { flex: 1, gap: spacing.xs },
   title: { ...typography.display, color: colors.text },

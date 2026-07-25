@@ -10,11 +10,15 @@ export type RewardSourceType = (typeof REWARD_SOURCE_TYPES)[RewardArea];
 export const WALKING_WEEKLY_REWARD_SOURCE_TYPE = "walking_weekly_reward" as const;
 export const WALKING_CLASSROOM_RANK_REWARD_SOURCE_TYPE =
   "walking_classroom_rank_reward" as const;
+export const READING_WEEKLY_MISSION_REWARD_SOURCE_TYPE =
+  "reading_weekly_mission_reward" as const;
+export const READING_CLASSROOM_RANK_REWARD_SOURCE_TYPE =
+  "reading_classroom_rank_reward" as const;
 
 /** Weekly classroom walking leaderboard payouts, from first through fifth. */
 export const WALKING_CLASSROOM_RANK_REWARDS = [100, 60, 50, 40, 30] as const;
 /** Do not create retroactive classroom-rank payouts from before launch. */
-export const WALKING_CLASSROOM_RANK_REWARD_START_DAY = "2026-07-12" as const;
+export const WALKING_CLASSROOM_RANK_REWARD_START_DAY = "2026-07-13" as const;
 
 /** Every month uses the same four-row attendance reward board. */
 export const MONTHLY_ATTENDANCE_REWARD_SOURCE_TYPE = "attendance_reward" as const;
@@ -125,32 +129,27 @@ export function getKstRewardWeekRange(at = new Date()): {
 }
 
 /**
- * Classroom walking ranks roll over every Sunday at 00:00 KST. This period
- * deliberately stays separate from the Monday-based walking mission week so
- * it matches the day-level totals supplied by Health Connect and Apple Health.
+ * Classroom walking ranks use the same Monday-to-next-Monday KST window as the
+ * walking summary and weekly mission totals, so leaderboard and summary steps match.
  */
 export function getKstClassroomWalkingRankPeriods(at = new Date()): {
   active: { weekStart: string; weekEnd: string };
   closed: { weekStart: string; weekEnd: string };
   nextResetAt: Date;
 } {
-  const { year, month, day } = kstDateParts(at);
-  const dayStart = kstMidnightUtc(year, month, day);
-  const localWeekday = new Date(Date.UTC(year, month - 1, day)).getUTCDay();
-  const activeStart = new Date(dayStart.getTime() - localWeekday * DAY_MS);
-  const activeEnd = new Date(activeStart.getTime() + 7 * DAY_MS);
-  const closedStart = new Date(activeStart.getTime() - 7 * DAY_MS);
+  const bounds = getKstRewardBounds(at);
+  const closedStart = new Date(bounds.weekStart.getTime() - 7 * DAY_MS);
 
   return {
     active: {
-      weekStart: toKstDayKey(activeStart),
-      weekEnd: toKstDayKey(activeEnd),
+      weekStart: toKstDayKey(bounds.weekStart),
+      weekEnd: toKstDayKey(bounds.weekEnd),
     },
     closed: {
       weekStart: toKstDayKey(closedStart),
-      weekEnd: toKstDayKey(activeStart),
+      weekEnd: toKstDayKey(bounds.weekStart),
     },
-    nextResetAt: activeEnd,
+    nextResetAt: bounds.weekEnd,
   };
 }
 
@@ -312,6 +311,22 @@ export function walkingWeeklyTierSourceRef(
   return `${studentId}:${weekStartDay}:weekly-tier:${key}`;
 }
 
+/**
+ * One student can claim each reading weekly mission reward once per KST week.
+ * Pass missionKey for the independent mission payout; omit for the legacy
+ * all-three payout source used before per-mission claims.
+ */
+export function readingWeeklyMissionSourceRef(
+  studentId: string,
+  weekStartDay: string,
+  missionKey?: string,
+): string {
+  if (missionKey) {
+    return `${studentId}:${weekStartDay}:reading-weekly-mission:${missionKey}`;
+  }
+  return `${studentId}:${weekStartDay}:reading-weekly-mission`;
+}
+
 /** Legacy source key used by the pre-tier 25,000-step payout. */
 export function walkingWeeklyGoalSourceRef(studentId: string, weekStartDay: string): string {
   return `${studentId}:${weekStartDay}:weekly-goal`;
@@ -323,6 +338,14 @@ export function walkingClassroomRankRewardSourceRef(
   weekStartDay: string,
 ): string {
   return `${studentId}:${weekStartDay}:classroom-rank`;
+}
+
+/** One student can collect one reading classroom-ranking reward per fixed KST week. */
+export function readingClassroomRankRewardSourceRef(
+  studentId: string,
+  weekStartDay: string,
+): string {
+  return `${studentId}:${weekStartDay}:reading-classroom-rank`;
 }
 
 /** Stable source key for one shared monthly attendance ordinal payout. */

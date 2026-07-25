@@ -1,4 +1,5 @@
 import ExpoModulesCore
+import CoreMotion
 import HealthKit
 import UIKit
 
@@ -8,9 +9,19 @@ private let maximumReadDays = 31
 public final class AuraBoardHealthConnectModule: Module {
   private let healthStore = HKHealthStore()
   private let stepType = HKQuantityType.quantityType(forIdentifier: .stepCount)!
+  private let pedometer = CMPedometer()
+  private let liveStepLock = NSLock()
+  private var liveStepUpdatesActive = false
+  private var liveStepBaseline: Int?
+  private var liveStepSessionID = 0
 
   public func definition() -> ModuleDefinition {
     Name("AuraBoardHealthConnect")
+    Events("onLiveStepUpdate")
+
+    OnDestroy {
+      self.stopLiveStepUpdates()
+    }
 
     AsyncFunction("getStatus") { () -> String in
       HKHealthStore.isHealthDataAvailable() ? "available" : "unavailable"
@@ -66,6 +77,14 @@ public final class AuraBoardHealthConnectModule: Module {
       }
     }
 
+    AsyncFunction("startLiveStepUpdates") { () -> String in
+      self.startLiveStepUpdates()
+    }
+
+    Function("stopLiveStepUpdates") {
+      self.stopLiveStepUpdates()
+    }
+
     AsyncFunction("openSettings") { (promise: Promise) in
       DispatchQueue.main.async {
         guard let url = URL(string: UIApplication.openSettingsURLString) else {
@@ -85,6 +104,79 @@ public final class AuraBoardHealthConnectModule: Module {
 
   private var requiredTypes: Set<HKObjectType> {
     [stepType]
+  }
+
+  private func startLiveStepUpdates() -> String {
+    guard CMPedometer.isStepCountingAvailable() else {
+      return "unavailable"
+    }
+
+    switch CMPedometer.authorizationStatus() {
+    case .denied, .restricted:
+      return "permission_required"
+    case .authorized, .notDetermined:
+      break
+    @unknown default:
+      return "unavailable"
+    }
+
+    liveStepLock.lock()
+    if liveStepUpdatesActive {
+      liveStepLock.unlock()
+      return "started"
+    }
+
+    liveStepSessionID &+= 1
+    let sessionID = liveStepSessionID
+    liveStepUpdatesActive = true
+    liveStepBaseline = 0
+    liveStepLock.unlock()
+
+    pedometer.startUpdates(from: Date()) { [weak self] data, error in
+      guard let self else { return }
+
+      if error != nil {
+        self.stopLiveStepUpdates(sessionID: sessionID)
+        return
+      }
+
+      guard let data else { return }
+      let cumulativeSteps = max(0, data.numberOfSteps.intValue)
+
+      self.liveStepLock.lock()
+      guard self.liveStepUpdatesActive, self.liveStepSessionID == sessionID else {
+        self.liveStepLock.unlock()
+        return
+      }
+
+      let baseline = self.liveStepBaseline ?? cumulativeSteps
+      let delta = cumulativeSteps - baseline
+      if delta > 0 {
+        self.liveStepBaseline = cumulativeSteps
+        self.sendEvent("onLiveStepUpdate", ["delta": delta])
+      }
+      self.liveStepLock.unlock()
+    }
+
+    return "started"
+  }
+
+  private func stopLiveStepUpdates() {
+    stopLiveStepUpdates(sessionID: nil)
+  }
+
+  private func stopLiveStepUpdates(sessionID: Int?) {
+    liveStepLock.lock()
+    if let sessionID, liveStepSessionID != sessionID {
+      liveStepLock.unlock()
+      return
+    }
+
+    liveStepUpdatesActive = false
+    liveStepBaseline = nil
+    liveStepSessionID &+= 1
+    liveStepLock.unlock()
+    pedometer.stopUpdates()
   }
 
   private func readDailyStats(startDay: String, endDay: String) async throws -> [[String: Any]] {

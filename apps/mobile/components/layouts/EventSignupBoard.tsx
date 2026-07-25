@@ -4,7 +4,13 @@ import { ScrollView, StyleSheet, Text, View } from "react-native";
 import { WebView } from "react-native-webview";
 import { getApiBase } from "../../lib/api";
 import type { BoardDetailResponse } from "../../lib/types";
-import { colors, spacing, typography, vibe } from "../../theme/tokens";
+import {
+  colors,
+  pageChrome,
+  spacing,
+  typography,
+  vibe,
+} from "../../theme/tokens";
 import { AppButton, EmptyState, Pill, SurfaceCard } from "../ui";
 
 export function EventSignupBoard({ data }: { data: BoardDetailResponse }) {
@@ -126,7 +132,7 @@ function formatDate(value: string | null) {
 
 const styles = StyleSheet.create({
   center: { flex: 1, alignItems: "center", justifyContent: "center", padding: spacing.xl },
-  content: { padding: spacing.xl, gap: spacing.lg, paddingBottom: spacing.xxxl },
+  content: { paddingHorizontal: spacing.xl, paddingTop: pageChrome.directContentStartGap, gap: spacing.lg, paddingBottom: spacing.xxxl },
   poster: { width: "100%", aspectRatio: vibe.thumbnailAspectRatio, backgroundColor: colors.surfaceAlt },
   card: { padding: spacing.xl, gap: spacing.md },
   heading: { flexDirection: "row", alignItems: "center", gap: spacing.md },

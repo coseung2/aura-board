@@ -5,6 +5,7 @@ import {
   colors,
   iconSizes,
   normalizeBoardTheme,
+  pageChrome,
   spacing,
   typography,
 } from "../../theme/tokens";
@@ -97,7 +98,7 @@ export function ReadOnlyCardsBoard({ data }: { data: BoardDetailResponse }) {
 
 const styles = StyleSheet.create({
   root: { flex: 1 },
-  content: { padding: spacing.lg, paddingBottom: spacing.xxxl },
+  content: { paddingHorizontal: spacing.lg, paddingTop: pageChrome.directContentStartGap, paddingBottom: spacing.xxxl },
   separator: { height: spacing.lg },
   empty: {
     alignItems: "center",

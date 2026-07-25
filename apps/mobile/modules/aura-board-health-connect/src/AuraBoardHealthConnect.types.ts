@@ -7,3 +7,12 @@ export type HealthConnectDailyStats = {
   steps: number;
   distanceMeters: number;
 };
+
+export type LiveStepUpdate = {
+  delta: number;
+};
+
+export type LiveStepUpdateStatus =
+  | "started"
+  | "permission_required"
+  | "unavailable";

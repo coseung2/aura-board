@@ -22,6 +22,7 @@ import {
   radii,
   spacing,
   typography,
+  pageChrome,
 } from "../../theme/tokens";
 import { AppButton, ControlPressable, EmptyState, SurfaceCard, TextField } from "../ui";
 
@@ -202,7 +203,7 @@ const styles = StyleSheet.create({
   tab: { flex: 1, alignItems: "center", justifyContent: "center", padding: spacing.sm },
   tabActive: { backgroundColor: colors.accentTintedBg, borderColor: colors.accent },
   tabText: { ...typography.label, color: colors.text },
-  content: { padding: spacing.xl, gap: spacing.md, paddingBottom: spacing.xxxl },
+  content: { paddingHorizontal: spacing.xl, paddingTop: pageChrome.directContentStartGap, gap: spacing.md, paddingBottom: spacing.xxxl },
   canvasCard: { padding: spacing.sm, overflow: "hidden" },
   canvas: { backgroundColor: colors.surface, borderRadius: radii.control },
   actions: { flexDirection: "row", gap: spacing.sm },

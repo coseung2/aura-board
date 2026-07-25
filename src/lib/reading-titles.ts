@@ -36,7 +36,9 @@ export const READING_TITLES = [
   {
     key: "reflection-300",
     label: "훌륭한 비평가",
-    imagePath: "/reading/titles/reflection-300-pixel-512.png",
+    // Cache-bust the corrected tag artwork. Older app sessions cached the
+    // previous "감상문가" pixels under the same static URL.
+    imagePath: "/reading/titles/reflection-300-pixel-512.png?v=2",
     requirement: "감상문 300자",
     effectKey: "reading_reward" as SlimeEffectKey,
     buffBps: 200,

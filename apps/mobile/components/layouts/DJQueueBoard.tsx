@@ -638,7 +638,7 @@ export function DJQueueBoard({
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.bg },
   feed: { flex: 1 },
-  feedContent: { paddingBottom: spacing.xxxl },
+  feedContent: { paddingTop: pageChrome.directContentStartGap, paddingBottom: spacing.xxxl },
   sectionNav: {
     width: "100%",
     alignSelf: "stretch",

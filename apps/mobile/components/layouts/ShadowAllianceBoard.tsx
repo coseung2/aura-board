@@ -4,7 +4,13 @@ import { AppState, Platform, ScrollView, StyleSheet, Text, View } from "react-na
 import { createClient, type RealtimeChannel } from "@supabase/supabase-js";
 import { apiFetch } from "../../lib/api";
 import type { BoardDetailResponse } from "../../lib/types";
-import { borders, colors, spacing, typography } from "../../theme/tokens";
+import {
+  borders,
+  colors,
+  pageChrome,
+  spacing,
+  typography,
+} from "../../theme/tokens";
 import { AppButton, EmptyState, Pill, SurfaceCard, TextField } from "../ui";
 
 type Team = "black" | "white";
@@ -250,7 +256,7 @@ function formatTime(seconds: number) {
 
 const styles = StyleSheet.create({
   center: { flex: 1, alignItems: "center", justifyContent: "center", padding: spacing.xl },
-  content: { padding: spacing.xl, gap: spacing.lg, paddingBottom: spacing.xxxl },
+  content: { paddingHorizontal: spacing.xl, paddingTop: pageChrome.directContentStartGap, gap: spacing.lg, paddingBottom: spacing.xxxl },
   agentCard: { padding: spacing.lg, flexDirection: "row", alignItems: "center", gap: spacing.md },
   teamDot: { width: spacing.lg, height: spacing.lg, borderRadius: spacing.md },
   black: { backgroundColor: colors.text },
