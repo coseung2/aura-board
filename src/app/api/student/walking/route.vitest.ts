@@ -9,6 +9,7 @@ const mocks = vi.hoisted(() => ({
   transactionFindFirst: vi.fn(),
   rewardConfig: vi.fn(),
   representativeSlime: vi.fn(),
+  getStudentMonthlyAttendance: vi.fn(),
 }));
 
 vi.mock("@/lib/student-auth", () => ({
@@ -25,6 +26,10 @@ vi.mock("@/lib/db", () => ({
     studentSlime: { findFirst: mocks.representativeSlime },
   },
 }));
+vi.mock("@/lib/student-attendance", () => ({
+  getStudentMonthlyAttendance: mocks.getStudentMonthlyAttendance,
+  recordStudentAttendanceVisit: vi.fn(),
+}));
 
 import { GET } from "./route";
 
@@ -38,6 +43,18 @@ describe("GET /api/student/walking fixed KST week", () => {
     mocks.transactionFindFirst.mockResolvedValue(null);
     mocks.rewardConfig.mockResolvedValue(null);
     mocks.representativeSlime.mockResolvedValue(null);
+    mocks.getStudentMonthlyAttendance.mockResolvedValue({
+      month: "2026-07",
+      monthDays: 28,
+      attendanceCount: 0,
+      attendanceDays: [],
+      visitCount: 0,
+      claimedOrdinals: [],
+      claimableAttendance: [],
+      itemRewardOrdinal: 28,
+      itemEarned: false,
+      nextOrdinalReward: { ordinal: 1, type: "cash", amount: 10 },
+    });
     mocks.transaction.mockImplementation(async (operation: (tx: unknown) => unknown) =>
       operation({ avatarRewardConfig: { findUnique: mocks.rewardConfig } }),
     );
@@ -76,24 +93,27 @@ describe("GET /api/student/walking fixed KST week", () => {
 
   it("includes the current classroom's weekly Top 5 and marks the current student", async () => {
     vi.setSystemTime(new Date("2026-07-23T03:00:00.000Z"));
-    mocks.queryRaw
-      .mockResolvedValueOnce([])
-      .mockResolvedValueOnce([])
-      .mockResolvedValueOnce([
-        {
-          studentId: "student-2",
-          studentNumber: 4,
-          studentName: "김하늘",
-          weeklySteps: BigInt(21_680),
-        },
-        {
-          studentId: "student-1",
-          studentNumber: 25,
-          studentName: "테스트",
-          weeklySteps: BigInt(5_780),
-        },
-      ])
-      .mockResolvedValueOnce([{ rank: 2 }]);
+    mocks.queryRaw.mockImplementation(async (query: { strings?: TemplateStringsArray }) => {
+      const source = query.strings?.join("?") ?? "";
+      if (source.includes('AS "weeklySteps"')) {
+        return [
+          {
+            studentId: "student-2",
+            studentNumber: 4,
+            studentName: "김하늘",
+            weeklySteps: BigInt(21_680),
+          },
+          {
+            studentId: "student-1",
+            studentNumber: 25,
+            studentName: "테스트",
+            weeklySteps: BigInt(5_780),
+          },
+        ];
+      }
+      if (source.includes('SELECT "rank"')) return [{ rank: 2 }];
+      return [];
+    });
 
     const response = await GET(new NextRequest("http://localhost/api/student/walking"));
     const body = await response.json();
@@ -123,6 +143,7 @@ describe("GET /api/student/walking fixed KST week", () => {
   });
 
   it("includes the current representative slime for the mission progress marker", async () => {
+    mocks.queryRaw.mockResolvedValue([]);
     mocks.representativeSlime.mockResolvedValue({
       color: "purple",
       growthStage: 2,
@@ -205,115 +226,32 @@ describe("GET /api/student/walking fixed KST week", () => {
     });
   });
 
-  it.each([
-    ["2026-02-28T03:00:00.000Z", "2026-02", 28],
-    ["2028-02-29T03:00:00.000Z", "2028-02", 29],
-    ["2026-04-30T03:00:00.000Z", "2026-04", 30],
-    ["2026-07-31T03:00:00.000Z", "2026-07", 31],
-  ])("builds the fixed 28-slot monthly ordinal board for %s", async (instant, month, calendarDays) => {
-    vi.setSystemTime(new Date(instant));
-    mocks.queryRaw.mockResolvedValue(
-      Array.from({ length: calendarDays as number }, (_, index) => {
-        const day = String(index + 1).padStart(2, "0");
-        return {
-          day: `${month}-${day}`,
-          steps: 0,
-          distanceMeters: 0,
-          syncedAt: `${month}-${day}T01:00:00.000Z`,
-        };
-      }),
-    );
-    const response = await GET(new NextRequest("http://localhost/api/student/walking"));
-    const body = await response.json();
-
-    expect(body.monthlyAttendanceReward).toMatchObject({
-      month,
+  it("exposes claimed and still-claimable attendance ordinals", async () => {
+    mocks.getStudentMonthlyAttendance.mockResolvedValue({
+      month: "2026-07",
       monthDays: 28,
-      attendanceCount: 28,
+      attendanceCount: 4,
+      attendanceDays: ["2026-07-01", "2026-07-02", "2026-07-03", "2026-07-04"],
+      visitCount: 5,
+      claimedOrdinals: [1, 2, 3, 4],
+      claimableAttendance: [{ ordinal: 5, day: "2026-07-05" }],
       itemRewardOrdinal: 28,
-      itemEarned: true,
-      nextOrdinalReward: null,
+      itemEarned: false,
+      nextOrdinalReward: { ordinal: 5, type: "cash", amount: 10 },
     });
-    expect(body.monthlyAttendanceReward.cashPaid).toBe(0);
-  });
-
-  it("keeps missed visit ordinals claimable after a later ordinal is claimed", async () => {
-    vi.setSystemTime(new Date("2026-07-23T03:00:00.000Z"));
-    mocks.queryRaw.mockResolvedValue([
-      {
-        day: "2026-07-20",
-        steps: 0,
-        distanceMeters: 0,
-        syncedAt: "2026-07-20T01:00:00.000Z",
-        attendanceVisitedAt: "2026-07-20T01:00:00.000Z",
-        attendanceMonth: "2026-07",
-        attendanceOrdinal: 1,
-        attendanceCompletedAt: null,
-      },
-      {
-        day: "2026-07-21",
-        steps: 0,
-        distanceMeters: 0,
-        syncedAt: "2026-07-21T01:00:00.000Z",
-        attendanceVisitedAt: "2026-07-21T01:00:00.000Z",
-        attendanceMonth: "2026-07",
-        attendanceOrdinal: 2,
-        attendanceCompletedAt: "2026-07-22T01:00:00.000Z",
-      },
-    ]);
-
-    const response = await GET(new NextRequest("http://localhost/api/student/walking"));
-    const body = await response.json();
-
-    expect(body.monthlyAttendanceReward).toMatchObject({
-      attendanceCount: 1,
-      visitCount: 2,
-      claimedOrdinals: [2],
-      claimableAttendance: [{ ordinal: 1, day: "2026-07-20" }],
-    });
-  });
-
-  it("reports chronological attendance and paid cash without claiming an item grant", async () => {
-    vi.setSystemTime(new Date("2026-07-23T03:00:00.000Z"));
-    mocks.queryRaw.mockResolvedValue([
-      { day: "2026-07-01", steps: 0, distanceMeters: 0, syncedAt: "2026-07-01T01:00:00.000Z" },
-      { day: "2026-07-03", steps: 0, distanceMeters: 0, syncedAt: "2026-07-03T01:00:00.000Z" },
-      { day: "2026-07-02", steps: 0, distanceMeters: 0, syncedAt: "2026-07-02T01:00:00.000Z" },
-      { day: "2026-07-03", steps: 0, distanceMeters: 0, syncedAt: "2026-07-03T02:00:00.000Z" },
-      { day: "2026-07-04", steps: 0, distanceMeters: 0, syncedAt: "2026-07-04T01:00:00.000Z" },
-      { day: "2026-07-05", steps: 0, distanceMeters: 0, syncedAt: "2026-07-05T01:00:00.000Z" },
-    ]);
-    mocks.transactionFindMany.mockResolvedValue([
-      {
-        sourceRef: "student-1:2026-07:attendance:1",
-        amount: 10,
-      },
-      {
-        sourceRef: "student-1:2026-07:attendance:2",
-        amount: 10,
-      },
-    ]);
     const response = await GET(new NextRequest("http://localhost/api/student/walking"));
     const body = await response.json();
 
     expect(body.monthlyAttendanceReward).toMatchObject({
       month: "2026-07",
       monthDays: 28,
-      attendanceCount: 5,
-      cashEarned: 50,
-      cashPaid: 20,
-      nextOrdinalReward: { ordinal: 6, type: "cash", amount: 10 },
-      itemRewardOrdinal: 28,
-      itemEarned: false,
+      attendanceCount: 4,
+      visitCount: 5,
+      claimedOrdinals: [1, 2, 3, 4],
+      claimableAttendance: [{ ordinal: 5, day: "2026-07-05" }],
+      eligibleAttendanceDays: ["2026-07-05"],
+      nextOrdinalReward: { ordinal: 5, type: "cash", amount: 10 },
     });
-    expect(body.monthlyAttendanceReward.itemGranted).toBeUndefined();
-    expect(mocks.transactionFindMany).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: expect.objectContaining({
-          sourceType: "walking_weekly_reward",
-          sourceRef: { startsWith: "student-1:2026-07:attendance:" },
-        }),
-      }),
-    );
+    expect(mocks.getStudentMonthlyAttendance).toHaveBeenCalledWith("student-1");
   });
 });

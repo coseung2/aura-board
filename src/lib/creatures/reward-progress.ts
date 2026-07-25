@@ -19,6 +19,7 @@ export const VERIFIED_REWARD_SOURCE_TYPES = [
   "walking_classroom_rank_reward",
   "assignment_reward",
   "comment_reward",
+  "attendance_reward",
 ] as const;
 
 export type VerifiedRewardSourceType = (typeof VERIFIED_REWARD_SOURCE_TYPES)[number];

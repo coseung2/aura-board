@@ -11,7 +11,7 @@ const config: ExpoConfig = {
   name: "Aura-board",
   slug: "aura-board-mobile",
   scheme: "auraboard",
-  version: "0.2.10",
+  version: "0.2.12",
   orientation: "default",
   icon: "./assets/icon.png",
   userInterfaceStyle: "light",
@@ -25,13 +25,16 @@ const config: ExpoConfig = {
     bundleIdentifier: "com.auraboard.app",
     supportsTablet: true,
     requireFullScreen: false,
+    infoPlist: {
+      ITSAppUsesNonExemptEncryption: false,
+    },
   },
   android: {
     edgeToEdgeEnabled: true,
     predictiveBackGestureEnabled: false,
     softwareKeyboardLayoutMode: "resize",
     package: "com.auraboard.app",
-    versionCode: 10,
+    versionCode: 12,
   },
   web: {
     favicon: "./assets/favicon.png",

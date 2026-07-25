@@ -1,3 +1,5 @@
+import type { SlimeEffectKey } from "./pets/types";
+
 export type WalkingTitleStats = {
   maxDailySteps: number | bigint;
   maxWeeklySteps: number | bigint;
@@ -9,24 +11,36 @@ export const WALKING_TITLES = [
     key: "monthly-300k",
     label: "국토대장정",
     imagePath: "/walking/titles/monthly-300k-pixel-512.png",
+    requirement: "한 달 300,000걸음",
+    effectKey: "walking_reward" as SlimeEffectKey,
+    buffBps: 400,
     earned: (row: WalkingTitleStats) => Number(row.maxMonthlySteps) >= 300_000,
   },
   {
     key: "weekly-75k",
     label: "위대한 행진",
     imagePath: "/walking/titles/weekly-75k-pixel-512.png",
+    requirement: "한 주 75,000걸음",
+    effectKey: "walking_reward" as SlimeEffectKey,
+    buffBps: 300,
     earned: (row: WalkingTitleStats) => Number(row.maxWeeklySteps) >= 75_000,
   },
   {
     key: "weekly-50k",
     label: "꾸준한 발걸음",
     imagePath: "/walking/titles/weekly-50k-pixel-512.png",
+    requirement: "한 주 50,000걸음",
+    effectKey: "walking_reward" as SlimeEffectKey,
+    buffBps: 200,
     earned: (row: WalkingTitleStats) => Number(row.maxWeeklySteps) >= 50_000,
   },
   {
     key: "daily-20k",
     label: "오늘의 질주",
     imagePath: "/walking/titles/daily-20k-pixel-512.png",
+    requirement: "하루 20,000걸음",
+    effectKey: "walking_reward" as SlimeEffectKey,
+    buffBps: 100,
     earned: (row: WalkingTitleStats) => Number(row.maxDailySteps) >= 20_000,
   },
 ] as const;
@@ -36,4 +50,33 @@ export function walkingTitleForStats(stats: WalkingTitleStats) {
   return title
     ? { key: title.key, label: title.label, imagePath: title.imagePath }
     : null;
+}
+
+export type TitleProgress = {
+  key: string;
+  label: string;
+  imagePath: string;
+  requirement: string;
+  effectKey: SlimeEffectKey;
+  buffBps: number;
+  earned: boolean;
+  /** True once the student has claimed the reward for this title. */
+  claimed: boolean;
+};
+
+/** Every walking title with its earned and claimed state, best title first. */
+export function walkingTitleProgress(
+  stats: WalkingTitleStats,
+  claimedKeys: ReadonlySet<string> = new Set(),
+): TitleProgress[] {
+  return WALKING_TITLES.map((title) => ({
+    key: title.key,
+    label: title.label,
+    imagePath: title.imagePath,
+    requirement: title.requirement,
+    effectKey: title.effectKey,
+    buffBps: title.buffBps,
+    earned: title.earned(stats),
+    claimed: claimedKeys.has(title.key),
+  }));
 }

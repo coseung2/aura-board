@@ -28,7 +28,6 @@ import {
   isHealthConnectModuleAvailable,
   openHealthConnectSettings,
   readAndSyncWalkingDays,
-  markWalkingAttendance,
   requestHealthConnectPermissions,
   type WalkingDay,
   type ClassroomWalkingRank,
@@ -37,6 +36,7 @@ import {
   type WalkingMonthlyAttendanceReward,
   type WalkingPolicy,
   type WalkingRepresentativeSlime,
+  type WalkingTitleProgress,
   type WalkingWeeklyStepRewards,
 } from "../../lib/walking-health";
 import type {
@@ -71,6 +71,9 @@ import {
 import { StudentHeaderActions } from "../../components/StudentHeaderActions";
 import { SlimeSprite } from "../../components/slime/SlimeSprite";
 import { WalkingAttendanceCalendar } from "../../components/walking-attendance-calendar";
+import { TitleCollection } from "../../components/TitleCollection";
+import { claimStudentAttendanceReward } from "../../lib/student-attendance";
+import { claimTitle } from "../../lib/titles";
 import { evolutionForStage } from "../../lib/slimes";
 
 const numberFormatter = new Intl.NumberFormat("ko-KR");
@@ -79,7 +82,7 @@ const REWARD_CLAIM_BUTTON_IMAGE = require("../../assets/walking/reward-claim-but
 const DISABLED_REWARD_CLAIM_BUTTON_IMAGE = require("../../assets/walking/reward-claim-button-disabled.png");
 const REWARD_COIN_IMAGE = require("../../assets/walking/reward-coin.png");
 
-type WalkingView = "record" | "missions";
+type WalkingView = "record" | "missions" | "titles";
 
 function dayLabel(day: string, today: string) {
   if (day === today) return "오늘";
@@ -113,6 +116,8 @@ export default function StudentWalkingScreen() {
   const [policy, setPolicy] = useState<WalkingPolicy>(DEFAULT_WALKING_POLICY);
   const [monthlyAttendanceReward, setMonthlyAttendanceReward] =
     useState<WalkingMonthlyAttendanceReward | null>(null);
+  const [titles, setTitles] = useState<WalkingTitleProgress[]>([]);
+  const [claimingTitleKey, setClaimingTitleKey] = useState<string | null>(null);
   const [dailyStepRewards, setDailyStepRewards] =
     useState<WalkingDailyStepRewards | null>(null);
   const [weeklyStepRewards, setWeeklyStepRewards] =
@@ -155,6 +160,7 @@ export default function StudentWalkingScreen() {
     setDailyStepRewards(snapshot.dailyStepRewards);
     setWeeklyStepRewards(snapshot.weeklyStepRewards);
     setRepresentativeSlime(snapshot.representativeSlime);
+    setTitles(snapshot.titles);
     setClassroomTopFive(snapshot.classroomTopFive);
     setClassroomRankRewards(snapshot.classroomRankRewards);
     setClassroomRankNextResetAt(snapshot.classroomRankNextResetAt);
@@ -174,6 +180,7 @@ export default function StudentWalkingScreen() {
         setDailyStepRewards(cloudSnapshot.dailyStepRewards);
         setWeeklyStepRewards(cloudSnapshot.weeklyStepRewards);
         setRepresentativeSlime(cloudSnapshot.representativeSlime);
+        setTitles(cloudSnapshot.titles);
         setClassroomTopFive(cloudSnapshot.classroomTopFive);
         setClassroomRankRewards(cloudSnapshot.classroomRankRewards);
         setClassroomRankNextResetAt(cloudSnapshot.classroomRankNextResetAt);
@@ -290,31 +297,6 @@ export default function StudentWalkingScreen() {
     }
   }, [handleAuthError, syncWalkingData]);
 
-  const markAttendance = useCallback(async (days: string[]) => {
-    if (days.length === 0) return;
-    setBusy("attendance");
-    setError(null);
-    setMessage(null);
-    try {
-      const snapshot = await markWalkingAttendance(days);
-      setRows(snapshot.rows);
-      setPolicy(snapshot.policy);
-      setMonthlyAttendanceReward(snapshot.monthlyAttendanceReward);
-      setDailyStepRewards(snapshot.dailyStepRewards);
-      setWeeklyStepRewards(snapshot.weeklyStepRewards);
-      setClassroomTopFive(snapshot.classroomTopFive);
-      setClassroomRankRewards(snapshot.classroomRankRewards);
-      setClassroomRankNextResetAt(snapshot.classroomRankNextResetAt);
-      setMessage("출석을 체크했어요.");
-    } catch (nextError) {
-      if (!(await handleAuthError(nextError))) {
-        setError(localizedWalkingError(nextError, "출석 체크에 실패했어요."));
-      }
-    } finally {
-      setBusy(null);
-    }
-  }, [handleAuthError]);
-
   const openSettings = useCallback(async () => {
     setBusy("settings");
     setError(null);
@@ -326,6 +308,40 @@ export default function StudentWalkingScreen() {
       setBusy(null);
     }
   }, []);
+
+  const claimAttendance = useCallback(async (day: string) => {
+    setBusy("attendance");
+    setError(null);
+    setMessage(null);
+    try {
+      const payload = await claimStudentAttendanceReward(day);
+      setMonthlyAttendanceReward(payload.attendance);
+      setMessage("출석 보상을 받았어요.");
+    } catch (nextError) {
+      if (!(await handleAuthError(nextError))) {
+        setError(localizedWalkingError(nextError, "출석 보상을 받지 못했어요."));
+      }
+    } finally {
+      setBusy(null);
+    }
+  }, [handleAuthError]);
+
+  const claimWalkingTitle = useCallback(async (titleKey: string) => {
+    setClaimingTitleKey(titleKey);
+    setError(null);
+    setMessage(null);
+    try {
+      const payload = await claimTitle(titleKey);
+      setTitles(payload.titles);
+      setMessage("칭호를 받았어요. 펫 꾸미기에서 붙일 수 있어요.");
+    } catch (nextError) {
+      if (!(await handleAuthError(nextError))) {
+        setError(localizedWalkingError(nextError, "칭호를 받지 못했어요."));
+      }
+    } finally {
+      setClaimingTitleKey(null);
+    }
+  }, [handleAuthError]);
 
   const claimClassroomRankReward = useCallback(async (weekStart: string) => {
     if (rankRewardPending) return;
@@ -396,33 +412,7 @@ export default function StudentWalkingScreen() {
   return (
     <SafeAreaView style={styles.container} edges={["top"]}>
       <AppHeader title="걷기" right={<StudentHeaderActions />} />
-      <ScrollView
-        contentContainerStyle={styles.content}
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={() => void load(true, true)}
-            tintColor={colors.accent}
-          />
-        }
-      >
-        <View style={styles.connectionOverlay}>
-          <View
-            style={[
-              styles.connectionDot,
-              connected && styles.connectionDotConnected,
-            ]}
-          />
-          <Text style={styles.connectionOverlayText}>{compactConnectionLabel}</Text>
-          <ControlPressable
-            style={styles.connectionSettingsButton}
-            hitSlop={spacing.sm}
-            onPress={() => setSettingsVisible(true)}
-            accessibilityLabel="걷기 연동 설정"
-          >
-            <Settings size={iconSizes.sm} color={colors.textMuted} accessible={false} />
-          </ControlPressable>
-        </View>
+      <View style={styles.pageTabsRow}>
         <ContentTabs
           accessibilityLabel="걷기 활동 보기"
           style={styles.viewNav}
@@ -443,8 +433,43 @@ export default function StudentWalkingScreen() {
           >
             미션
           </ContentTab>
+          <ContentTab
+            style={styles.viewNavItem}
+            selected={activeView === "titles"}
+            onPress={() => setActiveView("titles")}
+            accessibilityLabel="걷기 칭호 보기"
+          >
+            칭호
+          </ContentTab>
         </ContentTabs>
-
+        <View style={styles.connectionRow}>
+          <View
+            style={[
+              styles.connectionDot,
+              connected && styles.connectionDotConnected,
+            ]}
+          />
+          <Text style={styles.connectionOverlayText}>{compactConnectionLabel}</Text>
+          <ControlPressable
+            style={styles.connectionSettingsButton}
+            hitSlop={spacing.sm}
+            onPress={() => setSettingsVisible(true)}
+            accessibilityLabel="걷기 연동 설정"
+          >
+            <Settings size={iconSizes.sm} color={colors.textMuted} accessible={false} />
+          </ControlPressable>
+        </View>
+      </View>
+      <ScrollView
+        contentContainerStyle={styles.content}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={() => void load(true, true)}
+            tintColor={colors.accent}
+          />
+        }
+      >
         {status === "needs_update" ? (
           <AppButton loading={busy === "settings"} onPress={() => void openSettings()}>
             Health Connect 업데이트
@@ -574,7 +599,7 @@ export default function StudentWalkingScreen() {
           </>
         ) : null}
           </>
-        ) : (
+        ) : activeView === "missions" ? (
           <WalkingMissionPanel
             todaySteps={today.steps}
             dailyGoal={policy.stepThreshold}
@@ -582,12 +607,19 @@ export default function StudentWalkingScreen() {
             dailyUnitCap={policy.dailyUnitCap}
             dailyStepRewards={dailyStepRewards}
             monthlyAttendanceReward={monthlyAttendanceReward}
+            attendanceBusy={busy === "attendance"}
+            onClaimAttendance={(day) => void claimAttendance(day)}
             weeklyStepRewards={weeklyStepRewards}
             representativeSlime={representativeSlime}
             onDailyStepRewardsChange={setDailyStepRewards}
             onWeeklyStepRewardsChange={setWeeklyStepRewards}
-            attendanceBusy={busy === "attendance"}
-            onAttendanceDays={(days) => void markAttendance(days)}
+          />
+        ) : (
+          <TitleCollection
+            titles={titles}
+            emptyHint="걸음 기록을 쌓으면 칭호를 얻을 수 있어요."
+            claimingKey={claimingTitleKey}
+            onClaim={(titleKey) => void claimWalkingTitle(titleKey)}
           />
         )}
       </ScrollView>
@@ -1011,12 +1043,12 @@ function WalkingMissionPanel({
   dailyUnitCap,
   dailyStepRewards,
   monthlyAttendanceReward,
+  attendanceBusy,
+  onClaimAttendance,
   weeklyStepRewards,
   representativeSlime,
   onDailyStepRewardsChange,
   onWeeklyStepRewardsChange,
-  attendanceBusy,
-  onAttendanceDays,
 }: {
   todaySteps: number;
   dailyGoal: number;
@@ -1024,12 +1056,12 @@ function WalkingMissionPanel({
   dailyUnitCap: number;
   dailyStepRewards: WalkingDailyStepRewards | null;
   monthlyAttendanceReward: WalkingMonthlyAttendanceReward | null;
+  attendanceBusy: boolean;
+  onClaimAttendance: (day: string) => void;
   weeklyStepRewards: WalkingWeeklyStepRewards | null;
   representativeSlime: WalkingRepresentativeSlime | null;
   onDailyStepRewardsChange: (rewards: WalkingDailyStepRewards | null) => void;
   onWeeklyStepRewardsChange: (rewards: WalkingWeeklyStepRewards | null) => void;
-  attendanceBusy: boolean;
-  onAttendanceDays: (days: string[]) => void;
 }) {
   const safeDailyGoal = Math.max(1, dailyGoal);
   const safeDailyUnitCap = Math.min(4, Math.max(1, dailyUnitCap));
@@ -1081,7 +1113,7 @@ function WalkingMissionPanel({
         <WalkingAttendanceCalendar
           reward={monthlyAttendanceReward}
           busy={attendanceBusy}
-          onDayPress={(day) => onAttendanceDays([day])}
+          onDayPress={onClaimAttendance}
         />
       ) : null}
 
@@ -1140,20 +1172,26 @@ const styles = StyleSheet.create({
     gap: spacing.xxl,
     position: "relative",
   },
+  // The activity tabs stay outside the ScrollView so the current view and the
+  // connection state remain reachable while reading long mission content.
+  pageTabsRow: {
+    width: "100%",
+    maxWidth: layout.readableMaxWidth,
+    alignSelf: "center",
+    paddingHorizontal: spacing.xl,
+  },
+  connectionRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "flex-end",
+    gap: spacing.xs,
+    paddingTop: spacing.xs,
+  },
   viewNav: {
     alignSelf: "stretch",
-    marginTop: spacing.xl,
   },
   viewNavItem: {
     flex: 1,
-  },
-  connectionOverlay: {
-    position: "absolute",
-    top: spacing.xxs,
-    right: spacing.xl,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: spacing.xs,
   },
   connectionDot: {
     width: spacing.sm,

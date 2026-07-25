@@ -18,6 +18,10 @@ import { CardComposer } from "../CardComposer";
 import { nextCardOrder } from "./cards-board-utils";
 import { CardAuthorBottomSheet } from "../CardAuthorBottomSheet";
 import { CommentBottomSheet } from "../CommentBottomSheet";
+import {
+  PostModerationOverlay,
+  type PostAnchor,
+} from "../PostModerationOverlay";
 import type { BoardDetailResponse, BoardCard } from "../../lib/types";
 import {
   buildMobileSectionSummaries,
@@ -80,6 +84,10 @@ export function ColumnsBoard({
   const [composerOpen, setComposerOpen] = useState(false);
   const [commentCard, setCommentCard] = useState<BoardCard | null>(null);
   const [authorCard, setAuthorCard] = useState<BoardCard | null>(null);
+  const [moderationTarget, setModerationTarget] = useState<{
+    card: BoardCard;
+    anchor: PostAnchor;
+  } | null>(null);
   const [topicFilter, setTopicFilter] = useState<TopicFilter>("all");
   const writableSections = useMemo(
     () =>
@@ -181,27 +189,18 @@ export function ColumnsBoard({
           data={selectedCards}
           keyExtractor={(card) => card.id}
           contentContainerStyle={styles.listContent}
-            ListHeaderComponent={
+          ListHeaderComponent={
+            canWriteSelected ? (
               <View style={styles.detailHeaderContent}>
-                <View style={styles.detailTopRow}>
-                  <ControlPressable
-                    style={styles.backButton}
-                    onPress={() => setSelectedSectionKey(null)}
-                    accessibilityLabel="주제 목록으로 돌아가기"
-                  >
-                    <Text style={styles.backButtonText}>← 주제</Text>
-                  </ControlPressable>
-                  {canWriteSelected ? (
-                    <ControlPressable
-                      style={styles.addIconButton}
-                    onPress={() => openComposer(selectedSummary.id)}
-                    accessibilityLabel="카드 추가"
-                  >
-                    <Text style={styles.addIconText}>＋</Text>
-                  </ControlPressable>
-                ) : null}
+                <ControlPressable
+                  style={styles.addIconButton}
+                  onPress={() => openComposer(selectedSummary.id)}
+                  accessibilityLabel="카드 추가"
+                >
+                  <Text style={styles.addIconText}>＋</Text>
+                </ControlPressable>
               </View>
-            </View>
+            ) : null
           }
             renderItem={({ item }) => (
               <StreamFeedPost
@@ -211,6 +210,11 @@ export function ColumnsBoard({
                   item.canEdit === true
                     ? () => setAuthorCard(item)
                     : undefined
+                }
+                onLongPress={
+                  item.isMine === true
+                    ? undefined
+                    : (anchor) => setModerationTarget({ card: item, anchor })
                 }
               />
             )}
@@ -338,6 +342,17 @@ export function ColumnsBoard({
           onMutate();
         }}
       />
+      {moderationTarget ? (
+        <PostModerationOverlay
+          card={moderationTarget.card}
+          anchor={moderationTarget.anchor}
+          onClose={() => setModerationTarget(null)}
+          onHidden={(cardId) => {
+            setCards((current) => current.filter((card) => card.id !== cardId));
+            onMutate();
+          }}
+        />
+      ) : null}
     </View>
   );
 }
@@ -446,27 +461,7 @@ const styles = StyleSheet.create({
   },
   detailHeaderContent: {
     paddingBottom: spacing.md,
-  },
-  detailTopRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-  },
-  backButton: {
-    minWidth: tapMin,
-    minHeight: tapMin,
-    alignItems: "flex-start",
-    justifyContent: "center",
-    paddingHorizontal: spacing.none,
-    paddingVertical: spacing.none,
-    borderWidth: borders.none,
-    borderColor: colors.transparent,
-    borderRadius: radii.none,
-    backgroundColor: colors.transparent,
-  },
-  backButtonText: {
-    ...typography.label,
-    color: colors.accentTintedText,
+    alignItems: "flex-end",
   },
   addIconButton: {
     minWidth: tapMin,

@@ -20,6 +20,17 @@ export type WalkingDay = {
   syncedAt: string | null;
 };
 
+export type WalkingTitleProgress = {
+  key: string;
+  label: string;
+  imagePath: string;
+  requirement: string;
+  effectKey: string;
+  buffBps: number;
+  earned: boolean;
+  claimed: boolean;
+};
+
 export type WalkingWeekRange = {
   weekStart: string;
   weekEnd: string;
@@ -361,6 +372,7 @@ export type WalkingResponse = {
   classroomTopFive: ClassroomWalkingRank[];
   classroomRankRewards: ClassroomRankReward[];
   classroomRankNextResetAt: string | null;
+  titles: WalkingTitleProgress[];
 };
 
 function safePolicyInteger(value: unknown, fallback: number, minimum = 0) {
@@ -419,6 +431,7 @@ export async function fetchWalkingSnapshot(_days?: number): Promise<WalkingRespo
     classroomTopFive?: unknown;
     classroomRankRewards?: unknown;
     classroomRankNextResetAt?: unknown;
+    titles?: unknown;
   }>("/api/student/walking?week=current");
   return {
     rows: payload.rows,
@@ -435,7 +448,33 @@ export async function fetchWalkingSnapshot(_days?: number): Promise<WalkingRespo
       !Number.isNaN(new Date(payload.classroomRankNextResetAt).getTime())
         ? payload.classroomRankNextResetAt
         : null,
+    titles: normalizeTitleProgress(payload.titles),
   };
+}
+
+function normalizeTitleProgress(value: unknown): WalkingTitleProgress[] {
+  if (!Array.isArray(value)) return [];
+  return value.flatMap((entry) => {
+    if (!entry || typeof entry !== "object") return [];
+    const title = entry as Record<string, unknown>;
+    if (
+      typeof title.key !== "string" ||
+      typeof title.label !== "string" ||
+      typeof title.imagePath !== "string"
+    ) {
+      return [];
+    }
+    return [{
+      key: title.key,
+      label: title.label,
+      imagePath: title.imagePath,
+      requirement: typeof title.requirement === "string" ? title.requirement : "",
+      effectKey: typeof title.effectKey === "string" ? title.effectKey : "",
+      buffBps: Math.max(0, Math.round(Number(title.buffBps) || 0)),
+      earned: title.earned === true,
+      claimed: title.claimed === true,
+    }];
+  });
 }
 
 function normalizeWalkingRepresentativeSlime(value: unknown): WalkingRepresentativeSlime | null {
@@ -494,23 +533,6 @@ function normalizeClassroomRankRewards(value: unknown): ClassroomRankReward[] {
       !Number.isFinite(amount) || amount <= 0
     ) return [];
     return [{ weekStart: reward.weekStart, rank, amount: Math.round(amount) }];
-  });
-}
-
-export async function markWalkingAttendance(days: string[]) {
-  await apiFetch("/api/student/walking", {
-    method: "POST",
-    json: { attendanceDays: days },
-  });
-  // The mutation response is intentionally smaller than the GET snapshot and
-  // does not include policy/weekly reward fields required by the mission view.
-  return fetchWalkingSnapshot();
-}
-
-export async function recordWalkingAttendanceVisit() {
-  return apiFetch("/api/student/walking", {
-    method: "POST",
-    json: { attendanceVisit: true },
   });
 }
 

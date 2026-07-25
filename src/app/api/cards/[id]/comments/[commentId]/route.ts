@@ -32,6 +32,7 @@ export async function DELETE(
       authorUserId: true,
       authorStudentId: true,
       authorParentId: true,
+      parentCommentId: true,
       deletedAt: true,
     },
   });
@@ -57,8 +58,10 @@ export async function DELETE(
     return NextResponse.json({ error: "forbidden" }, { status: 403 });
   }
 
-  await db.cardComment.update({
-    where: { id: commentId },
+  await db.cardComment.updateMany({
+    where: comment.parentCommentId
+      ? { id: commentId }
+      : { OR: [{ id: commentId }, { parentCommentId: commentId }] },
     data: { deletedAt: new Date() },
   });
 

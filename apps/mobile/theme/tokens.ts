@@ -496,6 +496,13 @@ export const walking = {
   milestoneText: "#18313f",
 } as const;
 
+/** Achievement-title list shared by the walking and reading mission screens. */
+export const titleCollection = {
+  tagWidth: 132,
+  tagHeight: 34,
+  actionWidth: 76,
+} as const;
+
 export const store = {
   headerHeight: 72,
   itemCardWidth: 160,

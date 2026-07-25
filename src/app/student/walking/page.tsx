@@ -13,11 +13,11 @@ import {
 } from "@/lib/walking";
 import {
   getWalkingWeeklyRewardTiers,
-  WALKING_MONTHLY_ATTENDANCE_ORDINALS,
 } from "@/lib/reward-policy";
+import { getStudentMonthlyAttendance } from "@/lib/student-attendance";
 import { StudentTopNav } from "@/components/StudentTopNav";
 import { StudentWalkingTabs } from "@/components/student/StudentWalkingTabs";
-import { WalkingAttendanceCalendar } from "@/components/student/WalkingAttendanceCalendar";
+import { AttendanceMission } from "@/components/student/AttendanceMission";
 import {
   WeeklyWalkingMission,
   type WeeklyWalkingRewards,
@@ -126,12 +126,14 @@ export default async function StudentWalkingPage() {
     home,
     storedRows,
     rewardPolicy,
+    attendance,
     classroomTopFive,
     achievementRows,
   ] = await Promise.all([
     getStudentHomePayload(student),
     getStudentWalkingDays(student.id, 31),
     db.$transaction((tx) => loadRewardPolicy(tx, student.classroomId)),
+    getStudentMonthlyAttendance(student.id),
     db.$queryRaw<ClassroomWalkingRank[]>(Prisma.sql`
       SELECT
         student."id" AS "studentId",
@@ -240,19 +242,6 @@ export default async function StudentWalkingPage() {
     steps: dailyStepThreshold * (index + 1),
     amount: dailyRewardAmount,
   }));
-  const [monthYear, monthNumber] = weekRange.today.split("-").map(Number);
-  const currentMonth = `${monthYear}-${String(monthNumber).padStart(2, "0")}`;
-  const monthDays = WALKING_MONTHLY_ATTENDANCE_ORDINALS;
-  const attendanceCount = new Set(
-    storedRows
-      .filter(
-        (row) =>
-          row.day.startsWith(`${currentMonth}-`) &&
-          row.day <= weekRange.today &&
-          Boolean(row.syncedAt),
-      )
-      .map((row) => row.day),
-  ).size;
 
   return (
     <>
@@ -393,27 +382,7 @@ export default async function StudentWalkingPage() {
           missions={
             <div className="student-walking-missions-content">
               <div className="student-walking-mission-dashboard">
-                <section
-                  className="classroom-dashboard-panel student-walking-attendance-panel"
-                  aria-label="월간 출석 보드"
-                >
-                    <div className="classroom-dashboard-panel-head">
-                    <h2 id="walking-attendance-title">출석미션</h2>
-                    <strong
-                      className={`student-walking-mission-status${
-                        attendanceCount >= monthDays ? " is-complete" : ""
-                      }`}
-                    >
-                      {attendanceCount} / {monthDays}일
-                    </strong>
-                  </div>
-                  <WalkingAttendanceCalendar
-                    studentId={student.id}
-                    month={currentMonth}
-                    monthDays={monthDays}
-                    attendanceCount={attendanceCount}
-                  />
-                </section>
+                <AttendanceMission studentId={student.id} attendance={attendance} />
 
                 <div className="student-walking-mission-summary">
                   <section

@@ -765,8 +765,8 @@ const styles = StyleSheet.create({
     marginTop: spacing.sm,
   },
   queueSheet: {
-    height: "82%",
-    maxHeight: "82%",
+    height: "89%",
+    maxHeight: "89%",
     minHeight: tapMin * 6,
     paddingBottom: spacing.md,
   },

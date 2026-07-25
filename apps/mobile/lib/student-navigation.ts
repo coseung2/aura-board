@@ -20,10 +20,10 @@ export function normalizeStudentNavIds(value: unknown): string[] {
   const ids = [
     ...new Set(value.filter((id): id is string => typeof id === "string")),
   ];
-  // Keep the entry point to the full menu after every enabled tab.
+  // Keep the entry point to the full menu after every enabled tab. Older saved
+  // preferences predate the fixed menu entry, so restore it when it is absent.
   const moreIndex = ids.indexOf(MORE_NAV_ID);
-  if (moreIndex < 0) return ids;
-  ids.splice(moreIndex, 1);
+  if (moreIndex >= 0) ids.splice(moreIndex, 1);
   ids.push(MORE_NAV_ID);
   return ids;
 }

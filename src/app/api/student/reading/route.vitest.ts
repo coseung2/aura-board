@@ -5,6 +5,10 @@ const mocks = vi.hoisted(() => ({
   transactions: [] as Array<Record<string, unknown>>,
   balance: 0,
   award: vi.fn(),
+  findMany: vi.fn(),
+  count: vi.fn(),
+  aggregate: vi.fn(),
+  queryRaw: vi.fn(),
 }));
 
 vi.mock("@/lib/student-auth", () => ({
@@ -19,6 +23,9 @@ vi.mock("@/lib/bank", () => ({
 }));
 vi.mock("@/lib/reading-evaluator", () => ({
   evaluateReadingLog: vi.fn(() => ({ score: 5, feedback: "좋아요" })),
+}));
+vi.mock("@/lib/titles", () => ({
+  readReadingTitles: vi.fn(async () => []),
 }));
 vi.mock("@/lib/avatar-rewards", () => ({
   retryReadingRewardTransaction: (operation: () => Promise<unknown>) => operation(),
@@ -37,7 +44,13 @@ vi.mock("@/lib/db", () => {
   };
   return {
     db: {
-      readingLog: { findMany: vi.fn(), create: tx.readingLog.create },
+      readingLog: {
+        findMany: mocks.findMany,
+        count: mocks.count,
+        aggregate: mocks.aggregate,
+        create: tx.readingLog.create,
+      },
+      $queryRaw: mocks.queryRaw,
       $transaction: vi.fn(async (operation: (client: typeof tx) => Promise<unknown>) => {
         const logSnapshot = [...mocks.logs];
         const transactionSnapshot = [...mocks.transactions];
@@ -55,7 +68,7 @@ vi.mock("@/lib/db", () => {
   };
 });
 
-import { POST } from "./route";
+import { GET, POST } from "./route";
 
 function request() {
   return new Request("http://localhost/api/student/reading", {
@@ -76,6 +89,11 @@ describe("reading log and reward transaction", () => {
     mocks.transactions.length = 0;
     mocks.balance = 0;
     mocks.award.mockReset();
+    mocks.findMany.mockReset();
+    mocks.count.mockReset();
+    mocks.aggregate.mockReset();
+    mocks.queryRaw.mockReset();
+    mocks.queryRaw.mockResolvedValue([]);
   });
 
   it("rolls the reading log, wallet, and transaction back together", async () => {
@@ -90,5 +108,47 @@ describe("reading log and reward transaction", () => {
     expect(mocks.logs).toHaveLength(0);
     expect(mocks.balance).toBe(0);
     expect(mocks.transactions).toHaveLength(0);
+  });
+
+  it("uses complete aggregates while capping the returned recent entries", async () => {
+    const recentRows = Array.from({ length: 30 }, (_, index) => {
+      const now = new Date("2026-07-20T00:00:00.000Z");
+      return {
+        id: `reading-${index}`,
+        classroomId: "classroom-1",
+        studentId: "student-1",
+        bookType: "story",
+        title: `책 ${index}`,
+        author: "작가",
+        reflection: "감상",
+        aiScore: index === 0 ? 5 : null,
+        aiFeedback: null,
+        evaluatedAt: null,
+        createdAt: now,
+        updatedAt: now,
+      };
+    });
+    mocks.findMany.mockResolvedValue(recentRows);
+    mocks.count.mockResolvedValueOnce(31).mockResolvedValueOnce(4);
+    mocks.aggregate.mockResolvedValue({ _avg: { aiScore: 4.25 } });
+
+    const response = await GET();
+
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body.entries).toHaveLength(30);
+    expect(body.count).toBe(31);
+    expect(body.summary).toEqual({
+      weeklyCount: 4,
+      totalCount: 31,
+      averageScore: 4.3,
+    });
+    expect(mocks.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ take: 30 }),
+    );
+    expect(mocks.count).toHaveBeenCalledTimes(2);
+    expect(mocks.aggregate).toHaveBeenCalledWith(
+      expect.objectContaining({ _avg: { aiScore: true } }),
+    );
   });
 });

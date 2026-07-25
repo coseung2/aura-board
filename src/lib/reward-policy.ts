@@ -16,22 +16,14 @@ export const WALKING_CLASSROOM_RANK_REWARDS = [100, 60, 50, 40, 30] as const;
 /** Do not create retroactive classroom-rank payouts from before launch. */
 export const WALKING_CLASSROOM_RANK_REWARD_START_DAY = "2026-07-12" as const;
 
-/**
- * Monthly attendance uses the existing server-owned walking reward namespace.
- * Keeping the namespace stable avoids a schema change while the source ref
- * below separates monthly attendance ordinals from weekly step tiers and any
- * historical weekly attendance deposits.
- */
-export const WALKING_MONTHLY_REWARD_SOURCE_TYPE =
-  WALKING_WEEKLY_REWARD_SOURCE_TYPE;
-
 /** Every month uses the same four-row attendance reward board. */
-export const WALKING_MONTHLY_ATTENDANCE_ORDINALS = 28 as const;
-export const WALKING_MONTHLY_ATTENDANCE_ITEM_ORDINAL = 28 as const;
-export const WALKING_MONTHLY_COOKIE_REWARD_ORDINALS = [7, 14, 21] as const;
-export const WALKING_MONTHLY_COOKIE_ITEM_KEY = "slime-cookie" as const;
-export const WALKING_MONTHLY_COOKIE_REWARD_SOURCE_TYPE =
-  "walking_attendance_cookie_reward" as const;
+export const MONTHLY_ATTENDANCE_REWARD_SOURCE_TYPE = "attendance_reward" as const;
+export const MONTHLY_ATTENDANCE_ORDINALS = 28 as const;
+export const MONTHLY_ATTENDANCE_ITEM_ORDINAL = 28 as const;
+export const MONTHLY_ATTENDANCE_COOKIE_REWARD_ORDINALS = [7, 14, 21] as const;
+export const MONTHLY_ATTENDANCE_COOKIE_ITEM_KEY = "slime-cookie" as const;
+export const MONTHLY_ATTENDANCE_COOKIE_REWARD_SOURCE_TYPE =
+  "attendance_cookie_reward" as const;
 
 /** Weekly walking rewards are independent threshold payouts. */
 export const WALKING_WEEKLY_REWARD_TIERS = [
@@ -41,7 +33,7 @@ export const WALKING_WEEKLY_REWARD_TIERS = [
 ] as const;
 
 /** Cash amounts for monthly attendance ordinals within each seven-day cycle. */
-export const WALKING_MONTHLY_ATTENDANCE_REWARD_AMOUNTS = [10, 10, 10, 10, 10, 10, 20] as const;
+export const MONTHLY_ATTENDANCE_REWARD_AMOUNTS = [10, 10, 10, 10, 10, 10, 20] as const;
 
 export type WalkingWeeklyRewardTierKey = (typeof WALKING_WEEKLY_REWARD_TIERS)[number]["key"];
 
@@ -82,7 +74,9 @@ export const DEFAULT_REWARD_POLICY = {
   // submission; reading/comment zero values continue to disable payouts.
   assignmentDailyRewardCap: 0,
   assignmentWeeklyRewardCap: 0,
-  rewardBuffCapBps: 2_000,
+  // Reward buffs are uncapped by default. A classroom can still set a lower
+  // ceiling explicitly through this policy value.
+  rewardBuffCapBps: Number.MAX_SAFE_INTEGER,
 } as const;
 
 export type RewardPolicy = { -readonly [K in keyof typeof DEFAULT_REWARD_POLICY]: number };
@@ -264,7 +258,11 @@ export function getKstWeekStartDay(dayKey: string): string {
   return toKstDayKey(new Date(local.getTime() - daysSinceMonday * DAY_MS - KST_OFFSET_MS));
 }
 
-export function rewardAmountWithBuff(baseAmount: number, buffBps: number, capBps = 2_000): number {
+export function rewardAmountWithBuff(
+  baseAmount: number,
+  buffBps: number,
+  capBps = Number.MAX_SAFE_INTEGER,
+): number {
   if (!Number.isSafeInteger(baseAmount) || baseAmount <= 0) return 0;
   const boundedBuff = Math.min(
     Math.max(0, Math.trunc(Number.isFinite(buffBps) ? buffBps : 0)),
@@ -327,8 +325,8 @@ export function walkingClassroomRankRewardSourceRef(
   return `${studentId}:${weekStartDay}:classroom-rank`;
 }
 
-/** Stable source key for one monthly attendance ordinal payout. */
-export function walkingMonthlyAttendanceSourceRef(
+/** Stable source key for one shared monthly attendance ordinal payout. */
+export function monthlyAttendanceSourceRef(
   studentId: string,
   month: string,
   ordinal: number,
@@ -337,7 +335,7 @@ export function walkingMonthlyAttendanceSourceRef(
 }
 
 /** Stable source key for one cookie granted at a monthly attendance milestone. */
-export function walkingMonthlyCookieRewardSourceRef(
+export function monthlyAttendanceCookieRewardSourceRef(
   studentId: string,
   month: string,
   ordinal: number,
@@ -345,12 +343,35 @@ export function walkingMonthlyCookieRewardSourceRef(
   return `${studentId}:${month}:attendance:${ordinal}:cookie`;
 }
 
-export function isWalkingMonthlyCookieRewardOrdinal(ordinal: number): boolean {
-  return (WALKING_MONTHLY_COOKIE_REWARD_ORDINALS as readonly number[]).includes(ordinal);
+export function isMonthlyAttendanceCookieRewardOrdinal(ordinal: number): boolean {
+  return (MONTHLY_ATTENDANCE_COOKIE_REWARD_ORDINALS as readonly number[]).includes(ordinal);
 }
 
 /** Cash payout for an ordinal; the seventh position pays 20 won. */
-export function walkingMonthlyAttendanceRewardAmount(ordinal: number): number {
+export function monthlyAttendanceRewardAmount(ordinal: number): number {
   if (!Number.isSafeInteger(ordinal) || ordinal < 1) return 0;
-  return WALKING_MONTHLY_ATTENDANCE_REWARD_AMOUNTS[(ordinal - 1) % 7] ?? 0;
+  return MONTHLY_ATTENDANCE_REWARD_AMOUNTS[(ordinal - 1) % 7] ?? 0;
 }
+
+/** @deprecated Use the domain-neutral monthly attendance exports above. */
+export const WALKING_MONTHLY_REWARD_SOURCE_TYPE = MONTHLY_ATTENDANCE_REWARD_SOURCE_TYPE;
+/** @deprecated Use the domain-neutral monthly attendance exports above. */
+export const WALKING_MONTHLY_ATTENDANCE_ORDINALS = MONTHLY_ATTENDANCE_ORDINALS;
+/** @deprecated Use the domain-neutral monthly attendance exports above. */
+export const WALKING_MONTHLY_ATTENDANCE_ITEM_ORDINAL = MONTHLY_ATTENDANCE_ITEM_ORDINAL;
+/** @deprecated Use the domain-neutral monthly attendance exports above. */
+export const WALKING_MONTHLY_COOKIE_REWARD_ORDINALS = MONTHLY_ATTENDANCE_COOKIE_REWARD_ORDINALS;
+/** @deprecated Use the domain-neutral monthly attendance exports above. */
+export const WALKING_MONTHLY_COOKIE_ITEM_KEY = MONTHLY_ATTENDANCE_COOKIE_ITEM_KEY;
+/** @deprecated Use the domain-neutral monthly attendance exports above. */
+export const WALKING_MONTHLY_COOKIE_REWARD_SOURCE_TYPE = MONTHLY_ATTENDANCE_COOKIE_REWARD_SOURCE_TYPE;
+/** @deprecated Use the domain-neutral monthly attendance exports above. */
+export const WALKING_MONTHLY_ATTENDANCE_REWARD_AMOUNTS = MONTHLY_ATTENDANCE_REWARD_AMOUNTS;
+/** @deprecated Use monthlyAttendanceSourceRef. */
+export const walkingMonthlyAttendanceSourceRef = monthlyAttendanceSourceRef;
+/** @deprecated Use monthlyAttendanceCookieRewardSourceRef. */
+export const walkingMonthlyCookieRewardSourceRef = monthlyAttendanceCookieRewardSourceRef;
+/** @deprecated Use isMonthlyAttendanceCookieRewardOrdinal. */
+export const isWalkingMonthlyCookieRewardOrdinal = isMonthlyAttendanceCookieRewardOrdinal;
+/** @deprecated Use monthlyAttendanceRewardAmount. */
+export const walkingMonthlyAttendanceRewardAmount = monthlyAttendanceRewardAmount;

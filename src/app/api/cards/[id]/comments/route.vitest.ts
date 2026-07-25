@@ -15,6 +15,7 @@ const mocks = vi.hoisted(() => ({
     | { kind: "parent"; id: string; name: string },
   existingContents: [] as string[],
   replay: null as Record<string, unknown> | null,
+  replyTarget: null as Record<string, unknown> | null,
   award: vi.fn(),
   create: vi.fn(),
   announce: vi.fn(),
@@ -59,7 +60,11 @@ vi.mock("@/lib/db", () => {
   const tx = {
     cardComment: {
       findFirst: vi.fn(async ({ where }: { where: Record<string, unknown> }) => {
-        return mocks.replay?.cardId === where.cardId ? mocks.replay : null;
+        if (where.id) return mocks.replyTarget?.id === where.id ? mocks.replyTarget : null;
+        return mocks.replay?.cardId === where.cardId &&
+          (where.deletedAt === undefined || (mocks.replay.deletedAt ?? null) === where.deletedAt)
+          ? mocks.replay
+          : null;
       }),
       findUnique: vi.fn(async ({ where }: { where: Record<string, unknown> }) => {
         const key = where.authorStudentId_cardId_clientRequestId as
@@ -100,11 +105,12 @@ function request(
   clientRequestId = "request-0001",
   content = "정말 좋은 글이에요",
   audience?: "public" | "guardian",
+  parentCommentId?: string,
 ) {
   return new Request("http://localhost/api/cards/card-1/comments", {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({ content, clientRequestId, audience }),
+    body: JSON.stringify({ content, clientRequestId, audience, parentCommentId }),
   });
 }
 
@@ -121,6 +127,7 @@ describe("student comment reward transaction", () => {
     };
     mocks.existingContents.length = 0;
     mocks.replay = null;
+    mocks.replyTarget = null;
     mocks.award.mockReset();
     mocks.create.mockReset();
     mocks.announce.mockReset();
@@ -171,6 +178,24 @@ describe("student comment reward transaction", () => {
     expect((await response.json()).item.id).toBe("comment-existing");
     expect(mocks.create).not.toHaveBeenCalled();
     expect(mocks.award).not.toHaveBeenCalled();
+  });
+
+  it("does not replay a deleted comment for the same client request", async () => {
+    mocks.replay = {
+      id: "comment-deleted",
+      cardId: "card-1",
+      content: "정말 좋은 글이에요",
+      deletedAt: new Date("2026-07-21T00:00:00.000Z"),
+      createdAt: new Date("2026-07-20T00:00:00.000Z"),
+      authorKind: "student",
+      authorUser: null,
+      authorStudent: { id: "student-1", name: "학생" },
+    };
+
+    const response = await POST(request(), { params: Promise.resolve({ id: "card-1" }) });
+    expect(response.status).toBe(200);
+    expect(mocks.create).toHaveBeenCalledTimes(1);
+    expect((await response.json()).item.id).toBe("comment-1");
   });
 
   it("allows the same client request key on a different card", async () => {
@@ -288,5 +313,24 @@ describe("student comment reward transaction", () => {
 
     expect(response.status).toBe(403);
     expect(mocks.create).not.toHaveBeenCalled();
+  });
+
+  it("keeps replies to replies in the original flat thread", async () => {
+    mocks.replyTarget = {
+      id: "reply-1",
+      parentCommentId: "root-1",
+    };
+
+    const response = await POST(
+      request("reply-request-1", "같은 스레드에 남기는 답글", "public", "reply-1"),
+      { params: Promise.resolve({ id: "card-1" }) },
+    );
+
+    expect(response.status).toBe(200);
+    expect(mocks.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ parentCommentId: "root-1" }),
+      }),
+    );
   });
 });

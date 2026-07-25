@@ -72,7 +72,37 @@ export default function TermsPage() {
         </section>
 
         <section className="docs-section">
-          <h2 className="docs-h2">5. 서비스 변경 및 중단</h2>
+          <h2 className="docs-h2">5. 부적절한 콘텐츠에 대한 무관용 원칙</h2>
+          <p className="docs-p">
+            Aura-board는 초등학교 학급에서 사용되는 서비스입니다. 운영자는
+            부적절한 콘텐츠와 다른 이용자를 괴롭히는 행위에 대해 관용을
+            베풀지 않습니다. 서비스를 이용하는 것은 아래 내용에 동의하는
+            것으로 봅니다.
+          </p>
+          <ul className="docs-list">
+            <li>
+              욕설·비방·차별·위협, 성적이거나 폭력적인 표현, 타인의 개인정보,
+              그밖에 학급 구성원에게 불쾌감을 주는 콘텐츠를 게시하지 않습니다.
+            </li>
+            <li>
+              다른 이용자를 괴롭히거나 따돌리는 목적으로 카드·댓글 기능을
+              사용하지 않습니다.
+            </li>
+            <li>
+              이용자는 부적절한 콘텐츠를 신고할 수 있고, 특정 콘텐츠를 자신의
+              화면에서 숨길 수 있습니다.
+            </li>
+          </ul>
+          <p className="docs-p">
+            운영자와 담당 교사는 신고를 접수한 시점부터 24시간 이내에 해당
+            콘텐츠를 확인하고, 위반이 확인되면 콘텐츠를 삭제합니다. 위반을
+            반복하거나 정도가 심한 이용자는 사전 통보 없이 서비스 이용을
+            정지하거나 계정을 삭제할 수 있습니다.
+          </p>
+        </section>
+
+        <section className="docs-section">
+          <h2 className="docs-h2">6. 서비스 변경 및 중단</h2>
           <p className="docs-p">
             운영자는 사전 공지 없이 서비스의 기능을 변경하거나 일시적으로 중단할
             수 있습니다. 장기 중단이 예정된 경우 보드 데이터 내보내기 안내를
@@ -81,7 +111,7 @@ export default function TermsPage() {
         </section>
 
         <section className="docs-section">
-          <h2 className="docs-h2">6. 면책</h2>
+          <h2 className="docs-h2">7. 면책</h2>
           <p className="docs-p">
             서비스는 &ldquo;있는 그대로&rdquo; 제공됩니다. 이용자가 업로드한
             콘텐츠로 인해 발생한 분쟁 및 피해에 대해 운영자는 법이 허용하는
@@ -90,7 +120,7 @@ export default function TermsPage() {
         </section>
 
         <section className="docs-section">
-          <h2 className="docs-h2">7. 문의</h2>
+          <h2 className="docs-h2">8. 문의</h2>
           <p className="docs-p">
             약관 관련 문의는 <Link href="/support" className="docs-link">지원 페이지</Link>
             를 통해 보내주세요.

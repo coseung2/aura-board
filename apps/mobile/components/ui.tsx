@@ -107,6 +107,52 @@ export function ControlPressable({
   );
 }
 
+type BarePressableProps = PressableProps & {
+  children?: ReactNode;
+  style?: StyleProp<ViewStyle>;
+};
+
+/** Interaction-only pressable with no border, background, or minimum size. */
+export const BarePressable = forwardRef<View, BarePressableProps>(function BarePressable(
+  { children, style, ...props },
+  ref,
+) {
+  return (
+    <Pressable ref={ref} style={style} {...props}>
+      {children}
+    </Pressable>
+  );
+});
+
+type AppOverlayModalProps = {
+  visible: boolean;
+  onClose: () => void;
+  children: ReactNode;
+  animationType?: ModalProps["animationType"];
+  statusBarTranslucent?: boolean;
+};
+
+/** Unstyled full-screen modal primitive for custom focus layers and overlays. */
+export function AppOverlayModal({
+  visible,
+  onClose,
+  children,
+  animationType = "fade",
+  statusBarTranslucent = true,
+}: AppOverlayModalProps) {
+  return (
+    <Modal
+      visible={visible}
+      transparent
+      animationType={animationType}
+      statusBarTranslucent={statusBarTranslucent}
+      onRequestClose={onClose}
+    >
+      {children}
+    </Modal>
+  );
+}
+
 /** A non-card pressable for inline text actions such as delete and dismiss. */
 export function TextActionPressable({
   children,
@@ -234,6 +280,8 @@ type AppBottomSheetProps = {
   backdropStyle?: StyleProp<ViewStyle>;
   accessibilityLabel?: string;
   keyboardAvoiding?: boolean;
+  /** Optional full-screen layer rendered above the sheet and its backdrop. */
+  overlay?: ReactNode;
 };
 
 /** Shared draggable bottom sheet for mobile flows. */
@@ -245,6 +293,7 @@ export function AppBottomSheet({
   backdropStyle,
   accessibilityLabel,
   keyboardAvoiding,
+  overlay,
 }: AppBottomSheetProps) {
   const insets = useSafeAreaInsets();
   const translateY = useRef(new Animated.Value(0)).current;
@@ -274,7 +323,11 @@ export function AppBottomSheet({
 
   const panResponder = useRef(
     PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onStartShouldSetPanResponderCapture: () => true,
       onMoveShouldSetPanResponder: (_event, gesture) =>
+        gesture.dy > 4 && Math.abs(gesture.dy) > Math.abs(gesture.dx),
+      onMoveShouldSetPanResponderCapture: (_event, gesture) =>
         gesture.dy > 4 && Math.abs(gesture.dy) > Math.abs(gesture.dx),
       onPanResponderMove: (_event, gesture) => {
         translateY.setValue(Math.max(0, gesture.dy));
@@ -312,6 +365,7 @@ export function AppBottomSheet({
       <View
         {...panResponder.panHandlers}
         style={styles.bottomSheetHandleArea}
+        collapsable={false}
         accessibilityLabel={
           accessibilityLabel ? `${accessibilityLabel} 닫기` : "시트 닫기"
         }
@@ -350,6 +404,7 @@ export function AppBottomSheet({
         ) : (
           sheet
         )}
+        {overlay}
       </View>
     </Modal>
   );
@@ -732,8 +787,10 @@ const styles = StyleSheet.create({
     overflow: "hidden",
   },
   bottomSheetHandleArea: {
+    minHeight: tapMin,
     alignItems: "center",
-    paddingVertical: spacing.sm,
+    justifyContent: "center",
+    paddingVertical: spacing.xs,
   },
   bottomSheetHandle: {
     width: spacing.xxl,

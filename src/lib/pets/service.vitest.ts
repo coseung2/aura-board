@@ -137,7 +137,13 @@ describe("slime wallet service", () => {
     expect(home.catalog).toHaveLength(5);
     expect(mocks.slimeFindMany).toHaveBeenCalledWith({
       where: { studentId: student.id },
-      select: { color: true, isEquipped: true, isRepresentative: true, equippedItemKeys: true },
+      select: {
+        color: true,
+        isEquipped: true,
+        isRepresentative: true,
+        equippedItemKeys: true,
+        equippedTitleKey: true,
+      },
       orderBy: { createdAt: "asc" },
     });
   });

@@ -3,6 +3,8 @@ import { db } from "@/lib/db";
 import { getCurrentStudent } from "@/lib/student-auth";
 import { getEffectiveBoardRole } from "@/lib/rbac";
 import { resolveCardAuthorLabels } from "@/lib/card-author-labels";
+import { resolveHiddenReason } from "@/lib/content-safety";
+import { loadHiddenLookup } from "@/lib/content-safety-service";
 import { loadGameSnapshot } from "@/lib/speed-game/runtime";
 import { sanitizeGameSnapshotForStudent } from "@/lib/speed-game/student-snapshot";
 import { parseObservationPoints } from "@/lib/plant-schemas";
@@ -53,6 +55,8 @@ export async function GET(
     if (!board) {
       return NextResponse.json({ error: "not_found" }, { status: 404 });
     }
+
+    const hidden = await loadHiddenLookup(student.id);
 
     const layoutData: Record<string, unknown> = {};
     let allowedBreakoutSectionIds: Set<string> | null = null;
@@ -300,6 +304,9 @@ export async function GET(
     const cards = await Promise.all(
       visibleCards.map(async (card) => {
         const { _count, ...rest } = card;
+        const hiddenReason = hidden.hasAnyHide
+          ? resolveHiddenReason(hidden, "card", rest.id, rest.studentAuthorId)
+          : null;
         const hasAuthor =
           rest.authors.length > 0 ||
           Boolean(
@@ -313,6 +320,46 @@ export async function GET(
         const isOwnPendingQueue = rest.queueStatus === "pending" && isMine;
         const canEdit = isMine;
         const canDelete = isMine;
+        if (hiddenReason) {
+          return {
+            ...rest,
+            title: "",
+            content: "",
+            imageUrl: null,
+            thumbUrl: null,
+            linkUrl: null,
+            linkTitle: null,
+            linkDesc: null,
+            linkImage: null,
+            videoUrl: null,
+            fileUrl: null,
+            fileName: null,
+            fileSize: null,
+            fileMimeType: null,
+            canvaDesignId: null,
+            commentVoteOptionCount: null,
+            commentVoteOptionLabels: null,
+            groupId: null,
+            authorId: null,
+            externalAuthorKey: null,
+            externalAuthorName: null,
+            studentAuthorId: null,
+            authorName: null,
+            studentAuthorName: null,
+            authors: [],
+            attachments: [],
+            anonymousAuthor: false,
+            likeCount: _count.likes,
+            commentCount: _count.comments,
+            hiddenReason,
+            isMine: false,
+            canEdit: false,
+            canDelete: false,
+            isOwnPendingQueue: false,
+            createdAt: card.createdAt.toISOString(),
+            updatedAt: card.updatedAt.toISOString(),
+          };
+        }
         const visibleAuthorLabels = board.anonymousAuthor
           ? hasAuthor
             ? {

@@ -14,8 +14,11 @@ import type {
 } from "./types";
 import { SLIME_EFFECT_KEYS } from "./types";
 
-/** A per-effect guardrail for this preview contract. Values are basis points. */
-export const SLIME_EFFECT_CAP_BPS = 2_000;
+/**
+ * Effects are uncapped. The value stays as an explicit "no ceiling" default so
+ * existing callers that pass a cap keep working while nothing is clamped.
+ */
+export const SLIME_EFFECT_CAP_BPS = Number.MAX_SAFE_INTEGER;
 
 export type SlimeBuffInput = Pick<
   SlimeDefinition,

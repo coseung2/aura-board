@@ -4,6 +4,7 @@ import { Prisma } from "@prisma/client";
 
 import { awardActivityReward, type ActivityRewardResult } from "./creatures/activity-rewards";
 import { calculateCatalogSlimeEffects } from "./pets/math";
+import { getTitleDefinition } from "./title-catalog";
 import {
   DEFAULT_REWARD_POLICY,
   getKstRewardBounds,
@@ -45,7 +46,9 @@ export async function loadRewardPolicy(
   // local throttle; the product default is unlimited per valid submission.
   policy.walkingDailyUnitCap = Math.min(policy.walkingDailyUnitCap, 4);
   policy.walkingWeeklyRewardDayCap = Math.min(policy.walkingWeeklyRewardDayCap, 5);
-  policy.rewardBuffCapBps = Math.min(policy.rewardBuffCapBps, 2_000);
+  // Reward buffs are uncapped. Existing rows still carry the retired 20% value,
+  // so the stored ceiling is ignored rather than migrated.
+  policy.rewardBuffCapBps = Number.MAX_SAFE_INTEGER;
   return policy;
 }
 
@@ -58,20 +61,36 @@ export async function loadEquippedRewardBuffBps(
   const [slimes, equippedItems] = await Promise.all([
     tx.studentSlime.findMany({
       where: { studentId },
-      select: { color: true, isEquipped: true, growthStage: true },
+      select: {
+        color: true,
+        isEquipped: true,
+        growthStage: true,
+        equippedTitleKey: true,
+      },
     }),
     tx.studentCreatureItem.findMany({
       where: { studentId, isEquipped: true, quantity: { gt: 0 } },
       select: { itemKey: true },
     }),
   ]);
+  const equippedSlimes = slimes.filter((slime) => slime.isEquipped);
   const effects = calculateCatalogSlimeEffects(
-    slimes.map((slime) => slime.color),
+    equippedSlimes.map((slime) => slime.color),
     equippedItems.map((item) => item.itemKey),
     capBps,
-    Object.fromEntries(slimes.map((slime) => [slime.color, slime.growthStage])),
+    Object.fromEntries(equippedSlimes.map((slime) => [slime.color, slime.growthStage])),
   );
-  return effects.totals[REWARD_EFFECT_BY_AREA[area]];
+  const effectKey = REWARD_EFFECT_BY_AREA[area];
+  // Titles are worn per pet, so each equipped title adds its own buff. The same
+  // title on two pets counts twice, matching how per-pet cosmetics behave.
+  const titleBps = equippedSlimes.reduce((sum, slime) => {
+    if (!slime.equippedTitleKey) return sum;
+    const definition = getTitleDefinition(slime.equippedTitleKey);
+    return definition?.effectKey === effectKey ? sum + definition.buffBps : sum;
+  }, 0);
+  const total = effects.totals[effectKey] + titleBps;
+  const boundedCap = Math.max(0, Math.trunc(Number.isFinite(capBps) ? capBps : 0));
+  return Math.min(total, boundedCap);
 }
 
 function capsForArea(area: Exclude<RewardArea, "walking">, policy: RewardPolicy) {

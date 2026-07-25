@@ -71,6 +71,16 @@ export type SlimeHome = {
   growth: Partial<Record<SlimeColor, SlimeGrowthSnapshot>>;
   /** The highest walking achievement title currently earned by the student. */
   walkingTitle: { key: string; label: string; imagePath: string } | null;
+  /** Titles the student has claimed and can equip on any owned pet. */
+  claimedTitles: Array<{
+    key: string;
+    label: string;
+    imagePath: string;
+    effectKey: string;
+    buffBps: number;
+  }>;
+  /** Title worn by each pet, keyed by slime color. */
+  equippedTitleByColor: Partial<Record<SlimeColor, string>>;
 };
 
 export type SlimePurchaseResult = {

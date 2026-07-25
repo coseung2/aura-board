@@ -4,6 +4,7 @@ import { Prisma } from "@prisma/client";
 
 import { db } from "@/lib/db";
 import { walkingTitleForStats, type WalkingTitleStats } from "@/lib/walking-titles";
+import { getTitleDefinition } from "@/lib/title-catalog";
 import {
   getSlimeDefinition,
   getEquippedSlimeFloor,
@@ -71,6 +72,9 @@ export type {
 type StudentIdentity = { id: string; classroomId: string };
 
 async function walkingTitleForStudent(studentId: string) {
+  // Isolated service fixtures mock only the delegates they exercise, so treat a
+  // missing raw-query capability as "no title yet" instead of failing the home.
+  if (typeof db.$queryRaw !== "function") return null;
   const [stats] = await db.$queryRaw<WalkingTitleStats[]>(Prisma.sql`
     WITH daily AS (
       SELECT MAX("steps")::bigint AS "maxDailySteps"
@@ -199,7 +203,13 @@ export async function getSlimeHome(student: StudentIdentity): Promise<SlimeHome>
       // Slime ownership follows the student if they move classrooms. The
       // classroomId remains an audit snapshot of where it was purchased.
       where: { studentId: student.id },
-      select: { color: true, isEquipped: true, isRepresentative: true, equippedItemKeys: true },
+      select: {
+        color: true,
+        isEquipped: true,
+        isRepresentative: true,
+        equippedItemKeys: true,
+        equippedTitleKey: true,
+      },
       orderBy: { createdAt: "asc" },
     }),
     db.studentSlime.findMany({
@@ -252,6 +262,29 @@ export async function getSlimeHome(student: StudentIdentity): Promise<SlimeHome>
       getEquippedSlimeFloor(equippedItemsByColor[slime.color as SlimeColor] ?? []),
     ]),
   ) as Partial<Record<SlimeColor, SlimeFloor>>;
+  const equippedTitleByColor = Object.fromEntries(
+    owned
+      .filter((slime) => slime.equippedTitleKey)
+      .map((slime) => [slime.color, slime.equippedTitleKey as string]),
+  ) as Partial<Record<SlimeColor, string>>;
+  // The title delegate arrived with claimable titles; older isolated fixtures
+  // mock only slime ownership and still expect a usable home response.
+  const claimedTitleRows = (await db.studentTitle?.findMany?.({
+    where: { studentId: student.id },
+    select: { titleKey: true },
+    orderBy: { claimedAt: "asc" },
+  })) ?? [];
+  const claimedTitles = claimedTitleRows.flatMap((row) => {
+    const definition = getTitleDefinition(row.titleKey);
+    if (!definition) return [];
+    return [{
+      key: definition.key,
+      label: definition.label,
+      imagePath: definition.imagePath,
+      effectKey: definition.effectKey,
+      buffBps: definition.buffBps,
+    }];
+  });
   const representativeColor =
     (owned.find((row) => row.isRepresentative)?.color as SlimeColor | undefined) ?? null;
   const equippedColors = SLIME_CATALOG.map((slime) => slime.color).filter((color) => equippedSet.has(color));
@@ -306,6 +339,8 @@ export async function getSlimeHome(student: StudentIdentity): Promise<SlimeHome>
     growthByColor,
     growth: growthByColor,
     walkingTitle,
+    claimedTitles,
+    equippedTitleByColor,
   };
 }
 

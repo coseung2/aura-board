@@ -41,6 +41,7 @@ describe("StudentDashboard slime card", () => {
           {
             key: "slime-blue-trampoline",
             category: "ride",
+            floor: "trampoline",
             labelKo: "트램펄린",
             price: 30,
             spritePath: "/creatures/slimes/shop/slime-blue-trampoline.gif",
@@ -77,10 +78,10 @@ describe("StudentDashboard slime card", () => {
     expect(screen.getByText("활성 보상 버프 · 성장 속도 +2%")).toBeTruthy();
     expect(screen.getByText("잔액 320 원")).toBeTruthy();
     expect(
-      screen.getByRole("img", { name: "블루 슬라임, 트램펄린 적용 미리보기" }).getAttribute("src"),
-    ).toBe(
-      "/creatures/slimes/shop/slime-blue-trampoline.gif",
-    );
+      screen
+        .getByRole("img", { name: "블루 슬라임, 트램펄린 적용 미리보기" })
+        .getAttribute("data-equipped-floor"),
+    ).toBe("trampoline");
     expect(screen.getByRole("link", { name: "내 펫" }).getAttribute("href")).toBe(
       "/student/aura-pet",
     );

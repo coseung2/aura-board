@@ -53,7 +53,7 @@ export function ExpandablePostContent({
           accessibilityLabel={expanded ? "간단히 보기" : "더보기"}
         >
           <Text style={styles.toggleLabel}>
-            {expanded ? "간단히 보기" : "… 더보기"}
+            {expanded ? "간단히 보기" : "... 더보기"}
           </Text>
         </ControlPressable>
       ) : null}

@@ -3,6 +3,8 @@ import { Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
 import { ensureAccountFor } from "@/lib/bank";
 import { getCurrentStudent } from "@/lib/student-auth";
+import { getKstClassroomWalkingRankPeriods } from "@/lib/reward-policy";
+import { readReadingTitles } from "@/lib/titles";
 import {
   evaluateReadingLog,
   type ReadingBookType,
@@ -17,6 +19,59 @@ const MAX_TITLE = 80;
 const MAX_AUTHOR = 60;
 const MAX_REFLECTION = 600;
 const ALLOWED_BOOK_TYPES: ReadingBookType[] = ["comic", "story"];
+const TOP_FIVE_LIMIT = 5;
+
+type ClassroomReadingRank = {
+  studentId: string;
+  studentNumber: number | null;
+  studentName: string;
+  weeklyCount: number | bigint;
+};
+
+/**
+ * Weekly reading leaderboard for the student's classroom. The period matches the
+ * walking leaderboard so both surfaces reset on the same KST boundary.
+ */
+async function readClassroomTopFive(
+  classroomId: string,
+  range: { weekStart: string; weekEnd: string },
+  currentStudentId: string,
+) {
+  // ReadingLog.createdAt is a timestamp, so compare against the KST week
+  // boundaries rather than bare dates to avoid counting the wrong day.
+  const weekStart = new Date(`${range.weekStart}T00:00:00+09:00`);
+  const weekEnd = new Date(`${range.weekEnd}T00:00:00+09:00`);
+  const ranks = await db.$queryRaw<ClassroomReadingRank[]>(Prisma.sql`
+    SELECT
+      student."id" AS "studentId",
+      student."number" AS "studentNumber",
+      student."name" AS "studentName",
+      COUNT(log."id")::bigint AS "weeklyCount"
+    FROM "Student" student
+    LEFT JOIN "ReadingLog" log
+      ON log."studentId" = student."id"
+      AND log."classroomId" = ${classroomId}
+      AND log."createdAt" >= ${weekStart}
+      AND log."createdAt" < ${weekEnd}
+    WHERE student."classroomId" = ${classroomId}
+    GROUP BY student."id", student."number", student."name"
+    ORDER BY "weeklyCount" DESC, student."number" ASC NULLS LAST, student."name" ASC
+    LIMIT ${TOP_FIVE_LIMIT}
+  `);
+
+  return ranks
+    .filter(
+      (rank) =>
+        typeof rank.studentId === "string" && typeof rank.studentName === "string",
+    )
+    .map((rank) => ({
+      studentId: rank.studentId,
+      studentNumber: Number.isInteger(rank.studentNumber) ? rank.studentNumber : null,
+      studentName: rank.studentName,
+      weeklyCount: Number(rank.weeklyCount) || 0,
+      isCurrent: rank.studentId === currentStudentId,
+    }));
+}
 
 type SerializedReadingLog = {
   id: string;
@@ -87,24 +142,89 @@ export async function GET() {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
 
+  const rankPeriods = getKstClassroomWalkingRankPeriods();
+  const emptySummary = {
+    weeklyCount: 0,
+    totalCount: 0,
+    averageScore: null as number | null,
+  };
+
   if (!db.readingLog) {
-    return NextResponse.json({ entries: [], count: 0 });
+    return NextResponse.json({
+      entries: [],
+      count: 0,
+      summary: emptySummary,
+      weekRange: rankPeriods.active,
+      classroomTopFive: [],
+      classroomRankNextResetAt: rankPeriods.nextResetAt.toISOString(),
+      titles: [],
+    });
   }
 
   let rows: Awaited<ReturnType<typeof db.readingLog.findMany>>;
+  let totalCount = 0;
+  let weeklyCount = 0;
+  let averageScore: number | null = null;
+  let classroomTopFive: Awaited<ReturnType<typeof readClassroomTopFive>> = [];
+  let titles: Awaited<ReturnType<typeof readReadingTitles>> = [];
+  const weekStart = new Date(`${rankPeriods.active.weekStart}T00:00:00+09:00`);
+  const weekEnd = new Date(`${rankPeriods.active.weekEnd}T00:00:00+09:00`);
+  const readingWhere = {
+    studentId: student.id,
+    classroomId: student.classroomId,
+  };
   try {
-    rows = await db.readingLog.findMany({
-      where: { studentId: student.id, classroomId: student.classroomId },
-      orderBy: { createdAt: "desc" },
-      take: RECENT_LIMIT,
-    });
+    const [recentRows, completeTotalCount, completeWeeklyCount, scoreAggregate] =
+      await Promise.all([
+        db.readingLog.findMany({
+          where: readingWhere,
+          orderBy: { createdAt: "desc" },
+          take: RECENT_LIMIT,
+        }),
+        db.readingLog.count({ where: readingWhere }),
+        db.readingLog.count({
+          where: {
+            ...readingWhere,
+            createdAt: { gte: weekStart, lt: weekEnd },
+          },
+        }),
+        db.readingLog.aggregate({
+          where: readingWhere,
+          _avg: { aiScore: true },
+        }),
+      ]);
+    rows = recentRows;
+    totalCount = completeTotalCount;
+    weeklyCount = completeWeeklyCount;
+    const rawAverageScore = scoreAggregate._avg.aiScore;
+    averageScore =
+      rawAverageScore === null
+        ? null
+        : Math.round(rawAverageScore * 10) / 10;
+    classroomTopFive = await readClassroomTopFive(
+      student.classroomId,
+      rankPeriods.active,
+      student.id,
+    );
+    titles = await readReadingTitles(student.id);
   } catch (e) {
     if (!isMissingReadingLogTable(e)) throw e;
     rows = [];
+    classroomTopFive = [];
+    titles = [];
   }
 
   const entries = rows.map(serialize);
-  return NextResponse.json({ entries, count: entries.length });
+
+  return NextResponse.json({
+    entries,
+    count: totalCount,
+    summary: { weeklyCount, totalCount, averageScore },
+    weekRange: rankPeriods.active,
+    classroomTopFive,
+    classroomRankNextResetAt: rankPeriods.nextResetAt.toISOString(),
+    titles,
+  });
 }
 
 export async function POST(req: Request) {

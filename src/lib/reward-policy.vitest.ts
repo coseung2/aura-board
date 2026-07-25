@@ -47,7 +47,7 @@ describe("area reward policy", () => {
       walkingWeeklyTier2Amount: 40,
       walkingWeeklyTier3Steps: 75_000,
       walkingWeeklyTier3Amount: 100,
-      rewardBuffCapBps: 2_000,
+      rewardBuffCapBps: Number.MAX_SAFE_INTEGER,
     });
   });
 
@@ -69,10 +69,12 @@ describe("area reward policy", () => {
     expect(walkingRewardUnits(steps)).toBe(units);
   });
 
-  it("floors won and clamps a reward buff to 20 percent", () => {
+  it("floors won and applies a reward buff without a ceiling", () => {
     expect(rewardAmountWithBuff(5, 1_999)).toBe(5);
     expect(rewardAmountWithBuff(101, 1_999)).toBe(121);
-    expect(rewardAmountWithBuff(101, 9_999)).toBe(121);
+    expect(rewardAmountWithBuff(101, 9_999)).toBe(201);
+    // An explicit cap still bounds the buff when a classroom sets one.
+    expect(rewardAmountWithBuff(101, 9_999, 2_000)).toBe(121);
   });
 
   it("normalizes comments and rejects punctuation-only or too-short text", () => {

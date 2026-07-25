@@ -12,6 +12,7 @@ import { colors } from "../theme/tokens";
 import { clearParentSession, saveParentToken } from "../lib/session";
 import { useAndroidBackBehavior } from "../hooks/use-android-back-behavior";
 import { registerParentPushNotifications } from "../lib/parent-push-notifications";
+import { TermsConsentGate } from "../components/TermsConsentGate";
 
 // 루트 레이아웃. 모든 스크린을 Stack 으로 감싸되 헤더는 각 segment 에서 커스텀.
 // 학부모 이메일 매직링크 콜백(auraboard://parent/auth/callback#...) 을
@@ -135,13 +136,16 @@ export default function RootLayout() {
   return (
     <SafeAreaProvider>
       <StatusBar style="dark" />
-      <DeepLinkHandler />
-      <Stack
-        screenOptions={{
-          headerShown: false,
-          contentStyle: { backgroundColor: colors.bg },
-        }}
-      />
+      {/* Terms must be accepted before any login screen renders (guideline 1.2). */}
+      <TermsConsentGate>
+        <DeepLinkHandler />
+        <Stack
+          screenOptions={{
+            headerShown: false,
+            contentStyle: { backgroundColor: colors.bg },
+          }}
+        />
+      </TermsConsentGate>
     </SafeAreaProvider>
   );
 }

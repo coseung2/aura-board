@@ -26,7 +26,14 @@ function fakeTx(
       count: vi.fn(async () => counts.shift() ?? 0),
     },
     studentSlime: {
-      findMany: vi.fn(async () => colors.map((color) => ({ color }))),
+      findMany: vi.fn(async () =>
+        colors.map((color) => ({
+          color,
+          isEquipped: true,
+          growthStage: 1,
+          equippedTitleKey: null,
+        })),
+      ),
     },
     studentCreatureItem: { findMany: vi.fn(async () => []) },
   } as unknown as Prisma.TransactionClient;
@@ -114,7 +121,8 @@ describe("reward service caps and buffs", () => {
       assignmentWeeklyRewardCap: 99,
       walkingDailyUnitCap: 4,
       walkingWeeklyRewardDayCap: 5,
-      rewardBuffCapBps: 2_000,
+      // Buff ceilings were retired, so a stored value no longer clamps payouts.
+      rewardBuffCapBps: Number.MAX_SAFE_INTEGER,
     });
   });
 

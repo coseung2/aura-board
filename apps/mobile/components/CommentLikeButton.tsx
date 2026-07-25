@@ -19,6 +19,7 @@ type Props = {
   viewer?: CommentViewer;
   onUnauthorized?: (error: unknown) => Promise<boolean>;
   onChanged?: (state: { likeCount: number; isLiked: boolean }) => void;
+  onInteractionStart?: () => void;
 };
 
 export function CommentLikeButton({
@@ -29,6 +30,7 @@ export function CommentLikeButton({
   viewer = "student",
   onUnauthorized,
   onChanged,
+  onInteractionStart,
 }: Props) {
   const [likeCount, setLikeCount] = useState(Math.max(0, initialLikeCount ?? 0));
   const [liked, setLiked] = useState(Boolean(initialIsLiked));
@@ -78,6 +80,7 @@ export function CommentLikeButton({
 
   async function toggleLike() {
     if (busy) return;
+    onInteractionStart?.();
     const previous = { likeCount, liked };
     const nextLiked = !liked;
     const nextCount = Math.max(0, likeCount + (nextLiked ? 1 : -1));

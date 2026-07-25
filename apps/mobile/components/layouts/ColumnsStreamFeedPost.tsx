@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ScrollView, StyleSheet, Text, View } from "react-native";
 import { Image } from "expo-image";
 import { Heart, MessageCircle, UserRound } from "lucide-react-native";
@@ -23,7 +23,8 @@ import {
   findPlayableMediaUrl,
   mediaPreviewUrls,
 } from "../../lib/media";
-import { ControlPressable } from "../ui";
+import { BarePressable, ControlPressable } from "../ui";
+import type { PostAnchor } from "../PostModerationOverlay";
 
 export type StreamFeedPostEngagementMode = "interactive" | "summary";
 
@@ -31,6 +32,7 @@ type Props = {
   card: BoardCard;
   onOpenComments?: () => void;
   onOpenAuthorPicker?: () => void;
+  onLongPress?: (anchor: PostAnchor) => void;
   engagementMode?: StreamFeedPostEngagementMode;
   authorLabel?: string | null;
   highlighted?: boolean;
@@ -42,6 +44,7 @@ export function StreamFeedPost({
   card,
   onOpenComments,
   onOpenAuthorPicker,
+  onLongPress,
   engagementMode = "interactive",
   authorLabel,
   highlighted = false,
@@ -56,6 +59,10 @@ export function StreamFeedPost({
   const mediaItems = streamPostImages(card);
   const mediaLabel = streamPostMediaLabel(card);
   const embedUrl = findPlayableMediaUrl(card);
+  const hasMediaSurface = Boolean(
+    embedUrl || mediaItems.length > 0 || mediaLabel,
+  );
+  const textActsAsMedia = !hasMediaSurface && Boolean(displayTitle || content);
   const [likeCount, setLikeCount] = useState(Math.max(0, card.likeCount ?? 0));
   const [liked, setLiked] = useState(false);
   const [likeBusy, setLikeBusy] = useState(false);
@@ -63,6 +70,14 @@ export function StreamFeedPost({
   const date = formatStreamPostDate(card.createdAt);
   const [mediaIndex, setMediaIndex] = useState(0);
   const [mediaWidth, setMediaWidth] = useState(0);
+  const postRef = useRef<View>(null);
+
+  function handleLongPress() {
+    if (!onLongPress) return;
+    postRef.current?.measureInWindow((x, y, width, height) => {
+      onLongPress({ x, y, width, height });
+    });
+  }
 
   useEffect(() => {
     let cancelled = false;
@@ -122,10 +137,31 @@ export function StreamFeedPost({
     }
   }
 
+  const textBody = (
+    <>
+      {displayTitle ? (
+        <Text selectable style={styles.feedPostTitle} numberOfLines={2}>
+          {displayTitle}
+        </Text>
+      ) : null}
+      {content ? (
+        <ExpandablePostContent
+          content={content}
+          containerStyle={styles.feedPostContentWrap}
+          style={styles.feedPostContent}
+        />
+      ) : null}
+    </>
+  );
+
   return (
-    <View
+    <BarePressable
+      ref={postRef}
       style={[styles.feedPost, highlighted && styles.feedPostHighlighted]}
+      onLongPress={onLongPress ? handleLongPress : undefined}
+      delayLongPress={450}
       accessibilityLabel={`${author ? `${author}의 ` : ""}게시물`}
+      accessibilityHint={onLongPress ? "길게 누르면 숨기기와 신고 메뉴가 열립니다" : undefined}
     >
       {author ? (
         <View style={styles.feedPostCopy}>
@@ -210,6 +246,10 @@ export function StreamFeedPost({
             {mediaLabel}
           </Text>
         </View>
+      ) : null}
+
+      {textActsAsMedia ? (
+        <View style={styles.feedPostCopy}>{textBody}</View>
       ) : null}
 
       <View style={styles.feedPostEngagementWrap}>
@@ -302,25 +342,14 @@ export function StreamFeedPost({
       </View>
 
       <View style={styles.feedPostCopy}>
-        {displayTitle ? (
-          <Text selectable style={styles.feedPostTitle} numberOfLines={2}>
-            {displayTitle}
-          </Text>
-        ) : null}
-        {content ? (
-          <ExpandablePostContent
-            content={content}
-            containerStyle={styles.feedPostContentWrap}
-            style={styles.feedPostContent}
-          />
-        ) : null}
+        {!textActsAsMedia ? textBody : null}
         {date ? (
           <Text selectable style={styles.feedPostDate}>
             {date}
           </Text>
         ) : null}
       </View>
-    </View>
+    </BarePressable>
   );
 }
 
@@ -432,16 +461,18 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    gap: spacing.xxs,
+    gap: spacing.xs + 1,
+    paddingVertical: spacing.xs,
+    backgroundColor: colors.surface,
   },
   feedPostPaginationDot: {
-    width: spacing.xxs,
-    height: spacing.xxs,
+    width: spacing.xs + 2,
+    height: spacing.xs + 2,
     borderRadius: radii.pill,
-    backgroundColor: colors.border,
+    backgroundColor: colors.textFaint,
   },
   feedPostPaginationDotActive: {
-    width: spacing.sm,
+    width: spacing.lg,
     backgroundColor: colors.accent,
   },
   feedPostMediaFallback: {

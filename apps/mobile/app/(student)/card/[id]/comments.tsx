@@ -12,16 +12,39 @@ import {
 } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { AppButton, AppHeader, ControlPressable, TextField } from "../../../../components/ui";
+import {
+  AppButton,
+  AppHeader,
+  BarePressable,
+  ControlPressable,
+  TextField,
+} from "../../../../components/ui";
 import { CommentLikeButton } from "../../../../components/CommentLikeButton";
+import {
+  CommentModerationOverlay,
+  type CommentAnchor,
+} from "../../../../components/CommentModerationOverlay";
 import { ContentTab, ContentTabs } from "../../../../components/NavigationTabs";
 import { apiFetch, ApiError } from "../../../../lib/api";
+import {
+  hiddenPlaceholderText,
+  hideContent,
+  reportContent,
+  unhideContent,
+  type HiddenReason,
+} from "../../../../lib/content-safety";
 import {
   commentAudienceLabel,
   commentsPath,
   FAMILY_THREAD_PRIVATE_MESSAGE,
   type CommentAudience,
 } from "../../../../lib/comment-audience";
+import {
+  appendThreadReply,
+  removeThreadComment,
+  updateThreadComment,
+  type MobileCommentItem,
+} from "../../../../lib/comment-thread";
 import {
   clearSessionToken,
   getUnifiedLoginRoute,
@@ -38,16 +61,7 @@ import {
   typography,
 } from "../../../../theme/tokens";
 
-type CommentItem = {
-  id: string;
-  content: string;
-  createdAt: string;
-  authorKind: "teacher" | "student" | "parent" | "external";
-  authorLabel: string;
-  likeCount?: number;
-  isLiked?: boolean;
-  canDelete: boolean;
-};
+type CommentItem = MobileCommentItem;
 
 type Params = {
   id?: string | string[];
@@ -66,9 +80,22 @@ export default function StudentCardCommentsScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [replySubmitting, setReplySubmitting] = useState(false);
+  const [replyText, setReplyText] = useState("");
+  const [replyTarget, setReplyTarget] = useState<{
+    rootId: string;
+    targetId: string;
+    authorLabel: string;
+  } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [audience, setAudience] = useState<CommentAudience>("public");
   const [guardianAvailable, setGuardianAvailable] = useState(false);
+  // Comment currently open in the report/hide sheet.
+  const [moderationTarget, setModerationTarget] = useState<{
+    item: CommentItem;
+    anchor: CommentAnchor;
+  } | null>(null);
+  const commentRefs = useRef(new Map<string, View>());
   const requestVersion = useRef(0);
 
   const handleAuthError = useCallback(
@@ -131,6 +158,9 @@ export default function StudentCardCommentsScreen() {
   }, [loadComments]);
 
   function selectAudience(nextAudience: CommentAudience) {
+    setModerationTarget(null);
+    setReplyTarget(null);
+    setReplyText("");
     if (nextAudience === audience) return;
     setAudience(nextAudience);
     setCommentText("");
@@ -155,7 +185,7 @@ export default function StudentCardCommentsScreen() {
       });
       const nextItem = response.item ?? response.comment;
       if (!nextItem) throw new Error("missing comment");
-      setItems((current) => [nextItem, ...current]);
+      setItems((current) => [{ ...nextItem, replies: [] }, ...current]);
       setCommentText("");
       setError(null);
     } catch (nextError) {
@@ -183,12 +213,239 @@ export default function StudentCardCommentsScreen() {
         `/api/cards/${encodeURIComponent(cardId)}/comments/${encodeURIComponent(commentId)}`,
         { method: "DELETE" },
       );
-      setItems((current) => current.filter((item) => item.id !== commentId));
+      setItems((current) => removeThreadComment(current, commentId));
       setError(null);
     } catch (nextError) {
       if (await handleAuthError(nextError)) return;
       setError("댓글을 삭제하지 못했어요.");
     }
+  }
+
+  /** Mark one comment hidden or visible in local state. */
+  function applyHiddenReason(commentId: string, hiddenReason: HiddenReason | null) {
+    setItems((current) =>
+      updateThreadComment(current, commentId, (item) => ({ ...item, hiddenReason })),
+    );
+  }
+
+  function openReplyComposer(item: CommentItem) {
+    setModerationTarget(null);
+    setReplyText("");
+    setReplyTarget({
+      rootId: item.parentCommentId ?? item.id,
+      targetId: item.id,
+      authorLabel: item.authorLabel || "작성자",
+    });
+  }
+
+  async function submitReply() {
+    const content = replyText.trim();
+    if (!cardId || !replyTarget || !content || replySubmitting) return;
+    setReplySubmitting(true);
+    try {
+      const response = await apiFetch<{
+        item?: CommentItem;
+        comment?: CommentItem;
+      }>(commentsPath(cardId, audience), {
+        method: "POST",
+        json: { content, audience, parentCommentId: replyTarget.targetId },
+      });
+      const nextItem = response.item ?? response.comment;
+      if (!nextItem) throw new Error("missing reply");
+      setItems((current) =>
+        appendThreadReply(current, replyTarget.rootId, {
+          ...nextItem,
+          replies: [],
+        }),
+      );
+      setReplyText("");
+      setReplyTarget(null);
+      setError(null);
+    } catch (nextError) {
+      if (await handleAuthError(nextError)) return;
+      setError("답글을 등록하지 못했어요.");
+    } finally {
+      setReplySubmitting(false);
+    }
+  }
+
+  async function hideComment(item: CommentItem) {
+    applyHiddenReason(item.id, "item");
+    try {
+      await hideContent({ targetKind: "comment", targetId: item.id });
+    } catch (nextError) {
+      // Roll back so the student never sees a hide that did not persist.
+      applyHiddenReason(item.id, item.hiddenReason ?? null);
+      if (await handleAuthError(nextError)) return;
+      throw nextError;
+    }
+  }
+
+  async function unhideComment(item: CommentItem) {
+    applyHiddenReason(item.id, null);
+    try {
+      await unhideContent({ targetKind: "comment", targetId: item.id });
+      // The content was blanked server-side while hidden, so refetch to get it.
+      await loadComments(true);
+    } catch (nextError) {
+      applyHiddenReason(item.id, item.hiddenReason ?? "item");
+      if (await handleAuthError(nextError)) return;
+      setError("숨긴 댓글을 되돌리지 못했어요.");
+    }
+  }
+
+  async function reportComment(
+    item: CommentItem,
+    input: { reason: Parameters<typeof reportContent>[0]["reason"]; detail?: string; hideAuthor: boolean },
+  ) {
+    const result = await reportContent({
+      targetKind: "comment",
+      targetId: item.id,
+      reason: input.reason,
+      detail: input.detail,
+      hideAuthor: input.hideAuthor,
+    });
+    // The server hides the reported comment for the reporter.
+    applyHiddenReason(item.id, result.hiddenAuthor ? "author" : "item");
+    if (result.hiddenAuthor && result.authorStudentId) {
+      // Everything else from that author is hidden too; refetch to reflect it.
+      await loadComments(true);
+    }
+  }
+
+  const isFamilyAccessNotice = error === FAMILY_THREAD_PRIVATE_MESSAGE;
+
+  async function quickHideComment(item: CommentItem) {
+    setModerationTarget(null);
+    try {
+      await hideComment(item);
+      setError(null);
+    } catch {
+      setError("댓글을 숨기지 못했어요.");
+    }
+  }
+
+  function confirmReportComment(item: CommentItem) {
+    Alert.alert(
+      "댓글 신고",
+      item.authorStudentId
+        ? "이 댓글을 신고하고 작성자를 차단할까요?"
+        : "이 댓글을 신고할까요?",
+      [
+        { text: "취소", style: "cancel" },
+        {
+          text: "신고",
+          style: "destructive",
+          onPress: () => {
+            setModerationTarget(null);
+            void reportComment(item, {
+              reason: "other",
+              hideAuthor: Boolean(item.authorStudentId),
+            })
+              .then(() => {
+                setError(null);
+                Alert.alert("신고 완료", "선생님에게 신고를 보냈어요.");
+              })
+              .catch(() => setError("신고를 보내지 못했어요."));
+          },
+        },
+      ],
+    );
+  }
+
+  function openModerationMenu(item: CommentItem) {
+    commentRefs.current.get(item.id)?.measureInWindow((x, y, width, height) => {
+      setModerationTarget({ item, anchor: { x, y, width, height } });
+    });
+  }
+
+  function renderCommentItem(item: CommentItem, isReply: boolean) {
+    if (item.hiddenReason) {
+      return (
+        <View key={item.id} style={[styles.hiddenItem, isReply && styles.replyItem]}>
+          <Text style={styles.hiddenText}>
+            {hiddenPlaceholderText("comment", item.hiddenReason)}
+          </Text>
+          {item.hiddenReason === "item" ? (
+            <ControlPressable
+              style={styles.hiddenAction}
+              onPress={() => void unhideComment(item)}
+              accessibilityLabel="숨긴 댓글 다시 보기"
+            >
+              <Text style={styles.hiddenActionLabel}>다시 보기</Text>
+            </ControlPressable>
+          ) : null}
+        </View>
+      );
+    }
+
+    return (
+      <View
+        key={item.id}
+        ref={(node) => {
+          if (node) commentRefs.current.set(item.id, node);
+          else commentRefs.current.delete(item.id);
+        }}
+        style={[styles.commentItem, isReply && styles.replyItem]}
+      >
+        <View style={styles.commentItemRow}>
+          <BarePressable
+            style={styles.commentTextBlock}
+            onPress={() => setModerationTarget(null)}
+            onLongPress={item.canModerate ? () => openModerationMenu(item) : undefined}
+            delayLongPress={350}
+            accessible={item.canModerate}
+            accessibilityRole={item.canModerate ? "button" : undefined}
+            accessibilityLabel={
+              item.canModerate
+                ? `${item.authorLabel || "작성자"}의 댓글. 길게 눌러 숨기기 또는 신고`
+                : undefined
+            }
+          >
+            <View style={styles.commentHeader}>
+              <View style={styles.commentIdentity}>
+                <Text style={styles.commentAuthor} numberOfLines={1}>
+                  {item.authorLabel || "작성자"}
+                </Text>
+                <Text style={styles.commentDate}>{formatCommentDate(item.createdAt)}</Text>
+              </View>
+            </View>
+            <Text style={styles.commentContent}>{item.content}</Text>
+          </BarePressable>
+          <CommentLikeButton
+            cardId={cardId}
+            commentId={item.id}
+            likeCount={item.likeCount}
+            isLiked={item.isLiked}
+            onInteractionStart={() => setModerationTarget(null)}
+            onUnauthorized={handleAuthError}
+            onChanged={(next) => {
+              setItems((current) =>
+                updateThreadComment(current, item.id, (entry) => ({ ...entry, ...next })),
+              );
+            }}
+          />
+        </View>
+        <View style={styles.commentActions}>
+          <ControlPressable
+            style={styles.commentAction}
+            onPress={() => openReplyComposer(item)}
+            accessibilityLabel={`${item.authorLabel || "작성자"}에게 답글 달기`}
+          >
+            <Text style={styles.replyLabel}>답글 달기</Text>
+          </ControlPressable>
+          {item.canDelete ? (
+            <ControlPressable
+              style={styles.commentAction}
+              onPress={() => confirmDelete(item)}
+              accessibilityLabel="댓글 삭제"
+            >
+              <Text style={styles.deleteLabel}>삭제</Text>
+            </ControlPressable>
+          ) : null}
+        </View>
+      </View>
+    );
   }
 
   return (
@@ -240,6 +497,7 @@ export default function StudentCardCommentsScreen() {
                   multiline
                   maxLength={1000}
                   editable={!submitting}
+                  onFocus={() => setModerationTarget(null)}
                   style={styles.commentInput}
                 />
                 <AppButton
@@ -254,11 +512,25 @@ export default function StudentCardCommentsScreen() {
             ) : null}
 
             {error ? (
-              <View style={styles.errorBlock}>
-                <Text style={styles.errorText}>{error}</Text>
-                <AppButton variant="quiet" onPress={() => void loadComments(false, audience)}>
-                  다시 시도
-                </AppButton>
+              <View
+                style={[
+                  styles.errorBlock,
+                  isFamilyAccessNotice && styles.familyNoticeBlock,
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.errorText,
+                    isFamilyAccessNotice && styles.familyNoticeText,
+                  ]}
+                >
+                  {error}
+                </Text>
+                {!isFamilyAccessNotice ? (
+                  <AppButton variant="quiet" onPress={() => void loadComments(false, audience)}>
+                    다시 시도
+                  </AppButton>
+                ) : null}
               </View>
             ) : null}
 
@@ -270,46 +542,47 @@ export default function StudentCardCommentsScreen() {
               </View>
             ) : (
               <View style={styles.commentList}>
-                {items.map((item) => (
-                  <View key={item.id} style={styles.commentItem}>
-                    <View style={styles.commentItemRow}>
-                      <View style={styles.commentTextBlock}>
-                        <View style={styles.commentHeader}>
-                          <View style={styles.commentIdentity}>
-                            <Text style={styles.commentAuthor} numberOfLines={1}>
-                              {item.authorLabel || "작성자"}
-                            </Text>
-                            <Text style={styles.commentDate}>
-                              {formatCommentDate(item.createdAt)}
-                            </Text>
-                          </View>
-                          {item.canDelete ? (
-                            <ControlPressable
-                              style={styles.deleteButton}
-                              onPress={() => confirmDelete(item)}
-                              accessibilityLabel="댓글 삭제"
-                            >
-                              <Text style={styles.deleteLabel}>삭제</Text>
-                            </ControlPressable>
-                          ) : null}
+                {items.map((root) => (
+                  <View key={root.id} style={styles.thread}>
+                    {renderCommentItem(root, false)}
+                    {(root.replies ?? []).map((reply) => renderCommentItem(reply, true))}
+                    {replyTarget?.rootId === root.id ? (
+                      <View style={styles.replyComposer}>
+                        <Text style={styles.replyTargetLabel} numberOfLines={1}>
+                          {replyTarget.authorLabel}에게 답글
+                        </Text>
+                        <View style={styles.replyComposerRow}>
+                          <TextField
+                            value={replyText}
+                            onChangeText={setReplyText}
+                            placeholder="답글을 입력하세요"
+                            maxLength={1000}
+                            editable={!replySubmitting}
+                            autoFocus
+                            style={styles.replyInput}
+                            onSubmitEditing={() => void submitReply()}
+                          />
+                          <AppButton
+                            onPress={() => void submitReply()}
+                            disabled={!replyText.trim() || replySubmitting}
+                            loading={replySubmitting}
+                            style={styles.replySubmitButton}
+                          >
+                            등록
+                          </AppButton>
                         </View>
-                        <Text style={styles.commentContent}>{item.content}</Text>
+                        <ControlPressable
+                          style={styles.replyCancel}
+                          onPress={() => {
+                            setReplyTarget(null);
+                            setReplyText("");
+                          }}
+                          accessibilityLabel="답글 작성 취소"
+                        >
+                          <Text style={styles.replyCancelLabel}>취소</Text>
+                        </ControlPressable>
                       </View>
-                      <CommentLikeButton
-                        cardId={cardId}
-                        commentId={item.id}
-                        likeCount={item.likeCount}
-                        isLiked={item.isLiked}
-                        onUnauthorized={handleAuthError}
-                        onChanged={(next) => {
-                          setItems((current) =>
-                            current.map((entry) =>
-                              entry.id === item.id ? { ...entry, ...next } : entry,
-                            ),
-                          );
-                        }}
-                      />
-                    </View>
+                    ) : null}
                   </View>
                 ))}
               </View>
@@ -317,6 +590,18 @@ export default function StudentCardCommentsScreen() {
           </ScrollView>
         )}
       </KeyboardAvoidingView>
+      {moderationTarget ? (
+        <CommentModerationOverlay
+          anchor={moderationTarget.anchor}
+          authorLabel={moderationTarget.item.authorLabel || "작성자"}
+          dateLabel={formatCommentDate(moderationTarget.item.createdAt)}
+          content={moderationTarget.item.content}
+          likeCount={moderationTarget.item.likeCount ?? 0}
+          onClose={() => setModerationTarget(null)}
+          onHide={() => void quickHideComment(moderationTarget.item)}
+          onReport={() => confirmReportComment(moderationTarget.item)}
+        />
+      ) : null}
     </SafeAreaView>
   );
 }
@@ -370,7 +655,19 @@ const styles = StyleSheet.create({
     ...typography.body,
     color: colors.danger,
   },
+  familyNoticeBlock: {
+    width: "100%",
+    alignItems: "center",
+    paddingVertical: spacing.xl,
+  },
+  familyNoticeText: {
+    color: colors.textMuted,
+    textAlign: "center",
+  },
   commentList: {
+    gap: spacing.none,
+  },
+  thread: {
     gap: spacing.none,
   },
   commentItem: {
@@ -379,6 +676,12 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.lg,
     borderBottomWidth: borders.hairline,
     borderBottomColor: colors.border,
+  },
+  replyItem: {
+    marginLeft: spacing.xl,
+    paddingLeft: spacing.md,
+    borderLeftWidth: borders.hairline,
+    borderLeftColor: colors.border,
   },
   commentItemRow: {
     flexDirection: "row",
@@ -414,8 +717,14 @@ const styles = StyleSheet.create({
     ...typography.body,
     color: colors.text,
   },
-  deleteButton: {
+  commentActions: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.md,
+  },
+  commentAction: {
     minHeight: tapMin,
+    justifyContent: "center",
     paddingHorizontal: spacing.none,
     paddingVertical: spacing.xxs,
     borderWidth: borders.none,
@@ -423,9 +732,82 @@ const styles = StyleSheet.create({
     borderRadius: radii.none,
     backgroundColor: colors.transparent,
   },
+  replyLabel: {
+    ...typography.micro,
+    color: colors.textMuted,
+  },
   deleteLabel: {
     ...typography.micro,
     color: colors.danger,
+  },
+  replyComposer: {
+    marginLeft: spacing.xl,
+    paddingVertical: spacing.md,
+    paddingLeft: spacing.md,
+    gap: spacing.xs,
+    borderLeftWidth: borders.hairline,
+    borderLeftColor: colors.accent,
+    borderBottomWidth: borders.hairline,
+    borderBottomColor: colors.border,
+  },
+  replyTargetLabel: {
+    ...typography.micro,
+    color: colors.accentTintedText,
+  },
+  replyComposerRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.sm,
+  },
+  replyInput: {
+    flex: 1,
+    minHeight: controls.inputHeight,
+  },
+  replySubmitButton: {
+    minWidth: tapMin,
+  },
+  replyCancel: {
+    alignSelf: "flex-start",
+    minHeight: tapMin,
+    justifyContent: "center",
+    paddingHorizontal: spacing.none,
+    paddingVertical: spacing.none,
+    borderWidth: borders.none,
+    backgroundColor: colors.transparent,
+  },
+  replyCancelLabel: {
+    ...typography.micro,
+    color: colors.textMuted,
+  },
+  // Placeholder that replaces a hidden comment in place.
+  hiddenItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: spacing.sm,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
+    borderRadius: radii.control,
+    backgroundColor: colors.surfaceAlt,
+  },
+  hiddenText: {
+    ...typography.label,
+    color: colors.textMuted,
+    flex: 1,
+  },
+  hiddenAction: {
+    minHeight: tapMin,
+    justifyContent: "center",
+    paddingHorizontal: spacing.none,
+    paddingVertical: spacing.xxs,
+    borderWidth: borders.none,
+    borderColor: colors.transparent,
+    borderRadius: radii.none,
+    backgroundColor: colors.transparent,
+  },
+  hiddenActionLabel: {
+    ...typography.micro,
+    color: colors.accent,
   },
   emptyState: {
     alignItems: "flex-start",

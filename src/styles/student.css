@@ -237,10 +237,12 @@
 
 /* Walking view tabs replace the content below the activity header. Keep both
    panels in the DOM for stable hydration while `hidden` controls visibility. */
+.student-activity-tabpanel[hidden],
 .student-walking-tabpanel[hidden] {
   display: none;
 }
 
+.student-activity-tabpanel:focus-visible,
 .student-walking-tabpanel:focus-visible {
   outline: 2px solid var(--color-accent-tinted-text);
   outline-offset: 4px;
@@ -333,6 +335,26 @@
   flex-direction: column;
   padding-top: 12px;
   border-top: 0;
+}
+
+.student-attendance-panel {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  padding-top: 12px;
+  border-top: 0;
+}
+
+.student-attendance-status {
+  flex: 0 0 auto;
+  color: var(--color-text-muted);
+  font-size: 13px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.student-attendance-status.is-complete {
+  color: var(--color-accent-tinted-text);
 }
 
 .student-walking-page .student-walking-rewards {
@@ -639,7 +661,26 @@
   overflow: hidden;
 }
 
+.student-attendance-board {
+  display: grid;
+  align-content: start;
+  width: 100%;
+  min-width: 0;
+  aspect-ratio: 1;
+  overflow: hidden;
+}
+
 .student-walking-ordinal-grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  align-content: start;
+  align-items: start;
+  gap: clamp(4px, 0.8vw, 8px);
+  width: 100%;
+  min-height: 0;
+}
+
+.student-attendance-ordinal-grid {
   display: grid;
   grid-template-columns: repeat(7, minmax(0, 1fr));
   align-content: start;
@@ -655,7 +696,32 @@
   aspect-ratio: 1;
 }
 
+.student-attendance-ordinal-slot {
+  width: 100%;
+  min-width: 0;
+  aspect-ratio: 1;
+}
+
 .student-walking-ordinal-cell {
+  position: relative;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  align-content: space-between;
+  gap: 4px;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  overflow: hidden;
+  padding: clamp(4px, 0.8vw, 8px);
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  background: var(--color-surface-alt);
+  color: var(--color-text-faint);
+  font: inherit;
+  text-align: left;
+}
+
+.student-attendance-ordinal-cell {
   position: relative;
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
@@ -685,7 +751,21 @@
     transform var(--t-normal);
 }
 
+.student-attendance-ordinal-cell.is-earned {
+  border-color: var(--color-accent);
+  background: var(--color-accent-tinted-bg);
+  color: var(--color-text);
+  cursor: pointer;
+  transition: background var(--t-normal), border-color var(--t-normal), transform var(--t-normal);
+}
+
 .student-walking-ordinal-cell.is-earned:hover {
+  border-color: var(--color-accent-active);
+  background: var(--color-surface);
+  transform: translateY(-1px);
+}
+
+.student-attendance-ordinal-cell.is-earned:hover {
   border-color: var(--color-accent-active);
   background: var(--color-surface);
   transform: translateY(-1px);
@@ -696,7 +776,17 @@
   outline-offset: -2px;
 }
 
+.student-attendance-ordinal-cell.is-earned:focus-visible {
+  outline: 2px solid var(--color-accent-tinted-text);
+  outline-offset: -2px;
+}
+
 .student-walking-ordinal-cell.is-stamped {
+  border-color: var(--color-danger);
+  background: var(--color-surface);
+}
+
+.student-attendance-ordinal-cell.is-stamped {
   border-color: var(--color-danger);
   background: var(--color-surface);
 }
@@ -706,11 +796,27 @@
   border-color: var(--color-accent-tinted-text);
 }
 
+.student-attendance-ordinal-cell.is-item-reward {
+  border-style: dashed;
+  border-color: var(--color-accent-tinted-text);
+}
+
 .student-walking-ordinal-cell.is-earned.is-item-reward {
   background: var(--color-accent-tinted-bg);
 }
 
+.student-attendance-ordinal-cell.is-earned.is-item-reward {
+  background: var(--color-accent-tinted-bg);
+}
+
 .student-walking-ordinal-number {
+  color: inherit;
+  font-size: clamp(10px, 1.3vw, 14px);
+  font-weight: 900;
+  line-height: 1;
+}
+
+.student-attendance-ordinal-number {
   color: inherit;
   font-size: clamp(10px, 1.3vw, 14px);
   font-weight: 900;
@@ -727,11 +833,31 @@
   overflow-wrap: anywhere;
 }
 
+.student-attendance-ordinal-reward {
+  align-self: end;
+  color: var(--color-text-muted);
+  font-size: clamp(9px, 1.15vw, 12px);
+  font-weight: 800;
+  line-height: 1.15;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
 .student-walking-ordinal-cell.is-earned .student-walking-ordinal-reward {
   color: var(--color-accent-tinted-text);
 }
 
+.student-attendance-ordinal-cell.is-earned .student-attendance-ordinal-reward {
+  color: var(--color-accent-tinted-text);
+}
+
 .student-walking-ordinal-reward.is-item-reward {
+  display: grid;
+  gap: 2px;
+  color: var(--color-accent);
+}
+
+.student-attendance-ordinal-reward.is-item-reward {
   display: grid;
   gap: 2px;
   color: var(--color-accent);
@@ -744,6 +870,12 @@
 
 .student-walking-ordinal-reward.is-item-reward small,
 .student-walking-ordinal-reward.is-cookie-reward small {
+  color: var(--color-text-muted);
+  font-size: 0.78em;
+  font-weight: 700;
+}
+
+.student-attendance-ordinal-reward.is-item-reward small {
   color: var(--color-text-muted);
   font-size: 0.78em;
   font-weight: 700;
@@ -766,10 +898,61 @@
   transform: translate(-50%, -50%) rotate(-10deg);
 }
 
+.student-attendance-ordinal-stamp {
+  position: absolute;
+  inset: 50% auto auto 50%;
+  display: grid;
+  width: clamp(28px, 4.8vw, 44px);
+  height: clamp(28px, 4.8vw, 44px);
+  place-items: center;
+  border: 2px double var(--color-danger);
+  border-radius: 50%;
+  color: var(--color-danger);
+  font-family: var(--font-display);
+  font-size: clamp(8px, 1.05vw, 11px);
+  line-height: 1;
+  pointer-events: none;
+  transform: translate(-50%, -50%) rotate(-10deg);
+}
+
+.student-reading-missions-content {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: start;
+  gap: 16px;
+}
+
+.student-reading-future-missions {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+}
+
+.student-reading-future-mission-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.student-reading-future-mission-list li {
+  padding: 10px 12px;
+  border: 1px dashed var(--color-border);
+  color: var(--color-text-muted);
+  font-size: 13px;
+  font-weight: 700;
+}
+
 @media (max-width: 900px) {
   .student-walking-missions-content {
     grid-template-columns: 1fr;
     gap: 0;
+  }
+
+  .student-reading-missions-content {
+    grid-template-columns: 1fr;
   }
 
   .student-walking-page .student-walking-attendance-panel,

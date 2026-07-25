@@ -31,6 +31,7 @@ import {
 import { SlimeSprite } from "../../components/slime/SlimeSprite";
 import { StudentHeaderActions } from "../../components/StudentHeaderActions";
 import { WalkingTitleSlot } from "../../components/WalkingTitleSlot";
+import { equipPetTitle } from "../../lib/titles";
 import {
   SLIME_ASSET_COLORS,
   SLIME_SHARED_ASSETS,
@@ -522,6 +523,25 @@ export default function StudentSlimeScreen() {
     }
   }, [busyItemKey, clearRetryKey, equippedItems, home, load, owned, retryKey, selectedColor]);
 
+  const toggleTitle = useCallback(async (titleKey: string, equipped: boolean) => {
+    const targetColor = wardrobeColor ?? selectedColor;
+    if (!home || !targetColor || busyItemKey) return;
+    setBusyItemKey(titleKey);
+    setNotice(null);
+    try {
+      await equipPetTitle(targetColor, equipped ? null : titleKey);
+      setNotice({
+        kind: "success",
+        text: `칭호를 ${equipped ? "해제" : "적용"}했어요.`,
+      });
+      await load(true);
+    } catch (mutationError) {
+      setNotice({ kind: "error", text: apiErrorMessage(mutationError) });
+    } finally {
+      setBusyItemKey(null);
+    }
+  }, [busyItemKey, home, load, selectedColor, wardrobeColor]);
+
   const feedCookie = useCallback(async (color: SlimeColor) => {
     if (!home || !home.ownedColors.includes(color) || cookieQuantity <= 0 || busyItemKey) return;
     setBusyItemKey(SLIME_COOKIE_ITEM_KEY);
@@ -587,19 +607,7 @@ export default function StudentSlimeScreen() {
         </ControlPressable>
       ) : null}
       <AppHeader title="펫" onBack={() => router.back()} right={<StudentHeaderActions />} />
-      <ScrollView
-        contentContainerStyle={[
-          styles.scrollContent,
-          styles.scrollContentWide,
-        ]}
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={() => void load(true)}
-            tintColor={colors.accent}
-          />
-        }
-      >
+      <View style={styles.pageTabsRow}>
         <ContentTabs
           style={styles.petSectionNav}
           accessibilityLabel="펫 섹션"
@@ -629,7 +637,20 @@ export default function StudentSlimeScreen() {
             상점
           </ContentTab>
         </ContentTabs>
-
+      </View>
+      <ScrollView
+        contentContainerStyle={[
+          styles.scrollContent,
+          styles.scrollContentWide,
+        ]}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={() => void load(true)}
+            tintColor={colors.accent}
+          />
+        }
+      >
         {section === "classroom" ? (
           classroomLoading && classmates === null ? (
             <View style={styles.classroomState}>
@@ -1080,26 +1101,45 @@ export default function StudentSlimeScreen() {
         </ContentTabs>
         <ScrollView style={styles.wardrobeList} contentContainerStyle={styles.wardrobeListContent}>
           {wardrobeFilter === "title" ? (
-            home?.walkingTitle ? (
-              <View style={styles.wardrobeItem} accessibilityLabel={`${home.walkingTitle.label} 칭호 적용 중`}>
-                <View style={styles.shopPreview} accessible={false}>
-                  <Image
-                    source={{ uri: `${getApiBase()}${home.walkingTitle.imagePath}` }}
-                    style={styles.walkingTitlePreview}
-                    contentFit="contain"
-                    accessibilityLabel={`${home.walkingTitle.label} 칭호`}
-                  />
-                </View>
-                <View style={styles.wardrobeItemCopy}>
-                  <Text style={styles.floorTitle}>{home.walkingTitle.label}</Text>
-                  <Text style={styles.floorSubtitle}>칭호</Text>
-                </View>
-                <Text style={styles.wardrobeItemActionEquipped}>적용 중</Text>
+            (home?.claimedTitles.length ?? 0) === 0 ? (
+              <View style={styles.emptyCard}>
+                <Text style={styles.emptyText}>
+                  걷기와 독서 미션에서 칭호를 받아 오세요.
+                </Text>
               </View>
             ) : (
-              <View style={styles.emptyCard}>
-                <Text style={styles.emptyText}>걷기 칭호에 도전해 보세요.</Text>
-              </View>
+              (home?.claimedTitles ?? []).map((title) => {
+                const equipped =
+                  wardrobeColor != null &&
+                  home?.equippedTitleByColor?.[wardrobeColor] === title.key;
+                const busy = busyItemKey === title.key;
+                return (
+                  <ControlPressable
+                    key={title.key}
+                    style={[styles.wardrobeItem, equipped && styles.wardrobeItemEquipped]}
+                    disabled={busyItemKey !== null}
+                    onPress={() => void toggleTitle(title.key, equipped)}
+                    accessibilityLabel={`${title.label} 칭호 ${equipped ? "해제" : "장착"}`}
+                    accessibilityState={{ selected: equipped, busy }}
+                  >
+                    <View style={styles.shopPreview} accessible={false}>
+                      <Image
+                        source={{ uri: `${getApiBase()}${title.imagePath}` }}
+                        style={styles.walkingTitlePreview}
+                        contentFit="contain"
+                        accessible={false}
+                      />
+                    </View>
+                    <View style={styles.wardrobeItemCopy}>
+                      <Text style={styles.floorTitle}>{title.label}</Text>
+                      <Text style={styles.floorSubtitle}>+{title.buffBps / 100}%</Text>
+                    </View>
+                    <Text style={[styles.wardrobeItemAction, equipped && styles.wardrobeItemActionEquipped]}>
+                      {busy ? "처리 중…" : equipped ? "해제" : "장착"}
+                    </Text>
+                  </ControlPressable>
+                );
+              })
             )
           ) : visibleWardrobeItems.length === 0 ? (
             <View style={styles.emptyCard}>
@@ -1163,6 +1203,15 @@ const styles = StyleSheet.create({
   errorMessage: { ...typography.body, color: colors.textMuted, textAlign: "center" },
   scrollContent: { paddingHorizontal: pageChrome.horizontalPadding, paddingTop: pageChrome.contentStartGap, paddingBottom: spacing.xxxl, gap: spacing.lg },
   scrollContentWide: { alignSelf: "center", width: "100%", maxWidth: layout.readableMaxWidth },
+  // Section tabs live outside the ScrollView so they stay reachable while
+  // browsing long pet, classroom, or shop lists.
+  pageTabsRow: {
+    width: "100%",
+    maxWidth: layout.readableMaxWidth,
+    alignSelf: "center",
+    paddingHorizontal: pageChrome.horizontalPadding,
+    paddingBottom: spacing.md,
+  },
   petSectionNav: { width: "100%" },
   petSectionNavItem: { flex: 1 },
   myPetGrid: { flexDirection: "row", flexWrap: "wrap", justifyContent: "space-between", gap: spacing.xs },

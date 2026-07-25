@@ -35,7 +35,7 @@ describe("slime buff math", () => {
     expect(complete.breakdown.at(-1)).toMatchObject({ source: "set", bps: 180 });
   });
 
-  it("caps each effect while retaining the uncapped audit total", () => {
+  it("sums effects without a ceiling", () => {
     const effects = calculateSlimeEffects(
       [
         {
@@ -55,14 +55,31 @@ describe("slime buff math", () => {
     );
 
     expect(effects.uncappedTotals.growth_speed).toBe(2_200);
-    expect(effects.totals.growth_speed).toBe(SLIME_EFFECT_CAP_BPS);
-    expect(effects.totalBps).toBe(SLIME_EFFECT_CAP_BPS);
+    expect(effects.totals.growth_speed).toBe(2_200);
+    expect(effects.totalBps).toBe(2_200);
+  });
+
+  it("still honors an explicitly provided cap", () => {
+    const effects = calculateSlimeEffects(
+      [
+        {
+          key: "one",
+          nameKo: "테스트 1",
+          effectKey: "growth_speed",
+          baseBuffBps: 1_900,
+        },
+      ],
+      [],
+      1_000,
+    );
+
+    expect(effects.totals.growth_speed).toBe(1_000);
   });
 
   it("formats basis points as percentages without trailing zeroes", () => {
     expect(formatBpsPercent(200)).toBe("2%");
     expect(formatBpsPercent(180)).toBe("1.8%");
-    expect(formatBpsPercent(SLIME_EFFECT_CAP_BPS)).toBe("20%");
+    expect(formatBpsPercent(2_000)).toBe("20%");
   });
 
   it("doubles a slime's base buff at each growth stage", () => {

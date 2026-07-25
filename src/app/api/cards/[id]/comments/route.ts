@@ -5,6 +5,8 @@ import { db } from "@/lib/db";
 import { ensureAccountFor } from "@/lib/bank";
 import { authorizeCardAccess, getCurrentCardActor } from "@/lib/card-engagement-actor";
 import { formatEngagementAuthor } from "@/lib/card-engagement-format";
+import { resolveHiddenReason } from "@/lib/content-safety";
+import { emptyHiddenLookup, loadHiddenLookup } from "@/lib/content-safety-service";
 import { announceEngagementChange } from "@/lib/realtime-broadcast";
 import { touchBoardUpdatedAt } from "@/lib/board-touch";
 import { retryActivityRewardTransaction } from "@/lib/creatures/activity-rewards";
@@ -20,9 +22,27 @@ const CreateSchema = z.object({
   content: z.string().min(1).max(1000),
   clientRequestId: z.string().trim().min(8).max(100).optional(),
   audience: z.enum(["public", "guardian"]).default("public"),
+  parentCommentId: z.string().trim().min(1).max(191).nullable().optional(),
 });
 
 const AudienceSchema = z.enum(["public", "guardian"]);
+
+type CommentThreadItem = {
+  id: string;
+  parentCommentId: string | null;
+  content: string;
+  createdAt: string;
+  authorKind: string;
+  audience: "public" | "guardian";
+  authorLabel: string;
+  canDelete: boolean;
+  canModerate: boolean;
+  hiddenReason: ReturnType<typeof resolveHiddenReason>;
+  authorStudentId: string | null;
+  likeCount: number;
+  isLiked: boolean;
+  replies: CommentThreadItem[];
+};
 
 export async function GET(
   req: Request,
@@ -72,7 +92,12 @@ export async function GET(
     },
   });
 
-  const items = rows.map((r) => {
+  // Hiding is a per-student preference (App Store guideline 1.2). Teachers and
+  // guardians always see the unfiltered thread so moderation is not affected.
+  const hidden =
+    actor.kind === "student" ? await loadHiddenLookup(actor.id) : emptyHiddenLookup();
+
+  const flatItems = rows.map<CommentThreadItem>((r) => {
     const authorKind = r.authorParentId ? "parent" : r.authorKind;
     const rawName =
       authorKind === "teacher"
@@ -91,9 +116,15 @@ export async function GET(
       ((authorKind === "teacher" && actor.kind === "teacher" && actor.id === authorId) ||
         (authorKind === "student" && actor.kind === "student" && actor.id === authorId) ||
         (authorKind === "parent" && actor.kind === "parent" && actor.id === authorId));
+    // Hidden rows stay in the response so the client can render an inline
+    // "숨긴 댓글 · 되돌리기" placeholder instead of silently reflowing the list.
+    const hiddenReason = hidden.hasAnyHide
+      ? resolveHiddenReason(hidden, "comment", r.id, r.authorStudentId)
+      : null;
     return {
       id: r.id,
-      content: r.content,
+      parentCommentId: r.parentCommentId,
+      content: hiddenReason ? "" : r.content,
       createdAt: r.createdAt.toISOString(),
       authorKind,
       audience: r.audience,
@@ -103,10 +134,29 @@ export async function GET(
         anonymous: access.ctx.anonymousAuthor,
       }),
       canDelete: ownByMe || actor.kind === "teacher",
+      // Students may report/hide anything except their own writing.
+      canModerate: actor.kind === "student" && !ownByMe,
+      hiddenReason,
+      authorStudentId: r.authorStudentId,
       likeCount: r._count.likes,
       isLiked: r.likes.length > 0,
+      replies: [],
     };
   });
+
+  const byId = new Map(flatItems.map((item) => [item.id, item]));
+  const items: CommentThreadItem[] = [];
+  for (const item of flatItems) {
+    if (!item.parentCommentId) {
+      items.push(item);
+      continue;
+    }
+    const root = byId.get(item.parentCommentId);
+    if (root && !root.parentCommentId) root.replies.push(item);
+  }
+  for (const item of items) {
+    item.replies.sort((left, right) => left.createdAt.localeCompare(right.createdAt));
+  }
 
   return NextResponse.json({ items, guardianAvailable: access.ctx.guardianAvailable });
 }
@@ -143,6 +193,24 @@ export async function POST(
     return NextResponse.json({ error: "forbidden" }, { status: 403 });
   }
 
+  let threadRootId: string | null = null;
+  if (parsed.data.parentCommentId) {
+    const replyTarget = await db.cardComment.findFirst({
+      where: {
+        id: parsed.data.parentCommentId,
+        cardId,
+        audience,
+        deletedAt: null,
+      },
+      select: { id: true, parentCommentId: true },
+    });
+    if (!replyTarget) {
+      return NextResponse.json({ error: "reply_target_not_found" }, { status: 404 });
+    }
+    // Replying to a reply stays in the same flat thread.
+    threadRootId = replyTarget.parentCommentId ?? replyTarget.id;
+  }
+
   const isTeacher = actor.kind === "teacher";
   const studentActor = actor.kind === "student" ? actor : null;
   const parentActor = actor.kind === "parent" ? actor : null;
@@ -169,6 +237,7 @@ export async function POST(
             where: {
               cardId,
               clientRequestId: parsed.data.clientRequestId,
+              deletedAt: null,
               ...(studentActor
                 ? { authorStudentId: studentActor.id }
                 : { authorParentId: parentActor!.id }),
@@ -192,6 +261,7 @@ export async function POST(
         const comment = await tx.cardComment.create({
           data: {
             cardId,
+            parentCommentId: threadRootId,
             audience,
             authorKind: isTeacher ? "teacher" : studentActor ? "student" : "external",
             authorUserId: isTeacher ? actor.id : null,
@@ -241,6 +311,7 @@ export async function POST(
         where: {
           cardId,
           clientRequestId: parsed.data.clientRequestId,
+          deletedAt: null,
           ...(studentActor
             ? { authorStudentId: studentActor.id }
             : { authorParentId: parentActor!.id }),
@@ -285,6 +356,7 @@ export async function POST(
     reward,
     item: {
       id: created.id,
+      parentCommentId: created.parentCommentId ?? threadRootId,
       content: created.content,
       createdAt: created.createdAt.toISOString(),
       authorKind: createdAuthorKind,
@@ -295,8 +367,13 @@ export async function POST(
         anonymous: access.ctx.anonymousAuthor,
       }),
       canDelete: true,
+      // Your own new comment is never reportable or hidden.
+      canModerate: false,
+      hiddenReason: null,
+      authorStudentId: created.authorStudentId,
       likeCount: 0,
       isLiked: false,
+      replies: [],
     },
     guardianAvailable: access.ctx.guardianAvailable,
   });

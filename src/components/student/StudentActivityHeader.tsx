@@ -3,31 +3,32 @@
 import { useState } from "react";
 
 export type StudentActivityKey = "walking" | "reading";
-export type WalkingView = "records" | "missions";
+export type StudentActivityView = "records" | "missions";
 
 type Props = {
   active: StudentActivityKey;
-  walkingView?: WalkingView;
-  onWalkingViewChange?: (view: WalkingView) => void;
+  view?: StudentActivityView;
+  onViewChange?: (view: StudentActivityView) => void;
 };
 
 /** Shared student self-directed activity heading and local navigation. */
 export function StudentActivityHeader({
   active,
-  walkingView,
-  onWalkingViewChange,
+  view,
+  onViewChange,
 }: Props) {
   const title = active === "walking" ? "걷기" : "독서";
-  const [internalWalkingView, setInternalWalkingView] = useState<WalkingView>("records");
-  const selectedWalkingView = walkingView ?? internalWalkingView;
+  const [internalView, setInternalView] = useState<StudentActivityView>("records");
+  const selectedView = view ?? internalView;
+  const activityLabel = title;
 
-  const selectWalkingView = (view: WalkingView) => {
-    if (walkingView === undefined) setInternalWalkingView(view);
-    onWalkingViewChange?.(view);
+  const selectView = (nextView: StudentActivityView) => {
+    if (view === undefined) setInternalView(nextView);
+    onViewChange?.(nextView);
   };
 
-  const moveWalkingView = (current: WalkingView, direction: -1 | 1) => {
-    const tabOrder: WalkingView[] = ["records", "missions"];
+  const moveView = (current: StudentActivityView, direction: -1 | 1) => {
+    const tabOrder: StudentActivityView[] = ["records", "missions"];
     const currentIndex = tabOrder.indexOf(current);
     return tabOrder[(currentIndex + direction + tabOrder.length) % tabOrder.length];
   };
@@ -39,33 +40,33 @@ export function StudentActivityHeader({
         <h1 className="student-activity-title">{title}</h1>
       </div>
 
-      {active === "walking" ? (
+      {
         <div
           className="student-activity-navigation"
           role="tablist"
-          aria-label="걷기 보기"
+          aria-label={`${activityLabel} 보기`}
           aria-orientation="horizontal"
         >
           {(["records", "missions"] as const).map((view) => {
-            const isSelected = selectedWalkingView === view;
+            const isSelected = selectedView === view;
             const label = view === "records" ? "기록" : "미션";
             return (
               <button
                 key={view}
-                id={`student-walking-${view}-tab`}
+                id={`student-${active}-${view}-tab`}
                 className="student-activity-tab"
                 type="button"
                 role="tab"
                 aria-selected={isSelected}
-                aria-controls={`student-walking-${view}-panel`}
+                aria-controls={`student-${active}-${view}-panel`}
                 tabIndex={isSelected ? 0 : -1}
-                onClick={() => selectWalkingView(view)}
+                onClick={() => selectView(view)}
                 onKeyDown={(event) => {
-                  let nextView: WalkingView | null = null;
+                  let nextView: StudentActivityView | null = null;
                   if (event.key === "ArrowRight" || event.key === "ArrowDown") {
-                    nextView = moveWalkingView(view, 1);
+                    nextView = moveView(view, 1);
                   } else if (event.key === "ArrowLeft" || event.key === "ArrowUp") {
-                    nextView = moveWalkingView(view, -1);
+                    nextView = moveView(view, -1);
                   } else if (event.key === "Home") {
                     nextView = "records";
                   } else if (event.key === "End") {
@@ -74,8 +75,8 @@ export function StudentActivityHeader({
 
                   if (!nextView) return;
                   event.preventDefault();
-                  selectWalkingView(nextView);
-                  document.getElementById(`student-walking-${nextView}-tab`)?.focus();
+                  selectView(nextView);
+                  document.getElementById(`student-${active}-${nextView}-tab`)?.focus();
                 }}
               >
                 {label}
@@ -83,7 +84,7 @@ export function StudentActivityHeader({
             );
           })}
         </div>
-      ) : null}
+      }
     </header>
   );
 }

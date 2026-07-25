@@ -19,6 +19,7 @@ import Svg, { Path } from "react-native-svg";
 import { BookOpen, House } from "lucide-react-native";
 import {
   brand,
+  borders,
   colors,
   iconSizes,
   layout,
@@ -51,6 +52,7 @@ import { LogoLockup } from "../components/LogoLockup";
 import {
   AppButton,
   ControlPressable,
+  TextActionPressable,
   TextField,
 } from "../components/ui";
 import {
@@ -524,6 +526,7 @@ export function Landing() {
             </View>
           </View>
         </View>
+        <TermsNotice />
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -531,6 +534,44 @@ export function Landing() {
 }
 
 export default Landing;
+
+/**
+ * Terms notice shown below every login control (App Store guideline 1.2
+ * requires the agreement to be presented before login). The full-screen
+ * first-run gate lives in components/TermsConsentGate.tsx; this line keeps the
+ * agreement reachable on every later visit.
+ */
+function TermsNotice() {
+  async function open(path: "/terms" | "/privacy") {
+    try {
+      await WebBrowser.openBrowserAsync(`${getApiBase()}${path}`);
+    } catch {
+      // Opening the policy is best-effort; login must never be blocked by it.
+    }
+  }
+
+  return (
+    <View style={styles.termsNotice}>
+      <TextActionPressable
+        style={styles.termsNoticeLinkButton}
+        accessibilityRole="link"
+        accessibilityLabel="이용약관 열기"
+        onPress={() => void open("/terms")}
+      >
+        <Text style={styles.termsNoticeLink}>이용약관</Text>
+      </TextActionPressable>
+      <View style={styles.termsNoticeDivider} accessible={false} />
+      <TextActionPressable
+        style={styles.termsNoticeLinkButton}
+        accessibilityRole="link"
+        accessibilityLabel="개인정보처리방침 열기"
+        onPress={() => void open("/privacy")}
+      >
+        <Text style={styles.termsNoticeLink}>개인정보처리방침</Text>
+      </TextActionPressable>
+    </View>
+  );
+}
 
 function RoleLineIcon({ role }: { role: "student" | "parent" }) {
   const Icon = role === "student" ? BookOpen : House;
@@ -661,6 +702,30 @@ const styles = StyleSheet.create({
     ...typography.body,
     color: colors.textMuted,
     textAlign: "center",
+  },
+  termsNotice: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: spacing.sm,
+    width: "100%",
+    maxWidth: layout.readableMaxWidth,
+    alignSelf: "center",
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.lg,
+  },
+  termsNoticeLinkButton: {
+    minHeight: tapMin,
+    justifyContent: "center",
+  },
+  termsNoticeDivider: {
+    width: borders.hairline,
+    height: iconSizes.sm,
+    backgroundColor: colors.border,
+  },
+  termsNoticeLink: {
+    ...typography.label,
+    color: colors.accent,
   },
   studentLoginForm: {
     width: "100%",

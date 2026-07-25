@@ -9,6 +9,7 @@ import {
   retryActivityRewardTransaction,
 } from "@/lib/creatures/activity-rewards";
 import { jsonPrivateNoStore } from "@/lib/http-cache";
+import { readWalkingTitles } from "@/lib/titles";
 import { getCurrentStudent } from "@/lib/student-auth";
 import {
   addWalkingDays,
@@ -48,6 +49,11 @@ import {
 } from "@/lib/reward-service";
 import { awardWalkingAttendanceCookie } from "@/lib/walking-attendance-rewards";
 import { getEquippedSlimeFloor } from "@/lib/pets/catalog";
+import {
+  getStudentMonthlyAttendance,
+  recordStudentAttendanceVisit,
+  type MonthlyAttendanceSummary,
+} from "@/lib/student-attendance";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -149,6 +155,20 @@ type MonthlyAttendanceReward = {
   itemRewardOrdinal: number;
   itemEarned: boolean;
 };
+
+function attendanceForWalkingClient(
+  attendance: MonthlyAttendanceSummary,
+): MonthlyAttendanceReward {
+  const cashEarned = attendance.claimedOrdinals
+    .filter((ordinal) => ordinal !== attendance.itemRewardOrdinal)
+    .reduce((sum, ordinal) => sum + walkingMonthlyAttendanceRewardAmount(ordinal), 0);
+  return {
+    ...attendance,
+    eligibleAttendanceDays: attendance.claimableAttendance.map((entry) => entry.day),
+    cashEarned,
+    cashPaid: cashEarned,
+  };
+}
 
 type WeeklyStepReward = {
   key: string;
@@ -701,15 +721,8 @@ export async function GET(request: NextRequest) {
         select: { color: true, growthStage: true, equippedItemKeys: true },
       }),
     ]);
-    const monthRange = getKstRewardMonthRange();
-    const monthRows = await readRows(student.id, {
-      startDay: monthRange.monthStart,
-      endDayExclusive: monthRange.monthEnd,
-    });
-    const monthlyAttendanceReward = await readMonthlyAttendanceReward(
-      student.id,
-      monthRange,
-      monthRows,
+    const monthlyAttendanceReward = attendanceForWalkingClient(
+      await getStudentMonthlyAttendance(student.id),
     );
     const classroomRankPeriods = getKstClassroomWalkingRankPeriods();
     const classroomTopFive = await readClassroomTopFive(
@@ -721,6 +734,7 @@ export async function GET(request: NextRequest) {
       student.classroomId,
       student.id,
     );
+    const titles = await readWalkingTitles(student.id);
     const syncedDays = rows
       .filter((row) => row.syncedAt != null)
       .map((row) => row.day);
@@ -754,6 +768,7 @@ export async function GET(request: NextRequest) {
       classroomTopFive,
       classroomRankRewards,
       classroomRankNextResetAt: classroomRankPeriods.nextResetAt.toISOString(),
+      titles,
     });
   } catch (error) {
     console.error("[GET /api/student/walking]", error);
@@ -783,6 +798,10 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    if (parsed.data.attendanceVisit) {
+      await recordStudentAttendanceVisit(student);
+    }
+
     const { minDay, maxDay } = getWalkingDayRange();
     const uniqueRows = new Map(
       (parsed.data.rows ?? []).map((row) => [row.day, row]),
@@ -795,9 +814,9 @@ export async function POST(request: NextRequest) {
     const attendanceDays = [...new Set(requestedAttendanceDays)].sort((a, b) =>
       a.localeCompare(b),
     );
-    const attendanceVisitDay = parsed.data.attendanceVisit
-      ? getWalkingDayKey()
-      : null;
+    // App visits now write to StudentAttendance. Keep this endpoint's legacy
+    // field in the payload only so older clients receive a successful reply.
+    const attendanceVisitDay = null;
 
     if (
       rows.some((row) => row.day < minDay || row.day > maxDay) ||
@@ -879,66 +898,6 @@ export async function POST(request: NextRequest) {
                   "distanceMeters" = EXCLUDED."distanceMeters",
                   "source" = EXCLUDED."source",
                   "syncedAt" = CURRENT_TIMESTAMP,
-                  "updatedAt" = CURRENT_TIMESTAMP
-              `);
-            }
-
-            if (attendanceVisitDay) {
-              const attendanceMonth = attendanceVisitDay.slice(0, 7);
-              await tx.$executeRaw(Prisma.sql`
-                SELECT pg_advisory_xact_lock(
-                  hashtext(${student.id}),
-                  hashtext(${attendanceMonth})
-                )
-              `);
-              await tx.$executeRaw(Prisma.sql`
-                WITH next_ordinal AS (
-                  SELECT COALESCE(MAX("attendanceOrdinal"), 0) + 1 AS ordinal
-                  FROM "StudentWalkingDailyStat"
-                  WHERE "studentId" = ${student.id}
-                    AND "attendanceMonth" = ${attendanceMonth}
-                )
-                INSERT INTO "StudentWalkingDailyStat" (
-                  "id",
-                  "studentId",
-                  "day",
-                  "steps",
-                  "distanceMeters",
-                  "source",
-                  "syncedAt",
-                  "attendanceVisitedAt",
-                  "attendanceMonth",
-                  "attendanceOrdinal",
-                  "createdAt",
-                  "updatedAt"
-                ) SELECT
-                  ${randomUUID()},
-                  ${student.id},
-                  ${attendanceVisitDay}::date,
-                  0,
-                  0,
-                  'app_visit',
-                  CURRENT_TIMESTAMP,
-                  CURRENT_TIMESTAMP,
-                  ${attendanceMonth},
-                  ordinal,
-                  CURRENT_TIMESTAMP,
-                  CURRENT_TIMESTAMP
-                FROM next_ordinal
-                WHERE ordinal <= ${WALKING_MONTHLY_ATTENDANCE_ORDINALS}
-                ON CONFLICT ("studentId", "day") DO UPDATE SET
-                  "attendanceVisitedAt" = COALESCE(
-                    "StudentWalkingDailyStat"."attendanceVisitedAt",
-                    CURRENT_TIMESTAMP
-                  ),
-                  "attendanceMonth" = COALESCE(
-                    "StudentWalkingDailyStat"."attendanceMonth",
-                    EXCLUDED."attendanceMonth"
-                  ),
-                  "attendanceOrdinal" = COALESCE(
-                    "StudentWalkingDailyStat"."attendanceOrdinal",
-                    EXCLUDED."attendanceOrdinal"
-                  ),
                   "updatedAt" = CURRENT_TIMESTAMP
               `);
             }
@@ -1144,10 +1103,8 @@ export async function POST(request: NextRequest) {
       rows: responseRows,
       syncedDays,
       completedAttendanceDays,
-      monthlyAttendanceReward: await readMonthlyAttendanceReward(
-        student.id,
-        responseMonthRange,
-        responseMonthRows,
+      monthlyAttendanceReward: attendanceForWalkingClient(
+        await getStudentMonthlyAttendance(student.id, responseMonthRange),
       ),
     });
   } catch (error) {

@@ -46,7 +46,7 @@ describe("SlimePetPage", () => {
     expect(screen.queryByRole("heading", { name: "소품 세트" })).toBeNull();
     expect(screen.queryByText("효과 내역")).toBeTruthy();
     expect(screen.getAllByText("블루 슬라임").length).toBeGreaterThan(0);
-    expect(screen.getByText("대표")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "블루 슬라임 대표 펫" })).toBeTruthy();
     expect(screen.getAllByLabelText("빈 슬라임 자리")).toHaveLength(4);
     expect(screen.queryByText("500원 구매")).toBeNull();
   });

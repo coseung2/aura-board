@@ -10,6 +10,10 @@ import {
 import { CardComposer } from "../CardComposer";
 import { CardAuthorBottomSheet } from "../CardAuthorBottomSheet";
 import { CommentBottomSheet } from "../CommentBottomSheet";
+import {
+  PostModerationOverlay,
+  type PostAnchor,
+} from "../PostModerationOverlay";
 import type { BoardDetailResponse, BoardCard } from "../../lib/types";
 import {
   withBoardAnonymousAuthor,
@@ -36,6 +40,10 @@ export function CardsBoard({
   const [composerOpen, setComposerOpen] = useState(false);
   const [commentCard, setCommentCard] = useState<BoardCard | null>(null);
   const [authorCard, setAuthorCard] = useState<BoardCard | null>(null);
+  const [moderationTarget, setModerationTarget] = useState<{
+    card: BoardCard;
+    anchor: PostAnchor;
+  } | null>(null);
   // 서버 정렬이 order asc 로 바뀌었지만 클라이언트에서 한번 더 안정화한다.
   const [cards, setCards] = useState<BoardCard[]>(() =>
     withBoardAnonymousAuthors(sortCards(data.cards), data.board),
@@ -77,6 +85,11 @@ export function CardsBoard({
             onOpenComments={() => setCommentCard(item)}
             onOpenAuthorPicker={
               item.canEdit === true ? () => setAuthorCard(item) : undefined
+            }
+            onLongPress={
+              item.isMine === true
+                ? undefined
+                : (anchor) => setModerationTarget({ card: item, anchor })
             }
           />
         )}
@@ -145,6 +158,17 @@ export function CardsBoard({
           onMutate();
         }}
       />
+      {moderationTarget ? (
+        <PostModerationOverlay
+          card={moderationTarget.card}
+          anchor={moderationTarget.anchor}
+          onClose={() => setModerationTarget(null)}
+          onHidden={(cardId) => {
+            setCards((current) => current.filter((card) => card.id !== cardId));
+            onMutate();
+          }}
+        />
+      ) : null}
     </View>
   );
 }

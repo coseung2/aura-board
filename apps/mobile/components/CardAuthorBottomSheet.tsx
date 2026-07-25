@@ -232,7 +232,7 @@ export function CardAuthorBottomSheet({
 
 const styles = StyleSheet.create({
   sheet: {
-    maxHeight: "82%",
+    maxHeight: "89%",
     minHeight: tapMin * 6,
     paddingBottom: spacing.lg,
   },

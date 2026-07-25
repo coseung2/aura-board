@@ -106,6 +106,16 @@ export type MobileSlimeHome = {
   growthByColor: Partial<Record<SlimeColor, SlimeGrowth>>;
   effects: { breakdown: MobileSlimeEffect[] };
   walkingTitle: MobileWalkingTitle | null;
+  claimedTitles: MobileClaimedTitle[];
+  equippedTitleByColor: Partial<Record<SlimeColor, string>>;
+};
+
+export type MobileClaimedTitle = {
+  key: string;
+  label: string;
+  imagePath: string;
+  effectKey: string;
+  buffBps: number;
 };
 
 export type MobileSlimeClassmate = {
@@ -342,7 +352,42 @@ export function normalizeSlimeHome(payload: unknown): MobileSlimeHome {
     growthByColor,
     effects: normalizeEffects(value.effects),
     walkingTitle: walkingTitle(value.walkingTitle),
+    claimedTitles: normalizeClaimedTitles(value.claimedTitles),
+    equippedTitleByColor: normalizeTitlesByColor(value.equippedTitleByColor),
   };
+}
+
+function normalizeClaimedTitles(value: unknown): MobileClaimedTitle[] {
+  if (!Array.isArray(value)) return [];
+  return value.flatMap((entry) => {
+    if (!isRecord(entry)) return [];
+    if (
+      typeof entry.key !== "string" ||
+      typeof entry.label !== "string" ||
+      typeof entry.imagePath !== "string"
+    ) {
+      return [];
+    }
+    return [{
+      key: entry.key,
+      label: entry.label,
+      imagePath: entry.imagePath,
+      effectKey: typeof entry.effectKey === "string" ? entry.effectKey : "",
+      buffBps: Math.max(0, Math.trunc(numberValue(entry.buffBps))),
+    }];
+  });
+}
+
+function normalizeTitlesByColor(value: unknown): Partial<Record<SlimeColor, string>> {
+  if (!isRecord(value)) return {};
+  const result: Partial<Record<SlimeColor, string>> = {};
+  for (const [key, titleKey] of Object.entries(value)) {
+    const slimeColor = color(key);
+    if (slimeColor && typeof titleKey === "string" && titleKey.length > 0) {
+      result[slimeColor] = titleKey;
+    }
+  }
+  return result;
 }
 
 export function normalizeSlimeClassroom(payload: unknown): MobileSlimeClassmate[] {

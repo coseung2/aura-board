@@ -8,7 +8,7 @@ import {
   View,
   useWindowDimensions,
 } from "react-native";
-import { useRouter } from "expo-router";
+import { useRouter, type Href } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { ChevronDown, ChevronUp } from "lucide-react-native";
 import { apiFetch, ApiError } from "../../lib/api";
@@ -221,7 +221,11 @@ export default function StudentMoreScreen() {
                     <View style={styles.targetCopy}>
                       <Text style={styles.label}>{target.label}</Text>
                       <Text style={styles.targetMeta}>
-                        {enabled ? "하단 메뉴에 표시 중" : "더보기에서만 보기"}
+                        {isMore
+                          ? "하단 메뉴에 항상 표시"
+                          : enabled
+                            ? "하단 메뉴에 표시 중"
+                            : "더보기에서만 보기"}
                       </Text>
                     </View>
                     <View style={styles.controls}>
@@ -257,7 +261,8 @@ export default function StudentMoreScreen() {
                         </ControlPressable>
                       </View>
                       <Switch
-                        value={enabled}
+                        value={isMore ? true : enabled}
+                        disabled={isMore}
                         onValueChange={(value) => toggle(target.id, value)}
                         trackColor={{
                           false: colors.border,
@@ -274,6 +279,21 @@ export default function StudentMoreScreen() {
           ) : (
             <Text style={styles.mutedText}>추가할 메뉴가 없어요.</Text>
           )}
+        </View>
+
+        {/* Undo screen for reported/hidden content (App Store guideline 1.2). */}
+        <View style={styles.bannerCallout}>
+          <View style={styles.bannerCalloutCopy}>
+            <Text style={styles.bannerCalloutTitle} selectable>
+              숨긴 글과 댓글을 다시 볼 수 있어요.
+            </Text>
+          </View>
+          <AppButton
+            variant="secondary"
+            onPress={() => router.push("/(student)/hidden-content" as Href)}
+          >
+            숨긴 항목
+          </AppButton>
         </View>
 
       </ScrollView>

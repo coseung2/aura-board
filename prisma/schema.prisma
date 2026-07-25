@@ -125,6 +125,9 @@ model User {
   // Global daily banner moderation/publication.
   dailyBannerReviews      DailyBannerSubmission[]  @relation("DailyBannerReviewedBy")
   dailyBannerPublications DailyBannerPublication[] @relation("DailyBannerPublishedBy")
+
+  // UGC safety (App Store guideline 1.2).
+  contentReportsResolved ContentReport[] @relation("ContentReportResolver")
 }
 
 // ???????? Audit Log (Seed 14 security, 2026-04-22) ????????
@@ -500,6 +503,9 @@ model Classroom {
   creatureItems          StudentCreatureItem[]
   creatureItemUses       CreatureItemUse[]
 
+  // UGC safety (App Store guideline 1.2).
+  contentReports ContentReport[]
+
   @@index([teacherId])
   @@index([code])
 }
@@ -635,6 +641,15 @@ model Student {
   cleaningDutiesAssigned CleaningDuty[] @relation("CleaningDutyAssignedBy")
 
   walkingDailyStats StudentWalkingDailyStat[]
+  attendances       StudentAttendance[]
+  titles            StudentTitle[]
+
+  // UGC safety (App Store guideline 1.2).
+  contentReportsFiled   ContentReport[]      @relation("ContentReportReporterStudent")
+  contentReportsAgainst ContentReport[]      @relation("ContentReportAuthorStudent")
+  hiddenContent         HiddenContent[]      @relation("HiddenContentStudent")
+  hiddenByStudents      HiddenContentAuthor[] @relation("HiddenContentAuthorHider")
+  hiddenAsAuthor        HiddenContentAuthor[] @relation("HiddenContentAuthorTarget")
 
   // Global daily banner submissions.
   dailyBannerSubmissions DailyBannerSubmission[] @relation("DailyBannerSubmissionStudent")
@@ -721,8 +736,8 @@ model StudentWalkingDailyStat {
   distanceMeters Float    @default(0)
   source         String   @default("health_connect")
   syncedAt       DateTime @default(now())
-  // Opening the student app makes one calendar day claimable. Claiming the
-  // corresponding monthly ordinal remains a separate, explicit action.
+  // Legacy shadow fields retained only for the rolling deployment. New
+  // attendance writes use StudentAttendance exclusively.
   attendanceVisitedAt   DateTime?
   attendanceMonth       String?
   attendanceOrdinal     Int?
@@ -736,6 +751,150 @@ model StudentWalkingDailyStat {
   @@unique([studentId, attendanceMonth, attendanceOrdinal], map: "StudentWalkingDailyStat_attendance_ordinal_key")
   @@index([day], map: "StudentWalkingDailyStat_day_idx")
   @@index([studentId, syncedAt], map: "StudentWalkingDailyStat_studentId_syncedAt_idx")
+}
+
+// App-level attendance is independent of any one activity. A student earns at
+// most one ordinal per KST date by opening the student app.
+model StudentAttendance {
+  id String @id @default(cuid())
+
+  studentId String
+  day       DateTime @db.Date
+  month     String
+  ordinal   Int
+  visitedAt DateTime @default(now())
+  claimedAt DateTime?
+  createdAt DateTime @default(now())
+
+  student Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@unique([studentId, day])
+  @@unique([studentId, month, ordinal])
+  @@index([studentId, month])
+}
+
+// Achievement titles the student has claimed. Earning is derived from activity
+// stats, but the claim is an explicit action so the reward can be granted once.
+model StudentTitle {
+  id String @id @default(cuid())
+
+  studentId String
+  // "walking" | "reading" — the activity the title belongs to.
+  domain    String
+  titleKey  String
+  claimedAt DateTime @default(now())
+
+  student Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@unique([studentId, titleKey])
+  @@index([studentId, domain])
+}
+
+// ===== UGC safety (App Store guideline 1.2, 2026-07-25) =====
+//
+// Three separate concerns, deliberately not merged into one table:
+//   - ContentReport: a student escalates content to the teacher. Teacher-visible.
+//   - HiddenContent: one student hides one specific item for themselves only.
+//   - HiddenContentAuthor: one student hides everything a peer writes. Offered
+//     only after filing a report, so it stays rare in normal classroom use.
+//
+// Target is addressed by (targetKind, targetId) instead of separate FK columns
+// because cards and comments live in different tables and the set may grow.
+// A `targetId` therefore has no referential integrity; readers must tolerate
+// rows whose target has already been deleted.
+enum ContentTargetKind {
+  card
+  comment
+}
+
+// Fixed reason list. Free text is limited to the `other` case so a report
+// cannot become a second channel for abusive writing.
+enum ContentReportReason {
+  profanity
+  harassment
+  personal_info
+  other
+}
+
+enum ContentReportStatus {
+  pending
+  actioned
+  dismissed
+}
+
+model ContentReport {
+  id String @id @default(cuid())
+
+  classroomId String
+  targetKind  ContentTargetKind
+  targetId    String
+
+  reporterStudentId String
+  // Denormalized so the teacher queue still names the author after the
+  // reported card or comment is deleted.
+  authorStudentId String?
+  authorLabel     String?
+
+  reason ContentReportReason
+  // Only populated for reason=other; capped in the API layer.
+  detail String?
+  // Snapshot of the reported text so the teacher can judge after deletion.
+  contentSnapshot String?
+
+  status     ContentReportStatus @default(pending)
+  createdAt  DateTime            @default(now())
+  resolvedAt DateTime?
+  // Teacher who resolved the report.
+  resolvedByUserId String?
+
+  classroom Classroom @relation(fields: [classroomId], references: [id], onDelete: Cascade)
+  reporter  Student   @relation("ContentReportReporterStudent", fields: [reporterStudentId], references: [id], onDelete: Cascade)
+  author    Student?  @relation("ContentReportAuthorStudent", fields: [authorStudentId], references: [id], onDelete: SetNull)
+  resolvedBy User?    @relation("ContentReportResolver", fields: [resolvedByUserId], references: [id], onDelete: SetNull)
+
+  // One report per student per item; re-reporting is a no-op upsert.
+  @@unique([reporterStudentId, targetKind, targetId])
+  // Drives the teacher queue (oldest pending first).
+  @@index([classroomId, status, createdAt])
+  @@index([authorStudentId])
+}
+
+// Per-student, per-item hide. This is the primary path: the student hides the
+// one item that bothered them and nothing else changes.
+model HiddenContent {
+  id String @id @default(cuid())
+
+  studentId  String
+  targetKind ContentTargetKind
+  targetId   String
+  // True when the hide was applied automatically as part of filing a report.
+  viaReport Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  student Student @relation("HiddenContentStudent", fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@unique([studentId, targetKind, targetId])
+  // Read path: load every hide for one student, one kind, per screen.
+  @@index([studentId, targetKind])
+}
+
+// Per-student author-level hide (App Store "block abusive users"). Creating a
+// row also notifies the teacher, which is why it carries the report link.
+model HiddenContentAuthor {
+  id String @id @default(cuid())
+
+  studentId       String
+  hiddenStudentId String
+  // Report that prompted the block, when it came from the report flow.
+  reportId  String?
+  createdAt DateTime @default(now())
+
+  student       Student @relation("HiddenContentAuthorHider", fields: [studentId], references: [id], onDelete: Cascade)
+  hiddenStudent Student @relation("HiddenContentAuthorTarget", fields: [hiddenStudentId], references: [id], onDelete: Cascade)
+
+  @@unique([studentId, hiddenStudentId])
+  @@index([studentId])
+  @@index([hiddenStudentId])
 }
 
 // Per-student read cursor and receipts for the in-app like/comment feed.
@@ -1613,6 +1772,9 @@ model CardComment {
 
   content String
 
+  // Thread root for a reply. Replies to replies are normalized to this root.
+  parentCommentId String?
+
   // Optional student-client retry key. Null keeps existing callers compatible.
   clientRequestId String?
 
@@ -1628,6 +1790,10 @@ model CardComment {
 
   authorParent Parent? @relation("ParentCardComments", fields: [authorParentId], references: [id], onDelete: SetNull)
 
+  parentComment CardComment? @relation("CardCommentReplies", fields: [parentCommentId], references: [id], onDelete: Cascade)
+
+  replies CardComment[] @relation("CardCommentReplies")
+
   likes CardCommentLike[]
 
   @@unique([authorStudentId, cardId, clientRequestId])
@@ -1636,6 +1802,7 @@ model CardComment {
   @@index([authorUserId])
   @@index([authorStudentId])
   @@index([authorParentId])
+  @@index([parentCommentId, createdAt])
 }
 
 model CardCommentLike {
@@ -3489,6 +3656,9 @@ model StudentSlime {
   // Shop cosmetics are assigned per owned slime. Each category is kept to one
   // item by the slime equipment service.
   equippedItemKeys String[] @default([])
+  // Claimed title worn by this specific pet. Titles are owned per student, so
+  // several pets can each wear a different one.
+  equippedTitleKey String?
 
   purchaseTransactionId String @unique
 
