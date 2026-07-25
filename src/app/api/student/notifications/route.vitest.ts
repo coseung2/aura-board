@@ -117,4 +117,47 @@ describe("/api/student/notifications reward compatibility", () => {
       update: {},
     });
   });
+
+  it("includes every server-owned activity reward source", async () => {
+    mocks.rewardFindMany.mockResolvedValue([
+      {
+        id: "transaction-attendance",
+        amount: 10,
+        note: null,
+        sourceType: "attendance_reward",
+        createdAt: new Date("2026-07-20T00:00:00.000Z"),
+      },
+      {
+        id: "transaction-reading-rank",
+        amount: 60,
+        note: null,
+        sourceType: "reading_classroom_rank_reward",
+        createdAt: new Date("2026-07-20T00:01:00.000Z"),
+      },
+    ]);
+
+    const response = await GET();
+    const payload = await response.json();
+    expect(payload.items).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        id: "reward:transaction-attendance",
+        cardTitle: "출석 보상",
+      }),
+      expect.objectContaining({
+        id: "reward:transaction-reading-rank",
+        cardTitle: "우리 반 독서 순위 보상",
+      }),
+    ]));
+    expect(mocks.rewardFindMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          sourceType: { in: expect.arrayContaining([
+            "attendance_reward",
+            "reading_weekly_mission_reward",
+            "reading_classroom_rank_reward",
+          ]) },
+        }),
+      }),
+    );
+  });
 });

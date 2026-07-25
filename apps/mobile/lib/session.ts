@@ -110,6 +110,14 @@ export async function loadSessionToken(): Promise<string | null> {
 
 export async function clearSessionToken(): Promise<void> {
   clearBoardCache();
+  const authorizationToken = await getStoredItem(TOKEN_KEY);
+  if (authorizationToken) {
+    await import("./student-push-notifications")
+      .then(({ unregisterStudentPushNotifications }) =>
+        unregisterStudentPushNotifications(authorizationToken),
+      )
+      .catch(() => undefined);
+  }
   await deleteStoredItem(TOKEN_KEY).catch(() => undefined);
   await deleteStoredItem(STUDENT_KEY).catch(() => undefined);
 }
@@ -160,6 +168,14 @@ export async function clearParentSession(): Promise<void> {
  */
 export async function clearAllMobileSessions(): Promise<void> {
   clearBoardCache();
+  const studentAuthorizationToken = await getStoredItem(TOKEN_KEY);
+  if (studentAuthorizationToken) {
+    await import("./student-push-notifications")
+      .then(({ unregisterStudentPushNotifications }) =>
+        unregisterStudentPushNotifications(studentAuthorizationToken),
+      )
+      .catch(() => undefined);
+  }
   await Promise.all([
     deleteStoredItem(TOKEN_KEY).catch(() => undefined),
     deleteStoredItem(STUDENT_KEY).catch(() => undefined),

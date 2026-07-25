@@ -9,6 +9,12 @@ import { StudentBottomNav } from "../../components/StudentBottomNav";
 import { WalkingPermissionOnboarding } from "../../components/WalkingPermissionOnboarding";
 import { DailyBannerProvider } from "../../components/DailyBanner";
 import { recordStudentAttendanceVisit } from "../../lib/student-attendance";
+import {
+  registerStudentPushNotifications,
+  subscribeStudentPushNavigation,
+} from "../../lib/student-push-notifications";
+import { studentNotificationTarget } from "../../lib/student-notifications";
+import type { Href } from "expo-router";
 
 // Student segment 전체 공통 layout.
 export default function StudentLayout() {
@@ -38,6 +44,18 @@ export default function StudentLayout() {
   useEffect(() => {
     loadMe();
   }, [loadMe, pathname]);
+
+  useEffect(() => {
+    if (hideNav) return;
+    let unsubscribe: () => void = () => undefined;
+    void registerStudentPushNotifications();
+    void subscribeStudentPushNavigation((href) => {
+      router.push(studentNotificationTarget(href) as Href);
+    }).then((next) => {
+      unsubscribe = next;
+    });
+    return () => unsubscribe();
+  }, [hideNav, router]);
 
   return (
     <View style={styles.shell}>

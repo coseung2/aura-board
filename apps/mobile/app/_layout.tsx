@@ -1,7 +1,8 @@
 import { useEffect, useRef } from "react";
-import { Stack, useRouter } from "expo-router";
+import { Stack, useRouter, useSegments, type Href } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import * as SplashScreen from "expo-splash-screen";
+import * as SystemUI from "expo-system-ui";
 import { useFonts } from "expo-font";
 import { NotoSansKR_400Regular } from "@expo-google-fonts/noto-sans-kr/400Regular";
 import { NotoSansKR_600SemiBold } from "@expo-google-fonts/noto-sans-kr/600SemiBold";
@@ -20,8 +21,15 @@ import { TermsConsentGate } from "../components/TermsConsentGate";
 
 const CALLBACK_PATH = "parent/auth/callback";
 const EXPO_GO_CALLBACK_HOSTS = new Set(["10.0.2.2", "127.0.0.1"]);
+const SPLASH_BACKGROUND = colors.bg;
+const WELCOME_ROUTE = "/welcome" as unknown as Href;
 
 void SplashScreen.preventAutoHideAsync();
+SplashScreen.setOptions({
+  duration: 350,
+  fade: true,
+});
+void SystemUI.setBackgroundColorAsync(SPLASH_BACKGROUND).catch(() => null);
 
 function parseCallback(url: string) {
   let parsed: URL;
@@ -113,6 +121,9 @@ function DeepLinkHandler() {
 
 export default function RootLayout() {
   useAndroidBackBehavior();
+  const router = useRouter();
+  const segments = useSegments();
+  const welcomeShownRef = useRef(false);
 
   useEffect(() => {
     void registerParentPushNotifications();
@@ -126,26 +137,46 @@ export default function RootLayout() {
   });
 
   useEffect(() => {
-    if (fontsLoaded || fontError) {
-      void SplashScreen.hideAsync();
+    if ((!fontsLoaded && !fontError) || welcomeShownRef.current) return;
+
+    welcomeShownRef.current = true;
+    if ((segments[0] as string | undefined) !== "welcome") {
+      router.replace(WELCOME_ROUTE);
     }
-  }, [fontError, fontsLoaded]);
+  }, [fontError, fontsLoaded, router, segments]);
 
   if (!fontsLoaded && !fontError) return null;
+
+  const stack = (
+    <Stack
+      initialRouteName="welcome"
+      screenOptions={{
+        headerShown: false,
+        contentStyle: { backgroundColor: colors.bg },
+      }}
+    >
+      <Stack.Screen
+        name="welcome"
+        options={{
+          headerShown: false,
+          gestureEnabled: false,
+          animation: "none",
+          contentStyle: { backgroundColor: SPLASH_BACKGROUND },
+        }}
+      />
+    </Stack>
+  );
 
   return (
     <SafeAreaProvider>
       <StatusBar style="dark" />
-      {/* Terms must be accepted before any login screen renders (guideline 1.2). */}
-      <TermsConsentGate>
-        <DeepLinkHandler />
-        <Stack
-          screenOptions={{
-            headerShown: false,
-            contentStyle: { backgroundColor: colors.bg },
-          }}
-        />
-      </TermsConsentGate>
+      <DeepLinkHandler />
+      {/* The branded welcome may render first; terms still gate every app/login route. */}
+      {(segments[0] as string | undefined) === "welcome" ? (
+        stack
+      ) : (
+        <TermsConsentGate>{stack}</TermsConsentGate>
+      )}
     </SafeAreaProvider>
   );
 }

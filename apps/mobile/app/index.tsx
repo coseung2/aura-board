@@ -74,6 +74,7 @@ const EXPO_GO_PHONE_CALLBACK =
 // the reviewer field aligned with that contract so short Expo Go codes (for
 // example, "367") are submitted instead of being rejected client-side.
 const PARENT_REVIEW_CODE_MAX_LENGTH = 256;
+const PARENT_REVIEW_UI_ENABLED: boolean = false;
 
 const PARENT_OAUTH_ERROR_MESSAGES: Record<string, string> = {
   provider_disabled:
@@ -104,7 +105,9 @@ export function Landing() {
     (Array.isArray(routeRole) ? routeRole[0] : routeRole) === "parent"
       ? "parent"
       : (Array.isArray(routeRole) ? routeRole[0] : routeRole) === "review"
-        ? "review"
+        ? PARENT_REVIEW_UI_ENABLED
+          ? "review"
+          : "parent"
         : (Array.isArray(routeRole) ? routeRole[0] : routeRole) === "student"
           ? "student"
           : null;
@@ -382,14 +385,16 @@ export function Landing() {
             >
               학부모
             </ContentTab>
-            <ContentTab
-              style={styles.roleNavItem}
-              selected={activeRole === "review"}
-              onPress={() => setActiveRole("review")}
-              accessibilityLabel="심사용 학부모 로그인"
-            >
-              심사용
-            </ContentTab>
+            {PARENT_REVIEW_UI_ENABLED ? (
+              <ContentTab
+                style={styles.roleNavItem}
+                selected={activeRole === "review"}
+                onPress={() => setActiveRole("review")}
+                accessibilityLabel="심사용 학부모 로그인"
+              >
+                심사용
+              </ContentTab>
+            ) : null}
           </ContentTabs>
         </View>
         <View
@@ -483,48 +488,50 @@ export function Landing() {
             </View>
           </View>
 
-          <View
-            style={[
-              styles.roleCard,
-              isNarrow && styles.roleCardNarrow,
-              activeRole !== "review" && styles.hiddenRoleCard,
-            ]}
-          >
-            <RoleLineIcon role="parent" />
-            <Text style={styles.roleTitle}>심사용 학부모</Text>
-            <Text style={styles.roleDesc}>심사 코드로 자녀 활동을 확인해요</Text>
-            {parentError ? (
-              <Text style={styles.parentErrorText} accessibilityRole="alert">
-                {parentError}
-              </Text>
-            ) : null}
-            <View style={styles.studentLoginForm}>
-              <TextField
-                style={styles.studentCodeInput}
-                value={parentReviewCode}
-                onChangeText={(text) => {
-                  setParentReviewCode(text.toUpperCase());
-                  if (parentError) setParentError(null);
-                }}
-                placeholder="심사 코드 입력"
-                autoCapitalize="characters"
-                autoCorrect={false}
-                autoComplete="off"
-                maxLength={PARENT_REVIEW_CODE_MAX_LENGTH}
-                textAlign="center"
-                editable={!parentLoading}
-                onSubmitEditing={handleParentReviewLogin}
-              />
-              <AppButton
-                style={styles.studentLoginButton}
-                onPress={handleParentReviewLogin}
-                disabled={parentReviewCode.trim().length === 0}
-                loading={parentLoading}
-              >
-                코드로 로그인
-              </AppButton>
+          {PARENT_REVIEW_UI_ENABLED ? (
+            <View
+              style={[
+                styles.roleCard,
+                isNarrow && styles.roleCardNarrow,
+                activeRole !== "review" && styles.hiddenRoleCard,
+              ]}
+            >
+              <RoleLineIcon role="parent" />
+              <Text style={styles.roleTitle}>심사용 학부모</Text>
+              <Text style={styles.roleDesc}>심사 코드로 자녀 활동을 확인해요</Text>
+              {parentError ? (
+                <Text style={styles.parentErrorText} accessibilityRole="alert">
+                  {parentError}
+                </Text>
+              ) : null}
+              <View style={styles.studentLoginForm}>
+                <TextField
+                  style={styles.studentCodeInput}
+                  value={parentReviewCode}
+                  onChangeText={(text) => {
+                    setParentReviewCode(text.toUpperCase());
+                    if (parentError) setParentError(null);
+                  }}
+                  placeholder="심사 코드 입력"
+                  autoCapitalize="characters"
+                  autoCorrect={false}
+                  autoComplete="off"
+                  maxLength={PARENT_REVIEW_CODE_MAX_LENGTH}
+                  textAlign="center"
+                  editable={!parentLoading}
+                  onSubmitEditing={handleParentReviewLogin}
+                />
+                <AppButton
+                  style={styles.studentLoginButton}
+                  onPress={handleParentReviewLogin}
+                  disabled={parentReviewCode.trim().length === 0}
+                  loading={parentLoading}
+                >
+                  코드로 로그인
+                </AppButton>
+              </View>
             </View>
-          </View>
+          ) : null}
         </View>
         <TermsNotice />
         </ScrollView>

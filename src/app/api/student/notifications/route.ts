@@ -2,22 +2,17 @@ import { NextResponse } from "next/server";
 import { Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
 import { getCurrentStudent } from "@/lib/student-auth";
+import {
+  STUDENT_NOTIFICATION_REWARD_SOURCE_TYPES,
+  studentRewardTitle,
+  type StudentNotificationKind,
+  type StudentNotificationRewardSourceType,
+} from "@/lib/student-notification-contract";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
 const RECENT_LIMIT = 20;
-const REWARD_SOURCE_TYPES = [
-  "reading_reward",
-  "comment_reward",
-  "walking_reward",
-  "walking_weekly_reward",
-  "walking_classroom_rank_reward",
-  "assignment_reward",
-] as const;
-type RewardSourceType = (typeof REWARD_SOURCE_TYPES)[number];
-type NotificationKind = "like" | "comment" | "reward";
-
 export async function GET() {
   const student = await getCurrentStudent();
   if (!student) {
@@ -118,7 +113,7 @@ export async function GET() {
     }),
   ]);
 
-  const isRead = (kind: NotificationKind, id: string, createdAt: Date) =>
+  const isRead = (kind: StudentNotificationKind, id: string, createdAt: Date) =>
     Boolean(lastReadAt && createdAt <= lastReadAt) || readKeys.has(`${kind}:${id}`);
 
   const likeItems = likes.map((like) => ({
@@ -166,7 +161,7 @@ export async function GET() {
     const sourceType = isRewardSourceType(transaction.sourceType)
       ? transaction.sourceType
       : null;
-    const title = sourceType ? rewardTitle(sourceType) : "보상";
+    const title = sourceType ? studentRewardTitle(sourceType) : "보상";
     const amount = `+${transaction.amount.toLocaleString("ko-KR")} ${rewardUnit}`;
     const note = transaction.note ? truncate(transaction.note, 120) : null;
     return {
@@ -224,7 +219,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "invalid_body" }, { status: 400 });
   }
 
-  const kind = input.kind as NotificationKind;
+  const kind = input.kind as StudentNotificationKind;
   const { likeWhere, commentWhere, rewardWhere } = notificationWhere(student);
   const notification =
     kind === "like"
@@ -294,30 +289,16 @@ function notificationWhere(student: { id: string; classroomId: string }): {
     rewardWhere: {
       account: { studentId: student.id, classroomId: student.classroomId },
       type: "deposit",
-      sourceType: { in: [...REWARD_SOURCE_TYPES] },
+      sourceType: { in: [...STUDENT_NOTIFICATION_REWARD_SOURCE_TYPES] },
     },
   };
 }
 
-function isRewardSourceType(value: string | null): value is RewardSourceType {
-  return value !== null && (REWARD_SOURCE_TYPES as readonly string[]).includes(value);
-}
-
-function rewardTitle(sourceType: RewardSourceType): string {
-  switch (sourceType) {
-    case "reading_reward":
-      return "독서 보상";
-    case "comment_reward":
-      return "댓글 보상";
-    case "walking_reward":
-      return "걷기 보상";
-    case "walking_weekly_reward":
-      return "주간 걷기 보상";
-    case "walking_classroom_rank_reward":
-      return "우리 반 걷기 순위 보상";
-    case "assignment_reward":
-      return "과제 제출 보상";
-  }
+function isRewardSourceType(
+  value: string | null,
+): value is StudentNotificationRewardSourceType {
+  return value !== null &&
+    (STUDENT_NOTIFICATION_REWARD_SOURCE_TYPES as readonly string[]).includes(value);
 }
 
 function formatActorLabel({

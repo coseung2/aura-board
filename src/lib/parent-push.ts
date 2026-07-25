@@ -1,5 +1,6 @@
 import "server-only";
 import { db } from "@/lib/db";
+import { sendExpoPush } from "@/lib/expo-push";
 
 const EXPO_PUSH_URL = "https://exp.host/--/api/v2/push/send";
 const EXPO_BATCH_SIZE = 100;
@@ -17,6 +18,57 @@ type ExpoTicket = {
   status?: string;
   details?: { error?: string };
 };
+
+export type ParentNotificationPush = {
+  eventKey: string;
+  parentId: string;
+  title: string;
+  body: string;
+  data: Record<string, string>;
+};
+
+export async function dispatchParentNotificationPush(
+  input: ParentNotificationPush,
+): Promise<{ attempted: number; skipped: number }> {
+  try {
+    const devices = await db.parentPushDevice.findMany({
+      where: { parentId: input.parentId, disabledAt: null },
+      select: { id: true, expoPushToken: true },
+    });
+    if (devices.length === 0) return { attempted: 0, skipped: 0 };
+
+    try {
+      await db.parentPushDispatch.create({
+        data: { parentId: input.parentId, eventKey: input.eventKey },
+      });
+    } catch (error) {
+      if ((error as { code?: unknown })?.code === "P2002") {
+        return { attempted: 0, skipped: devices.length };
+      }
+      throw error;
+    }
+
+    const result = await sendExpoPush(devices, {
+      title: input.title,
+      body: input.body,
+      data: input.data,
+    });
+    if (result.invalidDeviceIds.length > 0) {
+      await db.parentPushDevice.updateMany({
+        where: { id: { in: result.invalidDeviceIds } },
+        data: { disabledAt: new Date() },
+      });
+    }
+    return { attempted: result.attempted, skipped: 0 };
+  } catch (error) {
+    console.error("[parent-push] notification dispatch failed", {
+      eventKey: input.eventKey,
+      parentId: input.parentId,
+      error,
+    });
+    return { attempted: 0, skipped: 0 };
+  }
+}
 
 export async function dispatchLinkedParentCardPush(
   input: ChildCardPushInput,

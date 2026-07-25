@@ -599,6 +599,9 @@ model Student {
 
   notificationReceipts StudentNotificationReceipt[]
 
+  pushDevices    StudentPushDevice[]
+  pushDispatches StudentPushDispatch[]
+
   // comment-area poll (2026-06-28): 학생이 누른 카드별 투표.
   cardPollVotes CardPollVote[] @relation("StudentCardPollVotes")
 
@@ -927,6 +930,34 @@ model StudentNotificationReceipt {
 
   @@unique([studentId, notificationType, notificationId])
   @@index([studentId, readAt])
+}
+
+model StudentPushDevice {
+  id String @id @default(cuid())
+
+  studentId     String
+  expoPushToken String    @unique
+  platform      String
+  disabledAt    DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  student Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@index([studentId, disabledAt])
+}
+
+model StudentPushDispatch {
+  id String @id @default(cuid())
+
+  studentId String
+  eventKey  String
+  createdAt DateTime @default(now())
+
+  student Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@unique([studentId, eventKey])
+  @@index([createdAt])
 }
 
 // ???????? AI ??繹먮굞苑?(2026-04-24) ????????

@@ -1,19 +1,16 @@
 import Constants from "expo-constants";
 import * as SecureStore from "expo-secure-store";
 import { Platform } from "react-native";
-import { parentApiFetch } from "./api";
-import { loadParentToken } from "./session";
+import { apiFetch } from "./api";
+import { loadSessionToken } from "./session";
 
-const PUSH_TOKEN_KEY = "aura_parent_expo_push_token";
+const PUSH_TOKEN_KEY = "aura_student_expo_push_token";
 let currentToken: string | null = null;
 let handlerConfigured = false;
 let lastHandledResponseId: string | null = null;
 
 async function loadNativePushModules() {
-  if (
-    Platform.OS === "web" ||
-    Constants.executionEnvironment === "storeClient"
-  ) {
+  if (Platform.OS === "web" || Constants.executionEnvironment === "storeClient") {
     return null;
   }
   const [Device, Notifications] = await Promise.all([
@@ -34,9 +31,9 @@ async function loadNativePushModules() {
   return { Device, Notifications };
 }
 
-export async function registerParentPushNotifications(): Promise<void> {
+export async function registerStudentPushNotifications(): Promise<void> {
   if (Platform.OS !== "android" && Platform.OS !== "ios") return;
-  if (!(await loadParentToken())) return;
+  if (!(await loadSessionToken())) return;
 
   try {
     const modules = await loadNativePushModules();
@@ -58,29 +55,29 @@ export async function registerParentPushNotifications(): Promise<void> {
     const projectId =
       Constants.easConfig?.projectId ?? Constants.expoConfig?.extra?.eas?.projectId;
     if (!projectId) {
-      console.warn("[parent-push] EAS projectId is missing");
+      console.warn("[student-push] EAS projectId is missing");
       return;
     }
     const result = await Notifications.getExpoPushTokenAsync({ projectId });
     currentToken = result.data;
     await SecureStore.setItemAsync(PUSH_TOKEN_KEY, currentToken);
-    await parentApiFetch("/api/parent/push-token", {
+    await apiFetch("/api/student/push-token", {
       method: "POST",
       json: { token: currentToken, platform: Platform.OS },
     });
   } catch (error) {
-    console.warn("[parent-push] registration failed", error);
+    console.warn("[student-push] registration failed", error);
   }
 }
 
-export async function unregisterParentPushNotifications(
+export async function unregisterStudentPushNotifications(
   authorizationToken?: string | null,
 ): Promise<void> {
   if (Platform.OS !== "android" && Platform.OS !== "ios") return;
   const token = currentToken ?? (await SecureStore.getItemAsync(PUSH_TOKEN_KEY));
   if (!token) return;
   currentToken = null;
-  await parentApiFetch("/api/parent/push-token", {
+  await apiFetch("/api/student/push-token", {
     method: "DELETE",
     json: { token },
     headers: authorizationToken
@@ -91,7 +88,7 @@ export async function unregisterParentPushNotifications(
   await SecureStore.deleteItemAsync(PUSH_TOKEN_KEY).catch(() => undefined);
 }
 
-export async function subscribeParentPushNavigation(
+export async function subscribeStudentPushNavigation(
   onHref: (href: string) => void,
 ): Promise<() => void> {
   const modules = await loadNativePushModules();
@@ -101,14 +98,9 @@ export async function subscribeParentPushNavigation(
     const responseId = response?.notification.request.identifier ?? null;
     if (responseId && responseId === lastHandledResponseId) return;
     const data = response?.notification.request.content.data;
-    if (data?.type === "parent_notification" && typeof data.href === "string") {
+    if (data?.type === "student_notification" && typeof data.href === "string") {
       lastHandledResponseId = responseId;
       onHref(data.href);
-      return;
-    }
-    if (data?.type === "child_card_created") {
-      lastHandledResponseId = responseId;
-      onHref("/(parent)");
     }
   };
   handle(await Notifications.getLastNotificationResponseAsync());
