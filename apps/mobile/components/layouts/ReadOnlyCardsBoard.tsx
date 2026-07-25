@@ -9,6 +9,10 @@ import {
   typography,
 } from "../../theme/tokens";
 import { CommentBottomSheet } from "../CommentBottomSheet";
+import {
+  PostModerationOverlay,
+  type PostAnchor,
+} from "../PostModerationOverlay";
 import type { BoardDetailResponse, BoardCard } from "../../lib/types";
 import { withBoardAnonymousAuthors } from "../../lib/card-privacy";
 import { StreamFeedPost } from "./ColumnsBoard";
@@ -19,6 +23,10 @@ import { sortCards, updateCardCommentCount } from "./cards-board-utils";
 
 export function ReadOnlyCardsBoard({ data }: { data: BoardDetailResponse }) {
   const [commentCard, setCommentCard] = useState<BoardCard | null>(null);
+  const [moderationTarget, setModerationTarget] = useState<{
+    card: BoardCard;
+    anchor: PostAnchor;
+  } | null>(null);
   const [cards, setCards] = useState<BoardCard[]>(() =>
     withBoardAnonymousAuthors(sortCards(data.cards), data.board),
   );
@@ -38,6 +46,11 @@ export function ReadOnlyCardsBoard({ data }: { data: BoardDetailResponse }) {
           <StreamFeedPost
             card={item}
             onOpenComments={() => setCommentCard(item)}
+            onLongPress={
+              item.isMine === true
+                ? undefined
+                : (anchor) => setModerationTarget({ card: item, anchor })
+            }
           />
         )}
         ItemSeparatorComponent={() => <View style={styles.separator} />}
@@ -68,6 +81,16 @@ export function ReadOnlyCardsBoard({ data }: { data: BoardDetailResponse }) {
           );
         }}
       />
+      {moderationTarget ? (
+        <PostModerationOverlay
+          card={moderationTarget.card}
+          anchor={moderationTarget.anchor}
+          onClose={() => setModerationTarget(null)}
+          onHidden={(cardId) => {
+            setCards((current) => current.filter((card) => card.id !== cardId));
+          }}
+        />
+      ) : null}
     </View>
   );
 }
