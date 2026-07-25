@@ -29,6 +29,7 @@ android/gradle.properties.local
 
 # Generated native and Expo directories
 .expo/
+.expo-release-check*/
 web-build/
 expo-env.d.ts
 .kotlin/
