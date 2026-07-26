@@ -42,13 +42,19 @@ jobs:
         with:
           node-version: 24
           cache: npm
-          cache-dependency-path: apps/mobile/package-lock.json
+          cache-dependency-path: |
+            package-lock.json
+            apps/mobile/package-lock.json
 
       - name: Setup Expo and EAS
         uses: expo/expo-github-action@v8
         with:
           eas-version: latest
           token: ${{ secrets.EXPO_TOKEN }}
+
+      - name: Install repository dependencies
+        working-directory: ${{ github.workspace }}
+        run: npm ci
 
       - name: Install mobile dependencies
         run: npm ci --legacy-peer-deps
