@@ -150,8 +150,8 @@ jobs:
     name: iOS production submission
     if: ${{ inputs.platform == 'all' || inputs.platform == 'ios' }}
     needs: validate
-    runs-on: ubuntu-latest
-    timeout-minutes: 120
+    runs-on: macos-15
+    timeout-minutes: 180
     defaults:
       run:
         working-directory: apps/mobile
@@ -178,16 +178,21 @@ jobs:
       - name: Build production IPA
         id: build
         run: |
-          eas build --platform ios --profile production --message "Aura Board ${{ inputs.expected_version }} GitHub release" --non-interactive --wait --json > "$RUNNER_TEMP/ios-build.json"
-          BUILD_ID=$(node -e 'const d=require(process.env.RUNNER_TEMP+"/ios-build.json"); const b=Array.isArray(d)?d[0]:d; process.stdout.write(b.id)')
-          BUILD_URL=$(node -e 'const d=require(process.env.RUNNER_TEMP+"/ios-build.json"); const b=Array.isArray(d)?d[0]:d; process.stdout.write(b.artifacts?.applicationArchiveUrl||b.artifacts?.buildUrl||"")')
-          BUILD_NUMBER=$(node -e 'const d=require(process.env.RUNNER_TEMP+"/ios-build.json"); const b=Array.isArray(d)?d[0]:d; process.stdout.write(String(b.appBuildVersion||""))')
-          echo "build_id=$BUILD_ID" >> "$GITHUB_OUTPUT"
-          echo "build_url=$BUILD_URL" >> "$GITHUB_OUTPUT"
+          IPA_PATH="$RUNNER_TEMP/aura-board-${{ inputs.expected_version }}.ipa"
+          eas build --platform ios --profile production --non-interactive --local --output "$IPA_PATH"
+          BUILD_NUMBER=$(unzip -p "$IPA_PATH" 'Payload/*.app/Info.plist' | plutil -extract CFBundleVersion raw -o - -)
+          echo "ipa_path=$IPA_PATH" >> "$GITHUB_OUTPUT"
           echo "build_number=$BUILD_NUMBER" >> "$GITHUB_OUTPUT"
 
       - name: Submit IPA to App Store Connect
-        run: eas submit --platform ios --profile production --id "${{ steps.build.outputs.build_id }}" --wait --non-interactive
+        run: eas submit --platform ios --profile production --path "${{ steps.build.outputs.ipa_path }}" --wait --non-interactive
+
+      - name: Preserve submitted IPA
+        uses: actions/upload-artifact@v4
+        with:
+          name: aura-board-ios-${{ inputs.expected_version }}-${{ steps.build.outputs.build_number }}
+          path: ${{ steps.build.outputs.ipa_path }}
+          retention-days: 14
 
       - name: Write iOS summary
         if: always()
@@ -197,7 +202,6 @@ jobs:
             echo "- Commit: $GITHUB_SHA"
             echo "- Version: ${{ inputs.expected_version }}"
             echo "- Build number: ${{ steps.build.outputs.build_number }}"
-            echo "- Build ID: ${{ steps.build.outputs.build_id }}"
-            echo "- IPA: ${{ steps.build.outputs.build_url }}"
+            echo "- Build: GitHub macOS runner (local EAS build)"
             echo "- Destination: App Store Connect"
           } >> "$GITHUB_STEP_SUMMARY"
