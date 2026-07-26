@@ -170,6 +170,19 @@ describe("OfficialSlimeSprite", () => {
     rerender(
       <OfficialSlimeSprite
         slimeColor="red"
+        backgroundSpritePath="/creatures/slimes/shop/backgrounds/cherry-cloud-ume/aura-package/cherry-cloud-ume-6s-128.gif"
+      />,
+    );
+    const logical128Background = container.querySelector<HTMLImageElement>(
+      'img[src="/creatures/slimes/shop/backgrounds/cherry-cloud-ume/aura-package/cherry-cloud-ume-6s-128.gif"]',
+    );
+    expect(logical128Background?.parentElement?.className).toContain(styles.backgroundFeather);
+    expect(logical128Background?.parentElement?.style.width).toBe("64px");
+    expect(logical128Background?.parentElement?.style.height).toBe("64px");
+
+    rerender(
+      <OfficialSlimeSprite
+        slimeColor="red"
         scale={4}
         backgroundSpritePath="creatures/slimes/shop/shooting-star-night-sky.gif"
       />,

@@ -21,14 +21,14 @@ export type OfficialSlimeSpriteProps = {
   evolution?: SlimeEvolution;
   action?: SlimeAction;
   equippedFloor?: EquippedFloor;
-  /** Integer source-pixel scale. The official artwork is authored at 64px. */
+  /** Integer logical viewport scale. Character art is authored at 64px; scene backgrounds may be authored at 64px or 128px while using the same logical viewport. */
   scale?: number;
   className?: string;
   alt?: string;
   dataSlimeColor?: SlimeColor;
   /** Legacy shop props are complete character images, not sheet overlays. */
   itemSpritePath?: string;
-  /** Optional scene art rendered behind every other 64x64 visual layer. */
+  /** Optional scene art rendered behind every other visual layer. Sources may be 64x64 or 128x128 while remaining in the fixed 64px logical viewport. */
   backgroundSpritePath?: string;
   /** Repeat a normally one-shot action when it is used as a passive preview. */
   repeat?: boolean;
@@ -193,8 +193,8 @@ export function OfficialSlimeSprite({
       data-floor-offset-source-pixels={staticFloor ? staticFloor.slimeFootY - staticFloor.surfaceY : 0}
     >
       {resolvedBackgroundSpritePath ? (
-        // Scene art is authored for the same logical 64x64 frame and remains
-        // below floor, character, prop, and crown layers.
+        // Scene art may be authored at 64x64 or 128x128. Keep it in the same
+        // logical 64x64 viewport below floor, character, prop, and crown layers.
         <div
           className={styles.backgroundFeather}
           data-background-feather="responsive-edge"

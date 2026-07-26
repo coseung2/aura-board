@@ -1,6 +1,10 @@
 {
   "status": "passed",
-  "id": "fizzy-soda-dream-v02",
+  "id": "cherry-cloud-ume",
+  "sourceSize": [
+    1024,
+    1024
+  ],
   "logicalSize": [
     128,
     128
@@ -9,16 +13,17 @@
     256,
     256
   ],
-  "frames": 72,
+  "downscaleFactor": 8,
+  "commonPalette": true,
+  "dithering": false,
+  "sourceFrames": 72,
   "fps": 12,
   "durationMs": 6000,
   "backgroundLocked": true,
-  "backgroundMismatchPixels": 0,
-  "commonPalette": true,
-  "dithering": false,
-  "motion": "hand-authored pixel bubble sprites on deterministic seamless paths",
+  "motionMaskCoverage1024": 0.52289,
+  "changedPixelPositions128": 9653,
   "gifs": {
-    "fizzy-soda-dream-v02-6s-128.gif": {
+    "cherry-cloud-ume-6s-128.gif": {
       "size": [
         128,
         128
@@ -26,7 +31,7 @@
       "encodedFrames": 72,
       "durationMs": 6000
     },
-    "fizzy-soda-dream-v02-6s-256.gif": {
+    "cherry-cloud-ume-6s-256.gif": {
       "size": [
         256,
         256

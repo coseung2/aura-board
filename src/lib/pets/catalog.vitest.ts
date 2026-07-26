@@ -18,7 +18,8 @@ const ANIMATED_BACKGROUND_CONTRACT = [
   ["cloud-garden", 700, "walking_reward", 200],
   ["dreamy-toy-room", 500, "assignment_reward", 100],
   ["enchanted-forest-canopy", 500, "reading_reward", 100],
-  ["fizzy-soda-dream", 1_000, "comment_reward", 300],
+  ["fizzy-soda-dream", 700, "comment_reward", 200],
+  ["cherry-cloud-ume", 1_000, "comment_reward", 300],
   ["four-season-sky", 1_000, "walking_reward", 300],
   ["jellyfish-ocean", 1_000, "reading_reward", 300],
   ["lavender-butterfly-sky", 700, "reading_reward", 200],
@@ -34,6 +35,7 @@ const ANIMATED_BACKGROUND_CONTRACT = [
 ] as const;
 
 const ANIMATED_BACKGROUND_IDS = ANIMATED_BACKGROUND_CONTRACT.map(([id]) => id);
+const LOGICAL_128_BACKGROUND_IDS = new Set(["fizzy-soda-dream", "cherry-cloud-ume"]);
 
 describe("slime catalog", () => {
   it("maps every color to the contracted effect at a 2% buff and 500 won", () => {
@@ -93,7 +95,7 @@ describe("slime catalog", () => {
     expect(isSlimeSceneBackground(legacyFloor)).toBe(false);
   });
 
-  it("registers exactly the 17 validated animated background variants", () => {
+  it("registers exactly the 18 validated animated background variants", () => {
     const imported = SLIME_SHOP_CATALOG.filter((item) =>
       item.spritePath.includes("/shop/backgrounds/"),
     );
@@ -104,15 +106,16 @@ describe("slime catalog", () => {
     for (const [index, item] of imported.entries()) {
       const [id, price, effectKey, effectBps] = ANIMATED_BACKGROUND_CONTRACT[index];
       const root = `/creatures/slimes/shop/backgrounds/${id}`;
+      const logicalSize = LOGICAL_128_BACKGROUND_IDS.has(id) ? 128 : 64;
       expect(item).toMatchObject({
         category: "background",
         floor: null,
         price,
         effectKey,
         effectBps,
-        spritePath: `${root}/aura-package/${id}-6s-64.gif`,
+        spritePath: `${root}/aura-package/${id}-6s-${logicalSize}.gif`,
         mobileSpritePath: `${root}/aura-package/${id}-6s-256.gif`,
-        staticSpritePath: `${root}/static-background-64.png`,
+        staticSpritePath: `${root}/static-background-${logicalSize}.png`,
       });
       expect(isSlimeSceneBackground(item)).toBe(true);
     }
@@ -121,13 +124,13 @@ describe("slime catalog", () => {
     )).toBe(false);
   });
 
-  it("uses the contracted 6/7/4 background price tiers", () => {
+  it("uses the contracted 6/8/4 background price tiers", () => {
     const imported = SLIME_SHOP_CATALOG.filter((item) =>
       item.spritePath.includes("/shop/backgrounds/"),
     );
 
     expect(imported.filter((item) => item.price === 1_000)).toHaveLength(6);
-    expect(imported.filter((item) => item.price === 700)).toHaveLength(7);
+    expect(imported.filter((item) => item.price === 700)).toHaveLength(8);
     expect(imported.filter((item) => item.price === 500)).toHaveLength(4);
     expect(imported.every((item) => item.effectKey !== "growth_speed")).toBe(true);
   });
