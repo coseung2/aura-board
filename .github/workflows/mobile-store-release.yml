@@ -19,6 +19,7 @@ on:
         type: string
 
 permissions:
+  id-token: write
   contents: read
 
 concurrency:
@@ -28,6 +29,7 @@ concurrency:
 jobs:
   validate:
     name: Validate release inputs
+    environment: production
     runs-on: ubuntu-latest
     timeout-minutes: 20
     defaults:
@@ -36,6 +38,16 @@ jobs:
     steps:
       - name: Checkout release commit
         uses: actions/checkout@v5
+
+      - name: Load release secrets from Infisical
+        uses: Infisical/secrets-action@v1.0.9
+        with:
+          method: oidc
+          identity-id: 2655fa57-76cd-4dab-bbd2-597bb61051d5
+          oidc-audience: https://github.com/coseung2
+          project-slug: mobile-release-d-w6g
+          env-slug: prod
+          secret-path: /aura-board
 
       - name: Setup Node 24
         uses: actions/setup-node@v6
@@ -92,6 +104,7 @@ jobs:
 
   android:
     name: Android AAB to closed testing
+    environment: production
     if: ${{ inputs.platform == 'all' || inputs.platform == 'android' }}
     needs: validate
     runs-on: ubuntu-latest
@@ -102,6 +115,16 @@ jobs:
     steps:
       - name: Checkout release commit
         uses: actions/checkout@v5
+
+      - name: Load release secrets from Infisical
+        uses: Infisical/secrets-action@v1.0.9
+        with:
+          method: oidc
+          identity-id: 2655fa57-76cd-4dab-bbd2-597bb61051d5
+          oidc-audience: https://github.com/coseung2
+          project-slug: mobile-release-d-w6g
+          env-slug: prod
+          secret-path: /aura-board
 
       - name: Setup Node 24
         uses: actions/setup-node@v6
@@ -118,6 +141,22 @@ jobs:
 
       - name: Install mobile dependencies
         run: npm ci --legacy-peer-deps
+
+      - name: Materialize Google Play service account
+        run: |
+          node - <<'NODE'
+          const fs = require("node:fs");
+          const path = require("node:path");
+          const serviceAccount = process.env.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON;
+          if (!serviceAccount) throw new Error("GOOGLE_PLAY_SERVICE_ACCOUNT_JSON was not loaded");
+          JSON.parse(serviceAccount);
+          const output = path.join(process.env.RUNNER_TEMP, "google-play-service-account.json");
+          fs.writeFileSync(output, serviceAccount + "\n", { encoding: "utf8", mode: 0o600 });
+          const easPath = path.join(process.cwd(), "eas.json");
+          const eas = JSON.parse(fs.readFileSync(easPath, "utf8"));
+          eas.submit.closed.android.serviceAccountKeyPath = output;
+          fs.writeFileSync(easPath, JSON.stringify(eas, null, 2) + "\n", { encoding: "utf8", mode: 0o600 });
+          NODE
 
       - name: Build production AAB
         id: build
@@ -146,8 +185,13 @@ jobs:
             echo "- Play track: alpha (closed testing)"
           } >> "$GITHUB_STEP_SUMMARY"
 
+      - name: Remove Google Play service account
+        if: always()
+        run: rm -f "$RUNNER_TEMP/google-play-service-account.json"
+
   ios:
     name: iOS production submission
+    environment: production
     if: ${{ inputs.platform == 'all' || inputs.platform == 'ios' }}
     needs: validate
     runs-on: macos-26
@@ -158,6 +202,16 @@ jobs:
     steps:
       - name: Checkout release commit
         uses: actions/checkout@v5
+
+      - name: Load release secrets from Infisical
+        uses: Infisical/secrets-action@v1.0.9
+        with:
+          method: oidc
+          identity-id: 2655fa57-76cd-4dab-bbd2-597bb61051d5
+          oidc-audience: https://github.com/coseung2
+          project-slug: mobile-release-d-w6g
+          env-slug: prod
+          secret-path: /aura-board
 
       - name: Setup Node 24
         uses: actions/setup-node@v6
