@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Image, type ImageProps } from "expo-image";
+import MaskedView from "@react-native-masked-view/masked-view";
 import { StyleSheet, View } from "react-native";
+import Svg, { Defs, LinearGradient, Rect, Stop } from "react-native-svg";
 import { layers } from "../../theme/tokens";
 import { getApiBase } from "../../lib/api";
 import {
@@ -14,11 +16,15 @@ import {
   type SlimeFrame,
 } from "../../lib/slime-assets";
 import { resolveSlimeRemoteSpriteUri } from "../../lib/slimes";
-import type { SlimeSpriteProps } from "./slime-types";
+import {
+  sceneBackgroundFeatherInset,
+  type SlimeSpriteProps,
+} from "./slime-types";
 
 const DEFAULT_DISPLAY_SCALE = 1;
 const TRAMPOLINE_FLOOR_SOURCE = require("../../assets/slimes/shared/trampoline-floor.png");
 type LocalImageSource = ImageProps["source"];
+type BackgroundEdge = "left" | "right" | "top" | "bottom";
 
 function normalizedDisplayScale(value: number | undefined): number {
   if (!Number.isFinite(value)) return DEFAULT_DISPLAY_SCALE;
@@ -51,6 +57,85 @@ function frameOffset(
       (frame.spriteSourceSize.y - frame.frame.y) * imageScale * scale +
       offsetY,
   };
+}
+
+function BackgroundEdgeMask({
+  edge,
+  width,
+  height,
+}: {
+  edge: BackgroundEdge;
+  width: number;
+  height: number;
+}) {
+  const horizontal = edge === "left" || edge === "right";
+  const inset = sceneBackgroundFeatherInset(horizontal ? width : height);
+  const gradientId = `scene-background-feather-${edge}`;
+  const fromEdge = edge === "right" || edge === "bottom" ? 1 : 0;
+  const toEdge = 1 - fromEdge;
+  const edgeOffset = horizontal ? inset / width : inset / height;
+
+  return (
+    <Svg width={width} height={height} viewBox={`0 0 ${width} ${height}`}>
+      <Defs>
+        <LinearGradient
+          id={gradientId}
+          x1={horizontal ? fromEdge : 0}
+          y1={horizontal ? 0 : fromEdge}
+          x2={horizontal ? toEdge : 0}
+          y2={horizontal ? 0 : toEdge}
+          gradientUnits="objectBoundingBox"
+        >
+          <Stop offset={0} stopColor="white" stopOpacity={0} />
+          <Stop offset={edgeOffset} stopColor="white" stopOpacity={1} />
+          <Stop offset={1} stopColor="white" stopOpacity={1} />
+        </LinearGradient>
+      </Defs>
+      <Rect width={width} height={height} fill={`url(#${gradientId})`} />
+    </Svg>
+  );
+}
+
+function FeatheredBackground({
+  backgroundUri,
+  sizeStyle,
+}: {
+  backgroundUri: string;
+  sizeStyle: { width: number; height: number };
+}) {
+  const width = Math.max(1, sizeStyle.width);
+  const height = Math.max(1, sizeStyle.height);
+  let content = (
+    <Image
+      source={{ uri: backgroundUri }}
+      style={StyleSheet.absoluteFill}
+      contentFit="cover"
+      recyclingKey={`background:${backgroundUri}`}
+      transition={0}
+      accessible={false}
+    />
+  );
+
+  for (const edge of ["left", "right", "top", "bottom"] as const) {
+    content = (
+      <MaskedView
+        style={StyleSheet.absoluteFill}
+        maskElement={<BackgroundEdgeMask edge={edge} width={width} height={height} />}
+      >
+        {content}
+      </MaskedView>
+    );
+  }
+
+  return (
+    <View
+      pointerEvents="none"
+      style={[styles.layer, styles.backgroundLayer, sizeStyle]}
+      accessible={false}
+    >
+      {content}
+    </View>
+  );
 }
 
 /**
@@ -147,14 +232,7 @@ export function SlimeSprite({
     : "";
   const renderBackgroundLayer = (sizeStyle: { width: number; height: number }) =>
     backgroundUri ? (
-      <Image
-        source={{ uri: backgroundUri }}
-        style={[styles.layer, styles.backgroundLayer, sizeStyle]}
-        contentFit="cover"
-        recyclingKey={`background:${backgroundUri}`}
-        transition={0}
-        accessible={false}
-      />
+      <FeatheredBackground backgroundUri={backgroundUri} sizeStyle={sizeStyle} />
     ) : null;
 
   if (itemSpritePath) {

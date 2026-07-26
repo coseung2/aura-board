@@ -1,0 +1,197 @@
+name: Mobile Store Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      platform:
+        description: Store platform to build and submit
+        required: true
+        default: all
+        type: choice
+        options:
+          - all
+          - android
+          - ios
+      expected_version:
+        description: App version that must be present in app.config.ts
+        required: true
+        default: 1.0.2
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: mobile-store-release
+  cancel-in-progress: false
+
+jobs:
+  validate:
+    name: Validate release inputs
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: apps/mobile
+    steps:
+      - name: Checkout release commit
+        uses: actions/checkout@v5
+
+      - name: Setup Node 24
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: apps/mobile/package-lock.json
+
+      - name: Setup Expo and EAS
+        uses: expo/expo-github-action@v8
+        with:
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+
+      - name: Install mobile dependencies
+        run: npm ci --legacy-peer-deps
+
+      - name: Verify app identity and version
+        env:
+          EXPECTED_VERSION: ${{ inputs.expected_version }}
+        run: |
+          npx expo config --json > "$RUNNER_TEMP/expo-config.json"
+          node - <<'NODE'
+          const fs = require("node:fs");
+          const config = JSON.parse(fs.readFileSync(process.env.RUNNER_TEMP + "/expo-config.json", "utf8"));
+          const expected = process.env.EXPECTED_VERSION;
+          const failures = [];
+          if (config.version !== expected) failures.push(`version=${config.version}`);
+          if (config.android?.package !== "com.auraboard.app") failures.push(`android.package=${config.android?.package}`);
+          if (config.ios?.bundleIdentifier !== "com.auraboard.app") failures.push(`ios.bundleIdentifier=${config.ios?.bundleIdentifier}`);
+          if (failures.length) throw new Error(`Release identity mismatch: ${failures.join(", ")}`);
+          console.log(`Validated Aura Board ${config.version} (${config.android.package}).`);
+          NODE
+
+      - name: Run mobile release checks
+        run: |
+          npm run typecheck
+          npm run design:check
+          npm run release:check
+          npm run assets:check
+
+      - name: Inspect iOS upload archive
+        if: ${{ inputs.platform == 'all' || inputs.platform == 'ios' }}
+        run: |
+          eas build:inspect --platform ios --stage archive --profile production --output "$RUNNER_TEMP/ios-archive" --force
+          test -f "$RUNNER_TEMP/ios-archive/apps/mobile/modules/aura-board-health-connect/ios/AuraBoardHealthConnectModule.swift"
+          test -f "$RUNNER_TEMP/ios-archive/apps/mobile/modules/aura-board-health-connect/ios/AuraBoardHealthConnect.podspec"
+
+  android:
+    name: Android AAB to closed testing
+    if: ${{ inputs.platform == 'all' || inputs.platform == 'android' }}
+    needs: validate
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    defaults:
+      run:
+        working-directory: apps/mobile
+    steps:
+      - name: Checkout release commit
+        uses: actions/checkout@v5
+
+      - name: Setup Node 24
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: apps/mobile/package-lock.json
+
+      - name: Setup Expo and EAS
+        uses: expo/expo-github-action@v8
+        with:
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+
+      - name: Install mobile dependencies
+        run: npm ci --legacy-peer-deps
+
+      - name: Build production AAB
+        id: build
+        run: |
+          eas build --platform android --profile production --message "Aura Board ${{ inputs.expected_version }} GitHub release" --non-interactive --wait --json > "$RUNNER_TEMP/android-build.json"
+          BUILD_ID=$(node -e 'const d=require(process.env.RUNNER_TEMP+"/android-build.json"); const b=Array.isArray(d)?d[0]:d; process.stdout.write(b.id)')
+          BUILD_URL=$(node -e 'const d=require(process.env.RUNNER_TEMP+"/android-build.json"); const b=Array.isArray(d)?d[0]:d; process.stdout.write(b.artifacts?.applicationArchiveUrl||b.artifacts?.buildUrl||"")')
+          BUILD_NUMBER=$(node -e 'const d=require(process.env.RUNNER_TEMP+"/android-build.json"); const b=Array.isArray(d)?d[0]:d; process.stdout.write(String(b.appBuildVersion||""))')
+          echo "build_id=$BUILD_ID" >> "$GITHUB_OUTPUT"
+          echo "build_url=$BUILD_URL" >> "$GITHUB_OUTPUT"
+          echo "build_number=$BUILD_NUMBER" >> "$GITHUB_OUTPUT"
+
+      - name: Submit AAB to Google Play closed testing
+        run: eas submit --platform android --profile closed --id "${{ steps.build.outputs.build_id }}" --wait --non-interactive
+
+      - name: Write Android summary
+        if: always()
+        run: |
+          {
+            echo "## Android closed testing"
+            echo "- Commit: $GITHUB_SHA"
+            echo "- Version: ${{ inputs.expected_version }}"
+            echo "- Version code: ${{ steps.build.outputs.build_number }}"
+            echo "- Build ID: ${{ steps.build.outputs.build_id }}"
+            echo "- AAB: ${{ steps.build.outputs.build_url }}"
+            echo "- Play track: alpha (closed testing)"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  ios:
+    name: iOS production submission
+    if: ${{ inputs.platform == 'all' || inputs.platform == 'ios' }}
+    needs: validate
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    defaults:
+      run:
+        working-directory: apps/mobile
+    steps:
+      - name: Checkout release commit
+        uses: actions/checkout@v5
+
+      - name: Setup Node 24
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: apps/mobile/package-lock.json
+
+      - name: Setup Expo and EAS
+        uses: expo/expo-github-action@v8
+        with:
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+
+      - name: Install mobile dependencies
+        run: npm ci --legacy-peer-deps
+
+      - name: Build production IPA
+        id: build
+        run: |
+          eas build --platform ios --profile production --message "Aura Board ${{ inputs.expected_version }} GitHub release" --non-interactive --wait --json > "$RUNNER_TEMP/ios-build.json"
+          BUILD_ID=$(node -e 'const d=require(process.env.RUNNER_TEMP+"/ios-build.json"); const b=Array.isArray(d)?d[0]:d; process.stdout.write(b.id)')
+          BUILD_URL=$(node -e 'const d=require(process.env.RUNNER_TEMP+"/ios-build.json"); const b=Array.isArray(d)?d[0]:d; process.stdout.write(b.artifacts?.applicationArchiveUrl||b.artifacts?.buildUrl||"")')
+          BUILD_NUMBER=$(node -e 'const d=require(process.env.RUNNER_TEMP+"/ios-build.json"); const b=Array.isArray(d)?d[0]:d; process.stdout.write(String(b.appBuildVersion||""))')
+          echo "build_id=$BUILD_ID" >> "$GITHUB_OUTPUT"
+          echo "build_url=$BUILD_URL" >> "$GITHUB_OUTPUT"
+          echo "build_number=$BUILD_NUMBER" >> "$GITHUB_OUTPUT"
+
+      - name: Submit IPA to App Store Connect
+        run: eas submit --platform ios --profile production --id "${{ steps.build.outputs.build_id }}" --wait --non-interactive
+
+      - name: Write iOS summary
+        if: always()
+        run: |
+          {
+            echo "## iOS production submission"
+            echo "- Commit: $GITHUB_SHA"
+            echo "- Version: ${{ inputs.expected_version }}"
+            echo "- Build number: ${{ steps.build.outputs.build_number }}"
+            echo "- Build ID: ${{ steps.build.outputs.build_id }}"
+            echo "- IPA: ${{ steps.build.outputs.build_url }}"
+            echo "- Destination: App Store Connect"
+          } >> "$GITHUB_STEP_SUMMARY"

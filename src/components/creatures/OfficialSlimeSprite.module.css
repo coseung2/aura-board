@@ -25,6 +25,52 @@
   transition: none;
 }
 
+.backgroundFeather {
+  --background-edge-feather: 6.25%;
+  position: absolute;
+  left: 0;
+  top: 0;
+  z-index: 0;
+  pointer-events: none;
+  user-select: none;
+  mask-image:
+    linear-gradient(
+      to right,
+      transparent 0,
+      #000 var(--background-edge-feather),
+      #000 calc(100% - var(--background-edge-feather)),
+      transparent 100%
+    ),
+    linear-gradient(
+      to bottom,
+      transparent 0,
+      #000 var(--background-edge-feather),
+      #000 calc(100% - var(--background-edge-feather)),
+      transparent 100%
+    );
+  mask-composite: intersect;
+  mask-repeat: no-repeat;
+  mask-size: 100% 100%;
+  -webkit-mask-image:
+    linear-gradient(
+      to right,
+      transparent 0,
+      #000 var(--background-edge-feather),
+      #000 calc(100% - var(--background-edge-feather)),
+      transparent 100%
+    ),
+    linear-gradient(
+      to bottom,
+      transparent 0,
+      #000 var(--background-edge-feather),
+      #000 calc(100% - var(--background-edge-feather)),
+      transparent 100%
+  );
+  -webkit-mask-composite: source-in;
+  -webkit-mask-repeat: no-repeat;
+  -webkit-mask-size: 100% 100%;
+}
+
 .background {
   z-index: 0;
 }

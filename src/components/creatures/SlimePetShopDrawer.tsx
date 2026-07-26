@@ -137,6 +137,9 @@ export function SlimePetShopDrawer({
     const previewColor = wardrobeColor ?? "blue";
     const itemSpritePath = slimeItemSpritePath(item, previewColor);
     const sceneBackground = isSlimeSceneBackground(item);
+    const effectLabel = item.effectKey && item.effectBps
+      ? `${EFFECT_LABELS[item.effectKey]} +${formatBpsPercent(item.effectBps)}`
+      : null;
     const isBall = item.key.startsWith("slime-ball-");
 
     return (
@@ -156,7 +159,7 @@ export function SlimePetShopDrawer({
         </div>
         <div className={styles.shopItemCopy}>
           <h3>{item.labelKo}</h3>
-          <p>{shopItemCategoryLabel(item)}</p>
+          <p>{effectLabel ?? shopItemCategoryLabel(item)}</p>
           <strong>{item.price.toLocaleString("ko-KR")}{unitLabel}</strong>
         </div>
         {!wardrobeColor && owned && !repeatable ? (

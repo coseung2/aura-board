@@ -16,3 +16,9 @@ export type LiveStepUpdateStatus =
   | "started"
   | "permission_required"
   | "unavailable";
+
+export type MotionPermissionStatus =
+  | "authorized"
+  | "not_determined"
+  | "permission_required"
+  | "unavailable";

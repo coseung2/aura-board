@@ -66,6 +66,35 @@ public final class AuraBoardHealthConnectModule: Module {
       }
     }.runOnQueue(.main)
 
+    AsyncFunction("getMotionPermissionStatus") { () -> String in
+      self.motionPermissionStatus()
+    }.runOnQueue(.main)
+
+    AsyncFunction("requestMotionPermission") { (promise: Promise) in
+      let status = self.motionPermissionStatus()
+      guard status == "not_determined" else {
+        promise.resolve(status)
+        return
+      }
+
+      let end = Date()
+      self.pedometer.queryPedometerData(
+        from: end.addingTimeInterval(-1),
+        to: end
+      ) { [weak self] _, error in
+        guard let self else {
+          promise.resolve("unavailable")
+          return
+        }
+
+        if error != nil {
+          promise.resolve(self.motionPermissionStatus())
+          return
+        }
+        promise.resolve(self.motionPermissionStatus())
+      }
+    }.runOnQueue(.main)
+
     AsyncFunction("readDailyStats") { (startDay: String, endDay: String, promise: Promise) in
       Task {
         do {
@@ -104,6 +133,23 @@ public final class AuraBoardHealthConnectModule: Module {
 
   private var requiredTypes: Set<HKObjectType> {
     [stepType]
+  }
+
+  private func motionPermissionStatus() -> String {
+    guard CMPedometer.isStepCountingAvailable() else {
+      return "unavailable"
+    }
+
+    switch CMPedometer.authorizationStatus() {
+    case .authorized:
+      return "authorized"
+    case .notDetermined:
+      return "not_determined"
+    case .denied, .restricted:
+      return "permission_required"
+    @unknown default:
+      return "unavailable"
+    }
   }
 
   private func startLiveStepUpdates() -> String {

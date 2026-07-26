@@ -3,6 +3,8 @@ import {
   SLIME_CATALOG,
   SLIME_SET_CATALOG,
   getSlimeDefinition,
+  getSlimeShopItem,
+  isSlimeSceneBackground,
 } from "./catalog";
 import type {
   SlimeAccessoryDefinition,
@@ -11,6 +13,7 @@ import type {
   SlimeEffectKey,
   SlimeEffectsPayload,
   SlimeColor,
+  SlimeShopItem,
 } from "./types";
 import { SLIME_EFFECT_KEYS } from "./types";
 
@@ -28,6 +31,11 @@ export type SlimeBuffInput = Pick<
 export type SlimeAccessoryInput = Pick<
   SlimeAccessoryDefinition,
   "key" | "labelKo" | "setKey"
+>;
+
+export type SlimeShopEffectInput = Pick<
+  SlimeShopItem,
+  "key" | "category" | "floor" | "labelKo" | "effectKey" | "effectBps"
 >;
 
 function emptyTotals(): Record<SlimeEffectKey, number> {
@@ -62,6 +70,7 @@ export function calculateSlimeEffects(
   slimes: readonly SlimeBuffInput[],
   accessories: readonly SlimeAccessoryInput[] = [],
   capBps = SLIME_EFFECT_CAP_BPS,
+  shopItems: readonly SlimeShopEffectInput[] = [],
 ): SlimeEffectsPayload {
   const uncappedTotals = emptyTotals();
   const breakdown: SlimeBuffBreakdownItem[] = [];
@@ -101,6 +110,23 @@ export function calculateSlimeEffects(
     });
   }
 
+  for (const item of shopItems) {
+    if (
+      !item.effectKey ||
+      !SLIME_EFFECT_KEYS.includes(item.effectKey)
+    ) continue;
+    const bps = safeBps(item.effectBps ?? 0);
+    if (bps === 0) continue;
+    uncappedTotals[item.effectKey] += bps;
+    breakdown.push({
+      source: isSlimeSceneBackground(item) ? "background" : "item",
+      key: item.key,
+      label: item.labelKo,
+      effectKey: item.effectKey,
+      bps,
+    });
+  }
+
   const totals = emptyTotals();
   for (const key of SLIME_EFFECT_KEYS) {
     totals[key] = Math.min(safeCap, uncappedTotals[key]);
@@ -119,7 +145,7 @@ export function calculateSlimeEffects(
 /** Resolve catalog keys for client and server effect summaries. */
 export function calculateCatalogSlimeEffects(
   slimeKeys: readonly string[],
-  accessoryKeys: readonly string[] = [],
+  equippedItemKeys: readonly string[] = [],
   capBps = SLIME_EFFECT_CAP_BPS,
   growthStages: Partial<Record<SlimeColor, number>> = {},
 ): SlimeEffectsPayload {
@@ -127,8 +153,13 @@ export function calculateCatalogSlimeEffects(
     .map((key) => getSlimeDefinition(key))
     .filter((slime): slime is SlimeDefinition => Boolean(slime))
     .map((slime) => ({ ...slime, growthStage: growthStages[slime.color] }));
-  const accessories = accessoryKeys
+  const distinctItemKeys = [...new Set(equippedItemKeys)];
+  const accessories = distinctItemKeys
     .map((key) => SLIME_ACCESSORY_CATALOG.find((item) => item.key === key))
     .filter((item): item is SlimeAccessoryDefinition => Boolean(item));
-  return calculateSlimeEffects(slimes, accessories, capBps);
+  const shopItems = distinctItemKeys
+    .map((key) => getSlimeShopItem(key))
+    .filter((item): item is SlimeShopItem => Boolean(item))
+    .filter((item) => item.effectKey !== undefined && item.effectBps !== undefined);
+  return calculateSlimeEffects(slimes, accessories, capBps, shopItems);
 }

@@ -2,6 +2,7 @@ import { act, render } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { OfficialSlimeSprite } from "./OfficialSlimeSprite";
+import styles from "./OfficialSlimeSprite.module.css";
 
 describe("OfficialSlimeSprite", () => {
   afterEach(() => {
@@ -126,7 +127,7 @@ describe("OfficialSlimeSprite", () => {
     ).toBeTruthy();
   });
 
-  it("renders a scene background below a legacy floor and complete prop", () => {
+  it("feathers only the scene background while preserving layer order and accessibility", () => {
     const { container, rerender } = render(
       <OfficialSlimeSprite
         slimeColor="red"
@@ -145,12 +146,23 @@ describe("OfficialSlimeSprite", () => {
     const prop = container.querySelector<HTMLImageElement>(
       'img[src="https://cdn.example.test/slime-prop.gif"]',
     );
+    const feather = background?.parentElement;
     expect(background).toBeTruthy();
     expect(floor).toBeTruthy();
     expect(prop).toBeTruthy();
+    expect(feather?.className).toContain(styles.backgroundFeather);
+    expect(feather?.getAttribute("data-background-feather")).toBe("responsive-edge");
+    expect(feather?.style.width).toBe("64px");
+    expect(feather?.style.height).toBe("64px");
+    expect(background?.className).toContain(styles.background);
+    expect(background?.getAttribute("alt")).toBe("");
+    expect(background?.getAttribute("aria-hidden")).toBe("true");
     expect(
       Array.from(container.querySelectorAll("img")).indexOf(background!),
     ).toBeLessThan(Array.from(container.querySelectorAll("img")).indexOf(floor!));
+    expect(
+      Array.from(container.querySelectorAll("img")).indexOf(floor!),
+    ).toBeLessThan(Array.from(container.querySelectorAll("img")).indexOf(prop!));
     expect(container.firstElementChild?.getAttribute("data-background-sprite-path")).toBe(
       "https://cdn.example.test/shooting-star-night-sky.gif",
     );
@@ -158,13 +170,16 @@ describe("OfficialSlimeSprite", () => {
     rerender(
       <OfficialSlimeSprite
         slimeColor="red"
+        scale={4}
         backgroundSpritePath="creatures/slimes/shop/shooting-star-night-sky.gif"
       />,
     );
-    expect(
-      container.querySelector(
-        'img[src="/creatures/slimes/shop/shooting-star-night-sky.gif"]',
-      ),
-    ).toBeTruthy();
+    const scaledBackground = container.querySelector<HTMLImageElement>(
+      'img[src="/creatures/slimes/shop/shooting-star-night-sky.gif"]',
+    );
+    expect(scaledBackground).toBeTruthy();
+    expect(scaledBackground?.parentElement?.className).toContain(styles.backgroundFeather);
+    expect(scaledBackground?.parentElement?.style.width).toBe("256px");
+    expect(scaledBackground?.parentElement?.style.height).toBe("256px");
   });
 });

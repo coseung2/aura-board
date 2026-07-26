@@ -35,6 +35,52 @@ describe("slime buff math", () => {
     expect(complete.breakdown.at(-1)).toMatchObject({ source: "set", bps: 180 });
   });
 
+  it("adds an equipped scene background once per distinct item key", () => {
+    const effects = calculateCatalogSlimeEffects([], [
+      "cloud-garden-background",
+      "cloud-garden-background",
+    ]);
+
+    expect(effects.totals.walking_reward).toBe(200);
+    expect(effects.totalBps).toBe(200);
+    expect(effects.breakdown).toEqual([
+      expect.objectContaining({
+        source: "background",
+        key: "cloud-garden-background",
+        effectKey: "walking_reward",
+        bps: 200,
+      }),
+    ]);
+  });
+
+  it("adds lower-tier floor, prop, drink, and legacy scene buffs by item theme", () => {
+    const effects = calculateCatalogSlimeEffects([], [
+      "grass-floor-background",
+      "slime-ball-baseball",
+      "slime-blue-drink-lemonade",
+      "shooting-star-night-sky-background",
+      "shooting-star-night-sky-background",
+    ]);
+
+    expect(effects.totals.walking_reward).toBe(200);
+    expect(effects.totals.comment_reward).toBe(100);
+    expect(effects.totals.assignment_reward).toBe(100);
+    expect(effects.totalBps).toBe(400);
+    expect(effects.breakdown.map(({ source, bps }) => [source, bps])).toEqual([
+      ["item", 100],
+      ["item", 100],
+      ["item", 100],
+      ["background", 100],
+    ]);
+  });
+
+  it("does not grant an equipment buff to consumable or unknown item keys", () => {
+    const effects = calculateCatalogSlimeEffects([], ["slime-cookie", "unknown-item"]);
+
+    expect(effects.totalBps).toBe(0);
+    expect(effects.breakdown).toEqual([]);
+  });
+
   it("sums effects without a ceiling", () => {
     const effects = calculateSlimeEffects(
       [

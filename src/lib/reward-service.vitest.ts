@@ -22,6 +22,7 @@ function fakeTx(
   counts: number[] = [0, 0],
   colors: string[] = [],
   rewardConfig: Record<string, number> | null = null,
+  equippedItemKeys: string[] = [],
 ) {
   return {
     avatarRewardConfig: { findUnique: vi.fn(async () => rewardConfig) },
@@ -39,7 +40,11 @@ function fakeTx(
         })),
       ),
     },
-    studentCreatureItem: { findMany: vi.fn(async () => []) },
+    studentCreatureItem: {
+      findMany: vi.fn(async () =>
+        equippedItemKeys.map((itemKey) => ({ itemKey })),
+      ),
+    },
   } as unknown as Prisma.TransactionClient;
 }
 
@@ -101,6 +106,28 @@ describe("reward service caps and buffs", () => {
     });
     expect(result).toMatchObject({ baseAmount: 51, buffBps: 200, amount: 52 });
     expect(mocks.award).toHaveBeenCalledWith(expect.objectContaining({ amount: 52 }));
+  });
+
+  it("applies an equipped scene background through the existing item lookup", async () => {
+    const tx = fakeTx(
+      [0, 0],
+      [],
+      null,
+      ["jellyfish-ocean-background"],
+    );
+    const result = await awardCappedPolicyReward({
+      tx,
+      studentId: "student-1",
+      classroomId: "classroom-1",
+      accountId: "account-1",
+      area: "reading",
+      sourceRef: "reading-background-1",
+      baseAmount: 100,
+      note: "독서 기록 보상",
+    });
+
+    expect(result).toMatchObject({ baseAmount: 100, buffBps: 300, amount: 103 });
+    expect(tx.studentCreatureItem.findMany).toHaveBeenCalledTimes(1);
   });
 
   it("hard-clamps configurable frequency and buff guardrails", async () => {

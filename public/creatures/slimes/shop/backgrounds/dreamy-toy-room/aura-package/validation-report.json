@@ -1,0 +1,37 @@
+{
+  "status": "passed",
+  "id": "dreamy-toy-room",
+  "logicalSize": [
+    64,
+    64
+  ],
+  "mobileSize": [
+    256,
+    256
+  ],
+  "sourceFrames": 72,
+  "fps": 12,
+  "durationMs": 6000,
+  "backgroundLocked": true,
+  "backgroundMismatchPixels": 0,
+  "dynamicMaskCoverage": 0.240723,
+  "changedPixelPositions": 978,
+  "gifs": {
+    "dreamy-toy-room-6s-64.gif": {
+      "size": [
+        64,
+        64
+      ],
+      "encodedFrames": 72,
+      "durationMs": 6000
+    },
+    "dreamy-toy-room-6s-256.gif": {
+      "size": [
+        256,
+        256
+      ],
+      "encodedFrames": 72,
+      "durationMs": 6000
+    }
+  }
+}

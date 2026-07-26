@@ -1,0 +1,37 @@
+{
+  "status": "passed",
+  "id": "mushroom-village",
+  "logicalSize": [
+    64,
+    64
+  ],
+  "mobileSize": [
+    256,
+    256
+  ],
+  "sourceFrames": 72,
+  "fps": 12,
+  "durationMs": 6000,
+  "backgroundLocked": true,
+  "backgroundMismatchPixels": 0,
+  "dynamicMaskCoverage": 0.211426,
+  "changedPixelPositions": 830,
+  "gifs": {
+    "mushroom-village-6s-64.gif": {
+      "size": [
+        64,
+        64
+      ],
+      "encodedFrames": 72,
+      "durationMs": 6000
+    },
+    "mushroom-village-6s-256.gif": {
+      "size": [
+        256,
+        256
+      ],
+      "encodedFrames": 72,
+      "durationMs": 6000
+    }
+  }
+}

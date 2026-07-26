@@ -60,6 +60,10 @@ export type SlimeShopItem = {
   labelKo: string;
   price: number;
   spritePath: string;
+  mobileSpritePath?: string;
+  staticSpritePath?: string;
+  effectKey?: string;
+  effectBps?: number;
 };
 
 export type SlimeShopFilter =
@@ -136,6 +140,12 @@ export function resolveEquippedSceneBackground(
     if (item && isSceneBackgroundItem(item)) equipped = item;
   }
   return equipped;
+}
+
+export function selectSceneBackgroundSpritePath(
+  item: Pick<SlimeShopItem, "mobileSpritePath" | "spritePath">,
+): string {
+  return item.mobileSpritePath || item.spritePath;
 }
 
 export const SLIME_COOKIE_ITEM_KEY = "slime-cookie";
@@ -339,6 +349,15 @@ function normalizeShopCatalog(value: unknown): SlimeShopItem[] {
         labelKo: typeof entry.labelKo === "string" ? entry.labelKo : entry.key,
         price: Math.max(0, Math.trunc(numberValue(entry.price))),
         spritePath: typeof entry.spritePath === "string" ? entry.spritePath : "",
+        mobileSpritePath:
+          typeof entry.mobileSpritePath === "string" ? entry.mobileSpritePath : undefined,
+        staticSpritePath:
+          typeof entry.staticSpritePath === "string" ? entry.staticSpritePath : undefined,
+        effectKey: typeof entry.effectKey === "string" ? entry.effectKey : undefined,
+        effectBps:
+          typeof entry.effectBps === "number"
+            ? Math.max(0, Math.trunc(entry.effectBps))
+            : undefined,
       },
     ];
   });

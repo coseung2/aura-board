@@ -74,6 +74,10 @@ export type SlimeShopItem = {
   readonly labelKo: string;
   readonly price: number;
   readonly spritePath: string;
+  readonly mobileSpritePath?: string;
+  readonly staticSpritePath?: string;
+  readonly effectKey?: SlimeEffectKey;
+  readonly effectBps?: number;
 };
 
 export type SlimeBallShopItem = SlimeShopItem & {
@@ -96,7 +100,7 @@ export type SlimeSetDefinition = {
 };
 
 export type SlimeBuffBreakdownItem = {
-  readonly source: "slime" | "set";
+  readonly source: "slime" | "set" | "background" | "item";
   readonly key: string;
   readonly label: string;
   readonly effectKey: SlimeEffectKey;

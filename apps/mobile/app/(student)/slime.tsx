@@ -50,6 +50,7 @@ import {
   normalizeSlimeClassroom,
   normalizeSlimeHome,
   resolveEquippedSceneBackground,
+  selectSceneBackgroundSpritePath,
   shopFilterForItem,
   slimeBuffBpsForStage,
   slimeBallSpritePath,
@@ -119,6 +120,12 @@ const SLIME_EFFECT_LABELS: Record<string, string> = {
   assignment_reward: "과제 보상",
   comment_reward: "댓글 보상",
 };
+
+function shopItemBuffLabel(item: SlimeShopItem): string | null {
+  if (!item.effectKey || !item.effectBps) return null;
+  const label = SLIME_EFFECT_LABELS[item.effectKey] ?? item.effectKey;
+  return `${label} +${item.effectBps / 100}%`;
+}
 
 function localSource(value: unknown): LocalImageSource {
   return value as LocalImageSource;
@@ -717,6 +724,12 @@ export default function StudentSlimeScreen() {
                 const classBallSpritePath = representative
                   ? slimeBallSpritePath(representative.equippedItemKeys, representative.color)
                   : undefined;
+                const classBackground = representative
+                  ? resolveEquippedSceneBackground(
+                      representative.equippedItemKeys,
+                      home?.shopCatalog ?? [],
+                    )
+                  : null;
                 return (
                   <View key={student.id} style={styles.classmateCard}>
                     <View style={styles.classmateSprite}>
@@ -730,10 +743,9 @@ export default function StudentSlimeScreen() {
                             repeat={classAction !== "idle"}
                             itemSpritePath={classBallSpritePath}
                             backgroundSpritePath={
-                              resolveEquippedSceneBackground(
-                                representative.equippedItemKeys,
-                                home?.shopCatalog ?? [],
-                              )?.spritePath
+                              classBackground
+                                ? selectSceneBackgroundSpritePath(classBackground)
+                                : undefined
                             }
                             accessibilityLabel={`${student.name}의 ${SLIME_COLOR_LABELS[representative.color]} 대표 펫`}
                           />
@@ -778,6 +790,10 @@ export default function StudentSlimeScreen() {
             const effectLabel = SLIME_EFFECT_LABELS[catalogItem?.effectKey ?? ""] ?? "기본 효과";
             const petItems = home?.equippedItemsByColor[itemColor] ?? [];
             const petFloor = home?.equippedFloorByColor[itemColor] ?? "none";
+            const petBackground = resolveEquippedSceneBackground(
+              petItems,
+              home?.shopCatalog ?? [],
+            );
             const petHasDrink = Boolean(lemonade && petItems.includes(lemonade.key));
             const manualAction = manualActions[itemColor];
             const petAction: SlimeAction = manualAction
@@ -858,7 +874,9 @@ export default function StudentSlimeScreen() {
                       repeat={!manualAction && petAction !== "idle"}
                       itemSpritePath={slimeBallSpritePath(petItems, itemColor)}
                       backgroundSpritePath={
-                        resolveEquippedSceneBackground(petItems, home?.shopCatalog ?? [])?.spritePath
+                        petBackground
+                          ? selectSceneBackgroundSpritePath(petBackground)
+                          : undefined
                       }
                       accessibilityLabel={`${SLIME_COLOR_LABELS[itemColor]} 슬라임`}
                       onComplete={manualAction
@@ -1024,6 +1042,7 @@ export default function StudentSlimeScreen() {
               const ownedItem = home?.ownedItemKeys.includes(item.key) ?? false;
               const busy = busyItemKey === item.key;
               const canInteract = !ownedItem && busyItemKey === null;
+              const buffLabel = shopItemBuffLabel(item);
               const status = busy
                 ? "처리 중…"
                 : ownedItem
@@ -1045,13 +1064,13 @@ export default function StudentSlimeScreen() {
                       action="idle"
                       equippedFloor="none"
                       displayScale={0.25}
-                      backgroundSpritePath={item.spritePath}
+                      backgroundSpritePath={selectSceneBackgroundSpritePath(item)}
                       accessibilityLabel={`${item.labelKo} 미리보기`}
                     />
                   </View>
                   <View style={styles.floorCopy}>
                     <Text style={styles.floorTitle}>{item.labelKo}</Text>
-                    <Text style={styles.floorSubtitle}>배경</Text>
+                    <Text style={styles.floorSubtitle}>{buffLabel ?? "배경"}</Text>
                   </View>
                   <View style={styles.floorStatus}>
                     {busy ? <ActivityIndicator size="small" color={colors.accent} /> : null}
@@ -1102,7 +1121,7 @@ export default function StudentSlimeScreen() {
                   </View>
                   <View style={styles.floorCopy}>
                     <Text style={styles.floorTitle}>{item.labelKo || floorLabel(floor)}</Text>
-                    <Text style={styles.floorSubtitle}>{floorLabel(floor)}</Text>
+                    <Text style={styles.floorSubtitle}>{shopItemBuffLabel(item) ?? floorLabel(floor)}</Text>
                   </View>
                   <View style={styles.floorStatus}>
                     {busy ? <ActivityIndicator size="small" color={colors.accent} /> : null}
@@ -1122,6 +1141,15 @@ export default function StudentSlimeScreen() {
               const repeatable = item.key === SLIME_COOKIE_ITEM_KEY;
               const ownedItem = repeatable ? quantity > 0 : home?.ownedItemKeys.includes(item.key) ?? false;
               const busy = busyItemKey === item.key;
+              const buffLabel = shopItemBuffLabel(item);
+              const itemSummary = [
+                buffLabel,
+                repeatable
+                  ? `${quantity}개 보유`
+                  : !ownedItem
+                    ? `${item.price.toLocaleString()}${home?.unitLabel ?? "원"}`
+                    : null,
+              ].filter((value): value is string => Boolean(value)).join(" · ");
               return (
                 <ControlPressable
                   key={item.key}
@@ -1143,11 +1171,7 @@ export default function StudentSlimeScreen() {
                   </View>
                   <View style={styles.floorCopy}>
                     <Text style={styles.floorTitle}>{item.labelKo}</Text>
-                    {repeatable || !ownedItem ? (
-                      <Text style={styles.floorSubtitle}>
-                        {repeatable ? `${quantity}개 보유` : `${item.price.toLocaleString()}${home?.unitLabel ?? "원"}`}
-                      </Text>
-                    ) : null}
+                    {itemSummary ? <Text style={styles.floorSubtitle}>{itemSummary}</Text> : null}
                   </View>
                   <Text style={[styles.floorStatusText, (repeatable || !ownedItem) && styles.floorStatusBuy]}>{busy ? "처리 중…" : repeatable ? "구매" : ownedItem ? "보유 중" : "구매"}</Text>
                 </ControlPressable>
@@ -1235,6 +1259,7 @@ export default function StudentSlimeScreen() {
             visibleWardrobeItems.map((item) => {
               const equipped = equippedItems.includes(item.key);
               const busy = busyItemKey === item.key;
+              const buffLabel = shopItemBuffLabel(item);
               return (
                 <ControlPressable
                   key={item.key}
@@ -1252,13 +1277,13 @@ export default function StudentSlimeScreen() {
                       equippedFloor="none"
                       displayScale={0.25}
                       itemSpritePath={isSceneBackgroundItem(item) ? undefined : shopItemSpritePath(item, wardrobeColor ?? selectedColor)}
-                      backgroundSpritePath={isSceneBackgroundItem(item) ? item.spritePath : undefined}
+                      backgroundSpritePath={isSceneBackgroundItem(item) ? selectSceneBackgroundSpritePath(item) : undefined}
                       accessibilityLabel={`${item.labelKo} 미리보기`}
                     />
                   </View>
                   <View style={styles.wardrobeItemCopy}>
                     <Text style={styles.floorTitle}>{item.labelKo}</Text>
-                    <Text style={styles.floorSubtitle}>{isSceneBackgroundItem(item) ? "배경" : item.floor ? "바닥" : item.category === "drink" ? "음료" : "소품"}</Text>
+                    <Text style={styles.floorSubtitle}>{buffLabel ?? (isSceneBackgroundItem(item) ? "배경" : item.floor ? "바닥" : item.category === "drink" ? "음료" : "소품")}</Text>
                   </View>
                   <Text style={[styles.wardrobeItemAction, equipped && styles.wardrobeItemActionEquipped]}>
                     {busy ? "처리 중…" : equipped ? "해제" : "장착"}
@@ -1340,7 +1365,7 @@ const styles = StyleSheet.create({
   myPetCookieQuantityDisabled: { color: colors.textFaint },
   unownedSprite: { width: iconSizes.empty, height: iconSizes.empty, alignItems: "center", justifyContent: "center" },
   unownedGlyph: { ...typography.section, color: colors.textFaint },
-  floorList: { flexDirection: "row", flexWrap: "wrap", justifyContent: "space-between", gap: spacing.sm },
+  floorList: { flexDirection: "row", flexWrap: "wrap", justifyContent: "flex-start", gap: spacing.sm },
   shopPage: { gap: spacing.sm },
   shopBalance: { ...typography.label, color: colors.accentTintedText, textAlign: "right", fontVariant: ["tabular-nums"] },
   shopTabs: { gap: spacing.xxs, paddingBottom: spacing.xs },
@@ -1349,7 +1374,7 @@ const styles = StyleSheet.create({
   shopTabText: { ...typography.label, color: colors.textMuted },
   shopTabTextSelected: { color: colors.accentTintedText },
   shopContent: { paddingBottom: spacing.sm, gap: spacing.sm },
-  floorRow: { width: "31.5%", minWidth: 0, paddingHorizontal: spacing.xs, paddingVertical: spacing.sm, borderWidth: borders.hairline, borderColor: colors.border, borderRadius: radii.control, backgroundColor: colors.surface, alignItems: "center", justifyContent: "flex-start", gap: spacing.xs },
+  floorRow: { width: "31%", minWidth: 0, paddingHorizontal: spacing.xs, paddingVertical: spacing.sm, borderWidth: borders.hairline, borderColor: colors.border, borderRadius: radii.control, backgroundColor: colors.surface, alignItems: "center", justifyContent: "flex-start", gap: spacing.xs },
   shopPreview: { width: iconSizes.empty, height: iconSizes.empty, alignItems: "center", justifyContent: "center", overflow: "hidden", backgroundColor: colors.surfaceAlt },
   floorCopy: { width: "100%", minWidth: 0, alignItems: "center", gap: spacing.xxs },
   floorTitle: { ...typography.label, color: colors.text, textAlign: "center" },

@@ -21,3 +21,10 @@ export type SlimeSpriteProps = {
   backgroundSpritePath?: string;
   onComplete?: () => void;
 };
+
+/** Scene backgrounds are feathered by this proportion on every edge. */
+export const SCENE_BACKGROUND_FEATHER_RATIO = 1 / 16;
+
+export function sceneBackgroundFeatherInset(size: number): number {
+  return Number.isFinite(size) && size > 0 ? size * SCENE_BACKGROUND_FEATHER_RATIO : 0;
+}

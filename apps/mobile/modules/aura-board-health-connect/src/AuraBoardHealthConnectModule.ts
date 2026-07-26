@@ -6,6 +6,7 @@ import type {
   HealthConnectStatus,
   LiveStepUpdate,
   LiveStepUpdateStatus,
+  MotionPermissionStatus,
 } from "./AuraBoardHealthConnect.types";
 
 declare class AuraBoardHealthConnectNativeModule extends NativeModule {
@@ -16,6 +17,8 @@ declare class AuraBoardHealthConnectNativeModule extends NativeModule {
   openSettings(): Promise<void>;
   startLiveStepUpdates(): Promise<LiveStepUpdateStatus>;
   stopLiveStepUpdates(): void;
+  getMotionPermissionStatus?: () => Promise<MotionPermissionStatus>;
+  requestMotionPermission?: () => Promise<MotionPermissionStatus>;
   addListener(
     eventName: "onLiveStepUpdate",
     listener: (event: LiveStepUpdate) => void,

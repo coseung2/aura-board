@@ -58,6 +58,7 @@ import {
   evolutionForStage,
   normalizeSlimeHome,
   resolveEquippedSceneBackground,
+  selectSceneBackgroundSpritePath,
   slimeBallSpritePath,
   stageForColor,
   studentPetHref,
@@ -272,6 +273,10 @@ function RepresentativePet({
   const equippedFloor = color
     ? petHome.equippedFloorByColor[color] ?? petHome.equippedFloor
     : undefined;
+  const equippedBackground = resolveEquippedSceneBackground(
+    equippedItems,
+    petHome.shopCatalog,
+  );
 
   return (
     <View style={styles.representativePet}>
@@ -297,10 +302,9 @@ function RepresentativePet({
           equippedFloor={equippedFloor}
           itemSpritePath={slimeBallSpritePath(equippedItems, color)}
           backgroundSpritePath={
-            resolveEquippedSceneBackground(
-              equippedItems,
-              petHome.shopCatalog,
-            )?.spritePath
+            equippedBackground
+              ? selectSceneBackgroundSpritePath(equippedBackground)
+              : undefined
           }
           displayScale={0.75}
           accessibilityLabel="내 대표 펫"

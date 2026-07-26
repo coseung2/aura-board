@@ -150,6 +150,7 @@ describe("SlimePetPage", () => {
 
     fireEvent.click(within(filters).getByRole("tab", { name: "배경" }));
     expect(within(drawer).getByText("별똥별 밤하늘")).toBeTruthy();
+    expect(within(drawer).getByText("과제 제출 보상 +3%")).toBeTruthy();
     expect(within(drawer).queryByText("물웅덩이 배경")).toBeNull();
     expect(
       within(drawer).getByRole("img", { name: "별똥별 밤하늘 미리보기" })
@@ -489,8 +490,8 @@ describe("SlimePetPage", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "퍼플 슬라임 효과 상세 보기" }));
     const details = screen.getByRole("region", { name: "퍼플 슬라임 효과 상세" });
-    expect(within(details).queryByText("소품 추가 효과")).toBeNull();
-    expect(within(details).queryByText(/레모네이드/)).toBeNull();
+    expect(within(details).getByText("소품 추가 효과")).toBeTruthy();
+    expect(within(details).getByText("레모네이드 · 댓글 보상 +1%")).toBeTruthy();
   });
 
   it("disables and grays the cookie action when no cookies are owned", async () => {

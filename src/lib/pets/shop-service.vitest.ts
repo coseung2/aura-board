@@ -151,8 +151,8 @@ describe("slime shop service", () => {
   });
 
   it("debits once, records source linkage, creates inventory, and replays", async () => {
-    const state = installState();
     const item = SLIME_SHOP_CATALOG[0];
+    const state = installState(item.price);
 
     const result = await purchaseSlimeShopItem(student, item.key, "shop-attempt");
     expect(result).toEqual({ ownedItemKey: item.key, balance: 0, idempotent: false });
@@ -162,7 +162,7 @@ describe("slime shop service", () => {
         type: "slime_item_purchase",
         sourceType: "slime_item_purchase",
         sourceRef: "student-1:shop-attempt",
-        amount: 100,
+        amount: item.price,
       }),
     });
 
@@ -182,13 +182,14 @@ describe("slime shop service", () => {
       purchaseSlimeShopItem(student, SLIME_SHOP_CATALOG[0].key, "new-key"),
     ).rejects.toMatchObject<Partial<SlimeServiceError>>({ code: "already_owned", status: 409 });
 
-    const poor = installState(99);
+    const poorItem = SLIME_SHOP_CATALOG[1];
+    const poor = installState(poorItem.price - 1);
     await expect(
-      purchaseSlimeShopItem(student, SLIME_SHOP_CATALOG[1].key, "poor-key"),
+      purchaseSlimeShopItem(student, poorItem.key, "poor-key"),
     ).rejects.toMatchObject<Partial<SlimeServiceError>>({ code: "insufficient_funds", status: 402 });
-    expect(poor.balance).toBe(99);
+    expect(poor.balance).toBe(poorItem.price - 1);
 
-    const reused = installState();
+    const reused = installState(SLIME_SHOP_CATALOG[0].price);
     await purchaseSlimeShopItem(student, SLIME_SHOP_CATALOG[0].key, "same-key");
     await expect(
       purchaseSlimeShopItem(student, SLIME_SHOP_CATALOG[1].key, "same-key"),

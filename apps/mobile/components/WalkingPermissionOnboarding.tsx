@@ -9,6 +9,7 @@ import {
   openHealthConnectSettings,
   requestHealthConnectPermissions,
 } from "../lib/walking-health";
+import AuraBoardHealthConnectModule from "../modules/aura-board-health-connect/src/AuraBoardHealthConnectModule";
 import { colors, spacing, typography } from "../theme/tokens";
 import { AppButton, AppModal } from "./ui";
 
@@ -16,7 +17,7 @@ type Props = {
   studentId: string;
 };
 
-const promptKey = (studentId: string) => `aura_walk_permission_intro_v1_${studentId}`;
+const promptKey = (studentId: string) => `aura_walk_permission_intro_v2_${studentId}`;
 
 export function WalkingPermissionOnboarding({ studentId }: Props) {
   const [visible, setVisible] = useState(false);
@@ -46,10 +47,13 @@ export function WalkingPermissionOnboarding({ studentId }: Props) {
           await new Promise<void>((resolve) => setTimeout(resolve, delayMs));
         }
         const permissions = await getGrantedHealthConnectPermissions();
-        if (hasRequiredHealthConnectPermissions(permissions)) {
-          await dismiss();
-          return true;
+        if (!hasRequiredHealthConnectPermissions(permissions)) continue;
+        if (Platform.OS === "ios") {
+          const motionStatus = await AuraBoardHealthConnectModule?.getMotionPermissionStatus?.();
+          if (motionStatus !== "authorized") continue;
         }
+        await dismiss();
+        return true;
       }
       return false;
     })().finally(() => {
@@ -82,7 +86,12 @@ export function WalkingPermissionOnboarding({ studentId }: Props) {
         }
 
         const permissions = await getGrantedHealthConnectPermissions();
-        if (!active || hasRequiredHealthConnectPermissions(permissions)) return;
+        if (!active || hasRequiredHealthConnectPermissions(permissions)) {
+          if (Platform.OS !== "ios") return;
+
+          const motionStatus = await AuraBoardHealthConnectModule?.getMotionPermissionStatus?.();
+          if (!active || motionStatus === "authorized") return;
+        }
         setVisible(true);
       } catch {
         // 권한 안내는 걷기 화면에서도 다시 제공하므로, 시작 흐름을 막지 않는다.
@@ -116,6 +125,14 @@ export function WalkingPermissionOnboarding({ studentId }: Props) {
       }
 
       const permissions = await requestHealthConnectPermissions();
+      if (Platform.OS === "ios") {
+        if (!AuraBoardHealthConnectModule?.requestMotionPermission) {
+          throw new Error("iOS 동작 및 피트니스 권한 요청을 사용할 수 없습니다.");
+        }
+        await AuraBoardHealthConnectModule.requestMotionPermission();
+        await dismiss();
+        return;
+      }
       if (
         !hasRequiredHealthConnectPermissions(permissions) &&
         !(await recheckGrantedPermission())
@@ -151,13 +168,27 @@ export function WalkingPermissionOnboarding({ studentId }: Props) {
       <Text style={styles.description}>
         {needsUpdate
           ? "걸음 수를 불러오려면 Health Connect 업데이트가 필요해요."
-          : "날짜별 걸음 수 합계만 읽어요."}
+          : Platform.OS === "ios"
+            ? "Apple 건강 데이터와 동작 및 피트니스 권한을 각각 요청해요. 서로 다른 권한이라 시스템 확인 창이 차례로 표시됩니다."
+            : "날짜별 걸음 수 합계만 읽어요."}
       </Text>
       {!needsUpdate ? (
         <View style={styles.facts}>
-          <Text style={styles.fact}>필요한 권한: 걸음 수</Text>
+          {Platform.OS === "ios" ? (
+            <>
+              <Text style={styles.fact}>필요한 권한: Apple 건강 데이터의 걸음 수 읽기</Text>
+              <Text style={styles.fact}>필요한 권한: 동작 및 피트니스의 걸음 수 감지</Text>
+              <Text style={styles.fact}>두 권한은 별도로 요청되며, 확인 창이 차례로 나타나요.</Text>
+            </>
+          ) : (
+            <Text style={styles.fact}>필요한 권한: 걸음 수</Text>
+          )}
           <Text style={styles.fact}>읽지 않는 정보: 위치, 이동 경로</Text>
-          <Text style={styles.fact}>권한은 언제든 Health Connect 설정에서 바꿀 수 있어요.</Text>
+          <Text style={styles.fact}>
+            {Platform.OS === "ios"
+              ? "권한은 언제든 Apple 건강 및 iPhone 설정에서 바꿀 수 있어요."
+              : "권한은 언제든 Health Connect 설정에서 바꿀 수 있어요."}
+          </Text>
         </View>
       ) : null}
       {message ? <Text style={styles.error}>{message}</Text> : null}

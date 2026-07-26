@@ -195,15 +195,21 @@ export function OfficialSlimeSprite({
       {resolvedBackgroundSpritePath ? (
         // Scene art is authored for the same logical 64x64 frame and remains
         // below floor, character, prop, and crown layers.
-        // eslint-disable-next-line @next/next/no-img-element
-        <img
-          src={resolvedBackgroundSpritePath}
-          alt=""
-          aria-hidden="true"
-          className={styles.background}
+        <div
+          className={styles.backgroundFeather}
+          data-background-feather="responsive-edge"
           style={{ width: 64 * scale, height: 64 * scale }}
-          draggable={false}
-        />
+        >
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={resolvedBackgroundSpritePath}
+            alt=""
+            aria-hidden="true"
+            className={styles.background}
+            style={{ width: 64 * scale, height: 64 * scale }}
+            draggable={false}
+          />
+        </div>
       ) : null}
       {puddleAsset && puddleFrame ? (
         // Keep the shared puddle as an independent floor layer so complete

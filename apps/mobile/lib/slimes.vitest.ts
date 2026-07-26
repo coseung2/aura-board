@@ -14,6 +14,7 @@ import {
   normalizeSlimeClassroom,
   resolveEquippedSceneBackground,
   resolveSlimeRemoteSpriteUri,
+  selectSceneBackgroundSpritePath,
   shopFilterForItem,
   slimeBallSpritePath,
   slimeShopNavItems,
@@ -21,6 +22,10 @@ import {
   SLIME_COOKIE_ITEM_KEY,
   studentPetHref,
 } from "./slimes";
+import {
+  SCENE_BACKGROUND_FEATHER_RATIO,
+  sceneBackgroundFeatherInset,
+} from "../components/slime/slime-types";
 
 describe("mobile slime parity model", () => {
   it("normalizes the current home snapshot including cookie quantity and growth", () => {
@@ -142,6 +147,46 @@ describe("mobile slime parity model", () => {
       )?.key,
     ).toBe("shooting-star-night-sky-background");
     expect(resolveEquippedSceneBackground(["grass-floor-background"], catalog)).toBeNull();
+  });
+
+  it("normalizes optional high-density and static scene background paths", () => {
+    const home = normalizeSlimeHome({
+      shopCatalog: [{
+        key: "shooting-star-night-sky-background",
+        category: "background",
+        floor: null,
+        spritePath: "/background-64.gif",
+        mobileSpritePath: "/background-256.gif",
+        staticSpritePath: "/static-background-64.png",
+        effectKey: "walking_reward",
+        effectBps: 300,
+      }],
+    });
+
+    expect(home.shopCatalog[0]).toMatchObject({
+      spritePath: "/background-64.gif",
+      mobileSpritePath: "/background-256.gif",
+      staticSpritePath: "/static-background-64.png",
+      effectKey: "walking_reward",
+      effectBps: 300,
+    });
+  });
+
+  it("selects the mobile scene background before the standard GIF and falls back safely", () => {
+    expect(selectSceneBackgroundSpritePath({
+      mobileSpritePath: "/background-256.gif",
+      spritePath: "/background-64.gif",
+    })).toBe("/background-256.gif");
+    expect(selectSceneBackgroundSpritePath({ spritePath: "/background-64.gif" })).toBe(
+      "/background-64.gif",
+    );
+  });
+
+  it("keeps the scene background feather contract proportional to the rendered asset", () => {
+    expect(SCENE_BACKGROUND_FEATHER_RATIO).toBe(0.0625);
+    expect(sceneBackgroundFeatherInset(64)).toBe(4);
+    expect(sceneBackgroundFeatherInset(256)).toBe(16);
+    expect(sceneBackgroundFeatherInset(0)).toBe(0);
   });
 
   it("resolves the equipped ball animation for the slime color", () => {
