@@ -150,7 +150,7 @@ jobs:
     name: iOS production submission
     if: ${{ inputs.platform == 'all' || inputs.platform == 'ios' }}
     needs: validate
-    runs-on: macos-15
+    runs-on: macos-26
     timeout-minutes: 180
     defaults:
       run:
@@ -188,6 +188,7 @@ jobs:
         run: eas submit --platform ios --profile production --path "${{ steps.build.outputs.ipa_path }}" --wait --non-interactive
 
       - name: Preserve submitted IPA
+        if: ${{ always() && steps.build.outcome == 'success' }}
         uses: actions/upload-artifact@v4
         with:
           name: aura-board-ios-${{ inputs.expected_version }}-${{ steps.build.outputs.build_number }}
