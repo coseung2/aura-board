@@ -45,16 +45,18 @@ import {
   calculateSlimeGrowthPercent,
   floorLabel,
   formatGrowthHours,
+  isSceneBackgroundItem,
   newSlimeIdempotencyKey,
   normalizeSlimeClassroom,
   normalizeSlimeHome,
+  resolveEquippedSceneBackground,
   shopFilterForItem,
   slimeBuffBpsForStage,
   slimeBallSpritePath,
+  slimeShopNavItems,
   SLIME_COOKIE_ITEM_KEY,
   SLIME_COLOR_LABELS,
   SLIME_STAGE_LABELS,
-  SLIME_SHOP_NAV_ITEMS,
   stageForColor,
   type MobileSlimeHome,
   type MobileSlimeClassmate,
@@ -83,7 +85,7 @@ import {
 
 type Notice = { kind: "success" | "error"; text: string };
 type LocalImageSource = ImageProps["source"];
-type WardrobeFilter = "floor" | "drink" | "prop" | "title";
+type WardrobeFilter = "background" | "floor" | "drink" | "prop" | "title";
 
 const DISABLED_COOKIE_SOURCE = require("../../assets/slimes/shared/cookie-shop-icon-256-disabled.png");
 
@@ -140,6 +142,7 @@ function itemFloor(item: SlimeShopItem): Exclude<EquippedFloor, "none"> | null {
 }
 
 function wardrobeFilterForItem(item: SlimeShopItem): WardrobeFilter {
+  if (isSceneBackgroundItem(item)) return "background";
   if (item.floor || item.category === "background" || item.category === "ride") return "floor";
   if (item.category === "drink") return "drink";
   return "prop";
@@ -201,6 +204,16 @@ export default function StudentSlimeScreen() {
     return () => clearTimeout(timeoutId);
   }, [notice]);
 
+  useEffect(() => {
+    const hasSceneBackground = (home?.shopCatalog ?? []).some((item) => isSceneBackgroundItem(item));
+    if (!hasSceneBackground && shopFilter === "background") {
+      setShopFilter("character");
+    }
+    if (!hasSceneBackground && wardrobeFilter === "background") {
+      setWardrobeFilter("floor");
+    }
+  }, [home?.shopCatalog, shopFilter, wardrobeFilter]);
+
   const buffArrowAnimatedStyle = {
     opacity: buffRise.interpolate({ inputRange: [0, 0.48, 1], outputRange: [0.78, 1, 0.78] }),
     transform: [
@@ -251,6 +264,22 @@ export default function StudentSlimeScreen() {
     (home?.representativeColor === selectedColor ? home.equippedFloor : "none");
   const lemonade = home?.shopCatalog.find((item) => item.category === "drink");
   const equippedItems = home?.equippedItemsByColor[selectedColor] ?? [];
+  const shopNavItems = useMemo(
+    () => slimeShopNavItems(home?.shopCatalog ?? []),
+    [home?.shopCatalog],
+  );
+  const wardrobeNavItems = useMemo(() => {
+    const hasSceneBackground = (home?.shopCatalog ?? []).some((item) => isSceneBackgroundItem(item));
+    if (!hasSceneBackground) return WARDROBE_NAV_ITEMS;
+    return [
+      { key: "background" as const, label: "배경" },
+      ...WARDROBE_NAV_ITEMS,
+    ];
+  }, [home?.shopCatalog]);
+  const sceneBackgroundItems = useMemo(
+    () => (home?.shopCatalog ?? []).filter((item) => isSceneBackgroundItem(item)),
+    [home?.shopCatalog],
+  );
   const floorItems = useMemo(() => {
     if (!home) return [];
     return FLOOR_ORDER.map((floor) =>
@@ -700,6 +729,12 @@ export default function StudentSlimeScreen() {
                             displayScale={0.25}
                             repeat={classAction !== "idle"}
                             itemSpritePath={classBallSpritePath}
+                            backgroundSpritePath={
+                              resolveEquippedSceneBackground(
+                                representative.equippedItemKeys,
+                                home?.shopCatalog ?? [],
+                              )?.spritePath
+                            }
                             accessibilityLabel={`${student.name}의 ${SLIME_COLOR_LABELS[representative.color]} 대표 펫`}
                           />
                       ) : (
@@ -822,6 +857,9 @@ export default function StudentSlimeScreen() {
                       displayScale={0.25}
                       repeat={!manualAction && petAction !== "idle"}
                       itemSpritePath={slimeBallSpritePath(petItems, itemColor)}
+                      backgroundSpritePath={
+                        resolveEquippedSceneBackground(petItems, home?.shopCatalog ?? [])?.spritePath
+                      }
                       accessibilityLabel={`${SLIME_COLOR_LABELS[itemColor]} 슬라임`}
                       onComplete={manualAction
                         ? () => setManualActions((current) => {
@@ -935,7 +973,7 @@ export default function StudentSlimeScreen() {
         <View style={styles.shopPage} accessibilityLabel="슬라임 상점">
           <Text style={styles.shopBalance}>{home?.balance.toLocaleString() ?? 0}{home?.unitLabel ?? "원"}</Text>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.shopTabs} accessibilityRole="tablist">
-          {SLIME_SHOP_NAV_ITEMS.map((tab) => (
+          {shopNavItems.map((tab) => (
             <ControlPressable
               key={tab.key}
               style={[styles.shopTab, shopFilter === tab.key && styles.shopTabSelected]}
@@ -975,6 +1013,55 @@ export default function StudentSlimeScreen() {
               );
             })}
           </View>
+        ) : shopFilter === "background" ? (
+        <View style={styles.floorList} accessibilityLabel="배경 인벤토리">
+          {sceneBackgroundItems.length === 0 ? (
+            <View style={styles.emptyCard}>
+              <Text style={styles.emptyText}>배경 상품을 준비 중이에요.</Text>
+            </View>
+          ) : (
+            sceneBackgroundItems.map((item) => {
+              const ownedItem = home?.ownedItemKeys.includes(item.key) ?? false;
+              const busy = busyItemKey === item.key;
+              const canInteract = !ownedItem && busyItemKey === null;
+              const status = busy
+                ? "처리 중…"
+                : ownedItem
+                  ? "보유 중"
+                  : `${item.price.toLocaleString()}${home?.unitLabel ?? "원"}`;
+              return (
+                <ControlPressable
+                  key={item.key}
+                  style={styles.floorRow}
+                  disabled={!canInteract}
+                  onPress={() => confirmItemPurchase(item)}
+                  accessibilityLabel={`${item.labelKo} ${ownedItem ? "보유 중" : "구매"}`}
+                  accessibilityState={{ disabled: !canInteract, busy }}
+                >
+                  <View style={styles.shopPreview} accessible={false}>
+                    <SlimeSprite
+                      slimeColor={selectedColor}
+                      evolution="base"
+                      action="idle"
+                      equippedFloor="none"
+                      displayScale={0.25}
+                      backgroundSpritePath={item.spritePath}
+                      accessibilityLabel={`${item.labelKo} 미리보기`}
+                    />
+                  </View>
+                  <View style={styles.floorCopy}>
+                    <Text style={styles.floorTitle}>{item.labelKo}</Text>
+                    <Text style={styles.floorSubtitle}>배경</Text>
+                  </View>
+                  <View style={styles.floorStatus}>
+                    {busy ? <ActivityIndicator size="small" color={colors.accent} /> : null}
+                    <Text style={[styles.floorStatusText, !ownedItem && styles.floorStatusBuy]}>{status}</Text>
+                  </View>
+                </ControlPressable>
+              );
+            })
+          )}
+        </View>
         ) : shopFilter === "floor" ? (
         <View style={styles.floorList} accessibilityLabel="바닥 인벤토리">
           {floorItems.length === 0 ? (
@@ -1087,7 +1174,7 @@ export default function StudentSlimeScreen() {
           style={styles.wardrobeNav}
           accessibilityLabel="보유 아이템 카테고리"
         >
-          {WARDROBE_NAV_ITEMS.map((item) => (
+          {wardrobeNavItems.map((item) => (
             <ContentTab
               key={item.key}
               style={styles.wardrobeNavItem}
@@ -1164,13 +1251,14 @@ export default function StudentSlimeScreen() {
                       action="idle"
                       equippedFloor="none"
                       displayScale={0.25}
-                      itemSpritePath={shopItemSpritePath(item, wardrobeColor ?? selectedColor)}
+                      itemSpritePath={isSceneBackgroundItem(item) ? undefined : shopItemSpritePath(item, wardrobeColor ?? selectedColor)}
+                      backgroundSpritePath={isSceneBackgroundItem(item) ? item.spritePath : undefined}
                       accessibilityLabel={`${item.labelKo} 미리보기`}
                     />
                   </View>
                   <View style={styles.wardrobeItemCopy}>
                     <Text style={styles.floorTitle}>{item.labelKo}</Text>
-                    <Text style={styles.floorSubtitle}>{item.floor ? "바닥" : item.category === "drink" ? "음료" : "소품"}</Text>
+                    <Text style={styles.floorSubtitle}>{isSceneBackgroundItem(item) ? "배경" : item.floor ? "바닥" : item.category === "drink" ? "음료" : "소품"}</Text>
                   </View>
                   <Text style={[styles.wardrobeItemAction, equipped && styles.wardrobeItemActionEquipped]}>
                     {busy ? "처리 중…" : equipped ? "해제" : "장착"}

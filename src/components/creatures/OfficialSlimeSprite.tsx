@@ -28,6 +28,8 @@ export type OfficialSlimeSpriteProps = {
   dataSlimeColor?: SlimeColor;
   /** Legacy shop props are complete character images, not sheet overlays. */
   itemSpritePath?: string;
+  /** Optional scene art rendered behind every other 64x64 visual layer. */
+  backgroundSpritePath?: string;
   /** Repeat a normally one-shot action when it is used as a passive preview. */
   repeat?: boolean;
   onComplete?: () => void;
@@ -67,6 +69,12 @@ function frameViewportStyle(frame: SlimeFrame, scale: number, extraHeight = 0): 
   };
 }
 
+function resolveSpritePath(path: string | null | undefined): string | null {
+  if (!path) return null;
+  if (/^https?:\/\//i.test(path) || path.startsWith("/")) return path;
+  return `/${path}`;
+}
+
 /**
  * Plays the imported official sheet for one semantic slime state. The sheet
  * itself is never animated with CSS: JSON frame durations drive a timer so
@@ -82,6 +90,7 @@ export function OfficialSlimeSprite({
   alt,
   dataSlimeColor,
   itemSpritePath,
+  backgroundSpritePath,
   repeat = false,
   onComplete,
 }: OfficialSlimeSpriteProps) {
@@ -135,6 +144,7 @@ export function OfficialSlimeSprite({
       }
     : undefined;
   const label = alt ?? `${slimeColor} 슬라임 ${resolution.action} 모습`;
+  const resolvedBackgroundSpritePath = resolveSpritePath(backgroundSpritePath);
 
   useEffect(() => {
     onCompleteRef.current = onComplete;
@@ -177,10 +187,24 @@ export function OfficialSlimeSprite({
       data-slime-action={resolution.action}
       data-equipped-floor={resolution.equippedFloor}
       data-item-sprite-path={itemSpritePath}
+      data-background-sprite-path={resolvedBackgroundSpritePath ?? undefined}
       data-frame-index={frameIndex}
       data-frame-duration={frame.duration}
       data-floor-offset-source-pixels={staticFloor ? staticFloor.slimeFootY - staticFloor.surfaceY : 0}
     >
+      {resolvedBackgroundSpritePath ? (
+        // Scene art is authored for the same logical 64x64 frame and remains
+        // below floor, character, prop, and crown layers.
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={resolvedBackgroundSpritePath}
+          alt=""
+          aria-hidden="true"
+          className={styles.background}
+          style={{ width: 64 * scale, height: 64 * scale }}
+          draggable={false}
+        />
+      ) : null}
       {puddleAsset && puddleFrame ? (
         // Keep the shared puddle as an independent floor layer so complete
         // prop GIFs can compose above it instead of replacing it.

@@ -371,6 +371,13 @@
   transform-origin: center;
 }
 
+.spriteCharacterFrame {
+  display: grid;
+  width: 88px;
+  height: 88px;
+  place-items: center;
+}
+
 .spriteFrame img {
   display: block;
   width: 88px;

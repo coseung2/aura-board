@@ -13,6 +13,7 @@ import {
   type EquippedFloor,
   type SlimeFrame,
 } from "../../lib/slime-assets";
+import { resolveSlimeRemoteSpriteUri } from "../../lib/slimes";
 import type { SlimeSpriteProps } from "./slime-types";
 
 const DEFAULT_DISPLAY_SCALE = 1;
@@ -68,6 +69,7 @@ export function SlimeSprite({
   accessibilityLabel,
   repeat = false,
   itemSpritePath,
+  backgroundSpritePath,
   onComplete,
 }: SlimeSpriteProps) {
   const displayScale = normalizedDisplayScale(requestedDisplayScale);
@@ -140,11 +142,23 @@ export function SlimeSprite({
   const puddleOffset = puddleAsset && puddleFrame
     ? frameOffset(puddleFrame, puddleAsset.imageScale, displayScale, 0)
     : null;
+  const backgroundUri = backgroundSpritePath
+    ? resolveSlimeRemoteSpriteUri(backgroundSpritePath, getApiBase())
+    : "";
+  const renderBackgroundLayer = (sizeStyle: { width: number; height: number }) =>
+    backgroundUri ? (
+      <Image
+        source={{ uri: backgroundUri }}
+        style={[styles.layer, styles.backgroundLayer, sizeStyle]}
+        contentFit="cover"
+        recyclingKey={`background:${backgroundUri}`}
+        transition={0}
+        accessible={false}
+      />
+    ) : null;
 
   if (itemSpritePath) {
-    const uri = itemSpritePath.startsWith("http")
-      ? itemSpritePath
-      : `${getApiBase()}${itemSpritePath.startsWith("/") ? "" : "/"}${itemSpritePath}`;
+    const uri = resolveSlimeRemoteSpriteUri(itemSpritePath, getApiBase());
     const size = 256 * displayScale;
     const itemSizeStyle = { width: size, height: size };
     const itemViewportStyle = { width: size, height: size + floorRise };
@@ -156,6 +170,7 @@ export function SlimeSprite({
         accessibilityLabel={accessibilityLabel ?? `${slimeColor} 슬라임 장착 소품 모습`}
         testID="slime-sprite"
       >
+        {renderBackgroundLayer(itemSizeStyle)}
         {puddleAsset && puddlePackedSheetSize && puddleOffset ? (
           <Image
             source={imageSource(puddleAsset.image)}
@@ -211,6 +226,7 @@ export function SlimeSprite({
       }
       testID="slime-sprite"
     >
+      {renderBackgroundLayer({ width: squareSourceSize, height: squareSourceSize })}
       {puddleAsset && puddlePackedSheetSize && puddleOffset ? (
         <Image
           source={imageSource(puddleAsset.image)}
@@ -283,6 +299,10 @@ const styles = StyleSheet.create({
   layer: {
     position: "absolute",
   },
+  // Keep the background in the normal sibling stack. A negative z-index can
+  // place it behind the clipped viewport on Android; render order keeps later
+  // floor and character layers above it.
+  backgroundLayer: { zIndex: layers.spriteFloor },
   floorUnder: { zIndex: layers.spriteFloor },
   itemLayer: { zIndex: layers.spriteItem },
 });

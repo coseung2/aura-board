@@ -3,6 +3,7 @@ import {
   type SlimeGrowthSnapshot,
   type SlimeGrowthStage,
 } from "@/lib/pets/growth";
+import { isSlimeSceneBackground } from "@/lib/pets/catalog";
 import type {
   SlimeColor,
   SlimeEffectKey,
@@ -25,6 +26,7 @@ export const EFFECT_LABELS: Record<SlimeEffectKey, string> = {
 export type ShopFilter =
   | "all"
   | "character"
+  | "background"
   | "floor"
   | "food"
   | "prop"
@@ -33,6 +35,7 @@ export type ShopFilter =
 export const SHOP_NAV_ITEMS: readonly { key: ShopFilter; label: string }[] = [
   { key: "all", label: "전체" },
   { key: "character", label: "캐릭터" },
+  { key: "background", label: "배경" },
   { key: "floor", label: "바닥" },
   { key: "food", label: "먹이" },
   { key: "prop", label: "소품" },
@@ -44,6 +47,7 @@ export const SLIME_COOKIE_ITEM_KEY = "slime-cookie";
 export const SHOP_CATEGORY_LABELS: Record<ShopFilter, string> = {
   all: "전체",
   character: "캐릭터",
+  background: "배경",
   floor: "바닥",
   food: "먹이",
   prop: "소품",
@@ -52,8 +56,9 @@ export const SHOP_CATEGORY_LABELS: Record<ShopFilter, string> = {
 
 /** Map API/catalog categories to the semantic top-level drawer tab. */
 export function shopFilterForItem(
-  item: Pick<SlimeShopItem, "category">,
+  item: Pick<SlimeShopItem, "category" | "floor">,
 ): Exclude<ShopFilter, "all" | "character"> {
+  if (isSlimeSceneBackground(item)) return "background";
   switch (String(item.category)) {
     case "background":
     case "ride":
@@ -72,7 +77,9 @@ export function shopFilterForItem(
   }
 }
 
-export function shopItemCategoryLabel(item: Pick<SlimeShopItem, "category">): string {
+export function shopItemCategoryLabel(
+  item: Pick<SlimeShopItem, "category" | "floor">,
+): string {
   return SHOP_CATEGORY_LABELS[shopFilterForItem(item)];
 }
 

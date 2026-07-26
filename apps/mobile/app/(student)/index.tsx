@@ -57,6 +57,7 @@ import { SlimeSprite } from "../../components/slime/SlimeSprite";
 import {
   evolutionForStage,
   normalizeSlimeHome,
+  resolveEquippedSceneBackground,
   slimeBallSpritePath,
   stageForColor,
   studentPetHref,
@@ -295,6 +296,12 @@ function RepresentativePet({
           evolution={evolutionForStage(stage)}
           equippedFloor={equippedFloor}
           itemSpritePath={slimeBallSpritePath(equippedItems, color)}
+          backgroundSpritePath={
+            resolveEquippedSceneBackground(
+              equippedItems,
+              petHome.shopCatalog,
+            )?.spritePath
+          }
           displayScale={0.75}
           accessibilityLabel="내 대표 펫"
         />

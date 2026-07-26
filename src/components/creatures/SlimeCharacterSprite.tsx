@@ -1,6 +1,7 @@
 "use client";
 
 import type { SlimeAction, SlimeColor, SlimeEvolution, EquippedFloor } from "@/lib/pets/slime-assets";
+import { isSlimeSceneBackground } from "@/lib/pets/catalog";
 import type { SlimeDefinition, SlimeShopItem } from "@/lib/pets/types";
 
 import { OfficialSlimeSprite } from "./OfficialSlimeSprite";
@@ -62,6 +63,7 @@ export function SlimeCharacterSprite({
 }: Props) {
   const floor = equippedFloor ?? floorFromItems(items);
   const evolution = evolutionForStage(growthStage);
+  const backgroundItem = items.find((item) => isSlimeSceneBackground(item));
   // Only unsupported legacy props may fall back to a complete character GIF.
   // Drinks and floors have canonical color/evolution-specific official sheets.
   // Ball props are complete, color-specific looping GIFs rather than an
@@ -86,6 +88,7 @@ export function SlimeCharacterSprite({
         action={action}
         equippedFloor={floor}
         itemSpritePath={itemSpritePath}
+        backgroundSpritePath={backgroundItem?.spritePath}
         repeat={repeat || Boolean(ballItem)}
         alt={alt}
         dataSlimeColor={slime.color as SlimeColor}

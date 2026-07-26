@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 
 import {
   getEquippedSlimeFloor,
+  isSlimeSceneBackground,
+  normalizeEquippedSlimeItemKeys,
   SLIME_CATALOG,
   SLIME_BALL_CATALOG,
   SLIME_DEFAULT_BUFF_BPS,
@@ -29,6 +31,7 @@ describe("slime catalog", () => {
     expect(SLIME_SHOP_CATALOG.map(({ key, floor }) => [key, floor])).toEqual([
       ["grass-floor-background", "grass-floor"],
       ["water-puddle-background", "water-puddle"],
+      ["shooting-star-night-sky-background", null],
       ["slime-blue-trampoline", "trampoline"],
       ["slime-blue-drink-lemonade", null],
       ["slime-ball-american-football", null],
@@ -42,13 +45,41 @@ describe("slime catalog", () => {
     ]);
     expect(SLIME_SHOP_DEFAULT_PRICE).toBe(100);
     expect(SLIME_COOKIE_PRICE).toBe(30);
-    expect(SLIME_SHOP_CATALOG.slice(0, 4).every((item) => item.price === 100)).toBe(true);
+    expect(SLIME_SHOP_CATALOG.slice(0, 5).every((item) => item.price === 100)).toBe(true);
     expect(SLIME_SHOP_CATALOG.at(-1)).toMatchObject({
       key: "slime-cookie",
       category: "food",
       price: 30,
       spritePath: "/creatures/slimes/official/shared/cookie-shop-icon-256.png",
     });
+  });
+
+  it("distinguishes true scene backgrounds from legacy background floors", () => {
+    const scene = SLIME_SHOP_CATALOG.find((item) => item.key === "shooting-star-night-sky-background")!;
+    const legacyFloor = SLIME_SHOP_CATALOG.find((item) => item.key === "grass-floor-background")!;
+
+    expect(scene).toMatchObject({
+      category: "background",
+      floor: null,
+      labelKo: "별똥별 밤하늘",
+      price: SLIME_SHOP_DEFAULT_PRICE,
+      spritePath: "/creatures/slimes/shop/shooting-star-night-sky.gif",
+    });
+    expect(isSlimeSceneBackground(scene)).toBe(true);
+    expect(isSlimeSceneBackground(legacyFloor)).toBe(false);
+  });
+
+  it("normalizes visual equipment in background, floor, accessory order", () => {
+    expect(normalizeEquippedSlimeItemKeys([
+      "slime-blue-drink-lemonade",
+      "grass-floor-background",
+      "shooting-star-night-sky-background",
+      "water-puddle-background",
+    ])).toEqual([
+      "shooting-star-night-sky-background",
+      "water-puddle-background",
+      "slime-blue-drink-lemonade",
+    ]);
   });
 
   it("exposes every imported ball family as a 100 won prop", () => {

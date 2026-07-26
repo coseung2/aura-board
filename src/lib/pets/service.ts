@@ -1238,9 +1238,9 @@ export async function refundSlimeShopItem(
 
 /**
  * Toggle one owned slime-home item without touching the purchase ledger.
- * Floors share one semantic slot even though legacy items span background and
- * ride categories. Other catalog categories keep their existing single-slot
- * behavior. The serializable transaction keeps resets and updates atomic.
+ * True scene backgrounds compose with floors and accessories. Floors share one
+ * semantic slot even though legacy items span background and ride categories.
+ * The serializable transaction keeps resets and updates atomic.
  */
 export async function equipSlimeShopItem(
   student: StudentIdentity,
@@ -1291,6 +1291,7 @@ export async function equipSlimeShopItem(
         return !candidate || slimeVisualItemSlot(candidate) !== itemSlot;
       });
       nextKeys.push(item.key);
+      nextKeys = normalizeEquippedSlimeItemKeys(nextKeys);
     }
 
     const nextKeysBySlimeId = new Map(

@@ -35,6 +35,15 @@ const BASEBALL_ITEM = SLIME_SHOP_CATALOG.find((item) => item.key === "slime-ball
   spritePath: "/creatures/slimes/official/props/ball/baseball/blue/slime-blue-baseball-hit.gif",
 } as unknown as SlimeShopItem;
 
+const SCENE_BACKGROUND_ITEM: SlimeShopItem = {
+  key: "shooting-star-night-sky-background",
+  category: "background",
+  floor: null,
+  labelKo: "별똥별 밤하늘",
+  price: 100,
+  spritePath: "/creatures/slimes/shop/shooting-star-night-sky.gif",
+};
+
 describe("SlimePetPage", () => {
   afterEach(() => vi.unstubAllGlobals());
 
@@ -123,8 +132,8 @@ describe("SlimePetPage", () => {
     );
 
     const filters = within(drawer).getByRole("tablist", { name: "상점 분류" });
-    expect(within(filters).getAllByRole("tab")).toHaveLength(6);
-    for (const label of ["전체", "캐릭터", "바닥", "먹이", "소품", "레벨업"]) {
+    expect(within(filters).getAllByRole("tab")).toHaveLength(7);
+    for (const label of ["전체", "캐릭터", "배경", "바닥", "먹이", "소품", "레벨업"]) {
       expect(within(filters).getByRole("tab", { name: label })).toBeTruthy();
     }
     expect(within(drawer).getByRole("button", { name: "그린 슬라임 구매" })).toBeTruthy();
@@ -138,6 +147,14 @@ describe("SlimePetPage", () => {
     expect(within(drawer).getByText("물웅덩이 배경")).toBeTruthy();
     expect(within(drawer).getByText("트램펄린")).toBeTruthy();
     expect(within(drawer).queryByText("레모네이드")).toBeNull();
+
+    fireEvent.click(within(filters).getByRole("tab", { name: "배경" }));
+    expect(within(drawer).getByText("별똥별 밤하늘")).toBeTruthy();
+    expect(within(drawer).queryByText("물웅덩이 배경")).toBeNull();
+    expect(
+      within(drawer).getByRole("img", { name: "별똥별 밤하늘 미리보기" })
+        .getAttribute("data-background-sprite-path"),
+    ).toBe("/creatures/slimes/shop/shooting-star-night-sky.gif");
   });
 
   it("moves the active tab with roving arrow and Home/End focus", async () => {
@@ -204,6 +221,51 @@ describe("SlimePetPage", () => {
     expect(preview.querySelector("img")?.getAttribute("src")).toContain(
       "/baseball/purple/slime-purple-baseball-hit.gif",
     );
+  });
+
+  it("composes a true scene background with a legacy floor for one slime color", async () => {
+    const legacyFloor = SLIME_SHOP_CATALOG.find(
+      (item) => item.key === "water-puddle-background",
+    );
+    expect(legacyFloor).toBeTruthy();
+    const shopCatalog = [
+      ...SLIME_SHOP_CATALOG.filter((item) => item.key !== SCENE_BACKGROUND_ITEM.key),
+      SCENE_BACKGROUND_ITEM,
+    ];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(() =>
+        json(
+          home({
+            ownedColors: ["blue"],
+            shopCatalog,
+            ownedItemKeys: [legacyFloor!.key, SCENE_BACKGROUND_ITEM.key],
+            equippedItemKeys: [legacyFloor!.key, SCENE_BACKGROUND_ITEM.key],
+            equippedItemsByColor: {
+              blue: [legacyFloor!.key, SCENE_BACKGROUND_ITEM.key],
+            },
+          }),
+        ),
+      ),
+    );
+    render(<SlimePetPage />);
+
+    const preview = await screen.findByRole("img", {
+      name: "블루 슬라임, 물웅덩이 배경, 별똥별 밤하늘 적용 미리보기",
+    });
+    expect(preview.getAttribute("data-background-sprite-path")).toBe(
+      SCENE_BACKGROUND_ITEM.spritePath,
+    );
+    expect(
+      preview.querySelector(
+        'img[src="/creatures/slimes/official/shared/water-puddle/sheet.png"]',
+      ),
+    ).toBeTruthy();
+    expect(
+      preview.querySelector(
+        `img[src="${SCENE_BACKGROUND_ITEM.spritePath}"]`,
+      ),
+    ).toBeTruthy();
   });
 
   it("closes on Escape and restores focus to the shop trigger", async () => {
@@ -380,6 +442,11 @@ describe("SlimePetPage", () => {
         '[data-slime-color="blue"][data-slime-action="floor-interaction"][data-equipped-floor="water-puddle"]',
       ),
     ).toBeTruthy();
+    expect(
+      document.querySelector('[data-slime-color="blue"]')?.getAttribute(
+        "data-background-sprite-path",
+      ),
+    ).toBeNull();
     expect(fetchMock.mock.calls[1][0]).toBe("/api/student/slimes/items/equip");
     expect(JSON.parse(fetchMock.mock.calls[1][1].body as string)).toEqual({
       slimeColor: "blue",

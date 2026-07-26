@@ -45,6 +45,12 @@ creating overlapping testing-notes documents.
 ## Mobile Parity And Android Release
 
 - Run `npm run typecheck` and `npm run design:check` in `apps/mobile`.
+- Run `npm run release:check` in `apps/mobile`. The same check runs as the
+  `eas-build-pre-install` hook and must fail if the HealthKit module sources,
+  podspec, config plugin, or anchored native-directory ignore rules are absent.
+- Before an iOS store build, inspect the EAS upload archive and confirm it
+  contains `modules/aura-board-health-connect/ios/AuraBoardHealthConnectModule.swift`
+  and `modules/aura-board-health-connect/ios/AuraBoardHealthConnect.podspec`.
 - Run `npx expo export --platform android --clear` to prove the Metro bundle and
   font/assets graph before requesting a signed build.
 - Compare student and parent navigation, loading, empty, error, session-expiry,

@@ -35,8 +35,8 @@ apps/mobile/android/gradle.properties.local
 web-build/
 expo-env.d.ts
 .kotlin/
-ios/
-android/
+/ios/
+/android/
 apps/mobile/.expo/
 apps/mobile/.expo-release-check*/
 apps/mobile/dist/

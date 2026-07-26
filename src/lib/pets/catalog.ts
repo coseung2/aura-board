@@ -115,6 +115,14 @@ export const SLIME_SHOP_CATALOG: readonly SlimeShopItem[] = [
     spritePath: `${SLIME_ASSET_ROOT}/shop/water-puddle.gif`,
   },
   {
+    key: "shooting-star-night-sky-background",
+    category: "background",
+    floor: null,
+    labelKo: "별똥별 밤하늘",
+    price: SLIME_SHOP_DEFAULT_PRICE,
+    spritePath: `${SLIME_ASSET_ROOT}/shop/shooting-star-night-sky.gif`,
+  },
+  {
     key: "slime-blue-trampoline",
     category: "ride",
     floor: "trampoline",
@@ -212,29 +220,39 @@ export function getSlimeShopItem(key: string): SlimeShopItem | undefined {
   return slimeShopItemByKey.get(key);
 }
 
-export type SlimeVisualItemSlot = "floor" | "accessory";
+export type SlimeVisualItemSlot = "background" | "floor" | "accessory";
 
-/** Floors compose with one visual accessory; food is never equipable. */
+/** A scene background has no floor state; legacy background floors still do. */
+export function isSlimeSceneBackground(
+  item: Pick<SlimeShopItem, "category" | "floor">,
+): boolean {
+  return item.category === "background" && item.floor === null;
+}
+
+/** Scene backgrounds, floors, and accessories occupy independent visual slots. */
 export function slimeVisualItemSlot(
   item: Pick<SlimeShopItem, "category" | "floor">,
 ): SlimeVisualItemSlot | null {
   if (item.floor) return "floor";
+  if (isSlimeSceneBackground(item)) return "background";
   if (item.category === "drink" || item.category === "prop") return "accessory";
   return null;
 }
 
 /** Collapse malformed legacy arrays to one key per visual slot. Last key wins. */
 export function normalizeEquippedSlimeItemKeys(itemKeys: readonly string[]): string[] {
+  let backgroundKey: string | null = null;
   let floorKey: string | null = null;
   let accessoryKey: string | null = null;
   for (const itemKey of itemKeys) {
     const item = getSlimeShopItem(itemKey);
     if (!item) continue;
     const slot = slimeVisualItemSlot(item);
+    if (slot === "background") backgroundKey = item.key;
     if (slot === "floor") floorKey = item.key;
     if (slot === "accessory") accessoryKey = item.key;
   }
-  return [floorKey, accessoryKey].filter((key): key is string => key !== null);
+  return [backgroundKey, floorKey, accessoryKey].filter((key): key is string => key !== null);
 }
 
 export function getSlimeBallDefinition(slug: string): SlimeBallShopItem | undefined {

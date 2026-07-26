@@ -17,5 +17,7 @@ export type SlimeSpriteProps = {
   repeat?: boolean;
   /** Complete color-specific animated prop, such as an equipped ball GIF. */
   itemSpritePath?: string;
+  /** Remote/API-relative scene background rendered behind floor and slime layers. */
+  backgroundSpritePath?: string;
   onComplete?: () => void;
 };

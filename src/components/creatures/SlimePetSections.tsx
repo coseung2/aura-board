@@ -9,6 +9,7 @@ import {
 import type { SlimeColor, SlimeDefinition, SlimeShopItem } from "@/lib/pets/types";
 
 import styles from "./SlimePetPage.module.css";
+import { OfficialSlimeSprite } from "./OfficialSlimeSprite";
 import { SlimeCharacterSprite } from "./SlimeCharacterSprite";
 import {
   calculateSlimeGrowthPercent,
@@ -16,6 +17,7 @@ import {
   EFFECT_LABELS,
   formatGrowthHours,
   SLIME_COOKIE_ITEM_KEY,
+  slimeItemSpritePath,
   type EquippedItemsByColor,
   type SlimeGrowthSnapshotPayload,
 } from "./SlimePetModel";
@@ -56,6 +58,27 @@ function floorFromItems(items: readonly SlimeShopItem[]): EquippedFloor {
     }
   }
   return floor;
+}
+
+function backgroundFromItems(items: readonly SlimeShopItem[]): SlimeShopItem | null {
+  let background: SlimeShopItem | null = null;
+  for (const item of items) {
+    if (item.category === "background" && item.floor === null) {
+      background = item;
+    }
+  }
+  return background;
+}
+
+function accessorySpritePath(
+  items: readonly SlimeShopItem[],
+  slimeColor: SlimeColor,
+): string | undefined {
+  const ballItem = items.find((item) => item.key.startsWith("slime-ball-"));
+  if (ballItem) return slimeItemSpritePath(ballItem, slimeColor);
+  return items.find(
+    (item) => !item.floor && item.category !== "background" && item.category !== "drink",
+  )?.spritePath;
 }
 
 function normalizeFloor(value: unknown, fallback: EquippedFloor): EquippedFloor {
@@ -144,6 +167,7 @@ export function SlimeCollectionSection({
             equippedFloorByColor[slime.color],
             floorFromItems(assignedItems),
           );
+          const background = backgroundFromItems(assignedItems);
           const drinkItem = assignedItems.find((item) => item.category === "drink");
           const hasInteractiveFloor = floor === "water-puddle" || floor === "trampoline";
           const hasPassiveDrink = Boolean(drinkItem);
@@ -244,26 +268,60 @@ export function SlimeCollectionSection({
                 <span aria-hidden="true">★</span>
               </button>
               <div className={styles.spriteFrame}>
-                <SlimeCharacterSprite
-                  slime={slime}
-                  items={assignedItems}
-                  growthStage={growth?.stage ?? 1}
-                  action={action}
-                  repeat={!manualAction && hasPassiveDrink}
-                  equippedFloor={floor}
-                  onComplete={manualAction
-                    ? clearAction
-                    : hasInteractiveFloor || hasPassiveDrink
-                      ? undefined
-                      : () => {
-                          setActionsByColor((current) => {
-                            if (!(slime.color in current)) return current;
-                            const next = { ...current };
-                            delete next[slime.color];
-                            return next;
-                          });
-                        }}
-                />
+                {background ? (
+                  <div className={styles.spriteCharacterFrame}>
+                    <OfficialSlimeSprite
+                      slimeColor={slime.color}
+                      evolution={growth?.stage && growth.stage >= 3
+                        ? "gold-crown-red-gem"
+                        : growth?.stage && growth.stage >= 2
+                          ? "silver-crown-blue-gem"
+                          : "base"}
+                      action={action}
+                      equippedFloor={floor}
+                      itemSpritePath={accessorySpritePath(assignedItems, slime.color)}
+                      backgroundSpritePath={background.spritePath}
+                      repeat={!manualAction && hasPassiveDrink}
+                      alt={assignedItems.length > 0
+                        ? `${slime.nameKo}, ${assignedItems.map((item) => item.labelKo).join(", ")} 적용 미리보기`
+                        : `${slime.nameKo} 미리보기`}
+                      dataSlimeColor={slime.color}
+                      onComplete={manualAction
+                        ? clearAction
+                        : hasInteractiveFloor || hasPassiveDrink
+                          ? undefined
+                          : () => {
+                              setActionsByColor((current) => {
+                                if (!(slime.color in current)) return current;
+                                const next = { ...current };
+                                delete next[slime.color];
+                                return next;
+                              });
+                            }}
+                    />
+                  </div>
+                ) : (
+                  <SlimeCharacterSprite
+                    slime={slime}
+                    items={assignedItems}
+                    growthStage={growth?.stage ?? 1}
+                    action={action}
+                    repeat={!manualAction && hasPassiveDrink}
+                    equippedFloor={floor}
+                    onComplete={manualAction
+                      ? clearAction
+                      : hasInteractiveFloor || hasPassiveDrink
+                        ? undefined
+                        : () => {
+                            setActionsByColor((current) => {
+                              if (!(slime.color in current)) return current;
+                              const next = { ...current };
+                              delete next[slime.color];
+                              return next;
+                            });
+                          }}
+                  />
+                )}
               </div>
               <div className={styles.itemCopy}>
                 {equippedTitle ? (

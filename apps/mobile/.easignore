@@ -33,8 +33,8 @@ android/gradle.properties.local
 web-build/
 expo-env.d.ts
 .kotlin/
-ios/
-android/
+/ios/
+/android/
 apps/mobile/ios/
 apps/mobile/android/
 

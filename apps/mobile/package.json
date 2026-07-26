@@ -8,6 +8,8 @@
     "ios": "expo start --ios",
     "web": "expo start --web",
     "design:check": "node scripts/check-design-system.mjs",
+    "release:check": "node scripts/check-release-inputs.mjs",
+    "eas-build-pre-install": "node scripts/check-release-inputs.mjs",
     "assets:check": "node ../../scripts/validate-mobile-slime-assets.mjs",
     "typecheck": "tsc --noEmit"
   },

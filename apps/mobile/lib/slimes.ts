@@ -62,7 +62,13 @@ export type SlimeShopItem = {
   spritePath: string;
 };
 
-export type SlimeShopFilter = "character" | "floor" | "food" | "prop" | "level-up";
+export type SlimeShopFilter =
+  | "character"
+  | "background"
+  | "floor"
+  | "food"
+  | "prop"
+  | "level-up";
 
 export const SLIME_SHOP_NAV_ITEMS: readonly { key: SlimeShopFilter; label: string }[] = [
   { key: "character", label: "캐릭터" },
@@ -70,6 +76,67 @@ export const SLIME_SHOP_NAV_ITEMS: readonly { key: SlimeShopFilter; label: strin
   { key: "food", label: "먹이" },
   { key: "prop", label: "소품" },
 ];
+
+export type SlimeVisualItemSlot = "background" | "floor" | "accessory";
+
+/** True scene backgrounds are category background with no floor mapping. */
+export function isSceneBackgroundItem(
+  item: Pick<SlimeShopItem, "category" | "floor">,
+): boolean {
+  return item.category === "background" && item.floor === null;
+}
+
+export function catalogHasSceneBackgrounds(
+  catalog: readonly Pick<SlimeShopItem, "category" | "floor">[],
+): boolean {
+  return catalog.some((item) => isSceneBackgroundItem(item));
+}
+
+/** Background tab is catalog-gated so empty remote catalogs stay hidden. */
+export function slimeShopNavItems(
+  catalog: readonly Pick<SlimeShopItem, "category" | "floor">[],
+): readonly { key: SlimeShopFilter; label: string }[] {
+  if (!catalogHasSceneBackgrounds(catalog)) return SLIME_SHOP_NAV_ITEMS;
+  return [
+    SLIME_SHOP_NAV_ITEMS[0]!,
+    { key: "background", label: "배경" },
+    ...SLIME_SHOP_NAV_ITEMS.slice(1),
+  ];
+}
+
+/** Visual slots keep at most one equipped key in background → floor → accessory order. */
+export function slimeVisualItemSlot(
+  item: Pick<SlimeShopItem, "category" | "floor">,
+): SlimeVisualItemSlot | null {
+  if (isSceneBackgroundItem(item)) return "background";
+  if (item.floor) return "floor";
+  if (item.category === "drink" || item.category === "prop") return "accessory";
+  return null;
+}
+
+export function resolveSlimeRemoteSpriteUri(
+  spritePath: string,
+  apiBase: string,
+): string {
+  const trimmed = spritePath.trim();
+  if (!trimmed) return "";
+  if (/^https?:\/\//i.test(trimmed)) return trimmed;
+  const base = apiBase.endsWith("/") ? apiBase.slice(0, -1) : apiBase;
+  return `${base}${trimmed.startsWith("/") ? "" : "/"}${trimmed}`;
+}
+
+export function resolveEquippedSceneBackground(
+  itemKeys: readonly string[],
+  catalog: readonly SlimeShopItem[],
+): SlimeShopItem | null {
+  const byKey = new Map(catalog.map((item) => [item.key, item]));
+  let equipped: SlimeShopItem | null = null;
+  for (const key of itemKeys) {
+    const item = byKey.get(key);
+    if (item && isSceneBackgroundItem(item)) equipped = item;
+  }
+  return equipped;
+}
 
 export const SLIME_COOKIE_ITEM_KEY = "slime-cookie";
 
@@ -423,8 +490,13 @@ export function normalizeSlimeClassroom(payload: unknown): MobileSlimeClassmate[
   });
 }
 
-export function shopFilterForItem(item: Pick<SlimeShopItem, "category">): Exclude<SlimeShopFilter, "character"> {
-  if (item.category === "background" || item.category === "ride") return "floor";
+export function shopFilterForItem(
+  item: Pick<SlimeShopItem, "category" | "floor">,
+): Exclude<SlimeShopFilter, "character"> {
+  if (isSceneBackgroundItem(item)) return "background";
+  if (item.category === "background" || item.category === "ride" || item.floor) {
+    return "floor";
+  }
   if (item.category === "food") return "food";
   if (item.category === "level-up") return "level-up";
   return "prop";

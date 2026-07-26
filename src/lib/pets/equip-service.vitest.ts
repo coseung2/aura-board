@@ -102,14 +102,14 @@ describe("slime shop item equipment", () => {
     const state = installState();
     const water = SLIME_SHOP_CATALOG.find((item) => item.floor === "water-puddle")!;
     const trampoline = SLIME_SHOP_CATALOG.find((item) => item.floor === "trampoline")!;
-    const drink = SLIME_SHOP_CATALOG.find((item) => item.floor === null)!;
+    const drink = SLIME_SHOP_CATALOG.find((item) => item.category === "drink")!;
     state.slimeRows[0].equippedItemKeys = [water.key, drink.key];
 
     const result = await equipSlimeShopItem(student, "blue", trampoline.key, true, "floor-swap");
 
     expect(result).toMatchObject({
-      equippedItemKeys: [drink.key, trampoline.key],
-      equippedItemsByColor: { blue: [drink.key, trampoline.key] },
+      equippedItemKeys: [trampoline.key, drink.key],
+      equippedItemsByColor: { blue: [trampoline.key, drink.key] },
       equippedFloorByColor: { blue: "trampoline" },
       equippedFloor: "trampoline",
       idempotent: false,
@@ -131,6 +131,48 @@ describe("slime shop item equipment", () => {
     expect(result.equippedFloorByColor).toEqual({ blue: "grass-floor" });
     expect(state.rows.get(drink.key)?.isEquipped).toBe(false);
     expect(state.rows.get(ball.key)?.isEquipped).toBe(true);
+  });
+
+  it("equips a scene background without replacing the floor or accessory", async () => {
+    const state = installState();
+    const scene = SLIME_SHOP_CATALOG.find((item) =>
+      item.category === "background" && item.floor === null)!;
+    const floor = SLIME_SHOP_CATALOG.find((item) => item.floor === "grass-floor")!;
+    const accessory = SLIME_SHOP_CATALOG.find((item) => item.category === "drink")!;
+    state.slimeRows[0].equippedItemKeys = [accessory.key, floor.key];
+    state.rows.get(floor.key)!.isEquipped = true;
+    state.rows.get(accessory.key)!.isEquipped = true;
+
+    const result = await equipSlimeShopItem(student, "blue", scene.key, true, "scene-background");
+
+    expect(result.equippedItemKeys).toEqual([scene.key, floor.key, accessory.key]);
+    expect(result.equippedItemsByColor).toEqual({
+      blue: [scene.key, floor.key, accessory.key],
+    });
+    expect(result.equippedFloorByColor).toEqual({ blue: "grass-floor" });
+    expect(state.rows.get(scene.key)?.isEquipped).toBe(true);
+    expect(state.rows.get(floor.key)?.isEquipped).toBe(true);
+    expect(state.rows.get(accessory.key)?.isEquipped).toBe(true);
+  });
+
+  it("removes only the scene background from a complete visual loadout", async () => {
+    const state = installState();
+    const scene = SLIME_SHOP_CATALOG.find((item) =>
+      item.category === "background" && item.floor === null)!;
+    const legacyFloor = SLIME_SHOP_CATALOG.find((item) => item.key === "water-puddle-background")!;
+    const accessory = SLIME_SHOP_CATALOG.find((item) => item.category === "prop")!;
+    state.slimeRows[0].equippedItemKeys = [scene.key, legacyFloor.key, accessory.key];
+    state.rows.get(scene.key)!.isEquipped = true;
+    state.rows.get(legacyFloor.key)!.isEquipped = true;
+    state.rows.get(accessory.key)!.isEquipped = true;
+
+    const result = await equipSlimeShopItem(student, "blue", scene.key, false, "remove-scene");
+
+    expect(result.equippedItemKeys).toEqual([legacyFloor.key, accessory.key]);
+    expect(result.equippedFloorByColor).toEqual({ blue: "water-puddle" });
+    expect(state.rows.get(scene.key)?.isEquipped).toBe(false);
+    expect(state.rows.get(legacyFloor.key)?.isEquipped).toBe(true);
+    expect(state.rows.get(accessory.key)?.isEquipped).toBe(true);
   });
 
   it("rejects food as a visual equipment item", async () => {

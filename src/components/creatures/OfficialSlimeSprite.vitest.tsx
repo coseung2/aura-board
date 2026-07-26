@@ -125,4 +125,46 @@ describe("OfficialSlimeSprite", () => {
       container.querySelector('img[src="/creatures/slimes/official/shared/trampoline-floor.png"]'),
     ).toBeTruthy();
   });
+
+  it("renders a scene background below a legacy floor and complete prop", () => {
+    const { container, rerender } = render(
+      <OfficialSlimeSprite
+        slimeColor="red"
+        equippedFloor="grass-floor"
+        itemSpritePath="https://cdn.example.test/slime-prop.gif"
+        backgroundSpritePath="https://cdn.example.test/shooting-star-night-sky.gif"
+      />,
+    );
+
+    const background = container.querySelector<HTMLImageElement>(
+      'img[src="https://cdn.example.test/shooting-star-night-sky.gif"]',
+    );
+    const floor = container.querySelector<HTMLImageElement>(
+      'img[src="/creatures/slimes/official/shared/grass-floor.png"]',
+    );
+    const prop = container.querySelector<HTMLImageElement>(
+      'img[src="https://cdn.example.test/slime-prop.gif"]',
+    );
+    expect(background).toBeTruthy();
+    expect(floor).toBeTruthy();
+    expect(prop).toBeTruthy();
+    expect(
+      Array.from(container.querySelectorAll("img")).indexOf(background!),
+    ).toBeLessThan(Array.from(container.querySelectorAll("img")).indexOf(floor!));
+    expect(container.firstElementChild?.getAttribute("data-background-sprite-path")).toBe(
+      "https://cdn.example.test/shooting-star-night-sky.gif",
+    );
+
+    rerender(
+      <OfficialSlimeSprite
+        slimeColor="red"
+        backgroundSpritePath="creatures/slimes/shop/shooting-star-night-sky.gif"
+      />,
+    );
+    expect(
+      container.querySelector(
+        'img[src="/creatures/slimes/shop/shooting-star-night-sky.gif"]',
+      ),
+    ).toBeTruthy();
+  });
 });

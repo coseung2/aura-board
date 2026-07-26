@@ -8,10 +8,16 @@ vi.mock("./slime-assets", () => ({
 import {
   calculateGrowthTimeComparison,
   calculateSlimeGrowthPercent,
+  catalogHasSceneBackgrounds,
+  isSceneBackgroundItem,
   normalizeSlimeHome,
   normalizeSlimeClassroom,
+  resolveEquippedSceneBackground,
+  resolveSlimeRemoteSpriteUri,
   shopFilterForItem,
   slimeBallSpritePath,
+  slimeShopNavItems,
+  slimeVisualItemSlot,
   SLIME_COOKIE_ITEM_KEY,
   studentPetHref,
 } from "./slimes";
@@ -43,14 +49,99 @@ describe("mobile slime parity model", () => {
     expect(calculateSlimeGrowthPercent(home.growthByColor.blue!)).toBe(50);
   });
 
-  it("maps API categories to the five Korean shop tabs", () => {
-    const item = (category: "background" | "ride" | "drink" | "food" | "prop" | "level-up") => ({ category });
-    expect(shopFilterForItem(item("background"))).toBe("floor");
-    expect(shopFilterForItem(item("ride"))).toBe("floor");
+  it("maps API categories to shop tabs and keeps legacy floors separate from scene backgrounds", () => {
+    const item = (
+      category: "background" | "ride" | "drink" | "food" | "prop" | "level-up",
+      floor: "grass-floor" | "water-puddle" | "trampoline" | null = null,
+    ) => ({ category, floor });
+
+    expect(isSceneBackgroundItem(item("background"))).toBe(true);
+    expect(isSceneBackgroundItem(item("background", "grass-floor"))).toBe(false);
+    expect(shopFilterForItem(item("background"))).toBe("background");
+    expect(shopFilterForItem(item("background", "grass-floor"))).toBe("floor");
+    expect(shopFilterForItem(item("ride", "trampoline"))).toBe("floor");
     expect(shopFilterForItem(item("food"))).toBe("food");
     expect(shopFilterForItem(item("drink"))).toBe("prop");
     expect(shopFilterForItem(item("prop"))).toBe("prop");
     expect(shopFilterForItem(item("level-up"))).toBe("level-up");
+    expect(slimeVisualItemSlot(item("background"))).toBe("background");
+    expect(slimeVisualItemSlot(item("background", "water-puddle"))).toBe("floor");
+    expect(slimeVisualItemSlot(item("prop"))).toBe("accessory");
+  });
+
+  it("shows the background shop tab only when the catalog has a true scene background", () => {
+    const legacyOnly = [
+      { category: "background" as const, floor: "grass-floor" as const },
+      { category: "ride" as const, floor: "trampoline" as const },
+    ];
+    const withScene = [
+      ...legacyOnly,
+      {
+        key: "shooting-star-night-sky-background",
+        category: "background" as const,
+        floor: null,
+        labelKo: "별똥별 밤하늘",
+        price: 100,
+        spritePath: "/creatures/slimes/shop/shooting-star-night-sky.gif",
+      },
+    ];
+
+    expect(catalogHasSceneBackgrounds(legacyOnly)).toBe(false);
+    expect(slimeShopNavItems(legacyOnly).map((tab) => tab.key)).toEqual([
+      "character",
+      "floor",
+      "food",
+      "prop",
+    ]);
+    expect(catalogHasSceneBackgrounds(withScene)).toBe(true);
+    expect(slimeShopNavItems(withScene).map((tab) => tab.key)).toEqual([
+      "character",
+      "background",
+      "floor",
+      "food",
+      "prop",
+    ]);
+  });
+
+  it("resolves remote and API-relative background paths and the equipped scene background", () => {
+    expect(
+      resolveSlimeRemoteSpriteUri(
+        "/creatures/slimes/shop/shooting-star-night-sky.gif",
+        "https://api.example.com",
+      ),
+    ).toBe("https://api.example.com/creatures/slimes/shop/shooting-star-night-sky.gif");
+    expect(
+      resolveSlimeRemoteSpriteUri(
+        "https://cdn.example.com/bg.gif",
+        "https://api.example.com",
+      ),
+    ).toBe("https://cdn.example.com/bg.gif");
+
+    const catalog = [
+      {
+        key: "grass-floor-background",
+        category: "background" as const,
+        floor: "grass-floor" as const,
+        labelKo: "잔디 바닥",
+        price: 100,
+        spritePath: "/creatures/slimes/official/shared/grass-floor.png",
+      },
+      {
+        key: "shooting-star-night-sky-background",
+        category: "background" as const,
+        floor: null,
+        labelKo: "별똥별 밤하늘",
+        price: 100,
+        spritePath: "/creatures/slimes/shop/shooting-star-night-sky.gif",
+      },
+    ];
+    expect(
+      resolveEquippedSceneBackground(
+        ["grass-floor-background", "shooting-star-night-sky-background"],
+        catalog,
+      )?.key,
+    ).toBe("shooting-star-night-sky-background");
+    expect(resolveEquippedSceneBackground(["grass-floor-background"], catalog)).toBeNull();
   });
 
   it("resolves the equipped ball animation for the slime color", () => {

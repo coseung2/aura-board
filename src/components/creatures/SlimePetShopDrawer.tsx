@@ -2,6 +2,7 @@ import { useRef, type KeyboardEvent, type RefObject } from "react";
 import { createPortal } from "react-dom";
 
 import { formatBpsPercent } from "@/lib/pets/math";
+import { isSlimeSceneBackground } from "@/lib/pets/catalog";
 import type { EquippedFloor, SlimeAction } from "@/lib/pets/slime-assets";
 import type { SlimeColor, SlimeDefinition, SlimeShopItem } from "@/lib/pets/types";
 
@@ -135,6 +136,7 @@ export function SlimePetShopDrawer({
     const preview = previewState(item);
     const previewColor = wardrobeColor ?? "blue";
     const itemSpritePath = slimeItemSpritePath(item, previewColor);
+    const sceneBackground = isSlimeSceneBackground(item);
     const isBall = item.key.startsWith("slime-ball-");
 
     return (
@@ -145,7 +147,8 @@ export function SlimePetShopDrawer({
             evolution="base"
             action={preview.action}
             equippedFloor={preview.equippedFloor}
-            itemSpritePath={itemSpritePath}
+            itemSpritePath={sceneBackground ? undefined : itemSpritePath}
+            backgroundSpritePath={sceneBackground ? item.spritePath : undefined}
             repeat={preview.action === "drink" || isBall}
             scale={1}
             alt={`${item.labelKo} 미리보기`}
