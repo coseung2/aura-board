@@ -4,6 +4,11 @@ import { memo, useMemo, useState } from "react";
 import { CardAttachments } from "../CardAttachments";
 import { CardAuthorFooter } from "./CardAuthorFooter";
 import { CardEngagement } from "../engagement/CardEngagement";
+import {
+  HiddenContentPlaceholder,
+  StudentContentModerationControls,
+  useStudentContentHidden,
+} from "../moderation/StudentContentModeration";
 
 const CONTENT_PREVIEW_CHAR_LIMIT = 150;
 const CONTENT_PREVIEW_LINE_LIMIT = 5;
@@ -36,6 +41,7 @@ type Props = {
       order: number;
     }>;
     externalAuthorName?: string | null;
+    studentAuthorId?: string | null;
     studentAuthorName?: string | null;
     authorName?: string | null;
     authors?: Array<{ order: number; displayName: string }>;
@@ -44,6 +50,8 @@ type Props = {
     commentCount?: number;
     isLiked?: boolean;
     canInteract?: boolean;
+    canModerate?: boolean;
+    hiddenReason?: "item" | "author" | null;
     // 보드 단위 익명 토글 (Board.anonymousAuthor) — 호출처에서 주입.
     anonymousAuthor?: boolean;
   };
@@ -88,7 +96,7 @@ export const CardBody = memo(function CardBody({
   const [isExpanded, setIsExpanded] = useState(false);
   const canToggleContent = useMemo(
     () => contentDisplay === "expandable" && isLongContent(card.content),
-    [card.content, contentDisplay]
+    [card.content, contentDisplay],
   );
   const contentClassName = [
     "padlet-card-content",
@@ -118,6 +126,36 @@ export const CardBody = memo(function CardBody({
           canInteract: card.canInteract,
         }
       : undefined;
+  const { hidden, setHidden } = useStudentContentHidden(
+    "card",
+    card.id ?? "",
+    card.hiddenReason ?? null,
+    card.studentAuthorId,
+  );
+
+  if (card.id && hidden) {
+    return (
+      <HiddenContentPlaceholder
+        targetKind="card"
+        targetId={card.id}
+        reason={hidden.reason}
+        hiddenStudentId={hidden.hiddenStudentId}
+        onRestored={() => {
+          setHidden(null);
+          window.location.reload();
+        }}
+      />
+    );
+  }
+
+  const moderationAction =
+    isStudentViewer && card.id && card.canModerate ? (
+      <StudentContentModerationControls
+        targetKind="card"
+        targetId={card.id}
+        authorStudentId={card.studentAuthorId}
+      />
+    ) : null;
 
   return (
     <>
@@ -139,7 +177,9 @@ export const CardBody = memo(function CardBody({
       {card.title.trim() && (
         <Title className="padlet-card-title">{card.title}</Title>
       )}
-      {card.content.trim() && <p className={contentClassName}>{card.content}</p>}
+      {card.content.trim() && (
+        <p className={contentClassName}>{card.content}</p>
+      )}
       {canToggleContent && (
         <button
           type="button"
@@ -172,7 +212,12 @@ export const CardBody = memo(function CardBody({
           boardId={boardId}
           isStudentViewer={isStudentViewer}
           initialCounts={initialCounts}
-          chipsActionsEnd={editAuthorsAction}
+          chipsActionsEnd={
+            <>
+              {editAuthorsAction}
+              {moderationAction}
+            </>
+          }
         />
       ) : editAuthorsAction ? (
         <div className="card-engagement-chips">{editAuthorsAction}</div>

@@ -371,3 +371,32 @@ PARENT_OAUTH_REDIRECT_BASE_URL
 - 매직링크 deprecate (현재 fallback 으로 보존)
 - plant 진행도 그래프 등 5탭 sub-feature 별도 시각화 (portfolio 카드 단위로 통합)
 - placeholder email 발송 path skip 자동화
+
+## 웹·모바일 패리티 잔여 정리 (web-mobile-parity-audit) — 2026-07-26
+
+감사 후 반영된 현재 동작. 의도적 플랫폼 차이는 유지한다.
+
+### 모바일 푸시·알림 고정
+- 학생 푸시 디스패치가 출석 리마인더·과제 배부 이벤트를 포함한다 (`/api/cron/notification-push` + `src/lib/student-push.ts`).
+- 학생 알림 목록은 like/comment/reward와 함께 영속 push dispatch(attendance/assignment)를 합쳐 반환한다.
+- Expo 알림 화면은 동일 계약으로 배지·읽음 상태를 표시한다.
+
+### 펫(슬라임) 화면 정리
+- 웹 `/student/aura-pet`와 모바일 `/(student)/slime` 모두 초기 로딩/오류 상태에서도 공통 헤더 골격을 유지한다.
+- 학급 펫 목록에서 걷기 칭호가 없는 학생도 이름 정렬이 깨지지 않도록 spacer를 둔다.
+- 대표 펫·성장 슬롯 분리는 기존 creature contract를 유지한다.
+
+### 웹 학급 역할·보상 설정
+- 교사 `ClassroomRolesTab`에서 역할 활성화/비활성과 급여(`salaryAmount`)·지급 주기(`daily|weekly|monthly`)를 편집한다.
+- `GET/PATCH /api/classrooms/[id]/roles`가 availableDefs·assignments·role settings를 함께 다룬다.
+- 비활성 역할로의 신규 배정은 API에서 거절한다.
+
+### 학부모 피드 engagement 패리티
+- 웹 학부모 피드는 더 이상 "읽기 전용"으로 안내하지 않는다.
+- 학부모는 게시물 좋아요 + 가족(보호자) 댓글을 작성할 수 있고, 공개 댓글은 읽기 전용이다.
+- 웹 engagement는 `viewer="parent"`를 명시적으로 전달한다. `.parent-topnav` DOM ancestry로 판별하지 않는다.
+
+### 의도적 플랫폼 차이 — 일일 배너
+- **일일 배너 표시·제안(제출)은 모바일 전용**이다.
+- 학생/학부모 Expo shell의 `DailyBanner` 표시와 학생 `daily-banner-submit` 제안 플로우가 해당 범위다.
+- 교사·관리자 웹의 배너 검수/게시(`/classroom/.../daily-banners`, `/admin/daily-banners`)는 운영 도구이며, 학생·학부모 웹 피드/홈에 일일 배너 표시/제안 UI를 두지 않는다.

@@ -97,7 +97,9 @@ export function ParentFeed({ pendingLinks = [], childCount }: Props) {
               <Link href="/parent/onboard/match/code">자녀 추가 <span>→</span></Link>
               <Link href="/parent/account">계정 관리 <span>→</span></Link>
             </nav>
-            <small className="parent-feed-readonly">학부모 화면은 읽기 전용입니다.</small>
+            <small className="parent-feed-readonly">
+              좋아요와 가족 댓글을 남길 수 있어요. 공개 댓글은 읽기 전용입니다.
+            </small>
           </aside>
         </div>
       )}
@@ -106,6 +108,7 @@ export function ParentFeed({ pendingLinks = [], childCount }: Props) {
         card={selectedPost ? portfolioCardToCardData(selectedPost) : null}
         onClose={() => setOpenPost(null)}
         boardId={selectedPost?.sourceBoard.id}
+        viewer="parent"
       />
     </main>
   );

@@ -44,6 +44,7 @@ export function StudentTopNav({
   const walkingActive = pathname.startsWith("/student/walking");
   const walletActive = pathname.startsWith("/my/wallet");
   const portfolioActive = pathname.startsWith("/student/portfolio");
+  const hiddenContentActive = pathname.startsWith("/student/hidden-content");
   const dutyActive = duties.some((duty) => pathname.startsWith(duty.href));
   const boardTab = searchParams.get("board");
 
@@ -75,7 +76,8 @@ export function StudentTopNav({
       id: "life",
       label: "생활",
       href: dutyLinks[0]?.href ?? "/my/wallet",
-      active: dutyActive || walletActive || portfolioActive,
+      active:
+        dutyActive || walletActive || portfolioActive || hiddenContentActive,
       groups: [
         {
           title: "1인1역할",
@@ -102,6 +104,11 @@ export function StudentTopNav({
               href: "/student/portfolio",
               label: "포트폴리오",
               active: portfolioActive,
+            },
+            {
+              href: "/student/hidden-content",
+              label: "숨긴 콘텐츠",
+              active: hiddenContentActive,
             },
           ],
         },

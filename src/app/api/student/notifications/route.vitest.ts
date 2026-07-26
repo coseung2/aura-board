@@ -12,6 +12,9 @@ const mocks = vi.hoisted(() => ({
   commentFindMany: vi.fn(),
   rewardFindMany: vi.fn(),
   rewardFindFirst: vi.fn(),
+  pushCount: vi.fn(),
+  pushFindMany: vi.fn(),
+  pushFindFirst: vi.fn(),
   receiptUpsert: vi.fn(),
   stateUpsert: vi.fn(),
 }));
@@ -38,6 +41,11 @@ vi.mock("@/lib/db", () => ({
       findMany: mocks.rewardFindMany,
       findFirst: mocks.rewardFindFirst,
     },
+    studentPushDispatch: {
+      count: mocks.pushCount,
+      findMany: mocks.pushFindMany,
+      findFirst: mocks.pushFindFirst,
+    },
   },
 }));
 
@@ -53,6 +61,7 @@ describe("/api/student/notifications reward compatibility", () => {
     mocks.likeCount.mockResolvedValue(0);
     mocks.commentCount.mockResolvedValue(0);
     mocks.rewardCount.mockResolvedValue(1);
+    mocks.pushCount.mockResolvedValue(0);
     mocks.likeFindMany.mockResolvedValue([]);
     mocks.commentFindMany.mockResolvedValue([]);
     mocks.rewardFindMany.mockResolvedValue([
@@ -65,6 +74,8 @@ describe("/api/student/notifications reward compatibility", () => {
       },
     ]);
     mocks.rewardFindFirst.mockResolvedValue({ id: "transaction-1" });
+    mocks.pushFindMany.mockResolvedValue([]);
+    mocks.pushFindFirst.mockResolvedValue(null);
     mocks.receiptUpsert.mockResolvedValue({});
   });
 
@@ -159,5 +170,127 @@ describe("/api/student/notifications reward compatibility", () => {
         }),
       }),
     );
+  });
+
+  it("merges persisted attendance and assignment events and keeps individual read state after reload", async () => {
+    const attendanceCreatedAt = new Date("2026-07-26T00:00:00.000Z");
+    const assignmentCreatedAt = new Date("2026-07-26T00:01:00.000Z");
+    mocks.rewardCount.mockResolvedValue(0);
+    mocks.rewardFindMany.mockResolvedValue([]);
+    mocks.pushCount.mockResolvedValue(2);
+    mocks.pushFindMany.mockResolvedValue([
+      {
+        id: "dispatch-assignment",
+        kind: "assignment",
+        title: "새 과제가 도착했어요",
+        body: "우리 반 과제를 확인해 주세요.",
+        href: "/board/class-homework",
+        createdAt: assignmentCreatedAt,
+      },
+      {
+        id: "dispatch-attendance",
+        kind: "attendance",
+        title: "오늘 출석을 확인해 주세요",
+        body: "오늘의 출석을 기록해 주세요.",
+        href: "/student",
+        createdAt: attendanceCreatedAt,
+      },
+    ]);
+    mocks.pushFindFirst.mockResolvedValue({ id: "dispatch-attendance" });
+
+    const initialResponse = await GET();
+    await expect(initialResponse.json()).resolves.toMatchObject({
+      count: 2,
+      items: [
+        expect.objectContaining({
+          id: "assignment:dispatch-assignment",
+          kind: "assignment",
+          href: "/board/class-homework",
+          read: false,
+        }),
+        expect.objectContaining({
+          id: "attendance:dispatch-attendance",
+          kind: "attendance",
+          read: false,
+        }),
+      ],
+    });
+
+    const markResponse = await POST(new Request(
+      "http://localhost/api/student/notifications",
+      {
+        method: "POST",
+        body: JSON.stringify({
+          action: "mark_read",
+          kind: "attendance",
+          id: "dispatch-attendance",
+        }),
+      },
+    ));
+    expect(markResponse.status).toBe(200);
+    expect(mocks.pushFindFirst).toHaveBeenCalledWith({
+      where: {
+        id: "dispatch-attendance",
+        studentId: "student-1",
+        kind: "attendance",
+      },
+      select: { id: true },
+    });
+
+    mocks.receiptFindMany.mockResolvedValue([{
+      notificationType: "attendance",
+      notificationId: "dispatch-attendance",
+    }]);
+    mocks.pushCount.mockResolvedValue(1);
+    const reloadResponse = await GET();
+    const reloaded = await reloadResponse.json();
+    expect(reloaded.count).toBe(1);
+    expect(reloaded.items).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        id: "attendance:dispatch-attendance",
+        read: true,
+      }),
+    ]));
+  });
+
+  it("persists mark-all and applies its read cursor on reload", async () => {
+    const readAt = new Date("2026-07-26T01:00:00.000Z");
+    vi.useFakeTimers();
+    vi.setSystemTime(readAt);
+    mocks.stateUpsert.mockResolvedValue({});
+
+    const markResponse = await POST(new Request(
+      "http://localhost/api/student/notifications",
+      { method: "POST", body: JSON.stringify({ action: "mark_all_read" }) },
+    ));
+    expect(markResponse.status).toBe(200);
+    expect(mocks.stateUpsert).toHaveBeenCalledWith({
+      where: { studentId: "student-1" },
+      create: { studentId: "student-1", lastReadAt: readAt },
+      update: { lastReadAt: readAt },
+    });
+
+    mocks.stateFindUnique.mockResolvedValue({ lastReadAt: readAt });
+    mocks.rewardCount.mockResolvedValue(0);
+    mocks.rewardFindMany.mockResolvedValue([]);
+    mocks.pushCount.mockResolvedValue(0);
+    mocks.pushFindMany.mockResolvedValue([{
+      id: "dispatch-assignment",
+      kind: "assignment",
+      title: "새 과제가 도착했어요",
+      body: "과제를 확인해 주세요.",
+      href: "/board/homework",
+      createdAt: new Date("2026-07-26T00:30:00.000Z"),
+    }]);
+
+    const reloadResponse = await GET();
+    await expect(reloadResponse.json()).resolves.toMatchObject({
+      count: 0,
+      items: [expect.objectContaining({
+        id: "assignment:dispatch-assignment",
+        read: true,
+      })],
+    });
+    vi.useRealTimers();
   });
 });

@@ -1,4 +1,10 @@
-import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { CardEngagement } from "../CardEngagement";
 import type { BoardEngagementEvent } from "@/hooks/useBoardEngagementRealtime";
@@ -72,16 +78,15 @@ describe("CardEngagement comment realtime", () => {
   it("uses the per-tab student marker while preserving an explicit prop override", async () => {
     document.body.innerHTML =
       '<header data-aura-board-id="board-marker" data-aura-student-viewer="true"></header>';
-    const fetchMock = vi.fn(
-      (_input: RequestInfo | URL, _init?: RequestInit) =>
-        Promise.resolve(
-          response({
-            likeCount: 0,
-            commentCount: 0,
-            isLiked: false,
-            canInteract: true,
-          }),
-        ),
+    const fetchMock = vi.fn((_input: RequestInfo | URL, _init?: RequestInit) =>
+      Promise.resolve(
+        response({
+          likeCount: 0,
+          commentCount: 0,
+          isLiked: false,
+          canInteract: true,
+        }),
+      ),
     );
     vi.stubGlobal("fetch", fetchMock);
 
@@ -322,6 +327,7 @@ describe("CardEngagement comment realtime", () => {
   });
 
   it("keeps a parent on the guardian writer and makes public comments read-only", async () => {
+    // Parent identity is explicit. DOM ancestry must not control audience.
     document.body.innerHTML = '<header class="parent-topnav"></header>';
     const fetchMock = vi.fn((input: RequestInfo | URL) => {
       const url = input.toString();
@@ -347,6 +353,7 @@ describe("CardEngagement comment realtime", () => {
         cardId="parent-card"
         boardId="parent-board"
         mode="panel"
+        viewer="parent"
         initialCounts={{
           likeCount: 0,
           commentCount: 0,
@@ -359,6 +366,111 @@ describe("CardEngagement comment realtime", () => {
     const guardianTab = await screen.findByRole("tab", { name: "보호자 대화" });
     expect(guardianTab.getAttribute("aria-selected")).toBe("true");
     expect(screen.getByRole("textbox")).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("tab", { name: "공개 대화" }));
+    await screen.findByText("읽기 전용이라 댓글을 달 수 없어요");
+    expect(screen.queryByRole("textbox")).toBeNull();
+  });
+
+  it("does not treat parent-topnav DOM alone as a parent viewer", async () => {
+    document.body.innerHTML = '<header class="parent-topnav"></header>';
+    const fetchMock = vi.fn((input: RequestInfo | URL) => {
+      const url = input.toString();
+      if (url.endsWith("/poll")) {
+        return Promise.resolve(response({ enabled: false }));
+      }
+      if (url.endsWith("/comments?audience=public")) {
+        return Promise.resolve(
+          response({ guardianAvailable: true, items: [] }),
+        );
+      }
+      if (url.endsWith("/comments?audience=guardian")) {
+        return Promise.resolve(
+          response({ guardianAvailable: true, items: [] }),
+        );
+      }
+      return Promise.resolve(response({}, false));
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(
+      <CardEngagement
+        cardId="non-parent-card"
+        boardId="board-public"
+        mode="panel"
+        initialCounts={{
+          likeCount: 0,
+          commentCount: 0,
+          isLiked: false,
+          canInteract: true,
+        }}
+      />,
+    );
+
+    const publicTab = await screen.findByRole("tab", { name: "공개 대화" });
+    expect(publicTab.getAttribute("aria-selected")).toBe("true");
+    expect(screen.getByRole("textbox")).toBeTruthy();
+    expect(
+      fetchMock.mock.calls.some(([input]) =>
+        input.toString().endsWith("/comments?audience=public"),
+      ),
+    ).toBe(true);
+  });
+
+  it("allows parent likes while keeping public comments read-only", async () => {
+    const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = input.toString();
+      if (url.endsWith("/poll")) {
+        return Promise.resolve(response({ enabled: false }));
+      }
+      if (url.endsWith("/comments?audience=guardian")) {
+        return Promise.resolve(
+          response({ guardianAvailable: true, items: [] }),
+        );
+      }
+      if (url.endsWith("/comments?audience=public")) {
+        return Promise.resolve(
+          response({ guardianAvailable: true, items: [] }),
+        );
+      }
+      if (url.endsWith("/like") && init?.method === "POST") {
+        return Promise.resolve(response({ liked: true, count: 1 }));
+      }
+      return Promise.resolve(response({}, false));
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(
+      <CardEngagement
+        cardId="parent-like-card"
+        boardId="parent-board"
+        mode="panel"
+        viewer="parent"
+        initialCounts={{
+          likeCount: 0,
+          commentCount: 0,
+          isLiked: false,
+          canInteract: true,
+        }}
+      />,
+    );
+
+    // Panel-mode like uses aria-pressed (chips mode owns the "좋아요" label).
+    const likeButton = document.querySelector(
+      ".card-engagement-like-btn",
+    ) as HTMLButtonElement | null;
+    expect(likeButton).toBeTruthy();
+    expect(likeButton?.disabled).toBe(false);
+    fireEvent.click(likeButton!);
+
+    await waitFor(() => {
+      const likeCall = fetchMock.mock.calls.find(
+        ([input, init]) =>
+          input.toString().endsWith("/like") && init?.method === "POST",
+      );
+      expect(likeCall).toBeTruthy();
+      expect(JSON.parse(String(likeCall?.[1]?.body))).toEqual({ liked: true });
+    });
 
     fireEvent.click(screen.getByRole("tab", { name: "공개 대화" }));
     await screen.findByText("읽기 전용이라 댓글을 달 수 없어요");
@@ -395,5 +507,83 @@ describe("CardEngagement comment realtime", () => {
 
     await screen.findByText("아직 댓글이 없어요");
     expect(screen.queryByRole("tab")).toBeNull();
+  });
+
+  it("shows moderation only for ACL-eligible comments in a student viewer", async () => {
+    const fetchMock = vi.fn((input: RequestInfo | URL) => {
+      const url = input.toString();
+      if (url.endsWith("/poll"))
+        return Promise.resolve(response({ enabled: false }));
+      if (url.endsWith("/comments?audience=public")) {
+        return Promise.resolve(
+          response({
+            items: [
+              {
+                id: "peer-comment",
+                content: "친구 댓글",
+                createdAt: "2026-07-25T00:00:00.000Z",
+                authorKind: "student",
+                authorLabel: "친구",
+                authorStudentId: "student-2",
+                canDelete: false,
+                canModerate: true,
+                hiddenReason: null,
+              },
+              {
+                id: "own-comment",
+                content: "내 댓글",
+                createdAt: "2026-07-25T00:00:01.000Z",
+                authorKind: "student",
+                authorLabel: "나",
+                authorStudentId: "student-1",
+                canDelete: true,
+                canModerate: false,
+                hiddenReason: null,
+              },
+            ],
+          }),
+        );
+      }
+      return Promise.resolve(response({}, false));
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const view = render(
+      <CardEngagement
+        cardId="student-moderation-card"
+        mode="panel"
+        isStudentViewer
+        initialCounts={{
+          likeCount: 0,
+          commentCount: 2,
+          isLiked: false,
+          canInteract: true,
+        }}
+      />,
+    );
+
+    await screen.findByText("친구 댓글");
+    expect(
+      screen.getAllByRole("button", { name: "댓글 신고 또는 숨기기" }),
+    ).toHaveLength(1);
+
+    view.rerender(
+      <CardEngagement
+        cardId="student-moderation-card"
+        mode="panel"
+        isStudentViewer={false}
+        initialCounts={{
+          likeCount: 0,
+          commentCount: 2,
+          isLiked: false,
+          canInteract: true,
+        }}
+      />,
+    );
+    await waitFor(() =>
+      expect(
+        screen.queryByRole("button", { name: "댓글 신고 또는 숨기기" }),
+      ).toBeNull(),
+    );
   });
 });

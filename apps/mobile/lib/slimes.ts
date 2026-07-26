@@ -127,6 +127,7 @@ export type MobileSlimeClassmate = {
     color: SlimeColor;
     growthStage: 1 | 2 | 3;
     equippedItemKeys: string[];
+    equippedTitleKey: string | null;
   } | null;
 };
 
@@ -411,6 +412,11 @@ export function normalizeSlimeClassroom(payload: unknown): MobileSlimeClassmate[
             color: representativeColor,
             growthStage: stageValue(representative.growthStage),
             equippedItemKeys: stringList(representative.equippedItemKeys),
+            equippedTitleKey:
+              typeof representative.equippedTitleKey === "string"
+              && representative.equippedTitleKey.length > 0
+                ? representative.equippedTitleKey
+                : null,
           }
         : null,
     }];

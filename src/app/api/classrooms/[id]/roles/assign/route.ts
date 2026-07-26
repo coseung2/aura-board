@@ -68,6 +68,19 @@ export async function POST(
     );
   }
 
+  const roleSetting = await db.classroomRoleSetting.findUnique({
+    where: {
+      classroomId_classroomRoleId: {
+        classroomId,
+        classroomRoleId: role.id,
+      },
+    },
+    select: { enabled: true },
+  });
+  if (roleSetting?.enabled === false) {
+    return NextResponse.json({ error: "Role is disabled" }, { status: 409 });
+  }
+
   try {
     const assignment = await db.classroomRoleAssignment.create({
       data: {

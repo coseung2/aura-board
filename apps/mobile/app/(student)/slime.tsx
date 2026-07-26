@@ -565,31 +565,8 @@ export default function StudentSlimeScreen() {
     }
   }, [busyItemKey, clearRetryKey, cookieQuantity, home, load, retryKey]);
 
-  if (loading && !home) {
-    return (
-      <SafeAreaView style={styles.container} edges={["top"]}>
-        <AppHeader title="슬라임" onBack={() => router.back()} />
-        <View style={styles.loadingCenter}>
-          <ActivityIndicator size="large" color={colors.accent} />
-          <Text style={styles.loadingText}>펫 화면으로 이동 중…</Text>
-        </View>
-      </SafeAreaView>
-    );
-  }
-
-  if (error && !home) {
-    return (
-      <SafeAreaView style={styles.container} edges={["top"]}>
-        <AppHeader title="슬라임" onBack={() => router.back()} />
-        <View style={styles.errorCenter}>
-          <Text style={styles.errorEmoji}>🫧</Text>
-          <Text style={styles.errorTitle}>펫 화면을 열 수 없어요</Text>
-          <Text style={styles.errorMessage}>{error}</Text>
-          <AppButton onPress={() => void load()}>다시 시도</AppButton>
-        </View>
-      </SafeAreaView>
-    );
-  }
+  const showInitialLoading = loading && !home;
+  const showInitialError = Boolean(error && !home);
 
   return (
     <SafeAreaView style={styles.container} edges={["top"]}>
@@ -606,7 +583,25 @@ export default function StudentSlimeScreen() {
           {null}
         </ControlPressable>
       ) : null}
-      <AppHeader title="펫" onBack={() => router.back()} right={<StudentHeaderActions />} />
+      <AppHeader
+        title="펫"
+        onBack={() => router.back()}
+        right={showInitialLoading || showInitialError ? undefined : <StudentHeaderActions />}
+      />
+      {showInitialLoading ? (
+        <View style={styles.loadingCenter}>
+          <ActivityIndicator size="large" color={colors.accent} />
+          <Text style={styles.loadingText}>펫 화면으로 이동 중…</Text>
+        </View>
+      ) : showInitialError ? (
+        <View style={styles.errorCenter}>
+          <Text style={styles.errorEmoji}>🫧</Text>
+          <Text style={styles.errorTitle}>펫 화면을 열 수 없어요</Text>
+          <Text style={styles.errorMessage}>{error}</Text>
+          <AppButton onPress={() => void load()}>다시 시도</AppButton>
+        </View>
+      ) : (
+        <>
       <View style={styles.pageTabsRow}>
         <ContentTabs
           style={styles.petSectionNav}
@@ -713,7 +708,11 @@ export default function StudentSlimeScreen() {
                         </View>
                       )}
                     </View>
-                    <WalkingTitleSlot title={student.walkingTitle} />
+                    {student.walkingTitle ? (
+                      <WalkingTitleSlot title={student.walkingTitle} />
+                    ) : (
+                      <View style={styles.classmateTitleSpacer} />
+                    )}
                     <Text style={styles.classmateName} numberOfLines={1}>
                       {student.number !== null ? `${student.number}번 ` : ""}{student.name}
                     </Text>
@@ -1188,6 +1187,8 @@ export default function StudentSlimeScreen() {
           <Text style={[styles.noticeText, notice.kind === "error" ? styles.noticeErrorText : styles.noticeSuccessText]}>{notice.text}</Text>
         </View>
       ) : null}
+        </>
+      )}
     </SafeAreaView>
   );
 }
@@ -1300,4 +1301,5 @@ const styles = StyleSheet.create({
   classmateSprite: { height: iconSizes.empty + spacing.md, width: "100%", alignItems: "center", justifyContent: "center", overflow: "hidden" },
   noRepresentative: { width: "100%", height: "100%", alignItems: "center", justifyContent: "center" },
   classmatePlaceholderText: { ...typography.micro, color: colors.textMuted, textAlign: "center" },
+  classmateTitleSpacer: { width: "100%", height: spacing.xxl },
 });

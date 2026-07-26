@@ -8,6 +8,150 @@
   margin: 0 auto;
 }
 
+.student-hidden-page {
+  padding-block: 32px 56px;
+}
+
+.student-hidden-sections {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 20px;
+}
+
+.student-hidden-section {
+  min-width: 0;
+  border-top: 1px solid var(--color-border);
+}
+
+.student-hidden-section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 52px;
+  padding: 10px 2px;
+}
+
+.student-hidden-section-head h2 {
+  margin: 0;
+  color: var(--color-text);
+  font-size: 17px;
+}
+
+.student-hidden-section-head > span {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 28px;
+  min-height: 28px;
+  border-radius: var(--radius-pill);
+  background: var(--color-surface-alt);
+  color: var(--color-text-muted);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.student-hidden-list {
+  margin: 0;
+  padding: 0;
+  border-bottom: 1px solid var(--color-border);
+  list-style: none;
+}
+
+.student-hidden-list li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-width: 0;
+  min-height: 64px;
+  padding: 10px 2px;
+  border-top: 1px solid var(--color-border);
+}
+
+.student-hidden-list li > div {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.student-hidden-list strong,
+.student-hidden-list span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.student-hidden-list strong {
+  color: var(--color-text);
+  font-size: 14px;
+}
+
+.student-hidden-list span {
+  color: var(--color-text-muted);
+  font-size: 12px;
+}
+
+.student-hidden-list button,
+.student-hidden-state button,
+.student-hidden-state a {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 64px;
+  min-height: 44px;
+  flex: 0 0 auto;
+  padding: 8px 12px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-btn);
+  background: var(--color-surface);
+  color: var(--color-accent-tinted-text);
+  cursor: pointer;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 800;
+  text-decoration: none;
+}
+
+.student-hidden-list button:disabled {
+  cursor: wait;
+  opacity: 0.55;
+}
+
+.student-hidden-section-empty {
+  margin: 0;
+  padding: 20px 2px;
+  border-block: 1px solid var(--color-border);
+  color: var(--color-text-muted);
+  font-size: 13px;
+}
+
+.student-hidden-state {
+  display: grid;
+  justify-items: start;
+  gap: 8px;
+  min-height: 180px;
+  align-content: center;
+  padding: 28px 2px;
+  border-block: 1px solid var(--color-border);
+  color: var(--color-text-muted);
+}
+
+.student-hidden-state strong {
+  color: var(--color-text);
+  font-size: 18px;
+}
+
+.student-hidden-state p {
+  margin: 0;
+}
+
+@media (max-width: 900px) {
+  .student-hidden-sections {
+    grid-template-columns: 1fr;
+  }
+}
+
 .student-walking-page {
   padding-block: 24px;
 }
@@ -756,7 +900,10 @@
   background: var(--color-accent-tinted-bg);
   color: var(--color-text);
   cursor: pointer;
-  transition: background var(--t-normal), border-color var(--t-normal), transform var(--t-normal);
+  transition:
+    background var(--t-normal),
+    border-color var(--t-normal),
+    transform var(--t-normal);
 }
 
 .student-walking-ordinal-cell.is-earned:hover {
@@ -967,7 +1114,10 @@
   font-weight: 800;
 }
 
-.student-reading-future-mission-list li.is-complete .student-reading-mission-heading span {
+.student-reading-future-mission-list
+  li.is-complete
+  .student-reading-mission-heading
+  span {
   color: var(--color-success, var(--color-accent));
 }
 
@@ -996,12 +1146,14 @@
   font-size: 13px;
 }
 
-.student-reading-future-mission-list li.is-claimable .student-reading-mission-heading span {
+.student-reading-future-mission-list
+  li.is-claimable
+  .student-reading-mission-heading
+  span {
   color: var(--color-accent);
 }
 
 .student-reading-mission-progress span {
-
   display: block;
   height: 100%;
   border-radius: inherit;
@@ -1131,7 +1283,6 @@
   .student-walking-mission-coin-amount {
     font-size: 12px;
   }
-
 }
 
 .student-coming-soon-page {

@@ -3,7 +3,6 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({
   getCurrentStudent: vi.fn(),
   findMany: vi.fn(),
-  queryRaw: vi.fn(),
 }));
 
 vi.mock("@/lib/student-auth", () => ({
@@ -11,7 +10,7 @@ vi.mock("@/lib/student-auth", () => ({
 }));
 
 vi.mock("@/lib/db", () => ({
-  db: { student: { findMany: mocks.findMany }, $queryRaw: mocks.queryRaw },
+  db: { student: { findMany: mocks.findMany } },
 }));
 
 import { GET } from "./route";
@@ -28,7 +27,7 @@ describe("GET /api/student/slimes/classroom", () => {
     expect(mocks.findMany).not.toHaveBeenCalled();
   });
 
-  it("returns the classroom roster in student-number order", async () => {
+  it("returns the title equipped on the representative pet", async () => {
     mocks.getCurrentStudent.mockResolvedValue({
       id: "student-1",
       classroomId: "classroom-1",
@@ -39,21 +38,23 @@ describe("GET /api/student/slimes/classroom", () => {
         id: "a",
         number: 2,
         name: "서연",
-        slimes: [{ color: "blue", growthStage: 2, equippedItemKeys: ["slime-ball-soccer-ball"] }],
-      },
-    ]);
-    mocks.queryRaw.mockResolvedValue([
-      {
-        studentId: "a",
-        maxDailySteps: 20_000,
-        maxWeeklySteps: 50_000,
-        maxMonthlySteps: 50_000,
+        slimes: [{
+          color: "blue",
+          growthStage: 2,
+          equippedItemKeys: ["slime-ball-soccer-ball"],
+          equippedTitleKey: "weekly-50k",
+        }],
       },
       {
-        studentId: "b",
-        maxDailySteps: 0,
-        maxWeeklySteps: 0,
-        maxMonthlySteps: 0,
+        id: "c",
+        number: 5,
+        name: "하린",
+        slimes: [{
+          color: "green",
+          growthStage: 1,
+          equippedItemKeys: [],
+          equippedTitleKey: null,
+        }],
       },
     ]);
 
@@ -78,9 +79,28 @@ describe("GET /api/student/slimes/classroom", () => {
           color: "blue",
           growthStage: 2,
           equippedItemKeys: ["slime-ball-soccer-ball"],
+          equippedTitleKey: "weekly-50k",
         },
       },
-      { id: "b", number: 12, name: "민수", walkingTitle: null, representative: null },
+      {
+        id: "c",
+        number: 5,
+        name: "하린",
+        walkingTitle: null,
+        representative: {
+          color: "green",
+          growthStage: 1,
+          equippedItemKeys: [],
+          equippedTitleKey: null,
+        },
+      },
+      {
+        id: "b",
+        number: 12,
+        name: "민수",
+        walkingTitle: null,
+        representative: null,
+      },
     ]);
   });
 });

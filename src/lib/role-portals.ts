@@ -63,12 +63,34 @@ export async function getStudentDuties(studentId: string): Promise<Duty[]> {
     where: { studentId },
     select: {
       classroom: { select: { id: true, name: true } },
-      classroomRole: { select: { key: true, labelKo: true, emoji: true } },
+      classroomRole: { select: { id: true, key: true, labelKo: true, emoji: true } },
     },
     orderBy: { assignedAt: "asc" },
   });
-  const byClassroom = new Map<string, typeof assignments>();
-  for (const assignment of assignments) {
+  const roleSettings = assignments.length
+    ? await db.classroomRoleSetting.findMany({
+        where: {
+          classroomId: { in: [...new Set(assignments.map((a) => a.classroom.id))] },
+          classroomRoleId: {
+            in: [...new Set(assignments.map((a) => a.classroomRole.id))],
+          },
+          enabled: false,
+        },
+        select: { classroomId: true, classroomRoleId: true },
+      })
+    : [];
+  const disabledRoles = new Set(
+    roleSettings.map((setting) => `${setting.classroomId}:${setting.classroomRoleId}`),
+  );
+  const activeAssignments = assignments.filter(
+    (assignment) =>
+      !disabledRoles.has(
+        `${assignment.classroom.id}:${assignment.classroomRole.id}`,
+      ),
+  );
+
+  const byClassroom = new Map<string, typeof activeAssignments>();
+  for (const assignment of activeAssignments) {
     const list = byClassroom.get(assignment.classroom.id) ?? [];
     list.push(assignment);
     byClassroom.set(assignment.classroom.id, list);

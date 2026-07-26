@@ -3,6 +3,7 @@ import { Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
 import { getCurrentStudent } from "@/lib/student-auth";
 import {
+  STUDENT_NOTIFICATION_KINDS,
   STUDENT_NOTIFICATION_REWARD_SOURCE_TYPES,
   studentRewardTitle,
   type StudentNotificationKind,
@@ -20,6 +21,10 @@ export async function GET() {
   }
 
   const { likeWhere, commentWhere, rewardWhere } = notificationWhere(student);
+  const pushWhere: Prisma.StudentPushDispatchWhereInput = {
+    studentId: student.id,
+    kind: { in: ["attendance", "assignment"] },
+  };
   const [state, receipts, currency] = await Promise.all([
     db.studentNotificationState.findUnique({ where: { studentId: student.id } }),
     db.studentNotificationReceipt.findMany({
@@ -45,9 +50,16 @@ export async function GET() {
   const unreadRewardIds = receipts
     .filter((receipt) => receipt.notificationType === "reward")
     .map((receipt) => receipt.notificationId);
+  const readPushIds = receipts
+    .filter(
+      (receipt) =>
+        receipt.notificationType === "attendance" ||
+        receipt.notificationType === "assignment",
+    )
+    .map((receipt) => receipt.notificationId);
   const unreadSince = lastReadAt ? { createdAt: { gt: lastReadAt } } : {};
 
-  const [likeCount, commentCount, rewardCount, likes, comments, rewards] = await Promise.all([
+  const [likeCount, commentCount, rewardCount, pushCount, likes, comments, rewards, pushes] = await Promise.all([
     db.cardLike.count({
       where: {
         ...likeWhere,
@@ -67,6 +79,13 @@ export async function GET() {
         ...rewardWhere,
         ...unreadSince,
         ...(unreadRewardIds.length > 0 ? { id: { notIn: unreadRewardIds } } : {}),
+      },
+    }),
+    db.studentPushDispatch.count({
+      where: {
+        ...pushWhere,
+        ...unreadSince,
+        ...(readPushIds.length > 0 ? { id: { notIn: readPushIds } } : {}),
       },
     }),
     db.cardLike.findMany({
@@ -108,6 +127,19 @@ export async function GET() {
         amount: true,
         note: true,
         sourceType: true,
+        createdAt: true,
+      },
+    }),
+    db.studentPushDispatch.findMany({
+      where: pushWhere,
+      orderBy: { createdAt: "desc" },
+      take: RECENT_LIMIT,
+      select: {
+        id: true,
+        kind: true,
+        title: true,
+        body: true,
+        href: true,
         createdAt: true,
       },
     }),
@@ -177,14 +209,35 @@ export async function GET() {
     };
   });
 
-  const items = [...likeItems, ...commentItems, ...rewardItems]
+  const pushItems = pushes.flatMap((push) => {
+    if (!isPersistentPushKind(push.kind)) return [];
+    const fallbackTitle = push.kind === "attendance"
+      ? "오늘 출석을 확인해 주세요"
+      : "새 과제가 도착했어요";
+    return [{
+      id: `${push.kind}:${push.id}`,
+      kind: push.kind,
+      actorLabel: "Aura Board",
+      cardTitle: push.title || fallbackTitle,
+      boardTitle: push.kind === "attendance" ? "출석" : "과제",
+      href: push.href || "/student",
+      createdAt: push.createdAt.toISOString(),
+      content: push.body || undefined,
+      read: isRead(push.kind, push.id, push.createdAt),
+    }];
+  });
+
+  const items = [...likeItems, ...commentItems, ...rewardItems, ...pushItems]
     .sort(
       (a, b) =>
         new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
     )
     .slice(0, RECENT_LIMIT);
 
-  return NextResponse.json({ count: likeCount + commentCount + rewardCount, items });
+  return NextResponse.json({
+    count: likeCount + commentCount + rewardCount + pushCount,
+    items,
+  });
 }
 
 export async function POST(req: Request) {
@@ -211,7 +264,7 @@ export async function POST(req: Request) {
 
   if (
     input.action !== "mark_read" ||
-    (input.kind !== "like" && input.kind !== "comment" && input.kind !== "reward") ||
+    !(STUDENT_NOTIFICATION_KINDS as readonly unknown[]).includes(input.kind) ||
     typeof input.id !== "string" ||
     input.id.length === 0 ||
     input.id.length > 128
@@ -229,10 +282,19 @@ export async function POST(req: Request) {
             where: { ...commentWhere, id: input.id },
             select: { id: true },
           })
-        : await db.transaction.findFirst({
-            where: { ...rewardWhere, id: input.id },
-            select: { id: true },
-          });
+        : kind === "reward"
+          ? await db.transaction.findFirst({
+              where: { ...rewardWhere, id: input.id },
+              select: { id: true },
+            })
+          : await db.studentPushDispatch.findFirst({
+              where: {
+                id: input.id,
+                studentId: student.id,
+                kind,
+              },
+              select: { id: true },
+            });
   if (!notification) {
     return NextResponse.json({ error: "not_found" }, { status: 404 });
   }
@@ -299,6 +361,12 @@ function isRewardSourceType(
 ): value is StudentNotificationRewardSourceType {
   return value !== null &&
     (STUDENT_NOTIFICATION_REWARD_SOURCE_TYPES as readonly string[]).includes(value);
+}
+
+function isPersistentPushKind(
+  value: string | null,
+): value is "attendance" | "assignment" {
+  return value === "attendance" || value === "assignment";
 }
 
 function formatActorLabel({

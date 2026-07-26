@@ -117,7 +117,8 @@ export function ColumnsBoard({
 
   useEffect(() => {
     function handleSectionsReordered(event: Event) {
-      const detail = (event as CustomEvent<BoardSectionsReorderedDetail>).detail;
+      const detail = (event as CustomEvent<BoardSectionsReorderedDetail>)
+        .detail;
       if (!detail || detail.boardId !== boardId) return;
       const orderById = new Map(
         detail.sections.map((section) => [section.id, section] as const),
@@ -268,9 +269,7 @@ export function ColumnsBoard({
     setCards((list) =>
       list.map((c) => (c.id === card.id ? { ...c, guidePinned } : c)),
     );
-    setOpenCard((c) =>
-      c?.id === card.id ? { ...c, guidePinned } : c,
-    );
+    setOpenCard((c) => (c?.id === card.id ? { ...c, guidePinned } : c));
     try {
       const res = await fetch(`/api/cards/${card.id}`, {
         method: "PATCH",
@@ -332,10 +331,12 @@ export function ColumnsBoard({
     };
   }, [scrollRailWidth]);
 
-  const { roster, authorsForSection, studentForSectionTitle } = useColumnRoster({
-    classroomId,
-    canEdit,
-  });
+  const { roster, authorsForSection, studentForSectionTitle } = useColumnRoster(
+    {
+      classroomId,
+      canEdit,
+    },
+  );
 
   const {
     sortedSections,
@@ -449,7 +450,9 @@ export function ColumnsBoard({
       if (!res.ok) {
         setSections((list) =>
           list.map((s) =>
-            s.id === sectionId ? applySectionAssignmentState(s, previousState) : s,
+            s.id === sectionId
+              ? applySectionAssignmentState(s, previousState)
+              : s,
           ),
         );
         alert(`과제 상태 저장 실패: ${await res.text().catch(() => "")}`);
@@ -464,7 +467,9 @@ export function ColumnsBoard({
         : nextState;
       setSections((list) =>
         list.map((s) =>
-          s.id === sectionId ? applySectionAssignmentState(s, persistedState) : s,
+          s.id === sectionId
+            ? applySectionAssignmentState(s, persistedState)
+            : s,
         ),
       );
       alert(
@@ -475,7 +480,9 @@ export function ColumnsBoard({
     } catch (e) {
       setSections((list) =>
         list.map((s) =>
-          s.id === sectionId ? applySectionAssignmentState(s, previousState) : s,
+          s.id === sectionId
+            ? applySectionAssignmentState(s, previousState)
+            : s,
         ),
       );
       console.error("[handleSectionAssignment]", e);
@@ -603,7 +610,7 @@ export function ColumnsBoard({
   }
 
   const detailCards = openCard
-    ? cardsBySection.get(openCard.sectionId ?? "") ?? []
+    ? (cardsBySection.get(openCard.sectionId ?? "") ?? [])
     : [];
   const openCardIndex = openCard
     ? detailCards.findIndex((card) => card.id === openCard.id)
@@ -634,12 +641,12 @@ export function ColumnsBoard({
       authors,
       studentAuthorId: authors[0]?.studentId ?? null,
       externalAuthorName:
-        authors.length > 0
-          ? formatAuthorList(authors, null, null, null)
-          : null,
+        authors.length > 0 ? formatAuthorList(authors, null, null, null) : null,
     };
     setCards((prev) =>
-      prev.map((card) => (card.id === cardId ? { ...card, ...authorPatch } : card)),
+      prev.map((card) =>
+        card.id === cardId ? { ...card, ...authorPatch } : card,
+      ),
     );
     setOpenCard((current) =>
       current?.id === cardId ? { ...current, ...authorPatch } : current,
@@ -667,6 +674,7 @@ export function ColumnsBoard({
         boardId={boardId}
         canEdit={canEdit}
         canAddCard={canAddCard}
+        isStudentViewer={isStudentViewer}
         currentRole={currentRole}
         currentUserId={currentUserId}
         classroomId={classroomId}

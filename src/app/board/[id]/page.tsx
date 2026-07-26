@@ -39,6 +39,11 @@ import {
 import type { BoardTheme } from "@/components/BoardSettingsPanel";
 import { normalizeSubjectOrder, type SubjectOrder } from "@/lib/subject-order";
 import { SLOT_INCLUDE_DEFAULT, slotRowToDTO } from "@/lib/assignment-api";
+import { resolveHiddenReason } from "@/lib/content-safety";
+import {
+  emptyHiddenLookup,
+  loadHiddenLookup,
+} from "@/lib/content-safety-service";
 import type {
   AuraBoardSettings,
   AuraEvaluationLevel,
@@ -105,7 +110,9 @@ export default async function BoardPage({
   params: Promise<{ id: string }>;
   searchParams: Promise<{ view?: string }>;
 }) {
-  const normalizeBoardTheme = (value: string | null | undefined): BoardTheme => {
+  const normalizeBoardTheme = (
+    value: string | null | undefined,
+  ): BoardTheme => {
     switch (value) {
       case "pastel-peach":
       case "pastel-mint":
@@ -125,7 +132,7 @@ export default async function BoardPage({
   // desktop-mode Safari reports a Mac UA and slips through; documented
   // tradeoff (scope phase2 R9 / phase3 §E9 accept this imperfection).
   const uaString =
-    viewParam === "matrix" ? (await headers()).get("user-agent") ?? "" : "";
+    viewParam === "matrix" ? ((await headers()).get("user-agent") ?? "") : "";
 
   // Round 1 — resolve the board itself plus auth subjects concurrently.
   const [board, user, student] = await Promise.all([
@@ -294,7 +301,9 @@ export default async function BoardPage({
   const breakoutMembershipsPromise = needsBreakoutAssignment
     ? db.breakoutMembership.findMany({
         where: { assignment: { boardId: board.id } },
-        include: { student: { select: { id: true, name: true, number: true } } },
+        include: {
+          student: { select: { id: true, name: true, number: true } },
+        },
       })
     : null;
   const rosterStudentsPromise =
@@ -356,7 +365,8 @@ export default async function BoardPage({
   // downstream viewer-kind checks. Teacher identity remains the default when
   // both sessions coexist; `?view=student` is the explicit per-tab override
   // emitted by the student dashboard after the student session is validated.
-  let studentViewer: { id: string; name: string; classroomId: string } | null = null;
+  let studentViewer: { id: string; name: string; classroomId: string } | null =
+    null;
   if (useStudentViewer && student) {
     studentViewer = {
       id: student.id,
@@ -369,60 +379,99 @@ export default async function BoardPage({
   // Determine the effective user id.
   const effectiveUserId = studentViewer?.id ?? user?.id ?? "";
 
-  const cardProps = cards.map((c) => ({
-    id: c.id,
-    title: c.title,
-    content: c.content,
-    color: c.color,
-    imageUrl: c.imageUrl,
-    linkUrl: c.linkUrl,
-    linkTitle: c.linkTitle,
-    linkDesc: c.linkDesc,
-    linkImage: c.linkImage,
-    videoUrl: c.videoUrl,
-    fileUrl: c.fileUrl,
-    fileName: c.fileName,
-    fileSize: c.fileSize,
-    fileMimeType: c.fileMimeType,
-    x: c.x,
-    y: c.y,
-    width: c.width,
-    height: c.height,
-    order: c.order,
-    guidePinned: c.guidePinned,
-    sectionId: c.sectionId,
-    // stream-board section breakout (2026-06-23): group tag.
-    // null for whole-section cards. Server always emits the field so the
-    // front-end can branch on `card.groupId !== null` without guarding
-    // for `undefined`.
-    groupId: c.groupId ?? null,
-    authorId: c.authorId,
-    studentAuthorId: c.studentAuthorId,
-    createdAt: c.createdAt.toISOString(),
-    externalAuthorName: c.externalAuthorName,
-    studentAuthorName: c.studentAuthor?.name ?? null,
-    authorName: c.author?.name ?? null,
-    likeCount: c._count.likes,
-    commentCount: c._count.comments,
-    isLiked: c.likes.length > 0,
-    canInteract: true,
-    commentVoteOptionCount: c.commentVoteOptionCount ?? null,
-    commentVoteOptionLabels: Array.isArray(c.commentVoteOptionLabels)
-      ? c.commentVoteOptionLabels.filter((label): label is string => typeof label === "string")
-      : null,
-    queueStatus: c.queueStatus ?? null,
-    authors:
-      (c as { authors?: { id: string; studentId: string | null; displayName: string; order: number }[] }).authors ??
-      [],
-    // multi-attachment (2026-04-20): 정규화 첨부 배열. singleton 필드는
-    // 별개로 남겨 attachments가 비었을 때 fallback 렌더 경로가 사용.
-    attachments:
-      (c as { attachments?: { id: string; kind: string; url: string; previewUrl: string | null; fileName: string | null; fileSize: number | null; mimeType: string | null; order: number }[] }).attachments ??
-      [],
-    // card-comments-likes (2026-04-26): 보드 단위 익명 토글 — 모든 카드가
-    // 동일한 보드를 공유하므로 board.anonymousAuthor 를 전 카드에 denorm.
-    anonymousAuthor: board.anonymousAuthor,
-  }));
+  const hiddenContent = studentViewer
+    ? await loadHiddenLookup(studentViewer.id)
+    : emptyHiddenLookup();
+  const cardProps = cards.map((c) => {
+    const hiddenReason = studentViewer
+      ? resolveHiddenReason(hiddenContent, "card", c.id, c.studentAuthorId)
+      : null;
+    return {
+      id: c.id,
+      title: hiddenReason ? "" : c.title,
+      content: hiddenReason ? "" : c.content,
+      color: c.color,
+      imageUrl: hiddenReason ? null : c.imageUrl,
+      linkUrl: hiddenReason ? null : c.linkUrl,
+      linkTitle: hiddenReason ? null : c.linkTitle,
+      linkDesc: hiddenReason ? null : c.linkDesc,
+      linkImage: hiddenReason ? null : c.linkImage,
+      videoUrl: hiddenReason ? null : c.videoUrl,
+      fileUrl: hiddenReason ? null : c.fileUrl,
+      fileName: hiddenReason ? null : c.fileName,
+      fileSize: hiddenReason ? null : c.fileSize,
+      fileMimeType: hiddenReason ? null : c.fileMimeType,
+      x: c.x,
+      y: c.y,
+      width: c.width,
+      height: c.height,
+      order: c.order,
+      guidePinned: c.guidePinned,
+      sectionId: c.sectionId,
+      // stream-board section breakout (2026-06-23): group tag.
+      // null for whole-section cards. Server always emits the field so the
+      // front-end can branch on `card.groupId !== null` without guarding
+      // for `undefined`.
+      groupId: c.groupId ?? null,
+      authorId: hiddenReason ? null : c.authorId,
+      studentAuthorId: hiddenReason ? null : c.studentAuthorId,
+      createdAt: c.createdAt.toISOString(),
+      externalAuthorName: hiddenReason ? null : c.externalAuthorName,
+      studentAuthorName: hiddenReason ? null : (c.studentAuthor?.name ?? null),
+      authorName: hiddenReason ? null : (c.author?.name ?? null),
+      likeCount: c._count.likes,
+      commentCount: c._count.comments,
+      isLiked: c.likes.length > 0,
+      canInteract: true,
+      canModerate: Boolean(
+        !hiddenReason &&
+        studentViewer &&
+        c.studentAuthorId &&
+        c.studentAuthorId !== studentViewer.id,
+      ),
+      hiddenReason,
+      commentVoteOptionCount: c.commentVoteOptionCount ?? null,
+      commentVoteOptionLabels: Array.isArray(c.commentVoteOptionLabels)
+        ? c.commentVoteOptionLabels.filter(
+            (label): label is string => typeof label === "string",
+          )
+        : null,
+      queueStatus: c.queueStatus ?? null,
+      authors: hiddenReason
+        ? []
+        : ((
+            c as {
+              authors?: {
+                id: string;
+                studentId: string | null;
+                displayName: string;
+                order: number;
+              }[];
+            }
+          ).authors ?? []),
+      // multi-attachment (2026-04-20): 정규화 첨부 배열. singleton 필드는
+      // 별개로 남겨 attachments가 비었을 때 fallback 렌더 경로가 사용.
+      attachments: hiddenReason
+        ? []
+        : ((
+            c as {
+              attachments?: {
+                id: string;
+                kind: string;
+                url: string;
+                previewUrl: string | null;
+                fileName: string | null;
+                fileSize: number | null;
+                mimeType: string | null;
+                order: number;
+              }[];
+            }
+          ).attachments ?? []),
+      // card-comments-likes (2026-04-26): 보드 단위 익명 토글 — 모든 카드가
+      // 동일한 보드를 공유하므로 board.anonymousAuthor 를 전 카드에 denorm.
+      anonymousAuthor: board.anonymousAuthor,
+    };
+  });
 
   const sectionProps = sections.map((s) => ({
     id: s.id,
@@ -432,8 +481,7 @@ export default async function BoardPage({
     accessToken: s.accessToken,
     sortMode: s.sortMode,
     assignmentPublishedAt: s.assignmentPublishedAt?.toISOString() ?? null,
-    assignmentReminderSentAt:
-      s.assignmentReminderSentAt?.toISOString() ?? null,
+    assignmentReminderSentAt: s.assignmentReminderSentAt?.toISOString() ?? null,
     activityTemplate: isStreamActivityTemplate(s.activityTemplate)
       ? s.activityTemplate
       : null,
@@ -479,7 +527,8 @@ export default async function BoardPage({
   );
 
   // columns + classroom 연결 보드만 학생 수를 미리 가져와 시드 모달에 노출.
-  const needsClassroomStudentCount = board.layout === "columns" && !!board.classroomId;
+  const needsClassroomStudentCount =
+    board.layout === "columns" && !!board.classroomId;
   const classroomStudentCount = needsClassroomStudentCount
     ? await db.student.count({ where: { classroomId: board.classroomId! } })
     : null;
@@ -518,15 +567,17 @@ export default async function BoardPage({
   const needsAssignmentTeacherMeta =
     needsAssignmentData && !studentViewer && !!user;
   const assignTeacherClassrooms = needsAssignmentTeacherMeta
-    ? (await db.classroom.findMany({
-        where: { teacherId: user!.id },
-        orderBy: { createdAt: "desc" },
-        select: {
-          id: true,
-          name: true,
-          _count: { select: { students: true } },
-        },
-      })).map((c) => ({
+    ? (
+        await db.classroom.findMany({
+          where: { teacherId: user!.id },
+          orderBy: { createdAt: "desc" },
+          select: {
+            id: true,
+            name: true,
+            _count: { select: { students: true } },
+          },
+        })
+      ).map((c) => ({
         id: c.id,
         name: c.name,
         studentCount: c._count.students,
@@ -534,21 +585,24 @@ export default async function BoardPage({
     : undefined;
   const assignBoundClassroom =
     assignTeacherClassrooms && board.classroomId
-      ? assignTeacherClassrooms.find((c) => c.id === board.classroomId) ?? null
+      ? (assignTeacherClassrooms.find((c) => c.id === board.classroomId) ??
+        null)
       : null;
 
   // Settings panel needs the teacher's classroom list for board connection edits.
   const settingsClassrooms =
     !studentViewer && user
-      ? (await db.classroom.findMany({
-          where: { teacherId: user.id },
-          orderBy: { createdAt: "desc" },
-          select: {
-            id: true,
-            name: true,
-            _count: { select: { students: true } },
-          },
-        })).map((c) => ({
+      ? (
+          await db.classroom.findMany({
+            where: { teacherId: user.id },
+            orderBy: { createdAt: "desc" },
+            select: {
+              id: true,
+              name: true,
+              _count: { select: { students: true } },
+            },
+          })
+        ).map((c) => ({
           id: c.id,
           name: c.name,
           studentCount: c._count.students,
@@ -562,14 +616,17 @@ export default async function BoardPage({
     (board.layout === "grid" || board.layout === "freeform") &&
     (effectiveRole === "owner" || effectiveRole === "editor") &&
     board.auraEvaluationEnabled;
-  const auraEvaluations: Record<string, AuraEvaluationLevel> = needsAuraEvaluations
-    ? Object.fromEntries(
-        (await db.cardEvaluation.findMany({
-          where: { boardId: board.id },
-          select: { cardId: true, level: true },
-        })).map((row) => [row.cardId, row.level as AuraEvaluationLevel]),
-      )
-    : {};
+  const auraEvaluations: Record<string, AuraEvaluationLevel> =
+    needsAuraEvaluations
+      ? Object.fromEntries(
+          (
+            await db.cardEvaluation.findMany({
+              where: { boardId: board.id },
+              select: { cardId: true, level: true },
+            })
+          ).map((row) => [row.cardId, row.level as AuraEvaluationLevel]),
+        )
+      : {};
 
   function renderBoard() {
     const common = {
@@ -623,7 +680,9 @@ export default async function BoardPage({
             boardId={board!.id}
             boardTitle={board!.title}
             initialCards={cardProps}
-            currentRole={(effectiveRole ?? "viewer") as "owner" | "editor" | "viewer"}
+            currentRole={
+              (effectiveRole ?? "viewer") as "owner" | "editor" | "viewer"
+            }
             currentUserId={user?.id ?? null}
             currentStudentId={studentViewer?.id ?? null}
           />
@@ -633,15 +692,27 @@ export default async function BoardPage({
           return (
             <div className="forbidden-card">
               <h2>모둠 학습 구성 정보 없음</h2>
-              <p>이 보드에 BreakoutAssignment 레코드가 없어요. 관리자에게 문의하세요.</p>
+              <p>
+                이 보드에 BreakoutAssignment 레코드가 없어요. 관리자에게
+                문의하세요.
+              </p>
             </div>
           );
         }
-        const structure = cloneStructure(breakoutAssignmentRaw.template.structure);
-        const sharedSectionTitles = (structure.sharedSections ?? []).map((s) => s.title);
+        const structure = cloneStructure(
+          breakoutAssignmentRaw.template.structure,
+        );
+        const sharedSectionTitles = (structure.sharedSections ?? []).map(
+          (s) => s.title,
+        );
         const visibility =
-          (breakoutAssignmentRaw.visibilityOverride as "own-only" | "peek-others" | null) ??
-          (breakoutAssignmentRaw.template.recommendedVisibility as "own-only" | "peek-others");
+          (breakoutAssignmentRaw.visibilityOverride as
+            | "own-only"
+            | "peek-others"
+            | null) ??
+          (breakoutAssignmentRaw.template.recommendedVisibility as
+            | "own-only"
+            | "peek-others");
         return (
           <BreakoutBoard
             boardId={board!.id}
@@ -684,8 +755,9 @@ export default async function BoardPage({
       }
       case "assignment": {
         const slotRows = assignmentSlotsRaw ?? [];
-        const viewer: "teacher" | "student" =
-          studentViewer ? "student" : "teacher";
+        const viewer: "teacher" | "student" = studentViewer
+          ? "student"
+          : "teacher";
         // AC-13 Matrix view guard: owner (teacher) + desktop UA only.
         // Non-teachers → notFound (403). Non-desktop UA → redirect to default grid.
         // UA heuristic is imperfect (iPad Pro desktop-mode, UA spoofing) — see
@@ -696,16 +768,21 @@ export default async function BoardPage({
             notFound();
           }
           const ua = uaString ?? "";
-          const isNonDesktop = /Android|iPhone|iPad|iPod|Mobile|Tablet/i.test(ua);
+          const isNonDesktop = /Android|iPhone|iPad|iPod|Mobile|Tablet/i.test(
+            ua,
+          );
           if (isNonDesktop) {
             redirect(`/board/${board!.slug}`);
           }
           matrixView = true;
         }
         const slotDTOs = slotRows
-          .filter((row) => viewer === "teacher" || row.studentId === studentViewer?.id)
+          .filter(
+            (row) =>
+              viewer === "teacher" || row.studentId === studentViewer?.id,
+          )
           .map(slotRowToDTO);
-        const mySlot = viewer === "student" ? slotDTOs[0] ?? null : null;
+        const mySlot = viewer === "student" ? (slotDTOs[0] ?? null) : null;
         const effectiveDeadline = mySlot?.dueAt ?? board!.assignmentDeadline;
         const canSubmit =
           viewer === "student" && mySlot
@@ -725,7 +802,8 @@ export default async function BoardPage({
               title: board!.title,
               assignmentGuideText: board!.assignmentGuideText ?? "",
               assignmentAllowLate: board!.assignmentAllowLate,
-              assignmentDeadline: board!.assignmentDeadline?.toISOString() ?? null,
+              assignmentDeadline:
+                board!.assignmentDeadline?.toISOString() ?? null,
             }}
             initialSlots={slotDTOs}
             canStudentSubmit={canSubmit}
@@ -737,8 +815,11 @@ export default async function BoardPage({
       case "plant-roadmap":
         return <PlantRoadmapBoard initial={plantJournalInitial!} />;
       case "drawing": {
-        const viewerKind: "teacher" | "student" | "none" =
-          studentViewer ? "student" : effectiveRole === "owner" ? "teacher" : "none";
+        const viewerKind: "teacher" | "student" | "none" = studentViewer
+          ? "student"
+          : effectiveRole === "owner"
+            ? "teacher"
+            : "none";
         return (
           <DrawingBoard
             boardId={board!.id}
@@ -765,7 +846,12 @@ export default async function BoardPage({
           />
         );
       case "quiz": {
-        const answerToIndex: Record<string, number> = { A: 0, B: 1, C: 2, D: 3 };
+        const answerToIndex: Record<string, number> = {
+          A: 0,
+          B: 1,
+          C: 2,
+          D: 3,
+        };
         return (
           <QuizBoard
             boardId={board!.id}
@@ -895,7 +981,9 @@ export default async function BoardPage({
         if (studentViewer) {
           redirect(`/board/${board!.slug ?? board!.id}/play/kordle`);
         }
-        return <KordleTeacherBoard boardId={board!.id} teacherUserId={user!.id} />;
+        return (
+          <KordleTeacherBoard boardId={board!.id} teacherUserId={user!.id} />
+        );
       }
       case "freeform":
       default:
@@ -930,7 +1018,9 @@ export default async function BoardPage({
             classrooms={settingsClassrooms}
             classroomId={board.classroomId}
             thumbnailMode={board.thumbnailMode}
-            thumbnailUrl={(board as { thumbnailUrl?: string | null }).thumbnailUrl ?? null}
+            thumbnailUrl={
+              (board as { thumbnailUrl?: string | null }).thumbnailUrl ?? null
+            }
             settingsSections={settingsSections}
             anonymousAuthor={board.anonymousAuthor}
             boardTheme={boardTheme}

@@ -35,9 +35,17 @@ import {
   SectionHeader,
 } from "../../components/ui";
 
+type ExpandedStudentNotificationItem = Omit<StudentNotificationItem, "kind"> & {
+  kind: StudentNotificationItem["kind"] | "attendance" | "assignment";
+};
+
+type ExpandedStudentNotificationPayload = Omit<StudentNotificationPayload, "items"> & {
+  items: ExpandedStudentNotificationItem[];
+};
+
 export default function StudentNotificationsScreen() {
   const router = useRouter();
-  const [payload, setPayload] = useState<StudentNotificationPayload | null>(null);
+  const [payload, setPayload] = useState<ExpandedStudentNotificationPayload | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [markingAll, setMarkingAll] = useState(false);
@@ -63,7 +71,7 @@ export default function StudentNotificationsScreen() {
     if (refresh) setRefreshing(true);
     try {
       setError(null);
-      setPayload(await apiFetch<StudentNotificationPayload>("/api/student/notifications"));
+      setPayload(await apiFetch<ExpandedStudentNotificationPayload>("/api/student/notifications"));
     } catch (nextError) {
       if (nextError instanceof ApiError && nextError.status === 401) {
         await clearSessionToken();
@@ -81,7 +89,7 @@ export default function StudentNotificationsScreen() {
     void load();
   }, [load]);
 
-  async function markRead(item: StudentNotificationItem) {
+  async function markRead(item: ExpandedStudentNotificationItem) {
     if (!item.read) {
       const sourceId = item.id.slice(`${item.kind}:`.length);
       setPayload((current) => current ? {
@@ -142,7 +150,7 @@ export default function StudentNotificationsScreen() {
               ) : undefined
             }
           />
-          <Text style={styles.subtitle}>좋아요, 댓글과 보상 소식이에요.</Text>
+          <Text style={styles.subtitle}>좋아요, 댓글, 보상, 출석과 과제 소식이에요.</Text>
           {!payload?.items.length ? (
             <View style={styles.emptyState}>
               <Text style={styles.emptyTitle}>새 알림이 없어요.</Text>
@@ -161,11 +169,7 @@ export default function StudentNotificationsScreen() {
                     index < payload.items.length - 1 && styles.itemDivider,
                   ]}
                   onPress={() => void markRead(item)}
-                  accessibilityLabel={
-                    item.kind === "reward"
-                      ? `${item.cardTitle || "보상"} 알림 열기`
-                      : `${item.actorLabel} ${item.kind === "like" ? "좋아요" : "댓글"} 알림 열기`
-                  }
+                  accessibilityLabel={`${notificationTitle(item)} 알림 열기`}
                 >
                   <View style={styles.itemTop}>
                     <Text
@@ -175,14 +179,12 @@ export default function StudentNotificationsScreen() {
                           ? styles.kindLike
                           : item.kind === "comment"
                             ? styles.kindComment
-                            : styles.kindReward,
+                            : item.kind === "reward"
+                              ? styles.kindReward
+                              : styles.kindSystem,
                       ]}
                     >
-                      {item.kind === "like"
-                        ? "좋아요"
-                        : item.kind === "comment"
-                          ? "댓글"
-                          : "보상"}
+                      {notificationKindLabel(item.kind)}
                     </Text>
                     <View style={styles.itemTimeRow}>
                       <Text style={styles.time}>{formatRelativeTime(item.createdAt)}</Text>
@@ -190,15 +192,11 @@ export default function StudentNotificationsScreen() {
                     </View>
                   </View>
                   <Text style={[styles.itemTitle, !item.read && styles.itemTitleUnread]}>
-                    {item.kind === "reward"
-                      ? `${item.cardTitle || "보상"}을 받았어요.`
-                      : `${item.actorLabel}님이 ${item.kind === "like" ? "좋아요를 눌렀어요." : "댓글을 남겼어요."}`}
+                    {notificationTitle(item)}
                   </Text>
                   {item.content ? <Text style={styles.contentText}>{item.content}</Text> : null}
                   <Text style={styles.meta}>
-                    {item.kind === "reward"
-                      ? item.boardTitle || "내 통장"
-                      : `${item.cardTitle || "제목 없는 카드"} · ${item.boardTitle}`}
+                    {notificationMeta(item)}
                   </Text>
                 </ControlPressable>
               ))}
@@ -208,6 +206,30 @@ export default function StudentNotificationsScreen() {
       )}
     </SafeAreaView>
   );
+}
+
+function notificationKindLabel(
+  kind: ExpandedStudentNotificationItem["kind"],
+): string {
+  if (kind === "like") return "좋아요";
+  if (kind === "comment") return "댓글";
+  if (kind === "reward") return "보상";
+  return kind === "attendance" ? "출석" : "과제";
+}
+
+function notificationTitle(item: ExpandedStudentNotificationItem): string {
+  if (item.kind === "like") return `${item.actorLabel}님이 좋아요를 눌렀어요.`;
+  if (item.kind === "comment") return `${item.actorLabel}님이 댓글을 남겼어요.`;
+  if (item.kind === "reward") return `${item.cardTitle || "보상"}을 받았어요.`;
+  return item.cardTitle || (item.kind === "attendance" ? "출석 알림" : "과제 알림");
+}
+
+function notificationMeta(item: ExpandedStudentNotificationItem): string {
+  if (item.kind === "reward") return item.boardTitle || "내 통장";
+  if (item.kind === "attendance" || item.kind === "assignment") {
+    return item.boardTitle || (item.kind === "attendance" ? "출석" : "과제");
+  }
+  return `${item.cardTitle || "제목 없는 카드"} · ${item.boardTitle}`;
 }
 
 function formatRelativeTime(value: string): string {
@@ -262,6 +284,7 @@ const styles = StyleSheet.create({
   kindLike: { color: colors.accent },
   kindComment: { color: colors.textMuted },
   kindReward: { color: colors.bankPositive },
+  kindSystem: { color: colors.accentTintedText },
   itemTimeRow: {
     flexDirection: "row",
     alignItems: "center",

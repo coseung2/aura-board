@@ -36,6 +36,7 @@ type Props = {
   sectionCards: CardData[];
   boardId?: string;
   canEdit: boolean;
+  isStudentViewer?: boolean;
   currentRole: "owner" | "editor" | "viewer";
   currentUserId: string;
   classroomId?: string | null;
@@ -96,6 +97,7 @@ export function ColumnView(props: Props) {
     sectionCards,
     boardId,
     canEdit,
+    isStudentViewer,
     currentRole,
     currentUserId,
     classroomId,
@@ -279,7 +281,9 @@ export function ColumnView(props: Props) {
     );
     if (!dragged) return sectionCards;
 
-    const withoutDragged = sectionCards.filter((card) => card.id !== dragged.id);
+    const withoutDragged = sectionCards.filter(
+      (card) => card.id !== dragged.id,
+    );
     const targetIndex = withoutDragged.findIndex(
       (card) => card.id === cardDropPreview.cardId,
     );
@@ -395,278 +399,285 @@ export function ColumnView(props: Props) {
           onDrop(e, section.id);
         }}
       >
-      <div
-        className={`column-header ${canEdit ? "is-section-draggable" : ""} ${
-          draggingSectionId === section.id ? "is-section-dragging" : ""
-        }`}
-        draggable={canEdit}
-        onDragStart={(e) => {
-          if (!canEdit) return;
-          e.dataTransfer.setData("application/section-id", section.id);
-          e.dataTransfer.effectAllowed = "move";
-          onSectionDragStart(section.id);
-        }}
-        onDragEnd={onSectionDragEnd}
-      >
-        <h3 className="column-title">{section.title}</h3>
-        {assignmentDistributed && (
-          <span className="column-assignment-badge" title={assignmentBadgeTitle}>
-            과제 배부됨
-          </span>
-        )}
-        {canEdit && (
+        <div
+          className={`column-header ${canEdit ? "is-section-draggable" : ""} ${
+            draggingSectionId === section.id ? "is-section-dragging" : ""
+          }`}
+          draggable={canEdit}
+          onDragStart={(e) => {
+            if (!canEdit) return;
+            e.dataTransfer.setData("application/section-id", section.id);
+            e.dataTransfer.effectAllowed = "move";
+            onSectionDragStart(section.id);
+          }}
+          onDragEnd={onSectionDragEnd}
+        >
+          <h3 className="column-title">{section.title}</h3>
+          {assignmentDistributed && (
+            <span
+              className="column-assignment-badge"
+              title={assignmentBadgeTitle}
+            >
+              과제 배부됨
+            </span>
+          )}
+          {canEdit && (
+            <button
+              type="button"
+              className={`column-pin-btn ${pinned ? "is-pinned" : ""}`}
+              onMouseDown={(e) => e.stopPropagation()}
+              onClick={(e) => {
+                e.stopPropagation();
+                onPin(!pinned);
+              }}
+              onDragStart={(e) => e.preventDefault()}
+              aria-pressed={pinned}
+              aria-label={pinned ? "섹션 고정 해제" : "섹션 고정"}
+              title={pinned ? "고정해제" : "고정"}
+            >
+              📌
+            </button>
+          )}
           <button
             type="button"
-            className={`column-pin-btn ${pinned ? "is-pinned" : ""}`}
+            className="column-count column-count-button"
             onMouseDown={(e) => e.stopPropagation()}
             onClick={(e) => {
               e.stopPropagation();
-              onPin(!pinned);
+              setSubmissionModalOpen(true);
             }}
             onDragStart={(e) => e.preventDefault()}
-            aria-pressed={pinned}
-            aria-label={pinned ? "섹션 고정 해제" : "섹션 고정"}
-            title={pinned ? "고정해제" : "고정"}
+            aria-label={`${section.title} 제출 현황 보기`}
+            title="제출 현황"
           >
-            📌
+            {submissionCount}
           </button>
-        )}
-        <button
-          type="button"
-          className="column-count column-count-button"
-          onMouseDown={(e) => e.stopPropagation()}
-          onClick={(e) => {
-            e.stopPropagation();
-            setSubmissionModalOpen(true);
-          }}
-          onDragStart={(e) => e.preventDefault()}
-          aria-label={`${section.title} 제출 현황 보기`}
-          title="제출 현황"
-        >
-          {submissionCount}
-        </button>
-        {(canEdit || menuItems.length > 0) && (
-          <ColumnMenu
-            sortMode={sortMode}
-            canSort={canEdit}
-            onSetSort={onSetSort}
-            actions={menuItems}
-            footer={<CanvaAttribution />}
-          />
-        )}
-      </div>
-      {onAddInColumn && (
-        <button
-          type="button"
-          className="column-inline-add"
-          onClick={onAddInColumn}
-        >
-          + 카드 추가
-        </button>
-      )}
-      <div
-        className="column-cards-scroll"
-        onDragOver={(e) => {
-          const draggedId = e.dataTransfer.getData("application/card-id");
-          if (!draggedId) return;
-          startColumnAutoScroll(e.currentTarget, e.clientY);
-        }}
-      >
-        <div
-          className={`column-cards ${
-            isDropSection ? "column-cards-active" : ""
-          }`}
-        >
-          {getPreviewCards().map((c) => {
-            const canModify =
-              currentRole === "owner" ||
-              (currentRole === "editor" && c.authorId === currentUserId) ||
-              c.studentAuthorId === currentUserId;
-            const isPreviewTarget =
-              cardDropPreview?.sectionId === section.id &&
-              cardDropPreview.cardId === c.id;
-            const beforeHeight =
-              isPreviewTarget && cardDropPreview.position === "before"
-                ? cardDropPreview.placeholderHeight
-                : 0;
-            const afterHeight =
-              isPreviewTarget && cardDropPreview.position === "after"
-                ? cardDropPreview.placeholderHeight
-                : 0;
-
-            return (
-              <div
-                key={c.id}
-                className={`column-card-drop-wrap${
-                  cardDropPreview?.sectionId === section.id &&
-                  cardDropPreview.cardId === c.id
-                    ? cardDropPreview.position === "before"
-                      ? " is-gap-before"
-                      : " is-gap-after"
-                    : ""
-                }`}
-              >
-                <div
-                  className="column-card-drop-placeholder"
-                  style={{ height: beforeHeight }}
-                  aria-hidden="true"
-                >
-                  {beforeHeight > 0 && <DropIndicator sortMode={sortMode} />}
-                </div>
-                <article
-                  data-column-card-id={c.id}
-                  className={`column-card is-clickable ${
-                    cardDropPreview?.sectionId === section.id &&
-                    cardDropPreview.cardId === c.id
-                      ? `is-drop-preview is-drop-preview-${cardDropPreview.position}`
-                      : ""
-                  }`}
-                  style={{ backgroundColor: c.color ?? undefined }}
-                  draggable={canEdit}
-                  onDragStart={(e) => onCardDragStart(e, c.id)}
-                  onDragEnd={(e) => {
-                    stopColumnAutoScroll();
-                    onCardDragEnd(e);
-                  }}
-                  onDragOver={(e) => {
-                    if (!canEdit) return;
-                    e.preventDefault();
-                    const draggedId = e.dataTransfer.getData(
-                      "application/card-id",
-                    );
-                    const scrollEl = e.currentTarget.closest(
-                      ".column-cards-scroll",
-                    ) as HTMLElement | null;
-                    if (scrollEl) {
-                      startColumnAutoScroll(scrollEl, e.clientY);
-                    }
-                    if (!draggedId || draggedId === c.id) {
-                      return;
-                    }
-                    const rect = e.currentTarget.getBoundingClientRect();
-                    const y = e.clientY - rect.top;
-                    const newPreview: CardDropPreview = {
-                      sectionId: section.id,
-                      draggedCardId: draggedId,
-                      cardId: c.id,
-                      position: y < rect.height / 2 ? "before" : "after",
-                      placeholderHeight: 22,
-                    };
-                    // Only update parent state when preview target actually
-                    // changes — avoids constant re-renders during drag.
-                    const last = lastPreviewRef.current;
-                    if (
-                      !last ||
-                      last.sectionId !== newPreview.sectionId ||
-                      last.draggedCardId !== newPreview.draggedCardId ||
-                      last.cardId !== newPreview.cardId ||
-                      last.position !== newPreview.position ||
-                      last.placeholderHeight !== newPreview.placeholderHeight
-                    ) {
-                      lastPreviewRef.current = newPreview;
-                      animatePreviewChange(newPreview);
-                    }
-                  }}
-                  onDrop={async (e) => {
-                    if (!canEdit) return;
-                    e.preventDefault();
-                    e.stopPropagation();
-                    stopColumnAutoScroll();
-                    const draggedId = e.dataTransfer.getData(
-                      "application/card-id",
-                    );
-                    if (!draggedId || draggedId === c.id) return;
-                    const rect = e.currentTarget.getBoundingClientRect();
-                    const y = e.clientY - rect.top;
-                    const position = y < rect.height / 2 ? "before" : "after";
-                    onClearCardDropPreview();
-                    if (sortMode !== "manual") {
-                      await onSetSort("manual");
-                    }
-                    await onCardDropReorder(
-                      draggedId,
-                      c.id,
-                      section.id,
-                      position,
-                      sectionCards.map((card) => card.id),
-                    );
-                  }}
-                  onClick={() => onCardOpen(c)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" || e.key === " ") {
-                      e.preventDefault();
-                      onCardOpen(c);
-                    }
-                  }}
-                  tabIndex={0}
-                  role="button"
-                >
-                  <CardBody
-                    card={c}
-                    titleAs="h4"
-                    boardId={boardId}
-                    onEditAuthors={
-                      canEdit || c.studentAuthorId === currentUserId
-                        ? () => onCardEditAuthors(c)
-                        : undefined
-                    }
-                  />
-                  {canModify && (
-                    <div
-                      className="card-ctx-menu"
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      <ContextMenu
-                        items={[
-                          {
-                            label: "수정",
-                            icon: "✏️",
-                            onClick: () => onCardEdit(c),
-                          },
-                          ...(canEdit && !!c.authorId && !c.studentAuthorId
-                            ? [
-                                {
-                                  label: c.guidePinned ? "가이드 해제" : "가이드 고정",
-                                  icon: "📌",
-                                  onClick: () => onCardToggleGuide(c, !c.guidePinned),
-                                },
-                              ]
-                            : []),
-                          {
-                            label: "복제",
-                            icon: "📋",
-                            onClick: () => onCardDuplicate(c),
-                          },
-                          {
-                            label: "삭제",
-                            icon: "🗑️",
-                            danger: true,
-                            onClick: () => onCardDelete(c.id),
-                          },
-                        ]}
-                      />
-                    </div>
-                  )}
-                </article>
-                <div
-                  className="column-card-drop-placeholder"
-                  style={{ height: afterHeight }}
-                  aria-hidden="true"
-                >
-                  {afterHeight > 0 && <DropIndicator sortMode={sortMode} />}
-                </div>
-              </div>
-            );
-          })}
-          {sectionCards.length === 0 && (
-            <div
-              className={`column-empty ${isDropSection ? "is-drop-target" : ""}`}
-            >
-              {isDropSection ? "여기에 놓기" : "카드를 여기로 끌어오세요"}
-            </div>
+          {(canEdit || menuItems.length > 0) && (
+            <ColumnMenu
+              sortMode={sortMode}
+              canSort={canEdit}
+              onSetSort={onSetSort}
+              actions={menuItems}
+              footer={<CanvaAttribution />}
+            />
           )}
         </div>
-      </div>
+        {onAddInColumn && (
+          <button
+            type="button"
+            className="column-inline-add"
+            onClick={onAddInColumn}
+          >
+            + 카드 추가
+          </button>
+        )}
+        <div
+          className="column-cards-scroll"
+          onDragOver={(e) => {
+            const draggedId = e.dataTransfer.getData("application/card-id");
+            if (!draggedId) return;
+            startColumnAutoScroll(e.currentTarget, e.clientY);
+          }}
+        >
+          <div
+            className={`column-cards ${
+              isDropSection ? "column-cards-active" : ""
+            }`}
+          >
+            {getPreviewCards().map((c) => {
+              const canModify =
+                currentRole === "owner" ||
+                (currentRole === "editor" && c.authorId === currentUserId) ||
+                c.studentAuthorId === currentUserId;
+              const isPreviewTarget =
+                cardDropPreview?.sectionId === section.id &&
+                cardDropPreview.cardId === c.id;
+              const beforeHeight =
+                isPreviewTarget && cardDropPreview.position === "before"
+                  ? cardDropPreview.placeholderHeight
+                  : 0;
+              const afterHeight =
+                isPreviewTarget && cardDropPreview.position === "after"
+                  ? cardDropPreview.placeholderHeight
+                  : 0;
+
+              return (
+                <div
+                  key={c.id}
+                  className={`column-card-drop-wrap${
+                    cardDropPreview?.sectionId === section.id &&
+                    cardDropPreview.cardId === c.id
+                      ? cardDropPreview.position === "before"
+                        ? " is-gap-before"
+                        : " is-gap-after"
+                      : ""
+                  }`}
+                >
+                  <div
+                    className="column-card-drop-placeholder"
+                    style={{ height: beforeHeight }}
+                    aria-hidden="true"
+                  >
+                    {beforeHeight > 0 && <DropIndicator sortMode={sortMode} />}
+                  </div>
+                  <article
+                    data-column-card-id={c.id}
+                    className={`column-card is-clickable ${
+                      cardDropPreview?.sectionId === section.id &&
+                      cardDropPreview.cardId === c.id
+                        ? `is-drop-preview is-drop-preview-${cardDropPreview.position}`
+                        : ""
+                    }`}
+                    style={{ backgroundColor: c.color ?? undefined }}
+                    draggable={canEdit}
+                    onDragStart={(e) => onCardDragStart(e, c.id)}
+                    onDragEnd={(e) => {
+                      stopColumnAutoScroll();
+                      onCardDragEnd(e);
+                    }}
+                    onDragOver={(e) => {
+                      if (!canEdit) return;
+                      e.preventDefault();
+                      const draggedId = e.dataTransfer.getData(
+                        "application/card-id",
+                      );
+                      const scrollEl = e.currentTarget.closest(
+                        ".column-cards-scroll",
+                      ) as HTMLElement | null;
+                      if (scrollEl) {
+                        startColumnAutoScroll(scrollEl, e.clientY);
+                      }
+                      if (!draggedId || draggedId === c.id) {
+                        return;
+                      }
+                      const rect = e.currentTarget.getBoundingClientRect();
+                      const y = e.clientY - rect.top;
+                      const newPreview: CardDropPreview = {
+                        sectionId: section.id,
+                        draggedCardId: draggedId,
+                        cardId: c.id,
+                        position: y < rect.height / 2 ? "before" : "after",
+                        placeholderHeight: 22,
+                      };
+                      // Only update parent state when preview target actually
+                      // changes — avoids constant re-renders during drag.
+                      const last = lastPreviewRef.current;
+                      if (
+                        !last ||
+                        last.sectionId !== newPreview.sectionId ||
+                        last.draggedCardId !== newPreview.draggedCardId ||
+                        last.cardId !== newPreview.cardId ||
+                        last.position !== newPreview.position ||
+                        last.placeholderHeight !== newPreview.placeholderHeight
+                      ) {
+                        lastPreviewRef.current = newPreview;
+                        animatePreviewChange(newPreview);
+                      }
+                    }}
+                    onDrop={async (e) => {
+                      if (!canEdit) return;
+                      e.preventDefault();
+                      e.stopPropagation();
+                      stopColumnAutoScroll();
+                      const draggedId = e.dataTransfer.getData(
+                        "application/card-id",
+                      );
+                      if (!draggedId || draggedId === c.id) return;
+                      const rect = e.currentTarget.getBoundingClientRect();
+                      const y = e.clientY - rect.top;
+                      const position = y < rect.height / 2 ? "before" : "after";
+                      onClearCardDropPreview();
+                      if (sortMode !== "manual") {
+                        await onSetSort("manual");
+                      }
+                      await onCardDropReorder(
+                        draggedId,
+                        c.id,
+                        section.id,
+                        position,
+                        sectionCards.map((card) => card.id),
+                      );
+                    }}
+                    onClick={() => onCardOpen(c)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault();
+                        onCardOpen(c);
+                      }
+                    }}
+                    tabIndex={0}
+                    role="button"
+                  >
+                    <CardBody
+                      card={c}
+                      titleAs="h4"
+                      boardId={boardId}
+                      isStudentViewer={isStudentViewer}
+                      onEditAuthors={
+                        canEdit || c.studentAuthorId === currentUserId
+                          ? () => onCardEditAuthors(c)
+                          : undefined
+                      }
+                    />
+                    {canModify && (
+                      <div
+                        className="card-ctx-menu"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <ContextMenu
+                          items={[
+                            {
+                              label: "수정",
+                              icon: "✏️",
+                              onClick: () => onCardEdit(c),
+                            },
+                            ...(canEdit && !!c.authorId && !c.studentAuthorId
+                              ? [
+                                  {
+                                    label: c.guidePinned
+                                      ? "가이드 해제"
+                                      : "가이드 고정",
+                                    icon: "📌",
+                                    onClick: () =>
+                                      onCardToggleGuide(c, !c.guidePinned),
+                                  },
+                                ]
+                              : []),
+                            {
+                              label: "복제",
+                              icon: "📋",
+                              onClick: () => onCardDuplicate(c),
+                            },
+                            {
+                              label: "삭제",
+                              icon: "🗑️",
+                              danger: true,
+                              onClick: () => onCardDelete(c.id),
+                            },
+                          ]}
+                        />
+                      </div>
+                    )}
+                  </article>
+                  <div
+                    className="column-card-drop-placeholder"
+                    style={{ height: afterHeight }}
+                    aria-hidden="true"
+                  >
+                    {afterHeight > 0 && <DropIndicator sortMode={sortMode} />}
+                  </div>
+                </div>
+              );
+            })}
+            {sectionCards.length === 0 && (
+              <div
+                className={`column-empty ${isDropSection ? "is-drop-target" : ""}`}
+              >
+                {isDropSection ? "여기에 놓기" : "카드를 여기로 끌어오세요"}
+              </div>
+            )}
+          </div>
+        </div>
       </div>
       {submissionModalOpen &&
         createPortal(
@@ -780,11 +791,16 @@ function SubmissionStatusModal({
           </div>
           {!hasRoster && (
             <p className="column-submission-note">
-              학급이 연결되지 않은 보드예요. 학생별 제출자/미제출자 현황 대신 이 섹션의 카드 수를 표시합니다.
+              학급이 연결되지 않은 보드예요. 학생별 제출자/미제출자 현황 대신 이
+              섹션의 카드 수를 표시합니다.
             </p>
           )}
 
-          <SubmissionList title="제출자" people={submitted} empty="제출자 없음" />
+          <SubmissionList
+            title="제출자"
+            people={submitted}
+            empty="제출자 없음"
+          />
           {hasRoster && (
             <SubmissionList
               title="미제출자"

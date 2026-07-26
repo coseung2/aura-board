@@ -388,6 +388,7 @@ export function BoardCanvas({
             <CardBody
               card={c}
               boardId={boardId}
+              isStudentViewer={isStudentViewer}
               onEditAuthors={
                 canEdit || c.studentAuthorId === currentUserId
                   ? () => setAuthorEditCard(c)

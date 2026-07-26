@@ -463,6 +463,8 @@ model Classroom {
 
   roleAssignments ClassroomRoleAssignment[]
 
+  roleSettings ClassroomRoleSetting[]
+
   currency ClassroomCurrency?
 
   studentAccounts StudentAccount[]
@@ -952,11 +954,16 @@ model StudentPushDispatch {
 
   studentId String
   eventKey  String
+  kind      String?
+  title     String?
+  body      String?
+  href      String?
   createdAt DateTime @default(now())
 
   student Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
 
   @@unique([studentId, eventKey])
+  @@index([studentId, kind, createdAt])
   @@index([createdAt])
 }
 
@@ -3404,6 +3411,33 @@ model ClassroomRoleDef {
   grants BoardLayoutRoleGrant[]
 
   assignments ClassroomRoleAssignment[]
+
+  classroomSettings ClassroomRoleSetting[]
+}
+
+model ClassroomRoleSetting {
+  id String @id @default(cuid())
+
+  classroomId String
+
+  classroomRoleId String
+
+  enabled Boolean @default(true)
+
+  salaryAmount Int @default(0)
+
+  payPeriod String @default("weekly")
+
+  createdAt DateTime @default(now())
+
+  updatedAt DateTime @updatedAt
+
+  classroom Classroom @relation(fields: [classroomId], references: [id], onDelete: Cascade)
+
+  classroomRole ClassroomRoleDef @relation(fields: [classroomRoleId], references: [id], onDelete: Cascade)
+
+  @@unique([classroomId, classroomRoleId])
+  @@index([classroomRoleId])
 }
 
 model BoardLayoutRoleGrant {

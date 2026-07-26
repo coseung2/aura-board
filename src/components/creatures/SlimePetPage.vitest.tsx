@@ -564,4 +564,98 @@ describe("SlimePetPage", () => {
     ).toBeTruthy();
   });
 
+  it("equips a claimed title and renders only the authoritative reloaded state", async () => {
+    const title = {
+      key: "weekly-50k",
+      label: "꾸준한 발걸음",
+      imagePath: "/walking/titles/weekly-50k-pixel-512.png",
+      effectKey: "growth_speed",
+      buffBps: 100,
+    };
+    const fetchMock = vi
+      .fn()
+      .mockImplementationOnce(() => json(home({ ownedColors: ["blue"], claimedTitles: [title] })))
+      .mockImplementationOnce(() => json({ color: "blue", equippedTitleKey: title.key }))
+      .mockImplementationOnce(() =>
+        json(home({
+          ownedColors: ["blue"],
+          claimedTitles: [title],
+          equippedTitleByColor: { blue: title.key },
+        })),
+      );
+    vi.stubGlobal("fetch", fetchMock);
+    render(<SlimePetPage />);
+
+    const wardrobe = await screen.findByRole("combobox", { name: "칭호" });
+    expect(within(wardrobe).getByRole("option", { name: title.label })).toBeTruthy();
+    fireEvent.change(wardrobe, { target: { value: title.key } });
+
+    expect(await screen.findByText("블루 슬라임에게 칭호를 붙였어요: 꾸준한 발걸음")).toBeTruthy();
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+    expect(fetchMock.mock.calls[1][0]).toBe("/api/student/titles/equip");
+    expect(fetchMock.mock.calls[1][1]).toEqual(expect.objectContaining({
+      method: "PATCH",
+      body: JSON.stringify({ color: "blue", titleKey: title.key }),
+    }));
+    expect(fetchMock.mock.calls[2][0]).toBe("/api/student/slimes");
+    expect((screen.getByRole("combobox", { name: "칭호" }) as HTMLSelectElement).value).toBe(title.key);
+    expect(screen.getAllByText(title.label).length).toBeGreaterThanOrEqual(2);
+  });
+
+  it("clears an equipped title and confirms the cleared state by reloading pets", async () => {
+    const title = {
+      key: "weekly-50k",
+      label: "꾸준한 발걸음",
+      imagePath: "/walking/titles/weekly-50k-pixel-512.png",
+      effectKey: "growth_speed",
+      buffBps: 100,
+    };
+    const fetchMock = vi
+      .fn()
+      .mockImplementationOnce(() => json(home({
+        ownedColors: ["blue"],
+        claimedTitles: [title],
+        equippedTitleByColor: { blue: title.key },
+      })))
+      .mockImplementationOnce(() => json({ color: "blue", equippedTitleKey: null }))
+      .mockImplementationOnce(() => json(home({ ownedColors: ["blue"], claimedTitles: [title] })));
+    vi.stubGlobal("fetch", fetchMock);
+    render(<SlimePetPage />);
+
+    fireEvent.change(await screen.findByRole("combobox", { name: "칭호" }), {
+      target: { value: "" },
+    });
+
+    expect(await screen.findByText("블루 슬라임의 칭호를 해제했어요.")).toBeTruthy();
+    expect(JSON.parse(fetchMock.mock.calls[1][1].body as string)).toEqual({
+      color: "blue",
+      titleKey: null,
+    });
+    expect((screen.getByRole("combobox", { name: "칭호" }) as HTMLSelectElement).value).toBe("");
+  });
+
+  it("keeps the previous pet title when the equip mutation fails", async () => {
+    const title = {
+      key: "weekly-50k",
+      label: "꾸준한 발걸음",
+      imagePath: "/walking/titles/weekly-50k-pixel-512.png",
+      effectKey: "growth_speed",
+      buffBps: 100,
+    };
+    const fetchMock = vi
+      .fn()
+      .mockImplementationOnce(() => json(home({ ownedColors: ["blue"], claimedTitles: [title] })))
+      .mockImplementationOnce(() => json({ error: "title_not_claimed" }, 409));
+    vi.stubGlobal("fetch", fetchMock);
+    render(<SlimePetPage />);
+
+    fireEvent.change(await screen.findByRole("combobox", { name: "칭호" }), {
+      target: { value: title.key },
+    });
+
+    expect((await screen.findByRole("alert")).textContent).toContain("아직 받지 않은 칭호예요.");
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect((screen.getByRole("combobox", { name: "칭호" }) as HTMLSelectElement).value).toBe("");
+  });
+
 });

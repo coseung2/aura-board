@@ -1,17 +1,34 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 import { createPortal } from "react-dom";
 import { formatRelativeTime } from "@/lib/card-engagement-format";
-import { useShareSession, type ShareSession } from "@/components/share/ShareSessionContext";
+import {
+  useShareSession,
+  type ShareSession,
+} from "@/components/share/ShareSessionContext";
 import { createPublicSupabaseClient } from "@/lib/supabase/client";
-import { useBoardEngagement, useBoardPollChange } from "@/hooks/useBoardEngagementRealtime";
+import {
+  useBoardEngagement,
+  useBoardPollChange,
+} from "@/hooks/useBoardEngagementRealtime";
 import {
   BOARD_ENGAGEMENT_CONTEXT_EVENT,
   EMPTY_BOARD_ENGAGEMENT_CONTEXT,
   readBoardEngagementContext,
   type BoardEngagementContext,
 } from "@/lib/board-engagement-context";
+import {
+  HiddenContentPlaceholder,
+  StudentContentModerationControls,
+  type HiddenReason,
+} from "@/components/moderation/StudentContentModeration";
 
 // card-comments-likes (2026-04-26): 카드별 좋아요 + 댓글 UI.
 // mode="chips"  — 인라인 보드 카드 footer (좋아요 토글 + 댓글 카운트
@@ -26,6 +43,9 @@ interface CommentItem {
   authorKind: "teacher" | "student" | "parent" | "external";
   authorLabel: string;
   canDelete: boolean;
+  canModerate?: boolean;
+  hiddenReason?: HiddenReason | null;
+  authorStudentId?: string | null;
 }
 
 type CommentAudience = "public" | "guardian";
@@ -42,6 +62,8 @@ interface Props {
   mode: "chips" | "panel";
   boardId?: string;
   isStudentViewer?: boolean;
+  /** Explicit parent surface. Do not infer from DOM ancestry. */
+  viewer?: "parent";
   initialCounts?: {
     likeCount: number;
     commentCount: number;
@@ -92,6 +114,7 @@ export function CardEngagement({
   mode,
   boardId,
   isStudentViewer,
+  viewer,
   initialCounts,
   chipsActionsEnd,
   panelActionsEnd,
@@ -107,6 +130,7 @@ export function CardEngagement({
   const effectiveBoardId = boardId ?? boardContext.boardId;
   const effectiveIsStudentViewer =
     isStudentViewer ?? boardContext.isStudentViewer;
+  const isParentViewer = viewer === "parent";
   const cacheKey = getEngagementCacheKey({
     cardId,
     boardId: effectiveBoardId,
@@ -114,8 +138,9 @@ export function CardEngagement({
     shareSession,
   });
   const cachedState = engagementStateCache.get(cacheKey);
-  const [state, setState] = useState<EngagementState | null>(() =>
-    cachedState ??
+  const [state, setState] = useState<EngagementState | null>(
+    () =>
+      cachedState ??
       initialEngagementState(
         initialLikeCount,
         initialCommentCount,
@@ -136,7 +161,9 @@ export function CardEngagement({
             cache: "no-store",
             headers: {
               "x-share-token": shareSession.shareToken,
-              ...(shareSession.guestId ? { "x-share-guest-id": shareSession.guestId } : {}),
+              ...(shareSession.guestId
+                ? { "x-share-guest-id": shareSession.guestId }
+                : {}),
             },
           })
         : await fetch(`/api/cards/${cardId}/engagement`, {
@@ -324,7 +351,9 @@ export function CardEngagement({
   if (!state) {
     return mode === "chips" ? (
       <div className="card-engagement-chips" aria-hidden>
-        <span className="card-engagement-chip card-engagement-chip-loading">…</span>
+        <span className="card-engagement-chip card-engagement-chip-loading">
+          …
+        </span>
         {chipsActionsEnd}
       </div>
     ) : null;
@@ -333,7 +362,10 @@ export function CardEngagement({
   if (mode === "chips") {
     return (
       <>
-        <div className="card-engagement-chips" onClick={(e) => e.stopPropagation()}>
+        <div
+          className="card-engagement-chips"
+          onClick={(e) => e.stopPropagation()}
+        >
           <button
             type="button"
             className={`card-engagement-chip card-engagement-like${state.isLiked ? " is-liked" : ""}`}
@@ -363,6 +395,7 @@ export function CardEngagement({
             canInteract={state.canInteract}
             shareSession={shareSession}
             isStudentViewer={effectiveIsStudentViewer}
+            isParentViewer={isParentViewer}
             boardId={effectiveBoardId}
             onClose={() => {
               setShowModal(false);
@@ -410,6 +443,7 @@ export function CardEngagement({
           canInteract={state.canInteract}
           shareSession={shareSession}
           isStudentViewer={effectiveIsStudentViewer}
+          isParentViewer={isParentViewer}
           boardId={effectiveBoardId}
           onChange={refresh}
           inputId={commentInputId}
@@ -438,7 +472,9 @@ function useBoardPageEngagementContext(): BoardEngagementContext {
   return context;
 }
 
-function studentViewerHeaders(isStudentViewer: boolean): Record<string, string> {
+function studentViewerHeaders(
+  isStudentViewer: boolean,
+): Record<string, string> {
   return isStudentViewer ? { "x-aura-student-viewer": "1" } : {};
 }
 
@@ -447,6 +483,7 @@ function CommentsModal({
   canInteract,
   shareSession,
   isStudentViewer,
+  isParentViewer,
   boardId,
   onClose,
 }: {
@@ -454,6 +491,7 @@ function CommentsModal({
   canInteract: boolean;
   shareSession: ShareSession | null;
   isStudentViewer: boolean;
+  isParentViewer: boolean;
   boardId?: string;
   onClose: () => void;
 }) {
@@ -486,7 +524,10 @@ function CommentsModal({
       aria-modal="true"
       aria-label="댓글"
     >
-      <div className="card-engagement-modal" onClick={(e) => e.stopPropagation()}>
+      <div
+        className="card-engagement-modal"
+        onClick={(e) => e.stopPropagation()}
+      >
         <div className="card-engagement-modal-head">
           <h3>댓글</h3>
           <button
@@ -504,6 +545,7 @@ function CommentsModal({
             canInteract={canInteract}
             shareSession={shareSession}
             isStudentViewer={isStudentViewer}
+            isParentViewer={isParentViewer}
             boardId={boardId}
           />
         </div>
@@ -519,6 +561,7 @@ function CommentsBlock({
   canInteract,
   shareSession,
   isStudentViewer,
+  isParentViewer,
   boardId,
   onChange,
   inputId,
@@ -527,14 +570,11 @@ function CommentsBlock({
   canInteract: boolean;
   shareSession: ShareSession | null;
   isStudentViewer: boolean;
+  isParentViewer: boolean;
   boardId?: string;
   onChange?: () => void;
   inputId?: string;
 }) {
-  const isParentViewer =
-    !shareSession &&
-    typeof document !== "undefined" &&
-    document.querySelector(".parent-topnav") !== null;
   const [audience, setAudience] = useState<CommentAudience>(() =>
     isParentViewer ? "guardian" : "public",
   );
@@ -559,50 +599,53 @@ function CommentsBlock({
     if (isParentViewer) setAudience("guardian");
   }, [isParentViewer]);
 
-  const load = useCallback(async (generation: number) => {
-    try {
-      const r = shareSession
-        ? await fetch(`/api/share/cards/${cardId}/comments`, {
-            cache: "no-store",
-            headers: { "x-share-token": shareSession.shareToken },
-          })
-        : await fetch(`/api/cards/${cardId}/comments?audience=${audience}`, {
-            cache: "no-store",
-            headers: studentViewerHeaders(isStudentViewer),
-          });
-      if (!r.ok) {
+  const load = useCallback(
+    async (generation: number) => {
+      try {
+        const r = shareSession
+          ? await fetch(`/api/share/cards/${cardId}/comments`, {
+              cache: "no-store",
+              headers: { "x-share-token": shareSession.shareToken },
+            })
+          : await fetch(`/api/cards/${cardId}/comments?audience=${audience}`, {
+              cache: "no-store",
+              headers: studentViewerHeaders(isStudentViewer),
+            });
+        if (!r.ok) {
+          if (
+            audience === "guardian" &&
+            commentsMountedRef.current &&
+            generation === loadGenerationRef.current
+          ) {
+            setGuardianAvailable(false);
+            setAudience("public");
+            setItems(null);
+          }
+          return;
+        }
+        const j = (await r.json()) as {
+          items: CommentItem[];
+          guardianAvailable?: boolean;
+        };
         if (
-          audience === "guardian" &&
-          commentsMountedRef.current &&
-          generation === loadGenerationRef.current
+          !commentsMountedRef.current ||
+          generation !== loadGenerationRef.current
         ) {
-          setGuardianAvailable(false);
+          return;
+        }
+        setGuardianAvailable(j.guardianAvailable === true);
+        if (audience === "guardian" && j.guardianAvailable !== true) {
           setAudience("public");
           setItems(null);
+          return;
         }
-        return;
+        setItems(j.items);
+      } catch {
+        /* ignore */
       }
-      const j = (await r.json()) as {
-        items: CommentItem[];
-        guardianAvailable?: boolean;
-      };
-      if (
-        !commentsMountedRef.current ||
-        generation !== loadGenerationRef.current
-      ) {
-        return;
-      }
-      setGuardianAvailable(j.guardianAvailable === true);
-      if (audience === "guardian" && j.guardianAvailable !== true) {
-        setAudience("public");
-        setItems(null);
-        return;
-      }
-      setItems(j.items);
-    } catch {
-      /* ignore */
-    }
-  }, [audience, cardId, shareSession, isStudentViewer]);
+    },
+    [audience, cardId, shareSession, isStudentViewer],
+  );
   loadRef.current = load;
 
   const runLoad = useCallback(() => {
@@ -683,7 +726,10 @@ function CommentsBlock({
     const nextAudience: CommentAudience =
       e.key === "ArrowLeft" || e.key === "Home" ? "public" : "guardian";
     selectAudience(nextAudience);
-    (nextAudience === "public" ? publicTabRef : guardianTabRef).current?.focus();
+    (nextAudience === "public"
+      ? publicTabRef
+      : guardianTabRef
+    ).current?.focus();
   };
 
   const submit = async (e: React.FormEvent) => {
@@ -716,7 +762,10 @@ function CommentsBlock({
         setErr("댓글 작성에 실패했어요");
         return;
       }
-      const j = (await r.json()) as { item?: CommentItem; comment?: CommentItem };
+      const j = (await r.json()) as {
+        item?: CommentItem;
+        comment?: CommentItem;
+      };
       const item = j.item ?? j.comment;
       if (!item) {
         setErr("댓글 작성에 실패했어요");
@@ -745,6 +794,29 @@ function CommentsBlock({
     } else {
       alert("삭제에 실패했어요");
     }
+  };
+
+  const markCommentHidden = (
+    id: string,
+    hiddenReason: HiddenReason,
+    hiddenStudentId?: string | null,
+  ) => {
+    setItems(
+      (current) =>
+        current?.map((comment) =>
+          comment.id === id ||
+          (hiddenReason === "author" &&
+            Boolean(hiddenStudentId) &&
+            comment.authorStudentId === hiddenStudentId)
+            ? {
+                ...comment,
+                content: "",
+                hiddenReason,
+                authorStudentId: hiddenStudentId ?? comment.authorStudentId,
+              }
+            : comment,
+        ) ?? null,
+    );
   };
 
   const canWriteAudience =
@@ -810,58 +882,92 @@ function CommentsBlock({
         }
         className="card-engagement-comment-thread"
       >
-      {/* comments-form-top (2026-04-26): 입력 폼이 상단, 댓글 목록은 그 아래
+        {/* comments-form-top (2026-04-26): 입력 폼이 상단, 댓글 목록은 그 아래
           oldest → newest 순으로 쌓임. 새 댓글은 자연스럽게 list 끝에 추가. */}
-      {canWriteAudience ? (
-        <form className="card-engagement-comment-form" onSubmit={submit}>
-          <textarea
-            id={inputId}
-            value={content}
-            onChange={(e) => setContent(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key !== "Enter" || e.shiftKey || e.nativeEvent.isComposing) {
-                return;
-              }
-              e.preventDefault();
-              e.currentTarget.form?.requestSubmit();
-            }}
-            placeholder="댓글을 입력하세요"
-            maxLength={1000}
-            rows={2}
-            disabled={submitting}
-          />
-          {err && <span className="card-engagement-comment-err">{err}</span>}
-        </form>
-      ) : items !== null ? (
-        <div className="card-engagement-readonly">읽기 전용이라 댓글을 달 수 없어요</div>
-      ) : null}
-      {items === null ? (
-        <div className="card-engagement-empty">불러오는 중...</div>
-      ) : items.length === 0 ? (
-        <div className="card-engagement-empty">아직 댓글이 없어요</div>
-      ) : (
-        <ul className="card-engagement-comment-list">
-          {items.map((c) => (
-            <li key={c.id} className="card-engagement-comment-item">
-              <div className="card-engagement-comment-head">
-                <span className="card-engagement-comment-author">{c.authorLabel}</span>
-                <span className="card-engagement-comment-time">{formatRelativeTime(c.createdAt)}</span>
-                {c.canDelete && (
-                  <button
-                    type="button"
-                    className="card-engagement-comment-delete"
-                    onClick={() => remove(c.id)}
-                    aria-label="삭제"
-                  >
-                    삭제
-                  </button>
+        {canWriteAudience ? (
+          <form className="card-engagement-comment-form" onSubmit={submit}>
+            <textarea
+              id={inputId}
+              value={content}
+              onChange={(e) => setContent(e.target.value)}
+              onKeyDown={(e) => {
+                if (
+                  e.key !== "Enter" ||
+                  e.shiftKey ||
+                  e.nativeEvent.isComposing
+                ) {
+                  return;
+                }
+                e.preventDefault();
+                e.currentTarget.form?.requestSubmit();
+              }}
+              placeholder="댓글을 입력하세요"
+              maxLength={1000}
+              rows={2}
+              disabled={submitting}
+            />
+            {err && <span className="card-engagement-comment-err">{err}</span>}
+          </form>
+        ) : items !== null ? (
+          <div className="card-engagement-readonly">
+            읽기 전용이라 댓글을 달 수 없어요
+          </div>
+        ) : null}
+        {items === null ? (
+          <div className="card-engagement-empty">불러오는 중...</div>
+        ) : items.length === 0 ? (
+          <div className="card-engagement-empty">아직 댓글이 없어요</div>
+        ) : (
+          <ul className="card-engagement-comment-list">
+            {items.map((c) => (
+              <li key={c.id} className="card-engagement-comment-item">
+                {c.hiddenReason ? (
+                  <HiddenContentPlaceholder
+                    targetKind="comment"
+                    targetId={c.id}
+                    reason={c.hiddenReason}
+                    hiddenStudentId={c.authorStudentId}
+                    onRestored={() => requestLoad()}
+                  />
+                ) : (
+                  <>
+                    <div className="card-engagement-comment-head">
+                      <span className="card-engagement-comment-author">
+                        {c.authorLabel}
+                      </span>
+                      <span className="card-engagement-comment-time">
+                        {formatRelativeTime(c.createdAt)}
+                      </span>
+                      {c.canDelete && (
+                        <button
+                          type="button"
+                          className="card-engagement-comment-delete"
+                          onClick={() => remove(c.id)}
+                          aria-label="삭제"
+                        >
+                          삭제
+                        </button>
+                      )}
+                      {isStudentViewer && c.canModerate && (
+                        <StudentContentModerationControls
+                          targetKind="comment"
+                          targetId={c.id}
+                          authorStudentId={c.authorStudentId}
+                          onHidden={(reason, hiddenStudentId) =>
+                            markCommentHidden(c.id, reason, hiddenStudentId)
+                          }
+                        />
+                      )}
+                    </div>
+                    <p className="card-engagement-comment-content">
+                      {c.content}
+                    </p>
+                  </>
                 )}
-              </div>
-              <p className="card-engagement-comment-content">{c.content}</p>
-            </li>
-          ))}
-        </ul>
-      )}
+              </li>
+            ))}
+          </ul>
+        )}
       </div>
     </div>
   );
@@ -921,7 +1027,13 @@ function CommentsPoll({
   });
 
   const vote = async (optionIndex: number) => {
-    if (shareSession || voting || !poll?.canVote || poll.selectedOption === optionIndex) return;
+    if (
+      shareSession ||
+      voting ||
+      !poll?.canVote ||
+      poll.selectedOption === optionIndex
+    )
+      return;
     setVoting(true);
     setOpenOption(optionIndex);
     setPoll((current) => {
@@ -972,11 +1084,10 @@ function CommentsPoll({
     }
     setOpenOption((current) => (current === optionIndex ? null : optionIndex));
   };
-  const openVoters =
-    openOption !== null ? (poll.voters[openOption] ?? []) : [];
+  const openVoters = openOption !== null ? (poll.voters[openOption] ?? []) : [];
   const openLabel =
     openOption !== null
-      ? poll.labels[openOption] ?? `${openOption + 1}번`
+      ? (poll.labels[openOption] ?? `${openOption + 1}번`)
       : "";
 
   return (
@@ -998,7 +1109,9 @@ function CommentsPoll({
               aria-label={`${label} (${count}표), 투표자 보기`}
             >
               <span className="card-engagement-poll-option-label">{label}</span>
-              <span className="card-engagement-poll-option-count">{count}표</span>
+              <span className="card-engagement-poll-option-count">
+                {count}표
+              </span>
             </button>
           );
         })}

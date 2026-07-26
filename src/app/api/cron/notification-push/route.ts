@@ -5,7 +5,13 @@ import {
   studentRewardTitle,
   type StudentNotificationRewardSourceType,
 } from "@/lib/student-notification-contract";
-import { dispatchStudentNotificationPush } from "@/lib/student-push";
+import {
+  assignmentDistributedPush,
+  attendanceReminderPush,
+  dispatchStudentNotificationPush,
+  shouldSendAttendanceReminder,
+  studentPushKstDay,
+} from "@/lib/student-push";
 import { dispatchParentNotificationPush } from "@/lib/parent-push";
 
 export const dynamic = "force-dynamic";
@@ -20,7 +26,17 @@ export async function GET(req: Request) {
   }
 
   const since = new Date(Date.now() - LOOKBACK_MS);
-  const [likes, comments, rewards, pendingLinks] = await Promise.all([
+  const attendanceDay = studentPushKstDay();
+  const attendanceDate = new Date(`${attendanceDay}T00:00:00.000Z`);
+  const attendanceReminderDue = shouldSendAttendanceReminder();
+  const [
+    likes,
+    comments,
+    rewards,
+    pendingLinks,
+    absentStudents,
+    assignmentSlots,
+  ] = await Promise.all([
     db.cardLike.findMany({
       where: {
         createdAt: { gte: since },
@@ -96,6 +112,38 @@ export async function GET(req: Request) {
         },
       },
     }),
+    attendanceReminderDue
+      ? db.student.findMany({
+          where: {
+            pushDevices: { some: { disabledAt: null } },
+            attendances: { none: { day: attendanceDate } },
+            pushDispatches: {
+              none: {
+                eventKey: {
+                  startsWith: "attendance-missing:",
+                  endsWith: `:${attendanceDay}`,
+                },
+              },
+            },
+          },
+          orderBy: { id: "asc" },
+          select: { id: true },
+          take: EVENT_LIMIT,
+        })
+      : Promise.resolve([]),
+    db.assignmentSlot.findMany({
+      where: {
+        createdAt: { gte: since },
+        submissionStatus: "assigned",
+      },
+      orderBy: { createdAt: "asc" },
+      take: EVENT_LIMIT,
+      select: {
+        id: true,
+        studentId: true,
+        board: { select: { slug: true, title: true } },
+      },
+    }),
   ]);
 
   const jobs: Array<Promise<unknown>> = [];
@@ -167,6 +215,27 @@ export async function GET(req: Request) {
     }));
   }
 
+  for (const student of absentStudents) {
+    jobs.push(
+      dispatchStudentNotificationPush(
+        attendanceReminderPush(student.id, attendanceDay),
+      ),
+    );
+  }
+
+  for (const slot of assignmentSlots) {
+    jobs.push(
+      dispatchStudentNotificationPush(
+        assignmentDistributedPush({
+          slotId: slot.id,
+          studentId: slot.studentId,
+          boardSlug: slot.board.slug,
+          boardTitle: slot.board.title,
+        }),
+      ),
+    );
+  }
+
   const results = await Promise.allSettled(jobs);
   return NextResponse.json({
     scanned: {
@@ -174,6 +243,8 @@ export async function GET(req: Request) {
       comments: comments.length,
       rewards: rewards.length,
       pendingLinks: pendingLinks.length,
+      absentStudents: absentStudents.length,
+      assignmentSlots: assignmentSlots.length,
     },
     dispatched: results.filter((result) => result.status === "fulfilled").length,
     failed: results.filter((result) => result.status === "rejected").length,

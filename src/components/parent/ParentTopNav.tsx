@@ -14,14 +14,15 @@ type Props = {
 };
 
 type Destination = {
-  href: "/parent/feed" | "/parent/home";
-  label: "피드" | "홈";
-  icon: "feed" | "home";
+  href: "/parent/feed" | "/parent/home" | "/parent/walking";
+  label: "피드" | "홈" | "걷기";
+  icon: "feed" | "home" | "walking";
 };
 
 const DESTINATIONS: Destination[] = [
   { href: "/parent/feed", label: "피드", icon: "feed" },
   { href: "/parent/home", label: "홈", icon: "home" },
+  { href: "/parent/walking", label: "걷기", icon: "walking" },
 ];
 
 export function ParentTopNav({
@@ -138,7 +139,13 @@ export function ParentTopNav({
         </Link>
       </header>
 
-      <nav className="parent-bottom-nav" aria-label="학부모 주 메뉴">
+      <nav
+        className="parent-bottom-nav"
+        aria-label="학부모 주 메뉴"
+        style={{
+          gridTemplateColumns: `repeat(${DESTINATIONS.length}, minmax(0, 1fr))`,
+        }}
+      >
         {DESTINATIONS.map((item) => {
           const active = pathname.startsWith(item.href);
           return (
@@ -161,7 +168,7 @@ export function ParentTopNav({
 function ParentNavIcon({
   name,
 }: {
-  name: "feed" | "home" | "account" | "teacher" | "logout";
+  name: "feed" | "home" | "walking" | "account" | "teacher" | "logout";
 }) {
   const paths: Record<typeof name, ReactNode> = {
     feed: (
@@ -177,6 +184,15 @@ function ParentNavIcon({
         <path d="M3 15h18" />
         <path d="M9 3v18" />
         <path d="M15 3v18" />
+      </>
+    ),
+    walking: (
+      <>
+        <circle cx="13" cy="5" r="2" />
+        <path d="m11 9 3 2 2 4" />
+        <path d="m10 10-3 4 3 2" />
+        <path d="m14 11-4 5 4 5" />
+        <path d="m8 14-3 5" />
       </>
     ),
     account: (

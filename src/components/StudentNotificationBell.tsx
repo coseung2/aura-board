@@ -5,7 +5,7 @@ import Link from "next/link";
 
 type StudentNotificationItem = {
   id: string;
-  kind: "like" | "comment" | "reward";
+  kind: "like" | "comment" | "reward" | "attendance" | "assignment";
   actorLabel: string;
   cardTitle: string;
   boardTitle: string;
@@ -165,19 +165,13 @@ export function StudentNotificationBell() {
               }}
             >
               <div className="auth-notify-item-title">
-                {item.kind === "like"
-                  ? `${item.actorLabel}님이 좋아요를 눌렀어요.`
-                  : item.kind === "comment"
-                    ? `${item.actorLabel}님이 댓글을 남겼어요.`
-                    : `${item.cardTitle || "보상"}을 받았어요.`}
+                {notificationTitle(item)}
               </div>
               {item.content && (
                 <div className="auth-notify-item-body">{item.content}</div>
               )}
               <div className="auth-notify-item-meta">
-                {item.kind === "reward"
-                  ? `${item.boardTitle || "내 통장"} · ${formatRelative(item.createdAt)}`
-                  : `${item.cardTitle || "제목 없는 카드"} · ${item.boardTitle} · ${formatRelative(item.createdAt)}`}
+                {notificationMeta(item)}
               </div>
             </Link>
           ))
@@ -185,6 +179,22 @@ export function StudentNotificationBell() {
       </div>
     </details>
   );
+}
+
+function notificationTitle(item: StudentNotificationItem): string {
+  if (item.kind === "like") return `${item.actorLabel}님이 좋아요를 눌렀어요.`;
+  if (item.kind === "comment") return `${item.actorLabel}님이 댓글을 남겼어요.`;
+  if (item.kind === "reward") return `${item.cardTitle || "보상"}을 받았어요.`;
+  return item.cardTitle || (item.kind === "attendance" ? "출석 알림" : "과제 알림");
+}
+
+function notificationMeta(item: StudentNotificationItem): string {
+  const relative = formatRelative(item.createdAt);
+  if (item.kind === "reward") return `${item.boardTitle || "내 통장"} · ${relative}`;
+  if (item.kind === "attendance" || item.kind === "assignment") {
+    return `${item.boardTitle || (item.kind === "attendance" ? "출석" : "과제")} · ${relative}`;
+  }
+  return `${item.cardTitle || "제목 없는 카드"} · ${item.boardTitle} · ${relative}`;
 }
 
 function formatRelative(iso: string): string {

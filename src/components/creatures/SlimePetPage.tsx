@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { SLIME_SHOP_CATALOG } from "@/lib/pets/catalog";
 import { calculateCatalogSlimeEffects } from "@/lib/pets/math";
@@ -42,6 +42,16 @@ type SlimeHome = {
   growthSpeedBps?: number;
   growthByColor?: Partial<Record<SlimeColor, SlimeGrowthSnapshotPayload>>;
   growth?: Partial<Record<SlimeColor, SlimeGrowthSnapshotPayload>>;
+  claimedTitles?: ClaimedTitle[];
+  equippedTitleByColor?: Partial<Record<SlimeColor, string>>;
+};
+
+export type ClaimedTitle = {
+  key: string;
+  label: string;
+  imagePath: string;
+  effectKey: string;
+  buffBps: number;
 };
 
 const PURCHASE_ERROR: Record<string, string> = {
@@ -104,6 +114,8 @@ export function SlimePetPage() {
   const [equippedItemsByColor, setEquippedItemsByColor] = useState<Partial<Record<SlimeColor, string[]>>>({});
   const [equippedFloorByColor, setEquippedFloorByColor] = useState<Partial<Record<SlimeColor, SlimeFloor>>>({});
   const [growthByColor, setGrowthByColor] = useState<Partial<Record<SlimeColor, SlimeGrowthSnapshotPayload>>>({});
+  const [claimedTitles, setClaimedTitles] = useState<ClaimedTitle[]>([]);
+  const [equippedTitleByColor, setEquippedTitleByColor] = useState<Partial<Record<SlimeColor, string>>>({});
   const [balance, setBalance] = useState(0);
   const [unitLabel, setUnitLabel] = useState("원");
   const [loading, setLoading] = useState(true);
@@ -113,6 +125,7 @@ export function SlimePetPage() {
   const [busyRepresentative, setBusyRepresentative] = useState<SlimeColor | null>(null);
   const [busyItemKey, setBusyItemKey] = useState<string | null>(null);
   const [busyCookieColor, setBusyCookieColor] = useState<SlimeColor | null>(null);
+  const [busyTitleColor, setBusyTitleColor] = useState<SlimeColor | null>(null);
   const [notice, setNotice] = useState<Notice | null>(null);
   const [shopNotice, setShopNotice] = useState<Notice | null>(null);
   const [shopOpen, setShopOpen] = useState(false);
@@ -152,46 +165,55 @@ export function SlimePetPage() {
       )
     : visibleShopItems;
 
+  const applyHome = useCallback((home: SlimeHome) => {
+    setCatalog(home.catalog);
+    setOwnedKeys(home.ownedColors);
+    setEquippedKeys(home.equippedColors ?? home.ownedColors);
+    setRepresentativeColor(
+      home.representativeColor ?? home.equippedColors?.[0] ?? home.ownedColors[0] ?? null,
+    );
+    const resolvedShopCatalog = home.shopCatalog ?? SLIME_SHOP_CATALOG.slice();
+    const resolvedItemsByColor = home.equippedItemsByColor ?? {};
+    const resolvedItemQuantities = { ...(home.ownedItemQuantities ?? {}) };
+    // Older snapshots only exposed ownedItemKeys. Treat a legacy cookie row as
+    // one item until the quantity payload is available.
+    if (
+      (home.ownedItemKeys ?? []).includes(SLIME_COOKIE_ITEM_KEY) &&
+      typeof resolvedItemQuantities[SLIME_COOKIE_ITEM_KEY] !== "number"
+    ) {
+      resolvedItemQuantities[SLIME_COOKIE_ITEM_KEY] = 1;
+    }
+    setShopCatalog(resolvedShopCatalog);
+    setOwnedItemKeys(home.ownedItemKeys ?? []);
+    setOwnedItemQuantities(resolvedItemQuantities);
+    setEquippedItemKeys(home.equippedItemKeys ?? []);
+    setEquippedItemsByColor(resolvedItemsByColor);
+    setEquippedFloorByColor({
+      ...floorsFromItemsByColor(resolvedItemsByColor, resolvedShopCatalog),
+      ...(home.equippedFloorByColor ?? {}),
+    });
+    setGrowthByColor(home.growthByColor ?? home.growth ?? {});
+    setClaimedTitles(home.claimedTitles ?? []);
+    setEquippedTitleByColor(home.equippedTitleByColor ?? {});
+    setBalance(home.balance);
+    setUnitLabel(home.currency.unitLabel || "원");
+  }, []);
+
+  const fetchHome = useCallback(async (signal?: AbortSignal) => {
+    const response = await fetch("/api/student/slimes", {
+      cache: "no-store",
+      signal,
+    });
+    if (!response.ok) throw new Error("load_failed");
+    return (await response.json()) as SlimeHome;
+  }, []);
+
   useEffect(() => {
     const controller = new AbortController();
     setLoading(true);
     setLoadError(false);
-    void fetch("/api/student/slimes", { cache: "no-store", signal: controller.signal })
-      .then(async (response) => {
-        if (!response.ok) throw new Error("load_failed");
-        return (await response.json()) as SlimeHome;
-      })
-      .then((home) => {
-        setCatalog(home.catalog);
-        setOwnedKeys(home.ownedColors);
-        setEquippedKeys(home.equippedColors ?? home.ownedColors);
-        setRepresentativeColor(
-          home.representativeColor ?? home.equippedColors?.[0] ?? home.ownedColors[0] ?? null,
-        );
-        const resolvedShopCatalog = home.shopCatalog ?? SLIME_SHOP_CATALOG.slice();
-        const resolvedItemsByColor = home.equippedItemsByColor ?? {};
-        const resolvedItemQuantities = { ...(home.ownedItemQuantities ?? {}) };
-        // Older snapshots only exposed ownedItemKeys. Treat a legacy cookie
-        // row as one item until the quantity payload is available.
-        if (
-          (home.ownedItemKeys ?? []).includes(SLIME_COOKIE_ITEM_KEY) &&
-          typeof resolvedItemQuantities[SLIME_COOKIE_ITEM_KEY] !== "number"
-        ) {
-          resolvedItemQuantities[SLIME_COOKIE_ITEM_KEY] = 1;
-        }
-        setShopCatalog(resolvedShopCatalog);
-        setOwnedItemKeys(home.ownedItemKeys ?? []);
-        setOwnedItemQuantities(resolvedItemQuantities);
-        setEquippedItemKeys(home.equippedItemKeys ?? []);
-        setEquippedItemsByColor(resolvedItemsByColor);
-        setEquippedFloorByColor({
-          ...floorsFromItemsByColor(resolvedItemsByColor, resolvedShopCatalog),
-          ...(home.equippedFloorByColor ?? {}),
-        });
-        setGrowthByColor(home.growthByColor ?? home.growth ?? {});
-        setBalance(home.balance);
-        setUnitLabel(home.currency.unitLabel || "원");
-      })
+    void fetchHome(controller.signal)
+      .then(applyHome)
       .catch((error: unknown) => {
         if (error instanceof DOMException && error.name === "AbortError") return;
         setLoadError(true);
@@ -200,7 +222,7 @@ export function SlimePetPage() {
         if (!controller.signal.aborted) setLoading(false);
     });
     return () => controller.abort();
-  }, [loadAttempt]);
+  }, [applyHome, fetchHome, loadAttempt]);
 
   // Keep the wall-clock projection fresh while the page is open.  The server
   // remains authoritative; this only advances the last persisted snapshot and
@@ -667,6 +689,55 @@ export function SlimePetPage() {
     }
   };
 
+  const equipPetTitle = async (color: SlimeColor, titleKey: string | null) => {
+    if (busyTitleColor) return;
+    setBusyTitleColor(color);
+    setNotice(null);
+    try {
+      const response = await fetch("/api/student/titles/equip", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ color, titleKey }),
+      });
+      const payload = (await response.json().catch(() => ({}))) as {
+        error?: string;
+        color?: string;
+        equippedTitleKey?: string | null;
+      };
+      if (!response.ok || payload.color !== color || payload.equippedTitleKey !== titleKey) {
+        const message =
+          payload.error === "title_not_claimed"
+            ? "아직 받지 않은 칭호예요."
+            : payload.error === "slime_not_found"
+              ? "보유한 펫을 찾지 못했어요."
+              : "칭호를 적용하지 못했어요. 다시 시도해 주세요.";
+        setNotice({ kind: "error", text: message });
+        return;
+      }
+
+      // Display only the complete authoritative pet snapshot after a save.
+      const refreshedHome = await fetchHome();
+      applyHome(refreshedHome);
+      const refreshedTitleKey = refreshedHome.equippedTitleByColor?.[color] ?? null;
+      if (refreshedTitleKey !== titleKey) {
+        setNotice({ kind: "error", text: "칭호 저장 상태를 확인하지 못했어요. 다시 시도해 주세요." });
+        return;
+      }
+      const slimeName = catalog.find((entry) => entry.color === color)?.nameKo ?? "펫";
+      const titleLabel = claimedTitles.find((title) => title.key === titleKey)?.label;
+      setNotice({
+        kind: "success",
+        text: titleKey
+          ? `${slimeName}에게 칭호를 붙였어요: ${titleLabel ?? "칭호"}`
+          : `${slimeName}의 칭호를 해제했어요.`,
+      });
+    } catch {
+      setNotice({ kind: "error", text: "칭호 저장 상태를 확인하지 못했어요. 다시 시도해 주세요." });
+    } finally {
+      setBusyTitleColor(null);
+    }
+  };
+
   const closeDrawer = () => {
     setShopOpen(false);
     setWardrobeColor(null);
@@ -735,12 +806,16 @@ export function SlimePetPage() {
         equippedItemsByColor={equippedItemsByColor}
         equippedFloorByColor={equippedFloorByColor}
         growthByColor={growthByColor}
+        claimedTitles={claimedTitles}
+        equippedTitleByColor={equippedTitleByColor}
         effects={effects}
         loading={loading}
         loadFailed={loadError}
         busyRepresentative={busyRepresentative}
+        busyTitleColor={busyTitleColor}
         onSetRepresentative={(color) => void setRepresentative(color)}
         onFeedCookie={consumeCookie}
+        onEquipTitle={(color, titleKey) => void equipPetTitle(color, titleKey)}
         onOpenWardrobe={(color, trigger) => {
           drawerTriggerRef.current = trigger;
           setShopNotice(null);

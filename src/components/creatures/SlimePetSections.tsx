@@ -19,6 +19,7 @@ import {
   type EquippedItemsByColor,
   type SlimeGrowthSnapshotPayload,
 } from "./SlimePetModel";
+import type { ClaimedTitle } from "./SlimePetPage";
 
 type SlimeCollectionSectionProps = {
   catalog: SlimeDefinition[];
@@ -29,12 +30,16 @@ type SlimeCollectionSectionProps = {
   equippedItemsByColor: EquippedItemsByColor;
   equippedFloorByColor?: Partial<Record<SlimeColor, EquippedFloor>>;
   growthByColor: Partial<Record<SlimeColor, SlimeGrowthSnapshotPayload>>;
+  claimedTitles: ClaimedTitle[];
+  equippedTitleByColor: Partial<Record<SlimeColor, string>>;
   effects: ReturnType<typeof calculateCatalogSlimeEffects>;
   loading: boolean;
   loadFailed: boolean;
   busyRepresentative: SlimeColor | null;
+  busyTitleColor: SlimeColor | null;
   onSetRepresentative: (color: SlimeColor) => void;
   onFeedCookie: (color: SlimeColor) => Promise<boolean>;
+  onEquipTitle: (color: SlimeColor, titleKey: string | null) => void;
   onOpenWardrobe: (color: SlimeColor, trigger: HTMLButtonElement) => void;
 };
 
@@ -70,12 +75,16 @@ export function SlimeCollectionSection({
   equippedItemsByColor,
   equippedFloorByColor = {},
   growthByColor,
+  claimedTitles,
+  equippedTitleByColor,
   effects,
   loading,
   loadFailed,
   busyRepresentative,
+  busyTitleColor,
   onSetRepresentative,
   onFeedCookie,
+  onEquipTitle,
   onOpenWardrobe,
 }: SlimeCollectionSectionProps) {
   const [actionsByColor, setActionsByColor] = useState<Partial<Record<SlimeColor, SlimeAction>>>({});
@@ -122,6 +131,8 @@ export function SlimeCollectionSection({
             .map((itemKey) => shopCatalog.find((item) => item.key === itemKey))
             .filter((item): item is SlimeShopItem => Boolean(item));
           const growth = growthByColor[slime.color];
+          const equippedTitleKey = equippedTitleByColor[slime.color] ?? null;
+          const equippedTitle = claimedTitles.find((title) => title.key === equippedTitleKey);
           const stageBuffBps = slimeBuffBpsForStage(slime.baseBuffBps, growth?.stage);
           const growthPercent = growth
             ? calculateSlimeGrowthPercent(growth)
@@ -255,6 +266,9 @@ export function SlimeCollectionSection({
                 />
               </div>
               <div className={styles.itemCopy}>
+                {equippedTitle ? (
+                  <span className={styles.equippedTitle}>{equippedTitle.label}</span>
+                ) : null}
                 <h3>{slime.nameKo}</h3>
                 {growth && growthPercent !== null ? (
                   <button
@@ -300,6 +314,22 @@ export function SlimeCollectionSection({
                     ) : null}
                   </button>
                 ) : null}
+              </div>
+              <div className={styles.titleWardrobe}>
+                <label htmlFor={`slime-title-${slime.color}`}>칭호</label>
+                <select
+                  id={`slime-title-${slime.color}`}
+                  className={styles.titleSelect}
+                  value={equippedTitleKey ?? ""}
+                  disabled={busyTitleColor !== null}
+                  aria-busy={busyTitleColor === slime.color}
+                  onChange={(event) => onEquipTitle(slime.color, event.currentTarget.value || null)}
+                >
+                  <option value="">칭호 없음</option>
+                  {claimedTitles.map((title) => (
+                    <option key={title.key} value={title.key}>{title.label}</option>
+                  ))}
+                </select>
               </div>
               <div className={styles.slimeActions}>
                 <button

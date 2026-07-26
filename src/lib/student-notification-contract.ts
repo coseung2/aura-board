@@ -5,7 +5,13 @@ import {
   type ActivityRewardSourceType,
 } from "@/lib/creatures/activity-rewards";
 
-export const STUDENT_NOTIFICATION_KINDS = ["like", "comment", "reward"] as const;
+export const STUDENT_NOTIFICATION_KINDS = [
+  "like",
+  "comment",
+  "reward",
+  "attendance",
+  "assignment",
+] as const;
 export type StudentNotificationKind = (typeof STUDENT_NOTIFICATION_KINDS)[number];
 
 export const STUDENT_NOTIFICATION_REWARD_SOURCE_TYPES =

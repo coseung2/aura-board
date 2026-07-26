@@ -401,6 +401,64 @@
   line-height: 1.45;
 }
 
+.equippedTitle {
+  display: inline-flex;
+  max-width: 100%;
+  margin-bottom: 5px;
+  padding: 4px 7px;
+  overflow: hidden;
+  border-radius: var(--radius-pill);
+  color: var(--color-accent-tinted-text);
+  background: var(--color-accent-tinted-bg);
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.titleWardrobe {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+}
+
+.titleWardrobe label {
+  color: var(--color-text-muted);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.titleSelect {
+  width: 100%;
+  min-width: 0;
+  min-height: 44px;
+  padding: 8px 30px 8px 9px;
+  overflow: hidden;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-btn);
+  color: var(--color-text);
+  background: var(--color-surface);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  text-overflow: ellipsis;
+}
+
+.titleSelect:hover {
+  border-color: var(--color-accent);
+}
+
+.titleSelect:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+.titleSelect:disabled {
+  color: var(--color-text-faint);
+  cursor: wait;
+}
+
 .growthSummary {
   position: relative;
   display: grid;

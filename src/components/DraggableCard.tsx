@@ -56,6 +56,9 @@ export type CardData = {
   commentCount?: number;
   isLiked?: boolean;
   canInteract?: boolean;
+  /** Student-only content-safety controls and persisted placeholder state. */
+  canModerate?: boolean;
+  hiddenReason?: "item" | "author" | null;
   /** DJ queue status. null on non-dj-queue boards. */
   queueStatus?: string | null;
   /** CardAuthor join rows. When empty, CardAuthorFooter falls back to the

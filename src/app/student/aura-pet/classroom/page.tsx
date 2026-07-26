@@ -1,6 +1,5 @@
 import { redirect } from "next/navigation";
 import Image from "next/image";
-import { Prisma } from "@prisma/client";
 import { StudentTopNav } from "@/components/StudentTopNav";
 import { SlimeCharacterSprite } from "@/components/creatures/SlimeCharacterSprite";
 import { StudentPetSectionHeader } from "@/components/creatures/StudentPetSectionHeader";
@@ -11,19 +10,17 @@ import {
 } from "@/lib/pets/classroom-gallery";
 import { getStudentDuties } from "@/lib/role-portals";
 import { getCurrentStudent } from "@/lib/student-auth";
-import { WALKING_TITLES, type WalkingTitleStats } from "@/lib/walking-titles";
+import { getTitleDefinition } from "@/lib/title-catalog";
 import type { SlimeColor, SlimeShopItem } from "@/lib/pets/types";
 import styles from "./page.module.css";
 
 export const dynamic = "force-dynamic";
 
-type WalkingAchievementRow = WalkingTitleStats & { studentId: string };
-
 export default async function ClassroomSlimeGalleryPage() {
   const student = await getCurrentStudent();
   if (!student) redirect("/login?from=/student/aura-pet/classroom");
 
-  const [duties, rosterRows, achievementRows] = await Promise.all([
+  const [duties, rosterRows] = await Promise.all([
     getStudentDuties(student.id),
     db.student.findMany({
       where: { classroomId: student.classroomId },
@@ -33,67 +30,45 @@ export default async function ClassroomSlimeGalleryPage() {
         name: true,
         slimes: {
           where: { isRepresentative: true },
-          select: { color: true, growthStage: true, equippedItemKeys: true },
+          select: {
+            color: true,
+            growthStage: true,
+            equippedItemKeys: true,
+            equippedTitleKey: true,
+          },
           take: 1,
         },
       },
     }),
-    db.$queryRaw<WalkingAchievementRow[]>(Prisma.sql`
-      WITH daily AS (
-        SELECT "studentId", MAX("steps")::bigint AS "maxDailySteps"
-        FROM "StudentWalkingDailyStat"
-        GROUP BY "studentId"
-      ), weekly AS (
-        SELECT "studentId", MAX("weeklySteps")::bigint AS "maxWeeklySteps"
-        FROM (
-          SELECT
-            "studentId",
-            DATE_TRUNC('week', "day") AS "weekStart",
-            SUM("steps")::bigint AS "weeklySteps"
-          FROM "StudentWalkingDailyStat"
-          GROUP BY "studentId", DATE_TRUNC('week', "day")
-        ) totals
-        GROUP BY "studentId"
-      ), monthly AS (
-        SELECT "studentId", MAX("monthlySteps")::bigint AS "maxMonthlySteps"
-        FROM (
-          SELECT
-            "studentId",
-            DATE_TRUNC('month', "day") AS "monthStart",
-            SUM("steps")::bigint AS "monthlySteps"
-          FROM "StudentWalkingDailyStat"
-          GROUP BY "studentId", DATE_TRUNC('month', "day")
-        ) totals
-        GROUP BY "studentId"
-      )
-      SELECT
-        student."id" AS "studentId",
-        COALESCE(daily."maxDailySteps", 0)::bigint AS "maxDailySteps",
-        COALESCE(weekly."maxWeeklySteps", 0)::bigint AS "maxWeeklySteps",
-        COALESCE(monthly."maxMonthlySteps", 0)::bigint AS "maxMonthlySteps"
-      FROM "Student" student
-      LEFT JOIN daily ON daily."studentId" = student."id"
-      LEFT JOIN weekly ON weekly."studentId" = student."id"
-      LEFT JOIN monthly ON monthly."studentId" = student."id"
-      WHERE student."classroomId" = ${student.classroomId}
-    `),
   ]);
-  const achievementsByStudent = new Map(
-    achievementRows.map((row) => [row.studentId, row]),
-  );
   const roster = sortClassroomSlimeStudents(
-    rosterRows.map((row) => ({
-      id: row.id,
-      number: row.number,
-      name: row.name,
-      representative: row.slimes[0]
+    rosterRows.map((row) => {
+      const representative = row.slimes[0];
+      const equippedTitle = representative?.equippedTitleKey
+        ? getTitleDefinition(representative.equippedTitleKey)
+        : null;
+      return {
+        id: row.id,
+        number: row.number,
+        name: row.name,
+        walkingTitle:
+          representative && equippedTitle
+            ? {
+                key: equippedTitle.key,
+                label: equippedTitle.label,
+                imagePath: equippedTitle.imagePath,
+              }
+            : null,
+        representative: representative
           ? {
-              color: row.slimes[0].color as SlimeColor,
-              growthStage: row.slimes[0].growthStage as 1 | 2 | 3,
-              equippedItemKeys: row.slimes[0].equippedItemKeys,
+              color: representative.color as SlimeColor,
+              growthStage: representative.growthStage as 1 | 2 | 3,
+              equippedItemKeys: representative.equippedItemKeys,
+              equippedTitleKey: representative.equippedTitleKey ?? null,
             }
-        : null,
-    })),
+          : null,
+      };
+    }),
   );
 
   return (
@@ -114,10 +89,7 @@ export default async function ClassroomSlimeGalleryPage() {
           <div className={styles.floorLayer} data-sprite-slot="floor" aria-hidden="true" />
           <ol className={styles.roster}>
             {roster.map((row) => {
-              const walking = achievementsByStudent.get(row.id);
-              const title = walking
-                ? WALKING_TITLES.find((candidate) => candidate.earned(walking))
-                : undefined;
+              const title = row.walkingTitle;
               const slime = row.representative
                 ? getSlimeDefinition(row.representative.color)
                 : null;
@@ -165,9 +137,7 @@ export default async function ClassroomSlimeGalleryPage() {
                           className={styles.walkingTitleFrame}
                         />
                       </div>
-                    ) : (
-                      <div className={styles.titlePlaceholder}>칭호 도전 중</div>
-                    )}
+                    ) : null}
                   </div>
                   <strong>{row.number !== null ? `${row.number}번 ${row.name}` : row.name}</strong>
                   <span>{slime?.nameKo ?? "대표 미지정"}</span>

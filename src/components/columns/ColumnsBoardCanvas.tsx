@@ -29,6 +29,7 @@ export type ColumnsBoardCanvasProps = {
   boardId: string;
   canEdit: boolean;
   canAddCard: boolean;
+  isStudentViewer?: boolean;
   currentRole: "owner" | "editor" | "viewer";
   currentUserId: string;
   classroomId?: string | null;
@@ -99,6 +100,7 @@ export function ColumnsBoardCanvas({
   boardId,
   canEdit,
   canAddCard,
+  isStudentViewer,
   currentRole,
   currentUserId,
   classroomId,
@@ -154,6 +156,7 @@ export function ColumnsBoardCanvas({
               sectionCards={getCardsForSection(section.id)}
               boardId={boardId}
               canEdit={canEdit}
+              isStudentViewer={isStudentViewer}
               currentRole={currentRole}
               currentUserId={currentUserId}
               classroomId={classroomId}
@@ -162,12 +165,10 @@ export function ColumnsBoardCanvas({
               draggingSectionId={draggingSectionId}
               cardDropPreview={cardDropPreview}
               organizing={organizing}
-              assignmentState={
-                getAssignmentState(
-                  section,
-                  assignmentBusySectionId === section.id,
-                )
-              }
+              assignmentState={getAssignmentState(
+                section,
+                assignmentBusySectionId === section.id,
+              )}
               roster={roster}
               authorsForSection={authorsForSection}
               studentForSectionTitle={studentForSectionTitle}
@@ -222,9 +223,7 @@ export function ColumnsBoardCanvas({
                   disabled={seedingStudents}
                   title="학급 학생 명단으로 섹션을 한 번에 추가"
                 >
-                  {seedingStudents
-                    ? "추가 중…"
-                    : "🧑 학생 이름으로 섹션 추가"}
+                  {seedingStudents ? "추가 중…" : "🧑 학생 이름으로 섹션 추가"}
                 </button>
               )}
             </div>

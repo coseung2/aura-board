@@ -20,6 +20,11 @@ import {
   AuraEvaluationControl,
   type AuraEvaluationLevel,
 } from "../AuraEvaluationControl";
+import {
+  HiddenContentPlaceholder,
+  StudentContentModerationControls,
+  useStudentContentHidden,
+} from "../moderation/StudentContentModeration";
 
 type Props = {
   card: CardData | null;
@@ -38,6 +43,8 @@ type Props = {
   onNext?: () => void;
   boardId?: string;
   isStudentViewer?: boolean;
+  /** Parent feed/detail surfaces pass this explicitly; never infer from DOM. */
+  viewer?: "parent";
   auraEvaluation?: {
     enabled: boolean;
     level: AuraEvaluationLevel | null;
@@ -58,6 +65,7 @@ export function CardDetailModal({
   onNext,
   boardId,
   isStudentViewer = false,
+  viewer,
   auraEvaluation,
 }: Props) {
   const rootRef = useRef<HTMLDivElement>(null);
@@ -65,6 +73,12 @@ export function CardDetailModal({
   // 카드 내부 이미지 라이트박스. null 이면 닫힘. 값은 card.attachments 중
   // kind==="image" 만 걸러낸 배열 내 인덱스.
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
+  const { hidden, setHidden } = useStudentContentHidden(
+    "card",
+    card?.id ?? "",
+    card?.hiddenReason ?? null,
+    card?.studentAuthorId,
+  );
   const canGoPrevious = Boolean(hasPrevious && onPrevious);
   const canGoNext = Boolean(hasNext && onNext);
 
@@ -152,6 +166,41 @@ export function CardDetailModal({
   }, []);
 
   if (!card) return null;
+
+  if (hidden) {
+    return (
+      <>
+        <div className="modal-backdrop" onClick={closeDetail} />
+        <div
+          ref={rootRef}
+          className="add-card-modal card-detail-modal student-hidden-card-modal"
+          role="dialog"
+          aria-modal="true"
+          aria-label="숨긴 카드"
+        >
+          <button
+            type="button"
+            className="ui-icon-action ui-corner-action card-detail-close"
+            onClick={closeDetail}
+            aria-label="닫기"
+          >
+            <CloseIcon size={20} />
+          </button>
+          <HiddenContentPlaceholder
+            targetKind="card"
+            targetId={card.id}
+            reason={hidden.reason}
+            hiddenStudentId={hidden.hiddenStudentId}
+            onRestored={() => {
+              setHidden(null);
+              closeDetail();
+              window.location.reload();
+            }}
+          />
+        </div>
+      </>
+    );
+  }
 
   const attachments = card.attachments ?? [];
   const mediaAttachments = attachments.filter(
@@ -385,6 +434,7 @@ export function CardDetailModal({
                 mode="panel"
                 boardId={boardId}
                 isStudentViewer={isStudentViewer}
+                viewer={viewer}
                 initialCounts={{
                   likeCount: card.likeCount ?? 0,
                   commentCount: card.commentCount ?? 0,
@@ -392,16 +442,25 @@ export function CardDetailModal({
                   canInteract: card.canInteract,
                 }}
                 panelActionsEnd={
-                  onEditAuthors &&
-                  (canEditAuthors ? canEditAuthors(card) : true) ? (
-                    <button
-                      type="button"
-                      className="card-detail-edit-authors"
-                      onClick={() => onEditAuthors(card)}
-                    >
-                      👥 작성자 지정
-                    </button>
-                  ) : null
+                  <>
+                    {onEditAuthors &&
+                    (canEditAuthors ? canEditAuthors(card) : true) ? (
+                      <button
+                        type="button"
+                        className="card-detail-edit-authors"
+                        onClick={() => onEditAuthors(card)}
+                      >
+                        👥 작성자 지정
+                      </button>
+                    ) : null}
+                    {isStudentViewer && card.canModerate ? (
+                      <StudentContentModerationControls
+                        targetKind="card"
+                        targetId={card.id}
+                        authorStudentId={card.studentAuthorId}
+                      />
+                    ) : null}
+                  </>
                 }
               />
             </aside>

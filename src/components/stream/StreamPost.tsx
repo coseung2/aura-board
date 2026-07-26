@@ -4,6 +4,7 @@ import { useState } from "react";
 import { formatRelativeTime } from "@/lib/card-engagement-format";
 import { CardBody } from "../cards/CardBody";
 import { CardEngagement } from "../engagement/CardEngagement";
+import { StudentContentModerationControls } from "../moderation/StudentContentModeration";
 import type { CardData } from "../DraggableCard";
 import { getStreamAuthor } from "./stream-author";
 
@@ -68,7 +69,9 @@ export function StreamPost({
               <span className="stream-post-guide-chip">가이드</span>
             )}
           </strong>
-          <time>{formatRelativeTime(card.createdAt ?? new Date().toISOString())}</time>
+          <time>
+            {formatRelativeTime(card.createdAt ?? new Date().toISOString())}
+          </time>
         </div>
         {(canEdit || canDelete || canToggleGuide) && (
           <div
@@ -140,7 +143,10 @@ export function StreamPost({
         />
       </div>
 
-      <div className="stream-post-engagement" onClick={(event) => event.stopPropagation()}>
+      <div
+        className="stream-post-engagement"
+        onClick={(event) => event.stopPropagation()}
+      >
         <CardEngagement
           cardId={card.id}
           mode="chips"
@@ -152,6 +158,15 @@ export function StreamPost({
             isLiked: card.isLiked,
             canInteract: card.canInteract,
           }}
+          chipsActionsEnd={
+            isStudentViewer && card.canModerate ? (
+              <StudentContentModerationControls
+                targetKind="card"
+                targetId={card.id}
+                authorStudentId={card.studentAuthorId}
+              />
+            ) : null
+          }
         />
       </div>
     </article>

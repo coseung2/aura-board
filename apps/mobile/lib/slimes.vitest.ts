@@ -84,6 +84,7 @@ describe("mobile slime parity model", () => {
           color: "purple",
           growthStage: 2,
           equippedItemKeys: ["water-puddle-background"],
+          equippedTitleKey: "weekly-50k",
         },
       },
       {
@@ -92,6 +93,22 @@ describe("mobile slime parity model", () => {
         name: "바다",
         walkingTitle: null,
         representative: null,
+      },
+      {
+        id: "student-3",
+        number: 7,
+        name: "별",
+        walkingTitle: {
+          key: "daily-20k",
+          label: "오늘의 질주",
+          imagePath: "/walking/titles/daily-20k-pixel-512.png",
+        },
+        representative: {
+          color: "green",
+          growthStage: 1,
+          equippedItemKeys: [],
+          equippedTitleKey: null,
+        },
       },
     ] })).toEqual([
       {
@@ -107,6 +124,7 @@ describe("mobile slime parity model", () => {
           color: "purple",
           growthStage: 2,
           equippedItemKeys: ["water-puddle-background"],
+          equippedTitleKey: "weekly-50k",
         },
       },
       {
@@ -115,6 +133,22 @@ describe("mobile slime parity model", () => {
         name: "바다",
         walkingTitle: null,
         representative: null,
+      },
+      {
+        id: "student-3",
+        number: 7,
+        name: "별",
+        walkingTitle: {
+          key: "daily-20k",
+          label: "오늘의 질주",
+          imagePath: "/walking/titles/daily-20k-pixel-512.png",
+        },
+        representative: {
+          color: "green",
+          growthStage: 1,
+          equippedItemKeys: [],
+          equippedTitleKey: null,
+        },
       },
     ]);
   });

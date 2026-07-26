@@ -71,6 +71,18 @@ export async function PUT(
         { status: 400 }
       );
     }
+    const roleSetting = await db.classroomRoleSetting.findUnique({
+      where: {
+        classroomId_classroomRoleId: {
+          classroomId,
+          classroomRoleId: role.id,
+        },
+      },
+      select: { enabled: true },
+    });
+    if (roleSetting?.enabled === false) {
+      return NextResponse.json({ error: "Role is disabled" }, { status: 409 });
+    }
     newRoleId = role.id;
   }
 
