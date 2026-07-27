@@ -15,6 +15,27 @@ type Props = {
 };
 
 const GROUP_SIZE = 4;
+
+/**
+ * Where a drag would land. `seat` targets a specific slot (swap or insert);
+ * `area` drops at the end of a group; `unassigned` removes the seat.
+ */
+type DropTarget =
+  | { kind: "seat"; groupIndex: number; seatIndex: number }
+  | { kind: "area"; groupIndex: number }
+  | { kind: "unassigned" };
+
+function isSameDropTarget(a: DropTarget | null, b: DropTarget | null): boolean {
+  if (!a || !b) return a === b;
+  if (a.kind !== b.kind) return false;
+  if (a.kind === "seat" && b.kind === "seat") {
+    return a.groupIndex === b.groupIndex && a.seatIndex === b.seatIndex;
+  }
+  if (a.kind === "area" && b.kind === "area") {
+    return a.groupIndex === b.groupIndex;
+  }
+  return true;
+}
 const PLACEMENT_STEP_MS = 110;
 const MIN_GROUP_COUNT = 1;
 type StudentGender = "male" | "female";
@@ -150,9 +171,13 @@ export function ClassroomSeatingEditor({
   const [fixedPairs, setFixedPairs] = useState<FixedPair[]>([]);
   const [pairFirstId, setPairFirstId] = useState("");
   const [pairSecondId, setPairSecondId] = useState("");
-  const dragSnapshotRef = useRef<GroupEditorDraft[] | null>(null);
-  const previewTargetRef = useRef<string | null>(null);
-  const dropCommittedRef = useRef(false);
+  /**
+   * Drop target under the cursor. Dragover only updates this highlight; the
+   * seating data is mutated exactly once on drop (2026-07-27). Previously
+   * dragover swapped students for real, which reordered the DOM mid-drag and
+   * made drops land on stale targets.
+   */
+  const [dropTarget, setDropTarget] = useState<DropTarget | null>(null);
 
   const studentMap = useMemo(() => {
     const map = new Map<string, GroupEditorStudent>();
@@ -224,7 +249,7 @@ export function ClassroomSeatingEditor({
   useEffect(() => {
     if (!draggingStudentId) return;
     function handleWindowDragEnd() {
-      cancelDragPreview();
+      endDrag();
     }
     window.addEventListener("dragend", handleWindowDragEnd);
     return () => window.removeEventListener("dragend", handleWindowDragEnd);
@@ -260,64 +285,42 @@ export function ClassroomSeatingEditor({
 
   function startStudentDrag(studentId: string) {
     setDraggingStudentId(studentId);
-    dragSnapshotRef.current = cloneGroups(groups);
-    previewTargetRef.current = null;
-    dropCommittedRef.current = false;
+    setDropTarget(null);
   }
 
-  function clearDragState() {
-    dragSnapshotRef.current = null;
-    previewTargetRef.current = null;
+  function endDrag() {
     setDraggingStudentId(null);
+    setDropTarget(null);
   }
 
-  function commitDrag() {
-    dropCommittedRef.current = true;
-    clearDragState();
-    window.setTimeout(() => {
-      dropCommittedRef.current = false;
-    }, 250);
+  /** Dragover handler: records the hovered target without touching the data. */
+  function highlightDropTarget(target: DropTarget) {
+    if (disabled || !draggingStudentId) return;
+    setDropTarget((current) =>
+      isSameDropTarget(current, target) ? current : target,
+    );
   }
 
-  function cancelDragPreview() {
-    if (!dropCommittedRef.current && dragSnapshotRef.current) {
-      changeGroups(dragSnapshotRef.current);
-    }
-    clearDragState();
-    dropCommittedRef.current = false;
-  }
-
-  function previewSwap(targetGroupIndex: number, targetSeatIndex: number) {
-    if (!draggingStudentId || disabled) return;
-    const previewKey = `${targetGroupIndex}:${targetSeatIndex}`;
-    if (previewTargetRef.current === previewKey) return;
-
-    const base = dragSnapshotRef.current ?? cloneGroups(groups);
-    dragSnapshotRef.current = base;
-    const source = base
-      .map((group, groupIndex) => ({
-        groupIndex,
-        seatIndex: group.studentIds.indexOf(draggingStudentId),
-      }))
-      .find((loc) => loc.seatIndex >= 0);
-    if (!source) return;
-
-    const targetStudentId =
-      base[targetGroupIndex]?.studentIds[targetSeatIndex] ?? null;
-    if (!targetStudentId) return;
-    if (targetStudentId === draggingStudentId) {
-      if (previewTargetRef.current) {
-        previewTargetRef.current = null;
-        changeGroups(base);
-      }
+  /** Single commit point for every drop path. */
+  function applyDrop(studentId: string, target: DropTarget) {
+    if (disabled) {
+      endDrag();
       return;
     }
+    if (target.kind === "unassigned") {
+      moveToUnassigned(studentId);
+    } else if (target.kind === "seat") {
+      moveDraggedStudent(studentId, target.groupIndex, target.seatIndex);
+    } else {
+      moveDraggedStudent(studentId, target.groupIndex);
+    }
+    endDrag();
+  }
 
-    const next = cloneGroups(base);
-    next[source.groupIndex].studentIds[source.seatIndex] = targetStudentId;
-    next[targetGroupIndex].studentIds[targetSeatIndex] = draggingStudentId;
-    previewTargetRef.current = previewKey;
-    changeGroups(next);
+  function readDraggedId(event: React.DragEvent): string | null {
+    return (
+      draggingStudentId || event.dataTransfer.getData("text/plain") || null
+    );
   }
 
   function moveDraggedStudent(
@@ -342,7 +345,7 @@ export function ClassroomSeatingEditor({
     if (targetStudentId && source && target) {
       next[source.groupIndex].studentIds[source.seatIndex] = targetStudentId;
       next[target.groupIndex].studentIds[target.seatIndex] = studentId;
-      onChange(next);
+      changeGroups(next);
       return;
     }
 
@@ -358,12 +361,12 @@ export function ClassroomSeatingEditor({
       ...without[targetGroupIndex],
       studentIds: targetIds,
     };
-    onChange(without);
+    changeGroups(without);
   }
 
   function moveToUnassigned(studentId: string) {
     if (disabled || !seatMap.has(studentId)) return;
-    onChange(withoutStudent(studentId));
+    changeGroups(withoutStudent(studentId));
   }
 
   function addFixedPair() {
@@ -753,23 +756,22 @@ export function ClassroomSeatingEditor({
         >
           {groups.map((group, groupIndex) => (
             <div
-              className={`seating-area ${draggingStudentId ? "is-dragging" : ""}`}
+              className={`seating-area ${draggingStudentId ? "is-dragging" : ""} ${
+                dropTarget?.kind === "area" &&
+                dropTarget.groupIndex === groupIndex
+                  ? "is-drop-target"
+                  : ""
+              }`}
               key={groupIndex}
               onDragOver={(event) => {
-                if (!disabled) event.preventDefault();
+                if (disabled) return;
+                event.preventDefault();
+                highlightDropTarget({ kind: "area", groupIndex });
               }}
               onDrop={(event) => {
                 event.preventDefault();
-                const studentId =
-                  draggingStudentId || event.dataTransfer.getData("text/plain");
-                if (studentId) {
-                  if (previewTargetRef.current) {
-                    commitDrag();
-                  } else {
-                    moveDraggedStudent(studentId, groupIndex);
-                    commitDrag();
-                  }
-                }
+                const studentId = readDraggedId(event);
+                if (studentId) applyDrop(studentId, { kind: "area", groupIndex });
               }}
             >
               <div className="seating-area-grid">
@@ -781,31 +783,34 @@ export function ClassroomSeatingEditor({
                   if (!student) {
                     return (
                       <div
-                        className="seating-slot is-empty"
+                        className={`seating-slot is-empty ${
+                          dropTarget?.kind === "seat" &&
+                          dropTarget.groupIndex === groupIndex &&
+                          dropTarget.seatIndex === seatIndex
+                            ? "is-drop-target"
+                            : ""
+                        }`}
                         key={`empty-${groupIndex}-${seatIndex}`}
                         onDragOver={(event) => {
-                          if (!disabled) event.preventDefault();
-                          if (
-                            previewTargetRef.current &&
-                            dragSnapshotRef.current
-                          ) {
-                            previewTargetRef.current = null;
-                            onChange(dragSnapshotRef.current);
-                          }
+                          if (disabled) return;
+                          event.preventDefault();
+                          event.stopPropagation();
+                          highlightDropTarget({
+                            kind: "seat",
+                            groupIndex,
+                            seatIndex,
+                          });
                         }}
                         onDrop={(event) => {
                           event.preventDefault();
                           event.stopPropagation();
-                          const droppedId =
-                            draggingStudentId ||
-                            event.dataTransfer.getData("text/plain");
+                          const droppedId = readDraggedId(event);
                           if (droppedId) {
-                            moveDraggedStudent(
-                              droppedId,
+                            applyDrop(droppedId, {
+                              kind: "seat",
                               groupIndex,
                               seatIndex,
-                            );
-                            commitDrag();
+                            });
                           }
                         }}
                       />
@@ -817,7 +822,14 @@ export function ClassroomSeatingEditor({
                         draggingStudentId === student.id
                           ? "is-dragging-card"
                           : ""
-                      } ${placementRunId > 0 ? "is-placing" : ""}`}
+                      } ${placementRunId > 0 ? "is-placing" : ""} ${
+                        dropTarget?.kind === "seat" &&
+                        dropTarget.groupIndex === groupIndex &&
+                        dropTarget.seatIndex === seatIndex &&
+                        draggingStudentId !== student.id
+                          ? "is-swap-target"
+                          : ""
+                      }`}
                       key={`${student.id}-${placementRunId}`}
                       style={{
                         animationDelay: `${
@@ -832,30 +844,27 @@ export function ClassroomSeatingEditor({
                         event.dataTransfer.effectAllowed = "move";
                         event.dataTransfer.setData("text/plain", student.id);
                       }}
-                      onDragEnd={cancelDragPreview}
+                      onDragEnd={endDrag}
                       onDragOver={(event) => {
-                        if (!disabled) {
-                          event.preventDefault();
-                          previewSwap(groupIndex, seatIndex);
-                        }
+                        if (disabled) return;
+                        event.preventDefault();
+                        event.stopPropagation();
+                        highlightDropTarget({
+                          kind: "seat",
+                          groupIndex,
+                          seatIndex,
+                        });
                       }}
                       onDrop={(event) => {
                         event.preventDefault();
                         event.stopPropagation();
-                        const droppedId =
-                          draggingStudentId ||
-                          event.dataTransfer.getData("text/plain");
+                        const droppedId = readDraggedId(event);
                         if (droppedId) {
-                          if (previewTargetRef.current) {
-                            commitDrag();
-                          } else {
-                            moveDraggedStudent(
-                              droppedId,
-                              groupIndex,
-                              seatIndex,
-                            );
-                            commitDrag();
-                          }
+                          applyDrop(droppedId, {
+                            kind: "seat",
+                            groupIndex,
+                            seatIndex,
+                          });
                         }
                       }}
                       role="button"
@@ -881,22 +890,18 @@ export function ClassroomSeatingEditor({
       </div>
 
       <div
-        className={`seating-unassigned ${draggingStudentId ? "is-drop-target" : ""}`}
+        className={`seating-unassigned ${draggingStudentId ? "is-dragging" : ""} ${
+          dropTarget?.kind === "unassigned" ? "is-drop-target" : ""
+        }`}
         onDragOver={(event) => {
-          if (!disabled) event.preventDefault();
+          if (disabled) return;
+          event.preventDefault();
+          highlightDropTarget({ kind: "unassigned" });
         }}
         onDrop={(event) => {
           event.preventDefault();
-          const studentId =
-            draggingStudentId || event.dataTransfer.getData("text/plain");
-          if (studentId) {
-            if (previewTargetRef.current && dragSnapshotRef.current) {
-              changeGroups(withoutStudent(studentId, dragSnapshotRef.current));
-            } else {
-              moveToUnassigned(studentId);
-            }
-            commitDrag();
-          }
+          const studentId = readDraggedId(event);
+          if (studentId) applyDrop(studentId, { kind: "unassigned" });
         }}
       >
         <strong>미배정 ({unassigned.length}명)</strong>
@@ -915,7 +920,7 @@ export function ClassroomSeatingEditor({
                 event.dataTransfer.effectAllowed = "move";
                 event.dataTransfer.setData("text/plain", student.id);
               }}
-              onDragEnd={cancelDragPreview}
+              onDragEnd={endDrag}
             >
               <span className="seating-desk-num">
                 {student.number != null ? `${student.number}번` : "-"}

@@ -2,12 +2,9 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { db } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
-import { announceCardChange } from "@/lib/realtime-broadcast";
 import {
   loadClassroomDefaultGroups,
-  saveBoardDefaultGroups,
   saveClassroomDefaultGroups,
-  saveSectionBreakoutGroups,
 } from "@/lib/default-groups";
 import { isSeatingExcludedStudent } from "@/lib/seating-exclusions";
 
@@ -109,39 +106,15 @@ export async function PUT(
         { status: 422 },
       );
     }
-    let affectedBoardIds: string[] = [];
+    // Saving here only updates the classroom's own arrangement. Boards take a
+    // snapshot of it when they are created or linked
+    // (snapshotClassroomGroupsToBoard), so existing boards and stream breakout
+    // sections are intentionally left untouched (2026-07-27).
     await db.$transaction(
       async (tx) => {
         await saveClassroomDefaultGroups(tx, id, input.groups);
-        const boards = await tx.board.findMany({
-          where: { classroomId: id },
-          select: { id: true },
-        });
-        affectedBoardIds = boards.map((board) => board.id);
-        for (const board of boards) {
-          await saveBoardDefaultGroups(tx, board.id, input.groups);
-        }
-        const breakoutSections = await tx.section.findMany({
-          where: {
-            board: { classroomId: id, layout: "stream" },
-            breakoutConfig: { is: { joinMode: "teacher_assign" } },
-          },
-          select: { id: true },
-        });
-        for (const section of breakoutSections) {
-          await saveSectionBreakoutGroups(tx, section.id, input.groups);
-        }
-        if (affectedBoardIds.length > 0) {
-          await tx.board.updateMany({
-            where: { id: { in: affectedBoardIds } },
-            data: { updatedAt: new Date() },
-          });
-        }
       },
       { timeout: 30_000 },
-    );
-    await Promise.all(
-      affectedBoardIds.map((boardId) => announceCardChange(boardId, "update")),
     );
     const groups = await loadClassroomDefaultGroups(db, id);
     return NextResponse.json({ groups });

@@ -312,7 +312,11 @@ export async function POST(req: Request) {
           },
         });
         if (classroom) {
-          await snapshotClassroomGroupsToBoard(tx, classroom.id, createdBoard.id);
+          await snapshotClassroomGroupsToBoard(
+            tx,
+            classroom.id,
+            createdBoard.id,
+          );
         }
         if (classroom) {
           for (const s of classroom.students) {

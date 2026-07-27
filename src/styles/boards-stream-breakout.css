@@ -428,3 +428,23 @@
   color: var(--color-text-faint);
 }
 
+/* Saved classroom seating layouts, applied into this section's roster. */
+.stream-breakout-layouts {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.stream-breakout-layouts-label {
+  color: var(--color-text-muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.stream-breakout-layouts-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}

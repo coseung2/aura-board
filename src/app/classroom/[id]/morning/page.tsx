@@ -1,29 +1,10 @@
-import { notFound } from "next/navigation";
-import { ClassroomMorningDashboard } from "@/components/classroom/ClassroomMorningDashboard";
-import { getCurrentUser } from "@/lib/auth";
-import { db } from "@/lib/db";
-import { isAdminEmail } from "@/lib/admin";
+import { redirect } from "next/navigation";
 
 type Props = { params: Promise<{ id: string }> };
 
+// The standalone 게시판 route is gone (2026-07-27); its 과제 and 청소 groups
+// are now dashboard sections. Old links and bookmarks land on the dashboard.
 export default async function ClassroomMorningPage({ params }: Props) {
   const { id } = await params;
-  const user = await getCurrentUser().catch(() => null);
-  if (!user) notFound();
-
-  const classroom = await db.classroom.findUnique({
-    where: { id },
-    select: { id: true, name: true, teacherId: true },
-  });
-  if (!classroom || classroom.teacherId !== user.id) notFound();
-
-  return (
-    <main className="classroom-page classroom-page-detail classroom-section-page classroom-morning">
-      <ClassroomMorningDashboard
-        classroomId={classroom.id}
-        classroomName={classroom.name}
-        showDevFeatures={isAdminEmail(user.email)}
-      />
-    </main>
-  );
+  redirect(`/classroom/${id}/dashboard`);
 }

@@ -2,25 +2,6 @@
 
 import { useEffect, useState } from "react";
 
-const AVATAR_COLORS = [
-  "#a69bff",
-  "#ff9ebd",
-  "#8ccfff",
-  "#ffd28c",
-  "#9ee5c1",
-  "#ffb08c",
-];
-
-export function avatarColor(name: string): string {
-  let h = 0;
-  for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) >>> 0;
-  return AVATAR_COLORS[h % AVATAR_COLORS.length];
-}
-
-export function avatarInitial(name: string): string {
-  return name ? name.slice(0, 1) : "?";
-}
-
 export type Student = {
   id: string;
   number: number | null;
@@ -79,43 +60,36 @@ export function StudentRow({
         <input type="checkbox" checked={checked} onChange={onToggle} />
       </td>
       <td className="classroom-td classroom-td-num">{student.number ?? "-"}</td>
-      <td className="classroom-td classroom-td-avatar">
-        <span
-          className="classroom-avatar"
-          style={{ background: avatarColor(student.name) }}
-          aria-hidden
-        >
-          {avatarInitial(student.name)}
-        </span>
-      </td>
       <td className="classroom-td classroom-td-name">
-        <div className="classroom-name-stack">
-          <span className="classroom-name-text">{student.name}</span>
-          <select
-            className="classroom-role-select classroom-role-select-inline"
-            value={student.gender ?? ""}
-            onChange={(e) => onGenderChange(e.target.value)}
-            aria-label={`${student.name} 성별`}
-          >
-            <option value="">미정</option>
-            <option value="female">여</option>
-            <option value="male">남</option>
-          </select>
-          <select
-            className="classroom-role-select classroom-role-select-inline"
-            value={roleKey}
-            onChange={(e) => onRoleChange(e.target.value)}
-            aria-label={`${student.name} 역할`}
-          >
-            <option value="">역할 없음</option>
-            {roleDefs.map((d) => (
-              <option key={d.key} value={d.key}>
-                {d.emoji ? `${d.emoji} ` : ""}
-                {d.labelKo}
-              </option>
-            ))}
-          </select>
-        </div>
+        <span className="classroom-name-text">{student.name}</span>
+      </td>
+      <td className="classroom-td classroom-td-gender">
+        <select
+          className="classroom-role-select classroom-role-select-inline"
+          value={student.gender ?? ""}
+          onChange={(e) => onGenderChange(e.target.value)}
+          aria-label={`${student.name} 성별`}
+        >
+          <option value="">미정</option>
+          <option value="female">여</option>
+          <option value="male">남</option>
+        </select>
+      </td>
+      <td className="classroom-td classroom-td-role">
+        <select
+          className="classroom-role-select classroom-role-select-inline"
+          value={roleKey}
+          onChange={(e) => onRoleChange(e.target.value)}
+          aria-label={`${student.name} 역할`}
+        >
+          <option value="">역할 없음</option>
+          {roleDefs.map((d) => (
+            <option key={d.key} value={d.key}>
+              {d.emoji ? `${d.emoji} ` : ""}
+              {d.labelKo}
+            </option>
+          ))}
+        </select>
       </td>
       <td className="classroom-td classroom-td-qr">
         {qrSrc ? (
@@ -129,17 +103,6 @@ export function StudentRow({
       </td>
       <td className="classroom-td classroom-td-code">
         <code className="classroom-text-code">{student.textCode}</code>
-      </td>
-      <td className="classroom-td classroom-td-parent">
-        <a
-          href={`/classroom/${classroomId}/parent-access?student=${student.id}`}
-          className={`classroom-parent-chip ${parentCount === 0 ? "is-empty" : ""}`}
-          title={
-            parentCount === 0 ? "연결된 학부모 없음" : `학부모 ${parentCount}명`
-          }
-        >
-          {parentCount === 0 ? "-" : `${parentCount}명`}
-        </a>
       </td>
       <td className="classroom-td classroom-td-actions">
         <div className="classroom-row-actions">
@@ -160,6 +123,17 @@ export function StudentRow({
             삭제
           </button>
         </div>
+      </td>
+      <td className="classroom-td classroom-td-parent">
+        <a
+          href={`/classroom/${classroomId}/parent-access?student=${student.id}`}
+          className={`classroom-parent-chip ${parentCount === 0 ? "is-empty" : ""}`}
+          title={
+            parentCount === 0 ? "연결된 학부모 없음" : `학부모 ${parentCount}명`
+          }
+        >
+          {parentCount === 0 ? "-" : `${parentCount}명`}
+        </a>
       </td>
     </tr>
   );

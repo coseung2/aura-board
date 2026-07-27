@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation";
 import { AddStudentsModal, type CreatedStudent } from "./AddStudentsModal";
 import { QRPrintSheet } from "./QRPrintSheet";
 import { ClassroomDeleteModal } from "./classroom/ClassroomDeleteModal";
-import { ClassroomSettingsModal } from "./classroom/ClassroomSettingsModal";
 import { StudentRow, type Student } from "./classroom/StudentRow";
 import {
   notifyClassroomListChanged,
@@ -40,17 +39,13 @@ type Props = {
 
 export function ClassroomDetail({ classroom }: Props) {
   const router = useRouter();
-  const [showSettings, setShowSettings] = useState(false);
   const [students, setStudents] = useState(classroom.students);
-  const linkedBoardCount = classroom.boards.length;
   const [showAddStudents, setShowAddStudents] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [deleting, setDeleting] = useState(false);
   const [showClassroomDelete, setShowClassroomDelete] = useState(false);
   const [deletingClassroom, setDeletingClassroom] = useState(false);
-  const [classroomName, setClassroomName] = useState(classroom.name);
-  const [renaming, setRenaming] = useState(false);
-  const [renameErr, setRenameErr] = useState<string | null>(null);
+  const classroomName = classroom.name;
 
   // Per-student parent-link counts, loaded once on mount and refreshed on
   // approval/revoke actions elsewhere. Plain Record keyed by studentId
@@ -247,31 +242,6 @@ export function ClassroomDetail({ classroom }: Props) {
     setDeleting(false);
   }
 
-  async function handleRenameClassroom(next: string) {
-    const trimmed = next.trim();
-    if (!trimmed || trimmed === classroomName) return;
-    setRenaming(true);
-    setRenameErr(null);
-    try {
-      const res = await fetch(`/api/classroom/${classroom.id}`, {
-        method: "PATCH",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ name: trimmed }),
-      });
-      if (res.ok) {
-        setClassroomName(trimmed);
-        notifyClassroomListChanged();
-      } else {
-        const body = (await res.json().catch(() => ({}))) as { error?: string };
-        setRenameErr(body.error ?? `rename ${res.status}`);
-      }
-    } catch (err) {
-      setRenameErr((err as Error).message);
-    } finally {
-      setRenaming(false);
-    }
-  }
-
   async function handleDeleteClassroom() {
     setDeletingClassroom(true);
     try {
@@ -374,49 +344,11 @@ export function ClassroomDetail({ classroom }: Props) {
 
   return (
     <div className="classroom-detail">
-      {/* Header — classroom.code used to be displayed here as a 6-char
-          "learner code" but no lookup path actually consumes it (student
-          login uses per-student textCode; parents use ClassInviteCode).
-          The field stays in the DB schema for future use. */}
-      <div className="classroom-detail-header">
-        <div className="classroom-detail-header-main">
-          <div className="classroom-detail-name-row">
-            <h1 className="classroom-detail-name">{classroomName}</h1>
-            <button
-              type="button"
-              className="classroom-settings-gear"
-              onClick={() => setShowSettings(true)}
-              title="학급 설정"
-              aria-label="학급 설정"
-            >
-              ⚙
-            </button>
-          </div>
-          <p className="classroom-detail-meta">
-            학생 {students.length}명 · 보드 {linkedBoardCount}개
-          </p>
-        </div>
-        <a
-          href={`/classroom/${classroom.id}/parent-access`}
-          className="classroom-invite-card"
-        >
-          <div>
-            <div className="classroom-invite-label">학부모 초대 코드</div>
-            <div className="classroom-invite-cta">코드 · 승인 관리 →</div>
-          </div>
-          {pendingCount > 0 && (
-            <span
-              className="classroom-invite-badge"
-              aria-label={`승인 대기 ${pendingCount}건`}
-              title={`승인 대기 ${pendingCount}건`}
-            >
-              {pendingCount}
-            </span>
-          )}
-        </a>
-      </div>
+      {/* The classroom title/meta header moved to the shared section header
+          (2026-07-27). Classroom settings and the parent invite entry point
+          now live in the action bar next to the roster actions.
 
-      {/* Tab navigation owned by the shared teacher <TopNav />:
+          Tab navigation owned by the shared teacher <TopNav />:
           학생 명단 = this page, 학부모 연결 = /parent-access,
           공유된 보드 = /boards, 설정 = 학급명 옆 톱니바퀴 → 설정 모달.
           2026-04-21. */}
@@ -445,6 +377,30 @@ export function ClassroomDetail({ classroom }: Props) {
           </button>
         )}
         <QRPrintSheet students={students} classroomName={classroomName} />
+        <a
+          href={`/classroom/${classroom.id}/parent-access`}
+          className="classroom-action-btn"
+        >
+          학부모 초대
+          {pendingCount > 0 && (
+            <span
+              className="classroom-action-badge"
+              aria-label={`승인 대기 ${pendingCount}건`}
+              title={`승인 대기 ${pendingCount}건`}
+            >
+              {pendingCount}
+            </span>
+          )}
+        </a>
+        {/* The settings modal is gone (2026-07-27): renaming happens inline in
+            the section header, so only deletion needed a new home. */}
+        <button
+          type="button"
+          className="classroom-detail-delete"
+          onClick={() => setShowClassroomDelete(true)}
+        >
+          학급 삭제
+        </button>
       </div>
 
       <div className="classroom-table-wrap">
@@ -472,16 +428,13 @@ export function ClassroomDetail({ classroom }: Props) {
                   />
                 </th>
                 <th className="classroom-th classroom-th-num">#</th>
-                <th
-                  className="classroom-th"
-                  style={{ width: 44 }}
-                  aria-label="아바타"
-                />
-                <th className="classroom-th">이름 / 성별 / 역할</th>
-                <th className="classroom-th">QR</th>
-                <th className="classroom-th">코드</th>
-                <th className="classroom-th">학부모</th>
-                <th className="classroom-th classroom-th-actions">관리</th>
+                <th className="classroom-th classroom-th-name">이름</th>
+                <th className="classroom-th classroom-th-gender">성별</th>
+                <th className="classroom-th classroom-th-role">역할</th>
+                <th className="classroom-th classroom-th-qr">QR</th>
+                <th className="classroom-th classroom-th-code">코드</th>
+                <th className="classroom-th classroom-th-actions">QR 관리</th>
+                <th className="classroom-th classroom-th-parent">학부모</th>
               </tr>
             </thead>
             <tbody>
@@ -505,22 +458,6 @@ export function ClassroomDetail({ classroom }: Props) {
           </table>
         )}
       </div>
-
-      {/* Settings moved to a modal opened by the ⚙ gear button next to the
-          classroom name. Content kept 1:1 with the old 설정 탭. */}
-      {showSettings && (
-        <ClassroomSettingsModal
-          classroomName={classroomName}
-          renaming={renaming}
-          renameErr={renameErr}
-          onRename={(next) => void handleRenameClassroom(next)}
-          onClose={() => setShowSettings(false)}
-          onRequestDelete={() => {
-            setShowSettings(false);
-            setShowClassroomDelete(true);
-          }}
-        />
-      )}
 
       {/* Add students modal */}
       {showAddStudents && (

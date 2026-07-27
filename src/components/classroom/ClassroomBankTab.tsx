@@ -72,9 +72,8 @@ type Props = {
 
 export function ClassroomBankTab({ classroomId, view = "actions" }: Props) {
   const [data, setData] = useState<Overview | null>(null);
-  const [selectedStudent, setSelectedStudent] = useState<string | null>(null);
-  const [amount, setAmount] = useState<string>("");
-  const [note, setNote] = useState<string>("");
+  /** Per-row deposit/withdraw amount, keyed by student id. */
+  const [rowAmounts, setRowAmounts] = useState<Record<string, string>>({});
   const [rateInput, setRateInput] = useState<string>("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -98,12 +97,16 @@ export function ClassroomBankTab({ classroomId, view = "actions" }: Props) {
     refresh();
   }, [refresh]);
 
-  async function handleAction(action: "deposit" | "withdraw") {
-    if (!selectedStudent) {
-      setError("학생을 먼저 선택하세요");
-      return;
-    }
-    const n = Number(amount.replace(/,/g, ""));
+  /**
+   * Deposit/withdraw for one row (2026-07-27). Each student row carries its own
+   * amount input, so no separate 처리 panel or selection step is needed.
+   */
+  async function handleAction(
+    action: "deposit" | "withdraw",
+    studentId: string,
+    rawAmount: string,
+  ) {
+    const n = Number(rawAmount.replace(/,/g, ""));
     if (!Number.isInteger(n) || n <= 0) {
       setError("금액은 1 이상 정수");
       return;
@@ -116,7 +119,7 @@ export function ClassroomBankTab({ classroomId, view = "actions" }: Props) {
         action === "deposit"
           ? `/api/classrooms/${classroomId}/bank/deposit`
           : `/api/classrooms/${classroomId}/bank/withdraw`;
-      const body = { studentId: selectedStudent, amount: n, note: note || undefined };
+      const body = { studentId, amount: n };
       const res = await fetch(path, {
         method: "POST",
         headers: { "content-type": "application/json" },
@@ -127,33 +130,12 @@ export function ClassroomBankTab({ classroomId, view = "actions" }: Props) {
         setError(typeof msg === "string" ? msg : "처리 실패");
         return;
       }
-      setAmount("");
-      setNote("");
+      setRowAmounts((current) => ({ ...current, [studentId]: "" }));
       setToast(
         action === "deposit"
           ? "입금 완료"
           : "출금 완료"
       );
-      await refresh();
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function handleCancelFD(fdId: string) {
-    if (!window.confirm("이 적금을 중도해지할까요? (이자 없이 원금만 반환)")) return;
-    setBusy(true);
-    try {
-      const res = await fetch(
-        `/api/classrooms/${classroomId}/bank/fixed-deposits/${fdId}/cancel`,
-        { method: "POST" }
-      );
-      if (!res.ok) {
-        const msg = (await res.json().catch(() => ({}))).error;
-        setError(typeof msg === "string" ? msg : "해지 실패");
-        return;
-      }
-      setToast("적금 해지 완료");
       await refresh();
     } finally {
       setBusy(false);
@@ -218,30 +200,52 @@ export function ClassroomBankTab({ classroomId, view = "actions" }: Props) {
   if (!data) return <p className="bank-loading">은행 정보 불러오는 중…</p>;
   const unit = data.currency.unitLabel;
   const isTeacher = data.viewerKind === "teacher";
+  /**
+   * Fixed-deposit principal per account, so each student row can show what is
+   * locked away next to what they can still spend (2026-07-27).
+   */
+  const fdTotalByAccount = new Map<string, number>();
+  for (const fd of data.activeFDs) {
+    fdTotalByAccount.set(
+      fd.accountId,
+      (fdTotalByAccount.get(fd.accountId) ?? 0) + fd.principal,
+    );
+  }
+  /** Nearest maturity per account, shown next to the deposit total. */
+  const fdDueByAccount = new Map<string, number>();
+  for (const fd of data.activeFDs) {
+    const daysLeft = Math.max(
+      0,
+      Math.ceil((new Date(fd.maturityDate).getTime() - Date.now()) / 86400000),
+    );
+    const current = fdDueByAccount.get(fd.accountId);
+    if (current === undefined || daysLeft < current) {
+      fdDueByAccount.set(fd.accountId, daysLeft);
+    }
+  }
 
   return (
     <section className="classroom-bank">
       {isTeacher && (
-        <div className="bank-summary-grid">
-          <div className="bank-summary-card">
-            <div className="bank-summary-label">총 예치금</div>
-            <div className="bank-summary-value">
+        /* Matches the dashboard's KPI strip (classroom-dashboard-kpis) so every
+           section header reads the same (2026-07-27). */
+        <section className="classroom-dashboard-kpis" aria-label="금융 요약">
+          <article className="classroom-dashboard-kpi">
+            <span>지갑 합계</span>
+            <strong>
               {data.totals.totalBalance.toLocaleString()} {unit}
-            </div>
-          </div>
-          <div className="bank-summary-card">
-            <div className="bank-summary-label">활성 적금 ({data.activeFDs.length}건)</div>
-            <div className="bank-summary-value">
+            </strong>
+          </article>
+          <article className="classroom-dashboard-kpi">
+            <span>적금 ({data.activeFDs.length}건)</span>
+            <strong>
               {data.totals.activeFDTotal.toLocaleString()} {unit}
-            </div>
-          </div>
-          <div className="bank-summary-card">
-            <div className="bank-summary-label">월 이자율</div>
-            <div className="bank-summary-value">
-              {data.currency.monthlyInterestRate === null
-                ? "미설정"
-                : `${data.currency.monthlyInterestRate}%`}
-            </div>
+            </strong>
+          </article>
+          <article className="classroom-dashboard-kpi">
+            <span>월 이자율</span>
+            {/* The input replaces the value line, so this cell stays the same
+                height as the other KPI cells (2026-07-27). */}
             <div className="bank-summary-rate">
               <input
                 className="bank-rate-input"
@@ -251,8 +255,12 @@ export function ClassroomBankTab({ classroomId, view = "actions" }: Props) {
                 max="50"
                 value={rateInput}
                 onChange={(e) => setRateInput(e.target.value)}
-                placeholder="0.0"
+                placeholder={
+                  data.currency.monthlyInterestRate === null ? "미설정" : "0.0"
+                }
+                aria-label="월 이자율"
               />
+              <span className="bank-rate-unit">%</span>
               <button
                 type="button"
                 className="bank-rate-save"
@@ -262,120 +270,101 @@ export function ClassroomBankTab({ classroomId, view = "actions" }: Props) {
                 저장
               </button>
             </div>
-          </div>
-        </div>
+          </article>
+        </section>
       )}
 
-      {view === "actions" ? <div className="bank-action-grid">
+      {view === "actions" ? (
         <div className="bank-student-panel">
-          <h3>학생 선택</h3>
-          <ul className="bank-student-list">
-            {data.students.map((s) => (
-              <li key={s.id}>
-                <button
-                  type="button"
-                  className={`bank-student-row ${
-                    selectedStudent === s.id ? "is-selected" : ""
-                  }`}
-                  onClick={() => setSelectedStudent(s.id)}
-                >
-                  <span className="bank-student-num">{s.number ?? "-"}</span>
-                  <span className="bank-student-name">{s.name}</span>
-                  <span className="bank-student-balance">
-                    {s.balance.toLocaleString()} {unit}
-                  </span>
-                </button>
-              </li>
-            ))}
-          </ul>
-        </div>
+          <table className="bank-student-table">
+            <thead>
+              <tr>
+                <th scope="col" className="bank-student-num">#</th>
+                <th scope="col" className="bank-student-name">학생</th>
+                <th scope="col" className="bank-student-balance">지갑</th>
+                <th scope="col" className="bank-student-fd">적금</th>
+                <th scope="col" className="bank-fd-due">만기</th>
+                <th scope="col" className="bank-student-action">입출금</th>
+              </tr>
+            </thead>
+            <tbody>
+              {data.students.map((s) => {
+                const fdTotal = s.accountId
+                  ? (fdTotalByAccount.get(s.accountId) ?? 0)
+                  : 0;
+                const rowAmount = rowAmounts[s.id] ?? "";
+                const fdDue = s.accountId
+                  ? fdDueByAccount.get(s.accountId)
+                  : undefined;
+                const canSubmit = rowAmount.replace(/,/g, "").length > 0;
+                return (
+                  <tr key={s.id}>
+                    <td className="bank-student-num">{s.number ?? "-"}</td>
+                    <td className="bank-student-name">{s.name}</td>
+                    <td className="bank-student-balance">
+                      {s.balance.toLocaleString()} {unit}
+                    </td>
+                    <td
+                      className={`bank-student-fd ${fdTotal === 0 ? "is-empty" : ""}`}
+                    >
+                      {fdTotal === 0
+                        ? "-"
+                        : `${fdTotal.toLocaleString()} ${unit}`}
+                    </td>
+                    <td
+                      className={`bank-fd-due ${fdDue === undefined ? "is-empty" : ""}`}
+                    >
+                      {fdDue === undefined ? "-" : `D-${fdDue}`}
+                    </td>
+                    <td className="bank-student-action">
+                      <div className="bank-row-controls">
+                        <input
+                          type="text"
+                          inputMode="numeric"
+                          className="bank-amount-input"
+                          value={rowAmount}
+                          onChange={(e) =>
+                            setRowAmounts((current) => ({
+                              ...current,
+                              [s.id]: e.target.value.replace(/[^\d,]/g, ""),
+                            }))
+                          }
+                          placeholder="0"
+                          aria-label={`${s.name} 금액`}
+                          disabled={busy}
+                        />
+                        <button
+                          type="button"
+                          className="bank-btn bank-btn-deposit"
+                          onClick={() =>
+                            void handleAction("deposit", s.id, rowAmount)
+                          }
+                          disabled={busy || !canSubmit}
+                        >
+                          입금
+                        </button>
+                        <button
+                          type="button"
+                          className="bank-btn bank-btn-withdraw"
+                          onClick={() =>
+                            void handleAction("withdraw", s.id, rowAmount)
+                          }
+                          disabled={busy || !canSubmit}
+                        >
+                          출금
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
 
-        <div className="bank-action-panel">
-          <h3>처리</h3>
-          <label className="bank-field">
-            <span>금액</span>
-            <input
-              type="text"
-              inputMode="numeric"
-              className="bank-amount-input"
-              value={amount}
-              onChange={(e) => setAmount(e.target.value.replace(/[^\d,]/g, ""))}
-              placeholder="0"
-              disabled={busy}
-            />
-          </label>
-          <label className="bank-field">
-            <span>사유 (선택)</span>
-            <input
-              type="text"
-              className="bank-note-input"
-              value={note}
-              onChange={(e) => setNote(e.target.value)}
-              maxLength={100}
-              disabled={busy}
-            />
-          </label>
-          <div className="bank-btn-row">
-            <button
-              type="button"
-              className="bank-btn bank-btn-deposit"
-              onClick={() => handleAction("deposit")}
-              disabled={busy || !selectedStudent}
-            >
-              ⬆ 입금
-            </button>
-            <button
-              type="button"
-              className="bank-btn bank-btn-withdraw"
-              onClick={() => handleAction("withdraw")}
-              disabled={busy || !selectedStudent}
-            >
-              ⬇ 출금
-            </button>
-          </div>
           {error && <p className="bank-error">{error}</p>}
           {toast && <p className="bank-toast">{toast}</p>}
         </div>
-      </div> : null}
-
-      {view === "actions" && data.activeFDs.length > 0 && (
-        <section className="bank-fd-section">
-          <h3>활성 적금</h3>
-          <ul className="bank-fd-list">
-            {data.activeFDs.map((fd) => {
-              const student = data.students.find(
-                (s) => s.accountId === fd.accountId
-              );
-              const studentName = student?.name ?? "";
-              const maturity = new Date(fd.maturityDate);
-              const daysLeft = Math.max(
-                0,
-                Math.ceil((maturity.getTime() - Date.now()) / 86400000)
-              );
-              return (
-                <li key={fd.id} className="bank-fd-row">
-                  <span className="bank-fd-principal">
-                    {fd.principal.toLocaleString()} {unit}
-                  </span>
-                  <span className="bank-fd-rate">@ {fd.monthlyRate}%</span>
-                  <span className="bank-fd-due">D-{daysLeft}</span>
-                  <span className="bank-fd-student">{studentName}</span>
-                  {data.canCancelFD && (
-                    <button
-                      type="button"
-                      className="bank-fd-cancel"
-                      onClick={() => handleCancelFD(fd.id)}
-                      disabled={busy}
-                    >
-                      중도해지
-                    </button>
-                  )}
-                </li>
-              );
-            })}
-          </ul>
-        </section>
-      )}
+      ) : null}
 
       {view === "history" ? <section className="bank-txn-section">
         <h3>

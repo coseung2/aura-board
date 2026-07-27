@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import type {
   PortfolioCardDTO,
   PortfolioStudentDTO,
@@ -13,11 +13,14 @@ type Props = {
   studentId: string;
   /** 본인 학생 id. 학부모/교사 viewer 면 null */
   selfStudentId: string | null;
+  /** Rendered in the head row next to the title (roster toggle, etc). */
+  headActions?: ReactNode;
 };
 
 export function PortfolioStudentView({
   studentId,
   selfStudentId,
+  headActions,
 }: Props) {
   const [data, setData] = useState<PortfolioStudentDTO | null>(null);
   const [loading, setLoading] = useState(true);
@@ -94,6 +97,9 @@ export function PortfolioStudentView({
     <section className="portfolio-student-view">
       <header className="portfolio-student-head">
         <h2>📚 {headTitle}</h2>
+        {headActions ? (
+          <div className="portfolio-student-head-actions">{headActions}</div>
+        ) : null}
       </header>
       {data.cards.length === 0 ? (
         <div className="portfolio-empty">

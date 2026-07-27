@@ -6,43 +6,24 @@
   align-items: center;
   justify-content: center;
   background: #fff;
-  padding: 24px;
+  padding: 24px 16px 40px;
 }
 
-.login-card {
-  width: 100%;
-  max-width: 400px;
-  background: var(--color-surface);
-  border: var(--border-card);
-  border-radius: var(--radius-card);
-  box-shadow: var(--shadow-card);
-  padding: 48px 40px;
-  text-align: center;
-}
-
-/* Login hub (3-way role picker) — wraps login-card but wider so all three
- * role cards fit side-by-side on desktop. */
+/* Mobile-aligned flat login hub: logo + content tabs + one role panel. */
 .login-hub-card {
   width: 100%;
-  max-width: 720px;
+  max-width: 420px;
   background: transparent;
   border: 0;
   border-radius: 0;
   box-shadow: none;
-  padding: 48px 40px;
+  padding: 24px 8px 0;
   text-align: center;
-}
-
-.login-hub-grid {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 16px;
-  margin: 32px 0 32px;
 }
 
 .login-page-error {
   margin: 16px auto 0;
-  max-width: 520px;
+  max-width: 420px;
   padding: 10px 14px;
   border: 1px solid var(--color-danger);
   border-radius: var(--radius-btn);
@@ -50,69 +31,101 @@
   color: var(--color-status-returned-text, var(--color-danger));
 }
 
-@media (max-width: 640px) {
-  .login-hub-grid {
-    grid-template-columns: 1fr;
-  }
-}
-
-.login-role-card {
+.login-role-tabs {
   display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 6px;
-  padding: 24px 16px;
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-card);
-  box-shadow: var(--shadow-card);
+  align-items: stretch;
+  width: 100%;
+  margin: 28px 0 0;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.login-role-tab {
+  flex: 1 1 0;
+  min-width: 0;
+  min-height: 44px;
+  padding: 10px 8px 12px;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  background: transparent;
+  color: var(--color-text-muted);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.2;
   cursor: pointer;
-  font-family: var(--font-body);
-  text-align: center;
-  transition: border-color 150ms ease, box-shadow 150ms ease, transform 150ms ease;
+  transition: color 150ms ease, border-color 150ms ease;
 }
 
-.login-role-card:hover {
-  border-color: var(--color-border-hover);
-  box-shadow: var(--shadow-card-hover);
-  transform: translateY(-2px);
+.login-role-tab:hover,
+.login-role-tab:focus-visible {
+  color: var(--color-text);
 }
 
-.login-role-card:focus-visible {
+.login-role-tab:focus-visible {
   outline: 2px solid var(--color-accent);
   outline-offset: 2px;
 }
 
-.login-role-emoji {
-  font-size: 40px;
-  line-height: 1;
-  margin-bottom: 4px;
-}
-
-.login-role-title {
-  font-size: 16px;
+.login-role-tab.is-active {
+  color: var(--color-accent);
+  border-bottom-color: var(--color-accent);
   font-weight: 700;
-  color: var(--color-text);
 }
 
-.login-role-desc {
-  font-size: 13px;
-  color: var(--color-text-muted);
-  min-height: 36px;
-}
-
-.login-role-cta {
-  margin-top: 10px;
+.login-role-panel {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
   width: 100%;
-  height: 36px;
+  margin-top: 28px;
+  padding: 8px 4px 0;
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+  text-align: center;
+}
+
+.login-role-icon {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  padding: 8px 16px;
+  color: var(--color-text);
+  margin-bottom: 2px;
+}
+
+.login-role-icon svg {
+  width: 48px;
+  height: 48px;
+}
+
+.login-role-title {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--color-text);
+  line-height: 1.25;
+}
+
+.login-role-desc {
+  font-size: 14px;
+  line-height: 1.45;
+  color: var(--color-text-muted);
+  min-height: 0;
+}
+
+.login-role-cta {
+  margin-top: 4px;
+  width: 100%;
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 10px 16px;
   background: var(--color-accent);
   color: #fff;
   border-radius: var(--radius-btn);
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 600;
   border: 0;
   font-family: var(--font-body);
@@ -122,7 +135,7 @@
   transition: background var(--t-normal);
 }
 
-.login-role-card:hover .login-role-cta {
+.login-role-cta:hover {
   background: var(--color-accent-active);
 }
 
@@ -132,11 +145,11 @@
 }
 
 .login-role-student-form {
-  margin-top: 10px;
+  margin-top: 8px;
   display: grid;
-  gap: 6px;
+  gap: 10px;
   width: 100%;
-  justify-items: center;
+  justify-items: stretch;
 }
 
 .login-role-student-form .login-role-cta {
@@ -145,13 +158,13 @@
 
 .login-role-code-input {
   width: 100%;
-  height: 36px;
+  min-height: 48px;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-btn);
   background: var(--color-surface);
   color: var(--color-text);
   font-family: var(--font-mono);
-  font-size: 15px;
+  font-size: 18px;
   font-weight: 700;
   text-align: center;
   text-transform: uppercase;
@@ -169,57 +182,48 @@
 .login-role-error {
   margin: 0;
   color: var(--color-danger);
-  font-size: 12px;
-  line-height: 1.35;
+  font-size: 13px;
+  line-height: 1.4;
 }
 
-/* OAuth 카드 (교사·학부모) — button-card 대신 div 컨테이너 + 내부
-   OAuth 버튼 행. teacher-login-button-unify (2026-04-26) 에서 학부모
-   전용 클래스를 일반화 (.login-role-card-parent → .login-role-card-static,
-   .login-role-parent-actions → .login-role-oauth-actions). */
-.login-role-card-static {
-  cursor: default;
-}
-.login-role-card-static:hover {
-  /* div 라 button hover 효과 의도 안 함 — 위 .login-role-card:hover 는 button 한정 */
-  transform: none;
-}
-.login-role-card-focused {
-  border-color: var(--color-accent);
-  box-shadow: var(--shadow-card-hover);
-}
+/* OAuth actions stay brand-colored and full-width under the active role panel. */
 .login-role-oauth-actions {
-  margin-top: 10px;
+  margin-top: 8px;
   display: grid;
-  gap: 6px;
+  gap: 10px;
   width: 100%;
 }
+
 .login-role-oauth {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 6px;
-  height: 36px;
+  gap: 8px;
+  min-height: 44px;
   border-radius: var(--radius-btn);
-  font-size: 12px;
+  font-size: 14px;
   font-weight: 600;
   text-decoration: none;
   border: 1px solid var(--color-border);
   cursor: pointer;
   transition: background 100ms, border-color 100ms;
 }
+
 .login-role-oauth:hover {
   border-color: var(--color-border-hover);
 }
+
 .login-role-oauth-google {
   background: #fff;
   color: #1f1f1f;
 }
+
 .login-role-oauth-kakao {
   background: var(--color-oauth-kakao);
   color: #181600;
   border-color: var(--color-oauth-kakao);
 }
+
 .login-role-oauth-kakao:hover {
   background: #fada0a;
   border-color: #fada0a;
@@ -259,7 +263,7 @@
 
 .login-reviewer-input {
   width: 100%;
-  height: 36px;
+  min-height: 40px;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-btn);
   background: var(--color-surface);
@@ -281,18 +285,59 @@
 
 .login-logo {
   /* PNG lockup wrapper — inner <Logo> renders the mark. Layout-only (T2-2). */
-  margin: 0 auto 20px;
+  margin: 0 auto 16px;
   display: flex;
   justify-content: center;
 }
 
 .login-title {
   font-family: var(--font-display);
-  font-size: 24px;
+  font-size: 28px;
   font-weight: 700;
   letter-spacing: var(--font-display-tracking);
-  margin: 0 0 8px;
+  margin: 0;
   color: var(--color-text);
+}
+
+.login-legal-links {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  margin-top: 28px;
+}
+
+.login-legal-links a {
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  color: var(--color-accent);
+  font-size: 13px;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.login-legal-links a:hover,
+.login-legal-links a:focus-visible {
+  text-decoration: underline;
+}
+
+.login-legal-divider {
+  width: 1px;
+  height: 14px;
+  background: var(--color-border);
+}
+
+/* Legacy single-card login styles retained for other auth surfaces. */
+.login-card {
+  width: 100%;
+  max-width: 400px;
+  background: var(--color-surface);
+  border: var(--border-card);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-card);
+  padding: 48px 40px;
+  text-align: center;
 }
 
 .login-google-btn {

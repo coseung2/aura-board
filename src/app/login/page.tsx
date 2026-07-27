@@ -1,15 +1,38 @@
 "use client";
 
 import { useEffect, useState, type FormEvent } from "react";
+import Link from "next/link";
 import { signIn, signOut } from "next-auth/react";
 import { Logo } from "@/components/Logo";
 import { RoleIcon } from "@/components/login/RoleIcon";
 
-// teacher-login-button-unify (2026-04-26): 교사 카드도 학부모처럼
-// Google 글리프 + 브랜드 컬러 OAuth 버튼으로 통일. 학생은 OAuth 가
-// 아니라 별도 라우팅이라 button-card 패턴 유지.
+// Mobile-aligned login hub: content-tab role switch + single flat panel.
+// teacher-login-button-unify (2026-04-26): teacher/parent share Google/Kakao
+// OAuth button styling. Student stays code-based.
 
 type LoginRole = "teacher" | "student" | "parent";
+
+const LOGIN_ROLES: Array<{
+  id: LoginRole;
+  title: string;
+  desc: string;
+}> = [
+  {
+    id: "teacher",
+    title: "교사",
+    desc: "학급과 보드를 관리해요",
+  },
+  {
+    id: "student",
+    title: "학생",
+    desc: "QR/코드로 학급에 참여해요",
+  },
+  {
+    id: "parent",
+    title: "학부모",
+    desc: "자녀 작품을 확인해요",
+  },
+];
 
 const LOGIN_ERROR_MESSAGES: Record<string, string> = {
   invalid_link:
@@ -37,6 +60,10 @@ function loginErrorMessage(value: string | null): string {
   );
 }
 
+function isLoginRole(value: string | null): value is LoginRole {
+  return value === "teacher" || value === "student" || value === "parent";
+}
+
 export default function LoginPage() {
   const [studentCode, setStudentCode] = useState("");
   const [studentError, setStudentError] = useState("");
@@ -46,17 +73,13 @@ export default function LoginPage() {
   const [reviewerPassword, setReviewerPassword] = useState("");
   const [reviewerError, setReviewerError] = useState("");
   const [reviewerBusy, setReviewerBusy] = useState(false);
-  const [loginRole, setLoginRole] = useState<LoginRole | null>(null);
+  const [activeRole, setActiveRole] = useState<LoginRole>("teacher");
   const [loginError, setLoginError] = useState("");
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const role = params.get("role");
-    setLoginRole(
-      role === "teacher" || role === "student" || role === "parent"
-        ? role
-        : null,
-    );
+    setActiveRole(isLoginRole(role) ? role : "teacher");
     setLoginError(loginErrorMessage(params.get("error")));
     setShowReviewerLogin(params.get("review") === "canva");
   }, []);
@@ -170,8 +193,11 @@ export default function LoginPage() {
     }
   }
 
+  const activeRoleMeta =
+    LOGIN_ROLES.find((role) => role.id === activeRole) ?? LOGIN_ROLES[0];
+
   return (
-    <main className="login-page" data-login-role={loginRole ?? undefined}>
+    <main className="login-page" data-login-role={activeRole}>
       <div className="login-hub-card">
         <div className="login-logo">
           <Logo size={56} />
@@ -188,107 +214,124 @@ export default function LoginPage() {
           </p>
         ) : null}
 
-        <div className="login-hub-grid">
-          {/* 교사 카드 — OAuth 진입점. 학부모 카드와 동일한
-              div + 내부 OAuth 버튼 패턴으로 통일. */}
-          <div
-            className={`login-role-card login-role-card-static${loginRole === "teacher" ? " login-role-card-focused" : ""}`}
-            role="group"
-            aria-label="교사 로그인"
-            data-role-focused={loginRole === "teacher" ? "true" : undefined}
-          >
-            <div className="login-role-icon">
-              <RoleIcon role="teacher" />
-            </div>
-            <div className="login-role-title">교사</div>
-            <div className="login-role-desc">학급과 보드를 관리해요</div>
-            <div className="login-role-oauth-actions">
+        <div
+          className="login-role-tabs"
+          role="tablist"
+          aria-label="로그인 역할 선택"
+        >
+          {LOGIN_ROLES.map((role) => {
+            const selected = activeRole === role.id;
+            return (
               <button
+                key={role.id}
                 type="button"
-                className="login-role-oauth login-role-oauth-google"
-                onClick={() => startTeacherSignIn("google")}
-                aria-label="Google로 교사 로그인"
+                role="tab"
+                id={`login-tab-${role.id}`}
+                aria-selected={selected}
+                aria-controls={`login-panel-${role.id}`}
+                tabIndex={selected ? 0 : -1}
+                className={`login-role-tab${selected ? " is-active" : ""}`}
+                onClick={() => setActiveRole(role.id)}
               >
-                <GoogleGlyph />
-                <span>Google로 로그인</span>
+                {role.title}
               </button>
-              <button
-                type="button"
-                className="login-role-oauth login-role-oauth-kakao"
-                onClick={() => startTeacherSignIn("kakao")}
-                aria-label="Kakao로 교사 로그인"
-              >
-                <KakaoGlyph />
-                <span>Kakao로 로그인</span>
-              </button>
-            </div>
-            {showReviewerLogin ? (
-              <>
-                <div className="login-reviewer-separator" role="separator">
-                  Canva review
-                </div>
-                <form className="login-reviewer-form" onSubmit={handleReviewerLogin}>
-                  <label className="login-reviewer-label">
-                    <span>Email</span>
-                    <input
-                      className="login-reviewer-input"
-                      type="email"
-                      value={reviewerEmail}
-                      onChange={(e) => {
-                        setReviewerEmail(e.target.value);
-                        setReviewerError("");
-                      }}
-                      autoComplete="username"
-                      maxLength={254}
-                      required
-                    />
-                  </label>
-                  <label className="login-reviewer-label">
-                    <span>Password</span>
-                    <input
-                      className="login-reviewer-input"
-                      type="password"
-                      value={reviewerPassword}
-                      onChange={(e) => {
-                        setReviewerPassword(e.target.value);
-                        setReviewerError("");
-                      }}
-                      autoComplete="current-password"
-                      minLength={16}
-                      maxLength={256}
-                      required
-                    />
-                  </label>
-                  {reviewerError ? (
-                    <p className="login-role-error" role="alert">
-                      {reviewerError}
-                    </p>
-                  ) : null}
-                  <button
-                    type="submit"
-                    className="login-role-cta"
-                    disabled={reviewerBusy}
-                  >
-                    {reviewerBusy ? "Signing in…" : "Reviewer sign in"}
-                  </button>
-                </form>
-              </>
-            ) : null}
-          </div>
+            );
+          })}
+        </div>
 
-          {/* 학생 카드 — QR/코드 진입. OAuth 가 아니라 별도 라우팅이라
-              button-card 패턴 유지. */}
-          <div
-            className={`login-role-card login-role-card-static${loginRole === "student" ? " login-role-card-focused" : ""}`}
-            role="group"
-            aria-label="학생 로그인"
-            data-role-focused={loginRole === "student" ? "true" : undefined}
-          >
-            <div className="login-role-icon">
-              <RoleIcon role="student" />
-            </div>
-            <div className="login-role-title">학생</div>
-            <div className="login-role-desc">QR/코드로 학급에 참여해요</div>
+        <section
+          className="login-role-panel"
+          role="tabpanel"
+          id={`login-panel-${activeRole}`}
+          aria-labelledby={`login-tab-${activeRole}`}
+        >
+          <div className="login-role-icon">
+            <RoleIcon role={activeRole} />
+          </div>
+          <div className="login-role-title">{activeRoleMeta.title}</div>
+          <div className="login-role-desc">{activeRoleMeta.desc}</div>
+
+          {activeRole === "teacher" ? (
+            <>
+              <div className="login-role-oauth-actions">
+                <button
+                  type="button"
+                  className="login-role-oauth login-role-oauth-google"
+                  onClick={() => startTeacherSignIn("google")}
+                  aria-label="Google로 교사 로그인"
+                >
+                  <GoogleGlyph />
+                  <span>Google로 로그인</span>
+                </button>
+                <button
+                  type="button"
+                  className="login-role-oauth login-role-oauth-kakao"
+                  onClick={() => startTeacherSignIn("kakao")}
+                  aria-label="Kakao로 교사 로그인"
+                >
+                  <KakaoGlyph />
+                  <span>Kakao로 로그인</span>
+                </button>
+              </div>
+              {showReviewerLogin ? (
+                <>
+                  <div className="login-reviewer-separator" role="separator">
+                    Canva review
+                  </div>
+                  <form
+                    className="login-reviewer-form"
+                    onSubmit={handleReviewerLogin}
+                  >
+                    <label className="login-reviewer-label">
+                      <span>Email</span>
+                      <input
+                        className="login-reviewer-input"
+                        type="email"
+                        value={reviewerEmail}
+                        onChange={(e) => {
+                          setReviewerEmail(e.target.value);
+                          setReviewerError("");
+                        }}
+                        autoComplete="username"
+                        maxLength={254}
+                        required
+                      />
+                    </label>
+                    <label className="login-reviewer-label">
+                      <span>Password</span>
+                      <input
+                        className="login-reviewer-input"
+                        type="password"
+                        value={reviewerPassword}
+                        onChange={(e) => {
+                          setReviewerPassword(e.target.value);
+                          setReviewerError("");
+                        }}
+                        autoComplete="current-password"
+                        minLength={16}
+                        maxLength={256}
+                        required
+                      />
+                    </label>
+                    {reviewerError ? (
+                      <p className="login-role-error" role="alert">
+                        {reviewerError}
+                      </p>
+                    ) : null}
+                    <button
+                      type="submit"
+                      className="login-role-cta"
+                      disabled={reviewerBusy}
+                    >
+                      {reviewerBusy ? "Signing in…" : "Reviewer sign in"}
+                    </button>
+                  </form>
+                </>
+              ) : null}
+            </>
+          ) : null}
+
+          {activeRole === "student" ? (
             <form className="login-role-student-form" onSubmit={handleStudentLogin}>
               <input
                 className="login-role-code-input"
@@ -314,21 +357,9 @@ export default function LoginPage() {
                 {studentBusy ? "확인 중..." : "학생 로그인"}
               </button>
             </form>
-          </div>
+          ) : null}
 
-          {/* 학부모 카드 — OAuth 2 진입점 (Google + Kakao). 클릭은 카드
-              자체가 아닌 내부 두 OAuth 링크. */}
-          <div
-            className={`login-role-card login-role-card-static${loginRole === "parent" ? " login-role-card-focused" : ""}`}
-            role="group"
-            aria-label="학부모 로그인"
-            data-role-focused={loginRole === "parent" ? "true" : undefined}
-          >
-            <div className="login-role-icon">
-              <RoleIcon role="parent" />
-            </div>
-            <div className="login-role-title">학부모</div>
-            <div className="login-role-desc">자녀 작품을 확인해요</div>
+          {activeRole === "parent" ? (
             <div className="login-role-oauth-actions">
               <a
                 href="/api/parent/auth/google"
@@ -347,7 +378,13 @@ export default function LoginPage() {
                 <span>Kakao로 로그인</span>
               </a>
             </div>
-          </div>
+          ) : null}
+        </section>
+
+        <div className="login-legal-links">
+          <Link href="/terms">이용약관</Link>
+          <span aria-hidden="true" className="login-legal-divider" />
+          <Link href="/privacy">개인정보처리방침</Link>
         </div>
       </div>
     </main>

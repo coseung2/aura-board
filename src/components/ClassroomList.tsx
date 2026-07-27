@@ -92,7 +92,10 @@ export function ClassroomList({ classrooms, onRefresh }: Props) {
             ref={menuOpen === c.id ? menuRootRef : null}
             className={`classroom-grid-card${menuOpen === c.id ? " classroom-grid-card--menu-open" : ""}`}
           >
-            <Link href={`/classroom/${c.id}`} className="classroom-grid-card-link">
+            <Link
+              href={`/classroom/${c.id}/dashboard`}
+              className="classroom-grid-card-link"
+            >
               <div className="classroom-grid-name">{c.name}</div>
               <div className="classroom-grid-code">{c.code}</div>
               <div className="classroom-grid-stats">

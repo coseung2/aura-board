@@ -100,6 +100,8 @@ describe("classroom role settings API", () => {
         enabled: true,
         salaryAmount: 0,
         payPeriod: "weekly",
+        payMode: "manual",
+        payAnchor: null,
       })),
     );
     expect(body.assignments).toHaveLength(2);

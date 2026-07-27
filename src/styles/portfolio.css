@@ -117,7 +117,8 @@
   bottom: 0;
   left: 0;
   width: clamp(280px, 28%, 360px);
-  z-index: 40;
+  /* Must sit above the top nav, which uses --z-topnav (2147483000). */
+  z-index: var(--z-nav-overlay, 2147483004);
   border-right: 1px solid var(--color-border);
   box-shadow: 8px 0 24px rgba(0, 0, 0, 0.08);
   transform: translateX(-100%);
@@ -134,7 +135,7 @@
   background: rgba(0, 0, 0, 0.4);
   opacity: 0;
   pointer-events: none;
-  z-index: 39;
+  z-index: var(--z-nav-overlay-backdrop, 2147483003);
   transition: opacity 220ms ease;
 }
 .portfolio-roster-backdrop.is-open {
@@ -303,17 +304,30 @@
   font-size: 0.875rem;
   cursor: pointer;
 }
+/* Title + roster toggle share one row. */
+.portfolio-student-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 12px;
+}
 .portfolio-student-head h2 {
-  margin: 0 0 12px;
+  margin: 0;
   font-size: 1.1rem;
   font-weight: 600;
 }
+.portfolio-student-head-actions {
+  flex: 0 0 auto;
+}
+/* Masonry columns so a tall card doesn't stretch its whole row. */
 .portfolio-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, 240px);
-  align-items: start;
-  justify-content: start;
-  gap: 24px;
+  columns: 240px;
+  column-gap: 24px;
+}
+.portfolio-grid > * {
+  margin-bottom: 24px;
+  break-inside: avoid;
 }
 .portfolio-empty {
   padding: 48px 16px;
@@ -733,7 +747,9 @@
     border-bottom: 1px solid var(--color-border);
     max-height: none;
   }
-  .portfolio-grid,
+  .portfolio-grid {
+    columns: 240px;
+  }
   .portfolio-student-skeleton,
   .showcase-gallery-grid {
     grid-template-columns: repeat(auto-fill, 240px);

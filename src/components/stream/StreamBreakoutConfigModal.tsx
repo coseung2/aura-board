@@ -79,6 +79,14 @@ export function BreakoutConfigModal({
   const [loading, setLoading] = useState(!state?.config);
   const [submitting, setSubmitting] = useState(false);
   const [status, setStatus] = useState("");
+  /**
+   * Saved classroom seating layouts (2026-07-27). Breakout groups are edited
+   * here, so this is where a teacher picks which saved arrangement to start
+   * from. Applying one only fills this section's roster.
+   */
+  const [seatingLayouts, setSeatingLayouts] = useState<
+    Array<{ id: string; name: string; groups: GroupEditorDraft[] }>
+  >([]);
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -102,6 +110,7 @@ export function BreakoutConfigModal({
         });
         if (!res.ok) throw new Error(await res.text());
         const data = (await res.json()) as {
+          classroomId: string | null;
           students: GroupEditorStudent[];
           groups: GroupEditorDraft[];
         };
@@ -114,6 +123,22 @@ export function BreakoutConfigModal({
               ? data.groups
               : defaultBreakoutGroups(data.students ?? []),
           );
+        }
+        if (data.classroomId) {
+          const layoutRes = await fetch(
+            `/api/classroom/${data.classroomId}/seating-layouts`,
+            { cache: "no-store" },
+          );
+          if (layoutRes.ok && !cancelled) {
+            const layoutData = (await layoutRes.json()) as {
+              layouts?: Array<{
+                id: string;
+                name: string;
+                groups: GroupEditorDraft[];
+              }>;
+            };
+            setSeatingLayouts(layoutData.layouts ?? []);
+          }
         }
       } catch {
         if (!cancelled) {
@@ -172,12 +197,39 @@ export function BreakoutConfigModal({
             {loading ? (
               <p className="stream-breakout-modal-hint">기본 모둠을 불러오는 중...</p>
             ) : (
-              <GroupRosterEditor
-                students={students}
-                groups={groups}
-                onChange={setGroups}
-                disabled={disabled}
-              />
+              <>
+                {seatingLayouts.length > 0 && (
+                  <div className="stream-breakout-layouts">
+                    <span className="stream-breakout-layouts-label">
+                      저장된 자리 배치
+                    </span>
+                    <div className="stream-breakout-layouts-list">
+                      {seatingLayouts.map((layout) => (
+                        <button
+                          key={layout.id}
+                          type="button"
+                          className="classroom-row-btn"
+                          onClick={() => {
+                            setGroups(layout.groups);
+                            setStatus(
+                              `"${layout.name}" 배치를 불러왔어요. 저장을 눌러 적용하세요.`,
+                            );
+                          }}
+                          disabled={disabled}
+                        >
+                          {layout.name}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                <GroupRosterEditor
+                  students={students}
+                  groups={groups}
+                  onChange={setGroups}
+                  disabled={disabled}
+                />
+              </>
             )}
             <p className="stream-breakout-modal-hint">
               {state?.config

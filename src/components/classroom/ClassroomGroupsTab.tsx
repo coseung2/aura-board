@@ -6,6 +6,7 @@ import {
   type GroupEditorStudent,
 } from "./GroupRosterEditor";
 import { ClassroomSeatingEditor } from "./ClassroomSeatingEditor";
+import { SeatingLayoutLibrary } from "./SeatingLayoutLibrary";
 import { isSeatingExcludedStudent } from "@/lib/seating-exclusions";
 
 type Props = {
@@ -218,8 +219,8 @@ export function ClassroomGroupsTab({
         <div>
           <h2 className="classroom-boards-heading">자리 배치</h2>
           <p className="classroom-setting-hint">
-            저장한 자리 배치는 학급 기본 모둠으로 쓰이며 새 보드, 기존 보드,
-            스트림보드의 모둠활동 설정에 이어서 반영됩니다.
+            저장한 자리 배치는 학급 기본 모둠이 됩니다. 보드는 만들 때 이
+            배치를 그대로 가져가며, 이미 만든 보드의 모둠은 바뀌지 않아요.
           </p>
         </div>
         <button
@@ -235,6 +236,16 @@ export function ClassroomGroupsTab({
         students={seatingStudents}
         groups={groups}
         onChange={handleGroupsChange}
+        disabled={saving}
+      />
+
+      <SeatingLayoutLibrary
+        classroomId={classroomId}
+        currentGroups={groups}
+        onRestore={(restored) => {
+          setGroups(restored);
+          setStatus("저장된 자리 배치를 불러왔어요. 저장을 눌러 반영하세요.");
+        }}
         disabled={saving}
       />
       {validation.message && (

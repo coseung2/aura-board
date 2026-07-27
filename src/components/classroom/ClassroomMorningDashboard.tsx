@@ -24,6 +24,14 @@ type Props = {
   classroomName: string;
   // Kept for callers that gate development-only features at the route level.
   showDevFeatures?: boolean;
+  /**
+   * Which groups to render. The classroom dashboard mounts this twice, once
+   * per nav tab (과제 / 청소), so each tab shows a single group without the
+   * standalone toolbar. Defaults to the full bulletin layout.
+   */
+  sections?: ReadonlyArray<"assignments" | "duties">;
+  /** Hide the back link + background action when embedded in the dashboard. */
+  showToolbar?: boolean;
 };
 
 type RoleTab = "cleaning" | "shoe";
@@ -107,14 +115,22 @@ function PanelToggle({
 export function ClassroomMorningDashboard({
   classroomId,
   classroomName,
+  sections = ["assignments", "duties"],
+  showToolbar = true,
 }: Props) {
+  const showAssignments = sections.includes("assignments");
+  const showDuties = sections.includes("duties");
   const [summary, setSummary] = useState<MorningSummary | null>(null);
   const [loaded, setLoaded] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
-  const [activeAssignmentIndex, setActiveAssignmentIndex] = useState<number | null>(
-    null,
-  );
+  /**
+   * Assignment rows expand independently: the list runs in two columns, so
+   * collapsing a neighbour when opening another was disorienting.
+   */
+  const [expandedAssignments, setExpandedAssignments] = useState<
+    Record<number, boolean>
+  >({});
   const [selectedCleaning, setSelectedCleaning] = useState<
     MorningSummary["cleaningFindings"][number] | null
   >(null);
@@ -436,7 +452,10 @@ export function ClassroomMorningDashboard({
   }
 
   return (
-    <section className="morning-dashboard">
+    <section
+      className={`morning-dashboard${showToolbar ? "" : " is-embedded"}`}
+    >
+      {showToolbar ? (
       <header className="morning-dashboard-toolbar">
         <div className="morning-dashboard-context">
           <Link
@@ -463,6 +482,7 @@ export function ClassroomMorningDashboard({
           </div>
         </div>
       </header>
+      ) : null}
 
       {!loaded ? (
         <p className="morning-state check-loading" role="status">
@@ -479,6 +499,7 @@ export function ClassroomMorningDashboard({
       ) : (
         <>
           <div className="morning-grid">
+            {showAssignments ? (
             <section
               className="morning-group morning-assignment-group"
               aria-labelledby="morning-assignment-heading"
@@ -496,7 +517,7 @@ export function ClassroomMorningDashboard({
                     {assignmentSections.map((section, index) => {
                       const rowId = `morning-assignment-panel-${index}`;
                       const buttonId = `morning-assignment-row-${index}`;
-                      const isExpanded = activeAssignmentIndex === index;
+                      const isExpanded = Boolean(expandedAssignments[index]);
                       return (
                         <li key={section.id} className="morning-assignment-row">
                           <button
@@ -506,9 +527,10 @@ export function ClassroomMorningDashboard({
                             aria-expanded={isExpanded}
                             aria-controls={rowId}
                             onClick={() =>
-                              setActiveAssignmentIndex(
-                                isExpanded ? null : index,
-                              )
+                              setExpandedAssignments((current) => ({
+                                ...current,
+                                [index]: !current[index],
+                              }))
                             }
                           >
                             <span className="morning-assignment-row-title">
@@ -557,7 +579,9 @@ export function ClassroomMorningDashboard({
                 )}
               </div>
             </section>
+            ) : null}
 
+            {showDuties ? (
             <section
               className="morning-group morning-role-group"
               aria-labelledby="morning-role-heading"
@@ -613,7 +637,7 @@ export function ClassroomMorningDashboard({
                 </div>
               </header>
 
-              {activeRoleTab === "cleaning" ? (
+              {activeRoleTab === "cleaning" || !showToolbar ? (
                 <div
                   id="morning-role-panel-cleaning"
                   role="tabpanel"
@@ -806,7 +830,8 @@ export function ClassroomMorningDashboard({
                     )}
                   </section>
                 </div>
-              ) : (
+              ) : null}
+              {activeRoleTab === "shoe" || !showToolbar ? (
                 <div
                   id="morning-role-panel-shoe"
                   role="tabpanel"
@@ -885,8 +910,9 @@ export function ClassroomMorningDashboard({
                     )}
                   </section>
                 </div>
-              )}
+              ) : null}
             </section>
+            ) : null}
           </div>
 
           {lastUpdated && (

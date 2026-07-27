@@ -434,7 +434,7 @@
 }
 
 .classroom-th {
-  text-align: left;
+  text-align: center;
   padding: 8px 12px;
   font-size: 13px;
   font-weight: 600;
@@ -447,8 +447,7 @@
 }
 
 .classroom-th-actions {
-  width: 120px;
-  text-align: right;
+  width: auto;
 }
 
 .classroom-td {
@@ -456,6 +455,7 @@
   font-size: 14px;
   border-bottom: 1px solid var(--color-border);
   vertical-align: middle;
+  text-align: center;
 }
 
 .classroom-tr:hover .classroom-td {
@@ -469,6 +469,38 @@
 
 .classroom-td-name {
   font-weight: 600;
+}
+
+/* Roster columns (2026-07-27): name, gender, and role are separate cells so
+   headers and values line up instead of sharing one stacked cell. Data columns
+   split the remaining width evenly via table-layout: fixed. */
+.classroom-table {
+  table-layout: fixed;
+}
+
+/* Seven data columns share the width left over by the checkbox (36px) and
+   index (40px) columns. */
+.classroom-th-name,
+.classroom-th-gender,
+.classroom-th-role,
+.classroom-th-qr,
+.classroom-th-code,
+.classroom-th-actions,
+.classroom-th-parent {
+  width: calc((100% - 76px) / 7);
+}
+
+.classroom-td-gender .classroom-role-select-inline,
+.classroom-td-role .classroom-role-select-inline {
+  width: auto;
+  min-width: 0;
+  max-width: none;
+  min-height: 0;
+  height: 26px;
+  padding: 2px 4px 2px 6px;
+  font-size: 12px;
+  text-align: center;
+  text-align-last: center;
 }
 
 .classroom-qr-thumb {
@@ -493,10 +525,6 @@
 }
 
 /* Parent-count cell: small deep-linkable chip. "–" when empty. */
-.classroom-td-parent {
-  text-align: center;
-}
-
 .classroom-parent-chip {
   display: inline-flex;
   align-items: center;
@@ -522,10 +550,6 @@
   font-weight: 400;
 }
 
-.classroom-td-role {
-  text-align: left;
-}
-
 .classroom-role-select {
   font: inherit;
   font-size: 12px;
@@ -543,21 +567,11 @@
   outline-offset: 1px;
 }
 
-.classroom-td-actions {
-  text-align: right;
-}
-
 .classroom-row-actions {
   display: flex;
   align-items: center;
-  justify-content: flex-end;
+  justify-content: center;
   gap: 8px;
-  opacity: 0;
-  transition: opacity 150ms ease;
-}
-
-.classroom-tr:hover .classroom-row-actions {
-  opacity: 1;
 }
 
 .classroom-row-btn {
@@ -1356,41 +1370,479 @@
 
 .classroom-role-mini-grid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 8px;
 }
 
 .classroom-role-mini-card {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
-  gap: 2px 8px;
-  align-items: center;
-  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-height: 88px;
+  padding: 12px;
   border-radius: var(--radius-btn);
   background: var(--color-surface-alt);
   font-size: 13px;
 }
 
-.classroom-role-mini-icon {
-  grid-row: span 2;
-  display: grid;
-  place-items: center;
-  width: 30px;
-  height: 30px;
-  border-radius: 999px;
-  background: #fff;
-  border: 1px solid var(--color-border);
+.classroom-role-mini-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
 }
 
-.classroom-role-mini-card strong {
+.classroom-role-mini-label {
+  min-width: 0;
+  color: var(--color-text);
+  font-size: 14px;
+  font-weight: 700;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.classroom-role-mini-salary {
+  flex: 0 0 auto;
+  color: var(--color-text-muted);
+  font-size: 11px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.classroom-role-mini-students {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  color: var(--color-text);
+  font-size: 12px;
+  white-space: pre-wrap;
+}
+
+.classroom-role-mini-unassigned {
+  margin: 0;
+  color: var(--color-text-faint);
+  font-size: 12px;
+}
+
+/* Transparent placeholder tile that doubles as the 역할 추가 entry point,
+   mirroring the board columns' dashed "+ 카드 추가" affordance. */
+.classroom-role-mini-add {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 88px;
+  padding: 12px;
+  border: 1px dashed var(--color-border);
+  border-radius: var(--radius-btn);
+  background: transparent;
+  color: var(--color-text-faint);
+  font-family: var(--font-body);
+  font-size: 13px;
+  font-weight: 600;
+  text-decoration: none;
+  cursor: pointer;
+  transition:
+    border-color 150ms ease,
+    color 150ms ease,
+    background 150ms ease;
+}
+
+.classroom-role-mini-add:hover,
+.classroom-role-mini-add:focus-visible {
+  border-color: var(--color-accent);
+  color: var(--color-accent);
+  background: var(--color-accent-tinted-bg);
+}
+
+.classroom-role-add-modal .modal-body {
+  display: grid;
+  gap: 16px;
+}
+
+.classroom-role-add-modal .modal-body,
+.classroom-role-edit-modal .modal-body {
+  padding: 4px 20px 0;
+}
+
+/* Keep the unit suffix inside the modal instead of overflowing its edge. */
+.classroom-role-add-modal .classroom-role-input-wrap,
+.classroom-role-edit-modal .classroom-role-input-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  width: 100%;
+}
+
+.classroom-role-add-modal .classroom-role-input-wrap > span,
+.classroom-role-edit-modal .classroom-role-input-wrap > span {
+  flex: 0 0 auto;
+  color: var(--color-text-muted);
+  font-size: 13px;
+}
+
+.classroom-role-add-modal .classroom-role-salary,
+.classroom-role-edit-modal .classroom-role-salary,
+.classroom-role-add-modal .classroom-role-name-input,
+.classroom-role-edit-modal .classroom-role-name-input {
+  padding-inline: 10px;
+}
+
+.classroom-role-add-label {
   color: var(--color-text-muted);
   font-size: 12px;
+  font-weight: 700;
+}
+
+.classroom-role-add-modal .classroom-role-select {
+  width: 100%;
+  min-height: 40px;
+}
+
+.classroom-role-mini-card {
+  border: 0;
+  font-family: var(--font-body);
+  text-align: left;
+  cursor: pointer;
+  transition: background 150ms ease;
+}
+
+.classroom-role-mini-card:hover,
+.classroom-role-mini-card:focus-visible {
+  background: var(--color-accent-tinted-bg);
+}
+
+/* Pay controls render inside the section divider row, right-aligned. */
+.classroom-role-pay-bar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-left: auto;
+  padding-bottom: 6px;
+}
+
+.classroom-role-pay-bar .segmented-control-item {
+  padding: 7px 14px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.classroom-role-pay-bar .classroom-role-select {
+  min-height: 36px;
+  font-size: 13px;
+}
+
+.classroom-role-pay-note {
+  color: var(--color-text-muted);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.classroom-role-pay-bar .classroom-role-pay-now {
+  min-height: 36px;
+  padding: 7px 16px;
+  font-size: 13px;
+}
+
+.classroom-role-pay-bar button:disabled,
+.classroom-role-pay-bar select:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.classroom-role-edit-modal .modal-body {
+  display: grid;
+  gap: 16px;
+}
+
+/* Title removed, so the header only carries the close button. */
+.classroom-role-edit-header {
+  justify-content: flex-end;
+}
+
+/* Align modal label/value text with where the input's --radius-btn (10px)
+   corner ends and its straight edge begins. */
+.classroom-role-add-modal .classroom-role-field label,
+.classroom-role-edit-modal .classroom-role-field label,
+.classroom-role-add-modal .classroom-role-add-label,
+.classroom-role-edit-modal .classroom-role-add-label {
+  padding-left: 10px;
+}
+
+.classroom-role-student-chip {
+  padding-inline: 10px;
+}
+
+/* Five student columns need more room than the default 520px modal. */
+.classroom-role-edit-modal,
+.classroom-role-add-modal {
+  width: 640px;
+}
+
+.classroom-role-add-pay {
+  display: flex;
+  align-items: flex-end;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.classroom-role-name-input {
+  width: 100%;
+  min-height: 40px;
+  padding: 0 10px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-btn);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font: inherit;
+  font-size: 14px;
+}
+
+.classroom-role-name-input:focus {
+  border-color: var(--color-accent);
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(0, 117, 222, 0.15);
+}
+
+/* 역할 이름 + 급여 split the row evenly. */
+.classroom-role-add-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: end;
+  gap: 12px;
+}
+
+.classroom-role-field-name,
+.classroom-role-field-salary {
+  min-width: 0;
+}
+
+/* Name and salary inputs share one height so the row reads as a single band. */
+.classroom-role-add-modal .classroom-role-name-input,
+.classroom-role-edit-modal .classroom-role-name-input,
+.classroom-role-add-modal .classroom-role-salary,
+.classroom-role-edit-modal .classroom-role-salary {
+  min-height: 40px;
+  font-size: 14px;
+}
+
+@media (max-width: 560px) {
+  .classroom-role-add-row {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.classroom-role-add-modal .modal-actions,
+.classroom-role-edit-modal .modal-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 16px 20px 20px;
+}
+
+.classroom-role-student-picker {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.classroom-role-student-chip {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+  min-height: 36px;
+  padding: 6px 8px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-btn);
+  background: var(--color-surface);
+  color: var(--color-text-muted);
+  font: inherit;
+  font-size: 12px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: pointer;
+}
+
+.classroom-role-student-chip.is-assigned {
+  border-color: var(--color-accent);
+  background: var(--color-accent-tinted-bg);
+  color: var(--color-accent);
+  font-weight: 700;
+}
+
+@media (max-width: 560px) {
+  .classroom-role-student-picker {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+.classroom-role-edit-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.classroom-role-edit-actions .classroom-role-remove-btn {
+  margin-right: auto;
 }
 
 .classroom-dashboard-empty {
   margin: 0;
   color: var(--color-text-muted);
   font-size: 13px;
+}
+
+/* Dashboard section switcher (2026-07-27): KPI strip + one active section.
+   Reuses the shared strong section nav so the classroom pages stay aligned. */
+.classroom-section-page .classroom-dashboard-kpis {
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, 1fr);
+  grid-template-columns: none;
+  gap: 0;
+  margin-bottom: 0;
+  border-bottom: 1px solid var(--color-border);
+}
+
+/* The KPI strip butts against the section header's bottom rule so the column
+   dividers start exactly where that line ends. */
+.classroom-section-page .classroom-section-header {
+  margin-bottom: 0;
+}
+
+.classroom-section-page .classroom-dashboard-kpi {
+  padding: 16px 20px;
+  border: 0;
+  border-right: 1px solid var(--color-border);
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.classroom-section-page .classroom-dashboard-kpi:first-child {
+  padding-left: 0;
+}
+
+.classroom-section-page .classroom-dashboard-kpi:last-child {
+  border-right: 0;
+}
+
+/* Interest-rate control replaces the value line in its KPI cell, so it matches
+   the height of the sibling cells' <strong> values. */
+.classroom-dashboard-kpi .bank-summary-rate {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.classroom-dashboard-kpi .bank-rate-input {
+  width: 76px;
+  height: 32px;
+  padding: 0 8px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-btn);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font: inherit;
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.classroom-dashboard-kpi .bank-rate-input:focus {
+  border-color: var(--color-accent);
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(0, 117, 222, 0.15);
+}
+
+.classroom-dashboard-kpi .bank-rate-unit {
+  color: var(--color-text);
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.classroom-dashboard-kpi .bank-rate-save {
+  height: 32px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: var(--radius-btn);
+  background: var(--color-accent);
+  color: #fff;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.classroom-dashboard-kpi .bank-rate-save:hover {
+  background: var(--color-accent-active);
+}
+
+.classroom-dashboard-section-body {
+  display: grid;
+  gap: 12px;
+  padding-top: 20px;
+}
+
+/* 금융 관리 renders its own KPI strip as the first child, so the body drops its
+   top padding to keep the column dividers touching the header rule. */
+.classroom-dashboard-section-body.is-flush {
+  padding-top: 0;
+  gap: 0;
+}
+
+/* The dashboard lists every student, so the rows run in two columns. */
+.classroom-dashboard-section-body .classroom-dashboard-list {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.classroom-dashboard-panel-nav {
+  display: flex;
+  align-items: flex-end;
+  flex-wrap: wrap;
+  gap: 0;
+  min-height: 44px;
+  border-bottom: 2px solid var(--color-text);
+}
+
+/* Right-aligned slot in the divider row for section-level actions. */
+.classroom-dashboard-panel-nav-slot {
+  display: flex;
+  align-items: center;
+  margin-left: auto;
+}
+
+/* 은행 panel groups savings and fixed deposits side by side on wide screens. */
+.classroom-dashboard-bank {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 24px;
+}
+
+.classroom-dashboard-bank-group {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+}
+
+.classroom-dashboard-bank-title {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+}
+
+@media (max-width: 720px) {
+  .classroom-dashboard-bank {
+    grid-template-columns: 1fr;
+  }
 }
 
 @media (max-width: 960px) {
@@ -1402,6 +1854,14 @@
   .classroom-dashboard-grid {
     grid-template-columns: 1fr;
   }
+  .classroom-section-page .classroom-dashboard-kpis {
+    grid-auto-flow: row;
+    grid-auto-columns: auto;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .classroom-section-page .classroom-dashboard-kpi:nth-child(2n) {
+    border-right: 0;
+  }
   .classroom-showcase-strip {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
@@ -1412,6 +1872,14 @@
     padding-inline: 16px;
   }
 
+  .classroom-section-page .classroom-dashboard-kpis {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .classroom-section-page .classroom-dashboard-kpi {
+    padding-inline: 0 16px;
+  }
+
   .student-walking-rewards .classroom-dashboard-panel-head {
     flex-direction: column;
   }
@@ -1419,6 +1887,10 @@
   .classroom-showcase-strip,
   .classroom-role-mini-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .classroom-dashboard-section-body .classroom-dashboard-list {
+    grid-template-columns: 1fr;
   }
 
   .walking-student-row {
@@ -1970,10 +2442,82 @@
 .bank-student-list > li {
   min-width: 0;
 }
+/* One table for every student: wallet, fixed deposits, and inline
+   deposit/withdraw controls (2026-07-27). */
+.bank-student-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+.bank-student-table th {
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--color-border);
+  color: var(--color-text-muted);
+  font-size: 12px;
+  font-weight: 700;
+  text-align: center;
+}
+
+.bank-student-table td {
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--color-border);
+  font-size: 13px;
+  text-align: center;
+  vertical-align: middle;
+}
+
+.bank-row-controls {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+
+.bank-student-table .bank-amount-input {
+  width: 88px;
+  min-width: 0;
+  height: 30px;
+  padding: 0 8px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-btn);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font: inherit;
+  font-size: 12px;
+  text-align: right;
+}
+
+.bank-student-table .bank-amount-input:focus {
+  border-color: var(--color-accent);
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(0, 117, 222, 0.15);
+}
+
+.bank-student-table .bank-btn {
+  flex: 0 0 auto;
+  min-width: 0;
+  height: 30px;
+  padding: 0 10px;
+  font-size: 12px;
+}
+
+/* 적금 만기 shares the deposit column's muted styling. */
+.bank-student-table .bank-fd-due {
+  color: var(--color-text-muted);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.bank-student-table .bank-fd-due.is-empty {
+  color: var(--color-text-faint);
+  font-weight: 400;
+}
+
 .bank-student-row {
   width: 100%;
   display: grid;
-  grid-template-columns: 32px 1fr auto;
+  grid-template-columns: 28px minmax(0, 1fr) auto auto;
   gap: 8px;
   align-items: center;
   padding: 10px 8px;
@@ -1998,6 +2542,20 @@
 }
 .bank-student-balance {
   font-weight: 600;
+}
+
+/* 지갑 = spendable balance, shown next to the amount locked in fixed
+   deposits. */
+.bank-student-fd {
+  min-width: 64px;
+  color: var(--color-text-muted);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.bank-student-fd.is-empty {
+  color: var(--color-text-faint);
+  font-weight: 400;
 }
 .bank-field {
   display: flex;
@@ -3845,8 +4403,8 @@
 }
 
 .classroom-name-text {
-  min-width: 72px;
-  max-width: 140px;
+  min-width: 0;
+  max-width: 100%;
   font-weight: 600;
   color: var(--color-text);
   overflow: hidden;
@@ -4574,10 +5132,18 @@
   background: rgba(0, 0, 0, 0.025);
 }
 
-.seating-chart.is-dragging .seating-slot.is-empty:hover,
-.seating-area.is-dragging:hover {
+/* Drop feedback follows the tracked drag target, not CSS :hover, so it can't
+   go stale when the cursor crosses gaps (2026-07-27). */
+.seating-slot.is-empty.is-drop-target,
+.seating-area.is-drop-target {
   border-color: var(--color-accent);
   background: var(--color-accent-tinted-bg);
+}
+
+/* The desk that would trade places with the dragged student. */
+.seating-desk.is-swap-target {
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-accent) 22%, transparent);
 }
 
 .seating-column {
@@ -4882,6 +5448,100 @@
   border-color: var(--color-accent);
   background: color-mix(in srgb, var(--color-accent) 6%, var(--color-bg));
   box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-accent) 14%, transparent);
+}
+
+/* Saved seating layout library (2026-07-27). */
+.seating-library {
+  margin-top: 20px;
+  padding-top: 16px;
+  border-top: 1px solid var(--color-border);
+}
+
+.seating-library-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.seating-library-title {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+.seating-library-save {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.seating-library-input {
+  min-height: 36px;
+  min-width: 180px;
+  padding: 0 10px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-btn);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font: inherit;
+  font-size: 13px;
+}
+
+.seating-library-input:focus {
+  border-color: var(--color-accent);
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(0, 117, 222, 0.15);
+}
+
+.seating-library-empty {
+  margin: 12px 0 0;
+  color: var(--color-text-muted);
+  font-size: 13px;
+}
+
+.seating-library-list {
+  display: grid;
+  gap: 8px;
+  margin: 12px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.seating-library-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  border-radius: var(--radius-btn);
+  background: var(--color-surface-alt);
+}
+
+.seating-library-item-main {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  min-width: 0;
+}
+
+.seating-library-item-main strong {
+  font-size: 14px;
+  color: var(--color-text);
+}
+
+.seating-library-item-main span {
+  color: var(--color-text-muted);
+  font-size: 12px;
+}
+
+.seating-library-item-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex: 0 0 auto;
 }
 
 .seating-unassigned > strong {
@@ -6036,14 +6696,16 @@
 
 .classroom-section-header {
   display: flex;
-  align-items: stretch;
+  align-items: flex-end;
   gap: 32px;
-  margin: 18px 0 28px;
+  margin: 0 0 28px;
   padding-bottom: 0;
   border-bottom: 1px solid var(--color-border);
 }
 
 .classroom-section-heading {
+  display: flex;
+  align-items: flex-end;
   flex: 1 1 auto;
   min-width: 0;
   padding-bottom: 18px;
@@ -6055,6 +6717,70 @@
   font-family: var(--font-display);
   font-size: 22px;
   font-weight: 700;
+}
+
+/* Inline classroom-name editing in the section header (2026-07-27).
+   The pencil keeps a 44px hit area without drawing any chrome. */
+.classroom-name-field {
+  display: flex;
+  align-items: flex-end;
+  flex-wrap: wrap;
+  gap: 2px;
+  min-height: 44px;
+}
+
+.classroom-name-field .classroom-section-title {
+  margin: 0;
+  line-height: 1.2;
+}
+
+.classroom-name-edit {
+  display: inline-flex;
+  align-items: flex-end;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  padding: 0 0 2px;
+  border: 0;
+  background: transparent;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  transition: color 150ms ease;
+}
+
+.classroom-name-edit:hover {
+  color: var(--color-text);
+}
+
+.classroom-name-edit:focus-visible {
+  outline: 2px solid var(--color-accent-tinted-text);
+  outline-offset: 2px;
+}
+
+.classroom-name-input {
+  min-width: 0;
+  width: min(320px, 100%);
+  padding: 4px 8px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-btn);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font-family: var(--font-display);
+  font-size: 22px;
+  font-weight: 700;
+}
+
+.classroom-name-input:focus {
+  border-color: var(--color-accent);
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(0, 117, 222, 0.15);
+}
+
+.classroom-name-error {
+  flex-basis: 100%;
+  margin: 0;
+  color: var(--color-danger);
+  font-size: 12px;
 }
 
 .classroom-section-eyebrow {
@@ -6084,20 +6810,39 @@
   overflow-y: hidden;
 }
 
-.classroom-section-navigation a {
+.classroom-section-navigation a,
+.classroom-section-nav-tab {
   display: inline-flex;
   align-items: flex-end;
   min-height: 44px;
   margin-bottom: -1px;
   padding: 8px 12px;
+  border: 0;
   border-bottom: 2px solid transparent;
+  background: transparent;
   color: var(--color-text-muted);
+  font: inherit;
   font-size: 13px;
   font-weight: 800;
   text-decoration: none;
 }
 
-.classroom-section-navigation a[aria-current="page"] {
+.classroom-section-nav-tab {
+  cursor: pointer;
+}
+
+.classroom-section-navigation a:hover,
+.classroom-section-nav-tab:hover {
+  color: var(--color-text);
+}
+
+.classroom-section-nav-tab:focus-visible {
+  outline: 2px solid var(--color-accent-tinted-text);
+  outline-offset: 2px;
+}
+
+.classroom-section-navigation a[aria-current="page"],
+.classroom-section-nav-tab[aria-current="page"] {
   border-color: var(--color-accent-tinted-text);
   color: var(--color-text);
 }
@@ -6826,6 +7571,55 @@
 
   .morning-group + .morning-group {
     margin-top: 24px;
+  }
+}
+
+/* Embedded in the classroom dashboard (2026-07-27): the section nav already
+   names the tab, so the inner group headings are redundant. Each tab shows one
+   group, so its content spans two columns instead. */
+.morning-dashboard.is-embedded .morning-group-heading,
+.morning-dashboard.is-embedded .morning-role-heading {
+  display: none;
+}
+
+.morning-dashboard.is-embedded .morning-grid {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+/* Two independent columns: rows expand without stretching their neighbour,
+   so the list flows as masonry-style columns rather than a grid. */
+.morning-dashboard.is-embedded .morning-assignment-list > ul {
+  columns: 2;
+  column-gap: 32px;
+}
+
+.morning-dashboard.is-embedded .morning-assignment-row {
+  break-inside: avoid;
+}
+
+/* 청소 tab: 교실 청소 and 실내화 정리 render together, side by side. */
+.morning-dashboard.is-embedded .morning-role-group {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0 32px;
+  align-items: start;
+}
+
+.morning-dashboard.is-embedded .morning-role-panel-stack {
+  min-width: 0;
+}
+
+.morning-dashboard.is-embedded .morning-role-panel-stack .morning-panel {
+  border-top: 0;
+}
+
+@media (max-width: 900px) {
+  .morning-dashboard.is-embedded .morning-assignment-list > ul {
+    columns: 1;
+  }
+
+  .morning-dashboard.is-embedded .morning-role-group {
+    grid-template-columns: minmax(0, 1fr);
   }
 }
 

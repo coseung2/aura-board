@@ -453,6 +453,8 @@ model Classroom {
 
   defaultGroupMembers ClassroomDefaultGroupMember[]
 
+  seatingLayouts ClassroomSeatingLayout[]
+
   boards Board[] @relation("ClassroomBoards")
 
   plantAllows ClassroomPlantAllow[]
@@ -1022,6 +1024,30 @@ model ClassroomDefaultGroupMember {
   @@unique([classroomId, studentId])
   @@index([groupId])
   @@index([studentId])
+}
+
+/// A named, saved seating arrangement. Distinct from ClassroomDefaultGroup:
+/// that model is the single "current" grouping other features read, while this
+/// one is a library the teacher can save to and restore from. Groups are stored
+/// as a JSON snapshot so deleting a student never breaks a saved layout.
+model ClassroomSeatingLayout {
+  id String @id @default(cuid())
+
+  classroomId String
+
+  name String
+
+  /// [{ name: string, studentIds: string[] }]
+  groups Json
+
+  createdAt DateTime @default(now())
+
+  updatedAt DateTime @updatedAt
+
+  classroom Classroom @relation(fields: [classroomId], references: [id], onDelete: Cascade)
+
+  @@unique([classroomId, name])
+  @@index([classroomId])
 }
 
 model AiFeedback {
@@ -3427,6 +3453,14 @@ model ClassroomRoleSetting {
   salaryAmount Int @default(0)
 
   payPeriod String @default("weekly")
+
+  /// "auto" pays on payPeriod + payAnchor; "manual" pays only when the teacher
+  /// triggers it from the role tile.
+  payMode String @default("manual")
+
+  /// Anchor for automatic payouts: 1-7 (weekday) for weekly, 1-31 (day of
+  /// month) for monthly, unused for daily.
+  payAnchor Int?
 
   createdAt DateTime @default(now())
 

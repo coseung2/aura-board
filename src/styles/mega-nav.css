@@ -3,6 +3,9 @@
   --z-topnav: 2147483000;
   --z-mega-nav-panel: 2147483001;
   --z-nav-popover: 2147483002;
+  /* Overlays that must cover the top nav (portfolio roster drawer, etc). */
+  --z-nav-overlay-backdrop: 2147483003;
+  --z-nav-overlay: 2147483004;
 }
 
 .mega-nav {

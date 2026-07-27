@@ -208,6 +208,16 @@ body.app-background-active .mega-nav-panel {
   z-index: var(--z-mega-nav-panel, 2147483001);
 }
 
+/* Overlays that intentionally cover the top nav need the same escape hatch:
+   `body > * { z-index: 1 }` above would otherwise trap them below it. */
+body.app-background-active .portfolio-roster.is-drawer {
+  z-index: var(--z-nav-overlay, 2147483004);
+}
+
+body.app-background-active .portfolio-roster-backdrop {
+  z-index: var(--z-nav-overlay-backdrop, 2147483003);
+}
+
 .app-background-layer {
   position: fixed;
   inset: 0;
