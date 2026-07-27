@@ -49,6 +49,7 @@ import {
 } from "@/lib/reward-service";
 import { awardWalkingAttendanceCookie } from "@/lib/walking-attendance-rewards";
 import { getEquippedSlimeFloor } from "@/lib/pets/catalog";
+import type { SlimeFloor } from "@/lib/pets/types";
 import {
   getStudentMonthlyAttendance,
   recordStudentAttendanceVisit,
@@ -203,7 +204,7 @@ type DailyStepRewards = {
 type WalkingRepresentativeSlime = {
   color: string;
   growthStage: 1 | 2 | 3;
-  equippedFloor: "none" | "grass-floor" | "water-puddle" | "trampoline";
+  equippedFloor: SlimeFloor;
 };
 
 type ClassroomWalkingRank = {

@@ -2,6 +2,7 @@ import { useState } from "react";
 
 import { formatBpsPercent, slimeBuffBpsForStage, type calculateCatalogSlimeEffects } from "@/lib/pets/math";
 import {
+  EQUIPPED_FLOORS,
   SLIME_SHARED_ASSETS,
   type EquippedFloor,
   type SlimeAction,
@@ -18,6 +19,7 @@ import {
   formatGrowthHours,
   SLIME_COOKIE_ITEM_KEY,
   slimeItemSpritePath,
+  slimeWearablesFromItems,
   type EquippedItemsByColor,
   type SlimeGrowthSnapshotPayload,
 } from "./SlimePetModel";
@@ -49,13 +51,7 @@ function floorFromItems(items: readonly SlimeShopItem[]): EquippedFloor {
   let floor: EquippedFloor = "none";
   for (const item of items) {
     const candidate = item.floor;
-    if (
-      candidate === "grass-floor" ||
-      candidate === "water-puddle" ||
-      candidate === "trampoline"
-    ) {
-      floor = candidate;
-    }
+    if (candidate) floor = candidate;
   }
   return floor;
 }
@@ -76,17 +72,23 @@ function accessorySpritePath(
 ): string | undefined {
   const ballItem = items.find((item) => item.key.startsWith("slime-ball-"));
   if (ballItem) return slimeItemSpritePath(ballItem, slimeColor);
+  // Drinks now compose from the anchor registry, so they must not take the
+  // complete-GIF path: that path replaces the character sheet and would suppress
+  // every wearable layer.
   return items.find(
-    (item) => !item.floor && item.category !== "background" && item.category !== "drink",
+    (item) =>
+      !item.floor &&
+      item.category !== "background" &&
+      item.category !== "drink" &&
+      item.category !== "wearable",
   )?.spritePath;
 }
 
 function normalizeFloor(value: unknown, fallback: EquippedFloor): EquippedFloor {
-  return value === "grass-floor" || value === "water-puddle" || value === "trampoline"
-    ? value
-    : value === "none"
-      ? "none"
-      : fallback;
+  return typeof value === "string"
+    && (EQUIPPED_FLOORS as readonly string[]).includes(value)
+    ? value as EquippedFloor
+    : fallback;
 }
 
 export function SlimeCollectionSection({
@@ -169,6 +171,8 @@ export function SlimeCollectionSection({
           );
           const background = backgroundFromItems(assignedItems);
           const drinkItem = assignedItems.find((item) => item.category === "drink");
+          const wearables = slimeWearablesFromItems(assignedItems);
+          const drinkFlavor = wearables.drink ?? null;
           const hasInteractiveFloor = floor === "water-puddle" || floor === "trampoline";
           const hasPassiveDrink = Boolean(drinkItem);
           const passiveAction: SlimeAction = hasPassiveDrink
@@ -272,15 +276,15 @@ export function SlimeCollectionSection({
                   <div className={styles.spriteCharacterFrame}>
                     <OfficialSlimeSprite
                       slimeColor={slime.color}
-                      evolution={growth?.stage && growth.stage >= 3
-                        ? "gold-crown-red-gem"
-                        : growth?.stage && growth.stage >= 2
-                          ? "silver-crown-blue-gem"
-                          : "base"}
+                      // Growth stage owns the default crown; the resolver turns it
+                      // into a head slot that a chosen hat can outrank.
+                      growthStage={growth?.stage ?? 1}
                       action={action}
                       equippedFloor={floor}
                       itemSpritePath={accessorySpritePath(assignedItems, slime.color)}
                       backgroundSpritePath={background.spritePath}
+                      wearables={wearables}
+                      drinkFlavor={drinkFlavor}
                       repeat={!manualAction && hasPassiveDrink}
                       alt={assignedItems.length > 0
                         ? `${slime.nameKo}, ${assignedItems.map((item) => item.labelKo).join(", ")} 적용 미리보기`

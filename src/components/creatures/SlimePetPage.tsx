@@ -77,13 +77,7 @@ function floorForItemKeys(
   let floor: SlimeFloor = "none";
   for (const itemKey of itemKeys) {
     const candidate = shopCatalog.find((item) => item.key === itemKey)?.floor;
-    if (
-      candidate === "grass-floor" ||
-      candidate === "water-puddle" ||
-      candidate === "trampoline"
-    ) {
-      floor = candidate;
-    }
+    if (candidate) floor = candidate;
   }
   return floor;
 }

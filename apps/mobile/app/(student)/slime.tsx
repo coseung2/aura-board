@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -40,20 +40,27 @@ import {
   type SlimeColor,
 } from "../../lib/slime-assets";
 import {
+  aggregateMobileSlimeBuffTotals,
   evolutionForStage,
   calculateGrowthTimeComparison,
   calculateSlimeGrowthPercent,
   floorLabel,
   formatGrowthHours,
   isSceneBackgroundItem,
+  groupSlimeShopItemsByTier,
+  groupSlimeOutfitsByRole,
+  groupSlimePropsByKind,
+  mobileSlimeActiveSets,
+  mobileSlimeBuffGroups,
   newSlimeIdempotencyKey,
   normalizeSlimeClassroom,
   normalizeSlimeHome,
   resolveEquippedSceneBackground,
+  resolveEquippedSlimeWearables,
   selectSceneBackgroundSpritePath,
   shopFilterForItem,
-  slimeBuffBpsForStage,
   slimeBallSpritePath,
+  slimeShopPreviewColor,
   slimeShopNavItems,
   SLIME_COOKIE_ITEM_KEY,
   SLIME_COLOR_LABELS,
@@ -86,7 +93,7 @@ import {
 
 type Notice = { kind: "success" | "error"; text: string };
 type LocalImageSource = ImageProps["source"];
-type WardrobeFilter = "background" | "floor" | "drink" | "prop" | "title";
+type WardrobeFilter = "background" | "floor" | "drink" | "prop" | "outfit" | "title";
 
 const DISABLED_COOKIE_SOURCE = require("../../assets/slimes/shared/cookie-shop-icon-256-disabled.png");
 
@@ -94,6 +101,7 @@ const WARDROBE_NAV_ITEMS: readonly { key: WardrobeFilter; label: string }[] = [
   { key: "floor", label: "바닥" },
   { key: "drink", label: "음료" },
   { key: "prop", label: "소품" },
+  { key: "outfit", label: "착장" },
   { key: "title", label: "칭호" },
 ];
 
@@ -109,6 +117,16 @@ const ERROR_LABELS: Record<string, string> = {
 
 const FLOOR_ORDER: Exclude<EquippedFloor, "none">[] = [
   "grass-floor",
+  "crystal-cave-floor",
+  "moonlit-marble-floor",
+  "royal-garden-floor",
+  "celestial-gold-floor",
+  "snow-ground-floor",
+  "ancient-brick-floor",
+  "cherry-stone-floor",
+  "sand-trail-floor",
+  "forest-soil-floor",
+  "stone-floor",
   "water-puddle",
   "trampoline",
 ];
@@ -125,6 +143,10 @@ function shopItemBuffLabel(item: SlimeShopItem): string | null {
   if (!item.effectKey || !item.effectBps) return null;
   const label = SLIME_EFFECT_LABELS[item.effectKey] ?? item.effectKey;
   return `${label} +${item.effectBps / 100}%`;
+}
+
+function formatBuffPercent(bps: number): string {
+  return `${(bps / 100).toLocaleString("ko-KR", { maximumFractionDigits: 2 })}%`;
 }
 
 function localSource(value: unknown): LocalImageSource {
@@ -152,12 +174,41 @@ function wardrobeFilterForItem(item: SlimeShopItem): WardrobeFilter {
   if (isSceneBackgroundItem(item)) return "background";
   if (item.floor || item.category === "background" || item.category === "ride") return "floor";
   if (item.category === "drink") return "drink";
+  if (item.category === "wearable") return "outfit";
   return "prop";
 }
 
-function shopItemSpritePath(item: SlimeShopItem, slimeColor: SlimeColor): string {
-  if (!item.key.startsWith("slime-ball-")) return item.spritePath;
+/**
+ * Complete preview sprite for a shop item, or `undefined` for drinks.
+ *
+ * Drinks compose from the anchor registry, so handing back a complete GIF would
+ * replace the character sheet and suppress the composed drink layer.
+ */
+function shopItemSpritePath(item: SlimeShopItem, slimeColor: SlimeColor): string | undefined {
+  if (item.category === "drink" || item.category === "wearable") return undefined;
+  if (!item.key.startsWith("slime-ball-")) return item.mobileSpritePath ?? item.spritePath;
   return slimeBallSpritePath([item.key], slimeColor) ?? item.spritePath;
+}
+
+/** Preview action and flavor for a shop item that composes rather than replaces. */
+function shopItemPreview(item: SlimeShopItem) {
+  const wearables = resolveEquippedSlimeWearables([item.key], [item]);
+  return {
+    action: item.category === "drink" ? "drink" as const : "idle" as const,
+    drinkFlavor: wearables.drink,
+    wearables,
+  };
+}
+
+function equippedItemSpritePath(
+  itemKeys: readonly string[],
+  slimeColor: SlimeColor,
+): string | undefined {
+  const ballPath = slimeBallSpritePath(itemKeys, slimeColor);
+  if (ballPath) return ballPath;
+  // Drinks compose from the anchor registry. Returning a complete GIF here would
+  // replace the character sheet and suppress every composed wearable layer.
+  return undefined;
 }
 
 export default function StudentSlimeScreen() {
@@ -269,7 +320,6 @@ export default function StudentSlimeScreen() {
   const equippedFloor =
     home?.equippedFloorByColor[selectedColor] ??
     (home?.representativeColor === selectedColor ? home.equippedFloor : "none");
-  const lemonade = home?.shopCatalog.find((item) => item.category === "drink");
   const equippedItems = home?.equippedItemsByColor[selectedColor] ?? [];
   const shopNavItems = useMemo(
     () => slimeShopNavItems(home?.shopCatalog ?? []),
@@ -287,6 +337,11 @@ export default function StudentSlimeScreen() {
     () => (home?.shopCatalog ?? []).filter((item) => isSceneBackgroundItem(item)),
     [home?.shopCatalog],
   );
+  /** Backgrounds grouped by price tier, entry band first and premium band last. */
+  const sceneBackgroundTiers = useMemo(
+    () => groupSlimeShopItemsByTier(sceneBackgroundItems),
+    [sceneBackgroundItems],
+  );
   const floorItems = useMemo(() => {
     if (!home) return [];
     return FLOOR_ORDER.map((floor) =>
@@ -298,6 +353,125 @@ export default function StudentSlimeScreen() {
     () => home?.shopCatalog.filter((item) => shopFilterForItem(item) === shopFilter) ?? [],
     [home, shopFilter],
   );
+  /**
+   * Price bands for each shop list, cheapest first. Categories priced uniformly
+   * come back as one unlabelled group and render exactly as before.
+   */
+  const floorTiers = useMemo(() => groupSlimeShopItemsByTier(floorItems), [floorItems]);
+  /** Family set bonuses are account-wide, so they are computed once per home. */
+  const activeSets = useMemo(() => (home ? mobileSlimeActiveSets(home) : []), [home]);
+
+  /**
+   * Which other pet is wearing an item, if any.
+   *
+   * A piece lives in one place at a time, so equipping it here takes it off that
+   * pet. Surfacing the current wearer stops that from looking like the item
+   * vanished from another slime, and it matters for family sets, where the same
+   * piece cannot count twice.
+   */
+  const wardrobeItemWearer = useCallback(
+    (itemKey: string): string | null => {
+      if (!home) return null;
+      for (const [color, itemKeys] of Object.entries(home.equippedItemsByColor)) {
+        if (color === wardrobeColor) continue;
+        if (!itemKeys?.includes(itemKey)) continue;
+        return SLIME_COLOR_LABELS[color as SlimeColor] ?? color;
+      }
+      return null;
+    },
+    [home, wardrobeColor],
+  );
+  const visibleShopTiers = useMemo(
+    () => groupSlimeShopItemsByTier(visibleShopItems),
+    [visibleShopItems],
+  );
+  /**
+   * Outfits nest one level deeper: slot sub-categories separated by a rule, and
+   * price bands within each slot separated by spacing alone.
+   */
+  const visibleOutfitGroups = useMemo(
+    () =>
+      groupSlimeOutfitsByRole(visibleShopItems).map((group) => ({
+        ...group,
+        tiers: groupSlimeShopItemsByTier(group.items),
+      })),
+    [visibleShopItems],
+  );
+  /** Props nest the same way outfits do: sub-category, then price band. */
+  const visiblePropGroups = useMemo(
+    () =>
+      groupSlimePropsByKind(visibleShopItems).map((group) => ({
+        ...group,
+        tiers: groupSlimeShopItemsByTier(group.items),
+      })),
+    [visibleShopItems],
+  );
+  /**
+   * Sub-category groups for the tabs that have them, or null for the flat tabs.
+   *
+   * Outfits group by slot and props by kind, but both render identically, so the
+   * list picks the grouping here rather than branching per tab in the markup.
+   */
+  const nestedShopGroups = useMemo(() => {
+    if (shopFilter === "outfit") {
+      return visibleOutfitGroups.map((group) => ({ ...group, key: group.role }));
+    }
+    if (shopFilter === "prop") return visiblePropGroups;
+    return null;
+  }, [shopFilter, visibleOutfitGroups, visiblePropGroups]);
+
+  /**
+   * One shop card. Extracted so the flat list and the nested outfit list render
+   * identical cards rather than keeping two copies of this markup in step.
+   */
+  const renderShopItemCard = (item: SlimeShopItem) => {
+    const quantity = home?.ownedItemQuantities[item.key] ?? 0;
+    const repeatable = item.key === SLIME_COOKIE_ITEM_KEY;
+    const ownedItem = repeatable ? quantity > 0 : home?.ownedItemKeys.includes(item.key) ?? false;
+    const busy = busyItemKey === item.key;
+    const buffLabel = shopItemBuffLabel(item);
+    const itemSummary = [
+      buffLabel,
+      repeatable
+        ? `${quantity}개 보유`
+        : !ownedItem
+          ? `${item.price.toLocaleString()}${home?.unitLabel ?? "원"}`
+          : null,
+    ]
+      .filter((value): value is string => Boolean(value))
+      .join(" · ");
+    return (
+      <ControlPressable
+        key={item.key}
+        style={styles.floorRow}
+        disabled={busyItemKey !== null || (ownedItem && !repeatable)}
+        onPress={() => confirmItemPurchase(item)}
+        accessibilityLabel={`${item.labelKo} ${repeatable && quantity > 0 ? `${quantity}개 보유, 구매` : ownedItem ? "보유 중" : "구매"}`}
+      >
+        <View style={styles.shopPreview} accessible={false}>
+          <SlimeSprite
+            slimeColor={slimeShopPreviewColor(item, selectedColor)}
+            evolution="base"
+            action={shopItemPreview(item).action}
+            equippedFloor="none"
+            displayScale={0.25}
+            repeat={item.category === "drink"}
+            itemSpritePath={shopItemSpritePath(item, selectedColor)}
+            wearables={shopItemPreview(item).wearables}
+            drinkFlavor={shopItemPreview(item).drinkFlavor}
+            accessibilityLabel={`${item.labelKo} 미리보기`}
+          />
+        </View>
+        <View style={styles.floorCopy}>
+          <Text style={styles.floorTitle}>{item.labelKo}</Text>
+          {itemSummary ? <Text style={styles.floorSubtitle}>{itemSummary}</Text> : null}
+        </View>
+        <Text style={[styles.floorStatusText, (repeatable || !ownedItem) && styles.floorStatusBuy]}>
+          {busy ? "처리 중…" : repeatable ? "구매" : ownedItem ? "보유 중" : "구매"}
+        </Text>
+      </ControlPressable>
+    );
+  };
   const wardrobeItems = useMemo(
     () => home?.shopCatalog.filter((item) =>
       home.ownedItemKeys.includes(item.key)
@@ -310,33 +484,18 @@ export default function StudentSlimeScreen() {
     () => wardrobeItems.filter((item) => wardrobeFilterForItem(item) === wardrobeFilter),
     [wardrobeFilter, wardrobeItems],
   );
-  const appliedEffects = useMemo(() => {
-    if (!home) return [];
-    const serverEffects = Array.isArray(home.effects?.breakdown)
-      ? home.effects.breakdown
-      : [];
-    // 슬라임 자체 버프는 장착 여부와 무관하게, 보유한 슬라임 전체가
-    // 적용된다. 서버의 보상·성장 계산과 같은 기준을 사용한다.
-    const activeColors = home.ownedColors;
-    const slimeEffects = activeColors.flatMap((color) => {
-      const slime = home.catalog.find((entry) => entry.color === color);
-      if (!slime) return [];
-      return [{
-        source: "slime",
-        key: slime.key,
-        label: slime.nameKo,
-        effectKey: slime.effectKey,
-        bps: slimeBuffBpsForStage(slime.baseBuffBps, stageForColor(home, color)),
-      }];
-    });
-    return [
-      ...slimeEffects,
-      ...serverEffects.filter((effect) => effect.source !== "slime"),
-    ];
-  }, [home]);
-  const appliedGrowthSpeedBps = appliedEffects
-    .filter((effect) => effect.effectKey === "growth_speed")
-    .reduce((total, effect) => total + effect.bps, 0);
+  const buffGroups = useMemo(() => home ? mobileSlimeBuffGroups(home) : [], [home]);
+  const buffGroupsByColor = useMemo(
+    () => new Map(buffGroups.map((group) => [group.color, group])),
+    [buffGroups],
+  );
+  const appliedBuffTotals = useMemo(
+    () => aggregateMobileSlimeBuffTotals(buffGroups),
+    [buffGroups],
+  );
+  const appliedGrowthSpeedBps = appliedBuffTotals.find(
+    (effect) => effect.effectKey === "growth_speed",
+  )?.bps ?? 0;
   const section = params.section === "classroom"
     ? "classroom"
     : params.section === "shop"
@@ -721,9 +880,18 @@ export default function StudentSlimeScreen() {
                   : classFloor === "water-puddle" || classFloor === "trampoline"
                     ? "floor-interaction"
                     : "idle";
-                const classBallSpritePath = representative
-                  ? slimeBallSpritePath(representative.equippedItemKeys, representative.color)
+                const classItemSpritePath = representative
+                  ? equippedItemSpritePath(
+                      representative.equippedItemKeys,
+                      representative.color,
+                    )
                   : undefined;
+                const classWearables = representative
+                  ? resolveEquippedSlimeWearables(
+                      representative.equippedItemKeys,
+                      home?.shopCatalog ?? [],
+                    )
+                  : null;
                 const classBackground = representative
                   ? resolveEquippedSceneBackground(
                       representative.equippedItemKeys,
@@ -736,12 +904,14 @@ export default function StudentSlimeScreen() {
                       {representative ? (
                           <SlimeSprite
                             slimeColor={representative.color}
-                            evolution={evolutionForStage(representative.growthStage)}
+                            growthStage={representative.growthStage}
                             action={classAction}
                             equippedFloor={classFloor}
                             displayScale={0.25}
                             repeat={classAction !== "idle"}
-                            itemSpritePath={classBallSpritePath}
+                            itemSpritePath={classItemSpritePath}
+                            wearables={classWearables ?? undefined}
+                            drinkFlavor={classWearables?.drink}
                             backgroundSpritePath={
                               classBackground
                                 ? selectSceneBackgroundSpritePath(classBackground)
@@ -773,7 +943,7 @@ export default function StudentSlimeScreen() {
         {section === "mine" ? (
           <>
         <View style={styles.myPetGrid} accessibilityRole="radiogroup" accessibilityLabel="내 슬라임 목록">
-          {SLIME_ASSET_COLORS.map((itemColor) => {
+          {SLIME_ASSET_COLORS.map((itemColor, colorIndex) => {
             const isOwned = home?.ownedColors.includes(itemColor) ?? false;
             const selected = selectedColor === itemColor;
             const petStage = home ? stageForColor(home, itemColor) : 1;
@@ -782,19 +952,20 @@ export default function StudentSlimeScreen() {
             const growthTime = growth
               ? calculateGrowthTimeComparison(growth.remainingSeconds, appliedGrowthSpeedBps)
               : null;
-            const catalogItem = home?.catalog.find((entry) => entry.color === itemColor);
-            const effectPercent = slimeBuffBpsForStage(
-              catalogItem?.baseBuffBps ?? 0,
-              petStage,
-            ) / 100;
-            const effectLabel = SLIME_EFFECT_LABELS[catalogItem?.effectKey ?? ""] ?? "기본 효과";
+            const petBuffGroup = buffGroupsByColor.get(itemColor);
             const petItems = home?.equippedItemsByColor[itemColor] ?? [];
+            const petWearables = resolveEquippedSlimeWearables(
+              petItems,
+              home?.shopCatalog ?? [],
+            );
             const petFloor = home?.equippedFloorByColor[itemColor] ?? "none";
             const petBackground = resolveEquippedSceneBackground(
               petItems,
               home?.shopCatalog ?? [],
             );
-            const petHasDrink = Boolean(lemonade && petItems.includes(lemonade.key));
+            const petHasDrink = (home?.shopCatalog ?? []).some(
+              (item) => item.category === "drink" && petItems.includes(item.key),
+            );
             const manualAction = manualActions[itemColor];
             const petAction: SlimeAction = manualAction
               ? manualAction
@@ -804,15 +975,38 @@ export default function StudentSlimeScreen() {
                   ? "floor-interaction"
                   : "idle";
             return (
+              <Fragment key={itemColor}>
+                {/* Five pets fill a three-column grid with one cell to spare. Set
+                    bonuses are account-wide rather than per pet, so they take that
+                    cell, placed before the final pet so the row reads
+                    pet · sets · pet. */}
+                {colorIndex === SLIME_ASSET_COLORS.length - 1 ? (
+                  <View style={styles.myPetSetCard} accessibilityLabel="적용 중인 세트 효과">
+                    {/* The heading aligns with the pet names beside it, so it sits at
+                        the top of the cell and entries fill downward from there
+                        rather than being centred as a block. */}
+                    <Text style={styles.myPetSetTitle}>세트 효과</Text>
+                    {activeSets.map((set) => (
+                      <View key={set.key} style={styles.myPetSetRow}>
+                        <Text style={styles.myPetSetName} numberOfLines={2}>{set.label}</Text>
+                        <Text style={styles.myPetSetValue}>
+                          {SLIME_EFFECT_LABELS[set.effectKey] ?? set.effectKey} +{formatBuffPercent(set.bps)}
+                        </Text>
+                      </View>
+                    ))}
+                  </View>
+                ) : null}
               <View
-                key={itemColor}
                 style={[
                   styles.myPetCard,
                   !isOwned && styles.myPetCardDisabled,
                   (openEffectColor === itemColor || openGrowthColor === itemColor) && styles.myPetCardEffectOpen,
                 ]}
               >
-                <View style={styles.myPetSprite}>
+                <View style={[
+                  styles.myPetSprite,
+                  openEffectColor === itemColor && styles.myPetSpriteEffectOpen,
+                ]}>
                   {isOwned ? (
                     <>
                       <View style={styles.myPetOverlayRow} pointerEvents="box-none">
@@ -857,9 +1051,14 @@ export default function StudentSlimeScreen() {
                       {openEffectColor === itemColor ? (
                         <View style={styles.myPetEffectPopover} accessibilityRole="summary">
                           <Text style={styles.myPetEffectPopoverTitle}>버프 내역</Text>
-                          <Text style={styles.myPetEffectPopoverText}>
-                            {effectLabel} +{effectPercent}%
-                          </Text>
+                          {petBuffGroup?.entries.map((effect) => (
+                            <View key={`${effect.source}:${effect.key}`} style={styles.myPetEffectPopoverRow}>
+                              <Text style={styles.myPetEffectPopoverText}>{effect.label}</Text>
+                              <Text style={styles.myPetEffectPopoverValue}>
+                                {SLIME_EFFECT_LABELS[effect.effectKey] ?? effect.effectKey} +{formatBuffPercent(effect.bps)}
+                              </Text>
+                            </View>
+                          ))}
                         </View>
                       ) : null}
                     </>
@@ -867,12 +1066,17 @@ export default function StudentSlimeScreen() {
                   {isOwned ? (
                     <SlimeSprite
                       slimeColor={itemColor}
-                      evolution={evolutionForStage(petStage)}
+                      growthStage={petStage}
                       action={petAction}
                       equippedFloor={petFloor}
                       displayScale={0.25}
                       repeat={!manualAction && petAction !== "idle"}
-                      itemSpritePath={slimeBallSpritePath(petItems, itemColor)}
+                      itemSpritePath={equippedItemSpritePath(
+                        petItems,
+                        itemColor,
+                      )}
+                      wearables={petWearables}
+                      drinkFlavor={petWearables.drink}
                       backgroundSpritePath={
                         petBackground
                           ? selectSceneBackgroundSpritePath(petBackground)
@@ -964,19 +1168,20 @@ export default function StudentSlimeScreen() {
                   </ControlPressable>
                 </View>
               </View>
+              </Fragment>
             );
-          })}
-        </View>
-        <View style={styles.appliedEffects} accessibilityLabel="적용 중인 버프 목록">
+            })}
+          </View>
+          <View style={styles.appliedEffects} accessibilityLabel="적용 중인 버프 목록">
           <Text style={styles.appliedEffectsTitle}>적용 중인 버프</Text>
-          {appliedEffects.length ? (
+          {buffGroups.length > 0 ? (
             <View style={styles.appliedEffectsList}>
-              {appliedEffects.map((effect) => (
-                <View key={`${effect.source}:${effect.key}`} style={styles.appliedEffectRow}>
-                  <Text style={styles.appliedEffectLabel} numberOfLines={1}>{effect.label}</Text>
-                  <Text style={styles.appliedEffectValue}>
-                    {SLIME_EFFECT_LABELS[effect.effectKey] ?? effect.effectKey} +{effect.bps / 100}%
+              {appliedBuffTotals.map((effect) => (
+                <View key={effect.effectKey} style={styles.appliedEffectRow}>
+                  <Text style={styles.appliedEffectLabel} numberOfLines={1}>
+                    {SLIME_EFFECT_LABELS[effect.effectKey] ?? effect.effectKey}
                   </Text>
+                  <Text style={styles.appliedEffectValue}>+{formatBuffPercent(effect.bps)}</Text>
                 </View>
               ))}
             </View>
@@ -1032,63 +1237,74 @@ export default function StudentSlimeScreen() {
             })}
           </View>
         ) : shopFilter === "background" ? (
-        <View style={styles.floorList} accessibilityLabel="배경 인벤토리">
+        <View style={styles.shopTierList} accessibilityLabel="배경 인벤토리">
           {sceneBackgroundItems.length === 0 ? (
             <View style={styles.emptyCard}>
               <Text style={styles.emptyText}>배경 상품을 준비 중이에요.</Text>
             </View>
           ) : (
-            sceneBackgroundItems.map((item) => {
-              const ownedItem = home?.ownedItemKeys.includes(item.key) ?? false;
-              const busy = busyItemKey === item.key;
-              const canInteract = !ownedItem && busyItemKey === null;
-              const buffLabel = shopItemBuffLabel(item);
-              const status = busy
-                ? "처리 중…"
-                : ownedItem
-                  ? "보유 중"
-                  : `${item.price.toLocaleString()}${home?.unitLabel ?? "원"}`;
-              return (
-                <ControlPressable
-                  key={item.key}
-                  style={styles.floorRow}
-                  disabled={!canInteract}
-                  onPress={() => confirmItemPurchase(item)}
-                  accessibilityLabel={`${item.labelKo} ${ownedItem ? "보유 중" : "구매"}`}
-                  accessibilityState={{ disabled: !canInteract, busy }}
-                >
-                  <View style={styles.shopPreview} accessible={false}>
-                    <SlimeSprite
-                      slimeColor={selectedColor}
-                      evolution="base"
-                      action="idle"
-                      equippedFloor="none"
-                      displayScale={0.25}
-                      backgroundSpritePath={selectSceneBackgroundSpritePath(item)}
-                      accessibilityLabel={`${item.labelKo} 미리보기`}
-                    />
-                  </View>
-                  <View style={styles.floorCopy}>
-                    <Text style={styles.floorTitle}>{item.labelKo}</Text>
-                    <Text style={styles.floorSubtitle}>{buffLabel ?? "배경"}</Text>
-                  </View>
-                  <View style={styles.floorStatus}>
-                    {busy ? <ActivityIndicator size="small" color={colors.accent} /> : null}
-                    <Text style={[styles.floorStatusText, !ownedItem && styles.floorStatusBuy]}>{status}</Text>
-                  </View>
-                </ControlPressable>
-              );
-            })
+            sceneBackgroundTiers.map((group) => (
+              <View key={group.price} style={styles.shopTierGroup}>
+                {group.label ? <Text style={styles.shopTierLabel}>{group.label}</Text> : null}
+                <View style={styles.shopTierItems}>
+                  {group.items.map((item) => {
+                  const ownedItem = home?.ownedItemKeys.includes(item.key) ?? false;
+                  const busy = busyItemKey === item.key;
+                  const canInteract = !ownedItem && busyItemKey === null;
+                  const buffLabel = shopItemBuffLabel(item);
+                  const status = busy
+                    ? "처리 중…"
+                    : ownedItem
+                      ? "보유 중"
+                      : `${item.price.toLocaleString()}${home?.unitLabel ?? "원"}`;
+                  return (
+                    <ControlPressable
+                      key={item.key}
+                      style={styles.floorRow}
+                      disabled={!canInteract}
+                      onPress={() => confirmItemPurchase(item)}
+                      accessibilityLabel={`${item.labelKo} ${ownedItem ? "보유 중" : "구매"}`}
+                      accessibilityState={{ disabled: !canInteract, busy }}
+                    >
+                      <View style={[styles.shopPreview, styles.shopPreviewScene]} accessible={false}>
+                        <SlimeSprite
+                          slimeColor={slimeShopPreviewColor(item, selectedColor)}
+                          evolution="base"
+                          action="idle"
+                          equippedFloor="none"
+                          displayScale={0.25}
+                          backgroundSpritePath={selectSceneBackgroundSpritePath(item)}
+                          accessibilityLabel={`${item.labelKo} 미리보기`}
+                        />
+                      </View>
+                      <View style={styles.floorCopy}>
+                        <Text style={styles.floorTitle}>{item.labelKo}</Text>
+                        <Text style={styles.floorSubtitle}>{buffLabel ?? "배경"}</Text>
+                      </View>
+                      <View style={styles.floorStatus}>
+                        {busy ? <ActivityIndicator size="small" color={colors.accent} /> : null}
+                        <Text style={[styles.floorStatusText, !ownedItem && styles.floorStatusBuy]}>{status}</Text>
+                      </View>
+                    </ControlPressable>
+                  );
+                  })}
+                </View>
+              </View>
+            ))
           )}
         </View>
         ) : shopFilter === "floor" ? (
-        <View style={styles.floorList} accessibilityLabel="바닥 인벤토리">
+        <View style={styles.shopTierList} accessibilityLabel="바닥 인벤토리">
           {floorItems.length === 0 ? (
             <View style={styles.emptyCard}>
               <Text style={styles.emptyText}>바닥 상품을 준비 중이에요.</Text>
             </View>
           ) : (
-            floorItems.map((item) => {
+            floorTiers.map((group) => (
+              <View key={group.price} style={styles.shopTierGroup}>
+                {group.label ? <Text style={styles.shopTierLabel}>{group.label}</Text> : null}
+                <View style={styles.shopTierItems}>
+                  {group.items.map((item) => {
               const floor = itemFloor(item);
               if (!floor) return null;
               const ownedItem = home?.ownedItemKeys.includes(item.key) ?? false;
@@ -1110,12 +1326,15 @@ export default function StudentSlimeScreen() {
                 >
                   <View style={styles.shopPreview} accessible={false}>
                     <SlimeSprite
-                      slimeColor={selectedColor}
+                      slimeColor={slimeShopPreviewColor(item, selectedColor)}
                       evolution="base"
-                      action="idle"
+                      action={shopItemPreview(item).action}
                       equippedFloor="none"
                       displayScale={0.25}
+                      repeat={item.category === "drink"}
                       itemSpritePath={shopItemSpritePath(item, selectedColor)}
+                      wearables={shopItemPreview(item).wearables}
+                      drinkFlavor={shopItemPreview(item).drinkFlavor}
                       accessibilityLabel={`${item.labelKo || floorLabel(floor)} 미리보기`}
                     />
                   </View>
@@ -1129,54 +1348,43 @@ export default function StudentSlimeScreen() {
                   </View>
                 </ControlPressable>
               );
-            })
+                  })}
+                </View>
+              </View>
+            ))
           )}
         </View>
         ) : (
-          <View style={styles.floorList}>
+          <View style={styles.shopTierList}>
             {visibleShopItems.length === 0 ? (
               <View style={styles.emptyCard}><Text style={styles.emptyText}>이 분류에는 상품이 없어요.</Text></View>
-            ) : visibleShopItems.map((item) => {
-              const quantity = home?.ownedItemQuantities[item.key] ?? 0;
-              const repeatable = item.key === SLIME_COOKIE_ITEM_KEY;
-              const ownedItem = repeatable ? quantity > 0 : home?.ownedItemKeys.includes(item.key) ?? false;
-              const busy = busyItemKey === item.key;
-              const buffLabel = shopItemBuffLabel(item);
-              const itemSummary = [
-                buffLabel,
-                repeatable
-                  ? `${quantity}개 보유`
-                  : !ownedItem
-                    ? `${item.price.toLocaleString()}${home?.unitLabel ?? "원"}`
-                    : null,
-              ].filter((value): value is string => Boolean(value)).join(" · ");
-              return (
-                <ControlPressable
-                  key={item.key}
-                  style={styles.floorRow}
-                  disabled={busyItemKey !== null || (ownedItem && !repeatable)}
-                  onPress={() => confirmItemPurchase(item)}
-                  accessibilityLabel={`${item.labelKo} ${repeatable && quantity > 0 ? `${quantity}개 보유, 구매` : ownedItem ? "보유 중" : "구매"}`}
-                >
-                  <View style={styles.shopPreview} accessible={false}>
-                    <SlimeSprite
-                      slimeColor={selectedColor}
-                      evolution="base"
-                      action="idle"
-                      equippedFloor="none"
-                      displayScale={0.25}
-                      itemSpritePath={shopItemSpritePath(item, selectedColor)}
-                      accessibilityLabel={`${item.labelKo} 미리보기`}
-                    />
+            ) : nestedShopGroups ? (
+              // Outfits and props nest two levels: a ruled divider per
+              // sub-category, then price bands inside it separated by spacing.
+              nestedShopGroups.map((group, groupIndex) => (
+                <View key={group.key} style={styles.shopTierGroup}>
+                  {groupIndex > 0 ? <View style={styles.shopOutfitDivider} /> : null}
+                  <Text style={styles.shopOutfitLabel}>{group.label}</Text>
+                  {group.tiers.map((tier) => (
+                    <View key={tier.price} style={styles.shopTierGroup}>
+                      {tier.label ? <Text style={styles.shopTierLabel}>{tier.label}</Text> : null}
+                      <View style={styles.shopTierItems}>
+                        {tier.items.map((item) => renderShopItemCard(item))}
+                      </View>
+                    </View>
+                  ))}
+                </View>
+              ))
+            ) : (
+              visibleShopTiers.map((group) => (
+                <View key={group.price} style={styles.shopTierGroup}>
+                  {group.label ? <Text style={styles.shopTierLabel}>{group.label}</Text> : null}
+                  <View style={styles.shopTierItems}>
+                    {group.items.map((item) => renderShopItemCard(item))}
                   </View>
-                  <View style={styles.floorCopy}>
-                    <Text style={styles.floorTitle}>{item.labelKo}</Text>
-                    {itemSummary ? <Text style={styles.floorSubtitle}>{itemSummary}</Text> : null}
-                  </View>
-                  <Text style={[styles.floorStatusText, (repeatable || !ownedItem) && styles.floorStatusBuy]}>{busy ? "처리 중…" : repeatable ? "구매" : ownedItem ? "보유 중" : "구매"}</Text>
-                </ControlPressable>
-              );
-            })}
+                </View>
+              ))
+            )}
           </View>
         )}
         </View>
@@ -1258,35 +1466,58 @@ export default function StudentSlimeScreen() {
           ) : (
             visibleWardrobeItems.map((item) => {
               const equipped = equippedItems.includes(item.key);
+              // An item worn by a different pet is still available here, but the
+              // player should know it will move rather than be duplicated.
+              const wornByOther = !equipped ? wardrobeItemWearer(item.key) : null;
               const busy = busyItemKey === item.key;
               const buffLabel = shopItemBuffLabel(item);
               return (
                 <ControlPressable
                   key={item.key}
-                  style={[styles.wardrobeItem, equipped && styles.wardrobeItemEquipped]}
+                  style={[
+                    styles.wardrobeItem,
+                    equipped && styles.wardrobeItemEquipped,
+                    wornByOther && styles.wardrobeItemWornByOther,
+                  ]}
                   disabled={busyItemKey !== null}
                   onPress={() => void toggleItem(item)}
-                  accessibilityLabel={`${item.labelKo} ${equipped ? "해제" : "장착"}`}
+                  accessibilityLabel={`${item.labelKo} ${
+                    equipped ? "해제" : wornByOther ? `${wornByOther} 슬라임 장착 중, 옮겨서 장착` : "장착"
+                  }`}
                   accessibilityState={{ selected: equipped, busy }}
                 >
-                  <View style={styles.shopPreview} accessible={false}>
+                  <View
+                    style={[
+                      styles.shopPreview,
+                      // Only scene backgrounds feather to transparent, so only they
+                      // need the tinted tile removed.
+                      isSceneBackgroundItem(item) && styles.shopPreviewScene,
+                    ]}
+                    accessible={false}
+                  >
                     <SlimeSprite
-                      slimeColor={wardrobeColor ?? selectedColor}
+                      slimeColor={slimeShopPreviewColor(item, wardrobeColor ?? selectedColor)}
                       evolution="base"
-                      action="idle"
+                      action={shopItemPreview(item).action}
                       equippedFloor="none"
                       displayScale={0.25}
+                      repeat={item.category === "drink"}
                       itemSpritePath={isSceneBackgroundItem(item) ? undefined : shopItemSpritePath(item, wardrobeColor ?? selectedColor)}
+                      wearables={shopItemPreview(item).wearables}
+                      drinkFlavor={shopItemPreview(item).drinkFlavor}
                       backgroundSpritePath={isSceneBackgroundItem(item) ? selectSceneBackgroundSpritePath(item) : undefined}
                       accessibilityLabel={`${item.labelKo} 미리보기`}
                     />
                   </View>
                   <View style={styles.wardrobeItemCopy}>
                     <Text style={styles.floorTitle}>{item.labelKo}</Text>
-                    <Text style={styles.floorSubtitle}>{buffLabel ?? (isSceneBackgroundItem(item) ? "배경" : item.floor ? "바닥" : item.category === "drink" ? "음료" : "소품")}</Text>
+                      <Text style={styles.floorSubtitle}>{buffLabel ?? (isSceneBackgroundItem(item) ? "배경" : item.floor ? "바닥" : item.category === "drink" ? "음료" : item.category === "wearable" ? "의상" : "소품")}</Text>
+                    {wornByOther ? (
+                      <Text style={styles.wardrobeItemWornText}>{wornByOther} 장착 중</Text>
+                    ) : null}
                   </View>
                   <Text style={[styles.wardrobeItemAction, equipped && styles.wardrobeItemActionEquipped]}>
-                    {busy ? "처리 중…" : equipped ? "해제" : "장착"}
+                    {busy ? "처리 중…" : equipped ? "해제" : wornByOther ? "옮기기" : "장착"}
                   </Text>
                 </ControlPressable>
               );
@@ -1330,19 +1561,36 @@ const styles = StyleSheet.create({
   petSectionNavItem: { flex: 1 },
   myPetGrid: { flexDirection: "row", flexWrap: "wrap", justifyContent: "space-between", gap: spacing.xs },
   myPetCard: { position: "relative", width: "32%", minWidth: 0, alignItems: "center", gap: spacing.xs, paddingVertical: spacing.xs },
-  myPetCardEffectOpen: { zIndex: layers.raisedContent },
+  // While this card owns an open popover it must sit above the cards rendered
+  // after it, or their text would paint over the panel.
+  myPetCardEffectOpen: { zIndex: layers.floatingPopover },
   myPetCardDisabled: { opacity: states.disabledOpacity },
   myPetSprite: { position: "relative", height: iconSizes.empty + spacing.md, width: "100%", alignItems: "center", justifyContent: "center", overflow: "visible" },
+  // Occupies the empty third cell of the second row, so it matches a pet card's
+  // width and sits inside the same grid rather than below it.
+  // Aligned to the top of the row so its heading reads as a title level with the
+  // pet names, with entries filling downward beneath it.
+  myPetSetCard: { width: "32%", minWidth: 0, alignSelf: "flex-start", paddingVertical: spacing.xs, paddingHorizontal: spacing.xxs, gap: spacing.xxs, alignItems: "center", justifyContent: "flex-start" },
+  myPetSetTitle: { ...typography.label, color: colors.text, textAlign: "center" },
+  myPetSetRow: { gap: spacing.none },
+  myPetSetName: { ...typography.micro, color: colors.text, textAlign: "center" },
+  myPetSetValue: { ...typography.micro, color: colors.accent, textAlign: "center" },
+  myPetSpriteEffectOpen: { zIndex: layers.floatingPopover },
   myPetOverlayRow: { position: "absolute", left: 0, right: 0, top: 0, zIndex: layers.cardOverlay, height: iconSizes.lg, flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
   myPetEffectButton: { width: iconSizes.lg, height: iconSizes.lg, alignItems: "center", justifyContent: "center", borderWidth: borders.none, borderRadius: radii.none, backgroundColor: colors.transparent },
   myPetEffectArrow: { width: slimeUi.effectArrow, height: slimeUi.effectArrow },
   myPetStarButton: { width: iconSizes.md, height: iconSizes.lg, alignItems: "center", justifyContent: "center", borderWidth: borders.none, borderRadius: radii.none, backgroundColor: colors.transparent },
-  myPetEffectPopover: { position: "absolute", left: 0, top: iconSizes.lg + spacing.xxs, zIndex: layers.popover, width: slimeUi.effectPopoverWidth, padding: spacing.sm, gap: spacing.xxs, borderWidth: borders.hairline, borderColor: colors.border, borderRadius: radii.btn, backgroundColor: colors.surface, ...shadows.lift },
+  myPetEffectPopover: { position: "absolute", left: 0, top: iconSizes.lg + spacing.xxs, zIndex: layers.floatingPopover, width: slimeUi.effectPopoverWidth, padding: spacing.sm, gap: spacing.xxs, borderWidth: borders.hairline, borderColor: colors.border, borderRadius: radii.btn, backgroundColor: colors.surface, ...shadows.lift },
   myPetEffectPopoverTitle: { ...typography.micro, color: colors.text, fontWeight: "700" },
+  myPetEffectPopoverRow: { gap: spacing.none },
   myPetEffectPopoverText: { ...typography.micro, color: colors.textMuted },
+  myPetEffectPopoverValue: { ...typography.micro, color: colors.accentTintedText, fontWeight: "700" },
   myPetName: { ...typography.micro, color: colors.textMuted, textAlign: "center" },
   myPetNameSelected: { color: colors.accentTintedText },
-  myPetGrowth: { position: "relative", zIndex: layers.notice, width: "100%", gap: spacing.xs, borderWidth: borders.none, borderRadius: radii.none, backgroundColor: colors.transparent },
+  // Above the sprite so the bar and its label stay legible, but below any open
+  // popover. It previously borrowed the notice layer, which put it over popovers
+  // and clipped the buff and growth panels behind the bar.
+  myPetGrowth: { position: "relative", zIndex: layers.raisedContent, width: "100%", gap: spacing.xs, borderWidth: borders.none, borderRadius: radii.none, backgroundColor: colors.transparent },
   myPetGrowthMeta: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: spacing.xxs },
   myPetGrowthLabel: { ...typography.micro, color: colors.textMuted },
   myPetGrowthPercent: { ...typography.micro, color: colors.accentTintedText, fontVariant: ["tabular-nums"] },
@@ -1376,6 +1624,24 @@ const styles = StyleSheet.create({
   shopContent: { paddingBottom: spacing.sm, gap: spacing.sm },
   floorRow: { width: "31%", minWidth: 0, paddingHorizontal: spacing.xs, paddingVertical: spacing.sm, borderWidth: borders.hairline, borderColor: colors.border, borderRadius: radii.control, backgroundColor: colors.surface, alignItems: "center", justifyContent: "flex-start", gap: spacing.xs },
   shopPreview: { width: iconSizes.empty, height: iconSizes.empty, alignItems: "center", justifyContent: "center", overflow: "hidden", backgroundColor: colors.surfaceAlt },
+  // Scene backgrounds feather their edges to transparent, so a tinted tile behind
+  // them shows through as a hard grey square outline. Those previews sit on the
+  // page background instead; the feather itself provides the visual boundary.
+  shopPreviewScene: { backgroundColor: colors.transparent },
+  // Price bands stack down the page, so each band spans the full width and lays
+  // its own items out in the same wrapping grid the ungrouped list used. Without
+  // `width: "100%"` a band would be treated as one cell of the parent row and the
+  // three bands would sit side by side.
+  shopTierGroup: { width: "100%", gap: spacing.xs },
+  // The outer list stacks bands vertically; the grid lives inside each band.
+  shopTierList: { gap: spacing.sm },
+  // No rule between bands; the gap and label carry the separation.
+  shopTierLabel: { ...typography.micro, color: colors.textMuted },
+  // Outfit slots are separated by a rule, one level above the price bands inside
+  // them, so the two groupings stay visually distinguishable.
+  shopOutfitDivider: { height: borders.hairline, marginTop: spacing.xs, marginBottom: spacing.xxs, backgroundColor: colors.border },
+  shopOutfitLabel: { ...typography.section, color: colors.text },
+  shopTierItems: { flexDirection: "row", flexWrap: "wrap", justifyContent: "flex-start", gap: spacing.sm },
   floorCopy: { width: "100%", minWidth: 0, alignItems: "center", gap: spacing.xxs },
   floorTitle: { ...typography.label, color: colors.text, textAlign: "center" },
   floorSubtitle: { ...typography.micro, color: colors.textMuted, textAlign: "center" },
@@ -1384,9 +1650,16 @@ const styles = StyleSheet.create({
   floorStatusBuy: { color: colors.accent },
   emptyCard: { width: "100%", padding: spacing.lg },
   emptyText: { ...typography.body, color: colors.textMuted, textAlign: "center" },
-  notice: { position: "absolute", zIndex: layers.notice, bottom: tapMin + spacing.md, left: pageChrome.horizontalPadding, right: pageChrome.horizontalPadding, minHeight: tapMin, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, borderRadius: radii.control, flexDirection: "row", alignItems: "center", gap: spacing.sm, ...shadows.lift },
-  noticeSuccess: { backgroundColor: colors.plantActiveTintedBg },
-  noticeError: { backgroundColor: colors.dangerTintedBg },
+  // Opaque fill plus a hairline edge, since the notice now covers content rather
+  // than tinting it.
+  // Sits just above the bottom nav rather than a full tap target higher, so the
+  // result of a tap appears near the thumb that made it. The nav already reserves
+  // the safe area below itself, so a small gap is all that is needed here.
+  notice: { position: "absolute", zIndex: layers.notice, bottom: spacing.sm, left: pageChrome.horizontalPadding, right: pageChrome.horizontalPadding, minHeight: tapMin, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, borderRadius: radii.control, borderWidth: borders.hairline, borderColor: colors.border, flexDirection: "row", alignItems: "center", gap: spacing.sm, ...shadows.lift },
+  // Opaque rather than tinted: the notice floats over the pet grid and shop list,
+  // so a translucent fill let the content behind it show through.
+  noticeSuccess: { backgroundColor: colors.noticeSuccessBg },
+  noticeError: { backgroundColor: colors.noticeErrorBg },
   noticeIcon: { transform: [{ rotate: "90deg" }] },
   noticeText: { ...typography.label, flex: 1 },
   noticeSuccessText: { color: colors.plantActive },
@@ -1399,6 +1672,10 @@ const styles = StyleSheet.create({
   wardrobeListContent: { flexDirection: "row", flexWrap: "wrap", justifyContent: "flex-start", gap: spacing.sm },
   wardrobeItem: { width: "31.5%", minWidth: 0, paddingHorizontal: spacing.xs, paddingVertical: spacing.sm, borderWidth: borders.hairline, borderColor: colors.border, borderRadius: radii.control, backgroundColor: colors.surface, alignItems: "center", justifyContent: "flex-start", gap: spacing.xs },
   wardrobeItemEquipped: { borderColor: colors.accent, backgroundColor: colors.accentTintedBg },
+  // Distinct from the equipped state: still selectable, but tapping moves the
+  // piece off another pet rather than adding a new one.
+  wardrobeItemWornByOther: { borderColor: colors.borderHover, backgroundColor: colors.surfaceAlt },
+  wardrobeItemWornText: { ...typography.micro, color: colors.textMuted, textAlign: "center" },
   wardrobeItemCopy: { width: "100%", minWidth: 0, alignItems: "center", gap: spacing.xxs },
   wardrobeItemAction: { ...typography.micro, color: colors.accentTintedText, textAlign: "center" },
   wardrobeItemActionEquipped: { color: colors.textMuted },

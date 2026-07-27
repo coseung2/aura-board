@@ -21,6 +21,7 @@ import {
   type ReadingWeeklyMissionReward,
 } from "@/lib/reading-missions";
 import { getEquippedSlimeFloor } from "@/lib/pets/catalog";
+import type { SlimeFloor } from "@/lib/pets/types";
 import { readReadingTitles } from "@/lib/titles";
 import {
   evaluateReadingLog,
@@ -41,7 +42,7 @@ const TOP_FIVE_LIMIT = 5;
 type ReadingRepresentativeSlime = {
   color: string;
   growthStage: 1 | 2 | 3;
-  equippedFloor: "none" | "grass-floor" | "water-puddle" | "trampoline";
+  equippedFloor: SlimeFloor;
 };
 
 async function readReadingWeeklyMissionClaims(

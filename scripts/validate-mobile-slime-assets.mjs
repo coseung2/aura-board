@@ -13,6 +13,13 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
+import {
+  SLIME_ACTIONS,
+  SLIME_COLORS,
+  SLIME_EVOLUTIONS,
+  slimeExpectedActionsForEvolution,
+} from "./import-slime-assets.mjs";
+
 const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const assetsRoot = path.join(projectRoot, "apps", "mobile", "assets", "slimes");
 
@@ -25,18 +32,20 @@ const STATIC_SHARED_DIMENSIONS = Object.freeze({
   "shared/trampoline-floor.png": [256, 256],
 });
 
-const SLIME_COLORS = ["blue", "green", "yellow", "purple", "red"];
-const SLIME_EVOLUTIONS = ["base", "gold-crown-red-gem", "silver-crown-blue-gem"];
-const SLIME_ACTIONS = ["idle", "happy", "drink", "water-puddle", "trampoline"];
-
+// The expected keys come from the importer rather than a second local list.
+// Sheet names are flavor-specific (`drink-lemonade`), so a new drink changes the
+// required set; deriving it here keeps this check from asking for the retired
+// single `drink` sheet the moment the importer moves on.
+//
 // Crowned idle/happy animations reuse the base sheet with an overlay at
-// runtime. Those precomposed source sheets may be present in a copied package,
-// but the importer intentionally does not require or copy them.
+// runtime, and the evolved packages only ever authored a crowned lemonade among
+// the drinks. Those gaps are encoded by the importer's own expectation, so this
+// check never demands art that does not exist.
 const REQUIRED_RUNTIME_SHEET_KEYS = SLIME_EVOLUTIONS.flatMap((evolution) =>
   SLIME_COLORS.flatMap((color) =>
-    SLIME_ACTIONS.filter(
-      (action) => evolution === "base" || (action !== "idle" && action !== "happy"),
-    ).map((action) => `${evolution}/${color}/${action}`),
+    slimeExpectedActionsForEvolution(evolution).map(
+      (action) => `${evolution}/${color}/${action}`,
+    ),
   ),
 );
 

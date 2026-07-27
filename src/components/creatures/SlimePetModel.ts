@@ -4,6 +4,8 @@ import {
   type SlimeGrowthStage,
 } from "@/lib/pets/growth";
 import { isSlimeSceneBackground } from "@/lib/pets/catalog";
+import { normalizeEquippedWearables } from "@/lib/pets/wearable-catalog";
+import type { SlimeWearableSelection } from "@/lib/pets/slime-wearables";
 import type {
   SlimeColor,
   SlimeEffectKey,
@@ -30,6 +32,7 @@ export type ShopFilter =
   | "floor"
   | "food"
   | "prop"
+  | "outfit"
   | "level-up";
 
 export const SHOP_NAV_ITEMS: readonly { key: ShopFilter; label: string }[] = [
@@ -39,6 +42,7 @@ export const SHOP_NAV_ITEMS: readonly { key: ShopFilter; label: string }[] = [
   { key: "floor", label: "바닥" },
   { key: "food", label: "먹이" },
   { key: "prop", label: "소품" },
+  { key: "outfit", label: "착장" },
   { key: "level-up", label: "레벨업" },
 ];
 
@@ -51,6 +55,7 @@ export const SHOP_CATEGORY_LABELS: Record<ShopFilter, string> = {
   floor: "바닥",
   food: "먹이",
   prop: "소품",
+  outfit: "착장",
   "level-up": "레벨업",
 };
 
@@ -68,6 +73,8 @@ export function shopFilterForItem(
     case "drink":
     case "prop":
       return "prop";
+    case "wearable":
+      return "outfit";
     case "level-up":
       return "level-up";
     default:
@@ -81,6 +88,20 @@ export function shopItemCategoryLabel(
   item: Pick<SlimeShopItem, "category" | "floor">,
 ): string {
   return SHOP_CATEGORY_LABELS[shopFilterForItem(item)];
+}
+
+/** Resolve equipped item keys into the independent wearable slots. */
+export function slimeWearablesFromItems(
+  items: readonly SlimeShopItem[],
+): SlimeWearableSelection {
+  const wearableSelection = normalizeEquippedWearables(items.map((item) => item.key));
+  const drink = items.find((item) => item.category === "drink");
+  return {
+    blush: wearableSelection.blush ?? null,
+    eyewear: wearableSelection.eyewear ?? null,
+    headwear: wearableSelection.headwear ?? null,
+    drink: drink?.animationKey ?? null,
+  };
 }
 
 const SLIME_BALL_KEY_PREFIX = "slime-ball-";

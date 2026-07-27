@@ -39,6 +39,15 @@ export const colors = {
   danger: "#c62828",
   dangerActive: "#a01b1b",
   dangerTintedBg: "rgba(198, 40, 40, 0.08)",
+  /**
+   * Opaque notice surfaces.
+   *
+   * The tinted variants above are meant to sit on a known background. A notice
+   * floats over arbitrary content, so a 5-8% tint leaves whatever is behind it
+   * showing through and the text hard to read. These are the same hues resolved
+   * against the page background.
+   */
+  noticeErrorBg: "#f8e5e5",
   warning: "#f59e0b",
   warningTintedBg: "#fef3c7",
   warningTintedText: "#92610a",
@@ -57,6 +66,8 @@ export const colors = {
   plantActive: "#27a35f",
   plantActivePressed: "#20824d",
   plantActiveTintedBg: "rgba(39, 163, 95, 0.05)",
+  /** Opaque success notice surface; see `noticeErrorBg`. */
+  noticeSuccessBg: "#e5f4ec",
   plantVisited: "#b8dfc7",
   plantUpcoming: "#d0cfcd",
   plantStalled: "#c62828",
@@ -313,8 +324,15 @@ export const layers = {
   mediaControl: 12,
   bottomNav: 20,
   raisedContent: 30,
-  notice: 50,
+  /**
+   * A card that currently owns an open popover. Raised above sibling cards so the
+   * popover is not clipped behind the card rendered after it.
+   */
+  popoverOwner: 40,
   floatingPopover: 51,
+  // Notices confirm an action the user just took, so they sit above every other
+  // surface. A popover left open by that same tap must not cover the result.
+  notice: 60,
 } as const;
 
 export const slimeUi = {

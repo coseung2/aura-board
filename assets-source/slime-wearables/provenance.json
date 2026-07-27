@@ -1,0 +1,170 @@
+{
+  "generatedBy": "scripts/import-slime-crowns.mjs",
+  "purpose": "One-time bootstrap of the level-up crowns into a canonical headwear overlay package. Replace with the external package's published overlay once available, then delete this bridge.",
+  "externalSource": "C:/Users/심보승/Desktop/pixel asset/SlimeAssets",
+  "companionBaseSourceByTimeline": {
+    "idle": "pre-mouth-update-backup",
+    "happy": "happy-heart-assets"
+  },
+  "extractionRule": "Per frame, align each color's character sheet under its crowned sheet without losing any body pixel, take the pixels the crowned sheet paints, and keep only those all five colors agree on. Every frame must yield exactly 187 crown pixels and recompose to the authored sheet.",
+  "frameDurationsByTimeline": {
+    "idle": [
+      240,
+      160,
+      180,
+      90,
+      90,
+      160,
+      180,
+      240
+    ],
+    "happy": [
+      220,
+      160,
+      120,
+      110,
+      110,
+      110,
+      120,
+      130,
+      150,
+      170,
+      190,
+      260
+    ]
+  },
+  "inputs": {
+    "gold-crown-red-gem/idle/blue": {
+      "crownedSheet": "level-up/crowned-idle-assets/gold-crown-red-gem/idle/blue/slime-blue-idle-gold-crown-red-gem-sheet.png",
+      "crownedSha256": "fb5f32179df03ab1911807270918933fb2975e92ff62c7b09ce038670b6d607a",
+      "companionBase": "backups/idle-before-mouth-update-20260726-235024/characters/blue/idle/slime-blue-idle-sheet.png",
+      "companionBaseSha256": "6cfa09d6519277b8ef1b8b198e07ea33a29336544f681ee7d0f083113cef58d4"
+    },
+    "gold-crown-red-gem/idle/green": {
+      "crownedSheet": "level-up/crowned-idle-assets/gold-crown-red-gem/idle/green/slime-green-idle-gold-crown-red-gem-sheet.png",
+      "crownedSha256": "2d5b9e0e31c006498bd09b0dd6d375e28aa42cdb326660a91d50a7a22d1a0719",
+      "companionBase": "backups/idle-before-mouth-update-20260726-235024/characters/green/idle/slime-green-idle-sheet.png",
+      "companionBaseSha256": "111750553a8cae6590f606edb4f820d67e914faf60e7cbe9d3a80420e48bb75f"
+    },
+    "gold-crown-red-gem/idle/purple": {
+      "crownedSheet": "level-up/crowned-idle-assets/gold-crown-red-gem/idle/purple/slime-purple-idle-gold-crown-red-gem-sheet.png",
+      "crownedSha256": "5f6e8866553dfa46b90fb1b87c4dfd0b3bac63b1bd3207fe8ce72aaa403052db",
+      "companionBase": "backups/idle-before-mouth-update-20260726-235024/characters/purple/idle/slime-purple-idle-sheet.png",
+      "companionBaseSha256": "d7a0170042196ce85f50f9dab1e4fe17c22fc3cf48d53880b11e251ad67ea0c1"
+    },
+    "gold-crown-red-gem/idle/red": {
+      "crownedSheet": "level-up/crowned-idle-assets/gold-crown-red-gem/idle/red/slime-red-idle-gold-crown-red-gem-sheet.png",
+      "crownedSha256": "384c864f9f8f1c18761f9cb873cef3c081e8964a88f79ffdaa5f1fe88e4cb227",
+      "companionBase": "backups/idle-before-mouth-update-20260726-235024/characters/red/idle/slime-red-idle-sheet.png",
+      "companionBaseSha256": "243df91669fa42c6135156d42b882d3cace277dd9061a5826dad7297fa25e7f2"
+    },
+    "gold-crown-red-gem/idle/yellow": {
+      "crownedSheet": "level-up/crowned-idle-assets/gold-crown-red-gem/idle/yellow/slime-yellow-idle-gold-crown-red-gem-sheet.png",
+      "crownedSha256": "64a758871918cc103c26bd7c356ea71a8417498af1688098034fdd1bbc507440",
+      "companionBase": "backups/idle-before-mouth-update-20260726-235024/characters/yellow/idle/slime-yellow-idle-sheet.png",
+      "companionBaseSha256": "fdaf4d3588b70fa50eab16117eeff6886bcf88e352177b777f6474604fe174a3"
+    },
+    "silver-crown-blue-gem/idle/blue": {
+      "crownedSheet": "level-up/crowned-idle-assets/silver-crown-blue-gem/idle/blue/slime-blue-idle-silver-crown-blue-gem-sheet.png",
+      "crownedSha256": "ece1f4efca5e1804348ef2bfa1d7c24618a1e203c217a2467b973d40a1ecf77b",
+      "companionBase": "backups/idle-before-mouth-update-20260726-235024/characters/blue/idle/slime-blue-idle-sheet.png",
+      "companionBaseSha256": "6cfa09d6519277b8ef1b8b198e07ea33a29336544f681ee7d0f083113cef58d4"
+    },
+    "silver-crown-blue-gem/idle/green": {
+      "crownedSheet": "level-up/crowned-idle-assets/silver-crown-blue-gem/idle/green/slime-green-idle-silver-crown-blue-gem-sheet.png",
+      "crownedSha256": "c41190bba446c0d3635124a343eb8e9b357b21bc4ab0a95ad957b7dbc7630da6",
+      "companionBase": "backups/idle-before-mouth-update-20260726-235024/characters/green/idle/slime-green-idle-sheet.png",
+      "companionBaseSha256": "111750553a8cae6590f606edb4f820d67e914faf60e7cbe9d3a80420e48bb75f"
+    },
+    "silver-crown-blue-gem/idle/purple": {
+      "crownedSheet": "level-up/crowned-idle-assets/silver-crown-blue-gem/idle/purple/slime-purple-idle-silver-crown-blue-gem-sheet.png",
+      "crownedSha256": "bf45fcd4b72a4b70ac5c013d02ab724c03e29512d532cabb77871e7dcf610fdb",
+      "companionBase": "backups/idle-before-mouth-update-20260726-235024/characters/purple/idle/slime-purple-idle-sheet.png",
+      "companionBaseSha256": "d7a0170042196ce85f50f9dab1e4fe17c22fc3cf48d53880b11e251ad67ea0c1"
+    },
+    "silver-crown-blue-gem/idle/red": {
+      "crownedSheet": "level-up/crowned-idle-assets/silver-crown-blue-gem/idle/red/slime-red-idle-silver-crown-blue-gem-sheet.png",
+      "crownedSha256": "aef82643f8b3c85d57af36f22d4015e29b6c30d001f4fe3a699dd276a484f057",
+      "companionBase": "backups/idle-before-mouth-update-20260726-235024/characters/red/idle/slime-red-idle-sheet.png",
+      "companionBaseSha256": "243df91669fa42c6135156d42b882d3cace277dd9061a5826dad7297fa25e7f2"
+    },
+    "silver-crown-blue-gem/idle/yellow": {
+      "crownedSheet": "level-up/crowned-idle-assets/silver-crown-blue-gem/idle/yellow/slime-yellow-idle-silver-crown-blue-gem-sheet.png",
+      "crownedSha256": "7f9eebb42920617ba772d05add7be963f3ce7fc023ac962a9e52091c7814df68",
+      "companionBase": "backups/idle-before-mouth-update-20260726-235024/characters/yellow/idle/slime-yellow-idle-sheet.png",
+      "companionBaseSha256": "fdaf4d3588b70fa50eab16117eeff6886bcf88e352177b777f6474604fe174a3"
+    },
+    "gold-crown-red-gem/happy/blue": {
+      "crownedSheet": "level-up/crowned-happy-assets/gold-crown-red-gem/happy/blue/slime-blue-happy-gold-crown-red-gem-sheet.png",
+      "crownedSha256": "311448c4917a61a4608a65e6f536d1d7ba1a04310fe3deb1e61a3dc94c19a2b6",
+      "companionBase": "food/happy-heart-assets/blue/slime-blue-happy-heart-sheet.png",
+      "companionBaseSha256": "4320a56820d5070bf89dc0b5aaf6cf7fc58bc513678c4bb261f4049f20378252"
+    },
+    "gold-crown-red-gem/happy/green": {
+      "crownedSheet": "level-up/crowned-happy-assets/gold-crown-red-gem/happy/green/slime-green-happy-gold-crown-red-gem-sheet.png",
+      "crownedSha256": "32e9d3f6fe387050ea23fb4b64f7e733f6761a392a426fe39a69cd3bd337e225",
+      "companionBase": "food/happy-heart-assets/green/slime-green-happy-heart-sheet.png",
+      "companionBaseSha256": "94275ecbc4e77d24b395875fae6e342cc3069d215b9e88dd95dbe5e6c67d8f84"
+    },
+    "gold-crown-red-gem/happy/purple": {
+      "crownedSheet": "level-up/crowned-happy-assets/gold-crown-red-gem/happy/purple/slime-purple-happy-gold-crown-red-gem-sheet.png",
+      "crownedSha256": "311f4c183b5f6c894e73a01985eb08d995ae8ecdb9853158828d10da66f0c5ef",
+      "companionBase": "food/happy-heart-assets/purple/slime-purple-happy-heart-sheet.png",
+      "companionBaseSha256": "4a9c6dd619e95ded25061a4e65b73fb3f2360492a4bc2b1877f3990776f0c3e0"
+    },
+    "gold-crown-red-gem/happy/red": {
+      "crownedSheet": "level-up/crowned-happy-assets/gold-crown-red-gem/happy/red/slime-red-happy-gold-crown-red-gem-sheet.png",
+      "crownedSha256": "90bdab7bc9b7e9f8755e12b411e0a484274701cc3f38e01857de165d7cbdcbf7",
+      "companionBase": "food/happy-heart-assets/red/slime-red-happy-heart-sheet.png",
+      "companionBaseSha256": "0fb2496eb3eb77503d50f5bc01236766249ab27266de6b6e059aebf87d0a7507"
+    },
+    "gold-crown-red-gem/happy/yellow": {
+      "crownedSheet": "level-up/crowned-happy-assets/gold-crown-red-gem/happy/yellow/slime-yellow-happy-gold-crown-red-gem-sheet.png",
+      "crownedSha256": "ff7626e6795f913762afe86de09b88a2c7022ddb02116b65d3f9ae94ae423462",
+      "companionBase": "food/happy-heart-assets/yellow/slime-yellow-happy-heart-sheet.png",
+      "companionBaseSha256": "d414de5f37c2ef6f1b4ec5213eeda85ce80ba940a76d645f59542ca3ec349c2b"
+    },
+    "silver-crown-blue-gem/happy/blue": {
+      "crownedSheet": "level-up/crowned-happy-assets/silver-crown-blue-gem/happy/blue/slime-blue-happy-silver-crown-blue-gem-sheet.png",
+      "crownedSha256": "2217de6f0690b4f07a2be22e41316bfe86081c505103309dc82ec7b8d3ff3c25",
+      "companionBase": "food/happy-heart-assets/blue/slime-blue-happy-heart-sheet.png",
+      "companionBaseSha256": "4320a56820d5070bf89dc0b5aaf6cf7fc58bc513678c4bb261f4049f20378252"
+    },
+    "silver-crown-blue-gem/happy/green": {
+      "crownedSheet": "level-up/crowned-happy-assets/silver-crown-blue-gem/happy/green/slime-green-happy-silver-crown-blue-gem-sheet.png",
+      "crownedSha256": "190033fd69a0d715c7b1e4b5eab47301bb7a6c5caed8ba440cd78d23d9e0d1ea",
+      "companionBase": "food/happy-heart-assets/green/slime-green-happy-heart-sheet.png",
+      "companionBaseSha256": "94275ecbc4e77d24b395875fae6e342cc3069d215b9e88dd95dbe5e6c67d8f84"
+    },
+    "silver-crown-blue-gem/happy/purple": {
+      "crownedSheet": "level-up/crowned-happy-assets/silver-crown-blue-gem/happy/purple/slime-purple-happy-silver-crown-blue-gem-sheet.png",
+      "crownedSha256": "af6c26a84ace2caee59ec5093205e56f3d1c096b416e5c889bb5a59c70ffa173",
+      "companionBase": "food/happy-heart-assets/purple/slime-purple-happy-heart-sheet.png",
+      "companionBaseSha256": "4a9c6dd619e95ded25061a4e65b73fb3f2360492a4bc2b1877f3990776f0c3e0"
+    },
+    "silver-crown-blue-gem/happy/red": {
+      "crownedSheet": "level-up/crowned-happy-assets/silver-crown-blue-gem/happy/red/slime-red-happy-silver-crown-blue-gem-sheet.png",
+      "crownedSha256": "59f34e897d0f90a9ac9a36586a70e005bffc23d033c5c2d7cca7bda2e0f6bef6",
+      "companionBase": "food/happy-heart-assets/red/slime-red-happy-heart-sheet.png",
+      "companionBaseSha256": "0fb2496eb3eb77503d50f5bc01236766249ab27266de6b6e059aebf87d0a7507"
+    },
+    "silver-crown-blue-gem/happy/yellow": {
+      "crownedSheet": "level-up/crowned-happy-assets/silver-crown-blue-gem/happy/yellow/slime-yellow-happy-silver-crown-blue-gem-sheet.png",
+      "crownedSha256": "6b9739801bcdea7f09440840ab4e74682610260e22023682f4fb8505a2071ea3",
+      "companionBase": "food/happy-heart-assets/yellow/slime-yellow-happy-heart-sheet.png",
+      "companionBaseSha256": "d414de5f37c2ef6f1b4ec5213eeda85ce80ba940a76d645f59542ca3ec349c2b"
+    }
+  },
+  "crownSheetSha256": {
+    "gold-crown-red-gem/idle": "5e8c7a9d21216f490f6489fed40f679a682b1fcaf123b41261e4afc9e294a7a2",
+    "silver-crown-blue-gem/idle": "975e5b377b2a987e74c80e1e24f76a1da473dc21ba3c2b03c276e0ed680cf91d",
+    "gold-crown-red-gem/happy": "78afecbb5b98df0c2f11f81b05da5649ee21b7a884bd9544a9cf5f08b37a3e43",
+    "silver-crown-blue-gem/happy": "9af3bbfe11c3c50e96c94ecbc2b59dd342c42f40cfa470caa813ca8bd942f611"
+  },
+  "publishTargets": [
+    "props/composition/overlays/headwear/gold-crown-red-gem/idle/{color}.{png,json}",
+    "props/composition/overlays/headwear/gold-crown-red-gem/happy/{color}.{png,json}",
+    "props/composition/overlays/headwear/silver-crown-blue-gem/idle/{color}.{png,json}",
+    "props/composition/overlays/headwear/silver-crown-blue-gem/happy/{color}.{png,json}"
+  ]
+}

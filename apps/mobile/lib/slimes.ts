@@ -44,6 +44,23 @@ export type MobileSlimeEffect = {
   bps: number;
 };
 
+export type MobileSlimeBuffGroup = {
+  color: SlimeColor;
+  label: string;
+  entries: MobileSlimeEffect[];
+  totals: Array<Pick<MobileSlimeEffect, "effectKey" | "bps">>;
+};
+
+export const MOBILE_SLIME_EFFECT_KEYS = [
+  "growth_speed",
+  "reading_reward",
+  "walking_reward",
+  "assignment_reward",
+  "comment_reward",
+] as const;
+
+export type MobileSlimeEffectKey = typeof MOBILE_SLIME_EFFECT_KEYS[number];
+
 export type SlimeCatalogItem = {
   key: SlimeColor;
   color: SlimeColor;
@@ -55,15 +72,36 @@ export type SlimeCatalogItem = {
 
 export type SlimeShopItem = {
   key: string;
-  category: "background" | "ride" | "drink" | "food" | "prop" | "level-up";
+  category:
+    | "background"
+    | "ride"
+    | "drink"
+    | "food"
+    | "prop"
+    | "wearable"
+    | "level-up";
   floor: Exclude<EquippedFloor, "none"> | null;
   labelKo: string;
   price: number;
   spritePath: string;
   mobileSpritePath?: string;
   staticSpritePath?: string;
+  animationKey?: string;
+  previewColor?: SlimeColor;
+  wearableRole?: SlimeWearableRole;
+  wearableOption?: string;
   effectKey?: string;
   effectBps?: number;
+};
+
+export const SLIME_WEARABLE_ROLES = ["blush", "eyewear", "headwear"] as const;
+export type SlimeWearableRole = (typeof SLIME_WEARABLE_ROLES)[number];
+
+export type MobileSlimeWearableSelection = {
+  blush: string | null;
+  eyewear: string | null;
+  headwear: string | null;
+  drink: string | null;
 };
 
 export type SlimeShopFilter =
@@ -72,6 +110,7 @@ export type SlimeShopFilter =
   | "floor"
   | "food"
   | "prop"
+  | "outfit"
   | "level-up";
 
 export const SLIME_SHOP_NAV_ITEMS: readonly { key: SlimeShopFilter; label: string }[] = [
@@ -79,9 +118,10 @@ export const SLIME_SHOP_NAV_ITEMS: readonly { key: SlimeShopFilter; label: strin
   { key: "floor", label: "바닥" },
   { key: "food", label: "먹이" },
   { key: "prop", label: "소품" },
+  { key: "outfit", label: "착장" },
 ];
 
-export type SlimeVisualItemSlot = "background" | "floor" | "accessory";
+export type SlimeVisualItemSlot = "background" | "floor" | "prop" | SlimeWearableRole;
 
 /** True scene backgrounds are category background with no floor mapping. */
 export function isSceneBackgroundItem(
@@ -108,14 +148,157 @@ export function slimeShopNavItems(
   ];
 }
 
-/** Visual slots keep at most one equipped key in background → floor → accessory order. */
+/** Visual slots keep at most one equipped key in each independent slot. */
 export function slimeVisualItemSlot(
-  item: Pick<SlimeShopItem, "category" | "floor">,
+  item: Pick<SlimeShopItem, "category" | "floor" | "wearableRole">,
 ): SlimeVisualItemSlot | null {
   if (isSceneBackgroundItem(item)) return "background";
   if (item.floor) return "floor";
-  if (item.category === "drink" || item.category === "prop") return "accessory";
+  if (item.category === "drink" || item.category === "prop") return "prop";
+  if (item.category === "wearable") return item.wearableRole ?? null;
   return null;
+}
+
+/**
+ * Label for each shop price point.
+ *
+ * Bound to the price rather than to a band's position, because a list may not
+ * contain every price. The wizard hat is the only 1,000-won outfit, so if labels
+ * followed position it would read as the second band ("고급") in a two-band list
+ * while the same price reads as "최고급" among backgrounds.
+ */
+export const SLIME_SHOP_TIER_LABEL_BY_PRICE: Readonly<Record<number, string>> = {
+  500: "기본",
+  700: "고급",
+  1_000: "최고급",
+};
+
+export type SlimeShopTierGroup<T> = Readonly<{
+  /** Ascending price for this band. */
+  price: number;
+  label: string;
+  items: readonly T[];
+}>;
+
+/**
+ * Group shop items into price bands, cheapest band first.
+ *
+ * Free items (price zero or missing) are grouped with the cheapest paid band
+ * rather than given a band of their own, since they read as starter content.
+ * Item order inside a band is preserved from the catalog.
+ *
+ * A list with fewer than two distinct prices returns a single unlabelled group,
+ * so a uniformly priced category renders exactly as it did before grouping.
+ */
+/**
+ * Outfit sub-categories, in display order.
+ *
+ * Outfits occupy independent slots, so a slime can wear one of each at the same
+ * time. Grouping by slot is what makes the list answer "what can I put on my
+ * head" rather than mixing unrelated slots together.
+ */
+/**
+ * Prop sub-categories, in display order.
+ *
+ * Props are a mixed bag: a drink the slime holds, a ride it plays on, and a ball
+ * it is hit by. Grouping them keeps the tab readable as it grows.
+ */
+export const SLIME_PROP_GROUPS = [
+  { key: "drink", label: "음료" },
+  { key: "ride", label: "탈것" },
+  { key: "ball", label: "공" },
+] as const;
+
+export type SlimePropGroupKey = (typeof SLIME_PROP_GROUPS)[number]["key"];
+
+/** Which prop sub-category an item belongs to. */
+export function propGroupForItem(
+  item: Pick<SlimeShopItem, "category" | "key">,
+): SlimePropGroupKey {
+  if (item.category === "drink") return "drink";
+  if (item.category === "ride") return "ride";
+  return "ball";
+}
+
+export type SlimePropGroup<T> = Readonly<{
+  key: SlimePropGroupKey;
+  label: string;
+  items: readonly T[];
+}>;
+
+/** Split props into their sub-categories, dropping empty ones. */
+export function groupSlimePropsByKind<T extends Pick<SlimeShopItem, "category" | "key">>(
+  items: readonly T[],
+): readonly SlimePropGroup<T>[] {
+  return SLIME_PROP_GROUPS.map((group) => ({
+    key: group.key,
+    label: group.label,
+    items: items.filter((item) => propGroupForItem(item) === group.key),
+  })).filter((group) => group.items.length > 0);
+}
+
+export const SLIME_OUTFIT_GROUPS = [
+  { role: "headwear", label: "모자" },
+  { role: "eyewear", label: "안경" },
+  { role: "blush", label: "볼터치" },
+] as const satisfies readonly { role: SlimeWearableRole; label: string }[];
+
+export type SlimeOutfitGroup<T> = Readonly<{
+  role: SlimeWearableRole;
+  label: string;
+  items: readonly T[];
+}>;
+
+/**
+ * Split outfits into their slot sub-categories, dropping empty ones.
+ *
+ * Items whose slot is unknown are appended under the last group rather than
+ * silently disappearing, so a newly added role is visible before it gets its own
+ * entry above.
+ */
+export function groupSlimeOutfitsByRole<
+  T extends { category?: string; floor?: unknown; wearableRole?: SlimeWearableRole | null },
+>(items: readonly T[]): readonly SlimeOutfitGroup<T>[] {
+  const known = new Set<SlimeWearableRole>(SLIME_OUTFIT_GROUPS.map((group) => group.role));
+  const groups = SLIME_OUTFIT_GROUPS.map((group) => ({
+    role: group.role,
+    label: group.label,
+    items: items.filter((item) => item.wearableRole === group.role),
+  }));
+  const unclassified = items.filter(
+    (item) => !item.wearableRole || !known.has(item.wearableRole),
+  );
+  if (unclassified.length > 0) {
+    const last = groups[groups.length - 1];
+    groups[groups.length - 1] = { ...last, items: [...last.items, ...unclassified] };
+  }
+  return groups.filter((group) => group.items.length > 0);
+}
+
+export function groupSlimeShopItemsByTier<T extends { price?: number }>(
+  items: readonly T[],
+): readonly SlimeShopTierGroup<T>[] {
+  const priceOf = (item: T) => (Number.isFinite(item.price) ? Number(item.price) : 0);
+  const paidPrices = [...new Set(items.map(priceOf).filter((price) => price > 0))].sort(
+    (a, b) => a - b,
+  );
+  if (paidPrices.length <= 1) {
+    return items.length > 0 ? [{ price: paidPrices[0] ?? 0, label: "", items }] : [];
+  }
+
+  const cheapest = paidPrices[0];
+  return paidPrices
+    .map((price) => ({
+      price,
+      // An unlabelled price falls back to the amount rather than borrowing a
+      // neighbouring band's name.
+      label: SLIME_SHOP_TIER_LABEL_BY_PRICE[price] ?? `${price.toLocaleString()}원`,
+      items: items.filter((item) => {
+        const itemPrice = priceOf(item);
+        return itemPrice === price || (itemPrice <= 0 && price === cheapest);
+      }),
+    }))
+    .filter((group) => group.items.length > 0);
 }
 
 export function resolveSlimeRemoteSpriteUri(
@@ -159,6 +342,56 @@ export function slimeBallSpritePath(
   const slug = key.slice("slime-ball-".length);
   if (!slug || !/^[a-z0-9-]+$/.test(slug)) return undefined;
   return `/creatures/slimes/official/props/ball/${slug}/${slimeColor}/slime-${slimeColor}-${slug}-hit-4x.gif`;
+}
+
+export function slimeDrinkSpritePath(
+  item: Pick<SlimeShopItem, "category" | "animationKey">,
+  slimeColor: SlimeColor,
+  highDensity = true,
+): string | undefined {
+  if (item.category !== "drink" || !item.animationKey) return undefined;
+  const base = `slime-${slimeColor}-drink-${item.animationKey}`;
+  return `/creatures/slimes/shop/drinks/${item.animationKey}/${slimeColor}/${base}${highDensity ? "-4x" : ""}.gif`;
+}
+
+export function slimeShopPreviewColor(
+  item: Pick<SlimeShopItem, "previewColor">,
+  fallback: SlimeColor,
+): SlimeColor {
+  return item.previewColor ?? fallback;
+}
+
+/** Resolve the independent wearable slots and the prop-driven drink flavor. */
+export function resolveEquippedSlimeWearables(
+  itemKeys: readonly string[],
+  catalog: readonly SlimeShopItem[],
+): MobileSlimeWearableSelection {
+  const byKey = new Map(catalog.map((item) => [item.key, item]));
+  const selection: MobileSlimeWearableSelection = {
+    blush: null,
+    eyewear: null,
+    headwear: null,
+    drink: null,
+  };
+
+  for (const itemKey of itemKeys) {
+    const item = byKey.get(itemKey);
+    if (!item) continue;
+    if (item.category === "drink") {
+      if (item.animationKey) selection.drink = item.animationKey;
+      continue;
+    }
+    if (
+      item.category !== "wearable" ||
+      !item.wearableRole ||
+      !item.wearableOption
+    ) {
+      continue;
+    }
+    selection[item.wearableRole] = item.wearableOption;
+  }
+
+  return selection;
 }
 
 export function studentPetHref(section: "mine" | "classroom"): string {
@@ -220,6 +453,13 @@ const isRecord = (value: unknown): value is Record<string, unknown> =>
 function color(value: unknown): SlimeColor | null {
   return typeof value === "string" && (SLIME_ASSET_COLORS as readonly string[]).includes(value)
     ? (value as SlimeColor)
+    : null;
+}
+
+function wearableRole(value: unknown): SlimeWearableRole | null {
+  return typeof value === "string" &&
+    (SLIME_WEARABLE_ROLES as readonly string[]).includes(value)
+    ? (value as SlimeWearableRole)
     : null;
 }
 
@@ -335,12 +575,14 @@ function normalizeShopCatalog(value: unknown): SlimeShopItem[] {
       category !== "drink" &&
       category !== "food" &&
       category !== "prop" &&
+      category !== "wearable" &&
       category !== "level-up"
     ) {
       return [];
     }
     const parsedFloor = entry.floor === null ? "none" : floor(entry.floor);
     const itemFloor = parsedFloor === "none" ? null : parsedFloor;
+    const parsedWearableRole = wearableRole(entry.wearableRole);
     return [
       {
         key: entry.key,
@@ -353,6 +595,16 @@ function normalizeShopCatalog(value: unknown): SlimeShopItem[] {
           typeof entry.mobileSpritePath === "string" ? entry.mobileSpritePath : undefined,
         staticSpritePath:
           typeof entry.staticSpritePath === "string" ? entry.staticSpritePath : undefined,
+        animationKey:
+          typeof entry.animationKey === "string" ? entry.animationKey : undefined,
+        previewColor: SLIME_ASSET_COLORS.includes(entry.previewColor as SlimeColor)
+          ? entry.previewColor as SlimeColor
+          : undefined,
+        wearableRole: parsedWearableRole ?? undefined,
+        wearableOption:
+          typeof entry.wearableOption === "string" && entry.wearableOption.length > 0
+            ? entry.wearableOption
+            : undefined,
         effectKey: typeof entry.effectKey === "string" ? entry.effectKey : undefined,
         effectBps:
           typeof entry.effectBps === "number"
@@ -444,6 +696,166 @@ export function normalizeSlimeHome(payload: unknown): MobileSlimeHome {
   };
 }
 
+/**
+ * Resolve the buffs worn by each owned pet, then aggregate duplicate effect
+ * types within that pet. The detailed entries feed the arrow popover while
+ * totals feed the compact summary below the pet grid.
+ */
+export function mobileSlimeBuffGroups(home: MobileSlimeHome): MobileSlimeBuffGroup[] {
+  const shopItemsByKey = new Map(home.shopCatalog.map((item) => [item.key, item]));
+  const claimedTitlesByKey = new Map(home.claimedTitles.map((title) => [title.key, title]));
+
+  return home.ownedColors.flatMap((itemColor) => {
+    const slime = home.catalog.find((entry) => entry.color === itemColor);
+    if (!slime) return [];
+
+    const entries: MobileSlimeEffect[] = [];
+    const baseBps = slimeBuffBpsForStage(slime.baseBuffBps, stageForColor(home, itemColor));
+    if (slime.effectKey && baseBps > 0) {
+      entries.push({
+        source: "slime",
+        key: slime.key,
+        label: "펫 기본 효과",
+        effectKey: slime.effectKey,
+        bps: baseBps,
+      });
+    }
+
+    for (const itemKey of home.equippedItemsByColor[itemColor] ?? []) {
+      const item = shopItemsByKey.get(itemKey);
+      if (!item?.effectKey || !item.effectBps) continue;
+      entries.push({
+        source: isSceneBackgroundItem(item) ? "background" : "item",
+        key: item.key,
+        label: item.labelKo,
+        effectKey: item.effectKey,
+        bps: item.effectBps,
+      });
+    }
+
+    const titleKey = home.equippedTitleByColor[itemColor];
+    const title = titleKey ? claimedTitlesByKey.get(titleKey) : undefined;
+    if (title?.effectKey && title.buffBps > 0) {
+      entries.push({
+        source: "title",
+        key: title.key,
+        label: title.label,
+        effectKey: title.effectKey,
+        bps: title.buffBps,
+      });
+    }
+
+    const totalsByEffect = new Map<string, number>();
+    for (const entry of entries) {
+      totalsByEffect.set(entry.effectKey, (totalsByEffect.get(entry.effectKey) ?? 0) + entry.bps);
+    }
+
+    return [{
+      color: itemColor,
+      label: slime.nameKo,
+      entries,
+      totals: Array.from(totalsByEffect, ([effectKey, bps]) => ({ effectKey, bps })),
+    }];
+  });
+}
+
+/**
+ * Outfit family sets, kept in step with the web catalog.
+ *
+ * Membership is by shop key so a rename of a display label cannot break a set.
+ */
+const WEARABLE_SETS = [
+  {
+    key: "beanie-collection",
+    labelKo: "비니 컬렉션",
+    itemKeys: [
+      "slime-headwear-beige-beanie",
+      "slime-headwear-brown-beanie",
+      "slime-headwear-charcoal-beanie",
+      "slime-headwear-ivory-beanie",
+    ],
+    effectKey: "assignment_reward",
+    bps: 200,
+  },
+  {
+    key: "goggles-collection",
+    labelKo: "고글 컬렉션",
+    itemKeys: [
+      "slime-eyewear-black-goggles",
+      "slime-eyewear-copper-goggles",
+      "slime-eyewear-gold-goggles",
+      "slime-eyewear-silver-goggles",
+    ],
+    effectKey: "reading_reward",
+    bps: 200,
+  },
+  {
+    key: "sunglasses-pair",
+    labelKo: "선글라스 세트",
+    itemKeys: ["slime-eyewear-black-sunglasses", "slime-eyewear-red-sunglasses"],
+    effectKey: "reading_reward",
+    bps: 100,
+  },
+  {
+    key: "blush-pair",
+    labelKo: "볼터치 세트",
+    itemKeys: ["slime-blush-peach-brush-blush", "slime-blush-rose-brush-blush"],
+    effectKey: "comment_reward",
+    bps: 100,
+  },
+] as const;
+
+export type MobileSlimeActiveSet = Readonly<{
+  key: string;
+  label: string;
+  effectKey: string;
+  bps: number;
+}>;
+
+/**
+ * Sets whose every piece is currently worn, counted across the whole collection.
+ *
+ * A single slime can only wear one option per slot, so a family is completed by
+ * spreading it over several pets: four beanies on four slimes activates the beanie
+ * collection. That is why this reads every pet's equipped list rather than one
+ * pet's, and why the grid shows the result in one shared cell.
+ *
+ * Owning a piece is not enough. Leaving it in the wardrobe grants nothing, so the
+ * bonus rewards actually dressing the collection.
+ */
+export function mobileSlimeActiveSets(home: MobileSlimeHome): readonly MobileSlimeActiveSet[] {
+  const worn = new Set<string>();
+  for (const itemKeys of Object.values(home.equippedItemsByColor ?? {})) {
+    for (const itemKey of itemKeys ?? []) worn.add(itemKey);
+  }
+  return WEARABLE_SETS.filter((set) => set.itemKeys.every((key) => worn.has(key))).map((set) => ({
+    key: set.key,
+    label: set.labelKo,
+    effectKey: set.effectKey,
+    bps: set.bps,
+  }));
+}
+
+/** Aggregate every pet's active buffs into the five product effect areas. */
+export function aggregateMobileSlimeBuffTotals(
+  groups: readonly MobileSlimeBuffGroup[],
+): Array<{ effectKey: MobileSlimeEffectKey; bps: number }> {
+  const totals = new Map<MobileSlimeEffectKey, number>(
+    MOBILE_SLIME_EFFECT_KEYS.map((effectKey) => [effectKey, 0]),
+  );
+  for (const group of groups) {
+    for (const effect of group.totals) {
+      if (!(MOBILE_SLIME_EFFECT_KEYS as readonly string[]).includes(effect.effectKey)) continue;
+      const effectKey = effect.effectKey as MobileSlimeEffectKey;
+      totals.set(effectKey, (totals.get(effectKey) ?? 0) + effect.bps);
+    }
+  }
+  return MOBILE_SLIME_EFFECT_KEYS.map((effectKey) => ({
+    effectKey,
+    bps: totals.get(effectKey) ?? 0,
+  }));
+}
+
 function normalizeClaimedTitles(value: unknown): MobileClaimedTitle[] {
   if (!Array.isArray(value)) return [];
   return value.flatMap((entry) => {
@@ -513,10 +925,12 @@ export function shopFilterForItem(
   item: Pick<SlimeShopItem, "category" | "floor">,
 ): Exclude<SlimeShopFilter, "character"> {
   if (isSceneBackgroundItem(item)) return "background";
-  if (item.category === "background" || item.category === "ride" || item.floor) {
-    return "floor";
-  }
+  // Rides are things the slime plays on rather than ground it stands on, so they
+  // belong with the other props even though they carry a floor value.
+  if (item.category === "ride") return "prop";
+  if (item.category === "background" || item.floor) return "floor";
   if (item.category === "food") return "food";
+  if (item.category === "wearable") return "outfit";
   if (item.category === "level-up") return "level-up";
   return "prop";
 }
@@ -579,9 +993,22 @@ export function stageForColor(
 }
 
 export function floorLabel(itemFloor: Exclude<EquippedFloor, "none">): string {
-  if (itemFloor === "grass-floor") return "잔디 바닥";
-  if (itemFloor === "water-puddle") return "물웅덩이";
-  return "트램펄린";
+  const labels: Record<Exclude<EquippedFloor, "none">, string> = {
+    "grass-floor": "잔디 바닥",
+    "crystal-cave-floor": "수정 동굴 바닥",
+    "moonlit-marble-floor": "달빛 대리석 바닥",
+    "royal-garden-floor": "왕실 정원 바닥",
+    "celestial-gold-floor": "천상의 황금 바닥",
+    "snow-ground-floor": "눈밭",
+    "ancient-brick-floor": "고대 벽돌 바닥",
+    "cherry-stone-floor": "벚꽃 돌바닥",
+    "sand-trail-floor": "모래길 바닥",
+    "forest-soil-floor": "숲 흙바닥",
+    "stone-floor": "돌바닥",
+    "water-puddle": "물웅덩이",
+    trampoline: "트램펄린",
+  };
+  return labels[itemFloor];
 }
 
 export function newSlimeIdempotencyKey(prefix: string, identity: string): string {

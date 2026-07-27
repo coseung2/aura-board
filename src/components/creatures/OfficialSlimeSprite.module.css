@@ -9,7 +9,7 @@
 }
 
 .sheet,
-.crown,
+.wearable,
 .floor,
 .puddle,
 .background {
@@ -83,7 +83,12 @@
   z-index: 1;
 }
 
-.crown {
+/**
+ * Wearables sit above the character sheet. Each layer's own z-index comes from
+ * the source composition contract order and is applied inline, so this base
+ * value only establishes the layer above the character.
+ */
+.wearable {
   z-index: 2;
 }
 

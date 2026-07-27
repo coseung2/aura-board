@@ -501,16 +501,16 @@ export const SLIME_MOBILE_ASSET_REGISTRY = {
     }
   }
 }, sheet: require("../assets/slimes/base/blue/happy/sheet.png") },
-  "base/blue/drink": { ...{
-  "key": "base/blue/drink",
+  "base/blue/drink-lemonade": { ...{
+  "key": "base/blue/drink-lemonade",
   "evolution": "base",
   "color": "blue",
-  "action": "drink",
+  "action": "drink-lemonade",
   "imageScale": 4,
   "metadata": {
     "frames": [
       {
-        "filename": "slime-blue-drink-lemonade 0.aseprite",
+        "filename": "0",
         "frame": {
           "x": 0,
           "y": 0,
@@ -532,7 +532,7 @@ export const SLIME_MOBILE_ASSET_REGISTRY = {
         "duration": 220
       },
       {
-        "filename": "slime-blue-drink-lemonade 1.aseprite",
+        "filename": "1",
         "frame": {
           "x": 64,
           "y": 0,
@@ -554,7 +554,7 @@ export const SLIME_MOBILE_ASSET_REGISTRY = {
         "duration": 160
       },
       {
-        "filename": "slime-blue-drink-lemonade 2.aseprite",
+        "filename": "2",
         "frame": {
           "x": 128,
           "y": 0,
@@ -576,7 +576,7 @@ export const SLIME_MOBILE_ASSET_REGISTRY = {
         "duration": 180
       },
       {
-        "filename": "slime-blue-drink-lemonade 3.aseprite",
+        "filename": "3",
         "frame": {
           "x": 192,
           "y": 0,
@@ -598,7 +598,7 @@ export const SLIME_MOBILE_ASSET_REGISTRY = {
         "duration": 140
       },
       {
-        "filename": "slime-blue-drink-lemonade 4.aseprite",
+        "filename": "4",
         "frame": {
           "x": 256,
           "y": 0,
@@ -620,7 +620,7 @@ export const SLIME_MOBILE_ASSET_REGISTRY = {
         "duration": 140
       },
       {
-        "filename": "slime-blue-drink-lemonade 5.aseprite",
+        "filename": "5",
         "frame": {
           "x": 320,
           "y": 0,
@@ -642,7 +642,7 @@ export const SLIME_MOBILE_ASSET_REGISTRY = {
         "duration": 160
       },
       {
-        "filename": "slime-blue-drink-lemonade 6.aseprite",
+        "filename": "6",
         "frame": {
           "x": 384,
           "y": 0,
@@ -664,7 +664,7 @@ export const SLIME_MOBILE_ASSET_REGISTRY = {
         "duration": 180
       },
       {
-        "filename": "slime-blue-drink-lemonade 7.aseprite",
+        "filename": "7",
         "frame": {
           "x": 448,
           "y": 0,
@@ -687,39 +687,1060 @@ export const SLIME_MOBILE_ASSET_REGISTRY = {
       }
     ],
     "meta": {
-      "app": "https://www.aseprite.org/",
-      "version": "1.x-dev",
-      "image": "slime-blue-drink-lemonade-sheet.png",
-      "format": "RGBA8888",
+      "image": "slime.png",
       "size": {
         "w": 512,
         "h": 64
       },
-      "scale": "1",
-      "frameTags": [
+      "frame_size": {
+        "w": 64,
+        "h": 64
+      },
+      "frame_count": 8,
+      "alpha": "binary",
+      "role": "slime",
+      "action": "drink-lemonade",
+      "color": "blue",
+      "option": null,
+      "source": "props/drink/lemonade/blue/slime-blue-drink-lemonade.aseprite",
+      "source_sha256": "cb3cba85404140d18672508b5afefc8770ad1101f6a3e6ffd63912afceedbb0d",
+      "transforms": [
         {
-          "name": "drink_lemonade",
-          "from": 0,
-          "to": 7,
-          "direction": "forward",
-          "color": "#000000ff"
-        }
-      ],
-      "layers": [
-        {
-          "name": "slime",
-          "opacity": 255,
-          "blendMode": "normal"
+          "source_idle_frame": 0,
+          "dx": 0,
+          "dy": 0
         },
         {
-          "name": "lemonade_glass",
-          "opacity": 255,
-          "blendMode": "normal"
+          "source_idle_frame": 1,
+          "dx": 0,
+          "dy": 0
+        },
+        {
+          "source_idle_frame": 2,
+          "dx": 0,
+          "dy": 0
+        },
+        {
+          "source_idle_frame": 3,
+          "dx": 0,
+          "dy": 0
+        },
+        {
+          "source_idle_frame": 4,
+          "dx": 0,
+          "dy": 0
+        },
+        {
+          "source_idle_frame": 5,
+          "dx": 0,
+          "dy": 0
+        },
+        {
+          "source_idle_frame": 6,
+          "dx": 0,
+          "dy": 0
+        },
+        {
+          "source_idle_frame": 7,
+          "dx": 0,
+          "dy": 0
         }
       ]
     }
   }
-}, sheet: require("../assets/slimes/base/blue/drink/sheet.png") },
+}, sheet: require("../assets/slimes/base/blue/drink-lemonade/sheet.png") },
+  "base/blue/drink-strawberry-soda": { ...{
+  "key": "base/blue/drink-strawberry-soda",
+  "evolution": "base",
+  "color": "blue",
+  "action": "drink-strawberry-soda",
+  "imageScale": 4,
+  "metadata": {
+    "frames": [
+      {
+        "filename": "0",
+        "frame": {
+          "x": 0,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "rotated": false,
+        "trimmed": false,
+        "spriteSourceSize": {
+          "x": 0,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "sourceSize": {
+          "w": 64,
+          "h": 64
+        },
+        "duration": 220
+      },
+      {
+        "filename": "1",
+        "frame": {
+          "x": 64,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "rotated": false,
+        "trimmed": false,
+        "spriteSourceSize": {
+          "x": 0,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "sourceSize": {
+          "w": 64,
+          "h": 64
+        },
+        "duration": 160
+      },
+      {
+        "filename": "2",
+        "frame": {
+          "x": 128,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "rotated": false,
+        "trimmed": false,
+        "spriteSourceSize": {
+          "x": 0,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "sourceSize": {
+          "w": 64,
+          "h": 64
+        },
+        "duration": 180
+      },
+      {
+        "filename": "3",
+        "frame": {
+          "x": 192,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "rotated": false,
+        "trimmed": false,
+        "spriteSourceSize": {
+          "x": 0,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "sourceSize": {
+          "w": 64,
+          "h": 64
+        },
+        "duration": 140
+      },
+      {
+        "filename": "4",
+        "frame": {
+          "x": 256,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "rotated": false,
+        "trimmed": false,
+        "spriteSourceSize": {
+          "x": 0,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "sourceSize": {
+          "w": 64,
+          "h": 64
+        },
+        "duration": 140
+      },
+      {
+        "filename": "5",
+        "frame": {
+          "x": 320,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "rotated": false,
+        "trimmed": false,
+        "spriteSourceSize": {
+          "x": 0,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "sourceSize": {
+          "w": 64,
+          "h": 64
+        },
+        "duration": 160
+      },
+      {
+        "filename": "6",
+        "frame": {
+          "x": 384,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "rotated": false,
+        "trimmed": false,
+        "spriteSourceSize": {
+          "x": 0,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "sourceSize": {
+          "w": 64,
+          "h": 64
+        },
+        "duration": 180
+      },
+      {
+        "filename": "7",
+        "frame": {
+          "x": 448,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "rotated": false,
+        "trimmed": false,
+        "spriteSourceSize": {
+          "x": 0,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "sourceSize": {
+          "w": 64,
+          "h": 64
+        },
+        "duration": 280
+      }
+    ],
+    "meta": {
+      "image": "slime.png",
+      "size": {
+        "w": 512,
+        "h": 64
+      },
+      "frame_size": {
+        "w": 64,
+        "h": 64
+      },
+      "frame_count": 8,
+      "alpha": "binary",
+      "role": "slime",
+      "action": "drink-strawberry-soda",
+      "color": "blue",
+      "option": null,
+      "source": "props/drink/strawberry-soda/blue/slime-blue-drink-strawberry-soda.aseprite",
+      "source_sha256": "1bd3c569d1a9064a75d490d9015729999710d22bdf4818d03db1b20f3f66852a",
+      "transforms": [
+        {
+          "source_idle_frame": 0,
+          "dx": 0,
+          "dy": 0
+        },
+        {
+          "source_idle_frame": 1,
+          "dx": 0,
+          "dy": 0
+        },
+        {
+          "source_idle_frame": 2,
+          "dx": 0,
+          "dy": 0
+        },
+        {
+          "source_idle_frame": 3,
+          "dx": 0,
+          "dy": 0
+        },
+        {
+          "source_idle_frame": 4,
+          "dx": 0,
+          "dy": 0
+        },
+        {
+          "source_idle_frame": 5,
+          "dx": 0,
+          "dy": 0
+        },
+        {
+          "source_idle_frame": 6,
+          "dx": 0,
+          "dy": 0
+        },
+        {
+          "source_idle_frame": 7,
+          "dx": 0,
+          "dy": 0
+        }
+      ]
+    }
+  }
+}, sheet: require("../assets/slimes/base/blue/drink-strawberry-soda/sheet.png") },
+  "base/blue/drink-melon-soda": { ...{
+  "key": "base/blue/drink-melon-soda",
+  "evolution": "base",
+  "color": "blue",
+  "action": "drink-melon-soda",
+  "imageScale": 4,
+  "metadata": {
+    "frames": [
+      {
+        "filename": "0",
+        "frame": {
+          "x": 0,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "rotated": false,
+        "trimmed": false,
+        "spriteSourceSize": {
+          "x": 0,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "sourceSize": {
+          "w": 64,
+          "h": 64
+        },
+        "duration": 220
+      },
+      {
+        "filename": "1",
+        "frame": {
+          "x": 64,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "rotated": false,
+        "trimmed": false,
+        "spriteSourceSize": {
+          "x": 0,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "sourceSize": {
+          "w": 64,
+          "h": 64
+        },
+        "duration": 160
+      },
+      {
+        "filename": "2",
+        "frame": {
+          "x": 128,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "rotated": false,
+        "trimmed": false,
+        "spriteSourceSize": {
+          "x": 0,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "sourceSize": {
+          "w": 64,
+          "h": 64
+        },
+        "duration": 180
+      },
+      {
+        "filename": "3",
+        "frame": {
+          "x": 192,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "rotated": false,
+        "trimmed": false,
+        "spriteSourceSize": {
+          "x": 0,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "sourceSize": {
+          "w": 64,
+          "h": 64
+        },
+        "duration": 140
+      },
+      {
+        "filename": "4",
+        "frame": {
+          "x": 256,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "rotated": false,
+        "trimmed": false,
+        "spriteSourceSize": {
+          "x": 0,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "sourceSize": {
+          "w": 64,
+          "h": 64
+        },
+        "duration": 140
+      },
+      {
+        "filename": "5",
+        "frame": {
+          "x": 320,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "rotated": false,
+        "trimmed": false,
+        "spriteSourceSize": {
+          "x": 0,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "sourceSize": {
+          "w": 64,
+          "h": 64
+        },
+        "duration": 160
+      },
+      {
+        "filename": "6",
+        "frame": {
+          "x": 384,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "rotated": false,
+        "trimmed": false,
+        "spriteSourceSize": {
+          "x": 0,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "sourceSize": {
+          "w": 64,
+          "h": 64
+        },
+        "duration": 180
+      },
+      {
+        "filename": "7",
+        "frame": {
+          "x": 448,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "rotated": false,
+        "trimmed": false,
+        "spriteSourceSize": {
+          "x": 0,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "sourceSize": {
+          "w": 64,
+          "h": 64
+        },
+        "duration": 280
+      }
+    ],
+    "meta": {
+      "image": "slime.png",
+      "size": {
+        "w": 512,
+        "h": 64
+      },
+      "frame_size": {
+        "w": 64,
+        "h": 64
+      },
+      "frame_count": 8,
+      "alpha": "binary",
+      "role": "slime",
+      "action": "drink-melon-soda",
+      "color": "blue",
+      "option": null,
+      "source": "props/drink/melon-soda/blue/slime-blue-drink-melon-soda.aseprite",
+      "source_sha256": "ccbfbd37a03b1c0801c71cd93c678686753b993e2abc462c4096f0ccc0cd7d7a",
+      "transforms": [
+        {
+          "source_idle_frame": 0,
+          "dx": 0,
+          "dy": 0
+        },
+        {
+          "source_idle_frame": 1,
+          "dx": 0,
+          "dy": 0
+        },
+        {
+          "source_idle_frame": 2,
+          "dx": 0,
+          "dy": 0
+        },
+        {
+          "source_idle_frame": 3,
+          "dx": 0,
+          "dy": 0
+        },
+        {
+          "source_idle_frame": 4,
+          "dx": 0,
+          "dy": 0
+        },
+        {
+          "source_idle_frame": 5,
+          "dx": 0,
+          "dy": 0
+        },
+        {
+          "source_idle_frame": 6,
+          "dx": 0,
+          "dy": 0
+        },
+        {
+          "source_idle_frame": 7,
+          "dx": 0,
+          "dy": 0
+        }
+      ]
+    }
+  }
+}, sheet: require("../assets/slimes/base/blue/drink-melon-soda/sheet.png") },
+  "base/blue/drink-grape-soda": { ...{
+  "key": "base/blue/drink-grape-soda",
+  "evolution": "base",
+  "color": "blue",
+  "action": "drink-grape-soda",
+  "imageScale": 4,
+  "metadata": {
+    "frames": [
+      {
+        "filename": "0",
+        "frame": {
+          "x": 0,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "rotated": false,
+        "trimmed": false,
+        "spriteSourceSize": {
+          "x": 0,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "sourceSize": {
+          "w": 64,
+          "h": 64
+        },
+        "duration": 220
+      },
+      {
+        "filename": "1",
+        "frame": {
+          "x": 64,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "rotated": false,
+        "trimmed": false,
+        "spriteSourceSize": {
+          "x": 0,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "sourceSize": {
+          "w": 64,
+          "h": 64
+        },
+        "duration": 160
+      },
+      {
+        "filename": "2",
+        "frame": {
+          "x": 128,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "rotated": false,
+        "trimmed": false,
+        "spriteSourceSize": {
+          "x": 0,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "sourceSize": {
+          "w": 64,
+          "h": 64
+        },
+        "duration": 180
+      },
+      {
+        "filename": "3",
+        "frame": {
+          "x": 192,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "rotated": false,
+        "trimmed": false,
+        "spriteSourceSize": {
+          "x": 0,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "sourceSize": {
+          "w": 64,
+          "h": 64
+        },
+        "duration": 140
+      },
+      {
+        "filename": "4",
+        "frame": {
+          "x": 256,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "rotated": false,
+        "trimmed": false,
+        "spriteSourceSize": {
+          "x": 0,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "sourceSize": {
+          "w": 64,
+          "h": 64
+        },
+        "duration": 140
+      },
+      {
+        "filename": "5",
+        "frame": {
+          "x": 320,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "rotated": false,
+        "trimmed": false,
+        "spriteSourceSize": {
+          "x": 0,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "sourceSize": {
+          "w": 64,
+          "h": 64
+        },
+        "duration": 160
+      },
+      {
+        "filename": "6",
+        "frame": {
+          "x": 384,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "rotated": false,
+        "trimmed": false,
+        "spriteSourceSize": {
+          "x": 0,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "sourceSize": {
+          "w": 64,
+          "h": 64
+        },
+        "duration": 180
+      },
+      {
+        "filename": "7",
+        "frame": {
+          "x": 448,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "rotated": false,
+        "trimmed": false,
+        "spriteSourceSize": {
+          "x": 0,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "sourceSize": {
+          "w": 64,
+          "h": 64
+        },
+        "duration": 280
+      }
+    ],
+    "meta": {
+      "image": "slime.png",
+      "size": {
+        "w": 512,
+        "h": 64
+      },
+      "frame_size": {
+        "w": 64,
+        "h": 64
+      },
+      "frame_count": 8,
+      "alpha": "binary",
+      "role": "slime",
+      "action": "drink-grape-soda",
+      "color": "blue",
+      "option": null,
+      "source": "props/drink/grape-soda/blue/slime-blue-drink-grape-soda.aseprite",
+      "source_sha256": "17d7a2ffd9b867d14686360caf66bacc7968b54921bfedd0d3588faf4d261da0",
+      "transforms": [
+        {
+          "source_idle_frame": 0,
+          "dx": 0,
+          "dy": 0
+        },
+        {
+          "source_idle_frame": 1,
+          "dx": 0,
+          "dy": 0
+        },
+        {
+          "source_idle_frame": 2,
+          "dx": 0,
+          "dy": 0
+        },
+        {
+          "source_idle_frame": 3,
+          "dx": 0,
+          "dy": 0
+        },
+        {
+          "source_idle_frame": 4,
+          "dx": 0,
+          "dy": 0
+        },
+        {
+          "source_idle_frame": 5,
+          "dx": 0,
+          "dy": 0
+        },
+        {
+          "source_idle_frame": 6,
+          "dx": 0,
+          "dy": 0
+        },
+        {
+          "source_idle_frame": 7,
+          "dx": 0,
+          "dy": 0
+        }
+      ]
+    }
+  }
+}, sheet: require("../assets/slimes/base/blue/drink-grape-soda/sheet.png") },
+  "base/blue/drink-blue-ramune": { ...{
+  "key": "base/blue/drink-blue-ramune",
+  "evolution": "base",
+  "color": "blue",
+  "action": "drink-blue-ramune",
+  "imageScale": 4,
+  "metadata": {
+    "frames": [
+      {
+        "filename": "0",
+        "frame": {
+          "x": 0,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "rotated": false,
+        "trimmed": false,
+        "spriteSourceSize": {
+          "x": 0,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "sourceSize": {
+          "w": 64,
+          "h": 64
+        },
+        "duration": 220
+      },
+      {
+        "filename": "1",
+        "frame": {
+          "x": 64,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "rotated": false,
+        "trimmed": false,
+        "spriteSourceSize": {
+          "x": 0,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "sourceSize": {
+          "w": 64,
+          "h": 64
+        },
+        "duration": 160
+      },
+      {
+        "filename": "2",
+        "frame": {
+          "x": 128,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "rotated": false,
+        "trimmed": false,
+        "spriteSourceSize": {
+          "x": 0,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "sourceSize": {
+          "w": 64,
+          "h": 64
+        },
+        "duration": 180
+      },
+      {
+        "filename": "3",
+        "frame": {
+          "x": 192,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "rotated": false,
+        "trimmed": false,
+        "spriteSourceSize": {
+          "x": 0,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "sourceSize": {
+          "w": 64,
+          "h": 64
+        },
+        "duration": 140
+      },
+      {
+        "filename": "4",
+        "frame": {
+          "x": 256,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "rotated": false,
+        "trimmed": false,
+        "spriteSourceSize": {
+          "x": 0,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "sourceSize": {
+          "w": 64,
+          "h": 64
+        },
+        "duration": 140
+      },
+      {
+        "filename": "5",
+        "frame": {
+          "x": 320,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "rotated": false,
+        "trimmed": false,
+        "spriteSourceSize": {
+          "x": 0,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "sourceSize": {
+          "w": 64,
+          "h": 64
+        },
+        "duration": 160
+      },
+      {
+        "filename": "6",
+        "frame": {
+          "x": 384,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "rotated": false,
+        "trimmed": false,
+        "spriteSourceSize": {
+          "x": 0,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "sourceSize": {
+          "w": 64,
+          "h": 64
+        },
+        "duration": 180
+      },
+      {
+        "filename": "7",
+        "frame": {
+          "x": 448,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "rotated": false,
+        "trimmed": false,
+        "spriteSourceSize": {
+          "x": 0,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "sourceSize": {
+          "w": 64,
+          "h": 64
+        },
+        "duration": 280
+      }
+    ],
+    "meta": {
+      "image": "slime.png",
+      "size": {
+        "w": 512,
+        "h": 64
+      },
+      "frame_size": {
+        "w": 64,
+        "h": 64
+      },
+      "frame_count": 8,
+      "alpha": "binary",
+      "role": "slime",
+      "action": "drink-blue-ramune",
+      "color": "blue",
+      "option": null,
+      "source": "props/drink/blue-ramune/blue/slime-blue-drink-blue-ramune.aseprite",
+      "source_sha256": "b77559cd78625d0e44fab5026d41d4f2e7443885fb19e49415b4217eefc55abb",
+      "transforms": [
+        {
+          "source_idle_frame": 0,
+          "dx": 0,
+          "dy": 0
+        },
+        {
+          "source_idle_frame": 1,
+          "dx": 0,
+          "dy": 0
+        },
+        {
+          "source_idle_frame": 2,
+          "dx": 0,
+          "dy": 0
+        },
+        {
+          "source_idle_frame": 3,
+          "dx": 0,
+          "dy": 0
+        },
+        {
+          "source_idle_frame": 4,
+          "dx": 0,
+          "dy": 0
+        },
+        {
+          "source_idle_frame": 5,
+          "dx": 0,
+          "dy": 0
+        },
+        {
+          "source_idle_frame": 6,
+          "dx": 0,
+          "dy": 0
+        },
+        {
+          "source_idle_frame": 7,
+          "dx": 0,
+          "dy": 0
+        }
+      ]
+    }
+  }
+}, sheet: require("../assets/slimes/base/blue/drink-blue-ramune/sheet.png") },
   "base/blue/water-puddle": { ...{
   "key": "base/blue/water-puddle",
   "evolution": "base",
@@ -2438,16 +3459,16 @@ export const SLIME_MOBILE_ASSET_REGISTRY = {
     }
   }
 }, sheet: require("../assets/slimes/base/green/happy/sheet.png") },
-  "base/green/drink": { ...{
-  "key": "base/green/drink",
+  "base/green/drink-lemonade": { ...{
+  "key": "base/green/drink-lemonade",
   "evolution": "base",
   "color": "green",
-  "action": "drink",
+  "action": "drink-lemonade",
   "imageScale": 4,
   "metadata": {
     "frames": [
       {
-        "filename": "slime-green-drink-lemonade 0.aseprite",
+        "filename": "0",
         "frame": {
           "x": 0,
           "y": 0,
@@ -2469,7 +3490,7 @@ export const SLIME_MOBILE_ASSET_REGISTRY = {
         "duration": 220
       },
       {
-        "filename": "slime-green-drink-lemonade 1.aseprite",
+        "filename": "1",
         "frame": {
           "x": 64,
           "y": 0,
@@ -2491,7 +3512,7 @@ export const SLIME_MOBILE_ASSET_REGISTRY = {
         "duration": 160
       },
       {
-        "filename": "slime-green-drink-lemonade 2.aseprite",
+        "filename": "2",
         "frame": {
           "x": 128,
           "y": 0,
@@ -2513,7 +3534,7 @@ export const SLIME_MOBILE_ASSET_REGISTRY = {
         "duration": 180
       },
       {
-        "filename": "slime-green-drink-lemonade 3.aseprite",
+        "filename": "3",
         "frame": {
           "x": 192,
           "y": 0,
@@ -2535,7 +3556,7 @@ export const SLIME_MOBILE_ASSET_REGISTRY = {
         "duration": 140
       },
       {
-        "filename": "slime-green-drink-lemonade 4.aseprite",
+        "filename": "4",
         "frame": {
           "x": 256,
           "y": 0,
@@ -2557,7 +3578,7 @@ export const SLIME_MOBILE_ASSET_REGISTRY = {
         "duration": 140
       },
       {
-        "filename": "slime-green-drink-lemonade 5.aseprite",
+        "filename": "5",
         "frame": {
           "x": 320,
           "y": 0,
@@ -2579,7 +3600,7 @@ export const SLIME_MOBILE_ASSET_REGISTRY = {
         "duration": 160
       },
       {
-        "filename": "slime-green-drink-lemonade 6.aseprite",
+        "filename": "6",
         "frame": {
           "x": 384,
           "y": 0,
@@ -2601,7 +3622,7 @@ export const SLIME_MOBILE_ASSET_REGISTRY = {
         "duration": 180
       },
       {
-        "filename": "slime-green-drink-lemonade 7.aseprite",
+        "filename": "7",
         "frame": {
           "x": 448,
           "y": 0,
@@ -2624,39 +3645,1060 @@ export const SLIME_MOBILE_ASSET_REGISTRY = {
       }
     ],
     "meta": {
-      "app": "https://www.aseprite.org/",
-      "version": "1.x-dev",
-      "image": "slime-green-drink-lemonade-sheet.png",
-      "format": "RGBA8888",
+      "image": "slime.png",
       "size": {
         "w": 512,
         "h": 64
       },
-      "scale": "1",
-      "frameTags": [
+      "frame_size": {
+        "w": 64,
+        "h": 64
+      },
+      "frame_count": 8,
+      "alpha": "binary",
+      "role": "slime",
+      "action": "drink-lemonade",
+      "color": "green",
+      "option": null,
+      "source": "props/drink/lemonade/green/slime-green-drink-lemonade.aseprite",
+      "source_sha256": "cdd2a97b76f915985a4ab42407c383936676ea40a91dae6ac3b0cc59998dab41",
+      "transforms": [
         {
-          "name": "drink_lemonade",
-          "from": 0,
-          "to": 7,
-          "direction": "forward",
-          "color": "#000000ff"
-        }
-      ],
-      "layers": [
-        {
-          "name": "slime",
-          "opacity": 255,
-          "blendMode": "normal"
+          "source_idle_frame": 0,
+          "dx": 0,
+          "dy": 0
         },
         {
-          "name": "lemonade_glass",
-          "opacity": 255,
-          "blendMode": "normal"
+          "source_idle_frame": 1,
+          "dx": 0,
+          "dy": 0
+        },
+        {
+          "source_idle_frame": 2,
+          "dx": 0,
+          "dy": 0
+        },
+        {
+          "source_idle_frame": 3,
+          "dx": 0,
+          "dy": 0
+        },
+        {
+          "source_idle_frame": 4,
+          "dx": 0,
+          "dy": 0
+        },
+        {
+          "source_idle_frame": 5,
+          "dx": 0,
+          "dy": 0
+        },
+        {
+          "source_idle_frame": 6,
+          "dx": 0,
+          "dy": 0
+        },
+        {
+          "source_idle_frame": 7,
+          "dx": 0,
+          "dy": 0
         }
       ]
     }
   }
-}, sheet: require("../assets/slimes/base/green/drink/sheet.png") },
+}, sheet: require("../assets/slimes/base/green/drink-lemonade/sheet.png") },
+  "base/green/drink-strawberry-soda": { ...{
+  "key": "base/green/drink-strawberry-soda",
+  "evolution": "base",
+  "color": "green",
+  "action": "drink-strawberry-soda",
+  "imageScale": 4,
+  "metadata": {
+    "frames": [
+      {
+        "filename": "0",
+        "frame": {
+          "x": 0,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "rotated": false,
+        "trimmed": false,
+        "spriteSourceSize": {
+          "x": 0,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "sourceSize": {
+          "w": 64,
+          "h": 64
+        },
+        "duration": 220
+      },
+      {
+        "filename": "1",
+        "frame": {
+          "x": 64,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "rotated": false,
+        "trimmed": false,
+        "spriteSourceSize": {
+          "x": 0,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "sourceSize": {
+          "w": 64,
+          "h": 64
+        },
+        "duration": 160
+      },
+      {
+        "filename": "2",
+        "frame": {
+          "x": 128,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "rotated": false,
+        "trimmed": false,
+        "spriteSourceSize": {
+          "x": 0,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "sourceSize": {
+          "w": 64,
+          "h": 64
+        },
+        "duration": 180
+      },
+      {
+        "filename": "3",
+        "frame": {
+          "x": 192,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "rotated": false,
+        "trimmed": false,
+        "spriteSourceSize": {
+          "x": 0,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "sourceSize": {
+          "w": 64,
+          "h": 64
+        },
+        "duration": 140
+      },
+      {
+        "filename": "4",
+        "frame": {
+          "x": 256,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "rotated": false,
+        "trimmed": false,
+        "spriteSourceSize": {
+          "x": 0,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "sourceSize": {
+          "w": 64,
+          "h": 64
+        },
+        "duration": 140
+      },
+      {
+        "filename": "5",
+        "frame": {
+          "x": 320,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "rotated": false,
+        "trimmed": false,
+        "spriteSourceSize": {
+          "x": 0,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "sourceSize": {
+          "w": 64,
+          "h": 64
+        },
+        "duration": 160
+      },
+      {
+        "filename": "6",
+        "frame": {
+          "x": 384,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "rotated": false,
+        "trimmed": false,
+        "spriteSourceSize": {
+          "x": 0,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "sourceSize": {
+          "w": 64,
+          "h": 64
+        },
+        "duration": 180
+      },
+      {
+        "filename": "7",
+        "frame": {
+          "x": 448,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "rotated": false,
+        "trimmed": false,
+        "spriteSourceSize": {
+          "x": 0,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "sourceSize": {
+          "w": 64,
+          "h": 64
+        },
+        "duration": 280
+      }
+    ],
+    "meta": {
+      "image": "slime.png",
+      "size": {
+        "w": 512,
+        "h": 64
+      },
+      "frame_size": {
+        "w": 64,
+        "h": 64
+      },
+      "frame_count": 8,
+      "alpha": "binary",
+      "role": "slime",
+      "action": "drink-strawberry-soda",
+      "color": "green",
+      "option": null,
+      "source": "props/drink/strawberry-soda/green/slime-green-drink-strawberry-soda.aseprite",
+      "source_sha256": "cfea2f28893e1a65663f42c36f20e1d46c1cb393ea4bfa59134cce185f094e52",
+      "transforms": [
+        {
+          "source_idle_frame": 0,
+          "dx": 0,
+          "dy": 0
+        },
+        {
+          "source_idle_frame": 1,
+          "dx": 0,
+          "dy": 0
+        },
+        {
+          "source_idle_frame": 2,
+          "dx": 0,
+          "dy": 0
+        },
+        {
+          "source_idle_frame": 3,
+          "dx": 0,
+          "dy": 0
+        },
+        {
+          "source_idle_frame": 4,
+          "dx": 0,
+          "dy": 0
+        },
+        {
+          "source_idle_frame": 5,
+          "dx": 0,
+          "dy": 0
+        },
+        {
+          "source_idle_frame": 6,
+          "dx": 0,
+          "dy": 0
+        },
+        {
+          "source_idle_frame": 7,
+          "dx": 0,
+          "dy": 0
+        }
+      ]
+    }
+  }
+}, sheet: require("../assets/slimes/base/green/drink-strawberry-soda/sheet.png") },
+  "base/green/drink-melon-soda": { ...{
+  "key": "base/green/drink-melon-soda",
+  "evolution": "base",
+  "color": "green",
+  "action": "drink-melon-soda",
+  "imageScale": 4,
+  "metadata": {
+    "frames": [
+      {
+        "filename": "0",
+        "frame": {
+          "x": 0,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "rotated": false,
+        "trimmed": false,
+        "spriteSourceSize": {
+          "x": 0,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "sourceSize": {
+          "w": 64,
+          "h": 64
+        },
+        "duration": 220
+      },
+      {
+        "filename": "1",
+        "frame": {
+          "x": 64,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "rotated": false,
+        "trimmed": false,
+        "spriteSourceSize": {
+          "x": 0,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "sourceSize": {
+          "w": 64,
+          "h": 64
+        },
+        "duration": 160
+      },
+      {
+        "filename": "2",
+        "frame": {
+          "x": 128,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "rotated": false,
+        "trimmed": false,
+        "spriteSourceSize": {
+          "x": 0,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "sourceSize": {
+          "w": 64,
+          "h": 64
+        },
+        "duration": 180
+      },
+      {
+        "filename": "3",
+        "frame": {
+          "x": 192,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "rotated": false,
+        "trimmed": false,
+        "spriteSourceSize": {
+          "x": 0,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "sourceSize": {
+          "w": 64,
+          "h": 64
+        },
+        "duration": 140
+      },
+      {
+        "filename": "4",
+        "frame": {
+          "x": 256,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "rotated": false,
+        "trimmed": false,
+        "spriteSourceSize": {
+          "x": 0,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "sourceSize": {
+          "w": 64,
+          "h": 64
+        },
+        "duration": 140
+      },
+      {
+        "filename": "5",
+        "frame": {
+          "x": 320,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "rotated": false,
+        "trimmed": false,
+        "spriteSourceSize": {
+          "x": 0,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "sourceSize": {
+          "w": 64,
+          "h": 64
+        },
+        "duration": 160
+      },
+      {
+        "filename": "6",
+        "frame": {
+          "x": 384,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "rotated": false,
+        "trimmed": false,
+        "spriteSourceSize": {
+          "x": 0,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "sourceSize": {
+          "w": 64,
+          "h": 64
+        },
+        "duration": 180
+      },
+      {
+        "filename": "7",
+        "frame": {
+          "x": 448,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "rotated": false,
+        "trimmed": false,
+        "spriteSourceSize": {
+          "x": 0,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "sourceSize": {
+          "w": 64,
+          "h": 64
+        },
+        "duration": 280
+      }
+    ],
+    "meta": {
+      "image": "slime.png",
+      "size": {
+        "w": 512,
+        "h": 64
+      },
+      "frame_size": {
+        "w": 64,
+        "h": 64
+      },
+      "frame_count": 8,
+      "alpha": "binary",
+      "role": "slime",
+      "action": "drink-melon-soda",
+      "color": "green",
+      "option": null,
+      "source": "props/drink/melon-soda/green/slime-green-drink-melon-soda.aseprite",
+      "source_sha256": "909518623cee1ab47b22077696ce577893e0a65873f650a2d4750628ef77d198",
+      "transforms": [
+        {
+          "source_idle_frame": 0,
+          "dx": 0,
+          "dy": 0
+        },
+        {
+          "source_idle_frame": 1,
+          "dx": 0,
+          "dy": 0
+        },
+        {
+          "source_idle_frame": 2,
+          "dx": 0,
+          "dy": 0
+        },
+        {
+          "source_idle_frame": 3,
+          "dx": 0,
+          "dy": 0
+        },
+        {
+          "source_idle_frame": 4,
+          "dx": 0,
+          "dy": 0
+        },
+        {
+          "source_idle_frame": 5,
+          "dx": 0,
+          "dy": 0
+        },
+        {
+          "source_idle_frame": 6,
+          "dx": 0,
+          "dy": 0
+        },
+        {
+          "source_idle_frame": 7,
+          "dx": 0,
+          "dy": 0
+        }
+      ]
+    }
+  }
+}, sheet: require("../assets/slimes/base/green/drink-melon-soda/sheet.png") },
+  "base/green/drink-grape-soda": { ...{
+  "key": "base/green/drink-grape-soda",
+  "evolution": "base",
+  "color": "green",
+  "action": "drink-grape-soda",
+  "imageScale": 4,
+  "metadata": {
+    "frames": [
+      {
+        "filename": "0",
+        "frame": {
+          "x": 0,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "rotated": false,
+        "trimmed": false,
+        "spriteSourceSize": {
+          "x": 0,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "sourceSize": {
+          "w": 64,
+          "h": 64
+        },
+        "duration": 220
+      },
+      {
+        "filename": "1",
+        "frame": {
+          "x": 64,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "rotated": false,
+        "trimmed": false,
+        "spriteSourceSize": {
+          "x": 0,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "sourceSize": {
+          "w": 64,
+          "h": 64
+        },
+        "duration": 160
+      },
+      {
+        "filename": "2",
+        "frame": {
+          "x": 128,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "rotated": false,
+        "trimmed": false,
+        "spriteSourceSize": {
+          "x": 0,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "sourceSize": {
+          "w": 64,
+          "h": 64
+        },
+        "duration": 180
+      },
+      {
+        "filename": "3",
+        "frame": {
+          "x": 192,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "rotated": false,
+        "trimmed": false,
+        "spriteSourceSize": {
+          "x": 0,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "sourceSize": {
+          "w": 64,
+          "h": 64
+        },
+        "duration": 140
+      },
+      {
+        "filename": "4",
+        "frame": {
+          "x": 256,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "rotated": false,
+        "trimmed": false,
+        "spriteSourceSize": {
+          "x": 0,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "sourceSize": {
+          "w": 64,
+          "h": 64
+        },
+        "duration": 140
+      },
+      {
+        "filename": "5",
+        "frame": {
+          "x": 320,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "rotated": false,
+        "trimmed": false,
+        "spriteSourceSize": {
+          "x": 0,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "sourceSize": {
+          "w": 64,
+          "h": 64
+        },
+        "duration": 160
+      },
+      {
+        "filename": "6",
+        "frame": {
+          "x": 384,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "rotated": false,
+        "trimmed": false,
+        "spriteSourceSize": {
+          "x": 0,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "sourceSize": {
+          "w": 64,
+          "h": 64
+        },
+        "duration": 180
+      },
+      {
+        "filename": "7",
+        "frame": {
+          "x": 448,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "rotated": false,
+        "trimmed": false,
+        "spriteSourceSize": {
+          "x": 0,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "sourceSize": {
+          "w": 64,
+          "h": 64
+        },
+        "duration": 280
+      }
+    ],
+    "meta": {
+      "image": "slime.png",
+      "size": {
+        "w": 512,
+        "h": 64
+      },
+      "frame_size": {
+        "w": 64,
+        "h": 64
+      },
+      "frame_count": 8,
+      "alpha": "binary",
+      "role": "slime",
+      "action": "drink-grape-soda",
+      "color": "green",
+      "option": null,
+      "source": "props/drink/grape-soda/green/slime-green-drink-grape-soda.aseprite",
+      "source_sha256": "f9b506a6ad6fcf90836f5d20f27f0fd7256febc220e44234f56cfd55a9b96d87",
+      "transforms": [
+        {
+          "source_idle_frame": 0,
+          "dx": 0,
+          "dy": 0
+        },
+        {
+          "source_idle_frame": 1,
+          "dx": 0,
+          "dy": 0
+        },
+        {
+          "source_idle_frame": 2,
+          "dx": 0,
+          "dy": 0
+        },
+        {
+          "source_idle_frame": 3,
+          "dx": 0,
+          "dy": 0
+        },
+        {
+          "source_idle_frame": 4,
+          "dx": 0,
+          "dy": 0
+        },
+        {
+          "source_idle_frame": 5,
+          "dx": 0,
+          "dy": 0
+        },
+        {
+          "source_idle_frame": 6,
+          "dx": 0,
+          "dy": 0
+        },
+        {
+          "source_idle_frame": 7,
+          "dx": 0,
+          "dy": 0
+        }
+      ]
+    }
+  }
+}, sheet: require("../assets/slimes/base/green/drink-grape-soda/sheet.png") },
+  "base/green/drink-blue-ramune": { ...{
+  "key": "base/green/drink-blue-ramune",
+  "evolution": "base",
+  "color": "green",
+  "action": "drink-blue-ramune",
+  "imageScale": 4,
+  "metadata": {
+    "frames": [
+      {
+        "filename": "0",
+        "frame": {
+          "x": 0,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "rotated": false,
+        "trimmed": false,
+        "spriteSourceSize": {
+          "x": 0,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "sourceSize": {
+          "w": 64,
+          "h": 64
+        },
+        "duration": 220
+      },
+      {
+        "filename": "1",
+        "frame": {
+          "x": 64,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "rotated": false,
+        "trimmed": false,
+        "spriteSourceSize": {
+          "x": 0,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "sourceSize": {
+          "w": 64,
+          "h": 64
+        },
+        "duration": 160
+      },
+      {
+        "filename": "2",
+        "frame": {
+          "x": 128,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "rotated": false,
+        "trimmed": false,
+        "spriteSourceSize": {
+          "x": 0,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "sourceSize": {
+          "w": 64,
+          "h": 64
+        },
+        "duration": 180
+      },
+      {
+        "filename": "3",
+        "frame": {
+          "x": 192,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "rotated": false,
+        "trimmed": false,
+        "spriteSourceSize": {
+          "x": 0,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "sourceSize": {
+          "w": 64,
+          "h": 64
+        },
+        "duration": 140
+      },
+      {
+        "filename": "4",
+        "frame": {
+          "x": 256,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "rotated": false,
+        "trimmed": false,
+        "spriteSourceSize": {
+          "x": 0,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "sourceSize": {
+          "w": 64,
+          "h": 64
+        },
+        "duration": 140
+      },
+      {
+        "filename": "5",
+        "frame": {
+          "x": 320,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "rotated": false,
+        "trimmed": false,
+        "spriteSourceSize": {
+          "x": 0,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "sourceSize": {
+          "w": 64,
+          "h": 64
+        },
+        "duration": 160
+      },
+      {
+        "filename": "6",
+        "frame": {
+          "x": 384,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "rotated": false,
+        "trimmed": false,
+        "spriteSourceSize": {
+          "x": 0,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "sourceSize": {
+          "w": 64,
+          "h": 64
+        },
+        "duration": 180
+      },
+      {
+        "filename": "7",
+        "frame": {
+          "x": 448,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "rotated": false,
+        "trimmed": false,
+        "spriteSourceSize": {
+          "x": 0,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "sourceSize": {
+          "w": 64,
+          "h": 64
+        },
+        "duration": 280
+      }
+    ],
+    "meta": {
+      "image": "slime.png",
+      "size": {
+        "w": 512,
+        "h": 64
+      },
+      "frame_size": {
+        "w": 64,
+        "h": 64
+      },
+      "frame_count": 8,
+      "alpha": "binary",
+      "role": "slime",
+      "action": "drink-blue-ramune",
+      "color": "green",
+      "option": null,
+      "source": "props/drink/blue-ramune/green/slime-green-drink-blue-ramune.aseprite",
+      "source_sha256": "364e730f8d7bdaf8a02e1fde13f9a762c884c4ae647499812f3830d8ad59fb37",
+      "transforms": [
+        {
+          "source_idle_frame": 0,
+          "dx": 0,
+          "dy": 0
+        },
+        {
+          "source_idle_frame": 1,
+          "dx": 0,
+          "dy": 0
+        },
+        {
+          "source_idle_frame": 2,
+          "dx": 0,
+          "dy": 0
+        },
+        {
+          "source_idle_frame": 3,
+          "dx": 0,
+          "dy": 0
+        },
+        {
+          "source_idle_frame": 4,
+          "dx": 0,
+          "dy": 0
+        },
+        {
+          "source_idle_frame": 5,
+          "dx": 0,
+          "dy": 0
+        },
+        {
+          "source_idle_frame": 6,
+          "dx": 0,
+          "dy": 0
+        },
+        {
+          "source_idle_frame": 7,
+          "dx": 0,
+          "dy": 0
+        }
+      ]
+    }
+  }
+}, sheet: require("../assets/slimes/base/green/drink-blue-ramune/sheet.png") },
   "base/green/water-puddle": { ...{
   "key": "base/green/water-puddle",
   "evolution": "base",
@@ -4375,16 +6417,16 @@ export const SLIME_MOBILE_ASSET_REGISTRY = {
     }
   }
 }, sheet: require("../assets/slimes/base/yellow/happy/sheet.png") },
-  "base/yellow/drink": { ...{
-  "key": "base/yellow/drink",
+  "base/yellow/drink-lemonade": { ...{
+  "key": "base/yellow/drink-lemonade",
   "evolution": "base",
   "color": "yellow",
-  "action": "drink",
+  "action": "drink-lemonade",
   "imageScale": 4,
   "metadata": {
     "frames": [
       {
-        "filename": "slime-yellow-drink-lemonade 0.aseprite",
+        "filename": "0",
         "frame": {
           "x": 0,
           "y": 0,
@@ -4406,7 +6448,7 @@ export const SLIME_MOBILE_ASSET_REGISTRY = {
         "duration": 220
       },
       {
-        "filename": "slime-yellow-drink-lemonade 1.aseprite",
+        "filename": "1",
         "frame": {
           "x": 64,
           "y": 0,
@@ -4428,7 +6470,7 @@ export const SLIME_MOBILE_ASSET_REGISTRY = {
         "duration": 160
       },
       {
-        "filename": "slime-yellow-drink-lemonade 2.aseprite",
+        "filename": "2",
         "frame": {
           "x": 128,
           "y": 0,
@@ -4450,7 +6492,7 @@ export const SLIME_MOBILE_ASSET_REGISTRY = {
         "duration": 180
       },
       {
-        "filename": "slime-yellow-drink-lemonade 3.aseprite",
+        "filename": "3",
         "frame": {
           "x": 192,
           "y": 0,
@@ -4472,7 +6514,7 @@ export const SLIME_MOBILE_ASSET_REGISTRY = {
         "duration": 140
       },
       {
-        "filename": "slime-yellow-drink-lemonade 4.aseprite",
+        "filename": "4",
         "frame": {
           "x": 256,
           "y": 0,
@@ -4494,7 +6536,7 @@ export const SLIME_MOBILE_ASSET_REGISTRY = {
         "duration": 140
       },
       {
-        "filename": "slime-yellow-drink-lemonade 5.aseprite",
+        "filename": "5",
         "frame": {
           "x": 320,
           "y": 0,
@@ -4516,7 +6558,7 @@ export const SLIME_MOBILE_ASSET_REGISTRY = {
         "duration": 160
       },
       {
-        "filename": "slime-yellow-drink-lemonade 6.aseprite",
+        "filename": "6",
         "frame": {
           "x": 384,
           "y": 0,
@@ -4538,7 +6580,7 @@ export const SLIME_MOBILE_ASSET_REGISTRY = {
         "duration": 180
       },
       {
-        "filename": "slime-yellow-drink-lemonade 7.aseprite",
+        "filename": "7",
         "frame": {
           "x": 448,
           "y": 0,
@@ -4561,39 +6603,1060 @@ export const SLIME_MOBILE_ASSET_REGISTRY = {
       }
     ],
     "meta": {
-      "app": "https://www.aseprite.org/",
-      "version": "1.x-dev",
-      "image": "slime-yellow-drink-lemonade-sheet.png",
-      "format": "RGBA8888",
+      "image": "slime.png",
       "size": {
         "w": 512,
         "h": 64
       },
-      "scale": "1",
-      "frameTags": [
+      "frame_size": {
+        "w": 64,
+        "h": 64
+      },
+      "frame_count": 8,
+      "alpha": "binary",
+      "role": "slime",
+      "action": "drink-lemonade",
+      "color": "yellow",
+      "option": null,
+      "source": "props/drink/lemonade/yellow/slime-yellow-drink-lemonade.aseprite",
+      "source_sha256": "eccae73242f6451f1bc5ba93f0b3b96ee5adf1aaf16939a4de7eb1ef22794423",
+      "transforms": [
         {
-          "name": "drink_lemonade",
-          "from": 0,
-          "to": 7,
-          "direction": "forward",
-          "color": "#000000ff"
-        }
-      ],
-      "layers": [
-        {
-          "name": "slime",
-          "opacity": 255,
-          "blendMode": "normal"
+          "source_idle_frame": 0,
+          "dx": 0,
+          "dy": 0
         },
         {
-          "name": "lemonade_glass",
-          "opacity": 255,
-          "blendMode": "normal"
+          "source_idle_frame": 1,
+          "dx": 0,
+          "dy": 0
+        },
+        {
+          "source_idle_frame": 2,
+          "dx": 0,
+          "dy": 0
+        },
+        {
+          "source_idle_frame": 3,
+          "dx": 0,
+          "dy": 0
+        },
+        {
+          "source_idle_frame": 4,
+          "dx": 0,
+          "dy": 0
+        },
+        {
+          "source_idle_frame": 5,
+          "dx": 0,
+          "dy": 0
+        },
+        {
+          "source_idle_frame": 6,
+          "dx": 0,
+          "dy": 0
+        },
+        {
+          "source_idle_frame": 7,
+          "dx": 0,
+          "dy": 0
         }
       ]
     }
   }
-}, sheet: require("../assets/slimes/base/yellow/drink/sheet.png") },
+}, sheet: require("../assets/slimes/base/yellow/drink-lemonade/sheet.png") },
+  "base/yellow/drink-strawberry-soda": { ...{
+  "key": "base/yellow/drink-strawberry-soda",
+  "evolution": "base",
+  "color": "yellow",
+  "action": "drink-strawberry-soda",
+  "imageScale": 4,
+  "metadata": {
+    "frames": [
+      {
+        "filename": "0",
+        "frame": {
+          "x": 0,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "rotated": false,
+        "trimmed": false,
+        "spriteSourceSize": {
+          "x": 0,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "sourceSize": {
+          "w": 64,
+          "h": 64
+        },
+        "duration": 220
+      },
+      {
+        "filename": "1",
+        "frame": {
+          "x": 64,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "rotated": false,
+        "trimmed": false,
+        "spriteSourceSize": {
+          "x": 0,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "sourceSize": {
+          "w": 64,
+          "h": 64
+        },
+        "duration": 160
+      },
+      {
+        "filename": "2",
+        "frame": {
+          "x": 128,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "rotated": false,
+        "trimmed": false,
+        "spriteSourceSize": {
+          "x": 0,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "sourceSize": {
+          "w": 64,
+          "h": 64
+        },
+        "duration": 180
+      },
+      {
+        "filename": "3",
+        "frame": {
+          "x": 192,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "rotated": false,
+        "trimmed": false,
+        "spriteSourceSize": {
+          "x": 0,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "sourceSize": {
+          "w": 64,
+          "h": 64
+        },
+        "duration": 140
+      },
+      {
+        "filename": "4",
+        "frame": {
+          "x": 256,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "rotated": false,
+        "trimmed": false,
+        "spriteSourceSize": {
+          "x": 0,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "sourceSize": {
+          "w": 64,
+          "h": 64
+        },
+        "duration": 140
+      },
+      {
+        "filename": "5",
+        "frame": {
+          "x": 320,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "rotated": false,
+        "trimmed": false,
+        "spriteSourceSize": {
+          "x": 0,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "sourceSize": {
+          "w": 64,
+          "h": 64
+        },
+        "duration": 160
+      },
+      {
+        "filename": "6",
+        "frame": {
+          "x": 384,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "rotated": false,
+        "trimmed": false,
+        "spriteSourceSize": {
+          "x": 0,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "sourceSize": {
+          "w": 64,
+          "h": 64
+        },
+        "duration": 180
+      },
+      {
+        "filename": "7",
+        "frame": {
+          "x": 448,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "rotated": false,
+        "trimmed": false,
+        "spriteSourceSize": {
+          "x": 0,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "sourceSize": {
+          "w": 64,
+          "h": 64
+        },
+        "duration": 280
+      }
+    ],
+    "meta": {
+      "image": "slime.png",
+      "size": {
+        "w": 512,
+        "h": 64
+      },
+      "frame_size": {
+        "w": 64,
+        "h": 64
+      },
+      "frame_count": 8,
+      "alpha": "binary",
+      "role": "slime",
+      "action": "drink-strawberry-soda",
+      "color": "yellow",
+      "option": null,
+      "source": "props/drink/strawberry-soda/yellow/slime-yellow-drink-strawberry-soda.aseprite",
+      "source_sha256": "c54c0a0f56dc8643049a9ce2f3078eb35aca0d1b779ca35cb1ce89c5031699bb",
+      "transforms": [
+        {
+          "source_idle_frame": 0,
+          "dx": 0,
+          "dy": 0
+        },
+        {
+          "source_idle_frame": 1,
+          "dx": 0,
+          "dy": 0
+        },
+        {
+          "source_idle_frame": 2,
+          "dx": 0,
+          "dy": 0
+        },
+        {
+          "source_idle_frame": 3,
+          "dx": 0,
+          "dy": 0
+        },
+        {
+          "source_idle_frame": 4,
+          "dx": 0,
+          "dy": 0
+        },
+        {
+          "source_idle_frame": 5,
+          "dx": 0,
+          "dy": 0
+        },
+        {
+          "source_idle_frame": 6,
+          "dx": 0,
+          "dy": 0
+        },
+        {
+          "source_idle_frame": 7,
+          "dx": 0,
+          "dy": 0
+        }
+      ]
+    }
+  }
+}, sheet: require("../assets/slimes/base/yellow/drink-strawberry-soda/sheet.png") },
+  "base/yellow/drink-melon-soda": { ...{
+  "key": "base/yellow/drink-melon-soda",
+  "evolution": "base",
+  "color": "yellow",
+  "action": "drink-melon-soda",
+  "imageScale": 4,
+  "metadata": {
+    "frames": [
+      {
+        "filename": "0",
+        "frame": {
+          "x": 0,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "rotated": false,
+        "trimmed": false,
+        "spriteSourceSize": {
+          "x": 0,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "sourceSize": {
+          "w": 64,
+          "h": 64
+        },
+        "duration": 220
+      },
+      {
+        "filename": "1",
+        "frame": {
+          "x": 64,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "rotated": false,
+        "trimmed": false,
+        "spriteSourceSize": {
+          "x": 0,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "sourceSize": {
+          "w": 64,
+          "h": 64
+        },
+        "duration": 160
+      },
+      {
+        "filename": "2",
+        "frame": {
+          "x": 128,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "rotated": false,
+        "trimmed": false,
+        "spriteSourceSize": {
+          "x": 0,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "sourceSize": {
+          "w": 64,
+          "h": 64
+        },
+        "duration": 180
+      },
+      {
+        "filename": "3",
+        "frame": {
+          "x": 192,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "rotated": false,
+        "trimmed": false,
+        "spriteSourceSize": {
+          "x": 0,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "sourceSize": {
+          "w": 64,
+          "h": 64
+        },
+        "duration": 140
+      },
+      {
+        "filename": "4",
+        "frame": {
+          "x": 256,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "rotated": false,
+        "trimmed": false,
+        "spriteSourceSize": {
+          "x": 0,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "sourceSize": {
+          "w": 64,
+          "h": 64
+        },
+        "duration": 140
+      },
+      {
+        "filename": "5",
+        "frame": {
+          "x": 320,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "rotated": false,
+        "trimmed": false,
+        "spriteSourceSize": {
+          "x": 0,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "sourceSize": {
+          "w": 64,
+          "h": 64
+        },
+        "duration": 160
+      },
+      {
+        "filename": "6",
+        "frame": {
+          "x": 384,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "rotated": false,
+        "trimmed": false,
+        "spriteSourceSize": {
+          "x": 0,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "sourceSize": {
+          "w": 64,
+          "h": 64
+        },
+        "duration": 180
+      },
+      {
+        "filename": "7",
+        "frame": {
+          "x": 448,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "rotated": false,
+        "trimmed": false,
+        "spriteSourceSize": {
+          "x": 0,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "sourceSize": {
+          "w": 64,
+          "h": 64
+        },
+        "duration": 280
+      }
+    ],
+    "meta": {
+      "image": "slime.png",
+      "size": {
+        "w": 512,
+        "h": 64
+      },
+      "frame_size": {
+        "w": 64,
+        "h": 64
+      },
+      "frame_count": 8,
+      "alpha": "binary",
+      "role": "slime",
+      "action": "drink-melon-soda",
+      "color": "yellow",
+      "option": null,
+      "source": "props/drink/melon-soda/yellow/slime-yellow-drink-melon-soda.aseprite",
+      "source_sha256": "3fcfe650977efdcbfb88a58ea1fb7c32864ae58982b18c2c260bc7085079e08b",
+      "transforms": [
+        {
+          "source_idle_frame": 0,
+          "dx": 0,
+          "dy": 0
+        },
+        {
+          "source_idle_frame": 1,
+          "dx": 0,
+          "dy": 0
+        },
+        {
+          "source_idle_frame": 2,
+          "dx": 0,
+          "dy": 0
+        },
+        {
+          "source_idle_frame": 3,
+          "dx": 0,
+          "dy": 0
+        },
+        {
+          "source_idle_frame": 4,
+          "dx": 0,
+          "dy": 0
+        },
+        {
+          "source_idle_frame": 5,
+          "dx": 0,
+          "dy": 0
+        },
+        {
+          "source_idle_frame": 6,
+          "dx": 0,
+          "dy": 0
+        },
+        {
+          "source_idle_frame": 7,
+          "dx": 0,
+          "dy": 0
+        }
+      ]
+    }
+  }
+}, sheet: require("../assets/slimes/base/yellow/drink-melon-soda/sheet.png") },
+  "base/yellow/drink-grape-soda": { ...{
+  "key": "base/yellow/drink-grape-soda",
+  "evolution": "base",
+  "color": "yellow",
+  "action": "drink-grape-soda",
+  "imageScale": 4,
+  "metadata": {
+    "frames": [
+      {
+        "filename": "0",
+        "frame": {
+          "x": 0,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "rotated": false,
+        "trimmed": false,
+        "spriteSourceSize": {
+          "x": 0,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "sourceSize": {
+          "w": 64,
+          "h": 64
+        },
+        "duration": 220
+      },
+      {
+        "filename": "1",
+        "frame": {
+          "x": 64,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "rotated": false,
+        "trimmed": false,
+        "spriteSourceSize": {
+          "x": 0,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "sourceSize": {
+          "w": 64,
+          "h": 64
+        },
+        "duration": 160
+      },
+      {
+        "filename": "2",
+        "frame": {
+          "x": 128,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "rotated": false,
+        "trimmed": false,
+        "spriteSourceSize": {
+          "x": 0,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "sourceSize": {
+          "w": 64,
+          "h": 64
+        },
+        "duration": 180
+      },
+      {
+        "filename": "3",
+        "frame": {
+          "x": 192,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "rotated": false,
+        "trimmed": false,
+        "spriteSourceSize": {
+          "x": 0,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "sourceSize": {
+          "w": 64,
+          "h": 64
+        },
+        "duration": 140
+      },
+      {
+        "filename": "4",
+        "frame": {
+          "x": 256,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "rotated": false,
+        "trimmed": false,
+        "spriteSourceSize": {
+          "x": 0,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "sourceSize": {
+          "w": 64,
+          "h": 64
+        },
+        "duration": 140
+      },
+      {
+        "filename": "5",
+        "frame": {
+          "x": 320,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "rotated": false,
+        "trimmed": false,
+        "spriteSourceSize": {
+          "x": 0,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "sourceSize": {
+          "w": 64,
+          "h": 64
+        },
+        "duration": 160
+      },
+      {
+        "filename": "6",
+        "frame": {
+          "x": 384,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "rotated": false,
+        "trimmed": false,
+        "spriteSourceSize": {
+          "x": 0,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "sourceSize": {
+          "w": 64,
+          "h": 64
+        },
+        "duration": 180
+      },
+      {
+        "filename": "7",
+        "frame": {
+          "x": 448,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "rotated": false,
+        "trimmed": false,
+        "spriteSourceSize": {
+          "x": 0,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "sourceSize": {
+          "w": 64,
+          "h": 64
+        },
+        "duration": 280
+      }
+    ],
+    "meta": {
+      "image": "slime.png",
+      "size": {
+        "w": 512,
+        "h": 64
+      },
+      "frame_size": {
+        "w": 64,
+        "h": 64
+      },
+      "frame_count": 8,
+      "alpha": "binary",
+      "role": "slime",
+      "action": "drink-grape-soda",
+      "color": "yellow",
+      "option": null,
+      "source": "props/drink/grape-soda/yellow/slime-yellow-drink-grape-soda.aseprite",
+      "source_sha256": "df2cf53e0723bba6f8c0c7da74655a8702afb2cc295555013566d26138032a42",
+      "transforms": [
+        {
+          "source_idle_frame": 0,
+          "dx": 0,
+          "dy": 0
+        },
+        {
+          "source_idle_frame": 1,
+          "dx": 0,
+          "dy": 0
+        },
+        {
+          "source_idle_frame": 2,
+          "dx": 0,
+          "dy": 0
+        },
+        {
+          "source_idle_frame": 3,
+          "dx": 0,
+          "dy": 0
+        },
+        {
+          "source_idle_frame": 4,
+          "dx": 0,
+          "dy": 0
+        },
+        {
+          "source_idle_frame": 5,
+          "dx": 0,
+          "dy": 0
+        },
+        {
+          "source_idle_frame": 6,
+          "dx": 0,
+          "dy": 0
+        },
+        {
+          "source_idle_frame": 7,
+          "dx": 0,
+          "dy": 0
+        }
+      ]
+    }
+  }
+}, sheet: require("../assets/slimes/base/yellow/drink-grape-soda/sheet.png") },
+  "base/yellow/drink-blue-ramune": { ...{
+  "key": "base/yellow/drink-blue-ramune",
+  "evolution": "base",
+  "color": "yellow",
+  "action": "drink-blue-ramune",
+  "imageScale": 4,
+  "metadata": {
+    "frames": [
+      {
+        "filename": "0",
+        "frame": {
+          "x": 0,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "rotated": false,
+        "trimmed": false,
+        "spriteSourceSize": {
+          "x": 0,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "sourceSize": {
+          "w": 64,
+          "h": 64
+        },
+        "duration": 220
+      },
+      {
+        "filename": "1",
+        "frame": {
+          "x": 64,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "rotated": false,
+        "trimmed": false,
+        "spriteSourceSize": {
+          "x": 0,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "sourceSize": {
+          "w": 64,
+          "h": 64
+        },
+        "duration": 160
+      },
+      {
+        "filename": "2",
+        "frame": {
+          "x": 128,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "rotated": false,
+        "trimmed": false,
+        "spriteSourceSize": {
+          "x": 0,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "sourceSize": {
+          "w": 64,
+          "h": 64
+        },
+        "duration": 180
+      },
+      {
+        "filename": "3",
+        "frame": {
+          "x": 192,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "rotated": false,
+        "trimmed": false,
+        "spriteSourceSize": {
+          "x": 0,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "sourceSize": {
+          "w": 64,
+          "h": 64
+        },
+        "duration": 140
+      },
+      {
+        "filename": "4",
+        "frame": {
+          "x": 256,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "rotated": false,
+        "trimmed": false,
+        "spriteSourceSize": {
+          "x": 0,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "sourceSize": {
+          "w": 64,
+          "h": 64
+        },
+        "duration": 140
+      },
+      {
+        "filename": "5",
+        "frame": {
+          "x": 320,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "rotated": false,
+        "trimmed": false,
+        "spriteSourceSize": {
+          "x": 0,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "sourceSize": {
+          "w": 64,
+          "h": 64
+        },
+        "duration": 160
+      },
+      {
+        "filename": "6",
+        "frame": {
+          "x": 384,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "rotated": false,
+        "trimmed": false,
+        "spriteSourceSize": {
+          "x": 0,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "sourceSize": {
+          "w": 64,
+          "h": 64
+        },
+        "duration": 180
+      },
+      {
+        "filename": "7",
+        "frame": {
+          "x": 448,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "rotated": false,
+        "trimmed": false,
+        "spriteSourceSize": {
+          "x": 0,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "sourceSize": {
+          "w": 64,
+          "h": 64
+        },
+        "duration": 280
+      }
+    ],
+    "meta": {
+      "image": "slime.png",
+      "size": {
+        "w": 512,
+        "h": 64
+      },
+      "frame_size": {
+        "w": 64,
+        "h": 64
+      },
+      "frame_count": 8,
+      "alpha": "binary",
+      "role": "slime",
+      "action": "drink-blue-ramune",
+      "color": "yellow",
+      "option": null,
+      "source": "props/drink/blue-ramune/yellow/slime-yellow-drink-blue-ramune.aseprite",
+      "source_sha256": "8e5a140758b09bf97000ddad4349976329a70a664692a763de500b5870214382",
+      "transforms": [
+        {
+          "source_idle_frame": 0,
+          "dx": 0,
+          "dy": 0
+        },
+        {
+          "source_idle_frame": 1,
+          "dx": 0,
+          "dy": 0
+        },
+        {
+          "source_idle_frame": 2,
+          "dx": 0,
+          "dy": 0
+        },
+        {
+          "source_idle_frame": 3,
+          "dx": 0,
+          "dy": 0
+        },
+        {
+          "source_idle_frame": 4,
+          "dx": 0,
+          "dy": 0
+        },
+        {
+          "source_idle_frame": 5,
+          "dx": 0,
+          "dy": 0
+        },
+        {
+          "source_idle_frame": 6,
+          "dx": 0,
+          "dy": 0
+        },
+        {
+          "source_idle_frame": 7,
+          "dx": 0,
+          "dy": 0
+        }
+      ]
+    }
+  }
+}, sheet: require("../assets/slimes/base/yellow/drink-blue-ramune/sheet.png") },
   "base/yellow/water-puddle": { ...{
   "key": "base/yellow/water-puddle",
   "evolution": "base",
@@ -6312,16 +9375,16 @@ export const SLIME_MOBILE_ASSET_REGISTRY = {
     }
   }
 }, sheet: require("../assets/slimes/base/purple/happy/sheet.png") },
-  "base/purple/drink": { ...{
-  "key": "base/purple/drink",
+  "base/purple/drink-lemonade": { ...{
+  "key": "base/purple/drink-lemonade",
   "evolution": "base",
   "color": "purple",
-  "action": "drink",
+  "action": "drink-lemonade",
   "imageScale": 4,
   "metadata": {
     "frames": [
       {
-        "filename": "slime-purple-drink-lemonade 0.aseprite",
+        "filename": "0",
         "frame": {
           "x": 0,
           "y": 0,
@@ -6343,7 +9406,7 @@ export const SLIME_MOBILE_ASSET_REGISTRY = {
         "duration": 220
       },
       {
-        "filename": "slime-purple-drink-lemonade 1.aseprite",
+        "filename": "1",
         "frame": {
           "x": 64,
           "y": 0,
@@ -6365,7 +9428,7 @@ export const SLIME_MOBILE_ASSET_REGISTRY = {
         "duration": 160
       },
       {
-        "filename": "slime-purple-drink-lemonade 2.aseprite",
+        "filename": "2",
         "frame": {
           "x": 128,
           "y": 0,
@@ -6387,7 +9450,7 @@ export const SLIME_MOBILE_ASSET_REGISTRY = {
         "duration": 180
       },
       {
-        "filename": "slime-purple-drink-lemonade 3.aseprite",
+        "filename": "3",
         "frame": {
           "x": 192,
           "y": 0,
@@ -6409,7 +9472,7 @@ export const SLIME_MOBILE_ASSET_REGISTRY = {
         "duration": 140
       },
       {
-        "filename": "slime-purple-drink-lemonade 4.aseprite",
+        "filename": "4",
         "frame": {
           "x": 256,
           "y": 0,
@@ -6431,7 +9494,7 @@ export const SLIME_MOBILE_ASSET_REGISTRY = {
         "duration": 140
       },
       {
-        "filename": "slime-purple-drink-lemonade 5.aseprite",
+        "filename": "5",
         "frame": {
           "x": 320,
           "y": 0,
@@ -6453,7 +9516,7 @@ export const SLIME_MOBILE_ASSET_REGISTRY = {
         "duration": 160
       },
       {
-        "filename": "slime-purple-drink-lemonade 6.aseprite",
+        "filename": "6",
         "frame": {
           "x": 384,
           "y": 0,
@@ -6475,7 +9538,7 @@ export const SLIME_MOBILE_ASSET_REGISTRY = {
         "duration": 180
       },
       {
-        "filename": "slime-purple-drink-lemonade 7.aseprite",
+        "filename": "7",
         "frame": {
           "x": 448,
           "y": 0,
@@ -6498,39 +9561,1060 @@ export const SLIME_MOBILE_ASSET_REGISTRY = {
       }
     ],
     "meta": {
-      "app": "https://www.aseprite.org/",
-      "version": "1.x-dev",
-      "image": "slime-purple-drink-lemonade-sheet.png",
-      "format": "RGBA8888",
+      "image": "slime.png",
       "size": {
         "w": 512,
         "h": 64
       },
-      "scale": "1",
-      "frameTags": [
+      "frame_size": {
+        "w": 64,
+        "h": 64
+      },
+      "frame_count": 8,
+      "alpha": "binary",
+      "role": "slime",
+      "action": "drink-lemonade",
+      "color": "purple",
+      "option": null,
+      "source": "props/drink/lemonade/purple/slime-purple-drink-lemonade.aseprite",
+      "source_sha256": "182fcec6dadb41bbc4ceaaae147ebe59c02d4cc8c25cc817a8a13c978ea24ca8",
+      "transforms": [
         {
-          "name": "drink_lemonade",
-          "from": 0,
-          "to": 7,
-          "direction": "forward",
-          "color": "#000000ff"
-        }
-      ],
-      "layers": [
-        {
-          "name": "slime",
-          "opacity": 255,
-          "blendMode": "normal"
+          "source_idle_frame": 0,
+          "dx": 0,
+          "dy": 0
         },
         {
-          "name": "lemonade_glass",
-          "opacity": 255,
-          "blendMode": "normal"
+          "source_idle_frame": 1,
+          "dx": 0,
+          "dy": 0
+        },
+        {
+          "source_idle_frame": 2,
+          "dx": 0,
+          "dy": 0
+        },
+        {
+          "source_idle_frame": 3,
+          "dx": 0,
+          "dy": 0
+        },
+        {
+          "source_idle_frame": 4,
+          "dx": 0,
+          "dy": 0
+        },
+        {
+          "source_idle_frame": 5,
+          "dx": 0,
+          "dy": 0
+        },
+        {
+          "source_idle_frame": 6,
+          "dx": 0,
+          "dy": 0
+        },
+        {
+          "source_idle_frame": 7,
+          "dx": 0,
+          "dy": 0
         }
       ]
     }
   }
-}, sheet: require("../assets/slimes/base/purple/drink/sheet.png") },
+}, sheet: require("../assets/slimes/base/purple/drink-lemonade/sheet.png") },
+  "base/purple/drink-strawberry-soda": { ...{
+  "key": "base/purple/drink-strawberry-soda",
+  "evolution": "base",
+  "color": "purple",
+  "action": "drink-strawberry-soda",
+  "imageScale": 4,
+  "metadata": {
+    "frames": [
+      {
+        "filename": "0",
+        "frame": {
+          "x": 0,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "rotated": false,
+        "trimmed": false,
+        "spriteSourceSize": {
+          "x": 0,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "sourceSize": {
+          "w": 64,
+          "h": 64
+        },
+        "duration": 220
+      },
+      {
+        "filename": "1",
+        "frame": {
+          "x": 64,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "rotated": false,
+        "trimmed": false,
+        "spriteSourceSize": {
+          "x": 0,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "sourceSize": {
+          "w": 64,
+          "h": 64
+        },
+        "duration": 160
+      },
+      {
+        "filename": "2",
+        "frame": {
+          "x": 128,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "rotated": false,
+        "trimmed": false,
+        "spriteSourceSize": {
+          "x": 0,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "sourceSize": {
+          "w": 64,
+          "h": 64
+        },
+        "duration": 180
+      },
+      {
+        "filename": "3",
+        "frame": {
+          "x": 192,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "rotated": false,
+        "trimmed": false,
+        "spriteSourceSize": {
+          "x": 0,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "sourceSize": {
+          "w": 64,
+          "h": 64
+        },
+        "duration": 140
+      },
+      {
+        "filename": "4",
+        "frame": {
+          "x": 256,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "rotated": false,
+        "trimmed": false,
+        "spriteSourceSize": {
+          "x": 0,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "sourceSize": {
+          "w": 64,
+          "h": 64
+        },
+        "duration": 140
+      },
+      {
+        "filename": "5",
+        "frame": {
+          "x": 320,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "rotated": false,
+        "trimmed": false,
+        "spriteSourceSize": {
+          "x": 0,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "sourceSize": {
+          "w": 64,
+          "h": 64
+        },
+        "duration": 160
+      },
+      {
+        "filename": "6",
+        "frame": {
+          "x": 384,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "rotated": false,
+        "trimmed": false,
+        "spriteSourceSize": {
+          "x": 0,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "sourceSize": {
+          "w": 64,
+          "h": 64
+        },
+        "duration": 180
+      },
+      {
+        "filename": "7",
+        "frame": {
+          "x": 448,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "rotated": false,
+        "trimmed": false,
+        "spriteSourceSize": {
+          "x": 0,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "sourceSize": {
+          "w": 64,
+          "h": 64
+        },
+        "duration": 280
+      }
+    ],
+    "meta": {
+      "image": "slime.png",
+      "size": {
+        "w": 512,
+        "h": 64
+      },
+      "frame_size": {
+        "w": 64,
+        "h": 64
+      },
+      "frame_count": 8,
+      "alpha": "binary",
+      "role": "slime",
+      "action": "drink-strawberry-soda",
+      "color": "purple",
+      "option": null,
+      "source": "props/drink/strawberry-soda/purple/slime-purple-drink-strawberry-soda.aseprite",
+      "source_sha256": "661acf4eab09a1f19a4eee7e7a42cb4213163533b9d3b112f05732f85e19137a",
+      "transforms": [
+        {
+          "source_idle_frame": 0,
+          "dx": 0,
+          "dy": 0
+        },
+        {
+          "source_idle_frame": 1,
+          "dx": 0,
+          "dy": 0
+        },
+        {
+          "source_idle_frame": 2,
+          "dx": 0,
+          "dy": 0
+        },
+        {
+          "source_idle_frame": 3,
+          "dx": 0,
+          "dy": 0
+        },
+        {
+          "source_idle_frame": 4,
+          "dx": 0,
+          "dy": 0
+        },
+        {
+          "source_idle_frame": 5,
+          "dx": 0,
+          "dy": 0
+        },
+        {
+          "source_idle_frame": 6,
+          "dx": 0,
+          "dy": 0
+        },
+        {
+          "source_idle_frame": 7,
+          "dx": 0,
+          "dy": 0
+        }
+      ]
+    }
+  }
+}, sheet: require("../assets/slimes/base/purple/drink-strawberry-soda/sheet.png") },
+  "base/purple/drink-melon-soda": { ...{
+  "key": "base/purple/drink-melon-soda",
+  "evolution": "base",
+  "color": "purple",
+  "action": "drink-melon-soda",
+  "imageScale": 4,
+  "metadata": {
+    "frames": [
+      {
+        "filename": "0",
+        "frame": {
+          "x": 0,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "rotated": false,
+        "trimmed": false,
+        "spriteSourceSize": {
+          "x": 0,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "sourceSize": {
+          "w": 64,
+          "h": 64
+        },
+        "duration": 220
+      },
+      {
+        "filename": "1",
+        "frame": {
+          "x": 64,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "rotated": false,
+        "trimmed": false,
+        "spriteSourceSize": {
+          "x": 0,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "sourceSize": {
+          "w": 64,
+          "h": 64
+        },
+        "duration": 160
+      },
+      {
+        "filename": "2",
+        "frame": {
+          "x": 128,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "rotated": false,
+        "trimmed": false,
+        "spriteSourceSize": {
+          "x": 0,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "sourceSize": {
+          "w": 64,
+          "h": 64
+        },
+        "duration": 180
+      },
+      {
+        "filename": "3",
+        "frame": {
+          "x": 192,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "rotated": false,
+        "trimmed": false,
+        "spriteSourceSize": {
+          "x": 0,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "sourceSize": {
+          "w": 64,
+          "h": 64
+        },
+        "duration": 140
+      },
+      {
+        "filename": "4",
+        "frame": {
+          "x": 256,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "rotated": false,
+        "trimmed": false,
+        "spriteSourceSize": {
+          "x": 0,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "sourceSize": {
+          "w": 64,
+          "h": 64
+        },
+        "duration": 140
+      },
+      {
+        "filename": "5",
+        "frame": {
+          "x": 320,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "rotated": false,
+        "trimmed": false,
+        "spriteSourceSize": {
+          "x": 0,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "sourceSize": {
+          "w": 64,
+          "h": 64
+        },
+        "duration": 160
+      },
+      {
+        "filename": "6",
+        "frame": {
+          "x": 384,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "rotated": false,
+        "trimmed": false,
+        "spriteSourceSize": {
+          "x": 0,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "sourceSize": {
+          "w": 64,
+          "h": 64
+        },
+        "duration": 180
+      },
+      {
+        "filename": "7",
+        "frame": {
+          "x": 448,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "rotated": false,
+        "trimmed": false,
+        "spriteSourceSize": {
+          "x": 0,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "sourceSize": {
+          "w": 64,
+          "h": 64
+        },
+        "duration": 280
+      }
+    ],
+    "meta": {
+      "image": "slime.png",
+      "size": {
+        "w": 512,
+        "h": 64
+      },
+      "frame_size": {
+        "w": 64,
+        "h": 64
+      },
+      "frame_count": 8,
+      "alpha": "binary",
+      "role": "slime",
+      "action": "drink-melon-soda",
+      "color": "purple",
+      "option": null,
+      "source": "props/drink/melon-soda/purple/slime-purple-drink-melon-soda.aseprite",
+      "source_sha256": "fca001e0fbe554a6a969f1efe372bff69db78321ae71d762431b500948309dbe",
+      "transforms": [
+        {
+          "source_idle_frame": 0,
+          "dx": 0,
+          "dy": 0
+        },
+        {
+          "source_idle_frame": 1,
+          "dx": 0,
+          "dy": 0
+        },
+        {
+          "source_idle_frame": 2,
+          "dx": 0,
+          "dy": 0
+        },
+        {
+          "source_idle_frame": 3,
+          "dx": 0,
+          "dy": 0
+        },
+        {
+          "source_idle_frame": 4,
+          "dx": 0,
+          "dy": 0
+        },
+        {
+          "source_idle_frame": 5,
+          "dx": 0,
+          "dy": 0
+        },
+        {
+          "source_idle_frame": 6,
+          "dx": 0,
+          "dy": 0
+        },
+        {
+          "source_idle_frame": 7,
+          "dx": 0,
+          "dy": 0
+        }
+      ]
+    }
+  }
+}, sheet: require("../assets/slimes/base/purple/drink-melon-soda/sheet.png") },
+  "base/purple/drink-grape-soda": { ...{
+  "key": "base/purple/drink-grape-soda",
+  "evolution": "base",
+  "color": "purple",
+  "action": "drink-grape-soda",
+  "imageScale": 4,
+  "metadata": {
+    "frames": [
+      {
+        "filename": "0",
+        "frame": {
+          "x": 0,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "rotated": false,
+        "trimmed": false,
+        "spriteSourceSize": {
+          "x": 0,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "sourceSize": {
+          "w": 64,
+          "h": 64
+        },
+        "duration": 220
+      },
+      {
+        "filename": "1",
+        "frame": {
+          "x": 64,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "rotated": false,
+        "trimmed": false,
+        "spriteSourceSize": {
+          "x": 0,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "sourceSize": {
+          "w": 64,
+          "h": 64
+        },
+        "duration": 160
+      },
+      {
+        "filename": "2",
+        "frame": {
+          "x": 128,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "rotated": false,
+        "trimmed": false,
+        "spriteSourceSize": {
+          "x": 0,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "sourceSize": {
+          "w": 64,
+          "h": 64
+        },
+        "duration": 180
+      },
+      {
+        "filename": "3",
+        "frame": {
+          "x": 192,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "rotated": false,
+        "trimmed": false,
+        "spriteSourceSize": {
+          "x": 0,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "sourceSize": {
+          "w": 64,
+          "h": 64
+        },
+        "duration": 140
+      },
+      {
+        "filename": "4",
+        "frame": {
+          "x": 256,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "rotated": false,
+        "trimmed": false,
+        "spriteSourceSize": {
+          "x": 0,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "sourceSize": {
+          "w": 64,
+          "h": 64
+        },
+        "duration": 140
+      },
+      {
+        "filename": "5",
+        "frame": {
+          "x": 320,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "rotated": false,
+        "trimmed": false,
+        "spriteSourceSize": {
+          "x": 0,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "sourceSize": {
+          "w": 64,
+          "h": 64
+        },
+        "duration": 160
+      },
+      {
+        "filename": "6",
+        "frame": {
+          "x": 384,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "rotated": false,
+        "trimmed": false,
+        "spriteSourceSize": {
+          "x": 0,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "sourceSize": {
+          "w": 64,
+          "h": 64
+        },
+        "duration": 180
+      },
+      {
+        "filename": "7",
+        "frame": {
+          "x": 448,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "rotated": false,
+        "trimmed": false,
+        "spriteSourceSize": {
+          "x": 0,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "sourceSize": {
+          "w": 64,
+          "h": 64
+        },
+        "duration": 280
+      }
+    ],
+    "meta": {
+      "image": "slime.png",
+      "size": {
+        "w": 512,
+        "h": 64
+      },
+      "frame_size": {
+        "w": 64,
+        "h": 64
+      },
+      "frame_count": 8,
+      "alpha": "binary",
+      "role": "slime",
+      "action": "drink-grape-soda",
+      "color": "purple",
+      "option": null,
+      "source": "props/drink/grape-soda/purple/slime-purple-drink-grape-soda.aseprite",
+      "source_sha256": "23bce34a8bfc9b02dd23be7fbafb4246702eacfa3b58d5e04f483403d0fb5526",
+      "transforms": [
+        {
+          "source_idle_frame": 0,
+          "dx": 0,
+          "dy": 0
+        },
+        {
+          "source_idle_frame": 1,
+          "dx": 0,
+          "dy": 0
+        },
+        {
+          "source_idle_frame": 2,
+          "dx": 0,
+          "dy": 0
+        },
+        {
+          "source_idle_frame": 3,
+          "dx": 0,
+          "dy": 0
+        },
+        {
+          "source_idle_frame": 4,
+          "dx": 0,
+          "dy": 0
+        },
+        {
+          "source_idle_frame": 5,
+          "dx": 0,
+          "dy": 0
+        },
+        {
+          "source_idle_frame": 6,
+          "dx": 0,
+          "dy": 0
+        },
+        {
+          "source_idle_frame": 7,
+          "dx": 0,
+          "dy": 0
+        }
+      ]
+    }
+  }
+}, sheet: require("../assets/slimes/base/purple/drink-grape-soda/sheet.png") },
+  "base/purple/drink-blue-ramune": { ...{
+  "key": "base/purple/drink-blue-ramune",
+  "evolution": "base",
+  "color": "purple",
+  "action": "drink-blue-ramune",
+  "imageScale": 4,
+  "metadata": {
+    "frames": [
+      {
+        "filename": "0",
+        "frame": {
+          "x": 0,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "rotated": false,
+        "trimmed": false,
+        "spriteSourceSize": {
+          "x": 0,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "sourceSize": {
+          "w": 64,
+          "h": 64
+        },
+        "duration": 220
+      },
+      {
+        "filename": "1",
+        "frame": {
+          "x": 64,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "rotated": false,
+        "trimmed": false,
+        "spriteSourceSize": {
+          "x": 0,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "sourceSize": {
+          "w": 64,
+          "h": 64
+        },
+        "duration": 160
+      },
+      {
+        "filename": "2",
+        "frame": {
+          "x": 128,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "rotated": false,
+        "trimmed": false,
+        "spriteSourceSize": {
+          "x": 0,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "sourceSize": {
+          "w": 64,
+          "h": 64
+        },
+        "duration": 180
+      },
+      {
+        "filename": "3",
+        "frame": {
+          "x": 192,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "rotated": false,
+        "trimmed": false,
+        "spriteSourceSize": {
+          "x": 0,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "sourceSize": {
+          "w": 64,
+          "h": 64
+        },
+        "duration": 140
+      },
+      {
+        "filename": "4",
+        "frame": {
+          "x": 256,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "rotated": false,
+        "trimmed": false,
+        "spriteSourceSize": {
+          "x": 0,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "sourceSize": {
+          "w": 64,
+          "h": 64
+        },
+        "duration": 140
+      },
+      {
+        "filename": "5",
+        "frame": {
+          "x": 320,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "rotated": false,
+        "trimmed": false,
+        "spriteSourceSize": {
+          "x": 0,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "sourceSize": {
+          "w": 64,
+          "h": 64
+        },
+        "duration": 160
+      },
+      {
+        "filename": "6",
+        "frame": {
+          "x": 384,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "rotated": false,
+        "trimmed": false,
+        "spriteSourceSize": {
+          "x": 0,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "sourceSize": {
+          "w": 64,
+          "h": 64
+        },
+        "duration": 180
+      },
+      {
+        "filename": "7",
+        "frame": {
+          "x": 448,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "rotated": false,
+        "trimmed": false,
+        "spriteSourceSize": {
+          "x": 0,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "sourceSize": {
+          "w": 64,
+          "h": 64
+        },
+        "duration": 280
+      }
+    ],
+    "meta": {
+      "image": "slime.png",
+      "size": {
+        "w": 512,
+        "h": 64
+      },
+      "frame_size": {
+        "w": 64,
+        "h": 64
+      },
+      "frame_count": 8,
+      "alpha": "binary",
+      "role": "slime",
+      "action": "drink-blue-ramune",
+      "color": "purple",
+      "option": null,
+      "source": "props/drink/blue-ramune/purple/slime-purple-drink-blue-ramune.aseprite",
+      "source_sha256": "bb052f14aae28c8d3864546b4d2bc6a55f67eb26a519431a20f05baba28f0c91",
+      "transforms": [
+        {
+          "source_idle_frame": 0,
+          "dx": 0,
+          "dy": 0
+        },
+        {
+          "source_idle_frame": 1,
+          "dx": 0,
+          "dy": 0
+        },
+        {
+          "source_idle_frame": 2,
+          "dx": 0,
+          "dy": 0
+        },
+        {
+          "source_idle_frame": 3,
+          "dx": 0,
+          "dy": 0
+        },
+        {
+          "source_idle_frame": 4,
+          "dx": 0,
+          "dy": 0
+        },
+        {
+          "source_idle_frame": 5,
+          "dx": 0,
+          "dy": 0
+        },
+        {
+          "source_idle_frame": 6,
+          "dx": 0,
+          "dy": 0
+        },
+        {
+          "source_idle_frame": 7,
+          "dx": 0,
+          "dy": 0
+        }
+      ]
+    }
+  }
+}, sheet: require("../assets/slimes/base/purple/drink-blue-ramune/sheet.png") },
   "base/purple/water-puddle": { ...{
   "key": "base/purple/water-puddle",
   "evolution": "base",
@@ -8249,16 +12333,16 @@ export const SLIME_MOBILE_ASSET_REGISTRY = {
     }
   }
 }, sheet: require("../assets/slimes/base/red/happy/sheet.png") },
-  "base/red/drink": { ...{
-  "key": "base/red/drink",
+  "base/red/drink-lemonade": { ...{
+  "key": "base/red/drink-lemonade",
   "evolution": "base",
   "color": "red",
-  "action": "drink",
+  "action": "drink-lemonade",
   "imageScale": 4,
   "metadata": {
     "frames": [
       {
-        "filename": "slime-red-drink-lemonade 0.aseprite",
+        "filename": "0",
         "frame": {
           "x": 0,
           "y": 0,
@@ -8280,7 +12364,7 @@ export const SLIME_MOBILE_ASSET_REGISTRY = {
         "duration": 220
       },
       {
-        "filename": "slime-red-drink-lemonade 1.aseprite",
+        "filename": "1",
         "frame": {
           "x": 64,
           "y": 0,
@@ -8302,7 +12386,7 @@ export const SLIME_MOBILE_ASSET_REGISTRY = {
         "duration": 160
       },
       {
-        "filename": "slime-red-drink-lemonade 2.aseprite",
+        "filename": "2",
         "frame": {
           "x": 128,
           "y": 0,
@@ -8324,7 +12408,7 @@ export const SLIME_MOBILE_ASSET_REGISTRY = {
         "duration": 180
       },
       {
-        "filename": "slime-red-drink-lemonade 3.aseprite",
+        "filename": "3",
         "frame": {
           "x": 192,
           "y": 0,
@@ -8346,7 +12430,7 @@ export const SLIME_MOBILE_ASSET_REGISTRY = {
         "duration": 140
       },
       {
-        "filename": "slime-red-drink-lemonade 4.aseprite",
+        "filename": "4",
         "frame": {
           "x": 256,
           "y": 0,
@@ -8368,7 +12452,7 @@ export const SLIME_MOBILE_ASSET_REGISTRY = {
         "duration": 140
       },
       {
-        "filename": "slime-red-drink-lemonade 5.aseprite",
+        "filename": "5",
         "frame": {
           "x": 320,
           "y": 0,
@@ -8390,7 +12474,7 @@ export const SLIME_MOBILE_ASSET_REGISTRY = {
         "duration": 160
       },
       {
-        "filename": "slime-red-drink-lemonade 6.aseprite",
+        "filename": "6",
         "frame": {
           "x": 384,
           "y": 0,
@@ -8412,7 +12496,7 @@ export const SLIME_MOBILE_ASSET_REGISTRY = {
         "duration": 180
       },
       {
-        "filename": "slime-red-drink-lemonade 7.aseprite",
+        "filename": "7",
         "frame": {
           "x": 448,
           "y": 0,
@@ -8435,39 +12519,1060 @@ export const SLIME_MOBILE_ASSET_REGISTRY = {
       }
     ],
     "meta": {
-      "app": "https://www.aseprite.org/",
-      "version": "1.x-dev",
-      "image": "slime-red-drink-lemonade-sheet.png",
-      "format": "RGBA8888",
+      "image": "slime.png",
       "size": {
         "w": 512,
         "h": 64
       },
-      "scale": "1",
-      "frameTags": [
+      "frame_size": {
+        "w": 64,
+        "h": 64
+      },
+      "frame_count": 8,
+      "alpha": "binary",
+      "role": "slime",
+      "action": "drink-lemonade",
+      "color": "red",
+      "option": null,
+      "source": "props/drink/lemonade/red/slime-red-drink-lemonade.aseprite",
+      "source_sha256": "800307442e655c8e56cb0af8778b0d8e92002710182f84a67893c6241e3152ff",
+      "transforms": [
         {
-          "name": "drink_lemonade",
-          "from": 0,
-          "to": 7,
-          "direction": "forward",
-          "color": "#000000ff"
-        }
-      ],
-      "layers": [
-        {
-          "name": "slime",
-          "opacity": 255,
-          "blendMode": "normal"
+          "source_idle_frame": 0,
+          "dx": 0,
+          "dy": 0
         },
         {
-          "name": "lemonade_glass",
-          "opacity": 255,
-          "blendMode": "normal"
+          "source_idle_frame": 1,
+          "dx": 0,
+          "dy": 0
+        },
+        {
+          "source_idle_frame": 2,
+          "dx": 0,
+          "dy": 0
+        },
+        {
+          "source_idle_frame": 3,
+          "dx": 0,
+          "dy": 0
+        },
+        {
+          "source_idle_frame": 4,
+          "dx": 0,
+          "dy": 0
+        },
+        {
+          "source_idle_frame": 5,
+          "dx": 0,
+          "dy": 0
+        },
+        {
+          "source_idle_frame": 6,
+          "dx": 0,
+          "dy": 0
+        },
+        {
+          "source_idle_frame": 7,
+          "dx": 0,
+          "dy": 0
         }
       ]
     }
   }
-}, sheet: require("../assets/slimes/base/red/drink/sheet.png") },
+}, sheet: require("../assets/slimes/base/red/drink-lemonade/sheet.png") },
+  "base/red/drink-strawberry-soda": { ...{
+  "key": "base/red/drink-strawberry-soda",
+  "evolution": "base",
+  "color": "red",
+  "action": "drink-strawberry-soda",
+  "imageScale": 4,
+  "metadata": {
+    "frames": [
+      {
+        "filename": "0",
+        "frame": {
+          "x": 0,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "rotated": false,
+        "trimmed": false,
+        "spriteSourceSize": {
+          "x": 0,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "sourceSize": {
+          "w": 64,
+          "h": 64
+        },
+        "duration": 220
+      },
+      {
+        "filename": "1",
+        "frame": {
+          "x": 64,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "rotated": false,
+        "trimmed": false,
+        "spriteSourceSize": {
+          "x": 0,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "sourceSize": {
+          "w": 64,
+          "h": 64
+        },
+        "duration": 160
+      },
+      {
+        "filename": "2",
+        "frame": {
+          "x": 128,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "rotated": false,
+        "trimmed": false,
+        "spriteSourceSize": {
+          "x": 0,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "sourceSize": {
+          "w": 64,
+          "h": 64
+        },
+        "duration": 180
+      },
+      {
+        "filename": "3",
+        "frame": {
+          "x": 192,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "rotated": false,
+        "trimmed": false,
+        "spriteSourceSize": {
+          "x": 0,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "sourceSize": {
+          "w": 64,
+          "h": 64
+        },
+        "duration": 140
+      },
+      {
+        "filename": "4",
+        "frame": {
+          "x": 256,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "rotated": false,
+        "trimmed": false,
+        "spriteSourceSize": {
+          "x": 0,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "sourceSize": {
+          "w": 64,
+          "h": 64
+        },
+        "duration": 140
+      },
+      {
+        "filename": "5",
+        "frame": {
+          "x": 320,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "rotated": false,
+        "trimmed": false,
+        "spriteSourceSize": {
+          "x": 0,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "sourceSize": {
+          "w": 64,
+          "h": 64
+        },
+        "duration": 160
+      },
+      {
+        "filename": "6",
+        "frame": {
+          "x": 384,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "rotated": false,
+        "trimmed": false,
+        "spriteSourceSize": {
+          "x": 0,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "sourceSize": {
+          "w": 64,
+          "h": 64
+        },
+        "duration": 180
+      },
+      {
+        "filename": "7",
+        "frame": {
+          "x": 448,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "rotated": false,
+        "trimmed": false,
+        "spriteSourceSize": {
+          "x": 0,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "sourceSize": {
+          "w": 64,
+          "h": 64
+        },
+        "duration": 280
+      }
+    ],
+    "meta": {
+      "image": "slime.png",
+      "size": {
+        "w": 512,
+        "h": 64
+      },
+      "frame_size": {
+        "w": 64,
+        "h": 64
+      },
+      "frame_count": 8,
+      "alpha": "binary",
+      "role": "slime",
+      "action": "drink-strawberry-soda",
+      "color": "red",
+      "option": null,
+      "source": "props/drink/strawberry-soda/red/slime-red-drink-strawberry-soda.aseprite",
+      "source_sha256": "51d01ce7d8883e84a9c5ce79693ceed682b169241bb0f3cddea8881e41c56149",
+      "transforms": [
+        {
+          "source_idle_frame": 0,
+          "dx": 0,
+          "dy": 0
+        },
+        {
+          "source_idle_frame": 1,
+          "dx": 0,
+          "dy": 0
+        },
+        {
+          "source_idle_frame": 2,
+          "dx": 0,
+          "dy": 0
+        },
+        {
+          "source_idle_frame": 3,
+          "dx": 0,
+          "dy": 0
+        },
+        {
+          "source_idle_frame": 4,
+          "dx": 0,
+          "dy": 0
+        },
+        {
+          "source_idle_frame": 5,
+          "dx": 0,
+          "dy": 0
+        },
+        {
+          "source_idle_frame": 6,
+          "dx": 0,
+          "dy": 0
+        },
+        {
+          "source_idle_frame": 7,
+          "dx": 0,
+          "dy": 0
+        }
+      ]
+    }
+  }
+}, sheet: require("../assets/slimes/base/red/drink-strawberry-soda/sheet.png") },
+  "base/red/drink-melon-soda": { ...{
+  "key": "base/red/drink-melon-soda",
+  "evolution": "base",
+  "color": "red",
+  "action": "drink-melon-soda",
+  "imageScale": 4,
+  "metadata": {
+    "frames": [
+      {
+        "filename": "0",
+        "frame": {
+          "x": 0,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "rotated": false,
+        "trimmed": false,
+        "spriteSourceSize": {
+          "x": 0,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "sourceSize": {
+          "w": 64,
+          "h": 64
+        },
+        "duration": 220
+      },
+      {
+        "filename": "1",
+        "frame": {
+          "x": 64,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "rotated": false,
+        "trimmed": false,
+        "spriteSourceSize": {
+          "x": 0,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "sourceSize": {
+          "w": 64,
+          "h": 64
+        },
+        "duration": 160
+      },
+      {
+        "filename": "2",
+        "frame": {
+          "x": 128,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "rotated": false,
+        "trimmed": false,
+        "spriteSourceSize": {
+          "x": 0,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "sourceSize": {
+          "w": 64,
+          "h": 64
+        },
+        "duration": 180
+      },
+      {
+        "filename": "3",
+        "frame": {
+          "x": 192,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "rotated": false,
+        "trimmed": false,
+        "spriteSourceSize": {
+          "x": 0,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "sourceSize": {
+          "w": 64,
+          "h": 64
+        },
+        "duration": 140
+      },
+      {
+        "filename": "4",
+        "frame": {
+          "x": 256,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "rotated": false,
+        "trimmed": false,
+        "spriteSourceSize": {
+          "x": 0,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "sourceSize": {
+          "w": 64,
+          "h": 64
+        },
+        "duration": 140
+      },
+      {
+        "filename": "5",
+        "frame": {
+          "x": 320,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "rotated": false,
+        "trimmed": false,
+        "spriteSourceSize": {
+          "x": 0,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "sourceSize": {
+          "w": 64,
+          "h": 64
+        },
+        "duration": 160
+      },
+      {
+        "filename": "6",
+        "frame": {
+          "x": 384,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "rotated": false,
+        "trimmed": false,
+        "spriteSourceSize": {
+          "x": 0,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "sourceSize": {
+          "w": 64,
+          "h": 64
+        },
+        "duration": 180
+      },
+      {
+        "filename": "7",
+        "frame": {
+          "x": 448,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "rotated": false,
+        "trimmed": false,
+        "spriteSourceSize": {
+          "x": 0,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "sourceSize": {
+          "w": 64,
+          "h": 64
+        },
+        "duration": 280
+      }
+    ],
+    "meta": {
+      "image": "slime.png",
+      "size": {
+        "w": 512,
+        "h": 64
+      },
+      "frame_size": {
+        "w": 64,
+        "h": 64
+      },
+      "frame_count": 8,
+      "alpha": "binary",
+      "role": "slime",
+      "action": "drink-melon-soda",
+      "color": "red",
+      "option": null,
+      "source": "props/drink/melon-soda/red/slime-red-drink-melon-soda.aseprite",
+      "source_sha256": "c6d2ccbac03e53b0b7dd83859144dae3af76c277ec182fb3e05c71136ff8c31c",
+      "transforms": [
+        {
+          "source_idle_frame": 0,
+          "dx": 0,
+          "dy": 0
+        },
+        {
+          "source_idle_frame": 1,
+          "dx": 0,
+          "dy": 0
+        },
+        {
+          "source_idle_frame": 2,
+          "dx": 0,
+          "dy": 0
+        },
+        {
+          "source_idle_frame": 3,
+          "dx": 0,
+          "dy": 0
+        },
+        {
+          "source_idle_frame": 4,
+          "dx": 0,
+          "dy": 0
+        },
+        {
+          "source_idle_frame": 5,
+          "dx": 0,
+          "dy": 0
+        },
+        {
+          "source_idle_frame": 6,
+          "dx": 0,
+          "dy": 0
+        },
+        {
+          "source_idle_frame": 7,
+          "dx": 0,
+          "dy": 0
+        }
+      ]
+    }
+  }
+}, sheet: require("../assets/slimes/base/red/drink-melon-soda/sheet.png") },
+  "base/red/drink-grape-soda": { ...{
+  "key": "base/red/drink-grape-soda",
+  "evolution": "base",
+  "color": "red",
+  "action": "drink-grape-soda",
+  "imageScale": 4,
+  "metadata": {
+    "frames": [
+      {
+        "filename": "0",
+        "frame": {
+          "x": 0,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "rotated": false,
+        "trimmed": false,
+        "spriteSourceSize": {
+          "x": 0,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "sourceSize": {
+          "w": 64,
+          "h": 64
+        },
+        "duration": 220
+      },
+      {
+        "filename": "1",
+        "frame": {
+          "x": 64,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "rotated": false,
+        "trimmed": false,
+        "spriteSourceSize": {
+          "x": 0,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "sourceSize": {
+          "w": 64,
+          "h": 64
+        },
+        "duration": 160
+      },
+      {
+        "filename": "2",
+        "frame": {
+          "x": 128,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "rotated": false,
+        "trimmed": false,
+        "spriteSourceSize": {
+          "x": 0,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "sourceSize": {
+          "w": 64,
+          "h": 64
+        },
+        "duration": 180
+      },
+      {
+        "filename": "3",
+        "frame": {
+          "x": 192,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "rotated": false,
+        "trimmed": false,
+        "spriteSourceSize": {
+          "x": 0,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "sourceSize": {
+          "w": 64,
+          "h": 64
+        },
+        "duration": 140
+      },
+      {
+        "filename": "4",
+        "frame": {
+          "x": 256,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "rotated": false,
+        "trimmed": false,
+        "spriteSourceSize": {
+          "x": 0,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "sourceSize": {
+          "w": 64,
+          "h": 64
+        },
+        "duration": 140
+      },
+      {
+        "filename": "5",
+        "frame": {
+          "x": 320,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "rotated": false,
+        "trimmed": false,
+        "spriteSourceSize": {
+          "x": 0,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "sourceSize": {
+          "w": 64,
+          "h": 64
+        },
+        "duration": 160
+      },
+      {
+        "filename": "6",
+        "frame": {
+          "x": 384,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "rotated": false,
+        "trimmed": false,
+        "spriteSourceSize": {
+          "x": 0,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "sourceSize": {
+          "w": 64,
+          "h": 64
+        },
+        "duration": 180
+      },
+      {
+        "filename": "7",
+        "frame": {
+          "x": 448,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "rotated": false,
+        "trimmed": false,
+        "spriteSourceSize": {
+          "x": 0,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "sourceSize": {
+          "w": 64,
+          "h": 64
+        },
+        "duration": 280
+      }
+    ],
+    "meta": {
+      "image": "slime.png",
+      "size": {
+        "w": 512,
+        "h": 64
+      },
+      "frame_size": {
+        "w": 64,
+        "h": 64
+      },
+      "frame_count": 8,
+      "alpha": "binary",
+      "role": "slime",
+      "action": "drink-grape-soda",
+      "color": "red",
+      "option": null,
+      "source": "props/drink/grape-soda/red/slime-red-drink-grape-soda.aseprite",
+      "source_sha256": "9590d6c9b7d6c5bf54881f8b120d5efc28c5603afbba8edf3c1c5aae44c855e8",
+      "transforms": [
+        {
+          "source_idle_frame": 0,
+          "dx": 0,
+          "dy": 0
+        },
+        {
+          "source_idle_frame": 1,
+          "dx": 0,
+          "dy": 0
+        },
+        {
+          "source_idle_frame": 2,
+          "dx": 0,
+          "dy": 0
+        },
+        {
+          "source_idle_frame": 3,
+          "dx": 0,
+          "dy": 0
+        },
+        {
+          "source_idle_frame": 4,
+          "dx": 0,
+          "dy": 0
+        },
+        {
+          "source_idle_frame": 5,
+          "dx": 0,
+          "dy": 0
+        },
+        {
+          "source_idle_frame": 6,
+          "dx": 0,
+          "dy": 0
+        },
+        {
+          "source_idle_frame": 7,
+          "dx": 0,
+          "dy": 0
+        }
+      ]
+    }
+  }
+}, sheet: require("../assets/slimes/base/red/drink-grape-soda/sheet.png") },
+  "base/red/drink-blue-ramune": { ...{
+  "key": "base/red/drink-blue-ramune",
+  "evolution": "base",
+  "color": "red",
+  "action": "drink-blue-ramune",
+  "imageScale": 4,
+  "metadata": {
+    "frames": [
+      {
+        "filename": "0",
+        "frame": {
+          "x": 0,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "rotated": false,
+        "trimmed": false,
+        "spriteSourceSize": {
+          "x": 0,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "sourceSize": {
+          "w": 64,
+          "h": 64
+        },
+        "duration": 220
+      },
+      {
+        "filename": "1",
+        "frame": {
+          "x": 64,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "rotated": false,
+        "trimmed": false,
+        "spriteSourceSize": {
+          "x": 0,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "sourceSize": {
+          "w": 64,
+          "h": 64
+        },
+        "duration": 160
+      },
+      {
+        "filename": "2",
+        "frame": {
+          "x": 128,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "rotated": false,
+        "trimmed": false,
+        "spriteSourceSize": {
+          "x": 0,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "sourceSize": {
+          "w": 64,
+          "h": 64
+        },
+        "duration": 180
+      },
+      {
+        "filename": "3",
+        "frame": {
+          "x": 192,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "rotated": false,
+        "trimmed": false,
+        "spriteSourceSize": {
+          "x": 0,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "sourceSize": {
+          "w": 64,
+          "h": 64
+        },
+        "duration": 140
+      },
+      {
+        "filename": "4",
+        "frame": {
+          "x": 256,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "rotated": false,
+        "trimmed": false,
+        "spriteSourceSize": {
+          "x": 0,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "sourceSize": {
+          "w": 64,
+          "h": 64
+        },
+        "duration": 140
+      },
+      {
+        "filename": "5",
+        "frame": {
+          "x": 320,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "rotated": false,
+        "trimmed": false,
+        "spriteSourceSize": {
+          "x": 0,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "sourceSize": {
+          "w": 64,
+          "h": 64
+        },
+        "duration": 160
+      },
+      {
+        "filename": "6",
+        "frame": {
+          "x": 384,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "rotated": false,
+        "trimmed": false,
+        "spriteSourceSize": {
+          "x": 0,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "sourceSize": {
+          "w": 64,
+          "h": 64
+        },
+        "duration": 180
+      },
+      {
+        "filename": "7",
+        "frame": {
+          "x": 448,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "rotated": false,
+        "trimmed": false,
+        "spriteSourceSize": {
+          "x": 0,
+          "y": 0,
+          "w": 64,
+          "h": 64
+        },
+        "sourceSize": {
+          "w": 64,
+          "h": 64
+        },
+        "duration": 280
+      }
+    ],
+    "meta": {
+      "image": "slime.png",
+      "size": {
+        "w": 512,
+        "h": 64
+      },
+      "frame_size": {
+        "w": 64,
+        "h": 64
+      },
+      "frame_count": 8,
+      "alpha": "binary",
+      "role": "slime",
+      "action": "drink-blue-ramune",
+      "color": "red",
+      "option": null,
+      "source": "props/drink/blue-ramune/red/slime-red-drink-blue-ramune.aseprite",
+      "source_sha256": "5bb66a17f904271f63c40803fc3954b199559b7b35b95f69bbb4fdc7b6ee08d0",
+      "transforms": [
+        {
+          "source_idle_frame": 0,
+          "dx": 0,
+          "dy": 0
+        },
+        {
+          "source_idle_frame": 1,
+          "dx": 0,
+          "dy": 0
+        },
+        {
+          "source_idle_frame": 2,
+          "dx": 0,
+          "dy": 0
+        },
+        {
+          "source_idle_frame": 3,
+          "dx": 0,
+          "dy": 0
+        },
+        {
+          "source_idle_frame": 4,
+          "dx": 0,
+          "dy": 0
+        },
+        {
+          "source_idle_frame": 5,
+          "dx": 0,
+          "dy": 0
+        },
+        {
+          "source_idle_frame": 6,
+          "dx": 0,
+          "dy": 0
+        },
+        {
+          "source_idle_frame": 7,
+          "dx": 0,
+          "dy": 0
+        }
+      ]
+    }
+  }
+}, sheet: require("../assets/slimes/base/red/drink-blue-ramune/sheet.png") },
   "base/red/water-puddle": { ...{
   "key": "base/red/water-puddle",
   "evolution": "base",
@@ -9686,11 +14791,11 @@ export const SLIME_MOBILE_ASSET_REGISTRY = {
     }
   }
 }, sheet: require("../assets/slimes/base/red/trampoline/sheet.png") },
-  "gold-crown-red-gem/blue/drink": { ...{
-  "key": "gold-crown-red-gem/blue/drink",
+  "gold-crown-red-gem/blue/drink-lemonade": { ...{
+  "key": "gold-crown-red-gem/blue/drink-lemonade",
   "evolution": "gold-crown-red-gem",
   "color": "blue",
-  "action": "drink",
+  "action": "drink-lemonade",
   "imageScale": 4,
   "metadata": {
     "frames": [
@@ -9880,10 +14985,36 @@ export const SLIME_MOBILE_ASSET_REGISTRY = {
         "w": 512,
         "h": 64
       },
-      "scale": "1"
+      "scale": "1",
+      "frameTags": [
+        {
+          "name": "crowned_drink",
+          "from": 0,
+          "to": 7,
+          "direction": "forward",
+          "color": "#000000ff"
+        }
+      ],
+      "layers": [
+        {
+          "name": "slime",
+          "opacity": 255,
+          "blendMode": "normal"
+        },
+        {
+          "name": "crown",
+          "opacity": 255,
+          "blendMode": "normal"
+        },
+        {
+          "name": "lemonade_glass",
+          "opacity": 255,
+          "blendMode": "normal"
+        }
+      ]
     }
   }
-}, sheet: require("../assets/slimes/gold-crown-red-gem/blue/drink/sheet.png") },
+}, sheet: require("../assets/slimes/gold-crown-red-gem/blue/drink-lemonade/sheet.png") },
   "gold-crown-red-gem/blue/water-puddle": { ...{
   "key": "gold-crown-red-gem/blue/water-puddle",
   "evolution": "gold-crown-red-gem",
@@ -11072,11 +16203,11 @@ export const SLIME_MOBILE_ASSET_REGISTRY = {
     }
   }
 }, sheet: require("../assets/slimes/gold-crown-red-gem/blue/trampoline/sheet.png") },
-  "gold-crown-red-gem/green/drink": { ...{
-  "key": "gold-crown-red-gem/green/drink",
+  "gold-crown-red-gem/green/drink-lemonade": { ...{
+  "key": "gold-crown-red-gem/green/drink-lemonade",
   "evolution": "gold-crown-red-gem",
   "color": "green",
-  "action": "drink",
+  "action": "drink-lemonade",
   "imageScale": 4,
   "metadata": {
     "frames": [
@@ -11266,10 +16397,36 @@ export const SLIME_MOBILE_ASSET_REGISTRY = {
         "w": 512,
         "h": 64
       },
-      "scale": "1"
+      "scale": "1",
+      "frameTags": [
+        {
+          "name": "crowned_drink",
+          "from": 0,
+          "to": 7,
+          "direction": "forward",
+          "color": "#000000ff"
+        }
+      ],
+      "layers": [
+        {
+          "name": "slime",
+          "opacity": 255,
+          "blendMode": "normal"
+        },
+        {
+          "name": "crown",
+          "opacity": 255,
+          "blendMode": "normal"
+        },
+        {
+          "name": "lemonade_glass",
+          "opacity": 255,
+          "blendMode": "normal"
+        }
+      ]
     }
   }
-}, sheet: require("../assets/slimes/gold-crown-red-gem/green/drink/sheet.png") },
+}, sheet: require("../assets/slimes/gold-crown-red-gem/green/drink-lemonade/sheet.png") },
   "gold-crown-red-gem/green/water-puddle": { ...{
   "key": "gold-crown-red-gem/green/water-puddle",
   "evolution": "gold-crown-red-gem",
@@ -12458,11 +17615,11 @@ export const SLIME_MOBILE_ASSET_REGISTRY = {
     }
   }
 }, sheet: require("../assets/slimes/gold-crown-red-gem/green/trampoline/sheet.png") },
-  "gold-crown-red-gem/yellow/drink": { ...{
-  "key": "gold-crown-red-gem/yellow/drink",
+  "gold-crown-red-gem/yellow/drink-lemonade": { ...{
+  "key": "gold-crown-red-gem/yellow/drink-lemonade",
   "evolution": "gold-crown-red-gem",
   "color": "yellow",
-  "action": "drink",
+  "action": "drink-lemonade",
   "imageScale": 4,
   "metadata": {
     "frames": [
@@ -12652,10 +17809,36 @@ export const SLIME_MOBILE_ASSET_REGISTRY = {
         "w": 512,
         "h": 64
       },
-      "scale": "1"
+      "scale": "1",
+      "frameTags": [
+        {
+          "name": "crowned_drink",
+          "from": 0,
+          "to": 7,
+          "direction": "forward",
+          "color": "#000000ff"
+        }
+      ],
+      "layers": [
+        {
+          "name": "slime",
+          "opacity": 255,
+          "blendMode": "normal"
+        },
+        {
+          "name": "crown",
+          "opacity": 255,
+          "blendMode": "normal"
+        },
+        {
+          "name": "lemonade_glass",
+          "opacity": 255,
+          "blendMode": "normal"
+        }
+      ]
     }
   }
-}, sheet: require("../assets/slimes/gold-crown-red-gem/yellow/drink/sheet.png") },
+}, sheet: require("../assets/slimes/gold-crown-red-gem/yellow/drink-lemonade/sheet.png") },
   "gold-crown-red-gem/yellow/water-puddle": { ...{
   "key": "gold-crown-red-gem/yellow/water-puddle",
   "evolution": "gold-crown-red-gem",
@@ -13844,11 +19027,11 @@ export const SLIME_MOBILE_ASSET_REGISTRY = {
     }
   }
 }, sheet: require("../assets/slimes/gold-crown-red-gem/yellow/trampoline/sheet.png") },
-  "gold-crown-red-gem/purple/drink": { ...{
-  "key": "gold-crown-red-gem/purple/drink",
+  "gold-crown-red-gem/purple/drink-lemonade": { ...{
+  "key": "gold-crown-red-gem/purple/drink-lemonade",
   "evolution": "gold-crown-red-gem",
   "color": "purple",
-  "action": "drink",
+  "action": "drink-lemonade",
   "imageScale": 4,
   "metadata": {
     "frames": [
@@ -14038,10 +19221,36 @@ export const SLIME_MOBILE_ASSET_REGISTRY = {
         "w": 512,
         "h": 64
       },
-      "scale": "1"
+      "scale": "1",
+      "frameTags": [
+        {
+          "name": "crowned_drink",
+          "from": 0,
+          "to": 7,
+          "direction": "forward",
+          "color": "#000000ff"
+        }
+      ],
+      "layers": [
+        {
+          "name": "slime",
+          "opacity": 255,
+          "blendMode": "normal"
+        },
+        {
+          "name": "crown",
+          "opacity": 255,
+          "blendMode": "normal"
+        },
+        {
+          "name": "lemonade_glass",
+          "opacity": 255,
+          "blendMode": "normal"
+        }
+      ]
     }
   }
-}, sheet: require("../assets/slimes/gold-crown-red-gem/purple/drink/sheet.png") },
+}, sheet: require("../assets/slimes/gold-crown-red-gem/purple/drink-lemonade/sheet.png") },
   "gold-crown-red-gem/purple/water-puddle": { ...{
   "key": "gold-crown-red-gem/purple/water-puddle",
   "evolution": "gold-crown-red-gem",
@@ -15230,11 +20439,11 @@ export const SLIME_MOBILE_ASSET_REGISTRY = {
     }
   }
 }, sheet: require("../assets/slimes/gold-crown-red-gem/purple/trampoline/sheet.png") },
-  "gold-crown-red-gem/red/drink": { ...{
-  "key": "gold-crown-red-gem/red/drink",
+  "gold-crown-red-gem/red/drink-lemonade": { ...{
+  "key": "gold-crown-red-gem/red/drink-lemonade",
   "evolution": "gold-crown-red-gem",
   "color": "red",
-  "action": "drink",
+  "action": "drink-lemonade",
   "imageScale": 4,
   "metadata": {
     "frames": [
@@ -15424,10 +20633,36 @@ export const SLIME_MOBILE_ASSET_REGISTRY = {
         "w": 512,
         "h": 64
       },
-      "scale": "1"
+      "scale": "1",
+      "frameTags": [
+        {
+          "name": "crowned_drink",
+          "from": 0,
+          "to": 7,
+          "direction": "forward",
+          "color": "#000000ff"
+        }
+      ],
+      "layers": [
+        {
+          "name": "slime",
+          "opacity": 255,
+          "blendMode": "normal"
+        },
+        {
+          "name": "crown",
+          "opacity": 255,
+          "blendMode": "normal"
+        },
+        {
+          "name": "lemonade_glass",
+          "opacity": 255,
+          "blendMode": "normal"
+        }
+      ]
     }
   }
-}, sheet: require("../assets/slimes/gold-crown-red-gem/red/drink/sheet.png") },
+}, sheet: require("../assets/slimes/gold-crown-red-gem/red/drink-lemonade/sheet.png") },
   "gold-crown-red-gem/red/water-puddle": { ...{
   "key": "gold-crown-red-gem/red/water-puddle",
   "evolution": "gold-crown-red-gem",
@@ -16616,11 +21851,11 @@ export const SLIME_MOBILE_ASSET_REGISTRY = {
     }
   }
 }, sheet: require("../assets/slimes/gold-crown-red-gem/red/trampoline/sheet.png") },
-  "silver-crown-blue-gem/blue/drink": { ...{
-  "key": "silver-crown-blue-gem/blue/drink",
+  "silver-crown-blue-gem/blue/drink-lemonade": { ...{
+  "key": "silver-crown-blue-gem/blue/drink-lemonade",
   "evolution": "silver-crown-blue-gem",
   "color": "blue",
-  "action": "drink",
+  "action": "drink-lemonade",
   "imageScale": 4,
   "metadata": {
     "frames": [
@@ -16810,10 +22045,36 @@ export const SLIME_MOBILE_ASSET_REGISTRY = {
         "w": 512,
         "h": 64
       },
-      "scale": "1"
+      "scale": "1",
+      "frameTags": [
+        {
+          "name": "crowned_drink",
+          "from": 0,
+          "to": 7,
+          "direction": "forward",
+          "color": "#000000ff"
+        }
+      ],
+      "layers": [
+        {
+          "name": "slime",
+          "opacity": 255,
+          "blendMode": "normal"
+        },
+        {
+          "name": "crown",
+          "opacity": 255,
+          "blendMode": "normal"
+        },
+        {
+          "name": "lemonade_glass",
+          "opacity": 255,
+          "blendMode": "normal"
+        }
+      ]
     }
   }
-}, sheet: require("../assets/slimes/silver-crown-blue-gem/blue/drink/sheet.png") },
+}, sheet: require("../assets/slimes/silver-crown-blue-gem/blue/drink-lemonade/sheet.png") },
   "silver-crown-blue-gem/blue/water-puddle": { ...{
   "key": "silver-crown-blue-gem/blue/water-puddle",
   "evolution": "silver-crown-blue-gem",
@@ -18002,11 +23263,11 @@ export const SLIME_MOBILE_ASSET_REGISTRY = {
     }
   }
 }, sheet: require("../assets/slimes/silver-crown-blue-gem/blue/trampoline/sheet.png") },
-  "silver-crown-blue-gem/green/drink": { ...{
-  "key": "silver-crown-blue-gem/green/drink",
+  "silver-crown-blue-gem/green/drink-lemonade": { ...{
+  "key": "silver-crown-blue-gem/green/drink-lemonade",
   "evolution": "silver-crown-blue-gem",
   "color": "green",
-  "action": "drink",
+  "action": "drink-lemonade",
   "imageScale": 4,
   "metadata": {
     "frames": [
@@ -18196,10 +23457,36 @@ export const SLIME_MOBILE_ASSET_REGISTRY = {
         "w": 512,
         "h": 64
       },
-      "scale": "1"
+      "scale": "1",
+      "frameTags": [
+        {
+          "name": "crowned_drink",
+          "from": 0,
+          "to": 7,
+          "direction": "forward",
+          "color": "#000000ff"
+        }
+      ],
+      "layers": [
+        {
+          "name": "slime",
+          "opacity": 255,
+          "blendMode": "normal"
+        },
+        {
+          "name": "crown",
+          "opacity": 255,
+          "blendMode": "normal"
+        },
+        {
+          "name": "lemonade_glass",
+          "opacity": 255,
+          "blendMode": "normal"
+        }
+      ]
     }
   }
-}, sheet: require("../assets/slimes/silver-crown-blue-gem/green/drink/sheet.png") },
+}, sheet: require("../assets/slimes/silver-crown-blue-gem/green/drink-lemonade/sheet.png") },
   "silver-crown-blue-gem/green/water-puddle": { ...{
   "key": "silver-crown-blue-gem/green/water-puddle",
   "evolution": "silver-crown-blue-gem",
@@ -19388,11 +24675,11 @@ export const SLIME_MOBILE_ASSET_REGISTRY = {
     }
   }
 }, sheet: require("../assets/slimes/silver-crown-blue-gem/green/trampoline/sheet.png") },
-  "silver-crown-blue-gem/yellow/drink": { ...{
-  "key": "silver-crown-blue-gem/yellow/drink",
+  "silver-crown-blue-gem/yellow/drink-lemonade": { ...{
+  "key": "silver-crown-blue-gem/yellow/drink-lemonade",
   "evolution": "silver-crown-blue-gem",
   "color": "yellow",
-  "action": "drink",
+  "action": "drink-lemonade",
   "imageScale": 4,
   "metadata": {
     "frames": [
@@ -19582,10 +24869,36 @@ export const SLIME_MOBILE_ASSET_REGISTRY = {
         "w": 512,
         "h": 64
       },
-      "scale": "1"
+      "scale": "1",
+      "frameTags": [
+        {
+          "name": "crowned_drink",
+          "from": 0,
+          "to": 7,
+          "direction": "forward",
+          "color": "#000000ff"
+        }
+      ],
+      "layers": [
+        {
+          "name": "slime",
+          "opacity": 255,
+          "blendMode": "normal"
+        },
+        {
+          "name": "crown",
+          "opacity": 255,
+          "blendMode": "normal"
+        },
+        {
+          "name": "lemonade_glass",
+          "opacity": 255,
+          "blendMode": "normal"
+        }
+      ]
     }
   }
-}, sheet: require("../assets/slimes/silver-crown-blue-gem/yellow/drink/sheet.png") },
+}, sheet: require("../assets/slimes/silver-crown-blue-gem/yellow/drink-lemonade/sheet.png") },
   "silver-crown-blue-gem/yellow/water-puddle": { ...{
   "key": "silver-crown-blue-gem/yellow/water-puddle",
   "evolution": "silver-crown-blue-gem",
@@ -20774,11 +26087,11 @@ export const SLIME_MOBILE_ASSET_REGISTRY = {
     }
   }
 }, sheet: require("../assets/slimes/silver-crown-blue-gem/yellow/trampoline/sheet.png") },
-  "silver-crown-blue-gem/purple/drink": { ...{
-  "key": "silver-crown-blue-gem/purple/drink",
+  "silver-crown-blue-gem/purple/drink-lemonade": { ...{
+  "key": "silver-crown-blue-gem/purple/drink-lemonade",
   "evolution": "silver-crown-blue-gem",
   "color": "purple",
-  "action": "drink",
+  "action": "drink-lemonade",
   "imageScale": 4,
   "metadata": {
     "frames": [
@@ -20968,10 +26281,36 @@ export const SLIME_MOBILE_ASSET_REGISTRY = {
         "w": 512,
         "h": 64
       },
-      "scale": "1"
+      "scale": "1",
+      "frameTags": [
+        {
+          "name": "crowned_drink",
+          "from": 0,
+          "to": 7,
+          "direction": "forward",
+          "color": "#000000ff"
+        }
+      ],
+      "layers": [
+        {
+          "name": "slime",
+          "opacity": 255,
+          "blendMode": "normal"
+        },
+        {
+          "name": "crown",
+          "opacity": 255,
+          "blendMode": "normal"
+        },
+        {
+          "name": "lemonade_glass",
+          "opacity": 255,
+          "blendMode": "normal"
+        }
+      ]
     }
   }
-}, sheet: require("../assets/slimes/silver-crown-blue-gem/purple/drink/sheet.png") },
+}, sheet: require("../assets/slimes/silver-crown-blue-gem/purple/drink-lemonade/sheet.png") },
   "silver-crown-blue-gem/purple/water-puddle": { ...{
   "key": "silver-crown-blue-gem/purple/water-puddle",
   "evolution": "silver-crown-blue-gem",
@@ -22160,11 +27499,11 @@ export const SLIME_MOBILE_ASSET_REGISTRY = {
     }
   }
 }, sheet: require("../assets/slimes/silver-crown-blue-gem/purple/trampoline/sheet.png") },
-  "silver-crown-blue-gem/red/drink": { ...{
-  "key": "silver-crown-blue-gem/red/drink",
+  "silver-crown-blue-gem/red/drink-lemonade": { ...{
+  "key": "silver-crown-blue-gem/red/drink-lemonade",
   "evolution": "silver-crown-blue-gem",
   "color": "red",
-  "action": "drink",
+  "action": "drink-lemonade",
   "imageScale": 4,
   "metadata": {
     "frames": [
@@ -22354,10 +27693,36 @@ export const SLIME_MOBILE_ASSET_REGISTRY = {
         "w": 512,
         "h": 64
       },
-      "scale": "1"
+      "scale": "1",
+      "frameTags": [
+        {
+          "name": "crowned_drink",
+          "from": 0,
+          "to": 7,
+          "direction": "forward",
+          "color": "#000000ff"
+        }
+      ],
+      "layers": [
+        {
+          "name": "slime",
+          "opacity": 255,
+          "blendMode": "normal"
+        },
+        {
+          "name": "crown",
+          "opacity": 255,
+          "blendMode": "normal"
+        },
+        {
+          "name": "lemonade_glass",
+          "opacity": 255,
+          "blendMode": "normal"
+        }
+      ]
     }
   }
-}, sheet: require("../assets/slimes/silver-crown-blue-gem/red/drink/sheet.png") },
+}, sheet: require("../assets/slimes/silver-crown-blue-gem/red/drink-lemonade/sheet.png") },
   "silver-crown-blue-gem/red/water-puddle": { ...{
   "key": "silver-crown-blue-gem/red/water-puddle",
   "evolution": "silver-crown-blue-gem",
@@ -23549,16 +28914,1414 @@ export const SLIME_MOBILE_ASSET_REGISTRY = {
 } as const;
 
 export const SLIME_MOBILE_CROWN_OVERLAY_REGISTRY = {
-  "gold-crown-red-gem/blue": { key: "gold-crown-red-gem/blue", imageScale: 4, differingPixels: 187, overlay: require("../assets/slimes/overlays/gold-crown-red-gem/blue/overlay.png") },
-  "gold-crown-red-gem/green": { key: "gold-crown-red-gem/green", imageScale: 4, differingPixels: 187, overlay: require("../assets/slimes/overlays/gold-crown-red-gem/green/overlay.png") },
-  "gold-crown-red-gem/purple": { key: "gold-crown-red-gem/purple", imageScale: 4, differingPixels: 187, overlay: require("../assets/slimes/overlays/gold-crown-red-gem/purple/overlay.png") },
-  "gold-crown-red-gem/red": { key: "gold-crown-red-gem/red", imageScale: 4, differingPixels: 187, overlay: require("../assets/slimes/overlays/gold-crown-red-gem/red/overlay.png") },
-  "gold-crown-red-gem/yellow": { key: "gold-crown-red-gem/yellow", imageScale: 4, differingPixels: 187, overlay: require("../assets/slimes/overlays/gold-crown-red-gem/yellow/overlay.png") },
-  "silver-crown-blue-gem/blue": { key: "silver-crown-blue-gem/blue", imageScale: 4, differingPixels: 187, overlay: require("../assets/slimes/overlays/silver-crown-blue-gem/blue/overlay.png") },
-  "silver-crown-blue-gem/green": { key: "silver-crown-blue-gem/green", imageScale: 4, differingPixels: 187, overlay: require("../assets/slimes/overlays/silver-crown-blue-gem/green/overlay.png") },
-  "silver-crown-blue-gem/purple": { key: "silver-crown-blue-gem/purple", imageScale: 4, differingPixels: 187, overlay: require("../assets/slimes/overlays/silver-crown-blue-gem/purple/overlay.png") },
-  "silver-crown-blue-gem/red": { key: "silver-crown-blue-gem/red", imageScale: 4, differingPixels: 187, overlay: require("../assets/slimes/overlays/silver-crown-blue-gem/red/overlay.png") },
-  "silver-crown-blue-gem/yellow": { key: "silver-crown-blue-gem/yellow", imageScale: 4, differingPixels: 187, overlay: require("../assets/slimes/overlays/silver-crown-blue-gem/yellow/overlay.png") },
+  "gold-crown-red-gem/blue": { key: "gold-crown-red-gem/blue", imageScale: 4, differingPixels: 298, overlay: require("../assets/slimes/overlays/gold-crown-red-gem/blue/overlay.png") },
+  "gold-crown-red-gem/green": { key: "gold-crown-red-gem/green", imageScale: 4, differingPixels: 424, overlay: require("../assets/slimes/overlays/gold-crown-red-gem/green/overlay.png") },
+  "gold-crown-red-gem/purple": { key: "gold-crown-red-gem/purple", imageScale: 4, differingPixels: 298, overlay: require("../assets/slimes/overlays/gold-crown-red-gem/purple/overlay.png") },
+  "gold-crown-red-gem/red": { key: "gold-crown-red-gem/red", imageScale: 4, differingPixels: 298, overlay: require("../assets/slimes/overlays/gold-crown-red-gem/red/overlay.png") },
+  "gold-crown-red-gem/yellow": { key: "gold-crown-red-gem/yellow", imageScale: 4, differingPixels: 298, overlay: require("../assets/slimes/overlays/gold-crown-red-gem/yellow/overlay.png") },
+  "silver-crown-blue-gem/blue": { key: "silver-crown-blue-gem/blue", imageScale: 4, differingPixels: 312, overlay: require("../assets/slimes/overlays/silver-crown-blue-gem/blue/overlay.png") },
+  "silver-crown-blue-gem/green": { key: "silver-crown-blue-gem/green", imageScale: 4, differingPixels: 435, overlay: require("../assets/slimes/overlays/silver-crown-blue-gem/green/overlay.png") },
+  "silver-crown-blue-gem/purple": { key: "silver-crown-blue-gem/purple", imageScale: 4, differingPixels: 531, overlay: require("../assets/slimes/overlays/silver-crown-blue-gem/purple/overlay.png") },
+  "silver-crown-blue-gem/red": { key: "silver-crown-blue-gem/red", imageScale: 4, differingPixels: 312, overlay: require("../assets/slimes/overlays/silver-crown-blue-gem/red/overlay.png") },
+  "silver-crown-blue-gem/yellow": { key: "silver-crown-blue-gem/yellow", imageScale: 4, differingPixels: 312, overlay: require("../assets/slimes/overlays/silver-crown-blue-gem/yellow/overlay.png") },
+} as const;
+
+export const SLIME_MOBILE_HAPPY_HEART_OVERLAY_REGISTRY = {
+  "base/blue": { key: "base/blue", evolution: "base", color: "blue", action: "happy", imageScale: 4, metadata: {
+  "frames": [
+    {
+      "filename": "slime-blue-happy-heart (하트) 0.aseprite",
+      "frame": {
+        "x": 0,
+        "y": 0,
+        "w": 64,
+        "h": 64
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 64,
+        "h": 64
+      },
+      "sourceSize": {
+        "w": 64,
+        "h": 64
+      },
+      "duration": 220
+    },
+    {
+      "filename": "slime-blue-happy-heart (하트) 1.aseprite",
+      "frame": {
+        "x": 64,
+        "y": 0,
+        "w": 64,
+        "h": 64
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 64,
+        "h": 64
+      },
+      "sourceSize": {
+        "w": 64,
+        "h": 64
+      },
+      "duration": 160
+    },
+    {
+      "filename": "slime-blue-happy-heart (하트) 2.aseprite",
+      "frame": {
+        "x": 128,
+        "y": 0,
+        "w": 64,
+        "h": 64
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 64,
+        "h": 64
+      },
+      "sourceSize": {
+        "w": 64,
+        "h": 64
+      },
+      "duration": 120
+    },
+    {
+      "filename": "slime-blue-happy-heart (하트) 3.aseprite",
+      "frame": {
+        "x": 192,
+        "y": 0,
+        "w": 64,
+        "h": 64
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 64,
+        "h": 64
+      },
+      "sourceSize": {
+        "w": 64,
+        "h": 64
+      },
+      "duration": 110
+    },
+    {
+      "filename": "slime-blue-happy-heart (하트) 4.aseprite",
+      "frame": {
+        "x": 256,
+        "y": 0,
+        "w": 64,
+        "h": 64
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 64,
+        "h": 64
+      },
+      "sourceSize": {
+        "w": 64,
+        "h": 64
+      },
+      "duration": 110
+    },
+    {
+      "filename": "slime-blue-happy-heart (하트) 5.aseprite",
+      "frame": {
+        "x": 320,
+        "y": 0,
+        "w": 64,
+        "h": 64
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 64,
+        "h": 64
+      },
+      "sourceSize": {
+        "w": 64,
+        "h": 64
+      },
+      "duration": 110
+    },
+    {
+      "filename": "slime-blue-happy-heart (하트) 6.aseprite",
+      "frame": {
+        "x": 384,
+        "y": 0,
+        "w": 64,
+        "h": 64
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 64,
+        "h": 64
+      },
+      "sourceSize": {
+        "w": 64,
+        "h": 64
+      },
+      "duration": 120
+    },
+    {
+      "filename": "slime-blue-happy-heart (하트) 7.aseprite",
+      "frame": {
+        "x": 448,
+        "y": 0,
+        "w": 64,
+        "h": 64
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 64,
+        "h": 64
+      },
+      "sourceSize": {
+        "w": 64,
+        "h": 64
+      },
+      "duration": 130
+    },
+    {
+      "filename": "slime-blue-happy-heart (하트) 8.aseprite",
+      "frame": {
+        "x": 512,
+        "y": 0,
+        "w": 64,
+        "h": 64
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 64,
+        "h": 64
+      },
+      "sourceSize": {
+        "w": 64,
+        "h": 64
+      },
+      "duration": 150
+    },
+    {
+      "filename": "slime-blue-happy-heart (하트) 9.aseprite",
+      "frame": {
+        "x": 576,
+        "y": 0,
+        "w": 64,
+        "h": 64
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 64,
+        "h": 64
+      },
+      "sourceSize": {
+        "w": 64,
+        "h": 64
+      },
+      "duration": 170
+    },
+    {
+      "filename": "slime-blue-happy-heart (하트) 10.aseprite",
+      "frame": {
+        "x": 640,
+        "y": 0,
+        "w": 64,
+        "h": 64
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 64,
+        "h": 64
+      },
+      "sourceSize": {
+        "w": 64,
+        "h": 64
+      },
+      "duration": 190
+    },
+    {
+      "filename": "slime-blue-happy-heart (하트) 11.aseprite",
+      "frame": {
+        "x": 704,
+        "y": 0,
+        "w": 64,
+        "h": 64
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 64,
+        "h": 64
+      },
+      "sourceSize": {
+        "w": 64,
+        "h": 64
+      },
+      "duration": 260
+    }
+  ],
+  "meta": {
+    "app": "https://www.aseprite.org/",
+    "version": "1.x-dev",
+    "image": "heart.png",
+    "format": "RGBA8888",
+    "size": {
+      "w": 768,
+      "h": 64
+    },
+    "scale": "1"
+  }
+}, sheet: require("../assets/slimes/overlays/happy-heart/base/blue/sheet.png") },
+  "base/green": { key: "base/green", evolution: "base", color: "green", action: "happy", imageScale: 4, metadata: {
+  "frames": [
+    {
+      "filename": "slime-green-happy-heart (하트) 0.aseprite",
+      "frame": {
+        "x": 0,
+        "y": 0,
+        "w": 64,
+        "h": 64
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 64,
+        "h": 64
+      },
+      "sourceSize": {
+        "w": 64,
+        "h": 64
+      },
+      "duration": 220
+    },
+    {
+      "filename": "slime-green-happy-heart (하트) 1.aseprite",
+      "frame": {
+        "x": 64,
+        "y": 0,
+        "w": 64,
+        "h": 64
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 64,
+        "h": 64
+      },
+      "sourceSize": {
+        "w": 64,
+        "h": 64
+      },
+      "duration": 160
+    },
+    {
+      "filename": "slime-green-happy-heart (하트) 2.aseprite",
+      "frame": {
+        "x": 128,
+        "y": 0,
+        "w": 64,
+        "h": 64
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 64,
+        "h": 64
+      },
+      "sourceSize": {
+        "w": 64,
+        "h": 64
+      },
+      "duration": 120
+    },
+    {
+      "filename": "slime-green-happy-heart (하트) 3.aseprite",
+      "frame": {
+        "x": 192,
+        "y": 0,
+        "w": 64,
+        "h": 64
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 64,
+        "h": 64
+      },
+      "sourceSize": {
+        "w": 64,
+        "h": 64
+      },
+      "duration": 110
+    },
+    {
+      "filename": "slime-green-happy-heart (하트) 4.aseprite",
+      "frame": {
+        "x": 256,
+        "y": 0,
+        "w": 64,
+        "h": 64
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 64,
+        "h": 64
+      },
+      "sourceSize": {
+        "w": 64,
+        "h": 64
+      },
+      "duration": 110
+    },
+    {
+      "filename": "slime-green-happy-heart (하트) 5.aseprite",
+      "frame": {
+        "x": 320,
+        "y": 0,
+        "w": 64,
+        "h": 64
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 64,
+        "h": 64
+      },
+      "sourceSize": {
+        "w": 64,
+        "h": 64
+      },
+      "duration": 110
+    },
+    {
+      "filename": "slime-green-happy-heart (하트) 6.aseprite",
+      "frame": {
+        "x": 384,
+        "y": 0,
+        "w": 64,
+        "h": 64
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 64,
+        "h": 64
+      },
+      "sourceSize": {
+        "w": 64,
+        "h": 64
+      },
+      "duration": 120
+    },
+    {
+      "filename": "slime-green-happy-heart (하트) 7.aseprite",
+      "frame": {
+        "x": 448,
+        "y": 0,
+        "w": 64,
+        "h": 64
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 64,
+        "h": 64
+      },
+      "sourceSize": {
+        "w": 64,
+        "h": 64
+      },
+      "duration": 130
+    },
+    {
+      "filename": "slime-green-happy-heart (하트) 8.aseprite",
+      "frame": {
+        "x": 512,
+        "y": 0,
+        "w": 64,
+        "h": 64
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 64,
+        "h": 64
+      },
+      "sourceSize": {
+        "w": 64,
+        "h": 64
+      },
+      "duration": 150
+    },
+    {
+      "filename": "slime-green-happy-heart (하트) 9.aseprite",
+      "frame": {
+        "x": 576,
+        "y": 0,
+        "w": 64,
+        "h": 64
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 64,
+        "h": 64
+      },
+      "sourceSize": {
+        "w": 64,
+        "h": 64
+      },
+      "duration": 170
+    },
+    {
+      "filename": "slime-green-happy-heart (하트) 10.aseprite",
+      "frame": {
+        "x": 640,
+        "y": 0,
+        "w": 64,
+        "h": 64
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 64,
+        "h": 64
+      },
+      "sourceSize": {
+        "w": 64,
+        "h": 64
+      },
+      "duration": 190
+    },
+    {
+      "filename": "slime-green-happy-heart (하트) 11.aseprite",
+      "frame": {
+        "x": 704,
+        "y": 0,
+        "w": 64,
+        "h": 64
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 64,
+        "h": 64
+      },
+      "sourceSize": {
+        "w": 64,
+        "h": 64
+      },
+      "duration": 260
+    }
+  ],
+  "meta": {
+    "app": "https://www.aseprite.org/",
+    "version": "1.x-dev",
+    "image": "heart.png",
+    "format": "RGBA8888",
+    "size": {
+      "w": 768,
+      "h": 64
+    },
+    "scale": "1"
+  }
+}, sheet: require("../assets/slimes/overlays/happy-heart/base/green/sheet.png") },
+  "base/purple": { key: "base/purple", evolution: "base", color: "purple", action: "happy", imageScale: 4, metadata: {
+  "frames": [
+    {
+      "filename": "slime-purple-happy-heart (하트) 0.aseprite",
+      "frame": {
+        "x": 0,
+        "y": 0,
+        "w": 64,
+        "h": 64
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 64,
+        "h": 64
+      },
+      "sourceSize": {
+        "w": 64,
+        "h": 64
+      },
+      "duration": 220
+    },
+    {
+      "filename": "slime-purple-happy-heart (하트) 1.aseprite",
+      "frame": {
+        "x": 64,
+        "y": 0,
+        "w": 64,
+        "h": 64
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 64,
+        "h": 64
+      },
+      "sourceSize": {
+        "w": 64,
+        "h": 64
+      },
+      "duration": 160
+    },
+    {
+      "filename": "slime-purple-happy-heart (하트) 2.aseprite",
+      "frame": {
+        "x": 128,
+        "y": 0,
+        "w": 64,
+        "h": 64
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 64,
+        "h": 64
+      },
+      "sourceSize": {
+        "w": 64,
+        "h": 64
+      },
+      "duration": 120
+    },
+    {
+      "filename": "slime-purple-happy-heart (하트) 3.aseprite",
+      "frame": {
+        "x": 192,
+        "y": 0,
+        "w": 64,
+        "h": 64
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 64,
+        "h": 64
+      },
+      "sourceSize": {
+        "w": 64,
+        "h": 64
+      },
+      "duration": 110
+    },
+    {
+      "filename": "slime-purple-happy-heart (하트) 4.aseprite",
+      "frame": {
+        "x": 256,
+        "y": 0,
+        "w": 64,
+        "h": 64
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 64,
+        "h": 64
+      },
+      "sourceSize": {
+        "w": 64,
+        "h": 64
+      },
+      "duration": 110
+    },
+    {
+      "filename": "slime-purple-happy-heart (하트) 5.aseprite",
+      "frame": {
+        "x": 320,
+        "y": 0,
+        "w": 64,
+        "h": 64
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 64,
+        "h": 64
+      },
+      "sourceSize": {
+        "w": 64,
+        "h": 64
+      },
+      "duration": 110
+    },
+    {
+      "filename": "slime-purple-happy-heart (하트) 6.aseprite",
+      "frame": {
+        "x": 384,
+        "y": 0,
+        "w": 64,
+        "h": 64
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 64,
+        "h": 64
+      },
+      "sourceSize": {
+        "w": 64,
+        "h": 64
+      },
+      "duration": 120
+    },
+    {
+      "filename": "slime-purple-happy-heart (하트) 7.aseprite",
+      "frame": {
+        "x": 448,
+        "y": 0,
+        "w": 64,
+        "h": 64
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 64,
+        "h": 64
+      },
+      "sourceSize": {
+        "w": 64,
+        "h": 64
+      },
+      "duration": 130
+    },
+    {
+      "filename": "slime-purple-happy-heart (하트) 8.aseprite",
+      "frame": {
+        "x": 512,
+        "y": 0,
+        "w": 64,
+        "h": 64
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 64,
+        "h": 64
+      },
+      "sourceSize": {
+        "w": 64,
+        "h": 64
+      },
+      "duration": 150
+    },
+    {
+      "filename": "slime-purple-happy-heart (하트) 9.aseprite",
+      "frame": {
+        "x": 576,
+        "y": 0,
+        "w": 64,
+        "h": 64
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 64,
+        "h": 64
+      },
+      "sourceSize": {
+        "w": 64,
+        "h": 64
+      },
+      "duration": 170
+    },
+    {
+      "filename": "slime-purple-happy-heart (하트) 10.aseprite",
+      "frame": {
+        "x": 640,
+        "y": 0,
+        "w": 64,
+        "h": 64
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 64,
+        "h": 64
+      },
+      "sourceSize": {
+        "w": 64,
+        "h": 64
+      },
+      "duration": 190
+    },
+    {
+      "filename": "slime-purple-happy-heart (하트) 11.aseprite",
+      "frame": {
+        "x": 704,
+        "y": 0,
+        "w": 64,
+        "h": 64
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 64,
+        "h": 64
+      },
+      "sourceSize": {
+        "w": 64,
+        "h": 64
+      },
+      "duration": 260
+    }
+  ],
+  "meta": {
+    "app": "https://www.aseprite.org/",
+    "version": "1.x-dev",
+    "image": "heart.png",
+    "format": "RGBA8888",
+    "size": {
+      "w": 768,
+      "h": 64
+    },
+    "scale": "1"
+  }
+}, sheet: require("../assets/slimes/overlays/happy-heart/base/purple/sheet.png") },
+  "base/red": { key: "base/red", evolution: "base", color: "red", action: "happy", imageScale: 4, metadata: {
+  "frames": [
+    {
+      "filename": "slime-red-happy-heart (하트) 0.aseprite",
+      "frame": {
+        "x": 0,
+        "y": 0,
+        "w": 64,
+        "h": 64
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 64,
+        "h": 64
+      },
+      "sourceSize": {
+        "w": 64,
+        "h": 64
+      },
+      "duration": 220
+    },
+    {
+      "filename": "slime-red-happy-heart (하트) 1.aseprite",
+      "frame": {
+        "x": 64,
+        "y": 0,
+        "w": 64,
+        "h": 64
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 64,
+        "h": 64
+      },
+      "sourceSize": {
+        "w": 64,
+        "h": 64
+      },
+      "duration": 160
+    },
+    {
+      "filename": "slime-red-happy-heart (하트) 2.aseprite",
+      "frame": {
+        "x": 128,
+        "y": 0,
+        "w": 64,
+        "h": 64
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 64,
+        "h": 64
+      },
+      "sourceSize": {
+        "w": 64,
+        "h": 64
+      },
+      "duration": 120
+    },
+    {
+      "filename": "slime-red-happy-heart (하트) 3.aseprite",
+      "frame": {
+        "x": 192,
+        "y": 0,
+        "w": 64,
+        "h": 64
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 64,
+        "h": 64
+      },
+      "sourceSize": {
+        "w": 64,
+        "h": 64
+      },
+      "duration": 110
+    },
+    {
+      "filename": "slime-red-happy-heart (하트) 4.aseprite",
+      "frame": {
+        "x": 256,
+        "y": 0,
+        "w": 64,
+        "h": 64
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 64,
+        "h": 64
+      },
+      "sourceSize": {
+        "w": 64,
+        "h": 64
+      },
+      "duration": 110
+    },
+    {
+      "filename": "slime-red-happy-heart (하트) 5.aseprite",
+      "frame": {
+        "x": 320,
+        "y": 0,
+        "w": 64,
+        "h": 64
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 64,
+        "h": 64
+      },
+      "sourceSize": {
+        "w": 64,
+        "h": 64
+      },
+      "duration": 110
+    },
+    {
+      "filename": "slime-red-happy-heart (하트) 6.aseprite",
+      "frame": {
+        "x": 384,
+        "y": 0,
+        "w": 64,
+        "h": 64
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 64,
+        "h": 64
+      },
+      "sourceSize": {
+        "w": 64,
+        "h": 64
+      },
+      "duration": 120
+    },
+    {
+      "filename": "slime-red-happy-heart (하트) 7.aseprite",
+      "frame": {
+        "x": 448,
+        "y": 0,
+        "w": 64,
+        "h": 64
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 64,
+        "h": 64
+      },
+      "sourceSize": {
+        "w": 64,
+        "h": 64
+      },
+      "duration": 130
+    },
+    {
+      "filename": "slime-red-happy-heart (하트) 8.aseprite",
+      "frame": {
+        "x": 512,
+        "y": 0,
+        "w": 64,
+        "h": 64
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 64,
+        "h": 64
+      },
+      "sourceSize": {
+        "w": 64,
+        "h": 64
+      },
+      "duration": 150
+    },
+    {
+      "filename": "slime-red-happy-heart (하트) 9.aseprite",
+      "frame": {
+        "x": 576,
+        "y": 0,
+        "w": 64,
+        "h": 64
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 64,
+        "h": 64
+      },
+      "sourceSize": {
+        "w": 64,
+        "h": 64
+      },
+      "duration": 170
+    },
+    {
+      "filename": "slime-red-happy-heart (하트) 10.aseprite",
+      "frame": {
+        "x": 640,
+        "y": 0,
+        "w": 64,
+        "h": 64
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 64,
+        "h": 64
+      },
+      "sourceSize": {
+        "w": 64,
+        "h": 64
+      },
+      "duration": 190
+    },
+    {
+      "filename": "slime-red-happy-heart (하트) 11.aseprite",
+      "frame": {
+        "x": 704,
+        "y": 0,
+        "w": 64,
+        "h": 64
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 64,
+        "h": 64
+      },
+      "sourceSize": {
+        "w": 64,
+        "h": 64
+      },
+      "duration": 260
+    }
+  ],
+  "meta": {
+    "app": "https://www.aseprite.org/",
+    "version": "1.x-dev",
+    "image": "heart.png",
+    "format": "RGBA8888",
+    "size": {
+      "w": 768,
+      "h": 64
+    },
+    "scale": "1"
+  }
+}, sheet: require("../assets/slimes/overlays/happy-heart/base/red/sheet.png") },
+  "base/yellow": { key: "base/yellow", evolution: "base", color: "yellow", action: "happy", imageScale: 4, metadata: {
+  "frames": [
+    {
+      "filename": "slime-yellow-happy-heart (하트) 0.aseprite",
+      "frame": {
+        "x": 0,
+        "y": 0,
+        "w": 64,
+        "h": 64
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 64,
+        "h": 64
+      },
+      "sourceSize": {
+        "w": 64,
+        "h": 64
+      },
+      "duration": 220
+    },
+    {
+      "filename": "slime-yellow-happy-heart (하트) 1.aseprite",
+      "frame": {
+        "x": 64,
+        "y": 0,
+        "w": 64,
+        "h": 64
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 64,
+        "h": 64
+      },
+      "sourceSize": {
+        "w": 64,
+        "h": 64
+      },
+      "duration": 160
+    },
+    {
+      "filename": "slime-yellow-happy-heart (하트) 2.aseprite",
+      "frame": {
+        "x": 128,
+        "y": 0,
+        "w": 64,
+        "h": 64
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 64,
+        "h": 64
+      },
+      "sourceSize": {
+        "w": 64,
+        "h": 64
+      },
+      "duration": 120
+    },
+    {
+      "filename": "slime-yellow-happy-heart (하트) 3.aseprite",
+      "frame": {
+        "x": 192,
+        "y": 0,
+        "w": 64,
+        "h": 64
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 64,
+        "h": 64
+      },
+      "sourceSize": {
+        "w": 64,
+        "h": 64
+      },
+      "duration": 110
+    },
+    {
+      "filename": "slime-yellow-happy-heart (하트) 4.aseprite",
+      "frame": {
+        "x": 256,
+        "y": 0,
+        "w": 64,
+        "h": 64
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 64,
+        "h": 64
+      },
+      "sourceSize": {
+        "w": 64,
+        "h": 64
+      },
+      "duration": 110
+    },
+    {
+      "filename": "slime-yellow-happy-heart (하트) 5.aseprite",
+      "frame": {
+        "x": 320,
+        "y": 0,
+        "w": 64,
+        "h": 64
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 64,
+        "h": 64
+      },
+      "sourceSize": {
+        "w": 64,
+        "h": 64
+      },
+      "duration": 110
+    },
+    {
+      "filename": "slime-yellow-happy-heart (하트) 6.aseprite",
+      "frame": {
+        "x": 384,
+        "y": 0,
+        "w": 64,
+        "h": 64
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 64,
+        "h": 64
+      },
+      "sourceSize": {
+        "w": 64,
+        "h": 64
+      },
+      "duration": 120
+    },
+    {
+      "filename": "slime-yellow-happy-heart (하트) 7.aseprite",
+      "frame": {
+        "x": 448,
+        "y": 0,
+        "w": 64,
+        "h": 64
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 64,
+        "h": 64
+      },
+      "sourceSize": {
+        "w": 64,
+        "h": 64
+      },
+      "duration": 130
+    },
+    {
+      "filename": "slime-yellow-happy-heart (하트) 8.aseprite",
+      "frame": {
+        "x": 512,
+        "y": 0,
+        "w": 64,
+        "h": 64
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 64,
+        "h": 64
+      },
+      "sourceSize": {
+        "w": 64,
+        "h": 64
+      },
+      "duration": 150
+    },
+    {
+      "filename": "slime-yellow-happy-heart (하트) 9.aseprite",
+      "frame": {
+        "x": 576,
+        "y": 0,
+        "w": 64,
+        "h": 64
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 64,
+        "h": 64
+      },
+      "sourceSize": {
+        "w": 64,
+        "h": 64
+      },
+      "duration": 170
+    },
+    {
+      "filename": "slime-yellow-happy-heart (하트) 10.aseprite",
+      "frame": {
+        "x": 640,
+        "y": 0,
+        "w": 64,
+        "h": 64
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 64,
+        "h": 64
+      },
+      "sourceSize": {
+        "w": 64,
+        "h": 64
+      },
+      "duration": 190
+    },
+    {
+      "filename": "slime-yellow-happy-heart (하트) 11.aseprite",
+      "frame": {
+        "x": 704,
+        "y": 0,
+        "w": 64,
+        "h": 64
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 64,
+        "h": 64
+      },
+      "sourceSize": {
+        "w": 64,
+        "h": 64
+      },
+      "duration": 260
+    }
+  ],
+  "meta": {
+    "app": "https://www.aseprite.org/",
+    "version": "1.x-dev",
+    "image": "heart.png",
+    "format": "RGBA8888",
+    "size": {
+      "w": 768,
+      "h": 64
+    },
+    "scale": "1"
+  }
+}, sheet: require("../assets/slimes/overlays/happy-heart/base/yellow/sheet.png") },
 } as const;
 
 export const SLIME_MOBILE_SHARED_ASSETS = {
@@ -24181,17 +30944,69 @@ export const SLIME_MOBILE_SHARED_ASSETS = {
 export const SLIME_MOBILE_ANIMATION_MANIFEST = {
   schemaVersion: 1,
   imageScale: 4,
-  colors: ["blue", "green", "yellow", "purple", "red"],
-  evolutions: ["base", "gold-crown-red-gem", "silver-crown-blue-gem"],
-  actions: ["idle", "happy", "drink", "water-puddle", "trampoline"],
+  colors: [
+  "blue",
+  "green",
+  "yellow",
+  "purple",
+  "red"
+],
+  evolutions: [
+  "base",
+  "gold-crown-red-gem",
+  "silver-crown-blue-gem"
+],
+  actions: [
+  "idle",
+  "happy",
+  "drink-lemonade",
+  "drink-strawberry-soda",
+  "drink-melon-soda",
+  "drink-grape-soda",
+  "drink-blue-ramune",
+  "water-puddle",
+  "trampoline"
+],
   playbackByAction: {
-    idle: { loop: true, oneShot: false },
-    happy: { loop: false, oneShot: true },
-    drink: { loop: false, oneShot: true },
-    "water-puddle": { loop: false, oneShot: true },
-    trampoline: { loop: false, oneShot: true },
+  "idle": {
+    "loop": true,
+    "oneShot": false
   },
+  "happy": {
+    "loop": false,
+    "oneShot": true
+  },
+  "drink-lemonade": {
+    "loop": false,
+    "oneShot": true
+  },
+  "drink-strawberry-soda": {
+    "loop": false,
+    "oneShot": true
+  },
+  "drink-melon-soda": {
+    "loop": false,
+    "oneShot": true
+  },
+  "drink-grape-soda": {
+    "loop": false,
+    "oneShot": true
+  },
+  "drink-blue-ramune": {
+    "loop": false,
+    "oneShot": true
+  },
+  "water-puddle": {
+    "loop": false,
+    "oneShot": true
+  },
+  "trampoline": {
+    "loop": false,
+    "oneShot": true
+  }
+},
   assets: SLIME_MOBILE_ASSET_REGISTRY,
   crownOverlays: SLIME_MOBILE_CROWN_OVERLAY_REGISTRY,
+  happyHeartOverlays: SLIME_MOBILE_HAPPY_HEART_OVERLAY_REGISTRY,
   shared: SLIME_MOBILE_SHARED_ASSETS,
 } as const;

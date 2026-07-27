@@ -1,0 +1,1107 @@
+{
+  "generatedBy": "scripts/import-slime-wearable-actions.mjs",
+  "purpose": "Extract per-action wearable overlays from the combined character-plus-wearable sheets so every character action joins the anchor pipeline. Replace with published overlays when available.",
+  "externalSource": "C:/Users/심보승/Desktop/pixel asset/SlimeAssets",
+  "extractionRule": "Per frame, align the character sheet under the combined sheet without losing any body pixel, take the pixels the combined sheet paints, and keep only those all five colors agree on. Recompositing must reproduce the authored sheet exactly.",
+  "inputs": {
+    "headwear/beige-beanie/trampoline/blue": {
+      "combinedSheet": "props/wearables/headwear/beige-beanie/jump/trampoline/blue/slime-blue-trampoline-beige-beanie-sheet.png",
+      "combinedSha256": "e6b1356690771fd37f87f8dc96ea1aacae1c1d7e7c6fa84c5c15a63b64c9aa66",
+      "characterSheet": "floors/trampoline/blue/slime-blue-trampoline-sheet.png",
+      "characterSha256": "55db67336c52cb5928dbd315f317b65c09e39eb01dc54e728438d98daa3f7afc"
+    },
+    "headwear/beige-beanie/trampoline/green": {
+      "combinedSheet": "props/wearables/headwear/beige-beanie/jump/trampoline/green/slime-green-trampoline-beige-beanie-sheet.png",
+      "combinedSha256": "2c2010d1ddef800746b94dc6e789a6ad9a2861ece58ead0de8a384b9a7723773",
+      "characterSheet": "floors/trampoline/green/slime-green-trampoline-sheet.png",
+      "characterSha256": "34318bf24e863a4fb1bb9911dba8d2c03e86c84d2bed75694c8f01c1848190da"
+    },
+    "headwear/beige-beanie/trampoline/purple": {
+      "combinedSheet": "props/wearables/headwear/beige-beanie/jump/trampoline/purple/slime-purple-trampoline-beige-beanie-sheet.png",
+      "combinedSha256": "147e5a827665e23b5eaa41e372d3c9d7e18e2efd29d9fdceb6512617828d5911",
+      "characterSheet": "floors/trampoline/purple/slime-purple-trampoline-sheet.png",
+      "characterSha256": "cd99088ae932831da75cb35755b275e961f84cf39ebd3cf09d969ff07c381a40"
+    },
+    "headwear/beige-beanie/trampoline/red": {
+      "combinedSheet": "props/wearables/headwear/beige-beanie/jump/trampoline/red/slime-red-trampoline-beige-beanie-sheet.png",
+      "combinedSha256": "ee2d63ebdb2c108e7bb462bff8c79cefa899a05c8935bc8f3fcecff82fe7f01d",
+      "characterSheet": "floors/trampoline/red/slime-red-trampoline-sheet.png",
+      "characterSha256": "de7fe036dd20d51e076fc9c72309159314de5f00b56221e4573ac73c588fd127"
+    },
+    "headwear/beige-beanie/trampoline/yellow": {
+      "combinedSheet": "props/wearables/headwear/beige-beanie/jump/trampoline/yellow/slime-yellow-trampoline-beige-beanie-sheet.png",
+      "combinedSha256": "bd171928890c760dd1983904f8c3796b9424a3ffabef0bd865bba35079e2e480",
+      "characterSheet": "floors/trampoline/yellow/slime-yellow-trampoline-sheet.png",
+      "characterSha256": "39f4109f51dff7edb4316036b43bd80846ce798a0de24a8ae6a133d94ffe8a58"
+    },
+    "headwear/beige-beanie/water-puddle/blue": {
+      "combinedSheet": "props/wearables/headwear/beige-beanie/jump/water-puddle/blue/slime-blue-water-puddle-beige-beanie-sheet.png",
+      "combinedSha256": "fc4ceafbaae39e9f80810082dca36f3164854ff12b5ed81886473096b0d64384",
+      "characterSheet": "floors/water-puddle/jump/blue/slime-blue-sheet.png",
+      "characterSha256": "7ef3c81b78156e87e5d87484b23ff89d9c095422f46c63fc60edf0bfa7f8c230"
+    },
+    "headwear/beige-beanie/water-puddle/green": {
+      "combinedSheet": "props/wearables/headwear/beige-beanie/jump/water-puddle/green/slime-green-water-puddle-beige-beanie-sheet.png",
+      "combinedSha256": "91c503805188e370f8779ab8e3c6305f20233161ffe883dda97bc9b54723f80a",
+      "characterSheet": "floors/water-puddle/jump/green/slime-green-sheet.png",
+      "characterSha256": "b10cc5fb93fcd128f21d54684b672a57ee076376b07cf06d4830ef4a781ed15d"
+    },
+    "headwear/beige-beanie/water-puddle/purple": {
+      "combinedSheet": "props/wearables/headwear/beige-beanie/jump/water-puddle/purple/slime-purple-water-puddle-beige-beanie-sheet.png",
+      "combinedSha256": "9f281c409784907778d51e69d2f28a0fdf3262ecf5d2ab87f6fb8535cf3e21ce",
+      "characterSheet": "floors/water-puddle/jump/purple/slime-purple-sheet.png",
+      "characterSha256": "e2df493ce6f53a8fa9486949742d90e5ff4705612a66ecbbb40b8683500b8f1d"
+    },
+    "headwear/beige-beanie/water-puddle/red": {
+      "combinedSheet": "props/wearables/headwear/beige-beanie/jump/water-puddle/red/slime-red-water-puddle-beige-beanie-sheet.png",
+      "combinedSha256": "8da7a3e026edc279e79e5c19365b397088ce5372e3058f46009f5570b26ca49f",
+      "characterSheet": "floors/water-puddle/jump/red/slime-red-sheet.png",
+      "characterSha256": "96cf1f7e639cedc666de1fed7ce3c925f1487e20ba3d5bf3a2275661d2f5f439"
+    },
+    "headwear/beige-beanie/water-puddle/yellow": {
+      "combinedSheet": "props/wearables/headwear/beige-beanie/jump/water-puddle/yellow/slime-yellow-water-puddle-beige-beanie-sheet.png",
+      "combinedSha256": "d9b201340faf179a3dfa57f2e49a990c0cf5d41da71d9cac1017d9fd86071078",
+      "characterSheet": "floors/water-puddle/jump/yellow/slime-yellow-sheet.png",
+      "characterSha256": "f98385f90175ec789acb16f683485425dc17e0509427fd89484f3d8b405533c8"
+    },
+    "headwear/brown-beanie/trampoline/blue": {
+      "combinedSheet": "props/wearables/headwear/brown-beanie/jump/trampoline/blue/slime-blue-trampoline-brown-beanie-sheet.png",
+      "combinedSha256": "72c5c240b4aa2b19736a50f50e327034db694d2171bd087b932e850c8236d897",
+      "characterSheet": "floors/trampoline/blue/slime-blue-trampoline-sheet.png",
+      "characterSha256": "55db67336c52cb5928dbd315f317b65c09e39eb01dc54e728438d98daa3f7afc"
+    },
+    "headwear/brown-beanie/trampoline/green": {
+      "combinedSheet": "props/wearables/headwear/brown-beanie/jump/trampoline/green/slime-green-trampoline-brown-beanie-sheet.png",
+      "combinedSha256": "2b8761ef968c5125ef7e3084dca07066a9292082c2df299149b722b678f0b979",
+      "characterSheet": "floors/trampoline/green/slime-green-trampoline-sheet.png",
+      "characterSha256": "34318bf24e863a4fb1bb9911dba8d2c03e86c84d2bed75694c8f01c1848190da"
+    },
+    "headwear/brown-beanie/trampoline/purple": {
+      "combinedSheet": "props/wearables/headwear/brown-beanie/jump/trampoline/purple/slime-purple-trampoline-brown-beanie-sheet.png",
+      "combinedSha256": "14e3f3bf1c0d57d2b01e655532cbb725dbf632663270faf70a345c25b2ee634d",
+      "characterSheet": "floors/trampoline/purple/slime-purple-trampoline-sheet.png",
+      "characterSha256": "cd99088ae932831da75cb35755b275e961f84cf39ebd3cf09d969ff07c381a40"
+    },
+    "headwear/brown-beanie/trampoline/red": {
+      "combinedSheet": "props/wearables/headwear/brown-beanie/jump/trampoline/red/slime-red-trampoline-brown-beanie-sheet.png",
+      "combinedSha256": "ba9df235f85f352c077aa2cbb1cfb30ec0ed9db8044b85a208fd3f7a52b5f3c4",
+      "characterSheet": "floors/trampoline/red/slime-red-trampoline-sheet.png",
+      "characterSha256": "de7fe036dd20d51e076fc9c72309159314de5f00b56221e4573ac73c588fd127"
+    },
+    "headwear/brown-beanie/trampoline/yellow": {
+      "combinedSheet": "props/wearables/headwear/brown-beanie/jump/trampoline/yellow/slime-yellow-trampoline-brown-beanie-sheet.png",
+      "combinedSha256": "6335b02787e2882496bf9d503752b1e052806b8ecaa5a976918553ecfbc99cde",
+      "characterSheet": "floors/trampoline/yellow/slime-yellow-trampoline-sheet.png",
+      "characterSha256": "39f4109f51dff7edb4316036b43bd80846ce798a0de24a8ae6a133d94ffe8a58"
+    },
+    "headwear/brown-beanie/water-puddle/blue": {
+      "combinedSheet": "props/wearables/headwear/brown-beanie/jump/water-puddle/blue/slime-blue-water-puddle-brown-beanie-sheet.png",
+      "combinedSha256": "75cfc6292b0c2e046f5350543aa031cc0ddf9928a3b68513db219427ef16b82d",
+      "characterSheet": "floors/water-puddle/jump/blue/slime-blue-sheet.png",
+      "characterSha256": "7ef3c81b78156e87e5d87484b23ff89d9c095422f46c63fc60edf0bfa7f8c230"
+    },
+    "headwear/brown-beanie/water-puddle/green": {
+      "combinedSheet": "props/wearables/headwear/brown-beanie/jump/water-puddle/green/slime-green-water-puddle-brown-beanie-sheet.png",
+      "combinedSha256": "be1f9aad0b90e943dd5370b69bfdf1daa1790b58590bd70356e92bee1f9ddb3a",
+      "characterSheet": "floors/water-puddle/jump/green/slime-green-sheet.png",
+      "characterSha256": "b10cc5fb93fcd128f21d54684b672a57ee076376b07cf06d4830ef4a781ed15d"
+    },
+    "headwear/brown-beanie/water-puddle/purple": {
+      "combinedSheet": "props/wearables/headwear/brown-beanie/jump/water-puddle/purple/slime-purple-water-puddle-brown-beanie-sheet.png",
+      "combinedSha256": "3ed27de88bcd18251a6ae3724867890fbc3b5a750b2330e792367f81f83a2a25",
+      "characterSheet": "floors/water-puddle/jump/purple/slime-purple-sheet.png",
+      "characterSha256": "e2df493ce6f53a8fa9486949742d90e5ff4705612a66ecbbb40b8683500b8f1d"
+    },
+    "headwear/brown-beanie/water-puddle/red": {
+      "combinedSheet": "props/wearables/headwear/brown-beanie/jump/water-puddle/red/slime-red-water-puddle-brown-beanie-sheet.png",
+      "combinedSha256": "dc83d77b93e4f3b75c6cba6251fc384e7f8c1f07609fee61896d3775ede3b136",
+      "characterSheet": "floors/water-puddle/jump/red/slime-red-sheet.png",
+      "characterSha256": "96cf1f7e639cedc666de1fed7ce3c925f1487e20ba3d5bf3a2275661d2f5f439"
+    },
+    "headwear/brown-beanie/water-puddle/yellow": {
+      "combinedSheet": "props/wearables/headwear/brown-beanie/jump/water-puddle/yellow/slime-yellow-water-puddle-brown-beanie-sheet.png",
+      "combinedSha256": "d680f109f4f51a0a3e5772fc9d0bb8d13445d4bf20d07212d8dfefaa8d4e8e84",
+      "characterSheet": "floors/water-puddle/jump/yellow/slime-yellow-sheet.png",
+      "characterSha256": "f98385f90175ec789acb16f683485425dc17e0509427fd89484f3d8b405533c8"
+    },
+    "headwear/charcoal-beanie/trampoline/blue": {
+      "combinedSheet": "props/wearables/headwear/charcoal-beanie/jump/trampoline/blue/slime-blue-trampoline-charcoal-beanie-sheet.png",
+      "combinedSha256": "0c225b2acb7a41ee5c5349092ca829415ee007c417d67d337b35a8fbab5b0fa9",
+      "characterSheet": "floors/trampoline/blue/slime-blue-trampoline-sheet.png",
+      "characterSha256": "55db67336c52cb5928dbd315f317b65c09e39eb01dc54e728438d98daa3f7afc"
+    },
+    "headwear/charcoal-beanie/trampoline/green": {
+      "combinedSheet": "props/wearables/headwear/charcoal-beanie/jump/trampoline/green/slime-green-trampoline-charcoal-beanie-sheet.png",
+      "combinedSha256": "2b21ba0361f5a8f77ea5ee0f5d9594516a778111da6b1818477c5736a821fe64",
+      "characterSheet": "floors/trampoline/green/slime-green-trampoline-sheet.png",
+      "characterSha256": "34318bf24e863a4fb1bb9911dba8d2c03e86c84d2bed75694c8f01c1848190da"
+    },
+    "headwear/charcoal-beanie/trampoline/purple": {
+      "combinedSheet": "props/wearables/headwear/charcoal-beanie/jump/trampoline/purple/slime-purple-trampoline-charcoal-beanie-sheet.png",
+      "combinedSha256": "40df23b0cc763539f60bf00eecf0924ee955d4a3d587b6dea3c390b5934f7861",
+      "characterSheet": "floors/trampoline/purple/slime-purple-trampoline-sheet.png",
+      "characterSha256": "cd99088ae932831da75cb35755b275e961f84cf39ebd3cf09d969ff07c381a40"
+    },
+    "headwear/charcoal-beanie/trampoline/red": {
+      "combinedSheet": "props/wearables/headwear/charcoal-beanie/jump/trampoline/red/slime-red-trampoline-charcoal-beanie-sheet.png",
+      "combinedSha256": "f10eb03027e3f0f7def990258b696a98e7c39a1c52b09b143fb04ab77403f27b",
+      "characterSheet": "floors/trampoline/red/slime-red-trampoline-sheet.png",
+      "characterSha256": "de7fe036dd20d51e076fc9c72309159314de5f00b56221e4573ac73c588fd127"
+    },
+    "headwear/charcoal-beanie/trampoline/yellow": {
+      "combinedSheet": "props/wearables/headwear/charcoal-beanie/jump/trampoline/yellow/slime-yellow-trampoline-charcoal-beanie-sheet.png",
+      "combinedSha256": "a0efc337b8f550cd06873723816828748ce2100dff5d2a6b612b8a73ddbfe687",
+      "characterSheet": "floors/trampoline/yellow/slime-yellow-trampoline-sheet.png",
+      "characterSha256": "39f4109f51dff7edb4316036b43bd80846ce798a0de24a8ae6a133d94ffe8a58"
+    },
+    "headwear/charcoal-beanie/water-puddle/blue": {
+      "combinedSheet": "props/wearables/headwear/charcoal-beanie/jump/water-puddle/blue/slime-blue-water-puddle-charcoal-beanie-sheet.png",
+      "combinedSha256": "87f69ec6edb822e8faebf64ecbab121cf288d01abfaa6451782c5f12183b99c8",
+      "characterSheet": "floors/water-puddle/jump/blue/slime-blue-sheet.png",
+      "characterSha256": "7ef3c81b78156e87e5d87484b23ff89d9c095422f46c63fc60edf0bfa7f8c230"
+    },
+    "headwear/charcoal-beanie/water-puddle/green": {
+      "combinedSheet": "props/wearables/headwear/charcoal-beanie/jump/water-puddle/green/slime-green-water-puddle-charcoal-beanie-sheet.png",
+      "combinedSha256": "85a0349d76fad2ea17de4ff33e7459518d7b126535688a9917695e308a89f358",
+      "characterSheet": "floors/water-puddle/jump/green/slime-green-sheet.png",
+      "characterSha256": "b10cc5fb93fcd128f21d54684b672a57ee076376b07cf06d4830ef4a781ed15d"
+    },
+    "headwear/charcoal-beanie/water-puddle/purple": {
+      "combinedSheet": "props/wearables/headwear/charcoal-beanie/jump/water-puddle/purple/slime-purple-water-puddle-charcoal-beanie-sheet.png",
+      "combinedSha256": "073d3f2972d5037ff4e627c58c17449dcd4b6bca5ef51c4423172e06ef1437cd",
+      "characterSheet": "floors/water-puddle/jump/purple/slime-purple-sheet.png",
+      "characterSha256": "e2df493ce6f53a8fa9486949742d90e5ff4705612a66ecbbb40b8683500b8f1d"
+    },
+    "headwear/charcoal-beanie/water-puddle/red": {
+      "combinedSheet": "props/wearables/headwear/charcoal-beanie/jump/water-puddle/red/slime-red-water-puddle-charcoal-beanie-sheet.png",
+      "combinedSha256": "db4c87d1ca70adcb5cdbdec13502e3acd18250bcd83cc6d8e03b91106a4b96b7",
+      "characterSheet": "floors/water-puddle/jump/red/slime-red-sheet.png",
+      "characterSha256": "96cf1f7e639cedc666de1fed7ce3c925f1487e20ba3d5bf3a2275661d2f5f439"
+    },
+    "headwear/charcoal-beanie/water-puddle/yellow": {
+      "combinedSheet": "props/wearables/headwear/charcoal-beanie/jump/water-puddle/yellow/slime-yellow-water-puddle-charcoal-beanie-sheet.png",
+      "combinedSha256": "deddcdd17e0003c61e8a3f45e6439e531fd8d8010c484e01cb0c0810d93c5042",
+      "characterSheet": "floors/water-puddle/jump/yellow/slime-yellow-sheet.png",
+      "characterSha256": "f98385f90175ec789acb16f683485425dc17e0509427fd89484f3d8b405533c8"
+    },
+    "headwear/ivory-beanie/trampoline/blue": {
+      "combinedSheet": "props/wearables/headwear/ivory-beanie/jump/trampoline/blue/slime-blue-trampoline-ivory-beanie-sheet.png",
+      "combinedSha256": "677e9d3bc54b78967eff4944268d2e1eb9dac1e66939e9c780cf9891ce4a8e13",
+      "characterSheet": "floors/trampoline/blue/slime-blue-trampoline-sheet.png",
+      "characterSha256": "55db67336c52cb5928dbd315f317b65c09e39eb01dc54e728438d98daa3f7afc"
+    },
+    "headwear/ivory-beanie/trampoline/green": {
+      "combinedSheet": "props/wearables/headwear/ivory-beanie/jump/trampoline/green/slime-green-trampoline-ivory-beanie-sheet.png",
+      "combinedSha256": "e55e3ecf964bf1bcef89ecca9ad8c996e6fbb0980d2aaeb352bd316d336d9b0a",
+      "characterSheet": "floors/trampoline/green/slime-green-trampoline-sheet.png",
+      "characterSha256": "34318bf24e863a4fb1bb9911dba8d2c03e86c84d2bed75694c8f01c1848190da"
+    },
+    "headwear/ivory-beanie/trampoline/purple": {
+      "combinedSheet": "props/wearables/headwear/ivory-beanie/jump/trampoline/purple/slime-purple-trampoline-ivory-beanie-sheet.png",
+      "combinedSha256": "92e4c5ea8a818ae43912ec153bc40b67fd935c43812198b46f4e81995152f4fb",
+      "characterSheet": "floors/trampoline/purple/slime-purple-trampoline-sheet.png",
+      "characterSha256": "cd99088ae932831da75cb35755b275e961f84cf39ebd3cf09d969ff07c381a40"
+    },
+    "headwear/ivory-beanie/trampoline/red": {
+      "combinedSheet": "props/wearables/headwear/ivory-beanie/jump/trampoline/red/slime-red-trampoline-ivory-beanie-sheet.png",
+      "combinedSha256": "e6cab57b3ea4c0d1c563ed367a053dbceb2a57ae59c8f13457892176d25539ff",
+      "characterSheet": "floors/trampoline/red/slime-red-trampoline-sheet.png",
+      "characterSha256": "de7fe036dd20d51e076fc9c72309159314de5f00b56221e4573ac73c588fd127"
+    },
+    "headwear/ivory-beanie/trampoline/yellow": {
+      "combinedSheet": "props/wearables/headwear/ivory-beanie/jump/trampoline/yellow/slime-yellow-trampoline-ivory-beanie-sheet.png",
+      "combinedSha256": "7ee64b7a98d921324b8d4194d6af0315f9d565ab4cb957b22a3831e30d9fb2bb",
+      "characterSheet": "floors/trampoline/yellow/slime-yellow-trampoline-sheet.png",
+      "characterSha256": "39f4109f51dff7edb4316036b43bd80846ce798a0de24a8ae6a133d94ffe8a58"
+    },
+    "headwear/ivory-beanie/water-puddle/blue": {
+      "combinedSheet": "props/wearables/headwear/ivory-beanie/jump/water-puddle/blue/slime-blue-water-puddle-ivory-beanie-sheet.png",
+      "combinedSha256": "e0e37478ced44e5733a58d21b06223242a15c09f25baf3710ff100a65c92f155",
+      "characterSheet": "floors/water-puddle/jump/blue/slime-blue-sheet.png",
+      "characterSha256": "7ef3c81b78156e87e5d87484b23ff89d9c095422f46c63fc60edf0bfa7f8c230"
+    },
+    "headwear/ivory-beanie/water-puddle/green": {
+      "combinedSheet": "props/wearables/headwear/ivory-beanie/jump/water-puddle/green/slime-green-water-puddle-ivory-beanie-sheet.png",
+      "combinedSha256": "6ab56538d6b3b95a108cb5b4c63bcb4123ce01c750a2cc8b4d36c13e46287539",
+      "characterSheet": "floors/water-puddle/jump/green/slime-green-sheet.png",
+      "characterSha256": "b10cc5fb93fcd128f21d54684b672a57ee076376b07cf06d4830ef4a781ed15d"
+    },
+    "headwear/ivory-beanie/water-puddle/purple": {
+      "combinedSheet": "props/wearables/headwear/ivory-beanie/jump/water-puddle/purple/slime-purple-water-puddle-ivory-beanie-sheet.png",
+      "combinedSha256": "8aeadfbb6db330724749b2c51b1ea111bfb366f0b15a34f90a9c2611e0f0dbfc",
+      "characterSheet": "floors/water-puddle/jump/purple/slime-purple-sheet.png",
+      "characterSha256": "e2df493ce6f53a8fa9486949742d90e5ff4705612a66ecbbb40b8683500b8f1d"
+    },
+    "headwear/ivory-beanie/water-puddle/red": {
+      "combinedSheet": "props/wearables/headwear/ivory-beanie/jump/water-puddle/red/slime-red-water-puddle-ivory-beanie-sheet.png",
+      "combinedSha256": "1725a26d1e97af9c41a3e8731f2cd9f0d37ce6871686f956e16440fc5ebe6b28",
+      "characterSheet": "floors/water-puddle/jump/red/slime-red-sheet.png",
+      "characterSha256": "96cf1f7e639cedc666de1fed7ce3c925f1487e20ba3d5bf3a2275661d2f5f439"
+    },
+    "headwear/ivory-beanie/water-puddle/yellow": {
+      "combinedSheet": "props/wearables/headwear/ivory-beanie/jump/water-puddle/yellow/slime-yellow-water-puddle-ivory-beanie-sheet.png",
+      "combinedSha256": "37fd4cecaae62a5533ec06dbafc7d291201014278c2d5afa227e707f6b77d64b",
+      "characterSheet": "floors/water-puddle/jump/yellow/slime-yellow-sheet.png",
+      "characterSha256": "f98385f90175ec789acb16f683485425dc17e0509427fd89484f3d8b405533c8"
+    },
+    "headwear/purple-wizard-hat/trampoline/blue": {
+      "combinedSheet": "props/wearables/headwear/purple-wizard-hat/jump/trampoline/blue/slime-blue-trampoline-purple-wizard-hat-sheet.png",
+      "combinedSha256": "1e00ba7f1f88c066ae7a1f8cd219f7e8679e98add165154ee857715310f56996",
+      "characterSheet": "floors/trampoline/blue/slime-blue-trampoline-sheet.png",
+      "characterSha256": "55db67336c52cb5928dbd315f317b65c09e39eb01dc54e728438d98daa3f7afc"
+    },
+    "headwear/purple-wizard-hat/trampoline/green": {
+      "combinedSheet": "props/wearables/headwear/purple-wizard-hat/jump/trampoline/green/slime-green-trampoline-purple-wizard-hat-sheet.png",
+      "combinedSha256": "b0ff06b46321ba4bdac87a989605095deda149d6acfbd9776d95cc1a4f9c1189",
+      "characterSheet": "floors/trampoline/green/slime-green-trampoline-sheet.png",
+      "characterSha256": "34318bf24e863a4fb1bb9911dba8d2c03e86c84d2bed75694c8f01c1848190da"
+    },
+    "headwear/purple-wizard-hat/trampoline/purple": {
+      "combinedSheet": "props/wearables/headwear/purple-wizard-hat/jump/trampoline/purple/slime-purple-trampoline-purple-wizard-hat-sheet.png",
+      "combinedSha256": "6d10d0ad07f28573cf03d59abf8b8aad26e2026e168b817c81374f8190e45874",
+      "characterSheet": "floors/trampoline/purple/slime-purple-trampoline-sheet.png",
+      "characterSha256": "cd99088ae932831da75cb35755b275e961f84cf39ebd3cf09d969ff07c381a40"
+    },
+    "headwear/purple-wizard-hat/trampoline/red": {
+      "combinedSheet": "props/wearables/headwear/purple-wizard-hat/jump/trampoline/red/slime-red-trampoline-purple-wizard-hat-sheet.png",
+      "combinedSha256": "e824da91f755120e8bb4a464f120c21714e99f9d4e570cbbb0c6698860461e4a",
+      "characterSheet": "floors/trampoline/red/slime-red-trampoline-sheet.png",
+      "characterSha256": "de7fe036dd20d51e076fc9c72309159314de5f00b56221e4573ac73c588fd127"
+    },
+    "headwear/purple-wizard-hat/trampoline/yellow": {
+      "combinedSheet": "props/wearables/headwear/purple-wizard-hat/jump/trampoline/yellow/slime-yellow-trampoline-purple-wizard-hat-sheet.png",
+      "combinedSha256": "c35ef714adb40a646034ea8b7a4d3cb8d6fad63d7b679cc2256d3dce4d55fb9a",
+      "characterSheet": "floors/trampoline/yellow/slime-yellow-trampoline-sheet.png",
+      "characterSha256": "39f4109f51dff7edb4316036b43bd80846ce798a0de24a8ae6a133d94ffe8a58"
+    },
+    "headwear/purple-wizard-hat/water-puddle/blue": {
+      "combinedSheet": "props/wearables/headwear/purple-wizard-hat/jump/water-puddle/blue/slime-blue-water-puddle-purple-wizard-hat-sheet.png",
+      "combinedSha256": "829c16493c592d25d563955feaed9e0f4e32d7f25e07e10fc333b3b838fb5e5b",
+      "characterSheet": "floors/water-puddle/jump/blue/slime-blue-sheet.png",
+      "characterSha256": "7ef3c81b78156e87e5d87484b23ff89d9c095422f46c63fc60edf0bfa7f8c230"
+    },
+    "headwear/purple-wizard-hat/water-puddle/green": {
+      "combinedSheet": "props/wearables/headwear/purple-wizard-hat/jump/water-puddle/green/slime-green-water-puddle-purple-wizard-hat-sheet.png",
+      "combinedSha256": "fe6a92edef5ab6478f2bd2c64e132a25638fbebe4eb6c406306c9f2191bda827",
+      "characterSheet": "floors/water-puddle/jump/green/slime-green-sheet.png",
+      "characterSha256": "b10cc5fb93fcd128f21d54684b672a57ee076376b07cf06d4830ef4a781ed15d"
+    },
+    "headwear/purple-wizard-hat/water-puddle/purple": {
+      "combinedSheet": "props/wearables/headwear/purple-wizard-hat/jump/water-puddle/purple/slime-purple-water-puddle-purple-wizard-hat-sheet.png",
+      "combinedSha256": "23229dd1aeddd3fe932a92c5c52a24e8c19528f7efa59009d0caea3a0a116100",
+      "characterSheet": "floors/water-puddle/jump/purple/slime-purple-sheet.png",
+      "characterSha256": "e2df493ce6f53a8fa9486949742d90e5ff4705612a66ecbbb40b8683500b8f1d"
+    },
+    "headwear/purple-wizard-hat/water-puddle/red": {
+      "combinedSheet": "props/wearables/headwear/purple-wizard-hat/jump/water-puddle/red/slime-red-water-puddle-purple-wizard-hat-sheet.png",
+      "combinedSha256": "6beab9d05076e43742eae122dd765d3dc99fc22a03c579be5868809c5eaacc2f",
+      "characterSheet": "floors/water-puddle/jump/red/slime-red-sheet.png",
+      "characterSha256": "96cf1f7e639cedc666de1fed7ce3c925f1487e20ba3d5bf3a2275661d2f5f439"
+    },
+    "headwear/purple-wizard-hat/water-puddle/yellow": {
+      "combinedSheet": "props/wearables/headwear/purple-wizard-hat/jump/water-puddle/yellow/slime-yellow-water-puddle-purple-wizard-hat-sheet.png",
+      "combinedSha256": "e700b4fe7874bbd52af7a209ae20376dc8a239277a9bee2fcfd7304aa4697e7b",
+      "characterSheet": "floors/water-puddle/jump/yellow/slime-yellow-sheet.png",
+      "characterSha256": "f98385f90175ec789acb16f683485425dc17e0509427fd89484f3d8b405533c8"
+    },
+    "headwear/red-baseball-cap/trampoline/blue": {
+      "combinedSheet": "props/wearables/headwear/red-baseball-cap/jump/trampoline/blue/slime-blue-trampoline-red-baseball-cap-sheet.png",
+      "combinedSha256": "ba63e5d50d3a1fd4ca15d3c3e17e49330a479a1ad98673cacad7e936ee07e9f0",
+      "characterSheet": "floors/trampoline/blue/slime-blue-trampoline-sheet.png",
+      "characterSha256": "55db67336c52cb5928dbd315f317b65c09e39eb01dc54e728438d98daa3f7afc"
+    },
+    "headwear/red-baseball-cap/trampoline/green": {
+      "combinedSheet": "props/wearables/headwear/red-baseball-cap/jump/trampoline/green/slime-green-trampoline-red-baseball-cap-sheet.png",
+      "combinedSha256": "4e4eba9bc1ffe6e5de6d7917d5e8debd02d9efbc8635903acda5a47a163435fc",
+      "characterSheet": "floors/trampoline/green/slime-green-trampoline-sheet.png",
+      "characterSha256": "34318bf24e863a4fb1bb9911dba8d2c03e86c84d2bed75694c8f01c1848190da"
+    },
+    "headwear/red-baseball-cap/trampoline/purple": {
+      "combinedSheet": "props/wearables/headwear/red-baseball-cap/jump/trampoline/purple/slime-purple-trampoline-red-baseball-cap-sheet.png",
+      "combinedSha256": "2259bbc0f936a39717826b175bdd0bc022660464ad701aa503ce99220fc66dda",
+      "characterSheet": "floors/trampoline/purple/slime-purple-trampoline-sheet.png",
+      "characterSha256": "cd99088ae932831da75cb35755b275e961f84cf39ebd3cf09d969ff07c381a40"
+    },
+    "headwear/red-baseball-cap/trampoline/red": {
+      "combinedSheet": "props/wearables/headwear/red-baseball-cap/jump/trampoline/red/slime-red-trampoline-red-baseball-cap-sheet.png",
+      "combinedSha256": "f1de68f3f4fc1e14f8bc74218673b4c4a4e108a82ca4408939bb764e9fc90b62",
+      "characterSheet": "floors/trampoline/red/slime-red-trampoline-sheet.png",
+      "characterSha256": "de7fe036dd20d51e076fc9c72309159314de5f00b56221e4573ac73c588fd127"
+    },
+    "headwear/red-baseball-cap/trampoline/yellow": {
+      "combinedSheet": "props/wearables/headwear/red-baseball-cap/jump/trampoline/yellow/slime-yellow-trampoline-red-baseball-cap-sheet.png",
+      "combinedSha256": "3f5a021cf4dfb3a57ddc11c18dcb81a2c05bac802883752e5dde1e089b56c310",
+      "characterSheet": "floors/trampoline/yellow/slime-yellow-trampoline-sheet.png",
+      "characterSha256": "39f4109f51dff7edb4316036b43bd80846ce798a0de24a8ae6a133d94ffe8a58"
+    },
+    "headwear/red-baseball-cap/water-puddle/blue": {
+      "combinedSheet": "props/wearables/headwear/red-baseball-cap/jump/water-puddle/blue/slime-blue-water-puddle-red-baseball-cap-sheet.png",
+      "combinedSha256": "bb87023271f677d5610503630c065ea21c60e28cb9658aabfa8baa617ed906d8",
+      "characterSheet": "floors/water-puddle/jump/blue/slime-blue-sheet.png",
+      "characterSha256": "7ef3c81b78156e87e5d87484b23ff89d9c095422f46c63fc60edf0bfa7f8c230"
+    },
+    "headwear/red-baseball-cap/water-puddle/green": {
+      "combinedSheet": "props/wearables/headwear/red-baseball-cap/jump/water-puddle/green/slime-green-water-puddle-red-baseball-cap-sheet.png",
+      "combinedSha256": "d2625df817b8ecb74b6c77d9c8f441622fd89bf5ac1f5fea3c7820931113a202",
+      "characterSheet": "floors/water-puddle/jump/green/slime-green-sheet.png",
+      "characterSha256": "b10cc5fb93fcd128f21d54684b672a57ee076376b07cf06d4830ef4a781ed15d"
+    },
+    "headwear/red-baseball-cap/water-puddle/purple": {
+      "combinedSheet": "props/wearables/headwear/red-baseball-cap/jump/water-puddle/purple/slime-purple-water-puddle-red-baseball-cap-sheet.png",
+      "combinedSha256": "bb078f24e33dab0165aed51ec72152bc9233c0c7be98a1e40fa37bddc9bf96f4",
+      "characterSheet": "floors/water-puddle/jump/purple/slime-purple-sheet.png",
+      "characterSha256": "e2df493ce6f53a8fa9486949742d90e5ff4705612a66ecbbb40b8683500b8f1d"
+    },
+    "headwear/red-baseball-cap/water-puddle/red": {
+      "combinedSheet": "props/wearables/headwear/red-baseball-cap/jump/water-puddle/red/slime-red-water-puddle-red-baseball-cap-sheet.png",
+      "combinedSha256": "825fcec35f5e76e677921513dc4a8ff6ee5762966e75d552d95457fa8537e2a2",
+      "characterSheet": "floors/water-puddle/jump/red/slime-red-sheet.png",
+      "characterSha256": "96cf1f7e639cedc666de1fed7ce3c925f1487e20ba3d5bf3a2275661d2f5f439"
+    },
+    "headwear/red-baseball-cap/water-puddle/yellow": {
+      "combinedSheet": "props/wearables/headwear/red-baseball-cap/jump/water-puddle/yellow/slime-yellow-water-puddle-red-baseball-cap-sheet.png",
+      "combinedSha256": "874295708c06313a11f1adadbf332ae84dc404e7e42a8fd6689ac91481983e9a",
+      "characterSheet": "floors/water-puddle/jump/yellow/slime-yellow-sheet.png",
+      "characterSha256": "f98385f90175ec789acb16f683485425dc17e0509427fd89484f3d8b405533c8"
+    },
+    "headwear/straw-hat/trampoline/blue": {
+      "combinedSheet": "props/wearables/headwear/straw-hat/jump/trampoline/blue/slime-blue-trampoline-straw-hat-sheet.png",
+      "combinedSha256": "e2101af1fcc4563c6e682599b04d57e42acd9173ca7d7e7f1715f9a9f855a392",
+      "characterSheet": "floors/trampoline/blue/slime-blue-trampoline-sheet.png",
+      "characterSha256": "55db67336c52cb5928dbd315f317b65c09e39eb01dc54e728438d98daa3f7afc"
+    },
+    "headwear/straw-hat/trampoline/green": {
+      "combinedSheet": "props/wearables/headwear/straw-hat/jump/trampoline/green/slime-green-trampoline-straw-hat-sheet.png",
+      "combinedSha256": "236c6b5af9eeb6f1614c01ea6a76c9113f24451ee7bbd8ed9122064095d48a2a",
+      "characterSheet": "floors/trampoline/green/slime-green-trampoline-sheet.png",
+      "characterSha256": "34318bf24e863a4fb1bb9911dba8d2c03e86c84d2bed75694c8f01c1848190da"
+    },
+    "headwear/straw-hat/trampoline/purple": {
+      "combinedSheet": "props/wearables/headwear/straw-hat/jump/trampoline/purple/slime-purple-trampoline-straw-hat-sheet.png",
+      "combinedSha256": "da65e10a5185ec462308169291091926c10d27bbe0ff8f2d7bc31b440a6b4e72",
+      "characterSheet": "floors/trampoline/purple/slime-purple-trampoline-sheet.png",
+      "characterSha256": "cd99088ae932831da75cb35755b275e961f84cf39ebd3cf09d969ff07c381a40"
+    },
+    "headwear/straw-hat/trampoline/red": {
+      "combinedSheet": "props/wearables/headwear/straw-hat/jump/trampoline/red/slime-red-trampoline-straw-hat-sheet.png",
+      "combinedSha256": "eca7b7ef69eb04636b918155279d0efca1dccba44f3b2581de92bc1584d76475",
+      "characterSheet": "floors/trampoline/red/slime-red-trampoline-sheet.png",
+      "characterSha256": "de7fe036dd20d51e076fc9c72309159314de5f00b56221e4573ac73c588fd127"
+    },
+    "headwear/straw-hat/trampoline/yellow": {
+      "combinedSheet": "props/wearables/headwear/straw-hat/jump/trampoline/yellow/slime-yellow-trampoline-straw-hat-sheet.png",
+      "combinedSha256": "8f4e97e44afcfb7d917d6894514f697d75d2cf256d0100e0401c373817de79bf",
+      "characterSheet": "floors/trampoline/yellow/slime-yellow-trampoline-sheet.png",
+      "characterSha256": "39f4109f51dff7edb4316036b43bd80846ce798a0de24a8ae6a133d94ffe8a58"
+    },
+    "headwear/straw-hat/water-puddle/blue": {
+      "combinedSheet": "props/wearables/headwear/straw-hat/jump/water-puddle/blue/slime-blue-water-puddle-straw-hat-sheet.png",
+      "combinedSha256": "791c15351768f244f0d660afce1751857deac4f9b1c08f08e73b386437444f5c",
+      "characterSheet": "floors/water-puddle/jump/blue/slime-blue-sheet.png",
+      "characterSha256": "7ef3c81b78156e87e5d87484b23ff89d9c095422f46c63fc60edf0bfa7f8c230"
+    },
+    "headwear/straw-hat/water-puddle/green": {
+      "combinedSheet": "props/wearables/headwear/straw-hat/jump/water-puddle/green/slime-green-water-puddle-straw-hat-sheet.png",
+      "combinedSha256": "b5b8f1c1a860a580e20a00d9007960d8e6f3529797c1d30fcac38b39dc00c1ce",
+      "characterSheet": "floors/water-puddle/jump/green/slime-green-sheet.png",
+      "characterSha256": "b10cc5fb93fcd128f21d54684b672a57ee076376b07cf06d4830ef4a781ed15d"
+    },
+    "headwear/straw-hat/water-puddle/purple": {
+      "combinedSheet": "props/wearables/headwear/straw-hat/jump/water-puddle/purple/slime-purple-water-puddle-straw-hat-sheet.png",
+      "combinedSha256": "0e60e72758e58ba5bbc5f13a3e6a217b4107e6a9af40d50e2a2e6338230a5190",
+      "characterSheet": "floors/water-puddle/jump/purple/slime-purple-sheet.png",
+      "characterSha256": "e2df493ce6f53a8fa9486949742d90e5ff4705612a66ecbbb40b8683500b8f1d"
+    },
+    "headwear/straw-hat/water-puddle/red": {
+      "combinedSheet": "props/wearables/headwear/straw-hat/jump/water-puddle/red/slime-red-water-puddle-straw-hat-sheet.png",
+      "combinedSha256": "bbb8c972efb62c00b570d5a0d018124382894b9f431e0be18b1fd4c0d82e29cd",
+      "characterSheet": "floors/water-puddle/jump/red/slime-red-sheet.png",
+      "characterSha256": "96cf1f7e639cedc666de1fed7ce3c925f1487e20ba3d5bf3a2275661d2f5f439"
+    },
+    "headwear/straw-hat/water-puddle/yellow": {
+      "combinedSheet": "props/wearables/headwear/straw-hat/jump/water-puddle/yellow/slime-yellow-water-puddle-straw-hat-sheet.png",
+      "combinedSha256": "ef71152e929ed95898cde5f033303e9db8bef124933802df0fe57858667645b9",
+      "characterSheet": "floors/water-puddle/jump/yellow/slime-yellow-sheet.png",
+      "characterSha256": "f98385f90175ec789acb16f683485425dc17e0509427fd89484f3d8b405533c8"
+    },
+    "eyewear/black-goggles/trampoline/blue": {
+      "combinedSheet": "props/wearables/eyewear/black-goggles/jump/trampoline/blue/slime-blue-trampoline-black-goggles-sheet.png",
+      "combinedSha256": "b1af2339618fe40784dd8b36252b5135d54c2095a0eab89c458d4b0c9c314aca",
+      "characterSheet": "floors/trampoline/blue/slime-blue-trampoline-sheet.png",
+      "characterSha256": "55db67336c52cb5928dbd315f317b65c09e39eb01dc54e728438d98daa3f7afc"
+    },
+    "eyewear/black-goggles/trampoline/green": {
+      "combinedSheet": "props/wearables/eyewear/black-goggles/jump/trampoline/green/slime-green-trampoline-black-goggles-sheet.png",
+      "combinedSha256": "37decc029dcbcd44f5b9b8a60c2f0bfcda9c765a64a83c380354b31f77475a2d",
+      "characterSheet": "floors/trampoline/green/slime-green-trampoline-sheet.png",
+      "characterSha256": "34318bf24e863a4fb1bb9911dba8d2c03e86c84d2bed75694c8f01c1848190da"
+    },
+    "eyewear/black-goggles/trampoline/purple": {
+      "combinedSheet": "props/wearables/eyewear/black-goggles/jump/trampoline/purple/slime-purple-trampoline-black-goggles-sheet.png",
+      "combinedSha256": "f97b394256d2e81b8adf5d03a932e154778a76cd348e4769b1457d570aff0f61",
+      "characterSheet": "floors/trampoline/purple/slime-purple-trampoline-sheet.png",
+      "characterSha256": "cd99088ae932831da75cb35755b275e961f84cf39ebd3cf09d969ff07c381a40"
+    },
+    "eyewear/black-goggles/trampoline/red": {
+      "combinedSheet": "props/wearables/eyewear/black-goggles/jump/trampoline/red/slime-red-trampoline-black-goggles-sheet.png",
+      "combinedSha256": "b0560aeae1677ce6517af743ba2d262f2822a4010ada74933440bf0f91e939ab",
+      "characterSheet": "floors/trampoline/red/slime-red-trampoline-sheet.png",
+      "characterSha256": "de7fe036dd20d51e076fc9c72309159314de5f00b56221e4573ac73c588fd127"
+    },
+    "eyewear/black-goggles/trampoline/yellow": {
+      "combinedSheet": "props/wearables/eyewear/black-goggles/jump/trampoline/yellow/slime-yellow-trampoline-black-goggles-sheet.png",
+      "combinedSha256": "a917d309f4bcece5e524fbd6e05cdc4e51dee4e0eed3ac5ecbe76e14536200fb",
+      "characterSheet": "floors/trampoline/yellow/slime-yellow-trampoline-sheet.png",
+      "characterSha256": "39f4109f51dff7edb4316036b43bd80846ce798a0de24a8ae6a133d94ffe8a58"
+    },
+    "eyewear/black-goggles/water-puddle/blue": {
+      "combinedSheet": "props/wearables/eyewear/black-goggles/jump/water-puddle/blue/slime-blue-water-puddle-black-goggles-sheet.png",
+      "combinedSha256": "3e34cb30af0f162b36c61befdba1a89e7e6ac8d1e7f3ac66a0ecaee7ea207bd1",
+      "characterSheet": "floors/water-puddle/jump/blue/slime-blue-sheet.png",
+      "characterSha256": "7ef3c81b78156e87e5d87484b23ff89d9c095422f46c63fc60edf0bfa7f8c230"
+    },
+    "eyewear/black-goggles/water-puddle/green": {
+      "combinedSheet": "props/wearables/eyewear/black-goggles/jump/water-puddle/green/slime-green-water-puddle-black-goggles-sheet.png",
+      "combinedSha256": "05b87a11c60039b28582e49a60b8729d9e92dd3ee45747eabf2fb0c986572098",
+      "characterSheet": "floors/water-puddle/jump/green/slime-green-sheet.png",
+      "characterSha256": "b10cc5fb93fcd128f21d54684b672a57ee076376b07cf06d4830ef4a781ed15d"
+    },
+    "eyewear/black-goggles/water-puddle/purple": {
+      "combinedSheet": "props/wearables/eyewear/black-goggles/jump/water-puddle/purple/slime-purple-water-puddle-black-goggles-sheet.png",
+      "combinedSha256": "db7ac6df2c1d665bd3e261709a92df16b789f204b0d107d875ea0d71c06118fc",
+      "characterSheet": "floors/water-puddle/jump/purple/slime-purple-sheet.png",
+      "characterSha256": "e2df493ce6f53a8fa9486949742d90e5ff4705612a66ecbbb40b8683500b8f1d"
+    },
+    "eyewear/black-goggles/water-puddle/red": {
+      "combinedSheet": "props/wearables/eyewear/black-goggles/jump/water-puddle/red/slime-red-water-puddle-black-goggles-sheet.png",
+      "combinedSha256": "b25befb126696b46de83b1ea75df092ce3794bbfbe10aaf2f649b56461760d4e",
+      "characterSheet": "floors/water-puddle/jump/red/slime-red-sheet.png",
+      "characterSha256": "96cf1f7e639cedc666de1fed7ce3c925f1487e20ba3d5bf3a2275661d2f5f439"
+    },
+    "eyewear/black-goggles/water-puddle/yellow": {
+      "combinedSheet": "props/wearables/eyewear/black-goggles/jump/water-puddle/yellow/slime-yellow-water-puddle-black-goggles-sheet.png",
+      "combinedSha256": "b71d08a76325ccbcf1616952d3ee76bffd2efc6e87f71580cb4df506756bfab6",
+      "characterSheet": "floors/water-puddle/jump/yellow/slime-yellow-sheet.png",
+      "characterSha256": "f98385f90175ec789acb16f683485425dc17e0509427fd89484f3d8b405533c8"
+    },
+    "eyewear/black-sunglasses/trampoline/blue": {
+      "combinedSheet": "props/wearables/eyewear/black-sunglasses/jump/trampoline/blue/slime-blue-trampoline-black-sunglasses-sheet.png",
+      "combinedSha256": "e0b9c7d045e7e5419a6c5266c5867db41006f559dd87d882b65efb9bf33c6240",
+      "characterSheet": "floors/trampoline/blue/slime-blue-trampoline-sheet.png",
+      "characterSha256": "55db67336c52cb5928dbd315f317b65c09e39eb01dc54e728438d98daa3f7afc"
+    },
+    "eyewear/black-sunglasses/trampoline/green": {
+      "combinedSheet": "props/wearables/eyewear/black-sunglasses/jump/trampoline/green/slime-green-trampoline-black-sunglasses-sheet.png",
+      "combinedSha256": "677c99035844bb1e20492bae3840fa6b6f0c1c8fee55e8388ee28011ff81f18a",
+      "characterSheet": "floors/trampoline/green/slime-green-trampoline-sheet.png",
+      "characterSha256": "34318bf24e863a4fb1bb9911dba8d2c03e86c84d2bed75694c8f01c1848190da"
+    },
+    "eyewear/black-sunglasses/trampoline/purple": {
+      "combinedSheet": "props/wearables/eyewear/black-sunglasses/jump/trampoline/purple/slime-purple-trampoline-black-sunglasses-sheet.png",
+      "combinedSha256": "b0e728bfd463dffaa9c2a943e9420985341e87dfff7ed1a43da6915869180867",
+      "characterSheet": "floors/trampoline/purple/slime-purple-trampoline-sheet.png",
+      "characterSha256": "cd99088ae932831da75cb35755b275e961f84cf39ebd3cf09d969ff07c381a40"
+    },
+    "eyewear/black-sunglasses/trampoline/red": {
+      "combinedSheet": "props/wearables/eyewear/black-sunglasses/jump/trampoline/red/slime-red-trampoline-black-sunglasses-sheet.png",
+      "combinedSha256": "dba7d55f5ece2a0624477f9f51cd566ffd644353d4a8a033f2a8c515f1827cfd",
+      "characterSheet": "floors/trampoline/red/slime-red-trampoline-sheet.png",
+      "characterSha256": "de7fe036dd20d51e076fc9c72309159314de5f00b56221e4573ac73c588fd127"
+    },
+    "eyewear/black-sunglasses/trampoline/yellow": {
+      "combinedSheet": "props/wearables/eyewear/black-sunglasses/jump/trampoline/yellow/slime-yellow-trampoline-black-sunglasses-sheet.png",
+      "combinedSha256": "d74a7a5260bed45f29af2bc73119755254029433057fb6cde191a7cab86c177f",
+      "characterSheet": "floors/trampoline/yellow/slime-yellow-trampoline-sheet.png",
+      "characterSha256": "39f4109f51dff7edb4316036b43bd80846ce798a0de24a8ae6a133d94ffe8a58"
+    },
+    "eyewear/black-sunglasses/water-puddle/blue": {
+      "combinedSheet": "props/wearables/eyewear/black-sunglasses/jump/water-puddle/blue/slime-blue-water-puddle-black-sunglasses-sheet.png",
+      "combinedSha256": "385b5a91d327eaeb75c3cea175ffe665958430ee2a3baeaac9fea568b5aa0fc5",
+      "characterSheet": "floors/water-puddle/jump/blue/slime-blue-sheet.png",
+      "characterSha256": "7ef3c81b78156e87e5d87484b23ff89d9c095422f46c63fc60edf0bfa7f8c230"
+    },
+    "eyewear/black-sunglasses/water-puddle/green": {
+      "combinedSheet": "props/wearables/eyewear/black-sunglasses/jump/water-puddle/green/slime-green-water-puddle-black-sunglasses-sheet.png",
+      "combinedSha256": "6d1d26cbd685e6ac65a552ef4181fac4deadcce03021499a3bc9a893b17daa4b",
+      "characterSheet": "floors/water-puddle/jump/green/slime-green-sheet.png",
+      "characterSha256": "b10cc5fb93fcd128f21d54684b672a57ee076376b07cf06d4830ef4a781ed15d"
+    },
+    "eyewear/black-sunglasses/water-puddle/purple": {
+      "combinedSheet": "props/wearables/eyewear/black-sunglasses/jump/water-puddle/purple/slime-purple-water-puddle-black-sunglasses-sheet.png",
+      "combinedSha256": "3c2bf95ecac7633f0a87f1c1d0ca6a55f5735bd2e02186f92128e048b04aa2dc",
+      "characterSheet": "floors/water-puddle/jump/purple/slime-purple-sheet.png",
+      "characterSha256": "e2df493ce6f53a8fa9486949742d90e5ff4705612a66ecbbb40b8683500b8f1d"
+    },
+    "eyewear/black-sunglasses/water-puddle/red": {
+      "combinedSheet": "props/wearables/eyewear/black-sunglasses/jump/water-puddle/red/slime-red-water-puddle-black-sunglasses-sheet.png",
+      "combinedSha256": "46069f9b1cc95bafd27ac592b1770b0d800737744bf8aa3d972b003148927458",
+      "characterSheet": "floors/water-puddle/jump/red/slime-red-sheet.png",
+      "characterSha256": "96cf1f7e639cedc666de1fed7ce3c925f1487e20ba3d5bf3a2275661d2f5f439"
+    },
+    "eyewear/black-sunglasses/water-puddle/yellow": {
+      "combinedSheet": "props/wearables/eyewear/black-sunglasses/jump/water-puddle/yellow/slime-yellow-water-puddle-black-sunglasses-sheet.png",
+      "combinedSha256": "300d30ee9b1d0eba0b683dae621a298f2018f473b75fa9861ced94d1de605f8f",
+      "characterSheet": "floors/water-puddle/jump/yellow/slime-yellow-sheet.png",
+      "characterSha256": "f98385f90175ec789acb16f683485425dc17e0509427fd89484f3d8b405533c8"
+    },
+    "eyewear/copper-goggles/trampoline/blue": {
+      "combinedSheet": "props/wearables/eyewear/copper-goggles/jump/trampoline/blue/slime-blue-trampoline-copper-goggles-sheet.png",
+      "combinedSha256": "f143259907bba01ac728d03e7171d93fbcfb7ae119b29da4dfe58e5824edce5c",
+      "characterSheet": "floors/trampoline/blue/slime-blue-trampoline-sheet.png",
+      "characterSha256": "55db67336c52cb5928dbd315f317b65c09e39eb01dc54e728438d98daa3f7afc"
+    },
+    "eyewear/copper-goggles/trampoline/green": {
+      "combinedSheet": "props/wearables/eyewear/copper-goggles/jump/trampoline/green/slime-green-trampoline-copper-goggles-sheet.png",
+      "combinedSha256": "63488ad64743dce299058666a93390458fa7efe173d45e884d76ac9c8ef51846",
+      "characterSheet": "floors/trampoline/green/slime-green-trampoline-sheet.png",
+      "characterSha256": "34318bf24e863a4fb1bb9911dba8d2c03e86c84d2bed75694c8f01c1848190da"
+    },
+    "eyewear/copper-goggles/trampoline/purple": {
+      "combinedSheet": "props/wearables/eyewear/copper-goggles/jump/trampoline/purple/slime-purple-trampoline-copper-goggles-sheet.png",
+      "combinedSha256": "63dc57507726a034b8ec1bf5a5b281dab23259ea823742f19e4bcf82ba800a68",
+      "characterSheet": "floors/trampoline/purple/slime-purple-trampoline-sheet.png",
+      "characterSha256": "cd99088ae932831da75cb35755b275e961f84cf39ebd3cf09d969ff07c381a40"
+    },
+    "eyewear/copper-goggles/trampoline/red": {
+      "combinedSheet": "props/wearables/eyewear/copper-goggles/jump/trampoline/red/slime-red-trampoline-copper-goggles-sheet.png",
+      "combinedSha256": "108fada39fb37af63ca200f1c898f76009046feca557309aca3884b3692373fc",
+      "characterSheet": "floors/trampoline/red/slime-red-trampoline-sheet.png",
+      "characterSha256": "de7fe036dd20d51e076fc9c72309159314de5f00b56221e4573ac73c588fd127"
+    },
+    "eyewear/copper-goggles/trampoline/yellow": {
+      "combinedSheet": "props/wearables/eyewear/copper-goggles/jump/trampoline/yellow/slime-yellow-trampoline-copper-goggles-sheet.png",
+      "combinedSha256": "8531d893eda3680d0adeb7b6193e4178252f1decb89d9cff89018d22fccd23e8",
+      "characterSheet": "floors/trampoline/yellow/slime-yellow-trampoline-sheet.png",
+      "characterSha256": "39f4109f51dff7edb4316036b43bd80846ce798a0de24a8ae6a133d94ffe8a58"
+    },
+    "eyewear/copper-goggles/water-puddle/blue": {
+      "combinedSheet": "props/wearables/eyewear/copper-goggles/jump/water-puddle/blue/slime-blue-water-puddle-copper-goggles-sheet.png",
+      "combinedSha256": "65ae546d6e6265d07a37068283fc7c596c409f96cb87bb589f5840731d98a83f",
+      "characterSheet": "floors/water-puddle/jump/blue/slime-blue-sheet.png",
+      "characterSha256": "7ef3c81b78156e87e5d87484b23ff89d9c095422f46c63fc60edf0bfa7f8c230"
+    },
+    "eyewear/copper-goggles/water-puddle/green": {
+      "combinedSheet": "props/wearables/eyewear/copper-goggles/jump/water-puddle/green/slime-green-water-puddle-copper-goggles-sheet.png",
+      "combinedSha256": "70f95b5b9519c47874f87b4144c02fc0ba0b2cf82996e9e7757948f84269fa90",
+      "characterSheet": "floors/water-puddle/jump/green/slime-green-sheet.png",
+      "characterSha256": "b10cc5fb93fcd128f21d54684b672a57ee076376b07cf06d4830ef4a781ed15d"
+    },
+    "eyewear/copper-goggles/water-puddle/purple": {
+      "combinedSheet": "props/wearables/eyewear/copper-goggles/jump/water-puddle/purple/slime-purple-water-puddle-copper-goggles-sheet.png",
+      "combinedSha256": "8f7128072f28caf332bb0e7095d267cd02c437a77807936737bdee6b3edbb15f",
+      "characterSheet": "floors/water-puddle/jump/purple/slime-purple-sheet.png",
+      "characterSha256": "e2df493ce6f53a8fa9486949742d90e5ff4705612a66ecbbb40b8683500b8f1d"
+    },
+    "eyewear/copper-goggles/water-puddle/red": {
+      "combinedSheet": "props/wearables/eyewear/copper-goggles/jump/water-puddle/red/slime-red-water-puddle-copper-goggles-sheet.png",
+      "combinedSha256": "dd70b7d634bc2db8beedb2b65a2f1a0a37c4b757d68aefd631b7079f7fe14711",
+      "characterSheet": "floors/water-puddle/jump/red/slime-red-sheet.png",
+      "characterSha256": "96cf1f7e639cedc666de1fed7ce3c925f1487e20ba3d5bf3a2275661d2f5f439"
+    },
+    "eyewear/copper-goggles/water-puddle/yellow": {
+      "combinedSheet": "props/wearables/eyewear/copper-goggles/jump/water-puddle/yellow/slime-yellow-water-puddle-copper-goggles-sheet.png",
+      "combinedSha256": "d04a66a9c1de7ef579e0f25813dc109e9aa6ca7f62d2f2fc01c61bea77a87ed6",
+      "characterSheet": "floors/water-puddle/jump/yellow/slime-yellow-sheet.png",
+      "characterSha256": "f98385f90175ec789acb16f683485425dc17e0509427fd89484f3d8b405533c8"
+    },
+    "eyewear/gold-goggles/trampoline/blue": {
+      "combinedSheet": "props/wearables/eyewear/gold-goggles/jump/trampoline/blue/slime-blue-trampoline-gold-goggles-sheet.png",
+      "combinedSha256": "5326fe974702c655ebcd241e3e0ee70be0cc17e150f5eea04c84ff618300d3f8",
+      "characterSheet": "floors/trampoline/blue/slime-blue-trampoline-sheet.png",
+      "characterSha256": "55db67336c52cb5928dbd315f317b65c09e39eb01dc54e728438d98daa3f7afc"
+    },
+    "eyewear/gold-goggles/trampoline/green": {
+      "combinedSheet": "props/wearables/eyewear/gold-goggles/jump/trampoline/green/slime-green-trampoline-gold-goggles-sheet.png",
+      "combinedSha256": "9c5675dac869c9c305769a7a437dfc1269af46a26ca3d0448b605e0d6a0e8300",
+      "characterSheet": "floors/trampoline/green/slime-green-trampoline-sheet.png",
+      "characterSha256": "34318bf24e863a4fb1bb9911dba8d2c03e86c84d2bed75694c8f01c1848190da"
+    },
+    "eyewear/gold-goggles/trampoline/purple": {
+      "combinedSheet": "props/wearables/eyewear/gold-goggles/jump/trampoline/purple/slime-purple-trampoline-gold-goggles-sheet.png",
+      "combinedSha256": "6ac74d5dfb9e39a315e244cda5ba8c14050038a978d474a31f2a8a07919ae0ab",
+      "characterSheet": "floors/trampoline/purple/slime-purple-trampoline-sheet.png",
+      "characterSha256": "cd99088ae932831da75cb35755b275e961f84cf39ebd3cf09d969ff07c381a40"
+    },
+    "eyewear/gold-goggles/trampoline/red": {
+      "combinedSheet": "props/wearables/eyewear/gold-goggles/jump/trampoline/red/slime-red-trampoline-gold-goggles-sheet.png",
+      "combinedSha256": "a525ff3072ab46a01958768fdf82ae378ee2aa257d579d29b06dc561a3ab4a19",
+      "characterSheet": "floors/trampoline/red/slime-red-trampoline-sheet.png",
+      "characterSha256": "de7fe036dd20d51e076fc9c72309159314de5f00b56221e4573ac73c588fd127"
+    },
+    "eyewear/gold-goggles/trampoline/yellow": {
+      "combinedSheet": "props/wearables/eyewear/gold-goggles/jump/trampoline/yellow/slime-yellow-trampoline-gold-goggles-sheet.png",
+      "combinedSha256": "423061f57ddc19e781b9c84c7b1a2fdb6153c95a2eb2dea95c5716554131f860",
+      "characterSheet": "floors/trampoline/yellow/slime-yellow-trampoline-sheet.png",
+      "characterSha256": "39f4109f51dff7edb4316036b43bd80846ce798a0de24a8ae6a133d94ffe8a58"
+    },
+    "eyewear/gold-goggles/water-puddle/blue": {
+      "combinedSheet": "props/wearables/eyewear/gold-goggles/jump/water-puddle/blue/slime-blue-water-puddle-gold-goggles-sheet.png",
+      "combinedSha256": "a828240a7551def8ea135edef7c3e8771cb96bacdea7a3ec7d9c800cedccbd86",
+      "characterSheet": "floors/water-puddle/jump/blue/slime-blue-sheet.png",
+      "characterSha256": "7ef3c81b78156e87e5d87484b23ff89d9c095422f46c63fc60edf0bfa7f8c230"
+    },
+    "eyewear/gold-goggles/water-puddle/green": {
+      "combinedSheet": "props/wearables/eyewear/gold-goggles/jump/water-puddle/green/slime-green-water-puddle-gold-goggles-sheet.png",
+      "combinedSha256": "96c6f6ad0e6090de9854e1dceef2edd5ac8941e6d4e05def8326cca99dd8c333",
+      "characterSheet": "floors/water-puddle/jump/green/slime-green-sheet.png",
+      "characterSha256": "b10cc5fb93fcd128f21d54684b672a57ee076376b07cf06d4830ef4a781ed15d"
+    },
+    "eyewear/gold-goggles/water-puddle/purple": {
+      "combinedSheet": "props/wearables/eyewear/gold-goggles/jump/water-puddle/purple/slime-purple-water-puddle-gold-goggles-sheet.png",
+      "combinedSha256": "8b3414aa34e5e9e53106f5debce35254a6b0dcc53c3d05a7bba8bfa76b99614f",
+      "characterSheet": "floors/water-puddle/jump/purple/slime-purple-sheet.png",
+      "characterSha256": "e2df493ce6f53a8fa9486949742d90e5ff4705612a66ecbbb40b8683500b8f1d"
+    },
+    "eyewear/gold-goggles/water-puddle/red": {
+      "combinedSheet": "props/wearables/eyewear/gold-goggles/jump/water-puddle/red/slime-red-water-puddle-gold-goggles-sheet.png",
+      "combinedSha256": "87c01d8657e3c2fed879131f09dfca5afda10c21a8fd4bddec4c3c33ff1dbc01",
+      "characterSheet": "floors/water-puddle/jump/red/slime-red-sheet.png",
+      "characterSha256": "96cf1f7e639cedc666de1fed7ce3c925f1487e20ba3d5bf3a2275661d2f5f439"
+    },
+    "eyewear/gold-goggles/water-puddle/yellow": {
+      "combinedSheet": "props/wearables/eyewear/gold-goggles/jump/water-puddle/yellow/slime-yellow-water-puddle-gold-goggles-sheet.png",
+      "combinedSha256": "18e1acacd3fc49996b4fc1786124910f6461d20dd1defa36c8b3ed1e06f269a5",
+      "characterSheet": "floors/water-puddle/jump/yellow/slime-yellow-sheet.png",
+      "characterSha256": "f98385f90175ec789acb16f683485425dc17e0509427fd89484f3d8b405533c8"
+    },
+    "eyewear/red-sunglasses/trampoline/blue": {
+      "combinedSheet": "props/wearables/eyewear/red-sunglasses/jump/trampoline/blue/slime-blue-trampoline-red-sunglasses-sheet.png",
+      "combinedSha256": "d35035c3bf1d2f10d28104fb130fcc8407abb95a30d383c97cb9032a11137015",
+      "characterSheet": "floors/trampoline/blue/slime-blue-trampoline-sheet.png",
+      "characterSha256": "55db67336c52cb5928dbd315f317b65c09e39eb01dc54e728438d98daa3f7afc"
+    },
+    "eyewear/red-sunglasses/trampoline/green": {
+      "combinedSheet": "props/wearables/eyewear/red-sunglasses/jump/trampoline/green/slime-green-trampoline-red-sunglasses-sheet.png",
+      "combinedSha256": "897c200a296a770217a9fa12210894c65169269bfdfa7db6ee60679b19a89212",
+      "characterSheet": "floors/trampoline/green/slime-green-trampoline-sheet.png",
+      "characterSha256": "34318bf24e863a4fb1bb9911dba8d2c03e86c84d2bed75694c8f01c1848190da"
+    },
+    "eyewear/red-sunglasses/trampoline/purple": {
+      "combinedSheet": "props/wearables/eyewear/red-sunglasses/jump/trampoline/purple/slime-purple-trampoline-red-sunglasses-sheet.png",
+      "combinedSha256": "6b18529e5296b288217241760c34d2b5d89098ef97f91b22b53266a3f29ad8fe",
+      "characterSheet": "floors/trampoline/purple/slime-purple-trampoline-sheet.png",
+      "characterSha256": "cd99088ae932831da75cb35755b275e961f84cf39ebd3cf09d969ff07c381a40"
+    },
+    "eyewear/red-sunglasses/trampoline/red": {
+      "combinedSheet": "props/wearables/eyewear/red-sunglasses/jump/trampoline/red/slime-red-trampoline-red-sunglasses-sheet.png",
+      "combinedSha256": "b9a8159c87e35ba2c4e38ee5c62afe79bccaa234ba71a34f59a5a3e8e47b1bb4",
+      "characterSheet": "floors/trampoline/red/slime-red-trampoline-sheet.png",
+      "characterSha256": "de7fe036dd20d51e076fc9c72309159314de5f00b56221e4573ac73c588fd127"
+    },
+    "eyewear/red-sunglasses/trampoline/yellow": {
+      "combinedSheet": "props/wearables/eyewear/red-sunglasses/jump/trampoline/yellow/slime-yellow-trampoline-red-sunglasses-sheet.png",
+      "combinedSha256": "f76e23ba197d52a752785e45cd67c4f77c26d6ae50b9f7f194f838446fd6a29a",
+      "characterSheet": "floors/trampoline/yellow/slime-yellow-trampoline-sheet.png",
+      "characterSha256": "39f4109f51dff7edb4316036b43bd80846ce798a0de24a8ae6a133d94ffe8a58"
+    },
+    "eyewear/red-sunglasses/water-puddle/blue": {
+      "combinedSheet": "props/wearables/eyewear/red-sunglasses/jump/water-puddle/blue/slime-blue-water-puddle-red-sunglasses-sheet.png",
+      "combinedSha256": "f470d791a1dadab3d6efc93d81f75c1c89e807f74dc925bb2b5ed3ac3394b54a",
+      "characterSheet": "floors/water-puddle/jump/blue/slime-blue-sheet.png",
+      "characterSha256": "7ef3c81b78156e87e5d87484b23ff89d9c095422f46c63fc60edf0bfa7f8c230"
+    },
+    "eyewear/red-sunglasses/water-puddle/green": {
+      "combinedSheet": "props/wearables/eyewear/red-sunglasses/jump/water-puddle/green/slime-green-water-puddle-red-sunglasses-sheet.png",
+      "combinedSha256": "44a055d050792542343e145eb4968cf9e149f064762b8bf16e2d0c168177aaa1",
+      "characterSheet": "floors/water-puddle/jump/green/slime-green-sheet.png",
+      "characterSha256": "b10cc5fb93fcd128f21d54684b672a57ee076376b07cf06d4830ef4a781ed15d"
+    },
+    "eyewear/red-sunglasses/water-puddle/purple": {
+      "combinedSheet": "props/wearables/eyewear/red-sunglasses/jump/water-puddle/purple/slime-purple-water-puddle-red-sunglasses-sheet.png",
+      "combinedSha256": "9c07c17a40c9bb2507e207653e29d31064c79168de1eaf9e7b08b874875158c9",
+      "characterSheet": "floors/water-puddle/jump/purple/slime-purple-sheet.png",
+      "characterSha256": "e2df493ce6f53a8fa9486949742d90e5ff4705612a66ecbbb40b8683500b8f1d"
+    },
+    "eyewear/red-sunglasses/water-puddle/red": {
+      "combinedSheet": "props/wearables/eyewear/red-sunglasses/jump/water-puddle/red/slime-red-water-puddle-red-sunglasses-sheet.png",
+      "combinedSha256": "52b4fb33f2e4290edf82edec782723aeb9c758bf0f57736e579b4d868e84049b",
+      "characterSheet": "floors/water-puddle/jump/red/slime-red-sheet.png",
+      "characterSha256": "96cf1f7e639cedc666de1fed7ce3c925f1487e20ba3d5bf3a2275661d2f5f439"
+    },
+    "eyewear/red-sunglasses/water-puddle/yellow": {
+      "combinedSheet": "props/wearables/eyewear/red-sunglasses/jump/water-puddle/yellow/slime-yellow-water-puddle-red-sunglasses-sheet.png",
+      "combinedSha256": "bd5431320c706d41183b41f47bcb174a2fd99151d5deb17b1bc84187948979f5",
+      "characterSheet": "floors/water-puddle/jump/yellow/slime-yellow-sheet.png",
+      "characterSha256": "f98385f90175ec789acb16f683485425dc17e0509427fd89484f3d8b405533c8"
+    },
+    "eyewear/round-glasses/trampoline/blue": {
+      "combinedSheet": "props/wearables/eyewear/round-glasses/jump/trampoline/blue/slime-blue-trampoline-round-glasses-sheet.png",
+      "combinedSha256": "58acd270ecfd6829b7829789cbc9b1df379c14bf63c3de4f389cf580f2fa3311",
+      "characterSheet": "floors/trampoline/blue/slime-blue-trampoline-sheet.png",
+      "characterSha256": "55db67336c52cb5928dbd315f317b65c09e39eb01dc54e728438d98daa3f7afc"
+    },
+    "eyewear/round-glasses/trampoline/green": {
+      "combinedSheet": "props/wearables/eyewear/round-glasses/jump/trampoline/green/slime-green-trampoline-round-glasses-sheet.png",
+      "combinedSha256": "f63c4a4e1432328f7378cdcbd537fea1593f123144be1948e590481c4fb9314f",
+      "characterSheet": "floors/trampoline/green/slime-green-trampoline-sheet.png",
+      "characterSha256": "34318bf24e863a4fb1bb9911dba8d2c03e86c84d2bed75694c8f01c1848190da"
+    },
+    "eyewear/round-glasses/trampoline/purple": {
+      "combinedSheet": "props/wearables/eyewear/round-glasses/jump/trampoline/purple/slime-purple-trampoline-round-glasses-sheet.png",
+      "combinedSha256": "b553a57b94bbd31ae10e66dfc77325e15558c3130935fd794eaca294f1c77d49",
+      "characterSheet": "floors/trampoline/purple/slime-purple-trampoline-sheet.png",
+      "characterSha256": "cd99088ae932831da75cb35755b275e961f84cf39ebd3cf09d969ff07c381a40"
+    },
+    "eyewear/round-glasses/trampoline/red": {
+      "combinedSheet": "props/wearables/eyewear/round-glasses/jump/trampoline/red/slime-red-trampoline-round-glasses-sheet.png",
+      "combinedSha256": "168fafeb69d1730aff75e8854f67afd816584ad1f365fe385a19b7bd293a365c",
+      "characterSheet": "floors/trampoline/red/slime-red-trampoline-sheet.png",
+      "characterSha256": "de7fe036dd20d51e076fc9c72309159314de5f00b56221e4573ac73c588fd127"
+    },
+    "eyewear/round-glasses/trampoline/yellow": {
+      "combinedSheet": "props/wearables/eyewear/round-glasses/jump/trampoline/yellow/slime-yellow-trampoline-round-glasses-sheet.png",
+      "combinedSha256": "bd6ba080c9195cfa7dfd4b02e055b6c61cf343a9fc4659ebf90780b441e33ecd",
+      "characterSheet": "floors/trampoline/yellow/slime-yellow-trampoline-sheet.png",
+      "characterSha256": "39f4109f51dff7edb4316036b43bd80846ce798a0de24a8ae6a133d94ffe8a58"
+    },
+    "eyewear/round-glasses/water-puddle/blue": {
+      "combinedSheet": "props/wearables/eyewear/round-glasses/jump/water-puddle/blue/slime-blue-water-puddle-round-glasses-sheet.png",
+      "combinedSha256": "68584a5c979b17bb5b0ad5899fdc8d4c5ad17100f532dadf1159a5b5e431939c",
+      "characterSheet": "floors/water-puddle/jump/blue/slime-blue-sheet.png",
+      "characterSha256": "7ef3c81b78156e87e5d87484b23ff89d9c095422f46c63fc60edf0bfa7f8c230"
+    },
+    "eyewear/round-glasses/water-puddle/green": {
+      "combinedSheet": "props/wearables/eyewear/round-glasses/jump/water-puddle/green/slime-green-water-puddle-round-glasses-sheet.png",
+      "combinedSha256": "bf5aabea42f82e390d9bea8bb5e01414f34e2d689536908cd885e0b233dc5175",
+      "characterSheet": "floors/water-puddle/jump/green/slime-green-sheet.png",
+      "characterSha256": "b10cc5fb93fcd128f21d54684b672a57ee076376b07cf06d4830ef4a781ed15d"
+    },
+    "eyewear/round-glasses/water-puddle/purple": {
+      "combinedSheet": "props/wearables/eyewear/round-glasses/jump/water-puddle/purple/slime-purple-water-puddle-round-glasses-sheet.png",
+      "combinedSha256": "85981dcc409b93be6986006986ceeb750aa0249b11b41f625a02212f559c22b4",
+      "characterSheet": "floors/water-puddle/jump/purple/slime-purple-sheet.png",
+      "characterSha256": "e2df493ce6f53a8fa9486949742d90e5ff4705612a66ecbbb40b8683500b8f1d"
+    },
+    "eyewear/round-glasses/water-puddle/red": {
+      "combinedSheet": "props/wearables/eyewear/round-glasses/jump/water-puddle/red/slime-red-water-puddle-round-glasses-sheet.png",
+      "combinedSha256": "029c4101e85895a563343f9824936d055e7d52234b9b4a6b6e848cc804bd808b",
+      "characterSheet": "floors/water-puddle/jump/red/slime-red-sheet.png",
+      "characterSha256": "96cf1f7e639cedc666de1fed7ce3c925f1487e20ba3d5bf3a2275661d2f5f439"
+    },
+    "eyewear/round-glasses/water-puddle/yellow": {
+      "combinedSheet": "props/wearables/eyewear/round-glasses/jump/water-puddle/yellow/slime-yellow-water-puddle-round-glasses-sheet.png",
+      "combinedSha256": "8c9cb42c17df34128ce9047161d17b30d48ce286c5ef1fb147ddfac0efe1556c",
+      "characterSheet": "floors/water-puddle/jump/yellow/slime-yellow-sheet.png",
+      "characterSha256": "f98385f90175ec789acb16f683485425dc17e0509427fd89484f3d8b405533c8"
+    },
+    "eyewear/silver-goggles/trampoline/blue": {
+      "combinedSheet": "props/wearables/eyewear/silver-goggles/jump/trampoline/blue/slime-blue-trampoline-silver-goggles-sheet.png",
+      "combinedSha256": "03305997e889675fe2b49114bbf45a561b7e3040f8f104db88d12339dfc0611c",
+      "characterSheet": "floors/trampoline/blue/slime-blue-trampoline-sheet.png",
+      "characterSha256": "55db67336c52cb5928dbd315f317b65c09e39eb01dc54e728438d98daa3f7afc"
+    },
+    "eyewear/silver-goggles/trampoline/green": {
+      "combinedSheet": "props/wearables/eyewear/silver-goggles/jump/trampoline/green/slime-green-trampoline-silver-goggles-sheet.png",
+      "combinedSha256": "4aa9ebd260322a217f66de2943074f00126bb7ce060fbe1f45567ad4c0b3bdd4",
+      "characterSheet": "floors/trampoline/green/slime-green-trampoline-sheet.png",
+      "characterSha256": "34318bf24e863a4fb1bb9911dba8d2c03e86c84d2bed75694c8f01c1848190da"
+    },
+    "eyewear/silver-goggles/trampoline/purple": {
+      "combinedSheet": "props/wearables/eyewear/silver-goggles/jump/trampoline/purple/slime-purple-trampoline-silver-goggles-sheet.png",
+      "combinedSha256": "ed7a4fae433b878388b6dc2c06e96ce1d63a949e5b18420623e11f6e0f9404c0",
+      "characterSheet": "floors/trampoline/purple/slime-purple-trampoline-sheet.png",
+      "characterSha256": "cd99088ae932831da75cb35755b275e961f84cf39ebd3cf09d969ff07c381a40"
+    },
+    "eyewear/silver-goggles/trampoline/red": {
+      "combinedSheet": "props/wearables/eyewear/silver-goggles/jump/trampoline/red/slime-red-trampoline-silver-goggles-sheet.png",
+      "combinedSha256": "65039bdad7676fdb8d0270cc88c41f4ed267b0acd0625955b6772b40458e409f",
+      "characterSheet": "floors/trampoline/red/slime-red-trampoline-sheet.png",
+      "characterSha256": "de7fe036dd20d51e076fc9c72309159314de5f00b56221e4573ac73c588fd127"
+    },
+    "eyewear/silver-goggles/trampoline/yellow": {
+      "combinedSheet": "props/wearables/eyewear/silver-goggles/jump/trampoline/yellow/slime-yellow-trampoline-silver-goggles-sheet.png",
+      "combinedSha256": "396f7f9d2349f85f9eab8429df7b533a3dd1eb1daa6aa4c00baf8b5e508e95d0",
+      "characterSheet": "floors/trampoline/yellow/slime-yellow-trampoline-sheet.png",
+      "characterSha256": "39f4109f51dff7edb4316036b43bd80846ce798a0de24a8ae6a133d94ffe8a58"
+    },
+    "eyewear/silver-goggles/water-puddle/blue": {
+      "combinedSheet": "props/wearables/eyewear/silver-goggles/jump/water-puddle/blue/slime-blue-water-puddle-silver-goggles-sheet.png",
+      "combinedSha256": "14112190cf8f7e80a428ece40f0131e3b1822edd029128d9f6d0ffcd4730b6ae",
+      "characterSheet": "floors/water-puddle/jump/blue/slime-blue-sheet.png",
+      "characterSha256": "7ef3c81b78156e87e5d87484b23ff89d9c095422f46c63fc60edf0bfa7f8c230"
+    },
+    "eyewear/silver-goggles/water-puddle/green": {
+      "combinedSheet": "props/wearables/eyewear/silver-goggles/jump/water-puddle/green/slime-green-water-puddle-silver-goggles-sheet.png",
+      "combinedSha256": "d82544fff212c702318beb174a6f6c2471de2250bec529c9a9705dbba445a767",
+      "characterSheet": "floors/water-puddle/jump/green/slime-green-sheet.png",
+      "characterSha256": "b10cc5fb93fcd128f21d54684b672a57ee076376b07cf06d4830ef4a781ed15d"
+    },
+    "eyewear/silver-goggles/water-puddle/purple": {
+      "combinedSheet": "props/wearables/eyewear/silver-goggles/jump/water-puddle/purple/slime-purple-water-puddle-silver-goggles-sheet.png",
+      "combinedSha256": "4e8dae94e9ff011135300569711e733465ca8f6c6d000e81728e5263f5b84ddd",
+      "characterSheet": "floors/water-puddle/jump/purple/slime-purple-sheet.png",
+      "characterSha256": "e2df493ce6f53a8fa9486949742d90e5ff4705612a66ecbbb40b8683500b8f1d"
+    },
+    "eyewear/silver-goggles/water-puddle/red": {
+      "combinedSheet": "props/wearables/eyewear/silver-goggles/jump/water-puddle/red/slime-red-water-puddle-silver-goggles-sheet.png",
+      "combinedSha256": "3d037f1347305bf973f4c7ee7dfaffbd6b0707486bf377985273198480ed84d8",
+      "characterSheet": "floors/water-puddle/jump/red/slime-red-sheet.png",
+      "characterSha256": "96cf1f7e639cedc666de1fed7ce3c925f1487e20ba3d5bf3a2275661d2f5f439"
+    },
+    "eyewear/silver-goggles/water-puddle/yellow": {
+      "combinedSheet": "props/wearables/eyewear/silver-goggles/jump/water-puddle/yellow/slime-yellow-water-puddle-silver-goggles-sheet.png",
+      "combinedSha256": "507af577fade67f550f6a3591f7f5bef0a0ac2a3bda83281715a3d961005738f",
+      "characterSheet": "floors/water-puddle/jump/yellow/slime-yellow-sheet.png",
+      "characterSha256": "f98385f90175ec789acb16f683485425dc17e0509427fd89484f3d8b405533c8"
+    }
+  },
+  "written": [
+    {
+      "key": "headwear/beige-beanie/trampoline",
+      "frames": 26,
+      "frameHeight": 81,
+      "grounded": false,
+      "characterBodyOffset": 17,
+      "overlayPixels": 263,
+      "sha256": "158a824aeb2f8d38c91a3ad2b97745e8af9381289a21748de6918061598c0f61"
+    },
+    {
+      "key": "headwear/beige-beanie/water-puddle",
+      "frames": 26,
+      "frameHeight": 81,
+      "grounded": false,
+      "characterBodyOffset": 17,
+      "overlayPixels": 536,
+      "sha256": "16c795d1fa2c3d4d4d524ccea06782c3dd723dd14bc5dbce4bf7e3de52c5ae2e"
+    },
+    {
+      "key": "headwear/brown-beanie/trampoline",
+      "frames": 26,
+      "frameHeight": 81,
+      "grounded": false,
+      "characterBodyOffset": 17,
+      "overlayPixels": 263,
+      "sha256": "362df8de0cb5d65cae798ba8fafabc5cc62d50ec73a032c71ebdd600075231c2"
+    },
+    {
+      "key": "headwear/brown-beanie/water-puddle",
+      "frames": 26,
+      "frameHeight": 81,
+      "grounded": false,
+      "characterBodyOffset": 17,
+      "overlayPixels": 536,
+      "sha256": "d7c3a243c06ade5a0085abb96864bd1e584c63d7f8d676c02db73ab4c7226b49"
+    },
+    {
+      "key": "headwear/charcoal-beanie/trampoline",
+      "frames": 26,
+      "frameHeight": 81,
+      "grounded": false,
+      "characterBodyOffset": 17,
+      "overlayPixels": 263,
+      "sha256": "9d2b282863a2a105ffff4f2d4aa1f31dca2e5391716a228c3bf422ef1fdb79f1"
+    },
+    {
+      "key": "headwear/charcoal-beanie/water-puddle",
+      "frames": 26,
+      "frameHeight": 81,
+      "grounded": false,
+      "characterBodyOffset": 17,
+      "overlayPixels": 536,
+      "sha256": "fe6edef2f6f2cb30fa0f646562e7b18835017913dab0d58d0caf6d915351510b"
+    },
+    {
+      "key": "headwear/ivory-beanie/trampoline",
+      "frames": 26,
+      "frameHeight": 81,
+      "grounded": false,
+      "characterBodyOffset": 17,
+      "overlayPixels": 263,
+      "sha256": "9a94051d025bb17140b539b6d2adcfb396e148a8dfc52cfa3dba2f27730475e3"
+    },
+    {
+      "key": "headwear/ivory-beanie/water-puddle",
+      "frames": 26,
+      "frameHeight": 81,
+      "grounded": false,
+      "characterBodyOffset": 17,
+      "overlayPixels": 536,
+      "sha256": "a0353a0e6784241a39e879c56f1ccbcf276ad82b60f4d485386dbf204e54d3d6"
+    },
+    {
+      "key": "headwear/purple-wizard-hat/trampoline",
+      "frames": 26,
+      "frameHeight": 81,
+      "grounded": false,
+      "characterBodyOffset": 17,
+      "overlayPixels": 364,
+      "sha256": "e129f9ff62cc3b9e16d543dad36c80be2c44a4cdf347891f3bfa12ed8df9171c"
+    },
+    {
+      "key": "headwear/purple-wizard-hat/water-puddle",
+      "frames": 26,
+      "frameHeight": 81,
+      "grounded": false,
+      "characterBodyOffset": 17,
+      "overlayPixels": 637,
+      "sha256": "6429de713cf07e1ea58c6d54cbc6e1a0e5a7fc5e87653d96a4525587c82f715c"
+    },
+    {
+      "key": "headwear/red-baseball-cap/trampoline",
+      "frames": 26,
+      "frameHeight": 81,
+      "grounded": false,
+      "characterBodyOffset": 17,
+      "overlayPixels": 203,
+      "sha256": "6cf306305412ba2556be4d9f032bf62c6dc5c57b99964547a6e6a96c95763675"
+    },
+    {
+      "key": "headwear/red-baseball-cap/water-puddle",
+      "frames": 26,
+      "frameHeight": 81,
+      "grounded": false,
+      "characterBodyOffset": 17,
+      "overlayPixels": 476,
+      "sha256": "dc1b32a0cea9a2cc6d1198d27f81b15a192d06c14d8d401240c97f2dbdb34a48"
+    },
+    {
+      "key": "headwear/straw-hat/trampoline",
+      "frames": 26,
+      "frameHeight": 81,
+      "grounded": false,
+      "characterBodyOffset": 17,
+      "overlayPixels": 202,
+      "sha256": "2c5c8bfc76b0488159aa31a697c0b186f4410b66fd223dee65bff428e487c276"
+    },
+    {
+      "key": "headwear/straw-hat/water-puddle",
+      "frames": 26,
+      "frameHeight": 81,
+      "grounded": false,
+      "characterBodyOffset": 17,
+      "overlayPixels": 475,
+      "sha256": "f66c50215ab9f1e2087dfd5e6ec2dd87a9296bcc71d422b7de9c1f09b0b94cf0"
+    },
+    {
+      "key": "eyewear/black-goggles/trampoline",
+      "frames": 26,
+      "frameHeight": 81,
+      "grounded": false,
+      "characterBodyOffset": 17,
+      "overlayPixels": 153,
+      "sha256": "b4321fd6f37050d594bcdf481962fbde4584ba4ed1b45d9db2a79018196e5075"
+    },
+    {
+      "key": "eyewear/black-goggles/water-puddle",
+      "frames": 26,
+      "frameHeight": 81,
+      "grounded": false,
+      "characterBodyOffset": 17,
+      "overlayPixels": 426,
+      "sha256": "057e1d574f8d1f504bfd59cf3c40b327a061dae5b4691032bcf21571232ac188"
+    },
+    {
+      "key": "eyewear/black-sunglasses/trampoline",
+      "frames": 26,
+      "frameHeight": 81,
+      "grounded": false,
+      "characterBodyOffset": 17,
+      "overlayPixels": 90,
+      "sha256": "97e0e7d52a1cc178150a4486a8c09b52c620068cc17a4f5ef9de8d774769b29f"
+    },
+    {
+      "key": "eyewear/black-sunglasses/water-puddle",
+      "frames": 26,
+      "frameHeight": 81,
+      "grounded": false,
+      "characterBodyOffset": 17,
+      "overlayPixels": 363,
+      "sha256": "78c4e770ee6b284ba039aac07218a06af6484b381c0e359b5fe01eb868883626"
+    },
+    {
+      "key": "eyewear/copper-goggles/trampoline",
+      "frames": 26,
+      "frameHeight": 81,
+      "grounded": false,
+      "characterBodyOffset": 17,
+      "overlayPixels": 153,
+      "sha256": "f0290e268643dec71dca25cdfc1a622ad7aa61dd46ce93cf7ce4d9ffe7f7ef05"
+    },
+    {
+      "key": "eyewear/copper-goggles/water-puddle",
+      "frames": 26,
+      "frameHeight": 81,
+      "grounded": false,
+      "characterBodyOffset": 17,
+      "overlayPixels": 426,
+      "sha256": "8675e588f2b2bd528aa49b0e8f421668751dd39f550ef8257e7ca81808f46d12"
+    },
+    {
+      "key": "eyewear/gold-goggles/trampoline",
+      "frames": 26,
+      "frameHeight": 81,
+      "grounded": false,
+      "characterBodyOffset": 17,
+      "overlayPixels": 153,
+      "sha256": "4b220961719f1cb6ac58aa9b3059b3f619e250a97101117ccb428789637cdbf7"
+    },
+    {
+      "key": "eyewear/gold-goggles/water-puddle",
+      "frames": 26,
+      "frameHeight": 81,
+      "grounded": false,
+      "characterBodyOffset": 17,
+      "overlayPixels": 426,
+      "sha256": "36e1a16a5d935a782696417275648a61a227115075d90606a0ad34b44e6d2aee"
+    },
+    {
+      "key": "eyewear/red-sunglasses/trampoline",
+      "frames": 26,
+      "frameHeight": 81,
+      "grounded": false,
+      "characterBodyOffset": 17,
+      "overlayPixels": 100,
+      "sha256": "2eee5bfe28c0ce58d0dc783b1cd05b881f6154898196c2fa8fa28b6856a52ccc"
+    },
+    {
+      "key": "eyewear/red-sunglasses/water-puddle",
+      "frames": 26,
+      "frameHeight": 81,
+      "grounded": false,
+      "characterBodyOffset": 17,
+      "overlayPixels": 373,
+      "sha256": "5f570c713fa7b84f5254ec29b9a7989011c4abd55021dc51d24f09c7b91bd3dc"
+    },
+    {
+      "key": "eyewear/round-glasses/trampoline",
+      "frames": 26,
+      "frameHeight": 81,
+      "grounded": false,
+      "characterBodyOffset": 17,
+      "overlayPixels": 43,
+      "sha256": "70aaa8ead859c3f20870dc53ba278930e5306b99f2ca1602cc751d825dd4f980"
+    },
+    {
+      "key": "eyewear/round-glasses/water-puddle",
+      "frames": 26,
+      "frameHeight": 81,
+      "grounded": false,
+      "characterBodyOffset": 17,
+      "overlayPixels": 316,
+      "sha256": "903d6d68757ef1ade1735398b3d7d257bb52efebf6d77484b4a6613910a44036"
+    },
+    {
+      "key": "eyewear/silver-goggles/trampoline",
+      "frames": 26,
+      "frameHeight": 81,
+      "grounded": false,
+      "characterBodyOffset": 17,
+      "overlayPixels": 153,
+      "sha256": "bcb336e2e466cbbc352972b6ea1ddd999204c728a64d9096268788bf3819ee40"
+    },
+    {
+      "key": "eyewear/silver-goggles/water-puddle",
+      "frames": 26,
+      "frameHeight": 81,
+      "grounded": false,
+      "characterBodyOffset": 17,
+      "overlayPixels": 426,
+      "sha256": "de5f80da90ea924be0555269d3d9daf04c76eb563e87843457c93b3fa1b22e45"
+    }
+  ],
+  "skipped": [],
+  "characterBodyOffsetByAction": {
+    "trampoline": 17,
+    "water-puddle": 17
+  }
+}

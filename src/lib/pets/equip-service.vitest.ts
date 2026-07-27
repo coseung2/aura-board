@@ -133,6 +133,27 @@ describe("slime shop item equipment", () => {
     expect(state.rows.get(ball.key)?.isEquipped).toBe(true);
   });
 
+  it("equips blush, eyewear, and headwear together while replacing only the matching slot", async () => {
+    const state = installState();
+    const peach = SLIME_SHOP_CATALOG.find((item) => item.wearableRole === "blush")!;
+    const rose = SLIME_SHOP_CATALOG.find((item) =>
+      item.wearableRole === "blush" && item.key !== peach.key)!;
+    const eyewear = SLIME_SHOP_CATALOG.find((item) => item.wearableRole === "eyewear")!;
+    const headwear = SLIME_SHOP_CATALOG.find((item) => item.wearableRole === "headwear")!;
+    state.slimeRows[0].equippedItemKeys = [peach.key, eyewear.key, headwear.key];
+    state.rows.get(peach.key)!.isEquipped = true;
+    state.rows.get(eyewear.key)!.isEquipped = true;
+    state.rows.get(headwear.key)!.isEquipped = true;
+
+    const result = await equipSlimeShopItem(student, "blue", rose.key, true, "blush-swap");
+
+    expect(result.equippedItemKeys).toEqual([rose.key, eyewear.key, headwear.key]);
+    expect(state.rows.get(peach.key)?.isEquipped).toBe(false);
+    expect(state.rows.get(rose.key)?.isEquipped).toBe(true);
+    expect(state.rows.get(eyewear.key)?.isEquipped).toBe(true);
+    expect(state.rows.get(headwear.key)?.isEquipped).toBe(true);
+  });
+
   it("equips a scene background without replacing the floor or accessory", async () => {
     const state = installState();
     const scene = SLIME_SHOP_CATALOG.find((item) =>

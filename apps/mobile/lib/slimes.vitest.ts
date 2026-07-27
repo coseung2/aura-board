@@ -1,26 +1,37 @@
 import { describe, expect, it, vi } from "vitest";
 
 vi.mock("./slime-assets", () => ({
-  EQUIPPED_FLOORS: ["none", "grass-floor", "water-puddle", "trampoline"],
+  EQUIPPED_FLOORS: [
+    "none", "grass-floor", "crystal-cave-floor", "moonlit-marble-floor",
+    "royal-garden-floor", "celestial-gold-floor", "snow-ground-floor",
+    "ancient-brick-floor", "cherry-stone-floor", "sand-trail-floor",
+    "forest-soil-floor", "stone-floor", "water-puddle", "trampoline",
+  ],
   SLIME_ASSET_COLORS: ["blue", "green", "yellow", "purple", "red"],
 }));
 
 import {
+  aggregateMobileSlimeBuffTotals,
   calculateGrowthTimeComparison,
   calculateSlimeGrowthPercent,
   catalogHasSceneBackgrounds,
   isSceneBackgroundItem,
+  mobileSlimeBuffGroups,
   normalizeSlimeHome,
   normalizeSlimeClassroom,
   resolveEquippedSceneBackground,
+  resolveEquippedSlimeWearables,
   resolveSlimeRemoteSpriteUri,
   selectSceneBackgroundSpritePath,
   shopFilterForItem,
   slimeBallSpritePath,
+  slimeDrinkSpritePath,
+  slimeShopPreviewColor,
   slimeShopNavItems,
   slimeVisualItemSlot,
   SLIME_COOKIE_ITEM_KEY,
   studentPetHref,
+  type SlimeShopItem,
 } from "./slimes";
 import {
   SCENE_BACKGROUND_FEATHER_RATIO,
@@ -56,9 +67,10 @@ describe("mobile slime parity model", () => {
 
   it("maps API categories to shop tabs and keeps legacy floors separate from scene backgrounds", () => {
     const item = (
-      category: "background" | "ride" | "drink" | "food" | "prop" | "level-up",
-      floor: "grass-floor" | "water-puddle" | "trampoline" | null = null,
-    ) => ({ category, floor });
+      category: "background" | "ride" | "drink" | "food" | "prop" | "wearable" | "level-up",
+      floor: SlimeShopItem["floor"] = null,
+      wearableRole?: "blush" | "eyewear" | "headwear",
+    ) => ({ category, floor, wearableRole });
 
     expect(isSceneBackgroundItem(item("background"))).toBe(true);
     expect(isSceneBackgroundItem(item("background", "grass-floor"))).toBe(false);
@@ -68,10 +80,12 @@ describe("mobile slime parity model", () => {
     expect(shopFilterForItem(item("food"))).toBe("food");
     expect(shopFilterForItem(item("drink"))).toBe("prop");
     expect(shopFilterForItem(item("prop"))).toBe("prop");
+    expect(shopFilterForItem(item("wearable", null, "eyewear"))).toBe("outfit");
     expect(shopFilterForItem(item("level-up"))).toBe("level-up");
     expect(slimeVisualItemSlot(item("background"))).toBe("background");
     expect(slimeVisualItemSlot(item("background", "water-puddle"))).toBe("floor");
-    expect(slimeVisualItemSlot(item("prop"))).toBe("accessory");
+    expect(slimeVisualItemSlot(item("prop"))).toBe("prop");
+    expect(slimeVisualItemSlot(item("wearable", null, "blush"))).toBe("blush");
   });
 
   it("shows the background shop tab only when the catalog has a true scene background", () => {
@@ -97,6 +111,7 @@ describe("mobile slime parity model", () => {
       "floor",
       "food",
       "prop",
+      "outfit",
     ]);
     expect(catalogHasSceneBackgrounds(withScene)).toBe(true);
     expect(slimeShopNavItems(withScene).map((tab) => tab.key)).toEqual([
@@ -105,6 +120,7 @@ describe("mobile slime parity model", () => {
       "floor",
       "food",
       "prop",
+      "outfit",
     ]);
   });
 
@@ -158,6 +174,7 @@ describe("mobile slime parity model", () => {
         spritePath: "/background-64.gif",
         mobileSpritePath: "/background-256.gif",
         staticSpritePath: "/static-background-64.png",
+        animationKey: "shooting-star-night-sky",
         effectKey: "walking_reward",
         effectBps: 300,
       }],
@@ -167,9 +184,147 @@ describe("mobile slime parity model", () => {
       spritePath: "/background-64.gif",
       mobileSpritePath: "/background-256.gif",
       staticSpritePath: "/static-background-64.png",
+      animationKey: "shooting-star-night-sky",
       effectKey: "walking_reward",
       effectBps: 300,
     });
+  });
+
+  it("normalizes imported wearable metadata and routes it to the outfit tab", () => {
+    const home = normalizeSlimeHome({
+      shopCatalog: [{
+        key: "slime-eyewear-round-glasses",
+        category: "wearable",
+        floor: null,
+        labelKo: "둥근 안경",
+        price: 100,
+        spritePath: "/wearables/eyewear/round-glasses/idle.png",
+        wearableRole: "eyewear",
+        wearableOption: "round-glasses",
+      }],
+    });
+
+    expect(home.shopCatalog[0]).toMatchObject({
+      category: "wearable",
+      wearableRole: "eyewear",
+      wearableOption: "round-glasses",
+    });
+    expect(shopFilterForItem(home.shopCatalog[0]!)).toBe("outfit");
+  });
+
+  it("resolves independent wearable slots together with the equipped drink flavor", () => {
+    const catalog = normalizeSlimeHome({
+      shopCatalog: [
+        {
+          key: "slime-blush-peach-brush-blush",
+          category: "wearable",
+          floor: null,
+          labelKo: "복숭아 블러셔",
+          price: 80,
+          spritePath: "/blush.png",
+          wearableRole: "blush",
+          wearableOption: "peach-brush-blush",
+        },
+        {
+          key: "slime-eyewear-round-glasses",
+          category: "wearable",
+          floor: null,
+          labelKo: "둥근 안경",
+          price: 100,
+          spritePath: "/glasses.png",
+          wearableRole: "eyewear",
+          wearableOption: "round-glasses",
+        },
+        {
+          key: "slime-headwear-straw-hat",
+          category: "wearable",
+          floor: null,
+          labelKo: "밀짚모자",
+          price: 120,
+          spritePath: "/hat.png",
+          wearableRole: "headwear",
+          wearableOption: "straw-hat",
+        },
+        {
+          key: "slime-blue-drink-lemonade",
+          category: "drink",
+          floor: null,
+          labelKo: "레모네이드",
+          price: 500,
+          spritePath: "/lemonade.gif",
+          animationKey: "lemonade",
+        },
+      ],
+    }).shopCatalog;
+
+    expect(resolveEquippedSlimeWearables([
+      "slime-blush-peach-brush-blush",
+      "slime-eyewear-round-glasses",
+      "slime-headwear-straw-hat",
+      "slime-blue-drink-lemonade",
+    ], catalog)).toEqual({
+      blush: "peach-brush-blush",
+      eyewear: "round-glasses",
+      headwear: "straw-hat",
+      drink: "lemonade",
+    });
+  });
+
+  it("lists every buff per pet and aggregates duplicate effect types in its summary", () => {
+    const home = normalizeSlimeHome({
+      ownedColors: ["blue"],
+      catalog: [{
+        key: "blue",
+        color: "blue",
+        nameKo: "파란 슬라임",
+        effectKey: "growth_speed",
+        baseBuffBps: 100,
+        price: 100,
+      }],
+      equippedItemsByColor: {
+        blue: ["reading-background"],
+      },
+      shopCatalog: [{
+        key: "reading-background",
+        category: "background",
+        floor: null,
+        labelKo: "독서 배경",
+        price: 500,
+        spritePath: "/reading.gif",
+        effectKey: "reading_reward",
+        effectBps: 100,
+      }],
+      claimedTitles: [{
+        key: "reading-title",
+        label: "독서 칭호",
+        imagePath: "/reading-title.png",
+        effectKey: "reading_reward",
+        buffBps: 200,
+      }],
+      equippedTitleByColor: { blue: "reading-title" },
+    });
+
+    const groups = mobileSlimeBuffGroups(home);
+    expect(groups).toEqual([{
+      color: "blue",
+      label: "파란 슬라임",
+      entries: [
+        { source: "slime", key: "blue", label: "펫 기본 효과", effectKey: "growth_speed", bps: 100 },
+        { source: "background", key: "reading-background", label: "독서 배경", effectKey: "reading_reward", bps: 100 },
+        { source: "title", key: "reading-title", label: "독서 칭호", effectKey: "reading_reward", bps: 200 },
+      ],
+      totals: [
+        { effectKey: "growth_speed", bps: 100 },
+        { effectKey: "reading_reward", bps: 300 },
+      ],
+    }]);
+    expect(aggregateMobileSlimeBuffTotals(groups)).toEqual([
+      { effectKey: "growth_speed", bps: 100 },
+      { effectKey: "reading_reward", bps: 300 },
+      { effectKey: "walking_reward", bps: 0 },
+      { effectKey: "assignment_reward", bps: 0 },
+      { effectKey: "comment_reward", bps: 0 },
+    ]);
   });
 
   it("selects the mobile scene background before the standard GIF and falls back safely", () => {
@@ -194,6 +349,24 @@ describe("mobile slime parity model", () => {
       "/creatures/slimes/official/props/ball/soccer-ball/purple/slime-purple-soccer-ball-hit-4x.gif",
     );
     expect(slimeBallSpritePath(["slime-cookie"], "purple")).toBeUndefined();
+  });
+
+  it("resolves the equipped drink animation for the slime color and density", () => {
+    const item = {
+      category: "drink" as const,
+      animationKey: "blue-ramune",
+    };
+    expect(slimeDrinkSpritePath(item, "red")).toBe(
+      "/creatures/slimes/shop/drinks/blue-ramune/red/slime-red-drink-blue-ramune-4x.gif",
+    );
+    expect(slimeDrinkSpritePath(item, "red", false)).toBe(
+      "/creatures/slimes/shop/drinks/blue-ramune/red/slime-red-drink-blue-ramune.gif",
+    );
+  });
+
+  it("uses the configured preview colour for a visually overlapping drink", () => {
+    expect(slimeShopPreviewColor({ previewColor: "red" }, "blue")).toBe("red");
+    expect(slimeShopPreviewColor({}, "purple")).toBe("purple");
   });
 
   it("compares growth time with the active buff and exposes direct pet routes", () => {

@@ -132,8 +132,8 @@ describe("SlimePetPage", () => {
     );
 
     const filters = within(drawer).getByRole("tablist", { name: "상점 분류" });
-    expect(within(filters).getAllByRole("tab")).toHaveLength(7);
-    for (const label of ["전체", "캐릭터", "배경", "바닥", "먹이", "소품", "레벨업"]) {
+    expect(within(filters).getAllByRole("tab")).toHaveLength(8);
+    for (const label of ["전체", "캐릭터", "배경", "바닥", "먹이", "소품", "착장", "레벨업"]) {
       expect(within(filters).getByRole("tab", { name: label })).toBeTruthy();
     }
     expect(within(drawer).getByRole("button", { name: "그린 슬라임 구매" })).toBeTruthy();
@@ -194,6 +194,75 @@ describe("SlimePetPage", () => {
     expect(within(drawer).getByRole("heading", { name: "음료" })).toBeTruthy();
     expect(within(drawer).getByText("야구공")).toBeTruthy();
     expect(within(drawer).getByText("레모네이드")).toBeTruthy();
+  });
+
+  it("routes wearable products to outfit groups and composes their previews", async () => {
+    const headwear = SLIME_SHOP_CATALOG.find((item) => item.wearableRole === "headwear");
+    const blush = SLIME_SHOP_CATALOG.find((item) => item.wearableRole === "blush");
+    const eyewear = SLIME_SHOP_CATALOG.find((item) => item.wearableRole === "eyewear");
+    expect(headwear).toBeTruthy();
+    expect(blush).toBeTruthy();
+    expect(eyewear).toBeTruthy();
+
+    vi.stubGlobal("fetch", vi.fn(() => json(home({ shopCatalog: SLIME_SHOP_CATALOG }))));
+    render(<SlimePetPage />);
+
+    fireEvent.click(await screen.findByRole("button", { name: "상점" }));
+    const drawer = await screen.findByRole("dialog", { name: "슬라임 상점" });
+    fireEvent.click(within(drawer).getByRole("tab", { name: "착장" }));
+
+    expect(within(drawer).getByRole("heading", { name: "볼터치" })).toBeTruthy();
+    expect(within(drawer).getByRole("heading", { name: "안경" })).toBeTruthy();
+    expect(within(drawer).getByRole("heading", { name: "모자" })).toBeTruthy();
+    expect(within(drawer).queryByText("레모네이드")).toBeNull();
+
+    const preview = within(drawer).getByRole("img", {
+      name: `${headwear!.labelKo} 미리보기`,
+    });
+    expect(preview.getAttribute("data-item-sprite-path")).toBeNull();
+    expect(preview.getAttribute("data-wearable-keys")).toContain(
+      `headwear/${headwear!.wearableOption}`,
+    );
+    expect(preview.querySelector('img[data-wearable-role="headwear"]')).toBeTruthy();
+  });
+
+  it("renders independent wearable slots together with the equipped drink flavor", async () => {
+    const drink = SLIME_SHOP_CATALOG.find(
+      (item) => item.category === "drink" && item.animationKey === "lemonade",
+    );
+    const blush = SLIME_SHOP_CATALOG.find((item) => item.wearableRole === "blush");
+    const eyewear = SLIME_SHOP_CATALOG.find((item) => item.wearableRole === "eyewear");
+    const headwear = SLIME_SHOP_CATALOG.find((item) => item.wearableRole === "headwear");
+    expect(drink).toBeTruthy();
+    expect(blush).toBeTruthy();
+    expect(eyewear).toBeTruthy();
+    expect(headwear).toBeTruthy();
+
+    const equipped = [blush!.key, eyewear!.key, headwear!.key, drink!.key];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(() =>
+        json(
+          home({
+            ownedColors: ["blue"],
+            ownedItemKeys: equipped,
+            equippedItemKeys: equipped,
+            equippedItemsByColor: { blue: equipped },
+          }),
+        ),
+      ),
+    );
+    render(<SlimePetPage />);
+
+    const preview = await screen.findByRole("img", {
+      name: /블루 슬라임, .* 적용 미리보기/,
+    });
+    const wearableKeys = preview.getAttribute("data-wearable-keys") ?? "";
+    expect(wearableKeys).toContain(`blush/${blush!.wearableOption}`);
+    expect(wearableKeys).toContain(`eyewear/${eyewear!.wearableOption}`);
+    expect(wearableKeys).toContain(`headwear/${headwear!.wearableOption}`);
+    expect(wearableKeys).toContain(`drink/${drink!.animationKey}`);
+    expect(preview.getAttribute("data-slime-action")).toBe("drink");
   });
 
   it("renders an equipped ball with the matching slime-color looping GIF", async () => {
@@ -491,7 +560,7 @@ describe("SlimePetPage", () => {
     fireEvent.click(screen.getByRole("button", { name: "퍼플 슬라임 효과 상세 보기" }));
     const details = screen.getByRole("region", { name: "퍼플 슬라임 효과 상세" });
     expect(within(details).getByText("소품 추가 효과")).toBeTruthy();
-    expect(within(details).getByText("레모네이드 · 댓글 보상 +1%")).toBeTruthy();
+    expect(within(details).getByText("레모네이드 · 걷기 보상 +1%")).toBeTruthy();
   });
 
   it("disables and grays the cookie action when no cookies are owned", async () => {

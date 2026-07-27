@@ -1,0 +1,193 @@
+{
+  "frames": [
+    {
+      "frame": {
+        "x": 0,
+        "y": 0,
+        "w": 64,
+        "h": 64
+      },
+      "duration": 220
+    },
+    {
+      "frame": {
+        "x": 64,
+        "y": 0,
+        "w": 64,
+        "h": 64
+      },
+      "duration": 160
+    },
+    {
+      "frame": {
+        "x": 128,
+        "y": 0,
+        "w": 64,
+        "h": 64
+      },
+      "duration": 120
+    },
+    {
+      "frame": {
+        "x": 192,
+        "y": 0,
+        "w": 64,
+        "h": 64
+      },
+      "duration": 110
+    },
+    {
+      "frame": {
+        "x": 256,
+        "y": 0,
+        "w": 64,
+        "h": 64
+      },
+      "duration": 110
+    },
+    {
+      "frame": {
+        "x": 320,
+        "y": 0,
+        "w": 64,
+        "h": 64
+      },
+      "duration": 110
+    },
+    {
+      "frame": {
+        "x": 384,
+        "y": 0,
+        "w": 64,
+        "h": 64
+      },
+      "duration": 120
+    },
+    {
+      "frame": {
+        "x": 448,
+        "y": 0,
+        "w": 64,
+        "h": 64
+      },
+      "duration": 130
+    },
+    {
+      "frame": {
+        "x": 512,
+        "y": 0,
+        "w": 64,
+        "h": 64
+      },
+      "duration": 150
+    },
+    {
+      "frame": {
+        "x": 576,
+        "y": 0,
+        "w": 64,
+        "h": 64
+      },
+      "duration": 170
+    },
+    {
+      "frame": {
+        "x": 640,
+        "y": 0,
+        "w": 64,
+        "h": 64
+      },
+      "duration": 190
+    },
+    {
+      "frame": {
+        "x": 704,
+        "y": 0,
+        "w": 64,
+        "h": 64
+      },
+      "duration": 260
+    }
+  ],
+  "meta": {
+    "image": "red.png",
+    "size": {
+      "w": 768,
+      "h": 64
+    },
+    "frame_size": {
+      "w": 64,
+      "h": 64
+    },
+    "frame_count": 12,
+    "alpha": "binary",
+    "role": "headwear",
+    "action": "happy",
+    "color": "red",
+    "option": "gold-crown-red-gem",
+    "source": "level-up/crowned-happy-assets/gold-crown-red-gem/happy/red/slime-red-happy-gold-crown-red-gem-sheet.png",
+    "source_sha256": "90bdab7bc9b7e9f8755e12b411e0a484274701cc3f38e01857de165d7cbdcbf7",
+    "transforms": [
+      {
+        "source_idle_frame": 0,
+        "dx": 0,
+        "dy": 0
+      },
+      {
+        "source_idle_frame": 1,
+        "dx": 0,
+        "dy": 0
+      },
+      {
+        "source_idle_frame": 2,
+        "dx": 0,
+        "dy": 0
+      },
+      {
+        "source_idle_frame": 3,
+        "dx": 0,
+        "dy": 0
+      },
+      {
+        "source_idle_frame": 4,
+        "dx": 0,
+        "dy": 0
+      },
+      {
+        "source_idle_frame": 5,
+        "dx": 0,
+        "dy": 0
+      },
+      {
+        "source_idle_frame": 6,
+        "dx": 0,
+        "dy": 0
+      },
+      {
+        "source_idle_frame": 7,
+        "dx": 0,
+        "dy": 0
+      },
+      {
+        "source_idle_frame": 8,
+        "dx": 0,
+        "dy": 0
+      },
+      {
+        "source_idle_frame": 9,
+        "dx": 0,
+        "dy": 0
+      },
+      {
+        "source_idle_frame": 10,
+        "dx": 0,
+        "dy": 0
+      },
+      {
+        "source_idle_frame": 11,
+        "dx": 0,
+        "dy": 0
+      }
+    ]
+  }
+}

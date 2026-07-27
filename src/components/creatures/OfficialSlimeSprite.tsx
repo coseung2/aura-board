@@ -13,12 +13,23 @@ import {
   type SlimeEvolution,
   type SlimeFrame,
 } from "@/lib/pets/slime-assets";
+import {
+  resolveSlimeWearables,
+  type ResolvedSlimeWearable,
+  type SlimeWearableSelection,
+} from "@/lib/pets/slime-wearables";
 
 import styles from "./OfficialSlimeSprite.module.css";
 
 export type OfficialSlimeSpriteProps = {
   slimeColor: SlimeColor;
+  /**
+   * Persisted evolution. Prefer `growthStage`; this remains for callers that
+   * only carry the evolution, and the resolver derives a stage from it.
+   */
   evolution?: SlimeEvolution;
+  /** Growth stage owning the default crown, which a chosen hat outranks. */
+  growthStage?: number;
   action?: SlimeAction;
   equippedFloor?: EquippedFloor;
   /** Integer logical viewport scale. Character art is authored at 64px; scene backgrounds may be authored at 64px or 128px while using the same logical viewport. */
@@ -30,6 +41,13 @@ export type OfficialSlimeSpriteProps = {
   itemSpritePath?: string;
   /** Optional scene art rendered behind every other visual layer. Sources may be 64x64 or 128x128 while remaining in the fixed 64px logical viewport. */
   backgroundSpritePath?: string;
+  /**
+   * Anchor-composed wearable layers. Each equipped option is one shared sheet
+   * repositioned per frame, so new drinks never require rebaking wearables.
+   */
+  wearables?: SlimeWearableSelection;
+  /** Drink flavor selecting the wearable drink timeline, such as `lemonade`. */
+  drinkFlavor?: string | null;
   /** Repeat a normally one-shot action when it is used as a passive preview. */
   repeat?: boolean;
   onComplete?: () => void;
@@ -69,6 +87,27 @@ function frameViewportStyle(frame: SlimeFrame, scale: number, extraHeight = 0): 
   };
 }
 
+/**
+ * Position one wearable frame inside the viewport.
+ *
+ * The sheet is shifted so the anchor's source column lands at the origin, then
+ * nudged by the per-frame `(dx, dy)` offset authored for that timeline.
+ *
+ * Jump actions are authored on a taller canvas whose extra headroom sits above
+ * the grounded pose, so `characterOffsetY` is subtracted to bring the overlay
+ * back onto the character's own 64px viewport. Grounded actions report zero, so
+ * both families share one formula.
+ */
+function wearableStyle(wearable: ResolvedSlimeWearable, scale: number): CSSProperties {
+  const left = (-wearable.sourceFrame * wearable.frameSize.w + wearable.dx) * scale;
+  const top = (wearable.dy - wearable.characterOffsetY) * scale;
+  return {
+    width: wearable.sheetWidth * scale,
+    height: wearable.sheetHeight * scale,
+    transform: `translate(${left}px, ${top}px)`,
+  };
+}
+
 function resolveSpritePath(path: string | null | undefined): string | null {
   if (!path) return null;
   if (/^https?:\/\//i.test(path) || path.startsWith("/")) return path;
@@ -83,6 +122,7 @@ function resolveSpritePath(path: string | null | undefined): string | null {
 export function OfficialSlimeSprite({
   slimeColor,
   evolution = "base",
+  growthStage,
   action = "idle",
   equippedFloor = "none",
   scale: requestedScale = DEFAULT_SCALE,
@@ -91,6 +131,8 @@ export function OfficialSlimeSprite({
   dataSlimeColor,
   itemSpritePath,
   backgroundSpritePath,
+  wearables,
+  drinkFlavor,
   repeat = false,
   onComplete,
 }: OfficialSlimeSpriteProps) {
@@ -101,8 +143,11 @@ export function OfficialSlimeSprite({
       evolution,
       action,
       equippedFloor,
+      growthStage,
+      equippedHeadwear: wearables?.headwear ?? null,
+      drinkFlavor,
     }),
-    [action, equippedFloor, evolution, slimeColor],
+    [action, drinkFlavor, equippedFloor, evolution, growthStage, slimeColor, wearables?.headwear],
   );
   const playbackKey = `${resolution.key}:${resolution.action}:${resolution.equippedFloor}`;
   const [frameIndex, setFrameIndex] = useState(0);
@@ -136,15 +181,39 @@ export function OfficialSlimeSprite({
     scale,
     0,
   );
-  const crownStyle = resolution.crownOverlay
-    ? {
-        width: 64 * resolution.crownOverlay.imageScale * scale,
-        height: 64 * resolution.crownOverlay.imageScale * scale,
-        transform: "translate(0px, 0px)",
-      }
-    : undefined;
   const label = alt ?? `${slimeColor} 슬라임 ${resolution.action} 모습`;
   const resolvedBackgroundSpritePath = resolveSpritePath(backgroundSpritePath);
+  // Wearables compose onto the character sheet. Legacy complete-GIF props
+  // replace that sheet entirely, so the two paths stay mutually exclusive.
+  // The head slot is owned by the resolver: it decides whether this action draws
+  // the growth crown, a player hat, or nothing. Other roles come from the
+  // caller's selection. Legacy complete-GIF props replace the character sheet
+  // entirely, so they suppress all composition.
+  const resolvedWearables = useMemo(
+    () => {
+      if (itemSpritePath || resolution.composition.mode !== "composed") return [];
+      // The resolver owns the head slot, including whether this action draws it.
+      // Other roles pass through so a chosen drink always shows its own flavor.
+      const selection = { ...wearables, headwear: resolution.renderedHeadwear };
+      return resolveSlimeWearables(
+        selection,
+        slimeColor,
+        resolution.resolvedAction,
+        frameIndex,
+        resolution.drinkFlavor,
+      );
+    },
+    [
+      frameIndex,
+      itemSpritePath,
+      resolution.composition.mode,
+      resolution.drinkFlavor,
+      resolution.renderedHeadwear,
+      resolution.resolvedAction,
+      slimeColor,
+      wearables,
+    ],
+  );
 
   useEffect(() => {
     onCompleteRef.current = onComplete;
@@ -190,6 +259,12 @@ export function OfficialSlimeSprite({
       data-background-sprite-path={resolvedBackgroundSpritePath ?? undefined}
       data-frame-index={frameIndex}
       data-frame-duration={frame.duration}
+      data-wearable-keys={resolvedWearables.length > 0
+        ? resolvedWearables.map((wearable) => wearable.key).join(",")
+        : undefined}
+      data-head-slot={resolution.headSlot?.option ?? undefined}
+      data-head-slot-source={resolution.headSlot?.source ?? undefined}
+      data-composition-mode={resolution.composition.mode}
       data-floor-offset-source-pixels={staticFloor ? staticFloor.slimeFootY - staticFloor.surfaceY : 0}
     >
       {resolvedBackgroundSpritePath ? (
@@ -284,18 +359,35 @@ export function OfficialSlimeSprite({
             style={sheetStyle}
             draggable={false}
           />
-          {resolution.crownOverlay ? (
-        // Crown overlays are generated by the importer from the official
-        // evolved/base diff; they share the same source-pixel coordinate.
-        // eslint-disable-next-line @next/next/no-img-element
-        <img
-          src={resolution.crownOverlay.imageUrl}
-          alt=""
-          aria-hidden="true"
-          className={styles.crown}
-          style={crownStyle}
-          draggable={false}
-        />
+          {resolvedWearables.map((wearable) => (
+            // One shared sheet per option; the anchor track supplies this
+            // frame's source column and offset.
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              key={wearable.key}
+              src={wearable.imageUrl}
+              alt=""
+              aria-hidden="true"
+              className={styles.wearable}
+              style={{ ...wearableStyle(wearable, scale), zIndex: 2 + wearable.zIndex }}
+              data-wearable-role={wearable.role}
+              data-wearable-source-frame={wearable.sourceFrame}
+              draggable={false}
+            />
+          ))}
+          {resolution.happyHeart ? (
+            // The happy heart is authored separately from the body so it can
+            // stay above blush, glasses, hats, and any future prop overlay.
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={resolution.happyHeart.imageUrl}
+              alt=""
+              aria-hidden="true"
+              className={styles.sheet}
+              style={{ ...sheetStyle, zIndex: 100 }}
+              data-happy-heart-layer="top"
+              draggable={false}
+            />
           ) : null}
         </>
       )}

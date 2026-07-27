@@ -62,8 +62,8 @@ describe("slime buff math", () => {
       "shooting-star-night-sky-background",
     ]);
 
-    expect(effects.totals.walking_reward).toBe(200);
-    expect(effects.totals.comment_reward).toBe(100);
+    expect(effects.totals.walking_reward).toBe(300);
+    expect(effects.totals.comment_reward).toBe(0);
     expect(effects.totals.assignment_reward).toBe(100);
     expect(effects.totalBps).toBe(400);
     expect(effects.breakdown.map(({ source, bps }) => [source, bps])).toEqual([

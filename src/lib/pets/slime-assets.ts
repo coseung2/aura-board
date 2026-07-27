@@ -1,12 +1,20 @@
 import {
   SLIME_WEB_ASSET_REGISTRY,
   SLIME_WEB_CROWN_OVERLAY_REGISTRY,
+  SLIME_WEB_HAPPY_HEART_OVERLAY_REGISTRY,
   SLIME_WEB_SHARED_ASSETS,
 } from "./slime-assets.generated";
+import { SLIME_WEB_STATIC_FLOORS } from "./static-floors.generated";
 import {
   SLIME_BALL_WEB_ASSET_REGISTRY,
 } from "./slime-ball-assets.generated";
 import type { SlimeBallSlug } from "./types";
+import {
+  resolveSlimeComposition,
+  resolveSlimeHeadSlot,
+  type SlimeCompositionDecision,
+  type SlimeHeadSlot,
+} from "./slime-wearables";
 export const SLIME_SHARED_ASSETS = SLIME_WEB_SHARED_ASSETS;
 export {
   SLIME_BALL_ASSET_REGISTRY,
@@ -19,17 +27,63 @@ export type SlimeColor = (typeof SLIME_ASSET_COLORS)[number];
 export const SLIME_EVOLUTIONS = ["base", "gold-crown-red-gem", "silver-crown-blue-gem"] as const;
 export type SlimeEvolution = (typeof SLIME_EVOLUTIONS)[number];
 
-export const EQUIPPED_FLOORS = ["none", "grass-floor", "water-puddle", "trampoline"] as const;
+export const EQUIPPED_FLOORS = [
+  "none",
+  "grass-floor",
+  "crystal-cave-floor",
+  "moonlit-marble-floor",
+  "royal-garden-floor",
+  "celestial-gold-floor",
+  "snow-ground-floor",
+  "ancient-brick-floor",
+  "cherry-stone-floor",
+  "sand-trail-floor",
+  "forest-soil-floor",
+  "stone-floor",
+  "water-puddle",
+  "trampoline",
+] as const;
 export type EquippedFloor = (typeof EQUIPPED_FLOORS)[number];
 
 export const SLIME_ACTIONS = ["idle", "happy", "drink", "floor-interaction"] as const;
 export type SlimeAction = (typeof SLIME_ACTIONS)[number];
 
 export type SlimeFloorInteraction = Extract<EquippedFloor, "water-puddle" | "trampoline">;
+
+/**
+ * Semantic animation the pet is playing.
+ *
+ * `drink` is one action regardless of flavor; the flavor selects art, not
+ * behaviour. Wearable anchor tracks are keyed off this.
+ */
 export type SlimeSheetAction = "idle" | "happy" | "drink" | SlimeFloorInteraction;
-export type SlimeAssetKey = `${SlimeEvolution}/${SlimeColor}/${SlimeSheetAction}`;
+
+/**
+ * Character sheet variant on disk.
+ *
+ * Drinking is authored per flavor because the pose differs, so the sheet name is
+ * flavor-specific even though the action above is not. Keeping these two types
+ * apart is what stops one flavor's sheet standing in for the others, which is how
+ * a lemonade glass previously appeared under every drink.
+ */
+export type SlimeSheetVariant =
+  | "idle"
+  | "happy"
+  | `drink-${string}`
+  | SlimeFloorInteraction;
+
+export type SlimeAssetKey = `${SlimeEvolution}/${SlimeColor}/${SlimeSheetVariant}`;
 export type SlimeCrownOverlayKey = `${Exclude<SlimeEvolution, "base">}/${SlimeColor}`;
 export type SlimeBallAssetKey = `${SlimeBallSlug}/${SlimeColor}`;
+
+/**
+ * Flavor used when a drink is requested without naming one.
+ *
+ * Older persisted snapshots carry `action: "drink"` with no flavor, and the
+ * shop can preview drinking before a flavor is chosen. Those cases need a real
+ * sheet, and lemonade is the flavor every evolution authored.
+ */
+export const DEFAULT_SLIME_DRINK_FLAVOR = "lemonade";
 
 export type SlimeFrameRect = Readonly<{ x: number; y: number; w: number; h: number }>;
 export type SlimeFrame = Readonly<{
@@ -83,6 +137,7 @@ export type SlimeBallAssetResolution = SlimeBallAssetEntry & Readonly<{
 
 type GeneratedWebEntry = (typeof SLIME_WEB_ASSET_REGISTRY)[keyof typeof SLIME_WEB_ASSET_REGISTRY];
 type GeneratedWebOverlay = (typeof SLIME_WEB_CROWN_OVERLAY_REGISTRY)[keyof typeof SLIME_WEB_CROWN_OVERLAY_REGISTRY];
+type GeneratedHappyHeartOverlay = (typeof SLIME_WEB_HAPPY_HEART_OVERLAY_REGISTRY)[keyof typeof SLIME_WEB_HAPPY_HEART_OVERLAY_REGISTRY];
 export type SlimeWebAssetEntry = Readonly<{
   key: SlimeAssetKey;
   evolution: SlimeEvolution;
@@ -99,12 +154,23 @@ export type SlimeCrownOverlay = Readonly<{
   differingPixels: number;
 }>;
 
+export type SlimeHappyHeartOverlay = Readonly<{
+  key: `base/${SlimeColor}`;
+  evolution: "base";
+  color: SlimeColor;
+  action: "happy";
+  imageUrl: string;
+  imageScale: 1;
+  metadata: SlimeSheetMetadata;
+}>;
+
 export type SlimeStaticFloor = Readonly<{
-  key: "grass-floor";
+  key: Exclude<EquippedFloor, "none" | "water-puddle" | "trampoline">;
   imageUrl: string;
   imageScale: 1;
   surfaceY: 44;
   slimeFootY: 56;
+  tier?: 1 | 2 | 3;
 }>;
 
 export type SlimePlayback = Readonly<{
@@ -121,6 +187,12 @@ export type SlimeAssetState = Readonly<{
   equippedBall?: SlimeBallSlug | null;
   /** Alias accepted while older persisted snapshots migrate. */
   ballSlug?: SlimeBallSlug | null;
+  /** Growth stage driving the awarded crown. Defaults from `evolution`. */
+  growthStage?: number;
+  /** Player-selected headwear, which outranks the growth crown. */
+  equippedHeadwear?: string | null;
+  /** Drink flavor selecting the wearable drink timeline. */
+  drinkFlavor?: string | null;
 }>;
 
 export type SlimeAssetResolution = Readonly<{
@@ -131,19 +203,29 @@ export type SlimeAssetResolution = Readonly<{
   slimeColor: SlimeColor;
   action: SlimeAction;
   resolvedAction: SlimeSheetAction;
+  /** Sheet variant actually loaded, which names the flavor for a drink. */
+  resolvedVariant: SlimeSheetVariant;
+  /** Flavor driving the drink sheet and the wearable drink timelines. */
+  drinkFlavor: string | null;
   equippedFloor: EquippedFloor;
   sheetUrl: string;
   imageScale: 1;
   metadata: SlimeSheetMetadata;
   frameCount: number;
   frameSize: SlimeFrameRect;
-  crownOverlay: SlimeCrownOverlay | null;
-  overlay: SlimeCrownOverlay | null;
+  /** Which head option is semantically worn, regardless of what this action draws. */
+  headSlot: SlimeHeadSlot;
+  /** The head option this action actually draws, or null when suppressed. */
+  renderedHeadwear: string | null;
+  /** Why the frame is composed, baked, or drawn bare-headed. */
+  composition: SlimeCompositionDecision;
   staticFloor: SlimeStaticFloor | null;
   playback: SlimePlayback;
   loop: boolean;
   oneShot: boolean;
   ball: SlimeBallAssetResolution | null;
+  /** Heart-only happy animation, rendered after every wearable layer. */
+  happyHeart: SlimeHappyHeartOverlay | null;
 }>;
 
 const webEntries = SLIME_WEB_ASSET_REGISTRY as Record<string, GeneratedWebEntry>;
@@ -152,12 +234,43 @@ const ballEntries = SLIME_BALL_WEB_ASSET_REGISTRY as Record<string, GeneratedBal
 
 const isCrowned = (evolution: SlimeEvolution): evolution is Exclude<SlimeEvolution, "base"> => evolution !== "base";
 
-function sheetKey(evolution: SlimeEvolution, color: SlimeColor, action: SlimeSheetAction): SlimeAssetKey {
-  return `${evolution}/${color}/${action}` as SlimeAssetKey;
+function sheetKey(
+  evolution: SlimeEvolution,
+  color: SlimeColor,
+  variant: SlimeSheetVariant,
+): SlimeAssetKey {
+  return `${evolution}/${color}/${variant}` as SlimeAssetKey;
+}
+
+/**
+ * Name the sheet variant one semantic action loads.
+ *
+ * Only drinking is flavor-specific on disk, because the pose differs per drink.
+ * Everything else names its own sheet. Keeping this mapping in one place is what
+ * stops a lemonade sheet standing in for a grape soda.
+ */
+function sheetVariantFor(
+  action: SlimeSheetAction,
+  drinkFlavor: string | null,
+): SlimeSheetVariant {
+  if (action !== "drink") return action;
+  return `drink-${drinkFlavor ?? DEFAULT_SLIME_DRINK_FLAVOR}` as SlimeSheetVariant;
 }
 
 function overlayKey(evolution: SlimeEvolution, color: SlimeColor): SlimeCrownOverlayKey | null {
   return isCrowned(evolution) ? `${evolution}/${color}` as SlimeCrownOverlayKey : null;
+}
+
+/**
+ * Infer a growth stage from a persisted evolution.
+ *
+ * Callers that already know the stage should pass it; this keeps older snapshots
+ * that only carry `evolution` resolving to the same crown as before.
+ */
+function growthStageForEvolution(evolution: SlimeEvolution): number {
+  if (evolution === "gold-crown-red-gem") return 3;
+  if (evolution === "silver-crown-blue-gem") return 2;
+  return 1;
 }
 
 function normalizedFrameIndex(frameIndex: number, frameCount: number): number {
@@ -174,13 +287,16 @@ function playbackFor(action: SlimeSheetAction): SlimePlayback {
 }
 
 function staticFloorFor(equippedFloor: EquippedFloor): SlimeStaticFloor | null {
-  return equippedFloor === "grass-floor" ? {
+  if (equippedFloor === "grass-floor") return {
     key: "grass-floor",
     imageUrl: SLIME_WEB_SHARED_ASSETS.grassFloor.imageUrl,
     imageScale: 1,
     surfaceY: 44,
     slimeFootY: 56,
-  } : null;
+  };
+  return SLIME_WEB_STATIC_FLOORS[
+    equippedFloor as keyof typeof SLIME_WEB_STATIC_FLOORS
+  ] ?? null;
 }
 
 function generatedEntry(key: SlimeAssetKey): SlimeWebAssetEntry {
@@ -271,9 +387,9 @@ export function resolveSlimeBallAsset(
 export function slimeAssetKey(
   evolution: SlimeEvolution,
   slimeColor: SlimeColor,
-  action: SlimeSheetAction,
+  variant: SlimeSheetVariant,
 ): SlimeAssetKey {
-  return sheetKey(evolution, slimeColor, action);
+  return sheetKey(evolution, slimeColor, variant);
 }
 
 /** Resolve persisted state to an imported sheet without reading the source package. */
@@ -286,14 +402,34 @@ export function resolveSlimeAsset(
     ? state.equippedFloor
     : null;
   const resolvedAction: SlimeSheetAction = floorAction ?? (state.action === "happy" ? "happy" : state.action === "drink" ? "drink" : "idle");
-  const usesBaseWithOverlay = isCrowned(state.evolution) && (resolvedAction === "idle" || resolvedAction === "happy");
-  const resolvedEvolution: SlimeEvolution = usesBaseWithOverlay ? "base" : state.evolution;
-  const key = sheetKey(resolvedEvolution, state.slimeColor, resolvedAction);
+  // A drink names its own sheet, so the flavor is resolved before any lookup.
+  // A drink requested without a flavor still needs a real sheet, so it falls back
+  // to the flavor every evolution authored rather than failing to resolve.
+  const drinkFlavor = resolvedAction === "drink"
+    ? state.drinkFlavor ?? DEFAULT_SLIME_DRINK_FLAVOR
+    : null;
+  const resolvedVariant = sheetVariantFor(resolvedAction, drinkFlavor);
+
+  // Growth stage stays authoritative for level display and buffs; here it only
+  // supplies the default crown. A player-selected hat outranks it in the same
+  // headwear slot, and removing the hat restores the crown.
+  const growthStage = state.growthStage ?? growthStageForEvolution(state.evolution);
+  const headSlot = resolveSlimeHeadSlot(growthStage, state.equippedHeadwear);
+  const composition = resolveSlimeComposition(resolvedAction, headSlot, drinkFlavor);
+
+  // Composed frames draw the plain base sheet and add overlays. `baked` keeps the
+  // pre-composited evolved sheet, but only where one was actually authored: the
+  // evolved package has no idle or happy sheets, so those fall back to base.
+  const bakedKey = sheetKey(state.evolution, state.slimeColor, resolvedVariant);
+  const hasBakedSheet = isCrowned(state.evolution) && Boolean(webEntries[bakedKey]);
+  const resolvedEvolution: SlimeEvolution =
+    composition.mode === "baked" && hasBakedSheet ? state.evolution : "base";
+  const renderedHeadwear = composition.headwear === "drawn" ? headSlot?.option ?? null : null;
+  const key = sheetKey(resolvedEvolution, state.slimeColor, resolvedVariant);
   const entry = generatedEntry(key);
   const metadata = entry.metadata;
   const firstFrame = metadata.frames[0];
   if (!firstFrame) throw new Error(`Imported slime asset has no frames: ${key}`);
-  const crownOverlay = usesBaseWithOverlay ? generatedOverlay(overlayKey(state.evolution, state.slimeColor)) : null;
   const playback = playbackFor(resolvedAction);
   const equippedBall = ballSlug !== undefined ? ballSlug : state.equippedBall ?? state.ballSlug ?? null;
   const result: SlimeAssetResolution = {
@@ -304,19 +440,25 @@ export function resolveSlimeAsset(
     slimeColor: state.slimeColor,
     action: state.action,
     resolvedAction,
+    resolvedVariant,
+    drinkFlavor,
     equippedFloor: state.equippedFloor,
     sheetUrl: entry.sheetUrl,
     imageScale: 1,
     metadata,
     frameCount: metadata.frames.length,
     frameSize: firstFrame.frame,
-    crownOverlay,
-    overlay: crownOverlay,
+    headSlot,
+    renderedHeadwear,
+    composition,
     staticFloor: staticFloorFor(state.equippedFloor),
     playback,
     loop: playback.loop,
     oneShot: playback.oneShot,
     ball: equippedBall ? resolveSlimeBallAsset(state.slimeColor, equippedBall) : null,
+    happyHeart: resolvedAction === "happy"
+      ? SLIME_WEB_HAPPY_HEART_OVERLAY_REGISTRY[`base/${state.slimeColor}`] as GeneratedHappyHeartOverlay
+      : null,
   };
   return result;
 }

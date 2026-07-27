@@ -28,6 +28,16 @@ export type SlimeBallSlug = (typeof SLIME_BALL_SLUGS)[number];
 export const SLIME_FLOORS = [
   "none",
   "grass-floor",
+  "crystal-cave-floor",
+  "moonlit-marble-floor",
+  "royal-garden-floor",
+  "celestial-gold-floor",
+  "snow-ground-floor",
+  "ancient-brick-floor",
+  "cherry-stone-floor",
+  "sand-trail-floor",
+  "forest-soil-floor",
+  "stone-floor",
   "water-puddle",
   "trampoline",
 ] as const;
@@ -62,7 +72,7 @@ export type SlimeDefinition = {
   readonly spritePath: string;
 };
 
-export const SLIME_SHOP_CATEGORIES = ["background", "ride", "drink", "food", "prop"] as const;
+export const SLIME_SHOP_CATEGORIES = ["background", "ride", "drink", "food", "prop", "wearable"] as const;
 
 export type SlimeShopCategory = (typeof SLIME_SHOP_CATEGORIES)[number];
 
@@ -76,6 +86,13 @@ export type SlimeShopItem = {
   readonly spritePath: string;
   readonly mobileSpritePath?: string;
   readonly staticSpritePath?: string;
+  /** Variant family used to resolve the matching per-slime animation. */
+  readonly animationKey?: string;
+  /** Slime colour chosen to keep the shop animation legible. */
+  readonly previewColor?: SlimeColor;
+  /** Imported anchor-overlay slot and option for wearable shop items. */
+  readonly wearableRole?: "blush" | "eyewear" | "headwear";
+  readonly wearableOption?: string;
   readonly effectKey?: SlimeEffectKey;
   readonly effectBps?: number;
 };

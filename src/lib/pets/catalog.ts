@@ -9,15 +9,53 @@ import type {
   SlimeSetDefinition,
 } from "./types";
 import { SLIME_SHARED_ASSETS } from "./slime-assets";
-import { SLIME_BALL_SLUGS } from "./types";
+import { SLIME_BALL_SLUGS, SLIME_COLORS } from "./types";
+import { SLIME_WEARABLE_CATALOG } from "./wearable-catalog";
+import { slimeWearableEntry } from "./slime-wearables";
+import { SLIME_ASSET_ROOT } from "./asset-base";
 
-const SLIME_ASSET_ROOT = "/creatures/slimes";
+export { SLIME_ASSET_ROOT, slimeAssetUrl, SLIME_ASSET_RELEASE } from "./asset-base";
 export const SLIME_DEFAULT_PRICE = 500;
 export const SLIME_DEFAULT_BUFF_BPS = 200;
 export const SLIME_SHOP_DEFAULT_PRICE = 500;
 export const SLIME_COOKIE_PRICE = 30;
 export const SLIME_BALL_PRICE = SLIME_SHOP_DEFAULT_PRICE;
 export const SLIME_SHOP_LOWER_TIER_EFFECT_BPS = 100;
+
+
+const STATIC_FLOOR_DEFINITIONS = [
+  ["crystal-cave-floor", "수정 동굴 바닥", 1, "growth_speed"],
+  ["moonlit-marble-floor", "달빛 대리석 바닥", 1, "reading_reward"],
+  ["royal-garden-floor", "왕실 정원 바닥", 1, "walking_reward"],
+  ["celestial-gold-floor", "천상의 황금 바닥", 1, "assignment_reward"],
+  ["snow-ground-floor", "눈밭", 2, "comment_reward"],
+  ["ancient-brick-floor", "고대 벽돌 바닥", 2, "assignment_reward"],
+  ["cherry-stone-floor", "벚꽃 돌바닥", 2, "comment_reward"],
+  ["sand-trail-floor", "모래길 바닥", 3, "walking_reward"],
+  ["forest-soil-floor", "숲 흙바닥", 3, "reading_reward"],
+  ["stone-floor", "돌바닥", 3, "growth_speed"],
+] as const satisfies readonly [
+  Exclude<SlimeFloor, "none" | "grass-floor" | "water-puddle" | "trampoline">,
+  string,
+  1 | 2 | 3,
+  NonNullable<SlimeShopItem["effectKey"]>,
+][];
+
+const STATIC_FLOOR_TIER_PRICE = { 1: 1_000, 2: 700, 3: 500 } as const;
+const STATIC_FLOOR_TIER_BPS = { 1: 300, 2: 200, 3: 100 } as const;
+
+export const SLIME_STATIC_FLOOR_CATALOG: readonly SlimeShopItem[] =
+  STATIC_FLOOR_DEFINITIONS.map(([id, labelKo, tier, effectKey]) => ({
+    key: id,
+    category: "background",
+    floor: id,
+    labelKo,
+    price: STATIC_FLOOR_TIER_PRICE[tier],
+    effectKey,
+    effectBps: STATIC_FLOOR_TIER_BPS[tier],
+    spritePath: `${SLIME_ASSET_ROOT}/official/shared/floors/${id}.png`,
+    mobileSpritePath: `${SLIME_ASSET_ROOT}/official/shared/floors/${id}.png`,
+  }));
 
 /** The five generated colour variants used by the web preview. */
 export const SLIME_CATALOG: readonly SlimeDefinition[] = [
@@ -94,10 +132,112 @@ export const SLIME_BALL_CATALOG: readonly SlimeBallShopItem[] = SLIME_BALL_SLUGS
   effectKey: "walking_reward",
   effectBps: SLIME_SHOP_LOWER_TIER_EFFECT_BPS,
   spritePath: slimeBallPreviewPath(slug),
+  /**
+   * Cycle the slime colours across the ball previews.
+   *
+   * Every ball renders on the same slime otherwise, which makes the shop grid a
+   * row of identical blue blobs and hides the only thing that differs. Cycling
+   * needs no per-ball decision and stays correct as balls are added.
+   */
+  previewColor: SLIME_COLORS[SLIME_BALL_SLUGS.indexOf(slug) % SLIME_COLORS.length],
 }));
 
 /** Alias kept explicit for callers that distinguish shop props from all items. */
 export const SLIME_BALL_SHOP_CATALOG = SLIME_BALL_CATALOG;
+
+const SLIME_DRINK_ROOT = `${SLIME_ASSET_ROOT}/shop/drinks`;
+/**
+ * Shop previews for drinks.
+ *
+ * `previewColor` is deliberately never the drink's own colour. A yellow lemonade
+ * on a yellow slime, or blue ramune on a blue slime, loses the contrast that makes
+ * the drink readable, and the blue ramune art additionally drops its highlight
+ * pixels on a blue body. Each drink therefore previews on a contrasting slime, and
+ * the five are kept distinct so the shop grid never repeats a body colour.
+ */
+const SLIME_DRINK_DEFINITIONS = [
+  {
+    key: "slime-blue-drink-lemonade",
+    animationKey: "lemonade",
+    previewColor: "blue",
+    labelKo: "레모네이드",
+    effectKey: "walking_reward",
+  },
+  {
+    key: "slime-red-drink-strawberry-soda",
+    animationKey: "strawberry-soda",
+    previewColor: "green",
+    labelKo: "딸기 소다",
+    effectKey: "comment_reward",
+  },
+  {
+    key: "slime-green-drink-melon-soda",
+    animationKey: "melon-soda",
+    previewColor: "purple",
+    labelKo: "멜론 소다",
+    effectKey: "reading_reward",
+  },
+  {
+    key: "slime-purple-drink-grape-soda",
+    animationKey: "grape-soda",
+    previewColor: "yellow",
+    labelKo: "포도 소다",
+    effectKey: "assignment_reward",
+  },
+  {
+    key: "slime-blue-drink-blue-ramune",
+    animationKey: "blue-ramune",
+    previewColor: "red",
+    labelKo: "블루 하와이 소다",
+    effectKey: "growth_speed",
+  },
+] as const satisfies readonly {
+  key: string;
+  animationKey: string;
+  previewColor: SlimeColor;
+  labelKo: string;
+  effectKey: NonNullable<SlimeShopItem["effectKey"]>;
+}[];
+
+export function slimeDrinkSpritePath(
+  item: Pick<SlimeShopItem, "category" | "animationKey">,
+  slimeColor: SlimeColor,
+  highDensity = false,
+): string | undefined {
+  if (item.category !== "drink" || !item.animationKey) return undefined;
+  const base = `slime-${slimeColor}-drink-${item.animationKey}`;
+  return `${SLIME_DRINK_ROOT}/${item.animationKey}/${slimeColor}/${base}${highDensity ? "-4x" : ""}.gif`;
+}
+
+export const SLIME_DRINK_CATALOG: readonly SlimeShopItem[] = SLIME_DRINK_DEFINITIONS.map(
+  (definition) => ({
+    key: definition.key,
+    category: "drink",
+    floor: null,
+    labelKo: definition.labelKo,
+    price: SLIME_SHOP_DEFAULT_PRICE,
+    animationKey: definition.animationKey,
+    previewColor: definition.previewColor,
+    effectKey: definition.effectKey,
+    effectBps: SLIME_SHOP_LOWER_TIER_EFFECT_BPS,
+    spritePath: slimeDrinkSpritePath(
+      { category: "drink", animationKey: definition.animationKey },
+      definition.previewColor,
+    )!,
+    mobileSpritePath: slimeDrinkSpritePath(
+      { category: "drink", animationKey: definition.animationKey },
+      definition.previewColor,
+      true,
+    )!,
+  }),
+);
+
+export function slimeShopPreviewColor(
+  item: Pick<SlimeShopItem, "previewColor">,
+  fallback: SlimeColor,
+): SlimeColor {
+  return item.previewColor ?? fallback;
+}
 
 /** Student-owned slime home items sold through the shared won wallet. */
 export const SLIME_SHOP_CATALOG: readonly SlimeShopItem[] = [
@@ -111,6 +251,7 @@ export const SLIME_SHOP_CATALOG: readonly SlimeShopItem[] = [
     effectBps: SLIME_SHOP_LOWER_TIER_EFFECT_BPS,
     spritePath: `${SLIME_ASSET_ROOT}/official/shared/grass-floor.png`,
   },
+  ...SLIME_STATIC_FLOOR_CATALOG,
   {
     key: "water-puddle-background",
     category: "background",
@@ -135,12 +276,12 @@ export const SLIME_SHOP_CATALOG: readonly SlimeShopItem[] = [
     key: "aurora-dream-sky-background",
     category: "background",
     floor: null,
-    labelKo: "오로라 꿈하늘",
+    labelKo: "오로라의 꿈",
     price: 1_000,
     effectKey: "assignment_reward",
     effectBps: 300,
     spritePath: `${SLIME_ASSET_ROOT}/shop/backgrounds/aurora-dream-sky/aura-package/aurora-dream-sky-6s-64.gif`,
-    mobileSpritePath: `${SLIME_ASSET_ROOT}/shop/backgrounds/aurora-dream-sky/aura-package/aurora-dream-sky-6s-256.gif`,
+    mobileSpritePath: `${SLIME_ASSET_ROOT}/shop/backgrounds/aurora-dream-sky/aura-package/aurora-dream-sky-6s-128.gif`,
     staticSpritePath: `${SLIME_ASSET_ROOT}/shop/backgrounds/aurora-dream-sky/static-background-64.png`,
   },
   {
@@ -152,31 +293,31 @@ export const SLIME_SHOP_CATALOG: readonly SlimeShopItem[] = [
     effectKey: "walking_reward",
     effectBps: 200,
     spritePath: `${SLIME_ASSET_ROOT}/shop/backgrounds/cloud-garden/aura-package/cloud-garden-6s-64.gif`,
-    mobileSpritePath: `${SLIME_ASSET_ROOT}/shop/backgrounds/cloud-garden/aura-package/cloud-garden-6s-256.gif`,
+    mobileSpritePath: `${SLIME_ASSET_ROOT}/shop/backgrounds/cloud-garden/aura-package/cloud-garden-6s-128.gif`,
     staticSpritePath: `${SLIME_ASSET_ROOT}/shop/backgrounds/cloud-garden/static-background-64.png`,
   },
   {
     key: "dreamy-toy-room-background",
     category: "background",
     floor: null,
-    labelKo: "꿈꾸는 장난감 방",
+    labelKo: "꿈꾸는 장난감",
     price: 500,
     effectKey: "assignment_reward",
     effectBps: 100,
     spritePath: `${SLIME_ASSET_ROOT}/shop/backgrounds/dreamy-toy-room/aura-package/dreamy-toy-room-6s-64.gif`,
-    mobileSpritePath: `${SLIME_ASSET_ROOT}/shop/backgrounds/dreamy-toy-room/aura-package/dreamy-toy-room-6s-256.gif`,
+    mobileSpritePath: `${SLIME_ASSET_ROOT}/shop/backgrounds/dreamy-toy-room/aura-package/dreamy-toy-room-6s-128.gif`,
     staticSpritePath: `${SLIME_ASSET_ROOT}/shop/backgrounds/dreamy-toy-room/static-background-64.png`,
   },
   {
     key: "enchanted-forest-canopy-background",
     category: "background",
     floor: null,
-    labelKo: "마법 숲속",
+    labelKo: "숲속의 마법",
     price: 500,
     effectKey: "reading_reward",
     effectBps: 100,
     spritePath: `${SLIME_ASSET_ROOT}/shop/backgrounds/enchanted-forest-canopy/aura-package/enchanted-forest-canopy-6s-64.gif`,
-    mobileSpritePath: `${SLIME_ASSET_ROOT}/shop/backgrounds/enchanted-forest-canopy/aura-package/enchanted-forest-canopy-6s-256.gif`,
+    mobileSpritePath: `${SLIME_ASSET_ROOT}/shop/backgrounds/enchanted-forest-canopy/aura-package/enchanted-forest-canopy-6s-128.gif`,
     staticSpritePath: `${SLIME_ASSET_ROOT}/shop/backgrounds/enchanted-forest-canopy/static-background-64.png`,
   },
   {
@@ -188,79 +329,79 @@ export const SLIME_SHOP_CATALOG: readonly SlimeShopItem[] = [
     effectKey: "comment_reward",
     effectBps: 200,
     spritePath: `${SLIME_ASSET_ROOT}/shop/backgrounds/fizzy-soda-dream/aura-package/fizzy-soda-dream-6s-128.gif`,
-    mobileSpritePath: `${SLIME_ASSET_ROOT}/shop/backgrounds/fizzy-soda-dream/aura-package/fizzy-soda-dream-6s-256.gif`,
+    mobileSpritePath: `${SLIME_ASSET_ROOT}/shop/backgrounds/fizzy-soda-dream/aura-package/fizzy-soda-dream-6s-128.gif`,
     staticSpritePath: `${SLIME_ASSET_ROOT}/shop/backgrounds/fizzy-soda-dream/static-background-128.png`,
   },
   {
     key: "cherry-cloud-ume-background",
     category: "background",
     floor: null,
-    labelKo: "벚꽃 하늘",
+    labelKo: "봄날의 구름",
     price: 1_000,
     effectKey: "comment_reward",
     effectBps: 300,
     spritePath: `${SLIME_ASSET_ROOT}/shop/backgrounds/cherry-cloud-ume/aura-package/cherry-cloud-ume-6s-128.gif`,
-    mobileSpritePath: `${SLIME_ASSET_ROOT}/shop/backgrounds/cherry-cloud-ume/aura-package/cherry-cloud-ume-6s-256.gif`,
+    mobileSpritePath: `${SLIME_ASSET_ROOT}/shop/backgrounds/cherry-cloud-ume/aura-package/cherry-cloud-ume-6s-128.gif`,
     staticSpritePath: `${SLIME_ASSET_ROOT}/shop/backgrounds/cherry-cloud-ume/static-background-128.png`,
   },
   {
     key: "four-season-sky-background",
     category: "background",
     floor: null,
-    labelKo: "사계절 하늘",
+    labelKo: "포시즌스",
     price: 1_000,
     effectKey: "walking_reward",
     effectBps: 300,
     spritePath: `${SLIME_ASSET_ROOT}/shop/backgrounds/four-season-sky/aura-package/four-season-sky-6s-64.gif`,
-    mobileSpritePath: `${SLIME_ASSET_ROOT}/shop/backgrounds/four-season-sky/aura-package/four-season-sky-6s-256.gif`,
+    mobileSpritePath: `${SLIME_ASSET_ROOT}/shop/backgrounds/four-season-sky/aura-package/four-season-sky-6s-128.gif`,
     staticSpritePath: `${SLIME_ASSET_ROOT}/shop/backgrounds/four-season-sky/static-background-64.png`,
   },
   {
     key: "jellyfish-ocean-background",
     category: "background",
     floor: null,
-    labelKo: "해파리 바다",
+    labelKo: "해파리 유영",
     price: 1_000,
     effectKey: "reading_reward",
     effectBps: 300,
     spritePath: `${SLIME_ASSET_ROOT}/shop/backgrounds/jellyfish-ocean/aura-package/jellyfish-ocean-6s-64.gif`,
-    mobileSpritePath: `${SLIME_ASSET_ROOT}/shop/backgrounds/jellyfish-ocean/aura-package/jellyfish-ocean-6s-256.gif`,
+    mobileSpritePath: `${SLIME_ASSET_ROOT}/shop/backgrounds/jellyfish-ocean/aura-package/jellyfish-ocean-6s-128.gif`,
     staticSpritePath: `${SLIME_ASSET_ROOT}/shop/backgrounds/jellyfish-ocean/static-background-64.png`,
   },
   {
     key: "lavender-butterfly-sky-background",
     category: "background",
     floor: null,
-    labelKo: "라벤더 나비 하늘",
+    labelKo: "라벤더 나비",
     price: 700,
     effectKey: "reading_reward",
     effectBps: 200,
     spritePath: `${SLIME_ASSET_ROOT}/shop/backgrounds/lavender-butterfly-sky/aura-package/lavender-butterfly-sky-6s-64.gif`,
-    mobileSpritePath: `${SLIME_ASSET_ROOT}/shop/backgrounds/lavender-butterfly-sky/aura-package/lavender-butterfly-sky-6s-256.gif`,
+    mobileSpritePath: `${SLIME_ASSET_ROOT}/shop/backgrounds/lavender-butterfly-sky/aura-package/lavender-butterfly-sky-6s-128.gif`,
     staticSpritePath: `${SLIME_ASSET_ROOT}/shop/backgrounds/lavender-butterfly-sky/static-background-64.png`,
   },
   {
     key: "meteor-festival-sky-background",
     category: "background",
     floor: null,
-    labelKo: "유성 축제 하늘",
+    labelKo: "유성우",
     price: 700,
     effectKey: "walking_reward",
     effectBps: 200,
     spritePath: `${SLIME_ASSET_ROOT}/shop/backgrounds/meteor-festival-sky/aura-package/meteor-festival-sky-6s-64.gif`,
-    mobileSpritePath: `${SLIME_ASSET_ROOT}/shop/backgrounds/meteor-festival-sky/aura-package/meteor-festival-sky-6s-256.gif`,
+    mobileSpritePath: `${SLIME_ASSET_ROOT}/shop/backgrounds/meteor-festival-sky/aura-package/meteor-festival-sky-6s-128.gif`,
     staticSpritePath: `${SLIME_ASSET_ROOT}/shop/backgrounds/meteor-festival-sky/static-background-64.png`,
   },
   {
     key: "midnight-snow-cloud-background",
     category: "background",
     floor: null,
-    labelKo: "한밤의 눈구름",
+    labelKo: "눈 내리는 밤",
     price: 700,
     effectKey: "assignment_reward",
     effectBps: 200,
     spritePath: `${SLIME_ASSET_ROOT}/shop/backgrounds/midnight-snow-cloud/aura-package/midnight-snow-cloud-6s-64.gif`,
-    mobileSpritePath: `${SLIME_ASSET_ROOT}/shop/backgrounds/midnight-snow-cloud/aura-package/midnight-snow-cloud-6s-256.gif`,
+    mobileSpritePath: `${SLIME_ASSET_ROOT}/shop/backgrounds/midnight-snow-cloud/aura-package/midnight-snow-cloud-6s-128.gif`,
     staticSpritePath: `${SLIME_ASSET_ROOT}/shop/backgrounds/midnight-snow-cloud/static-background-64.png`,
   },
   {
@@ -272,7 +413,7 @@ export const SLIME_SHOP_CATALOG: readonly SlimeShopItem[] = [
     effectKey: "reading_reward",
     effectBps: 200,
     spritePath: `${SLIME_ASSET_ROOT}/shop/backgrounds/moonlit-lake/aura-package/moonlit-lake-6s-64.gif`,
-    mobileSpritePath: `${SLIME_ASSET_ROOT}/shop/backgrounds/moonlit-lake/aura-package/moonlit-lake-6s-256.gif`,
+    mobileSpritePath: `${SLIME_ASSET_ROOT}/shop/backgrounds/moonlit-lake/aura-package/moonlit-lake-6s-128.gif`,
     staticSpritePath: `${SLIME_ASSET_ROOT}/shop/backgrounds/moonlit-lake/static-background-64.png`,
   },
   {
@@ -284,31 +425,31 @@ export const SLIME_SHOP_CATALOG: readonly SlimeShopItem[] = [
     effectKey: "comment_reward",
     effectBps: 200,
     spritePath: `${SLIME_ASSET_ROOT}/shop/backgrounds/mushroom-village/aura-package/mushroom-village-6s-64.gif`,
-    mobileSpritePath: `${SLIME_ASSET_ROOT}/shop/backgrounds/mushroom-village/aura-package/mushroom-village-6s-256.gif`,
+    mobileSpritePath: `${SLIME_ASSET_ROOT}/shop/backgrounds/mushroom-village/aura-package/mushroom-village-6s-128.gif`,
     staticSpritePath: `${SLIME_ASSET_ROOT}/shop/backgrounds/mushroom-village/static-background-64.png`,
   },
   {
     key: "neon-space-station-background",
     category: "background",
     floor: null,
-    labelKo: "네온 우주 정거장",
+    labelKo: "우주정거장",
     price: 700,
     effectKey: "assignment_reward",
     effectBps: 200,
     spritePath: `${SLIME_ASSET_ROOT}/shop/backgrounds/neon-space-station/aura-package/neon-space-station-6s-64.gif`,
-    mobileSpritePath: `${SLIME_ASSET_ROOT}/shop/backgrounds/neon-space-station/aura-package/neon-space-station-6s-256.gif`,
+    mobileSpritePath: `${SLIME_ASSET_ROOT}/shop/backgrounds/neon-space-station/aura-package/neon-space-station-6s-128.gif`,
     staticSpritePath: `${SLIME_ASSET_ROOT}/shop/backgrounds/neon-space-station/static-background-64.png`,
   },
   {
     key: "rainy-window-cafe-background",
     category: "background",
     floor: null,
-    labelKo: "비 오는 창가 카페",
+    labelKo: "비 오는 날",
     price: 500,
     effectKey: "comment_reward",
     effectBps: 100,
     spritePath: `${SLIME_ASSET_ROOT}/shop/backgrounds/rainy-window-cafe/aura-package/rainy-window-cafe-6s-64.gif`,
-    mobileSpritePath: `${SLIME_ASSET_ROOT}/shop/backgrounds/rainy-window-cafe/aura-package/rainy-window-cafe-6s-256.gif`,
+    mobileSpritePath: `${SLIME_ASSET_ROOT}/shop/backgrounds/rainy-window-cafe/aura-package/rainy-window-cafe-6s-128.gif`,
     staticSpritePath: `${SLIME_ASSET_ROOT}/shop/backgrounds/rainy-window-cafe/static-background-64.png`,
   },
   {
@@ -320,31 +461,31 @@ export const SLIME_SHOP_CATALOG: readonly SlimeShopItem[] = [
     effectKey: "assignment_reward",
     effectBps: 100,
     spritePath: `${SLIME_ASSET_ROOT}/shop/backgrounds/starry-workshop/aura-package/starry-workshop-6s-64.gif`,
-    mobileSpritePath: `${SLIME_ASSET_ROOT}/shop/backgrounds/starry-workshop/aura-package/starry-workshop-6s-256.gif`,
+    mobileSpritePath: `${SLIME_ASSET_ROOT}/shop/backgrounds/starry-workshop/aura-package/starry-workshop-6s-128.gif`,
     staticSpritePath: `${SLIME_ASSET_ROOT}/shop/backgrounds/starry-workshop/static-background-64.png`,
   },
   {
     key: "sunset-lantern-sky-background",
     category: "background",
     floor: null,
-    labelKo: "노을 등불 하늘",
+    labelKo: "노을 등불",
     price: 1_000,
     effectKey: "comment_reward",
     effectBps: 300,
     spritePath: `${SLIME_ASSET_ROOT}/shop/backgrounds/sunset-lantern-sky/aura-package/sunset-lantern-sky-6s-64.gif`,
-    mobileSpritePath: `${SLIME_ASSET_ROOT}/shop/backgrounds/sunset-lantern-sky/aura-package/sunset-lantern-sky-6s-256.gif`,
+    mobileSpritePath: `${SLIME_ASSET_ROOT}/shop/backgrounds/sunset-lantern-sky/aura-package/sunset-lantern-sky-6s-128.gif`,
     staticSpritePath: `${SLIME_ASSET_ROOT}/shop/backgrounds/sunset-lantern-sky/static-background-64.png`,
   },
   {
     key: "tropical-fish-ocean-background",
     category: "background",
     floor: null,
-    labelKo: "열대어 바다",
+    labelKo: "열대어 파티",
     price: 1_000,
     effectKey: "walking_reward",
     effectBps: 300,
     spritePath: `${SLIME_ASSET_ROOT}/shop/backgrounds/tropical-fish-ocean/aura-package/tropical-fish-ocean-6s-64.gif`,
-    mobileSpritePath: `${SLIME_ASSET_ROOT}/shop/backgrounds/tropical-fish-ocean/aura-package/tropical-fish-ocean-6s-256.gif`,
+    mobileSpritePath: `${SLIME_ASSET_ROOT}/shop/backgrounds/tropical-fish-ocean/aura-package/tropical-fish-ocean-6s-128.gif`,
     staticSpritePath: `${SLIME_ASSET_ROOT}/shop/backgrounds/tropical-fish-ocean/static-background-64.png`,
   },
   {
@@ -357,17 +498,20 @@ export const SLIME_SHOP_CATALOG: readonly SlimeShopItem[] = [
     effectBps: SLIME_SHOP_LOWER_TIER_EFFECT_BPS,
     spritePath: `${SLIME_ASSET_ROOT}/shop/slime-blue-trampoline.gif`,
   },
-  {
-    key: "slime-blue-drink-lemonade",
-    category: "drink",
-    floor: null,
-    labelKo: "레모네이드",
-    price: SLIME_SHOP_DEFAULT_PRICE,
-    effectKey: "comment_reward",
-    effectBps: SLIME_SHOP_LOWER_TIER_EFFECT_BPS,
-    spritePath: `${SLIME_ASSET_ROOT}/shop/slime-blue-drink-lemonade.gif`,
-  },
+  ...SLIME_DRINK_CATALOG,
   ...SLIME_BALL_CATALOG,
+  ...SLIME_WEARABLE_CATALOG.map((wearable): SlimeShopItem => ({
+    key: wearable.key,
+    category: "wearable",
+    floor: null,
+    labelKo: wearable.labelKo,
+    price: wearable.price,
+    spritePath: slimeWearableEntry(wearable.role, wearable.option)?.sheets.idle?.url ?? "",
+    wearableRole: wearable.role,
+    wearableOption: wearable.option,
+    effectKey: wearable.effectKey,
+    effectBps: wearable.effectBps,
+  })),
   {
     key: "slime-cookie",
     category: "food",
@@ -449,7 +593,13 @@ export function getSlimeShopItem(key: string): SlimeShopItem | undefined {
   return slimeShopItemByKey.get(key);
 }
 
-export type SlimeVisualItemSlot = "background" | "floor" | "accessory";
+export type SlimeVisualItemSlot =
+  | "background"
+  | "floor"
+  | "prop"
+  | "blush"
+  | "eyewear"
+  | "headwear";
 
 /** A scene background has no floor state; legacy background floors still do. */
 export function isSlimeSceneBackground(
@@ -460,28 +610,27 @@ export function isSlimeSceneBackground(
 
 /** Scene backgrounds, floors, and accessories occupy independent visual slots. */
 export function slimeVisualItemSlot(
-  item: Pick<SlimeShopItem, "category" | "floor">,
+  item: Pick<SlimeShopItem, "category" | "floor" | "wearableRole">,
 ): SlimeVisualItemSlot | null {
   if (item.floor) return "floor";
   if (isSlimeSceneBackground(item)) return "background";
-  if (item.category === "drink" || item.category === "prop") return "accessory";
+  if (item.category === "drink" || item.category === "prop") return "prop";
+  if (item.category === "wearable") return item.wearableRole ?? null;
   return null;
 }
 
 /** Collapse malformed legacy arrays to one key per visual slot. Last key wins. */
 export function normalizeEquippedSlimeItemKeys(itemKeys: readonly string[]): string[] {
-  let backgroundKey: string | null = null;
-  let floorKey: string | null = null;
-  let accessoryKey: string | null = null;
+  const slotKeys: Partial<Record<SlimeVisualItemSlot, string>> = {};
   for (const itemKey of itemKeys) {
     const item = getSlimeShopItem(itemKey);
     if (!item) continue;
     const slot = slimeVisualItemSlot(item);
-    if (slot === "background") backgroundKey = item.key;
-    if (slot === "floor") floorKey = item.key;
-    if (slot === "accessory") accessoryKey = item.key;
+    if (slot) slotKeys[slot] = item.key;
   }
-  return [backgroundKey, floorKey, accessoryKey].filter((key): key is string => key !== null);
+  return ["background", "floor", "prop", "blush", "eyewear", "headwear"]
+    .map((slot) => slotKeys[slot as SlimeVisualItemSlot])
+    .filter((key): key is string => Boolean(key));
 }
 
 export function getSlimeBallDefinition(slug: string): SlimeBallShopItem | undefined {

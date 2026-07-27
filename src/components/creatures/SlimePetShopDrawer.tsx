@@ -2,7 +2,7 @@ import { useRef, type KeyboardEvent, type RefObject } from "react";
 import { createPortal } from "react-dom";
 
 import { formatBpsPercent } from "@/lib/pets/math";
-import { isSlimeSceneBackground } from "@/lib/pets/catalog";
+import { isSlimeSceneBackground, slimeShopPreviewColor } from "@/lib/pets/catalog";
 import type { EquippedFloor, SlimeAction } from "@/lib/pets/slime-assets";
 import type { SlimeColor, SlimeDefinition, SlimeShopItem } from "@/lib/pets/types";
 
@@ -14,6 +14,7 @@ import {
   SHOP_NAV_ITEMS,
   shopItemCategoryLabel,
   slimeItemSpritePath,
+  slimeWearablesFromItems,
   type EquippedItemsByColor,
   type Notice,
   type ShopFilter,
@@ -72,6 +73,19 @@ const PROP_SUBGROUP_LABELS: Record<PropSubgroup, string> = {
   ball: "공",
   drink: "음료",
   other: "소품",
+};
+
+type OutfitSubgroup = "blush" | "eyewear" | "headwear" | "other";
+
+function outfitSubgroup(item: SlimeShopItem): OutfitSubgroup {
+  return item.wearableRole ?? "other";
+}
+
+const OUTFIT_SUBGROUP_LABELS: Record<OutfitSubgroup, string> = {
+  blush: "볼터치",
+  eyewear: "안경",
+  headwear: "모자",
+  other: "착장",
 };
 
 export function SlimePetShopDrawer({
@@ -134,8 +148,19 @@ export function SlimePetShopDrawer({
       : equippedItemKeys.includes(item.key);
     const busy = busyItemKey === item.key;
     const preview = previewState(item);
-    const previewColor = wardrobeColor ?? "blue";
-    const itemSpritePath = slimeItemSpritePath(item, previewColor);
+    const previewColor = slimeShopPreviewColor(item, wardrobeColor ?? "blue");
+    // Drinks compose from the anchor registry, so they must not take the
+    // complete-GIF path: that path replaces the character sheet and would
+    // suppress the composed drink layer.
+    const isDrink = item.category === "drink";
+    const isWearable = item.category === "wearable";
+    const previewDrinkFlavor = isDrink ? item.animationKey ?? null : null;
+    const previewWearables = isDrink || isWearable
+      ? slimeWearablesFromItems([item])
+      : undefined;
+    const itemSpritePath = isDrink || isWearable
+      ? undefined
+      : slimeItemSpritePath(item, previewColor);
     const sceneBackground = isSlimeSceneBackground(item);
     const effectLabel = item.effectKey && item.effectBps
       ? `${EFFECT_LABELS[item.effectKey]} +${formatBpsPercent(item.effectBps)}`
@@ -152,6 +177,8 @@ export function SlimePetShopDrawer({
             equippedFloor={preview.equippedFloor}
             itemSpritePath={sceneBackground ? undefined : itemSpritePath}
             backgroundSpritePath={sceneBackground ? item.spritePath : undefined}
+            wearables={previewWearables}
+            drinkFlavor={previewDrinkFlavor}
             repeat={preview.action === "drink" || isBall}
             scale={1}
             alt={`${item.labelKo} 미리보기`}
@@ -378,6 +405,32 @@ export function SlimePetShopDrawer({
                   <section key={subgroup} className={styles.shopGroup} aria-labelledby={headingId}>
                     <h3 id={headingId} className={styles.shopGroupHeading}>{PROP_SUBGROUP_LABELS[subgroup]}</h3>
                     <ul className={styles.shopList} aria-label={`${PROP_SUBGROUP_LABELS[subgroup]} 상품 목록`}>
+                      {items.map(renderShopItem)}
+                    </ul>
+                  </section>
+                );
+              })}
+            </div>
+          )
+        ) : shopFilter === "outfit" ? (
+          drawerItems.length === 0 ? (
+            <ul className={styles.shopList} aria-label="아웃핏 상품 목록">
+              <li className={styles.emptyState}>
+                {wardrobeColor
+                  ? "이 분류에 보유한 아이템이 없어요. 상점에서 먼저 구매해 주세요."
+                  : "이 분류에는 상품이 없어요."}
+              </li>
+            </ul>
+          ) : (
+            <div className={styles.shopGroups}>
+              {(Object.keys(OUTFIT_SUBGROUP_LABELS) as OutfitSubgroup[]).map((subgroup) => {
+                const items = drawerItems.filter((item) => outfitSubgroup(item) === subgroup);
+                if (items.length === 0) return null;
+                const headingId = `slime-shop-outfit-${subgroup}`;
+                return (
+                  <section key={subgroup} className={styles.shopGroup} aria-labelledby={headingId}>
+                    <h3 id={headingId} className={styles.shopGroupHeading}>{OUTFIT_SUBGROUP_LABELS[subgroup]}</h3>
+                    <ul className={styles.shopList} aria-label={`${OUTFIT_SUBGROUP_LABELS[subgroup]} 상품 목록`}>
                       {items.map(renderShopItem)}
                     </ul>
                   </section>

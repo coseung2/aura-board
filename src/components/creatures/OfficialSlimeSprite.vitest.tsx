@@ -63,6 +63,28 @@ describe("OfficialSlimeSprite", () => {
     expect(onComplete).not.toHaveBeenCalled();
   });
 
+  it("keeps a new headband during happy and renders the heart above it", () => {
+    const { container, getByRole } = render(
+      <OfficialSlimeSprite
+        slimeColor="green"
+        action="happy"
+        wearables={{ headwear: "pearl-ribbon-headband" }}
+      />,
+    );
+    const sprite = getByRole("img");
+    const headwear = container.querySelector<HTMLImageElement>('[data-wearable-role="headwear"]');
+    const heart = container.querySelector<HTMLImageElement>('[data-happy-heart-layer="top"]');
+    const images = Array.from(container.querySelectorAll("img"));
+
+    expect(sprite.getAttribute("data-wearable-keys")).toContain("pearl-ribbon-headband");
+    expect(headwear).toBeTruthy();
+    expect(heart?.getAttribute("src")).toBe(
+      "/creatures/slimes/official/overlays/happy-heart/base/green/sheet.png",
+    );
+    expect(images.indexOf(heart!)).toBeGreaterThan(images.indexOf(headwear!));
+    expect(Number(heart?.style.zIndex)).toBeGreaterThan(Number(headwear?.style.zIndex));
+  });
+
   it("loops floor interactions and composites the shared puddle sheet", () => {
     vi.useFakeTimers();
     const { container, getByRole } = render(
@@ -83,8 +105,8 @@ describe("OfficialSlimeSprite", () => {
     expect(sprite.getAttribute("data-frame-index")).toBe("0");
   });
 
-  it("keeps the grass floor visible with a complete legacy item sprite", () => {
-    const { container } = render(
+  it("keeps grass and imported static floors visible with a complete item sprite", () => {
+    const { container, rerender } = render(
       <OfficialSlimeSprite
         slimeColor="red"
         equippedFloor="grass-floor"
@@ -97,6 +119,17 @@ describe("OfficialSlimeSprite", () => {
     ).toBeTruthy();
     expect(
       container.querySelector('img[src="/creatures/slimes/official/shared/grass-floor.png"]'),
+    ).toBeTruthy();
+
+    rerender(
+      <OfficialSlimeSprite
+        slimeColor="red"
+        equippedFloor="stone-floor"
+        itemSpritePath="/creatures/slimes/items/red-ball.gif"
+      />,
+    );
+    expect(
+      container.querySelector('img[src="/creatures/slimes/official/shared/floors/stone-floor.png"]'),
     ).toBeTruthy();
   });
 

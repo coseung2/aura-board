@@ -6,6 +6,7 @@ import {
   getSlimeShopItem,
   isSlimeSceneBackground,
 } from "./catalog";
+import { activeSlimeWearableSets } from "./wearable-catalog";
 import type {
   SlimeAccessoryDefinition,
   SlimeBuffBreakdownItem,
@@ -71,6 +72,13 @@ export function calculateSlimeEffects(
   accessories: readonly SlimeAccessoryInput[] = [],
   capBps = SLIME_EFFECT_CAP_BPS,
   shopItems: readonly SlimeShopEffectInput[] = [],
+  /**
+   * Every equipped key across the collection, used for family set completion.
+   *
+   * Separate from `shopItems` because that list is filtered to items carrying a
+   * buff, while set completion depends on the pieces actually worn.
+   */
+  equippedItemKeys: readonly string[] = shopItems.map((item) => item.key),
 ): SlimeEffectsPayload {
   const uncappedTotals = emptyTotals();
   const breakdown: SlimeBuffBreakdownItem[] = [];
@@ -127,6 +135,23 @@ export function calculateSlimeEffects(
     });
   }
 
+  // A slime wears one option per slot, so a family is completed by spreading it
+  // over several pets: four beanies on four slimes activates the beanie set.
+  // Completion therefore reads every equipped key, not just the buff-carrying ones.
+  for (const set of activeSlimeWearableSets(equippedItemKeys)) {
+    const bps = safeBps(set.effectBps);
+    if (bps === 0) continue;
+    activeSetKeys.push(set.key);
+    uncappedTotals[set.effectKey] += bps;
+    breakdown.push({
+      source: "set",
+      key: set.key,
+      label: `${set.labelKo} 효과`,
+      effectKey: set.effectKey,
+      bps,
+    });
+  }
+
   const totals = emptyTotals();
   for (const key of SLIME_EFFECT_KEYS) {
     totals[key] = Math.min(safeCap, uncappedTotals[key]);
@@ -161,5 +186,5 @@ export function calculateCatalogSlimeEffects(
     .map((key) => getSlimeShopItem(key))
     .filter((item): item is SlimeShopItem => Boolean(item))
     .filter((item) => item.effectKey !== undefined && item.effectBps !== undefined);
-  return calculateSlimeEffects(slimes, accessories, capBps, shopItems);
+  return calculateSlimeEffects(slimes, accessories, capBps, shopItems, distinctItemKeys);
 }

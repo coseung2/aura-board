@@ -11,7 +11,7 @@ import {
 import { getStudentDuties } from "@/lib/role-portals";
 import { getCurrentStudent } from "@/lib/student-auth";
 import { getTitleDefinition } from "@/lib/title-catalog";
-import type { SlimeColor, SlimeShopItem } from "@/lib/pets/types";
+import type { SlimeColor, SlimeFloor, SlimeShopItem } from "@/lib/pets/types";
 import styles from "./page.module.css";
 
 export const dynamic = "force-dynamic";
@@ -98,7 +98,7 @@ export default async function ClassroomSlimeGalleryPage() {
                     .map((key) => getSlimeShopItem(key))
                     .filter((item): item is SlimeShopItem => Boolean(item))
                 : [];
-              const equippedFloor = items.reduce<"none" | "grass-floor" | "water-puddle" | "trampoline">(
+              const equippedFloor = items.reduce<SlimeFloor>(
                 (floor, item) => item.floor ?? floor,
                 "none",
               );

@@ -1,12 +1,12 @@
 "use client";
 
-import type { SlimeAction, SlimeColor, SlimeEvolution, EquippedFloor } from "@/lib/pets/slime-assets";
+import type { SlimeAction, SlimeColor, EquippedFloor } from "@/lib/pets/slime-assets";
 import { isSlimeSceneBackground } from "@/lib/pets/catalog";
 import type { SlimeDefinition, SlimeShopItem } from "@/lib/pets/types";
 
 import { OfficialSlimeSprite } from "./OfficialSlimeSprite";
 import styles from "./SlimeCharacterSprite.module.css";
-import { slimeItemSpritePath } from "./SlimePetModel";
+import { slimeItemSpritePath, slimeWearablesFromItems } from "./SlimePetModel";
 
 export type SlimeGrowthStage = 1 | 2 | 3;
 
@@ -24,45 +24,31 @@ type Props = {
   className?: string;
 };
 
-const EVOLUTION_BY_STAGE: Record<SlimeGrowthStage, SlimeEvolution> = {
-  1: "base",
-  2: "silver-crown-blue-gem",
-  3: "gold-crown-red-gem",
-};
-
 function floorFromItems(items: readonly SlimeShopItem[]): EquippedFloor {
   let floor: EquippedFloor = "none";
   for (const item of items) {
     const candidate = item.floor;
-    if (
-      candidate === "grass-floor" ||
-      candidate === "water-puddle" ||
-      candidate === "trampoline"
-    ) {
-      floor = candidate;
-    }
+    if (candidate) floor = candidate;
   }
   return floor;
-}
-
-function evolutionForStage(stage: number): SlimeEvolution {
-  if (stage >= 3) return EVOLUTION_BY_STAGE[3];
-  if (stage >= 2) return EVOLUTION_BY_STAGE[2];
-  return EVOLUTION_BY_STAGE[1];
 }
 
 export function SlimeCharacterSprite({
   slime,
   items = [],
   growthStage = 1,
-  action = "idle",
+  action,
   equippedFloor,
   onComplete,
   repeat = false,
   className = "",
 }: Props) {
   const floor = equippedFloor ?? floorFromItems(items);
-  const evolution = evolutionForStage(growthStage);
+  const wearables = slimeWearablesFromItems(items);
+  const drinkFlavor = wearables.drink ?? null;
+  // An equipped drink has no idle timeline, so callers that do not manage an
+  // action would otherwise render a slime holding nothing.
+  const resolvedAction: SlimeAction = action ?? (drinkFlavor ? "drink" : "idle");
   const backgroundItem = items.find((item) => isSlimeSceneBackground(item));
   // Only unsupported legacy props may fall back to a complete character GIF.
   // Drinks and floors have canonical color/evolution-specific official sheets.
@@ -73,7 +59,11 @@ export function SlimeCharacterSprite({
   const itemSpritePath = ballItem
     ? slimeItemSpritePath(ballItem, slime.color as SlimeColor)
     : items.find(
-        (item) => !item.floor && item.category !== "background" && item.category !== "drink",
+        (item) =>
+          !item.floor &&
+          item.category !== "background" &&
+          item.category !== "drink" &&
+          item.category !== "wearable",
       )?.spritePath;
   const itemLabels = items.map((item) => item.labelKo).join(", ");
   const alt = items.length > 0
@@ -84,12 +74,14 @@ export function SlimeCharacterSprite({
     <div className={`${styles.frame} ${className}`.trim()}>
       <OfficialSlimeSprite
         slimeColor={slime.color as SlimeColor}
-        evolution={evolution}
-        action={action}
+        growthStage={growthStage}
+        action={resolvedAction}
         equippedFloor={floor}
         itemSpritePath={itemSpritePath}
         backgroundSpritePath={backgroundItem?.spritePath}
-        repeat={repeat || Boolean(ballItem)}
+        wearables={wearables}
+        drinkFlavor={drinkFlavor}
+        repeat={repeat || Boolean(ballItem) || Boolean(drinkFlavor)}
         alt={alt}
         dataSlimeColor={slime.color as SlimeColor}
         onComplete={onComplete}
