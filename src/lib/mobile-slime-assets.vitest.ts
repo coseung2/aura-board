@@ -32,24 +32,37 @@ vi.mock("../../apps/mobile/lib/slime-assets.generated", () => {
     imageScale: 4,
     colors: ["blue", "green", "yellow", "purple", "red"],
     evolutions: ["base", "gold-crown-red-gem", "silver-crown-blue-gem"],
-    actions: ["idle", "happy", "drink", "water-puddle", "trampoline"],
+    actions: ["idle", "happy", "drink-lemonade", "drink-grape-soda", "water-puddle", "trampoline"],
     playbackByAction: {
       idle: { loop: true, oneShot: false },
       // Deliberately differs from the production policy so this test proves
       // the resolver consumes generated manifest metadata instead of a local rule.
       happy: { loop: true, oneShot: false },
-      drink: { loop: false, oneShot: true },
+      "drink-lemonade": { loop: false, oneShot: true },
+      "drink-grape-soda": { loop: false, oneShot: true },
       "water-puddle": { loop: false, oneShot: true },
       trampoline: { loop: false, oneShot: true },
     },
     assets: {
       "base/blue/idle": asset("base/blue/idle", "base", "blue", "idle"),
       "base/blue/happy": asset("base/blue/happy", "base", "blue", "happy"),
-      "gold-crown-red-gem/blue/drink": asset(
-        "gold-crown-red-gem/blue/drink",
+      "base/blue/drink-lemonade": asset(
+        "base/blue/drink-lemonade",
+        "base",
+        "blue",
+        "drink-lemonade",
+      ),
+      "base/blue/drink-grape-soda": asset(
+        "base/blue/drink-grape-soda",
+        "base",
+        "blue",
+        "drink-grape-soda",
+      ),
+      "gold-crown-red-gem/blue/drink-lemonade": asset(
+        "gold-crown-red-gem/blue/drink-lemonade",
         "gold-crown-red-gem",
         "blue",
-        "drink",
+        "drink-lemonade",
       ),
       "base/blue/water-puddle": asset(
         "base/blue/water-puddle",
@@ -64,6 +77,17 @@ vi.mock("../../apps/mobile/lib/slime-assets.generated", () => {
         imageScale: 4,
         differingPixels: 10,
         overlay: 2,
+      },
+    },
+    happyHeartOverlays: {
+      "base/blue": {
+        key: "base/blue",
+        evolution: "base",
+        color: "blue",
+        action: "happy",
+        imageScale: 4,
+        metadata: asset("base/blue/happy", "base", "blue", "happy").metadata,
+        sheet: 5,
       },
     },
     shared: {
@@ -101,7 +125,7 @@ describe("mobile slime animation manifest", () => {
     expect(SLIME_SHEET_ACTIONS).toContain("water-puddle");
   });
 
-  it("uses manifest playback metadata and crown overlay resolution", () => {
+  it("uses manifest playback metadata and composes the growth crown", () => {
     const resolution = resolveSlimeAsset({
       slimeColor: "blue",
       evolution: "gold-crown-red-gem",
@@ -110,7 +134,10 @@ describe("mobile slime animation manifest", () => {
     });
 
     expect(resolution.assetKey).toBe("base/blue/happy");
-    expect(resolution.crownOverlay?.key).toBe("gold-crown-red-gem/blue");
+    expect(resolution.headSlot).toEqual({ option: "gold-crown-red-gem", source: "growth" });
+    expect(resolution.renderedHeadwear).toBe("gold-crown-red-gem");
+    expect(resolution.composition.mode).toBe("composed");
+    expect(resolution.happyHeart).toMatchObject({ key: "base/blue", sheet: 5 });
     expect(resolution.playback).toEqual({ loop: true, oneShot: false });
     expect(getSlimeFrame(resolution, -1)).toMatchObject({
       filename: "frame-0.aseprite",
@@ -128,6 +155,22 @@ describe("mobile slime animation manifest", () => {
     });
 
     expect(resolution.resolvedAction).toBe("water-puddle");
+    expect(resolution.playback).toEqual({ loop: false, oneShot: true });
+  });
+
+  it("selects a flavor-specific sheet for the semantic drink action", () => {
+    const resolution = resolveSlimeAsset({
+      slimeColor: "blue",
+      evolution: "base",
+      action: "drink",
+      equippedFloor: "none",
+      drinkFlavor: "grape-soda",
+    });
+
+    expect(resolution.resolvedAction).toBe("drink");
+    expect(resolution.resolvedVariant).toBe("drink-grape-soda");
+    expect(resolution.drinkFlavor).toBe("grape-soda");
+    expect(resolution.assetKey).toBe("base/blue/drink-grape-soda");
     expect(resolution.playback).toEqual({ loop: false, oneShot: true });
   });
 });
