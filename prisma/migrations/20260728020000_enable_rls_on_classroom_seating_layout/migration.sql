@@ -1,0 +1,1 @@
+ALTER TABLE "ClassroomSeatingLayout" ENABLE ROW LEVEL SECURITY;
