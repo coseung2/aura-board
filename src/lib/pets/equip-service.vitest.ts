@@ -100,22 +100,22 @@ describe("slime shop item equipment", () => {
 
   it("replaces a floor across legacy categories without removing non-floor items", async () => {
     const state = installState();
-    const water = SLIME_SHOP_CATALOG.find((item) => item.floor === "water-puddle")!;
-    const trampoline = SLIME_SHOP_CATALOG.find((item) => item.floor === "trampoline")!;
+    const stone = SLIME_SHOP_CATALOG.find((item) => item.floor === "stone-floor")!;
+    const snow = SLIME_SHOP_CATALOG.find((item) => item.floor === "snow-ground-floor")!;
     const drink = SLIME_SHOP_CATALOG.find((item) => item.category === "drink")!;
-    state.slimeRows[0].equippedItemKeys = [water.key, drink.key];
+    state.slimeRows[0].equippedItemKeys = [stone.key, drink.key];
 
-    const result = await equipSlimeShopItem(student, "blue", trampoline.key, true, "floor-swap");
+    const result = await equipSlimeShopItem(student, "blue", snow.key, true, "floor-swap");
 
     expect(result).toMatchObject({
-      equippedItemKeys: [trampoline.key, drink.key],
-      equippedItemsByColor: { blue: [trampoline.key, drink.key] },
-      equippedFloorByColor: { blue: "trampoline" },
-      equippedFloor: "trampoline",
+      equippedItemKeys: [snow.key, drink.key],
+      equippedItemsByColor: { blue: [snow.key, drink.key] },
+      equippedFloorByColor: { blue: "snow-ground-floor" },
+      equippedFloor: "snow-ground-floor",
       idempotent: false,
     });
-    expect(state.rows.get(water.key)?.isEquipped).toBe(false);
-    expect(state.rows.get(trampoline.key)?.isEquipped).toBe(true);
+    expect(state.rows.get(stone.key)?.isEquipped).toBe(false);
+    expect(state.rows.get(snow.key)?.isEquipped).toBe(true);
   });
 
   it("keeps one floor with one accessory and replaces only the accessory slot", async () => {
@@ -180,7 +180,7 @@ describe("slime shop item equipment", () => {
     const state = installState();
     const scene = SLIME_SHOP_CATALOG.find((item) =>
       item.category === "background" && item.floor === null)!;
-    const legacyFloor = SLIME_SHOP_CATALOG.find((item) => item.key === "water-puddle-background")!;
+    const legacyFloor = SLIME_SHOP_CATALOG.find((item) => item.key === "grass-floor-background")!;
     const accessory = SLIME_SHOP_CATALOG.find((item) => item.category === "prop")!;
     state.slimeRows[0].equippedItemKeys = [scene.key, legacyFloor.key, accessory.key];
     state.rows.get(scene.key)!.isEquipped = true;
@@ -190,7 +190,7 @@ describe("slime shop item equipment", () => {
     const result = await equipSlimeShopItem(student, "blue", scene.key, false, "remove-scene");
 
     expect(result.equippedItemKeys).toEqual([legacyFloor.key, accessory.key]);
-    expect(result.equippedFloorByColor).toEqual({ blue: "water-puddle" });
+    expect(result.equippedFloorByColor).toEqual({ blue: "grass-floor" });
     expect(state.rows.get(scene.key)?.isEquipped).toBe(false);
     expect(state.rows.get(legacyFloor.key)?.isEquipped).toBe(true);
     expect(state.rows.get(accessory.key)?.isEquipped).toBe(true);
@@ -208,24 +208,24 @@ describe("slime shop item equipment", () => {
   it("moves the same floor between slimes while preserving each slime's other floor", async () => {
     const state = installState();
     const grass = SLIME_SHOP_CATALOG.find((item) => item.floor === "grass-floor")!;
-    const water = SLIME_SHOP_CATALOG.find((item) => item.floor === "water-puddle")!;
-    const trampoline = SLIME_SHOP_CATALOG.find((item) => item.floor === "trampoline")!;
-    state.slimeRows[0].equippedItemKeys = [water.key];
+    const stone = SLIME_SHOP_CATALOG.find((item) => item.floor === "stone-floor")!;
+    const snow = SLIME_SHOP_CATALOG.find((item) => item.floor === "snow-ground-floor")!;
+    state.slimeRows[0].equippedItemKeys = [stone.key];
     state.slimeRows.push({
       id: "slime-2",
       studentId: student.id,
       color: "red",
       isRepresentative: false,
-      equippedItemKeys: [grass.key, trampoline.key],
+      equippedItemKeys: [grass.key, snow.key],
     });
 
-    const result = await equipSlimeShopItem(student, "blue", trampoline.key, true, "move-floor");
+    const result = await equipSlimeShopItem(student, "blue", snow.key, true, "move-floor");
 
     expect(result.equippedItemsByColor).toEqual({
-      blue: [trampoline.key],
+      blue: [snow.key],
       red: [grass.key],
     });
-    expect(result.equippedFloorByColor).toEqual({ blue: "trampoline", red: "grass-floor" });
+    expect(result.equippedFloorByColor).toEqual({ blue: "snow-ground-floor", red: "grass-floor" });
     expect(state.slimeRows[1].equippedItemKeys).toEqual([grass.key]);
     expect(state.rows.get(grass.key)?.isEquipped).toBe(true);
   });

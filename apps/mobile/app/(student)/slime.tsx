@@ -56,6 +56,7 @@ import {
   normalizeSlimeClassroom,
   normalizeSlimeHome,
   resolveEquippedSceneBackground,
+  resolveEquippedVehicle,
   resolveEquippedSlimeWearables,
   selectSceneBackgroundSpritePath,
   shopFilterForItem,
@@ -873,11 +874,19 @@ export default function StudentSlimeScreen() {
                   (current, item) => item.floor ?? current,
                   "none",
                 );
+                const classVehicleItem = representative
+                  ? resolveEquippedVehicle(
+                      representative.equippedItemKeys,
+                      home?.shopCatalog ?? [],
+                    )
+                  : null;
                 const classAction: SlimeAction = classItems.some(
                   (item) => item.category === "drink",
                 )
                   ? "drink"
-                  : classFloor === "water-puddle" || classFloor === "trampoline"
+                  : // The trampoline is a vehicle now, so its jump timeline keys off
+                    // the equipped vehicle rather than a floor value.
+                    classVehicleItem?.key === "slime-blue-trampoline"
                     ? "floor-interaction"
                     : "idle";
                 const classItemSpritePath = representative
@@ -917,6 +926,8 @@ export default function StudentSlimeScreen() {
                                 ? selectSceneBackgroundSpritePath(classBackground)
                                 : undefined
                             }
+                            vehicleSpritePath={classVehicleItem?.spritePath}
+                            vehicleRiseY={classVehicleItem?.vehicleRiseY}
                             accessibilityLabel={`${student.name}의 ${SLIME_COLOR_LABELS[representative.color]} 대표 펫`}
                           />
                       ) : (
@@ -963,6 +974,10 @@ export default function StudentSlimeScreen() {
               petItems,
               home?.shopCatalog ?? [],
             );
+            const petVehicle = resolveEquippedVehicle(
+              petItems,
+              home?.shopCatalog ?? [],
+            );
             const petHasDrink = (home?.shopCatalog ?? []).some(
               (item) => item.category === "drink" && petItems.includes(item.key),
             );
@@ -971,7 +986,9 @@ export default function StudentSlimeScreen() {
               ? manualAction
               : petHasDrink
                 ? "drink"
-                : petFloor === "water-puddle" || petFloor === "trampoline"
+                : // The trampoline is a vehicle now, so its jump timeline is keyed
+                  // off the equipped vehicle rather than a floor value.
+                  petVehicle?.key === "slime-blue-trampoline"
                   ? "floor-interaction"
                   : "idle";
             return (
@@ -1082,6 +1099,8 @@ export default function StudentSlimeScreen() {
                           ? selectSceneBackgroundSpritePath(petBackground)
                           : undefined
                       }
+                      vehicleSpritePath={petVehicle?.spritePath}
+                      vehicleRiseY={petVehicle?.vehicleRiseY}
                       accessibilityLabel={`${SLIME_COLOR_LABELS[itemColor]} 슬라임`}
                       onComplete={manualAction
                         ? () => setManualActions((current) => {

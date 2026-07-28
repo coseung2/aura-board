@@ -145,8 +145,8 @@ describe("SlimePetPage", () => {
     expect(screen.queryByRole("dialog", { name: "슬라임 상점" })).toBeNull();
 
     const filters = within(drawer).getByRole("tablist", { name: "상점 분류" });
-    expect(within(filters).getAllByRole("tab")).toHaveLength(6);
-    for (const label of ["캐릭터", "배경", "바닥", "먹이", "소품", "착장"]) {
+    expect(within(filters).getAllByRole("tab")).toHaveLength(7);
+    for (const label of ["캐릭터", "배경", "바닥", "탈것", "먹이", "소품", "착장"]) {
       expect(within(filters).getByRole("tab", { name: label })).toBeTruthy();
     }
     expect(
@@ -154,14 +154,19 @@ describe("SlimePetPage", () => {
     ).toBeTruthy();
 
     fireEvent.click(within(filters).getByRole("tab", { name: "바닥" }));
-    expect(within(drawer).getByText("물웅덩이 배경")).toBeTruthy();
-    expect(within(drawer).getByText("트램펄린")).toBeTruthy();
+    expect(within(drawer).getByText("잔디 바닥")).toBeTruthy();
     expect(within(drawer).queryByText("레모네이드")).toBeNull();
+
+    // The trampoline is a vehicle now, so it leaves the floor tab entirely.
+    expect(within(drawer).queryByText("트램펄린")).toBeNull();
+    fireEvent.click(within(filters).getByRole("tab", { name: "탈것" }));
+    expect(within(drawer).getByText("트램펄린")).toBeTruthy();
+    expect(within(drawer).queryByText("잔디 바닥")).toBeNull();
 
     fireEvent.click(within(filters).getByRole("tab", { name: "배경" }));
     expect(within(drawer).getByText("별똥별 밤하늘")).toBeTruthy();
     expect(within(drawer).getByText("과제 제출 보상 +3%")).toBeTruthy();
-    expect(within(drawer).queryByText("물웅덩이 배경")).toBeNull();
+    expect(within(drawer).queryByText("잔디 바닥")).toBeNull();
     expect(
       within(drawer)
         .getByRole("img", { name: "별똥별 밤하늘 미리보기" })
@@ -208,6 +213,7 @@ describe("SlimePetPage", () => {
     expect(tabs.map((tab) => tab.textContent)).toEqual([
       "캐릭터",
       "바닥",
+      "탈것",
       "먹이",
       "소품",
       "착장",
@@ -346,7 +352,7 @@ describe("SlimePetPage", () => {
 
   it("composes a true scene background with a legacy floor for one slime color", async () => {
     const legacyFloor = SLIME_SHOP_CATALOG.find(
-      (item) => item.key === "water-puddle-background",
+      (item) => item.key === "grass-floor-background",
     );
     expect(legacyFloor).toBeTruthy();
     const shopCatalog = [
@@ -374,14 +380,14 @@ describe("SlimePetPage", () => {
     render(<SlimePetPage />);
 
     const preview = await screen.findByRole("img", {
-      name: "블루 슬라임, 물웅덩이 배경, 별똥별 밤하늘 적용 미리보기",
+      name: "블루 슬라임, 잔디 바닥, 별똥별 밤하늘 적용 미리보기",
     });
     expect(preview.getAttribute("data-background-sprite-path")).toBe(
       SCENE_BACKGROUND_ITEM.spritePath,
     );
     expect(
       preview.querySelector(
-        'img[src="/creatures/slimes/official/shared/water-puddle/sheet.png"]',
+        'img[src="/creatures/slimes/official/shared/grass-floor.png"]',
       ),
     ).toBeTruthy();
     expect(
@@ -442,7 +448,7 @@ describe("SlimePetPage", () => {
       .mockImplementationOnce(() =>
         json(
           {
-            ownedItemKey: "water-puddle-background",
+            ownedItemKey: "grass-floor-background",
             balance: 320,
             idempotent: false,
           },
@@ -455,22 +461,27 @@ describe("SlimePetPage", () => {
     const drawer = await screen.findByRole("region", { name: "슬라임 상점" });
     fireEvent.click(within(drawer).getByRole("tab", { name: "바닥" }));
     fireEvent.click(
-      within(drawer).getByRole("button", { name: "물웅덩이 배경 구매" }),
+      within(drawer).getByRole("button", { name: "잔디 바닥 구매" }),
     );
 
-    await screen.findByText("물웅덩이 배경 구매를 완료했어요.");
+    // Buying now opens a confirmation step so the student can preview the item
+    // on their own pets before any money moves.
+    const confirmDialog = await screen.findByRole("dialog", { name: "잔디 바닥" });
+    fireEvent.click(within(confirmDialog).getByRole("button", { name: "구매하기" }));
+
+    await screen.findByText("잔디 바닥 구매를 완료했어요.");
     expect(screen.getByTestId("slime-wallet-balance").textContent).toContain(
       "320",
     );
     expect(within(drawer).getByText("보유 중")).toBeTruthy();
     expect(
-      within(drawer).getByRole("button", { name: "물웅덩이 배경 환불" }),
+      within(drawer).getByRole("button", { name: "잔디 바닥 환불" }),
     ).toBeTruthy();
     expect(fetchMock.mock.calls[1][0]).toBe(
       "/api/student/slimes/items/purchase",
     );
     expect(JSON.parse(fetchMock.mock.calls[1][1].body as string)).toEqual({
-      itemKey: "water-puddle-background",
+      itemKey: "grass-floor-background",
     });
   });
 
@@ -482,15 +493,15 @@ describe("SlimePetPage", () => {
           home({
             balance: 320,
             ownedColors: ["blue"],
-            ownedItemKeys: ["water-puddle-background"],
-            equippedItemKeys: ["water-puddle-background"],
-            equippedItemsByColor: { blue: ["water-puddle-background"] },
+            ownedItemKeys: ["grass-floor-background"],
+            equippedItemKeys: ["grass-floor-background"],
+            equippedItemsByColor: { blue: ["grass-floor-background"] },
           }),
         ),
       )
       .mockImplementationOnce(() =>
         json({
-          refundedItemKey: "water-puddle-background",
+          refundedItemKey: "grass-floor-background",
           balance: 350,
         }),
       );
@@ -504,20 +515,20 @@ describe("SlimePetPage", () => {
     const drawer = await screen.findByRole("region", { name: "슬라임 상점" });
     fireEvent.click(within(drawer).getByRole("tab", { name: "바닥" }));
     fireEvent.click(
-      within(drawer).getByRole("button", { name: "물웅덩이 배경 환불" }),
+      within(drawer).getByRole("button", { name: "잔디 바닥 환불" }),
     );
 
-    await screen.findByText("물웅덩이 배경을(를) 환불했어요.");
+    await screen.findByText("잔디 바닥을(를) 환불했어요.");
     expect(screen.getByTestId("slime-wallet-balance").textContent).toContain(
       "350",
     );
     expect(
-      within(drawer).getByRole("button", { name: "물웅덩이 배경 구매" }),
+      within(drawer).getByRole("button", { name: "잔디 바닥 구매" }),
     ).toBeTruthy();
     expect(screen.queryByText("장착한 아이템 없음")).toBeNull();
     expect(fetchMock.mock.calls[1][0]).toBe("/api/student/slimes/items/refund");
     expect(JSON.parse(fetchMock.mock.calls[1][1].body as string)).toEqual({
-      itemKey: "water-puddle-background",
+      itemKey: "grass-floor-background",
     });
   });
 
@@ -528,7 +539,7 @@ describe("SlimePetPage", () => {
         json(
           home({
             ownedColors: ["blue"],
-            ownedItemKeys: ["water-puddle-background"],
+            ownedItemKeys: ["grass-floor-background"],
             equippedItemKeys: [],
             equippedItemsByColor: { blue: [] },
           }),
@@ -537,17 +548,17 @@ describe("SlimePetPage", () => {
       .mockImplementationOnce(() =>
         json({
           slimeColor: "blue",
-          itemKey: "water-puddle-background",
+          itemKey: "grass-floor-background",
           isEquipped: true,
-          equippedItemKeys: ["water-puddle-background"],
-          equippedItemsByColor: { blue: ["water-puddle-background"] },
+          equippedItemKeys: ["grass-floor-background"],
+          equippedItemsByColor: { blue: ["grass-floor-background"] },
           idempotent: false,
         }),
       )
       .mockImplementationOnce(() =>
         json({
           slimeColor: "blue",
-          itemKey: "water-puddle-background",
+          itemKey: "grass-floor-background",
           isEquipped: false,
           equippedItemKeys: [],
           equippedItemsByColor: { blue: [] },
@@ -564,14 +575,14 @@ describe("SlimePetPage", () => {
       name: "블루 슬라임 꾸미기",
     });
     const apply = within(drawer).getByRole("button", {
-      name: "물웅덩이 배경 적용",
+      name: "잔디 바닥 적용",
     });
     fireEvent.click(apply);
-    await screen.findByText("물웅덩이 배경을(를) 블루 슬라임에 적용했어요.");
-    expect(screen.queryByText("장착: 물웅덩이 배경")).toBeNull();
+    await screen.findByText("잔디 바닥을(를) 블루 슬라임에 적용했어요.");
+    expect(screen.queryByText("장착: 잔디 바닥")).toBeNull();
     expect(
       document.querySelector(
-        '[data-slime-color="blue"][data-slime-action="floor-interaction"][data-equipped-floor="water-puddle"]',
+        '[data-slime-color="blue"][data-slime-action="idle"][data-equipped-floor="grass-floor"]',
       ),
     ).toBeTruthy();
     expect(
@@ -582,19 +593,19 @@ describe("SlimePetPage", () => {
     expect(fetchMock.mock.calls[1][0]).toBe("/api/student/slimes/items/equip");
     expect(JSON.parse(fetchMock.mock.calls[1][1].body as string)).toEqual({
       slimeColor: "blue",
-      itemKey: "water-puddle-background",
+      itemKey: "grass-floor-background",
       isEquipped: true,
     });
 
     fireEvent.click(
-      within(drawer).getByRole("button", { name: "물웅덩이 배경 해제" }),
+      within(drawer).getByRole("button", { name: "잔디 바닥 해제" }),
     );
-    await screen.findByText("물웅덩이 배경을(를) 블루 슬라임에 해제했어요.");
+    await screen.findByText("잔디 바닥을(를) 블루 슬라임에 해제했어요.");
     expect(screen.queryByText("장착한 아이템 없음")).toBeNull();
     expect(fetchMock.mock.calls[2][0]).toBe("/api/student/slimes/items/equip");
     expect(JSON.parse(fetchMock.mock.calls[2][1].body as string)).toEqual({
       slimeColor: "blue",
-      itemKey: "water-puddle-background",
+      itemKey: "grass-floor-background",
       isEquipped: false,
     });
   });

@@ -12,6 +12,7 @@ import {
   normalizeEquippedSlimeItemKeys,
   slimeVisualItemSlot,
   SLIME_CATALOG,
+  SLIME_MAX_PURCHASE_QUANTITY,
   SLIME_SHOP_CATALOG,
 } from "./catalog";
 import {
@@ -654,12 +655,27 @@ async function replaySlimeShopPurchase(
   student: StudentIdentity,
   sourceRef: string,
   item: SlimeShopItem,
+  chargeAmount: number,
 ): Promise<SlimeShopPurchaseResult | null> {
   const transaction = await db.transaction.findFirst({
     where: shopTransactionWhere(student.id, sourceRef),
   });
   if (!transaction) return null;
   if (transaction.note !== shopPurchaseNote(item.key)) {
+    throw new SlimeServiceError("idempotency_key_reused");
+  }
+  /**
+   * The note carries only the item key, so a replay with a different quantity
+   * would otherwise report success while charging the original amount. Comparing
+   * the charge keeps "same key means same request" true now that quantity is
+   * part of a purchase.
+   *
+   * The stored amount is the only record of the original quantity, so a catalog
+   * price change between the first call and a retry also trips this. That is the
+   * accepted trade: the caller gets 409 and retries with a fresh key, and no
+   * money moves incorrectly either way.
+   */
+  if (transaction.amount !== chargeAmount) {
     throw new SlimeServiceError("idempotency_key_reused");
   }
   const account = await db.studentAccount.findUnique({
@@ -678,6 +694,7 @@ export async function purchaseSlimeShopItem(
   student: StudentIdentity,
   itemKey: string,
   idempotencyKey: string,
+  requestedQuantity = 1,
 ): Promise<SlimeShopPurchaseResult> {
   const item = getSlimeShopItem(itemKey);
   if (!item) throw new SlimeServiceError("unknown_item");
@@ -685,9 +702,25 @@ export async function purchaseSlimeShopItem(
     throw new SlimeServiceError("unknown_item", "Invalid slime item price");
   }
   const isConsumable = item.category === "food";
+  /**
+   * Only consumables stack. Everything else is owned once per student and
+   * equipped per slime, so a quantity above one would charge for an item the
+   * student can never receive twice.
+   */
+  if (!Number.isSafeInteger(requestedQuantity) || requestedQuantity < 1) {
+    throw new SlimeServiceError("invalid_body", "Invalid purchase quantity");
+  }
+  if (!isConsumable && requestedQuantity !== 1) {
+    throw new SlimeServiceError("invalid_body", "Only consumables support quantity");
+  }
+  if (requestedQuantity > SLIME_MAX_PURCHASE_QUANTITY) {
+    throw new SlimeServiceError("invalid_body", "Purchase quantity too large");
+  }
+  const quantity = isConsumable ? requestedQuantity : 1;
+  const chargeAmount = item.price * quantity;
 
   const sourceRef = slimeShopPurchaseSourceRef(student.id, idempotencyKey);
-  const replay = await replaySlimeShopPurchase(student, sourceRef, item);
+  const replay = await replaySlimeShopPurchase(student, sourceRef, item, chargeAmount);
   if (replay) return replay;
 
   const account = await db.studentAccount.findUnique({
@@ -713,6 +746,14 @@ export async function purchaseSlimeShopItem(
         if (existing.note !== shopPurchaseNote(item.key)) {
           throw new SlimeServiceError("idempotency_key_reused");
         }
+        /**
+         * Same guard as the pre-transaction replay. Two requests sharing a key
+         * can both miss that check and race here, where only the loser sees
+         * `existing`, so the quantity comparison has to live on this path too.
+         */
+        if (existing.amount !== chargeAmount) {
+          throw new SlimeServiceError("idempotency_key_reused");
+        }
         const currentAccount = await tx.studentAccount.findUnique({
           where: { id: existing.accountId },
           select: { balance: true },
@@ -733,8 +774,8 @@ export async function purchaseSlimeShopItem(
       }
 
       const guarded = await tx.studentAccount.updateMany({
-        where: { id: account.id, studentId: student.id, balance: { gte: item.price } },
-        data: { balance: { decrement: item.price } },
+        where: { id: account.id, studentId: student.id, balance: { gte: chargeAmount } },
+        data: { balance: { decrement: chargeAmount } },
       });
       if (guarded.count !== 1) throw new SlimeServiceError("insufficient_funds");
 
@@ -748,7 +789,7 @@ export async function purchaseSlimeShopItem(
         data: {
           accountId: account.id,
           type: SLIME_ITEM_PURCHASE_SOURCE_TYPE,
-          amount: item.price,
+          amount: chargeAmount,
           balanceAfter: updatedAccount.balance,
           note: shopPurchaseNote(item.key),
           sourceType: SLIME_ITEM_PURCHASE_SOURCE_TYPE,
@@ -762,7 +803,7 @@ export async function purchaseSlimeShopItem(
         await tx.studentCreatureItem.update({
           where: { id: owned.id },
           data: {
-            quantity: isConsumable ? { increment: 1 } : 1,
+            quantity: isConsumable ? { increment: quantity } : 1,
             itemKind: `slime-${item.category}`,
             purchaseTransactionId: transaction.id,
           },
@@ -774,7 +815,7 @@ export async function purchaseSlimeShopItem(
             classroomId: student.classroomId,
             itemKey: item.key,
             itemKind: `slime-${item.category}`,
-            quantity: 1,
+            quantity,
             purchaseTransactionId: transaction.id,
           },
         });
@@ -788,7 +829,7 @@ export async function purchaseSlimeShopItem(
     });
   } catch (error) {
     if (isPrismaCode(error, "P2002")) {
-      const resolved = await replaySlimeShopPurchase(student, sourceRef, item);
+      const resolved = await replaySlimeShopPurchase(student, sourceRef, item, chargeAmount);
       if (resolved) return resolved;
       const owned = await db.studentCreatureItem?.findUnique?.({
         where: { studentId_itemKey: { studentId: student.id, itemKey: item.key } },
@@ -1127,6 +1168,18 @@ export async function refundSlimeShopItem(
 ): Promise<SlimeItemRefundResult> {
   const item = getSlimeShopItem(itemKey);
   if (!item) throw new SlimeServiceError("unknown_item");
+  /**
+   * Consumables cannot be refunded.
+   *
+   * Inventory tracks one running quantity and one `purchaseTransactionId`, which
+   * the newest purchase overwrites. A refund would hand back that last
+   * transaction's full amount while zeroing every unit on hand, so buying 99
+   * cookies, eating 98, then refunding would make the eaten ones free. Fixing
+   * that properly needs per-lot accounting; until then the money stays put.
+   */
+  if (item.category === "food") {
+    throw new SlimeServiceError("not_refundable", "Consumables cannot be refunded");
+  }
 
   return serializable(async (tx) => {
     const inventory = await tx.studentCreatureItem.findUnique({

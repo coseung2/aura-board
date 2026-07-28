@@ -5,7 +5,7 @@ import Link from "next/link";
 
 type StudentNotificationItem = {
   id: string;
-  kind: "like" | "comment" | "reward" | "attendance" | "assignment";
+  kind: "like" | "comment" | "reward" | "refund" | "attendance" | "assignment";
   actorLabel: string;
   cardTitle: string;
   boardTitle: string;
@@ -185,12 +185,15 @@ function notificationTitle(item: StudentNotificationItem): string {
   if (item.kind === "like") return `${item.actorLabel}님이 좋아요를 눌렀어요.`;
   if (item.kind === "comment") return `${item.actorLabel}님이 댓글을 남겼어요.`;
   if (item.kind === "reward") return `${item.cardTitle || "보상"}을 받았어요.`;
+  // The refund title already reads as a sentence, so it is not re-wrapped.
+  if (item.kind === "refund") return item.cardTitle || "돌려받은 금액이 있어요.";
   return item.cardTitle || (item.kind === "attendance" ? "출석 알림" : "과제 알림");
 }
 
 function notificationMeta(item: StudentNotificationItem): string {
   const relative = formatRelative(item.createdAt);
   if (item.kind === "reward") return `${item.boardTitle || "내 통장"} · ${relative}`;
+  if (item.kind === "refund") return `${item.actorLabel || "펫 상점"} · ${relative}`;
   if (item.kind === "attendance" || item.kind === "assignment") {
     return `${item.boardTitle || (item.kind === "attendance" ? "출석" : "과제")} · ${relative}`;
   }

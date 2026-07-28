@@ -30,6 +30,7 @@ export type ShopFilter =
   | "character"
   | "background"
   | "floor"
+  | "vehicle"
   | "food"
   | "prop"
   | "outfit"
@@ -40,6 +41,7 @@ export const SHOP_NAV_ITEMS: readonly { key: ShopFilter; label: string }[] = [
   { key: "character", label: "캐릭터" },
   { key: "background", label: "배경" },
   { key: "floor", label: "바닥" },
+  { key: "vehicle", label: "탈것" },
   { key: "food", label: "먹이" },
   { key: "prop", label: "소품" },
   { key: "outfit", label: "착장" },
@@ -53,6 +55,7 @@ export const SHOP_CATEGORY_LABELS: Record<ShopFilter, string> = {
   character: "캐릭터",
   background: "배경",
   floor: "바닥",
+  vehicle: "탈것",
   food: "먹이",
   prop: "소품",
   outfit: "착장",
@@ -66,8 +69,11 @@ export function shopFilterForItem(
   if (isSlimeSceneBackground(item)) return "background";
   switch (String(item.category)) {
     case "background":
-    case "ride":
       return "floor";
+    // `ride` is the pre-vehicle name for the same family; both land in 탈것.
+    case "ride":
+    case "vehicle":
+      return "vehicle";
     case "food":
       return "food";
     case "drink":

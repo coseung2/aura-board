@@ -134,6 +134,9 @@ export function SlimeSprite({
   repeat = false,
   itemSpritePath,
   backgroundSpritePath,
+  vehicleSpritePath,
+  vehicleFrontSpritePath,
+  vehicleRiseY = 0,
   wearables,
   drinkFlavor,
   growthStage,
@@ -192,9 +195,14 @@ export function SlimeSprite({
   const floorRise = staticFloor
     ? (staticFloor.slimeFootY - staticFloor.surfaceY) * resolution.imageScale * displayScale
     : 0;
+  // A vehicle lifts the slime on top of whatever the floor already contributed,
+  // so the two offsets add instead of overriding each other.
+  const vehicleRise =
+    Math.max(0, Math.trunc(vehicleRiseY)) * resolution.imageScale * displayScale;
+  const totalRise = floorRise + vehicleRise;
   const viewport = {
     ...sourceSize(frame, resolution.imageScale, displayScale),
-    height: frame.sourceSize.h * resolution.imageScale * displayScale + floorRise,
+    height: frame.sourceSize.h * resolution.imageScale * displayScale + totalRise,
   };
   const packedSheetSize = {
     width: resolution.metadata.meta.size.w * resolution.imageScale * displayScale,
@@ -252,6 +260,12 @@ export function SlimeSprite({
     backgroundUri ? (
       <FeatheredBackground backgroundUri={backgroundUri} sizeStyle={sizeStyle} />
     ) : null;
+  const vehicleBackUri = vehicleSpritePath
+    ? resolveSlimeRemoteSpriteUri(vehicleSpritePath, getApiBase())
+    : "";
+  const vehicleFrontUri = vehicleFrontSpritePath
+    ? resolveSlimeRemoteSpriteUri(vehicleFrontSpritePath, getApiBase())
+    : "";
 
   if (itemSpritePath) {
     const uri = resolveSlimeRemoteSpriteUri(itemSpritePath, getApiBase());
@@ -354,6 +368,23 @@ export function SlimeSprite({
           accessible={false}
         />
       ) : null}
+      {vehicleBackUri ? (
+        // Vehicle back half sits above the floor and behind the character, which
+        // is what lets the front half hide the slime's lower body.
+        <Image
+          source={{ uri: vehicleBackUri }}
+          style={[
+            styles.layer,
+            styles.floorUnder,
+            { width: squareSourceSize, height: squareSourceSize, left: 0, top: floorRise },
+          ]}
+          contentFit="fill"
+          allowDownscaling={false}
+          recyclingKey={`${playbackKey}:vehicle-back`}
+          transition={0}
+          accessible={false}
+        />
+      ) : null}
       <Image
         source={imageSource(resolution.sheet)}
         style={[styles.layer, packedSheetSize, offset]}
@@ -407,6 +438,28 @@ export function SlimeSprite({
           transition={0}
           accessible={false}
           testID="slime-happy-heart-layer"
+        />
+      ) : null}
+      {vehicleFrontUri ? (
+        // Front half of the vehicle. Above every character layer so the slime
+        // reads as sitting inside rather than behind the vehicle.
+        <Image
+          source={{ uri: vehicleFrontUri }}
+          style={[
+            styles.layer,
+            {
+              width: squareSourceSize,
+              height: squareSourceSize,
+              left: 0,
+              top: floorRise,
+              zIndex: layers.spriteItem + 200,
+            },
+          ]}
+          contentFit="fill"
+          allowDownscaling={false}
+          recyclingKey={`${playbackKey}:vehicle-front`}
+          transition={0}
+          accessible={false}
         />
       ) : null}
     </View>

@@ -66,6 +66,18 @@ function backgroundFromItems(items: readonly SlimeShopItem[]): SlimeShopItem | n
   return background;
 }
 
+/**
+ * Equipped vehicle, if any. Last matching key wins so a legacy row carrying more
+ * than one vehicle still resolves deterministically.
+ */
+function vehicleFromItems(items: readonly SlimeShopItem[]): SlimeShopItem | null {
+  let vehicle: SlimeShopItem | null = null;
+  for (const item of items) {
+    if (item.category === "vehicle" || item.category === "ride") vehicle = item;
+  }
+  return vehicle;
+}
+
 function accessorySpritePath(
   items: readonly SlimeShopItem[],
   slimeColor: SlimeColor,
@@ -170,6 +182,7 @@ export function SlimeCollectionSection({
             floorFromItems(assignedItems),
           );
           const background = backgroundFromItems(assignedItems);
+          const vehicle = vehicleFromItems(assignedItems);
           const drinkItem = assignedItems.find((item) => item.category === "drink");
           const wearables = slimeWearablesFromItems(assignedItems);
           const drinkFlavor = wearables.drink ?? null;
@@ -282,6 +295,8 @@ export function SlimeCollectionSection({
                       action={action}
                       equippedFloor={floor}
                       itemSpritePath={accessorySpritePath(assignedItems, slime.color)}
+                      vehicleSpritePath={vehicle?.spritePath}
+                      vehicleRiseY={vehicle?.vehicleRiseY}
                       backgroundSpritePath={background.spritePath}
                       wearables={wearables}
                       drinkFlavor={drinkFlavor}

@@ -75,6 +75,7 @@ export type SlimeShopItem = {
   category:
     | "background"
     | "ride"
+    | "vehicle"
     | "drink"
     | "food"
     | "prop"
@@ -90,6 +91,10 @@ export type SlimeShopItem = {
   previewColor?: SlimeColor;
   wearableRole?: SlimeWearableRole;
   wearableOption?: string;
+  /** Vehicle stance; `floating` rides never touch the floor surface. */
+  vehicleStance?: "grounded" | "floating";
+  /** Pixels the vehicle lifts the slime, in 64px-viewport units. */
+  vehicleRiseY?: number;
   effectKey?: string;
   effectBps?: number;
 };
@@ -108,6 +113,7 @@ export type SlimeShopFilter =
   | "character"
   | "background"
   | "floor"
+  | "vehicle"
   | "food"
   | "prop"
   | "outfit"
@@ -116,12 +122,18 @@ export type SlimeShopFilter =
 export const SLIME_SHOP_NAV_ITEMS: readonly { key: SlimeShopFilter; label: string }[] = [
   { key: "character", label: "캐릭터" },
   { key: "floor", label: "바닥" },
+  { key: "vehicle", label: "탈것" },
   { key: "food", label: "먹이" },
   { key: "prop", label: "소품" },
   { key: "outfit", label: "착장" },
 ];
 
-export type SlimeVisualItemSlot = "background" | "floor" | "prop" | SlimeWearableRole;
+export type SlimeVisualItemSlot =
+  | "background"
+  | "floor"
+  | "vehicle"
+  | "prop"
+  | SlimeWearableRole;
 
 /** True scene backgrounds are category background with no floor mapping. */
 export function isSceneBackgroundItem(
@@ -154,6 +166,9 @@ export function slimeVisualItemSlot(
 ): SlimeVisualItemSlot | null {
   if (isSceneBackgroundItem(item)) return "background";
   if (item.floor) return "floor";
+  // Vehicles ride above the floor rather than replacing it, so they hold an
+  // independent slot and stay equippable next to a background and a floor.
+  if (item.category === "vehicle" || item.category === "ride") return "vehicle";
   if (item.category === "drink" || item.category === "prop") return "prop";
   if (item.category === "wearable") return item.wearableRole ?? null;
   return null;
@@ -329,6 +344,25 @@ export function selectSceneBackgroundSpritePath(
   item: Pick<SlimeShopItem, "mobileSpritePath" | "spritePath">,
 ): string {
   return item.mobileSpritePath || item.spritePath;
+}
+
+/**
+ * Vehicle currently equipped, if any.
+ *
+ * Mirrors the scene-background resolver: last matching key wins so a legacy row
+ * carrying more than one vehicle still resolves deterministically.
+ */
+export function resolveEquippedVehicle(
+  itemKeys: readonly string[],
+  catalog: readonly SlimeShopItem[],
+): SlimeShopItem | null {
+  const byKey = new Map(catalog.map((item) => [item.key, item]));
+  let equipped: SlimeShopItem | null = null;
+  for (const key of itemKeys) {
+    const item = byKey.get(key);
+    if (item && slimeVisualItemSlot(item) === "vehicle") equipped = item;
+  }
+  return equipped;
 }
 
 export const SLIME_COOKIE_ITEM_KEY = "slime-cookie";
@@ -572,6 +606,7 @@ function normalizeShopCatalog(value: unknown): SlimeShopItem[] {
     if (
       category !== "background" &&
       category !== "ride" &&
+      category !== "vehicle" &&
       category !== "drink" &&
       category !== "food" &&
       category !== "prop" &&
@@ -925,9 +960,9 @@ export function shopFilterForItem(
   item: Pick<SlimeShopItem, "category" | "floor">,
 ): Exclude<SlimeShopFilter, "character"> {
   if (isSceneBackgroundItem(item)) return "background";
-  // Rides are things the slime plays on rather than ground it stands on, so they
-  // belong with the other props even though they carry a floor value.
-  if (item.category === "ride") return "prop";
+  // Vehicles are ridden above the floor rather than stood on, so they own the
+  // 탈것 tab. `ride` is the pre-vehicle name for the same family.
+  if (item.category === "vehicle" || item.category === "ride") return "vehicle";
   if (item.category === "background" || item.floor) return "floor";
   if (item.category === "food") return "food";
   if (item.category === "wearable") return "outfit";

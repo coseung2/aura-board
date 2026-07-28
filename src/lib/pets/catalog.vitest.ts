@@ -71,10 +71,11 @@ describe("slime catalog", () => {
     expect(SLIME_SHOP_CATALOG.map(({ key, floor }) => [key, floor])).toEqual([
       ["grass-floor-background", "grass-floor"],
       ...STATIC_FLOOR_CONTRACT.map(([id]) => [id, id]),
-      ["water-puddle-background", "water-puddle"],
       ["shooting-star-night-sky-background", null],
       ...ANIMATED_BACKGROUND_IDS.map((id) => [`${id}-background`, null]),
-      ["slime-blue-trampoline", "trampoline"],
+      // The trampoline moved to the vehicle category, which rides above the
+      // floor instead of owning a floor state.
+      ["slime-blue-trampoline", null],
       ["slime-blue-drink-lemonade", null],
       ["slime-red-drink-strawberry-soda", null],
       ["slime-green-drink-melon-soda", null],
@@ -180,12 +181,11 @@ describe("slime catalog", () => {
         && !staticFloorKeys.has(item.key),
     );
 
-    expect(existingCosmetics).toHaveLength(16);
+    expect(existingCosmetics).toHaveLength(15);
     expect(existingCosmetics.every((item) => item.price === 500)).toBe(true);
     expect(existingCosmetics.every((item) => item.effectBps === 100)).toBe(true);
     expect(existingCosmetics.map(({ key, effectKey }) => [key, effectKey])).toEqual([
       ["grass-floor-background", "walking_reward"],
-      ["water-puddle-background", "walking_reward"],
       ["shooting-star-night-sky-background", "assignment_reward"],
       ["slime-blue-trampoline", "walking_reward"],
       ["slime-blue-drink-lemonade", "walking_reward"],
@@ -221,7 +221,7 @@ describe("slime catalog", () => {
     expect(slimeShopPreviewColor(SLIME_DRINK_CATALOG[4]!, "blue")).toBe("red");
   });
 
-  it("normalizes visual equipment in background, floor, prop, and outfit slot order", () => {
+  it("normalizes visual equipment in background, floor, vehicle, prop, and outfit slot order", () => {
     expect(normalizeEquippedSlimeItemKeys([
       "slime-blue-drink-lemonade",
       "slime-headwear-straw-hat",
@@ -229,10 +229,13 @@ describe("slime catalog", () => {
       "slime-blush-peach-brush-blush",
       "grass-floor-background",
       "shooting-star-night-sky-background",
-      "water-puddle-background",
+      "slime-blue-trampoline",
     ])).toEqual([
       "shooting-star-night-sky-background",
-      "water-puddle-background",
+      "grass-floor-background",
+      // A vehicle holds its own slot, so it survives next to a background and a
+      // floor instead of competing with them.
+      "slime-blue-trampoline",
       "slime-blue-drink-lemonade",
       "slime-blush-peach-brush-blush",
       "slime-eyewear-round-glasses",
@@ -262,8 +265,10 @@ describe("slime catalog", () => {
     expect(getEquippedSlimeFloor([
       "slime-blue-trampoline",
       "slime-blue-drink-lemonade",
-      "water-puddle-background",
-    ])).toBe("water-puddle");
+      "grass-floor-background",
+    ])).toBe("grass-floor");
+    // Vehicles carry no floor state, so they never win floor recovery.
+    expect(getEquippedSlimeFloor(["slime-blue-trampoline"])).toBe("none");
     expect(getEquippedSlimeFloor(["slime-blue-drink-lemonade"])).toBe("none");
   });
 

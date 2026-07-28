@@ -25,6 +25,7 @@ import {
   SlimeEffectsSection,
 } from "./SlimePetSections";
 import { SlimePetShopDrawer } from "./SlimePetShopDrawer";
+import { SlimePurchaseConfirmDialog } from "./SlimePurchaseConfirmDialog";
 import { StudentPetSectionHeader } from "./StudentPetSectionHeader";
 
 type SlimeHome = {
@@ -137,6 +138,12 @@ export function SlimePetPage({ initialSection = "mine" }: Props) {
   const [busyRepresentative, setBusyRepresentative] =
     useState<SlimeColor | null>(null);
   const [busyItemKey, setBusyItemKey] = useState<string | null>(null);
+  /**
+   * Item awaiting purchase confirmation. Buying is a two-step flow so students
+   * can preview the item on their own pets and, for consumables, pick a count
+   * before any money moves.
+   */
+  const [pendingPurchase, setPendingPurchase] = useState<SlimeShopItem | null>(null);
   const [busyCookieColor, setBusyCookieColor] = useState<SlimeColor | null>(
     null,
   );
@@ -434,7 +441,7 @@ export function SlimePetPage({ initialSection = "mine" }: Props) {
     }
   };
 
-  const purchaseShopItem = async (item: SlimeShopItem) => {
+  const purchaseShopItem = async (item: SlimeShopItem, quantity = 1) => {
     const repeatable = item.key === SLIME_COOKIE_ITEM_KEY;
     if (busyItemKey || (!repeatable && ownedItemKeys.includes(item.key)))
       return;
@@ -451,7 +458,11 @@ export function SlimePetPage({ initialSection = "mine" }: Props) {
           "Content-Type": "application/json",
           "Idempotency-Key": idempotencyKey,
         },
-        body: JSON.stringify({ itemKey: item.key }),
+        body: JSON.stringify(
+          // Only consumables accept a quantity, so a cosmetic keeps sending the
+          // exact body older servers already understand.
+          repeatable ? { itemKey: item.key, quantity } : { itemKey: item.key },
+        ),
       });
       const payload = (await response.json().catch(() => ({}))) as {
         error?: string;
@@ -489,7 +500,7 @@ export function SlimePetPage({ initialSection = "mine" }: Props) {
           ...current,
           [item.key]: Math.max(
             0,
-            Math.floor(returnedQuantity ?? (current[item.key] ?? 0) + 1),
+            Math.floor(returnedQuantity ?? (current[item.key] ?? 0) + quantity),
           ),
         }));
       }
@@ -497,7 +508,7 @@ export function SlimePetPage({ initialSection = "mine" }: Props) {
       setShopNotice({
         kind: "success",
         text: repeatable
-          ? `${item.labelKo} 구매를 완료했어요. 보유 수량이 늘었어요.`
+          ? `${item.labelKo} ${quantity}개 구매를 완료했어요.`
           : `${item.labelKo} 구매를 완료했어요.`,
       });
     } catch {
@@ -973,7 +984,7 @@ export function SlimePetPage({ initialSection = "mine" }: Props) {
           onFilterChange={setShopFilter}
           onPurchaseSlime={(color) => void purchase(color)}
           onRefundSlime={(slime) => void refundSlimePurchase(slime)}
-          onPurchaseItem={(item) => void purchaseShopItem(item)}
+          onPurchaseItem={(item) => setPendingPurchase(item)}
           onRefundItem={(item) => void refundShopItem(item)}
           onEquipItem={(color, item, nextEquipped) =>
             void equipShopItem(color, item, nextEquipped)
@@ -1001,11 +1012,27 @@ export function SlimePetPage({ initialSection = "mine" }: Props) {
           onFilterChange={setShopFilter}
           onPurchaseSlime={(color) => void purchase(color)}
           onRefundSlime={(slime) => void refundSlimePurchase(slime)}
-          onPurchaseItem={(item) => void purchaseShopItem(item)}
+          onPurchaseItem={(item) => setPendingPurchase(item)}
           onRefundItem={(item) => void refundShopItem(item)}
           onEquipItem={(color, item, nextEquipped) =>
             void equipShopItem(color, item, nextEquipped)
           }
+        />
+      )}
+
+      {pendingPurchase && (
+        <SlimePurchaseConfirmDialog
+          item={pendingPurchase}
+          previewColors={ownedKeys}
+          balance={balance}
+          unitLabel={unitLabel}
+          busy={busyItemKey === pendingPurchase.key}
+          onCancel={() => setPendingPurchase(null)}
+          onConfirm={(quantity) => {
+            void purchaseShopItem(pendingPurchase, quantity).finally(() => {
+              setPendingPurchase(null);
+            });
+          }}
         />
       )}
     </main>

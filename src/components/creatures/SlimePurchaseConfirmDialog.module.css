@@ -1,0 +1,194 @@
+.backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: grid;
+  place-items: center;
+  padding: 1rem;
+  background: rgb(15 23 42 / 55%);
+}
+
+.dialog {
+  width: min(22rem, 100%);
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding: 1rem;
+  border-radius: 1.25rem;
+  background: var(--surface, #fff);
+  box-shadow: 0 1.25rem 3rem rgb(15 23 42 / 25%);
+}
+
+.header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.title {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 700;
+}
+
+.price {
+  margin: 0;
+  font-weight: 700;
+  color: var(--accent, #2563eb);
+}
+
+.previewArea {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.75rem 0.5rem;
+  border-radius: 1rem;
+  background: rgb(148 163 184 / 12%);
+}
+
+.preview {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.previewLabel {
+  margin: 0;
+  font-size: 0.8rem;
+  color: var(--text-muted, #64748b);
+}
+
+.arrow {
+  width: 2rem;
+  height: 2rem;
+  border: none;
+  border-radius: 999px;
+  background: #fff;
+  font-size: 1.1rem;
+  line-height: 1;
+  cursor: pointer;
+  box-shadow: 0 0.15rem 0.5rem rgb(15 23 42 / 15%);
+}
+
+.arrow:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.dots {
+  display: flex;
+  justify-content: center;
+  gap: 0.35rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.dot,
+.dotActive {
+  width: 0.45rem;
+  height: 0.45rem;
+  border-radius: 999px;
+  background: rgb(148 163 184 / 45%);
+}
+
+.dotActive {
+  background: var(--accent, #2563eb);
+}
+
+.quantityRow,
+.totalRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.6rem 0.75rem;
+  border-radius: 0.75rem;
+  background: rgb(148 163 184 / 12%);
+}
+
+.rowLabel {
+  font-size: 0.9rem;
+  color: var(--text-muted, #475569);
+}
+
+.stepper {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.stepper button {
+  width: 1.9rem;
+  height: 1.9rem;
+  border: 1px solid rgb(148 163 184 / 45%);
+  border-radius: 999px;
+  background: #fff;
+  font-size: 1rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.stepper button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.stepper output {
+  min-width: 1.75rem;
+  text-align: center;
+  font-weight: 700;
+}
+
+.total {
+  color: var(--accent, #2563eb);
+}
+
+.warning {
+  margin: 0;
+  font-size: 0.85rem;
+  color: #dc2626;
+}
+
+.footer {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.cancel,
+.confirm {
+  flex: 1;
+  padding: 0.7rem 0.5rem;
+  border-radius: 0.85rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.cancel {
+  border: 1px solid rgb(148 163 184 / 55%);
+  background: #fff;
+}
+
+.confirm {
+  border: none;
+  background: var(--accent, #2563eb);
+  color: #fff;
+}
+
+.cancel:disabled,
+.confirm:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}

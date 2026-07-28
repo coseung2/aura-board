@@ -27,6 +27,16 @@ export type SlimeSpriteProps = {
   /** Remote/API-relative scene background rendered behind floor and slime layers. */
   backgroundSpritePath?: string;
   /**
+   * Vehicle art the slime rides. Vehicles sit above the floor instead of
+   * replacing it, so a tube on grass stays valid and a player who wants water
+   * buys that background separately.
+   */
+  vehicleSpritePath?: string;
+  /** Vehicle layer drawn in front of the slime so its lower half reads as seated. */
+  vehicleFrontSpritePath?: string;
+  /** Pixels the vehicle lifts the slime, in 64px-viewport units. */
+  vehicleRiseY?: number;
+  /**
    * Anchor-composed wearable layers. Each equipped option is one shared sheet
    * repositioned per frame, so new drinks never require rebaking wearables.
    */

@@ -9,6 +9,7 @@ export const STUDENT_NOTIFICATION_KINDS = [
   "like",
   "comment",
   "reward",
+  "refund",
   "attendance",
   "assignment",
 ] as const;
@@ -17,6 +18,22 @@ export type StudentNotificationKind = (typeof STUDENT_NOTIFICATION_KINDS)[number
 export const STUDENT_NOTIFICATION_REWARD_SOURCE_TYPES =
   ACTIVITY_REWARD_SOURCE_TYPES;
 export type StudentNotificationRewardSourceType = ActivityRewardSourceType;
+
+/**
+ * Refund ledger source that students are told about.
+ *
+ * Mirrors `SLIME_ITEM_REFUND_SOURCE_TYPE`. Refunds are the one case where money
+ * arrives without the student doing anything, so they would otherwise land in
+ * the wallet silently.
+ */
+export const STUDENT_NOTIFICATION_REFUND_SOURCE_TYPE = "slime_item_refund" as const;
+
+/** Item key embedded in a refund note, when the note still carries one. */
+export function studentRefundItemKey(note: string | null): string | null {
+  if (!note) return null;
+  const match = /^slime-item-refund:(.+)$/.exec(note);
+  return match?.[1] ?? null;
+}
 
 export function studentRewardTitle(
   sourceType: StudentNotificationRewardSourceType,

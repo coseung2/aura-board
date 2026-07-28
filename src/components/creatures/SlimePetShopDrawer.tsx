@@ -62,9 +62,6 @@ function previewState(item: SlimeShopItem): {
   equippedFloor: EquippedFloor;
 } {
   const floor = item.floor;
-  if (floor === "water-puddle" || floor === "trampoline") {
-    return { action: "floor-interaction", equippedFloor: floor };
-  }
   if (floor === "grass-floor") {
     return { action: "idle", equippedFloor: floor };
   }

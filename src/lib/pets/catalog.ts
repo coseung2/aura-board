@@ -21,6 +21,31 @@ export const SLIME_SHOP_DEFAULT_PRICE = 500;
 export const SLIME_COOKIE_PRICE = 30;
 export const SLIME_BALL_PRICE = SLIME_SHOP_DEFAULT_PRICE;
 export const SLIME_SHOP_LOWER_TIER_EFFECT_BPS = 100;
+/**
+ * Default pixels a grounded vehicle lifts the slime.
+ *
+ * Static floors all place the slime's feet at `slimeFootY` 56 over a surface at
+ * 44, so a grounded vehicle owns the 12px between them and seats the slime just
+ * above its own rim. Floating vehicles override this with a larger rise.
+ */
+export const SLIME_VEHICLE_DEFAULT_RISE_Y = 6;
+/**
+ * Y where a vehicle's front layer starts covering the slime, in the 64px
+ * viewport.
+ *
+ * The slime's head tops out at y 32-34 and its feet rest at y 55-56, so a front
+ * edge here crosses the middle of the body: high enough to read as "seated
+ * inside", low enough to leave the face fully visible. Fixed for every vehicle
+ * so 35 rides stay visually consistent and share one rise value.
+ */
+export const SLIME_VEHICLE_FRONT_LINE_Y = 46;
+/**
+ * Upper bound for one consumable purchase.
+ *
+ * Keeps a mistyped quantity from draining a student's wallet in a single tap
+ * while still covering a realistic cookie restock.
+ */
+export const SLIME_MAX_PURCHASE_QUANTITY = 99;
 
 
 const STATIC_FLOOR_DEFINITIONS = [
@@ -35,7 +60,7 @@ const STATIC_FLOOR_DEFINITIONS = [
   ["forest-soil-floor", "숲 흙바닥", 3, "reading_reward"],
   ["stone-floor", "돌바닥", 3, "growth_speed"],
 ] as const satisfies readonly [
-  Exclude<SlimeFloor, "none" | "grass-floor" | "water-puddle" | "trampoline">,
+  Exclude<SlimeFloor, "none" | "grass-floor">,
   string,
   1 | 2 | 3,
   NonNullable<SlimeShopItem["effectKey"]>,
@@ -252,16 +277,6 @@ export const SLIME_SHOP_CATALOG: readonly SlimeShopItem[] = [
     spritePath: `${SLIME_ASSET_ROOT}/official/shared/grass-floor.png`,
   },
   ...SLIME_STATIC_FLOOR_CATALOG,
-  {
-    key: "water-puddle-background",
-    category: "background",
-    floor: "water-puddle",
-    labelKo: "물웅덩이 배경",
-    price: SLIME_SHOP_DEFAULT_PRICE,
-    effectKey: "walking_reward",
-    effectBps: SLIME_SHOP_LOWER_TIER_EFFECT_BPS,
-    spritePath: `${SLIME_ASSET_ROOT}/shop/water-puddle.gif`,
-  },
   {
     key: "shooting-star-night-sky-background",
     category: "background",
@@ -490,10 +505,12 @@ export const SLIME_SHOP_CATALOG: readonly SlimeShopItem[] = [
   },
   {
     key: "slime-blue-trampoline",
-    category: "ride",
-    floor: "trampoline",
+    category: "vehicle",
+    floor: null,
     labelKo: "트램펄린",
     price: SLIME_SHOP_DEFAULT_PRICE,
+    vehicleStance: "grounded",
+    vehicleRiseY: SLIME_VEHICLE_DEFAULT_RISE_Y,
     effectKey: "walking_reward",
     effectBps: SLIME_SHOP_LOWER_TIER_EFFECT_BPS,
     spritePath: `${SLIME_ASSET_ROOT}/shop/slime-blue-trampoline.gif`,
@@ -596,6 +613,7 @@ export function getSlimeShopItem(key: string): SlimeShopItem | undefined {
 export type SlimeVisualItemSlot =
   | "background"
   | "floor"
+  | "vehicle"
   | "prop"
   | "blush"
   | "eyewear"
@@ -614,6 +632,9 @@ export function slimeVisualItemSlot(
 ): SlimeVisualItemSlot | null {
   if (item.floor) return "floor";
   if (isSlimeSceneBackground(item)) return "background";
+  // Vehicles sit above the floor instead of replacing it, so they own their own
+  // slot and stay equippable alongside a background and a floor.
+  if (item.category === "vehicle" || item.category === "ride") return "vehicle";
   if (item.category === "drink" || item.category === "prop") return "prop";
   if (item.category === "wearable") return item.wearableRole ?? null;
   return null;
@@ -628,7 +649,7 @@ export function normalizeEquippedSlimeItemKeys(itemKeys: readonly string[]): str
     const slot = slimeVisualItemSlot(item);
     if (slot) slotKeys[slot] = item.key;
   }
-  return ["background", "floor", "prop", "blush", "eyewear", "headwear"]
+  return ["background", "floor", "vehicle", "prop", "blush", "eyewear", "headwear"]
     .map((slot) => slotKeys[slot as SlimeVisualItemSlot])
     .filter((key): key is string => Boolean(key));
 }

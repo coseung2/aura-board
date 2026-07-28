@@ -42,6 +42,19 @@ export type OfficialSlimeSpriteProps = {
   /** Optional scene art rendered behind every other visual layer. Sources may be 64x64 or 128x128 while remaining in the fixed 64px logical viewport. */
   backgroundSpritePath?: string;
   /**
+   * Vehicle art the slime rides. Vehicles never replace the floor: a grounded
+   * vehicle rests on the same surface the floor draws, and a floating one simply
+   * sits higher, so a player who wants water under a tube buys that background.
+   */
+  vehicleSpritePath?: string;
+  /** Vehicle layer drawn in front of the slime so its lower half reads as seated. */
+  vehicleFrontSpritePath?: string;
+  /**
+   * Pixels the slime is lifted by the vehicle, in 64px-viewport units. Added on
+   * top of the floor rise so a vehicle and a floor stay independently correct.
+   */
+  vehicleRiseY?: number;
+  /**
    * Anchor-composed wearable layers. Each equipped option is one shared sheet
    * repositioned per frame, so new drinks never require rebaking wearables.
    */
@@ -131,6 +144,9 @@ export function OfficialSlimeSprite({
   dataSlimeColor,
   itemSpritePath,
   backgroundSpritePath,
+  vehicleSpritePath,
+  vehicleFrontSpritePath,
+  vehicleRiseY = 0,
   wearables,
   drinkFlavor,
   repeat = false,
@@ -173,7 +189,10 @@ export function OfficialSlimeSprite({
   const floorRise = staticFloor
     ? (staticFloor.slimeFootY - staticFloor.surfaceY) * scale
     : 0;
-  const viewportStyle = frameViewportStyle(frame, scale, floorRise);
+  // A vehicle lifts the slime on top of whatever the floor already contributed,
+  // so the two offsets add instead of overriding each other.
+  const vehicleRise = Math.max(0, Math.trunc(vehicleRiseY)) * scale;
+  const viewportStyle = frameViewportStyle(frame, scale, floorRise + vehicleRise);
   const sheetStyle = frameSourceStyle(
     frame,
     resolution.metadata.meta.size.w,
@@ -183,6 +202,8 @@ export function OfficialSlimeSprite({
   );
   const label = alt ?? `${slimeColor} 슬라임 ${resolution.action} 모습`;
   const resolvedBackgroundSpritePath = resolveSpritePath(backgroundSpritePath);
+  const resolvedVehicleSpritePath = resolveSpritePath(vehicleSpritePath);
+  const resolvedVehicleFrontSpritePath = resolveSpritePath(vehicleFrontSpritePath);
   // Wearables compose onto the character sheet. Legacy complete-GIF props
   // replace that sheet entirely, so the two paths stay mutually exclusive.
   // The head slot is owned by the resolver: it decides whether this action draws
@@ -329,6 +350,19 @@ export function OfficialSlimeSprite({
           draggable={false}
         />
       ) : null}
+      {resolvedVehicleSpritePath ? (
+        // Vehicle back half sits above the floor and behind the character, which
+        // is what lets the front half below hide the slime's lower body.
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={resolvedVehicleSpritePath}
+          alt=""
+          aria-hidden="true"
+          className={styles.floorUnder}
+          style={{ width: 64 * scale, height: 64 * scale, top: floorRise }}
+          draggable={false}
+        />
+      ) : null}
       {itemSpritePath ? (
         // Older shop props are authored as complete looping GIFs. Render the
         // persisted prop in the same viewport while keeping the semantic
@@ -391,6 +425,19 @@ export function OfficialSlimeSprite({
           ) : null}
         </>
       )}
+      {resolvedVehicleFrontSpritePath ? (
+        // Front half of the vehicle. Drawn above every character layer so the
+        // slime reads as sitting inside rather than behind the vehicle.
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={resolvedVehicleFrontSpritePath}
+          alt=""
+          aria-hidden="true"
+          className={styles.floorUnder}
+          style={{ width: 64 * scale, height: 64 * scale, top: floorRise, zIndex: 200 }}
+          draggable={false}
+        />
+      ) : null}
     </div>
   );
 }
