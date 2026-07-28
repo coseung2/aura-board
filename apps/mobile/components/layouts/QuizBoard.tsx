@@ -64,10 +64,28 @@ export function QuizBoard({
   const [joinError, setJoinError] = useState<string | null>(null);
   const [player, setPlayer] = useState<Player | null>(null);
   const [quiz, setQuiz] = useState<QuizState | null>(null);
-  const [lastAnsweredQ, setLastAnsweredQ] = useState<number>(-1);
   const [selected, setSelected] = useState<Letter | null>(null);
   const [showFeedback, setShowFeedback] = useState<"ok" | "late" | null>(null);
+  const [refreshError, setRefreshError] = useState<string | null>(null);
+  const [retryingRefresh, setRetryingRefresh] = useState(false);
   const questionStartMs = useRef<number>(0);
+  const mountedRef = useRef(true);
+  const latestQuizRef = useRef<QuizState | null>(null);
+  const refreshControllerRef = useRef<AbortController | null>(null);
+  const refreshInFlightRef = useRef<Promise<void> | null>(null);
+  const answerControllerRef = useRef<AbortController | null>(null);
+  const answerLockedRef = useRef(false);
+  const onMutateRef = useRef(onMutate);
+  onMutateRef.current = onMutate;
+
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      refreshControllerRef.current?.abort();
+      answerControllerRef.current?.abort();
+    };
+  }, []);
 
   const join = useCallback(async () => {
     if (!room?.roomCode) return;
@@ -98,52 +116,109 @@ export function QuizBoard({
     }
   }, [room?.roomCode, data.currentStudent.id]);
 
-  // Poll quiz state every 2 초.
+  const refreshQuiz = useCallback((): Promise<void> => {
+    if (!room?.id) return Promise.resolve();
+    if (refreshInFlightRef.current) return refreshInFlightRef.current;
+
+    const controller = new AbortController();
+    refreshControllerRef.current = controller;
+    let request!: Promise<void>;
+    request = (async () => {
+      try {
+        const res = await apiFetch<{ quiz: QuizState }>(`/api/quiz/${room.id}`, {
+          signal: controller.signal,
+        });
+        if (!mountedRef.current || controller.signal.aborted) return;
+
+        const previous = latestQuizRef.current;
+        latestQuizRef.current = res.quiz;
+        setQuiz(res.quiz);
+        setRefreshError(null);
+
+        const authoritativePlayer = res.quiz.players.find(
+          (candidate) => candidate.id === player?.id,
+        );
+        if (authoritativePlayer) {
+          setPlayer((current) =>
+            current?.id === authoritativePlayer.id
+              ? { ...current, score: authoritativePlayer.score }
+              : current,
+          );
+        }
+
+        if (previous && previous.currentQ !== res.quiz.currentQ) {
+          answerLockedRef.current = false;
+          setSelected(null);
+          setShowFeedback(null);
+          questionStartMs.current = Date.now();
+        } else if (!previous) {
+          questionStartMs.current = Date.now();
+        }
+
+        if (previous?.status !== "finished" && res.quiz.status === "finished") {
+          onMutateRef.current();
+        }
+      } catch (error) {
+        if (!mountedRef.current || controller.signal.aborted) return;
+        setRefreshError(
+          error instanceof ApiError
+            ? `퀴즈 상태를 불러오지 못했어요. (${error.status})`
+            : "네트워크 연결을 확인하고 다시 시도해 주세요.",
+        );
+      } finally {
+        if (refreshControllerRef.current === controller) {
+          refreshControllerRef.current = null;
+        }
+        if (refreshInFlightRef.current === request) {
+          refreshInFlightRef.current = null;
+        }
+      }
+    })();
+    refreshInFlightRef.current = request;
+    return request;
+  }, [player?.id, room?.id]);
+
+  // 이전 요청이 끝난 뒤 다음 poll 을 예약해 겹치는 요청과 타이머를 막는다.
   useEffect(() => {
     if (!player || !room?.id) return;
     let cancelled = false;
+    let handle: ReturnType<typeof setTimeout> | null = null;
+
     async function tick() {
-      try {
-        const res = await apiFetch<{ quiz: QuizState }>(`/api/quiz/${room!.id}`);
-        if (cancelled) return;
-        setQuiz(res.quiz);
-        // 새 문제로 넘어왔으면 타이머 초기화.
-        if (res.quiz.currentQ !== lastAnsweredQ) {
-          if (res.quiz.currentQ > lastAnsweredQ && selected !== null) {
-            setSelected(null);
-            setShowFeedback(null);
-          }
-        }
-      } catch {
-        // best-effort.
+      await refreshQuiz();
+      if (!cancelled) {
+        handle = setTimeout(() => void tick(), quizTokens.pollIntervalMs);
       }
     }
-    tick();
-    const handle = setInterval(tick, quizTokens.pollIntervalMs);
+
+    void tick();
     return () => {
       cancelled = true;
-      clearInterval(handle);
+      if (handle) clearTimeout(handle);
     };
-  }, [player, room?.id, lastAnsweredQ, selected]);
+  }, [player?.id, refreshQuiz, room?.id]);
 
-  // 문제 시작 시각 추적 (점수 계산용).
-  useEffect(() => {
-    if (!quiz) return;
-    if (quiz.currentQ !== lastAnsweredQ) {
-      questionStartMs.current = Date.now();
-    }
-  }, [quiz, lastAnsweredQ]);
+  const retryRefresh = useCallback(async () => {
+    if (retryingRefresh) return;
+    setRetryingRefresh(true);
+    await refreshQuiz();
+    if (mountedRef.current) setRetryingRefresh(false);
+  }, [refreshQuiz, retryingRefresh]);
 
   async function answer(letter: Letter) {
     if (!quiz || !player) return;
     const current = quiz.questions[quiz.currentQ];
     if (!current) return;
-    if (selected) return; // 중복 제출 방지
+    if (selected || answerLockedRef.current) return;
+    answerLockedRef.current = true;
     setSelected(letter);
     const timeMs = Date.now() - questionStartMs.current;
+    const controller = new AbortController();
+    answerControllerRef.current = controller;
     try {
       await apiFetch("/api/quiz/answer", {
         method: "POST",
+        signal: controller.signal,
         json: {
           questionId: current.id,
           playerId: player.id,
@@ -151,12 +226,35 @@ export function QuizBoard({
           timeMs,
         },
       });
+      if (!mountedRef.current || controller.signal.aborted) return;
       setShowFeedback("ok");
-      setLastAnsweredQ(quiz.currentQ);
-    } catch {
+      await refreshQuiz();
+    } catch (error) {
+      if (!mountedRef.current || controller.signal.aborted) return;
       setShowFeedback("late");
+      setRefreshError(
+        "답변 처리 결과를 확인하지 못했어요. 상태를 다시 확인해 주세요.",
+      );
+    } finally {
+      if (answerControllerRef.current === controller) {
+        answerControllerRef.current = null;
+      }
     }
   }
+
+  const refreshErrorNotice = refreshError ? (
+    <View style={styles.refreshError} accessibilityRole="alert">
+      <Text style={styles.refreshErrorText}>{refreshError}</Text>
+      <AppButton
+        variant="secondary"
+        style={styles.retryBtn}
+        onPress={() => void retryRefresh()}
+        loading={retryingRefresh}
+      >
+        다시 시도
+      </AppButton>
+    </View>
+  ) : null;
 
   if (!room) {
     return (
@@ -196,8 +294,12 @@ export function QuizBoard({
   if (!quiz) {
     return (
       <View style={styles.center}>
-        <ActivityIndicator size="large" color={colors.accent} />
-        <Text style={styles.infoMsg}>상태 확인 중…</Text>
+        {refreshErrorNotice ?? (
+          <>
+            <ActivityIndicator size="large" color={colors.accent} />
+            <Text style={styles.infoMsg}>상태 확인 중…</Text>
+          </>
+        )}
       </View>
     );
   }
@@ -210,20 +312,24 @@ export function QuizBoard({
         <Text style={styles.infoMsg}>
           참가자 {quiz.players.length}명 · 선생님이 시작하면 문제가 보여요.
         </Text>
+        {refreshErrorNotice}
       </View>
     );
   }
 
   if (quiz.status === "finished") {
     const sorted = [...quiz.players].sort((a, b) => b.score - a.score);
-    const myRank = sorted.findIndex((p) => p.id === player.id) + 1;
+    const playerIndex = sorted.findIndex((p) => p.id === player.id);
+    const myRank = playerIndex >= 0 ? playerIndex + 1 : null;
+    const finalScore = playerIndex >= 0 ? sorted[playerIndex].score : player.score;
     return (
       <View style={styles.center}>
         <Text style={styles.infoEmoji}>🏁</Text>
         <Text style={styles.infoTitle}>퀴즈 종료!</Text>
         <Text style={styles.infoMsg}>
-          {myRank}위 · {player.score}점
+          {myRank ? `${myRank}위 · ` : ""}{finalScore}점
         </Text>
+        {refreshErrorNotice}
         <SurfaceCard style={styles.leaderboard}>
           {sorted.slice(0, quizTokens.leaderboardPreviewCount).map((p, i) => (
             <View key={p.id} style={styles.lbRow}>
@@ -262,6 +368,7 @@ export function QuizBoard({
         </Text>
         <Text style={styles.topScore}>{player.nickname} · {myScore}점</Text>
       </View>
+      {refreshErrorNotice}
       <SurfaceCard style={styles.qCard}>
         <Text style={styles.qText}>{q.question}</Text>
       </SurfaceCard>
@@ -271,6 +378,13 @@ export function QuizBoard({
           return (
             <SurfacePressable
               key={opt.letter}
+              accessibilityRole="button"
+              accessibilityLabel={`${opt.letter}번. ${opt.text}`}
+              accessibilityHint="두 번 탭하여 이 답을 제출합니다."
+              accessibilityState={{
+                disabled: selected !== null,
+                selected: isSelected,
+              }}
               style={[
                 styles.opt,
                 { backgroundColor: opt.color },
@@ -288,7 +402,7 @@ export function QuizBoard({
       {showFeedback ? (
         <View style={styles.feedbackBar}>
           <Text style={styles.feedbackText}>
-            {showFeedback === "ok" ? "정답 대기 중…" : "이미 답을 제출했어요"}
+            {showFeedback === "ok" ? "정답 대기 중…" : "답변 결과를 확인 중이에요"}
           </Text>
         </View>
       ) : null}
@@ -313,6 +427,19 @@ const styles = StyleSheet.create({
     letterSpacing: quizTokens.roomCodeLetterSpacing,
   },
   errorText: { ...typography.label, color: colors.danger },
+  refreshError: {
+    width: "100%",
+    alignItems: "center",
+    gap: spacing.sm,
+    padding: spacing.md,
+    backgroundColor: colors.statusReturnedBg,
+  },
+  refreshErrorText: {
+    ...typography.label,
+    color: colors.statusReturnedText,
+    textAlign: "center",
+  },
+  retryBtn: { minWidth: quizTokens.rankWidth * 3 },
   joinBtn: {
     marginTop: spacing.lg,
     paddingHorizontal: spacing.xxl,

@@ -1,4 +1,10 @@
-import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import {
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { SLIME_CATALOG, SLIME_SHOP_CATALOG } from "@/lib/pets/catalog";
@@ -26,14 +32,17 @@ function home(overrides: Record<string, unknown> = {}) {
   };
 }
 
-const BASEBALL_ITEM = SLIME_SHOP_CATALOG.find((item) => item.key === "slime-ball-baseball") ?? {
-  key: "slime-ball-baseball",
-  category: "prop",
-  floor: null,
-  labelKo: "야구공",
-  price: 100,
-  spritePath: "/creatures/slimes/official/props/ball/baseball/blue/slime-blue-baseball-hit.gif",
-} as unknown as SlimeShopItem;
+const BASEBALL_ITEM =
+  SLIME_SHOP_CATALOG.find((item) => item.key === "slime-ball-baseball") ??
+  ({
+    key: "slime-ball-baseball",
+    category: "prop",
+    floor: null,
+    labelKo: "야구공",
+    price: 100,
+    spritePath:
+      "/creatures/slimes/official/props/ball/baseball/blue/slime-blue-baseball-hit.gif",
+  } as unknown as SlimeShopItem);
 
 const SCENE_BACKGROUND_ITEM: SlimeShopItem = {
   key: "shooting-star-night-sky-background",
@@ -48,14 +57,19 @@ describe("SlimePetPage", () => {
   afterEach(() => vi.unstubAllGlobals());
 
   it("removes the accessory set section and keeps individual slime effects", async () => {
-    vi.stubGlobal("fetch", vi.fn(() => json(home({ ownedColors: ["blue"] }))));
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(() => json(home({ ownedColors: ["blue"] }))),
+    );
     render(<SlimePetPage />);
 
     expect(await screen.findByText("350 원")).toBeTruthy();
     expect(screen.queryByRole("heading", { name: "소품 세트" })).toBeNull();
     expect(screen.queryByText("효과 내역")).toBeTruthy();
     expect(screen.getAllByText("블루 슬라임").length).toBeGreaterThan(0);
-    expect(screen.getByRole("button", { name: "블루 슬라임 대표 펫" })).toBeTruthy();
+    expect(
+      screen.getByRole("button", { name: "블루 슬라임 대표 펫" }),
+    ).toBeTruthy();
     expect(screen.getAllByLabelText("빈 슬라임 자리")).toHaveLength(4);
     expect(screen.queryByText("500원 구매")).toBeNull();
   });
@@ -105,7 +119,9 @@ describe("SlimePetPage", () => {
       name: "블루 슬라임 성장 시간 비교 보기",
     });
     fireEvent.mouseEnter(growthDetailTrigger);
-    const comparison = screen.getByRole("region", { name: "블루 슬라임 성장 시간 비교" });
+    const comparison = screen.getByRole("region", {
+      name: "블루 슬라임 성장 시간 비교",
+    });
     expect(within(comparison).getByText("성장 속도 +2% 적용 중")).toBeTruthy();
     expect(within(comparison).getByText("버프 없음 120시간")).toBeTruthy();
     expect(within(comparison).getByText("적용 후 117.6시간")).toBeTruthy();
@@ -118,30 +134,24 @@ describe("SlimePetPage", () => {
     expect(screen.queryByText(/남은 시간/)).toBeNull();
   });
 
-  it("opens the shop drawer with semantic tabs and filters products", async () => {
-    vi.stubGlobal("fetch", vi.fn(() => json(home())));
-    render(<SlimePetPage />);
-
-    const trigger = await screen.findByRole("button", { name: "상점" });
-    fireEvent.click(trigger);
-    const drawer = await screen.findByRole("dialog", { name: "슬라임 상점" });
-    await waitFor(() =>
-      expect(document.activeElement).toBe(
-        within(drawer).getByRole("button", { name: "상점 닫기" }),
-      ),
+  it("renders the shop inline with semantic tabs and filters products", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(() => json(home())),
     );
+    render(<SlimePetPage initialSection="shop" />);
+
+    const drawer = await screen.findByRole("region", { name: "슬라임 상점" });
+    expect(screen.queryByRole("dialog", { name: "슬라임 상점" })).toBeNull();
 
     const filters = within(drawer).getByRole("tablist", { name: "상점 분류" });
-    expect(within(filters).getAllByRole("tab")).toHaveLength(8);
-    for (const label of ["전체", "캐릭터", "배경", "바닥", "먹이", "소품", "착장", "레벨업"]) {
+    expect(within(filters).getAllByRole("tab")).toHaveLength(6);
+    for (const label of ["캐릭터", "배경", "바닥", "먹이", "소품", "착장"]) {
       expect(within(filters).getByRole("tab", { name: label })).toBeTruthy();
     }
-    expect(within(drawer).getByRole("button", { name: "그린 슬라임 구매" })).toBeTruthy();
-
-    fireEvent.click(within(filters).getByRole("tab", { name: "전체" }));
-    expect(within(drawer).getByText("물웅덩이 배경")).toBeTruthy();
-    expect(within(drawer).getByText("트램펄린")).toBeTruthy();
-    expect(within(drawer).getByText("레모네이드")).toBeTruthy();
+    expect(
+      within(drawer).getByRole("button", { name: "그린 슬라임 구매" }),
+    ).toBeTruthy();
 
     fireEvent.click(within(filters).getByRole("tab", { name: "바닥" }));
     expect(within(drawer).getByText("물웅덩이 배경")).toBeTruthy();
@@ -153,26 +163,29 @@ describe("SlimePetPage", () => {
     expect(within(drawer).getByText("과제 제출 보상 +3%")).toBeTruthy();
     expect(within(drawer).queryByText("물웅덩이 배경")).toBeNull();
     expect(
-      within(drawer).getByRole("img", { name: "별똥별 밤하늘 미리보기" })
+      within(drawer)
+        .getByRole("img", { name: "별똥별 밤하늘 미리보기" })
         .getAttribute("data-background-sprite-path"),
     ).toBe("/creatures/slimes/shop/shooting-star-night-sky.gif");
   });
 
   it("moves the active tab with roving arrow and Home/End focus", async () => {
-    vi.stubGlobal("fetch", vi.fn(() => json(home())));
-    render(<SlimePetPage />);
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(() => json(home())),
+    );
+    render(<SlimePetPage initialSection="shop" />);
 
-    fireEvent.click(await screen.findByRole("button", { name: "상점" }));
-    const drawer = await screen.findByRole("dialog", { name: "슬라임 상점" });
+    const drawer = await screen.findByRole("region", { name: "슬라임 상점" });
     const tabs = within(drawer).getAllByRole("tab");
-    expect(tabs[1]?.getAttribute("aria-selected")).toBe("true");
-    expect(tabs[1]?.getAttribute("tabindex")).toBe("0");
+    expect(tabs[0]?.getAttribute("aria-selected")).toBe("true");
+    expect(tabs[0]?.getAttribute("tabindex")).toBe("0");
 
-    tabs[1]!.focus();
-    fireEvent.keyDown(tabs[1]!, { key: "ArrowRight" });
-    expect(document.activeElement).toBe(tabs[2]);
-    expect(tabs[2]?.getAttribute("aria-selected")).toBe("true");
-    fireEvent.keyDown(tabs[2]!, { key: "Home" });
+    tabs[0]!.focus();
+    fireEvent.keyDown(tabs[0]!, { key: "ArrowRight" });
+    expect(document.activeElement).toBe(tabs[1]);
+    expect(tabs[1]?.getAttribute("aria-selected")).toBe("true");
+    fireEvent.keyDown(tabs[1]!, { key: "Home" });
     expect(document.activeElement).toBe(tabs[0]);
     expect(tabs[0]?.getAttribute("aria-selected")).toBe("true");
     fireEvent.keyDown(tabs[0]!, { key: "End" });
@@ -180,15 +193,35 @@ describe("SlimePetPage", () => {
     expect(tabs.at(-1)?.getAttribute("aria-selected")).toBe("true");
   });
 
+  it("hides the optional background category when the catalog has no scene background", async () => {
+    const legacyCatalog = SLIME_SHOP_CATALOG.filter(
+      (item) => !(item.category === "background" && item.floor === null),
+    );
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(() => json(home({ shopCatalog: legacyCatalog }))),
+    );
+    render(<SlimePetPage initialSection="shop" />);
+
+    const shop = await screen.findByRole("region", { name: "슬라임 상점" });
+    const tabs = within(shop).getAllByRole("tab");
+    expect(tabs.map((tab) => tab.textContent)).toEqual([
+      "캐릭터",
+      "바닥",
+      "먹이",
+      "소품",
+      "착장",
+    ]);
+  });
+
   it("groups prop results into Korean ball and drink sections", async () => {
     vi.stubGlobal(
       "fetch",
       vi.fn(() => json(home({ shopCatalog: SLIME_SHOP_CATALOG }))),
     );
-    render(<SlimePetPage />);
+    render(<SlimePetPage initialSection="shop" />);
 
-    fireEvent.click(await screen.findByRole("button", { name: "상점" }));
-    const drawer = await screen.findByRole("dialog", { name: "슬라임 상점" });
+    const drawer = await screen.findByRole("region", { name: "슬라임 상점" });
     fireEvent.click(within(drawer).getByRole("tab", { name: "소품" }));
     expect(within(drawer).getByRole("heading", { name: "공" })).toBeTruthy();
     expect(within(drawer).getByRole("heading", { name: "음료" })).toBeTruthy();
@@ -197,21 +230,31 @@ describe("SlimePetPage", () => {
   });
 
   it("routes wearable products to outfit groups and composes their previews", async () => {
-    const headwear = SLIME_SHOP_CATALOG.find((item) => item.wearableRole === "headwear");
-    const blush = SLIME_SHOP_CATALOG.find((item) => item.wearableRole === "blush");
-    const eyewear = SLIME_SHOP_CATALOG.find((item) => item.wearableRole === "eyewear");
+    const headwear = SLIME_SHOP_CATALOG.find(
+      (item) => item.wearableRole === "headwear",
+    );
+    const blush = SLIME_SHOP_CATALOG.find(
+      (item) => item.wearableRole === "blush",
+    );
+    const eyewear = SLIME_SHOP_CATALOG.find(
+      (item) => item.wearableRole === "eyewear",
+    );
     expect(headwear).toBeTruthy();
     expect(blush).toBeTruthy();
     expect(eyewear).toBeTruthy();
 
-    vi.stubGlobal("fetch", vi.fn(() => json(home({ shopCatalog: SLIME_SHOP_CATALOG }))));
-    render(<SlimePetPage />);
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(() => json(home({ shopCatalog: SLIME_SHOP_CATALOG }))),
+    );
+    render(<SlimePetPage initialSection="shop" />);
 
-    fireEvent.click(await screen.findByRole("button", { name: "상점" }));
-    const drawer = await screen.findByRole("dialog", { name: "슬라임 상점" });
+    const drawer = await screen.findByRole("region", { name: "슬라임 상점" });
     fireEvent.click(within(drawer).getByRole("tab", { name: "착장" }));
 
-    expect(within(drawer).getByRole("heading", { name: "볼터치" })).toBeTruthy();
+    expect(
+      within(drawer).getByRole("heading", { name: "볼터치" }),
+    ).toBeTruthy();
     expect(within(drawer).getByRole("heading", { name: "안경" })).toBeTruthy();
     expect(within(drawer).getByRole("heading", { name: "모자" })).toBeTruthy();
     expect(within(drawer).queryByText("레모네이드")).toBeNull();
@@ -223,16 +266,24 @@ describe("SlimePetPage", () => {
     expect(preview.getAttribute("data-wearable-keys")).toContain(
       `headwear/${headwear!.wearableOption}`,
     );
-    expect(preview.querySelector('img[data-wearable-role="headwear"]')).toBeTruthy();
+    expect(
+      preview.querySelector('img[data-wearable-role="headwear"]'),
+    ).toBeTruthy();
   });
 
   it("renders independent wearable slots together with the equipped drink flavor", async () => {
     const drink = SLIME_SHOP_CATALOG.find(
       (item) => item.category === "drink" && item.animationKey === "lemonade",
     );
-    const blush = SLIME_SHOP_CATALOG.find((item) => item.wearableRole === "blush");
-    const eyewear = SLIME_SHOP_CATALOG.find((item) => item.wearableRole === "eyewear");
-    const headwear = SLIME_SHOP_CATALOG.find((item) => item.wearableRole === "headwear");
+    const blush = SLIME_SHOP_CATALOG.find(
+      (item) => item.wearableRole === "blush",
+    );
+    const eyewear = SLIME_SHOP_CATALOG.find(
+      (item) => item.wearableRole === "eyewear",
+    );
+    const headwear = SLIME_SHOP_CATALOG.find(
+      (item) => item.wearableRole === "headwear",
+    );
     expect(drink).toBeTruthy();
     expect(blush).toBeTruthy();
     expect(eyewear).toBeTruthy();
@@ -299,7 +350,9 @@ describe("SlimePetPage", () => {
     );
     expect(legacyFloor).toBeTruthy();
     const shopCatalog = [
-      ...SLIME_SHOP_CATALOG.filter((item) => item.key !== SCENE_BACKGROUND_ITEM.key),
+      ...SLIME_SHOP_CATALOG.filter(
+        (item) => item.key !== SCENE_BACKGROUND_ITEM.key,
+      ),
       SCENE_BACKGROUND_ITEM,
     ];
     vi.stubGlobal(
@@ -332,47 +385,33 @@ describe("SlimePetPage", () => {
       ),
     ).toBeTruthy();
     expect(
-      preview.querySelector(
-        `img[src="${SCENE_BACKGROUND_ITEM.spritePath}"]`,
-      ),
+      preview.querySelector(`img[src="${SCENE_BACKGROUND_ITEM.spritePath}"]`),
     ).toBeTruthy();
   });
 
-  it("closes on Escape and restores focus to the shop trigger", async () => {
-    vi.stubGlobal("fetch", vi.fn(() => json(home())));
-    render(<SlimePetPage />);
+  it("exposes directly addressable pet sections and marks Shop active", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(() => json(home())),
+    );
+    render(<SlimePetPage initialSection="shop" />);
 
-    const trigger = await screen.findByRole("button", { name: "상점" });
-    fireEvent.click(trigger);
-    await screen.findByRole("dialog", { name: "슬라임 상점" });
-
-    fireEvent.keyDown(window, { key: "Escape" });
-    await waitFor(() => expect(screen.queryByRole("dialog", { name: "슬라임 상점" })).toBeNull());
-    expect(document.activeElement).toBe(trigger);
-
-    fireEvent.click(trigger);
-    const drawer = await screen.findByRole("dialog", { name: "슬라임 상점" });
-    fireEvent.click(within(drawer).getByRole("button", { name: "상점 닫기" }));
-    await waitFor(() => expect(screen.queryByRole("dialog", { name: "슬라임 상점" })).toBeNull());
-    expect(document.activeElement).toBe(trigger);
-  });
-
-  it("keeps keyboard focus inside the open shop drawer", async () => {
-    vi.stubGlobal("fetch", vi.fn(() => json(home())));
-    render(<SlimePetPage />);
-
-    fireEvent.click(await screen.findByRole("button", { name: "상점" }));
-    const drawer = await screen.findByRole("dialog", { name: "슬라임 상점" });
-    const buttons = within(drawer).getAllByRole("button");
-    const first = buttons[0];
-    const last = buttons.at(-1)!;
-
-    await waitFor(() => expect(document.activeElement).toBe(first));
-    fireEvent.keyDown(window, { key: "Tab", shiftKey: true });
-    expect(document.activeElement).toBe(last);
-
-    fireEvent.keyDown(window, { key: "Tab" });
-    expect(document.activeElement).toBe(first);
+    const navigation = screen.getByRole("navigation", { name: "펫 메뉴" });
+    expect(
+      within(navigation)
+        .getByRole("link", { name: "내 펫" })
+        .getAttribute("href"),
+    ).toBe("/student/aura-pet?section=mine");
+    expect(
+      within(navigation)
+        .getByRole("link", { name: "우리 반 펫" })
+        .getAttribute("href"),
+    ).toBe("/student/aura-pet?section=classroom");
+    const shopLink = within(navigation).getByRole("link", { name: "상점" });
+    expect(shopLink.getAttribute("href")).toBe(
+      "/student/aura-pet?section=shop",
+    );
+    expect(shopLink.getAttribute("aria-current")).toBe("page");
   });
 
   it("offers a retry after the initial load fails", async () => {
@@ -383,7 +422,9 @@ describe("SlimePetPage", () => {
     vi.stubGlobal("fetch", fetchMock);
     render(<SlimePetPage />);
 
-    expect(await screen.findByText("슬라임 정보를 불러오지 못했어요.")).toBeTruthy();
+    expect(
+      await screen.findByText("슬라임 정보를 불러오지 못했어요."),
+    ).toBeTruthy();
     expect(screen.queryByText("표시할 슬라임이 없어요.")).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "다시 시도" }));
 
@@ -409,18 +450,25 @@ describe("SlimePetPage", () => {
         ),
       );
     vi.stubGlobal("fetch", fetchMock);
-    render(<SlimePetPage />);
+    render(<SlimePetPage initialSection="shop" />);
 
-    fireEvent.click(await screen.findByRole("button", { name: "상점" }));
-    const drawer = await screen.findByRole("dialog", { name: "슬라임 상점" });
-    fireEvent.click(within(drawer).getByRole("tab", { name: "전체" }));
-    fireEvent.click(within(drawer).getByRole("button", { name: "물웅덩이 배경 구매" }));
+    const drawer = await screen.findByRole("region", { name: "슬라임 상점" });
+    fireEvent.click(within(drawer).getByRole("tab", { name: "바닥" }));
+    fireEvent.click(
+      within(drawer).getByRole("button", { name: "물웅덩이 배경 구매" }),
+    );
 
     await screen.findByText("물웅덩이 배경 구매를 완료했어요.");
-    expect(screen.getByTestId("slime-wallet-balance").textContent).toContain("320");
+    expect(screen.getByTestId("slime-wallet-balance").textContent).toContain(
+      "320",
+    );
     expect(within(drawer).getByText("보유 중")).toBeTruthy();
-    expect(within(drawer).getByRole("button", { name: "물웅덩이 배경 환불" })).toBeTruthy();
-    expect(fetchMock.mock.calls[1][0]).toBe("/api/student/slimes/items/purchase");
+    expect(
+      within(drawer).getByRole("button", { name: "물웅덩이 배경 환불" }),
+    ).toBeTruthy();
+    expect(fetchMock.mock.calls[1][0]).toBe(
+      "/api/student/slimes/items/purchase",
+    );
     expect(JSON.parse(fetchMock.mock.calls[1][1].body as string)).toEqual({
       itemKey: "water-puddle-background",
     });
@@ -447,17 +495,25 @@ describe("SlimePetPage", () => {
         }),
       );
     vi.stubGlobal("fetch", fetchMock);
-    vi.stubGlobal("confirm", vi.fn(() => true));
-    render(<SlimePetPage />);
+    vi.stubGlobal(
+      "confirm",
+      vi.fn(() => true),
+    );
+    render(<SlimePetPage initialSection="shop" />);
 
-    fireEvent.click(await screen.findByRole("button", { name: "상점" }));
-    const drawer = await screen.findByRole("dialog", { name: "슬라임 상점" });
-    fireEvent.click(within(drawer).getByRole("tab", { name: "전체" }));
-    fireEvent.click(within(drawer).getByRole("button", { name: "물웅덩이 배경 환불" }));
+    const drawer = await screen.findByRole("region", { name: "슬라임 상점" });
+    fireEvent.click(within(drawer).getByRole("tab", { name: "바닥" }));
+    fireEvent.click(
+      within(drawer).getByRole("button", { name: "물웅덩이 배경 환불" }),
+    );
 
     await screen.findByText("물웅덩이 배경을(를) 환불했어요.");
-    expect(screen.getByTestId("slime-wallet-balance").textContent).toContain("350");
-    expect(within(drawer).getByRole("button", { name: "물웅덩이 배경 구매" })).toBeTruthy();
+    expect(screen.getByTestId("slime-wallet-balance").textContent).toContain(
+      "350",
+    );
+    expect(
+      within(drawer).getByRole("button", { name: "물웅덩이 배경 구매" }),
+    ).toBeTruthy();
     expect(screen.queryByText("장착한 아이템 없음")).toBeNull();
     expect(fetchMock.mock.calls[1][0]).toBe("/api/student/slimes/items/refund");
     expect(JSON.parse(fetchMock.mock.calls[1][1].body as string)).toEqual({
@@ -501,9 +557,15 @@ describe("SlimePetPage", () => {
     vi.stubGlobal("fetch", fetchMock);
     render(<SlimePetPage />);
 
-    fireEvent.click(await screen.findByRole("button", { name: "블루 슬라임 꾸미기" }));
-    const drawer = await screen.findByRole("dialog", { name: "블루 슬라임 꾸미기" });
-    const apply = within(drawer).getByRole("button", { name: "물웅덩이 배경 적용" });
+    fireEvent.click(
+      await screen.findByRole("button", { name: "블루 슬라임 꾸미기" }),
+    );
+    const drawer = await screen.findByRole("dialog", {
+      name: "블루 슬라임 꾸미기",
+    });
+    const apply = within(drawer).getByRole("button", {
+      name: "물웅덩이 배경 적용",
+    });
     fireEvent.click(apply);
     await screen.findByText("물웅덩이 배경을(를) 블루 슬라임에 적용했어요.");
     expect(screen.queryByText("장착: 물웅덩이 배경")).toBeNull();
@@ -513,9 +575,9 @@ describe("SlimePetPage", () => {
       ),
     ).toBeTruthy();
     expect(
-      document.querySelector('[data-slime-color="blue"]')?.getAttribute(
-        "data-background-sprite-path",
-      ),
+      document
+        .querySelector('[data-slime-color="blue"]')
+        ?.getAttribute("data-background-sprite-path"),
     ).toBeNull();
     expect(fetchMock.mock.calls[1][0]).toBe("/api/student/slimes/items/equip");
     expect(JSON.parse(fetchMock.mock.calls[1][1].body as string)).toEqual({
@@ -524,7 +586,9 @@ describe("SlimePetPage", () => {
       isEquipped: true,
     });
 
-    fireEvent.click(within(drawer).getByRole("button", { name: "물웅덩이 배경 해제" }));
+    fireEvent.click(
+      within(drawer).getByRole("button", { name: "물웅덩이 배경 해제" }),
+    );
     await screen.findByText("물웅덩이 배경을(를) 블루 슬라임에 해제했어요.");
     expect(screen.queryByText("장착한 아이템 없음")).toBeNull();
     expect(fetchMock.mock.calls[2][0]).toBe("/api/student/slimes/items/equip");
@@ -557,16 +621,24 @@ describe("SlimePetPage", () => {
     });
     expect(preview.getAttribute("data-slime-color")).toBe("purple");
 
-    fireEvent.click(screen.getByRole("button", { name: "퍼플 슬라임 효과 상세 보기" }));
-    const details = screen.getByRole("region", { name: "퍼플 슬라임 효과 상세" });
+    fireEvent.click(
+      screen.getByRole("button", { name: "퍼플 슬라임 효과 상세 보기" }),
+    );
+    const details = screen.getByRole("region", {
+      name: "퍼플 슬라임 효과 상세",
+    });
     expect(within(details).getByText("소품 추가 효과")).toBeTruthy();
-    expect(within(details).getByText("레모네이드 · 걷기 보상 +1%")).toBeTruthy();
+    expect(
+      within(details).getByText("레모네이드 · 걷기 보상 +1%"),
+    ).toBeTruthy();
   });
 
   it("disables and grays the cookie action when no cookies are owned", async () => {
     vi.stubGlobal(
       "fetch",
-      vi.fn(() => json(home({ ownedColors: ["blue"], ownedItemQuantities: {} }))),
+      vi.fn(() =>
+        json(home({ ownedColors: ["blue"], ownedItemQuantities: {} })),
+      ),
     );
     render(<SlimePetPage />);
 
@@ -606,17 +678,21 @@ describe("SlimePetPage", () => {
     });
     expect(within(details).getByText("펫 기본 효과")).toBeTruthy();
     expect(within(details).getByText("성장 속도 +2%")).toBeTruthy();
-    expect(screen.getAllByText("펫 기본 효과").length).toBeGreaterThanOrEqual(2);
+    expect(screen.getAllByText("펫 기본 효과").length).toBeGreaterThanOrEqual(
+      2,
+    );
   });
 
   it("lists every owned slime buff even when only another slime is equipped", async () => {
     vi.stubGlobal(
       "fetch",
       vi.fn(() =>
-        json(home({
-          ownedColors: ["blue", "purple"],
-          equippedColors: ["purple"],
-        })),
+        json(
+          home({
+            ownedColors: ["blue", "purple"],
+            equippedColors: ["purple"],
+          }),
+        ),
       ),
     );
     render(<SlimePetPage />);
@@ -678,11 +754,15 @@ describe("SlimePetPage", () => {
     );
 
     await screen.findByText("블루 슬라임에게 쿠키를 먹였어요.");
-    expect(fetchMock.mock.calls[1][0]).toBe("/api/student/slimes/items/consume");
+    expect(fetchMock.mock.calls[1][0]).toBe(
+      "/api/student/slimes/items/consume",
+    );
     expect(fetchMock.mock.calls[1][1]).toEqual(
       expect.objectContaining({
         headers: expect.objectContaining({
-          "Idempotency-Key": expect.stringContaining("slime-cookie-consume-blue"),
+          "Idempotency-Key": expect.stringContaining(
+            "slime-cookie-consume-blue",
+          ),
         }),
       }),
     );
@@ -695,9 +775,13 @@ describe("SlimePetPage", () => {
         name: "블루 슬라임에게 쿠키 주기 (보유 1개)",
       }),
     ).toBeTruthy();
-    expect(screen.getByRole("progressbar", { name: /진행도 52%/ })).toBeTruthy();
     expect(
-      document.querySelector('[data-slime-color="blue"][data-slime-action="happy"]'),
+      screen.getByRole("progressbar", { name: /진행도 52%/ }),
+    ).toBeTruthy();
+    expect(
+      document.querySelector(
+        '[data-slime-color="blue"][data-slime-action="happy"]',
+      ),
     ).toBeTruthy();
   });
 
@@ -711,31 +795,46 @@ describe("SlimePetPage", () => {
     };
     const fetchMock = vi
       .fn()
-      .mockImplementationOnce(() => json(home({ ownedColors: ["blue"], claimedTitles: [title] })))
-      .mockImplementationOnce(() => json({ color: "blue", equippedTitleKey: title.key }))
       .mockImplementationOnce(() =>
-        json(home({
-          ownedColors: ["blue"],
-          claimedTitles: [title],
-          equippedTitleByColor: { blue: title.key },
-        })),
+        json(home({ ownedColors: ["blue"], claimedTitles: [title] })),
+      )
+      .mockImplementationOnce(() =>
+        json({ color: "blue", equippedTitleKey: title.key }),
+      )
+      .mockImplementationOnce(() =>
+        json(
+          home({
+            ownedColors: ["blue"],
+            claimedTitles: [title],
+            equippedTitleByColor: { blue: title.key },
+          }),
+        ),
       );
     vi.stubGlobal("fetch", fetchMock);
     render(<SlimePetPage />);
 
     const wardrobe = await screen.findByRole("combobox", { name: "칭호" });
-    expect(within(wardrobe).getByRole("option", { name: title.label })).toBeTruthy();
+    expect(
+      within(wardrobe).getByRole("option", { name: title.label }),
+    ).toBeTruthy();
     fireEvent.change(wardrobe, { target: { value: title.key } });
 
-    expect(await screen.findByText("블루 슬라임에게 칭호를 붙였어요: 꾸준한 발걸음")).toBeTruthy();
+    expect(
+      await screen.findByText("블루 슬라임에게 칭호를 붙였어요: 꾸준한 발걸음"),
+    ).toBeTruthy();
     expect(fetchMock).toHaveBeenCalledTimes(3);
     expect(fetchMock.mock.calls[1][0]).toBe("/api/student/titles/equip");
-    expect(fetchMock.mock.calls[1][1]).toEqual(expect.objectContaining({
-      method: "PATCH",
-      body: JSON.stringify({ color: "blue", titleKey: title.key }),
-    }));
+    expect(fetchMock.mock.calls[1][1]).toEqual(
+      expect.objectContaining({
+        method: "PATCH",
+        body: JSON.stringify({ color: "blue", titleKey: title.key }),
+      }),
+    );
     expect(fetchMock.mock.calls[2][0]).toBe("/api/student/slimes");
-    expect((screen.getByRole("combobox", { name: "칭호" }) as HTMLSelectElement).value).toBe(title.key);
+    expect(
+      (screen.getByRole("combobox", { name: "칭호" }) as HTMLSelectElement)
+        .value,
+    ).toBe(title.key);
     expect(screen.getAllByText(title.label).length).toBeGreaterThanOrEqual(2);
   });
 
@@ -749,13 +848,21 @@ describe("SlimePetPage", () => {
     };
     const fetchMock = vi
       .fn()
-      .mockImplementationOnce(() => json(home({
-        ownedColors: ["blue"],
-        claimedTitles: [title],
-        equippedTitleByColor: { blue: title.key },
-      })))
-      .mockImplementationOnce(() => json({ color: "blue", equippedTitleKey: null }))
-      .mockImplementationOnce(() => json(home({ ownedColors: ["blue"], claimedTitles: [title] })));
+      .mockImplementationOnce(() =>
+        json(
+          home({
+            ownedColors: ["blue"],
+            claimedTitles: [title],
+            equippedTitleByColor: { blue: title.key },
+          }),
+        ),
+      )
+      .mockImplementationOnce(() =>
+        json({ color: "blue", equippedTitleKey: null }),
+      )
+      .mockImplementationOnce(() =>
+        json(home({ ownedColors: ["blue"], claimedTitles: [title] })),
+      );
     vi.stubGlobal("fetch", fetchMock);
     render(<SlimePetPage />);
 
@@ -763,12 +870,17 @@ describe("SlimePetPage", () => {
       target: { value: "" },
     });
 
-    expect(await screen.findByText("블루 슬라임의 칭호를 해제했어요.")).toBeTruthy();
+    expect(
+      await screen.findByText("블루 슬라임의 칭호를 해제했어요."),
+    ).toBeTruthy();
     expect(JSON.parse(fetchMock.mock.calls[1][1].body as string)).toEqual({
       color: "blue",
       titleKey: null,
     });
-    expect((screen.getByRole("combobox", { name: "칭호" }) as HTMLSelectElement).value).toBe("");
+    expect(
+      (screen.getByRole("combobox", { name: "칭호" }) as HTMLSelectElement)
+        .value,
+    ).toBe("");
   });
 
   it("keeps the previous pet title when the equip mutation fails", async () => {
@@ -781,7 +893,9 @@ describe("SlimePetPage", () => {
     };
     const fetchMock = vi
       .fn()
-      .mockImplementationOnce(() => json(home({ ownedColors: ["blue"], claimedTitles: [title] })))
+      .mockImplementationOnce(() =>
+        json(home({ ownedColors: ["blue"], claimedTitles: [title] })),
+      )
       .mockImplementationOnce(() => json({ error: "title_not_claimed" }, 409));
     vi.stubGlobal("fetch", fetchMock);
     render(<SlimePetPage />);
@@ -790,9 +904,13 @@ describe("SlimePetPage", () => {
       target: { value: title.key },
     });
 
-    expect((await screen.findByRole("alert")).textContent).toContain("아직 받지 않은 칭호예요.");
+    expect((await screen.findByRole("alert")).textContent).toContain(
+      "아직 받지 않은 칭호예요.",
+    );
     expect(fetchMock).toHaveBeenCalledTimes(2);
-    expect((screen.getByRole("combobox", { name: "칭호" }) as HTMLSelectElement).value).toBe("");
+    expect(
+      (screen.getByRole("combobox", { name: "칭호" }) as HTMLSelectElement)
+        .value,
+    ).toBe("");
   });
-
 });

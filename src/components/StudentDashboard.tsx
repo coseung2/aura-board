@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { RealtimeChannel } from "@supabase/supabase-js";
 import { layoutLabel, layoutThumbnail } from "@/lib/layout-meta";
 import { formatBpsPercent } from "@/lib/pets/math";
@@ -25,9 +25,24 @@ import type {
   StudentHomeBreakout as StudentBreakout,
 } from "@/lib/student-home-types";
 import { isStudentAssignmentReminded } from "@/lib/student-home-types";
+import {
+  parseStudentBoardCategory,
+  STUDENT_BOARD_CATEGORIES,
+  type StudentBoardCategory,
+} from "@/components/student/student-board-navigation";
 
 const FALLBACK_THUMBNAIL = "/board-type-thumbnails/card-board.png";
 const STUDENT_ASSIGNMENT_VISIBLE_LIMIT = 4;
+const PLAY_FILTERS = [
+  { id: "all", label: "전체" },
+  { id: "live", label: "진행 중" },
+  { id: "kordle", label: "코들" },
+  { id: "speed-game", label: "스피드 게임" },
+  { id: "quiz", label: "퀴즈" },
+  { id: "shadow-alliance", label: "그림자 연합" },
+] as const;
+
+type PlayFilter = (typeof PLAY_FILTERS)[number]["id"];
 
 type BreakoutGroup = {
   groupIndex: number;
@@ -104,53 +119,55 @@ export function StudentDashboard({
   assignments = [],
 }: Props) {
   const [wallet, setWallet] = useState<WalletSummary | null>(null);
+  const [walletLoading, setWalletLoading] = useState(true);
+  const [walletError, setWalletError] = useState(false);
+  const walletLoadGeneration = useRef(0);
   const [slimeHome, setSlimeHome] = useState<StudentSlimeHome | null>(null);
   const [slimeLoading, setSlimeLoading] = useState(true);
   const [slimeError, setSlimeError] = useState(false);
+  const slimeLoadGeneration = useRef(0);
   const [cancellingFD, setCancellingFD] = useState<string | null>(null);
   const [fdError, setFdError] = useState<string | null>(null);
-  const [breakoutModal, setBreakoutModal] = useState<{
-    sourceTitle: string;
-    breakout: StudentBreakout;
-  } | null>(null);
+  const loadWallet = useCallback(async () => {
+    const generation = ++walletLoadGeneration.current;
+    setWalletLoading(true);
+    setWalletError(false);
+    try {
+      const res = await fetch("/api/my/wallet", { cache: "no-store" });
+      if (!res.ok) throw new Error("wallet_load_failed");
+      const payload = (await res.json()) as WalletSummary;
+      if (generation === walletLoadGeneration.current) setWallet(payload);
+    } catch {
+      if (generation === walletLoadGeneration.current) setWalletError(true);
+    } finally {
+      if (generation === walletLoadGeneration.current) setWalletLoading(false);
+    }
+  }, []);
+
+  const loadSlimeHome = useCallback(async () => {
+    const generation = ++slimeLoadGeneration.current;
+    setSlimeLoading(true);
+    setSlimeError(false);
+    try {
+      const res = await fetch("/api/student/slimes", { cache: "no-store" });
+      if (!res.ok) throw new Error("slime_home_load_failed");
+      const payload = (await res.json()) as StudentSlimeHome;
+      if (generation === slimeLoadGeneration.current) setSlimeHome(payload);
+    } catch {
+      if (generation === slimeLoadGeneration.current) setSlimeError(true);
+    } finally {
+      if (generation === slimeLoadGeneration.current) setSlimeLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
-    let cancelled = false;
-
-    async function loadWallet() {
-      try {
-        const res = await fetch("/api/my/wallet", { cache: "no-store" });
-        if (!res.ok) return;
-        const payload = (await res.json()) as WalletSummary;
-        if (!cancelled) setWallet(payload);
-      } catch {
-        // Ignore wallet summary load failures on the dashboard.
-      }
-    }
-
-    async function loadSlimeHome() {
-      if (!cancelled) {
-        setSlimeLoading(true);
-        setSlimeError(false);
-      }
-      try {
-        const res = await fetch("/api/student/slimes", { cache: "no-store" });
-        if (!res.ok) throw new Error("slime_home_load_failed");
-        const payload = (await res.json()) as StudentSlimeHome;
-        if (!cancelled) setSlimeHome(payload);
-      } catch {
-        if (!cancelled) setSlimeError(true);
-      } finally {
-        if (!cancelled) setSlimeLoading(false);
-      }
-    }
-
-    loadWallet();
-    loadSlimeHome();
+    void loadWallet();
+    void loadSlimeHome();
     return () => {
-      cancelled = true;
+      walletLoadGeneration.current += 1;
+      slimeLoadGeneration.current += 1;
     };
-  }, []);
+  }, [loadSlimeHome, loadWallet]);
 
   async function handleCancelFD(fdId: string) {
     if (!window.confirm("이 적금을 중도해지할까요? (이자 없이 원금만 반환)")) {
@@ -184,13 +201,26 @@ export function StudentDashboard({
 
   return (
     <>
-      <div className="student-greeting-row">
-        <h1 className="student-greeting">{studentName}님, 안녕하세요</h1>
-        <span className="student-classroom-badge">{classroomName}</span>
-      </div>
+      <header className="student-page-header">
+        <p className="student-page-eyebrow">
+          {classroomName} · {studentName}님
+        </p>
+        <h1 className="student-page-title">홈</h1>
+      </header>
+
+      <StudentSlimeCard
+        snapshot={slimeHome}
+        loading={slimeLoading}
+        error={slimeError}
+        onRetry={loadSlimeHome}
+      />
 
       <div className="student-overview-row">
-        <section className="student-utilities" aria-label="바로가기">
+        <section
+          className="student-utilities"
+          aria-label="내 통장"
+          aria-busy={walletLoading}
+        >
           <div className="student-wallet-card">
             <div className="student-wallet-header">
               <div>
@@ -252,41 +282,25 @@ export function StudentDashboard({
                   )}
                 </div>
               </>
+            ) : walletError ? (
+              <div className="student-wallet-error" role="alert">
+                <p>통장 정보를 불러오지 못했어요.</p>
+                <button type="button" onClick={() => void loadWallet()}>
+                  다시 시도
+                </button>
+              </div>
             ) : (
-              <div className="student-wallet-empty">
-                통장 정보를 불러오는 중이에요.
+              <div className="student-wallet-empty" role={walletLoading ? "status" : undefined}>
+                {walletLoading ? "통장 정보를 불러오는 중이에요." : "통장 정보가 없어요."}
               </div>
             )}
           </div>
-
-          <StudentSlimeCard
-            snapshot={slimeHome}
-            loading={slimeLoading}
-            error={slimeError}
-          />
         </section>
 
         <StudentAssignmentTodos assignments={assignments} />
       </div>
 
-      {boards.length === 0 ? (
-        <div className="student-empty">
-          <p>아직 보드가 없어요.</p>
-        </div>
-      ) : (
-        <StudentBoardSections
-          boards={boards}
-          onOpenBreakout={setBreakoutModal}
-        />
-      )}
-
-      {breakoutModal && (
-        <StudentBreakoutModal
-          sourceTitle={breakoutModal.sourceTitle}
-          breakout={breakoutModal.breakout}
-          onClose={() => setBreakoutModal(null)}
-        />
-      )}
+      <StudentBoardHighlights boards={boards} />
     </>
   );
 }
@@ -295,10 +309,12 @@ function StudentSlimeCard({
   snapshot,
   loading,
   error,
+  onRetry,
 }: {
   snapshot: StudentSlimeHome | null;
   loading: boolean;
   error: boolean;
+  onRetry: () => Promise<void>;
 }) {
   const representativeColor =
     snapshot?.representativeColor ?? snapshot?.equippedColors?.[0] ?? snapshot?.ownedColors?.[0] ?? null;
@@ -313,20 +329,28 @@ function StudentSlimeCard({
     : 0;
 
   return (
-    <div className="student-slime-card" data-testid="student-slime-card">
+    <section
+      className="student-slime-card"
+      data-testid="student-slime-card"
+      aria-labelledby="student-pet-title"
+      aria-busy={loading}
+    >
       <div className="student-slime-header">
         <div>
-          <h2 className="student-slime-title">내 슬라임</h2>
+          <h2 id="student-pet-title" className="student-slime-title">내 대표 펫</h2>
         </div>
         <Link href="/student/aura-pet" className="student-slime-link">
-          내 펫
+          펫 관리하기
         </Link>
       </div>
 
       {loading ? (
         <p className="student-slime-status" role="status">슬라임 정보를 불러오는 중이에요.</p>
       ) : error ? (
-        <p className="student-slime-status" role="alert">슬라임 정보를 불러오지 못했어요.</p>
+        <div className="student-slime-status" role="alert">
+          <p>슬라임 정보를 불러오지 못했어요.</p>
+          <button type="button" onClick={() => void onRetry()}>다시 시도</button>
+        </div>
       ) : !snapshot || !slime ? (
         <div className="student-slime-empty">
           <p>아직 대표 슬라임이 없어요.</p>
@@ -349,7 +373,7 @@ function StudentSlimeCard({
           </div>
         </div>
       )}
-    </div>
+    </section>
   );
 }
 
@@ -475,49 +499,207 @@ function formatAssignmentDate(value: string | null | undefined) {
   return `${date.getMonth() + 1}/${date.getDate()}`;
 }
 
-// BC-1: render the student's boards split into lesson vs play sections.
-// The breakout modal state lives on the parent so we still need setBreakoutModal
-// threaded in via props.
-type StudentBoardSectionsProps = {
+type StudentBoardHubProps = {
   boards: BoardItem[];
-  onOpenBreakout: (
-    modal: { sourceTitle: string; breakout: StudentBreakout } | null,
-  ) => void;
 };
 
-function StudentBoardSections({
-  boards,
-  onOpenBreakout,
-}: StudentBoardSectionsProps) {
+function playBoardState(
+  board: BoardItem,
+  shadowAllianceStatus?: ShadowAllianceBoardStatus,
+) {
+  if (board.layout === "kordle") {
+    return board.kordleStatus === "LIVE"
+      ? { label: "진행 중", live: true }
+      : board.kordleStatus === "DRAFT"
+        ? { label: "시작 대기", live: false }
+        : { label: "게임 없음", live: false };
+  }
+  if (board.layout === "speed-game") {
+    return board.speedGameStatus === "running"
+      ? { label: "진행 중", live: true }
+      : board.speedGameStatus === "finished"
+        ? { label: "종료", live: false }
+        : { label: "시작 대기", live: false };
+  }
+  if (board.layout === "quiz") {
+    const status = board.quizzes?.[0]?.status;
+    return status === "active"
+      ? { label: "진행 중", live: true }
+      : status === "finished"
+        ? { label: "종료", live: false }
+        : { label: "시작 대기", live: false };
+  }
+  if (board.layout === "shadow-alliance") {
+    const status = shadowAllianceStatus ?? board.shadowAllianceStatus ?? "waiting";
+    return {
+      label: SHADOW_ALLIANCE_STATUS_LABELS[status],
+      live: status === "active",
+    };
+  }
+  return { label: layoutLabel(board.layout), live: false };
+}
+
+function isPriorityBoard(
+  board: BoardItem,
+  shadowAllianceStatus?: ShadowAllianceBoardStatus,
+) {
+  return (
+    board.breakout !== null ||
+    playBoardState(board, shadowAllianceStatus).live
+  );
+}
+
+function StudentBoardHighlights({ boards }: { boards: BoardItem[] }) {
+  const priorityBoards = boards.filter((board) => isPriorityBoard(board)).slice(0, 3);
+
+  return (
+    <section className="student-home-boards" aria-labelledby="student-home-boards-title">
+      <div className="student-flat-section-heading">
+        <h2 id="student-home-boards-title">지금 확인할 보드</h2>
+        <Link href="/student/boards?category=priority">전체 보드</Link>
+      </div>
+      {priorityBoards.length > 0 ? (
+        <div className="student-board-highlight-list">
+          {priorityBoards.map((board) => {
+            const state = playBoardState(board);
+            return (
+              <Link
+                key={board.id}
+                href="/student/boards?category=priority"
+                className="student-board-highlight"
+              >
+                <span>
+                  <strong>{board.title}</strong>
+                  <small>
+                    {board.breakout && !board.breakout.selectedSectionId
+                      ? "모둠 선택 필요"
+                      : state.label}
+                  </small>
+                </span>
+                <span className="student-board-highlight-action">확인</span>
+              </Link>
+            );
+          })}
+        </div>
+      ) : (
+        <p className="student-flat-empty">지금 바로 확인할 보드는 없어요.</p>
+      )}
+    </section>
+  );
+}
+
+export function StudentBoardHub({ boards }: StudentBoardHubProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const [breakoutModal, setBreakoutModal] = useState<{
+    sourceTitle: string;
+    breakout: StudentBreakout;
+  } | null>(null);
   const [shadowAllianceStatuses, setShadowAllianceStatuses] = useState<
     Record<string, ShadowAllianceBoardStatus>
   >({});
-  const requestedCategory =
-    searchParams.get("board") === "lesson"
-      ? "LESSON"
-      : searchParams.get("board") === "play"
-        ? "PLAY"
-        : null;
-  const [activeCategory, setActiveCategory] = useState<"LESSON" | "PLAY">(
-    () =>
-      requestedCategory ??
-      (boards.some((board) => board.category === "LESSON") ? "LESSON" : "PLAY"),
-  );
+  const [query, setQuery] = useState(() => searchParams.get("q") ?? "");
+  const requestedPlayFilter = PLAY_FILTERS.some(
+    (filter) => filter.id === searchParams.get("playType"),
+  )
+    ? (searchParams.get("playType") as PlayFilter)
+    : "all";
+  const [playFilter, setPlayFilter] = useState<PlayFilter>(requestedPlayFilter);
+  const categoryTabRefs = useRef<Array<HTMLButtonElement | null>>([]);
+  const playFilterRefs = useRef<Array<HTMLButtonElement | null>>([]);
+  const requestedCategory = parseStudentBoardCategory(searchParams.get("category"));
+  const [activeCategory, setActiveCategory] =
+    useState<StudentBoardCategory>(requestedCategory);
   const lessonBoards = boards.filter((b) => b.category === "LESSON");
   const playBoards = boards.filter((b) => b.category === "PLAY");
-  const activeBoards = activeCategory === "LESSON" ? lessonBoards : playBoards;
+  const priorityBoards = boards.filter((board) =>
+    isPriorityBoard(board, shadowAllianceStatuses[board.id]),
+  );
+  const normalizedQuery = query.trim().toLocaleLowerCase("ko");
+  const categoryBoards =
+    activeCategory === "priority"
+      ? priorityBoards
+      : activeCategory === "lesson"
+        ? lessonBoards
+        : activeCategory === "play"
+          ? playBoards
+          : boards;
+  const activeBoards = categoryBoards
+    .filter((board) => {
+      if (
+        normalizedQuery &&
+        !`${board.title} ${layoutLabel(board.layout)}`
+          .toLocaleLowerCase("ko")
+          .includes(normalizedQuery)
+      ) {
+        return false;
+      }
+      if (activeCategory !== "play" || playFilter === "all") return true;
+      const state = playBoardState(board, shadowAllianceStatuses[board.id]);
+      return playFilter === "live" ? state.live : board.layout === playFilter;
+    })
+    .sort((left, right) => {
+      const leftLive = playBoardState(left, shadowAllianceStatuses[left.id]).live;
+      const rightLive = playBoardState(right, shadowAllianceStatuses[right.id]).live;
+      return Number(rightLive) - Number(leftLive);
+    });
 
   useEffect(() => {
-    if (requestedCategory) setActiveCategory(requestedCategory);
+    setActiveCategory(requestedCategory);
   }, [requestedCategory]);
 
-  function selectCategory(category: "LESSON" | "PLAY") {
-    setActiveCategory(category);
+  useEffect(() => {
+    setQuery(searchParams.get("q") ?? "");
+  }, [searchParams]);
+
+  useEffect(() => {
+    setPlayFilter(requestedPlayFilter);
+  }, [requestedPlayFilter]);
+
+  function replaceBoardQuery(updates: Record<string, string | null>) {
     const nextSearchParams = new URLSearchParams(searchParams.toString());
-    nextSearchParams.set("board", category.toLowerCase());
-    router.replace(`/student?${nextSearchParams.toString()}`, { scroll: false });
+    nextSearchParams.set("category", activeCategory);
+    if (activeCategory === "play" && playFilter !== "all") {
+      nextSearchParams.set("playType", playFilter);
+    }
+    for (const [key, value] of Object.entries(updates)) {
+      if (value) nextSearchParams.set(key, value);
+      else nextSearchParams.delete(key);
+    }
+    router.replace(`/student/boards?${nextSearchParams.toString()}`, { scroll: false });
+  }
+
+  function selectCategory(category: StudentBoardCategory) {
+    setActiveCategory(category);
+    replaceBoardQuery({ category });
+  }
+
+  function selectPlayFilter(filter: PlayFilter) {
+    setPlayFilter(filter);
+    replaceBoardQuery({ playType: filter === "all" ? null : filter });
+  }
+
+  function handleRovingKeys(
+    event: React.KeyboardEvent<HTMLButtonElement>,
+    currentIndex: number,
+    count: number,
+    refs: React.RefObject<Array<HTMLButtonElement | null>>,
+    select: (index: number) => void,
+  ) {
+    let nextIndex: number | null = null;
+    if (event.key === "ArrowRight" || event.key === "ArrowDown") {
+      nextIndex = (currentIndex + 1) % count;
+    } else if (event.key === "ArrowLeft" || event.key === "ArrowUp") {
+      nextIndex = (currentIndex - 1 + count) % count;
+    } else if (event.key === "Home") {
+      nextIndex = 0;
+    } else if (event.key === "End") {
+      nextIndex = count - 1;
+    }
+    if (nextIndex === null) return;
+    event.preventDefault();
+    select(nextIndex);
+    refs.current[nextIndex]?.focus();
   }
 
   useEffect(() => {
@@ -570,27 +752,10 @@ function StudentBoardSections({
   const renderCard = (board: BoardItem) => {
     const thumbnail = boardThumbnail(board);
     const quizCode = board.layout === "quiz" && board.quizzes?.[0]?.roomCode;
-    const kordleMeta =
-      board.layout === "kordle"
-        ? board.kordleStatus === "LIVE"
-          ? "진행 중"
-          : board.kordleStatus === "DRAFT"
-            ? "시작 대기"
-            : "게임 없음"
-        : null;
-    const gameMeta =
-      kordleMeta ??
-      (board.layout === "speed-game"
-        ? board.speedGameStatus === "running"
-          ? "진행 중"
-          : board.speedGameStatus === "finished"
-            ? "종료"
-            : "시작 대기"
-        : board.layout === "shadow-alliance"
-          ? SHADOW_ALLIANCE_STATUS_LABELS[
-              shadowAllianceStatuses[board.id] ?? "waiting"
-            ]
-          : null);
+    const gameState = playBoardState(board, shadowAllianceStatuses[board.id]);
+    const isPlayGame = ["kordle", "speed-game", "quiz", "shadow-alliance"].includes(
+      board.layout,
+    );
     const href = quizCode
       ? `/quiz/${quizCode}`
       : board.layout === "kordle"
@@ -602,7 +767,7 @@ function StudentBoardSections({
         <button
           key={board.id}
           type="button"
-          className="student-board-card"
+          className={`student-board-card ${gameState.live ? "is-live" : ""}`}
           onClick={() => {
             if (breakout.selectedSectionId) {
               router.push(
@@ -610,7 +775,7 @@ function StudentBoardSections({
               );
               return;
             }
-            onOpenBreakout({ sourceTitle: board.title, breakout });
+            setBreakoutModal({ sourceTitle: board.title, breakout });
           }}
         >
           <div className="student-board-preview">
@@ -621,6 +786,7 @@ function StudentBoardSections({
             />
           </div>
           <div className="student-board-card-body">
+            {gameState.live && <span className="student-board-live-badge">LIVE</span>}
             <span className="student-board-card-title">{board.title}</span>
             <span className="student-board-card-meta">
               모둠 선택 · {breakout.boardTitle}
@@ -630,7 +796,12 @@ function StudentBoardSections({
       );
     }
     return (
-      <Link key={board.id} href={href} className="student-board-card">
+      <Link
+        key={board.id}
+        href={href}
+        className={`student-board-card ${gameState.live ? "is-live" : ""}`}
+        aria-label={gameState.live ? `${board.title}, 실시간 진행 중` : undefined}
+      >
         <div className="student-board-preview">
           <img
             className="student-board-preview-img"
@@ -639,9 +810,10 @@ function StudentBoardSections({
           />
         </div>
         <div className="student-board-card-body">
+          {gameState.live && <span className="student-board-live-badge">LIVE</span>}
           <span className="student-board-card-title">{board.title}</span>
           <span className="student-board-card-meta">
-            {gameMeta ?? layoutLabel(board.layout)}
+            {isPlayGame ? gameState.label : layoutLabel(board.layout)}
             {quizCode && " · 참여하기"}
           </span>
         </div>
@@ -649,37 +821,122 @@ function StudentBoardSections({
     );
   };
 
+  const categoryTabs: Array<{
+    id: StudentBoardCategory;
+    label: string;
+    count: number;
+  }> = [
+    { id: "priority", label: "우선", count: priorityBoards.length },
+    { id: "lesson", label: "수업", count: lessonBoards.length },
+    { id: "play", label: "놀이", count: playBoards.length },
+    { id: "all", label: "전체", count: boards.length },
+  ];
+
   return (
     <>
-      <div className="board-section-tabs" role="tablist" aria-label="보드 구분">
-        <div className="board-section-tabs-list">
+      <div className="student-content-tabs" role="tablist" aria-label="보드 구분">
+        {categoryTabs.map((tab, index) => (
           <button
+            key={tab.id}
             type="button"
             role="tab"
-            aria-selected={activeCategory === "LESSON"}
-            className={`board-section-tab ${activeCategory === "LESSON" ? "is-active" : ""}`}
-            onClick={() => selectCategory("LESSON")}
+            id={`student-board-tab-${tab.id}`}
+            aria-controls="student-board-panel"
+            aria-selected={activeCategory === tab.id}
+            tabIndex={activeCategory === tab.id ? 0 : -1}
+            ref={(element) => {
+              categoryTabRefs.current[index] = element;
+            }}
+            className={activeCategory === tab.id ? "is-active" : ""}
+            onClick={() => selectCategory(tab.id)}
+            onKeyDown={(event) =>
+              handleRovingKeys(
+                event,
+                index,
+                STUDENT_BOARD_CATEGORIES.length,
+                categoryTabRefs,
+                (nextIndex) => selectCategory(categoryTabs[nextIndex].id),
+              )
+            }
           >
-            수업
-            <span className="board-section-tab-count">
-              {lessonBoards.length}
-            </span>
+            {tab.label}
+            <span>{tab.count}</span>
           </button>
-          <button
-            type="button"
-            role="tab"
-            aria-selected={activeCategory === "PLAY"}
-            className={`board-section-tab ${activeCategory === "PLAY" ? "is-active" : ""}`}
-            onClick={() => selectCategory("PLAY")}
-          >
-            놀이
-            <span className="board-section-tab-count">{playBoards.length}</span>
-          </button>
+        ))}
+      </div>
+      <section
+        id="student-board-panel"
+        className="student-board-panel"
+        role="tabpanel"
+        aria-labelledby={`student-board-tab-${activeCategory}`}
+      >
+        <div className="student-board-tools">
+          <label className="student-board-search">
+            <span className="sr-only">보드 검색</span>
+            <input
+              type="search"
+              value={query}
+              onChange={(event) => {
+                const value = event.target.value;
+                setQuery(value);
+                replaceBoardQuery({ q: value.trim() || null });
+              }}
+              placeholder={activeCategory === "play" ? "놀이 보드 검색" : "보드 검색"}
+            />
+          </label>
+          {activeCategory === "play" && (
+            <div className="student-board-filters" role="group" aria-label="놀이 보드 필터">
+              {PLAY_FILTERS.map((filter, index) => (
+                <button
+                  key={filter.id}
+                  type="button"
+                  ref={(element) => {
+                    playFilterRefs.current[index] = element;
+                  }}
+                  className={playFilter === filter.id ? "is-active" : ""}
+                  aria-pressed={playFilter === filter.id}
+                  tabIndex={playFilter === filter.id ? 0 : -1}
+                  onClick={() => selectPlayFilter(filter.id)}
+                  onKeyDown={(event) =>
+                    handleRovingKeys(
+                      event,
+                      index,
+                      PLAY_FILTERS.length,
+                      playFilterRefs,
+                      (nextIndex) => selectPlayFilter(PLAY_FILTERS[nextIndex].id),
+                    )
+                  }
+                >
+                  {filter.label}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
-      </div>
-      <div className="student-board-grid">
-        {activeBoards.map((board) => renderCard(board))}
-      </div>
+        <p className="sr-only" role="status" aria-live="polite">
+          검색 결과 {activeBoards.length}개
+        </p>
+        {activeBoards.length > 0 ? (
+          <div className="student-board-grid">
+            {activeBoards.map((board) => renderCard(board))}
+          </div>
+        ) : (
+          <div className="student-board-empty">
+            {categoryBoards.length === 0
+              ? activeCategory === "priority"
+                ? "지금 우선 확인할 보드가 없어요."
+                : `${activeCategory === "play" ? "놀이" : activeCategory === "lesson" ? "수업" : "등록된"} 보드가 아직 없어요.`
+              : "검색 조건에 맞는 보드가 없어요."}
+          </div>
+        )}
+      </section>
+      {breakoutModal && (
+        <StudentBreakoutModal
+          sourceTitle={breakoutModal.sourceTitle}
+          breakout={breakoutModal.breakout}
+          onClose={() => setBreakoutModal(null)}
+        />
+      )}
     </>
   );
 }

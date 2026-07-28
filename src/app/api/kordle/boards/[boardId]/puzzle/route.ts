@@ -24,6 +24,7 @@ const CreatePuzzleSchema = z.object({
 const PuzzleActionSchema = z.object({
   action: z.enum(["start", "stop", "advance"]),
   puzzleId: z.string().min(1),
+  expectedGuessIndex: z.number().int().min(1).optional(),
 });
 
 export async function GET(_req: Request, { params }: Params) {
@@ -294,14 +295,29 @@ export async function PATCH(req: Request, { params }: Params) {
       if (puzzle.status !== "LIVE") {
         return "not_startable" as const;
       }
+      const expectedGuessIndex = parsed.data.expectedGuessIndex ?? puzzle.currentGuessIndex;
+      if (expectedGuessIndex !== puzzle.currentGuessIndex) {
+        return "stale_advance" as const;
+      }
       if (puzzle.currentGuessIndex >= puzzle.game.maxGuesses) {
         return "last_guess" as const;
       }
-      return await tx.kordlePuzzle.update({
-        where: { id: puzzle.id },
+      const advanced = await tx.kordlePuzzle.updateMany({
+        where: {
+          id: puzzle.id,
+          gameId: puzzle.gameId,
+          status: "LIVE",
+          currentGuessIndex: expectedGuessIndex,
+        },
         data: {
           currentGuessIndex: { increment: 1 },
         },
+      });
+      if (advanced.count !== 1) {
+        return "stale_advance" as const;
+      }
+      return await tx.kordlePuzzle.findUnique({
+        where: { id: puzzle.id },
         select: { id: true, status: true, startsAt: true, currentGuessIndex: true },
       });
     }
@@ -343,6 +359,9 @@ export async function PATCH(req: Request, { params }: Params) {
   }
   if (result === "last_guess") {
     return NextResponse.json({ error: "already_last_guess" }, { status: 409 });
+  }
+  if (result === "stale_advance") {
+    return NextResponse.json({ error: "stale_puzzle_advance" }, { status: 409 });
   }
 
   await announceKordlePuzzleChange(board.id, {

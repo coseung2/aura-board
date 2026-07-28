@@ -1,7 +1,7 @@
 import "server-only";
 
 import { db } from "@/lib/db";
-import { sendExpoPush } from "@/lib/expo-push";
+import { expoPushFailureDetails, sendExpoPush } from "@/lib/expo-push";
 import type { StudentNotificationKind } from "@/lib/student-notification-contract";
 
 export type StudentPushKind = StudentNotificationKind;
@@ -62,9 +62,10 @@ export function assignmentDistributedPush(input: {
 export async function dispatchStudentNotificationPush(
   input: StudentNotificationPush,
 ): Promise<{ attempted: number; skipped: number }> {
+  let dispatchId: string | null = null;
   try {
     try {
-      await db.studentPushDispatch.create({
+      const dispatch = await db.studentPushDispatch.create({
         data: {
           studentId: input.studentId,
           eventKey: input.eventKey,
@@ -74,6 +75,7 @@ export async function dispatchStudentNotificationPush(
           href: input.href,
         },
       });
+      dispatchId = dispatch.id;
     } catch (error) {
       if ((error as { code?: unknown })?.code === "P2002") {
         const activeDeviceCount = await db.studentPushDevice.count({
@@ -99,19 +101,58 @@ export async function dispatchStudentNotificationPush(
         href: input.href,
       },
     });
+
     if (result.invalidDeviceIds.length > 0) {
-      await db.studentPushDevice.updateMany({
-        where: { id: { in: result.invalidDeviceIds } },
-        data: { disabledAt: new Date() },
-      });
+      try {
+        await db.studentPushDevice.updateMany({
+          where: { id: { in: result.invalidDeviceIds } },
+          data: { disabledAt: new Date() },
+        });
+      } catch (error) {
+        console.error("[student-push] invalid-device cleanup failed", {
+          eventKey: input.eventKey,
+          studentId: input.studentId,
+          error: safeErrorDetails(error),
+        });
+      }
     }
     return { attempted: result.attempted, skipped: 0 };
   } catch (error) {
+    const released = dispatchId
+      ? await releaseStudentPushReservation(dispatchId, input)
+      : false;
     console.error("[student-push] dispatch failed", {
       eventKey: input.eventKey,
       studentId: input.studentId,
-      error,
+      reservationReleased: released,
+      error: expoPushFailureDetails(error),
     });
     return { attempted: 0, skipped: 0 };
   }
+}
+
+async function releaseStudentPushReservation(
+  dispatchId: string,
+  input: StudentNotificationPush,
+): Promise<boolean> {
+  try {
+    await db.studentPushDispatch.delete({ where: { id: dispatchId } });
+    return true;
+  } catch (error) {
+    console.error("[student-push] reservation release failed", {
+      eventKey: input.eventKey,
+      studentId: input.studentId,
+      error: safeErrorDetails(error),
+    });
+    return false;
+  }
+}
+
+function safeErrorDetails(error: unknown): { name: string; code?: string } {
+  const name = error instanceof Error ? error.name : "UnknownError";
+  const code =
+    error && typeof error === "object" && "code" in error
+      ? String((error as { code?: unknown }).code)
+      : undefined;
+  return { name, ...(code ? { code } : {}) };
 }

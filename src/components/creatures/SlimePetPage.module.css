@@ -239,7 +239,8 @@
 }
 
 @keyframes growthBuffRise {
-  0%, 100% {
+  0%,
+  100% {
     opacity: 0.78;
     transform: translateY(2px) scale(0.94);
   }
@@ -273,7 +274,9 @@
   opacity: 0;
   pointer-events: none;
   transform: translateY(-4px);
-  transition: opacity 120ms ease-out, transform 120ms ease-out;
+  transition:
+    opacity 120ms ease-out,
+    transform 120ms ease-out;
   visibility: hidden;
 }
 
@@ -385,7 +388,6 @@
   object-fit: contain;
   image-rendering: pixelated;
 }
-
 
 .itemCopy,
 .shopItemCopy {
@@ -536,7 +538,9 @@
   opacity: 0;
   pointer-events: none;
   transform: translateY(-4px);
-  transition: opacity 120ms ease-out, transform 120ms ease-out;
+  transition:
+    opacity 120ms ease-out,
+    transform 120ms ease-out;
   visibility: hidden;
 }
 
@@ -554,7 +558,6 @@
 
 .wardrobeButton,
 .representativeButton,
-.shopTrigger,
 .galleryLink,
 .shopBuyButton,
 .refundButton,
@@ -579,26 +582,8 @@
   text-align: center;
 }
 
-.shopTrigger {
-  position: relative;
-  align-self: center;
-  width: fit-content;
-  min-width: 0;
-  min-height: 0;
-  padding: 3px 5px;
-  border-color: var(--color-accent);
-  color: var(--color-accent-active);
-}
-
-.shopTrigger::after {
-  position: absolute;
-  inset: -10px -8px;
-  content: "";
-}
-
 .wardrobeButton:hover,
 .representativeButton:hover,
-.shopTrigger:hover,
 .galleryLink:hover,
 .shopBuyButton:hover,
 .refundButton:hover,
@@ -626,7 +611,6 @@
 
 .wardrobeButton:focus-visible,
 .representativeButton:focus-visible,
-.shopTrigger:focus-visible,
 .galleryLink:focus-visible,
 .shopBuyButton:focus-visible,
 .refundButton:focus-visible,
@@ -766,7 +750,6 @@
   opacity: 0.55;
 }
 
-
 .drawerSubtitle {
   margin: 6px 0 0;
   color: var(--color-text-muted);
@@ -805,6 +788,37 @@
   justify-content: flex-end;
 }
 
+.inlineShop {
+  min-width: 0;
+  padding-bottom: 28px;
+}
+
+.inlineShop .shopNavigation {
+  margin-top: 0;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.inlineShop .shopFilters {
+  gap: 0;
+}
+
+.inlineShop .filterButton {
+  min-width: 76px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+
+.inlineShop .shopList {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  column-gap: 28px;
+  row-gap: 0;
+}
+
+.inlineShop .shopGroup .shopList {
+  margin-top: 8px;
+}
+
 .drawerBackdrop {
   position: absolute;
   inset: 0;
@@ -825,7 +839,9 @@
   overflow-y: auto;
   border-left: 1px solid var(--color-border);
   background: var(--color-surface);
-  box-shadow: -8px 0 24px rgba(24, 74, 92, 0.12), var(--shadow-card);
+  box-shadow:
+    -8px 0 24px rgba(24, 74, 92, 0.12),
+    var(--shadow-card);
   animation: drawerIn 180ms ease-out;
 }
 
@@ -977,6 +993,10 @@
   .slimeGrid {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
+
+  .inlineShop .shopList {
+    grid-template-columns: 1fr;
+  }
 }
 
 @media (max-width: 560px) {
@@ -999,10 +1019,6 @@
     border-top: 1px solid var(--color-border);
     border-left: 0;
     text-align: left;
-  }
-
-.shopTrigger {
-    align-self: end;
   }
 
   .sectionHeading .count {

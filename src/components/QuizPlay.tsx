@@ -54,6 +54,7 @@ export function QuizPlay({
   const [code, setCode] = useState(initialCode ?? "");
   const [nickname, setNickname] = useState(studentName ?? "");
   const [playerId, setPlayerId] = useState<string | null>(null);
+  const [playerToken, setPlayerToken] = useState<string | null>(null);
   const [quizId, setQuizId] = useState<string | null>(null);
   const [state, setState] = useState<GameState>({ phase: "join" });
   const [myScore, setMyScore] = useState(0);
@@ -178,6 +179,7 @@ export function QuizPlay({
       .then((payload) => {
         if (!payload.player) return;
         setPlayerId(payload.player.id);
+        setPlayerToken(payload.playerToken ?? null);
         setQuizId(payload.quiz.id);
         setState({
           phase: "waiting",
@@ -216,6 +218,7 @@ export function QuizPlay({
       const nextPlayerId = payload.player?.id ?? payload.playerId;
       const nextQuizId = payload.quiz?.id ?? payload.quizId;
       setPlayerId(nextPlayerId);
+      setPlayerToken(payload.playerToken ?? null);
       setQuizId(nextQuizId);
       setState({
         phase: "waiting",
@@ -250,6 +253,7 @@ export function QuizPlay({
         body: JSON.stringify({
           questionId,
           playerId,
+          playerToken: playerToken || undefined,
           selected: selectedLetter,
           timeMs,
         }),

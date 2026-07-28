@@ -29,7 +29,10 @@ export function SpeedGameBoard({ data }: { data: BoardDetailResponse }) {
         const result = await apiFetch<{ game: SpeedGameWire }>(
           `/api/speed-game/games/${encodeURIComponent(game.id)}`,
         );
-        if (!cancelled) setGame(result.game);
+        if (!cancelled) {
+          setGame(result.game);
+          setError(null);
+        }
       } catch {
         if (!cancelled) setError("게임 상태를 갱신하지 못했어요.");
       }

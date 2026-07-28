@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import type { Prisma } from "@prisma/client";
 import { z } from "zod";
 import { db } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
@@ -85,31 +86,47 @@ export async function PATCH(
     );
   }
 
-  const updated = await db.card.update({
-    where: { id: cardId },
-    data: { queueStatus: parsed.data.status },
-  });
+  let updated;
+  if (parsed.data.status === "played") {
+    if (card.queueStatus === "played") {
+      return NextResponse.json(
+        { error: "이미 재생 처리된 큐 항목입니다" },
+        { status: 409 }
+      );
+    }
 
-  // dj-recap (2026-04-22): played 로 전환되는 시점에만 이벤트 로그 기록.
-  // Card.queueStatus 는 UI 상태용, DjPlayEvent 는 월말 리캡 영구 로그.
-  // 같은 곡이 재복귀(played → approved) 후 다시 played 되면 별도 이벤트 2건.
-  if (parsed.data.status === "played" && board.classroomId) {
-    const wasPlayed = card.queueStatus === "played";
-    if (!wasPlayed) {
-      // 제출자 이름·ID 는 카드에 이미 stamped 되어 있음. studentAuthorId 가
-      // 있으면 student 로, 없으면 teacher 경로로 판정.
-      const submitterName =
-        card.externalAuthorName ??
-        (await resolveSubmitterName(card.studentAuthorId, card.authorId));
-      const submitterKind: "student" | "teacher" | "anon" = card.studentAuthorId
-        ? "student"
-        : card.authorId
-          ? "teacher"
-          : "anon";
-      const submitterId = card.studentAuthorId ?? card.authorId ?? null;
-      const videoId = extractVideoId(card.videoUrl ?? card.linkUrl);
-      await db.djPlayEvent
-        .create({
+    const previousQueueStatus = card.queueStatus;
+    updated = await db.$transaction(async (tx) => {
+      // Read-then-update alone lets two DJs both observe the same old status.
+      // Claim this exact transition atomically; only the claimant may append
+      // the recap/ranking event below.
+      const claimed = await tx.card.updateMany({
+        where: {
+          id: cardId,
+          boardId: board.id,
+          queueStatus: previousQueueStatus,
+        },
+        data: { queueStatus: "played" },
+      });
+      if (claimed.count !== 1) return null;
+
+      // dj-recap (2026-04-22): Card.queueStatus 는 UI 상태용,
+      // DjPlayEvent 는 월말 리캡/랭킹 영구 로그. 둘은 함께 commit/rollback 한다.
+      // played → approved 후 다시 played 되면 새 전이이므로 이벤트도 새로 기록.
+      if (board.classroomId) {
+        const submitterName =
+          card.externalAuthorName ??
+          (await resolveSubmitterName(
+            card.studentAuthorId,
+            card.authorId,
+            tx
+          ));
+        const submitterKind: "student" | "teacher" | "anon" = card.studentAuthorId
+          ? "student"
+          : card.authorId
+            ? "teacher"
+            : "anon";
+        await tx.djPlayEvent.create({
           data: {
             boardId: board.id,
             classroomId: board.classroomId,
@@ -117,20 +134,31 @@ export async function PATCH(
             title: card.title,
             linkUrl: card.linkUrl ?? null,
             linkImage: card.linkImage ?? null,
-            videoId,
+            videoId: extractVideoId(card.videoUrl ?? card.linkUrl),
             submitterName: submitterName ?? null,
-            submitterId,
+            submitterId: card.studentAuthorId ?? card.authorId ?? null,
             submitterKind,
             // durationSec 은 YouTube oEmbed 결과가 지금 Card 에 안 저장돼 있음.
-            // 후속 확장 시 linkDesc 또는 별도 필드에서 파싱.
             durationSec: null,
           },
-        })
-        .catch((e) => {
-          // 이벤트 기록 실패해도 카드 업데이트 자체는 성공으로 유지 (best-effort).
-          console.error("[dj-recap] play event insert failed", e);
         });
+      }
+
+      return tx.card.findUniqueOrThrow({ where: { id: cardId } });
+    });
+
+    if (!updated) {
+      return NextResponse.json(
+        { error: "큐 항목 상태가 이미 변경되었습니다" },
+        { status: 409 }
+      );
     }
+  } else {
+    // 승인/거절 전이는 기존 API 의미를 유지한다.
+    updated = await db.card.update({
+      where: { id: cardId },
+      data: { queueStatus: parsed.data.status },
+    });
   }
 
   // classroom-boards-tab "🟢 새 활동" 배지 — 큐 상태 변경도 활동 신호.
@@ -152,16 +180,17 @@ export async function PATCH(
 async function resolveSubmitterName(
   studentAuthorId: string | null,
   authorId: string | null,
+  client: Pick<Prisma.TransactionClient, "student" | "user"> = db,
 ): Promise<string | null> {
   if (studentAuthorId) {
-    const s = await db.student.findUnique({
+    const s = await client.student.findUnique({
       where: { id: studentAuthorId },
       select: { name: true },
     });
     return s?.name ?? null;
   }
   if (authorId) {
-    const u = await db.user.findUnique({
+    const u = await client.user.findUnique({
       where: { id: authorId },
       select: { name: true },
     });

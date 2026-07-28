@@ -3,8 +3,12 @@ import type { Identities } from "../card-permissions";
 
 // Shim the Prisma client — canManageQuiz only touches db.quiz.findUnique.
 const findUnique = vi.fn();
+const findMembership = vi.fn();
 vi.mock("../db", () => ({
-  db: { quiz: { findUnique } },
+  db: {
+    quiz: { findUnique },
+    boardMember: { findUnique: findMembership },
+  },
 }));
 
 // Import AFTER the mock so the helper picks up the shimmed db.
@@ -43,6 +47,7 @@ const ANON_IDS: Identities = {
 describe("canManageQuiz", () => {
   beforeEach(() => {
     findUnique.mockReset();
+    findMembership.mockReset();
   });
 
   it("returns true when the teacher owns the quiz's board", async () => {
@@ -52,7 +57,18 @@ describe("canManageQuiz", () => {
 
   it("returns false when the teacher does not own the board", async () => {
     findUnique.mockResolvedValueOnce({ boardId: "b1" });
+    findMembership.mockResolvedValueOnce(null);
     expect(await canManageQuiz("q1", teacherIds(["b9"]))).toBe(false);
+  });
+
+  it("returns true for a teacher who is an editor on the quiz board", async () => {
+    findUnique.mockResolvedValueOnce({ boardId: "b1" });
+    findMembership.mockResolvedValueOnce({ role: "editor" });
+    expect(await canManageQuiz("q1", teacherIds([]))).toBe(true);
+    expect(findMembership).toHaveBeenCalledWith({
+      where: { boardId_userId: { boardId: "b1", userId: "t1" } },
+      select: { role: true },
+    });
   });
 
   it("returns false for a student identity", async () => {

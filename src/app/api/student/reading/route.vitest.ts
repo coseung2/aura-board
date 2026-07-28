@@ -127,6 +127,8 @@ describe("reading log and reward transaction", () => {
   });
 
   it("uses complete aggregates while capping the returned recent entries", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-07-23T03:00:00.000Z"));
     const recentRows = Array.from({ length: 30 }, (_, index) => {
       const now = new Date("2026-07-20T00:00:00.000Z");
       return {
@@ -150,44 +152,48 @@ describe("reading log and reward transaction", () => {
     mocks.count.mockResolvedValueOnce(31).mockResolvedValueOnce(4);
     mocks.aggregate.mockResolvedValue({ _avg: { aiScore: 4.25 } });
 
-    const response = await GET();
+    try {
+      const response = await GET();
 
-    expect(response.status).toBe(200);
-    const body = await response.json();
-    expect(body.entries).toHaveLength(30);
-    expect(body.count).toBe(31);
-    expect(body.summary).toEqual({
-      weeklyCount: 4,
-      totalCount: 31,
-      averageScore: 4.3,
-    });
-    expect(body.missions.map((mission: { key: string }) => mission.key)).toEqual([
-      "weekly_books",
-      "consecutive_days",
-      "reflection_chars",
-    ]);
-    expect(body.missions[0].progress).toBe(4);
-    expect(body.weeklyMissionReward).toMatchObject({
-      totalCount: 3,
-      completedCount: expect.any(Number),
-      claimed: false,
-      claimable: true,
-      claimableStepCount: 5,
-      claimableAmount: 50,
-    });
-    expect(body.representativeSlime).toBeNull();
-    expect(mocks.findMany).toHaveBeenCalledWith(
-      expect.objectContaining({ take: 30 }),
-    );
-    expect(mocks.findMany).toHaveBeenCalledWith(
-      expect.objectContaining({
-        select: { createdAt: true, reflection: true },
-      }),
-    );
-    expect(mocks.count).toHaveBeenCalledTimes(2);
-    expect(mocks.aggregate).toHaveBeenCalledWith(
-      expect.objectContaining({ _avg: { aiScore: true } }),
-    );
+      expect(response.status).toBe(200);
+      const body = await response.json();
+      expect(body.entries).toHaveLength(30);
+      expect(body.count).toBe(31);
+      expect(body.summary).toEqual({
+        weeklyCount: 4,
+        totalCount: 31,
+        averageScore: 4.3,
+      });
+      expect(body.missions.map((mission: { key: string }) => mission.key)).toEqual([
+        "weekly_books",
+        "consecutive_days",
+        "reflection_chars",
+      ]);
+      expect(body.missions[0].progress).toBe(4);
+      expect(body.weeklyMissionReward).toMatchObject({
+        totalCount: 3,
+        completedCount: expect.any(Number),
+        claimed: false,
+        claimable: true,
+        claimableStepCount: 5,
+        claimableAmount: 50,
+      });
+      expect(body.representativeSlime).toBeNull();
+      expect(mocks.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({ take: 30 }),
+      );
+      expect(mocks.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          select: { createdAt: true, reflection: true },
+        }),
+      );
+      expect(mocks.count).toHaveBeenCalledTimes(2);
+      expect(mocks.aggregate).toHaveBeenCalledWith(
+        expect.objectContaining({ _avg: { aiScore: true } }),
+      );
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("returns Top 5 reward amounts and prior-week unclaimed reading rank rewards", async () => {

@@ -42,6 +42,9 @@ const BodySchema = z
 type Params = { params: Promise<{ gameId: string }> };
 
 export async function POST(req: Request, { params }: Params) {
+  // Capture this before authentication/database work so request-processing
+  // latency cannot reduce the student's score.
+  const receivedAt = new Date();
   const { gameId } = await params;
 
   const student = await getCurrentStudent();
@@ -133,12 +136,13 @@ export async function POST(req: Request, { params }: Params) {
 
   const groupId = studentGroupId;
   const rawText = parsed.data.text;
-  const now = new Date();
-  // 클라이언트가 보낸 elapsedMs 가 있으면 사용, 없으면 서버 계산.
-  const elapsedMs =
-    typeof parsed.data.elapsedMs === "number"
-      ? parsed.data.elapsedMs
-      : Math.max(0, now.getTime() - round.startedAt.getTime());
+  // 활성 라운드 시작 시각과 서버 수신 시각으로만 경과 시간을 계산한다.
+  // Keep accepting client elapsedMs for wire compatibility, but never use it
+  // for persisted timing or scoring.
+  const elapsedMs = Math.max(
+    0,
+    receivedAt.getTime() - round.startedAt.getTime(),
+  );
 
   // 판정: exact / normalize-space 는 자동, teacher-approval 은 pending.
   const isAutoJudge =

@@ -21,8 +21,8 @@ const Body = z.object({
 
 // POST /api/classrooms/:id/store/charge
 // Cashier (store-clerk or teacher) scans student card QR, submits cart.
-// Atomic: token verify → balance check → cart fetch → balance decrement +
-// stock decrement + Transaction.
+// Atomic: token verify → cart fetch → guarded balance/stock decrements +
+// Transaction ledger entry.
 export async function POST(
   req: Request,
   { params }: { params: Promise<{ id: string }> }
@@ -132,29 +132,34 @@ export async function POST(
 
   try {
     const result = await db.$transaction(async (tx) => {
-      // Balance lock-and-check
-      const acc = await tx.studentAccount.findUnique({
+      const debited = await tx.studentAccount.updateMany({
+        where: { id: card.accountId, balance: { gte: total } },
+        data: { balance: { decrement: total } },
+      });
+      if (debited.count === 0) throw new Error("insufficient_balance");
+
+      // A stable update order reduces deadlock risk for overlapping carts.
+      for (const it of [...items].sort((a, b) => a.id.localeCompare(b.id))) {
+        if (it.stock !== null) {
+          const decremented = await tx.storeItem.updateMany({
+            where: {
+              id: it.id,
+              classroomId,
+              archived: false,
+              stock: { gte: qtyByItem.get(it.id)! },
+            },
+            data: { stock: { decrement: qtyByItem.get(it.id)! } },
+          });
+          if (decremented.count === 0) {
+            throw new Error(`insufficient_stock:${it.id}`);
+          }
+        }
+      }
+
+      const updated = await tx.studentAccount.findUniqueOrThrow({
         where: { id: card.accountId },
         select: { id: true, balance: true },
       });
-      if (!acc) throw new Error("account_missing");
-      if (acc.balance < total) throw new Error("insufficient_balance");
-
-      const updated = await tx.studentAccount.update({
-        where: { id: acc.id },
-        data: { balance: { decrement: total } },
-        select: { balance: true },
-      });
-
-      // Decrement stock (non-null only)
-      for (const it of items) {
-        if (it.stock !== null) {
-          await tx.storeItem.update({
-            where: { id: it.id },
-            data: { stock: { decrement: qtyByItem.get(it.id)! } },
-          });
-        }
-      }
 
       // Single Transaction record for the whole charge (note serializes items)
       const note = items
@@ -162,7 +167,7 @@ export async function POST(
         .join(", ");
       const trx = await tx.transaction.create({
         data: {
-          accountId: acc.id,
+          accountId: updated.id,
           type: "purchase",
           amount: total,
           balanceAfter: updated.balance,
@@ -194,7 +199,19 @@ export async function POST(
     if (msg === "insufficient_balance") {
       return NextResponse.json(
         { error: "잔액 부족" },
-        { status: 400 }
+        { status: 409 }
+      );
+    }
+    if (msg.startsWith("insufficient_stock:")) {
+      const itemId = msg.slice("insufficient_stock:".length);
+      const item = items.find((candidate) => candidate.id === itemId);
+      return NextResponse.json(
+        {
+          // The pre-transaction stock snapshot is stale after a lost race, so
+          // do not present it as the current remaining quantity.
+          error: item ? `${item.name} 재고 부족` : "재고 부족",
+        },
+        { status: 409 }
       );
     }
     throw err;

@@ -2,22 +2,46 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   findLinks: vi.fn(),
+  findDevices: vi.fn(),
   createDispatch: vi.fn(),
+  deleteDispatch: vi.fn(),
   disableDevices: vi.fn(),
+  sendExpoPush: vi.fn(),
 }));
 
 vi.mock("server-only", () => ({}));
 vi.mock("@/lib/db", () => ({
   db: {
     parentChildLink: { findMany: mocks.findLinks },
-    parentPushDispatch: { create: mocks.createDispatch },
-    parentPushDevice: { updateMany: mocks.disableDevices },
+    parentPushDispatch: {
+      create: mocks.createDispatch,
+      delete: mocks.deleteDispatch,
+    },
+    parentPushDevice: {
+      findMany: mocks.findDevices,
+      updateMany: mocks.disableDevices,
+    },
   },
 }));
+vi.mock("@/lib/expo-push", () => ({
+  sendExpoPush: mocks.sendExpoPush,
+  expoPushFailureDetails: () => ({ reason: "request_error" }),
+}));
 
-import { dispatchLinkedParentCardPush } from "./parent-push";
+import {
+  dispatchLinkedParentCardPush,
+  dispatchParentNotificationPush,
+} from "./parent-push";
 
-const input = {
+const directInput = {
+  eventKey: "attendance:student-1:2026-07-28",
+  parentId: "parent-1",
+  title: "출석 알림",
+  body: "출석을 확인해 주세요.",
+  data: { type: "student_attendance" },
+};
+
+const linkedInput = {
   eventKey: "card:card-1",
   studentId: "student-1",
   studentName: "하늘",
@@ -26,28 +50,90 @@ const input = {
   cardId: "card-1",
 };
 
-describe("dispatchLinkedParentCardPush", () => {
+const device = { id: "device-1", expoPushToken: "ExpoPushToken[token1]" };
+
+describe("parent push dispatch reservations", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({
-      ok: true,
-      json: vi.fn().mockResolvedValue({ data: [{ status: "ok" }] }),
-    }));
+    mocks.findDevices.mockResolvedValue([device]);
+    mocks.findLinks.mockResolvedValue([
+      { parent: { id: "parent-1", pushDevices: [device] } },
+    ]);
     mocks.createDispatch.mockResolvedValue({ id: "dispatch-1" });
+    mocks.deleteDispatch.mockResolvedValue({ id: "dispatch-1" });
     mocks.disableDevices.mockResolvedValue({ count: 0 });
+    mocks.sendExpoPush.mockResolvedValue({ attempted: 1, invalidDeviceIds: [] });
   });
 
-  it("targets only active, non-deleted links and sends registered parent devices", async () => {
-    mocks.findLinks.mockResolvedValue([
-      {
-        parent: {
-          id: "parent-1",
-          pushDevices: [{ id: "device-1", expoPushToken: "ExpoPushToken[token1]" }],
-        },
-      },
-    ]);
+  it("keeps a confirmed direct-send reservation and suppresses a later duplicate", async () => {
+    let reserved = false;
+    mocks.createDispatch.mockImplementation(async () => {
+      if (reserved) {
+        throw Object.assign(new Error("duplicate"), { code: "P2002" });
+      }
+      reserved = true;
+      return { id: "dispatch-1" };
+    });
 
-    await expect(dispatchLinkedParentCardPush(input)).resolves.toEqual({
+    await expect(dispatchParentNotificationPush(directInput)).resolves.toEqual({
+      attempted: 1,
+      skipped: 0,
+    });
+    await expect(dispatchParentNotificationPush(directInput)).resolves.toEqual({
+      attempted: 0,
+      skipped: 1,
+    });
+    expect(mocks.sendExpoPush).toHaveBeenCalledOnce();
+    expect(mocks.deleteDispatch).not.toHaveBeenCalled();
+  });
+
+  it("releases a failed direct send so the same parent event can retry", async () => {
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    mocks.sendExpoPush
+      .mockRejectedValueOnce(new Error("ExpoPushToken[secret]"))
+      .mockResolvedValueOnce({ attempted: 1, invalidDeviceIds: [] });
+
+    await expect(dispatchParentNotificationPush(directInput)).resolves.toEqual({
+      attempted: 0,
+      skipped: 0,
+    });
+    expect(mocks.deleteDispatch).toHaveBeenCalledWith({
+      where: { id: "dispatch-1" },
+    });
+    await expect(dispatchParentNotificationPush(directInput)).resolves.toEqual({
+      attempted: 1,
+      skipped: 0,
+    });
+    expect(mocks.createDispatch).toHaveBeenCalledTimes(2);
+    expect(JSON.stringify(consoleError.mock.calls)).not.toContain("ExpoPushToken[secret]");
+  });
+
+  it("allows only the parent reservation winner to send while callers overlap", async () => {
+    let reserved = false;
+    let finishSend!: (value: { attempted: number; invalidDeviceIds: string[] }) => void;
+    mocks.createDispatch.mockImplementation(async () => {
+      if (reserved) {
+        throw Object.assign(new Error("duplicate"), { code: "P2002" });
+      }
+      reserved = true;
+      return { id: "dispatch-1" };
+    });
+    mocks.sendExpoPush.mockImplementationOnce(
+      () => new Promise((resolve) => { finishSend = resolve; }),
+    );
+
+    const first = dispatchParentNotificationPush(directInput);
+    await vi.waitFor(() => expect(mocks.sendExpoPush).toHaveBeenCalledOnce());
+    const second = dispatchParentNotificationPush(directInput);
+
+    await expect(second).resolves.toEqual({ attempted: 0, skipped: 1 });
+    finishSend({ attempted: 1, invalidDeviceIds: [] });
+    await expect(first).resolves.toEqual({ attempted: 1, skipped: 0 });
+    expect(mocks.sendExpoPush).toHaveBeenCalledOnce();
+  });
+
+  it("uses the same shared send contract for linked-parent notifications", async () => {
+    await expect(dispatchLinkedParentCardPush(linkedInput)).resolves.toEqual({
       attempted: 1,
       skipped: 0,
     });
@@ -61,75 +147,41 @@ describe("dispatchLinkedParentCardPush", () => {
         },
       }),
     );
-    expect(fetch).toHaveBeenCalledOnce();
-    const request = vi.mocked(fetch).mock.calls[0]?.[1];
-    expect(JSON.parse(String(request?.body))).toEqual([
-      expect.objectContaining({
-        to: "ExpoPushToken[token1]",
-        data: expect.objectContaining({ studentId: "student-1", cardId: "card-1" }),
-      }),
-    ]);
-  });
-
-  it("does not resend an event already claimed for the parent", async () => {
-    mocks.findLinks.mockResolvedValue([
-      {
-        parent: {
-          id: "parent-1",
-          pushDevices: [{ id: "device-1", expoPushToken: "ExpoPushToken[token1]" }],
-        },
+    expect(mocks.sendExpoPush).toHaveBeenCalledWith([device], {
+      title: "하늘 학생이 새 글을 올렸어요",
+      body: "우리 반 이야기 보드에서 확인해 보세요.",
+      data: {
+        type: "child_card_created",
+        studentId: "student-1",
+        boardId: "board-1",
+        cardId: "card-1",
       },
-    ]);
-    mocks.createDispatch.mockRejectedValue(Object.assign(new Error("duplicate"), { code: "P2002" }));
-
-    await expect(dispatchLinkedParentCardPush(input)).resolves.toEqual({
-      attempted: 0,
-      skipped: 1,
     });
-    expect(fetch).not.toHaveBeenCalled();
   });
 
-  it("keeps Expo failures non-fatal and disables unregistered devices", async () => {
-    mocks.findLinks.mockResolvedValue([
-      {
-        parent: {
-          id: "parent-1",
-          pushDevices: [{ id: "device-1", expoPushToken: "ExpoPushToken[token1]" }],
-        },
-      },
-    ]);
-    vi.mocked(fetch).mockResolvedValueOnce({
-      ok: true,
-      json: vi.fn().mockResolvedValue({
-        data: [{ status: "error", details: { error: "DeviceNotRegistered" } }],
-      }),
-    } as unknown as Response);
+  it("releases a linked-parent reservation after an external send failure", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => undefined);
+    mocks.sendExpoPush.mockRejectedValueOnce(new Error("network unavailable"));
 
-    await expect(dispatchLinkedParentCardPush(input)).resolves.toEqual({
-      attempted: 1,
+    await expect(dispatchLinkedParentCardPush(linkedInput)).resolves.toEqual({
+      attempted: 0,
       skipped: 0,
     });
+    expect(mocks.deleteDispatch).toHaveBeenCalledWith({
+      where: { id: "dispatch-1" },
+    });
+  });
+
+  it("disables unregistered parent devices after a confirmed request", async () => {
+    mocks.sendExpoPush.mockResolvedValue({
+      attempted: 1,
+      invalidDeviceIds: ["device-1"],
+    });
+
+    await dispatchParentNotificationPush(directInput);
     expect(mocks.disableDevices).toHaveBeenCalledWith({
       where: { id: { in: ["device-1"] } },
       data: { disabledAt: expect.any(Date) },
-    });
-  });
-
-  it("does not fail card creation when the Expo request is unavailable", async () => {
-    mocks.findLinks.mockResolvedValue([
-      {
-        parent: {
-          id: "parent-1",
-          pushDevices: [{ id: "device-1", expoPushToken: "ExpoPushToken[token1]" }],
-        },
-      },
-    ]);
-    vi.mocked(fetch).mockRejectedValueOnce(new Error("network unavailable"));
-    vi.spyOn(console, "warn").mockImplementation(() => undefined);
-
-    await expect(dispatchLinkedParentCardPush(input)).resolves.toEqual({
-      attempted: 1,
-      skipped: 0,
     });
   });
 });

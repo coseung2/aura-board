@@ -4,6 +4,7 @@ const mocks = vi.hoisted(() => ({
   findDevices: vi.fn(),
   countDevices: vi.fn(),
   createDispatch: vi.fn(),
+  deleteDispatch: vi.fn(),
   disableDevices: vi.fn(),
   sendExpoPush: vi.fn(),
 }));
@@ -16,10 +17,16 @@ vi.mock("@/lib/db", () => ({
       count: mocks.countDevices,
       updateMany: mocks.disableDevices,
     },
-    studentPushDispatch: { create: mocks.createDispatch },
+    studentPushDispatch: {
+      create: mocks.createDispatch,
+      delete: mocks.deleteDispatch,
+    },
   },
 }));
-vi.mock("@/lib/expo-push", () => ({ sendExpoPush: mocks.sendExpoPush }));
+vi.mock("@/lib/expo-push", () => ({
+  sendExpoPush: mocks.sendExpoPush,
+  expoPushFailureDetails: () => ({ reason: "request_error" }),
+}));
 
 import {
   assignmentDistributedPush,
@@ -46,6 +53,7 @@ describe("dispatchStudentNotificationPush", () => {
     ]);
     mocks.countDevices.mockResolvedValue(1);
     mocks.createDispatch.mockResolvedValue({ id: "dispatch-1" });
+    mocks.deleteDispatch.mockResolvedValue({ id: "dispatch-1" });
     mocks.sendExpoPush.mockResolvedValue({ attempted: 1, invalidDeviceIds: [] });
     mocks.disableDevices.mockResolvedValue({ count: 0 });
   });
@@ -83,16 +91,72 @@ describe("dispatchStudentNotificationPush", () => {
     );
   });
 
-  it("deduplicates the same event for the same student", async () => {
-    mocks.createDispatch.mockRejectedValue(
-      Object.assign(new Error("duplicate"), { code: "P2002" }),
-    );
+  it("keeps the confirmed reservation and suppresses a later duplicate", async () => {
+    let reserved = false;
+    mocks.createDispatch.mockImplementation(async () => {
+      if (reserved) {
+        throw Object.assign(new Error("duplicate"), { code: "P2002" });
+      }
+      reserved = true;
+      return { id: "dispatch-1" };
+    });
 
+    await expect(dispatchStudentNotificationPush(input)).resolves.toEqual({
+      attempted: 1,
+      skipped: 0,
+    });
     await expect(dispatchStudentNotificationPush(input)).resolves.toEqual({
       attempted: 0,
       skipped: 1,
     });
-    expect(mocks.sendExpoPush).not.toHaveBeenCalled();
+    expect(mocks.sendExpoPush).toHaveBeenCalledOnce();
+    expect(mocks.deleteDispatch).not.toHaveBeenCalled();
+  });
+
+  it("releases a failed send so the same event can be retried", async () => {
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    mocks.sendExpoPush
+      .mockRejectedValueOnce(new Error("secret token must not be logged"))
+      .mockResolvedValueOnce({ attempted: 1, invalidDeviceIds: [] });
+
+    await expect(dispatchStudentNotificationPush(input)).resolves.toEqual({
+      attempted: 0,
+      skipped: 0,
+    });
+    expect(mocks.deleteDispatch).toHaveBeenCalledWith({
+      where: { id: "dispatch-1" },
+    });
+
+    await expect(dispatchStudentNotificationPush(input)).resolves.toEqual({
+      attempted: 1,
+      skipped: 0,
+    });
+    expect(mocks.createDispatch).toHaveBeenCalledTimes(2);
+    expect(JSON.stringify(consoleError.mock.calls)).not.toContain("secret token");
+  });
+
+  it("allows only the reservation winner to send while callers overlap", async () => {
+    let reserved = false;
+    let finishSend!: (value: { attempted: number; invalidDeviceIds: string[] }) => void;
+    mocks.createDispatch.mockImplementation(async () => {
+      if (reserved) {
+        throw Object.assign(new Error("duplicate"), { code: "P2002" });
+      }
+      reserved = true;
+      return { id: "dispatch-1" };
+    });
+    mocks.sendExpoPush.mockImplementationOnce(
+      () => new Promise((resolve) => { finishSend = resolve; }),
+    );
+
+    const first = dispatchStudentNotificationPush(input);
+    await vi.waitFor(() => expect(mocks.sendExpoPush).toHaveBeenCalledOnce());
+    const second = dispatchStudentNotificationPush(input);
+
+    await expect(second).resolves.toEqual({ attempted: 0, skipped: 1 });
+    finishSend({ attempted: 1, invalidDeviceIds: [] });
+    await expect(first).resolves.toEqual({ attempted: 1, skipped: 0 });
+    expect(mocks.sendExpoPush).toHaveBeenCalledOnce();
   });
 
   it("persists the notification center event even without an active device", async () => {

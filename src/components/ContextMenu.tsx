@@ -7,6 +7,7 @@ export type MenuItem = {
   label: string;
   icon?: string;
   danger?: boolean;
+  disabled?: boolean;
   onClick: () => void;
 };
 
@@ -24,6 +25,34 @@ export function ContextMenu({ items }: Props) {
   const [pos, setPos] = useState<{ top: number; right: number } | null>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const menuVisible = open && pos !== null;
+
+  function getEnabledControls() {
+    return Array.from(
+      dropdownRef.current?.querySelectorAll<HTMLButtonElement>(
+        'button[role^="menuitem"]:not(:disabled)'
+      ) ?? []
+    );
+  }
+
+  function closeAndRestoreFocus() {
+    setOpen(false);
+    triggerRef.current?.focus();
+  }
+
+  function closeAfterAction(action: () => void) {
+    setOpen(false);
+    action();
+    if (dropdownRef.current?.contains(document.activeElement)) {
+      triggerRef.current?.focus();
+    }
+  }
+
+  // Focus enters the menu after the positioned portal has mounted.
+  useEffect(() => {
+    if (!menuVisible) return;
+    getEnabledControls()[0]?.focus();
+  }, [menuVisible]);
 
   // Outside-click close — both trigger and dropdown 영역은 제외.
   useEffect(() => {
@@ -89,6 +118,44 @@ export function ContextMenu({ items }: Props) {
     setOpen((o) => !o);
   }
 
+  function handleMenuKeyDown(e: React.KeyboardEvent<HTMLDivElement>) {
+    if (e.key === "Escape") {
+      e.preventDefault();
+      e.stopPropagation();
+      closeAndRestoreFocus();
+      return;
+    }
+
+    if (e.key === "Tab") {
+      // Do not prevent the browser's normal forward/backward tab movement.
+      setOpen(false);
+      return;
+    }
+
+    if (!["ArrowDown", "ArrowUp", "Home", "End"].includes(e.key)) {
+      return;
+    }
+
+    const controls = getEnabledControls();
+    if (controls.length === 0) return;
+
+    e.preventDefault();
+    const currentIndex = controls.indexOf(document.activeElement as HTMLButtonElement);
+    let nextIndex: number;
+    if (e.key === "Home") {
+      nextIndex = 0;
+    } else if (e.key === "End") {
+      nextIndex = controls.length - 1;
+    } else if (e.key === "ArrowDown") {
+      nextIndex = currentIndex < 0 ? 0 : (currentIndex + 1) % controls.length;
+    } else {
+      nextIndex = currentIndex < 0
+        ? controls.length - 1
+        : (currentIndex - 1 + controls.length) % controls.length;
+    }
+    controls[nextIndex]?.focus();
+  }
+
   return (
     <div className="ctx-menu-wrap">
       <button
@@ -114,17 +181,18 @@ export function ContextMenu({ items }: Props) {
               right: pos.right,
             }}
             onClick={(e) => e.stopPropagation()}
+            onKeyDown={handleMenuKeyDown}
           >
             {items.map((item, i) => (
               <button
                 key={i}
                 type="button"
                 role="menuitem"
+                disabled={item.disabled}
                 className={`ctx-menu-item ${item.danger ? "ctx-menu-item-danger" : ""}`}
                 onClick={(e) => {
                   e.stopPropagation();
-                  setOpen(false);
-                  item.onClick();
+                  closeAfterAction(item.onClick);
                 }}
               >
                 {item.icon && <span className="ctx-menu-icon">{item.icon}</span>}

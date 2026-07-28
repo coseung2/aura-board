@@ -79,11 +79,13 @@ export default function BoardDetail() {
     () => initialCache?.data ?? null,
   );
   const [loading, setLoading] = useState(() => !initialCache);
+  const [retrying, setRetrying] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [activeSectionTitle, setActiveSectionTitle] = useState<string | null>(
     null,
   );
   const sequenceRef = useRef(0);
+  const retryInFlightRef = useRef(false);
   const previousCacheKeyRef = useRef(cacheKey);
 
   useEffect(() => {
@@ -108,7 +110,7 @@ export default function BoardDetail() {
       if (cached) {
         setData(cached.data);
         setLoading(false);
-      } else {
+      } else if (!force) {
         setLoading(true);
       }
 
@@ -119,7 +121,6 @@ export default function BoardDetail() {
       }
 
       try {
-        setError(null);
         const nextData = await revalidateBoardCache<BoardDetailResponse>(
           cacheKey,
           () =>
@@ -160,6 +161,18 @@ export default function BoardDetail() {
     },
     [cacheKey, router, slug],
   );
+
+  const handleRetry = useCallback(async () => {
+    if (retryInFlightRef.current) return;
+    retryInFlightRef.current = true;
+    setRetrying(true);
+    try {
+      await load(true);
+    } finally {
+      retryInFlightRef.current = false;
+      setRetrying(false);
+    }
+  }, [load]);
 
   useFocusEffect(
     useCallback(() => {
@@ -210,6 +223,14 @@ export default function BoardDetail() {
           <Text style={styles.errorEmoji}>🚫</Text>
           <Text style={styles.errorTitle}>{error ?? "알 수 없는 오류"}</Text>
           <AppButton
+            loading={retrying}
+            disabled={retrying}
+            onPress={() => void handleRetry()}
+          >
+            다시 시도
+          </AppButton>
+          <AppButton
+            variant="secondary"
             onPress={() => {
               if (router.canGoBack()) {
                 router.back();

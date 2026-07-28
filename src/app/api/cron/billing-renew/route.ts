@@ -16,17 +16,7 @@ import {
 } from "@/lib/billing/toss";
 import { decryptBillingKey } from "@/lib/billing/billing-key-crypto";
 import { notifySlack } from "@/lib/ops/slack";
-
-function authorized(req: Request): boolean {
-  const secret = process.env.CRON_SECRET;
-  if (!secret) return false;
-  const header = req.headers.get("authorization") ?? "";
-  // Vercel Cron 헤더는 "Bearer <secret>" 형태.
-  if (header === `Bearer ${secret}`) return true;
-  // x-vercel-cron 헤더는 Vercel이 추가로 붙인다 — secret 검증과 함께 확인.
-  if (req.headers.get("x-vercel-cron") && header === `Bearer ${secret}`) return true;
-  return false;
-}
+import { isAuthorizedCronRequest } from "@/lib/cron-auth";
 
 function nextPeriodEnd(plan: PlanKey, from: Date): Date {
   const meta = PLAN_CATALOG[plan];
@@ -39,7 +29,7 @@ function newOrderId(userId: string): string {
 }
 
 export async function POST(req: Request) {
-  if (!authorized(req)) {
+  if (!isAuthorizedCronRequest(req)) {
     return new Response(JSON.stringify({ error: "unauthorized" }), {
       status: 401,
       headers: { "Content-Type": "application/json" },

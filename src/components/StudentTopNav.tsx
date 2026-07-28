@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Logo } from "./Logo";
 import { MegaNav, type MegaNavItem } from "./MegaNav";
 import { StudentNotificationBell } from "./StudentNotificationBell";
@@ -22,6 +22,11 @@ type Props = {
   duties?: Duty[];
 };
 
+function pathMatches(pathname: string, href: string) {
+  const path = href.split("?", 1)[0];
+  return pathname === path || pathname.startsWith(`${path}/`);
+}
+
 export function StudentTopNav({
   studentName,
   classroomName,
@@ -31,51 +36,160 @@ export function StudentTopNav({
   const router = useRouter();
   const searchParams = useSearchParams();
   const [loggingOut, setLoggingOut] = useState(false);
+  const [logoutError, setLogoutError] = useState(false);
+  const logoutRequestRef = useRef(false);
 
   const dutyLinks = duties.map((duty) => ({
     href: duty.href,
     label: `${duty.classroomName} · ${duty.roleLabel}`,
-    active: pathname.startsWith(duty.href),
+    active: pathMatches(pathname, duty.href),
     emoji: duty.emoji,
   }));
 
-  const readingRecordActive =
-    pathname === "/student/reading" || pathname.startsWith("/student/reading/");
-  const walkingActive = pathname.startsWith("/student/walking");
-  const walletActive = pathname.startsWith("/my/wallet");
-  const portfolioActive = pathname.startsWith("/student/portfolio");
-  const hiddenContentActive = pathname.startsWith("/student/hidden-content");
-  const dutyActive = duties.some((duty) => pathname.startsWith(duty.href));
-  const boardTab = searchParams.get("board");
+  const legacyBoard = searchParams.get("board");
+  const boardCategory = searchParams.get("category");
+  const petSection = searchParams.get("section");
+  const activity = searchParams.get("activity");
+
+  const legacyLessonActive = pathname === "/student" && legacyBoard === "lesson";
+  const legacyPlayActive = pathname === "/student" && legacyBoard === "play";
+  const boardsActive =
+    pathMatches(pathname, "/student/boards") ||
+    legacyLessonActive ||
+    legacyPlayActive;
+  const homeActive = pathname === "/student" && !boardsActive;
+
+  const petActive = pathMatches(pathname, "/student/aura-pet");
+  const petMineActive =
+    pathname === "/student/aura-pet" &&
+    (petSection === null || petSection === "mine");
+  const petClassroomActive =
+    (pathname === "/student/aura-pet" && petSection === "classroom") ||
+    pathMatches(pathname, "/student/aura-pet/classroom");
+  const petShopActive =
+    pathname === "/student/aura-pet" && petSection === "shop";
+
+  const legacyReadingActive = pathMatches(pathname, "/student/reading");
+  const legacyWalkingActive = pathMatches(pathname, "/student/walking");
+  const selfDirectedActive =
+    pathMatches(pathname, "/student/self-directed") ||
+    legacyReadingActive ||
+    legacyWalkingActive;
+  const readingActive =
+    (pathname === "/student/self-directed" &&
+      (activity === null || activity === "reading")) ||
+    legacyReadingActive;
+  const walkingActive =
+    (pathname === "/student/self-directed" && activity === "walking") ||
+    legacyWalkingActive;
+
+  const walletActive = pathMatches(pathname, "/my/wallet");
+  const portfolioActive = pathMatches(pathname, "/student/portfolio");
+  const hiddenContentActive = pathMatches(pathname, "/student/hidden-content");
+  const dutyActive = duties.some((duty) => pathMatches(pathname, duty.href));
 
   const navItems: MegaNavItem[] = [
     {
+      id: "home",
+      label: "홈",
+      href: "/student",
+      active: homeActive,
+      groups: [],
+    },
+    {
       id: "boards",
       label: "보드",
-      href: "/student?board=lesson",
-      active: pathname === "/student",
+      href: "/student/boards?category=priority",
+      active: boardsActive,
       groups: [
         {
           title: "보드",
           links: [
             {
-              href: "/student?board=lesson",
-              label: "수업보드",
-              active: pathname === "/student" && boardTab === "lesson",
+              href: "/student/boards?category=priority",
+              label: "우선 보드",
+              active:
+                pathname === "/student/boards" && boardCategory === "priority",
             },
             {
-              href: "/student?board=play",
+              href: "/student/boards?category=lesson",
+              label: "수업보드",
+              active:
+                (pathname === "/student/boards" && boardCategory === "lesson") ||
+                legacyLessonActive,
+            },
+            {
+              href: "/student/boards?category=play",
               label: "놀이보드",
-              active: pathname === "/student" && boardTab === "play",
+              active:
+                (pathname === "/student/boards" && boardCategory === "play") ||
+                legacyPlayActive,
+            },
+            {
+              href: "/student/boards?category=all",
+              label: "전체 보드",
+              active:
+                pathname === "/student/boards" && boardCategory === "all",
             },
           ],
         },
       ],
     },
     {
-      id: "life",
-      label: "생활",
-      href: dutyLinks[0]?.href ?? "/my/wallet",
+      id: "pet",
+      label: "펫",
+      href: "/student/aura-pet?section=mine",
+      active: petActive,
+      groups: [
+        {
+          title: "펫",
+          links: [
+            {
+              href: "/student/aura-pet?section=mine",
+              label: "내 펫",
+              active: petMineActive,
+            },
+            {
+              href: "/student/aura-pet?section=classroom",
+              label: "우리 반 펫",
+              active: petClassroomActive,
+            },
+            {
+              href: "/student/aura-pet?section=shop",
+              label: "상점",
+              active: petShopActive,
+            },
+          ],
+        },
+      ],
+    },
+    {
+      id: "self-directed",
+      label: "자율활동",
+      href: "/student/self-directed?activity=reading",
+      active: selfDirectedActive,
+      groups: [
+        {
+          title: "자율활동",
+          links: [
+            {
+              href: "/student/self-directed?activity=reading",
+              label: "독서",
+              active: readingActive,
+            },
+            {
+              href: "/student/self-directed?activity=walking",
+              label: "걷기",
+              active: walkingActive,
+            },
+          ],
+        },
+      ],
+    },
+    {
+      id: "more",
+      label: "더보기",
+      href: "/my/wallet",
       active:
         dutyActive || walletActive || portfolioActive || hiddenContentActive,
       groups: [
@@ -93,13 +207,9 @@ export function StudentTopNav({
                 ],
         },
         {
-          title: "생활",
+          title: "더보기",
           links: [
-            {
-              href: "/my/wallet",
-              label: "은행",
-              active: walletActive,
-            },
+            { href: "/my/wallet", label: "통장", active: walletActive },
             {
               href: "/student/portfolio",
               label: "포트폴리오",
@@ -114,60 +224,23 @@ export function StudentTopNav({
         },
       ],
     },
-    {
-      id: "self-directed",
-      label: "자율활동",
-      href: "/student/walking",
-      active: walkingActive || readingRecordActive,
-      groups: [
-        {
-          title: "자율활동",
-          links: [
-            {
-              href: "/student/walking",
-              label: "걷기",
-              active: walkingActive,
-            },
-            {
-              href: "/student/reading",
-              label: "독서",
-              active: readingRecordActive,
-            },
-          ],
-        },
-      ],
-    },
-    {
-      id: "creatures",
-      label: "펫",
-      href: "/student/aura-pet",
-      active: pathname.startsWith("/student/aura-pet"),
-      groups: [
-        {
-          title: "펫",
-          links: [
-            {
-              href: "/student/aura-pet",
-              label: "내 펫",
-              active: pathname === "/student/aura-pet",
-            },
-            {
-              href: "/student/aura-pet/classroom",
-              label: "우리 반 펫",
-              active: pathname.startsWith("/student/aura-pet/classroom"),
-            },
-          ],
-        },
-      ],
-    },
   ];
 
   async function handleLogout() {
+    if (logoutRequestRef.current) return;
+
+    logoutRequestRef.current = true;
     setLoggingOut(true);
     try {
-      await fetch("/api/student/logout", { method: "POST" });
+      const response = await fetch("/api/student/logout", { method: "POST" });
+      if (!response.ok) throw new Error("Student logout request failed");
+
+      setLogoutError(false);
       router.replace("/login");
     } catch {
+      setLogoutError(true);
+    } finally {
+      logoutRequestRef.current = false;
       setLoggingOut(false);
     }
   }
@@ -187,6 +260,19 @@ export function StudentTopNav({
       </div>
 
       <div className="student-topnav-right auth-header auth-header-flat">
+        {logoutError ? (
+          <div className="nav-action-status" role="alert">
+            <span className="nav-action-status-message">로그아웃 실패</span>
+            <button
+              type="button"
+              className="nav-action-retry"
+              onClick={() => void handleLogout()}
+              disabled={loggingOut}
+            >
+              {loggingOut ? "시도 중…" : "다시 시도"}
+            </button>
+          </div>
+        ) : null}
         <span className="auth-name" title={classroomName}>
           {studentName}
         </span>
@@ -196,7 +282,7 @@ export function StudentTopNav({
           className="auth-logout-btn"
           onClick={handleLogout}
           disabled={loggingOut}
-          aria-label="로그아웃"
+          aria-label={logoutError ? "로그아웃 다시 시도" : "로그아웃"}
           title={loggingOut ? "로그아웃 중..." : "로그아웃"}
         >
           <svg

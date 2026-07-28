@@ -1,9 +1,6 @@
 import "server-only";
 import { db } from "@/lib/db";
-import { sendExpoPush } from "@/lib/expo-push";
-
-const EXPO_PUSH_URL = "https://exp.host/--/api/v2/push/send";
-const EXPO_BATCH_SIZE = 100;
+import { expoPushFailureDetails, sendExpoPush } from "@/lib/expo-push";
 
 type ChildCardPushInput = {
   eventKey: string;
@@ -12,11 +9,6 @@ type ChildCardPushInput = {
   boardId: string;
   boardTitle?: string | null;
   cardId: string;
-};
-
-type ExpoTicket = {
-  status?: string;
-  details?: { error?: string };
 };
 
 export type ParentNotificationPush = {
@@ -30,6 +22,7 @@ export type ParentNotificationPush = {
 export async function dispatchParentNotificationPush(
   input: ParentNotificationPush,
 ): Promise<{ attempted: number; skipped: number }> {
+  let dispatchId: string | null = null;
   try {
     const devices = await db.parentPushDevice.findMany({
       where: { parentId: input.parentId, disabledAt: null },
@@ -38,9 +31,10 @@ export async function dispatchParentNotificationPush(
     if (devices.length === 0) return { attempted: 0, skipped: 0 };
 
     try {
-      await db.parentPushDispatch.create({
+      const dispatch = await db.parentPushDispatch.create({
         data: { parentId: input.parentId, eventKey: input.eventKey },
       });
+      dispatchId = dispatch.id;
     } catch (error) {
       if ((error as { code?: unknown })?.code === "P2002") {
         return { attempted: 0, skipped: devices.length };
@@ -53,18 +47,17 @@ export async function dispatchParentNotificationPush(
       body: input.body,
       data: input.data,
     });
-    if (result.invalidDeviceIds.length > 0) {
-      await db.parentPushDevice.updateMany({
-        where: { id: { in: result.invalidDeviceIds } },
-        data: { disabledAt: new Date() },
-      });
-    }
+    await disableInvalidParentDevices(result.invalidDeviceIds, input);
     return { attempted: result.attempted, skipped: 0 };
   } catch (error) {
+    const released = dispatchId
+      ? await releaseParentPushReservation(dispatchId, input)
+      : false;
     console.error("[parent-push] notification dispatch failed", {
       eventKey: input.eventKey,
       parentId: input.parentId,
-      error,
+      reservationReleased: released,
+      error: expoPushFailureDetails(error),
     });
     return { attempted: 0, skipped: 0 };
   }
@@ -99,10 +92,12 @@ export async function dispatchLinkedParentCardPush(
     for (const { parent } of links) {
       if (parent.pushDevices.length === 0) continue;
 
+      let dispatchId: string;
       try {
-        await db.parentPushDispatch.create({
+        const dispatch = await db.parentPushDispatch.create({
           data: { parentId: parent.id, eventKey: input.eventKey },
         });
+        dispatchId = dispatch.id;
       } catch (error) {
         if ((error as { code?: unknown })?.code === "P2002") {
           skipped += parent.pushDevices.length;
@@ -111,39 +106,8 @@ export async function dispatchLinkedParentCardPush(
         throw error;
       }
 
-      for (let start = 0; start < parent.pushDevices.length; start += EXPO_BATCH_SIZE) {
-        const devices = parent.pushDevices.slice(start, start + EXPO_BATCH_SIZE);
-        attempted += devices.length;
-        await sendExpoBatch(devices, input);
-      }
-    }
-    return { attempted, skipped };
-  } catch (error) {
-    console.error("[parent-push] dispatch failed", {
-      eventKey: input.eventKey,
-      studentId: input.studentId,
-      error,
-    });
-    return { attempted: 0, skipped: 0 };
-  }
-}
-
-async function sendExpoBatch(
-  devices: Array<{ id: string; expoPushToken: string }>,
-  input: ChildCardPushInput,
-): Promise<void> {
-  try {
-    const response = await fetch(EXPO_PUSH_URL, {
-      method: "POST",
-      signal: AbortSignal.timeout(5_000),
-      headers: {
-        Accept: "application/json",
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(
-        devices.map((device) => ({
-          to: device.expoPushToken,
-          sound: "default",
+      try {
+        const result = await sendExpoPush(parent.pushDevices, {
           title: `${input.studentName} 학생이 새 글을 올렸어요`,
           body: input.boardTitle
             ? `${input.boardTitle} 보드에서 확인해 보세요.`
@@ -154,29 +118,77 @@ async function sendExpoBatch(
             boardId: input.boardId,
             cardId: input.cardId,
           },
-        })),
-      ),
-    });
-    if (!response.ok) {
-      console.warn("[parent-push] Expo rejected batch", { status: response.status });
-      return;
+        });
+        attempted += result.attempted;
+        await disableInvalidParentDevices(result.invalidDeviceIds, {
+          eventKey: input.eventKey,
+          parentId: parent.id,
+        });
+      } catch (error) {
+        const released = await releaseParentPushReservation(dispatchId, {
+          eventKey: input.eventKey,
+          parentId: parent.id,
+        });
+        console.error("[parent-push] linked notification dispatch failed", {
+          eventKey: input.eventKey,
+          parentId: parent.id,
+          reservationReleased: released,
+          error: expoPushFailureDetails(error),
+        });
+      }
     }
-
-    const payload = (await response.json().catch(() => null)) as
-      | { data?: ExpoTicket[] }
-      | null;
-    const invalidDeviceIds = devices.flatMap((device, index) =>
-      payload?.data?.[index]?.details?.error === "DeviceNotRegistered"
-        ? [device.id]
-        : [],
-    );
-    if (invalidDeviceIds.length > 0) {
-      await db.parentPushDevice.updateMany({
-        where: { id: { in: invalidDeviceIds } },
-        data: { disabledAt: new Date() },
-      });
-    }
+    return { attempted, skipped };
   } catch (error) {
-    console.warn("[parent-push] Expo request failed", error);
+    console.error("[parent-push] dispatch failed", {
+      eventKey: input.eventKey,
+      studentId: input.studentId,
+      error: safeErrorDetails(error),
+    });
+    return { attempted: 0, skipped: 0 };
   }
+}
+
+async function releaseParentPushReservation(
+  dispatchId: string,
+  input: { eventKey: string; parentId: string },
+): Promise<boolean> {
+  try {
+    await db.parentPushDispatch.delete({ where: { id: dispatchId } });
+    return true;
+  } catch (error) {
+    console.error("[parent-push] reservation release failed", {
+      eventKey: input.eventKey,
+      parentId: input.parentId,
+      error: safeErrorDetails(error),
+    });
+    return false;
+  }
+}
+
+async function disableInvalidParentDevices(
+  invalidDeviceIds: string[],
+  input: { eventKey: string; parentId: string },
+): Promise<void> {
+  if (invalidDeviceIds.length === 0) return;
+  try {
+    await db.parentPushDevice.updateMany({
+      where: { id: { in: invalidDeviceIds } },
+      data: { disabledAt: new Date() },
+    });
+  } catch (error) {
+    console.error("[parent-push] invalid-device cleanup failed", {
+      eventKey: input.eventKey,
+      parentId: input.parentId,
+      error: safeErrorDetails(error),
+    });
+  }
+}
+
+function safeErrorDetails(error: unknown): { name: string; code?: string } {
+  const name = error instanceof Error ? error.name : "UnknownError";
+  const code =
+    error && typeof error === "object" && "code" in error
+      ? String((error as { code?: unknown }).code)
+      : undefined;
+  return { name, ...(code ? { code } : {}) };
 }

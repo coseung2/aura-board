@@ -324,6 +324,135 @@ describe("CardEngagement comment realtime", () => {
         audience: "guardian",
       });
     });
+    await screen.findByText("비공개 답글");
+  });
+
+  it("renders reply threads and creates a reply with its selected parent", async () => {
+    const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = input.toString();
+      if (url.endsWith("/poll")) {
+        return Promise.resolve(response({ enabled: false }));
+      }
+      if (url.endsWith("/comments?audience=public")) {
+        return Promise.resolve(
+          response({
+            guardianAvailable: false,
+            items: [
+              {
+                id: "root-comment",
+                parentCommentId: null,
+                content: "루트 댓글",
+                createdAt: "2026-07-10T00:00:00.000Z",
+                authorKind: "teacher",
+                authorLabel: "선생님",
+                canDelete: false,
+                replies: [
+                  {
+                    id: "existing-reply",
+                    parentCommentId: "root-comment",
+                    content: "기존 답글",
+                    createdAt: "2026-07-10T00:00:01.000Z",
+                    authorKind: "student",
+                    authorLabel: "민지",
+                    canDelete: false,
+                    replies: [],
+                  },
+                ],
+              },
+            ],
+          }),
+        );
+      }
+      if (url.endsWith("/comments") && init?.method === "POST") {
+        return Promise.resolve(
+          response({
+            item: {
+              id: "new-reply",
+              parentCommentId: "root-comment",
+              content: "이어지는 답글",
+              createdAt: "2026-07-10T00:00:02.000Z",
+              authorKind: "teacher",
+              authorLabel: "선생님",
+              canDelete: true,
+              replies: [],
+            },
+          }),
+        );
+      }
+      return Promise.resolve(response({}, false));
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(
+      <CardEngagement
+        cardId="reply-card"
+        boardId="reply-board"
+        mode="panel"
+        initialCounts={{
+          likeCount: 0,
+          commentCount: 2,
+          isLiked: false,
+          canInteract: true,
+        }}
+      />,
+    );
+
+    await screen.findByText("루트 댓글");
+    await screen.findByText("기존 답글");
+
+    const replyToExisting = screen.getByRole("button", {
+      name: "민지에게 답글 달기",
+    });
+    fireEvent.click(replyToExisting);
+
+    const replyTextbox = screen.getByRole("textbox", {
+      name: "민지에게 보낼 답글",
+    });
+    await waitFor(() => expect(document.activeElement).toBe(replyTextbox));
+    expect(screen.getByText("민지에게 답글")).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: "취소" }));
+    await waitFor(() => {
+      expect(
+        screen.queryByRole("textbox", { name: "민지에게 보낼 답글" }),
+      ).toBeNull();
+      expect(document.activeElement).toBe(replyToExisting);
+    });
+
+    fireEvent.click(replyToExisting);
+    const reopenedTextbox = screen.getByRole("textbox", {
+      name: "민지에게 보낼 답글",
+    });
+    fireEvent.change(reopenedTextbox, {
+      target: { value: "이어지는 답글" },
+    });
+    fireEvent.submit(reopenedTextbox.closest("form")!);
+
+    await waitFor(() => {
+      const post = fetchMock.mock.calls.find(
+        ([request, requestInit]) =>
+          request.toString().endsWith("/comments") &&
+          requestInit?.method === "POST",
+      );
+      expect(JSON.parse(String(post?.[1]?.body))).toEqual({
+        content: "이어지는 답글",
+        audience: "public",
+        parentCommentId: "existing-reply",
+      });
+    });
+    await screen.findByText("이어지는 답글");
+    await waitFor(() => {
+      expect(
+        screen.queryByRole("textbox", { name: "민지에게 보낼 답글" }),
+      ).toBeNull();
+      expect(document.activeElement).toBe(replyToExisting);
+    });
+    expect(
+      screen.getByRole("list", { name: "선생님 댓글의 답글" }).textContent,
+    ).toContain("기존 답글");
+    expect(
+      screen.getByRole("list", { name: "선생님 댓글의 답글" }).textContent,
+    ).toContain("이어지는 답글");
   });
 
   it("keeps a parent on the guardian writer and makes public comments read-only", async () => {

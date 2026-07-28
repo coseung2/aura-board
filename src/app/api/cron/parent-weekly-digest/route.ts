@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { sendParentDigest } from "@/lib/parent-email";
+import { isAuthorizedCronRequest } from "@/lib/cron-auth";
 
 // PV-10 — weekly digest cron for Pro parents only.
 //
@@ -11,27 +12,13 @@ import { sendParentDigest } from "@/lib/parent-email";
 //   plant observations, drawing uploads, breakout joins, and event signups
 //   we do not send a mail (spec AC-9).
 //
-// Authentication: Vercel's cron runner sets an `x-vercel-cron: 1` header.
-// For manual triggers from ops, set CRON_SECRET env and include it as
-// `?secret=...`. Locally in dev we allow all callers to simplify testing.
+// Vercel and manual callers must send `Authorization: Bearer <CRON_SECRET>`.
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
-function authorizeCron(req: Request): boolean {
-  if (process.env.NODE_ENV !== "production") return true;
-  const header = req.headers.get("x-vercel-cron");
-  if (header) return true;
-  const url = new URL(req.url);
-  const secret = url.searchParams.get("secret");
-  if (secret && process.env.CRON_SECRET && secret === process.env.CRON_SECRET) {
-    return true;
-  }
-  return false;
-}
-
 export async function GET(req: Request) {
-  if (!authorizeCron(req)) {
+  if (!isAuthorizedCronRequest(req)) {
     return NextResponse.json({ error: "forbidden" }, { status: 403 });
   }
 

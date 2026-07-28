@@ -13,6 +13,7 @@ import {
   studentPushKstDay,
 } from "@/lib/student-push";
 import { dispatchParentNotificationPush } from "@/lib/parent-push";
+import { isAuthorizedCronRequest } from "@/lib/cron-auth";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -21,7 +22,7 @@ const LOOKBACK_MS = 10 * 60 * 1000;
 const EVENT_LIMIT = 200;
 
 export async function GET(req: Request) {
-  if (!isAuthorizedCron(req)) {
+  if (!isAuthorizedCronRequest(req)) {
     return NextResponse.json({ error: "invalid_secret" }, { status: 401 });
   }
 
@@ -249,15 +250,6 @@ export async function GET(req: Request) {
     dispatched: results.filter((result) => result.status === "fulfilled").length,
     failed: results.filter((result) => result.status === "rejected").length,
   });
-}
-
-function isAuthorizedCron(req: Request): boolean {
-  const secret = process.env.CRON_SECRET;
-  const authorization = req.headers.get("authorization") ?? "";
-  return Boolean(
-    (secret && authorization === `Bearer ${secret}`) ||
-      req.headers.get("x-vercel-cron"),
-  );
 }
 
 function cardStudentIds(card: {

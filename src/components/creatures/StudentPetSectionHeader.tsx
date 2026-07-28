@@ -3,7 +3,7 @@ import type { ReactNode } from "react";
 
 import styles from "./StudentPetSectionHeader.module.css";
 
-export type StudentPetSection = "mine" | "classroom";
+export type StudentPetSection = "mine" | "classroom" | "shop";
 
 type Props = {
   active: StudentPetSection;
@@ -16,34 +16,24 @@ const PET_LINKS: Array<{
   label: string;
   href: string;
 }> = [
-  { key: "mine", label: "내 펫", href: "/student/aura-pet" },
+  { key: "mine", label: "내 펫", href: "/student/aura-pet?section=mine" },
   {
     key: "classroom",
     label: "우리 반 펫",
-    href: "/student/aura-pet/classroom",
+    href: "/student/aura-pet?section=classroom",
   },
+  { key: "shop", label: "상점", href: "/student/aura-pet?section=shop" },
 ];
-
-const SECTION_COPY: Record<
-  StudentPetSection,
-  { eyebrow: string; title: string }
-> = {
-  mine: { eyebrow: "MY PET", title: "내 펫" },
-  classroom: { eyebrow: "CLASS PETS", title: "우리 반 펫" },
-};
 
 export function StudentPetSectionHeader({
   active,
   actions,
   description,
 }: Props) {
-  const copy = SECTION_COPY[active];
-
   return (
     <header className={styles.header}>
       <div className={styles.heading}>
-        <p className={styles.eyebrow}>{copy.eyebrow}</p>
-        <h1 className={styles.title}>{copy.title}</h1>
+        <h1 className={styles.title}>펫</h1>
         {description !== undefined && description !== null ? (
           <p className={styles.description}>{description}</p>
         ) : null}

@@ -108,7 +108,10 @@ export async function PATCH(
       }
       identity = {
         ...identity,
-        share: shareResult.identity,
+        share: {
+          ...shareResult.identity,
+          guestId: req.headers.get("x-share-guest-id")?.trim() || null,
+        },
         primary: identity.primary === "anon" ? "share" : identity.primary,
       };
     }
@@ -134,6 +137,7 @@ export async function PATCH(
       boardId: card.boardId,
       authorId: card.authorId,
       studentAuthorId: card.studentAuthorId,
+      externalAuthorKey: card.externalAuthorKey,
     };
     if (!canEditCard(identity, boardLike, cardLike) && !studentCanReorder) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
@@ -350,6 +354,14 @@ export async function PATCH(
       : undefined;
 
     const updated = await db.$transaction(async (tx) => {
+      if (input.sectionId) {
+        const section = await tx.section.findFirst({
+          where: { id: input.sectionId, boardId: card.boardId },
+          select: { id: true },
+        });
+        if (!section) return null;
+      }
+
       const updatedCard = await tx.card.update({ where: { id }, data: cardPatchData });
 
       if (input.commentVoteOptionCount !== undefined) {
@@ -389,6 +401,13 @@ export async function PATCH(
       return updatedCard;
     });
 
+    if (!updated) {
+      return NextResponse.json(
+        { error: "sectionId does not belong to boardId" },
+        { status: 400 },
+      );
+    }
+
     const attachments = await db.cardAttachment.findMany({
       where: { cardId: id },
       orderBy: { order: "asc" },
@@ -403,6 +422,54 @@ export async function PATCH(
         order: true,
       },
     });
+
+    const previousMediaUrls = new Set(
+      [
+        card.imageUrl,
+        card.thumbUrl,
+        card.linkImage,
+        card.videoUrl,
+        card.fileUrl,
+        ...card.attachments.flatMap((attachment) => [
+          attachment.url,
+          attachment.previewUrl,
+        ]),
+      ].filter((url): url is string => Boolean(url)),
+    );
+    const retainedMediaUrls = new Set(
+      [
+        updated.imageUrl,
+        updated.thumbUrl,
+        updated.linkImage,
+        updated.videoUrl,
+        updated.fileUrl,
+        ...attachments.flatMap((attachment) => [
+          attachment.url,
+          attachment.previewUrl,
+        ]),
+      ].filter((url): url is string => Boolean(url)),
+    );
+    const removedMediaUrls = [...previousMediaUrls].filter(
+      (url) => !retainedMediaUrls.has(url),
+    );
+    if (removedMediaUrls.length > 0) {
+      try {
+        await enqueueBlobDeletion(
+          removedMediaUrls,
+          "card.update",
+          "Card",
+          id,
+        );
+      } catch (error) {
+        // The card mutation is already committed. Cleanup reservation failure
+        // must not turn a successful edit into a retryable API failure.
+        console.warn("[card.update] blob cleanup enqueue failed", {
+          cardId: id,
+          count: removedMediaUrls.length,
+          error: error instanceof Error ? error.message : "enqueue_failed",
+        });
+      }
+    }
 
     // classroom-boards-tab "🟢 새 활동" 배지 — 카드 수정으로 부모 board touch.
     await touchBoardUpdatedAt(card.boardId, {
@@ -486,7 +553,10 @@ export async function DELETE(
       }
       identity = {
         ...identity,
-        share: shareResult.identity,
+        share: {
+          ...shareResult.identity,
+          guestId: _req.headers.get("x-share-guest-id")?.trim() || null,
+        },
         primary: identity.primary === "anon" ? "share" : identity.primary,
       };
     }
@@ -501,6 +571,7 @@ export async function DELETE(
       boardId: card.boardId,
       authorId: card.authorId,
       studentAuthorId: card.studentAuthorId,
+      externalAuthorKey: card.externalAuthorKey,
     };
     if (!canDeleteCard(identity, boardLike, cardLike)) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });

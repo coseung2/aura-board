@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { StudentWalkingTabs } from "@/components/student/StudentWalkingTabs";
+import type { StudentActivityView } from "@/components/student/StudentActivityHeader";
 
 import styles from "./WalkingDashboard.module.css";
 
@@ -185,7 +186,11 @@ function ClaimButton({
   );
 }
 
-export function WalkingDashboard() {
+export function WalkingDashboard({
+  initialView = "records",
+}: {
+  initialView?: StudentActivityView;
+}) {
   const [snapshot, setSnapshot] = useState<WalkingSnapshot | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadAttempt, setLoadAttempt] = useState(0);
@@ -311,6 +316,7 @@ export function WalkingDashboard() {
         </p>
       ) : null}
       <StudentWalkingTabs
+        initialView={initialView}
         records={
           <div className={styles.stack}>
             <section className="classroom-dashboard-kpis" aria-label="걷기 요약">
@@ -436,11 +442,14 @@ function RewardSection({
     <section className="classroom-dashboard-panel" aria-label={title}>
       <div className="classroom-dashboard-panel-head"><h2>{title}</h2><strong>{numberFormatter.format(totalSteps)}걸음</strong></div>
       <div className={styles.claimList}>
-        {tiers.map((tier) => {
+        {tiers.map((tier, index) => {
           const claimable = tier.claimable ?? tier.achieved;
           const key = kind === "daily" ? `daily:${tier.unit ?? Number(tier.key.replace(/\D/g, ""))}` : `weekly:${tier.key}`;
           return (
-            <div className={styles.claimRow} key={tier.key}>
+            <div
+              className={styles.claimRow}
+              key={`${kind}:${tier.key}:${tier.unit ?? tier.steps}:${index}`}
+            >
               <span><strong>{numberFormatter.format(tier.steps)}걸음</strong><small>{numberFormatter.format(tier.amount)}원</small></span>
               <ClaimButton label={tier.claimed ? "수령 완료" : claimable ? "보상 받기" : "미달성"} disabled={busy !== null || tier.claimed || !claimable} busy={busy === key} onClick={() => void onClaim(tier)} />
             </div>

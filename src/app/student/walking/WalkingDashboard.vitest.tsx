@@ -92,6 +92,36 @@ describe("WalkingDashboard", () => {
     expect(walkingAverageSteps(rows, "2026-07-22")).toBe(1_000);
   });
 
+  it("renders reward tiers without duplicate React keys when legacy keys repeat", async () => {
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(() =>
+        json(
+          snapshot({
+            dailyStepRewards: {
+              day: "2026-07-26",
+              totalSteps: 30_000,
+              tiers: [
+                { key: "legacy", unit: 1, steps: 10_000, amount: 10, achieved: true, claimed: false },
+                { key: "legacy", unit: 2, steps: 20_000, amount: 20, achieved: true, claimed: false },
+              ],
+            },
+          }),
+        ),
+      ),
+    );
+
+    render(<WalkingDashboard initialView="missions" />);
+    await screen.findByRole("region", { name: "일간미션" });
+
+    expect(
+      consoleError.mock.calls.some(([message]) =>
+        String(message).includes('unique "key" prop'),
+      ),
+    ).toBe(false);
+  });
+
   it("claims daily and weekly rewards, reloading authoritative claimed state after each save", async () => {
     const dailyClaimed = snapshot({
       dailyStepRewards: {

@@ -34,6 +34,7 @@ radius, shadow 값을 새로 만들지 않는다.
 |---|---|---|
 | `--color-accent` | `#1683c7` | CTA 버튼, 링크 |
 | `--color-accent-active` | `#0d679f` | hover/pressed 상태 |
+| `--color-on-accent` | `#ffffff` | 액센트 배경 위 버튼/라벨 텍스트 |
 | `--color-accent-tinted-bg` | `#e9f7ff` | 뱃지 배경 |
 | `--color-accent-tinted-text` | `#0f70ad` | 뱃지 텍스트, focus outline |
 

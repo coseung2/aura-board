@@ -49,6 +49,8 @@ export type ShareIdentity = {
   permission: SharePermission;
   /** Visitor-chosen display name (from localStorage or prompt). */
   authorName: string;
+  /** Stable browser-local guest id used for share-card ownership checks. */
+  guestId?: string | null;
 };
 
 /**
@@ -111,7 +113,13 @@ export function asIdentities(id: Identity): Identities {
         teacher: null,
         student: null,
         parent: null,
-        share: { shareToken: id.shareToken, boardId: id.boardId, permission: id.permission, authorName: id.authorName },
+        share: {
+          shareToken: id.shareToken,
+          boardId: id.boardId,
+          permission: id.permission,
+          authorName: id.authorName,
+          guestId: id.guestId,
+        },
         primary: "share",
       };
     case "anon":
@@ -133,6 +141,8 @@ export type CardLike = {
   authorId: string | null;
   /** Set when a student published the card. */
   studentAuthorId: string | null;
+  /** Stable owner key for cards created by external share visitors. */
+  externalAuthorKey?: string | null;
 };
 
 // ─── Per-path helpers (do NOT export — callers should use OR'd predicates) ──
@@ -207,7 +217,9 @@ export function canEditCard(
     ids.share &&
     shareCanReachBoard(ids.share, b) &&
     c.authorId === null &&
-    c.studentAuthorId === null
+    c.studentAuthorId === null &&
+    !!ids.share.guestId &&
+    c.externalAuthorKey === ids.share.guestId
   )
     return true;
   // Parents never edit. Anon never edits.

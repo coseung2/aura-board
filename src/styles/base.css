@@ -36,6 +36,7 @@ img.emoji {
   --color-text-faint: #8fa0a6;
   --color-accent: #1683c7;
   --color-accent-active: #0d679f;
+  --color-on-accent: #ffffff;
   --color-accent-tinted-bg: #e9f7ff;
   --color-accent-tinted-text: #0f70ad;
   --color-border: rgba(24, 74, 92, 0.14);
@@ -208,6 +209,43 @@ body.app-background-active .mega-nav-panel {
   z-index: var(--z-mega-nav-panel, 2147483001);
 }
 
+/* Student navigation keeps one scrollable IA tree at compact and in-between widths. */
+.student-topnav .student-topnav-left {
+  flex: 1 1 auto;
+  overflow: hidden;
+}
+
+.student-topnav .student-topnav-left > .mega-nav {
+  max-width: 100%;
+  overflow: hidden;
+}
+
+.student-topnav .mega-nav-bar {
+  overscroll-behavior-inline: contain;
+  scroll-padding-inline: 8px;
+}
+
+@media (max-width: 760px) {
+  .student-topnav.student-topnav {
+    gap: 8px;
+  }
+
+  .student-topnav .mega-nav-toplink {
+    scroll-snap-align: start;
+  }
+
+  .student-topnav .student-topnav-right.auth-header {
+    min-width: 0;
+  }
+
+  .student-topnav .auth-name {
+    max-width: min(36vw, 180px);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+}
+
 /* Overlays that intentionally cover the top nav need the same escape hatch:
    `body > * { z-index: 1 }` above would otherwise trap them below it. */
 body.app-background-active .portfolio-roster.is-drawer {
@@ -354,6 +392,43 @@ button {
 .ui-corner-action {
   position: absolute;
   z-index: 6;
+}
+
+.nav-action-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  color: var(--color-danger);
+  font-size: var(--text-badge-size);
+  font-weight: 700;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+.nav-action-retry {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  padding: 6px 9px;
+  border: 1px solid currentColor;
+  border-radius: var(--radius-control);
+  background: var(--color-surface);
+  color: inherit;
+  font-size: inherit;
+  font-weight: 700;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.nav-action-retry:hover:not(:disabled) {
+  background: var(--color-status-returned-bg);
+}
+
+.nav-action-retry:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
 }
 
 button,
