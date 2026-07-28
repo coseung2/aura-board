@@ -927,6 +927,8 @@ export default function StudentSlimeScreen() {
                                 : undefined
                             }
                             vehicleSpritePath={classVehicleItem?.spritePath}
+                            vehicleGroundedSpritePath={classVehicleItem?.vehicleGroundedSpritePath}
+                            vehicleFrameCount={classVehicleItem?.vehicleFrameCount}
                             vehicleRiseY={classVehicleItem?.vehicleRiseY}
                             accessibilityLabel={`${student.name}의 ${SLIME_COLOR_LABELS[representative.color]} 대표 펫`}
                           />
@@ -1100,6 +1102,8 @@ export default function StudentSlimeScreen() {
                           : undefined
                       }
                       vehicleSpritePath={petVehicle?.spritePath}
+                      vehicleGroundedSpritePath={petVehicle?.vehicleGroundedSpritePath}
+                      vehicleFrameCount={petVehicle?.vehicleFrameCount}
                       vehicleRiseY={petVehicle?.vehicleRiseY}
                       accessibilityLabel={`${SLIME_COLOR_LABELS[itemColor]} 슬라임`}
                       onComplete={manualAction

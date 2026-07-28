@@ -296,6 +296,8 @@ export function SlimeCollectionSection({
                       equippedFloor={floor}
                       itemSpritePath={accessorySpritePath(assignedItems, slime.color)}
                       vehicleSpritePath={vehicle?.spritePath}
+                      vehicleGroundedSpritePath={vehicle?.vehicleGroundedSpritePath}
+                      vehicleFrameCount={vehicle?.vehicleFrameCount}
                       vehicleRiseY={vehicle?.vehicleRiseY}
                       backgroundSpritePath={background.spritePath}
                       wearables={wearables}

@@ -95,6 +95,10 @@ export type SlimeShopItem = {
   vehicleStance?: "grounded" | "floating";
   /** Pixels the vehicle lifts the slime, in 64px-viewport units. */
   vehicleRiseY?: number;
+  /** Vehicle parts that stay planted while the body moves, such as wheels. */
+  vehicleGroundedSpritePath?: string;
+  /** Frames in the vehicle sheet. Omitted means a single static image. */
+  vehicleFrameCount?: number;
   effectKey?: string;
   effectBps?: number;
 };
@@ -639,6 +643,24 @@ function normalizeShopCatalog(value: unknown): SlimeShopItem[] {
         wearableOption:
           typeof entry.wearableOption === "string" && entry.wearableOption.length > 0
             ? entry.wearableOption
+            : undefined,
+        // Vehicle fields have to survive normalization or the ride never renders
+        // on mobile even though the server sent it.
+        vehicleStance:
+          entry.vehicleStance === "grounded" || entry.vehicleStance === "floating"
+            ? entry.vehicleStance
+            : undefined,
+        vehicleRiseY:
+          typeof entry.vehicleRiseY === "number"
+            ? Math.max(0, Math.trunc(entry.vehicleRiseY))
+            : undefined,
+        vehicleGroundedSpritePath:
+          typeof entry.vehicleGroundedSpritePath === "string"
+            ? entry.vehicleGroundedSpritePath
+            : undefined,
+        vehicleFrameCount:
+          typeof entry.vehicleFrameCount === "number"
+            ? Math.max(1, Math.trunc(entry.vehicleFrameCount))
             : undefined,
         effectKey: typeof entry.effectKey === "string" ? entry.effectKey : undefined,
         effectBps:

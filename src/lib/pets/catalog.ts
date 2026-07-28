@@ -30,15 +30,12 @@ export const SLIME_SHOP_LOWER_TIER_EFFECT_BPS = 100;
  */
 export const SLIME_VEHICLE_DEFAULT_RISE_Y = 6;
 /**
- * Y where a vehicle's front layer starts covering the slime, in the 64px
- * viewport.
+ * Frames in a vehicle sheet.
  *
- * The slime's head tops out at y 32-34 and its feet rest at y 55-56, so a front
- * edge here crosses the middle of the body: high enough to read as "seated
- * inside", low enough to leave the face fully visible. Fixed for every vehicle
- * so 35 rides stay visually consistent and share one rise value.
+ * Vehicles animate on the same 8-frame clock as the slime idle timeline, with
+ * matching durations, so a ride and its rider never drift apart.
  */
-export const SLIME_VEHICLE_FRONT_LINE_Y = 46;
+export const SLIME_VEHICLE_FRAME_COUNT = 8;
 /**
  * Upper bound for one consumable purchase.
  *

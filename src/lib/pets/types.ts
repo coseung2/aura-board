@@ -116,8 +116,18 @@ export type SlimeShopItem = {
   /**
    * Pixels the slime is lifted so it reads as seated in the vehicle. Measured
    * against the 64px character viewport, matching `slimeFootY`.
+   *
+   * Fixed on purpose. A per-frame offset would stack on the slime's own idle
+   * squash and double the amplitude, which reads as hovering rather than riding.
    */
   readonly vehicleRiseY?: number;
+  /**
+   * Vehicle parts that stay planted while the body moves, such as wheels. Drawn
+   * behind the character so the body layer can overlap them.
+   */
+  readonly vehicleGroundedSpritePath?: string;
+  /** Frames in the vehicle sheet. Omitted means a single static image. */
+  readonly vehicleFrameCount?: number;
   readonly effectKey?: SlimeEffectKey;
   readonly effectBps?: number;
 };

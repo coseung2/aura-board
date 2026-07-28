@@ -135,7 +135,8 @@ export function SlimeSprite({
   itemSpritePath,
   backgroundSpritePath,
   vehicleSpritePath,
-  vehicleFrontSpritePath,
+  vehicleGroundedSpritePath,
+  vehicleFrameCount = 1,
   vehicleRiseY = 0,
   wearables,
   drinkFlavor,
@@ -260,12 +261,23 @@ export function SlimeSprite({
     backgroundUri ? (
       <FeatheredBackground backgroundUri={backgroundUri} sizeStyle={sizeStyle} />
     ) : null;
-  const vehicleBackUri = vehicleSpritePath
+  const vehicleUri = vehicleSpritePath
     ? resolveSlimeRemoteSpriteUri(vehicleSpritePath, getApiBase())
     : "";
-  const vehicleFrontUri = vehicleFrontSpritePath
-    ? resolveSlimeRemoteSpriteUri(vehicleFrontSpritePath, getApiBase())
+  const vehicleGroundedUri = vehicleGroundedSpritePath
+    ? resolveSlimeRemoteSpriteUri(vehicleGroundedSpritePath, getApiBase())
     : "";
+  /**
+   * Vehicles ride the character's frame clock with matching authored durations,
+   * so one index keeps a ride and its rider in step.
+   */
+  const vehicleFrames = Math.max(1, Math.trunc(vehicleFrameCount));
+  const vehicleSheetStyle = {
+    width: 64 * vehicleFrames * resolution.imageScale * displayScale,
+    height: 64 * resolution.imageScale * displayScale,
+    left: -(frameIndex % vehicleFrames) * 64 * resolution.imageScale * displayScale,
+    top: floorRise,
+  };
 
   if (itemSpritePath) {
     const uri = resolveSlimeRemoteSpriteUri(itemSpritePath, getApiBase());
@@ -368,19 +380,14 @@ export function SlimeSprite({
           accessible={false}
         />
       ) : null}
-      {vehicleBackUri ? (
-        // Vehicle back half sits above the floor and behind the character, which
-        // is what lets the front half hide the slime's lower body.
+      {vehicleGroundedUri ? (
+        // Parts that must stay planted while the body moves, such as wheels.
         <Image
-          source={{ uri: vehicleBackUri }}
-          style={[
-            styles.layer,
-            styles.floorUnder,
-            { width: squareSourceSize, height: squareSourceSize, left: 0, top: floorRise },
-          ]}
+          source={{ uri: vehicleGroundedUri }}
+          style={[styles.layer, styles.floorUnder, vehicleSheetStyle]}
           contentFit="fill"
           allowDownscaling={false}
-          recyclingKey={`${playbackKey}:vehicle-back`}
+          recyclingKey={`${playbackKey}:vehicle-grounded`}
           transition={0}
           accessible={false}
         />
@@ -440,24 +447,19 @@ export function SlimeSprite({
           testID="slime-happy-heart-layer"
         />
       ) : null}
-      {vehicleFrontUri ? (
-        // Front half of the vehicle. Above every character layer so the slime
-        // reads as sitting inside rather than behind the vehicle.
+      {vehicleUri ? (
+        // The vehicle itself, above every character layer. Drawing it in front is
+        // what seats the slime inside without authoring the hidden side.
         <Image
-          source={{ uri: vehicleFrontUri }}
+          source={{ uri: vehicleUri }}
           style={[
             styles.layer,
-            {
-              width: squareSourceSize,
-              height: squareSourceSize,
-              left: 0,
-              top: floorRise,
-              zIndex: layers.spriteItem + 200,
-            },
+            vehicleSheetStyle,
+            { zIndex: layers.spriteItem + 200 },
           ]}
           contentFit="fill"
           allowDownscaling={false}
-          recyclingKey={`${playbackKey}:vehicle-front`}
+          recyclingKey={`${playbackKey}:vehicle`}
           transition={0}
           accessible={false}
         />

@@ -45,13 +45,24 @@ export type OfficialSlimeSpriteProps = {
    * Vehicle art the slime rides. Vehicles never replace the floor: a grounded
    * vehicle rests on the same surface the floor draws, and a floating one simply
    * sits higher, so a player who wants water under a tube buys that background.
+   *
+   * Drawn above the character as a single layer. Anything the character would
+   * hide is never authored, which is why there is no separate back sheet.
    */
   vehicleSpritePath?: string;
-  /** Vehicle layer drawn in front of the slime so its lower half reads as seated. */
-  vehicleFrontSpritePath?: string;
+  /**
+   * Extra vehicle layer that must stay put while the body moves, such as wheels
+   * that would otherwise lift off the ground with the suspension bounce.
+   */
+  vehicleGroundedSpritePath?: string;
+  /** Frames in the vehicle sheet. One means a single static image. */
+  vehicleFrameCount?: number;
   /**
    * Pixels the slime is lifted by the vehicle, in 64px-viewport units. Added on
    * top of the floor rise so a vehicle and a floor stay independently correct.
+   *
+   * Deliberately a fixed offset. Adding a per-frame offset would stack on the
+   * slime's own idle squash and double the amplitude, which reads as hovering.
    */
   vehicleRiseY?: number;
   /**
@@ -145,7 +156,8 @@ export function OfficialSlimeSprite({
   itemSpritePath,
   backgroundSpritePath,
   vehicleSpritePath,
-  vehicleFrontSpritePath,
+  vehicleGroundedSpritePath,
+  vehicleFrameCount = 1,
   vehicleRiseY = 0,
   wearables,
   drinkFlavor,
@@ -203,7 +215,18 @@ export function OfficialSlimeSprite({
   const label = alt ?? `${slimeColor} 슬라임 ${resolution.action} 모습`;
   const resolvedBackgroundSpritePath = resolveSpritePath(backgroundSpritePath);
   const resolvedVehicleSpritePath = resolveSpritePath(vehicleSpritePath);
-  const resolvedVehicleFrontSpritePath = resolveSpritePath(vehicleFrontSpritePath);
+  const resolvedVehicleGroundedSpritePath = resolveSpritePath(vehicleGroundedSpritePath);
+  /**
+   * Vehicle sheets share the character's frame clock, so a rider and its ride
+   * stay in step. Authored durations match the slime idle timeline, which is why
+   * one index can drive both.
+   */
+  const vehicleFrames = Math.max(1, Math.trunc(vehicleFrameCount));
+  const vehicleFrameStyle = (): CSSProperties => ({
+    width: 64 * vehicleFrames * scale,
+    height: 64 * scale,
+    transform: `translate(${-(frameIndex % vehicleFrames) * 64 * scale}px, 0px)`,
+  });
   // Wearables compose onto the character sheet. Legacy complete-GIF props
   // replace that sheet entirely, so the two paths stay mutually exclusive.
   // The head slot is owned by the resolver: it decides whether this action draws
@@ -350,16 +373,16 @@ export function OfficialSlimeSprite({
           draggable={false}
         />
       ) : null}
-      {resolvedVehicleSpritePath ? (
-        // Vehicle back half sits above the floor and behind the character, which
-        // is what lets the front half below hide the slime's lower body.
+      {resolvedVehicleGroundedSpritePath ? (
+        // Parts that must not move with the body, such as wheels. Kept behind the
+        // character so the body layer above can overlap them.
         // eslint-disable-next-line @next/next/no-img-element
         <img
-          src={resolvedVehicleSpritePath}
+          src={resolvedVehicleGroundedSpritePath}
           alt=""
           aria-hidden="true"
-          className={styles.floorUnder}
-          style={{ width: 64 * scale, height: 64 * scale, top: floorRise }}
+          className={`${styles.sheet} ${styles.floorUnder}`}
+          style={{ ...vehicleFrameStyle(), top: floorRise }}
           draggable={false}
         />
       ) : null}
@@ -425,16 +448,17 @@ export function OfficialSlimeSprite({
           ) : null}
         </>
       )}
-      {resolvedVehicleFrontSpritePath ? (
-        // Front half of the vehicle. Drawn above every character layer so the
-        // slime reads as sitting inside rather than behind the vehicle.
+      {resolvedVehicleSpritePath ? (
+        // The vehicle itself, above every character layer. Drawing it in front is
+        // what makes a slime read as seated inside a tube or a car without any
+        // second sheet for the hidden side.
         // eslint-disable-next-line @next/next/no-img-element
         <img
-          src={resolvedVehicleFrontSpritePath}
+          src={resolvedVehicleSpritePath}
           alt=""
           aria-hidden="true"
-          className={styles.floorUnder}
-          style={{ width: 64 * scale, height: 64 * scale, top: floorRise, zIndex: 200 }}
+          className={`${styles.sheet} ${styles.floorUnder}`}
+          style={{ ...vehicleFrameStyle(), top: floorRise, zIndex: 200 }}
           draggable={false}
         />
       ) : null}

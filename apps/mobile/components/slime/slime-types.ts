@@ -30,11 +30,21 @@ export type SlimeSpriteProps = {
    * Vehicle art the slime rides. Vehicles sit above the floor instead of
    * replacing it, so a tube on grass stays valid and a player who wants water
    * buys that background separately.
+   *
+   * Drawn above the character as a single layer; the hidden side is never
+   * authored.
    */
   vehicleSpritePath?: string;
-  /** Vehicle layer drawn in front of the slime so its lower half reads as seated. */
-  vehicleFrontSpritePath?: string;
-  /** Pixels the vehicle lifts the slime, in 64px-viewport units. */
+  /**
+   * Vehicle parts that stay planted while the body moves, such as wheels.
+   */
+  vehicleGroundedSpritePath?: string;
+  /** Frames in the vehicle sheet. One means a single static image. */
+  vehicleFrameCount?: number;
+  /**
+   * Pixels the vehicle lifts the slime, in 64px-viewport units. Fixed on purpose:
+   * a per-frame offset would double the slime's own idle amplitude.
+   */
   vehicleRiseY?: number;
   /**
    * Anchor-composed wearable layers. Each equipped option is one shared sheet
