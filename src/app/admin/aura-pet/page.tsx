@@ -163,6 +163,20 @@ export default async function AdminAuraPetPage() {
                     const items = pet.equippedItemKeys
                       .map((key) => SLIME_SHOP_CATALOG.find((item) => item.key === key))
                       .filter((item): item is SlimeShopItem => Boolean(item));
+                    const hasScene = items.some(
+                      (item) =>
+                        Boolean(item.floor) ||
+                        item.category === "background" ||
+                        item.category === "vehicle" ||
+                        item.category === "ride",
+                    );
+                    const sceneBackground = items.reduce<SlimeShopItem | null>(
+                      (background, item) =>
+                        item.category === "background" && item.floor === null
+                          ? item
+                          : background,
+                      null,
+                    );
                     return (
                       <tr key={pet.id}>
                         <td>{formatDateTime(pet.createdAt)}</td>
@@ -172,7 +186,12 @@ export default async function AdminAuraPetPage() {
                         <td>
                           {definition ? (
                             <div className="admin-user-cell">
-                              <div style={{ width: 64, height: 64 }}>
+                              <div
+                                className={`admin-pet-preview ${hasScene ? "admin-pet-preview-scene" : ""}`.trim()}
+                                style={sceneBackground
+                                  ? { backgroundImage: `url("${sceneBackground.spritePath}")` }
+                                  : undefined}
+                              >
                                 <SlimeCharacterSprite slime={definition} items={items} />
                               </div>
                               <strong>{definition.nameKo}</strong>

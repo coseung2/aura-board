@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createHash } from "crypto";
 import { db } from "@/lib/db";
+import { isAuthorizedCronRequest } from "@/lib/cron-auth";
 
 // PV-11 — 90-day PII anonymization sweep.
 //
@@ -23,20 +24,12 @@ export const runtime = "nodejs";
 
 const NINETY_DAYS_MS = 90 * 24 * 60 * 60 * 1000;
 
-function authorizeCron(req: Request): boolean {
-  if (process.env.NODE_ENV !== "production") return true;
-  if (req.headers.get("x-vercel-cron")) return true;
-  const url = new URL(req.url);
-  const secret = url.searchParams.get("secret");
-  return Boolean(secret && process.env.CRON_SECRET && secret === process.env.CRON_SECRET);
-}
-
 function sha256(s: string): string {
   return createHash("sha256").update(s).digest("hex");
 }
 
 export async function GET(req: Request) {
-  if (!authorizeCron(req)) {
+  if (!isAuthorizedCronRequest(req)) {
     return NextResponse.json({ error: "forbidden" }, { status: 403 });
   }
 

@@ -1,0 +1,15 @@
+{
+  "option": "swan-boat",
+  "labelKo": "백조 보트",
+  "pattern": "front-only",
+  "stance": "grounded",
+  "price": 1000,
+  "canvas": { "w": 64, "h": 81 },
+  "characterOffsetY": 17,
+  "groundLineY": 56,
+  "riseY": 16,
+  "frameCount": 8,
+  "frameDurationsMs": [240, 160, 180, 90, 90, 160, 180, 240],
+  "bobY": [0, -1, -1, -2, -2, -1, -1, 0],
+  "riderFollows": true
+}

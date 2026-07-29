@@ -53,6 +53,70 @@ describe("GET /api/cron/notification-push", () => {
     delete process.env.CRON_SECRET;
   });
 
+  it.each([
+    {
+      name: "missing secret",
+      secret: undefined,
+      headers: { authorization: "Bearer cron-test" },
+      status: 401,
+    },
+    {
+      name: "missing header",
+      secret: "cron-test",
+      headers: {},
+      status: 401,
+    },
+    {
+      name: "malformed scheme",
+      secret: "cron-test",
+      headers: { authorization: "Basic cron-test" },
+      status: 401,
+    },
+    {
+      name: "wrong secret",
+      secret: "cron-test",
+      headers: { authorization: "Bearer wrong" },
+      status: 401,
+    },
+    {
+      name: "x-vercel-cron only",
+      secret: "cron-test",
+      headers: { "x-vercel-cron": "1" },
+      status: 401,
+    },
+    {
+      name: "valid bearer secret",
+      secret: "cron-test",
+      headers: { authorization: "Bearer cron-test" },
+      status: 200,
+    },
+  ])(
+    "handles $name without crossing the auth boundary",
+    async ({ secret, headers, status }) => {
+      if (secret === undefined) {
+        delete process.env.CRON_SECRET;
+      } else {
+        process.env.CRON_SECRET = secret;
+      }
+
+      const response = await GET(
+        new Request("http://localhost/api/cron/notification-push", { headers }),
+      );
+
+      expect(response.status).toBe(status);
+      if (status === 401) {
+        expect(mocks.findLikes).not.toHaveBeenCalled();
+        expect(mocks.findComments).not.toHaveBeenCalled();
+        expect(mocks.findRewards).not.toHaveBeenCalled();
+        expect(mocks.findPendingLinks).not.toHaveBeenCalled();
+        expect(mocks.findStudents).not.toHaveBeenCalled();
+        expect(mocks.findAssignmentSlots).not.toHaveBeenCalled();
+      } else {
+        expect(mocks.findLikes).toHaveBeenCalledOnce();
+      }
+    },
+  );
+
   it(
     "selects only students missing the current KST attendance and sends one daily reminder",
     async () => {

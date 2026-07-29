@@ -6,6 +6,7 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  useWindowDimensions,
   View,
 } from "react-native";
 import { ApiError, apiFetch } from "../../lib/api";
@@ -45,6 +46,7 @@ type PuzzleInfo = {
 };
 
 export function KordleBoard({ data }: { data: BoardDetailResponse }) {
+  const { width: viewportWidth } = useWindowDimensions();
   const [puzzle, setPuzzle] = useState<PuzzleInfo | null>(null);
   const [attemptId, setAttemptId] = useState<string | null>(null);
   const [state, setState] = useState<PublicState | null>(null);
@@ -94,14 +96,37 @@ export function KordleBoard({ data }: { data: BoardDetailResponse }) {
     }
   }, [data.board.id]);
 
+  const syncActivePuzzle = useCallback(async () => {
+    const info = await apiFetch<PuzzleInfo>(
+      `/api/kordle/boards/${encodeURIComponent(data.board.id)}/puzzle`,
+    );
+    setPuzzle(info);
+    if (info.puzzle?.status !== "LIVE") {
+      setAttemptId(null);
+      setState(null);
+      return;
+    }
+    if (attemptId && state?.puzzleId === info.puzzle.id) {
+      await loadAttempt(attemptId);
+      return;
+    }
+    const attempt = await apiFetch<{ attemptId: string; state: PublicState }>(
+      `/api/kordle/puzzles/${encodeURIComponent(info.puzzle.id)}/attempt`,
+      { method: "POST" },
+    );
+    setAttemptId(attempt.attemptId);
+    setState(attempt.state);
+    setDraft("");
+    setError(null);
+  }, [attemptId, data.board.id, loadAttempt, state?.puzzleId]);
+
   useEffect(() => { void load(); }, [load]);
   useEffect(() => {
     const timer = setInterval(() => {
-      if (attemptId) void loadAttempt(attemptId).catch(() => undefined);
-      else void load("silent");
+      void syncActivePuzzle().catch(() => undefined);
     }, 4_000);
     return () => clearInterval(timer);
-  }, [attemptId, load, loadAttempt]);
+  }, [syncActivePuzzle]);
 
   async function submitGuess() {
     if (!attemptId || !state?.nextGuessIndex || !draft.trim()) return;
@@ -118,6 +143,9 @@ export function KordleBoard({ data }: { data: BoardDetailResponse }) {
       setDraft("");
       setError(null);
     } catch (caught) {
+      if (caught instanceof ApiError && caught.status === 409) {
+        await syncActivePuzzle().catch(() => undefined);
+      }
       const code = caught instanceof ApiError && typeof caught.body === "object" && caught.body
         ? (caught.body as { error?: string }).error
         : null;
@@ -142,6 +170,18 @@ export function KordleBoard({ data }: { data: BoardDetailResponse }) {
       state?.guesses[rowIndex] ?? Array.from({ length }, () => null),
     );
   }, [puzzle, state]);
+  const wordLength = state?.wordLength ?? puzzle?.wordLength ?? 5;
+  const cellGap = wordLength >= 6 ? spacing.xs : spacing.sm;
+  const gridHorizontalSpace = spacing.xl * 2 + spacing.lg * 2;
+  const cellSize = Math.min(
+    tapMin,
+    Math.max(
+      1,
+      Math.floor(
+        (viewportWidth - gridHorizontalSpace - cellGap * (wordLength - 1)) / wordLength,
+      ),
+    ),
+  );
 
   if (loading) {
     return <View style={styles.center}><ActivityIndicator color={colors.accent} /></View>;
@@ -179,12 +219,15 @@ export function KordleBoard({ data }: { data: BoardDetailResponse }) {
         <>
           <SurfaceCard style={styles.gridCard} accessibilityLabel="꼬들 추리판">
             {rows.map((row, rowIndex) => (
-              <View key={rowIndex} style={styles.row}>
+              <View key={rowIndex} style={[styles.row, { gap: cellGap }]}>
                 {row.map((cell, cellIndex) => (
                   <View
                     key={cellIndex}
+                    accessible={Boolean(cell)}
+                    accessibilityLabel={cell ? `${cell.char}, ${feedbackLabel(cell.state)}` : undefined}
                     style={[
                       styles.cell,
+                      { width: cellSize, height: cellSize },
                       cell?.state === "correct" && styles.cellCorrect,
                       cell?.state === "present" && styles.cellPresent,
                       cell?.state === "absent" && styles.cellAbsent,
@@ -193,10 +236,20 @@ export function KordleBoard({ data }: { data: BoardDetailResponse }) {
                     <Text style={[styles.cellText, cell && styles.cellTextFilled]}>
                       {cell?.char ?? ""}
                     </Text>
+                    {cell ? (
+                      <Text
+                        style={styles.feedbackSymbol}
+                        accessibilityElementsHidden
+                        importantForAccessibility="no-hide-descendants"
+                      >
+                        {feedbackSymbol(cell.state)}
+                      </Text>
+                    ) : null}
                   </View>
                 ))}
               </View>
             ))}
+            <Text style={styles.feedbackLegend}>✓ 정답 위치 · ◆ 포함 · × 없음</Text>
           </SurfaceCard>
 
           {state.status === "IN_PROGRESS" ? (
@@ -243,6 +296,18 @@ function statusLabel(status: PublicState["status"]) {
   return "진행 중";
 }
 
+function feedbackSymbol(state: LetterState) {
+  if (state === "correct") return "✓";
+  if (state === "present") return "◆";
+  return "×";
+}
+
+function feedbackLabel(state: LetterState) {
+  if (state === "correct") return "정답 위치";
+  if (state === "present") return "단어에 포함";
+  return "단어에 없음";
+}
+
 const styles = StyleSheet.create({
   center: { flex: 1, alignItems: "center", justifyContent: "center" },
   content: { paddingHorizontal: spacing.xl, paddingTop: pageChrome.directContentStartGap, gap: spacing.lg, paddingBottom: spacing.xxxl },
@@ -250,8 +315,8 @@ const styles = StyleSheet.create({
   headingText: { flex: 1, gap: spacing.xs },
   title: { ...typography.display, color: colors.text },
   subtitle: { ...typography.body, color: colors.textMuted },
-  gridCard: { padding: spacing.lg, gap: spacing.sm, alignItems: "center" },
-  row: { flexDirection: "row", gap: spacing.sm },
+  gridCard: { width: "100%", padding: spacing.lg, gap: spacing.sm, alignItems: "center" },
+  row: { flexDirection: "row" },
   cell: {
     width: tapMin,
     height: tapMin,
@@ -267,6 +332,14 @@ const styles = StyleSheet.create({
   cellAbsent: { backgroundColor: colors.textMuted, borderColor: colors.textMuted },
   cellText: { ...typography.title, color: colors.text },
   cellTextFilled: { color: colors.onAccent },
+  feedbackSymbol: {
+    ...typography.badge,
+    position: "absolute",
+    right: spacing.xxs,
+    bottom: 0,
+    color: colors.onAccent,
+  },
+  feedbackLegend: { ...typography.label, color: colors.textMuted, textAlign: "center" },
   composer: { padding: spacing.lg, gap: spacing.md },
   waiting: { ...typography.body, color: colors.textMuted, textAlign: "center" },
   errorCard: { padding: spacing.md, gap: spacing.md },

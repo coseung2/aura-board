@@ -33,6 +33,7 @@ vi.mock("@/lib/db", () => ({
 import {
   getSlimeHome,
   purchaseSlimeShopItem,
+  refundSlimeShopItem,
   SlimeServiceError,
 } from "./service";
 import { SLIME_SHOP_CATALOG } from "./catalog";
@@ -42,7 +43,10 @@ const student = { id: "student-1", classroomId: "classroom-1" };
 function installState(startingBalance = 100) {
   let balance = startingBalance;
   const inventory = new Map<string, { id: string; itemKey: string; quantity: number }>();
-  const ledger = new Map<string, { id: string; accountId: string; balanceAfter: number; note: string }>();
+  const ledger = new Map<
+    string,
+    { id: string; accountId: string; balanceAfter: number; note: string; amount: number }
+  >();
 
   const readInventory = (itemKey: string) => inventory.get(itemKey) ?? null;
   mocks.accountFind.mockImplementation(async ({ where }: { where: { studentId?: string; id?: string } }) =>
@@ -62,8 +66,16 @@ function installState(startingBalance = 100) {
     balance -= where.balance.gte;
     return { count: 1 };
   });
-  mocks.ledgerCreate.mockImplementation(async ({ data }: { data: { sourceRef: string; balanceAfter: number; note: string } }) => {
-    const row = { id: `transaction-${ledger.size + 1}`, accountId: "account-1", balanceAfter: data.balanceAfter, note: data.note };
+  mocks.ledgerCreate.mockImplementation(async ({ data }: { data: { sourceRef: string; balanceAfter: number; note: string; amount: number } }) => {
+    // `amount` is part of the real row and the replay guard compares it, so the
+    // fake ledger has to persist it too.
+    const row = {
+      id: `transaction-${ledger.size + 1}`,
+      accountId: "account-1",
+      balanceAfter: data.balanceAfter,
+      note: data.note,
+      amount: data.amount,
+    };
     ledger.set(data.sourceRef, row);
     return row;
   });
@@ -132,7 +144,9 @@ describe("slime shop service", () => {
           color: "blue",
           isEquipped: true,
           isRepresentative: true,
-          equippedItemKeys: ["slime-blue-trampoline", "water-puddle-background"],
+          // The trampoline is a vehicle now and carries no floor state, so the
+          // floor comes from the last real floor key.
+          equippedItemKeys: ["slime-blue-trampoline", "stone-floor"],
         },
         {
           color: "red",
@@ -146,8 +160,8 @@ describe("slime shop service", () => {
 
     const home = await getSlimeHome(student);
 
-    expect(home.equippedFloorByColor).toEqual({ blue: "water-puddle", red: "none" });
-    expect(home.equippedFloor).toBe("water-puddle");
+    expect(home.equippedFloorByColor).toEqual({ blue: "stone-floor", red: "none" });
+    expect(home.equippedFloor).toBe("stone-floor");
   });
 
   it("debits once, records source linkage, creates inventory, and replays", async () => {
@@ -213,5 +227,105 @@ describe("slime shop service", () => {
     expect(state.inventory.get(cookie.key)?.quantity).toBe(2);
     expect(replay).toEqual({ ownedItemKey: cookie.key, balance: 40, idempotent: true });
     expect(mocks.accountUpdateMany).toHaveBeenCalledTimes(2);
+  });
+
+  it("charges consumables per unit and stacks the purchased quantity", async () => {
+    const cookie = SLIME_SHOP_CATALOG.find((item) => item.key === "slime-cookie");
+    if (!cookie) throw new Error("cookie catalog item missing");
+    const state = installState(cookie.price * 5);
+
+    const result = await purchaseSlimeShopItem(student, cookie.key, "cookie-bulk", 3);
+
+    expect(result).toMatchObject({ ownedItemKey: cookie.key, idempotent: false });
+    expect(state.balance).toBe(cookie.price * 2);
+    expect(state.inventory.get(cookie.key)?.quantity).toBe(3);
+    expect(mocks.ledgerCreate).toHaveBeenCalledWith({
+      data: expect.objectContaining({ amount: cookie.price * 3 }),
+    });
+  });
+
+  it("rejects a quantity replay that does not match the original charge", async () => {
+    const cookie = SLIME_SHOP_CATALOG.find((item) => item.key === "slime-cookie");
+    if (!cookie) throw new Error("cookie catalog item missing");
+    const state = installState(cookie.price * 10);
+
+    await purchaseSlimeShopItem(student, cookie.key, "cookie-mismatch", 2);
+    // Reusing a key with a different quantity is a different request, so it must
+    // not report success while silently keeping the original charge.
+    await expect(
+      purchaseSlimeShopItem(student, cookie.key, "cookie-mismatch", 5),
+    ).rejects.toMatchObject<Partial<SlimeServiceError>>({
+      code: "idempotency_key_reused",
+      status: 409,
+    });
+    expect(state.inventory.get(cookie.key)?.quantity).toBe(2);
+
+    const replay = await purchaseSlimeShopItem(student, cookie.key, "cookie-mismatch", 2);
+    expect(replay).toMatchObject({ idempotent: true });
+    expect(mocks.accountUpdateMany).toHaveBeenCalledTimes(1);
+  });
+
+  it("rejects a quantity mismatch found inside the transaction, not just before it", async () => {
+    const cookie = SLIME_SHOP_CATALOG.find((item) => item.key === "slime-cookie");
+    if (!cookie) throw new Error("cookie catalog item missing");
+    const state = installState(cookie.price * 10);
+
+    await purchaseSlimeShopItem(student, cookie.key, "cookie-race", 2);
+
+    // Simulate the race the pre-transaction replay cannot see: the row exists by
+    // the time the transaction runs, but the outer lookup missed it.
+    const realFind = mocks.ledgerFind.getMockImplementation()!;
+    mocks.ledgerFind.mockImplementationOnce(async () => null);
+
+    await expect(
+      purchaseSlimeShopItem(student, cookie.key, "cookie-race", 5),
+    ).rejects.toMatchObject<Partial<SlimeServiceError>>({
+      code: "idempotency_key_reused",
+      status: 409,
+    });
+    mocks.ledgerFind.mockImplementation(realFind);
+    expect(state.inventory.get(cookie.key)?.quantity).toBe(2);
+    expect(mocks.accountUpdateMany).toHaveBeenCalledTimes(1);
+  });
+
+  it("refuses quantity on items that are owned once per student", async () => {
+    const cosmetic = SLIME_SHOP_CATALOG[0];
+    installState(cosmetic.price * 5);
+
+    await expect(
+      purchaseSlimeShopItem(student, cosmetic.key, "cosmetic-bulk", 2),
+    ).rejects.toMatchObject<Partial<SlimeServiceError>>({
+      code: "invalid_body",
+      status: 400,
+    });
+  });
+
+  it("rejects non-positive, fractional, and oversized quantities", async () => {
+    const cookie = SLIME_SHOP_CATALOG.find((item) => item.key === "slime-cookie");
+    if (!cookie) throw new Error("cookie catalog item missing");
+
+    for (const quantity of [0, -1, 1.5, 100]) {
+      installState(cookie.price * 200);
+      await expect(
+        purchaseSlimeShopItem(student, cookie.key, `bad-${quantity}`, quantity),
+      ).rejects.toMatchObject<Partial<SlimeServiceError>>({
+        code: "invalid_body",
+        status: 400,
+      });
+    }
+  });
+
+  it("never refunds a consumable, since inventory cannot tell spent units apart", async () => {
+    const cookie = SLIME_SHOP_CATALOG.find((item) => item.key === "slime-cookie");
+    if (!cookie) throw new Error("cookie catalog item missing");
+    const state = installState(cookie.price * 5);
+    await purchaseSlimeShopItem(student, cookie.key, "cookie-refund", 3);
+    const balanceAfterPurchase = state.balance;
+
+    await expect(
+      refundSlimeShopItem(student, cookie.key),
+    ).rejects.toMatchObject<Partial<SlimeServiceError>>({ code: "not_refundable" });
+    expect(state.balance).toBe(balanceAfterPurchase);
+    expect(state.inventory.get(cookie.key)?.quantity).toBe(3);
   });
 });

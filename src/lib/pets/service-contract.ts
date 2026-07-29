@@ -61,6 +61,9 @@ export type SlimeHome = {
   ownedItemQuantities: Record<string, number>;
   equippedItemKeys: string[];
   equippedItemsByColor: Partial<Record<SlimeColor, string[]>>;
+  /** Aggregate alias for clients that do not render per-pet loadouts. */
+  hiddenItemKeys: string[];
+  hiddenItemsByColor: Partial<Record<SlimeColor, string[]>>;
   equippedFloorByColor: Partial<Record<SlimeColor, SlimeFloor>>;
   /** Floor equipped by the representative slime, or none. */
   equippedFloor: SlimeFloor;
@@ -101,9 +104,22 @@ export type SlimeShopEquipResult = {
   isEquipped: boolean;
   equippedItemKeys: string[];
   equippedItemsByColor: Partial<Record<SlimeColor, string[]>>;
+  hiddenItemKeys: string[];
+  hiddenItemsByColor: Partial<Record<SlimeColor, string[]>>;
   equippedFloorByColor: Partial<Record<SlimeColor, SlimeFloor>>;
   /** Floor equipped by the representative slime, or none. */
   equippedFloor: SlimeFloor;
+  idempotent: boolean;
+};
+
+export type SlimeShopVisibilityResult = {
+  slimeColor: SlimeColor;
+  itemKey: string;
+  isHidden: boolean;
+  equippedItemKeys: string[];
+  equippedItemsByColor: Partial<Record<SlimeColor, string[]>>;
+  hiddenItemKeys: string[];
+  hiddenItemsByColor: Partial<Record<SlimeColor, string[]>>;
   idempotent: boolean;
 };
 

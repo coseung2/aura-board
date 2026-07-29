@@ -239,7 +239,8 @@
 }
 
 @keyframes growthBuffRise {
-  0%, 100% {
+  0%,
+  100% {
     opacity: 0.78;
     transform: translateY(2px) scale(0.94);
   }
@@ -273,7 +274,9 @@
   opacity: 0;
   pointer-events: none;
   transform: translateY(-4px);
-  transition: opacity 120ms ease-out, transform 120ms ease-out;
+  transition:
+    opacity 120ms ease-out,
+    transform 120ms ease-out;
   visibility: hidden;
 }
 
@@ -366,6 +369,20 @@
   margin-inline: auto;
 }
 
+.spriteFrameScene {
+  --slime-art-slot: 192px;
+  width: 100%;
+  min-height: var(--slime-art-slot);
+  margin-inline: 0;
+  overflow: hidden;
+  border-bottom: 1px solid rgba(24, 74, 92, 0.1);
+  background-color: var(--color-surface-alt);
+  background-image: linear-gradient(180deg, #f7fbff 0%, #edf6ff 100%);
+  background-position: center;
+  background-size: cover;
+  image-rendering: pixelated;
+}
+
 .spriteFrame > div {
   transform: scale(var(--slime-art-scale));
   transform-origin: center;
@@ -373,19 +390,10 @@
 
 .spriteCharacterFrame {
   display: grid;
-  width: 88px;
-  height: 88px;
+  width: 96px;
+  min-height: 96px;
   place-items: center;
 }
-
-.spriteFrame img {
-  display: block;
-  width: 88px;
-  height: 88px;
-  object-fit: contain;
-  image-rendering: pixelated;
-}
-
 
 .itemCopy,
 .shopItemCopy {
@@ -536,7 +544,9 @@
   opacity: 0;
   pointer-events: none;
   transform: translateY(-4px);
-  transition: opacity 120ms ease-out, transform 120ms ease-out;
+  transition:
+    opacity 120ms ease-out,
+    transform 120ms ease-out;
   visibility: hidden;
 }
 
@@ -554,7 +564,6 @@
 
 .wardrobeButton,
 .representativeButton,
-.shopTrigger,
 .galleryLink,
 .shopBuyButton,
 .refundButton,
@@ -579,26 +588,8 @@
   text-align: center;
 }
 
-.shopTrigger {
-  position: relative;
-  align-self: center;
-  width: fit-content;
-  min-width: 0;
-  min-height: 0;
-  padding: 3px 5px;
-  border-color: var(--color-accent);
-  color: var(--color-accent-active);
-}
-
-.shopTrigger::after {
-  position: absolute;
-  inset: -10px -8px;
-  content: "";
-}
-
 .wardrobeButton:hover,
 .representativeButton:hover,
-.shopTrigger:hover,
 .galleryLink:hover,
 .shopBuyButton:hover,
 .refundButton:hover,
@@ -626,7 +617,6 @@
 
 .wardrobeButton:focus-visible,
 .representativeButton:focus-visible,
-.shopTrigger:focus-visible,
 .galleryLink:focus-visible,
 .shopBuyButton:focus-visible,
 .refundButton:focus-visible,
@@ -766,7 +756,6 @@
   opacity: 0.55;
 }
 
-
 .drawerSubtitle {
   margin: 6px 0 0;
   color: var(--color-text-muted);
@@ -805,6 +794,37 @@
   justify-content: flex-end;
 }
 
+.inlineShop {
+  min-width: 0;
+  padding-bottom: 28px;
+}
+
+.inlineShop .shopNavigation {
+  margin-top: 0;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.inlineShop .shopFilters {
+  gap: 0;
+}
+
+.inlineShop .filterButton {
+  min-width: 76px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+
+.inlineShop .shopList {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  column-gap: 28px;
+  row-gap: 0;
+}
+
+.inlineShop .shopGroup .shopList {
+  margin-top: 8px;
+}
+
 .drawerBackdrop {
   position: absolute;
   inset: 0;
@@ -825,7 +845,9 @@
   overflow-y: auto;
   border-left: 1px solid var(--color-border);
   background: var(--color-surface);
-  box-shadow: -8px 0 24px rgba(24, 74, 92, 0.12), var(--shadow-card);
+  box-shadow:
+    -8px 0 24px rgba(24, 74, 92, 0.12),
+    var(--shadow-card);
   animation: drawerIn 180ms ease-out;
 }
 
@@ -902,16 +924,35 @@
   border-bottom: 1px solid var(--color-border);
 }
 
+.shopItemScene {
+  grid-template-columns: 96px minmax(0, 1fr) auto;
+  align-items: stretch;
+  min-height: 120px;
+  padding-block: 0;
+}
+
 .shopImageFrame {
+  width: 72px;
   min-height: 72px;
 }
 
-.shopImageFrame img {
-  display: block;
-  width: 72px;
-  height: 72px;
-  object-fit: contain;
+.shopImageFrameScene {
+  width: 100%;
+  min-height: 96px;
+  overflow: hidden;
+  border-right: 1px solid rgba(24, 74, 92, 0.1);
+  background-color: var(--color-surface-alt);
+  background-image: linear-gradient(180deg, #f7fbff 0%, #edf6ff 100%);
+  background-position: center;
+  background-size: cover;
   image-rendering: pixelated;
+}
+
+.shopItemScene .shopItemCopy,
+.shopItemScene > .shopBuyButton,
+.shopItemScene > .shopItemActions {
+  align-self: center;
+  margin-block: 12px;
 }
 
 .shopItemCopy strong {
@@ -977,6 +1018,10 @@
   .slimeGrid {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
+
+  .inlineShop .shopList {
+    grid-template-columns: 1fr;
+  }
 }
 
 @media (max-width: 560px) {
@@ -1001,10 +1046,6 @@
     text-align: left;
   }
 
-.shopTrigger {
-    align-self: end;
-  }
-
   .sectionHeading .count {
     display: inline-block;
     margin-top: 10px;
@@ -1020,6 +1061,10 @@
     --slime-art-slot: 154px;
   }
 
+  .spriteFrameScene {
+    --slime-art-slot: 168px;
+  }
+
   .drawer {
     width: 100%;
     padding: 20px 16px;
@@ -1030,9 +1075,16 @@
     gap: 10px;
   }
 
-  .shopImageFrame,
-  .shopImageFrame img {
+  .shopImageFrame {
     width: 64px;
+  }
+
+  .shopItemScene {
+    grid-template-columns: 96px minmax(0, 1fr) auto;
+  }
+
+  .shopImageFrameScene {
+    width: 100%;
   }
 
   .retryButton {
@@ -1051,6 +1103,10 @@
   .spriteFrame {
     --slime-art-scale: 1.5;
     --slime-art-slot: 132px;
+  }
+
+  .spriteFrameScene {
+    --slime-art-slot: 144px;
   }
 }
 

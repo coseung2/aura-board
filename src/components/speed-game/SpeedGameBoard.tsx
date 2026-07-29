@@ -89,7 +89,7 @@ export function SpeedGameBoard({
       const data = (await res.json()) as { game?: SpeedGameWire };
       if (data.game) {
         setGame(data.game);
-        setError((prev) => (prev ? null : prev));
+        setError(null);
       }
     } catch {
       // ignore transient refresh failures

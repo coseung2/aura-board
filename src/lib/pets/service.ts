@@ -12,6 +12,7 @@ import {
   normalizeEquippedSlimeItemKeys,
   slimeVisualItemSlot,
   SLIME_CATALOG,
+  SLIME_MAX_PURCHASE_QUANTITY,
   SLIME_SHOP_CATALOG,
 } from "./catalog";
 import {
@@ -38,6 +39,7 @@ import {
   type SlimeRefundResult,
   type SlimeShopEquipResult,
   type SlimeShopPurchaseResult,
+  type SlimeShopVisibilityResult,
 } from "./service-contract";
 import {
   growthEffectsForColors,
@@ -66,10 +68,31 @@ export type {
   SlimeServiceErrorCode,
   SlimeShopEquipResult,
   SlimeShopPurchaseResult,
+  SlimeShopVisibilityResult,
   SlimeCookieConsumeResult,
 } from "./service-contract";
 
 type StudentIdentity = { id: string; classroomId: string };
+
+const RESLOTTED_TRAMPOLINE_KEY = "slime-blue-trampoline";
+
+function normalizeHiddenItemKeys(
+  hiddenItemKeys: readonly string[] | null | undefined,
+  equippedItemKeys: readonly string[],
+): string[] {
+  const equipped = new Set(equippedItemKeys);
+  return Array.from(new Set((hiddenItemKeys ?? []).filter((key) => equipped.has(key))));
+}
+
+/**
+ * Accept inventory written before the trampoline moved from `ride` to
+ * `vehicle`. Keep the exception item-specific so a corrupted or unrelated
+ * inventory kind still cannot be equipped or refunded.
+ */
+function inventoryKindMatchesShopItem(item: SlimeShopItem, itemKind: string): boolean {
+  if (itemKind === `slime-${item.category}`) return true;
+  return item.key === RESLOTTED_TRAMPOLINE_KEY && itemKind === "slime-ride";
+}
 
 async function walkingTitleForStudent(studentId: string) {
   // Isolated service fixtures mock only the delegates they exercise, so treat a
@@ -208,6 +231,7 @@ export async function getSlimeHome(student: StudentIdentity): Promise<SlimeHome>
         isEquipped: true,
         isRepresentative: true,
         equippedItemKeys: true,
+        hiddenItemKeys: true,
         equippedTitleKey: true,
       },
       orderBy: { createdAt: "asc" },
@@ -255,6 +279,15 @@ export async function getSlimeHome(student: StudentIdentity): Promise<SlimeHome>
   ) as Partial<Record<SlimeColor, string[]>>;
   const equippedItemKeys = Array.from(
     new Set(Object.values(equippedItemsByColor).flatMap((keys) => keys ?? [])),
+  );
+  const hiddenItemsByColor = Object.fromEntries(
+    owned.map((slime) => {
+      const color = slime.color as SlimeColor;
+      return [color, normalizeHiddenItemKeys(slime.hiddenItemKeys, equippedItemsByColor[color] ?? [])];
+    }),
+  ) as Partial<Record<SlimeColor, string[]>>;
+  const hiddenItemKeys = Array.from(
+    new Set(Object.values(hiddenItemsByColor).flatMap((keys) => keys ?? [])),
   );
   const equippedFloorByColor = Object.fromEntries(
     owned.map((slime) => [
@@ -329,6 +362,8 @@ export async function getSlimeHome(student: StudentIdentity): Promise<SlimeHome>
     ownedItemQuantities,
     equippedItemKeys,
     equippedItemsByColor,
+    hiddenItemKeys,
+    hiddenItemsByColor,
     equippedFloorByColor,
     equippedFloor: representativeColor
       ? equippedFloorByColor[representativeColor] ?? "none"
@@ -654,12 +689,27 @@ async function replaySlimeShopPurchase(
   student: StudentIdentity,
   sourceRef: string,
   item: SlimeShopItem,
+  chargeAmount: number,
 ): Promise<SlimeShopPurchaseResult | null> {
   const transaction = await db.transaction.findFirst({
     where: shopTransactionWhere(student.id, sourceRef),
   });
   if (!transaction) return null;
   if (transaction.note !== shopPurchaseNote(item.key)) {
+    throw new SlimeServiceError("idempotency_key_reused");
+  }
+  /**
+   * The note carries only the item key, so a replay with a different quantity
+   * would otherwise report success while charging the original amount. Comparing
+   * the charge keeps "same key means same request" true now that quantity is
+   * part of a purchase.
+   *
+   * The stored amount is the only record of the original quantity, so a catalog
+   * price change between the first call and a retry also trips this. That is the
+   * accepted trade: the caller gets 409 and retries with a fresh key, and no
+   * money moves incorrectly either way.
+   */
+  if (transaction.amount !== chargeAmount) {
     throw new SlimeServiceError("idempotency_key_reused");
   }
   const account = await db.studentAccount.findUnique({
@@ -678,6 +728,7 @@ export async function purchaseSlimeShopItem(
   student: StudentIdentity,
   itemKey: string,
   idempotencyKey: string,
+  requestedQuantity = 1,
 ): Promise<SlimeShopPurchaseResult> {
   const item = getSlimeShopItem(itemKey);
   if (!item) throw new SlimeServiceError("unknown_item");
@@ -685,9 +736,25 @@ export async function purchaseSlimeShopItem(
     throw new SlimeServiceError("unknown_item", "Invalid slime item price");
   }
   const isConsumable = item.category === "food";
+  /**
+   * Only consumables stack. Everything else is owned once per student and
+   * equipped per slime, so a quantity above one would charge for an item the
+   * student can never receive twice.
+   */
+  if (!Number.isSafeInteger(requestedQuantity) || requestedQuantity < 1) {
+    throw new SlimeServiceError("invalid_body", "Invalid purchase quantity");
+  }
+  if (!isConsumable && requestedQuantity !== 1) {
+    throw new SlimeServiceError("invalid_body", "Only consumables support quantity");
+  }
+  if (requestedQuantity > SLIME_MAX_PURCHASE_QUANTITY) {
+    throw new SlimeServiceError("invalid_body", "Purchase quantity too large");
+  }
+  const quantity = isConsumable ? requestedQuantity : 1;
+  const chargeAmount = item.price * quantity;
 
   const sourceRef = slimeShopPurchaseSourceRef(student.id, idempotencyKey);
-  const replay = await replaySlimeShopPurchase(student, sourceRef, item);
+  const replay = await replaySlimeShopPurchase(student, sourceRef, item, chargeAmount);
   if (replay) return replay;
 
   const account = await db.studentAccount.findUnique({
@@ -713,6 +780,14 @@ export async function purchaseSlimeShopItem(
         if (existing.note !== shopPurchaseNote(item.key)) {
           throw new SlimeServiceError("idempotency_key_reused");
         }
+        /**
+         * Same guard as the pre-transaction replay. Two requests sharing a key
+         * can both miss that check and race here, where only the loser sees
+         * `existing`, so the quantity comparison has to live on this path too.
+         */
+        if (existing.amount !== chargeAmount) {
+          throw new SlimeServiceError("idempotency_key_reused");
+        }
         const currentAccount = await tx.studentAccount.findUnique({
           where: { id: existing.accountId },
           select: { balance: true },
@@ -733,8 +808,8 @@ export async function purchaseSlimeShopItem(
       }
 
       const guarded = await tx.studentAccount.updateMany({
-        where: { id: account.id, studentId: student.id, balance: { gte: item.price } },
-        data: { balance: { decrement: item.price } },
+        where: { id: account.id, studentId: student.id, balance: { gte: chargeAmount } },
+        data: { balance: { decrement: chargeAmount } },
       });
       if (guarded.count !== 1) throw new SlimeServiceError("insufficient_funds");
 
@@ -748,7 +823,7 @@ export async function purchaseSlimeShopItem(
         data: {
           accountId: account.id,
           type: SLIME_ITEM_PURCHASE_SOURCE_TYPE,
-          amount: item.price,
+          amount: chargeAmount,
           balanceAfter: updatedAccount.balance,
           note: shopPurchaseNote(item.key),
           sourceType: SLIME_ITEM_PURCHASE_SOURCE_TYPE,
@@ -762,7 +837,7 @@ export async function purchaseSlimeShopItem(
         await tx.studentCreatureItem.update({
           where: { id: owned.id },
           data: {
-            quantity: isConsumable ? { increment: 1 } : 1,
+            quantity: isConsumable ? { increment: quantity } : 1,
             itemKind: `slime-${item.category}`,
             purchaseTransactionId: transaction.id,
           },
@@ -774,7 +849,7 @@ export async function purchaseSlimeShopItem(
             classroomId: student.classroomId,
             itemKey: item.key,
             itemKind: `slime-${item.category}`,
-            quantity: 1,
+            quantity,
             purchaseTransactionId: transaction.id,
           },
         });
@@ -788,7 +863,7 @@ export async function purchaseSlimeShopItem(
     });
   } catch (error) {
     if (isPrismaCode(error, "P2002")) {
-      const resolved = await replaySlimeShopPurchase(student, sourceRef, item);
+      const resolved = await replaySlimeShopPurchase(student, sourceRef, item, chargeAmount);
       if (resolved) return resolved;
       const owned = await db.studentCreatureItem?.findUnique?.({
         where: { studentId_itemKey: { studentId: student.id, itemKey: item.key } },
@@ -1127,6 +1202,18 @@ export async function refundSlimeShopItem(
 ): Promise<SlimeItemRefundResult> {
   const item = getSlimeShopItem(itemKey);
   if (!item) throw new SlimeServiceError("unknown_item");
+  /**
+   * Consumables cannot be refunded.
+   *
+   * Inventory tracks one running quantity and one `purchaseTransactionId`, which
+   * the newest purchase overwrites. A refund would hand back that last
+   * transaction's full amount while zeroing every unit on hand, so buying 99
+   * cookies, eating 98, then refunding would make the eaten ones free. Fixing
+   * that properly needs per-lot accounting; until then the money stays put.
+   */
+  if (item.category === "food") {
+    throw new SlimeServiceError("not_refundable", "Consumables cannot be refunded");
+  }
 
   return serializable(async (tx) => {
     const inventory = await tx.studentCreatureItem.findUnique({
@@ -1166,7 +1253,7 @@ export async function refundSlimeShopItem(
       },
     });
     if (
-      inventory.itemKind !== `slime-${item.category}` ||
+      !inventoryKindMatchesShopItem(item, inventory.itemKind) ||
       !purchase ||
       purchase.amount <= 0 ||
       purchase.type !== SLIME_ITEM_PURCHASE_SOURCE_TYPE ||
@@ -1214,12 +1301,16 @@ export async function refundSlimeShopItem(
     });
     const slimes = await tx.studentSlime.findMany({
       where: { studentId: student.id, equippedItemKeys: { has: item.key } },
-      select: { id: true, equippedItemKeys: true },
+      select: { id: true, equippedItemKeys: true, hiddenItemKeys: true },
     });
     for (const ownedSlime of slimes) {
+      const equippedItemKeys = ownedSlime.equippedItemKeys.filter((key) => key !== item.key);
       await tx.studentSlime.update({
         where: { id: ownedSlime.id },
-        data: { equippedItemKeys: ownedSlime.equippedItemKeys.filter((key) => key !== item.key) },
+        data: {
+          equippedItemKeys,
+          hiddenItemKeys: normalizeHiddenItemKeys(ownedSlime.hiddenItemKeys, equippedItemKeys),
+        },
       });
     }
 
@@ -1263,7 +1354,7 @@ export async function equipSlimeShopItem(
   return serializable(async (tx) => {
     const ownedSlime = await tx.studentSlime.findUnique({
       where: { studentId_color: { studentId: student.id, color: slime.color } },
-      select: { id: true, equippedItemKeys: true },
+      select: { id: true, equippedItemKeys: true, hiddenItemKeys: true },
     });
     if (!ownedSlime) throw new SlimeServiceError("not_owned");
     const inventory = await tx.studentCreatureItem.findUnique({
@@ -1271,7 +1362,7 @@ export async function equipSlimeShopItem(
     });
     if (
       !inventory ||
-      inventory.itemKind !== `slime-${item.category}` ||
+      !inventoryKindMatchesShopItem(item, inventory.itemKind) ||
       inventory.quantity < 1
     ) {
       throw new SlimeServiceError("not_owned");
@@ -1279,7 +1370,7 @@ export async function equipSlimeShopItem(
 
     const slimeRowsBefore = await tx.studentSlime.findMany({
       where: { studentId: student.id },
-      select: { id: true, color: true, isRepresentative: true, equippedItemKeys: true },
+      select: { id: true, color: true, isRepresentative: true, equippedItemKeys: true, hiddenItemKeys: true },
       orderBy: { createdAt: "asc" },
     });
     let nextKeys = normalizeEquippedSlimeItemKeys(
@@ -1304,16 +1395,29 @@ export async function equipSlimeShopItem(
             : normalizeEquippedSlimeItemKeys(row.equippedItemKeys),
       ]),
     );
+    const nextHiddenKeysBySlimeId = new Map(
+      slimeRowsBefore.map((row) => [
+        row.id,
+        normalizeHiddenItemKeys(row.hiddenItemKeys, nextKeysBySlimeId.get(row.id) ?? row.equippedItemKeys),
+      ]),
+    );
     const changedRows = slimeRowsBefore.filter((row) => {
       const rowNextKeys = nextKeysBySlimeId.get(row.id) ?? row.equippedItemKeys;
+      const rowNextHiddenKeys = nextHiddenKeysBySlimeId.get(row.id) ?? [];
+      const currentHiddenKeys = row.hiddenItemKeys ?? [];
       return rowNextKeys.length !== row.equippedItemKeys.length ||
-        rowNextKeys.some((key, index) => key !== row.equippedItemKeys[index]);
+        rowNextKeys.some((key, index) => key !== row.equippedItemKeys[index]) ||
+        rowNextHiddenKeys.length !== currentHiddenKeys.length ||
+        rowNextHiddenKeys.some((key, index) => key !== currentHiddenKeys[index]);
     });
     await Promise.all(
       changedRows.map((row) =>
         tx.studentSlime.update({
           where: { id: row.id },
-          data: { equippedItemKeys: nextKeysBySlimeId.get(row.id) ?? row.equippedItemKeys },
+          data: {
+            equippedItemKeys: nextKeysBySlimeId.get(row.id) ?? row.equippedItemKeys,
+            hiddenItemKeys: nextHiddenKeysBySlimeId.get(row.id) ?? [],
+          },
         }),
       ),
     );
@@ -1322,6 +1426,15 @@ export async function equipSlimeShopItem(
       slimeRowsBefore.map((row) => [row.color, nextKeysBySlimeId.get(row.id) ?? row.equippedItemKeys]),
     ) as Partial<Record<SlimeColor, string[]>>;
     const equippedItemKeys = Array.from(new Set(Object.values(equippedItemsByColor).flatMap((keys) => keys ?? [])));
+    const hiddenItemsByColor = Object.fromEntries(
+      slimeRowsBefore.map((row) => [
+        row.color,
+        nextHiddenKeysBySlimeId.get(row.id) ?? [],
+      ]),
+    ) as Partial<Record<SlimeColor, string[]>>;
+    const hiddenItemKeys = Array.from(
+      new Set(Object.values(hiddenItemsByColor).flatMap((keys) => keys ?? [])),
+    );
     const slotItemKeys = SLIME_SHOP_CATALOG
       .filter((candidate) => slimeVisualItemSlot(candidate) === itemSlot)
       .map((candidate) => candidate.key);
@@ -1352,11 +1465,100 @@ export async function equipSlimeShopItem(
       isEquipped,
       equippedItemKeys,
       equippedItemsByColor,
+      hiddenItemKeys,
+      hiddenItemsByColor,
       equippedFloorByColor,
       equippedFloor: representativeColor
         ? equippedFloorByColor[representativeColor] ?? "none"
         : "none",
       idempotent: changedRows.length === 0,
+    };
+  });
+}
+
+/** Keep an equipped item active while controlling only its visual visibility. */
+export async function setSlimeShopItemHidden(
+  student: StudentIdentity,
+  slimeColor: string,
+  itemKey: string,
+  isHidden: boolean,
+): Promise<SlimeShopVisibilityResult> {
+  const slime = getSlimeDefinition(slimeColor);
+  const normalizedKey = typeof itemKey === "string" ? itemKey.trim() : "";
+  const item = getSlimeShopItem(normalizedKey);
+  if (!slime || !item || !slimeVisualItemSlot(item) || typeof isHidden !== "boolean") {
+    throw new SlimeServiceError("invalid_body");
+  }
+
+  return serializable(async (tx) => {
+    const [ownedSlime, inventory, slimeRows] = await Promise.all([
+      tx.studentSlime.findUnique({
+        where: { studentId_color: { studentId: student.id, color: slime.color } },
+        select: { id: true, equippedItemKeys: true, hiddenItemKeys: true },
+      }),
+      tx.studentCreatureItem.findUnique({
+        where: { studentId_itemKey: { studentId: student.id, itemKey: item.key } },
+      }),
+      tx.studentSlime.findMany({
+        where: { studentId: student.id },
+        select: { id: true, color: true, equippedItemKeys: true, hiddenItemKeys: true },
+        orderBy: { createdAt: "asc" },
+      }),
+    ]);
+    if (!ownedSlime) throw new SlimeServiceError("not_owned");
+    if (
+      !inventory ||
+      !inventoryKindMatchesShopItem(item, inventory.itemKind) ||
+      inventory.quantity < 1
+    ) {
+      throw new SlimeServiceError("not_owned");
+    }
+    if (isHidden && !ownedSlime.equippedItemKeys.includes(item.key)) {
+      throw new SlimeServiceError("invalid_body");
+    }
+
+    const previousHidden = normalizeHiddenItemKeys(
+      ownedSlime.hiddenItemKeys,
+      ownedSlime.equippedItemKeys,
+    );
+    const nextHiddenItemKeys = isHidden
+      ? Array.from(new Set([...previousHidden, item.key]))
+      : previousHidden.filter((key) => key !== item.key);
+    const idempotent = nextHiddenItemKeys.length === previousHidden.length &&
+      nextHiddenItemKeys.every((key, index) => key === previousHidden[index]);
+    if (!idempotent || (ownedSlime.hiddenItemKeys?.length ?? 0) !== previousHidden.length) {
+      await tx.studentSlime.update({
+        where: { id: ownedSlime.id },
+        data: { hiddenItemKeys: nextHiddenItemKeys },
+      });
+    }
+
+    const equippedItemsByColor = Object.fromEntries(
+      slimeRows.map((row) => [row.color, normalizeEquippedSlimeItemKeys(row.equippedItemKeys)]),
+    ) as Partial<Record<SlimeColor, string[]>>;
+    const hiddenItemsByColor = Object.fromEntries(
+      slimeRows.map((row) => [
+        row.color,
+        row.id === ownedSlime.id
+          ? nextHiddenItemKeys
+          : normalizeHiddenItemKeys(row.hiddenItemKeys, row.equippedItemKeys),
+      ]),
+    ) as Partial<Record<SlimeColor, string[]>>;
+    const hiddenItemKeys = Array.from(
+      new Set(Object.values(hiddenItemsByColor).flatMap((keys) => keys ?? [])),
+    );
+    const equippedItemKeys = Array.from(
+      new Set(Object.values(equippedItemsByColor).flatMap((keys) => keys ?? [])),
+    );
+    return {
+      slimeColor: slime.color,
+      itemKey: item.key,
+      isHidden,
+      equippedItemKeys,
+      equippedItemsByColor,
+      hiddenItemKeys,
+      hiddenItemsByColor,
+      idempotent,
     };
   });
 }

@@ -38,11 +38,21 @@ export const SLIME_FLOORS = [
   "sand-trail-floor",
   "forest-soil-floor",
   "stone-floor",
-  "water-puddle",
-  "trampoline",
 ] as const;
 
 export type SlimeFloor = (typeof SLIME_FLOORS)[number];
+
+/**
+ * How a vehicle meets the scene.
+ *
+ * `grounded` rests its own base on the static floor surface, so the slime only
+ * rises by the seat height. `floating` never touches the floor, so its rise is
+ * large enough to need the taller overlay canvas. Vehicles never replace the
+ * floor: a player who wants water under a tube buys the matching background.
+ */
+export const SLIME_VEHICLE_STANCES = ["grounded", "floating"] as const;
+
+export type SlimeVehicleStance = (typeof SLIME_VEHICLE_STANCES)[number];
 
 export const SLIME_EVOLUTIONS = [
   "base",
@@ -72,9 +82,19 @@ export type SlimeDefinition = {
   readonly spritePath: string;
 };
 
-export const SLIME_SHOP_CATEGORIES = ["background", "ride", "drink", "food", "prop", "wearable"] as const;
+export const SLIME_SHOP_CATEGORIES = [
+  "background",
+  "ride",
+  "vehicle",
+  "drink",
+  "food",
+  "prop",
+  "wearable",
+] as const;
 
 export type SlimeShopCategory = (typeof SLIME_SHOP_CATEGORIES)[number];
+
+export type SlimeShopTier = 1 | 2 | 3;
 
 export type SlimeShopItem = {
   readonly key: string;
@@ -83,6 +103,8 @@ export type SlimeShopItem = {
   readonly floor: Exclude<SlimeFloor, "none"> | null;
   readonly labelKo: string;
   readonly price: number;
+  /** Explicit tier for tiered shop items such as vehicles. */
+  readonly tier?: SlimeShopTier;
   readonly spritePath: string;
   readonly mobileSpritePath?: string;
   readonly staticSpritePath?: string;
@@ -93,6 +115,42 @@ export type SlimeShopItem = {
   /** Imported anchor-overlay slot and option for wearable shop items. */
   readonly wearableRole?: "blush" | "eyewear" | "headwear";
   readonly wearableOption?: string;
+  /** Vehicle stance; present only for `vehicle` shop items. */
+  readonly vehicleStance?: SlimeVehicleStance;
+  /**
+   * Pixels the slime is lifted so it reads as seated in the vehicle. Measured
+   * against the 64px character viewport, matching `slimeFootY`.
+   *
+   * Fixed on purpose. A per-frame offset would stack on the slime's own idle
+   * squash and double the amplitude, which reads as hovering rather than riding.
+   */
+  readonly vehicleRiseY?: number;
+  /** Pixels the vehicle is shifted horizontally inside its scene slot. */
+  readonly vehicleOffsetX?: number;
+  /**
+   * Vehicle parts that stay planted while the body moves, such as wheels. Drawn
+   * behind the character so the body layer can overlap them.
+   */
+  readonly vehicleGroundedSpritePath?: string;
+  /** Transparent effect sheets synchronized to the vehicle's main frame clock. */
+  readonly vehicleEffectSpritePaths?: readonly string[];
+  /** Frames in the vehicle sheet. Omitted means a single static image. */
+  readonly vehicleFrameCount?: number;
+  /** Frames in the grounded-part sheet, such as a wheel rotation. */
+  readonly vehicleGroundedFrameCount?: number;
+  /**
+   * Fixed frame duration for the grounded part, in milliseconds. A rotation runs
+   * at a constant rate, unlike the body's variable idle timing.
+   */
+  readonly vehicleGroundedFrameDurationMs?: number;
+  /** Height of the vehicle canvas; taller than the viewport when art needs headroom. */
+  readonly vehicleCanvasHeight?: number;
+  /** Where the character sits inside a taller vehicle canvas. */
+  readonly vehicleCharacterOffsetY?: number;
+  /** Per-frame vertical bob authored into the vehicle. The rider follows it. */
+  readonly vehicleBobY?: readonly number[];
+  /** Animated vehicle sheet; `spritePath` stays the still shop image. */
+  readonly vehicleSheetPath?: string;
   readonly effectKey?: SlimeEffectKey;
   readonly effectBps?: number;
 };

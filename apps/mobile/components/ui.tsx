@@ -308,27 +308,37 @@ export function AppBottomSheet({
   const safePaddingBottom = contentPaddingBottom + insets.bottom;
 
   useEffect(() => {
-    if (visible) translateY.setValue(0);
-  }, [translateY, visible]);
+    if (!visible) return;
+    // A previous sheet can still be finishing its dismiss animation when the
+    // parent immediately opens this component for a different record. Cancel
+    // that stale callback so it cannot close the newly opened sheet.
+    translateY.stopAnimation();
+    translateY.setValue(0);
+  }, [accessibilityLabel, translateY, visible]);
 
   dismissRef.current = () => {
-    Animated.timing(translateY, {
-      toValue: 720,
-      duration: 180,
-      useNativeDriver: true,
-    }).start(() => {
-      onCloseRef.current();
-    });
+    // Close synchronously. Keeping a transparent native Modal mounted during a
+    // dismissal animation can leave an invisible touch-blocking window over a
+    // newly opened sheet on Android.
+    translateY.stopAnimation();
+    translateY.setValue(0);
+    onCloseRef.current();
   };
 
   const panResponder = useRef(
     PanResponder.create({
+      // This responder exists only on the dedicated handle area. Claim the
+      // gesture at touch-down so Android native Modals keep delivering move
+      // events; waiting until movement can lose the stream entirely.
       onStartShouldSetPanResponder: () => true,
       onStartShouldSetPanResponderCapture: () => true,
       onMoveShouldSetPanResponder: (_event, gesture) =>
         gesture.dy > 4 && Math.abs(gesture.dy) > Math.abs(gesture.dx),
       onMoveShouldSetPanResponderCapture: (_event, gesture) =>
         gesture.dy > 4 && Math.abs(gesture.dy) > Math.abs(gesture.dx),
+      onPanResponderGrant: () => {
+        translateY.stopAnimation();
+      },
       onPanResponderMove: (_event, gesture) => {
         translateY.setValue(Math.max(0, gesture.dy));
       },

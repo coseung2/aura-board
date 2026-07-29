@@ -1,0 +1,9 @@
+{
+  "frames": [
+    { "filename": "bumper-car-wheels-idle 0.aseprite", "frame": { "x": 0, "y": 0, "w": 64, "h": 81 }, "rotated": false, "trimmed": false, "spriteSourceSize": { "x": 0, "y": 0, "w": 64, "h": 81 }, "sourceSize": { "w": 64, "h": 81 }, "duration": 100 },
+    { "filename": "bumper-car-wheels-idle 1.aseprite", "frame": { "x": 64, "y": 0, "w": 64, "h": 81 }, "rotated": false, "trimmed": false, "spriteSourceSize": { "x": 0, "y": 0, "w": 64, "h": 81 }, "sourceSize": { "w": 64, "h": 81 }, "duration": 100 },
+    { "filename": "bumper-car-wheels-idle 2.aseprite", "frame": { "x": 128, "y": 0, "w": 64, "h": 81 }, "rotated": false, "trimmed": false, "spriteSourceSize": { "x": 0, "y": 0, "w": 64, "h": 81 }, "sourceSize": { "w": 64, "h": 81 }, "duration": 100 },
+    { "filename": "bumper-car-wheels-idle 3.aseprite", "frame": { "x": 192, "y": 0, "w": 64, "h": 81 }, "rotated": false, "trimmed": false, "spriteSourceSize": { "x": 0, "y": 0, "w": 64, "h": 81 }, "sourceSize": { "w": 64, "h": 81 }, "duration": 100 }
+  ],
+  "meta": { "app": "https://www.aseprite.org/", "version": "1.x-dev", "image": "wheels-idle-sheet.png", "format": "RGBA8888", "size": { "w": 256, "h": 81 }, "scale": "1" }
+}

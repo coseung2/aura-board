@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
+import { isAuthorizedCronRequest } from "@/lib/cron-auth";
 
 /**
  * Daily maturity sweep. Scheduled via vercel.json at 00:05 KST (15:05 UTC).
@@ -11,9 +12,7 @@ import { db } from "@/lib/db";
  * double-invocation processes the same fixed deposit at most once.
  */
 export async function GET(req: Request) {
-  const auth = req.headers.get("authorization");
-  const cronSecret = process.env.CRON_SECRET;
-  if (cronSecret && auth !== `Bearer ${cronSecret}`) {
+  if (!isAuthorizedCronRequest(req)) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 

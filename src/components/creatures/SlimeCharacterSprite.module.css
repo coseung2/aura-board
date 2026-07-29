@@ -1,13 +1,17 @@
 .frame {
   position: relative;
   display: grid;
-  width: 88px;
-  height: 88px;
+  width: 64px;
+  min-height: 64px;
   place-items: center;
   overflow: visible;
+}
+
+.sceneFrame {
+  width: 96px;
+  min-height: 96px;
 }
 
 .frame > div {
   flex: 0 0 auto;
 }
-

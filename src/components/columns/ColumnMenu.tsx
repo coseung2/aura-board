@@ -40,6 +40,39 @@ export function ColumnMenu({
   const [pos, setPos] = useState<{ top: number; right: number } | null>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const menuVisible = open && pos !== null;
+
+  function getEnabledControls() {
+    return Array.from(
+      dropdownRef.current?.querySelectorAll<HTMLButtonElement>(
+        'button[role^="menuitem"]:not(:disabled)'
+      ) ?? []
+    );
+  }
+
+  function closeAndRestoreFocus() {
+    setOpen(false);
+    triggerRef.current?.focus();
+  }
+
+  function closeAfterAction(action: () => void) {
+    setOpen(false);
+    action();
+    if (dropdownRef.current?.contains(document.activeElement)) {
+      triggerRef.current?.focus();
+    }
+  }
+
+  useEffect(() => {
+    if (!menuVisible) return;
+    const controls = getEnabledControls();
+    const selected = controls.find(
+      (control) =>
+        control.getAttribute("role") === "menuitemradio" &&
+        control.getAttribute("aria-checked") === "true"
+    );
+    (selected ?? controls[0])?.focus();
+  }, [menuVisible]);
 
   useEffect(() => {
     if (!open) return;
@@ -75,6 +108,43 @@ export function ColumnMenu({
 
   const showSortSection = canSort;
 
+  function handleMenuKeyDown(e: React.KeyboardEvent<HTMLDivElement>) {
+    if (e.key === "Escape") {
+      e.preventDefault();
+      e.stopPropagation();
+      closeAndRestoreFocus();
+      return;
+    }
+
+    if (e.key === "Tab") {
+      setOpen(false);
+      return;
+    }
+
+    if (!["ArrowDown", "ArrowUp", "Home", "End"].includes(e.key)) {
+      return;
+    }
+
+    const controls = getEnabledControls();
+    if (controls.length === 0) return;
+
+    e.preventDefault();
+    const currentIndex = controls.indexOf(document.activeElement as HTMLButtonElement);
+    let nextIndex: number;
+    if (e.key === "Home") {
+      nextIndex = 0;
+    } else if (e.key === "End") {
+      nextIndex = controls.length - 1;
+    } else if (e.key === "ArrowDown") {
+      nextIndex = currentIndex < 0 ? 0 : (currentIndex + 1) % controls.length;
+    } else {
+      nextIndex = currentIndex < 0
+        ? controls.length - 1
+        : (currentIndex - 1 + controls.length) % controls.length;
+    }
+    controls[nextIndex]?.focus();
+  }
+
   const dropdown =
     open && pos ? (
       <div
@@ -87,6 +157,7 @@ export function ColumnMenu({
           right: pos.right,
         }}
         onClick={(e) => e.stopPropagation()}
+        onKeyDown={handleMenuKeyDown}
       >
         {showSortSection && (
           <>
@@ -102,8 +173,7 @@ export function ColumnMenu({
                   className={`ctx-menu-item ctx-menu-item-radio${selected ? " is-selected" : ""}`}
                   onClick={(e) => {
                     e.stopPropagation();
-                    setOpen(false);
-                    onSetSort(o.value);
+                    closeAfterAction(() => onSetSort(o.value));
                   }}
                 >
                   <span className="ctx-menu-check" aria-hidden="true">
@@ -121,11 +191,11 @@ export function ColumnMenu({
             key={i}
             type="button"
             role="menuitem"
+            disabled={a.disabled}
             className={`ctx-menu-item${a.danger ? " ctx-menu-item-danger" : ""}`}
             onClick={(e) => {
               e.stopPropagation();
-              setOpen(false);
-              a.onClick();
+              closeAfterAction(a.onClick);
             }}
           >
             {a.icon && <span className="ctx-menu-icon">{a.icon}</span>}

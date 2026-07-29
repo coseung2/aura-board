@@ -15,6 +15,7 @@ import {
   calculateGrowthTimeComparison,
   calculateSlimeGrowthPercent,
   catalogHasSceneBackgrounds,
+  groupSlimeShopItemsByTier,
   isSceneBackgroundItem,
   mobileSlimeBuffGroups,
   normalizeSlimeHome,
@@ -47,6 +48,7 @@ describe("mobile slime parity model", () => {
       representativeColor: "blue",
       ownedItemKeys: [SLIME_COOKIE_ITEM_KEY],
       ownedItemQuantities: { [SLIME_COOKIE_ITEM_KEY]: 4 },
+      hiddenItemsByColor: { blue: ["water-puddle-background"] },
       growthSpeedBps: 200,
       growthByColor: {
         blue: {
@@ -61,13 +63,24 @@ describe("mobile slime parity model", () => {
 
     expect(home.representativeColor).toBe("blue");
     expect(home.ownedItemQuantities[SLIME_COOKIE_ITEM_KEY]).toBe(4);
+    expect(home.hiddenItemsByColor).toEqual({ blue: ["water-puddle-background"] });
     expect(home.growthSpeedBps).toBe(200);
     expect(calculateSlimeGrowthPercent(home.growthByColor.blue!)).toBe(50);
   });
 
+  it("shows carried growth below one percent instead of resetting it to zero", () => {
+    const stageTwoStart = 10 * 86_400;
+    const carriedSeconds = Math.round(0.004 * 15 * 86_400);
+
+    expect(calculateSlimeGrowthPercent({
+      stage: 2,
+      growthSeconds: stageTwoStart + carriedSeconds,
+    })).toBe(0.4);
+  });
+
   it("maps API categories to shop tabs and keeps legacy floors separate from scene backgrounds", () => {
     const item = (
-      category: "background" | "ride" | "drink" | "food" | "prop" | "wearable" | "level-up",
+      category: "background" | "ride" | "vehicle" | "drink" | "food" | "prop" | "wearable" | "level-up",
       floor: SlimeShopItem["floor"] = null,
       wearableRole?: "blush" | "eyewear" | "headwear",
     ) => ({ category, floor, wearableRole });
@@ -76,7 +89,8 @@ describe("mobile slime parity model", () => {
     expect(isSceneBackgroundItem(item("background", "grass-floor"))).toBe(false);
     expect(shopFilterForItem(item("background"))).toBe("background");
     expect(shopFilterForItem(item("background", "grass-floor"))).toBe("floor");
-    expect(shopFilterForItem(item("ride", "trampoline"))).toBe("floor");
+    expect(shopFilterForItem(item("ride", "trampoline"))).toBe("vehicle");
+    expect(shopFilterForItem(item("vehicle"))).toBe("vehicle");
     expect(shopFilterForItem(item("food"))).toBe("food");
     expect(shopFilterForItem(item("drink"))).toBe("prop");
     expect(shopFilterForItem(item("prop"))).toBe("prop");
@@ -109,6 +123,7 @@ describe("mobile slime parity model", () => {
     expect(slimeShopNavItems(legacyOnly).map((tab) => tab.key)).toEqual([
       "character",
       "floor",
+      "vehicle",
       "food",
       "prop",
       "outfit",
@@ -118,6 +133,7 @@ describe("mobile slime parity model", () => {
       "character",
       "background",
       "floor",
+      "vehicle",
       "food",
       "prop",
       "outfit",
@@ -188,6 +204,53 @@ describe("mobile slime parity model", () => {
       effectKey: "walking_reward",
       effectBps: 300,
     });
+  });
+
+  it("preserves explicit vehicle tiers while keeping price-based group labels", () => {
+    const home = normalizeSlimeHome({
+      shopCatalog: [
+        {
+          key: "vehicle-tier-1",
+          category: "vehicle",
+          floor: null,
+          labelKo: "최고급 탈것",
+          price: 1_000,
+          tier: 1,
+          spritePath: "/tier-1.png",
+        },
+        {
+          key: "vehicle-tier-2",
+          category: "vehicle",
+          floor: null,
+          labelKo: "고급 탈것",
+          price: 700,
+          tier: 2,
+          spritePath: "/tier-2.png",
+          vehicleOffsetX: 2.9,
+        },
+        {
+          key: "vehicle-tier-3",
+          category: "vehicle",
+          floor: null,
+          labelKo: "기본 탈것",
+          price: 500,
+          tier: 3,
+          spritePath: "/tier-3.png",
+        },
+      ],
+    });
+
+    expect(home.shopCatalog.map(({ tier, price }) => [tier, price])).toEqual([
+      [1, 1_000],
+      [2, 700],
+      [3, 500],
+    ]);
+    expect(home.shopCatalog[1]?.vehicleOffsetX).toBe(2);
+    expect(groupSlimeShopItemsByTier(home.shopCatalog).map(({ price, label }) => [price, label])).toEqual([
+      [500, "기본"],
+      [700, "고급"],
+      [1_000, "최고급"],
+    ]);
   });
 
   it("normalizes imported wearable metadata and routes it to the outfit tab", () => {
@@ -338,9 +401,9 @@ describe("mobile slime parity model", () => {
   });
 
   it("keeps the scene background feather contract proportional to the rendered asset", () => {
-    expect(SCENE_BACKGROUND_FEATHER_RATIO).toBe(0.0625);
-    expect(sceneBackgroundFeatherInset(64)).toBe(4);
-    expect(sceneBackgroundFeatherInset(256)).toBe(16);
+    expect(SCENE_BACKGROUND_FEATHER_RATIO).toBe(0.1875);
+    expect(sceneBackgroundFeatherInset(64)).toBe(12);
+    expect(sceneBackgroundFeatherInset(256)).toBe(48);
     expect(sceneBackgroundFeatherInset(0)).toBe(0);
   });
 
@@ -393,6 +456,7 @@ describe("mobile slime parity model", () => {
           color: "purple",
           growthStage: 2,
           equippedItemKeys: ["water-puddle-background"],
+          hiddenItemKeys: ["water-puddle-background"],
           equippedTitleKey: "weekly-50k",
         },
       },
@@ -416,6 +480,7 @@ describe("mobile slime parity model", () => {
           color: "green",
           growthStage: 1,
           equippedItemKeys: [],
+          hiddenItemKeys: [],
           equippedTitleKey: null,
         },
       },
@@ -433,6 +498,7 @@ describe("mobile slime parity model", () => {
           color: "purple",
           growthStage: 2,
           equippedItemKeys: ["water-puddle-background"],
+          hiddenItemKeys: ["water-puddle-background"],
           equippedTitleKey: "weekly-50k",
         },
       },
@@ -456,6 +522,7 @@ describe("mobile slime parity model", () => {
           color: "green",
           growthStage: 1,
           equippedItemKeys: [],
+          hiddenItemKeys: [],
           equippedTitleKey: null,
         },
       },

@@ -5,6 +5,7 @@ import { ForbiddenError } from "@/lib/rbac";
 import { resolveIdentities } from "@/lib/identity";
 import { canEditCard, type BoardLike, type CardLike } from "@/lib/card-permissions";
 import { touchBoardUpdatedAt } from "@/lib/board-touch";
+import { requireShareAuth } from "@/lib/share/with-share";
 
 const MoveCardSchema = z.object({
   sectionId: z.string().nullable(),
@@ -31,7 +32,22 @@ export async function PATCH(
     });
     if (!board) return NextResponse.json({ error: "Board not found" }, { status: 404 });
 
-    const identity = await resolveIdentities();
+    let identity = await resolveIdentities();
+    const shareToken = req.headers.get("x-share-token");
+    if (shareToken) {
+      const shareResult = await requireShareAuth(shareToken, "student");
+      if (!("identity" in shareResult)) {
+        return NextResponse.json({ error: shareResult.error }, { status: shareResult.status });
+      }
+      identity = {
+        ...identity,
+        share: {
+          ...shareResult.identity,
+          guestId: req.headers.get("x-share-guest-id")?.trim() || null,
+        },
+        primary: identity.primary === "anon" ? "share" : identity.primary,
+      };
+    }
     const boardLike: BoardLike = {
       id: board.id,
       classroomId: board.classroomId,
@@ -42,6 +58,7 @@ export async function PATCH(
       boardId: card.boardId,
       authorId: card.authorId,
       studentAuthorId: card.studentAuthorId,
+      externalAuthorKey: card.externalAuthorKey,
     };
     if (!canEditCard(identity, boardLike, cardLike)) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
@@ -50,10 +67,25 @@ export async function PATCH(
     const body = await req.json();
     const input = MoveCardSchema.parse(body);
 
-    const updated = await db.card.update({
-      where: { id },
-      data: { sectionId: input.sectionId, order: input.order },
+    const updated = await db.$transaction(async (tx) => {
+      if (input.sectionId) {
+        const section = await tx.section.findFirst({
+          where: { id: input.sectionId, boardId: card.boardId },
+          select: { id: true },
+        });
+        if (!section) return null;
+      }
+      return tx.card.update({
+        where: { id },
+        data: { sectionId: input.sectionId, order: input.order },
+      });
     });
+    if (!updated) {
+      return NextResponse.json(
+        { error: "sectionId does not belong to boardId" },
+        { status: 400 },
+      );
+    }
 
     // classroom-boards-tab "🟢 새 활동" 배지 — 카드 이동도 활동 신호로 간주.
     await touchBoardUpdatedAt(card.boardId, { action: "card.moved" });

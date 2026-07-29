@@ -2,9 +2,16 @@ import { useRef, type KeyboardEvent, type RefObject } from "react";
 import { createPortal } from "react-dom";
 
 import { formatBpsPercent } from "@/lib/pets/math";
-import { isSlimeSceneBackground, slimeShopPreviewColor } from "@/lib/pets/catalog";
+import {
+  isSlimeSceneBackground,
+  slimeShopPreviewColor,
+} from "@/lib/pets/catalog";
 import type { EquippedFloor, SlimeAction } from "@/lib/pets/slime-assets";
-import type { SlimeColor, SlimeDefinition, SlimeShopItem } from "@/lib/pets/types";
+import type {
+  SlimeColor,
+  SlimeDefinition,
+  SlimeShopItem,
+} from "@/lib/pets/types";
 
 import { OfficialSlimeSprite } from "./OfficialSlimeSprite";
 import styles from "./SlimePetPage.module.css";
@@ -21,6 +28,8 @@ import {
 } from "./SlimePetModel";
 
 type Props = {
+  presentation?: "drawer" | "inline";
+  supportsBackground?: boolean;
   catalog: SlimeDefinition[];
   drawerItems: SlimeShopItem[];
   ownedKeys: SlimeColor[];
@@ -34,30 +43,34 @@ type Props = {
   busyColor: SlimeColor | null;
   busyItemKey: string | null;
   notice: Notice | null;
-  closeButtonRef: RefObject<HTMLButtonElement | null>;
-  onClose: () => void;
+  closeButtonRef?: RefObject<HTMLButtonElement | null>;
+  onClose?: () => void;
   onFilterChange: (filter: ShopFilter) => void;
   onPurchaseSlime: (color: SlimeColor) => void;
   onRefundSlime: (slime: SlimeDefinition) => void;
   onPurchaseItem: (item: SlimeShopItem) => void;
   onRefundItem: (item: SlimeShopItem) => void;
-  onEquipItem: (color: SlimeColor, item: SlimeShopItem, nextEquipped: boolean) => void;
+  onEquipItem: (
+    color: SlimeColor,
+    item: SlimeShopItem,
+    nextEquipped: boolean,
+  ) => void;
 };
+
+const SLIME_TRAMPOLINE_ITEM_KEY = "slime-blue-trampoline";
 
 function previewState(item: SlimeShopItem): {
   action: SlimeAction;
   equippedFloor: EquippedFloor;
 } {
-  const floor = item.floor;
-  if (floor === "water-puddle" || floor === "trampoline") {
-    return { action: "floor-interaction", equippedFloor: floor };
-  }
-  if (floor === "grass-floor") {
-    return { action: "idle", equippedFloor: floor };
-  }
+  const usesTrampoline = item.key === SLIME_TRAMPOLINE_ITEM_KEY;
   return {
-    action: item.category === "drink" ? "drink" : "idle",
-    equippedFloor: "none",
+    action: usesTrampoline
+      ? "floor-interaction"
+      : item.category === "drink"
+        ? "drink"
+        : "idle",
+    equippedFloor: usesTrampoline ? "trampoline" : item.floor ?? "none",
   };
 }
 
@@ -89,6 +102,8 @@ const OUTFIT_SUBGROUP_LABELS: Record<OutfitSubgroup, string> = {
 };
 
 export function SlimePetShopDrawer({
+  presentation = "drawer",
+  supportsBackground = false,
   catalog,
   drawerItems,
   ownedKeys,
@@ -111,24 +126,45 @@ export function SlimePetShopDrawer({
   onRefundItem,
   onEquipItem,
 }: Props) {
-  const wardrobeName = catalog.find((slime) => slime.color === wardrobeColor)?.nameKo ?? "슬라임";
+  const wardrobeName =
+    catalog.find((slime) => slime.color === wardrobeColor)?.nameKo ?? "슬라임";
   const tabRefs = useRef<Array<HTMLButtonElement | null>>([]);
+  const navigationItems =
+    presentation === "inline"
+      ? SHOP_NAV_ITEMS.filter(
+          ({ key }) =>
+            key !== "all" &&
+            key !== "level-up" &&
+            (key !== "background" || supportsBackground),
+        )
+      : SHOP_NAV_ITEMS;
 
-  const handleTabKeyDown = (event: KeyboardEvent<HTMLButtonElement>, index: number) => {
+  const handleTabKeyDown = (
+    event: KeyboardEvent<HTMLButtonElement>,
+    index: number,
+  ) => {
     const key = event.key;
-    if (key !== "ArrowRight" && key !== "ArrowDown" && key !== "ArrowLeft" && key !== "ArrowUp" && key !== "Home" && key !== "End") {
+    if (
+      key !== "ArrowRight" &&
+      key !== "ArrowDown" &&
+      key !== "ArrowLeft" &&
+      key !== "ArrowUp" &&
+      key !== "Home" &&
+      key !== "End"
+    ) {
       return;
     }
     event.preventDefault();
-    const lastIndex = SHOP_NAV_ITEMS.length - 1;
-    const nextIndex = key === "Home"
-      ? 0
-      : key === "End"
-        ? lastIndex
-        : key === "ArrowRight" || key === "ArrowDown"
-          ? (index + 1) % SHOP_NAV_ITEMS.length
-          : (index - 1 + SHOP_NAV_ITEMS.length) % SHOP_NAV_ITEMS.length;
-    const next = SHOP_NAV_ITEMS[nextIndex];
+    const lastIndex = navigationItems.length - 1;
+    const nextIndex =
+      key === "Home"
+        ? 0
+        : key === "End"
+          ? lastIndex
+          : key === "ArrowRight" || key === "ArrowDown"
+            ? (index + 1) % navigationItems.length
+            : (index - 1 + navigationItems.length) % navigationItems.length;
+    const next = navigationItems[nextIndex];
     if (!next) return;
     onFilterChange(next.key);
     tabRefs.current[nextIndex]?.focus();
@@ -154,29 +190,54 @@ export function SlimePetShopDrawer({
     // suppress the composed drink layer.
     const isDrink = item.category === "drink";
     const isWearable = item.category === "wearable";
-    const previewDrinkFlavor = isDrink ? item.animationKey ?? null : null;
-    const previewWearables = isDrink || isWearable
-      ? slimeWearablesFromItems([item])
-      : undefined;
-    const itemSpritePath = isDrink || isWearable
-      ? undefined
-      : slimeItemSpritePath(item, previewColor);
+    const isVehicle = item.category === "vehicle" || item.category === "ride";
+    const usesTrampoline = item.key === SLIME_TRAMPOLINE_ITEM_KEY;
+    const renderedVehicle = isVehicle && !usesTrampoline ? item : null;
+    const previewDrinkFlavor = isDrink ? (item.animationKey ?? null) : null;
+    const previewWearables =
+      isDrink || isWearable ? slimeWearablesFromItems([item]) : undefined;
     const sceneBackground = isSlimeSceneBackground(item);
-    const effectLabel = item.effectKey && item.effectBps
-      ? `${EFFECT_LABELS[item.effectKey]} +${formatBpsPercent(item.effectBps)}`
-      : null;
+    const effectLabel =
+      item.effectKey && item.effectBps
+        ? `${EFFECT_LABELS[item.effectKey]} +${formatBpsPercent(item.effectBps)}`
+        : null;
     const isBall = item.key.startsWith("slime-ball-");
+    const itemSpritePath = isBall
+      ? slimeItemSpritePath(item, previewColor)
+      : undefined;
+    const hasScene = Boolean(
+      sceneBackground || isVehicle || preview.equippedFloor !== "none",
+    );
 
     return (
-      <li key={item.key} className={styles.shopItem}>
-        <div className={styles.shopImageFrame}>
+      <li
+        key={item.key}
+        className={`${styles.shopItem} ${hasScene ? styles.shopItemScene : ""}`.trim()}
+      >
+        <div
+          className={`${styles.shopImageFrame} ${hasScene ? styles.shopImageFrameScene : ""}`.trim()}
+          style={sceneBackground
+            ? { backgroundImage: `url("${item.spritePath}")` }
+            : undefined}
+        >
           <OfficialSlimeSprite
             slimeColor={previewColor}
             evolution="base"
             action={preview.action}
             equippedFloor={preview.equippedFloor}
-            itemSpritePath={sceneBackground ? undefined : itemSpritePath}
-            backgroundSpritePath={sceneBackground ? item.spritePath : undefined}
+            itemSpritePath={itemSpritePath}
+            expandSceneSurfaces={sceneBackground}
+            vehicleSpritePath={renderedVehicle?.vehicleSheetPath ?? renderedVehicle?.spritePath}
+            vehicleGroundedSpritePath={renderedVehicle?.vehicleGroundedSpritePath}
+            vehicleEffectSpritePaths={renderedVehicle?.vehicleEffectSpritePaths}
+            vehicleFrameCount={renderedVehicle?.vehicleFrameCount}
+            vehicleGroundedFrameCount={renderedVehicle?.vehicleGroundedFrameCount}
+            vehicleGroundedFrameDurationMs={renderedVehicle?.vehicleGroundedFrameDurationMs}
+            vehicleCanvasHeight={renderedVehicle?.vehicleCanvasHeight}
+            vehicleCharacterOffsetY={renderedVehicle?.vehicleCharacterOffsetY}
+            vehicleBobY={renderedVehicle?.vehicleBobY}
+            vehicleRiseY={renderedVehicle?.vehicleRiseY}
+            vehicleOffsetX={renderedVehicle?.vehicleOffsetX}
             wearables={previewWearables}
             drinkFlavor={previewDrinkFlavor}
             repeat={preview.action === "drink" || isBall}
@@ -187,7 +248,10 @@ export function SlimePetShopDrawer({
         <div className={styles.shopItemCopy}>
           <h3>{item.labelKo}</h3>
           <p>{effectLabel ?? shopItemCategoryLabel(item)}</p>
-          <strong>{item.price.toLocaleString("ko-KR")}{unitLabel}</strong>
+          <strong>
+            {item.price.toLocaleString("ko-KR")}
+            {unitLabel}
+          </strong>
         </div>
         {!wardrobeColor && owned && !repeatable ? (
           <div className={styles.shopItemActions}>
@@ -207,9 +271,11 @@ export function SlimePetShopDrawer({
             type="button"
             className={`${styles.shopBuyButton} ${equipped ? styles.shopBuyButtonRemove : ""}`}
             disabled={busyItemKey !== null}
-            onClick={() => wardrobeColor
-              ? onEquipItem(wardrobeColor, item, !equipped)
-              : onPurchaseItem(item)}
+            onClick={() =>
+              wardrobeColor
+                ? onEquipItem(wardrobeColor, item, !equipped)
+                : onPurchaseItem(item)
+            }
             aria-pressed={wardrobeColor ? equipped : undefined}
             aria-label={`${item.labelKo} ${wardrobeColor ? (equipped ? "해제" : "적용") : "구매"}${!wardrobeColor && repeatable && ownedQuantity > 0 ? ` (보유 ${ownedQuantity}개)` : ""}`}
           >
@@ -218,9 +284,13 @@ export function SlimePetShopDrawer({
             </span>
             <span className={styles.buttonLabel}>
               {busy
-                ? wardrobeColor ? "적용 중…" : "구매 중…"
+                ? wardrobeColor
+                  ? "적용 중…"
+                  : "구매 중…"
                 : wardrobeColor
-                  ? equipped ? "해제" : "적용"
+                  ? equipped
+                    ? "해제"
+                    : "적용"
                   : "구매"}
             </span>
             {!wardrobeColor && repeatable && ownedQuantity > 0 ? (
@@ -253,8 +323,14 @@ export function SlimePetShopDrawer({
             </div>
             <div className={styles.shopItemCopy}>
               <h3>{slime.nameKo}</h3>
-              <p>{EFFECT_LABELS[slime.effectKey]} +{formatBpsPercent(slime.baseBuffBps)}</p>
-              <strong>{slime.price.toLocaleString("ko-KR")}{unitLabel}</strong>
+              <p>
+                {EFFECT_LABELS[slime.effectKey]} +
+                {formatBpsPercent(slime.baseBuffBps)}
+              </p>
+              <strong>
+                {slime.price.toLocaleString("ko-KR")}
+                {unitLabel}
+              </strong>
             </div>
             {owned ? (
               <div className={styles.shopItemActions}>
@@ -286,32 +362,21 @@ export function SlimePetShopDrawer({
     </ul>
   );
 
-  if (typeof document === "undefined") return null;
-
-  return createPortal(
-    <div className={styles.drawerLayer}>
-      <div
-        className={styles.drawerBackdrop}
-        role="presentation"
-        aria-hidden="true"
-        onClick={(event) => {
-          if (event.target === event.currentTarget) onClose();
-        }}
-      />
-      <aside
-        className={styles.drawer}
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="slime-drawer-title"
-      >
+  const content = (
+    <>
+      {presentation === "drawer" ? (
         <div className={styles.drawerHeader}>
           <div>
-            <p className={styles.eyebrow}>{wardrobeColor ? "SLIME DRESS UP" : "SLIME SHOP"}</p>
+            <p className={styles.eyebrow}>
+              {wardrobeColor ? "SLIME DRESS UP" : "SLIME SHOP"}
+            </p>
             <h2 id="slime-drawer-title">
               {wardrobeColor ? `${wardrobeName} 꾸미기` : "슬라임 상점"}
             </h2>
             {wardrobeColor ? (
-              <p className={styles.drawerSubtitle}>보유한 아이템을 골라 이 슬라임에 적용하세요.</p>
+              <p className={styles.drawerSubtitle}>
+                보유한 아이템을 골라 이 슬라임에 적용하세요.
+              </p>
             ) : null}
           </div>
           <button
@@ -324,57 +389,58 @@ export function SlimePetShopDrawer({
             ×
           </button>
         </div>
+      ) : null}
 
-        <nav className={styles.shopNavigation} aria-label="상점 탐색">
-          <div
-            className={styles.shopFilters}
-            role="tablist"
-            aria-label="상점 분류"
-            aria-orientation="horizontal"
-          >
-            {SHOP_NAV_ITEMS.map(({ key, label }, index) => {
-              const selected = shopFilter === key;
-              const tabId = `slime-shop-tab-${key}`;
-              return (
-                <button
-                  key={key}
-                  ref={(element) => {
-                    tabRefs.current[index] = element;
-                  }}
-                  id={tabId}
-                  type="button"
-                  role="tab"
-                  className={styles.filterButton}
-                  aria-selected={selected}
-                  aria-controls="slime-shop-panel"
-                  tabIndex={selected ? 0 : -1}
-                  onClick={() => onFilterChange(key)}
-                  onKeyDown={(event) => handleTabKeyDown(event, index)}
-                >
-                  {label}
-                </button>
-              );
-            })}
-          </div>
-        </nav>
-
-        {notice && (
-          <p
-            className={`${styles.drawerNotice} ${notice.kind === "error" ? styles.statusError : ""}`}
-            role={notice.kind === "error" ? "alert" : "status"}
-            aria-live="polite"
-          >
-            {notice.text}
-          </p>
-        )}
-
+      <nav className={styles.shopNavigation} aria-label="상점 탐색">
         <div
-          id="slime-shop-panel"
-          role="tabpanel"
-          aria-labelledby={`slime-shop-tab-${shopFilter}`}
-          tabIndex={0}
-          className={styles.shopPanel}
+          className={styles.shopFilters}
+          role="tablist"
+          aria-label="상점 분류"
+          aria-orientation="horizontal"
         >
+          {navigationItems.map(({ key, label }, index) => {
+            const selected = shopFilter === key;
+            const tabId = `slime-shop-tab-${key}`;
+            return (
+              <button
+                key={key}
+                ref={(element) => {
+                  tabRefs.current[index] = element;
+                }}
+                id={tabId}
+                type="button"
+                role="tab"
+                className={styles.filterButton}
+                aria-selected={selected}
+                aria-controls="slime-shop-panel"
+                tabIndex={selected ? 0 : -1}
+                onClick={() => onFilterChange(key)}
+                onKeyDown={(event) => handleTabKeyDown(event, index)}
+              >
+                {label}
+              </button>
+            );
+          })}
+        </div>
+      </nav>
+
+      {notice && (
+        <p
+          className={`${styles.drawerNotice} ${notice.kind === "error" ? styles.statusError : ""}`}
+          role={notice.kind === "error" ? "alert" : "status"}
+          aria-live="polite"
+        >
+          {notice.text}
+        </p>
+      )}
+
+      <div
+        id="slime-shop-panel"
+        role="tabpanel"
+        aria-labelledby={`slime-shop-tab-${shopFilter}`}
+        tabIndex={0}
+        className={styles.shopPanel}
+      >
         {shopFilter === "character" && !wardrobeColor ? (
           renderSlimeList()
         ) : shopFilter === "all" && !wardrobeColor ? (
@@ -382,8 +448,12 @@ export function SlimePetShopDrawer({
             {renderSlimeList()}
             <ul className={styles.shopList} aria-label="상점 상품 목록">
               {drawerItems.length === 0 ? (
-                <li className={styles.emptyState}>이 분류에는 상품이 없어요.</li>
-              ) : drawerItems.map(renderShopItem)}
+                <li className={styles.emptyState}>
+                  이 분류에는 상품이 없어요.
+                </li>
+              ) : (
+                drawerItems.map(renderShopItem)
+              )}
             </ul>
           </>
         ) : shopFilter === "prop" ? (
@@ -397,19 +467,32 @@ export function SlimePetShopDrawer({
             </ul>
           ) : (
             <div className={styles.shopGroups}>
-              {(Object.keys(PROP_SUBGROUP_LABELS) as PropSubgroup[]).map((subgroup) => {
-                const items = drawerItems.filter((item) => propSubgroup(item) === subgroup);
-                if (items.length === 0) return null;
-                const headingId = `slime-shop-prop-${subgroup}`;
-                return (
-                  <section key={subgroup} className={styles.shopGroup} aria-labelledby={headingId}>
-                    <h3 id={headingId} className={styles.shopGroupHeading}>{PROP_SUBGROUP_LABELS[subgroup]}</h3>
-                    <ul className={styles.shopList} aria-label={`${PROP_SUBGROUP_LABELS[subgroup]} 상품 목록`}>
-                      {items.map(renderShopItem)}
-                    </ul>
-                  </section>
-                );
-              })}
+              {(Object.keys(PROP_SUBGROUP_LABELS) as PropSubgroup[]).map(
+                (subgroup) => {
+                  const items = drawerItems.filter(
+                    (item) => propSubgroup(item) === subgroup,
+                  );
+                  if (items.length === 0) return null;
+                  const headingId = `slime-shop-prop-${subgroup}`;
+                  return (
+                    <section
+                      key={subgroup}
+                      className={styles.shopGroup}
+                      aria-labelledby={headingId}
+                    >
+                      <h3 id={headingId} className={styles.shopGroupHeading}>
+                        {PROP_SUBGROUP_LABELS[subgroup]}
+                      </h3>
+                      <ul
+                        className={styles.shopList}
+                        aria-label={`${PROP_SUBGROUP_LABELS[subgroup]} 상품 목록`}
+                      >
+                        {items.map(renderShopItem)}
+                      </ul>
+                    </section>
+                  );
+                },
+              )}
             </div>
           )
         ) : shopFilter === "outfit" ? (
@@ -423,19 +506,32 @@ export function SlimePetShopDrawer({
             </ul>
           ) : (
             <div className={styles.shopGroups}>
-              {(Object.keys(OUTFIT_SUBGROUP_LABELS) as OutfitSubgroup[]).map((subgroup) => {
-                const items = drawerItems.filter((item) => outfitSubgroup(item) === subgroup);
-                if (items.length === 0) return null;
-                const headingId = `slime-shop-outfit-${subgroup}`;
-                return (
-                  <section key={subgroup} className={styles.shopGroup} aria-labelledby={headingId}>
-                    <h3 id={headingId} className={styles.shopGroupHeading}>{OUTFIT_SUBGROUP_LABELS[subgroup]}</h3>
-                    <ul className={styles.shopList} aria-label={`${OUTFIT_SUBGROUP_LABELS[subgroup]} 상품 목록`}>
-                      {items.map(renderShopItem)}
-                    </ul>
-                  </section>
-                );
-              })}
+              {(Object.keys(OUTFIT_SUBGROUP_LABELS) as OutfitSubgroup[]).map(
+                (subgroup) => {
+                  const items = drawerItems.filter(
+                    (item) => outfitSubgroup(item) === subgroup,
+                  );
+                  if (items.length === 0) return null;
+                  const headingId = `slime-shop-outfit-${subgroup}`;
+                  return (
+                    <section
+                      key={subgroup}
+                      className={styles.shopGroup}
+                      aria-labelledby={headingId}
+                    >
+                      <h3 id={headingId} className={styles.shopGroupHeading}>
+                        {OUTFIT_SUBGROUP_LABELS[subgroup]}
+                      </h3>
+                      <ul
+                        className={styles.shopList}
+                        aria-label={`${OUTFIT_SUBGROUP_LABELS[subgroup]} 상품 목록`}
+                      >
+                        {items.map(renderShopItem)}
+                      </ul>
+                    </section>
+                  );
+                },
+              )}
             </div>
           )
         ) : (
@@ -446,10 +542,42 @@ export function SlimePetShopDrawer({
                   ? "이 분류에 보유한 아이템이 없어요. 상점에서 먼저 구매해 주세요."
                   : "이 분류에는 상품이 없어요."}
               </li>
-            ) : drawerItems.map(renderShopItem)}
+            ) : (
+              drawerItems.map(renderShopItem)
+            )}
           </ul>
         )}
-        </div>
+      </div>
+    </>
+  );
+
+  if (presentation === "inline") {
+    return (
+      <section className={styles.inlineShop} aria-label="슬라임 상점">
+        {content}
+      </section>
+    );
+  }
+
+  if (typeof document === "undefined") return null;
+
+  return createPortal(
+    <div className={styles.drawerLayer}>
+      <div
+        className={styles.drawerBackdrop}
+        role="presentation"
+        aria-hidden="true"
+        onClick={(event) => {
+          if (event.target === event.currentTarget) onClose?.();
+        }}
+      />
+      <aside
+        className={styles.drawer}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="slime-drawer-title"
+      >
+        {content}
       </aside>
     </div>,
     document.body,

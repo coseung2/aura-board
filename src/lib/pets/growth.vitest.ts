@@ -95,4 +95,21 @@ describe("slime wall-clock growth", () => {
     // Stage 2 spans 15 days, so the same absolute bonus is <2% of this stage.
     expect(snapshot.remainingSeconds).toBe(15 * SLIME_GROWTH_SECONDS_PER_DAY - SLIME_COOKIE_GROWTH_SECONDS);
   });
+
+  it("carries a cookie's excess progress across the stage-2 threshold", () => {
+    const threshold = 10 * SLIME_GROWTH_SECONDS_PER_DAY;
+    const onePercent = SLIME_COOKIE_GROWTH_SECONDS / 2;
+    const before = state({
+      stage: 1,
+      growthSeconds: threshold - onePercent,
+    });
+
+    const after = addSlimeGrowthSeconds(before, SLIME_COOKIE_GROWTH_SECONDS);
+
+    expect(after.stage).toBe(2);
+    expect(after.growthSeconds).toBe(threshold + onePercent);
+    expect(calculateSlimeGrowthSnapshot(after, at(0)).remainingSeconds).toBe(
+      15 * SLIME_GROWTH_SECONDS_PER_DAY - onePercent,
+    );
+  });
 });

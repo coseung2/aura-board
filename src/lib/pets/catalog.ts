@@ -7,6 +7,7 @@ import type {
   SlimeFloor,
   SlimeShopItem,
   SlimeSetDefinition,
+  SlimeShopTier,
 } from "./types";
 import { SLIME_SHARED_ASSETS } from "./slime-assets";
 import { SLIME_BALL_SLUGS, SLIME_COLORS } from "./types";
@@ -21,6 +22,303 @@ export const SLIME_SHOP_DEFAULT_PRICE = 500;
 export const SLIME_COOKIE_PRICE = 30;
 export const SLIME_BALL_PRICE = SLIME_SHOP_DEFAULT_PRICE;
 export const SLIME_SHOP_LOWER_TIER_EFFECT_BPS = 100;
+/**
+ * Default pixels a grounded vehicle lifts the slime.
+ *
+ * Static floors all place the slime's feet at `slimeFootY` 56 over a surface at
+ * 44, so a grounded vehicle owns the 12px between them and seats the slime just
+ * above its own rim. Floating vehicles override this with a larger rise.
+ */
+export const SLIME_VEHICLE_DEFAULT_RISE_Y = 6;
+/**
+ * Frames in a vehicle sheet.
+ *
+ * Vehicles animate on the same 8-frame clock as the slime idle timeline, with
+ * matching durations, so a ride and its rider never drift apart.
+ */
+export const SLIME_VEHICLE_FRAME_COUNT = 8;
+
+/**
+ * Height of an authored vehicle canvas, and where the character sits inside it.
+ *
+ * Vehicles are drawn taller than the 64px character viewport so a balloon can
+ * climb above the grounded pose. The renderer subtracts the offset to land that
+ * art back on the viewport, matching how jump wearables already work.
+ */
+export const SLIME_VEHICLE_CANVAS_HEIGHT = 81;
+export const SLIME_VEHICLE_CHARACTER_OFFSET_Y = 17;
+
+const VEHICLE_ROOT = `${SLIME_ASSET_ROOT}/shop/vehicles`;
+
+const SLIME_VEHICLE_TIER_PRICE = {
+  1: 1_000,
+  2: 700,
+  3: 500,
+} as const satisfies Record<SlimeShopTier, number>;
+
+const SLIME_VEHICLE_TIER_BPS = {
+  1: 300,
+  2: 200,
+  3: 100,
+} as const satisfies Record<SlimeShopTier, number>;
+
+/**
+ * Vehicles delivered as front-only art on the taller canvas.
+ *
+ * `bobY` is authored per frame and the rider follows it, so a passenger never
+ * slides out of a seat moving under it. Prices follow the existing tiers.
+ */
+const VEHICLE_DEFINITIONS = [
+  {
+    option: "donut-tube",
+    labelKo: "도넛 튜브",
+    tier: 3,
+    stance: "grounded",
+    riseY: 10,
+    bobY: [0, -1, -1, -2, -2, -1, -1, 0],
+    effectKey: "walking_reward",
+  },
+  {
+    option: "open-convertible",
+    labelKo: "오픈카",
+    tier: 1,
+    stance: "grounded",
+    riseY: 6,
+    bobY: [0, 0, -1, -1, -1, -1, 0, 0],
+    effectKey: "walking_reward",
+    // Wheels keep their own constant-rate timeline; a wheel that rose with the
+    // suspension would leave the ground and lift the whole sprite.
+    wheels: { frameCount: 4, frameDurationMs: 100 },
+    vehicleEffectSpritePaths: [
+      `${VEHICLE_ROOT}/open-convertible/fx/wind-idle-sheet.png`,
+    ],
+  },
+  {
+    option: "hot-air-balloon",
+    labelKo: "열기구",
+    tier: 1,
+    stance: "floating",
+    riseY: 9,
+    bobY: [0, -1, -2, -2, -2, -1, -1, 0],
+    effectKey: "reading_reward",
+  },
+  {
+    option: "cloud",
+    labelKo: "구름",
+    tier: 2,
+    stance: "floating",
+    riseY: 23,
+    bobY: [0, -1, -2, -2, -2, -1, -1, 0],
+    effectKey: "reading_reward",
+  },
+  {
+    option: "duck-tube",
+    labelKo: "러버덕 튜브",
+    tier: 2,
+    stance: "grounded",
+    riseY: 14,
+    bobY: [0, -1, -1, -2, -2, -1, -1, 0],
+    effectKey: "walking_reward",
+  },
+  {
+    option: "go-kart",
+    labelKo: "고카트",
+    tier: 2,
+    stance: "grounded",
+    // The authored front wheel reaches y=72 while the right rear wheel reaches
+    // y=67. Lower the whole composite by 5px so the rear wheel owns contact.
+    riseY: 9,
+    characterOffsetY: 12,
+    bobY: [0, 0, -1, -1, -1, -1, 0, 0],
+    effectKey: "walking_reward",
+    vehicleEffectSpritePaths: [
+      `${VEHICLE_ROOT}/go-kart/fx/wind-idle-sheet.png`,
+      `${VEHICLE_ROOT}/go-kart/fx/exhaust-idle-sheet.png`,
+    ],
+  },
+  {
+    option: "wooden-cart",
+    labelKo: "나무수레",
+    tier: 3,
+    stance: "grounded",
+    // The right rear wheel ends at y=68, 4px above the previous bbox contact.
+    riseY: 17,
+    characterOffsetY: 13,
+    bobY: [0, 0, -1, -1, -1, -1, 0, 0],
+    effectKey: "assignment_reward",
+    vehicleEffectSpritePaths: [
+      `${VEHICLE_ROOT}/wooden-cart/fx/wind-idle-sheet.png`,
+    ],
+  },
+  {
+    option: "kayak",
+    labelKo: "카약",
+    tier: 2,
+    stance: "grounded",
+    riseY: 15,
+    bobY: [0, -1, -1, -2, -2, -1, -1, 0],
+    effectKey: "reading_reward",
+  },
+  {
+    option: "skateboard",
+    labelKo: "스케이트보드",
+    tier: 3,
+    stance: "grounded",
+    riseY: 13,
+    bobY: [0, 0, 0, 0, 0, 0, 0, 0],
+    effectKey: "walking_reward",
+    wheels: { frameCount: 4, frameDurationMs: 100 },
+    vehicleEffectSpritePaths: [
+      `${VEHICLE_ROOT}/skateboard/fx/wind-idle-sheet.png`,
+    ],
+  },
+  {
+    option: "flying-broom",
+    labelKo: "하늘 빗자루",
+    tier: 2,
+    stance: "floating",
+    riseY: 13,
+    bobY: [0, -1, -2, -2, -2, -1, -1, 0],
+    effectKey: "assignment_reward",
+    vehicleEffectSpritePaths: [
+      `${VEHICLE_ROOT}/flying-broom/fx/wind-idle-sheet.png`,
+    ],
+  },
+  {
+    option: "swan-boat",
+    labelKo: "백조 보트",
+    tier: 1,
+    stance: "grounded",
+    riseY: 16,
+    bobY: [0, -1, -1, -2, -2, -1, -1, 0],
+    effectKey: "comment_reward",
+  },
+  {
+    option: "magic-carpet",
+    labelKo: "마법 양탄자",
+    tier: 1,
+    stance: "floating",
+    riseY: 14,
+    bobY: [0, -1, -2, -2, -2, -1, -1, 0],
+    effectKey: "growth_speed",
+    vehicleEffectSpritePaths: [
+      `${VEHICLE_ROOT}/magic-carpet/fx/sparkle-idle-sheet.png`,
+    ],
+  },
+  {
+    option: "bumper-car",
+    labelKo: "범퍼카",
+    tier: 2,
+    stance: "grounded",
+    riseY: 11,
+    bobY: [0, 0, 0, 0, 0, 0, 0, 0],
+    effectKey: "walking_reward",
+    wheels: { frameCount: 4, frameDurationMs: 100 },
+  },
+  {
+    option: "carousel-horse",
+    labelKo: "회전목마",
+    tier: 1,
+    stance: "grounded",
+    riseY: 23,
+    bobY: [0, -1, -2, -2, -2, -1, -1, 0],
+    effectKey: "assignment_reward",
+    vehicleOffsetX: -4,
+  },
+  {
+    option: "flamingo-tube",
+    labelKo: "플라밍고 튜브",
+    tier: 2,
+    stance: "grounded",
+    riseY: 15,
+    bobY: [0, -1, -1, -2, -2, -1, -1, 0],
+    effectKey: "comment_reward",
+    vehicleOffsetX: -4,
+  },
+  {
+    option: "soap-bubble",
+    labelKo: "비눗방울",
+    tier: 2,
+    stance: "floating",
+    riseY: 2,
+    bobY: [0, -1, -2, -2, -2, -1, -1, 0],
+    effectKey: "growth_speed",
+    vehicleEffectSpritePaths: [
+      `${VEHICLE_ROOT}/soap-bubble/fx/glint-idle-sheet.png`,
+    ],
+  },
+  {
+    option: "crescent-moon",
+    labelKo: "초승달",
+    tier: 1,
+    stance: "floating",
+    riseY: 9,
+    bobY: [0, -1, -2, -2, -2, -1, -1, 0],
+    effectKey: "reading_reward",
+    // The approved rider is 4px right of center, and delivery extraction moved
+    // the two-pixel left overhang into the sheet. Undo both without moving the rider.
+    vehicleOffsetX: -6,
+    vehicleEffectSpritePaths: [
+      `${VEHICLE_ROOT}/crescent-moon/fx/stars-idle-sheet.png`,
+    ],
+  },
+] as const satisfies readonly {
+  option: string;
+  labelKo: string;
+  tier: SlimeShopTier;
+  stance: "grounded" | "floating";
+  riseY: number;
+  bobY: readonly number[];
+  effectKey: NonNullable<SlimeShopItem["effectKey"]>;
+  wheels?: { frameCount: number; frameDurationMs: number };
+  characterOffsetY?: number;
+  vehicleOffsetX?: number;
+  vehicleEffectSpritePaths?: readonly string[];
+}[];
+
+export const SLIME_VEHICLE_CATALOG: readonly SlimeShopItem[] = VEHICLE_DEFINITIONS.map(
+  (vehicle): SlimeShopItem => ({
+    key: `slime-vehicle-${vehicle.option}`,
+    category: "vehicle",
+    floor: null,
+    labelKo: vehicle.labelKo,
+    tier: vehicle.tier,
+    price: SLIME_VEHICLE_TIER_PRICE[vehicle.tier],
+    vehicleStance: vehicle.stance,
+    vehicleRiseY: vehicle.riseY,
+    vehicleBobY: vehicle.bobY,
+    vehicleFrameCount: SLIME_VEHICLE_FRAME_COUNT,
+    vehicleCanvasHeight: SLIME_VEHICLE_CANVAS_HEIGHT,
+    vehicleCharacterOffsetY: "characterOffsetY" in vehicle
+      ? vehicle.characterOffsetY
+      : SLIME_VEHICLE_CHARACTER_OFFSET_Y,
+    ...("vehicleOffsetX" in vehicle && vehicle.vehicleOffsetX !== undefined
+      ? { vehicleOffsetX: vehicle.vehicleOffsetX }
+      : {}),
+    effectKey: vehicle.effectKey,
+    effectBps: SLIME_VEHICLE_TIER_BPS[vehicle.tier],
+    // The still frame doubles as the shop card image.
+    spritePath: `${VEHICLE_ROOT}/${vehicle.option}/vehicle.png`,
+    vehicleSheetPath: `${VEHICLE_ROOT}/${vehicle.option}/idle-sheet.png`,
+    ...("wheels" in vehicle && vehicle.wheels
+      ? {
+          vehicleGroundedSpritePath: `${VEHICLE_ROOT}/${vehicle.option}/wheels-idle-sheet.png`,
+          vehicleGroundedFrameCount: vehicle.wheels.frameCount,
+          vehicleGroundedFrameDurationMs: vehicle.wheels.frameDurationMs,
+        }
+      : {}),
+    ...("vehicleEffectSpritePaths" in vehicle && vehicle.vehicleEffectSpritePaths
+      ? { vehicleEffectSpritePaths: vehicle.vehicleEffectSpritePaths }
+      : {}),
+  }),
+);
+/**
+ * Upper bound for one consumable purchase.
+ *
+ * Keeps a mistyped quantity from draining a student's wallet in a single tap
+ * while still covering a realistic cookie restock.
+ */
+export const SLIME_MAX_PURCHASE_QUANTITY = 99;
 
 
 const STATIC_FLOOR_DEFINITIONS = [
@@ -35,7 +333,7 @@ const STATIC_FLOOR_DEFINITIONS = [
   ["forest-soil-floor", "숲 흙바닥", 3, "reading_reward"],
   ["stone-floor", "돌바닥", 3, "growth_speed"],
 ] as const satisfies readonly [
-  Exclude<SlimeFloor, "none" | "grass-floor" | "water-puddle" | "trampoline">,
+  Exclude<SlimeFloor, "none" | "grass-floor">,
   string,
   1 | 2 | 3,
   NonNullable<SlimeShopItem["effectKey"]>,
@@ -252,16 +550,6 @@ export const SLIME_SHOP_CATALOG: readonly SlimeShopItem[] = [
     spritePath: `${SLIME_ASSET_ROOT}/official/shared/grass-floor.png`,
   },
   ...SLIME_STATIC_FLOOR_CATALOG,
-  {
-    key: "water-puddle-background",
-    category: "background",
-    floor: "water-puddle",
-    labelKo: "물웅덩이 배경",
-    price: SLIME_SHOP_DEFAULT_PRICE,
-    effectKey: "walking_reward",
-    effectBps: SLIME_SHOP_LOWER_TIER_EFFECT_BPS,
-    spritePath: `${SLIME_ASSET_ROOT}/shop/water-puddle.gif`,
-  },
   {
     key: "shooting-star-night-sky-background",
     category: "background",
@@ -490,14 +778,18 @@ export const SLIME_SHOP_CATALOG: readonly SlimeShopItem[] = [
   },
   {
     key: "slime-blue-trampoline",
-    category: "ride",
-    floor: "trampoline",
+    category: "vehicle",
+    floor: null,
     labelKo: "트램펄린",
+    tier: 3,
     price: SLIME_SHOP_DEFAULT_PRICE,
+    vehicleStance: "grounded",
+    vehicleRiseY: SLIME_VEHICLE_DEFAULT_RISE_Y,
     effectKey: "walking_reward",
     effectBps: SLIME_SHOP_LOWER_TIER_EFFECT_BPS,
     spritePath: `${SLIME_ASSET_ROOT}/shop/slime-blue-trampoline.gif`,
   },
+  ...SLIME_VEHICLE_CATALOG,
   ...SLIME_DRINK_CATALOG,
   ...SLIME_BALL_CATALOG,
   ...SLIME_WEARABLE_CATALOG.map((wearable): SlimeShopItem => ({
@@ -596,6 +888,7 @@ export function getSlimeShopItem(key: string): SlimeShopItem | undefined {
 export type SlimeVisualItemSlot =
   | "background"
   | "floor"
+  | "vehicle"
   | "prop"
   | "blush"
   | "eyewear"
@@ -614,6 +907,9 @@ export function slimeVisualItemSlot(
 ): SlimeVisualItemSlot | null {
   if (item.floor) return "floor";
   if (isSlimeSceneBackground(item)) return "background";
+  // Vehicles sit above the floor instead of replacing it, so they own their own
+  // slot and stay equippable alongside a background and a floor.
+  if (item.category === "vehicle" || item.category === "ride") return "vehicle";
   if (item.category === "drink" || item.category === "prop") return "prop";
   if (item.category === "wearable") return item.wearableRole ?? null;
   return null;
@@ -628,7 +924,7 @@ export function normalizeEquippedSlimeItemKeys(itemKeys: readonly string[]): str
     const slot = slimeVisualItemSlot(item);
     if (slot) slotKeys[slot] = item.key;
   }
-  return ["background", "floor", "prop", "blush", "eyewear", "headwear"]
+  return ["background", "floor", "vehicle", "prop", "blush", "eyewear", "headwear"]
     .map((slot) => slotKeys[slot as SlimeVisualItemSlot])
     .filter((key): key is string => Boolean(key));
 }

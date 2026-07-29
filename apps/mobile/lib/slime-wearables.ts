@@ -2,6 +2,7 @@ import {
   SLIME_MOBILE_WEARABLE_REGISTRY,
   SLIME_WEARABLE_LAYER_ORDER,
 } from "./slime-wearables.generated";
+import { SLIME_MOBILE_WEARABLE_ACTION_REGISTRY } from "./slime-wearable-actions.generated";
 import type { SlimeColor, SlimeSheetAction } from "./slime-assets";
 
 export { SLIME_WEARABLE_LAYER_ORDER };
@@ -9,6 +10,7 @@ export { SLIME_WEARABLE_LAYER_ORDER };
 /** Overlay roles above the character layer, ordered bottom to top. */
 export const SLIME_WEARABLE_ROLES = ["blush", "eyewear", "headwear", "drink"] as const;
 export type SlimeWearableRole = (typeof SLIME_WEARABLE_ROLES)[number];
+export type SlimeWearableAction = SlimeSheetAction | "ball-hit";
 
 /**
  * Headwear awarded by growth stage rather than bought. Kept in step with the
@@ -110,7 +112,21 @@ export type SlimeCompositionDecision = Readonly<{
   reason?: "unsupported-action";
 }>;
 
-const registry = SLIME_MOBILE_WEARABLE_REGISTRY as unknown as Record<string, RegistryEntry>;
+const baseRegistry = SLIME_MOBILE_WEARABLE_REGISTRY as unknown as Record<string, RegistryEntry>;
+const actionRegistry = SLIME_MOBILE_WEARABLE_ACTION_REGISTRY as unknown as Record<
+  string,
+  Pick<RegistryEntry, "sheets" | "timelines">
+>;
+const registry = Object.fromEntries(
+  Object.entries(baseRegistry).map(([key, entry]) => {
+    const actions = actionRegistry[key];
+    return [key, actions ? {
+      ...entry,
+      sheets: { ...entry.sheets, ...actions.sheets },
+      timelines: { ...entry.timelines, ...actions.timelines },
+    } : entry];
+  }),
+) as Record<string, RegistryEntry>;
 
 export function slimeWearableEntry(role: SlimeWearableRole, option: string): RegistryEntry | null {
   return registry[`${role}/${option}`] ?? null;
@@ -126,7 +142,7 @@ export function slimeWearableEntry(role: SlimeWearableRole, option: string): Reg
  * `characterOffsetY` rather than by exclusion.
  */
 export function slimeWearableTimelineKey(
-  action: SlimeSheetAction,
+  action: SlimeWearableAction,
   drinkFlavor?: string | null,
 ): string | null {
   if (action === "drink") return drinkFlavor ? `drink:${drinkFlavor}` : null;
@@ -149,12 +165,13 @@ export function slimeActionSupportsWearables(action: SlimeSheetAction): boolean 
 export function slimeWearableCoversAction(
   role: SlimeWearableRole,
   option: string,
-  action: SlimeSheetAction,
+  action: SlimeWearableAction,
   drinkFlavor?: string | null,
 ): boolean {
   const timelineKey = slimeWearableTimelineKey(action, drinkFlavor);
   if (!timelineKey) return false;
-  return Boolean(slimeWearableEntry(role, option)?.timelines[timelineKey]);
+  const timelines = slimeWearableEntry(role, option)?.timelines;
+  return Boolean(timelines?.[timelineKey]);
 }
 
 /**
@@ -202,7 +219,7 @@ export function resolveSlimeComposition(
 export function resolveSlimeWearables(
   selection: SlimeWearableSelection,
   slimeColor: SlimeColor,
-  action: SlimeSheetAction,
+  action: SlimeWearableAction,
   frameIndex: number,
   drinkFlavor?: string | null,
 ): readonly ResolvedSlimeWearable[] {

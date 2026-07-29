@@ -3,11 +3,22 @@ import { describe, expect, it } from "vitest";
 import { SLIME_SHOP_CATALOG } from "@/lib/pets/catalog";
 
 import {
+  calculateSlimeGrowthPercent,
   shopFilterForItem,
   slimeWearablesFromItems,
 } from "./SlimePetModel";
 
 describe("slime shop model", () => {
+  it("keeps sub-percent growth visible after a stage transition", () => {
+    const stageTwoStart = 10 * 86_400;
+    const carriedSeconds = Math.round(0.004 * 15 * 86_400);
+
+    expect(calculateSlimeGrowthPercent({
+      stage: 2,
+      growthSeconds: stageTwoStart + carriedSeconds,
+    })).toBe(0.4);
+  });
+
   it("routes props and wearables to their top-level shop filters", () => {
     const ball = SLIME_SHOP_CATALOG.find((item) => item.key.startsWith("slime-ball-"));
     const drink = SLIME_SHOP_CATALOG.find((item) => item.category === "drink");

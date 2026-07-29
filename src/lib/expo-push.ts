@@ -15,8 +15,37 @@ export type ExpoPushMessage = {
 };
 
 type ExpoTicket = {
+  status?: string;
   details?: { error?: string };
 };
+
+export class ExpoPushSendError extends Error {
+  readonly reason: "http_error" | "invalid_response" | "ticket_error" | "request_error";
+  readonly status?: number;
+
+  constructor(
+    reason: ExpoPushSendError["reason"],
+    options: { status?: number } = {},
+  ) {
+    super(`expo_push_${reason}`);
+    this.name = "ExpoPushSendError";
+    this.reason = reason;
+    this.status = options.status;
+  }
+}
+
+export function expoPushFailureDetails(error: unknown): {
+  reason: string;
+  status?: number;
+} {
+  if (error instanceof ExpoPushSendError) {
+    return {
+      reason: error.reason,
+      ...(error.status == null ? {} : { status: error.status }),
+    };
+  }
+  return { reason: "unexpected_error" };
+}
 
 export async function sendExpoPush(
   devices: ExpoPushDevice[],
@@ -27,7 +56,6 @@ export async function sendExpoPush(
 
   for (let start = 0; start < devices.length; start += EXPO_BATCH_SIZE) {
     const batch = devices.slice(start, start + EXPO_BATCH_SIZE);
-    attempted += batch.length;
     try {
       const accessToken = process.env.EXPO_ACCESS_TOKEN?.trim();
       const response = await fetch(EXPO_PUSH_URL, {
@@ -49,19 +77,30 @@ export async function sendExpoPush(
         ),
       });
       if (!response.ok) {
-        console.warn("[expo-push] Expo rejected batch", { status: response.status });
-        continue;
+        throw new ExpoPushSendError("http_error", { status: response.status });
       }
       const payload = (await response.json().catch(() => null)) as
         | { data?: ExpoTicket[] }
         | null;
+      if (!Array.isArray(payload?.data) || payload.data.length !== batch.length) {
+        throw new ExpoPushSendError("invalid_response");
+      }
+      let hasRetryableTicketError = false;
       batch.forEach((device, index) => {
-        if (payload?.data?.[index]?.details?.error === "DeviceNotRegistered") {
+        const ticket = payload.data?.[index];
+        if (ticket?.details?.error === "DeviceNotRegistered") {
           invalidDeviceIds.push(device.id);
+        } else if (ticket?.status !== "ok") {
+          hasRetryableTicketError = true;
         }
       });
+      if (hasRetryableTicketError) {
+        throw new ExpoPushSendError("ticket_error");
+      }
+      attempted += batch.length;
     } catch (error) {
-      console.warn("[expo-push] Expo request failed", error);
+      if (error instanceof ExpoPushSendError) throw error;
+      throw new ExpoPushSendError("request_error");
     }
   }
 

@@ -3,24 +3,36 @@
 import { useState } from "react";
 
 export type StudentActivityKey = "walking" | "reading";
-export type StudentActivityView = "records" | "missions";
+export type StudentActivityView = "records" | "missions" | "titles";
 
 type Props = {
   active: StudentActivityKey;
   view?: StudentActivityView;
+  views?: readonly StudentActivityView[];
   onViewChange?: (view: StudentActivityView) => void;
 };
 
-/** Shared student self-directed activity heading and local navigation. */
+const ACTIVITY_LABELS: Record<StudentActivityKey, string> = {
+  reading: "독서",
+  walking: "걷기",
+};
+
+const VIEW_LABELS: Record<StudentActivityView, string> = {
+  records: "기록",
+  missions: "미션",
+  titles: "칭호",
+};
+
+/** Activity heading and keyboard-operable local content tabs. */
 export function StudentActivityHeader({
   active,
   view,
+  views = ["records", "missions"],
   onViewChange,
 }: Props) {
-  const title = active === "walking" ? "걷기" : "독서";
   const [internalView, setInternalView] = useState<StudentActivityView>("records");
   const selectedView = view ?? internalView;
-  const activityLabel = title;
+  const activityLabel = ACTIVITY_LABELS[active];
 
   const selectView = (nextView: StudentActivityView) => {
     if (view === undefined) setInternalView(nextView);
@@ -28,63 +40,60 @@ export function StudentActivityHeader({
   };
 
   const moveView = (current: StudentActivityView, direction: -1 | 1) => {
-    const tabOrder: StudentActivityView[] = ["records", "missions"];
-    const currentIndex = tabOrder.indexOf(current);
-    return tabOrder[(currentIndex + direction + tabOrder.length) % tabOrder.length];
+    const currentIndex = views.indexOf(current);
+    return views[(currentIndex + direction + views.length) % views.length];
   };
 
   return (
     <header className="student-activity-header">
       <div className="student-activity-heading">
-        <p className="student-activity-eyebrow">자율활동</p>
-        <h1 className="student-activity-title">{title}</h1>
+        <h2 className="student-activity-title">{activityLabel}</h2>
       </div>
 
-      {
-        <div
-          className="student-activity-navigation"
-          role="tablist"
-          aria-label={`${activityLabel} 보기`}
-          aria-orientation="horizontal"
-        >
-          {(["records", "missions"] as const).map((view) => {
-            const isSelected = selectedView === view;
-            const label = view === "records" ? "기록" : "미션";
-            return (
-              <button
-                key={view}
-                id={`student-${active}-${view}-tab`}
-                className="student-activity-tab"
-                type="button"
-                role="tab"
-                aria-selected={isSelected}
-                aria-controls={`student-${active}-${view}-panel`}
-                tabIndex={isSelected ? 0 : -1}
-                onClick={() => selectView(view)}
-                onKeyDown={(event) => {
-                  let nextView: StudentActivityView | null = null;
-                  if (event.key === "ArrowRight" || event.key === "ArrowDown") {
-                    nextView = moveView(view, 1);
-                  } else if (event.key === "ArrowLeft" || event.key === "ArrowUp") {
-                    nextView = moveView(view, -1);
-                  } else if (event.key === "Home") {
-                    nextView = "records";
-                  } else if (event.key === "End") {
-                    nextView = "missions";
-                  }
+      <div
+        className="student-activity-navigation"
+        role="tablist"
+        aria-label={`${activityLabel} 보기`}
+        aria-orientation="horizontal"
+      >
+        {views.map((localView) => {
+          const isSelected = selectedView === localView;
+          return (
+            <button
+              key={localView}
+              id={`student-${active}-${localView}-tab`}
+              className="student-activity-tab"
+              type="button"
+              role="tab"
+              aria-selected={isSelected}
+              aria-controls={`student-${active}-${localView}-panel`}
+              tabIndex={isSelected ? 0 : -1}
+              onClick={() => selectView(localView)}
+              onKeyDown={(event) => {
+                let nextView: StudentActivityView | null = null;
+                if (event.key === "ArrowRight" || event.key === "ArrowDown") {
+                  nextView = moveView(localView, 1);
+                } else if (event.key === "ArrowLeft" || event.key === "ArrowUp") {
+                  nextView = moveView(localView, -1);
+                } else if (event.key === "Home") {
+                  nextView = views[0];
+                } else if (event.key === "End") {
+                  nextView = views[views.length - 1];
+                }
 
-                  if (!nextView) return;
-                  event.preventDefault();
-                  selectView(nextView);
-                  document.getElementById(`student-${active}-${nextView}-tab`)?.focus();
-                }}
-              >
-                {label}
-              </button>
-            );
-          })}
-        </div>
-      }
+                if (!nextView) return;
+                event.preventDefault();
+                selectView(nextView);
+                document
+                  .getElementById(`student-${active}-${nextView}-tab`)
+                  ?.focus();
+              }}
+            >
+              {VIEW_LABELS[localView]}
+            </button>
+          );
+        })}
+      </div>
     </header>
   );
 }

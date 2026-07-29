@@ -25,6 +25,8 @@ import {
 } from "./SlimePetModel";
 import type { ClaimedTitle } from "./SlimePetPage";
 
+const SLIME_TRAMPOLINE_ITEM_KEY = "slime-blue-trampoline";
+
 type SlimeCollectionSectionProps = {
   catalog: SlimeDefinition[];
   ownedKeys: SlimeColor[];
@@ -66,6 +68,18 @@ function backgroundFromItems(items: readonly SlimeShopItem[]): SlimeShopItem | n
   return background;
 }
 
+/**
+ * Equipped vehicle, if any. Last matching key wins so a legacy row carrying more
+ * than one vehicle still resolves deterministically.
+ */
+function vehicleFromItems(items: readonly SlimeShopItem[]): SlimeShopItem | null {
+  let vehicle: SlimeShopItem | null = null;
+  for (const item of items) {
+    if (item.category === "vehicle" || item.category === "ride") vehicle = item;
+  }
+  return vehicle;
+}
+
 function accessorySpritePath(
   items: readonly SlimeShopItem[],
   slimeColor: SlimeColor,
@@ -80,7 +94,9 @@ function accessorySpritePath(
       !item.floor &&
       item.category !== "background" &&
       item.category !== "drink" &&
-      item.category !== "wearable",
+      item.category !== "wearable" &&
+      item.category !== "vehicle" &&
+      item.category !== "ride",
   )?.spritePath;
 }
 
@@ -170,10 +186,16 @@ export function SlimeCollectionSection({
             floorFromItems(assignedItems),
           );
           const background = backgroundFromItems(assignedItems);
+          const vehicle = vehicleFromItems(assignedItems);
+          const usesTrampoline = vehicle?.key === SLIME_TRAMPOLINE_ITEM_KEY;
+          const renderedVehicle = usesTrampoline ? null : vehicle;
+          const renderedFloor: EquippedFloor = usesTrampoline ? "trampoline" : floor;
+          const hasScene = Boolean(background || vehicle || renderedFloor !== "none");
           const drinkItem = assignedItems.find((item) => item.category === "drink");
           const wearables = slimeWearablesFromItems(assignedItems);
           const drinkFlavor = wearables.drink ?? null;
-          const hasInteractiveFloor = floor === "water-puddle" || floor === "trampoline";
+          const hasInteractiveFloor =
+            renderedFloor === "water-puddle" || renderedFloor === "trampoline";
           const hasPassiveDrink = Boolean(drinkItem);
           const passiveAction: SlimeAction = hasPassiveDrink
             ? "drink"
@@ -271,7 +293,12 @@ export function SlimeCollectionSection({
               >
                 <span aria-hidden="true">★</span>
               </button>
-              <div className={styles.spriteFrame}>
+              <div
+                className={`${styles.spriteFrame} ${hasScene ? styles.spriteFrameScene : ""}`.trim()}
+                style={background
+                  ? { backgroundImage: `url("${background.spritePath}")` }
+                  : undefined}
+              >
                 {background ? (
                   <div className={styles.spriteCharacterFrame}>
                     <OfficialSlimeSprite
@@ -280,9 +307,20 @@ export function SlimeCollectionSection({
                       // into a head slot that a chosen hat can outrank.
                       growthStage={growth?.stage ?? 1}
                       action={action}
-                      equippedFloor={floor}
+                      equippedFloor={renderedFloor}
                       itemSpritePath={accessorySpritePath(assignedItems, slime.color)}
-                      backgroundSpritePath={background.spritePath}
+                      vehicleSpritePath={renderedVehicle?.vehicleSheetPath ?? renderedVehicle?.spritePath}
+                      vehicleGroundedSpritePath={renderedVehicle?.vehicleGroundedSpritePath}
+                      vehicleEffectSpritePaths={renderedVehicle?.vehicleEffectSpritePaths}
+                      vehicleFrameCount={renderedVehicle?.vehicleFrameCount}
+                      vehicleGroundedFrameCount={renderedVehicle?.vehicleGroundedFrameCount}
+                      vehicleGroundedFrameDurationMs={renderedVehicle?.vehicleGroundedFrameDurationMs}
+                      vehicleCanvasHeight={renderedVehicle?.vehicleCanvasHeight}
+                      vehicleCharacterOffsetY={renderedVehicle?.vehicleCharacterOffsetY}
+                      vehicleBobY={renderedVehicle?.vehicleBobY}
+                      vehicleRiseY={renderedVehicle?.vehicleRiseY}
+                      vehicleOffsetX={renderedVehicle?.vehicleOffsetX}
+                      expandSceneSurfaces
                       wearables={wearables}
                       drinkFlavor={drinkFlavor}
                       repeat={!manualAction && hasPassiveDrink}

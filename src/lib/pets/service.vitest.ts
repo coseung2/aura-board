@@ -142,6 +142,7 @@ describe("slime wallet service", () => {
         isEquipped: true,
         isRepresentative: true,
         equippedItemKeys: true,
+        hiddenItemKeys: true,
         equippedTitleKey: true,
       },
       orderBy: { createdAt: "asc" },

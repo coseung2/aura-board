@@ -82,6 +82,8 @@ type FetchOpts = RequestInit & {
   skipAuth?: boolean;
   /** true 이면 학생 토큰 대신 학부모 토큰을 Authorization 헤더에 사용. */
   parentAuth?: boolean;
+  /** Prevent a stalled native request from leaving its control busy forever. */
+  timeoutMs?: number;
 };
 
 /**
@@ -95,7 +97,7 @@ export async function apiFetch<T = unknown>(
   path: string,
   opts: FetchOpts = {},
 ): Promise<T> {
-  const { json, skipAuth, parentAuth, headers, ...rest } = opts;
+  const { json, skipAuth, parentAuth, headers, timeoutMs, ...rest } = opts;
   const hdrs: Record<string, string> = {
     Accept: "application/json",
     ...((headers as Record<string, string>) ?? {}),
@@ -112,11 +114,34 @@ export async function apiFetch<T = unknown>(
 
   const baseUrl = parentAuth ? getParentApiBase() : getApiBase();
   const url = path.startsWith("http") ? path : `${baseUrl}${path}`;
-  const res = await fetch(url, {
-    ...rest,
-    headers: hdrs,
-    body: json !== undefined ? JSON.stringify(json) : (rest.body as BodyInit | undefined),
-  });
+  const timeoutController = timeoutMs && timeoutMs > 0 ? new AbortController() : null;
+  const timeoutId = timeoutController
+    ? setTimeout(() => timeoutController.abort(), timeoutMs)
+    : null;
+  const callerSignal = rest.signal;
+  const abortForCaller = () => timeoutController?.abort();
+  if (callerSignal && timeoutController) {
+    if (callerSignal.aborted) timeoutController.abort();
+    else callerSignal.addEventListener("abort", abortForCaller, { once: true });
+  }
+
+  let res: Response;
+  try {
+    res = await fetch(url, {
+      ...rest,
+      signal: timeoutController?.signal ?? callerSignal,
+      headers: hdrs,
+      body: json !== undefined ? JSON.stringify(json) : (rest.body as BodyInit | undefined),
+    });
+  } catch (error) {
+    if (timeoutController?.signal.aborted && !callerSignal?.aborted) {
+      throw new ApiError(408, { error: "request_timeout" });
+    }
+    throw error;
+  } finally {
+    if (timeoutId) clearTimeout(timeoutId);
+    callerSignal?.removeEventListener("abort", abortForCaller);
+  }
 
   const text = await res.text();
   let body: unknown = text;

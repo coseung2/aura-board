@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Logo } from "./Logo";
 import { AuthHeader } from "./AuthHeader";
 import { MegaNav, type MegaNavItem, type MegaNavLink } from "./MegaNav";
@@ -78,6 +78,9 @@ function readRecentBoardIds() {
 export function TopNav({ showAdmin = false }: Props) {
   const pathname = usePathname() ?? "";
   const [navData, setNavData] = useState<TeacherNavData>(EMPTY_NAV_DATA);
+  const [navLoadError, setNavLoadError] = useState(false);
+  const [navLoading, setNavLoading] = useState(false);
+  const navRequestRef = useRef<AbortController | null>(null);
   const [recentBoardIds, setRecentBoardIds] = useState<string[]>([]);
   const [previewClassroomId, setPreviewClassroomId] = useState<string | null>(
     null,
@@ -100,33 +103,52 @@ export function TopNav({ showAdmin = false }: Props) {
     );
   };
 
-  useEffect(() => {
-    let cancelled = false;
+  const loadTeacherNav = useCallback(async () => {
+    if (navRequestRef.current) return;
 
-    async function loadTeacherNav() {
-      try {
-        const response = await fetch("/api/nav/teacher", {
-          cache: "no-store",
-          credentials: "same-origin",
+    const controller = new AbortController();
+    navRequestRef.current = controller;
+    setNavLoading(true);
+
+    try {
+      const response = await fetch("/api/nav/teacher", {
+        cache: "no-store",
+        credentials: "same-origin",
+        signal: controller.signal,
+      });
+      if (!response.ok) throw new Error("Teacher navigation request failed");
+
+      const data = (await response.json()) as TeacherNavData;
+      if (!controller.signal.aborted) {
+        setNavData({
+          classrooms: Array.isArray(data.classrooms) ? data.classrooms : [],
+          boards: Array.isArray(data.boards) ? data.boards : [],
         });
-        if (!response.ok) return;
-        const data = (await response.json()) as TeacherNavData;
-        if (!cancelled) {
-          setNavData({
-            classrooms: Array.isArray(data.classrooms) ? data.classrooms : [],
-            boards: Array.isArray(data.boards) ? data.boards : [],
-          });
-        }
-      } catch {
-        if (!cancelled) setNavData(EMPTY_NAV_DATA);
+        setNavLoadError(false);
+      }
+    } catch (error) {
+      if (
+        !controller.signal.aborted &&
+        (!(error instanceof DOMException) || error.name !== "AbortError")
+      ) {
+        setNavLoadError(true);
+      }
+    } finally {
+      if (navRequestRef.current === controller) {
+        navRequestRef.current = null;
+        if (!controller.signal.aborted) setNavLoading(false);
       }
     }
-
-    loadTeacherNav();
-    return () => {
-      cancelled = true;
-    };
   }, []);
+
+  useEffect(() => {
+    void loadTeacherNav();
+    return () => {
+      const activeRequest = navRequestRef.current;
+      navRequestRef.current = null;
+      activeRequest?.abort();
+    };
+  }, [loadTeacherNav]);
 
   useEffect(() => {
     function refreshRecentBoards() {
@@ -432,6 +454,19 @@ export function TopNav({ showAdmin = false }: Props) {
         <MegaNav items={navItems} ariaLabel="주 메뉴" />
       </div>
       <div className="ab-topnav-right">
+        {navLoadError ? (
+          <div className="nav-action-status" role="alert">
+            <span className="nav-action-status-message">메뉴 로드 실패</span>
+            <button
+              type="button"
+              className="nav-action-retry"
+              onClick={() => void loadTeacherNav()}
+              disabled={navLoading}
+            >
+              {navLoading ? "시도 중…" : "다시 시도"}
+            </button>
+          </div>
+        ) : null}
         <AuthHeader />
       </div>
     </header>

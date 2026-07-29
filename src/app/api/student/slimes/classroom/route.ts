@@ -25,6 +25,7 @@ export async function GET() {
           color: true,
           growthStage: true,
           equippedItemKeys: true,
+          hiddenItemKeys: true,
           equippedTitleKey: true,
         },
       },
@@ -56,6 +57,9 @@ export async function GET() {
               color: representative.color as SlimeColor,
               growthStage: representative.growthStage as 1 | 2 | 3,
               equippedItemKeys: representative.equippedItemKeys,
+              hiddenItemKeys: representative.hiddenItemKeys.filter((key) =>
+                representative.equippedItemKeys.includes(key)
+              ),
               equippedTitleKey: representative.equippedTitleKey ?? null,
             }
           : null,

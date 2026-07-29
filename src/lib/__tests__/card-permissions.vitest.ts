@@ -187,6 +187,45 @@ describe("card-permissions — anon + edge cases", () => {
   });
 });
 
+describe("card-permissions — share-card ownership", () => {
+  const shareCard: CardLike = {
+    id: "card-share",
+    boardId: "b1",
+    authorId: null,
+    studentAuthorId: null,
+    externalAuthorKey: "guest-owner",
+  };
+  const shareVisitor = (guestId: string): Identities => ({
+    teacher: null,
+    student: null,
+    parent: null,
+    share: {
+      shareToken: "share-token",
+      boardId: "b1",
+      permission: "student",
+      authorName: "Guest",
+      guestId,
+    },
+    primary: "share",
+  });
+
+  it("allows the matching share guest to edit and delete their card", () => {
+    expect(canEditCard(shareVisitor("guest-owner"), BOARD, shareCard)).toBe(true);
+    expect(canDeleteCard(shareVisitor("guest-owner"), BOARD, shareCard)).toBe(true);
+  });
+
+  it("denies a different share guest", () => {
+    expect(canEditCard(shareVisitor("guest-other"), BOARD, shareCard)).toBe(false);
+    expect(canDeleteCard(shareVisitor("guest-other"), BOARD, shareCard)).toBe(false);
+  });
+
+  it("does not treat anonymous display mode as ownership", () => {
+    const anonymousBoard = { ...BOARD, anonymousAuthor: true };
+    expect(canEditCard(shareVisitor("guest-other"), anonymousBoard, shareCard)).toBe(false);
+    expect(canEditCard(shareVisitor("guest-owner"), anonymousBoard, shareCard)).toBe(true);
+  });
+});
+
 describe("boardCaps convenience", () => {
   it("teacher owner gets full caps", () => {
     const caps = boardCaps(ids(teacherOwner), BOARD);

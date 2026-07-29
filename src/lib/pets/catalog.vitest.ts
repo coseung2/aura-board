@@ -14,6 +14,7 @@ import {
   SLIME_COOKIE_PRICE,
   SLIME_SHOP_DEFAULT_PRICE,
   SLIME_SHOP_CATALOG,
+  SLIME_VEHICLE_CATALOG,
 } from "./catalog";
 import { SLIME_WEARABLE_CATALOG } from "./wearable-catalog";
 
@@ -71,10 +72,29 @@ describe("slime catalog", () => {
     expect(SLIME_SHOP_CATALOG.map(({ key, floor }) => [key, floor])).toEqual([
       ["grass-floor-background", "grass-floor"],
       ...STATIC_FLOOR_CONTRACT.map(([id]) => [id, id]),
-      ["water-puddle-background", "water-puddle"],
       ["shooting-star-night-sky-background", null],
       ...ANIMATED_BACKGROUND_IDS.map((id) => [`${id}-background`, null]),
-      ["slime-blue-trampoline", "trampoline"],
+      // The trampoline moved to the vehicle category, which rides above the
+      // floor instead of owning a floor state.
+      ["slime-blue-trampoline", null],
+      // Delivered vehicles ride above the floor too, so none of them carry one.
+      ["slime-vehicle-donut-tube", null],
+      ["slime-vehicle-open-convertible", null],
+      ["slime-vehicle-hot-air-balloon", null],
+      ["slime-vehicle-cloud", null],
+      ["slime-vehicle-duck-tube", null],
+      ["slime-vehicle-go-kart", null],
+      ["slime-vehicle-wooden-cart", null],
+      ["slime-vehicle-kayak", null],
+      ["slime-vehicle-skateboard", null],
+      ["slime-vehicle-flying-broom", null],
+      ["slime-vehicle-swan-boat", null],
+      ["slime-vehicle-magic-carpet", null],
+      ["slime-vehicle-bumper-car", null],
+      ["slime-vehicle-carousel-horse", null],
+      ["slime-vehicle-flamingo-tube", null],
+      ["slime-vehicle-soap-bubble", null],
+      ["slime-vehicle-crescent-moon", null],
       ["slime-blue-drink-lemonade", null],
       ["slime-red-drink-strawberry-soda", null],
       ["slime-green-drink-melon-soda", null],
@@ -176,16 +196,18 @@ describe("slime catalog", () => {
     const existingCosmetics = SLIME_SHOP_CATALOG.filter(
       (item) => item.key !== "slime-cookie"
         && item.category !== "wearable"
+        // Delivered vehicles are priced by their own tiers, so this guard stays
+        // scoped to the props that predate them.
+        && !item.key.startsWith("slime-vehicle-")
         && !importedKeys.has(item.key)
         && !staticFloorKeys.has(item.key),
     );
 
-    expect(existingCosmetics).toHaveLength(16);
+    expect(existingCosmetics).toHaveLength(15);
     expect(existingCosmetics.every((item) => item.price === 500)).toBe(true);
     expect(existingCosmetics.every((item) => item.effectBps === 100)).toBe(true);
     expect(existingCosmetics.map(({ key, effectKey }) => [key, effectKey])).toEqual([
       ["grass-floor-background", "walking_reward"],
-      ["water-puddle-background", "walking_reward"],
       ["shooting-star-night-sky-background", "assignment_reward"],
       ["slime-blue-trampoline", "walking_reward"],
       ["slime-blue-drink-lemonade", "walking_reward"],
@@ -221,7 +243,163 @@ describe("slime catalog", () => {
     expect(slimeShopPreviewColor(SLIME_DRINK_CATALOG[4]!, "blue")).toBe("red");
   });
 
-  it("normalizes visual equipment in background, floor, prop, and outfit slot order", () => {
+  it("registers the delivered vehicle tiers, placement metadata, and FX sheets", () => {
+    expect(SLIME_VEHICLE_CATALOG).toHaveLength(17);
+    expect(SLIME_VEHICLE_CATALOG.map((item) => [
+      item.key,
+      item.labelKo,
+      item.tier,
+      item.price,
+      item.vehicleStance,
+      item.vehicleRiseY,
+      item.effectKey,
+      item.effectBps,
+    ])).toEqual([
+      ["slime-vehicle-donut-tube", "도넛 튜브", 3, 500, "grounded", 10, "walking_reward", 100],
+      ["slime-vehicle-open-convertible", "오픈카", 1, 1_000, "grounded", 6, "walking_reward", 300],
+      ["slime-vehicle-hot-air-balloon", "열기구", 1, 1_000, "floating", 9, "reading_reward", 300],
+      ["slime-vehicle-cloud", "구름", 2, 700, "floating", 23, "reading_reward", 200],
+      ["slime-vehicle-duck-tube", "러버덕 튜브", 2, 700, "grounded", 14, "walking_reward", 200],
+      ["slime-vehicle-go-kart", "고카트", 2, 700, "grounded", 9, "walking_reward", 200],
+      ["slime-vehicle-wooden-cart", "나무수레", 3, 500, "grounded", 17, "assignment_reward", 100],
+      ["slime-vehicle-kayak", "카약", 2, 700, "grounded", 15, "reading_reward", 200],
+      ["slime-vehicle-skateboard", "스케이트보드", 3, 500, "grounded", 13, "walking_reward", 100],
+      ["slime-vehicle-flying-broom", "하늘 빗자루", 2, 700, "floating", 13, "assignment_reward", 200],
+      ["slime-vehicle-swan-boat", "백조 보트", 1, 1_000, "grounded", 16, "comment_reward", 300],
+      ["slime-vehicle-magic-carpet", "마법 양탄자", 1, 1_000, "floating", 14, "growth_speed", 300],
+      ["slime-vehicle-bumper-car", "범퍼카", 2, 700, "grounded", 11, "walking_reward", 200],
+      ["slime-vehicle-carousel-horse", "회전목마", 1, 1_000, "grounded", 23, "assignment_reward", 300],
+      ["slime-vehicle-flamingo-tube", "플라밍고 튜브", 2, 700, "grounded", 15, "comment_reward", 200],
+      ["slime-vehicle-soap-bubble", "비눗방울", 2, 700, "floating", 2, "growth_speed", 200],
+      ["slime-vehicle-crescent-moon", "초승달", 1, 1_000, "floating", 9, "reading_reward", 300],
+    ]);
+
+    expect(SLIME_VEHICLE_CATALOG.every((item) =>
+      item.vehicleFrameCount === 8
+      && item.vehicleCanvasHeight === 81
+      && (
+        item.key === "slime-vehicle-go-kart"
+        || item.key === "slime-vehicle-wooden-cart"
+        || item.vehicleCharacterOffsetY === 17
+      )
+      && item.vehicleSheetPath?.endsWith("/idle-sheet.png"),
+    )).toBe(true);
+    expect(SLIME_VEHICLE_CATALOG.find((item) => item.key === "slime-vehicle-open-convertible"))
+      .toMatchObject({
+        vehicleGroundedSpritePath: "/creatures/slimes/shop/vehicles/open-convertible/wheels-idle-sheet.png",
+        vehicleGroundedFrameCount: 4,
+        vehicleGroundedFrameDurationMs: 100,
+        vehicleEffectSpritePaths: [
+          "/creatures/slimes/shop/vehicles/open-convertible/fx/wind-idle-sheet.png",
+        ],
+      });
+    const goKart = SLIME_VEHICLE_CATALOG.find((item) => item.key === "slime-vehicle-go-kart");
+    expect(goKart).toMatchObject({
+      vehicleEffectSpritePaths: [
+        "/creatures/slimes/shop/vehicles/go-kart/fx/wind-idle-sheet.png",
+        "/creatures/slimes/shop/vehicles/go-kart/fx/exhaust-idle-sheet.png",
+      ],
+    });
+    expect(goKart?.vehicleGroundedSpritePath).toBeUndefined();
+    const woodenCart = SLIME_VEHICLE_CATALOG.find((item) => item.key === "slime-vehicle-wooden-cart");
+    expect(woodenCart).toMatchObject({
+      vehicleEffectSpritePaths: [
+        "/creatures/slimes/shop/vehicles/wooden-cart/fx/wind-idle-sheet.png",
+      ],
+    });
+    expect(woodenCart?.vehicleGroundedSpritePath).toBeUndefined();
+    const cloud = SLIME_VEHICLE_CATALOG.find((item) => item.key === "slime-vehicle-cloud");
+    expect(cloud?.vehicleEffectSpritePaths).toBeUndefined();
+    expect(SLIME_VEHICLE_CATALOG.find((item) => item.key === "slime-vehicle-skateboard"))
+      .toMatchObject({
+        vehicleGroundedSpritePath: "/creatures/slimes/shop/vehicles/skateboard/wheels-idle-sheet.png",
+        vehicleGroundedFrameCount: 4,
+        vehicleGroundedFrameDurationMs: 100,
+        vehicleEffectSpritePaths: [
+          "/creatures/slimes/shop/vehicles/skateboard/fx/wind-idle-sheet.png",
+        ],
+      });
+    expect(SLIME_VEHICLE_CATALOG.find((item) => item.key === "slime-vehicle-flying-broom"))
+      .toMatchObject({
+        vehicleEffectSpritePaths: [
+          "/creatures/slimes/shop/vehicles/flying-broom/fx/wind-idle-sheet.png",
+        ],
+      });
+    expect(SLIME_VEHICLE_CATALOG.find((item) => item.key === "slime-vehicle-magic-carpet"))
+      .toMatchObject({
+        vehicleEffectSpritePaths: [
+          "/creatures/slimes/shop/vehicles/magic-carpet/fx/sparkle-idle-sheet.png",
+        ],
+      });
+    const bumperCar = SLIME_VEHICLE_CATALOG.find((item) => item.key === "slime-vehicle-bumper-car");
+    expect(bumperCar).toMatchObject({
+      vehicleStance: "grounded",
+      vehicleRiseY: 11,
+      vehicleBobY: [0, 0, 0, 0, 0, 0, 0, 0],
+      vehicleGroundedSpritePath: "/creatures/slimes/shop/vehicles/bumper-car/wheels-idle-sheet.png",
+      vehicleGroundedFrameCount: 4,
+      vehicleGroundedFrameDurationMs: 100,
+    });
+    expect(bumperCar?.vehicleOffsetX).toBeUndefined();
+    expect(SLIME_VEHICLE_CATALOG.find((item) => item.key === "slime-vehicle-carousel-horse"))
+      .toMatchObject({
+        vehicleStance: "grounded",
+        vehicleRiseY: 23,
+        vehicleBobY: [0, -1, -2, -2, -2, -1, -1, 0],
+        vehicleOffsetX: -4,
+        effectKey: "assignment_reward",
+      });
+    expect(SLIME_VEHICLE_CATALOG.find((item) => item.key === "slime-vehicle-flamingo-tube"))
+      .toMatchObject({
+        vehicleStance: "grounded",
+        vehicleRiseY: 15,
+        vehicleBobY: [0, -1, -1, -2, -2, -1, -1, 0],
+        vehicleOffsetX: -4,
+        effectKey: "comment_reward",
+      });
+    expect(SLIME_VEHICLE_CATALOG.find((item) => item.key === "slime-vehicle-soap-bubble"))
+      .toMatchObject({
+        vehicleStance: "floating",
+        vehicleRiseY: 2,
+        vehicleBobY: [0, -1, -2, -2, -2, -1, -1, 0],
+        effectKey: "growth_speed",
+        vehicleEffectSpritePaths: [
+          "/creatures/slimes/shop/vehicles/soap-bubble/fx/glint-idle-sheet.png",
+        ],
+      });
+    expect(SLIME_VEHICLE_CATALOG.find((item) => item.key === "slime-vehicle-crescent-moon"))
+      .toMatchObject({
+        vehicleStance: "floating",
+        vehicleRiseY: 9,
+        vehicleBobY: [0, -1, -2, -2, -2, -1, -1, 0],
+        vehicleOffsetX: -6,
+        effectKey: "reading_reward",
+        vehicleEffectSpritePaths: [
+          "/creatures/slimes/shop/vehicles/crescent-moon/fx/stars-idle-sheet.png",
+        ],
+      });
+    expect(SLIME_VEHICLE_CATALOG.find((item) => item.key === "slime-vehicle-go-kart"))
+      .toMatchObject({
+        vehicleRiseY: 9,
+        vehicleCharacterOffsetY: 12,
+      });
+    expect(SLIME_VEHICLE_CATALOG.find((item) => item.key === "slime-vehicle-wooden-cart"))
+      .toMatchObject({
+        vehicleRiseY: 17,
+        vehicleCharacterOffsetY: 13,
+      });
+  });
+
+  it("assigns an explicit tier to every vehicle, including the migrated trampoline", () => {
+    const vehicles = SLIME_SHOP_CATALOG.filter((item) => item.category === "vehicle");
+
+    expect(vehicles).toHaveLength(18);
+    expect(vehicles.every((item) => item.tier === 1 || item.tier === 2 || item.tier === 3))
+      .toBe(true);
+    expect(vehicles.find((item) => item.key === "slime-blue-trampoline")?.tier).toBe(3);
+  });
+
+  it("normalizes visual equipment in background, floor, vehicle, prop, and outfit slot order", () => {
     expect(normalizeEquippedSlimeItemKeys([
       "slime-blue-drink-lemonade",
       "slime-headwear-straw-hat",
@@ -229,10 +407,13 @@ describe("slime catalog", () => {
       "slime-blush-peach-brush-blush",
       "grass-floor-background",
       "shooting-star-night-sky-background",
-      "water-puddle-background",
+      "slime-blue-trampoline",
     ])).toEqual([
       "shooting-star-night-sky-background",
-      "water-puddle-background",
+      "grass-floor-background",
+      // A vehicle holds its own slot, so it survives next to a background and a
+      // floor instead of competing with them.
+      "slime-blue-trampoline",
       "slime-blue-drink-lemonade",
       "slime-blush-peach-brush-blush",
       "slime-eyewear-round-glasses",
@@ -262,8 +443,10 @@ describe("slime catalog", () => {
     expect(getEquippedSlimeFloor([
       "slime-blue-trampoline",
       "slime-blue-drink-lemonade",
-      "water-puddle-background",
-    ])).toBe("water-puddle");
+      "grass-floor-background",
+    ])).toBe("grass-floor");
+    // Vehicles carry no floor state, so they never win floor recovery.
+    expect(getEquippedSlimeFloor(["slime-blue-trampoline"])).toBe("none");
     expect(getEquippedSlimeFloor(["slime-blue-drink-lemonade"])).toBe("none");
   });
 

@@ -131,6 +131,24 @@ describe("slime cookie consumption", () => {
     );
   });
 
+  it("persists the cookie remainder when feeding crosses into stage 2", async () => {
+    const threshold = 10 * SLIME_GROWTH_SECONDS_PER_DAY;
+    const onePercent = SLIME_COOKIE_GROWTH_SECONDS / 2;
+    slime.growthStage = 1;
+    slime.growthSeconds = threshold - onePercent;
+
+    const result = await consumeSlimeCookie(
+      student,
+      "slime-cookie",
+      "blue",
+      "cookie-stage-boundary",
+    );
+
+    expect(result.growth.stage).toBe(2);
+    expect(result.growth.growthSeconds).toBe(threshold + onePercent);
+    expect(slime.growthSeconds).toBe(threshold + onePercent);
+  });
+
   it("requires a matching owned slime and cookie inventory", async () => {
     mocks.slimeFind.mockResolvedValue(null);
     await expect(

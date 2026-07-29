@@ -12,6 +12,9 @@ const mocks = vi.hoisted(() => ({
   commentFindMany: vi.fn(),
   rewardFindMany: vi.fn(),
   rewardFindFirst: vi.fn(),
+  refundCount: vi.fn(),
+  refundFindMany: vi.fn(),
+  refundFindFirst: vi.fn(),
   pushCount: vi.fn(),
   pushFindMany: vi.fn(),
   pushFindFirst: vi.fn(),
@@ -37,9 +40,14 @@ vi.mock("@/lib/db", () => ({
     cardLike: { count: mocks.likeCount, findMany: mocks.likeFindMany },
     cardComment: { count: mocks.commentCount, findMany: mocks.commentFindMany },
     transaction: {
-      count: mocks.rewardCount,
-      findMany: mocks.rewardFindMany,
-      findFirst: mocks.rewardFindFirst,
+      // Rewards and refunds share the transaction table but never the same
+      // `type`, so the fake client routes on it exactly like the real query does.
+      count: (args: { where?: { type?: string } }) =>
+        args?.where?.type === "refund" ? mocks.refundCount(args) : mocks.rewardCount(args),
+      findMany: (args: { where?: { type?: string } }) =>
+        args?.where?.type === "refund" ? mocks.refundFindMany(args) : mocks.rewardFindMany(args),
+      findFirst: (args: { where?: { type?: string } }) =>
+        args?.where?.type === "refund" ? mocks.refundFindFirst(args) : mocks.rewardFindFirst(args),
     },
     studentPushDispatch: {
       count: mocks.pushCount,
@@ -61,6 +69,7 @@ describe("/api/student/notifications reward compatibility", () => {
     mocks.likeCount.mockResolvedValue(0);
     mocks.commentCount.mockResolvedValue(0);
     mocks.rewardCount.mockResolvedValue(1);
+    mocks.refundCount.mockResolvedValue(0);
     mocks.pushCount.mockResolvedValue(0);
     mocks.likeFindMany.mockResolvedValue([]);
     mocks.commentFindMany.mockResolvedValue([]);
@@ -74,6 +83,8 @@ describe("/api/student/notifications reward compatibility", () => {
       },
     ]);
     mocks.rewardFindFirst.mockResolvedValue({ id: "transaction-1" });
+    mocks.refundFindMany.mockResolvedValue([]);
+    mocks.refundFindFirst.mockResolvedValue(null);
     mocks.pushFindMany.mockResolvedValue([]);
     mocks.pushFindFirst.mockResolvedValue(null);
     mocks.receiptUpsert.mockResolvedValue({});
@@ -97,6 +108,68 @@ describe("/api/student/notifications reward compatibility", () => {
         },
       ],
     });
+  });
+
+  it("tells the student when a retired item was refunded", async () => {
+    mocks.rewardCount.mockResolvedValue(0);
+    mocks.rewardFindMany.mockResolvedValue([]);
+    mocks.refundCount.mockResolvedValue(1);
+    mocks.refundFindMany.mockResolvedValue([
+      {
+        id: "transaction-refund-1",
+        amount: 500,
+        note: "slime-item-refund:water-puddle-background",
+        sourceType: "slime_item_refund",
+        createdAt: new Date("2026-07-28T00:00:00.000Z"),
+      },
+    ]);
+
+    const response = await GET();
+
+    expect(response.status).toBe(200);
+    const payload = (await response.json()) as {
+      count: number;
+      items: { id: string; kind: string; cardTitle: string; content: string; href: string }[];
+    };
+    expect(payload.count).toBe(1);
+    expect(payload.items[0]).toMatchObject({
+      id: "refund:transaction-refund-1",
+      kind: "refund",
+      actorLabel: "펫 상점",
+      href: "/my/wallet",
+    });
+    // The item is gone from the catalog, so the copy must still explain the money
+    // without leaking a raw key to a child.
+    expect(payload.items[0].cardTitle).toContain("돌려");
+    expect(payload.items[0].content).toContain("+500 별");
+    expect(payload.items[0].content).not.toContain("water-puddle-background");
+  });
+
+  it("accepts refund receipts by transaction id", async () => {
+    mocks.refundFindFirst.mockResolvedValue({ id: "transaction-refund-1" });
+
+    const response = await POST(
+      new Request("http://localhost/api/student/notifications", {
+        method: "POST",
+        body: JSON.stringify({
+          action: "mark_read",
+          kind: "refund",
+          id: "transaction-refund-1",
+        }),
+      }),
+    );
+
+    expect(response.status).toBe(200);
+    expect(mocks.receiptUpsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          studentId_notificationType_notificationId: expect.objectContaining({
+            notificationType: "refund",
+            notificationId: "transaction-refund-1",
+          }),
+        }),
+      }),
+    );
   });
 
   it("accepts reward receipts by transaction id", async () => {

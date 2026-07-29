@@ -1,0 +1,15 @@
+{
+  "frame_size": { "w": 64, "h": 81 },
+  "size": { "w": 256, "h": 81 },
+  "frame_count": 4,
+  "frame_duration_ms": 100,
+  "independent": true,
+  "direction": "counter-clockwise",
+  "mask_fixed": true,
+  "frames": [
+    { "x": 0, "y": 0, "w": 64, "h": 81, "duration": 100 },
+    { "x": 64, "y": 0, "w": 64, "h": 81, "duration": 100 },
+    { "x": 128, "y": 0, "w": 64, "h": 81, "duration": 100 },
+    { "x": 192, "y": 0, "w": 64, "h": 81, "duration": 100 }
+  ]
+}

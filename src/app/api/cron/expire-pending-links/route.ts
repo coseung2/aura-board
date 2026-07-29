@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { dispatchOnce, dispatchParentNotification } from "@/lib/parent-email";
+import { isAuthorizedCronRequest } from "@/lib/cron-auth";
 
 // parent-class-invite-v2 — GET /api/cron/expire-pending-links.
 // Invoked by Vercel Cron at KST 02:00 (UTC 17:00) daily. See vercel.json.
@@ -23,14 +24,8 @@ function kstDateStamp(d: Date): string {
 }
 
 export async function GET(req: Request) {
-  const secret = process.env.CRON_SECRET;
-  const authHeader = req.headers.get("authorization") ?? "";
-  if (!secret || authHeader !== `Bearer ${secret}`) {
-    // Vercel Cron also sets an x-vercel-cron header; accept that in prod.
-    const vercelCron = req.headers.get("x-vercel-cron");
-    if (!vercelCron) {
-      return NextResponse.json({ error: "invalid_secret" }, { status: 401 });
-    }
+  if (!isAuthorizedCronRequest(req)) {
+    return NextResponse.json({ error: "invalid_secret" }, { status: 401 });
   }
 
   const origin = new URL(req.url).origin;

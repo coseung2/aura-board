@@ -4,7 +4,6 @@ const mocks = vi.hoisted(() => ({
   logs: [] as Array<Record<string, unknown>>,
   transactions: [] as Array<Record<string, unknown>>,
   balance: 0,
-  award: vi.fn(),
   findMany: vi.fn(),
   count: vi.fn(),
   aggregate: vi.fn(),
@@ -29,10 +28,6 @@ vi.mock("@/lib/reading-evaluator", () => ({
 }));
 vi.mock("@/lib/titles", () => ({
   readReadingTitles: vi.fn(async () => []),
-}));
-vi.mock("@/lib/avatar-rewards", () => ({
-  retryReadingRewardTransaction: (operation: () => Promise<unknown>) => operation(),
-  awardReadingReward: mocks.award,
 }));
 vi.mock("@/lib/db", () => {
   const tx = {
@@ -93,12 +88,11 @@ function request() {
   });
 }
 
-describe("reading log and reward transaction", () => {
+describe("reading logs and missions", () => {
   beforeEach(() => {
     mocks.logs.length = 0;
     mocks.transactions.length = 0;
     mocks.balance = 0;
-    mocks.award.mockReset();
     mocks.findMany.mockReset();
     mocks.count.mockReset();
     mocks.aggregate.mockReset();
@@ -116,16 +110,18 @@ describe("reading log and reward transaction", () => {
     vi.useRealTimers();
   });
 
-  it("rolls the reading log, wallet, and transaction back together", async () => {
-    mocks.award.mockImplementationOnce(async ({ tx }: { tx?: unknown }) => {
-      expect(tx).toBeDefined();
-      mocks.balance += 25;
-      mocks.transactions.push({ sourceType: "reading_reward", amount: 25 });
-      throw new Error("reward transaction failed");
-    });
+  it("saves a reading log without granting the retired per-record reward", async () => {
+    const response = await POST(request());
+    const body = await response.json();
 
-    await expect(POST(request())).rejects.toThrow("reward transaction failed");
-    expect(mocks.logs).toHaveLength(0);
+    expect(response.status).toBe(201);
+    expect(body.entry).toMatchObject({
+      id: "reading-1",
+      title: "어린 왕자",
+      aiScore: 5,
+    });
+    expect(body).not.toHaveProperty("reward");
+    expect(mocks.logs).toHaveLength(1);
     expect(mocks.balance).toBe(0);
     expect(mocks.transactions).toHaveLength(0);
   });
@@ -133,6 +129,7 @@ describe("reading log and reward transaction", () => {
   it("uses complete aggregates while capping the returned recent entries", async () => {
     // The fixture rows are dated inside the KST week starting 2026-07-20, so
     // pin the clock to that week instead of depending on the current date.
+    vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-07-22T03:00:00.000Z"));
     const recentRows = Array.from({ length: 30 }, (_, index) => {
       const now = new Date("2026-07-20T00:00:00.000Z");
@@ -157,44 +154,48 @@ describe("reading log and reward transaction", () => {
     mocks.count.mockResolvedValueOnce(31).mockResolvedValueOnce(4);
     mocks.aggregate.mockResolvedValue({ _avg: { aiScore: 4.25 } });
 
-    const response = await GET();
+    try {
+      const response = await GET();
 
-    expect(response.status).toBe(200);
-    const body = await response.json();
-    expect(body.entries).toHaveLength(30);
-    expect(body.count).toBe(31);
-    expect(body.summary).toEqual({
-      weeklyCount: 4,
-      totalCount: 31,
-      averageScore: 4.3,
-    });
-    expect(body.missions.map((mission: { key: string }) => mission.key)).toEqual([
-      "weekly_books",
-      "consecutive_days",
-      "reflection_chars",
-    ]);
-    expect(body.missions[0].progress).toBe(4);
-    expect(body.weeklyMissionReward).toMatchObject({
-      totalCount: 3,
-      completedCount: expect.any(Number),
-      claimed: false,
-      claimable: true,
-      claimableStepCount: 5,
-      claimableAmount: 50,
-    });
-    expect(body.representativeSlime).toBeNull();
-    expect(mocks.findMany).toHaveBeenCalledWith(
-      expect.objectContaining({ take: 30 }),
-    );
-    expect(mocks.findMany).toHaveBeenCalledWith(
-      expect.objectContaining({
-        select: { createdAt: true, reflection: true },
-      }),
-    );
-    expect(mocks.count).toHaveBeenCalledTimes(2);
-    expect(mocks.aggregate).toHaveBeenCalledWith(
-      expect.objectContaining({ _avg: { aiScore: true } }),
-    );
+      expect(response.status).toBe(200);
+      const body = await response.json();
+      expect(body.entries).toHaveLength(30);
+      expect(body.count).toBe(31);
+      expect(body.summary).toEqual({
+        weeklyCount: 4,
+        totalCount: 31,
+        averageScore: 4.3,
+      });
+      expect(body.missions.map((mission: { key: string }) => mission.key)).toEqual([
+        "weekly_books",
+        "consecutive_days",
+        "reflection_chars",
+      ]);
+      expect(body.missions[0].progress).toBe(4);
+      expect(body.weeklyMissionReward).toMatchObject({
+        totalCount: 3,
+        completedCount: expect.any(Number),
+        claimed: false,
+        claimable: true,
+        claimableStepCount: 5,
+        claimableAmount: 50,
+      });
+      expect(body.representativeSlime).toBeNull();
+      expect(mocks.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({ take: 30 }),
+      );
+      expect(mocks.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          select: { createdAt: true, reflection: true },
+        }),
+      );
+      expect(mocks.count).toHaveBeenCalledTimes(2);
+      expect(mocks.aggregate).toHaveBeenCalledWith(
+        expect.objectContaining({ _avg: { aiScore: true } }),
+      );
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("returns Top 5 reward amounts and prior-week unclaimed reading rank rewards", async () => {

@@ -70,11 +70,14 @@ export type SlimeCatalogItem = {
   price: number;
 };
 
+export type SlimeShopTier = 1 | 2 | 3;
+
 export type SlimeShopItem = {
   key: string;
   category:
     | "background"
     | "ride"
+    | "vehicle"
     | "drink"
     | "food"
     | "prop"
@@ -83,6 +86,7 @@ export type SlimeShopItem = {
   floor: Exclude<EquippedFloor, "none"> | null;
   labelKo: string;
   price: number;
+  tier?: SlimeShopTier;
   spritePath: string;
   mobileSpritePath?: string;
   staticSpritePath?: string;
@@ -90,6 +94,30 @@ export type SlimeShopItem = {
   previewColor?: SlimeColor;
   wearableRole?: SlimeWearableRole;
   wearableOption?: string;
+  /** Vehicle stance; `floating` rides never touch the floor surface. */
+  vehicleStance?: "grounded" | "floating";
+  /** Pixels the vehicle lifts the slime, in 64px-viewport units. */
+  vehicleRiseY?: number;
+  /** Horizontal delivery correction for vehicle-owned layers only. */
+  vehicleOffsetX?: number;
+  /** Vehicle parts that stay planted while the body moves, such as wheels. */
+  vehicleGroundedSpritePath?: string;
+  /** Transparent effect sheets synchronized to the vehicle's main frame clock. */
+  vehicleEffectSpritePaths?: string[];
+  /** Frames in the vehicle sheet. Omitted means a single static image. */
+  vehicleFrameCount?: number;
+  /** Frames in the grounded-part sheet, such as a wheel rotation. */
+  vehicleGroundedFrameCount?: number;
+  /** Fixed frame duration for the grounded part, in milliseconds. */
+  vehicleGroundedFrameDurationMs?: number;
+  /** Height of the vehicle canvas; taller than the viewport when art needs headroom. */
+  vehicleCanvasHeight?: number;
+  /** Where the character sits inside a taller vehicle canvas. */
+  vehicleCharacterOffsetY?: number;
+  /** Per-frame vertical bob authored into the vehicle. The rider follows it. */
+  vehicleBobY?: number[];
+  /** Animated vehicle sheet; `spritePath` stays the still shop image. */
+  vehicleSheetPath?: string;
   effectKey?: string;
   effectBps?: number;
 };
@@ -108,6 +136,7 @@ export type SlimeShopFilter =
   | "character"
   | "background"
   | "floor"
+  | "vehicle"
   | "food"
   | "prop"
   | "outfit"
@@ -116,12 +145,18 @@ export type SlimeShopFilter =
 export const SLIME_SHOP_NAV_ITEMS: readonly { key: SlimeShopFilter; label: string }[] = [
   { key: "character", label: "캐릭터" },
   { key: "floor", label: "바닥" },
+  { key: "vehicle", label: "탈것" },
   { key: "food", label: "먹이" },
   { key: "prop", label: "소품" },
   { key: "outfit", label: "착장" },
 ];
 
-export type SlimeVisualItemSlot = "background" | "floor" | "prop" | SlimeWearableRole;
+export type SlimeVisualItemSlot =
+  | "background"
+  | "floor"
+  | "vehicle"
+  | "prop"
+  | SlimeWearableRole;
 
 /** True scene backgrounds are category background with no floor mapping. */
 export function isSceneBackgroundItem(
@@ -154,6 +189,9 @@ export function slimeVisualItemSlot(
 ): SlimeVisualItemSlot | null {
   if (isSceneBackgroundItem(item)) return "background";
   if (item.floor) return "floor";
+  // Vehicles ride above the floor rather than replacing it, so they hold an
+  // independent slot and stay equippable next to a background and a floor.
+  if (item.category === "vehicle" || item.category === "ride") return "vehicle";
   if (item.category === "drink" || item.category === "prop") return "prop";
   if (item.category === "wearable") return item.wearableRole ?? null;
   return null;
@@ -331,7 +369,32 @@ export function selectSceneBackgroundSpritePath(
   return item.mobileSpritePath || item.spritePath;
 }
 
+/**
+ * Vehicle currently equipped, if any.
+ *
+ * Mirrors the scene-background resolver: last matching key wins so a legacy row
+ * carrying more than one vehicle still resolves deterministically.
+ */
+export function resolveEquippedVehicle(
+  itemKeys: readonly string[],
+  catalog: readonly SlimeShopItem[],
+): SlimeShopItem | null {
+  const byKey = new Map(catalog.map((item) => [item.key, item]));
+  let equipped: SlimeShopItem | null = null;
+  for (const key of itemKeys) {
+    const item = byKey.get(key);
+    if (item && slimeVisualItemSlot(item) === "vehicle") equipped = item;
+  }
+  return equipped;
+}
+
 export const SLIME_COOKIE_ITEM_KEY = "slime-cookie";
+
+/**
+ * Mirrors the server-side cap in `src/lib/pets/catalog.ts`, so a mistyped
+ * quantity cannot drain a student's wallet in a single tap.
+ */
+export const SLIME_MAX_PURCHASE_QUANTITY = 99;
 
 export function slimeBallSpritePath(
   itemKeys: readonly string[],
@@ -409,6 +472,9 @@ export type MobileSlimeHome = {
   ownedItemQuantities: Record<string, number>;
   equippedItemKeys: string[];
   equippedItemsByColor: Partial<Record<SlimeColor, string[]>>;
+  /** Equipped items hidden from sprite composition; buffs still use equipped keys. */
+  hiddenItemKeys: string[];
+  hiddenItemsByColor: Partial<Record<SlimeColor, string[]>>;
   equippedFloorByColor: Partial<Record<SlimeColor, EquippedFloor>>;
   equippedFloor: EquippedFloor;
   shopCatalog: SlimeShopItem[];
@@ -437,6 +503,7 @@ export type MobileSlimeClassmate = {
     color: SlimeColor;
     growthStage: 1 | 2 | 3;
     equippedItemKeys: string[];
+    hiddenItemKeys: string[];
     equippedTitleKey: string | null;
   } | null;
 };
@@ -572,6 +639,7 @@ function normalizeShopCatalog(value: unknown): SlimeShopItem[] {
     if (
       category !== "background" &&
       category !== "ride" &&
+      category !== "vehicle" &&
       category !== "drink" &&
       category !== "food" &&
       category !== "prop" &&
@@ -583,6 +651,10 @@ function normalizeShopCatalog(value: unknown): SlimeShopItem[] {
     const parsedFloor = entry.floor === null ? "none" : floor(entry.floor);
     const itemFloor = parsedFloor === "none" ? null : parsedFloor;
     const parsedWearableRole = wearableRole(entry.wearableRole);
+    const tier =
+      entry.tier === 1 || entry.tier === 2 || entry.tier === 3
+        ? entry.tier
+        : undefined;
     return [
       {
         key: entry.key,
@@ -590,6 +662,7 @@ function normalizeShopCatalog(value: unknown): SlimeShopItem[] {
         floor: itemFloor,
         labelKo: typeof entry.labelKo === "string" ? entry.labelKo : entry.key,
         price: Math.max(0, Math.trunc(numberValue(entry.price))),
+        tier,
         spritePath: typeof entry.spritePath === "string" ? entry.spritePath : "",
         mobileSpritePath:
           typeof entry.mobileSpritePath === "string" ? entry.mobileSpritePath : undefined,
@@ -605,6 +678,56 @@ function normalizeShopCatalog(value: unknown): SlimeShopItem[] {
           typeof entry.wearableOption === "string" && entry.wearableOption.length > 0
             ? entry.wearableOption
             : undefined,
+        // Vehicle fields have to survive normalization or the ride never renders
+        // on mobile even though the server sent it.
+        vehicleStance:
+          entry.vehicleStance === "grounded" || entry.vehicleStance === "floating"
+            ? entry.vehicleStance
+            : undefined,
+        vehicleRiseY:
+          typeof entry.vehicleRiseY === "number"
+            ? Math.max(0, Math.trunc(entry.vehicleRiseY))
+            : undefined,
+        vehicleOffsetX:
+          typeof entry.vehicleOffsetX === "number"
+            ? Math.trunc(entry.vehicleOffsetX)
+            : undefined,
+        vehicleGroundedSpritePath:
+          typeof entry.vehicleGroundedSpritePath === "string"
+            ? entry.vehicleGroundedSpritePath
+            : undefined,
+        vehicleEffectSpritePaths: Array.isArray(entry.vehicleEffectSpritePaths)
+          ? entry.vehicleEffectSpritePaths.filter(
+              (path): path is string => typeof path === "string" && path.length > 0,
+            )
+          : undefined,
+        vehicleFrameCount:
+          typeof entry.vehicleFrameCount === "number"
+            ? Math.max(1, Math.trunc(entry.vehicleFrameCount))
+            : undefined,
+        vehicleGroundedFrameCount:
+          typeof entry.vehicleGroundedFrameCount === "number"
+            ? Math.max(1, Math.trunc(entry.vehicleGroundedFrameCount))
+            : undefined,
+        vehicleGroundedFrameDurationMs:
+          typeof entry.vehicleGroundedFrameDurationMs === "number"
+            ? Math.max(16, Math.trunc(entry.vehicleGroundedFrameDurationMs))
+            : undefined,
+        vehicleCanvasHeight:
+          typeof entry.vehicleCanvasHeight === "number"
+            ? Math.max(64, Math.trunc(entry.vehicleCanvasHeight))
+            : undefined,
+        vehicleCharacterOffsetY:
+          typeof entry.vehicleCharacterOffsetY === "number"
+            ? Math.max(0, Math.trunc(entry.vehicleCharacterOffsetY))
+            : undefined,
+        vehicleBobY: Array.isArray(entry.vehicleBobY)
+          ? entry.vehicleBobY
+              .filter((value): value is number => typeof value === "number")
+              .map((value) => Math.trunc(value))
+          : undefined,
+        vehicleSheetPath:
+          typeof entry.vehicleSheetPath === "string" ? entry.vehicleSheetPath : undefined,
         effectKey: typeof entry.effectKey === "string" ? entry.effectKey : undefined,
         effectBps:
           typeof entry.effectBps === "number"
@@ -622,6 +745,17 @@ function normalizeItemsByColor(
   const result: Partial<Record<SlimeColor, string[]>> = {};
   for (const itemColor of SLIME_ASSET_COLORS) {
     result[itemColor] = stringList(value[itemColor]);
+  }
+  return result;
+}
+
+function normalizeOptionalItemsByColor(
+  value: unknown,
+): Partial<Record<SlimeColor, string[]>> {
+  if (!isRecord(value)) return {};
+  const result: Partial<Record<SlimeColor, string[]>> = {};
+  for (const itemColor of SLIME_ASSET_COLORS) {
+    if (itemColor in value) result[itemColor] = stringList(value[itemColor]);
   }
   return result;
 }
@@ -684,6 +818,8 @@ export function normalizeSlimeHome(payload: unknown): MobileSlimeHome {
     ownedItemQuantities,
     equippedItemKeys: stringList(value.equippedItemKeys),
     equippedItemsByColor: normalizeItemsByColor(value.equippedItemsByColor),
+    hiddenItemKeys: stringList(value.hiddenItemKeys),
+    hiddenItemsByColor: normalizeOptionalItemsByColor(value.hiddenItemsByColor),
     equippedFloorByColor,
     equippedFloor: floor(value.equippedFloor),
     shopCatalog: normalizeShopCatalog(value.shopCatalog),
@@ -910,6 +1046,7 @@ export function normalizeSlimeClassroom(payload: unknown): MobileSlimeClassmate[
             color: representativeColor,
             growthStage: stageValue(representative.growthStage),
             equippedItemKeys: stringList(representative.equippedItemKeys),
+            hiddenItemKeys: stringList(representative.hiddenItemKeys),
             equippedTitleKey:
               typeof representative.equippedTitleKey === "string"
               && representative.equippedTitleKey.length > 0
@@ -925,9 +1062,9 @@ export function shopFilterForItem(
   item: Pick<SlimeShopItem, "category" | "floor">,
 ): Exclude<SlimeShopFilter, "character"> {
   if (isSceneBackgroundItem(item)) return "background";
-  // Rides are things the slime plays on rather than ground it stands on, so they
-  // belong with the other props even though they carry a floor value.
-  if (item.category === "ride") return "prop";
+  // Vehicles are ridden above the floor rather than stood on, so they own the
+  // 탈것 tab. `ride` is the pre-vehicle name for the same family.
+  if (item.category === "vehicle" || item.category === "ride") return "vehicle";
   if (item.category === "background" || item.floor) return "floor";
   if (item.category === "food") return "food";
   if (item.category === "wearable") return "outfit";
@@ -948,10 +1085,11 @@ export function calculateSlimeGrowthPercent(
   const start = STAGE_START_SECONDS[growth.stage];
   const target = STAGE_START_SECONDS[(growth.stage + 1) as 2 | 3];
   if (target <= start) return 100;
-  return Math.min(
-    100,
-    Math.max(0, Math.round(((growth.growthSeconds - start) / (target - start)) * 100)),
-  );
+  const percent =
+    ((growth.growthSeconds - start) / (target - start)) * 100;
+  // Keep one decimal so a small remainder carried into a new stage does not
+  // appear to reset to zero after integer rounding.
+  return Math.min(100, Math.max(0, Math.round(percent * 10) / 10));
 }
 
 /** Stage one uses the catalog base buff; later stages double it each time. */

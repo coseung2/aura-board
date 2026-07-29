@@ -1,0 +1,28 @@
+{
+  "option": "skateboard",
+  "labelKo": "스케이트보드",
+  "pattern": "front-only",
+  "stance": "grounded",
+  "price": 500,
+  "canvas": { "w": 64, "h": 81 },
+  "characterOffsetY": 17,
+  "groundLineY": 56,
+  "riseY": 13,
+  "frameCount": 8,
+  "frameDurationsMs": [240, 160, 180, 90, 90, 160, 180, 240],
+  "bobY": [0, 0, 0, 0, 0, 0, 0, 0],
+  "riderFollows": true,
+  "wheelAnimation": {
+    "independent": true,
+    "frameCount": 4,
+    "frameDurationMs": 100,
+    "direction": "counter-clockwise",
+    "maskFixed": true,
+    "source": "wheels-source.aseprite",
+    "sheet": "wheels-idle-sheet.png",
+    "layers": ["skateboard-wheel-left", "skateboard-wheel-right"]
+  },
+  "effects": {
+    "wind": { "source": "fx/wind-source.aseprite", "sheet": "fx/wind-idle-sheet.png" }
+  }
+}

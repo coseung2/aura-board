@@ -17,6 +17,7 @@ import {
   type SlimeWearableRole,
 } from "./slime-wearables";
 import { SLIME_WEB_WEARABLE_REGISTRY } from "./slime-wearables.generated";
+import { SLIME_WEB_WEARABLE_ACTION_REGISTRY } from "./slime-wearable-actions.generated";
 
 type Anchor = { sourceFrame: number; dx: number; dy: number };
 type Sheet = {
@@ -75,6 +76,30 @@ async function readSheetFrames(
 }
 
 describe("slime wearable anchor registry", () => {
+  it("imports every delivered happy and ball-hit action without an idle fallback", () => {
+    const actions = SLIME_WEB_WEARABLE_ACTION_REGISTRY as unknown as Record<
+      string,
+      { timelines: Record<string, { anchors: Anchor[] }> }
+    >;
+    const happy = Object.entries(actions).filter(([, entry]) => entry.timelines.happy);
+    const ballHit = Object.entries(actions).filter(([, entry]) => entry.timelines["ball-hit"]);
+
+    expect(happy).toHaveLength(16);
+    expect(ballHit).toHaveLength(22);
+    for (const [key, entry] of ballHit) {
+      expect(entry.timelines["ball-hit"].anchors).toHaveLength(18);
+      const [role, option] = key.split("/") as [SlimeWearableRole, string];
+      expect(resolveSlimeWearables(
+        { [role]: option },
+        "blue",
+        "ball-hit" as SlimeSheetAction,
+        5,
+      )).toEqual([
+        expect.objectContaining({ key, sourceFrame: 5, sheetFrameCount: 18 }),
+      ]);
+    }
+  });
+
   it("covers every role in the source composition contract order", () => {
     expect(SLIME_WEARABLE_LAYER_ORDER).toEqual(["slime", ...SLIME_WEARABLE_ROLES]);
     const roles = new Set(Object.values(registry).map((entry) => entry.role));
@@ -223,11 +248,16 @@ describe("slime wearable resolution", () => {
     }
   });
 
-  it("renders nothing for actions an option was never authored for", () => {
-    // Legacy hats still lack happy and ball-hit tracks. New headbands cover
-    // happy separately so they remain visible during feeding.
+  it("keeps a legacy hat attached through happy and ball-hit", () => {
     for (const action of ["happy", "ball-hit"] as const) {
-      expect(resolveSlimeWearables({ headwear: "straw-hat" }, "blue", action, 0), action).toEqual([]);
+      const layers = resolveSlimeWearables({ headwear: "straw-hat" }, "blue", action, 5);
+      expect(layers, action).toEqual([
+        expect.objectContaining({
+          key: "headwear/straw-hat",
+          sourceFrame: 5,
+          sheetFrameCount: action === "happy" ? 12 : 18,
+        }),
+      ]);
     }
   });
 
@@ -302,14 +332,11 @@ describe("head slot gives a chosen hat priority over the growth crown", () => {
     }
   });
 
-  it("hides a chosen hat rather than revealing the crown under it", () => {
+  it("keeps a chosen legacy hat drawn during happy", () => {
     const headSlot = resolveSlimeHeadSlot(3, "straw-hat");
-    // No hat has a happy track yet. The head is left bare rather than showing the
-    // growth crown the player did not choose.
     expect(resolveSlimeComposition("happy", headSlot)).toEqual({
       mode: "composed",
-      headwear: "suppressed",
-      reason: "unsupported-action",
+      headwear: "drawn",
     });
   });
 

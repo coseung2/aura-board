@@ -66,18 +66,13 @@ export async function POST(
 
   try {
     const txResult = await db.$transaction(async (tx) => {
-      // Read current balance under lock
-      const acc = await tx.studentAccount.findUnique({
-        where: { id: accountId },
-        select: { id: true, balance: true },
-      });
-      if (!acc) throw new Error("account_missing");
-      if (acc.balance < parsed.data.amount) {
-        throw new Error("insufficient_balance");
-      }
-      const updated = await tx.studentAccount.update({
-        where: { id: acc.id },
+      const debited = await tx.studentAccount.updateMany({
+        where: { id: accountId, balance: { gte: parsed.data.amount } },
         data: { balance: { decrement: parsed.data.amount } },
+      });
+      if (debited.count === 0) throw new Error("insufficient_balance");
+      const updated = await tx.studentAccount.findUniqueOrThrow({
+        where: { id: accountId },
         select: { id: true, balance: true },
       });
       const trx = await tx.transaction.create({
@@ -99,7 +94,7 @@ export async function POST(
     if (msg === "insufficient_balance") {
       return NextResponse.json(
         { error: "잔액 부족" },
-        { status: 400 }
+        { status: 409 }
       );
     }
     throw err;

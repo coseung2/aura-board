@@ -27,12 +27,23 @@ export async function POST(req: Request) {
   if (!itemKey || !idempotencyKey) {
     return jsonPrivateNoStore({ error: "invalid_body" }, { status: 400 });
   }
+  /**
+   * Quantity is optional so existing clients keep working. An older app that
+   * omits it still buys exactly one, which is what it already expected.
+   */
+  const rawQuantity =
+    body && typeof body === "object" ? (body as { quantity?: unknown }).quantity : undefined;
+  if (rawQuantity !== undefined && typeof rawQuantity !== "number") {
+    return jsonPrivateNoStore({ error: "invalid_body" }, { status: 400 });
+  }
+  const quantity = rawQuantity === undefined ? 1 : rawQuantity;
 
   try {
     const result = await purchaseSlimeShopItem(
       { id: student.id, classroomId: student.classroomId },
       itemKey,
       idempotencyKey,
+      quantity,
     );
     return jsonPrivateNoStore(result, { status: result.idempotent ? 200 : 201 });
   } catch (error) {

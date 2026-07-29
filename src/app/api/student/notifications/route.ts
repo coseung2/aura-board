@@ -2,9 +2,12 @@ import { NextResponse } from "next/server";
 import { Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
 import { getCurrentStudent } from "@/lib/student-auth";
+import { getSlimeShopItem } from "@/lib/pets/catalog";
 import {
   STUDENT_NOTIFICATION_KINDS,
+  STUDENT_NOTIFICATION_REFUND_SOURCE_TYPE,
   STUDENT_NOTIFICATION_REWARD_SOURCE_TYPES,
+  studentRefundItemKey,
   studentRewardTitle,
   type StudentNotificationKind,
   type StudentNotificationRewardSourceType,
@@ -20,7 +23,7 @@ export async function GET() {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
 
-  const { likeWhere, commentWhere, rewardWhere } = notificationWhere(student);
+  const { likeWhere, commentWhere, rewardWhere, refundWhere } = notificationWhere(student);
   const pushWhere: Prisma.StudentPushDispatchWhereInput = {
     studentId: student.id,
     kind: { in: ["attendance", "assignment"] },
@@ -50,6 +53,9 @@ export async function GET() {
   const unreadRewardIds = receipts
     .filter((receipt) => receipt.notificationType === "reward")
     .map((receipt) => receipt.notificationId);
+  const unreadRefundIds = receipts
+    .filter((receipt) => receipt.notificationType === "refund")
+    .map((receipt) => receipt.notificationId);
   const readPushIds = receipts
     .filter(
       (receipt) =>
@@ -59,7 +65,18 @@ export async function GET() {
     .map((receipt) => receipt.notificationId);
   const unreadSince = lastReadAt ? { createdAt: { gt: lastReadAt } } : {};
 
-  const [likeCount, commentCount, rewardCount, pushCount, likes, comments, rewards, pushes] = await Promise.all([
+  const [
+    likeCount,
+    commentCount,
+    rewardCount,
+    refundCount,
+    pushCount,
+    likes,
+    comments,
+    rewards,
+    refunds,
+    pushes,
+  ] = await Promise.all([
     db.cardLike.count({
       where: {
         ...likeWhere,
@@ -79,6 +96,13 @@ export async function GET() {
         ...rewardWhere,
         ...unreadSince,
         ...(unreadRewardIds.length > 0 ? { id: { notIn: unreadRewardIds } } : {}),
+      },
+    }),
+    db.transaction.count({
+      where: {
+        ...refundWhere,
+        ...unreadSince,
+        ...(unreadRefundIds.length > 0 ? { id: { notIn: unreadRefundIds } } : {}),
       },
     }),
     db.studentPushDispatch.count({
@@ -120,6 +144,18 @@ export async function GET() {
     }),
     db.transaction.findMany({
       where: rewardWhere,
+      orderBy: { createdAt: "desc" },
+      take: RECENT_LIMIT,
+      select: {
+        id: true,
+        amount: true,
+        note: true,
+        sourceType: true,
+        createdAt: true,
+      },
+    }),
+    db.transaction.findMany({
+      where: refundWhere,
       orderBy: { createdAt: "desc" },
       take: RECENT_LIMIT,
       select: {
@@ -209,6 +245,33 @@ export async function GET() {
     };
   });
 
+  const refundItems = refunds.map((transaction) => {
+    const itemKey = studentRefundItemKey(transaction.note);
+    /**
+     * A retired item is gone from the catalog, so its label may be unresolvable.
+     * Fall back to wording that still explains the money instead of showing a raw
+     * key to a child.
+     */
+    const itemLabel = itemKey ? getSlimeShopItem(itemKey)?.labelKo ?? null : null;
+    const amount = `+${transaction.amount.toLocaleString("ko-KR")} ${rewardUnit}`;
+    return {
+      id: `refund:${transaction.id}`,
+      kind: "refund" as const,
+      actorLabel: "펫 상점",
+      cardTitle: itemLabel
+        ? `${itemLabel}을(를) 돌려드렸어요`
+        : "상점에서 사라진 물건 값을 돌려드렸어요",
+      boardTitle: "내 통장",
+      href: "/my/wallet",
+      createdAt: transaction.createdAt.toISOString(),
+      content: [
+        "상점에서 더 이상 팔지 않게 되어 샀던 금액을 그대로 돌려줬어요.",
+        amount,
+      ].join(" · "),
+      read: isRead("refund", transaction.id, transaction.createdAt),
+    };
+  });
+
   const pushItems = pushes.flatMap((push) => {
     if (!isPersistentPushKind(push.kind)) return [];
     const fallbackTitle = push.kind === "attendance"
@@ -227,7 +290,7 @@ export async function GET() {
     }];
   });
 
-  const items = [...likeItems, ...commentItems, ...rewardItems, ...pushItems]
+  const items = [...likeItems, ...commentItems, ...rewardItems, ...refundItems, ...pushItems]
     .sort(
       (a, b) =>
         new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
@@ -235,7 +298,7 @@ export async function GET() {
     .slice(0, RECENT_LIMIT);
 
   return NextResponse.json({
-    count: likeCount + commentCount + rewardCount + pushCount,
+    count: likeCount + commentCount + rewardCount + refundCount + pushCount,
     items,
   });
 }
@@ -273,7 +336,7 @@ export async function POST(req: Request) {
   }
 
   const kind = input.kind as StudentNotificationKind;
-  const { likeWhere, commentWhere, rewardWhere } = notificationWhere(student);
+  const { likeWhere, commentWhere, rewardWhere, refundWhere } = notificationWhere(student);
   const notification =
     kind === "like"
       ? await db.cardLike.findFirst({ where: { ...likeWhere, id: input.id }, select: { id: true } })
@@ -287,14 +350,19 @@ export async function POST(req: Request) {
               where: { ...rewardWhere, id: input.id },
               select: { id: true },
             })
-          : await db.studentPushDispatch.findFirst({
-              where: {
-                id: input.id,
-                studentId: student.id,
-                kind,
-              },
-              select: { id: true },
-            });
+          : kind === "refund"
+            ? await db.transaction.findFirst({
+                where: { ...refundWhere, id: input.id },
+                select: { id: true },
+              })
+            : await db.studentPushDispatch.findFirst({
+                where: {
+                  id: input.id,
+                  studentId: student.id,
+                  kind,
+                },
+                select: { id: true },
+              });
   if (!notification) {
     return NextResponse.json({ error: "not_found" }, { status: 404 });
   }
@@ -322,6 +390,7 @@ function notificationWhere(student: { id: string; classroomId: string }): {
   likeWhere: Prisma.CardLikeWhereInput;
   commentWhere: Prisma.CardCommentWhereInput;
   rewardWhere: Prisma.TransactionWhereInput;
+  refundWhere: Prisma.TransactionWhereInput;
 } {
   const ownedCardWhere: Prisma.CardWhereInput = {
     board: { classroomId: student.classroomId },
@@ -352,6 +421,16 @@ function notificationWhere(student: { id: string; classroomId: string }): {
       account: { studentId: student.id, classroomId: student.classroomId },
       type: "deposit",
       sourceType: { in: [...STUDENT_NOTIFICATION_REWARD_SOURCE_TYPES] },
+    },
+    /**
+     * Shop refunds credit the wallet without any student action, including the
+     * bulk refund issued when an item is retired from the catalog. Surfacing them
+     * here is what stops the balance from changing unexplained.
+     */
+    refundWhere: {
+      account: { studentId: student.id, classroomId: student.classroomId },
+      type: "refund",
+      sourceType: STUDENT_NOTIFICATION_REFUND_SOURCE_TYPE,
     },
   };
 }

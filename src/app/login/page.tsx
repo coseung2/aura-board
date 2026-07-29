@@ -5,6 +5,10 @@ import Link from "next/link";
 import { signIn, signOut } from "next-auth/react";
 import { Logo } from "@/components/Logo";
 import { RoleIcon } from "@/components/login/RoleIcon";
+import {
+  safeStudentLoginReturnTarget,
+  safeTeacherLoginReturnTarget,
+} from "@/lib/login-return-target";
 
 // Mobile-aligned login hub: content-tab role switch + single flat panel.
 // teacher-login-button-unify (2026-04-26): teacher/parent share Google/Kakao
@@ -121,25 +125,6 @@ export default function LoginPage() {
     }
   }
 
-  function safeReturnTarget(raw: string | null | undefined, fallback: string): string {
-    const blockedTargets = ["/api", "/landing", "/login", "/student/login"];
-    if (
-      raw &&
-      raw.startsWith("/") &&
-      !raw.startsWith("//") &&
-      raw !== "/" &&
-      !blockedTargets.some(
-        (target) =>
-          raw === target ||
-          raw.startsWith(`${target}?`) ||
-          raw.startsWith(`${target}/`),
-      )
-    ) {
-      return raw;
-    }
-    return fallback;
-  }
-
   function safeStudentReturnTarget(fallback?: string): string {
     const params = new URLSearchParams(window.location.search);
     const raw =
@@ -147,14 +132,13 @@ export default function LoginPage() {
       params.get("return") ??
       params.get("callbackUrl") ??
       fallback;
-    return safeReturnTarget(raw, "/student");
+    return safeStudentLoginReturnTarget(raw, fallback);
   }
 
   function safeTeacherReturnTarget(): string {
     const params = new URLSearchParams(window.location.search);
-    return safeReturnTarget(
+    return safeTeacherLoginReturnTarget(
       params.get("from") ?? params.get("return") ?? params.get("callbackUrl"),
-      "/dashboard",
     );
   }
 
@@ -347,7 +331,9 @@ export default function LoginPage() {
                 aria-label="학생 로그인 코드"
               />
               {studentError ? (
-                <p className="login-role-error">{studentError}</p>
+                <p className="login-role-error" role="alert">
+                  {studentError}
+                </p>
               ) : null}
               <button
                 type="submit"

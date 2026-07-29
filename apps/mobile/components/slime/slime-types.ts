@@ -5,6 +5,7 @@ import type {
   SlimeEvolution,
 } from "../../lib/slime-assets";
 import type { SlimeWearableSelection } from "../../lib/slime-wearables";
+import type { SlimePropAction } from "../../lib/slime-props";
 
 export type SlimeSpriteProps = {
   slimeColor: SlimeColor;
@@ -17,15 +18,58 @@ export type SlimeSpriteProps = {
   growthStage?: number;
   action?: SlimeAction;
   equippedFloor?: EquippedFloor;
-  /** Additional integer multiplier for the already nearest-scaled 4x art. */
+  /** Display multiplier, quantized to eighth steps for proportional scene sizing. */
   displayScale?: number;
   accessibilityLabel?: string;
   /** Force a normally one-shot equipped animation to loop in the pet preview. */
   repeat?: boolean;
-  /** Complete color-specific animated prop, such as an equipped ball GIF. */
+  /** Legacy remote prop image. Composable ball and drink actions use `propAction`. */
   itemSpritePath?: string;
+  /** Explicit highest-priority prop action composed by the renderer. */
+  propAction?: SlimePropAction | null;
   /** Remote/API-relative scene background rendered behind floor and slime layers. */
   backgroundSpritePath?: string;
+  /**
+   * Force the wider scene viewport even when no scene asset is present yet.
+   * Backgrounds, floors, trampolines, and vehicles expand automatically.
+   */
+  expandSceneSurfaces?: boolean;
+  /**
+   * Vehicle art the slime rides. Vehicles sit above the floor instead of
+   * replacing it, so a tube on grass stays valid and a player who wants water
+   * buys that background separately.
+   *
+   * Drawn above the character as a single layer; the hidden side is never
+   * authored.
+   */
+  vehicleSpritePath?: string;
+  /**
+   * Vehicle parts that stay planted while the body moves, such as wheels.
+   */
+  vehicleGroundedSpritePath?: string;
+  vehicleEffectSpritePaths?: readonly string[];
+  /** Frames in the vehicle body sheet. One means a single static image. */
+  vehicleFrameCount?: number;
+  /** Frames in the grounded-part sheet, such as a wheel rotation. */
+  vehicleGroundedFrameCount?: number;
+  /**
+   * Fixed frame duration for the grounded part, in milliseconds. A rotation runs
+   * at a constant rate while the body follows the slime's variable idle timing.
+   */
+  vehicleGroundedFrameDurationMs?: number;
+  /** Height of the vehicle canvas; taller than the viewport when art needs headroom. */
+  vehicleCanvasHeight?: number;
+  /** Where the character sits inside a taller vehicle canvas. */
+  vehicleCharacterOffsetY?: number;
+  /** Per-frame vertical bob authored into the vehicle. The rider follows it. */
+  vehicleBobY?: readonly number[];
+  /**
+   * Pixels the vehicle lifts the slime, in 64px-viewport units. Fixed on purpose:
+   * a per-frame offset would double the slime's own idle amplitude.
+   */
+  vehicleRiseY?: number;
+  /** Horizontal correction applied only to vehicle-owned art layers. */
+  vehicleOffsetX?: number;
   /**
    * Anchor-composed wearable layers. Each equipped option is one shared sheet
    * repositioned per frame, so new drinks never require rebaking wearables.

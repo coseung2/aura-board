@@ -208,10 +208,36 @@
   flex-direction: column;
   gap: 10px;
 }
+.card-engagement-comment-thread-item,
+.card-engagement-comment-replies {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.card-engagement-comment-thread-item {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.card-engagement-comment-replies {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-left: 24px;
+  padding-left: 12px;
+  border-left: 1px solid var(--color-border);
+}
 .card-engagement-comment-item {
   background: var(--color-surface-alt);
   border-radius: 8px;
   padding: 10px 12px;
+}
+.card-engagement-comment-item.is-reply {
+  background: color-mix(
+    in srgb,
+    var(--color-surface-alt) 70%,
+    var(--color-surface)
+  );
 }
 .card-engagement-comment-head {
   display: flex;
@@ -241,6 +267,35 @@
   background: var(--color-surface);
   color: var(--color-danger);
 }
+.card-engagement-comment-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 4px;
+}
+.card-engagement-comment-reply,
+.card-engagement-reply-cancel {
+  min-height: 32px;
+  padding: 4px 6px;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--color-text-muted);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.card-engagement-comment-reply:hover:not(:disabled),
+.card-engagement-reply-cancel:hover:not(:disabled) {
+  background: var(--color-surface);
+  color: var(--color-text);
+}
+.card-engagement-comment-reply:disabled,
+.card-engagement-reply-cancel:disabled {
+  cursor: wait;
+  opacity: 0.65;
+}
 .card-engagement-comment-content {
   margin: 0;
   font-size: 14px;
@@ -269,6 +324,83 @@
   outline: 2px solid var(--color-accent);
   outline-offset: 1px;
 }
+.card-engagement-reply-form {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-left: 24px;
+  padding-left: 12px;
+  border-left: 2px solid var(--color-accent);
+}
+.card-engagement-reply-target {
+  color: var(--color-text-muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+.card-engagement-reply-row {
+  display: flex;
+  align-items: stretch;
+  gap: 8px;
+}
+.card-engagement-reply-row textarea {
+  flex: 1;
+  min-width: 0;
+  min-height: 48px;
+  padding: 8px 10px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-btn);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font: inherit;
+  font-size: 14px;
+  resize: vertical;
+}
+.card-engagement-reply-row textarea:focus {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 1px;
+}
+.card-engagement-reply-submit {
+  min-width: 64px;
+  min-height: 44px;
+  padding: 8px 12px;
+  border: 0;
+  border-radius: var(--radius-btn);
+  background: var(--color-accent);
+  color: var(--color-on-accent);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 800;
+  cursor: pointer;
+}
+.card-engagement-reply-submit:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+.card-engagement-comment-reply:focus-visible,
+.card-engagement-reply-cancel:focus-visible,
+.card-engagement-reply-submit:focus-visible,
+.card-engagement-comment-load-error button:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+.card-engagement-comment-load-error {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 10px;
+  color: var(--color-danger);
+  font-size: 12px;
+}
+.card-engagement-comment-load-error button {
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-weight: 800;
+  text-decoration: underline;
+  cursor: pointer;
+}
 .card-engagement-comment-err {
   font-size: 12px;
   color: var(--color-danger);
@@ -278,6 +410,18 @@
   color: var(--color-text-muted);
   text-align: center;
   padding: 8px;
+}
+
+@media (max-width: 520px) {
+  .card-engagement-comment-replies,
+  .card-engagement-reply-form {
+    margin-left: 12px;
+    padding-left: 8px;
+  }
+
+  .card-engagement-reply-row {
+    flex-direction: column;
+  }
 }
 
 /* comment-area poll (2026-06-28) */

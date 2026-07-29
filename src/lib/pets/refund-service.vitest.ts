@@ -67,10 +67,10 @@ describe("student slime shop refunds", () => {
   });
 
   it("refunds an owned cosmetic and removes it from every slime", async () => {
-    const item = SLIME_SHOP_CATALOG.find((candidate) => candidate.key === "water-puddle-background")!;
+    const item = SLIME_SHOP_CATALOG.find((candidate) => candidate.key === "grass-floor-background")!;
     const slimeRows = [
-      { id: "slime-blue", equippedItemKeys: [item.key, "another-item"] },
-      { id: "slime-purple", equippedItemKeys: [item.key] },
+      { id: "slime-blue", equippedItemKeys: [item.key, "another-item"], hiddenItemKeys: [item.key] },
+      { id: "slime-purple", equippedItemKeys: [item.key], hiddenItemKeys: [item.key] },
     ];
     const updateInventory = vi.fn(async () => ({ id: "inventory-1" }));
     const updateSlime = vi.fn(async () => ({}));
@@ -130,11 +130,49 @@ describe("student slime shop refunds", () => {
     });
     expect(updateSlime).toHaveBeenNthCalledWith(1, {
       where: { id: "slime-blue" },
-      data: { equippedItemKeys: ["another-item"] },
+      data: { equippedItemKeys: ["another-item"], hiddenItemKeys: [] },
     });
     expect(updateSlime).toHaveBeenNthCalledWith(2, {
       where: { id: "slime-purple" },
-      data: { equippedItemKeys: [] },
+      data: { equippedItemKeys: [], hiddenItemKeys: [] },
+    });
+  });
+
+  it("refunds a trampoline purchased before its ride-to-vehicle reslot", async () => {
+    const item = SLIME_SHOP_CATALOG.find((candidate) => candidate.key === "slime-blue-trampoline")!;
+    const purchase = {
+      id: "purchase-trampoline-1",
+      amount: item.price,
+      accountId: "account-1",
+      type: SLIME_ITEM_PURCHASE_SOURCE_TYPE,
+      sourceType: SLIME_ITEM_PURCHASE_SOURCE_TYPE,
+      account: { studentId: student.id },
+    };
+    const tx = {
+      studentCreatureItem: {
+        findUnique: vi.fn(async () => ({
+          id: "inventory-trampoline-1",
+          quantity: 1,
+          itemKind: "slime-ride",
+          purchaseTransaction: purchase,
+        })),
+        update: vi.fn(async () => ({})),
+      },
+      studentSlime: {
+        findMany: vi.fn(async () => []),
+        update: vi.fn(async () => ({})),
+      },
+      transaction: {
+        findFirst: vi.fn(async () => null),
+        create: vi.fn(async () => ({ id: "refund-trampoline-1" })),
+      },
+      studentAccount: { update: vi.fn(async () => ({ balance: item.price })) },
+    };
+    mocks.transaction.mockImplementation(async (operation: (client: typeof tx) => unknown) => operation(tx));
+
+    await expect(refundSlimeShopItem(student, item.key)).resolves.toEqual({
+      refundedItemKey: item.key,
+      balance: item.price,
     });
   });
 });

@@ -11,7 +11,7 @@ const config: ExpoConfig = {
   name: "Aura-board",
   slug: "aura-board-mobile",
   scheme: "auraboard",
-  version: "1.0.3",
+  version: "1.0.4",
   orientation: "default",
   icon: "./assets/icon.png",
   userInterfaceStyle: "light",
@@ -29,7 +29,7 @@ const config: ExpoConfig = {
     predictiveBackGestureEnabled: false,
     softwareKeyboardLayoutMode: "resize",
     package: "com.auraboard.app",
-    versionCode: 16,
+    versionCode: 17,
   },
   web: {
     favicon: "./assets/favicon.png",
@@ -68,13 +68,17 @@ const config: ExpoConfig = {
           url: "https://u.expo.dev/fd9f26c1-ef04-4f19-8663-ed7c481af3ea",
         },
       }),
-  extra: {
-    router: {},
-    eas: {
-      projectId: "fd9f26c1-ef04-4f19-8663-ed7c481af3ea",
-    },
-  },
-  owner: "coseung2",
+  extra: isExpoGoDevelopment
+    ? {
+        router: {},
+      }
+    : {
+        router: {},
+        eas: {
+          projectId: "fd9f26c1-ef04-4f19-8663-ed7c481af3ea",
+        },
+      },
+  ...(isExpoGoDevelopment ? {} : { owner: "coseung2" }),
 };
 
 export default config;

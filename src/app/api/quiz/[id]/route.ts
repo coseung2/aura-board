@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
+import { resolveIdentities } from "@/lib/identity";
+import { canManageQuiz } from "@/lib/quiz-permissions";
 import { publishQuizRealtimeSnapshot } from "@/lib/quiz-realtime-snapshot";
 
 export async function GET(
@@ -7,6 +9,27 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
+  const ids = await resolveIdentities();
+  if (ids.primary === "anon") {
+    return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+  }
+
+  const canManage = await canManageQuiz(id, ids);
+  if (!canManage) {
+    if (!ids.student) {
+      return NextResponse.json({ error: "forbidden" }, { status: 403 });
+    }
+    const player = await db.quizPlayer.findUnique({
+      where: {
+        quizId_studentId: { quizId: id, studentId: ids.student.studentId },
+      },
+      select: { id: true },
+    });
+    if (!player) {
+      return NextResponse.json({ error: "forbidden" }, { status: 403 });
+    }
+  }
+
   const quiz = await db.quiz.findUnique({
     where: { id },
     include: {
@@ -19,7 +42,15 @@ export async function GET(
     return NextResponse.json({ error: "Quiz not found" }, { status: 404 });
   }
 
-  return NextResponse.json({ quiz });
+  if (canManage) return NextResponse.json({ quiz });
+
+  return NextResponse.json({
+    quiz: {
+      ...quiz,
+      questions: quiz.questions.map(({ answer: _answer, ...question }) => question),
+      players: quiz.players.map((player) => ({ ...player, studentId: null })),
+    },
+  });
 }
 
 export async function PATCH(
@@ -27,6 +58,14 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
+  const ids = await resolveIdentities();
+  if (ids.primary === "anon") {
+    return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+  }
+  if (!(await canManageQuiz(id, ids))) {
+    return NextResponse.json({ error: "forbidden" }, { status: 403 });
+  }
+
   const body = await req.json();
   const { action } = body; // "start" | "next" | "finish"
 

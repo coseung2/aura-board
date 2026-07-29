@@ -38,17 +38,54 @@ import {
 
 interface CommentItem {
   id: string;
+  parentCommentId?: string | null;
   content: string;
   createdAt: string;
   authorKind: "teacher" | "student" | "parent" | "external";
+  audience?: CommentAudience;
   authorLabel: string;
   canDelete: boolean;
   canModerate?: boolean;
   hiddenReason?: HiddenReason | null;
   authorStudentId?: string | null;
+  replies?: CommentItem[];
 }
 
 type CommentAudience = "public" | "guardian";
+
+function appendThreadReply(
+  items: CommentItem[],
+  rootCommentId: string,
+  reply: CommentItem,
+): CommentItem[] {
+  return items.map((root) =>
+    root.id === rootCommentId
+      ? { ...root, replies: [...(root.replies ?? []), reply] }
+      : root,
+  );
+}
+
+function removeThreadComment(
+  items: CommentItem[],
+  commentId: string,
+): CommentItem[] {
+  return items
+    .filter((root) => root.id !== commentId)
+    .map((root) => ({
+      ...root,
+      replies: (root.replies ?? []).filter((reply) => reply.id !== commentId),
+    }));
+}
+
+function updateThreadComments(
+  items: CommentItem[],
+  update: (item: CommentItem) => CommentItem,
+): CommentItem[] {
+  return items.map((root) => ({
+    ...update(root),
+    replies: (root.replies ?? []).map(update),
+  }));
+}
 
 interface EngagementState {
   likeCount: number;
@@ -585,6 +622,15 @@ function CommentsBlock({
   const [content, setContent] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  const [loadErr, setLoadErr] = useState<string | null>(null);
+  const [replyContent, setReplyContent] = useState("");
+  const [replySubmitting, setReplySubmitting] = useState(false);
+  const [replyErr, setReplyErr] = useState<string | null>(null);
+  const [replyTarget, setReplyTarget] = useState<{
+    rootId: string;
+    targetId: string;
+    authorLabel: string;
+  } | null>(null);
   const loadInFlightRef = useRef<Promise<void> | null>(null);
   const loadQueuedRef = useRef(false);
   const loadTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -594,6 +640,9 @@ function CommentsBlock({
   const runLoadRef = useRef<() => void>(() => {});
   const publicTabRef = useRef<HTMLButtonElement>(null);
   const guardianTabRef = useRef<HTMLButtonElement>(null);
+  const replyInputRef = useRef<HTMLTextAreaElement>(null);
+  const replyReturnFocusRef = useRef<HTMLButtonElement | null>(null);
+  const replyRestoreFocusRef = useRef(false);
 
   useEffect(() => {
     if (isParentViewer) setAudience("guardian");
@@ -620,6 +669,11 @@ function CommentsBlock({
             setGuardianAvailable(false);
             setAudience("public");
             setItems(null);
+          } else if (
+            commentsMountedRef.current &&
+            generation === loadGenerationRef.current
+          ) {
+            setLoadErr("댓글을 불러오지 못했어요");
           }
           return;
         }
@@ -633,6 +687,7 @@ function CommentsBlock({
         ) {
           return;
         }
+        setLoadErr(null);
         setGuardianAvailable(j.guardianAvailable === true);
         if (audience === "guardian" && j.guardianAvailable !== true) {
           setAudience("public");
@@ -641,7 +696,12 @@ function CommentsBlock({
         }
         setItems(j.items);
       } catch {
-        /* ignore */
+        if (
+          commentsMountedRef.current &&
+          generation === loadGenerationRef.current
+        ) {
+          setLoadErr("댓글을 불러오지 못했어요");
+        }
       }
     },
     [audience, cardId, shareSession, isStudentViewer],
@@ -712,15 +772,19 @@ function CommentsBlock({
   });
 
   const selectAudience = (nextAudience: CommentAudience) => {
-    if (submitting || nextAudience === audience) return;
+    if (submitting || replySubmitting || nextAudience === audience) return;
     setAudience(nextAudience);
     setItems(null);
     setContent("");
     setErr(null);
+    setLoadErr(null);
+    setReplyContent("");
+    setReplyErr(null);
+    setReplyTarget(null);
   };
 
   const handleTabKeyDown = (e: React.KeyboardEvent<HTMLButtonElement>) => {
-    if (submitting) return;
+    if (submitting || replySubmitting) return;
     if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(e.key)) return;
     e.preventDefault();
     const nextAudience: CommentAudience =
@@ -734,7 +798,7 @@ function CommentsBlock({
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (submitting) return;
+    if (submitting || replySubmitting) return;
     const trimmed = content.trim();
     if (!trimmed) return;
     setSubmitting(true);
@@ -773,11 +837,103 @@ function CommentsBlock({
       }
       // comments-newest-first (2026-04-26): 새 댓글을 list 맨 앞에 prepend
       // 해서 폼 바로 아래에 노출.
-      setItems((prev) => [item, ...(prev ?? [])]);
+      setItems((prev) => [
+        { ...item, replies: item.replies ?? [] },
+        ...(prev ?? []),
+      ]);
       setContent("");
       onChange?.();
+    } catch {
+      setErr("댓글 작성에 실패했어요");
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const closeReplyComposer = (restoreFocus: boolean) => {
+    replyRestoreFocusRef.current = restoreFocus;
+    setReplyContent("");
+    setReplyErr(null);
+    setReplyTarget(null);
+  };
+
+  const openReplyComposer = (
+    item: CommentItem,
+    trigger: HTMLButtonElement,
+  ) => {
+    replyRestoreFocusRef.current = false;
+    replyReturnFocusRef.current = trigger;
+    setReplyContent("");
+    setReplyErr(null);
+    setReplyTarget({
+      rootId: item.parentCommentId ?? item.id,
+      targetId: item.id,
+      authorLabel: item.authorLabel || "작성자",
+    });
+  };
+
+  useEffect(() => {
+    if (replyTarget) replyInputRef.current?.focus();
+  }, [replyTarget]);
+
+  useEffect(() => {
+    if (
+      replyTarget ||
+      replySubmitting ||
+      !replyRestoreFocusRef.current
+    ) {
+      return;
+    }
+    replyRestoreFocusRef.current = false;
+    replyReturnFocusRef.current?.focus();
+  }, [replySubmitting, replyTarget]);
+
+  const submitReply = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const trimmed = replyContent.trim();
+    if (!replyTarget || !trimmed || replySubmitting || shareSession) return;
+    setReplySubmitting(true);
+    setReplyErr(null);
+    try {
+      const r = await fetch(`/api/cards/${cardId}/comments`, {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          ...studentViewerHeaders(isStudentViewer),
+        },
+        body: JSON.stringify({
+          content: trimmed,
+          audience,
+          parentCommentId: replyTarget.targetId,
+        }),
+      });
+      if (!r.ok) {
+        setReplyErr("답글을 등록하지 못했어요");
+        return;
+      }
+      const j = (await r.json()) as {
+        item?: CommentItem;
+        comment?: CommentItem;
+      };
+      const item = j.item ?? j.comment;
+      if (!item) {
+        setReplyErr("답글을 등록하지 못했어요");
+        return;
+      }
+      setItems((current) =>
+        current
+          ? appendThreadReply(current, replyTarget.rootId, {
+              ...item,
+              replies: [],
+            })
+          : current,
+      );
+      closeReplyComposer(true);
+      onChange?.();
+    } catch {
+      setReplyErr("답글을 등록하지 못했어요");
+    } finally {
+      setReplySubmitting(false);
     }
   };
 
@@ -789,7 +945,10 @@ function CommentsBlock({
       headers: studentViewerHeaders(isStudentViewer),
     });
     if (r.ok) {
-      setItems((prev) => prev?.filter((c) => c.id !== id) ?? null);
+      setItems((prev) => (prev ? removeThreadComment(prev, id) : null));
+      if (replyTarget?.targetId === id || replyTarget?.rootId === id) {
+        closeReplyComposer(false);
+      }
       onChange?.();
     } else {
       alert("삭제에 실패했어요");
@@ -803,19 +962,22 @@ function CommentsBlock({
   ) => {
     setItems(
       (current) =>
-        current?.map((comment) =>
-          comment.id === id ||
-          (hiddenReason === "author" &&
-            Boolean(hiddenStudentId) &&
-            comment.authorStudentId === hiddenStudentId)
-            ? {
-                ...comment,
-                content: "",
-                hiddenReason,
-                authorStudentId: hiddenStudentId ?? comment.authorStudentId,
-              }
-            : comment,
-        ) ?? null,
+        current
+          ? updateThreadComments(current, (comment) =>
+              comment.id === id ||
+              (hiddenReason === "author" &&
+                Boolean(hiddenStudentId) &&
+                comment.authorStudentId === hiddenStudentId)
+                ? {
+                    ...comment,
+                    content: "",
+                    hiddenReason,
+                    authorStudentId:
+                      hiddenStudentId ?? comment.authorStudentId,
+                  }
+                : comment,
+            )
+          : null,
     );
   };
 
@@ -823,8 +985,72 @@ function CommentsBlock({
     canInteract &&
     (!isParentViewer || audience === "guardian") &&
     (audience === "public" || guardianAvailable === true);
+  const canReply = canWriteAudience && !shareSession;
   const tabsId = `card-comments-tabs-${cardId}`;
   const panelId = `card-comments-panel-${cardId}`;
+
+  const renderCommentItem = (comment: CommentItem, isReply: boolean) => (
+    <div
+      className={`card-engagement-comment-item${isReply ? " is-reply" : ""}`}
+    >
+      {comment.hiddenReason ? (
+        <HiddenContentPlaceholder
+          targetKind="comment"
+          targetId={comment.id}
+          reason={comment.hiddenReason}
+          hiddenStudentId={comment.authorStudentId}
+          onRestored={() => requestLoad()}
+        />
+      ) : (
+        <>
+          <div className="card-engagement-comment-head">
+            <span className="card-engagement-comment-author">
+              {comment.authorLabel || "작성자"}
+            </span>
+            <span className="card-engagement-comment-time">
+              {formatRelativeTime(comment.createdAt)}
+            </span>
+            {comment.canDelete && (
+              <button
+                type="button"
+                className="card-engagement-comment-delete"
+                onClick={() => remove(comment.id)}
+                aria-label="댓글 삭제"
+              >
+                삭제
+              </button>
+            )}
+            {isStudentViewer && comment.canModerate && (
+              <StudentContentModerationControls
+                targetKind="comment"
+                targetId={comment.id}
+                authorStudentId={comment.authorStudentId}
+                onHidden={(reason, hiddenStudentId) =>
+                  markCommentHidden(comment.id, reason, hiddenStudentId)
+                }
+              />
+            )}
+          </div>
+          <p className="card-engagement-comment-content">
+            {comment.content}
+          </p>
+          {canReply && (
+            <div className="card-engagement-comment-actions">
+              <button
+                type="button"
+                className="card-engagement-comment-reply"
+                onClick={(e) => openReplyComposer(comment, e.currentTarget)}
+                aria-label={`${comment.authorLabel || "작성자"}에게 답글 달기`}
+                disabled={submitting || replySubmitting}
+              >
+                답글 달기
+              </button>
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  );
 
   return (
     <div className="card-engagement-comments">
@@ -850,7 +1076,7 @@ function CommentsBlock({
             aria-selected={audience === "public"}
             aria-controls={panelId}
             tabIndex={audience === "public" ? 0 : -1}
-            disabled={submitting}
+            disabled={submitting || replySubmitting}
             className={`card-engagement-comment-tab${audience === "public" ? " is-active" : ""}`}
             onClick={() => selectAudience("public")}
             onKeyDown={handleTabKeyDown}
@@ -865,7 +1091,7 @@ function CommentsBlock({
             aria-selected={audience === "guardian"}
             aria-controls={panelId}
             tabIndex={audience === "guardian" ? 0 : -1}
-            disabled={submitting}
+            disabled={submitting || replySubmitting}
             className={`card-engagement-comment-tab${audience === "guardian" ? " is-active" : ""}`}
             onClick={() => selectAudience("guardian")}
             onKeyDown={handleTabKeyDown}
@@ -904,7 +1130,7 @@ function CommentsBlock({
               placeholder="댓글을 입력하세요"
               maxLength={1000}
               rows={2}
-              disabled={submitting}
+              disabled={submitting || replySubmitting}
             />
             {err && <span className="card-engagement-comment-err">{err}</span>}
           </form>
@@ -913,56 +1139,99 @@ function CommentsBlock({
             읽기 전용이라 댓글을 달 수 없어요
           </div>
         ) : null}
+        {loadErr && (
+          <div className="card-engagement-comment-load-error" role="alert">
+            <span>{loadErr}</span>
+            <button
+              type="button"
+              onClick={() => {
+                setLoadErr(null);
+                requestLoad();
+              }}
+            >
+              다시 시도
+            </button>
+          </div>
+        )}
         {items === null ? (
-          <div className="card-engagement-empty">불러오는 중...</div>
+          loadErr ? null : (
+            <div className="card-engagement-empty">불러오는 중...</div>
+          )
         ) : items.length === 0 ? (
           <div className="card-engagement-empty">아직 댓글이 없어요</div>
         ) : (
           <ul className="card-engagement-comment-list">
-            {items.map((c) => (
-              <li key={c.id} className="card-engagement-comment-item">
-                {c.hiddenReason ? (
-                  <HiddenContentPlaceholder
-                    targetKind="comment"
-                    targetId={c.id}
-                    reason={c.hiddenReason}
-                    hiddenStudentId={c.authorStudentId}
-                    onRestored={() => requestLoad()}
-                  />
-                ) : (
-                  <>
-                    <div className="card-engagement-comment-head">
-                      <span className="card-engagement-comment-author">
-                        {c.authorLabel}
-                      </span>
-                      <span className="card-engagement-comment-time">
-                        {formatRelativeTime(c.createdAt)}
-                      </span>
-                      {c.canDelete && (
-                        <button
-                          type="button"
-                          className="card-engagement-comment-delete"
-                          onClick={() => remove(c.id)}
-                          aria-label="삭제"
-                        >
-                          삭제
-                        </button>
-                      )}
-                      {isStudentViewer && c.canModerate && (
-                        <StudentContentModerationControls
-                          targetKind="comment"
-                          targetId={c.id}
-                          authorStudentId={c.authorStudentId}
-                          onHidden={(reason, hiddenStudentId) =>
-                            markCommentHidden(c.id, reason, hiddenStudentId)
-                          }
-                        />
-                      )}
+            {items.map((root) => (
+              <li key={root.id} className="card-engagement-comment-thread-item">
+                {renderCommentItem(root, false)}
+                {(root.replies ?? []).length > 0 && (
+                  <ul
+                    className="card-engagement-comment-replies"
+                    aria-label={`${root.authorLabel || "작성자"} 댓글의 답글`}
+                  >
+                    {(root.replies ?? []).map((reply) => (
+                      <li key={reply.id}>{renderCommentItem(reply, true)}</li>
+                    ))}
+                  </ul>
+                )}
+                {replyTarget?.rootId === root.id && (
+                  <form
+                    className="card-engagement-reply-form"
+                    onSubmit={submitReply}
+                  >
+                    <div
+                      className="card-engagement-reply-target"
+                      aria-live="polite"
+                    >
+                      {replyTarget.authorLabel}에게 답글
                     </div>
-                    <p className="card-engagement-comment-content">
-                      {c.content}
-                    </p>
-                  </>
+                    <div className="card-engagement-reply-row">
+                      <textarea
+                        ref={replyInputRef}
+                        value={replyContent}
+                        onChange={(e) => setReplyContent(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (
+                            e.key !== "Enter" ||
+                            e.shiftKey ||
+                            e.nativeEvent.isComposing
+                          ) {
+                            return;
+                          }
+                          e.preventDefault();
+                          e.currentTarget.form?.requestSubmit();
+                        }}
+                        aria-label={`${replyTarget.authorLabel}에게 보낼 답글`}
+                        placeholder="답글을 입력하세요"
+                        maxLength={1000}
+                        rows={2}
+                        disabled={replySubmitting}
+                      />
+                      <button
+                        type="submit"
+                        className="card-engagement-reply-submit"
+                        disabled={!replyContent.trim() || replySubmitting}
+                      >
+                        {replySubmitting ? "등록 중..." : "등록"}
+                      </button>
+                    </div>
+                    <button
+                      type="button"
+                      className="card-engagement-reply-cancel"
+                      onClick={() => closeReplyComposer(true)}
+                      disabled={replySubmitting}
+                    >
+                      취소
+                    </button>
+                    {replyErr && (
+                      <span
+                        className="card-engagement-comment-err"
+                        role="alert"
+                      >
+                        {replyErr}
+                      </span>
+                    )}
+                  </form>
                 )}
               </li>
             ))}

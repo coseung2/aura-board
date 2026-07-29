@@ -1,0 +1,16 @@
+{
+  "canvas": { "w": 64, "h": 81 },
+  "frameCount": 8,
+  "frameDurationsMs": [240, 160, 180, 90, 90, 160, 180, 240],
+  "alpha": "binary",
+  "tracks": {
+    "glint": {
+      "layers": ["soap-bubble-glint-fx"],
+      "componentCount": 4,
+      "centersOrbit": "bubble",
+      "angles": [0, 22, 45, 22, 0, -22, -45, -22],
+      "shapesInvariant": true,
+      "pixelCountsInvariant": true
+    }
+  }
+}
