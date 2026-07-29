@@ -133,9 +133,18 @@ function validateSheetMetadata(label, metadata, pngDimensions, problems) {
     return;
   }
 
-  const size = isRecord(metadata.meta) && isRecord(metadata.meta.size) ? metadata.meta.size : null;
+  const standardSize = isRecord(metadata.meta) && isRecord(metadata.meta.size)
+    ? metadata.meta.size
+    : null;
+  const wearableSize = isRecord(metadata.canvas) && isPositiveInteger(metadata.frameCount)
+    ? {
+        w: metadata.canvas.w * metadata.frameCount,
+        h: metadata.canvas.h,
+      }
+    : null;
+  const size = standardSize ?? wearableSize;
   if (!size) {
-    problems.push("meta.size is required");
+    problems.push("meta.size or wearable canvas/frameCount is required");
   } else {
     if (!isPositiveInteger(size.w) || !isPositiveInteger(size.h)) {
       problems.push("meta.size.w/.h must be positive integers");
