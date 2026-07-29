@@ -10,7 +10,14 @@ import {
 } from "react-native";
 import { useFocusEffect, useRouter, type Href } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { ChevronRight } from "lucide-react-native";
+import {
+  BookOpen,
+  CalendarCheck,
+  ChevronRight,
+  CircleCheck,
+  Footprints,
+  MessageCircle,
+} from "lucide-react-native";
 import {
   borders,
   colors,
@@ -38,6 +45,7 @@ import { roleEmoji, studentDutyTarget } from "../../lib/student-navigation";
 import { isAssignmentReminderVisible } from "../../lib/student-notifications";
 import type {
   MeResponse,
+  StudentDailyRewardProgress,
   StudentAssignmentTodo,
   StudentDuty,
   WalletSummary,
@@ -65,12 +73,17 @@ import {
   resolveEquippedVehicle,
   selectSceneBackgroundSpritePath,
   stageForColor,
-  studentPetHref,
   type MobileSlimeHome,
 } from "../../lib/slimes";
 import { resolveEquippedSlimePropAction } from "../../lib/slime-props";
 import { visibleEquippedSlimeItemKeys } from "../../lib/slime-item-visibility";
 import type { EquippedFloor } from "../../lib/slime-assets";
+import {
+  fetchWalkingSnapshot,
+  type WalkingDailyStepRewards,
+  type WalkingMonthlyAttendanceReward,
+  type WalkingWeeklyStepRewards,
+} from "../../lib/walking-health";
 
 const SLIME_TRAMPOLINE_ITEM_KEY = "slime-blue-trampoline";
 
@@ -87,6 +100,14 @@ export default function StudentHome() {
   );
   const [wallet, setWallet] = useState<WalletSummary | null>(null);
   const [petHome, setPetHome] = useState<MobileSlimeHome | null>(null);
+  const [dailyWalking, setDailyWalking] = useState<WalkingDailyStepRewards | null>(null);
+  const [weeklyWalking, setWeeklyWalking] = useState<WalkingWeeklyStepRewards | null>(null);
+  const [walkingRankRewardCount, setWalkingRankRewardCount] = useState(0);
+  const [attendance, setAttendance] = useState<WalkingMonthlyAttendanceReward | null>(null);
+  const [readingClaimableCount, setReadingClaimableCount] = useState(0);
+  const [readingRankRewardCount, setReadingRankRewardCount] = useState(0);
+  const [dailyRewardLoading, setDailyRewardLoading] = useState(false);
+  const [dailyRewardError, setDailyRewardError] = useState<string | null>(null);
   const [walletLoading, setWalletLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(() => !initialHomeCache);
@@ -114,6 +135,36 @@ export default function StudentHome() {
     }
   }, []);
 
+  const loadDailyRewards = useCallback(async () => {
+    setDailyRewardLoading(true);
+    try {
+      const [snapshot, reading] = await Promise.all([
+        fetchWalkingSnapshot(),
+        apiFetch<{
+          weeklyMissionReward?: { claimableStepCount?: number; claimable?: boolean } | null;
+          classroomRankRewards?: unknown[];
+        }>("/api/student/reading"),
+      ]);
+      setDailyWalking(snapshot.dailyStepRewards);
+      setWeeklyWalking(snapshot.weeklyStepRewards);
+      setWalkingRankRewardCount(snapshot.classroomRankRewards.length);
+      setAttendance(snapshot.monthlyAttendanceReward);
+      setReadingClaimableCount(
+        Math.max(
+          0,
+          reading.weeklyMissionReward?.claimableStepCount ??
+            (reading.weeklyMissionReward?.claimable ? 1 : 0),
+        ),
+      );
+      setReadingRankRewardCount(reading.classroomRankRewards?.length ?? 0);
+      setDailyRewardError(null);
+    } catch {
+      setDailyRewardError("보상 현황을 불러오지 못했어요.");
+    } finally {
+      setDailyRewardLoading(false);
+    }
+  }, []);
+
   const load = useCallback(
     async (isRefresh = false) => {
       const cached = readBoardCache<MeResponse>(STUDENT_HOME_CACHE_KEY, {
@@ -126,6 +177,7 @@ export default function StudentHome() {
         setLoading(true);
       }
       void loadPet();
+      void loadDailyRewards();
       try {
         if (isRefresh) setRefreshing(true);
         const res = await revalidateBoardCache<MeResponse>(
@@ -155,7 +207,7 @@ export default function StudentHome() {
         if (isRefresh) setRefreshing(false);
       }
     },
-    [router, loadPet, loadWallet],
+    [router, loadDailyRewards, loadPet, loadWallet],
   );
 
   useFocusEffect(
@@ -234,9 +286,23 @@ export default function StudentHome() {
           />
         }
       >
-        <RepresentativePet
+        <DailyGamePanel
           petHome={petHome}
-          onManage={() => router.push(studentPetHref("mine") as Href)}
+          dailyRewards={me?.dailyRewards}
+          dailyWalking={dailyWalking}
+          weeklyWalking={weeklyWalking}
+          walkingRankRewardCount={walkingRankRewardCount}
+          attendance={attendance}
+          readingClaimableCount={readingClaimableCount}
+          readingRankRewardCount={readingRankRewardCount}
+          loading={dailyRewardLoading}
+          error={dailyRewardError}
+          onOpenAttendance={() => router.push("/(student)/walking?view=missions" as Href)}
+          onOpenWalkingMissions={() => router.push("/(student)/walking?view=missions" as Href)}
+          onOpenWalkingRank={() => router.push("/(student)/walking?view=record" as Href)}
+          onOpenReadingMissions={() => router.push("/(student)/reading?view=missions" as Href)}
+          onOpenReadingRank={() => router.push("/(student)/reading?view=records" as Href)}
+          onOpenBoards={() => router.push("/(student)/boards" as Href)}
         />
         <View
           style={
@@ -267,66 +333,87 @@ export default function StudentHome() {
   );
 }
 
-function RepresentativePet({
+function DailyGamePanel({
   petHome,
-  onManage,
+  dailyRewards,
+  dailyWalking,
+  weeklyWalking,
+  walkingRankRewardCount,
+  attendance,
+  readingClaimableCount,
+  readingRankRewardCount,
+  loading,
+  error,
+  onOpenAttendance,
+  onOpenWalkingMissions,
+  onOpenWalkingRank,
+  onOpenReadingMissions,
+  onOpenReadingRank,
+  onOpenBoards,
 }: {
   petHome: MobileSlimeHome | null;
-  onManage: () => void;
+  dailyRewards: MeResponse["dailyRewards"];
+  dailyWalking: WalkingDailyStepRewards | null;
+  weeklyWalking: WalkingWeeklyStepRewards | null;
+  walkingRankRewardCount: number;
+  attendance: WalkingMonthlyAttendanceReward | null;
+  readingClaimableCount: number;
+  readingRankRewardCount: number;
+  loading: boolean;
+  error: string | null;
+  onOpenAttendance: () => void;
+  onOpenWalkingMissions: () => void;
+  onOpenWalkingRank: () => void;
+  onOpenReadingMissions: () => void;
+  onOpenReadingRank: () => void;
+  onOpenBoards: () => void;
 }) {
   const color = petHome?.representativeColor;
-  if (!petHome) return null;
-
-  const stage = color ? stageForColor(petHome, color) : null;
-  const equippedItems = color ? petHome.equippedItemsByColor[color] ?? [] : [];
+  const stage = color && petHome ? stageForColor(petHome, color) : null;
+  const equippedItems = color && petHome ? petHome.equippedItemsByColor[color] ?? [] : [];
   const visibleItems = color
-    ? visibleEquippedSlimeItemKeys(equippedItems, petHome.hiddenItemsByColor[color])
+    ? visibleEquippedSlimeItemKeys(equippedItems, petHome?.hiddenItemsByColor[color])
     : [];
   const equippedFloor = visibleItems.reduce<EquippedFloor>(
-    (current, itemKey) => petHome.shopCatalog.find((item) => item.key === itemKey)?.floor ?? current,
+    (current, itemKey) => petHome?.shopCatalog.find((item) => item.key === itemKey)?.floor ?? current,
     "none",
   );
   const equippedBackground = resolveEquippedSceneBackground(
     visibleItems,
-    petHome.shopCatalog,
+    petHome?.shopCatalog ?? [],
   );
   const equippedBackgroundPath = equippedBackground
     ? selectSceneBackgroundSpritePath(equippedBackground)
     : null;
   const equippedWearables = resolveEquippedSlimeWearables(
     visibleItems,
-    petHome.shopCatalog,
+    petHome?.shopCatalog ?? [],
   );
   const equippedVehicle = resolveEquippedVehicle(
     visibleItems,
-    petHome.shopCatalog,
+    petHome?.shopCatalog ?? [],
   );
   const usesTrampoline = equippedVehicle?.key === SLIME_TRAMPOLINE_ITEM_KEY;
   const renderedVehicle = usesTrampoline ? null : equippedVehicle;
-  const propAction = resolveEquippedSlimePropAction(visibleItems, petHome.shopCatalog);
+  const propAction = resolveEquippedSlimePropAction(visibleItems, petHome?.shopCatalog ?? []);
   const action = usesTrampoline
     ? "floor-interaction" as const
     : "idle" as const;
 
   return (
-    <View style={styles.representativePet}>
-      <View style={styles.petManageRow}>
-        <ControlPressable
-          style={styles.petManageLink}
-          onPress={onManage}
-          accessibilityLabel="펫 관리하기"
-        >
-          <Text style={styles.petManageLinkText}>펫 관리하기</Text>
-          <ChevronRight
-            size={iconSizes.sm}
-            color={colors.textMuted}
-            strokeWidth={2}
-            accessible={false}
-          />
-        </ControlPressable>
+    <View style={styles.dailyGamePanel}>
+      <View style={styles.dailyGameHeader}>
+        <View style={styles.petHeaderTitle}>
+          <Text style={styles.dailyGameTitle}>대표 펫</Text>
+        </View>
+        <View style={styles.rewardHeaderTitle}>
+          <Text style={styles.dailyGameTitle}>오늘 보상</Text>
+        </View>
       </View>
-      {color && stage !== null ? (
-        <View style={styles.representativePetScene}>
+      <View style={styles.dailyGameBody}>
+        <View style={styles.petPane}>
+          {color && stage !== null ? (
+            <View style={styles.representativePetScene}>
           {equippedBackgroundPath ? (
             <FeatheredSceneBackground
               spritePath={equippedBackgroundPath}
@@ -357,13 +444,199 @@ function RepresentativePet({
             expandSceneSurfaces
             accessibilityLabel="내 대표 펫"
           />
+            </View>
+          ) : (
+            <View style={styles.petEmptyState} accessibilityRole="text">
+              <Text style={styles.petEmptyText}>대표펫이 없어요</Text>
+            </View>
+          )}
         </View>
-      ) : (
-        <View style={styles.petEmptyState} accessibilityRole="text">
-          <Text style={styles.petEmptyText}>대표펫이 없어요</Text>
-        </View>
-      )}
+        <DailyRewardChecklist
+          dailyRewards={dailyRewards}
+          dailyWalking={dailyWalking}
+          weeklyWalking={weeklyWalking}
+          walkingRankRewardCount={walkingRankRewardCount}
+          attendance={attendance}
+          readingClaimableCount={readingClaimableCount}
+          readingRankRewardCount={readingRankRewardCount}
+          loading={loading}
+          error={error}
+          onOpenAttendance={onOpenAttendance}
+          onOpenWalkingMissions={onOpenWalkingMissions}
+          onOpenWalkingRank={onOpenWalkingRank}
+          onOpenReadingMissions={onOpenReadingMissions}
+          onOpenReadingRank={onOpenReadingRank}
+          onOpenBoards={onOpenBoards}
+        />
+      </View>
     </View>
+  );
+}
+
+function DailyRewardChecklist({
+  dailyRewards,
+  dailyWalking,
+  weeklyWalking,
+  walkingRankRewardCount,
+  attendance,
+  readingClaimableCount,
+  readingRankRewardCount,
+  loading,
+  error,
+  onOpenAttendance,
+  onOpenWalkingMissions,
+  onOpenWalkingRank,
+  onOpenReadingMissions,
+  onOpenReadingRank,
+  onOpenBoards,
+}: {
+  dailyRewards: MeResponse["dailyRewards"];
+  dailyWalking: WalkingDailyStepRewards | null;
+  weeklyWalking: WalkingWeeklyStepRewards | null;
+  walkingRankRewardCount: number;
+  attendance: WalkingMonthlyAttendanceReward | null;
+  readingClaimableCount: number;
+  readingRankRewardCount: number;
+  loading: boolean;
+  error: string | null;
+  onOpenAttendance: () => void;
+  onOpenWalkingMissions: () => void;
+  onOpenWalkingRank: () => void;
+  onOpenReadingMissions: () => void;
+  onOpenReadingRank: () => void;
+  onOpenBoards: () => void;
+}) {
+  const today = dailyWalking?.day;
+  const attendanceClaimable = attendance?.claimableAttendance?.filter(
+    (entry) => !today || entry.day <= today,
+  ) ?? [];
+  const attendanceComplete = Boolean(
+    today && attendance?.attendanceDays?.includes(today),
+  );
+  const walkingClaimable = dailyWalking?.tiers.filter((tier) => tier.claimable) ?? [];
+  const weeklyWalkingClaimableCount = weeklyWalking?.tiers.filter(
+    (tier) => tier.achieved && !tier.claimed,
+  ).length ?? 0;
+  const walkingMissionClaimableCount =
+    walkingClaimable.length + weeklyWalkingClaimableCount;
+  const walkingStatus = rewardSourcesLabel([
+    ["일간", walkingClaimable.length],
+    ["주간", weeklyWalkingClaimableCount],
+    ["Top 5", walkingRankRewardCount],
+  ]);
+  const readingStatus = rewardSourcesLabel([
+    ["주간", readingClaimableCount],
+    ["Top 5", readingRankRewardCount],
+  ]);
+
+  if (loading && !dailyWalking) {
+    return (
+      <View style={styles.dailyRewardList} accessibilityLabel="오늘 보상 불러오는 중">
+        <ActivityIndicator size="small" color={colors.accent} />
+        <Text style={styles.dailyRewardLoading}>현황 확인 중…</Text>
+      </View>
+    );
+  }
+
+  return (
+    <View style={styles.dailyRewardList} accessibilityLabel="오늘 받을 수 있는 보상">
+      <DailyRewardRow
+        icon={CalendarCheck}
+        label="출석"
+        status={attendanceClaimable.length > 0 ? `${attendanceClaimable.length}개 받기` : attendanceComplete ? "오늘 완료" : "접속 확인 중"}
+        complete={attendanceComplete && attendanceClaimable.length === 0}
+        claimable={attendanceClaimable.length > 0}
+        onPress={onOpenAttendance}
+      />
+      {walkingMissionClaimableCount + walkingRankRewardCount > 0 ? (
+        <DailyRewardRow
+          icon={Footprints}
+          label="걷기"
+          status={walkingStatus}
+          claimable
+          onPress={
+            walkingMissionClaimableCount > 0
+              ? onOpenWalkingMissions
+              : onOpenWalkingRank
+          }
+        />
+      ) : null}
+      <DailyRewardRow
+        icon={MessageCircle}
+        label="댓글"
+        status={progressLabel(dailyRewards?.comment)}
+        complete={dailyRewards?.comment.complete === true}
+        disabled={dailyRewards?.comment.enabled === false}
+        onPress={onOpenBoards}
+      />
+      {readingClaimableCount + readingRankRewardCount > 0 ? (
+        <DailyRewardRow
+          icon={BookOpen}
+          label="독서"
+          status={readingStatus}
+          claimable
+          onPress={
+            readingClaimableCount > 0
+              ? onOpenReadingMissions
+              : onOpenReadingRank
+          }
+        />
+      ) : null}
+      {error ? <Text style={styles.dailyRewardError} numberOfLines={1}>{error}</Text> : null}
+    </View>
+  );
+}
+
+function rewardSourcesLabel(sources: Array<[string, number]>): string {
+  return sources
+    .filter(([, count]) => count > 0)
+    .map(([label, count]) => `${label} ${count}`)
+    .join(" · ");
+}
+
+function progressLabel(progress: StudentDailyRewardProgress | undefined) {
+  if (!progress) return "확인 중";
+  if (!progress.enabled) return "보상 없음";
+  if (progress.complete) return "오늘 완료";
+  return `${progress.earnedCount}/${progress.dailyCap} 받음`;
+}
+
+type DailyRewardIcon = typeof CalendarCheck;
+
+function DailyRewardRow({
+  icon: Icon,
+  label,
+  status,
+  complete = false,
+  claimable = false,
+  busy = false,
+  disabled = false,
+  onPress,
+}: {
+  icon: DailyRewardIcon;
+  label: string;
+  status: string;
+  complete?: boolean;
+  claimable?: boolean;
+  busy?: boolean;
+  disabled?: boolean;
+  onPress: () => void;
+}) {
+  return (
+    <ControlPressable
+      style={[styles.dailyRewardRow, claimable && styles.dailyRewardRowClaimable]}
+      onPress={onPress}
+      disabled={busy}
+      accessibilityLabel={`${label} 보상, ${busy ? "처리 중" : status}`}
+      accessibilityState={{ busy, disabled: disabled || busy }}
+    >
+      <Icon size={iconSizes.sm} color={complete ? colors.plantActive : claimable ? colors.accent : colors.textMuted} strokeWidth={2} accessible={false} />
+      <Text style={styles.dailyRewardLabel} numberOfLines={1}>{label}</Text>
+      <Text style={[styles.dailyRewardStatus, complete && styles.dailyRewardStatusComplete, claimable && styles.dailyRewardStatusClaimable, disabled && styles.dailyRewardStatusDisabled]} numberOfLines={1}>
+        {busy ? "받는 중…" : status}
+      </Text>
+      {complete ? <CircleCheck size={iconSizes.sm} color={colors.plantActive} strokeWidth={2.4} accessible={false} /> : <ChevronRight size={iconSizes.sm} color={colors.textFaint} strokeWidth={2} accessible={false} />}
+    </ControlPressable>
   );
 }
 
@@ -741,41 +1014,107 @@ const styles = StyleSheet.create({
     paddingBottom: spacing.xxl,
     gap: spacing.sm,
   },
-  representativePet: {
+  dailyGamePanel: {
     alignSelf: "stretch",
+    backgroundColor: colors.transparent,
+  },
+  dailyGameHeader: {
+    minHeight: tapMin,
+    flexDirection: "row",
     alignItems: "center",
-    gap: spacing.xs,
-    paddingVertical: spacing.xs,
+    borderBottomWidth: borders.hairline,
+    borderBottomColor: colors.border,
+  },
+  petHeaderTitle: {
+    width: "46%",
+    minHeight: tapMin,
+    minWidth: 0,
+    alignItems: "center",
+    flexDirection: "row",
+  },
+  rewardHeaderTitle: {
+    flex: 1,
+    minWidth: 0,
+    paddingLeft: spacing.sm,
+  },
+  dailyGameTitle: {
+    ...typography.section,
+    color: colors.text,
+  },
+  dailyGameBody: {
+    minHeight: slimeUi.homePetSceneHeight,
+    flexDirection: "row",
+    alignItems: "stretch",
+  },
+  petPane: {
+    width: "46%",
+    minWidth: 0,
+    alignItems: "center",
+    justifyContent: "center",
   },
   representativePetScene: {
     position: "relative",
-    width: slimeUi.homePetSceneWidth,
+    width: "100%",
     height: slimeUi.homePetSceneHeight,
     maxWidth: "100%",
     alignItems: "center",
     justifyContent: "center",
     overflow: "hidden",
   },
-  petManageRow: { alignSelf: "stretch", alignItems: "flex-end" },
-  petManageLink: {
-    minHeight: tapMin,
-    minWidth: 0,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: spacing.xxs,
-    paddingHorizontal: spacing.xs,
-    paddingVertical: spacing.none,
-    borderWidth: borders.none,
-    borderRadius: radii.none,
-    backgroundColor: colors.transparent,
-  },
-  petManageLinkText: { ...typography.badge, color: colors.textMuted },
   petEmptyState: {
-    minHeight: iconSizes.empty + spacing.md,
+    height: slimeUi.homePetSceneHeight,
     alignItems: "center",
     justifyContent: "center",
   },
   petEmptyText: { ...typography.body, color: colors.textMuted },
+  dailyRewardList: {
+    flex: 1,
+    minWidth: 0,
+    justifyContent: "center",
+    paddingVertical: spacing.xxs,
+  },
+  dailyRewardLoading: {
+    ...typography.micro,
+    color: colors.textMuted,
+    textAlign: "center",
+    marginTop: spacing.xs,
+  },
+  dailyRewardRow: {
+    minHeight: tapMin,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.xs,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xxs,
+    borderWidth: borders.none,
+    borderRadius: radii.none,
+    backgroundColor: colors.transparent,
+  },
+  dailyRewardRowClaimable: {
+    borderLeftWidth: borders.medium,
+    borderLeftColor: colors.accent,
+  },
+  dailyRewardLabel: {
+    ...typography.badge,
+    color: colors.text,
+    width: spacing.xxl,
+  },
+  dailyRewardStatus: {
+    ...typography.micro,
+    color: colors.textMuted,
+    flex: 1,
+    minWidth: 0,
+    textAlign: "right",
+  },
+  dailyRewardStatusComplete: { color: colors.plantActive },
+  dailyRewardStatusClaimable: { color: colors.accentTintedText },
+  dailyRewardStatusDisabled: { color: colors.textFaint },
+  dailyRewardError: {
+    ...typography.micro,
+    color: colors.danger,
+    paddingHorizontal: spacing.sm,
+    paddingTop: spacing.xxs,
+  },
   landscapeOverview: {
     flexDirection: "row",
     alignItems: "stretch",

@@ -11,7 +11,7 @@ import {
   View,
   useWindowDimensions,
 } from "react-native";
-import { useFocusEffect, useRouter } from "expo-router";
+import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Footprints, Settings } from "lucide-react-native";
 import { apiFetch, ApiError } from "../../lib/api";
@@ -110,6 +110,8 @@ function localizedWalkingError(nextError: unknown, fallback: string) {
 
 export default function StudentWalkingScreen() {
   const router = useRouter();
+  const params = useLocalSearchParams<{ view?: string | string[] }>();
+  const requestedView = Array.isArray(params.view) ? params.view[0] : params.view;
   const [rows, setRows] = useState<WalkingDay[]>([]);
   const [policy, setPolicy] = useState<WalkingPolicy>(DEFAULT_WALKING_POLICY);
   const [monthlyAttendanceReward, setMonthlyAttendanceReward] =
@@ -134,12 +136,24 @@ export default function StudentWalkingScreen() {
   const [busy, setBusy] = useState<"connect" | "sync" | "settings" | "attendance" | null>(null);
   const silentSyncInFlight = useRef(false);
   const [liveStepDelta, setLiveStepDelta] = useState(0);
-  const [activeView, setActiveView] = useState<WalkingView>("record");
+  const [activeView, setActiveView] = useState<WalkingView>(
+    requestedView === "missions" ? "missions" : "record",
+  );
   const [settingsVisible, setSettingsVisible] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const connected = hasRequiredHealthConnectPermissions(permissions);
+
+  useEffect(() => {
+    if (
+      requestedView === "record" ||
+      requestedView === "missions" ||
+      requestedView === "titles"
+    ) {
+      setActiveView(requestedView);
+    }
+  }, [requestedView]);
 
   const handleAuthError = useCallback(async (nextError: unknown) => {
     if (nextError instanceof ApiError && nextError.status === 401) {

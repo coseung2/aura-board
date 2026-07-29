@@ -50,6 +50,13 @@ export type StudentAssignmentTodo = {
   submittedAt: string | null;
 };
 
+export type StudentDailyRewardProgress = {
+  earnedCount: number;
+  dailyCap: number;
+  complete: boolean;
+  enabled: boolean;
+};
+
 export type StudentHomePayload = {
   student: {
     id: string;
@@ -59,6 +66,9 @@ export type StudentHomePayload = {
   boards: StudentHomeBoard[];
   duties: Duty[];
   assignments: StudentAssignmentTodo[];
+  dailyRewards: {
+    comment: StudentDailyRewardProgress;
+  };
 };
 
 export function isStudentAssignmentReminded(

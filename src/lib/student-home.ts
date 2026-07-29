@@ -2,9 +2,12 @@ import "server-only";
 
 import { cloneStructure } from "./breakout";
 import { db } from "./db";
+import { getKstRewardBounds, REWARD_SOURCE_TYPES } from "./reward-policy";
+import { loadRewardPolicy } from "./reward-service";
 import { getStudentDuties } from "./role-portals";
 import type {
   StudentAssignmentTodo,
+  StudentDailyRewardProgress,
   StudentHomeBreakout,
   StudentHomePayload,
 } from "./student-home-types";
@@ -19,7 +22,7 @@ type StudentIdentity = {
 export async function getStudentHomePayload(
   student: StudentIdentity,
 ): Promise<StudentHomePayload> {
-  const [boards, duties, assignmentSections, checkTasks, assignmentBoardSlots] =
+  const [boards, duties, assignmentSections, checkTasks, assignmentBoardSlots, dailyRewards] =
     await Promise.all([
       db.board.findMany({
         where: { classroomId: student.classroomId },
@@ -108,6 +111,7 @@ export async function getStudentHomePayload(
           board: { select: { id: true, slug: true, title: true } },
         },
       }),
+      loadStudentDailyRewards(student),
     ]);
 
   const streamBreakouts = boards
@@ -275,6 +279,65 @@ export async function getStudentHomePayload(
     boards: homeBoards,
     duties,
     assignments: [...columnTodos, ...assignmentTodos, ...checkTodos],
+    dailyRewards,
+  };
+}
+
+async function loadStudentDailyRewards(
+  student: Pick<StudentIdentity, "id" | "classroomId">,
+): Promise<StudentHomePayload["dailyRewards"]> {
+  const bounds = getKstRewardBounds();
+  const [policy, account] = await Promise.all([
+    loadRewardPolicy(db, student.classroomId),
+    db.studentAccount.findUnique({
+      where: { studentId: student.id },
+      select: { id: true, studentId: true, classroomId: true },
+    }),
+  ]);
+
+  const accountId = account?.studentId === student.id && account.classroomId === student.classroomId
+    ? account.id
+    : null;
+  const commentEarnedCount = accountId
+    ? await countDailyRewardDeposits(accountId, REWARD_SOURCE_TYPES.comment, bounds)
+    : 0;
+
+  return {
+    comment: dailyRewardProgress(
+      commentEarnedCount,
+      policy.commentDailyRewardCap,
+      policy.commentRewardAmount > 0 &&
+      policy.commentDailyRewardCap > 0 &&
+        policy.commentWeeklyRewardCap > 0,
+    ),
+  };
+}
+
+function countDailyRewardDeposits(
+  accountId: string,
+  sourceType: string,
+  bounds: ReturnType<typeof getKstRewardBounds>,
+): Promise<number> {
+  return db.transaction.count({
+    where: {
+      accountId,
+      sourceType,
+      type: "deposit",
+      createdAt: { gte: bounds.dayStart, lt: bounds.dayEnd },
+    },
+  });
+}
+
+function dailyRewardProgress(
+  earnedCount: number,
+  dailyCap: number,
+  enabled: boolean,
+): StudentDailyRewardProgress {
+  return {
+    earnedCount,
+    dailyCap,
+    complete: enabled && earnedCount >= dailyCap,
+    enabled,
   };
 }
 

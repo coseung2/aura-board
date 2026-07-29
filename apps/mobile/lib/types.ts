@@ -83,6 +83,16 @@ export type MeResponse = {
   boards: BoardMeta[];
   duties?: StudentDuty[];
   assignments?: StudentAssignmentTodo[];
+  dailyRewards?: {
+    comment: StudentDailyRewardProgress;
+  };
+};
+
+export type StudentDailyRewardProgress = {
+  earnedCount: number;
+  dailyCap: number;
+  complete: boolean;
+  enabled: boolean;
 };
 
 export type StudentAuthResponse = {

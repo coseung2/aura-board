@@ -4,7 +4,6 @@ const mocks = vi.hoisted(() => ({
   logs: [] as Array<Record<string, unknown>>,
   transactions: [] as Array<Record<string, unknown>>,
   balance: 0,
-  award: vi.fn(),
   findMany: vi.fn(),
   count: vi.fn(),
   aggregate: vi.fn(),
@@ -29,10 +28,6 @@ vi.mock("@/lib/reading-evaluator", () => ({
 }));
 vi.mock("@/lib/titles", () => ({
   readReadingTitles: vi.fn(async () => []),
-}));
-vi.mock("@/lib/avatar-rewards", () => ({
-  retryReadingRewardTransaction: (operation: () => Promise<unknown>) => operation(),
-  awardReadingReward: mocks.award,
 }));
 vi.mock("@/lib/db", () => {
   const tx = {
@@ -93,12 +88,11 @@ function request() {
   });
 }
 
-describe("reading log and reward transaction", () => {
+describe("reading logs and missions", () => {
   beforeEach(() => {
     mocks.logs.length = 0;
     mocks.transactions.length = 0;
     mocks.balance = 0;
-    mocks.award.mockReset();
     mocks.findMany.mockReset();
     mocks.count.mockReset();
     mocks.aggregate.mockReset();
@@ -112,16 +106,18 @@ describe("reading log and reward transaction", () => {
     mocks.studentSlimeFindFirst.mockResolvedValue(null);
   });
 
-  it("rolls the reading log, wallet, and transaction back together", async () => {
-    mocks.award.mockImplementationOnce(async ({ tx }: { tx?: unknown }) => {
-      expect(tx).toBeDefined();
-      mocks.balance += 25;
-      mocks.transactions.push({ sourceType: "reading_reward", amount: 25 });
-      throw new Error("reward transaction failed");
-    });
+  it("saves a reading log without granting the retired per-record reward", async () => {
+    const response = await POST(request());
+    const body = await response.json();
 
-    await expect(POST(request())).rejects.toThrow("reward transaction failed");
-    expect(mocks.logs).toHaveLength(0);
+    expect(response.status).toBe(201);
+    expect(body.entry).toMatchObject({
+      id: "reading-1",
+      title: "어린 왕자",
+      aiScore: 5,
+    });
+    expect(body).not.toHaveProperty("reward");
+    expect(mocks.logs).toHaveLength(1);
     expect(mocks.balance).toBe(0);
     expect(mocks.transactions).toHaveLength(0);
   });

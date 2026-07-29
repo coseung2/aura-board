@@ -10,7 +10,7 @@ import {
   View,
   useWindowDimensions,
 } from "react-native";
-import { useRouter } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import { ChevronDown, ChevronUp, X } from "lucide-react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { apiFetch, ApiError } from "../../lib/api";
@@ -137,10 +137,14 @@ type ReadingEntry = {
 
 export default function StudentReadingScreen() {
   const router = useRouter();
+  const params = useLocalSearchParams<{ view?: string | string[] }>();
+  const requestedView = Array.isArray(params.view) ? params.view[0] : params.view;
   const { width, height } = useWindowDimensions();
   const isLandscape = width > height;
   const [bookType, setBookType] = useState<BookType>("story");
-  const [activeTab, setActiveTab] = useState<ReadingTab>("records");
+  const [activeTab, setActiveTab] = useState<ReadingTab>(
+    requestedView === "missions" ? "missions" : "records",
+  );
   const [composerVisible, setComposerVisible] = useState(false);
   const [title, setTitle] = useState("");
   const [author, setAuthor] = useState("");
@@ -179,6 +183,16 @@ export default function StudentReadingScreen() {
     }),
     [entries],
   );
+
+  useEffect(() => {
+    if (
+      requestedView === "records" ||
+      requestedView === "missions" ||
+      requestedView === "titles"
+    ) {
+      setActiveTab(requestedView);
+    }
+  }, [requestedView]);
   const visibleEntries = useMemo(
     () => entries.filter((entry) => entry.bookType === historyBookType),
     [entries, historyBookType],

@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import { Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
-import { ensureAccountFor } from "@/lib/bank";
 import { getCurrentStudent } from "@/lib/student-auth";
 import {
   getKstClassroomWalkingRankPeriods,
@@ -27,7 +26,6 @@ import {
   evaluateReadingLog,
   type ReadingBookType,
 } from "@/lib/reading-evaluator";
-import { awardReadingReward, retryReadingRewardTransaction } from "@/lib/avatar-rewards";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -511,37 +509,21 @@ export async function POST(req: Request) {
 
   const bookType = bookTypeRaw as ReadingBookType;
   const evaluation = evaluateReadingLog({ bookType, title, author, reflection });
-  const { accountId } = await ensureAccountFor(student);
   let created: Awaited<ReturnType<typeof db.readingLog.create>>;
-  let reward: { amount: number; unitLabel: string } | null;
   try {
-    const result = await retryReadingRewardTransaction(() =>
-      db.$transaction(async (tx) => {
-        const readingLog = await tx.readingLog.create({
-          data: {
-            classroomId: student.classroomId,
-            studentId: student.id,
-            bookType,
-            title,
-            author,
-            reflection,
-            aiScore: evaluation.score,
-            aiFeedback: evaluation.feedback,
-            evaluatedAt: new Date(),
-          },
-        });
-        const readingReward = await awardReadingReward({
-          tx,
-          accountId,
-          student,
-          score: readingLog.aiScore,
-          readingLogId: readingLog.id,
-        });
-        return { created: readingLog, reward: readingReward };
-      }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable }),
-    );
-    created = result.created;
-    reward = result.reward;
+    created = await db.readingLog.create({
+      data: {
+        classroomId: student.classroomId,
+        studentId: student.id,
+        bookType,
+        title,
+        author,
+        reflection,
+        aiScore: evaluation.score,
+        aiFeedback: evaluation.feedback,
+        evaluatedAt: new Date(),
+      },
+    });
   } catch (e) {
     if (!isMissingReadingLogTable(e)) throw e;
     return NextResponse.json(
@@ -554,5 +536,5 @@ export async function POST(req: Request) {
     );
   }
 
-  return NextResponse.json({ entry: serialize(created), reward }, { status: 201 });
+  return NextResponse.json({ entry: serialize(created) }, { status: 201 });
 }
