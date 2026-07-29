@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   logs: [] as Array<Record<string, unknown>>,
@@ -112,6 +112,10 @@ describe("reading log and reward transaction", () => {
     mocks.studentSlimeFindFirst.mockResolvedValue(null);
   });
 
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   it("rolls the reading log, wallet, and transaction back together", async () => {
     mocks.award.mockImplementationOnce(async ({ tx }: { tx?: unknown }) => {
       expect(tx).toBeDefined();
@@ -127,6 +131,9 @@ describe("reading log and reward transaction", () => {
   });
 
   it("uses complete aggregates while capping the returned recent entries", async () => {
+    // The fixture rows are dated inside the KST week starting 2026-07-20, so
+    // pin the clock to that week instead of depending on the current date.
+    vi.setSystemTime(new Date("2026-07-22T03:00:00.000Z"));
     const recentRows = Array.from({ length: 30 }, (_, index) => {
       const now = new Date("2026-07-20T00:00:00.000Z");
       return {
