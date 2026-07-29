@@ -36,6 +36,98 @@ export const SLIME_VEHICLE_DEFAULT_RISE_Y = 6;
  * matching durations, so a ride and its rider never drift apart.
  */
 export const SLIME_VEHICLE_FRAME_COUNT = 8;
+
+/**
+ * Height of an authored vehicle canvas, and where the character sits inside it.
+ *
+ * Vehicles are drawn taller than the 64px character viewport so a balloon can
+ * climb above the grounded pose. The renderer subtracts the offset to land that
+ * art back on the viewport, matching how jump wearables already work.
+ */
+export const SLIME_VEHICLE_CANVAS_HEIGHT = 81;
+export const SLIME_VEHICLE_CHARACTER_OFFSET_Y = 17;
+
+const VEHICLE_ROOT = `${SLIME_ASSET_ROOT}/shop/vehicles`;
+
+/**
+ * Vehicles delivered as front-only art on the taller canvas.
+ *
+ * `bobY` is authored per frame and the rider follows it, so a passenger never
+ * slides out of a seat moving under it. Prices follow the existing tiers.
+ */
+const VEHICLE_DEFINITIONS = [
+  {
+    option: "donut-tube",
+    labelKo: "도넛 튜브",
+    price: 500,
+    stance: "grounded",
+    riseY: 10,
+    bobY: [0, -1, -1, -2, -2, -1, -1, 0],
+    effectKey: "walking_reward",
+    effectBps: 100,
+  },
+  {
+    option: "open-convertible",
+    labelKo: "오픈카",
+    price: 1_000,
+    stance: "grounded",
+    riseY: 6,
+    bobY: [0, 0, -1, -1, -1, -1, 0, 0],
+    effectKey: "walking_reward",
+    effectBps: 300,
+    // Wheels keep their own constant-rate timeline; a wheel that rose with the
+    // suspension would leave the ground and lift the whole sprite.
+    wheels: { frameCount: 4, frameDurationMs: 100 },
+  },
+  {
+    option: "hot-air-balloon",
+    labelKo: "열기구",
+    price: 1_000,
+    stance: "floating",
+    riseY: 9,
+    bobY: [0, -1, -2, -2, -2, -1, -1, 0],
+    effectKey: "reading_reward",
+    effectBps: 300,
+  },
+] as const satisfies readonly {
+  option: string;
+  labelKo: string;
+  price: number;
+  stance: "grounded" | "floating";
+  riseY: number;
+  bobY: readonly number[];
+  effectKey: NonNullable<SlimeShopItem["effectKey"]>;
+  effectBps: number;
+  wheels?: { frameCount: number; frameDurationMs: number };
+}[];
+
+export const SLIME_VEHICLE_CATALOG: readonly SlimeShopItem[] = VEHICLE_DEFINITIONS.map(
+  (vehicle): SlimeShopItem => ({
+    key: `slime-vehicle-${vehicle.option}`,
+    category: "vehicle",
+    floor: null,
+    labelKo: vehicle.labelKo,
+    price: vehicle.price,
+    vehicleStance: vehicle.stance,
+    vehicleRiseY: vehicle.riseY,
+    vehicleBobY: vehicle.bobY,
+    vehicleFrameCount: SLIME_VEHICLE_FRAME_COUNT,
+    vehicleCanvasHeight: SLIME_VEHICLE_CANVAS_HEIGHT,
+    vehicleCharacterOffsetY: SLIME_VEHICLE_CHARACTER_OFFSET_Y,
+    effectKey: vehicle.effectKey,
+    effectBps: vehicle.effectBps,
+    // The still frame doubles as the shop card image.
+    spritePath: `${VEHICLE_ROOT}/${vehicle.option}/vehicle.png`,
+    vehicleSheetPath: `${VEHICLE_ROOT}/${vehicle.option}/idle-sheet.png`,
+    ...("wheels" in vehicle && vehicle.wheels
+      ? {
+          vehicleGroundedSpritePath: `${VEHICLE_ROOT}/${vehicle.option}/wheels-idle-sheet.png`,
+          vehicleGroundedFrameCount: vehicle.wheels.frameCount,
+          vehicleGroundedFrameDurationMs: vehicle.wheels.frameDurationMs,
+        }
+      : {}),
+  }),
+);
 /**
  * Upper bound for one consumable purchase.
  *
@@ -512,6 +604,7 @@ export const SLIME_SHOP_CATALOG: readonly SlimeShopItem[] = [
     effectBps: SLIME_SHOP_LOWER_TIER_EFFECT_BPS,
     spritePath: `${SLIME_ASSET_ROOT}/shop/slime-blue-trampoline.gif`,
   },
+  ...SLIME_VEHICLE_CATALOG,
   ...SLIME_DRINK_CATALOG,
   ...SLIME_BALL_CATALOG,
   ...SLIME_WEARABLE_CATALOG.map((wearable): SlimeShopItem => ({

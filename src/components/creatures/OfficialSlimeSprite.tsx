@@ -55,8 +55,36 @@ export type OfficialSlimeSpriteProps = {
    * that would otherwise lift off the ground with the suspension bounce.
    */
   vehicleGroundedSpritePath?: string;
-  /** Frames in the vehicle sheet. One means a single static image. */
+  /** Frames in the vehicle body sheet. One means a single static image. */
   vehicleFrameCount?: number;
+  /** Frames in the grounded-part sheet, such as a wheel rotation. */
+  vehicleGroundedFrameCount?: number;
+  /**
+   * Fixed frame duration for the grounded part, in milliseconds.
+   *
+   * A wheel turns at a constant rate while the body follows the slime's variable
+   * idle timing, so the two cannot share one frame index without the rotation
+   * stuttering.
+   */
+  vehicleGroundedFrameDurationMs?: number;
+  /**
+   * Height of the vehicle canvas.
+   *
+   * Vehicles are authored taller than the character viewport so a balloon can
+   * climb above the grounded pose. `vehicleCharacterOffsetY` says where the
+   * character sits inside that canvas, and the renderer subtracts it to land the
+   * art back on the 64px viewport.
+   */
+  vehicleCanvasHeight?: number;
+  /** Where the character sits inside the taller vehicle canvas. */
+  vehicleCharacterOffsetY?: number;
+  /**
+   * Per-frame vertical bob authored into the vehicle, in viewport pixels.
+   *
+   * The rider follows it. A vehicle that bobs while its passenger holds still
+   * looks like the passenger is sliding out of the seat.
+   */
+  vehicleBobY?: readonly number[];
   /**
    * Pixels the slime is lifted by the vehicle, in 64px-viewport units. Added on
    * top of the floor rise so a vehicle and a floor stay independently correct.
@@ -122,9 +150,14 @@ function frameViewportStyle(frame: SlimeFrame, scale: number, extraHeight = 0): 
  * back onto the character's own 64px viewport. Grounded actions report zero, so
  * both families share one formula.
  */
-function wearableStyle(wearable: ResolvedSlimeWearable, scale: number): CSSProperties {
+function wearableStyle(
+  wearable: ResolvedSlimeWearable,
+  scale: number,
+  riderOffsetY = 0,
+): CSSProperties {
   const left = (-wearable.sourceFrame * wearable.frameSize.w + wearable.dx) * scale;
-  const top = (wearable.dy - wearable.characterOffsetY) * scale;
+  // Hats ride the head, so they take the same seat offset the character does.
+  const top = (wearable.dy - wearable.characterOffsetY) * scale + riderOffsetY;
   return {
     width: wearable.sheetWidth * scale,
     height: wearable.sheetHeight * scale,
@@ -158,6 +191,11 @@ export function OfficialSlimeSprite({
   vehicleSpritePath,
   vehicleGroundedSpritePath,
   vehicleFrameCount = 1,
+  vehicleGroundedFrameCount = 1,
+  vehicleGroundedFrameDurationMs = 100,
+  vehicleCanvasHeight = 64,
+  vehicleCharacterOffsetY = 0,
+  vehicleBobY,
   vehicleRiseY = 0,
   wearables,
   drinkFlavor,
@@ -204,13 +242,23 @@ export function OfficialSlimeSprite({
   // A vehicle lifts the slime on top of whatever the floor already contributed,
   // so the two offsets add instead of overriding each other.
   const vehicleRise = Math.max(0, Math.trunc(vehicleRiseY)) * scale;
+  const vehicleBob = vehicleBobY?.length
+    ? Math.trunc(vehicleBobY[frameIndex % vehicleBobY.length] ?? 0)
+    : 0;
   const viewportStyle = frameViewportStyle(frame, scale, floorRise + vehicleRise);
+  /**
+   * Rider offset: the seat height plus this frame's bob.
+   *
+   * `vehicleRiseY` alone would leave the slime still while its seat moves, so the
+   * authored bob is added here rather than baked into the character sheet.
+   */
+  const riderOffsetY = -(vehicleRise + vehicleBob * scale);
   const sheetStyle = frameSourceStyle(
     frame,
     resolution.metadata.meta.size.w,
     resolution.metadata.meta.size.h,
     scale,
-    0,
+    riderOffsetY,
   );
   const label = alt ?? `${slimeColor} 슬라임 ${resolution.action} 모습`;
   const resolvedBackgroundSpritePath = resolveSpritePath(backgroundSpritePath);
@@ -222,10 +270,37 @@ export function OfficialSlimeSprite({
    * one index can drive both.
    */
   const vehicleFrames = Math.max(1, Math.trunc(vehicleFrameCount));
-  const vehicleFrameStyle = (): CSSProperties => ({
-    width: 64 * vehicleFrames * scale,
-    height: 64 * scale,
-    transform: `translate(${-(frameIndex % vehicleFrames) * 64 * scale}px, 0px)`,
+  const vehicleGroundedFrames = Math.max(1, Math.trunc(vehicleGroundedFrameCount));
+  /**
+   * Wheels run on their own clock.
+   *
+   * The body shares the character's frame index so a bob stays in step with the
+   * rider, but a constant-rate rotation driven by that variable timing would
+   * speed up and slow down within one loop.
+   */
+  const [groundedFrame, setGroundedFrame] = useState(0);
+  useEffect(() => {
+    if (!vehicleGroundedSpritePath || vehicleGroundedFrames <= 1) return;
+    const period = Math.max(16, Math.trunc(vehicleGroundedFrameDurationMs));
+    const timer = window.setInterval(() => {
+      setGroundedFrame((current) => (current + 1) % vehicleGroundedFrames);
+    }, period);
+    return () => window.clearInterval(timer);
+  }, [vehicleGroundedFrameDurationMs, vehicleGroundedFrames, vehicleGroundedSpritePath]);
+
+  /**
+   * Vehicle art is authored on a taller canvas whose headroom sits above the
+   * grounded pose, so the offset is subtracted to bring it back onto the 64px
+   * character viewport.
+   */
+  const vehicleTop = floorRise - Math.trunc(vehicleCharacterOffsetY) * scale;
+  const vehicleSheetStyle = (
+    sheetFrames: number,
+    activeFrame: number,
+  ): CSSProperties => ({
+    width: 64 * sheetFrames * scale,
+    height: Math.trunc(vehicleCanvasHeight) * scale,
+    transform: `translate(${-(activeFrame % sheetFrames) * 64 * scale}px, 0px)`,
   });
   // Wearables compose onto the character sheet. Legacy complete-GIF props
   // replace that sheet entirely, so the two paths stay mutually exclusive.
@@ -382,7 +457,10 @@ export function OfficialSlimeSprite({
           alt=""
           aria-hidden="true"
           className={`${styles.sheet} ${styles.floorUnder}`}
-          style={{ ...vehicleFrameStyle(), top: floorRise }}
+          style={{
+            ...vehicleSheetStyle(vehicleGroundedFrames, groundedFrame),
+            top: vehicleTop,
+          }}
           draggable={false}
         />
       ) : null}
@@ -426,7 +504,10 @@ export function OfficialSlimeSprite({
               alt=""
               aria-hidden="true"
               className={styles.wearable}
-              style={{ ...wearableStyle(wearable, scale), zIndex: 2 + wearable.zIndex }}
+              style={{
+                ...wearableStyle(wearable, scale, riderOffsetY),
+                zIndex: 2 + wearable.zIndex,
+              }}
               data-wearable-role={wearable.role}
               data-wearable-source-frame={wearable.sourceFrame}
               draggable={false}
@@ -458,7 +539,11 @@ export function OfficialSlimeSprite({
           alt=""
           aria-hidden="true"
           className={`${styles.sheet} ${styles.floorUnder}`}
-          style={{ ...vehicleFrameStyle(), top: floorRise, zIndex: 200 }}
+          style={{
+            ...vehicleSheetStyle(vehicleFrames, frameIndex),
+            top: vehicleTop,
+            zIndex: 200,
+          }}
           draggable={false}
         />
       ) : null}

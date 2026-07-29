@@ -926,9 +926,16 @@ export default function StudentSlimeScreen() {
                                 ? selectSceneBackgroundSpritePath(classBackground)
                                 : undefined
                             }
-                            vehicleSpritePath={classVehicleItem?.spritePath}
+                            vehicleSpritePath={
+                              classVehicleItem?.vehicleSheetPath ?? classVehicleItem?.spritePath
+                            }
                             vehicleGroundedSpritePath={classVehicleItem?.vehicleGroundedSpritePath}
                             vehicleFrameCount={classVehicleItem?.vehicleFrameCount}
+                            vehicleGroundedFrameCount={classVehicleItem?.vehicleGroundedFrameCount}
+                            vehicleGroundedFrameDurationMs={classVehicleItem?.vehicleGroundedFrameDurationMs}
+                            vehicleCanvasHeight={classVehicleItem?.vehicleCanvasHeight}
+                            vehicleCharacterOffsetY={classVehicleItem?.vehicleCharacterOffsetY}
+                            vehicleBobY={classVehicleItem?.vehicleBobY}
                             vehicleRiseY={classVehicleItem?.vehicleRiseY}
                             accessibilityLabel={`${student.name}의 ${SLIME_COLOR_LABELS[representative.color]} 대표 펫`}
                           />
@@ -1101,9 +1108,14 @@ export default function StudentSlimeScreen() {
                           ? selectSceneBackgroundSpritePath(petBackground)
                           : undefined
                       }
-                      vehicleSpritePath={petVehicle?.spritePath}
+                      vehicleSpritePath={petVehicle?.vehicleSheetPath ?? petVehicle?.spritePath}
                       vehicleGroundedSpritePath={petVehicle?.vehicleGroundedSpritePath}
                       vehicleFrameCount={petVehicle?.vehicleFrameCount}
+                      vehicleGroundedFrameCount={petVehicle?.vehicleGroundedFrameCount}
+                      vehicleGroundedFrameDurationMs={petVehicle?.vehicleGroundedFrameDurationMs}
+                      vehicleCanvasHeight={petVehicle?.vehicleCanvasHeight}
+                      vehicleCharacterOffsetY={petVehicle?.vehicleCharacterOffsetY}
+                      vehicleBobY={petVehicle?.vehicleBobY}
                       vehicleRiseY={petVehicle?.vehicleRiseY}
                       accessibilityLabel={`${SLIME_COLOR_LABELS[itemColor]} 슬라임`}
                       onComplete={manualAction

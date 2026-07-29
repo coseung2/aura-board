@@ -137,6 +137,11 @@ export function SlimeSprite({
   vehicleSpritePath,
   vehicleGroundedSpritePath,
   vehicleFrameCount = 1,
+  vehicleGroundedFrameCount = 1,
+  vehicleGroundedFrameDurationMs = 100,
+  vehicleCanvasHeight = 64,
+  vehicleCharacterOffsetY = 0,
+  vehicleBobY,
   vehicleRiseY = 0,
   wearables,
   drinkFlavor,
@@ -201,6 +206,15 @@ export function SlimeSprite({
   const vehicleRise =
     Math.max(0, Math.trunc(vehicleRiseY)) * resolution.imageScale * displayScale;
   const totalRise = floorRise + vehicleRise;
+  const vehicleBob = vehicleBobY?.length
+    ? Math.trunc(vehicleBobY[frameIndex % vehicleBobY.length] ?? 0)
+    : 0;
+  /**
+   * Rider offset: seat height plus this frame's bob. Without the bob the slime
+   * would hold still while its seat moves under it.
+   */
+  const riderOffsetY =
+    -(vehicleRise + vehicleBob * resolution.imageScale * displayScale);
   const viewport = {
     ...sourceSize(frame, resolution.imageScale, displayScale),
     height: frame.sourceSize.h * resolution.imageScale * displayScale + totalRise,
@@ -209,7 +223,7 @@ export function SlimeSprite({
     width: resolution.metadata.meta.size.w * resolution.imageScale * displayScale,
     height: resolution.metadata.meta.size.h * resolution.imageScale * displayScale,
   };
-  const offset = frameOffset(frame, resolution.imageScale, displayScale, 0);
+  const offset = frameOffset(frame, resolution.imageScale, displayScale, riderOffsetY);
   const squareSourceSize = frame.sourceSize.w * resolution.imageScale * displayScale;
 
   useEffect(() => {
@@ -272,12 +286,32 @@ export function SlimeSprite({
    * so one index keeps a ride and its rider in step.
    */
   const vehicleFrames = Math.max(1, Math.trunc(vehicleFrameCount));
-  const vehicleSheetStyle = {
-    width: 64 * vehicleFrames * resolution.imageScale * displayScale,
-    height: 64 * resolution.imageScale * displayScale,
-    left: -(frameIndex % vehicleFrames) * 64 * resolution.imageScale * displayScale,
-    top: floorRise,
-  };
+  const vehicleGroundedFrames = Math.max(1, Math.trunc(vehicleGroundedFrameCount));
+  /**
+   * Wheels turn on their own clock. Sharing the character's variable idle timing
+   * would make a constant-rate rotation speed up and slow down mid-loop.
+   */
+  const [groundedFrame, setGroundedFrame] = useState(0);
+  useEffect(() => {
+    if (!vehicleGroundedSpritePath || vehicleGroundedFrames <= 1) return;
+    const period = Math.max(16, Math.trunc(vehicleGroundedFrameDurationMs));
+    const timer = setInterval(() => {
+      setGroundedFrame((current) => (current + 1) % vehicleGroundedFrames);
+    }, period);
+    return () => clearInterval(timer);
+  }, [vehicleGroundedFrameDurationMs, vehicleGroundedFrames, vehicleGroundedSpritePath]);
+
+  const vehicleCanvas = Math.max(64, Math.trunc(vehicleCanvasHeight));
+  // Vehicle headroom sits above the grounded pose, so the offset is subtracted to
+  // land the art back on the character viewport.
+  const vehicleTop =
+    floorRise - Math.trunc(vehicleCharacterOffsetY) * resolution.imageScale * displayScale;
+  const vehicleSheetStyle = (sheetFrames: number, activeFrame: number) => ({
+    width: 64 * sheetFrames * resolution.imageScale * displayScale,
+    height: vehicleCanvas * resolution.imageScale * displayScale,
+    left: -(activeFrame % sheetFrames) * 64 * resolution.imageScale * displayScale,
+    top: vehicleTop,
+  });
 
   if (itemSpritePath) {
     const uri = resolveSlimeRemoteSpriteUri(itemSpritePath, getApiBase());
@@ -384,7 +418,11 @@ export function SlimeSprite({
         // Parts that must stay planted while the body moves, such as wheels.
         <Image
           source={{ uri: vehicleGroundedUri }}
-          style={[styles.layer, styles.floorUnder, vehicleSheetStyle]}
+          style={[
+            styles.layer,
+            styles.floorUnder,
+            vehicleSheetStyle(vehicleGroundedFrames, groundedFrame),
+          ]}
           contentFit="fill"
           allowDownscaling={false}
           recyclingKey={`${playbackKey}:vehicle-grounded`}
@@ -454,7 +492,7 @@ export function SlimeSprite({
           source={{ uri: vehicleUri }}
           style={[
             styles.layer,
-            vehicleSheetStyle,
+            vehicleSheetStyle(vehicleFrames, frameIndex),
             { zIndex: layers.spriteItem + 200 },
           ]}
           contentFit="fill"

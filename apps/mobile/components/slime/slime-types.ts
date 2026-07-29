@@ -39,8 +39,21 @@ export type SlimeSpriteProps = {
    * Vehicle parts that stay planted while the body moves, such as wheels.
    */
   vehicleGroundedSpritePath?: string;
-  /** Frames in the vehicle sheet. One means a single static image. */
+  /** Frames in the vehicle body sheet. One means a single static image. */
   vehicleFrameCount?: number;
+  /** Frames in the grounded-part sheet, such as a wheel rotation. */
+  vehicleGroundedFrameCount?: number;
+  /**
+   * Fixed frame duration for the grounded part, in milliseconds. A rotation runs
+   * at a constant rate while the body follows the slime's variable idle timing.
+   */
+  vehicleGroundedFrameDurationMs?: number;
+  /** Height of the vehicle canvas; taller than the viewport when art needs headroom. */
+  vehicleCanvasHeight?: number;
+  /** Where the character sits inside a taller vehicle canvas. */
+  vehicleCharacterOffsetY?: number;
+  /** Per-frame vertical bob authored into the vehicle. The rider follows it. */
+  vehicleBobY?: readonly number[];
   /**
    * Pixels the vehicle lifts the slime, in 64px-viewport units. Fixed on purpose:
    * a per-frame offset would double the slime's own idle amplitude.

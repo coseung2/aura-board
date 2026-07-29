@@ -99,6 +99,18 @@ export type SlimeShopItem = {
   vehicleGroundedSpritePath?: string;
   /** Frames in the vehicle sheet. Omitted means a single static image. */
   vehicleFrameCount?: number;
+  /** Frames in the grounded-part sheet, such as a wheel rotation. */
+  vehicleGroundedFrameCount?: number;
+  /** Fixed frame duration for the grounded part, in milliseconds. */
+  vehicleGroundedFrameDurationMs?: number;
+  /** Height of the vehicle canvas; taller than the viewport when art needs headroom. */
+  vehicleCanvasHeight?: number;
+  /** Where the character sits inside a taller vehicle canvas. */
+  vehicleCharacterOffsetY?: number;
+  /** Per-frame vertical bob authored into the vehicle. The rider follows it. */
+  vehicleBobY?: number[];
+  /** Animated vehicle sheet; `spritePath` stays the still shop image. */
+  vehicleSheetPath?: string;
   effectKey?: string;
   effectBps?: number;
 };
@@ -662,6 +674,29 @@ function normalizeShopCatalog(value: unknown): SlimeShopItem[] {
           typeof entry.vehicleFrameCount === "number"
             ? Math.max(1, Math.trunc(entry.vehicleFrameCount))
             : undefined,
+        vehicleGroundedFrameCount:
+          typeof entry.vehicleGroundedFrameCount === "number"
+            ? Math.max(1, Math.trunc(entry.vehicleGroundedFrameCount))
+            : undefined,
+        vehicleGroundedFrameDurationMs:
+          typeof entry.vehicleGroundedFrameDurationMs === "number"
+            ? Math.max(16, Math.trunc(entry.vehicleGroundedFrameDurationMs))
+            : undefined,
+        vehicleCanvasHeight:
+          typeof entry.vehicleCanvasHeight === "number"
+            ? Math.max(64, Math.trunc(entry.vehicleCanvasHeight))
+            : undefined,
+        vehicleCharacterOffsetY:
+          typeof entry.vehicleCharacterOffsetY === "number"
+            ? Math.max(0, Math.trunc(entry.vehicleCharacterOffsetY))
+            : undefined,
+        vehicleBobY: Array.isArray(entry.vehicleBobY)
+          ? entry.vehicleBobY
+              .filter((value): value is number => typeof value === "number")
+              .map((value) => Math.trunc(value))
+          : undefined,
+        vehicleSheetPath:
+          typeof entry.vehicleSheetPath === "string" ? entry.vehicleSheetPath : undefined,
         effectKey: typeof entry.effectKey === "string" ? entry.effectKey : undefined,
         effectBps:
           typeof entry.effectBps === "number"

@@ -128,6 +128,21 @@ export type SlimeShopItem = {
   readonly vehicleGroundedSpritePath?: string;
   /** Frames in the vehicle sheet. Omitted means a single static image. */
   readonly vehicleFrameCount?: number;
+  /** Frames in the grounded-part sheet, such as a wheel rotation. */
+  readonly vehicleGroundedFrameCount?: number;
+  /**
+   * Fixed frame duration for the grounded part, in milliseconds. A rotation runs
+   * at a constant rate, unlike the body's variable idle timing.
+   */
+  readonly vehicleGroundedFrameDurationMs?: number;
+  /** Height of the vehicle canvas; taller than the viewport when art needs headroom. */
+  readonly vehicleCanvasHeight?: number;
+  /** Where the character sits inside a taller vehicle canvas. */
+  readonly vehicleCharacterOffsetY?: number;
+  /** Per-frame vertical bob authored into the vehicle. The rider follows it. */
+  readonly vehicleBobY?: readonly number[];
+  /** Animated vehicle sheet; `spritePath` stays the still shop image. */
+  readonly vehicleSheetPath?: string;
   readonly effectKey?: SlimeEffectKey;
   readonly effectBps?: number;
 };

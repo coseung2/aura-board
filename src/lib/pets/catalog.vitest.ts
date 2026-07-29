@@ -76,6 +76,10 @@ describe("slime catalog", () => {
       // The trampoline moved to the vehicle category, which rides above the
       // floor instead of owning a floor state.
       ["slime-blue-trampoline", null],
+      // Delivered vehicles ride above the floor too, so none of them carry one.
+      ["slime-vehicle-donut-tube", null],
+      ["slime-vehicle-open-convertible", null],
+      ["slime-vehicle-hot-air-balloon", null],
       ["slime-blue-drink-lemonade", null],
       ["slime-red-drink-strawberry-soda", null],
       ["slime-green-drink-melon-soda", null],
@@ -177,6 +181,9 @@ describe("slime catalog", () => {
     const existingCosmetics = SLIME_SHOP_CATALOG.filter(
       (item) => item.key !== "slime-cookie"
         && item.category !== "wearable"
+        // Delivered vehicles are priced by their own tiers, so this guard stays
+        // scoped to the props that predate them.
+        && !item.key.startsWith("slime-vehicle-")
         && !importedKeys.has(item.key)
         && !staticFloorKeys.has(item.key),
     );
