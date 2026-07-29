@@ -463,7 +463,14 @@ export function SlimeSprite({
           ]}
           contentFit="fill"
           allowDownscaling={false}
-          recyclingKey={`${playbackKey}:${wearable.key}:${wearable.sourceFrame}`}
+          // Frame-stable on purpose. `recyclingKey` makes iOS expo-image clear the
+          // native image immediately (`sdImageView.image = nil`), so including the
+          // per-frame `sourceFrame` blanked every overlay on each frame and read as
+          // flicker on iPhone. Android hid it by discarding the clear when the
+          // source is unchanged. The sheet is constant per playback; only the `left`
+          // offset advances frames, so the key must not track it. Keeping playback
+          // and option identity still clears when the sheet genuinely changes.
+          recyclingKey={`${playbackKey}:${wearable.key}`}
           transition={0}
           accessible={false}
         />
