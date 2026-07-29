@@ -218,13 +218,13 @@ export function StudentDashboard({
       <div className="student-overview-row">
         <section
           className="student-utilities"
-          aria-label="내 통장"
+          aria-label="은행"
           aria-busy={walletLoading}
         >
           <div className="student-wallet-card">
             <div className="student-wallet-header">
               <div>
-                <h2 className="student-wallet-title">내 통장과 적금</h2>
+                <h2 className="student-wallet-title">은행</h2>
               </div>
               <Link href="/my/wallet" className="student-wallet-link">
                 자세히

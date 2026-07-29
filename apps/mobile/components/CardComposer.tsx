@@ -1,6 +1,7 @@
 import { useState } from "react";
 import {
   Alert,
+  Platform,
   ScrollView,
   StyleSheet,
   Text,
@@ -231,7 +232,9 @@ export function CardComposer({
       <ScrollView
         style={styles.formScroll}
         contentContainerStyle={styles.formBody}
+        keyboardDismissMode={Platform.OS === "ios" ? "interactive" : "on-drag"}
         keyboardShouldPersistTaps="handled"
+        automaticallyAdjustKeyboardInsets
       >
         <TextField
           style={styles.titleInput}

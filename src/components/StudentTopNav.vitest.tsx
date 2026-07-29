@@ -150,7 +150,7 @@ describe("StudentTopNav information architecture", () => {
       },
     ]);
 
-    expect(link("more", "통장").href).toBe("/my/wallet");
+    expect(link("more", "은행").href).toBe("/my/wallet");
     expect(link("more", "포트폴리오").href).toBe("/student/portfolio");
     expect(link("more", "숨긴 콘텐츠").href).toBe("/student/hidden-content");
     expect(link("more", "햇살반 · 정리 대장").href).toBe(

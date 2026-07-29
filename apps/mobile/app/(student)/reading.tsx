@@ -688,7 +688,10 @@ export default function StudentReadingScreen() {
         <ScrollView
           style={styles.composerScroll}
           contentContainerStyle={styles.composerContent}
+          keyboardDismissMode={Platform.OS === "ios" ? "interactive" : "on-drag"}
           keyboardShouldPersistTaps="handled"
+          automaticallyAdjustKeyboardInsets
+          showsVerticalScrollIndicator={false}
         >
           <SectionNav accessibilityLabel="책 종류">
                 <SectionNavItem

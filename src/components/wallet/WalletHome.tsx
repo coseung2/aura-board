@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { getSlimeDefinition, getSlimeShopItem } from "@/lib/pets/catalog";
+import { getWalletTransactionDisplay } from "@/lib/wallet-transaction-display";
 import { WalletCardQR } from "./WalletCardQR";
 
 type FD = {
@@ -18,6 +19,7 @@ type Transaction = {
   amount: number;
   balanceAfter: number;
   note: string | null;
+  sourceType?: string | null;
   createdAt: string;
 };
 
@@ -29,23 +31,6 @@ type WalletData = {
   card: { id: string; cardNumber: string; status: string } | null;
   activeFDs: FD[];
   recentTransactions: Transaction[];
-};
-
-const TYPE_LABEL: Record<string, string> = {
-  deposit: "입금",
-  withdraw: "출금",
-  purchase: "결제",
-  refund: "환불",
-  fd_open: "적금 가입",
-  fd_matured: "적금 만기",
-  fd_cancelled: "적금 해지",
-  avatar_purchase: "캐릭터 상점 구매",
-  creature_egg_purchase: "펫 알 구매",
-  creature_item_purchase: "펫 아이템 구매",
-  slime_purchase: "슬라임 구매",
-  slime_item_purchase: "슬라임 아이템 구매",
-  correction_credit: "정정 입금",
-  correction_debit: "정정 출금",
 };
 
 const TRANSACTIONS_PER_PAGE = 10;
@@ -211,7 +196,7 @@ export function WalletHome() {
   return (
     <div className="wallet-home">
       <header className="wallet-header">
-        <h1>🏦 {data.studentName}님 통장</h1>
+        <h1>🏦 은행</h1>
         <div className="wallet-balance">
           <div className="wallet-balance-label">현재 잔액</div>
           <div className="wallet-balance-value">
@@ -238,9 +223,15 @@ export function WalletHome() {
             <ul className="wallet-txn-list">
               {visibleTransactions.map((t) => {
                 const rewardAchievement = stripRewardAchievementDate(t.type, t.note);
-                const transactionNote = t.note
+                const locallyFormattedNote = t.note
                   ? formatTransactionNote(rewardAchievement?.note ?? t.note)
                   : null;
+                const transactionDisplay = getWalletTransactionDisplay({
+                  type: t.type,
+                  note: locallyFormattedNote,
+                  sourceType: t.sourceType,
+                });
+                const transactionNote = transactionDisplay.noteLabel;
                 const fixedDepositNote =
                   t.type === "fd_matured"
                     ? transactionNote?.match(/^(.*?)\s+(\([^)]*\))$/)
@@ -254,13 +245,13 @@ export function WalletHome() {
                 return (
                   <li key={t.id} className={`wallet-txn-row wallet-txn-${t.type}`}>
                     <span className="wallet-txn-type">
-                      {TYPE_LABEL[t.type] ?? t.type}
+                      {transactionDisplay.typeLabel}
                     </span>
                     <span className="wallet-txn-amount">
                       {sign}
                       {t.amount.toLocaleString()} {unit}
                     </span>
-                    {t.note && (
+                    {transactionNote && (
                       <span className="wallet-txn-note">
                         {fixedDepositNote ? (
                           <>

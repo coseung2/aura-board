@@ -404,9 +404,9 @@ export function AppBottomSheet({
             accessibilityLabel ? `${accessibilityLabel} 닫기` : "시트 닫기"
           }
         />
-        {keyboardAvoiding && Platform.OS === "ios" ? (
+        {keyboardAvoiding ? (
           <KeyboardAvoidingView
-            behavior="padding"
+            behavior={Platform.OS === "ios" ? "padding" : "height"}
             style={styles.bottomSheetKeyboardWrap}
           >
             {sheet}

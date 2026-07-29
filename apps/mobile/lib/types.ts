@@ -173,6 +173,9 @@ export type WalletSummary = {
     amount: number;
     balanceAfter: number;
     note: string | null;
+    displayNote?: string | null;
+    typeLabel?: string;
+    sourceType?: string | null;
     createdAt: string;
   }>;
 };

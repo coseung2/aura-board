@@ -3,6 +3,7 @@ import {
   Alert,
   FlatList,
   Image,
+  Platform,
   ScrollView,
   StyleSheet,
   Text,
@@ -416,7 +417,9 @@ function SubmitModal({
       <ScrollView
         style={styles.modalBody}
         contentContainerStyle={styles.modalBodyContent}
+        keyboardDismissMode={Platform.OS === "ios" ? "interactive" : "on-drag"}
         keyboardShouldPersistTaps="handled"
+        automaticallyAdjustKeyboardInsets
       >
         {deadlineLabel ? (
           <View style={[styles.deadlinePanel, deadlinePassed && styles.deadlinePanelLate]}>

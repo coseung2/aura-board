@@ -24,6 +24,7 @@ import {
 import { apiFetch, ApiError } from "../../lib/api";
 import { clearSessionToken, getUnifiedLoginRoute } from "../../lib/session";
 import type { WalletSummary } from "../../lib/types";
+import { mobileWalletTransactionLabel } from "../../lib/wallet-transactions";
 import {
   AppButton,
   AppHeader,
@@ -137,7 +138,7 @@ export default function StudentWalletScreen() {
 
   return (
     <SafeAreaView style={styles.container} edges={["top"]}>
-      <AppHeader title="내 통장과 적금" onBack={() => router.back()} />
+      <AppHeader title="은행" onBack={() => router.back()} />
 
       {loading ? (
         <View style={styles.center}>
@@ -261,7 +262,9 @@ export default function StudentWalletScreen() {
                   ]}
                 >
                   <View style={styles.txInfo}>
-                    <Text style={styles.listTitle}>{tx.note ?? tx.type}</Text>
+                    <Text style={styles.listTitle}>
+                      {mobileWalletTransactionLabel(tx)}
+                    </Text>
                     <Text style={styles.muted}>{formatShortDate(tx.createdAt)}</Text>
                   </View>
                   <Text

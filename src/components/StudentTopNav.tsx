@@ -209,7 +209,7 @@ export function StudentTopNav({
         {
           title: "더보기",
           links: [
-            { href: "/my/wallet", label: "통장", active: walletActive },
+            { href: "/my/wallet", label: "은행", active: walletActive },
             {
               href: "/student/portfolio",
               label: "포트폴리오",

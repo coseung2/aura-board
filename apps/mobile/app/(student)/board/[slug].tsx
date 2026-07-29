@@ -266,7 +266,7 @@ export default function BoardDetail() {
       <DailyBanner role="student" />
       <KeyboardAvoidingView
         style={styles.body}
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
       >
         {renderLayout(
           data,

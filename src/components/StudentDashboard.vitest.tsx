@@ -147,7 +147,7 @@ describe("StudentDashboard pet hero", () => {
     renderDashboard();
 
     const petHero = await screen.findByRole("region", { name: "내 대표 펫" });
-    const walletRegion = screen.getByRole("region", { name: "내 통장" });
+    const walletRegion = screen.getByRole("region", { name: "은행" });
     expect(
       petHero.compareDocumentPosition(walletRegion) & Node.DOCUMENT_POSITION_FOLLOWING,
     ).toBeTruthy();

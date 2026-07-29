@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { getCurrentStudent } from "@/lib/student-auth";
 import { ensureAccountFor } from "@/lib/bank";
+import { getWalletTransactionDisplay } from "@/lib/wallet-transaction-display";
 
 // GET /api/my/wallet
 // Student-only. Returns balance + card display info + active FDs + recent transactions.
@@ -60,13 +61,23 @@ export async function GET() {
       startDate: fd.startDate.toISOString(),
       maturityDate: fd.maturityDate.toISOString(),
     })),
-    recentTransactions: txns.map((t) => ({
-      id: t.id,
-      type: t.type,
-      amount: t.amount,
-      balanceAfter: t.balanceAfter,
-      note: t.note,
-      createdAt: t.createdAt.toISOString(),
-    })),
+    recentTransactions: txns.map((t) => {
+      const display = getWalletTransactionDisplay({
+        type: t.type,
+        note: t.note,
+        sourceType: t.sourceType,
+      });
+      return {
+        id: t.id,
+        type: t.type,
+        typeLabel: display.typeLabel,
+        amount: t.amount,
+        balanceAfter: t.balanceAfter,
+        note: t.note,
+        displayNote: display.noteLabel,
+        sourceType: t.sourceType,
+        createdAt: t.createdAt.toISOString(),
+      };
+    }),
   });
 }

@@ -2,6 +2,7 @@ import { useCallback, useState } from "react";
 import {
   Alert,
   Image,
+  Platform,
   ScrollView,
   StyleSheet,
   Text,
@@ -121,7 +122,9 @@ export function ObservationEditor({
       <ScrollView
         style={styles.bodyScroll}
         contentContainerStyle={styles.body}
+        keyboardDismissMode={Platform.OS === "ios" ? "interactive" : "on-drag"}
         keyboardShouldPersistTaps="handled"
+        automaticallyAdjustKeyboardInsets
       >
         <TextField
           style={styles.memoInput}

@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { ScrollView, StyleSheet, Text, View } from "react-native";
 import { Image } from "expo-image";
-import { Heart, MessageCircle, UserRound } from "lucide-react-native";
+import { Heart, MessageCircle, MoreHorizontal, UserRound } from "lucide-react-native";
 import {
   borders,
   colors,
@@ -155,22 +155,44 @@ export function StreamFeedPost({
   );
 
   return (
-    <BarePressable
+    <View
       ref={postRef}
       style={[styles.feedPost, highlighted && styles.feedPostHighlighted]}
-      onLongPress={onLongPress ? handleLongPress : undefined}
-      delayLongPress={450}
-      accessibilityLabel={`${author ? `${author}의 ` : ""}게시물`}
-      accessibilityHint={onLongPress ? "길게 누르면 숨기기와 신고 메뉴가 열립니다" : undefined}
     >
-      {author ? (
-        <View style={styles.feedPostCopy}>
+      {author || onLongPress ? (
+        <BarePressable
+          style={styles.feedPostCopy}
+          onLongPress={onLongPress ? handleLongPress : undefined}
+          delayLongPress={450}
+          disabled={!onLongPress}
+          accessibilityLabel={`${author ? `${author}의 ` : ""}게시물`}
+          accessibilityHint={onLongPress ? "길게 누르면 숨기기와 신고 메뉴가 열립니다" : undefined}
+        >
           <View style={styles.feedPostHeader}>
-            <Text selectable style={styles.feedPostAuthor} numberOfLines={1}>
-              {author}
-            </Text>
+            {author ? (
+              <Text selectable style={styles.feedPostAuthor} numberOfLines={1}>
+                {author}
+              </Text>
+            ) : (
+              <View style={styles.feedPostHeaderSpacer} />
+            )}
+            {onLongPress ? (
+              <BarePressable
+                style={styles.feedPostMenuAction}
+                onPress={handleLongPress}
+                accessibilityLabel="게시물 숨기기 및 신고 메뉴"
+                accessibilityHint="게시물을 숨기거나 신고할 수 있는 메뉴를 엽니다"
+              >
+                <MoreHorizontal
+                  size={iconSizes.md}
+                  color={colors.textMuted}
+                  strokeWidth={2}
+                  accessible={false}
+                />
+              </BarePressable>
+            ) : null}
           </View>
-        </View>
+        </BarePressable>
       ) : null}
 
       {embedUrl ? (
@@ -190,8 +212,10 @@ export function StreamFeedPost({
             horizontal
             pagingEnabled
             nestedScrollEnabled
+            directionalLockEnabled
+            scrollEnabled={mediaItems.length > 1}
             showsHorizontalScrollIndicator={false}
-            onMomentumScrollEnd={(event) => {
+            onScroll={(event) => {
               const pageWidth = event.nativeEvent.layoutMeasurement.width;
               if (pageWidth <= 0) return;
               setMediaIndex(
@@ -204,6 +228,7 @@ export function StreamFeedPost({
                 ),
               );
             }}
+            scrollEventThrottle={16}
             accessibilityLabel={`${title || "게시글"} 미디어 ${mediaItems.length}개`}
           >
             {mediaItems.map((uri) => (
@@ -249,7 +274,16 @@ export function StreamFeedPost({
       ) : null}
 
       {textActsAsMedia ? (
-        <View style={styles.feedPostCopy}>{textBody}</View>
+        <BarePressable
+          style={styles.feedPostCopy}
+          onLongPress={onLongPress ? handleLongPress : undefined}
+          delayLongPress={450}
+          disabled={!onLongPress}
+          accessibilityLabel={`${author ? `${author}의 ` : ""}게시물 본문`}
+          accessibilityHint={onLongPress ? "길게 누르면 숨기기와 신고 메뉴가 열립니다" : undefined}
+        >
+          {textBody}
+        </BarePressable>
       ) : null}
 
       <View style={styles.feedPostEngagementWrap}>
@@ -349,7 +383,7 @@ export function StreamFeedPost({
           </Text>
         ) : null}
       </View>
-    </BarePressable>
+    </View>
   );
 }
 
@@ -422,10 +456,23 @@ const styles = StyleSheet.create({
   feedPostHeader: {
     flexDirection: "row",
     alignItems: "center",
+    justifyContent: "space-between",
+    gap: spacing.sm,
   },
   feedPostAuthor: {
     ...typography.section,
     color: colors.text,
+    flex: 1,
+    minWidth: 0,
+  },
+  feedPostHeaderSpacer: {
+    flex: 1,
+  },
+  feedPostMenuAction: {
+    width: tapMin,
+    minHeight: tapMin,
+    alignItems: "center",
+    justifyContent: "center",
   },
   feedPostTitle: {
     ...typography.section,
