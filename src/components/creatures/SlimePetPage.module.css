@@ -369,6 +369,20 @@
   margin-inline: auto;
 }
 
+.spriteFrameScene {
+  --slime-art-slot: 192px;
+  width: 100%;
+  min-height: var(--slime-art-slot);
+  margin-inline: 0;
+  overflow: hidden;
+  border-bottom: 1px solid rgba(24, 74, 92, 0.1);
+  background-color: var(--color-surface-alt);
+  background-image: linear-gradient(180deg, #f7fbff 0%, #edf6ff 100%);
+  background-position: center;
+  background-size: cover;
+  image-rendering: pixelated;
+}
+
 .spriteFrame > div {
   transform: scale(var(--slime-art-scale));
   transform-origin: center;
@@ -376,17 +390,9 @@
 
 .spriteCharacterFrame {
   display: grid;
-  width: 88px;
-  height: 88px;
+  width: 96px;
+  min-height: 96px;
   place-items: center;
-}
-
-.spriteFrame img {
-  display: block;
-  width: 88px;
-  height: 88px;
-  object-fit: contain;
-  image-rendering: pixelated;
 }
 
 .itemCopy,
@@ -918,16 +924,35 @@
   border-bottom: 1px solid var(--color-border);
 }
 
+.shopItemScene {
+  grid-template-columns: 96px minmax(0, 1fr) auto;
+  align-items: stretch;
+  min-height: 120px;
+  padding-block: 0;
+}
+
 .shopImageFrame {
+  width: 72px;
   min-height: 72px;
 }
 
-.shopImageFrame img {
-  display: block;
-  width: 72px;
-  height: 72px;
-  object-fit: contain;
+.shopImageFrameScene {
+  width: 100%;
+  min-height: 96px;
+  overflow: hidden;
+  border-right: 1px solid rgba(24, 74, 92, 0.1);
+  background-color: var(--color-surface-alt);
+  background-image: linear-gradient(180deg, #f7fbff 0%, #edf6ff 100%);
+  background-position: center;
+  background-size: cover;
   image-rendering: pixelated;
+}
+
+.shopItemScene .shopItemCopy,
+.shopItemScene > .shopBuyButton,
+.shopItemScene > .shopItemActions {
+  align-self: center;
+  margin-block: 12px;
 }
 
 .shopItemCopy strong {
@@ -1036,6 +1061,10 @@
     --slime-art-slot: 154px;
   }
 
+  .spriteFrameScene {
+    --slime-art-slot: 168px;
+  }
+
   .drawer {
     width: 100%;
     padding: 20px 16px;
@@ -1046,9 +1075,16 @@
     gap: 10px;
   }
 
-  .shopImageFrame,
-  .shopImageFrame img {
+  .shopImageFrame {
     width: 64px;
+  }
+
+  .shopItemScene {
+    grid-template-columns: 96px minmax(0, 1fr) auto;
+  }
+
+  .shopImageFrameScene {
+    width: 100%;
   }
 
   .retryButton {
@@ -1067,6 +1103,10 @@
   .spriteFrame {
     --slime-art-scale: 1.5;
     --slime-art-slot: 132px;
+  }
+
+  .spriteFrameScene {
+    --slime-art-slot: 144px;
   }
 }
 

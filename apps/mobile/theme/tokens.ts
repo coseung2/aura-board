@@ -339,6 +339,13 @@ export const slimeUi = {
   effectArrow: 25,
   effectPopoverWidth: 132,
   growthPopoverWidth: 156,
+  purchasePreviewHeight: 132,
+  purchaseVehiclePreviewHeight: 188,
+  carouselDotSize: 8,
+  vehicleFrameWidth: 64,
+  vehicleSceneScale: 1.5,
+  vehicleFloorScale: 1.375,
+  vehicleSceneSlotHeight: 116,
 } as const;
 
 export const media = {

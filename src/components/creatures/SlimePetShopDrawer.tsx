@@ -57,17 +57,20 @@ type Props = {
   ) => void;
 };
 
+const SLIME_TRAMPOLINE_ITEM_KEY = "slime-blue-trampoline";
+
 function previewState(item: SlimeShopItem): {
   action: SlimeAction;
   equippedFloor: EquippedFloor;
 } {
-  const floor = item.floor;
-  if (floor === "grass-floor") {
-    return { action: "idle", equippedFloor: floor };
-  }
+  const usesTrampoline = item.key === SLIME_TRAMPOLINE_ITEM_KEY;
   return {
-    action: item.category === "drink" ? "drink" : "idle",
-    equippedFloor: "none",
+    action: usesTrampoline
+      ? "floor-interaction"
+      : item.category === "drink"
+        ? "drink"
+        : "idle",
+    equippedFloor: usesTrampoline ? "trampoline" : item.floor ?? "none",
   };
 }
 
@@ -187,30 +190,53 @@ export function SlimePetShopDrawer({
     // suppress the composed drink layer.
     const isDrink = item.category === "drink";
     const isWearable = item.category === "wearable";
+    const isVehicle = item.category === "vehicle" || item.category === "ride";
+    const usesTrampoline = item.key === SLIME_TRAMPOLINE_ITEM_KEY;
+    const renderedVehicle = isVehicle && !usesTrampoline ? item : null;
     const previewDrinkFlavor = isDrink ? (item.animationKey ?? null) : null;
     const previewWearables =
       isDrink || isWearable ? slimeWearablesFromItems([item]) : undefined;
-    const itemSpritePath =
-      isDrink || isWearable
-        ? undefined
-        : slimeItemSpritePath(item, previewColor);
     const sceneBackground = isSlimeSceneBackground(item);
     const effectLabel =
       item.effectKey && item.effectBps
         ? `${EFFECT_LABELS[item.effectKey]} +${formatBpsPercent(item.effectBps)}`
         : null;
     const isBall = item.key.startsWith("slime-ball-");
+    const itemSpritePath = isBall
+      ? slimeItemSpritePath(item, previewColor)
+      : undefined;
+    const hasScene = Boolean(
+      sceneBackground || isVehicle || preview.equippedFloor !== "none",
+    );
 
     return (
-      <li key={item.key} className={styles.shopItem}>
-        <div className={styles.shopImageFrame}>
+      <li
+        key={item.key}
+        className={`${styles.shopItem} ${hasScene ? styles.shopItemScene : ""}`.trim()}
+      >
+        <div
+          className={`${styles.shopImageFrame} ${hasScene ? styles.shopImageFrameScene : ""}`.trim()}
+          style={sceneBackground
+            ? { backgroundImage: `url("${item.spritePath}")` }
+            : undefined}
+        >
           <OfficialSlimeSprite
             slimeColor={previewColor}
             evolution="base"
             action={preview.action}
             equippedFloor={preview.equippedFloor}
-            itemSpritePath={sceneBackground ? undefined : itemSpritePath}
-            backgroundSpritePath={sceneBackground ? item.spritePath : undefined}
+            itemSpritePath={itemSpritePath}
+            expandSceneSurfaces={sceneBackground}
+            vehicleSpritePath={renderedVehicle?.vehicleSheetPath ?? renderedVehicle?.spritePath}
+            vehicleGroundedSpritePath={renderedVehicle?.vehicleGroundedSpritePath}
+            vehicleEffectSpritePaths={renderedVehicle?.vehicleEffectSpritePaths}
+            vehicleFrameCount={renderedVehicle?.vehicleFrameCount}
+            vehicleGroundedFrameCount={renderedVehicle?.vehicleGroundedFrameCount}
+            vehicleGroundedFrameDurationMs={renderedVehicle?.vehicleGroundedFrameDurationMs}
+            vehicleCanvasHeight={renderedVehicle?.vehicleCanvasHeight}
+            vehicleCharacterOffsetY={renderedVehicle?.vehicleCharacterOffsetY}
+            vehicleBobY={renderedVehicle?.vehicleBobY}
+            vehicleRiseY={renderedVehicle?.vehicleRiseY}
             wearables={previewWearables}
             drinkFlavor={previewDrinkFlavor}
             repeat={preview.action === "drink" || isBall}

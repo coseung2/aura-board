@@ -163,7 +163,10 @@ export function calculateSlimeGrowthPercent(
   const span = target - start;
   if (span <= 0) return 100;
 
-  return Math.min(100, Math.max(0, Math.round(((seconds - start) / span) * 100)));
+  const percent = ((seconds - start) / span) * 100;
+  // One decimal keeps stage-boundary overflow visible. Integer rounding made
+  // 98.5% read as 99%, then a small carried remainder read as 0% after growth.
+  return Math.min(100, Math.max(0, Math.round(percent * 10) / 10));
 }
 
 export function calculateGrowthTimeComparison(

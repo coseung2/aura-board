@@ -1,0 +1,18 @@
+{
+  "option": "flying-broom",
+  "labelKo": "하늘 빗자루",
+  "pattern": "front-only",
+  "stance": "floating",
+  "price": 700,
+  "canvas": { "w": 64, "h": 81 },
+  "characterOffsetY": 17,
+  "groundLineY": 56,
+  "riseY": 13,
+  "frameCount": 8,
+  "frameDurationsMs": [240, 160, 180, 90, 90, 160, 180, 240],
+  "bobY": [0, -1, -2, -2, -2, -1, -1, 0],
+  "riderFollows": true,
+  "effects": {
+    "wind": { "source": "fx/wind-source.aseprite", "sheet": "fx/wind-idle-sheet.png" }
+  }
+}

@@ -68,13 +68,17 @@ const config: ExpoConfig = {
           url: "https://u.expo.dev/fd9f26c1-ef04-4f19-8663-ed7c481af3ea",
         },
       }),
-  extra: {
-    router: {},
-    eas: {
-      projectId: "fd9f26c1-ef04-4f19-8663-ed7c481af3ea",
-    },
-  },
-  owner: "coseung2",
+  extra: isExpoGoDevelopment
+    ? {
+        router: {},
+      }
+    : {
+        router: {},
+        eas: {
+          projectId: "fd9f26c1-ef04-4f19-8663-ed7c481af3ea",
+        },
+      },
+  ...(isExpoGoDevelopment ? {} : { owner: "coseung2" }),
 };
 
 export default config;

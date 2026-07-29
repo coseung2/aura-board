@@ -27,6 +27,11 @@ export type SlimeSpriteProps = {
   /** Remote/API-relative scene background rendered behind floor and slime layers. */
   backgroundSpritePath?: string;
   /**
+   * Force the wider scene viewport even when no scene asset is present yet.
+   * Backgrounds, floors, trampolines, and vehicles expand automatically.
+   */
+  expandSceneSurfaces?: boolean;
+  /**
    * Vehicle art the slime rides. Vehicles sit above the floor instead of
    * replacing it, so a tube on grass stays valid and a player who wants water
    * buys that background separately.
@@ -39,6 +44,7 @@ export type SlimeSpriteProps = {
    * Vehicle parts that stay planted while the body moves, such as wheels.
    */
   vehicleGroundedSpritePath?: string;
+  vehicleEffectSpritePaths?: readonly string[];
   /** Frames in the vehicle body sheet. One means a single static image. */
   vehicleFrameCount?: number;
   /** Frames in the grounded-part sheet, such as a wheel rotation. */

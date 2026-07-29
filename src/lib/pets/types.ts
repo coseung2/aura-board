@@ -94,6 +94,8 @@ export const SLIME_SHOP_CATEGORIES = [
 
 export type SlimeShopCategory = (typeof SLIME_SHOP_CATEGORIES)[number];
 
+export type SlimeShopTier = 1 | 2 | 3;
+
 export type SlimeShopItem = {
   readonly key: string;
   readonly category: SlimeShopCategory;
@@ -101,6 +103,8 @@ export type SlimeShopItem = {
   readonly floor: Exclude<SlimeFloor, "none"> | null;
   readonly labelKo: string;
   readonly price: number;
+  /** Explicit tier for tiered shop items such as vehicles. */
+  readonly tier?: SlimeShopTier;
   readonly spritePath: string;
   readonly mobileSpritePath?: string;
   readonly staticSpritePath?: string;
@@ -126,6 +130,8 @@ export type SlimeShopItem = {
    * behind the character so the body layer can overlap them.
    */
   readonly vehicleGroundedSpritePath?: string;
+  /** Transparent effect sheets synchronized to the vehicle's main frame clock. */
+  readonly vehicleEffectSpritePaths?: readonly string[];
   /** Frames in the vehicle sheet. Omitted means a single static image. */
   readonly vehicleFrameCount?: number;
   /** Frames in the grounded-part sheet, such as a wheel rotation. */

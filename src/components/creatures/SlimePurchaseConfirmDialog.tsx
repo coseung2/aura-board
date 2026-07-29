@@ -2,8 +2,16 @@
 
 import { useEffect, useId, useRef, useState } from "react";
 import { OfficialSlimeSprite } from "./OfficialSlimeSprite";
-import { SLIME_COOKIE_ITEM_KEY } from "./SlimePetModel";
-import { SLIME_MAX_PURCHASE_QUANTITY } from "@/lib/pets/catalog";
+import {
+  SLIME_COOKIE_ITEM_KEY,
+  slimeItemSpritePath,
+  slimeWearablesFromItems,
+} from "./SlimePetModel";
+import {
+  isSlimeSceneBackground,
+  SLIME_MAX_PURCHASE_QUANTITY,
+  slimeShopPreviewColor,
+} from "@/lib/pets/catalog";
 import type { SlimeColor, SlimeShopItem } from "@/lib/pets/types";
 import styles from "./SlimePurchaseConfirmDialog.module.css";
 
@@ -14,6 +22,8 @@ const COLOR_LABELS: Record<SlimeColor, string> = {
   purple: "퍼플",
   red: "레드",
 };
+
+const SLIME_TRAMPOLINE_ITEM_KEY = "slime-blue-trampoline";
 
 type Props = {
   item: SlimeShopItem;
@@ -50,6 +60,19 @@ export function SlimePurchaseConfirmDialog({
 
   const colors = previewColors.length > 0 ? previewColors : (["blue"] as const);
   const activeColor = colors[Math.min(pageIndex, colors.length - 1)] ?? "blue";
+  const previewColor = slimeShopPreviewColor(item, activeColor);
+  const wearables = slimeWearablesFromItems([item]);
+  const isDrink = item.category === "drink";
+  const isBall = item.key.startsWith("slime-ball-");
+  const isVehicle = item.category === "vehicle" || item.category === "ride";
+  const usesTrampoline = item.key === SLIME_TRAMPOLINE_ITEM_KEY;
+  const renderedVehicle = isVehicle && !usesTrampoline ? item : null;
+  const sceneBackground = isSlimeSceneBackground(item);
+  const equippedFloor = usesTrampoline ? "trampoline" : item.floor ?? "none";
+  const hasScene = Boolean(sceneBackground || isVehicle || equippedFloor !== "none");
+  const itemSpritePath = isBall
+    ? slimeItemSpritePath(item, previewColor)
+    : undefined;
   const total = item.price * quantity;
   /**
    * Advisory only. The wallet check that actually protects the ledger runs
@@ -95,7 +118,13 @@ export function SlimePurchaseConfirmDialog({
           </p>
         </header>
 
-        <section className={styles.previewArea} aria-label="펫 미리보기">
+        <section
+          className={`${styles.previewArea} ${hasScene ? styles.previewAreaScene : ""}`.trim()}
+          style={sceneBackground
+            ? { backgroundImage: `url("${item.spritePath}")` }
+            : undefined}
+          aria-label="펫 미리보기"
+        >
           <button
             type="button"
             className={styles.arrow}
@@ -105,9 +134,27 @@ export function SlimePurchaseConfirmDialog({
           >
             ‹
           </button>
-          <div className={styles.preview}>
+          <div className={`${styles.preview} ${hasScene ? styles.previewScene : ""}`.trim()}>
             <OfficialSlimeSprite
-              slimeColor={activeColor}
+              slimeColor={previewColor}
+              evolution="base"
+              action={usesTrampoline ? "floor-interaction" : isDrink ? "drink" : "idle"}
+              equippedFloor={equippedFloor}
+              itemSpritePath={itemSpritePath}
+              expandSceneSurfaces={sceneBackground}
+              vehicleSpritePath={renderedVehicle?.vehicleSheetPath ?? renderedVehicle?.spritePath}
+              vehicleGroundedSpritePath={renderedVehicle?.vehicleGroundedSpritePath}
+              vehicleEffectSpritePaths={renderedVehicle?.vehicleEffectSpritePaths}
+              vehicleFrameCount={renderedVehicle?.vehicleFrameCount}
+              vehicleGroundedFrameCount={renderedVehicle?.vehicleGroundedFrameCount}
+              vehicleGroundedFrameDurationMs={renderedVehicle?.vehicleGroundedFrameDurationMs}
+              vehicleCanvasHeight={renderedVehicle?.vehicleCanvasHeight}
+              vehicleCharacterOffsetY={renderedVehicle?.vehicleCharacterOffsetY}
+              vehicleBobY={renderedVehicle?.vehicleBobY}
+              vehicleRiseY={renderedVehicle?.vehicleRiseY}
+              wearables={wearables}
+              drinkFlavor={isDrink ? wearables.drink ?? null : null}
+              repeat={isDrink || isBall}
               scale={3}
               alt={`${COLOR_LABELS[activeColor]} 슬라임에 ${item.labelKo} 미리보기`}
             />

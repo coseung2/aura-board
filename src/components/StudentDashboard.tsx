@@ -324,6 +324,18 @@ function StudentSlimeCard({
         .map((itemKey) => snapshot?.shopCatalog?.find((item) => item.key === itemKey))
         .filter((item): item is SlimeShopItem => Boolean(item))
     : [];
+  const hasSlimeScene = assignedItems.some(
+    (item) =>
+      Boolean(item.floor) ||
+      item.category === "background" ||
+      item.category === "vehicle" ||
+      item.category === "ride",
+  );
+  const slimeSceneBackground = assignedItems.reduce<SlimeShopItem | null>(
+    (background, item) =>
+      item.category === "background" && item.floor === null ? item : background,
+    null,
+  );
   const activeBuffBps = slime
     ? snapshot?.effects?.totals?.[slime.effectKey] ?? slime.baseBuffBps
     : 0;
@@ -357,8 +369,15 @@ function StudentSlimeCard({
           <span>내 펫에서 대표 슬라임을 지정해 보세요.</span>
         </div>
       ) : (
-        <div className="student-slime-body">
-          <div className="student-slime-sprite">
+        <div
+          className={`student-slime-body ${hasSlimeScene ? "student-slime-body-scene" : ""}`.trim()}
+        >
+          <div
+            className={`student-slime-sprite ${hasSlimeScene ? "student-slime-sprite-scene" : ""}`.trim()}
+            style={slimeSceneBackground
+              ? { backgroundImage: `url("${slimeSceneBackground.spritePath}")` }
+              : undefined}
+          >
             <SlimeCharacterSprite slime={slime} items={assignedItems} />
           </div>
           <div className="student-slime-copy">

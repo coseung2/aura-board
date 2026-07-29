@@ -42,6 +42,11 @@ export type OfficialSlimeSpriteProps = {
   /** Optional scene art rendered behind every other visual layer. Sources may be 64x64 or 128x128 while remaining in the fixed 64px logical viewport. */
   backgroundSpritePath?: string;
   /**
+   * Force the wider scene viewport before a scene asset is attached. Backgrounds,
+   * floors, trampolines, and vehicles opt into it automatically.
+   */
+  expandSceneSurfaces?: boolean;
+  /**
    * Vehicle art the slime rides. Vehicles never replace the floor: a grounded
    * vehicle rests on the same surface the floor draws, and a floating one simply
    * sits higher, so a player who wants water under a tube buys that background.
@@ -55,6 +60,8 @@ export type OfficialSlimeSpriteProps = {
    * that would otherwise lift off the ground with the suspension bounce.
    */
   vehicleGroundedSpritePath?: string;
+  /** Transparent effect sheets synchronized to the vehicle's main frame clock. */
+  vehicleEffectSpritePaths?: readonly string[];
   /** Frames in the vehicle body sheet. One means a single static image. */
   vehicleFrameCount?: number;
   /** Frames in the grounded-part sheet, such as a wheel rotation. */
@@ -106,6 +113,8 @@ export type OfficialSlimeSpriteProps = {
 };
 
 const DEFAULT_SCALE = 1;
+const SCENE_SCALE = 1.5;
+const FLOOR_SCALE = 1.375;
 
 function integerScale(value: number | undefined): number {
   if (!Number.isFinite(value)) return DEFAULT_SCALE;
@@ -129,13 +138,6 @@ function frameSourceStyle(
     width: sheetWidth * scale,
     height: sheetHeight * scale,
     transform: `translate(${left}px, ${top}px)`,
-  };
-}
-
-function frameViewportStyle(frame: SlimeFrame, scale: number, extraHeight = 0): CSSProperties {
-  return {
-    width: frame.sourceSize.w * scale,
-    height: frame.sourceSize.h * scale + extraHeight,
   };
 }
 
@@ -188,8 +190,10 @@ export function OfficialSlimeSprite({
   dataSlimeColor,
   itemSpritePath,
   backgroundSpritePath,
+  expandSceneSurfaces = false,
   vehicleSpritePath,
   vehicleGroundedSpritePath,
+  vehicleEffectSpritePaths,
   vehicleFrameCount = 1,
   vehicleGroundedFrameCount = 1,
   vehicleGroundedFrameDurationMs = 100,
@@ -245,14 +249,15 @@ export function OfficialSlimeSprite({
   const vehicleBob = vehicleBobY?.length
     ? Math.trunc(vehicleBobY[frameIndex % vehicleBobY.length] ?? 0)
     : 0;
-  const viewportStyle = frameViewportStyle(frame, scale, floorRise + vehicleRise);
   /**
    * Rider offset: the seat height plus this frame's bob.
    *
    * `vehicleRiseY` alone would leave the slime still while its seat moves, so the
    * authored bob is added here rather than baked into the character sheet.
    */
-  const riderOffsetY = -(vehicleRise + vehicleBob * scale);
+  // Authored bob values use screen coordinates: negative is upward. Preserve
+  // that sign so the rider follows the vehicle instead of moving against it.
+  const riderOffsetY = -vehicleRise + vehicleBob * scale;
   const sheetStyle = frameSourceStyle(
     frame,
     resolution.metadata.meta.size.w,
@@ -264,6 +269,49 @@ export function OfficialSlimeSprite({
   const resolvedBackgroundSpritePath = resolveSpritePath(backgroundSpritePath);
   const resolvedVehicleSpritePath = resolveSpritePath(vehicleSpritePath);
   const resolvedVehicleGroundedSpritePath = resolveSpritePath(vehicleGroundedSpritePath);
+  const resolvedVehicleEffectSpritePaths = (vehicleEffectSpritePaths ?? [])
+    .map(resolveSpritePath)
+    .filter((path): path is string => Boolean(path));
+  const hasVehicleScene = Boolean(
+    resolvedVehicleSpritePath
+      || resolvedVehicleGroundedSpritePath
+      || resolvedVehicleEffectSpritePaths.length,
+  );
+  // Scene art must never depend on every caller remembering a viewport opt-in.
+  // Avatar-only sprites remain 64px, while any visible scene surface gets the
+  // shared wider canvas automatically.
+  const hasExpandedSceneSurfaces = Boolean(
+    hasVehicleScene
+      || resolvedBackgroundSpritePath
+      || staticFloor
+      || equippedFloor === "water-puddle"
+      || equippedFloor === "trampoline"
+      || expandSceneSurfaces,
+  );
+  const baseWidth = frame.sourceSize.w * scale;
+  const baseHeight = frame.sourceSize.h * scale;
+  const sceneScale = hasExpandedSceneSurfaces ? SCENE_SCALE : 1;
+  const floorScale = hasExpandedSceneSurfaces ? FLOOR_SCALE : 1;
+  const sceneWidth = baseWidth * sceneScale;
+  const sceneHeight = baseHeight * sceneScale;
+  const sceneInsetX = (sceneWidth - baseWidth) / 2;
+  const sceneInsetY = (sceneHeight - baseHeight) / 2;
+  const floorWidth = baseWidth * floorScale;
+  const floorHeight = baseHeight * floorScale;
+  const floorInsetX = (sceneWidth - floorWidth) / 2;
+  const expandedFloorTop = staticFloor
+    ? sceneInsetY
+      + staticFloor.slimeFootY * scale
+      - staticFloor.surfaceY * scale * floorScale
+    : 0;
+  const viewportStyle: CSSProperties = {
+    width: sceneWidth,
+    height: Math.max(
+      sceneHeight,
+      sceneInsetY + baseHeight + floorRise + vehicleRise,
+      staticFloor ? expandedFloorTop + floorHeight : 0,
+    ),
+  };
   /**
    * Vehicle sheets share the character's frame clock, so a rider and its ride
    * stay in step. Authored durations match the slime idle timeline, which is why
@@ -290,10 +338,10 @@ export function OfficialSlimeSprite({
 
   /**
    * Vehicle art is authored on a taller canvas whose headroom sits above the
-   * grounded pose, so the offset is subtracted to bring it back onto the 64px
-   * character viewport.
+   * grounded pose. Static floors align their surface to the fixed slime-foot
+   * baseline independently, so adding `floorRise` here would sink the vehicle.
    */
-  const vehicleTop = floorRise - Math.trunc(vehicleCharacterOffsetY) * scale;
+  const vehicleTop = -Math.trunc(vehicleCharacterOffsetY) * scale;
   const vehicleSheetStyle = (
     sheetFrames: number,
     activeFrame: number,
@@ -385,6 +433,7 @@ export function OfficialSlimeSprite({
       data-head-slot-source={resolution.headSlot?.source ?? undefined}
       data-composition-mode={resolution.composition.mode}
       data-floor-offset-source-pixels={staticFloor ? staticFloor.slimeFootY - staticFloor.surfaceY : 0}
+      data-expanded-scene={hasExpandedSceneSurfaces ? "true" : "false"}
     >
       {resolvedBackgroundSpritePath ? (
         // Scene art may be authored at 64x64 or 128x128. Keep it in the same
@@ -392,7 +441,7 @@ export function OfficialSlimeSprite({
         <div
           className={styles.backgroundFeather}
           data-background-feather="responsive-edge"
-          style={{ width: 64 * scale, height: 64 * scale }}
+          style={{ width: sceneWidth, height: sceneHeight }}
         >
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
@@ -400,23 +449,28 @@ export function OfficialSlimeSprite({
             alt=""
             aria-hidden="true"
             className={styles.background}
-            style={{ width: 64 * scale, height: 64 * scale }}
+            style={{ width: sceneWidth, height: sceneHeight }}
             draggable={false}
           />
         </div>
       ) : null}
       {puddleAsset && puddleFrame ? (
-        // Keep the shared puddle as an independent floor layer so complete
-        // prop GIFs can compose above it instead of replacing it.
-        // eslint-disable-next-line @next/next/no-img-element
-        <img
-          src={puddleAsset.sheetUrl}
-          alt=""
-          aria-hidden="true"
-          className={styles.puddle}
-          style={puddleStyle}
-          draggable={false}
-        />
+        <div
+          className={`${styles.characterFrame} ${styles.floorUnder}`}
+          style={{ width: baseWidth, height: baseHeight, left: sceneInsetX, top: sceneInsetY }}
+        >
+          {/* Keep the shared puddle as an independent floor layer so complete
+              prop GIFs can compose above it instead of replacing it. */}
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={puddleAsset.sheetUrl}
+            alt=""
+            aria-hidden="true"
+            className={styles.puddle}
+            style={puddleStyle}
+            draggable={false}
+          />
+        </div>
       ) : null}
       {staticFloor ? (
         // The floor owns a separate lower slot. Its authored surface aligns
@@ -428,9 +482,10 @@ export function OfficialSlimeSprite({
           aria-hidden="true"
           className={`${styles.floor} ${styles.floorUnder}`}
           style={{
-            width: 64 * staticFloor.imageScale * scale,
-            height: 64 * staticFloor.imageScale * scale,
-            top: floorRise,
+            width: floorWidth * staticFloor.imageScale,
+            height: floorHeight * staticFloor.imageScale,
+            left: floorInsetX,
+            top: expandedFloorTop,
           }}
           draggable={false}
         />
@@ -444,25 +499,36 @@ export function OfficialSlimeSprite({
           alt=""
           aria-hidden="true"
           className={styles.floorUnder}
-          style={{ width: 64 * 4 * scale, height: 64 * 4 * scale }}
+          style={{
+            width: floorWidth,
+            height: floorHeight,
+            left: floorInsetX,
+            top: sceneInsetY + baseHeight - floorHeight,
+          }}
           draggable={false}
         />
       ) : null}
       {resolvedVehicleGroundedSpritePath ? (
-        // Parts that must not move with the body, such as wheels. Kept behind the
-        // character so the body layer above can overlap them.
-        // eslint-disable-next-line @next/next/no-img-element
-        <img
-          src={resolvedVehicleGroundedSpritePath}
-          alt=""
-          aria-hidden="true"
-          className={`${styles.sheet} ${styles.floorUnder}`}
+        <div
+          className={`${styles.vehicleFrame} ${styles.floorUnder}`}
           style={{
-            ...vehicleSheetStyle(vehicleGroundedFrames, groundedFrame),
-            top: vehicleTop,
+            width: 64 * scale,
+            height: Math.trunc(vehicleCanvasHeight) * scale,
+            left: sceneInsetX,
+            top: sceneInsetY + vehicleTop,
           }}
-          draggable={false}
-        />
+        >
+          {/* Parts that must not move with the body, such as wheels. */}
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={resolvedVehicleGroundedSpritePath}
+            alt=""
+            aria-hidden="true"
+            className={styles.sheet}
+            style={vehicleSheetStyle(vehicleGroundedFrames, groundedFrame)}
+            draggable={false}
+          />
+        </div>
       ) : null}
       {itemSpritePath ? (
         // Older shop props are authored as complete looping GIFs. Render the
@@ -475,15 +541,20 @@ export function OfficialSlimeSprite({
           aria-hidden="true"
           className={styles.sheet}
           style={{
-            width: "100%",
-            height: frame.sourceSize.h * scale,
+            width: baseWidth,
+            height: baseHeight,
+            left: sceneInsetX,
+            top: sceneInsetY,
             objectFit: "contain",
             zIndex: 1,
           }}
           draggable={false}
         />
       ) : (
-        <>
+        <div
+          className={styles.characterFrame}
+          style={{ width: baseWidth, height: baseHeight, left: sceneInsetX, top: sceneInsetY }}
+        >
           {/* The raw packed sheet is intentionally not a Next Image. */}
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
@@ -522,31 +593,62 @@ export function OfficialSlimeSprite({
               alt=""
               aria-hidden="true"
               className={styles.sheet}
-              style={{ ...sheetStyle, zIndex: 100 }}
+              style={{
+                ...sheetStyle,
+                zIndex: 400,
+              }}
               data-happy-heart-layer="top"
               draggable={false}
             />
           ) : null}
-        </>
+        </div>
       )}
       {resolvedVehicleSpritePath ? (
-        // The vehicle itself, above every character layer. Drawing it in front is
-        // what makes a slime read as seated inside a tube or a car without any
-        // second sheet for the hidden side.
-        // eslint-disable-next-line @next/next/no-img-element
-        <img
-          src={resolvedVehicleSpritePath}
-          alt=""
-          aria-hidden="true"
-          className={`${styles.sheet} ${styles.floorUnder}`}
+        <div
+          className={styles.vehicleFrame}
           style={{
-            ...vehicleSheetStyle(vehicleFrames, frameIndex),
-            top: vehicleTop,
+            width: 64 * scale,
+            height: Math.trunc(vehicleCanvasHeight) * scale,
+            left: sceneInsetX,
+            top: sceneInsetY + vehicleTop,
             zIndex: 200,
           }}
-          draggable={false}
-        />
+        >
+          {/* The vehicle itself sits above every character layer. */}
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={resolvedVehicleSpritePath}
+            alt=""
+            aria-hidden="true"
+            className={styles.sheet}
+            style={vehicleSheetStyle(vehicleFrames, frameIndex)}
+            draggable={false}
+          />
+        </div>
       ) : null}
+      {resolvedVehicleEffectSpritePaths.map((path, index) => (
+        <div
+          key={path}
+          className={styles.vehicleFrame}
+          style={{
+            width: 64 * scale,
+            height: Math.trunc(vehicleCanvasHeight) * scale,
+            left: sceneInsetX,
+            top: sceneInsetY + vehicleTop,
+            zIndex: 301 + index,
+          }}
+        >
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={path}
+            alt=""
+            aria-hidden="true"
+            className={styles.sheet}
+            style={vehicleSheetStyle(vehicleFrames, frameIndex)}
+            draggable={false}
+          />
+        </div>
+      ))}
     </div>
   );
 }

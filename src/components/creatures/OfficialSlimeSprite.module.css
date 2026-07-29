@@ -8,6 +8,13 @@
   contain: paint;
 }
 
+.characterFrame,
+.vehicleFrame {
+  position: absolute;
+  overflow: hidden;
+  pointer-events: none;
+}
+
 .sheet,
 .wearable,
 .floor,

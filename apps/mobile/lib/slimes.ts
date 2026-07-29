@@ -70,6 +70,8 @@ export type SlimeCatalogItem = {
   price: number;
 };
 
+export type SlimeShopTier = 1 | 2 | 3;
+
 export type SlimeShopItem = {
   key: string;
   category:
@@ -84,6 +86,7 @@ export type SlimeShopItem = {
   floor: Exclude<EquippedFloor, "none"> | null;
   labelKo: string;
   price: number;
+  tier?: SlimeShopTier;
   spritePath: string;
   mobileSpritePath?: string;
   staticSpritePath?: string;
@@ -97,6 +100,8 @@ export type SlimeShopItem = {
   vehicleRiseY?: number;
   /** Vehicle parts that stay planted while the body moves, such as wheels. */
   vehicleGroundedSpritePath?: string;
+  /** Transparent effect sheets synchronized to the vehicle's main frame clock. */
+  vehicleEffectSpritePaths?: string[];
   /** Frames in the vehicle sheet. Omitted means a single static image. */
   vehicleFrameCount?: number;
   /** Frames in the grounded-part sheet, such as a wheel rotation. */
@@ -383,6 +388,12 @@ export function resolveEquippedVehicle(
 
 export const SLIME_COOKIE_ITEM_KEY = "slime-cookie";
 
+/**
+ * Mirrors the server-side cap in `src/lib/pets/catalog.ts`, so a mistyped
+ * quantity cannot drain a student's wallet in a single tap.
+ */
+export const SLIME_MAX_PURCHASE_QUANTITY = 99;
+
 export function slimeBallSpritePath(
   itemKeys: readonly string[],
   slimeColor: SlimeColor,
@@ -634,6 +645,10 @@ function normalizeShopCatalog(value: unknown): SlimeShopItem[] {
     const parsedFloor = entry.floor === null ? "none" : floor(entry.floor);
     const itemFloor = parsedFloor === "none" ? null : parsedFloor;
     const parsedWearableRole = wearableRole(entry.wearableRole);
+    const tier =
+      entry.tier === 1 || entry.tier === 2 || entry.tier === 3
+        ? entry.tier
+        : undefined;
     return [
       {
         key: entry.key,
@@ -641,6 +656,7 @@ function normalizeShopCatalog(value: unknown): SlimeShopItem[] {
         floor: itemFloor,
         labelKo: typeof entry.labelKo === "string" ? entry.labelKo : entry.key,
         price: Math.max(0, Math.trunc(numberValue(entry.price))),
+        tier,
         spritePath: typeof entry.spritePath === "string" ? entry.spritePath : "",
         mobileSpritePath:
           typeof entry.mobileSpritePath === "string" ? entry.mobileSpritePath : undefined,
@@ -670,6 +686,11 @@ function normalizeShopCatalog(value: unknown): SlimeShopItem[] {
           typeof entry.vehicleGroundedSpritePath === "string"
             ? entry.vehicleGroundedSpritePath
             : undefined,
+        vehicleEffectSpritePaths: Array.isArray(entry.vehicleEffectSpritePaths)
+          ? entry.vehicleEffectSpritePaths.filter(
+              (path): path is string => typeof path === "string" && path.length > 0,
+            )
+          : undefined,
         vehicleFrameCount:
           typeof entry.vehicleFrameCount === "number"
             ? Math.max(1, Math.trunc(entry.vehicleFrameCount))
@@ -1040,10 +1061,11 @@ export function calculateSlimeGrowthPercent(
   const start = STAGE_START_SECONDS[growth.stage];
   const target = STAGE_START_SECONDS[(growth.stage + 1) as 2 | 3];
   if (target <= start) return 100;
-  return Math.min(
-    100,
-    Math.max(0, Math.round(((growth.growthSeconds - start) / (target - start)) * 100)),
-  );
+  const percent =
+    ((growth.growthSeconds - start) / (target - start)) * 100;
+  // Keep one decimal so a small remainder carried into a new stage does not
+  // appear to reset to zero after integer rounding.
+  return Math.min(100, Math.max(0, Math.round(percent * 10) / 10));
 }
 
 /** Stage one uses the catalog base buff; later stages double it each time. */

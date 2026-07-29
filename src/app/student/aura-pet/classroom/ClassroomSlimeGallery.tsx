@@ -10,6 +10,8 @@ import { getTitleDefinition } from "@/lib/title-catalog";
 
 import styles from "./page.module.css";
 
+const SLIME_TRAMPOLINE_ITEM_KEY = "slime-blue-trampoline";
+
 type Props = {
   classroomId: string;
 };
@@ -99,8 +101,25 @@ export async function ClassroomSlimeGallery({ classroomId }: Props) {
             const hasPassiveDrink = items.some(
               (item) => item.category === "drink",
             );
+            const usesTrampoline = items.some(
+              (item) => item.key === SLIME_TRAMPOLINE_ITEM_KEY,
+            );
+            const sceneBackground = items.reduce<SlimeShopItem | null>(
+              (background, item) =>
+                item.category === "background" && item.floor === null
+                  ? item
+                  : background,
+              null,
+            );
+            const hasScene = items.some(
+              (item) =>
+                Boolean(item.floor) ||
+                item.category === "background" ||
+                item.category === "vehicle" ||
+                item.category === "ride",
+            );
             const action =
-              equippedFloor === "water-puddle" || equippedFloor === "trampoline"
+              usesTrampoline
                 ? "floor-interaction"
                 : hasPassiveDrink
                   ? "drink"
@@ -108,7 +127,12 @@ export async function ClassroomSlimeGallery({ classroomId }: Props) {
 
             return (
               <li key={row.id} className={styles.student}>
-                <div className={styles.spriteSlot}>
+                <div
+                  className={`${styles.spriteSlot} ${hasScene ? styles.spriteSlotScene : ""}`.trim()}
+                  style={sceneBackground
+                    ? { backgroundImage: `url("${sceneBackground.spritePath}")` }
+                    : undefined}
+                >
                   {slime ? (
                     <SlimeCharacterSprite
                       slime={slime}

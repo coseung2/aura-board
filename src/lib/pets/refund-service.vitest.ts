@@ -137,4 +137,42 @@ describe("student slime shop refunds", () => {
       data: { equippedItemKeys: [] },
     });
   });
+
+  it("refunds a trampoline purchased before its ride-to-vehicle reslot", async () => {
+    const item = SLIME_SHOP_CATALOG.find((candidate) => candidate.key === "slime-blue-trampoline")!;
+    const purchase = {
+      id: "purchase-trampoline-1",
+      amount: item.price,
+      accountId: "account-1",
+      type: SLIME_ITEM_PURCHASE_SOURCE_TYPE,
+      sourceType: SLIME_ITEM_PURCHASE_SOURCE_TYPE,
+      account: { studentId: student.id },
+    };
+    const tx = {
+      studentCreatureItem: {
+        findUnique: vi.fn(async () => ({
+          id: "inventory-trampoline-1",
+          quantity: 1,
+          itemKind: "slime-ride",
+          purchaseTransaction: purchase,
+        })),
+        update: vi.fn(async () => ({})),
+      },
+      studentSlime: {
+        findMany: vi.fn(async () => []),
+        update: vi.fn(async () => ({})),
+      },
+      transaction: {
+        findFirst: vi.fn(async () => null),
+        create: vi.fn(async () => ({ id: "refund-trampoline-1" })),
+      },
+      studentAccount: { update: vi.fn(async () => ({ balance: item.price })) },
+    };
+    mocks.transaction.mockImplementation(async (operation: (client: typeof tx) => unknown) => operation(tx));
+
+    await expect(refundSlimeShopItem(student, item.key)).resolves.toEqual({
+      refundedItemKey: item.key,
+      balance: item.price,
+    });
+  });
 });

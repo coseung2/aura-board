@@ -1,8 +1,8 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Image, type ImageProps } from "expo-image";
 import MaskedView from "@react-native-masked-view/masked-view";
 import { StyleSheet, View } from "react-native";
-import { layers } from "../../theme/tokens";
+import { layers, slimeUi } from "../../theme/tokens";
 import { getApiBase } from "../../lib/api";
 import {
   getSlimeFrame,
@@ -134,8 +134,10 @@ export function SlimeSprite({
   repeat = false,
   itemSpritePath,
   backgroundSpritePath,
+  expandSceneSurfaces = false,
   vehicleSpritePath,
   vehicleGroundedSpritePath,
+  vehicleEffectSpritePaths,
   vehicleFrameCount = 1,
   vehicleGroundedFrameCount = 1,
   vehicleGroundedFrameDurationMs = 100,
@@ -212,21 +214,66 @@ export function SlimeSprite({
   /**
    * Rider offset: seat height plus this frame's bob. Without the bob the slime
    * would hold still while its seat moves under it.
+   *
+   * Authored bob values use screen coordinates: negative is upward. Keep that
+   * sign when adding bob to the already-negative seat lift.
    */
   const riderOffsetY =
-    -(vehicleRise + vehicleBob * resolution.imageScale * displayScale);
-  const viewport = {
-    ...sourceSize(frame, resolution.imageScale, displayScale),
-    height: frame.sourceSize.h * resolution.imageScale * displayScale + totalRise,
-  };
+    -vehicleRise + vehicleBob * resolution.imageScale * displayScale;
+  const baseViewport = sourceSize(frame, resolution.imageScale, displayScale);
+  const hasVehicleScene = Boolean(
+    vehicleSpritePath
+      || vehicleGroundedSpritePath
+      || vehicleEffectSpritePaths?.length,
+  );
+  // Scene art owns more visual area than the 64px character cell. Detect it at
+  // the render boundary so a new call site cannot silently fall back to the
+  // legacy character-only viewport just because it forgot an opt-in prop.
+  const hasExpandedSceneSurfaces = Boolean(
+    hasVehicleScene
+      || backgroundSpritePath
+      || staticFloor
+      || equippedFloor === "water-puddle"
+      || equippedFloor === "trampoline"
+      || expandSceneSurfaces,
+  );
+  const sceneScale = hasExpandedSceneSurfaces ? slimeUi.vehicleSceneScale : 1;
+  const sceneWidth = baseViewport.width * sceneScale;
+  const sceneHeight = baseViewport.height * sceneScale;
+  const sceneInsetX = (sceneWidth - baseViewport.width) / 2;
+  const sceneInsetY = (sceneHeight - baseViewport.height) / 2;
+  const floorScale = hasExpandedSceneSurfaces ? slimeUi.vehicleFloorScale : 1;
+  const floorWidth = baseViewport.width * floorScale;
+  const floorHeight = baseViewport.height * floorScale;
+  const floorInsetX = (sceneWidth - floorWidth) / 2;
   const packedSheetSize = {
     width: resolution.metadata.meta.size.w * resolution.imageScale * displayScale,
     height: resolution.metadata.meta.size.h * resolution.imageScale * displayScale,
   };
-  const offset = frameOffset(frame, resolution.imageScale, displayScale, riderOffsetY);
+  const baseOffset = frameOffset(frame, resolution.imageScale, displayScale, riderOffsetY);
+  const offset = {
+    left: baseOffset.left + sceneInsetX,
+    top: baseOffset.top + sceneInsetY,
+  };
   const squareSourceSize = frame.sourceSize.w * resolution.imageScale * displayScale;
+  const expandedFloorTop = staticFloor
+    ? sceneInsetY
+      + staticFloor.slimeFootY * resolution.imageScale * displayScale
+      - staticFloor.surfaceY * staticFloor.imageScale * displayScale * floorScale
+    : 0;
+  const viewport = {
+    width: sceneWidth,
+    height: Math.max(
+      sceneHeight,
+      sceneInsetY + baseViewport.height + totalRise,
+      staticFloor ? expandedFloorTop + floorHeight : 0,
+    ),
+  };
 
-  useEffect(() => {
+  // Reset before React Native paints the new action. A normal effect lets the
+  // previous action's frame index render once against the new sheet, which is
+  // visible as a single-frame flash when feeding switches idle -> happy.
+  useLayoutEffect(() => {
     setFrameIndex(0);
     completedPlaybackRef.current = null;
   }, [playbackKey]);
@@ -281,6 +328,9 @@ export function SlimeSprite({
   const vehicleGroundedUri = vehicleGroundedSpritePath
     ? resolveSlimeRemoteSpriteUri(vehicleGroundedSpritePath, getApiBase())
     : "";
+  const vehicleEffectUris = (vehicleEffectSpritePaths ?? []).map((path) =>
+    resolveSlimeRemoteSpriteUri(path, getApiBase()),
+  );
   /**
    * Vehicles ride the character's frame clock with matching authored durations,
    * so one index keeps a ride and its rider in step.
@@ -303,21 +353,43 @@ export function SlimeSprite({
 
   const vehicleCanvas = Math.max(64, Math.trunc(vehicleCanvasHeight));
   // Vehicle headroom sits above the grounded pose, so the offset is subtracted to
-  // land the art back on the character viewport.
+  // land the art on the fixed slime-foot baseline. Static floors align their own
+  // surface to that same baseline; adding `floorRise` here would lower only the
+  // vehicle and sink it into an otherwise correctly positioned floor.
   const vehicleTop =
-    floorRise - Math.trunc(vehicleCharacterOffsetY) * resolution.imageScale * displayScale;
-  const vehicleSheetStyle = (sheetFrames: number, activeFrame: number) => ({
-    width: 64 * sheetFrames * resolution.imageScale * displayScale,
+    -Math.trunc(vehicleCharacterOffsetY) * resolution.imageScale * displayScale;
+  const vehicleViewportStyle = {
+    width: slimeUi.vehicleFrameWidth * resolution.imageScale * displayScale,
     height: vehicleCanvas * resolution.imageScale * displayScale,
-    left: -(activeFrame % sheetFrames) * 64 * resolution.imageScale * displayScale,
-    top: vehicleTop,
+    left: sceneInsetX,
+    top: sceneInsetY + vehicleTop,
+  };
+  const vehicleSheetStyle = (sheetFrames: number, activeFrame: number) => ({
+    width: slimeUi.vehicleFrameWidth * sheetFrames * resolution.imageScale * displayScale,
+    height: vehicleCanvas * resolution.imageScale * displayScale,
+    left:
+      -(activeFrame % sheetFrames)
+        * slimeUi.vehicleFrameWidth
+        * resolution.imageScale
+        * displayScale,
+    top: 0,
   });
 
   if (itemSpritePath) {
     const uri = resolveSlimeRemoteSpriteUri(itemSpritePath, getApiBase());
     const size = 256 * displayScale;
     const itemSizeStyle = { width: size, height: size };
-    const itemViewportStyle = { width: size, height: size + floorRise };
+    const itemInsetX = (sceneWidth - size) / 2;
+    const itemInsetY = (sceneHeight - size) / 2;
+    const itemViewportStyle = {
+      width: sceneWidth,
+      height: Math.max(
+        sceneHeight,
+        itemInsetY + size + floorRise,
+        staticFloor ? expandedFloorTop + floorHeight : 0,
+      ),
+    };
+    const insetItemStyle = { ...itemSizeStyle, left: itemInsetX, top: itemInsetY };
     return (
       <View
         style={[styles.viewport, itemViewportStyle]}
@@ -326,11 +398,16 @@ export function SlimeSprite({
         accessibilityLabel={accessibilityLabel ?? `${slimeColor} 슬라임 장착 소품 모습`}
         testID="slime-sprite"
       >
-        {renderBackgroundLayer(itemSizeStyle)}
+        {renderBackgroundLayer({ width: sceneWidth, height: sceneHeight })}
         {puddleAsset && puddlePackedSheetSize && puddleOffset ? (
           <Image
             source={imageSource(puddleAsset.image)}
-            style={[styles.layer, styles.floorUnder, puddlePackedSheetSize, puddleOffset]}
+            style={[
+              styles.layer,
+              styles.floorUnder,
+              puddlePackedSheetSize,
+              { left: puddleOffset.left + itemInsetX, top: puddleOffset.top + itemInsetY },
+            ]}
             contentFit="fill"
             allowDownscaling={false}
             recyclingKey={`${playbackKey}:puddle-under-item`}
@@ -341,7 +418,16 @@ export function SlimeSprite({
         {staticFloor ? (
           <Image
             source={imageSource(staticFloor.image)}
-            style={[styles.layer, styles.floorUnder, itemSizeStyle, { top: floorRise }]}
+            style={[
+              styles.layer,
+              styles.floorUnder,
+              {
+                width: floorWidth,
+                height: floorHeight,
+                left: floorInsetX,
+                top: expandedFloorTop,
+              },
+            ]}
             contentFit="fill"
             allowDownscaling={false}
             recyclingKey={`${playbackKey}:floor-under-item`}
@@ -352,7 +438,16 @@ export function SlimeSprite({
         {equippedFloor === "trampoline" ? (
           <Image
             source={imageSource(TRAMPOLINE_FLOOR_SOURCE)}
-            style={[styles.layer, styles.floorUnder, itemSizeStyle]}
+            style={[
+              styles.layer,
+              styles.floorUnder,
+              {
+                width: floorWidth,
+                height: floorHeight,
+                left: floorInsetX,
+                top: itemInsetY + size - floorHeight,
+              },
+            ]}
             contentFit="fill"
             allowDownscaling={false}
             recyclingKey={`${playbackKey}:trampoline-under-item`}
@@ -362,7 +457,7 @@ export function SlimeSprite({
         ) : null}
         <Image
           source={{ uri }}
-          style={[styles.layer, styles.itemLayer, itemSizeStyle]}
+          style={[styles.layer, styles.itemLayer, insetItemStyle]}
           contentFit="contain"
           recyclingKey={`item:${uri}`}
           transition={0}
@@ -382,11 +477,19 @@ export function SlimeSprite({
       }
       testID="slime-sprite"
     >
-      {renderBackgroundLayer({ width: squareSourceSize, height: squareSourceSize })}
+      {renderBackgroundLayer({ width: sceneWidth, height: sceneHeight })}
       {puddleAsset && puddlePackedSheetSize && puddleOffset ? (
         <Image
           source={imageSource(puddleAsset.image)}
-          style={[styles.layer, styles.floorUnder, puddlePackedSheetSize, puddleOffset]}
+          style={[
+            styles.layer,
+            styles.floorUnder,
+            puddlePackedSheetSize,
+            {
+              left: puddleOffset.left + sceneInsetX,
+              top: puddleOffset.top + sceneInsetY,
+            },
+          ]}
           contentFit="fill"
           allowDownscaling={false}
           recyclingKey={`${playbackKey}:puddle`}
@@ -401,10 +504,10 @@ export function SlimeSprite({
             styles.layer,
             styles.floorUnder,
             {
-              width: frame.sourceSize.w * staticFloor.imageScale * displayScale,
-              height: squareSourceSize,
-              left: 0,
-              top: floorRise,
+              width: floorWidth,
+              height: floorHeight,
+              left: floorInsetX,
+              top: expandedFloorTop,
             },
           ]}
           contentFit="fill"
@@ -416,29 +519,49 @@ export function SlimeSprite({
       ) : null}
       {vehicleGroundedUri ? (
         // Parts that must stay planted while the body moves, such as wheels.
-        <Image
-          source={{ uri: vehicleGroundedUri }}
+        <View
           style={[
             styles.layer,
             styles.floorUnder,
-            vehicleSheetStyle(vehicleGroundedFrames, groundedFrame),
+            styles.vehicleFrameViewport,
+            vehicleViewportStyle,
           ]}
+          pointerEvents="none"
+        >
+          <Image
+            source={{ uri: vehicleGroundedUri }}
+            style={[styles.layer, vehicleSheetStyle(vehicleGroundedFrames, groundedFrame)]}
+            contentFit="fill"
+            allowDownscaling={false}
+            recyclingKey={`${playbackKey}:vehicle-grounded`}
+            transition={0}
+            accessible={false}
+          />
+        </View>
+      ) : null}
+      <View
+        style={[
+          styles.layer,
+          styles.characterFrameViewport,
+          {
+            width: baseViewport.width,
+            height: baseViewport.height,
+            left: sceneInsetX,
+            top: sceneInsetY,
+          },
+        ]}
+        pointerEvents="none"
+      >
+        <Image
+          source={imageSource(resolution.sheet)}
+          style={[styles.layer, packedSheetSize, baseOffset]}
           contentFit="fill"
           allowDownscaling={false}
-          recyclingKey={`${playbackKey}:vehicle-grounded`}
+          recyclingKey={playbackKey}
           transition={0}
           accessible={false}
         />
-      ) : null}
-      <Image
-        source={imageSource(resolution.sheet)}
-        style={[styles.layer, packedSheetSize, offset]}
-        contentFit="fill"
-        allowDownscaling={false}
-        recyclingKey={playbackKey}
-        transition={0}
-        accessible={false}
-      />
+      </View>
       {resolvedWearables.map((wearable) => (
         // One shared sheet per option. The anchor track selects this frame's
         // source column and nudges it by the authored offset. Jump overlays sit on
@@ -454,10 +577,16 @@ export function SlimeSprite({
                 wearable.frameSize.w * wearable.sheetFrameCount * wearable.imageScale * displayScale,
               height: wearable.frameSize.h * wearable.imageScale * displayScale,
               left:
-                (-wearable.sourceFrame * wearable.frameSize.w + wearable.dx) *
-                wearable.imageScale *
-                displayScale,
-              top: (wearable.dy - wearable.characterOffsetY) * wearable.imageScale * displayScale,
+                sceneInsetX
+                + (-wearable.sourceFrame * wearable.frameSize.w + wearable.dx)
+                  * wearable.imageScale
+                  * displayScale,
+              top:
+                sceneInsetY
+                + (wearable.dy - wearable.characterOffsetY)
+                  * wearable.imageScale
+                  * displayScale
+                + riderOffsetY,
               zIndex: layers.spriteItem + wearable.zIndex,
             },
           ]}
@@ -475,6 +604,51 @@ export function SlimeSprite({
           accessible={false}
         />
       ))}
+      {vehicleUri ? (
+        // The vehicle itself, above every character layer. Drawing it in front is
+        // what seats the slime inside without authoring the hidden side.
+        <View
+          style={[
+            styles.layer,
+            styles.vehicleFrameViewport,
+            vehicleViewportStyle,
+            { zIndex: layers.spriteItem + 200 },
+          ]}
+          pointerEvents="none"
+        >
+          <Image
+            source={{ uri: vehicleUri }}
+            style={[styles.layer, vehicleSheetStyle(vehicleFrames, frameIndex)]}
+            contentFit="fill"
+            allowDownscaling={false}
+            recyclingKey={`${playbackKey}:vehicle`}
+            transition={0}
+            accessible={false}
+          />
+        </View>
+      ) : null}
+      {vehicleEffectUris.map((uri, index) => (
+        <View
+          key={uri}
+          style={[
+            styles.layer,
+            styles.vehicleFrameViewport,
+            vehicleViewportStyle,
+            { zIndex: layers.spriteItem + 300 + index },
+          ]}
+          pointerEvents="none"
+        >
+          <Image
+            source={{ uri }}
+            style={[styles.layer, vehicleSheetStyle(vehicleFrames, frameIndex)]}
+            contentFit="fill"
+            allowDownscaling={false}
+            recyclingKey={`${playbackKey}:vehicle-fx:${uri}`}
+            transition={0}
+            accessible={false}
+          />
+        </View>
+      ))}
       {resolution.happyHeart ? (
         <Image
           source={imageSource(resolution.happyHeart.sheet)}
@@ -482,7 +656,7 @@ export function SlimeSprite({
             styles.layer,
             packedSheetSize,
             offset,
-            { zIndex: layers.spriteItem + 100 },
+            { zIndex: layers.spriteItem + 400 },
           ]}
           contentFit="fill"
           allowDownscaling={false}
@@ -490,23 +664,6 @@ export function SlimeSprite({
           transition={0}
           accessible={false}
           testID="slime-happy-heart-layer"
-        />
-      ) : null}
-      {vehicleUri ? (
-        // The vehicle itself, above every character layer. Drawing it in front is
-        // what seats the slime inside without authoring the hidden side.
-        <Image
-          source={{ uri: vehicleUri }}
-          style={[
-            styles.layer,
-            vehicleSheetStyle(vehicleFrames, frameIndex),
-            { zIndex: layers.spriteItem + 200 },
-          ]}
-          contentFit="fill"
-          allowDownscaling={false}
-          recyclingKey={`${playbackKey}:vehicle`}
-          transition={0}
-          accessible={false}
         />
       ) : null}
     </View>
@@ -529,4 +686,6 @@ const styles = StyleSheet.create({
   backgroundLayer: { zIndex: layers.spriteFloor },
   floorUnder: { zIndex: layers.spriteFloor },
   itemLayer: { zIndex: layers.spriteItem },
+  characterFrameViewport: { overflow: "hidden" },
+  vehicleFrameViewport: { overflow: "hidden" },
 });

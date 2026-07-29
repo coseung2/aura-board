@@ -243,4 +243,19 @@ describe("slime shop item equipment", () => {
     ).rejects.toMatchObject<Partial<SlimeServiceError>>({ code: "not_owned", status: 403 });
     expect(wrongKind.inventory.update).not.toHaveBeenCalled();
   });
+
+  it("equips a trampoline purchased before its ride-to-vehicle reslot", async () => {
+    const state = installState();
+    const trampoline = SLIME_SHOP_CATALOG.find((item) => item.key === "slime-blue-trampoline")!;
+    state.rows.get(trampoline.key)!.itemKind = "slime-ride";
+
+    await expect(
+      equipSlimeShopItem(student, "blue", trampoline.key, true, "legacy-trampoline"),
+    ).resolves.toMatchObject({
+      itemKey: trampoline.key,
+      isEquipped: true,
+      equippedItemKeys: [trampoline.key],
+    });
+    expect(state.rows.get(trampoline.key)?.isEquipped).toBe(true);
+  });
 });

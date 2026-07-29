@@ -55,15 +55,18 @@ import {
 import { StudentHeaderActions } from "../../components/StudentHeaderActions";
 import { SlimeSprite } from "../../components/slime/SlimeSprite";
 import {
-  evolutionForStage,
   normalizeSlimeHome,
   resolveEquippedSceneBackground,
+  resolveEquippedSlimeWearables,
+  resolveEquippedVehicle,
   selectSceneBackgroundSpritePath,
   slimeBallSpritePath,
   stageForColor,
   studentPetHref,
   type MobileSlimeHome,
 } from "../../lib/slimes";
+
+const SLIME_TRAMPOLINE_ITEM_KEY = "slime-blue-trampoline";
 
 // 학생 대시보드. 웹과 같은 /api/student/me 계약을 사용한다.
 
@@ -277,6 +280,24 @@ function RepresentativePet({
     equippedItems,
     petHome.shopCatalog,
   );
+  const equippedWearables = resolveEquippedSlimeWearables(
+    equippedItems,
+    petHome.shopCatalog,
+  );
+  const equippedVehicle = resolveEquippedVehicle(
+    equippedItems,
+    petHome.shopCatalog,
+  );
+  const usesTrampoline = equippedVehicle?.key === SLIME_TRAMPOLINE_ITEM_KEY;
+  const renderedVehicle = usesTrampoline ? null : equippedVehicle;
+  const hasDrink = petHome.shopCatalog.some(
+    (item) => item.category === "drink" && equippedItems.includes(item.key),
+  );
+  const action = usesTrampoline
+    ? "floor-interaction" as const
+    : hasDrink
+      ? "drink" as const
+      : "idle" as const;
 
   return (
     <View style={styles.representativePet}>
@@ -298,14 +319,28 @@ function RepresentativePet({
       {color && stage !== null ? (
         <SlimeSprite
           slimeColor={color}
-          evolution={evolutionForStage(stage)}
-          equippedFloor={equippedFloor}
+          growthStage={stage}
+          action={action}
+          equippedFloor={usesTrampoline ? "trampoline" : equippedFloor}
+          repeat={action !== "idle"}
           itemSpritePath={slimeBallSpritePath(equippedItems, color)}
+          wearables={equippedWearables}
+          drinkFlavor={equippedWearables.drink}
           backgroundSpritePath={
             equippedBackground
               ? selectSceneBackgroundSpritePath(equippedBackground)
               : undefined
           }
+          vehicleSpritePath={renderedVehicle?.vehicleSheetPath ?? renderedVehicle?.spritePath}
+          vehicleGroundedSpritePath={renderedVehicle?.vehicleGroundedSpritePath}
+          vehicleEffectSpritePaths={renderedVehicle?.vehicleEffectSpritePaths}
+          vehicleFrameCount={renderedVehicle?.vehicleFrameCount}
+          vehicleGroundedFrameCount={renderedVehicle?.vehicleGroundedFrameCount}
+          vehicleGroundedFrameDurationMs={renderedVehicle?.vehicleGroundedFrameDurationMs}
+          vehicleCanvasHeight={renderedVehicle?.vehicleCanvasHeight}
+          vehicleCharacterOffsetY={renderedVehicle?.vehicleCharacterOffsetY}
+          vehicleBobY={renderedVehicle?.vehicleBobY}
+          vehicleRiseY={renderedVehicle?.vehicleRiseY}
           displayScale={0.75}
           accessibilityLabel="내 대표 펫"
         />

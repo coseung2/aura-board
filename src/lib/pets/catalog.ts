@@ -7,6 +7,7 @@ import type {
   SlimeFloor,
   SlimeShopItem,
   SlimeSetDefinition,
+  SlimeShopTier,
 } from "./types";
 import { SLIME_SHARED_ASSETS } from "./slime-assets";
 import { SLIME_BALL_SLUGS, SLIME_COLORS } from "./types";
@@ -49,6 +50,18 @@ export const SLIME_VEHICLE_CHARACTER_OFFSET_Y = 17;
 
 const VEHICLE_ROOT = `${SLIME_ASSET_ROOT}/shop/vehicles`;
 
+const SLIME_VEHICLE_TIER_PRICE = {
+  1: 1_000,
+  2: 700,
+  3: 500,
+} as const satisfies Record<SlimeShopTier, number>;
+
+const SLIME_VEHICLE_TIER_BPS = {
+  1: 300,
+  2: 200,
+  3: 100,
+} as const satisfies Record<SlimeShopTier, number>;
+
 /**
  * Vehicles delivered as front-only art on the taller canvas.
  *
@@ -59,46 +72,150 @@ const VEHICLE_DEFINITIONS = [
   {
     option: "donut-tube",
     labelKo: "도넛 튜브",
-    price: 500,
+    tier: 3,
     stance: "grounded",
     riseY: 10,
     bobY: [0, -1, -1, -2, -2, -1, -1, 0],
     effectKey: "walking_reward",
-    effectBps: 100,
   },
   {
     option: "open-convertible",
     labelKo: "오픈카",
-    price: 1_000,
+    tier: 1,
     stance: "grounded",
     riseY: 6,
     bobY: [0, 0, -1, -1, -1, -1, 0, 0],
     effectKey: "walking_reward",
-    effectBps: 300,
     // Wheels keep their own constant-rate timeline; a wheel that rose with the
     // suspension would leave the ground and lift the whole sprite.
     wheels: { frameCount: 4, frameDurationMs: 100 },
+    vehicleEffectSpritePaths: [
+      `${VEHICLE_ROOT}/open-convertible/fx/wind-idle-sheet.png`,
+    ],
   },
   {
     option: "hot-air-balloon",
     labelKo: "열기구",
-    price: 1_000,
+    tier: 1,
     stance: "floating",
     riseY: 9,
     bobY: [0, -1, -2, -2, -2, -1, -1, 0],
     effectKey: "reading_reward",
-    effectBps: 300,
+  },
+  {
+    option: "cloud",
+    labelKo: "구름",
+    tier: 2,
+    stance: "floating",
+    riseY: 23,
+    bobY: [0, -1, -2, -2, -2, -1, -1, 0],
+    effectKey: "reading_reward",
+  },
+  {
+    option: "duck-tube",
+    labelKo: "러버덕 튜브",
+    tier: 2,
+    stance: "grounded",
+    riseY: 14,
+    bobY: [0, -1, -1, -2, -2, -1, -1, 0],
+    effectKey: "walking_reward",
+  },
+  {
+    option: "go-kart",
+    labelKo: "고카트",
+    tier: 2,
+    stance: "grounded",
+    // The authored front wheel reaches y=72 while the right rear wheel reaches
+    // y=67. Lower the whole composite by 5px so the rear wheel owns contact.
+    riseY: 9,
+    characterOffsetY: 12,
+    bobY: [0, 0, -1, -1, -1, -1, 0, 0],
+    effectKey: "walking_reward",
+    vehicleEffectSpritePaths: [
+      `${VEHICLE_ROOT}/go-kart/fx/wind-idle-sheet.png`,
+      `${VEHICLE_ROOT}/go-kart/fx/exhaust-idle-sheet.png`,
+    ],
+  },
+  {
+    option: "wooden-cart",
+    labelKo: "나무수레",
+    tier: 3,
+    stance: "grounded",
+    // The right rear wheel ends at y=68, 4px above the previous bbox contact.
+    riseY: 17,
+    characterOffsetY: 13,
+    bobY: [0, 0, -1, -1, -1, -1, 0, 0],
+    effectKey: "assignment_reward",
+    vehicleEffectSpritePaths: [
+      `${VEHICLE_ROOT}/wooden-cart/fx/wind-idle-sheet.png`,
+    ],
+  },
+  {
+    option: "kayak",
+    labelKo: "카약",
+    tier: 2,
+    stance: "grounded",
+    riseY: 15,
+    bobY: [0, -1, -1, -2, -2, -1, -1, 0],
+    effectKey: "reading_reward",
+  },
+  {
+    option: "skateboard",
+    labelKo: "스케이트보드",
+    tier: 3,
+    stance: "grounded",
+    riseY: 13,
+    bobY: [0, 0, 0, 0, 0, 0, 0, 0],
+    effectKey: "walking_reward",
+    wheels: { frameCount: 4, frameDurationMs: 100 },
+    vehicleEffectSpritePaths: [
+      `${VEHICLE_ROOT}/skateboard/fx/wind-idle-sheet.png`,
+    ],
+  },
+  {
+    option: "flying-broom",
+    labelKo: "하늘 빗자루",
+    tier: 2,
+    stance: "floating",
+    riseY: 13,
+    bobY: [0, -1, -2, -2, -2, -1, -1, 0],
+    effectKey: "assignment_reward",
+    vehicleEffectSpritePaths: [
+      `${VEHICLE_ROOT}/flying-broom/fx/wind-idle-sheet.png`,
+    ],
+  },
+  {
+    option: "swan-boat",
+    labelKo: "백조 보트",
+    tier: 1,
+    stance: "grounded",
+    riseY: 16,
+    bobY: [0, -1, -1, -2, -2, -1, -1, 0],
+    effectKey: "comment_reward",
+  },
+  {
+    option: "magic-carpet",
+    labelKo: "마법 양탄자",
+    tier: 1,
+    stance: "floating",
+    riseY: 14,
+    bobY: [0, -1, -2, -2, -2, -1, -1, 0],
+    effectKey: "growth_speed",
+    vehicleEffectSpritePaths: [
+      `${VEHICLE_ROOT}/magic-carpet/fx/sparkle-idle-sheet.png`,
+    ],
   },
 ] as const satisfies readonly {
   option: string;
   labelKo: string;
-  price: number;
+  tier: SlimeShopTier;
   stance: "grounded" | "floating";
   riseY: number;
   bobY: readonly number[];
   effectKey: NonNullable<SlimeShopItem["effectKey"]>;
-  effectBps: number;
   wheels?: { frameCount: number; frameDurationMs: number };
+  characterOffsetY?: number;
+  vehicleEffectSpritePaths?: readonly string[];
 }[];
 
 export const SLIME_VEHICLE_CATALOG: readonly SlimeShopItem[] = VEHICLE_DEFINITIONS.map(
@@ -107,15 +224,18 @@ export const SLIME_VEHICLE_CATALOG: readonly SlimeShopItem[] = VEHICLE_DEFINITIO
     category: "vehicle",
     floor: null,
     labelKo: vehicle.labelKo,
-    price: vehicle.price,
+    tier: vehicle.tier,
+    price: SLIME_VEHICLE_TIER_PRICE[vehicle.tier],
     vehicleStance: vehicle.stance,
     vehicleRiseY: vehicle.riseY,
     vehicleBobY: vehicle.bobY,
     vehicleFrameCount: SLIME_VEHICLE_FRAME_COUNT,
     vehicleCanvasHeight: SLIME_VEHICLE_CANVAS_HEIGHT,
-    vehicleCharacterOffsetY: SLIME_VEHICLE_CHARACTER_OFFSET_Y,
+    vehicleCharacterOffsetY: "characterOffsetY" in vehicle
+      ? vehicle.characterOffsetY
+      : SLIME_VEHICLE_CHARACTER_OFFSET_Y,
     effectKey: vehicle.effectKey,
-    effectBps: vehicle.effectBps,
+    effectBps: SLIME_VEHICLE_TIER_BPS[vehicle.tier],
     // The still frame doubles as the shop card image.
     spritePath: `${VEHICLE_ROOT}/${vehicle.option}/vehicle.png`,
     vehicleSheetPath: `${VEHICLE_ROOT}/${vehicle.option}/idle-sheet.png`,
@@ -125,6 +245,9 @@ export const SLIME_VEHICLE_CATALOG: readonly SlimeShopItem[] = VEHICLE_DEFINITIO
           vehicleGroundedFrameCount: vehicle.wheels.frameCount,
           vehicleGroundedFrameDurationMs: vehicle.wheels.frameDurationMs,
         }
+      : {}),
+    ...("vehicleEffectSpritePaths" in vehicle && vehicle.vehicleEffectSpritePaths
+      ? { vehicleEffectSpritePaths: vehicle.vehicleEffectSpritePaths }
       : {}),
   }),
 );
@@ -597,6 +720,7 @@ export const SLIME_SHOP_CATALOG: readonly SlimeShopItem[] = [
     category: "vehicle",
     floor: null,
     labelKo: "트램펄린",
+    tier: 3,
     price: SLIME_SHOP_DEFAULT_PRICE,
     vehicleStance: "grounded",
     vehicleRiseY: SLIME_VEHICLE_DEFAULT_RISE_Y,

@@ -72,6 +72,18 @@ export type {
 
 type StudentIdentity = { id: string; classroomId: string };
 
+const RESLOTTED_TRAMPOLINE_KEY = "slime-blue-trampoline";
+
+/**
+ * Accept inventory written before the trampoline moved from `ride` to
+ * `vehicle`. Keep the exception item-specific so a corrupted or unrelated
+ * inventory kind still cannot be equipped or refunded.
+ */
+function inventoryKindMatchesShopItem(item: SlimeShopItem, itemKind: string): boolean {
+  if (itemKind === `slime-${item.category}`) return true;
+  return item.key === RESLOTTED_TRAMPOLINE_KEY && itemKind === "slime-ride";
+}
+
 async function walkingTitleForStudent(studentId: string) {
   // Isolated service fixtures mock only the delegates they exercise, so treat a
   // missing raw-query capability as "no title yet" instead of failing the home.
@@ -1219,7 +1231,7 @@ export async function refundSlimeShopItem(
       },
     });
     if (
-      inventory.itemKind !== `slime-${item.category}` ||
+      !inventoryKindMatchesShopItem(item, inventory.itemKind) ||
       !purchase ||
       purchase.amount <= 0 ||
       purchase.type !== SLIME_ITEM_PURCHASE_SOURCE_TYPE ||
@@ -1324,7 +1336,7 @@ export async function equipSlimeShopItem(
     });
     if (
       !inventory ||
-      inventory.itemKind !== `slime-${item.category}` ||
+      !inventoryKindMatchesShopItem(item, inventory.itemKind) ||
       inventory.quantity < 1
     ) {
       throw new SlimeServiceError("not_owned");
