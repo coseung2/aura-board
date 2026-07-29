@@ -3755,6 +3755,9 @@ model StudentSlime {
   // Shop cosmetics are assigned per owned slime. Each category is kept to one
   // item by the slime equipment service.
   equippedItemKeys String[] @default([])
+  // Equipped cosmetics can remain active for buffs while omitted by renderers.
+  // This list is always constrained to keys in equippedItemKeys by mutations.
+  hiddenItemKeys String[] @default([])
   // Claimed title worn by this specific pet. Titles are owned per student, so
   // several pets can each wear a different one.
   equippedTitleKey String?

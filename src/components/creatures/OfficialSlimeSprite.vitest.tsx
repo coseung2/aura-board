@@ -77,6 +77,7 @@ describe("OfficialSlimeSprite", () => {
         vehicleFrameCount={8}
         vehicleCanvasHeight={81}
         vehicleCharacterOffsetY={17}
+        vehicleOffsetX={2}
       />,
     );
     const sprite = getByRole("img");
@@ -192,6 +193,7 @@ describe("OfficialSlimeSprite", () => {
         vehicleFrameCount={8}
         vehicleCanvasHeight={81}
         vehicleCharacterOffsetY={17}
+        vehicleOffsetX={2}
       />,
     );
 
@@ -199,6 +201,9 @@ describe("OfficialSlimeSprite", () => {
     const body = container.querySelector<HTMLImageElement>(`img[src="${bodyPath}"]`);
     const wind = container.querySelector<HTMLImageElement>(`img[src="${windPath}"]`);
     const exhaust = container.querySelector<HTMLImageElement>(`img[src="${exhaustPath}"]`);
+    const rider = container.querySelector<HTMLImageElement>(
+      'img[src="/creatures/slimes/official/base/blue/idle/sheet.png"]',
+    );
 
     expect(body).toBeTruthy();
     expect(wind).toBeTruthy();
@@ -208,6 +213,10 @@ describe("OfficialSlimeSprite", () => {
     expect(wind?.style.width).toBe(body?.style.width);
     expect(wind?.style.transform).toBe(body?.style.transform);
     expect(body?.parentElement?.style.top).toBe("-1px");
+    expect(body?.parentElement?.style.left).toBe("18px");
+    expect(wind?.parentElement?.style.left).toBe("18px");
+    expect(exhaust?.parentElement?.style.left).toBe("18px");
+    expect(rider?.parentElement?.style.left).toBe("16px");
 
     rerender(
       <OfficialSlimeSprite
@@ -218,6 +227,7 @@ describe("OfficialSlimeSprite", () => {
         vehicleFrameCount={8}
         vehicleCanvasHeight={81}
         vehicleCharacterOffsetY={17}
+        vehicleOffsetX={2}
       />,
     );
     const bodyWithFloor = container.querySelector<HTMLImageElement>(`img[src="${bodyPath}"]`);

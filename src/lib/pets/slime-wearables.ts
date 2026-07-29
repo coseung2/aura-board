@@ -2,6 +2,7 @@ import {
   SLIME_WEARABLE_LAYER_ORDER,
   SLIME_WEB_WEARABLE_REGISTRY,
 } from "./slime-wearables.generated";
+import { SLIME_WEB_WEARABLE_ACTION_REGISTRY } from "./slime-wearable-actions.generated";
 import type { SlimeColor, SlimeSheetAction } from "./slime-assets";
 
 /**
@@ -221,7 +222,21 @@ export function resolveSlimeComposition(
   return { mode: "composed", headwear: "suppressed", reason: "unsupported-action" };
 }
 
-const registry = SLIME_WEB_WEARABLE_REGISTRY as unknown as Record<string, SlimeWearableEntry>;
+const baseRegistry = SLIME_WEB_WEARABLE_REGISTRY as unknown as Record<string, SlimeWearableEntry>;
+const actionRegistry = SLIME_WEB_WEARABLE_ACTION_REGISTRY as unknown as Record<
+  string,
+  Pick<SlimeWearableEntry, "sheets" | "timelines">
+>;
+const registry = Object.fromEntries(
+  Object.entries(baseRegistry).map(([key, entry]) => {
+    const actions = actionRegistry[key];
+    return [key, actions ? {
+      ...entry,
+      sheets: { ...entry.sheets, ...actions.sheets },
+      timelines: { ...entry.timelines, ...actions.timelines },
+    } : entry];
+  }),
+) as Record<string, SlimeWearableEntry>;
 
 function entryKey(role: SlimeWearableRole, option: string): string {
   return `${role}/${option}`;

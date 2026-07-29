@@ -48,6 +48,7 @@ describe("mobile slime parity model", () => {
       representativeColor: "blue",
       ownedItemKeys: [SLIME_COOKIE_ITEM_KEY],
       ownedItemQuantities: { [SLIME_COOKIE_ITEM_KEY]: 4 },
+      hiddenItemsByColor: { blue: ["water-puddle-background"] },
       growthSpeedBps: 200,
       growthByColor: {
         blue: {
@@ -62,6 +63,7 @@ describe("mobile slime parity model", () => {
 
     expect(home.representativeColor).toBe("blue");
     expect(home.ownedItemQuantities[SLIME_COOKIE_ITEM_KEY]).toBe(4);
+    expect(home.hiddenItemsByColor).toEqual({ blue: ["water-puddle-background"] });
     expect(home.growthSpeedBps).toBe(200);
     expect(calculateSlimeGrowthPercent(home.growthByColor.blue!)).toBe(50);
   });
@@ -224,6 +226,7 @@ describe("mobile slime parity model", () => {
           price: 700,
           tier: 2,
           spritePath: "/tier-2.png",
+          vehicleOffsetX: 2.9,
         },
         {
           key: "vehicle-tier-3",
@@ -242,6 +245,7 @@ describe("mobile slime parity model", () => {
       [2, 700],
       [3, 500],
     ]);
+    expect(home.shopCatalog[1]?.vehicleOffsetX).toBe(2);
     expect(groupSlimeShopItemsByTier(home.shopCatalog).map(({ price, label }) => [price, label])).toEqual([
       [500, "기본"],
       [700, "고급"],
@@ -452,6 +456,7 @@ describe("mobile slime parity model", () => {
           color: "purple",
           growthStage: 2,
           equippedItemKeys: ["water-puddle-background"],
+          hiddenItemKeys: ["water-puddle-background"],
           equippedTitleKey: "weekly-50k",
         },
       },
@@ -475,6 +480,7 @@ describe("mobile slime parity model", () => {
           color: "green",
           growthStage: 1,
           equippedItemKeys: [],
+          hiddenItemKeys: [],
           equippedTitleKey: null,
         },
       },
@@ -492,6 +498,7 @@ describe("mobile slime parity model", () => {
           color: "purple",
           growthStage: 2,
           equippedItemKeys: ["water-puddle-background"],
+          hiddenItemKeys: ["water-puddle-background"],
           equippedTitleKey: "weekly-50k",
         },
       },
@@ -515,6 +522,7 @@ describe("mobile slime parity model", () => {
           color: "green",
           growthStage: 1,
           equippedItemKeys: [],
+          hiddenItemKeys: [],
           equippedTitleKey: null,
         },
       },

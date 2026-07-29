@@ -98,6 +98,8 @@ export type SlimeShopItem = {
   vehicleStance?: "grounded" | "floating";
   /** Pixels the vehicle lifts the slime, in 64px-viewport units. */
   vehicleRiseY?: number;
+  /** Horizontal delivery correction for vehicle-owned layers only. */
+  vehicleOffsetX?: number;
   /** Vehicle parts that stay planted while the body moves, such as wheels. */
   vehicleGroundedSpritePath?: string;
   /** Transparent effect sheets synchronized to the vehicle's main frame clock. */
@@ -470,6 +472,9 @@ export type MobileSlimeHome = {
   ownedItemQuantities: Record<string, number>;
   equippedItemKeys: string[];
   equippedItemsByColor: Partial<Record<SlimeColor, string[]>>;
+  /** Equipped items hidden from sprite composition; buffs still use equipped keys. */
+  hiddenItemKeys: string[];
+  hiddenItemsByColor: Partial<Record<SlimeColor, string[]>>;
   equippedFloorByColor: Partial<Record<SlimeColor, EquippedFloor>>;
   equippedFloor: EquippedFloor;
   shopCatalog: SlimeShopItem[];
@@ -498,6 +503,7 @@ export type MobileSlimeClassmate = {
     color: SlimeColor;
     growthStage: 1 | 2 | 3;
     equippedItemKeys: string[];
+    hiddenItemKeys: string[];
     equippedTitleKey: string | null;
   } | null;
 };
@@ -682,6 +688,10 @@ function normalizeShopCatalog(value: unknown): SlimeShopItem[] {
           typeof entry.vehicleRiseY === "number"
             ? Math.max(0, Math.trunc(entry.vehicleRiseY))
             : undefined,
+        vehicleOffsetX:
+          typeof entry.vehicleOffsetX === "number"
+            ? Math.trunc(entry.vehicleOffsetX)
+            : undefined,
         vehicleGroundedSpritePath:
           typeof entry.vehicleGroundedSpritePath === "string"
             ? entry.vehicleGroundedSpritePath
@@ -735,6 +745,17 @@ function normalizeItemsByColor(
   const result: Partial<Record<SlimeColor, string[]>> = {};
   for (const itemColor of SLIME_ASSET_COLORS) {
     result[itemColor] = stringList(value[itemColor]);
+  }
+  return result;
+}
+
+function normalizeOptionalItemsByColor(
+  value: unknown,
+): Partial<Record<SlimeColor, string[]>> {
+  if (!isRecord(value)) return {};
+  const result: Partial<Record<SlimeColor, string[]>> = {};
+  for (const itemColor of SLIME_ASSET_COLORS) {
+    if (itemColor in value) result[itemColor] = stringList(value[itemColor]);
   }
   return result;
 }
@@ -797,6 +818,8 @@ export function normalizeSlimeHome(payload: unknown): MobileSlimeHome {
     ownedItemQuantities,
     equippedItemKeys: stringList(value.equippedItemKeys),
     equippedItemsByColor: normalizeItemsByColor(value.equippedItemsByColor),
+    hiddenItemKeys: stringList(value.hiddenItemKeys),
+    hiddenItemsByColor: normalizeOptionalItemsByColor(value.hiddenItemsByColor),
     equippedFloorByColor,
     equippedFloor: floor(value.equippedFloor),
     shopCatalog: normalizeShopCatalog(value.shopCatalog),
@@ -1023,6 +1046,7 @@ export function normalizeSlimeClassroom(payload: unknown): MobileSlimeClassmate[
             color: representativeColor,
             growthStage: stageValue(representative.growthStage),
             equippedItemKeys: stringList(representative.equippedItemKeys),
+            hiddenItemKeys: stringList(representative.hiddenItemKeys),
             equippedTitleKey:
               typeof representative.equippedTitleKey === "string"
               && representative.equippedTitleKey.length > 0

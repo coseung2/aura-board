@@ -100,6 +100,8 @@ export type OfficialSlimeSpriteProps = {
    * slime's own idle squash and double the amplitude, which reads as hovering.
    */
   vehicleRiseY?: number;
+  /** Horizontal correction applied only to vehicle-owned art layers. */
+  vehicleOffsetX?: number;
   /**
    * Anchor-composed wearable layers. Each equipped option is one shared sheet
    * repositioned per frame, so new drinks never require rebaking wearables.
@@ -201,6 +203,7 @@ export function OfficialSlimeSprite({
   vehicleCharacterOffsetY = 0,
   vehicleBobY,
   vehicleRiseY = 0,
+  vehicleOffsetX = 0,
   wearables,
   drinkFlavor,
   repeat = false,
@@ -342,6 +345,7 @@ export function OfficialSlimeSprite({
    * baseline independently, so adding `floorRise` here would sink the vehicle.
    */
   const vehicleTop = -Math.trunc(vehicleCharacterOffsetY) * scale;
+  const vehicleLeft = Math.trunc(vehicleOffsetX) * scale;
   const vehicleSheetStyle = (
     sheetFrames: number,
     activeFrame: number,
@@ -514,7 +518,7 @@ export function OfficialSlimeSprite({
           style={{
             width: 64 * scale,
             height: Math.trunc(vehicleCanvasHeight) * scale,
-            left: sceneInsetX,
+            left: sceneInsetX + vehicleLeft,
             top: sceneInsetY + vehicleTop,
           }}
         >
@@ -609,7 +613,7 @@ export function OfficialSlimeSprite({
           style={{
             width: 64 * scale,
             height: Math.trunc(vehicleCanvasHeight) * scale,
-            left: sceneInsetX,
+            left: sceneInsetX + vehicleLeft,
             top: sceneInsetY + vehicleTop,
             zIndex: 200,
           }}
@@ -633,7 +637,7 @@ export function OfficialSlimeSprite({
           style={{
             width: 64 * scale,
             height: Math.trunc(vehicleCanvasHeight) * scale,
-            left: sceneInsetX,
+            left: sceneInsetX + vehicleLeft,
             top: sceneInsetY + vehicleTop,
             zIndex: 301 + index,
           }}

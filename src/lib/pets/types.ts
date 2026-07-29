@@ -125,6 +125,8 @@ export type SlimeShopItem = {
    * squash and double the amplitude, which reads as hovering rather than riding.
    */
   readonly vehicleRiseY?: number;
+  /** Pixels the vehicle is shifted horizontally inside its scene slot. */
+  readonly vehicleOffsetX?: number;
   /**
    * Vehicle parts that stay planted while the body moves, such as wheels. Drawn
    * behind the character so the body layer can overlap them.

@@ -5,6 +5,7 @@ import type {
   SlimeEvolution,
 } from "../../lib/slime-assets";
 import type { SlimeWearableSelection } from "../../lib/slime-wearables";
+import type { SlimePropAction } from "../../lib/slime-props";
 
 export type SlimeSpriteProps = {
   slimeColor: SlimeColor;
@@ -17,13 +18,15 @@ export type SlimeSpriteProps = {
   growthStage?: number;
   action?: SlimeAction;
   equippedFloor?: EquippedFloor;
-  /** Additional integer multiplier for the already nearest-scaled 4x art. */
+  /** Display multiplier, quantized to eighth steps for proportional scene sizing. */
   displayScale?: number;
   accessibilityLabel?: string;
   /** Force a normally one-shot equipped animation to loop in the pet preview. */
   repeat?: boolean;
-  /** Complete color-specific animated prop, such as an equipped ball GIF. */
+  /** Legacy remote prop image. Composable ball and drink actions use `propAction`. */
   itemSpritePath?: string;
+  /** Explicit highest-priority prop action composed by the renderer. */
+  propAction?: SlimePropAction | null;
   /** Remote/API-relative scene background rendered behind floor and slime layers. */
   backgroundSpritePath?: string;
   /**
@@ -65,6 +68,8 @@ export type SlimeSpriteProps = {
    * a per-frame offset would double the slime's own idle amplitude.
    */
   vehicleRiseY?: number;
+  /** Horizontal correction applied only to vehicle-owned art layers. */
+  vehicleOffsetX?: number;
   /**
    * Anchor-composed wearable layers. Each equipped option is one shared sheet
    * repositioned per frame, so new drinks never require rebaking wearables.

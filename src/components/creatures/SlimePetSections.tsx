@@ -319,6 +319,7 @@ export function SlimeCollectionSection({
                       vehicleCharacterOffsetY={renderedVehicle?.vehicleCharacterOffsetY}
                       vehicleBobY={renderedVehicle?.vehicleBobY}
                       vehicleRiseY={renderedVehicle?.vehicleRiseY}
+                      vehicleOffsetX={renderedVehicle?.vehicleOffsetX}
                       expandSceneSurfaces
                       wearables={wearables}
                       drinkFlavor={drinkFlavor}

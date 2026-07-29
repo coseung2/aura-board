@@ -237,6 +237,7 @@ export function SlimePetShopDrawer({
             vehicleCharacterOffsetY={renderedVehicle?.vehicleCharacterOffsetY}
             vehicleBobY={renderedVehicle?.vehicleBobY}
             vehicleRiseY={renderedVehicle?.vehicleRiseY}
+            vehicleOffsetX={renderedVehicle?.vehicleOffsetX}
             wearables={previewWearables}
             drinkFlavor={previewDrinkFlavor}
             repeat={preview.action === "drink" || isBall}

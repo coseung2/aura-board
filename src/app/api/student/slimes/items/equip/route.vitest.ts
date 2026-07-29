@@ -34,6 +34,7 @@ describe("POST /api/student/slimes/items/equip", () => {
       isEquipped: true,
       equippedItemKeys: ["water-puddle-background"],
       equippedItemsByColor: { blue: ["water-puddle-background"] },
+      hiddenItemsByColor: { blue: [] },
       idempotent: false,
     });
   });
@@ -63,6 +64,7 @@ describe("POST /api/student/slimes/items/equip", () => {
     expect(await response.json()).toMatchObject({
       itemKey: "water-puddle-background",
       isEquipped: true,
+      hiddenItemsByColor: { blue: [] },
     });
   });
 

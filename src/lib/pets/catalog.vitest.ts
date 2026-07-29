@@ -90,6 +90,11 @@ describe("slime catalog", () => {
       ["slime-vehicle-flying-broom", null],
       ["slime-vehicle-swan-boat", null],
       ["slime-vehicle-magic-carpet", null],
+      ["slime-vehicle-bumper-car", null],
+      ["slime-vehicle-carousel-horse", null],
+      ["slime-vehicle-flamingo-tube", null],
+      ["slime-vehicle-soap-bubble", null],
+      ["slime-vehicle-crescent-moon", null],
       ["slime-blue-drink-lemonade", null],
       ["slime-red-drink-strawberry-soda", null],
       ["slime-green-drink-melon-soda", null],
@@ -239,7 +244,7 @@ describe("slime catalog", () => {
   });
 
   it("registers the delivered vehicle tiers, placement metadata, and FX sheets", () => {
-    expect(SLIME_VEHICLE_CATALOG).toHaveLength(12);
+    expect(SLIME_VEHICLE_CATALOG).toHaveLength(17);
     expect(SLIME_VEHICLE_CATALOG.map((item) => [
       item.key,
       item.labelKo,
@@ -262,6 +267,11 @@ describe("slime catalog", () => {
       ["slime-vehicle-flying-broom", "하늘 빗자루", 2, 700, "floating", 13, "assignment_reward", 200],
       ["slime-vehicle-swan-boat", "백조 보트", 1, 1_000, "grounded", 16, "comment_reward", 300],
       ["slime-vehicle-magic-carpet", "마법 양탄자", 1, 1_000, "floating", 14, "growth_speed", 300],
+      ["slime-vehicle-bumper-car", "범퍼카", 2, 700, "grounded", 11, "walking_reward", 200],
+      ["slime-vehicle-carousel-horse", "회전목마", 1, 1_000, "grounded", 23, "assignment_reward", 300],
+      ["slime-vehicle-flamingo-tube", "플라밍고 튜브", 2, 700, "grounded", 15, "comment_reward", 200],
+      ["slime-vehicle-soap-bubble", "비눗방울", 2, 700, "floating", 2, "growth_speed", 200],
+      ["slime-vehicle-crescent-moon", "초승달", 1, 1_000, "floating", 9, "reading_reward", 300],
     ]);
 
     expect(SLIME_VEHICLE_CATALOG.every((item) =>
@@ -321,6 +331,53 @@ describe("slime catalog", () => {
           "/creatures/slimes/shop/vehicles/magic-carpet/fx/sparkle-idle-sheet.png",
         ],
       });
+    const bumperCar = SLIME_VEHICLE_CATALOG.find((item) => item.key === "slime-vehicle-bumper-car");
+    expect(bumperCar).toMatchObject({
+      vehicleStance: "grounded",
+      vehicleRiseY: 11,
+      vehicleBobY: [0, 0, 0, 0, 0, 0, 0, 0],
+      vehicleGroundedSpritePath: "/creatures/slimes/shop/vehicles/bumper-car/wheels-idle-sheet.png",
+      vehicleGroundedFrameCount: 4,
+      vehicleGroundedFrameDurationMs: 100,
+    });
+    expect(bumperCar?.vehicleOffsetX).toBeUndefined();
+    expect(SLIME_VEHICLE_CATALOG.find((item) => item.key === "slime-vehicle-carousel-horse"))
+      .toMatchObject({
+        vehicleStance: "grounded",
+        vehicleRiseY: 23,
+        vehicleBobY: [0, -1, -2, -2, -2, -1, -1, 0],
+        vehicleOffsetX: -4,
+        effectKey: "assignment_reward",
+      });
+    expect(SLIME_VEHICLE_CATALOG.find((item) => item.key === "slime-vehicle-flamingo-tube"))
+      .toMatchObject({
+        vehicleStance: "grounded",
+        vehicleRiseY: 15,
+        vehicleBobY: [0, -1, -1, -2, -2, -1, -1, 0],
+        vehicleOffsetX: -4,
+        effectKey: "comment_reward",
+      });
+    expect(SLIME_VEHICLE_CATALOG.find((item) => item.key === "slime-vehicle-soap-bubble"))
+      .toMatchObject({
+        vehicleStance: "floating",
+        vehicleRiseY: 2,
+        vehicleBobY: [0, -1, -2, -2, -2, -1, -1, 0],
+        effectKey: "growth_speed",
+        vehicleEffectSpritePaths: [
+          "/creatures/slimes/shop/vehicles/soap-bubble/fx/glint-idle-sheet.png",
+        ],
+      });
+    expect(SLIME_VEHICLE_CATALOG.find((item) => item.key === "slime-vehicle-crescent-moon"))
+      .toMatchObject({
+        vehicleStance: "floating",
+        vehicleRiseY: 9,
+        vehicleBobY: [0, -1, -2, -2, -2, -1, -1, 0],
+        vehicleOffsetX: -6,
+        effectKey: "reading_reward",
+        vehicleEffectSpritePaths: [
+          "/creatures/slimes/shop/vehicles/crescent-moon/fx/stars-idle-sheet.png",
+        ],
+      });
     expect(SLIME_VEHICLE_CATALOG.find((item) => item.key === "slime-vehicle-go-kart"))
       .toMatchObject({
         vehicleRiseY: 9,
@@ -336,7 +393,7 @@ describe("slime catalog", () => {
   it("assigns an explicit tier to every vehicle, including the migrated trampoline", () => {
     const vehicles = SLIME_SHOP_CATALOG.filter((item) => item.category === "vehicle");
 
-    expect(vehicles).toHaveLength(13);
+    expect(vehicles).toHaveLength(18);
     expect(vehicles.every((item) => item.tier === 1 || item.tier === 2 || item.tier === 3))
       .toBe(true);
     expect(vehicles.find((item) => item.key === "slime-blue-trampoline")?.tier).toBe(3);

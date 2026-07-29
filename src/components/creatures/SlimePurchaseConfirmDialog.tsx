@@ -152,6 +152,7 @@ export function SlimePurchaseConfirmDialog({
               vehicleCharacterOffsetY={renderedVehicle?.vehicleCharacterOffsetY}
               vehicleBobY={renderedVehicle?.vehicleBobY}
               vehicleRiseY={renderedVehicle?.vehicleRiseY}
+              vehicleOffsetX={renderedVehicle?.vehicleOffsetX}
               wearables={wearables}
               drinkFlavor={isDrink ? wearables.drink ?? null : null}
               repeat={isDrink || isBall}

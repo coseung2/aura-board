@@ -317,6 +317,8 @@ export const states = {
 export const layers = {
   spriteFloor: 0,
   spriteItem: 1,
+  /** Prop actions (drinks, balls) must remain above every character/equipment layer. */
+  spriteProp: 501,
   badge: 2,
   cardOverlay: 3,
   popover: 5,
@@ -344,8 +346,13 @@ export const slimeUi = {
   carouselDotSize: 8,
   vehicleFrameWidth: 64,
   vehicleSceneScale: 1.5,
-  vehicleFloorScale: 1.375,
+  vehicleFloorScale: 1.125,
   vehicleSceneSlotHeight: 116,
+  petSceneDisplayScale: 0.25,
+  /** Home reuses the 32%-wide pet-card composition at a uniform 1.25x scale. */
+  homePetSceneDisplayScale: 0.3125,
+  homePetSceneWidth: "40%" as const,
+  homePetSceneHeight: 145,
 } as const;
 
 export const media = {

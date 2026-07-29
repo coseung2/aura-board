@@ -1,0 +1,16 @@
+{
+  "option": "carousel-horse",
+  "labelKo": "회전목마",
+  "pattern": "front-only",
+  "stance": "grounded",
+  "price": 1000,
+  "tier": 1,
+  "canvas": { "w": 64, "h": 81 },
+  "characterOffsetY": 17,
+  "groundLineY": 56,
+  "riseY": 23,
+  "frameCount": 8,
+  "frameDurationsMs": [240, 160, 180, 90, 90, 160, 180, 240],
+  "bobY": [0, -1, -2, -2, -2, -1, -1, 0],
+  "riderFollows": true
+}

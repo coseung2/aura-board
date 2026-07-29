@@ -14,21 +14,26 @@ import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Image, type ImageProps } from "expo-image";
 import {
-  ArrowLeft,
-  Check,
+  Ban,
+  CircleAlert,
+  CircleCheck,
   Star,
 } from "lucide-react-native";
 import {
   AppBottomSheet,
   AppButton,
   AppHeader,
+  BarePressable,
   ControlPressable,
 } from "../../components/ui";
 import {
   ContentTab,
   ContentTabs,
 } from "../../components/NavigationTabs";
-import { SlimeSprite } from "../../components/slime/SlimeSprite";
+import {
+  FeatheredSceneBackground,
+  SlimeSprite,
+} from "../../components/slime/SlimeSprite";
 import { SlimePurchaseConfirmModal } from "../../components/slime/SlimePurchaseConfirmModal";
 import { StudentHeaderActions } from "../../components/StudentHeaderActions";
 import { WalkingTitleSlot } from "../../components/WalkingTitleSlot";
@@ -59,10 +64,8 @@ import {
   resolveEquippedSceneBackground,
   resolveEquippedVehicle,
   resolveEquippedSlimeWearables,
-  resolveSlimeRemoteSpriteUri,
   selectSceneBackgroundSpritePath,
   shopFilterForItem,
-  slimeBallSpritePath,
   slimeShopPreviewColor,
   slimeShopNavItems,
   slimeVisualItemSlot,
@@ -76,6 +79,12 @@ import {
   type SlimeShopItem,
   type SlimeShopFilter,
 } from "../../lib/slimes";
+import { resolveEquippedSlimePropAction } from "../../lib/slime-props";
+import {
+  prioritizeEquippedSlimeItems,
+  setSlimeItemHidden,
+  visibleEquippedSlimeItemKeys,
+} from "../../lib/slime-item-visibility";
 import { ApiError, apiFetch, getApiBase } from "../../lib/api";
 import { clearSessionToken, getUnifiedLoginRoute } from "../../lib/session";
 import {
@@ -98,12 +107,25 @@ import {
 type Notice = { kind: "success" | "error"; text: string };
 type SlimeEquipResponse = Pick<
   MobileSlimeHome,
-  "equippedItemKeys" | "equippedItemsByColor" | "equippedFloorByColor" | "equippedFloor"
+  | "equippedItemKeys"
+  | "equippedItemsByColor"
+  | "hiddenItemKeys"
+  | "hiddenItemsByColor"
+  | "equippedFloorByColor"
+  | "equippedFloor"
 >;
 type SlimeCookieConsumeResponse = {
   itemKey: string;
   remainingQuantity: number;
   growth: NonNullable<MobileSlimeHome["growthByColor"][SlimeColor]>;
+};
+type SlimeVisibilityResponse = Pick<
+  MobileSlimeHome,
+  "hiddenItemKeys" | "hiddenItemsByColor"
+> & {
+  slimeColor: SlimeColor;
+  itemKey: string;
+  isHidden: boolean;
 };
 type LocalImageSource = ImageProps["source"];
 type WardrobeFilter =
@@ -126,19 +148,6 @@ const WARDROBE_NAV_ITEMS: readonly { key: WardrobeFilter; label: string }[] = [
   { key: "outfit", label: "착장" },
   { key: "title", label: "칭호" },
 ];
-
-function FullBleedSceneBackground({ item }: { item: SlimeShopItem }) {
-  const path = selectSceneBackgroundSpritePath(item);
-  return (
-    <Image
-      source={{ uri: resolveSlimeRemoteSpriteUri(path, getApiBase()) }}
-      style={styles.fullBleedSceneBackground}
-      contentFit="cover"
-      transition={0}
-      accessible={false}
-    />
-  );
-}
 
 const ERROR_LABELS: Record<string, string> = {
   insufficient_funds: "잔액이 부족해요.",
@@ -173,6 +182,14 @@ const SLIME_EFFECT_LABELS: Record<string, string> = {
   walking_reward: "걷기 보상",
   assignment_reward: "과제 보상",
   comment_reward: "댓글 보상",
+};
+
+const SLIME_EFFECT_DESCRIPTIONS: Record<string, string> = {
+  growth_speed: "펫의 성장 속도가 UP!",
+  reading_reward: "독서로 얻을 수 있는 보상이 UP!",
+  walking_reward: "걷기로 얻을 수 있는 보상이 UP!",
+  assignment_reward: "과제 제출 날짜를 지켰을 때의 보상이 UP!",
+  comment_reward: "게시물에 댓글을 달았을 때의 보상이 UP!",
 };
 
 function shopItemBuffLabel(item: SlimeShopItem): string | null {
@@ -216,6 +233,7 @@ function optimisticallyEquipItem(
   if (!slot) return current;
   const catalogByKey = new Map(current.shopCatalog.map((candidate) => [candidate.key, candidate]));
   const nextItemsByColor = { ...current.equippedItemsByColor };
+  const nextHiddenByColor = { ...current.hiddenItemsByColor };
 
   for (const color of current.ownedColors) {
     let keys = [...(current.equippedItemsByColor[color] ?? [])];
@@ -233,10 +251,16 @@ function optimisticallyEquipItem(
       keys = keys.filter((key) => key !== item.key);
     }
     nextItemsByColor[color] = keys;
+    const equipped = new Set(keys);
+    nextHiddenByColor[color] = (current.hiddenItemsByColor[color] ?? []).filter((key) =>
+      equipped.has(key));
   }
 
   const equippedItemKeys = Array.from(new Set(
     Object.values(nextItemsByColor).flatMap((keys) => keys ?? []),
+  ));
+  const hiddenItemKeys = Array.from(new Set(
+    Object.values(nextHiddenByColor).flatMap((keys) => keys ?? []),
   ));
   const equippedFloorByColor = { ...current.equippedFloorByColor };
   for (const color of current.ownedColors) {
@@ -250,6 +274,8 @@ function optimisticallyEquipItem(
     ...current,
     equippedItemKeys,
     equippedItemsByColor: nextItemsByColor,
+    hiddenItemKeys,
+    hiddenItemsByColor: nextHiddenByColor,
     equippedFloorByColor,
     equippedFloor: current.representativeColor
       ? equippedFloorByColor[current.representativeColor] ?? "none"
@@ -271,12 +297,12 @@ function isVehicleShopItem(item: SlimeShopItem): boolean {
 }
 
 /**
- * Complete preview sprite for a shop item, or `undefined` for drinks.
+ * Complete preview sprite for a legacy item, excluding composed prop actions.
  *
  * Drinks compose from the anchor registry, so handing back a complete GIF would
  * replace the character sheet and suppress the composed drink layer.
  */
-function shopItemSpritePath(item: SlimeShopItem, slimeColor: SlimeColor): string | undefined {
+function shopItemSpritePath(item: SlimeShopItem, _slimeColor: SlimeColor): string | undefined {
   if (
     item.category === "drink"
     || item.category === "wearable"
@@ -285,8 +311,8 @@ function shopItemSpritePath(item: SlimeShopItem, slimeColor: SlimeColor): string
     || isSceneBackgroundItem(item)
     || item.floor
   ) return undefined;
-  if (!item.key.startsWith("slime-ball-")) return item.mobileSpritePath ?? item.spritePath;
-  return slimeBallSpritePath([item.key], slimeColor) ?? item.spritePath;
+  if (item.key.startsWith("slime-ball-")) return undefined;
+  return item.mobileSpritePath ?? item.spritePath;
 }
 
 /** Preview action and flavor for a shop item that composes rather than replaces. */
@@ -301,22 +327,12 @@ function shopItemPreview(item: SlimeShopItem) {
         ? "drink" as const
         : "idle" as const,
     drinkFlavor: wearables.drink,
+    propAction: resolveEquippedSlimePropAction([item.key], [item]),
     equippedFloor: trampoline ? "trampoline" as const : item.floor ?? "none" as const,
     expandSceneSurfaces: trampoline,
     vehicle: trampoline ? null : vehicle,
     wearables,
   };
-}
-
-function equippedItemSpritePath(
-  itemKeys: readonly string[],
-  slimeColor: SlimeColor,
-): string | undefined {
-  const ballPath = slimeBallSpritePath(itemKeys, slimeColor);
-  if (ballPath) return ballPath;
-  // Drinks compose from the anchor registry. Returning a complete GIF here would
-  // replace the character sheet and suppress every composed wearable layer.
-  return undefined;
 }
 
 export default function StudentSlimeScreen() {
@@ -581,16 +597,17 @@ export default function StudentSlimeScreen() {
           ]}
           accessible={false}
         >
-          {sceneBackground ? <FullBleedSceneBackground item={item} /> : null}
           <SlimeSprite
             slimeColor={slimeShopPreviewColor(item, selectedColor)}
             evolution="base"
             action={preview.action}
             equippedFloor={preview.equippedFloor}
-            displayScale={0.25}
-            repeat={item.category === "drink"}
+            displayScale={slimeUi.petSceneDisplayScale}
+            repeat={Boolean(preview.propAction)}
             expandSceneSurfaces={preview.expandSceneSurfaces || sceneBackground}
             itemSpritePath={sceneBackground ? undefined : shopItemSpritePath(item, selectedColor)}
+            propAction={preview.propAction}
+            backgroundSpritePath={sceneBackground ? selectSceneBackgroundSpritePath(item) : undefined}
             wearables={preview.wearables}
             drinkFlavor={preview.drinkFlavor}
             vehicleSpritePath={preview.vehicle?.vehicleSheetPath ?? preview.vehicle?.spritePath}
@@ -603,6 +620,7 @@ export default function StudentSlimeScreen() {
             vehicleCharacterOffsetY={preview.vehicle?.vehicleCharacterOffsetY}
             vehicleBobY={preview.vehicle?.vehicleBobY}
             vehicleRiseY={preview.vehicle?.vehicleRiseY}
+            vehicleOffsetX={preview.vehicle?.vehicleOffsetX}
             accessibilityLabel={`${item.labelKo} 미리보기`}
           />
         </View>
@@ -627,9 +645,19 @@ export default function StudentSlimeScreen() {
     [home],
   );
   const visibleWardrobeItems = useMemo(
-    () => wardrobeItems.filter((item) => wardrobeFilterForItem(item) === wardrobeFilter),
-    [wardrobeFilter, wardrobeItems],
+    () => prioritizeEquippedSlimeItems(
+      wardrobeItems.filter((item) => wardrobeFilterForItem(item) === wardrobeFilter),
+      wardrobeEquippedItems,
+    ),
+    [wardrobeEquippedItems, wardrobeFilter, wardrobeItems],
   );
+  const visibleWardrobeTitles = useMemo(() => {
+    const equippedTitle = home?.equippedTitleByColor?.[wardrobeTargetColor];
+    return prioritizeEquippedSlimeItems(
+      home?.claimedTitles ?? [],
+      equippedTitle ? [equippedTitle] : [],
+    );
+  }, [home?.claimedTitles, home?.equippedTitleByColor, wardrobeTargetColor]);
   const buffGroups = useMemo(() => home ? mobileSlimeBuffGroups(home) : [], [home]);
   const buffGroupsByColor = useMemo(
     () => new Map(buffGroups.map((group) => [group.color, group])),
@@ -876,6 +904,8 @@ export default function StudentSlimeScreen() {
               ...homeRef.current,
               equippedItemKeys: result.equippedItemKeys,
               equippedItemsByColor: result.equippedItemsByColor,
+              hiddenItemKeys: result.hiddenItemKeys,
+              hiddenItemsByColor: result.hiddenItemsByColor,
               equippedFloorByColor: result.equippedFloorByColor,
               equippedFloor: result.equippedFloor,
             } : null;
@@ -895,6 +925,77 @@ export default function StudentSlimeScreen() {
           if (latestEquipRequestRef.current === requestVersion) {
             setBusyItemKey(null);
           }
+        }
+      });
+    equipQueueRef.current = queuedRequest;
+  }, [clearRetryKey, load, retryKey, wardrobeTargetColor]);
+
+  const toggleItemVisibility = useCallback((item: SlimeShopItem, isCurrentlyHidden: boolean) => {
+    const currentHome = homeRef.current;
+    const equipped = currentHome?.equippedItemsByColor[wardrobeTargetColor] ?? [];
+    if (!currentHome || !equipped.includes(item.key)) return;
+
+    const isHidden = !isCurrentlyHidden;
+    const requestVersion = latestEquipRequestRef.current + 1;
+    latestEquipRequestRef.current = requestVersion;
+    const hiddenItemsByColor = setSlimeItemHidden(
+      currentHome.hiddenItemsByColor,
+      wardrobeTargetColor,
+      item.key,
+      isHidden,
+    );
+    const optimisticHome: MobileSlimeHome = {
+      ...currentHome,
+      hiddenItemsByColor: Object.fromEntries(
+        Object.entries(hiddenItemsByColor).map(([color, keys]) => [color, [...(keys ?? [])]]),
+      ),
+      hiddenItemKeys: Array.from(new Set(
+        Object.values(hiddenItemsByColor).flatMap((keys) => [...(keys ?? [])]),
+      )),
+    };
+    homeRef.current = optimisticHome;
+    setHome(optimisticHome);
+    setBusyItemKey(item.key);
+    setNotice(null);
+    const retryIdentity = `${wardrobeTargetColor}:${item.key}:${isHidden}`;
+
+    const queuedRequest = equipQueueRef.current
+      .catch(() => undefined)
+      .then(async () => {
+        setBusyItemKey(item.key);
+        try {
+          const result = await apiFetch<SlimeVisibilityResponse>(
+            "/api/student/slimes/items/visibility",
+            {
+              method: "POST",
+              json: { itemKey: item.key, slimeColor: wardrobeTargetColor, isHidden },
+              timeoutMs: 15_000,
+              headers: {
+                "Idempotency-Key": retryKey("slime-item-visibility", retryIdentity),
+              },
+            },
+          );
+          clearRetryKey("slime-item-visibility", retryIdentity);
+          if (latestEquipRequestRef.current === requestVersion) {
+            const reconciledHome = homeRef.current ? {
+              ...homeRef.current,
+              hiddenItemKeys: result.hiddenItemKeys,
+              hiddenItemsByColor: result.hiddenItemsByColor,
+            } : null;
+            homeRef.current = reconciledHome;
+            setHome(reconciledHome);
+            setNotice({
+              kind: "success",
+              text: `${item.labelKo} 외형을 ${isHidden ? "숨겼어요. 버프는 계속 적용돼요." : "다시 표시했어요."}`,
+            });
+          }
+        } catch (mutationError) {
+          if (latestEquipRequestRef.current === requestVersion) {
+            setNotice({ kind: "error", text: apiErrorMessage(mutationError) });
+            await load(true);
+          }
+        } finally {
+          if (latestEquipRequestRef.current === requestVersion) setBusyItemKey(null);
         }
       });
     equipQueueRef.current = queuedRequest;
@@ -1062,9 +1163,15 @@ export default function StudentSlimeScreen() {
             <View style={styles.classroomList} accessibilityLabel="우리 반 대표 펫 목록">
               {classmates?.map((student) => {
                 const representative = student.representative;
+                const classVisibleItemKeys = representative
+                  ? visibleEquippedSlimeItemKeys(
+                      representative.equippedItemKeys,
+                      representative.hiddenItemKeys,
+                    )
+                  : [];
                 const classItems = representative
                   ? home?.shopCatalog.filter((item) =>
-                      representative.equippedItemKeys.includes(item.key),
+                      classVisibleItemKeys.includes(item.key),
                     ) ?? []
                   : [];
                 const classFloor = classItems.reduce<EquippedFloor>(
@@ -1073,37 +1180,31 @@ export default function StudentSlimeScreen() {
                 );
                 const classVehicleItem = representative
                   ? resolveEquippedVehicle(
-                      representative.equippedItemKeys,
+                      classVisibleItemKeys,
                       home?.shopCatalog ?? [],
                     )
                   : null;
                 const classUsesTrampoline =
                   classVehicleItem?.key === SLIME_TRAMPOLINE_ITEM_KEY;
                 const classRenderedVehicle = classUsesTrampoline ? null : classVehicleItem;
-                const classAction: SlimeAction = classItems.some(
-                  (item) => item.category === "drink",
-                )
-                  ? "drink"
-                  : // The trampoline is a vehicle now, so its jump timeline keys off
-                    // the equipped vehicle rather than a floor value.
-                    classUsesTrampoline
+                const classAction: SlimeAction = classUsesTrampoline
                     ? "floor-interaction"
                     : "idle";
-                const classItemSpritePath = representative
-                  ? equippedItemSpritePath(
-                      representative.equippedItemKeys,
-                      representative.color,
+                const classPropAction = representative
+                  ? resolveEquippedSlimePropAction(
+                      classVisibleItemKeys,
+                      home?.shopCatalog ?? [],
                     )
-                  : undefined;
+                  : null;
                 const classWearables = representative
                   ? resolveEquippedSlimeWearables(
-                      representative.equippedItemKeys,
+                      classVisibleItemKeys,
                       home?.shopCatalog ?? [],
                     )
                   : null;
                 const classBackground = representative
                   ? resolveEquippedSceneBackground(
-                      representative.equippedItemKeys,
+                      classVisibleItemKeys,
                       home?.shopCatalog ?? [],
                     )
                   : null;
@@ -1116,7 +1217,10 @@ export default function StudentSlimeScreen() {
                       ]}
                     >
                       {classBackground ? (
-                        <FullBleedSceneBackground item={classBackground} />
+                        <FeatheredSceneBackground
+                          spritePath={selectSceneBackgroundSpritePath(classBackground)}
+                          style={StyleSheet.absoluteFill}
+                        />
                       ) : null}
                       {representative ? (
                           <SlimeSprite
@@ -1124,10 +1228,10 @@ export default function StudentSlimeScreen() {
                             growthStage={representative.growthStage}
                             action={classAction}
                             equippedFloor={classUsesTrampoline ? "trampoline" : classFloor}
-                            displayScale={0.25}
+                            displayScale={slimeUi.petSceneDisplayScale}
                             expandSceneSurfaces
-                            repeat={classAction !== "idle"}
-                            itemSpritePath={classItemSpritePath}
+                            repeat={Boolean(classPropAction) || classAction !== "idle"}
+                            propAction={classPropAction}
                             wearables={classWearables ?? undefined}
                             drinkFlavor={classWearables?.drink}
                             vehicleSpritePath={
@@ -1142,6 +1246,7 @@ export default function StudentSlimeScreen() {
                             vehicleCharacterOffsetY={classRenderedVehicle?.vehicleCharacterOffsetY}
                             vehicleBobY={classRenderedVehicle?.vehicleBobY}
                             vehicleRiseY={classRenderedVehicle?.vehicleRiseY}
+                            vehicleOffsetX={classRenderedVehicle?.vehicleOffsetX}
                             accessibilityLabel={`${student.name}의 ${SLIME_COLOR_LABELS[representative.color]} 대표 펫`}
                           />
                       ) : (
@@ -1181,23 +1286,35 @@ export default function StudentSlimeScreen() {
               : null;
             const petBuffGroup = buffGroupsByColor.get(itemColor);
             const petItems = home?.equippedItemsByColor[itemColor] ?? [];
-            const petWearables = resolveEquippedSlimeWearables(
+            const petVisibleItems = visibleEquippedSlimeItemKeys(
               petItems,
+              home?.hiddenItemsByColor[itemColor],
+            );
+            const petWearables = resolveEquippedSlimeWearables(
+              petVisibleItems,
               home?.shopCatalog ?? [],
             );
-            const petFloor = home?.equippedFloorByColor[itemColor] ?? "none";
+            const petFloor = petVisibleItems.reduce<EquippedFloor>(
+              (current, itemKey) =>
+                home?.shopCatalog.find((item) => item.key === itemKey)?.floor ?? current,
+              "none",
+            );
             const petBackground = resolveEquippedSceneBackground(
-              petItems,
+              petVisibleItems,
+              home?.shopCatalog ?? [],
+            );
+            const petPropAction = resolveEquippedSlimePropAction(
+              petVisibleItems,
               home?.shopCatalog ?? [],
             );
             const petVehicle = resolveEquippedVehicle(
-              petItems,
+              petVisibleItems,
               home?.shopCatalog ?? [],
             );
             const petUsesTrampoline = petVehicle?.key === SLIME_TRAMPOLINE_ITEM_KEY;
             const petRenderedVehicle = petUsesTrampoline ? null : petVehicle;
             const petHasDrink = (home?.shopCatalog ?? []).some(
-              (item) => item.category === "drink" && petItems.includes(item.key),
+              (item) => item.category === "drink" && petVisibleItems.includes(item.key),
             );
             const manualAction = manualActions[itemColor];
             const petAction: SlimeAction = manualAction
@@ -1243,7 +1360,12 @@ export default function StudentSlimeScreen() {
                   styles.vehicleSceneSlot,
                   openEffectColor === itemColor && styles.myPetSpriteEffectOpen,
                 ]}>
-                  {petBackground ? <FullBleedSceneBackground item={petBackground} /> : null}
+                  {petBackground ? (
+                    <FeatheredSceneBackground
+                      spritePath={selectSceneBackgroundSpritePath(petBackground)}
+                      style={StyleSheet.absoluteFill}
+                    />
+                  ) : null}
                   {isOwned ? (
                     <>
                       {openEffectColor === itemColor ? (
@@ -1267,13 +1389,10 @@ export default function StudentSlimeScreen() {
                       growthStage={petStage}
                       action={petAction}
                       equippedFloor={petUsesTrampoline ? "trampoline" : petFloor}
-                      displayScale={0.25}
+                      displayScale={slimeUi.petSceneDisplayScale}
                       expandSceneSurfaces
-                      repeat={!manualAction && petAction !== "idle"}
-                      itemSpritePath={equippedItemSpritePath(
-                        petItems,
-                        itemColor,
-                      )}
+                      repeat={!manualAction && (Boolean(petPropAction) || petAction !== "idle")}
+                      propAction={petPropAction}
                       wearables={petWearables}
                       drinkFlavor={petWearables.drink}
                       vehicleSpritePath={petRenderedVehicle?.vehicleSheetPath ?? petRenderedVehicle?.spritePath}
@@ -1286,6 +1405,7 @@ export default function StudentSlimeScreen() {
                       vehicleCharacterOffsetY={petRenderedVehicle?.vehicleCharacterOffsetY}
                       vehicleBobY={petRenderedVehicle?.vehicleBobY}
                       vehicleRiseY={petRenderedVehicle?.vehicleRiseY}
+                      vehicleOffsetX={petRenderedVehicle?.vehicleOffsetX}
                       accessibilityLabel={`${SLIME_COLOR_LABELS[itemColor]} 슬라임`}
                       onComplete={manualAction
                         ? () => setManualActions((current) => {
@@ -1382,19 +1502,21 @@ export default function StudentSlimeScreen() {
                   </ControlPressable>
                 ) : null}
                 <View style={styles.myPetActions} accessibilityLabel={`${SLIME_COLOR_LABELS[itemColor]} 펫 관리`}>
-                  <ControlPressable
-                    style={styles.myPetActionButton}
+                  <BarePressable
+                    style={styles.myPetActionLink}
                     disabled={!isOwned}
-                    hitSlop={spacing.xs}
+                    hitSlop={spacing.sm}
                     onPress={() => {
                       setOpenEffectColor(null);
                       setOpenGrowthColor(null);
                       setSelectedColor(itemColor);
                       setWardrobeColor(itemColor);
                     }}
+                    accessibilityRole="button"
+                    accessibilityLabel={`${SLIME_COLOR_LABELS[itemColor]} 꾸미기`}
                   >
                     <Text style={styles.myPetActionText}>꾸미기</Text>
-                  </ControlPressable>
+                  </BarePressable>
                   <ControlPressable
                     style={styles.myPetCookieButton}
                     disabled={!isOwned || cookieQuantity <= 0 || busyItemKey !== null}
@@ -1431,6 +1553,14 @@ export default function StudentSlimeScreen() {
                 <View key={effect.effectKey} style={styles.appliedEffectRow}>
                   <Text style={styles.appliedEffectLabel} numberOfLines={1}>
                     {SLIME_EFFECT_LABELS[effect.effectKey] ?? effect.effectKey}
+                  </Text>
+                  <Text
+                    style={styles.appliedEffectDescription}
+                    numberOfLines={1}
+                    adjustsFontSizeToFit
+                    minimumFontScale={0.75}
+                  >
+                    {SLIME_EFFECT_DESCRIPTIONS[effect.effectKey] ?? ""}
                   </Text>
                   <Text style={styles.appliedEffectValue}>+{formatBuffPercent(effect.bps)}</Text>
                 </View>
@@ -1474,7 +1604,7 @@ export default function StudentSlimeScreen() {
                       evolution="base"
                       action="idle"
                       equippedFloor="none"
-                      displayScale={0.25}
+                      displayScale={slimeUi.petSceneDisplayScale}
                       accessibilityLabel={`${slime.nameKo} 미리보기`}
                     />
                   </View>
@@ -1528,14 +1658,14 @@ export default function StudentSlimeScreen() {
                         ]}
                         accessible={false}
                       >
-                        <FullBleedSceneBackground item={item} />
                         <SlimeSprite
                           slimeColor={slimeShopPreviewColor(item, selectedColor)}
                           evolution="base"
                           action="idle"
                           equippedFloor="none"
-                          displayScale={0.25}
+                          displayScale={slimeUi.petSceneDisplayScale}
                           expandSceneSurfaces
+                          backgroundSpritePath={selectSceneBackgroundSpritePath(item)}
                           accessibilityLabel={`${item.labelKo} 미리보기`}
                         />
                       </View>
@@ -1597,7 +1727,7 @@ export default function StudentSlimeScreen() {
                       evolution="base"
                       action={shopItemPreview(item).action}
                       equippedFloor={shopItemPreview(item).equippedFloor}
-                      displayScale={0.25}
+                      displayScale={slimeUi.petSceneDisplayScale}
                       repeat={item.category === "drink"}
                       itemSpritePath={shopItemSpritePath(item, selectedColor)}
                       wearables={shopItemPreview(item).wearables}
@@ -1705,17 +1835,16 @@ export default function StudentSlimeScreen() {
                 </Text>
               </View>
             ) : (
-              (home?.claimedTitles ?? []).map((title) => {
+              visibleWardrobeTitles.map((title) => {
                 const equipped =
                   wardrobeColor != null &&
                   home?.equippedTitleByColor?.[wardrobeColor] === title.key;
                 const busy = busyItemKey === title.key;
                 return (
-                  <ControlPressable
+                  <View
                     key={title.key}
                     style={[styles.wardrobeItem, equipped && styles.wardrobeItemEquipped]}
-                    disabled={busy}
-                    onPress={() => void toggleTitle(title.key, equipped)}
+                    accessible
                     accessibilityLabel={`${title.label} 칭호 ${equipped ? "해제" : "장착"}`}
                     accessibilityState={{ selected: equipped, busy }}
                   >
@@ -1727,16 +1856,27 @@ export default function StudentSlimeScreen() {
                         accessible={false}
                       />
                     </View>
-                    <View style={styles.itemCardBody}>
+                    <View style={[styles.itemCardBody, styles.wardrobeCardBody]}>
                       <View style={styles.wardrobeItemCopy}>
                         <Text style={styles.floorTitle}>{title.label}</Text>
                         <Text style={styles.floorSubtitle}>+{title.buffBps / 100}%</Text>
                       </View>
-                      <Text style={[styles.wardrobeItemAction, equipped && styles.wardrobeItemActionEquipped]}>
-                        {busy ? "처리 중…" : equipped ? "해제" : "장착"}
-                      </Text>
+                      <BarePressable
+                        disabled={busy}
+                        hitSlop={spacing.sm}
+                        onPress={() => void toggleTitle(title.key, equipped)}
+                        accessibilityRole="button"
+                        accessibilityLabel={`${title.label} 칭호 ${equipped ? "해제" : "장착"}`}
+                      >
+                        <Text style={[
+                          styles.wardrobeInlineActionText,
+                          equipped ? styles.wardrobeInlineActionDanger : styles.wardrobeInlineActionPrimary,
+                        ]}>
+                          {busy ? "처리 중…" : equipped ? "해제" : "장착"}
+                        </Text>
+                      </BarePressable>
                     </View>
-                  </ControlPressable>
+                  </View>
                 );
               })
             )
@@ -1747,6 +1887,9 @@ export default function StudentSlimeScreen() {
           ) : (
             visibleWardrobeItems.map((item) => {
               const equipped = wardrobeEquippedItems.includes(item.key);
+              const hidden = equipped && Boolean(
+                home?.hiddenItemsByColor[wardrobeTargetColor]?.includes(item.key),
+              );
               // An item worn by a different pet is still available here, but the
               // player should know it will move rather than be duplicated.
               const wornByOther = !equipped ? wardrobeItemWearer(item.key) : null;
@@ -1758,7 +1901,7 @@ export default function StudentSlimeScreen() {
               const expandedSceneItem =
                 vehicleItem || sceneBackground || preview.equippedFloor !== "none";
               return (
-                <ControlPressable
+                <View
                   key={item.key}
                   style={[
                     styles.wardrobeItem,
@@ -1766,10 +1909,7 @@ export default function StudentSlimeScreen() {
                     equipped && styles.wardrobeItemEquipped,
                     wornByOther && styles.wardrobeItemWornByOther,
                   ]}
-                  // Keep the card interactive while an earlier equip request is
-                  // queued. This lets the same purchased item move directly to
-                  // another pet; the request queue preserves server order.
-                  onPress={() => void toggleItem(item)}
+                  accessible
                   accessibilityLabel={`${item.labelKo} ${
                     equipped ? "해제" : wornByOther ? `${wornByOther} 슬라임 장착 중, 옮겨서 장착` : "장착"
                   }`}
@@ -1786,44 +1926,95 @@ export default function StudentSlimeScreen() {
                     ]}
                     accessible={false}
                   >
-                    {sceneBackground ? <FullBleedSceneBackground item={item} /> : null}
-                    <SlimeSprite
-                      slimeColor={slimeShopPreviewColor(item, wardrobeColor ?? selectedColor)}
-                      evolution="base"
-                      action={preview.action}
-                      equippedFloor={preview.equippedFloor}
-                      displayScale={0.25}
-                      repeat={item.category === "drink"}
-                      expandSceneSurfaces={preview.expandSceneSurfaces || sceneBackground}
-                      itemSpritePath={sceneBackground ? undefined : shopItemSpritePath(item, wardrobeColor ?? selectedColor)}
-                      wearables={preview.wearables}
-                      drinkFlavor={preview.drinkFlavor}
-                      vehicleSpritePath={preview.vehicle?.vehicleSheetPath ?? preview.vehicle?.spritePath}
-                      vehicleGroundedSpritePath={preview.vehicle?.vehicleGroundedSpritePath}
-                      vehicleEffectSpritePaths={preview.vehicle?.vehicleEffectSpritePaths}
-                      vehicleFrameCount={preview.vehicle?.vehicleFrameCount}
-                      vehicleGroundedFrameCount={preview.vehicle?.vehicleGroundedFrameCount}
-                      vehicleGroundedFrameDurationMs={preview.vehicle?.vehicleGroundedFrameDurationMs}
-                      vehicleCanvasHeight={preview.vehicle?.vehicleCanvasHeight}
-                      vehicleCharacterOffsetY={preview.vehicle?.vehicleCharacterOffsetY}
-                      vehicleBobY={preview.vehicle?.vehicleBobY}
-                      vehicleRiseY={preview.vehicle?.vehicleRiseY}
-                      accessibilityLabel={`${item.labelKo} 미리보기`}
-                    />
-                  </View>
-                  <View style={[styles.itemCardBody, styles.shopCardBody]}>
-                    <View style={styles.wardrobeItemCopy}>
-                      <Text style={styles.floorTitle}>{item.labelKo}</Text>
-                      <Text style={styles.floorSubtitle}>{buffLabel ?? (isSceneBackgroundItem(item) ? "배경" : item.floor ? "바닥" : item.category === "drink" ? "음료" : item.category === "wearable" ? "의상" : "소품")}</Text>
-                      {wornByOther ? (
-                        <Text style={styles.wardrobeItemWornText}>{wornByOther} 장착 중</Text>
+                    <View style={[styles.wardrobePreviewVisual, wornByOther && styles.wardrobeContentDimmed]}>
+                      <SlimeSprite
+                        slimeColor={wardrobeFilter === "prop" || wardrobeFilter === "drink"
+                          ? wardrobeColor ?? selectedColor
+                          : slimeShopPreviewColor(item, wardrobeColor ?? selectedColor)}
+                        evolution="base"
+                        action={preview.action}
+                        equippedFloor={preview.equippedFloor}
+                        displayScale={slimeUi.petSceneDisplayScale}
+                        repeat={Boolean(preview.propAction) || preview.action !== "idle"}
+                        expandSceneSurfaces={preview.expandSceneSurfaces || sceneBackground}
+                        itemSpritePath={sceneBackground ? undefined : shopItemSpritePath(item, wardrobeColor ?? selectedColor)}
+                        propAction={preview.propAction}
+                        backgroundSpritePath={sceneBackground ? selectSceneBackgroundSpritePath(item) : undefined}
+                        wearables={preview.wearables}
+                        drinkFlavor={preview.drinkFlavor}
+                        vehicleSpritePath={preview.vehicle?.vehicleSheetPath ?? preview.vehicle?.spritePath}
+                        vehicleGroundedSpritePath={preview.vehicle?.vehicleGroundedSpritePath}
+                        vehicleEffectSpritePaths={preview.vehicle?.vehicleEffectSpritePaths}
+                        vehicleFrameCount={preview.vehicle?.vehicleFrameCount}
+                        vehicleGroundedFrameCount={preview.vehicle?.vehicleGroundedFrameCount}
+                        vehicleGroundedFrameDurationMs={preview.vehicle?.vehicleGroundedFrameDurationMs}
+                        vehicleCanvasHeight={preview.vehicle?.vehicleCanvasHeight}
+                        vehicleCharacterOffsetY={preview.vehicle?.vehicleCharacterOffsetY}
+                        vehicleBobY={preview.vehicle?.vehicleBobY}
+                        vehicleRiseY={preview.vehicle?.vehicleRiseY}
+                        vehicleOffsetX={preview.vehicle?.vehicleOffsetX}
+                        accessibilityLabel={`${item.labelKo} 미리보기`}
+                      />
+                      {buffLabel ? (
+                        <Text style={styles.wardrobePreviewBuff}>{buffLabel}</Text>
                       ) : null}
                     </View>
-                    <Text style={[styles.wardrobeItemAction, equipped && styles.wardrobeItemActionEquipped]}>
-                      {busy ? "처리 중…" : equipped ? "해제" : wornByOther ? "옮기기" : "장착"}
-                    </Text>
+                    {wornByOther ? (
+                      <View style={styles.wardrobeWornOverlay} pointerEvents="none">
+                        <Ban size={iconSizes.sm} color={colors.danger} accessible={false} />
+                        <Text style={styles.wardrobeWornOverlayText}>
+                          {wornByOther} 슬라임에{"\n"}장착 중
+                        </Text>
+                      </View>
+                    ) : null}
                   </View>
-                </ControlPressable>
+                  <View style={[styles.itemCardBody, styles.shopCardBody, styles.wardrobeCardBody]}>
+                    <View style={[styles.wardrobeItemCopy, wornByOther && styles.wardrobeContentDimmed]}>
+                      <Text style={styles.floorTitle}>{item.labelKo}</Text>
+                    </View>
+                    <View style={styles.wardrobeItemActions}>
+                      {equipped ? (
+                        <>
+                          <BarePressable
+                            disabled={busy}
+                            hitSlop={spacing.sm}
+                            onPress={() => void toggleItem(item)}
+                            accessibilityRole="button"
+                            accessibilityLabel={`${item.labelKo} 해제`}
+                          >
+                            <Text style={[styles.wardrobeInlineActionText, styles.wardrobeInlineActionDanger]}>
+                              {busy ? "처리 중…" : "해제"}
+                            </Text>
+                          </BarePressable>
+                          <BarePressable
+                            disabled={busy}
+                            hitSlop={spacing.sm}
+                            onPress={() => void toggleItemVisibility(item, hidden)}
+                            accessibilityRole="button"
+                            accessibilityLabel={`${item.labelKo} 외형 ${hidden ? "보이기" : "숨기기"}`}
+                            accessibilityState={{ checked: !hidden, busy }}
+                          >
+                            <Text style={styles.wardrobeInlineActionText}>
+                              {hidden ? "보이기" : "숨기기"}
+                            </Text>
+                          </BarePressable>
+                        </>
+                      ) : (
+                        <BarePressable
+                          disabled={busy}
+                          hitSlop={spacing.sm}
+                          onPress={() => void toggleItem(item)}
+                          accessibilityRole="button"
+                          accessibilityLabel={`${item.labelKo} ${wornByOther ? "여기로 옮기기" : "장착"}`}
+                        >
+                          <Text style={[styles.wardrobeInlineActionText, styles.wardrobeInlineActionPrimary]}>
+                            {busy ? "처리 중…" : wornByOther ? "여기로 옮기기" : "장착"}
+                          </Text>
+                        </BarePressable>
+                      )}
+                    </View>
+                  </View>
+                </View>
               );
             })
           )}
@@ -1853,7 +2044,11 @@ export default function StudentSlimeScreen() {
           style={[styles.notice, notice.kind === "error" ? styles.noticeError : styles.noticeSuccess]}
           accessibilityRole="alert"
         >
-          {notice.kind === "error" ? <ArrowLeft size={iconSizes.sm} color={colors.danger} style={styles.noticeIcon} /> : <Check size={iconSizes.sm} color={colors.plantActive} style={styles.noticeIcon} />}
+          {notice.kind === "error" ? (
+            <CircleAlert size={iconSizes.sm} color={colors.danger} style={styles.noticeIcon} accessible={false} />
+          ) : (
+            <CircleCheck size={iconSizes.sm} color={colors.plantActive} style={styles.noticeIcon} accessible={false} />
+          )}
           <Text style={[styles.noticeText, notice.kind === "error" ? styles.noticeErrorText : styles.noticeSuccessText]}>{notice.text}</Text>
         </View>
       ) : null}
@@ -1933,11 +2128,12 @@ const styles = StyleSheet.create({
   appliedEffectsTitle: { ...typography.label, color: colors.text },
   appliedEffectsList: { gap: spacing.xxs },
   appliedEffectRow: { minHeight: tapMin - spacing.md, paddingHorizontal: spacing.xs, flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: spacing.sm, backgroundColor: colors.transparent },
-  appliedEffectLabel: { ...typography.micro, flex: 1, minWidth: 0, color: colors.textMuted },
-  appliedEffectValue: { ...typography.micro, color: colors.accentTintedText, fontWeight: "700", textAlign: "right" },
+  appliedEffectLabel: { ...typography.micro, width: iconSizes.empty - spacing.sm, flexShrink: 0, color: colors.text, fontWeight: "700" },
+  appliedEffectDescription: { ...typography.micro, flex: 1, minWidth: 0, color: colors.textMuted, textAlign: "left" },
+  appliedEffectValue: { ...typography.micro, width: iconSizes.lg + spacing.xs, flexShrink: 0, color: colors.accentTintedText, fontWeight: "700", textAlign: "right" },
   appliedEffectsEmpty: { ...typography.micro, color: colors.textMuted },
-  myPetActionButton: { flex: 1, minWidth: 0, minHeight: tapMin - spacing.md, paddingHorizontal: spacing.xxs, paddingVertical: spacing.none, alignItems: "center", justifyContent: "center", borderWidth: borders.hairline, borderColor: colors.border, borderRadius: radii.btn, backgroundColor: colors.surface },
-  myPetActionText: { ...typography.micro, color: colors.text, textAlign: "center", fontWeight: "700" },
+  myPetActionLink: { flex: 1, minWidth: 0, alignItems: "center", justifyContent: "center" },
+  myPetActionText: { ...typography.micro, color: colors.accentTintedText, textAlign: "center", fontWeight: "700" },
   myPetCookieButton: { width: iconSizes.md + spacing.xl, minHeight: tapMin - spacing.md, flexShrink: 0, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: spacing.xxs, borderWidth: borders.none, borderRadius: radii.none, backgroundColor: colors.transparent },
   myPetCookieIcon: { width: iconSizes.md, height: iconSizes.md },
   myPetCookieQuantity: { ...typography.micro, color: colors.accentTintedText, fontVariant: ["tabular-nums"] },
@@ -1959,12 +2155,6 @@ const styles = StyleSheet.create({
   shopPreviewFullBleed: { width: "100%", height: iconSizes.empty },
   shopPreviewSceneSlot: { position: "relative", width: "100%", height: iconSizes.empty + spacing.xxl, overflow: "hidden" },
   vehicleSceneSlot: { position: "relative", height: slimeUi.vehicleSceneSlotHeight, overflow: "hidden" },
-  fullBleedSceneBackground: {
-    ...StyleSheet.absoluteFillObject,
-    width: "100%",
-    height: "100%",
-    backgroundColor: colors.surfaceAlt,
-  },
   // Scene backgrounds feather their edges to transparent, so a tinted tile behind
   // them shows through as a hard grey square outline. Those previews sit on the
   // page background instead; the feather itself provides the visual boundary.
@@ -2005,7 +2195,7 @@ const styles = StyleSheet.create({
   // so a translucent fill let the content behind it show through.
   noticeSuccess: { backgroundColor: colors.noticeSuccessBg },
   noticeError: { backgroundColor: colors.noticeErrorBg },
-  noticeIcon: { transform: [{ rotate: "90deg" }] },
+  noticeIcon: { flexShrink: 0 },
   noticeText: { ...typography.label, flex: 1 },
   noticeSuccessText: { color: colors.plantActive },
   noticeErrorText: { color: colors.danger },
@@ -2017,15 +2207,22 @@ const styles = StyleSheet.create({
   wardrobeNavItem: { flex: 1 },
   wardrobeList: { maxHeight: iconSizes.empty * 5 },
   wardrobeListContent: { flexDirection: "row", flexWrap: "wrap", justifyContent: "flex-start", gap: spacing.sm },
-  wardrobeItem: { width: "31.5%", minWidth: 0, paddingHorizontal: spacing.xs, paddingVertical: spacing.sm, borderWidth: borders.hairline, borderColor: colors.border, borderRadius: radii.control, backgroundColor: colors.surface, alignItems: "center", justifyContent: "flex-start", gap: spacing.xs },
+  wardrobeItem: { width: "31.5%", minWidth: 0, paddingHorizontal: spacing.xs, paddingVertical: spacing.xs, borderWidth: borders.hairline, borderColor: colors.border, borderRadius: radii.control, backgroundColor: colors.surface, alignItems: "center", justifyContent: "flex-start", gap: spacing.xxs },
   wardrobeItemEquipped: { borderColor: colors.accent, backgroundColor: colors.accentTintedBg },
   // Distinct from the equipped state: still selectable, but tapping moves the
   // piece off another pet rather than adding a new one.
   wardrobeItemWornByOther: { borderColor: colors.borderHover, backgroundColor: colors.surfaceAlt },
-  wardrobeItemWornText: { ...typography.micro, color: colors.textMuted, textAlign: "center" },
   wardrobeItemCopy: { width: "100%", minWidth: 0, alignItems: "center", gap: spacing.xxs },
-  wardrobeItemAction: { ...typography.micro, color: colors.accentTintedText, textAlign: "center" },
-  wardrobeItemActionEquipped: { color: colors.textMuted },
+  wardrobePreviewVisual: { ...StyleSheet.absoluteFillObject, alignItems: "center", justifyContent: "center" },
+  wardrobeContentDimmed: { opacity: states.disabledOpacity },
+  wardrobePreviewBuff: { position: "absolute", zIndex: layers.cardOverlay, top: spacing.xs, right: spacing.xs, paddingHorizontal: spacing.xxs, borderRadius: radii.pill, backgroundColor: colors.surfaceGlass, ...typography.micro, color: colors.plantActive, includeFontPadding: false },
+  wardrobeWornOverlay: { ...StyleSheet.absoluteFillObject, zIndex: layers.cardOverlay, alignItems: "center", justifyContent: "center", gap: spacing.xxs },
+  wardrobeWornOverlayText: { ...typography.micro, color: colors.text, textAlign: "center", fontWeight: "700", includeFontPadding: false },
+  wardrobeCardBody: { paddingBottom: spacing.xs, gap: spacing.xxs },
+  wardrobeItemActions: { width: "100%", flexDirection: "row", alignItems: "center", justifyContent: "center", gap: spacing.xs },
+  wardrobeInlineActionText: { ...typography.micro, color: colors.textMuted, textAlign: "center", includeFontPadding: false },
+  wardrobeInlineActionPrimary: { color: colors.accentTintedText },
+  wardrobeInlineActionDanger: { color: colors.danger },
   walkingTitlePreview: { width: "100%", height: "100%" },
   classroomCard: { padding: spacing.xxl, alignItems: "center", gap: spacing.md },
   classroomEmoji: { fontSize: iconSizes.gate },

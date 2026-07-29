@@ -108,6 +108,7 @@ export function SlimeCharacterSprite({
         vehicleCharacterOffsetY={renderedVehicle?.vehicleCharacterOffsetY}
         vehicleBobY={renderedVehicle?.vehicleBobY}
         vehicleRiseY={renderedVehicle?.vehicleRiseY}
+        vehicleOffsetX={renderedVehicle?.vehicleOffsetX}
         wearables={wearables}
         drinkFlavor={drinkFlavor}
         repeat={repeat || Boolean(ballItem) || Boolean(drinkFlavor)}

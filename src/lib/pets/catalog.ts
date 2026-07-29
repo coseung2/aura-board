@@ -205,6 +205,63 @@ const VEHICLE_DEFINITIONS = [
       `${VEHICLE_ROOT}/magic-carpet/fx/sparkle-idle-sheet.png`,
     ],
   },
+  {
+    option: "bumper-car",
+    labelKo: "범퍼카",
+    tier: 2,
+    stance: "grounded",
+    riseY: 11,
+    bobY: [0, 0, 0, 0, 0, 0, 0, 0],
+    effectKey: "walking_reward",
+    wheels: { frameCount: 4, frameDurationMs: 100 },
+  },
+  {
+    option: "carousel-horse",
+    labelKo: "회전목마",
+    tier: 1,
+    stance: "grounded",
+    riseY: 23,
+    bobY: [0, -1, -2, -2, -2, -1, -1, 0],
+    effectKey: "assignment_reward",
+    vehicleOffsetX: -4,
+  },
+  {
+    option: "flamingo-tube",
+    labelKo: "플라밍고 튜브",
+    tier: 2,
+    stance: "grounded",
+    riseY: 15,
+    bobY: [0, -1, -1, -2, -2, -1, -1, 0],
+    effectKey: "comment_reward",
+    vehicleOffsetX: -4,
+  },
+  {
+    option: "soap-bubble",
+    labelKo: "비눗방울",
+    tier: 2,
+    stance: "floating",
+    riseY: 2,
+    bobY: [0, -1, -2, -2, -2, -1, -1, 0],
+    effectKey: "growth_speed",
+    vehicleEffectSpritePaths: [
+      `${VEHICLE_ROOT}/soap-bubble/fx/glint-idle-sheet.png`,
+    ],
+  },
+  {
+    option: "crescent-moon",
+    labelKo: "초승달",
+    tier: 1,
+    stance: "floating",
+    riseY: 9,
+    bobY: [0, -1, -2, -2, -2, -1, -1, 0],
+    effectKey: "reading_reward",
+    // The approved rider is 4px right of center, and delivery extraction moved
+    // the two-pixel left overhang into the sheet. Undo both without moving the rider.
+    vehicleOffsetX: -6,
+    vehicleEffectSpritePaths: [
+      `${VEHICLE_ROOT}/crescent-moon/fx/stars-idle-sheet.png`,
+    ],
+  },
 ] as const satisfies readonly {
   option: string;
   labelKo: string;
@@ -215,6 +272,7 @@ const VEHICLE_DEFINITIONS = [
   effectKey: NonNullable<SlimeShopItem["effectKey"]>;
   wheels?: { frameCount: number; frameDurationMs: number };
   characterOffsetY?: number;
+  vehicleOffsetX?: number;
   vehicleEffectSpritePaths?: readonly string[];
 }[];
 
@@ -234,6 +292,9 @@ export const SLIME_VEHICLE_CATALOG: readonly SlimeShopItem[] = VEHICLE_DEFINITIO
     vehicleCharacterOffsetY: "characterOffsetY" in vehicle
       ? vehicle.characterOffsetY
       : SLIME_VEHICLE_CHARACTER_OFFSET_Y,
+    ...("vehicleOffsetX" in vehicle && vehicle.vehicleOffsetX !== undefined
+      ? { vehicleOffsetX: vehicle.vehicleOffsetX }
+      : {}),
     effectKey: vehicle.effectKey,
     effectBps: SLIME_VEHICLE_TIER_BPS[vehicle.tier],
     // The still frame doubles as the shop card image.

@@ -180,6 +180,7 @@ export function SlimePurchaseConfirmModal({
               vehicleCharacterOffsetY={renderedVehicle?.vehicleCharacterOffsetY}
               vehicleBobY={renderedVehicle?.vehicleBobY}
               vehicleRiseY={renderedVehicle?.vehicleRiseY}
+              vehicleOffsetX={renderedVehicle?.vehicleOffsetX}
               accessibilityLabel={`${SLIME_COLOR_LABELS[activeColor]} 슬라임에 ${item.labelKo} 미리보기`}
             />
           </View>

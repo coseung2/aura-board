@@ -1,0 +1,2 @@
+ALTER TABLE "StudentSlime"
+ADD COLUMN "hiddenItemKeys" TEXT[] NOT NULL DEFAULT ARRAY[]::TEXT[];

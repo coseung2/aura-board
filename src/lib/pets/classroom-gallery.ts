@@ -7,6 +7,7 @@ export type ClassroomSlimeStudent = {
   representative: {
     color: SlimeColor;
     equippedItemKeys: string[];
+    hiddenItemKeys: string[];
   } | null;
 };
 

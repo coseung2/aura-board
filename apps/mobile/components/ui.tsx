@@ -327,14 +327,18 @@ export function AppBottomSheet({
 
   const panResponder = useRef(
     PanResponder.create({
-      // Do not claim taps. The handle becomes the responder only after a real
-      // downward drag, leaving category tabs and item cards uninterrupted.
-      onStartShouldSetPanResponder: () => false,
-      onStartShouldSetPanResponderCapture: () => false,
+      // This responder exists only on the dedicated handle area. Claim the
+      // gesture at touch-down so Android native Modals keep delivering move
+      // events; waiting until movement can lose the stream entirely.
+      onStartShouldSetPanResponder: () => true,
+      onStartShouldSetPanResponderCapture: () => true,
       onMoveShouldSetPanResponder: (_event, gesture) =>
         gesture.dy > 4 && Math.abs(gesture.dy) > Math.abs(gesture.dx),
       onMoveShouldSetPanResponderCapture: (_event, gesture) =>
         gesture.dy > 4 && Math.abs(gesture.dy) > Math.abs(gesture.dx),
+      onPanResponderGrant: () => {
+        translateY.stopAnimation();
+      },
       onPanResponderMove: (_event, gesture) => {
         translateY.setValue(Math.max(0, gesture.dy));
       },

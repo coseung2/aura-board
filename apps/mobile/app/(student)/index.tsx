@@ -20,6 +20,7 @@ import {
   pageChrome,
   radii,
   shadows,
+  slimeUi,
   spacing,
   tapMin,
   typography,
@@ -53,18 +54,23 @@ import {
   SectionNavItem,
 } from "../../components/NavigationTabs";
 import { StudentHeaderActions } from "../../components/StudentHeaderActions";
-import { SlimeSprite } from "../../components/slime/SlimeSprite";
+import {
+  FeatheredSceneBackground,
+  SlimeSprite,
+} from "../../components/slime/SlimeSprite";
 import {
   normalizeSlimeHome,
   resolveEquippedSceneBackground,
   resolveEquippedSlimeWearables,
   resolveEquippedVehicle,
   selectSceneBackgroundSpritePath,
-  slimeBallSpritePath,
   stageForColor,
   studentPetHref,
   type MobileSlimeHome,
 } from "../../lib/slimes";
+import { resolveEquippedSlimePropAction } from "../../lib/slime-props";
+import { visibleEquippedSlimeItemKeys } from "../../lib/slime-item-visibility";
+import type { EquippedFloor } from "../../lib/slime-assets";
 
 const SLIME_TRAMPOLINE_ITEM_KEY = "slime-blue-trampoline";
 
@@ -273,31 +279,34 @@ function RepresentativePet({
 
   const stage = color ? stageForColor(petHome, color) : null;
   const equippedItems = color ? petHome.equippedItemsByColor[color] ?? [] : [];
-  const equippedFloor = color
-    ? petHome.equippedFloorByColor[color] ?? petHome.equippedFloor
-    : undefined;
+  const visibleItems = color
+    ? visibleEquippedSlimeItemKeys(equippedItems, petHome.hiddenItemsByColor[color])
+    : [];
+  const equippedFloor = visibleItems.reduce<EquippedFloor>(
+    (current, itemKey) => petHome.shopCatalog.find((item) => item.key === itemKey)?.floor ?? current,
+    "none",
+  );
   const equippedBackground = resolveEquippedSceneBackground(
-    equippedItems,
+    visibleItems,
     petHome.shopCatalog,
   );
+  const equippedBackgroundPath = equippedBackground
+    ? selectSceneBackgroundSpritePath(equippedBackground)
+    : null;
   const equippedWearables = resolveEquippedSlimeWearables(
-    equippedItems,
+    visibleItems,
     petHome.shopCatalog,
   );
   const equippedVehicle = resolveEquippedVehicle(
-    equippedItems,
+    visibleItems,
     petHome.shopCatalog,
   );
   const usesTrampoline = equippedVehicle?.key === SLIME_TRAMPOLINE_ITEM_KEY;
   const renderedVehicle = usesTrampoline ? null : equippedVehicle;
-  const hasDrink = petHome.shopCatalog.some(
-    (item) => item.category === "drink" && equippedItems.includes(item.key),
-  );
+  const propAction = resolveEquippedSlimePropAction(visibleItems, petHome.shopCatalog);
   const action = usesTrampoline
     ? "floor-interaction" as const
-    : hasDrink
-      ? "drink" as const
-      : "idle" as const;
+    : "idle" as const;
 
   return (
     <View style={styles.representativePet}>
@@ -317,33 +326,38 @@ function RepresentativePet({
         </ControlPressable>
       </View>
       {color && stage !== null ? (
-        <SlimeSprite
-          slimeColor={color}
-          growthStage={stage}
-          action={action}
-          equippedFloor={usesTrampoline ? "trampoline" : equippedFloor}
-          repeat={action !== "idle"}
-          itemSpritePath={slimeBallSpritePath(equippedItems, color)}
-          wearables={equippedWearables}
-          drinkFlavor={equippedWearables.drink}
-          backgroundSpritePath={
-            equippedBackground
-              ? selectSceneBackgroundSpritePath(equippedBackground)
-              : undefined
-          }
-          vehicleSpritePath={renderedVehicle?.vehicleSheetPath ?? renderedVehicle?.spritePath}
-          vehicleGroundedSpritePath={renderedVehicle?.vehicleGroundedSpritePath}
-          vehicleEffectSpritePaths={renderedVehicle?.vehicleEffectSpritePaths}
-          vehicleFrameCount={renderedVehicle?.vehicleFrameCount}
-          vehicleGroundedFrameCount={renderedVehicle?.vehicleGroundedFrameCount}
-          vehicleGroundedFrameDurationMs={renderedVehicle?.vehicleGroundedFrameDurationMs}
-          vehicleCanvasHeight={renderedVehicle?.vehicleCanvasHeight}
-          vehicleCharacterOffsetY={renderedVehicle?.vehicleCharacterOffsetY}
+        <View style={styles.representativePetScene}>
+          {equippedBackgroundPath ? (
+            <FeatheredSceneBackground
+              spritePath={equippedBackgroundPath}
+              style={StyleSheet.absoluteFill}
+            />
+          ) : null}
+          <SlimeSprite
+            slimeColor={color}
+            growthStage={stage}
+            action={action}
+            equippedFloor={usesTrampoline ? "trampoline" : equippedFloor}
+            repeat={Boolean(propAction) || action !== "idle"}
+            propAction={propAction}
+            wearables={equippedWearables}
+            drinkFlavor={equippedWearables.drink}
+            vehicleSpritePath={renderedVehicle?.vehicleSheetPath ?? renderedVehicle?.spritePath}
+            vehicleGroundedSpritePath={renderedVehicle?.vehicleGroundedSpritePath}
+            vehicleEffectSpritePaths={renderedVehicle?.vehicleEffectSpritePaths}
+            vehicleFrameCount={renderedVehicle?.vehicleFrameCount}
+            vehicleGroundedFrameCount={renderedVehicle?.vehicleGroundedFrameCount}
+            vehicleGroundedFrameDurationMs={renderedVehicle?.vehicleGroundedFrameDurationMs}
+            vehicleCanvasHeight={renderedVehicle?.vehicleCanvasHeight}
+            vehicleCharacterOffsetY={renderedVehicle?.vehicleCharacterOffsetY}
           vehicleBobY={renderedVehicle?.vehicleBobY}
           vehicleRiseY={renderedVehicle?.vehicleRiseY}
-          displayScale={0.75}
-          accessibilityLabel="내 대표 펫"
-        />
+          vehicleOffsetX={renderedVehicle?.vehicleOffsetX}
+            displayScale={slimeUi.homePetSceneDisplayScale}
+            expandSceneSurfaces
+            accessibilityLabel="내 대표 펫"
+          />
+        </View>
       ) : (
         <View style={styles.petEmptyState} accessibilityRole="text">
           <Text style={styles.petEmptyText}>대표펫이 없어요</Text>
@@ -732,6 +746,15 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: spacing.xs,
     paddingVertical: spacing.xs,
+  },
+  representativePetScene: {
+    position: "relative",
+    width: slimeUi.homePetSceneWidth,
+    height: slimeUi.homePetSceneHeight,
+    maxWidth: "100%",
+    alignItems: "center",
+    justifyContent: "center",
+    overflow: "hidden",
   },
   petManageRow: { alignSelf: "stretch", alignItems: "flex-end" },
   petManageLink: {

@@ -5,7 +5,7 @@ const mocks = vi.hoisted(() => ({ transaction: vi.fn() }));
 vi.mock("@/lib/db", () => ({ db: { $transaction: mocks.transaction } }));
 
 import { SLIME_SHOP_CATALOG } from "./catalog";
-import { equipSlimeShopItem, SlimeServiceError } from "./service";
+import { equipSlimeShopItem, setSlimeShopItemHidden, SlimeServiceError } from "./service";
 
 const student = { id: "student-1", classroomId: "classroom-1" };
 const background = SLIME_SHOP_CATALOG[0];
@@ -48,16 +48,24 @@ function installState(overrides: Partial<{ quantity: number; isEquipped: boolean
     findMany: vi.fn(async () => [...rows.values()]),
   };
   const slimeRows = [
-    { id: "slime-1", studentId: student.id, color: "blue", isRepresentative: true, equippedItemKeys: [] as string[] },
+    {
+      id: "slime-1",
+      studentId: student.id,
+      color: "blue",
+      isRepresentative: true,
+      equippedItemKeys: [] as string[],
+      hiddenItemKeys: [] as string[],
+    },
   ];
   const slimes = {
     findUnique: vi.fn(async () => slimeRows[0]),
     findMany: vi.fn(async () => slimeRows),
     updateMany: vi.fn(async () => ({ count: 0 })),
-    update: vi.fn(async ({ where, data }: { where: { id: string }; data: { equippedItemKeys: string[] } }) => {
+    update: vi.fn(async ({ where, data }: { where: { id: string }; data: { equippedItemKeys?: string[]; hiddenItemKeys?: string[] } }) => {
       const row = slimeRows.find((candidate) => candidate.id === where.id);
       if (!row) throw new Error("missing slime");
-      row.equippedItemKeys = data.equippedItemKeys;
+      if (data.equippedItemKeys) row.equippedItemKeys = data.equippedItemKeys;
+      if (data.hiddenItemKeys) row.hiddenItemKeys = data.hiddenItemKeys;
       return row;
     }),
   };
@@ -217,6 +225,7 @@ describe("slime shop item equipment", () => {
       color: "red",
       isRepresentative: false,
       equippedItemKeys: [grass.key, snow.key],
+      hiddenItemKeys: [snow.key],
     });
 
     const result = await equipSlimeShopItem(student, "blue", snow.key, true, "move-floor");
@@ -227,7 +236,60 @@ describe("slime shop item equipment", () => {
     });
     expect(result.equippedFloorByColor).toEqual({ blue: "snow-ground-floor", red: "grass-floor" });
     expect(state.slimeRows[1].equippedItemKeys).toEqual([grass.key]);
+    expect(state.slimeRows[1].hiddenItemKeys).toEqual([]);
+    expect(result.hiddenItemsByColor).toEqual({ blue: [], red: [] });
     expect(state.rows.get(grass.key)?.isEquipped).toBe(true);
+  });
+
+  it("hides only an equipped owned item without changing equipment or inventory state", async () => {
+    const state = installState();
+    state.slimeRows[0].equippedItemKeys = [background.key];
+    state.rows.get(background.key)!.isEquipped = true;
+
+    const result = await setSlimeShopItemHidden(
+      student,
+      "blue",
+      background.key,
+      true,
+    );
+
+    expect(result).toMatchObject({
+      slimeColor: "blue",
+      itemKey: background.key,
+      isHidden: true,
+      equippedItemKeys: [background.key],
+      equippedItemsByColor: { blue: [background.key] },
+      hiddenItemsByColor: { blue: [background.key] },
+      idempotent: false,
+    });
+    expect(state.slimeRows[0].equippedItemKeys).toEqual([background.key]);
+    expect(state.slimeRows[0].hiddenItemKeys).toEqual([background.key]);
+    expect(state.rows.get(background.key)?.isEquipped).toBe(true);
+
+    await expect(
+      setSlimeShopItemHidden(student, "blue", background.key, true),
+    ).resolves.toMatchObject({ idempotent: true });
+  });
+
+  it("rejects hiding an item that is not equipped", async () => {
+    const state = installState();
+
+    await expect(
+      setSlimeShopItemHidden(student, "blue", background.key, true),
+    ).rejects.toMatchObject<Partial<SlimeServiceError>>({ code: "invalid_body", status: 400 });
+    expect(state.slimes.update).not.toHaveBeenCalled();
+  });
+
+  it("clears hidden state when the hidden item is unequipped", async () => {
+    const state = installState();
+    state.slimeRows[0].equippedItemKeys = [background.key];
+    state.slimeRows[0].hiddenItemKeys = [background.key];
+
+    const result = await equipSlimeShopItem(student, "blue", background.key, false, "hide-remove");
+
+    expect(result.equippedItemKeys).toEqual([]);
+    expect(result.hiddenItemsByColor).toEqual({ blue: [] });
+    expect(state.slimeRows[0].hiddenItemKeys).toEqual([]);
   });
 
   it("blocks unowned, empty, and mismatched item rows", async () => {
