@@ -133,6 +133,15 @@ Vercel Blob distinct URL 4개와 due queue 165개를 재확인한다. Supabase S
 - [ ] Operational verification: cutover 승인 후 URL별 참조/대상 object, queue 처리·실패 재시도, 사용자 다운로드/이미지 표시를 확인. dry-run도 후보 검색을 위해 지정된 DB를 읽으므로 운영 실행 전에 연결 대상을 재확인.
 - [x] Handoff: 이번 commit은 도구 준비만 수행했고 데이터 복사·참조 갱신·원본 삭제는 하지 않음. 처리 전후 object/URL/queue 수치와 원본 삭제 승인은 실제 실행 handoff에 별도로 기록.
 
+## 실제 실행 전 승인 체크
+
+- [ ] OCI Osaka에서 A1 2 OCPU/12 GB capacity, ARM64 image, private Object Storage bucket, dynamic group/IAM policy를 준비하고 OCID·owner·비용 경계를 값 노출 없이 기록.
+- [ ] 새 A1에서 logical backup `--write` 1회, checksum/archive 확인, 격리 restore rehearsal을 마친 뒤에만 기존 1 GB 인스턴스의 job을 하나씩 이관. 관찰 기간 전에는 기존 인스턴스를 종료하지 않음.
+- [ ] GitHub `Production` environment에 `CRON_SECRET`, `AURA_BOARD_BASE_URL`을 설정하고 수동 dry-run 결과를 확인. 별도 cutover 승인 전에는 `schedule`을 추가하지 않음.
+- [ ] 운영 DB backup과 대상 Supabase 프로젝트/리전을 확인한 뒤 5개 migration을 문서 순서대로 적용. 부분 적용이나 임의 down migration 금지.
+- [ ] Vercel Blob 이전 도구의 DB 연결 대상을 확인하고 먼저 dry-run으로 후보를 고정. `--write` 후 대상 object와 사용자 경로를 검증하기 전 원본 Blob과 queue 항목 삭제 금지.
+- [ ] 앱 배포는 이 준비 작업과 분리하여 별도 승인·검증으로 진행.
+
 ## Rollback
 
 - **GitHub Actions cron:** workflow를 disable하고 Vercel schedule이 아직 존재하는지 확인한다. 이미 제거했다면 해당 schedule만 복원하는 commit을 push한다. endpoint 구현과 `CRON_SECRET` 인증은 유지한다.
@@ -157,6 +166,7 @@ Vercel Blob distinct URL 4개와 due queue 165개를 재확인한다. Supabase S
 
 | 일자 | 상태 | 기록 | 다음 단계 |
 | --- | --- | --- | --- |
+| 2026-07-31 | 준비 기준선 `0298379f` 회귀 검증 완료 | 구현과 단계별 handoff가 포함된 `main`에서 제한된 4-worker 전체 Vitest 540 suites/1,276 tests, typecheck, Next.js production build 통과. 첫 전체 테스트 시도는 도구의 5분 제한으로 부모 셸만 종료되어 소유 Vitest 프로세스 트리를 정리한 뒤 결과 JSON을 남기는 단일 실행으로 재검증. 배포·workflow dispatch·운영 DB/Storage/OCI 접근 없음. | 위 실제 실행 전 승인 체크를 제공자별로 충족한 뒤 별도 cutover 작업에서 진행 |
 | 2026-07-31 | Step 7 도구 준비 `f06d6a32` push 완료 | Blob cleanup의 전체 23개 참조 필드를 이전 도구와 일치시키고 `.env` 자동 읽기 제거, strict CLI/path 검증, import 시 Prisma 미실행, 명시적 `--write`, 부분 실패 non-zero 종료를 추가. 외부 연결 없는 23 tests, typecheck, diff check 통과. 실제 DB/Blob/Storage 접근·데이터 이동·삭제·배포 없음. | 전체 regression 검증 후 운영 cutover에 필요한 credential/resource/승인 항목을 최종 정리 |
 | 2026-07-31 | Step 6 `6ebe78d8` push 완료 | Oracle 목표를 오사카 홈 리전 `ap-osaka-1`의 단일 `VM.Standard.A1.Flex` 2 OCPU/12 GB로 변경. 기존 1 GB 인스턴스 2개는 A1 백업·복구와 워커 검증 후 순차 교체. instance principal 기반 Supabase custom-format dump, archive/sha256 검증, private Object Storage upload, systemd timer와 runbook을 준비. 구문, 외부 접근 없는 dry-run, 오사카 리전 거부 가드와 diff를 재검증했으며 실제 OCI/DB 접근·리소스 변경·배포는 하지 않음. | Vercel Blob 이전 도구의 전체 참조 필드 커버리지와 dry-run 안전성 보강 |
 | 2026-07-31 | Step 5 `cb49da46` push 완료 | Cloudflare Stream REST helper에 direct upload duration, UID 검증과 응답 일치, video details 상태 판정, 보드 creator/meta ownership, redacted error, idempotent delete를 추가. 이벤트 제출은 `pendingupload`/`error`/타 보드 UID를 거부하고 정상 인코딩 중은 허용. 제출 DB 삭제 뒤 Stream 삭제를 best-effort로 수행하며 R2는 도입하지 않음. 전체 1,251 tests, 부모 targeted 48 tests, typecheck 통과. 운영 API 호출·배포 없음. | Oracle pull worker의 최소 골격과 비운영 dry-run 계약을 설계·구현 |
