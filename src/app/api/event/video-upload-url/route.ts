@@ -6,11 +6,23 @@
  * includes "cfstream". Otherwise 501.
  *
  * Uses the same token gating as /submit so random traffic can't drain CF quota.
+ *
+ * Every upload is tagged with `creator = board:<boardId>` (see
+ * `streamCreatorForBoard`). The submit route then requires that tag, which
+ * stops a uid minted for board A from being pasted into board B inside the
+ * same Cloudflare account. There is no per-applicant identity at this point in
+ * the public flow (the submitToken is only issued *after* submit), so the board
+ * is the finest-grained stable owner available without a schema change.
  */
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { tokensEqual } from "@/lib/event/tokens";
-import { createDirectUploadUrl, cfStreamEnabled } from "@/lib/event/cfstream";
+import {
+  createDirectUploadUrl,
+  cfStreamEnabled,
+  streamCreatorForBoard,
+  CfStreamError,
+} from "@/lib/event/cfstream";
 
 export async function POST(req: Request) {
   if (!cfStreamEnabled()) {
@@ -39,10 +51,24 @@ export async function POST(req: Request) {
   if (!providers.includes("cfstream")) {
     return NextResponse.json({ error: "cfstream_disabled_for_board" }, { status: 400 });
   }
-  const result = await createDirectUploadUrl({
-    maxDurationSeconds: board.maxVideoDurationSec ?? null,
-    maxSizeMb: board.maxVideoSizeMb ?? null,
-  });
+  let result;
+  try {
+    result = await createDirectUploadUrl({
+      maxDurationSeconds: board.maxVideoDurationSec ?? null,
+      maxSizeMb: board.maxVideoSizeMb ?? null,
+      creator: streamCreatorForBoard(board.id),
+      // Only non-personal routing data. No applicant name/contact here.
+      meta: { boardId: board.id, app: "aura-board-event" },
+    });
+  } catch (e) {
+    // CfStreamError messages are pre-redacted (status + CF codes only).
+    console.error("[event/video-upload-url] cfstream create failed", {
+      boardId: board.id,
+      code: e instanceof CfStreamError ? e.code : "unknown",
+      status: e instanceof CfStreamError ? e.status : undefined,
+    });
+    return NextResponse.json({ error: "cfstream_create_failed" }, { status: 502 });
+  }
   if (!result) return NextResponse.json({ error: "cfstream_create_failed" }, { status: 502 });
   return NextResponse.json({ ok: true, ...result });
 }

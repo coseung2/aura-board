@@ -12,7 +12,9 @@
  *   4. Verify hCaptcha (skipped if HCAPTCHA_SECRET unset).
  *   5. Throttle check (ipHash / boardId, 1h/5).
  *   6. Enforce board.ask* required fields & customQuestions required.
- *   7. Extract YouTube id (if provided). CF stream videoProvider trusted if uid supplied.
+ *   7. Extract YouTube id (if provided). For cfstream, validate the uid shape
+ *      and — when Cloudflare is configured — verify the upload exists, belongs
+ *      to this board, and is not error/pendingupload.
  *   8. Create Submission, set status (pending_approval or submitted based on requireApproval).
  *   9. Issue submitToken + set httpOnly cookie. Return token so client can stash in URL.
  *
@@ -24,6 +26,7 @@
  *   404 { error:"not_found" }
  *   422 { error:"captcha_failed" }
  *   429 { error:"throttled" }
+ *   502 { error:"cfstream_unavailable" }
  */
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
@@ -33,6 +36,14 @@ import { tokensEqual, hashIp, getIpFromRequest, issueToken } from "@/lib/event/t
 import { verifyCaptcha } from "@/lib/event/hcaptcha";
 import { checkThrottle } from "@/lib/event/throttle";
 import { extractYoutubeId, youtubeThumbnailUrl } from "@/lib/event/youtube";
+import {
+  cfStreamEnabled,
+  isValidStreamUid,
+  getVideoDetails,
+  checkSubmittable,
+  streamCreatorForBoard,
+  CfStreamError,
+} from "@/lib/event/cfstream";
 
 function cookieName(boardId: string) {
   return `as_submit_${boardId}`;
@@ -128,9 +139,48 @@ export async function POST(req: Request) {
     videoId = yt;
     videoThumbnail = youtubeThumbnailUrl(yt);
   } else if (videoProvider === "cfstream") {
-    // Trust the uid from the direct_upload path; we don't verify upload completion here.
     if (!videoId) return NextResponse.json({ error: "missing_required", field: "videoId" }, { status: 400 });
+    if (!isValidStreamUid(videoId)) {
+      return NextResponse.json({ error: "invalid_video_id" }, { status: 400 });
+    }
     videoThumbnail = null;
+    // When Cloudflare isn't configured we keep the historical behaviour: the
+    // uid is trusted as-is so self-hosted/dev setups and the YouTube-only
+    // fallback path stay functional.
+    if (cfStreamEnabled()) {
+      let video;
+      try {
+        video = await getVideoDetails(videoId);
+      } catch (e) {
+        // Transport/API failure is *not* the applicant's fault, and silently
+        // accepting would let a forged uid through. Ask them to retry.
+        console.error("[event/submit] cfstream lookup failed", {
+          boardId: board.id,
+          code: e instanceof CfStreamError ? e.code : "unknown",
+          status: e instanceof CfStreamError ? e.status : undefined,
+        });
+        return NextResponse.json({ error: "cfstream_unavailable" }, { status: 502 });
+      }
+      if (!video) {
+        return NextResponse.json({ error: "video_not_found" }, { status: 400 });
+      }
+      // Ownership: uploads issued by /video-upload-url carry
+      // creator="board:<id>". Uploads that predate that tagging have no
+      // creator at all, so only a *mismatching* tag is rejected — that is what
+      // blocks reusing another board's uid inside the same CF account.
+      const expectedCreator = streamCreatorForBoard(board.id);
+      const metaBoardId = video.meta?.boardId;
+      if (
+        (video.creator && video.creator !== expectedCreator) ||
+        (typeof metaBoardId === "string" && metaBoardId !== board.id)
+      ) {
+        return NextResponse.json({ error: "video_not_owned" }, { status: 403 });
+      }
+      const check = checkSubmittable(video);
+      if (!check.ok) {
+        return NextResponse.json({ error: "video_not_ready", reason: check.reason }, { status: 400 });
+      }
+    }
   }
 
   const submitToken = issueToken();
