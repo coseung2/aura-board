@@ -10,7 +10,7 @@
 | 제공자 | 책임 | 책임이 아닌 것 | 현재 상태 |
 | --- | --- | --- | --- |
 | Oracle Cloud | 장기 FFmpeg 작업, 배치 메일, Supabase 논리 백업을 가져가는 pull worker | 원본 Postgres, 원본 Storage, 앱 호스팅 | 오사카 홈 리전 `ap-osaka-1`의 단일 A1 2 OCPU/12 GB 목표. 기존 1 GB 인스턴스 2개를 검증 후 교체하며 아직 리소스 변경은 하지 않음 |
-| Cloudflare | Stream 비디오 업로드·재생 및 향후 상태 검증/삭제 수명주기 | 일반 파일·이미지 저장소, R2 | Stream 직접 업로드 코드가 있으며 운영 수명주기 보강 필요. R2는 도입하지 않음 |
+| Cloudflare | Stream 비디오 업로드·재생 및 상태 검증/삭제 수명주기 | 일반 파일·이미지 저장소, R2 | Stream UID·상태·ownership 검증과 best-effort 삭제 보강 완료. R2는 도입하지 않음 |
 | Supabase Pro (Seoul) | Postgres, Auth, Realtime, 일반 파일·이미지 Storage, `NotificationOutbox`, `pg_net`, `pg_cron` | Cloudflare Stream 비디오, Oracle 작업 실행 환경 | 운영 사용 중. `20260731` 마이그레이션 5개는 운영 미적용 |
 | GitHub Actions | Vercel의 일/주간 cron 7개를 `Authorization: Bearer` 방식으로 호출 | 앱 호스팅, `notification-push`의 주 wakeup | 수동 dry-run 우선 workflow 준비 완료, schedule 미설정 |
 | Vercel Hobby | Next.js 앱 호스팅과 cron API endpoint 제공 | 향후 cron scheduler, 장기 작업, 원본 데이터 저장소 | 기존 production은 유지 중. [`vercel.json`](../vercel.json)의 매분 cron 때문에 최신 `main` 배포 실패. 이번 범위에서 배포하지 않음 |
@@ -123,14 +123,15 @@ OCI 인증, compartment, compute/runtime, 네트워크 egress, 로그/모니터�
 - [x] Verification: script 구문, 외부 접근 없는 기본 dry-run, 오사카 리전 고정, instance principal·checksum·no-overwrite, private temp cleanup, systemd hardening과 설치 경로를 정적으로 검증. 실제 backup/OCI 연결/복구 rehearsal은 리소스 준비 후 수행.
 - [x] Handoff: 기존 1 GB 인스턴스 2개를 유지한 채 A1을 병렬 준비하고, 백업·복구 검증 후 하나씩 중지/종료하는 blue/green 절차를 [`infra/oracle/README.md`](../infra/oracle/README.md)에 기록. 실제 OCID와 운영 로그는 아직 없음.
 
-### 7. Vercel Blob 잔여 정리와 안정화
+### 7. Vercel Blob 잔여 정리와 안정화 — 이전 도구 준비 완료 (`f06d6a32`)
 
 Vercel Blob distinct URL 4개와 due queue 165개를 재확인한다. Supabase Storage에 존재하고 참조가 전환됐음을 검증하기 전에는 원본을 삭제하지 않는다. [`scripts/migrate-vercel-blob-to-supabase.ts`](../scripts/migrate-vercel-blob-to-supabase.ts)는 검토 후 필요한 경우에만 사용한다.
 
-- [ ] Commit: 필요한 cleanup 안전 보완만 별도 commit으로 작성.
-- [ ] Push: commit push 및 배포 SHA 기록.
-- [ ] Verification: URL별 참조/대상 object 확인, queue 처리 결과, 실패 재시도, 사용자 다운로드/이미지 표시 확인.
-- [ ] Handoff: 처리 전후 object/URL/queue 수치와 삭제 승인 증거 기록.
+- [x] Commit: Blob cleanup 참조 검사와 동일한 23개 모델·필드 커버리지, env-file opt-in, strict args/path 검증, import side-effect 제거와 write 실패 non-zero 처리를 `f06d6a32`로 작성.
+- [x] Push: `f06d6a32`을 `main`에 push. 배포는 수행하지 않음.
+- [x] Preparation verification: 외부 서비스·실제 env file 없이 전용 23 tests, typecheck, diff check 통과. 기본은 dry-run이며 `.env`/`.env.local`은 `--load-env-files`, 파일 복사와 DB 갱신은 `--write`를 명시해야만 활성화됨.
+- [ ] Operational verification: cutover 승인 후 URL별 참조/대상 object, queue 처리·실패 재시도, 사용자 다운로드/이미지 표시를 확인. dry-run도 후보 검색을 위해 지정된 DB를 읽으므로 운영 실행 전에 연결 대상을 재확인.
+- [x] Handoff: 이번 commit은 도구 준비만 수행했고 데이터 복사·참조 갱신·원본 삭제는 하지 않음. 처리 전후 object/URL/queue 수치와 원본 삭제 승인은 실제 실행 handoff에 별도로 기록.
 
 ## Rollback
 
@@ -148,7 +149,7 @@ Vercel Blob distinct URL 4개와 due queue 165개를 재확인한다. Supabase S
 - 운영 미적용 migration 5개 사이에는 순서 의존성이 있다. 일부만 적용하면 schema와 실행 코드가 어긋날 수 있다.
 - GitHub Actions cron은 아직 없으며, scheduler 지연·중복·GitHub 장애 시 복구 경로와 알림이 검증되지 않았다.
 - Supabase callback은 Vercel의 production URL과 `CRON_SECRET` 동기화에 의존한다. secret rotation 순서가 틀리면 `401` backlog가 발생한다.
-- Cloudflare Stream 처리 실패와 고아 asset 삭제 수명주기가 아직 보강되지 않았다. R2가 없으므로 R2 fallback을 가정하면 안 된다.
+- Cloudflare Stream 삭제 실패는 현재 식별자 로그만 남기며 자동 orphan 재시도 queue는 없다. R2가 없으므로 R2 fallback을 가정하면 안 된다.
 - Vercel Blob URL 4개와 due queue 165개는 참조 무결성을 확인하기 전까지 삭제 위험이 남는다.
 - 기록된 DB/Storage/object/queue 수치는 2026-07-31 시점 스냅샷이며 cutover 직전에 다시 측정해야 한다.
 
@@ -156,6 +157,7 @@ Vercel Blob distinct URL 4개와 due queue 165개를 재확인한다. Supabase S
 
 | 일자 | 상태 | 기록 | 다음 단계 |
 | --- | --- | --- | --- |
+| 2026-07-31 | Step 7 도구 준비 `f06d6a32` push 완료 | Blob cleanup의 전체 23개 참조 필드를 이전 도구와 일치시키고 `.env` 자동 읽기 제거, strict CLI/path 검증, import 시 Prisma 미실행, 명시적 `--write`, 부분 실패 non-zero 종료를 추가. 외부 연결 없는 23 tests, typecheck, diff check 통과. 실제 DB/Blob/Storage 접근·데이터 이동·삭제·배포 없음. | 전체 regression 검증 후 운영 cutover에 필요한 credential/resource/승인 항목을 최종 정리 |
 | 2026-07-31 | Step 6 `6ebe78d8` push 완료 | Oracle 목표를 오사카 홈 리전 `ap-osaka-1`의 단일 `VM.Standard.A1.Flex` 2 OCPU/12 GB로 변경. 기존 1 GB 인스턴스 2개는 A1 백업·복구와 워커 검증 후 순차 교체. instance principal 기반 Supabase custom-format dump, archive/sha256 검증, private Object Storage upload, systemd timer와 runbook을 준비. 구문, 외부 접근 없는 dry-run, 오사카 리전 거부 가드와 diff를 재검증했으며 실제 OCI/DB 접근·리소스 변경·배포는 하지 않음. | Vercel Blob 이전 도구의 전체 참조 필드 커버리지와 dry-run 안전성 보강 |
 | 2026-07-31 | Step 5 `cb49da46` push 완료 | Cloudflare Stream REST helper에 direct upload duration, UID 검증과 응답 일치, video details 상태 판정, 보드 creator/meta ownership, redacted error, idempotent delete를 추가. 이벤트 제출은 `pendingupload`/`error`/타 보드 UID를 거부하고 정상 인코딩 중은 허용. 제출 DB 삭제 뒤 Stream 삭제를 best-effort로 수행하며 R2는 도입하지 않음. 전체 1,251 tests, 부모 targeted 48 tests, typecheck 통과. 운영 API 호출·배포 없음. | Oracle pull worker의 최소 골격과 비운영 dry-run 계약을 설계·구현 |
 | 2026-07-31 | Step 2 `3cd8837e` push 완료 | 5개 Supabase migration을 현재 공식 규칙과 대조. `TossWebhookEvent`와 `BlobDeletionQueue`에 RLS는 있었지만 명시적 `anon`/`authenticated` revoke가 없어 최소 보완함. cron 함수 사용, Vault 미설정 no-op, private `SECURITY DEFINER`, seed 삭제 조건, 165개 due queue의 bounded claim은 수정 없이 적합. Prisma validate/generate와 targeted 38 tests 통과. 운영 적용·배포 없음. | Cloudflare Stream UID 소유권·상태 검증과 삭제 수명주기 변경을 별도 commit으로 검토 |
