@@ -1,0 +1,30 @@
+[Unit]
+Description=Aura Board Supabase logical backup to OCI Object Storage
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+User=aura-backup
+Group=aura-backup
+EnvironmentFile=/etc/aura-board/oracle-backup.env
+WorkingDirectory=/opt/aura-board/infra/oracle
+ExecStart=/opt/aura-board/infra/oracle/backup-supabase.sh --write
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectKernelLogs=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+RestrictRealtime=true
+LockPersonality=true
+MemoryDenyWriteExecute=true
+SystemCallArchitectures=native
+
+[Install]
+WantedBy=multi-user.target

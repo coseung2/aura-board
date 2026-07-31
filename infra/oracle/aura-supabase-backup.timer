@@ -1,0 +1,13 @@
+[Unit]
+Description=Run Aura Board Supabase backup daily
+Wants=network-online.target
+After=network-online.target
+
+[Timer]
+OnCalendar=*-*-* 03:00:00 UTC
+Persistent=true
+RandomizedDelaySec=30m
+Unit=aura-supabase-backup.service
+
+[Install]
+WantedBy=timers.target
