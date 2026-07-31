@@ -175,10 +175,10 @@ describe("outfit sub-categories", () => {
 describe("prop sub-categories", () => {
   const props = SLIME_SHOP_CATALOG.filter((item) => shopFilterForItem(item) === "prop");
 
-  it("splits props into drink, ride, and ball groups", () => {
+  it("splits props into drink and ball groups", () => {
     const groups = groupSlimePropsByKind(props);
-    expect(groups.map((group) => group.key)).toEqual(["drink", "ride", "ball"]);
-    expect(groups.map((group) => group.label)).toEqual(["음료", "탈것", "공"]);
+    expect(groups.map((group) => group.key)).toEqual(["drink", "ball"]);
+    expect(groups.map((group) => group.label)).toEqual(["음료", "공"]);
   });
 
   it("loses no prop to grouping", () => {
@@ -189,16 +189,14 @@ describe("prop sub-categories", () => {
     expect(total).toBe(props.length);
   });
 
-  it("files the trampoline under props rather than floors", () => {
-    // It carries a floor value because the slime lands on it, but it is a thing to
-    // play on rather than ground to stand on.
-    const trampoline = SLIME_SHOP_CATALOG.find((item) => item.category === "ride");
+  it("files the trampoline under vehicles rather than floors or props", () => {
+    const trampoline = SLIME_SHOP_CATALOG.find(
+      (item) => item.key === "slime-blue-trampoline",
+    );
     expect(trampoline).toBeTruthy();
-    expect(trampoline.floor).toBe("trampoline");
-    expect(shopFilterForItem(trampoline)).toBe("prop");
-
-    const rides = groupSlimePropsByKind(props).find((group) => group.key === "ride");
-    expect(rides.items.map((item) => item.key)).toContain(trampoline.key);
+    expect(trampoline.floor).toBeNull();
+    expect(shopFilterForItem(trampoline)).toBe("vehicle");
+    expect(props.map((item) => item.key)).not.toContain(trampoline.key);
   });
 
   it("keeps real floors in the floor tab", () => {

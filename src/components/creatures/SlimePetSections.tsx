@@ -295,9 +295,6 @@ export function SlimeCollectionSection({
               </button>
               <div
                 className={`${styles.spriteFrame} ${hasScene ? styles.spriteFrameScene : ""}`.trim()}
-                style={background
-                  ? { backgroundImage: `url("${background.spritePath}")` }
-                  : undefined}
               >
                 {background ? (
                   <div className={styles.spriteCharacterFrame}>
@@ -309,6 +306,7 @@ export function SlimeCollectionSection({
                       action={action}
                       equippedFloor={renderedFloor}
                       itemSpritePath={accessorySpritePath(assignedItems, slime.color)}
+                      backgroundSpritePath={background.spritePath}
                       vehicleSpritePath={renderedVehicle?.vehicleSheetPath ?? renderedVehicle?.spritePath}
                       vehicleGroundedSpritePath={renderedVehicle?.vehicleGroundedSpritePath}
                       vehicleEffectSpritePaths={renderedVehicle?.vehicleEffectSpritePaths}

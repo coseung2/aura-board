@@ -216,9 +216,6 @@ export function SlimePetShopDrawer({
       >
         <div
           className={`${styles.shopImageFrame} ${hasScene ? styles.shopImageFrameScene : ""}`.trim()}
-          style={sceneBackground
-            ? { backgroundImage: `url("${item.spritePath}")` }
-            : undefined}
         >
           <OfficialSlimeSprite
             slimeColor={previewColor}
@@ -226,6 +223,7 @@ export function SlimePetShopDrawer({
             action={preview.action}
             equippedFloor={preview.equippedFloor}
             itemSpritePath={itemSpritePath}
+            backgroundSpritePath={sceneBackground ? item.spritePath : undefined}
             expandSceneSurfaces={sceneBackground}
             vehicleSpritePath={renderedVehicle?.vehicleSheetPath ?? renderedVehicle?.spritePath}
             vehicleGroundedSpritePath={renderedVehicle?.vehicleGroundedSpritePath}

@@ -156,7 +156,7 @@ describe("GET /api/student/walking fixed KST week", () => {
       representativeSlime: {
         color: "purple",
         growthStage: 2,
-        equippedFloor: "water-puddle",
+        equippedFloor: "none",
       },
     });
     expect(mocks.representativeSlime).toHaveBeenCalledWith({

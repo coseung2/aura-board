@@ -624,7 +624,7 @@ function DailyRewardRow({
 }) {
   return (
     <ControlPressable
-      style={[styles.dailyRewardRow, claimable && styles.dailyRewardRowClaimable]}
+      style={styles.dailyRewardRow}
       onPress={onPress}
       disabled={busy}
       accessibilityLabel={`${label} 보상, ${busy ? "처리 중" : status}`}
@@ -1089,10 +1089,6 @@ const styles = StyleSheet.create({
     borderWidth: borders.none,
     borderRadius: radii.none,
     backgroundColor: colors.transparent,
-  },
-  dailyRewardRowClaimable: {
-    borderLeftWidth: borders.medium,
-    borderLeftColor: colors.accent,
   },
   dailyRewardLabel: {
     ...typography.badge,

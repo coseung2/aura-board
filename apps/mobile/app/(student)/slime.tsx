@@ -192,10 +192,42 @@ const SLIME_EFFECT_DESCRIPTIONS: Record<string, string> = {
   comment_reward: "게시물에 댓글을 달았을 때의 보상이 UP!",
 };
 
+const SLIME_EFFECT_CHIP_LABELS: Record<string, string> = {
+  growth_speed: "성장",
+  reading_reward: "독서",
+  walking_reward: "걷기",
+  assignment_reward: "과제",
+  comment_reward: "댓글",
+};
+
 function shopItemBuffLabel(item: SlimeShopItem): string | null {
   if (!item.effectKey || !item.effectBps) return null;
-  const label = SLIME_EFFECT_LABELS[item.effectKey] ?? item.effectKey;
+  const label = SLIME_EFFECT_CHIP_LABELS[item.effectKey] ?? SLIME_EFFECT_LABELS[item.effectKey] ?? item.effectKey;
   return `${label} +${item.effectBps / 100}%`;
+}
+
+function buffChipTier(bps: number): "bronze" | "silver" | "gold" {
+  if (bps > 200) return "gold";
+  if (bps > 100) return "silver";
+  return "bronze";
+}
+
+const BUFF_TIER_ICON = {
+  bronze: require("../../assets/ui/buff-tiers/buff-tier-bronze.png"),
+  silver: require("../../assets/ui/buff-tiers/buff-tier-silver.png"),
+  gold: require("../../assets/ui/buff-tiers/buff-tier-gold.png"),
+} as const;
+
+function BuffTierChip({ label, bps }: { label: string; bps: number }) {
+  const tier = buffChipTier(bps);
+  return (
+    <View style={styles.itemPreviewBuff} pointerEvents="none" accessible={false}>
+      <Image source={BUFF_TIER_ICON[tier]} style={styles.itemPreviewBuffIcon} contentFit="contain" />
+      <Text style={styles.itemPreviewBuffText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.72}>
+        {label}
+      </Text>
+    </View>
+  );
 }
 
 function formatBuffPercent(bps: number): string {
@@ -570,16 +602,11 @@ export default function StudentSlimeScreen() {
     const sceneBackground = isSceneBackgroundItem(item);
     const expandedSceneItem =
       vehicleItem || sceneBackground || preview.equippedFloor !== "none";
-    const itemSummary = [
-      buffLabel,
-      repeatable
-        ? `${quantity}개 보유`
-        : !ownedItem
-          ? `${item.price.toLocaleString()}${home?.unitLabel ?? "원"}`
-          : null,
-    ]
-      .filter((value): value is string => Boolean(value))
-      .join(" · ");
+    const itemSummary = repeatable
+      ? `${quantity}개 보유`
+      : !ownedItem
+        ? `${item.price.toLocaleString()}${home?.unitLabel ?? "원"}`
+        : null;
     return (
       <ControlPressable
         key={item.key}
@@ -623,6 +650,9 @@ export default function StudentSlimeScreen() {
             vehicleOffsetX={preview.vehicle?.vehicleOffsetX}
             accessibilityLabel={`${item.labelKo} 미리보기`}
           />
+          {buffLabel ? (
+            <BuffTierChip label={buffLabel} bps={item.effectBps ?? 0} />
+          ) : null}
         </View>
         <View style={[styles.itemCardBody, styles.shopCardBody]}>
           <View style={styles.floorCopy}>
@@ -1576,20 +1606,18 @@ export default function StudentSlimeScreen() {
         {section === "shop" ? (
         <View style={styles.shopPage} accessibilityLabel="슬라임 상점">
           <Text style={styles.shopBalance}>{home?.balance.toLocaleString() ?? 0}{home?.unitLabel ?? "원"}</Text>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.shopTabs} accessibilityRole="tablist">
+        <ContentTabs style={styles.shopNav} accessibilityLabel="상점 상품 카테고리">
           {shopNavItems.map((tab) => (
-            <ControlPressable
+            <ContentTab
               key={tab.key}
-              style={[styles.shopTab, shopFilter === tab.key && styles.shopTabSelected]}
+              style={styles.shopNavItem}
+              selected={shopFilter === tab.key}
               onPress={() => setShopFilter(tab.key)}
-              hitSlop={spacing.sm}
-              accessibilityRole="tab"
-              accessibilityState={{ selected: shopFilter === tab.key }}
             >
-              <Text style={[styles.shopTabText, shopFilter === tab.key && styles.shopTabTextSelected]}>{tab.label}</Text>
-            </ControlPressable>
+              {tab.label}
+            </ContentTab>
           ))}
-        </ScrollView>
+        </ContentTabs>
         <View style={styles.shopContent}>
         {shopFilter === "character" ? (
           <View style={styles.floorList}>
@@ -1607,11 +1635,11 @@ export default function StudentSlimeScreen() {
                       displayScale={slimeUi.petSceneDisplayScale}
                       accessibilityLabel={`${slime.nameKo} 미리보기`}
                     />
+                    <BuffTierChip label={`기본 효과 +${slime.baseBuffBps / 100}%`} bps={slime.baseBuffBps} />
                   </View>
                   <View style={[styles.itemCardBody, styles.shopCardBody]}>
                     <View style={styles.floorCopy}>
                       <Text style={styles.floorTitle}>{slime.nameKo}</Text>
-                      <Text style={styles.floorSubtitle}>기본 효과 +{slime.baseBuffBps / 100}%</Text>
                     </View>
                     <Text style={[styles.floorStatusText, !isOwned && styles.floorStatusBuy]}>{busy ? "구매 중…" : isOwned ? "보유 중" : `${slime.price.toLocaleString()}${home.unitLabel}`}</Text>
                   </View>
@@ -1668,11 +1696,13 @@ export default function StudentSlimeScreen() {
                           backgroundSpritePath={selectSceneBackgroundSpritePath(item)}
                           accessibilityLabel={`${item.labelKo} 미리보기`}
                         />
+                        {buffLabel ? (
+                          <BuffTierChip label={buffLabel} bps={item.effectBps ?? 0} />
+                        ) : null}
                       </View>
                       <View style={[styles.itemCardBody, styles.shopCardBody]}>
                         <View style={styles.floorCopy}>
                           <Text style={styles.floorTitle}>{item.labelKo}</Text>
-                          <Text style={styles.floorSubtitle}>{buffLabel ?? "배경"}</Text>
                         </View>
                         <View style={styles.floorStatus}>
                           {busy ? <ActivityIndicator size="small" color={colors.accent} /> : null}
@@ -1734,11 +1764,13 @@ export default function StudentSlimeScreen() {
                       drinkFlavor={shopItemPreview(item).drinkFlavor}
                       accessibilityLabel={`${item.labelKo || floorLabel(floor)} 미리보기`}
                     />
+                    {shopItemBuffLabel(item) ? (
+                      <BuffTierChip label={shopItemBuffLabel(item) ?? ""} bps={item.effectBps ?? 0} />
+                    ) : null}
                   </View>
                   <View style={[styles.itemCardBody, styles.shopCardBody]}>
                     <View style={styles.floorCopy}>
                       <Text style={styles.floorTitle}>{item.labelKo || floorLabel(floor)}</Text>
-                      <Text style={styles.floorSubtitle}>{shopItemBuffLabel(item) ?? floorLabel(floor)}</Text>
                     </View>
                     <View style={styles.floorStatus}>
                       {busy ? <ActivityIndicator size="small" color={colors.accent} /> : null}
@@ -1956,7 +1988,7 @@ export default function StudentSlimeScreen() {
                         accessibilityLabel={`${item.labelKo} 미리보기`}
                       />
                       {buffLabel ? (
-                        <Text style={styles.wardrobePreviewBuff}>{buffLabel}</Text>
+                        <BuffTierChip label={buffLabel} bps={item.effectBps ?? 0} />
                       ) : null}
                     </View>
                     {wornByOther ? (
@@ -2143,13 +2175,10 @@ const styles = StyleSheet.create({
   floorList: { flexDirection: "row", flexWrap: "wrap", justifyContent: "flex-start", gap: spacing.sm },
   shopPage: { gap: spacing.sm },
   shopBalance: { ...typography.label, color: colors.accentTintedText, textAlign: "right", fontVariant: ["tabular-nums"] },
-  shopTabs: { gap: spacing.xxs, paddingBottom: spacing.xs },
-  shopTab: { minHeight: tapMin - spacing.lg, paddingHorizontal: spacing.xs, paddingVertical: spacing.xxs, alignItems: "center", justifyContent: "center", borderRadius: spacing.xs, backgroundColor: colors.surface },
-  shopTabSelected: { backgroundColor: colors.accentTintedBg },
-  shopTabText: { ...typography.label, color: colors.textMuted },
-  shopTabTextSelected: { color: colors.accentTintedText },
+  shopNav: { width: "100%" },
+  shopNavItem: { flex: 1, paddingHorizontal: spacing.xxs },
   shopContent: { paddingBottom: spacing.sm, gap: spacing.sm },
-  floorRow: { width: "31%", minWidth: 0, paddingHorizontal: spacing.xs, paddingVertical: spacing.sm, borderWidth: borders.hairline, borderColor: colors.border, borderRadius: radii.control, backgroundColor: colors.surface, alignItems: "center", justifyContent: "flex-start", gap: spacing.xs },
+  floorRow: { width: "31.5%", minWidth: 0, paddingHorizontal: spacing.xs, paddingVertical: spacing.xs, borderWidth: borders.hairline, borderColor: colors.border, borderRadius: radii.control, backgroundColor: colors.surface, alignItems: "center", justifyContent: "flex-start", gap: spacing.xxs },
   shopPreview: { width: iconSizes.empty, height: iconSizes.empty, alignItems: "center", justifyContent: "center", overflow: "hidden", backgroundColor: colors.surfaceAlt },
   sceneCard: { paddingHorizontal: spacing.none, paddingVertical: spacing.none, gap: spacing.none, overflow: "hidden" },
   shopPreviewFullBleed: { width: "100%", height: iconSizes.empty },
@@ -2159,6 +2188,9 @@ const styles = StyleSheet.create({
   // them shows through as a hard grey square outline. Those previews sit on the
   // page background instead; the feather itself provides the visual boundary.
   shopPreviewScene: { backgroundColor: colors.transparent },
+  itemPreviewBuff: { position: "absolute", zIndex: layers.cardOverlay, top: spacing.xs, left: spacing.xs, maxWidth: "92%", flexDirection: "row", alignItems: "center", justifyContent: "flex-start", gap: spacing.xxs },
+  itemPreviewBuffIcon: { width: iconSizes.sm, height: iconSizes.sm, flexShrink: 0 },
+  itemPreviewBuffText: { ...typography.micro, flexShrink: 1, color: colors.text, textAlign: "left", includeFontPadding: false },
   // Price bands stack down the page, so each band spans the full width and lays
   // its own items out in the same wrapping grid the ungrouped list used. Without
   // `width: "100%"` a band would be treated as one cell of the parent row and the
@@ -2215,7 +2247,6 @@ const styles = StyleSheet.create({
   wardrobeItemCopy: { width: "100%", minWidth: 0, alignItems: "center", gap: spacing.xxs },
   wardrobePreviewVisual: { ...StyleSheet.absoluteFillObject, alignItems: "center", justifyContent: "center" },
   wardrobeContentDimmed: { opacity: states.disabledOpacity },
-  wardrobePreviewBuff: { position: "absolute", zIndex: layers.cardOverlay, top: spacing.xs, right: spacing.xs, paddingHorizontal: spacing.xxs, borderRadius: radii.pill, backgroundColor: colors.surfaceGlass, ...typography.micro, color: colors.plantActive, includeFontPadding: false },
   wardrobeWornOverlay: { ...StyleSheet.absoluteFillObject, zIndex: layers.cardOverlay, alignItems: "center", justifyContent: "center", gap: spacing.xxs },
   wardrobeWornOverlayText: { ...typography.micro, color: colors.text, textAlign: "center", fontWeight: "700", includeFontPadding: false },
   wardrobeCardBody: { paddingBottom: spacing.xs, gap: spacing.xxs },
