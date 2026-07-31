@@ -5,7 +5,7 @@ import { consumeNotificationOutbox } from "@/lib/notification-outbox";
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
-export async function GET(req: Request) {
+async function consume(req: Request) {
   if (!isAuthorizedCronRequest(req)) {
     return NextResponse.json({ error: "invalid_secret" }, { status: 401 });
   }
@@ -16,3 +16,6 @@ export async function GET(req: Request) {
   });
   return NextResponse.json(result);
 }
+
+export const GET = consume;
+export const POST = consume;

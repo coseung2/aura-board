@@ -7,9 +7,9 @@ vi.mock("@/lib/notification-outbox", () => ({
   consumeNotificationOutbox: mocks.consume,
 }));
 
-import { GET } from "./route";
+import { GET, POST } from "./route";
 
-describe("GET /api/cron/notification-push", () => {
+describe("/api/cron/notification-push", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     process.env.CRON_SECRET = "cron-test";
@@ -47,5 +47,30 @@ describe("GET /api/cron/notification-push", () => {
       retried: 0,
       dead: 0,
     });
+  });
+
+  it("accepts the same authenticated contract from a POST database webhook", async () => {
+    const response = await POST(new Request("http://localhost/api/cron/notification-push", {
+      method: "POST",
+      headers: {
+        authorization: "Bearer cron-test",
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({ reason: "notification_outbox_insert" }),
+    }));
+
+    expect(response.status).toBe(200);
+    expect(mocks.consume).toHaveBeenCalledWith({ batchSize: 50, concurrency: 5 });
+  });
+
+  it("rejects an unauthenticated POST database webhook", async () => {
+    const response = await POST(new Request("http://localhost/api/cron/notification-push", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ reason: "notification_outbox_insert" }),
+    }));
+
+    expect(response.status).toBe(401);
+    expect(mocks.consume).not.toHaveBeenCalled();
   });
 });
