@@ -62,9 +62,10 @@ output/
 # Local mobile signing credentials and one-off build outputs
 .codex/tmp/
 .codex/builds/
+/.codex/*.png
+/.codex/*.xml
 supabase/.temp/
 apps/mobile/credentials.json
 apps/mobile/credentials/
 apps/mobile/android/keystores/
 apps/mobile/android/gradle.properties.local
-
