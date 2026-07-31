@@ -1,15 +1,15 @@
 # 4-provider infrastructure handoff
 
 기준일: 2026-07-31
-기준 브랜치/커밋: `main` / `80183f55`
+기준 브랜치/커밋: `main` / `dc57588a`
 
-이 문서는 Oracle Cloud, Cloudflare, Supabase, GitHub Actions의 책임 경계와 후속 실행 순서를 기록한다. **현재 준비 단계는 코드·설정·문서의 구현, 검증, commit, push까지만 포함하며 운영 변경, 마이그레이션 적용, secret 등록, workflow 실행, Vercel 배포 및 수동 배포는 포함하지 않는다.** 아래 체크박스는 실제 실행자가 증거를 확인한 뒤에만 갱신한다.
+이 문서는 Oracle Cloud, Cloudflare, Supabase, GitHub Actions의 책임 경계와 후속 실행 순서를 기록한다. **코드 준비 단계 이후 Oracle 새 테넌시에는 무료 범위의 compartment, VCN, public subnet/NSG, private backup bucket까지 생성됐다. A1 Compute, boot volume, dynamic group/IAM policy, secret 등록, backup 실행, 데이터 이관, workflow 실행 및 앱 배포는 아직 수행하지 않았다.** 아래 체크박스는 실제 실행자가 증거를 확인한 뒤에만 갱신한다.
 
 ## 책임과 경계
 
 | 제공자 | 책임 | 책임이 아닌 것 | 현재 상태 |
 | --- | --- | --- | --- |
-| Oracle Cloud | 장기 FFmpeg 작업, 배치 메일, Supabase 논리 백업을 가져가는 pull worker | 원본 Postgres, 원본 Storage, 앱 호스팅 | 오사카 홈 리전 `ap-osaka-1`의 단일 A1 2 OCPU/12 GB 목표. 기존 1 GB 인스턴스 2개를 검증 후 교체하며 아직 리소스 변경은 하지 않음 |
+| Oracle Cloud | 장기 FFmpeg 작업, 배치 메일, Supabase 논리 백업을 가져가는 pull worker | 원본 Postgres, 원본 Storage, 앱 호스팅 | 새 테넌시 오사카 `ap-osaka-1`에 compartment·VCN·public subnet/NSG·private bucket 생성 완료. 단일 A1 2 OCPU/12 GB는 capacity 부족으로 대기 중이며 5시간 간격 단일 요청 재시도 계획. 기존 1 GB 2대는 교차 테넌시 blue/green 검증 전 유지 |
 | Cloudflare | Stream 비디오 업로드·재생 및 상태 검증/삭제 수명주기 | 일반 파일·이미지 저장소, R2 | Stream UID·상태·ownership 검증과 best-effort 삭제 보강 완료. R2는 도입하지 않음 |
 | Supabase Pro (Seoul) | Postgres, Auth, Realtime, 일반 파일·이미지 Storage, `NotificationOutbox`, `pg_net`, `pg_cron` | Cloudflare Stream 비디오, Oracle 작업 실행 환경 | 운영 사용 중. `20260731` 마이그레이션 5개는 운영 미적용 |
 | GitHub Actions | Vercel의 일/주간 cron 7개를 `Authorization: Bearer` 방식으로 호출 | 앱 호스팅, `notification-push`의 주 wakeup | 수동 dry-run 우선 workflow 준비 완료, schedule 미설정 |
@@ -26,6 +26,8 @@
 - `main` 기준 이전 8개 커밋은 `80183f55`까지 push 완료.
 - 최신 `main`의 production 배포는 실패했지만 기존 production은 유지 중이다. 실패 원인은 [`vercel.json`](../vercel.json)의 `/api/cron/notification-push` 매분 schedule이 Vercel Hobby 제약과 충돌하기 때문이다.
 - 일반 일/주간 schedule 7개는 `parent-weekly-digest`, `parent-anonymize`, `expire-pending-links`, `fd-maturity`, `billing-renew`, `blob-cleanup`, `attendance-reminder`이다.
+- Oracle 새 테넌시 `dbsk7618`의 홈 리전은 `ap-osaka-1`이다. `aura-board-prod`, `aura-board-vcn`, `aura-board-public-subnet`, `aura-board-worker-nsg`, `aura-board-postgres-backups`가 준비됐고 인스턴스·boot/block volume은 0개다.
+- A1 최초 요청은 `Out of host capacity`, 즉시 후속 요청은 `429 TooManyRequests`였다. 추가 즉시 재시도는 중단했다. 5시간 재시도는 매 실행 전 동일 이름의 non-terminated instance와 boot volume이 0개인지 읽기 전용으로 확인하고, 실행당 launch 요청 한 번만 허용하며, 성공 검증 즉시 자동화를 영구 중지한다.
 - `notification-push`는 위 7개와 별도다. Supabase `NotificationOutbox` insert event wakeup과 5분 retry sweep으로 이전하며, 상세 cutover 계약은 [`src/app/api/cron/notification-push/HANDOFF.md`](../src/app/api/cron/notification-push/HANDOFF.md)에 있다.
 - Cloudflare Stream 진입점은 [`src/lib/event/cfstream.ts`](../src/lib/event/cfstream.ts)와 [`src/app/api/event/video-upload-url/route.ts`](../src/app/api/event/video-upload-url/route.ts)다.
 - 일반 파일·이미지는 Supabase Storage가 기준이며 관련 구현은 [`src/lib/media-storage.ts`](../src/lib/media-storage.ts)와 [`src/app/api/upload/route.ts`](../src/app/api/upload/route.ts)다. Vercel Blob 잔여분 이전 도구는 [`scripts/migrate-vercel-blob-to-supabase.ts`](../scripts/migrate-vercel-blob-to-supabase.ts)다.
@@ -116,12 +118,15 @@ Stream 업로드 완료/실패 상태를 검증하고, 앱 레코드 삭제 시 
 
 ### 6. Oracle pull worker 준비 — 논리 백업 골격 완료 (`6ebe78d8`)
 
-OCI 인증, compartment, compute/runtime, 네트워크 egress, 로그/모니터링을 먼저 확정한다. 이후 장기 FFmpeg, 배치 메일, Supabase 논리 backup pull을 각각 독립 job으로 구현한다. Oracle에는 원본 DB나 원본 Storage를 만들지 않으며 backup은 암호화, 보존 기간, 복구 시험을 갖춘 파생 사본으로만 취급한다.
+OCI 인증, compartment, compute/runtime, 네트워크 egress, 로그/모니터링을 먼저 확정한다. 이후 장기 FFmpeg, 배치 메일, Supabase 논리 backup pull을 각각 독립 systemd job·사용자·작업 디렉터리로 분리한다. A1 한 대에서는 처음부터 무거운 작업을 병렬 실행하지 않고 backup → batch mail → FFmpeg 순서로 하나씩 이관하며 측정 후에만 동시성을 늘린다. Oracle에는 원본 DB나 원본 Storage를 만들지 않으며 backup은 암호화, 보존 기간, 복구 시험을 갖춘 파생 사본으로만 취급한다.
 
 - [x] Commit: 오사카 A1 2 OCPU/12 GB의 첫 작업으로 Supabase logical backup script, systemd unit/timer, env template, runbook을 독립 commit `6ebe78d8`로 작성.
 - [x] Push: `6ebe78d8`을 `main`에 push. 실행 artifact는 실제 OCI 리소스 준비 전이라 없음.
 - [x] Verification: script 구문, 외부 접근 없는 기본 dry-run, 오사카 리전 고정, instance principal·checksum·no-overwrite, private temp cleanup, systemd hardening과 설치 경로를 정적으로 검증. 실제 backup/OCI 연결/복구 rehearsal은 리소스 준비 후 수행.
-- [x] Handoff: 기존 1 GB 인스턴스 2개를 유지한 채 A1을 병렬 준비하고, 백업·복구 검증 후 하나씩 중지/종료하는 blue/green 절차를 [`infra/oracle/README.md`](../infra/oracle/README.md)에 기록. 실제 OCID와 운영 로그는 아직 없음.
+- [x] Handoff: 구 테넌시의 기존 1 GB AMD 인스턴스 2개를 유지한 채 새 테넌시 A1을 병렬 준비하는 교차 테넌시 blue/green 절차를 [`infra/oracle/README.md`](../infra/oracle/README.md)에 기록. 호스트 단위 교체가 아니라 backup → batch mail → FFmpeg 역할 단위 이관이며, ARM64 재검증과 단일 노드 resource isolation을 추가함.
+- [x] A1 runtime preparation: backup unit에 150% CPU·1.5/2 GB memory envelope를 추가하고, video thumbnail backfill을 기본 dry-run/명시적 `--write`, exact Supabase origin+bucket allowlist, redirect/local/internal source 차단, streaming temp file, 1 GiB source cap, download/FFmpeg timeout, 64 MiB frame cap, 부분 실패 non-zero 종료로 보강. 두 unit은 공유 nonblocking `flock`을 사용하고 수동 video unit은 초기 concurrency 1, 180% CPU·6/8 GB memory envelope, timer/install target 없음.
+- [x] A1 runtime implementation: 위 script/tests/systemd/tmpfiles/env/runbook 변경을 `450c62b4` (`feat(oracle): prepare A1 media worker`)로 `main`에 push. targeted Vitest 61/61, `npm run typecheck`, `bash -n infra/oracle/backup-supabase.sh`, `git diff --check`를 통과했으며 배포·Infisical 주입·systemd 활성화·실제 backfill은 수행하지 않음.
+- [ ] A1 runtime verification: 실제 ARM64 호스트에서 systemd unit verify와 native binary 확인 후 `--dry-run --limit=1`, 승인된 1건 write, WebP/DB/Storage/temp cleanup 및 `MemoryPeak` 측정을 완료. backup/restore와 video unit을 동시에 실행하지 않음.
 
 ### 7. Vercel Blob 잔여 정리와 안정화 — 이전 도구 준비 완료 (`f06d6a32`)
 
@@ -135,8 +140,9 @@ Vercel Blob distinct URL 4개와 due queue 165개를 재확인한다. Supabase S
 
 ## 실제 실행 전 승인 체크
 
-- [ ] OCI Osaka에서 A1 2 OCPU/12 GB capacity, ARM64 image, private Object Storage bucket, dynamic group/IAM policy를 준비하고 OCID·owner·비용 경계를 값 노출 없이 기록.
+- [ ] OCI Osaka의 compartment, VCN, public subnet/NSG, private Object Storage bucket은 준비 완료. A1 2 OCPU/12 GB capacity를 확보해 ARM64 instance와 50 GB boot volume을 만든 뒤 instance OCID 단일 dynamic group/IAM policy를 준비하고 owner·비용 경계를 기록.
 - [ ] 새 A1에서 logical backup `--write` 1회, checksum/archive 확인, 격리 restore rehearsal을 마친 뒤에만 기존 1 GB 인스턴스의 job을 하나씩 이관. 관찰 기간 전에는 기존 인스턴스를 종료하지 않음.
+- [ ] Infisical production scope `/oracle/aura-board/backup`과 `/oracle/aura-board/video-thumbnail`에 필요한 값을 분리 등록하고, 값 노출 없이 A1의 root-owned env files로 주입. video scope 이름은 `DATABASE_URL`, `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_STORAGE_BUCKET`이며 transaction pooler `:6543`은 사용하지 않음. A1 존재·검증 전에는 secret을 주입하지 않음.
 - [ ] GitHub `Production` environment에 `CRON_SECRET`, `AURA_BOARD_BASE_URL`을 설정하고 수동 dry-run 결과를 확인. 별도 cutover 승인 전에는 `schedule`을 추가하지 않음.
 - [ ] 운영 DB backup과 대상 Supabase 프로젝트/리전을 확인한 뒤 5개 migration을 문서 순서대로 적용. 부분 적용이나 임의 down migration 금지.
 - [ ] Vercel Blob 이전 도구의 DB 연결 대상을 확인하고 먼저 dry-run으로 후보를 고정. `--write` 후 대상 object와 사용자 경로를 검증하기 전 원본 Blob과 queue 항목 삭제 금지.
@@ -153,12 +159,13 @@ Vercel Blob distinct URL 4개와 due queue 165개를 재확인한다. Supabase S
 
 ## Residual risks
 
-- OCI 인증과 리소스가 없어 Oracle 작업의 실행 환경, 비용, 처리량, backup 복구 시간이 검증되지 않았다. 오사카 A1 Always Free capacity가 부족할 수 있으며 ARM64 패키지 호환을 확인하기 전 기존 1 GB 인스턴스를 종료하면 안 된다.
+- OCI 인증과 기본 네트워크·private bucket은 준비됐지만 A1은 Osaka host capacity 부족으로 아직 없다. 단일 A1은 두 micro host의 장애 격리를 잃으므로 job별 systemd 격리, 직렬 이관, ARM64 패키지 호환, 처리량과 backup 복구 시간을 검증하기 전 기존 1 GB 인스턴스를 종료하면 안 된다.
 - Vercel Hobby의 현재 cron 제약으로 최신 `main`과 production SHA가 다르다. 코드 검증만으로 production 반영을 가정하면 안 된다.
 - 운영 미적용 migration 5개 사이에는 순서 의존성이 있다. 일부만 적용하면 schema와 실행 코드가 어긋날 수 있다.
 - GitHub Actions cron은 아직 없으며, scheduler 지연·중복·GitHub 장애 시 복구 경로와 알림이 검증되지 않았다.
 - Supabase callback은 Vercel의 production URL과 `CRON_SECRET` 동기화에 의존한다. secret rotation 순서가 틀리면 `401` backlog가 발생한다.
 - Cloudflare Stream 삭제 실패는 현재 식별자 로그만 남기며 자동 orphan 재시도 queue는 없다. R2가 없으므로 R2 fallback을 가정하면 안 된다.
+- A1 video backfill은 upload 후 DB update 실패 시 새 Supabase object를 best-effort 삭제한다. cleanup까지 실패하면 `orphan cleanup failed` 로그를 기준으로 attachment prefix의 미참조 object를 확인·수동 삭제해야 하며, 자동 orphan queue는 아직 없다.
 - Vercel Blob URL 4개와 due queue 165개는 참조 무결성을 확인하기 전까지 삭제 위험이 남는다.
 - 기록된 DB/Storage/object/queue 수치는 2026-07-31 시점 스냅샷이며 cutover 직전에 다시 측정해야 한다.
 
@@ -166,6 +173,9 @@ Vercel Blob distinct URL 4개와 due queue 165개를 재확인한다. Supabase S
 
 | 일자 | 상태 | 기록 | 다음 단계 |
 | --- | --- | --- | --- |
+| 2026-07-31 | A1 worker 구현 `450c62b4` push 완료 | 기본 dry-run/명시적 write gate, Supabase exact origin·bucket allowlist, redirect 및 FFmpeg nested network protocol 차단, 최소 child env, 64 MiB frame cap, DB update 실패 시 best-effort object cleanup, 공유 `flock`, 초기 concurrency 1, Node.js 22 ARM64 runbook을 반영. targeted 61/61 tests, typecheck, backup shell syntax, diff check 통과. 배포·secret 주입·systemd 활성화·DB/Storage write 없음. | A1 또는 승인된 Work 전용 VPS에서 Node 22/ARM64 native binary와 systemd unit을 검증한 뒤 dry-run 1건 → 승인된 write 1건 → cleanup/MemoryPeak 순서로 확인 |
+| 2026-07-31 | A1 worker 성능·격리 구현 보강 | video thumbnail backfill을 A1용 streaming download와 최대 2-worker 처리로 바꾸고 strict CLI, source-size guard, download/FFmpeg timeout, temp cleanup, 부분 실패 non-zero를 추가. backup/video systemd unit에 12 GB 단일 호스트용 CPU·memory envelope를 적용했으며 video unit은 수동 전용으로 유지. Vercel/Supabase/provider 제약인 cron batch, Prisma connection limit, 알림/Blob queue, 결제 직렬화는 변경하지 않음. | A1 capacity 확보 후 ARM64/systemd 검증, dry-run 1건과 승인된 write 1건 측정. request-time FFmpeg 제거는 durable media queue 설계 후 별도 단계로 수행 |
+| 2026-07-31 | Oracle 부분 프로비저닝 및 A1 계획 재구성 | 새 테넌시 Osaka에 `aura-board-prod`, VCN/public subnet/NSG, private bucket을 무료 범위로 생성. 인스턴스와 boot/block volume은 0개이며 A1 요청은 host capacity 부족과 후속 429로 중단. 두 micro host의 역할 분리를 단일 ARM64 A1에서 systemd 격리·직렬 실행·역할 단위 blue/green으로 대체하도록 runbook 갱신. secret, backup, IAM instance principal, 데이터 이관, 기존 리소스 종료·삭제는 수행하지 않음. | 내일부터 5시간 간격 단일 A1 요청. 성공 시 instance OCID 단일 dynamic group/bucket policy → SSH/cloud-init 검증 → dry-run 순서로 진행 |
 | 2026-07-31 | 준비 기준선 `0298379f` 회귀 검증 완료 | 구현과 단계별 handoff가 포함된 `main`에서 제한된 4-worker 전체 Vitest 540 suites/1,276 tests, typecheck, Next.js production build 통과. 첫 전체 테스트 시도는 도구의 5분 제한으로 부모 셸만 종료되어 소유 Vitest 프로세스 트리를 정리한 뒤 결과 JSON을 남기는 단일 실행으로 재검증. 배포·workflow dispatch·운영 DB/Storage/OCI 접근 없음. | 위 실제 실행 전 승인 체크를 제공자별로 충족한 뒤 별도 cutover 작업에서 진행 |
 | 2026-07-31 | Step 7 도구 준비 `f06d6a32` push 완료 | Blob cleanup의 전체 23개 참조 필드를 이전 도구와 일치시키고 `.env` 자동 읽기 제거, strict CLI/path 검증, import 시 Prisma 미실행, 명시적 `--write`, 부분 실패 non-zero 종료를 추가. 외부 연결 없는 23 tests, typecheck, diff check 통과. 실제 DB/Blob/Storage 접근·데이터 이동·삭제·배포 없음. | 전체 regression 검증 후 운영 cutover에 필요한 credential/resource/승인 항목을 최종 정리 |
 | 2026-07-31 | Step 6 `6ebe78d8` push 완료 | Oracle 목표를 오사카 홈 리전 `ap-osaka-1`의 단일 `VM.Standard.A1.Flex` 2 OCPU/12 GB로 변경. 기존 1 GB 인스턴스 2개는 A1 백업·복구와 워커 검증 후 순차 교체. instance principal 기반 Supabase custom-format dump, archive/sha256 검증, private Object Storage upload, systemd timer와 runbook을 준비. 구문, 외부 접근 없는 dry-run, 오사카 리전 거부 가드와 diff를 재검증했으며 실제 OCI/DB 접근·리소스 변경·배포는 하지 않음. | Vercel Blob 이전 도구의 전체 참조 필드 커버리지와 dry-run 안전성 보강 |
