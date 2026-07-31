@@ -104,13 +104,13 @@ GitHub environment의 정확한 이름은 `Production`이며 environment 자체�
 - [ ] Verification: 각 endpoint의 최근 GitHub run, HTTP status, application log, 중복 실행 부작용 없음 확인.
 - [ ] Handoff: endpoint별 마지막 성공 run과 Vercel schedule 제거 여부 기록.
 
-### 5. Cloudflare Stream 수명주기 보강 — 구현 완료 (`pending commit`)
+### 5. Cloudflare Stream 수명주기 보강 — `cb49da46` push 완료
 
 Stream 업로드 완료/실패 상태를 검증하고, 앱 레코드 삭제 시 Cloudflare asset 삭제가 재시도 가능한 형태로 이어지도록 설계·구현한다. 일반 파일·이미지를 Stream에 넣지 않으며 R2를 추가하지 않는다.
 
-- [ ] Commit: 상태 검증, 보드 단위 ownership, 삭제 수명주기 변경과 테스트를 독립 commit으로 작성. 현재 SHA는 `pending commit`.
-- [ ] Push: commit push 및 배포 대상 SHA 기록.
-- [x] Verification: direct upload의 `maxDurationSeconds`, UID 형식, 보드 creator/meta ownership, ready/encoding/error/pending 상태, API 오류 redaction, delete 404 idempotency, DB 삭제 후 Stream cleanup 성공/실패를 테스트. 전체 test와 typecheck는 변경 commit 전에 재확인.
+- [x] Commit: 상태 검증, 보드 단위 ownership, 삭제 수명주기 변경과 테스트를 `cb49da46` (`feat(cloudflare): harden Stream video lifecycle`)로 작성.
+- [x] Push: `cb49da46`를 `main`에 push하고 배포 대상 SHA를 기록. 수동 배포는 하지 않음.
+- [x] Verification: direct upload의 `maxDurationSeconds`, UID 형식과 응답 일치, 보드 creator/meta ownership, ready/encoding/error/pending 상태, API 오류 redaction, delete 404 idempotency, DB 삭제 후 Stream cleanup 성공/실패를 검증. 전체 1,251 tests와 typecheck 통과 후, 부모 리뷰 보강까지 포함한 targeted 48 tests와 typecheck를 다시 통과.
 - [x] Handoff: Cloudflare는 Stream video-only로 유지하고 R2는 추가하지 않음. cleanup 실패는 DB 삭제를 되돌리지 않고 식별자만 로그에 남기며, 자동 orphan queue는 아직 없음.
 
 ### 6. Oracle pull worker 준비
@@ -155,7 +155,7 @@ Vercel Blob distinct URL 4개와 due queue 165개를 재확인한다. Supabase S
 
 | 일자 | 상태 | 기록 | 다음 단계 |
 | --- | --- | --- | --- |
-| 2026-07-31 | Step 5 구현 완료 (`pending commit`) | Cloudflare Stream REST helper에 direct upload duration, UID 검증, video details 상태 판정, 보드 creator/meta ownership, redacted error, idempotent delete를 추가. 이벤트 제출은 `pendingupload`/`error`/타 보드 UID를 거부하고 정상 인코딩 중은 허용. 제출 DB 삭제 뒤 Stream 삭제를 best-effort로 수행하며 R2는 도입하지 않음. 운영 API 호출·배포 없음. | targeted test/typecheck를 재실행한 뒤 독립 commit/push하고 실제 SHA 기록. 이후 Oracle pull worker의 최소 골격 설계 |
+| 2026-07-31 | Step 5 `cb49da46` push 완료 | Cloudflare Stream REST helper에 direct upload duration, UID 검증과 응답 일치, video details 상태 판정, 보드 creator/meta ownership, redacted error, idempotent delete를 추가. 이벤트 제출은 `pendingupload`/`error`/타 보드 UID를 거부하고 정상 인코딩 중은 허용. 제출 DB 삭제 뒤 Stream 삭제를 best-effort로 수행하며 R2는 도입하지 않음. 전체 1,251 tests, 부모 targeted 48 tests, typecheck 통과. 운영 API 호출·배포 없음. | Oracle pull worker의 최소 골격과 비운영 dry-run 계약을 설계·구현 |
 | 2026-07-31 | Step 2 `3cd8837e` push 완료 | 5개 Supabase migration을 현재 공식 규칙과 대조. `TossWebhookEvent`와 `BlobDeletionQueue`에 RLS는 있었지만 명시적 `anon`/`authenticated` revoke가 없어 최소 보완함. cron 함수 사용, Vault 미설정 no-op, private `SECURITY DEFINER`, seed 삭제 조건, 165개 due queue의 bounded claim은 수정 없이 적합. Prisma validate/generate와 targeted 38 tests 통과. 운영 적용·배포 없음. | Cloudflare Stream UID 소유권·상태 검증과 삭제 수명주기 변경을 별도 commit으로 검토 |
 | 2026-07-31 | Step 1 `14bb101a` push 완료 | [`.github/workflows/cron-jobs.yml`](../.github/workflows/cron-jobs.yml)에 `Production` environment를 사용하는 수동 dispatcher를 추가. `workflow_dispatch`만 사용하고 `schedule`은 두지 않았으며, `dry_run` 기본값은 `true`라 endpoint를 호출하지 않는다. 7개 job의 method/path, secret 비출력, `notification-push` 제외를 정적으로 검증했고 운영 호출은 실행하지 않음. `Production` environment는 존재하지만 `CRON_SECRET`과 `AURA_BOARD_BASE_URL`은 아직 미설정. | Supabase 마이그레이션 5개의 적용 전 안전성·순서·검증 자동화를 점검. 승인된 non-dry-run 전에 두 GitHub environment 값을 설정하고 값 노출 없이 존재 여부를 확인 |
 | 2026-07-31 | Baseline push 완료 | 이전 8개 commit이 `main`의 `80183f55`까지 push됨. 운영 실측과 4-provider 책임 경계를 기록했으며 운영 변경·배포는 수행하지 않음. | GitHub Actions cron workflow 준비: 일반 일/주간 7개 endpoint만 대상으로 구현·정적 검증하고 `notification-push`는 제외 |
