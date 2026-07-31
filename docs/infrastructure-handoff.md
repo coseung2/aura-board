@@ -77,14 +77,14 @@ GitHub environment의 정확한 이름은 `Production`이며 environment 자체�
 - [x] Verification: [`.github/workflows/cron-jobs.yml`](../.github/workflows/cron-jobs.yml)의 구문, 7개 path와 호출 메서드, `schedule` 부재, `notification-push` 제외, secret 값 미출력을 정적으로 대조. 실제 운영 호출은 승인된 cutover 전에는 실행하지 않음.
 - [x] Handoff: workflow 경로, 무예약 상태, 기본 dry-run 원칙, 정적 검증 결과와 구현 SHA `14bb101a`를 Update log에 기록.
 
-### 2. Supabase 마이그레이션 적용 준비 및 승인
+### 2. Supabase 마이그레이션 적용 준비 및 승인 — 검토 완료 (`pending commit`)
 
 5개 migration SQL을 순서대로 검토하고 [`docs/verification-checklist.md`](verification-checklist.md)의 Prisma/production 기준을 따른다. 이 단계의 준비 commit은 코드 검증과 runbook 보완만 포함한다. 운영 DB 적용은 별도 승인 작업이다.
 
-- [ ] Commit: migration 검증 또는 필요한 안전 보완을 독립 commit으로 작성.
+- [ ] Commit: `TossWebhookEvent`와 `BlobDeletionQueue`의 `anon`/`authenticated` 권한 회수 및 회귀 검증을 독립 commit으로 작성. 현재 SHA는 `pending commit`.
 - [ ] Push: 준비 commit push 및 대상 SHA 고정.
-- [ ] Verification: `npx prisma validate`, `npx prisma generate`, 관련 migration/route targeted test, 적용 전 논리 backup 복구 가능성 확인.
-- [ ] Handoff: 운영 미적용/적용 여부를 migration별로 기록하고 SQL 실행 증거 위치를 남김.
+- [x] Verification: 5개 migration의 순서·스키마 일치, RLS/revoke, `SECURITY DEFINER` 권한, extension no-op, `cron.schedule`/`cron.unschedule`, 165개 due queue의 25건 claim 상한과 참조 검사를 정적으로 감사. Prisma validate와 migration/consumer/cron targeted test를 통과했으며 운영 SQL은 실행하지 않음.
+- [x] Handoff: 5개 모두 운영 미적용 상태를 유지하고, 실제 변경은 서버 전용 두 테이블의 Data API 권한 회수뿐임을 기록.
 
 ### 3. NotificationOutbox를 Supabase wakeup으로 cutover
 
@@ -155,5 +155,6 @@ Vercel Blob distinct URL 4개와 due queue 165개를 재확인한다. Supabase S
 
 | 일자 | 상태 | 기록 | 다음 단계 |
 | --- | --- | --- | --- |
+| 2026-07-31 | Step 2 검토 완료 (`pending commit`) | 5개 Supabase migration을 현재 공식 규칙과 대조. `TossWebhookEvent`와 `BlobDeletionQueue`에 RLS는 있었지만 명시적 `anon`/`authenticated` revoke가 없어 최소 보완함. cron 함수 사용, Vault 미설정 no-op, private `SECURITY DEFINER`, seed 삭제 조건, 165개 due queue의 bounded claim은 수정 없이 적합. 운영 적용·배포 없음. | 보안 보완을 commit/push하고 실제 SHA를 기록한 뒤 Cloudflare Stream 수명주기 변경을 별도 commit으로 검토 |
 | 2026-07-31 | Step 1 `14bb101a` push 완료 | [`.github/workflows/cron-jobs.yml`](../.github/workflows/cron-jobs.yml)에 `Production` environment를 사용하는 수동 dispatcher를 추가. `workflow_dispatch`만 사용하고 `schedule`은 두지 않았으며, `dry_run` 기본값은 `true`라 endpoint를 호출하지 않는다. 7개 job의 method/path, secret 비출력, `notification-push` 제외를 정적으로 검증했고 운영 호출은 실행하지 않음. `Production` environment는 존재하지만 `CRON_SECRET`과 `AURA_BOARD_BASE_URL`은 아직 미설정. | Supabase 마이그레이션 5개의 적용 전 안전성·순서·검증 자동화를 점검. 승인된 non-dry-run 전에 두 GitHub environment 값을 설정하고 값 노출 없이 존재 여부를 확인 |
 | 2026-07-31 | Baseline push 완료 | 이전 8개 commit이 `main`의 `80183f55`까지 push됨. 운영 실측과 4-provider 책임 경계를 기록했으며 운영 변경·배포는 수행하지 않음. | GitHub Actions cron workflow 준비: 일반 일/주간 7개 endpoint만 대상으로 구현·정적 검증하고 `notification-push`는 제외 |

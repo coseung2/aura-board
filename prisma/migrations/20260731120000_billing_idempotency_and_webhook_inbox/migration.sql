@@ -39,3 +39,4 @@ ALTER TABLE "TossWebhookEvent"
 
 -- Server-only inbox. Keep it inaccessible through Supabase's public Data API.
 ALTER TABLE public."TossWebhookEvent" ENABLE ROW LEVEL SECURITY;
+REVOKE ALL ON TABLE public."TossWebhookEvent" FROM anon, authenticated;

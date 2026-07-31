@@ -47,5 +47,8 @@ describe("BlobDeletionQueue lease migration", () => {
     expect(migration).toContain(
       'ALTER TABLE public."BlobDeletionQueue" ENABLE ROW LEVEL SECURITY',
     );
+    expect(migration).toContain(
+      'REVOKE ALL ON TABLE public."BlobDeletionQueue" FROM anon, authenticated',
+    );
   });
 });

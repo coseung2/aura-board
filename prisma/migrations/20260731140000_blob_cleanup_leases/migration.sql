@@ -36,3 +36,4 @@ CREATE INDEX "BlobDeletionQueue_status_nextAttemptAt_createdAt_idx"
 -- exposed public schema. The earlier RLS migration already enables it; this is
 -- intentionally idempotent and does not replace or disable the setting.
 ALTER TABLE public."BlobDeletionQueue" ENABLE ROW LEVEL SECURITY;
+REVOKE ALL ON TABLE public."BlobDeletionQueue" FROM anon, authenticated;
