@@ -68,14 +68,14 @@ GitHub environment의 정확한 이름은 `Production`이며 environment 자체�
 - [x] Verification: 운영 용량과 잔여 queue 수치, 기존 production 유지 상태를 기록.
 - [x] Handoff: 4-provider 책임 경계와 운영 미변경 원칙을 이 문서에 기록.
 
-### 1. GitHub Actions cron workflow 준비 — 구현 완료 (pending commit)
+### 1. GitHub Actions cron workflow 준비 — `14bb101a` push 완료
 
 [`vercel.json`](../vercel.json)의 일반 일/주간 cron 7개를 개별 호출할 수 있는 `workflow_dispatch` 전용 workflow를 [`.github/workflows`](../.github/workflows/)에 먼저 추가한다. 이 단계에서는 `schedule`을 넣지 않아 push만으로 운영 endpoint가 호출되지 않게 한다. 각 요청은 HTTPS production base URL과 해당 path를 조합하고 `Authorization: Bearer` header를 사용해야 한다. timeout, non-2xx 실패, 동시 실행 중복을 명시적으로 처리한다. `/api/cron/notification-push`는 이 workflow에 포함하지 않는다.
 
-- [ ] Commit: workflow와 문서 변경을 별도 commit으로 작성. 현재 SHA는 `pending commit`이며 부모 작업에서 commit 후 이 항목과 Update log를 갱신한다.
-- [ ] Push: commit을 `main`에 push하고 GitHub에 반영된 SHA 확인.
+- [x] Commit: workflow와 문서 변경을 `14bb101a` (`ci(cron): add manual production dispatcher`)로 작성.
+- [x] Push: `14bb101a`를 `main`에 push하고 GitHub 반영을 확인.
 - [x] Verification: [`.github/workflows/cron-jobs.yml`](../.github/workflows/cron-jobs.yml)의 구문, 7개 path와 호출 메서드, `schedule` 부재, `notification-push` 제외, secret 값 미출력을 정적으로 대조. 실제 운영 호출은 승인된 cutover 전에는 실행하지 않음.
-- [x] Handoff: workflow 경로, 무예약 상태, 기본 dry-run 원칙과 정적 검증 결과를 Update log에 기록. commit 후 부모 작업에서 SHA만 갱신한다.
+- [x] Handoff: workflow 경로, 무예약 상태, 기본 dry-run 원칙, 정적 검증 결과와 구현 SHA `14bb101a`를 Update log에 기록.
 
 ### 2. Supabase 마이그레이션 적용 준비 및 승인
 
@@ -155,5 +155,5 @@ Vercel Blob distinct URL 4개와 due queue 165개를 재확인한다. Supabase S
 
 | 일자 | 상태 | 기록 | 다음 단계 |
 | --- | --- | --- | --- |
-| 2026-07-31 | Step 1 구현 완료 (`pending commit`) | [`.github/workflows/cron-jobs.yml`](../.github/workflows/cron-jobs.yml)에 `Production` environment를 사용하는 수동 dispatcher를 추가. `workflow_dispatch`만 사용하고 `schedule`은 두지 않았으며, `dry_run` 기본값은 `true`라 endpoint를 호출하지 않는다. 7개 job의 method/path, secret 비출력, `notification-push` 제외를 정적으로 검증했고 운영 호출은 실행하지 않음. `Production` environment는 존재하지만 `CRON_SECRET`과 `AURA_BOARD_BASE_URL`은 아직 미설정. | 부모 작업에서 commit 후 이 행과 Step 1의 `pending commit`을 실제 SHA로 갱신하고 push 상태를 기록. 승인된 non-dry-run 전에 두 GitHub environment 값을 설정하고 값 노출 없이 존재 여부를 확인 |
+| 2026-07-31 | Step 1 `14bb101a` push 완료 | [`.github/workflows/cron-jobs.yml`](../.github/workflows/cron-jobs.yml)에 `Production` environment를 사용하는 수동 dispatcher를 추가. `workflow_dispatch`만 사용하고 `schedule`은 두지 않았으며, `dry_run` 기본값은 `true`라 endpoint를 호출하지 않는다. 7개 job의 method/path, secret 비출력, `notification-push` 제외를 정적으로 검증했고 운영 호출은 실행하지 않음. `Production` environment는 존재하지만 `CRON_SECRET`과 `AURA_BOARD_BASE_URL`은 아직 미설정. | Supabase 마이그레이션 5개의 적용 전 안전성·순서·검증 자동화를 점검. 승인된 non-dry-run 전에 두 GitHub environment 값을 설정하고 값 노출 없이 존재 여부를 확인 |
 | 2026-07-31 | Baseline push 완료 | 이전 8개 commit이 `main`의 `80183f55`까지 push됨. 운영 실측과 4-provider 책임 경계를 기록했으며 운영 변경·배포는 수행하지 않음. | GitHub Actions cron workflow 준비: 일반 일/주간 7개 endpoint만 대상으로 구현·정적 검증하고 `notification-push`는 제외 |
