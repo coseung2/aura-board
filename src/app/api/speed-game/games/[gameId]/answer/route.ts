@@ -15,6 +15,7 @@ import { z } from "zod";
 import { db } from "@/lib/db";
 import { getCurrentStudent } from "@/lib/student-auth";
 import { jsonPrivateNoStore } from "@/lib/http-cache";
+import { scheduleSpeedGameChange } from "@/lib/realtime-server";
 import {
   answersMatch,
   computeScore,
@@ -256,6 +257,7 @@ export async function POST(req: Request, { params }: Params) {
   }
 
   const upserted = await persistAnswer();
+  scheduleSpeedGameChange(gameId, "answer");
 
   // wire DTO 는 src/components/speed-game/types.ts SpeedGameAnswer 와 일치.
   return jsonPrivateNoStore({

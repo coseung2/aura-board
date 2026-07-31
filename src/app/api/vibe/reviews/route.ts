@@ -5,7 +5,7 @@ import { NextResponse } from "next/server";
 import { Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
 import { getCurrentStudent } from "@/lib/student-auth";
-import { publish } from "@/lib/realtime";
+import { scheduleRealtimePublish } from "@/lib/realtime-server";
 import { VibeReviewCreateSchema } from "@/lib/vibe-arcade/types";
 import { scanText } from "@/lib/vibe-arcade/moderation-filter";
 
@@ -62,7 +62,7 @@ export async function POST(req: Request) {
       },
     });
 
-    publish({
+    scheduleRealtimePublish({
       channel: `board:${project.boardId}:vibe-arcade`,
       type: "review.created",
       payload: {

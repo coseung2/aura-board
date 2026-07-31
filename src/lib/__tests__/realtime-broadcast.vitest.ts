@@ -113,4 +113,94 @@ describe("server realtime broadcasts", () => {
     ).resolves.toBeUndefined();
     expect(supabaseMocks.removeChannel).not.toHaveBeenCalled();
   });
+
+  it("delivers validated legacy events as invalidation-only payloads", async () => {
+    configureClient();
+    const { publishValidatedRealtimeEvent } = await import("../realtime-broadcast");
+
+    await publishValidatedRealtimeEvent({
+      channel: "board:board-1:assignment",
+      type: "reminder.issued",
+      payload: {
+        boardId: "board-1",
+        studentIds: ["student-secret"],
+        issuedAt: "2026-07-31T00:00:00.000Z",
+      },
+    });
+
+    expect(supabaseMocks.httpSend).toHaveBeenCalledWith(
+      "reminder.issued",
+      { type: "reminder.issued" },
+      { timeout: 1500 },
+    );
+  });
+
+  it("rejects a legacy event whose channel does not match its contract", async () => {
+    configureClient();
+    const { publishValidatedRealtimeEvent } = await import("../realtime-broadcast");
+
+    await expect(
+      publishValidatedRealtimeEvent({
+        channel: "board:board-1:vibe-arcade",
+        type: "reminder.issued",
+        payload: {
+          boardId: "board-1",
+          studentIds: [],
+          issuedAt: "2026-07-31T00:00:00.000Z",
+        },
+      }),
+    ).rejects.toThrow("Channel does not match reminder.issued");
+    expect(supabaseMocks.httpSend).not.toHaveBeenCalled();
+  });
+
+  it("does not treat an HTTP error result as successful delivery", async () => {
+    configureClient();
+    supabaseMocks.httpSend.mockResolvedValueOnce({
+      success: false,
+      status: 503,
+      error: "unavailable",
+    });
+    const { sendRealtimeBroadcast } = await import("../realtime-broadcast");
+
+    await expect(
+      sendRealtimeBroadcast("board:board-1:assignment", "slot.updated", {
+        type: "slot.updated",
+      }),
+    ).rejects.toThrow("broadcast failed (503)");
+  });
+
+  it("fails truthfully when server configuration is absent", async () => {
+    vi.stubEnv("NEXT_PUBLIC_SUPABASE_URL", "");
+    vi.stubEnv("SUPABASE_SERVICE_ROLE_KEY", "");
+    const { publishValidatedRealtimeEvent, RealtimeConfigurationError } = await import(
+      "../realtime-broadcast"
+    );
+
+    await expect(
+      publishValidatedRealtimeEvent({
+        channel: "board:board-1:assignment",
+        type: "slot.updated",
+        payload: {
+          slotId: "slot-1",
+          submissionStatus: "submitted",
+          gradingStatus: "not_graded",
+          updatedAt: "2026-07-31T00:00:00.000Z",
+        },
+      }),
+    ).rejects.toBeInstanceOf(RealtimeConfigurationError);
+    expect(supabaseMocks.createClient).not.toHaveBeenCalled();
+  });
+
+  it("keeps speed-game broadcasts invalidation-only", async () => {
+    configureClient();
+    const { announceSpeedGameChange } = await import("../realtime-broadcast");
+
+    await announceSpeedGameChange("game-1", "answer");
+
+    expect(supabaseMocks.httpSend).toHaveBeenCalledWith(
+      "speed_game_changed",
+      { type: "speed_game_changed" },
+      { timeout: 1500 },
+    );
+  });
 });

@@ -63,6 +63,13 @@ export function VibeArcadeBoard({ data }: { data: BoardDetailResponse }) {
   const [playTarget, setPlayTarget] = useState<PlayProject | null>(null);
   const abortRef = useRef<AbortController | null>(null);
 
+  useEffect(() => {
+    return () => {
+      abortRef.current?.abort();
+      abortRef.current = null;
+    };
+  }, []);
+
   const send = useCallback(async () => {
     const msg = input.trim();
     if (!msg || streaming) return;
@@ -117,6 +124,7 @@ export function VibeArcadeBoard({ data }: { data: BoardDetailResponse }) {
         },
       });
     } catch (e) {
+      if (ctrl.signal.aborted) return;
       if (e instanceof ApiError) {
         if (e.status === 401) setError("로그인이 만료되었어요.");
         else if (e.status === 403)
@@ -130,8 +138,10 @@ export function VibeArcadeBoard({ data }: { data: BoardDetailResponse }) {
         setError(e instanceof Error ? e.message : "오류");
       }
     } finally {
-      setStreaming(false);
-      abortRef.current = null;
+      if (abortRef.current === ctrl) {
+        setStreaming(false);
+        abortRef.current = null;
+      }
     }
   }, [input, sessionId, streaming, data.board.id]);
 

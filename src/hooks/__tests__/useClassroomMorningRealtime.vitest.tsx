@@ -11,6 +11,7 @@ vi.mock("@/lib/supabase/client", () => ({
 
 function createRealtimeHarness() {
   let broadcast: ((message: { payload: unknown }) => void) | null = null;
+  let statusListener: ((status: string) => void) | null = null;
   const channel = {
     on: vi.fn(
       (
@@ -22,7 +23,10 @@ function createRealtimeHarness() {
         return channel;
       },
     ),
-    subscribe: vi.fn(() => channel),
+    subscribe: vi.fn((listener?: (status: string) => void) => {
+      statusListener = listener ?? null;
+      return channel;
+    }),
   };
   const client = {
     channel: vi.fn(() => channel),
@@ -35,6 +39,9 @@ function createRealtimeHarness() {
     client,
     emit(event: ClassroomMorningRealtimeEvent) {
       broadcast?.({ payload: event });
+    },
+    setStatus(status: string) {
+      statusListener?.(status);
     },
   };
 }
@@ -135,6 +142,50 @@ describe("useClassroomMorningRealtime", () => {
     });
 
     expect(onRefresh).not.toHaveBeenCalled();
+    hook.unmount();
+  });
+
+  it("passes the scoped event and only uses the fallback while unavailable", async () => {
+    const onRefresh = vi.fn(async () => undefined);
+    const { emit, setStatus } = createRealtimeHarness();
+
+    const hook = renderHook(() =>
+      useClassroomMorningRealtime({
+        classroomId: "classroom-a",
+        onRefresh,
+      }),
+    );
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    act(() => setStatus("SUBSCRIBED"));
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(60_000);
+    });
+    expect(onRefresh).not.toHaveBeenCalled();
+
+    const event = morningEvent();
+    act(() => {
+      emit(event);
+      vi.advanceTimersByTime(80);
+    });
+    expect(onRefresh).toHaveBeenCalledWith(event);
+
+    onRefresh.mockClear();
+    act(() => setStatus("CHANNEL_ERROR"));
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(80);
+    });
+    expect(onRefresh).toHaveBeenCalledWith(undefined);
+
+    onRefresh.mockClear();
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(60_080);
+    });
+    expect(onRefresh).toHaveBeenCalledWith(undefined);
+
     hook.unmount();
   });
 });

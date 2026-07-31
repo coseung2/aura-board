@@ -10,7 +10,8 @@ import type {
   AssignmentGradingStatus,
 } from "@/lib/assignment-schemas";
 import { slotRowToDTO, SLOT_INCLUDE_DEFAULT } from "@/lib/assignment-api";
-import { assignmentChannelKey, publish } from "@/lib/realtime";
+import { assignmentChannelKey } from "@/lib/realtime";
+import { scheduleRealtimePublish } from "@/lib/realtime-server";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -84,8 +85,7 @@ export async function PATCH(
     `[AssignmentSlot] transition slotId=${slotId} from=${slot.submissionStatus} to=${updated.submissionStatus} actor=teacher actorId=${user.id}`
   );
 
-  // Declarative publish — v1 no-op. See src/lib/realtime.ts.
-  await publish({
+  scheduleRealtimePublish({
     channel: assignmentChannelKey(slot.boardId),
     type: "slot.updated",
     payload: {

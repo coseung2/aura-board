@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Platform,
@@ -11,6 +11,7 @@ import {
 } from "react-native";
 import { ApiError, apiFetch } from "../../lib/api";
 import type { BoardDetailResponse } from "../../lib/types";
+import { useLiveSnapshot } from "../../lib/use-live-snapshot";
 import {
   borders,
   colors,
@@ -45,6 +46,9 @@ type PuzzleInfo = {
   puzzle: { id: string; status: "DRAFT" | "LIVE" | "SCHEDULED" } | null;
 };
 
+const KORDLE_GUESS_SUBMITTED_EVENT = "guess-submitted";
+const KORDLE_PUZZLE_CHANGED_EVENT = "puzzle-changed";
+
 export function KordleBoard({ data }: { data: BoardDetailResponse }) {
   const { width: viewportWidth } = useWindowDimensions();
   const [puzzle, setPuzzle] = useState<PuzzleInfo | null>(null);
@@ -55,81 +59,113 @@ export function KordleBoard({ data }: { data: BoardDetailResponse }) {
   const [refreshing, setRefreshing] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const mountedRef = useRef(true);
+  const attemptRef = useRef<string | null>(null);
+  const puzzleRef = useRef<string | null>(null);
+  const loadInFlightRef = useRef<Promise<void> | null>(null);
+  const loadControllerRef = useRef<AbortController | null>(null);
 
-  const loadAttempt = useCallback(async (id: string) => {
-    const result = await apiFetch<{ state: PublicState }>(
-      `/api/kordle/attempts/${encodeURIComponent(id)}`,
-    );
-    setState(result.state);
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      loadControllerRef.current?.abort();
+    };
   }, []);
 
-  const load = useCallback(async (mode: "initial" | "refresh" | "silent" = "initial") => {
+  const load = useCallback((mode: "initial" | "refresh" | "silent" = "initial"): Promise<void> => {
+    if (loadInFlightRef.current) return loadInFlightRef.current;
     if (mode === "refresh") setRefreshing(true);
     if (mode === "initial") setLoading(true);
-    try {
-      const info = await apiFetch<PuzzleInfo>(
-        `/api/kordle/boards/${encodeURIComponent(data.board.id)}/puzzle`,
-      );
-      setPuzzle(info);
-      if (info.puzzle?.status === "LIVE") {
-        const attempt = await apiFetch<{ attemptId: string; state: PublicState }>(
-          `/api/kordle/puzzles/${encodeURIComponent(info.puzzle.id)}/attempt`,
-          { method: "POST" },
+    const controller = new AbortController();
+    loadControllerRef.current = controller;
+    const previousAttemptId = attemptRef.current;
+    const previousPuzzleId = puzzleRef.current;
+    let request!: Promise<void>;
+    request = (async () => {
+      try {
+        const info = await apiFetch<PuzzleInfo>(
+          `/api/kordle/boards/${encodeURIComponent(data.board.id)}/puzzle`,
+          { signal: controller.signal },
         );
-        setAttemptId(attempt.attemptId);
-        setState(attempt.state);
-      } else {
-        setAttemptId(null);
-        setState(null);
-      }
-      setError(null);
-    } catch (caught) {
-      if (caught instanceof ApiError && caught.status === 404) {
-        setPuzzle(null);
+        if (!mountedRef.current || controller.signal.aborted) return;
+
+        if (!info.puzzle || info.puzzle.status !== "LIVE") {
+          setPuzzle(info);
+          setAttemptId(null);
+          setState(null);
+          setDraft("");
+          attemptRef.current = null;
+          puzzleRef.current = null;
+          setError(null);
+          return;
+        }
+
+        const samePuzzle =
+          previousAttemptId !== null && previousPuzzleId === info.puzzle.id;
+        const result = samePuzzle
+          ? {
+              attemptId: previousAttemptId,
+              state: (
+                await apiFetch<{ state: PublicState }>(
+                  `/api/kordle/attempts/${encodeURIComponent(previousAttemptId)}`,
+                  { signal: controller.signal },
+                )
+              ).state,
+            }
+          : await apiFetch<{ attemptId: string; state: PublicState }>(
+              `/api/kordle/puzzles/${encodeURIComponent(info.puzzle.id)}/attempt`,
+              { method: "POST", signal: controller.signal },
+            );
+        if (!mountedRef.current || controller.signal.aborted) return;
+
+        setPuzzle(info);
+        setAttemptId(result.attemptId);
+        setState(result.state);
+        attemptRef.current = result.attemptId;
+        puzzleRef.current = info.puzzle.id;
+        if (!samePuzzle || previousAttemptId !== result.attemptId) setDraft("");
         setError(null);
-      } else {
+      } catch (caught) {
+        if (!mountedRef.current || controller.signal.aborted) return;
+        if (caught instanceof ApiError && caught.status === 404) {
+          setPuzzle(null);
+          setAttemptId(null);
+          setState(null);
+          setDraft("");
+          attemptRef.current = null;
+          puzzleRef.current = null;
+          setError(null);
+          return;
+        }
         setError("꼬들 게임을 불러오지 못했어요.");
+        throw caught;
+      } finally {
+        if (mountedRef.current) {
+          setLoading(false);
+          setRefreshing(false);
+        }
+        if (loadControllerRef.current === controller) loadControllerRef.current = null;
+        if (loadInFlightRef.current === request) loadInFlightRef.current = null;
       }
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
+    })();
+    loadInFlightRef.current = request;
+    return request;
   }, [data.board.id]);
 
-  const syncActivePuzzle = useCallback(async () => {
-    const info = await apiFetch<PuzzleInfo>(
-      `/api/kordle/boards/${encodeURIComponent(data.board.id)}/puzzle`,
-    );
-    setPuzzle(info);
-    if (info.puzzle?.status !== "LIVE") {
-      setAttemptId(null);
-      setState(null);
-      return;
-    }
-    if (attemptId && state?.puzzleId === info.puzzle.id) {
-      await loadAttempt(attemptId);
-      return;
-    }
-    const attempt = await apiFetch<{ attemptId: string; state: PublicState }>(
-      `/api/kordle/puzzles/${encodeURIComponent(info.puzzle.id)}/attempt`,
-      { method: "POST" },
-    );
-    setAttemptId(attempt.attemptId);
-    setState(attempt.state);
-    setDraft("");
-    setError(null);
-  }, [attemptId, data.board.id, loadAttempt, state?.puzzleId]);
+  const refresh = useCallback(async () => {
+    await load("refresh").catch(() => undefined);
+  }, [load]);
 
-  useEffect(() => { void load(); }, [load]);
-  useEffect(() => {
-    const timer = setInterval(() => {
-      void syncActivePuzzle().catch(() => undefined);
-    }, 4_000);
-    return () => clearInterval(timer);
-  }, [syncActivePuzzle]);
+  useLiveSnapshot({
+    channelName: `kordle:board:${data.board.id}`,
+    events: [KORDLE_PUZZLE_CHANGED_EVENT, KORDLE_GUESS_SUBMITTED_EVENT],
+    terminal: Boolean(state && state.status !== "IN_PROGRESS"),
+    reload: () => load("silent"),
+  });
 
   async function submitGuess() {
-    if (!attemptId || !state?.nextGuessIndex || !draft.trim()) return;
+    if (!attemptId || state?.nextGuessIndex == null || !draft.trim()) return;
     setSubmitting(true);
     try {
       const result = await apiFetch<{ state: PublicState }>(
@@ -144,7 +180,7 @@ export function KordleBoard({ data }: { data: BoardDetailResponse }) {
       setError(null);
     } catch (caught) {
       if (caught instanceof ApiError && caught.status === 409) {
-        await syncActivePuzzle().catch(() => undefined);
+        await load("silent").catch(() => undefined);
       }
       const code = caught instanceof ApiError && typeof caught.body === "object" && caught.body
         ? (caught.body as { error?: string }).error
@@ -194,7 +230,7 @@ export function KordleBoard({ data }: { data: BoardDetailResponse }) {
       keyboardShouldPersistTaps="handled"
       keyboardDismissMode={Platform.OS === "ios" ? "interactive" : "on-drag"}
       automaticallyAdjustKeyboardInsets
-      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => void load("refresh")} />}
+      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => void refresh()} />}
     >
       <View style={styles.heading}>
         <View style={styles.headingText}>

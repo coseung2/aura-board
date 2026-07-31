@@ -12,6 +12,7 @@ const mocks = vi.hoisted(() => ({
   speedGameUpdate: vi.fn(),
   resolveStudentGroupId: vi.fn(),
   limitSpeedGameAnswer: vi.fn(),
+  scheduleSpeedGameChange: vi.fn(),
 }));
 
 vi.mock("@/lib/db", () => ({
@@ -40,6 +41,9 @@ vi.mock("@/lib/speed-game/runtime", () => ({
 }));
 vi.mock("@/lib/rate-limit-routes", () => ({
   limitSpeedGameAnswer: mocks.limitSpeedGameAnswer,
+}));
+vi.mock("@/lib/realtime-server", () => ({
+  scheduleSpeedGameChange: mocks.scheduleSpeedGameChange,
 }));
 
 import { POST } from "./route";
@@ -140,6 +144,7 @@ describe("POST /api/speed-game/games/[gameId]/answer", () => {
       expect(await response.json()).toMatchObject({
         answer: { elapsedMs: 2000, score: 1200 },
       });
+      expect(mocks.scheduleSpeedGameChange).toHaveBeenCalledWith("game-1", "answer");
     },
   );
 

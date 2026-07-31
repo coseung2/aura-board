@@ -1,8 +1,9 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { RealtimeChannel, SupabaseClient } from "@supabase/supabase-js";
 import { GameWinnerInfo } from "@/features/games/components/GameWinnerInfo";
+import { createTrailingRefreshRunner } from "@/lib/realtime-invalidation";
 import type { KordlePublicState, LetterState } from "../engine";
 import {
   KORDLE_GUESS_SUBMITTED_EVENT,
@@ -246,7 +247,6 @@ export function KordleBoard({ boardId, initialState, attemptId, locale }: Props)
   const [buffer, setBuffer] = useState<string>("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [realtimeReady, setRealtimeReady] = useState(false);
   const isKorean = activeLocale.toLowerCase().startsWith("ko");
 
   useEffect(() => {
@@ -286,6 +286,10 @@ export function KordleBoard({ boardId, initialState, attemptId, locale }: Props)
   const isComplete = state.status === "WON" || state.status === "LOST";
   const isWaitingForTurn =
     !isComplete && state.turn.currentGuessIndex !== null && state.turn.isWaiting;
+  const isCompleteRef = useRef(isComplete);
+  isCompleteRef.current = isComplete;
+  const isWaitingForTurnRef = useRef(isWaitingForTurn);
+  isWaitingForTurnRef.current = isWaitingForTurn;
   const canType =
     !isComplete &&
     !submitting &&
@@ -304,40 +308,58 @@ export function KordleBoard({ boardId, initialState, attemptId, locale }: Props)
   }, [attemptId]);
 
   useEffect(() => {
-    if (isComplete) return;
     let cancelled = false;
+    let subscribed = false;
     let timer: number | null = null;
+    let supabase: SupabaseClient | null = null;
+    let channel: RealtimeChannel | null = null;
+    const refreshRunner = createTrailingRefreshRunner(async () => {
+      if (cancelled || isCompleteRef.current) return;
+      const nextState = await refreshState();
+      if (cancelled || !nextState) return;
+      setState(nextState);
+      if (!nextState.turn.isWaiting) setError(null);
+    });
 
-    async function poll() {
-      try {
-        const nextState = await refreshState();
-        if (!cancelled && nextState) {
-          setState(nextState);
-          if (!nextState.turn.isWaiting) {
-            setError(null);
-          }
-        }
-      } finally {
-        if (!cancelled) {
-          timer = window.setTimeout(
-            poll,
-            realtimeReady ? 30000 : isWaitingForTurn ? 1200 : 2500,
-          );
-        }
+    function stopFallbackPolling() {
+      if (timer !== null) {
+        window.clearTimeout(timer);
+        timer = null;
       }
     }
 
-    timer = window.setTimeout(poll, realtimeReady ? 30000 : isWaitingForTurn ? 900 : 2500);
-    return () => {
-      cancelled = true;
-      if (timer !== null) window.clearTimeout(timer);
-    };
-  }, [isComplete, isWaitingForTurn, realtimeReady, refreshState]);
+    function scheduleFallbackPolling(delayMs: number) {
+      if (
+        cancelled ||
+        subscribed ||
+        isCompleteRef.current ||
+        document.visibilityState !== "visible" ||
+        timer !== null
+      ) {
+        return;
+      }
+      timer = window.setTimeout(async () => {
+        timer = null;
+        if (
+          cancelled ||
+          subscribed ||
+          isCompleteRef.current ||
+          document.visibilityState !== "visible"
+        ) {
+          return;
+        }
+        await refreshRunner.run();
+        scheduleFallbackPolling(isWaitingForTurnRef.current ? 1200 : 2500);
+      }, delayMs);
+    }
 
-  useEffect(() => {
-    let cancelled = false;
-    let supabase: SupabaseClient | null = null;
-    let channel: RealtimeChannel | null = null;
+    function reconcileWhenVisible() {
+      if (document.visibilityState !== "visible" || isCompleteRef.current) return;
+      void refreshRunner.run();
+      if (!subscribed) {
+        scheduleFallbackPolling(isWaitingForTurnRef.current ? 1200 : 2500);
+      }
+    }
 
     async function subscribe() {
       try {
@@ -346,30 +368,51 @@ export function KordleBoard({ boardId, initialState, attemptId, locale }: Props)
         supabase = createPublicSupabaseClient();
         channel = supabase
           .channel(kordleBoardChannelKey(boardId))
-          .on("broadcast", { event: KORDLE_PUZZLE_CHANGED_EVENT }, async () => {
-            const nextState = await refreshState();
-            if (!cancelled && nextState) {
-              setState(nextState);
-              setPending([]);
-              setBuffer("");
-              setError(null);
-            }
+          .on("broadcast", { event: KORDLE_PUZZLE_CHANGED_EVENT }, () => {
+            if (cancelled) return;
+            setPending([]);
+            setBuffer("");
+            setError(null);
+            void refreshRunner.run();
           })
-          .on("broadcast", { event: KORDLE_GUESS_SUBMITTED_EVENT }, async () => {
-            const nextState = await refreshState();
-            if (!cancelled && nextState) setState(nextState);
+          .on("broadcast", { event: KORDLE_GUESS_SUBMITTED_EVENT }, () => {
+            void refreshRunner.run();
           })
           .subscribe((nextStatus) => {
-            if (!cancelled) setRealtimeReady(nextStatus === "SUBSCRIBED");
+            if (cancelled) return;
+            if (nextStatus === "SUBSCRIBED") {
+              subscribed = true;
+              stopFallbackPolling();
+              // Realtime is the live transport; reconcile the durable state once
+              // before relying on subsequent broadcast events.
+              void refreshRunner.run();
+              return;
+            }
+            if (
+              nextStatus === "CHANNEL_ERROR" ||
+              nextStatus === "TIMED_OUT" ||
+              nextStatus === "CLOSED"
+            ) {
+              subscribed = false;
+              scheduleFallbackPolling(isWaitingForTurnRef.current ? 1200 : 2500);
+            }
           });
       } catch {
-        if (!cancelled) setRealtimeReady(false);
+        if (!cancelled) {
+          subscribed = false;
+          scheduleFallbackPolling(isWaitingForTurnRef.current ? 1200 : 2500);
+        }
       }
     }
 
+    scheduleFallbackPolling(isWaitingForTurnRef.current ? 900 : 2500);
+    document.addEventListener("visibilitychange", reconcileWhenVisible);
     void subscribe();
     return () => {
       cancelled = true;
+      subscribed = false;
+      stopFallbackPolling();
+      document.removeEventListener("visibilitychange", reconcileWhenVisible);
       if (supabase && channel) void supabase.removeChannel(channel);
     };
   }, [boardId, refreshState]);

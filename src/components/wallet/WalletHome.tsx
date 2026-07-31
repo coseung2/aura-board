@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { getSlimeDefinition, getSlimeShopItem } from "@/lib/pets/catalog";
 import { getWalletTransactionDisplay } from "@/lib/wallet-transaction-display";
 import { WalletCardQR } from "./WalletCardQR";
@@ -34,6 +34,7 @@ type WalletData = {
 };
 
 const TRANSACTIONS_PER_PAGE = 10;
+const WALLET_STALE_MS = 60_000;
 
 function formatTransactionNote(note: string): string {
   const separatorIndex = note.indexOf(":");
@@ -92,8 +93,14 @@ export function WalletHome() {
   const [openingFD, setOpeningFD] = useState(false);
   const [fdNotice, setFdNotice] = useState<string | null>(null);
   const [transactionPage, setTransactionPage] = useState(1);
+  const loadInFlightRef = useRef<Promise<void> | null>(null);
+  const lastLoadedAtRef = useRef(0);
 
   const load = useCallback(async () => {
+    const existing = loadInFlightRef.current;
+    if (existing) return existing;
+
+    const request = (async () => {
     try {
       const res = await fetch("/api/my/wallet", { cache: "no-store" });
       if (!res.ok) {
@@ -103,15 +110,39 @@ export function WalletHome() {
       const payload = (await res.json()) as WalletData;
       setData(payload);
       setError(null);
+      lastLoadedAtRef.current = Date.now();
     } catch {
       setError("네트워크 오류");
     }
+    })();
+
+    loadInFlightRef.current = request;
+    request.then(
+      () => {
+        if (loadInFlightRef.current === request) loadInFlightRef.current = null;
+      },
+      () => {
+        if (loadInFlightRef.current === request) loadInFlightRef.current = null;
+      },
+    );
+    return request;
   }, []);
 
   useEffect(() => {
-    load();
-    const i = setInterval(load, 15_000); // 15초마다 백그라운드 새로고침
-    return () => clearInterval(i);
+    void load();
+
+    const refreshIfStale = () => {
+      if (document.visibilityState !== "visible") return;
+      if (Date.now() - lastLoadedAtRef.current < WALLET_STALE_MS) return;
+      void load();
+    };
+
+    window.addEventListener("focus", refreshIfStale);
+    document.addEventListener("visibilitychange", refreshIfStale);
+    return () => {
+      window.removeEventListener("focus", refreshIfStale);
+      document.removeEventListener("visibilitychange", refreshIfStale);
+    };
   }, [load]);
 
   useEffect(() => {

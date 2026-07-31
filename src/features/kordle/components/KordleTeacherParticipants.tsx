@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import type { RealtimeChannel, SupabaseClient } from "@supabase/supabase-js";
+import { createTrailingRefreshRunner } from "@/lib/realtime-invalidation";
 import {
   KORDLE_GUESS_SUBMITTED_EVENT,
   KORDLE_PUZZLE_CHANGED_EVENT,
@@ -48,7 +49,6 @@ export function KordleTeacherParticipants({
   const [participants, setParticipants] = useState(initialParticipants);
   const [status, setStatus] = useState(initialStatus ?? null);
   const [round, setRound] = useState<RoundSnapshot | null>(null);
-  const [realtimeReady, setRealtimeReady] = useState(false);
   const [advancing, setAdvancing] = useState(false);
   const [controlError, setControlError] = useState<string | null>(null);
 
@@ -85,30 +85,51 @@ export function KordleTeacherParticipants({
 
   useEffect(() => {
     let cancelled = false;
+    let subscribed = false;
     let timer: number | null = null;
+    let supabase: SupabaseClient | null = null;
+    let channel: RealtimeChannel | null = null;
+    const refreshRunner = createTrailingRefreshRunner(async () => {
+      if (cancelled) return;
+      const snapshot = await fetchSnapshot();
+      if (!cancelled) applySnapshot(snapshot);
+    });
 
-    async function poll() {
-      try {
-        const snapshot = await fetchSnapshot();
-        if (!cancelled) applySnapshot(snapshot);
-      } finally {
-        if (!cancelled) {
-          timer = window.setTimeout(poll, realtimeReady ? 30000 : pollDelayMs);
-        }
+    function stopFallbackPolling() {
+      if (timer !== null) {
+        window.clearTimeout(timer);
+        timer = null;
       }
     }
 
-    timer = window.setTimeout(poll, 600);
-    return () => {
-      cancelled = true;
-      if (timer !== null) window.clearTimeout(timer);
-    };
-  }, [applySnapshot, fetchSnapshot, pollDelayMs, realtimeReady]);
+    function scheduleFallbackPolling(delayMs = pollDelayMs) {
+      if (
+        cancelled ||
+        subscribed ||
+        document.visibilityState !== "visible" ||
+        timer !== null
+      ) {
+        return;
+      }
+      timer = window.setTimeout(async () => {
+        timer = null;
+        if (
+          cancelled ||
+          subscribed ||
+          document.visibilityState !== "visible"
+        ) {
+          return;
+        }
+        await refreshRunner.run();
+        scheduleFallbackPolling();
+      }, delayMs);
+    }
 
-  useEffect(() => {
-    let cancelled = false;
-    let supabase: SupabaseClient | null = null;
-    let channel: RealtimeChannel | null = null;
+    function reconcileWhenVisible() {
+      if (document.visibilityState !== "visible") return;
+      void refreshRunner.run();
+      if (!subscribed) scheduleFallbackPolling();
+    }
 
     async function subscribe() {
       try {
@@ -117,34 +138,55 @@ export function KordleTeacherParticipants({
         supabase = createPublicSupabaseClient();
         channel = supabase
           .channel(kordleBoardChannelKey(boardId))
-          .on("broadcast", { event: KORDLE_GUESS_SUBMITTED_EVENT }, async () => {
-            const snapshot = await fetchSnapshot();
-            if (!cancelled) applySnapshot(snapshot);
+          .on("broadcast", { event: KORDLE_GUESS_SUBMITTED_EVENT }, () => {
+            void refreshRunner.run();
           })
           .on(
             "broadcast",
             { event: KORDLE_PUZZLE_CHANGED_EVENT },
-            async ({ payload }: { payload: KordlePuzzleChangedEvent }) => {
+            ({ payload }: { payload: KordlePuzzleChangedEvent }) => {
               if (cancelled) return;
               if (payload?.status) setStatus(payload.status);
-              const snapshot = await fetchSnapshot();
-              if (!cancelled) applySnapshot(snapshot);
+              void refreshRunner.run();
             },
           )
           .subscribe((nextStatus) => {
-            if (!cancelled) setRealtimeReady(nextStatus === "SUBSCRIBED");
+            if (cancelled) return;
+            if (nextStatus === "SUBSCRIBED") {
+              subscribed = true;
+              stopFallbackPolling();
+              // Reconcile once at the handoff from HTTP fallback to Realtime.
+              void refreshRunner.run();
+              return;
+            }
+            if (
+              nextStatus === "CHANNEL_ERROR" ||
+              nextStatus === "TIMED_OUT" ||
+              nextStatus === "CLOSED"
+            ) {
+              subscribed = false;
+              scheduleFallbackPolling();
+            }
           });
       } catch {
-        if (!cancelled) setRealtimeReady(false);
+        if (!cancelled) {
+          subscribed = false;
+          scheduleFallbackPolling();
+        }
       }
     }
 
+    scheduleFallbackPolling(600);
+    document.addEventListener("visibilitychange", reconcileWhenVisible);
     void subscribe();
     return () => {
       cancelled = true;
+      subscribed = false;
+      stopFallbackPolling();
+      document.removeEventListener("visibilitychange", reconcileWhenVisible);
       if (supabase && channel) void supabase.removeChannel(channel);
     };
-  }, [applySnapshot, boardId, fetchSnapshot]);
+  }, [applySnapshot, boardId, fetchSnapshot, pollDelayMs]);
 
   async function advanceLine() {
     if (advancing || !round?.currentGuessIndex || round.currentGuessIndex >= maxGuesses) {

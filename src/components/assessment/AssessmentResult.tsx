@@ -1,11 +1,11 @@
 "use client";
 
-// Student-only post-submit view. Polls /result every 10s until the
-// teacher releases the gradebook entry; then renders score + per-question
-// correct/wrong breakdown.
-
 import { useEffect, useRef, useState } from "react";
 import type { AssessmentResultPayload } from "@/types/assessment";
+
+// Student-only post-submit view. A visible-tab fallback checks /result until
+// the teacher releases the gradebook entry; hidden tabs pause the checks.
+const RELEASE_CHECK_MS = 10_000;
 
 type LoadState =
   | { kind: "loading" }
@@ -18,40 +18,93 @@ export interface AssessmentResultProps {
 
 export function AssessmentResult({ submissionId }: AssessmentResultProps) {
   const [state, setState] = useState<LoadState>({ kind: "loading" });
-  // Mirror released-ness so the polling interval can see it without
-  // recreating (the setInterval closure would otherwise capture the
-  // initial state and keep polling after release).
   const releasedRef = useRef(false);
 
   useEffect(() => {
     let cancelled = false;
-    async function load() {
-      try {
-        const res = await fetch(
-          `/api/assessment/submissions/${submissionId}/result`
-        );
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const data = (await res.json()) as AssessmentResultPayload;
-        if (!cancelled) {
-          setState({ kind: "ready", data });
-          if (data.released) releasedRef.current = true;
-        }
-      } catch (e) {
-        if (!cancelled)
-          setState({
-            kind: "error",
-            message: e instanceof Error ? e.message : "load_failed",
-          });
-      }
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    let inFlight: Promise<void> | null = null;
+    releasedRef.current = false;
+
+    function stopTimer() {
+      if (!timer) return;
+      clearTimeout(timer);
+      timer = null;
     }
-    load();
-    const timer = setInterval(() => {
-      if (releasedRef.current) return;
-      load();
-    }, 10_000);
+
+    function scheduleNextCheck() {
+      if (
+        cancelled ||
+        releasedRef.current ||
+        document.visibilityState !== "visible" ||
+        timer
+      ) {
+        return;
+      }
+      timer = setTimeout(() => {
+        timer = null;
+        if (
+          cancelled ||
+          releasedRef.current ||
+          document.visibilityState !== "visible"
+        ) {
+          return;
+        }
+        void load().then(scheduleNextCheck, scheduleNextCheck);
+      }, RELEASE_CHECK_MS);
+    }
+
+    function load(): Promise<void> {
+      if (inFlight) return inFlight;
+      const request = (async () => {
+        try {
+          const res = await fetch(
+            `/api/assessment/submissions/${submissionId}/result`,
+          );
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          const data = (await res.json()) as AssessmentResultPayload;
+          releasedRef.current = data.released;
+          if (!cancelled) {
+            setState({ kind: "ready", data });
+            if (data.released) stopTimer();
+          }
+        } catch (e) {
+          if (!cancelled) {
+            setState({
+              kind: "error",
+              message: e instanceof Error ? e.message : "load_failed",
+            });
+          }
+        }
+      })();
+      inFlight = request;
+      request.then(
+        () => {
+          if (inFlight === request) inFlight = null;
+        },
+        () => {
+          if (inFlight === request) inFlight = null;
+        },
+      );
+      return request;
+    }
+
+    function checkVisible() {
+      if (document.visibilityState !== "visible") {
+        stopTimer();
+        return;
+      }
+      if (!releasedRef.current) void load().then(scheduleNextCheck, scheduleNextCheck);
+    }
+
+    void load().then(scheduleNextCheck, scheduleNextCheck);
+    window.addEventListener("focus", checkVisible);
+    document.addEventListener("visibilitychange", checkVisible);
     return () => {
       cancelled = true;
-      clearInterval(timer);
+      stopTimer();
+      window.removeEventListener("focus", checkVisible);
+      document.removeEventListener("visibilitychange", checkVisible);
     };
   }, [submissionId]);
 

@@ -3,11 +3,114 @@ import * as SecureStore from "expo-secure-store";
 import { Platform } from "react-native";
 import { apiFetch } from "./api";
 import { loadSessionToken } from "./session";
+import type { StudentNotificationPayload } from "./types";
 
 const PUSH_TOKEN_KEY = "aura_student_expo_push_token";
+export const STUDENT_NOTIFICATION_STALE_MS = 60_000;
 let currentToken: string | null = null;
 let handlerConfigured = false;
 let lastHandledResponseId: string | null = null;
+let notificationCountCache: { count: number; fetchedAt: number } | null = null;
+let notificationCountInFlight: Promise<StudentNotificationPayload> | null = null;
+
+type RemovableSubscription = { remove: () => void };
+type ForegroundNotificationListener = () => void;
+
+const foregroundNotificationListeners = new Map<ForegroundNotificationListener, number>();
+let foregroundNotificationSubscription: RemovableSubscription | null = null;
+let foregroundNotificationSetup: Promise<void> | null = null;
+
+export function isStudentNotificationCountStale(now = Date.now()): boolean {
+  return (
+    notificationCountCache === null ||
+    now - notificationCountCache.fetchedAt >= STUDENT_NOTIFICATION_STALE_MS
+  );
+}
+
+export function getStudentNotificationCount(
+  options: { force?: boolean } = {},
+): Promise<number> {
+  if (!options.force && notificationCountCache && !isStudentNotificationCountStale()) {
+    return Promise.resolve(notificationCountCache.count);
+  }
+  if (notificationCountInFlight) {
+    return notificationCountInFlight.then((payload) => payload.count);
+  }
+
+  let request!: Promise<StudentNotificationPayload>;
+  request = apiFetch<StudentNotificationPayload>("/api/student/notifications")
+    .then((payload) => {
+      notificationCountCache = {
+        count: payload.count,
+        fetchedAt: Date.now(),
+      };
+      return payload;
+    })
+    .finally(() => {
+      if (notificationCountInFlight === request) notificationCountInFlight = null;
+    });
+  notificationCountInFlight = request;
+  return request.then((payload) => payload.count);
+}
+
+export function clearStudentNotificationCountCache(): void {
+  notificationCountCache = null;
+}
+
+async function ensureForegroundNotificationListener(): Promise<void> {
+  if (foregroundNotificationSubscription || foregroundNotificationSetup) return;
+
+  const setup = (async () => {
+    const modules = await loadNativePushModules();
+    if (!modules || foregroundNotificationListeners.size === 0) return;
+    const subscription = modules.Notifications.addNotificationReceivedListener(() => {
+      clearStudentNotificationCountCache();
+      for (const listener of foregroundNotificationListeners.keys()) {
+        try {
+          listener();
+        } catch {
+          // One badge listener must not prevent the remaining listeners from refreshing.
+        }
+      }
+    });
+    if (foregroundNotificationListeners.size === 0) {
+      subscription.remove();
+      return;
+    }
+    foregroundNotificationSubscription = subscription;
+  })().catch(() => undefined);
+  foregroundNotificationSetup = setup;
+  await setup;
+  if (foregroundNotificationSetup === setup) foregroundNotificationSetup = null;
+}
+
+export function subscribeStudentPushForeground(
+  listener: ForegroundNotificationListener,
+): () => void {
+  foregroundNotificationListeners.set(
+    listener,
+    (foregroundNotificationListeners.get(listener) ?? 0) + 1,
+  );
+  void ensureForegroundNotificationListener();
+
+  let active = true;
+  return () => {
+    if (!active) return;
+    active = false;
+    const count = foregroundNotificationListeners.get(listener);
+    if (!count) return;
+    if (count === 1) foregroundNotificationListeners.delete(listener);
+    else foregroundNotificationListeners.set(listener, count - 1);
+    if (foregroundNotificationListeners.size !== 0) return;
+    const subscription = foregroundNotificationSubscription;
+    foregroundNotificationSubscription = null;
+    try {
+      subscription?.remove();
+    } catch {
+      // Notification cleanup should never make screen unmount fail.
+    }
+  };
+}
 
 async function loadNativePushModules() {
   if (Platform.OS === "web" || Constants.executionEnvironment === "storeClient") {
@@ -73,6 +176,7 @@ export async function registerStudentPushNotifications(): Promise<void> {
 export async function unregisterStudentPushNotifications(
   authorizationToken?: string | null,
 ): Promise<void> {
+  clearStudentNotificationCountCache();
   if (Platform.OS !== "android" && Platform.OS !== "ios") return;
   const token = currentToken ?? (await SecureStore.getItemAsync(PUSH_TOKEN_KEY));
   if (!token) return;

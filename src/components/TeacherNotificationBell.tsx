@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 
 interface NotificationItem {
@@ -13,33 +13,72 @@ interface NotificationItem {
   requestedAt: string;
 }
 
+type NotificationPayload = {
+  items: NotificationItem[];
+  total?: number;
+};
+
+const NOTIFICATION_STALE_MS = 60_000;
+
 export function TeacherNotificationBell() {
   const [items, setItems] = useState<NotificationItem[] | null>(null);
+  const [total, setTotal] = useState<number | null>(null);
   const [open, setOpen] = useState(false);
   const detailsRef = useRef<HTMLDetailsElement | null>(null);
+  const loadInFlightRef = useRef<Promise<void> | null>(null);
+  const lastLoadedAtRef = useRef(0);
+  const mountedRef = useRef(true);
 
-  useEffect(() => {
-    let cancelled = false;
-    const load = async () => {
+  const load = useCallback((): Promise<void> => {
+    const existing = loadInFlightRef.current;
+    if (existing) return existing;
+
+    const request = (async () => {
       try {
         const res = await fetch("/api/teacher/notifications", {
           cache: "no-store",
         });
         if (!res.ok) return;
-        const data = await res.json();
-        if (!cancelled) setItems(data.items as NotificationItem[]);
+        const data = (await res.json()) as NotificationPayload;
+        if (!mountedRef.current) return;
+        setItems(data.items);
+        setTotal(typeof data.total === "number" ? data.total : data.items.length);
+        lastLoadedAtRef.current = Date.now();
       } catch {
-        /* network/transient: retry on the next polling cycle */
+        /* network/transient: retry on the next open or stale check */
       }
+    })();
+
+    loadInFlightRef.current = request;
+    request.then(
+      () => {
+        if (loadInFlightRef.current === request) loadInFlightRef.current = null;
+      },
+      () => {
+        if (loadInFlightRef.current === request) loadInFlightRef.current = null;
+      },
+    );
+    return request;
+  }, []);
+
+  useEffect(() => {
+    mountedRef.current = true;
+    void load();
+
+    const refreshIfStale = () => {
+      if (document.visibilityState !== "visible") return;
+      if (Date.now() - lastLoadedAtRef.current < NOTIFICATION_STALE_MS) return;
+      void load();
     };
 
-    void load();
-    const id = setInterval(load, 60_000);
+    window.addEventListener("focus", refreshIfStale);
+    document.addEventListener("visibilitychange", refreshIfStale);
     return () => {
-      cancelled = true;
-      clearInterval(id);
+      mountedRef.current = false;
+      window.removeEventListener("focus", refreshIfStale);
+      document.removeEventListener("visibilitychange", refreshIfStale);
     };
-  }, []);
+  }, [load]);
 
   useEffect(() => {
     if (!open) return;
@@ -64,14 +103,18 @@ export function TeacherNotificationBell() {
     };
   }, [open]);
 
-  const count = items?.length ?? 0;
+  const count = total ?? items?.length ?? 0;
 
   return (
     <details
       ref={detailsRef}
       className="auth-notify"
       open={open}
-      onToggle={(event) => setOpen(event.currentTarget.open)}
+      onToggle={(event) => {
+        const nextOpen = event.currentTarget.open;
+        setOpen(nextOpen);
+        if (nextOpen) void load();
+      }}
     >
       <summary
         className="auth-notify-trigger"

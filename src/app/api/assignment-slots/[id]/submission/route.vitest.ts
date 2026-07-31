@@ -6,7 +6,7 @@ const mocks = vi.hoisted(() => ({
   award: vi.fn(),
   loadPolicy: vi.fn(),
   touch: vi.fn(),
-  publish: vi.fn(),
+  schedulePublish: vi.fn(),
 }));
 
 const runtime = vi.hoisted(() => {
@@ -117,7 +117,9 @@ vi.mock("@/lib/assignment-api", () => ({
 vi.mock("@/lib/board-touch", () => ({ touchBoardUpdatedAt: mocks.touch }));
 vi.mock("@/lib/realtime", () => ({
   assignmentChannelKey: vi.fn(() => "channel"),
-  publish: mocks.publish,
+}));
+vi.mock("@/lib/realtime-server", () => ({
+  scheduleRealtimePublish: mocks.schedulePublish,
 }));
 
 import { POST } from "./route";
@@ -199,7 +201,7 @@ describe("assignment submission deadline rewards", () => {
     expect(runtime.get().attempts).toHaveLength(1);
     expect(mocks.award).toHaveBeenCalledTimes(1);
     expect(mocks.touch).toHaveBeenCalledTimes(1);
-    expect(mocks.publish).toHaveBeenCalledTimes(1);
+    expect(mocks.schedulePublish).toHaveBeenCalledTimes(1);
 
     runtime.get().slot.submissionStatus = "returned";
     runtime.get().slot.gradingStatus = "not_graded";
@@ -226,6 +228,6 @@ describe("assignment submission deadline rewards", () => {
     expect(runtime.get().submission).toBeNull();
     expect(runtime.get().attempts).toHaveLength(0);
     expect(mocks.touch).not.toHaveBeenCalled();
-    expect(mocks.publish).not.toHaveBeenCalled();
+    expect(mocks.schedulePublish).not.toHaveBeenCalled();
   });
 });

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { ToastProvider, useToast } from "@/components/ui/Toast";
 import { InviteCodeCard } from "@/components/parent-access/InviteCodeCard";
@@ -21,14 +21,22 @@ import {
 
 // parent-class-invite-v2 — teacher parent-access client.
 // 2-column Inbox-First layout; left (60%) = approval inbox, right = invite
-// code + linked parents. Data via SWR-ish 60s poll (plain setInterval to
-// avoid pulling a new dependency for one call site).
+// code + linked parents. Data refreshes after mutations and when a visible
+// tab returns after becoming stale.
 
 interface ActiveCode {
   id: string;
   code: string;
   createdAt: string;
 }
+
+type ApprovalStatus = "pending" | "active";
+
+const APPROVAL_STALE_MS = 60_000;
+const ALL_APPROVAL_STATUSES: readonly ApprovalStatus[] = [
+  "pending",
+  "active",
+];
 
 export function ParentAccessClient({ classroomId }: { classroomId: string }) {
   return (
@@ -51,6 +59,12 @@ function InnerPage({ classroomId }: { classroomId: string }) {
   const [linked, setLinked] = useState<LinkedItem[]>([]);
   const [rotateOpen, setRotateOpen] = useState(false);
   const [filter, setFilter] = useState<FilterValue>("all");
+  const approvalLoadedAtRef = useRef<Record<ApprovalStatus, number>>({
+    pending: 0,
+    active: 0,
+  });
+  const approvalInFlightRef = useRef<Promise<void> | null>(null);
+  const queuedApprovalStatusesRef = useRef<Set<ApprovalStatus>>(new Set());
 
   const loadCode = useCallback(async () => {
     const r = await fetch(
@@ -63,40 +77,100 @@ function InnerPage({ classroomId }: { classroomId: string }) {
     setCodeLoading(false);
   }, [classroomId]);
 
-  const loadApprovals = useCallback(async () => {
-    const [p, a] = await Promise.all([
-      fetch(
-        `/api/parent/approvals?classroomId=${encodeURIComponent(classroomId)}&status=pending`,
-      ),
-      fetch(
-        `/api/parent/approvals?classroomId=${encodeURIComponent(classroomId)}&status=active`,
-      ),
-    ]);
-    if (p.ok) {
-      const j = await p.json();
-      setPending(j.items);
-    }
-    if (a.ok) {
-      const j = await a.json();
-      setLinked(
-        j.items.map((it: PendingLink & { approvedAt: string | null }) => ({
-          linkId: it.linkId,
-          parentEmail: it.parentEmail,
-          studentId: it.studentId,
-          studentName: it.studentName,
-          classNo: it.classNo,
-          studentNo: it.studentNo,
-          approvedAt: it.approvedAt ?? it.requestedAt,
-        })),
+  const loadApprovalStatus = useCallback(
+    async (status: ApprovalStatus) => {
+      const r = await fetch(
+        `/api/parent/approvals?classroomId=${encodeURIComponent(classroomId)}&status=${status}`,
       );
-    }
-  }, [classroomId]);
+      if (!r.ok) return;
+      const j = (await r.json()) as {
+        items?: Array<PendingLink & { approvedAt?: string | null }>;
+      };
+      if (status === "pending") {
+        setPending(j.items ?? []);
+      } else {
+        setLinked(
+          (j.items ?? []).map((it) => ({
+            linkId: it.linkId,
+            parentEmail: it.parentEmail,
+            studentId: it.studentId,
+            studentName: it.studentName,
+            classNo: it.classNo,
+            studentNo: it.studentNo,
+            approvedAt: it.approvedAt ?? it.requestedAt,
+          })),
+        );
+      }
+      approvalLoadedAtRef.current[status] = Date.now();
+    },
+    [classroomId],
+  );
+
+  const loadApprovals = useCallback(
+    (statuses: readonly ApprovalStatus[] = ALL_APPROVAL_STATUSES): Promise<void> => {
+      const requested = new Set(statuses);
+      if (requested.size === 0) return Promise.resolve();
+
+      if (approvalInFlightRef.current) {
+        for (const status of requested) {
+          queuedApprovalStatusesRef.current.add(status);
+        }
+        return approvalInFlightRef.current;
+      }
+
+      const run = async (targets: Set<ApprovalStatus>): Promise<void> => {
+        await Promise.all(
+          Array.from(targets, async (status) => {
+            try {
+              await loadApprovalStatus(status);
+            } catch {
+              // Keep the last successful response for transient failures.
+            }
+          }),
+        );
+        const queued = queuedApprovalStatusesRef.current;
+        queuedApprovalStatusesRef.current = new Set();
+        if (queued.size > 0) await run(queued);
+      };
+
+      const request = run(requested);
+      approvalInFlightRef.current = request;
+      request.then(
+        () => {
+          if (approvalInFlightRef.current === request) {
+            approvalInFlightRef.current = null;
+          }
+        },
+        () => {
+          if (approvalInFlightRef.current === request) {
+            approvalInFlightRef.current = null;
+          }
+        },
+      );
+      return request;
+    },
+    [loadApprovalStatus],
+  );
 
   useEffect(() => {
-    loadCode();
-    loadApprovals();
-    const int = setInterval(loadApprovals, 60_000);
-    return () => clearInterval(int);
+    void loadCode();
+    void loadApprovals();
+
+    const refreshIfStale = () => {
+      if (document.visibilityState !== "visible") return;
+      const now = Date.now();
+      const isStale = ALL_APPROVAL_STATUSES.some(
+        (status) => now - approvalLoadedAtRef.current[status] >= APPROVAL_STALE_MS,
+      );
+      if (isStale) void loadApprovals();
+    };
+
+    window.addEventListener("focus", refreshIfStale);
+    document.addEventListener("visibilitychange", refreshIfStale);
+    return () => {
+      window.removeEventListener("focus", refreshIfStale);
+      document.removeEventListener("visibilitychange", refreshIfStale);
+    };
   }, [loadCode, loadApprovals]);
 
   const issueCode = async () => {
@@ -107,7 +181,7 @@ function InnerPage({ classroomId }: { classroomId: string }) {
     });
     if (r.ok) {
       toast.show({ variant: "success", message: "새 코드가 발급되었습니다" });
-      loadCode();
+      void loadCode();
     } else {
       toast.show({ variant: "error", message: "발급에 실패했습니다" });
     }
@@ -125,8 +199,8 @@ function InnerPage({ classroomId }: { classroomId: string }) {
         message: `새 코드가 발급되었습니다 (기존 대기 ${j.rotatedCount}건은 자동 거부)`,
       });
       setRotateOpen(false);
-      loadCode();
-      loadApprovals();
+      void loadCode();
+      void loadApprovals(["pending"]);
     } else {
       toast.show({ variant: "error", message: "재발급에 실패했습니다" });
     }
@@ -138,7 +212,7 @@ function InnerPage({ classroomId }: { classroomId: string }) {
     });
     if (r.ok) {
       toast.show({ variant: "success", message: "승인되었습니다" });
-      loadApprovals();
+      void loadApprovals(["pending", "active"]);
     } else {
       toast.show({ variant: "error", message: "승인에 실패했습니다" });
     }
@@ -155,7 +229,7 @@ function InnerPage({ classroomId }: { classroomId: string }) {
         variant: "success",
         message: `거부되었습니다 (사유: ${reasonLabel(reason)})`,
       });
-      loadApprovals();
+      void loadApprovals(["pending"]);
     } else {
       toast.show({ variant: "error", message: "거부에 실패했습니다" });
     }

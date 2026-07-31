@@ -81,10 +81,18 @@ export function KordleWaitingRoom({ boardId, studentId, studentName }: Props) {
             },
           )
           .subscribe((status) => {
-            const subscribed = status === "SUBSCRIBED";
-            setRealtimeReady(subscribed);
-            if (subscribed) {
+            if (cancelled) return;
+            if (status === "SUBSCRIBED") {
+              setRealtimeReady(true);
               void channel?.track({ studentId, name: studentName, joinedAt });
+              return;
+            }
+            if (
+              status === "CHANNEL_ERROR" ||
+              status === "TIMED_OUT" ||
+              status === "CLOSED"
+            ) {
+              setRealtimeReady(false);
             }
           });
       } catch {
@@ -113,7 +121,8 @@ export function KordleWaitingRoom({ boardId, studentId, studentName }: Props) {
       message=""
       pollSnapshot={pollSnapshot}
       onReady={onReady}
-      pollDelayMs={realtimeReady ? 30000 : 1800}
+      pollDelayMs={1800}
+      pollEnabled={!realtimeReady}
       participantsOverride={participantsOverride}
       className="kordle-waiting"
     >

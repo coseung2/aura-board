@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import type { RealtimeChannel, SupabaseClient } from "@supabase/supabase-js";
+import { createTrailingRefreshRunner } from "@/lib/realtime-invalidation";
 import {
   KORDLE_GUESS_SUBMITTED_EVENT,
   kordleBoardChannelKey,
@@ -21,14 +22,13 @@ export function KordleLiveToasts({ boardId }: Props) {
   const [events, setEvents] = useState<KordleLiveEvent[]>([]);
   const seenIds = useRef(new Set<string>());
   const sinceRef = useRef(new Date().toISOString());
-  const realtimeReadyRef = useRef(false);
 
   useEffect(() => {
     let cancelled = false;
+    let subscribed = false;
     let timer: number | null = null;
     let supabase: SupabaseClient | null = null;
     let channel: RealtimeChannel | null = null;
-    realtimeReadyRef.current = false;
 
     function pushFresh(incoming: KordleLiveEvent[]) {
       const fresh = incoming.filter((event) => !seenIds.current.has(event.id));
@@ -38,22 +38,53 @@ export function KordleLiveToasts({ boardId }: Props) {
       }
     }
 
-    async function poll() {
-      try {
-        const res = await fetch(
-          `/api/kordle/boards/${boardId}/feed?since=${encodeURIComponent(sinceRef.current)}`,
-          { cache: "no-store" },
-        );
-        if (res.ok) {
-          const data = (await res.json()) as FeedResponse;
-          sinceRef.current = data.serverTime;
-          pushFresh(data.events);
-        }
-      } finally {
-        if (!cancelled) {
-          timer = window.setTimeout(poll, realtimeReadyRef.current ? 30000 : 2200);
-        }
+    const refreshRunner = createTrailingRefreshRunner(async () => {
+      if (cancelled) return;
+      const res = await fetch(
+        `/api/kordle/boards/${boardId}/feed?since=${encodeURIComponent(sinceRef.current)}`,
+        { cache: "no-store" },
+      );
+      if (res.ok) {
+        const data = (await res.json()) as FeedResponse;
+        sinceRef.current = data.serverTime;
+        pushFresh(data.events);
       }
+    });
+
+    function stopFallbackPolling() {
+      if (timer !== null) {
+        window.clearTimeout(timer);
+        timer = null;
+      }
+    }
+
+    function scheduleFallbackPolling(delayMs = 2200) {
+      if (
+        cancelled ||
+        subscribed ||
+        document.visibilityState !== "visible" ||
+        timer !== null
+      ) {
+        return;
+      }
+      timer = window.setTimeout(async () => {
+        timer = null;
+        if (
+          cancelled ||
+          subscribed ||
+          document.visibilityState !== "visible"
+        ) {
+          return;
+        }
+        await refreshRunner.run();
+        scheduleFallbackPolling();
+      }, delayMs);
+    }
+
+    function reconcileWhenVisible() {
+      if (document.visibilityState !== "visible") return;
+      void refreshRunner.run();
+      if (!subscribed) scheduleFallbackPolling();
     }
 
     async function subscribe() {
@@ -74,18 +105,39 @@ export function KordleLiveToasts({ boardId }: Props) {
             },
           )
           .subscribe((status) => {
-            realtimeReadyRef.current = status === "SUBSCRIBED";
+            if (cancelled) return;
+            if (status === "SUBSCRIBED") {
+              subscribed = true;
+              stopFallbackPolling();
+              // Reconcile once at the handoff from HTTP fallback to Realtime.
+              void refreshRunner.run();
+              return;
+            }
+            if (
+              status === "CHANNEL_ERROR" ||
+              status === "TIMED_OUT" ||
+              status === "CLOSED"
+            ) {
+              subscribed = false;
+              scheduleFallbackPolling();
+            }
           });
       } catch {
-        realtimeReadyRef.current = false;
+        if (!cancelled) {
+          subscribed = false;
+          scheduleFallbackPolling();
+        }
       }
     }
 
+    scheduleFallbackPolling(1200);
+    document.addEventListener("visibilitychange", reconcileWhenVisible);
     void subscribe();
-    timer = window.setTimeout(poll, 1200);
     return () => {
       cancelled = true;
-      if (timer !== null) window.clearTimeout(timer);
+      subscribed = false;
+      stopFallbackPolling();
+      document.removeEventListener("visibilitychange", reconcileWhenVisible);
       if (supabase && channel) {
         void supabase.removeChannel(channel);
       }

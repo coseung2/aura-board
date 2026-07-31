@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { AddStudentsModal, type CreatedStudent } from "./AddStudentsModal";
 import { QRPrintSheet } from "./QRPrintSheet";
@@ -122,24 +122,58 @@ export function ClassroomDetail({ classroom }: Props) {
   // Count of pending approval requests across this classroom. Shown as a
   // red badge next to the "초대 코드·승인 관리" action-bar button so the
   // teacher sees inbox activity without leaving the student management
-  // screen. 60s poll matches the polling cadence inside /parent-access.
+  // screen. Refresh on mount and on a stale visible-tab focus/visibility
+  // check; approval mutations refresh the full inbox on their own page.
   // (Inline approve/reject UI moved to /classroom/[id]/parent-access —
   //  this surface only tracks the count.)
   const [pendingCount, setPendingCount] = useState<number>(0);
+  const pendingCountInFlightRef = useRef<Promise<void> | null>(null);
+  const pendingCountLoadedAtRef = useRef(0);
 
-  async function loadPendingCount() {
-    try {
-      const res = await fetch(
-        `/api/parent/approvals?classroomId=${encodeURIComponent(classroom.id)}&status=pending`,
-        { cache: "no-store" }
-      );
-      if (res.ok) {
-        const data = await res.json();
-        setPendingCount((data.items ?? []).length);
+  function loadPendingCount(): Promise<void> {
+    const existing = pendingCountInFlightRef.current;
+    if (existing) return existing;
+
+    const request = (async () => {
+      try {
+        const res = await fetch(
+          `/api/parent/approvals?classroomId=${encodeURIComponent(classroom.id)}&status=pending`,
+          { cache: "no-store" },
+        );
+        if (!res.ok) return;
+        const data = (await res.json()) as {
+          count?: unknown;
+          pendingCount?: unknown;
+          total?: unknown;
+          items?: unknown;
+        };
+        const compactCount = [
+          data.count,
+          data.pendingCount,
+          data.total,
+        ].find((value): value is number => typeof value === "number");
+        const itemCount = Array.isArray(data.items) ? data.items.length : 0;
+        setPendingCount(compactCount ?? itemCount);
+        pendingCountLoadedAtRef.current = Date.now();
+      } catch {
+        /* best-effort; badge just stays at last known value */
       }
-    } catch {
-      /* best-effort; badge just stays at last known value */
-    }
+    })();
+
+    pendingCountInFlightRef.current = request;
+    request.then(
+      () => {
+        if (pendingCountInFlightRef.current === request) {
+          pendingCountInFlightRef.current = null;
+        }
+      },
+      () => {
+        if (pendingCountInFlightRef.current === request) {
+          pendingCountInFlightRef.current = null;
+        }
+      },
+    );
+    return request;
   }
 
   useEffect(() => {
@@ -162,10 +196,19 @@ export function ClassroomDetail({ classroom }: Props) {
         /* best-effort; header badges fall back to 0 */
       }
     }
-    loadParentLinks();
+    void loadParentLinks();
     void loadPendingCount();
-    const poll = setInterval(() => void loadPendingCount(), 60_000);
-    return () => clearInterval(poll);
+    const refreshIfStale = () => {
+      if (document.visibilityState !== "visible") return;
+      if (Date.now() - pendingCountLoadedAtRef.current < 60_000) return;
+      void loadPendingCount();
+    };
+    window.addEventListener("focus", refreshIfStale);
+    document.addEventListener("visibilitychange", refreshIfStale);
+    return () => {
+      window.removeEventListener("focus", refreshIfStale);
+      document.removeEventListener("visibilitychange", refreshIfStale);
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [classroom.id]);
 

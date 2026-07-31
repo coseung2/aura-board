@@ -14,15 +14,14 @@ import {
   pageChrome,
 } from "../../theme/tokens";
 import { apiFetch, ApiError } from "../../lib/api";
+import { useLiveSnapshot } from "../../lib/use-live-snapshot";
 import type { BoardDetailResponse } from "../../lib/types";
 import { AppButton, SurfaceCard, SurfacePressable } from "../ui";
 
 // Kahoot-style quiz (student side).
 // 1) Lobby: roomCode + 이름(자동) 으로 join → playerId 받기
-// 2) Polling: /api/quiz/:id 을 2초마다 → currentQ 바뀌면 문제 표시
+// 2) Broadcast invalidation → /api/quiz/:id authoritative snapshot refresh
 // 3) Answer: /api/quiz/answer → 다음 문제로.
-// SSE 대신 polling 을 쓴 이유 — /api/quiz/:id/stream 은 `event: name\ndata:` 포맷이라
-// 모바일 SSE parser 가 추가로 필요하고, 교실 wi-fi 장시간 SSE 가 불안정.
 
 type QuizState = {
   id: string;
@@ -165,6 +164,7 @@ export function QuizBoard({
             ? `퀴즈 상태를 불러오지 못했어요. (${error.status})`
             : "네트워크 연결을 확인하고 다시 시도해 주세요.",
         );
+        throw error;
       } finally {
         if (refreshControllerRef.current === controller) {
           refreshControllerRef.current = null;
@@ -178,31 +178,24 @@ export function QuizBoard({
     return request;
   }, [player?.id, room?.id]);
 
-  // 이전 요청이 끝난 뒤 다음 poll 을 예약해 겹치는 요청과 타이머를 막는다.
-  useEffect(() => {
-    if (!player || !room?.id) return;
-    let cancelled = false;
-    let handle: ReturnType<typeof setTimeout> | null = null;
-
-    async function tick() {
-      await refreshQuiz();
-      if (!cancelled) {
-        handle = setTimeout(() => void tick(), quizTokens.pollIntervalMs);
-      }
-    }
-
-    void tick();
-    return () => {
-      cancelled = true;
-      if (handle) clearTimeout(handle);
-    };
-  }, [player?.id, refreshQuiz, room?.id]);
+  useLiveSnapshot({
+    channelName: room?.id ? `quiz:${room.id}` : "",
+    events: ["quiz_snapshot"],
+    enabled: Boolean(player && room?.id),
+    terminal: quiz?.status === "finished",
+    reload: refreshQuiz,
+  });
 
   const retryRefresh = useCallback(async () => {
     if (retryingRefresh) return;
     setRetryingRefresh(true);
-    await refreshQuiz();
-    if (mountedRef.current) setRetryingRefresh(false);
+    try {
+      await refreshQuiz();
+    } catch {
+      // refreshQuiz already exposes the actionable error in the board UI.
+    } finally {
+      if (mountedRef.current) setRetryingRefresh(false);
+    }
   }, [refreshQuiz, retryingRefresh]);
 
   async function answer(letter: Letter) {

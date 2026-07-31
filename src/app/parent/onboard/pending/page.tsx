@@ -16,8 +16,7 @@ export default function PendingPage() {
   useEffect(() => {
     let cancelled = false;
     let hasRedirected = false;
-    let int: ReturnType<typeof setInterval> | undefined;
-    const poll = async () => {
+    const checkStatus = async () => {
       if (hasRedirected) return;
       try {
         const r = await fetch("/api/parent/session/status");
@@ -27,28 +26,23 @@ export default function PendingPage() {
         setStatus(j.state);
         if (j.state === "active" || j.state === "pending") {
           hasRedirected = true;
-          if (int) clearInterval(int);
           router.replace("/parent/feed");
         } else if (j.state === "rejected") {
           hasRedirected = true;
-          if (int) clearInterval(int);
           router.replace(
             `/parent/onboard/rejected?reason=${encodeURIComponent(j.rejectedReason ?? "other")}`,
           );
         } else if (j.state === "anonymous" || j.state === "authed_prematch") {
           hasRedirected = true;
-          if (int) clearInterval(int);
           router.replace("/login?role=parent&error=session_required");
         }
       } catch (e) {
-        setErr((e as Error).message);
+        if (!cancelled) setErr((e as Error).message);
       }
     };
-    int = setInterval(poll, 30_000);
-    poll();
+    void checkStatus();
     return () => {
       cancelled = true;
-      if (int) clearInterval(int);
     };
   }, [router]);
 

@@ -7,7 +7,7 @@ import { db } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
 import { getCurrentStudent } from "@/lib/student-auth";
 import { getBoardRole } from "@/lib/rbac";
-import { publish } from "@/lib/realtime";
+import { scheduleRealtimePublish } from "@/lib/realtime-server";
 import { VibeProjectCreateSchema } from "@/lib/vibe-arcade/types";
 import { scanHtml } from "@/lib/vibe-arcade/moderation-filter";
 
@@ -138,7 +138,7 @@ export async function POST(req: Request) {
     data: { projectId: project.id, status: "completed", endedAt: new Date() },
   });
 
-  publish({
+  scheduleRealtimePublish({
     channel: `board:${input.boardId}:vibe-arcade`,
     type: "project.created",
     payload: { projectId: project.id, boardId: input.boardId },

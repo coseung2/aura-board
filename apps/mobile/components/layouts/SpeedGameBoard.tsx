@@ -1,7 +1,8 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Platform, ScrollView, StyleSheet, Text, View } from "react-native";
 import { apiFetch } from "../../lib/api";
 import type { BoardDetailResponse, SpeedGameWire } from "../../lib/types";
+import { useLiveSnapshot } from "../../lib/use-live-snapshot";
 import {
   colors,
   pageChrome,
@@ -16,30 +17,63 @@ export function SpeedGameBoard({ data }: { data: BoardDetailResponse }) {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const startedAt = useRef(Date.now());
+  const mountedRef = useRef(true);
+  const refreshControllerRef = useRef<AbortController | null>(null);
+  const refreshInFlightRef = useRef<Promise<void> | null>(null);
+
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      refreshControllerRef.current?.abort();
+    };
+  }, []);
 
   useEffect(() => {
     setGame(data.layoutData.speedGame?.game ?? null);
   }, [data.layoutData.speedGame?.game]);
 
-  useEffect(() => {
-    if (!game?.id) return;
-    let cancelled = false;
-    const refresh = async () => {
+  const refreshGame = useCallback((): Promise<void> => {
+    if (!game?.id) return Promise.resolve();
+    if (refreshInFlightRef.current) return refreshInFlightRef.current;
+    const gameId = game.id;
+    const controller = new AbortController();
+    refreshControllerRef.current = controller;
+    let request!: Promise<void>;
+    request = (async () => {
       try {
         const result = await apiFetch<{ game: SpeedGameWire }>(
-          `/api/speed-game/games/${encodeURIComponent(game.id)}`,
+          `/api/speed-game/games/${encodeURIComponent(gameId)}`,
+          { signal: controller.signal },
         );
-        if (!cancelled) {
+        if (mountedRef.current && !controller.signal.aborted) {
           setGame(result.game);
           setError(null);
         }
-      } catch {
-        if (!cancelled) setError("게임 상태를 갱신하지 못했어요.");
+      } catch (refreshError) {
+        if (!mountedRef.current || controller.signal.aborted) return;
+        setError("게임 상태를 갱신하지 못했어요.");
+        throw refreshError;
+      } finally {
+        if (refreshControllerRef.current === controller) {
+          refreshControllerRef.current = null;
+        }
+        if (refreshInFlightRef.current === request) {
+          refreshInFlightRef.current = null;
+        }
       }
-    };
-    const timer = setInterval(() => void refresh(), 2_000);
-    return () => { cancelled = true; clearInterval(timer); };
+    })();
+    refreshInFlightRef.current = request;
+    return request;
   }, [game?.id]);
+
+  useLiveSnapshot({
+    channelName: game?.id ? `speed-game:${game.id}` : "",
+    events: ["speed_game_changed"],
+    enabled: Boolean(game?.id),
+    terminal: game?.status === "finished",
+    reload: refreshGame,
+  });
 
   const round = game && game.roundIndex >= 0 ? game.rounds[game.roundIndex] ?? null : null;
   const group = useMemo(
@@ -70,10 +104,7 @@ export function SpeedGameBoard({ data }: { data: BoardDetailResponse }) {
           elapsedMs: Math.max(0, Date.now() - startedAt.current),
         },
       });
-      const refreshed = await apiFetch<{ game: SpeedGameWire }>(
-        `/api/speed-game/games/${encodeURIComponent(game.id)}`,
-      );
-      setGame(refreshed.game);
+      await refreshGame();
       setDraft("");
       setError(null);
     } catch {

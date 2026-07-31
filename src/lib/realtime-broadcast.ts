@@ -2,11 +2,12 @@
  * Server-side Supabase Realtime broadcast helper.
  *
  * Uses the service-role key to send broadcast events on public channels.
- * Clients subscribe to the same channel and refetch on signal. Broadcast
- * failures are non-fatal because the API mutation already succeeded.
+ * Clients subscribe to the same channel and refetch on signal. The core send
+ * is strict; committed mutation routes explicitly opt into best-effort use.
  */
 
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import { z } from "zod";
 import {
   KORDLE_GUESS_SUBMITTED_EVENT,
   KORDLE_PUZZLE_CHANGED_EVENT,
@@ -23,14 +24,28 @@ import type {
   BoardRealtimeEvent,
   ClassroomMorningRealtimeEvent,
 } from "./realtime";
-import { boardChannelKey, classroomMorningChannelKey } from "./realtime";
+import {
+  boardChannelKey,
+  classroomMorningChannelKey,
+  SPEED_GAME_CHANGED_EVENT,
+  speedGameChannelKey,
+} from "./realtime";
 
 let serverClient: SupabaseClient | null = null;
 
-function getServerClient(): SupabaseClient | null {
+export class RealtimeConfigurationError extends Error {
+  constructor() {
+    super(
+      "Supabase Realtime is not configured. Set NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY.",
+    );
+    this.name = "RealtimeConfigurationError";
+  }
+}
+
+function getServerClient(): SupabaseClient {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!url || !key) return null;
+  if (!url || !key) throw new RealtimeConfigurationError();
   if (serverClient) return serverClient;
   serverClient = createClient(url, key, {
     auth: {
@@ -41,29 +56,131 @@ function getServerClient(): SupabaseClient | null {
   return serverClient;
 }
 
-async function broadcast(
+export async function sendRealtimeBroadcast(
   channelKey: string,
   event: string,
   payload: unknown,
 ): Promise<void> {
-  let client: SupabaseClient | null = null;
+  const client = getServerClient();
   let channel: ReturnType<SupabaseClient["channel"]> | null = null;
   try {
-    client = getServerClient();
-    if (!client) return;
     channel = client.channel(channelKey);
-    await channel.httpSend(event, payload, { timeout: 1500 });
-  } catch {
-    // Realtime is best-effort and must never fail a committed mutation.
+    const result = await channel.httpSend(event, payload, { timeout: 1500 });
+    if (!result.success) {
+      throw new Error(
+        `Supabase Realtime broadcast failed (${result.status}): ${result.error}`,
+      );
+    }
   } finally {
-    if (client && channel) {
+    if (channel) {
       try {
-        void client.removeChannel(channel).catch(() => {});
+        await client.removeChannel(channel);
       } catch {
         // ignore cleanup errors
       }
     }
   }
+}
+
+async function broadcastBestEffort(
+  channelKey: string,
+  event: string,
+  payload: unknown,
+): Promise<void> {
+  try {
+    await sendRealtimeBroadcast(channelKey, event, payload);
+  } catch (error) {
+    if (process.env.NODE_ENV === "production") {
+      console.error("[realtime broadcast] delivery failed", error);
+    }
+  }
+}
+
+const channelSchema = z.string().trim().min(1).max(255);
+const idSchema = z.string().trim().min(1);
+const timestampSchema = z.string().datetime({ offset: true });
+
+function legacyEventSchema<T extends string, S extends z.ZodRawShape>(
+  type: T,
+  payload: S,
+) {
+  return z.object({
+    channel: channelSchema,
+    type: z.literal(type),
+    payload: z.object({ type: z.literal(type).optional(), ...payload }),
+  });
+}
+
+const legacyPublishSchema = z
+  .discriminatedUnion("type", [
+    legacyEventSchema("slot.updated", {
+      slotId: idSchema,
+      submissionStatus: z.string().min(1),
+      gradingStatus: z.string().min(1),
+      updatedAt: timestampSchema,
+    }),
+    legacyEventSchema("slot.returned", {
+      slotId: idSchema,
+      returnReason: z.string(),
+      returnedAt: timestampSchema,
+    }),
+    legacyEventSchema("reminder.issued", {
+      boardId: idSchema,
+      studentIds: z.array(idSchema),
+      issuedAt: timestampSchema,
+    }),
+    legacyEventSchema("showcase_added", {
+      cardId: idSchema,
+      studentId: idSchema,
+      classroomId: idSchema,
+      createdAt: timestampSchema,
+    }),
+    legacyEventSchema("showcase_removed", {
+      cardId: idSchema,
+      studentId: idSchema,
+      classroomId: idSchema,
+    }),
+    legacyEventSchema("project.created", {
+      projectId: idSchema,
+      boardId: idSchema,
+    }),
+    legacyEventSchema("review.created", {
+      projectId: idSchema,
+      ratingAvg: z.number().nullable(),
+      reviewCount: z.number().int().nonnegative(),
+    }),
+    legacyEventSchema("project.approved", {
+      projectId: idSchema,
+      boardId: idSchema,
+    }),
+    legacyEventSchema("project.rejected", {
+      projectId: idSchema,
+      boardId: idSchema,
+      note: z.string().nullable().optional(),
+    }),
+  ])
+  .superRefine((event, ctx) => {
+    const expectedChannel =
+      event.type === "slot.updated" ||
+      event.type === "slot.returned" ||
+      event.type === "reminder.issued"
+        ? /^board:[^:]+:assignment$/
+        : event.type === "showcase_added" || event.type === "showcase_removed"
+          ? /^classroom:[^:]+:showcase$/
+          : /^board:[^:]+:vibe-arcade$/;
+    if (!expectedChannel.test(event.channel)) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["channel"],
+        message: `Channel does not match ${event.type}`,
+      });
+    }
+  });
+
+/** Validate a legacy publish contract and emit only a public invalidation. */
+export async function publishValidatedRealtimeEvent(event: unknown): Promise<void> {
+  const parsed = legacyPublishSchema.parse(event);
+  await sendRealtimeBroadcast(parsed.channel, parsed.type, { type: parsed.type });
 }
 
 /**
@@ -75,7 +192,7 @@ export async function announceCardChange(
   changeType: "insert" | "update" | "delete" = "insert",
 ): Promise<void> {
   if (!boardId) return;
-  await broadcast(boardChannelKey(boardId), "card_changed", {
+  await broadcastBestEffort(boardChannelKey(boardId), "card_changed", {
     boardId,
     changeType,
     ts: Date.now(),
@@ -104,7 +221,7 @@ export async function announceEngagementChange(
     ...(changeType ? { changeType } : {}),
     updatedAt: new Date().toISOString(),
   };
-  await broadcast(boardChannelKey(boardId), "board_changed", event);
+  await broadcastBestEffort(boardChannelKey(boardId), "board_changed", event);
 }
 
 /** Broadcast a classroom morning-check or duty-roster mutation. */
@@ -121,7 +238,7 @@ export async function announceClassroomMorningChange(
     date,
     updatedAt: new Date().toISOString(),
   };
-  await broadcast(
+  await broadcastBestEffort(
     classroomMorningChannelKey(classroomId),
     "morning_changed",
     event,
@@ -145,7 +262,7 @@ export async function announceQueueChange(
     changeType,
     updatedAt: new Date().toISOString(),
   };
-  await broadcast(boardChannelKey(boardId), "queue_changed", event);
+  await broadcastBestEffort(boardChannelKey(boardId), "queue_changed", event);
 }
 
 /**
@@ -163,7 +280,7 @@ export async function announcePollChange(
     cardId,
     updatedAt: new Date().toISOString(),
   };
-  await broadcast(boardChannelKey(boardId), "board_changed", event);
+  await broadcastBestEffort(boardChannelKey(boardId), "board_changed", event);
 }
 
 /**
@@ -184,7 +301,7 @@ export async function announceQuestionChange(
     ...(responseId ? { responseId } : {}),
     updatedAt: new Date().toISOString(),
   };
-  await broadcast(boardChannelKey(boardId), "question_changed", event);
+  await broadcastBestEffort(boardChannelKey(boardId), "question_changed", event);
 }
 
 /**
@@ -196,7 +313,19 @@ export async function announceQuizSnapshot(
   snapshot: QuizRealtimeSnapshot,
 ): Promise<void> {
   if (!snapshot.quizId) return;
-  await broadcast(quizChannelKey(snapshot.quizId), QUIZ_SNAPSHOT_EVENT, snapshot);
+  await broadcastBestEffort(quizChannelKey(snapshot.quizId), QUIZ_SNAPSHOT_EVENT, snapshot);
+}
+
+/** Broadcast a speed-game mutation; clients reconcile through the GET API. */
+export async function announceSpeedGameChange(
+  gameId: string,
+  changeType: "start" | "next" | "finish" | "answer",
+): Promise<void> {
+  if (!gameId) return;
+  void changeType;
+  await broadcastBestEffort(speedGameChannelKey(gameId), SPEED_GAME_CHANGED_EVENT, {
+    type: SPEED_GAME_CHANGED_EVENT,
+  });
 }
 
 /**
@@ -208,7 +337,7 @@ export async function announceKordleGuess(
   event: KordleLiveEvent,
 ): Promise<void> {
   if (!boardId || !event.id) return;
-  await broadcast(
+  await broadcastBestEffort(
     kordleBoardChannelKey(boardId),
     KORDLE_GUESS_SUBMITTED_EVENT,
     event,
@@ -224,7 +353,7 @@ export async function announceKordlePuzzleChange(
   event: KordlePuzzleChangedEvent,
 ): Promise<void> {
   if (!boardId || !event.puzzleId) return;
-  await broadcast(
+  await broadcastBestEffort(
     kordleBoardChannelKey(boardId),
     KORDLE_PUZZLE_CHANGED_EVENT,
     event,

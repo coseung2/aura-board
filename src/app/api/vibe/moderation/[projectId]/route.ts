@@ -5,7 +5,7 @@ import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
 import { getBoardRole } from "@/lib/rbac";
-import { publish } from "@/lib/realtime";
+import { scheduleRealtimePublish } from "@/lib/realtime-server";
 import { VibeModerationActionSchema } from "@/lib/vibe-arcade/types";
 import { logAudit } from "@/lib/audit";
 
@@ -58,7 +58,7 @@ export async function POST(
           },
   });
 
-  publish({
+  scheduleRealtimePublish({
     channel: `board:${project.boardId}:vibe-arcade`,
     type: action === "approve" ? "project.approved" : "project.rejected",
     payload: { projectId: updated.id, boardId: project.boardId, note: updated.moderationNote },

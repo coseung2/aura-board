@@ -1,6 +1,7 @@
 "use client";
 
-import { type ReactNode, useEffect, useState } from "react";
+import { type ReactNode, useEffect, useRef, useState } from "react";
+import { createTrailingRefreshRunner } from "@/lib/realtime-invalidation";
 import { GameParticipantsList, type GameParticipant } from "./GameParticipantsList";
 
 export type GameWaitingSnapshot = {
@@ -16,6 +17,7 @@ type Props = {
   onReady: () => void;
   isReadyStatus?: (status: string | null | undefined) => boolean;
   pollDelayMs?: number;
+  pollEnabled?: boolean;
   participantsOverride?: GameParticipant[] | null;
   className?: string;
   children?: ReactNode;
@@ -33,40 +35,87 @@ export function GameWaitingRoom({
   onReady,
   isReadyStatus = defaultIsReadyStatus,
   pollDelayMs = 1800,
+  pollEnabled = true,
   participantsOverride,
   className,
   children,
 }: Props) {
   const [participants, setParticipants] = useState<GameParticipant[]>([]);
   const displayedParticipants = participantsOverride ?? participants;
+  const pollSnapshotRef = useRef(pollSnapshot);
+  const onReadyRef = useRef(onReady);
+  const isReadyStatusRef = useRef(isReadyStatus);
+  const mountedRef = useRef(false);
+  const refreshRunnerRef = useRef<ReturnType<typeof createTrailingRefreshRunner> | null>(null);
+  pollSnapshotRef.current = pollSnapshot;
+  onReadyRef.current = onReady;
+  isReadyStatusRef.current = isReadyStatus;
+  if (!refreshRunnerRef.current) {
+    refreshRunnerRef.current = createTrailingRefreshRunner(async () => {
+      if (!mountedRef.current) return;
+      const snapshot = await pollSnapshotRef.current();
+      if (!mountedRef.current || !snapshot) return;
+      setParticipants(snapshot.participants);
+      if (isReadyStatusRef.current(snapshot.status)) onReadyRef.current();
+    });
+  }
 
   useEffect(() => {
     let cancelled = false;
     let timer: number | null = null;
+    mountedRef.current = true;
+    const refreshRunner = refreshRunnerRef.current!;
 
-    async function poll() {
-      try {
-        const snapshot = await pollSnapshot();
-        if (!cancelled && snapshot) {
-          setParticipants(snapshot.participants);
-          if (isReadyStatus(snapshot.status)) {
-            onReady();
-            return;
-          }
-        }
-      } finally {
-        if (!cancelled) {
-          timer = window.setTimeout(poll, pollDelayMs);
-        }
+    function stopPolling() {
+      if (timer !== null) {
+        window.clearTimeout(timer);
+        timer = null;
       }
     }
 
-    timer = window.setTimeout(poll, 1000);
+    function schedulePoll(delayMs: number) {
+      if (
+        cancelled ||
+        !pollEnabled ||
+        document.visibilityState !== "visible" ||
+        timer !== null
+      ) {
+        return;
+      }
+      timer = window.setTimeout(async () => {
+        timer = null;
+        if (
+          cancelled ||
+          !pollEnabled ||
+          document.visibilityState !== "visible"
+        ) {
+          return;
+        }
+        await refreshRunner.run();
+        schedulePoll(pollDelayMs);
+      }, delayMs);
+    }
+
+    function reconcileWhenVisible() {
+      if (document.visibilityState !== "visible") return;
+      void refreshRunner.run();
+      schedulePoll(pollDelayMs);
+    }
+
+    if (pollEnabled) {
+      schedulePoll(1000);
+    } else {
+      // Reconcile exactly once when Realtime takes over HTTP transport.
+      void refreshRunner.run();
+    }
+    document.addEventListener("visibilitychange", reconcileWhenVisible);
     return () => {
       cancelled = true;
-      if (timer !== null) window.clearTimeout(timer);
+      mountedRef.current = false;
+      stopPolling();
+      document.removeEventListener("visibilitychange", reconcileWhenVisible);
     };
-  }, [isReadyStatus, onReady, pollDelayMs, pollSnapshot]);
+  }, [isReadyStatus, onReady, pollDelayMs, pollEnabled, pollSnapshot]);
 
   return (
     <main className={["game-waiting", className].filter(Boolean).join(" ")}>

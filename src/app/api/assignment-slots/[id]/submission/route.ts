@@ -16,7 +16,8 @@ import {
   assignmentSubmissionRewardSourceRef,
   isAssignmentSubmissionOnTime,
 } from "@/lib/assignment-submission";
-import { assignmentChannelKey, publish } from "@/lib/realtime";
+import { assignmentChannelKey } from "@/lib/realtime";
+import { scheduleRealtimePublish } from "@/lib/realtime-server";
 import { resizeToWebPThumbUrl } from "@/lib/blob";
 import { touchBoardUpdatedAt } from "@/lib/board-touch";
 import { dispatchLinkedParentCardPush } from "@/lib/parent-push";
@@ -319,7 +320,7 @@ export async function POST(
       `[AssignmentSlot] transition slotId=${slot.id} from=${slot.submissionStatus} to=${result.updated.submissionStatus} actor=student actorId=${student.id}`,
     );
     await touchBoardUpdatedAt(slot.boardId);
-    await publish({
+    scheduleRealtimePublish({
       channel: assignmentChannelKey(slot.boardId),
       type: "slot.updated",
       payload: {

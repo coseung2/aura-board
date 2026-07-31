@@ -57,4 +57,31 @@ describe("StudentNotificationBell", () => {
       }),
     ));
   });
+
+  it("serializes the initial visibility checks and refreshes when opened", async () => {
+    let resolveInitial!: (response: Response) => void;
+    const initialResponse = new Promise<Response>((resolve) => {
+      resolveInitial = resolve;
+    });
+    const fetchMock = vi
+      .fn()
+      .mockReturnValueOnce(initialResponse)
+      .mockResolvedValue(new Response(JSON.stringify({ count: 0, items: [] }), { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const { container } = render(<StudentNotificationBell />);
+    fireEvent(window, new Event("focus"));
+    fireEvent(document, new Event("visibilitychange"));
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+
+    resolveInitial(
+      new Response(JSON.stringify({ count: 0, items: [] }), { status: 200 }),
+    );
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+
+    const summary = container.querySelector("summary");
+    if (!summary) throw new Error("notification summary did not render");
+    fireEvent.click(summary);
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+  });
 });

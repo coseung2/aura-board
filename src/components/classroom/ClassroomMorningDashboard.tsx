@@ -18,6 +18,7 @@ import {
 import { AppBackgroundButton } from "@/components/AppBackground";
 import { todayDateString } from "@/lib/inspector-findings";
 import { useClassroomMorningRealtime } from "@/hooks/useClassroomMorningRealtime";
+import type { ClassroomMorningRealtimeEvent } from "@/lib/realtime";
 
 type Props = {
   classroomId: string;
@@ -42,7 +43,6 @@ type DateNavigationProps = {
   onNext: () => void;
 };
 
-const REFRESH_MS = 60_000;
 const ROLE_TABS: readonly RoleTab[] = ["cleaning", "shoe"];
 const MORNING_ROSTER_COLUMNS = 4;
 
@@ -161,14 +161,41 @@ export function ClassroomMorningDashboard({
   const [overflowPanels, setOverflowPanels] = useState<Record<string, boolean>>(
     {},
   );
-  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const classroomIdRef = useRef(classroomId);
   classroomIdRef.current = classroomId;
+  const summaryRequestsRef = useRef(
+    new Map<string, Promise<MorningSummary>>(),
+  );
   const summaryRequestRef = useRef(0);
   const inspDateRef = useRef(inspDate);
   inspDateRef.current = inspDate;
   const inspectionRequestRef = useRef(0);
   const dutiesRequestRef = useRef(0);
+
+  const loadSummary = useCallback(
+    (date: string): Promise<MorningSummary> => {
+      const key = `${classroomId}:${date}`;
+      const existing = summaryRequestsRef.current.get(key);
+      if (existing) return existing;
+
+      const request = fetchMorningSummary(classroomId, date);
+      summaryRequestsRef.current.set(key, request);
+      request.then(
+        () => {
+          if (summaryRequestsRef.current.get(key) === request) {
+            summaryRequestsRef.current.delete(key);
+          }
+        },
+        () => {
+          if (summaryRequestsRef.current.get(key) === request) {
+            summaryRequestsRef.current.delete(key);
+          }
+        },
+      );
+      return request;
+    },
+    [classroomId],
+  );
 
   useEffect(() => {
     const checkOverflow = () => {
@@ -189,9 +216,10 @@ export function ClassroomMorningDashboard({
 
   const refresh = useCallback(async () => {
     const requestId = ++summaryRequestRef.current;
+    const date = todayDateString();
     setError(null);
     try {
-      const data = await fetchMorningSummary(classroomId);
+      const data = await loadSummary(date);
       if (
         requestId !== summaryRequestRef.current ||
         classroomIdRef.current !== classroomId
@@ -200,6 +228,11 @@ export function ClassroomMorningDashboard({
       }
       setSummary(data);
       setLastUpdated(new Date());
+      if (inspDateRef.current === date) {
+        setCleaningItems(data.cleaningFindings);
+        setShoeItems(data.shoeFindings);
+        setInspLoaded(true);
+      }
     } catch (reason) {
       if (
         requestId !== summaryRequestRef.current ||
@@ -220,13 +253,13 @@ export function ClassroomMorningDashboard({
         setLoaded(true);
       }
     }
-  }, [classroomId]);
+  }, [classroomId, loadSummary]);
 
   const refreshInspections = useCallback(
     async (date: string) => {
       const requestId = ++inspectionRequestRef.current;
       try {
-        const data = await fetchMorningSummary(classroomId, date);
+        const data = await loadSummary(date);
         if (
           requestId !== inspectionRequestRef.current ||
           classroomIdRef.current !== classroomId ||
@@ -236,6 +269,10 @@ export function ClassroomMorningDashboard({
         }
         setCleaningItems(data.cleaningFindings);
         setShoeItems(data.shoeFindings);
+        if (date === todayDateString()) {
+          setSummary(data);
+          setLastUpdated(new Date());
+        }
       } catch {
         if (
           requestId !== inspectionRequestRef.current ||
@@ -256,14 +293,14 @@ export function ClassroomMorningDashboard({
         }
       }
     },
-    [classroomId],
+    [classroomId, loadSummary],
   );
 
-  const refreshDuties = useCallback(async () => {
+  const refreshDuties = useCallback(async (date = todayDateString()) => {
     const requestId = ++dutiesRequestRef.current;
     setDutiesError(null);
     try {
-      const data = await fetchCleaningDuties(classroomId, todayDateString());
+      const data = await fetchCleaningDuties(classroomId, date);
       if (
         requestId !== dutiesRequestRef.current ||
         classroomIdRef.current !== classroomId
@@ -293,14 +330,40 @@ export function ClassroomMorningDashboard({
     }
   }, [classroomId]);
 
-  const refreshRealtimeData = useCallback(async () => {
-    const selectedDate = inspDateRef.current;
-    await Promise.all([
-      refresh(),
-      refreshInspections(selectedDate),
-      refreshDuties(),
-    ]);
-  }, [refresh, refreshDuties, refreshInspections]);
+  const refreshRealtimeData = useCallback(
+    async (event?: ClassroomMorningRealtimeEvent) => {
+      const today = todayDateString();
+      if (event) {
+        if (
+          event.changeType === "cleaning_inspection" ||
+          event.changeType === "shoe_inspection"
+        ) {
+          if (event.date === inspDateRef.current) {
+            await refreshInspections(event.date);
+          }
+          return;
+        }
+        if (
+          (event.changeType === "cleaning_duty" ||
+            event.changeType === "yellow_card") &&
+          event.date === today
+        ) {
+          await refreshDuties(event.date);
+        }
+        return;
+      }
+
+      const selectedDate = inspDateRef.current;
+      await Promise.all([
+        refresh(),
+        selectedDate === today
+          ? Promise.resolve()
+          : refreshInspections(selectedDate),
+        refreshDuties(),
+      ]);
+    },
+    [refresh, refreshDuties, refreshInspections],
+  );
 
   useClassroomMorningRealtime({
     classroomId,
@@ -321,17 +384,6 @@ export function ClassroomMorningDashboard({
     setDutiesLoaded(false);
     void refreshDuties();
   }, [refreshDuties]);
-
-  useEffect(() => {
-    if (timerRef.current) clearInterval(timerRef.current);
-    timerRef.current = setInterval(() => {
-      void refreshRealtimeData();
-    }, REFRESH_MS);
-    return () => {
-      if (timerRef.current) clearInterval(timerRef.current);
-      timerRef.current = null;
-    };
-  }, [refreshRealtimeData]);
 
   const assignmentSections = summary
     ? [

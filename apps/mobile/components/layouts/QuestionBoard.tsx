@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
@@ -9,6 +9,7 @@ import {
   View,
 } from "react-native";
 import { apiFetch } from "../../lib/api";
+import { useLiveSnapshot } from "../../lib/use-live-snapshot";
 import type { BoardDetailResponse } from "../../lib/types";
 import {
   borders,
@@ -45,29 +46,60 @@ export function QuestionBoard({ data }: { data: BoardDetailResponse }) {
   const [refreshing, setRefreshing] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  const load = useCallback(async (mode: "initial" | "refresh" | "silent" = "initial") => {
-    if (mode === "refresh") setRefreshing(true);
-    if (mode === "initial") setLoading(true);
-    try {
-      const snapshot = await apiFetch<Snapshot>(
-        `/api/boards/${encodeURIComponent(data.board.id)}/snapshot`,
-      );
-      setQuestion(snapshot.question);
-      setError(null);
-    } catch {
-      setError("질문 보드를 불러오지 못했어요.");
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
-  }, [data.board.id]);
+  const mountedRef = useRef(true);
+  const loadInFlightRef = useRef<Promise<boolean> | null>(null);
+  const loadControllerRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
-    void load();
-    const timer = setInterval(() => void load("silent"), 10_000);
-    return () => clearInterval(timer);
-  }, [load]);
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      loadControllerRef.current?.abort();
+    };
+  }, []);
+
+  const load = useCallback((mode: "initial" | "refresh" | "silent" = "initial"): Promise<boolean> => {
+    if (loadInFlightRef.current) return loadInFlightRef.current;
+    if (mode === "refresh") setRefreshing(true);
+    if (mode === "initial") setLoading(true);
+    const controller = new AbortController();
+    loadControllerRef.current = controller;
+    let request!: Promise<boolean>;
+    request = (async () => {
+      try {
+        const snapshot = await apiFetch<Snapshot>(
+          `/api/boards/${encodeURIComponent(data.board.id)}/snapshot`,
+          { signal: controller.signal },
+        );
+        if (!mountedRef.current || controller.signal.aborted) return false;
+        setQuestion(snapshot.question);
+        setError(null);
+        return true;
+      } catch {
+        if (mountedRef.current && !controller.signal.aborted) {
+          setError("질문 보드를 불러오지 못했어요.");
+        }
+        return false;
+      } finally {
+        if (mountedRef.current) {
+          setLoading(false);
+          setRefreshing(false);
+        }
+        if (loadControllerRef.current === controller) loadControllerRef.current = null;
+        if (loadInFlightRef.current === request) loadInFlightRef.current = null;
+      }
+    })();
+    loadInFlightRef.current = request;
+    return request;
+  }, [data.board.id]);
+
+  useLiveSnapshot({
+    channelName: `board:${data.board.id}`,
+    events: ["question_changed"],
+    reload: async () => {
+      if (!(await load("silent"))) throw new Error("question_snapshot_failed");
+    },
+  });
 
   async function submit() {
     const text = draft.trim();

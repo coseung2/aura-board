@@ -10,6 +10,8 @@ import type {
   SpeedGameWire,
 } from "./types";
 import { PlayBoardContinueButton } from "@/components/PlayBoardContinueButton";
+import { SPEED_GAME_CHANGED_EVENT, speedGameChannelKey } from "@/lib/realtime";
+import type { PublicSupabaseClient } from "@/lib/supabase/client";
 
 type Props = {
   boardId: string;
@@ -25,6 +27,10 @@ const STATUS_LABELS: Record<SpeedGameStatus, string> = {
   active: "진행 중",
   finished: "종료",
 };
+
+const FALLBACK_BASE_DELAY_MS = 15_000;
+const FALLBACK_MAX_DELAY_MS = 60_000;
+type RefreshResult = "updated" | "failed" | "terminal" | "skipped";
 
 function formatDuration(ms: number): string {
   if (ms < 1000) return `${ms}ms`;
@@ -50,11 +56,15 @@ export function SpeedGameBoard({
   const [answerDraft, setAnswerDraft] = useState("");
   const [answerSubmitting, setAnswerSubmitting] = useState(false);
   const answerStartMsRef = useRef<number>(0);
-  const eventSourceRef = useRef<EventSource | null>(null);
-  const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const reconnectDelayRef = useRef(1000);
+  const [realtimeFallback, setRealtimeFallback] = useState(false);
+  const gameStatusRef = useRef<SpeedGameStatus | null>(initialGame?.status ?? null);
+  const refreshGameIdRef = useRef<string | undefined>(initialGame?.id);
+  const refreshInFlightRef = useRef<Promise<RefreshResult> | null>(null);
+  const refreshQueuedRef = useRef(false);
 
   const gameId = game?.id;
+  gameStatusRef.current = game?.status ?? null;
+  refreshGameIdRef.current = gameId;
 
   const currentRound = useMemo(() => {
     if (!game || game.roundIndex < 0 || game.roundIndex >= game.rounds.length) return null;
@@ -81,19 +91,58 @@ export function SpeedGameBoard({
     );
   }, [game, currentRound, myGroup]);
 
-  const refresh = useCallback(async () => {
-    if (!gameId) return;
-    try {
-      const res = await fetch(`/api/speed-game/games/${gameId}`, { cache: "no-store" });
-      if (!res.ok) return;
-      const data = (await res.json()) as { game?: SpeedGameWire };
-      if (data.game) {
-        setGame(data.game);
-        setError(null);
-      }
-    } catch {
-      // ignore transient refresh failures
+  const refresh = useCallback((): Promise<RefreshResult> => {
+    if (!gameId || gameStatusRef.current === "finished") {
+      return Promise.resolve("terminal");
     }
+    if (refreshInFlightRef.current) {
+      refreshQueuedRef.current = true;
+      return refreshInFlightRef.current;
+    }
+
+    const targetGameId = gameId;
+    const request = (async (): Promise<RefreshResult> => {
+      let result: RefreshResult = "skipped";
+      do {
+        refreshQueuedRef.current = false;
+        if (
+          refreshGameIdRef.current !== targetGameId ||
+          gameStatusRef.current === "finished"
+        ) {
+          return "terminal";
+        }
+        try {
+          const res = await fetch(`/api/speed-game/games/${targetGameId}`, {
+            cache: "no-store",
+          });
+          if (!res.ok) {
+            result = "failed";
+            continue;
+          }
+          const data = (await res.json()) as { game?: SpeedGameWire };
+          if (refreshGameIdRef.current !== targetGameId) return "skipped";
+          if ((gameStatusRef.current as SpeedGameStatus | null) === "finished") {
+            return "terminal";
+          }
+          if (data.game) {
+            gameStatusRef.current = data.game.status;
+            setGame(data.game);
+            setError(null);
+            result = data.game.status === "finished" ? "terminal" : "updated";
+          } else {
+            result = "failed";
+          }
+        } catch {
+          result = "failed";
+        }
+      } while (refreshQueuedRef.current && result !== "terminal");
+      return result;
+    })().finally(() => {
+      refreshInFlightRef.current = null;
+    });
+
+    refreshInFlightRef.current = request;
+    return request;
   }, [gameId]);
 
   useEffect(() => {
@@ -101,60 +150,139 @@ export function SpeedGameBoard({
   }, [initialGame]);
 
   useEffect(() => {
-    if (!gameId) return;
-    let cancelled = false;
+    if (!gameId || game?.status === "finished") {
+      setRealtimeFallback(false);
+      return;
+    }
+    let stopped = false;
+    let fallbackTimer: ReturnType<typeof setTimeout> | null = null;
+    let fallbackDelayMs = FALLBACK_BASE_DELAY_MS;
+    let fallbackActive = false;
+    let supabase: PublicSupabaseClient | null = null;
+    let channel: ReturnType<PublicSupabaseClient["channel"]> | null = null;
 
-    function connect() {
-      if (cancelled) return;
-      try {
-        const es = new EventSource(`/api/speed-game/games/${gameId}/stream`);
-        eventSourceRef.current = es;
+    function stopFallback() {
+      if (fallbackTimer) clearTimeout(fallbackTimer);
+      fallbackTimer = null;
+      fallbackDelayMs = FALLBACK_BASE_DELAY_MS;
+      fallbackActive = false;
+      if (!stopped) setRealtimeFallback(false);
+    }
 
-        es.onopen = () => {
-          reconnectDelayRef.current = 1000;
-        };
-
-        const applySnapshot = (raw: string) => {
-          try {
-            const payload = JSON.parse(raw) as
-              | { game?: SpeedGameWire }
-              | SpeedGameWire;
-            const nextGame =
-              "game" in payload ? payload.game : "id" in payload ? payload : null;
-            if (nextGame) {
-              setGame(nextGame);
-            }
-          } catch {
-            // ignore malformed events
-          }
-        };
-
-        es.onmessage = (event) => applySnapshot(event.data);
-        es.addEventListener("snapshot", (event) =>
-          applySnapshot((event as MessageEvent).data),
-        );
-        es.addEventListener("finished", (event) =>
-          applySnapshot((event as MessageEvent).data),
-        );
-
-        es.onerror = () => {
-          es.close();
-          if (cancelled) return;
-          reconnectDelayRef.current = Math.min(reconnectDelayRef.current * 1.5, 30000);
-          reconnectTimerRef.current = setTimeout(connect, reconnectDelayRef.current);
-        };
-      } catch {
-        reconnectTimerRef.current = setTimeout(connect, reconnectDelayRef.current);
+    function stopRealtime() {
+      if (stopped) return;
+      stopped = true;
+      if (fallbackTimer) clearTimeout(fallbackTimer);
+      fallbackTimer = null;
+      setRealtimeFallback(false);
+      window.removeEventListener("focus", reconcile);
+      window.removeEventListener("online", reconcile);
+      document.removeEventListener("visibilitychange", reconcile);
+      if (supabase && channel) {
+        void supabase.removeChannel(channel).catch(() => undefined);
       }
     }
 
-    connect();
+    function scheduleFallback() {
+      if (
+        stopped ||
+        !fallbackActive ||
+        fallbackTimer ||
+        gameStatusRef.current === "finished"
+      ) {
+        return;
+      }
+      const delay = fallbackDelayMs;
+      fallbackTimer = setTimeout(async () => {
+        fallbackTimer = null;
+        if (stopped) return;
+        const result = document.hidden ? "skipped" : await refresh();
+        if (result === "terminal" || gameStatusRef.current === "finished") {
+          stopRealtime();
+          return;
+        }
+        fallbackDelayMs =
+          result === "failed"
+            ? Math.min(delay * 2, FALLBACK_MAX_DELAY_MS)
+            : FALLBACK_BASE_DELAY_MS;
+        scheduleFallback();
+      }, delay);
+    }
+
+    function startFallback() {
+      if (stopped || gameStatusRef.current === "finished") return;
+      setRealtimeFallback(true);
+      if (fallbackActive) return;
+      fallbackActive = true;
+      void refresh().then((result) => {
+        if (result === "terminal" || gameStatusRef.current === "finished") {
+          stopRealtime();
+          return;
+        }
+        fallbackDelayMs =
+          result === "failed"
+            ? Math.min(FALLBACK_BASE_DELAY_MS * 2, FALLBACK_MAX_DELAY_MS)
+            : FALLBACK_BASE_DELAY_MS;
+        scheduleFallback();
+      });
+    }
+
+    void (async () => {
+      try {
+        const { createIsolatedPublicSupabaseClient } = await import(
+          "@/lib/supabase/client"
+        );
+        if (stopped) return;
+        supabase = createIsolatedPublicSupabaseClient();
+        channel = supabase
+          .channel(speedGameChannelKey(gameId))
+          .on("broadcast", { event: SPEED_GAME_CHANGED_EVENT }, () => {
+            void refresh().then((result) => {
+              if (result === "terminal" || gameStatusRef.current === "finished") {
+                stopRealtime();
+              }
+            });
+          });
+        channel.subscribe((status: string) => {
+          if (stopped || gameStatusRef.current === "finished") {
+            stopRealtime();
+            return;
+          }
+          if (status === "SUBSCRIBED") {
+            stopFallback();
+            void refresh();
+          } else if (
+            status === "CHANNEL_ERROR" ||
+            status === "TIMED_OUT" ||
+            status === "CLOSED"
+          ) {
+            startFallback();
+            void refresh();
+          }
+        });
+      } catch {
+        startFallback();
+        void refresh();
+      }
+    })();
+
+    function reconcile() {
+      if (!document.hidden) {
+        void refresh().then((result) => {
+          if (result === "terminal" || gameStatusRef.current === "finished") {
+            stopRealtime();
+          }
+        });
+      }
+    }
+
+    window.addEventListener("focus", reconcile);
+    window.addEventListener("online", reconcile);
+    document.addEventListener("visibilitychange", reconcile);
     return () => {
-      cancelled = true;
-      eventSourceRef.current?.close();
-      if (reconnectTimerRef.current) clearTimeout(reconnectTimerRef.current);
+      stopRealtime();
     };
-  }, [gameId]);
+  }, [game?.status, gameId, refresh]);
 
   const control = useCallback(
     async (action: "start" | "next" | "finish") => {
@@ -249,6 +377,11 @@ export function SpeedGameBoard({
         href={viewerKind === "teacher" ? "/dashboard" : "/student"}
       />
       {error && <p className="speed-game-error">{error}</p>}
+      {realtimeFallback && (
+        <p className="speed-game-error" role="status">
+          실시간 연결이 불안정해 게임 상태를 다시 확인하고 있어요.
+        </p>
+      )}
 
       {viewerKind === "none" && (
         <div className="speed-game-empty">

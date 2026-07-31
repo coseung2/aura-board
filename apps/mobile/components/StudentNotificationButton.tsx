@@ -2,9 +2,13 @@ import { useCallback, useEffect, useState } from "react";
 import { AppState, StyleSheet, Text, View } from "react-native";
 import { usePathname, useRouter } from "expo-router";
 import { Bell } from "lucide-react-native";
-import { apiFetch, ApiError } from "../lib/api";
+import { ApiError } from "../lib/api";
 import { clearSessionToken, getUnifiedLoginRoute } from "../lib/session";
-import type { StudentNotificationPayload } from "../lib/types";
+import {
+  getStudentNotificationCount,
+  isStudentNotificationCountStale,
+  subscribeStudentPushForeground,
+} from "../lib/student-push-notifications";
 import {
   borders,
   colors,
@@ -22,12 +26,9 @@ export function StudentNotificationButton() {
   const pathname = usePathname();
   const [count, setCount] = useState(0);
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (force = false) => {
     try {
-      const payload = await apiFetch<StudentNotificationPayload>(
-        "/api/student/notifications",
-      );
-      setCount(payload.count);
+      setCount(await getStudentNotificationCount({ force }));
     } catch (error) {
       if (error instanceof ApiError && error.status === 401) {
         await clearSessionToken();
@@ -37,13 +38,18 @@ export function StudentNotificationButton() {
   }, [router]);
 
   useEffect(() => {
-    void load();
-    const interval = setInterval(() => void load(), 60_000);
+    let previousActive = AppState.currentState === "active";
+    const unsubscribeForegroundPush = subscribeStudentPushForeground(() => {
+      void load(true);
+    });
+    void load(true);
     const appState = AppState.addEventListener("change", (state) => {
-      if (state === "active") void load();
+      const becameActive = state === "active" && !previousActive;
+      previousActive = state === "active";
+      if (becameActive && isStudentNotificationCountStale()) void load(true);
     });
     return () => {
-      clearInterval(interval);
+      unsubscribeForegroundPush();
       appState.remove();
     };
   }, [load, pathname]);
@@ -51,7 +57,10 @@ export function StudentNotificationButton() {
   return (
     <ControlPressable
       style={styles.button}
-      onPress={() => router.push("/(student)/notifications")}
+      onPress={() => {
+        void load(true);
+        router.push("/(student)/notifications");
+      }}
       accessibilityLabel={count > 0 ? `알림 ${count}건` : "알림"}
     >
       <Bell

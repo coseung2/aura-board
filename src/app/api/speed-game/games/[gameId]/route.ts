@@ -8,6 +8,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { db } from "@/lib/db";
 import { jsonPrivateNoStore } from "@/lib/http-cache";
+import { scheduleSpeedGameChange } from "@/lib/realtime-server";
 import {
   authenticateGameViewer,
   loadGameSnapshot,
@@ -164,5 +165,6 @@ export async function PATCH(req: Request, { params }: Params) {
   if (!snap) {
     return jsonPrivateNoStore({ error: "game_not_found" }, { status: 404 });
   }
+  scheduleSpeedGameChange(gameId, parsed.data.action);
   return jsonPrivateNoStore({ game: snap });
 }

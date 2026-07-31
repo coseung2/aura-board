@@ -40,6 +40,13 @@ export function classroomMorningChannelKey(classroomId: string): string {
   return `classroom:${classroomId}:morning`;
 }
 
+export const SPEED_GAME_CHANGED_EVENT = "speed_game_changed";
+
+export function speedGameChannelKey(gameId: string): string {
+  if (!gameId) throw new Error("speedGameChannelKey: gameId required");
+  return `speed-game:${gameId}`;
+}
+
 export type ClassroomMorningRealtimeEvent = {
   type: "morning_changed";
   classroomId: string;
@@ -131,17 +138,14 @@ export type AssignmentRealtimeEvent =
       issuedAt: string;
     };
 
-/**
- * Placeholder publish/subscribe. Intentionally a no-op.
- * When the realtime engine is chosen, replace the body of this module while
- * keeping the signatures so callers do not need updates.
- */
 export type RealtimeEvent = {
   channel: string;
   type: string;
   payload: unknown;
 };
 
-export async function publish(_event: RealtimeEvent): Promise<void> {
-  // no-op until a realtime engine is adopted
+/** Validate and deliver an event through Supabase Broadcast. */
+export async function publish(event: RealtimeEvent): Promise<void> {
+  const { publishValidatedRealtimeEvent } = await import("./realtime-broadcast");
+  await publishValidatedRealtimeEvent(event);
 }

@@ -6,7 +6,8 @@ import {
   isPortfolioEligibleLayout,
 } from "@/lib/portfolio-acl-pure";
 import { mapPortfolioCard } from "@/lib/portfolio-card-mapper";
-import { classroomShowcaseChannelKey, publish } from "@/lib/realtime";
+import { classroomShowcaseChannelKey } from "@/lib/realtime";
+import { scheduleRealtimePublish } from "@/lib/realtime-server";
 import type { PortfolioCardDTO } from "@/lib/portfolio-dto";
 
 export const dynamic = "force-dynamic";
@@ -166,7 +167,7 @@ export async function POST(req: Request) {
     }
 
     if (result.kind === "created") {
-      await publish({
+      scheduleRealtimePublish({
         channel: classroomShowcaseChannelKey(classroomId),
         type: "showcase_added",
         payload: {
@@ -216,7 +217,7 @@ export async function DELETE(req: Request) {
     return NextResponse.json({ error: "not_found" }, { status: 404 });
   }
   await db.showcaseEntry.delete({ where: { id: entry.id } });
-  await publish({
+  scheduleRealtimePublish({
     channel: classroomShowcaseChannelKey(entry.classroomId),
     type: "showcase_removed",
     payload: {

@@ -8,6 +8,7 @@ vi.mock("../../../apps/mobile/lib/api", () => ({
 }));
 
 const realtime = await import("../../../apps/mobile/lib/use-board-realtime");
+const liveSnapshot = await import("../../../apps/mobile/lib/use-live-snapshot");
 
 type BoardRealtimeChannel = {
   on: (
@@ -130,5 +131,25 @@ describe("mobile board realtime", () => {
     expect(realtime.shouldUseBoardFallbackPolling("error")).toBe(true);
     expect(realtime.shouldUseBoardFallbackPolling("unavailable")).toBe(true);
     expect(realtime.shouldUseBoardFallbackPolling("subscribed")).toBe(false);
+  });
+
+  it("only schedules live snapshot fallback while active, non-terminal, and unsubscribed", () => {
+    const base = {
+      active: true,
+      enabled: true,
+      status: "error" as const,
+      terminal: false,
+    };
+    expect(liveSnapshot.shouldScheduleLiveSnapshotFallback(base)).toBe(true);
+    expect(liveSnapshot.shouldScheduleLiveSnapshotFallback({ ...base, active: false })).toBe(false);
+    expect(liveSnapshot.shouldScheduleLiveSnapshotFallback({ ...base, terminal: true })).toBe(false);
+    expect(liveSnapshot.shouldScheduleLiveSnapshotFallback({ ...base, status: "subscribed" })).toBe(false);
+  });
+
+  it("backs fallback snapshots off from 15 seconds and caps at 60 seconds", () => {
+    expect(liveSnapshot.liveSnapshotFallbackDelay(0)).toBe(15_000);
+    expect(liveSnapshot.liveSnapshotFallbackDelay(1)).toBe(30_000);
+    expect(liveSnapshot.liveSnapshotFallbackDelay(2)).toBe(60_000);
+    expect(liveSnapshot.liveSnapshotFallbackDelay(20)).toBe(60_000);
   });
 });

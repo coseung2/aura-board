@@ -287,6 +287,11 @@ function getModuleSupabaseClient(): BoardRealtimeClient | null {
   return moduleSupabaseClient;
 }
 
+/** Shared public client for focused mobile realtime consumers. */
+export function getMobileRealtimeClient(): BoardRealtimeClient | null {
+  return getModuleSupabaseClient();
+}
+
 function getModuleRegistry(): ReturnType<typeof createBoardRealtimeRegistry> | null {
   const client = getModuleSupabaseClient();
   if (!client) return null;

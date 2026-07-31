@@ -83,6 +83,22 @@ describe("ClassroomMorningDashboard cleaning duties", () => {
     expect(screen.queryByText("표시할 아침 정보가 없습니다.")).toBeNull();
   });
 
+  it("shares the in-flight today summary between the summary and inspection loads", async () => {
+    fetchCleaningDutiesMock.mockResolvedValue({ duties: [] });
+
+    render(
+      <ClassroomMorningDashboard
+        classroomId="classroom-a"
+        classroomName="classroom"
+      />,
+    );
+
+    await waitFor(() => {
+      expect(fetchMorningSummaryMock).toHaveBeenCalledTimes(1);
+    });
+    expect(fetchMorningSummaryMock).toHaveBeenCalledTimes(1);
+  });
+
   it("switches the selected role panel with keyboard tab navigation", async () => {
     fetchCleaningDutiesMock.mockResolvedValue({ duties: [] });
     fetchMorningSummaryMock.mockResolvedValue({

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 
 type StudentNotificationItem = {
@@ -20,34 +20,66 @@ type Payload = {
   items: StudentNotificationItem[];
 };
 
+const NOTIFICATION_STALE_MS = 60_000;
+
 export function StudentNotificationBell() {
   const [payload, setPayload] = useState<Payload | null>(null);
   const [open, setOpen] = useState(false);
   const [markingAll, setMarkingAll] = useState(false);
   const detailsRef = useRef<HTMLDetailsElement | null>(null);
+  const loadInFlightRef = useRef<Promise<void> | null>(null);
+  const lastLoadedAtRef = useRef(0);
+  const mountedRef = useRef(true);
 
-  useEffect(() => {
-    let cancelled = false;
-    const load = async () => {
+  const load = useCallback((): Promise<void> => {
+    const existing = loadInFlightRef.current;
+    if (existing) return existing;
+
+    const request = (async () => {
       try {
         const res = await fetch("/api/student/notifications", {
           cache: "no-store",
         });
         if (!res.ok) return;
         const data = (await res.json()) as Payload;
-        if (!cancelled) setPayload(data);
+        if (!mountedRef.current) return;
+        setPayload(data);
+        lastLoadedAtRef.current = Date.now();
       } catch {
-        /* retry on the next polling cycle */
+        /* retry on the next open or stale visibility/focus check */
       }
+    })();
+
+    loadInFlightRef.current = request;
+    request.then(
+      () => {
+        if (loadInFlightRef.current === request) loadInFlightRef.current = null;
+      },
+      () => {
+        if (loadInFlightRef.current === request) loadInFlightRef.current = null;
+      },
+    );
+    return request;
+  }, []);
+
+  useEffect(() => {
+    mountedRef.current = true;
+    void load();
+
+    const refreshIfStale = () => {
+      if (document.visibilityState !== "visible") return;
+      if (Date.now() - lastLoadedAtRef.current < NOTIFICATION_STALE_MS) return;
+      void load();
     };
 
-    void load();
-    const id = setInterval(load, 60_000);
+    window.addEventListener("focus", refreshIfStale);
+    document.addEventListener("visibilitychange", refreshIfStale);
     return () => {
-      cancelled = true;
-      clearInterval(id);
+      mountedRef.current = false;
+      window.removeEventListener("focus", refreshIfStale);
+      document.removeEventListener("visibilitychange", refreshIfStale);
     };
-  }, []);
+  }, [load]);
 
   useEffect(() => {
     if (!open) return;
@@ -119,7 +151,11 @@ export function StudentNotificationBell() {
       ref={detailsRef}
       className="auth-notify"
       open={open}
-      onToggle={(event) => setOpen(event.currentTarget.open)}
+      onToggle={(event) => {
+        const nextOpen = event.currentTarget.open;
+        setOpen(nextOpen);
+        if (nextOpen) void load();
+      }}
     >
       <summary
         className="auth-notify-trigger"
