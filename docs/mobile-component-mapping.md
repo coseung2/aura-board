@@ -36,7 +36,7 @@ instead of route-local patches.
 | Word/game boards | Kordle, Speed Game, Shadow Alliance | `KordleBoard`, `SpeedGameBoard`, `ShadowAllianceBoard` | Preserve role visibility, secret-word filtering, polling/realtime, and final states. |
 | Event signup | public event application | `EventSignupBoard` | Render the same web form in an origin-restricted in-app WebView. |
 | Breakout | breakout columns and membership | `BreakoutBoard` + `ColumnsBoard` | Server-provided visible and writable section IDs are authoritative. |
-| Drawing | web drawing studio/gallery | `DrawingBoard` | Native canvas saves through student-assets and reloads the class gallery. |
+| Drawing | web drawing gallery (no web editor) | `DrawingBoard` | Native canvas saves through student-assets and reloads the class gallery. |
 | Student inspection | web cleaning/shoes role pages | `StudentInspectionScreen` | Preserve findings and photo upload round trips; shoes remains photo-free. |
 
 ## Modal Exceptions

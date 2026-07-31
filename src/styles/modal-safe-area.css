@@ -25,8 +25,6 @@ body:has(.ab-topnav, .student-topnav, .parent-topnav) .agent-modal-overlay,
 body:has(.ab-topnav, .student-topnav, .parent-topnav) .plant-modal-backdrop,
 body:has(.ab-topnav, .student-topnav, .parent-topnav) .vs-backdrop,
 body:has(.ab-topnav, .student-topnav, .parent-topnav) .vp-backdrop,
-body:has(.ab-topnav, .student-topnav, .parent-topnav) .ds-hsv-backdrop,
-body:has(.ab-topnav, .student-topnav, .parent-topnav) .ds-save-dialog-backdrop,
 body:has(.ab-topnav, .student-topnav, .parent-topnav) .dj-recap-backdrop {
   padding: var(--modal-safe-top) 16px var(--modal-safe-bottom);
 }
@@ -66,8 +64,6 @@ body:has(.ab-topnav, .student-topnav, .parent-topnav) .plant-modal,
 body:has(.ab-topnav, .student-topnav, .parent-topnav) .agent-modal,
 body:has(.ab-topnav, .student-topnav, .parent-topnav) .vs-studio,
 body:has(.ab-topnav, .student-topnav, .parent-topnav) .vp-modal,
-body:has(.ab-topnav, .student-topnav, .parent-topnav) .ds-hsv-panel,
-body:has(.ab-topnav, .student-topnav, .parent-topnav) .ds-save-dialog,
 body:has(.ab-topnav, .student-topnav, .parent-topnav) .dj-recap-modal,
 body:has(.ab-topnav, .student-topnav, .parent-topnav)
   .morning-cleaning-modal:not(.morning-cleaning-photo-modal),

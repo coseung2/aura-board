@@ -1,9 +1,9 @@
 /**
  * Seeds a handful of reusable design-asset stickers into `StudentAsset`
- * rows so DrawingStudio's "🖼️ 에셋 불러오기" modal has something to show
- * on a fresh install. All assets are marked `isSharedToClass=true` so the
- * existing GET /api/student-assets?scope=shared endpoint picks them up
- * without schema or endpoint changes.
+ * rows so the shared class gallery has content on a fresh install. All assets
+ * are marked `isSharedToClass=true` so the existing
+ * GET /api/student-assets?scope=shared endpoint picks them up without schema
+ * or endpoint changes.
  *
  * Storage strategy: inline SVG data URIs in fileUrl. Svg is fine because
  *   (1) the existing <img loading="lazy"> gallery renders it,
