@@ -1,0 +1,141 @@
+name: Production Cron Dispatcher
+
+on:
+  workflow_dispatch:
+    inputs:
+      job:
+        description: Production cron job to dispatch
+        required: true
+        type: choice
+        options:
+          - parent-weekly-digest
+          - parent-anonymize
+          - expire-pending-links
+          - fd-maturity
+          - billing-renew
+          - blob-cleanup
+          - attendance-reminder
+      dry_run:
+        description: Record the request without calling production
+        required: true
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: production-cron-${{ inputs.job }}
+  cancel-in-progress: false
+
+jobs:
+  dispatch:
+    name: Dispatch ${{ inputs.job }}
+    runs-on: ubuntu-latest
+    environment: Production
+    timeout-minutes: 15
+    steps:
+      - name: Resolve endpoint
+        shell: bash
+        run: |
+          case "${{ inputs.job }}" in
+            parent-weekly-digest) method=GET; path=/api/cron/parent-weekly-digest ;;
+            parent-anonymize) method=GET; path=/api/cron/parent-anonymize ;;
+            expire-pending-links) method=GET; path=/api/cron/expire-pending-links ;;
+            fd-maturity) method=GET; path=/api/cron/fd-maturity ;;
+            billing-renew) method=POST; path=/api/cron/billing-renew ;;
+            blob-cleanup) method=GET; path=/api/cron/blob-cleanup ;;
+            attendance-reminder) method=GET; path=/api/cron/attendance-reminder ;;
+            *) echo "Unsupported job selection" >&2; exit 1 ;;
+          esac
+
+          echo "METHOD=$method" >> "$GITHUB_ENV"
+          echo "ENDPOINT_PATH=$path" >> "$GITHUB_ENV"
+
+      - name: Record dry run
+        if: ${{ inputs.dry_run }}
+        shell: bash
+        run: |
+          {
+            echo "### Production cron dry run"
+            echo "- Method: \`$METHOD\`"
+            echo "- Path: \`$ENDPOINT_PATH\`"
+            echo "- Request sent: no"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Call production endpoint
+        if: ${{ !inputs.dry_run }}
+        shell: bash
+        env:
+          BASE_URL: ${{ vars.AURA_BOARD_BASE_URL }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          if [[ -z "$BASE_URL" ]]; then
+            echo "AURA_BOARD_BASE_URL is not configured" >&2
+            exit 1
+          fi
+          if [[ -z "$CRON_SECRET" ]]; then
+            echo "CRON_SECRET is not configured" >&2
+            exit 1
+          fi
+          if [[ "$BASE_URL" != https://* ]]; then
+            echo "AURA_BOARD_BASE_URL must use HTTPS" >&2
+            exit 1
+          fi
+
+          url="${BASE_URL%/}${ENDPOINT_PATH}"
+          max_attempts=3
+          if [[ "${{ inputs.job }}" == "parent-weekly-digest" ]]; then
+            max_attempts=1
+          fi
+
+          attempt=1
+          http_status=000
+          while true; do
+            set +e
+            http_status="$(curl --silent \
+              --output /dev/null \
+              --write-out '%{http_code}' \
+              --connect-timeout 15 \
+              --max-time 300 \
+              --request "$METHOD" \
+              --header "Authorization: Bearer $CRON_SECRET" \
+              "$url")"
+            curl_exit=$?
+            set -e
+
+            if [[ $curl_exit -eq 0 ]]; then
+              break
+            fi
+
+            case "$curl_exit" in
+              5|6|7|18|28|35|52|55|56) retryable=true ;;
+              *) retryable=false ;;
+            esac
+
+            if [[ "$retryable" != true || $attempt -ge $max_attempts ]]; then
+              {
+                echo "### Production cron result"
+                echo "- Method: \`$METHOD\`"
+                echo "- Path: \`$ENDPOINT_PATH\`"
+                echo "- HTTP status: \`$http_status\`"
+              } >> "$GITHUB_STEP_SUMMARY"
+              echo "Production cron request failed before a successful HTTP response" >&2
+              exit 1
+            fi
+
+            attempt=$((attempt + 1))
+            sleep $((attempt - 1))
+          done
+
+          {
+            echo "### Production cron result"
+            echo "- Method: \`$METHOD\`"
+            echo "- Path: \`$ENDPOINT_PATH\`"
+            echo "- HTTP status: \`$http_status\`"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          if [[ ! "$http_status" =~ ^2[0-9][0-9]$ ]]; then
+            echo "Production cron endpoint returned a non-2xx status" >&2
+            exit 1
+          fi

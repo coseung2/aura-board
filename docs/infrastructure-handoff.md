@@ -12,7 +12,7 @@
 | Oracle Cloud | 장기 FFmpeg 작업, 배치 메일, Supabase 논리 백업을 가져가는 pull worker | 원본 Postgres, 원본 Storage, 앱 호스팅 | OCI 인증과 리소스가 아직 준비되지 않음 |
 | Cloudflare | Stream 비디오 업로드·재생 및 향후 상태 검증/삭제 수명주기 | 일반 파일·이미지 저장소, R2 | Stream 직접 업로드 코드가 있으며 운영 수명주기 보강 필요. R2는 도입하지 않음 |
 | Supabase Pro (Seoul) | Postgres, Auth, Realtime, 일반 파일·이미지 Storage, `NotificationOutbox`, `pg_net`, `pg_cron` | Cloudflare Stream 비디오, Oracle 작업 실행 환경 | 운영 사용 중. `20260731` 마이그레이션 5개는 운영 미적용 |
-| GitHub Actions | Vercel의 일/주간 cron 7개를 `Authorization: Bearer` 방식으로 호출 | 앱 호스팅, `notification-push`의 주 wakeup | cron workflow 미구현 |
+| GitHub Actions | Vercel의 일/주간 cron 7개를 `Authorization: Bearer` 방식으로 호출 | 앱 호스팅, `notification-push`의 주 wakeup | 수동 dry-run 우선 workflow 준비 완료, schedule 미설정 |
 | Vercel Hobby | Next.js 앱 호스팅과 cron API endpoint 제공 | 향후 cron scheduler, 장기 작업, 원본 데이터 저장소 | 기존 production은 유지 중. [`vercel.json`](../vercel.json)의 매분 cron 때문에 최신 `main` 배포 실패. 이번 범위에서 배포하지 않음 |
 
 책임 이전 후에도 cron API의 인증 기준은 [`src/lib/cron-auth.ts`](../src/lib/cron-auth.ts)이며, GitHub Actions와 Supabase callback 모두 동일한 `CRON_SECRET`을 Bearer token으로 사용한다.
@@ -54,7 +54,9 @@
 | Cloudflare Stream | `CF_ACCOUNT_ID`, `CF_STREAM_API_TOKEN` |
 | Vercel Blob 잔여 이전 시에만 | `BLOB_READ_WRITE_TOKEN` |
 
-`AURA_BOARD_BASE_URL`은 GitHub Actions workflow가 호출할 HTTPS 앱 오리진이다. secret이 아니며 GitHub `production` environment variable로 관리한다. 구현 시 이름을 바꾸면 이 문서와 workflow를 같은 commit에서 함께 갱신한다. Oracle worker의 신규 secret/env 이름은 리소스와 실행 방식이 확정된 뒤 정의하며, 기존 credential 값을 재사용하거나 문서에 복사하지 않는다.
+GitHub environment의 정확한 이름은 `Production`이며 environment 자체는 이미 존재한다. 현재 이 environment의 secret과 variable 목록은 모두 비어 있어 `CRON_SECRET`과 `AURA_BOARD_BASE_URL`은 아직 미설정 상태다. 두 값이 설정되기 전 non-dry-run dispatch는 workflow의 사전 검증에서 실패해야 하며, 값을 문서나 workflow log에 출력하지 않는다.
+
+`AURA_BOARD_BASE_URL`은 GitHub Actions workflow가 호출할 HTTPS 앱 오리진이다. secret이 아니며 GitHub `Production` environment variable로 관리한다. 구현 시 이름을 바꾸면 이 문서와 workflow를 같은 commit에서 함께 갱신한다. Oracle worker의 신규 secret/env 이름은 리소스와 실행 방식이 확정된 뒤 정의하며, 기존 credential 값을 재사용하거나 문서에 복사하지 않는다.
 
 ## 단계별 실행 계획
 
@@ -66,14 +68,14 @@
 - [x] Verification: 운영 용량과 잔여 queue 수치, 기존 production 유지 상태를 기록.
 - [x] Handoff: 4-provider 책임 경계와 운영 미변경 원칙을 이 문서에 기록.
 
-### 1. GitHub Actions cron workflow 준비 — 다음 단계
+### 1. GitHub Actions cron workflow 준비 — 구현 완료 (pending commit)
 
 [`vercel.json`](../vercel.json)의 일반 일/주간 cron 7개를 개별 호출할 수 있는 `workflow_dispatch` 전용 workflow를 [`.github/workflows`](../.github/workflows/)에 먼저 추가한다. 이 단계에서는 `schedule`을 넣지 않아 push만으로 운영 endpoint가 호출되지 않게 한다. 각 요청은 HTTPS production base URL과 해당 path를 조합하고 `Authorization: Bearer` header를 사용해야 한다. timeout, non-2xx 실패, 동시 실행 중복을 명시적으로 처리한다. `/api/cron/notification-push`는 이 workflow에 포함하지 않는다.
 
-- [ ] Commit: workflow와 필요한 테스트/검증만 별도 commit으로 작성.
+- [ ] Commit: workflow와 문서 변경을 별도 commit으로 작성. 현재 SHA는 `pending commit`이며 부모 작업에서 commit 후 이 항목과 Update log를 갱신한다.
 - [ ] Push: commit을 `main`에 push하고 GitHub에 반영된 SHA 확인.
-- [ ] Verification: workflow 구문 검증, 7개 path와 호출 메서드 대조, `schedule` 부재, secret 값 미출력 확인. 실제 운영 호출은 승인된 cutover 전에는 실행하지 않음.
-- [ ] Handoff: workflow 경로, commit SHA, 검증 결과와 미실행 사유를 Update log에 기록.
+- [x] Verification: [`.github/workflows/cron-jobs.yml`](../.github/workflows/cron-jobs.yml)의 구문, 7개 path와 호출 메서드, `schedule` 부재, `notification-push` 제외, secret 값 미출력을 정적으로 대조. 실제 운영 호출은 승인된 cutover 전에는 실행하지 않음.
+- [x] Handoff: workflow 경로, 무예약 상태, 기본 dry-run 원칙과 정적 검증 결과를 Update log에 기록. commit 후 부모 작업에서 SHA만 갱신한다.
 
 ### 2. Supabase 마이그레이션 적용 준비 및 승인
 
@@ -153,4 +155,5 @@ Vercel Blob distinct URL 4개와 due queue 165개를 재확인한다. Supabase S
 
 | 일자 | 상태 | 기록 | 다음 단계 |
 | --- | --- | --- | --- |
+| 2026-07-31 | Step 1 구현 완료 (`pending commit`) | [`.github/workflows/cron-jobs.yml`](../.github/workflows/cron-jobs.yml)에 `Production` environment를 사용하는 수동 dispatcher를 추가. `workflow_dispatch`만 사용하고 `schedule`은 두지 않았으며, `dry_run` 기본값은 `true`라 endpoint를 호출하지 않는다. 7개 job의 method/path, secret 비출력, `notification-push` 제외를 정적으로 검증했고 운영 호출은 실행하지 않음. `Production` environment는 존재하지만 `CRON_SECRET`과 `AURA_BOARD_BASE_URL`은 아직 미설정. | 부모 작업에서 commit 후 이 행과 Step 1의 `pending commit`을 실제 SHA로 갱신하고 push 상태를 기록. 승인된 non-dry-run 전에 두 GitHub environment 값을 설정하고 값 노출 없이 존재 여부를 확인 |
 | 2026-07-31 | Baseline push 완료 | 이전 8개 commit이 `main`의 `80183f55`까지 push됨. 운영 실측과 4-provider 책임 경계를 기록했으며 운영 변경·배포는 수행하지 않음. | GitHub Actions cron workflow 준비: 일반 일/주간 7개 endpoint만 대상으로 구현·정적 검증하고 `notification-push`는 제외 |

@@ -42,6 +42,14 @@ creating overlapping testing-notes documents.
 - Inspect production data shape when the symptom is data-dependent.
 - Re-test the exact route, board, classroom, or student flow named by the user.
 
+### Scheduled Job Changes
+
+- Parse the workflow syntax and verify the exact endpoint method/path mapping.
+- Keep `schedule` absent before an explicitly approved cutover.
+- Confirm secrets and response bodies cannot appear in logs or step summaries.
+- Verify retries and endpoint behavior are idempotent before enabling a schedule.
+- Call a production endpoint only after explicit approval; use dry-run verification otherwise.
+
 ## Mobile Parity And Android Release
 
 - Run `npm run typecheck` and `npm run design:check` in `apps/mobile`.
