@@ -96,41 +96,26 @@ See `docs/design-system.md`. T0-① Breakout surfaces introduce these utility cl
 2026-04-13 board-settings-panel adds: `.board-settings-trigger`, `.board-settings-tab-meta`, `.board-settings-list`, `.board-settings-row`, `.board-settings-row-title`, `.board-settings-row-name`, `.board-settings-row-badge` (`.on`/`.off`), `.board-settings-empty`, `.board-settings-placeholder` — all in `src/styles/side-panel.css`, reusing existing tokens (no new design tokens). Note: `.section-actions-trigger` is now unused (section ⋯ uses the generic `.ctx-menu-trigger`); the class remains for backward compat until next cleanup.
 
 
-## 2026-04-13 Drawpile 그림보드 (schema + UI stub, partial scope)
+## 그림보드 (retired)
 
-Status: schema + route + UI placeholder only. Drawpile 서버/포크/COOP-COEP/postMessage bridge 는 `BLOCKERS.md` 참조.
+그림보드 레이아웃과 전용 업로드·갤러리·학부모 조회 API는 제거되었다. 남은
+것은 기존 데이터 보존과 용량 산정을 위한 스키마뿐이다.
 
-### Data model additions
-- `StudentAsset` — 학생 소유 이미지(업로드 or Drawpile 생성). `studentId`, 비정규화 `classroomId`, `fileUrl`, `thumbnailUrl`, `format`, `sizeBytes`, `isSharedToClass`, `source` (`upload`|`drawpile`), `drawpileFileId?`. FK: Student cascade.
-- `AssetAttachment` — StudentAsset ↔ Card / PlantObservation 조인. 둘 중 하나만 채움. Card/Observation cascade.
-- 관계 추가: `Student.assets`, `Card.assetAttachments`(rel `"CardAssetAttachments"`), `PlantObservation.assetAttachments`(rel `"PlantObservationAssetAttachments"`).
-
-### Routes
-- `POST /api/student-assets` — 학생 세션 필수. multipart/form-data `file` (image/*, ≤50MB). `public/uploads/` 저장 (기존 `/api/upload` 와 동일 FS 패턴 — 영속성 업그레이드는 BLOCKERS.md #6).
-- `GET /api/student-assets?scope=mine|shared[&classroomId=…]` — `mine`: 로그인 학생 본인. `shared`: 교사 owner or 해당 교실 학생.
-
-### Layout wiring
-- `Board.layout` app-level zod enum 에 `"drawing"` 추가 (`src/app/api/boards/route.ts`).
-- `src/app/board/[id]/page.tsx` `LAYOUT_LABEL.drawing = "그림보드"` + `case "drawing"` → `<DrawingBoard />`.
-- `CreateBoardModal` LAYOUTS 에 entry 추가.
-
-### Components
-- `src/components/DrawingBoard.tsx` — 작업실/갤러리 탭 토글. `NEXT_PUBLIC_DRAWPILE_URL` 있음 → `<iframe sandbox="allow-scripts allow-same-origin allow-forms allow-modals">`. 미설정 → placeholder card (`BLOCKERS.md` 가이드). 갤러리 탭: GET shared + `gallery-empty` 빈 상태.
-- `src/components/StudentLibrary.tsx` — 학생 로그인 시에만 사이드바. GET mine + 업로드 버튼 + 썸네일 list.
-
-### Styles
-- `src/styles/drawing.css` (globals.css import) — `.drawing-board`, `.drawing-tabs`, `.drawing-panel`, `.drawing-iframe`, `.drawing-placeholder`, `.drawing-gallery`, `.gallery-thumb`, `.drawing-sidebar`, `.library-list`. 768px breakpoint 에서 세로 스택.
-
-### Migrations
-- `prisma/migrations/20260413_add_drawpile_student_assets/migration.sql` (non-destructive). Supabase 수동 적용 필요 (`BLOCKERS.md` #5).
-
-### Deferred (BLOCKERS.md)
-1. Drawpile fork repo (GPL 격리)
-2. Drawpile 서버 호스팅 + `drawpile.aura-board.app`
-3. COOP/COEP 헤더 (drawing-only 라우트 전략)
-4. postMessage bridge (`docs/drawpile-protocol.md`)
-5. Supabase migration 적용
-6. 프로덕션 Supabase Storage bucket/policy 적용
+### 유지되는 기존 데이터
+- `StudentAsset` — 학생 소유 이미지 row. 신규 생성 경로는 없고, 과거 row를
+  보존하고 용량을 집계하기 위해 유지 (`studentId`, 비정규화 `classroomId`, `fileUrl`,
+  `thumbnailUrl`, `format`, `sizeBytes`, `isSharedToClass`, `source`). FK:
+  Student cascade.
+- `AssetAttachment` — StudentAsset ↔ Card / PlantObservation 조인. 둘 중
+  하나만 채움. Card/Observation cascade.
+- 관계: `Student.assets`, `Card.assetAttachments`(rel
+  `"CardAssetAttachments"`), `PlantObservation.assetAttachments`(rel
+  `"PlantObservationAssetAttachments"`).
+- 기존 마이그레이션(`prisma/migrations/20260413_add_drawpile_student_assets/`)
+  은 그대로 남는다 (non-destructive).
+- 운영 연계 유지: admin 스토리지 사용량 집계(`src/app/admin/page.tsx`),
+  blob cleanup 참조 검사(`src/lib/blob-cleanup.ts`), blob 마이그레이션
+  스크립트(`scripts/migrate-vercel-blob-to-supabase.ts`).
 
 ## Breakout Room Foundation (2026-04-12, BR-1 ~ BR-4)
 
@@ -466,8 +451,8 @@ VibeCodingStudio · PlayModal · ReviewPanel · TeacherModerationDashboard · 8 
 
 ## Parent Redesign — OAuth + 통합 대시보드 (parent-redesign) — 2026-04-26
 
-학부모 매직링크 인증 → OAuth(Google + Kakao) 추가. 자녀 페이지 6탭
-(portfolio·plant·drawing·assignments·events·breakout) 을 portfolio 1개로
+학부모 매직링크 인증 → OAuth(Google + Kakao) 추가. 자녀 페이지 5탭
+(portfolio·plant·assignments·events·breakout)을 portfolio 1개로
 통합한 대시보드. 학급 자랑해요 진입점 추가.
 
 ### Data model

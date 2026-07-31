@@ -20,7 +20,7 @@ import { StreamFeedPost } from "./ColumnsBoard";
 import { sortCards, updateCardCommentCount } from "./cards-board-utils";
 
 // 카드 추가를 아직 모바일에서 지원하지 않는 레이아웃의 공통 뷰어.
-// vibe-gallery / dj-queue / event-signup / breakout / assessment / drawing.
+// vibe-gallery / dj-queue / event-signup / breakout / assessment.
 
 export function ReadOnlyCardsBoard({ data }: { data: BoardDetailResponse }) {
   const [commentCard, setCommentCard] = useState<BoardCard | null>(null);

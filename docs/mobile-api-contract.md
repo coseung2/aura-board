@@ -41,7 +41,6 @@ Expo React Native 모바일 앱(student + parent)용 API 계약서.
 | Child post grid | ✅ live | `GET /api/parent/children/[id]/posts?kind=media\|text` |
 | Child assignments | ✅ live | `GET /api/parent/children/[id]/assignments` |
 | Child events | ✅ live | `GET /api/parent/children/[id]/events` |
-| Child drawing library | ✅ live | `GET /api/parent/children/[id]/drawing` |
 | Child breakout | ✅ live | `GET /api/parent/children/[id]/breakout` |
 | Account withdraw | ⚠️ web-only | Cookie-based |
 | Logout | ⚠️ web-only | Cookie-based |
@@ -468,12 +467,6 @@ Expo React Native 모바일 앱(student + parent)용 API 계약서.
 - **Purpose**: 자녀 이벤트 신청 현황
 - **Auth**: parent session + studentId ∈ parent.children
 - **Response 200**: `{ "events": [{ "board": {...}, "mySubmissions": [...] }] }`
-
-#### GET /api/parent/children/[id]/drawing
-
-- **Purpose**: 자녀 그림 라이브러리
-- **Auth**: parent session + studentId ∈ parent.children
-- **Response 200**: `{ "assets": [...] }`
 
 #### GET /api/parent/children/[id]/breakout
 

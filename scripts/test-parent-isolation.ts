@@ -111,7 +111,7 @@ async function runAC6(): Promise<TestResult> {
   // Direct 404 assertion against `requireParentChildLinkOwned` is best
   // done as a unit test — we wire that path via the teacher revoke endpoint
   // below (AC-7) which indirectly exercises it.
-  const r = await hit(`/api/parent/children/${B_STUDENT}/drawing`, PARENT_A_COOKIE);
+  const r = await hit(`/api/parent/children/${B_STUDENT}/breakout`, PARENT_A_COOKIE);
   const pass = r.status === 403;
   return {
     name: "AC-6 parent A + parent B's child (link boundary) → 403/404",

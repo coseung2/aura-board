@@ -31,7 +31,7 @@ Vercel Functions 요청 본문 한도(≈4.5MB)가 `/api/upload` 라우트의 mu
 
 - 업로드 엔드포인트 `MAX_SIZE` 상수와 Vercel 플랫폼 한도(4.5MB)의 정합을 PR 체크리스트에 추가.
 - 본문 큰 파일을 받는 신규 엔드포인트 설계 시 client-direct 패턴을 기본값으로.
-- 후속: `/api/student-assets` 동일 전환 (별도 task).
+- `/api/student-assets`는 그림보드 기능 폐기와 함께 제거되어 별도 전환 대상이 아니다.
 
 ## 상세
 

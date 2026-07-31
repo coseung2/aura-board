@@ -433,7 +433,7 @@ npm run ds:check
 | `.ds-btn-secondary` | 보조 버튼 |
 | `:disabled` | 두 버튼 모두 opacity 0.5 + pointer-events: none |
 
-버튼 클래스는 `ds-utils.css`에만 정의되어 있어야 함. 타 CSS 파일(`drawing.css` 등)에서 중복 정의 금지.
+버튼 클래스는 `ds-utils.css`에만 정의되어 있어야 함. 타 CSS 파일에서 중복 정의 금지.
 
 ---
 

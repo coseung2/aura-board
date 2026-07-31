@@ -6,7 +6,7 @@ import type { PrismaClient } from "@prisma/client";
  * Layouts that the safe "teacher-owned copy" clone path supports.
  *
  * Shared by the internal duplicate API and the public share-clone API.
- * Specialized boards (assignment, quiz, drawing, breakout, assessment,
+ * Specialized boards (assignment, quiz, breakout, assessment,
  * dj-queue, plant-roadmap, vibe-arcade, vibe-gallery, question-board, ...)
  * require layout-specific copy logic that this helper does not provide -
  * callers should return 400 `unsupported_layout` rather than producing a

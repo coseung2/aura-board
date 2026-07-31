@@ -41,7 +41,6 @@ describe("buildSourceLabel", () => {
       "dj-queue",
       "breakout",
       "assignment",
-      "drawing",
       "vibe-arcade",
       "question-board",
     ]) {

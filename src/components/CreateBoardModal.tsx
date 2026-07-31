@@ -20,7 +20,6 @@ const PICKER_ROWS: PickerRow[] = [
   { id: "columns", desc: "주제별로 게시물을 나눠 정리" },
   { id: "assignment", desc: "학생별 과제 제출 및 확인" },
   { id: "quiz", desc: "실시간 퀴즈 게임" },
-  { id: "drawing", desc: "공동 그림판과 라이브러리", hidden: true },
   { id: "breakout", desc: "템플릿 기반 모둠 협력 보드", hidden: true },
   { id: "assessment", desc: "교사가 입력한 문항 기반 OMR 채점" },
   { id: "dj-queue", desc: "학생 YouTube 곡 신청 및 재생 순서 관리" },

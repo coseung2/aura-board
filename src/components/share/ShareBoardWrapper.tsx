@@ -224,7 +224,7 @@ function ShareBoardContent({
           />
         );
 
-      // Special layouts (assignment, quiz, drawing, etc.) are teacher-only
+      // Special layouts (assignment, quiz, etc.) are teacher-only
       // or require classroom context — show a simplified student-style card view.
       default:
         // Render a read-only board with the freeform canvas.

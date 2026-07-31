@@ -12,7 +12,6 @@ Live feature inventory. Update when merging feature tasks.
 | `assignment` | 과제 배부 + 제출 (AB-1 rewrite 2026-04-14: AssignmentSlot entity — roster-bound 5×6 grid, full-screen review modal, inline return reason, identity-based teacher/student/parent scope) |
 | `quiz` | 실시간 퀴즈 |
 | `plant-roadmap` | 식물 관찰일지 세로 타임라인 (2026-04-12 PJ-1~6, 2026-04-13 v2) |
-| `drawing` | Drawpile 공동 그림판 + 학생 라이브러리 (2026-04-13, **schema + UI stub only** — 서버 배포 대기, `BLOCKERS.md`) |
 | `breakout` | 모둠 학습 보드 (2026-04-12, foundation BR-1~BR-4) — 8종 템플릿(Free 3 + Pro 5), N모둠 × S섹션 자동 복사, teacher-pool 공용 섹션, "모든 모둠에 복제" 일괄 액션 |
 | `dj-queue` | DJ 큐 (2026-04-18) — YouTube 곡 대기열, classroom-role 학생 DJ가 교사와 동등한 순서·승인 권한. Now-Playing pinned + 단일 세로 큐 + status pill (pending/approved/played/rejected) |
 | `vibe-arcade` | 학급 Steam (2026-04-20, Seed 13 v1) — 학생이 Claude Sonnet과 대화해 브라우저 실행 HTML 게임·퀴즈를 만들고 반 친구들이 cross-origin 샌드박스에서 플레이·리뷰. 현재 스코프: **backend + 카탈로그/게이트오프 UI 뼈대**. Studio/PlayModal/ReviewPanel/TeacherModerationDashboard UI는 phase7 후속 세션. `VibeArcadeConfig.enabled` gate 기본 false. |
@@ -169,7 +168,7 @@ Card 의 단일 `studentAuthorId` + 자유 `externalAuthorName` 구조를 **N:N 
 - **⋯ 카드 컨텍스트 메뉴**: hover-only 제거. 기본 표시 + `@media (hover: hover)` 안에서만 opacity reveal. 터치 기기에서 상시 보임.
 - **터치 타깃 44px 승격**: `.ctx-menu-trigger`, CardAuthorEditor row 이동/삭제 버튼이 `@media (pointer: coarse)` 에서 `--tap-min` 로 확장.
 - **모달**: `.add-card-modal` 폭이 `--modal-max` 사용 — 뷰포트 92% 내 fit. `dvh` 높이로 주소창 변화 대응.
-- **이미 충족 확인**: 학생 로그인 input 52px+, Drawing 툴바 48px, Quiz 답지 80px+ — 추가 수정 불필요.
+- **이미 충족 확인**: 학생 로그인 input 52px+, Quiz 답지 80px+ — 추가 수정 불필요.
 - **Deferred**: 교사 대시보드 반응형 / 학부모 페이지 반응형 / 다크 모드.
 
 ## DJ Board (dj-queue) — 2026-04-18

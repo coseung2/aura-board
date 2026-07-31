@@ -44,7 +44,6 @@ const CreateBoardSchema = z.object({
     "columns",
     "assignment",
     "quiz",
-    "drawing",
     "breakout",
     "assessment",
     "dj-queue",

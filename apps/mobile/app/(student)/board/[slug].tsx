@@ -54,7 +54,6 @@ import { VibeGalleryBoard } from "../../../components/layouts/VibeGalleryBoard";
 import { SpeedGameBoard } from "../../../components/layouts/SpeedGameBoard";
 import { EventSignupBoard } from "../../../components/layouts/EventSignupBoard";
 import { BreakoutBoard } from "../../../components/layouts/BreakoutBoard";
-import { DrawingBoard } from "../../../components/layouts/DrawingBoard";
 import { ShadowAllianceBoard } from "../../../components/layouts/ShadowAllianceBoard";
 import { AppButton } from "../../../components/ui";
 
@@ -322,8 +321,6 @@ function renderLayout(
       return <EventSignupBoard data={data} />;
     case "breakout":
       return <BreakoutBoard data={data} onMutate={reload} />;
-    case "drawing":
-      return <DrawingBoard data={data} />;
     case "shadow-alliance":
       return <ShadowAllianceBoard data={data} />;
     case "freeform":

@@ -127,7 +127,6 @@ describe("isPortfolioEligibleLayout — dj-queue 등 결과물 아닌 layout 제
       "columns",
       "breakout",
       "assignment",
-      "drawing",
       "vibe-arcade",
       "question-board",
       "plant-roadmap",

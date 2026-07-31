@@ -9,7 +9,6 @@ export type LayoutKey =
   | "columns"
   | "assignment"
   | "quiz"
-  | "drawing"
   | "breakout"
   | "assessment"
   | "dj-queue"
@@ -37,7 +36,6 @@ export const LAYOUT_META: Record<LayoutKey, { emoji: string; label: string }> =
     columns: { emoji: "🗂️", label: "주제별 보드" },
     assignment: { emoji: "📝", label: "과제 배부" },
     quiz: { emoji: "🧩", label: "퀴즈" },
-    drawing: { emoji: "🎨", label: "그림보드" },
     breakout: { emoji: "👥", label: "모둠 학습" },
     assessment: { emoji: "📋", label: "수행평가" },
     "dj-queue": { emoji: "🎵", label: "DJ" },

@@ -3,7 +3,7 @@
    Handoff ingest T1-2 (2026-04-21).
    Source: handoff bundle project/colors_and_type.css §Semantic type roles / §Reusable patterns.
    Tokens: see base.css.
-   Scope: additive. Existing component CSS (drawing.css .ds-btn-* etc.) takes
+   Scope: additive. Existing component CSS (.ds-btn-* etc.) takes
    precedence via later @import order in app/globals.css.
    ===================================================== */
 

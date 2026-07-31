@@ -23,7 +23,6 @@ export interface DigestEmailInput {
   children: Array<{
     studentName: string;
     plantObservations: number;
-    drawingsCreated: number;
     breakoutJoined: number;
     eventSignups: number;
   }>;

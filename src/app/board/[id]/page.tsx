@@ -14,7 +14,6 @@ import { AssignmentBoard } from "@/components/AssignmentBoard";
 import { QuizBoard } from "@/components/QuizBoard";
 import { PlantRoadmapBoard } from "@/components/PlantRoadmapBoard";
 import { EventSignupBoard } from "@/components/event/EventSignupBoard";
-import { DrawingBoard } from "@/components/DrawingBoard";
 import { AssessmentBoard } from "@/components/assessment/AssessmentBoard";
 import { BreakoutBoard } from "@/components/BreakoutBoard";
 import { DJBoard } from "@/components/DJBoard";
@@ -163,7 +162,6 @@ export default async function BoardPage({
   const needsQuizData = board.layout === "quiz";
   const needsPlantData = board.layout === "plant-roadmap";
   const needsEventData = board.layout === "event-signup";
-  const needsDrawingData = board.layout === "drawing";
   const needsBreakoutData = board.layout === "breakout";
   const needsQuestionData = board.layout === "question-board";
   const needsSpeedGameData = board.layout === "speed-game";
@@ -173,7 +171,6 @@ export default async function BoardPage({
     !needsQuizData &&
     !needsPlantData &&
     !needsEventData &&
-    !needsDrawingData &&
     !needsQuestionData &&
     !needsSpeedGameData &&
     !needsShadowAllianceData;
@@ -814,22 +811,6 @@ export default async function BoardPage({
       }
       case "plant-roadmap":
         return <PlantRoadmapBoard initial={plantJournalInitial!} />;
-      case "drawing": {
-        const viewerKind: "teacher" | "student" | "none" = studentViewer
-          ? "student"
-          : effectiveRole === "owner"
-            ? "teacher"
-            : "none";
-        return (
-          <DrawingBoard
-            boardId={board!.id}
-            boardTitle={board!.title}
-            classroomId={board!.classroomId}
-            viewerKind={viewerKind}
-            studentId={studentViewer?.id ?? null}
-          />
-        );
-      }
       case "event-signup":
         return (
           <EventSignupBoard

@@ -1232,7 +1232,7 @@ model CardEvaluation {
   @@index([studentId, updatedAt])
 }
 
-// layout: "freeform" | "grid" | "stream" | "columns" | "assignment" | "quiz" | "plant-roadmap" | "event-signup" | "drawing" | "breakout" | "vibe-arcade" | "vibe-gallery"
+// layout: "freeform" | "grid" | "stream" | "columns" | "assignment" | "quiz" | "plant-roadmap" | "event-signup" | "breakout" | "vibe-arcade" | "vibe-gallery"
 
 // (validated in app via zod)
 
@@ -2625,15 +2625,17 @@ model PlantObservationImage {
   @@index([observationId])
 }
 
-// ???????? Drawpile student-asset library (partial scope ??schema + stub) ????????
+// Student image library (retained legacy / general image data)
 
-// StudentAsset = a student-owned image (uploaded or produced by Drawpile).
+// StudentAsset = a student-owned image row. The dedicated board layout that
 
-// classroomId is denormalized for fast classroom-scoped gallery scans.
+// originally produced these rows is retired; the model is kept so existing
 
-// source: "upload" (current path) | "drawpile" (set later when Drawpile fork
+// rows stay readable and accounted for (admin storage usage, blob cleanup).
 
-// posts back via postMessage bridge ??see docs/drawpile-protocol.md).
+// classroomId is denormalized for fast classroom-scoped scans.
+
+// source / external file id fields are legacy values on historical rows.
 
 model StudentAsset {
   id String @id @default(cuid())

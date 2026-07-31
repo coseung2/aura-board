@@ -9,8 +9,8 @@ import { isAuthorizedCronRequest } from "@/lib/cron-auth";
 // Tier gate: free parents are skipped entirely.
 // Activity window: the last 7 calendar days (now - 7d → now).
 // Skip-if-zero: if a parent's children have ZERO combined activity across
-//   plant observations, drawing uploads, breakout joins, and event signups
-//   we do not send a mail (spec AC-9).
+//   plant observations, breakout joins, and event signups we do not send a
+//   mail (spec AC-9).
 //
 // Vercel and manual callers must send `Authorization: Bearer <CRON_SECRET>`.
 
@@ -51,15 +51,12 @@ export async function GET(req: Request) {
     const children = await Promise.all(
       parent.children.map(async (link) => {
         const studentId = link.studentId;
-        const [plantObs, drawings, breakouts, eventSubs] = await Promise.all([
+        const [plantObs, breakouts, eventSubs] = await Promise.all([
           db.plantObservation.count({
             where: {
               observedAt: { gte: weekStart, lte: now },
               studentPlant: { studentId },
             },
-          }),
-          db.studentAsset.count({
-            where: { studentId, createdAt: { gte: weekStart, lte: now } },
           }),
           db.breakoutMembership.count({
             where: { studentId, joinedAt: { gte: weekStart, lte: now } },
@@ -86,7 +83,6 @@ export async function GET(req: Request) {
         return {
           studentName: link.student.name,
           plantObservations: plantObs,
-          drawingsCreated: drawings,
           breakoutJoined: breakouts,
           eventSignups: eventSubs,
         };
@@ -97,7 +93,6 @@ export async function GET(req: Request) {
       (sum, c) =>
         sum +
         c.plantObservations +
-        c.drawingsCreated +
         c.breakoutJoined +
         c.eventSignups,
       0

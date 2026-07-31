@@ -141,7 +141,6 @@ npm run seed
 ```bash
 npm run seed:plant
 npm run seed:breakout
-npm run seed:drawing-assets
 ```
 
 프로덕션 빌드는 `prisma migrate deploy`를 먼저 실행합니다.
