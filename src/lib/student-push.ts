@@ -8,12 +8,20 @@ export type StudentPushKind = StudentNotificationKind;
 
 export type StudentNotificationPush = {
   eventKey: string;
+  sourceId?: string;
   studentId: string;
   kind: StudentPushKind;
   title: string;
   body: string;
   href: string;
+  actorLabel?: string;
+  cardTitle?: string;
+  boardTitle?: string;
+  content?: string | null;
+  createdAt?: Date;
 };
+
+type DispatchOptions = { propagateFailure?: boolean };
 
 const KST_OFFSET_MS = 9 * 60 * 60 * 1_000;
 export const ATTENDANCE_REMINDER_KST_HOUR = 8;
@@ -61,9 +69,32 @@ export function assignmentDistributedPush(input: {
 
 export async function dispatchStudentNotificationPush(
   input: StudentNotificationPush,
+  options: DispatchOptions = {},
 ): Promise<{ attempted: number; skipped: number }> {
   let dispatchId: string | null = null;
   try {
+    await db.studentNotification.upsert({
+      where: {
+        studentId_eventKey: {
+          studentId: input.studentId,
+          eventKey: input.eventKey,
+        },
+      },
+      create: {
+        studentId: input.studentId,
+        eventKey: input.eventKey,
+        sourceId: input.sourceId ?? sourceIdFromEventKey(input.eventKey),
+        kind: input.kind,
+        actorLabel: input.actorLabel ?? "Aura Board",
+        cardTitle: input.cardTitle ?? input.title,
+        boardTitle: input.boardTitle ?? defaultBoardTitle(input.kind),
+        href: input.href,
+        content: input.content === undefined ? input.body : input.content,
+        ...(input.createdAt ? { createdAt: input.createdAt } : {}),
+      },
+      update: {},
+    });
+
     try {
       const dispatch = await db.studentPushDispatch.create({
         data: {
@@ -127,8 +158,21 @@ export async function dispatchStudentNotificationPush(
       reservationReleased: released,
       error: expoPushFailureDetails(error),
     });
+    if (options.propagateFailure) throw error;
     return { attempted: 0, skipped: 0 };
   }
+}
+
+function sourceIdFromEventKey(eventKey: string): string {
+  const separator = eventKey.indexOf(":");
+  return separator >= 0 ? eventKey.slice(separator + 1) : eventKey;
+}
+
+function defaultBoardTitle(kind: StudentPushKind): string {
+  if (kind === "attendance") return "출석";
+  if (kind === "assignment") return "과제";
+  if (kind === "reward" || kind === "refund") return "내 통장";
+  return "게시판";
 }
 
 async function releaseStudentPushReservation(

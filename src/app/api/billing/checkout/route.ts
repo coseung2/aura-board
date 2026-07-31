@@ -11,6 +11,7 @@ import { db } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
 import { PLAN_CATALOG, getPublicClientKey } from "@/lib/billing/toss";
 import { limitBillingCheckout } from "@/lib/rate-limit-routes";
+import { reconcileTossWebhookEventsForOrder } from "@/lib/billing/toss-webhook";
 
 const Schema = z.object({
   planKey: z.enum(["pro_monthly", "pro_yearly"]),
@@ -86,6 +87,9 @@ export async function POST(req: Request) {
       pgOrderId: orderId,
     },
   });
+
+  // A verified provider event can arrive before this local row is committed.
+  await reconcileTossWebhookEventsForOrder(orderId);
 
   return new Response(
     JSON.stringify({

@@ -6,6 +6,7 @@ const mocks = vi.hoisted(() => ({
   createDispatch: vi.fn(),
   deleteDispatch: vi.fn(),
   disableDevices: vi.fn(),
+  upsertNotification: vi.fn(),
   sendExpoPush: vi.fn(),
 }));
 
@@ -21,6 +22,7 @@ vi.mock("@/lib/db", () => ({
       create: mocks.createDispatch,
       delete: mocks.deleteDispatch,
     },
+    studentNotification: { upsert: mocks.upsertNotification },
   },
 }));
 vi.mock("@/lib/expo-push", () => ({
@@ -56,6 +58,7 @@ describe("dispatchStudentNotificationPush", () => {
     mocks.deleteDispatch.mockResolvedValue({ id: "dispatch-1" });
     mocks.sendExpoPush.mockResolvedValue({ attempted: 1, invalidDeviceIds: [] });
     mocks.disableDevices.mockResolvedValue({ count: 0 });
+    mocks.upsertNotification.mockResolvedValue({ id: "notification-1" });
   });
 
   it("sends a typed student notification payload to active devices", async () => {
@@ -76,6 +79,21 @@ describe("dispatchStudentNotificationPush", () => {
         body: input.body,
         href: input.href,
       },
+    });
+    expect(mocks.upsertNotification).toHaveBeenCalledWith({
+      where: {
+        studentId_eventKey: {
+          studentId: input.studentId,
+          eventKey: input.eventKey,
+        },
+      },
+      create: expect.objectContaining({
+        studentId: input.studentId,
+        eventKey: input.eventKey,
+        sourceId: "comment-1",
+        kind: "comment",
+      }),
+      update: {},
     });
     expect(mocks.sendExpoPush).toHaveBeenCalledWith(
       [{ id: "device-1", expoPushToken: "ExpoPushToken[token1]" }],

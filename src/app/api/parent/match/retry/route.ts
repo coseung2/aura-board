@@ -9,7 +9,7 @@ import { checkRejectionCooldown } from "@/lib/rate-limit-parent";
 
 export async function POST(req: Request) {
   return withParentAuth(req, async (ctx) => {
-    const gate = checkRejectionCooldown(ctx.parent.email);
+    const gate = await checkRejectionCooldown(ctx.parent.email);
     if (!gate.ok) {
       return NextResponse.json(
         { error: "cooldown", cooldownSeconds: gate.retryAfterSec },

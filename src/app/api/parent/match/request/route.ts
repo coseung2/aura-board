@@ -26,7 +26,7 @@ export async function POST(req: Request) {
     if (!parsed.success) {
       return NextResponse.json({ error: "invalid_input" }, { status: 400 });
     }
-    const t = consumeTicket(parsed.data.ticket, ctx.session.id);
+    const t = await consumeTicket(parsed.data.ticket, ctx.session.id);
     if (!t) {
       return NextResponse.json({ error: "invalid_ticket" }, { status: 400 });
     }

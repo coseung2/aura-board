@@ -79,6 +79,8 @@ model User {
 
   paymentEvents PaymentEvent[]
 
+  tossWebhookEvents TossWebhookEvent[]
+
   boardResponses BoardResponse[] @relation("UserBoardResponses")
 
   kordleAttempts KordleAttempt[] @relation("TeacherKordleAttempts")
@@ -333,6 +335,17 @@ model PaymentEvent {
 
   pgPaymentKey String?
 
+  // Stable identity and lease for one renewal of one subscription period.
+  billingPeriodKey String? @unique
+
+  billingPeriodStart DateTime?
+
+  billingPeriodEnd DateTime?
+
+  renewalLeaseToken String?
+
+  renewalLeaseUntil DateTime?
+
   rawPayload Json?
 
   errorMessage String?
@@ -345,6 +358,42 @@ model PaymentEvent {
 
   @@index([userId, createdAt])
   @@index([subscriptionId])
+}
+
+// Durable inbox for payment webhooks that Toss has verified through its
+// authenticated payment-query API. It intentionally has no required payment
+// FK because provider delivery can race local PaymentEvent creation.
+model TossWebhookEvent {
+  id String @id @default(cuid())
+
+  eventKey String @unique
+
+  transmissionId String?
+
+  eventType String
+
+  orderId String
+
+  paymentKey String
+
+  providerStatus String
+
+  rawPayload Json
+
+  verifiedPayload Json
+
+  matchedPaymentEventId String?
+
+  processedAt DateTime?
+
+  receivedAt DateTime @default(now())
+
+  userId String?
+
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([orderId, receivedAt])
+  @@index([processedAt, receivedAt])
 }
 
 // ???????? Canva Connect API token store ????????
@@ -602,6 +651,8 @@ model Student {
   notificationState StudentNotificationState?
 
   notificationReceipts StudentNotificationReceipt[]
+
+  notifications StudentNotification[]
 
   pushDevices    StudentPushDevice[]
   pushDispatches StudentPushDispatch[]
@@ -967,6 +1018,56 @@ model StudentPushDispatch {
   @@unique([studentId, eventKey])
   @@index([studentId, kind, createdAt])
   @@index([createdAt])
+}
+
+// Server-owned notification center rows. Source tables enqueue compact outbox
+// events; the worker resolves the display snapshot and inserts one row per
+// recipient using eventKey as the idempotency boundary.
+model StudentNotification {
+  id String @id @default(cuid())
+
+  studentId String
+  eventKey  String
+  sourceId  String
+  kind      String
+
+  actorLabel String
+  cardTitle  String
+  boardTitle String
+  href       String
+  content    String?
+
+  createdAt DateTime @default(now())
+  readAt    DateTime?
+
+  student Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@unique([studentId, eventKey])
+  @@unique([studentId, kind, sourceId])
+  @@index([studentId, createdAt])
+  @@index([studentId, readAt, createdAt])
+}
+
+// Compact, trigger-written queue. Claims are leased by the Node worker with
+// FOR UPDATE SKIP LOCKED; no browser role receives an RLS policy.
+model NotificationOutbox {
+  id String @id @default(cuid())
+
+  eventType String
+  sourceId  String
+  status    String   @default("pending")
+  attempts  Int      @default(0)
+
+  nextAttemptAt DateTime @default(now())
+  lockedAt      DateTime?
+  lockToken     String?
+  lastError     String?
+  processedAt   DateTime?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @default(now()) @updatedAt
+
+  @@unique([eventType, sourceId])
+  @@index([status, nextAttemptAt, createdAt])
 }
 
 // ???????? AI ??繹먮굞苑?(2026-04-24) ????????
@@ -2023,9 +2124,19 @@ model BlobDeletionQueue {
 
   deleteAfter DateTime
 
+  nextAttemptAt DateTime @default(now())
+
+  status String @default("pending")
+
   attempts Int @default(0)
 
   lastError String?
+
+  lockedAt DateTime?
+
+  lockToken String?
+
+  terminal Boolean @default(false)
 
   deletedAt DateTime?
 
@@ -2034,6 +2145,7 @@ model BlobDeletionQueue {
   updatedAt DateTime @updatedAt
 
   @@index([deleteAfter, deletedAt])
+  @@index([status, nextAttemptAt, createdAt])
   @@index([url])
 }
 

@@ -21,6 +21,7 @@ export type ParentNotificationPush = {
 
 export async function dispatchParentNotificationPush(
   input: ParentNotificationPush,
+  options: { propagateFailure?: boolean } = {},
 ): Promise<{ attempted: number; skipped: number }> {
   let dispatchId: string | null = null;
   try {
@@ -59,6 +60,7 @@ export async function dispatchParentNotificationPush(
       reservationReleased: released,
       error: expoPushFailureDetails(error),
     });
+    if (options.propagateFailure) throw error;
     return { attempted: 0, skipped: 0 };
   }
 }

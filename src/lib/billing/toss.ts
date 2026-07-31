@@ -39,6 +39,7 @@ export type ChargeInput = {
   customerEmail?: string;
   customerName?: string;
   taxFreeAmount?: number;
+  idempotencyKey?: string;
 };
 
 export type ChargeResult = {
@@ -56,6 +57,17 @@ export class TossConfigMissingError extends Error {
   constructor() {
     super("TOSS_SECRET_KEY is not configured on this deployment");
     this.name = "TossConfigMissingError";
+  }
+}
+
+export class TossApiError extends Error {
+  constructor(
+    message: string,
+    readonly status: number,
+    readonly providerCode?: string,
+  ) {
+    super(message);
+    this.name = "TossApiError";
   }
 }
 
@@ -116,6 +128,9 @@ export async function chargeBillingKey(input: ChargeInput): Promise<ChargeResult
       headers: {
         Authorization: secretHeader(),
         "Content-Type": "application/json",
+        ...(input.idempotencyKey
+          ? { "Idempotency-Key": input.idempotencyKey }
+          : {}),
       },
       body: JSON.stringify({
         customerKey: input.customerKey,
@@ -132,7 +147,11 @@ export async function chargeBillingKey(input: ChargeInput): Promise<ChargeResult
   const data = (await res.json().catch(() => ({}))) as Record<string, unknown>;
   if (!res.ok) {
     const msg = (data.message as string) ?? `HTTP ${res.status}`;
-    throw new Error(`toss chargeBillingKey: ${msg}`);
+    throw new TossApiError(
+      `toss chargeBillingKey: ${msg}`,
+      res.status,
+      data.code as string | undefined,
+    );
   }
   return {
     paymentKey: data.paymentKey as string,
@@ -141,6 +160,44 @@ export async function chargeBillingKey(input: ChargeInput): Promise<ChargeResult
     totalAmount: Number(data.totalAmount ?? 0),
     approvedAt: data.approvedAt as string | undefined,
     card: (data.card as ChargeResult["card"]) ?? undefined,
+    raw: data,
+  };
+}
+
+
+export type TossPayment = {
+  paymentKey: string;
+  orderId: string;
+  status: string;
+  totalAmount: number;
+  currency?: string;
+  raw: Record<string, unknown>;
+};
+
+/** Authenticated provider lookup used for retry recovery and webhook trust. */
+export async function getPaymentByOrderId(
+  orderId: string,
+): Promise<TossPayment | null> {
+  const res = await fetch(
+    `${API_BASE}/v1/payments/orders/${encodeURIComponent(orderId)}`,
+    { headers: { Authorization: secretHeader() } },
+  );
+  const data = (await res.json().catch(() => ({}))) as Record<string, unknown>;
+  if (res.status === 404) return null;
+  if (!res.ok) {
+    const msg = (data.message as string) ?? `HTTP ${res.status}`;
+    throw new TossApiError(
+      `toss getPaymentByOrderId: ${msg}`,
+      res.status,
+      data.code as string | undefined,
+    );
+  }
+  return {
+    paymentKey: data.paymentKey as string,
+    orderId: data.orderId as string,
+    status: data.status as string,
+    totalAmount: Number(data.totalAmount ?? 0),
+    currency: data.currency as string | undefined,
     raw: data,
   };
 }

@@ -56,7 +56,7 @@ export async function POST(
         rejectedReason: parsed.data.reason,
       },
     });
-    recordRejection(link.parent.email);
+    await recordRejection(link.parent.email);
 
     // after-commit email
     const origin = new URL(req.url).origin;

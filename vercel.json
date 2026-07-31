@@ -34,6 +34,10 @@
     {
       "path": "/api/cron/notification-push",
       "schedule": "* * * * *"
+    },
+    {
+      "path": "/api/cron/attendance-reminder",
+      "schedule": "0 23 * * *"
     }
   ]
 }

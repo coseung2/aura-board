@@ -1,70 +1,87 @@
 import "server-only";
 import { randomBytes } from "crypto";
+import {
+  _resetParentSecurityStoreForTests,
+  consumeBoundValue,
+  readBoundValue,
+  sensitiveKey,
+  setExpiringValue,
+} from "./parent-security-store";
 
-// parent-class-invite-v2 — in-memory match ticket.
-//
-// Binds (parentSessionId, classroomId) for 5 minutes after a successful
-// /api/parent/match/code call. Consumed by /api/parent/match/students (read)
-// and /api/parent/match/request (consume).
-//
-// Single-instance; sticky-route naturally because Vercel Functions (icn1)
-// run parent requests on a shared pool. If multi-region is added later,
-// migrate to a small key-value store (see architecture.md §5.1 note).
+const TTL_SECONDS = 5 * 60;
+const KEY_PREFIX = "parent-security:match-ticket";
 
-const TTL_MS = 5 * 60 * 1000;
-
-type Ticket = {
-  parentSessionId: string;
+export type Ticket = {
   classroomId: string;
   classroomName: string;
   expiresAt: number;
 };
 
-const tickets = new Map<string, Ticket>();
+function ticketKey(ticket: string): string {
+  return sensitiveKey(KEY_PREFIX, ticket);
+}
 
-function gc(): void {
-  const now = Date.now();
-  for (const [id, t] of tickets) {
-    if (t.expiresAt <= now) tickets.delete(id);
+function sessionBinding(parentSessionId: string): string {
+  return sensitiveKey("session", parentSessionId).slice("session:".length);
+}
+
+function parseTicket(value: string | null): Ticket | null {
+  if (!value) return null;
+  try {
+    const ticket = JSON.parse(Buffer.from(value, "base64url").toString("utf8")) as Ticket;
+    if (
+      typeof ticket.classroomId !== "string" ||
+      typeof ticket.classroomName !== "string" ||
+      typeof ticket.expiresAt !== "number" ||
+      ticket.expiresAt <= Date.now()
+    ) {
+      return null;
+    }
+    return ticket;
+  } catch {
+    return null;
   }
 }
 
-export function issueTicket(params: {
+export async function issueTicket(params: {
   parentSessionId: string;
   classroomId: string;
   classroomName: string;
-}): string {
-  gc();
-  const ticket = randomBytes(24).toString("base64url");
-  tickets.set(ticket, {
-    parentSessionId: params.parentSessionId,
-    classroomId: params.classroomId,
-    classroomName: params.classroomName,
-    expiresAt: Date.now() + TTL_MS,
-  });
-  return ticket;
-}
+}): Promise<string> {
+  const expiresAt = Date.now() + TTL_SECONDS * 1000;
+  const payload = Buffer.from(
+    JSON.stringify({
+      classroomId: params.classroomId,
+      classroomName: params.classroomName,
+      expiresAt,
+    } satisfies Ticket),
+    "utf8",
+  ).toString("base64url");
+  const binding = sessionBinding(params.parentSessionId);
 
-export function readTicket(ticket: string, parentSessionId: string): Ticket | null {
-  gc();
-  const t = tickets.get(ticket);
-  if (!t) return null;
-  if (t.parentSessionId !== parentSessionId) return null;
-  if (t.expiresAt <= Date.now()) {
-    tickets.delete(ticket);
-    return null;
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    const ticket = randomBytes(32).toString("base64url");
+    if (await setExpiringValue(ticketKey(ticket), `${binding}:${payload}`, TTL_SECONDS)) {
+      return ticket;
+    }
   }
-  return t;
+  throw new Error("Unable to allocate a unique parent match ticket");
 }
 
-export function consumeTicket(ticket: string, parentSessionId: string): Ticket | null {
-  const t = readTicket(ticket, parentSessionId);
-  if (!t) return null;
-  tickets.delete(ticket);
-  return t;
+export async function readTicket(
+  ticket: string,
+  parentSessionId: string,
+): Promise<Ticket | null> {
+  return parseTicket(await readBoundValue(ticketKey(ticket), sessionBinding(parentSessionId)));
 }
 
-// Test-only hook.
+export async function consumeTicket(
+  ticket: string,
+  parentSessionId: string,
+): Promise<Ticket | null> {
+  return parseTicket(await consumeBoundValue(ticketKey(ticket), sessionBinding(parentSessionId)));
+}
+
 export function _resetTicketsForTests(): void {
-  tickets.clear();
+  _resetParentSecurityStoreForTests();
 }

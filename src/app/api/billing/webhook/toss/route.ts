@@ -1,126 +1,101 @@
-// POST /api/billing/webhook/toss — Toss Payments 웹훅 수신.
-//
-// 2단계 인증:
-//   1) 쿼리 파라미터 `?secret=<TOSS_WEBHOOK_SECRET>` (타이밍-안전 비교)
-//   2) (선택) Toss가 HMAC 서명 헤더를 보내주면 본문 검증 — Toss 콘솔에서
-//      "웹훅 서명 검증" 활성화했을 때만 사용. `TOSS_WEBHOOK_SIGNING_SECRET`
-//      환경변수가 있으면 검증, 없으면 쿼리 secret만.
-//
-// 매칭 로직:
-//   - payload.data.orderId로 기존 PaymentEvent 조회 → 상태/paymentKey 동기화
-//   - 미매칭 이벤트는 userId="" 로 감사 로그만 남기려 했으나 FK required라
-//     실제로는 스킵. Slack/Sentry에 경고만 노출(SEC-2 구현 시 연결).
+// POST /api/billing/webhook/toss
+// General Toss payment webhooks do not have a supported signature. Trust is
+// established by querying Toss with the server-side secret key and comparing
+// the returned payment before the event enters the durable inbox.
 
-import { createHmac, timingSafeEqual } from "crypto";
+import { createHash } from "crypto";
 import { db } from "@/lib/db";
-import { notifySlack } from "@/lib/ops/slack";
+import {
+  getPaymentByOrderId,
+  TossConfigMissingError,
+} from "@/lib/billing/toss";
+import { reconcileTossWebhookEventsForOrder } from "@/lib/billing/toss-webhook";
 
-function timingSafeEqualStrings(a: string, b: string): boolean {
-  if (a.length !== b.length) return false;
-  try {
-    return timingSafeEqual(Buffer.from(a), Buffer.from(b));
-  } catch {
-    return false;
-  }
-}
+type PaymentWebhookPayload = {
+  eventType?: string;
+  createdAt?: string;
+  data?: {
+    orderId?: string;
+    paymentKey?: string;
+    status?: string;
+    totalAmount?: number;
+    currency?: string;
+  };
+};
 
-function verifyQuerySecret(req: Request): boolean {
-  const expected = process.env.TOSS_WEBHOOK_SECRET;
-  if (!expected) return false;
-  const given = new URL(req.url).searchParams.get("secret") ?? "";
-  return timingSafeEqualStrings(given, expected);
-}
-
-/**
- * HMAC-SHA256 기반 선택적 서명 검증.
- * Toss 콘솔에서 webhook 서명 활성 시 req 헤더 `TossPayments-Signature` 에
- * base64 HMAC(body, signingSecret) 이 담겨 온다. 콘솔 미활성 / secret 미설정
- * 이면 true(skip).
- */
-function verifyHmacSignature(req: Request, rawBody: string): boolean {
-  const signingSecret = process.env.TOSS_WEBHOOK_SIGNING_SECRET;
-  if (!signingSecret) return true; // 검증 미설정 — 스킵
-  const header = req.headers.get("tosspayments-signature") ?? "";
-  if (!header) return false; // 검증 활성인데 헤더 없음 → 거절
-  const expected = createHmac("sha256", signingSecret).update(rawBody).digest("base64");
-  return timingSafeEqualStrings(header, expected);
+function json(body: unknown, status: number) {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { "Content-Type": "application/json" },
+  });
 }
 
 export async function POST(req: Request) {
-  if (!process.env.TOSS_WEBHOOK_SECRET) {
-    return new Response(JSON.stringify({ error: "webhook_not_configured" }), {
-      status: 503,
-      headers: { "Content-Type": "application/json" },
-    });
-  }
-  if (!verifyQuerySecret(req)) {
-    return new Response(JSON.stringify({ error: "forbidden" }), {
-      status: 403,
-      headers: { "Content-Type": "application/json" },
-    });
-  }
-
   const rawBody = await req.text();
-  if (!verifyHmacSignature(req, rawBody)) {
-    return new Response(JSON.stringify({ error: "signature_invalid" }), {
-      status: 403,
-      headers: { "Content-Type": "application/json" },
-    });
-  }
-
-  let payload: {
-    eventType?: string;
-    data?: { orderId?: string; paymentKey?: string; status?: string };
-  } | null = null;
+  let payload: PaymentWebhookPayload;
   try {
-    payload = JSON.parse(rawBody);
+    payload = JSON.parse(rawBody) as PaymentWebhookPayload;
   } catch {
-    return new Response(JSON.stringify({ error: "bad_request" }), {
-      status: 400,
-      headers: { "Content-Type": "application/json" },
-    });
-  }
-  if (!payload) {
-    return new Response(JSON.stringify({ error: "bad_request" }), { status: 400 });
+    return json({ error: "bad_request" }, 400);
   }
 
-  const orderId = payload.data?.orderId ?? null;
+  const { eventType, data } = payload;
+  if (
+    !eventType ||
+    !data?.orderId ||
+    !data.paymentKey ||
+    !data.status
+  ) {
+    return json({ error: "unsupported_event" }, 400);
+  }
 
-  if (orderId) {
-    const existing = await db.paymentEvent.findUnique({ where: { pgOrderId: orderId } });
-    if (existing) {
-      const nextStatus =
-        payload.data?.status === "DONE"
-          ? "succeeded"
-          : payload.data?.status === "CANCELED" || payload.data?.status === "FAILED"
-            ? "failed"
-            : existing.status;
-      await db.paymentEvent.update({
-        where: { id: existing.id },
-        data: {
-          status: nextStatus,
-          pgPaymentKey: payload.data?.paymentKey ?? existing.pgPaymentKey,
-          rawPayload: payload as never,
-        },
-      });
-      return new Response(JSON.stringify({ ok: true, matched: true }), {
-        status: 200,
-        headers: { "Content-Type": "application/json" },
-      });
+  let verified;
+  try {
+    verified = await getPaymentByOrderId(data.orderId);
+  } catch (error) {
+    if (error instanceof TossConfigMissingError) {
+      return json({ error: "webhook_not_configured" }, 503);
     }
+    // Non-2xx asks Toss to retry instead of acknowledging an unverified event.
+    return json({ error: "provider_verification_unavailable" }, 502);
   }
 
-  // 매칭 실패 — 미지 이벤트. FK required로 추가 로그 저장은 못 하지만,
-  // 운영자에게 알려서 수동 리콘실리에이션 trigger.
-  await notifySlack({
-    severity: "warn",
-    title: "Toss webhook: unmatched event",
-    detail: `orderId=${orderId ?? "null"} eventType=${payload.eventType ?? "unknown"}`,
-    context: payload.data as Record<string, unknown> | undefined,
+  if (
+    !verified ||
+    verified.orderId !== data.orderId ||
+    verified.paymentKey !== data.paymentKey ||
+    (data.totalAmount !== undefined &&
+      verified.totalAmount !== data.totalAmount) ||
+    (data.currency !== undefined && verified.currency !== data.currency)
+  ) {
+    return json({ error: "provider_verification_failed" }, 403);
+  }
+
+  // Deduplicate provider retries and harmless body/header variations by the
+  // verified payment state, not by attacker-controlled raw bytes.
+  const eventKey = createHash("sha256")
+    .update(
+      [eventType, verified.orderId, verified.paymentKey, verified.status].join(
+        ":",
+      ),
+    )
+    .digest("hex");
+  await db.tossWebhookEvent.upsert({
+    where: { eventKey },
+    update: {},
+    create: {
+      eventKey,
+      transmissionId:
+        req.headers.get("tosspayments-webhook-transmission-id") ?? null,
+      eventType,
+      orderId: verified.orderId,
+      paymentKey: verified.paymentKey,
+      providerStatus: verified.status,
+      rawPayload: payload as never,
+      verifiedPayload: verified.raw as never,
+    },
   });
 
-  return new Response(
-    JSON.stringify({ ok: true, matched: false, orderId }),
-    { status: 200, headers: { "Content-Type": "application/json" } },
-  );
+  const matched = await reconcileTossWebhookEventsForOrder(verified.orderId);
+  return json({ ok: true, matched }, 200);
 }

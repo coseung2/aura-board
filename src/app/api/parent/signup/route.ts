@@ -22,7 +22,7 @@ const Schema = z.object({
 
 export async function POST(req: Request) {
   const ip = extractClientIp(req);
-  if (isIpLocked(ip)) {
+  if (await isIpLocked(ip)) {
     return NextResponse.json({ error: "rate_limited" }, { status: 429 });
   }
   let body: unknown;
@@ -33,7 +33,7 @@ export async function POST(req: Request) {
   }
   const parsed = Schema.safeParse(body);
   if (!parsed.success) {
-    recordIpFailure(ip);
+    await recordIpFailure(ip);
     return NextResponse.json({ error: "invalid_input" }, { status: 400 });
   }
   const email = parsed.data.email.toLowerCase();

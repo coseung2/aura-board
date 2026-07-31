@@ -18,7 +18,7 @@ export async function GET(req: Request) {
     if (!ticket) {
       return NextResponse.json({ error: "invalid_ticket" }, { status: 400 });
     }
-    const t = readTicket(ticket, ctx.session.id);
+    const t = await readTicket(ticket, ctx.session.id);
     if (!t) {
       return NextResponse.json({ error: "invalid_ticket" }, { status: 400 });
     }

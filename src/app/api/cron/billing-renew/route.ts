@@ -1,31 +1,269 @@
-// POST /api/cron/billing-renew — 정기결제 자동 갱신 (Seed 14 follow-up, 2026-04-22).
-//
-// Vercel Cron이 매일 호출(KST 03:00 ≈ UTC 18:00 전날).
-// 대상: currentPeriodEnd <= now() 이면서 status=active, canceledAt=null, billingKey 존재.
-// 각 구독에 대해 chargeBillingKey 재호출 → 성공 시 다음 기간 확장, 실패 시 past_due.
-//
-// 보안: Vercel Cron은 `Authorization: Bearer <CRON_SECRET>` 헤더를 자동 주입.
-// 로컬/수동 호출도 동일한 시크릿으로만 허용. CRON_SECRET 미설정 배포는 401 반환.
+// POST /api/cron/billing-renew — recurring subscription renewal.
 
+import { randomUUID } from "crypto";
+import { Prisma, type PaymentEvent, type TeacherSubscription } from "@prisma/client";
 import { db } from "@/lib/db";
 import {
   chargeBillingKey,
+  getPaymentByOrderId,
   PLAN_CATALOG,
+  TossApiError,
   TossConfigMissingError,
   type PlanKey,
+  type TossPayment,
 } from "@/lib/billing/toss";
 import { decryptBillingKey } from "@/lib/billing/billing-key-crypto";
+import {
+  getRenewalIdentity,
+  isTerminalTossStatus,
+  RENEWAL_LEASE_MS,
+} from "@/lib/billing/renewal";
 import { notifySlack } from "@/lib/ops/slack";
 import { isAuthorizedCronRequest } from "@/lib/cron-auth";
 
+type RenewalResult = {
+  userId: string;
+  action: "renewed" | "canceled" | "past_due" | "skipped";
+  detail?: string;
+};
+
 function nextPeriodEnd(plan: PlanKey, from: Date): Date {
-  const meta = PLAN_CATALOG[plan];
-  return new Date(from.getTime() + meta.periodDays * 24 * 60 * 60 * 1000);
+  return new Date(
+    from.getTime() + PLAN_CATALOG[plan].periodDays * 24 * 60 * 60 * 1000,
+  );
 }
 
-function newOrderId(userId: string): string {
-  const stamp = Date.now().toString(36);
-  return `renew_${userId.slice(0, 8)}_${stamp}`;
+async function acquireClaim(
+  sub: TeacherSubscription,
+  planKey: PlanKey,
+  now: Date,
+): Promise<{
+  event: PaymentEvent;
+  token: string;
+  idempotencyKey: string;
+  isNew: boolean;
+} | null> {
+  const periodStart = sub.currentPeriodEnd;
+  if (!periodStart) return null;
+  const periodEnd = nextPeriodEnd(planKey, periodStart);
+  const identity = getRenewalIdentity(sub.userId, periodStart);
+  const token = randomUUID();
+  const leaseUntil = new Date(now.getTime() + RENEWAL_LEASE_MS);
+
+  try {
+    const event = await db.paymentEvent.create({
+      data: {
+        userId: sub.userId,
+        subscriptionId: sub.userId,
+        type: "charge",
+        amount: PLAN_CATALOG[planKey].amount,
+        currency: "KRW",
+        status: "pending",
+        pgOrderId: identity.orderId,
+        billingPeriodKey: identity.periodKey,
+        billingPeriodStart: periodStart,
+        billingPeriodEnd: periodEnd,
+        renewalLeaseToken: token,
+        renewalLeaseUntil: leaseUntil,
+      },
+    });
+    return {
+      event,
+      token,
+      idempotencyKey: identity.idempotencyKey,
+      isNew: true,
+    };
+  } catch (error) {
+    if (
+      !(error instanceof Prisma.PrismaClientKnownRequestError) ||
+      error.code !== "P2002"
+    ) {
+      throw error;
+    }
+  }
+
+  const existing = await db.paymentEvent.findUnique({
+    where: { billingPeriodKey: identity.periodKey },
+  });
+  if (!existing || existing.status !== "pending") return null;
+
+  const acquired = await db.paymentEvent.updateMany({
+    where: {
+      id: existing.id,
+      status: "pending",
+      OR: [
+        { renewalLeaseUntil: null },
+        { renewalLeaseUntil: { lte: now } },
+      ],
+    },
+    data: { renewalLeaseToken: token, renewalLeaseUntil: leaseUntil },
+  });
+  if (acquired.count !== 1) return null;
+  return {
+    event: { ...existing, renewalLeaseToken: token, renewalLeaseUntil: leaseUntil },
+    token,
+    idempotencyKey: identity.idempotencyKey,
+    isNew: false,
+  };
+}
+
+function validSuccessfulPayment(
+  payment: TossPayment,
+  event: PaymentEvent,
+): boolean {
+  return (
+    payment.status === "DONE" &&
+    payment.orderId === event.pgOrderId &&
+    payment.totalAmount === event.amount
+  );
+}
+
+async function completeRenewal(event: PaymentEvent, payment: TossPayment) {
+  if (!event.billingPeriodStart || !event.billingPeriodEnd) {
+    throw new Error("renewal period is missing");
+  }
+  await db.$transaction([
+    db.paymentEvent.update({
+      where: { id: event.id },
+      data: {
+        status: "succeeded",
+        pgPaymentKey: payment.paymentKey,
+        rawPayload: payment.raw as never,
+        errorMessage: null,
+        renewalLeaseToken: null,
+        renewalLeaseUntil: null,
+      },
+    }),
+    db.teacherSubscription.updateMany({
+      where: {
+        userId: event.userId,
+        status: "active",
+        currentPeriodEnd: event.billingPeriodStart,
+      },
+      data: {
+        currentPeriodStart: event.billingPeriodStart,
+        currentPeriodEnd: event.billingPeriodEnd,
+      },
+    }),
+  ]);
+}
+
+async function failRenewal(event: PaymentEvent, message: string) {
+  await db.$transaction([
+    db.paymentEvent.update({
+      where: { id: event.id },
+      data: {
+        status: "failed",
+        errorMessage: message,
+        renewalLeaseToken: null,
+        renewalLeaseUntil: null,
+      },
+    }),
+    db.teacherSubscription.update({
+      where: { userId: event.userId },
+      data: { status: "past_due" },
+    }),
+  ]);
+}
+
+async function processClaim(
+  sub: TeacherSubscription,
+  planKey: PlanKey,
+  claim: NonNullable<Awaited<ReturnType<typeof acquireClaim>>>,
+): Promise<RenewalResult> {
+  const { event, idempotencyKey, isNew } = claim;
+  const orderId = event.pgOrderId!;
+  const plan = PLAN_CATALOG[planKey];
+
+  let knownPayment: TossPayment | null = null;
+  try {
+    knownPayment = await getPaymentByOrderId(orderId);
+  } catch (error) {
+    if (error instanceof TossConfigMissingError) throw error;
+    // A fresh claim cannot have reached the provider yet. A reclaimed claim
+    // must wait for authenticated reconciliation before another POST.
+    if (!isNew) {
+      return {
+        userId: sub.userId,
+        action: "skipped",
+        detail: "provider verification pending retry",
+      };
+    }
+  }
+
+  if (!knownPayment) {
+    let billingKey: string;
+    try {
+      billingKey = decryptBillingKey(sub.pgBillingKey!);
+    } catch (error) {
+      const message = `decrypt failed: ${(error as Error).message}`;
+      await failRenewal(event, message);
+      return { userId: sub.userId, action: "past_due", detail: message };
+    }
+
+    try {
+      const charged = await chargeBillingKey({
+        billingKey,
+        customerKey: sub.pgCustomerKey!,
+        amount: plan.amount,
+        orderId,
+        orderName: plan.label,
+        idempotencyKey,
+      });
+      knownPayment = {
+        paymentKey: charged.paymentKey,
+        orderId: charged.orderId,
+        status: charged.status,
+        totalAmount: charged.totalAmount,
+        raw: charged.raw as Record<string, unknown>,
+      };
+    } catch (chargeError) {
+      if (chargeError instanceof TossConfigMissingError) throw chargeError;
+      try {
+        knownPayment = await getPaymentByOrderId(orderId);
+      } catch {
+        // Keep the claim pending. A later cron retries with the same provider key.
+      }
+      if (!knownPayment) {
+        const isHardFailure =
+          chargeError instanceof TossApiError &&
+          chargeError.status >= 400 &&
+          chargeError.status < 500 &&
+          chargeError.status !== 429;
+        if (isHardFailure) {
+          const message = chargeError.message;
+          await failRenewal(event, message);
+          return { userId: sub.userId, action: "past_due", detail: message };
+        }
+        return {
+          userId: sub.userId,
+          action: "skipped",
+          detail: "provider result pending retry",
+        };
+      }
+    }
+  }
+
+  if (validSuccessfulPayment(knownPayment, event)) {
+    await completeRenewal(event, knownPayment);
+    return {
+      userId: sub.userId,
+      action: "renewed",
+      detail: event.billingPeriodEnd!.toISOString(),
+    };
+  }
+
+  if (isTerminalTossStatus(knownPayment.status)) {
+    const message = `provider status ${knownPayment.status}`;
+    await failRenewal(event, message);
+    return { userId: sub.userId, action: "past_due", detail: message };
+  }
+
+  return {
+    userId: sub.userId,
+    action: "skipped",
+    detail: `provider status ${knownPayment.status}`,
+  };
 }
 
 export async function POST(req: Request) {
@@ -37,9 +275,6 @@ export async function POST(req: Request) {
   }
 
   const now = new Date();
-
-  // 만료가 임박하거나 지난 active 구독만 스캔. canceled(canceledAt != null)은 기간이
-  // 끝나야 하므로 갱신 제외(아래 반복문 안에서 status=canceled로 전환).
   const due = await db.teacherSubscription.findMany({
     where: {
       status: "active",
@@ -49,15 +284,9 @@ export async function POST(req: Request) {
       pgCustomerKey: { not: null },
     },
   });
-
-  const results: Array<{
-    userId: string;
-    action: "renewed" | "canceled" | "past_due" | "skipped";
-    detail?: string;
-  }> = [];
+  const results: RenewalResult[] = [];
 
   for (const sub of due) {
-    // 취소 예약된 구독은 이 시점에 실제 canceled 처리.
     if (sub.canceledAt) {
       await db.teacherSubscription.update({
         where: { userId: sub.userId },
@@ -69,124 +298,57 @@ export async function POST(req: Request) {
 
     const planKey = sub.plan as PlanKey;
     if (!(planKey in PLAN_CATALOG)) {
-      results.push({ userId: sub.userId, action: "skipped", detail: `unknown plan ${sub.plan}` });
-      continue;
-    }
-    const plan = PLAN_CATALOG[planKey];
-
-    if (!sub.pgBillingKey || !sub.pgCustomerKey) {
-      results.push({ userId: sub.userId, action: "past_due", detail: "missing billing key" });
-      await db.teacherSubscription.update({
-        where: { userId: sub.userId },
-        data: { status: "past_due" },
-      });
-      continue;
-    }
-
-    // 빌링키 복호화 — 실패 시 재결제 필요 상태로 전환.
-    let billingKeyPlain: string;
-    try {
-      billingKeyPlain = decryptBillingKey(sub.pgBillingKey);
-    } catch (err) {
       results.push({
         userId: sub.userId,
-        action: "past_due",
-        detail: `decrypt failed: ${(err as Error).message}`,
-      });
-      await db.teacherSubscription.update({
-        where: { userId: sub.userId },
-        data: { status: "past_due" },
+        action: "skipped",
+        detail: `unknown plan ${sub.plan}`,
       });
       continue;
     }
 
-    const orderId = newOrderId(sub.userId);
-
-    // 이벤트 레코드 pending 으로 미리 생성 — 실결제 후 상태 갱신.
-    await db.paymentEvent.create({
-      data: {
+    const claim = await acquireClaim(sub, planKey, now);
+    if (!claim) {
+      results.push({
         userId: sub.userId,
-        subscriptionId: sub.userId,
-        type: "charge",
-        amount: plan.amount,
-        currency: "KRW",
-        status: "pending",
-        pgOrderId: orderId,
-      },
-    });
+        action: "skipped",
+        detail: "renewal already claimed",
+      });
+      continue;
+    }
 
     try {
-      const charge = await chargeBillingKey({
-        billingKey: billingKeyPlain,
-        customerKey: sub.pgCustomerKey,
-        amount: plan.amount,
-        orderId,
-        orderName: plan.label,
-      });
-
-      const periodStart = sub.currentPeriodEnd ?? now;
-      const periodEnd = nextPeriodEnd(planKey, periodStart);
-
-      await db.teacherSubscription.update({
-        where: { userId: sub.userId },
-        data: {
-          status: "active",
-          currentPeriodStart: periodStart,
-          currentPeriodEnd: periodEnd,
-        },
-      });
-      await db.paymentEvent.updateMany({
-        where: { pgOrderId: orderId },
-        data: {
-          status: "succeeded",
-          pgPaymentKey: charge.paymentKey,
-          rawPayload: charge.raw as never,
-        },
-      });
-      results.push({ userId: sub.userId, action: "renewed", detail: periodEnd.toISOString() });
-    } catch (err) {
-      if (err instanceof TossConfigMissingError) {
-        // Toss 설정 자체가 빠진 배포 — cron을 fail 처리하지 말고 노출.
-        return new Response(
-          JSON.stringify({ error: "toss_not_configured" }),
-          { status: 503, headers: { "Content-Type": "application/json" } },
-        );
+      results.push(await processClaim(sub, planKey, claim));
+    } catch (error) {
+      if (error instanceof TossConfigMissingError) {
+        return new Response(JSON.stringify({ error: "toss_not_configured" }), {
+          status: 503,
+          headers: { "Content-Type": "application/json" },
+        });
       }
-      const msg = (err as Error).message;
-      await db.paymentEvent.updateMany({
-        where: { pgOrderId: orderId },
-        data: { status: "failed", errorMessage: msg },
-      });
-      await db.teacherSubscription.update({
-        where: { userId: sub.userId },
-        data: { status: "past_due" },
-      });
-      results.push({ userId: sub.userId, action: "past_due", detail: msg });
+      throw error;
     }
   }
 
-  // 실패·과거결제(past_due) 건 수 요약 알림.
-  const failures = results.filter((r) => r.action === "past_due");
+  const failures = results.filter((result) => result.action === "past_due");
   if (failures.length > 0) {
     await notifySlack({
       severity: "warn",
-      title: "billing-renew: past_due 발생",
-      detail: `${failures.length}건의 구독이 갱신 실패로 past_due 상태가 되었습니다.`,
+      title: "billing-renew: past_due",
+      detail: `${failures.length} subscription renewal(s) failed.`,
       context: {
         scanned: due.length,
         past_due: failures.length,
-        user_ids: failures.map((f) => f.userId).slice(0, 10),
+        user_ids: failures.map((failure) => failure.userId).slice(0, 10),
       },
     });
   }
 
-  return new Response(
-    JSON.stringify({ ok: true, scanned: due.length, results }),
-    { status: 200, headers: { "Content-Type": "application/json" } },
-  );
+  return new Response(JSON.stringify({ ok: true, scanned: due.length, results }), {
+    status: 200,
+    headers: { "Content-Type": "application/json" },
+  });
 }
 
-// Vercel Cron은 기본 GET. 본 라우트는 POST만 허용하므로 GET fallback 추가.
 export async function GET(req: Request) {
   return POST(req);
 }

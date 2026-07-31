@@ -3,7 +3,7 @@ import { z } from "zod";
 import { db } from "@/lib/db";
 import { withParentAuth } from "@/lib/parent-auth-only";
 import { hashCode, normalizeCode, CODE_LENGTH } from "@/lib/class-invite-codes";
-import { checkMatchLimit, recordMatchAttempt } from "@/lib/rate-limit-parent";
+import { checkMatchLimit } from "@/lib/rate-limit-parent";
 import { extractClientIp } from "@/lib/parent-rate-limit";
 import { issueTicket } from "@/lib/match-ticket";
 
@@ -32,7 +32,7 @@ export async function POST(req: Request) {
 
     const ip = extractClientIp(req);
     // Check by axis (code+classroomId known only after DB lookup; check IP first).
-    const pre = checkMatchLimit(ip, null, null);
+    const pre = await checkMatchLimit(ip, null, null);
     if (!pre.ok) {
       return NextResponse.json(
         { error: "rate_limited", axis: pre.axis, retryAfter: pre.retryAfterSec },
@@ -46,8 +46,8 @@ export async function POST(req: Request) {
     });
 
     // Post-lookup limit axes.
-    const full = checkMatchLimit(
-      ip,
+    const full = await checkMatchLimit(
+      null,
       normalized,
       invite?.classroomId ?? null
     );
@@ -57,8 +57,6 @@ export async function POST(req: Request) {
         { status: 429, headers: { "retry-after": String(full.retryAfterSec) } }
       );
     }
-    recordMatchAttempt(ip, normalized, invite?.classroomId ?? null);
-
     if (!invite || invite.rotatedAt) {
       return NextResponse.json({ error: "code_not_found" }, { status: 404 });
     }
@@ -66,7 +64,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "code_expired" }, { status: 410 });
     }
 
-    const ticket = issueTicket({
+    const ticket = await issueTicket({
       parentSessionId: ctx.session.id,
       classroomId: invite.classroomId,
       classroomName: invite.classroom.name,
