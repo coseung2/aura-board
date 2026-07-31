@@ -114,12 +114,12 @@ Stream 업로드 완료/실패 상태를 검증하고, 앱 레코드 삭제 시 
 - [x] Verification: direct upload의 `maxDurationSeconds`, UID 형식과 응답 일치, 보드 creator/meta ownership, ready/encoding/error/pending 상태, API 오류 redaction, delete 404 idempotency, DB 삭제 후 Stream cleanup 성공/실패를 검증. 전체 1,251 tests와 typecheck 통과 후, 부모 리뷰 보강까지 포함한 targeted 48 tests와 typecheck를 다시 통과.
 - [x] Handoff: Cloudflare는 Stream video-only로 유지하고 R2는 추가하지 않음. cleanup 실패는 DB 삭제를 되돌리지 않고 식별자만 로그에 남기며, 자동 orphan queue는 아직 없음.
 
-### 6. Oracle pull worker 준비 — 논리 백업 골격 완료 (`pending commit`)
+### 6. Oracle pull worker 준비 — 논리 백업 골격 완료 (`6ebe78d8`)
 
 OCI 인증, compartment, compute/runtime, 네트워크 egress, 로그/모니터링을 먼저 확정한다. 이후 장기 FFmpeg, 배치 메일, Supabase 논리 backup pull을 각각 독립 job으로 구현한다. Oracle에는 원본 DB나 원본 Storage를 만들지 않으며 backup은 암호화, 보존 기간, 복구 시험을 갖춘 파생 사본으로만 취급한다.
 
-- [ ] Commit: 오사카 A1 2 OCPU/12 GB의 첫 작업으로 Supabase logical backup script, systemd unit/timer, env template, runbook을 독립 commit으로 작성. 현재 SHA는 `pending commit`.
-- [ ] Push: 각 commit push 후 실행 artifact와 SHA 연결.
+- [x] Commit: 오사카 A1 2 OCPU/12 GB의 첫 작업으로 Supabase logical backup script, systemd unit/timer, env template, runbook을 독립 commit `6ebe78d8`로 작성.
+- [x] Push: `6ebe78d8`을 `main`에 push. 실행 artifact는 실제 OCI 리소스 준비 전이라 없음.
 - [x] Verification: script 구문, 외부 접근 없는 기본 dry-run, 오사카 리전 고정, instance principal·checksum·no-overwrite, private temp cleanup, systemd hardening과 설치 경로를 정적으로 검증. 실제 backup/OCI 연결/복구 rehearsal은 리소스 준비 후 수행.
 - [x] Handoff: 기존 1 GB 인스턴스 2개를 유지한 채 A1을 병렬 준비하고, 백업·복구 검증 후 하나씩 중지/종료하는 blue/green 절차를 [`infra/oracle/README.md`](../infra/oracle/README.md)에 기록. 실제 OCID와 운영 로그는 아직 없음.
 
@@ -156,7 +156,7 @@ Vercel Blob distinct URL 4개와 due queue 165개를 재확인한다. Supabase S
 
 | 일자 | 상태 | 기록 | 다음 단계 |
 | --- | --- | --- | --- |
-| 2026-07-31 | Step 6 backup 골격 완료 (`pending commit`) | Oracle 목표를 오사카 홈 리전 `ap-osaka-1`의 단일 `VM.Standard.A1.Flex` 2 OCPU/12 GB로 변경. 기존 1 GB 인스턴스 2개는 A1 백업·복구와 워커 검증 후 순차 교체. instance principal 기반 Supabase custom-format dump, archive/sha256 검증, private Object Storage upload, systemd timer와 runbook을 준비. 실제 OCI/DB 접근·리소스 변경·배포 없음. | 구문/dry-run을 부모가 재검증하고 독립 commit/push 후 실제 SHA 기록. 다음으로 Vercel Blob 이전 도구 필드 커버리지 보강 |
+| 2026-07-31 | Step 6 `6ebe78d8` push 완료 | Oracle 목표를 오사카 홈 리전 `ap-osaka-1`의 단일 `VM.Standard.A1.Flex` 2 OCPU/12 GB로 변경. 기존 1 GB 인스턴스 2개는 A1 백업·복구와 워커 검증 후 순차 교체. instance principal 기반 Supabase custom-format dump, archive/sha256 검증, private Object Storage upload, systemd timer와 runbook을 준비. 구문, 외부 접근 없는 dry-run, 오사카 리전 거부 가드와 diff를 재검증했으며 실제 OCI/DB 접근·리소스 변경·배포는 하지 않음. | Vercel Blob 이전 도구의 전체 참조 필드 커버리지와 dry-run 안전성 보강 |
 | 2026-07-31 | Step 5 `cb49da46` push 완료 | Cloudflare Stream REST helper에 direct upload duration, UID 검증과 응답 일치, video details 상태 판정, 보드 creator/meta ownership, redacted error, idempotent delete를 추가. 이벤트 제출은 `pendingupload`/`error`/타 보드 UID를 거부하고 정상 인코딩 중은 허용. 제출 DB 삭제 뒤 Stream 삭제를 best-effort로 수행하며 R2는 도입하지 않음. 전체 1,251 tests, 부모 targeted 48 tests, typecheck 통과. 운영 API 호출·배포 없음. | Oracle pull worker의 최소 골격과 비운영 dry-run 계약을 설계·구현 |
 | 2026-07-31 | Step 2 `3cd8837e` push 완료 | 5개 Supabase migration을 현재 공식 규칙과 대조. `TossWebhookEvent`와 `BlobDeletionQueue`에 RLS는 있었지만 명시적 `anon`/`authenticated` revoke가 없어 최소 보완함. cron 함수 사용, Vault 미설정 no-op, private `SECURITY DEFINER`, seed 삭제 조건, 165개 due queue의 bounded claim은 수정 없이 적합. Prisma validate/generate와 targeted 38 tests 통과. 운영 적용·배포 없음. | Cloudflare Stream UID 소유권·상태 검증과 삭제 수명주기 변경을 별도 commit으로 검토 |
 | 2026-07-31 | Step 1 `14bb101a` push 완료 | [`.github/workflows/cron-jobs.yml`](../.github/workflows/cron-jobs.yml)에 `Production` environment를 사용하는 수동 dispatcher를 추가. `workflow_dispatch`만 사용하고 `schedule`은 두지 않았으며, `dry_run` 기본값은 `true`라 endpoint를 호출하지 않는다. 7개 job의 method/path, secret 비출력, `notification-push` 제외를 정적으로 검증했고 운영 호출은 실행하지 않음. `Production` environment는 존재하지만 `CRON_SECRET`과 `AURA_BOARD_BASE_URL`은 아직 미설정. | Supabase 마이그레이션 5개의 적용 전 안전성·순서·검증 자동화를 점검. 승인된 non-dry-run 전에 두 GitHub environment 값을 설정하고 값 노출 없이 존재 여부를 확인 |
