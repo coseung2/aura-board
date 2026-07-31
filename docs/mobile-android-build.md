@@ -138,6 +138,27 @@ Get-FileHash -Algorithm SHA256 -LiteralPath "<artifact>"
 & "C:\Android\Sdk\build-tools\36.0.0\aapt.exe" dump badging "<apk>"
 ```
 
+## Mobile Version Policy
+
+The mobile app checks `GET /api/mobile/version-policy` at launch and whenever
+the app returns to the foreground. A version below `MOBILE_LATEST_VERSION`
+gets an optional update prompt. A version below
+`MOBILE_MINIMUM_SUPPORTED_VERSION` gets a blocking update prompt.
+
+Configure the deployed web/API environment when releasing a mobile version:
+
+```text
+MOBILE_LATEST_VERSION=1.0.5
+MOBILE_MINIMUM_SUPPORTED_VERSION=1.0.4
+MOBILE_UPDATE_MESSAGE=더 안정적인 Aura Board를 사용하려면 최신 버전으로 업데이트해 주세요.
+MOBILE_ANDROID_STORE_URL=https://play.google.com/store/apps/details?id=com.auraboard.app
+MOBILE_IOS_STORE_URL=https://aura-board.com
+```
+
+Keep the minimum version at or below the latest version. The API rejects
+malformed version strings and non-HTTPS store overrides by falling back to safe
+defaults. Set the final iOS App Store URL before enforcing an iOS update.
+
 ## Verification Gate
 
 After changing the pipeline or app config, first verify native generation

@@ -1,5 +1,5 @@
-import { useEffect, useRef } from "react";
-import { Stack, useRouter, useSegments, type Href } from "expo-router";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { Stack, useRouter, useSegments } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import * as SplashScreen from "expo-splash-screen";
 import * as SystemUI from "expo-system-ui";
@@ -13,7 +13,9 @@ import { colors } from "../theme/tokens";
 import { clearParentSession, saveParentToken } from "../lib/session";
 import { useAndroidBackBehavior } from "../hooks/use-android-back-behavior";
 import { registerParentPushNotifications } from "../lib/parent-push-notifications";
+import { MobileUpdateGate } from "../components/MobileUpdateGate";
 import { TermsConsentGate } from "../components/TermsConsentGate";
+import WelcomeScreen from "./welcome";
 
 // 루트 레이아웃. 모든 스크린을 Stack 으로 감싸되 헤더는 각 segment 에서 커스텀.
 // 학부모 이메일 매직링크 콜백(auraboard://parent/auth/callback#...) 을
@@ -22,7 +24,6 @@ import { TermsConsentGate } from "../components/TermsConsentGate";
 const CALLBACK_PATH = "parent/auth/callback";
 const EXPO_GO_CALLBACK_HOSTS = new Set(["10.0.2.2", "127.0.0.1"]);
 const SPLASH_BACKGROUND = colors.bg;
-const WELCOME_ROUTE = "/welcome" as unknown as Href;
 
 void SplashScreen.preventAutoHideAsync();
 SplashScreen.setOptions({
@@ -121,9 +122,10 @@ function DeepLinkHandler() {
 
 export default function RootLayout() {
   useAndroidBackBehavior();
-  const router = useRouter();
   const segments = useSegments();
-  const welcomeShownRef = useRef(false);
+  const [launchState, setLaunchState] = useState<
+    "checking" | "welcome" | "complete"
+  >("checking");
 
   useEffect(() => {
     void registerParentPushNotifications();
@@ -137,15 +139,38 @@ export default function RootLayout() {
   });
 
   useEffect(() => {
-    if ((!fontsLoaded && !fontError) || welcomeShownRef.current) return;
+    if (!fontsLoaded && !fontError) return;
+    let active = true;
+    void Linking.getInitialURL()
+      .then((url) => {
+        if (!active) return;
+        // Authentication callbacks must reach their target immediately. Every
+        // ordinary app launch is held outside the router until welcome ends,
+        // so the landing screen cannot restore a session over the animation.
+        setLaunchState(url && parseCallback(url) ? "complete" : "welcome");
+      })
+      .catch(() => {
+        if (active) setLaunchState("welcome");
+      });
+    return () => {
+      active = false;
+    };
+  }, [fontError, fontsLoaded]);
 
-    welcomeShownRef.current = true;
-    if ((segments[0] as string | undefined) !== "welcome") {
-      router.replace(WELCOME_ROUTE);
-    }
-  }, [fontError, fontsLoaded, router, segments]);
+  const finishWelcome = useCallback(() => {
+    setLaunchState("complete");
+  }, []);
 
-  if (!fontsLoaded && !fontError) return null;
+  if ((!fontsLoaded && !fontError) || launchState === "checking") return null;
+
+  if (launchState === "welcome") {
+    return (
+      <SafeAreaProvider>
+        <StatusBar style="dark" />
+        <WelcomeScreen onFinished={finishWelcome} />
+      </SafeAreaProvider>
+    );
+  }
 
   const stack = (
     <Stack
@@ -169,13 +194,15 @@ export default function RootLayout() {
   return (
     <SafeAreaProvider>
       <StatusBar style="dark" />
-      <DeepLinkHandler />
-      {/* The branded welcome may render first; terms still gate every app/login route. */}
-      <TermsConsentGate
-        bypass={(segments[0] as string | undefined) === "welcome"}
-      >
-        {stack}
-      </TermsConsentGate>
+      <MobileUpdateGate>
+        <DeepLinkHandler />
+        {/* The branded welcome may render first; terms still gate every app/login route. */}
+        <TermsConsentGate
+          bypass={(segments[0] as string | undefined) === "welcome"}
+        >
+          {stack}
+        </TermsConsentGate>
+      </MobileUpdateGate>
     </SafeAreaProvider>
   );
 }

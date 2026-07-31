@@ -36,7 +36,11 @@ const WORDMARK_TOP = (STAGE_HEIGHT - FINAL_ICON_SIZE) / 2;
 const WORDMARK_HEIGHT = FINAL_ICON_SIZE;
 const DIVIDER_HEIGHT = 42;
 
-export default function WelcomeScreen() {
+export default function WelcomeScreen({
+  onFinished,
+}: {
+  onFinished?: () => void;
+} = {}) {
   const router = useRouter();
   const progress = useRef(new Animated.Value(0)).current;
   const [rootLaidOut, setRootLaidOut] = useState(false);
@@ -76,7 +80,11 @@ export default function WelcomeScreen() {
             if (cancelled) return;
             // Return through the normal landing route so an existing student
             // or parent session is restored instead of forcing a login.
-            router.replace("/");
+            if (onFinished) {
+              onFinished();
+            } else {
+              router.replace("/");
+            }
           }, HOLD_AFTER);
         });
       }, HOLD_BEFORE);
@@ -90,7 +98,7 @@ export default function WelcomeScreen() {
       if (routeTimer) clearTimeout(routeTimer);
       progress.stopAnimation();
     };
-  }, [iconLoaded, progress, rootLaidOut, router]);
+  }, [iconLoaded, onFinished, progress, rootLaidOut, router]);
 
   const iconTranslateX = progress.interpolate({
     inputRange: [0, 1],
