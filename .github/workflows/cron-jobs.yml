@@ -24,6 +24,7 @@ on:
 
 permissions:
   contents: read
+  id-token: write
 
 concurrency:
   group: production-cron-${{ inputs.job }}
@@ -65,14 +66,22 @@ jobs:
             echo "- Request sent: no"
           } >> "$GITHUB_STEP_SUMMARY"
 
+      - name: Load production runtime from Infisical
+        if: ${{ !inputs.dry_run }}
+        uses: Infisical/secrets-action@v1.0.9
+        with:
+          method: oidc
+          identity-id: c45f8370-4f1b-4f7b-8851-0050eaf1df63
+          oidc-audience: https://github.com/coseung2
+          project-slug: aura-board-zp9-h
+          env-slug: prod
+          secret-path: /
+
       - name: Call production endpoint
         if: ${{ !inputs.dry_run }}
         shell: bash
-        env:
-          BASE_URL: ${{ vars.AURA_BOARD_BASE_URL }}
-          CRON_SECRET: ${{ secrets.CRON_SECRET }}
         run: |
-          if [[ -z "$BASE_URL" ]]; then
+          if [[ -z "$AURA_BOARD_BASE_URL" ]]; then
             echo "AURA_BOARD_BASE_URL is not configured" >&2
             exit 1
           fi
@@ -80,12 +89,12 @@ jobs:
             echo "CRON_SECRET is not configured" >&2
             exit 1
           fi
-          if [[ "$BASE_URL" != https://* ]]; then
+          if [[ "$AURA_BOARD_BASE_URL" != https://* ]]; then
             echo "AURA_BOARD_BASE_URL must use HTTPS" >&2
             exit 1
           fi
 
-          url="${BASE_URL%/}${ENDPOINT_PATH}"
+          url="${AURA_BOARD_BASE_URL%/}${ENDPOINT_PATH}"
           max_attempts=3
           if [[ "${{ inputs.job }}" == "parent-weekly-digest" ]]; then
             max_attempts=1

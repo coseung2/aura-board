@@ -1,7 +1,7 @@
 # 4-provider infrastructure handoff
 
 기준일: 2026-07-31
-기준 브랜치/커밋: `main` / `dc57588a`
+기준 브랜치/원격 커밋: `main` / `b642b38` (2026-08-01 운영 작업과 workflow 변경은 아직 local-only)
 
 이 문서는 Oracle Cloud, Cloudflare, Supabase, GitHub Actions의 책임 경계와 후속 실행 순서를 기록한다. **코드 준비 단계 이후 Oracle 새 테넌시에는 무료 범위의 compartment, VCN, public subnet/NSG, private backup bucket까지 생성됐다. A1 Compute, boot volume, dynamic group/IAM policy, secret 등록, backup 실행, 데이터 이관, workflow 실행 및 앱 배포는 아직 수행하지 않았다.** 아래 체크박스는 실제 실행자가 증거를 확인한 뒤에만 갱신한다.
 
@@ -11,8 +11,8 @@
 | --- | --- | --- | --- |
 | Oracle Cloud | 장기 FFmpeg 작업, 배치 메일, Supabase 논리 백업을 가져가는 pull worker | 원본 Postgres, 원본 Storage, 앱 호스팅 | 새 테넌시 오사카 `ap-osaka-1`에 compartment·VCN·public subnet/NSG·private bucket 생성 완료. 단일 A1 2 OCPU/12 GB는 capacity 부족으로 대기 중이며 5시간 간격 단일 요청 재시도 계획. 기존 1 GB 2대는 교차 테넌시 blue/green 검증 전 유지 |
 | Cloudflare | Stream 비디오 업로드·재생 및 상태 검증/삭제 수명주기 | 일반 파일·이미지 저장소, R2 | Stream UID·상태·ownership 검증과 best-effort 삭제 보강 완료. R2는 도입하지 않음 |
-| Supabase Pro (Seoul) | Postgres, Auth, Realtime, 일반 파일·이미지 Storage, `NotificationOutbox`, `pg_net`, `pg_cron` | Cloudflare Stream 비디오, Oracle 작업 실행 환경 | 운영 사용 중. `20260731` 마이그레이션 5개는 운영 미적용 |
-| GitHub Actions | Vercel의 일반 일/주간 cron 7개와 신규 `role-salary-payout`을 `Authorization: Bearer` 방식으로 호출 | 앱 호스팅, `notification-push`의 주 wakeup | 8개 endpoint용 수동 dry-run workflow 준비 완료, schedule 미설정. `Production` environment 값도 아직 비어 있음 |
+| Supabase Pro (Seoul) | Postgres, Auth, Realtime, 일반 파일·이미지 Storage, `NotificationOutbox`, `pg_net`, `pg_cron` | Cloudflare Stream 비디오, Oracle 작업 실행 환경 | 운영 사용 중. `20260731` 마이그레이션 5개를 2026-08-01 적용하고 RLS·권한·함수·트리거·cron job을 검증함 |
+| GitHub Actions | Vercel의 일반 일/주간 cron 7개와 신규 `role-salary-payout`을 `Authorization: Bearer` 방식으로 호출 | 앱 호스팅, `notification-push`의 주 wakeup | 8개 endpoint용 수동 dry-run workflow 준비 완료, schedule 미설정. Infisical OIDC 런타임 주입 변경은 로컬 working tree에 준비됐으며 아직 push·실행하지 않음 |
 | Vercel Hobby | Next.js 앱 호스팅과 cron API endpoint 제공 | 향후 cron scheduler, 장기 작업, 원본 데이터 저장소 | 기존 production은 유지 중. [`vercel.json`](../vercel.json)의 매분 cron 때문에 최신 `main` 배포 실패. 이번 범위에서 배포하지 않음 |
 
 책임 이전 후에도 cron API의 인증 기준은 [`src/lib/cron-auth.ts`](../src/lib/cron-auth.ts)이며, GitHub Actions와 Supabase callback 모두 동일한 `CRON_SECRET`을 Bearer token으로 사용한다.
@@ -33,9 +33,9 @@
 - Cloudflare Stream 진입점은 [`src/lib/event/cfstream.ts`](../src/lib/event/cfstream.ts)와 [`src/app/api/event/video-upload-url/route.ts`](../src/app/api/event/video-upload-url/route.ts)다.
 - 일반 파일·이미지는 Supabase Storage가 기준이며 관련 구현은 [`src/lib/media-storage.ts`](../src/lib/media-storage.ts)와 [`src/app/api/upload/route.ts`](../src/app/api/upload/route.ts)다. Vercel Blob 잔여분 이전 도구는 [`scripts/migrate-vercel-blob-to-supabase.ts`](../scripts/migrate-vercel-blob-to-supabase.ts)다.
 
-### 운영 미적용 마이그레이션
+### 운영 적용 마이그레이션
 
-다음 5개를 순서대로 취급한다. 운영 적용 전 backup, 대상 프로젝트/리전 확인, SQL 검토가 필요하다.
+다음 5개는 2026-08-01 운영 논리 backup을 확보한 뒤 `prisma migrate deploy`로 순서대로 적용했다. 임의 down migration 대신 forward-fix 또는 검증된 backup 복구 절차를 사용한다.
 
 1. [`20260731120000_billing_idempotency_and_webhook_inbox`](../prisma/migrations/20260731120000_billing_idempotency_and_webhook_inbox/migration.sql)
 2. [`20260731130000_durable_notification_outbox`](../prisma/migrations/20260731130000_durable_notification_outbox/migration.sql)
@@ -49,8 +49,8 @@
 
 | 위치 | 이름 |
 | --- | --- |
-| GitHub Actions secret | `CRON_SECRET` |
-| GitHub Actions environment variable | `AURA_BOARD_BASE_URL` |
+| Infisical `prod` `/` | `CRON_SECRET`, `AURA_BOARD_BASE_URL` |
+| GitHub Actions | Infisical OIDC identity와 project slug만 workflow에 기록하며 장기 secret은 저장하지 않음 |
 | Vercel/server | `CRON_SECRET`, `DATABASE_URL`, `DIRECT_URL` |
 | Supabase/client·server | `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_STORAGE_BUCKET`, `AURA_STORAGE_BUCKET` |
 | Supabase Vault | `notification_outbox_worker_url`, `notification_outbox_worker_secret` |
@@ -58,9 +58,9 @@
 | Oracle backup worker | `DATABASE_URL`, `OCI_NAMESPACE`, `OCI_BUCKET_NAME`, `OCI_OBJECT_PREFIX`, `OCI_REGION` |
 | Vercel Blob 잔여 이전 시에만 | `BLOB_READ_WRITE_TOKEN` |
 
-GitHub environment의 정확한 이름은 `Production`이며 environment 자체는 이미 존재한다. 현재 이 environment의 secret과 variable 목록은 모두 비어 있어 `CRON_SECRET`과 `AURA_BOARD_BASE_URL`은 아직 미설정 상태다. 두 값이 설정되기 전 non-dry-run dispatch는 workflow의 사전 검증에서 실패해야 하며, 값을 문서나 workflow log에 출력하지 않는다.
+GitHub environment의 정확한 이름은 `Production`이며 environment 자체는 이미 존재한다. GitHub에 `CRON_SECRET`이나 앱 URL을 복제하지 않고, `id-token: write`로 발급된 단기 GitHub OIDC token을 Infisical 전용 identity와 교환해 `prod` `/`의 두 값을 실행 중에만 주입한다. identity는 `Production` environment, `main`, `cron-jobs.yml`, `coseung2/aura-board`에 한정하며 project role은 `viewer`, access token TTL은 900초다.
 
-`AURA_BOARD_BASE_URL`은 GitHub Actions workflow가 호출할 HTTPS 앱 오리진이다. secret이 아니며 GitHub `Production` environment variable로 관리한다. 구현 시 이름을 바꾸면 이 문서와 workflow를 같은 commit에서 함께 갱신한다. Oracle worker의 신규 secret/env 이름은 리소스와 실행 방식이 확정된 뒤 정의하며, 기존 credential 값을 재사용하거나 문서에 복사하지 않는다.
+`AURA_BOARD_BASE_URL`은 GitHub Actions workflow가 호출할 HTTPS 앱 오리진이며 Infisical 기준값은 `https://aura-board.com`이다. `CRON_SECRET`은 2026-08-01 새 64자 값으로 생성했으며 값 자체는 문서나 log에 기록하지 않는다. Vercel production과 Supabase Vault에 동일 값을 동기화하기 전에는 실제 callback·non-dry-run을 활성화하지 않는다. Oracle worker의 신규 secret/env 이름은 리소스와 실행 방식이 확정된 뒤 정의하며, 기존 credential 값을 문서에 복사하지 않는다.
 
 ## 단계별 실행 계획
 
@@ -144,8 +144,9 @@ Vercel Blob distinct URL 4개와 due queue 165개를 재확인한다. Supabase S
 - [ ] OCI Osaka의 compartment, VCN, public subnet/NSG, private Object Storage bucket은 준비 완료. A1 2 OCPU/12 GB capacity를 확보해 ARM64 instance와 50 GB boot volume을 만든 뒤 instance OCID 단일 dynamic group/IAM policy를 준비하고 owner·비용 경계를 기록.
 - [ ] 새 A1에서 logical backup `--write` 1회, checksum/archive 확인, 격리 restore rehearsal을 마친 뒤에만 기존 1 GB 인스턴스의 job을 하나씩 이관. 관찰 기간 전에는 기존 인스턴스를 종료하지 않음.
 - [ ] Infisical production scope `/oracle/aura-board/backup`과 `/oracle/aura-board/video-thumbnail`에 필요한 값을 분리 등록하고, 값 노출 없이 A1의 root-owned env files로 주입. video scope 이름은 `DATABASE_URL`, `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_STORAGE_BUCKET`이며 transaction pooler `:6543`은 사용하지 않음. A1 존재·검증 전에는 secret을 주입하지 않음.
-- [ ] GitHub `Production` environment에 `CRON_SECRET`, `AURA_BOARD_BASE_URL`을 설정하고 수동 dry-run 결과를 확인. 별도 cutover 승인 전에는 `schedule`을 추가하지 않음.
-- [ ] 운영 DB backup과 대상 Supabase 프로젝트/리전을 확인한 뒤 5개 migration을 문서 순서대로 적용. 부분 적용이나 임의 down migration 금지.
+- [x] Infisical `prod` `/`에 `CRON_SECRET`, `AURA_BOARD_BASE_URL`을 등록하고 로컬 backup을 갱신. 서버 프로젝트 전용 GitHub OIDC identity를 `viewer`로 연결. workflow 변경은 아직 local-only이며 별도 cutover 전에는 `schedule`을 추가하지 않음.
+- [x] 운영 DB custom-format backup과 SHA-256/archive 구조를 확인한 뒤 5개 migration을 문서 순서대로 적용. Prisma 상태와 운영 SQL로 실제 객체·RLS·권한을 재검증함.
+- [ ] OIDC workflow 변경을 push한 뒤 GitHub `Production` 수동 dry-run을 실행하고, 최신 앱 배포와 동일 `CRON_SECRET`을 확인한 후에만 승인된 non-dry-run을 실행.
 - [ ] Vercel Blob 이전 도구의 DB 연결 대상을 확인하고 먼저 dry-run으로 후보를 고정. `--write` 후 대상 object와 사용자 경로를 검증하기 전 원본 Blob과 queue 항목 삭제 금지.
 - [ ] 앱 배포는 이 준비 작업과 분리하여 별도 승인·검증으로 진행.
 
@@ -162,8 +163,8 @@ Vercel Blob distinct URL 4개와 due queue 165개를 재확인한다. Supabase S
 
 - OCI 인증과 기본 네트워크·private bucket은 준비됐지만 A1은 Osaka host capacity 부족으로 아직 없다. 단일 A1은 두 micro host의 장애 격리를 잃으므로 job별 systemd 격리, 직렬 이관, ARM64 패키지 호환, 처리량과 backup 복구 시간을 검증하기 전 기존 1 GB 인스턴스를 종료하면 안 된다.
 - Vercel Hobby의 현재 cron 제약으로 최신 `main`과 production SHA가 다르다. 코드 검증만으로 production 반영을 가정하면 안 된다.
-- 운영 미적용 migration 5개 사이에는 순서 의존성이 있다. 일부만 적용하면 schema와 실행 코드가 어긋날 수 있다.
-- GitHub Actions cron은 아직 없으며, scheduler 지연·중복·GitHub 장애 시 복구 경로와 알림이 검증되지 않았다.
+- migration 5개는 운영 적용됐지만 신규 consumer가 포함된 최신 앱 배포는 별도다. 배포 SHA를 확인하지 않고 callback을 활성화하면 안 된다.
+- GitHub Actions cron workflow는 수동 전용이며 OIDC 변경도 아직 push되지 않았다. scheduler 지연·중복·GitHub 장애 시 복구 경로와 알림은 미검증이다.
 - Supabase callback은 Vercel의 production URL과 `CRON_SECRET` 동기화에 의존한다. secret rotation 순서가 틀리면 `401` backlog가 발생한다.
 - Cloudflare Stream 삭제 실패는 현재 식별자 로그만 남기며 자동 orphan 재시도 queue는 없다. R2가 없으므로 R2 fallback을 가정하면 안 된다.
 - A1 video backfill은 upload 후 DB update 실패 시 새 Supabase object를 best-effort 삭제한다. cleanup까지 실패하면 `orphan cleanup failed` 로그를 기준으로 attachment prefix의 미참조 object를 확인·수동 삭제해야 하며, 자동 orphan queue는 아직 없다.
@@ -174,6 +175,7 @@ Vercel Blob distinct URL 4개와 due queue 165개를 재확인한다. Supabase S
 
 | 일자 | 상태 | 기록 | 다음 단계 |
 | --- | --- | --- | --- |
+| 2026-08-01 | 운영 DB migration·Infisical runtime/OIDC 준비 완료, 실제 callback·schedule 보류 | PostgreSQL 17.10 custom-format 운영 backup `2,231,856` bytes와 1,617 archive entries, SHA-256 `ce5501873765d504db76151df8c37e04c7a4022545269ea19af0524bd834a01d`를 확인한 뒤 migration 5개를 모두 적용했다. RLS 4개, anon/authenticated SELECT 차단, `pg_cron 1.6.4`, `pg_net 0.20.0`, 함수 4개, 트리거 6개, 5분 retry job을 운영 SQL로 확인했다. Infisical `prod` `/`에는 URL과 새 cron secret을 등록하고 로컬 env backup을 25키로 갱신했으며, 서버 프로젝트 전용 GitHub OIDC identity를 exact repo/main/workflow/Production claims와 900초 TTL, project `viewer`로 연결했다. workflow의 Infisical action 변경은 local-only이고 Supabase Vault 두 값은 비어 있어 외부 callback은 발생하지 않는다. | local workflow 정적 검증 → 명시적 commit/push → GitHub dry-run → 최신 앱 배포와 Vercel secret 동기화 → Supabase Vault 등록 → 제한된 callback/non-dry-run 검증 → schedule cutover |
 | 2026-08-01 | 1인1역 자동급여 구현·실지급 회수 검증 완료, scheduler cutover 보류 | `155c7c54`에서 학급 단위 지급 정책, 멱등 지급, KST 일/주/월 판정, 학급 제한 cron route와 테스트를 push. 별무리반 실지급·재호출·보상 거래 원복을 검증했다. 이후 `d164e839`에서 GitHub schedule을 성급히 추가했으나, live 확인 결과 `Production` environment의 variables/secrets는 여전히 비어 있고 `20260731` migration 5개도 운영 미적용임을 재확인했다. 따라서 workflow는 수동 dry-run 전용으로 되돌리고 급여 endpoint만 8번째 선택지로 유지한다. | 기존 handoff 순서대로 Supabase notification wakeup 검증 → 최신 앱 배포 복구 → GitHub `Production` 값 설정 → 8개 endpoint dry-run/non-dry-run 검증 → 승인된 schedule cutover |
 | 2026-07-31 | A1 worker 구현 `450c62b4` push 완료 | 기본 dry-run/명시적 write gate, Supabase exact origin·bucket allowlist, redirect 및 FFmpeg nested network protocol 차단, 최소 child env, 64 MiB frame cap, DB update 실패 시 best-effort object cleanup, 공유 `flock`, 초기 concurrency 1, Node.js 22 ARM64 runbook을 반영. targeted 61/61 tests, typecheck, backup shell syntax, diff check 통과. 배포·secret 주입·systemd 활성화·DB/Storage write 없음. | A1 또는 승인된 Work 전용 VPS에서 Node 22/ARM64 native binary와 systemd unit을 검증한 뒤 dry-run 1건 → 승인된 write 1건 → cleanup/MemoryPeak 순서로 확인 |
 | 2026-07-31 | A1 worker 성능·격리 구현 보강 | video thumbnail backfill을 A1용 streaming download와 최대 2-worker 처리로 바꾸고 strict CLI, source-size guard, download/FFmpeg timeout, temp cleanup, 부분 실패 non-zero를 추가. backup/video systemd unit에 12 GB 단일 호스트용 CPU·memory envelope를 적용했으며 video unit은 수동 전용으로 유지. Vercel/Supabase/provider 제약인 cron batch, Prisma connection limit, 알림/Blob queue, 결제 직렬화는 변경하지 않음. | A1 capacity 확보 후 ARM64/systemd 검증, dry-run 1건과 승인된 write 1건 측정. request-time FFmpeg 제거는 durable media queue 설계 후 별도 단계로 수행 |
