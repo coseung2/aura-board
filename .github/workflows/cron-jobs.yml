@@ -1,6 +1,8 @@
 name: Production Cron Dispatcher
 
 on:
+  schedule:
+    - cron: "10 15 * * *"
   workflow_dispatch:
     inputs:
       job:
@@ -26,12 +28,12 @@ permissions:
   contents: read
 
 concurrency:
-  group: production-cron-${{ inputs.job }}
+  group: production-cron-${{ github.event_name == 'schedule' && 'role-salary-payout' || inputs.job }}
   cancel-in-progress: false
 
 jobs:
   dispatch:
-    name: Dispatch ${{ inputs.job }}
+    name: Dispatch ${{ github.event_name == 'schedule' && 'role-salary-payout' || inputs.job }}
     runs-on: ubuntu-latest
     environment: Production
     timeout-minutes: 15
@@ -39,7 +41,9 @@ jobs:
       - name: Resolve endpoint
         shell: bash
         run: |
-          case "${{ inputs.job }}" in
+          job="${{ github.event_name == 'schedule' && 'role-salary-payout' || inputs.job }}"
+          echo "JOB=$job" >> "$GITHUB_ENV"
+          case "$job" in
             parent-weekly-digest) method=GET; path=/api/cron/parent-weekly-digest ;;
             parent-anonymize) method=GET; path=/api/cron/parent-anonymize ;;
             expire-pending-links) method=GET; path=/api/cron/expire-pending-links ;;
@@ -55,7 +59,7 @@ jobs:
           echo "ENDPOINT_PATH=$path" >> "$GITHUB_ENV"
 
       - name: Record dry run
-        if: ${{ inputs.dry_run }}
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run }}
         shell: bash
         run: |
           {
@@ -66,7 +70,7 @@ jobs:
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Call production endpoint
-        if: ${{ !inputs.dry_run }}
+        if: ${{ github.event_name == 'schedule' || !inputs.dry_run }}
         shell: bash
         env:
           BASE_URL: ${{ vars.AURA_BOARD_BASE_URL }}
@@ -87,7 +91,7 @@ jobs:
 
           url="${BASE_URL%/}${ENDPOINT_PATH}"
           max_attempts=3
-          if [[ "${{ inputs.job }}" == "parent-weekly-digest" ]]; then
+          if [[ "$JOB" == "parent-weekly-digest" ]]; then
             max_attempts=1
           fi
 
