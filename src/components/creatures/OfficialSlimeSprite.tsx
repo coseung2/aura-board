@@ -588,23 +588,6 @@ export function OfficialSlimeSprite({
               draggable={false}
             />
           ))}
-          {resolution.happyHeart ? (
-            // The happy heart is authored separately from the body so it can
-            // stay above blush, glasses, hats, and any future prop overlay.
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={resolution.happyHeart.imageUrl}
-              alt=""
-              aria-hidden="true"
-              className={styles.sheet}
-              style={{
-                ...sheetStyle,
-                zIndex: 400,
-              }}
-              data-happy-heart-layer="top"
-              draggable={false}
-            />
-          ) : null}
         </div>
       )}
       {resolvedVehicleSpritePath ? (
@@ -653,6 +636,31 @@ export function OfficialSlimeSprite({
           />
         </div>
       ))}
+      {resolution.happyHeart ? (
+        // The happy heart is a runtime top layer, separate from wearable and
+        // vehicle sheets. Keep it last so web and mobile share the same order.
+        <div
+          className={styles.characterFrame}
+          style={{
+            width: baseWidth,
+            height: baseHeight,
+            left: sceneInsetX,
+            top: sceneInsetY,
+            zIndex: 400,
+          }}
+        >
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={resolution.happyHeart.imageUrl}
+            alt=""
+            aria-hidden="true"
+            className={styles.sheet}
+            style={sheetStyle}
+            data-happy-heart-layer="top"
+            draggable={false}
+          />
+        </div>
+      ) : null}
     </div>
   );
 }

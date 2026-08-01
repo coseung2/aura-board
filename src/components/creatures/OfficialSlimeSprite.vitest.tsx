@@ -91,9 +91,11 @@ describe("OfficialSlimeSprite", () => {
     expect(heart?.getAttribute("src")).toBe(
       "/creatures/slimes/official/overlays/happy-heart/base/green/sheet.png",
     );
-    expect(images.indexOf(heart!)).toBeGreaterThan(images.indexOf(headwear!));
-    expect(Number(heart?.style.zIndex)).toBeGreaterThan(Number(headwear?.style.zIndex));
-    expect(Number(heart?.style.zIndex)).toBeGreaterThan(Number(vehicle?.style.zIndex));
+    expect(images.indexOf(vehicle!)).toBeGreaterThan(images.indexOf(headwear!));
+    expect(images.indexOf(heart!)).toBeGreaterThan(images.indexOf(vehicle!));
+    expect(Number(heart?.parentElement?.style.zIndex)).toBeGreaterThan(
+      Number(vehicle?.parentElement?.style.zIndex),
+    );
   });
 
   it("loops floor interactions and composites the shared puddle sheet", () => {

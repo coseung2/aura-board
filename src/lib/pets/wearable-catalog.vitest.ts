@@ -30,14 +30,47 @@ describe("slime wearable buffs", () => {
   it("applies the authored premium and refined tiers", () => {
     const premium = SLIME_WEARABLE_CATALOG.filter((item) => item.tier === 1);
     expect(premium.map((item) => item.option).sort()).toEqual([
+      "blue-cyber-visor",
       "caramel-puppy-ear-headband",
+      "cyber-monocle",
+      "flame-tail-bandana",
+      "gold-star-glasses",
+      "golden-aura-halo",
+      "lime-barracuda-headset",
+      "neon-circuit-headband",
+      "neon-ski-goggles",
       "pearl-ribbon-headband",
+      "pirate-tricorn-hat",
+      "prism-kaleidoscope-glasses",
+      "purple-cat-ear-headset",
       "purple-wizard-hat",
+      "shadow-thief-bandana",
+      "sprout-terrarium-dome-hat",
+      "starry-wizard-hat",
+      "violet-aura-flame-headband",
+      "white-spatial-headset",
     ]);
     const refined = SLIME_WEARABLE_CATALOG.filter((item) => item.tier === 2);
     expect(refined.map((item) => item.option).sort()).toEqual([
+      "aqua-bomb-bandana",
+      "black-swoosh-sport-headband",
+      "brainrot-antenna-headband",
       "cream-bunny-ear-headband",
+      "crescent-moon-half-rim-glasses",
+      "crimson-pirate-bandana",
+      "detective-deerstalker",
+      "lilac-origami-crane-fascinator",
       "mauve-cat-ear-headband",
+      "midnight-street-bandana",
+      "orange-67-headband",
+      "orange-dj-headset",
+      "pixel-deal-with-it-shades",
+      "ramen-cup-novelty-hat",
+      "red-wraparound-sport-shades",
+      "ruby-heart-glasses",
+      "sigma-angular-shades",
+      "silver-studio-headset",
+      "white-triple-stripe-headband",
     ]);
   });
 
@@ -88,29 +121,53 @@ describe("slime wearable sets", () => {
 });
 
 describe("slime wearable shop catalog", () => {
-  it("registers the four new headbands with their approved labels and tiers", () => {
+  it("registers every headband with its approved label and tier", () => {
     expect(
       slimeWearableCatalogForRole("headwear")
         .filter((item) => item.option.includes("headband"))
         .map(({ option, labelKo, tier, price, effectBps }) => ({ option, labelKo, tier, price, effectBps }))
         .sort((a, b) => a.option.localeCompare(b.option)),
     ).toEqual([
+      { option: "black-swoosh-sport-headband", labelKo: "블랙 윙 스포츠 헤드밴드", tier: 2, price: 700, effectBps: 200 },
+      { option: "brainrot-antenna-headband", labelKo: "브레인롯 안테나 머리띠", tier: 2, price: 700, effectBps: 200 },
       { option: "caramel-puppy-ear-headband", labelKo: "카라멜 강아지 귀 머리띠", tier: 1, price: 1_000, effectBps: 300 },
       { option: "cream-bunny-ear-headband", labelKo: "크림 토끼 귀 머리띠", tier: 2, price: 700, effectBps: 200 },
       { option: "mauve-cat-ear-headband", labelKo: "모브 고양이 귀 머리띠", tier: 2, price: 700, effectBps: 200 },
+      { option: "neon-circuit-headband", labelKo: "네온 서킷 헤드밴드", tier: 1, price: 1_000, effectBps: 300 },
+      { option: "orange-67-headband", labelKo: "오렌지 67 배지 헤드밴드", tier: 2, price: 700, effectBps: 200 },
       { option: "pearl-ribbon-headband", labelKo: "진주 리본 머리띠", tier: 1, price: 1_000, effectBps: 300 },
+      { option: "retro-terry-headband", labelKo: "레트로 테리클로스 헤드밴드", tier: 3, price: 500, effectBps: 100 },
+      { option: "violet-aura-flame-headband", labelKo: "바이올렛 오라 플레임 헤드밴드", tier: 1, price: 1_000, effectBps: 300 },
+      { option: "white-triple-stripe-headband", labelKo: "화이트 삼선 스포츠 헤드밴드", tier: 2, price: 700, effectBps: 200 },
     ]);
   });
 
   it("offers exactly the imported purchasable options", () => {
     expect(slimeWearableCatalogForRole("blush")).toHaveLength(2);
-    expect(slimeWearableCatalogForRole("headwear")).toHaveLength(11);
-    expect(slimeWearableCatalogForRole("eyewear")).toHaveLength(7);
+    expect(slimeWearableCatalogForRole("headwear")).toHaveLength(40);
+    expect(slimeWearableCatalogForRole("eyewear")).toHaveLength(18);
     for (const item of SLIME_WEARABLE_CATALOG) {
       expect(slimeWearableEntry(item.role, item.option), item.key).toBeTruthy();
       expect(item.labelKo.length).toBeGreaterThan(0);
       expect(item.price).toBeGreaterThan(0);
     }
+  });
+
+  it("registers the four batch-v2 delivery options with approved shop contracts", () => {
+    expect(
+      [
+        "slime-headwear-lilac-origami-crane-fascinator",
+        "slime-headwear-sprout-terrarium-dome-hat",
+        "slime-eyewear-prism-kaleidoscope-glasses",
+        "slime-eyewear-crescent-moon-half-rim-glasses",
+      ].map((key) => SLIME_WEARABLE_CATALOG.find((item) => item.key === key)),
+    ).toEqual([
+      expect.objectContaining({ labelKo: "라일락 종이학 패시네이터", tier: 2, price: 700, effectKey: "assignment_reward", effectBps: 200 }),
+      expect.objectContaining({ labelKo: "새싹 테라리움 돔 모자", tier: 1, price: 1_000, effectKey: "assignment_reward", effectBps: 300 }),
+      expect.objectContaining({ labelKo: "프리즘 만화경 안경", tier: 1, price: 1_000, effectKey: "reading_reward", effectBps: 300 }),
+      expect.objectContaining({ labelKo: "초승달 하프림 안경", tier: 2, price: 700, effectKey: "reading_reward", effectBps: 200 }),
+    ]);
+    expect(SLIME_WEARABLE_CATALOG.some((item) => item.option === "acorn-leaf-beret")).toBe(false);
   });
 
   it("never sells a growth-awarded crown", () => {

@@ -158,8 +158,15 @@ describe("slime wearable anchor registry", () => {
   });
 
   it("exposes finished wearable roles while keeping growth crowns out of the shop", () => {
-    expect(slimeWearableOptions("headwear")).toHaveLength(11);
-    expect(slimeWearableOptions("eyewear")).toHaveLength(7);
+    const headwear = slimeWearableOptions("headwear");
+    expect(headwear).toHaveLength(40);
+    expect(headwear).toEqual(expect.arrayContaining([
+      "caramel-puppy-ear-headband",
+      "cream-bunny-ear-headband",
+      "mauve-cat-ear-headband",
+      "pearl-ribbon-headband",
+    ]));
+    expect(slimeWearableOptions("eyewear")).toHaveLength(18);
     expect(slimeWearableOptions("blush")).toEqual([
       "peach-brush-blush",
       "rose-brush-blush",
@@ -197,6 +204,7 @@ describe("slime wearable resolution", () => {
   it("maps only authored actions to a wearable timeline", () => {
     expect(slimeWearableTimelineKey("idle")).toBe("idle");
     expect(slimeWearableTimelineKey("happy")).toBe("happy");
+    expect(slimeWearableTimelineKey("ball-hit")).toBe("ball-hit");
     expect(slimeWearableTimelineKey("drink", "lemonade")).toBe("drink:lemonade");
     // A drink needs its flavor to name a timeline.
     expect(slimeWearableTimelineKey("drink")).toBeNull();
@@ -258,6 +266,31 @@ describe("slime wearable resolution", () => {
           sheetFrameCount: action === "happy" ? 12 : 18,
         }),
       ]);
+    }
+  });
+
+  it("ships all 40 batch-v2 wearables with their own ball-hit track", () => {
+    const entries = Object.values(registry).filter(
+      (entry) =>
+        (entry.role === "headwear" || entry.role === "eyewear") &&
+        entry.timelines["ball-hit"],
+    );
+    expect(entries.filter((entry) => entry.role === "headwear")).toHaveLength(29);
+    expect(entries.filter((entry) => entry.role === "eyewear")).toHaveLength(11);
+    for (const entry of entries) {
+      const [layer] = resolveSlimeWearables(
+        { [entry.role]: entry.option },
+        "blue",
+        "ball-hit",
+        9,
+      );
+      expect(layer, entry.key).toMatchObject({
+        role: entry.role,
+        option: entry.option,
+        grounded: true,
+        characterOffsetY: 0,
+        sheetFrameCount: 18,
+      });
     }
   });
 
@@ -500,8 +533,8 @@ describe("shipped idle sheets back every drink timeline", () => {
         }
       }
     }
-    // 20 authored wearable options plus 2 growth crowns, across 5 colors,
+    // 60 authored wearable options plus 2 growth crowns, across 5 colors,
     // 5 drink flavors, and 8 frames.
-    expect(comparedFrames).toBe(22 * 5 * 5 * 8);
+    expect(comparedFrames).toBe(62 * 5 * 5 * 8);
   });
 });
