@@ -24,6 +24,10 @@
       "schedule": "5 15 * * *"
     },
     {
+      "path": "/api/cron/role-salary-payout",
+      "schedule": "10 15 * * *"
+    },
+    {
       "path": "/api/cron/billing-renew",
       "schedule": "0 18 * * *"
     },

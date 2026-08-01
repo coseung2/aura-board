@@ -4,6 +4,7 @@ import { z } from "zod";
 import { db } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
 import {
+  payClassroomRoleSalaries,
   payRoleSalaryBatch,
   RoleSalaryPayoutError,
 } from "@/lib/role-salary-payout";
@@ -16,13 +17,17 @@ const RequestKey = z
   .regex(/^[A-Za-z0-9._:-]+$/);
 
 const Body = z.object({
-  roleKey: z.string().min(1),
+  /**
+   * 생략하면 학급의 지급 가능한 모든 역할을 한 번에 지급한다. 대시보드 지급
+   * 버튼이 이 경로를 쓰므로 클릭당 요청은 1회다.
+   */
+  roleKey: z.string().min(1).optional(),
   requestKey: RequestKey.optional(),
 });
 
 // POST /api/classrooms/:id/roles/pay
-// Pays the role's salary once to every student currently holding it. Teacher
-// only; used by the 수동지급 action on the dashboard role tile.
+// roleKey 지정 시 그 역할만, 생략 시 학급 전체 역할을 지급한다. Teacher only;
+// used by the 수동지급 action on the dashboard pay bar.
 export async function POST(
   req: Request,
   { params }: { params: Promise<{ id: string }> },
@@ -70,12 +75,19 @@ export async function POST(
   }
 
   try {
-    const result = await payRoleSalaryBatch({
-      classroomId,
-      roleKey: parsed.data.roleKey,
-      requestKey,
-      performedById: user.id,
-    });
+    const roleKey = parsed.data.roleKey;
+    const result = roleKey
+      ? await payRoleSalaryBatch({
+          classroomId,
+          roleKey,
+          requestKey,
+          performedById: user.id,
+        })
+      : await payClassroomRoleSalaries({
+          classroomId,
+          requestKey,
+          performedById: user.id,
+        });
     return NextResponse.json(result, {
       headers: { "Idempotency-Key": requestKey },
     });
@@ -94,7 +106,11 @@ export async function POST(
           );
         case "no_assignees":
           return NextResponse.json(
-            { error: "지급할 담당 학생이 없습니다." },
+            {
+              error: parsed.data.roleKey
+                ? "지급할 담당 학생이 없습니다."
+                : "지급할 수 있는 역할이 없습니다.",
+            },
             { status: 400 },
           );
         case "already_applied":

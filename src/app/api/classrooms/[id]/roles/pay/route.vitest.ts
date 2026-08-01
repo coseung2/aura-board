@@ -46,6 +46,15 @@ function request(requestKey: string | null = "salary-request-001") {
   });
 }
 
+/** roleKey 없이 보내면 학급의 지급 가능한 모든 역할을 한 번에 지급한다. */
+function classroomWideRequest(requestKey = "salary-request-100") {
+  return new Request("https://example.test/api/classrooms/class-1/roles/pay", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ requestKey }),
+  });
+}
+
 function matchingLedger(where: {
   sourceType: string;
   sourceRef: string;
@@ -64,12 +73,46 @@ function transactionClient() {
     },
     classroomRoleSetting: {
       findUnique: vi.fn(async () => ({ enabled: true, salaryAmount: 200 })),
+      findMany: vi.fn(async () => [
+        {
+          classroomRoleId: "role-helper",
+          salaryAmount: 200,
+          classroomRole: { labelKo: "도우미" },
+        },
+        {
+          classroomRoleId: "role-banker",
+          salaryAmount: 500,
+          classroomRole: { labelKo: "은행원" },
+        },
+      ]),
     },
     classroomRoleAssignment: {
-      findMany: vi.fn(async () => [
-        { studentId: "student-1", student: { id: "student-1", classroomId: "class-1" } },
-        { studentId: "student-2", student: { id: "student-2", classroomId: "class-1" } },
-      ]),
+      findMany: vi.fn(async ({ where }: { where: { classroomRoleId?: unknown } }) => {
+        const perRole = [
+          {
+            studentId: "student-1",
+            classroomRoleId: "role-helper",
+            student: { id: "student-1", classroomId: "class-1" },
+          },
+          {
+            studentId: "student-2",
+            classroomRoleId: "role-helper",
+            student: { id: "student-2", classroomId: "class-1" },
+          },
+        ];
+        // 학급 전체 지급은 `classroomRoleId: { in: [...] }` 로 조회한다.
+        const isClassroomWide =
+          typeof where.classroomRoleId === "object" && where.classroomRoleId !== null;
+        if (!isClassroomWide) return perRole;
+        return [
+          ...perRole,
+          {
+            studentId: "student-3",
+            classroomRoleId: "role-banker",
+            student: { id: "student-3", classroomId: "class-1" },
+          },
+        ];
+      }),
     },
     studentAccount: {
       upsert: vi.fn(async ({ create }: { create: Omit<Account, "id"> }) => {
@@ -176,6 +219,45 @@ describe("POST classroom role salary payout", () => {
     expect(accounts.size).toBe(0);
     expect(cards.size).toBe(0);
     expect(ledger.size).toBe(0);
+  });
+
+  it("pays every classroom role in one transaction when roleKey is omitted", async () => {
+    const response = await POST(classroomWideRequest(), context);
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({
+      paidRoles: 2,
+      paidStudents: 3,
+      totalAmount: 900,
+    });
+    expect(mocks.dbTransaction).toHaveBeenCalledOnce();
+    expect([...accounts.values()].map((account) => account.balance)).toEqual([
+      200, 200, 500,
+    ]);
+  });
+
+  it("rolls back the whole classroom payout on partial failure", async () => {
+    failLedgerWrite = 3;
+
+    await expect(POST(classroomWideRequest(), context)).rejects.toThrow(
+      "ledger_failed",
+    );
+
+    expect(accounts.size).toBe(0);
+    expect(ledger.size).toBe(0);
+  });
+
+  it("blocks a retried classroom payout with the same request key", async () => {
+    const first = await POST(classroomWideRequest(), context);
+    const balances = [...accounts.values()].map((account) => account.balance);
+
+    const retry = await POST(classroomWideRequest(), context);
+
+    expect(first.status).toBe(200);
+    expect(retry.status).toBe(409);
+    expect([...accounts.values()].map((account) => account.balance)).toEqual(
+      balances,
+    );
   });
 
   it("returns a deterministic conflict when the same request key is retried", async () => {

@@ -5,6 +5,7 @@ import { getCurrentUser } from "@/lib/auth";
 import { z } from "zod";
 import {
   CLASSROOM_ROLE_PAY_PERIODS,
+  resolveClassroomRolePayPolicy,
   resolveClassroomRoleSetting,
 } from "@/lib/classroom-role-settings";
 
@@ -13,29 +14,18 @@ const UpdateRoleBody = z
     roleKey: z.string().min(1),
     enabled: z.boolean().optional(),
     salaryAmount: z.number().int().nonnegative().optional(),
-    payPeriod: z.enum(CLASSROOM_ROLE_PAY_PERIODS).optional(),
-    payMode: z.enum(["auto", "manual"]).optional(),
-    payAnchor: z.number().int().min(1).max(31).nullable().optional(),
     /** Rename is only allowed for teacher-authored (custom:) roles. */
     labelKo: z.string().trim().min(1).max(30).optional(),
   })
   .refine(
-    ({ enabled, salaryAmount, payPeriod, payMode, payAnchor, labelKo }) =>
-      enabled !== undefined ||
-      salaryAmount !== undefined ||
-      payPeriod !== undefined ||
-      payMode !== undefined ||
-      payAnchor !== undefined ||
-      labelKo !== undefined,
+    ({ enabled, salaryAmount, labelKo }) =>
+      enabled !== undefined || salaryAmount !== undefined || labelKo !== undefined,
     { message: "No role setting supplied" },
   );
 
 const CreateRoleBody = z.object({
   labelKo: z.string().trim().min(1).max(30),
   salaryAmount: z.number().int().nonnegative().optional(),
-  payPeriod: z.enum(CLASSROOM_ROLE_PAY_PERIODS).optional(),
-  payMode: z.enum(["auto", "manual"]).optional(),
-  payAnchor: z.number().int().min(1).max(31).nullable().optional(),
 });
 
 /**
@@ -72,7 +62,7 @@ export async function GET(
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
-  const [availableDefs, assignments, settings] = await Promise.all([
+  const [availableDefs, assignments, settings, payPolicy] = await Promise.all([
     db.classroomRoleDef.findMany({
       orderBy: { createdAt: "asc" },
       select: {
@@ -100,10 +90,11 @@ export async function GET(
         classroomRoleId: true,
         enabled: true,
         salaryAmount: true,
-        payPeriod: true,
-        payMode: true,
-        payAnchor: true,
       },
+    }),
+    db.classroomRolePayPolicy.findUnique({
+      where: { classroomId },
+      select: { payMode: true, payPeriod: true, payAnchor: true },
     }),
   ]);
 
@@ -119,6 +110,8 @@ export async function GET(
       enabledRoleIds.has(assignment.classroomRoleId),
     ),
     availableDefs,
+    // 지급 방식/주기/기준일은 학급 단위 단일 값이다 (2026-07-28).
+    payPolicy: resolveClassroomRolePayPolicy(payPolicy),
   });
 }
 
@@ -175,10 +168,7 @@ export async function PATCH(
 
     const renameOnly =
       parsed.data.enabled === undefined &&
-      parsed.data.salaryAmount === undefined &&
-      parsed.data.payPeriod === undefined &&
-      parsed.data.payMode === undefined &&
-      parsed.data.payAnchor === undefined;
+      parsed.data.salaryAmount === undefined;
     if (renameOnly) {
       return NextResponse.json({
         roleKey: parsed.data.roleKey,
@@ -194,7 +184,7 @@ export async function PATCH(
     select: { enabled: true },
   });
   const nextEnabled = parsed.data.enabled ?? existing?.enabled ?? true;
-  if (!nextEnabled && (parsed.data.salaryAmount !== undefined || parsed.data.payPeriod)) {
+  if (!nextEnabled && parsed.data.salaryAmount !== undefined) {
     return NextResponse.json(
       { error: "Compensation requires an enabled role" },
       { status: 400 },
@@ -211,27 +201,16 @@ export async function PATCH(
         classroomRoleId: role.id,
         enabled: nextEnabled,
         salaryAmount: parsed.data.salaryAmount ?? 0,
-        payPeriod: parsed.data.payPeriod ?? "weekly",
-        payMode: parsed.data.payMode ?? "manual",
-        payAnchor: parsed.data.payAnchor ?? null,
       },
       update: {
         ...(parsed.data.enabled !== undefined ? { enabled: parsed.data.enabled } : {}),
         ...(parsed.data.salaryAmount !== undefined
           ? { salaryAmount: parsed.data.salaryAmount }
           : {}),
-        ...(parsed.data.payPeriod !== undefined ? { payPeriod: parsed.data.payPeriod } : {}),
-        ...(parsed.data.payMode !== undefined ? { payMode: parsed.data.payMode } : {}),
-        ...(parsed.data.payAnchor !== undefined
-          ? { payAnchor: parsed.data.payAnchor }
-          : {}),
       },
       select: {
         enabled: true,
         salaryAmount: true,
-        payPeriod: true,
-        payMode: true,
-        payAnchor: true,
       },
     });
 
@@ -314,9 +293,6 @@ export async function POST(
         classroomRoleId: def.id,
         enabled: true,
         salaryAmount: parsed.data.salaryAmount ?? 0,
-        payPeriod: parsed.data.payPeriod ?? "weekly",
-        payMode: parsed.data.payMode ?? "manual",
-        payAnchor: parsed.data.payAnchor ?? null,
       },
     });
     return def;

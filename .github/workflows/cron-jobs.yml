@@ -15,6 +15,7 @@ on:
           - billing-renew
           - blob-cleanup
           - attendance-reminder
+          - role-salary-payout
       dry_run:
         description: Record the request without calling production
         required: true
@@ -46,6 +47,7 @@ jobs:
             billing-renew) method=POST; path=/api/cron/billing-renew ;;
             blob-cleanup) method=GET; path=/api/cron/blob-cleanup ;;
             attendance-reminder) method=GET; path=/api/cron/attendance-reminder ;;
+            role-salary-payout) method=GET; path=/api/cron/role-salary-payout ;;
             *) echo "Unsupported job selection" >&2; exit 1 ;;
           esac
 

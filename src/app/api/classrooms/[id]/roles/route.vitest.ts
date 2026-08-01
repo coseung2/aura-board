@@ -12,6 +12,8 @@ const mocks = vi.hoisted(() => ({
   settingFindMany: vi.fn(),
   settingFindUnique: vi.fn(),
   settingUpsert: vi.fn(),
+  payPolicyFindUnique: vi.fn(),
+  payPolicyUpsert: vi.fn(),
 }));
 
 vi.mock("@/lib/auth", () => ({ getCurrentUser: mocks.getCurrentUser }));
@@ -30,6 +32,10 @@ vi.mock("@/lib/db", () => ({
       findMany: mocks.settingFindMany,
       findUnique: mocks.settingFindUnique,
     },
+    classroomRolePayPolicy: {
+      findUnique: mocks.payPolicyFindUnique,
+      upsert: mocks.payPolicyUpsert,
+    },
     student: { findUnique: mocks.studentFindUnique },
     $transaction: vi.fn(async (callback) =>
       callback({
@@ -43,6 +49,7 @@ vi.mock("@/lib/db", () => ({
 import { GET, PATCH } from "./route";
 import { POST as ASSIGN } from "./assign/route";
 import { PUT as SET_ROLE } from "./set/route";
+import { PUT as SET_PAY_POLICY } from "./pay-policy/route";
 
 const context = { params: Promise.resolve({ id: "classroom-1" }) };
 const roleDefs = [
@@ -85,10 +92,11 @@ beforeEach(() => {
   mocks.roleDefFindMany.mockResolvedValue(roleDefs);
   mocks.assignmentFindMany.mockResolvedValue(assignments);
   mocks.settingFindMany.mockResolvedValue([]);
+  mocks.payPolicyFindUnique.mockResolvedValue(null);
 });
 
 describe("classroom role settings API", () => {
-  it("keeps every legacy role enabled with zero weekly compensation", async () => {
+  it("keeps every legacy role enabled with zero compensation", async () => {
     const response = await GET(new Request("http://localhost"), context);
     const body = await response.json();
 
@@ -99,12 +107,37 @@ describe("classroom role settings API", () => {
         ...role,
         enabled: true,
         salaryAmount: 0,
-        payPeriod: "weekly",
-        payMode: "manual",
-        payAnchor: null,
       })),
     );
     expect(body.assignments).toHaveLength(2);
+  });
+
+  it("falls back to 수동지급 주급 when the classroom has no pay policy row", async () => {
+    const response = await GET(new Request("http://localhost"), context);
+    const body = await response.json();
+
+    expect(body.payPolicy).toEqual({
+      payMode: "manual",
+      payPeriod: "weekly",
+      payAnchor: null,
+    });
+  });
+
+  it("returns the stored classroom pay policy", async () => {
+    mocks.payPolicyFindUnique.mockResolvedValue({
+      payMode: "auto",
+      payPeriod: "monthly",
+      payAnchor: 10,
+    });
+
+    const response = await GET(new Request("http://localhost"), context);
+    const body = await response.json();
+
+    expect(body.payPolicy).toEqual({
+      payMode: "auto",
+      payPeriod: "monthly",
+      payAnchor: 10,
+    });
   });
 
   it("omits explicitly disabled roles and their stale assignments", async () => {
@@ -113,7 +146,6 @@ describe("classroom role settings API", () => {
         classroomRoleId: "role-2",
         enabled: false,
         salaryAmount: 100,
-        payPeriod: "daily",
       },
     ]);
 
@@ -145,7 +177,7 @@ describe("classroom role settings API", () => {
     for (const body of [
       { roleKey: "banker", salaryAmount: -1 },
       { roleKey: "banker", salaryAmount: 1.5 },
-      { roleKey: "banker", payPeriod: "yearly" },
+      { roleKey: "banker" },
     ]) {
       const response = await PATCH(
         new Request("http://localhost", { method: "PATCH", body: JSON.stringify(body) }),
@@ -162,7 +194,6 @@ describe("classroom role settings API", () => {
     mocks.settingUpsert.mockResolvedValue({
       enabled: true,
       salaryAmount: 300,
-      payPeriod: "monthly",
     });
 
     const response = await PATCH(
@@ -171,7 +202,6 @@ describe("classroom role settings API", () => {
         body: JSON.stringify({
           roleKey: "banker",
           salaryAmount: 300,
-          payPeriod: "monthly",
         }),
       }),
       context,
@@ -183,9 +213,8 @@ describe("classroom role settings API", () => {
         create: expect.objectContaining({
           enabled: true,
           salaryAmount: 300,
-          payPeriod: "monthly",
         }),
-        update: { salaryAmount: 300, payPeriod: "monthly" },
+        update: { salaryAmount: 300 },
       }),
     );
     expect(mocks.assignmentDeleteMany).not.toHaveBeenCalled();
@@ -197,7 +226,6 @@ describe("classroom role settings API", () => {
     mocks.settingUpsert.mockResolvedValue({
       enabled: false,
       salaryAmount: 0,
-      payPeriod: "weekly",
     });
 
     const response = await PATCH(
@@ -246,5 +274,108 @@ describe("classroom role settings API", () => {
 
     expect(response.status).toBe(409);
     expect(mocks.assignmentDeleteMany).not.toHaveBeenCalled();
+  });
+});
+
+// 지급 방식/주기/기준일은 학급 단위 한 행이다. 역할 수와 무관하게 쓰기 1회.
+describe("classroom role pay policy API", () => {
+  function payPolicyRequest(body: unknown) {
+    return new Request("http://localhost", {
+      method: "PUT",
+      body: JSON.stringify(body),
+    });
+  }
+
+  it("upserts the classroom policy exactly once regardless of role count", async () => {
+    mocks.payPolicyUpsert.mockResolvedValue({
+      payMode: "auto",
+      payPeriod: "weekly",
+      payAnchor: 1,
+    });
+
+    const response = await SET_PAY_POLICY(
+      payPolicyRequest({ payMode: "auto" }),
+      context,
+    );
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({
+      payMode: "auto",
+      payPeriod: "weekly",
+      payAnchor: 1,
+    });
+    expect(mocks.payPolicyUpsert).toHaveBeenCalledOnce();
+    expect(mocks.settingUpsert).not.toHaveBeenCalled();
+  });
+
+  it("clears the anchor when switching to 일급", async () => {
+    mocks.payPolicyFindUnique.mockResolvedValue({
+      payMode: "auto",
+      payPeriod: "weekly",
+      payAnchor: 3,
+    });
+    mocks.payPolicyUpsert.mockResolvedValue({
+      payMode: "auto",
+      payPeriod: "daily",
+      payAnchor: null,
+    });
+
+    await SET_PAY_POLICY(payPolicyRequest({ payPeriod: "daily" }), context);
+
+    expect(mocks.payPolicyUpsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        update: { payMode: "auto", payPeriod: "daily", payAnchor: null },
+      }),
+    );
+  });
+
+  it("resets the anchor to 1 when the period changes without one", async () => {
+    mocks.payPolicyFindUnique.mockResolvedValue({
+      payMode: "auto",
+      payPeriod: "monthly",
+      payAnchor: 25,
+    });
+    mocks.payPolicyUpsert.mockResolvedValue({
+      payMode: "auto",
+      payPeriod: "weekly",
+      payAnchor: 1,
+    });
+
+    await SET_PAY_POLICY(payPolicyRequest({ payPeriod: "weekly" }), context);
+
+    expect(mocks.payPolicyUpsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        update: { payMode: "auto", payPeriod: "weekly", payAnchor: 1 },
+      }),
+    );
+  });
+
+  it("rejects a weekday anchor outside 1~7 for 주급", async () => {
+    mocks.payPolicyFindUnique.mockResolvedValue({
+      payMode: "auto",
+      payPeriod: "weekly",
+      payAnchor: 1,
+    });
+
+    const response = await SET_PAY_POLICY(
+      payPolicyRequest({ payAnchor: 20 }),
+      context,
+    );
+
+    expect(response.status).toBe(400);
+    expect(mocks.payPolicyUpsert).not.toHaveBeenCalled();
+  });
+
+  it("rejects an empty patch and non-teachers", async () => {
+    const empty = await SET_PAY_POLICY(payPolicyRequest({}), context);
+    expect(empty.status).toBe(400);
+
+    mocks.classroomFindUnique.mockResolvedValue({ teacherId: "teacher-2" });
+    const forbidden = await SET_PAY_POLICY(
+      payPolicyRequest({ payMode: "auto" }),
+      context,
+    );
+    expect(forbidden.status).toBe(403);
+    expect(mocks.payPolicyUpsert).not.toHaveBeenCalled();
   });
 });

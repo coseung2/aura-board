@@ -516,6 +516,9 @@ model Classroom {
 
   roleSettings ClassroomRoleSetting[]
 
+  // 1인1역 급여 지급 정책은 학급 단위 단일 값이다 (2026-07-28).
+  rolePayPolicy ClassroomRolePayPolicy?
+
   currency ClassroomCurrency?
 
   studentAccounts StudentAccount[]
@@ -3566,16 +3569,6 @@ model ClassroomRoleSetting {
 
   salaryAmount Int @default(0)
 
-  payPeriod String @default("weekly")
-
-  /// "auto" pays on payPeriod + payAnchor; "manual" pays only when the teacher
-  /// triggers it from the role tile.
-  payMode String @default("manual")
-
-  /// Anchor for automatic payouts: 1-7 (weekday) for weekly, 1-31 (day of
-  /// month) for monthly, unused for daily.
-  payAnchor Int?
-
   createdAt DateTime @default(now())
 
   updatedAt DateTime @updatedAt
@@ -3586,6 +3579,31 @@ model ClassroomRoleSetting {
 
   @@unique([classroomId, classroomRoleId])
   @@index([classroomRoleId])
+}
+
+/// 1인1역 급여 지급 정책. 지급 방식/주기/기준일은 역할마다 다르게 둘 이유가
+/// 없어서(개별 지급은 금융관리에서 처리) 학급당 한 행으로 관리한다.
+/// 행이 없는 학급은 수동지급 + 주급으로 해석한다.
+model ClassroomRolePayPolicy {
+  id String @id @default(cuid())
+
+  classroomId String @unique
+
+  /// "auto" pays on payPeriod + payAnchor; "manual" pays only when the teacher
+  /// presses 지급 on the dashboard pay bar.
+  payMode String @default("manual")
+
+  payPeriod String @default("weekly")
+
+  /// Anchor for automatic payouts: 1-7 (weekday) for weekly, 1-31 (day of
+  /// month) for monthly, unused for daily.
+  payAnchor Int?
+
+  createdAt DateTime @default(now())
+
+  updatedAt DateTime @updatedAt
+
+  classroom Classroom @relation(fields: [classroomId], references: [id], onDelete: Cascade)
 }
 
 model BoardLayoutRoleGrant {

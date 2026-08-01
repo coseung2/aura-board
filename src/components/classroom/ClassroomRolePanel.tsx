@@ -23,13 +23,23 @@ type RoleTile = {
   key: string;
   labelKo: string;
   salaryAmount: number;
-  payPeriod: PayPeriod;
-  payMode: PayMode;
-  payAnchor: number | null;
   students: RoleStudent[];
   permissions: Record<string, boolean>;
   description: string;
   emoji: string | null;
+};
+
+/** 지급 방식/주기/기준일은 학급 단위 단일 값이다 (2026-07-28). */
+type PayPolicy = {
+  payMode: PayMode;
+  payPeriod: PayPeriod;
+  payAnchor: number | null;
+};
+
+const DEFAULT_PAY_POLICY: PayPolicy = {
+  payMode: "manual",
+  payPeriod: "weekly",
+  payAnchor: null,
 };
 
 type CatalogEntry = {
@@ -48,15 +58,17 @@ type RolesResponse = {
     emoji?: string | null;
     description?: string;
     salaryAmount?: number | null;
-    payPeriod?: PayPeriod | null;
-    payMode?: string | null;
-    payAnchor?: number | null;
   }>;
   assignments?: Array<{
     id: string;
     classroomRoleId: string;
     student: RoleStudent;
   }>;
+  payPolicy?: {
+    payMode?: string | null;
+    payPeriod?: PayPeriod | null;
+    payAnchor?: number | null;
+  } | null;
 };
 
 type PermissionsResponse = {
@@ -86,6 +98,23 @@ function normalizePayPeriod(value: PayPeriod | null | undefined): PayPeriod {
   return value === "daily" || value === "monthly" ? value : "weekly";
 }
 
+/** Normalizes a server pay policy payload; missing fields fall back. */
+function normalizePayPolicy(
+  policy: RolesResponse["payPolicy"] | undefined,
+): PayPolicy {
+  const payPeriod = normalizePayPeriod(policy?.payPeriod);
+  return {
+    payMode: policy?.payMode === "auto" ? "auto" : "manual",
+    payPeriod,
+    payAnchor:
+      payPeriod === "daily"
+        ? null
+        : typeof policy?.payAnchor === "number"
+          ? policy.payAnchor
+          : 1,
+  };
+}
+
 const WEEKDAYS = ["월", "화", "수", "목", "금", "토", "일"];
 
 
@@ -100,6 +129,7 @@ export function ClassroomRolePanel({
   payBarSlot,
 }: Props) {
   const [roles, setRoles] = useState<RoleTile[]>([]);
+  const [payPolicy, setPayPolicy] = useState<PayPolicy>(DEFAULT_PAY_POLICY);
   const [catalog, setCatalog] = useState<CatalogEntry[]>([]);
   const [loaded, setLoaded] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -109,6 +139,11 @@ export function ClassroomRolePanel({
   /** Students picked while creating a role; assigned right after creation. */
   const [newRoleStudentIds, setNewRoleStudentIds] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
+  /**
+   * 지급바 전용 저장 플래그. 역할 편집(`saving`)과 분리해서, 급여 지급 설정을
+   * 만지는 동안 역할 타일이 잠기지 않게 한다.
+   */
+  const [savingPolicy, setSavingPolicy] = useState(false);
   const [addError, setAddError] = useState<string | null>(null);
   /** Role key currently open in the edit modal. */
   const [editingKey, setEditingKey] = useState<string | null>(null);
@@ -155,10 +190,6 @@ export function ClassroomRolePanel({
             description: role.description ?? permissionRole?.description ?? "",
             salaryAmount:
               typeof role.salaryAmount === "number" ? role.salaryAmount : 0,
-            payPeriod: normalizePayPeriod(role.payPeriod),
-            payMode: role.payMode === "auto" ? "auto" : "manual",
-            payAnchor:
-              typeof role.payAnchor === "number" ? role.payAnchor : null,
             permissions: permissionRole?.permissions ?? {},
             students: (studentsByRole.get(role.id) ?? []).sort(
               (a, b) => (a.number ?? 999) - (b.number ?? 999),
@@ -166,6 +197,7 @@ export function ClassroomRolePanel({
           };
         }),
       );
+      setPayPolicy(normalizePayPolicy(data.payPolicy));
       setCatalog(permissionsData.catalog ?? []);
     } catch {
       setError("역할을 불러오지 못했습니다. 다시 시도해 주세요.");
@@ -259,15 +291,6 @@ export function ClassroomRolePanel({
   const editingRole = roles.find((role) => role.key === editingKey) ?? null;
   const permissionRole =
     roles.find((role) => role.key === permissionKey) ?? null;
-
-  // Divider controls reflect the shared setting; "auto" only when every role
-  // is on auto, so a mixed state falls back to 수동지급.
-  const payMode: PayMode =
-    roles.length > 0 && roles.every((role) => role.payMode === "auto")
-      ? "auto"
-      : "manual";
-  const payPeriod: PayPeriod = roles[0]?.payPeriod ?? "weekly";
-  const payAnchor: number | null = roles[0]?.payAnchor ?? null;
 
   function openEdit(role: RoleTile) {
     setEditingKey(role.key);
@@ -415,67 +438,80 @@ export function ClassroomRolePanel({
   }
 
   /**
-   * The divider controls apply to every role, so each change writes the same
-   * patch for all active roles.
+   * 지급 정책은 학급 단위 한 행이므로 클릭당 요청은 1회다. 이전에는 역할마다
+   * PATCH 를 보내서 역할 수만큼 왕복이 발생했고, 응답을 기다리는 동안 지급바
+   * 전체가 잠겼다.
    */
-  async function applyToAllRoles(
-    patch: {
-      payMode?: PayMode;
-      payPeriod?: PayPeriod;
-      payAnchor?: number | null;
-    },
+  async function applyPayPolicy(
+    patch: Partial<PayPolicy>,
     failureMessage: string,
   ) {
-    if (saving || roles.length === 0) return;
-    setSaving(true);
+    if (savingPolicy) return;
+    const previous = payPolicy;
+    // 서버 정규화 규칙과 동일하게 미리 반영해, 왕복 중에도 컨트롤이 응답한다.
+    const optimistic: PayPolicy = { ...previous, ...patch };
+    if (patch.payPeriod !== undefined && patch.payAnchor === undefined) {
+      optimistic.payAnchor = patch.payPeriod === "daily" ? null : 1;
+    }
+    setPayPolicy(optimistic);
+    setSavingPolicy(true);
     setError(null);
     try {
-      for (const role of roles) {
-        const res = await fetch(`/api/classrooms/${classroomId}/roles`, {
-          method: "PATCH",
+      const res = await fetch(
+        `/api/classrooms/${classroomId}/roles/pay-policy`,
+        {
+          method: "PUT",
           headers: { "content-type": "application/json" },
-          body: JSON.stringify({ roleKey: role.key, ...patch }),
-        });
-        if (!res.ok) {
-          const body = (await res.json().catch(() => null)) as {
-            error?: string;
-          } | null;
-          setError(body?.error ?? failureMessage);
-          return;
-        }
+          body: JSON.stringify(patch),
+        },
+      );
+      if (!res.ok) {
+        const body = (await res.json().catch(() => null)) as {
+          error?: string;
+        } | null;
+        setPayPolicy(previous);
+        setError(body?.error ?? failureMessage);
+        return;
       }
-      await refresh();
+      setPayPolicy(
+        normalizePayPolicy((await res.json().catch(() => null)) as PayPolicy),
+      );
     } catch {
+      setPayPolicy(previous);
       setError(failureMessage);
     } finally {
-      setSaving(false);
+      setSavingPolicy(false);
     }
   }
 
   function applyPayMode(nextMode: PayMode) {
-    return applyToAllRoles(
+    if (nextMode === payPolicy.payMode) return;
+    return applyPayPolicy(
       { payMode: nextMode },
       "지급 방식을 저장하지 못했습니다.",
     );
   }
 
   function applyPayPeriod(nextPeriod: PayPeriod) {
-    return applyToAllRoles(
-      { payPeriod: nextPeriod, payAnchor: nextPeriod === "daily" ? null : 1 },
+    return applyPayPolicy(
+      { payPeriod: nextPeriod },
       "지급 주기를 저장하지 못했습니다.",
     );
   }
 
   function applyPayAnchor(nextAnchor: number) {
-    return applyToAllRoles(
+    return applyPayPolicy(
       { payAnchor: nextAnchor },
       "지급 기준일을 저장하지 못했습니다.",
     );
   }
 
-  /** 수동지급: confirm once, then pay every role's assigned students. */
+  /**
+   * 수동지급: confirm once, then pay every role in a single request. 서버가 한
+   * 트랜잭션으로 처리하므로 부분 지급으로 끝나지 않는다.
+   */
   async function payAll() {
-    if (saving) return;
+    if (savingPolicy) return;
     const payable = roles.filter(
       (role) => role.salaryAmount > 0 && role.students.length > 0,
     );
@@ -487,33 +523,31 @@ export function ClassroomRolePanel({
       `${payable.length}개 역할의 급여를 담당 학생에게 지급하시겠습니까?`,
     );
     if (!confirmed) return;
-    setSaving(true);
+    setSavingPolicy(true);
     setError(null);
     try {
-      for (const role of payable) {
-        const res = await fetch(`/api/classrooms/${classroomId}/roles/pay`, {
-          method: "POST",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify({ roleKey: role.key }),
-        });
-        if (!res.ok) {
-          const body = (await res.json().catch(() => null)) as {
-            error?: string;
-          } | null;
-          setError(body?.error ?? "급여를 지급하지 못했습니다.");
-          return;
-        }
+      const res = await fetch(`/api/classrooms/${classroomId}/roles/pay`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        // 중복 클릭이 이중 지급되지 않도록 요청마다 고유 키를 붙인다.
+        body: JSON.stringify({ requestKey: crypto.randomUUID() }),
+      });
+      if (!res.ok) {
+        const body = (await res.json().catch(() => null)) as {
+          error?: string;
+        } | null;
+        setError(body?.error ?? "급여를 지급하지 못했습니다.");
+        return;
       }
-      await refresh();
     } catch {
       setError("급여를 지급하지 못했습니다. 다시 시도해 주세요.");
     } finally {
-      setSaving(false);
+      setSavingPolicy(false);
     }
   }
 
-  // Pay controls live in the section divider row and apply to every role at
-  // once (2026-07-27). Per-tile duplicates were removed.
+  // Pay controls live in the section divider row and write the classroom-level
+  // pay policy in one request (2026-07-28). Per-tile duplicates were removed.
   const payBar = (
     <div className="classroom-role-pay-bar">
         <div
@@ -524,35 +558,35 @@ export function ClassroomRolePanel({
           <button
             type="button"
             role="radio"
-            aria-checked={payMode === "auto"}
-            className={`segmented-control-item${payMode === "auto" ? " is-active" : ""}`}
+            aria-checked={payPolicy.payMode === "auto"}
+            className={`segmented-control-item${payPolicy.payMode === "auto" ? " is-active" : ""}`}
             onClick={() => void applyPayMode("auto")}
-            disabled={saving || roles.length === 0}
+            disabled={!loaded}
           >
             자동지급
           </button>
           <button
             type="button"
             role="radio"
-            aria-checked={payMode === "manual"}
-            className={`segmented-control-item${payMode === "manual" ? " is-active" : ""}`}
+            aria-checked={payPolicy.payMode === "manual"}
+            className={`segmented-control-item${payPolicy.payMode === "manual" ? " is-active" : ""}`}
             onClick={() => void applyPayMode("manual")}
-            disabled={saving || roles.length === 0}
+            disabled={!loaded}
           >
             수동지급
           </button>
         </div>
 
-        {payMode === "auto" ? (
+        {payPolicy.payMode === "auto" ? (
           <>
             <select
               className="classroom-role-select"
-              value={payPeriod}
+              value={payPolicy.payPeriod}
               onChange={(event) =>
                 void applyPayPeriod(event.target.value as PayPeriod)
               }
               aria-label="지급 주기"
-              disabled={saving}
+              disabled={!loaded}
             >
               {PAY_PERIODS.map((period) => (
                 <option key={period.value} value={period.value}>
@@ -561,15 +595,15 @@ export function ClassroomRolePanel({
               ))}
             </select>
 
-            {payPeriod === "weekly" ? (
+            {payPolicy.payPeriod === "weekly" ? (
               <select
                 className="classroom-role-select"
-                value={payAnchor ?? 1}
+                value={payPolicy.payAnchor ?? 1}
                 onChange={(event) =>
                   void applyPayAnchor(Number(event.target.value))
                 }
                 aria-label="지급 기준일"
-                disabled={saving}
+                disabled={!loaded}
               >
                 {WEEKDAYS.map((label, index) => (
                   <option key={label} value={index + 1}>
@@ -579,15 +613,15 @@ export function ClassroomRolePanel({
               </select>
             ) : null}
 
-            {payPeriod === "monthly" ? (
+            {payPolicy.payPeriod === "monthly" ? (
               <select
                 className="classroom-role-select"
-                value={payAnchor ?? 1}
+                value={payPolicy.payAnchor ?? 1}
                 onChange={(event) =>
                   void applyPayAnchor(Number(event.target.value))
                 }
                 aria-label="지급 기준일"
-                disabled={saving}
+                disabled={!loaded}
               >
                 {Array.from({ length: 31 }, (_, index) => index + 1).map(
                   (day) => (
@@ -599,7 +633,7 @@ export function ClassroomRolePanel({
               </select>
             ) : null}
 
-            {payPeriod === "daily" ? (
+            {payPolicy.payPeriod === "daily" ? (
               <span className="classroom-role-pay-note">매일 지급</span>
             ) : null}
           </>
@@ -608,9 +642,9 @@ export function ClassroomRolePanel({
             type="button"
             className="classroom-action-btn classroom-role-pay-now"
             onClick={() => void payAll()}
-            disabled={saving || roles.length === 0}
+            disabled={savingPolicy || roles.length === 0}
           >
-            지급
+            {savingPolicy ? "지급 중…" : "지급"}
           </button>
         )}
     </div>

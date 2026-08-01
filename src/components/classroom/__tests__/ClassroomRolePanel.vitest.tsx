@@ -19,12 +19,10 @@ const rolesBody = {
       emoji: "🧹",
       description: "학급 도우미",
       salaryAmount: 100,
-      payPeriod: "weekly" as const,
-      payMode: "manual",
-      payAnchor: null,
     },
   ],
   assignments: [],
+  payPolicy: { payMode: "manual", payPeriod: "weekly" as const, payAnchor: 1 },
 };
 
 const permissionsBody = {
@@ -169,49 +167,67 @@ describe("ClassroomRolePanel", () => {
     });
   });
 
-  it("switches to 자동지급 from the divider and exposes the schedule pickers", async () => {
-    fetchMock
-      .mockResolvedValueOnce(jsonResponse({ ok: true }))
-      .mockResolvedValueOnce(
-        jsonResponse({
-          ...rolesBody,
-          defs: [{ ...rolesBody.defs[0], payMode: "auto", payAnchor: 3 }],
-        }),
-      )
-      .mockResolvedValueOnce(jsonResponse(permissionsBody));
+  // 지급 정책은 학급 단위 한 행이므로 역할이 몇 개든 쓰기 요청은 1회여야 한다.
+  it("switches to 자동지급 with a single classroom-level write", async () => {
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse({ payMode: "auto", payPeriod: "weekly", payAnchor: 3 }),
+    );
     renderPanel();
 
     fireEvent.click(await screen.findByRole("radio", { name: "자동지급" }));
 
-    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(5));
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(3));
+    expect(fetchMock.mock.calls[2][0]).toBe(
+      "/api/classrooms/classroom-1/roles/pay-policy",
+    );
+    expect(fetchMock.mock.calls[2][1]).toMatchObject({ method: "PUT" });
     expect(JSON.parse(fetchMock.mock.calls[2][1].body)).toEqual({
-      roleKey: "helper",
       payMode: "auto",
     });
     expect(await screen.findByLabelText("지급 주기")).toBeTruthy();
     expect(screen.getByLabelText("지급 기준일")).toBeTruthy();
   });
 
-  it("pays manually after the confirm prompt", async () => {
+  it("shows 자동지급 immediately and rolls back when the write fails", async () => {
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse({ error: "지급 방식을 저장하지 못했습니다." }, false),
+    );
+    renderPanel();
+
+    const autoRadio = await screen.findByRole("radio", { name: "자동지급" });
+    fireEvent.click(autoRadio);
+
+    await waitFor(() =>
+      expect(
+        screen.getByRole("radio", { name: "수동지급" }).getAttribute("aria-checked"),
+      ).toBe("true"),
+    );
+    expect(screen.getByRole("alert").textContent).toBe(
+      "지급 방식을 저장하지 못했습니다.",
+    );
+    // 실패해도 역할 목록을 다시 받아오지 않는다 (초기 2회만).
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+  });
+
+  it("pays every role in one request after the confirm prompt", async () => {
     vi.spyOn(window, "confirm").mockReturnValue(true);
     fetchMock.mockReset();
     fetchMock
       .mockResolvedValueOnce(jsonResponse(assignedRolesBody))
       .mockResolvedValueOnce(jsonResponse(permissionsBody))
-      .mockResolvedValueOnce(jsonResponse({ paidStudents: 1 }))
-      .mockResolvedValueOnce(jsonResponse(assignedRolesBody))
-      .mockResolvedValueOnce(jsonResponse(permissionsBody));
+      .mockResolvedValueOnce(jsonResponse({ paidRoles: 1, paidStudents: 1 }));
     renderPanel();
 
     fireEvent.click(await screen.findByRole("button", { name: "지급" }));
 
-    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(5));
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(3));
     expect(fetchMock.mock.calls[2][0]).toBe(
       "/api/classrooms/classroom-1/roles/pay",
     );
-    expect(JSON.parse(fetchMock.mock.calls[2][1].body)).toEqual({
-      roleKey: "helper",
-    });
+    // roleKey 없이 보내면 서버가 학급 전체를 한 트랜잭션으로 지급한다.
+    const payBody = JSON.parse(fetchMock.mock.calls[2][1].body);
+    expect(payBody.roleKey).toBeUndefined();
+    expect(typeof payBody.requestKey).toBe("string");
   });
 
   it("renames a custom role from the inline name field", async () => {
