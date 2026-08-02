@@ -1,277 +1,150 @@
-// POST /api/speed-game/games/[gameId]/answer
-//
-// 학생 전용. 현재 활성 라운드에 한 번만 답을 등록/업데이트.
-// 프론트엔드(SpeedGameBoard.submitAnswer) 가 보내는 body 와 호환:
-//   { roundId?, groupId?, answer, elapsedMs? }
-//
-// exact 모드: 서버에서 즉시 정답 판정 + 점수 계산.
-// normalize-space 모드: 공백 제거 후 비교 (정규화 동일 효과 — MVP 에서는
-// exact 와 동일 처리).
-// teacher-approval 모드: pending 으로 저장(점수 0). 교사 승인은 별도 PATCH
-// (이번 스코프 외 — finish 시 accept 시키는 흐름은 추후).
-
-import { NextResponse } from "next/server";
 import { z } from "zod";
 import { db } from "@/lib/db";
-import { getCurrentStudent } from "@/lib/student-auth";
 import { jsonPrivateNoStore } from "@/lib/http-cache";
 import { scheduleSpeedGameChange } from "@/lib/realtime-server";
 import {
-  answersMatch,
-  computeScore,
-  parseBonusRanks,
-  rankCorrectAnswers,
-} from "@/lib/speed-game/score";
-import { resolveStudentGroupId } from "@/lib/speed-game/runtime";
-import { limitSpeedGameAnswer } from "@/lib/rate-limit-routes";
-
-const BodySchema = z
-  .object({
-    roundId: z.string().min(1).max(64).optional(),
-    groupId: z.string().min(1).max(64).optional(),
-    answer: z.string().min(1).max(200),
-    elapsedMs: z.number().int().min(0).max(600000).optional(),
-    rawText: z.string().min(1).max(200).optional(),
-  })
-  .transform((v) => ({
-    text: v.answer ?? v.rawText ?? "",
-    roundId: v.roundId,
-    groupId: v.groupId,
-    elapsedMs: v.elapsedMs,
-  }));
+  authenticateGameViewer,
+  IdempotencyConflictError,
+  reviewSpeedGameAnswer,
+  SpeedRunCommandError,
+  submitSpeedGameAnswer,
+} from "@/lib/speed-game/runtime";
+import { sanitizeGameSnapshotForStudent } from "@/lib/speed-game/student-snapshot";
 
 type Params = { params: Promise<{ gameId: string }> };
 
-export async function POST(req: Request, { params }: Params) {
-  // Capture this before authentication/database work so request-processing
-  // latency cannot reduce the student's score.
-  const receivedAt = new Date();
-  const { gameId } = await params;
+const SubmitSchema = z
+  .object({
+    requestId: z.string().min(1).max(128),
+    runId: z.string().min(1).max(128),
+    expectedVersion: z.number().int().min(0).max(Number.MAX_SAFE_INTEGER),
+    answer: z.string().trim().min(1).max(200),
+    roundId: z.string().min(1).max(128).optional(),
+    groupId: z.string().min(1).max(128).optional(),
+  })
+  .strict();
 
-  const student = await getCurrentStudent();
-  if (!student) {
-    return jsonPrivateNoStore({ error: "unauthorized" }, { status: 401 });
-  }
+const ReviewSchema = z
+  .object({
+    requestId: z.string().min(1).max(128),
+    runId: z.string().min(1).max(128),
+    expectedVersion: z.number().int().min(0).max(Number.MAX_SAFE_INTEGER),
+    answerId: z.string().min(1).max(128),
+    decision: z.enum(["accepted", "rejected"]),
+  })
+  .strict();
 
+async function boardIdForGame(gameId: string): Promise<string | null> {
   const game = await db.speedGame.findUnique({
     where: { id: gameId },
-    select: {
-      id: true,
-      boardId: true,
-      status: true,
-      roundIndex: true,
-      answerMode: true,
-      baseScore: true,
-      minScore: true,
-      bonusRanks: true,
-    },
+    select: { boardId: true },
   });
-  if (!game) {
+  return game?.boardId ?? null;
+}
+
+function commandErrorResponse(error: unknown) {
+  if (error instanceof IdempotencyConflictError) {
+    return jsonPrivateNoStore({ error: error.code }, { status: error.status });
+  }
+  if (error instanceof SpeedRunCommandError) {
+    return jsonPrivateNoStore(
+      {
+        error: error.code,
+        ...(error.snapshot ? { game: error.snapshot } : {}),
+      },
+      { status: error.status },
+    );
+  }
+  return null;
+}
+
+export async function POST(req: Request, { params }: Params) {
+  const receivedAt = new Date();
+  const { gameId } = await params;
+  const boardId = await boardIdForGame(gameId);
+  if (!boardId) {
     return jsonPrivateNoStore({ error: "game_not_found" }, { status: 404 });
   }
-  if (game.status !== "running") {
-    return jsonPrivateNoStore({ error: "game_not_running" }, { status: 409 });
+  const auth = await authenticateGameViewer(boardId);
+  if (auth.kind !== "student") {
+    return jsonPrivateNoStore(
+      { error: auth.kind === "unauthorized" ? "unauthorized" : "student_required" },
+      { status: auth.kind === "unauthorized" ? 401 : 403 },
+    );
   }
 
-  // 학생이 보드 학급에 속하는지 검증.
-  const board = await db.board.findUnique({
-    where: { id: game.boardId },
-    select: { classroomId: true },
-  });
-  if (!board?.classroomId || board.classroomId !== student.classroomId) {
-    return jsonPrivateNoStore({ error: "forbidden" }, { status: 403 });
-  }
-
-  // 학생 모둠 결정.
-  const studentGroupId = await resolveStudentGroupId(game.boardId, student.id);
-  if (!studentGroupId) {
-    return jsonPrivateNoStore({ error: "student_has_no_group" }, { status: 400 });
-  }
-
-  let body: unknown;
-  try {
-    body = await req.json();
-  } catch {
-    return NextResponse.json({ error: "bad_json" }, { status: 400 });
-  }
-  const parsed = BodySchema.safeParse(body);
+  const parsed = SubmitSchema.safeParse(await req.json().catch(() => null));
   if (!parsed.success) {
-    return NextResponse.json(
+    return jsonPrivateNoStore(
       { error: "bad_request", issues: parsed.error.issues },
       { status: 400 },
     );
   }
 
-  // 현재 라운드.
-  const round = await db.speedGameRound.findFirst({
-    where: { gameId, order: game.roundIndex },
-    select: {
-      id: true,
-      keyword: true,
-      keywordNormalized: true,
-      startedAt: true,
-    },
-  });
-  if (!round || !round.startedAt) {
-    return jsonPrivateNoStore({ error: "round_not_active" }, { status: 409 });
+  try {
+    const result = await submitSpeedGameAnswer({
+      gameId,
+      runId: parsed.data.runId,
+      requestId: parsed.data.requestId,
+      expectedVersion: parsed.data.expectedVersion,
+      studentId: auth.studentId,
+      actorSubject: `student:${auth.studentId}`,
+      rawText: parsed.data.answer,
+      roundId: parsed.data.roundId,
+      groupId: parsed.data.groupId,
+      receivedAt,
+    });
+    if (!result.replayed) scheduleSpeedGameChange(gameId, "answer");
+    return jsonPrivateNoStore({
+      ...result,
+      game: sanitizeGameSnapshotForStudent(result.game, auth.studentId),
+    });
+  } catch (error) {
+    const response = commandErrorResponse(error);
+    if (response) return response;
+    console.error("[POST /api/speed-game/games/:gameId/answer]", error);
+    return jsonPrivateNoStore({ error: "internal_error" }, { status: 500 });
+  }
+}
+
+export async function PATCH(req: Request, { params }: Params) {
+  const { gameId } = await params;
+  const boardId = await boardIdForGame(gameId);
+  if (!boardId) {
+    return jsonPrivateNoStore({ error: "game_not_found" }, { status: 404 });
+  }
+  const auth = await authenticateGameViewer(boardId);
+  if (
+    auth.kind !== "teacher" ||
+    (auth.role !== "owner" && auth.role !== "editor")
+  ) {
+    return jsonPrivateNoStore({ error: "forbidden" }, { status: 403 });
   }
 
-  // roundId/groupId 가 명시되면 활성 라운드/학생 모둠 과 일치하는지 확인.
-  if (parsed.data.roundId && parsed.data.roundId !== round.id) {
-    return jsonPrivateNoStore({ error: "round_mismatch" }, { status: 409 });
-  }
-  if (parsed.data.groupId && parsed.data.groupId !== studentGroupId) {
-    return jsonPrivateNoStore({ error: "group_mismatch" }, { status: 403 });
-  }
-
-  const limit = await limitSpeedGameAnswer(gameId, student.id);
-  if (!limit.ok) {
+  const parsed = ReviewSchema.safeParse(await req.json().catch(() => null));
+  if (!parsed.success) {
     return jsonPrivateNoStore(
-      { error: "rate_limited", retryAfter: limit.retryAfter },
-      {
-        status: 429,
-        headers: { "Retry-After": String(Math.max(1, limit.retryAfter)) },
-      },
+      { error: "bad_request", issues: parsed.error.issues },
+      { status: 400 },
     );
   }
 
-  const groupId = studentGroupId;
-  const rawText = parsed.data.text;
-  // 활성 라운드 시작 시각과 서버 수신 시각으로만 경과 시간을 계산한다.
-  // Keep accepting client elapsedMs for wire compatibility, but never use it
-  // for persisted timing or scoring.
-  const elapsedMs = Math.max(
-    0,
-    receivedAt.getTime() - round.startedAt.getTime(),
-  );
-
-  // 판정: exact / normalize-space 는 자동, teacher-approval 은 pending.
-  const isAutoJudge =
-    game.answerMode === "exact" || game.answerMode === "normalize-space";
-  const isCorrect = isAutoJudge
-    ? game.answerMode === "exact"
-      ? rawText.trim().toLowerCase() === round.keyword.trim().toLowerCase()
-      : answersMatch(round.keywordNormalized, rawText)
-    : false;
-
-  const approval = isCorrect
-    ? "accepted"
-    : isAutoJudge
-      ? "rejected"
-      : "pending";
-  const activeRoundId = round.id;
-  const activeStudentId = student.id;
-  const bonusRanks = parseBonusRanks(game.bonusRanks);
-  const baseScore = game.baseScore;
-  const minScore = game.minScore;
-
-  async function persistAnswer() {
-    for (let attempt = 0; attempt < 3; attempt += 1) {
-      try {
-        return await db.$transaction(
-          async (tx) => {
-            // Rank-dependent scoring must share one serializable snapshot.
-            // Otherwise simultaneous correct answers can receive the same
-            // bonus rank even though they belong to different groups.
-            const existing = await tx.speedGameAnswer.findUnique({
-              where: { roundId_groupId: { roundId: activeRoundId, groupId } },
-              select: { id: true },
-            });
-
-            let score = 0;
-            if (isCorrect) {
-              const others = await tx.speedGameAnswer.findMany({
-                where: {
-                  roundId: activeRoundId,
-                  correct: true,
-                  approval: "accepted",
-                  ...(existing ? { id: { not: existing.id } } : {}),
-                },
-                select: { id: true, createdAt: true, correct: true },
-              });
-              const othersRanked = rankCorrectAnswers(
-                others.map((candidate) => ({
-                  answerId: candidate.id,
-                  createdAt: candidate.createdAt,
-                  correct: candidate.correct,
-                })),
-              );
-              score = computeScore({
-                correct: true,
-                elapsedMs,
-                rank: othersRanked.size + 1,
-                bonusRanks,
-                baseScore,
-                minScore,
-              });
-            }
-
-            const answer = await tx.speedGameAnswer.upsert({
-              where: { roundId_groupId: { roundId: activeRoundId, groupId } },
-              create: {
-                roundId: activeRoundId,
-                groupId,
-                studentId: activeStudentId,
-                correct: isCorrect,
-                score,
-                approval,
-                rawText,
-                elapsedMs,
-              },
-              update: {
-                correct: isCorrect,
-                score,
-                approval,
-                rawText,
-                elapsedMs,
-                // createdAt 은 유지 — 첫 제출 시각 기준.
-              },
-              select: {
-                id: true,
-                correct: true,
-                score: true,
-                approval: true,
-                elapsedMs: true,
-                createdAt: true,
-              },
-            });
-
-            await tx.speedGame.update({
-              where: { id: gameId },
-              data: { updatedAt: new Date() },
-            });
-
-            return answer;
-          },
-          { isolationLevel: "Serializable" },
-        );
-      } catch (error) {
-        const code =
-          error && typeof error === "object" && "code" in error
-            ? (error as { code?: unknown }).code
-            : undefined;
-        if (code !== "P2034" || attempt === 2) throw error;
-      }
-    }
-    throw new Error("speed_game_answer_transaction_failed");
+  try {
+    const result = await reviewSpeedGameAnswer({
+      gameId,
+      runId: parsed.data.runId,
+      answerId: parsed.data.answerId,
+      requestId: parsed.data.requestId,
+      expectedVersion: parsed.data.expectedVersion,
+      decision: parsed.data.decision,
+      actorSubject: `teacher:${auth.userId}`,
+    });
+    if (!result.replayed) scheduleSpeedGameChange(gameId, "answer-review");
+    return jsonPrivateNoStore(result);
+  } catch (error) {
+    const response = commandErrorResponse(error);
+    if (response) return response;
+    console.error("[PATCH /api/speed-game/games/:gameId/answer]", error);
+    return jsonPrivateNoStore({ error: "internal_error" }, { status: 500 });
   }
-
-  const upserted = await persistAnswer();
-  scheduleSpeedGameChange(gameId, "answer");
-
-  // wire DTO 는 src/components/speed-game/types.ts SpeedGameAnswer 와 일치.
-  return jsonPrivateNoStore({
-    answer: {
-      id: upserted.id,
-      roundId: round.id,
-      groupId,
-      studentId: student.id,
-      answer: rawText,
-      correct: upserted.correct,
-      rank: upserted.correct ? 1 : null, // 채점 후 rank 는 다음 refresh 에서 정확히 채워짐.
-      score: upserted.score,
-      elapsedMs: upserted.elapsedMs,
-      createdAt: upserted.createdAt.toISOString(),
-    },
-  });
 }

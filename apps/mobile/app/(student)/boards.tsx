@@ -3,13 +3,19 @@ import {
   ActivityIndicator,
   FlatList,
   RefreshControl,
+  ScrollView,
   StyleSheet,
   Text,
   View,
   useWindowDimensions,
 } from "react-native";
 import { Image } from "expo-image";
-import { useFocusEffect, useRouter } from "expo-router";
+import {
+  type Href,
+  useFocusEffect,
+  useLocalSearchParams,
+  useRouter,
+} from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { layoutLabel, layoutThumbnail } from "../../theme/layout-meta";
 import {
@@ -39,6 +45,10 @@ import {
   type MobileBoardRow,
 } from "../../lib/mobile-board-overview";
 import {
+  isMobileOfficialGameKind,
+  MOBILE_GAME_HUB_ORDER,
+} from "../../lib/game-platform-contract";
+import {
   AppButton,
   AppHeader,
   EmptyState,
@@ -49,6 +59,8 @@ import {
   SectionNavItem,
 } from "../../components/NavigationTabs";
 import { StudentHeaderActions } from "../../components/StudentHeaderActions";
+import { GameHubCatalog } from "../../components/game-platform/GameHubCatalog";
+import { GameRecordsPanel } from "../../components/game-platform/GameRecordsPanel";
 
 const FALLBACK_THUMBNAIL = "/board-type-thumbnails/card-board.png";
 type StudentBoardsResponse = {
@@ -56,6 +68,7 @@ type StudentBoardsResponse = {
   classroomName: string | null;
 };
 type LegacyStudentBoardsResponse = MeResponse["boards"];
+type PlayTab = "games" | "records";
 
 function normalizeStudentBoardsResponse(
   response: StudentBoardsResponse | LegacyStudentBoardsResponse,
@@ -66,8 +79,26 @@ function normalizeStudentBoardsResponse(
   return response;
 }
 
+function parseFilter(value: unknown): MobileBoardFilter {
+  return value === "lesson" || value === "play" ? value : "all";
+}
+
+function parsePlayTab(value: unknown): PlayTab {
+  return value === "records" ? "records" : "games";
+}
+
 export default function StudentBoardsScreen() {
   const router = useRouter();
+  const routeParams = useLocalSearchParams<{
+    filter?: string | string[];
+    playTab?: string | string[];
+  }>();
+  const routeFilter = Array.isArray(routeParams.filter)
+    ? routeParams.filter[0]
+    : routeParams.filter;
+  const routePlayTab = Array.isArray(routeParams.playTab)
+    ? routeParams.playTab[0]
+    : routeParams.playTab;
   const { width } = useWindowDimensions();
   const initialCache = readBoardCache<
     StudentBoardsResponse | LegacyStudentBoardsResponse
@@ -86,7 +117,12 @@ export default function StudentBoardsScreen() {
   const [loading, setLoading] = useState(() => !initialCache);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [filter, setFilter] = useState<MobileBoardFilter>("all");
+  const [filter, setFilter] = useState<MobileBoardFilter>(() =>
+    parseFilter(routeFilter),
+  );
+  const [playTab, setPlayTab] = useState<PlayTab>(() =>
+    parsePlayTab(routePlayTab),
+  );
   const useWidePadding = width >= layoutTokens.mobileBreakpoint;
   const horizontalPadding = useWidePadding ? spacing.xxl : spacing.lg;
   const boardGridWidth = Math.max(
@@ -101,9 +137,16 @@ export default function StudentBoardsScreen() {
         layoutTokens.mobileBoardColumns,
     ),
   );
-  const overview = useMemo(() => buildMobileBoardOverview(boards), [boards]);
+  const contentBoards = useMemo(
+    () => boards.filter((board) => !isMobileOfficialGameKind(board.layout)),
+    [boards],
+  );
+  const overview = useMemo(
+    () => buildMobileBoardOverview(contentBoards),
+    [contentBoards],
+  );
   const visibleRows = useMemo(
-    () => filterMobileBoardRows(overview, filter, ""),
+    () => filterMobileBoardRows(overview, filter === "play" ? "all" : filter, ""),
     [filter, overview],
   );
 
@@ -173,25 +216,132 @@ export default function StudentBoardsScreen() {
     }, [load]),
   );
 
+  function chooseFilter(next: MobileBoardFilter) {
+    setFilter(next);
+    router.setParams({
+      filter: next === "all" ? undefined : next,
+      playTab: next === "play" && playTab === "records" ? "records" : undefined,
+    });
+  }
+
+  function choosePlayTab(next: PlayTab) {
+    setPlayTab(next);
+    router.setParams({
+      filter: "play",
+      playTab: next === "records" ? "records" : undefined,
+    });
+  }
+
+  const filterHeader = (
+    <View style={styles.headerContent}>
+      <View style={styles.boardFilterHeader}>
+        <Text style={styles.boardHeaderTitle} accessibilityRole="header">
+          {classroomName ?? cachedClassroomName ?? "내 학급"}
+        </Text>
+        <SectionNav style={styles.filterNav} accessibilityLabel="보드 필터">
+          <SectionNavItem
+            selected={filter === "all"}
+            onPress={() => chooseFilter("all")}
+            accessibilityLabel={`전체 보드 ${overview.summary.total}개`}
+          >
+            {`전체 ${overview.summary.total}`}
+          </SectionNavItem>
+          <SectionNavItem
+            selected={filter === "lesson"}
+            onPress={() => chooseFilter("lesson")}
+            accessibilityLabel={`수업 보드 ${overview.summary.lesson}개`}
+          >
+            {`수업 ${overview.summary.lesson}`}
+          </SectionNavItem>
+          <SectionNavItem
+            selected={filter === "play"}
+            onPress={() => chooseFilter("play")}
+            accessibilityLabel={`놀이 게임 ${MOBILE_GAME_HUB_ORDER.length}개`}
+          >
+            {`놀이 ${MOBILE_GAME_HUB_ORDER.length}`}
+          </SectionNavItem>
+        </SectionNav>
+      </View>
+      {filter === "play" ? (
+        <SectionNav
+          style={styles.playNav}
+          accessibilityLabel="놀이 보기"
+        >
+          <SectionNavItem
+            selected={playTab === "games"}
+            onPress={() => choosePlayTab("games")}
+          >
+            게임
+          </SectionNavItem>
+          <SectionNavItem
+            selected={playTab === "records"}
+            onPress={() => choosePlayTab("records")}
+          >
+            나의 전적
+          </SectionNavItem>
+        </SectionNav>
+      ) : null}
+    </View>
+  );
+
+  if (filter === "play") {
+    return (
+      <SafeAreaView style={styles.container} edges={["top"]}>
+        <AppHeader title="보드" right={<StudentHeaderActions />} />
+        <ScrollView
+          contentInsetAdjustmentBehavior="automatic"
+          contentContainerStyle={[
+            styles.content,
+            useWidePadding && styles.contentWide,
+          ]}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={() => void load(true)}
+              tintColor={colors.accent}
+            />
+          }
+        >
+          {filterHeader}
+          {playTab === "games" ? <GameHubCatalog /> : <GameRecordsPanel />}
+        </ScrollView>
+      </SafeAreaView>
+    );
+  }
+
   return (
     <SafeAreaView style={styles.container} edges={["top"]}>
       <AppHeader title="보드" right={<StudentHeaderActions />} />
-      {loading ? (
-        <View style={styles.center}>
-          <ActivityIndicator size="large" color={colors.accent} />
-          <Text style={styles.loadingText}>보드를 불러오는 중…</Text>
+      {loading && contentBoards.length === 0 ? (
+        <View style={styles.screenBody}>
+          {filterHeader}
+          <View style={styles.center}>
+            <ActivityIndicator size="large" color={colors.accent} />
+            <Text style={styles.loadingText}>보드를 불러오는 중…</Text>
+          </View>
         </View>
-      ) : error && boards.length === 0 ? (
-        <View style={styles.center}>
-          <Text style={styles.error}>{error}</Text>
-          <AppButton onPress={() => void load()}>다시 시도</AppButton>
+      ) : error && contentBoards.length === 0 ? (
+        <View style={styles.screenBody}>
+          {filterHeader}
+          <View style={styles.center}>
+            <Text style={styles.error}>{error}</Text>
+            <AppButton onPress={() => void load()}>다시 시도</AppButton>
+          </View>
         </View>
-      ) : boards.length === 0 ? (
-        <View style={styles.emptyWrap}>
-          <EmptyState
-            title="아직 참여할 수 있는 보드가 없어요."
-            description="선생님이 보드를 열어 주면 이곳에서 바로 참여할 수 있어요."
-          />
+      ) : contentBoards.length === 0 ? (
+        <View style={styles.screenBody}>
+          {filterHeader}
+          <View style={styles.emptyWrap}>
+            <EmptyState
+              title="아직 참여할 수 있는 수업 보드가 없어요."
+              description="놀이 탭의 다섯 게임은 보드와 관계없이 언제든 확인할 수 있어요."
+              action={
+                <AppButton onPress={() => chooseFilter("play")}>
+                  놀이 게임 보기
+                </AppButton>
+              }
+            />
+          </View>
         </View>
       ) : (
         <FlatList
@@ -213,48 +363,14 @@ export default function StudentBoardsScreen() {
               tintColor={colors.accent}
             />
           }
-          ListHeaderComponent={
-            <View style={styles.headerContent}>
-              <View style={styles.boardFilterHeader}>
-                <Text style={styles.boardHeaderTitle} accessibilityRole="header">
-                  {classroomName ?? cachedClassroomName ?? "내 학급"}
-                </Text>
-                <SectionNav
-                  style={styles.filterNav}
-                  accessibilityLabel="보드 필터"
-                >
-                  <SectionNavItem
-                    selected={filter === "all"}
-                    onPress={() => setFilter("all")}
-                    accessibilityLabel={`전체 보드 ${overview.summary.total}개`}
-                  >
-                    {`전체 ${overview.summary.total}`}
-                  </SectionNavItem>
-                  <SectionNavItem
-                    selected={filter === "lesson"}
-                    onPress={() => setFilter("lesson")}
-                    accessibilityLabel={`수업 보드 ${overview.summary.lesson}개`}
-                  >
-                    {`수업 ${overview.summary.lesson}`}
-                  </SectionNavItem>
-                  <SectionNavItem
-                    selected={filter === "play"}
-                    onPress={() => setFilter("play")}
-                    accessibilityLabel={`놀이 보드 ${overview.summary.play}개`}
-                  >
-                    {`놀이 ${overview.summary.play}`}
-                  </SectionNavItem>
-                </SectionNav>
-              </View>
-            </View>
-          }
+          ListHeaderComponent={filterHeader}
           renderItem={({ item }) => (
             <BoardRow
               row={item}
               cardWidth={boardCardWidth}
               onPress={() =>
                 router.push(
-                  `/(student)/board/${item.board.slug}?layout=${item.board.layout}`,
+                  `/(student)/board/${item.board.slug}?layout=${item.board.layout}` as Href,
                 )
               }
             />
@@ -262,19 +378,15 @@ export default function StudentBoardsScreen() {
           ItemSeparatorComponent={() => <View style={styles.separator} />}
           ListEmptyComponent={
             <EmptyState
-              title="지금 바로 할 보드가 없어요"
-              description="전체 탭에서 수업 자료와 지난 활동을 확인할 수 있어요."
+              title="이 조건의 수업 보드가 없어요"
+              description="전체 탭에서 다른 수업 자료를 확인하거나 놀이 탭에서 게임을 시작해 보세요."
               action={
-                filter !== "all" ? (
-                  <AppButton
-                    variant="secondary"
-                    onPress={() => {
-                      setFilter("all");
-                    }}
-                  >
-                    전체 보드 보기
-                  </AppButton>
-                ) : undefined
+                <AppButton
+                  variant="secondary"
+                  onPress={() => chooseFilter("all")}
+                >
+                  전체 보드 보기
+                </AppButton>
               }
             />
           }
@@ -331,6 +443,7 @@ function boardThumbUri(board: MeResponse["boards"][number]): string {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg },
+  screenBody: { flex: 1, paddingHorizontal: spacing.lg, paddingTop: pageChrome.contentStartGap },
   center: {
     flex: 1,
     alignItems: "center",
@@ -355,10 +468,11 @@ const styles = StyleSheet.create({
   },
   contentWide: { paddingHorizontal: spacing.xxl },
   headerContent: {
-    paddingBottom: spacing.md,
+    gap: spacing.md,
+    paddingBottom: spacing.lg,
   },
   boardFilterHeader: {
-    minHeight: tapMin + spacing.xs,
+    minHeight: tapMin,
     flexDirection: "row",
     alignItems: "flex-end",
     justifyContent: "space-between",
@@ -376,6 +490,9 @@ const styles = StyleSheet.create({
   filterNav: {
     borderBottomWidth: borders.none,
     flexShrink: 0,
+  },
+  playNav: {
+    alignSelf: "flex-start",
   },
   columnWrapper: {
     gap: layoutTokens.boardGridGap,

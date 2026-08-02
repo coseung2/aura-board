@@ -1,19 +1,34 @@
-// BC-2 Kordle server helpers. Pure functions that wrap Prisma + engine so
-// route handlers stay thin and testable.
-
 import "server-only";
 
 import type { Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
+import { withPlayRequestReceipt } from "@/lib/game-platform/idempotency";
+import { writeGameResult } from "@/lib/game-platform/result-writer";
 import { evaluateGuess, validateGuess } from "../engine";
 import type {
   GuessFeedback,
+  KordleCommandResponse,
   KordleEngineConfig,
   KordlePublicState,
+  KordleTerminalReason,
   KordleWinnerStats,
 } from "../engine";
 
 export const KORDLE_ROUND_DURATION_MS = 0;
+const KORDLE_RULES_VERSION = 1;
+const KORDLE_STATE_SCHEMA_VERSION = 1;
+
+type KordleClient = Prisma.TransactionClient | typeof db;
+
+type KordleActorIdentity = {
+  studentId: string | null;
+  vibePlaySessionId?: string | null;
+  teacherUserId?: string | null;
+};
+
+type StoredKordleCommandResult =
+  | { ok: true; response: KordleCommandResponse }
+  | { ok: false; reason: string; state?: KordlePublicState };
 
 export async function loadGameConfig(boardId: string): Promise<{
   gameId: string;
@@ -50,18 +65,13 @@ export async function ensureAttempt(opts: EnsureAttemptInput): Promise<string> {
   if (actorCount !== 1) {
     throw new Error("ensureAttempt: must provide exactly one actor");
   }
-  // The partial unique index on (puzzleId, studentId) / (puzzleId, vibePlaySessionId)
-  // guarantees idempotency, but we still try-then-create so the read path
-  // does not need a follow-up write.
+  const actorWhere = opts.studentId
+    ? { studentId: opts.studentId }
+    : opts.vibePlaySessionId
+      ? { vibePlaySessionId: opts.vibePlaySessionId }
+      : { teacherUserId: opts.teacherUserId };
   const existing = await db.kordleAttempt.findFirst({
-    where: {
-      puzzleId: opts.puzzleId,
-      ...(opts.studentId
-        ? { studentId: opts.studentId }
-        : opts.vibePlaySessionId
-          ? { vibePlaySessionId: opts.vibePlaySessionId }
-          : { teacherUserId: opts.teacherUserId }),
-    },
+    where: { puzzleId: opts.puzzleId, ...actorWhere },
     select: { id: true },
   });
   if (existing) return existing.id;
@@ -76,34 +86,21 @@ export async function ensureAttempt(opts: EnsureAttemptInput): Promise<string> {
       select: { id: true },
     });
     return created.id;
-  } catch (err: unknown) {
-    // P2002 unique violation: another request created the row between our
-    // findFirst and create. Re-read and return that row.
-    if (err && typeof err === "object" && "code" in err && (err as { code?: string }).code === "P2002") {
-      const again = await db.kordleAttempt.findFirst({
-        where: {
-          puzzleId: opts.puzzleId,
-          ...(opts.studentId
-            ? { studentId: opts.studentId }
-            : opts.vibePlaySessionId
-              ? { vibePlaySessionId: opts.vibePlaySessionId }
-              : { teacherUserId: opts.teacherUserId }),
-        },
+  } catch (error: unknown) {
+    if (
+      error &&
+      typeof error === "object" &&
+      "code" in error &&
+      (error as { code?: string }).code === "P2002"
+    ) {
+      const raced = await db.kordleAttempt.findFirst({
+        where: { puzzleId: opts.puzzleId, ...actorWhere },
         select: { id: true },
       });
-      if (again) return again.id;
+      if (raced) return raced.id;
     }
-    throw err;
+    throw error;
   }
-}
-
-export interface SubmitGuessInput {
-  attemptId: string;
-  rawGuess: string;
-  expectedGuessIndex?: number;
-  studentId: string | null;
-  vibePlaySessionId: string | null;
-  teacherUserId?: string | null;
 }
 
 type KordleTurnState = KordlePublicState["turn"];
@@ -113,10 +110,8 @@ function materializeGuessRows(
 ): GuessFeedback[] {
   const rows: GuessFeedback[] = [];
   for (const guess of guesses) {
-    while (rows.length < guess.guessIndex - 1) {
-      rows.push([]);
-    }
-    rows[guess.guessIndex - 1] = guess.feedback as unknown as GuessFeedback;
+    while (rows.length < guess.guessIndex - 1) rows.push([]);
+    rows[guess.guessIndex - 1] = guess.feedback as GuessFeedback;
   }
   return rows;
 }
@@ -125,8 +120,16 @@ function latestGuessIndex(guesses: Array<{ guessIndex: number }>): number {
   return guesses.reduce((latest, guess) => Math.max(latest, guess.guessIndex), 0);
 }
 
+function safeVersion(value: bigint): number {
+  const version = Number(value);
+  if (!Number.isSafeInteger(version) || version < 0) {
+    throw new RangeError("kordle_version_out_of_range");
+  }
+  return version;
+}
+
 async function loadWinnerStats(
-  client: Prisma.TransactionClient | typeof db,
+  client: KordleClient,
   boardId: string,
 ): Promise<KordleWinnerStats> {
   const puzzles = await client.kordlePuzzle.findMany({
@@ -160,29 +163,26 @@ async function loadWinnerStats(
 
   const wins = new Map<string, { studentId: string; name: string; wins: number }>();
   const rounds: KordleWinnerStats["rounds"] = [];
-
   puzzles.forEach((puzzle, index) => {
     const solved = puzzle.attempts.filter(
       (attempt) => attempt.studentId && attempt.solvedAtGuess !== null,
     );
     if (solved.length === 0) return;
-    const bestGuess = Math.min(...solved.map((attempt) => attempt.solvedAtGuess ?? Infinity));
+    const bestGuess = Math.min(
+      ...solved.map((attempt) => attempt.solvedAtGuess ?? Number.POSITIVE_INFINITY),
+    );
     if (!Number.isFinite(bestGuess)) return;
-    const winners = solved.filter((attempt) => attempt.solvedAtGuess === bestGuess);
-    const roundWinners = winners.map((attempt) => ({
-      studentId: attempt.studentId!,
-      name: attempt.student?.name ?? "이름 없음",
-    }));
-
+    const roundWinners = solved
+      .filter((attempt) => attempt.solvedAtGuess === bestGuess)
+      .map((attempt) => ({
+        studentId: attempt.studentId!,
+        name: attempt.student?.name ?? "이름 없음",
+      }));
     for (const winner of roundWinners) {
       const current = wins.get(winner.studentId);
-      if (current) {
-        current.wins += 1;
-      } else {
-        wins.set(winner.studentId, { ...winner, wins: 1 });
-      }
+      if (current) current.wins += 1;
+      else wins.set(winner.studentId, { ...winner, wins: 1 });
     }
-
     rounds.push({
       puzzleId: puzzle.id,
       roundNumber: index + 1,
@@ -190,46 +190,36 @@ async function loadWinnerStats(
       solvedAtGuess: bestGuess,
     });
   });
-
   return {
     leaderboard: Array.from(wins.values()).sort(
-      (a, b) => b.wins - a.wins || a.name.localeCompare(b.name, "ko-KR"),
+      (left, right) =>
+        right.wins - left.wins || left.name.localeCompare(right.name, "ko-KR"),
     ),
     rounds: rounds.slice(-6).reverse(),
   };
 }
 
 async function getTurnState(
-  client: Prisma.TransactionClient | typeof db,
+  client: KordleClient,
   puzzleId: string,
   puzzleCurrentGuessIndex: number,
   maxGuesses: number,
   actorGuessCount: number,
   actorStatus: "IN_PROGRESS" | "WON" | "LOST" | "ABANDONED",
-  actorStartedAt: Date,
-  isStudentActor: boolean,
 ): Promise<KordleTurnState> {
   const studentAttempts = await client.kordleAttempt.findMany({
-    where: {
-      puzzleId,
-      studentId: { not: null },
-    },
+    where: { puzzleId, studentId: { not: null } },
     select: {
-      id: true,
-      startedAt: true,
       status: true,
       guesses: {
         orderBy: { guessIndex: "asc" },
-        select: { guessIndex: true, createdAt: true },
+        select: { guessIndex: true },
       },
-      _count: { select: { guesses: true } },
     },
   });
-
-  void actorStartedAt;
-  void isStudentActor;
-  const joinedAttempts = studentAttempts;
-  const activeAttempts = joinedAttempts.filter((attempt) => attempt.status === "IN_PROGRESS");
+  const activeAttempts = studentAttempts.filter(
+    (attempt) => attempt.status === "IN_PROGRESS",
+  );
   const currentGuessIndex =
     actorStatus === "IN_PROGRESS" && actorGuessCount < maxGuesses
       ? Math.min(Math.max(puzzleCurrentGuessIndex, 1), maxGuesses)
@@ -238,8 +228,8 @@ async function getTurnState(
     return {
       currentGuessIndex,
       nextGuessIndex: currentGuessIndex,
-      submittedCount: joinedAttempts.length,
-      totalCount: joinedAttempts.length,
+      submittedCount: studentAttempts.length,
+      totalCount: studentAttempts.length,
       isWaiting: false,
       isPendingJoin: false,
       roundDurationMs: KORDLE_ROUND_DURATION_MS,
@@ -248,7 +238,6 @@ async function getTurnState(
       remainingMs: 0,
     };
   }
-
   if (currentGuessIndex === null) {
     return {
       currentGuessIndex: null,
@@ -263,9 +252,8 @@ async function getTurnState(
       remainingMs: 0,
     };
   }
-
-  const submittedCount = activeAttempts.filter(
-    (attempt) => attempt.guesses.some((guess) => guess.guessIndex === currentGuessIndex),
+  const submittedCount = activeAttempts.filter((attempt) =>
+    attempt.guesses.some((guess) => guess.guessIndex === currentGuessIndex),
   ).length;
   const actorNextGuessIndex =
     actorStatus === "IN_PROGRESS"
@@ -273,7 +261,6 @@ async function getTurnState(
         ? Math.min(actorGuessCount + 1, maxGuesses)
         : currentGuessIndex
       : null;
-
   return {
     currentGuessIndex,
     nextGuessIndex: actorNextGuessIndex,
@@ -291,273 +278,509 @@ async function getTurnState(
   };
 }
 
-export async function submitGuess(
-  opts: SubmitGuessInput,
-): Promise<{ ok: true; state: KordlePublicState } | { ok: false; reason: string }> {
-  if (!opts.studentId && !opts.vibePlaySessionId && !opts.teacherUserId) {
-    return { ok: false, reason: "unauthenticated" };
+async function authorizeAttempt(
+  client: KordleClient,
+  attempt: {
+    studentId: string | null;
+    vibePlaySessionId: string | null;
+    teacherUserId: string | null;
+    puzzle: { game: { boardId: string } };
+  },
+  actor: KordleActorIdentity,
+): Promise<boolean> {
+  if (actor.studentId) return attempt.studentId === actor.studentId;
+  if (actor.vibePlaySessionId) {
+    return attempt.vibePlaySessionId === actor.vibePlaySessionId;
   }
-  if ([opts.studentId, opts.vibePlaySessionId, opts.teacherUserId].filter(Boolean).length > 1) {
-    return { ok: false, reason: "ambiguous_actor" };
+  if (!actor.teacherUserId || attempt.teacherUserId !== actor.teacherUserId) {
+    return false;
   }
-  return await db.$transaction(async (tx) => {
-    // Lock the attempt row for the rest of this transaction. Other
-    // concurrent guess submissions will queue behind us and read the
-    // updated guesses count + status.
-    const lockRows = await tx.$queryRaw<
-      Array<{ id: string }>
-    >`SELECT id FROM "KordleAttempt" WHERE id = ${opts.attemptId} FOR UPDATE`;
-    if (lockRows.length === 0) {
-      return { ok: false as const, reason: "attempt_not_found" };
-    }
-
-    const attempt = await tx.kordleAttempt.findUnique({
-      where: { id: opts.attemptId },
-      include: {
-        puzzle: { include: { game: true, solutionWord: true } },
-        guesses: { orderBy: { guessIndex: "asc" } },
-      },
-    });
-    if (!attempt) return { ok: false as const, reason: "attempt_not_found" };
-
-    // Ownership check. Students, Vibe sessions, and teachers each have their
-    // own attempt rows so every actor solves the same puzzle independently.
-    if (opts.studentId) {
-      if (attempt.studentId !== opts.studentId) {
-        return { ok: false as const, reason: "forbidden" };
-      }
-    } else if (opts.vibePlaySessionId) {
-      if (attempt.vibePlaySessionId !== opts.vibePlaySessionId) {
-        return { ok: false as const, reason: "forbidden" };
-      }
-    } else if (opts.teacherUserId) {
-      if (attempt.teacherUserId !== opts.teacherUserId) {
-        return { ok: false as const, reason: "forbidden" };
-      }
-      const board = await tx.board.findFirst({
-        where: {
-          id: attempt.puzzle.game.boardId,
-          members: {
-            some: {
-              userId: opts.teacherUserId,
-              role: { in: ["owner", "editor"] },
-            },
-          },
+  const board = await client.board.findFirst({
+    where: {
+      id: attempt.puzzle.game.boardId,
+      members: {
+        some: {
+          userId: actor.teacherUserId,
+          role: { in: ["owner", "editor"] },
         },
-        select: { id: true },
-      });
-      if (!board) return { ok: false as const, reason: "forbidden" };
-    } else {
-      return { ok: false as const, reason: "forbidden" };
-    }
-
-    // Reject if the attempt is already closed.
-    if (attempt.status !== "IN_PROGRESS") {
-      return { ok: false as const, reason: "puzzle_closed" };
-    }
-
-    // Reject if the puzzle itself is not in a playable state.
-    const now = new Date();
-    if (
-      attempt.puzzle.status === "DRAFT" ||
-      attempt.puzzle.status === "ARCHIVED" ||
-      attempt.puzzle.status === "CLOSED"
-    ) {
-      return { ok: false as const, reason: "puzzle_not_playable" };
-    }
-    if (attempt.puzzle.status === "SCHEDULED" && attempt.puzzle.startsAt && attempt.puzzle.startsAt > now) {
-      return { ok: false as const, reason: "puzzle_not_playable" };
-    }
-    if (attempt.puzzle.endsAt && attempt.puzzle.endsAt < now) {
-      return { ok: false as const, reason: "puzzle_not_playable" };
-    }
-
-    const config: KordleEngineConfig = {
-      wordLength: attempt.puzzle.game.wordLength,
-      maxGuesses: attempt.puzzle.game.maxGuesses,
-      locale: attempt.puzzle.game.locale,
-    };
-
-    const validation = await validateGuess(opts.rawGuess, config, {
-      isAllowed: async () => true,
-    });
-    if (!validation.ok) {
-      return { ok: false as const, reason: validation.reason };
-    }
-
-    const turnBeforeGuess = await getTurnState(
-      tx,
-      attempt.puzzleId,
-      attempt.puzzle.currentGuessIndex,
-      config.maxGuesses,
-      latestGuessIndex(attempt.guesses),
-      attempt.status,
-      attempt.startedAt,
-      !!attempt.studentId,
-    );
-    const guessIndex = turnBeforeGuess.nextGuessIndex;
-    if (
-      opts.expectedGuessIndex !== undefined &&
-      opts.expectedGuessIndex !== turnBeforeGuess.currentGuessIndex
-    ) {
-      return { ok: false as const, reason: "line_not_active" };
-    }
-    if (guessIndex === null || guessIndex > config.maxGuesses) {
-      return { ok: false as const, reason: "no_attempts_left" };
-    }
-    if (
-      turnBeforeGuess.currentGuessIndex !== null &&
-      guessIndex !== turnBeforeGuess.currentGuessIndex
-    ) {
-      return { ok: false as const, reason: "waiting_for_turn" };
-    }
-
-    const result = evaluateGuess(attempt.puzzle.solutionWord.text, opts.rawGuess, config);
-
-    await tx.kordleGuess.create({
-      data: {
-        attemptId: attempt.id,
-        guessIndex,
-        guess: opts.rawGuess,
-        feedback: result.feedback as unknown as object,
-        isCorrect: result.isCorrect,
       },
-    });
-
-    let nextStatus: "IN_PROGRESS" | "WON" | "LOST" = "IN_PROGRESS";
-    if (result.isCorrect) nextStatus = "WON";
-    else if (guessIndex >= config.maxGuesses) nextStatus = "LOST";
-
-    const updated = await tx.kordleAttempt.update({
-      where: { id: attempt.id },
-      data: {
-        status: nextStatus,
-        solvedAtGuess: result.isCorrect ? guessIndex : attempt.solvedAtGuess,
-        completedAt: nextStatus === "IN_PROGRESS" ? null : new Date(),
-      },
-    });
-
-    const allGuesses = materializeGuessRows([
-      ...attempt.guesses.map((g) => ({
-        guessIndex: g.guessIndex,
-        feedback: g.feedback,
-      })),
-      { guessIndex, feedback: result.feedback },
-    ]);
-    const absentLetters: string[] = [];
-    for (const fb of allGuesses) {
-      for (const lf of fb) {
-        if (lf.state === "absent" && !absentLetters.includes(lf.char)) {
-          absentLetters.push(lf.char);
-        }
-      }
-    }
-    const turn = await getTurnState(
-      tx,
-      attempt.puzzleId,
-      attempt.puzzle.currentGuessIndex,
-      config.maxGuesses,
-      latestGuessIndex([...attempt.guesses, { guessIndex }]),
-      updated.status,
-      attempt.startedAt,
-      !!attempt.studentId,
-    );
-    const winnerStats = await loadWinnerStats(tx, attempt.puzzle.game.boardId);
-
-    return {
-      ok: true as const,
-      state: {
-        puzzleId: attempt.puzzleId,
-        status: updated.status,
-        wordLength: config.wordLength,
-        maxGuesses: config.maxGuesses,
-        guesses: allGuesses,
-        nextGuessIndex: turn.nextGuessIndex,
-        absentLetters,
-        solvedAtGuess: updated.solvedAtGuess,
-        turn,
-        winnerStats,
-      },
-    };
+    },
+    select: { id: true },
   });
+  return Boolean(board);
 }
 
-export async function getPublicState(opts: {
-  attemptId: string;
-  studentId: string | null;
-  vibePlaySessionId?: string | null;
-  teacherUserId?: string | null;
-}): Promise<KordlePublicState | null> {
-  const attempt = await db.kordleAttempt.findUnique({
+async function loadPublicState(
+  client: KordleClient,
+  opts: { attemptId: string } & KordleActorIdentity,
+): Promise<KordlePublicState | null> {
+  const attempt = await client.kordleAttempt.findUnique({
     where: { id: opts.attemptId },
     include: {
       puzzle: { include: { game: true } },
       guesses: { orderBy: { guessIndex: "asc" } },
     },
   });
-  if (!attempt) return null;
-  // Strict ownership: caller must match one of the FKs on the attempt.
-  if (opts.studentId && attempt.studentId !== opts.studentId) return null;
-  if (opts.vibePlaySessionId && attempt.vibePlaySessionId !== opts.vibePlaySessionId) {
-    return null;
-  }
-  if (opts.teacherUserId) {
-    if (attempt.teacherUserId !== opts.teacherUserId) return null;
-    const board = await db.board.findFirst({
-      where: {
-        id: attempt.puzzle.game.boardId,
-        members: {
-          some: {
-            userId: opts.teacherUserId,
-            role: { in: ["owner", "editor"] },
-          },
-        },
-      },
-      select: { id: true },
-    });
-    if (!board) return null;
-  } else if (!opts.studentId && !opts.vibePlaySessionId) {
-    return null;
-  }
+  if (!attempt || !(await authorizeAttempt(client, attempt, opts))) return null;
+
   const config: KordleEngineConfig = {
     wordLength: attempt.puzzle.game.wordLength,
     maxGuesses: attempt.puzzle.game.maxGuesses,
     locale: attempt.puzzle.game.locale,
   };
-  const allGuesses = materializeGuessRows(attempt.guesses);
+  const guesses = materializeGuessRows(attempt.guesses);
   const absentLetters: string[] = [];
-  for (const fb of allGuesses) {
-    for (const lf of fb) {
-      if (lf.state === "absent" && !absentLetters.includes(lf.char)) {
-        absentLetters.push(lf.char);
+  for (const feedback of guesses) {
+    for (const letter of feedback) {
+      if (
+        letter.state === "absent" &&
+        !absentLetters.includes(letter.char)
+      ) {
+        absentLetters.push(letter.char);
       }
     }
   }
   const turn = await getTurnState(
-    db,
+    client,
     attempt.puzzleId,
     attempt.puzzle.currentGuessIndex,
     config.maxGuesses,
     latestGuessIndex(attempt.guesses),
     attempt.status,
-    attempt.startedAt,
-    !!attempt.studentId,
   );
-  const winnerStats = await loadWinnerStats(db, attempt.puzzle.game.boardId);
-  const status =
-    attempt.status === "IN_PROGRESS" && (attempt.puzzle.status === "CLOSED" || turn.nextGuessIndex === null)
-      ? "LOST"
-      : attempt.status;
+  const [winnerStats, result] = await Promise.all([
+    loadWinnerStats(client, attempt.puzzle.game.boardId),
+    attempt.studentId
+      ? client.gameResult.findFirst({
+          where: {
+            gameKind: "kordle",
+            sourceType: "kordle_attempt",
+            sourceId: attempt.id,
+            studentId: attempt.studentId,
+          },
+          select: { id: true },
+        })
+      : Promise.resolve(null),
+  ]);
   return {
     puzzleId: attempt.puzzleId,
-    status,
+    version: safeVersion(attempt.version),
+    status: attempt.status,
+    terminalReason: attempt.terminalReason as KordleTerminalReason | null,
+    resultId: result?.id ?? null,
     wordLength: config.wordLength,
     maxGuesses: config.maxGuesses,
-    guesses: allGuesses,
+    guesses,
     nextGuessIndex: turn.nextGuessIndex,
     absentLetters,
     solvedAtGuess: attempt.solvedAtGuess,
     turn,
     winnerStats,
   };
+}
+
+function terminalMapping(reason: KordleTerminalReason) {
+  switch (reason) {
+    case "solved":
+      return { status: "WON" as const, outcome: "win" as const };
+    case "guesses_exhausted":
+    case "deadline":
+      return { status: "LOST" as const, outcome: "loss" as const };
+    case "participant_abandon":
+      return { status: "ABANDONED" as const, outcome: "abandoned" as const };
+    case "host_ended":
+      return { status: "ABANDONED" as const, outcome: "host-ended" as const };
+  }
+}
+
+export async function finalizeKordleAttempt(
+  tx: Prisma.TransactionClient,
+  input: {
+    attemptId: string;
+    reason: KordleTerminalReason;
+    completedAt: Date;
+    solvedAtGuess?: number | null;
+  },
+): Promise<{ version: number; resultId: string | null }> {
+  await tx.$queryRaw`SELECT id FROM "KordleAttempt" WHERE id = ${input.attemptId} FOR UPDATE`;
+  const attempt = await tx.kordleAttempt.findUnique({
+    where: { id: input.attemptId },
+    include: {
+      puzzle: {
+        include: {
+          game: { include: { board: true } },
+        },
+      },
+      _count: { select: { guesses: true } },
+    },
+  });
+  if (!attempt) throw new Error("attempt_not_found");
+
+  const mapping = terminalMapping(input.reason);
+  const updated =
+    attempt.status === "IN_PROGRESS"
+      ? await tx.kordleAttempt.update({
+          where: { id: attempt.id },
+          data: {
+            status: mapping.status,
+            terminalReason: input.reason,
+            completedAt: input.completedAt,
+            solvedAtGuess:
+              input.solvedAtGuess === undefined
+                ? attempt.solvedAtGuess
+                : input.solvedAtGuess,
+            version: { increment: 1 },
+          },
+        })
+      : attempt;
+
+  let resultId: string | null = null;
+  if (attempt.studentId) {
+    const classroomId = attempt.puzzle.game.board.classroomId;
+    if (!classroomId) throw new Error("kordle_board_without_classroom");
+    const persistedReason =
+      (updated.terminalReason as KordleTerminalReason | null) ?? input.reason;
+    const persistedMapping = terminalMapping(persistedReason);
+    const result = await writeGameResult(tx, {
+      gameKind: "kordle",
+      boardId: attempt.puzzle.game.boardId,
+      classroomId,
+      studentId: attempt.studentId,
+      sourceType: "kordle_attempt",
+      sourceId: attempt.id,
+      outcome: persistedMapping.outcome,
+      score: null,
+      metrics: {
+        guessesUsed: attempt._count.guesses,
+        maxGuesses: attempt.puzzle.game.maxGuesses,
+        wordLength: attempt.puzzle.game.wordLength,
+        solved: persistedReason === "solved",
+        reason: persistedReason,
+      },
+      startedAt: attempt.startedAt,
+      completedAt: updated.completedAt ?? input.completedAt,
+      rulesVersion: KORDLE_RULES_VERSION,
+      stateSchemaVersion: KORDLE_STATE_SCHEMA_VERSION,
+    });
+    resultId = result.id;
+  }
+  return { version: safeVersion(updated.version), resultId };
+}
+
+export async function closeKordlePuzzleAttempts(
+  tx: Prisma.TransactionClient,
+  puzzleId: string,
+  completedAt: Date,
+): Promise<number> {
+  const attempts = await tx.kordleAttempt.findMany({
+    where: { puzzleId, status: "IN_PROGRESS" },
+    select: { id: true },
+    orderBy: { startedAt: "asc" },
+  });
+  for (const attempt of attempts) {
+    await finalizeKordleAttempt(tx, {
+      attemptId: attempt.id,
+      reason: "host_ended",
+      completedAt,
+    });
+  }
+  return attempts.length;
+}
+
+export interface SubmitGuessInput extends KordleActorIdentity {
+  attemptId: string;
+  requestId: string;
+  expectedVersion: number;
+  rawGuess: string;
+  expectedGuessIndex?: number;
+  actorSubject: string;
+}
+
+export type SubmitGuessResult =
+  | { ok: true; response: KordleCommandResponse; replayed: boolean }
+  | {
+      ok: false;
+      reason: string;
+      state?: KordlePublicState;
+      replayed: boolean;
+    };
+
+export async function submitGuess(
+  opts: SubmitGuessInput,
+): Promise<SubmitGuessResult> {
+  const actorCount = [
+    opts.studentId,
+    opts.vibePlaySessionId,
+    opts.teacherUserId,
+  ].filter(Boolean).length;
+  if (actorCount === 0) {
+    return { ok: false, reason: "unauthenticated", replayed: false };
+  }
+  if (actorCount !== 1) {
+    return { ok: false, reason: "ambiguous_actor", replayed: false };
+  }
+  if (!Number.isSafeInteger(opts.expectedVersion) || opts.expectedVersion < 0) {
+    return { ok: false, reason: "invalid_version", replayed: false };
+  }
+
+  return db.$transaction(async (tx) => {
+    const receipt = await withPlayRequestReceipt(
+      tx,
+      {
+        actorSubject: opts.actorSubject,
+        scopeType: "kordle_attempt_command",
+        scopeId: opts.attemptId,
+        requestId: opts.requestId,
+        requestBody: {
+          expectedVersion: opts.expectedVersion,
+          guess: opts.rawGuess,
+          guessIndex: opts.expectedGuessIndex ?? null,
+        },
+      },
+      async () => {
+        const lockRows = await tx.$queryRaw<Array<{ id: string }>>`
+          SELECT id FROM "KordleAttempt" WHERE id = ${opts.attemptId} FOR UPDATE
+        `;
+        if (lockRows.length === 0) {
+          return { ok: false, reason: "attempt_not_found" } as unknown as Prisma.InputJsonObject;
+        }
+
+        const attempt = await tx.kordleAttempt.findUnique({
+          where: { id: opts.attemptId },
+          include: {
+            puzzle: { include: { game: true, solutionWord: true } },
+            guesses: { orderBy: { guessIndex: "asc" } },
+          },
+        });
+        if (!attempt) {
+          return { ok: false, reason: "attempt_not_found" } as unknown as Prisma.InputJsonObject;
+        }
+        if (!(await authorizeAttempt(tx, attempt, opts))) {
+          return { ok: false, reason: "forbidden" } as unknown as Prisma.InputJsonObject;
+        }
+
+        const previousVersion = safeVersion(attempt.version);
+        if (previousVersion !== opts.expectedVersion) {
+          const state = await loadPublicState(tx, opts);
+          return {
+            ok: false,
+            reason: "version_conflict",
+            ...(state ? { state } : {}),
+          } as unknown as Prisma.InputJsonObject;
+        }
+        if (attempt.status !== "IN_PROGRESS") {
+          const state = await loadPublicState(tx, opts);
+          return {
+            ok: false,
+            reason: "puzzle_closed",
+            ...(state ? { state } : {}),
+          } as unknown as Prisma.InputJsonObject;
+        }
+
+        const now = new Date();
+        if (
+          attempt.puzzle.status === "DRAFT" ||
+          attempt.puzzle.status === "ARCHIVED" ||
+          attempt.puzzle.status === "CLOSED" ||
+          (attempt.puzzle.status === "SCHEDULED" &&
+            attempt.puzzle.startsAt &&
+            attempt.puzzle.startsAt > now) ||
+          (attempt.puzzle.endsAt && attempt.puzzle.endsAt < now)
+        ) {
+          return {
+            ok: false,
+            reason: "puzzle_not_playable",
+          } as unknown as Prisma.InputJsonObject;
+        }
+
+        const config: KordleEngineConfig = {
+          wordLength: attempt.puzzle.game.wordLength,
+          maxGuesses: attempt.puzzle.game.maxGuesses,
+          locale: attempt.puzzle.game.locale,
+        };
+        const validation = await validateGuess(opts.rawGuess, config, {
+          isAllowed: async () => true,
+        });
+        if (!validation.ok) {
+          return {
+            ok: false,
+            reason: validation.reason,
+          } as unknown as Prisma.InputJsonObject;
+        }
+
+        const turnBeforeGuess = await getTurnState(
+          tx,
+          attempt.puzzleId,
+          attempt.puzzle.currentGuessIndex,
+          config.maxGuesses,
+          latestGuessIndex(attempt.guesses),
+          attempt.status,
+        );
+        const guessIndex = turnBeforeGuess.nextGuessIndex;
+        if (
+          opts.expectedGuessIndex !== undefined &&
+          opts.expectedGuessIndex !== turnBeforeGuess.currentGuessIndex
+        ) {
+          return { ok: false, reason: "line_not_active" } as unknown as Prisma.InputJsonObject;
+        }
+        if (guessIndex === null || guessIndex > config.maxGuesses) {
+          return { ok: false, reason: "no_attempts_left" } as unknown as Prisma.InputJsonObject;
+        }
+        if (
+          turnBeforeGuess.currentGuessIndex !== null &&
+          guessIndex !== turnBeforeGuess.currentGuessIndex
+        ) {
+          return { ok: false, reason: "waiting_for_turn" } as unknown as Prisma.InputJsonObject;
+        }
+
+        const guessResult = evaluateGuess(
+          attempt.puzzle.solutionWord.text,
+          opts.rawGuess,
+          config,
+        );
+        await tx.kordleGuess.create({
+          data: {
+            attemptId: attempt.id,
+            guessIndex,
+            guess: opts.rawGuess,
+            feedback: guessResult.feedback as unknown as object,
+            isCorrect: guessResult.isCorrect,
+          },
+        });
+
+        if (guessResult.isCorrect) {
+          await finalizeKordleAttempt(tx, {
+            attemptId: attempt.id,
+            reason: "solved",
+            completedAt: now,
+            solvedAtGuess: guessIndex,
+          });
+        } else if (guessIndex >= config.maxGuesses) {
+          await finalizeKordleAttempt(tx, {
+            attemptId: attempt.id,
+            reason: "guesses_exhausted",
+            completedAt: now,
+          });
+        } else {
+          await tx.kordleAttempt.update({
+            where: { id: attempt.id },
+            data: { version: { increment: 1 } },
+          });
+        }
+
+        const state = await loadPublicState(tx, opts);
+        if (!state) throw new Error("kordle_state_missing_after_command");
+        const response: KordleCommandResponse = {
+          requestId: opts.requestId,
+          previousVersion,
+          version: state.version,
+          state,
+        };
+        return {
+          ok: true,
+          response,
+        } as unknown as Prisma.InputJsonObject;
+      },
+    );
+
+    const stored = receipt.response as unknown as StoredKordleCommandResult;
+    return stored.ok
+      ? { ok: true, response: stored.response, replayed: receipt.replayed }
+      : {
+          ok: false,
+          reason: stored.reason,
+          state: stored.state,
+          replayed: receipt.replayed,
+        };
+  });
+}
+
+export async function abandonKordleAttempt(input: {
+  attemptId: string;
+  requestId: string;
+  expectedVersion: number;
+  actorSubject: string;
+  studentId: string;
+}): Promise<SubmitGuessResult> {
+  if (!Number.isSafeInteger(input.expectedVersion) || input.expectedVersion < 0) {
+    return { ok: false, reason: "invalid_version", replayed: false };
+  }
+  return db.$transaction(async (tx) => {
+    const receipt = await withPlayRequestReceipt(
+      tx,
+      {
+        actorSubject: input.actorSubject,
+        scopeType: "kordle_attempt_command",
+        scopeId: input.attemptId,
+        requestId: input.requestId,
+        requestBody: {
+          expectedVersion: input.expectedVersion,
+          action: "abandon",
+        },
+      },
+      async () => {
+        await tx.$queryRaw`
+          SELECT id FROM "KordleAttempt" WHERE id = ${input.attemptId} FOR UPDATE
+        `;
+        const attempt = await tx.kordleAttempt.findUnique({
+          where: { id: input.attemptId },
+          select: { id: true, studentId: true, version: true, status: true },
+        });
+        if (!attempt) {
+          return { ok: false, reason: "attempt_not_found" } as unknown as Prisma.InputJsonObject;
+        }
+        if (attempt.studentId !== input.studentId) {
+          return { ok: false, reason: "forbidden" } as unknown as Prisma.InputJsonObject;
+        }
+        const previousVersion = safeVersion(attempt.version);
+        if (previousVersion !== input.expectedVersion) {
+          const state = await loadPublicState(tx, {
+            attemptId: input.attemptId,
+            studentId: input.studentId,
+          });
+          return {
+            ok: false,
+            reason: "version_conflict",
+            ...(state ? { state } : {}),
+          } as unknown as Prisma.InputJsonObject;
+        }
+        if (attempt.status === "IN_PROGRESS") {
+          await finalizeKordleAttempt(tx, {
+            attemptId: attempt.id,
+            reason: "participant_abandon",
+            completedAt: new Date(),
+          });
+        }
+        const state = await loadPublicState(tx, {
+          attemptId: input.attemptId,
+          studentId: input.studentId,
+        });
+        if (!state) throw new Error("kordle_state_missing_after_abandon");
+        return {
+          ok: true,
+          response: {
+            requestId: input.requestId,
+            previousVersion,
+            version: state.version,
+            state,
+          },
+        } as unknown as Prisma.InputJsonObject;
+      },
+    );
+    const stored = receipt.response as unknown as StoredKordleCommandResult;
+    return stored.ok
+      ? { ok: true, response: stored.response, replayed: receipt.replayed }
+      : {
+          ok: false,
+          reason: stored.reason,
+          state: stored.state,
+          replayed: receipt.replayed,
+        };
+  });
+}
+
+export async function getPublicState(
+  opts: { attemptId: string } & KordleActorIdentity,
+): Promise<KordlePublicState | null> {
+  return loadPublicState(db, opts);
 }

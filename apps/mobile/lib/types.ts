@@ -117,6 +117,9 @@ export type StudentDuty = {
 
 export type SpeedGameWire = {
   id: string;
+  runId: string;
+  version: number;
+  terminalReason: "completed" | "participant_forfeit" | "host_ended" | null;
   boardId: string;
   boardSlug: string;
   classroomId: string;
@@ -148,6 +151,15 @@ export type SpeedGameWire = {
     createdAt: string;
   }>;
   groups: Array<{ id: string; name: string; studentIds: string[] }>;
+  participants: Array<{
+    studentId: string;
+    groupId: string;
+    name: string;
+    invitedAt: string;
+    joinedAt: string | null;
+    readyAt: string | null;
+    forfeitedAt: string | null;
+  }>;
   leaderboard: Array<{ groupId: string; groupName: string; score: number }>;
 };
 

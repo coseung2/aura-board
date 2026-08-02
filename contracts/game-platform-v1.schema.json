@@ -1,0 +1,175 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://aura-board.local/contracts/game-platform-v1.schema.json",
+  "title": "Aura Board Game Platform v1",
+  "schemaVersion": 1,
+  "type": "object",
+  "required": ["schemaVersion", "gameKinds", "outcomes", "ranges", "presentation"],
+  "additionalProperties": false,
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "gameKinds": {
+      "type": "array",
+      "minItems": 5,
+      "maxItems": 5,
+      "uniqueItems": true,
+      "items": { "$ref": "#/$defs/gameCatalogEntry" }
+    },
+    "outcomes": {
+      "const": ["win", "loss", "draw", "completed", "forfeit", "abandoned", "host-ended"]
+    },
+    "ranges": { "const": ["7d", "30d", "90d", "all"] },
+    "presentation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["phases", "connections", "actions"],
+      "properties": {
+        "phases": {
+          "const": ["loading", "empty", "unavailable", "lobby", "ready", "active", "reconnecting", "interrupted", "completed", "won", "lost", "draw", "forfeit", "abandoned", "host-ended", "error"]
+        },
+        "connections": { "const": ["online", "reconnecting", "offline"] },
+        "actions": {
+          "const": ["join", "ready", "start", "play", "exit", "end-early", "retry", "rematch", "games", "records"]
+        }
+      }
+    }
+  },
+  "$defs": {
+    "gameKind": {
+      "type": "string",
+      "enum": ["kordle", "speed-game", "shadow-alliance", "omok", "song-guess"]
+    },
+    "outcome": {
+      "type": "string",
+      "enum": ["win", "loss", "draw", "completed", "forfeit", "abandoned", "host-ended"]
+    },
+    "range": {
+      "type": "string",
+      "enum": ["7d", "30d", "90d", "all"]
+    },
+    "gameCatalogEntry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["wireValue", "displayName", "metrics"],
+      "properties": {
+        "wireValue": { "$ref": "#/$defs/gameKind" },
+        "displayName": { "type": "string", "minLength": 1, "maxLength": 40 },
+        "metrics": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["keys"],
+          "properties": {
+            "keys": {
+              "type": "array",
+              "uniqueItems": true,
+              "items": { "type": "string" }
+            }
+          }
+        }
+      }
+    },
+    "kordleMetrics": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["guessesUsed", "maxGuesses", "wordLength", "solved", "reason"],
+      "properties": {
+        "guessesUsed": { "type": "integer", "minimum": 0, "maximum": 100 },
+        "maxGuesses": { "type": "integer", "minimum": 1, "maximum": 100 },
+        "wordLength": { "type": "integer", "minimum": 1, "maximum": 64 },
+        "solved": { "type": "boolean" },
+        "reason": { "type": "string", "enum": ["solved", "guesses_exhausted", "participant_abandon", "host_ended", "deadline"] }
+      }
+    },
+    "speedGameMetrics": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["attribution", "groupName", "groupRank", "correctCount", "totalRounds"],
+      "properties": {
+        "attribution": { "const": "team" },
+        "groupName": { "type": "string", "minLength": 1, "maxLength": 100 },
+        "groupRank": { "type": "integer", "minimum": 1, "maximum": 1000 },
+        "correctCount": { "type": "integer", "minimum": 0, "maximum": 10000 },
+        "totalRounds": { "type": "integer", "minimum": 0, "maximum": 10000 }
+      }
+    },
+    "shadowAllianceMetrics": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["rank", "team", "roundWins", "completedRounds", "totalRounds", "reason"],
+      "properties": {
+        "rank": { "type": "integer", "minimum": 1, "maximum": 1000 },
+        "team": { "type": "string", "enum": ["black", "white"] },
+        "roundWins": { "type": "integer", "minimum": 0, "maximum": 10000 },
+        "completedRounds": { "type": "integer", "minimum": 0, "maximum": 10000 },
+        "totalRounds": { "type": "integer", "minimum": 0, "maximum": 10000 },
+        "reason": { "type": "string", "enum": ["completed", "participant_forfeit", "host_ended"] }
+      }
+    },
+    "omokMetrics": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["side", "moveCount", "reason"],
+      "properties": {
+        "side": { "type": "string", "enum": ["black", "white"] },
+        "moveCount": { "type": "integer", "minimum": 0, "maximum": 1000 },
+        "reason": { "type": "string", "enum": ["five", "draw", "resignation", "host_ended"] }
+      }
+    },
+    "songGuessMetrics": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["rank", "correctRounds", "totalRounds", "bestTierMs", "reason"],
+      "properties": {
+        "rank": { "type": "integer", "minimum": 1, "maximum": 1000 },
+        "correctRounds": { "type": "integer", "minimum": 0, "maximum": 10000 },
+        "totalRounds": { "type": "integer", "minimum": 0, "maximum": 10000 },
+        "bestTierMs": { "type": ["integer", "null"], "minimum": 0, "maximum": 9007199254740991 },
+        "reason": { "type": "string", "enum": ["completed", "participant_forfeit", "host_ended"] }
+      }
+    },
+    "record": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "gameKind", "boardId", "boardTitle", "outcome", "score", "durationMs", "metrics", "startedAt", "completedAt"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "gameKind": { "$ref": "#/$defs/gameKind" },
+        "boardId": { "type": "string", "minLength": 1 },
+        "boardTitle": { "type": "string" },
+        "outcome": { "$ref": "#/$defs/outcome" },
+        "score": { "type": ["integer", "null"], "minimum": 0, "maximum": 9007199254740991 },
+        "durationMs": { "type": ["integer", "null"], "minimum": 0, "maximum": 9007199254740991 },
+        "metrics": {
+          "oneOf": [
+            { "$ref": "#/$defs/kordleMetrics" },
+            { "$ref": "#/$defs/speedGameMetrics" },
+            { "$ref": "#/$defs/shadowAllianceMetrics" },
+            { "$ref": "#/$defs/omokMetrics" },
+            { "$ref": "#/$defs/songGuessMetrics" }
+          ]
+        },
+        "startedAt": { "type": "string", "format": "date-time" },
+        "completedAt": { "type": "string", "format": "date-time" }
+      }
+    }
+  },
+  "examples": [
+    {
+      "schemaVersion": 1,
+      "gameKinds": [
+        { "wireValue": "kordle", "displayName": "꼬들", "metrics": { "keys": ["guessesUsed", "maxGuesses", "wordLength", "solved", "reason"] } },
+        { "wireValue": "speed-game", "displayName": "스피드게임", "metrics": { "keys": ["attribution", "groupName", "groupRank", "correctCount", "totalRounds"] } },
+        { "wireValue": "shadow-alliance", "displayName": "그림자연합", "metrics": { "keys": ["rank", "team", "roundWins", "completedRounds", "totalRounds", "reason"] } },
+        { "wireValue": "omok", "displayName": "오목", "metrics": { "keys": ["side", "moveCount", "reason"] } },
+        { "wireValue": "song-guess", "displayName": "노래 맞히기", "metrics": { "keys": ["rank", "correctRounds", "totalRounds", "bestTierMs", "reason"] } }
+      ],
+      "outcomes": ["win", "loss", "draw", "completed", "forfeit", "abandoned", "host-ended"],
+      "ranges": ["7d", "30d", "90d", "all"],
+      "presentation": {
+        "phases": ["loading", "empty", "unavailable", "lobby", "ready", "active", "reconnecting", "interrupted", "completed", "won", "lost", "draw", "forfeit", "abandoned", "host-ended", "error"],
+        "connections": ["online", "reconnecting", "offline"],
+        "actions": ["join", "ready", "start", "play", "exit", "end-early", "retry", "rematch", "games", "records"]
+      }
+    }
+  ]
+}

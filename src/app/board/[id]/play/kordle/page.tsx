@@ -3,38 +3,43 @@ import { db } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
 import { getCurrentStudent } from "@/lib/student-auth";
 import { PlayBoardContinueButton } from "@/components/PlayBoardContinueButton";
+import { GameAreaShell } from "@/components/game-platform/GameAreaShell";
 import { KordleBoard } from "@/features/kordle/components/KordleBoard";
 import { KordleLiveToasts } from "@/features/kordle/components/KordleLiveToasts";
 import { KordleWaitingRoom } from "@/features/kordle/components/KordleWaitingRoom";
 import { ensureAttempt, getPublicState } from "@/features/kordle/server/kordleServer";
-import type { BoardTheme } from "@/components/BoardSettingsPanel";
 import "@/features/kordle/components/kordle.css";
 
 type Props = { params: Promise<{ id: string }> };
 
-function normalizeBoardTheme(value: string | null | undefined): BoardTheme {
-  switch (value) {
-    case "pastel-peach":
-    case "pastel-mint":
-    case "pastel-sky":
-    case "pastel-lilac":
-    case "pastel-lemon":
-      return value;
-    default:
-      return "pastel-sky";
-  }
+function WaitingShell({
+  boardId,
+  boardTitle,
+  studentId,
+  studentName,
+}: {
+  boardId: string;
+  boardTitle: string;
+  studentId: string;
+  studentName: string;
+}) {
+  return (
+    <GameAreaShell
+      title={`🟩 ${boardTitle}`}
+      rulesLabel="꼬들"
+      actions={<PlayBoardContinueButton />}
+    >
+      <KordleWaitingRoom
+        boardId={boardId}
+        studentId={studentId}
+        studentName={studentName}
+      />
+    </GameAreaShell>
+  );
 }
 
-// BC-2: a Kordle play page. Student-facing daily play surface. If a
-// teacher hits this URL we redirect to the board page so the same link
-// works in both contexts.
 export default async function KordlePlayPage({ params }: Props) {
-  const { id } = await params;
-  const boardIdOrSlug = id;
-
-  // StudentDashboard links to /board/${board.slug}/play/kordle, so the
-  // dynamic segment can be either a board id or a slug. Resolve to the
-  // canonical board row first; the Kordle game is keyed by boardId.
+  const { id: boardIdOrSlug } = await params;
   const board = await db.board.findFirst({
     where: { OR: [{ id: boardIdOrSlug }, { slug: boardIdOrSlug }] },
     select: {
@@ -42,53 +47,44 @@ export default async function KordlePlayPage({ params }: Props) {
       slug: true,
       title: true,
       layout: true,
-      boardTheme: true,
-      category: true,
       classroomId: true,
       classroom: { select: { teacherId: true } },
     },
   });
-  if (!board) notFound();
-  const boardId = board.id;
-  const boardTheme = normalizeBoardTheme(board.boardTheme);
+  if (!board || board.layout !== "kordle") notFound();
 
   const student = await getCurrentStudent();
   if (!student) {
-    // Teacher fallback: same link, no student session.
     const user = await getCurrentUser();
     if (user && board.classroom?.teacherId === user.id) {
-      redirect(`/board/${board.slug ?? boardId}`);
+      redirect(`/board/${board.slug ?? board.id}`);
     }
     notFound();
   }
-  if (board.classroomId !== student.classroomId) {
-    notFound();
-  }
+  if (board.classroomId !== student.classroomId) notFound();
 
   const game = await db.kordleGame.findUnique({
-    where: { boardId },
+    where: { boardId: board.id },
     select: {
       locale: true,
       puzzles: {
         where: { status: { in: ["DRAFT", "LIVE"] } },
         orderBy: { createdAt: "desc" },
         take: 1,
-        select: { id: true },
+        select: { id: true, status: true },
       },
     },
   });
   if (!game) notFound();
   const puzzle = game.puzzles[0];
-  if (!puzzle) {
+  if (!puzzle || puzzle.status !== "LIVE") {
     return (
-      <main className="board-page kordle-waiting-page" data-board-theme={boardTheme} data-play-board="true" data-board-category={board.category}>
-        <PlayBoardContinueButton />
-        <KordleWaitingRoom
-          boardId={boardId}
-          studentId={student.id}
-          studentName={student.name}
-        />
-      </main>
+      <WaitingShell
+        boardId={board.id}
+        boardTitle={board.title}
+        studentId={student.id}
+        studentName={student.name}
+      />
     );
   }
 
@@ -98,37 +94,33 @@ export default async function KordlePlayPage({ params }: Props) {
     vibePlaySessionId: null,
     teacherUserId: null,
   });
-
-  const livePuzzle = await db.kordlePuzzle.findUnique({
-    where: { id: puzzle.id },
-    select: { status: true },
+  const state = await getPublicState({
+    attemptId,
+    studentId: student.id,
+    vibePlaySessionId: null,
+    teacherUserId: null,
   });
-  if (livePuzzle?.status !== "LIVE") {
-    return (
-      <main className="board-page kordle-waiting-page" data-board-theme={boardTheme} data-play-board="true" data-board-category={board.category}>
-        <PlayBoardContinueButton />
-        <KordleWaitingRoom
-          boardId={boardId}
-          studentId={student.id}
-          studentName={student.name}
-        />
-      </main>
-    );
-  }
-
-  const state = await getPublicState({ attemptId, studentId: student.id });
   if (!state) notFound();
 
   return (
-    <main className="board-page kordle-play-page" data-board-theme={boardTheme} data-play-board="true" data-board-category={board.category}>
-      <PlayBoardContinueButton />
+    <GameAreaShell
+      title={`🟩 ${board.title}`}
+      roundLabel={
+        state.turn.currentGuessIndex
+          ? `${state.turn.currentGuessIndex}/${state.maxGuesses}줄`
+          : null
+      }
+      rulesLabel="꼬들"
+      actions={<PlayBoardContinueButton />}
+    >
       <KordleBoard
-        boardId={boardId}
+        boardId={board.id}
         attemptId={attemptId}
         initialState={state}
         locale={game.locale}
+        viewer="student"
       />
-      <KordleLiveToasts boardId={boardId} />
-    </main>
+      <KordleLiveToasts boardId={board.id} />
+    </GameAreaShell>
   );
 }

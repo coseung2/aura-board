@@ -69,3 +69,4 @@ apps/mobile/credentials.json
 apps/mobile/credentials/
 apps/mobile/android/keystores/
 apps/mobile/android/gradle.properties.local
+apps/mobile/.tmp/

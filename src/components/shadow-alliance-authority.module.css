@@ -1,0 +1,349 @@
+.root {
+  --sa-black: #08090d;
+  --sa-panel: #141720;
+  --sa-panel-soft: #1c202b;
+  --sa-line: #343a4a;
+  --sa-line-soft: rgba(52, 58, 74, 0.64);
+  --sa-text: #f5f1e7;
+  --sa-muted: #a9afbd;
+  --sa-gold: #e4c778;
+  --sa-black-team: #7180a4;
+  --sa-white-team: #f0e5c3;
+  --sa-space-1: 8px;
+  --sa-space-2: 12px;
+  --sa-space-3: 16px;
+  --sa-space-4: 24px;
+  --sa-space-5: 32px;
+  --sa-radius-panel: 12px;
+  --sa-radius-control: 8px;
+  --sa-shadow-panel: 0 18px 48px rgba(0, 0, 0, 0.18);
+
+  display: grid;
+  gap: var(--sa-space-3);
+  min-height: 100%;
+  padding: clamp(var(--sa-space-3), 3vw, var(--sa-space-5));
+  border-radius: var(--sa-radius-panel);
+  background: var(--sa-black);
+  color: var(--sa-text);
+}
+
+.state {
+  min-height: 320px;
+  display: grid;
+  place-items: center;
+  gap: var(--sa-space-2);
+}
+
+.notice,
+.error,
+.submitted {
+  margin: 0;
+  border-radius: var(--sa-radius-control);
+  padding: var(--sa-space-2) var(--sa-space-3);
+  line-height: 1.55;
+}
+
+.notice {
+  border: 1px solid rgba(228, 199, 120, 0.45);
+  background: rgba(228, 199, 120, 0.12);
+  color: var(--sa-text);
+}
+
+.error {
+  border: 1px solid rgba(239, 125, 125, 0.5);
+  background: rgba(239, 125, 125, 0.12);
+  color: #ffd6d6;
+}
+
+.submitted {
+  border: 1px solid rgba(134, 214, 164, 0.45);
+  background: rgba(134, 214, 164, 0.12);
+  color: #cdf1d8;
+  font-weight: 750;
+}
+
+.actions,
+.settingsRow,
+.submitRow,
+.resultHeader {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sa-space-2);
+}
+
+.resultHeader {
+  justify-content: space-between;
+}
+
+.button,
+.secondaryButton,
+.dangerButton {
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--sa-radius-control);
+  padding: 0 var(--sa-space-3);
+  font: inherit;
+  font-weight: 800;
+  text-decoration: none;
+  cursor: pointer;
+  transition:
+    transform 140ms ease,
+    opacity 140ms ease,
+    border-color 140ms ease;
+}
+
+.button {
+  border: 1px solid var(--sa-gold);
+  background: var(--sa-gold);
+  color: #15130d;
+}
+
+.secondaryButton {
+  border: 1px solid var(--sa-line);
+  background: var(--sa-panel-soft);
+  color: var(--sa-text);
+}
+
+.dangerButton {
+  border: 1px solid rgba(239, 125, 125, 0.6);
+  background: rgba(239, 125, 125, 0.1);
+  color: #ffd6d6;
+}
+
+.button:hover:not(:disabled),
+.secondaryButton:hover:not(:disabled),
+.dangerButton:hover:not(:disabled) {
+  transform: translateY(-1px);
+}
+
+.button:disabled,
+.secondaryButton:disabled,
+.dangerButton:disabled {
+  cursor: not-allowed;
+  opacity: 0.48;
+}
+
+.hostControlStack,
+.choicePanel,
+.hostPanel,
+.scoreboard,
+.resultCard {
+  display: grid;
+  gap: var(--sa-space-3);
+}
+
+.hostControlStack {
+  min-width: min(100%, 540px);
+}
+
+.settingsRow {
+  align-items: end;
+}
+
+.checkboxLabel,
+.fieldLabel {
+  display: inline-flex;
+  gap: var(--sa-space-1);
+  color: var(--sa-muted);
+  font-weight: 750;
+}
+
+.checkboxLabel {
+  align-items: center;
+}
+
+.fieldLabel {
+  align-items: flex-start;
+  flex-direction: column;
+}
+
+.numberInput,
+.largeNumberInput {
+  min-height: 44px;
+  border: 1px solid var(--sa-line);
+  border-radius: var(--sa-radius-control);
+  background: var(--sa-panel-soft);
+  color: var(--sa-text);
+  font: inherit;
+  font-weight: 800;
+}
+
+.numberInput {
+  width: 120px;
+  padding: var(--sa-space-1) var(--sa-space-2);
+}
+
+.largeNumberInput {
+  width: min(100%, 220px);
+  min-height: 64px;
+  padding: var(--sa-space-1) var(--sa-space-3);
+  font-size: 1.8rem;
+  text-align: center;
+}
+
+.commandCard,
+.choicePanel,
+.hostPanel,
+.scoreboard,
+.resultCard {
+  border: 1px solid var(--sa-line);
+  border-radius: var(--sa-radius-panel);
+  background: var(--sa-panel);
+  padding: clamp(var(--sa-space-3), 4vw, var(--sa-space-5));
+  box-shadow: var(--sa-shadow-panel);
+}
+
+.commandCard {
+  display: grid;
+  justify-items: center;
+  gap: var(--sa-space-2);
+  text-align: center;
+}
+
+.eyebrow {
+  margin: 0;
+  color: var(--sa-gold);
+  font-size: 0.75rem;
+  font-weight: 900;
+  letter-spacing: 0.12em;
+}
+
+.title,
+.choicePanel h3,
+.hostPanel h3,
+.scoreboard h3 {
+  margin: 0;
+  color: var(--sa-text);
+}
+
+.commandNumber {
+  color: var(--sa-text);
+  font-size: clamp(3rem, 10vw, 6rem);
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+.meta {
+  max-width: 54ch;
+  margin: 0;
+  color: var(--sa-muted);
+  line-height: 1.6;
+  word-break: keep-all;
+}
+
+.hostList,
+.scoreList,
+.revealList {
+  display: grid;
+  gap: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.hostRow,
+.scoreRow,
+.revealRow {
+  min-height: 58px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: var(--sa-space-2);
+  border-bottom: 1px solid var(--sa-line-soft);
+  padding: var(--sa-space-2) 0;
+  color: var(--sa-text);
+}
+
+.hostRow:last-child,
+.scoreRow:last-child,
+.revealRow:last-child {
+  border-bottom: 0;
+}
+
+.hostRow > div,
+.revealRow > div {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sa-space-1);
+}
+
+.team,
+.rank,
+.runtimeMeta {
+  color: var(--sa-muted);
+  font-size: 0.78rem;
+}
+
+.resultCard {
+  gap: var(--sa-space-4);
+}
+
+.commandBadge {
+  border-radius: 999px;
+  padding: var(--sa-space-1) var(--sa-space-2);
+  background: var(--sa-gold);
+  color: #15130d;
+}
+
+.averageGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: var(--sa-space-2);
+  margin: 0;
+}
+
+.averageGrid div {
+  border-top: 2px solid var(--sa-line);
+  padding: var(--sa-space-2) 0;
+}
+
+.averageGrid div:nth-child(-n + 2) {
+  border-color: var(--sa-black-team);
+}
+
+.averageGrid div:nth-child(n + 3) {
+  border-color: var(--sa-white-team);
+}
+
+.averageGrid dt {
+  color: var(--sa-muted);
+  font-size: 0.82rem;
+  font-weight: 800;
+}
+
+.averageGrid dd {
+  margin: var(--sa-space-1) 0 0;
+  color: var(--sa-text);
+  font-size: 1.2rem;
+  font-weight: 900;
+  font-variant-numeric: tabular-nums;
+}
+
+.revealRow strong:last-child,
+.scoreRow > strong {
+  color: var(--sa-gold);
+  font-variant-numeric: tabular-nums;
+}
+
+.runtimeMeta {
+  margin: 0;
+  text-align: right;
+}
+
+@media (max-width: 640px) {
+  .hostRow,
+  .scoreRow,
+  .revealRow {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .hostRow > :last-child,
+  .revealRow > :last-child,
+  .scoreRow > :last-child {
+    grid-column: 1 / -1;
+  }
+}

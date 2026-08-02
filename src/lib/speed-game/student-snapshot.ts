@@ -1,31 +1,36 @@
-type StudentSnapshotShape = {
-  roundIndex: number;
-  rounds: Array<{ keyword: string; guesserSlot: number }>;
-  groups: Array<{ studentIds: string[] }>;
-};
+import type { SpeedGameWire } from "@/components/speed-game/types";
 
 /**
- * Future words are hidden from every student. The active word is also hidden
- * from the student whose slot is guessing, while explainers can still see it.
+ * Removes teacher-only answers and future keywords from a Speed Game snapshot.
+ * The authoritative run identity, version, roster, timing, and public scores are
+ * preserved so web and Expo can reconcile the same state machine.
  */
-export function sanitizeGameSnapshotForStudent<T extends StudentSnapshotShape>(
-  snapshot: T,
+export function sanitizeGameSnapshotForStudent(
+  game: SpeedGameWire,
   studentId: string,
-): T {
-  const group = snapshot.groups.find((candidate) =>
-    candidate.studentIds.includes(studentId),
-  );
-  const studentSlot = group ? group.studentIds.indexOf(studentId) + 1 : 0;
-
+): SpeedGameWire {
+  const ownGroup = game.groups.find((group) => group.studentIds.includes(studentId));
+  const ownMemberIndex = ownGroup?.studentIds.indexOf(studentId) ?? -1;
+  const revealAllAnswers = game.status === "finished";
   return {
-    ...snapshot,
-    rounds: snapshot.rounds.map((round, index) => ({
+    ...game,
+    rounds: game.rounds.map((round) => ({
       ...round,
       keyword:
-        index > snapshot.roundIndex ||
-        (index === snapshot.roundIndex && studentSlot === round.guesserSlot)
-          ? ""
-          : round.keyword,
+        game.status === "finished" ||
+        round.order < game.roundIndex ||
+        (round.order === game.roundIndex &&
+          ownMemberIndex >= 0 &&
+          ownMemberIndex + 1 !== round.guesserSlot)
+          ? round.keyword
+          : "",
     })),
-  } as T;
+    answers: game.answers.map((answer) => {
+      const maySeeText = revealAllAnswers || answer.groupId === ownGroup?.id;
+      return {
+        ...answer,
+        answer: maySeeText ? answer.answer : "",
+      };
+    }),
+  };
 }

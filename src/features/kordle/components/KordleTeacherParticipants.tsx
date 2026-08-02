@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { RealtimeChannel, SupabaseClient } from "@supabase/supabase-js";
 import { createTrailingRefreshRunner } from "@/lib/realtime-invalidation";
 import {
@@ -19,6 +19,7 @@ type Props = {
   puzzleId: string;
   initialParticipants: GameParticipant[];
   initialStatus?: string | null;
+  initialVersion: number;
   maxGuesses: number;
   pollDelayMs?: number;
 };
@@ -35,6 +36,7 @@ type RoundSnapshot = {
 type ParticipantsSnapshot = {
   participants: GameParticipant[];
   status: string | null;
+  version: number;
   round: RoundSnapshot | null;
 };
 
@@ -43,20 +45,29 @@ export function KordleTeacherParticipants({
   puzzleId,
   initialParticipants,
   initialStatus,
+  initialVersion,
   maxGuesses,
   pollDelayMs = 2000,
 }: Props) {
   const [participants, setParticipants] = useState(initialParticipants);
   const [status, setStatus] = useState(initialStatus ?? null);
+  const [version, setVersion] = useState(initialVersion);
   const [round, setRound] = useState<RoundSnapshot | null>(null);
   const [advancing, setAdvancing] = useState(false);
   const [controlError, setControlError] = useState<string | null>(null);
+  const pendingAdvanceRef = useRef<{
+    requestId: string;
+    expectedVersion: number;
+    expectedGuessIndex: number;
+  } | null>(null);
 
   useEffect(() => {
     setParticipants(initialParticipants);
     setStatus(initialStatus ?? null);
+    setVersion(initialVersion);
     setRound(null);
-  }, [initialParticipants, initialStatus, puzzleId]);
+    pendingAdvanceRef.current = null;
+  }, [initialParticipants, initialStatus, initialVersion, puzzleId]);
 
   const fetchSnapshot = useCallback(async (): Promise<ParticipantsSnapshot | null> => {
     const res = await fetch(
@@ -70,16 +81,21 @@ export function KordleTeacherParticipants({
       return {
         participants: nextParticipants,
         status: data?.puzzle?.status ?? null,
+        version:
+          typeof data?.puzzle?.version === "number"
+            ? data.puzzle.version
+            : version,
         round: data?.puzzle?.round ?? null,
       };
     }
     return null;
-  }, [boardId, puzzleId]);
+  }, [boardId, puzzleId, version]);
 
   const applySnapshot = useCallback((snapshot: ParticipantsSnapshot | null) => {
     if (!snapshot) return;
     setParticipants(snapshot.participants);
     setStatus(snapshot.status);
+    setVersion(snapshot.version);
     setRound(snapshot.round);
   }, []);
 
@@ -195,15 +211,44 @@ export function KordleTeacherParticipants({
     setAdvancing(true);
     setControlError(null);
     try {
-      const res = await fetch(`/api/kordle/boards/${encodeURIComponent(boardId)}/puzzle`, {
-        method: "PATCH",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ action: "advance", puzzleId }),
-      });
+      const expectedGuessIndex = round.currentGuessIndex;
+      const pending = pendingAdvanceRef.current;
+      const command =
+        pending &&
+        pending.expectedVersion === version &&
+        pending.expectedGuessIndex === expectedGuessIndex
+          ? pending
+          : {
+              requestId: crypto.randomUUID(),
+              expectedVersion: version,
+              expectedGuessIndex,
+            };
+      pendingAdvanceRef.current = command;
+      const res = await fetch(
+        `/api/kordle/boards/${encodeURIComponent(boardId)}/puzzle`,
+        {
+          method: "PATCH",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            action: "advance",
+            puzzleId,
+            ...command,
+          }),
+        },
+      );
+      const data = await res.json().catch(() => null);
       if (!res.ok) {
+        if (typeof data?.puzzle?.version === "number") {
+          setVersion(data.puzzle.version);
+          pendingAdvanceRef.current = null;
+        }
+        const snapshot = await fetchSnapshot();
+        applySnapshot(snapshot);
         setControlError("다음 줄로 넘기지 못했습니다.");
         return;
       }
+      pendingAdvanceRef.current = null;
+      if (typeof data?.version === "number") setVersion(data.version);
       const snapshot = await fetchSnapshot();
       applySnapshot(snapshot);
     } finally {

@@ -36,6 +36,91 @@ const ANIMALS = [
   "코브라",
 ];
 
+const ROUND_REWARD_POOL = 10_000;
+
+type SubmittedTeamStats = {
+  players: ShadowAlliancePlayer[];
+  sum: bigint;
+  count: bigint;
+  distanceNumerator: bigint;
+};
+
+function submittedTeamStats(
+  players: ShadowAlliancePlayer[],
+  team: ShadowAllianceTeam,
+  command: bigint,
+): SubmittedTeamStats {
+  const submitted = players.filter(
+    (player) => player.team === team && player.number !== null,
+  );
+  const sum = submitted.reduce(
+    (total, player) => total + BigInt(player.number as number),
+    0n,
+  );
+  const count = BigInt(submitted.length);
+  const distanceNumerator =
+    count === 0n ? 0n : absBigInt(sum - command * count);
+  return { players: submitted, sum, count, distanceNumerator };
+}
+
+function absBigInt(value: bigint): bigint {
+  return value < 0n ? -value : value;
+}
+
+function compareRationalDistances(
+  left: SubmittedTeamStats,
+  right: SubmittedTeamStats,
+): number {
+  const leftCrossProduct = left.distanceNumerator * right.count;
+  const rightCrossProduct = right.distanceNumerator * left.count;
+  if (leftCrossProduct === rightCrossProduct) return 0;
+  return leftCrossProduct < rightCrossProduct ? -1 : 1;
+}
+
+function comparePlayerIds(left: string, right: string): number {
+  if (left < right) return -1;
+  if (left > right) return 1;
+  return 0;
+}
+
+function allocateShadowAllianceRewards(
+  winners: ShadowAlliancePlayer[],
+): Record<string, number> {
+  const gains: Record<string, number> = {};
+  const total = winners.reduce(
+    (sum, player) => sum + BigInt(player.number as number),
+    0n,
+  );
+  if (total <= 0n) return gains;
+
+  const allocations = winners.map((player) => {
+    const numerator = BigInt(ROUND_REWARD_POOL) * BigInt(player.number as number);
+    return {
+      player,
+      floorShare: numerator / total,
+      remainder: numerator % total,
+    };
+  });
+  const allocated = allocations.reduce(
+    (sum, allocation) => sum + allocation.floorShare,
+    0n,
+  );
+  const remaining = Number(BigInt(ROUND_REWARD_POOL) - allocated);
+
+  allocations.sort((left, right) => {
+    if (left.remainder !== right.remainder) {
+      return left.remainder > right.remainder ? -1 : 1;
+    }
+    return comparePlayerIds(left.player.id, right.player.id);
+  });
+
+  allocations.forEach((allocation, index) => {
+    gains[allocation.player.id] =
+      Number(allocation.floorShare) + (index < remaining ? 1 : 0);
+  });
+  return gains;
+}
+
 export function createShadowAllianceGame(): ShadowAllianceGame {
   return {
     phase: "lobby",
@@ -255,24 +340,31 @@ export function computeShadowAllianceRound(
   players: ShadowAlliancePlayer[],
   command: number,
 ): ShadowAllianceResult {
-  const submitted = (team: ShadowAllianceTeam) =>
-    players.filter((player) => player.team === team && player.number !== null);
-  const black = submitted("black");
-  const white = submitted("white");
-  const average = (group: ShadowAlliancePlayer[]) =>
-    group.reduce((sum, player) => sum + (player.number ?? 0), 0) / group.length;
-  const blackAvg = black.length ? average(black) : null;
-  const whiteAvg = white.length ? average(white) : null;
+  const commandInteger = BigInt(command);
+  const blackStats = submittedTeamStats(players, "black", commandInteger);
+  const whiteStats = submittedTeamStats(players, "white", commandInteger);
+  const black = blackStats.players;
+  const white = whiteStats.players;
+  const blackAvg = blackStats.count
+    ? Number(blackStats.sum) / Number(blackStats.count)
+    : null;
+  const whiteAvg = whiteStats.count
+    ? Number(whiteStats.sum) / Number(whiteStats.count)
+    : null;
+  const distanceComparison =
+    blackStats.count > 0n && whiteStats.count > 0n
+      ? compareRationalDistances(blackStats, whiteStats)
+      : null;
   const winner =
-    blackAvg === null && whiteAvg === null
+    blackStats.count === 0n && whiteStats.count === 0n
       ? "tie"
-      : blackAvg === null
+      : blackStats.count === 0n
         ? "white"
-        : whiteAvg === null
+        : whiteStats.count === 0n
           ? "black"
-          : Math.abs(blackAvg - command) === Math.abs(whiteAvg - command)
+          : distanceComparison === 0
             ? "tie"
-            : Math.abs(blackAvg - command) < Math.abs(whiteAvg - command)
+            : distanceComparison === -1
               ? "black"
               : "white";
   const gains: Record<string, number> = Object.fromEntries(
@@ -280,12 +372,7 @@ export function computeShadowAllianceRound(
   );
   if (winner !== "tie") {
     const winners = winner === "black" ? black : white;
-    const total = winners.reduce((sum, player) => sum + (player.number ?? 0), 0);
-    winners.forEach((player) => {
-      gains[player.id] = total
-        ? Math.round((10_000 * (player.number ?? 0)) / total)
-        : 0;
-    });
+    Object.assign(gains, allocateShadowAllianceRewards(winners));
   }
   return {
     command,

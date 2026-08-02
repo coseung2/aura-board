@@ -21,6 +21,8 @@ import {
   normalizeKeyword,
   parseKeywords,
 } from "@/lib/speed-game/score";
+import { deriveBoardCategory } from "@/lib/game-platform/catalog";
+import { createSpeedGameRun } from "@/lib/speed-game/runtime";
 
 // Grid cell dims ??matches Card default width/height; render uses CSS grid so
 // these are stored-only placeholders for future freeform fallback.
@@ -54,10 +56,13 @@ const CreateBoardSchema = z.object({
     "question-board",
     "speed-game",
     "shadow-alliance",
+    "omok",
+    "song-guess",
   ]),
   description: z.string().max(2000).default(""),
-  // BC-1: lesson vs play grouping. Defaults to LESSON to keep legacy clients working.
-  category: z.enum(["LESSON", "PLAY"]).default("LESSON"),
+  // Legacy clients may still send category, but the server derives the stored
+  // value from layout and rejects drift instead of trusting this field.
+  category: z.enum(["LESSON", "PLAY"]).optional(),
   classroomId: z.string().optional(),
   thumbnailMode: z.enum(["default", "none", "custom"]).default("default"),
   // Public image URL for board thumbnail. Used when thumbnailMode="custom";
@@ -107,6 +112,13 @@ export async function POST(req: Request) {
     const user = await getCurrentUser();
     const body = await req.json();
     const input = CreateBoardSchema.parse(body);
+    const boardCategory = deriveBoardCategory(input.layout);
+    if (input.category !== undefined && input.category !== boardCategory) {
+      return NextResponse.json(
+        { error: "category_layout_mismatch" },
+        { status: 400 },
+      );
+    }
 
     // BC-1 fix: validate classroom ownership up-front so every layout branch
     // (breakout, assignment, generic) inherits the same guard. Without this,
@@ -176,7 +188,7 @@ export async function POST(req: Request) {
             slug,
             layout: "breakout",
             description: input.description,
-            category: input.category,
+            category: boardCategory,
             classroomId: ownedClassroom?.id ?? null,
             thumbnailMode: input.thumbnailMode,
             thumbnailUrl: input.thumbnailUrl,
@@ -300,7 +312,7 @@ export async function POST(req: Request) {
             slug,
             layout: "assignment",
             description: input.description,
-            category: input.category,
+            category: boardCategory,
             classroomId: classroom?.id ?? null,
             thumbnailMode: input.thumbnailMode,
             thumbnailUrl: input.thumbnailUrl,
@@ -406,8 +418,7 @@ export async function POST(req: Request) {
             slug,
             layout: 'speed-game',
             description: input.description,
-            // 스피드게임은 항상 PLAY 카테고리로 강제.
-            category: 'PLAY',
+            category: boardCategory,
             classroomId: ownedClassroom.id,
             thumbnailMode: input.thumbnailMode,
             thumbnailUrl: input.thumbnailUrl,
@@ -458,6 +469,7 @@ export async function POST(req: Request) {
           speedGameGroups[index % groupCount].studentIds.push(student.id);
         });
         await saveBoardDefaultGroups(tx, createdBoard.id, speedGameGroups);
+        await createSpeedGameRun(tx, { gameId: game.id });
         return createdBoard;
       });
 
@@ -479,7 +491,7 @@ export async function POST(req: Request) {
             slug,
             layout: "kordle",
             description: input.description,
-            category: "PLAY",
+            category: boardCategory,
             classroomId: ownedClassroom.id,
             thumbnailMode: input.thumbnailMode,
             thumbnailUrl: input.thumbnailUrl,
@@ -542,10 +554,21 @@ export async function POST(req: Request) {
       return NextResponse.json({ board });
     }
 
-    if (input.layout === "shadow-alliance") {
+    if (
+      input.layout === "shadow-alliance" ||
+      input.layout === "omok" ||
+      input.layout === "song-guess"
+    ) {
       if (!ownedClassroom) {
         return NextResponse.json(
-          { error: "그림자연합 보드는 학급을 선택해야 합니다." },
+          {
+            error:
+              input.layout === "omok"
+                ? "오목 보드는 학급을 선택해야 합니다."
+                : input.layout === "song-guess"
+                  ? "음악 퀴즈 보드는 학급을 선택해야 합니다."
+                  : "그림자연합 보드는 학급을 선택해야 합니다.",
+          },
           { status: 400 },
         );
       }
@@ -553,11 +576,17 @@ export async function POST(req: Request) {
       const board = await db.$transaction(async (tx) => {
         const createdBoard = await tx.board.create({
           data: {
-            title: input.title || "그림자연합",
+            title:
+              input.title ||
+              (input.layout === "omok"
+                ? "권위 오목"
+                : input.layout === "song-guess"
+                  ? "0.5초 음악 퀴즈"
+                  : "그림자연합"),
             slug,
-            layout: "shadow-alliance",
+            layout: input.layout,
             description: input.description,
-            category: "PLAY",
+            category: boardCategory,
             classroomId: ownedClassroom.id,
             thumbnailMode: input.thumbnailMode,
             thumbnailUrl: input.thumbnailUrl,
@@ -596,7 +625,7 @@ export async function POST(req: Request) {
         slug,
         layout: input.layout,
         description: input.description,
-        category: input.category,
+        category: boardCategory,
         classroomId: ownedClassroom?.id ?? null,
         thumbnailMode: input.thumbnailMode,
         thumbnailUrl: input.thumbnailUrl,

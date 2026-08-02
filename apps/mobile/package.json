@@ -19,6 +19,7 @@
     "@react-native-masked-view/masked-view": "0.3.2",
     "@supabase/supabase-js": "^2.108.2",
     "expo": "~54.0.35",
+    "expo-audio": "~1.1.1",
     "expo-camera": "~17.0.10",
     "expo-constants": "~18.0.13",
     "expo-device": "~8.0.10",

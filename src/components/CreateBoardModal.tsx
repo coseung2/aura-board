@@ -3,9 +3,9 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { CreateBreakoutBoardModal } from "./CreateBreakoutBoardModal";
-import { CreateSpeedGameBoardModal } from "./CreateSpeedGameBoardModal";
 import { BoardThumbnailPicker, type ThumbnailMode } from "./BoardThumbnailPicker";
 import { LAYOUT_META, layoutThumbnail, type LayoutKey } from "@/lib/layout-meta";
+import { deriveBoardCategory } from "@/lib/game-platform/catalog";
 
 type PickerRow = {
   id: LayoutKey;
@@ -26,9 +26,6 @@ const PICKER_ROWS: PickerRow[] = [
   { id: "plant-roadmap", desc: "성장 단계별 관찰 사진과 기록 관리" },
   { id: "vibe-arcade", desc: "생성형 AI를 활용한 바이브 코딩 교실" },
   { id: "vibe-gallery", desc: "승인된 코딩 결과물 전시와 체험" },
-  { id: "kordle", desc: "학생들이 매일 푸는 단어 추리 게임" },
-  { id: "speed-game", desc: "모둠별 실시간 단어 설명 맞추기 게임" },
-  { id: "shadow-alliance", desc: "익명으로 진행하는 팀 추리 숫자 게임" },
   { id: "question-board", desc: "학생 응답을 다양한 시각화로 표시" },
 ];
 
@@ -37,9 +34,6 @@ const READY_LAYOUT_IDS = new Set<LayoutKey>([
   "columns",
   "dj-queue",
   "plant-roadmap",
-  "kordle",
-  "speed-game",
-  "shadow-alliance",
 ]);
 
 const UNLOCKED_DEV_LAYOUT_IDS = new Set<LayoutKey>(["stream"]);
@@ -60,8 +54,6 @@ const LAYOUTS = PICKER_ROWS.map((row) => ({
 const VISIBLE_LAYOUTS = LAYOUTS.filter((layout) => !layout.hidden).sort(
   (a, b) => Number(b.selectable) - Number(a.selectable)
 );
-const PLAY_LAYOUT_IDS = new Set<LayoutKey>(["kordle", "speed-game", "shadow-alliance"]);
-
 type ClassroomItem = {
   id: string;
   name: string;
@@ -83,13 +75,12 @@ export function CreateBoardModal({
 }: Props) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
-  const [step, setStep] = useState<"layout" | "classroom" | "breakout" | "speed-game">(
+  const [step, setStep] = useState<"layout" | "classroom" | "breakout">(
     "layout",
   );
   const [selectedLayout, setSelectedLayout] = useState<LayoutKey | null>(null);
   const [thumbnailMode, setThumbnailMode] = useState<ThumbnailMode>("default");
   const [thumbnailUrl, setThumbnailUrl] = useState<string | null>(null);
-  const [category, setCategory] = useState<"LESSON" | "PLAY">("LESSON");
 
   async function createBoard(layoutId: LayoutKey, classroomId?: string) {
     setBusy(true);
@@ -100,7 +91,7 @@ export function CreateBoardModal({
         body: JSON.stringify({
           title: "",
           layout: layoutId,
-          category,
+          category: deriveBoardCategory(layoutId),
           classroomId,
           thumbnailMode:
             thumbnailMode === "custom" && thumbnailUrl
@@ -141,15 +132,6 @@ export function CreateBoardModal({
       return;
     }
 
-    if (layoutId === "speed-game") {
-      setSelectedLayout(layoutId);
-      setThumbnailMode("default");
-      setThumbnailUrl(null);
-      setStep("speed-game");
-      return;
-    }
-
-    setCategory(PLAY_LAYOUT_IDS.has(layoutId) ? "PLAY" : "LESSON");
     setSelectedLayout(layoutId);
     setThumbnailMode("default");
     setThumbnailUrl(null);
@@ -171,34 +153,12 @@ export function CreateBoardModal({
     );
   }
 
-  if (step === "speed-game") {
-    return (
-      <CreateSpeedGameBoardModal
-        classrooms={classrooms}
-        userTier={userTier}
-        onClose={onClose}
-        onBack={() => {
-          setStep("layout");
-          setSelectedLayout(null);
-          setThumbnailMode("default");
-          setThumbnailUrl(null);
-        }}
-      />
-    );
-  }
-
   const selectedLayoutMeta = selectedLayout
     ? LAYOUTS.find((layout) => layout.id === selectedLayout)
     : null;
-  const requiresClassroom =
-    selectedLayout === "dj-queue" ||
-    selectedLayout === "kordle" ||
-    selectedLayout === "shadow-alliance";
-  const visibleLayoutsForCategory = VISIBLE_LAYOUTS.filter((layout) =>
-    (layout.ready || isAdmin) &&
-    (category === "PLAY"
-      ? PLAY_LAYOUT_IDS.has(layout.id)
-      : !PLAY_LAYOUT_IDS.has(layout.id)),
+  const requiresClassroom = selectedLayout === "dj-queue";
+  const visibleLayoutsForCategory = VISIBLE_LAYOUTS.filter(
+    (layout) => layout.ready || isAdmin,
   );
 
   const renderLayoutGrid = (layouts: typeof VISIBLE_LAYOUTS) => (
@@ -258,30 +218,10 @@ export function CreateBoardModal({
         <div className="modal-body">
           {step === "layout" && (
             <>
-              <fieldset className="create-board-category">
-                <legend>보드 분류</legend>
-                <label className="create-board-category-option">
-                  <input
-                    type="radio"
-                    name="board-category"
-                    value="LESSON"
-                    checked={category === "LESSON"}
-                    onChange={() => setCategory("LESSON")}
-                  />
-                  <span>수업</span>
-                </label>
-                <label className="create-board-category-option">
-                  <input
-                    type="radio"
-                    name="board-category"
-                    value="PLAY"
-                    checked={category === "PLAY"}
-                    onChange={() => setCategory("PLAY")}
-                  />
-                  <span>놀이</span>
-                </label>
-              </fieldset>
-              <p className="create-board-hint">보드 유형을 선택하세요.</p>
+              <p className="create-board-hint">
+                수업 보드 유형을 선택하세요. 공식 게임은 학생 놀이 탭의 게임 허브에서
+                학급별 상시 방으로 자동 제공됩니다.
+              </p>
               {renderLayoutGrid(visibleLayoutsForCategory)}
             </>
           )}

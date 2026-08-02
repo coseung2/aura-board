@@ -18,7 +18,10 @@ export async function GET() {
     }
 
     const boards = await db.board.findMany({
-      where: { classroomId: student.classroomId },
+      where: {
+        classroomId: student.classroomId,
+        systemGameKind: null,
+      },
       select: {
         id: true,
         slug: true,

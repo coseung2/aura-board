@@ -25,7 +25,10 @@ export async function getStudentHomePayload(
   const [boards, duties, assignmentSections, checkTasks, assignmentBoardSlots, dailyRewards] =
     await Promise.all([
       db.board.findMany({
-        where: { classroomId: student.classroomId },
+        where: {
+          classroomId: student.classroomId,
+          systemGameKind: null,
+        },
         include: {
           quizzes: {
             select: { roomCode: true, status: true },

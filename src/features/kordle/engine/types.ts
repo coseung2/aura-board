@@ -50,9 +50,19 @@ export interface KordleGuessResult {
 }
 
 // Server returns this to the client after each successful guess.
+export type KordleTerminalReason =
+  | "solved"
+  | "guesses_exhausted"
+  | "participant_abandon"
+  | "host_ended"
+  | "deadline";
+
 export interface KordlePublicState {
   puzzleId: string;
+  version: number;
   status: "IN_PROGRESS" | "WON" | "LOST" | "ABANDONED";
+  terminalReason: KordleTerminalReason | null;
+  resultId: string | null;
   wordLength: number;
   maxGuesses: number;
   // Past guesses (most recent last). Empty for a fresh attempt.
@@ -77,4 +87,11 @@ export interface KordlePublicState {
     remainingMs: number;
   };
   winnerStats: KordleWinnerStats;
+}
+
+export interface KordleCommandResponse {
+  requestId: string;
+  previousVersion: number;
+  version: number;
+  state: KordlePublicState;
 }

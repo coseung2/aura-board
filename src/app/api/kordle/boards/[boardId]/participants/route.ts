@@ -93,6 +93,7 @@ export async function GET(req: Request, { params }: Params) {
         select: {
           id: true,
           status: true,
+          version: true,
           startsAt: true,
           currentGuessIndex: true,
           game: { select: { maxGuesses: true } },
@@ -123,6 +124,7 @@ export async function GET(req: Request, { params }: Params) {
       ? {
           id: puzzle.id,
           status: puzzle.status,
+          version: Number(puzzle.version),
           participants: puzzle.attempts
             .filter((attempt) => attempt.student)
             .map((attempt) => ({

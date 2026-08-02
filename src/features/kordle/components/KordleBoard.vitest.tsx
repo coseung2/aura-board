@@ -7,12 +7,18 @@ import type { KordlePublicState } from "../engine";
 const createPublicSupabaseClient = vi.hoisted(() => vi.fn());
 
 vi.mock("@/lib/supabase/client", () => ({ createPublicSupabaseClient }));
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ push: vi.fn(), replace: vi.fn(), refresh: vi.fn() }),
+}));
 
 import { KordleBoard } from "./KordleBoard";
 
 const initialState: KordlePublicState = {
   puzzleId: "puzzle-1",
+  version: 0,
   status: "IN_PROGRESS",
+  terminalReason: null,
+  resultId: null,
   wordLength: 5,
   maxGuesses: 6,
   guesses: [],

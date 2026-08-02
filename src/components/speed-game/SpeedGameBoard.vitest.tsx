@@ -35,6 +35,9 @@ import { SpeedGameBoard } from "./SpeedGameBoard";
 
 const game: SpeedGameWire = {
   id: "game-1",
+  runId: "run-1",
+  version: 0,
+  terminalReason: null,
   boardId: "board-1",
   boardSlug: "speed",
   classroomId: "classroom-1",
@@ -48,6 +51,7 @@ const game: SpeedGameWire = {
   rounds: [],
   answers: [],
   groups: [],
+  participants: [],
   leaderboard: [],
 };
 
@@ -231,6 +235,6 @@ describe("SpeedGameBoard realtime transport", () => {
       await pendingResponse;
     });
 
-    expect(screen.getByText("종료", { selector: ".speed-game-status" })).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "게임 완료" })).toBeTruthy();
   });
 });

@@ -23,10 +23,12 @@ import {
 import type {
   BoardRealtimeEvent,
   ClassroomMorningRealtimeEvent,
+  PlaySessionRealtimeEvent,
 } from "./realtime";
 import {
   boardChannelKey,
   classroomMorningChannelKey,
+  PLAY_SESSION_CHANGED_EVENT,
   SPEED_GAME_CHANGED_EVENT,
   speedGameChannelKey,
 } from "./realtime";
@@ -319,13 +321,47 @@ export async function announceQuizSnapshot(
 /** Broadcast a speed-game mutation; clients reconcile through the GET API. */
 export async function announceSpeedGameChange(
   gameId: string,
-  changeType: "start" | "next" | "finish" | "answer",
+  changeType:
+    | "start"
+    | "next"
+    | "finish"
+    | "end-early"
+    | "rematch"
+    | "answer"
+    | "answer-review"
+    | "participant-join"
+    | "participant-ready"
+    | "participant-forfeit",
 ): Promise<void> {
   if (!gameId) return;
   void changeType;
   await broadcastBestEffort(speedGameChannelKey(gameId), SPEED_GAME_CHANGED_EVENT, {
     type: SPEED_GAME_CHANGED_EVENT,
   });
+}
+
+/**
+ * Strict delivery for the durable Rust play outbox. The caller completes an
+ * outbox lease only after this succeeds; payloads are compact invalidations,
+ * never hidden game state or client-authored commands.
+ */
+export async function publishPlaySessionInvalidation(
+  event: PlaySessionRealtimeEvent,
+): Promise<void> {
+  if (
+    !event.eventId ||
+    !event.sessionId ||
+    !event.boardId ||
+    !Number.isSafeInteger(event.version) ||
+    event.version < 0
+  ) {
+    throw new Error("invalid_play_session_invalidation");
+  }
+  await sendRealtimeBroadcast(
+    boardChannelKey(event.boardId),
+    PLAY_SESSION_CHANGED_EVENT,
+    event,
+  );
 }
 
 /**

@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   boardFindFirst: vi.fn(),
+  boardFindUnique: vi.fn(),
   hiddenLookup: {
     hasAnyHide: true,
     isTargetHidden: (kind: string, id: string) => kind === "card" && id === "card-hidden",
@@ -13,7 +14,14 @@ vi.mock("@/lib/student-auth", () => ({
   getCurrentStudent: vi.fn(async () => ({ id: "student-viewer", classroomId: "classroom-1" })),
 }));
 
-vi.mock("@/lib/db", () => ({ db: { board: { findFirst: mocks.boardFindFirst } } }));
+vi.mock("@/lib/db", () => ({
+  db: {
+    board: {
+      findFirst: mocks.boardFindFirst,
+      findUnique: mocks.boardFindUnique,
+    },
+  },
+}));
 vi.mock("@/lib/rbac", () => ({ getEffectiveBoardRole: vi.fn(async () => "viewer") }));
 vi.mock("@/lib/card-author-labels", () => ({
   resolveCardAuthorLabels: vi.fn(async () => ({ authorName: "작성자", studentAuthorName: "학생" })),
@@ -71,7 +79,8 @@ function card(id: string, studentAuthorId: string | null) {
 describe("student board hidden card serialization", () => {
   beforeEach(() => {
     mocks.boardFindFirst.mockReset();
-    mocks.boardFindFirst.mockResolvedValue({
+    mocks.boardFindUnique.mockReset();
+    const board = {
       id: "board-1",
       slug: "board-1",
       title: "보드",
@@ -87,7 +96,9 @@ describe("student board hidden card serialization", () => {
       streamSectionsEnabled: false,
       cards: [card("card-hidden", "student-visible"), card("card-author-hidden", "student-hidden")],
       sections: [],
-    });
+    };
+    mocks.boardFindFirst.mockResolvedValue(board);
+    mocks.boardFindUnique.mockResolvedValue(board);
   });
 
   it("keeps hidden cards as non-content placeholders with their undo reason", async () => {

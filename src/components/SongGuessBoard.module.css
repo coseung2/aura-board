@@ -1,0 +1,503 @@
+.shell {
+  min-height: 100vh;
+  padding: 28px;
+  background:
+    radial-gradient(circle at top right, rgba(124, 92, 255, 0.13), transparent 34%),
+    linear-gradient(180deg, #f7f8fc 0%, #eef1f7 100%);
+  color: #182033;
+}
+
+.header {
+  max-width: 1240px;
+  margin: 0 auto 22px;
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 20px;
+}
+
+.header h1,
+.sectionHeading h2,
+.roundHeader h3,
+.phaseCard h2,
+.playerCard h3,
+.revealCard h3,
+.sidebarCard h2,
+.panel h2 {
+  margin: 0;
+}
+
+.eyebrow {
+  margin: 0 0 5px;
+  color: #6554c0;
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+}
+
+.version,
+.roleBadge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 34px;
+  padding: 7px 12px;
+  border: 1px solid #d6d9e6;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.86);
+  color: #576079;
+  font-size: 0.82rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.panel,
+.roundCard,
+.sidebarCard,
+.phaseCard,
+.clueCard,
+.playerCard,
+.guessForm,
+.revealCard,
+.stageMessage {
+  border: 1px solid #dde1ec;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.96);
+  box-shadow: 0 14px 38px rgba(31, 38, 61, 0.07);
+}
+
+.panel {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 30px;
+}
+
+.editorLayout,
+.gameLayout {
+  max-width: 1240px;
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 300px;
+  gap: 22px;
+  align-items: start;
+}
+
+.editorMain,
+.gameMain,
+.editorSidebar,
+.gameSidebar {
+  display: grid;
+  gap: 18px;
+}
+
+.editorSidebar,
+.gameSidebar {
+  position: sticky;
+  top: 20px;
+}
+
+.sectionHeading,
+.roundHeader,
+.phaseCard,
+.sourceMeta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.roundCard {
+  padding: 22px;
+}
+
+.roundHeader {
+  margin-bottom: 18px;
+}
+
+.formGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.formGrid .field:first-child,
+.formGrid .field:last-child {
+  grid-column: 1 / -1;
+}
+
+.field {
+  display: grid;
+  gap: 7px;
+  color: #3f4860;
+  font-size: 0.88rem;
+  font-weight: 700;
+}
+
+.field input,
+.field textarea,
+.numberInput {
+  width: 100%;
+  box-sizing: border-box;
+  border: 1px solid #cfd5e3;
+  border-radius: 11px;
+  padding: 11px 12px;
+  background: #fff;
+  color: #182033;
+  font: inherit;
+  font-weight: 500;
+}
+
+.field textarea {
+  resize: vertical;
+}
+
+.field input:focus,
+.field textarea:focus,
+.numberInput:focus,
+.filePicker:focus-within {
+  outline: 3px solid rgba(101, 84, 192, 0.22);
+  border-color: #6554c0;
+}
+
+.audioWorkbench {
+  margin-top: 18px;
+  padding-top: 18px;
+  border-top: 1px solid #e6e8f0;
+  display: grid;
+  gap: 14px;
+}
+
+.filePicker {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 46px;
+  padding: 0 16px;
+  border: 1px dashed #8e83cb;
+  border-radius: 12px;
+  background: #f7f5ff;
+  color: #51439a;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.filePicker input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+}
+
+.trimPanel,
+.savedClipSummary {
+  padding: 15px;
+  border: 1px solid #e0e3ed;
+  border-radius: 14px;
+  background: #fafbfe;
+  display: grid;
+  gap: 14px;
+}
+
+.sourceMeta span,
+.savedClipSummary span,
+.helperText,
+.sidebarCard p,
+.revealCard p,
+.clueCard p,
+.panel p {
+  margin: 0;
+  color: #667087;
+  line-height: 1.55;
+}
+
+.rangeRow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 94px auto;
+  gap: 9px;
+  align-items: center;
+}
+
+.rangeRow input[type="range"] {
+  accent-color: #6554c0;
+}
+
+.numberInput {
+  padding: 8px 9px;
+}
+
+.inlineActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 9px;
+}
+
+.primaryButton,
+.secondaryButton,
+.dangerButton,
+.dangerQuietButton,
+.iconButton {
+  min-height: 42px;
+  border-radius: 11px;
+  padding: 9px 14px;
+  border: 1px solid transparent;
+  font: inherit;
+  font-weight: 800;
+  cursor: pointer;
+  transition: transform 140ms ease, box-shadow 140ms ease, opacity 140ms ease;
+}
+
+.primaryButton {
+  background: #6554c0;
+  color: #fff;
+  box-shadow: 0 8px 18px rgba(101, 84, 192, 0.2);
+}
+
+.secondaryButton {
+  border-color: #cfd5e3;
+  background: #fff;
+  color: #3d4760;
+}
+
+.dangerButton {
+  border-color: #efb3ba;
+  background: #fff3f4;
+  color: #a42c3a;
+}
+
+.dangerQuietButton {
+  min-height: 34px;
+  padding: 5px 10px;
+  background: transparent;
+  color: #a42c3a;
+}
+
+.iconButton {
+  min-width: 36px;
+  min-height: 34px;
+  padding: 5px 9px;
+  border-color: #d6d9e6;
+  background: #fff;
+  color: #4d566c;
+}
+
+.primaryButton:hover:not(:disabled),
+.secondaryButton:hover:not(:disabled),
+.dangerButton:hover:not(:disabled),
+.iconButton:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 8px 18px rgba(31, 38, 61, 0.12);
+}
+
+.primaryButton:focus-visible,
+.secondaryButton:focus-visible,
+.dangerButton:focus-visible,
+.dangerQuietButton:focus-visible,
+.iconButton:focus-visible {
+  outline: 3px solid rgba(101, 84, 192, 0.28);
+  outline-offset: 2px;
+}
+
+.primaryButton:disabled,
+.secondaryButton:disabled,
+.dangerButton:disabled,
+.dangerQuietButton:disabled,
+.iconButton:disabled,
+.filePicker:has(input:disabled) {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.previewGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.previewItem {
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid #dfe3ed;
+  border-radius: 12px;
+  background: #fff;
+  display: grid;
+  gap: 8px;
+  font-size: 0.86rem;
+  font-weight: 800;
+}
+
+.previewItem audio,
+.playerCard audio {
+  width: 100%;
+  max-width: 100%;
+}
+
+.rightsCheck {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 10px;
+  align-items: start;
+  padding: 13px;
+  border: 1px solid #ead99b;
+  border-radius: 12px;
+  background: #fffbed;
+  color: #5b4e23;
+  font-size: 0.88rem;
+  line-height: 1.45;
+}
+
+.rightsCheck input {
+  width: 18px;
+  height: 18px;
+  accent-color: #6554c0;
+}
+
+.sidebarCard {
+  padding: 19px;
+  display: grid;
+  gap: 13px;
+}
+
+.notice,
+.error,
+.correctResult,
+.wrongResult {
+  margin: 0;
+  padding: 13px 15px;
+  border-radius: 12px;
+  line-height: 1.45;
+}
+
+.notice,
+.correctResult {
+  border: 1px solid #a8dfc2;
+  background: #effaf4;
+  color: #24633f;
+}
+
+.error,
+.wrongResult {
+  border: 1px solid #efb3ba;
+  background: #fff3f4;
+  color: #912b38;
+}
+
+.phaseCard,
+.clueCard,
+.playerCard,
+.guessForm,
+.revealCard,
+.stageMessage {
+  padding: 22px;
+}
+
+.clueCard,
+.playerCard,
+.revealCard {
+  display: grid;
+  gap: 10px;
+}
+
+.clueCard {
+  border-left: 5px solid #d9a441;
+  background: #fffdf5;
+}
+
+.playerCard {
+  border-left: 5px solid #6554c0;
+}
+
+.guessForm {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: end;
+}
+
+.stageMessage {
+  color: #59637a;
+  font-weight: 700;
+}
+
+.scoreList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+
+.scoreList li {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 0;
+  border-bottom: 1px solid #edf0f5;
+}
+
+.scoreList li:last-child {
+  border-bottom: 0;
+}
+
+@media (max-width: 900px) {
+  .shell {
+    padding: 18px;
+  }
+
+  .editorLayout,
+  .gameLayout {
+    grid-template-columns: 1fr;
+  }
+
+  .editorSidebar,
+  .gameSidebar {
+    position: static;
+  }
+
+  .formGrid,
+  .previewGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .formGrid .field:first-child,
+  .formGrid .field:last-child {
+    grid-column: auto;
+  }
+}
+
+@media (max-width: 600px) {
+  .header,
+  .sectionHeading,
+  .roundHeader,
+  .phaseCard,
+  .sourceMeta {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .roundCard,
+  .panel,
+  .phaseCard,
+  .clueCard,
+  .playerCard,
+  .guessForm,
+  .revealCard,
+  .stageMessage {
+    padding: 16px;
+  }
+
+  .rangeRow,
+  .guessForm {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .primaryButton,
+  .secondaryButton,
+  .dangerButton,
+  .dangerQuietButton,
+  .iconButton {
+    transition: none;
+  }
+}

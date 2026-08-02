@@ -1,17 +1,16 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type {
-  SpeedGameAnswer,
-  SpeedGameGroup,
-  SpeedGameLeaderboardEntry,
-  SpeedGameRound,
-  SpeedGameStatus,
-  SpeedGameWire,
-} from "./types";
-import { PlayBoardContinueButton } from "@/components/PlayBoardContinueButton";
-import { SPEED_GAME_CHANGED_EVENT, speedGameChannelKey } from "@/lib/realtime";
+import { GameLobby } from "@/components/game-platform/GameLobby";
+import { GameExitDialog } from "@/components/game-platform/GameExitDialog";
+import { GameResultPanel } from "@/components/game-platform/GameResultPanel";
+import {
+  SPEED_GAME_CHANGED_EVENT,
+  speedGameChannelKey,
+} from "@/lib/realtime";
 import type { PublicSupabaseClient } from "@/lib/supabase/client";
+import type { SpeedGameAnswer, SpeedGameWire } from "./types";
 
 type Props = {
   boardId: string;
@@ -22,74 +21,107 @@ type Props = {
   initialGame: SpeedGameWire | null;
 };
 
-const STATUS_LABELS: Record<SpeedGameStatus, string> = {
-  waiting: "대기 중",
-  active: "진행 중",
-  finished: "종료",
+type RunAction = "start" | "next" | "finish" | "end-early" | "rematch";
+type ParticipantAction = "join" | "ready" | "forfeit";
+
+type CommandErrorBody = {
+  error?: string;
+  game?: SpeedGameWire;
+};
+
+type PendingCommand = {
+  requestId: string;
+  runId: string;
+  expectedVersion: number;
+  fingerprint: string;
 };
 
 const FALLBACK_BASE_DELAY_MS = 15_000;
 const FALLBACK_MAX_DELAY_MS = 60_000;
 type RefreshResult = "updated" | "failed" | "terminal" | "skipped";
 
-function formatDuration(ms: number): string {
-  if (ms < 1000) return `${ms}ms`;
-  return `${(ms / 1000).toFixed(2)}초`;
+function makeRequestId(prefix: string) {
+  return `${prefix}_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
 }
 
-function roundDisplayIndex(roundIndex: number): string {
-  return roundIndex >= 0 ? String(roundIndex + 1) : "-";
+function errorMessage(code: string | undefined): string {
+  switch (code) {
+    case "version_conflict":
+      return "다른 기기에서 게임 상태가 바뀌었어요. 최신 상태를 반영했습니다.";
+    case "idempotency_key_reuse":
+      return "이 요청은 다른 내용으로 이미 사용됐어요. 다시 시도해 주세요.";
+    case "not_current_guesser":
+      return "이번 라운드의 답변 순서가 아니에요.";
+    case "already_answered":
+      return "우리 모둠은 이미 답을 제출했어요.";
+    case "participant_not_invited":
+      return "이 게임의 참가자 명단에 없어요.";
+    case "participant_forfeited":
+      return "이미 게임에서 나간 참가자예요.";
+    case "game_not_running":
+    case "round_not_active":
+      return "현재 답을 제출할 수 있는 라운드가 아니에요.";
+    case "already_last_round":
+      return "마지막 라운드예요. 게임을 종료해 주세요.";
+    case "run_not_terminal":
+      return "게임이 끝난 뒤에 다시 시작할 수 있어요.";
+    case "game_already_started":
+      return "게임이 이미 시작되어 준비 상태를 바꿀 수 없어요.";
+    default:
+      return "요청을 처리하지 못했어요. 연결을 확인하고 다시 시도해 주세요.";
+  }
+}
+
+async function readJson<T>(response: Response): Promise<T | null> {
+  return (await response.json().catch(() => null)) as T | null;
+}
+
+function participantState(participant: SpeedGameWire["participants"][number]) {
+  if (participant.forfeitedAt) return "forfeited" as const;
+  if (participant.readyAt) return "ready" as const;
+  if (participant.joinedAt) return "joined" as const;
+  return "invited" as const;
+}
+
+function answerForRound(
+  game: SpeedGameWire,
+  roundId: string,
+  groupId: string,
+): SpeedGameAnswer | undefined {
+  return game.answers.find(
+    (answer) => answer.roundId === roundId && answer.groupId === groupId,
+  );
 }
 
 export function SpeedGameBoard({
+  boardId,
   boardSlug,
   classroomId,
   viewerKind,
   currentStudentId,
   initialGame,
 }: Props) {
-  void boardSlug;
-  void classroomId;
   const [game, setGame] = useState<SpeedGameWire | null>(initialGame);
+  const [answer, setAnswer] = useState("");
+  const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [busyAction, setBusyAction] = useState<string | null>(null);
-  const [answerDraft, setAnswerDraft] = useState("");
-  const [answerSubmitting, setAnswerSubmitting] = useState(false);
-  const answerStartMsRef = useRef<number>(0);
-  const [realtimeFallback, setRealtimeFallback] = useState(false);
-  const gameStatusRef = useRef<SpeedGameStatus | null>(initialGame?.status ?? null);
+  const [exitOpen, setExitOpen] = useState(false);
+  const [reconnecting, setReconnecting] = useState(false);
+  const runCommandRef = useRef<PendingCommand | null>(null);
+  const participantCommandRef = useRef<PendingCommand | null>(null);
+  const answerCommandRef = useRef<PendingCommand | null>(null);
+  const reviewCommandRef = useRef<PendingCommand | null>(null);
+  const joinedRunRef = useRef<string | null>(null);
+  const gameStatusRef = useRef<SpeedGameWire["status"] | null>(
+    initialGame?.status ?? null,
+  );
   const refreshGameIdRef = useRef<string | undefined>(initialGame?.id);
   const refreshInFlightRef = useRef<Promise<RefreshResult> | null>(null);
   const refreshQueuedRef = useRef(false);
-
   const gameId = game?.id;
+
   gameStatusRef.current = game?.status ?? null;
   refreshGameIdRef.current = gameId;
-
-  const currentRound = useMemo(() => {
-    if (!game || game.roundIndex < 0 || game.roundIndex >= game.rounds.length) return null;
-    return game.rounds[game.roundIndex];
-  }, [game]);
-
-  const myGroup = useMemo(() => {
-    if (!currentStudentId || !game) return null;
-    return game.groups.find((g) => g.studentIds.includes(currentStudentId)) ?? null;
-  }, [currentStudentId, game]);
-
-  const mySlot = useMemo(() => {
-    if (!myGroup || !currentStudentId) return null;
-    const slotIndex = myGroup.studentIds.indexOf(currentStudentId);
-    return slotIndex >= 0 ? slotIndex + 1 : null;
-  }, [myGroup, currentStudentId]);
-
-  const myAnswerForCurrentRound = useMemo(() => {
-    if (!game || !currentRound || !myGroup) return null;
-    return (
-      game.answers.find(
-        (a) => a.roundId === currentRound.id && a.groupId === myGroup.id,
-      ) ?? null
-    );
-  }, [game, currentRound, myGroup]);
 
   const refresh = useCallback((): Promise<RefreshResult> => {
     if (!gameId || gameStatusRef.current === "finished") {
@@ -112,26 +144,43 @@ export function SpeedGameBoard({
           return "terminal";
         }
         try {
-          const res = await fetch(`/api/speed-game/games/${targetGameId}`, {
+          const response = await fetch(`/api/speed-game/games/${targetGameId}`, {
             cache: "no-store",
           });
-          if (!res.ok) {
+          if (!response.ok) {
             result = "failed";
             continue;
           }
-          const data = (await res.json()) as { game?: SpeedGameWire };
+          const body = await readJson<{ game?: SpeedGameWire }>(response);
           if (refreshGameIdRef.current !== targetGameId) return "skipped";
-          if ((gameStatusRef.current as SpeedGameStatus | null) === "finished") {
+          if (
+            (gameStatusRef.current as SpeedGameWire["status"] | null) ===
+            "finished"
+          ) {
             return "terminal";
           }
-          if (data.game) {
-            gameStatusRef.current = data.game.status;
-            setGame(data.game);
-            setError(null);
-            result = data.game.status === "finished" ? "terminal" : "updated";
-          } else {
+          if (!body?.game) {
             result = "failed";
+            continue;
           }
+          const next = body.game;
+          for (const commandRef of [
+            runCommandRef,
+            participantCommandRef,
+            answerCommandRef,
+            reviewCommandRef,
+          ]) {
+            if (
+              commandRef.current &&
+              next.version !== commandRef.current.expectedVersion
+            ) {
+              commandRef.current = null;
+            }
+          }
+          gameStatusRef.current = next.status;
+          setGame(next);
+          setError(null);
+          result = next.status === "finished" ? "terminal" : "updated";
         } catch {
           result = "failed";
         }
@@ -147,11 +196,19 @@ export function SpeedGameBoard({
 
   useEffect(() => {
     setGame(initialGame);
+    setAnswer("");
+    setError(null);
+    setExitOpen(false);
+    runCommandRef.current = null;
+    participantCommandRef.current = null;
+    answerCommandRef.current = null;
+    reviewCommandRef.current = null;
+    joinedRunRef.current = null;
   }, [initialGame]);
 
   useEffect(() => {
     if (!gameId || game?.status === "finished") {
-      setRealtimeFallback(false);
+      setReconnecting(false);
       return;
     }
     let stopped = false;
@@ -166,7 +223,7 @@ export function SpeedGameBoard({
       fallbackTimer = null;
       fallbackDelayMs = FALLBACK_BASE_DELAY_MS;
       fallbackActive = false;
-      if (!stopped) setRealtimeFallback(false);
+      if (!stopped) setReconnecting(false);
     }
 
     function stopRealtime() {
@@ -174,7 +231,7 @@ export function SpeedGameBoard({
       stopped = true;
       if (fallbackTimer) clearTimeout(fallbackTimer);
       fallbackTimer = null;
-      setRealtimeFallback(false);
+      setReconnecting(false);
       window.removeEventListener("focus", reconcile);
       window.removeEventListener("online", reconcile);
       document.removeEventListener("visibilitychange", reconcile);
@@ -211,7 +268,7 @@ export function SpeedGameBoard({
 
     function startFallback() {
       if (stopped || gameStatusRef.current === "finished") return;
-      setRealtimeFallback(true);
+      setReconnecting(true);
       if (fallbackActive) return;
       fallbackActive = true;
       void refresh().then((result) => {
@@ -257,12 +314,10 @@ export function SpeedGameBoard({
             status === "CLOSED"
           ) {
             startFallback();
-            void refresh();
           }
         });
       } catch {
         startFallback();
-        void refresh();
       }
     })();
 
@@ -279,393 +334,605 @@ export function SpeedGameBoard({
     window.addEventListener("focus", reconcile);
     window.addEventListener("online", reconcile);
     document.addEventListener("visibilitychange", reconcile);
-    return () => {
-      stopRealtime();
-    };
+    return stopRealtime;
   }, [game?.status, gameId, refresh]);
 
-  const control = useCallback(
-    async (action: "start" | "next" | "finish") => {
-      if (!gameId) return;
-      setBusyAction(action);
+  const currentRound = useMemo(() => {
+    if (!game || game.roundIndex < 0) return null;
+    return game.rounds.find((round) => round.order === game.roundIndex) ?? null;
+  }, [game]);
+
+  const currentParticipant = useMemo(() => {
+    if (!game || !currentStudentId) return null;
+    return (
+      game.participants.find(
+        (participant) => participant.studentId === currentStudentId,
+      ) ?? null
+    );
+  }, [currentStudentId, game]);
+
+  const currentGroup = useMemo(() => {
+    if (!game || !currentParticipant) return null;
+    return game.groups.find((group) => group.id === currentParticipant.groupId) ?? null;
+  }, [currentParticipant, game]);
+
+  const canAnswer = useMemo(() => {
+    if (
+      !game ||
+      !currentRound ||
+      !currentParticipant ||
+      !currentGroup ||
+      currentParticipant.forfeitedAt ||
+      game.status !== "active"
+    ) {
+      return false;
+    }
+    const memberIndex = currentGroup.studentIds.indexOf(currentParticipant.studentId);
+    if (memberIndex < 0 || memberIndex + 1 !== currentRound.guesserSlot) return false;
+    return !answerForRound(game, currentRound.id, currentGroup.id);
+  }, [currentGroup, currentParticipant, currentRound, game]);
+
+  const executeParticipantCommand = useCallback(
+    async (action: ParticipantAction) => {
+      if (!game || !currentStudentId || viewerKind !== "student") return null;
+      const fingerprint = `${action}:${game.runId}`;
+      const pending = participantCommandRef.current;
+      const command =
+        pending &&
+        pending.runId === game.runId &&
+        pending.expectedVersion === game.version &&
+        pending.fingerprint === fingerprint
+          ? pending
+          : {
+              requestId: makeRequestId(`speed_${action}`),
+              runId: game.runId,
+              expectedVersion: game.version,
+              fingerprint,
+            };
+      participantCommandRef.current = command;
+      setBusy(true);
       setError(null);
       try {
-        const res = await fetch(`/api/speed-game/games/${gameId}`, {
-          method: "PATCH",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify({ action }),
-        });
-        if (!res.ok) {
-          setError(`액션 실패: ${await res.text()}`);
-          return;
+        const response = await fetch(
+          `/api/speed-game/games/${encodeURIComponent(game.id)}/participant`,
+          {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({
+              requestId: command.requestId,
+              runId: command.runId,
+              expectedVersion: command.expectedVersion,
+              action,
+            }),
+          },
+        );
+        const body = await readJson<
+          | { game: SpeedGameWire; resultId?: string | null }
+          | CommandErrorBody
+        >(response);
+        if (!response.ok) {
+          if (body && "game" in body && body.game) {
+            setGame(body.game);
+            if (body.game.version !== command.expectedVersion) {
+              participantCommandRef.current = null;
+            }
+          }
+          setError(errorMessage(body && "error" in body ? body.error : undefined));
+          return null;
         }
-        const data = (await res.json()) as { game?: SpeedGameWire };
-        if (data.game) setGame(data.game);
-        else await refresh();
-      } catch {
-        setError("액션 중 오류가 발생했습니다.");
+        if (!body || !("game" in body) || !body.game) {
+          setError("최신 게임 상태를 확인하지 못했어요.");
+          return null;
+        }
+        participantCommandRef.current = null;
+        setGame(body.game);
+        return body;
       } finally {
-        setBusyAction(null);
+        setBusy(false);
       }
     },
-    [gameId, refresh],
+    [currentStudentId, game, viewerKind],
+  );
+
+  useEffect(() => {
+    if (
+      viewerKind !== "student" ||
+      !game ||
+      !currentParticipant ||
+      currentParticipant.joinedAt ||
+      currentParticipant.forfeitedAt ||
+      joinedRunRef.current === game.runId
+    ) {
+      return;
+    }
+    joinedRunRef.current = game.runId;
+    void executeParticipantCommand("join").then((result) => {
+      if (!result) joinedRunRef.current = null;
+    });
+  }, [currentParticipant, executeParticipantCommand, game, viewerKind]);
+
+  const mutateRun = useCallback(
+    async (action: RunAction) => {
+      if (!game || viewerKind !== "teacher") return;
+      const fingerprint = `${action}:${game.runId}`;
+      const pending = runCommandRef.current;
+      const command =
+        pending &&
+        pending.runId === game.runId &&
+        pending.expectedVersion === game.version &&
+        pending.fingerprint === fingerprint
+          ? pending
+          : {
+              requestId: makeRequestId(`speed_${action}`),
+              runId: game.runId,
+              expectedVersion: game.version,
+              fingerprint,
+            };
+      runCommandRef.current = command;
+      setBusy(true);
+      setError(null);
+      try {
+        const response = await fetch(`/api/speed-game/games/${encodeURIComponent(game.id)}`, {
+          method: "PATCH",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            requestId: command.requestId,
+            runId: command.runId,
+            expectedVersion: command.expectedVersion,
+            action,
+          }),
+        });
+        const body = await readJson<{ game?: SpeedGameWire; error?: string }>(response);
+        if (!response.ok) {
+          if (body?.game) {
+            setGame(body.game);
+            if (body.game.version !== command.expectedVersion) {
+              runCommandRef.current = null;
+            }
+          }
+          setError(errorMessage(body?.error));
+          return;
+        }
+        if (!body?.game) {
+          setError("최신 게임 상태를 확인하지 못했어요.");
+          return;
+        }
+        runCommandRef.current = null;
+        joinedRunRef.current = null;
+        setGame(body.game);
+        setAnswer("");
+      } finally {
+        setBusy(false);
+      }
+    },
+    [game, viewerKind],
   );
 
   const submitAnswer = useCallback(async () => {
-    if (!gameId || !currentRound || !myGroup) return;
-    const answer = answerDraft.trim();
-    if (!answer) return;
-    const elapsedMs = answerStartMsRef.current
-      ? Date.now() - answerStartMsRef.current
-      : 0;
-    setAnswerSubmitting(true);
+    if (!game || !currentRound || !currentGroup || !canAnswer) return;
+    const rawText = answer.trim();
+    if (!rawText) return;
+    const fingerprint = `${game.runId}:${currentRound.id}:${currentGroup.id}:${rawText}`;
+    const pending = answerCommandRef.current;
+    const command =
+      pending &&
+      pending.runId === game.runId &&
+      pending.expectedVersion === game.version &&
+      pending.fingerprint === fingerprint
+        ? pending
+        : {
+            requestId: makeRequestId("speed_answer"),
+            runId: game.runId,
+            expectedVersion: game.version,
+            fingerprint,
+          };
+    answerCommandRef.current = command;
+    setBusy(true);
     setError(null);
     try {
-      const res = await fetch(`/api/speed-game/games/${gameId}/answer`, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          roundId: currentRound.id,
-          groupId: myGroup.id,
-          answer,
-          elapsedMs,
-        }),
-      });
-      if (!res.ok) {
-        setError(`제출 실패: ${await res.text()}`);
+      const response = await fetch(
+        `/api/speed-game/games/${encodeURIComponent(game.id)}/answer`,
+        {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            requestId: command.requestId,
+            runId: command.runId,
+            expectedVersion: command.expectedVersion,
+            answer: rawText,
+            roundId: currentRound.id,
+            groupId: currentGroup.id,
+          }),
+        },
+      );
+      const body = await readJson<{ game?: SpeedGameWire; error?: string }>(response);
+      if (!response.ok) {
+        if (body?.game) {
+          setGame(body.game);
+          if (body.game.version !== command.expectedVersion) {
+            answerCommandRef.current = null;
+          }
+        }
+        setError(errorMessage(body?.error));
         return;
       }
-      const data = (await res.json()) as { answer?: SpeedGameAnswer };
-      if (data.answer) {
-        setGame((prev) => {
-          if (!prev) return prev;
-          const nextAnswers = prev.answers.filter((a) => a.id !== data.answer!.id);
-          return { ...prev, answers: [...nextAnswers, data.answer!] };
-        });
-        setAnswerDraft("");
+      if (!body?.game) {
+        setError("최신 게임 상태를 확인하지 못했어요.");
+        return;
       }
-      await refresh();
-    } catch {
-      setError("답변 제출 중 오류가 발생했습니다.");
+      answerCommandRef.current = null;
+      setGame(body.game);
+      setAnswer("");
     } finally {
-      setAnswerSubmitting(false);
+      setBusy(false);
     }
-  }, [gameId, currentRound, myGroup, answerDraft, refresh]);
+  }, [answer, canAnswer, currentGroup, currentRound, game]);
 
-  useEffect(() => {
-    if (game?.status === "active" && currentRound && mySlot === currentRound.guesserSlot) {
-      answerStartMsRef.current = Date.now();
-    }
-  }, [game?.status, currentRound, mySlot]);
+  const reviewAnswer = useCallback(
+    async (answerId: string, decision: "accepted" | "rejected") => {
+      if (!game || viewerKind !== "teacher") return;
+      const fingerprint = `${answerId}:${decision}`;
+      const pending = reviewCommandRef.current;
+      const command =
+        pending &&
+        pending.runId === game.runId &&
+        pending.expectedVersion === game.version &&
+        pending.fingerprint === fingerprint
+          ? pending
+          : {
+              requestId: makeRequestId("speed_review"),
+              runId: game.runId,
+              expectedVersion: game.version,
+              fingerprint,
+            };
+      reviewCommandRef.current = command;
+      setBusy(true);
+      setError(null);
+      try {
+        const response = await fetch(
+          `/api/speed-game/games/${encodeURIComponent(game.id)}/answer`,
+          {
+            method: "PATCH",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({
+              requestId: command.requestId,
+              runId: command.runId,
+              expectedVersion: command.expectedVersion,
+              answerId,
+              decision,
+            }),
+          },
+        );
+        const body = await readJson<{ game?: SpeedGameWire; error?: string }>(response);
+        if (!response.ok) {
+          if (body?.game) {
+            setGame(body.game);
+            if (body.game.version !== command.expectedVersion) {
+              reviewCommandRef.current = null;
+            }
+          }
+          setError(errorMessage(body?.error));
+          return;
+        }
+        if (!body?.game) return;
+        reviewCommandRef.current = null;
+        setGame(body.game);
+      } finally {
+        setBusy(false);
+      }
+    },
+    [game, viewerKind],
+  );
 
   if (!game) {
     return (
-      <section className="speed-game-board">
-        <div className="speed-game-empty">
-          <p>아직 생성된 스피드게임이 없어요.</p>
-          {viewerKind === "teacher" && (
-            <p className="speed-game-empty-hint">잠시 후 다시 시도하거나 페이지를 새로고침해 주세요.</p>
-          )}
-        </div>
+      <section className="speed-game-empty" role="status">
+        <h2>스피드게임 준비 중</h2>
+        <p>게임 설정이나 모둠 구성이 아직 완료되지 않았어요.</p>
       </section>
     );
   }
 
-  return (
-    <section className="speed-game-board">
-      <PlayBoardContinueButton
-        href={viewerKind === "teacher" ? "/dashboard" : "/student"}
-      />
-      {error && <p className="speed-game-error">{error}</p>}
-      {realtimeFallback && (
-        <p className="speed-game-error" role="status">
-          실시간 연결이 불안정해 게임 상태를 다시 확인하고 있어요.
-        </p>
-      )}
-
-      {viewerKind === "none" && (
-        <div className="speed-game-empty">
-          <p>참여 권한이 없어요.</p>
-        </div>
-      )}
-
-      {viewerKind === "teacher" && (
-        <TeacherPanel
-          game={game}
-          currentRound={currentRound}
-          busyAction={busyAction}
-          onControl={control}
-        />
-      )}
-      {viewerKind === "student" && (
-        <StudentPanel
-          game={game}
-          currentRound={currentRound}
-          myGroup={myGroup}
-          mySlot={mySlot}
-          myAnswer={myAnswerForCurrentRound}
-          answerDraft={answerDraft}
-          answerSubmitting={answerSubmitting}
-          onAnswerChange={setAnswerDraft}
-          onSubmit={submitAnswer}
-        />
-      )}
-    </section>
-  );
-}
-
-function TeacherPanel({
-  game,
-  currentRound,
-  busyAction,
-  onControl,
-}: {
-  game: SpeedGameWire;
-  currentRound: SpeedGameRound | null;
-  busyAction: string | null;
-  onControl: (action: "start" | "next" | "finish") => void;
-}) {
-  const canStart = game.status === "waiting" && game.rounds.length > 0;
-  const canNext = game.status === "active" && game.roundIndex < game.rounds.length - 1;
-  const canFinish = game.status === "active" || game.status === "waiting";
-
-  const groupSubmissionStatus = useMemo(() => {
-    if (!currentRound) return [];
-    return game.groups.map((group) => {
-      const answer = game.answers.find(
-        (a) => a.roundId === currentRound.id && a.groupId === group.id,
-      );
-      return { group, submitted: !!answer, answer };
-    });
-  }, [game.groups, game.answers, currentRound]);
-
-  return (
-    <div className="speed-game-teacher">
-      <header className="speed-game-header">
-        <div className="speed-game-status-row">
-          <span className={`speed-game-status speed-game-status--${game.status}`}>
-            {STATUS_LABELS[game.status]}
-          </span>
-          <span className="speed-game-round-count">
-            라운드 {roundDisplayIndex(game.roundIndex)} / {game.rounds.length}
-          </span>
-        </div>
-        {currentRound && game.status === "active" && (
-          <div className="speed-game-current-round">
-            <span className="speed-game-keyword-label">현재 단어</span>
-            <strong className="speed-game-keyword">{currentRound.keyword}</strong>
-            <span className="speed-game-guesser">추리 역할: {currentRound.guesserSlot}번 학생</span>
-          </div>
-        )}
-      </header>
-
-      <div className="speed-game-controls">
-        <button
-          type="button"
-          className="speed-game-btn speed-game-btn-primary"
-          onClick={() => onControl("start")}
-          disabled={!canStart || !!busyAction}
-        >
-          {busyAction === "start" ? "시작하는 중…" : "게임 시작"}
-        </button>
-        <button
-          type="button"
-          className="speed-game-btn speed-game-btn-secondary"
-          onClick={() => onControl("next")}
-          disabled={!canNext || !!busyAction}
-        >
-          {busyAction === "next" ? "넘어가는 중…" : "다음 라운드"}
-        </button>
-        <button
-          type="button"
-          className="speed-game-btn speed-game-btn-danger"
-          onClick={() => onControl("finish")}
-          disabled={!canFinish || !!busyAction}
-        >
-          {busyAction === "finish" ? "종료하는 중…" : "게임 종료"}
-        </button>
-      </div>
-
-      {currentRound && game.status !== "finished" && (
-        <div className="speed-game-submissions">
-          <h3>모둠 제출 현황</h3>
-          {groupSubmissionStatus.length === 0 ? (
-            <p className="speed-game-empty-hint">등록된 모둠이 없어요.</p>
-          ) : (
-            <ul className="speed-game-submission-list">
-              {groupSubmissionStatus.map(({ group, submitted, answer }) => (
-                <li key={group.id} className="speed-game-submission-item">
-                  <span className="speed-game-group-name">{group.name}</span>
-                  {submitted ? (
-                    <span className="speed-game-submission-badge speed-game-submission-badge--submitted">
-                      제출 완료
-                      {answer?.answer ? ` · "${answer.answer}"` : ""}
-                      {answer?.elapsedMs ? ` · ${formatDuration(answer.elapsedMs)}` : ""}
-                    </span>
-                  ) : (
-                    <span className="speed-game-submission-badge speed-game-submission-badge--waiting">
-                      대기 중
-                    </span>
-                  )}
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
-      )}
-
-      <Leaderboard leaderboard={game.leaderboard} />
-    </div>
-  );
-}
-
-function StudentPanel({
-  game,
-  currentRound,
-  myGroup,
-  mySlot,
-  myAnswer,
-  answerDraft,
-  answerSubmitting,
-  onAnswerChange,
-  onSubmit,
-}: {
-  game: SpeedGameWire;
-  currentRound: SpeedGameRound | null;
-  myGroup: SpeedGameGroup | null;
-  mySlot: number | null;
-  myAnswer: SpeedGameAnswer | null;
-  answerDraft: string;
-  answerSubmitting: boolean;
-  onAnswerChange: (value: string) => void;
-  onSubmit: () => void;
-}) {
-  if (!myGroup) {
+  if (viewerKind === "none") {
     return (
-      <div className="speed-game-student">
-        <div className="speed-game-empty">
-          <p>아직 모둠에 배정되지 않았어요.</p>
-          <p className="speed-game-empty-hint">교사에게 모둠 배정을 요청해 주세요.</p>
-        </div>
-        <Leaderboard leaderboard={game.leaderboard} />
-      </div>
+      <section className="speed-game-empty" role="alert">
+        <h2>접근할 수 없어요</h2>
+        <p>이 게임을 볼 권한이 없습니다.</p>
+      </section>
     );
   }
 
+  const pendingAnswers = game.answers.filter((item) => item.correct === null);
+  const currentAnswer =
+    currentRound && currentGroup
+      ? answerForRound(game, currentRound.id, currentGroup.id)
+      : undefined;
+
   if (game.status === "waiting") {
     return (
-      <div className="speed-game-student">
-        <div className="speed-game-wait">
-          <p>게임 시작을 기다리고 있어요.</p>
-          <p className="speed-game-empty-hint">교사가 시작하면 화면이 바뀝니다.</p>
-        </div>
-        <Leaderboard leaderboard={game.leaderboard} />
-      </div>
+      <>
+        <GameLobby
+          title="스피드게임 대기실"
+          description="모둠과 순서를 확인하고 준비가 끝나면 게임을 시작하세요."
+          participants={game.participants.map((participant) => ({
+            id: participant.studentId,
+            name: participant.name,
+            state: participantState(participant),
+          }))}
+          actions={
+            <>
+              {viewerKind === "teacher" ? (
+                <button
+                  type="button"
+                  className="speed-game-primary-button"
+                  disabled={busy}
+                  onClick={() => void mutateRun("start")}
+                >
+                  게임 시작
+                </button>
+              ) : null}
+              {viewerKind === "student" && currentParticipant ? (
+                <button
+                  type="button"
+                  className="speed-game-primary-button"
+                  disabled={busy || Boolean(currentParticipant.readyAt)}
+                  onClick={() => void executeParticipantCommand("ready")}
+                >
+                  {currentParticipant.readyAt ? "준비 완료" : "준비하기"}
+                </button>
+              ) : null}
+            </>
+          }
+        />
+        {reconnecting ? (
+          <p className="speed-game-notice" role="status">
+            최신 게임 상태를 다시 확인하고 있어요. 입력은 잠시 잠깁니다.
+          </p>
+        ) : null}
+        {error ? <p className="speed-game-error" role="alert">{error}</p> : null}
+      </>
     );
   }
 
   if (game.status === "finished") {
+    const ownRow = currentGroup
+      ? game.leaderboard.find((row) => row.groupId === currentGroup.id)
+      : null;
+    const ownRank = ownRow
+      ? game.leaderboard.findIndex((row) => row.groupId === ownRow.groupId) + 1
+      : null;
     return (
-      <div className="speed-game-student">
-        <div className="speed-game-finished">
-          <p>게임이 종료되었어요!</p>
-        </div>
-        <Leaderboard leaderboard={game.leaderboard} />
-      </div>
+      <GameResultPanel
+        outcome={
+          game.terminalReason === "host_ended"
+            ? "host-ended"
+            : currentParticipant?.forfeitedAt
+              ? "forfeit"
+              : "completed"
+        }
+        score={ownRow?.score ?? null}
+        metrics={[
+          ...(ownRank == null ? [] : [{ label: "모둠 순위", value: `${ownRank}위` }]),
+          { label: "라운드", value: `${game.rounds.length}개` },
+        ]}
+        message={
+          game.terminalReason === "host_ended"
+            ? "진행자가 게임을 종료했습니다. 서버가 확정한 결과만 전적에 기록됩니다."
+            : "게임이 완료되었습니다."
+        }
+        retryAction={
+          viewerKind === "teacher" ? (
+            <button
+              type="button"
+              className="speed-game-primary-button"
+              disabled={busy}
+              onClick={() => void mutateRun("rematch")}
+            >
+              다시 하기
+            </button>
+          ) : null
+        }
+        gamesAction={
+          <Link className="speed-game-secondary-button" href="/student/boards?category=play&playTab=games">
+            게임 목록
+          </Link>
+        }
+        recordsAction={
+          viewerKind === "student" ? (
+            <Link
+              className="speed-game-secondary-button"
+              href="/student/boards?category=play&playTab=records&game=speed-game"
+            >
+              나의 전적
+            </Link>
+          ) : null
+        }
+      />
     );
   }
-
-  if (!currentRound) {
-    return (
-      <div className="speed-game-student">
-        <div className="speed-game-wait">
-          <p>라운드 정보를 불러오는 중이에요.</p>
-        </div>
-        <Leaderboard leaderboard={game.leaderboard} />
-      </div>
-    );
-  }
-
-  const isGuesser = mySlot === currentRound.guesserSlot;
-  const submitted = !!myAnswer;
 
   return (
-    <div className="speed-game-student">
-      <div className="speed-game-student-meta">
-        <span className="speed-game-group-name">{myGroup.name}</span>
-        <span className="speed-game-round-count">
-          라운드 {roundDisplayIndex(game.roundIndex)} / {game.rounds.length}
-        </span>
-      </div>
-
-      {submitted ? (
-        <div className="speed-game-submitted">
-          <p>제출 완료!</p>
-          {myAnswer && (
-            <div className="speed-game-submitted-detail">
-              <p>내 답변: <strong>{myAnswer.answer}</strong></p>
-              {myAnswer.correct !== null && (
-                <p className={myAnswer.correct ? "speed-game-correct" : "speed-game-wrong"}>
-                  {myAnswer.correct ? "정답" : "오답"}
-                </p>
-              )}
-              {myAnswer.score !== null && <p>점수: <strong>{myAnswer.score}</strong></p>}
-              {myAnswer.rank !== null && <p>순위: <strong>{myAnswer.rank}</strong>등</p>}
-            </div>
+    <section className="speed-game-shell" aria-busy={busy || reconnecting || undefined}>
+      <header className="speed-game-round-header">
+        <div>
+          <p className="speed-game-eyebrow">ROUND</p>
+          <h2>
+            {currentRound
+              ? `${currentRound.order + 1}/${game.rounds.length} 라운드`
+              : "라운드 준비 중"}
+          </h2>
+        </div>
+        <div className="speed-game-round-actions">
+          {viewerKind === "teacher" ? (
+            <>
+              <button
+                type="button"
+                className="speed-game-secondary-button"
+                disabled={busy || !currentRound || currentRound.order >= game.rounds.length - 1}
+                onClick={() => void mutateRun("next")}
+              >
+                다음 라운드
+              </button>
+              <button
+                type="button"
+                className="speed-game-primary-button"
+                disabled={busy}
+                onClick={() => void mutateRun("finish")}
+              >
+                게임 완료
+              </button>
+              <button
+                type="button"
+                className="speed-game-danger-button"
+                disabled={busy}
+                onClick={() => void mutateRun("end-early")}
+              >
+                조기 종료
+              </button>
+            </>
+          ) : (
+            <button
+              type="button"
+              className="speed-game-danger-button"
+              disabled={busy || Boolean(currentParticipant?.forfeitedAt)}
+              onClick={() => setExitOpen(true)}
+            >
+              게임 나가기
+            </button>
           )}
         </div>
-      ) : isGuesser ? (
-        <div className="speed-game-guesser">
-          <p className="speed-game-role-hint">모둠원의 설명을 듣고 단어를 맞혀보세요!</p>
-          <input
-            type="text"
-            className="speed-game-answer-input"
-            value={answerDraft}
-            onChange={(e) => onAnswerChange(e.target.value)}
-            placeholder="정답을 입력하세요"
-            maxLength={80}
-            disabled={answerSubmitting}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") onSubmit();
-            }}
-          />
-          <button
-            type="button"
-            className="speed-game-btn speed-game-btn-primary"
-            onClick={onSubmit}
-            disabled={!answerDraft.trim() || answerSubmitting}
-          >
-            {answerSubmitting ? "제출 중…" : "제출"}
-          </button>
-        </div>
-      ) : (
-        <div className="speed-game-explainer">
-          <p className="speed-game-role-hint">당신은 설명자예요. 단어를 설명해 주세요!</p>
-          <div className="speed-game-keyword-card">
-            <span className="speed-game-keyword-label">설명할 단어</span>
-            <strong className="speed-game-keyword">{currentRound.keyword}</strong>
-          </div>
-        </div>
-      )}
+      </header>
 
-      <Leaderboard leaderboard={game.leaderboard} />
-    </div>
-  );
-}
+      {reconnecting ? (
+        <p className="speed-game-notice" role="status">
+          최신 게임 상태를 다시 확인하고 있어요. 입력은 잠시 잠깁니다.
+        </p>
+      ) : null}
+      {error ? <p className="speed-game-error" role="alert">{error}</p> : null}
 
-function Leaderboard({ leaderboard }: { leaderboard: SpeedGameLeaderboardEntry[] }) {
-  if (leaderboard.length === 0) return null;
-  return (
-    <div className="speed-game-leaderboard">
-      <h3>리더보드</h3>
-      <ol className="speed-game-leaderboard-list">
-        {leaderboard.map((entry) => (
-          <li key={entry.groupId} className="speed-game-leaderboard-item">
-            <span className="speed-game-leaderboard-name">{entry.groupName}</span>
-            <span className="speed-game-leaderboard-score">{entry.score}점</span>
-          </li>
-        ))}
-      </ol>
-    </div>
+      <div className="speed-game-keyword-card">
+        <span>제시어</span>
+        <strong>
+          {viewerKind === "teacher"
+            ? currentRound?.keyword ?? "—"
+            : currentRound
+              ? `${currentRound.guesserSlot}번 순서`
+              : "—"}
+        </strong>
+      </div>
+
+      {viewerKind === "student" ? (
+        <section className="speed-game-answer-panel" aria-label="답변 제출">
+          <p>
+            {currentGroup
+              ? `${currentGroup.name} · ${currentRound?.guesserSlot ?? "-"}번 순서`
+              : "배정된 모둠이 없습니다."}
+          </p>
+          {currentAnswer ? (
+            <p role="status">
+              제출 완료: {currentAnswer.answer || "답변 비공개"}
+              {currentAnswer.correct === null
+                ? " · 교사 확인 중"
+                : currentAnswer.correct
+                  ? ` · 정답 +${currentAnswer.score ?? 0}점`
+                  : " · 오답"}
+            </p>
+          ) : (
+            <form
+              onSubmit={(event) => {
+                event.preventDefault();
+                void submitAnswer();
+              }}
+            >
+              <label htmlFor="speed-game-answer">답변</label>
+              <div className="speed-game-answer-row">
+                <input
+                  id="speed-game-answer"
+                  value={answer}
+                  maxLength={200}
+                  disabled={!canAnswer || busy || reconnecting}
+                  onChange={(event) => setAnswer(event.target.value)}
+                  placeholder={canAnswer ? "답을 입력하세요" : "내 순서를 기다려 주세요"}
+                  autoComplete="off"
+                />
+                <button
+                  type="submit"
+                  className="speed-game-primary-button"
+                  disabled={!canAnswer || busy || reconnecting || !answer.trim()}
+                >
+                  정답 제출
+                </button>
+              </div>
+            </form>
+          )}
+        </section>
+      ) : null}
+
+      <section className="speed-game-leaderboard" aria-label="모둠 점수">
+        <h3>모둠 점수</h3>
+        <ol>
+          {game.leaderboard.map((row) => (
+            <li key={row.groupId}>
+              <span>{row.groupName}</span>
+              <strong>{row.score.toLocaleString("ko-KR")}점</strong>
+            </li>
+          ))}
+        </ol>
+      </section>
+
+      {viewerKind === "teacher" && game.answerMode === "teacher-approval" ? (
+        <section className="speed-game-review-panel" aria-label="답변 판정">
+          <h3>답변 판정</h3>
+          {pendingAnswers.length === 0 ? (
+            <p>확인할 답변이 없습니다.</p>
+          ) : (
+            <ul>
+              {pendingAnswers.map((item) => (
+                <li key={item.id}>
+                  <span>{item.answer}</span>
+                  <div>
+                    <button
+                      type="button"
+                      disabled={busy}
+                      onClick={() => void reviewAnswer(item.id, "accepted")}
+                    >
+                      정답
+                    </button>
+                    <button
+                      type="button"
+                      disabled={busy}
+                      onClick={() => void reviewAnswer(item.id, "rejected")}
+                    >
+                      오답
+                    </button>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+      ) : null}
+
+      <footer className="speed-game-runtime-meta">
+        <span>run {game.runId}</span>
+        <span>v{game.version}</span>
+        <span>{boardSlug}</span>
+        <span>{classroomId}</span>
+        <span>{boardId}</span>
+      </footer>
+
+      <GameExitDialog
+        open={exitOpen}
+        title="스피드게임에서 나갈까요?"
+        description="진행 중 나가면 이번 run은 기권으로 기록됩니다. 서버가 결과를 확정한 뒤 나갈 수 있어요."
+        confirmLabel="기권하고 나가기"
+        busy={busy}
+        onCancel={() => setExitOpen(false)}
+        onConfirm={async () => {
+          const result = await executeParticipantCommand("forfeit");
+          if (result) setExitOpen(false);
+        }}
+      />
+    </section>
   );
 }

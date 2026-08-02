@@ -506,6 +506,8 @@ model Classroom {
 
   boards Board[] @relation("ClassroomBoards")
 
+  gameResults GameResult[]
+
   plantAllows ClassroomPlantAllow[]
 
   inviteCodes ClassInviteCode[]
@@ -634,6 +636,10 @@ model Student {
   vibePlaySessions VibePlaySession[] @relation("VibePlayer")
   // BC-2: back-relation for Kordle attempts without a play session.
   kordleAttempts   KordleAttempt[]
+  playParticipants PlayParticipant[]
+  speedGameRunParticipants SpeedGameRunParticipant[]
+  speedGameRunAnswers SpeedGameRunAnswer[]
+  gameResults GameResult[]
 
   boardResponses BoardResponse[] @relation("StudentBoardResponses")
 
@@ -1258,6 +1264,11 @@ model Board {
 
   classroomId String?
 
+  // Server-owned, classroom-scoped room behind the always-open game hub.
+  // Null means a normal teacher-created board. The matching migration enforces
+  // that non-null values are one of the five official game kinds and equal layout.
+  systemGameKind String?
+
   createdAt DateTime @default(now())
 
   // classroom-boards-tab "???????筌먲퐣彛? ?袁⑸즲????좊읈? ???源놁졆 ??筌먲퐣彛???袁⑸즵????嚥▲꺃?????⑤베堉?.
@@ -1417,6 +1428,16 @@ model Board {
   // 스피드게임 (2026-07-06) — 보드 1개당 게임 1개 (1:1).
   speedGame    SpeedGame?
 
+  // Authoritative Rust play sessions. Browser/mobile clients never write these
+  // rows directly; the play service owns commands, versions, receipts, and outbox.
+  playSessions PlaySession[]
+  speedGameRuns SpeedGameRun[]
+  gameResults GameResult[]
+
+  songGuessGame SongGuessGame?
+
+  songGuessAssets SongGuessAsset[]
+
   djPlayEvents DjPlayEvent[]
 
   responses BoardResponse[]
@@ -1427,6 +1448,188 @@ model Board {
 
   // BC-1: speeds up the lesson/play split in the dashboard filter.
   @@index([classroomId, category])
+  @@unique([classroomId, systemGameKind])
+}
+
+// Authoritative multiplayer play platform. Full aggregate state is stored in
+// PlaySession.state; PlayParticipant is the server-owned actor/slot index used
+// for authorization audits and operational inspection.
+model PlaySession {
+  id String @id
+
+  boardId String
+
+  hostSubject String
+
+  gameKind String @default("omok")
+
+  version BigInt @default(0)
+
+  rulesVersion Int
+
+  stateSchemaVersion Int
+
+  previousSessionId String?
+
+  current Boolean @default(true)
+
+  createdAtMs BigInt
+
+  startedAtMs BigInt?
+
+  completedAtMs BigInt?
+
+  terminalReason String?
+
+  state Json
+
+  createdAt DateTime @default(now())
+
+  updatedAt DateTime @updatedAt
+
+  board Board @relation(fields: [boardId], references: [id], onDelete: Cascade)
+
+  participants PlayParticipant[]
+
+  outbox PlayOutbox[]
+
+  @@index([boardId, createdAt])
+  @@index([boardId, current])
+}
+
+model PlayParticipant {
+  id String @id
+
+  sessionId String
+
+  actorSubject String
+
+  studentId String?
+
+  displayName String
+
+  slot String
+
+  joinedAtMs BigInt?
+
+  forfeitedAtMs BigInt?
+
+  createdAt DateTime @default(now())
+
+  session PlaySession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  student Student? @relation(fields: [studentId], references: [id], onDelete: SetNull)
+
+  @@unique([sessionId, actorSubject])
+  @@unique([sessionId, slot])
+  @@index([actorSubject])
+  @@index([studentId])
+}
+
+// Durable idempotency receipt. The response JSON is returned byte-for-byte in
+// semantic content when a mobile retry repeats the same request after loss.
+model PlayRequestReceipt {
+  id String @id
+
+  scopeType String
+
+  scopeId String
+
+  requestId String
+
+  requestHash String
+
+  response Json
+
+  createdAt DateTime @default(now())
+
+  @@unique([scopeType, scopeId, requestId])
+  @@index([createdAt])
+}
+
+// Transactional outbox: a committed version invalidation only. It never stores
+// client-authored state or live hidden game data.
+model PlayOutbox {
+  id String @id
+
+  sessionId String
+
+  boardId String
+
+  version BigInt
+
+  eventType String
+
+  status String @default("pending")
+
+  attempts Int @default(0)
+
+  nextAttemptAt DateTime @default(now())
+
+  lockedAt DateTime?
+
+  lockToken String?
+
+  lastError String?
+
+  processedAt DateTime?
+
+  createdAt DateTime @default(now())
+
+  updatedAt DateTime @updatedAt
+
+  session PlaySession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@index([status, nextAttemptAt, createdAt])
+  @@index([boardId, createdAt])
+}
+
+// Append-only, server-owned result projection for the authenticated student's
+// own record history. sourceId is intentionally heterogeneous and has no FK.
+model GameResult {
+  id String @id @default(cuid())
+
+  gameKind String
+
+  boardId String
+
+  classroomId String
+
+  studentId String
+
+  sourceType String
+
+  sourceId String
+
+  outcome String
+
+  score BigInt?
+
+  durationMs BigInt?
+
+  metrics Json
+
+  startedAt DateTime
+
+  completedAt DateTime
+
+  idempotencyKey String @unique
+
+  rulesVersion Int?
+
+  stateSchemaVersion Int?
+
+  createdAt DateTime @default(now())
+
+  board Board @relation(fields: [boardId], references: [id], onDelete: Cascade)
+
+  classroom Classroom @relation(fields: [classroomId], references: [id], onDelete: Cascade)
+
+  student Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@unique([gameKind, sourceId, studentId])
+  @@index([studentId, completedAt, id])
+  @@index([studentId, gameKind, completedAt, id])
+  @@index([boardId, completedAt])
 }
 
 // Question Board ???쑩?젆?(QB-1, 2026-04-23).
@@ -1434,6 +1637,87 @@ model Board {
 // ??嚥▲굥猷??Board(layout=question-board) ??N ?????쑩?젆? ????뽓????獒??????벧?녌關苡? ??????
 
 // Board ??????cascade, Student/User ?????????쑩?젆?? ???癲?authorship ???.
+
+// Teacher-owned ordered song-guess pack. Round answers and aliases are
+// server-only fields; student snapshots are projected by Rust without them.
+model SongGuessGame {
+  id String @id @default(cuid())
+
+  boardId String @unique
+
+  createdByUserId String
+
+  createdAt DateTime @default(now())
+
+  updatedAt DateTime @updatedAt
+
+  board Board @relation(fields: [boardId], references: [id], onDelete: Cascade)
+
+  rounds SongGuessRound[]
+
+  @@index([createdByUserId])
+}
+
+model SongGuessRound {
+  id String @id @default(cuid())
+
+  gameId String
+
+  order Int
+
+  representativeAnswer String
+
+  normalizedAnswer String
+
+  aliases Json
+
+  normalizedAliases Json
+
+  accessibilityClue String?
+
+  createdAt DateTime @default(now())
+
+  updatedAt DateTime @updatedAt
+
+  game SongGuessGame @relation(fields: [gameId], references: [id], onDelete: Cascade)
+
+  clips SongGuessAsset[]
+
+  @@unique([gameId, order])
+  @@index([gameId, order])
+}
+
+// Only browser-derived, fixed-duration clips are accepted. The object key is
+// private storage identity, never a public URL and never serialized to clients.
+model SongGuessAsset {
+  id String @id @default(cuid())
+
+  boardId String
+
+  roundId String?
+
+  uploadedByUserId String
+
+  tierMs Int
+
+  mimeType String
+
+  sizeBytes Int
+
+  durationMs Int
+
+  objectKey String @unique
+
+  createdAt DateTime @default(now())
+
+  board Board @relation(fields: [boardId], references: [id], onDelete: Cascade)
+
+  round SongGuessRound? @relation(fields: [roundId], references: [id], onDelete: SetNull)
+
+  @@unique([roundId, tierMs])
+  @@index([boardId, createdAt])
+  @@index([uploadedByUserId, boardId])
+}
 
 model BoardDefaultGroup {
   id String @id @default(cuid())
@@ -4564,6 +4848,7 @@ model KordlePuzzle {
   solutionWordId    String
   solutionWord      KordleWord         @relation(fields: [solutionWordId], references: [id])
   status            KordlePuzzleStatus @default(DRAFT)
+  version           BigInt             @default(0)
   // When the puzzle goes live (DAILY mode uses startsAt; LIVE_CLASS uses live
   // toggles). Null until scheduled.
   startsAt          DateTime?
@@ -4597,6 +4882,8 @@ model KordleAttempt {
   teacherUserId     String?
   teacherUser       User?               @relation("TeacherKordleAttempts", fields: [teacherUserId], references: [id], onDelete: SetNull)
   status            KordleAttemptStatus @default(IN_PROGRESS)
+  version           BigInt              @default(0)
+  terminalReason    String?
   // Which guess (1-indexed) won; null until status=WON.
   solvedAtGuess     Int?
   startedAt         DateTime            @default(now())
@@ -4869,6 +5156,7 @@ model SpeedGame {
 
   rounds  SpeedGameRound[]
   answers SpeedGameAnswer[]
+  runs    SpeedGameRun[]
 
   @@index([status])
 }
@@ -4926,4 +5214,165 @@ model SpeedGameAnswer {
   @@index([roundId])
   @@index([studentId])
   @@index([groupId])
+}
+
+// Immutable execution identity for new speed-game sessions. Legacy SpeedGame,
+// SpeedGameRound, and SpeedGameAnswer remain readable for compatibility but
+// new authoritative mutations target a run and its frozen snapshots.
+model SpeedGameRun {
+  id String @id @default(cuid())
+
+  gameId String
+
+  boardId String
+
+  status String @default("lobby")
+
+  version BigInt @default(0)
+
+  current Boolean @default(true)
+
+  previousRunId String?
+
+  currentRoundIndex Int @default(-1)
+
+  configSnapshot Json
+
+  startedAt DateTime?
+
+  completedAt DateTime?
+
+  terminalReason String?
+
+  createdAt DateTime @default(now())
+
+  updatedAt DateTime @updatedAt
+
+  game SpeedGame @relation(fields: [gameId], references: [id], onDelete: Cascade)
+
+  board Board @relation(fields: [boardId], references: [id], onDelete: Cascade)
+
+  groups SpeedGameRunGroup[]
+
+  participants SpeedGameRunParticipant[]
+
+  rounds SpeedGameRunRound[]
+
+  @@index([gameId, createdAt])
+  @@index([boardId, current])
+  @@index([previousRunId])
+}
+
+model SpeedGameRunGroup {
+  id String @id @default(cuid())
+
+  runId String
+
+  sourceGroupId String
+
+  name String
+
+  order Int
+
+  run SpeedGameRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+
+  participants SpeedGameRunParticipant[]
+
+  answers SpeedGameRunAnswer[]
+
+  @@unique([runId, sourceGroupId])
+  @@unique([runId, order])
+  @@index([runId])
+}
+
+model SpeedGameRunParticipant {
+  id String @id @default(cuid())
+
+  runId String
+
+  groupId String
+
+  studentId String
+
+  memberOrder Int
+
+  invitedAt DateTime @default(now())
+
+  joinedAt DateTime?
+
+  readyAt DateTime?
+
+  forfeitedAt DateTime?
+
+  run SpeedGameRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+
+  group SpeedGameRunGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+
+  student Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@unique([runId, studentId])
+  @@index([groupId, joinedAt])
+  @@index([studentId, createdAt])
+
+  createdAt DateTime @default(now())
+}
+
+model SpeedGameRunRound {
+  id String @id @default(cuid())
+
+  runId String
+
+  sourceRoundId String
+
+  order Int
+
+  keyword String
+
+  keywordNormalized String
+
+  guesserSlot Int
+
+  startedAt DateTime?
+
+  endedAt DateTime?
+
+  run SpeedGameRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+
+  answers SpeedGameRunAnswer[]
+
+  @@unique([runId, order])
+  @@unique([runId, sourceRoundId])
+  @@index([runId, startedAt])
+}
+
+model SpeedGameRunAnswer {
+  id String @id @default(cuid())
+
+  runRoundId String
+
+  groupId String
+
+  studentId String
+
+  rawText String
+
+  correct Boolean @default(false)
+
+  approval String @default("pending")
+
+  score Int @default(0)
+
+  elapsedMs Int @default(0)
+
+  createdAt DateTime @default(now())
+
+  runRound SpeedGameRunRound @relation(fields: [runRoundId], references: [id], onDelete: Cascade)
+
+  group SpeedGameRunGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+
+  student Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@unique([runRoundId, groupId])
+  @@index([studentId, createdAt])
+  @@index([groupId, createdAt])
 }

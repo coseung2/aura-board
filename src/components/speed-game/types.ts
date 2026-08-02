@@ -36,6 +36,9 @@ export type SpeedGameLeaderboardEntry = {
 
 export type SpeedGameWire = {
   id: string;
+  runId: string;
+  version: number;
+  terminalReason: "completed" | "participant_forfeit" | "host_ended" | null;
   boardId: string;
   boardSlug: string;
   classroomId: string;
@@ -49,5 +52,14 @@ export type SpeedGameWire = {
   rounds: SpeedGameRound[];
   answers: SpeedGameAnswer[];
   groups: SpeedGameGroup[];
+  participants: Array<{
+    studentId: string;
+    groupId: string;
+    name: string;
+    invitedAt: string;
+    joinedAt: string | null;
+    readyAt: string | null;
+    forfeitedAt: string | null;
+  }>;
   leaderboard: SpeedGameLeaderboardEntry[];
 };

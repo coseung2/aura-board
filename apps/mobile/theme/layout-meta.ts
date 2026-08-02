@@ -1,3 +1,5 @@
+import { MOBILE_GAME_CATALOG } from "../lib/game-platform-contract";
+
 // 웹 src/lib/layout-meta.ts 와 1:1 동일한 레이아웃 메타데이터.
 // Board.layout 문자열 → { emoji, label }. 양쪽 동기화 유지 책임은 수동 —
 // 추후 packages/shared/ 로 추출 대상.
@@ -17,6 +19,8 @@ export type LayoutKey =
   | "kordle"
   | "speed-game"
   | "shadow-alliance"
+  | "omok"
+  | "song-guess"
   | "plant-roadmap"
   | "event-signup"
   | "question-board";
@@ -41,9 +45,20 @@ export const LAYOUT_META: Record<LayoutKey, { emoji: string; label: string }> =
     "dj-queue": { emoji: "🎵", label: "DJ" },
     "vibe-arcade": { emoji: "💻", label: "코딩 교실" },
     "vibe-gallery": { emoji: "🌟", label: "코딩 갤러리" },
-    kordle: { emoji: "🟩", label: "꼬들" },
-    "speed-game": { emoji: "⚡", label: "스피드게임" },
-    "shadow-alliance": { emoji: "♟", label: "그림자연합" },
+    kordle: { emoji: "🟩", label: MOBILE_GAME_CATALOG.kordle.displayName },
+    "speed-game": {
+      emoji: "⚡",
+      label: MOBILE_GAME_CATALOG["speed-game"].displayName,
+    },
+    "shadow-alliance": {
+      emoji: "♟",
+      label: MOBILE_GAME_CATALOG["shadow-alliance"].displayName,
+    },
+    omok: { emoji: "⚫", label: MOBILE_GAME_CATALOG.omok.displayName },
+    "song-guess": {
+      emoji: "🎧",
+      label: MOBILE_GAME_CATALOG["song-guess"].displayName,
+    },
     "plant-roadmap": { emoji: "🌱", label: "식물 관찰일지" },
     "event-signup": { emoji: "🎟️", label: "행사 신청" },
     "question-board": { emoji: "💬", label: "질문 보드" },

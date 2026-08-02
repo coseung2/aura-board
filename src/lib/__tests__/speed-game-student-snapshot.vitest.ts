@@ -2,13 +2,15 @@ import { describe, expect, it } from "vitest";
 import { sanitizeGameSnapshotForStudent } from "@/lib/speed-game/student-snapshot";
 
 const snapshot = {
+  status: "active",
   roundIndex: 1,
   rounds: [
-    { keyword: "past", guesserSlot: 1 },
-    { keyword: "active", guesserSlot: 2 },
-    { keyword: "future", guesserSlot: 1 },
+    { id: "round-0", order: 0, keyword: "past", guesserSlot: 1 },
+    { id: "round-1", order: 1, keyword: "active", guesserSlot: 2 },
+    { id: "round-2", order: 2, keyword: "future", guesserSlot: 1 },
   ],
-  groups: [{ studentIds: ["student-a", "student-b"] }],
+  groups: [{ id: "group-a", studentIds: ["student-a", "student-b"] }],
+  answers: [],
 };
 
 describe("sanitizeGameSnapshotForStudent", () => {

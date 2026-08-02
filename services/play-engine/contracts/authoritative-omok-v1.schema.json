@@ -1,0 +1,229 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://aura-board.com/contracts/authoritative-omok-v1.schema.json",
+  "title": "Aura Board Authoritative Omok v1",
+  "description": "Shared wire contract for Rust, Next.js, web, and Expo clients. The client sends intents only; actor identity, slot ownership, version advancement, and outcomes remain server-owned.",
+  "type": "object",
+  "properties": {
+    "commandSchemaVersion": { "const": 1 },
+    "stateSchemaVersion": { "const": 1 },
+    "rulesVersion": { "const": 1 }
+  },
+  "$defs": {
+    "slot": {
+      "type": "string",
+      "enum": ["first", "second"]
+    },
+    "position": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["row", "column"],
+      "properties": {
+        "row": { "type": "integer", "minimum": 0, "maximum": 14 },
+        "column": { "type": "integer", "minimum": 0, "maximum": 14 }
+      }
+    },
+    "intent": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["type"],
+          "properties": { "type": { "const": "ready" } }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["type"],
+          "properties": { "type": { "const": "start" } }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["type", "position"],
+          "properties": {
+            "type": { "const": "place_stone" },
+            "position": { "$ref": "#/$defs/position" }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["type"],
+          "properties": { "type": { "const": "resign" } }
+        }
+      ]
+    },
+    "commandRequest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["requestId", "expectedVersion", "commandSchemaVersion", "command"],
+      "properties": {
+        "requestId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[A-Za-z0-9._-]+$"
+        },
+        "expectedVersion": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "commandSchemaVersion": { "const": 1 },
+        "command": { "$ref": "#/$defs/intent" }
+      }
+    },
+    "participant": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["displayName", "slot", "ready"],
+      "properties": {
+        "displayName": { "type": "string", "minLength": 1, "maxLength": 100 },
+        "slot": { "$ref": "#/$defs/slot" },
+        "ready": { "type": "boolean" }
+      }
+    },
+    "move": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["number", "side", "position"],
+      "properties": {
+        "number": { "type": "integer", "minimum": 1, "maximum": 225 },
+        "side": { "$ref": "#/$defs/slot" },
+        "position": { "$ref": "#/$defs/position" }
+      }
+    },
+    "gameStatus": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["status"],
+          "properties": { "status": { "const": "playing" } }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["status", "winner"],
+          "properties": {
+            "status": { "const": "won" },
+            "winner": { "$ref": "#/$defs/slot" }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["status"],
+          "properties": { "status": { "const": "draw" } }
+        }
+      ]
+    },
+    "snapshot": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "sessionId",
+        "boardId",
+        "gameKind",
+        "version",
+        "serverTimeMs",
+        "rulesVersion",
+        "stateSchemaVersion",
+        "previousSessionId",
+        "roomStatus",
+        "participants",
+        "viewer",
+        "game",
+        "outcome"
+      ],
+      "properties": {
+        "sessionId": { "type": "string", "minLength": 1 },
+        "boardId": { "type": "string", "minLength": 1 },
+        "gameKind": { "const": "omok" },
+        "version": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "serverTimeMs": { "type": "integer" },
+        "rulesVersion": { "const": 1 },
+        "stateSchemaVersion": { "const": 1 },
+        "previousSessionId": { "type": ["string", "null"] },
+        "roomStatus": {
+          "type": "string",
+          "enum": ["waiting", "ready", "active", "finished"]
+        },
+        "participants": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 2,
+          "items": { "$ref": "#/$defs/participant" }
+        },
+        "viewer": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["role", "slot"],
+          "properties": {
+            "role": { "type": "string", "enum": ["host", "participant"] },
+            "slot": {
+              "oneOf": [
+                { "$ref": "#/$defs/slot" },
+                { "type": "null" }
+              ]
+            }
+          }
+        },
+        "game": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["board", "nextTurn", "status", "moveCount", "lastMove"],
+          "properties": {
+            "board": {
+              "type": "array",
+              "minItems": 225,
+              "maxItems": 225,
+              "items": {
+                "oneOf": [
+                  { "$ref": "#/$defs/slot" },
+                  { "type": "null" }
+                ]
+              }
+            },
+            "nextTurn": { "$ref": "#/$defs/slot" },
+            "status": { "$ref": "#/$defs/gameStatus" },
+            "moveCount": { "type": "integer", "minimum": 0, "maximum": 225 },
+            "lastMove": {
+              "oneOf": [
+                { "$ref": "#/$defs/move" },
+                { "type": "null" }
+              ]
+            }
+          }
+        },
+        "outcome": {
+          "oneOf": [
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["winner", "reason"],
+              "properties": {
+                "winner": {
+                  "oneOf": [
+                    { "$ref": "#/$defs/slot" },
+                    { "type": "null" }
+                  ]
+                },
+                "reason": {
+                  "type": "string",
+                  "enum": ["five_in_a_row", "draw", "resignation"]
+                }
+              }
+            },
+            { "type": "null" }
+          ]
+        }
+      }
+    }
+  }
+}

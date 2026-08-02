@@ -19,7 +19,17 @@ export function scheduleRealtimePublish(event: RealtimeEvent): void {
 
 export function scheduleSpeedGameChange(
   gameId: string,
-  changeType: "start" | "next" | "finish" | "answer",
+  changeType:
+    | "start"
+    | "next"
+    | "finish"
+    | "end-early"
+    | "rematch"
+    | "answer"
+    | "answer-review"
+    | "participant-join"
+    | "participant-ready"
+    | "participant-forfeit",
 ): void {
   after(() => announceSpeedGameChange(gameId, changeType));
 }

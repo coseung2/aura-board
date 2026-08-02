@@ -3,7 +3,6 @@
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { RealtimeChannel } from "@supabase/supabase-js";
 import { layoutLabel, layoutThumbnail } from "@/lib/layout-meta";
 import { formatBpsPercent } from "@/lib/pets/math";
 import type {
@@ -13,12 +12,6 @@ import type {
   SlimeShopItem,
 } from "@/lib/pets/types";
 import { SlimeCharacterSprite } from "@/components/creatures/SlimeCharacterSprite";
-import { createPublicSupabaseClient } from "@/lib/supabase/client";
-import { SHADOW_ALLIANCE_STATUS_LABELS } from "@/features/shadow-alliance/types";
-import type {
-  ShadowAllianceBoardStatus,
-  ShadowAllianceSnapshot,
-} from "@/features/shadow-alliance/types";
 import type {
   StudentAssignmentTodo,
   StudentHomeBoard as BoardItem,
@@ -30,19 +23,24 @@ import {
   STUDENT_BOARD_CATEGORIES,
   type StudentBoardCategory,
 } from "@/components/student/student-board-navigation";
+import { GameHubCatalog } from "@/components/game-platform/GameHubCatalog";
+import { GameRecordsPanel } from "@/components/game-platform/GameRecordsPanel";
+import { GAME_HUB_ORDER } from "@/lib/game-platform/catalog";
+import {
+  isGameRecordRange,
+  isOfficialGameKind,
+  type GameRecordRange,
+  type OfficialGameKind,
+} from "@/lib/game-platform/contracts";
 
 const FALLBACK_THUMBNAIL = "/board-type-thumbnails/card-board.png";
 const STUDENT_ASSIGNMENT_VISIBLE_LIMIT = 4;
-const PLAY_FILTERS = [
-  { id: "all", label: "전체" },
-  { id: "live", label: "진행 중" },
-  { id: "kordle", label: "코들" },
-  { id: "speed-game", label: "스피드 게임" },
-  { id: "quiz", label: "퀴즈" },
-  { id: "shadow-alliance", label: "그림자 연합" },
-] as const;
 
-type PlayFilter = (typeof PLAY_FILTERS)[number]["id"];
+const PLAY_TABS = [
+  { id: "games", label: "게임" },
+  { id: "records", label: "나의 전적" },
+] as const;
+type PlayTab = (typeof PLAY_TABS)[number]["id"];
 
 type BreakoutGroup = {
   groupIndex: number;
@@ -522,24 +520,7 @@ type StudentBoardHubProps = {
   boards: BoardItem[];
 };
 
-function playBoardState(
-  board: BoardItem,
-  shadowAllianceStatus?: ShadowAllianceBoardStatus,
-) {
-  if (board.layout === "kordle") {
-    return board.kordleStatus === "LIVE"
-      ? { label: "진행 중", live: true }
-      : board.kordleStatus === "DRAFT"
-        ? { label: "시작 대기", live: false }
-        : { label: "게임 없음", live: false };
-  }
-  if (board.layout === "speed-game") {
-    return board.speedGameStatus === "running"
-      ? { label: "진행 중", live: true }
-      : board.speedGameStatus === "finished"
-        ? { label: "종료", live: false }
-        : { label: "시작 대기", live: false };
-  }
+function boardListState(board: BoardItem) {
   if (board.layout === "quiz") {
     const status = board.quizzes?.[0]?.status;
     return status === "active"
@@ -548,28 +529,18 @@ function playBoardState(
         ? { label: "종료", live: false }
         : { label: "시작 대기", live: false };
   }
-  if (board.layout === "shadow-alliance") {
-    const status = shadowAllianceStatus ?? board.shadowAllianceStatus ?? "waiting";
-    return {
-      label: SHADOW_ALLIANCE_STATUS_LABELS[status],
-      live: status === "active",
-    };
-  }
   return { label: layoutLabel(board.layout), live: false };
 }
 
-function isPriorityBoard(
-  board: BoardItem,
-  shadowAllianceStatus?: ShadowAllianceBoardStatus,
-) {
-  return (
-    board.breakout !== null ||
-    playBoardState(board, shadowAllianceStatus).live
-  );
+function isPriorityBoard(board: BoardItem) {
+  return board.breakout !== null || boardListState(board).live;
 }
 
 function StudentBoardHighlights({ boards }: { boards: BoardItem[] }) {
-  const priorityBoards = boards.filter((board) => isPriorityBoard(board)).slice(0, 3);
+  const priorityBoards = boards
+    .filter((board) => !isOfficialGameKind(board.layout))
+    .filter((board) => isPriorityBoard(board))
+    .slice(0, 3);
 
   return (
     <section className="student-home-boards" aria-labelledby="student-home-boards-title">
@@ -580,7 +551,7 @@ function StudentBoardHighlights({ boards }: { boards: BoardItem[] }) {
       {priorityBoards.length > 0 ? (
         <div className="student-board-highlight-list">
           {priorityBoards.map((board) => {
-            const state = playBoardState(board);
+            const state = boardListState(board);
             return (
               <Link
                 key={board.id}
@@ -614,26 +585,30 @@ export function StudentBoardHub({ boards }: StudentBoardHubProps) {
     sourceTitle: string;
     breakout: StudentBreakout;
   } | null>(null);
-  const [shadowAllianceStatuses, setShadowAllianceStatuses] = useState<
-    Record<string, ShadowAllianceBoardStatus>
-  >({});
   const [query, setQuery] = useState(() => searchParams.get("q") ?? "");
-  const requestedPlayFilter = PLAY_FILTERS.some(
-    (filter) => filter.id === searchParams.get("playType"),
+  const requestedPlayTab: PlayTab =
+    searchParams.get("playTab") === "records" ? "records" : "games";
+  const [playTab, setPlayTab] = useState<PlayTab>(requestedPlayTab);
+  const requestedRecordKind: OfficialGameKind | "all" = isOfficialGameKind(
+    searchParams.get("game"),
   )
-    ? (searchParams.get("playType") as PlayFilter)
+    ? (searchParams.get("game") as OfficialGameKind)
     : "all";
-  const [playFilter, setPlayFilter] = useState<PlayFilter>(requestedPlayFilter);
+  const requestedRecordRange: GameRecordRange = isGameRecordRange(
+    searchParams.get("range"),
+  )
+    ? (searchParams.get("range") as GameRecordRange)
+    : "30d";
   const categoryTabRefs = useRef<Array<HTMLButtonElement | null>>([]);
-  const playFilterRefs = useRef<Array<HTMLButtonElement | null>>([]);
+  const playTabRefs = useRef<Array<HTMLButtonElement | null>>([]);
   const requestedCategory = parseStudentBoardCategory(searchParams.get("category"));
   const [activeCategory, setActiveCategory] =
     useState<StudentBoardCategory>(requestedCategory);
-  const lessonBoards = boards.filter((b) => b.category === "LESSON");
-  const playBoards = boards.filter((b) => b.category === "PLAY");
-  const priorityBoards = boards.filter((board) =>
-    isPriorityBoard(board, shadowAllianceStatuses[board.id]),
+  const contentBoards = boards.filter(
+    (board) => !isOfficialGameKind(board.layout),
   );
+  const lessonBoards = contentBoards.filter((b) => b.category === "LESSON");
+  const priorityBoards = contentBoards.filter((board) => isPriorityBoard(board));
   const normalizedQuery = query.trim().toLocaleLowerCase("ko");
   const categoryBoards =
     activeCategory === "priority"
@@ -641,27 +616,20 @@ export function StudentBoardHub({ boards }: StudentBoardHubProps) {
       : activeCategory === "lesson"
         ? lessonBoards
         : activeCategory === "play"
-          ? playBoards
-          : boards;
+          ? []
+          : contentBoards;
   const activeBoards = categoryBoards
-    .filter((board) => {
-      if (
-        normalizedQuery &&
-        !`${board.title} ${layoutLabel(board.layout)}`
-          .toLocaleLowerCase("ko")
-          .includes(normalizedQuery)
-      ) {
-        return false;
-      }
-      if (activeCategory !== "play" || playFilter === "all") return true;
-      const state = playBoardState(board, shadowAllianceStatuses[board.id]);
-      return playFilter === "live" ? state.live : board.layout === playFilter;
-    })
-    .sort((left, right) => {
-      const leftLive = playBoardState(left, shadowAllianceStatuses[left.id]).live;
-      const rightLive = playBoardState(right, shadowAllianceStatuses[right.id]).live;
-      return Number(rightLive) - Number(leftLive);
-    });
+    .filter((board) =>
+      normalizedQuery
+        ? `${board.title} ${layoutLabel(board.layout)}`
+            .toLocaleLowerCase("ko")
+            .includes(normalizedQuery)
+        : true,
+    )
+    .sort(
+      (left, right) =>
+        Number(boardListState(right).live) - Number(boardListState(left).live),
+    );
 
   useEffect(() => {
     setActiveCategory(requestedCategory);
@@ -672,19 +640,32 @@ export function StudentBoardHub({ boards }: StudentBoardHubProps) {
   }, [searchParams]);
 
   useEffect(() => {
-    setPlayFilter(requestedPlayFilter);
-  }, [requestedPlayFilter]);
+    setPlayTab(requestedPlayTab);
+  }, [requestedPlayTab]);
 
   function replaceBoardQuery(updates: Record<string, string | null>) {
     const nextSearchParams = new URLSearchParams(searchParams.toString());
-    nextSearchParams.set("category", activeCategory);
-    if (activeCategory === "play" && playFilter !== "all") {
-      nextSearchParams.set("playType", playFilter);
+    if (!("category" in updates)) {
+      nextSearchParams.set("category", activeCategory);
     }
     for (const [key, value] of Object.entries(updates)) {
       if (value) nextSearchParams.set(key, value);
       else nextSearchParams.delete(key);
     }
+
+    const nextCategory = parseStudentBoardCategory(
+      nextSearchParams.get("category"),
+    );
+    nextSearchParams.set("category", nextCategory);
+    nextSearchParams.delete("playType");
+    if (nextCategory !== "play") {
+      nextSearchParams.delete("playTab");
+      nextSearchParams.delete("game");
+      nextSearchParams.delete("range");
+    } else if (nextSearchParams.get("playTab") !== "records") {
+      nextSearchParams.delete("playTab");
+    }
+
     router.replace(`/student/boards?${nextSearchParams.toString()}`, { scroll: false });
   }
 
@@ -693,9 +674,13 @@ export function StudentBoardHub({ boards }: StudentBoardHubProps) {
     replaceBoardQuery({ category });
   }
 
-  function selectPlayFilter(filter: PlayFilter) {
-    setPlayFilter(filter);
-    replaceBoardQuery({ playType: filter === "all" ? null : filter });
+  function selectPlayTab(tab: PlayTab) {
+    setPlayTab(tab);
+    replaceBoardQuery({
+      category: "play",
+      playTab: tab,
+      playType: null,
+    });
   }
 
   function handleRovingKeys(
@@ -721,46 +706,6 @@ export function StudentBoardHub({ boards }: StudentBoardHubProps) {
     refs.current[nextIndex]?.focus();
   }
 
-  useEffect(() => {
-    const shadowAllianceBoards = boards.filter(
-      (board) => board.layout === "shadow-alliance",
-    );
-    if (shadowAllianceBoards.length === 0) return;
-
-    let disposed = false;
-    const client = createPublicSupabaseClient();
-    const channels: RealtimeChannel[] = [];
-    const statusFromPhase = (
-      phase: ShadowAllianceSnapshot["phase"],
-    ): ShadowAllianceBoardStatus =>
-      phase === "lobby" ? "waiting" : phase === "final" ? "ended" : "active";
-
-    for (const board of shadowAllianceBoards) {
-      const channel = client.channel(`shadow-alliance-board-${board.id}`, {
-        config: { broadcast: { self: false } },
-      });
-      channel.on("broadcast", { event: "snapshot" }, ({ payload }) => {
-        const snapshot = (payload as { snapshot?: ShadowAllianceSnapshot }).snapshot;
-        if (!snapshot || disposed) return;
-        setShadowAllianceStatuses((current) => ({
-          ...current,
-          [board.id]: statusFromPhase(snapshot.phase),
-        }));
-      });
-      channel.subscribe((status) => {
-        if (status === "SUBSCRIBED") {
-          void channel.send({ type: "broadcast", event: "hello", payload: {} });
-        }
-      });
-      channels.push(channel);
-    }
-
-    return () => {
-      disposed = true;
-      for (const channel of channels) void client.removeChannel(channel);
-    };
-  }, [boards]);
-
   const boardThumbnail = (board: BoardItem) => {
     if (board.thumbnailMode === "custom" && board.thumbnailUrl) {
       return board.thumbnailUrl;
@@ -771,22 +716,18 @@ export function StudentBoardHub({ boards }: StudentBoardHubProps) {
   const renderCard = (board: BoardItem) => {
     const thumbnail = boardThumbnail(board);
     const quizCode = board.layout === "quiz" && board.quizzes?.[0]?.roomCode;
-    const gameState = playBoardState(board, shadowAllianceStatuses[board.id]);
-    const isPlayGame = ["kordle", "speed-game", "quiz", "shadow-alliance"].includes(
-      board.layout,
-    );
+    const boardState = boardListState(board);
     const href = quizCode
       ? `/quiz/${quizCode}`
-      : board.layout === "kordle"
-        ? `/board/${board.slug}/play/kordle`
-        : `/board/${board.slug}?view=student`;
+      : `/board/${board.slug}?view=student`;
     const breakout = board.breakout;
+
     if (breakout) {
       return (
         <button
           key={board.id}
           type="button"
-          className={`student-board-card ${gameState.live ? "is-live" : ""}`}
+          className={`student-board-card ${boardState.live ? "is-live" : ""}`}
           onClick={() => {
             if (breakout.selectedSectionId) {
               router.push(
@@ -805,7 +746,9 @@ export function StudentBoardHub({ boards }: StudentBoardHubProps) {
             />
           </div>
           <div className="student-board-card-body">
-            {gameState.live && <span className="student-board-live-badge">LIVE</span>}
+            {boardState.live ? (
+              <span className="student-board-live-badge">LIVE</span>
+            ) : null}
             <span className="student-board-card-title">{board.title}</span>
             <span className="student-board-card-meta">
               모둠 선택 · {breakout.boardTitle}
@@ -814,12 +757,13 @@ export function StudentBoardHub({ boards }: StudentBoardHubProps) {
         </button>
       );
     }
+
     return (
       <Link
         key={board.id}
         href={href}
-        className={`student-board-card ${gameState.live ? "is-live" : ""}`}
-        aria-label={gameState.live ? `${board.title}, 실시간 진행 중` : undefined}
+        className={`student-board-card ${boardState.live ? "is-live" : ""}`}
+        aria-label={boardState.live ? `${board.title}, 실시간 진행 중` : undefined}
       >
         <div className="student-board-preview">
           <img
@@ -829,11 +773,13 @@ export function StudentBoardHub({ boards }: StudentBoardHubProps) {
           />
         </div>
         <div className="student-board-card-body">
-          {gameState.live && <span className="student-board-live-badge">LIVE</span>}
+          {boardState.live ? (
+            <span className="student-board-live-badge">LIVE</span>
+          ) : null}
           <span className="student-board-card-title">{board.title}</span>
           <span className="student-board-card-meta">
-            {isPlayGame ? gameState.label : layoutLabel(board.layout)}
-            {quizCode && " · 참여하기"}
+            {layoutLabel(board.layout)}
+            {quizCode ? " · 참여하기" : ""}
           </span>
         </div>
       </Link>
@@ -847,8 +793,8 @@ export function StudentBoardHub({ boards }: StudentBoardHubProps) {
   }> = [
     { id: "priority", label: "우선", count: priorityBoards.length },
     { id: "lesson", label: "수업", count: lessonBoards.length },
-    { id: "play", label: "놀이", count: playBoards.length },
-    { id: "all", label: "전체", count: boards.length },
+    { id: "play", label: "놀이", count: GAME_HUB_ORDER.length },
+    { id: "all", label: "전체", count: contentBoards.length },
   ];
 
   return (
@@ -889,6 +835,45 @@ export function StudentBoardHub({ boards }: StudentBoardHubProps) {
         role="tabpanel"
         aria-labelledby={`student-board-tab-${activeCategory}`}
       >
+        {activeCategory === "play" ? (
+          <div className="student-board-filters student-play-tabs" role="tablist" aria-label="놀이 보기">
+            {PLAY_TABS.map((tab, index) => (
+              <button
+                key={tab.id}
+                type="button"
+                role="tab"
+                aria-selected={playTab === tab.id}
+                tabIndex={playTab === tab.id ? 0 : -1}
+                ref={(element) => {
+                  playTabRefs.current[index] = element;
+                }}
+                className={playTab === tab.id ? "is-active" : ""}
+                onClick={() => selectPlayTab(tab.id)}
+                onKeyDown={(event) =>
+                  handleRovingKeys(
+                    event,
+                    index,
+                    PLAY_TABS.length,
+                    playTabRefs,
+                    (nextIndex) => selectPlayTab(PLAY_TABS[nextIndex].id),
+                  )
+                }
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
+        ) : null}
+        {activeCategory === "play" && playTab === "records" ? (
+          <GameRecordsPanel
+            key={`${requestedRecordKind}:${requestedRecordRange}`}
+            initialGameKind={requestedRecordKind}
+            initialRange={requestedRecordRange}
+          />
+        ) : activeCategory === "play" ? (
+          <GameHubCatalog />
+        ) : (
+          <>
         <div className="student-board-tools">
           <label className="student-board-search">
             <span className="sr-only">보드 검색</span>
@@ -900,37 +885,9 @@ export function StudentBoardHub({ boards }: StudentBoardHubProps) {
                 setQuery(value);
                 replaceBoardQuery({ q: value.trim() || null });
               }}
-              placeholder={activeCategory === "play" ? "놀이 보드 검색" : "보드 검색"}
+              placeholder="보드 검색"
             />
           </label>
-          {activeCategory === "play" && (
-            <div className="student-board-filters" role="group" aria-label="놀이 보드 필터">
-              {PLAY_FILTERS.map((filter, index) => (
-                <button
-                  key={filter.id}
-                  type="button"
-                  ref={(element) => {
-                    playFilterRefs.current[index] = element;
-                  }}
-                  className={playFilter === filter.id ? "is-active" : ""}
-                  aria-pressed={playFilter === filter.id}
-                  tabIndex={playFilter === filter.id ? 0 : -1}
-                  onClick={() => selectPlayFilter(filter.id)}
-                  onKeyDown={(event) =>
-                    handleRovingKeys(
-                      event,
-                      index,
-                      PLAY_FILTERS.length,
-                      playFilterRefs,
-                      (nextIndex) => selectPlayFilter(PLAY_FILTERS[nextIndex].id),
-                    )
-                  }
-                >
-                  {filter.label}
-                </button>
-              ))}
-            </div>
-          )}
         </div>
         <p className="sr-only" role="status" aria-live="polite">
           검색 결과 {activeBoards.length}개
@@ -944,9 +901,11 @@ export function StudentBoardHub({ boards }: StudentBoardHubProps) {
             {categoryBoards.length === 0
               ? activeCategory === "priority"
                 ? "지금 우선 확인할 보드가 없어요."
-                : `${activeCategory === "play" ? "놀이" : activeCategory === "lesson" ? "수업" : "등록된"} 보드가 아직 없어요.`
+                : `${activeCategory === "lesson" ? "수업" : "등록된"} 보드가 아직 없어요.`
               : "검색 조건에 맞는 보드가 없어요."}
           </div>
+        )}
+          </>
         )}
       </section>
       {breakoutModal && (

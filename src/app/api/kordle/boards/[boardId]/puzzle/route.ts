@@ -1,11 +1,19 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import type { KordlePuzzleStatus, Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
 import { getCurrentStudent } from "@/lib/student-auth";
 import { jsonPrivateNoStore } from "@/lib/http-cache";
 import { announceKordlePuzzleChange } from "@/lib/realtime-broadcast";
 import { normalizeWord } from "@/features/kordle/engine";
+import {
+  closeKordlePuzzleAttempts,
+} from "@/features/kordle/server/kordleServer";
+import {
+  IdempotencyConflictError,
+  withPlayRequestReceipt,
+} from "@/lib/game-platform/idempotency";
 import {
   KORDLE_WORD_LENGTH,
   resolveRandomKordleSolution,
@@ -16,22 +24,122 @@ type Params = { params: Promise<{ boardId: string }> };
 
 const WORD_LENGTH = KORDLE_WORD_LENGTH;
 
-const CreatePuzzleSchema = z.object({
-  locale: z.enum(["en-US", "ko-KR"]),
-  solution: z.string().trim().max(30).optional(),
-});
+const CreatePuzzleSchema = z
+  .object({
+    requestId: z.string().min(1).max(128),
+    expectedVersion: z.number().int().min(0).max(Number.MAX_SAFE_INTEGER),
+    locale: z.enum(["en-US", "ko-KR"]),
+    solution: z.string().trim().max(30).optional(),
+  })
+  .strict();
 
-const PuzzleActionSchema = z.object({
-  action: z.enum(["start", "stop", "advance"]),
-  puzzleId: z.string().min(1),
-  expectedGuessIndex: z.number().int().min(1).optional(),
-});
+const PuzzleActionSchema = z
+  .object({
+    requestId: z.string().min(1).max(128),
+    expectedVersion: z.number().int().min(0).max(Number.MAX_SAFE_INTEGER),
+    action: z.enum(["start", "stop", "advance"]),
+    puzzleId: z.string().min(1),
+    expectedGuessIndex: z.number().int().min(1).optional(),
+  })
+  .strict();
+
+type PuzzleSnapshot = {
+  id: string;
+  status: KordlePuzzleStatus;
+  version: number;
+  startsAt: string | null;
+  endsAt: string | null;
+  currentGuessIndex: number;
+};
+
+type StoredPuzzleResponse =
+  | {
+      ok: true;
+      response: {
+        requestId: string;
+        previousVersion: number;
+        version: number;
+        puzzle: PuzzleSnapshot;
+        game?: {
+          id: string;
+          locale: string;
+          wordLength: number;
+          maxGuesses: number;
+        };
+      };
+    }
+  | { ok: false; error: string; puzzle?: PuzzleSnapshot };
+
+function safeVersion(version: bigint): number {
+  const value = Number(version);
+  if (!Number.isSafeInteger(value) || value < 0) {
+    throw new RangeError("kordle_version_out_of_range");
+  }
+  return value;
+}
+
+function serializePuzzle(puzzle: {
+  id: string;
+  status: KordlePuzzleStatus;
+  version: bigint;
+  startsAt: Date | null;
+  endsAt: Date | null;
+  currentGuessIndex: number;
+}): PuzzleSnapshot {
+  return {
+    id: puzzle.id,
+    status: puzzle.status,
+    version: safeVersion(puzzle.version),
+    startsAt: puzzle.startsAt?.toISOString() ?? null,
+    endsAt: puzzle.endsAt?.toISOString() ?? null,
+    currentGuessIndex: puzzle.currentGuessIndex,
+  };
+}
+
+async function resolveTeacherBoard(boardIdOrSlug: string, userId: string) {
+  return db.board.findFirst({
+    where: {
+      OR: [{ id: boardIdOrSlug }, { slug: boardIdOrSlug }],
+      members: {
+        some: {
+          userId,
+          role: { in: ["owner", "editor"] },
+        },
+      },
+    },
+    select: { id: true, title: true },
+  });
+}
+
+async function closeOtherPlayablePuzzles(
+  tx: Prisma.TransactionClient,
+  input: { gameId: string; exceptPuzzleId?: string; completedAt: Date },
+) {
+  const puzzles = await tx.kordlePuzzle.findMany({
+    where: {
+      gameId: input.gameId,
+      ...(input.exceptPuzzleId ? { id: { not: input.exceptPuzzleId } } : {}),
+      status: { in: ["DRAFT", "LIVE", "SCHEDULED"] },
+    },
+    select: { id: true },
+    orderBy: { createdAt: "asc" },
+  });
+  for (const puzzle of puzzles) {
+    await closeKordlePuzzleAttempts(tx, puzzle.id, input.completedAt);
+  }
+  if (puzzles.length > 0) {
+    await tx.kordlePuzzle.updateMany({
+      where: { id: { in: puzzles.map((puzzle) => puzzle.id) } },
+      data: {
+        status: "CLOSED",
+        endsAt: input.completedAt,
+        version: { increment: 1 },
+      },
+    });
+  }
+}
 
 export async function GET(_req: Request, { params }: Params) {
-  // StudentDashboard links to /board/${board.slug}/play/kordle and the
-  // page then calls this endpoint with the same dynamic segment, so the
-  // param can be either a board id or a slug. Resolve to the canonical
-  // board id before looking up the Kordle game.
   const { boardId: boardIdOrSlug } = await params;
   const student = await getCurrentStudent();
   if (!student) {
@@ -44,9 +152,8 @@ export async function GET(_req: Request, { params }: Params) {
   if (!board) {
     return jsonPrivateNoStore({ error: "game_not_found" }, { status: 404 });
   }
-  const boardId = board.id;
   const game = await db.kordleGame.findUnique({
-    where: { boardId },
+    where: { boardId: board.id },
     select: {
       id: true,
       wordLength: true,
@@ -60,8 +167,10 @@ export async function GET(_req: Request, { params }: Params) {
         select: {
           id: true,
           status: true,
+          version: true,
           startsAt: true,
           endsAt: true,
+          currentGuessIndex: true,
           attempts: {
             where: { studentId: { not: null } },
             orderBy: { startedAt: "asc" },
@@ -89,10 +198,7 @@ export async function GET(_req: Request, { params }: Params) {
     locale: game.locale,
     puzzle: puzzle
       ? {
-          id: puzzle.id,
-          status: puzzle.status,
-          startsAt: puzzle.startsAt,
-          endsAt: puzzle.endsAt,
+          ...serializePuzzle(puzzle),
           participants: puzzle.attempts
             .filter((attempt) => attempt.student)
             .map((attempt) => ({
@@ -111,28 +217,14 @@ export async function POST(req: Request, { params }: Params) {
   if (!user) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
-
-  const body = await req.json().catch(() => null);
-  const parsed = CreatePuzzleSchema.safeParse(body);
+  const parsed = CreatePuzzleSchema.safeParse(await req.json().catch(() => null));
   if (!parsed.success) {
     return NextResponse.json(
       { error: "bad_request", issues: parsed.error.issues },
       { status: 400 },
     );
   }
-
-  const board = await db.board.findFirst({
-    where: {
-      OR: [{ id: boardIdOrSlug }, { slug: boardIdOrSlug }],
-      members: {
-        some: {
-          userId: user.id,
-          role: { in: ["owner", "editor"] },
-        },
-      },
-    },
-    select: { id: true, title: true },
-  });
+  const board = await resolveTeacherBoard(boardIdOrSlug, user.id);
   if (!board) {
     return NextResponse.json({ error: "forbidden" }, { status: 403 });
   }
@@ -149,92 +241,155 @@ export async function POST(req: Request, { params }: Params) {
           locale,
           wordLength: WORD_LENGTH,
         });
-  const rawWord = selectedWord.text;
-  const normalized = selectedWord.normalized;
-  if (normalized.length !== WORD_LENGTH) {
+  if (selectedWord.normalized.length !== WORD_LENGTH) {
     return NextResponse.json(
       {
         error: "wrong_length",
         wordLength: WORD_LENGTH,
-        normalizedLength: normalized.length,
+        normalizedLength: selectedWord.normalized.length,
       },
       { status: 400 },
     );
   }
 
-  const result = await db.$transaction(async (tx) => {
-    const game = await tx.kordleGame.upsert({
-      where: { boardId: board.id },
-      update: {
-        title: board.title || "꼬들",
-        locale,
-        wordLength: WORD_LENGTH,
-        maxGuesses: 6,
-      },
-      create: {
-        boardId: board.id,
-        title: board.title || "꼬들",
-        locale,
-        wordLength: WORD_LENGTH,
-        maxGuesses: 6,
-        mode: "CLASSIC",
-      },
-    });
-
-    await tx.kordlePuzzle.updateMany({
-      where: {
-        gameId: game.id,
-        status: { in: ["DRAFT", "LIVE", "SCHEDULED"] },
-      },
-      data: {
-        status: "CLOSED",
-        endsAt: new Date(),
-      },
-    });
-
-    const word = await tx.kordleWord.upsert({
-      where: {
-        locale_normalized: {
-          locale,
-          normalized,
+  try {
+    const receipt = await db.$transaction(async (tx) =>
+      withPlayRequestReceipt(
+        tx,
+        {
+          actorSubject: `teacher:${user.id}`,
+          scopeType: "kordle_puzzle_command",
+          scopeId: board.id,
+          requestId: parsed.data.requestId,
+          requestBody: parsed.data,
         },
-      },
-      update: {
-        text: rawWord,
-        length: WORD_LENGTH,
-        isAllowed: true,
-        isSolution: true,
-      },
-      create: {
-        text: rawWord,
-        normalized,
-        length: WORD_LENGTH,
-        locale,
-        isAllowed: true,
-        isSolution: true,
-      },
+        async () => {
+          await tx.$queryRaw`SELECT id FROM "Board" WHERE id = ${board.id} FOR UPDATE`;
+          const currentPuzzle = await tx.kordlePuzzle.findFirst({
+            where: { game: { boardId: board.id } },
+            orderBy: { createdAt: "desc" },
+            select: {
+              id: true,
+              status: true,
+              version: true,
+              startsAt: true,
+              endsAt: true,
+              currentGuessIndex: true,
+            },
+          });
+          const previousVersion = currentPuzzle
+            ? safeVersion(currentPuzzle.version)
+            : 0;
+          if (previousVersion !== parsed.data.expectedVersion) {
+            return {
+              ok: false,
+              error: "version_conflict",
+              ...(currentPuzzle
+                ? { puzzle: serializePuzzle(currentPuzzle) }
+                : {}),
+            } as unknown as Prisma.InputJsonObject;
+          }
+
+          const game = await tx.kordleGame.upsert({
+            where: { boardId: board.id },
+            update: {
+              title: board.title || "꼬들",
+              locale,
+              wordLength: WORD_LENGTH,
+              maxGuesses: 6,
+            },
+            create: {
+              boardId: board.id,
+              title: board.title || "꼬들",
+              locale,
+              wordLength: WORD_LENGTH,
+              maxGuesses: 6,
+              mode: "CLASSIC",
+            },
+          });
+          const now = new Date();
+          await closeOtherPlayablePuzzles(tx, {
+            gameId: game.id,
+            completedAt: now,
+          });
+          const word = await tx.kordleWord.upsert({
+            where: {
+              locale_normalized: {
+                locale,
+                normalized: selectedWord.normalized,
+              },
+            },
+            update: {
+              text: selectedWord.text,
+              length: WORD_LENGTH,
+              isAllowed: true,
+              isSolution: true,
+            },
+            create: {
+              text: selectedWord.text,
+              normalized: selectedWord.normalized,
+              length: WORD_LENGTH,
+              locale,
+              isAllowed: true,
+              isSolution: true,
+            },
+          });
+          const created = await tx.kordlePuzzle.create({
+            data: {
+              gameId: game.id,
+              solutionWordId: word.id,
+              status: "DRAFT",
+              startsAt: null,
+            },
+            select: {
+              id: true,
+              status: true,
+              version: true,
+              startsAt: true,
+              endsAt: true,
+              currentGuessIndex: true,
+            },
+          });
+          const puzzle = serializePuzzle(created);
+          return {
+            ok: true,
+            response: {
+              requestId: parsed.data.requestId,
+              previousVersion,
+              version: puzzle.version,
+              puzzle,
+              game: {
+                id: game.id,
+                locale: game.locale,
+                wordLength: game.wordLength,
+                maxGuesses: game.maxGuesses,
+              },
+            },
+          } as unknown as Prisma.InputJsonObject;
+        },
+      ),
+    );
+    const stored = receipt.response as unknown as StoredPuzzleResponse;
+    if (!stored.ok) {
+      return NextResponse.json(stored, {
+        status: stored.error === "version_conflict" ? 409 : 400,
+      });
+    }
+    return NextResponse.json({
+      ...stored.response,
+      replayed: receipt.replayed,
+      gameId: stored.response.game?.id,
+      locale: stored.response.game?.locale,
+      wordLength: stored.response.game?.wordLength,
+      maxGuesses: stored.response.game?.maxGuesses,
     });
-
-    const puzzle = await tx.kordlePuzzle.create({
-      data: {
-        gameId: game.id,
-        solutionWordId: word.id,
-        status: "DRAFT",
-        startsAt: null,
-      },
-      select: { id: true, status: true, startsAt: true },
-    });
-
-    return { game, puzzle };
-  });
-
-  return NextResponse.json({
-    gameId: result.game.id,
-    locale: result.game.locale,
-    wordLength: result.game.wordLength,
-    maxGuesses: result.game.maxGuesses,
-    puzzle: result.puzzle,
-  });
+  } catch (error) {
+    if (error instanceof IdempotencyConflictError) {
+      return NextResponse.json({ error: error.code }, { status: error.status });
+    }
+    console.error("[POST /api/kordle/boards/:boardId/puzzle]", error);
+    return NextResponse.json({ error: "internal_error" }, { status: 500 });
+  }
 }
 
 export async function PATCH(req: Request, { params }: Params) {
@@ -243,133 +398,247 @@ export async function PATCH(req: Request, { params }: Params) {
   if (!user) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
-
-  const body = await req.json().catch(() => null);
-  const parsed = PuzzleActionSchema.safeParse(body);
+  const parsed = PuzzleActionSchema.safeParse(await req.json().catch(() => null));
   if (!parsed.success) {
     return NextResponse.json(
       { error: "bad_request", issues: parsed.error.issues },
       { status: 400 },
     );
   }
-
-  const board = await db.board.findFirst({
-    where: {
-      OR: [{ id: boardIdOrSlug }, { slug: boardIdOrSlug }],
-      members: {
-        some: {
-          userId: user.id,
-          role: { in: ["owner", "editor"] },
-        },
-      },
-    },
-    select: {
-      id: true,
-    },
-  });
+  const board = await resolveTeacherBoard(boardIdOrSlug, user.id);
   if (!board) {
     return NextResponse.json({ error: "forbidden" }, { status: 403 });
   }
 
-  const result = await db.$transaction(async (tx) => {
-    const puzzle = await tx.kordlePuzzle.findFirst({
-      where: {
-        id: parsed.data.puzzleId,
-        game: { boardId: board.id },
-      },
-      select: { id: true, gameId: true, status: true, currentGuessIndex: true, game: { select: { maxGuesses: true } } },
-    });
-    if (!puzzle) return null;
-
-    if (parsed.data.action === "stop") {
-      return await tx.kordlePuzzle.update({
-        where: { id: puzzle.id },
-        data: {
-          status: "CLOSED",
-          endsAt: new Date(),
+  try {
+    const receipt = await db.$transaction(async (tx) =>
+      withPlayRequestReceipt(
+        tx,
+        {
+          actorSubject: `teacher:${user.id}`,
+          scopeType: "kordle_puzzle_command",
+          scopeId: parsed.data.puzzleId,
+          requestId: parsed.data.requestId,
+          requestBody: parsed.data,
         },
-        select: { id: true, status: true, startsAt: true, currentGuessIndex: true },
+        async () => {
+          const lockRows = await tx.$queryRaw<Array<{ id: string }>>`
+            SELECT id FROM "KordlePuzzle" WHERE id = ${parsed.data.puzzleId} FOR UPDATE
+          `;
+          if (lockRows.length === 0) {
+            return {
+              ok: false,
+              error: "puzzle_not_found",
+            } as unknown as Prisma.InputJsonObject;
+          }
+          const puzzle = await tx.kordlePuzzle.findFirst({
+            where: {
+              id: parsed.data.puzzleId,
+              game: { boardId: board.id },
+            },
+            select: {
+              id: true,
+              gameId: true,
+              status: true,
+              version: true,
+              startsAt: true,
+              endsAt: true,
+              currentGuessIndex: true,
+              game: { select: { maxGuesses: true } },
+            },
+          });
+          if (!puzzle) {
+            return {
+              ok: false,
+              error: "puzzle_not_found",
+            } as unknown as Prisma.InputJsonObject;
+          }
+          const previousVersion = safeVersion(puzzle.version);
+          if (previousVersion !== parsed.data.expectedVersion) {
+            return {
+              ok: false,
+              error: "version_conflict",
+              puzzle: serializePuzzle(puzzle),
+            } as unknown as Prisma.InputJsonObject;
+          }
+
+          let updated:
+            | {
+                id: string;
+                status: KordlePuzzleStatus;
+                version: bigint;
+                startsAt: Date | null;
+                endsAt: Date | null;
+                currentGuessIndex: number;
+              }
+            | null = null;
+          const now = new Date();
+
+          if (parsed.data.action === "stop") {
+            if (puzzle.status !== "CLOSED" && puzzle.status !== "ARCHIVED") {
+              await closeKordlePuzzleAttempts(tx, puzzle.id, now);
+              updated = await tx.kordlePuzzle.update({
+                where: { id: puzzle.id },
+                data: {
+                  status: "CLOSED",
+                  endsAt: now,
+                  version: { increment: 1 },
+                },
+                select: {
+                  id: true,
+                  status: true,
+                  version: true,
+                  startsAt: true,
+                  endsAt: true,
+                  currentGuessIndex: true,
+                },
+              });
+            } else {
+              updated = puzzle;
+            }
+          } else if (parsed.data.action === "advance") {
+            if (puzzle.status !== "LIVE") {
+              return {
+                ok: false,
+                error: "puzzle_not_startable",
+                puzzle: serializePuzzle(puzzle),
+              } as unknown as Prisma.InputJsonObject;
+            }
+            const expectedGuessIndex =
+              parsed.data.expectedGuessIndex ?? puzzle.currentGuessIndex;
+            if (expectedGuessIndex !== puzzle.currentGuessIndex) {
+              return {
+                ok: false,
+                error: "stale_puzzle_advance",
+                puzzle: serializePuzzle(puzzle),
+              } as unknown as Prisma.InputJsonObject;
+            }
+            if (puzzle.currentGuessIndex >= puzzle.game.maxGuesses) {
+              return {
+                ok: false,
+                error: "already_last_guess",
+                puzzle: serializePuzzle(puzzle),
+              } as unknown as Prisma.InputJsonObject;
+            }
+            const advanced = await tx.kordlePuzzle.updateMany({
+              where: {
+                id: puzzle.id,
+                status: "LIVE",
+                version: puzzle.version,
+                currentGuessIndex: expectedGuessIndex,
+              },
+              data: {
+                currentGuessIndex: { increment: 1 },
+                version: { increment: 1 },
+              },
+            });
+            if (advanced.count !== 1) {
+              const latest = await tx.kordlePuzzle.findUnique({
+                where: { id: puzzle.id },
+                select: {
+                  id: true,
+                  status: true,
+                  version: true,
+                  startsAt: true,
+                  endsAt: true,
+                  currentGuessIndex: true,
+                },
+              });
+              return {
+                ok: false,
+                error: "version_conflict",
+                ...(latest ? { puzzle: serializePuzzle(latest) } : {}),
+              } as unknown as Prisma.InputJsonObject;
+            }
+            updated = await tx.kordlePuzzle.findUnique({
+              where: { id: puzzle.id },
+              select: {
+                id: true,
+                status: true,
+                version: true,
+                startsAt: true,
+                endsAt: true,
+                currentGuessIndex: true,
+              },
+            });
+          } else {
+            if (puzzle.status !== "DRAFT") {
+              return {
+                ok: false,
+                error: "puzzle_not_startable",
+                puzzle: serializePuzzle(puzzle),
+              } as unknown as Prisma.InputJsonObject;
+            }
+            await closeOtherPlayablePuzzles(tx, {
+              gameId: puzzle.gameId,
+              exceptPuzzleId: puzzle.id,
+              completedAt: now,
+            });
+            updated = await tx.kordlePuzzle.update({
+              where: { id: puzzle.id },
+              data: {
+                status: "LIVE",
+                currentGuessIndex: 1,
+                startsAt: now,
+                endsAt: null,
+                version: { increment: 1 },
+              },
+              select: {
+                id: true,
+                status: true,
+                version: true,
+                startsAt: true,
+                endsAt: true,
+                currentGuessIndex: true,
+              },
+            });
+          }
+
+          if (!updated) throw new Error("kordle_puzzle_update_missing");
+          const snapshot = serializePuzzle(updated);
+          return {
+            ok: true,
+            response: {
+              requestId: parsed.data.requestId,
+              previousVersion,
+              version: snapshot.version,
+              puzzle: snapshot,
+            },
+          } as unknown as Prisma.InputJsonObject;
+        },
+      ),
+    );
+    const stored = receipt.response as unknown as StoredPuzzleResponse;
+    if (!stored.ok) {
+      const status =
+        stored.error === "puzzle_not_found"
+          ? 404
+          : stored.error === "version_conflict" ||
+              stored.error === "stale_puzzle_advance" ||
+              stored.error === "puzzle_not_startable" ||
+              stored.error === "already_last_guess"
+            ? 409
+            : 400;
+      return NextResponse.json(stored, { status });
+    }
+
+    if (!receipt.replayed) {
+      await announceKordlePuzzleChange(board.id, {
+        puzzleId: stored.response.puzzle.id,
+        status: stored.response.puzzle.status,
+        currentGuessIndex: stored.response.puzzle.currentGuessIndex,
+        updatedAt: new Date().toISOString(),
       });
     }
-    if (parsed.data.action === "advance") {
-      if (puzzle.status !== "LIVE") {
-        return "not_startable" as const;
-      }
-      const expectedGuessIndex = parsed.data.expectedGuessIndex ?? puzzle.currentGuessIndex;
-      if (expectedGuessIndex !== puzzle.currentGuessIndex) {
-        return "stale_advance" as const;
-      }
-      if (puzzle.currentGuessIndex >= puzzle.game.maxGuesses) {
-        return "last_guess" as const;
-      }
-      const advanced = await tx.kordlePuzzle.updateMany({
-        where: {
-          id: puzzle.id,
-          gameId: puzzle.gameId,
-          status: "LIVE",
-          currentGuessIndex: expectedGuessIndex,
-        },
-        data: {
-          currentGuessIndex: { increment: 1 },
-        },
-      });
-      if (advanced.count !== 1) {
-        return "stale_advance" as const;
-      }
-      return await tx.kordlePuzzle.findUnique({
-        where: { id: puzzle.id },
-        select: { id: true, status: true, startsAt: true, currentGuessIndex: true },
-      });
-    }
-    if (puzzle.status !== "DRAFT") {
-      return "not_startable" as const;
-    }
-
-    await tx.kordlePuzzle.updateMany({
-      where: {
-        gameId: puzzle.gameId,
-        id: { not: puzzle.id },
-        status: { in: ["LIVE", "SCHEDULED"] },
-      },
-      data: {
-        status: "CLOSED",
-        endsAt: new Date(),
-      },
+    return NextResponse.json({
+      ...stored.response,
+      replayed: receipt.replayed,
     });
-
-    const livePuzzle = await tx.kordlePuzzle.update({
-      where: { id: puzzle.id },
-      data: {
-        status: "LIVE",
-        currentGuessIndex: 1,
-        startsAt: new Date(),
-        endsAt: null,
-      },
-      select: { id: true, status: true, startsAt: true, currentGuessIndex: true },
-    });
-
-    return livePuzzle;
-  });
-
-  if (!result) {
-    return NextResponse.json({ error: "puzzle_not_found" }, { status: 404 });
+  } catch (error) {
+    if (error instanceof IdempotencyConflictError) {
+      return NextResponse.json({ error: error.code }, { status: error.status });
+    }
+    console.error("[PATCH /api/kordle/boards/:boardId/puzzle]", error);
+    return NextResponse.json({ error: "internal_error" }, { status: 500 });
   }
-  if (result === "not_startable") {
-    return NextResponse.json({ error: "puzzle_not_startable" }, { status: 409 });
-  }
-  if (result === "last_guess") {
-    return NextResponse.json({ error: "already_last_guess" }, { status: 409 });
-  }
-  if (result === "stale_advance") {
-    return NextResponse.json({ error: "stale_puzzle_advance" }, { status: 409 });
-  }
-
-  await announceKordlePuzzleChange(board.id, {
-    puzzleId: result.id,
-    status: result.status,
-    currentGuessIndex: result.currentGuessIndex,
-    updatedAt: new Date().toISOString(),
-  });
-
-  return NextResponse.json({ puzzle: result });
 }

@@ -9,10 +9,12 @@ import {
   View,
 } from "react-native";
 import {
+  type Href,
   useFocusEffect,
   useLocalSearchParams,
   useRouter,
 } from "expo-router";
+import { CircleAlert } from "lucide-react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import {
   boardThemes,
@@ -55,7 +57,14 @@ import { SpeedGameBoard } from "../../../components/layouts/SpeedGameBoard";
 import { EventSignupBoard } from "../../../components/layouts/EventSignupBoard";
 import { BreakoutBoard } from "../../../components/layouts/BreakoutBoard";
 import { ShadowAllianceBoard } from "../../../components/layouts/ShadowAllianceBoard";
+import { OmokBoard } from "../../../components/layouts/OmokBoard";
+import { SongGuessBoard } from "../../../components/layouts/SongGuessBoard";
 import { AppButton } from "../../../components/ui";
+import { GameAreaShell } from "../../../components/game-platform/GameAreaShell";
+import {
+  isMobileOfficialGameKind,
+  MOBILE_GAME_CATALOG,
+} from "../../../lib/game-platform-contract";
 
 // 학생 앱 보드 상세 dispatcher. /api/student/board/:slug 한 번 fetch 후
 // board.layout 에 따라 맞는 레이아웃 컴포넌트 렌더.
@@ -201,7 +210,11 @@ export default function BoardDetail() {
       router.setParams({ section: undefined });
       return;
     }
-    router.back();
+    if (router.canGoBack()) {
+      router.back();
+    } else {
+      router.replace("/(student)/boards?filter=play" as Href);
+    }
   }, [router, selectedColumnSectionKey]);
 
   if (loading) {
@@ -219,7 +232,12 @@ export default function BoardDetail() {
     return (
       <SafeAreaView style={styles.container} edges={["top"]}>
         <View style={styles.center}>
-          <Text style={styles.errorEmoji}>🚫</Text>
+          <CircleAlert
+            size={iconSizes.xl}
+            color={colors.danger}
+            strokeWidth={2}
+            accessibilityLabel="오류"
+          />
           <Text style={styles.errorTitle}>{error ?? "알 수 없는 오류"}</Text>
           <AppButton
             loading={retrying}
@@ -247,6 +265,21 @@ export default function BoardDetail() {
 
   const { board } = data;
   const boardTheme = boardThemes[normalizeBoardTheme(board.boardTheme)];
+  if (isMobileOfficialGameKind(board.layout)) {
+    return (
+      <GameAreaShell
+        title={board.title}
+        rulesLabel={MOBILE_GAME_CATALOG[board.layout].displayName}
+        connection="online"
+        onExit={handleBoardBack}
+        exitLabel="게임 목록"
+        scrollEnabled={false}
+      >
+        {renderOfficialGameLayout(data)}
+      </GameAreaShell>
+    );
+  }
+
   const usesCardStream =
     board.layout === "freeform" ||
     board.layout === "grid" ||
@@ -277,6 +310,23 @@ export default function BoardDetail() {
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
+}
+
+function renderOfficialGameLayout(data: BoardDetailResponse) {
+  switch (data.board.layout) {
+    case "kordle":
+      return <KordleBoard data={data} />;
+    case "speed-game":
+      return <SpeedGameBoard data={data} />;
+    case "shadow-alliance":
+      return <ShadowAllianceBoard data={data} />;
+    case "omok":
+      return <OmokBoard data={data} />;
+    case "song-guess":
+      return <SongGuessBoard data={data} />;
+    default:
+      return null;
+  }
 }
 
 function renderLayout(
@@ -323,6 +373,10 @@ function renderLayout(
       return <BreakoutBoard data={data} onMutate={reload} />;
     case "shadow-alliance":
       return <ShadowAllianceBoard data={data} />;
+    case "omok":
+      return <OmokBoard data={data} />;
+    case "song-guess":
+      return <SongGuessBoard data={data} />;
     case "freeform":
     case "grid":
     case "stream":
@@ -344,6 +398,5 @@ const styles = StyleSheet.create({
     padding: spacing.xxl,
   },
   loadingText: { ...typography.body, color: colors.textMuted },
-  errorEmoji: { fontSize: iconSizes.empty },
   errorTitle: { ...typography.title, color: colors.text, textAlign: "center" },
 });

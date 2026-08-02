@@ -27,7 +27,16 @@ type LetterState = "correct" | "present" | "absent";
 type Feedback = Array<{ char: string; state: LetterState }>;
 type PublicState = {
   puzzleId: string;
+  version: number;
   status: "IN_PROGRESS" | "WON" | "LOST" | "ABANDONED";
+  terminalReason:
+    | "solved"
+    | "guesses_exhausted"
+    | "participant_abandon"
+    | "host_ended"
+    | "deadline"
+    | null;
+  resultId: string | null;
   wordLength: number;
   maxGuesses: number;
   guesses: Feedback[];
@@ -49,6 +58,10 @@ type PuzzleInfo = {
 const KORDLE_GUESS_SUBMITTED_EVENT = "guess-submitted";
 const KORDLE_PUZZLE_CHANGED_EVENT = "puzzle-changed";
 
+function createKordleRequestId(): string {
+  return `kordle_guess_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
+}
+
 export function KordleBoard({ data }: { data: BoardDetailResponse }) {
   const { width: viewportWidth } = useWindowDimensions();
   const [puzzle, setPuzzle] = useState<PuzzleInfo | null>(null);
@@ -64,6 +77,12 @@ export function KordleBoard({ data }: { data: BoardDetailResponse }) {
   const puzzleRef = useRef<string | null>(null);
   const loadInFlightRef = useRef<Promise<void> | null>(null);
   const loadControllerRef = useRef<AbortController | null>(null);
+  const pendingCommandRef = useRef<{
+    requestId: string;
+    expectedVersion: number;
+    guess: string;
+    guessIndex: number;
+  } | null>(null);
 
   useEffect(() => {
     mountedRef.current = true;
@@ -97,6 +116,7 @@ export function KordleBoard({ data }: { data: BoardDetailResponse }) {
           setDraft("");
           attemptRef.current = null;
           puzzleRef.current = null;
+          pendingCommandRef.current = null;
           setError(null);
           return;
         }
@@ -124,7 +144,10 @@ export function KordleBoard({ data }: { data: BoardDetailResponse }) {
         setState(result.state);
         attemptRef.current = result.attemptId;
         puzzleRef.current = info.puzzle.id;
-        if (!samePuzzle || previousAttemptId !== result.attemptId) setDraft("");
+        if (!samePuzzle || previousAttemptId !== result.attemptId) {
+          setDraft("");
+          pendingCommandRef.current = null;
+        }
         setError(null);
       } catch (caught) {
         if (!mountedRef.current || controller.signal.aborted) return;
@@ -168,23 +191,58 @@ export function KordleBoard({ data }: { data: BoardDetailResponse }) {
     if (!attemptId || state?.nextGuessIndex == null || !draft.trim()) return;
     setSubmitting(true);
     try {
-      const result = await apiFetch<{ state: PublicState }>(
-        `/api/kordle/attempts/${encodeURIComponent(attemptId)}/guess`,
-        {
-          method: "POST",
-          json: { guess: draft.trim(), guessIndex: state.nextGuessIndex },
-        },
-      );
+      const guess = draft.trim();
+      const guessIndex = state.nextGuessIndex;
+      const pending = pendingCommandRef.current;
+      const command =
+        pending &&
+        pending.expectedVersion === state.version &&
+        pending.guess === guess &&
+        pending.guessIndex === guessIndex
+          ? pending
+          : {
+              requestId: createKordleRequestId(),
+              expectedVersion: state.version,
+              guess,
+              guessIndex,
+            };
+      pendingCommandRef.current = command;
+      const result = await apiFetch<{
+        requestId: string;
+        previousVersion: number;
+        version: number;
+        state: PublicState;
+        replayed?: boolean;
+      }>(`/api/kordle/attempts/${encodeURIComponent(attemptId)}/guess`, {
+        method: "POST",
+        json: command,
+      });
+      pendingCommandRef.current = null;
       setState(result.state);
       setDraft("");
       setError(null);
     } catch (caught) {
+      const conflictBody =
+        caught instanceof ApiError &&
+        typeof caught.body === "object" &&
+        caught.body
+          ? (caught.body as { error?: string; state?: PublicState })
+          : null;
       if (caught instanceof ApiError && caught.status === 409) {
-        await load("silent").catch(() => undefined);
+        if (conflictBody?.state) {
+          setState(conflictBody.state);
+          if (
+            pendingCommandRef.current &&
+            conflictBody.state.version !==
+              pendingCommandRef.current.expectedVersion
+          ) {
+            pendingCommandRef.current = null;
+          }
+        } else {
+          await load("silent").catch(() => undefined);
+        }
       }
-      const code = caught instanceof ApiError && typeof caught.body === "object" && caught.body
-        ? (caught.body as { error?: string }).error
-        : null;
+      const code = conflictBody?.error ?? null;
       setError(
         code === "wrong_length"
           ? `${state.wordLength}칸에 맞는 단어를 입력해 주세요.`

@@ -22,7 +22,11 @@ import { VibeGalleryBoard } from "@/components/VibeGalleryBoard";
 import { QuestionBoard } from "@/components/QuestionBoard";
 import { SpeedGameBoard } from "@/components/speed-game/SpeedGameBoard";
 import { ShadowAllianceBoard } from "@/components/ShadowAllianceBoard";
+import { OmokBoard } from "@/components/OmokBoard";
+import { SongGuessBoard } from "@/components/SongGuessBoard";
 import { KordleTeacherBoard } from "@/features/kordle/components/KordleTeacherBoard";
+import { OfficialGameBoard } from "@/components/game-platform/OfficialGameBoard";
+import { isOfficialPlayLayout } from "@/lib/game-platform/catalog";
 import { cloneStructure } from "@/lib/breakout";
 import { loadGameSnapshot } from "@/lib/speed-game/runtime";
 import type { PlantJournalResponse } from "@/types/plant";
@@ -149,6 +153,33 @@ export default async function BoardPage({
     hasTeacherSession: Boolean(user),
     studentViewRequested,
   });
+
+  // Official play layouts dispatch before any card/section/submission query.
+  // Category is a database invariant, while layout is the canonical wire kind.
+  if (isOfficialPlayLayout(board.layout)) {
+    return (
+      <OfficialGameBoard
+        board={{
+          id: board.id,
+          slug: board.slug,
+          title: board.title,
+          layout: board.layout,
+          classroomId: board.classroomId,
+        }}
+        userId={user?.id ?? null}
+        student={
+          student
+            ? {
+                id: student.id,
+                name: student.name,
+                classroomId: student.classroomId,
+              }
+            : null
+        }
+        useStudentViewer={useStudentViewer}
+      />
+    );
+  }
 
   // 개발 중 기능(dev-only) 접근 권한이 있는 관리자 계정 여부.
   const isAdmin = isAdminEmail(user?.email);
@@ -952,6 +983,34 @@ export default async function BoardPage({
             : null;
         return viewer ? (
           <ShadowAllianceBoard
+            boardId={board!.id}
+            boardTitle={board!.title}
+            viewer={viewer}
+          />
+        ) : null;
+      }
+      case "omok": {
+        const viewer = studentViewer
+          ? "student"
+          : effectiveRole === "owner" || effectiveRole === "editor"
+            ? "teacher"
+            : null;
+        return viewer ? (
+          <OmokBoard
+            boardId={board!.id}
+            boardTitle={board!.title}
+            viewer={viewer}
+          />
+        ) : null;
+      }
+      case "song-guess": {
+        const viewer = studentViewer
+          ? "student"
+          : effectiveRole === "owner" || effectiveRole === "editor"
+            ? "teacher"
+            : null;
+        return viewer ? (
+          <SongGuessBoard
             boardId={board!.id}
             boardTitle={board!.title}
             viewer={viewer}

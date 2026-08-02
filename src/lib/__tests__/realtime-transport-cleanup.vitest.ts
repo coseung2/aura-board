@@ -13,7 +13,9 @@ describe("realtime transport cleanup", () => {
     expect(board).not.toContain("EventSource");
     expect(board).not.toContain("/stream");
     expect(board).toContain("SPEED_GAME_CHANGED_EVENT");
-    expect(board).toContain("/api/speed-game/games/${gameId}");
+    expect(board).toContain(
+      "/api/speed-game/games/${encodeURIComponent(game.id)}",
+    );
   });
 
   it.each([

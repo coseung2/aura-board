@@ -1,49 +1,22 @@
 "use client";
 
-import { ShadowAllianceStudentGame } from "./ShadowAllianceStudentGame";
-import { ShadowAllianceTeacherGame } from "./ShadowAllianceTeacherGame";
-import { useShadowAllianceGame } from "../useShadowAllianceGame";
-import { PlayBoardContinueButton } from "@/components/PlayBoardContinueButton";
+import { ShadowAllianceBoard } from "@/components/ShadowAllianceBoard";
 
 type Props = {
   boardId: string;
   viewer: "teacher" | "student";
 };
 
+/**
+ * Compatibility entry point for callers that still import the feature-local
+ * component. Authority and mutations live in the shared server-backed board.
+ */
 export function ShadowAllianceGame({ boardId, viewer }: Props) {
-  const game = useShadowAllianceGame({ boardId, viewer });
-
-  if (viewer === "student") {
-    return (
-      <>
-      <PlayBoardContinueButton />
-        <ShadowAllianceStudentGame
-          connection={game.connection}
-          joinPending={game.joinPending}
-          player={game.studentPlayer}
-          snapshot={game.snapshot}
-          onRetryJoin={game.requestJoin}
-          onSubmitNumber={game.submitNumber}
-        />
-      </>
-    );
-  }
-
   return (
-    <ShadowAllianceTeacherGame
-        game={game.game}
-        connection={game.connection}
-        rankings={game.rankings}
-        onAddPlayer={game.addPlayer}
-        onRemovePlayer={game.removePlayer}
-        onRebalanceTeams={game.rebalanceTeams}
-        onSetSettings={game.setSettings}
-        onStartGame={game.startGame}
-        onResetGame={game.resetGame}
-        onNextRound={game.nextRound}
-        onRevealRound={game.revealRound}
-        onShowPostround={game.showPostround}
-        onSetTimerRunning={game.setTimerRunning}
-      />
+    <ShadowAllianceBoard
+      boardId={boardId}
+      boardTitle="그림자연합"
+      viewer={viewer}
+    />
   );
 }

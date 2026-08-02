@@ -1,0 +1,132 @@
+{
+  "version": 1,
+  "cases": [
+    {
+      "name": "proportional reward",
+      "command": 45,
+      "players": [
+        { "id": "black-1", "team": "black", "number": 44 },
+        { "id": "black-2", "team": "black", "number": 46 },
+        { "id": "white-1", "team": "white", "number": 70 }
+      ],
+      "expected": {
+        "winner": "black",
+        "blackAverage": 45.0,
+        "whiteAverage": 70.0,
+        "blackDifference": 0.0,
+        "whiteDifference": 25.0,
+        "gains": { "black-1": 4889, "black-2": 5111, "white-1": 0 }
+      }
+    },
+    {
+      "name": "missing team submission",
+      "command": 50,
+      "players": [
+        { "id": "black", "team": "black", "number": null },
+        { "id": "white", "team": "white", "number": 50 }
+      ],
+      "expected": {
+        "winner": "white",
+        "blackAverage": null,
+        "whiteAverage": 50.0,
+        "blackDifference": null,
+        "whiteDifference": 0.0,
+        "gains": { "black": 0, "white": 10000 }
+      }
+    },
+    {
+      "name": "equal distance tie",
+      "command": 50,
+      "players": [
+        { "id": "black", "team": "black", "number": 40 },
+        { "id": "white", "team": "white", "number": 60 }
+      ],
+      "expected": {
+        "winner": "tie",
+        "blackAverage": 40.0,
+        "whiteAverage": 60.0,
+        "blackDifference": 10.0,
+        "whiteDifference": 10.0,
+        "gains": { "black": 0, "white": 0 }
+      }
+    },
+    {
+      "name": "one decimal averages",
+      "command": 45,
+      "players": [
+        { "id": "black-1", "team": "black", "number": 44 },
+        { "id": "black-2", "team": "black", "number": 45 },
+        { "id": "white", "team": "white", "number": 50 }
+      ],
+      "expected": {
+        "winner": "black",
+        "blackAverage": 44.5,
+        "whiteAverage": 50.0,
+        "blackDifference": 0.5,
+        "whiteDifference": 5.0,
+        "gains": { "black-1": 4944, "black-2": 5056, "white": 0 }
+      }
+    },
+    {
+      "name": "exact rational distance tie",
+      "command": 30,
+      "players": [
+        { "id": "black-1", "team": "black", "number": 27 },
+        { "id": "black-2", "team": "black", "number": 28 },
+        { "id": "black-3", "team": "black", "number": 28 },
+        { "id": "white-1", "team": "white", "number": 32 },
+        { "id": "white-2", "team": "white", "number": 32 },
+        { "id": "white-3", "team": "white", "number": 33 }
+      ],
+      "expected": {
+        "winner": "tie",
+        "blackAverage": 27.7,
+        "whiteAverage": 32.3,
+        "blackDifference": 2.3,
+        "whiteDifference": 2.3,
+        "gains": {
+          "black-1": 0,
+          "black-2": 0,
+          "black-3": 0,
+          "white-1": 0,
+          "white-2": 0,
+          "white-3": 0
+        }
+      }
+    },
+    {
+      "name": "largest remainder tie breaks by player id",
+      "command": 30,
+      "players": [
+        { "id": "zulu", "team": "black", "number": 1 },
+        { "id": "alpha", "team": "black", "number": 1 },
+        { "id": "mike", "team": "black", "number": 1 },
+        { "id": "white", "team": "white", "number": null }
+      ],
+      "expected": {
+        "winner": "black",
+        "blackAverage": 1.0,
+        "whiteAverage": null,
+        "blackDifference": 29.0,
+        "whiteDifference": null,
+        "gains": { "zulu": 3333, "alpha": 3334, "mike": 3333, "white": 0 }
+      }
+    },
+    {
+      "name": "no submissions is a tie with no rewards",
+      "command": 50,
+      "players": [
+        { "id": "black", "team": "black", "number": null },
+        { "id": "white", "team": "white", "number": null }
+      ],
+      "expected": {
+        "winner": "tie",
+        "blackAverage": null,
+        "whiteAverage": null,
+        "blackDifference": null,
+        "whiteDifference": null,
+        "gains": { "black": 0, "white": 0 }
+      }
+    }
+  ]
+}

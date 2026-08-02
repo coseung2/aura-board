@@ -1,3 +1,5 @@
+import { OFFICIAL_GAME_CATALOG } from "@/lib/game-platform/catalog";
+
 export type LayoutKey =
   | "freeform"
   | "grid"
@@ -13,6 +15,8 @@ export type LayoutKey =
   | "kordle"
   | "speed-game"
   | "shadow-alliance"
+  | "omok"
+  | "song-guess"
   | "plant-roadmap"
   | "event-signup"
   | "question-board";
@@ -41,9 +45,26 @@ export const LAYOUT_META: Record<LayoutKey, LayoutMeta> = {
   "dj-queue": { emoji: "🎵", label: "DJ" },
   "vibe-arcade": { emoji: "💻", label: "코딩 교실" },
   "vibe-gallery": { emoji: "🌟", label: "코딩 갤러리" },
-  kordle: { emoji: "🟩", label: "꼬들" },
-  "speed-game": { emoji: "⚡", label: "스피드게임" },
-  "shadow-alliance": { emoji: "♟", label: "그림자연합" },
+  kordle: {
+    emoji: OFFICIAL_GAME_CATALOG.kordle.emoji,
+    label: OFFICIAL_GAME_CATALOG.kordle.label,
+  },
+  "speed-game": {
+    emoji: OFFICIAL_GAME_CATALOG["speed-game"].emoji,
+    label: OFFICIAL_GAME_CATALOG["speed-game"].label,
+  },
+  "shadow-alliance": {
+    emoji: OFFICIAL_GAME_CATALOG["shadow-alliance"].emoji,
+    label: OFFICIAL_GAME_CATALOG["shadow-alliance"].label,
+  },
+  omok: {
+    emoji: OFFICIAL_GAME_CATALOG.omok.emoji,
+    label: OFFICIAL_GAME_CATALOG.omok.label,
+  },
+  "song-guess": {
+    emoji: OFFICIAL_GAME_CATALOG["song-guess"].emoji,
+    label: OFFICIAL_GAME_CATALOG["song-guess"].label,
+  },
   "plant-roadmap": { emoji: "🌱", label: "식물 관찰일지" },
   "event-signup": { emoji: "🎟️", label: "행사 신청" },
   "question-board": { emoji: "💬", label: "질문 보드" },

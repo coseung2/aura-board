@@ -1,0 +1,358 @@
+.shell {
+  min-height: 100%;
+  padding: clamp(16px, 3vw, 36px);
+  background:
+    radial-gradient(circle at 12% 8%, rgba(255, 255, 255, 0.88), transparent 28%),
+    linear-gradient(145deg, #effbf7 0%, #e7f4ff 54%, #f7efff 100%);
+  color: #17352d;
+}
+
+.header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 20px;
+  margin: 0 auto 20px;
+  max-width: 1040px;
+}
+
+.eyebrow {
+  margin: 0 0 4px;
+  color: #4a766b;
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.title {
+  margin: 0;
+  font-size: clamp(1.55rem, 4vw, 2.45rem);
+  letter-spacing: -0.04em;
+}
+
+.version {
+  flex: 0 0 auto;
+  border: 1px solid rgba(43, 92, 80, 0.16);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.72);
+  padding: 8px 12px;
+  color: #4a6f67;
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.panel {
+  max-width: 1040px;
+  margin: 0 auto;
+  border: 1px solid rgba(38, 83, 72, 0.14);
+  border-radius: 28px;
+  background: rgba(255, 255, 255, 0.82);
+  box-shadow: 0 24px 70px rgba(44, 77, 99, 0.13);
+  backdrop-filter: blur(18px);
+  overflow: hidden;
+}
+
+.statusBar {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1px;
+  background: rgba(43, 91, 78, 0.12);
+}
+
+.statusItem {
+  min-height: 82px;
+  padding: 16px 18px;
+  background: rgba(250, 255, 253, 0.96);
+}
+
+.statusLabel {
+  display: block;
+  margin-bottom: 6px;
+  color: #62847c;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+}
+
+.statusValue {
+  display: block;
+  font-size: 1rem;
+  font-weight: 800;
+}
+
+.content {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(220px, 300px);
+  gap: clamp(18px, 3vw, 34px);
+  align-items: start;
+  padding: clamp(18px, 3vw, 34px);
+}
+
+.boardWrap {
+  min-width: 0;
+}
+
+.board {
+  display: grid;
+  grid-template-columns: repeat(15, minmax(20px, 1fr));
+  width: min(100%, 680px);
+  aspect-ratio: 1;
+  margin: 0 auto;
+  border: 12px solid #ad7a42;
+  border-radius: 20px;
+  background: #d9a65e;
+  box-shadow:
+    inset 0 0 0 2px rgba(72, 42, 17, 0.28),
+    0 18px 34px rgba(79, 55, 35, 0.2);
+  overflow: hidden;
+}
+
+.cell {
+  position: relative;
+  display: grid;
+  place-items: center;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  border-right: 1px solid rgba(74, 46, 22, 0.46);
+  border-bottom: 1px solid rgba(74, 46, 22, 0.46);
+  background: transparent;
+  cursor: default;
+}
+
+.cell:not(:disabled) {
+  cursor: pointer;
+}
+
+.cell:not(:disabled):hover,
+.cell:not(:disabled):focus-visible {
+  background: rgba(255, 248, 209, 0.48);
+  outline: 3px solid #1f7f68;
+  outline-offset: -3px;
+  z-index: 2;
+}
+
+.star::after {
+  content: "";
+  width: 5px;
+  height: 5px;
+  border-radius: 999px;
+  background: rgba(62, 37, 17, 0.78);
+}
+
+.stone {
+  position: absolute;
+  inset: 11%;
+  border-radius: 48% 52% 54% 46%;
+  box-shadow:
+    inset 0 -3px 5px rgba(0, 0, 0, 0.25),
+    0 2px 5px rgba(62, 38, 19, 0.32);
+}
+
+.first {
+  background: radial-gradient(circle at 34% 27%, #71867f 0%, #21342f 34%, #08100e 100%);
+}
+
+.second {
+  background: radial-gradient(circle at 34% 27%, #ffffff 0%, #ecf6f2 52%, #bdd1ca 100%);
+  border: 1px solid rgba(46, 75, 67, 0.2);
+}
+
+.lastMove {
+  box-shadow:
+    inset 0 0 0 3px #ffca48,
+    inset 0 -3px 5px rgba(0, 0, 0, 0.2),
+    0 0 0 2px rgba(255, 255, 255, 0.9);
+}
+
+.sidebar {
+  display: grid;
+  gap: 14px;
+}
+
+.card {
+  border: 1px solid rgba(43, 91, 78, 0.12);
+  border-radius: 18px;
+  background: #f9fffc;
+  padding: 16px;
+}
+
+.cardTitle {
+  margin: 0 0 12px;
+  font-size: 0.9rem;
+}
+
+.playerRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 9px 0;
+  border-top: 1px solid rgba(43, 91, 78, 0.09);
+}
+
+.playerRow:first-of-type {
+  border-top: 0;
+}
+
+.playerIdentity {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-width: 0;
+}
+
+.dot {
+  width: 22px;
+  height: 22px;
+  flex: 0 0 auto;
+  border-radius: 45% 55% 52% 48%;
+}
+
+.playerName {
+  overflow: hidden;
+  font-weight: 800;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.badge {
+  border-radius: 999px;
+  padding: 5px 8px;
+  background: #e5f4ef;
+  color: #276b59;
+  font-size: 0.72rem;
+  font-weight: 800;
+}
+
+.message {
+  margin: 0;
+  color: #45665e;
+  line-height: 1.55;
+}
+
+.error {
+  margin: 0;
+  border-radius: 14px;
+  background: #fff0ed;
+  padding: 12px 14px;
+  color: #9b392c;
+  font-weight: 700;
+}
+
+.actions {
+  display: grid;
+  gap: 9px;
+}
+
+.button,
+.secondaryButton,
+.dangerButton {
+  width: 100%;
+  min-height: 44px;
+  border-radius: 13px;
+  padding: 10px 14px;
+  font-weight: 850;
+  cursor: pointer;
+}
+
+.button {
+  border: 0;
+  background: #1f7f68;
+  color: white;
+  box-shadow: 0 8px 18px rgba(31, 127, 104, 0.22);
+}
+
+.secondaryButton {
+  border: 1px solid rgba(31, 127, 104, 0.26);
+  background: white;
+  color: #246b5a;
+}
+
+.dangerButton {
+  border: 1px solid rgba(169, 65, 50, 0.22);
+  background: #fff5f3;
+  color: #a33e31;
+}
+
+.button:disabled,
+.secondaryButton:disabled,
+.dangerButton:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.createPanel {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: clamp(22px, 4vw, 42px);
+}
+
+.selectGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin: 18px 0;
+}
+
+.selectLabel {
+  display: grid;
+  gap: 7px;
+  color: #46675f;
+  font-size: 0.82rem;
+  font-weight: 800;
+}
+
+.select {
+  min-height: 44px;
+  border: 1px solid rgba(42, 89, 76, 0.22);
+  border-radius: 12px;
+  background: white;
+  padding: 0 12px;
+  color: #17352d;
+  font: inherit;
+}
+
+@media (max-width: 780px) {
+  .statusBar {
+    grid-template-columns: 1fr;
+  }
+
+  .statusItem {
+    min-height: 0;
+  }
+
+  .content {
+    grid-template-columns: 1fr;
+  }
+
+  .sidebar {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 520px) {
+  .shell {
+    padding: 10px;
+  }
+
+  .panel {
+    border-radius: 20px;
+  }
+
+  .content {
+    padding: 12px;
+  }
+
+  .board {
+    grid-template-columns: repeat(15, minmax(17px, 1fr));
+    border-width: 7px;
+    border-radius: 13px;
+  }
+
+  .sidebar,
+  .selectGrid {
+    grid-template-columns: 1fr;
+  }
+}

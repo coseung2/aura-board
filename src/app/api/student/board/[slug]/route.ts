@@ -8,6 +8,7 @@ import { loadHiddenLookup } from "@/lib/content-safety-service";
 import { loadGameSnapshot } from "@/lib/speed-game/runtime";
 import { sanitizeGameSnapshotForStudent } from "@/lib/speed-game/student-snapshot";
 import { parseObservationPoints } from "@/lib/plant-schemas";
+import { isOfficialPlayLayout } from "@/lib/game-platform/catalog";
 
 const ANONYMOUS_AUTHOR_LABEL = "익명";
 
@@ -29,11 +30,76 @@ export async function GET(
       return NextResponse.json({ error: "unauthorized" }, { status: 401 });
     }
 
-    const board = await db.board.findFirst({
+    const boardMeta = await db.board.findFirst({
       where: {
         OR: [{ id: slug }, { slug }],
         classroomId: student.classroomId,
       },
+      select: {
+        id: true,
+        slug: true,
+        title: true,
+        layout: true,
+        description: true,
+        classroomId: true,
+        anonymousAuthor: true,
+        assignmentDeadline: true,
+        assignmentAllowLate: true,
+        thumbnailMode: true,
+        thumbnailUrl: true,
+        boardTheme: true,
+        streamSectionsEnabled: true,
+      },
+    });
+    if (!boardMeta) {
+      return NextResponse.json({ error: "not_found" }, { status: 404 });
+    }
+
+    // Official games are metadata-first surfaces. They do not need generic
+    // cards, sections, authors, attachments, moderation lookups, or submission
+    // payloads before dispatch. Game-specific components fetch their own
+    // authoritative snapshots; Speed Game receives only its sanitized snapshot.
+    if (isOfficialPlayLayout(boardMeta.layout)) {
+      const layoutData: Record<string, unknown> = {};
+      if (boardMeta.layout === "speed-game") {
+        const game = await db.speedGame.findFirst({
+          where: { boardId: boardMeta.id },
+          orderBy: { createdAt: "desc" },
+          select: { id: true },
+        });
+        const snapshot = game ? await loadGameSnapshot(game.id) : null;
+        layoutData.speedGame = {
+          game: snapshot
+            ? sanitizeGameSnapshotForStudent(snapshot, student.id)
+            : null,
+        };
+      }
+      return NextResponse.json({
+        board: {
+          ...boardMeta,
+          assignmentDeadline:
+            boardMeta.assignmentDeadline?.toISOString() ?? null,
+          _count: { cards: 0 },
+        },
+        cards: [],
+        sections: [],
+        currentStudent: {
+          id: student.id,
+          name: student.name,
+          classroomId: student.classroomId,
+        },
+        capabilities: {
+          canControlQueue: false,
+          canAddCard: false,
+          canEditOwnCard: false,
+          canDeleteOwnCard: false,
+        },
+        layoutData,
+      });
+    }
+
+    const board = await db.board.findUnique({
+      where: { id: boardMeta.id },
       include: {
         cards: {
           // web 의 order 기반 정렬과 동일하게 유지하되 createdAt 으로 안정 정렬.

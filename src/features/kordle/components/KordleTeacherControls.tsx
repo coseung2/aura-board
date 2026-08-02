@@ -11,6 +11,7 @@ type Props = {
   initialLocale: string;
   puzzleId?: string | null;
   puzzleStatus?: string | null;
+  puzzleVersion?: number | null;
 };
 
 const WORD_LENGTH = 6;
@@ -20,6 +21,7 @@ export function KordleTeacherControls({
   initialLocale,
   puzzleId,
   puzzleStatus,
+  puzzleVersion,
 }: Props) {
   const router = useRouter();
   const [locale, setLocale] = useState<KordleLocale>(
@@ -29,6 +31,13 @@ export function KordleTeacherControls({
   const [solution, setSolution] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [version, setVersion] = useState(puzzleVersion ?? 0);
+  const pendingCommandRef = useRef<{
+    action: "create" | "start" | "stop";
+    requestId: string;
+    expectedVersion: number;
+    fingerprint: string;
+  } | null>(null);
   const [isPending, startTransition] = useTransition();
 
   const normalizedLength = useMemo(() => {
@@ -45,6 +54,11 @@ export function KordleTeacherControls({
     setLocale(nextLocale);
     localeRef.current = nextLocale;
   }, [initialLocale]);
+
+  useEffect(() => {
+    setVersion(puzzleVersion ?? 0);
+    pendingCommandRef.current = null;
+  }, [puzzleId, puzzleVersion]);
 
   function applyLocale(nextLocale: KordleLocale) {
     localeRef.current = nextLocale;
@@ -67,17 +81,39 @@ export function KordleTeacherControls({
     setError(null);
     setBusy(true);
     const selectedLocale = localeRef.current;
+    const submittedSolution = useRandom ? "" : solution;
+    const fingerprint = `${selectedLocale}:${submittedSolution}`;
+    const pending = pendingCommandRef.current;
+    const command =
+      pending &&
+      pending.action === "create" &&
+      pending.expectedVersion === version &&
+      pending.fingerprint === fingerprint
+        ? pending
+        : {
+            action: "create" as const,
+            requestId: crypto.randomUUID(),
+            expectedVersion: version,
+            fingerprint,
+          };
+    pendingCommandRef.current = command;
     try {
       const res = await fetch(`/api/kordle/boards/${boardId}/puzzle`, {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
+          requestId: command.requestId,
+          expectedVersion: command.expectedVersion,
           locale: selectedLocale,
           solution: useRandom ? undefined : solution,
         }),
       });
       const data = await res.json().catch(() => null);
       if (!res.ok) {
+        if (typeof data?.puzzle?.version === "number") {
+          setVersion(data.puzzle.version);
+          pendingCommandRef.current = null;
+        }
         if (data?.error === "wrong_length") {
           setError(`${WORD_LENGTH}칸에 맞는 단어를 입력하세요`);
         } else {
@@ -85,6 +121,8 @@ export function KordleTeacherControls({
         }
         return;
       }
+      pendingCommandRef.current = null;
+      if (typeof data?.version === "number") setVersion(data.version);
       const nextLocale = data?.locale === "ko-KR" ? "ko-KR" : "en-US";
       localeRef.current = nextLocale;
       setLocale(nextLocale);
@@ -104,16 +142,42 @@ export function KordleTeacherControls({
     if (busy || !puzzleId) return;
     setBusy(true);
     setError(null);
+    const pending = pendingCommandRef.current;
+    const command =
+      pending &&
+      pending.action === "start" &&
+      pending.expectedVersion === version &&
+      pending.fingerprint === puzzleId
+        ? pending
+        : {
+            action: "start" as const,
+            requestId: crypto.randomUUID(),
+            expectedVersion: version,
+            fingerprint: puzzleId,
+          };
+    pendingCommandRef.current = command;
     try {
       const res = await fetch(`/api/kordle/boards/${boardId}/puzzle`, {
         method: "PATCH",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ action: "start", puzzleId }),
+        body: JSON.stringify({
+          action: "start",
+          puzzleId,
+          requestId: command.requestId,
+          expectedVersion: command.expectedVersion,
+        }),
       });
+      const data = await res.json().catch(() => null);
       if (!res.ok) {
+        if (typeof data?.puzzle?.version === "number") {
+          setVersion(data.puzzle.version);
+          pendingCommandRef.current = null;
+        }
         setError("시작하지 못했습니다");
         return;
       }
+      pendingCommandRef.current = null;
+      if (typeof data?.version === "number") setVersion(data.version);
       startTransition(() => router.refresh());
     } finally {
       setBusy(false);
@@ -124,16 +188,42 @@ export function KordleTeacherControls({
     if (busy || !puzzleId) return;
     setBusy(true);
     setError(null);
+    const pending = pendingCommandRef.current;
+    const command =
+      pending &&
+      pending.action === "stop" &&
+      pending.expectedVersion === version &&
+      pending.fingerprint === puzzleId
+        ? pending
+        : {
+            action: "stop" as const,
+            requestId: crypto.randomUUID(),
+            expectedVersion: version,
+            fingerprint: puzzleId,
+          };
+    pendingCommandRef.current = command;
     try {
       const res = await fetch(`/api/kordle/boards/${boardId}/puzzle`, {
         method: "PATCH",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ action: "stop", puzzleId }),
+        body: JSON.stringify({
+          action: "stop",
+          puzzleId,
+          requestId: command.requestId,
+          expectedVersion: command.expectedVersion,
+        }),
       });
+      const data = await res.json().catch(() => null);
       if (!res.ok) {
+        if (typeof data?.puzzle?.version === "number") {
+          setVersion(data.puzzle.version);
+          pendingCommandRef.current = null;
+        }
         setError("중단하지 못했습니다");
         return;
       }
+      pendingCommandRef.current = null;
+      if (typeof data?.version === "number") setVersion(data.version);
       startTransition(() => router.refresh());
     } finally {
       setBusy(false);

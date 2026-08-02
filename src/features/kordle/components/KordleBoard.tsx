@@ -1,10 +1,16 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import type { RealtimeChannel, SupabaseClient } from "@supabase/supabase-js";
 import { GameWinnerInfo } from "@/features/games/components/GameWinnerInfo";
+import { GameExitDialog } from "@/components/game-platform/GameExitDialog";
 import { createTrailingRefreshRunner } from "@/lib/realtime-invalidation";
-import type { KordlePublicState, LetterState } from "../engine";
+import type {
+  KordleCommandResponse,
+  KordlePublicState,
+  LetterState,
+} from "../engine";
 import {
   KORDLE_GUESS_SUBMITTED_EVENT,
   KORDLE_PUZZLE_CHANGED_EVENT,
@@ -19,6 +25,7 @@ type Props = {
   initialState: KordlePublicState;
   attemptId: string;
   locale: string;
+  viewer?: "student" | "teacher";
 };
 
 type Status = KordlePublicState["status"];
@@ -237,7 +244,14 @@ function guessErrorMessage(reason: string, wordLength: number): string {
   }
 }
 
-export function KordleBoard({ boardId, initialState, attemptId, locale }: Props) {
+export function KordleBoard({
+  boardId,
+  initialState,
+  attemptId,
+  locale,
+  viewer = "student",
+}: Props) {
+  const router = useRouter();
   const [state, setState] = useState<KordlePublicState>(initialState);
   const [activeLocale, setActiveLocale] = useState(locale);
   // `pending` holds committed single-character cells: one letter per slot for
@@ -246,7 +260,19 @@ export function KordleBoard({ boardId, initialState, attemptId, locale }: Props)
   const [pending, setPending] = useState<string[]>([]);
   const [buffer, setBuffer] = useState<string>("");
   const [submitting, setSubmitting] = useState(false);
+  const [exitOpen, setExitOpen] = useState(false);
+  const [exiting, setExiting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const pendingCommandRef = useRef<{
+    requestId: string;
+    expectedVersion: number;
+    guess: string;
+    guessIndex?: number;
+  } | null>(null);
+  const abandonCommandRef = useRef<{
+    requestId: string;
+    expectedVersion: number;
+  } | null>(null);
   const isKorean = activeLocale.toLowerCase().startsWith("ko");
 
   useEffect(() => {
@@ -254,6 +280,9 @@ export function KordleBoard({ boardId, initialState, attemptId, locale }: Props)
     setPending([]);
     setBuffer("");
     setError(null);
+    pendingCommandRef.current = null;
+    abandonCommandRef.current = null;
+    setExitOpen(false);
   }, [locale, attemptId]);
 
   useEffect(() => {
@@ -283,7 +312,10 @@ export function KordleBoard({ boardId, initialState, attemptId, locale }: Props)
     return map;
   }, [state.guesses]);
 
-  const isComplete = state.status === "WON" || state.status === "LOST";
+  const isComplete =
+    state.status === "WON" ||
+    state.status === "LOST" ||
+    state.status === "ABANDONED";
   const isWaitingForTurn =
     !isComplete && state.turn.currentGuessIndex !== null && state.turn.isWaiting;
   const isCompleteRef = useRef(isComplete);
@@ -429,21 +461,49 @@ export function KordleBoard({ boardId, initialState, attemptId, locale }: Props)
     setSubmitting(true);
     setError(null);
     try {
+      const guessIndex = state.turn.currentGuessIndex ?? undefined;
+      const existing = pendingCommandRef.current;
+      const command =
+        existing &&
+        existing.expectedVersion === state.version &&
+        existing.guess === guess &&
+        existing.guessIndex === guessIndex
+          ? existing
+          : {
+              requestId: crypto.randomUUID(),
+              expectedVersion: state.version,
+              guess,
+              guessIndex,
+            };
+      pendingCommandRef.current = command;
       const res = await fetch(`/api/kordle/attempts/${attemptId}/guess`, {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ guess, guessIndex: state.turn.currentGuessIndex ?? undefined }),
+        body: JSON.stringify(command),
       });
+      const data = (await res.json().catch(() => null)) as
+        | (KordleCommandResponse & { replayed?: boolean })
+        | { error?: string; state?: KordlePublicState }
+        | null;
       if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
+        if (data && "state" in data && data.state) {
+          setState(data.state);
+          if (data.state.version !== command.expectedVersion) {
+            pendingCommandRef.current = null;
+          }
+        }
         setError(
-          typeof data.error === "string"
+          data && "error" in data && typeof data.error === "string"
             ? guessErrorMessage(data.error, state.wordLength)
             : "제출하지 못했어요",
         );
         return;
       }
-      const data = (await res.json()) as { state: KordlePublicState };
+      if (!data || !("state" in data) || !data.state) {
+        setError("최신 게임 상태를 확인하지 못했어요");
+        return;
+      }
+      pendingCommandRef.current = null;
       setState(data.state);
       setPending([]);
       setBuffer("");
@@ -456,9 +516,58 @@ export function KordleBoard({ boardId, initialState, attemptId, locale }: Props)
     isComplete,
     pending,
     state.turn.currentGuessIndex,
+    state.version,
     state.wordLength,
     submitting,
   ]);
+
+  const abandon = useCallback(async () => {
+    if (viewer !== "student" || isComplete || exiting) return;
+    const pending = abandonCommandRef.current;
+    const command =
+      pending && pending.expectedVersion === state.version
+        ? pending
+        : {
+            requestId: crypto.randomUUID(),
+            expectedVersion: state.version,
+          };
+    abandonCommandRef.current = command;
+    setExiting(true);
+    setError(null);
+    try {
+      const response = await fetch(`/api/kordle/attempts/${attemptId}`, {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ action: "abandon", ...command }),
+      });
+      const body = (await response.json().catch(() => null)) as
+        | (KordleCommandResponse & { replayed?: boolean })
+        | { error?: string; state?: KordlePublicState }
+        | null;
+      if (!response.ok) {
+        if (body && "state" in body && body.state) {
+          setState(body.state);
+          if (body.state.version !== command.expectedVersion) {
+            abandonCommandRef.current = null;
+          }
+        }
+        setError("게임에서 나가지 못했어요. 연결을 확인하고 다시 시도해 주세요.");
+        return;
+      }
+      if (!body || !("state" in body) || !body.state) {
+        setError("종료 결과를 확인하지 못했어요.");
+        return;
+      }
+      setState(body.state);
+      abandonCommandRef.current = null;
+      setExitOpen(false);
+      if (body.state.resultId) {
+        router.push("/student/boards?category=play&playTab=records&game=kordle");
+      }
+    } finally {
+      setExiting(false);
+    }
+  }, [attemptId, exiting, isComplete, router, state.version, viewer]);
 
   const onKey = useCallback(
     (key: string) => {
@@ -637,6 +746,15 @@ export function KordleBoard({ boardId, initialState, attemptId, locale }: Props)
             {state.turn.currentGuessIndex}줄 진행 중
           </p>
         )}
+        {viewer === "student" && !isComplete ? (
+          <button
+            type="button"
+            className="kordle-result-close"
+            onClick={() => setExitOpen(true)}
+          >
+            게임 나가기
+          </button>
+        ) : null}
         {isWaitingForTurn && (
           <p className="kordle-turn-wait" role="status">
             {state.turn.isPendingJoin
@@ -655,9 +773,20 @@ export function KordleBoard({ boardId, initialState, attemptId, locale }: Props)
             status={state.status as Status}
             solvedAtGuess={state.solvedAtGuess}
             totalGuesses={state.guesses.length}
+            terminalReason={state.terminalReason}
+            resultId={state.resultId}
           />
         )}
       </div>
+      <GameExitDialog
+        open={exitOpen}
+        title="꼬들 게임에서 나갈까요?"
+        description="진행 중 나가면 이번 시도는 포기로 기록됩니다. 서버가 종료 결과를 확정한 뒤 전적 화면으로 이동합니다."
+        confirmLabel="포기하고 나가기"
+        busy={exiting}
+        onCancel={() => setExitOpen(false)}
+        onConfirm={abandon}
+      />
     </div>
   );
 }

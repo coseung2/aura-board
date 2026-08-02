@@ -41,6 +41,15 @@ export function classroomMorningChannelKey(classroomId: string): string {
 }
 
 export const SPEED_GAME_CHANGED_EVENT = "speed_game_changed";
+export const PLAY_SESSION_CHANGED_EVENT = "play_session_changed";
+
+export type PlaySessionRealtimeEvent = {
+  type: typeof PLAY_SESSION_CHANGED_EVENT;
+  eventId: string;
+  sessionId: string;
+  boardId: string;
+  version: number;
+};
 
 export function speedGameChannelKey(gameId: string): string {
   if (!gameId) throw new Error("speedGameChannelKey: gameId required");

@@ -47,6 +47,13 @@ const config: ExpoConfig = {
     ],
     "expo-font",
     "expo-secure-store",
+    [
+      "expo-audio",
+      {
+        microphonePermission: false,
+        recordAudioAndroid: false,
+      },
+    ],
     "expo-notifications",
     "./plugins/with-aura-board-health-connect",
     "./plugins/with-android-debug-network-security",

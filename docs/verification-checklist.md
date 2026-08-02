@@ -50,6 +50,87 @@ creating overlapping testing-notes documents.
 - Verify retries and endpoint behavior are idempotent before enabling a schedule.
 - Call a production endpoint only after explicit approval; use dry-run verification otherwise.
 
+## Always-open Game Hub
+
+- Render the web student board hub with zero teacher-created boards and confirm the 놀이 tab still shows exactly Shadow Alliance, Kordle, Speed Game, Omok, and Song Guess with unique generated raster art, one-line descriptions, `상시 입장`, and one obvious entry action each.
+- Run `src/lib/game-platform/contracts.vitest.ts`, `src/lib/game-platform/hub-room.vitest.ts`, `src/app/api/student/game-hub/entry/route.vitest.ts`, `src/components/StudentDashboard.vitest.tsx`, and `src/app/api/student/game-records/route.vitest.ts`. Confirm web/mobile catalog parity, five unique artwork keys, canonical room reuse/race handling, strict rejection of client score/timing claims, zero-board rendering, and reachable record filters.
+- Confirm `/api/student/boards` and the student-home loader exclude rows with `systemGameKind`, while direct game entry can still fetch the canonical room detail.
+- Inspect `20260802160000_game_ui_platform/migration.sql` and confirm `Board.systemGameKind` is null for normal boards, equals an official PLAY layout when present, requires a classroom, and is unique by `(classroomId, systemGameKind)`. Do not apply the migration outside disposable/staging approval.
+- Enter the same game concurrently from web and Expo for one classroom and confirm both clients receive the same room. Enter from another classroom and confirm a different room. Confirm the classroom teacher is the server-created owner and the client cannot choose the teacher, classroom, room ID, score, duration, participant, or host.
+- Run the root production build and `npx expo export --platform android`. Confirm the web bundle includes all five `.ai-bridge/generated-game-hub-assets/*.png` imports and Expo resolves the cached `/api/game-hub/art/:kind` URLs without bundling a placeholder.
+- At phone, Galaxy Tab portrait, Galaxy Tab landscape, and desktop widths, confirm no clipped cards, overlapping status/action controls, or nested generic board-card metadata. Verify keyboard focus, screen-reader names, 44px touch targets, reduced motion, loading, retry, missing-setup, and safe back-to-hub behavior.
+
+## Authoritative Multiplayer Play
+
+### Static and automated checks
+
+- Run `cargo fmt --manifest-path services/play-engine/Cargo.toml --all -- --check`.
+- Run `cargo clippy --manifest-path services/play-engine/Cargo.toml --workspace --all-targets -- -D warnings`.
+- Run `cargo test --manifest-path services/play-engine/Cargo.toml --workspace` and confirm coverage for actor-to-slot binding, two-party ready plus host start, stale expected version, exact duplicate replay before version checking, request-ID reuse with a changed payload, terminal results, rematch slot swap, and outbox versions.
+- Run the targeted Vitest files for the play wire contract and migration, then `npm run typecheck`.
+- Run `npm run typecheck` and `npm run design:check` in `apps/mobile`.
+- Run `npx prisma validate` and `npx prisma generate`; inspect the generated migration SQL for the current-session partial unique index, participant slot uniqueness, durable request receipt uniqueness, safe-integer checks, RLS, and revoked browser-role grants.
+- Confirm the canonical JSON schema versions match Rust and TypeScript constants.
+
+### Song-guess browser ingestion and play checks
+
+- Run `src/lib/song-guess/audio.vitest.ts` and confirm exact 44-byte WAV headers, 22,050 / 44,100 / 66,150 mono sample counts, selected-start slicing, stereo downmix, resampling, exact-end acceptance, and no-padding rejection.
+- Run `src/lib/song-guess/teacher-workflow.vitest.ts` and confirm rights confirmation is mandatory, the upload dependency receives only three `audio/wav` derivative blobs, the ordered setup payload contains only opaque asset IDs, and partial upload/setup-save failures clean successful unassigned assets.
+- Run `src/components/SongGuessBoard.vitest.tsx` and confirm a current session locks teacher editing, student HTML contains only the current clip URL and no teacher answer, server-returned score feedback is rendered, and an unacknowledged command reuses the exact stored request.
+- Run `npm run test:song-guess:browser` to bundle the production audio utility in memory, create a 48 kHz stereo synthetic tone in Headless Chrome, generate all three derivatives, verify exact WAV headers/byte lengths, create and revoke object URLs, and browser-decode 0.5/1.0/1.5-second mono clips without autoplay.
+- In an authenticated browser, select a local tone or music file, move the start slider and number input, explicitly preview the 1.5-second source, generate and play all three local derivatives, then save. Inspect Network and confirm no request body contains the original filename, original byte length, original MIME, local path, or full source.
+- Confirm every generated local object URL is revoked after replacement, deletion, successful save, or unmount; confirm source preview nodes stop and the `AudioContext` closes on unmount.
+- Force the second or third derivative upload to fail. Confirm successful assets from that attempt receive authorized `DELETE` cleanup requests and retry starts from the locally generated blobs without uploading the source.
+- Force setup save to fail after all three uploads. Confirm cleanup deletes only unassigned assets; assigned assets return a conflict and remain attached to the committed setup after a lost response.
+- Create a session and verify `draft -> lobby -> guessing -> reveal -> next_round/finished`. Confirm only the host can advance phases, only participants can guess, 0.5/1.0/1.5-second clips unlock in order, and score awards come only from Rust command results.
+- Inspect participant snapshots and page HTML in every phase. Representative answers, aliases, normalized forms, private object keys, source metadata, and future clip IDs must never appear.
+- Run `src/lib/__tests__/mobile-song-guess-contract.vitest.ts`, mobile typecheck/design checks, and `npx expo export --platform android --clear`. Confirm the Expo student board renders the native song-guess layout, fetches only the authorized current snapshot, and cannot roll back or cross sessions.
+- On a physical Android device with an authenticated student and active staging session, confirm private clips load through `expo-audio` with the student bearer header, replay from the beginning after completion, pause correctly, and switch cleanly across 0.5/1.0/1.5-second unlocks. Submit with the keyboard open, reload after the server response, and verify the same score and revealed answer on web and mobile.
+- Inspect unassigned `SongGuessAsset` age/count in staging. The interactive flow should clean normal failures; define an operator-owned age sweep before production to cover a tab closing between upload and setup save.
+
+### Staging database and service checks
+
+- Use a disposable or staging Postgres database only. Apply the migration and confirm `PlaySession`, `PlayParticipant`, `PlayRequestReceipt`, and `PlayOutbox` exist.
+- Confirm `anon` and `authenticated` cannot select, insert, update, or delete any authoritative play table.
+- Confirm the private Rust database role can transact against all four tables.
+- Start Axum with private staging configuration and verify `/health` only through the intended private network path.
+- Verify Next rejects a missing, expired, or tampered actor assertion and never accepts a client-supplied actor subject or slot.
+- Verify a teacher can create an Omok session only from two students in the board classroom; a student outside that classroom and a non-member teacher receive `403`.
+
+### Lifecycle and recovery matrix
+
+- Create a session and confirm the server assigns unique `first` and `second` slots. Reload web and Expo before either student is ready; both must recover the same `waiting` snapshot.
+- Ready one participant, reload, and confirm only that participant is ready. Ready the second participant and confirm the session becomes `ready` but does not start automatically.
+- Start as the host. Confirm participants cannot start and the host cannot place a stone.
+- Submit a legal move and verify response version, persisted state, page reload, the other client, and Postgres all agree.
+- Submit two commands with the same `expectedVersion`; confirm one commits and the other receives `409 version_conflict` with the current authorized snapshot and no extra outbox row.
+- Simulate a lost successful response, then retry the exact same `requestId`, actor, and payload. Confirm the stored response is returned with `x-idempotent-replay: true`, no second mutation occurs, and the version advances only once.
+- Reuse the same request ID with a different payload or actor and confirm `idempotency_key_reuse` with no mutation.
+- Background the Expo app, change state from another client, and foreground it. Confirm snapshot reconciliation completes before board input is enabled.
+- Disable or interrupt Realtime and confirm web fallback polling and Expo fallback polling recover the latest version; restore Realtime and confirm polling no longer remains the primary path.
+- Finish once by five-in-a-row and once by resignation. Confirm the result cannot change and no further move is accepted.
+- Create a rematch as the host. Confirm a new session ID, `previousSessionId`, swapped slots, reset board, version `0`, and exactly one current session for the board.
+
+### Shadow Alliance authoritative matrix
+
+- Run every case in `services/play-engine/contracts/shadow-alliance-parity-v1.json`; Rust and TypeScript must produce identical winners, averages, differences, and per-player gains.
+- Before reveal, inspect student snapshots and page HTML. Other students' submitted numbers must be absent; only `submitted: true/false` may be visible. The submitting student may see only their own number.
+- Pause a playing round, background and reconnect both clients, then resume. The server-owned remaining time must be preserved and no browser timer may advance phase or write a result.
+- Submit two Shadow commands with the same expected version. Confirm one commits and the other receives an authorized `409 version_conflict` snapshot.
+- Simulate a lost successful Shadow response and retry the exact request ID. Confirm the receipt is replayed before version comparison and no duplicate mutation, outbox row, or `GameResult` appears.
+- Forfeit one joined participant during lobby and during play. Confirm exactly one personal forfeit result is stored, the aggregate continues, and later completion does not duplicate that result.
+- Verify `playing -> revealing -> postround -> next_round` and final `postround -> finished` require explicit host commands. Timer expiry alone must not invent a winner.
+- Finish normally and with host-ended. Confirm state, all remaining personal results, receipt, and outbox row commit atomically.
+- Create a Shadow rematch. Confirm a new aggregate ID, `previousSessionId`, version `0`, reset private submissions, and exactly one current `PlaySession` for the board.
+
+### Outbox and operability
+
+- Confirm session state, request receipt, and outbox row commit atomically. Force a transaction failure and verify none of the three remain.
+- Run `/api/cron/play-outbox` with staging cron authorization. Confirm only `{eventId, sessionId, boardId, version}` is broadcast and only successfully delivered IDs are completed with the current claim lock token.
+- Force a broadcast failure, wait for the lease to expire, and confirm the row is reclaimed without duplicating game state.
+- Inspect logs and metrics for route/status counts, conflicts, idempotency reuse, outbox pending age/attempts, transaction latency, and lock wait. Confirm assertions, secrets, student identifiers, command bodies, and snapshots are absent from logs.
+- Do not enable production routing, apply the production migration, or change production secrets until the staging matrix, web smoke test, and physical-device Expo smoke test pass and an operator explicitly approves rollout.
+
 ## Mobile Parity And Android Release
 
 - Run `npm run typecheck` and `npm run design:check` in `apps/mobile`.

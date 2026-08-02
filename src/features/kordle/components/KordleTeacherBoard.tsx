@@ -75,6 +75,7 @@ export async function KordleTeacherBoard({ boardId, teacherUserId }: Props) {
         select: {
           id: true,
           status: true,
+          version: true,
           startsAt: true,
           endsAt: true,
           solutionWord: { select: { text: true } },
@@ -160,6 +161,7 @@ export async function KordleTeacherBoard({ boardId, teacherUserId }: Props) {
             initialLocale={game.locale}
             puzzleId={puzzle.id}
             puzzleStatus={puzzle.status}
+            puzzleVersion={Number(puzzle.version)}
           />
           <div className="kordle-teacher-live-layout">
             <KordleBoard
@@ -167,12 +169,14 @@ export async function KordleTeacherBoard({ boardId, teacherUserId }: Props) {
               attemptId={attemptId}
               initialState={state}
               locale={game.locale}
+              viewer="teacher"
             />
             <aside className="kordle-teacher-live-panel" aria-label="라운드별 제출 현황">
               <KordleTeacherParticipants
                 boardId={boardId}
                 puzzleId={puzzle.id}
                 initialStatus={puzzle.status}
+                initialVersion={Number(puzzle.version)}
                 initialParticipants={participants}
                 maxGuesses={game.maxGuesses}
               />
@@ -200,6 +204,7 @@ export async function KordleTeacherBoard({ boardId, teacherUserId }: Props) {
           initialLocale={game.locale}
           puzzleId={puzzle?.id ?? null}
           puzzleStatus={puzzle?.status ?? null}
+          puzzleVersion={puzzle ? Number(puzzle.version) : 0}
         />
 
         <div className="kordle-teacher-layout">
@@ -231,6 +236,7 @@ export async function KordleTeacherBoard({ boardId, teacherUserId }: Props) {
                 boardId={boardId}
                 puzzleId={puzzle.id}
                 initialStatus={puzzle.status}
+                initialVersion={Number(puzzle.version)}
                 initialParticipants={participants}
                 maxGuesses={game.maxGuesses}
               />
