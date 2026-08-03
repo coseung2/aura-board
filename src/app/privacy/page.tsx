@@ -20,7 +20,7 @@ export default function PrivacyPage() {
       <article className="docs-article">
         <Link href="/landing" className="docs-back">← 홈으로</Link>
         <h1 className="docs-title">개인정보처리방침</h1>
-        <p className="docs-subtitle">최종 수정일: 2026년 7월 13일 | 시행일: 2026년 7월 13일</p>
+        <p className="docs-subtitle">최종 수정일: 2026년 8월 3일 | 시행일: 2026년 8월 3일</p>
 
         <section className="docs-section">
           <h2 className="docs-h2">1. 개인정보 처리자</h2>
@@ -63,9 +63,25 @@ export default function PrivacyPage() {
 
           <h3 className="docs-h3">2.4 모바일 앱에서 수집하는 정보</h3>
           <ul className="docs-list">
-            <li><strong>칩/사진:</strong> 카드에 이미지를 첨부할 때 사용자 동의 하에 칩라/갤러리 접근</li>
+            <li><strong>카메라/사진:</strong> 카드에 이미지를 첨부할 때 사용자 동의 하에 카메라/갤러리 접근</li>
             <li><strong>문서:</strong> 파일 첨부 시 사용자가 직접 선택한 문서</li>
             <li><strong>푸시 알림 토큰:</strong> 알림 수신을 위해 기기마다 발급되는 자생 토큰</li>
+          </ul>
+
+          <h3 className="docs-h3">2.5 건강·피트니스 데이터(Health Data)</h3>
+          <p className="docs-p">
+            걷기 기능은 선택 사항이며, 이용자가 기기 권한 화면에서 명시적으로 허용한 경우에만 건강·피트니스 데이터에 접근합니다.
+          </p>
+          <ul className="docs-list">
+            <li>
+              <strong>접근하는 데이터:</strong> Android Health Connect 또는 iOS Apple 건강(HealthKit)에 기록된 날짜별 걸음 수 합계만 읽습니다. 심박수, 수면, 체중, 위치 등 다른 건강 데이터는 읽지 않으며 건강 데이터 쓰기 권한을 요청하지 않습니다.
+            </li>
+            <li>
+              <strong>수집 및 저장:</strong> 읽은 날짜와 일별 걸음 수 합계를 암호화된 통신(HTTPS)으로 Aura-board 서버에 전송하고 학생 계정과 연결해 저장합니다. 개별 걸음의 시각이나 이동 경로는 수집하지 않습니다.
+            </li>
+            <li>
+              <strong>기기 내 실시간 표시:</strong> 걷기 화면을 보는 동안 Android 신체 활동 센서 또는 iOS 동작 및 피트니스(Core Motion)로 감지한 걸음 변화는 화면에 즉시 표시하기 위해 기기에서만 처리하며, 개별 센서 이벤트를 서버에 전송하거나 별도로 저장하지 않습니다.
+            </li>
           </ul>
         </section>
 
@@ -76,6 +92,7 @@ export default function PrivacyPage() {
             <li>학급 운영(보드, 카드, 학생 관리, 학부모 공유)</li>
             <li>컨텐츠 생성 및 공유(영상 임베드 등)</li>
             <li>푸시 알림 발송</li>
+            <li>걸음 수 동기화, 일간·주간 걷기 현황 제공, 걷기 보상·칭호 산정 및 학급 내 걷기 순위 표시</li>
             <li>공지사항, 고객 문의 응대</li>
             <li>보안, 부정 이용 방지, 서비스 품질 개선</li>
           </ul>
@@ -86,6 +103,7 @@ export default function PrivacyPage() {
           <p className="docs-p">
             회원 탈퇴 시 수집된 개인정보는 지체 없이 파기합니다. 다만, 관련 법령에 따라 일정 기간 보관이 필요한 경우 해당 기간 동안 보관합니다.
             학생 정보는 교사가 학급을 삭제하거나 탈퇴 시 함께 삭제됩니다.
+            서버에 동기화된 날짜별 걸음 수는 해당 학생 또는 학급이 유지되는 동안 보관하며, 교사가 학생·학급을 삭제하거나 적법한 삭제 요청이 처리되면 함께 삭제합니다. Health Connect 또는 Apple 건강 설정에서 권한을 철회하면 이후의 접근과 동기화는 중단되지만, 이미 서버에 동기화된 기록은 자동으로 삭제되지 않으므로 서비스 내 삭제 기능 또는 아래 개인정보 보호책임자 이메일을 통해 삭제를 요청할 수 있습니다. Aura-board는 기기의 Health Connect 또는 Apple 건강 원본 데이터를 삭제하거나 변경하지 않습니다.
             교사가 Canva 연결을 해제하면 Canva OAuth 접근·갱신 토큰, Canva 사용자·팀 식별자와 임시 인증 정보는 즉시 폐기하며, Canva에 토큰 폐기를 요청합니다.
             전자적 파일은 복구 불가능한 방법으로 삭제하며, 종이 문서는 분쇄 또는 소각합니다.
           </p>
@@ -95,6 +113,9 @@ export default function PrivacyPage() {
           <h2 className="docs-h2">5. 개인정보의 제3자 제공</h2>
           <p className="docs-p">
             원칙적으로 이용자의 동의 없이 제3자에게 개인정보를 제공하지 않습니다. 다만, 이용자가 사전에 동의한 경우 또는 법령에 따른 수사·조사 목적 등 법적 의무가 있는 경우에는 예외로 합니다.
+          </p>
+          <p className="docs-p">
+            걷기 기능을 이용하면 학생 이름·번호와 주간 걸음 수가 같은 학급의 인증된 이용자에게 학급 순위로 표시될 수 있습니다. 건강·피트니스 데이터는 광고, 마케팅, 신용평가 또는 데이터 판매 목적으로 사용하거나 제공하지 않습니다.
           </p>
         </section>
 
@@ -124,6 +145,9 @@ export default function PrivacyPage() {
           <p className="docs-p">
             권리 행사는 서비스 내 설정 또는 이메일(<a href="mailto:mallagaenge@gmail.com" className="docs-link">mallagaenge@gmail.com</a>)로 요청할 수 있으며, 요청 시 지체 없이 조치하겠습니다.
           </p>
+          <p className="docs-p">
+            건강 데이터 접근 권한은 Android의 Health Connect 설정 또는 iOS의 설정·건강 앱에서 언제든지 철회할 수 있습니다. 권한 철회 후에도 이미 동기화된 서버 기록의 삭제를 원하면 교사에게 학생·학급 삭제를 요청하거나 위 이메일로 삭제를 요청해 주세요.
+          </p>
         </section>
 
         <section className="docs-section">
@@ -145,6 +169,7 @@ export default function PrivacyPage() {
           <ul className="docs-list">
             <li>Canva OAuth 토큰 등 중요 인증정보의 암호화 저장</li>
             <li>데이터베이스 보호 및 안전한 접근 통로(SSL/TLS) 사용</li>
+            <li>건강·피트니스 데이터의 HTTPS 전송, 계정·학급 기반 접근 통제 및 저장 시스템 접근 권한 최소화</li>
             <li>접근 권한 최소화 및 감사 로그 기록</li>
             <li>정기적인 보안 점검 및 업데이트</li>
           </ul>
