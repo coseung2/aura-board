@@ -47,6 +47,11 @@ import {
   getParentApiBase,
   parentApiFetch,
 } from "../lib/api";
+import {
+  BOARD_LIST_CACHE_KEY,
+  STUDENT_HOME_CACHE_KEY,
+  writeBoardCache,
+} from "../lib/board-cache";
 import { webSafeWidthStyle } from "../lib/responsive";
 import { LogoLockup } from "../components/LogoLockup";
 import {
@@ -59,7 +64,11 @@ import {
   ContentTab,
   ContentTabs,
 } from "../components/NavigationTabs";
-import type { ParentChildrenResponse, StudentAuthResponse } from "../lib/types";
+import type {
+  MeResponse,
+  ParentChildrenResponse,
+  StudentAuthResponse,
+} from "../lib/types";
 
 // 랜딩 화면 — 학생 / 학부모 역할 선택.
 // 기존 세션이 있으면 해당 역할 대시보드로 자동 이동.
@@ -146,7 +155,9 @@ export function Landing() {
         // 기존 학생 세션 확인
         const studentToken = await loadSessionToken();
         if (studentToken) {
-          await apiFetch("/api/student/me");
+          const me = await apiFetch<MeResponse>("/api/student/me");
+          writeBoardCache(STUDENT_HOME_CACHE_KEY, me, { kind: "boards" });
+          writeBoardCache(BOARD_LIST_CACHE_KEY, me.boards, { kind: "boards" });
           router.replace("/(student)");
           return;
         }

@@ -3,6 +3,13 @@ import { StyleSheet, View } from "react-native";
 import { Stack, usePathname, useRouter } from "expo-router";
 import { colors } from "../../theme/tokens";
 import { apiFetch, ApiError } from "../../lib/api";
+import {
+  BOARD_LIST_CACHE_KEY,
+  STUDENT_HOME_CACHE_KEY,
+  readBoardCache,
+  revalidateBoardCache,
+  writeBoardCache,
+} from "../../lib/board-cache";
 import { clearSessionToken, getUnifiedLoginRoute } from "../../lib/session";
 import type { MeResponse } from "../../lib/types";
 import { StudentBottomNav } from "../../components/StudentBottomNav";
@@ -21,7 +28,11 @@ export default function StudentLayout() {
   const router = useRouter();
   const pathname = usePathname();
   const hideNav = pathname === "/login" || pathname.endsWith("/login");
-  const [me, setMe] = useState<MeResponse | null>(null);
+  const [me, setMe] = useState<MeResponse | null>(
+    () =>
+      readBoardCache<MeResponse>(STUDENT_HOME_CACHE_KEY, { kind: "boards" })
+        ?.data ?? null,
+  );
 
   const loadMe = useCallback(async () => {
     if (hideNav) {
@@ -29,7 +40,17 @@ export default function StudentLayout() {
       return;
     }
     try {
-      const res = await apiFetch<MeResponse>("/api/student/me");
+      const res = await revalidateBoardCache<MeResponse>(
+        STUDENT_HOME_CACHE_KEY,
+        async () => {
+          const response = await apiFetch<MeResponse>("/api/student/me");
+          writeBoardCache(BOARD_LIST_CACHE_KEY, response.boards, {
+            kind: "boards",
+          });
+          return response;
+        },
+        { kind: "boards" },
+      );
       setMe(res);
       void recordStudentAttendanceVisit().catch(() => undefined);
     } catch (e) {

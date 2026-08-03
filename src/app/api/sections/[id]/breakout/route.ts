@@ -46,10 +46,10 @@ export async function GET(
 ) {
   try {
     const { id: sectionId } = await ctx.params;
-    // Sequential under connection_limit=1: getCurrentStudent internally
-    // re-calls getCurrentUser, so the original Promise.all fired two
-    // concurrent user.findUnique calls. Resolve the user first and only
-    // consult the student cookie if no teacher session is active.
+    // Resolve the user first: getCurrentStudent internally re-calls
+    // getCurrentUser, so the original Promise.all fired duplicate
+    // user.findUnique calls. Consult the student cookie only when no teacher
+    // session is active.
     const user = await getCurrentUser().catch(() => null);
     const student = user ? null : await getCurrentStudentRaw();
     if (!user && !student) {
@@ -362,10 +362,9 @@ export async function loadSnapshot(
   sectionId: string,
   opts: { callerRole: string; studentId: string | null },
 ): Promise<SectionBreakoutSnapshot> {
-  // Sequential under serverless Prisma with connection_limit=1. The previous
-  // Promise.all fan-out (3 concurrent reads per call) collided with
-  // sectionBreakoutConfig/Group/Membership lookups happening on every section
-  // of every board page load and surfaced as P2024 in Vercel logs.
+  // Keep this fan-out bounded. The previous Promise.all issued three reads per
+  // section while every board section was loading and surfaced as P2024 in
+  // production logs even before other requests shared the application pool.
   const config = await db.sectionBreakoutConfig.findUnique({
     where: { sectionId },
   });

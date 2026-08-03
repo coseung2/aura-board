@@ -97,9 +97,8 @@ export async function getCurrentParent() {
   if (session.expiresAt <= now) return null;
   if (session.parent.parentDeletedAt) return null;
 
-  // Best-effort lastSeenAt bump. Keep it sequential and throttled so a
-  // serverless Prisma pool with connection_limit=1 does not run two queries
-  // concurrently in the same request.
+  // Best-effort lastSeenAt bump. Keep it sequential and throttled so session
+  // validation does not consume an additional pooled connection per request.
   if (!session.lastSeenAt || now.getTime() - session.lastSeenAt.getTime() > LAST_SEEN_TOUCH_MS) {
     await db.parentSession
       .update({ where: { id: session.id }, data: { lastSeenAt: now } })
