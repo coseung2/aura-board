@@ -15,7 +15,7 @@ on:
       expected_version:
         description: App version that must be present in app.config.ts
         required: true
-        default: 1.0.2
+        default: 1.0.4
         type: string
 
 permissions:
@@ -103,7 +103,7 @@ jobs:
           test -f "$RUNNER_TEMP/ios-archive/apps/mobile/modules/aura-board-health-connect/ios/AuraBoardHealthConnect.podspec"
 
   android:
-    name: Android AAB to closed testing
+    name: Android AAB to production
     environment: production
     if: ${{ inputs.platform == 'all' || inputs.platform == 'android' }}
     needs: validate
@@ -154,7 +154,7 @@ jobs:
           fs.writeFileSync(output, serviceAccount + "\n", { encoding: "utf8", mode: 0o600 });
           const easPath = path.join(process.cwd(), "eas.json");
           const eas = JSON.parse(fs.readFileSync(easPath, "utf8"));
-          eas.submit.closed.android.serviceAccountKeyPath = output;
+          eas.submit.production.android.serviceAccountKeyPath = output;
           fs.writeFileSync(easPath, JSON.stringify(eas, null, 2) + "\n", { encoding: "utf8", mode: 0o600 });
           NODE
 
@@ -169,20 +169,20 @@ jobs:
           echo "build_url=$BUILD_URL" >> "$GITHUB_OUTPUT"
           echo "build_number=$BUILD_NUMBER" >> "$GITHUB_OUTPUT"
 
-      - name: Submit AAB to Google Play closed testing
-        run: eas submit --platform android --profile closed --id "${{ steps.build.outputs.build_id }}" --wait --non-interactive
+      - name: Submit AAB to Google Play production
+        run: eas submit --platform android --profile production --id "${{ steps.build.outputs.build_id }}" --wait --non-interactive
 
       - name: Write Android summary
         if: always()
         run: |
           {
-            echo "## Android closed testing"
+            echo "## Android production"
             echo "- Commit: $GITHUB_SHA"
             echo "- Version: ${{ inputs.expected_version }}"
             echo "- Version code: ${{ steps.build.outputs.build_number }}"
             echo "- Build ID: ${{ steps.build.outputs.build_id }}"
             echo "- AAB: ${{ steps.build.outputs.build_url }}"
-            echo "- Play track: alpha (closed testing)"
+            echo "- Play track: production"
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Remove Google Play service account
