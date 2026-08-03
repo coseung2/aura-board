@@ -1,15 +1,15 @@
 # 4-provider infrastructure handoff
 
-기준일: 2026-07-31
-기준 브랜치/원격 커밋: `main` / `b642b38` (2026-08-01 운영 작업과 workflow 변경은 아직 local-only)
+기준일: 2026-08-03
+기준 브랜치: `main` (2026-08-03 실행 기준)
 
-이 문서는 Oracle Cloud, Cloudflare, Supabase, GitHub Actions의 책임 경계와 후속 실행 순서를 기록한다. **코드 준비 단계 이후 Oracle 새 테넌시에는 무료 범위의 compartment, VCN, public subnet/NSG, private backup bucket까지 생성됐다. A1 Compute, boot volume, dynamic group/IAM policy, secret 등록, backup 실행, 데이터 이관, workflow 실행 및 앱 배포는 아직 수행하지 않았다.** 아래 체크박스는 실제 실행자가 증거를 확인한 뒤에만 갱신한다.
+이 문서는 Oracle Cloud, Cloudflare, Supabase, GitHub Actions의 책임 경계와 후속 실행 순서를 기록한다. **Oracle 새 테넌시의 무료 A1 Compute와 boot volume, instance-principal dynamic group/IAM policy, Infisical secret scope, ARM64 runtime, backup/restore 검증 및 backup timer 활성화까지 완료했다. 기존 1 GB 인스턴스 2대 종료·삭제와 애플리케이션 데이터 원본 삭제는 수행하지 않았다.** 아래 체크박스는 실제 실행자가 증거를 확인한 뒤에만 갱신한다.
 
 ## 책임과 경계
 
 | 제공자 | 책임 | 책임이 아닌 것 | 현재 상태 |
 | --- | --- | --- | --- |
-| Oracle Cloud | 장기 FFmpeg 작업, 배치 메일, Supabase 논리 백업을 가져가는 pull worker | 원본 Postgres, 원본 Storage, 앱 호스팅 | 새 테넌시 오사카 `ap-osaka-1`에 compartment·VCN·public subnet/NSG·private bucket 생성 완료. 단일 A1 2 OCPU/12 GB는 capacity 부족으로 대기 중이며 5시간 간격 단일 요청 재시도 계획. 기존 1 GB 2대는 교차 테넌시 blue/green 검증 전 유지 |
+| Oracle Cloud | 장기 FFmpeg 작업, 배치 메일, Supabase 논리 백업을 가져가는 pull worker | 원본 Postgres, 원본 Storage, 앱 호스팅 | `ap-osaka-1`에 `aura-board-worker-a1-osaka` A1 2 OCPU/12 GB가 `RUNNING`으로 동작 중. instance principal dynamic group/policy, private bucket, daily backup timer를 검증·활성화했으며 기존 1 GB 2대는 관찰·rollback 기간 동안 유지 |
 | Cloudflare | Stream 비디오 업로드·재생 및 상태 검증/삭제 수명주기 | 일반 파일·이미지 저장소, R2 | Stream UID·상태·ownership 검증과 best-effort 삭제 보강 완료. R2는 도입하지 않음 |
 | Supabase Pro (Seoul) | Postgres, Auth, Realtime, 일반 파일·이미지 Storage, `NotificationOutbox`, `pg_net`, `pg_cron` | Cloudflare Stream 비디오, Oracle 작업 실행 환경 | 운영 사용 중. `20260731` 마이그레이션 5개를 2026-08-01 적용하고 RLS·권한·함수·트리거·cron job을 검증함 |
 | GitHub Actions | Vercel의 일반 일/주간 cron 7개와 신규 `role-salary-payout`을 `Authorization: Bearer` 방식으로 호출 | 앱 호스팅, `notification-push`의 주 wakeup | 8개 endpoint용 수동 dry-run workflow 준비 완료, schedule 미설정. Infisical OIDC 런타임 주입 변경은 로컬 working tree에 준비됐으며 아직 push·실행하지 않음 |
@@ -26,8 +26,9 @@
 - `main` 기준 이전 8개 커밋은 `80183f55`까지 push 완료.
 - 최신 `main`의 production 배포는 실패했지만 기존 production은 유지 중이다. 실패 원인은 [`vercel.json`](../vercel.json)의 `/api/cron/notification-push` 매분 schedule이 Vercel Hobby 제약과 충돌하기 때문이다.
 - 일반 일/주간 schedule 7개는 `parent-weekly-digest`, `parent-anonymize`, `expire-pending-links`, `fd-maturity`, `billing-renew`, `blob-cleanup`, `attendance-reminder`이다.
-- Oracle 새 테넌시 `dbsk7618`의 홈 리전은 `ap-osaka-1`이다. `aura-board-prod`, `aura-board-vcn`, `aura-board-public-subnet`, `aura-board-worker-nsg`, `aura-board-postgres-backups`가 준비됐고 인스턴스·boot/block volume은 0개다.
-- A1 최초 요청은 `Out of host capacity`, 즉시 후속 요청은 `429 TooManyRequests`였다. 추가 즉시 재시도는 중단했다. 5시간 재시도는 매 실행 전 동일 이름의 non-terminated instance와 boot volume이 0개인지 읽기 전용으로 확인하고, 실행당 launch 요청 한 번만 허용하며, 성공 검증 즉시 자동화를 영구 중지한다.
+- Oracle 새 테넌시 `dbsk7618`의 홈 리전은 `ap-osaka-1`이다. `aura-board-prod`, `aura-board-vcn`, `aura-board-public-subnet`, `aura-board-worker-nsg`, `aura-board-postgres-backups`가 준비됐다.
+- 2026-08-03 08:35 UTC에 `aura-board-worker-a1-osaka` (`ocid1.instance.oc1.ap-osaka-1.anvwsljrchxbcsic7cnylrup6ozazxn4yoemirdm7ijnkkp2nfnoyraocxwq`)가 `RUNNING`으로 생성됐다. boot volume은 `ocid1.bootvolume.oc1.ap-osaka-1.abvwsljrhwrc3dkxzkmvfj3rd4hbtiue6c47bnhvxrnslfh4q6hjt3molf2a` (`ATTACHED`), public IP는 `161.33.30.33`, private IP는 `10.20.1.83`이다. `aura-board-backup-workers` (`ocid1.dynamicgroup.oc1..aaaaaaaa5bqqhqomenic5ipilrzwzsovpia65gocu6ztp4erodbhnca27wja`)와 `aura-board-backup-object-policy` (`ocid1.policy.oc1..aaaaaaaalisqsnb7bimf4gq2y5dmbnuwx65vnncrerldruhentjhmy23proq`)가 private bucket `aura-board-postgres-backups`에만 권한을 갖도록 검증됐다.
+- A1 성공 검증 직후 `oci-a1-1` 용량 retry automation은 삭제되어 재실행되지 않는다. 기존 1 GB 인스턴스는 종료·삭제하지 않았다.
 - `notification-push`는 위 7개와 별도다. Supabase `NotificationOutbox` insert event wakeup과 5분 retry sweep으로 이전하며, 상세 cutover 계약은 [`src/app/api/cron/notification-push/HANDOFF.md`](../src/app/api/cron/notification-push/HANDOFF.md)에 있다.
 - `role-salary-payout`은 `155c7c54`에서 구현·push됐지만 production에는 아직 배포되지 않았고 scheduler도 없다. 2026-08-01 로컬 코드와 운영 DB를 연결한 별무리반 제한 검증에서 24명·16역할·26,300 지급, 동일 키 재호출 차단, 24건 보상 거래 회수와 잔액 원복을 확인했다. 이 테스트로 별무리반의 `2026-08` 자동지급 키는 소비됐으며 다음 정상 자동지급 기간은 2026-09다.
 - Cloudflare Stream 진입점은 [`src/lib/event/cfstream.ts`](../src/lib/event/cfstream.ts)와 [`src/app/api/event/video-upload-url/route.ts`](../src/app/api/event/video-upload-url/route.ts)다.
@@ -122,12 +123,12 @@ Stream 업로드 완료/실패 상태를 검증하고, 앱 레코드 삭제 시 
 OCI 인증, compartment, compute/runtime, 네트워크 egress, 로그/모니터링을 먼저 확정한다. 이후 장기 FFmpeg, 배치 메일, Supabase 논리 backup pull을 각각 독립 systemd job·사용자·작업 디렉터리로 분리한다. A1 한 대에서는 처음부터 무거운 작업을 병렬 실행하지 않고 backup → batch mail → FFmpeg 순서로 하나씩 이관하며 측정 후에만 동시성을 늘린다. Oracle에는 원본 DB나 원본 Storage를 만들지 않으며 backup은 암호화, 보존 기간, 복구 시험을 갖춘 파생 사본으로만 취급한다.
 
 - [x] Commit: 오사카 A1 2 OCPU/12 GB의 첫 작업으로 Supabase logical backup script, systemd unit/timer, env template, runbook을 독립 commit `6ebe78d8`로 작성.
-- [x] Push: `6ebe78d8`을 `main`에 push. 실행 artifact는 실제 OCI 리소스 준비 전이라 없음.
-- [x] Verification: script 구문, 외부 접근 없는 기본 dry-run, 오사카 리전 고정, instance principal·checksum·no-overwrite, private temp cleanup, systemd hardening과 설치 경로를 정적으로 검증. 실제 backup/OCI 연결/복구 rehearsal은 리소스 준비 후 수행.
+- [x] Push: `6ebe78d8`을 `main`에 push. 이후 실제 A1 실행 증거는 아래 `2026-08-03` handoff row에 기록.
+- [x] Verification: script 구문, 외부 접근 없는 기본 dry-run, 오사카 리전 고정, instance principal·checksum·no-overwrite, private temp cleanup, systemd hardening과 설치 경로를 정적으로 검증. 실제 A1에서 ARM64 native binary, IAM/bucket/DB 연결, backup/restore rehearsal까지 후속 검증 완료.
 - [x] Handoff: 구 테넌시의 기존 1 GB AMD 인스턴스 2개를 유지한 채 새 테넌시 A1을 병렬 준비하는 교차 테넌시 blue/green 절차를 [`infra/oracle/README.md`](../infra/oracle/README.md)에 기록. 호스트 단위 교체가 아니라 backup → batch mail → FFmpeg 역할 단위 이관이며, ARM64 재검증과 단일 노드 resource isolation을 추가함.
 - [x] A1 runtime preparation: backup unit에 150% CPU·1.5/2 GB memory envelope를 추가하고, video thumbnail backfill을 기본 dry-run/명시적 `--write`, exact Supabase origin+bucket allowlist, redirect/local/internal source 차단, streaming temp file, 1 GiB source cap, download/FFmpeg timeout, 64 MiB frame cap, 부분 실패 non-zero 종료로 보강. 두 unit은 공유 nonblocking `flock`을 사용하고 수동 video unit은 초기 concurrency 1, 180% CPU·6/8 GB memory envelope, timer/install target 없음.
-- [x] A1 runtime implementation: 위 script/tests/systemd/tmpfiles/env/runbook 변경을 `450c62b4` (`feat(oracle): prepare A1 media worker`)로 `main`에 push. targeted Vitest 61/61, `npm run typecheck`, `bash -n infra/oracle/backup-supabase.sh`, `git diff --check`를 통과했으며 배포·Infisical 주입·systemd 활성화·실제 backfill은 수행하지 않음.
-- [ ] A1 runtime verification: 실제 ARM64 호스트에서 systemd unit verify와 native binary 확인 후 `--dry-run --limit=1`, 승인된 1건 write, WebP/DB/Storage/temp cleanup 및 `MemoryPeak` 측정을 완료. backup/restore와 video unit을 동시에 실행하지 않음.
+- [x] A1 runtime implementation: 위 script/tests/systemd/tmpfiles/env/runbook 변경을 `450c62b4` (`feat(oracle): prepare A1 media worker`)로 `main`에 push. targeted Vitest 61/61, `npm run typecheck`, `bash -n infra/oracle/backup-supabase.sh`, `git diff --check`를 통과했고 A1에는 ARM64 네이티브 runtime과 root-owned Infisical env를 설치함.
+- [x] A1 runtime verification: 실제 ARM64 호스트에서 systemd unit verify와 Node 22/PG17/FFmpeg/OCI CLI native binary를 확인. backup dry-run, approved `--write` 1회(archive `supabase-20260803T085532Z-070b540b-2d55-40b4-94a5-84dd3aa741c3`), checksum/upload/head, vault secret schema를 제외한 199개 table의 격리 restore rehearsal, video unit 0건(`write=true`, `scanned=0`, `updated=0`, `failed=0`)을 완료하고 그 뒤 backup timer만 활성화함. oneshot cgroup의 종료 후 `MemoryPeak/CPUUsageNSec`는 제공되지 않아 accounting을 두 unit에 추가했으며 다음 실행에서 측정함.
 
 ### 7. Vercel Blob 잔여 정리와 안정화 — 이전 도구 준비 완료 (`f06d6a32`)
 
@@ -141,12 +142,14 @@ Vercel Blob distinct URL 4개와 due queue 165개를 재확인한다. Supabase S
 
 ## 실제 실행 전 승인 체크
 
-- [ ] OCI Osaka의 compartment, VCN, public subnet/NSG, private Object Storage bucket은 준비 완료. A1 2 OCPU/12 GB capacity를 확보해 ARM64 instance와 50 GB boot volume을 만든 뒤 instance OCID 단일 dynamic group/IAM policy를 준비하고 owner·비용 경계를 기록.
-- [ ] 새 A1에서 logical backup `--write` 1회, checksum/archive 확인, 격리 restore rehearsal을 마친 뒤에만 기존 1 GB 인스턴스의 job을 하나씩 이관. 관찰 기간 전에는 기존 인스턴스를 종료하지 않음.
-- [ ] Infisical production scope `/oracle/aura-board/backup`과 `/oracle/aura-board/video-thumbnail`에 필요한 값을 분리 등록하고, 값 노출 없이 A1의 root-owned env files로 주입. video scope 이름은 `DATABASE_URL`, `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_STORAGE_BUCKET`이며 transaction pooler `:6543`은 사용하지 않음. A1 존재·검증 전에는 secret을 주입하지 않음.
+- [x] OCI Osaka의 compartment, VCN, public subnet/NSG, private Object Storage bucket은 준비 완료. A1 `2 OCPU/12 GB`, ARM64 instance와 boot volume, instance OCID 단일 dynamic group/IAM policy를 확인했고 유료 리소스는 만들지 않음.
+- [x] 새 A1에서 logical backup `--write` 1회, checksum/archive 확인, 격리 restore rehearsal을 마친 뒤 backup timer를 활성화함. 기존 1 GB 인스턴스는 관찰 기간 동안 종료하지 않음.
+- [x] Infisical production scope `/oracle/aura-board/backup`과 `/oracle/aura-board/video-thumbnail`에 필요한 값을 분리 등록하고, 값 노출 없이 A1의 root-owned env files로 주입. video scope 이름은 `DATABASE_URL`, `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_STORAGE_BUCKET`이며 transaction pooler `:6543`은 사용하지 않음.
 - [x] Infisical `prod` `/`에 `CRON_SECRET`, `AURA_BOARD_BASE_URL`을 등록하고 로컬 backup을 갱신. 서버 프로젝트 전용 GitHub OIDC identity를 `viewer`로 연결. workflow 변경은 아직 local-only이며 별도 cutover 전에는 `schedule`을 추가하지 않음.
 - [x] 운영 DB custom-format backup과 SHA-256/archive 구조를 확인한 뒤 5개 migration을 문서 순서대로 적용. Prisma 상태와 운영 SQL로 실제 객체·RLS·권한을 재검증함.
 - [ ] OIDC workflow 변경을 push한 뒤 GitHub `Production` 수동 dry-run을 실행하고, 최신 앱 배포와 동일 `CRON_SECRET`을 확인한 후에만 승인된 non-dry-run을 실행.
+- [ ] GitHub `Production` environment에 `CRON_SECRET`, `AURA_BOARD_BASE_URL`을 설정하고 수동 dry-run 결과를 확인. 별도 cutover 승인 전에는 `schedule`을 추가하지 않음.
+- [ ] 운영 DB backup과 대상 Supabase 프로젝트/리전을 확인한 뒤 5개 migration을 문서 순서대로 적용. 부분 적용이나 임의 down migration 금지.
 - [ ] Vercel Blob 이전 도구의 DB 연결 대상을 확인하고 먼저 dry-run으로 후보를 고정. `--write` 후 대상 object와 사용자 경로를 검증하기 전 원본 Blob과 queue 항목 삭제 금지.
 - [ ] 앱 배포는 이 준비 작업과 분리하여 별도 승인·검증으로 진행.
 
@@ -161,13 +164,13 @@ Vercel Blob distinct URL 4개와 due queue 165개를 재확인한다. Supabase S
 
 ## Residual risks
 
-- OCI 인증과 기본 네트워크·private bucket은 준비됐지만 A1은 Osaka host capacity 부족으로 아직 없다. 단일 A1은 두 micro host의 장애 격리를 잃으므로 job별 systemd 격리, 직렬 이관, ARM64 패키지 호환, 처리량과 backup 복구 시간을 검증하기 전 기존 1 GB 인스턴스를 종료하면 안 된다.
+- OCI A1은 Osaka `ap-osaka-1`에서 `RUNNING`이며 instance principal·private bucket·backup timer까지 검증됐다. 단일 A1은 두 micro host의 장애 격리를 잃으므로 job별 systemd 격리, 직렬 이관, ARM64 패키지 호환, 처리량과 backup 복구 시간을 관찰하는 동안 기존 1 GB 인스턴스를 종료하면 안 된다.
 - Vercel Hobby의 현재 cron 제약으로 최신 `main`과 production SHA가 다르다. 코드 검증만으로 production 반영을 가정하면 안 된다.
 - migration 5개는 운영 적용됐지만 신규 consumer가 포함된 최신 앱 배포는 별도다. 배포 SHA를 확인하지 않고 callback을 활성화하면 안 된다.
 - GitHub Actions cron workflow는 수동 전용이며 OIDC 변경도 아직 push되지 않았다. scheduler 지연·중복·GitHub 장애 시 복구 경로와 알림은 미검증이다.
 - Supabase callback은 Vercel의 production URL과 `CRON_SECRET` 동기화에 의존한다. secret rotation 순서가 틀리면 `401` backlog가 발생한다.
 - Cloudflare Stream 삭제 실패는 현재 식별자 로그만 남기며 자동 orphan 재시도 queue는 없다. R2가 없으므로 R2 fallback을 가정하면 안 된다.
-- A1 video backfill은 upload 후 DB update 실패 시 새 Supabase object를 best-effort 삭제한다. cleanup까지 실패하면 `orphan cleanup failed` 로그를 기준으로 attachment prefix의 미참조 object를 확인·수동 삭제해야 하며, 자동 orphan queue는 아직 없다.
+- A1은 현재 `RUNNING` 상태이며 backup daily timer만 활성화되어 있다. video backfill은 수동 unit으로 유지되고 이번 검증에서는 후보 0건이었다. upload 후 DB update 실패 시 새 Supabase object를 best-effort 삭제하며, cleanup까지 실패하면 `orphan cleanup failed` 로그를 기준으로 attachment prefix의 미참조 object를 확인·수동 삭제해야 한다.
 - Vercel Blob URL 4개와 due queue 165개는 참조 무결성을 확인하기 전까지 삭제 위험이 남는다.
 - 기록된 DB/Storage/object/queue 수치는 2026-07-31 시점 스냅샷이며 cutover 직전에 다시 측정해야 한다.
 
@@ -177,6 +180,7 @@ Vercel Blob distinct URL 4개와 due queue 165개를 재확인한다. Supabase S
 | --- | --- | --- | --- |
 | 2026-08-01 | 운영 DB migration·Infisical runtime/OIDC 준비 완료, 실제 callback·schedule 보류 | PostgreSQL 17.10 custom-format 운영 backup `2,231,856` bytes와 1,617 archive entries, SHA-256 `ce5501873765d504db76151df8c37e04c7a4022545269ea19af0524bd834a01d`를 확인한 뒤 migration 5개를 모두 적용했다. RLS 4개, anon/authenticated SELECT 차단, `pg_cron 1.6.4`, `pg_net 0.20.0`, 함수 4개, 트리거 6개, 5분 retry job을 운영 SQL로 확인했다. Infisical `prod` `/`에는 URL과 새 cron secret을 등록하고 로컬 env backup을 25키로 갱신했으며, 서버 프로젝트 전용 GitHub OIDC identity를 exact repo/main/workflow/Production claims와 900초 TTL, project `viewer`로 연결했다. workflow의 Infisical action 변경은 local-only이고 Supabase Vault 두 값은 비어 있어 외부 callback은 발생하지 않는다. | local workflow 정적 검증 → 명시적 commit/push → GitHub dry-run → 최신 앱 배포와 Vercel secret 동기화 → Supabase Vault 등록 → 제한된 callback/non-dry-run 검증 → schedule cutover |
 | 2026-08-01 | 1인1역 자동급여 구현·실지급 회수 검증 완료, scheduler cutover 보류 | `155c7c54`에서 학급 단위 지급 정책, 멱등 지급, KST 일/주/월 판정, 학급 제한 cron route와 테스트를 push. 별무리반 실지급·재호출·보상 거래 원복을 검증했다. 이후 `d164e839`에서 GitHub schedule을 성급히 추가했으나, live 확인 결과 `Production` environment의 variables/secrets는 여전히 비어 있고 `20260731` migration 5개도 운영 미적용임을 재확인했다. 따라서 workflow는 수동 dry-run 전용으로 되돌리고 급여 endpoint만 8번째 선택지로 유지한다. | 기존 handoff 순서대로 Supabase notification wakeup 검증 → 최신 앱 배포 복구 → GitHub `Production` 값 설정 → 8개 endpoint dry-run/non-dry-run 검증 → 승인된 schedule cutover |
+| 2026-08-03 | A1 실운영 준비 검증 완료 | `aura-board-worker-a1-osaka` (`ocid1.instance.oc1.ap-osaka-1.anvwsljrchxbcsic7cnylrup6ozazxn4yoemirdm7ijnkkp2nfnoyraocxwq`)가 `RUNNING`, boot volume `ocid1.bootvolume.oc1.ap-osaka-1.abvwsljrhwrc3dkxzkmvfj3rd4hbtiue6c47bnhvxrnslfh4q6hjt3molf2a`, public IP `161.33.30.33`. dynamic group `aura-board-backup-workers`/`ocid1.dynamicgroup.oc1..aaaaaaaa5bqqhqomenic5ipilrzwzsovpia65gocu6ztp4erodbhnca27wja`, policy `aura-board-backup-object-policy`/`ocid1.policy.oc1..aaaaaaaalisqsnb7bimf4gq2y5dmbnuwx65vnncrerldruhentjhmy23proq`. Node 22/PG17/FFmpeg/OCI CLI ARM64 확인, IAM·bucket·direct 5432 DB 검증, backup dry-run과 approved write 1회 성공, dump/manifest checksum 및 object head 확인, vault schema 제외 199-table 격리 restore, video 0건 unit 검증 후 `aura-supabase-backup.timer` 활성화. `oci-a1-1` 용량 automation은 성공 즉시 삭제. 기존 1 GB 2대와 원본 데이터는 유지. | 첫 daily timer 실행의 MemoryPeak/CPU/disk/elapsed 관찰. backup script의 PGSERVICEFILE 보완은 현재 working tree에 있으므로 다음 코드 커밋·push 후 source/runtime SHA를 일치시키고, 관찰 기간 종료 전 기존 인스턴스 종료·삭제 금지 |
 | 2026-07-31 | A1 worker 구현 `450c62b4` push 완료 | 기본 dry-run/명시적 write gate, Supabase exact origin·bucket allowlist, redirect 및 FFmpeg nested network protocol 차단, 최소 child env, 64 MiB frame cap, DB update 실패 시 best-effort object cleanup, 공유 `flock`, 초기 concurrency 1, Node.js 22 ARM64 runbook을 반영. targeted 61/61 tests, typecheck, backup shell syntax, diff check 통과. 배포·secret 주입·systemd 활성화·DB/Storage write 없음. | A1 또는 승인된 Work 전용 VPS에서 Node 22/ARM64 native binary와 systemd unit을 검증한 뒤 dry-run 1건 → 승인된 write 1건 → cleanup/MemoryPeak 순서로 확인 |
 | 2026-07-31 | A1 worker 성능·격리 구현 보강 | video thumbnail backfill을 A1용 streaming download와 최대 2-worker 처리로 바꾸고 strict CLI, source-size guard, download/FFmpeg timeout, temp cleanup, 부분 실패 non-zero를 추가. backup/video systemd unit에 12 GB 단일 호스트용 CPU·memory envelope를 적용했으며 video unit은 수동 전용으로 유지. Vercel/Supabase/provider 제약인 cron batch, Prisma connection limit, 알림/Blob queue, 결제 직렬화는 변경하지 않음. | A1 capacity 확보 후 ARM64/systemd 검증, dry-run 1건과 승인된 write 1건 측정. request-time FFmpeg 제거는 durable media queue 설계 후 별도 단계로 수행 |
 | 2026-07-31 | Oracle 부분 프로비저닝 및 A1 계획 재구성 | 새 테넌시 Osaka에 `aura-board-prod`, VCN/public subnet/NSG, private bucket을 무료 범위로 생성. 인스턴스와 boot/block volume은 0개이며 A1 요청은 host capacity 부족과 후속 429로 중단. 두 micro host의 역할 분리를 단일 ARM64 A1에서 systemd 격리·직렬 실행·역할 단위 blue/green으로 대체하도록 runbook 갱신. secret, backup, IAM instance principal, 데이터 이관, 기존 리소스 종료·삭제는 수행하지 않음. | 내일부터 5시간 간격 단일 A1 요청. 성공 시 instance OCID 단일 dynamic group/bucket policy → SSH/cloud-init 검증 → dry-run 순서로 진행 |

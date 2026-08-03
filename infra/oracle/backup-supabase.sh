@@ -17,7 +17,7 @@ fail() {
 
 cleanup() {
   local exit_code=$?
-  unset DATABASE_URL PGDATABASE
+  unset DATABASE_URL PGDATABASE PGSERVICE PGSERVICEFILE
   if [[ -n "$temp_dir" && -d "$temp_dir" ]]; then
     rm -rf -- "$temp_dir"
   fi
@@ -92,7 +92,7 @@ if [[ "$mode" == "dry-run" ]]; then
   exit 0
 fi
 
-for command_path in "$PG_DUMP_BIN" "$PG_RESTORE_BIN" "$OCI_BIN" mktemp sha256sum; do
+for command_path in "$PG_DUMP_BIN" "$PG_RESTORE_BIN" "$OCI_BIN" python3 mktemp sha256sum; do
   command -v -- "$command_path" >/dev/null 2>&1 || fail "none"
 done
 
@@ -100,13 +100,46 @@ temp_dir="$(mktemp -d)"
 dump_path="${temp_dir}/${base_name}.dump"
 manifest_path="${temp_dir}/${base_name}.dump.sha256"
 
-export PGDATABASE="$DATABASE_URL"
+python3 - "$temp_dir/pg_service.conf" <<'PY'
+import os
+import sys
+from urllib.parse import parse_qs, unquote, urlparse
+
+url = os.environ["DATABASE_URL"]
+parsed = urlparse(url)
+if parsed.scheme not in {"postgres", "postgresql"} or not parsed.hostname or not parsed.path:
+    raise SystemExit("DATABASE_URL must be a PostgreSQL URL")
+
+values = {
+    "host": parsed.hostname,
+    "port": parsed.port or 5432,
+    "user": unquote(parsed.username or ""),
+    "password": unquote(parsed.password or ""),
+    "dbname": unquote(parsed.path.lstrip("/")),
+}
+for key in ("sslmode", "sslrootcert", "sslcert", "sslkey", "gssencmode", "channel_binding"):
+    values[key] = parse_qs(parsed.query, keep_blank_values=True).get(key, [""])[-1]
+
+def escape(value: object) -> str:
+    return str(value).replace("\\", "\\\\").replace("\n", "\\n").replace("\r", "\\r")
+
+with open(sys.argv[1], "w", encoding="utf-8") as service_file:
+    service_file.write("[aura-backup]\n")
+    for key, value in values.items():
+        if value != "":
+            rendered = str(value) if key == "port" else escape(value)
+            service_file.write(f"{key}={rendered}\n")
+os.chmod(sys.argv[1], 0o600)
+PY
+
+export PGSERVICEFILE="$temp_dir/pg_service.conf"
+export PGSERVICE="aura-backup"
 unset DATABASE_URL
 
 current_object="$dump_object"
 log "dump-started" "$dump_object"
 "$PG_DUMP_BIN" --format=custom --no-owner --no-acl --file="$dump_path"
-unset PGDATABASE
+unset PGSERVICE PGSERVICEFILE
 log "dump-complete" "$dump_object"
 
 log "archive-verify-started" "$dump_object"

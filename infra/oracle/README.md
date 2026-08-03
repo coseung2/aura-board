@@ -126,7 +126,7 @@ set +a
 /opt/aura-board/infra/oracle/backup-supabase.sh
 ```
 
-Only `--write` enables `pg_dump`, archive validation, checksum creation, and uploads. In write mode the database URL is passed to `pg_dump` through `PGDATABASE`, not as a command-line argument, and the original `DATABASE_URL` shell variable is unset before `pg_dump` starts.
+Only `--write` enables `pg_dump`, archive validation, checksum creation, and uploads. In write mode the script converts `DATABASE_URL` into a short-lived, mode-0600 `pg_service.conf` under the private temporary directory, invokes `pg_dump` through `PGSERVICEFILE`/`PGSERVICE`, then removes the file with the rest of the temporary directory. The original `DATABASE_URL` shell variable is unset before `pg_dump` starts, so the connection string is not placed in the process argument list.
 
 After installation and review, an operator can load and enable the timer:
 
