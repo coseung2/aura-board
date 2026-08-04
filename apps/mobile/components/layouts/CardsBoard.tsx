@@ -80,9 +80,10 @@ export function CardsBoard({
         data={cards}
         keyExtractor={(card) => card.id}
         contentContainerStyle={styles.streamContent}
-        renderItem={({ item }) => (
+        renderItem={({ item, index }) => (
           <StreamFeedPost
             card={item}
+            deferEmbeddedMedia={index > 0}
             onOpenComments={() => setCommentCard(item)}
             onOpenAuthorPicker={
               item.canEdit === true ? () => setAuthorCard(item) : undefined

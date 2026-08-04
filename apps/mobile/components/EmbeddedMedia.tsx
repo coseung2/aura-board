@@ -2,12 +2,14 @@ import { useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Linking,
+  Platform,
   StyleSheet,
   type StyleProp,
   Text,
   View,
   type ViewStyle,
 } from "react-native";
+import { Image } from "expo-image";
 import { WebView } from "react-native-webview";
 import {
   classifyMediaUrl,
@@ -20,7 +22,7 @@ import {
   safeHost,
 } from "../lib/media";
 import { colors, media, radii, spacing, typography } from "../theme/tokens";
-import { AppButton } from "./ui";
+import { AppButton, ControlPressable } from "./ui";
 
 type Props = {
   url: string;
@@ -28,6 +30,8 @@ type Props = {
   aspectRatio?: number;
   style?: StyleProp<ViewStyle>;
   hideExternal?: boolean;
+  previewUrl?: string | null;
+  deferLoad?: boolean;
 };
 
 type EmbedMessage = {
@@ -44,10 +48,13 @@ export function EmbeddedMedia({
   aspectRatio = media.previewAspectRatio,
   style,
   hideExternal = false,
+  previewUrl = null,
+  deferLoad = false,
 }: Props) {
   const [loading, setLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
+  const [activated, setActivated] = useState(!deferLoad);
   const { kind, embedUrl, externalUrl } = classifyMediaUrl(url);
   const youtubeId = kind === "youtube" ? extractYouTubeVideoId(url) : null;
   const canEmbed = Boolean(
@@ -83,7 +90,8 @@ export function EmbeddedMedia({
     setLoading(canEmbed);
     setErrorMessage(null);
     setReloadKey(0);
-  }, [canEmbed, embedUrl, url]);
+    setActivated(!deferLoad);
+  }, [canEmbed, deferLoad, embedUrl, url]);
 
   useEffect(() => {
     if (!canEmbed || !loading || errorMessage) return;
@@ -102,7 +110,36 @@ export function EmbeddedMedia({
 
   return (
     <View style={[styles.container, { aspectRatio }, style]}>
-      {canEmbed ? (
+      {canEmbed && !activated ? (
+        <ControlPressable
+          style={styles.previewButton}
+          onPress={() => setActivated(true)}
+          accessibilityRole="button"
+          accessibilityLabel={`${title ?? "미디어"} ${kind === "youtube" ? "재생" : "열기"}`}
+        >
+          {previewUrl ? (
+            <Image
+              source={{ uri: previewUrl }}
+              style={styles.previewImage}
+              contentFit="contain"
+              cachePolicy="memory-disk"
+              recyclingKey={`embed-preview:${previewUrl}`}
+              transition={0}
+            />
+          ) : (
+            <View style={styles.previewFallback} />
+          )}
+          <View style={styles.previewOverlay} pointerEvents="none">
+            <Text style={styles.previewLabel}>
+              {kind === "youtube"
+                ? "▶ YouTube 재생"
+                : kind === "canva"
+                  ? "Canva 열기"
+                  : "영상 재생"}
+            </Text>
+          </View>
+        </ControlPressable>
+      ) : canEmbed ? (
         <>
           <WebView
             key={`${url}:${reloadKey}`}
@@ -111,6 +148,10 @@ export function EmbeddedMedia({
             style={styles.webview}
             javaScriptEnabled
             domStorageEnabled
+            cacheEnabled
+            cacheMode={
+              Platform.OS === "android" ? "LOAD_CACHE_ELSE_NETWORK" : undefined
+            }
             thirdPartyCookiesEnabled={kind === "canva"}
             sharedCookiesEnabled={kind === "canva"}
             allowsFullscreenVideo
@@ -462,6 +503,32 @@ const styles = StyleSheet.create({
   webview: {
     flex: 1,
     backgroundColor: "transparent",
+  },
+  previewButton: {
+    flex: 1,
+    backgroundColor: colors.mediaBackdrop,
+  },
+  previewImage: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  previewFallback: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: colors.mediaBackdrop,
+  },
+  previewOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: colors.overlay,
+  },
+  previewLabel: {
+    ...typography.label,
+    color: colors.onAccent,
+    backgroundColor: colors.mediaDotsBg,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.sm,
+    borderRadius: radii.pill,
+    overflow: "hidden",
   },
   loading: {
     ...StyleSheet.absoluteFillObject,

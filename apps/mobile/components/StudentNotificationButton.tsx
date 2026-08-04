@@ -42,7 +42,7 @@ export function StudentNotificationButton() {
     const unsubscribeForegroundPush = subscribeStudentPushForeground(() => {
       void load(true);
     });
-    void load(true);
+    void load();
     const appState = AppState.addEventListener("change", (state) => {
       const becameActive = state === "active" && !previousActive;
       previousActive = state === "active";

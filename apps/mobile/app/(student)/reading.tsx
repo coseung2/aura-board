@@ -207,7 +207,7 @@ export default function StudentReadingScreen() {
     return false;
   }, [router]);
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (force = false) => {
     try {
       const payload = await apiFetch<{
         entries: ReadingEntry[];
@@ -219,7 +219,10 @@ export default function StudentReadingScreen() {
         missions?: ReadingMission[];
         weeklyMissionReward?: ReadingWeeklyMissionReward | null;
         representativeSlime?: WalkingRepresentativeSlime | null;
-      }>("/api/student/reading");
+      }>("/api/student/reading", {
+        cacheTtlMs: 5 * 60_000,
+        forceRefresh: force,
+      });
       setEntries(payload.entries);
       setSummary(payload.summary ?? null);
       setClassroomTopFive(payload.classroomTopFive ?? []);
@@ -383,7 +386,7 @@ export default function StudentReadingScreen() {
       setComposerVisible(false);
       // Summary and leaderboard totals are server-derived, so refresh them
       // instead of guessing the new counts locally.
-      void load();
+      void load(true);
     } catch (nextError) {
       if (!(await handleError(nextError))) setError("독서 기록을 저장하지 못했어요.");
     } finally {
@@ -626,7 +629,7 @@ export default function StudentReadingScreen() {
                 ) : error && !weeklyMissionReward && missions.length === 0 ? (
                   <View style={styles.missionError} accessibilityRole="alert">
                     <Text style={styles.error}>{error}</Text>
-                    <AppButton variant="secondary" onPress={() => void load()}>
+                    <AppButton variant="secondary" onPress={() => void load(true)}>
                       다시 시도
                     </AppButton>
                   </View>

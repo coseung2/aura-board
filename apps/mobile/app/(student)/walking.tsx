@@ -166,7 +166,7 @@ export default function StudentWalkingScreen() {
 
   const syncWalkingData = useCallback(async () => {
     await readAndSyncWalkingDays();
-    const snapshot = await fetchWalkingSnapshot();
+    const snapshot = await fetchWalkingSnapshot(undefined, { forceRefresh: true });
     setRows(snapshot.rows);
     setPolicy(snapshot.policy);
     setMonthlyAttendanceReward(snapshot.monthlyAttendanceReward);
@@ -187,7 +187,9 @@ export default function StudentWalkingScreen() {
     setMessage(null);
 
     try {
-      const cloudSnapshot = await fetchWalkingSnapshot();
+      const cloudSnapshot = await fetchWalkingSnapshot(undefined, {
+        forceRefresh: refresh,
+      });
       setRows(cloudSnapshot.rows);
         setPolicy(cloudSnapshot.policy);
         setMonthlyAttendanceReward(cloudSnapshot.monthlyAttendanceReward);
@@ -198,6 +200,7 @@ export default function StudentWalkingScreen() {
         setClassroomTopFive(cloudSnapshot.classroomTopFive);
         setClassroomRankRewards(cloudSnapshot.classroomRankRewards);
         setClassroomRankNextResetAt(cloudSnapshot.classroomRankNextResetAt);
+      if (!refresh) setLoading(false);
 
       if (!isHealthConnectModuleAvailable()) {
         setStatus("unavailable");

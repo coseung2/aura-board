@@ -43,9 +43,10 @@ export function ReadOnlyCardsBoard({ data }: { data: BoardDetailResponse }) {
         data={cards}
         keyExtractor={(c) => c.id}
         contentContainerStyle={styles.content}
-        renderItem={({ item }) => (
+        renderItem={({ item, index }) => (
           <StreamFeedPost
             card={item}
+            deferEmbeddedMedia={index > 0}
             onOpenComments={() => setCommentCard(item)}
             onLongPress={
               item.isMine === true

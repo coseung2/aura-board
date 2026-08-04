@@ -471,7 +471,10 @@ export function normalizeWalkingPolicy(value: unknown): WalkingPolicy {
   };
 }
 
-export async function fetchWalkingSnapshot(_days?: number): Promise<WalkingResponse> {
+export async function fetchWalkingSnapshot(
+  _days?: number,
+  options: { forceRefresh?: boolean } = {},
+): Promise<WalkingResponse> {
   const payload = await apiFetch<{
     rows: WalkingDay[];
     range?: Pick<WalkingWeekRange, "weekStart" | "weekEnd">;
@@ -484,7 +487,10 @@ export async function fetchWalkingSnapshot(_days?: number): Promise<WalkingRespo
     classroomRankRewards?: unknown;
     classroomRankNextResetAt?: unknown;
     titles?: unknown;
-  }>("/api/student/walking?week=current");
+  }>("/api/student/walking?week=current", {
+    cacheTtlMs: 5 * 60_000,
+    forceRefresh: options.forceRefresh,
+  });
   return {
     rows: payload.rows,
     range: payload.range,

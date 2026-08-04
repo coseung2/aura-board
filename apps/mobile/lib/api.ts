@@ -7,6 +7,7 @@ import Constants from "expo-constants";
 import * as Device from "expo-device";
 import { Platform } from "react-native";
 import { loadParentToken, loadSessionToken } from "./session";
+import { cachedRequest } from "./request-cache";
 
 export class ApiError extends Error {
   status: number;
@@ -84,7 +85,27 @@ type FetchOpts = RequestInit & {
   parentAuth?: boolean;
   /** Prevent a stalled native request from leaving its control busy forever. */
   timeoutMs?: number;
+  /** Additional attempts after the first request. Defaults to one for GET only. */
+  retry?: number;
+  /** Reuse a successful GET response for this many milliseconds. */
+  cacheTtlMs?: number;
+  /** Bypass a fresh cached GET response, while still deduplicating in-flight work. */
+  forceRefresh?: boolean;
 };
+
+const DEFAULT_REQUEST_TIMEOUT_MS = 12_000;
+const DEFAULT_GET_RETRIES = 1;
+const RETRY_BASE_DELAY_MS = 300;
+
+const delay = (ms: number) =>
+  new Promise<void>((resolve) => setTimeout(resolve, ms));
+
+function shouldRetryRequest(error: unknown): boolean {
+  return (
+    error instanceof ApiError &&
+    (error.status === 0 || error.status === 408 || error.status >= 500)
+  );
+}
 
 /**
  * 인증 붙인 fetch. 401 이 떨어지면 호출자가 세션 만료 취급(로그인으로 되돌림).
@@ -97,7 +118,17 @@ export async function apiFetch<T = unknown>(
   path: string,
   opts: FetchOpts = {},
 ): Promise<T> {
-  const { json, skipAuth, parentAuth, headers, timeoutMs, ...rest } = opts;
+  const {
+    json,
+    skipAuth,
+    parentAuth,
+    headers,
+    timeoutMs = DEFAULT_REQUEST_TIMEOUT_MS,
+    retry,
+    cacheTtlMs = 0,
+    forceRefresh = false,
+    ...rest
+  } = opts;
   const hdrs: Record<string, string> = {
     Accept: "application/json",
     ...((headers as Record<string, string>) ?? {}),
@@ -114,47 +145,101 @@ export async function apiFetch<T = unknown>(
 
   const baseUrl = parentAuth ? getParentApiBase() : getApiBase();
   const url = path.startsWith("http") ? path : `${baseUrl}${path}`;
-  const timeoutController = timeoutMs && timeoutMs > 0 ? new AbortController() : null;
-  const timeoutId = timeoutController
-    ? setTimeout(() => timeoutController.abort(), timeoutMs)
-    : null;
-  const callerSignal = rest.signal;
-  const abortForCaller = () => timeoutController?.abort();
-  if (callerSignal && timeoutController) {
-    if (callerSignal.aborted) timeoutController.abort();
-    else callerSignal.addEventListener("abort", abortForCaller, { once: true });
-  }
-
-  let res: Response;
-  try {
-    res = await fetch(url, {
-      ...rest,
-      signal: timeoutController?.signal ?? callerSignal,
-      headers: hdrs,
-      body: json !== undefined ? JSON.stringify(json) : (rest.body as BodyInit | undefined),
+  const method = (rest.method ?? "GET").toUpperCase();
+  const maxRetries = Math.max(
+    0,
+    Math.floor(retry ?? (method === "GET" ? DEFAULT_GET_RETRIES : 0)),
+  );
+  if (method === "GET" && cacheTtlMs > 0) {
+    return cachedRequest<T>({
+      key: `${parentAuth ? "parent" : skipAuth ? "public" : "student"}:${url}`,
+      ttlMs: cacheTtlMs,
+      force: forceRefresh,
+      loader: () =>
+        apiFetch<T>(path, {
+          ...opts,
+          cacheTtlMs: 0,
+          forceRefresh: false,
+        }),
     });
-  } catch (error) {
-    if (timeoutController?.signal.aborted && !callerSignal?.aborted) {
-      throw new ApiError(408, { error: "request_timeout" });
+  }
+
+  for (let attempt = 0; attempt <= maxRetries; attempt += 1) {
+    const startedAt = Date.now();
+    const timeoutController =
+      timeoutMs && timeoutMs > 0 ? new AbortController() : null;
+    const timeoutId = timeoutController
+      ? setTimeout(() => timeoutController.abort(), timeoutMs)
+      : null;
+    const callerSignal = rest.signal;
+    const abortForCaller = () => timeoutController?.abort();
+    if (callerSignal && timeoutController) {
+      if (callerSignal.aborted) timeoutController.abort();
+      else callerSignal.addEventListener("abort", abortForCaller, { once: true });
     }
-    throw error;
-  } finally {
-    if (timeoutId) clearTimeout(timeoutId);
-    callerSignal?.removeEventListener("abort", abortForCaller);
+
+    try {
+      const res = await fetch(url, {
+        ...rest,
+        signal: timeoutController?.signal ?? callerSignal,
+        headers: hdrs,
+        body:
+          json !== undefined
+            ? JSON.stringify(json)
+            : (rest.body as BodyInit | undefined),
+      });
+      const text = await res.text();
+      let body: unknown = text;
+      try {
+        body = text ? JSON.parse(text) : null;
+      } catch {
+        // leave as text
+      }
+
+      if (!res.ok) throw new ApiError(res.status, body);
+      if (__DEV__) {
+        console.info(
+          `[api] ${method} ${path} ${res.status} ${Date.now() - startedAt}ms attempt=${attempt + 1}`,
+        );
+      }
+      return body as T;
+    } catch (error) {
+      let normalized = error;
+      if (timeoutController?.signal.aborted && !callerSignal?.aborted) {
+        normalized = new ApiError(
+          408,
+          { error: "request_timeout" },
+          "응답이 지연되고 있어요. 다시 시도해 주세요.",
+        );
+      } else if (!(error instanceof ApiError) && !callerSignal?.aborted) {
+        normalized = new ApiError(
+          0,
+          { error: "network_error" },
+          "네트워크 연결을 확인해 주세요.",
+        );
+      }
+
+      if (__DEV__) {
+        const status = normalized instanceof ApiError ? normalized.status : "aborted";
+        console.info(
+          `[api] ${method} ${path} ${status} ${Date.now() - startedAt}ms attempt=${attempt + 1}`,
+        );
+      }
+      if (
+        attempt >= maxRetries ||
+        callerSignal?.aborted ||
+        !shouldRetryRequest(normalized)
+      ) {
+        throw normalized;
+      }
+      await delay(RETRY_BASE_DELAY_MS * 2 ** attempt);
+    } finally {
+      if (timeoutId) clearTimeout(timeoutId);
+      callerSignal?.removeEventListener("abort", abortForCaller);
+    }
   }
 
-  const text = await res.text();
-  let body: unknown = text;
-  try {
-    body = text ? JSON.parse(text) : null;
-  } catch {
-    // leave as text
-  }
-
-  if (!res.ok) {
-    throw new ApiError(res.status, body);
-  }
-  return body as T;
+  throw new ApiError(0, { error: "network_error" });
 }
 
 export function getApiUrl(path: string): string {

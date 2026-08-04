@@ -164,7 +164,7 @@ export function DailyBanner({ role, studentId }: Props) {
           }`;
 
     const fetchCurrent = role === "student" ? apiFetch : parentApiFetch;
-    void fetchCurrent<unknown>(path)
+    void fetchCurrent<unknown>(path, { cacheTtlMs: 60_000 })
       .then((response) => {
         if (cancelled) return;
         const next = parseBanner(response);

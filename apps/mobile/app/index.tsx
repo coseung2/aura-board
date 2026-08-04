@@ -50,6 +50,8 @@ import {
 import {
   BOARD_LIST_CACHE_KEY,
   STUDENT_HOME_CACHE_KEY,
+  hydrateBoardCache,
+  readBoardCache,
   writeBoardCache,
 } from "../lib/board-cache";
 import { webSafeWidthStyle } from "../lib/responsive";
@@ -155,6 +157,17 @@ export function Landing() {
         // 기존 학생 세션 확인
         const studentToken = await loadSessionToken();
         if (studentToken) {
+          await hydrateBoardCache();
+          if (
+            readBoardCache<MeResponse>(STUDENT_HOME_CACHE_KEY, {
+              kind: "boards",
+            })
+          ) {
+            // Route immediately with the last successful snapshot. The student
+            // layout performs the normal stale-while-revalidate request.
+            router.replace("/(student)");
+            return;
+          }
           const me = await apiFetch<MeResponse>("/api/student/me");
           writeBoardCache(STUDENT_HOME_CACHE_KEY, me, { kind: "boards" });
           writeBoardCache(BOARD_LIST_CACHE_KEY, me.boards, { kind: "boards" });

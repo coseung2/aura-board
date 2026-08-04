@@ -1,4 +1,9 @@
 import type { BoardDetailResponse, BoardMeta } from "./types";
+import {
+  readPersistentJson,
+  removePersistentJson,
+  writePersistentJson,
+} from "./persistent-json-cache";
 
 /**
  * 학생 보드 화면에서만 사용하는 메모리 SWR 저장소.
@@ -61,6 +66,31 @@ const STALE_MAX_MS: Record<BoardCacheKind, number> = {
   detail: 2 * 60_000,
 };
 
+const PERSISTED_BOARD_CACHE_KEY = "student-board-cache-v1";
+const PERSISTED_BOARD_CACHE_MAX_AGE_MS = 24 * 60 * 60_000;
+const PERSISTED_SHARED_KEYS = new Set<string>([
+  STUDENT_HOME_CACHE_KEY,
+  BOARD_LIST_CACHE_KEY,
+]);
+const PERSISTED_BOARD_DETAIL_LIMIT = 8;
+
+function isPersistedBoardCacheKey(key: string): boolean {
+  return (
+    PERSISTED_SHARED_KEYS.has(key) || key.startsWith(BOARD_DETAIL_CACHE_PREFIX)
+  );
+}
+
+type PersistedBoardCache = {
+  version: 1;
+  savedAt: number;
+  entries: Array<{
+    key: string;
+    data: unknown;
+    kind: BoardCacheKind;
+    fetchedAt: number;
+  }>;
+};
+
 // A student normally has only a handful of boards open. Keep the cap finite so
 // repeatedly visiting arbitrary slugs cannot grow the process indefinitely.
 export const BOARD_CACHE_MAX_ENTRIES = 32;
@@ -68,6 +98,8 @@ export const BOARD_CACHE_MAX_ENTRIES = 32;
 const entries = new Map<string, InternalEntry>();
 const inFlight = new Map<string, Promise<unknown>>();
 let cacheGeneration = 0;
+let hydrationPromise: Promise<void> | null = null;
+let hydrated = false;
 
 export function boardDetailCacheKey(slug: string): string {
   return `${BOARD_DETAIL_CACHE_PREFIX}${encodeURIComponent(slug)}`;
@@ -157,6 +189,7 @@ export function writeBoardCache<T>(
   };
   entries.set(key, entry);
   pruneBoardCache(now);
+  if (isPersistedBoardCacheKey(key)) void persistBoardCache();
   return snapshotFor(entry, now) as BoardCacheSnapshot<T>;
 }
 
@@ -212,6 +245,9 @@ export function clearBoardCache(): void {
   cacheGeneration += 1;
   entries.clear();
   inFlight.clear();
+  hydrated = false;
+  hydrationPromise = null;
+  void removePersistentJson(PERSISTED_BOARD_CACHE_KEY);
 }
 
 export const resetBoardCache = clearBoardCache;
@@ -223,6 +259,80 @@ export function boardCacheSize(): number {
 
 export function boardCacheHasInFlight(key: string): boolean {
   return inFlight.has(key);
+}
+
+/**
+ * Restore the last successful home snapshot before the student route mounts.
+ * Restored values are always marked stale so screens render immediately while
+ * the normal revalidation path refreshes them in the background.
+ */
+export function hydrateBoardCache(): Promise<void> {
+  if (hydrated) return Promise.resolve();
+  if (hydrationPromise) return hydrationPromise;
+
+  const generationAtStart = cacheGeneration;
+  hydrationPromise = readPersistentJson<PersistedBoardCache>(
+    PERSISTED_BOARD_CACHE_KEY,
+  )
+    .then((persisted) => {
+      if (
+        generationAtStart !== cacheGeneration ||
+        !persisted ||
+        persisted.version !== 1 ||
+        !Array.isArray(persisted.entries) ||
+        Date.now() - persisted.savedAt > PERSISTED_BOARD_CACHE_MAX_AGE_MS
+      ) {
+        return;
+      }
+
+      const now = Date.now();
+      for (const item of persisted.entries) {
+        if (
+          !item ||
+          !isPersistedBoardCacheKey(item.key) ||
+          (item.kind !== "boards" && item.kind !== "detail")
+        ) {
+          continue;
+        }
+        entries.set(item.key, {
+          key: item.key,
+          data: item.data,
+          kind: item.kind,
+          // Keep it usable but stale, regardless of when the app was closed.
+          fetchedAt: now - FRESH_TTL_MS[item.kind],
+          lastAccessAt: now,
+          dirty: true,
+        });
+      }
+      pruneBoardCache(now);
+    })
+    .finally(() => {
+      if (generationAtStart === cacheGeneration) hydrated = true;
+      hydrationPromise = null;
+    });
+  return hydrationPromise;
+}
+
+function persistBoardCache(): Promise<void> {
+  const sharedEntries = [...entries.values()].filter((entry) =>
+    PERSISTED_SHARED_KEYS.has(entry.key),
+  );
+  const detailEntries = [...entries.values()]
+    .filter((entry) => entry.key.startsWith(BOARD_DETAIL_CACHE_PREFIX))
+    .sort((left, right) => right.lastAccessAt - left.lastAccessAt)
+    .slice(0, PERSISTED_BOARD_DETAIL_LIMIT);
+  const persistedEntries = [...sharedEntries, ...detailEntries]
+    .map((entry) => ({
+      key: entry.key,
+      data: entry.data,
+      kind: entry.kind,
+      fetchedAt: entry.fetchedAt,
+    }));
+  return writePersistentJson(PERSISTED_BOARD_CACHE_KEY, {
+    version: 1,
+    savedAt: Date.now(),
+    entries: persistedEntries,
+  } satisfies PersistedBoardCache);
 }
 
 /**

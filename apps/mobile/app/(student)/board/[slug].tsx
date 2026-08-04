@@ -15,6 +15,7 @@ import {
   useRouter,
 } from "expo-router";
 import { CircleAlert } from "lucide-react-native";
+import { Image } from "expo-image";
 import { SafeAreaView } from "react-native-safe-area-context";
 import {
   boardThemes,
@@ -41,6 +42,7 @@ import {
   getUnifiedLoginRoute,
 } from "../../../lib/session";
 import type { BoardDetailResponse } from "../../../lib/types";
+import { buildMediaItems, mediaPreviewUrls } from "../../../lib/media";
 import { CardsBoard } from "../../../components/layouts/CardsBoard";
 import { ColumnsBoard } from "../../../components/layouts/ColumnsBoard";
 import { VibeArcadeBoard } from "../../../components/layouts/VibeArcadeBoard";
@@ -139,6 +141,7 @@ export default function BoardDetail() {
         );
         if (sequence !== sequenceRef.current) return;
         setData(nextData);
+        void prefetchBoardPreviewImages(nextData);
         setError(null);
         // A detail mutation/realtime refresh can change the card count and
         // status shown in the hub list. Mark that summary stale; the next hub
@@ -310,6 +313,17 @@ export default function BoardDetail() {
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
+}
+
+function prefetchBoardPreviewImages(data: BoardDetailResponse): Promise<boolean> {
+  const previewUrls = [
+    ...new Set(
+      data.cards.flatMap((card) => mediaPreviewUrls(buildMediaItems(card))),
+    ),
+  ].slice(0, 24);
+  return previewUrls.length > 0
+    ? Image.prefetch(previewUrls, "memory-disk")
+    : Promise.resolve(true);
 }
 
 function renderOfficialGameLayout(data: BoardDetailResponse) {

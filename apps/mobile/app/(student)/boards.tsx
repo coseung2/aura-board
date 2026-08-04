@@ -1,7 +1,8 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
+  InteractionManager,
   RefreshControl,
   ScrollView,
   StyleSheet,
@@ -31,9 +32,10 @@ import {
 } from "../../theme/tokens";
 import { apiFetch, ApiError, getApiUrl } from "../../lib/api";
 import { clearSessionToken, getUnifiedLoginRoute } from "../../lib/session";
-import type { MeResponse } from "../../lib/types";
+import type { BoardDetailResponse, BoardMeta, MeResponse } from "../../lib/types";
 import {
   BOARD_LIST_CACHE_KEY,
+  boardDetailCacheKey,
   readBoardCache,
   revalidateBoardCache,
   STUDENT_HOME_CACHE_KEY,
@@ -149,6 +151,27 @@ export default function StudentBoardsScreen() {
     () => filterMobileBoardRows(overview, filter === "play" ? "all" : filter, ""),
     [filter, overview],
   );
+
+  useEffect(() => {
+    if (filter === "play" || visibleRows.length === 0) return undefined;
+    let cancelled = false;
+    const task = InteractionManager.runAfterInteractions(() => {
+      const candidates = visibleRows.slice(0, 4).map((row) => row.board);
+      let nextIndex = 0;
+      const worker = async () => {
+        while (!cancelled) {
+          const board = candidates[nextIndex++];
+          if (!board) return;
+          await prefetchBoardDetail(board).catch(() => undefined);
+        }
+      };
+      void Promise.all([worker(), worker()]);
+    });
+    return () => {
+      cancelled = true;
+      task.cancel();
+    };
+  }, [filter, visibleRows]);
 
   const load = useCallback(
     async (refresh = false) => {
@@ -368,6 +391,7 @@ export default function StudentBoardsScreen() {
             <BoardRow
               row={item}
               cardWidth={boardCardWidth}
+              onPressIn={() => void prefetchBoardDetail(item.board)}
               onPress={() =>
                 router.push(
                   `/(student)/board/${item.board.slug}?layout=${item.board.layout}` as Href,
@@ -399,16 +423,19 @@ export default function StudentBoardsScreen() {
 function BoardRow({
   row,
   cardWidth,
+  onPressIn,
   onPress,
 }: {
   row: MobileBoardRow;
   cardWidth: number;
+  onPressIn: () => void;
   onPress: () => void;
 }) {
   const { board } = row;
   return (
     <SurfacePressable
       style={[styles.boardCard, { width: cardWidth }]}
+      onPressIn={onPressIn}
       onPress={onPress}
       accessibilityLabel={`${board.title}, ${layoutLabel(board.layout)}`}
       accessibilityHint="보드를 열어요"
@@ -430,6 +457,18 @@ function BoardRow({
         </Text>
       </View>
     </SurfacePressable>
+  );
+}
+
+function prefetchBoardDetail(board: BoardMeta): Promise<BoardDetailResponse> {
+  const key = boardDetailCacheKey(board.slug);
+  return revalidateBoardCache<BoardDetailResponse>(
+    key,
+    () =>
+      apiFetch<BoardDetailResponse>(
+        `/api/student/board/${encodeURIComponent(board.slug)}`,
+      ),
+    { kind: "detail" },
   );
 }
 

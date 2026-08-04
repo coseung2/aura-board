@@ -1,6 +1,7 @@
 import * as SecureStore from "expo-secure-store";
 import { Platform } from "react-native";
 import { clearBoardCache } from "./board-cache";
+import { clearRequestCache } from "./request-cache";
 
 // 학생 세션 토큰 · 학생 프로필 캐시.
 // SecureStore = 안드로이드에선 AndroidKeystore 로 AES 암호화.
@@ -12,6 +13,10 @@ const STUDENT_KEY = "aura_student_cache";
 const PARENT_TOKEN_KEY = "aura_parent_token";
 const PARENT_KEY = "aura_parent_cache";
 const PARENT_SELECTED_CHILD_KEY = "aura_parent_selected_child";
+let studentTokenCache: string | null | undefined;
+let studentTokenInFlight: Promise<string | null> | null = null;
+let parentTokenCache: string | null | undefined;
+let parentTokenInFlight: Promise<string | null> | null = null;
 const parentSelectedChildListeners = new Set<
   (studentId: string | null) => void
 >();
@@ -101,16 +106,29 @@ export async function saveSessionToken(token: string): Promise<void> {
   // student's in-memory board data survive that boundary.
   logoutInProgressRole = null;
   clearBoardCache();
+  clearRequestCache();
   await setStoredItem(TOKEN_KEY, token);
+  studentTokenCache = token;
 }
 
 export async function loadSessionToken(): Promise<string | null> {
-  return getStoredItem(TOKEN_KEY);
+  if (studentTokenCache !== undefined) return studentTokenCache;
+  if (studentTokenInFlight) return studentTokenInFlight;
+  studentTokenInFlight = getStoredItem(TOKEN_KEY)
+    .then((token) => {
+      studentTokenCache = token;
+      return token;
+    })
+    .finally(() => {
+      studentTokenInFlight = null;
+    });
+  return studentTokenInFlight;
 }
 
 export async function clearSessionToken(): Promise<void> {
   clearBoardCache();
-  const authorizationToken = await getStoredItem(TOKEN_KEY);
+  clearRequestCache();
+  const authorizationToken = await loadSessionToken();
   if (authorizationToken) {
     await import("./student-push-notifications")
       .then(({ unregisterStudentPushNotifications }) =>
@@ -120,6 +138,7 @@ export async function clearSessionToken(): Promise<void> {
   }
   await deleteStoredItem(TOKEN_KEY).catch(() => undefined);
   await deleteStoredItem(STUDENT_KEY).catch(() => undefined);
+  studentTokenCache = null;
 }
 
 export async function saveStudentCache(student: CachedStudent): Promise<void> {
@@ -147,17 +166,31 @@ export type CachedParent = {
 
 export async function saveParentToken(token: string): Promise<void> {
   logoutInProgressRole = null;
+  clearRequestCache();
   await setStoredItem(PARENT_TOKEN_KEY, token);
+  parentTokenCache = token;
 }
 
 export async function loadParentToken(): Promise<string | null> {
-  return getStoredItem(PARENT_TOKEN_KEY);
+  if (parentTokenCache !== undefined) return parentTokenCache;
+  if (parentTokenInFlight) return parentTokenInFlight;
+  parentTokenInFlight = getStoredItem(PARENT_TOKEN_KEY)
+    .then((token) => {
+      parentTokenCache = token;
+      return token;
+    })
+    .finally(() => {
+      parentTokenInFlight = null;
+    });
+  return parentTokenInFlight;
 }
 
 export async function clearParentSession(): Promise<void> {
+  clearRequestCache();
   await deleteStoredItem(PARENT_TOKEN_KEY).catch(() => undefined);
   await deleteStoredItem(PARENT_KEY).catch(() => undefined);
   await deleteStoredItem(PARENT_SELECTED_CHILD_KEY).catch(() => undefined);
+  parentTokenCache = null;
   notifyParentSelectedChild(null);
 }
 
@@ -168,7 +201,8 @@ export async function clearParentSession(): Promise<void> {
  */
 export async function clearAllMobileSessions(): Promise<void> {
   clearBoardCache();
-  const studentAuthorizationToken = await getStoredItem(TOKEN_KEY);
+  clearRequestCache();
+  const studentAuthorizationToken = await loadSessionToken();
   if (studentAuthorizationToken) {
     await import("./student-push-notifications")
       .then(({ unregisterStudentPushNotifications }) =>
@@ -183,6 +217,8 @@ export async function clearAllMobileSessions(): Promise<void> {
     deleteStoredItem(PARENT_KEY).catch(() => undefined),
     deleteStoredItem(PARENT_SELECTED_CHILD_KEY).catch(() => undefined),
   ]);
+  studentTokenCache = null;
+  parentTokenCache = null;
   notifyParentSelectedChild(null);
 }
 

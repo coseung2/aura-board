@@ -191,9 +191,10 @@ export function ColumnsBoard({
           data={selectedCards}
           keyExtractor={(card) => card.id}
           contentContainerStyle={styles.listContent}
-          renderItem={({ item }) => (
+          renderItem={({ item, index }) => (
             <StreamFeedPost
               card={item}
+              deferEmbeddedMedia={index > 0}
               onOpenComments={() => setCommentCard(item)}
               onOpenAuthorPicker={
                 item.canEdit === true

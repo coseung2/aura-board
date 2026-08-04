@@ -6,6 +6,7 @@ import { apiFetch, ApiError } from "../../lib/api";
 import {
   BOARD_LIST_CACHE_KEY,
   STUDENT_HOME_CACHE_KEY,
+  hydrateBoardCache,
   readBoardCache,
   revalidateBoardCache,
   writeBoardCache,
@@ -28,13 +29,30 @@ export default function StudentLayout() {
   const router = useRouter();
   const pathname = usePathname();
   const hideNav = pathname === "/login" || pathname.endsWith("/login");
+  const [cacheReady, setCacheReady] = useState(false);
   const [me, setMe] = useState<MeResponse | null>(
     () =>
       readBoardCache<MeResponse>(STUDENT_HOME_CACHE_KEY, { kind: "boards" })
         ?.data ?? null,
   );
 
+  useEffect(() => {
+    let active = true;
+    void hydrateBoardCache().finally(() => {
+      if (!active) return;
+      setMe(
+        readBoardCache<MeResponse>(STUDENT_HOME_CACHE_KEY, { kind: "boards" })
+          ?.data ?? null,
+      );
+      setCacheReady(true);
+    });
+    return () => {
+      active = false;
+    };
+  }, []);
+
   const loadMe = useCallback(async () => {
+    if (!cacheReady) return;
     if (hideNav) {
       setMe(null);
       return;
@@ -60,7 +78,7 @@ export default function StudentLayout() {
         router.replace(getUnifiedLoginRoute("student"));
       }
     }
-  }, [hideNav, router]);
+  }, [cacheReady, hideNav, router]);
 
   useEffect(() => {
     loadMe();
@@ -77,6 +95,10 @@ export default function StudentLayout() {
     });
     return () => unsubscribe();
   }, [hideNav, router]);
+
+  if (!cacheReady) {
+    return <View style={styles.shell} />;
+  }
 
   return (
     <View style={styles.shell}>

@@ -27,6 +27,7 @@ import { BarePressable, ControlPressable } from "../ui";
 import type { PostAnchor } from "../PostModerationOverlay";
 
 export type StreamFeedPostEngagementMode = "interactive" | "summary";
+const ENGAGEMENT_CACHE_MS = 5 * 60_000;
 
 type Props = {
   card: BoardCard;
@@ -38,6 +39,7 @@ type Props = {
   highlighted?: boolean;
   viewer?: CommentViewer;
   onUnauthorized?: (error: unknown) => void | Promise<void>;
+  deferEmbeddedMedia?: boolean;
 };
 
 export function StreamFeedPost({
@@ -50,6 +52,7 @@ export function StreamFeedPost({
   highlighted = false,
   viewer = "student",
   onUnauthorized,
+  deferEmbeddedMedia = false,
 }: Props) {
   const author =
     authorLabel === undefined ? resolveCardAuthorName(card) : authorLabel;
@@ -90,6 +93,7 @@ export function StreamFeedPost({
     const request = viewer === "parent" ? parentApiFetch : apiFetch;
     void request<{ likeCount: number; isLiked: boolean }>(
       `/api/cards/${encodeURIComponent(card.id)}/engagement`,
+      { cacheTtlMs: ENGAGEMENT_CACHE_MS },
     )
       .then((engagement) => {
         if (cancelled) return;
@@ -126,6 +130,13 @@ export function StreamFeedPost({
       );
       setLiked(response.liked);
       setLikeCount(Math.max(0, response.count));
+      void request<{ likeCount: number; isLiked: boolean }>(
+        `/api/cards/${encodeURIComponent(card.id)}/engagement`,
+        {
+          cacheTtlMs: ENGAGEMENT_CACHE_MS,
+          forceRefresh: true,
+        },
+      ).catch(() => undefined);
     } catch (error) {
       setLiked(previous.liked);
       setLikeCount(previous.likeCount);
@@ -199,6 +210,8 @@ export function StreamFeedPost({
         <EmbeddedMedia
           url={embedUrl}
           title={title || undefined}
+          previewUrl={mediaItems[0] ?? null}
+          deferLoad={deferEmbeddedMedia}
           style={styles.feedPostEmbed}
         />
       ) : mediaItems.length > 0 ? (

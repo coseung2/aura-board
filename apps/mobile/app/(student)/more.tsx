@@ -15,6 +15,11 @@ import { apiFetch, ApiError } from "../../lib/api";
 import { clearSessionToken, getUnifiedLoginRoute } from "../../lib/session";
 import type { MeResponse } from "../../lib/types";
 import {
+  readBoardCache,
+  STUDENT_HOME_CACHE_KEY,
+  writeBoardCache,
+} from "../../lib/board-cache";
+import {
   loadStudentNavPreferences,
   normalizeStudentNavIds,
   saveStudentNavPreferences,
@@ -46,9 +51,12 @@ import { StudentHeaderActions } from "../../components/StudentHeaderActions";
 export default function StudentMoreScreen() {
   const router = useRouter();
   const { width, height } = useWindowDimensions();
-  const [me, setMe] = useState<MeResponse | null>(null);
+  const initialMe = readBoardCache<MeResponse>(STUDENT_HOME_CACHE_KEY, {
+    kind: "boards",
+  })?.data ?? null;
+  const [me, setMe] = useState<MeResponse | null>(() => initialMe);
   const [enabledIds, setEnabledIds] = useState<string[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(() => !initialMe);
   const [error, setError] = useState<string | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -56,7 +64,15 @@ export default function StudentMoreScreen() {
   const isLandscapeLayout = width > height && width >= dashboard.columns.one;
 
   const load = useCallback(async () => {
-    setLoading(true);
+    const cached = readBoardCache<MeResponse>(STUDENT_HOME_CACHE_KEY, {
+      kind: "boards",
+    });
+    if (cached) {
+      setMe(cached.data);
+      setLoading(false);
+    } else {
+      setLoading(true);
+    }
     setError(null);
     try {
       const [response, savedIds] = await Promise.all([
@@ -64,6 +80,7 @@ export default function StudentMoreScreen() {
         loadStudentNavPreferences(),
       ]);
       setMe(response);
+      writeBoardCache(STUDENT_HOME_CACHE_KEY, response, { kind: "boards" });
       setEnabledIds(normalizeStudentNavIds(savedIds));
     } catch (nextError) {
       if (nextError instanceof ApiError && nextError.status === 401) {

@@ -1,6 +1,7 @@
-import { useCallback, useState, type ReactNode } from "react";
+import { useCallback, useRef, useState, type ReactNode } from "react";
 import {
   ActivityIndicator,
+  InteractionManager,
   RefreshControl,
   ScrollView,
   StyleSheet,
@@ -86,6 +87,8 @@ import {
 } from "../../lib/walking-health";
 
 const SLIME_TRAMPOLINE_ITEM_KEY = "slime-blue-trampoline";
+const HOME_AUXILIARY_STALE_MS = 60_000;
+const NAV_SHARED_CACHE_MS = 5 * 60_000;
 
 // 학생 대시보드. 웹과 같은 /api/student/me 계약을 사용한다.
 
@@ -112,13 +115,18 @@ export default function StudentHome() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(() => !initialHomeCache);
   const [refreshing, setRefreshing] = useState(false);
+  const auxiliaryLoadedAtRef = useRef(0);
+  const auxiliaryInFlightRef = useRef<Promise<void> | null>(null);
 
   const isLandscapeLayout = width > height && width >= dashboard.columns.one;
 
-  const loadWallet = useCallback(async () => {
+  const loadWallet = useCallback(async (force = false) => {
     setWalletLoading(true);
     try {
-      const res = await apiFetch<WalletSummary>("/api/my/wallet");
+      const res = await apiFetch<WalletSummary>("/api/my/wallet", {
+        cacheTtlMs: HOME_AUXILIARY_STALE_MS,
+        forceRefresh: force,
+      });
       setWallet(res);
     } catch {
       setWallet(null);
@@ -127,28 +135,38 @@ export default function StudentHome() {
     }
   }, []);
 
-  const loadPet = useCallback(async () => {
+  const loadPet = useCallback(async (force = false) => {
     try {
-      setPetHome(normalizeSlimeHome(await apiFetch<unknown>("/api/student/slimes")));
+      setPetHome(normalizeSlimeHome(await apiFetch<unknown>("/api/student/slimes", {
+        cacheTtlMs: NAV_SHARED_CACHE_MS,
+        forceRefresh: force,
+      })));
     } catch {
       setPetHome(null);
     }
   }, []);
 
-  const loadDailyRewards = useCallback(async () => {
+  const loadDailyRewards = useCallback(async (force = false) => {
     setDailyRewardLoading(true);
-    try {
-      const [snapshot, reading] = await Promise.all([
-        fetchWalkingSnapshot(),
+    const [walkingResult, readingResult] = await Promise.allSettled([
+        fetchWalkingSnapshot(undefined, { forceRefresh: force }),
         apiFetch<{
           weeklyMissionReward?: { claimableStepCount?: number; claimable?: boolean } | null;
           classroomRankRewards?: unknown[];
-        }>("/api/student/reading"),
+        }>("/api/student/reading", {
+          cacheTtlMs: NAV_SHARED_CACHE_MS,
+          forceRefresh: force,
+        }),
       ]);
+    if (walkingResult.status === "fulfilled") {
+      const snapshot = walkingResult.value;
       setDailyWalking(snapshot.dailyStepRewards);
       setWeeklyWalking(snapshot.weeklyStepRewards);
       setWalkingRankRewardCount(snapshot.classroomRankRewards.length);
       setAttendance(snapshot.monthlyAttendanceReward);
+    }
+    if (readingResult.status === "fulfilled") {
+      const reading = readingResult.value;
       setReadingClaimableCount(
         Math.max(
           0,
@@ -157,13 +175,50 @@ export default function StudentHome() {
         ),
       );
       setReadingRankRewardCount(reading.classroomRankRewards?.length ?? 0);
-      setDailyRewardError(null);
-    } catch {
-      setDailyRewardError("보상 현황을 불러오지 못했어요.");
-    } finally {
-      setDailyRewardLoading(false);
     }
+
+    const failedLabels = [
+      walkingResult.status === "rejected" ? "걷기" : null,
+      readingResult.status === "rejected" ? "독서" : null,
+    ].filter((label): label is string => Boolean(label));
+    if (failedLabels.length === 0) {
+      setDailyRewardError(null);
+    } else if (failedLabels.length === 2) {
+      setDailyRewardError("보상 현황을 불러오지 못했어요.");
+    } else {
+      setDailyRewardError(`${failedLabels[0]} 보상만 불러오지 못했어요.`);
+    }
+    setDailyRewardLoading(false);
   }, []);
+
+  const loadAuxiliary = useCallback(
+    (force = false): Promise<void> => {
+      if (
+        !force &&
+        Date.now() - auxiliaryLoadedAtRef.current < HOME_AUXILIARY_STALE_MS
+      ) {
+        return Promise.resolve();
+      }
+      if (auxiliaryInFlightRef.current) return auxiliaryInFlightRef.current;
+
+      const request = Promise.allSettled([
+        loadPet(force),
+        loadDailyRewards(force),
+        loadWallet(force),
+      ])
+        .then(() => {
+          auxiliaryLoadedAtRef.current = Date.now();
+        })
+        .finally(() => {
+          if (auxiliaryInFlightRef.current === request) {
+            auxiliaryInFlightRef.current = null;
+          }
+        });
+      auxiliaryInFlightRef.current = request;
+      return request;
+    },
+    [loadDailyRewards, loadPet, loadWallet],
+  );
 
   const load = useCallback(
     async (isRefresh = false) => {
@@ -176,8 +231,13 @@ export default function StudentHome() {
       } else {
         setLoading(true);
       }
-      void loadPet();
-      void loadDailyRewards();
+      const auxiliaryTask = isRefresh
+        ? loadAuxiliary(true)
+        : new Promise<void>((resolve) => {
+            InteractionManager.runAfterInteractions(() => {
+              void loadAuxiliary().finally(resolve);
+            });
+          });
       try {
         if (isRefresh) setRefreshing(true);
         const res = await revalidateBoardCache<MeResponse>(
@@ -193,8 +253,6 @@ export default function StudentHome() {
         );
         setMe(res);
         setError(null);
-
-        loadWallet();
       } catch (e) {
         if (e instanceof ApiError && e.status === 401) {
           await clearSessionToken();
@@ -203,11 +261,12 @@ export default function StudentHome() {
         }
         setError(e instanceof Error ? e.message : "불러올 수 없어요");
       } finally {
+        if (isRefresh) await auxiliaryTask;
         setLoading(false);
         if (isRefresh) setRefreshing(false);
       }
     },
-    [router, loadDailyRewards, loadPet, loadWallet],
+    [router, loadAuxiliary],
   );
 
   useFocusEffect(
