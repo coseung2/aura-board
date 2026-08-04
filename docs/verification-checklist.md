@@ -50,6 +50,16 @@ creating overlapping testing-notes documents.
 - Verify retries and endpoint behavior are idempotent before enabling a schedule.
 - Call a production endpoint only after explicit approval; use dry-run verification otherwise.
 
+### Oracle Production Deployment
+
+- Parse `.github/workflows/deploy-oracle.yml`, run `bash -n` for every changed Oracle shell script, and validate the installed sudoers file with `visudo -cf` on Linux.
+- Confirm `/etc/aura-board/build.env` contains no production credentials, is `root:aura-app` mode `0640`, and the repository build never reads `/etc/aura-board/app.env`.
+- Confirm the runner is repository-scoped, online, ARM64, and labeled `aura-board-prod`; never run pull-request code on the production runner.
+- Trigger the first release with `workflow_dispatch`. Confirm the workflow SHA, `/opt/aura-board-app/current`, and `/opt/aura-board-play-engine/current` all resolve to the same commit.
+- Confirm the play-engine, Next.js, and nginx loopback health checks pass after restart, then verify the public production health endpoint and the exact changed user flow.
+- Exercise rollback with a disposable failing release before treating push deployment as operational. Confirm both symlinks and both services return to the same prior release.
+- Confirm completed release trees are root-owned, contain matching completion/checksum markers, and have no group/world-writable files or directories.
+
 ## Always-open Game Hub
 
 - Render the web student board hub with zero teacher-created boards and confirm the 놀이 tab still shows exactly Shadow Alliance, Kordle, Speed Game, Omok, and Song Guess with unique generated raster art, one-line descriptions, `상시 입장`, and one obvious entry action each.

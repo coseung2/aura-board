@@ -1,0 +1,45 @@
+name: Deploy Oracle Production
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: oracle-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Deploy ${{ github.sha }}
+    if: github.repository == 'coseung2/aura-board' && github.ref == 'refs/heads/main'
+    environment: Production
+    runs-on:
+      - self-hosted
+      - Linux
+      - ARM64
+      - aura-board-prod
+    timeout-minutes: 60
+
+    steps:
+      - name: Checkout exact revision
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 1
+          persist-credentials: false
+          clean: true
+
+      - name: Verify deployment revision
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          test "$(git branch --show-current)" = "main" || test "$GITHUB_REF" = "refs/heads/main"
+
+      - name: Build, switch, and verify production
+        shell: bash
+        run: sudo /usr/local/sbin/aura-board-deploy-release

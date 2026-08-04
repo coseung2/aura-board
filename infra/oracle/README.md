@@ -49,6 +49,7 @@ The single A1 preserves workload isolation in software:
 /opt/aura-board-play-engine/releases/<git-sha>/play-server
 /opt/aura-board-play-engine/current -> releases/<git-sha>
 /etc/aura-board/app.env
+/etc/aura-board/build.env
 /etc/systemd/system/aura-board-app.service
 /etc/systemd/system/aura-play-engine.service
 /etc/nginx/sites-available/aura-board
@@ -57,6 +58,8 @@ The single A1 preserves workload isolation in software:
 ```
 
 Build the Next.js standalone output and Rust binary on the A1 so Prisma, Sharp, and Rust artifacts match Linux ARM64. Copy `public` and `.next/static` into the standalone release, link `.next/cache` to `/opt/aura-board-app/shared/cache`, then switch the `current` symlink. Keep `/etc/aura-board/app.env` root-owned with mode `0640` and group `aura-app`.
+
+Builds must never source `/etc/aura-board/app.env`. Create `/etc/aura-board/build.env` from `build.env.example`, keep only non-production placeholders or explicitly public build-time values, and set it to `root:aura-app` mode `0640`. A repository build can execute package lifecycle and Next.js build code, so any value in this file must be safe to disclose to someone who can push `main`.
 
 Before switching public traffic, verify all three layers locally:
 
@@ -67,6 +70,64 @@ curl --fail -H 'Host: aura-board.com' http://127.0.0.1/api/health
 ```
 
 Only nginx is internet-facing. OCI network rules should allow TCP 80/443 from the internet and retain SSH as an administrator-only rule. Do not expose ports 3000, 8081, Postgres, or rpcbind.
+
+## GitHub push deployment
+
+`Deploy Oracle Production` connects every push to `main` to the production A1 through a repository-scoped self-hosted GitHub Actions runner. The runner initiates an outbound GitHub connection, so deployment does not require widening the administrator-only SSH rule.
+
+Treat write access to `main` as production deployment access. This private repository's current GitHub plan does not provide branch protection or repository rulesets, and the `Production` environment currently has no protection rules. Keep collaborator write access minimal; if the plan changes, require reviewed pull requests and protect the production environment before adding more writers.
+
+This automation assumes the existing production units, `/etc/aura-board/app.env`, shared directories, and one currently healthy known-good release are already installed. It intentionally refuses a first-ever deployment with no rollback target.
+
+Create the dedicated runner account and directory, then download the current Linux ARM64 runner archive using the checksum and commands shown in GitHub's **Settings -> Actions -> Runners -> New self-hosted runner** page:
+
+```bash
+sudo useradd --system --create-home --home-dir /opt/actions-runner-aura-board --shell /bin/bash aura-deploy
+sudo chown -R aura-deploy:aura-deploy /opt/actions-runner-aura-board
+cd /opt/actions-runner-aura-board
+# Download and verify the exact GitHub-provided Linux ARM64 runner archive here.
+sudo -u aura-deploy ./config.sh \
+  --url https://github.com/coseung2/aura-board \
+  --token '<SHORT_LIVED_REGISTRATION_TOKEN>' \
+  --name aura-board-oracle-prod \
+  --labels aura-board-prod \
+  --work _work \
+  --unattended
+sudo ./svc.sh install aura-deploy
+sudo ./svc.sh start
+```
+
+Keep the token out of shell history by substituting it interactively or through a root-readable temporary mechanism and deleting that temporary value immediately. Restrict the runner group to this repository and never enable it for fork pull requests.
+
+Create the non-secret build environment before installing the helper:
+
+```bash
+sudo install -o root -g aura-app -m 0640 \
+  ./infra/oracle/build.env.example /etc/aura-board/build.env
+sudoedit /etc/aura-board/build.env
+```
+
+After the runner service exists, install the root-owned deployment helpers from a reviewed checkout:
+
+```bash
+sudo bash ./infra/oracle/install-deploy-automation.sh "$PWD"
+sudo -u aura-deploy sudo -n /usr/local/sbin/aura-board-deploy-release
+```
+
+The second command is an end-to-end **live production deployment**, not a privilege-only smoke test, and must be run only during an approved release window. The sudo policy permits exactly that argument-free helper. The helper accepts only the fixed runner checkout path, locks concurrent releases, builds root-owned immutable ARM64 artifacts with the trusted copy of `build-release.sh`, switches both release links, restarts the Rust engine and Next.js app, verifies their process paths plus all three health endpoints, and records durable pending state. Errors and termination signals restore both previous links; a later run recovers an interrupted activation before starting another deployment.
+
+Use `workflow_dispatch` for the first controlled deployment. After it succeeds, a push to `main` uses the same workflow automatically. Updating either deployment script does not update the trusted installed copy; review it and rerun `install-deploy-automation.sh` manually before relying on changed deployment behavior.
+
+Required one-time checks:
+
+```bash
+sudo -u aura-deploy test -w /opt/actions-runner-aura-board/_work
+sudo -u aura-deploy sudo -n -l
+sudo systemctl status 'actions.runner.*aura-board*'
+curl --fail http://127.0.0.1:8081/health
+curl --fail http://127.0.0.1:3000/api/health
+curl --fail -H 'Host: aura-board.com' http://127.0.0.1/api/health
+```
 
 Install `aura-board-app.cron` as `/etc/cron.d/aura-board-app` and keep it root-owned with mode `0644`. The runner calls the loopback Next.js endpoint with the root-owned `CRON_SECRET`, takes a per-job nonblocking lock, and never sends cron traffic through public DNS. `notification-push` and `play-outbox` run once per minute; the remaining schedules preserve the existing UTC production cadence, including `role-salary-payout` at 15:10 UTC.
 

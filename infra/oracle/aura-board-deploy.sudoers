@@ -1,0 +1,3 @@
+# Install as /etc/sudoers.d/aura-board-deploy with mode 0440.
+# The trusted helper accepts no arguments and validates its fixed checkout path.
+aura-deploy ALL=(root) NOPASSWD: /usr/local/sbin/aura-board-deploy-release ""
