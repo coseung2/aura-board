@@ -73,7 +73,9 @@ Only nginx is internet-facing. OCI network rules should allow TCP 80/443 from th
 
 ## GitHub push deployment
 
-`Deploy Oracle Production` connects every push to `main` to the production A1 through a repository-scoped self-hosted GitHub Actions runner. The runner initiates an outbound GitHub connection, so deployment does not require widening the administrator-only SSH rule.
+`Deploy Oracle Production` connects every push to `main` to production in two stages. A standard GitHub-hosted `ubuntu-24.04-arm` runner builds and tests the Linux ARM64 Next.js/Rust artifact without production secrets. The repository-scoped self-hosted runner on the A1 only downloads that artifact, verifies it, combines it with the exact checkout's `public` tree, switches the release, and runs health checks. The production runner initiates an outbound GitHub connection, so deployment does not require widening the administrator-only SSH rule.
+
+The transient artifact deliberately excludes `public`, which is copied from the same verified Git SHA on the production runner. This avoids repeatedly storing the large static asset tree in GitHub Actions. The workflow deletes the artifact after every deploy attempt and does not create npm, Next, or Cargo caches. This keeps the first implementation within the private repository's included Actions storage while moving CPU-heavy builds off production.
 
 Treat write access to `main` as production deployment access. This private repository's current GitHub plan does not provide branch protection or repository rulesets, and the `Production` environment currently has no protection rules. Keep collaborator write access minimal; if the plan changes, require reviewed pull requests and protect the production environment before adding more writers.
 
@@ -114,7 +116,7 @@ sudo bash ./infra/oracle/install-deploy-automation.sh "$PWD"
 sudo -u aura-deploy sudo -n /usr/local/sbin/aura-board-deploy-release
 ```
 
-The second command is an end-to-end **live production deployment**, not a privilege-only smoke test, and must be run only during an approved release window. The sudo policy permits exactly that argument-free helper. The helper accepts only the fixed runner checkout path, locks concurrent releases, builds root-owned immutable ARM64 artifacts with the trusted copy of `build-release.sh`, switches both release links, restarts the Rust engine and Next.js app, verifies their process paths plus all three health endpoints, and records durable pending state. Errors and termination signals restore both previous links; a later run recovers an interrupted activation before starting another deployment.
+The second command is an end-to-end **live production deployment**, not a privilege-only smoke test, and must be run only during an approved release window. The sudo policy permits exactly that argument-free helper. In Actions, the helper requires the downloaded artifact at the fixed checkout path and publishes it through the root-owned `publish-ci-artifact.sh`; without an artifact it retains the existing on-host build path as an operator-only fallback. It locks concurrent releases, switches both release links, restarts the Rust engine and Next.js app, verifies their process paths plus all three health endpoints, and records durable pending state. Errors and termination signals restore both previous links; a later run recovers an interrupted activation before starting another deployment.
 
 Use `workflow_dispatch` for the first controlled deployment. After it succeeds, a push to `main` uses the same workflow automatically. Updating either deployment script does not update the trusted installed copy; review it and rerun `install-deploy-automation.sh` manually before relying on changed deployment behavior.
 

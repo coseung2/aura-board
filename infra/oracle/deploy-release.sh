@@ -5,6 +5,7 @@ readonly source_dir=/opt/actions-runner-aura-board/_work/aura-board/aura-board
 readonly app_root=/opt/aura-board-app
 readonly engine_root=/opt/aura-board-play-engine
 readonly build_script=/usr/local/libexec/aura-board/build-release.sh
+readonly publish_script=/usr/local/libexec/aura-board/publish-ci-artifact.sh
 readonly lock_file=/opt/aura-board-app/shared/locks/deploy.lock
 readonly build_root=/opt/aura-board-app/shared/builds
 readonly state_file=/opt/aura-board-app/shared/locks/deploy.pending
@@ -190,13 +191,19 @@ if [[ -e ${app_release} || -e ${engine_release} ]]; then
   verify_release "${engine_root}" "${engine_release}" "${release_id}"
   echo "release_reused=${release_id}"
 else
-  install -d -o root -g root -m 0755 "${build_root}"
-  build_dir=$(mktemp -d "${build_root}/${release_id}.XXXXXX")
-  git -C "${source_dir}" archive "${release_id}" | tar -x -C "${build_dir}"
-  chown -R aura-app:aura-app "${build_dir}"
-  "${build_script}" "${build_dir}" "${release_id}"
-  rm -rf -- "${build_dir}"
-  build_dir=
+  artifact_dir="${source_dir}/.deploy-artifact"
+  if [[ -s ${artifact_dir}/oracle-release.tar.gz && -s ${artifact_dir}/oracle-release.tar.gz.sha256 ]]; then
+    test -x "${publish_script}"
+    "${publish_script}" "${source_dir}" "${artifact_dir}" "${release_id}"
+  else
+    install -d -o root -g root -m 0755 "${build_root}"
+    build_dir=$(mktemp -d "${build_root}/${release_id}.XXXXXX")
+    git -C "${source_dir}" archive "${release_id}" | tar -x -C "${build_dir}"
+    chown -R aura-app:aura-app "${build_dir}"
+    "${build_script}" "${build_dir}" "${release_id}"
+    rm -rf -- "${build_dir}"
+    build_dir=
+  fi
 fi
 
 verify_release "${app_root}" "${app_release}" "${release_id}"

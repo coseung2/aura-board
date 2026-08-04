@@ -13,6 +13,7 @@ fi
 repo_root=$(readlink -f "$1")
 test -f "${repo_root}/infra/oracle/build-release.sh"
 test -f "${repo_root}/infra/oracle/deploy-release.sh"
+test -f "${repo_root}/infra/oracle/publish-ci-artifact.sh"
 test -f "${repo_root}/infra/oracle/aura-board-deploy.sudoers"
 id aura-deploy >/dev/null 2>&1
 test -s /etc/aura-board/build.env
@@ -25,6 +26,9 @@ install -o root -g root -m 0755 \
 install -o root -g root -m 0755 \
   "${repo_root}/infra/oracle/deploy-release.sh" \
   /usr/local/sbin/aura-board-deploy-release
+install -o root -g root -m 0755 \
+  "${repo_root}/infra/oracle/publish-ci-artifact.sh" \
+  /usr/local/libexec/aura-board/publish-ci-artifact.sh
 
 sudoers_temp=$(mktemp)
 trap 'rm -f "${sudoers_temp}"' EXIT
