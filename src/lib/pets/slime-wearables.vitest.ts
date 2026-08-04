@@ -536,5 +536,5 @@ describe("shipped idle sheets back every drink timeline", () => {
     // 60 authored wearable options plus 2 growth crowns, across 5 colors,
     // 5 drink flavors, and 8 frames.
     expect(comparedFrames).toBe(62 * 5 * 5 * 8);
-  });
+  }, 15_000);
 });

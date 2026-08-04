@@ -4,7 +4,6 @@
   margin: 0 auto;
   padding: 44px 32px 64px;
 }
-
 .header {
   display: flex;
   align-items: end;
@@ -80,27 +79,37 @@
 }
 
 .spriteSlot {
+  position: relative;
   display: grid;
+  /* Match the shared logical scene (64x64 * scale 2 => 128) and expanded
+     scene width (96 * 2 => 192). Never force a square host taller than the
+     sprite; vehicle art is authored on a 64x81 canvas and must keep that ratio. */
   width: 192px;
-  height: 192px;
+  min-height: 128px;
   place-items: center;
+  overflow: hidden;
+  background: transparent;
 }
 
 .spriteSlotScene {
   width: 100%;
-  min-height: 192px;
-  overflow: hidden;
+  max-width: 192px;
+  /* Expanded scene at scale 2 is 192 wide; height follows the sprite
+     (background scene or 64x81 vehicle canvas), not a square holder. */
+  min-height: 0;
   border-bottom: 1px solid rgba(24, 74, 92, 0.1);
-  background-color: var(--color-surface-alt);
-  background-image: linear-gradient(180deg, #f7fbff 0%, #edf6ff 100%);
-  background-position: center;
-  background-size: cover;
+  background-color: transparent;
+  background-image: none;
   image-rendering: pixelated;
 }
 
 .classroomSprite {
-  transform: scale(2);
-  transform-origin: center;
+  /* Let OfficialSlimeSprite own integer pixel size. Stretching to a square
+     host was turning the 64x81 vehicle scene into a 1:1 card. */
+  width: max-content;
+  max-width: 100%;
+  height: auto;
+  min-height: 0;
 }
 
 .placeholder {

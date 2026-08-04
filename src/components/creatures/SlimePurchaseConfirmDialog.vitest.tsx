@@ -29,6 +29,8 @@ describe("SlimePurchaseConfirmDialog", () => {
 
     expect(within(dialog).getByLabelText("구매 수량").textContent).toBe("3");
     expect(within(dialog).getByText(`${(cookie.price * 3).toLocaleString()}원`)).toBeTruthy();
+    expect(within(dialog).getByText("현재 잔액")).toBeTruthy();
+    expect(within(dialog).getByText("구매 후 잔액")).toBeTruthy();
 
     fireEvent.click(within(dialog).getByRole("button", { name: "구매하기" }));
     expect(onConfirm).toHaveBeenCalledWith(3);
@@ -80,6 +82,27 @@ describe("SlimePurchaseConfirmDialog", () => {
     expect(within(dialog).getByText("레드 슬라임")).toBeTruthy();
   });
 
+  it("adds the selected quantity to the cart when requested", () => {
+    const onAddToCart = vi.fn();
+    render(
+      <SlimePurchaseConfirmDialog
+        item={cookie}
+        previewColors={["blue"]}
+        balance={10_000}
+        unitLabel="원"
+        busy={false}
+        onCancel={vi.fn()}
+        onAddToCart={onAddToCart}
+        onConfirm={vi.fn()}
+      />,
+    );
+
+    const dialog = screen.getByRole("dialog", { name: cookie.labelKo });
+    fireEvent.click(within(dialog).getByRole("button", { name: "수량 늘리기" }));
+    fireEvent.click(within(dialog).getByRole("button", { name: "장바구니 담기" }));
+    expect(onAddToCart).toHaveBeenCalledWith(2);
+  });
+
   it("warns when the wallet looks short but still lets the server decide", () => {
     const onConfirm = vi.fn();
     render(
@@ -96,6 +119,7 @@ describe("SlimePurchaseConfirmDialog", () => {
 
     const dialog = screen.getByRole("dialog", { name: floor.labelKo });
     expect(within(dialog).getByRole("alert").textContent).toContain("잔액이 부족해요");
+    expect(within(dialog).getByText("-500원")).toBeTruthy();
 
     fireEvent.click(within(dialog).getByRole("button", { name: "구매하기" }));
     expect(onConfirm).toHaveBeenCalledWith(1);

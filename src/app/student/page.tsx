@@ -35,6 +35,7 @@ export default async function StudentPage({ searchParams }: StudentPageProps) {
           boards={home.boards}
           duties={home.duties}
           assignments={home.assignments}
+          dailyRewards={home.dailyRewards}
         />
       </main>
     </>

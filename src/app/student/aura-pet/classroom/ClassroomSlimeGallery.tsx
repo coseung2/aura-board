@@ -5,6 +5,7 @@ import { StudentPetSectionHeader } from "@/components/creatures/StudentPetSectio
 import { db } from "@/lib/db";
 import { getSlimeDefinition, getSlimeShopItem } from "@/lib/pets/catalog";
 import { sortClassroomSlimeStudents } from "@/lib/pets/classroom-gallery";
+import { visibleEquippedSlimeItemKeys } from "@/lib/pets/item-visibility";
 import type { SlimeColor, SlimeFloor, SlimeShopItem } from "@/lib/pets/types";
 import { getTitleDefinition } from "@/lib/title-catalog";
 
@@ -29,6 +30,7 @@ export async function ClassroomSlimeGallery({ classroomId }: Props) {
           color: true,
           growthStage: true,
           equippedItemKeys: true,
+          hiddenItemKeys: true,
           equippedTitleKey: true,
         },
         take: 1,
@@ -58,6 +60,7 @@ export async function ClassroomSlimeGallery({ classroomId }: Props) {
               color: representative.color as SlimeColor,
               growthStage: representative.growthStage as 1 | 2 | 3,
               equippedItemKeys: representative.equippedItemKeys,
+              hiddenItemKeys: representative.hiddenItemKeys,
               equippedTitleKey: representative.equippedTitleKey ?? null,
             }
           : null,
@@ -67,10 +70,7 @@ export async function ClassroomSlimeGallery({ classroomId }: Props) {
 
   return (
     <main className={styles.page}>
-      <StudentPetSectionHeader
-        active="classroom"
-        actions={<span className={styles.count}>{roster.length}명</span>}
-      />
+      <StudentPetSectionHeader active="classroom" />
 
       <section className={styles.stage} aria-label="우리 반 대표 펫 전시">
         <div
@@ -90,7 +90,10 @@ export async function ClassroomSlimeGallery({ classroomId }: Props) {
               ? getSlimeDefinition(row.representative.color)
               : null;
             const items = row.representative
-              ? row.representative.equippedItemKeys
+              ? visibleEquippedSlimeItemKeys(
+                  row.representative.equippedItemKeys,
+                  row.representative.hiddenItemKeys,
+                )
                   .map((key) => getSlimeShopItem(key))
                   .filter((item): item is SlimeShopItem => Boolean(item))
               : [];
@@ -103,13 +106,6 @@ export async function ClassroomSlimeGallery({ classroomId }: Props) {
             );
             const usesTrampoline = items.some(
               (item) => item.key === SLIME_TRAMPOLINE_ITEM_KEY,
-            );
-            const sceneBackground = items.reduce<SlimeShopItem | null>(
-              (background, item) =>
-                item.category === "background" && item.floor === null
-                  ? item
-                  : background,
-              null,
             );
             const hasScene = items.some(
               (item) =>
@@ -129,9 +125,6 @@ export async function ClassroomSlimeGallery({ classroomId }: Props) {
               <li key={row.id} className={styles.student}>
                 <div
                   className={`${styles.spriteSlot} ${hasScene ? styles.spriteSlotScene : ""}`.trim()}
-                  style={sceneBackground
-                    ? { backgroundImage: `url("${sceneBackground.spritePath}")` }
-                    : undefined}
                 >
                   {slime ? (
                     <SlimeCharacterSprite
@@ -142,6 +135,8 @@ export async function ClassroomSlimeGallery({ classroomId }: Props) {
                       action={action}
                       repeat={hasPassiveDrink}
                       equippedFloor={equippedFloor}
+                      scale={2}
+                      hostBackground
                     />
                   ) : (
                     <div

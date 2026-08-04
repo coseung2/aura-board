@@ -14,8 +14,7 @@ import {
   SLIME_COOKIE_PRICE,
   SLIME_SHOP_DEFAULT_PRICE,
   SLIME_SHOP_CATALOG,
-  SLIME_VEHICLE_CATALOG,
-} from "./catalog";
+  SLIME_VEHICLE_CATALOG, selectSceneBackgroundSpritePath} from "./catalog";
 import { SLIME_WEARABLE_CATALOG } from "./wearable-catalog";
 
 const ANIMATED_BACKGROUND_CONTRACT = [
@@ -427,8 +426,8 @@ describe("slime catalog", () => {
       ["american-football", "slime-ball-american-football", "미식축구공"],
       ["baseball", "slime-ball-baseball", "야구공"],
       ["basketball", "slime-ball-basketball", "농구공"],
-      ["black-ball", "slime-ball-black-ball", "검은 공"],
-      ["dark-blue-ball", "slime-ball-dark-blue-ball", "남색 공"],
+      ["black-ball", "slime-ball-black-ball", "당구공"],
+      ["dark-blue-ball", "slime-ball-dark-blue-ball", "볼링공"],
       ["soccer-ball", "slime-ball-soccer-ball", "축구공"],
       ["tennis-ball", "slime-ball-tennis-ball", "테니스공"],
     ]);
@@ -450,4 +449,23 @@ describe("slime catalog", () => {
     expect(getEquippedSlimeFloor(["slime-blue-drink-lemonade"])).toBe("none");
   });
 
+});
+
+describe("selectSceneBackgroundSpritePath", () => {
+  it("prefers the sharper mobile sheet when present", () => {
+    expect(
+      selectSceneBackgroundSpritePath({
+        spritePath: "/a/64.gif",
+        mobileSpritePath: "/a/128.gif",
+      }),
+    ).toBe("/a/128.gif");
+  });
+
+  it("falls back to the catalog preview path", () => {
+    expect(
+      selectSceneBackgroundSpritePath({
+        spritePath: "/a/64.gif",
+      }),
+    ).toBe("/a/64.gif");
+  });
 });

@@ -102,6 +102,46 @@ const LABELS_BY_ROLE: Readonly<Record<SlimeEquippableRole, Readonly<Record<strin
 };
 
 /**
+ * Product approval gate for the shop and equipment APIs.
+ *
+ * Keep every wearable that was already in production before batch-v2, plus the
+ * four approved batch-v2 deliveries. Other imported options remain available
+ * to the asset pipeline for review, but must not become purchasable merely
+ * because the generated registry contains production-ready animation tracks.
+ */
+const SHOP_APPROVED_WEARABLE_OPTIONS = new Set<string>([
+  // Existing production blush.
+  "peach-brush-blush",
+  "rose-brush-blush",
+  // Existing production eyewear.
+  "black-goggles",
+  "black-sunglasses",
+  "copper-goggles",
+  "gold-goggles",
+  "red-sunglasses",
+  "round-glasses",
+  "silver-goggles",
+  // Approved batch-v2 eyewear.
+  "crescent-moon-half-rim-glasses",
+  "prism-kaleidoscope-glasses",
+  // Existing production headwear.
+  "beige-beanie",
+  "brown-beanie",
+  "caramel-puppy-ear-headband",
+  "charcoal-beanie",
+  "cream-bunny-ear-headband",
+  "ivory-beanie",
+  "mauve-cat-ear-headband",
+  "pearl-ribbon-headband",
+  "purple-wizard-hat",
+  "red-baseball-cap",
+  "straw-hat",
+  // Approved batch-v2 headwear.
+  "lilac-origami-crane-fascinator",
+  "sprout-terrarium-dome-hat",
+]);
+
+/**
  * Price bands shared with the background and floor catalogs, so every shop
  * category reads on one scale.
  */
@@ -179,6 +219,7 @@ function buildCatalog(): readonly SlimeWearableCatalogItem[] {
   const items: SlimeWearableCatalogItem[] = [];
   for (const role of SLIME_EQUIPPABLE_ROLES) {
     for (const option of slimeWearableOptions(role)) {
+      if (!SHOP_APPROVED_WEARABLE_OPTIONS.has(option)) continue;
       const labelKo = LABELS_BY_ROLE[role][option];
       if (!labelKo) {
         throw new Error(`Missing Korean label for wearable ${role}/${option}`);

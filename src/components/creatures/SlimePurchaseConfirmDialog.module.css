@@ -1,7 +1,8 @@
 .backdrop {
   position: fixed;
   inset: 0;
-  z-index: 60;
+  /* Above student topnav so purchase preview is never covered. */
+  z-index: var(--z-modal-top, 2147483600);
   display: grid;
   place-items: center;
   padding: 1rem;
@@ -22,7 +23,7 @@
 .header {
   display: flex;
   align-items: baseline;
-  justify-content: space-between;
+  justify-content: flex-start;
   gap: 0.5rem;
 }
 
@@ -30,12 +31,6 @@
   margin: 0;
   font-size: 1.05rem;
   font-weight: 700;
-}
-
-.price {
-  margin: 0;
-  font-weight: 700;
-  color: var(--accent, #2563eb);
 }
 
 .previewArea {
@@ -90,27 +85,32 @@
 .arrow {
   position: absolute;
   z-index: 1;
-  width: 2rem;
-  height: 2rem;
-  border: none;
-  border-radius: 999px;
-  background: #fff;
-  font-size: 1.1rem;
-  line-height: 1;
+  display: inline-grid;
+  width: 2.75rem;
+  height: 2.75rem;
+  place-items: center;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--color-text-muted, #64748b);
   cursor: pointer;
-  box-shadow: 0 0.15rem 0.5rem rgb(15 23 42 / 15%);
 }
 
 .arrow:first-child {
-  left: 0.5rem;
+  left: 0.15rem;
 }
 
 .arrow:last-child {
-  right: 0.5rem;
+  right: 0.15rem;
+}
+
+.arrow:hover:not(:disabled),
+.arrow:focus-visible:not(:disabled) {
+  color: var(--color-text, #0f172a);
 }
 
 .arrow:disabled {
-  opacity: 0.4;
+  opacity: 0.35;
   cursor: default;
 }
 
@@ -190,20 +190,27 @@
 }
 
 .footer {
-  display: flex;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 0.5rem;
 }
 
+.footer:has(> :nth-child(2):last-child) {
+  grid-template-columns: 1fr 1fr;
+}
+
 .cancel,
+.cart,
 .confirm {
-  flex: 1;
+  min-height: 44px;
   padding: 0.7rem 0.5rem;
   border-radius: 0.85rem;
   font-weight: 700;
   cursor: pointer;
 }
 
-.cancel {
+.cancel,
+.cart {
   border: 1px solid rgb(148 163 184 / 55%);
   background: #fff;
 }
@@ -215,6 +222,7 @@
 }
 
 .cancel:disabled,
+.cart:disabled,
 .confirm:disabled {
   opacity: 0.55;
   cursor: default;

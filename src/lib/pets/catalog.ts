@@ -413,8 +413,8 @@ const SLIME_BALL_LABELS: Readonly<Record<SlimeBallSlug, string>> = {
   "american-football": "미식축구공",
   baseball: "야구공",
   basketball: "농구공",
-  "black-ball": "검은 공",
-  "dark-blue-ball": "남색 공",
+  "black-ball": "당구공",
+  "dark-blue-ball": "볼링공",
   "soccer-ball": "축구공",
   "tennis-ball": "테니스공",
 };
@@ -899,6 +899,16 @@ export function isSlimeSceneBackground(
   item: Pick<SlimeShopItem, "category" | "floor">,
 ): boolean {
   return item.category === "background" && item.floor === null;
+}
+
+/**
+ * Prefer the sharper mobile/web display sheet (usually 128px) for scene art.
+ * Falls back to the catalog preview path when a dedicated sheet is absent.
+ */
+export function selectSceneBackgroundSpritePath(
+  item: Pick<SlimeShopItem, "mobileSpritePath" | "spritePath">,
+): string {
+  return item.mobileSpritePath || item.spritePath;
 }
 
 /** Scene backgrounds, floors, and accessories occupy independent visual slots. */

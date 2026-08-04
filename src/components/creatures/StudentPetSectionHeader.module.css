@@ -1,118 +1,57 @@
-.header {
-  display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: 24px;
-  width: 100%;
-  margin: 0 0 28px;
-  border-bottom: 2px solid var(--color-text);
-}
-
-.heading {
-  min-width: 0;
-  padding: 0 0 14px;
-}
-
-.title {
-  margin: 0;
-  color: var(--color-text);
-  font-family: var(--font-display);
-  font-size: 32px;
-  font-weight: 700;
-  letter-spacing: -0.04em;
-  line-height: 1.15;
-}
-
-.description {
-  margin: 0;
-  color: var(--color-text-muted);
-  font-size: 13px;
-  line-height: 1.6;
-}
-
+/* Local content tabs only: sit directly above content, no page header/wallet. */
 .navigation {
   display: flex;
-  align-items: flex-end;
-  min-width: 0;
-  margin-left: auto;
-  margin-bottom: -2px;
+  width: 100%;
+  margin: 0 0 22px;
   overflow-x: auto;
-  overflow-y: hidden;
+  border-bottom: 1px solid var(--color-border);
+  scrollbar-width: none;
+}
+
+.navigation::-webkit-scrollbar {
+  display: none;
 }
 
 .navigation a {
   position: relative;
   display: inline-flex;
+  flex: 1 1 0;
   align-items: center;
   justify-content: center;
+  min-width: 0;
   min-height: 44px;
-  padding: 8px 14px;
+  padding: 0 8px;
   color: var(--color-text-muted);
-  font-size: 13px;
-  font-weight: 800;
+  font-size: 14px;
+  font-weight: 650;
   line-height: 1.4;
+  text-align: center;
   text-decoration: none;
   white-space: nowrap;
 }
 
-.navigation a + a::before {
+.navigation a::after {
   position: absolute;
+  right: 0;
+  bottom: -1px;
   left: 0;
-  top: 50%;
-  width: 1px;
-  height: 1em;
-  background: var(--color-border);
+  height: 2px;
+  background: transparent;
   content: "";
-  transform: translateY(-50%);
 }
 
-.navigation a:hover {
+.navigation a:hover,
+.navigation a.active,
+.navigation a[aria-current="page"] {
   color: var(--color-text);
 }
 
-.navigation a[aria-current="page"] {
-  color: var(--color-accent);
+.navigation a.active::after,
+.navigation a[aria-current="page"]::after {
+  background: var(--color-accent);
 }
 
 .navigation a:focus-visible {
   outline: 2px solid var(--color-accent-tinted-text);
   outline-offset: -2px;
-}
-
-.actions {
-  display: flex;
-  align-items: center;
-  min-height: 44px;
-  padding-bottom: 14px;
-}
-
-@media (max-width: 760px) {
-  .header {
-    align-items: flex-start;
-    flex-wrap: wrap;
-    gap: 4px;
-  }
-
-  .heading {
-    padding-bottom: 10px;
-  }
-
-  .title {
-    font-size: 28px;
-  }
-
-  .navigation {
-    width: 100%;
-    margin-left: 0;
-    order: 3;
-  }
-
-  .navigation a {
-    flex: 1 1 0;
-  }
-
-  .actions {
-    width: 100%;
-    padding: 10px 0 18px;
-  }
 }
