@@ -18,6 +18,7 @@ import {
   type SlimeShopItem,
 } from "../../lib/slimes";
 import { getApiBase } from "../../lib/api";
+import { calculateSlimePurchaseBalanceSummary } from "../../lib/slime-purchase-summary";
 import type { SlimeColor } from "../../lib/slime-assets";
 import {
   borders,
@@ -70,13 +71,16 @@ export function SlimePurchaseConfirmModal({
     colorPages[Math.min(pageIndex, colorPages.length - 1)] ?? "blue";
   const previewColor = slimeShopPreviewColor(item, activeColor);
   const maxQuantity = supportsQuantity ? SLIME_MAX_PURCHASE_QUANTITY : 1;
-  const total = item.price * quantity;
   /**
    * Advisory only. The wallet check that actually protects the ledger runs
    * server-side, so a stale client balance must never be the reason a student
    * cannot complete a purchase.
    */
-  const shortOnFunds = total > balance;
+  const balanceSummary = calculateSlimePurchaseBalanceSummary(
+    item.price,
+    quantity,
+    balance,
+  );
 
   const preview = useMemo(() => {
     const wearables = resolveEquippedSlimeWearables([item.key], [item]);
@@ -124,10 +128,6 @@ export function SlimePurchaseConfirmModal({
     >
       <View style={styles.header}>
         <Text style={styles.title}>{item.labelKo}</Text>
-        <Text style={styles.price}>
-          {item.price.toLocaleString()}
-          {unitLabel}
-        </Text>
       </View>
 
       <View
@@ -242,14 +242,30 @@ export function SlimePurchaseConfirmModal({
       ) : null}
 
       <View style={styles.row}>
-        <Text style={styles.rowLabel}>합계</Text>
+        <Text style={styles.rowLabel}>금액</Text>
         <Text style={styles.total}>
-          {total.toLocaleString()}
+          {balanceSummary.total.toLocaleString()}
           {unitLabel}
         </Text>
       </View>
 
-      {shortOnFunds ? (
+      <View style={styles.row}>
+        <Text style={styles.rowLabel}>현재 잔액</Text>
+        <Text style={styles.total}>
+          {balanceSummary.currentBalance.toLocaleString()}
+          {unitLabel}
+        </Text>
+      </View>
+
+      <View style={styles.row}>
+        <Text style={styles.rowLabel}>구매 후 잔액</Text>
+        <Text style={styles.total} accessibilityLiveRegion="polite">
+          {balanceSummary.remainingBalance.toLocaleString()}
+          {unitLabel}
+        </Text>
+      </View>
+
+      {balanceSummary.shortOnFunds ? (
         <Text style={styles.warning} accessibilityRole="alert">
           잔액이 부족해요.
         </Text>
@@ -288,10 +304,6 @@ const styles = StyleSheet.create({
     ...typography.title,
     color: colors.text,
   },
-  price: {
-    ...typography.body,
-    color: colors.textMuted,
-  },
   previewRow: {
     minHeight: slimeUi.purchasePreviewHeight,
     flexDirection: "row",
@@ -307,6 +319,9 @@ const styles = StyleSheet.create({
     minHeight: tapMin,
     alignItems: "center",
     justifyContent: "center",
+    borderWidth: borders.none,
+    borderRadius: radii.none,
+    backgroundColor: colors.transparent,
   },
   preview: {
     flex: 1,

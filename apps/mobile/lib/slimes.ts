@@ -68,6 +68,7 @@ export type SlimeCatalogItem = {
   effectKey: string;
   baseBuffBps: number;
   price: number;
+  purchaseCount?: number;
 };
 
 export type SlimeShopTier = 1 | 2 | 3;
@@ -120,6 +121,7 @@ export type SlimeShopItem = {
   vehicleSheetPath?: string;
   effectKey?: string;
   effectBps?: number;
+  purchaseCount?: number;
 };
 
 export const SLIME_WEARABLE_ROLES = ["blush", "eyewear", "headwear"] as const;
@@ -133,6 +135,7 @@ export type MobileSlimeWearableSelection = {
 };
 
 export type SlimeShopFilter =
+  | "all"
   | "character"
   | "background"
   | "floor"
@@ -143,6 +146,7 @@ export type SlimeShopFilter =
   | "level-up";
 
 export const SLIME_SHOP_NAV_ITEMS: readonly { key: SlimeShopFilter; label: string }[] = [
+  { key: "all", label: "전체" },
   { key: "character", label: "캐릭터" },
   { key: "floor", label: "바닥" },
   { key: "vehicle", label: "탈것" },
@@ -626,6 +630,10 @@ function normalizeCatalog(value: unknown): SlimeCatalogItem[] {
         effectKey: typeof entry.effectKey === "string" ? entry.effectKey : "",
         baseBuffBps: Math.max(0, Math.trunc(numberValue(entry.baseBuffBps))),
         price: Math.max(0, Math.trunc(numberValue(entry.price))),
+        purchaseCount: Math.max(
+          0,
+          Math.trunc(numberValue(entry.purchaseCount)),
+        ),
       },
     ];
   });
@@ -729,6 +737,10 @@ function normalizeShopCatalog(value: unknown): SlimeShopItem[] {
         vehicleSheetPath:
           typeof entry.vehicleSheetPath === "string" ? entry.vehicleSheetPath : undefined,
         effectKey: typeof entry.effectKey === "string" ? entry.effectKey : undefined,
+        purchaseCount: Math.max(
+          0,
+          Math.trunc(numberValue(entry.purchaseCount)),
+        ),
         effectBps:
           typeof entry.effectBps === "number"
             ? Math.max(0, Math.trunc(entry.effectBps))
@@ -1060,7 +1072,7 @@ export function normalizeSlimeClassroom(payload: unknown): MobileSlimeClassmate[
 
 export function shopFilterForItem(
   item: Pick<SlimeShopItem, "category" | "floor">,
-): Exclude<SlimeShopFilter, "character"> {
+): Exclude<SlimeShopFilter, "all" | "character"> {
   if (isSceneBackgroundItem(item)) return "background";
   // Vehicles are ridden above the floor rather than stood on, so they own the
   // 탈것 tab. `ride` is the pre-vehicle name for the same family.

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useMemo } from "react";
 import type { CSSProperties } from "react";
 
 import {
@@ -12,14 +12,35 @@ import {
   type SlimeColor,
   type SlimeEvolution,
   type SlimeFrame,
+  type SlimeSheetAction,
 } from "@/lib/pets/slime-assets";
+import {
+  resolveSlimeBallPropAsset,
+  resolveSlimePropAction,
+  slimePropFrameOffset,
+  type SlimePropAction,
+} from "@/lib/pets/slime-props";
 import {
   resolveSlimeWearables,
   type ResolvedSlimeWearable,
   type SlimeWearableSelection,
 } from "@/lib/pets/slime-wearables";
+import {
+  SLIME_DEFAULT_RENDERER_SCALE,
+  normalizeSlimeRendererScale,
+  resolveSlimeSpriteGeometry,
+  slimeFrameOffset,
+} from "@/lib/pets/slime-sprite-geometry";
 
 import styles from "./OfficialSlimeSprite.module.css";
+import {
+  useGroundedVehiclePlayback,
+  useSlimeSpritePlayback,
+} from "./useSlimeSpritePlayback";
+
+/** Single-pass H(x)*V(y) feather mask, identical to the mobile shared asset. */
+const SCENE_BACKGROUND_FEATHER_MASK =
+  "/creatures/slimes/official/shared/scene-background-feather-mask.png";
 
 export type OfficialSlimeSpriteProps = {
   slimeColor: SlimeColor;
@@ -32,15 +53,30 @@ export type OfficialSlimeSpriteProps = {
   growthStage?: number;
   action?: SlimeAction;
   equippedFloor?: EquippedFloor;
-  /** Integer logical viewport scale. Character art is authored at 64px; scene backgrounds may be authored at 64px or 128px while using the same logical viewport. */
+  /**
+   * Integer renderer scale for the logical 64px viewport.
+   * Prefer this over CSS transforms so vehicle passengers, effects, and pixel art stay on integer CSS pixels.
+   */
   scale?: number;
+  /** Alias for `scale`; kept for call sites that speak in renderer terms. */
+  rendererScale?: number;
   className?: string;
   alt?: string;
   dataSlimeColor?: SlimeColor;
-  /** Legacy shop props are complete character images, not sheet overlays. */
+  /**
+   * Legacy complete-GIF fallback for unsupported static props only.
+   * Catalog balls and drinks must use `propAction` composition instead.
+   */
   itemSpritePath?: string;
+  /**
+   * Composable equipped prop (ball / drink). Matches mobile pet-card contract:
+   * character, wearables, and vehicles remain layered.
+   */
+  propAction?: SlimePropAction | null;
   /** Optional scene art rendered behind every other visual layer. Sources may be 64x64 or 128x128 while remaining in the fixed 64px logical viewport. */
   backgroundSpritePath?: string;
+  /** Scene backgrounds feather by default; shop previews use an edge-to-edge image. */
+  featherBackground?: boolean;
   /**
    * Force the wider scene viewport before a scene asset is attached. Backgrounds,
    * floors, trampolines, and vehicles opt into it automatically.
@@ -103,69 +139,76 @@ export type OfficialSlimeSpriteProps = {
   /** Horizontal correction applied only to vehicle-owned art layers. */
   vehicleOffsetX?: number;
   /**
-   * Anchor-composed wearable layers. Each equipped option is one shared sheet
-   * repositioned per frame, so new drinks never require rebaking wearables.
+   * Anchor-composed wearable layers. Each equippable role is optional; omitted
+   * roles simply contribute no overlay.
    */
   wearables?: SlimeWearableSelection;
-  /** Drink flavor selecting the wearable drink timeline, such as `lemonade`. */
+  /** Drink flavor selecting the wearable drink timeline and character sheet. */
   drinkFlavor?: string | null;
-  /** Repeat a normally one-shot action when it is used as a passive preview. */
+  /** Loop one-shot actions when used as a passive preview. */
   repeat?: boolean;
   onComplete?: () => void;
 };
-
-const DEFAULT_SCALE = 1;
-const SCENE_SCALE = 1.5;
-const FLOOR_SCALE = 1.375;
-
-function integerScale(value: number | undefined): number {
-  if (!Number.isFinite(value)) return DEFAULT_SCALE;
-  return Math.max(1, Math.round(value as number));
-}
 
 function frameSourceStyle(
   frame: SlimeFrame,
   sheetWidth: number,
   sheetHeight: number,
   scale: number,
-  sourceOffsetY: number,
+  offsetY = 0,
 ): CSSProperties {
-  // Texture-packer's spriteSourceSize is the placement inside the untrimmed
-  // source frame. Keeping that placement here means trimmed and crowned
-  // (64x75) frames retain their authored footprint.
-  const left = (frame.spriteSourceSize.x - frame.frame.x) * scale;
-  const top = (frame.spriteSourceSize.y - frame.frame.y) * scale + sourceOffsetY;
-
+  const offset = slimeFrameOffset(frame, scale, offsetY);
   return {
     width: sheetWidth * scale,
     height: sheetHeight * scale,
-    transform: `translate(${left}px, ${top}px)`,
+    transform: `translate(${offset.left}px, ${offset.top}px)`,
   };
 }
 
 /**
- * Position one wearable frame inside the viewport.
- *
- * The sheet is shifted so the anchor's source column lands at the origin, then
- * nudged by the per-frame `(dx, dy)` offset authored for that timeline.
+ * Wearable sheets are clipped by a one-frame viewport. The packed sheet is
+ * shifted so the chosen source column lands at the origin, then nudged by the
+ * per-frame `(dx, dy)` offset authored for that timeline.
  *
  * Jump actions are authored on a taller canvas whose extra headroom sits above
  * the grounded pose, so `characterOffsetY` is subtracted to bring the overlay
  * back onto the character's own 64px viewport. Grounded actions report zero, so
  * both families share one formula.
  */
-function wearableStyle(
+/** Matches apps/mobile theme layers.spriteProp: prop drinks/balls sit above vehicles. */
+const SLIME_PROP_LAYER_Z = 501;
+
+function wearableViewportStyle(
   wearable: ResolvedSlimeWearable,
   scale: number,
+  sceneInsetX: number,
+  sceneInsetY: number,
   riderOffsetY = 0,
+  frontmost = false,
 ): CSSProperties {
-  const left = (-wearable.sourceFrame * wearable.frameSize.w + wearable.dx) * scale;
-  // Hats ride the head, so they take the same seat offset the character does.
-  const top = (wearable.dy - wearable.characterOffsetY) * scale + riderOffsetY;
+  return {
+    width: wearable.frameSize.w * scale,
+    height: wearable.frameSize.h * scale,
+    left: sceneInsetX + wearable.dx * scale,
+    top:
+      sceneInsetY +
+      (wearable.dy - wearable.characterOffsetY) * scale +
+      riderOffsetY,
+    // Inline z-index overrides CSS. Mobile wins propLayer (501) over vehicle
+    // (spriteItem+200). Without this, drink wearables stayed at 2+role and hid
+    // under the vehicle body at z-index 200.
+    zIndex: frontmost ? SLIME_PROP_LAYER_Z : 2 + wearable.zIndex,
+  };
+}
+
+function wearableSheetStyle(
+  wearable: ResolvedSlimeWearable,
+  scale: number,
+): CSSProperties {
   return {
     width: wearable.sheetWidth * scale,
     height: wearable.sheetHeight * scale,
-    transform: `translate(${left}px, ${top}px)`,
+    transform: `translate(${-wearable.sourceFrame * wearable.frameSize.w * scale}px, 0px)`,
   };
 }
 
@@ -186,12 +229,15 @@ export function OfficialSlimeSprite({
   growthStage,
   action = "idle",
   equippedFloor = "none",
-  scale: requestedScale = DEFAULT_SCALE,
+  scale: requestedScale,
+  rendererScale: requestedRendererScale,
   className = "",
   alt,
   dataSlimeColor,
   itemSpritePath,
+  propAction,
   backgroundSpritePath,
+  featherBackground = true,
   expandSceneSurfaces = false,
   vehicleSpritePath,
   vehicleGroundedSpritePath,
@@ -209,58 +255,148 @@ export function OfficialSlimeSprite({
   repeat = false,
   onComplete,
 }: OfficialSlimeSpriteProps) {
-  const scale = integerScale(requestedScale);
-  const resolution = useMemo(
-    () => resolveSlimeAsset({
-      slimeColor,
-      evolution,
-      action,
-      equippedFloor,
-      growthStage,
-      equippedHeadwear: wearables?.headwear ?? null,
-      drinkFlavor,
-    }),
-    [action, drinkFlavor, equippedFloor, evolution, growthStage, slimeColor, wearables?.headwear],
+  const scale = normalizeSlimeRendererScale(
+    requestedRendererScale ?? requestedScale ?? SLIME_DEFAULT_RENDERER_SCALE,
   );
-  const playbackKey = `${resolution.key}:${resolution.action}:${resolution.equippedFloor}`;
-  const [frameIndex, setFrameIndex] = useState(0);
-  const completedPlaybackRef = useRef<string | null>(null);
-  const onCompleteRef = useRef(onComplete);
+  const requestedPropAction = useMemo<SlimePropAction | null>(
+    () =>
+      propAction ??
+      (action === "drink" && drinkFlavor
+        ? {
+            kind: "drink",
+            itemKey: `drink:${drinkFlavor}`,
+            flavor: drinkFlavor,
+          }
+        : null),
+    [action, drinkFlavor, propAction],
+  );
+  const actionResolution = useMemo(
+    () => resolveSlimePropAction(action, requestedPropAction, equippedFloor),
+    [action, equippedFloor, requestedPropAction],
+  );
+  const resolution = useMemo(
+    () =>
+      resolveSlimeAsset({
+        slimeColor,
+        evolution,
+        action: actionResolution.characterAction,
+        equippedFloor,
+        growthStage,
+        equippedHeadwear: wearables?.headwear ?? null,
+        drinkFlavor:
+          actionResolution.prop?.kind === "drink"
+            ? actionResolution.prop.flavor
+            : drinkFlavor,
+      }),
+    [
+      actionResolution.characterAction,
+      actionResolution.prop,
+      drinkFlavor,
+      equippedFloor,
+      evolution,
+      growthStage,
+      slimeColor,
+      wearables?.headwear,
+    ],
+  );
+  const ballAsset =
+    actionResolution.prop?.kind === "ball"
+      ? resolveSlimeBallPropAsset(actionResolution.prop.slug, slimeColor)
+      : null;
+  const playbackKey = `${resolution.key}:${actionResolution.wearableAction}:${resolution.equippedFloor}:${actionResolution.prop?.itemKey ?? "none"}`;
+  const playbackFrameCount = ballAsset?.frameCount ?? resolution.frameCount;
+  const playbackLoops = Boolean(ballAsset) || resolution.loop;
+  const playbackIsOneShot = ballAsset ? false : resolution.oneShot;
+  const frameIndex = useSlimeSpritePlayback({
+    playbackKey,
+    frameCount: playbackFrameCount,
+    durationForFrame: (candidateFrame) =>
+      ballAsset
+        ? (ballAsset.durations[candidateFrame % ballAsset.frameCount] ?? 0)
+        : getSlimeFrame(resolution, candidateFrame).duration,
+    loops: playbackLoops,
+    oneShot: playbackIsOneShot,
+    repeat,
+    onComplete,
+  });
+
   const frame = getSlimeFrame(resolution, frameIndex);
   const staticFloor = resolution.staticFloor;
-  const puddleAsset = equippedFloor === "water-puddle"
-    ? SLIME_SHARED_ASSETS.sharedPuddle
-    : null;
+  const puddleAsset =
+    equippedFloor === "water-puddle" ? SLIME_SHARED_ASSETS.sharedPuddle : null;
   const puddleFrame = puddleAsset
-    ? puddleAsset.metadata.frames[frameIndex % puddleAsset.metadata.frames.length]
+    ? puddleAsset.metadata.frames[
+        frameIndex % puddleAsset.metadata.frames.length
+      ]
     : null;
-  const puddleStyle = puddleAsset && puddleFrame
-    ? frameSourceStyle(
-        puddleFrame,
-        puddleAsset.metadata.meta.size.w,
-        puddleAsset.metadata.meta.size.h,
-        scale,
-        0,
-      )
-    : undefined;
-  const floorRise = staticFloor
-    ? (staticFloor.slimeFootY - staticFloor.surfaceY) * scale
-    : 0;
-  // A vehicle lifts the slime on top of whatever the floor already contributed,
-  // so the two offsets add instead of overriding each other.
-  const vehicleRise = Math.max(0, Math.trunc(vehicleRiseY)) * scale;
-  const vehicleBob = vehicleBobY?.length
+  const vehicleBobSource = vehicleBobY?.length
     ? Math.trunc(vehicleBobY[frameIndex % vehicleBobY.length] ?? 0)
     : 0;
-  /**
-   * Rider offset: the seat height plus this frame's bob.
-   *
-   * `vehicleRiseY` alone would leave the slime still while its seat moves, so the
-   * authored bob is added here rather than baked into the character sheet.
-   */
-  // Authored bob values use screen coordinates: negative is upward. Preserve
-  // that sign so the rider follows the vehicle instead of moving against it.
-  const riderOffsetY = -vehicleRise + vehicleBob * scale;
+  const label = alt ?? `${slimeColor} 슬라임 ${resolution.action} 모습`;
+  const resolvedBackgroundSpritePath = resolveSpritePath(backgroundSpritePath);
+  const resolvedVehicleSpritePath = resolveSpritePath(vehicleSpritePath);
+  const resolvedVehicleGroundedSpritePath = resolveSpritePath(
+    vehicleGroundedSpritePath,
+  );
+  const resolvedVehicleEffectSpritePaths = (vehicleEffectSpritePaths ?? [])
+    .map(resolveSpritePath)
+    .filter((path): path is string => Boolean(path));
+  const hasVehicleScene = Boolean(
+    resolvedVehicleSpritePath ||
+      resolvedVehicleGroundedSpritePath ||
+      resolvedVehicleEffectSpritePaths.length,
+  );
+  // Scene art must never depend on every caller remembering a viewport opt-in.
+  // Avatar-only sprites remain 64px, while any visible scene surface gets the
+  // shared wider canvas automatically. Prop actions expand like mobile.
+  const hasExpandedSceneSurfaces = Boolean(
+    hasVehicleScene ||
+      resolvedBackgroundSpritePath ||
+      staticFloor ||
+      equippedFloor === "water-puddle" ||
+      equippedFloor === "trampoline" ||
+      requestedPropAction ||
+      expandSceneSurfaces,
+  );
+  const { geometry, viewportHeight } = resolveSlimeSpriteGeometry({
+    sourceWidth: frame.sourceSize.w,
+    sourceHeight: frame.sourceSize.h,
+    rendererScale: scale,
+    expandedScene: hasExpandedSceneSurfaces,
+    vehicleRiseY,
+    vehicleBobY: vehicleBobSource,
+    vehicleCharacterOffsetY,
+    vehicleOffsetX,
+    vehicleCanvasHeight,
+    staticFloor,
+  });
+  const {
+    baseWidth,
+    baseHeight,
+    sceneWidth,
+    sceneHeight,
+    sceneInsetX,
+    sceneInsetY,
+    floorWidth,
+    floorHeight,
+    floorInsetX,
+    riderOffsetY,
+    vehicleTop,
+    vehicleLeft,
+    vehicleCanvasHeight: vehicleCanvas,
+    vehicleFrameWidth,
+    expandedFloorTop,
+  } = geometry;
+  const puddleStyle =
+    puddleAsset && puddleFrame
+      ? frameSourceStyle(
+          puddleFrame,
+          puddleAsset.metadata.meta.size.w,
+          puddleAsset.metadata.meta.size.h,
+          scale,
+          0,
+        )
+      : undefined;
   const sheetStyle = frameSourceStyle(
     frame,
     resolution.metadata.meta.size.w,
@@ -268,52 +404,18 @@ export function OfficialSlimeSprite({
     scale,
     riderOffsetY,
   );
-  const label = alt ?? `${slimeColor} 슬라임 ${resolution.action} 모습`;
-  const resolvedBackgroundSpritePath = resolveSpritePath(backgroundSpritePath);
-  const resolvedVehicleSpritePath = resolveSpritePath(vehicleSpritePath);
-  const resolvedVehicleGroundedSpritePath = resolveSpritePath(vehicleGroundedSpritePath);
-  const resolvedVehicleEffectSpritePaths = (vehicleEffectSpritePaths ?? [])
-    .map(resolveSpritePath)
-    .filter((path): path is string => Boolean(path));
-  const hasVehicleScene = Boolean(
-    resolvedVehicleSpritePath
-      || resolvedVehicleGroundedSpritePath
-      || resolvedVehicleEffectSpritePaths.length,
-  );
-  // Scene art must never depend on every caller remembering a viewport opt-in.
-  // Avatar-only sprites remain 64px, while any visible scene surface gets the
-  // shared wider canvas automatically.
-  const hasExpandedSceneSurfaces = Boolean(
-    hasVehicleScene
-      || resolvedBackgroundSpritePath
-      || staticFloor
-      || equippedFloor === "water-puddle"
-      || equippedFloor === "trampoline"
-      || expandSceneSurfaces,
-  );
-  const baseWidth = frame.sourceSize.w * scale;
-  const baseHeight = frame.sourceSize.h * scale;
-  const sceneScale = hasExpandedSceneSurfaces ? SCENE_SCALE : 1;
-  const floorScale = hasExpandedSceneSurfaces ? FLOOR_SCALE : 1;
-  const sceneWidth = baseWidth * sceneScale;
-  const sceneHeight = baseHeight * sceneScale;
-  const sceneInsetX = (sceneWidth - baseWidth) / 2;
-  const sceneInsetY = (sceneHeight - baseHeight) / 2;
-  const floorWidth = baseWidth * floorScale;
-  const floorHeight = baseHeight * floorScale;
-  const floorInsetX = (sceneWidth - floorWidth) / 2;
-  const expandedFloorTop = staticFloor
-    ? sceneInsetY
-      + staticFloor.slimeFootY * scale
-      - staticFloor.surfaceY * scale * floorScale
-    : 0;
+  const ballPackedSheetSize = ballAsset
+    ? {
+        width: ballAsset.sheetWidth * scale,
+        height: ballAsset.sheetHeight * scale,
+      }
+    : null;
+  const ballOffset = ballAsset
+    ? slimePropFrameOffset(frameIndex, ballAsset, scale)
+    : null;
   const viewportStyle: CSSProperties = {
     width: sceneWidth,
-    height: Math.max(
-      sceneHeight,
-      sceneInsetY + baseHeight + floorRise + vehicleRise,
-      staticFloor ? expandedFloorTop + floorHeight : 0,
-    ),
+    height: viewportHeight,
   };
   /**
    * Vehicle sheets share the character's frame clock, so a rider and its ride
@@ -329,92 +431,93 @@ export function OfficialSlimeSprite({
    * rider, but a constant-rate rotation driven by that variable timing would
    * speed up and slow down within one loop.
    */
-  const [groundedFrame, setGroundedFrame] = useState(0);
-  useEffect(() => {
-    if (!vehicleGroundedSpritePath || vehicleGroundedFrames <= 1) return;
-    const period = Math.max(16, Math.trunc(vehicleGroundedFrameDurationMs));
-    const timer = window.setInterval(() => {
-      setGroundedFrame((current) => (current + 1) % vehicleGroundedFrames);
-    }, period);
-    return () => window.clearInterval(timer);
-  }, [vehicleGroundedFrameDurationMs, vehicleGroundedFrames, vehicleGroundedSpritePath]);
+  const groundedFrame = useGroundedVehiclePlayback({
+    enabled: Boolean(vehicleGroundedSpritePath),
+    frameCount: vehicleGroundedFrames,
+    frameDurationMs: vehicleGroundedFrameDurationMs,
+  });
 
   /**
    * Vehicle art is authored on a taller canvas whose headroom sits above the
-   * grounded pose. Static floors align their surface to the fixed slime-foot
-   * baseline independently, so adding `floorRise` here would sink the vehicle.
+   * grounded pose. Geometry already subtracts characterOffsetY so the art lands
+   * on the fixed slime-foot baseline without reapplying floor rise.
    */
-  const vehicleTop = -Math.trunc(vehicleCharacterOffsetY) * scale;
-  const vehicleLeft = Math.trunc(vehicleOffsetX) * scale;
   const vehicleSheetStyle = (
     sheetFrames: number,
     activeFrame: number,
   ): CSSProperties => ({
-    width: 64 * sheetFrames * scale,
-    height: Math.trunc(vehicleCanvasHeight) * scale,
-    transform: `translate(${-(activeFrame % sheetFrames) * 64 * scale}px, 0px)`,
+    width: vehicleFrameWidth * sheetFrames,
+    height: vehicleCanvas * scale,
+    transform: `translate(${-(activeFrame % sheetFrames) * vehicleFrameWidth}px, 0px)`,
   });
+
   // Wearables compose onto the character sheet. Legacy complete-GIF props
   // replace that sheet entirely, so the two paths stay mutually exclusive.
   // The head slot is owned by the resolver: it decides whether this action draws
   // the growth crown, a player hat, or nothing. Other roles come from the
-  // caller's selection. Legacy complete-GIF props replace the character sheet
-  // entirely, so they suppress all composition.
-  const resolvedWearables = useMemo(
-    () => {
-      if (itemSpritePath || resolution.composition.mode !== "composed") return [];
-      // The resolver owns the head slot, including whether this action draws it.
-      // Other roles pass through so a chosen drink always shows its own flavor.
-      const selection = { ...wearables, headwear: resolution.renderedHeadwear };
-      return resolveSlimeWearables(
-        selection,
-        slimeColor,
-        resolution.resolvedAction,
-        frameIndex,
-        resolution.drinkFlavor,
-      );
-    },
-    [
-      frameIndex,
-      itemSpritePath,
-      resolution.composition.mode,
-      resolution.drinkFlavor,
-      resolution.renderedHeadwear,
-      resolution.resolvedAction,
+  // caller's selection. Ball action drives wearableAction "ball-hit".
+  const resolvedWearables = useMemo(() => {
+    if (itemSpritePath || resolution.composition.mode !== "composed") return [];
+    const selection = { ...wearables, headwear: resolution.renderedHeadwear };
+    // ball-hit is a wearable timeline key, not a character sheet action.
+    // Web wearable resolver is typed to sheet actions; ball-hit is a valid
+    // generated timeline key and matches the mobile wearable action contract.
+    return resolveSlimeWearables(
+      selection,
       slimeColor,
-      wearables,
-    ],
+      actionResolution.wearableAction as unknown as SlimeSheetAction,
+      frameIndex,
+      resolution.drinkFlavor,
+    );
+  }, [
+    actionResolution.wearableAction,
+    frameIndex,
+    itemSpritePath,
+    resolution.composition.mode,
+    resolution.drinkFlavor,
+    resolution.renderedHeadwear,
+    slimeColor,
+    wearables,
+  ]);
+  const equipmentWearables = resolvedWearables.filter(
+    (wearable) => wearable.role !== "drink",
+  );
+  const propWearables = resolvedWearables.filter(
+    (wearable) => wearable.role === "drink",
   );
 
-  useEffect(() => {
-    onCompleteRef.current = onComplete;
-  }, [onComplete]);
 
-  useEffect(() => {
-    setFrameIndex(0);
-    completedPlaybackRef.current = null;
-  }, [playbackKey]);
-
-  useEffect(() => {
-    const currentFrame = getSlimeFrame(resolution, frameIndex);
-    const timeoutId = window.setTimeout(() => {
-      const isLastFrame = frameIndex >= resolution.frameCount - 1;
-      if (resolution.oneShot && !repeat && isLastFrame) {
-        if (completedPlaybackRef.current !== playbackKey) {
-          completedPlaybackRef.current = playbackKey;
-          onCompleteRef.current?.();
-        }
-        return;
-      }
-
-      setFrameIndex((current) => {
-        if (resolution.loop || repeat) return (current + 1) % resolution.frameCount;
-        return Math.min(current + 1, resolution.frameCount - 1);
-      });
-    }, Math.max(0, currentFrame.duration));
-
-    return () => window.clearTimeout(timeoutId);
-  }, [frameIndex, playbackKey, repeat, resolution]);
+  const renderWearableLayers = (
+    items: readonly ResolvedSlimeWearable[],
+    frontmost = false,
+  ) =>
+    items.map((wearable) => (
+      <div
+        key={wearable.key}
+        className={`${styles.frameViewport} ${frontmost ? styles.propLayer : styles.wearableFrame}`.trim()}
+        style={wearableViewportStyle(
+          wearable,
+          scale,
+          sceneInsetX,
+          sceneInsetY,
+          riderOffsetY,
+          frontmost,
+        )}
+        data-wearable-role={wearable.role}
+        data-wearable-source-frame={wearable.sourceFrame}
+        data-slime-prop-overlay={frontmost ? "true" : undefined}
+      >
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={wearable.imageUrl}
+          alt=""
+          aria-hidden="true"
+          className={styles.sheet}
+          style={wearableSheetStyle(wearable, scale)}
+          draggable={false}
+        />
+      </div>
+    ));
 
   return (
     <div
@@ -427,24 +530,39 @@ export function OfficialSlimeSprite({
       data-slime-action={resolution.action}
       data-equipped-floor={resolution.equippedFloor}
       data-item-sprite-path={itemSpritePath}
+      data-prop-action={actionResolution.prop?.itemKey}
+      data-prop-kind={actionResolution.prop?.kind}
       data-background-sprite-path={resolvedBackgroundSpritePath ?? undefined}
       data-frame-index={frameIndex}
-      data-frame-duration={frame.duration}
-      data-wearable-keys={resolvedWearables.length > 0
-        ? resolvedWearables.map((wearable) => wearable.key).join(",")
-        : undefined}
+      data-frame-duration={
+        ballAsset
+          ? ballAsset.durations[frameIndex % ballAsset.frameCount]
+          : frame.duration
+      }
+      data-wearable-keys={
+        resolvedWearables.length > 0
+          ? resolvedWearables.map((wearable) => wearable.key).join(",")
+          : undefined
+      }
       data-head-slot={resolution.headSlot?.option ?? undefined}
       data-head-slot-source={resolution.headSlot?.source ?? undefined}
       data-composition-mode={resolution.composition.mode}
-      data-floor-offset-source-pixels={staticFloor ? staticFloor.slimeFootY - staticFloor.surfaceY : 0}
+      data-floor-offset-source-pixels={
+        staticFloor ? staticFloor.slimeFootY - staticFloor.surfaceY : 0
+      }
       data-expanded-scene={hasExpandedSceneSurfaces ? "true" : "false"}
+      data-renderer-scale={scale}
+      data-scene-width={sceneWidth}
+      data-scene-height={sceneHeight}
+      data-vehicle-rise={geometry.vehicleRise}
+      data-vehicle-top={vehicleTop}
+      data-vehicle-left={vehicleLeft}
+      data-rider-offset-y={riderOffsetY}
     >
       {resolvedBackgroundSpritePath ? (
-        // Scene art may be authored at 64x64 or 128x128. Keep it in the same
-        // logical 64x64 viewport below floor, character, prop, and crown layers.
         <div
-          className={styles.backgroundFeather}
-          data-background-feather="responsive-edge"
+          className={featherBackground ? styles.backgroundFeather : styles.backgroundFull}
+          data-background-feather={featherBackground ? "mask-product" : "none"}
           style={{ width: sceneWidth, height: sceneHeight }}
         >
           {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -460,11 +578,14 @@ export function OfficialSlimeSprite({
       ) : null}
       {puddleAsset && puddleFrame ? (
         <div
-          className={`${styles.characterFrame} ${styles.floorUnder}`}
-          style={{ width: baseWidth, height: baseHeight, left: sceneInsetX, top: sceneInsetY }}
+          className={`${styles.frameViewport} ${styles.floorUnder}`}
+          style={{
+            width: baseWidth,
+            height: baseHeight,
+            left: sceneInsetX,
+            top: sceneInsetY,
+          }}
         >
-          {/* Keep the shared puddle as an independent floor layer so complete
-              prop GIFs can compose above it instead of replacing it. */}
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src={puddleAsset.sheetUrl}
@@ -477,8 +598,6 @@ export function OfficialSlimeSprite({
         </div>
       ) : null}
       {staticFloor ? (
-        // The floor owns a separate lower slot. Its authored surface aligns
-        // exactly with the unchanged character foot baseline.
         // eslint-disable-next-line @next/next/no-img-element
         <img
           src={staticFloor.imageUrl}
@@ -495,8 +614,6 @@ export function OfficialSlimeSprite({
         />
       ) : null}
       {itemSpritePath && equippedFloor === "trampoline" ? (
-        // The official trampoline sheets combine character and floor. This
-        // extracted shared floor preserves composition with complete props.
         // eslint-disable-next-line @next/next/no-img-element
         <img
           src="/creatures/slimes/official/shared/trampoline-floor.png"
@@ -514,15 +631,14 @@ export function OfficialSlimeSprite({
       ) : null}
       {resolvedVehicleGroundedSpritePath ? (
         <div
-          className={`${styles.vehicleFrame} ${styles.floorUnder}`}
+          className={`${styles.frameViewport} ${styles.floorUnder}`}
           style={{
-            width: 64 * scale,
-            height: Math.trunc(vehicleCanvasHeight) * scale,
+            width: vehicleFrameWidth,
+            height: vehicleCanvas * scale,
             left: sceneInsetX + vehicleLeft,
             top: sceneInsetY + vehicleTop,
           }}
         >
-          {/* Parts that must not move with the body, such as wheels. */}
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src={resolvedVehicleGroundedSpritePath}
@@ -535,9 +651,7 @@ export function OfficialSlimeSprite({
         </div>
       ) : null}
       {itemSpritePath ? (
-        // Older shop props are authored as complete looping GIFs. Render the
-        // persisted prop in the same viewport while keeping the semantic
-        // asset metadata above for callers and accessibility.
+        // Unsupported legacy static props only. Catalog balls/drinks use propAction.
         // eslint-disable-next-line @next/next/no-img-element
         <img
           src={itemSpritePath}
@@ -554,12 +668,43 @@ export function OfficialSlimeSprite({
           }}
           draggable={false}
         />
+      ) : ballAsset && ballPackedSheetSize && ballOffset ? (
+        <div
+          className={styles.frameViewport}
+          data-slime-ball-action-layer="true"
+          style={{
+            width: sceneWidth,
+            height: sceneHeight,
+            left: 0,
+            top: riderOffsetY,
+            zIndex: 1,
+          }}
+        >
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={ballAsset.actionSheetUrl}
+            alt=""
+            aria-hidden="true"
+            className={styles.sheet}
+            style={{
+              width: ballPackedSheetSize.width,
+              height: ballPackedSheetSize.height,
+              transform: `translate(${ballOffset.left}px, ${ballOffset.top}px)`,
+            }}
+            draggable={false}
+          />
+        </div>
       ) : (
         <div
-          className={styles.characterFrame}
-          style={{ width: baseWidth, height: baseHeight, left: sceneInsetX, top: sceneInsetY }}
+          className={styles.frameViewport}
+          data-slime-character-layer="true"
+          style={{
+            width: baseWidth,
+            height: baseHeight,
+            left: sceneInsetX,
+            top: sceneInsetY,
+          }}
         >
-          {/* The raw packed sheet is intentionally not a Next Image. */}
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src={resolution.sheetUrl}
@@ -569,39 +714,21 @@ export function OfficialSlimeSprite({
             style={sheetStyle}
             draggable={false}
           />
-          {resolvedWearables.map((wearable) => (
-            // One shared sheet per option; the anchor track supplies this
-            // frame's source column and offset.
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              key={wearable.key}
-              src={wearable.imageUrl}
-              alt=""
-              aria-hidden="true"
-              className={styles.wearable}
-              style={{
-                ...wearableStyle(wearable, scale, riderOffsetY),
-                zIndex: 2 + wearable.zIndex,
-              }}
-              data-wearable-role={wearable.role}
-              data-wearable-source-frame={wearable.sourceFrame}
-              draggable={false}
-            />
-          ))}
         </div>
       )}
+      {!itemSpritePath ? renderWearableLayers(equipmentWearables) : null}
       {resolvedVehicleSpritePath ? (
         <div
-          className={styles.vehicleFrame}
+          className={styles.frameViewport}
+          data-slime-vehicle-layer="true"
           style={{
-            width: 64 * scale,
-            height: Math.trunc(vehicleCanvasHeight) * scale,
+            width: vehicleFrameWidth,
+            height: vehicleCanvas * scale,
             left: sceneInsetX + vehicleLeft,
             top: sceneInsetY + vehicleTop,
             zIndex: 200,
           }}
         >
-          {/* The vehicle itself sits above every character layer. */}
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src={resolvedVehicleSpritePath}
@@ -616,10 +743,10 @@ export function OfficialSlimeSprite({
       {resolvedVehicleEffectSpritePaths.map((path, index) => (
         <div
           key={path}
-          className={styles.vehicleFrame}
+          className={styles.frameViewport}
           style={{
-            width: 64 * scale,
-            height: Math.trunc(vehicleCanvasHeight) * scale,
+            width: vehicleFrameWidth,
+            height: vehicleCanvas * scale,
             left: sceneInsetX + vehicleLeft,
             top: sceneInsetY + vehicleTop,
             zIndex: 301 + index,
@@ -637,10 +764,8 @@ export function OfficialSlimeSprite({
         </div>
       ))}
       {resolution.happyHeart ? (
-        // The happy heart is a runtime top layer, separate from wearable and
-        // vehicle sheets. Keep it last so web and mobile share the same order.
         <div
-          className={styles.characterFrame}
+          className={styles.frameViewport}
           style={{
             width: baseWidth,
             height: baseHeight,
@@ -661,6 +786,34 @@ export function OfficialSlimeSprite({
           />
         </div>
       ) : null}
+      {ballAsset && ballPackedSheetSize && ballOffset ? (
+        <div
+          className={`${styles.frameViewport} ${styles.propLayer}`}
+          data-slime-prop-overlay="true"
+          data-slime-ball-prop-layer="true"
+          style={{
+            width: sceneWidth,
+            height: sceneHeight,
+            left: 0,
+            top: riderOffsetY,
+          }}
+        >
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={ballAsset.overlaySheetUrl}
+            alt=""
+            aria-hidden="true"
+            className={styles.sheet}
+            style={{
+              width: ballPackedSheetSize.width,
+              height: ballPackedSheetSize.height,
+              transform: `translate(${ballOffset.left}px, ${ballOffset.top}px)`,
+            }}
+            draggable={false}
+          />
+        </div>
+      ) : null}
+      {!itemSpritePath ? renderWearableLayers(propWearables, true) : null}
     </div>
   );
 }

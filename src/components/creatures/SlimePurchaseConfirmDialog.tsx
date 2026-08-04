@@ -13,6 +13,7 @@ import {
   SLIME_MAX_PURCHASE_QUANTITY,
   slimeShopPreviewColor,
 } from "@/lib/pets/catalog";
+import { calculateSlimePurchaseBalanceSummary } from "@/lib/pets/slime-purchase-summary";
 import type { SlimeColor, SlimeShopItem } from "@/lib/pets/types";
 import styles from "./SlimePurchaseConfirmDialog.module.css";
 
@@ -56,6 +57,7 @@ export function SlimePurchaseConfirmDialog({
   onConfirm,
 }: Props) {
   const titleId = useId();
+  const balanceSummaryId = useId();
   const supportsQuantity = item.key === SLIME_COOKIE_ITEM_KEY;
   const [quantity, setQuantity] = useState(1);
   const [pageIndex, setPageIndex] = useState(0);
@@ -65,8 +67,8 @@ export function SlimePurchaseConfirmDialog({
   const activeColor = colors[Math.min(pageIndex, colors.length - 1)] ?? "blue";
   const previewColor = slimeShopPreviewColor(item, activeColor);
   const wearables = slimeWearablesFromItems([item]);
-    const isDrink = item.category === "drink";
-    const isFood = item.category === "food";
+  const isDrink = item.category === "drink";
+  const isFood = item.category === "food";
   const isBall = item.key.startsWith("slime-ball-");
   const isVehicle = item.category === "vehicle" || item.category === "ride";
   const usesTrampoline = item.key === SLIME_TRAMPOLINE_ITEM_KEY;
@@ -77,13 +79,16 @@ export function SlimePurchaseConfirmDialog({
   const itemSpritePath = isBall
     ? slimeItemSpritePath(item, previewColor)
     : undefined;
-  const total = item.price * quantity;
   /**
    * Advisory only. The wallet check that actually protects the ledger runs
    * server-side, so a stale client balance must never be the reason a student
    * cannot complete a purchase.
    */
-  const shortOnFunds = total > balance;
+  const balanceSummary = calculateSlimePurchaseBalanceSummary(
+    item.price,
+    quantity,
+    balance,
+  );
 
   useEffect(() => {
     cancelRef.current?.focus();
@@ -110,6 +115,7 @@ export function SlimePurchaseConfirmDialog({
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
+        aria-describedby={balanceSummaryId}
         onClick={(event) => event.stopPropagation()}
       >
         <header className={styles.header}>
@@ -138,7 +144,15 @@ export function SlimePurchaseConfirmDialog({
             <OfficialSlimeSprite
               slimeColor={previewColor}
               evolution="base"
-                action={usesTrampoline ? "floor-interaction" : isDrink ? "drink" : isFood ? "happy" : "idle"}
+              action={
+                usesTrampoline
+                  ? "floor-interaction"
+                  : isDrink
+                    ? "drink"
+                    : isFood
+                      ? "happy"
+                      : "idle"
+              }
               equippedFloor={equippedFloor}
               itemSpritePath={itemSpritePath}
               expandSceneSurfaces={sceneBackground}
@@ -212,12 +226,28 @@ export function SlimePurchaseConfirmDialog({
         <div className={styles.totalRow}>
           <span className={styles.rowLabel}>금액</span>
           <strong className={styles.total}>
-            {total.toLocaleString()}
+            {balanceSummary.total.toLocaleString()}
             {unitLabel}
           </strong>
         </div>
 
-        {shortOnFunds ? (
+        <div className={styles.totalRow}>
+          <span className={styles.rowLabel}>현재 잔액</span>
+          <strong className={styles.total}>
+            {balanceSummary.currentBalance.toLocaleString()}
+            {unitLabel}
+          </strong>
+        </div>
+
+        <div id={balanceSummaryId} className={styles.totalRow}>
+          <span className={styles.rowLabel}>구매 후 잔액</span>
+          <strong className={styles.total} aria-live="polite">
+            {balanceSummary.remainingBalance.toLocaleString()}
+            {unitLabel}
+          </strong>
+        </div>
+
+        {balanceSummary.shortOnFunds ? (
           <p className={styles.warning} role="alert">
             잔액이 부족해요.
           </p>
@@ -240,7 +270,7 @@ export function SlimePurchaseConfirmDialog({
               onClick={() => onAddToCart(quantity)}
               disabled={busy}
             >
-              장바구니
+              장바구니 담기
             </button>
           ) : null}
           <button
@@ -249,7 +279,7 @@ export function SlimePurchaseConfirmDialog({
             onClick={() => onConfirm(quantity)}
             disabled={busy}
           >
-            {busy ? "구매 중…" : "구매"}
+            {busy ? "구매 중…" : "구매하기"}
           </button>
         </footer>
       </div>

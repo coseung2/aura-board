@@ -13,14 +13,8 @@ import {
 import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Image, type ImageProps } from "expo-image";
+import { CircleAlert, CircleCheck, Star } from "lucide-react-native";
 import {
-  Ban,
-  CircleAlert,
-  CircleCheck,
-  Star,
-} from "lucide-react-native";
-import {
-  AppBottomSheet,
   AppButton,
   AppHeader,
   BarePressable,
@@ -35,6 +29,11 @@ import {
   SlimeSprite,
 } from "../../components/slime/SlimeSprite";
 import { SlimePurchaseConfirmModal } from "../../components/slime/SlimePurchaseConfirmModal";
+import { SlimeWardrobeSheet } from "../../components/slime/SlimeWardrobeSheet";
+import {
+  SlimeCharacterCatalogCard,
+  SlimeShopItemCard,
+} from "../../components/slime/SlimeShopCatalogCards";
 import { StudentHeaderActions } from "../../components/StudentHeaderActions";
 import { WalkingTitleSlot } from "../../components/WalkingTitleSlot";
 import { equipPetTitle } from "../../lib/titles";
@@ -68,7 +67,6 @@ import {
   shopFilterForItem,
   slimeShopPreviewColor,
   slimeShopNavItems,
-  slimeVisualItemSlot,
   SLIME_COOKIE_ITEM_KEY,
   SLIME_COLOR_LABELS,
   SLIME_STAGE_LABELS,
@@ -80,6 +78,14 @@ import {
   type SlimeShopFilter,
 } from "../../lib/slimes";
 import { resolveEquippedSlimePropAction } from "../../lib/slime-props";
+import {
+  buildSlimeShopOverviewSections,
+  optimisticallyEquipSlimeItem,
+  slimeWardrobeFilterForItem,
+  slimeWardrobeItemWearerLabel,
+  slimeWardrobeNavItems,
+  type SlimeWardrobeFilter as WardrobeFilter,
+} from "../../lib/slime-shop-presentation";
 import {
   prioritizeEquippedSlimeItems,
   setSlimeItemHidden,
@@ -128,26 +134,8 @@ type SlimeVisibilityResponse = Pick<
   isHidden: boolean;
 };
 type LocalImageSource = ImageProps["source"];
-type WardrobeFilter =
-  | "background"
-  | "floor"
-  | "vehicle"
-  | "drink"
-  | "prop"
-  | "outfit"
-  | "title";
-
 const DISABLED_COOKIE_SOURCE = require("../../assets/slimes/shared/cookie-shop-icon-256-disabled.png");
 const SLIME_TRAMPOLINE_ITEM_KEY = "slime-blue-trampoline";
-
-const WARDROBE_NAV_ITEMS: readonly { key: WardrobeFilter; label: string }[] = [
-  { key: "floor", label: "바닥" },
-  { key: "vehicle", label: "탈것" },
-  { key: "drink", label: "음료" },
-  { key: "prop", label: "소품" },
-  { key: "outfit", label: "착장" },
-  { key: "title", label: "칭호" },
-];
 
 const ERROR_LABELS: Record<string, string> = {
   insufficient_funds: "잔액이 부족해요.",
@@ -192,44 +180,6 @@ const SLIME_EFFECT_DESCRIPTIONS: Record<string, string> = {
   comment_reward: "게시물에 댓글을 달았을 때의 보상이 UP!",
 };
 
-const SLIME_EFFECT_CHIP_LABELS: Record<string, string> = {
-  growth_speed: "성장",
-  reading_reward: "독서",
-  walking_reward: "걷기",
-  assignment_reward: "과제",
-  comment_reward: "댓글",
-};
-
-function shopItemBuffLabel(item: SlimeShopItem): string | null {
-  if (!item.effectKey || !item.effectBps) return null;
-  const label = SLIME_EFFECT_CHIP_LABELS[item.effectKey] ?? SLIME_EFFECT_LABELS[item.effectKey] ?? item.effectKey;
-  return `${label} +${item.effectBps / 100}%`;
-}
-
-function buffChipTier(bps: number): "bronze" | "silver" | "gold" {
-  if (bps > 200) return "gold";
-  if (bps > 100) return "silver";
-  return "bronze";
-}
-
-const BUFF_TIER_ICON = {
-  bronze: require("../../assets/ui/buff-tiers/buff-tier-bronze.png"),
-  silver: require("../../assets/ui/buff-tiers/buff-tier-silver.png"),
-  gold: require("../../assets/ui/buff-tiers/buff-tier-gold.png"),
-} as const;
-
-function BuffTierChip({ label, bps }: { label: string; bps: number }) {
-  const tier = buffChipTier(bps);
-  return (
-    <View style={styles.itemPreviewBuff} pointerEvents="none" accessible={false}>
-      <Image source={BUFF_TIER_ICON[tier]} style={styles.itemPreviewBuffIcon} contentFit="contain" />
-      <Text style={styles.itemPreviewBuffText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.72}>
-        {label}
-      </Text>
-    </View>
-  );
-}
-
 function formatBuffPercent(bps: number): string {
   return `${(bps / 100).toLocaleString("ko-KR", { maximumFractionDigits: 2 })}%`;
 }
@@ -255,118 +205,6 @@ function itemFloor(item: SlimeShopItem): Exclude<EquippedFloor, "none"> | null {
     : null;
 }
 
-function optimisticallyEquipItem(
-  current: MobileSlimeHome,
-  targetColor: SlimeColor,
-  item: SlimeShopItem,
-  isEquipped: boolean,
-): MobileSlimeHome {
-  const slot = slimeVisualItemSlot(item);
-  if (!slot) return current;
-  const catalogByKey = new Map(current.shopCatalog.map((candidate) => [candidate.key, candidate]));
-  const nextItemsByColor = { ...current.equippedItemsByColor };
-  const nextHiddenByColor = { ...current.hiddenItemsByColor };
-
-  for (const color of current.ownedColors) {
-    let keys = [...(current.equippedItemsByColor[color] ?? [])];
-    if (color === targetColor) {
-      keys = keys.filter((key) => key !== item.key);
-      if (isEquipped) {
-        keys = keys.filter((key) => {
-          const candidate = catalogByKey.get(key);
-          return !candidate || slimeVisualItemSlot(candidate) !== slot;
-        });
-        keys.push(item.key);
-      }
-    } else if (isEquipped) {
-      // One purchased item can move between pets, but cannot be duplicated.
-      keys = keys.filter((key) => key !== item.key);
-    }
-    nextItemsByColor[color] = keys;
-    const equipped = new Set(keys);
-    nextHiddenByColor[color] = (current.hiddenItemsByColor[color] ?? []).filter((key) =>
-      equipped.has(key));
-  }
-
-  const equippedItemKeys = Array.from(new Set(
-    Object.values(nextItemsByColor).flatMap((keys) => keys ?? []),
-  ));
-  const hiddenItemKeys = Array.from(new Set(
-    Object.values(nextHiddenByColor).flatMap((keys) => keys ?? []),
-  ));
-  const equippedFloorByColor = { ...current.equippedFloorByColor };
-  for (const color of current.ownedColors) {
-    const floor = (nextItemsByColor[color] ?? [])
-      .map((key) => catalogByKey.get(key))
-      .find((candidate) => candidate && itemFloor(candidate));
-    equippedFloorByColor[color] = floor ? itemFloor(floor) ?? "none" : "none";
-  }
-
-  return {
-    ...current,
-    equippedItemKeys,
-    equippedItemsByColor: nextItemsByColor,
-    hiddenItemKeys,
-    hiddenItemsByColor: nextHiddenByColor,
-    equippedFloorByColor,
-    equippedFloor: current.representativeColor
-      ? equippedFloorByColor[current.representativeColor] ?? "none"
-      : "none",
-  };
-}
-
-function wardrobeFilterForItem(item: SlimeShopItem): WardrobeFilter {
-  if (isSceneBackgroundItem(item)) return "background";
-  if (item.floor || item.category === "background") return "floor";
-  if (item.category === "vehicle" || item.category === "ride") return "vehicle";
-  if (item.category === "drink") return "drink";
-  if (item.category === "wearable") return "outfit";
-  return "prop";
-}
-
-function isVehicleShopItem(item: SlimeShopItem): boolean {
-  return item.category === "vehicle" || item.category === "ride";
-}
-
-/**
- * Complete preview sprite for a legacy item, excluding composed prop actions.
- *
- * Drinks compose from the anchor registry, so handing back a complete GIF would
- * replace the character sheet and suppress the composed drink layer.
- */
-function shopItemSpritePath(item: SlimeShopItem, _slimeColor: SlimeColor): string | undefined {
-  if (
-    item.category === "drink"
-    || item.category === "wearable"
-    || item.category === "vehicle"
-    || item.category === "ride"
-    || isSceneBackgroundItem(item)
-    || item.floor
-  ) return undefined;
-  if (item.key.startsWith("slime-ball-")) return undefined;
-  return item.mobileSpritePath ?? item.spritePath;
-}
-
-/** Preview action and flavor for a shop item that composes rather than replaces. */
-function shopItemPreview(item: SlimeShopItem) {
-  const wearables = resolveEquippedSlimeWearables([item.key], [item]);
-  const vehicle = resolveEquippedVehicle([item.key], [item]);
-  const trampoline = vehicle?.key === SLIME_TRAMPOLINE_ITEM_KEY;
-  return {
-    action: trampoline
-      ? "floor-interaction" as const
-      : item.category === "drink"
-        ? "drink" as const
-        : "idle" as const,
-    drinkFlavor: wearables.drink,
-    propAction: resolveEquippedSlimePropAction([item.key], [item]),
-    equippedFloor: trampoline ? "trampoline" as const : item.floor ?? "none" as const,
-    expandSceneSurfaces: trampoline,
-    vehicle: trampoline ? null : vehicle,
-    wearables,
-  };
-}
-
 export default function StudentSlimeScreen() {
   const router = useRouter();
   const params = useLocalSearchParams<{ section?: string }>();
@@ -381,7 +219,7 @@ export default function StudentSlimeScreen() {
   const [pendingPurchase, setPendingPurchase] = useState<SlimeShopItem | null>(null);
   const [busyColor, setBusyColor] = useState<SlimeColor | null>(null);
   const [busyRepresentative, setBusyRepresentative] = useState<SlimeColor | null>(null);
-  const [shopFilter, setShopFilter] = useState<SlimeShopFilter>("character");
+  const [shopFilter, setShopFilter] = useState<SlimeShopFilter>("all");
   const [wardrobeColor, setWardrobeColor] = useState<SlimeColor | null>(null);
   const [wardrobeFilter, setWardrobeFilter] = useState<WardrobeFilter>("floor");
   const [openEffectColor, setOpenEffectColor] = useState<SlimeColor | null>(null);
@@ -429,7 +267,7 @@ export default function StudentSlimeScreen() {
   useEffect(() => {
     const hasSceneBackground = (home?.shopCatalog ?? []).some((item) => isSceneBackgroundItem(item));
     if (!hasSceneBackground && shopFilter === "background") {
-      setShopFilter("character");
+      setShopFilter("all");
     }
     if (!hasSceneBackground && wardrobeFilter === "background") {
       setWardrobeFilter("floor");
@@ -449,7 +287,10 @@ export default function StudentSlimeScreen() {
       if (isRefresh) setRefreshing(true);
       else setLoading(true);
       try {
-        const response = await apiFetch<unknown>("/api/student/slimes");
+        const response = await apiFetch<unknown>("/api/student/slimes", {
+          cacheTtlMs: 5 * 60_000,
+          forceRefresh: isRefresh,
+        });
         const nextHome = normalizeSlimeHome(response);
         homeRef.current = nextHome;
         setHome(nextHome);
@@ -492,39 +333,24 @@ export default function StudentSlimeScreen() {
     () => slimeShopNavItems(home?.shopCatalog ?? []),
     [home?.shopCatalog],
   );
-  const wardrobeNavItems = useMemo(() => {
-    const hasSceneBackground = (home?.shopCatalog ?? []).some((item) => isSceneBackgroundItem(item));
-    if (!hasSceneBackground) return WARDROBE_NAV_ITEMS;
-    return [
-      { key: "background" as const, label: "배경" },
-      ...WARDROBE_NAV_ITEMS,
-    ];
-  }, [home?.shopCatalog]);
-  const sceneBackgroundItems = useMemo(
-    () => (home?.shopCatalog ?? []).filter((item) => isSceneBackgroundItem(item)),
+  const wardrobeNavItems = useMemo(
+    () => slimeWardrobeNavItems(home?.shopCatalog ?? []),
     [home?.shopCatalog],
   );
-  /** Backgrounds grouped by price tier, entry band first and premium band last. */
-  const sceneBackgroundTiers = useMemo(
-    () => groupSlimeShopItemsByTier(sceneBackgroundItems),
-    [sceneBackgroundItems],
-  );
-  const floorItems = useMemo(() => {
-    if (!home) return [];
-    return FLOOR_ORDER.map((floor) =>
-      home.shopCatalog.find((item) => itemFloor(item) === floor),
-    ).filter((item): item is SlimeShopItem => item !== undefined);
-  }, [home]);
   const cookieQuantity = home?.ownedItemQuantities[SLIME_COOKIE_ITEM_KEY] ?? 0;
   const visibleShopItems = useMemo(
-    () => home?.shopCatalog.filter((item) => shopFilterForItem(item) === shopFilter) ?? [],
+    () =>
+      home?.shopCatalog.filter((item) =>
+        shopFilter === "all"
+          ? item.category !== "level-up"
+          : shopFilterForItem(item) === shopFilter,
+      ) ?? [],
     [home, shopFilter],
   );
-  /**
-   * Price bands for each shop list, cheapest first. Categories priced uniformly
-   * come back as one unlabelled group and render exactly as before.
-   */
-  const floorTiers = useMemo(() => groupSlimeShopItemsByTier(floorItems), [floorItems]);
+  const shopOverviewSections = useMemo(
+    () => buildSlimeShopOverviewSections(home?.catalog ?? [], home?.shopCatalog ?? []),
+    [home?.catalog, home?.shopCatalog],
+  );
   /** Family set bonuses are account-wide, so they are computed once per home. */
   const activeSets = useMemo(() => (home ? mobileSlimeActiveSets(home) : []), [home]);
 
@@ -537,16 +363,16 @@ export default function StudentSlimeScreen() {
    * piece cannot count twice.
    */
   const wardrobeItemWearer = useCallback(
-    (itemKey: string): string | null => {
-      if (!home) return null;
-      for (const [color, itemKeys] of Object.entries(home.equippedItemsByColor)) {
-        if (color === wardrobeColor) continue;
-        if (!itemKeys?.includes(itemKey)) continue;
-        return SLIME_COLOR_LABELS[color as SlimeColor] ?? color;
-      }
-      return null;
-    },
-    [home, wardrobeColor],
+    (itemKey: string): string | null =>
+      home
+        ? slimeWardrobeItemWearerLabel(
+            itemKey,
+            wardrobeTargetColor,
+            home.equippedItemsByColor,
+            SLIME_COLOR_LABELS,
+          )
+        : null,
+    [home, wardrobeTargetColor],
   );
   const visibleShopTiers = useMemo(
     () => groupSlimeShopItemsByTier(visibleShopItems),
@@ -591,81 +417,30 @@ export default function StudentSlimeScreen() {
    * One shop card. Extracted so the flat list and the nested outfit list render
    * identical cards rather than keeping two copies of this markup in step.
    */
-  const renderShopItemCard = (item: SlimeShopItem) => {
-    const quantity = home?.ownedItemQuantities[item.key] ?? 0;
-    const repeatable = item.key === SLIME_COOKIE_ITEM_KEY;
-    const ownedItem = repeatable ? quantity > 0 : home?.ownedItemKeys.includes(item.key) ?? false;
-    const busy = busyItemKey === item.key;
-    const buffLabel = shopItemBuffLabel(item);
-    const preview = shopItemPreview(item);
-    const vehicleItem = isVehicleShopItem(item);
-    const sceneBackground = isSceneBackgroundItem(item);
-    const expandedSceneItem =
-      vehicleItem || sceneBackground || preview.equippedFloor !== "none";
-    const itemSummary = repeatable
-      ? `${quantity}개 보유`
-      : !ownedItem
-        ? `${item.price.toLocaleString()}${home?.unitLabel ?? "원"}`
-        : null;
-    return (
-      <ControlPressable
-        key={item.key}
-        style={[styles.floorRow, styles.sceneCard]}
-        disabled={busyItemKey !== null || (ownedItem && !repeatable)}
-        onPress={() => confirmItemPurchase(item)}
-        accessibilityLabel={`${item.labelKo} ${repeatable && quantity > 0 ? `${quantity}개 보유, 구매` : ownedItem ? "보유 중" : "구매"}`}
-      >
-        <View
-          style={[
-            styles.shopPreview,
-            styles.shopPreviewFullBleed,
-            expandedSceneItem && styles.shopPreviewSceneSlot,
-            sceneBackground && styles.shopPreviewScene,
-          ]}
-          accessible={false}
-        >
-          <SlimeSprite
-            slimeColor={slimeShopPreviewColor(item, selectedColor)}
-            evolution="base"
-            action={preview.action}
-            equippedFloor={preview.equippedFloor}
-            displayScale={slimeUi.petSceneDisplayScale}
-            repeat={Boolean(preview.propAction)}
-            expandSceneSurfaces={preview.expandSceneSurfaces || sceneBackground}
-            itemSpritePath={sceneBackground ? undefined : shopItemSpritePath(item, selectedColor)}
-            propAction={preview.propAction}
-            backgroundSpritePath={sceneBackground ? selectSceneBackgroundSpritePath(item) : undefined}
-            wearables={preview.wearables}
-            drinkFlavor={preview.drinkFlavor}
-            vehicleSpritePath={preview.vehicle?.vehicleSheetPath ?? preview.vehicle?.spritePath}
-            vehicleGroundedSpritePath={preview.vehicle?.vehicleGroundedSpritePath}
-            vehicleEffectSpritePaths={preview.vehicle?.vehicleEffectSpritePaths}
-            vehicleFrameCount={preview.vehicle?.vehicleFrameCount}
-            vehicleGroundedFrameCount={preview.vehicle?.vehicleGroundedFrameCount}
-            vehicleGroundedFrameDurationMs={preview.vehicle?.vehicleGroundedFrameDurationMs}
-            vehicleCanvasHeight={preview.vehicle?.vehicleCanvasHeight}
-            vehicleCharacterOffsetY={preview.vehicle?.vehicleCharacterOffsetY}
-            vehicleBobY={preview.vehicle?.vehicleBobY}
-            vehicleRiseY={preview.vehicle?.vehicleRiseY}
-            vehicleOffsetX={preview.vehicle?.vehicleOffsetX}
-            accessibilityLabel={`${item.labelKo} 미리보기`}
-          />
-          {buffLabel ? (
-            <BuffTierChip label={buffLabel} bps={item.effectBps ?? 0} />
-          ) : null}
-        </View>
-        <View style={[styles.itemCardBody, styles.shopCardBody]}>
-          <View style={styles.floorCopy}>
-            <Text style={styles.floorTitle}>{item.labelKo}</Text>
-            {itemSummary ? <Text style={styles.floorSubtitle}>{itemSummary}</Text> : null}
-          </View>
-          <Text style={[styles.floorStatusText, (repeatable || !ownedItem) && styles.floorStatusBuy]}>
-            {busy ? "처리 중…" : repeatable ? "구매" : ownedItem ? "보유 중" : "구매"}
-          </Text>
-        </View>
-      </ControlPressable>
-    );
-  };
+  const renderShopItemCard = (item: SlimeShopItem) => (
+    <SlimeShopItemCard
+      key={item.key}
+      item={item}
+      selectedColor={selectedColor}
+      unitLabel={home?.unitLabel ?? "원"}
+      ownedItemKeys={home?.ownedItemKeys ?? []}
+      ownedItemQuantities={home?.ownedItemQuantities ?? {}}
+      busyItemKey={busyItemKey}
+      onPress={confirmItemPurchase}
+    />
+  );
+
+  const renderSlimeShopCard = (slime: SlimeCatalogItem) => (
+    <SlimeCharacterCatalogCard
+      key={slime.key}
+      slime={slime}
+      unitLabel={home?.unitLabel ?? "원"}
+      ownedColors={home?.ownedColors ?? []}
+      busyColor={busyColor}
+      onPress={confirmSlimePurchase}
+    />
+  );
+
   const wardrobeItems = useMemo(
     () => home?.shopCatalog.filter((item) =>
       home.ownedItemKeys.includes(item.key)
@@ -676,7 +451,9 @@ export default function StudentSlimeScreen() {
   );
   const visibleWardrobeItems = useMemo(
     () => prioritizeEquippedSlimeItems(
-      wardrobeItems.filter((item) => wardrobeFilterForItem(item) === wardrobeFilter),
+      wardrobeItems.filter(
+        (item) => slimeWardrobeFilterForItem(item) === wardrobeFilter,
+      ),
       wardrobeEquippedItems,
     ),
     [wardrobeEquippedItems, wardrobeFilter, wardrobeItems],
@@ -903,7 +680,7 @@ export default function StudentSlimeScreen() {
     const isEquipped = !targetItems.includes(item.key);
     const requestVersion = latestEquipRequestRef.current + 1;
     latestEquipRequestRef.current = requestVersion;
-    const optimisticHome = optimisticallyEquipItem(
+    const optimisticHome = optimisticallyEquipSlimeItem(
       currentHome,
       wardrobeTargetColor,
       item,
@@ -1149,7 +926,7 @@ export default function StudentSlimeScreen() {
             style={styles.petSectionNavItem}
             selected={section === "shop"}
             onPress={() => {
-              setShopFilter("character");
+              setShopFilter("all");
               router.setParams({ section: "shop" });
             }}
           >
@@ -1619,172 +1396,24 @@ export default function StudentSlimeScreen() {
           ))}
         </ContentTabs>
         <View style={styles.shopContent}>
-        {shopFilter === "character" ? (
-          <View style={styles.floorList}>
-            {home?.catalog.map((slime) => {
-              const isOwned = home.ownedColors.includes(slime.color);
-              const busy = busyColor === slime.color;
-              return (
-                <ControlPressable key={slime.key} style={[styles.floorRow, styles.sceneCard]} disabled={isOwned || busyColor !== null} onPress={() => confirmSlimePurchase(slime)} accessibilityLabel={`${slime.nameKo} ${isOwned ? "보유 중" : "구매"}`}>
-                  <View style={[styles.shopPreview, styles.shopPreviewFullBleed]} accessible={false}>
-                    <SlimeSprite
-                      slimeColor={slime.color}
-                      evolution="base"
-                      action="idle"
-                      equippedFloor="none"
-                      displayScale={slimeUi.petSceneDisplayScale}
-                      accessibilityLabel={`${slime.nameKo} 미리보기`}
-                    />
-                    <BuffTierChip label={`기본 효과 +${slime.baseBuffBps / 100}%`} bps={slime.baseBuffBps} />
-                  </View>
-                  <View style={[styles.itemCardBody, styles.shopCardBody]}>
-                    <View style={styles.floorCopy}>
-                      <Text style={styles.floorTitle}>{slime.nameKo}</Text>
-                    </View>
-                    <Text style={[styles.floorStatusText, !isOwned && styles.floorStatusBuy]}>{busy ? "구매 중…" : isOwned ? "보유 중" : `${slime.price.toLocaleString()}${home.unitLabel}`}</Text>
-                  </View>
-                </ControlPressable>
-              );
-            })}
+        {shopFilter === "all" ? (
+          <View style={styles.shopOverview} accessibilityLabel="전체 상품">
+            {shopOverviewSections.map((overviewSection) => (
+              <View key={overviewSection.key} style={styles.shopOverviewSection}>
+                <Text style={styles.shopOverviewHeading}>
+                  {overviewSection.label}
+                </Text>
+                <View style={styles.shopTierItems}>
+                  {overviewSection.characters.map(renderSlimeShopCard)}
+                  {overviewSection.items.map(renderShopItemCard)}
+                </View>
+              </View>
+            ))}
           </View>
-        ) : shopFilter === "background" ? (
-        <View style={styles.shopTierList} accessibilityLabel="배경 인벤토리">
-          {sceneBackgroundItems.length === 0 ? (
-            <View style={styles.emptyCard}>
-              <Text style={styles.emptyText}>배경 상품을 준비 중이에요.</Text>
-            </View>
-          ) : (
-            sceneBackgroundTiers.map((group) => (
-              <View key={group.price} style={styles.shopTierGroup}>
-                {group.label ? <Text style={styles.shopTierLabel}>{group.label}</Text> : null}
-                <View style={styles.shopTierItems}>
-                  {group.items.map((item) => {
-                  const ownedItem = home?.ownedItemKeys.includes(item.key) ?? false;
-                  const busy = busyItemKey === item.key;
-                  const canInteract = !ownedItem && busyItemKey === null;
-                  const buffLabel = shopItemBuffLabel(item);
-                  const status = busy
-                    ? "처리 중…"
-                    : ownedItem
-                      ? "보유 중"
-                      : `${item.price.toLocaleString()}${home?.unitLabel ?? "원"}`;
-                  return (
-                    <ControlPressable
-                      key={item.key}
-                      style={[styles.floorRow, styles.sceneCard]}
-                      disabled={!canInteract}
-                      onPress={() => confirmItemPurchase(item)}
-                      accessibilityLabel={`${item.labelKo} ${ownedItem ? "보유 중" : "구매"}`}
-                      accessibilityState={{ disabled: !canInteract, busy }}
-                    >
-                      <View
-                        style={[
-                          styles.shopPreview,
-                          styles.shopPreviewFullBleed,
-                          styles.shopPreviewSceneSlot,
-                          styles.shopPreviewScene,
-                        ]}
-                        accessible={false}
-                      >
-                        <SlimeSprite
-                          slimeColor={slimeShopPreviewColor(item, selectedColor)}
-                          evolution="base"
-                          action="idle"
-                          equippedFloor="none"
-                          displayScale={slimeUi.petSceneDisplayScale}
-                          expandSceneSurfaces
-                          backgroundSpritePath={selectSceneBackgroundSpritePath(item)}
-                          accessibilityLabel={`${item.labelKo} 미리보기`}
-                        />
-                        {buffLabel ? (
-                          <BuffTierChip label={buffLabel} bps={item.effectBps ?? 0} />
-                        ) : null}
-                      </View>
-                      <View style={[styles.itemCardBody, styles.shopCardBody]}>
-                        <View style={styles.floorCopy}>
-                          <Text style={styles.floorTitle}>{item.labelKo}</Text>
-                        </View>
-                        <View style={styles.floorStatus}>
-                          {busy ? <ActivityIndicator size="small" color={colors.accent} /> : null}
-                          <Text style={[styles.floorStatusText, !ownedItem && styles.floorStatusBuy]}>{status}</Text>
-                        </View>
-                      </View>
-                    </ControlPressable>
-                  );
-                  })}
-                </View>
-              </View>
-            ))
-          )}
-        </View>
-        ) : shopFilter === "floor" ? (
-        <View style={styles.shopTierList} accessibilityLabel="바닥 인벤토리">
-          {floorItems.length === 0 ? (
-            <View style={styles.emptyCard}>
-              <Text style={styles.emptyText}>바닥 상품을 준비 중이에요.</Text>
-            </View>
-          ) : (
-            floorTiers.map((group) => (
-              <View key={group.price} style={styles.shopTierGroup}>
-                {group.label ? <Text style={styles.shopTierLabel}>{group.label}</Text> : null}
-                <View style={styles.shopTierItems}>
-                  {group.items.map((item) => {
-              const floor = itemFloor(item);
-              if (!floor) return null;
-              const ownedItem = home?.ownedItemKeys.includes(item.key) ?? false;
-              const busy = busyItemKey === item.key;
-              const canInteract = owned && !ownedItem && busyItemKey === null;
-              const status = busy
-                ? "처리 중…"
-                : ownedItem
-                  ? "보유 중"
-                  : `${item.price.toLocaleString()}${home?.unitLabel ?? "원"}`;
-              return (
-                <ControlPressable
-                  key={item.key}
-                  style={[styles.floorRow, styles.sceneCard]}
-                  disabled={!canInteract}
-                  onPress={() => confirmItemPurchase(item)}
-                  accessibilityLabel={`${floorLabel(floor)} ${ownedItem ? "보유 중" : "구매"}`}
-                  accessibilityState={{ disabled: !canInteract, busy }}
-                >
-                  <View
-                    style={[styles.shopPreview, styles.shopPreviewFullBleed, styles.shopPreviewSceneSlot]}
-                    accessible={false}
-                  >
-                    <SlimeSprite
-                      slimeColor={slimeShopPreviewColor(item, selectedColor)}
-                      evolution="base"
-                      action={shopItemPreview(item).action}
-                      equippedFloor={shopItemPreview(item).equippedFloor}
-                      displayScale={slimeUi.petSceneDisplayScale}
-                      repeat={item.category === "drink"}
-                      itemSpritePath={shopItemSpritePath(item, selectedColor)}
-                      wearables={shopItemPreview(item).wearables}
-                      drinkFlavor={shopItemPreview(item).drinkFlavor}
-                      accessibilityLabel={`${item.labelKo || floorLabel(floor)} 미리보기`}
-                    />
-                    {shopItemBuffLabel(item) ? (
-                      <BuffTierChip label={shopItemBuffLabel(item) ?? ""} bps={item.effectBps ?? 0} />
-                    ) : null}
-                  </View>
-                  <View style={[styles.itemCardBody, styles.shopCardBody]}>
-                    <View style={styles.floorCopy}>
-                      <Text style={styles.floorTitle}>{item.labelKo || floorLabel(floor)}</Text>
-                    </View>
-                    <View style={styles.floorStatus}>
-                      {busy ? <ActivityIndicator size="small" color={colors.accent} /> : null}
-                      <Text style={[styles.floorStatusText, !ownedItem && styles.floorStatusBuy]}>{status}</Text>
-                    </View>
-                  </View>
-                </ControlPressable>
-              );
-                  })}
-                </View>
-              </View>
-            ))
-          )}
-        </View>
+        ) : shopFilter === "character" ? (
+          <View style={styles.floorList}>
+            {home?.catalog.map(renderSlimeShopCard)}
+          </View>
         ) : (
           <View style={styles.shopTierList}>
             {visibleShopItems.length === 0 ? (
@@ -1824,234 +1453,33 @@ export default function StudentSlimeScreen() {
           </>
         )}
       </ScrollView>
-      <AppBottomSheet
-        visible={wardrobeColor !== null}
+      <SlimeWardrobeSheet
+        color={wardrobeColor}
+        selectedColor={selectedColor}
+        notice={notice}
+        navItems={wardrobeNavItems}
+        filter={wardrobeFilter}
+        titles={visibleWardrobeTitles}
+        equippedTitleKey={
+          home?.equippedTitleByColor?.[wardrobeTargetColor] ?? null
+        }
+        items={visibleWardrobeItems}
+        equippedItemKeys={wardrobeEquippedItems}
+        hiddenItemKeys={
+          home?.hiddenItemsByColor[wardrobeTargetColor] ?? []
+        }
+        busyItemKey={busyItemKey}
+        itemWearer={wardrobeItemWearer}
         onClose={() => setWardrobeColor(null)}
-        sheetStyle={styles.wardrobeSheet}
-        accessibilityLabel={`${wardrobeColor ? SLIME_COLOR_LABELS[wardrobeColor] : "슬라임"} 꾸미기`}
-      >
-        <Text style={styles.wardrobeTitle}>
-          {wardrobeColor ? `${SLIME_COLOR_LABELS[wardrobeColor]} 슬라임 꾸미기` : "슬라임 꾸미기"}
-        </Text>
-        {notice ? (
-          <View
-            style={[styles.wardrobeNotice, notice.kind === "error" ? styles.noticeError : styles.noticeSuccess]}
-            accessibilityRole="alert"
-          >
-            <Text style={[styles.wardrobeNoticeText, notice.kind === "error" ? styles.noticeErrorText : styles.noticeSuccessText]}>
-              {notice.text}
-            </Text>
-          </View>
-        ) : null}
-        <ContentTabs
-          style={styles.wardrobeNav}
-          accessibilityLabel="보유 아이템 카테고리"
-        >
-          {wardrobeNavItems.map((item) => (
-            <ContentTab
-              key={item.key}
-              style={styles.wardrobeNavItem}
-              selected={wardrobeFilter === item.key}
-              onPress={() => setWardrobeFilter(item.key)}
-            >
-              {item.label}
-            </ContentTab>
-          ))}
-        </ContentTabs>
-        <ScrollView style={styles.wardrobeList} contentContainerStyle={styles.wardrobeListContent}>
-          {wardrobeFilter === "title" ? (
-            (home?.claimedTitles.length ?? 0) === 0 ? (
-              <View style={styles.emptyCard}>
-                <Text style={styles.emptyText}>
-                  걷기와 독서 미션에서 칭호를 받아 오세요.
-                </Text>
-              </View>
-            ) : (
-              visibleWardrobeTitles.map((title) => {
-                const equipped =
-                  wardrobeColor != null &&
-                  home?.equippedTitleByColor?.[wardrobeColor] === title.key;
-                const busy = busyItemKey === title.key;
-                return (
-                  <View
-                    key={title.key}
-                    style={[styles.wardrobeItem, equipped && styles.wardrobeItemEquipped]}
-                    accessible
-                    accessibilityLabel={`${title.label} 칭호 ${equipped ? "해제" : "장착"}`}
-                    accessibilityState={{ selected: equipped, busy }}
-                  >
-                    <View style={styles.shopPreview} accessible={false}>
-                      <Image
-                        source={{ uri: `${getApiBase()}${title.imagePath}` }}
-                        style={styles.walkingTitlePreview}
-                        contentFit="contain"
-                        accessible={false}
-                      />
-                    </View>
-                    <View style={[styles.itemCardBody, styles.wardrobeCardBody]}>
-                      <View style={styles.wardrobeItemCopy}>
-                        <Text style={styles.floorTitle}>{title.label}</Text>
-                        <Text style={styles.floorSubtitle}>+{title.buffBps / 100}%</Text>
-                      </View>
-                      <BarePressable
-                        disabled={busy}
-                        hitSlop={spacing.sm}
-                        onPress={() => void toggleTitle(title.key, equipped)}
-                        accessibilityRole="button"
-                        accessibilityLabel={`${title.label} 칭호 ${equipped ? "해제" : "장착"}`}
-                      >
-                        <Text style={[
-                          styles.wardrobeInlineActionText,
-                          equipped ? styles.wardrobeInlineActionDanger : styles.wardrobeInlineActionPrimary,
-                        ]}>
-                          {busy ? "처리 중…" : equipped ? "해제" : "장착"}
-                        </Text>
-                      </BarePressable>
-                    </View>
-                  </View>
-                );
-              })
-            )
-          ) : visibleWardrobeItems.length === 0 ? (
-            <View style={styles.emptyCard}>
-              <Text style={styles.emptyText}>이 카테고리에 보유한 아이템이 없어요.</Text>
-            </View>
-          ) : (
-            visibleWardrobeItems.map((item) => {
-              const equipped = wardrobeEquippedItems.includes(item.key);
-              const hidden = equipped && Boolean(
-                home?.hiddenItemsByColor[wardrobeTargetColor]?.includes(item.key),
-              );
-              // An item worn by a different pet is still available here, but the
-              // player should know it will move rather than be duplicated.
-              const wornByOther = !equipped ? wardrobeItemWearer(item.key) : null;
-              const busy = busyItemKey === item.key;
-              const buffLabel = shopItemBuffLabel(item);
-              const preview = shopItemPreview(item);
-              const vehicleItem = isVehicleShopItem(item);
-              const sceneBackground = isSceneBackgroundItem(item);
-              const expandedSceneItem =
-                vehicleItem || sceneBackground || preview.equippedFloor !== "none";
-              return (
-                <View
-                  key={item.key}
-                  style={[
-                    styles.wardrobeItem,
-                    styles.sceneCard,
-                    equipped && styles.wardrobeItemEquipped,
-                    wornByOther && styles.wardrobeItemWornByOther,
-                  ]}
-                  accessible
-                  accessibilityLabel={`${item.labelKo} ${
-                    equipped ? "해제" : wornByOther ? `${wornByOther} 슬라임 장착 중, 옮겨서 장착` : "장착"
-                  }`}
-                  accessibilityState={{ selected: equipped, busy }}
-                >
-                  <View
-                    style={[
-                      styles.shopPreview,
-                      styles.shopPreviewFullBleed,
-                      expandedSceneItem && styles.shopPreviewSceneSlot,
-                      // Only scene backgrounds feather to transparent, so only they
-                      // need the tinted tile removed.
-                      sceneBackground && styles.shopPreviewScene,
-                    ]}
-                    accessible={false}
-                  >
-                    <View style={[styles.wardrobePreviewVisual, wornByOther && styles.wardrobeContentDimmed]}>
-                      <SlimeSprite
-                        slimeColor={wardrobeFilter === "prop" || wardrobeFilter === "drink"
-                          ? wardrobeColor ?? selectedColor
-                          : slimeShopPreviewColor(item, wardrobeColor ?? selectedColor)}
-                        evolution="base"
-                        action={preview.action}
-                        equippedFloor={preview.equippedFloor}
-                        displayScale={slimeUi.petSceneDisplayScale}
-                        repeat={Boolean(preview.propAction) || preview.action !== "idle"}
-                        expandSceneSurfaces={preview.expandSceneSurfaces || sceneBackground}
-                        itemSpritePath={sceneBackground ? undefined : shopItemSpritePath(item, wardrobeColor ?? selectedColor)}
-                        propAction={preview.propAction}
-                        backgroundSpritePath={sceneBackground ? selectSceneBackgroundSpritePath(item) : undefined}
-                        wearables={preview.wearables}
-                        drinkFlavor={preview.drinkFlavor}
-                        vehicleSpritePath={preview.vehicle?.vehicleSheetPath ?? preview.vehicle?.spritePath}
-                        vehicleGroundedSpritePath={preview.vehicle?.vehicleGroundedSpritePath}
-                        vehicleEffectSpritePaths={preview.vehicle?.vehicleEffectSpritePaths}
-                        vehicleFrameCount={preview.vehicle?.vehicleFrameCount}
-                        vehicleGroundedFrameCount={preview.vehicle?.vehicleGroundedFrameCount}
-                        vehicleGroundedFrameDurationMs={preview.vehicle?.vehicleGroundedFrameDurationMs}
-                        vehicleCanvasHeight={preview.vehicle?.vehicleCanvasHeight}
-                        vehicleCharacterOffsetY={preview.vehicle?.vehicleCharacterOffsetY}
-                        vehicleBobY={preview.vehicle?.vehicleBobY}
-                        vehicleRiseY={preview.vehicle?.vehicleRiseY}
-                        vehicleOffsetX={preview.vehicle?.vehicleOffsetX}
-                        accessibilityLabel={`${item.labelKo} 미리보기`}
-                      />
-                      {buffLabel ? (
-                        <BuffTierChip label={buffLabel} bps={item.effectBps ?? 0} />
-                      ) : null}
-                    </View>
-                    {wornByOther ? (
-                      <View style={styles.wardrobeWornOverlay} pointerEvents="none">
-                        <Ban size={iconSizes.sm} color={colors.danger} accessible={false} />
-                        <Text style={styles.wardrobeWornOverlayText}>
-                          {wornByOther} 슬라임에{"\n"}장착 중
-                        </Text>
-                      </View>
-                    ) : null}
-                  </View>
-                  <View style={[styles.itemCardBody, styles.shopCardBody, styles.wardrobeCardBody]}>
-                    <View style={[styles.wardrobeItemCopy, wornByOther && styles.wardrobeContentDimmed]}>
-                      <Text style={styles.floorTitle}>{item.labelKo}</Text>
-                    </View>
-                    <View style={styles.wardrobeItemActions}>
-                      {equipped ? (
-                        <>
-                          <BarePressable
-                            disabled={busy}
-                            hitSlop={spacing.sm}
-                            onPress={() => void toggleItem(item)}
-                            accessibilityRole="button"
-                            accessibilityLabel={`${item.labelKo} 해제`}
-                          >
-                            <Text style={[styles.wardrobeInlineActionText, styles.wardrobeInlineActionDanger]}>
-                              {busy ? "처리 중…" : "해제"}
-                            </Text>
-                          </BarePressable>
-                          <BarePressable
-                            disabled={busy}
-                            hitSlop={spacing.sm}
-                            onPress={() => void toggleItemVisibility(item, hidden)}
-                            accessibilityRole="button"
-                            accessibilityLabel={`${item.labelKo} 외형 ${hidden ? "보이기" : "숨기기"}`}
-                            accessibilityState={{ checked: !hidden, busy }}
-                          >
-                            <Text style={styles.wardrobeInlineActionText}>
-                              {hidden ? "보이기" : "숨기기"}
-                            </Text>
-                          </BarePressable>
-                        </>
-                      ) : (
-                        <BarePressable
-                          disabled={busy}
-                          hitSlop={spacing.sm}
-                          onPress={() => void toggleItem(item)}
-                          accessibilityRole="button"
-                          accessibilityLabel={`${item.labelKo} ${wornByOther ? "여기로 옮기기" : "장착"}`}
-                        >
-                          <Text style={[styles.wardrobeInlineActionText, styles.wardrobeInlineActionPrimary]}>
-                            {busy ? "처리 중…" : wornByOther ? "여기로 옮기기" : "장착"}
-                          </Text>
-                        </BarePressable>
-                      )}
-                    </View>
-                  </View>
-                </View>
-              );
-            })
-          )}
-        </ScrollView>
-      </AppBottomSheet>
+        onFilterChange={setWardrobeFilter}
+        onToggleTitle={(titleKey, equipped) =>
+          void toggleTitle(titleKey, equipped)
+        }
+        onToggleItem={(item) => void toggleItem(item)}
+        onToggleItemVisibility={(item, hidden) =>
+          void toggleItemVisibility(item, hidden)
+        }
+      />
       {pendingPurchase ? (
         <SlimePurchaseConfirmModal
           item={pendingPurchase}
@@ -2178,19 +1606,11 @@ const styles = StyleSheet.create({
   shopNav: { width: "100%" },
   shopNavItem: { flex: 1, paddingHorizontal: spacing.xxs },
   shopContent: { paddingBottom: spacing.sm, gap: spacing.sm },
+  shopOverview: { gap: spacing.lg },
+  shopOverviewSection: { width: "100%", gap: spacing.sm },
+  shopOverviewHeading: { ...typography.section, color: colors.text },
   floorRow: { width: "31.5%", minWidth: 0, paddingHorizontal: spacing.xs, paddingVertical: spacing.xs, borderWidth: borders.hairline, borderColor: colors.border, borderRadius: radii.control, backgroundColor: colors.surface, alignItems: "center", justifyContent: "flex-start", gap: spacing.xxs },
-  shopPreview: { width: iconSizes.empty, height: iconSizes.empty, alignItems: "center", justifyContent: "center", overflow: "hidden", backgroundColor: colors.surfaceAlt },
-  sceneCard: { paddingHorizontal: spacing.none, paddingVertical: spacing.none, gap: spacing.none, overflow: "hidden" },
-  shopPreviewFullBleed: { width: "100%", height: iconSizes.empty },
-  shopPreviewSceneSlot: { position: "relative", width: "100%", height: iconSizes.empty + spacing.xxl, overflow: "hidden" },
   vehicleSceneSlot: { position: "relative", height: slimeUi.vehicleSceneSlotHeight, overflow: "hidden" },
-  // Scene backgrounds feather their edges to transparent, so a tinted tile behind
-  // them shows through as a hard grey square outline. Those previews sit on the
-  // page background instead; the feather itself provides the visual boundary.
-  shopPreviewScene: { backgroundColor: colors.transparent },
-  itemPreviewBuff: { position: "absolute", zIndex: layers.cardOverlay, top: spacing.xs, left: spacing.xs, maxWidth: "92%", flexDirection: "row", alignItems: "center", justifyContent: "flex-start", gap: spacing.xxs },
-  itemPreviewBuffIcon: { width: iconSizes.sm, height: iconSizes.sm, flexShrink: 0 },
-  itemPreviewBuffText: { ...typography.micro, flexShrink: 1, color: colors.text, textAlign: "left", includeFontPadding: false },
   // Price bands stack down the page, so each band spans the full width and lays
   // its own items out in the same wrapping grid the ungrouped list used. Without
   // `width: "100%"` a band would be treated as one cell of the parent row and the
@@ -2205,16 +1625,6 @@ const styles = StyleSheet.create({
   shopOutfitDivider: { height: borders.hairline, marginTop: spacing.xs, marginBottom: spacing.xxs, backgroundColor: colors.border },
   shopOutfitLabel: { ...typography.section, color: colors.text },
   shopTierItems: { flexDirection: "row", flexWrap: "wrap", justifyContent: "flex-start", gap: spacing.sm },
-  itemCardBody: { width: "100%", gap: spacing.xs },
-  shopCardBody: { paddingHorizontal: spacing.xs, paddingTop: spacing.xs, paddingBottom: spacing.sm, gap: spacing.xxs },
-  floorCopy: { width: "100%", minWidth: 0, alignItems: "center", gap: spacing.xxs },
-  floorTitle: { ...typography.label, color: colors.text, textAlign: "center" },
-  floorSubtitle: { ...typography.micro, color: colors.textMuted, textAlign: "center" },
-  // The whole card is already the 44px+ touch target, so reserving another
-  // tap-sized row around the price only stretches the card vertically.
-  floorStatus: { width: "100%", alignItems: "center", justifyContent: "center", gap: spacing.xxs },
-  floorStatusText: { ...typography.micro, color: colors.textMuted, textAlign: "center" },
-  floorStatusBuy: { color: colors.accent },
   emptyCard: { width: "100%", padding: spacing.lg },
   emptyText: { ...typography.body, color: colors.textMuted, textAlign: "center" },
   // Opaque fill plus a hairline edge, since the notice now covers content rather
@@ -2231,30 +1641,6 @@ const styles = StyleSheet.create({
   noticeText: { ...typography.label, flex: 1 },
   noticeSuccessText: { color: colors.plantActive },
   noticeErrorText: { color: colors.danger },
-  wardrobeSheet: { paddingHorizontal: spacing.lg, paddingBottom: spacing.lg, gap: spacing.sm },
-  wardrobeTitle: { ...typography.title, color: colors.text },
-  wardrobeNotice: { width: "100%", paddingHorizontal: spacing.sm, paddingVertical: spacing.xs, borderWidth: borders.hairline, borderColor: colors.border, borderRadius: radii.btn },
-  wardrobeNoticeText: { ...typography.label },
-  wardrobeNav: { width: "100%" },
-  wardrobeNavItem: { flex: 1 },
-  wardrobeList: { maxHeight: iconSizes.empty * 5 },
-  wardrobeListContent: { flexDirection: "row", flexWrap: "wrap", justifyContent: "flex-start", gap: spacing.sm },
-  wardrobeItem: { width: "31.5%", minWidth: 0, paddingHorizontal: spacing.xs, paddingVertical: spacing.xs, borderWidth: borders.hairline, borderColor: colors.border, borderRadius: radii.control, backgroundColor: colors.surface, alignItems: "center", justifyContent: "flex-start", gap: spacing.xxs },
-  wardrobeItemEquipped: { borderColor: colors.accent, backgroundColor: colors.accentTintedBg },
-  // Distinct from the equipped state: still selectable, but tapping moves the
-  // piece off another pet rather than adding a new one.
-  wardrobeItemWornByOther: { borderColor: colors.borderHover, backgroundColor: colors.surfaceAlt },
-  wardrobeItemCopy: { width: "100%", minWidth: 0, alignItems: "center", gap: spacing.xxs },
-  wardrobePreviewVisual: { ...StyleSheet.absoluteFillObject, alignItems: "center", justifyContent: "center" },
-  wardrobeContentDimmed: { opacity: states.disabledOpacity },
-  wardrobeWornOverlay: { ...StyleSheet.absoluteFillObject, zIndex: layers.cardOverlay, alignItems: "center", justifyContent: "center", gap: spacing.xxs },
-  wardrobeWornOverlayText: { ...typography.micro, color: colors.text, textAlign: "center", fontWeight: "700", includeFontPadding: false },
-  wardrobeCardBody: { paddingBottom: spacing.xs, gap: spacing.xxs },
-  wardrobeItemActions: { width: "100%", flexDirection: "row", alignItems: "center", justifyContent: "center", gap: spacing.xs },
-  wardrobeInlineActionText: { ...typography.micro, color: colors.textMuted, textAlign: "center", includeFontPadding: false },
-  wardrobeInlineActionPrimary: { color: colors.accentTintedText },
-  wardrobeInlineActionDanger: { color: colors.danger },
-  walkingTitlePreview: { width: "100%", height: "100%" },
   classroomCard: { padding: spacing.xxl, alignItems: "center", gap: spacing.md },
   classroomEmoji: { fontSize: iconSizes.gate },
   classroomTitle: { ...typography.title, color: colors.text },

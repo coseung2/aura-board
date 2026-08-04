@@ -121,6 +121,7 @@ describe("mobile slime parity model", () => {
 
     expect(catalogHasSceneBackgrounds(legacyOnly)).toBe(false);
     expect(slimeShopNavItems(legacyOnly).map((tab) => tab.key)).toEqual([
+      "all",
       "character",
       "floor",
       "vehicle",
@@ -130,8 +131,9 @@ describe("mobile slime parity model", () => {
     ]);
     expect(catalogHasSceneBackgrounds(withScene)).toBe(true);
     expect(slimeShopNavItems(withScene).map((tab) => tab.key)).toEqual([
-      "character",
+      "all",
       "background",
+      "character",
       "floor",
       "vehicle",
       "food",

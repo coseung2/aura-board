@@ -3,15 +3,21 @@
   display: block;
   flex: 0 0 auto;
   overflow: hidden;
+  contain: paint;
+  isolation: isolate;
   image-rendering: pixelated;
   image-rendering: crisp-edges;
-  contain: paint;
 }
 
-.characterFrame,
-.vehicleFrame {
+/**
+ * Every packed sheet is clipped by a one-frame viewport so neighboring columns
+ * never paint, never leak, and never expand document scroll width.
+ */
+.frameViewport,
+.wearableFrame {
   position: absolute;
   overflow: hidden;
+  contain: paint;
   pointer-events: none;
 }
 
@@ -24,7 +30,10 @@
   left: 0;
   top: 0;
   display: block;
+  width: auto;
+  height: auto;
   max-width: none;
+  max-height: none;
   pointer-events: none;
   user-select: none;
   image-rendering: pixelated;
@@ -33,53 +42,37 @@
 }
 
 .backgroundFeather {
-  --background-edge-feather: 6.25%;
   position: absolute;
   left: 0;
   top: 0;
   z-index: 0;
+  overflow: hidden;
   pointer-events: none;
   user-select: none;
-  mask-image:
-    linear-gradient(
-      to right,
-      transparent 0,
-      #000 var(--background-edge-feather),
-      #000 calc(100% - var(--background-edge-feather)),
-      transparent 100%
-    ),
-    linear-gradient(
-      to bottom,
-      transparent 0,
-      #000 var(--background-edge-feather),
-      #000 calc(100% - var(--background-edge-feather)),
-      transparent 100%
-    );
-  mask-composite: intersect;
+  /* Single-pass product mask matching mobile scene-background-feather-mask.png */
+  mask-image: url("/creatures/slimes/official/shared/scene-background-feather-mask.png");
+  mask-mode: alpha;
   mask-repeat: no-repeat;
   mask-size: 100% 100%;
-  -webkit-mask-image:
-    linear-gradient(
-      to right,
-      transparent 0,
-      #000 var(--background-edge-feather),
-      #000 calc(100% - var(--background-edge-feather)),
-      transparent 100%
-    ),
-    linear-gradient(
-      to bottom,
-      transparent 0,
-      #000 var(--background-edge-feather),
-      #000 calc(100% - var(--background-edge-feather)),
-      transparent 100%
-  );
-  -webkit-mask-composite: source-in;
+  mask-position: center;
+  -webkit-mask-image: url("/creatures/slimes/official/shared/scene-background-feather-mask.png");
   -webkit-mask-repeat: no-repeat;
   -webkit-mask-size: 100% 100%;
+  -webkit-mask-position: center;
+}
+
+.backgroundFull {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  pointer-events: none;
+  user-select: none;
 }
 
 .background {
   z-index: 0;
+  object-fit: cover;
 }
 
 .puddle {
@@ -90,11 +83,6 @@
   z-index: 1;
 }
 
-/**
- * Wearables sit above the character sheet. Each layer's own z-index comes from
- * the source composition contract order and is applied inline, so this base
- * value only establishes the layer above the character.
- */
 .wearable {
   z-index: 2;
 }
@@ -109,4 +97,15 @@
   left: 0;
   image-rendering: pixelated;
   pointer-events: none;
+}
+
+.propLayer {
+  position: absolute;
+  /* Match mobile layers.spriteProp so drinks stay above vehicle (200). */
+  z-index: 501;
+  overflow: hidden;
+  contain: paint;
+  pointer-events: none;
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
 }

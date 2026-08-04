@@ -5,6 +5,9 @@ import { SLIME_SHOP_CATALOG } from "@/lib/pets/catalog";
 import {
   calculateSlimeGrowthPercent,
   shopFilterForItem,
+  slimeShopNavItems,
+  slimeWardrobeNavItems,
+  wardrobeFilterForItem,
   slimeWearablesFromItems,
 } from "./SlimePetModel";
 
@@ -62,5 +65,49 @@ describe("slime shop model", () => {
       headwear: headwear!.wearableOption,
       drink: "lemonade",
     });
+  });
+
+  it("builds mobile-equivalent shop and wardrobe navigation", () => {
+    const withBackground = slimeShopNavItems(SLIME_SHOP_CATALOG);
+    expect(withBackground.map((item) => item.key)).toEqual([
+      "all",
+      "background",
+      "character",
+      "floor",
+      "vehicle",
+      "food",
+      "prop",
+      "outfit",
+    ]);
+
+    const withoutBackground = slimeShopNavItems(
+      SLIME_SHOP_CATALOG.filter(
+        (item) => !(item.category === "background" && item.floor === null),
+      ),
+    );
+    expect(withoutBackground.map((item) => item.key)).toEqual([
+      "all",
+      "character",
+      "floor",
+      "vehicle",
+      "food",
+      "prop",
+      "outfit",
+    ]);
+
+    const wardrobe = slimeWardrobeNavItems(SLIME_SHOP_CATALOG);
+    expect(wardrobe.map((item) => item.key)).toContain("title");
+    expect(wardrobe.map((item) => item.key)).toContain("background");
+  });
+
+  it("routes wardrobe filters for drink and scene backgrounds", () => {
+    const drink = SLIME_SHOP_CATALOG.find((item) => item.category === "drink");
+    const background = SLIME_SHOP_CATALOG.find(
+      (item) => item.category === "background" && item.floor === null,
+    );
+    expect(drink).toBeTruthy();
+    expect(background).toBeTruthy();
+    expect(wardrobeFilterForItem(drink!)).toBe("drink");
+    expect(wardrobeFilterForItem(background!)).toBe("background");
   });
 });
