@@ -31,7 +31,7 @@ import {
 const SLIME_TRAMPOLINE_ITEM_KEY = "slime-blue-trampoline";
 const SHOP_PREVIEW_SLOT_PX = 192;
 
-type SlimeShopItemCardProps = {
+export type SlimeShopItemCardProps = {
   item: SlimeShopItem;
   wardrobe: boolean;
   wardrobeColor: SlimeColor | null;

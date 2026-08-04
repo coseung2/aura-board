@@ -1082,3 +1082,5 @@ export function useSlimePetController() {
     },
   };
 }
+
+export type SlimePetController = ReturnType<typeof useSlimePetController>;
