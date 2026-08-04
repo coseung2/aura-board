@@ -38,7 +38,7 @@ if [[ ! ${release_id} =~ ^[0-9a-f]{40}$ ]]; then
   echo "invalid Git revision: ${release_id}" >&2
   exit 1
 fi
-if [[ $(git -C "${source_dir}" status --porcelain) ]]; then
+if [[ $(git -C "${source_dir}" status --porcelain --untracked-files=all -- . ':(exclude).deploy-artifact') ]]; then
   echo "runner checkout is not clean" >&2
   exit 1
 fi
