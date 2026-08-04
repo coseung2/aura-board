@@ -15,7 +15,7 @@ on:
       expected_version:
         description: App version that must be present in app.config.ts
         required: true
-        default: 1.0.4
+        default: 1.0.5
         type: string
 
 permissions:
