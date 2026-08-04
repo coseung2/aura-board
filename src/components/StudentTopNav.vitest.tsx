@@ -115,14 +115,13 @@ describe("StudentTopNav information architecture", () => {
     ]);
     expect(renderedItems.map(({ href }) => href)).toEqual([
       "/student",
-      "/student/boards?category=priority",
+      "/student/boards?category=lesson",
       "/student/aura-pet?section=mine",
-      "/student/self-directed?activity=reading",
+      "/student/reading",
       "/my/wallet",
     ]);
 
     expect(item("boards").groups[0].links.map(({ href }) => href)).toEqual([
-      "/student/boards?category=priority",
       "/student/boards?category=lesson",
       "/student/boards?category=play",
       "/student/boards?category=all",
@@ -133,8 +132,8 @@ describe("StudentTopNav information architecture", () => {
       "/student/aura-pet?section=shop",
     ]);
     expect(item("self-directed").groups[0].links.map(({ href }) => href)).toEqual([
-      "/student/self-directed?activity=reading",
-      "/student/self-directed?activity=walking",
+      "/student/reading",
+      "/student/walking",
     ]);
   });
 

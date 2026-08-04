@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type CSSProperties } from "react";
 
 export type StudentActivityKey = "walking" | "reading";
 export type StudentActivityView = "records" | "missions" | "titles";
@@ -23,11 +23,11 @@ const VIEW_LABELS: Record<StudentActivityView, string> = {
   titles: "칭호",
 };
 
-/** Activity heading and keyboard-operable local content tabs. */
+/** Equal-width local content tabs below the global student mega navigation. */
 export function StudentActivityHeader({
   active,
   view,
-  views = ["records", "missions"],
+  views = ["records", "missions", "titles"],
   onViewChange,
 }: Props) {
   const [internalView, setInternalView] = useState<StudentActivityView>("records");
@@ -45,16 +45,13 @@ export function StudentActivityHeader({
   };
 
   return (
-    <header className="student-activity-header">
-      <div className="student-activity-heading">
-        <h2 className="student-activity-title">{activityLabel}</h2>
-      </div>
-
+    <div className="student-activity-header">
       <div
         className="student-activity-navigation"
         role="tablist"
         aria-label={`${activityLabel} 보기`}
         aria-orientation="horizontal"
+        style={{ "--student-activity-tab-count": views.length } as CSSProperties}
       >
         {views.map((localView) => {
           const isSelected = selectedView === localView;
@@ -94,6 +91,6 @@ export function StudentActivityHeader({
           );
         })}
       </div>
-    </header>
+    </div>
   );
 }

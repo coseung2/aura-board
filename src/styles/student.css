@@ -402,55 +402,19 @@
   padding-block: 24px;
 }
 
-/* Self-directed activity pages share the same bold section rule as the
-   classroom feature headers while keeping student navigation page-semantic. */
+/* The global mega navigation already owns the page identity. Activity pages
+   therefore begin with one flat, equal-width content tab row. */
 .student-activity-header {
-  display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: 24px;
+  width: 100%;
   margin: 0 0 28px;
-  border-bottom: 2px solid var(--color-text);
-}
-
-.student-walking-page .student-activity-header {
-  margin-bottom: 0;
-}
-
-.student-activity-heading {
-  min-width: 0;
-  padding: 0 0 14px;
-}
-
-.student-activity-eyebrow {
-  margin: 0 0 6px;
-  color: var(--color-text-muted);
-  font-size: 11px;
-  font-weight: 800;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-}
-
-.student-activity-title {
-  margin: 0;
-  color: var(--color-text);
-  font-family: var(--font-display);
-  font-size: 32px;
-  font-weight: 700;
-  line-height: 1.15;
+  border-bottom: 1px solid var(--color-border);
 }
 
 .student-activity-navigation {
-  display: flex;
-  align-items: flex-end;
+  display: grid;
+  grid-template-columns: repeat(var(--student-activity-tab-count, 3), minmax(0, 1fr));
+  width: 100%;
   min-width: 0;
-  margin-bottom: -2px;
-  overflow-x: auto;
-  overflow-y: hidden;
-}
-
-.student-walking-page .student-activity-title {
-  font-size: 22px;
 }
 
 .student-activity-tab {
@@ -458,29 +422,19 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-height: 44px;
-  padding: 8px 14px;
+  min-width: 0;
+  min-height: 48px;
+  padding: 8px 12px;
   border: 0;
   background: transparent;
   color: var(--color-text-muted);
   cursor: pointer;
   font: inherit;
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 800;
   line-height: 1.4;
   text-decoration: none;
   white-space: nowrap;
-}
-
-.student-activity-tab + .student-activity-tab::before {
-  position: absolute;
-  left: 0;
-  top: 50%;
-  width: 1px;
-  height: 1em;
-  background: var(--color-border);
-  content: "";
-  transform: translateY(-50%);
 }
 
 .student-activity-tab:hover {
@@ -488,43 +442,31 @@
 }
 
 .student-activity-tab[aria-selected="true"] {
-  color: var(--color-accent);
+  color: var(--color-accent-active);
+}
+
+.student-activity-tab[aria-selected="true"]::after {
+  position: absolute;
+  right: 0;
+  bottom: -1px;
+  left: 0;
+  height: 2px;
+  background: var(--color-accent);
+  content: "";
 }
 
 .student-activity-tab:focus-visible {
   outline: 2px solid var(--color-accent-tinted-text);
-  outline-offset: -2px;
+  outline-offset: -3px;
 }
 
 @media (max-width: 760px) {
   .student-activity-header {
-    align-items: flex-start;
-    flex-wrap: wrap;
-    gap: 4px;
-  }
-
-  .student-activity-heading {
-    padding-bottom: 10px;
-  }
-
-  .student-activity-title {
-    font-size: 28px;
-  }
-
-  .student-walking-page .student-activity-title {
-    font-size: 22px;
-  }
-
-  .student-activity-navigation {
-    width: 100%;
-  }
-
-  .student-activity-tab {
-    flex: 1 1 0;
+    margin-bottom: 22px;
   }
 
   .student-walking-page {
-    padding-block: 24px;
+    padding-block: 20px 44px;
   }
 }
 
@@ -1528,6 +1470,315 @@
 
   .student-walking-mission-coin-amount {
     font-size: 12px;
+  }
+}
+
+/* ---- Flat self-directed mission and title parity with mobile ------------ */
+.student-reading-missions-content {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 32px;
+}
+
+.student-walking-attendance-board,
+.student-attendance-board {
+  width: min(100%, 760px);
+  aspect-ratio: auto;
+  justify-self: center;
+  overflow: visible;
+}
+
+.student-mission-section {
+  display: grid;
+  gap: 16px;
+  min-width: 0;
+  padding: 0 0 28px;
+  border-bottom: 1px solid var(--color-border);
+  background: transparent;
+}
+
+.student-mission-section-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.student-mission-section-header h2,
+.student-mission-section-header p {
+  margin: 0;
+}
+
+.student-mission-section-header h2 {
+  color: var(--color-text);
+  font-size: 16px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+
+.student-mission-section-header p,
+.student-mission-section-header > span,
+.student-mission-section-header > strong {
+  color: var(--color-text-muted);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.student-mobile-reward-coin {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  min-height: 30px;
+  color: var(--color-text);
+  font-size: 11px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.student-mobile-reward-coin img {
+  display: block;
+  width: 24px;
+  height: 24px;
+  object-fit: contain;
+  image-rendering: pixelated;
+}
+
+.student-mobile-reward-claim {
+  position: relative;
+  display: grid;
+  width: min(100%, 116px);
+  min-width: 84px;
+  min-height: 44px;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+}
+
+.student-mobile-reward-claim img {
+  display: block;
+  width: 100%;
+  height: 44px;
+  object-fit: contain;
+  image-rendering: pixelated;
+}
+
+.student-mobile-reward-claim:not(:disabled):hover img {
+  transform: translateY(-1px);
+}
+
+.student-mobile-reward-claim:focus-visible {
+  border-radius: var(--radius-btn);
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+.student-mobile-reward-claim:disabled {
+  cursor: default;
+}
+
+.student-mobile-reward-claim-status {
+  position: absolute;
+  inset: 50% auto auto 50%;
+  color: var(--color-text-muted);
+  font-size: 10px;
+  font-weight: 800;
+  transform: translate(-50%, -50%);
+}
+
+.student-attendance-ordinal-stamp,
+.student-walking-ordinal-stamp {
+  position: absolute;
+  inset: 50% auto auto 50%;
+  display: block;
+  width: clamp(28px, 4.8vw, 44px);
+  height: clamp(28px, 4.8vw, 44px);
+  border: 0;
+  border-radius: 0;
+  object-fit: contain;
+  pointer-events: none;
+  transform: translate(-50%, -50%) rotate(-10deg);
+  image-rendering: pixelated;
+}
+
+.student-title-content,
+.student-title-collection {
+  display: grid;
+  gap: 16px;
+  min-width: 0;
+}
+
+.student-title-collection {
+  padding-bottom: 32px;
+}
+
+.student-title-collection-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.student-title-collection-header h2,
+.student-title-empty-hint,
+.student-activity-state p,
+.student-activity-notice,
+.student-activity-error {
+  margin: 0;
+}
+
+.student-title-collection-header h2 {
+  color: var(--color-text);
+  font-size: 16px;
+  font-weight: 800;
+}
+
+.student-title-collection-header span {
+  color: var(--color-accent-tinted-text);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.student-title-empty-hint,
+.student-activity-state,
+.student-title-meta small {
+  color: var(--color-text-muted);
+  font-size: 13px;
+}
+
+.student-title-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.student-title-row {
+  display: grid;
+  grid-template-columns: 132px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 16px;
+  min-width: 0;
+  padding: 14px 0;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.student-title-row:first-child {
+  border-top: 1px solid var(--color-border);
+}
+
+.student-title-row.is-claimable {
+  padding-inline: 12px;
+  background: var(--color-accent-tinted-bg);
+}
+
+.student-title-row.is-locked .student-title-tag {
+  opacity: 0.42;
+  filter: grayscale(1);
+}
+
+.student-title-tag {
+  display: grid;
+  width: 132px;
+  height: 54px;
+  place-items: center;
+}
+
+.student-title-tag img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  image-rendering: pixelated;
+}
+
+.student-title-meta {
+  display: grid;
+  min-width: 0;
+  gap: 4px;
+}
+
+.student-title-meta strong {
+  color: var(--color-text);
+  font-size: 14px;
+  line-height: 1.4;
+}
+
+.student-title-meta small.is-claimable {
+  color: var(--color-accent-tinted-text);
+}
+
+.student-title-claim,
+.student-activity-retry {
+  min-width: 72px;
+  min-height: 44px;
+  padding: 8px 14px;
+  border: 1px solid var(--color-accent);
+  border-radius: var(--radius-btn);
+  background: var(--color-accent);
+  color: var(--color-on-accent);
+  cursor: pointer;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.student-title-claim:disabled {
+  cursor: wait;
+  opacity: 0.58;
+}
+
+.student-activity-retry {
+  background: transparent;
+  color: var(--color-accent-active);
+}
+
+.student-activity-state {
+  display: grid;
+  min-height: 160px;
+  align-content: center;
+  justify-items: start;
+  gap: 10px;
+  padding-block: 28px;
+  border-block: 1px solid var(--color-border);
+}
+
+.student-activity-state.is-error,
+.student-activity-error {
+  color: var(--color-danger);
+}
+
+.student-activity-notice {
+  color: var(--color-accent-tinted-text);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.student-activity-error {
+  font-size: 13px;
+  font-weight: 800;
+}
+
+@media (max-width: 640px) {
+  .student-reading-missions-content {
+    gap: 26px;
+  }
+
+  .student-title-row {
+    grid-template-columns: 96px minmax(0, 1fr);
+    gap: 12px;
+  }
+
+  .student-title-tag {
+    width: 96px;
+    height: 46px;
+  }
+
+  .student-title-claim {
+    grid-column: 1 / -1;
+    width: 100%;
   }
 }
 
@@ -2898,7 +3149,7 @@
   width: max-content;
   max-width: 100%;
   min-width: 128px;
-  min-height: 0;
+  min-height: 230px;
   height: auto;
   place-items: center;
   justify-self: center;
@@ -2910,12 +3161,12 @@
 }
 
 .student-slime-sprite.student-slime-sprite-scene {
-  /* Shared scene canvas: width follows expanded 96*scale (scale 2 => 192).
-     Height follows OfficialSlimeSprite geometry (vehicle 64x81 etc). */
+  /* Use the same tallest 2x scene canvas as the pet collection and classroom
+     gallery, so changing floor or vehicle never shifts the home layout. */
   width: max-content;
   max-width: none;
   height: auto;
-  min-height: 0;
+  min-height: 230px;
   border: 0;
   border-radius: 0;
   background-color: transparent;
@@ -3049,6 +3300,7 @@
   .student-slime-sprite.student-slime-sprite-scene {
     width: max-content;
     max-width: 100%;
+    min-height: 230px;
     height: auto;
   }
 
@@ -3163,6 +3415,7 @@
   .student-slime-sprite.student-slime-sprite-scene {
     width: max-content;
     max-width: 100%;
+    min-height: 230px;
     height: auto;
   }
 }

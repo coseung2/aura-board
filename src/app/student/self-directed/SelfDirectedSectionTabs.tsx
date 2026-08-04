@@ -22,7 +22,7 @@ export function SelfDirectedSectionTabs({
       {ACTIVITIES.map((activity) => (
         <Link
           key={activity.key}
-          href={`/student/self-directed?activity=${activity.key}`}
+          href={`/student/${activity.key}`}
           className={styles.sectionTab}
           aria-current={active === activity.key ? "page" : undefined}
         >

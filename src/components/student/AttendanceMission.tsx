@@ -5,6 +5,8 @@ import { useEffect, useMemo, useState } from "react";
 import { MONTHLY_ATTENDANCE_COOKIE_REWARD_ORDINALS } from "@/lib/reward-policy";
 import type { MonthlyAttendanceSummary } from "@/lib/student-attendance";
 
+import { MOBILE_ATTENDANCE_STAMP_SRC } from "./MobileMissionAssets";
+
 type Props = {
   studentId: string;
   attendance: MonthlyAttendanceSummary;
@@ -78,8 +80,8 @@ export function AttendanceMission({ studentId, attendance }: Props) {
   };
 
   return (
-    <section className="classroom-dashboard-panel student-attendance-panel" aria-label="월간 출석 미션">
-      <div className="classroom-dashboard-panel-head">
+    <section className="student-mission-section student-attendance-panel" aria-label="월간 출석 미션">
+      <div className="student-mission-section-header">
         <h2>출석미션</h2>
         <strong className={`student-attendance-status${count >= currentAttendance.monthDays ? " is-complete" : ""}`}>
           {count} / {currentAttendance.monthDays}일
@@ -97,7 +99,15 @@ export function AttendanceMission({ studentId, attendance }: Props) {
                 <span className={`student-attendance-ordinal-reward${isItemReward ? " is-item-reward" : ""}`}>
                   {isItemReward ? <><span>아이템</span><small>보상 자리</small></> : label}
                 </span>
-                {stamped.has(ordinal) ? <strong className="student-attendance-ordinal-stamp" aria-hidden="true">출석</strong> : null}
+                {stamped.has(ordinal) ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    className="student-attendance-ordinal-stamp"
+                    src={MOBILE_ATTENDANCE_STAMP_SRC}
+                    alt=""
+                    aria-hidden="true"
+                  />
+                ) : null}
               </>
             );
             return (

@@ -99,18 +99,12 @@ export function StudentTopNav({
     {
       id: "boards",
       label: "보드",
-      href: "/student/boards?category=priority",
+      href: "/student/boards?category=lesson",
       active: boardsActive,
       groups: [
         {
           title: "보드",
           links: [
-            {
-              href: "/student/boards?category=priority",
-              label: "우선 보드",
-              active:
-                pathname === "/student/boards" && boardCategory === "priority",
-            },
             {
               href: "/student/boards?category=lesson",
               label: "수업보드",
@@ -166,19 +160,19 @@ export function StudentTopNav({
     {
       id: "self-directed",
       label: "자율활동",
-      href: "/student/self-directed?activity=reading",
+      href: "/student/reading",
       active: selfDirectedActive,
       groups: [
         {
           title: "자율활동",
           links: [
             {
-              href: "/student/self-directed?activity=reading",
+              href: "/student/reading",
               label: "독서",
               active: readingActive,
             },
             {
-              href: "/student/self-directed?activity=walking",
+              href: "/student/walking",
               label: "걷기",
               active: walkingActive,
             },

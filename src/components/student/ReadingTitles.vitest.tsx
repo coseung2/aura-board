@@ -56,7 +56,7 @@ describe("ReadingTitles", () => {
     resolveFetch(jsonResponse({ reading: TITLES, walking: [] }));
 
     expect(await screen.findByText("독서 기록 50권")).toBeInTheDocument();
-    expect(screen.getByText("잠김")).toBeInTheDocument();
+    expect(screen.getByText("미달성 · 독서 보상 +4%")).toBeInTheDocument();
     expect(screen.getByText("수령 가능 · 독서 보상 +1%")).toBeInTheDocument();
     expect(
       screen.getByRole("button", { name: "독서 새싹 칭호 수령" }),

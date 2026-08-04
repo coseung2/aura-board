@@ -320,7 +320,7 @@ describe("student home and board hub separation", () => {
     );
   });
 
-  it("opens the existing breakout selection behavior from priority", () => {
+  it("opens the existing breakout selection behavior from the lesson board", () => {
     renderBoardHub([
       board({
         id: "breakout",
@@ -348,7 +348,7 @@ describe("student home and board hub separation", () => {
     expect(screen.getByRole("dialog", { name: "모둠 선택" })).toBeTruthy();
   });
 
-  it("keeps an already assigned breakout board in priority", () => {
+  it("keeps an already assigned breakout board in lessons", () => {
     renderBoardHub([
       board({
         id: "assigned-breakout",
@@ -365,7 +365,7 @@ describe("student home and board hub separation", () => {
       }),
     ]);
 
-    expect(screen.getByRole("tab", { name: /우선\s*1/ })).toBeTruthy();
+    expect(screen.getByRole("tab", { name: /수업\s*1/ })).toBeTruthy();
     expect(screen.getByText("배정된 모둠 수업")).toBeTruthy();
   });
 });

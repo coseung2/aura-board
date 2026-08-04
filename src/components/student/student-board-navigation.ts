@@ -1,9 +1,4 @@
-export const STUDENT_BOARD_CATEGORIES = [
-  "priority",
-  "lesson",
-  "play",
-  "all",
-] as const;
+export const STUDENT_BOARD_CATEGORIES = ["lesson", "play", "all"] as const;
 
 export type StudentBoardCategory = (typeof STUDENT_BOARD_CATEGORIES)[number];
 
@@ -17,7 +12,7 @@ export function parseStudentBoardCategory(
 ): StudentBoardCategory {
   return STUDENT_BOARD_CATEGORIES.includes(value as StudentBoardCategory)
     ? (value as StudentBoardCategory)
-    : "priority";
+    : "lesson";
 }
 
 export function legacyStudentBoardRedirect(

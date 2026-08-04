@@ -25,7 +25,7 @@ export function normalizeActivityView(
 ): StudentActivityView {
   const candidate = first(value);
   if (candidate === "missions") return "missions";
-  if (candidate === "titles" && activity === "reading") return "titles";
+  if (candidate === "titles") return "titles";
   return "records";
 }
 
@@ -34,7 +34,8 @@ export function legacySelfDirectedHref(
   params: Omit<SelfDirectedSearchParams, "activity">,
 ): string {
   const view = normalizeActivityView(activity, params.tab ?? params.view);
-  const query = new URLSearchParams({ activity });
+  const query = new URLSearchParams();
   if (view !== "records") query.set("tab", view);
-  return `/student/self-directed?${query.toString()}`;
+  const suffix = query.size > 0 ? `?${query.toString()}` : "";
+  return `/student/${activity}${suffix}`;
 }

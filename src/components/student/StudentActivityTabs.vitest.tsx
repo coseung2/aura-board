@@ -6,7 +6,7 @@ import { describe, expect, it } from "vitest";
 import { StudentActivityTabs } from "./StudentActivityTabs";
 
 describe("StudentActivityTabs", () => {
-  it("connects reading content tabs to their panels and uses an h2 activity heading", () => {
+  it("connects equal reading content tabs to their panels without a duplicate page heading", () => {
     render(
       <StudentActivityTabs
         activity="reading"
@@ -18,8 +18,10 @@ describe("StudentActivityTabs", () => {
 
     const tabs = screen.getAllByRole("tab");
     expect(tabs.map((tab) => tab.textContent)).toEqual(["기록", "미션", "칭호"]);
-    expect(screen.getByRole("heading", { level: 2, name: "독서" })).toBeInTheDocument();
-    expect(screen.queryByRole("heading", { level: 1 })).not.toBeInTheDocument();
+    expect(screen.queryByRole("heading")).not.toBeInTheDocument();
+    expect(screen.getByRole("tablist", { name: "독서 보기" })).toHaveStyle({
+      "--student-activity-tab-count": "3",
+    });
     expect(tabs[0]).toHaveAttribute("aria-controls", "student-reading-records-panel");
 
     fireEvent.click(screen.getByRole("tab", { name: "칭호" }));
@@ -53,14 +55,20 @@ describe("StudentActivityTabs", () => {
     expect(screen.getByRole("tabpanel")).toHaveTextContent("칭호");
   });
 
-  it("keeps walking to its two supported local tabs", () => {
+  it("gives walking the same three local tabs", () => {
     render(
-      <StudentActivityTabs activity="walking" records="기록" missions="미션" />,
+      <StudentActivityTabs
+        activity="walking"
+        records="기록"
+        missions="미션"
+        titles="칭호"
+      />,
     );
 
     expect(screen.getAllByRole("tab").map((tab) => tab.textContent)).toEqual([
       "기록",
       "미션",
+      "칭호",
     ]);
   });
 });

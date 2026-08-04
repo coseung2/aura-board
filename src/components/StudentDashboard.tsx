@@ -595,7 +595,7 @@ function StudentBoardHighlights({ boards }: { boards: BoardItem[] }) {
     <section className="student-home-boards" aria-labelledby="student-home-boards-title">
       <div className="student-flat-section-heading">
         <h2 id="student-home-boards-title">지금 확인할 보드</h2>
-        <Link href="/student/boards?category=priority">전체 보드</Link>
+        <Link href="/student/boards?category=all">전체 보드</Link>
       </div>
       {priorityBoards.length > 0 ? (
         <div className="student-board-highlight-list">
@@ -604,7 +604,7 @@ function StudentBoardHighlights({ boards }: { boards: BoardItem[] }) {
             return (
               <Link
                 key={board.id}
-                href="/student/boards?category=priority"
+                href="/student/boards?category=all"
                 className="student-board-highlight"
               >
                 <span>
@@ -657,16 +657,13 @@ export function StudentBoardHub({ boards }: StudentBoardHubProps) {
     (board) => !isOfficialGameKind(board.layout),
   );
   const lessonBoards = contentBoards.filter((b) => b.category === "LESSON");
-  const priorityBoards = contentBoards.filter((board) => isPriorityBoard(board));
   const normalizedQuery = query.trim().toLocaleLowerCase("ko");
   const categoryBoards =
-    activeCategory === "priority"
-      ? priorityBoards
-      : activeCategory === "lesson"
-        ? lessonBoards
-        : activeCategory === "play"
-          ? []
-          : contentBoards;
+    activeCategory === "lesson"
+      ? lessonBoards
+      : activeCategory === "play"
+        ? []
+        : contentBoards;
   const activeBoards = categoryBoards
     .filter((board) =>
       normalizedQuery
@@ -840,7 +837,6 @@ export function StudentBoardHub({ boards }: StudentBoardHubProps) {
     label: string;
     count: number;
   }> = [
-    { id: "priority", label: "우선", count: priorityBoards.length },
     { id: "lesson", label: "수업", count: lessonBoards.length },
     { id: "play", label: "놀이", count: GAME_HUB_ORDER.length },
     { id: "all", label: "전체", count: contentBoards.length },
@@ -948,9 +944,7 @@ export function StudentBoardHub({ boards }: StudentBoardHubProps) {
         ) : (
           <div className="student-board-empty">
             {categoryBoards.length === 0
-              ? activeCategory === "priority"
-                ? "지금 우선 확인할 보드가 없어요."
-                : `${activeCategory === "lesson" ? "수업" : "등록된"} 보드가 아직 없어요.`
+              ? `${activeCategory === "lesson" ? "수업" : "등록된"} 보드가 아직 없어요.`
               : "검색 조건에 맞는 보드가 없어요."}
           </div>
         )}

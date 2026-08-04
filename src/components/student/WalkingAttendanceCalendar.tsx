@@ -3,6 +3,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { WALKING_MONTHLY_COOKIE_REWARD_ORDINALS } from "@/lib/reward-policy";
 
+import { MOBILE_ATTENDANCE_STAMP_SRC } from "./MobileMissionAssets";
+
 type Props = {
   studentId: string;
   month: string;
@@ -136,9 +138,13 @@ export function WalkingAttendanceCalendar({
                 )}
               </span>
               {stamped ? (
-                <strong className="student-walking-ordinal-stamp" aria-hidden="true">
-                  출석
-                </strong>
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  className="student-walking-ordinal-stamp"
+                  src={MOBILE_ATTENDANCE_STAMP_SRC}
+                  alt=""
+                  aria-hidden="true"
+                />
               ) : null}
             </>
           );

@@ -11,11 +11,11 @@ describe("SelfDirectedSectionTabs", () => {
 
     expect(screen.getByRole("link", { name: "독서" })).toHaveAttribute(
       "href",
-      "/student/self-directed?activity=reading",
+      "/student/reading",
     );
     expect(screen.getByRole("link", { name: "걷기" })).toHaveAttribute(
       "href",
-      "/student/self-directed?activity=walking",
+      "/student/walking",
     );
     expect(screen.getByRole("link", { name: "걷기" })).toHaveAttribute(
       "aria-current",

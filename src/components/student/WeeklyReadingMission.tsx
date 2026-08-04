@@ -10,6 +10,11 @@ import type {
 } from "@/lib/reading-missions";
 import { READING_MISSION_STEP_REWARD_AMOUNT } from "@/lib/reading-missions";
 
+import {
+  MissionRewardClaimButton,
+  MissionRewardCoin,
+} from "./MobileMissionAssets";
+
 type Props = {
   initialReward: ReadingWeeklyMissionReward;
 };
@@ -331,10 +336,10 @@ export function WeeklyReadingMission({ initialReward }: Props) {
 
   return (
     <section
-      className="classroom-dashboard-panel student-reading-future-missions"
+      className="student-mission-section student-reading-future-missions"
       aria-labelledby="reading-missions-title"
     >
-      <div className="classroom-dashboard-panel-head">
+      <div className="student-mission-section-header">
         <div>
           <h2 id="reading-missions-title">독서 미션</h2>
           <p>학생마다 매주 새로운 목표가 정해져요. 단계마다 따로 보상을 받아요.</p>
@@ -415,24 +420,16 @@ export function WeeklyReadingMission({ initialReward }: Props) {
                         {numberFormatter.format(step.target)}
                         {mission.unit}
                       </span>
+                      <MissionRewardCoin amount={step.amount} />
                       {step.claimed ? (
                         <span className="student-reading-mission-step-state">수령 완료</span>
                       ) : (
-                        <button
-                          type="button"
-                          className={`student-walking-mission-coin is-${state}`}
-                          onClick={() => void claim(mission.key, step.unit)}
+                        <MissionRewardClaimButton
                           disabled={!step.claimable || step.claimed || isBusy}
-                          aria-label={`${mission.title} ${numberFormatter.format(step.target)}${mission.unit} 보상 ${numberFormatter.format(step.amount)}원 ${label}`}
-                          aria-describedby={
-                            errorKey === claimKey && error ? "reading-reward-error" : undefined
-                          }
-                        >
-                          <span className="student-walking-mission-coin-amount">
-                            {numberFormatter.format(step.amount)}원
-                          </span>
-                          <span className="student-walking-mission-coin-state">{label}</span>
-                        </button>
+                          busy={pendingKey === claimKey}
+                          onClick={() => void claim(mission.key, step.unit)}
+                          label={`${mission.title} ${numberFormatter.format(step.target)}${mission.unit} 보상 ${numberFormatter.format(step.amount)}원 ${label}`}
+                        />
                       )}
                     </div>
                   );

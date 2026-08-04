@@ -198,8 +198,9 @@ describe("WalkingDashboard", () => {
     expect(await screen.findByText("지금 받을 수 있는 출석 보상이 없어요.")).toBeTruthy();
     expect(JSON.parse(fetchMock.mock.calls[2][1].body as string)).toEqual({ day: "2026-07-26" });
 
-    fireEvent.click(screen.getByRole("button", { name: "칭호 받기" }));
-    expect(await screen.findByRole("button", { name: "수령 완료" })).toBeTruthy();
+    fireEvent.click(screen.getByRole("tab", { name: "칭호" }));
+    fireEvent.click(screen.getByRole("button", { name: `${title.label} 칭호 수령` }));
+    expect(await screen.findByText("수령 완료 · 성장 속도 +1%")).toBeTruthy();
     expect(JSON.parse(fetchMock.mock.calls[4][1].body as string)).toEqual({ titleKey: title.key });
     expect(fetchMock.mock.calls[5][0]).toBe("/api/student/walking?week=current");
   });
