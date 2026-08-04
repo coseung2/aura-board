@@ -161,16 +161,25 @@ jobs:
       - name: Build production AAB
         id: build
         run: |
-          eas build --platform android --profile production --message "Aura Board ${{ inputs.expected_version }} GitHub release" --non-interactive --wait --json > "$RUNNER_TEMP/android-build.json"
-          BUILD_ID=$(node -e 'const d=require(process.env.RUNNER_TEMP+"/android-build.json"); const b=Array.isArray(d)?d[0]:d; process.stdout.write(b.id)')
-          BUILD_URL=$(node -e 'const d=require(process.env.RUNNER_TEMP+"/android-build.json"); const b=Array.isArray(d)?d[0]:d; process.stdout.write(b.artifacts?.applicationArchiveUrl||b.artifacts?.buildUrl||"")')
-          BUILD_NUMBER=$(node -e 'const d=require(process.env.RUNNER_TEMP+"/android-build.json"); const b=Array.isArray(d)?d[0]:d; process.stdout.write(String(b.appBuildVersion||""))')
-          echo "build_id=$BUILD_ID" >> "$GITHUB_OUTPUT"
-          echo "build_url=$BUILD_URL" >> "$GITHUB_OUTPUT"
+          AAB_PATH="$RUNNER_TEMP/aura-board-${{ inputs.expected_version }}.aab"
+          eas build --platform android --profile production --local --output "$AAB_PATH" --non-interactive
+          BUILD_NUMBER=$(eas build:version:get --platform android --profile production --non-interactive | sed -n 's/^Android versionCode - //p' | tail -n 1)
+          test -s "$AAB_PATH"
+          test -n "$BUILD_NUMBER"
+          sha256sum "$AAB_PATH"
+          echo "aab_path=$AAB_PATH" >> "$GITHUB_OUTPUT"
           echo "build_number=$BUILD_NUMBER" >> "$GITHUB_OUTPUT"
 
       - name: Submit AAB to Google Play production
-        run: eas submit --platform android --profile production --id "${{ steps.build.outputs.build_id }}" --wait --non-interactive
+        run: eas submit --platform android --profile production --path "${{ steps.build.outputs.aab_path }}" --wait --non-interactive
+
+      - name: Preserve submitted AAB
+        if: ${{ always() && steps.build.outcome == 'success' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: aura-board-android-${{ inputs.expected_version }}-${{ steps.build.outputs.build_number }}
+          path: ${{ steps.build.outputs.aab_path }}
+          retention-days: 14
 
       - name: Write Android summary
         if: always()
@@ -180,8 +189,7 @@ jobs:
             echo "- Commit: $GITHUB_SHA"
             echo "- Version: ${{ inputs.expected_version }}"
             echo "- Version code: ${{ steps.build.outputs.build_number }}"
-            echo "- Build ID: ${{ steps.build.outputs.build_id }}"
-            echo "- AAB: ${{ steps.build.outputs.build_url }}"
+            echo "- Build: GitHub Ubuntu runner (local EAS build)"
             echo "- Play track: production"
           } >> "$GITHUB_STEP_SUMMARY"
 
