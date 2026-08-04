@@ -6,9 +6,80 @@
   font-family: var(--font-body);
 }
 
+
+.cartEntry {
+  display: inline-flex;
+  flex-direction: column;
+  min-width: 64px;
+  min-height: 52px;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  /* Extra top/right padding so the badge is never clipped by the tab row. */
+  padding: 10px 14px 4px 10px;
+  border: 0;
+  border-radius: var(--radius-btn);
+  background: transparent;
+  color: var(--color-text);
+  cursor: pointer;
+  white-space: nowrap;
+  overflow: visible;
+}
+
+.cartIconWrap {
+  position: relative;
+  display: inline-grid;
+  width: 28px;
+  height: 24px;
+  place-items: center;
+  overflow: visible;
+}
+
+.cartBadge {
+  position: absolute;
+  top: -8px;
+  right: -12px;
+  display: inline-flex;
+  min-width: 18px;
+  height: 18px;
+  align-items: center;
+  justify-content: center;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: var(--color-accent);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1;
+  pointer-events: none;
+}
+
+.cartLabel {
+  color: var(--color-text);
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.cartEntry:hover,
+.cartEntry:focus-visible {
+  color: var(--color-accent);
+}
+
+.cartEntry:hover .cartLabel,
+.cartEntry:focus-visible .cartLabel {
+  color: var(--color-accent);
+}
+
+.cartEntry:focus-visible {
+  outline: 2px solid var(--color-accent-tinted-text);
+  outline-offset: 2px;
+}
+
 .header,
 .sectionHeading,
 .breakdownHeading,
+.modalHeader,
 .drawerHeader {
   display: flex;
   align-items: flex-start;
@@ -116,6 +187,14 @@
   border-bottom: 1px solid var(--color-border);
 }
 
+.collectionSection {
+  padding-top: 0;
+}
+
+.collectionSection .slimeGrid {
+  margin-top: 0;
+}
+
 .section:last-child {
   border-bottom: 0;
 }
@@ -143,8 +222,8 @@
 
 .slimeGrid {
   display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
-  gap: 16px;
+  grid-template-columns: repeat(auto-fit, minmax(168px, 1fr));
+  gap: 18px 16px;
   margin-top: 20px;
 }
 
@@ -153,8 +232,8 @@
   display: grid;
   gap: 10px;
   min-width: 0;
-  padding: 0 0 16px;
-  border-bottom: 1px solid var(--color-border);
+  padding: 0;
+  border-bottom: 0;
 }
 
 .ownedChip,
@@ -178,10 +257,6 @@
 }
 
 .representativeStar {
-  position: absolute;
-  z-index: 6;
-  top: 0;
-  right: 0;
   display: inline-grid;
   width: 28px;
   height: 28px;
@@ -218,10 +293,7 @@
 }
 
 .effectDetail {
-  position: absolute;
-  z-index: 5;
-  top: 0;
-  left: 0;
+  position: relative;
 }
 
 .effectBadge:focus-visible {
@@ -258,8 +330,9 @@
 
 .effectPopover {
   position: absolute;
-  top: 48px;
+  top: calc(100% + 6px);
   left: 0;
+  z-index: 8;
   display: grid;
   width: min(260px, calc(100vw - 34px));
   gap: 10px;
@@ -278,6 +351,12 @@
     opacity 120ms ease-out,
     transform 120ms ease-out;
   visibility: hidden;
+}
+
+.slimeItem:nth-child(5n) .effectPopover,
+.slimeItem:last-child .effectPopover {
+  right: 0;
+  left: auto;
 }
 
 .effectDetail:hover .effectPopover,
@@ -318,6 +397,7 @@
 
 .shopOwnedChip {
   padding: 6px 9px;
+  justify-content: center;
 }
 
 .slimePlaceholder {
@@ -342,8 +422,7 @@
 }
 
 .slimeItemSelected {
-  padding-top: 30px;
-  border-bottom-color: var(--color-accent);
+  padding-top: 0;
 }
 
 .emptyState {
@@ -361,37 +440,33 @@
 }
 
 .spriteFrame {
-  --slime-art-scale: 2;
-  --slime-art-slot: 176px;
   position: relative;
-  width: var(--slime-art-slot);
-  min-height: var(--slime-art-slot);
+  width: 128px;
+  min-height: 128px;
   margin-inline: auto;
 }
 
 .spriteFrameScene {
-  --slime-art-slot: 192px;
   width: 100%;
-  min-height: var(--slime-art-slot);
+  min-height: 0;
   margin-inline: 0;
   overflow: hidden;
   border-bottom: 1px solid rgba(24, 74, 92, 0.1);
-  background-color: var(--color-surface-alt);
-  background-image: linear-gradient(180deg, #f7fbff 0%, #edf6ff 100%);
-  background-position: center;
-  background-size: cover;
+  background-color: transparent;
+  background-image: none;
   image-rendering: pixelated;
 }
 
-.spriteFrame > div {
-  transform: scale(var(--slime-art-scale));
-  transform-origin: center;
+/* Scene backgrounds feather to transparent, so a grey holder must not show. */
+.spriteFrameSceneBackground {
+  background-color: transparent;
+  background-image: none;
 }
 
 .spriteCharacterFrame {
   display: grid;
-  width: 96px;
-  min-height: 96px;
+  width: 192px;
+  min-height: 192px;
   place-items: center;
 }
 
@@ -406,6 +481,45 @@
   font-size: 14px;
   letter-spacing: -0.02em;
   overflow-wrap: anywhere;
+}
+
+/* Mobile name row: buff arrow | name | representative star */
+.nameRow {
+  display: grid;
+  grid-template-columns: 32px minmax(0, 1fr) 32px;
+  align-items: center;
+  gap: 4px;
+  min-height: 32px;
+  margin-top: 2px;
+}
+
+.nameActionSlot {
+  position: relative;
+  display: grid;
+  width: 32px;
+  height: 32px;
+  place-items: center;
+}
+
+.petName {
+  margin: 0;
+  min-width: 0;
+  font-size: 14px;
+  letter-spacing: -0.02em;
+  text-align: center;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.nameRow .effectBadge {
+  min-width: 32px;
+  min-height: 32px;
+}
+
+.nameRow .representativeStar {
+  width: 32px;
+  height: 32px;
 }
 
 .itemCopy p,
@@ -666,14 +780,9 @@
   align-items: center;
   justify-content: flex-start;
   gap: 4px;
-}
-
-.slimeActionButtons {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
+  margin-top: -2px;
+  flex-wrap: wrap;
   min-height: 44px;
-  flex: 0 0 44px;
 }
 
 .slimeActionButton {
@@ -786,12 +895,13 @@
   border-bottom: 0;
 }
 
-.drawerLayer {
+.modalLayer {
   position: fixed;
   z-index: 2147483647;
   inset: 0;
-  display: flex;
-  justify-content: flex-end;
+  display: grid;
+  place-items: center;
+  padding: clamp(12px, 3vw, 28px);
 }
 
 .inlineShop {
@@ -801,7 +911,6 @@
 
 .inlineShop .shopNavigation {
   margin-top: 0;
-  border-bottom: 1px solid var(--color-border);
 }
 
 .inlineShop .shopFilters {
@@ -816,64 +925,148 @@
 }
 
 .inlineShop .shopList {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  column-gap: 28px;
-  row-gap: 0;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 16px;
 }
 
 .inlineShop .shopGroup .shopList {
   margin-top: 8px;
 }
 
-.drawerBackdrop {
+.modalBackdrop {
   position: absolute;
   inset: 0;
   width: 100%;
   height: 100%;
   border: 0;
-  background: rgba(24, 49, 63, 0.34);
+  background: rgba(24, 49, 63, 0.42);
   cursor: default;
 }
 
-.drawer {
+.wardrobeModal {
   position: relative;
+  z-index: 1;
   display: flex;
   flex-direction: column;
-  width: min(440px, 100%);
-  height: 100%;
-  padding: 24px;
-  overflow-y: auto;
-  border-left: 1px solid var(--color-border);
+  width: min(1080px, 100%);
+  height: min(860px, 100%);
+  max-height: calc(100vh - 24px);
+  padding: clamp(18px, 2.4vw, 28px);
+  overflow: hidden;
+  border: 1px solid var(--color-border);
+  border-radius: calc(var(--radius-card) + 4px);
   background: var(--color-surface);
-  box-shadow:
-    -8px 0 24px rgba(24, 74, 92, 0.12),
-    var(--shadow-card);
-  animation: drawerIn 180ms ease-out;
+  box-shadow: var(--shadow-card);
+  animation: modalIn 180ms ease-out;
+}
+
+.modalHeader {
+  flex: 0 0 auto;
+  gap: 12px;
+  min-width: 0;
+}
+
+.modalHeader > div {
+  min-width: 0;
+  flex: 1 1 auto;
+  padding-right: 8px;
+}
+
+.modalHeader h2 {
+  margin: 0;
+  font-size: clamp(18px, 2.2vw, 24px);
+  letter-spacing: -0.03em;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
 }
 
 .drawerHeader {
   align-items: flex-start;
 }
 
+.wardrobeModal .shopPanel {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+  scrollbar-gutter: stable;
+  overscroll-behavior: contain;
+}
+
+.wardrobeModal .filterButtonContent {
+  flex-direction: row;
+  gap: 0;
+}
+
+.wardrobeModal .shopFilters {
+  gap: 4px;
+}
+
 .closeButton {
+  flex: 0 0 auto;
   width: 44px;
+  height: 44px;
+  min-width: 44px;
+  min-height: 44px;
+  margin-left: auto;
   padding: 0;
+  align-self: flex-start;
   font-size: 25px;
   line-height: 1;
 }
 
 .shopNavigation {
+  display: flex;
+  align-items: center;
+  gap: 12px;
   max-width: 100%;
   margin-top: 24px;
-  overflow-x: auto;
-  overflow-y: hidden;
-  scrollbar-width: thin;
+  /* Keep the cart badge outside the scrolling filter strip. */
+  overflow: visible;
 }
 
 .shopFilters {
   display: flex;
+  flex: 1 1 auto;
   gap: 6px;
-  min-width: max-content;
+  min-width: 0;
+  overflow-x: auto;
+}
+
+.shopSearchField {
+  display: flex;
+  flex: 0 1 220px;
+  min-width: 150px;
+  height: 40px;
+  align-items: center;
+  gap: 7px;
+  padding: 0 10px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-btn);
+  color: var(--color-text-muted);
+  background: var(--color-surface);
+}
+
+.shopSearchField:focus-within {
+  border-color: var(--color-accent);
+  outline: 2px solid color-mix(in srgb, var(--color-accent) 22%, transparent);
+  outline-offset: 1px;
+}
+
+.shopSearchField input {
+  width: 100%;
+  min-width: 0;
+  border: 0;
+  outline: 0;
+  color: var(--color-text);
+  background: transparent;
+  font: inherit;
+  font-size: 13px;
+}
+
+.shopNavigation .cartEntry {
+  flex: 0 0 auto;
+  margin-left: auto;
+  align-self: center;
 }
 
 .filterButton {
@@ -881,9 +1074,90 @@
   padding-inline: 10px;
 }
 
+.filterButtonContent {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+}
+
+.filterButtonIconFrame,
+.filterButtonSpriteFrame {
+  position: relative;
+  display: block;
+  width: 52px;
+  height: 52px;
+  overflow: hidden;
+  flex: 0 0 auto;
+}
+
+.filterButtonIconFrame img {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 52px;
+  height: 52px;
+  flex: 0 0 auto;
+  object-fit: contain;
+  image-rendering: auto;
+  transform: translate(-50%, -50%);
+}
+
+.filterButtonIconCharacter img {
+  width: 64px;
+  height: 64px;
+}
+
+.filterButtonIconVehicle img {
+  width: 60px;
+  height: 60px;
+}
+
+.filterButtonIconFood img {
+  width: 32px;
+  height: 32px;
+  transform: translate(-50%, -30%);
+}
+
+.filterButtonIconBackground img {
+  width: 38px;
+  height: 38px;
+}
+
+.filterButtonSpriteFrame img {
+  position: absolute;
+  top: -13px;
+  left: -13px;
+  width: 624px;
+  max-width: none;
+  height: 78px;
+  object-fit: initial;
+  image-rendering: pixelated;
+}
+
+.filterButtonSpriteOutfit img {
+  left: -10px;
+  width: 624px;
+  height: 78px;
+}
+
+.filterButtonSpriteProp img {
+  top: -32px;
+  /* The strawberry soda artwork sits left in its source frame. */
+  left: 6px;
+  width: 704px;
+  height: 88px;
+}
+
+.filterButtonIcon {
+  flex: 0 0 auto;
+}
+
 .shopList {
   display: grid;
-  gap: 12px;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 16px;
   margin-top: 18px;
 }
 
@@ -894,95 +1168,378 @@
 
 .shopGroups {
   display: grid;
-  gap: 18px;
+  /* Tier separation is spacing-only; no divider rules. */
+  gap: 28px;
   margin-top: 18px;
 }
 
 .shopGroup + .shopGroup {
-  padding-top: 18px;
-  border-top: 1px solid var(--color-border);
+  padding-top: 0;
+  border-top: 0;
 }
 
-.shopGroupHeading {
+.shopTierHeading {
   margin: 0;
+  color: var(--color-text-muted);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.shopAllCategories {
+  display: grid;
+  gap: 34px;
+  padding-top: 24px;
+}
+
+.shopAllCategory {
+  min-width: 0;
+}
+
+.shopAllCategoryHeader {
+  display: flex;
+  align-items: flex-end;
+  justify-content: flex-start;
+  gap: 12px;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.shopAllCategoryHeading {
+  flex: 0 0 auto;
+  margin: 0;
+  padding-bottom: 8px;
   color: var(--color-text);
-  font-size: 13px;
+  font-size: 17px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+
+.shopAllCategoryMore {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 2px;
+  margin: 0;
+  height: 24px;
+  padding: 0 0 8px;
+  box-sizing: border-box;
+  border: 0;
+  color: var(--color-text-muted);
+  background: transparent;
+  cursor: pointer;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.shopCarouselRow {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 8px;
+}
+
+  .shopCarouselRow .shopList {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+
+  .shopCarouselPage {
+    animation: shopCarouselSlideIn 320ms ease-out both;
+  }
+
+  .shopCarouselPage > li {
+    animation: shopCarouselItemSlideIn 260ms ease-out both;
+  }
+
+  .shopCarouselPage > li:nth-child(1) { animation-delay: 0ms; }
+  .shopCarouselPage > li:nth-child(2) { animation-delay: 45ms; }
+  .shopCarouselPage > li:nth-child(3) { animation-delay: 90ms; }
+  .shopCarouselPage > li:nth-child(4) { animation-delay: 135ms; }
+  .shopCarouselPage > li:nth-child(5) { animation-delay: 180ms; }
+
+  @keyframes shopCarouselSlideIn {
+    from {
+      opacity: 0.35;
+      transform: translateX(28px);
+    }
+    to {
+      opacity: 1;
+      transform: translateX(0);
+    }
+  }
+
+  @keyframes shopCarouselItemSlideIn {
+    from {
+      opacity: 0;
+      transform: translateX(28px);
+    }
+    to {
+      opacity: 1;
+      transform: translateX(0);
+    }
+  }
+
+  .shopCarouselArrow {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 0;
+  color: var(--color-text-muted);
+  background: transparent;
+    cursor: pointer;
+  }
+
+  .shopCarouselArrowPrevious {
+    transform: rotate(180deg);
+  }
+
+.shopCarouselArrow:hover,
+.shopCarouselArrow:focus-visible {
+  color: var(--color-accent-active);
+}
+
+.shopAllCategoryMore:hover,
+.shopAllCategoryMore:focus-visible {
+  color: var(--color-accent-active);
+}
+
+.shopSubcategoryHeading {
+  margin: 0;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--color-border);
+  color: var(--color-text);
+  font-size: 15px;
   font-weight: 800;
   letter-spacing: -0.01em;
 }
 
-.shopGroup .shopList {
-  margin-top: 6px;
+.shopSubcategoryGroup + .shopSubcategoryGroup {
+  padding-top: 12px;
 }
 
-.shopItem {
+.shopGroup .shopList {
+  margin-top: 10px;
+}
+
+.shopItem,
+.shopProductCard {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  padding: 0;
+  overflow: visible;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  gap: 8px;
+  cursor: pointer;
+}
+
+.shopItem:focus-visible,
+.shopProductCard:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 4px;
+}
+
+.shopItem[aria-disabled="true"],
+.shopProductCard[aria-disabled="true"] {
+  cursor: progress;
+}
+
+.shopItemOwned {
+  position: relative;
+  cursor: default;
+}
+
+.shopItemOwned > *:not(.shopOwnedOverlay) {
+  opacity: 0.42;
+  filter: saturate(0.45);
+}
+
+.shopOwnedOverlay {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
   display: grid;
-  grid-template-columns: 76px minmax(0, 1fr) auto;
-  align-items: center;
-  gap: 12px;
-  padding: 12px 0;
-  border-bottom: 1px solid var(--color-border);
+  align-content: center;
+  justify-items: center;
+  gap: 4px;
+  color: var(--color-text-muted);
+  pointer-events: none;
+  text-align: center;
+}
+
+.shopOwnedOverlay svg {
+  color: var(--color-danger);
+}
+
+.shopOwnedOverlay span {
+  color: var(--color-text);
+  font-size: 12px;
+  font-weight: 800;
 }
 
 .shopItemScene {
-  grid-template-columns: 96px minmax(0, 1fr) auto;
-  align-items: stretch;
-  min-height: 120px;
-  padding-block: 0;
+  min-height: 0;
 }
 
-.shopImageFrame {
-  width: 72px;
-  min-height: 72px;
+.shopItemSceneBackground {
+  background: transparent;
 }
 
-.shopImageFrameScene {
+.shopImageFrame,
+.shopMedia {
+  position: relative;
+  display: grid;
   width: 100%;
-  min-height: 96px;
+  min-height: 192px;
+  place-items: center;
   overflow: hidden;
-  border-right: 1px solid rgba(24, 74, 92, 0.1);
   background-color: var(--color-surface-alt);
   background-image: linear-gradient(180deg, #f7fbff 0%, #edf6ff 100%);
   background-position: center;
-  background-size: cover;
+  background-repeat: no-repeat;
   image-rendering: pixelated;
 }
 
-.shopItemScene .shopItemCopy,
-.shopItemScene > .shopBuyButton,
-.shopItemScene > .shopItemActions {
-  align-self: center;
-  margin-block: 12px;
+.shopFoodPreview {
+  width: 72px;
+  height: 72px;
+  object-fit: contain;
+  image-rendering: pixelated;
 }
 
+.shopImageFrameScene {
+  min-height: 192px;
+}
+
+.shopImageFrameSceneBackground {
+  background-image: none;
+  background-color: transparent;
+}
+
+.shopItemCopy,
+.shopCardBody {
+  display: grid;
+  gap: 8px;
+  width: 100%;
+  min-width: 0;
+  padding: 10px 0 12px;
+}
+
+.shopCardCopy {
+  display: grid;
+  min-width: 0;
+  min-height: 44px;
+  align-content: start;
+  text-align: left;
+}
+
+.shopCardTitleRow {
+  display: flex;
+  min-width: 0;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.shopCardCopy h3,
+.shopItemCopy h3 {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  overflow-wrap: anywhere;
+}
+
+.shopCardCopy p,
+.shopItemCopy p {
+  margin: 4px 0 0;
+  color: var(--color-text-muted);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.shopCardMeta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.shopPrice,
 .shopItemCopy strong {
-  display: block;
+  display: inline-block;
+  margin: 6px 0 0;
+  color: var(--color-text);
+  font-size: 16px;
+  font-weight: 800;
+  line-height: 1.2;
+}
+
+.shopCardCopy .shopPrice {
   margin-top: 6px;
-  color: var(--color-accent-active);
-  font-size: 13px;
+  color: var(--color-text);
+  font-size: 16px;
+  font-weight: 800;
+  line-height: 1.2;
 }
 
 .shopBuyButton {
-  min-width: 76px;
+  width: 100%;
+  min-width: 0;
+  min-height: 44px;
+  border-radius: 0;
+  border-width: 0;
+  /* Product cards are separated by whitespace; the action keeps its own control role. */
+  justify-content: center;
 }
 
 .shopItemActions {
   display: grid;
-  justify-items: end;
-  gap: 7px;
+  width: 100%;
+  gap: 0;
 }
 
+.shopItemActions .shopBuyButton {
+  width: 100%;
+  min-width: 0;
+  border-radius: 0;
+  border-width: 0;
+}
+
+.shopItemActions .shopOwnedChip {
+  display: none;
+}
+
+/* Refund keeps the same full-width footer control as buy. */
+.shopRefundButton {
+  border-color: var(--color-border);
+  color: var(--color-danger, #b42318);
+  background: transparent;
+}
+
+.shopRefundButton:hover {
+  border-color: var(--color-danger, #b42318);
+  color: var(--color-danger-active, #912018);
+}
+
+/* Legacy class kept for non-shop surfaces that still import it. */
 .refundButton {
   min-width: 64px;
   min-height: 44px;
   padding: 5px 9px;
-  border-color: var(--color-danger);
-  color: var(--color-danger);
+  border-color: var(--color-border);
+  color: var(--color-text-muted);
 }
 
 .refundButton:hover {
-  border-color: var(--color-danger-active);
-  color: var(--color-danger-active);
+  border-color: var(--color-accent);
+  color: var(--color-accent-active);
 }
 
 .shopBuyButtonRemove {
@@ -997,28 +1554,24 @@
   background: var(--color-status-returned-bg);
 }
 
-@keyframes drawerIn {
+@keyframes modalIn {
   from {
-    transform: translateX(18px);
+    transform: translateY(10px) scale(0.985);
     opacity: 0;
   }
   to {
-    transform: translateX(0);
+    transform: translateY(0) scale(1);
     opacity: 1;
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .drawer {
+  .wardrobeModal {
     animation: none;
   }
 }
 
 @media (max-width: 900px) {
-  .slimeGrid {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
-
   .inlineShop .shopList {
     grid-template-columns: 1fr;
   }
@@ -1052,39 +1605,56 @@
   }
 
   .slimeGrid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 16px 12px;
   }
 
   .spriteFrame {
-    --slime-art-scale: 1.75;
-    --slime-art-slot: 154px;
+    width: 128px;
+    min-height: 128px;
   }
 
   .spriteFrameScene {
-    --slime-art-slot: 168px;
+    min-height: 192px;
   }
 
-  .drawer {
+  .modalLayer {
+    padding: 0;
+  }
+
+  .wardrobeModal {
     width: 100%;
-    padding: 20px 16px;
+    height: 100%;
+    max-height: 100%;
+    border-radius: 0;
+    padding: 18px 16px 20px;
   }
 
-  .shopItem {
-    grid-template-columns: 64px minmax(0, 1fr) auto;
+  .modalHeader {
     gap: 10px;
   }
 
-  .shopImageFrame {
-    width: 64px;
+  .modalHeader > div {
+    padding-right: 4px;
   }
 
-  .shopItemScene {
-    grid-template-columns: 96px minmax(0, 1fr) auto;
+  .shopNavigation {
+    margin-top: 18px;
   }
 
-  .shopImageFrameScene {
+  .shopList {
+    grid-template-columns: repeat(auto-fill, minmax(168px, 1fr));
+    gap: 12px;
+  }
+
+  .shopImageFrame,
+  .shopMedia {
+    min-height: 160px;
+  }
+
+  .shopBuyButton,
+  .shopItemActions .refundButton {
     width: 100%;
+    min-width: 0;
   }
 
   .retryButton {
@@ -1101,12 +1671,12 @@
 
 @media (max-width: 380px) {
   .spriteFrame {
-    --slime-art-scale: 1.5;
-    --slime-art-slot: 132px;
+    width: 128px;
+    min-height: 128px;
   }
 
   .spriteFrameScene {
-    --slime-art-slot: 144px;
+    min-height: 192px;
   }
 }
 
@@ -1114,4 +1684,445 @@
   min-width: 84px;
   color: var(--color-text-muted);
   text-decoration: none;
+}
+
+
+.secondaryActionButton {
+  min-width: 84px;
+  min-height: 44px;
+  padding: 6px 10px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-btn);
+  color: var(--color-text-muted);
+  background: transparent;
+  cursor: pointer;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.secondaryActionButton:hover,
+.secondaryActionButton[aria-pressed="true"] {
+  border-color: var(--color-accent);
+  color: var(--color-accent-active);
+}
+
+.secondaryActionButton:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+.titlePreviewImage {
+  display: block;
+  width: 64px;
+  height: 40px;
+  object-fit: contain;
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+}
+
+.shopImageFrameScene {
+  background-repeat: no-repeat;
+}
+
+.shopProductCard .shopOwnedChip {
+  justify-self: center;
+}
+
+
+.slimeActions .wardrobeButton {
+  flex: 1 1 auto;
+  min-width: 0;
+  justify-content: center;
+  min-height: 36px;
+  padding: 0 10px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-btn);
+  color: var(--color-text);
+  background: transparent;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.slimeActions .wardrobeButton:hover,
+.slimeActions .wardrobeButton:focus-visible {
+  border: 0;
+  color: var(--color-accent-active);
+}
+
+.slimeActions .wardrobeButton:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+  border-radius: var(--radius-btn);
+}
+
+.slimeActionButtonDisabled img {
+  opacity: 0.42;
+  filter: grayscale(1);
+}
+
+.slimeActionButtonDisabled .cookieQuantity {
+  color: var(--color-text-faint);
+}
+
+.effectPopover {
+  max-height: min(280px, 50vh);
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+
+.appliedEffects {
+  padding: 24px 0 8px;
+}
+
+.appliedEffectsEmpty {
+  margin: 12px 0 0;
+  color: var(--color-text-muted);
+  font-size: 13px;
+}
+
+.appliedEffectsList {
+  display: grid;
+  gap: 0;
+  margin: 12px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.appliedEffectRow {
+  display: grid;
+  grid-template-columns: minmax(88px, 120px) minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px 16px;
+  min-height: 44px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.appliedEffectRow:last-child {
+  border-bottom: 0;
+}
+
+.appliedEffectLabel {
+  color: var(--color-text);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.appliedEffectDescription {
+  color: var(--color-text-muted);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.appliedEffectValue {
+  color: var(--color-accent-active);
+  font-size: 13px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+@media (max-width: 700px) {
+  .appliedEffectRow {
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 4px 12px;
+  }
+
+  .appliedEffectDescription {
+    grid-column: 1 / -1;
+    order: 3;
+  }
+}
+
+@media (max-width: 900px) {
+  .slimeGrid {
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  }
+
+  .slimeItem:nth-child(5n) .effectPopover {
+    right: auto;
+    left: 0;
+  }
+
+  .slimeItem:nth-child(4n) .effectPopover {
+    right: 0;
+    left: auto;
+  }
+}
+
+@media (max-width: 560px) {
+  .slimeGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+
+  .slimeItem:nth-child(4n) .effectPopover {
+    right: auto;
+    left: 0;
+  }
+
+  .slimeItem:nth-child(2n) .effectPopover {
+    right: 0;
+    left: auto;
+  }
+}
+
+
+/* Wardrobe modal content parity with mobile owned-item cards. */
+.wardrobeList {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 16px;
+  margin-top: 18px;
+  list-style: none;
+  padding: 0;
+}
+
+.wardrobeItem {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  gap: 0;
+}
+
+.wardrobeItemEquipped {
+  border-color: var(--color-accent);
+  background: var(--color-accent-tinted-bg);
+}
+
+.wardrobeItemWornByOther {
+  border-color: var(--color-border-hover);
+  background: var(--color-surface-alt);
+}
+
+.wardrobePreview {
+  position: relative;
+  display: grid;
+  width: 100%;
+  min-height: 192px;
+  place-items: center;
+  overflow: hidden;
+  border-radius: 0;
+  background: var(--color-surface-alt);
+}
+
+.wardrobePreviewScene {
+  min-height: 192px;
+}
+
+.wardrobePreviewSceneBackground {
+  background-image: none;
+  background-color: transparent;
+}
+
+.wardrobePreviewVisual {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+}
+
+.wardrobeContentDimmed {
+  opacity: 0.48;
+}
+
+.wardrobeWornOverlay {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: 4px;
+  padding: 8px;
+  pointer-events: none;
+}
+
+.wardrobeWornOverlayIcon {
+  color: var(--color-danger);
+  font-size: 16px;
+  line-height: 1;
+}
+
+.wardrobeWornOverlayText {
+  color: var(--color-text);
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.25;
+  text-align: center;
+}
+
+.wardrobeCardBody {
+  display: grid;
+  gap: 8px;
+  width: 100%;
+  min-width: 0;
+  padding: 10px 0 12px;
+}
+
+.wardrobeItemCopy {
+  min-width: 0;
+  text-align: left;
+}
+
+.wardrobeItemCopy h3 {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  overflow-wrap: anywhere;
+}
+
+.wardrobeItemCopy p {
+  margin: 4px 0 0;
+  color: var(--color-text-muted);
+  font-size: 11px;
+  line-height: 1.35;
+}
+
+.wardrobeItemActions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: 100%;
+}
+
+.wardrobeInlineAction {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 64px;
+  min-height: 44px;
+  padding: 6px 10px;
+  border: 0;
+  border-radius: var(--radius-btn);
+  color: var(--color-text-muted);
+  background: transparent;
+  cursor: pointer;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.wardrobeInlineAction:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.wardrobeInlineAction:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+.wardrobeInlineActionPrimary {
+  color: var(--color-accent-tinted-text);
+}
+
+.wardrobeInlineActionDanger {
+  color: var(--color-danger);
+}
+
+.itemPreviewBuff {
+  position: static;
+  z-index: auto;
+  display: inline-flex;
+  max-width: calc(100% - 12px);
+  align-items: center;
+  gap: 4px;
+  padding: 0;
+  pointer-events: none;
+}
+
+.itemPreviewBuffIcon {
+  width: 14px;
+  height: 14px;
+  flex: 0 0 auto;
+  display: block;
+  object-fit: contain;
+  image-rendering: auto;
+}
+
+.itemPreviewBuffText {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--color-text);
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.1;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.shopCardTitleRow .itemPreviewBuff {
+  position: static;
+  z-index: auto;
+  flex: 0 1 auto;
+  max-width: 52%;
+  pointer-events: none;
+}
+
+@media (max-width: 560px) {
+  .wardrobeList {
+    grid-template-columns: 1fr;
+  }
+}
+
+
+/* Fixed bottom-right toast stack (same placement language as Kordle/ui Toast). */
+.petToastHost {
+  position: fixed;
+  right: 18px;
+  bottom: 18px;
+  z-index: var(--z-modal-top, 2147483600);
+  display: flex;
+  flex-direction: column-reverse;
+  gap: 8px;
+  width: min(360px, calc(100vw - 32px));
+  pointer-events: none;
+}
+
+.petToast {
+  pointer-events: auto;
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  min-height: 44px;
+  padding: 12px 16px;
+  border-radius: var(--radius-card, 12px);
+  border-left: 3px solid var(--color-accent);
+  background: var(--color-surface, #fff);
+  box-shadow: var(--shadow-card-hover, 0 12px 34px rgba(0, 0, 0, 0.08));
+  color: var(--color-text);
+  font-size: 14px;
+  line-height: 1.45;
+}
+
+.petToastError {
+  border-left-color: var(--color-danger, #b42318);
+}
+
+.petToastText {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.petToastClose {
+  flex: 0 0 auto;
+  width: 44px;
+  height: 44px;
+  margin: -12px -12px -12px 0;
+  border: 0;
+  background: transparent;
+  color: var(--color-text-muted);
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
 }

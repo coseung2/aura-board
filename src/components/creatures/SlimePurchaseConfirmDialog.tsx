@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useId, useRef, useState } from "react";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 import { OfficialSlimeSprite } from "./OfficialSlimeSprite";
 import {
   SLIME_COOKIE_ITEM_KEY,
@@ -33,6 +34,7 @@ type Props = {
   unitLabel: string;
   busy: boolean;
   onCancel: () => void;
+  onAddToCart?: (quantity: number) => void;
   onConfirm: (quantity: number) => void;
 };
 
@@ -50,6 +52,7 @@ export function SlimePurchaseConfirmDialog({
   unitLabel,
   busy,
   onCancel,
+  onAddToCart,
   onConfirm,
 }: Props) {
   const titleId = useId();
@@ -62,7 +65,8 @@ export function SlimePurchaseConfirmDialog({
   const activeColor = colors[Math.min(pageIndex, colors.length - 1)] ?? "blue";
   const previewColor = slimeShopPreviewColor(item, activeColor);
   const wearables = slimeWearablesFromItems([item]);
-  const isDrink = item.category === "drink";
+    const isDrink = item.category === "drink";
+    const isFood = item.category === "food";
   const isBall = item.key.startsWith("slime-ball-");
   const isVehicle = item.category === "vehicle" || item.category === "ride";
   const usesTrampoline = item.key === SLIME_TRAMPOLINE_ITEM_KEY;
@@ -112,10 +116,6 @@ export function SlimePurchaseConfirmDialog({
           <h2 id={titleId} className={styles.title}>
             {item.labelKo}
           </h2>
-          <p className={styles.price}>
-            {item.price.toLocaleString()}
-            {unitLabel}
-          </p>
         </header>
 
         <section
@@ -132,13 +132,13 @@ export function SlimePurchaseConfirmDialog({
             disabled={colors.length <= 1}
             aria-label="이전 펫 미리보기"
           >
-            ‹
+            <ChevronLeft size={20} aria-hidden="true" />
           </button>
           <div className={`${styles.preview} ${hasScene ? styles.previewScene : ""}`.trim()}>
             <OfficialSlimeSprite
               slimeColor={previewColor}
               evolution="base"
-              action={usesTrampoline ? "floor-interaction" : isDrink ? "drink" : "idle"}
+                action={usesTrampoline ? "floor-interaction" : isDrink ? "drink" : isFood ? "happy" : "idle"}
               equippedFloor={equippedFloor}
               itemSpritePath={itemSpritePath}
               expandSceneSurfaces={sceneBackground}
@@ -168,7 +168,7 @@ export function SlimePurchaseConfirmDialog({
             disabled={colors.length <= 1}
             aria-label="다음 펫 미리보기"
           >
-            ›
+            <ChevronRight size={20} aria-hidden="true" />
           </button>
         </section>
 
@@ -210,7 +210,7 @@ export function SlimePurchaseConfirmDialog({
         ) : null}
 
         <div className={styles.totalRow}>
-          <span className={styles.rowLabel}>합계</span>
+          <span className={styles.rowLabel}>금액</span>
           <strong className={styles.total}>
             {total.toLocaleString()}
             {unitLabel}
@@ -233,13 +233,23 @@ export function SlimePurchaseConfirmDialog({
           >
             취소
           </button>
+          {onAddToCart ? (
+            <button
+              type="button"
+              className={styles.cart}
+              onClick={() => onAddToCart(quantity)}
+              disabled={busy}
+            >
+              장바구니
+            </button>
+          ) : null}
           <button
             type="button"
             className={styles.confirm}
             onClick={() => onConfirm(quantity)}
             disabled={busy}
           >
-            {busy ? "구매 중…" : "구매하기"}
+            {busy ? "구매 중…" : "구매"}
           </button>
         </footer>
       </div>

@@ -10,16 +10,14 @@ import {
 import type { SlimeColor, SlimeDefinition, SlimeShopItem } from "@/lib/pets/types";
 
 import styles from "./SlimePetPage.module.css";
-import { OfficialSlimeSprite } from "./OfficialSlimeSprite";
 import { SlimeCharacterSprite } from "./SlimeCharacterSprite";
+import { visibleEquippedSlimeItemKeys } from "@/lib/pets/item-visibility";
 import {
   calculateSlimeGrowthPercent,
   calculateGrowthTimeComparison,
   EFFECT_LABELS,
   formatGrowthHours,
   SLIME_COOKIE_ITEM_KEY,
-  slimeItemSpritePath,
-  slimeWearablesFromItems,
   type EquippedItemsByColor,
   type SlimeGrowthSnapshotPayload,
 } from "./SlimePetModel";
@@ -34,6 +32,7 @@ type SlimeCollectionSectionProps = {
   shopCatalog: SlimeShopItem[];
   ownedItemQuantities: Record<string, number>;
   equippedItemsByColor: EquippedItemsByColor;
+  hiddenItemsByColor?: Partial<Record<SlimeColor, string[]>>;
   equippedFloorByColor?: Partial<Record<SlimeColor, EquippedFloor>>;
   growthByColor: Partial<Record<SlimeColor, SlimeGrowthSnapshotPayload>>;
   claimedTitles: ClaimedTitle[];
@@ -42,10 +41,8 @@ type SlimeCollectionSectionProps = {
   loading: boolean;
   loadFailed: boolean;
   busyRepresentative: SlimeColor | null;
-  busyTitleColor: SlimeColor | null;
   onSetRepresentative: (color: SlimeColor) => void;
   onFeedCookie: (color: SlimeColor) => Promise<boolean>;
-  onEquipTitle: (color: SlimeColor, titleKey: string | null) => void;
   onOpenWardrobe: (color: SlimeColor, trigger: HTMLButtonElement) => void;
 };
 
@@ -80,26 +77,6 @@ function vehicleFromItems(items: readonly SlimeShopItem[]): SlimeShopItem | null
   return vehicle;
 }
 
-function accessorySpritePath(
-  items: readonly SlimeShopItem[],
-  slimeColor: SlimeColor,
-): string | undefined {
-  const ballItem = items.find((item) => item.key.startsWith("slime-ball-"));
-  if (ballItem) return slimeItemSpritePath(ballItem, slimeColor);
-  // Drinks now compose from the anchor registry, so they must not take the
-  // complete-GIF path: that path replaces the character sheet and would suppress
-  // every wearable layer.
-  return items.find(
-    (item) =>
-      !item.floor &&
-      item.category !== "background" &&
-      item.category !== "drink" &&
-      item.category !== "wearable" &&
-      item.category !== "vehicle" &&
-      item.category !== "ride",
-  )?.spritePath;
-}
-
 function normalizeFloor(value: unknown, fallback: EquippedFloor): EquippedFloor {
   return typeof value === "string"
     && (EQUIPPED_FLOORS as readonly string[]).includes(value)
@@ -114,6 +91,7 @@ export function SlimeCollectionSection({
   shopCatalog,
   ownedItemQuantities,
   equippedItemsByColor,
+  hiddenItemsByColor = {},
   equippedFloorByColor = {},
   growthByColor,
   claimedTitles,
@@ -122,31 +100,18 @@ export function SlimeCollectionSection({
   loading,
   loadFailed,
   busyRepresentative,
-  busyTitleColor,
   onSetRepresentative,
   onFeedCookie,
-  onEquipTitle,
   onOpenWardrobe,
 }: SlimeCollectionSectionProps) {
   const [actionsByColor, setActionsByColor] = useState<Partial<Record<SlimeColor, SlimeAction>>>({});
   const [pendingCookieByColor, setPendingCookieByColor] = useState<Partial<Record<SlimeColor, boolean>>>({});
   const [openEffectColor, setOpenEffectColor] = useState<SlimeColor | null>(null);
   const [openGrowthColor, setOpenGrowthColor] = useState<SlimeColor | null>(null);
-  const accessoryEffects = effects.breakdown.filter((entry) => entry.source !== "slime");
   const growthSpeedBps = effects.totals.growth_speed;
 
   return (
-    <section className={styles.section} aria-labelledby="slime-selection-title">
-      <div className={styles.sectionHeading}>
-        <div>
-          <h2 id="slime-selection-title">펫 선택</h2>
-          <p>장착한 펫의 버프가 해당 활동에 적용돼요.</p>
-        </div>
-        <span className={styles.count}>
-          {ownedKeys.length} / {catalog.length} 보유
-        </span>
-      </div>
-
+    <section className={`${styles.section} ${styles.collectionSection}`}>
       <ul className={styles.slimeGrid} aria-label="슬라임 목록" aria-busy={loading}>
         {loading ? (
           <li className={styles.emptyState}>슬라임 목록을 준비하고 있어요…</li>
@@ -168,13 +133,30 @@ export function SlimeCollectionSection({
               </li>
             );
           }
-          const assignedItems = (equippedItemsByColor[slime.color] ?? [])
+          const equippedKeys = equippedItemsByColor[slime.color] ?? [];
+          const visibleKeys = visibleEquippedSlimeItemKeys(
+            equippedKeys,
+            hiddenItemsByColor[slime.color],
+          );
+          // Buff/set math keeps full equipped keys; only the sprite uses visibleKeys.
+          const assignedItems = visibleKeys
             .map((itemKey) => shopCatalog.find((item) => item.key === itemKey))
             .filter((item): item is SlimeShopItem => Boolean(item));
           const growth = growthByColor[slime.color];
           const equippedTitleKey = equippedTitleByColor[slime.color] ?? null;
           const equippedTitle = claimedTitles.find((title) => title.key === equippedTitleKey);
           const stageBuffBps = slimeBuffBpsForStage(slime.baseBuffBps, growth?.stage);
+          // Buff popovers are pet-local: only this pet's base, equipped items, and title.
+          // Hidden items still contribute buffs even when the sprite omits them.
+          const equippedBuffItems = equippedKeys
+            .map((itemKey) => shopCatalog.find((item) => item.key === itemKey))
+            .filter((item): item is SlimeShopItem => Boolean(item))
+            .filter(
+              (item) =>
+                Boolean(item.effectKey) &&
+                typeof item.effectBps === "number" &&
+                item.effectBps > 0,
+            );
           const growthPercent = growth
             ? calculateSlimeGrowthPercent(growth)
             : null;
@@ -188,12 +170,9 @@ export function SlimeCollectionSection({
           const background = backgroundFromItems(assignedItems);
           const vehicle = vehicleFromItems(assignedItems);
           const usesTrampoline = vehicle?.key === SLIME_TRAMPOLINE_ITEM_KEY;
-          const renderedVehicle = usesTrampoline ? null : vehicle;
           const renderedFloor: EquippedFloor = usesTrampoline ? "trampoline" : floor;
           const hasScene = Boolean(background || vehicle || renderedFloor !== "none");
           const drinkItem = assignedItems.find((item) => item.category === "drink");
-          const wearables = slimeWearablesFromItems(assignedItems);
-          const drinkFlavor = wearables.drink ?? null;
           const hasInteractiveFloor =
             renderedFloor === "water-puddle" || renderedFloor === "trampoline";
           const hasPassiveDrink = Boolean(drinkItem);
@@ -236,118 +215,18 @@ export function SlimeCollectionSection({
           const effectDetailId = `slime-effect-detail-${slime.color}`;
           return (
             <li key={slime.key} className={`${styles.slimeItem} ${styles.slimeItemSelected}`}>
-              <div className={styles.effectDetail}>
-                <button
-                  type="button"
-                  className={styles.effectBadge}
-                  aria-expanded={openEffectColor === slime.color}
-                  aria-controls={effectDetailId}
-                  aria-label={`${slime.nameKo} 효과 상세 보기`}
-                  onClick={() => setOpenEffectColor((current) =>
-                    current === slime.color ? null : slime.color,
-                  )}
-                >
-                  <img
-                    className={styles.effectArrowIcon}
-                    src="/creatures/slimes/ui/growth-buff-arrow.png"
-                    alt=""
-                    aria-hidden="true"
-                  />
-                  <span className={styles.visuallyHidden}>
-                    {EFFECT_LABELS[slime.effectKey]} +{formatBpsPercent(stageBuffBps)}
-                  </span>
-                </button>
-                <div
-                  id={effectDetailId}
-                  className={`${styles.effectPopover} ${openEffectColor === slime.color ? styles.effectPopoverOpen : ""}`}
-                  role="region"
-                  aria-label={`${slime.nameKo} 효과 상세`}
-                  aria-hidden={openEffectColor !== slime.color}
-                >
-                  <strong>활성 효과</strong>
-                  <div className={styles.effectGroup}>
-                    <span className={styles.effectGroupLabel}>펫 기본 효과</span>
-                    <span>{EFFECT_LABELS[slime.effectKey]} +{formatBpsPercent(stageBuffBps)}</span>
-                  </div>
-                  {accessoryEffects.length > 0 ? (
-                    <div className={styles.effectGroup}>
-                      <span className={styles.effectGroupLabel}>소품 추가 효과</span>
-                      <ul className={styles.effectItemList}>
-                        {accessoryEffects.map((entry) => (
-                          <li key={`${entry.source}:${entry.key}`}>
-                            {entry.label} · {EFFECT_LABELS[entry.effectKey]} +{formatBpsPercent(entry.bps)}
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  ) : null}
-                </div>
-              </div>
-              <button
-                type="button"
-                className={`${styles.representativeStar} ${representativeColor === slime.color ? styles.representativeStarSelected : ""}`}
-                disabled={busyRepresentative !== null || representativeColor === slime.color}
-                onClick={() => onSetRepresentative(slime.color)}
-                aria-label={representativeColor === slime.color ? `${slime.nameKo} 대표 펫` : `${slime.nameKo}을 대표 펫으로 지정`}
-                title={representativeColor === slime.color ? "대표 펫" : "대표로 지정"}
-              >
-                <span aria-hidden="true">★</span>
-              </button>
               <div
-                className={`${styles.spriteFrame} ${hasScene ? styles.spriteFrameScene : ""}`.trim()}
+                className={`${styles.spriteFrame} ${hasScene ? styles.spriteFrameScene : ""} ${background ? styles.spriteFrameSceneBackground : ""}`.trim()}
               >
-                {background ? (
-                  <div className={styles.spriteCharacterFrame}>
-                    <OfficialSlimeSprite
-                      slimeColor={slime.color}
-                      // Growth stage owns the default crown; the resolver turns it
-                      // into a head slot that a chosen hat can outrank.
-                      growthStage={growth?.stage ?? 1}
-                      action={action}
-                      equippedFloor={renderedFloor}
-                      itemSpritePath={accessorySpritePath(assignedItems, slime.color)}
-                      backgroundSpritePath={background.spritePath}
-                      vehicleSpritePath={renderedVehicle?.vehicleSheetPath ?? renderedVehicle?.spritePath}
-                      vehicleGroundedSpritePath={renderedVehicle?.vehicleGroundedSpritePath}
-                      vehicleEffectSpritePaths={renderedVehicle?.vehicleEffectSpritePaths}
-                      vehicleFrameCount={renderedVehicle?.vehicleFrameCount}
-                      vehicleGroundedFrameCount={renderedVehicle?.vehicleGroundedFrameCount}
-                      vehicleGroundedFrameDurationMs={renderedVehicle?.vehicleGroundedFrameDurationMs}
-                      vehicleCanvasHeight={renderedVehicle?.vehicleCanvasHeight}
-                      vehicleCharacterOffsetY={renderedVehicle?.vehicleCharacterOffsetY}
-                      vehicleBobY={renderedVehicle?.vehicleBobY}
-                      vehicleRiseY={renderedVehicle?.vehicleRiseY}
-                      vehicleOffsetX={renderedVehicle?.vehicleOffsetX}
-                      expandSceneSurfaces
-                      wearables={wearables}
-                      drinkFlavor={drinkFlavor}
-                      repeat={!manualAction && hasPassiveDrink}
-                      alt={assignedItems.length > 0
-                        ? `${slime.nameKo}, ${assignedItems.map((item) => item.labelKo).join(", ")} 적용 미리보기`
-                        : `${slime.nameKo} 미리보기`}
-                      dataSlimeColor={slime.color}
-                      onComplete={manualAction
-                        ? clearAction
-                        : hasInteractiveFloor || hasPassiveDrink
-                          ? undefined
-                          : () => {
-                              setActionsByColor((current) => {
-                                if (!(slime.color in current)) return current;
-                                const next = { ...current };
-                                delete next[slime.color];
-                                return next;
-                              });
-                            }}
-                    />
-                  </div>
-                ) : (
-                  <SlimeCharacterSprite
+                <SlimeCharacterSprite
                     slime={slime}
                     items={assignedItems}
                     growthStage={growth?.stage ?? 1}
                     action={action}
                     repeat={!manualAction && hasPassiveDrink}
                     equippedFloor={floor}
+                    scale={2}
+                    hostBackground={Boolean(background)}
                     onComplete={manualAction
                       ? clearAction
                       : hasInteractiveFloor || hasPassiveDrink
@@ -361,13 +240,86 @@ export function SlimeCollectionSection({
                             });
                           }}
                   />
-                )}
               </div>
               <div className={styles.itemCopy}>
                 {equippedTitle ? (
                   <span className={styles.equippedTitle}>{equippedTitle.label}</span>
                 ) : null}
-                <h3>{slime.nameKo}</h3>
+                <div className={styles.nameRow}>
+                  <div className={styles.nameActionSlot}>
+                    <button
+                      type="button"
+                      className={styles.effectBadge}
+                      aria-expanded={openEffectColor === slime.color}
+                      aria-controls={effectDetailId}
+                      aria-label={`${slime.nameKo} 효과 상세 보기`}
+                      onClick={() => {
+                        setOpenGrowthColor(null);
+                        setOpenEffectColor((current) =>
+                          current === slime.color ? null : slime.color,
+                        );
+                      }}
+                    >
+                      <img
+                        className={styles.effectArrowIcon}
+                        src="/creatures/slimes/ui/growth-buff-arrow.png"
+                        alt=""
+                        aria-hidden="true"
+                      />
+                      <span className={styles.visuallyHidden}>
+                        {EFFECT_LABELS[slime.effectKey]} +{formatBpsPercent(stageBuffBps)}
+                      </span>
+                    </button>
+                    <div
+                      id={effectDetailId}
+                      className={`${styles.effectPopover} ${openEffectColor === slime.color ? styles.effectPopoverOpen : ""}`}
+                      role="region"
+                      aria-label={`${slime.nameKo} 효과 상세`}
+                      aria-hidden={openEffectColor !== slime.color}
+                    >
+                      <strong>활성 효과</strong>
+                      <div className={styles.effectGroup}>
+                        <span className={styles.effectGroupLabel}>펫 기본 효과</span>
+                        <span>{EFFECT_LABELS[slime.effectKey]} +{formatBpsPercent(stageBuffBps)}</span>
+                      </div>
+                      {equippedBuffItems.length > 0 ? (
+                        <div className={styles.effectGroup}>
+                          <span className={styles.effectGroupLabel}>소품 추가 효과</span>
+                          <ul className={styles.effectItemList}>
+                            {equippedBuffItems.map((item) => (
+                              <li key={item.key}>
+                                {item.labelKo} · {EFFECT_LABELS[item.effectKey!]} +
+                                {formatBpsPercent(item.effectBps ?? 0)}
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      ) : null}
+                      {equippedTitle && equippedTitle.buffBps > 0 ? (
+                        <div className={styles.effectGroup}>
+                          <span className={styles.effectGroupLabel}>칭호 효과</span>
+                          <span>
+                            {equippedTitle.label} · {EFFECT_LABELS[equippedTitle.effectKey as keyof typeof EFFECT_LABELS] ?? equippedTitle.effectKey} +
+                            {formatBpsPercent(equippedTitle.buffBps)}
+                          </span>
+                        </div>
+                      ) : null}
+                    </div>
+                  </div>
+                  <h3 className={styles.petName}>{slime.nameKo}</h3>
+                  <div className={styles.nameActionSlot}>
+                    <button
+                      type="button"
+                      className={`${styles.representativeStar} ${representativeColor === slime.color ? styles.representativeStarSelected : ""}`}
+                      disabled={busyRepresentative !== null || representativeColor === slime.color}
+                      onClick={() => onSetRepresentative(slime.color)}
+                      aria-label={representativeColor === slime.color ? `${slime.nameKo} 대표 펫` : `${slime.nameKo}을 대표 펫으로 지정`}
+                      title={representativeColor === slime.color ? "대표 펫" : "대표로 지정"}
+                    >
+                      <span aria-hidden="true">★</span>
+                    </button>
+                  </div>
+                </div>
                 {growth && growthPercent !== null ? (
                   <button
                     type="button"
@@ -413,23 +365,11 @@ export function SlimeCollectionSection({
                   </button>
                 ) : null}
               </div>
-              <div className={styles.titleWardrobe}>
-                <label htmlFor={`slime-title-${slime.color}`}>칭호</label>
-                <select
-                  id={`slime-title-${slime.color}`}
-                  className={styles.titleSelect}
-                  value={equippedTitleKey ?? ""}
-                  disabled={busyTitleColor !== null}
-                  aria-busy={busyTitleColor === slime.color}
-                  onChange={(event) => onEquipTitle(slime.color, event.currentTarget.value || null)}
-                >
-                  <option value="">칭호 없음</option>
-                  {claimedTitles.map((title) => (
-                    <option key={title.key} value={title.key}>{title.label}</option>
-                  ))}
-                </select>
-              </div>
-              <div className={styles.slimeActions}>
+<div
+                className={styles.slimeActions}
+                role="group"
+                aria-label={`${slime.nameKo} 펫 관리`}
+              >
                 <button
                   type="button"
                   className={styles.wardrobeButton}
@@ -438,31 +378,25 @@ export function SlimeCollectionSection({
                 >
                   꾸미기
                 </button>
-                <div
-                  className={styles.slimeActionButtons}
-                  role="group"
-                  aria-label={`${slime.nameKo} 행동`}
+                <button
+                  type="button"
+                  className={`${styles.slimeActionButton} ${cookieQuantity <= 0 ? styles.slimeActionButtonDisabled : ""}`.trim()}
+                  disabled={cookieQuantity <= 0 || cookiePending || manualAction === "happy"}
+                  onClick={() => void feedCookie()}
+                  aria-label={
+                    cookieQuantity > 0
+                      ? `${slime.nameKo}에게 쿠키 주기 (보유 ${cookieQuantity}개)`
+                      : `${slime.nameKo}에게 쿠키 주기 (쿠키 없음)`
+                  }
+                  title="쿠키 주기"
+                  data-testid={`slime-cookie-feed-${slime.color}`}
                 >
-                  <button
-                    type="button"
-                    className={styles.slimeActionButton}
-                    disabled={cookieQuantity <= 0 || cookiePending || manualAction === "happy"}
-                    onClick={() => void feedCookie()}
-                    aria-label={
-                      cookieQuantity > 0
-                        ? `${slime.nameKo}에게 쿠키 주기 (보유 ${cookieQuantity}개)`
-                        : `${slime.nameKo}에게 쿠키 주기 (쿠키 없음)`
-                    }
-                    title="쿠키 주기"
-                    data-testid={`slime-cookie-feed-${slime.color}`}
-                  >
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={SLIME_SHARED_ASSETS.cookie.imageUrl} alt="" aria-hidden="true" />
-                    <span className={styles.cookieQuantity} aria-hidden="true">
-                      {cookieQuantity}
-                    </span>
-                  </button>
-                </div>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={SLIME_SHARED_ASSETS.cookie.imageUrl} alt="" aria-hidden="true" />
+                  <span className={styles.cookieQuantity} aria-hidden="true">
+                    {cookieQuantity}
+                  </span>
+                </button>
               </div>
             </li>
           );
@@ -476,52 +410,47 @@ type SlimeEffectsSectionProps = {
   effects: ReturnType<typeof calculateCatalogSlimeEffects>;
 };
 
+const EFFECT_DESCRIPTIONS: Record<string, string> = {
+  growth_speed: "펫의 성장 속도가 UP!",
+  reading_reward: "독서로 얻을 수 있는 보상이 UP!",
+  walking_reward: "걷기로 얻을 수 있는 보상이 UP!",
+  assignment_reward: "과제 제출 날짜를 지켰을 때의 보상이 UP!",
+  comment_reward: "게시물에 댓글을 남겼을 때의 보상이 UP!",
+};
+
 export function SlimeEffectsSection({ effects }: SlimeEffectsSectionProps) {
-  const baseEffects = effects.breakdown.filter((entry) => entry.source === "slime");
-  const accessoryEffects = effects.breakdown.filter((entry) => entry.source !== "slime");
+  const applied = (Object.entries(effects.totals) as Array<
+    [keyof typeof effects.totals, number]
+  >)
+    .filter(([, bps]) => bps > 0)
+    .map(([effectKey, bps]) => ({ effectKey, bps }));
+
   return (
-    <section className={styles.section} aria-labelledby="slime-breakdown-title">
+    <section className={styles.appliedEffects} aria-labelledby="slime-applied-buffs-title">
       <div className={styles.breakdownHeading}>
-        <h2 id="slime-breakdown-title">효과 내역</h2>
+        <h2 id="slime-applied-buffs-title">적용 중인 버프</h2>
       </div>
-      <ul className={styles.breakdown} aria-live="polite">
-        {effects.breakdown.length === 0 ? (
-          <li>슬라임을 장착하면 개별 버프가 표시돼요.</li>
-        ) : (
-          <>
-            {baseEffects.length > 0 ? (
-              <li className={styles.breakdownGroup}>
-                <strong className={styles.breakdownGroupLabel}>펫 기본 효과</strong>
-                <ul className={styles.breakdownGroupList}>
-                  {baseEffects.map((entry) => (
-                    <li key={`${entry.source}:${entry.key}`}>
-                      <span className={styles.breakdownEffectLabel}>
-                        <span>{entry.label}</span>
-                      </span>
-                      <span>{EFFECT_LABELS[entry.effectKey]} +{formatBpsPercent(entry.bps)}</span>
-                    </li>
-                  ))}
-                </ul>
-              </li>
-            ) : null}
-            {accessoryEffects.length > 0 ? (
-              <li className={styles.breakdownGroup}>
-                <strong className={styles.breakdownGroupLabel}>소품 추가 효과</strong>
-                <ul className={styles.breakdownGroupList}>
-                  {accessoryEffects.map((entry) => (
-                    <li key={`${entry.source}:${entry.key}`}>
-                      <span className={styles.breakdownEffectLabel}>
-                        <span>{entry.label}</span>
-                      </span>
-                      <span>{EFFECT_LABELS[entry.effectKey]} +{formatBpsPercent(entry.bps)}</span>
-                    </li>
-                  ))}
-                </ul>
-              </li>
-            ) : null}
-          </>
-        )}
-      </ul>
+      {applied.length === 0 ? (
+        <p className={styles.appliedEffectsEmpty} aria-live="polite">
+          현재 적용 중인 버프가 없어요.
+        </p>
+      ) : (
+        <ul className={styles.appliedEffectsList} aria-live="polite">
+          {applied.map((effect) => (
+            <li key={effect.effectKey} className={styles.appliedEffectRow}>
+              <span className={styles.appliedEffectLabel}>
+                {EFFECT_LABELS[effect.effectKey]}
+              </span>
+              <span className={styles.appliedEffectDescription}>
+                {EFFECT_DESCRIPTIONS[effect.effectKey] ?? ""}
+              </span>
+              <strong className={styles.appliedEffectValue}>
+                +{formatBpsPercent(effect.bps)}
+              </strong>
+            </li>
+          ))}
+        </ul>
+      )}
     </section>
   );
 }

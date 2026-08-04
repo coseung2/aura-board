@@ -77,9 +77,11 @@ export type SlimeDefinition = {
   readonly color: SlimeColor;
   readonly nameKo: string;
   readonly effectKey: SlimeEffectKey;
-  readonly baseBuffBps: number;
-  readonly price: number;
-  readonly spritePath: string;
+    readonly baseBuffBps: number;
+    readonly price: number;
+    /** Optional purchase count used to order the all-products carousel. */
+    readonly purchaseCount?: number;
+    readonly spritePath: string;
 };
 
 export const SLIME_SHOP_CATEGORIES = [
@@ -101,8 +103,10 @@ export type SlimeShopItem = {
   readonly category: SlimeShopCategory;
   /** Semantic floor state; null means the item is not a floor. */
   readonly floor: Exclude<SlimeFloor, "none"> | null;
-  readonly labelKo: string;
-  readonly price: number;
+    readonly labelKo: string;
+    readonly price: number;
+    /** Optional purchase count used for popularity ordering in the all view. */
+    readonly purchaseCount?: number;
   /** Explicit tier for tiered shop items such as vehicles. */
   readonly tier?: SlimeShopTier;
   readonly spritePath: string;
