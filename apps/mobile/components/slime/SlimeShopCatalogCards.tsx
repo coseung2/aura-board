@@ -1,4 +1,10 @@
-import { Text, StyleSheet, View } from "react-native";
+import { Ban } from "lucide-react-native";
+import {
+  StyleSheet,
+  Text,
+  useWindowDimensions,
+  View,
+} from "react-native";
 
 import { ControlPressable } from "../ui";
 import { SlimeSprite } from "./SlimeSprite";
@@ -13,7 +19,6 @@ import {
 } from "../../lib/slimes";
 import type { SlimeColor } from "../../lib/slime-assets";
 import {
-  isVehicleSlimeShopItem,
   slimeShopItemBuffLabel,
   slimeShopItemPreview,
   slimeShopItemSpritePath,
@@ -22,9 +27,11 @@ import {
   borders,
   colors,
   iconSizes,
+  layers,
   radii,
   slimeUi,
   spacing,
+  states,
   typography,
 } from "../../theme/tokens";
 
@@ -48,40 +55,39 @@ export function SlimeShopItemCard({
   busyItemKey,
   onPress,
 }: SlimeShopItemCardProps) {
-  const quantity = ownedItemQuantities[item.key] ?? 0;
+  const cardWidth = useShopCardWidth();
+  const quantity = Math.max(0, ownedItemQuantities[item.key] ?? 0);
   const repeatable = item.key === SLIME_COOKIE_ITEM_KEY;
   const owned = repeatable ? quantity > 0 : ownedItemKeys.includes(item.key);
   const busy = busyItemKey === item.key;
   const buffLabel = slimeShopItemBuffLabel(item);
   const preview = slimeShopItemPreview(item);
   const sceneBackground = isSceneBackgroundItem(item);
-  const expandedScene =
-    isVehicleSlimeShopItem(item) ||
-    sceneBackground ||
-    preview.equippedFloor !== "none";
-  const itemSummary = repeatable
-    ? `${quantity}개 보유`
-    : !owned
-      ? `${item.price.toLocaleString()}${unitLabel}`
-      : null;
+  const unavailable = owned && !repeatable;
+  const priceLabel = `${item.price.toLocaleString()}${unitLabel}`;
 
   return (
     <ControlPressable
-      style={[styles.card, styles.sceneCard]}
-      disabled={busyItemKey !== null || (owned && !repeatable)}
+      style={[styles.card, { width: cardWidth }]}
+      disabled={busyItemKey !== null || unavailable}
       onPress={() => onPress(item)}
-      accessibilityLabel={`${item.labelKo} ${repeatable && quantity > 0 ? `${quantity}개 보유, 구매` : owned ? "보유 중" : "구매"}`}
+      accessibilityLabel={`${item.labelKo} ${
+        repeatable && quantity > 0
+          ? `${quantity}개 보유, 구매`
+          : unavailable
+            ? "보유 중"
+            : `${priceLabel}, 구매`
+      }`}
       accessibilityState={{
-        disabled: busyItemKey !== null || (owned && !repeatable),
+        disabled: busyItemKey !== null || unavailable,
         busy,
       }}
     >
       <View
         style={[
           styles.preview,
-          styles.previewFullBleed,
-          expandedScene && styles.previewSceneSlot,
           sceneBackground && styles.previewScene,
+          unavailable && styles.contentMuted,
         ]}
         accessible={false}
       >
@@ -90,7 +96,7 @@ export function SlimeShopItemCard({
           evolution="base"
           action={preview.action}
           equippedFloor={preview.equippedFloor}
-          displayScale={slimeUi.petSceneDisplayScale}
+          displayScale={slimeUi.shopCardSceneDisplayScale}
           repeat={Boolean(preview.propAction)}
           expandSceneSurfaces={preview.expandSceneSurfaces || sceneBackground}
           itemSpritePath={
@@ -123,20 +129,17 @@ export function SlimeShopItemCard({
           <SlimeBuffTierChip label={buffLabel} bps={item.effectBps ?? 0} />
         ) : null}
       </View>
-      <View style={[styles.cardBody, styles.shopCardBody]}>
-        <View style={styles.copy}>
-          <Text style={styles.title}>{item.labelKo}</Text>
-          {itemSummary ? <Text style={styles.subtitle}>{itemSummary}</Text> : null}
-        </View>
-        <Text
-          style={[
-            styles.status,
-            (repeatable || !owned) && styles.statusBuy,
-          ]}
-        >
-          {busy ? "처리 중…" : repeatable ? "구매" : owned ? "보유 중" : "구매"}
+      <View style={[styles.cardBody, unavailable && styles.contentMuted]}>
+        <Text style={styles.title} numberOfLines={2}>
+          {item.labelKo}
         </Text>
+        <Text style={styles.price}>{priceLabel}</Text>
+        {repeatable && quantity > 0 ? (
+          <Text style={styles.detail}>{quantity}개 보유</Text>
+        ) : null}
+        {busy ? <Text style={styles.detail}>처리 중…</Text> : null}
       </View>
+      {unavailable ? <OwnedOverlay /> : null}
     </ControlPressable>
   );
 }
@@ -157,23 +160,29 @@ export function SlimeCharacterCatalogCard({
   busyColor,
   onPress,
 }: SlimeCharacterCatalogCardProps) {
+  const cardWidth = useShopCardWidth();
   const owned = ownedColors.includes(slime.color);
   const busy = busyColor === slime.color;
+  const priceLabel = `${slime.price.toLocaleString()}${unitLabel}`;
+
   return (
     <ControlPressable
-      style={[styles.card, styles.sceneCard]}
+      style={[styles.card, { width: cardWidth }]}
       disabled={owned || busyColor !== null}
       onPress={() => onPress(slime)}
-      accessibilityLabel={`${slime.nameKo} ${owned ? "보유 중" : "구매"}`}
+      accessibilityLabel={`${slime.nameKo} ${owned ? "보유 중" : `${priceLabel}, 구매`}`}
       accessibilityState={{ disabled: owned || busyColor !== null, busy }}
     >
-      <View style={[styles.preview, styles.previewFullBleed]} accessible={false}>
+      <View
+        style={[styles.preview, owned && styles.contentMuted]}
+        accessible={false}
+      >
         <SlimeSprite
           slimeColor={slime.color}
           evolution="base"
           action="idle"
           equippedFloor="none"
-          displayScale={slimeUi.petSceneDisplayScale}
+          displayScale={slimeUi.shopCardSceneDisplayScale}
           accessibilityLabel={`${slime.nameKo} 미리보기`}
         />
         <SlimeBuffTierChip
@@ -181,68 +190,98 @@ export function SlimeCharacterCatalogCard({
           bps={slime.baseBuffBps}
         />
       </View>
-      <View style={[styles.cardBody, styles.shopCardBody]}>
-        <View style={styles.copy}>
-          <Text style={styles.title}>{slime.nameKo}</Text>
-        </View>
-        <Text style={[styles.status, !owned && styles.statusBuy]}>
-          {busy
-            ? "구매 중…"
-            : owned
-              ? "보유 중"
-              : `${slime.price.toLocaleString()}${unitLabel}`}
+      <View style={[styles.cardBody, owned && styles.contentMuted]}>
+        <Text style={styles.title} numberOfLines={2}>
+          {slime.nameKo}
         </Text>
+        <Text style={styles.price}>{busy ? "구매 중…" : priceLabel}</Text>
       </View>
+      {owned ? <OwnedOverlay /> : null}
     </ControlPressable>
   );
 }
 
+function OwnedOverlay() {
+  return (
+    <View style={styles.ownedOverlay} pointerEvents="none" accessible={false}>
+      <Ban size={iconSizes.md} color={colors.danger} strokeWidth={2.25} />
+      <Text style={styles.ownedOverlayText}>보유 중</Text>
+    </View>
+  );
+}
+
+function useShopCardWidth(): "47.8%" | "31.5%" {
+  const { width } = useWindowDimensions();
+  return width >= 700 ? "31.5%" : "47.8%";
+}
+
 const styles = StyleSheet.create({
   card: {
-    width: "31.5%",
+    position: "relative",
     minWidth: 0,
-    paddingHorizontal: spacing.xs,
-    paddingVertical: spacing.xs,
-    borderWidth: borders.hairline,
-    borderColor: colors.border,
-    borderRadius: radii.control,
-    backgroundColor: colors.surface,
-    alignItems: "center",
-    justifyContent: "flex-start",
-    gap: spacing.xxs,
-  },
-  sceneCard: {
     paddingHorizontal: spacing.none,
     paddingVertical: spacing.none,
-    gap: spacing.none,
-    overflow: "hidden",
+    borderWidth: borders.none,
+    borderRadius: radii.none,
+    backgroundColor: colors.transparent,
+    alignItems: "stretch",
+    justifyContent: "flex-start",
+    gap: spacing.sm,
+    overflow: "visible",
+    opacity: states.visibleOpacity,
   },
   preview: {
-    width: iconSizes.empty,
-    height: iconSizes.empty,
+    position: "relative",
+    width: "100%",
+    aspectRatio: 1,
     alignItems: "center",
     justifyContent: "center",
     overflow: "hidden",
     backgroundColor: colors.surfaceAlt,
   },
-  previewFullBleed: { width: "100%", height: iconSizes.empty },
-  previewSceneSlot: {
-    position: "relative",
-    width: "100%",
-    height: iconSizes.empty + spacing.xxl,
-    overflow: "hidden",
-  },
   previewScene: { backgroundColor: colors.transparent },
-  cardBody: { width: "100%", gap: spacing.xs },
-  shopCardBody: {
-    paddingHorizontal: spacing.xs,
+  cardBody: {
+    width: "100%",
+    minWidth: 0,
+    minHeight: slimeUi.shopCardBodyMinHeight,
     paddingTop: spacing.xs,
-    paddingBottom: spacing.sm,
+    paddingBottom: spacing.md,
+    gap: spacing.xs,
+    alignItems: "flex-start",
+  },
+  title: {
+    ...typography.label,
+    width: "100%",
+    color: colors.text,
+    textAlign: "left",
+  },
+  price: {
+    ...typography.subtitle,
+    color: colors.text,
+    textAlign: "left",
+    fontVariant: ["tabular-nums"],
+  },
+  detail: {
+    ...typography.micro,
+    color: colors.textMuted,
+    textAlign: "left",
+    fontVariant: ["tabular-nums"],
+  },
+  contentMuted: {
+    opacity: states.disabledOpacity,
+  },
+  ownedOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    zIndex: layers.cardOverlay,
+    alignItems: "center",
+    justifyContent: "center",
     gap: spacing.xxs,
   },
-  copy: { width: "100%", minWidth: 0, alignItems: "center", gap: spacing.xxs },
-  title: { ...typography.label, color: colors.text, textAlign: "center" },
-  subtitle: { ...typography.micro, color: colors.textMuted, textAlign: "center" },
-  status: { ...typography.micro, color: colors.textMuted, textAlign: "center" },
-  statusBuy: { color: colors.accent },
+  ownedOverlayText: {
+    ...typography.micro,
+    color: colors.text,
+    fontWeight: "800",
+    textAlign: "center",
+    includeFontPadding: false,
+  },
 });

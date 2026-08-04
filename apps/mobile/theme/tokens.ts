@@ -447,6 +447,10 @@ export const slimeUi = {
   vehicleFloorScale: 1.125,
   vehicleSceneSlotHeight: 116,
   petSceneDisplayScale: 0.25,
+  /** Media-first shop and wardrobe cards use the purchase-preview scale. */
+  shopCardSceneDisplayScale: 0.4,
+  shopCardBodyMinHeight: 62,
+  wardrobeCardBodyMinHeight: 70,
   /** Home reuses the 32%-wide pet-card composition at a uniform 1.25x scale. */
   homePetSceneDisplayScale: 0.3125,
   homePetSceneWidth: "40%" as const,

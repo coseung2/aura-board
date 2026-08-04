@@ -1,6 +1,12 @@
 import { Image } from "expo-image";
 import { Ban } from "lucide-react-native";
-import { ScrollView, StyleSheet, Text, View } from "react-native";
+import {
+  ScrollView,
+  StyleSheet,
+  Text,
+  useWindowDimensions,
+  View,
+} from "react-native";
 
 import { ContentTab, ContentTabs } from "../NavigationTabs";
 import { AppBottomSheet, BarePressable } from "../ui";
@@ -17,7 +23,6 @@ import {
   type SlimeShopItem,
 } from "../../lib/slimes";
 import {
-  isVehicleSlimeShopItem,
   slimeShopItemBuffLabel,
   slimeShopItemPreview,
   slimeShopItemSpritePath,
@@ -32,6 +37,7 @@ import {
   slimeUi,
   spacing,
   states,
+  tapMin,
   typography,
 } from "../../theme/tokens";
 
@@ -78,6 +84,9 @@ export function SlimeWardrobeSheet({
   onToggleItem,
   onToggleItemVisibility,
 }: SlimeWardrobeSheetProps) {
+  const { width } = useWindowDimensions();
+  const cardWidth = width >= 700 ? "31.5%" : "47.8%";
+
   return (
     <AppBottomSheet
       visible={color !== null}
@@ -136,12 +145,21 @@ export function SlimeWardrobeSheet({
               return (
                 <View
                   key={title.key}
-                  style={[styles.item, equipped && styles.itemEquipped]}
+                  style={[
+                    styles.item,
+                    { width: cardWidth },
+                  ]}
                   accessible
                   accessibilityLabel={`${title.label} 칭호 ${equipped ? "해제" : "장착"}`}
                   accessibilityState={{ selected: equipped, busy }}
                 >
-                  <View style={styles.preview} accessible={false}>
+                  <View
+                    style={[
+                      styles.preview,
+                      equipped && styles.previewEquipped,
+                    ]}
+                    accessible={false}
+                  >
                     <Image
                       source={{ uri: `${getApiBase()}${title.imagePath}` }}
                       style={styles.titlePreview}
@@ -190,18 +208,12 @@ export function SlimeWardrobeSheet({
             const buffLabel = slimeShopItemBuffLabel(item);
             const preview = slimeShopItemPreview(item);
             const sceneBackground = isSceneBackgroundItem(item);
-            const expandedScene =
-              isVehicleSlimeShopItem(item) ||
-              sceneBackground ||
-              preview.equippedFloor !== "none";
             return (
               <View
                 key={item.key}
                 style={[
                   styles.item,
-                  styles.sceneCard,
-                  equipped && styles.itemEquipped,
-                  wornByOther && styles.itemWornByOther,
+                  { width: cardWidth },
                 ]}
                 accessible
                 accessibilityLabel={`${item.labelKo} ${
@@ -216,9 +228,8 @@ export function SlimeWardrobeSheet({
                 <View
                   style={[
                     styles.preview,
-                    styles.previewFullBleed,
-                    expandedScene && styles.previewSceneSlot,
                     sceneBackground && styles.previewScene,
+                    equipped && styles.previewEquipped,
                   ]}
                   accessible={false}
                 >
@@ -240,7 +251,7 @@ export function SlimeWardrobeSheet({
                       evolution="base"
                       action={preview.action}
                       equippedFloor={preview.equippedFloor}
-                      displayScale={slimeUi.petSceneDisplayScale}
+                      displayScale={slimeUi.shopCardSceneDisplayScale}
                       repeat={
                         Boolean(preview.propAction) ||
                         preview.action !== "idle"
@@ -319,7 +330,7 @@ export function SlimeWardrobeSheet({
                     <Text style={styles.itemTitle}>{item.labelKo}</Text>
                     {hidden ? (
                       <Text style={styles.itemSubtitle}>
-                        외형 숨김
+                        외형 숨김 · 버프는 유지
                       </Text>
                     ) : null}
                   </View>
@@ -408,7 +419,7 @@ const styles = StyleSheet.create({
   noticeErrorText: { color: colors.danger },
   nav: { width: "100%" },
   navItem: { flex: 1 },
-  list: { maxHeight: iconSizes.empty * 5 },
+  list: { maxHeight: iconSizes.empty * 6 },
   listContent: {
     flexDirection: "row",
     flexWrap: "wrap",
@@ -416,46 +427,29 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
   },
   item: {
-    width: "31.5%",
     minWidth: 0,
-    paddingHorizontal: spacing.xs,
-    paddingVertical: spacing.xs,
-    borderWidth: borders.hairline,
-    borderColor: colors.border,
-    borderRadius: radii.control,
-    backgroundColor: colors.surface,
-    alignItems: "center",
-    justifyContent: "flex-start",
-    gap: spacing.xxs,
-  },
-  itemEquipped: {
-    borderColor: colors.accent,
-    backgroundColor: colors.accentTintedBg,
-  },
-  itemWornByOther: {
-    borderColor: colors.borderHover,
-    backgroundColor: colors.surfaceAlt,
-  },
-  sceneCard: {
     paddingHorizontal: spacing.none,
     paddingVertical: spacing.none,
-    gap: spacing.none,
-    overflow: "hidden",
+    borderWidth: borders.none,
+    borderRadius: radii.none,
+    backgroundColor: colors.transparent,
+    alignItems: "stretch",
+    justifyContent: "flex-start",
+    gap: spacing.sm,
+    overflow: "visible",
   },
   preview: {
-    width: iconSizes.empty,
-    height: iconSizes.empty,
+    position: "relative",
+    width: "100%",
+    aspectRatio: 1,
     alignItems: "center",
     justifyContent: "center",
     overflow: "hidden",
     backgroundColor: colors.surfaceAlt,
   },
-  previewFullBleed: { width: "100%", height: iconSizes.empty },
-  previewSceneSlot: {
-    position: "relative",
-    width: "100%",
-    height: iconSizes.empty + spacing.xxl,
-    overflow: "hidden",
+  previewEquipped: {
+    borderWidth: borders.medium,
+    borderColor: colors.accent,
   },
   previewScene: { backgroundColor: colors.transparent },
   previewVisual: {
@@ -478,31 +472,38 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     includeFontPadding: false,
   },
-  cardBody: { width: "100%", gap: spacing.xs },
+  cardBody: {
+    width: "100%",
+    minWidth: 0,
+    minHeight: slimeUi.wardrobeCardBodyMinHeight,
+    gap: spacing.xs,
+  },
   shopCardBody: {
-    paddingHorizontal: spacing.xs,
+    paddingHorizontal: spacing.none,
     paddingTop: spacing.xs,
-    paddingBottom: spacing.sm,
+    paddingBottom: spacing.md,
     gap: spacing.xxs,
   },
-  wardrobeCardBody: { paddingBottom: spacing.xs, gap: spacing.xxs },
+  wardrobeCardBody: { gap: spacing.xxs },
   itemCopy: {
     width: "100%",
     minWidth: 0,
-    alignItems: "center",
+    alignItems: "flex-start",
     gap: spacing.xxs,
   },
-  itemTitle: { ...typography.label, color: colors.text, textAlign: "center" },
+  itemTitle: { ...typography.label, color: colors.text, textAlign: "left" },
   itemSubtitle: {
     ...typography.micro,
     color: colors.textMuted,
-    textAlign: "center",
+    textAlign: "left",
   },
   actions: {
     width: "100%",
+    minHeight: tapMin,
     flexDirection: "row",
+    flexWrap: "wrap",
     alignItems: "center",
-    justifyContent: "center",
+    justifyContent: "flex-start",
     gap: spacing.xs,
   },
   actionText: {
@@ -513,7 +514,7 @@ const styles = StyleSheet.create({
   },
   actionPrimary: { color: colors.accentTintedText },
   actionDanger: { color: colors.danger },
-  titlePreview: { width: "100%", height: "100%" },
+  titlePreview: { width: "78%", height: "62%" },
   empty: { width: "100%", padding: spacing.lg },
   emptyText: { ...typography.body, color: colors.textMuted, textAlign: "center" },
 });
