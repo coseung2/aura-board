@@ -1,6 +1,6 @@
 use async_trait::async_trait;
 use serde::{Serialize, de::DeserializeOwned};
-use sqlx::postgres::PgPoolOptions;
+use sqlx::postgres::{PgConnectOptions, PgPoolOptions};
 use sqlx::types::Json;
 use sqlx::{PgPool, Postgres, Row, Transaction};
 use uuid::Uuid;
@@ -34,9 +34,16 @@ impl PostgresRepository {
     }
 
     pub async fn connect(database_url: &str) -> Result<Self, RepositoryError> {
+        // Supabase transaction poolers (PgBouncer) discard prepared statements
+        // between checkouts. Disable statement caching so current-session reads
+        // do not fail with "prepared statement does not exist".
+        let options = database_url
+            .parse::<PgConnectOptions>()
+            .map_err(storage)?
+            .statement_cache_capacity(0);
         let pool = PgPoolOptions::new()
             .max_connections(10)
-            .connect(database_url)
+            .connect_with(options)
             .await
             .map_err(storage)?;
         Ok(Self::new(pool))

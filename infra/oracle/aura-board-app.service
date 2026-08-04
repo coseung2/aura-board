@@ -1,0 +1,43 @@
+[Unit]
+Description=Aura Board Next.js application
+Wants=network-online.target
+After=network-online.target aura-play-engine.service
+
+[Service]
+Type=simple
+User=aura-app
+Group=aura-app
+Environment=NODE_ENV=production
+Environment=HOSTNAME=127.0.0.1
+Environment=PORT=3000
+EnvironmentFile=/etc/aura-board/app.env
+WorkingDirectory=/opt/aura-board-app/current
+ExecStart=/usr/bin/node /opt/aura-board-app/current/server.js
+Restart=on-failure
+RestartSec=5s
+TimeoutStartSec=60
+TimeoutStopSec=30
+KillSignal=SIGINT
+MemoryHigh=4G
+MemoryMax=6G
+CPUQuota=180%
+CPUAccounting=true
+MemoryAccounting=true
+TasksMax=512
+UMask=0027
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=true
+ProtectSystem=strict
+ReadWritePaths=/opt/aura-board-app/shared/cache
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectKernelLogs=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+RestrictRealtime=true
+LockPersonality=true
+SystemCallArchitectures=native
+
+[Install]
+WantedBy=multi-user.target

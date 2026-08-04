@@ -13,6 +13,7 @@ const FRAME_SRC_ALLOWLIST = [
 
 const nextConfig: NextConfig = {
   reactStrictMode: true,
+  output: "standalone",
   allowedDevOrigins: ["127.0.0.1", "egestive-sharron-farrandly.ngrok-free.dev"],
   images: {
     // Thumbnails we optimize via next/image. All other external hosts
@@ -50,6 +51,17 @@ const nextConfig: NextConfig = {
       {
         source: "/privacy.html",
         destination: "/privacy",
+        permanent: true,
+      },
+      {
+        // Legacy student creature hub bookmarks land on the Aura pet product route.
+        source: "/student/creatures",
+        destination: "/student/aura-pet",
+        permanent: true,
+      },
+      {
+        source: "/student/creatures/:path*",
+        destination: "/student/aura-pet",
         permanent: true,
       },
     ];

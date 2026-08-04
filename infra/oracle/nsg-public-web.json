@@ -1,0 +1,30 @@
+[
+  {
+    "direction": "INGRESS",
+    "protocol": "6",
+    "source": "0.0.0.0/0",
+    "source-type": "CIDR_BLOCK",
+    "is-stateless": false,
+    "tcp-options": {
+      "destination-port-range": {
+        "min": 80,
+        "max": 80
+      }
+    },
+    "description": "Aura Board HTTP health and ACME"
+  },
+  {
+    "direction": "INGRESS",
+    "protocol": "6",
+    "source": "0.0.0.0/0",
+    "source-type": "CIDR_BLOCK",
+    "is-stateless": false,
+    "tcp-options": {
+      "destination-port-range": {
+        "min": 443,
+        "max": 443
+      }
+    },
+    "description": "Aura Board HTTPS"
+  }
+]

@@ -1,16 +1,16 @@
-# Oracle Cloud backup preparation
+# Oracle Cloud application and worker operations
 
-This directory is a preparation skeleton for a daily logical backup from Supabase Postgres to a private OCI Object Storage bucket. Supabase remains the system of record. Oracle stores a backup copy and may host long-running workers separately; it does not become the primary database.
+This directory contains the production runtime contract for Aura Board on Oracle Cloud. The Osaka A1 instance hosts the public Next.js application, the private Rust play engine, scheduled API jobs, media workers, and the daily logical backup. Supabase remains the primary Postgres/Auth/Realtime/Storage service and OCI Object Storage keeps the backup copy.
 
-The target compute plan is one `VM.Standard.A1.Flex` instance with **2 OCPUs and 12 GB RAM** in the tenancy home region, Japan Central (Osaka), `ap-osaka-1`. This uses the full Always Free Ampere A1 allowance as a single ARM64 worker. It replaces the legacy two 1 GB AMD micro instances after validation; it is a cross-tenancy blue/green replacement, not an in-place resize or a reuse of the old network/IAM configuration.
+The production compute target is one `VM.Standard.A1.Flex` instance with **2 OCPUs and 12 GB RAM** in Japan Central (Osaka), `ap-osaka-1`. All runtime artifacts and native dependencies must be built for Linux ARM64.
 
-Nothing in this repository creates OCI resources, logs in to OCI, deploys the service, or runs a real backup. Perform those actions only after an infrastructure review.
+OCI resource creation remains an operator action. The checked-in systemd and nginx files define the application runtime after the instance exists.
 
 ## Prerequisites
 
-- One OCI Ampere A1 Compute instance in the Osaka home region (`ap-osaka-1`), shape `VM.Standard.A1.Flex`, configured with 2 OCPUs and 12 GB RAM, plus dedicated `aura-backup` and `aura-media` system users and groups.
+- One OCI Ampere A1 Compute instance in the Osaka home region (`ap-osaka-1`), shape `VM.Standard.A1.Flex`, configured with 2 OCPUs and 12 GB RAM, plus dedicated `aura-app`, `aura-backup`, and `aura-media` system users and groups.
 - Node.js 22 for Linux ARM64. Install dependencies and run `prisma generate` on the A1 itself; never copy `node_modules` or generated native binaries from an AMD64 host.
-- ARM64-compatible PostgreSQL 17 client, OCI CLI, and future FFmpeg binaries. Do not copy x86_64 binaries from the old 1 GB instances.
+- ARM64-compatible PostgreSQL 17 client, OCI CLI, Rust toolchain, nginx, and FFmpeg binaries.
 - PostgreSQL 17 client tools (`pg_dump` and `pg_restore`). Keep the client major version compatible with or newer than the Supabase server version.
 - OCI CLI with instance-principal authentication available to the service user. No API signing-key file is needed.
 - A private Object Storage bucket. OCI Object Storage encrypts data at rest with AES-256 by default.
@@ -26,33 +26,49 @@ If your tenancy requires separate permissions to inspect the bucket or namespace
 
 Configure a bucket lifecycle policy for retention and expiry after recovery requirements are approved. The upload script never lists or deletes remote objects. Keep the bucket private and disable public access.
 
-## A1 consolidation operating model
+## A1 operating model
 
-The old two-instance plan could isolate work by host. The single A1 plan must preserve that isolation in software:
+The single A1 preserves workload isolation in software:
 
 - Keep backup, FFmpeg, and batch-mail work as separate systemd units, service users, working directories, and log streams. A failure or restart in one job must not implicitly enable another job.
-- Treat GitHub Actions and Supabase as the schedule and queue sources of truth. The A1 instance is a pull worker, not a second application host or an independent scheduler.
+- Run the public app only through nginx on ports 80/443. Keep Next.js on `127.0.0.1:3000` and the Rust play engine on `127.0.0.1:8081`.
+- Use the A1 scheduler for application cron endpoints. Supabase remains responsible for its database-native notification outbox wakeup.
 - Start with one resource-intensive job at a time. Do not overlap FFmpeg with a backup write or restore rehearsal until measured CPU, memory, disk, and network headroom demonstrates that concurrency is safe.
 - Add explicit systemd CPU/memory limits per worker after the first measured runs. The 12 GB total is shared capacity, not 12 GB guaranteed to every process.
 - Install only ARM64-native packages and images. Rebuild or replace every x86_64 binary, container image, native Node module, PostgreSQL client, OCI CLI, and FFmpeg dependency before cutover.
 - Treat the 50 GB boot volume as replaceable runtime storage. Upload durable backup artifacts to the private bucket and keep original application data in Supabase/Cloudflare; do not make local A1 files the only copy.
-- Accept that one A1 is a worker single point of failure. If it is unavailable, pause Oracle jobs and recover or recreate the worker; the Vercel app, Supabase source data, Cloudflare media, and GitHub configuration must continue independently.
+- Treat the A1 as a single application host. Keep release directories immutable, switch `/opt/aura-board-app/current` atomically, and retain one known-good release for rollback.
 
-## Cross-tenancy replacement of the two 1 GB instances
+## Application runtime layout
 
-Treat the move as a blue/green replacement, not an in-place upgrade:
+```text
+/opt/aura-board-app/releases/<git-sha>/server.js
+/opt/aura-board-app/current -> releases/<git-sha>
+/opt/aura-board-app/shared/cache
+/opt/aura-board-app/shared/locks
+/opt/aura-board-play-engine/releases/<git-sha>/play-server
+/opt/aura-board-play-engine/current -> releases/<git-sha>
+/etc/aura-board/app.env
+/etc/systemd/system/aura-board-app.service
+/etc/systemd/system/aura-play-engine.service
+/etc/nginx/sites-available/aura-board
+/opt/aura-board-app/bin/run-app-cron.sh
+/etc/cron.d/aura-board-app
+```
 
-1. Inventory both legacy instances before the old tenancy is removed: attached boot/block volumes, public/private IP dependencies, systemd units, cron entries, DNS, firewall rules, job ownership, and any data that is not reproducible from source control. Record configuration without copying secrets into this repository.
-2. Keep both old instances running while requesting the Osaka A1 capacity in the new tenancy. An `out of host capacity` response is not a reason to terminate working instances; retry later in the home region. The new compartment, VCN, and bucket are independent replacements; the dynamic group and policy are created only after the new instance OCID exists.
-3. Create one `VM.Standard.A1.Flex` instance at 2 OCPUs / 12 GB RAM with an Always Free-eligible ARM64 image. Confirm total boot/block volume allocation remains inside the tenancy allowance before provisioning.
-4. Install this repository and ARM64-native dependencies on the A1 instance. Configure the dynamic group, private bucket policy, root-owned environment file, and systemd units without enabling the timer.
-5. Run the script in its default dry-run mode, then perform one approved `--write` backup and an isolated restore rehearsal. Verify checksum, archive contents, logs, and Object Storage lifecycle policy.
-6. Move roles rather than hosts: logical backup first, then batch mail, then FFmpeg/other long-running work. Move one job at a time, keep its old copy disabled while the new copy runs, and observe the A1 before moving the next job.
-7. Stop the old instances before termination and retain rollback material for the approved observation window. Terminate them and remove obsolete volumes, IPs, IAM policies, and schedules only after the A1 backup and worker paths are proven.
+Build the Next.js standalone output and Rust binary on the A1 so Prisma, Sharp, and Rust artifacts match Linux ARM64. Copy `public` and `.next/static` into the standalone release, link `.next/cache` to `/opt/aura-board-app/shared/cache`, then switch the `current` symlink. Keep `/etc/aura-board/app.env` root-owned with mode `0640` and group `aura-app`.
 
-The repository does not automate instance creation or termination. Record instance OCIDs and cutover evidence in the operator-owned handoff without placing them in source control if they are considered sensitive.
+Before switching public traffic, verify all three layers locally:
 
-The capacity retry automation must perform a read-only guard before every attempt: confirm that no non-terminated `aura-board-worker-a1-osaka` instance and no associated boot volume already exists. Each five-hour wakeup may send exactly one A1 launch request. A verified successful launch permanently disables the retry automation before the dynamic group or policy is created, preventing a second instance from being requested.
+```bash
+curl --fail http://127.0.0.1:8081/health
+curl --fail http://127.0.0.1:3000/api/health
+curl --fail -H 'Host: aura-board.com' http://127.0.0.1/api/health
+```
+
+Only nginx is internet-facing. OCI network rules should allow TCP 80/443 from the internet and retain SSH as an administrator-only rule. Do not expose ports 3000, 8081, Postgres, or rpcbind.
+
+Install `aura-board-app.cron` as `/etc/cron.d/aura-board-app` and keep it root-owned with mode `0644`. The runner calls the loopback Next.js endpoint with the root-owned `CRON_SECRET`, takes a per-job nonblocking lock, and never sends cron traffic through public DNS. `notification-push` and `play-outbox` run once per minute; the remaining schedules preserve the existing UTC production cadence, including `role-salary-payout` at 15:10 UTC.
 
 ## Installation layout
 
